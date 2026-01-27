@@ -121,7 +121,7 @@ export default function PublicApp() {
   return (
     <div className="app">
       <header className="app__header">
-        <span className="eyebrow">Customer mint portal</span>
+        <span className="eyebrow">Data Inscription Portal</span>
         <h1>xtrata</h1>
         <p>View the collection, mint an inscription, and manage your wallet.</p>
       </header>
