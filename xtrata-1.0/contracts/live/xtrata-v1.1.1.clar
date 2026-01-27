@@ -1,6 +1,6 @@
-;; xtrata-v1.1.0
+;; xtrata-v1.1.1
 ;;
-;; Core posture (v1.1.0):
+;; Core posture (v1.1.1):
 ;; 1) Open participation: anyone can inscribe (fees apply) once unpaused.
 ;; 2) Content-addressed + canonical: a given final-hash can be sealed at most once.
 ;;    - HashToId provides on-chain lookup (final-hash -> canonical token-id)

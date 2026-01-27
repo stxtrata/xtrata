@@ -5,8 +5,8 @@ import { fetchContractAdminStatus } from '../admin-status';
 const makeClient = (overrides: Partial<XtrataClient> = {}): XtrataClient => {
   const base = {
     contract: {
-      address: 'SPD60B1MGZVZR8758E86SR364N95VSP13E5FHYXE',
-      contractName: 'xtrata-v1-1-0',
+      address: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+      contractName: 'xtrata-v1-1-1',
       network: 'mainnet'
     },
     getAdmin: vi.fn().mockResolvedValue('SPADMIN'),
@@ -29,7 +29,7 @@ const makeClient = (overrides: Partial<XtrataClient> = {}): XtrataClient => {
 };
 
 describe('contract admin status', () => {
-  it('fetches admin status for v1.1.0', async () => {
+  it('fetches admin status for v1.1.1', async () => {
     const client = makeClient();
     const status = await fetchContractAdminStatus({
       client,

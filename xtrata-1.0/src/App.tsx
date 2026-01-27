@@ -535,7 +535,7 @@ export default function App() {
               <span className="field__label">Contract name</span>
               <input
                 className="input"
-                placeholder="xtrata-v1-1-0"
+                placeholder="xtrata-v1-1-1"
                 value={deployName}
                 onChange={(event) => {
                   setDeployName(event.target.value);

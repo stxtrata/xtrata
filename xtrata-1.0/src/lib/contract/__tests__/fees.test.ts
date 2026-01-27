@@ -6,8 +6,8 @@ import {
 } from '../fees';
 
 describe('contract fee estimates', () => {
-  it('estimates fee-unit fees for v1.1.0', () => {
-    const schedule = getFeeSchedule({ protocolVersion: '1.1.0' }, 250_000);
+  it('estimates fee-unit fees for v1.1.1', () => {
+    const schedule = getFeeSchedule({ protocolVersion: '1.1.1' }, 250_000);
     expect(schedule.model).toBe('fee-unit');
     expect(schedule.feeUnitMicroStx).toBe(250_000);
 
@@ -19,7 +19,7 @@ describe('contract fee estimates', () => {
   });
 
   it('defaults the fee unit when missing', () => {
-    const schedule = getFeeSchedule({ protocolVersion: '1.1.0' }, null);
+    const schedule = getFeeSchedule({ protocolVersion: '1.1.1' }, null);
     expect(schedule.feeUnitMicroStx).toBe(DEFAULT_FEE_UNIT_MICROSTX);
   });
 });

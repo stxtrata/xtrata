@@ -1,6 +1,6 @@
-export type ProtocolVersion = '1.1.0';
+export type ProtocolVersion = '1.1.1';
 
-export const PROTOCOL_VERSIONS = ['1.1.0'] as const;
+export const PROTOCOL_VERSIONS = ['1.1.1'] as const;
 
 export const isProtocolVersion = (value: string): value is ProtocolVersion =>
   PROTOCOL_VERSIONS.includes(value as ProtocolVersion);
@@ -21,8 +21,8 @@ export type ContractCapabilities = {
 };
 
 const CAPABILITIES_BY_VERSION: Record<ProtocolVersion, ContractCapabilities> = {
-  '1.1.0': {
-    version: '1.1.0',
+  '1.1.1': {
+    version: '1.1.1',
     feeModel: 'fee-unit',
     supportsFeeUnit: true,
     supportsPause: true,
@@ -39,8 +39,8 @@ const CAPABILITIES_BY_VERSION: Record<ProtocolVersion, ContractCapabilities> = {
 
 const inferProtocolVersion = (contractName: string): ProtocolVersion | null => {
   const normalized = contractName.toLowerCase();
-  if (normalized.includes('v1-1-0') || normalized.includes('v1.1.0')) {
-    return '1.1.0';
+  if (normalized.includes('v1-1-1') || normalized.includes('v1.1.1')) {
+    return '1.1.1';
   }
   return null;
 };
@@ -58,5 +58,5 @@ export const resolveContractCapabilities = (contract: {
       return CAPABILITIES_BY_VERSION[inferred];
     }
   }
-  return CAPABILITIES_BY_VERSION['1.1.0'];
+  return CAPABILITIES_BY_VERSION['1.1.1'];
 };

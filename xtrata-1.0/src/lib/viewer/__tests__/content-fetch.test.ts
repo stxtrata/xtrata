@@ -15,8 +15,8 @@ const buildClient = (params: {
 }) =>
   ({
     contract: {
-      address: 'SPD60B1MGZVZR8758E86SR364N95VSP13E5FHYXE',
-      contractName: 'xtrata-v1-1-0',
+      address: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+      contractName: 'xtrata-v1-1-1',
       network: 'mainnet'
     },
     supportsChunkBatchRead: params.supportsBatch,

@@ -16,7 +16,7 @@ describe('network guard', () => {
   it('detects network from contract principal', () => {
     expect(
       getNetworkFromAddress(
-        'SPD60B1MGZVZR8758E86SR364N95VSP13E5FHYXE.xtrata-v1-1-0'
+        'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1'
       )
     ).toBe('mainnet');
   });
