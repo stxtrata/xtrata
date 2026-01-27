@@ -11,7 +11,7 @@ export const PUBLIC_CONTRACT: ContractRegistryEntry = {
 export const PUBLIC_MAX_FILE_BYTES = 4 * 1024 * 1024;
 export const PUBLIC_FIXED_BATCH_SIZE = 30;
 export const PUBLIC_FIXED_TOKEN_URI =
-  'https://6s6gwuq2g5m2xc74jv4o7646fytl6xyovqrfhdiusbvzwwycszuq.arweave.net/9LxrUho3WauL_E147_ueLia_Xw6sIlONFJBrm1sClmk';
+  'https://xvgh3sbdkivby4blejmripeiyjuvji3d4tycym6hgaxalescegjq.arweave.net/vUx9yCNSKhxwKyJZFDyIwmlUo2Pk8CwzxzAuBZJCIZM';
 
 export const PUBLIC_MINT_RESTRICTIONS = {
   fixedBatchSize: PUBLIC_FIXED_BATCH_SIZE,

@@ -87,7 +87,7 @@ const BATCH_OPTIONS = Array.from(
 );
 const MAX_UPLOAD_RETRIES = 3;
 const DEFAULT_TOKEN_URI =
-  'https://6s6gwuq2g5m2xc74jv4o7646fytl6xyovqrfhdiusbvzwwycszuq.arweave.net/9LxrUho3WauL_E147_ueLia_Xw6sIlONFJBrm1sClmk';
+  'https://xvgh3sbdkivby4blejmripeiyjuvji3d4tycym6hgaxalescegjq.arweave.net/vUx9yCNSKhxwKyJZFDyIwmlUo2Pk8CwzxzAuBZJCIZM';
 const MAX_TOKEN_URI_LENGTH = 256;
 const MAX_MIME_LENGTH = 64;
 const SIP16_TOKEN_ID_PLACEHOLDER = '{id}';
