@@ -1,0 +1,278 @@
+What I’d recommend for someone doing serious Clarity work
+
+Primary:
+
+Codex (CLI or API) for implementation
+
+Claude for reasoning / review
+
+Gemini for peripheral tooling (JS, UI, infra)
+
+Optional:
+
+Build a tiny Clarinet-based benchmark harness
+
+Score models on:
+
+compile rate
+
+test pass rate
+
+hallucinated primitives count
+
+That will quantify exactly what you’re feeling.
+
+
+Perfect — here’s a **minimal but *meaningful*** **ClarityBench** that will *actually* separate models the way you’ve observed (Codex vs Gemini vs others).
+This is designed to be:
+
+* **15–20 tasks**
+* **Fast to run**
+* **Binary-scored** (compile / test / invariant)
+* **Hard to bluff**
+* **Representative of real Stacks work**, not toy Lisp
+
+No fluff, no prose-heavy tasks — just places where models *break*.
+
+---
+
+# **ClarityBench v0.1 — Minimal, Real-World**
+
+### **Harness assumptions**
+
+* `clarinet >= 2.x`
+* One contract per task
+* Each task has:
+
+  * `README.md` (problem statement)
+  * `contract.clar`
+  * `tests.ts`
+* Models get **only** the README + current contract
+
+---
+
+## **Category A — Language Semantics (5 tasks)**
+
+These kill models that don’t *actually* understand Clarity.
+
+### **A1. Option vs Response Discipline**
+
+**Task:**
+Implement a function that:
+
+* Reads from a map `(map-get?)`
+* Returns `(ok none)` if key missing
+* Returns `(ok (some value))` if present
+
+**Fails if model:**
+
+* Confuses `option` and `response`
+* Uses `(unwrap!)` incorrectly
+
+**Score:** compile + tests
+
+---
+
+### **A2. No Helper Hallucination**
+
+**Task:**
+Convert a `uint` to a decimal ASCII string **without assuming helper functions exist**.
+
+**Constraints:**
+
+* Must fail gracefully (return `(err u400)`)
+* Max 20 chars
+* No invented stdlib calls
+
+**This is your `uint-to-ascii` killer.**
+
+---
+
+### **A3. Deterministic Branching**
+
+**Task:**
+Implement a function whose return type **must be identical across all branches**.
+
+**Test:**
+
+* One branch returns `(ok u1)`
+* Another must *not* accidentally return `none`
+
+---
+
+### **A4. Let-Scope Correctness**
+
+**Task:**
+Nested `let` with shadowed variables — must return outer value.
+
+**Why:**
+Gemini frequently leaks scopes here.
+
+---
+
+### **A5. Trait Import Correctness**
+
+**Task:**
+Import a trait and call it **without assuming concrete implementation**.
+
+---
+
+## **Category B — SIP & Token Patterns (5 tasks)**
+
+### **B1. SIP-009 Minimal NFT**
+
+**Task:**
+Implement:
+
+* `get-owner`
+* `transfer`
+* `get-token-uri`
+
+**Constraints:**
+
+* No mint-after-deploy
+* Proper error codes
+* Compile-time trait conformance
+
+---
+
+### **B2. Token URI Option Discipline**
+
+**Task:**
+`get-token-uri` must:
+
+* Return `none` if unset
+* Return `(some uri)` if set
+* URI must be deterministic
+
+Wallets are strict here.
+
+---
+
+### **B3. SVG Data URI Construction**
+
+**Task:**
+Construct a **sub-256 byte SVG data URI**:
+
+* Base64 forbidden
+* UTF-8 inline only
+* Deterministic output
+
+**Hard stop for Gemini.**
+
+---
+
+### **B4. Metadata Mutability Guard**
+
+**Task:**
+Allow metadata updates **only by owner** and **only once**.
+
+---
+
+### **B5. Trait-Owned NFT**
+
+**Task:**
+NFT ownership must be derived from a **trait call**, not local storage.
+
+---
+
+## **Category C — Security & Invariants (4 tasks)**
+
+### **C1. Unauthorized Transfer Block**
+
+**Task:**
+Prevent transfers unless `tx-sender == owner`.
+
+**Fail condition:**
+Silent success.
+
+---
+
+### **C2. Supply Conservation**
+
+**Task:**
+Total supply must never change after initialization.
+
+---
+
+### **C3. Reentrancy-Impossible Pattern**
+
+**Task:**
+Call an external trait *after* state mutation, safely.
+
+(Clarity makes this safe, models still screw it up.)
+
+---
+
+### **C4. Error-Code Stability**
+
+**Task:**
+Error codes must:
+
+* Be stable
+* Be documented
+* Never overlap
+
+---
+
+## **Category D — Refactoring Under Constraints (3 tasks)**
+
+### **D1. Refactor Without Semantic Change**
+
+**Task:**
+Refactor nested `if` into `match` **without changing return types**.
+
+Gemini breaks this constantly.
+
+---
+
+### **D2. Edit-Only Patch**
+
+**Task:**
+Fix a bug **without adding functions**.
+
+---
+
+### **D3. Gas/Size Optimization**
+
+**Task:**
+Reduce contract size by ≥10%
+**without** changing any public signatures.
+
+---
+
+## **Scoring (simple and brutal)**
+
+| Metric                | Weight    |
+| --------------------- | --------- |
+| Compiles              | mandatory |
+| Tests pass            | mandatory |
+| No invented functions | mandatory |
+| Invariant violations  | auto-fail |
+| Pass@1                | primary   |
+| Pass@3                | secondary |
+
+**Any hallucinated primitive = fail.**
+
+---
+
+## **Expected Results (based on real-world use)**
+
+| Model                      | Expected Score |
+| -------------------------- | -------------- |
+| Codex                      | 🟢 80–90%      |
+| Claude Opus                | 🟡 65–75%      |
+| Claude Sonnet              | 🟡 55–65%      |
+| Gemini Pro                 | 🔴 25–40%      |
+| Open-weight coder (seeded) | 🟡 60–70%      |
+
+---
+
+## **Why this benchmark works**
+
+* No prose rewards
+* No partial credit
+* Binary correctness
+* Real SIP constraints
+* Wallet-compatibility pressure
+* Explicit hallucination traps
