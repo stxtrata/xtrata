@@ -1256,6 +1256,11 @@ p {
   background: rgba(254, 226, 226, 0.6);
 }
 
+.mint-step--countdown {
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
 .mint-actions {
   display: flex;
   align-items: center;

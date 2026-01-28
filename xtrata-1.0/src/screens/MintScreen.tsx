@@ -30,6 +30,12 @@ import { resolveContractCapabilities } from '../lib/contract/capabilities';
 import { useContractAdminStatus } from '../lib/contract/admin-status';
 import { createXtrataClient } from '../lib/contract/client';
 import {
+  clearMintAttempt,
+  loadMintAttempt,
+  saveMintAttempt,
+  type MintAttempt
+} from '../lib/mint/attempt-cache';
+import {
   estimateContractFees,
   formatMicroStx,
   getFeeSchedule,
@@ -271,6 +277,7 @@ export default function MintScreen(props: MintScreenProps) {
     () => createXtrataClient({ contract: props.contract }),
     [props.contract]
   );
+  const contractId = getContractId(props.contract);
   const [file, setFile] = useState<File | null>(null);
   const [fileBytes, setFileBytes] = useState<Uint8Array | null>(null);
   const [chunks, setChunks] = useState<Uint8Array[]>([]);
@@ -321,6 +328,8 @@ export default function MintScreen(props: MintScreenProps) {
   const [tokenUriStatusTone, setTokenUriStatusTone] = useState<
     'idle' | 'ok' | 'error' | 'pending'
   >('idle');
+  const [lastAttempt, setLastAttempt] = useState<MintAttempt | null>(null);
+  const [resumeHint, setResumeHint] = useState<string | null>(null);
   const [txDelaySeconds, setTxDelaySeconds] = useState<number | null>(null);
   const [txDelayLabel, setTxDelayLabel] = useState<string | null>(null);
   const [mintStatus, setMintStatus] = useState<string | null>(null);
@@ -350,6 +359,18 @@ export default function MintScreen(props: MintScreenProps) {
       setTokenUri(fixedTokenUri);
     }
   }, [fixedTokenUri]);
+
+  useEffect(() => {
+    let active = true;
+    void loadMintAttempt(contractId).then((attempt) => {
+      if (active) {
+        setLastAttempt(attempt);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [contractId]);
 
   const mismatch = getNetworkMismatch(
     props.contract.network,
@@ -530,6 +551,7 @@ export default function MintScreen(props: MintScreenProps) {
       setDuplicateMatch(null);
       setResumeState(null);
       setAllowDuplicate(false);
+      setResumeHint(null);
       return;
     }
     const checkId = duplicateCheckRef.current + 1;
@@ -728,7 +750,6 @@ export default function MintScreen(props: MintScreenProps) {
       return;
     }
     const mimeType = file.type || 'application/octet-stream';
-    const contractId = getContractId(props.contract);
     const metadata = buildSip16Metadata({
       contractId,
       contractName: props.contract.contractName,
@@ -821,6 +842,7 @@ export default function MintScreen(props: MintScreenProps) {
     setMintLog([]);
     setMetadataJson(null);
     setMetadataStatus(null);
+    setResumeHint(null);
     resetPreview();
     if (options?.clearDelegate !== false) {
       setDelegateTargetId(null);
@@ -860,6 +882,33 @@ export default function MintScreen(props: MintScreenProps) {
       setFileBytes(bytes);
       setChunks(nextChunks);
       setExpectedHash(expectedHash);
+      const previousAttempt = lastAttempt ?? (await loadMintAttempt(contractId));
+      if (previousAttempt) {
+        setLastAttempt(previousAttempt);
+      }
+      if (previousAttempt && previousAttempt.expectedHashHex === expectedHashHex) {
+        const name = previousAttempt.fileName ?? selected.name;
+        setResumeHint(
+          `Matched your last inscription attempt (${name}). Resume will pick up where you left off.`
+        );
+      } else {
+        setResumeHint(null);
+      }
+      const resolvedTokenUri =
+        fixedTokenUri ?? (tokenUri.trim() || DEFAULT_TOKEN_URI);
+      const attempt: MintAttempt = {
+        contractId,
+        expectedHashHex,
+        fileName: selected.name,
+        mimeType: selected.type || 'application/octet-stream',
+        totalBytes: bytes.length,
+        totalChunks: nextChunks.length,
+        batchSize: batchLimit,
+        tokenUri: resolvedTokenUri,
+        updatedAt: Date.now()
+      };
+      void saveMintAttempt(attempt);
+      setLastAttempt(attempt);
       logInfo('mint', 'Prepared inscription file', {
         fileName: selected.name,
         fileType: selected.type || 'application/octet-stream',
@@ -1010,7 +1059,6 @@ export default function MintScreen(props: MintScreenProps) {
   }) => {
     const network = props.walletSession.network ?? props.contract.network;
     const stxAddress = props.walletSession.address;
-    const contractId = getContractId(props.contract);
     logInfo('mint', 'Requesting contract call', {
       contractId,
       functionName: options.functionName,
@@ -1268,6 +1316,9 @@ export default function MintScreen(props: MintScreenProps) {
       setResumeCheckKey((prev) => prev + 1);
       resetSteps();
       setMintStatus('Upload state cleared. You can begin again once confirmed.');
+      void clearMintAttempt(getContractId(props.contract));
+      setLastAttempt(null);
+      setResumeHint(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setMintStatus(`Unable to clear upload state: ${message}`);
@@ -1296,7 +1347,6 @@ export default function MintScreen(props: MintScreenProps) {
       return;
     }
 
-    const contractId = getContractId(props.contract);
     const batchLimit = effectiveBatchSize;
     logInfo('mint', 'Mint start requested', {
       contractId,
@@ -1420,6 +1470,9 @@ export default function MintScreen(props: MintScreenProps) {
         txId: sealTx.txId
       });
       props.onInscriptionSealed?.({ txId: sealTx.txId });
+      void clearMintAttempt(contractId);
+      setLastAttempt(null);
+      setResumeHint(null);
       setResumeState(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1477,7 +1530,6 @@ export default function MintScreen(props: MintScreenProps) {
       return;
     }
 
-    const contractId = getContractId(props.contract);
     const batchLimit = effectiveBatchSize;
     logInfo('mint', 'Resume requested', {
       contractId,
@@ -1620,6 +1672,9 @@ export default function MintScreen(props: MintScreenProps) {
         txId: sealTx.txId
       });
       props.onInscriptionSealed?.({ txId: sealTx.txId });
+      void clearMintAttempt(contractId);
+      setLastAttempt(null);
+      setResumeHint(null);
       setResumeState(null);
       setResumeCheckKey((prev) => prev + 1);
     } catch (error) {
@@ -1879,7 +1934,7 @@ export default function MintScreen(props: MintScreenProps) {
         )}
 
         <div className="mint-settings">
-          {!hideTokenUri ? (
+          {!hideTokenUri && (
             <label className="field">
               <span className="field__label">Token URI (required)</span>
               <input
@@ -1955,13 +2010,6 @@ export default function MintScreen(props: MintScreenProps) {
                 </details>
               )}
             </label>
-          ) : (
-            <div className="mint-panel">
-              <span className="meta-label">Token URI</span>
-              <span className="meta-value">
-                {fixedTokenUri ?? tokenUri}
-              </span>
-            </div>
           )}
           {!hideBatchSize ? (
             <label className="field">
@@ -2057,6 +2105,16 @@ export default function MintScreen(props: MintScreenProps) {
           )}
         </div>
 
+        <div className="alert">
+          <strong>Automated sequence.</strong> After you approve the first
+          transaction, all remaining transactions will appear automatically in
+          order. If anything goes wrong, reload the page and re-select the exact
+          same file — your latest upload is stored locally (IndexedDB) and will
+          rehydrate the mint state so you can resume where you left off.
+        </div>
+
+        {resumeHint && <div className="alert">{resumeHint}</div>}
+
         <div className="mint-steps">
           <div className={`mint-step mint-step--${beginState}`}>
             <span>1. Initialization</span>
@@ -2075,6 +2133,14 @@ export default function MintScreen(props: MintScreenProps) {
             <span>3. Seal inscription</span>
             <span>{formatStepStatus(sealState)}</span>
           </div>
+          {formattedTxDelay && (
+            <div className="mint-step mint-step--pending mint-step--countdown">
+              <span>Automated sequence</span>
+              <span>
+                {(txDelayLabel ?? 'Next transaction in')} {formattedTxDelay}s
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="mint-actions">
