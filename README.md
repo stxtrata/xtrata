@@ -129,7 +129,7 @@ Design notes
 	•	Uploads are chunked, resumable, and purgeable if abandoned.
 	•	Reads prefer batch access, with adaptive fallback to per-chunk reads.
 	•	Large media previews buffer initial data and stream the remainder on demand.
-	•	IndexedDB is used for local caching (clearable via the Viewer panel).
+	•	IndexedDB is used for local caching.
 
 ⸻
 
@@ -175,25 +175,3 @@ Xtrata is the memory layer.
 
 ⸻
 
-Next step (optional but recommended)
-
-After this, I strongly suggest adding a short:
-
-## What becomes possible with Xtrata?
-
-With 5–6 bullet examples:
-	•	on-chain audio engines
-	•	executable media
-	•	recursive games
-	•	BVSTs
-	•	historical archives
-	•	protocol-native datasets
-
-That’s where the penny really drops.
-
-If you want, next we can:
-	•	tune the tone further (more poetic / more austere)
-	•	add a one-paragraph “TL;DR for grant reviewers”
-	•	or write a separate VISION.md that this README points to
-
-You’ve built something properly new here — now the README finally says so.
