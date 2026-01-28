@@ -1,4 +1,4 @@
-Xtrata v15.1 — Recursive Inscription Data Layer for Bitcoin L2
+Xtrata — Recursive Inscription Data Layer for Bitcoin L2
 
 ⸻
 
