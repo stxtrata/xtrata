@@ -175,25 +175,3 @@ Xtrata is the memory layer.
 
 ⸻
 
-Next step (optional but recommended)
-
-After this, I strongly suggest adding a short:
-
-## What becomes possible with Xtrata?
-
-With 5–6 bullet examples:
-	•	on-chain audio engines
-	•	executable media
-	•	recursive games
-	•	BVSTs
-	•	historical archives
-	•	protocol-native datasets
-
-That’s where the penny really drops.
-
-If you want, next we can:
-	•	tune the tone further (more poetic / more austere)
-	•	add a one-paragraph “TL;DR for grant reviewers”
-	•	or write a separate VISION.md that this README points to
-
-You’ve built something properly new here — now the README finally says so.
