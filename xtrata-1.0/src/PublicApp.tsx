@@ -15,6 +15,7 @@ import MyWalletScreen from './screens/MyWalletScreen';
 const walletSessionStore = createWalletSessionStore();
 
 const SECTION_KEYS = [
+  'docs',
   'wallet-session',
   'mint',
   'collection-viewer',
@@ -126,6 +127,9 @@ export default function PublicApp() {
         <p>View the collection, mint an inscription, and manage your wallet.</p>
       </header>
       <nav className="app__nav">
+        <a className="button button--ghost app__nav-link" href="#docs">
+          Docs
+        </a>
         <a className="button button--ghost app__nav-link" href="#wallet-session">
           Wallet
         </a>
@@ -175,6 +179,65 @@ export default function PublicApp() {
         </div>
       </div>
       <main className="app__main">
+        <section
+          className={`panel app-section${collapsedSections.docs ? ' panel--collapsed' : ''}`}
+          id="docs"
+        >
+          <div className="panel__header">
+            <div>
+              <h2>Docs</h2>
+              <p>Quick links for protocol details, contracts, and releases.</p>
+            </div>
+            <div className="panel__actions">
+              <button
+                className="button button--ghost button--collapse"
+                type="button"
+                onClick={() => toggleSection('docs')}
+                aria-expanded={!collapsedSections.docs}
+              >
+                {collapsedSections.docs ? 'Expand' : 'Collapse'}
+              </button>
+            </div>
+          </div>
+          <div className="panel__body">
+            <div className="meta-grid">
+              <div>
+                <span className="meta-label">GitHub</span>
+                <a
+                  className="meta-value"
+                  href="https://github.com/stxtrata/xtrata"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  github.com/stxtrata/xtrata
+                </a>
+              </div>
+              <div>
+                <span className="meta-label">Docs</span>
+                <a
+                  className="meta-value"
+                  href="https://github.com/stxtrata/xtrata/tree/main/docs"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  docs/
+                </a>
+              </div>
+              <div>
+                <span className="meta-label">README</span>
+                <a
+                  className="meta-value"
+                  href="https://github.com/stxtrata/xtrata/blob/main/README.md"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  README.md
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section
           className={`panel app-section${collapsedSections['wallet-session'] ? ' panel--collapsed' : ''}`}
           id="wallet-session"

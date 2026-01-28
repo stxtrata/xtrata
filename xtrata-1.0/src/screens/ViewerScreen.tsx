@@ -23,7 +23,6 @@ import { bytesToHex } from '../lib/utils/encoding';
 import TokenContentPreview from '../components/TokenContentPreview';
 import TokenCardMedia from '../components/TokenCardMedia';
 import { getMediaKind } from '../lib/viewer/content';
-import { clearInscriptionCache } from '../lib/viewer/cache';
 
 const PAGE_SIZE = 16;
 const REFRESH_INTERVAL_MS = 6_000;
@@ -383,8 +382,6 @@ export default function ViewerScreen(props: ViewerScreenProps) {
     .filter((token): token is TokenSummary => !!token);
 
   const [selectedTokenId, setSelectedTokenId] = useState<bigint | null>(null);
-  const [cacheStatus, setCacheStatus] = useState<string | null>(null);
-  const cacheStatusTimeout = useRef<number | null>(null);
   const handleSelectToken = useCallback((id: bigint) => {
     autoSelectRef.current = false;
     setSelectedTokenId(id);
@@ -415,39 +412,6 @@ export default function ViewerScreen(props: ViewerScreenProps) {
     });
   }, [queryClient, contractId]);
 
-  const handleClearCache = useCallback(async () => {
-    const result = await clearInscriptionCache();
-    if (cacheStatusTimeout.current !== null) {
-      window.clearTimeout(cacheStatusTimeout.current);
-      cacheStatusTimeout.current = null;
-    }
-    if (result.cleared) {
-      setCacheStatus('Inscription cache cleared.');
-      queryClient.removeQueries({
-        predicate: (query) => {
-          const key = query.queryKey;
-          if (!Array.isArray(key) || key.length < 3) {
-            return false;
-          }
-          if (key[0] !== 'viewer' || key[1] !== contractId) {
-            return false;
-          }
-          const segment = String(key[2]);
-          return (
-            segment === 'content' ||
-            segment === 'chunk' ||
-            segment === 'stream-status'
-          );
-        }
-      });
-    } else {
-      setCacheStatus('Unable to clear cache.');
-    }
-    cacheStatusTimeout.current = window.setTimeout(() => {
-      setCacheStatus(null);
-      cacheStatusTimeout.current = null;
-    }, 4000);
-  }, [contractId, queryClient]);
 
   useEffect(() => {
     if (props.focusKey === undefined) {
@@ -498,14 +462,6 @@ export default function ViewerScreen(props: ViewerScreenProps) {
     setSelectedTokenId(targetId);
   }, [pageTokenIds, selectedTokenId]);
 
-  useEffect(
-    () => () => {
-      if (cacheStatusTimeout.current !== null) {
-        window.clearTimeout(cacheStatusTimeout.current);
-      }
-    },
-    []
-  );
 
   useEffect(() => {
     const focusRequest = focusRequestRef.current;
@@ -604,13 +560,6 @@ export default function ViewerScreen(props: ViewerScreenProps) {
                 </button>
               </div>
               <span className="viewer-controls__range">{rangeLabel}</span>
-              <button
-                className="button button--ghost button--mini"
-                type="button"
-                onClick={handleClearCache}
-              >
-                Clear cache
-              </button>
             </div>
           </div>
         </div>
@@ -626,7 +575,6 @@ export default function ViewerScreen(props: ViewerScreenProps) {
               {!lastTokenQuery.isLoading && tokenIds.length === 0 && (
                 <p>No tokens minted yet.</p>
               )}
-              {cacheStatus && <p>{cacheStatus}</p>}
             </div>
             {gridSlots.length > 0 && (
               <div className="square-frame">

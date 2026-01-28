@@ -80,12 +80,13 @@ type Sip16MetadataParams = {
   dependencies: bigint[];
 };
 
-const DEFAULT_BATCH_SIZE = Math.min(40, MAX_BATCH_SIZE);
+const DEFAULT_BATCH_SIZE = Math.min(30, MAX_BATCH_SIZE);
 const BATCH_OPTIONS = Array.from(
   { length: MAX_BATCH_SIZE },
   (_, index) => index + 1
 );
 const MAX_UPLOAD_RETRIES = 3;
+const TX_DELAY_SECONDS = 5;
 const DEFAULT_TOKEN_URI =
   'https://xvgh3sbdkivby4blejmripeiyjuvji3d4tycym6hgaxalescegjq.arweave.net/vUx9yCNSKhxwKyJZFDyIwmlUo2Pk8CwzxzAuBZJCIZM';
 const MAX_TOKEN_URI_LENGTH = 256;
@@ -320,6 +321,8 @@ export default function MintScreen(props: MintScreenProps) {
   const [tokenUriStatusTone, setTokenUriStatusTone] = useState<
     'idle' | 'ok' | 'error' | 'pending'
   >('idle');
+  const [txDelaySeconds, setTxDelaySeconds] = useState<number | null>(null);
+  const [txDelayLabel, setTxDelayLabel] = useState<string | null>(null);
   const [mintStatus, setMintStatus] = useState<string | null>(null);
   const [mintLog, setMintLog] = useState<string[]>([]);
   const [mintPending, setMintPending] = useState(false);
@@ -501,6 +504,16 @@ export default function MintScreen(props: MintScreenProps) {
     if (anchor) {
       anchor.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
     }
+  };
+
+  const pauseBeforeNextTx = async (label: string) => {
+    setTxDelayLabel(label);
+    for (let remaining = TX_DELAY_SECONDS; remaining > 0; remaining -= 1) {
+      setTxDelaySeconds(remaining);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    setTxDelaySeconds(null);
+    setTxDelayLabel(null);
   };
 
   useEffect(() => {
@@ -1331,6 +1344,7 @@ export default function MintScreen(props: MintScreenProps) {
       });
       appendLog(`Begin tx sent: ${beginTx.txId}`);
       setBeginState('done');
+      await pauseBeforeNextTx('Next transaction in');
 
       activeStage = 'upload';
       setUploadState('pending');
@@ -1354,6 +1368,9 @@ export default function MintScreen(props: MintScreenProps) {
             resume: false
           }
         );
+        if (index < batches.length - 1) {
+          await pauseBeforeNextTx('Next batch in');
+        }
       }
       setUploadState('done');
 
@@ -1366,6 +1383,7 @@ export default function MintScreen(props: MintScreenProps) {
               .join(', ')})`
           : 'Step 3: seal-inscription'
       );
+      await pauseBeforeNextTx('Sealing in');
       const sealPostConditions = resolveFeePostConditions(feeEstimate.sealMicroStx);
       const sealTx = await requestContractCall({
         functionName:
@@ -1408,6 +1426,8 @@ export default function MintScreen(props: MintScreenProps) {
       setMintStatus(`Mint failed: ${message}`);
       appendLog(`Mint failed: ${message}`);
       logWarn('mint', 'Mint failed', { error: message });
+      setTxDelaySeconds(null);
+      setTxDelayLabel(null);
       if (activeStage === 'begin') {
         setBeginState('error');
       } else if (activeStage === 'upload') {
@@ -1419,6 +1439,8 @@ export default function MintScreen(props: MintScreenProps) {
         setResumeCheckKey((prev) => prev + 1);
       }
     } finally {
+      setTxDelaySeconds(null);
+      setTxDelayLabel(null);
       setMintPending(false);
     }
   };
@@ -1514,6 +1536,7 @@ export default function MintScreen(props: MintScreenProps) {
       const remainingChunks = chunks.slice(currentIndex);
       const batchLimit = effectiveBatchSize;
       const remainingBatches = batchChunks(remainingChunks, batchLimit);
+      const didUploadBatches = remainingBatches.length > 0;
       appendLog(
         `On-chain confirmed: ${currentIndex}/${totalChunks} chunks uploaded. ${remainingBatches.length} batch${remainingBatches.length === 1 ? '' : 'es'} remaining.`
       );
@@ -1539,6 +1562,9 @@ export default function MintScreen(props: MintScreenProps) {
               resume: true
             }
           );
+          if (index < remainingBatches.length - 1) {
+            await pauseBeforeNextTx('Next batch in');
+          }
         }
         setUploadState('done');
       } else {
@@ -1555,6 +1581,9 @@ export default function MintScreen(props: MintScreenProps) {
               .join(', ')})`
           : 'Step 3: seal-inscription'
       );
+      if (didUploadBatches) {
+        await pauseBeforeNextTx('Sealing in');
+      }
       const sealPostConditions = resolveFeePostConditions(feeEstimate.sealMicroStx);
       const sealTx = await requestContractCall({
         functionName:
@@ -1598,6 +1627,8 @@ export default function MintScreen(props: MintScreenProps) {
       setMintStatus(`Mint failed: ${message}`);
       appendLog(`Mint failed: ${message}`);
       logWarn('mint', 'Resume failed', { error: message });
+      setTxDelaySeconds(null);
+      setTxDelayLabel(null);
       if (activeStage === 'upload') {
         setUploadState('error');
       } else if (activeStage === 'seal') {
@@ -1605,6 +1636,8 @@ export default function MintScreen(props: MintScreenProps) {
       }
       setResumeCheckKey((prev) => prev + 1);
     } finally {
+      setTxDelaySeconds(null);
+      setTxDelayLabel(null);
       setMintPending(false);
     }
   };
@@ -1635,6 +1668,8 @@ export default function MintScreen(props: MintScreenProps) {
     pauseBlocked ||
     startOverUnsupported;
   const metadataDisabled = isPreparing || !file || !expectedHashHex;
+  const formattedTxDelay =
+    txDelaySeconds === null ? null : txDelaySeconds.toString().padStart(2, '0');
 
   return (
     <section
@@ -2077,6 +2112,12 @@ export default function MintScreen(props: MintScreenProps) {
         )}
 
         {mintStatus && <div className="alert">{mintStatus}</div>}
+
+        {formattedTxDelay && (
+          <div className="alert">
+            {(txDelayLabel ?? 'Next transaction in')} {formattedTxDelay}s
+          </div>
+        )}
 
         {delegateTargetId && (
           <div className="alert">
