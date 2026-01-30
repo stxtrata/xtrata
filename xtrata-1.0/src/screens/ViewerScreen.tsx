@@ -31,6 +31,7 @@ import { bytesToHex } from '../lib/utils/encoding';
 import TokenContentPreview from '../components/TokenContentPreview';
 import TokenCardMedia from '../components/TokenCardMedia';
 import { getMediaKind } from '../lib/viewer/content';
+import { logInfo } from '../lib/utils/logger';
 import { getTransferValidationMessage, validateTransferRequest } from '../lib/wallet/transfer';
 import type { WalletSession } from '../lib/wallet/types';
 import type { WalletLookupState } from '../lib/wallet/lookup';
@@ -39,6 +40,8 @@ import { truncateMiddle } from '../lib/utils/format';
 const PAGE_SIZE = 16;
 const REFRESH_INTERVAL_MS = 6_000;
 const REFRESH_WINDOW_MS = 120_000;
+const PREFETCH_PAGE_DELAY_MS = 220;
+const PREFETCH_PAGE_CONCURRENCY = 4;
 
 export type ViewerMode = 'collection' | 'wallet';
 
@@ -566,6 +569,8 @@ export default function ViewerScreen(props: ViewerScreenProps) {
     key: number;
     baseline: bigint | null;
   } | null>(null);
+  const prefetchScopeRef = useRef<string>('');
+  const loadOrderLogRef = useRef<string>('');
 
   const collectionMaxPage = useMemo(() => {
     if (lastTokenQuery.data === undefined) {
@@ -574,6 +579,18 @@ export default function ViewerScreen(props: ViewerScreenProps) {
     const maxPageValue = Number(lastTokenQuery.data / BigInt(PAGE_SIZE));
     return Number.isSafeInteger(maxPageValue) ? maxPageValue : 0;
   }, [lastTokenQuery.data]);
+  const activePageIndex = (() => {
+    if (isWalletView) {
+      return pageIndex;
+    }
+    if (lastTokenQuery.data === undefined) {
+      return pageIndex;
+    }
+    if (!initialPageSetRef.current) {
+      return collectionMaxPage;
+    }
+    return pageIndex;
+  })();
   const walletTokenIds = useMemo(() => {
     if (!isWalletView) {
       return [] as bigint[];
@@ -612,8 +629,8 @@ export default function ViewerScreen(props: ViewerScreenProps) {
     if (lastTokenQuery.data === undefined) {
       return [];
     }
-    return buildTokenPage(lastTokenQuery.data, pageIndex, PAGE_SIZE);
-  }, [lastTokenQuery.data, pageIndex]);
+    return buildTokenPage(lastTokenQuery.data, activePageIndex, PAGE_SIZE);
+  }, [lastTokenQuery.data, activePageIndex]);
   const pageTokenIds = collectionTokenIds;
 
   const { tokenIds: collectionIds, tokenQueries: collectionQueries } =
@@ -687,9 +704,9 @@ export default function ViewerScreen(props: ViewerScreenProps) {
     if (ownedTokens.length === 0) {
       return [];
     }
-    const start = pageIndex * PAGE_SIZE;
+    const start = activePageIndex * PAGE_SIZE;
     return ownedTokens.slice(start, start + PAGE_SIZE);
-  }, [isWalletView, ownedTokens, pageIndex, tokenSummaries]);
+  }, [isWalletView, ownedTokens, activePageIndex, tokenSummaries]);
 
   useEffect(() => {
     if (isWalletView) {
@@ -770,6 +787,40 @@ export default function ViewerScreen(props: ViewerScreenProps) {
       type: 'active'
     });
   }, [queryClient, contractId]);
+
+  const prefetchTokenSummaries = useCallback(
+    async (tokenIds: bigint[], cancelled: () => boolean) => {
+      if (tokenIds.length === 0) {
+        return;
+      }
+      const queue = [...tokenIds];
+      const runWorker = async () => {
+        while (queue.length > 0 && !cancelled()) {
+          const id = queue.shift();
+          if (id === undefined) {
+            return;
+          }
+          await queryClient.prefetchQuery({
+            queryKey: getTokenSummaryKey(contractId, id),
+            queryFn: () =>
+              fetchTokenSummary({
+                client,
+                id,
+                senderAddress: props.senderAddress
+              }),
+            staleTime: 300_000,
+            refetchOnWindowFocus: false
+          });
+        }
+      };
+      const workers = Array.from(
+        { length: Math.min(PREFETCH_PAGE_CONCURRENCY, queue.length) },
+        () => runWorker()
+      );
+      await Promise.all(workers);
+    },
+    [client, contractId, props.senderAddress, queryClient]
+  );
 
 
   useEffect(() => {
@@ -921,6 +972,128 @@ export default function ViewerScreen(props: ViewerScreenProps) {
   });
   const resolvedSelectedToken = selectedTokenQuery.data ?? selectedToken;
 
+  useEffect(() => {
+    if (isWalletView) {
+      return;
+    }
+    if (!props.isActiveTab) {
+      return;
+    }
+    if (lastTokenQuery.data === undefined) {
+      return;
+    }
+    void queryClient.prefetchQuery({
+      queryKey: getTokenSummaryKey(contractId, lastTokenQuery.data),
+      queryFn: () =>
+        fetchTokenSummary({
+          client,
+          id: lastTokenQuery.data as bigint,
+          senderAddress: props.senderAddress
+        }),
+      staleTime: 300_000,
+      refetchOnWindowFocus: false
+    });
+  }, [
+    client,
+    contractId,
+    isWalletView,
+    lastTokenQuery.data,
+    props.isActiveTab,
+    props.senderAddress,
+    queryClient
+  ]);
+
+  useEffect(() => {
+    if (isWalletView) {
+      return;
+    }
+    if (!props.isActiveTab) {
+      return;
+    }
+    if (lastTokenQuery.data === undefined) {
+      return;
+    }
+    const logKey = `${contractId}:${lastTokenQuery.data.toString()}`;
+    if (loadOrderLogRef.current === logKey) {
+      return;
+    }
+    loadOrderLogRef.current = logKey;
+    const pageIds = buildTokenPage(lastTokenQuery.data, activePageIndex, PAGE_SIZE);
+    logInfo('viewer', 'Collection load order summary', {
+      contractId,
+      lastTokenId: lastTokenQuery.data.toString(),
+      collectionMaxPage,
+      initialPageSet: initialPageSetRef.current,
+      activePageIndex,
+      pageIndex,
+      pageIds:
+        pageIds.length > 0
+          ? `${pageIds[0].toString()}–${pageIds[pageIds.length - 1].toString()}`
+          : 'none',
+      prefetchStartPage: collectionMaxPage,
+      prefetchDirection: 'descending'
+    });
+  }, [
+    contractId,
+    isWalletView,
+    props.isActiveTab,
+    lastTokenQuery.data,
+    collectionMaxPage,
+    activePageIndex,
+    pageIndex
+  ]);
+
+  useEffect(() => {
+    if (isWalletView) {
+      return;
+    }
+    if (!props.isActiveTab) {
+      return;
+    }
+    if (lastTokenQuery.data === undefined) {
+      return;
+    }
+    const scopeKey = `${contractId}:${lastTokenQuery.data.toString()}`;
+    if (prefetchScopeRef.current === scopeKey) {
+      return;
+    }
+    prefetchScopeRef.current = scopeKey;
+    let cancelled = false;
+    const isCancelled = () => cancelled;
+    const run = async () => {
+      const lastId = lastTokenQuery.data as bigint;
+      for (let page = collectionMaxPage; page >= 0; page -= 1) {
+        if (cancelled) {
+          return;
+        }
+        const pageIds = buildTokenPage(lastId, page, PAGE_SIZE);
+        if (pageIds.length === 0) {
+          continue;
+        }
+        const ordered =
+          page === collectionMaxPage ? [...pageIds].reverse() : [...pageIds];
+        await prefetchTokenSummaries(ordered, isCancelled);
+        if (cancelled) {
+          return;
+        }
+        await new Promise((resolve) =>
+          setTimeout(resolve, PREFETCH_PAGE_DELAY_MS)
+        );
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    collectionMaxPage,
+    contractId,
+    isWalletView,
+    lastTokenQuery.data,
+    prefetchTokenSummaries,
+    props.isActiveTab
+  ]);
+
   const collectionRangeLabel =
     lastTokenQuery.data === undefined
       ? 'Loading...'
@@ -937,6 +1110,7 @@ export default function ViewerScreen(props: ViewerScreenProps) {
           ? 'No tokens'
           : `Showing ${pageIndex * PAGE_SIZE + 1}–${pageIndex * PAGE_SIZE + pageTokens.length} of ${ownedTokens.length}`;
   const rangeLabel = isWalletView ? walletRangeLabel : collectionRangeLabel;
+  const displayPageIndex = isWalletView ? pageIndex : activePageIndex;
 
   return (
     <section
@@ -1003,22 +1177,34 @@ export default function ViewerScreen(props: ViewerScreenProps) {
                   className="button button--ghost button--mini"
                   type="button"
                   onClick={() =>
-                    setPageIndex((current) => Math.max(0, current - 1))
+                    setPageIndex((current) => {
+                      const base =
+                        isWalletView || initialPageSetRef.current
+                          ? current
+                          : collectionMaxPage;
+                      return Math.max(0, base - 1);
+                    })
                   }
-                  disabled={pageIndex <= 0}
+                  disabled={displayPageIndex <= 0}
                 >
                   Prev
                 </button>
                 <span className="viewer-controls__label">
-                  Page {pageIndex + 1} of {maxPage + 1}
+                  Page {displayPageIndex + 1} of {maxPage + 1}
                 </span>
                 <button
                   className="button button--ghost button--mini"
                   type="button"
                   onClick={() =>
-                    setPageIndex((current) => Math.min(maxPage, current + 1))
+                    setPageIndex((current) => {
+                      const base =
+                        isWalletView || initialPageSetRef.current
+                          ? current
+                          : collectionMaxPage;
+                      return Math.min(maxPage, base + 1);
+                    })
                   }
-                  disabled={pageIndex >= maxPage}
+                  disabled={displayPageIndex >= maxPage}
                 >
                   Next
                 </button>

@@ -621,6 +621,39 @@ p {
   word-break: break-all;
 }
 
+.thumbnail-diagnostic {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.thumbnail-diagnostic__meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.thumbnail-diagnostic__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.thumbnail-diagnostic__status {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.thumbnail-diagnostic__image {
+  width: 100%;
+  max-width: 160px;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
 .meta-value--truncate {
   display: inline-block;
   max-width: 100%;

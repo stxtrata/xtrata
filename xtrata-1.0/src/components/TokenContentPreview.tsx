@@ -31,14 +31,18 @@ import {
   type StreamPhase,
   shouldAllowTokenUriPreview
 } from '../lib/viewer/streaming';
-import { getTokenContentKey } from '../lib/viewer/queries';
+import { getTokenContentKey, getTokenThumbnailKey } from '../lib/viewer/queries';
 import {
+  buildInscriptionThumbnailCacheKey,
   loadInscriptionPreviewFromCache,
+  loadInscriptionThumbnailRecord,
+  saveInscriptionThumbnailToCache,
   saveInscriptionPreviewToCache,
   saveInscriptionToTempCache,
   TEMP_CACHE_MAX_BYTES,
   TEMP_CACHE_TTL_MS
 } from '../lib/viewer/cache';
+import { createImageThumbnail, THUMBNAIL_SIZE } from '../lib/viewer/thumbnail';
 import { createObjectUrl } from '../lib/utils/blob';
 import { formatBytes, truncateMiddle } from '../lib/utils/format';
 import { bytesToHex } from '../lib/utils/encoding';
@@ -134,11 +138,17 @@ export default function TokenContentPreview(props: TokenContentPreviewProps) {
   const imageErrorLogRef = useRef<string | null>(null);
   const [tokenUriFailed, setTokenUriFailed] = useState(false);
   const [bridgeSource, setBridgeSource] = useState<MessageEventSource | null>(null);
+  const [thumbnailPending, setThumbnailPending] = useState(false);
+  const [thumbnailStatusMessage, setThumbnailStatusMessage] = useState<string | null>(
+    null
+  );
   useEffect(() => {
     previewSourceLogRef.current = null;
     imageMetricsLogRef.current = null;
     imageErrorLogRef.current = null;
     setTokenUriFailed(false);
+    setThumbnailPending(false);
+    setThumbnailStatusMessage(null);
   }, [props.token.id, props.token.tokenUri]);
   const mimeType = props.token.meta?.mimeType ?? null;
   const mediaKind = getMediaKind(mimeType);
@@ -307,6 +317,55 @@ export default function TokenContentPreview(props: TokenContentPreviewProps) {
     : 'Not set';
   const tokenUriLink =
     tokenUriValue && isHttpUrl(tokenUriValue) ? tokenUriValue : null;
+  const thumbnailRecordKey = useMemo(
+    () => [
+      'viewer',
+      props.contractId,
+      'thumbnail-record',
+      props.token.id.toString()
+    ],
+    [props.contractId, props.token.id]
+  );
+  const thumbnailRecordQuery = useQuery({
+    queryKey: thumbnailRecordKey,
+    queryFn: () => loadInscriptionThumbnailRecord(props.contractId, props.token.id),
+    enabled: isActiveTab,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false
+  });
+  const thumbnailRecord = thumbnailRecordQuery.data ?? null;
+  const thumbnailValue = thumbnailRecord?.value ?? null;
+  const thumbnailStatus = thumbnailRecordQuery.isLoading
+    ? 'Checking...'
+    : thumbnailValue
+      ? 'Cached'
+      : 'Missing';
+  const thumbnailFallbackLabel = thumbnailValue
+    ? 'Thumbnail cache'
+    : tokenUriValue
+      ? 'Token URI fallback'
+      : 'None';
+  const thumbnailTimestamp = thumbnailRecord
+    ? new Date(thumbnailRecord.timestamp).toLocaleString()
+    : null;
+  const thumbnailUrl = useMemo(() => {
+    if (!thumbnailValue?.data || thumbnailValue.data.length === 0) {
+      return null;
+    }
+    return createObjectUrl(
+      thumbnailValue.data,
+      thumbnailValue.mimeType ?? 'image/webp'
+    );
+  }, [thumbnailValue]);
+  useEffect(() => {
+    if (!thumbnailUrl) {
+      return;
+    }
+    return () => {
+      URL.revokeObjectURL(thumbnailUrl);
+    };
+  }, [thumbnailUrl]);
   const finalHash = props.token.meta?.finalHash
     ? bytesToHex(props.token.meta.finalHash)
     : null;
@@ -1101,6 +1160,202 @@ export default function TokenContentPreview(props: TokenContentPreviewProps) {
     (isHttpUrl(props.token.tokenUri) || isDataUri(props.token.tokenUri))
       ? props.token.tokenUri
       : null;
+  const normalizeImageUrl = useCallback((value: string) => {
+    if (value.startsWith('ipfs://')) {
+      let path = value.slice('ipfs://'.length);
+      if (path.startsWith('ipfs/')) {
+        path = path.slice('ipfs/'.length);
+      }
+      return `https://ipfs.io/ipfs/${path}`;
+    }
+    if (value.startsWith('ar://')) {
+      const path = value.slice('ar://'.length);
+      return `https://arweave.net/${path}`;
+    }
+    return value;
+  }, []);
+  const thumbnailCandidate = useMemo(() => {
+    if (
+      contentQuery.data &&
+      contentQuery.data.length > 0 &&
+      (resolvedMediaKind === 'image' || resolvedMediaKind === 'svg')
+    ) {
+      return { source: 'on-chain', label: 'On-chain bytes' };
+    }
+    if (resolvedMediaKind === 'svg' && svgPreview) {
+      return { source: 'svg-preview', label: 'SVG preview' };
+    }
+    if (allowTokenUriPreview && tokenUriPreview) {
+      return { source: 'token-uri', label: 'Token URI image' };
+    }
+    if (jsonImagePreview) {
+      const normalized = normalizeImageUrl(jsonImagePreview);
+      if (isHttpUrl(normalized) || isDataUri(normalized)) {
+        return { source: 'metadata-image', label: 'Metadata image' };
+      }
+    }
+    if (allowTokenUriFallback && directTokenUri) {
+      return { source: 'token-uri-direct', label: 'Token URI (direct)' };
+    }
+    return null;
+  }, [
+    contentQuery.data,
+    resolvedMediaKind,
+    svgPreview,
+    allowTokenUriPreview,
+    tokenUriPreview,
+    jsonImagePreview,
+    allowTokenUriFallback,
+    directTokenUri,
+    normalizeImageUrl
+  ]);
+  const fetchImageBytes = useCallback(async (url: string) => {
+    const response = await fetch(url, { cache: 'no-store', redirect: 'follow' });
+    if (!response.ok) {
+      throw new Error(`Fetch failed (${response.status})`);
+    }
+    const buffer = await response.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    const headerType = (response.headers.get('content-type') || '')
+      .split(';')[0]
+      .trim();
+    const dataUriMatch = url.startsWith('data:')
+      ? url.match(/^data:([^;,]+)[;,]/i)
+      : null;
+    const dataUriType = dataUriMatch ? dataUriMatch[1].toLowerCase() : null;
+    const sniffed = sniffMimeType(bytes);
+    const mimeType = headerType || dataUriType || sniffed || null;
+    return { bytes, mimeType };
+  }, []);
+  const handleGenerateThumbnail = useCallback(async () => {
+    if (thumbnailPending) {
+      return;
+    }
+    setThumbnailPending(true);
+    setThumbnailStatusMessage('Generating...');
+    try {
+      let bytes: Uint8Array | null = null;
+      let sourceMimeType: string | null = null;
+      let source = thumbnailCandidate?.source ?? null;
+      if (
+        contentQuery.data &&
+        contentQuery.data.length > 0 &&
+        (resolvedMediaKind === 'image' || resolvedMediaKind === 'svg')
+      ) {
+        bytes = contentQuery.data;
+        sourceMimeType = resolvedMimeType ?? mimeType ?? sniffMimeType(bytes);
+        source = 'on-chain';
+      } else if (resolvedMediaKind === 'svg' && svgPreview) {
+        const result = await fetchImageBytes(svgPreview);
+        bytes = result.bytes;
+        sourceMimeType = result.mimeType ?? 'image/svg+xml';
+        source = 'svg-preview';
+      } else if (allowTokenUriPreview && tokenUriPreview) {
+        const result = await fetchImageBytes(tokenUriPreview);
+        bytes = result.bytes;
+        sourceMimeType = result.mimeType;
+        source = 'token-uri';
+      } else if (jsonImagePreview) {
+        const normalized = normalizeImageUrl(jsonImagePreview);
+        if (isHttpUrl(normalized) || isDataUri(normalized)) {
+          const result = await fetchImageBytes(normalized);
+          bytes = result.bytes;
+          sourceMimeType = result.mimeType;
+          source = 'metadata-image';
+        }
+      } else if (allowTokenUriFallback && directTokenUri) {
+        const result = await fetchImageBytes(directTokenUri);
+        bytes = result.bytes;
+        sourceMimeType = result.mimeType;
+        source = 'token-uri-direct';
+      }
+      if (!bytes || bytes.length === 0) {
+        setThumbnailStatusMessage('No image source available');
+        return;
+      }
+      const resolvedMime = sourceMimeType ?? sniffMimeType(bytes);
+      const resolvedKind = getMediaKind(resolvedMime ?? null);
+      if (resolvedKind !== 'image' && resolvedKind !== 'svg') {
+        setThumbnailStatusMessage('Source is not an image');
+        logWarn('thumbnail', 'Thumbnail source is not an image', {
+          id: props.token.id.toString(),
+          source,
+          mimeType: resolvedMime ?? null
+        });
+        return;
+      }
+      const result = await createImageThumbnail({
+        bytes,
+        mimeType: resolvedMime,
+        size: THUMBNAIL_SIZE
+      });
+      if (!result || result.data.length === 0) {
+        setThumbnailStatusMessage('Thumbnail generation failed');
+        return;
+      }
+      await saveInscriptionThumbnailToCache(
+        props.contractId,
+        props.token.id,
+        result.data,
+        {
+          mimeType: result.mimeType,
+          width: result.width,
+          height: result.height
+        }
+      );
+      const value = {
+        data: result.data,
+        mimeType: result.mimeType,
+        width: result.width,
+        height: result.height
+      };
+      queryClient.setQueryData(
+        getTokenThumbnailKey(props.contractId, props.token.id),
+        value
+      );
+      queryClient.setQueryData(thumbnailRecordKey, {
+        id: buildInscriptionThumbnailCacheKey(props.contractId, props.token.id),
+        value,
+        timestamp: Date.now()
+      });
+      setThumbnailStatusMessage(`Saved ${formatBytes(result.data.length)}`);
+      logInfo('thumbnail', 'Generated thumbnail via preview', {
+        id: props.token.id.toString(),
+        source,
+        bytes: result.data.length,
+        mimeType: result.mimeType ?? null,
+        width: result.width,
+        height: result.height
+      });
+    } catch (error) {
+      setThumbnailStatusMessage('Thumbnail generation failed');
+      logWarn('thumbnail', 'Thumbnail generation failed', {
+        id: props.token.id.toString(),
+        error: error instanceof Error ? error.message : String(error)
+      });
+    } finally {
+      setThumbnailPending(false);
+    }
+  }, [
+    thumbnailPending,
+    thumbnailCandidate?.source,
+    contentQuery.data,
+    resolvedMediaKind,
+    resolvedMimeType,
+    mimeType,
+    svgPreview,
+    allowTokenUriPreview,
+    tokenUriPreview,
+    jsonImagePreview,
+    allowTokenUriFallback,
+    directTokenUri,
+    fetchImageBytes,
+    normalizeImageUrl,
+    props.contractId,
+    props.token.id,
+    queryClient,
+    thumbnailRecordKey
+  ]);
   const imagePreviewOrigin = useMemo(() => {
     if (resolvedMediaKind === 'svg' && svgPreview) {
       return 'svg-preview';
@@ -1711,6 +1966,58 @@ export default function TokenContentPreview(props: TokenContentPreviewProps) {
                       </a>
                     )}
                   </div>
+                </div>
+                <div className="thumbnail-diagnostic">
+                  <span className="meta-label">Thumbnail</span>
+                  <span className="meta-value">{thumbnailStatus}</span>
+                  <span className="thumbnail-diagnostic__meta">
+                    Fallback: {thumbnailFallbackLabel}
+                  </span>
+                  <span className="thumbnail-diagnostic__meta">
+                    Candidate: {thumbnailCandidate ? thumbnailCandidate.label : 'None'}
+                  </span>
+                  {thumbnailValue?.mimeType && (
+                    <span className="thumbnail-diagnostic__meta">
+                      Mime: {thumbnailValue.mimeType}
+                    </span>
+                  )}
+                  {thumbnailValue?.data && (
+                    <span className="thumbnail-diagnostic__meta">
+                      Bytes: {thumbnailValue.data.length.toString()}
+                    </span>
+                  )}
+                  {thumbnailTimestamp && (
+                    <span className="thumbnail-diagnostic__meta">
+                      Cached: {thumbnailTimestamp}
+                    </span>
+                  )}
+                  <div className="thumbnail-diagnostic__actions">
+                    <button
+                      type="button"
+                      className="button button--ghost button--mini"
+                      onClick={handleGenerateThumbnail}
+                      disabled={!thumbnailCandidate || thumbnailPending}
+                    >
+                      {thumbnailPending
+                        ? 'Generating...'
+                        : thumbnailValue
+                          ? 'Refresh'
+                          : 'Generate'}
+                    </button>
+                    {thumbnailStatusMessage && (
+                      <span className="thumbnail-diagnostic__status">
+                        {thumbnailStatusMessage}
+                      </span>
+                    )}
+                  </div>
+                  {thumbnailUrl && (
+                    <img
+                      className="thumbnail-diagnostic__image"
+                      src={thumbnailUrl}
+                      alt="Thumbnail preview"
+                      loading="lazy"
+                    />
+                  )}
                 </div>
                 <div>
                   <span className="meta-label">Mime type</span>
