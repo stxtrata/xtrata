@@ -17,6 +17,8 @@ import MintScreen from './screens/MintScreen';
 import ViewerScreen, { type ViewerMode } from './screens/ViewerScreen';
 import ContractAdminScreen from './screens/ContractAdminScreen';
 import WalletLookupScreen from './screens/WalletLookupScreen';
+import AdminDiagnosticsScreen from './screens/AdminDiagnosticsScreen';
+import CollectionMintScreen from './screens/CollectionMintScreen';
 
 const contractSelectionStore = createContractSelectionStore(CONTRACT_REGISTRY);
 const walletSessionStore = createWalletSessionStore();
@@ -28,6 +30,8 @@ const SECTION_KEYS = [
   'active-contract',
   'deploy-contract',
   'contract-admin',
+  'admin-diagnostics',
+  'collection-mint',
   'mint',
   'collection-viewer'
 ] as const;
@@ -122,6 +126,8 @@ export default function App() {
     initial['wallet-lookup'] = true;
     initial['wallet-session'] = true;
     initial['active-contract'] = true;
+    initial['admin-diagnostics'] = true;
+    initial['collection-mint'] = true;
     return initial;
   });
   const tabGuard = useActiveTabGuard();
@@ -349,6 +355,18 @@ export default function App() {
               </a>
               <a className="button button--ghost app__nav-link" href="#contract-admin">
                 Contract admin
+              </a>
+              <a
+                className="button button--ghost app__nav-link"
+                href="#admin-diagnostics"
+              >
+                Diagnostics
+              </a>
+              <a
+                className="button button--ghost app__nav-link"
+                href="#collection-mint"
+              >
+                Collection mint
               </a>
               <a className="button button--ghost app__nav-link" href="#mint">
                 Mint
@@ -650,6 +668,24 @@ export default function App() {
           walletSession={walletSession}
           collapsed={collapsedSections['contract-admin']}
           onToggleCollapse={() => toggleSection('contract-admin')}
+        />
+
+        <AdminDiagnosticsScreen
+          contractId={contractId}
+          contractNetwork={selectedContract.network}
+          walletAddress={walletSession.address ?? null}
+          walletNetwork={walletSession.network ?? null}
+          readOnlySender={readOnlySender}
+          isActiveTab={tabGuard.isActive}
+          collapsed={collapsedSections['admin-diagnostics']}
+          onToggleCollapse={() => toggleSection('admin-diagnostics')}
+        />
+
+        <CollectionMintScreen
+          contract={selectedContract}
+          walletSession={walletSession}
+          collapsed={collapsedSections['collection-mint']}
+          onToggleCollapse={() => toggleSection('collection-mint')}
         />
 
         <MintScreen

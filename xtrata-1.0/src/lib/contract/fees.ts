@@ -16,6 +16,14 @@ export type FeeEstimate = {
   feeBatches: number;
 };
 
+export type BatchFeeEstimate = {
+  itemCount: number;
+  beginMicroStx: number;
+  sealMicroStx: number;
+  totalMicroStx: number;
+  feeBatches: number;
+};
+
 const normalizeMicroStx = (value: number | null | undefined) => {
   if (value === null || value === undefined) {
     return DEFAULT_FEE_UNIT_MICROSTX;
@@ -56,6 +64,25 @@ export const estimateContractFees = (params: {
     totalChunks > 0 ? feeUnitMicroStx * (1 + feeBatches) : 0;
   const beginMicroStx = feeUnitMicroStx;
   return {
+    beginMicroStx,
+    sealMicroStx,
+    totalMicroStx: beginMicroStx + sealMicroStx,
+    feeBatches
+  };
+};
+
+export const estimateBatchContractFees = (params: {
+  schedule: FeeSchedule;
+  totalChunks: number[];
+}): BatchFeeEstimate => {
+  const items = params.totalChunks.map((count) =>
+    estimateContractFees({ schedule: params.schedule, totalChunks: count })
+  );
+  const beginMicroStx = items.reduce((sum, item) => sum + item.beginMicroStx, 0);
+  const sealMicroStx = items.reduce((sum, item) => sum + item.sealMicroStx, 0);
+  const feeBatches = items.reduce((sum, item) => sum + item.feeBatches, 0);
+  return {
+    itemCount: items.length,
     beginMicroStx,
     sealMicroStx,
     totalMicroStx: beginMicroStx + sealMicroStx,

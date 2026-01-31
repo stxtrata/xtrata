@@ -137,6 +137,7 @@ export default function TokenContentPreview(props: TokenContentPreviewProps) {
   const imageMetricsLogRef = useRef<string | null>(null);
   const imageErrorLogRef = useRef<string | null>(null);
   const [tokenUriFailed, setTokenUriFailed] = useState(false);
+  const [pixelatePreview, setPixelatePreview] = useState(false);
   const [bridgeSource, setBridgeSource] = useState<MessageEventSource | null>(null);
   const [thumbnailPending, setThumbnailPending] = useState(false);
   const [thumbnailStatusMessage, setThumbnailStatusMessage] = useState<string | null>(
@@ -147,6 +148,7 @@ export default function TokenContentPreview(props: TokenContentPreviewProps) {
     imageMetricsLogRef.current = null;
     imageErrorLogRef.current = null;
     setTokenUriFailed(false);
+    setPixelatePreview(false);
     setThumbnailPending(false);
     setThumbnailStatusMessage(null);
   }, [props.token.id, props.token.tokenUri]);
@@ -1378,6 +1380,10 @@ export default function TokenContentPreview(props: TokenContentPreviewProps) {
     textPreview,
     jsonImagePreview
   ]);
+  const previewImageClassName =
+    pixelatePreview && imagePreviewOrigin !== 'svg-preview'
+      ? 'preview-media--pixelated'
+      : undefined;
   const mediaSourceUrl = streamUrl ?? contentUrl;
   const isStreamBuffering = shouldStream && streamPhase === 'buffering';
   const isStreamLoading = shouldStream && streamPhase === 'loading';
@@ -1433,6 +1439,34 @@ export default function TokenContentPreview(props: TokenContentPreviewProps) {
         if (!url) {
           return;
         }
+        const target = event.currentTarget;
+        const rect = target.getBoundingClientRect();
+        const naturalWidth = target.naturalWidth || 0;
+        const naturalHeight = target.naturalHeight || 0;
+        const normalizedMime = (resolvedMimeType ?? mimeType ?? '').toLowerCase();
+        const urlLower = url.toLowerCase();
+        const isSvgSource =
+          source === 'svg-preview' ||
+          normalizedMime.includes('svg') ||
+          urlLower.startsWith('data:image/svg') ||
+          urlLower.includes('.svg');
+        let nextPixelate = false;
+        if (
+          !isSvgSource &&
+          naturalWidth > 0 &&
+          naturalHeight > 0 &&
+          rect.width > 0 &&
+          rect.height > 0
+        ) {
+          const scaleX = rect.width / naturalWidth;
+          const scaleY = rect.height / naturalHeight;
+          const scale = Math.max(scaleX, scaleY);
+          const maxNatural = Math.max(naturalWidth, naturalHeight);
+          nextPixelate = scale >= 1.2 && maxNatural <= 512;
+        }
+        setPixelatePreview((previous) =>
+          previous === nextPixelate ? previous : nextPixelate
+        );
         if (!shouldLog('preview', 'debug')) {
           return;
         }
@@ -1441,8 +1475,6 @@ export default function TokenContentPreview(props: TokenContentPreviewProps) {
           return;
         }
         imageMetricsLogRef.current = logKey;
-        const target = event.currentTarget;
-        const rect = target.getBoundingClientRect();
         const computed =
           typeof window !== 'undefined' ? window.getComputedStyle(target) : null;
         const sourceType = url.startsWith('data:')
@@ -1458,8 +1490,8 @@ export default function TokenContentPreview(props: TokenContentPreviewProps) {
           mediaKind: resolvedMediaKind,
           totalSize: totalSize !== null ? totalSize.toString() : null,
           bytesLoaded: contentBytes,
-          naturalWidth: target.naturalWidth,
-          naturalHeight: target.naturalHeight,
+          naturalWidth,
+          naturalHeight,
           renderedWidth: Math.round(rect.width),
           renderedHeight: Math.round(rect.height),
           objectFit: computed?.objectFit ?? null,
@@ -1486,6 +1518,7 @@ export default function TokenContentPreview(props: TokenContentPreviewProps) {
         if (!url) {
           return;
         }
+        setPixelatePreview(false);
         if (source.startsWith('token-uri')) {
           setTokenUriFailed(true);
           if (
@@ -1794,6 +1827,7 @@ export default function TokenContentPreview(props: TokenContentPreviewProps) {
                         src={svgPreview}
                         alt="SVG preview"
                         loading="lazy"
+                        className={previewImageClassName}
                         onLoad={handlePreviewImageLoad('svg-preview', svgPreview)}
                         onError={handlePreviewImageError('svg-preview', svgPreview)}
                       />
@@ -1802,6 +1836,7 @@ export default function TokenContentPreview(props: TokenContentPreviewProps) {
                         src={contentUrl}
                         alt="Image preview"
                         loading="lazy"
+                        className={previewImageClassName}
                         onLoad={handlePreviewImageLoad('on-chain', contentUrl)}
                         onError={handlePreviewImageError('on-chain', contentUrl)}
                       />
@@ -1831,6 +1866,7 @@ export default function TokenContentPreview(props: TokenContentPreviewProps) {
                         src={tokenUriPreview}
                         alt="Token URI preview"
                         loading="lazy"
+                        className={previewImageClassName}
                         onLoad={handlePreviewImageLoad('token-uri', tokenUriPreview)}
                         onError={handlePreviewImageError('token-uri', tokenUriPreview)}
                       />

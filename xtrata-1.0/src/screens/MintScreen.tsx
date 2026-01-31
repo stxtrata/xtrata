@@ -30,6 +30,19 @@ import { resolveContractCapabilities } from '../lib/contract/capabilities';
 import { useContractAdminStatus } from '../lib/contract/admin-status';
 import { createXtrataClient } from '../lib/contract/client';
 import {
+  DEFAULT_BATCH_SIZE,
+  DEFAULT_TOKEN_URI,
+  MAX_MIME_LENGTH,
+  MAX_TOKEN_URI_LENGTH,
+  SIP16_COLLECTION_NAME,
+  SIP16_COLLECTION_SYMBOL,
+  SIP16_PLACEHOLDER_IMAGE,
+  SIP16_PREVIEW_HOST_PLACEHOLDER,
+  SIP16_RESOLVER_HOST_PLACEHOLDER,
+  SIP16_TOKEN_ID_PLACEHOLDER,
+  TX_DELAY_SECONDS
+} from '../lib/mint/constants';
+import {
   clearMintAttempt,
   loadMintAttempt,
   saveMintAttempt,
@@ -86,24 +99,11 @@ type Sip16MetadataParams = {
   dependencies: bigint[];
 };
 
-const DEFAULT_BATCH_SIZE = Math.min(30, MAX_BATCH_SIZE);
 const BATCH_OPTIONS = Array.from(
   { length: MAX_BATCH_SIZE },
   (_, index) => index + 1
 );
 const MAX_UPLOAD_RETRIES = 3;
-const TX_DELAY_SECONDS = 5;
-const DEFAULT_TOKEN_URI =
-  'https://xvgh3sbdkivby4blejmripeiyjuvji3d4tycym6hgaxalescegjq.arweave.net/vUx9yCNSKhxwKyJZFDyIwmlUo2Pk8CwzxzAuBZJCIZM';
-const MAX_TOKEN_URI_LENGTH = 256;
-const MAX_MIME_LENGTH = 64;
-const SIP16_TOKEN_ID_PLACEHOLDER = '{id}';
-const SIP16_RESOLVER_HOST_PLACEHOLDER = '{resolver-host}';
-const SIP16_PREVIEW_HOST_PLACEHOLDER = '{preview-host}';
-const SIP16_COLLECTION_NAME = 'xtrata';
-const SIP16_COLLECTION_SYMBOL = 'XST';
-const SIP16_PLACEHOLDER_IMAGE =
-  'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCA1MCA1MCc+PGNpcmNsZSBjeD0nMjUnIGN5PScyNScgcj0nMjAnIGZpbGw9J25vbmUnIHN0cm9rZT0nIzYzNjZmMScgc3Ryb2tlLXdpZHRoPSc0Jy8+PGNpcmNsZSBjeD0nMjUnIGN5PScyNScgcj0nMTInIGZpbGw9J25vbmUnIHN0cm9rZT0nI2VjNDg5OScgc3Ryb2tlLXdpZHRoPSc0Jy8+PC9zdmc+';
 
 const isAscii = (value: string) => /^[\x00-\x7F]*$/.test(value);
 const isHttpUrl = (value: string) =>

@@ -5,6 +5,7 @@ import {
   listCV,
   principalCV,
   stringAsciiCV,
+  tupleCV,
   uintCV
 } from '@stacks/transactions';
 import type { ContractCallOptions } from '@stacks/connect';
@@ -137,6 +138,30 @@ export const buildSealInscriptionCall = (params: {
     network: params.network,
     functionName: 'seal-inscription',
     functionArgs: [bufferCV(params.expectedHash), stringAsciiCV(params.tokenUri)],
+    overrides: params.overrides
+  });
+};
+
+export const buildSealInscriptionBatchCall = (params: {
+  contract: ContractConfig;
+  network: StacksNetwork;
+  items: { expectedHash: Uint8Array; tokenUri: string }[];
+  overrides?: ContractCallOverrides;
+}) => {
+  return buildContractCallOptions({
+    contract: params.contract,
+    network: params.network,
+    functionName: 'seal-inscription-batch',
+    functionArgs: [
+      listCV(
+        params.items.map((item) =>
+          tupleCV({
+            hash: bufferCV(item.expectedHash),
+            'token-uri': stringAsciiCV(item.tokenUri)
+          })
+        )
+      )
+    ],
     overrides: params.overrides
   });
 };

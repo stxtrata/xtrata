@@ -13,6 +13,7 @@ import {
 } from '@stacks/transactions';
 import { DEFAULT_CONTRACT } from '../config';
 import {
+  buildSealInscriptionBatchCall,
   buildTransferCall,
   createXtrataClient
 } from '../client';
@@ -92,5 +93,22 @@ describe('xtrata contract client', () => {
     expect(options.functionArgs[0].type).toBe(ClarityType.UInt);
     expect(options.functionArgs[1].type).toBe(ClarityType.PrincipalStandard);
     expect(options.functionArgs[2].type).toBe(ClarityType.PrincipalStandard);
+  });
+
+  it('builds seal-inscription-batch call options', () => {
+    const hashA = new Uint8Array(32).fill(1);
+    const hashB = new Uint8Array(32).fill(2);
+    const options = buildSealInscriptionBatchCall({
+      contract: DEFAULT_CONTRACT,
+      network: new StacksMainnet(),
+      items: [
+        { expectedHash: hashA, tokenUri: 'ipfs://xtrata/a' },
+        { expectedHash: hashB, tokenUri: 'ipfs://xtrata/b' }
+      ]
+    });
+
+    expect(options.functionName).toBe('seal-inscription-batch');
+    expect(options.functionArgs).toHaveLength(1);
+    expect(options.functionArgs[0].type).toBe(ClarityType.List);
   });
 });

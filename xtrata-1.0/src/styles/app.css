@@ -588,6 +588,26 @@ p {
   color: var(--muted);
 }
 
+.admin-diagnostics__controls {
+  gap: 6px;
+}
+
+.admin-diagnostics__status {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.admin-diagnostics__presets {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-diagnostics__preset-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .select {
   padding: 12px 14px;
   border-radius: 12px;
@@ -1714,6 +1734,69 @@ p {
   flex-wrap: wrap;
 }
 
+.collection-mint__steps {
+  display: grid;
+  gap: 6px;
+}
+
+.collection-mint__inputs {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.collection-mint__fees {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.collection-mint__table {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px dashed var(--border);
+  background: rgba(15, 23, 42, 0.03);
+}
+
+.collection-mint__row {
+  display: grid;
+  grid-template-columns: minmax(140px, 2fr) minmax(80px, 1fr) minmax(60px, 1fr) minmax(90px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.collection-mint__row span {
+  word-break: break-word;
+}
+
+.collection-mint__row--header {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 4px;
+}
+
+.collection-mint__issues {
+  grid-column: 1 / -1;
+  font-size: 0.72rem;
+  color: var(--accent-strong);
+}
+
+.collection-mint__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .mint-log {
   border-radius: 12px;
   border: 1px solid var(--border);
@@ -1953,6 +2036,11 @@ p {
   object-fit: contain;
   object-position: center;
   border: none;
+}
+
+.preview-media--pixelated {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
 /* Audio should not try to fill vertically */

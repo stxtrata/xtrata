@@ -7,9 +7,9 @@ const LEVEL_RANK: Record<LogLevel, number> = {
   error: 3
 };
 
-const LOG_ENABLED_KEY = 'xtrata.log.enabled';
-const LOG_LEVEL_KEY = 'xtrata.log.level';
-const LOG_TAGS_KEY = 'xtrata.log.tags';
+export const LOG_ENABLED_KEY = 'xtrata.log.enabled';
+export const LOG_LEVEL_KEY = 'xtrata.log.level';
+export const LOG_TAGS_KEY = 'xtrata.log.tags';
 
 const getStorageValue = (key: string) => {
   try {
