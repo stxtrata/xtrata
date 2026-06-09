@@ -5416,7 +5416,7 @@
           }
         ];
       } else if (stagedFee) {
-        const batchCount = Math.max(0, transactionCount - 2);
+        const batchCount = Math.max(0, Number(transactionCount) - 2);
         feeBreakdownRows = [
           {
             key: 'Begin — anti-spam fee',
