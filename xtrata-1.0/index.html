@@ -2960,6 +2960,15 @@
                 <button
                   class="wallet-example-chip"
                   type="button"
+                  data-curated-gallery="v3-core"
+                  title="The current live core, xtrata-v3-2-3."
+                >
+                  v3 core
+                </button>
+
+                <button
+                  class="wallet-example-chip"
+                  type="button"
                   data-wallet-showcase="dyle.btc"
                   data-default-token-id="296"
                   title="Early Stacks-native art inscriptions by DYLE."
@@ -2992,6 +3001,24 @@
                   title="Early autonomous agent memory inscriptions."
                 >
                   Agent 27
+                </button>
+
+                <button
+                  class="wallet-example-chip"
+                  type="button"
+                  data-curated-gallery="v1-origins"
+                  title="The original Xtrata core, xtrata-v1-1-1."
+                >
+                  v1 origins
+                </button>
+
+                <button
+                  class="wallet-example-chip"
+                  type="button"
+                  data-curated-gallery="stacksboard"
+                  title="The Stacksboard inscription (#350)."
+                >
+                  Stacksboard
                 </button>
 
 
@@ -3186,6 +3213,7 @@
         <a href="#docs">Documentation</a>
         <a href="/opus-file-generator/" target="_blank" rel="noopener noreferrer">Opus audio tool</a>
         <a href="/manage">Artist portal</a>
+        <a href="/web/migrate.html">Migrate to v3</a>
         <a href="https://x.com/XtrataLayers" target="_blank" rel="noreferrer">Xtrata on X</a>
       </nav>
       <label class="footer-theme">
@@ -3329,12 +3357,17 @@
       entry.protocolVersion === '2.1.0' ||
       entry.protocolVersion === '2.1.1' ||
       entry.protocolVersion === '3.0.0' ||
+      entry.protocolVersion === '3.2.3' ||
       entry.contractName?.toLowerCase().includes('v2-1-0') === true ||
       entry.contractName?.toLowerCase().includes('v2-1-1') === true ||
-      entry.contractName?.toLowerCase().includes('v3-0-0') === true;
+      entry.contractName?.toLowerCase().includes('v3-0-0') === true ||
+      entry.contractName?.toLowerCase().includes('v3-2-3') === true;
 
     const coreContracts = CONTRACT_REGISTRY.filter(isCoreEntry);
     const versionWeight = (entry) => {
+      if (entry.protocolVersion === '3.2.3' || entry.contractName?.includes('v3-2-3')) {
+        return 30203;
+      }
       if (entry.protocolVersion === '3.0.0' || entry.contractName?.includes('v3-0-0')) {
         return 30000;
       }
@@ -3352,8 +3385,8 @@
     const DEFAULT_CONTRACT =
       ACTIVE_CONTRACTS.find(
         (entry) =>
-          entry.protocolVersion === '2.1.0' ||
-          entry.contractName?.toLowerCase().includes('v2-1-0')
+          entry.protocolVersion === '3.2.3' ||
+          entry.contractName?.toLowerCase().includes('v3-2-3')
       ) ?? ACTIVE_CONTRACTS[0];
     const SMALL_MINT_HELPER_TARGET_CORE_CONTRACT_ID =
       `${SMALL_MINT_HELPER_MAINNET_ADDRESS}.xtrata-v2-1-0`;
@@ -3453,6 +3486,12 @@
     const THEME_IDS = new Set(['classic', 'terminal', 'midnight', 'neon', 'monochrome', 'obsidian', 'ember', 'ultraviolet', 'arctic', 'ruby']);
     const CURATED_GALLERIES = [
           {
+            id: 'v3-core',
+            title: 'v3',
+            tokenIds: [359n, 313n, 14n],
+            primaryOnly: true
+          },
+          {
             id: 'jim-music',
             title: 'music',
             tokenIds: [312n, 288n, 269n, 315n]
@@ -3466,6 +3505,18 @@
             id: 'agent-27',
             title: 'Agent 27',
             tokenIds: [ 107n, 112n, 121n, 123n, 128n, 135n,137n, 152n, 161n, 162n, 163n, 175n, 188n, 194n, 196n, 200n, 213n]
+          },
+          {
+            id: 'v1-origins',
+            title: 'v1 origins',
+            // Read strictly from the original core, xtrata-v1-1-1.
+            contractId: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1',
+            tokenIds: [1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n, 9n, 10n, 11n, 12n, 14n, 20n, 25n, 38n]
+          },
+          {
+            id: 'stacksboard',
+            title: 'Stacksboard',
+            tokenIds: [350n]
           }
         ];
 
@@ -3477,6 +3528,33 @@
           'jim-music': 269n,
           'code-various': 287n
         });
+
+        // Per-gallery read clients: a gallery may pin a specific core in the
+        // lineage (e.g. v1 origins reads xtrata-v1-1-1). Cached by contract id.
+        const galleryReadClientCache = new Map();
+        const getGalleryReadClient = (contractId) => {
+          if (!contractId) {
+            return null;
+          }
+          if (galleryReadClientCache.has(contractId)) {
+            return galleryReadClientCache.get(contractId);
+          }
+          const entry = findContractById(contractId);
+          const client = entry ? createXtrataClient({ contract: entry }) : null;
+          galleryReadClientCache.set(contractId, client);
+          return client;
+        };
+        const getActiveGalleryReadClient = () => {
+          if (!state.curatedGalleryId) {
+            return null;
+          }
+          const gallery = CURATED_GALLERIES.find(
+            (entry) => entry.id === state.curatedGalleryId
+          );
+          return gallery?.contractId
+            ? getGalleryReadClient(gallery.contractId)
+            : null;
+        };
     
         let activeExampleDescriptionKey = null;
 
@@ -3487,6 +3565,14 @@
         tooltip: 'Early Stacks-native art inscriptions by DYLE.',
         description:
           'A very early Stacks art collection by OG artist DYLE, inscribed through Xtrata as permanent on-chain media.'
+      },
+
+      'v3-core': {
+        label: 'v3 core',
+        heading: 'Viewing the v3 core',
+        tooltip: 'The current live core, xtrata-v3-2-3.',
+        description:
+          'The current Xtrata core (xtrata-v3-2-3): the v3 sealing inscription and tokens carried forward by migration from earlier cores.'
       },
 
       'jim-music': {
@@ -3511,6 +3597,22 @@
         tooltip: 'Early autonomous agent memory inscriptions.',
         description:
           'An early on-chain agent memory test, where an automated agent used a wallet to inscribe its thoughts over time.'
+      },
+
+      'v1-origins': {
+        label: 'v1 origins',
+        heading: 'Viewing v1 origins',
+        tooltip: 'The original Xtrata core, xtrata-v1-1-1.',
+        description:
+          'The earliest inscriptions on the original Xtrata core (xtrata-v1-1-1), still live and readable on-chain.'
+      },
+
+      'stacksboard': {
+        label: 'Stacksboard',
+        heading: 'Viewing Stacksboard',
+        tooltip: 'The Stacksboard inscription (#350).',
+        description:
+          'A single featured inscription: Stacksboard, recorded on-chain through Xtrata as #350.'
       }
     });
     
@@ -4144,13 +4246,10 @@
           }
         : null;
 
-    const shouldUseSmallMintHelper = () => {
+    const smallMintEligible = () => {
       const prepared = state.prepared;
-      const capabilities = resolveContractCapabilities(state.contract);
       return (
         !!prepared &&
-        !!getSmallMintHelperContract() &&
-        capabilities.version !== '1.1.1' &&
         !state.uploadState &&
         prepared.chunks.length > 0 &&
         (prepared.dependencyIds ?? []).length <= 50 &&
@@ -4158,20 +4257,45 @@
       );
     };
 
+    // v3+ cores expose their own one-transaction mint-single-tx route, so small
+    // inscriptions (<= SMALL_MINT_HELPER_MAX_CHUNKS) are minted in a single
+    // wallet signature directly on the core — no 3-stage begin/upload/seal and no
+    // external helper contract.
+    const shouldUseNativeSingleTx = () =>
+      resolveContractCapabilities(state.contract).supportsNativeSingleTx === true &&
+      smallMintEligible();
+
+    // Older cores (v2.x) lack a native single-tx route; they use the external
+    // helper contract instead.
+    const shouldUseSmallMintHelper = () => {
+      const capabilities = resolveContractCapabilities(state.contract);
+      return (
+        !shouldUseNativeSingleTx() &&
+        !!getSmallMintHelperContract() &&
+        capabilities.version !== '1.1.1' &&
+        smallMintEligible()
+      );
+    };
+
+    // True when the inscription will be minted in one transaction by either path.
+    const shouldUseSingleTx = () =>
+      shouldUseNativeSingleTx() || shouldUseSmallMintHelper();
+
     const resolveFeePostConditions = (amountMicroStx) => {
       const sender = state.walletSession.address;
       if (!sender || !Number.isFinite(amountMicroStx) || amountMicroStx < 0) {
         return undefined;
       }
-      const royaltyRecipient = state.adminStatus?.royaltyRecipient ?? null;
-      const conditionCode =
-        !royaltyRecipient || addressesEqual(royaltyRecipient, sender)
-          ? FungibleConditionCode.LessEqual
-          : FungibleConditionCode.Equal;
+      // A fee post-condition only needs to CAP the sender's spend. Using an
+      // exact (Equal) condition adds a "pays no less" constraint with no benefit
+      // to the sender and breaks whenever the real protocol fee differs from the
+      // estimate — e.g. the v3 core-native single-tx fee (single-tx-fee-unit +
+      // chunks·upload-chunk-fee-unit) is far below the summed 3-stage estimate.
+      // LessEqual protects the sender and tolerates the contract charging less.
       return [
         makeStandardSTXPostCondition(
           sender,
-          conditionCode,
+          FungibleConditionCode.LessEqual,
           BigInt(Math.round(amountMicroStx))
         )
       ];
@@ -5012,7 +5136,7 @@
         duplicateBlocked;
       dom.inscribeButton.textContent = state.uploadState
         ? 'Resume inscription'
-        : shouldUseSmallMintHelper()
+        : shouldUseSingleTx()
           ? (state.prepared?.dependencyIds?.length ?? 0) > 0
             ? 'Start recursive single-tx inscription'
             : 'Start single-tx inscription'
@@ -5136,6 +5260,7 @@
       state.legacyClient = state.legacyContract
         ? createXtrataClient({ contract: state.legacyContract })
         : null;
+      state.primaryMintedIdCache = null;
       refreshConnectedWalletMatureMode();
       logApiConfiguration();
       setExperienceMode();
@@ -5242,7 +5367,27 @@
       }
 
       const feeEstimate = getFeeEstimate(state.prepared.chunks.length);
-      const usesSingleTx = shouldUseSmallMintHelper();
+      const usesSingleTx = shouldUseSingleTx();
+      // When the core charges a single flat single-tx fee (quoted in advance),
+      // show that real amount instead of the summed 3-stage estimate.
+      const singleTxFeeMicroStx = state.prepared.singleTxFeeMicroStx;
+      const stagedFee = state.prepared.stagedFee;
+      const effectiveFeeEstimate =
+        shouldUseNativeSingleTx() && typeof singleTxFeeMicroStx === 'number'
+          ? {
+              beginMicroStx: singleTxFeeMicroStx,
+              sealMicroStx: 0,
+              totalMicroStx: singleTxFeeMicroStx,
+              feeBatches: 0
+            }
+          : stagedFee
+            ? {
+                beginMicroStx: stagedFee.beginMicroStx,
+                sealMicroStx: stagedFee.sealMicroStx,
+                totalMicroStx: stagedFee.totalMicroStx,
+                feeBatches: feeEstimate.feeBatches
+              }
+            : feeEstimate;
       const sequentialTxEstimate = estimateSequentialMintTransactions({
         totalChunks: state.prepared.chunks.length,
         batchSize: Math.min(DEFAULT_BATCH_SIZE, MAX_UPLOAD_BATCH_SIZE)
@@ -5254,6 +5399,50 @@
       );
       const dependencyIds = state.prepared.dependencyIds ?? [];
       const dependencyLabel = dependencyIds.map((id) => id.toString()).join(', ');
+
+      // Per-stage protocol fee breakdown, so the user sees what is charged when.
+      // Fees are only really paid on delivery: a small anti-spam fee up front,
+      // nothing on each upload batch, and the bulk only on the seal that mints
+      // the token.
+      const usdBook = state.usdPriceBook;
+      let feeBreakdownRows;
+      if (shouldUseNativeSingleTx() && typeof singleTxFeeMicroStx === 'number') {
+        feeBreakdownRows = [
+          {
+            key: 'Inscription fee',
+            subkey: 'Charged on mint — one transaction',
+            value: formatMicroStxWithUsd(BigInt(Math.round(singleTxFeeMicroStx)), usdBook),
+            layout: 'stack'
+          }
+        ];
+      } else if (stagedFee) {
+        const batchCount = Math.max(0, Number(transactionCount) - 2);
+        feeBreakdownRows = [
+          {
+            key: 'Begin — anti-spam fee',
+            subkey: 'Paid now, on the first transaction',
+            value: formatMicroStxWithUsd(BigInt(Math.round(stagedFee.beginMicroStx)), usdBook),
+            layout: 'stack'
+          },
+          {
+            key: `Upload batch${batchCount === 1 ? '' : 'es'}${batchCount > 0 ? ` (${batchCount})` : ''}`,
+            subkey: 'No fee — your data is uploaded free',
+            value: 'Free',
+            layout: 'stack'
+          },
+          {
+            key: 'Seal — mints your token',
+            subkey: 'The remaining fee, paid only on delivery',
+            value: formatMicroStxWithUsd(BigInt(Math.round(stagedFee.sealMicroStx)), usdBook),
+            layout: 'stack'
+          }
+        ];
+      } else {
+        feeBreakdownRows = [
+          { key: 'Protocol fee', value: formatExtraFee(effectiveFeeEstimate), layout: 'stack' }
+        ];
+      }
+
       renderMeta(dom.preparedMeta, [
         { section: 'File' },
         {
@@ -5291,13 +5480,9 @@
           layout: 'stat',
           valueClass: 'meta-value--count'
         },
-        { section: 'Cost estimate' },
+        { section: 'Protocol fee — paid on delivery' },
         ['Live exchange rate', getLiveStxUsdRateLabel()],
-        {
-          key: 'Extra fee',
-          value: formatExtraFee(feeEstimate),
-          layout: 'stack'
-        },
+        ...feeBreakdownRows,
         {
           key: 'Mining fee',
           value: dataMiningEstimate.label,
@@ -5308,7 +5493,7 @@
           key: 'Total estimated cost',
           subkey: 'For this inscription',
           value: formatEstimatedTotalFees(
-            feeEstimate,
+            effectiveFeeEstimate,
             dataMiningEstimate.miningFeeMicroStx
           ),
           layout: 'total'
@@ -5495,6 +5680,41 @@
         state.duplicateId = null;
       }
 
+      // Quote the exact fees the core will charge so the user is told the real
+      // cost and each transaction's post-condition caps at the right amount.
+      // Single-tx: one flat fee. Staged: begin-fee on begin, seal-fee on seal.
+      state.prepared.singleTxFeeMicroStx = null;
+      state.prepared.stagedFee = null;
+      const capabilities = resolveContractCapabilities(state.contract);
+      if (capabilities.supportsNativeSingleTx === true && chunks.length > 0) {
+        if (chunks.length <= SMALL_MINT_HELPER_MAX_CHUNKS) {
+          try {
+            const quoted = await state.client.quoteSingleTxFee(
+              BigInt(bytes.length),
+              BigInt(chunks.length),
+              sender
+            );
+            state.prepared.singleTxFeeMicroStx = Number(quoted);
+          } catch (error) {
+            state.prepared.singleTxFeeMicroStx = null;
+          }
+        }
+        try {
+          const staged = await state.client.quoteStagedFee(
+            BigInt(bytes.length),
+            BigInt(chunks.length),
+            sender
+          );
+          state.prepared.stagedFee = {
+            beginMicroStx: Number(staged.beginFee),
+            sealMicroStx: Number(staged.sealFee),
+            totalMicroStx: Number(staged.totalFee)
+          };
+        } catch (error) {
+          state.prepared.stagedFee = null;
+        }
+      }
+
       await refreshUploadState(expectedHash);
       renderPreparedState();
       void loadUsdPriceBook();
@@ -5585,6 +5805,54 @@
         const hasUploadState = !!state.uploadState;
         let didSendBeforeSeal = false;
 
+        if (shouldUseNativeSingleTx()) {
+          // v3+ native one-transaction mint directly on the core.
+          setStep('begin', 'pending', 'Wallet prompt');
+          setStep('upload', 'pending', 'Single tx');
+          setStep('seal', 'pending', 'Single tx');
+          appendLog(
+            `Native single-tx mint on ${getContractId(state.contract)} (<=${SMALL_MINT_HELPER_MAX_CHUNKS} chunks)${
+              dependencyIds.length > 0 ? ` with ${dependencyIds.length} recursive dependency${dependencyIds.length === 1 ? '' : 'ies'}` : ''
+            }.`
+          );
+          const coreArgs = [
+            bufferCV(prepared.expectedHash),
+            stringAsciiCV(prepared.mimeType),
+            uintCV(BigInt(prepared.bytes.length)),
+            listCV(prepared.chunks.map((chunk) => bufferCV(chunk))),
+            stringAsciiCV(prepared.tokenUriValue)
+          ];
+          // Cap at the quoted single-tx fee when known; fall back to the 3-stage
+          // estimate (always >= the single-tx fee) if the quote is unavailable.
+          const singleTxCapMicroStx =
+            typeof prepared.singleTxFeeMicroStx === 'number'
+              ? prepared.singleTxFeeMicroStx
+              : feeEstimate.totalMicroStx;
+          const singleTx = await requestContractCall({
+            functionName:
+              dependencyIds.length > 0 ? 'mint-single-tx-recursive' : 'mint-single-tx',
+            functionArgs:
+              dependencyIds.length > 0
+                ? [...coreArgs, listCV(dependencyIds.map((id) => uintCV(id)))]
+                : coreArgs,
+            postConditions: resolveFeePostConditions(singleTxCapMicroStx)
+          });
+          const singleTxId = normalizeTxId(singleTx);
+          state.lastSubmittedTxId = singleTxId;
+          appendLog(`Single-tx mint sent: ${singleTxId}`);
+          setStep('begin', 'done', 'Submitted');
+          setStep('upload', 'done', 'Submitted');
+          setStep('seal', 'done', 'Submitted');
+          setStatus(
+            dom.walletStatus,
+            `<strong>Submitted</strong> ${truncateMiddle(singleTxId, 8, 8)}`,
+            'pending',
+            'blue'
+          );
+          await loadWalletInscriptions();
+          return;
+        }
+
         if (shouldUseSmallMintHelper()) {
           const smallMintHelperContract = getSmallMintHelperContract();
           if (!smallMintHelperContract) {
@@ -5652,7 +5920,9 @@
               uintCV(BigInt(prepared.bytes.length)),
               uintCV(BigInt(prepared.chunks.length))
             ],
-            postConditions: resolveFeePostConditions(feeEstimate.beginMicroStx)
+            postConditions: resolveFeePostConditions(
+              prepared.stagedFee?.beginMicroStx ?? feeEstimate.beginMicroStx
+            )
           });
           appendLog(`Begin tx sent: ${normalizeTxId(beginTx)}`);
           setStep('begin', 'done', 'Submitted');
@@ -5728,7 +5998,9 @@
                   bufferCV(prepared.expectedHash),
                   stringAsciiCV(prepared.tokenUriValue)
                 ],
-          postConditions: resolveFeePostConditions(feeEstimate.sealMicroStx)
+          postConditions: resolveFeePostConditions(
+            prepared.stagedFee?.sealMicroStx ?? feeEstimate.sealMicroStx
+          )
         });
         const sealTxId = normalizeTxId(sealTx);
         state.lastSubmittedTxId = sealTxId;
@@ -5803,6 +6075,10 @@
     };
 
     const getTokenClient = (token) => {
+      const galleryClient = getActiveGalleryReadClient();
+      if (galleryClient) {
+        return galleryClient;
+      }
       const legacyId = state.legacyClient ? getContractId(state.legacyClient.contract) : null;
       return legacyId && token.sourceContractId === legacyId
         ? state.legacyClient
@@ -6477,6 +6753,20 @@
       return true;
     };
 
+    // Locate the live grid thumb element for a token without rebuilding the
+    // grid, so a freshly-warmed thumbnail can be applied to just that card
+    // instead of triggering a full re-render (which revokes every blob URL and
+    // restarts all media streams).
+    const findGridThumbElement = (token) => {
+      if (!dom.tokenGrid || !token) {
+        return null;
+      }
+      const card = dom.tokenGrid.querySelector(
+        `.token-card[data-token-id="${token.id.toString()}"]`
+      );
+      return card ? card.querySelector('.token-thumb') : null;
+    };
+
     const warmThumbnailCacheFromBytes = async (token, bytes, mimeType, options = {}) => {
       const kind = getMediaKind(mimeType);
       if (kind !== 'image' && kind !== 'svg') {
@@ -6497,7 +6787,12 @@
           mimeType
         });
         if (options.renderGrid !== false) {
-          renderTokenGrid();
+          const thumbElement = findGridThumbElement(token);
+          if (thumbElement) {
+            renderGridLiveMedia(token, thumbElement, state.gridLiveMediaCache.get(cacheKey));
+          } else {
+            scheduleGridRender();
+          }
         }
         return null;
       }
@@ -6527,7 +6822,12 @@
           mimeType: thumbnail.mimeType
         });
         if (options.renderGrid !== false) {
-          renderTokenGrid();
+          const thumbElement = findGridThumbElement(token);
+          if (thumbElement) {
+            await applyCachedThumbnail(token, thumbElement);
+          } else {
+            scheduleGridRender();
+          }
         }
         return thumbnail;
       } catch (error) {
@@ -6806,7 +7106,7 @@
           ) {
             renderGridLiveMedia(token, thumbElement, state.gridLiveMediaCache.get(cacheKey));
           } else if (getWalletPageIds().some((id) => id === token.id)) {
-            renderTokenGrid();
+            scheduleGridRender();
           }
           debugLog('cache', 'background audio grid display ready', {
             tokenId: token.id.toString(),
@@ -6828,7 +7128,7 @@
           ) {
             renderGridLiveMedia(token, thumbElement, state.gridLiveMediaCache.get(cacheKey));
           } else if (getWalletPageIds().some((id) => id === token.id)) {
-            renderTokenGrid();
+            scheduleGridRender();
           }
           debugLog('cache', 'background video grid display ready', {
             tokenId: token.id.toString(),
@@ -6854,7 +7154,7 @@
           ) {
             renderGridLiveMedia(token, thumbElement, state.gridLiveMediaCache.get(cacheKey));
           } else if (getWalletPageIds().some((id) => id === token.id)) {
-            renderTokenGrid();
+            scheduleGridRender();
           }
           debugLog('cache', 'background html grid display ready', {
             tokenId: token.id.toString(),
@@ -6876,7 +7176,7 @@
           ) {
             renderGridLiveMedia(token, thumbElement, state.gridLiveMediaCache.get(cacheKey));
           } else if (getWalletPageIds().some((id) => id === token.id)) {
-            renderTokenGrid();
+            scheduleGridRender();
           }
           return;
         }
@@ -6900,7 +7200,7 @@
           ) {
             renderGridLiveMedia(token, thumbElement, state.gridLiveMediaCache.get(cacheKey));
           } else if (getWalletPageIds().some((id) => id === token.id)) {
-            renderTokenGrid();
+            scheduleGridRender();
           }
           debugLog('cache', 'background animated image grid display ready', {
             tokenId: token.id.toString(),
@@ -6922,7 +7222,7 @@
         ) {
           await applyCachedThumbnail(token, thumbElement);
         } else if (getWalletPageIds().some((id) => id === token.id)) {
-          renderTokenGrid();
+          scheduleGridRender();
         }
       } catch (error) {
         debugLog(
@@ -6998,6 +7298,29 @@
       });
       pumpBackgroundThumbnailHydrationQueue();
       return true;
+    };
+
+    // Coalesce hydration-triggered re-renders into one per frame. A full
+    // renderTokenGrid revokes every grid blob URL and rebuilds the DOM, which
+    // invalidates the thumbElement references held by in-flight media/thumbnail
+    // callbacks — each of which would then trigger another full render, causing
+    // a render storm and visible flicker (images briefly reverting to the mime
+    // placeholder). Scheduling collapses that cascade.
+    let gridRenderScheduled = false;
+    const scheduleGridRender = () => {
+      if (gridRenderScheduled) {
+        return;
+      }
+      gridRenderScheduled = true;
+      const run = () => {
+        gridRenderScheduled = false;
+        renderTokenGrid();
+      };
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(run);
+      } else {
+        setTimeout(run, 16);
+      }
     };
 
     const renderTokenGrid = (options = {}) => {
@@ -7532,7 +7855,9 @@ const openCuratedGallery = async (galleryId) => {
   renderTokenGridPlaceholders('...');
 
   try {
-    const summaries = await fetchWalletTokenSummaries(gallery.tokenIds);
+    const summaries = await fetchWalletTokenSummaries(gallery.tokenIds, {
+      primaryOnly: gallery.primaryOnly === true
+    });
     debugLog('grid', 'curated gallery summaries fetched', {
       viewRequestId,
       galleryId: gallery.id,
@@ -7730,15 +8055,71 @@ const openCuratedGallery = async (galleryId) => {
       };
     };
 
-    const fetchWalletTokenSummaries = async (ids) => {
+    // Fetch (cached per primary contract) the set of primary-minted token ids
+    // that fall within the legacy id range, so reads can be routed in one shot.
+    const getPrimaryMintedIdSet = async (sender, legacyMaxId) => {
+      if (!state.client || legacyMaxId === null) {
+        return null;
+      }
+      const cacheKey = getContractId(state.contract);
+      if (state.primaryMintedIdCache && state.primaryMintedIdCache.key === cacheKey) {
+        return state.primaryMintedIdCache.set;
+      }
+      try {
+        const count = await state.client.getMintedCount(sender);
+        const total = Number(count);
+        if (!Number.isFinite(total) || total <= 0) {
+          const empty = new Set();
+          state.primaryMintedIdCache = { key: cacheKey, set: empty };
+          return empty;
+        }
+        const scanCount = Math.min(total, 2000);
+        const indices = Array.from({ length: scanCount }, (_, index) => BigInt(index));
+        const mintedIds = await runLimited(indices, 6, async (index) => {
+          try {
+            return await state.client.getMintedId(index, sender);
+          } catch (error) {
+            return null;
+          }
+        });
+        const set = new Set(
+          mintedIds
+            .filter((id) => id !== null && id <= legacyMaxId)
+            .map((id) => id.toString())
+        );
+        state.primaryMintedIdCache = { key: cacheKey, set };
+        return set;
+      } catch (error) {
+        return null;
+      }
+    };
+
+    const fetchWalletTokenSummaries = async (ids, options = {}) => {
       const startedAt = performance.now();
+      // primaryOnly: read strictly from the active (primary) contract, skipping
+      // the legacy fallback. Used by galleries whose token ids live on the
+      // primary core but fall within the legacy id range (e.g. v3 #359, which
+      // would otherwise be shadowed by the v2 token of the same id).
+      const primaryOnly = options.primaryOnly === true;
+      // A gallery pinned to a specific core (e.g. v1 origins) reads strictly
+      // from that core's client, with no legacy fallback.
+      const galleryReadClient = getActiveGalleryReadClient();
+      const directReadClient = galleryReadClient ?? state.client;
+      const useDirectRead = primaryOnly || !!galleryReadClient;
       const sender = getReadOnlySenderAddress();
       let legacyMaxId = null;
-      if (state.legacyClient) {
+      let primaryMintedIds = null;
+      if (state.legacyClient && !useDirectRead) {
         try {
           legacyMaxId = await state.legacyClient.getLastTokenId(sender);
         } catch (error) {
           legacyMaxId = null;
+        }
+        // Fetch (and cache) the set of primary-minted ids that fall within the
+        // legacy id range. This lets each token route in a single read: ids on
+        // primary resolve on primary, all others on legacy — no read-misses.
+        if (legacyMaxId !== null) {
+          primaryMintedIds = await getPrimaryMintedIdSet(sender, legacyMaxId);
         }
       }
       const visibleIds = [...ids]
@@ -7755,17 +8136,18 @@ const openCuratedGallery = async (galleryId) => {
       });
       const summaries = await runLimited(visibleIds, 4, async (id) => {
         try {
-          if (state.legacyClient) {
+          if (state.legacyClient && !useDirectRead) {
             return await fetchTokenSummaryWithFallback({
               primaryClient: state.client,
               legacyClient: state.legacyClient,
               id,
               senderAddress: sender,
-              legacyMaxId
+              legacyMaxId,
+              primaryMintedIds
             });
           }
           return await fetchTokenSummary({
-            client: state.client,
+            client: directReadClient,
             id,
             senderAddress: sender
           });

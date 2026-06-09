@@ -5,8 +5,10 @@ import {
   showConnect as legacyShowConnect,
   showContractCall as legacyShowContractCall,
   showContractDeploy as legacyShowContractDeploy,
+  showSTXTransfer as legacyShowSTXTransfer,
   type ContractCallOptions,
   type ContractDeployOptions,
+  type STXTransferOptions,
   type StacksProvider
 } from '@stacks/connect';
 import {
@@ -94,6 +96,12 @@ type WalletContractDeployOptions = WalletActionBase & {
   contractName: string;
   codeBody: string;
   clarityVersion?: number;
+};
+
+type WalletStxTransferOptions = WalletActionBase & {
+  recipient: string;
+  amount: STXTransferOptions['amount'];
+  memo?: string;
 };
 
 const disconnectedSession = (): WalletSession => ({ isConnected: false });
@@ -444,6 +452,17 @@ const normalizeTxResult = (payload: unknown): WalletTxResult => {
   throw new Error('Wallet response did not include a transaction id.');
 };
 
+const normalizeTxResultForCallback = (payload: unknown): WalletTxResult => {
+  const normalized = normalizeTxResultPayload(payload);
+  if (normalized) {
+    return normalized;
+  }
+  if (payload && typeof payload === 'object') {
+    return payload as WalletTxResult;
+  }
+  return { result: payload };
+};
+
 const toLegacyContractCallOptions = (
   options: WalletContractCallOptions
 ): ContractCallOptions =>
@@ -457,6 +476,13 @@ const toLegacyContractDeployOptions = (
   (options.sponsored === true
     ? { ...options, sponsored: true }
     : { ...options, sponsored: false }) as ContractDeployOptions;
+
+const toLegacyStxTransferOptions = (
+  options: WalletStxTransferOptions
+): STXTransferOptions =>
+  (options.sponsored === true
+    ? { ...options, sponsored: true }
+    : { ...options, sponsored: false }) as STXTransferOptions;
 
 const buildContractCallParams = (options: WalletContractCallOptions) => {
   const postConditions =
@@ -502,6 +528,17 @@ const buildContractDeployParams = (options: WalletContractDeployOptions) => {
   };
 };
 
+const buildStxTransferParams = (options: WalletStxTransferOptions) => ({
+  recipient: options.recipient,
+  amount: normalizeBigIntLike(options.amount) ?? '0',
+  memo: options.memo,
+  network: normalizeNetwork(options.network),
+  address: options.stxAddress,
+  fee: normalizeBigIntLike(options.fee),
+  nonce: normalizeBigIntLike(options.nonce),
+  sponsored: options.sponsored ?? false
+});
+
 const requestLeatherContractCall = async (
   provider: StacksProvider,
   options: WalletContractCallOptions
@@ -510,6 +547,18 @@ const requestLeatherContractCall = async (
     provider,
     'stx_callContract',
     buildContractCallParams(options)
+  );
+  return normalizeTxResult(response);
+};
+
+const requestLeatherStxTransfer = async (
+  provider: StacksProvider,
+  options: WalletStxTransferOptions
+) => {
+  const response = await requestProvider(
+    provider,
+    'stx_transferStx',
+    buildStxTransferParams(options)
   );
   return normalizeTxResult(response);
 };
@@ -658,6 +707,8 @@ const selectProvider = (options?: {
 export const isLeatherProviderId = (providerId: string | null | undefined) =>
   typeof providerId === 'string' && providerId.toLowerCase().includes('leather');
 
+export const getSelectedWalletProviderId = () => getSelectedProviderId();
+
 export const getStacksProvider = (): StacksProvider | undefined => {
   if (typeof window === 'undefined') {
     return undefined;
@@ -742,10 +793,12 @@ export const showContractCall = (
   provider?: StacksProvider
 ) => {
   const activeProvider = provider ?? getStacksProvider();
-  const providerId = getSelectedProviderId();
   const legacyOptions = toLegacyContractCallOptions(options);
 
-  if (!activeProvider || !isLeatherProviderId(providerId)) {
+  // Prefer the modern stx_callContract request for any provider that exposes a
+  // request() bridge (Xverse, Leather, other WBIP wallets). The legacy popup
+  // flow is rejected by current Xverse builds, so it is only a fallback.
+  if (!activeProvider || typeof activeProvider.request !== 'function') {
     return legacyShowContractCall(legacyOptions, provider);
   }
 
@@ -769,10 +822,14 @@ export const showContractDeploy = (
   provider?: StacksProvider
 ) => {
   const activeProvider = provider ?? getStacksProvider();
-  const providerId = getSelectedProviderId();
   const legacyOptions = toLegacyContractDeployOptions(options);
 
-  if (!activeProvider || !isLeatherProviderId(providerId)) {
+  // Prefer the modern stx_deployContract request for any provider that exposes
+  // it (Xverse, Leather, and other WBIP-compatible wallets). The legacy
+  // showContractDeploy popup flow is rejected by current Xverse builds with
+  // "Unexpected error creating transaction", so it is only used as a fallback
+  // when the provider has no request() bridge or reports the method unsupported.
+  if (!activeProvider || typeof activeProvider.request !== 'function') {
     return legacyShowContractDeploy(legacyOptions, provider);
   }
 
@@ -791,13 +848,48 @@ export const showContractDeploy = (
     });
 };
 
+export const showStxTransfer = (
+  options: WalletStxTransferOptions,
+  provider?: StacksProvider
+) => {
+  const activeProvider = provider ?? getStacksProvider();
+  const legacyOptions = toLegacyStxTransferOptions({
+    ...options,
+    onFinish: (payload) => {
+      options.onFinish?.(normalizeTxResultForCallback(payload));
+    }
+  });
+
+  // Prefer the modern stx_transferStx request for any provider with a request()
+  // bridge; legacy popup is only a fallback (rejected by current Xverse).
+  if (!activeProvider || typeof activeProvider.request !== 'function') {
+    return legacyShowSTXTransfer(legacyOptions, provider);
+  }
+
+  return void requestLeatherStxTransfer(activeProvider, options)
+    .then((payload) => {
+      options.onFinish?.(payload);
+    })
+    .catch((error) => {
+      if (isMethodUnsupportedError(error)) {
+        legacyShowSTXTransfer(legacyOptions, activeProvider);
+        return;
+      }
+      // eslint-disable-next-line no-console
+      console.error('[wallet] STX transfer request failed', error);
+      options.onCancel?.();
+    });
+};
+
 export const __testing = {
   buildContractCallParams,
   buildContractDeployParams,
+  buildStxTransferParams,
   extractStacksAddress,
   isMethodUnsupportedError,
   isUserCancelledError,
   normalizeNetwork,
+  normalizeTxResultForCallback,
   normalizeTxResultPayload,
   normalizeTxResult
 };
