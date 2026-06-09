@@ -8108,18 +8108,20 @@ const openCuratedGallery = async (galleryId) => {
       const useDirectRead = primaryOnly || !!galleryReadClient;
       const sender = getReadOnlySenderAddress();
       let legacyMaxId = null;
-      let primaryMintedIds = null;
+      // Migrated tokens are held in escrow by the primary (v3) contract, so a
+      // legacy token whose owner is the primary contract has moved to v3. Passing
+      // this as escrowOwner lets the fallback resolve each id in 1–2 reads (legacy
+      // read; primary read only when escrow-owned) instead of pre-fetching the
+      // whole primary minted-id set — which grew large and blocked page loads.
+      const escrowOwner =
+        state.legacyClient && !useDirectRead
+          ? getContractId(state.client.contract)
+          : null;
       if (state.legacyClient && !useDirectRead) {
         try {
           legacyMaxId = await state.legacyClient.getLastTokenId(sender);
         } catch (error) {
           legacyMaxId = null;
-        }
-        // Fetch (and cache) the set of primary-minted ids that fall within the
-        // legacy id range. This lets each token route in a single read: ids on
-        // primary resolve on primary, all others on legacy — no read-misses.
-        if (legacyMaxId !== null) {
-          primaryMintedIds = await getPrimaryMintedIdSet(sender, legacyMaxId);
         }
       }
       const visibleIds = [...ids]
@@ -8143,7 +8145,7 @@ const openCuratedGallery = async (galleryId) => {
               id,
               senderAddress: sender,
               legacyMaxId,
-              primaryMintedIds
+              escrowOwner
             });
           }
           return await fetchTokenSummary({
