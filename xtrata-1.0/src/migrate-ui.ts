@@ -202,6 +202,12 @@ const migrate = (id: bigint) =>
             state.v3Minted.add(id.toString());
             state.eligible = state.eligible.filter((value) => value !== id);
             render();
+            // Keep the cached index accurate immediately: the new v3 token and
+            // the now-escrowed legacy token both changed. Fire-and-forget.
+            const sourceName = SOURCES[state.source].name;
+            for (const contractId of [`${DEPLOYER}.${CORE}`, `${DEPLOYER}.${sourceName}`]) {
+              void fetch(`/index/${contractId}?id=${id}`, { method: 'POST' }).catch(() => undefined);
+            }
             resolve();
           } else {
             note(`#${id} FAILED on-chain (${txId}). Stopping the run.`);

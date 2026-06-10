@@ -9,6 +9,7 @@ import {
   loadTokenSummaryFromCache,
   saveTokenSummaryToCache
 } from './cache';
+import { fetchIndexedSummaries } from './index-summaries';
 
 export const getViewerKey = (contractId: string) => ['viewer', contractId];
 export const getLastTokenIdKey = (contractId: string) => [
@@ -174,6 +175,12 @@ export const fetchTokenSummaryWithFallback = async (params: {
   // provided, routing is a single read: ids in this set resolve on primary, all
   // other ids in the legacy range resolve on legacy — no speculative read-miss.
   primaryMintedIds?: Set<string> | null;
+  // Ordered legacy lineage (e.g. [v2, v1]). When provided, resolution is
+  // primary-first: read the primary core, then each lineage core until a token
+  // is found. This is the only correct strategy across all migration paths —
+  // including v1->v3 direct migrations, which never existed on v2, so a
+  // legacy-first/escrow check would miss them and the token would not render.
+  lineageClients?: Array<XtrataClient | null> | null;
 }): Promise<TokenSummary> => {
   const legacyClient = params.legacyClient ?? null;
   const legacyMaxId = params.legacyMaxId ?? null;
@@ -185,6 +192,34 @@ export const fetchTokenSummaryWithFallback = async (params: {
   const legacyContractId = legacyClient
     ? getContractId(legacyClient.contract)
     : null;
+
+  const lineage = (params.lineageClients ?? []).filter(
+    (candidate): candidate is XtrataClient => !!candidate
+  );
+  if (lineage.length > 0) {
+    const primarySummary = await fetchTokenSummary({
+      client: params.primaryClient,
+      id: params.id,
+      senderAddress: params.senderAddress
+    });
+    if (!isEmptySummary(primarySummary)) {
+      return { ...primarySummary, sourceContractId: primaryContractId };
+    }
+    for (const candidate of lineage) {
+      const candidateSummary = await fetchTokenSummary({
+        client: candidate,
+        id: params.id,
+        senderAddress: params.senderAddress
+      });
+      if (!isEmptySummary(candidateSummary)) {
+        return {
+          ...candidateSummary,
+          sourceContractId: getContractId(candidate.contract)
+        };
+      }
+    }
+    return { ...primarySummary, sourceContractId: primaryContractId };
+  }
 
   // If we know the primary minted this id, it is authoritative — route straight
   // to the primary path below (single read), even if the id overlaps the legacy
@@ -328,6 +363,10 @@ export const useTokenSummaries = (params: {
   enabled?: boolean;
   contractIdOverride?: string;
   fetchSummary?: (id: bigint) => Promise<TokenSummary>;
+  // When provided, the whole page is served from the D1 index first (primary-
+  // first across [primary, ...lineage]); only ids the index hasn't synced (or
+  // SVGs) fall through to per-token chain reads.
+  indexLineageContractIds?: string[];
 }) => {
   const contractId =
     params.contractIdOverride ?? getContractId(params.client.contract);
@@ -342,20 +381,54 @@ export const useTokenSummaries = (params: {
     return buildTokenRange(params.lastTokenId);
   }, [params.lastTokenId, params.tokenIds]);
 
+  const useIndex =
+    !params.fetchSummary &&
+    !!params.indexLineageContractIds &&
+    params.indexLineageContractIds.length > 0;
+  const indexQuery = useQuery({
+    queryKey: [
+      ...getViewerKey(contractId),
+      'index-batch',
+      tokenIds.map((id) => id.toString()).join(',')
+    ],
+    queryFn: () =>
+      fetchIndexedSummaries({
+        primaryContractId: contractId,
+        lineageContractIds: params.indexLineageContractIds!,
+        ids: tokenIds
+      }),
+    enabled: useIndex && isEnabled && tokenIds.length > 0,
+    staleTime: 300_000,
+    refetchOnWindowFocus: false
+  });
+  const indexMap = indexQuery.data ?? null;
+  // Don't start per-token chain reads until the batch index has settled, so
+  // index hits never trigger a redundant chain read.
+  const indexSettled = !useIndex || indexQuery.isSuccess || indexQuery.isError;
+
   const fetcher =
     params.fetchSummary ??
-    ((id: bigint) =>
-      fetchTokenSummary({
+    ((id: bigint) => {
+      const indexed = indexMap?.get(id.toString());
+      if (indexed) {
+        return Promise.resolve(indexed);
+      }
+      return fetchTokenSummary({
         client: params.client,
         id,
         senderAddress: params.senderAddress
-      }));
+      });
+    });
 
   const tokenQueries = useQueries({
     queries: tokenIds.map((id) => ({
       queryKey: getTokenSummaryKey(contractId, id),
       queryFn: () => fetcher(id),
-      enabled: isEnabled && params.senderAddress.length > 0 && tokenIds.length > 0,
+      enabled:
+        isEnabled &&
+        params.senderAddress.length > 0 &&
+        tokenIds.length > 0 &&
+        indexSettled,
       staleTime: 300_000,
       refetchOnWindowFocus: false
     }))
