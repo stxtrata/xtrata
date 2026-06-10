@@ -1123,10 +1123,22 @@
 
     .selected-relationships {
       display: grid;
-      gap: 8px;
+      gap: 14px;
       margin-top: 12px;
       padding-top: 12px;
       border-top: 1px solid var(--line);
+    }
+
+    .selected-relationships__group {
+      display: grid;
+      gap: 8px;
+    }
+
+    .selected-relationships__scan {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 8px;
     }
 
     .selected-relationships__head {
@@ -3522,6 +3534,12 @@
     } from '/src/lib/viewer/queries.ts';
     import { fetchIndexedSummaries } from '/src/lib/viewer/index-summaries.ts';
     import {
+      loadIndexedChildren,
+      loadChildIndexCursor,
+      recordChildParents,
+      syncChildIndex
+    } from '/src/lib/viewer/parent-child-index.ts';
+    import {
       decodeTokenUriToImage,
       fetchTokenImageFromUri,
       fetchOnChainContent,
@@ -3920,6 +3938,10 @@
       tokenPreviewRequestId: 0,
       selectedOwnerNameRequestId: 0,
       selectedParentsRequestId: 0,
+      selectedChildrenRequestId: 0,
+      childScanRunning: false,
+      childScanCancel: false,
+      childScanTokenId: null,
       fullscreenUrl: null,
       fullscreenOpen: false,
       tokenThumbUrls: new Map(),
@@ -4864,23 +4886,54 @@
 
     const clearSelectedInscriptionRelationships = () => {
       state.selectedParentsRequestId += 1;
+      state.selectedChildrenRequestId += 1;
       if (dom.selectedRelationships) {
         dom.selectedRelationships.replaceChildren();
         dom.selectedRelationships.hidden = true;
       }
     };
 
-    // Fetches and renders the parent inscriptions of the selected token: the
-    // parent ID numbers followed by a thumbnail grid. Thumbnails load straight
-    // from the runtime content endpoint (image/svg render inline; other media
-    // falls back to an ID-only tile). A monotonic request id guards against
-    // stale async results when the selection changes mid-fetch.
+    // Shared thumbnail tile for a related inscription (parent or child). Loads
+    // straight from the runtime content endpoint (image/svg render inline; any
+    // other media triggers the error fallback to an ID-only tile) and navigates
+    // to the inscription on click.
+    const buildRelationshipThumbCard = (contractId, relatedId, role) => {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'parent-thumb';
+      card.title = `View ${role} ${formatTokenId(relatedId)}`;
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.alt = `${role} ${formatTokenId(relatedId)}`;
+      img.src = buildRuntimeInscriptionContentUrl({
+        coreContractId: contractId,
+        tokenId: relatedId
+      });
+      img.addEventListener('error', () => {
+        img.remove();
+        card.classList.add('parent-thumb--error');
+      });
+      const tag = document.createElement('span');
+      tag.className = 'parent-thumb__id';
+      tag.textContent = formatTokenId(relatedId);
+      card.append(img, tag);
+      card.addEventListener('click', () => {
+        void focusWalletTokenById(relatedId);
+      });
+      return card;
+    };
+
+    // Orchestrates both relationship directions for the selected inscription:
+    // upward to its parents (on-chain get-parents) and downward to its children
+    // (the persisted reverse index, with an explicit scan to build/refresh it).
     const renderSelectedInscriptionRelationships = async (token) => {
       const container = dom.selectedRelationships;
       if (!container) {
         return;
       }
-      const requestId = ++state.selectedParentsRequestId;
+      state.selectedParentsRequestId += 1;
+      state.selectedChildrenRequestId += 1;
       if (!token || !supportsParentRelationships()) {
         container.replaceChildren();
         container.hidden = true;
@@ -4888,13 +4941,28 @@
       }
       container.hidden = false;
       container.replaceChildren();
+      const contractId = getTokenCacheContractId(token);
+      const parentsSection = document.createElement('div');
+      parentsSection.className = 'selected-relationships__group';
+      const childrenSection = document.createElement('div');
+      childrenSection.className = 'selected-relationships__group';
+      container.append(parentsSection, childrenSection);
+      void renderParentsSection(token, contractId, parentsSection);
+      void renderChildrenSection(token, contractId, childrenSection);
+    };
+
+    // Upward navigation: this inscription's parents, read live from the chain.
+    // Also opportunistically records the child -> parents edge so browsing
+    // gradually seeds the reverse index even without a full scan.
+    const renderParentsSection = async (token, contractId, section) => {
+      const requestId = ++state.selectedParentsRequestId;
       const heading = document.createElement('div');
       heading.className = 'selected-relationships__head';
       heading.textContent = 'Parents';
       const status = document.createElement('div');
       status.className = 'selected-relationships__status';
       status.textContent = 'Loading parents…';
-      container.append(heading, status);
+      section.replaceChildren(heading, status);
 
       let parents = [];
       try {
@@ -4916,12 +4984,12 @@
       ) {
         return;
       }
+      void recordChildParents({ contractId, childId: token.id, parentIds: parents });
       if (!parents || parents.length === 0) {
-        container.replaceChildren();
-        container.hidden = true;
+        heading.textContent = 'Parents (0)';
+        status.textContent = 'No parents.';
         return;
       }
-
       heading.textContent = `Parents (${parents.length})`;
       status.remove();
       const ids = document.createElement('div');
@@ -4929,34 +4997,147 @@
       ids.textContent = parents.map((id) => formatTokenId(id)).join(', ');
       const thumbs = document.createElement('div');
       thumbs.className = 'selected-relationships__thumbs';
-      const contractId = getTokenCacheContractId(token);
       for (const parentId of parents) {
-        const card = document.createElement('button');
-        card.type = 'button';
-        card.className = 'parent-thumb';
-        card.title = `View parent ${formatTokenId(parentId)}`;
-        const img = document.createElement('img');
-        img.loading = 'lazy';
-        img.decoding = 'async';
-        img.alt = `Parent ${formatTokenId(parentId)}`;
-        img.src = buildRuntimeInscriptionContentUrl({
-          coreContractId: contractId,
-          tokenId: parentId
-        });
-        img.addEventListener('error', () => {
-          img.remove();
-          card.classList.add('parent-thumb--error');
-        });
-        const tag = document.createElement('span');
-        tag.className = 'parent-thumb__id';
-        tag.textContent = formatTokenId(parentId);
-        card.append(img, tag);
-        card.addEventListener('click', () => {
-          void focusWalletTokenById(parentId);
-        });
-        thumbs.append(card);
+        thumbs.append(buildRelationshipThumbCard(contractId, parentId, 'parent'));
       }
-      container.append(ids, thumbs);
+      section.append(ids, thumbs);
+    };
+
+    // Downward navigation: children read from the persisted reverse index, plus
+    // a Scan control to build/refresh it (there is no on-chain get-children).
+    const renderChildrenSection = async (token, contractId, section) => {
+      const requestId = ++state.selectedChildrenRequestId;
+      const heading = document.createElement('div');
+      heading.className = 'selected-relationships__head';
+      heading.textContent = 'Children';
+      const status = document.createElement('div');
+      status.className = 'selected-relationships__status';
+      status.textContent = 'Reading child index…';
+      section.replaceChildren(heading, status);
+
+      let children = [];
+      try {
+        children = await loadIndexedChildren({ contractId, parentId: token.id });
+      } catch (error) {
+        children = [];
+      }
+      if (
+        requestId !== state.selectedChildrenRequestId ||
+        state.selectedTokenId !== token.id
+      ) {
+        return;
+      }
+
+      heading.textContent = `Children (${children.length})`;
+      if (children.length > 0) {
+        const ids = document.createElement('div');
+        ids.className = 'selected-relationships__ids';
+        ids.textContent = children.map((id) => formatTokenId(id)).join(', ');
+        const thumbs = document.createElement('div');
+        thumbs.className = 'selected-relationships__thumbs';
+        for (const childId of children) {
+          thumbs.append(buildRelationshipThumbCard(contractId, childId, 'child'));
+        }
+        section.replaceChildren(heading, ids, thumbs);
+      } else {
+        status.textContent = 'No indexed children yet.';
+      }
+
+      // Coverage line + scan control. The index is contract-wide, so the cursor
+      // tells us how much of the minted list has been scanned regardless of
+      // which token is selected.
+      const controls = document.createElement('div');
+      controls.className = 'selected-relationships__scan';
+      const coverage = document.createElement('span');
+      coverage.className = 'selected-relationships__status';
+      const scanButton = document.createElement('button');
+      scanButton.type = 'button';
+      scanButton.className = 'small-link';
+      controls.append(scanButton, coverage);
+      section.append(controls);
+
+      const supportsScan = state.client.supportsMintedIndex === true;
+      try {
+        const cursor = await loadChildIndexCursor(contractId);
+        if (
+          requestId !== state.selectedChildrenRequestId ||
+          state.selectedTokenId !== token.id
+        ) {
+          return;
+        }
+        coverage.textContent =
+          cursor > 0n ? `Indexed ${cursor.toString()} inscriptions so far.` : 'Not indexed yet.';
+      } catch (error) {
+        coverage.textContent = '';
+      }
+
+      if (!supportsScan) {
+        scanButton.hidden = true;
+        coverage.textContent = 'Child indexing requires a minted-index contract (v2.1.0+).';
+        return;
+      }
+      scanButton.textContent = state.childScanRunning
+        ? 'Cancel scan'
+        : children.length > 0
+          ? 'Rescan for children'
+          : 'Scan for children';
+      scanButton.disabled = state.childScanRunning && state.childScanTokenId !== token.id;
+      scanButton.addEventListener('click', () => {
+        if (state.childScanRunning) {
+          state.childScanCancel = true;
+          return;
+        }
+        void runChildIndexScan(token, contractId, scanButton, coverage);
+      });
+    };
+
+    // Runs the bounded, cancellable reverse-index scan for the selected token's
+    // contract, streaming progress into the Children section and re-rendering
+    // it on completion so newly-found children appear.
+    const runChildIndexScan = async (token, contractId, scanButton, coverage) => {
+      if (state.childScanRunning) {
+        return;
+      }
+      state.childScanRunning = true;
+      state.childScanCancel = false;
+      state.childScanTokenId = token.id;
+      scanButton.textContent = 'Cancel scan';
+      coverage.textContent = 'Starting scan…';
+      try {
+        const sender = getReadOnlySenderAddress();
+        const result = await syncChildIndex({
+          client: state.client,
+          contractId,
+          senderAddress: sender,
+          parentId: token.id,
+          shouldCancel: () => state.childScanCancel,
+          onProgress: (progress) => {
+            if (state.selectedTokenId !== token.id) {
+              return;
+            }
+            coverage.textContent =
+              `Scanning ${progress.scanned.toString()}/${progress.total.toString()}… ` +
+              `${progress.found.toString()} child${progress.found === 1n ? '' : 'ren'} found.`;
+          }
+        });
+        coverage.textContent = result.cancelled
+          ? `Scan paused at ${result.nextMintedIndex.toString()}/${result.mintedCount.toString()}.`
+          : `Scan complete — covered ${result.mintedCount.toString()} inscriptions.`;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        coverage.textContent = `Scan failed: ${message}`;
+      } finally {
+        state.childScanRunning = false;
+        state.childScanCancel = false;
+        state.childScanTokenId = null;
+        // Re-render with the freshly indexed children if the token is still selected.
+        if (state.selectedTokenId === token.id) {
+          const section = scanButton.closest('.selected-relationships__group');
+          if (section) {
+            void renderChildrenSection(token, contractId, section);
+          }
+        }
+      }
     };
 
     const resolveSelectedInscriptionOwnerName = async (token) => {
