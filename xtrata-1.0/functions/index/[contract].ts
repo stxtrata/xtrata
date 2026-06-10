@@ -80,10 +80,17 @@ const readSummary = async (env: RuntimeEnv, apiBases: string[], contract: Runtim
     totalSize: asNumber(fields['total-size']),
     totalChunks: asNumber(fields['total-chunks']),
     sealed: unwrap(fields['sealed']) === true ? 1 : 0,
+    // migration-source is (optional { source-contract: principal, source-id: uint }).
+    // Store the XIP-002 canonical reference "<contract>:<id>", or null.
     migrationSource: (() => {
       const ms = fields['migration-source'];
-      const v = ms ? unwrap(unwrap(ms)) : null;
-      return v ? asString(v) : null;
+      if (!ms) return null;
+      const inner = unwrap(ms); // optional -> tuple json or null
+      if (inner === null || inner === undefined) return null;
+      const t = inner.value ?? inner;
+      const sourceContract = asString(t['source-contract']);
+      const sourceId = asNumber(t['source-id']);
+      return sourceContract != null && sourceId != null ? `${sourceContract}:${sourceId}` : null;
     })()
   };
 };
