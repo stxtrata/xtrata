@@ -2957,14 +2957,7 @@
               <div class="wallet-examples" id="walletExamples" aria-label="Example wallet views">
                 <span>View Examples</span>
 
-                <button
-                  class="wallet-example-chip"
-                  type="button"
-                  data-curated-gallery="v3-core"
-                  title="The current live core, xtrata-v3-2-3."
-                >
-                  v3 core
-                </button>
+
 
                 <button
                   class="wallet-example-chip"
@@ -3486,12 +3479,7 @@
     const OPUS_HTML_HANDOFF_STORE = 'pending';
     const THEME_IDS = new Set(['classic', 'terminal', 'midnight', 'neon', 'monochrome', 'obsidian', 'ember', 'ultraviolet', 'arctic', 'ruby']);
     const CURATED_GALLERIES = [
-          {
-            id: 'v3-core',
-            title: 'v3',
-            tokenIds: [359n, 313n, 14n],
-            primaryOnly: true
-          },
+          
           {
             id: 'jim-music',
             title: 'music',
@@ -3512,7 +3500,7 @@
             title: 'v1 origins',
             // Read strictly from the original core, xtrata-v1-1-1.
             contractId: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1',
-            tokenIds: [1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n, 9n, 10n, 11n, 12n, 14n, 20n, 25n, 38n]
+            tokenIds: [1n, 3n, 4n, 5n, 6n, 7n, 9n, 10n, 11n, 14n, 18n, 19n, 24n]
           },
           {
             id: 'stacksboard',
@@ -3590,13 +3578,6 @@
           'A very early Stacks art collection by OG artist DYLE, inscribed through Xtrata as permanent on-chain media.'
       },
 
-      'v3-core': {
-        label: 'v3 core',
-        heading: 'Viewing the v3 core',
-        tooltip: 'The current live core, xtrata-v3-2-3.',
-        description:
-          'The current Xtrata core (xtrata-v3-2-3): the v3 sealing inscription and tokens carried forward by migration from earlier cores.'
-      },
 
       'jim-music': {
         label: 'Music by Various',
@@ -3736,6 +3717,7 @@
       tokenThumbUrls: new Map(),
       thumbnailCache: new Map(),
       gridLiveMediaCache: new Map(),
+      summaryCacheScopes: new Map(),
       thumbnailHydrationQueue: [],
       thumbnailHydrationQueued: new Set(),
       thumbnailHydrationInFlight: new Set(),
@@ -3772,10 +3754,23 @@
     const WALLET_FALLBACK_SCAN_LIMIT = 2000;
     const MAX_GRID_EAGER_FULL_LOAD_BYTES = 4n * 1024n * 1024n;
     const GRID_THUMBNAIL_HYDRATION_CONCURRENCY = 2;
+    const GRID_SUMMARY_CACHE_MAX_SCOPES = 12;
+    const GRID_SUMMARY_CACHE_MAX_ENTRIES = 512;
     const EXPLORER_FILTER_INDEX_CHUNK_SIZE = 48;
     const CONNECTED_LEDGER_MODE_STORAGE_PREFIX = 'xtrata.simple-homepage.connected-ledger-mode';
 
     const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+    const waitForGridPaint = () =>
+      new Promise((resolve) => {
+        if (typeof window.requestAnimationFrame !== 'function') {
+          window.setTimeout(resolve, 0);
+          return;
+        }
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(resolve);
+        });
+      });
 
     const isAscii = (value) => /^[\x00-\x7F]*$/.test(value);
 
@@ -6895,10 +6890,21 @@
       token.meta.totalSize <= MAX_GRID_EAGER_FULL_LOAD_BYTES &&
       isPotentialAnimatedRasterMimeType(token.meta.mimeType ?? null);
 
-    const getTokenRuntimeImageUrl = (token) =>
-      getMediaKind(token.meta?.mimeType ?? null) === 'image'
+    const getTokenRuntimeImageUrl = (token) => {
+      // SVG is included here so the grid renders it as a direct <img> from the
+      // runtime content endpoint (served as image/svg+xml). The browser scales
+      // the vector to the card; this avoids the canvas thumbnail rasterizer,
+      // which returns null for SVGs that declare no intrinsic width/height (most
+      // generative SVGs) — the reason XML/SVG tiles previously showed blank even
+      // though the preview canvas, which renders the same <img> directly, worked.
+      const kind = getMediaKind(token.meta?.mimeType ?? null);
+      return kind === 'image' || kind === 'svg'
         ? getTokenRuntimeContentUrl(token)
         : null;
+    };
+
+    const isSvgToken = (token) =>
+      getMediaKind(token.meta?.mimeType ?? null) === 'svg';
 
     const renderGridRuntimeImage = (token, thumbElement) => {
       const sourceUrl = getTokenRuntimeImageUrl(token);
@@ -6913,6 +6919,7 @@
       applyPixelPerfectImageRendering(img, {
         mimeType: token.meta?.mimeType ?? null,
         sourceUrl,
+        isSvgSource: isSvgToken(token),
         squareFrame: true
       });
       img.addEventListener('load', () => {
@@ -7203,6 +7210,32 @@
           }
           return;
         }
+        if (kind === 'svg') {
+          // Render SVG directly as a blob <img> rather than rasterising it: the
+          // canvas thumbnail path yields 0x0 for SVGs that declare no intrinsic
+          // size. This is the fallback when the runtime-content <img> failed
+          // (e.g. the endpoint hiccuped), so SVG tiles still render from bytes.
+          state.gridLiveMediaCache.set(cacheKey, {
+            kind: 'svg',
+            bytes,
+            mimeType: 'image/svg+xml'
+          });
+          if (
+            thumbElement.isConnected &&
+            thumbElement.dataset.thumbnailKey === cacheKey
+          ) {
+            renderGridLiveMedia(token, thumbElement, state.gridLiveMediaCache.get(cacheKey));
+          } else if (getWalletPageIds().some((id) => id === token.id)) {
+            scheduleGridRender();
+          }
+          debugLog('cache', 'background svg grid display ready', {
+            tokenId: token.id.toString(),
+            contractId: cacheContractId,
+            bytes: bytes.length,
+            mimeType
+          });
+          return;
+        }
         if (kind !== 'image' && kind !== 'svg') {
           debugLog('cache', 'background thumbnail skipped non-image content', {
             tokenId: token.id.toString(),
@@ -7405,6 +7438,11 @@
             thumb.classList.add('has-thumbnail');
             thumb.dataset.thumbnailState = 'inline-svg';
             thumb.append(img);
+          } else if (isSvgToken(token) && renderGridRuntimeImage(token, thumb)) {
+            // SVG with no precomputed data-uri (e.g. served from the D1 index):
+            // render the vector directly from the runtime content endpoint
+            // instead of the rasterizer, which fails for size-less SVGs.
+            shouldApplyCachedThumbnail = false;
           } else {
             const cacheKey = getThumbnailKey(token);
             const liveMedia = state.gridLiveMediaCache.get(cacheKey);
@@ -7878,13 +7916,33 @@ const openCuratedGallery = async (galleryId) => {
   renderTokenGridPlaceholders('...');
 
   try {
-    const summaries = await fetchWalletTokenSummaries(gallery.tokenIds, {
+    const summaryOptions = {
       primaryOnly: gallery.primaryOnly === true
-    });
+    };
+    const primedSummaries = primeWalletTokenCacheFromSummaryCache(
+      gallery.tokenIds,
+      summaryOptions
+    );
+    if (primedSummaries > 0) {
+      debugLog('grid', 'curated gallery summary cache primed', {
+        viewRequestId,
+        galleryId: gallery.id,
+        primed: primedSummaries
+      });
+      renderTokenGrid({ deferHydration: true });
+    }
+
+    const missingIds = gallery.tokenIds.filter(
+      (id) => !state.walletTokenCache.has(id.toString())
+    );
+    const summaries = missingIds.length > 0
+      ? await fetchWalletTokenSummaries(missingIds, summaryOptions)
+      : [];
     debugLog('grid', 'curated gallery summaries fetched', {
       viewRequestId,
       galleryId: gallery.id,
       requested: gallery.tokenIds.length,
+      missing: missingIds.length,
       returned: summaries.length,
       returnedIds: summaries.map((token) => token.id.toString())
     });
@@ -7895,9 +7953,7 @@ const openCuratedGallery = async (galleryId) => {
 
     // Keep curated galleries in the exact order defined in CURATED_GALLERIES.
     // This avoids fetch results or later sorting forcing a different display order.
-    const loadedTokenIds = new Set(
-      summaries.map((token) => token.id.toString())
-    );
+    const loadedTokenIds = new Set(state.walletTokenCache.keys());
 
     state.walletTokenIds = gallery.tokenIds.filter((id) =>
       loadedTokenIds.has(id.toString())
@@ -7912,7 +7968,8 @@ const openCuratedGallery = async (galleryId) => {
       'blue'
     );
 
-    renderTokenGrid();
+    renderTokenGrid({ deferHydration: true });
+    await waitForGridPaint();
 
     const configuredDefaultTokenId =
       CURATED_GALLERY_DEFAULT_TOKEN_IDS[gallery.id] ?? null;
@@ -7930,6 +7987,7 @@ const openCuratedGallery = async (galleryId) => {
     } else {
       clearSelectedTokenPreview();
     }
+    renderTokenGrid();
 
     setExperienceMode();
     debugLog('grid', 'curated gallery load finished', {
@@ -8117,6 +8175,108 @@ const openCuratedGallery = async (galleryId) => {
       }
     };
 
+    const getSummaryFetchContext = (options = {}) => {
+      if (!state.client) {
+        return null;
+      }
+      const primaryContractId = getContractId(state.client.contract);
+      const galleryReadClient = getActiveGalleryReadClient();
+      if (options.primaryOnly === true) {
+        return {
+          scopeKey: `direct:${primaryContractId}`,
+          primaryContractId,
+          lineageContractIds: [],
+          useDirectRead: true,
+          directReadClient: state.client
+        };
+      }
+      if (galleryReadClient) {
+        const galleryContractId = getContractId(galleryReadClient.contract);
+        return {
+          scopeKey: `direct:${galleryContractId}`,
+          primaryContractId: galleryContractId,
+          lineageContractIds: [],
+          useDirectRead: true,
+          directReadClient: galleryReadClient
+        };
+      }
+      const lineageContractIds = (getContentFallbackClients(state.client) ?? [])
+        .map((candidate) => getContractId(candidate.contract));
+      return {
+        scopeKey: `lineage:${[primaryContractId, ...lineageContractIds].join('>')}`,
+        primaryContractId,
+        lineageContractIds,
+        useDirectRead: false,
+        directReadClient: state.client
+      };
+    };
+
+    const getSummaryScopeCache = (scopeKey, create = true) => {
+      if (!scopeKey) {
+        return null;
+      }
+      const existing = state.summaryCacheScopes.get(scopeKey);
+      if (existing) {
+        if (create) {
+          state.summaryCacheScopes.delete(scopeKey);
+          state.summaryCacheScopes.set(scopeKey, existing);
+        }
+        return existing;
+      }
+      if (!create) {
+        return null;
+      }
+      const cache = new Map();
+      state.summaryCacheScopes.set(scopeKey, cache);
+      while (state.summaryCacheScopes.size > GRID_SUMMARY_CACHE_MAX_SCOPES) {
+        const oldest = state.summaryCacheScopes.keys().next().value;
+        state.summaryCacheScopes.delete(oldest);
+      }
+      return cache;
+    };
+
+    const rememberSummaryCache = (scopeKey, summaries) => {
+      const cache = getSummaryScopeCache(scopeKey);
+      if (!cache) {
+        return;
+      }
+      for (const token of summaries) {
+        if (!token || !(token.meta || token.owner || token.svgDataUri)) {
+          continue;
+        }
+        const key = token.id.toString();
+        if (cache.has(key)) {
+          cache.delete(key);
+        }
+        cache.set(key, token);
+      }
+      while (cache.size > GRID_SUMMARY_CACHE_MAX_ENTRIES) {
+        const oldest = cache.keys().next().value;
+        cache.delete(oldest);
+      }
+    };
+
+    const primeWalletTokenCacheFromSummaryCache = (ids, options = {}) => {
+      const context = getSummaryFetchContext(options);
+      const cache = context ? getSummaryScopeCache(context.scopeKey, false) : null;
+      if (!cache || options.force === true) {
+        return 0;
+      }
+      let hits = 0;
+      for (const id of ids) {
+        const key = id.toString();
+        if (state.walletTokenCache.has(key)) {
+          continue;
+        }
+        const token = cache.get(key);
+        if (token) {
+          state.walletTokenCache.set(key, token);
+          hits += 1;
+        }
+      }
+      return hits;
+    };
+
     const fetchWalletTokenSummaries = async (ids, options = {}) => {
       const startedAt = performance.now();
       // primaryOnly: read strictly from the active (primary) contract, skipping
@@ -8126,9 +8286,13 @@ const openCuratedGallery = async (galleryId) => {
       const primaryOnly = options.primaryOnly === true;
       // A gallery pinned to a specific core (e.g. v1 origins) reads strictly
       // from that core's client, with no legacy fallback.
-      const galleryReadClient = getActiveGalleryReadClient();
-      const directReadClient = galleryReadClient ?? state.client;
-      const useDirectRead = primaryOnly || !!galleryReadClient;
+      const summaryContext = getSummaryFetchContext(options);
+      const directReadClient = summaryContext?.directReadClient ?? state.client;
+      const useDirectRead = summaryContext?.useDirectRead ?? primaryOnly;
+      const scopeCache = summaryContext
+        ? getSummaryScopeCache(summaryContext.scopeKey, false)
+        : null;
+      const allowSummaryCache = options.force !== true;
       const sender = getReadOnlySenderAddress();
       let legacyMaxId = null;
       // Migrated tokens are held in escrow by the primary (v3) contract, so a
@@ -8149,9 +8313,24 @@ const openCuratedGallery = async (galleryId) => {
       }
       const visibleIds = [...ids]
         .sort((left, right) => (left < right ? 1 : left > right ? -1 : 0));
+      const cachedSummaries = [];
+      const cachedSummaryIds = new Set();
+      const idsToResolve = [];
+      for (const id of visibleIds) {
+        const cached = allowSummaryCache ? scopeCache?.get(id.toString()) : null;
+        if (cached) {
+          cachedSummaries.push(cached);
+          cachedSummaryIds.add(id.toString());
+        } else {
+          idsToResolve.push(id);
+        }
+      }
       debugLog('readonly', 'token summaries request started', {
         requested: ids.length,
         visibleIds: formatDebugTokenIds(visibleIds),
+        cached: cachedSummaries.length,
+        resolving: idsToResolve.length,
+        summaryScope: summaryContext?.scopeKey ?? null,
         contractId: getContractId(state.contract),
         legacyContractId: state.legacyClient
           ? getContractId(state.legacyClient.contract)
@@ -8163,20 +8342,18 @@ const openCuratedGallery = async (galleryId) => {
       // (primary-first across the lineage). Ids the index hasn't synced yet — or
       // SVGs — fall through to the per-token chain path below.
       let indexedSummaries = null;
-      if (state.legacyClient && !useDirectRead) {
+      if (summaryContext && idsToResolve.length > 0) {
         try {
-          const lineageContractIds = (getContentFallbackClients(state.client) ?? [])
-            .map((candidate) => getContractId(candidate.contract));
           indexedSummaries = await fetchIndexedSummaries({
-            primaryContractId: getContractId(state.client.contract),
-            lineageContractIds,
-            ids: visibleIds
+            primaryContractId: summaryContext.primaryContractId,
+            lineageContractIds: summaryContext.lineageContractIds,
+            ids: idsToResolve
           });
         } catch (error) {
           indexedSummaries = null;
         }
       }
-      const summaries = await runLimited(visibleIds, 4, async (id) => {
+      const resolvedSummaries = await runLimited(idsToResolve, 4, async (id) => {
         try {
           const indexed = indexedSummaries?.get(id.toString());
           if (indexed) {
@@ -8217,11 +8394,29 @@ const openCuratedGallery = async (galleryId) => {
           return null;
         }
       });
-      const filtered = summaries.filter((token) => !!token && (token.meta || token.owner || token.svgDataUri));
+      const resolvedById = new Map();
+      for (const token of resolvedSummaries) {
+        if (token && (token.meta || token.owner || token.svgDataUri)) {
+          resolvedById.set(token.id.toString(), token);
+        }
+      }
+      const cachedById = new Map(
+        cachedSummaries
+          .filter((token) => !!token && (token.meta || token.owner || token.svgDataUri))
+          .map((token) => [token.id.toString(), token])
+      );
+      const filtered = visibleIds
+        .map((id) => cachedById.get(id.toString()) ?? resolvedById.get(id.toString()) ?? null)
+        .filter((token) => !!token);
+      if (summaryContext) {
+        rememberSummaryCache(summaryContext.scopeKey, filtered);
+      }
       debugLog('readonly', 'token summaries request finished', {
         requested: ids.length,
         returned: filtered.length,
-        dropped: summaries.length - filtered.length,
+        cached: cachedSummaryIds.size,
+        resolved: resolvedById.size,
+        dropped: visibleIds.length - filtered.length,
         returnedIds: filtered.map((token) => token.id.toString()),
         ms: Math.round(performance.now() - startedAt)
       });
@@ -8596,6 +8791,16 @@ const openCuratedGallery = async (galleryId) => {
       );
 
       const pageIds = getWalletPageIds();
+      const primedSummaries = primeWalletTokenCacheFromSummaryCache(pageIds, {
+        force: !!options.force
+      });
+      if (primedSummaries > 0) {
+        debugLog('grid', 'explorer page summary cache primed', {
+          primed: primedSummaries,
+          pageIds: formatDebugTokenIds(pageIds),
+          summaryCacheSize: state.walletTokenCache.size
+        });
+      }
       const missingIds = pageIds.filter((id) => !state.walletTokenCache.has(id.toString()));
       debugLog('grid', 'explorer page summary cache checked', {
         ...getGridDebugContext(pageIds),
@@ -8607,7 +8812,9 @@ const openCuratedGallery = async (galleryId) => {
       try {
         if (missingIds.length > 0 || options.force) {
           const idsToFetch = options.force ? pageIds : missingIds;
-          const summaries = await fetchWalletTokenSummaries(idsToFetch);
+          const summaries = await fetchWalletTokenSummaries(idsToFetch, {
+            force: !!options.force
+          });
           for (const token of summaries) {
             state.walletTokenCache.set(token.id.toString(), token);
           }
@@ -8746,6 +8953,16 @@ const openCuratedGallery = async (galleryId) => {
         return;
       }
 
+      const primedSummaries = primeWalletTokenCacheFromSummaryCache(pageIds, {
+        force: !!options.force
+      });
+      if (primedSummaries > 0) {
+        debugLog('grid', 'wallet page summary cache primed', {
+          primed: primedSummaries,
+          pageIds: formatDebugTokenIds(pageIds),
+          summaryCacheSize: state.walletTokenCache.size
+        });
+      }
       const missingIds = pageIds.filter((id) => !state.walletTokenCache.has(id.toString()));
       debugLog('grid', 'wallet page summary cache checked', {
         ...getGridDebugContext(pageIds),
@@ -8757,7 +8974,9 @@ const openCuratedGallery = async (galleryId) => {
       try {
         if (missingIds.length > 0 || options.force) {
           const idsToFetch = options.force ? pageIds : missingIds;
-          const summaries = await fetchWalletTokenSummaries(idsToFetch);
+          const summaries = await fetchWalletTokenSummaries(idsToFetch, {
+            force: !!options.force
+          });
           for (const token of summaries) {
             state.walletTokenCache.set(token.id.toString(), token);
           }

@@ -73,7 +73,102 @@ index that powers the homepage explorer grids and the React grids.
 - Same caveat as task 1 re: running tsc/tests locally before deploy (sandbox
   unavailable in-session).
 
+## SVG grid rendering fix (done)
+
+**Files:** `index.html`, `src/components/TokenCardMedia.tsx`
+
+**Bug:** `image/svg+xml` inscriptions rendered in the large preview canvas but
+showed as blank tiles in the grid (both the inline homepage and the React
+explorer). Root cause: the grid builds thumbnails by rasterising the image to a
+`<canvas>` (`createImageThumbnail` → `createImageBitmap`). Generative SVGs
+usually declare no intrinsic width/height, so the bitmap is 0×0,
+`maxDimension <= 0`, and the function returns `null` — no thumbnail, blank tile.
+The preview canvas always worked because it renders the SVG straight into an
+`<img>` (browser scales it), never rasterising. (The "XML" tile label is just
+`getGridMimeLabel` collapsing any `+xml` mime to "XML"; these are real SVGs.)
+
+**Fix — render SVG as a direct `<img>` from the runtime content endpoint**
+(served as `image/svg+xml`), bypassing the rasteriser:
+
+- Homepage: `getTokenRuntimeImageUrl` now also returns the runtime URL for
+  `svg`; a new grid branch renders SVGs via `renderGridRuntimeImage` (direct
+  `<img>`) when there's no precomputed `svgDataUri`. No rasterising for SVGs.
+- React `TokenCardMedia`: added an `svg-runtime` image source
+  (`buildRuntimeInscriptionContentUrl`) preferred for SVG tokens without a
+  data-uri, with an error fallback to the existing on-chain bytes path. React
+  already skipped rasterising for `svg`, so this mainly covers SVGs served from
+  the D1 index and those above the eager-load window.
+
+**Safety:** both paths fall back to the prior behaviour on `<img>` error;
+non-SVG tiles are untouched. Verify on an SVG-heavy gallery (e.g. the bullseye /
+droplet XML tokens) in both the homepage explorer and the React explorer.
+
+## Task #4 — Sync-stampede guard (done)
+
+**Files:** `functions/migrations/005_inscription_index_sync_lock.sql` (new),
+`functions/index/[contract].ts`
+
+- Added `sync_lock_until` to `inscription_index_state`. `sync()` now acquires a
+  soft, self-expiring lock (TTL 120s) via a conditional `UPDATE ... WHERE
+  sync_lock_until <= now` and backs off (`{ skipped: true }`) if another sync
+  holds it; the lock is released in a `finally`. The body moved to `runSync()`.
+- Prevents concurrent page views (GET lazy trigger + `/index/page` POST fan-out)
+  from launching redundant chain reads/writes. A crashed run can't wedge the
+  index — the lock expires.
+- Apply: `wrangler d1 migrations apply xtrata-manage --config functions/wrangler.toml`
+  (`--remote` for live). Remote tracker note from migration 004 still applies if
+  003 shows as pending.
+
+## Task #6 — Persist index summaries client-side (done)
+
+**File:** `src/lib/viewer/index-summaries.ts`
+
+- `fetchIndexedSummaries` now seeds from the shared IndexedDB token-summaries
+  store first (keyed by the primary contract), fetches only the misses, and
+  persists freshly fetched summaries. Return visits / reloads paint the grid
+  instantly from disk. TTL 5 min (owner/migration freshness handled
+  authoritatively by the edge cache + rolling sync).
+- Best-effort: cache errors are swallowed; SVGs are never index-cached (still
+  chain-fallback). Both homepage and React use this function.
+
+## Task #7 — React short-circuit index hits (done)
+
+**File:** `src/lib/viewer/queries.ts`
+
+- `useTokenSummaries` per-token queries now take `initialData` from the batch
+  index map: index hits render immediately with no loading flash and never
+  schedule `queryFn`; misses fall through to the normal per-token chain fetch.
+
+## Task #5 — Serve SVG summaries from the index, R2-backed (done)
+
+**Files:** `functions/index/page.ts`, `src/lib/viewer/index-summaries.ts`,
+`index.html`
+
+Context: the SVG grid fix made SVGs render via the runtime content endpoint,
+which already caches the bytes in R2 on first view. So the remaining cost was
+that the index *skipped* SVG, forcing the client to chain-reconstruct each SVG
+summary (heavy `get-svg-data-uri` reads). This removes that skip.
+
+- Server (`/index/page`) and client (`fetchCombined`/`fetchFanOut`) no longer
+  drop SVG rows — SVG summaries now serve straight from D1 (no chain
+  reconstruction). `rowToSummary` still sets `svgDataUri: null`.
+- Rendering: SVGs render from the R2-backed runtime content endpoint (homepage
+  grid svg branch; React `svg-runtime` source).
+- Robustness fallback (homepage): if the runtime-content `<img>` errors, the
+  background hydration path now renders the SVG directly from a blob of the
+  fetched bytes (`renderGridLiveMedia` svg kind) instead of the canvas
+  rasteriser (which fails for size-less SVGs). React already falls back to the
+  on-chain bytes path on `svg-runtime` error.
+
+Net: no per-token chain reconstruction for indexed SVGs; bytes are served from
+R2 (shared across users) after the first view. Ids the index hasn't synced still
+chain-fall-back as before.
+
+**Note:** I did not add SVG pre-warming during `sync()` (it would add chain
+reads and risk the Worker subrequest budget); the runtime content handler
+already populates R2 lazily on first view, which covers the same ground.
+
 ## Next
 
-- Task 5 — SVG tokens still chain-fall-back; store preview/data-uri in R2 so
-  cold SVG-heavy grids stop hitting the chain.
+- (Optional) Pre-warm R2 with SVG bytes during sync if cold-first-view latency
+  on brand-new SVGs proves noticeable — weigh against sync subrequest budget.
