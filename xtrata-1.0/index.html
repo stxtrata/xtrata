@@ -6909,10 +6909,21 @@
       token.meta.totalSize <= MAX_GRID_EAGER_FULL_LOAD_BYTES &&
       isPotentialAnimatedRasterMimeType(token.meta.mimeType ?? null);
 
-    const getTokenRuntimeImageUrl = (token) =>
-      getMediaKind(token.meta?.mimeType ?? null) === 'image'
+    const getTokenRuntimeImageUrl = (token) => {
+      // SVG is included here so the grid renders it as a direct <img> from the
+      // runtime content endpoint (served as image/svg+xml). The browser scales
+      // the vector to the card; this avoids the canvas thumbnail rasterizer,
+      // which returns null for SVGs that declare no intrinsic width/height (most
+      // generative SVGs) — the reason XML/SVG tiles previously showed blank even
+      // though the preview canvas, which renders the same <img> directly, worked.
+      const kind = getMediaKind(token.meta?.mimeType ?? null);
+      return kind === 'image' || kind === 'svg'
         ? getTokenRuntimeContentUrl(token)
         : null;
+    };
+
+    const isSvgToken = (token) =>
+      getMediaKind(token.meta?.mimeType ?? null) === 'svg';
 
     const renderGridRuntimeImage = (token, thumbElement) => {
       const sourceUrl = getTokenRuntimeImageUrl(token);
@@ -6927,6 +6938,7 @@
       applyPixelPerfectImageRendering(img, {
         mimeType: token.meta?.mimeType ?? null,
         sourceUrl,
+        isSvgSource: isSvgToken(token),
         squareFrame: true
       });
       img.addEventListener('load', () => {
@@ -7419,6 +7431,11 @@
             thumb.classList.add('has-thumbnail');
             thumb.dataset.thumbnailState = 'inline-svg';
             thumb.append(img);
+          } else if (isSvgToken(token) && renderGridRuntimeImage(token, thumb)) {
+            // SVG with no precomputed data-uri (e.g. served from the D1 index):
+            // render the vector directly from the runtime content endpoint
+            // instead of the rasterizer, which fails for size-less SVGs.
+            shouldApplyCachedThumbnail = false;
           } else {
             const cacheKey = getThumbnailKey(token);
             const liveMedia = state.gridLiveMediaCache.get(cacheKey);

@@ -73,7 +73,40 @@ index that powers the homepage explorer grids and the React grids.
 - Same caveat as task 1 re: running tsc/tests locally before deploy (sandbox
   unavailable in-session).
 
+## SVG grid rendering fix (done)
+
+**Files:** `index.html`, `src/components/TokenCardMedia.tsx`
+
+**Bug:** `image/svg+xml` inscriptions rendered in the large preview canvas but
+showed as blank tiles in the grid (both the inline homepage and the React
+explorer). Root cause: the grid builds thumbnails by rasterising the image to a
+`<canvas>` (`createImageThumbnail` → `createImageBitmap`). Generative SVGs
+usually declare no intrinsic width/height, so the bitmap is 0×0,
+`maxDimension <= 0`, and the function returns `null` — no thumbnail, blank tile.
+The preview canvas always worked because it renders the SVG straight into an
+`<img>` (browser scales it), never rasterising. (The "XML" tile label is just
+`getGridMimeLabel` collapsing any `+xml` mime to "XML"; these are real SVGs.)
+
+**Fix — render SVG as a direct `<img>` from the runtime content endpoint**
+(served as `image/svg+xml`), bypassing the rasteriser:
+
+- Homepage: `getTokenRuntimeImageUrl` now also returns the runtime URL for
+  `svg`; a new grid branch renders SVGs via `renderGridRuntimeImage` (direct
+  `<img>`) when there's no precomputed `svgDataUri`. No rasterising for SVGs.
+- React `TokenCardMedia`: added an `svg-runtime` image source
+  (`buildRuntimeInscriptionContentUrl`) preferred for SVG tokens without a
+  data-uri, with an error fallback to the existing on-chain bytes path. React
+  already skipped rasterising for `svg`, so this mainly covers SVGs served from
+  the D1 index and those above the eager-load window.
+
+**Safety:** both paths fall back to the prior behaviour on `<img>` error;
+non-SVG tiles are untouched. Verify on an SVG-heavy gallery (e.g. the bullseye /
+droplet XML tokens) in both the homepage explorer and the React explorer.
+
 ## Next
 
-- Task 5 — SVG tokens still chain-fall-back; store preview/data-uri in R2 so
-  cold SVG-heavy grids stop hitting the chain.
+- Task #4 — sync-stampede guard (lock in inscription_index_state).
+- Task #6 — persist index summaries client-side (reuse the IndexedDB
+  token-summaries store).
+- Task #5 — store SVG previews in R2 so the runtime SVG render is itself cached
+  (this fix removes the blank-tile bug; R2 caching would further cut cold cost).

@@ -51,6 +51,7 @@ import {
   shouldUsePixelatedImageRendering
 } from '../lib/viewer/image-rendering';
 import { createObjectUrl } from '../lib/utils/blob';
+import { buildRuntimeInscriptionContentUrl } from '../lib/collections/cover-image';
 
 const MAX_GRID_EAGER_FULL_LOAD_BYTES = 4n * 1024n * 1024n;
 const MAX_ANIMATED_PNG_PROBE_BYTES = 512n * 1024n;
@@ -82,6 +83,7 @@ export default function TokenCardMedia(props: TokenCardMediaProps) {
   const [tokenUriDeferred, setTokenUriDeferred] = useState(false);
   const [pixelatePreview, setPixelatePreview] = useState(false);
   const [letterboxPreview, setLetterboxPreview] = useState(false);
+  const [svgRuntimeFailed, setSvgRuntimeFailed] = useState(false);
   const [animatedReplayTick, setAnimatedReplayTick] = useState(0);
   const [squareImageFrameStyle, setSquareImageFrameStyle] =
     useState<CSSProperties | undefined>(undefined);
@@ -92,6 +94,26 @@ export default function TokenCardMedia(props: TokenCardMediaProps) {
   const mediaKind = getMediaKind(mimeType);
   const totalSize = props.token.meta?.totalSize ?? null;
   const svgPreview = props.token.svgDataUri ?? null;
+  // For SVG tokens without a precomputed data-uri (e.g. served from the D1
+  // index), render the vector straight from the runtime content endpoint
+  // (image/svg+xml). The browser scales it to the card — no canvas rasterizing,
+  // which fails for SVGs that declare no intrinsic size, and no need to download
+  // the full payload first. Falls back to the on-chain bytes path on error.
+  const svgRuntimeUrl = useMemo(() => {
+    if (mediaKind !== 'svg' || svgPreview) {
+      return null;
+    }
+    return buildRuntimeInscriptionContentUrl({
+      coreContractId: props.token.sourceContractId ?? props.contractId,
+      tokenId: props.token.id
+    });
+  }, [
+    mediaKind,
+    svgPreview,
+    props.token.sourceContractId,
+    props.contractId,
+    props.token.id
+  ]);
   const streamStatusKey = useMemo(
     () => [
       'viewer',
@@ -302,6 +324,7 @@ export default function TokenCardMedia(props: TokenCardMediaProps) {
     setTokenUriDeferred(false);
     setPixelatePreview(false);
     setLetterboxPreview(false);
+    setSvgRuntimeFailed(false);
     setAnimatedReplayTick(0);
     setSquareImageFrameStyle(undefined);
   }, [props.token.id]);
@@ -573,8 +596,10 @@ export default function TokenCardMedia(props: TokenCardMediaProps) {
     ? resolvedThumbnailUrl
     : onChainPreviewSource;
   const secondaryImageOrigin = preferFullResolution ? 'thumbnail-cache' : 'on-chain';
+  const svgRuntimeSource = !svgRuntimeFailed ? svgRuntimeUrl : null;
   const imagePreviewSource =
     svgPreview ||
+    svgRuntimeSource ||
     primaryImageSource ||
     secondaryImageSource ||
     jsonImagePreview ||
@@ -586,6 +611,9 @@ export default function TokenCardMedia(props: TokenCardMediaProps) {
   const imagePreviewOrigin = (() => {
     if (svgPreview) {
       return 'svg-preview';
+    }
+    if (svgRuntimeSource) {
+      return 'svg-runtime';
     }
     if (primaryImageSource) {
       return primaryImageOrigin;
@@ -742,7 +770,10 @@ export default function TokenCardMedia(props: TokenCardMediaProps) {
       if (!imagePreviewSource || !imagePreviewOrigin) {
         return;
       }
-      if (imagePreviewOrigin === 'thumbnail-cache') {
+      if (imagePreviewOrigin === 'svg-runtime') {
+        // Runtime SVG render failed; fall back to the on-chain bytes path.
+        setSvgRuntimeFailed(true);
+      } else if (imagePreviewOrigin === 'thumbnail-cache') {
         setThumbnailFailed(true);
         queryClient.setQueryData(
           getTokenThumbnailKey(props.contractId, props.token.id),
