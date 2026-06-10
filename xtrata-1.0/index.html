@@ -1121,6 +1121,83 @@
       color: var(--rose);
     }
 
+    .selected-relationships {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .selected-relationships__head {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .selected-relationships__ids {
+      font-size: 12px;
+      color: var(--ink);
+      word-break: break-word;
+    }
+
+    .selected-relationships__status {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .selected-relationships__thumbs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .parent-thumb {
+      position: relative;
+      width: 64px;
+      height: 64px;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface-soft);
+      overflow: hidden;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .parent-thumb:hover {
+      border-color: var(--blue);
+    }
+
+    .parent-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .parent-thumb__id {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 2px 4px;
+      font-size: 10px;
+      font-weight: 700;
+      text-align: center;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.55);
+    }
+
+    .parent-thumb--error {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
     .actions {
       display: flex;
       flex-wrap: wrap;
@@ -3217,6 +3294,7 @@
                   <span class="meta-value">None selected</span>
                 </div>
               </div>
+              <div class="selected-relationships" id="selectedRelationships" hidden></div>
               <div class="preview-actions">
                 <a class="small-link" id="explorerLink" href="#" target="_blank" rel="noreferrer" hidden>Blockchain Explorer</a>
                 <a class="small-link" id="xtrataExplorerLink" href="#" target="_blank" rel="noreferrer" hidden>Xtrata Explorer</a>
@@ -3561,6 +3639,7 @@
       tokenPreviewPanel: $('tokenPreviewPanel'),
       tokenPreviewMedia: $('tokenPreviewMedia'),
       tokenPreviewMeta: $('tokenPreviewMeta'),
+      selectedRelationships: $('selectedRelationships'),
       previewExpandButton: $('previewExpandButton'),
       fullscreenButton: $('fullscreenButton'),
       explorerLink: $('explorerLink'),
@@ -3840,6 +3919,7 @@
       tokenPreviewHtmlDoc: null,
       tokenPreviewRequestId: 0,
       selectedOwnerNameRequestId: 0,
+      selectedParentsRequestId: 0,
       fullscreenUrl: null,
       fullscreenOpen: false,
       tokenThumbUrls: new Map(),
@@ -4760,6 +4840,7 @@
 
     const renderNoSelectedInscriptionMeta = () => {
       state.selectedOwnerNameRequestId += 1;
+      clearSelectedInscriptionRelationships();
       renderMeta(dom.tokenPreviewMeta, [['Status', 'None selected']]);
     };
 
@@ -4772,11 +4853,110 @@
         [
           'Owner',
           ownerName ?? (token.owner ? truncateMiddle(token.owner, 8, 8) : 'unknown')
-        ]
+        ],
+        ['ID', formatTokenId(token.id)]
       ]);
       if (!ownerName) {
         void resolveSelectedInscriptionOwnerName(token);
       }
+      void renderSelectedInscriptionRelationships(token);
+    };
+
+    const clearSelectedInscriptionRelationships = () => {
+      state.selectedParentsRequestId += 1;
+      if (dom.selectedRelationships) {
+        dom.selectedRelationships.replaceChildren();
+        dom.selectedRelationships.hidden = true;
+      }
+    };
+
+    // Fetches and renders the parent inscriptions of the selected token: the
+    // parent ID numbers followed by a thumbnail grid. Thumbnails load straight
+    // from the runtime content endpoint (image/svg render inline; other media
+    // falls back to an ID-only tile). A monotonic request id guards against
+    // stale async results when the selection changes mid-fetch.
+    const renderSelectedInscriptionRelationships = async (token) => {
+      const container = dom.selectedRelationships;
+      if (!container) {
+        return;
+      }
+      const requestId = ++state.selectedParentsRequestId;
+      if (!token || !supportsParentRelationships()) {
+        container.replaceChildren();
+        container.hidden = true;
+        return;
+      }
+      container.hidden = false;
+      container.replaceChildren();
+      const heading = document.createElement('div');
+      heading.className = 'selected-relationships__head';
+      heading.textContent = 'Parents';
+      const status = document.createElement('div');
+      status.className = 'selected-relationships__status';
+      status.textContent = 'Loading parents…';
+      container.append(heading, status);
+
+      let parents = [];
+      try {
+        const sender = getReadOnlySenderAddress();
+        parents = await state.client.getParents(token.id, sender);
+      } catch (error) {
+        if (
+          requestId !== state.selectedParentsRequestId ||
+          state.selectedTokenId !== token.id
+        ) {
+          return;
+        }
+        status.textContent = 'Parent relationships unavailable.';
+        return;
+      }
+      if (
+        requestId !== state.selectedParentsRequestId ||
+        state.selectedTokenId !== token.id
+      ) {
+        return;
+      }
+      if (!parents || parents.length === 0) {
+        container.replaceChildren();
+        container.hidden = true;
+        return;
+      }
+
+      heading.textContent = `Parents (${parents.length})`;
+      status.remove();
+      const ids = document.createElement('div');
+      ids.className = 'selected-relationships__ids';
+      ids.textContent = parents.map((id) => formatTokenId(id)).join(', ');
+      const thumbs = document.createElement('div');
+      thumbs.className = 'selected-relationships__thumbs';
+      const contractId = getTokenCacheContractId(token);
+      for (const parentId of parents) {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'parent-thumb';
+        card.title = `View parent ${formatTokenId(parentId)}`;
+        const img = document.createElement('img');
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.alt = `Parent ${formatTokenId(parentId)}`;
+        img.src = buildRuntimeInscriptionContentUrl({
+          coreContractId: contractId,
+          tokenId: parentId
+        });
+        img.addEventListener('error', () => {
+          img.remove();
+          card.classList.add('parent-thumb--error');
+        });
+        const tag = document.createElement('span');
+        tag.className = 'parent-thumb__id';
+        tag.textContent = formatTokenId(parentId);
+        card.append(img, tag);
+        card.addEventListener('click', () => {
+          void focusWalletTokenById(parentId);
+        });
+        thumbs.append(card);
+      }
+      container.append(ids, thumbs);
     };
 
     const resolveSelectedInscriptionOwnerName = async (token) => {
