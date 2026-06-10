@@ -139,8 +139,36 @@ droplet XML tokens) in both the homepage explorer and the React explorer.
   index map: index hits render immediately with no loading flash and never
   schedule `queryFn`; misses fall through to the normal per-token chain fetch.
 
+## Task #5 — Serve SVG summaries from the index, R2-backed (done)
+
+**Files:** `functions/index/page.ts`, `src/lib/viewer/index-summaries.ts`,
+`index.html`
+
+Context: the SVG grid fix made SVGs render via the runtime content endpoint,
+which already caches the bytes in R2 on first view. So the remaining cost was
+that the index *skipped* SVG, forcing the client to chain-reconstruct each SVG
+summary (heavy `get-svg-data-uri` reads). This removes that skip.
+
+- Server (`/index/page`) and client (`fetchCombined`/`fetchFanOut`) no longer
+  drop SVG rows — SVG summaries now serve straight from D1 (no chain
+  reconstruction). `rowToSummary` still sets `svgDataUri: null`.
+- Rendering: SVGs render from the R2-backed runtime content endpoint (homepage
+  grid svg branch; React `svg-runtime` source).
+- Robustness fallback (homepage): if the runtime-content `<img>` errors, the
+  background hydration path now renders the SVG directly from a blob of the
+  fetched bytes (`renderGridLiveMedia` svg kind) instead of the canvas
+  rasteriser (which fails for size-less SVGs). React already falls back to the
+  on-chain bytes path on `svg-runtime` error.
+
+Net: no per-token chain reconstruction for indexed SVGs; bytes are served from
+R2 (shared across users) after the first view. Ids the index hasn't synced still
+chain-fall-back as before.
+
+**Note:** I did not add SVG pre-warming during `sync()` (it would add chain
+reads and risk the Worker subrequest budget); the runtime content handler
+already populates R2 lazily on first view, which covers the same ground.
+
 ## Next
 
-- Task #5 — store SVG previews in R2 so the runtime SVG render is itself cached
-  (the SVG grid fix removes the blank-tile bug; R2 caching would further cut cold
-  cost). Larger change — own branch.
+- (Optional) Pre-warm R2 with SVG bytes during sync if cold-first-view latency
+  on brand-new SVGs proves noticeable — weigh against sync subrequest budget.

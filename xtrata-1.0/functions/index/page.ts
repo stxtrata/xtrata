@@ -11,9 +11,8 @@ import type { RuntimeEnv } from '../runtime/lib';
 //
 // Returns each resolved token with the contract it came from (sourceContract),
 // so the client can attribute ownership/lineage exactly as the per-contract path
-// did. SVG tokens are skipped during resolution (they need a separate data-uri
-// read the index can't supply) so the client falls back to the chain for them —
-// identical semantics to the previous fan-out.
+// did. SVG tokens are included: the client renders them from the R2-backed
+// runtime content endpoint (no per-token chain reconstruction needed).
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -25,8 +24,6 @@ const json = (body: unknown, status = 200) =>
     status,
     headers: { 'content-type': 'application/json', ...CORS }
   });
-
-const isSvg = (mime: string | null) => mime?.toLowerCase() === 'image/svg+xml';
 
 type IndexDbRow = {
   contract: string;
@@ -132,7 +129,7 @@ export const onRequest = async (context: {
     for (const id of ids) {
       for (const contractId of contracts) {
         const row = byContract.get(contractId)?.get(id);
-        if (row && !isSvg(row.mime)) {
+        if (row) {
           tokens.push({
             id: row.token_id,
             sourceContract: contractId,

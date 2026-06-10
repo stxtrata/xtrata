@@ -7229,6 +7229,32 @@
           }
           return;
         }
+        if (kind === 'svg') {
+          // Render SVG directly as a blob <img> rather than rasterising it: the
+          // canvas thumbnail path yields 0x0 for SVGs that declare no intrinsic
+          // size. This is the fallback when the runtime-content <img> failed
+          // (e.g. the endpoint hiccuped), so SVG tiles still render from bytes.
+          state.gridLiveMediaCache.set(cacheKey, {
+            kind: 'svg',
+            bytes,
+            mimeType: 'image/svg+xml'
+          });
+          if (
+            thumbElement.isConnected &&
+            thumbElement.dataset.thumbnailKey === cacheKey
+          ) {
+            renderGridLiveMedia(token, thumbElement, state.gridLiveMediaCache.get(cacheKey));
+          } else if (getWalletPageIds().some((id) => id === token.id)) {
+            scheduleGridRender();
+          }
+          debugLog('cache', 'background svg grid display ready', {
+            tokenId: token.id.toString(),
+            contractId: cacheContractId,
+            bytes: bytes.length,
+            mimeType
+          });
+          return;
+        }
         if (kind !== 'image' && kind !== 'svg') {
           debugLog('cache', 'background thumbnail skipped non-image content', {
             tokenId: token.id.toString(),

@@ -41,8 +41,9 @@ const rowToSummary = (row: IndexRow, contractId: string): TokenSummary => ({
   id: BigInt(row.id),
   owner: row.owner ?? null,
   tokenUri: row.tokenUri ?? null,
-  // SVG previews need a separate data-uri read; the index can't supply it, so
-  // svg rows are treated as "not indexed" below and fall back to the chain.
+  // SVG rows carry no inline data-uri; the grids render SVGs from the R2-backed
+  // runtime content endpoint (falling back to on-chain bytes on error), so the
+  // index no longer needs to chain-fetch a data-uri for them.
   svgDataUri: null,
   sourceContractId: contractId,
   meta: row.mime
@@ -57,8 +58,6 @@ const rowToSummary = (row: IndexRow, contractId: string): TokenSummary => ({
       }
     : null
 });
-
-const isSvg = (mime: string | null) => mime?.toLowerCase() === 'image/svg+xml';
 
 const fetchContractRows = async (
   origin: string,
@@ -97,7 +96,6 @@ const fetchCombined = async (
   const body = (await response.json()) as { tokens?: CombinedRow[] };
   const out = new Map<string, TokenSummary>();
   for (const row of Array.isArray(body.tokens) ? body.tokens : []) {
-    if (isSvg(row.mime)) continue; // server already skips, defensive
     out.set(row.id.toString(), rowToSummary(row, row.sourceContract));
   }
   return out;
@@ -132,7 +130,7 @@ const fetchFanOut = async (
     const key = id.toString();
     for (const { contractId, map } of byContract) {
       const row = map.get(key);
-      if (row && !isSvg(row.mime)) {
+      if (row) {
         out.set(key, rowToSummary(row, contractId));
         break; // primary-first: first contract that has it wins
       }
