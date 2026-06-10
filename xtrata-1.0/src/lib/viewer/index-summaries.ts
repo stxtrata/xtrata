@@ -66,6 +66,35 @@ const fetchContractRows = async (
   return Array.isArray(body.tokens) ? body.tokens : [];
 };
 
+type CombinedRow = IndexRow & { sourceContract: string };
+
+// Single round-trip: the combined endpoint resolves the whole lineage server-
+// side in one D1 query and returns each id's primary-first winner already
+// attributed to its source contract. Throws on any non-OK so the caller can
+// fall back to the per-contract fan-out below.
+const fetchCombined = async (
+  origin: string,
+  primaryContractId: string,
+  lineageContractIds: string[],
+  ids: bigint[]
+): Promise<Map<string, TokenSummary>> => {
+  const url =
+    `${origin}/index/page?primary=${encodeURIComponent(primaryContractId)}` +
+    `&lineage=${encodeURIComponent(lineageContractIds.join(','))}` +
+    `&ids=${ids.map((id) => id.toString()).join(',')}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`index page HTTP ${response.status}`);
+  }
+  const body = (await response.json()) as { tokens?: CombinedRow[] };
+  const out = new Map<string, TokenSummary>();
+  for (const row of Array.isArray(body.tokens) ? body.tokens : []) {
+    if (isSvg(row.mime)) continue; // server already skips, defensive
+    out.set(row.id.toString(), rowToSummary(row, row.sourceContract));
+  }
+  return out;
+};
+
 // Resolve the given ids from the index, primary-first across [primary, ...lineage].
 // Returns a map of id-string -> TokenSummary for the ids the index actually has.
 // SVG tokens and any id missing everywhere are omitted (caller chain-fallback).
@@ -78,6 +107,19 @@ export const fetchIndexedSummaries = async (params: {
   const out = new Map<string, TokenSummary>();
   if (params.ids.length === 0) return out;
   const origin = params.origin ?? '';
+
+  // Preferred path: one combined request for the whole lineage.
+  try {
+    return await fetchCombined(
+      origin,
+      params.primaryContractId,
+      params.lineageContractIds,
+      params.ids
+    );
+  } catch {
+    // Fall through to the per-contract fan-out (older deploys without /index/page).
+  }
+
   const contracts = [params.primaryContractId, ...params.lineageContractIds];
 
   // One request per contract (in parallel), each returning whichever of the ids

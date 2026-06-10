@@ -45,7 +45,35 @@ index that powers the homepage explorer grids and the React grids.
 `wrangler d1 migrations apply xtrata-manage --config functions/wrangler.toml`
 (add `--remote` for the live D1).
 
+## Task 2 — Combined lineage endpoint, one round-trip (done)
+
+**Files:** `functions/index/page.ts` (new), `src/lib/viewer/index-summaries.ts`
+
+- New endpoint `GET /index/page?primary=<id>&lineage=<id,id>&ids=1,2,3` resolves
+  the whole lineage in **one D1 query** (`WHERE contract IN (...) AND token_id IN
+  (...)`), dedupes primary-first server-side, and returns each token attributed
+  to its `sourceContract`. SVG rows are skipped (chain fallback) — identical
+  semantics to the previous client-side fan-out.
+- Edge-cached with the same `Cache-Control` / Cache API pattern as task 1, keyed
+  on normalised `primary`+`lineage`+`ids`. One cache entry per page instead of
+  one per contract.
+- Lazy freshness: for each contract that is behind/stale it fires that
+  contract's own `POST /index/<contract>` in the background (`waitUntil`), so the
+  existing sync logic is reused, not duplicated.
+- Client: `fetchIndexedSummaries` now calls the combined endpoint first and
+  falls back to the per-contract fan-out on any error (covers older deploys
+  without `/index/page`). Both the homepage and React grids use this function, so
+  both drop from 3 requests/page (v3/v2/v1) to 1.
+
+**Notes**
+
+- Routing: `functions/index/page.ts` (static segment) takes precedence over
+  `functions/index/[contract].ts`. Real contract ids always contain a dot
+  (`address.name`), so `page` can never shadow a contract.
+- Same caveat as task 1 re: running tsc/tests locally before deploy (sandbox
+  unavailable in-session).
+
 ## Next
 
-- Task 2 — single server round-trip lineage endpoint (collapse the per-contract
-  client fan-out into one request that resolves primary-first server-side).
+- Task 5 — SVG tokens still chain-fall-back; store preview/data-uri in R2 so
+  cold SVG-heavy grids stop hitting the chain.
