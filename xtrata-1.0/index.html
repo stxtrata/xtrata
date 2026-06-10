@@ -1210,6 +1210,52 @@
       font-size: 11px;
     }
 
+    /* Selected-parent picker tiles in the Add Parents panel: a thumbnail with a
+       remove control, tinted by the wallet-ownership check. */
+    .parent-thumb--pick {
+      cursor: default;
+    }
+
+    .parent-thumb--pick.parent-thumb--ok {
+      border-color: var(--green);
+    }
+
+    .parent-thumb--pick.parent-thumb--error {
+      border-color: var(--rose);
+    }
+
+    .parent-thumb--pick.parent-thumb--warn {
+      border-color: var(--amber, #b9881f);
+    }
+
+    .parent-thumb__remove {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 18px;
+      height: 18px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      font-size: 11px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .parent-thumb__remove:hover {
+      background: var(--rose);
+    }
+
+    .parent-thumb__remove:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     .actions {
       display: flex;
       flex-wrap: wrap;
@@ -4076,13 +4122,44 @@
           : 'optional'
         : 'v3 required';
       dom.parentChipList.replaceChildren();
+      const pickContractId = getContractId(state.contract);
       for (const id of parentIds) {
-        const chip = document.createElement('button');
-        chip.className = 'relationship-chip';
-        chip.type = 'button';
-        chip.textContent = `#${id.toString()} remove`;
-        chip.addEventListener('click', () => removeParentId(id));
-        dom.parentChipList.append(chip);
+        const status = state.parentStatusById.get(id.toString());
+        const tone =
+          status?.status === 'owned'
+            ? 'ok'
+            : status?.status === 'missing' || status?.status === 'not-owned'
+              ? 'error'
+              : status?.status === 'error'
+                ? 'warn'
+                : '';
+        const tile = document.createElement('div');
+        tile.className = `parent-thumb parent-thumb--pick${tone ? ` parent-thumb--${tone}` : ''}`;
+        const img = document.createElement('img');
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.alt = `Parent ${formatTokenId(id)}`;
+        img.src = buildRuntimeInscriptionContentUrl({
+          coreContractId: pickContractId,
+          tokenId: id
+        });
+        img.addEventListener('error', () => {
+          img.remove();
+          tile.classList.add('parent-thumb--error');
+        });
+        const tag = document.createElement('span');
+        tag.className = 'parent-thumb__id';
+        tag.textContent = formatTokenId(id);
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'parent-thumb__remove';
+        remove.textContent = '✕';
+        remove.title = `Remove parent ${formatTokenId(id)}`;
+        remove.setAttribute('aria-label', `Remove parent ${formatTokenId(id)}`);
+        remove.disabled = state.busy;
+        remove.addEventListener('click', () => removeParentId(id));
+        tile.append(img, tag, remove);
+        dom.parentChipList.append(tile);
       }
       dom.parentStatusList.replaceChildren();
       if (!supportsParents) {
