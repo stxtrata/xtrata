@@ -9,6 +9,7 @@ import {
   loadTokenSummaryFromCache,
   saveTokenSummaryToCache
 } from './cache';
+import { fetchIndexedSummaries } from './index-summaries';
 
 export const getViewerKey = (contractId: string) => ['viewer', contractId];
 export const getLastTokenIdKey = (contractId: string) => [
@@ -362,6 +363,10 @@ export const useTokenSummaries = (params: {
   enabled?: boolean;
   contractIdOverride?: string;
   fetchSummary?: (id: bigint) => Promise<TokenSummary>;
+  // When provided, the whole page is served from the D1 index first (primary-
+  // first across [primary, ...lineage]); only ids the index hasn't synced (or
+  // SVGs) fall through to per-token chain reads.
+  indexLineageContractIds?: string[];
 }) => {
   const contractId =
     params.contractIdOverride ?? getContractId(params.client.contract);
@@ -376,20 +381,54 @@ export const useTokenSummaries = (params: {
     return buildTokenRange(params.lastTokenId);
   }, [params.lastTokenId, params.tokenIds]);
 
+  const useIndex =
+    !params.fetchSummary &&
+    !!params.indexLineageContractIds &&
+    params.indexLineageContractIds.length > 0;
+  const indexQuery = useQuery({
+    queryKey: [
+      ...getViewerKey(contractId),
+      'index-batch',
+      tokenIds.map((id) => id.toString()).join(',')
+    ],
+    queryFn: () =>
+      fetchIndexedSummaries({
+        primaryContractId: contractId,
+        lineageContractIds: params.indexLineageContractIds!,
+        ids: tokenIds
+      }),
+    enabled: useIndex && isEnabled && tokenIds.length > 0,
+    staleTime: 300_000,
+    refetchOnWindowFocus: false
+  });
+  const indexMap = indexQuery.data ?? null;
+  // Don't start per-token chain reads until the batch index has settled, so
+  // index hits never trigger a redundant chain read.
+  const indexSettled = !useIndex || indexQuery.isSuccess || indexQuery.isError;
+
   const fetcher =
     params.fetchSummary ??
-    ((id: bigint) =>
-      fetchTokenSummary({
+    ((id: bigint) => {
+      const indexed = indexMap?.get(id.toString());
+      if (indexed) {
+        return Promise.resolve(indexed);
+      }
+      return fetchTokenSummary({
         client: params.client,
         id,
         senderAddress: params.senderAddress
-      }));
+      });
+    });
 
   const tokenQueries = useQueries({
     queries: tokenIds.map((id) => ({
       queryKey: getTokenSummaryKey(contractId, id),
       queryFn: () => fetcher(id),
-      enabled: isEnabled && params.senderAddress.length > 0 && tokenIds.length > 0,
+      enabled:
+        isEnabled &&
+        params.senderAddress.length > 0 &&
+        tokenIds.length > 0 &&
+        indexSettled,
       staleTime: 300_000,
       refetchOnWindowFocus: false
     }))

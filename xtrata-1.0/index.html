@@ -3340,6 +3340,7 @@
       fetchTokenSummary,
       fetchTokenSummaryWithFallback
     } from '/src/lib/viewer/queries.ts';
+    import { fetchIndexedSummaries } from '/src/lib/viewer/index-summaries.ts';
     import {
       decodeTokenUriToImage,
       fetchTokenImageFromUri,
@@ -8158,8 +8159,29 @@ const openCuratedGallery = async (galleryId) => {
         sender: truncateMiddle(sender, 8, 8),
         summaryCacheSize: state.walletTokenCache.size
       });
+      // Serve the whole visible page from the D1 index in one round-trip
+      // (primary-first across the lineage). Ids the index hasn't synced yet — or
+      // SVGs — fall through to the per-token chain path below.
+      let indexedSummaries = null;
+      if (state.legacyClient && !useDirectRead) {
+        try {
+          const lineageContractIds = (getContentFallbackClients(state.client) ?? [])
+            .map((candidate) => getContractId(candidate.contract));
+          indexedSummaries = await fetchIndexedSummaries({
+            primaryContractId: getContractId(state.client.contract),
+            lineageContractIds,
+            ids: visibleIds
+          });
+        } catch (error) {
+          indexedSummaries = null;
+        }
+      }
       const summaries = await runLimited(visibleIds, 4, async (id) => {
         try {
+          const indexed = indexedSummaries?.get(id.toString());
+          if (indexed) {
+            return indexed;
+          }
           if (state.legacyClient && !useDirectRead) {
             return await fetchTokenSummaryWithFallback({
               primaryClient: state.client,

@@ -85,6 +85,7 @@ const readSummary = async (env: RuntimeEnv, apiBases: string[], contract: Runtim
     totalSize: asNumber(fields['total-size']),
     totalChunks: asNumber(fields['total-chunks']),
     sealed: unwrap(fields['sealed']) === true ? 1 : 0,
+    tokenUri: asString(unwrap(fields['token-uri'])),
     // migration-source is (optional { source-contract: principal, source-id: uint }).
     // Store the XIP-002 canonical reference "<contract>:<id>", or null.
     migrationSource: (() => {
@@ -121,6 +122,15 @@ const readMetaSummary = async (env: RuntimeEnv, apiBases: string[], contract: Ru
       owner = asString(unwrap(unwrap(cvToJSON(oc))));
     } catch { owner = null; }
   }
+  // get-inscription-meta has no token-uri; read it separately (one-time at sync).
+  let tokenUri: string | null = null;
+  try {
+    const tc = await callRuntimeReadOnly({
+      env, apiBases, contract,
+      functionName: 'get-token-uri', functionArgs: [uintArg(BigInt(id))], senderAddress: contract.address
+    });
+    tokenUri = asString(unwrap(unwrap(unwrap(cvToJSON(tc)))));
+  } catch { tokenUri = null; }
   return {
     owner,
     creator: asString(fields['creator']),
@@ -129,6 +139,7 @@ const readMetaSummary = async (env: RuntimeEnv, apiBases: string[], contract: Ru
     totalSize: asNumber(fields['total-size']),
     totalChunks: asNumber(fields['total-chunks']),
     sealed: unwrap(fields['sealed']) === true ? 1 : 0,
+    tokenUri,
     migrationSource: null as string | null
   };
 };
@@ -155,7 +166,8 @@ const getState = async (env: RuntimeEnv, contractId: string) => {
 
 type IndexSummary = {
   owner: string | null; creator: string | null; finalHash: string | null; mime: string | null;
-  totalSize: number | null; totalChunks: number | null; sealed: number; migrationSource: string | null;
+  totalSize: number | null; totalChunks: number | null; sealed: number;
+  tokenUri: string | null; migrationSource: string | null;
 };
 type Caps = { hasMintedList: boolean; hasSummary: boolean };
 
@@ -170,14 +182,15 @@ const upsertToken = (env: RuntimeEnv, contractId: string, tokenId: number, s: In
   run(
     env,
     `INSERT INTO inscription_index
-       (contract, token_id, owner, creator, final_hash, mime, total_size, total_chunks, sealed, migration_source, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?)
+       (contract, token_id, owner, creator, final_hash, mime, total_size, total_chunks, sealed, token_uri, migration_source, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
      ON CONFLICT(contract, token_id) DO UPDATE SET
        owner=excluded.owner, creator=excluded.creator, final_hash=excluded.final_hash,
        mime=excluded.mime, total_size=excluded.total_size, total_chunks=excluded.total_chunks,
-       sealed=excluded.sealed, migration_source=excluded.migration_source, updated_at=excluded.updated_at`,
+       sealed=excluded.sealed, token_uri=excluded.token_uri,
+       migration_source=excluded.migration_source, updated_at=excluded.updated_at`,
     [contractId, tokenId, s.owner, s.creator, s.finalHash, s.mime,
-     s.totalSize, s.totalChunks, s.sealed, s.migrationSource, Date.now()]
+     s.totalSize, s.totalChunks, s.sealed, s.tokenUri, s.migrationSource, Date.now()]
   );
 
 const sync = async (env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef, contractId: string, maxPerRun: number) => {
@@ -277,20 +290,34 @@ export const onRequest = async (context: {
       return json({ ok: true, ...result });
     }
 
-    // GET: serve a page from D1.
+    // GET: serve from D1. Either an explicit id set (?ids=1,2,3 — used by grids
+    // to fetch exactly the visible page) or a range (?from=&limit=&order=).
     const url = new URL(request.url);
-    const from = Math.max(1, Number(url.searchParams.get('from') || '1'));
-    const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || '16')));
-    const order = (url.searchParams.get('order') || 'asc').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
-    const rows = await queryAll(
-      env,
-      `SELECT token_id, owner, creator, final_hash, mime, total_size, total_chunks, sealed, migration_source
-         FROM inscription_index
-        WHERE contract = ? AND token_id >= ?
-        ORDER BY token_id ${order}
-        LIMIT ?`,
-      [contractId, from, limit]
-    );
+    const cols = 'token_id, owner, creator, final_hash, mime, total_size, total_chunks, sealed, token_uri, migration_source';
+    const idsParam = url.searchParams.get('ids');
+    let rows;
+    if (idsParam) {
+      const ids = idsParam.split(',').map((s) => Number(s.trim()))
+        .filter((n) => Number.isInteger(n) && n > 0).slice(0, 200);
+      if (ids.length === 0) return json({ error: 'No valid ids.' }, 400);
+      rows = await queryAll(
+        env,
+        `SELECT ${cols} FROM inscription_index
+          WHERE contract = ? AND token_id IN (${ids.map(() => '?').join(',')})`,
+        [contractId, ...ids]
+      );
+    } else {
+      const from = Math.max(1, Number(url.searchParams.get('from') || '1'));
+      const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || '16')));
+      const order = (url.searchParams.get('order') || 'asc').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+      rows = await queryAll(
+        env,
+        `SELECT ${cols} FROM inscription_index
+          WHERE contract = ? AND token_id >= ?
+          ORDER BY token_id ${order} LIMIT ?`,
+        [contractId, from, limit]
+      );
+    }
     const state = await getState(env, contractId);
 
     // Lazily keep the index fresh: kick a throttled background sync when behind
@@ -319,6 +346,7 @@ export const onRequest = async (context: {
         totalSize: r.total_size,
         totalChunks: r.total_chunks,
         sealed: r.sealed === 1,
+        tokenUri: r.token_uri ?? null,
         migrationSource: r.migration_source
       }))
     });
