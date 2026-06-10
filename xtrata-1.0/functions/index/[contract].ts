@@ -294,22 +294,54 @@ export const onRequest = async (context: {
     // to fetch exactly the visible page) or a range (?from=&limit=&order=).
     const url = new URL(request.url);
     const cols = 'token_id, owner, creator, final_hash, mime, total_size, total_chunks, sealed, token_uri, migration_source';
+
+    // Parse + normalize the query first so equivalent requests (e.g. the same
+    // ids in a different order, or with duplicates) collapse to one edge-cache
+    // entry. The normalized form is also what we key the Cloudflare Cache API on.
     const idsParam = url.searchParams.get('ids');
-    let rows;
+    let parsedIds: number[] | null = null;
+    let from = 1;
+    let limit = 16;
+    let order: 'ASC' | 'DESC' = 'ASC';
     if (idsParam) {
       const ids = idsParam.split(',').map((s) => Number(s.trim()))
         .filter((n) => Number.isInteger(n) && n > 0).slice(0, 200);
       if (ids.length === 0) return json({ error: 'No valid ids.' }, 400);
+      parsedIds = Array.from(new Set(ids)).sort((a, b) => a - b);
+    } else {
+      from = Math.max(1, Number(url.searchParams.get('from') || '1'));
+      limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || '16')));
+      order = (url.searchParams.get('order') || 'asc').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+    }
+
+    // Edge cache: a hot page (page 1 of a popular gallery) is served from the
+    // Cloudflare edge with zero Worker D1 work. Short s-maxage + SWR keeps it
+    // fresh — owner/migration changes already self-heal via the rolling sync, so
+    // a brief staleness window is acceptable and the SWR revalidation is silent.
+    const cacheKeyUrl = new URL(url.origin + url.pathname);
+    if (parsedIds) {
+      cacheKeyUrl.searchParams.set('ids', parsedIds.join(','));
+    } else {
+      cacheKeyUrl.searchParams.set('from', String(from));
+      cacheKeyUrl.searchParams.set('limit', String(limit));
+      cacheKeyUrl.searchParams.set('order', order);
+    }
+    const edgeCache = (globalThis as { caches?: { default?: Cache } }).caches?.default ?? null;
+    const cacheRequest = new Request(cacheKeyUrl.toString(), { method: 'GET' });
+    if (edgeCache) {
+      const hit = await edgeCache.match(cacheRequest);
+      if (hit) return hit;
+    }
+
+    let rows;
+    if (parsedIds) {
       rows = await queryAll(
         env,
         `SELECT ${cols} FROM inscription_index
-          WHERE contract = ? AND token_id IN (${ids.map(() => '?').join(',')})`,
-        [contractId, ...ids]
+          WHERE contract = ? AND token_id IN (${parsedIds.map(() => '?').join(',')})`,
+        [contractId, ...parsedIds]
       );
     } else {
-      const from = Math.max(1, Number(url.searchParams.get('from') || '1'));
-      const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || '16')));
-      const order = (url.searchParams.get('order') || 'asc').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
       rows = await queryAll(
         env,
         `SELECT ${cols} FROM inscription_index
@@ -333,7 +365,7 @@ export const onRequest = async (context: {
       }
     }
 
-    return json({
+    const payload = {
       contract: contractId,
       mintedCount: state.mintedCount,
       syncedCount: state.syncedCount,
@@ -349,7 +381,23 @@ export const onRequest = async (context: {
         tokenUri: r.token_uri ?? null,
         migrationSource: r.migration_source
       }))
+    };
+    const response = new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: {
+        'content-type': 'application/json',
+        // max-age: brief browser cache. s-maxage: edge TTL. SWR: serve stale
+        // instantly while a background revalidation refreshes the entry.
+        'Cache-Control': 'public, max-age=15, s-maxage=60, stale-while-revalidate=300',
+        ...CORS
+      }
     });
+    if (edgeCache && context.waitUntil) {
+      // Store under the normalized key; clone so the body stream stays readable
+      // for the response we return now.
+      context.waitUntil(edgeCache.put(cacheRequest, response.clone()));
+    }
+    return response;
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : String(error) }, 500);
   }
