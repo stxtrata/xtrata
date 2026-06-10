@@ -47,7 +47,8 @@ const readMintedCount = async (env: RuntimeEnv, apiBases: string[], contract: Ru
     env, apiBases, contract,
     functionName: 'get-minted-count', functionArgs: [], senderAddress: contract.address
   });
-  return Number(unwrap(cvToJSON(cv)));
+  // (ok uint): cvToJSON -> { value: { value: "56" } } — unwrap twice.
+  return Number(unwrap(unwrap(cvToJSON(cv))));
 };
 
 const readMintedId = async (env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef, index: number) => {
