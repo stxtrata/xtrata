@@ -229,6 +229,13 @@ export const parseGetDependencies = (value: ClarityValue) => {
   );
 };
 
+export const parseGetParents = (value: ClarityValue) => {
+  const list = expectList(value, 'get-parents');
+  return list.map((entry, index) =>
+    expectUInt(entry, `get-parents[${index}]`)
+  );
+};
+
 export const parseGetUploadState = (value: ClarityValue) => {
   const optional = expectOptional(value, 'get-upload-state');
   if (!optional) {

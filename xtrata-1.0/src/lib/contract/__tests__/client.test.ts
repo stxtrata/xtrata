@@ -3,6 +3,7 @@ import { StacksMainnet } from '@stacks/network';
 import {
   ClarityType,
   bufferCV,
+  listCV,
   responseOkCV,
   someCV,
   standardPrincipalCV,
@@ -13,7 +14,9 @@ import {
 } from '@stacks/transactions';
 import { DEFAULT_CONTRACT } from '../config';
 import {
+  buildMintSingleTxWithRelationshipsCall,
   buildSealInscriptionBatchCall,
+  buildSealWithRelationshipsCall,
   buildTransferCall,
   createXtrataClient
 } from '../client';
@@ -23,6 +26,10 @@ describe('xtrata contract client', () => {
   const V2_CONTRACT = {
     ...DEFAULT_CONTRACT,
     contractName: 'xtrata-v2-1-0'
+  };
+  const V3_CONTRACT = {
+    ...DEFAULT_CONTRACT,
+    contractName: 'xtrata-v3-2-3'
   };
 
   it('calls get-last-token-id with correct args', async () => {
@@ -117,6 +124,43 @@ describe('xtrata contract client', () => {
     expect(options.functionArgs[0].type).toBe(ClarityType.List);
   });
 
+  it('builds relationship seal call options', () => {
+    const hash = new Uint8Array(32).fill(7);
+    const options = buildSealWithRelationshipsCall({
+      contract: V3_CONTRACT,
+      network: new StacksMainnet(),
+      expectedHash: hash,
+      tokenUri: 'ipfs://xtrata/child',
+      dependencies: [2n],
+      parents: [1n, 3n]
+    });
+
+    expect(options.functionName).toBe('seal-with-relationships');
+    expect(options.functionArgs).toHaveLength(4);
+    expect(options.functionArgs[2].type).toBe(ClarityType.List);
+    expect(options.functionArgs[3].type).toBe(ClarityType.List);
+  });
+
+  it('builds relationship single-tx call options', () => {
+    const hash = new Uint8Array(32).fill(8);
+    const options = buildMintSingleTxWithRelationshipsCall({
+      contract: V3_CONTRACT,
+      network: new StacksMainnet(),
+      expectedHash: hash,
+      mime: 'text/plain',
+      totalSize: 5n,
+      chunks: [new Uint8Array([1, 2, 3, 4, 5])],
+      tokenUri: 'ipfs://xtrata/child',
+      dependencies: [2n],
+      parents: [1n]
+    });
+
+    expect(options.functionName).toBe('mint-single-tx-with-relationships');
+    expect(options.functionArgs).toHaveLength(7);
+    expect(options.functionArgs[5].type).toBe(ClarityType.List);
+    expect(options.functionArgs[6].type).toBe(ClarityType.List);
+  });
+
   it('calls minted index readers for v2 contracts', async () => {
     const calls: ReadOnlyCallOptions[] = [];
     const caller: ReadOnlyCaller = {
@@ -151,5 +195,28 @@ describe('xtrata contract client', () => {
       'get-minted-count',
       'get-minted-id'
     ]);
+  });
+
+  it('calls relationship reader for v3 contracts', async () => {
+    const calls: ReadOnlyCallOptions[] = [];
+    const caller: ReadOnlyCaller = {
+      callReadOnly: async (options) => {
+        calls.push(options);
+        return listCV([uintCV(1), uintCV(2)]);
+      }
+    };
+    const client = createXtrataClient({
+      contract: V3_CONTRACT,
+      caller
+    });
+
+    const parents = await client.getParents(
+      9n,
+      'SP2JXKMSH007NPYAQHKJPQMAQYAD90NQGTVJVQ02B'
+    );
+
+    expect(parents).toEqual([1n, 2n]);
+    expect(calls[0].functionName).toBe('get-parents');
+    expect(calls[0].functionArgs[0].type).toBe(ClarityType.UInt);
   });
 });

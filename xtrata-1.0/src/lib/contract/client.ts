@@ -27,6 +27,7 @@ import { resolveContractCapabilities } from './capabilities';
 import {
   parseGetChunk,
   parseGetDependencies,
+  parseGetParents,
   parseGetAdmin,
   parseGetFeeUnit,
   parseQuoteSingleTxFee,
@@ -199,6 +200,58 @@ export const buildSealRecursiveCall = (params: {
   });
 };
 
+export const buildSealWithRelationshipsCall = (params: {
+  contract: ContractConfig;
+  network: StacksNetwork;
+  expectedHash: Uint8Array;
+  tokenUri: string;
+  dependencies: bigint[];
+  parents: bigint[];
+  overrides?: ContractCallOverrides;
+}) => {
+  return buildContractCallOptions({
+    contract: params.contract,
+    network: params.network,
+    functionName: 'seal-with-relationships',
+    functionArgs: [
+      bufferCV(params.expectedHash),
+      stringAsciiCV(params.tokenUri),
+      listCV(params.dependencies.map((dep) => uintCV(dep))),
+      listCV(params.parents.map((parent) => uintCV(parent)))
+    ],
+    overrides: params.overrides
+  });
+};
+
+export const buildMintSingleTxWithRelationshipsCall = (params: {
+  contract: ContractConfig;
+  network: StacksNetwork;
+  expectedHash: Uint8Array;
+  mime: string;
+  totalSize: bigint;
+  chunks: Uint8Array[];
+  tokenUri: string;
+  dependencies: bigint[];
+  parents: bigint[];
+  overrides?: ContractCallOverrides;
+}) => {
+  return buildContractCallOptions({
+    contract: params.contract,
+    network: params.network,
+    functionName: 'mint-single-tx-with-relationships',
+    functionArgs: [
+      bufferCV(params.expectedHash),
+      stringAsciiCV(params.mime),
+      uintCV(params.totalSize),
+      listCV(params.chunks.map((chunk) => bufferCV(chunk))),
+      stringAsciiCV(params.tokenUri),
+      listCV(params.dependencies.map((dep) => uintCV(dep))),
+      listCV(params.parents.map((parent) => uintCV(parent)))
+    ],
+    overrides: params.overrides
+  });
+};
+
 export const buildTransferCall = (params: {
   contract: ContractConfig;
   network: StacksNetwork;
@@ -345,6 +398,7 @@ export type XtrataClient = {
   getSvgDataUri: (id: bigint, senderAddress: string) => Promise<string | null>;
   getInscriptionMeta: (id: bigint, senderAddress: string) => Promise<InscriptionMeta | null>;
   getDependencies: (id: bigint, senderAddress: string) => Promise<bigint[]>;
+  getParents: (id: bigint, senderAddress: string) => Promise<bigint[]>;
   getChunk: (id: bigint, index: bigint, senderAddress: string) => Promise<Uint8Array | null>;
   getChunkBatch: (
     id: bigint,
@@ -568,6 +622,20 @@ export const createXtrataClient = (params: {
         senderAddress
       });
       return parseGetDependencies(value);
+    },
+    getParents: async (id, senderAddress) => {
+      if (!capabilities.supportsRelationships) {
+        throw new Error('Relationship readers not supported by this contract');
+      }
+      const value = await callReadOnly({
+        caller,
+        contract: params.contract,
+        network: stacksNetwork,
+        functionName: 'get-parents',
+        functionArgs: [uintCV(id)],
+        senderAddress
+      });
+      return parseGetParents(value);
     },
     getChunk: async (id, index, senderAddress) => {
       const value = await callReadOnly({

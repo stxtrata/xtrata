@@ -25,6 +25,7 @@ import {
   parseGetMintedId,
   parseGetNextTokenId,
   parseGetOwner,
+  parseGetParents,
   parseGetPendingChunk,
   parseGetRoyaltyRecipient,
   parseIsPaused,
@@ -138,6 +139,11 @@ describe('contract parsers', () => {
   it('parses empty dependency list', () => {
     const list = listCV([]);
     expect(parseGetDependencies(list)).toEqual([]);
+  });
+
+  it('parses parents list', () => {
+    const list = listCV([uintCV(4), uintCV(8)]);
+    expect(parseGetParents(list)).toEqual([4n, 8n]);
   });
 
   it('parses large dependency ids', () => {

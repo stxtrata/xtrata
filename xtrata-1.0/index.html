@@ -1037,6 +1037,90 @@
       margin-top: 3px;
     }
 
+    .relationship-panel {
+      display: grid;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-soft);
+      padding: 12px;
+    }
+
+    .relationship-panel__head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: baseline;
+    }
+
+    .relationship-panel__title {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .relationship-panel__copy,
+    .relationship-status-list {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .relationship-actions,
+    .relationship-chip-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .relationship-chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--ink);
+      padding: 6px 9px;
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .relationship-chip:hover {
+      border-color: var(--blue);
+    }
+
+    .relationship-status {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      border-radius: 999px;
+      padding: 3px 8px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 12px;
+      margin: 0 6px 6px 0;
+    }
+
+    .relationship-status.ok {
+      border-color: rgba(36, 95, 69, 0.3);
+      background: var(--green-soft);
+      color: var(--green);
+    }
+
+    .relationship-status.warn {
+      border-color: rgba(132, 96, 27, 0.3);
+      background: var(--amber-soft);
+      color: #6b4d11;
+    }
+
+    .relationship-status.error {
+      border-color: rgba(159, 54, 54, 0.3);
+      background: var(--rose-soft);
+      color: var(--rose);
+    }
+
     .actions {
       display: flex;
       flex-wrap: wrap;
@@ -2882,6 +2966,26 @@
               <span class="label">Text payload</span>
               <textarea class="textarea" id="textPayload" spellcheck="false" placeholder="Optional text, JSON, SVG, or HTML"></textarea>
             </label>
+
+            <div class="relationship-panel" id="parentRelationshipPanel">
+              <div class="relationship-panel__head">
+                <span class="relationship-panel__title">Add Parents</span>
+                <span class="badge" id="parentRelationshipBadge">optional</span>
+              </div>
+              <div class="relationship-panel__copy">
+                Link this inscription as a child of one or more inscriptions owned by the connected wallet.
+              </div>
+              <label class="field">
+                <span class="label">Parent IDs</span>
+                <textarea class="textarea" id="parentIdsInput" spellcheck="false" placeholder="e.g. 12, 48 102"></textarea>
+              </label>
+              <div class="relationship-actions">
+                <button class="btn secondary" id="addParentsButton" type="button">Add parents</button>
+                <button class="btn secondary" id="clearParentsButton" type="button">Clear parents</button>
+              </div>
+              <div class="relationship-chip-list" id="parentChipList"></div>
+              <div class="relationship-status-list" id="parentStatusList">No parents selected.</div>
+            </div>
           </form>
 
           <div class="prepare-grid">
@@ -3324,6 +3428,11 @@
     } from '/src/lib/viewer/runtime-inline.ts';
     import { buildRuntimeInscriptionContentUrl } from '/src/lib/collections/cover-image.ts';
     import { resolveInscriptionMimeType } from '/src/lib/mint/mime.ts';
+    import {
+      mergeDependencySources,
+      parseDependencyInput,
+      validateDependencyIds
+    } from '/src/lib/mint/dependencies.ts';
     import { createImageThumbnail, THUMBNAIL_SIZE } from '/src/lib/viewer/thumbnail.ts';
     import {
       getSquareFramedImageStyle,
@@ -3352,13 +3461,18 @@
       entry.protocolVersion === '2.1.1' ||
       entry.protocolVersion === '3.0.0' ||
       entry.protocolVersion === '3.2.3' ||
+      entry.protocolVersion === '3.4.0' ||
       entry.contractName?.toLowerCase().includes('v2-1-0') === true ||
       entry.contractName?.toLowerCase().includes('v2-1-1') === true ||
       entry.contractName?.toLowerCase().includes('v3-0-0') === true ||
-      entry.contractName?.toLowerCase().includes('v3-2-3') === true;
+      entry.contractName?.toLowerCase().includes('v3-2-3') === true ||
+      entry.contractName?.toLowerCase().includes('v3-4-0') === true;
 
     const coreContracts = CONTRACT_REGISTRY.filter(isCoreEntry);
     const versionWeight = (entry) => {
+      if (entry.protocolVersion === '3.4.0' || entry.contractName?.includes('v3-4-0')) {
+        return 30400;
+      }
       if (entry.protocolVersion === '3.2.3' || entry.contractName?.includes('v3-2-3')) {
         return 30203;
       }
@@ -3379,6 +3493,8 @@
     const DEFAULT_CONTRACT =
       ACTIVE_CONTRACTS.find(
         (entry) =>
+          entry.protocolVersion === '3.4.0' ||
+          entry.contractName?.toLowerCase().includes('v3-4-0') ||
           entry.protocolVersion === '3.2.3' ||
           entry.contractName?.toLowerCase().includes('v3-2-3')
       ) ?? ACTIVE_CONTRACTS[0];
@@ -3410,6 +3526,13 @@
       dropzone: $('dropzone'),
       dropzoneText: $('dropzoneText'),
       textPayload: $('textPayload'),
+      parentRelationshipPanel: $('parentRelationshipPanel'),
+      parentRelationshipBadge: $('parentRelationshipBadge'),
+      parentIdsInput: $('parentIdsInput'),
+      addParentsButton: $('addParentsButton'),
+      clearParentsButton: $('clearParentsButton'),
+      parentChipList: $('parentChipList'),
+      parentStatusList: $('parentStatusList'),
       payloadPreview: $('payloadPreview'),
       preparedMeta: $('preparedMeta'),
       duplicateWarning: $('duplicateWarning'),
@@ -3697,6 +3820,11 @@
       selectedFile: null,
       prepared: null,
       handoffDependencyIds: [],
+      parentIds: [],
+      parentStatusById: new Map(),
+      parentStatusMessage: null,
+      parentChecking: false,
+      parentCheckRequestId: 0,
       duplicateId: null,
       uploadState: null,
       busy: false,
@@ -3810,6 +3938,240 @@
       const a = normalizeAddress(left);
       const b = normalizeAddress(right);
       return a.length > 0 && a === b;
+    };
+
+    const runReadOnlyLimited = async (items, limit, task) => {
+      const results = new Array(items.length);
+      let cursor = 0;
+      const workers = Array.from(
+        { length: Math.max(1, Math.min(limit, items.length)) },
+        async () => {
+          while (cursor < items.length) {
+            const index = cursor;
+            cursor += 1;
+            results[index] = await task(items[index], index);
+          }
+        }
+      );
+      await Promise.all(workers);
+      return results;
+    };
+
+    const supportsParentRelationships = () =>
+      resolveContractCapabilities(state.contract).supportsRelationships === true;
+
+    const renderParentSelection = () => {
+      const parentIds = state.parentIds ?? [];
+      const supportsParents = supportsParentRelationships();
+      dom.parentIdsInput.disabled = state.busy || !supportsParents;
+      dom.addParentsButton.disabled =
+        state.busy || !supportsParents || !dom.parentIdsInput.value.trim();
+      dom.clearParentsButton.disabled = state.busy || parentIds.length === 0;
+      dom.parentRelationshipBadge.textContent = supportsParents
+        ? parentIds.length > 0
+          ? `${parentIds.length} selected`
+          : 'optional'
+        : 'v3 required';
+      dom.parentChipList.replaceChildren();
+      for (const id of parentIds) {
+        const chip = document.createElement('button');
+        chip.className = 'relationship-chip';
+        chip.type = 'button';
+        chip.textContent = `#${id.toString()} remove`;
+        chip.addEventListener('click', () => removeParentId(id));
+        dom.parentChipList.append(chip);
+      }
+      dom.parentStatusList.replaceChildren();
+      if (!supportsParents) {
+        dom.parentStatusList.textContent =
+          'Parent-child links require a v3 relationship-aware contract.';
+        return;
+      }
+      if (parentIds.length === 0) {
+        dom.parentStatusList.textContent = 'No parents selected.';
+        return;
+      }
+      if (state.parentStatusMessage) {
+        const message = document.createElement('div');
+        message.textContent = state.parentStatusMessage;
+        dom.parentStatusList.append(message);
+      }
+      for (const id of parentIds) {
+        const key = id.toString();
+        const status = state.parentStatusById.get(key);
+        const pill = document.createElement('span');
+        let tone = '';
+        let label = state.parentChecking ? 'checking' : 'pending';
+        if (status?.status === 'owned') {
+          tone = 'ok';
+          label = 'in wallet';
+        } else if (status?.status === 'missing') {
+          tone = 'error';
+          label = 'missing';
+        } else if (status?.status === 'not-owned') {
+          tone = 'error';
+          label = 'not in wallet';
+        } else if (status?.status === 'error') {
+          tone = 'warn';
+          label = 'check failed';
+        }
+        pill.className = `relationship-status${tone ? ` ${tone}` : ''}`;
+        pill.textContent = `#${key}: ${label}`;
+        dom.parentStatusList.append(pill);
+      }
+    };
+
+    const getParentBlockingMessage = () => {
+      const parentIds = state.parentIds ?? [];
+      if (parentIds.length === 0) {
+        return null;
+      }
+      if (!supportsParentRelationships()) {
+        return 'Parent-child links require a v3 relationship-aware contract.';
+      }
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        return 'Connect the wallet that owns every selected parent inscription.';
+      }
+      if (state.parentChecking) {
+        return 'Waiting for parent ownership checks to finish.';
+      }
+      if (state.parentStatusMessage?.startsWith('Parent check failed')) {
+        return state.parentStatusMessage;
+      }
+      for (const id of parentIds) {
+        const status = state.parentStatusById.get(id.toString());
+        if (!status || status.status === 'pending') {
+          return 'Waiting for parent ownership checks to finish.';
+        }
+        if (status.status === 'missing') {
+          return `Parent ID #${id.toString()} was not found on-chain.`;
+        }
+        if (status.status === 'not-owned') {
+          return `Parent ID #${id.toString()} is not in the connected wallet.`;
+        }
+        if (status.status === 'error') {
+          return `Parent ID #${id.toString()} could not be confirmed.`;
+        }
+      }
+      return null;
+    };
+
+    const refreshParentChecks = async () => {
+      const parentIds = state.parentIds ?? [];
+      const requestId = state.parentCheckRequestId + 1;
+      state.parentCheckRequestId = requestId;
+      state.parentStatusById = new Map();
+      state.parentStatusMessage = null;
+      if (parentIds.length === 0 || !supportsParentRelationships()) {
+        state.parentChecking = false;
+        renderParentSelection();
+        updateControls();
+        return;
+      }
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        state.parentChecking = false;
+        state.parentStatusMessage =
+          'Connect the wallet that owns every selected parent inscription.';
+        renderParentSelection();
+        updateControls();
+        return;
+      }
+      state.parentChecking = true;
+      state.parentStatusMessage = 'Checking selected parents in the connected wallet.';
+      renderParentSelection();
+      updateControls();
+      try {
+        const sender = state.walletSession.address;
+        const owners = await runReadOnlyLimited(parentIds, 4, (id) =>
+          state.client.getOwner(id, sender)
+        );
+        if (requestId !== state.parentCheckRequestId) {
+          return;
+        }
+        const nextStatus = new Map();
+        parentIds.forEach((id, index) => {
+          const owner = owners[index];
+          const status = !owner
+            ? 'missing'
+            : addressesEqual(owner, sender)
+              ? 'owned'
+              : 'not-owned';
+          nextStatus.set(id.toString(), { status, owner: owner ?? null });
+        });
+        state.parentStatusById = nextStatus;
+        state.parentStatusMessage = null;
+      } catch (error) {
+        if (requestId !== state.parentCheckRequestId) {
+          return;
+        }
+        const message = error instanceof Error ? error.message : String(error);
+        state.parentStatusMessage = `Parent check failed: ${message}`;
+        state.parentStatusById = new Map(
+          parentIds.map((id) => [id.toString(), { status: 'error', owner: null }])
+        );
+      } finally {
+        if (requestId === state.parentCheckRequestId) {
+          state.parentChecking = false;
+          renderParentSelection();
+          updateControls();
+        }
+      }
+    };
+
+    const markRelationshipPreparedDirty = () => {
+      state.prepared = null;
+      state.duplicateId = null;
+      state.uploadState = null;
+      resetSteps();
+      renderPreparedState();
+    };
+
+    const applyParentInput = () => {
+      const parsed = parseDependencyInput(dom.parentIdsInput.value);
+      if (parsed.invalidTokens.length > 0) {
+        state.parentStatusMessage = `Invalid parent IDs: ${parsed.invalidTokens.join(', ')}.`;
+        renderParentSelection();
+        updateControls();
+        return;
+      }
+      if (parsed.ids.length === 0) {
+        state.parentStatusMessage = 'Enter at least one parent ID.';
+        renderParentSelection();
+        updateControls();
+        return;
+      }
+      const merged = mergeDependencySources(state.parentIds ?? [], parsed.ids);
+      const validation = validateDependencyIds(merged);
+      if (!validation.ok) {
+        state.parentStatusMessage =
+          validation.reason === 'max-50'
+            ? 'A maximum of 50 parent IDs is allowed.'
+            : 'Parent IDs are invalid.';
+        renderParentSelection();
+        updateControls();
+        return;
+      }
+      state.parentIds = merged;
+      dom.parentIdsInput.value = '';
+      state.parentStatusMessage = null;
+      markRelationshipPreparedDirty();
+      void refreshParentChecks();
+    };
+
+    const removeParentId = (id) => {
+      state.parentIds = (state.parentIds ?? []).filter((value) => value !== id);
+      markRelationshipPreparedDirty();
+      void refreshParentChecks();
+    };
+
+    const clearParentIds = () => {
+      state.parentIds = [];
+      state.parentStatusById = new Map();
+      state.parentStatusMessage = null;
+      dom.parentIdsInput.value = '';
+      markRelationshipPreparedDirty();
+      renderParentSelection();
+      updateControls();
     };
 
     const isLikelyStacksAddressInput = (value) =>
@@ -4271,6 +4633,7 @@
         !state.uploadState &&
         prepared.chunks.length > 0 &&
         (prepared.dependencyIds ?? []).length <= 50 &&
+        (prepared.parentIds ?? []).length <= 50 &&
         prepared.chunks.length <= SMALL_MINT_HELPER_MAX_CHUNKS
       );
     };
@@ -5134,6 +5497,7 @@
       const mismatch = getMismatch();
       const viewingAddress = getViewingWalletAddress();
       const duplicateBlocked = state.duplicateId !== null && !dom.allowDuplicateInput.checked;
+      const parentBlocked = getParentBlockingMessage();
       const visibleWalletCount = state.walletUsesPagedHoldings
         ? state.walletTotalCount
         : state.walletTokenIds.length;
@@ -5151,16 +5515,22 @@
         !connected ||
         !!mismatch ||
         !state.prepared ||
-        duplicateBlocked;
+        duplicateBlocked ||
+        !!parentBlocked;
       dom.inscribeButton.textContent = state.uploadState
         ? 'Resume inscription'
         : shouldUseSingleTx()
-          ? (state.prepared?.dependencyIds?.length ?? 0) > 0
+          ? (state.prepared?.parentIds?.length ?? 0) > 0
+            ? 'Start relationship single-tx inscription'
+            : (state.prepared?.dependencyIds?.length ?? 0) > 0
             ? 'Start recursive single-tx inscription'
             : 'Start single-tx inscription'
-          : (state.prepared?.dependencyIds?.length ?? 0) > 0
+          : (state.prepared?.parentIds?.length ?? 0) > 0
+            ? 'Start relationship inscription'
+            : (state.prepared?.dependencyIds?.length ?? 0) > 0
             ? 'Start recursive inscription'
             : 'Start inscription';
+      renderParentSelection();
       dom.refreshWalletButton.disabled = state.busy || state.walletLoadingPage || (!viewingAddress && !state.explorerMode);
       dom.walletLookupButton.textContent = shouldClearWalletLookupOnSubmit()
         ? 'Clear'
@@ -5287,6 +5657,12 @@
       state.prepared = null;
       state.duplicateId = null;
       state.uploadState = null;
+      state.parentIds = [];
+      state.parentStatusById = new Map();
+      state.parentStatusMessage = null;
+      state.parentChecking = false;
+      state.parentCheckRequestId += 1;
+      dom.parentIdsInput.value = '';
       state.walletTokenIds = [];
       state.walletPageIds = [];
       state.walletTotalCount = 0;
@@ -5417,6 +5793,8 @@
       );
       const dependencyIds = state.prepared.dependencyIds ?? [];
       const dependencyLabel = dependencyIds.map((id) => id.toString()).join(', ');
+      const parentIds = state.prepared.parentIds ?? [];
+      const parentLabel = parentIds.map((id) => id.toString()).join(', ');
 
       // Per-stage protocol fee breakdown, so the user sees what is charged when.
       // Fees are only really paid on delivery: a small anti-spam fee up front,
@@ -5483,7 +5861,17 @@
               {
                 key: 'Dependencies',
                 value: dependencyLabel,
-                title: `Recursive parent inscription ID${dependencyIds.length === 1 ? '' : 's'}: ${dependencyLabel}`,
+                title: `Recursive dependency inscription ID${dependencyIds.length === 1 ? '' : 's'}: ${dependencyLabel}`,
+                wide: true
+              }
+            ]
+          : []),
+        ...(parentIds.length > 0
+          ? [
+              {
+                key: 'Parents',
+                value: parentLabel,
+                title: `Parent inscription ID${parentIds.length === 1 ? '' : 's'}: ${parentLabel}`,
                 wide: true
               }
             ]
@@ -5673,6 +6061,7 @@
       const batches = batchChunks(chunks, Math.min(DEFAULT_BATCH_SIZE, MAX_UPLOAD_BATCH_SIZE));
       const expectedHashHex = bytesToHex(expectedHash);
       const dependencyIds = state.handoffDependencyIds ?? [];
+      const parentIds = state.parentIds ?? [];
 
       state.prepared = {
         file,
@@ -5683,7 +6072,8 @@
         expectedHashHex,
         tokenUriValue,
         mimeType,
-        dependencyIds
+        dependencyIds,
+        parentIds
       };
       state.duplicateId = null;
       state.uploadState = null;
@@ -5790,6 +6180,10 @@
       if (!state.prepared) {
         await preparePayload();
       }
+      const parentBlocked = getParentBlockingMessage();
+      if (parentBlocked) {
+        throw new Error(parentBlocked);
+      }
       if (state.duplicateId !== null && !dom.allowDuplicateInput.checked) {
         throw new Error('Existing payload must be acknowledged before continuing.');
       }
@@ -5809,6 +6203,103 @@
       }
     };
 
+    const checkDependencyPresence = async (dependencyIds) => {
+      if (dependencyIds.length === 0) {
+        return { ok: true, missing: [], legacyAvailable: [] };
+      }
+      appendLog('Checking dependency IDs on-chain...');
+      const sender = getReadOnlySenderAddress();
+      const metaResults = await runReadOnlyLimited(dependencyIds, 4, (id) =>
+        state.client.getInscriptionMeta(id, sender)
+      );
+      const missing = dependencyIds.filter((id, index) => !metaResults[index]);
+      if (missing.length === 0) {
+        return { ok: true, missing, legacyAvailable: [] };
+      }
+      let legacyAvailable = [];
+      if (state.legacyClient) {
+        const legacyResults = await runReadOnlyLimited(missing, 4, (id) =>
+          state.legacyClient.getInscriptionMeta(id, sender)
+        );
+        legacyAvailable = missing.filter((id, index) => !!legacyResults[index]);
+      }
+      return { ok: false, missing, legacyAvailable };
+    };
+
+    const formatDependencyPresenceFailure = (dependencyCheck) => {
+      const missingList = dependencyCheck.missing.map((id) => id.toString()).join(', ');
+      const legacyList = dependencyCheck.legacyAvailable.map((id) => id.toString()).join(', ');
+      const legacyLabel = state.legacyContract?.label ?? 'legacy contract';
+      const stillMissing = dependencyCheck.missing.filter(
+        (id) => !dependencyCheck.legacyAvailable.includes(id)
+      );
+      const stillMissingList = stillMissing.map((id) => id.toString()).join(', ');
+      if (dependencyCheck.legacyAvailable.length > 0) {
+        return stillMissing.length > 0
+          ? `Dependency IDs missing in ${state.contract.label}: ${stillMissingList}. IDs found in ${legacyLabel}: ${legacyList}. Migrate legacy dependencies before sealing.`
+          : `Dependency IDs found in ${legacyLabel} but not yet migrated: ${legacyList}. Migrate them before sealing.`;
+      }
+      return `Dependency IDs not found in ${state.contract.label}: ${missingList}.`;
+    };
+
+    const checkPreparedRelationships = async (prepared) => {
+      const dependencyCheck = await checkDependencyPresence(prepared.dependencyIds ?? []);
+      if (!dependencyCheck.ok) {
+        throw new Error(formatDependencyPresenceFailure(dependencyCheck));
+      }
+      const parentIds = prepared.parentIds ?? [];
+      if (parentIds.length === 0) {
+        return;
+      }
+      await refreshParentChecks();
+      const parentBlocked = getParentBlockingMessage();
+      if (parentBlocked) {
+        throw new Error(parentBlocked);
+      }
+    };
+
+    const getSealFunctionName = (dependencyIds, parentIds) => {
+      if (parentIds.length > 0) {
+        return 'seal-with-relationships';
+      }
+      return dependencyIds.length > 0 ? 'seal-recursive' : 'seal-inscription';
+    };
+
+    const getSealLogLabel = (dependencyIds, parentIds) => {
+      if (parentIds.length > 0) {
+        const parentLabel = parentIds.map((id) => id.toString()).join(', ');
+        const dependencyLabel =
+          dependencyIds.length > 0
+            ? `, deps: ${dependencyIds.map((id) => id.toString()).join(', ')}`
+            : '';
+        return `Step 3: seal-with-relationships (parents: ${parentLabel}${dependencyLabel})`;
+      }
+      return dependencyIds.length > 0
+        ? `Step 3: seal-recursive (deps: ${dependencyIds.map((id) => id.toString()).join(', ')})`
+        : 'Step 3: seal-inscription';
+    };
+
+    const buildSealFunctionArgs = (prepared) => {
+      const dependencyIds = prepared.dependencyIds ?? [];
+      const parentIds = prepared.parentIds ?? [];
+      if (parentIds.length > 0) {
+        return [
+          bufferCV(prepared.expectedHash),
+          stringAsciiCV(prepared.tokenUriValue),
+          listCV(dependencyIds.map((id) => uintCV(id))),
+          listCV(parentIds.map((id) => uintCV(id)))
+        ];
+      }
+      if (dependencyIds.length > 0) {
+        return [
+          bufferCV(prepared.expectedHash),
+          stringAsciiCV(prepared.tokenUriValue),
+          listCV(dependencyIds.map((id) => uintCV(id)))
+        ];
+      }
+      return [bufferCV(prepared.expectedHash), stringAsciiCV(prepared.tokenUriValue)];
+    };
+
     const runInscription = async () => {
       setBusy(true);
       resetSteps();
@@ -5817,6 +6308,8 @@
         await validateMintReadiness();
         const prepared = state.prepared;
         const dependencyIds = prepared.dependencyIds ?? [];
+        const parentIds = prepared.parentIds ?? [];
+        await checkPreparedRelationships(prepared);
         await refreshUploadState(prepared.expectedHash);
         flowStarted = true;
         const feeEstimate = getFeeEstimate(prepared.chunks.length);
@@ -5830,7 +6323,9 @@
           setStep('seal', 'pending', 'Single tx');
           appendLog(
             `Native single-tx mint on ${getContractId(state.contract)} (<=${SMALL_MINT_HELPER_MAX_CHUNKS} chunks)${
-              dependencyIds.length > 0 ? ` with ${dependencyIds.length} recursive dependency${dependencyIds.length === 1 ? '' : 'ies'}` : ''
+              parentIds.length > 0
+                ? ` with ${parentIds.length} parent${parentIds.length === 1 ? '' : 's'}`
+                : dependencyIds.length > 0 ? ` with ${dependencyIds.length} recursive dependency${dependencyIds.length === 1 ? '' : 'ies'}` : ''
             }.`
           );
           const coreArgs = [
@@ -5848,9 +6343,17 @@
               : feeEstimate.totalMicroStx;
           const singleTx = await requestContractCall({
             functionName:
-              dependencyIds.length > 0 ? 'mint-single-tx-recursive' : 'mint-single-tx',
+              parentIds.length > 0
+                ? 'mint-single-tx-with-relationships'
+                : dependencyIds.length > 0 ? 'mint-single-tx-recursive' : 'mint-single-tx',
             functionArgs:
-              dependencyIds.length > 0
+              parentIds.length > 0
+                ? [
+                    ...coreArgs,
+                    listCV(dependencyIds.map((id) => uintCV(id))),
+                    listCV(parentIds.map((id) => uintCV(id)))
+                  ]
+                : dependencyIds.length > 0
                 ? [...coreArgs, listCV(dependencyIds.map((id) => uintCV(id)))]
                 : coreArgs,
             postConditions: resolveFeePostConditions(singleTxCapMicroStx)
@@ -5995,27 +6498,15 @@
 
         setStep('seal', 'pending', 'Wallet prompt');
         appendLog(
-          dependencyIds.length > 0
-            ? `Step 3: seal-recursive (deps: ${dependencyIds.map((id) => id.toString()).join(', ')})`
-            : 'Step 3: seal-inscription'
+          getSealLogLabel(dependencyIds, parentIds)
         );
         if (didSendBeforeSeal) {
           await pauseBeforeNext('Sealing in');
         }
+        const sealFunctionName = getSealFunctionName(dependencyIds, parentIds);
         const sealTx = await requestContractCall({
-          functionName:
-            dependencyIds.length > 0 ? 'seal-recursive' : 'seal-inscription',
-          functionArgs:
-            dependencyIds.length > 0
-              ? [
-                  bufferCV(prepared.expectedHash),
-                  stringAsciiCV(prepared.tokenUriValue),
-                  listCV(dependencyIds.map((id) => uintCV(id)))
-                ]
-              : [
-                  bufferCV(prepared.expectedHash),
-                  stringAsciiCV(prepared.tokenUriValue)
-                ],
+          functionName: sealFunctionName,
+          functionArgs: buildSealFunctionArgs(prepared),
           postConditions: resolveFeePostConditions(
             prepared.stagedFee?.sealMicroStx ?? feeEstimate.sealMicroStx
           )
@@ -9204,6 +9695,7 @@ const openCuratedGallery = async (galleryId) => {
         appendLog(state.walletSession.address ? `Wallet connected: ${truncateMiddle(state.walletSession.address)}` : 'Wallet connection cancelled.');
         updateWalletStatus();
         await fetchAdminStatus();
+        await refreshParentChecks();
         if (state.prepared) {
           await refreshUploadState(state.prepared.expectedHash);
           renderPreparedState();
@@ -9239,6 +9731,7 @@ const openCuratedGallery = async (galleryId) => {
         appendLog('Wallet disconnected.');
         updateWalletStatus();
         await fetchAdminStatus();
+        await refreshParentChecks();
         await loadWalletInscriptions();
         renderPreparedState();
       } finally {
@@ -9861,6 +10354,13 @@ const openCuratedGallery = async (galleryId) => {
     });
     dom.inscribeButton.addEventListener('click', runInscription);
     dom.allowDuplicateInput.addEventListener('change', updateControls);
+    dom.parentIdsInput.addEventListener('input', () => {
+      state.parentStatusMessage = null;
+      renderParentSelection();
+      updateControls();
+    });
+    dom.addParentsButton.addEventListener('click', applyParentInput);
+    dom.clearParentsButton.addEventListener('click', clearParentIds);
     dom.transferRecipientInput.addEventListener('input', updateTransferControls);
     dom.transferButton.addEventListener('click', transferSelectedToken);
     dom.fullscreenButton?.addEventListener('click', openFullscreenViewer);
