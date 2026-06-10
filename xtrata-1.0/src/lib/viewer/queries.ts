@@ -174,6 +174,12 @@ export const fetchTokenSummaryWithFallback = async (params: {
   // provided, routing is a single read: ids in this set resolve on primary, all
   // other ids in the legacy range resolve on legacy — no speculative read-miss.
   primaryMintedIds?: Set<string> | null;
+  // Ordered legacy lineage (e.g. [v2, v1]). When provided, resolution is
+  // primary-first: read the primary core, then each lineage core until a token
+  // is found. This is the only correct strategy across all migration paths —
+  // including v1->v3 direct migrations, which never existed on v2, so a
+  // legacy-first/escrow check would miss them and the token would not render.
+  lineageClients?: Array<XtrataClient | null> | null;
 }): Promise<TokenSummary> => {
   const legacyClient = params.legacyClient ?? null;
   const legacyMaxId = params.legacyMaxId ?? null;
@@ -185,6 +191,34 @@ export const fetchTokenSummaryWithFallback = async (params: {
   const legacyContractId = legacyClient
     ? getContractId(legacyClient.contract)
     : null;
+
+  const lineage = (params.lineageClients ?? []).filter(
+    (candidate): candidate is XtrataClient => !!candidate
+  );
+  if (lineage.length > 0) {
+    const primarySummary = await fetchTokenSummary({
+      client: params.primaryClient,
+      id: params.id,
+      senderAddress: params.senderAddress
+    });
+    if (!isEmptySummary(primarySummary)) {
+      return { ...primarySummary, sourceContractId: primaryContractId };
+    }
+    for (const candidate of lineage) {
+      const candidateSummary = await fetchTokenSummary({
+        client: candidate,
+        id: params.id,
+        senderAddress: params.senderAddress
+      });
+      if (!isEmptySummary(candidateSummary)) {
+        return {
+          ...candidateSummary,
+          sourceContractId: getContractId(candidate.contract)
+        };
+      }
+    }
+    return { ...primarySummary, sourceContractId: primaryContractId };
+  }
 
   // If we know the primary minted this id, it is authoritative — route straight
   // to the primary path below (single read), even if the id overlaps the legacy

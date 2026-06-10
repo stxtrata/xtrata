@@ -8167,7 +8167,10 @@ const openCuratedGallery = async (galleryId) => {
               id,
               senderAddress: sender,
               legacyMaxId,
-              escrowOwner
+              escrowOwner,
+              // Primary-first across the full lineage [v2, v1] so tokens migrated
+              // v1->v3 directly (never on v2) still resolve to the primary core.
+              lineageClients: getContentFallbackClients(state.client)
             });
           }
           return await fetchTokenSummary({
