@@ -3539,6 +3539,7 @@
       recordChildParents,
       syncChildIndex
     } from '/src/lib/viewer/parent-child-index.ts';
+    import { fetchLineage } from '/src/lib/viewer/relations-api.ts';
     import {
       decodeTokenUriToImage,
       fetchTokenImageFromUri,
@@ -4924,9 +4925,53 @@
       return card;
     };
 
-    // Orchestrates both relationship directions for the selected inscription:
-    // upward to its parents (on-chain get-parents) and downward to its children
-    // (the persisted reverse index, with an explicit scan to build/refresh it).
+    // Renders one labelled group of related inscriptions (heading + id list +
+    // thumbnail row). Returns nothing; appends into `section`.
+    const appendRelationGroup = (section, contractId, title, ids, role) => {
+      if (!ids || ids.length === 0) {
+        return;
+      }
+      const heading = document.createElement('div');
+      heading.className = 'selected-relationships__head';
+      heading.textContent = `${title} (${ids.length})`;
+      const idLine = document.createElement('div');
+      idLine.className = 'selected-relationships__ids';
+      idLine.textContent = ids.map((id) => formatTokenId(id)).join(', ');
+      const thumbs = document.createElement('div');
+      thumbs.className = 'selected-relationships__thumbs';
+      for (const id of ids) {
+        thumbs.append(buildRelationshipThumbCard(contractId, id, role));
+      }
+      section.append(heading, idLine, thumbs);
+    };
+
+    // Depth -> human label for lineage tiers beyond the direct relation.
+    const depthLabel = (depth, direction) => {
+      if (direction === 'down') {
+        if (depth === 1) return 'Children';
+        if (depth === 2) return 'Grandchildren';
+        return `Descendants · depth ${depth}`;
+      }
+      if (depth === 1) return 'Parents';
+      if (depth === 2) return 'Grandparents';
+      return `Ancestors · depth ${depth}`;
+    };
+
+    const groupByDepth = (nodes) => {
+      const byDepth = new Map();
+      for (const node of nodes) {
+        const list = byDepth.get(node.depth) ?? [];
+        list.push(node.id);
+        byDepth.set(node.depth, list);
+      }
+      return [...byDepth.entries()].sort((a, b) => a[0] - b[0]);
+    };
+
+    // Orchestrates every relationship direction for the selected inscription:
+    // its live on-chain parents, then the full server-indexed lineage (children,
+    // grandchildren, …, ancestors above direct parents, and half-siblings). Falls
+    // back to the local IndexedDB child index + scan when the server lineage
+    // endpoint is unavailable.
     const renderSelectedInscriptionRelationships = async (token) => {
       const container = dom.selectedRelationships;
       if (!container) {
@@ -4944,11 +4989,11 @@
       const contractId = getTokenCacheContractId(token);
       const parentsSection = document.createElement('div');
       parentsSection.className = 'selected-relationships__group';
-      const childrenSection = document.createElement('div');
-      childrenSection.className = 'selected-relationships__group';
-      container.append(parentsSection, childrenSection);
+      const lineageSection = document.createElement('div');
+      lineageSection.className = 'selected-relationships__group';
+      container.append(parentsSection, lineageSection);
       void renderParentsSection(token, contractId, parentsSection);
-      void renderChildrenSection(token, contractId, childrenSection);
+      void renderLineageSection(token, contractId, lineageSection);
     };
 
     // Upward navigation: this inscription's parents, read live from the chain.
@@ -5003,9 +5048,67 @@
       section.append(ids, thumbs);
     };
 
-    // Downward navigation: children read from the persisted reverse index, plus
-    // a Scan control to build/refresh it (there is no on-chain get-children).
-    const renderChildrenSection = async (token, contractId, section) => {
+    // Downward + lateral navigation. Prefers the server lineage index (one
+    // round-trip: children, grandchildren, …, ancestors above direct parents,
+    // and half-siblings). Degrades to the local IndexedDB child index + scan
+    // button when the endpoint is unavailable (e.g. local/static hosting).
+    const renderLineageSection = async (token, contractId, section) => {
+      const requestId = ++state.selectedChildrenRequestId;
+      const status = document.createElement('div');
+      status.className = 'selected-relationships__status';
+      status.textContent = 'Loading lineage…';
+      section.replaceChildren(status);
+
+      const lineage = await fetchLineage({ contractId, id: token.id });
+      if (
+        requestId !== state.selectedChildrenRequestId ||
+        state.selectedTokenId !== token.id
+      ) {
+        return;
+      }
+      if (!lineage) {
+        // Server lineage unavailable — fall back to the local child index.
+        void renderLocalChildrenSection(token, contractId, section);
+        return;
+      }
+
+      section.replaceChildren();
+      // Descendants grouped by depth: Children, Grandchildren, deeper tiers.
+      for (const [depth, ids] of groupByDepth(lineage.descendants)) {
+        appendRelationGroup(section, contractId, depthLabel(depth, 'down'), ids, 'child');
+      }
+      // Half-siblings.
+      appendRelationGroup(section, contractId, 'Siblings', lineage.siblings, 'sibling');
+      // Ancestors above the direct parents (direct parents are shown live in the
+      // parents section), grouped by depth: Grandparents, deeper tiers.
+      for (const [depth, ids] of groupByDepth(lineage.ancestors)) {
+        if (depth < 2) continue;
+        appendRelationGroup(section, contractId, depthLabel(depth, 'up'), ids, 'ancestor');
+      }
+
+      const hasAny =
+        lineage.descendants.length > 0 ||
+        lineage.siblings.length > 0 ||
+        lineage.ancestors.some((node) => node.depth >= 2);
+      const coverage = document.createElement('span');
+      coverage.className = 'selected-relationships__status';
+      if (!hasAny) {
+        coverage.textContent = lineage.complete
+          ? 'No children, siblings, or deeper lineage.'
+          : 'No lineage indexed yet — the index is still catching up.';
+      } else if (!lineage.complete) {
+        coverage.textContent =
+          `Index ${lineage.syncedCount.toString()}/${lineage.mintedCount.toString()} — newer relations may still be syncing.`;
+      } else {
+        coverage.textContent = `Lineage complete across ${lineage.mintedCount.toString()} inscriptions.`;
+      }
+      section.append(coverage);
+    };
+
+    // Local fallback: children read from the persisted reverse index, plus a
+    // Scan control to build/refresh it (used only when the server lineage
+    // endpoint is unreachable).
+    const renderLocalChildrenSection = async (token, contractId, section) => {
       const requestId = ++state.selectedChildrenRequestId;
       const heading = document.createElement('div');
       heading.className = 'selected-relationships__head';
@@ -5134,7 +5237,7 @@
         if (state.selectedTokenId === token.id) {
           const section = scanButton.closest('.selected-relationships__group');
           if (section) {
-            void renderChildrenSection(token, contractId, section);
+            void renderLocalChildrenSection(token, contractId, section);
           }
         }
       }
