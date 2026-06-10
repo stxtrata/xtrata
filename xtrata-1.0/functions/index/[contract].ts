@@ -42,14 +42,19 @@ const asString = (node: any): string | null => {
   return typeof v === 'string' ? v : v === null || v === undefined ? null : String(v);
 };
 
-const readMintedCount = async (env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef) => {
+const readOkUint = async (
+  env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef, functionName: string
+) => {
   const cv = await callRuntimeReadOnly({
-    env, apiBases, contract,
-    functionName: 'get-minted-count', functionArgs: [], senderAddress: contract.address
+    env, apiBases, contract, functionName, functionArgs: [], senderAddress: contract.address
   });
   // (ok uint): cvToJSON -> { value: { value: "56" } } — unwrap twice.
   return Number(unwrap(unwrap(cvToJSON(cv))));
 };
+const readMintedCount = (env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef) =>
+  readOkUint(env, apiBases, contract, 'get-minted-count');
+const readLastTokenId = (env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef) =>
+  readOkUint(env, apiBases, contract, 'get-last-token-id');
 
 const readMintedId = async (env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef, index: number) => {
   const cv = await callRuntimeReadOnly({
@@ -95,6 +100,53 @@ const readSummary = async (env: RuntimeEnv, apiBases: string[], contract: Runtim
   };
 };
 
+// Older cores (v1/v2) lack get-inscription-summary: read get-inscription-meta
+// (+ get-owner when the meta tuple carries no owner). v1/v2 are migration sources
+// themselves, so migration-source is null.
+const readMetaSummary = async (env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef, id: number) => {
+  const cv = await callRuntimeReadOnly({
+    env, apiBases, contract,
+    functionName: 'get-inscription-meta', functionArgs: [uintArg(BigInt(id))], senderAddress: contract.address
+  });
+  const optVal = unwrap(unwrap(cvToJSON(cv)));
+  if (optVal === null || optVal === undefined) return null;
+  const fields = optVal.value ?? optVal;
+  let owner = asString(fields['owner']);
+  if (owner === null) {
+    try {
+      const oc = await callRuntimeReadOnly({
+        env, apiBases, contract,
+        functionName: 'get-owner', functionArgs: [uintArg(BigInt(id))], senderAddress: contract.address
+      });
+      owner = asString(unwrap(unwrap(cvToJSON(oc))));
+    } catch { owner = null; }
+  }
+  return {
+    owner,
+    creator: asString(fields['creator']),
+    finalHash: asString(fields['final-hash']),
+    mime: asString(fields['mime-type']),
+    totalSize: asNumber(fields['total-size']),
+    totalChunks: asNumber(fields['total-chunks']),
+    sealed: unwrap(fields['sealed']) === true ? 1 : 0,
+    migrationSource: null as string | null
+  };
+};
+
+// Detect the contract's reader shape so v1/v2/v3 all index from one endpoint.
+const probeCaps = async (env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef) => {
+  let hasMintedList = true;
+  let hasSummary = true;
+  try { await readMintedCount(env, apiBases, contract); } catch { hasMintedList = false; }
+  try {
+    await callRuntimeReadOnly({
+      env, apiBases, contract,
+      functionName: 'get-inscription-summary', functionArgs: [uintArg(1n)], senderAddress: contract.address
+    });
+  } catch { hasSummary = false; }
+  return { hasMintedList, hasSummary };
+};
+
 const getState = async (env: RuntimeEnv, contractId: string) => {
   const res = await queryAll(env, 'SELECT minted_count, synced_count FROM inscription_index_state WHERE contract = ?', [contractId]);
   const row = (res.results ?? [])[0] as { minted_count?: number; synced_count?: number } | undefined;
@@ -102,15 +154,24 @@ const getState = async (env: RuntimeEnv, contractId: string) => {
 };
 
 const sync = async (env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef, contractId: string, maxPerRun: number) => {
-  const mintedCount = await readMintedCount(env, apiBases, contract);
+  const caps = await probeCaps(env, apiBases, contract);
+  // total = number of enumerable entries. Sparse cores (v2/v3) enumerate the
+  // minted-id list; dense cores (v1) enumerate ids 1..last-token-id.
+  const total = caps.hasMintedList
+    ? await readMintedCount(env, apiBases, contract)
+    : await readLastTokenId(env, apiBases, contract);
   const { syncedCount } = await getState(env, contractId);
   const start = syncedCount;
-  const end = Math.min(mintedCount, start + maxPerRun);
+  const end = Math.min(total, start + maxPerRun);
   let ingested = 0;
   for (let index = start; index < end; index += 1) {
-    const tokenId = await readMintedId(env, apiBases, contract, index);
+    const tokenId = caps.hasMintedList
+      ? await readMintedId(env, apiBases, contract, index)
+      : index + 1; // dense 1-based ids
     if (tokenId === null) continue;
-    const summary = await readSummary(env, apiBases, contract, tokenId);
+    const summary = caps.hasSummary
+      ? await readSummary(env, apiBases, contract, tokenId)
+      : await readMetaSummary(env, apiBases, contract, tokenId);
     if (!summary) continue;
     await run(
       env,
@@ -126,15 +187,15 @@ const sync = async (env: RuntimeEnv, apiBases: string[], contract: RuntimeContra
     );
     ingested += 1;
   }
-  const newSynced = start + (end - start);
+  const newSynced = end;
   await run(
     env,
     `INSERT INTO inscription_index_state (contract, minted_count, synced_count, updated_at)
      VALUES (?,?,?,?)
      ON CONFLICT(contract) DO UPDATE SET minted_count=excluded.minted_count, synced_count=excluded.synced_count, updated_at=excluded.updated_at`,
-    [contractId, mintedCount, newSynced, Date.now()]
+    [contractId, total, newSynced, Date.now()]
   );
-  return { mintedCount, syncedCount: newSynced, ingested, complete: newSynced >= mintedCount };
+  return { mintedCount: total, syncedCount: newSynced, ingested, complete: newSynced >= total };
 };
 
 export const onRequest = async (context: {
