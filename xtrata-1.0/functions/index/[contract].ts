@@ -193,7 +193,47 @@ const upsertToken = (env: RuntimeEnv, contractId: string, tokenId: number, s: In
      s.totalSize, s.totalChunks, s.sealed, s.tokenUri, s.migrationSource, Date.now()]
   );
 
+// Soft self-expiring lock TTL. Generous relative to a batch sync (which reads
+// at most maxPerRun tokens) so a slow run doesn't release early, but short
+// enough that a crashed run frees the lock quickly.
+const SYNC_LOCK_TTL_MS = 120_000;
+
 const sync = async (env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef, contractId: string, maxPerRun: number) => {
+  // Acquire the stampede lock. Ensure a state row exists, then conditionally
+  // claim the lock only if it is free or expired. If the UPDATE changes no rows,
+  // another sync holds the lock — back off rather than duplicate the work.
+  const now = Date.now();
+  await run(
+    env,
+    `INSERT OR IGNORE INTO inscription_index_state
+       (contract, minted_count, synced_count, updated_at, sync_lock_until)
+     VALUES (?,0,0,0,0)`,
+    [contractId]
+  );
+  const lockRes = await run(
+    env,
+    `UPDATE inscription_index_state SET sync_lock_until = ?
+      WHERE contract = ? AND (sync_lock_until IS NULL OR sync_lock_until <= ?)`,
+    [now + SYNC_LOCK_TTL_MS, contractId, now]
+  );
+  const acquired = Number((lockRes as { meta?: { changes?: number } })?.meta?.changes ?? 0) > 0;
+  if (!acquired) {
+    return { skipped: true as const };
+  }
+
+  try {
+    return await runSync(env, apiBases, contract, contractId, maxPerRun);
+  } finally {
+    // Release the lock so the next sync can run immediately (don't wait for TTL).
+    await run(
+      env,
+      'UPDATE inscription_index_state SET sync_lock_until = 0 WHERE contract = ?',
+      [contractId]
+    ).catch(() => undefined);
+  }
+};
+
+const runSync = async (env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef, contractId: string, maxPerRun: number) => {
   const caps = await probeCaps(env, apiBases, contract);
   // total = number of enumerable entries. Sparse cores (v2/v3) enumerate the
   // minted-id list; dense cores (v1) enumerate ids 1..last-token-id.

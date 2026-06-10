@@ -424,6 +424,13 @@ export const useTokenSummaries = (params: {
     queries: tokenIds.map((id) => ({
       queryKey: getTokenSummaryKey(contractId, id),
       queryFn: () => fetcher(id),
+      // Short-circuit index hits: when the batch index already holds this id,
+      // seed it as initial data so the card renders immediately with no loading
+      // flash and queryFn is never scheduled. Misses return undefined here and
+      // fall through to the normal per-token fetch (chain fallback).
+      initialData: useIndex
+        ? () => indexMap?.get(id.toString())
+        : undefined,
       enabled:
         isEnabled &&
         params.senderAddress.length > 0 &&

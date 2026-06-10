@@ -103,10 +103,44 @@ The preview canvas always worked because it renders the SVG straight into an
 non-SVG tiles are untouched. Verify on an SVG-heavy gallery (e.g. the bullseye /
 droplet XML tokens) in both the homepage explorer and the React explorer.
 
+## Task #4 — Sync-stampede guard (done)
+
+**Files:** `functions/migrations/005_inscription_index_sync_lock.sql` (new),
+`functions/index/[contract].ts`
+
+- Added `sync_lock_until` to `inscription_index_state`. `sync()` now acquires a
+  soft, self-expiring lock (TTL 120s) via a conditional `UPDATE ... WHERE
+  sync_lock_until <= now` and backs off (`{ skipped: true }`) if another sync
+  holds it; the lock is released in a `finally`. The body moved to `runSync()`.
+- Prevents concurrent page views (GET lazy trigger + `/index/page` POST fan-out)
+  from launching redundant chain reads/writes. A crashed run can't wedge the
+  index — the lock expires.
+- Apply: `wrangler d1 migrations apply xtrata-manage --config functions/wrangler.toml`
+  (`--remote` for live). Remote tracker note from migration 004 still applies if
+  003 shows as pending.
+
+## Task #6 — Persist index summaries client-side (done)
+
+**File:** `src/lib/viewer/index-summaries.ts`
+
+- `fetchIndexedSummaries` now seeds from the shared IndexedDB token-summaries
+  store first (keyed by the primary contract), fetches only the misses, and
+  persists freshly fetched summaries. Return visits / reloads paint the grid
+  instantly from disk. TTL 5 min (owner/migration freshness handled
+  authoritatively by the edge cache + rolling sync).
+- Best-effort: cache errors are swallowed; SVGs are never index-cached (still
+  chain-fallback). Both homepage and React use this function.
+
+## Task #7 — React short-circuit index hits (done)
+
+**File:** `src/lib/viewer/queries.ts`
+
+- `useTokenSummaries` per-token queries now take `initialData` from the batch
+  index map: index hits render immediately with no loading flash and never
+  schedule `queryFn`; misses fall through to the normal per-token chain fetch.
+
 ## Next
 
-- Task #4 — sync-stampede guard (lock in inscription_index_state).
-- Task #6 — persist index summaries client-side (reuse the IndexedDB
-  token-summaries store).
 - Task #5 — store SVG previews in R2 so the runtime SVG render is itself cached
-  (this fix removes the blank-tile bug; R2 caching would further cut cold cost).
+  (the SVG grid fix removes the blank-tile bug; R2 caching would further cut cold
+  cost). Larger change — own branch.
