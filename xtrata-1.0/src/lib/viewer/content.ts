@@ -1337,6 +1337,11 @@ const fetchRemainingChunksWithBatch = async (params: {
 export const fetchOnChainContent = async (params: {
   client: XtrataClient;
   fallbackClient?: XtrataClient | null;
+  // Ordered legacy lineage to try when the primary (and single fallback) miss
+  // the content — e.g. a token migrated v1->v2->v3 has its bytes stranded on v1,
+  // so the chain is [v2, v1]. Migration preserves the id, so the same id is read
+  // on each. Takes precedence over fallbackClient when provided.
+  fallbackClients?: Array<XtrataClient | null> | null;
   cacheContractId?: string;
   id: bigint;
   senderAddress: string;
@@ -1386,40 +1391,55 @@ export const fetchOnChainContent = async (params: {
     totalSize: totalSizeNumber,
     sender: params.senderAddress
   });
+  // Try the primary, then each legacy core in the lineage, until one holds the
+  // content. Only a missing-chunk miss advances to the next source; any other
+  // error (network, etc.) propagates immediately.
+  const lineage = (
+    params.fallbackClients && params.fallbackClients.length > 0
+      ? params.fallbackClients
+      : [fallbackClient]
+  ).filter((candidate): candidate is XtrataClient => !!candidate);
+  const candidates: XtrataClient[] = [params.client, ...lineage];
   let activeClient = params.client;
   let chunkSourceContractId = primaryContractId;
-  let firstChunk: Uint8Array;
-  try {
-    firstChunk = await fetchChunkWithRetry({
-      client: params.client,
-      id: params.id,
-      index: 0n,
-      senderAddress: params.senderAddress
-    });
-  } catch (error) {
-    if (!fallbackClient || !isMissingChunkError(error)) {
-      throw error;
+  let firstChunk: Uint8Array | null = null;
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < candidates.length; attempt += 1) {
+    const candidate = candidates[attempt];
+    try {
+      firstChunk = await fetchChunkWithRetry({
+        client: candidate,
+        id: params.id,
+        index: 0n,
+        senderAddress: params.senderAddress
+      });
+      activeClient = candidate;
+      chunkSourceContractId = getContractId(candidate.contract);
+      if (attempt > 0) {
+        logInfo('chunk', 'Using fallback chunk source contract', {
+          id: params.id.toString(),
+          primaryContractId,
+          chunkSourceContractId,
+          cacheContractId
+        });
+      }
+      break;
+    } catch (error) {
+      lastError = error;
+      const hasNext = attempt < candidates.length - 1;
+      if (!hasNext || !isMissingChunkError(error)) {
+        throw error;
+      }
+      logWarn('chunk', 'Primary chunk read failed; attempting fallback source', {
+        id: params.id.toString(),
+        primaryContractId,
+        fallbackContractId: getContractId(candidates[attempt + 1].contract),
+        error: getErrorMessage(error)
+      });
     }
-    logWarn('chunk', 'Primary chunk read failed; attempting fallback source', {
-      id: params.id.toString(),
-      primaryContractId,
-      fallbackContractId,
-      error: getErrorMessage(error)
-    });
-    firstChunk = await fetchChunkWithRetry({
-      client: fallbackClient,
-      id: params.id,
-      index: 0n,
-      senderAddress: params.senderAddress
-    });
-    activeClient = fallbackClient;
-    chunkSourceContractId = fallbackContractId ?? primaryContractId;
-    logInfo('chunk', 'Using fallback chunk source contract', {
-      id: params.id.toString(),
-      primaryContractId,
-      chunkSourceContractId,
-      cacheContractId
-    });
+  }
+  if (firstChunk === null) {
+    throw lastError ?? new Error(`Missing chunk ${(0n).toString()}`);
   }
 
   const expectedChunks = getExpectedChunkCount(

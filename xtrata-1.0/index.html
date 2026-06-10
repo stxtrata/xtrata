@@ -3544,6 +3544,28 @@
           galleryReadClientCache.set(contractId, client);
           return client;
         };
+
+        // Content fallback lineage: when reading the primary core misses the
+        // bytes (e.g. a token migrated v1->v2->v3 leaves its content stranded on
+        // v1, because v3's get-chunk only delegates one hop), try the legacy
+        // cores in order [v2, v1]. Migration preserves the id, so the same id is
+        // read on each. Only used when reading the primary core.
+        const V1_CORE_CONTRACT_ID =
+          'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1';
+        const getContentFallbackClients = (contentClient) => {
+          if (contentClient !== state.client) {
+            return null;
+          }
+          const lineage = [];
+          if (state.legacyClient) {
+            lineage.push(state.legacyClient);
+          }
+          const v1Client = getGalleryReadClient(V1_CORE_CONTRACT_ID);
+          if (v1Client && v1Client !== state.client && !lineage.includes(v1Client)) {
+            lineage.push(v1Client);
+          }
+          return lineage.length > 0 ? lineage : null;
+        };
         const getActiveGalleryReadClient = () => {
           if (!state.curatedGalleryId) {
             return null;
@@ -6208,7 +6230,7 @@
         return await inlineRuntimeContentUrls({
           html,
           client: contentClient,
-          fallbackClient: contentClient === state.client ? state.legacyClient : null
+          fallbackClients: getContentFallbackClients(contentClient)
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -6326,7 +6348,7 @@
       const contentClient = getTokenClient(token);
       const bytes = await fetchOnChainContent({
         client: contentClient,
-        fallbackClient: contentClient === state.client ? state.legacyClient : null,
+        fallbackClients: getContentFallbackClients(contentClient),
         cacheContractId: token.sourceContractId ?? getContractId(contentClient.contract),
         id: token.id,
         senderAddress: getReadOnlySenderAddress(),
@@ -7083,7 +7105,7 @@
         });
         const bytes = await fetchOnChainContent({
           client: contentClient,
-          fallbackClient: contentClient === state.client ? state.legacyClient : null,
+          fallbackClients: getContentFallbackClients(contentClient),
           cacheContractId,
           id: token.id,
           senderAddress: getReadOnlySenderAddress(),
@@ -7462,7 +7484,7 @@
       });
       const bytes = await fetchOnChainContent({
         client: contentClient,
-        fallbackClient: contentClient === state.client ? state.legacyClient : null,
+        fallbackClients: getContentFallbackClients(contentClient),
         cacheContractId,
         id: token.id,
         senderAddress: getReadOnlySenderAddress(),
