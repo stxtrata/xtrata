@@ -5069,27 +5069,63 @@
       const lineageSection = document.createElement('div');
       lineageSection.className = 'selected-relationships__group';
       container.append(parentsSection, lineageSection);
-      void renderParentsSection(token, contractId, parentsSection);
+      void renderAncestorsSection(token, contractId, parentsSection);
       void renderLineageSection(token, contractId, lineageSection);
     };
 
-    // Upward navigation: this inscription's parents, read live from the chain.
-    // Also opportunistically records the child -> parents edge so browsing
-    // gradually seeds the reverse index even without a full scan.
-    const renderParentsSection = async (token, contractId, section) => {
+    // Walk the ancestor chain live from the chain: BFS up via get-parents,
+    // recording the shallowest depth each ancestor is reached at (so a node
+    // reachable by multiple paths is listed once, at its closest tier). Cheap —
+    // lineages are shallow — and works with or without the server index. Each
+    // visited child -> parents edge is opportunistically recorded so the local
+    // reverse index is seeded as a side effect.
+    const walkAncestorsLive = async (tokenId, sender, contractId, maxDepth = 16) => {
+      const byDepth = new Map();
+      const seen = new Set([tokenId.toString()]);
+      let frontier = [tokenId];
+      let depth = 1;
+      while (frontier.length > 0 && depth <= maxDepth) {
+        const lists = await runReadOnlyLimited(frontier, 4, (id) =>
+          state.client.getParents(id, sender)
+        );
+        const levelIds = [];
+        const next = [];
+        frontier.forEach((childId, index) => {
+          const parents = lists[index] ?? [];
+          void recordChildParents({ contractId, childId, parentIds: parents });
+          for (const parentId of parents) {
+            const key = parentId.toString();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            levelIds.push(parentId);
+            next.push(parentId);
+          }
+        });
+        if (levelIds.length > 0) {
+          byDepth.set(depth, levelIds);
+        }
+        frontier = next;
+        depth += 1;
+      }
+      return byDepth;
+    };
+
+    // Upward navigation: full ancestor lineage (Parents, Grandparents, …) read
+    // live from the chain, depth-grouped.
+    const renderAncestorsSection = async (token, contractId, section) => {
       const requestId = ++state.selectedParentsRequestId;
       const heading = document.createElement('div');
       heading.className = 'selected-relationships__head';
       heading.textContent = 'Parents';
       const status = document.createElement('div');
       status.className = 'selected-relationships__status';
-      status.textContent = 'Loading parents…';
+      status.textContent = 'Loading lineage…';
       section.replaceChildren(heading, status);
 
-      let parents = [];
+      let byDepth;
       try {
         const sender = getReadOnlySenderAddress();
-        parents = await state.client.getParents(token.id, sender);
+        byDepth = await walkAncestorsLive(token.id, sender, contractId);
       } catch (error) {
         if (
           requestId !== state.selectedParentsRequestId ||
@@ -5106,23 +5142,21 @@
       ) {
         return;
       }
-      void recordChildParents({ contractId, childId: token.id, parentIds: parents });
-      if (!parents || parents.length === 0) {
+      if (byDepth.size === 0) {
         heading.textContent = 'Parents (0)';
         status.textContent = 'No parents.';
         return;
       }
-      heading.textContent = `Parents (${parents.length})`;
-      status.remove();
-      const ids = document.createElement('div');
-      ids.className = 'selected-relationships__ids';
-      ids.textContent = parents.map((id) => formatTokenId(id)).join(', ');
-      const thumbs = document.createElement('div');
-      thumbs.className = 'selected-relationships__thumbs';
-      for (const parentId of parents) {
-        thumbs.append(buildRelationshipThumbCard(contractId, parentId, 'parent'));
+      section.replaceChildren();
+      for (const [depth, ids] of [...byDepth.entries()].sort((a, b) => a[0] - b[0])) {
+        appendRelationGroup(
+          section,
+          contractId,
+          depthLabel(depth, 'up'),
+          ids,
+          depth === 1 ? 'parent' : 'ancestor'
+        );
       }
-      section.append(ids, thumbs);
     };
 
     // Downward + lateral navigation. Prefers the server lineage index (one
@@ -5151,22 +5185,15 @@
 
       section.replaceChildren();
       // Descendants grouped by depth: Children, Grandchildren, deeper tiers.
+      // (Ancestors are rendered live in the parents section above.)
       for (const [depth, ids] of groupByDepth(lineage.descendants)) {
         appendRelationGroup(section, contractId, depthLabel(depth, 'down'), ids, 'child');
       }
       // Half-siblings.
       appendRelationGroup(section, contractId, 'Siblings', lineage.siblings, 'sibling');
-      // Ancestors above the direct parents (direct parents are shown live in the
-      // parents section), grouped by depth: Grandparents, deeper tiers.
-      for (const [depth, ids] of groupByDepth(lineage.ancestors)) {
-        if (depth < 2) continue;
-        appendRelationGroup(section, contractId, depthLabel(depth, 'up'), ids, 'ancestor');
-      }
 
       const hasAny =
-        lineage.descendants.length > 0 ||
-        lineage.siblings.length > 0 ||
-        lineage.ancestors.some((node) => node.depth >= 2);
+        lineage.descendants.length > 0 || lineage.siblings.length > 0;
       const coverage = document.createElement('span');
       coverage.className = 'selected-relationships__status';
       if (!hasAny) {
