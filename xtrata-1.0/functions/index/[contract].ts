@@ -153,6 +153,33 @@ const getState = async (env: RuntimeEnv, contractId: string) => {
   return { mintedCount: row?.minted_count ?? 0, syncedCount: row?.synced_count ?? 0 };
 };
 
+type IndexSummary = {
+  owner: string | null; creator: string | null; finalHash: string | null; mime: string | null;
+  totalSize: number | null; totalChunks: number | null; sealed: number; migrationSource: string | null;
+};
+type Caps = { hasMintedList: boolean; hasSummary: boolean };
+
+const readToken = (
+  env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef, caps: Caps, id: number
+): Promise<IndexSummary | null> =>
+  caps.hasSummary
+    ? readSummary(env, apiBases, contract, id)
+    : readMetaSummary(env, apiBases, contract, id);
+
+const upsertToken = (env: RuntimeEnv, contractId: string, tokenId: number, s: IndexSummary) =>
+  run(
+    env,
+    `INSERT INTO inscription_index
+       (contract, token_id, owner, creator, final_hash, mime, total_size, total_chunks, sealed, migration_source, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)
+     ON CONFLICT(contract, token_id) DO UPDATE SET
+       owner=excluded.owner, creator=excluded.creator, final_hash=excluded.final_hash,
+       mime=excluded.mime, total_size=excluded.total_size, total_chunks=excluded.total_chunks,
+       sealed=excluded.sealed, migration_source=excluded.migration_source, updated_at=excluded.updated_at`,
+    [contractId, tokenId, s.owner, s.creator, s.finalHash, s.mime,
+     s.totalSize, s.totalChunks, s.sealed, s.migrationSource, Date.now()]
+  );
+
 const sync = async (env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef, contractId: string, maxPerRun: number) => {
   const caps = await probeCaps(env, apiBases, contract);
   // total = number of enumerable entries. Sparse cores (v2/v3) enumerate the
@@ -169,22 +196,9 @@ const sync = async (env: RuntimeEnv, apiBases: string[], contract: RuntimeContra
       ? await readMintedId(env, apiBases, contract, index)
       : index + 1; // dense 1-based ids
     if (tokenId === null) continue;
-    const summary = caps.hasSummary
-      ? await readSummary(env, apiBases, contract, tokenId)
-      : await readMetaSummary(env, apiBases, contract, tokenId);
+    const summary = await readToken(env, apiBases, contract, caps, tokenId);
     if (!summary) continue;
-    await run(
-      env,
-      `INSERT INTO inscription_index
-         (contract, token_id, owner, creator, final_hash, mime, total_size, total_chunks, sealed, migration_source, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)
-       ON CONFLICT(contract, token_id) DO UPDATE SET
-         owner=excluded.owner, creator=excluded.creator, final_hash=excluded.final_hash,
-         mime=excluded.mime, total_size=excluded.total_size, total_chunks=excluded.total_chunks,
-         sealed=excluded.sealed, migration_source=excluded.migration_source, updated_at=excluded.updated_at`,
-      [contractId, tokenId, summary.owner, summary.creator, summary.finalHash, summary.mime,
-       summary.totalSize, summary.totalChunks, summary.sealed, summary.migrationSource, Date.now()]
-    );
+    await upsertToken(env, contractId, tokenId, summary);
     ingested += 1;
   }
   const newSynced = end;
@@ -195,7 +209,41 @@ const sync = async (env: RuntimeEnv, apiBases: string[], contract: RuntimeContra
      ON CONFLICT(contract) DO UPDATE SET minted_count=excluded.minted_count, synced_count=excluded.synced_count, updated_at=excluded.updated_at`,
     [contractId, total, newSynced, Date.now()]
   );
-  return { mintedCount: total, syncedCount: newSynced, ingested, complete: newSynced >= total };
+  const complete = newSynced >= total;
+
+  // Rolling owner-refresh: once the backlog is ingested, re-read the least-
+  // recently-refreshed rows so transfers and migrations (which change owner on
+  // already-indexed tokens, e.g. the v2 side of a v2->v3 migration) self-heal
+  // over traffic without any per-event trigger.
+  let refreshed = 0;
+  if (complete) {
+    const window = Number((env as any).INSCRIPTION_INDEX_REFRESH_WINDOW) || 12;
+    const stale = await queryAll(
+      env,
+      'SELECT token_id FROM inscription_index WHERE contract = ? ORDER BY updated_at ASC LIMIT ?',
+      [contractId, window]
+    );
+    for (const row of (stale.results ?? []) as Array<{ token_id: number }>) {
+      const summary = await readToken(env, apiBases, contract, caps, row.token_id);
+      if (summary) { await upsertToken(env, contractId, row.token_id, summary); refreshed += 1; }
+    }
+  }
+
+  return { mintedCount: total, syncedCount: newSynced, ingested, refreshed, complete };
+};
+
+// Re-read specific token ids on demand (targeted trigger, e.g. after a migration
+// confirms). Returns how many were updated.
+const refreshTokens = async (
+  env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef, contractId: string, ids: number[]
+) => {
+  const caps = await probeCaps(env, apiBases, contract);
+  let refreshed = 0;
+  for (const id of ids) {
+    const summary = await readToken(env, apiBases, contract, caps, id);
+    if (summary) { await upsertToken(env, contractId, id, summary); refreshed += 1; }
+  }
+  return { refreshed, ids };
 };
 
 export const onRequest = async (context: {
@@ -215,6 +263,15 @@ export const onRequest = async (context: {
 
   try {
     if (request.method === 'POST') {
+      // Targeted refresh: POST ...?id=14 or ?id=14,15,16 re-reads just those
+      // tokens (instant accuracy after a migration/transfer). Otherwise: sync.
+      const idParam = new URL(request.url).searchParams.get('id');
+      if (idParam) {
+        const ids = idParam.split(',').map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0);
+        if (ids.length === 0) return json({ error: 'No valid id(s).' }, 400);
+        const result = await refreshTokens(env, apiBases, contract, contractId, ids);
+        return json({ ok: true, ...result });
+      }
       const maxPerRun = Number((env as any).INSCRIPTION_INDEX_SYNC_BATCH) || 20;
       const result = await sync(env, apiBases, contract, contractId, maxPerRun);
       return json({ ok: true, ...result });
