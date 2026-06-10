@@ -6271,7 +6271,7 @@
           {
             key: 'Inscription fee',
             subkey: 'Charged on mint — one transaction',
-            value: formatMicroStxWithUsd(BigInt(Math.round(singleTxFeeMicroStx)), usdBook),
+            value: formatMicroStxWithUsd(BigInt(Math.round(singleTxFeeMicroStx)), usdBook).combined,
             layout: 'stack'
           }
         ];
@@ -6281,7 +6281,7 @@
           {
             key: 'Begin — anti-spam fee',
             subkey: 'Paid now, on the first transaction',
-            value: formatMicroStxWithUsd(BigInt(Math.round(stagedFee.beginMicroStx)), usdBook),
+            value: formatMicroStxWithUsd(BigInt(Math.round(stagedFee.beginMicroStx)), usdBook).combined,
             layout: 'stack'
           },
           {
@@ -6293,7 +6293,7 @@
           {
             key: 'Seal — mints your token',
             subkey: 'The remaining fee, paid only on delivery',
-            value: formatMicroStxWithUsd(BigInt(Math.round(stagedFee.sealMicroStx)), usdBook),
+            value: formatMicroStxWithUsd(BigInt(Math.round(stagedFee.sealMicroStx)), usdBook).combined,
             layout: 'stack'
           }
         ];
