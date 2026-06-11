@@ -13,6 +13,7 @@ import {
 } from './clarity';
 import {
   ContractCallError,
+  ContractInfo,
   CONTRACT_ERROR_CODES,
   InscriptionMeta,
   UploadState
@@ -141,6 +142,79 @@ export const parseGetLastTokenId = (value: ClarityValue) =>
 export const parseGetFeeUnit = (value: ClarityValue) =>
   expectUInt(expectContractOk(value, 'get-fee-unit'), 'get-fee-unit');
 
+export const parseGetBeginFeeUnit = (value: ClarityValue) =>
+  expectUInt(expectContractOk(value, 'get-begin-fee-unit'), 'get-begin-fee-unit');
+
+export const parseGetUploadChunkFeeUnit = (value: ClarityValue) =>
+  expectUInt(
+    expectContractOk(value, 'get-upload-chunk-fee-unit'),
+    'get-upload-chunk-fee-unit'
+  );
+
+export const parseGetUploadBatchFeeUnit = (value: ClarityValue) =>
+  expectUInt(
+    expectContractOk(value, 'get-upload-batch-fee-unit'),
+    'get-upload-batch-fee-unit'
+  );
+
+export const parseGetSealFeeUnit = (value: ClarityValue) =>
+  expectUInt(expectContractOk(value, 'get-seal-fee-unit'), 'get-seal-fee-unit');
+
+export const parseGetSingleTxFeeUnit = (value: ClarityValue) =>
+  expectUInt(
+    expectContractOk(value, 'get-single-tx-fee-unit'),
+    'get-single-tx-fee-unit'
+  );
+
+export const parseGetContractInfo = (value: ClarityValue): ContractInfo => {
+  const tuple = expectTuple(
+    expectContractOk(value, 'get-contract-info'),
+    'get-contract-info'
+  );
+  return {
+    version: expectStringAscii(
+      getTupleValue(tuple, 'version', 'get-contract-info'),
+      'get-contract-info.version'
+    ),
+    chunkSize: expectUInt(
+      getTupleValue(tuple, 'chunk-size', 'get-contract-info'),
+      'get-contract-info.chunk-size'
+    ),
+    uploadBatchLimit: expectUInt(
+      getTupleValue(tuple, 'upload-batch-limit', 'get-contract-info'),
+      'get-contract-info.upload-batch-limit'
+    ),
+    uploadPayloadLimit: expectUInt(
+      getTupleValue(tuple, 'upload-payload-limit', 'get-contract-info'),
+      'get-contract-info.upload-payload-limit'
+    ),
+    singleTxChunkLimit: expectUInt(
+      getTupleValue(tuple, 'single-tx-chunk-limit', 'get-contract-info'),
+      'get-contract-info.single-tx-chunk-limit'
+    ),
+    singleTxPayloadLimit: expectUInt(
+      getTupleValue(tuple, 'single-tx-payload-limit', 'get-contract-info'),
+      'get-contract-info.single-tx-payload-limit'
+    ),
+    generalListLimit: expectUInt(
+      getTupleValue(tuple, 'general-list-limit', 'get-contract-info'),
+      'get-contract-info.general-list-limit'
+    ),
+    sealBatchLimit: expectUInt(
+      getTupleValue(tuple, 'seal-batch-limit', 'get-contract-info'),
+      'get-contract-info.seal-batch-limit'
+    ),
+    maxTotalChunks: expectUInt(
+      getTupleValue(tuple, 'max-total-chunks', 'get-contract-info'),
+      'get-contract-info.max-total-chunks'
+    ),
+    maxTotalSize: expectUInt(
+      getTupleValue(tuple, 'max-total-size', 'get-contract-info'),
+      'get-contract-info.max-total-size'
+    )
+  };
+};
+
 // quote-single-tx-fee returns (ok { …, single-tx-fee, total-fee, … }); for the
 // single-tx mode total-fee equals the single-tx fee — the exact amount charged.
 export const parseQuoteSingleTxFee = (value: ClarityValue) => {
@@ -192,6 +266,9 @@ export const parseGetRoyaltyRecipient = (value: ClarityValue) =>
 export const parseIsPaused = (value: ClarityValue) =>
   expectBool(expectContractOk(value, 'is-paused'), 'is-paused');
 
+export const parseIsAllowedCaller = (value: ClarityValue) =>
+  expectBool(expectContractOk(value, 'is-allowed-caller'), 'is-allowed-caller');
+
 export const parseGetTokenUri = (value: ClarityValue) =>
   parseOptionalString(expectContractOk(value, 'get-token-uri'), 'get-token-uri');
 
@@ -234,6 +311,24 @@ export const parseGetParents = (value: ClarityValue) => {
   return list.map((entry, index) =>
     expectUInt(entry, `get-parents[${index}]`)
   );
+};
+
+export const parseGetMigrationSource = (value: ClarityValue) => {
+  const optional = expectOptional(value, 'get-migration-source');
+  if (!optional) {
+    return null;
+  }
+  const tuple = expectTuple(optional, 'get-migration-source');
+  return {
+    contract: expectPrincipal(
+      getTupleValue(tuple, 'contract', 'get-migration-source'),
+      'get-migration-source.contract'
+    ),
+    tokenId: expectUInt(
+      getTupleValue(tuple, 'token-id', 'get-migration-source'),
+      'get-migration-source.token-id'
+    )
+  };
 };
 
 export const parseGetUploadState = (value: ClarityValue) => {

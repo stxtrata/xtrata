@@ -25,7 +25,11 @@ coverage
 *.zip
 
 # Large generated wallet/contract history dumps (the .jsonl is ~346MB; over GitHub's 100MB limit)
-xtrata-wallet-contract-history.*
+xtrata-wallet-contract-history.jsonl
+xtrata-wallet-contract-history.tsv
 
 # Build artifacts
 xtrata-1.0/artifacts/
+
+# Local/generated recursive app prototypes
+xtrata-1.0/recursive-apps/

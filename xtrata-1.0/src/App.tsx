@@ -61,6 +61,7 @@ import PreinscribedCollectionSaleScreen from './screens/PreinscribedCollectionSa
 import MarketScreen from './screens/MarketScreen';
 import CommerceScreen from './screens/CommerceScreen';
 import VaultScreen from './screens/VaultScreen';
+import V323OwnerConsoleScreen from './screens/V323OwnerConsoleScreen';
 import collectionMintTemplateSource from '../contracts/clarinet/contracts/xtrata-collection-mint-v1.4.clar?raw';
 import {
   buildCollectionMintContractSource,
@@ -135,6 +136,7 @@ const SECTION_KEYS = [
   'active-contract',
   'deploy-contract',
   'contract-admin',
+  'v323-owner-console',
   'collection-mint-admin',
   'preinscribed-sale-admin',
   'preinscribed-sale',
@@ -681,6 +683,7 @@ export default function App() {
   const [collapsedSections, setCollapsedSections] = useState(() => {
     const initial = buildCollapsedState(true);
     initial['collection-viewer'] = false;
+    initial['v323-owner-console'] = false;
     return initial;
   });
   const tabGuard = useActiveTabGuard();
@@ -1411,6 +1414,13 @@ export default function App() {
                   </a>
                   <a
                     className="button button--ghost app__nav-link"
+                    href="#v323-owner-console"
+                    onClick={(event) => handleNavJump(event, 'v323-owner-console')}
+                  >
+                    v3.2.3 owner
+                  </a>
+                  <a
+                    className="button button--ghost app__nav-link"
                     href="#collection-mint-admin"
                     onClick={(event) => handleNavJump(event, 'collection-mint-admin')}
                   >
@@ -1819,6 +1829,13 @@ export default function App() {
           walletSession={walletSession}
           collapsed={collapsedSections['contract-admin']}
           onToggleCollapse={() => toggleSection('contract-admin')}
+        />
+
+        <V323OwnerConsoleScreen
+          contract={selectedContract}
+          walletSession={walletSession}
+          collapsed={collapsedSections['v323-owner-console']}
+          onToggleCollapse={() => toggleSection('v323-owner-console')}
         />
 
         <CollectionMintAdminScreen
