@@ -124,6 +124,7 @@ type Sip16MetadataParams = {
   expectedHashHex: string;
   creator: string | null;
   dependencies: bigint[];
+  parents: bigint[];
 };
 
 const BATCH_OPTIONS = Array.from(
@@ -279,6 +280,12 @@ const areStringArraysEqual = (left: string[] = [], right: string[] = []) =>
   left.length === right.length &&
   left.every((value, index) => value === right[index]);
 
+const isSameAddress = (left?: string | null, right?: string | null) => {
+  const normalizedLeft = left?.trim().toUpperCase();
+  const normalizedRight = right?.trim().toUpperCase();
+  return !!normalizedLeft && !!normalizedRight && normalizedLeft === normalizedRight;
+};
+
 const getSip16Category = (mimeType: string) => {
   if (mimeType.startsWith('image/')) {
     return 'image';
@@ -356,6 +363,10 @@ const buildSip16Metadata = (params: Sip16MetadataParams) => {
   if (params.dependencies.length > 0) {
     (properties.xtrata as Record<string, unknown>).dependencies =
       params.dependencies.map((dependency) => dependency.toString());
+  }
+  if (params.parents.length > 0) {
+    (properties.xtrata as Record<string, unknown>).parents =
+      params.parents.map((parent) => parent.toString());
   }
   metadata.properties = properties;
   return metadata;
@@ -463,6 +474,10 @@ export default function MintScreen(props: MintScreenProps) {
   const [manualDependencyIds, setManualDependencyIds] = useState<bigint[]>([]);
   const [dependencyUiError, setDependencyUiError] = useState<string | null>(null);
   const [dependenciesHydrated, setDependenciesHydrated] = useState(false);
+  const [parentInput, setParentInput] = useState('');
+  const [manualParentIds, setManualParentIds] = useState<bigint[]>([]);
+  const [parentUiError, setParentUiError] = useState<string | null>(null);
+  const [parentsHydrated, setParentsHydrated] = useState(false);
   const [metadataJson, setMetadataJson] = useState<string | null>(null);
   const [metadataStatus, setMetadataStatus] = useState<string | null>(null);
   const [duplicateState, setDuplicateState] = useState<
@@ -538,6 +553,10 @@ export default function MintScreen(props: MintScreenProps) {
     setDependencyInput('');
     setDependencyUiError(null);
     setDependenciesHydrated(false);
+    setManualParentIds([]);
+    setParentInput('');
+    setParentUiError(null);
+    setParentsHydrated(false);
   }, [contractId]);
 
   useEffect(() => {
@@ -560,6 +579,15 @@ export default function MintScreen(props: MintScreenProps) {
     setManualDependencyIds(restored);
     setDependenciesHydrated(true);
   }, [lastAttempt, dependenciesHydrated]);
+
+  useEffect(() => {
+    if (!lastAttempt || parentsHydrated) {
+      return;
+    }
+    const restored = fromDependencyStrings(lastAttempt.parentIds ?? []);
+    setManualParentIds(restored);
+    setParentsHydrated(true);
+  }, [lastAttempt, parentsHydrated]);
 
   const mismatch = getNetworkMismatch(
     props.contract.network,
@@ -589,29 +617,36 @@ export default function MintScreen(props: MintScreenProps) {
   }, [chunks, effectiveBatchSize]);
 
   const expectedHashHex = expectedHash ? bytesToHex(expectedHash) : null;
-  const importedDependencyIds = props.parentDraftIds ?? [];
+  const importedParentIds = props.parentDraftIds ?? [];
   const resolvedDependencyIds = useMemo(
     () =>
       mergeDependencySources(
         manualDependencyIds,
-        importedDependencyIds,
         delegateTargetId ? [delegateTargetId] : []
       ),
-    [manualDependencyIds, importedDependencyIds, delegateTargetId]
+    [manualDependencyIds, delegateTargetId]
+  );
+  const resolvedParentIds = useMemo(
+    () => mergeDependencySources(manualParentIds, importedParentIds),
+    [manualParentIds, importedParentIds]
   );
   const dependencyIdStrings = useMemo(
     () => toDependencyStrings(resolvedDependencyIds),
     [resolvedDependencyIds]
   );
+  const parentIdStrings = useMemo(
+    () => toDependencyStrings(resolvedParentIds),
+    [resolvedParentIds]
+  );
   const legacyContractId = legacyContract ? getContractId(legacyContract) : null;
-  const { tokenQueries: parentV2Queries } = useTokenSummaries({
+  const { tokenQueries: dependencyPrimaryQueries } = useTokenSummaries({
     client,
     senderAddress: readOnlySender,
     tokenIds: resolvedDependencyIds,
     enabled: !props.collapsed && resolvedDependencyIds.length > 0,
     contractIdOverride: contractId
   });
-  const parentV2StatusById = useMemo(() => {
+  const dependencyPrimaryStatusById = useMemo(() => {
     const map = new Map<
       string,
       {
@@ -621,7 +656,7 @@ export default function MintScreen(props: MintScreenProps) {
       }
     >();
     resolvedDependencyIds.forEach((id, index) => {
-      const query = parentV2Queries[index];
+      const query = dependencyPrimaryQueries[index];
       map.set(id.toString(), {
         summary: query?.data ?? null,
         isLoading: query?.isLoading ?? false,
@@ -629,17 +664,150 @@ export default function MintScreen(props: MintScreenProps) {
       });
     });
     return map;
-  }, [parentV2Queries, resolvedDependencyIds]);
-  const missingParentIds = useMemo(
+  }, [dependencyPrimaryQueries, resolvedDependencyIds]);
+  const missingDependencyIds = useMemo(
     () =>
       resolvedDependencyIds.filter((id) => {
-        const status = parentV2StatusById.get(id.toString());
+        const status = dependencyPrimaryStatusById.get(id.toString());
         if (!status || status.isLoading) {
           return false;
         }
         return !status.summary?.meta;
       }),
-    [resolvedDependencyIds, parentV2StatusById]
+    [resolvedDependencyIds, dependencyPrimaryStatusById]
+  );
+  const { tokenQueries: dependencyLegacyQueries } = useTokenSummaries({
+    client: legacyClient ?? client,
+    senderAddress: readOnlySender,
+    tokenIds: missingDependencyIds,
+    enabled:
+      !props.collapsed && !!legacyClient && missingDependencyIds.length > 0,
+    contractIdOverride: legacyContractId ?? contractId
+  });
+  const dependencyLegacyStatusById = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        summary: TokenSummary | null;
+        isLoading: boolean;
+        isError: boolean;
+      }
+    >();
+    missingDependencyIds.forEach((id, index) => {
+      const query = dependencyLegacyQueries[index];
+      map.set(id.toString(), {
+        summary: query?.data ?? null,
+        isLoading: query?.isLoading ?? false,
+        isError: query?.isError ?? false
+      });
+    });
+    return map;
+  }, [dependencyLegacyQueries, missingDependencyIds]);
+  const dependencyDisplayItems = useMemo(() => {
+    return resolvedDependencyIds.map((id) => {
+      const key = id.toString();
+      const v2Status = dependencyPrimaryStatusById.get(key);
+      const legacyStatus = dependencyLegacyStatusById.get(key);
+      const v2Summary = v2Status?.summary ?? null;
+      const legacySummary = legacyStatus?.summary ?? null;
+      const v2Ready = !!v2Summary?.meta;
+      const legacyReady = !!legacySummary?.meta;
+      const isLoading =
+        v2Status?.isLoading ||
+        (!v2Ready && legacyStatus?.isLoading) ||
+        false;
+      let status: 'loading' | 'available' | 'legacy' | 'missing' = 'loading';
+      if (!isLoading) {
+        if (v2Ready) {
+          status = 'available';
+        } else if (legacyReady) {
+          status = 'legacy';
+        } else {
+          status = 'missing';
+        }
+      }
+      const summary = v2Ready ? v2Summary : legacyReady ? legacySummary : null;
+      const summaryContractId = summary?.sourceContractId ?? contractId;
+      const summaryClient =
+        summaryContractId === legacyContractId && legacyClient
+          ? legacyClient
+          : client;
+      return {
+        id,
+        summary,
+        summaryClient,
+        summaryContractId,
+        status
+      };
+    });
+  }, [
+    resolvedDependencyIds,
+    dependencyPrimaryStatusById,
+    dependencyLegacyStatusById,
+    contractId,
+    legacyContractId,
+    legacyClient,
+    client
+  ]);
+  const dependencyStatusSummary = useMemo(() => {
+    const legacyOnly: bigint[] = [];
+    const missing: bigint[] = [];
+    const loading: bigint[] = [];
+    dependencyDisplayItems.forEach((item) => {
+      if (item.status === 'loading') {
+        loading.push(item.id);
+      } else if (item.status === 'legacy') {
+        legacyOnly.push(item.id);
+      } else if (item.status === 'missing') {
+        missing.push(item.id);
+      }
+    });
+    return { legacyOnly, missing, loading };
+  }, [dependencyDisplayItems]);
+  const visibleDependencyItems = useMemo(
+    () => dependencyDisplayItems.slice(0, PARENT_THUMBNAIL_LIMIT),
+    [dependencyDisplayItems]
+  );
+  const dependencyOverflowCount = Math.max(
+    0,
+    dependencyDisplayItems.length - visibleDependencyItems.length
+  );
+  const { tokenQueries: parentPrimaryQueries } = useTokenSummaries({
+    client,
+    senderAddress: readOnlySender,
+    tokenIds: resolvedParentIds,
+    enabled: !props.collapsed && resolvedParentIds.length > 0,
+    contractIdOverride: contractId
+  });
+  const parentPrimaryStatusById = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        summary: TokenSummary | null;
+        isLoading: boolean;
+        isError: boolean;
+      }
+    >();
+    resolvedParentIds.forEach((id, index) => {
+      const query = parentPrimaryQueries[index];
+      map.set(id.toString(), {
+        summary: query?.data ?? null,
+        isLoading: query?.isLoading ?? false,
+        isError: query?.isError ?? false
+      });
+    });
+    return map;
+  }, [parentPrimaryQueries, resolvedParentIds]);
+  const missingParentIds = useMemo(
+    () =>
+      resolvedParentIds.filter((id) => {
+        const status = parentPrimaryStatusById.get(id.toString());
+        if (!status || status.isLoading) {
+          return false;
+        }
+        return !status.summary?.meta;
+      }),
+    [resolvedParentIds, parentPrimaryStatusById]
   );
   const { tokenQueries: parentLegacyQueries } = useTokenSummaries({
     client: legacyClient ?? client,
@@ -669,9 +837,9 @@ export default function MintScreen(props: MintScreenProps) {
     return map;
   }, [parentLegacyQueries, missingParentIds]);
   const parentDisplayItems = useMemo(() => {
-    return resolvedDependencyIds.map((id) => {
+    return resolvedParentIds.map((id) => {
       const key = id.toString();
-      const v2Status = parentV2StatusById.get(key);
+      const v2Status = parentPrimaryStatusById.get(key);
       const legacyStatus = parentLegacyStatusById.get(key);
       const v2Summary = v2Status?.summary ?? null;
       const legacySummary = legacyStatus?.summary ?? null;
@@ -685,12 +853,9 @@ export default function MintScreen(props: MintScreenProps) {
         'loading';
       if (!isLoading) {
         if (v2Ready) {
-          const owner = v2Summary?.owner ?? null;
-          if (props.walletSession.address && owner === props.walletSession.address) {
-            status = 'owned';
-          } else {
-            status = 'not-owned';
-          }
+          status = isSameAddress(v2Summary?.owner, props.walletSession.address)
+            ? 'owned'
+            : 'not-owned';
         } else if (legacyReady) {
           status = 'legacy';
         } else {
@@ -712,8 +877,8 @@ export default function MintScreen(props: MintScreenProps) {
       };
     });
   }, [
-    resolvedDependencyIds,
-    parentV2StatusById,
+    resolvedParentIds,
+    parentPrimaryStatusById,
     parentLegacyStatusById,
     props.walletSession.address,
     contractId,
@@ -785,17 +950,21 @@ export default function MintScreen(props: MintScreenProps) {
     if (lastAttempt.expectedHashHex !== expectedHashHex) {
       return;
     }
-    if (areStringArraysEqual(lastAttempt.dependencyIds ?? [], dependencyIdStrings)) {
+    if (
+      areStringArraysEqual(lastAttempt.dependencyIds ?? [], dependencyIdStrings) &&
+      areStringArraysEqual(lastAttempt.parentIds ?? [], parentIdStrings)
+    ) {
       return;
     }
     const updatedAttempt: MintAttempt = {
       ...lastAttempt,
       dependencyIds: dependencyIdStrings,
+      parentIds: parentIdStrings,
       updatedAt: Date.now()
     };
     setLastAttempt(updatedAttempt);
     void saveMintAttempt(updatedAttempt);
-  }, [dependencyIdStrings, expectedHashHex, file, lastAttempt]);
+  }, [dependencyIdStrings, expectedHashHex, file, lastAttempt, parentIdStrings]);
   const resumeMismatch = useMemo(() => {
     if (!resumeState || !file || !fileBytes) {
       return null;
@@ -1209,7 +1378,8 @@ export default function MintScreen(props: MintScreenProps) {
       totalChunks: chunks.length,
       expectedHashHex,
       creator: props.walletSession.address ?? null,
-      dependencies: resolvedDependencyIds
+      dependencies: resolvedDependencyIds,
+      parents: resolvedParentIds
     });
     const json = JSON.stringify(metadata, null, 2);
     setMetadataJson(json);
@@ -1352,6 +1522,7 @@ export default function MintScreen(props: MintScreenProps) {
         batchSize: batchLimit,
         tokenUri: resolvedTokenUri,
         dependencyIds: dependencyIdStrings,
+        parentIds: parentIdStrings,
         updatedAt: Date.now()
       };
       void saveMintAttempt(attempt);
@@ -1437,7 +1608,6 @@ export default function MintScreen(props: MintScreenProps) {
     );
     const combined = mergeDependencySources(
       mergedManual,
-      importedDependencyIds,
       delegateTargetId ? [delegateTargetId] : []
     );
     const validation = validateDependencyIds(combined);
@@ -1469,6 +1639,51 @@ export default function MintScreen(props: MintScreenProps) {
     setManualDependencyIds([]);
     setDependencyInput('');
     setDependencyUiError(null);
+  };
+
+  const applyParentInput = () => {
+    if (!capabilities.supportsRelationships) {
+      setParentUiError('Parent-child relationships require a v3 contract.');
+      return;
+    }
+    const parsed = parseDependencyInput(parentInput);
+    if (parsed.invalidTokens.length > 0) {
+      setParentUiError(`Invalid token IDs: ${parsed.invalidTokens.join(', ')}.`);
+      return;
+    }
+    if (parsed.ids.length === 0) {
+      setParentUiError('Enter at least one parent token ID.');
+      return;
+    }
+    const mergedManual = mergeDependencySources(manualParentIds, parsed.ids);
+    const combined = mergeDependencySources(mergedManual, importedParentIds);
+    const validation = validateDependencyIds(combined);
+    if (!validation.ok) {
+      const message =
+        validation.reason === 'max-50'
+          ? 'A maximum of 50 parent IDs is allowed.'
+          : validation.reason === 'duplicate-ids'
+            ? 'Duplicate parent IDs are not allowed.'
+            : validation.reason === 'negative-id'
+              ? 'Parent IDs must be non-negative.'
+              : 'Invalid parent IDs.';
+      setParentUiError(message);
+      return;
+    }
+    setManualParentIds(mergedManual);
+    setParentInput('');
+    setParentUiError(null);
+  };
+
+  const removeManualParent = (id: bigint) => {
+    setManualParentIds((current) => current.filter((value) => value !== id));
+    setParentUiError(null);
+  };
+
+  const clearManualParents = () => {
+    setManualParentIds([]);
+    setParentInput('');
+    setParentUiError(null);
   };
 
   const handleGenerateDelegate = async () => {
@@ -1656,6 +1871,7 @@ export default function MintScreen(props: MintScreenProps) {
       return null;
     }
     const dependencyIds = resolvedDependencyIds;
+    const parentIds = resolvedParentIds;
     if (delegateTargetId !== null && !delegateMeta) {
       setMintStatus('Delegate target missing. Regenerate the delegate file.');
       appendLog('Mint blocked: delegate target missing.');
@@ -1680,15 +1896,33 @@ export default function MintScreen(props: MintScreenProps) {
       });
       return null;
     }
+    const parentValidation = validateDependencyIds(parentIds);
+    if (!parentValidation.ok) {
+      const message =
+        parentValidation.reason === 'max-50'
+          ? 'Parent list exceeds the maximum of 50 ids.'
+          : parentValidation.reason === 'duplicate-ids'
+            ? 'Parent list contains duplicate ids.'
+            : parentValidation.reason === 'negative-id'
+              ? 'Parent list includes a negative id.'
+              : 'Parent list is invalid.';
+      setMintStatus(message);
+      appendLog(`Mint blocked: ${message}`);
+      logWarn('mint', 'Mint blocked: invalid parents', {
+        reason: parentValidation.reason,
+        parentCount: parentIds.length
+      });
+      return null;
+    }
     if (dependencyIds.length > 0) {
-      if (parentStatusSummary.loading.length > 0) {
+      if (dependencyStatusSummary.loading.length > 0) {
         setMintStatus('Waiting for dependency status checks to finish.');
         appendLog('Mint blocked: dependency status checks still loading.');
         logWarn('mint', 'Mint blocked: dependency checks loading');
         return null;
       }
-      if (parentStatusSummary.legacyOnly.length > 0) {
-        const ids = parentStatusSummary.legacyOnly
+      if (dependencyStatusSummary.legacyOnly.length > 0) {
+        const ids = dependencyStatusSummary.legacyOnly
           .map((id) => id.toString())
           .join(', ');
         setMintStatus(
@@ -1698,8 +1932,8 @@ export default function MintScreen(props: MintScreenProps) {
         logWarn('mint', 'Mint blocked: dependency ids require migration', { ids });
         return null;
       }
-      if (parentStatusSummary.missing.length > 0) {
-        const ids = parentStatusSummary.missing
+      if (dependencyStatusSummary.missing.length > 0) {
+        const ids = dependencyStatusSummary.missing
           .map((id) => id.toString())
           .join(', ');
         setMintStatus(`Dependency IDs not found on-chain: ${ids}.`);
@@ -1707,15 +1941,49 @@ export default function MintScreen(props: MintScreenProps) {
         logWarn('mint', 'Mint blocked: dependency ids missing', { ids });
         return null;
       }
+    }
+    if (parentIds.length > 0) {
+      if (!capabilities.supportsRelationships) {
+        setMintStatus('Parent-child relationships require a v3 contract.');
+        appendLog('Mint blocked: selected contract does not support parents.');
+        logWarn('mint', 'Mint blocked: parent relationships unsupported');
+        return null;
+      }
+      if (parentStatusSummary.loading.length > 0) {
+        setMintStatus('Waiting for parent ownership checks to finish.');
+        appendLog('Mint blocked: parent ownership checks still loading.');
+        logWarn('mint', 'Mint blocked: parent checks loading');
+        return null;
+      }
+      if (parentStatusSummary.legacyOnly.length > 0) {
+        const ids = parentStatusSummary.legacyOnly
+          .map((id) => id.toString())
+          .join(', ');
+        setMintStatus(
+          `Parent IDs only exist in the legacy contract. Migrate before minting: ${ids}.`
+        );
+        appendLog('Mint blocked: parent ids require migration.');
+        logWarn('mint', 'Mint blocked: parent ids require migration', { ids });
+        return null;
+      }
+      if (parentStatusSummary.missing.length > 0) {
+        const ids = parentStatusSummary.missing
+          .map((id) => id.toString())
+          .join(', ');
+        setMintStatus(`Parent IDs not found on-chain: ${ids}.`);
+        appendLog('Mint blocked: parent ids missing.');
+        logWarn('mint', 'Mint blocked: parent ids missing', { ids });
+        return null;
+      }
       if (parentStatusSummary.notOwned.length > 0) {
         const ids = parentStatusSummary.notOwned
           .map((id) => id.toString())
           .join(', ');
         setMintStatus(
-          `Dependency IDs are not in the connected wallet for this mint flow: ${ids}.`
+          `Parent IDs are not in the connected wallet for this mint flow: ${ids}.`
         );
-        appendLog('Mint blocked: dependency ids not in wallet.');
-        logWarn('mint', 'Mint blocked: dependency ids not in wallet', { ids });
+        appendLog('Mint blocked: parent ids not in wallet.');
+        logWarn('mint', 'Mint blocked: parent ids not in wallet', { ids });
         return null;
       }
     }
@@ -1731,7 +1999,8 @@ export default function MintScreen(props: MintScreenProps) {
       walletAddress,
       mimeType,
       tokenUriValue,
-      dependencyIds
+      dependencyIds,
+      parentIds
     };
   };
 
@@ -1763,6 +2032,104 @@ export default function MintScreen(props: MintScreenProps) {
       legacyAvailable = missing.filter((id, index) => !!legacyResults[index]);
     }
     return { ok: false, missing, legacyAvailable };
+  };
+
+  const checkParentOwnership = async (parentIds: bigint[]) => {
+    if (parentIds.length === 0) {
+      return {
+        ok: true,
+        missing: [] as bigint[],
+        notOwned: [] as bigint[]
+      };
+    }
+    const walletAddress = props.walletSession.address;
+    if (!walletAddress) {
+      return {
+        ok: false,
+        missing: [] as bigint[],
+        notOwned: parentIds
+      };
+    }
+    appendLog('Checking parent ownership on-chain...');
+    const ownerResults = await runWithConcurrency(parentIds, 4, (id) =>
+      client.getOwner(id, readOnlySender)
+    );
+    const missing: bigint[] = [];
+    const notOwned: bigint[] = [];
+    parentIds.forEach((id, index) => {
+      const owner = ownerResults[index];
+      if (!owner) {
+        missing.push(id);
+      } else if (!isSameAddress(owner, walletAddress)) {
+        notOwned.push(id);
+      }
+    });
+    return {
+      ok: missing.length === 0 && notOwned.length === 0,
+      missing,
+      notOwned
+    };
+  };
+
+  const getSealFunctionName = (dependencyIds: bigint[], parentIds: bigint[]) => {
+    if (parentIds.length > 0) {
+      return 'seal-with-relationships';
+    }
+    return dependencyIds.length > 0 ? 'seal-recursive' : 'seal-inscription';
+  };
+
+  const getSealLogLabel = (dependencyIds: bigint[], parentIds: bigint[]) => {
+    if (parentIds.length > 0) {
+      const parentLabel = parentIds.map((id) => id.toString()).join(', ');
+      const dependencyLabel =
+        dependencyIds.length > 0
+          ? `, deps: ${dependencyIds.map((id) => id.toString()).join(', ')}`
+          : '';
+      return `Step 3: seal-with-relationships (parents: ${parentLabel}${dependencyLabel})`;
+    }
+    return dependencyIds.length > 0
+      ? `Step 3: seal-recursive (deps: ${dependencyIds
+          .map((id) => id.toString())
+          .join(', ')})`
+      : 'Step 3: seal-inscription';
+  };
+
+  const buildSealFunctionArgs = (
+    expectedHash: Uint8Array,
+    tokenUriValue: string,
+    dependencyIds: bigint[],
+    parentIds: bigint[]
+  ) => {
+    if (parentIds.length > 0) {
+      return [
+        bufferCV(expectedHash),
+        stringAsciiCV(tokenUriValue),
+        listCV(dependencyIds.map((id) => uintCV(id))),
+        listCV(parentIds.map((id) => uintCV(id)))
+      ];
+    }
+    if (dependencyIds.length > 0) {
+      return [
+        bufferCV(expectedHash),
+        stringAsciiCV(tokenUriValue),
+        listCV(dependencyIds.map((id) => uintCV(id)))
+      ];
+    }
+    return [bufferCV(expectedHash), stringAsciiCV(tokenUriValue)];
+  };
+
+  const formatParentCheckFailure = (check: {
+    missing: bigint[];
+    notOwned: bigint[];
+  }) => {
+    if (check.missing.length > 0) {
+      return `Parent IDs not found in ${props.contract.label}: ${check.missing
+        .map((id) => id.toString())
+        .join(', ')}.`;
+    }
+    return `Parent IDs are not in the connected wallet: ${check.notOwned
+      .map((id) => id.toString())
+      .join(', ')}.`;
   };
 
   const getResumeValidationError = (
@@ -2011,6 +2378,7 @@ export default function MintScreen(props: MintScreenProps) {
       batches: batches.length,
       tokenUriLength: mintInputs.tokenUriValue.length,
       dependencyCount: mintInputs.dependencyIds.length,
+      parentCount: mintInputs.parentIds.length,
       expectedHash: bytesToHex(expectedHash)
     });
     setMintPending(true);
@@ -2069,11 +2437,23 @@ export default function MintScreen(props: MintScreenProps) {
           setResumeCheckKey((prev) => prev + 1);
           return;
         }
+        const parentCheck = await checkParentOwnership(mintInputs.parentIds);
+        if (!parentCheck.ok) {
+          const message = formatParentCheckFailure(parentCheck);
+          setMintStatus(message);
+          appendLog(`Mint blocked: ${message}`);
+          setBeginState('error');
+          setUploadState('error');
+          setSealState('error');
+          setResumeCheckKey((prev) => prev + 1);
+          return;
+        }
 
         const helperPostConditions = resolveFeePostConditions(
           feeEstimate.totalMicroStx
         );
         const hasDependencies = mintInputs.dependencyIds.length > 0;
+        const hasParents = mintInputs.parentIds.length > 0;
         // Native (v3+): call the core's own mint-single-tx, which does NOT take a
         // target-core principal. Helper (v2.x): call the helper, passing the
         // target core as the first argument.
@@ -2081,7 +2461,9 @@ export default function MintScreen(props: MintScreenProps) {
           ? props.contract
           : smallMintHelperContract!;
         const singleTxFunctionName = shouldUseNativeSingleTx
-          ? hasDependencies
+          ? hasParents
+            ? 'mint-single-tx-with-relationships'
+            : hasDependencies
             ? 'mint-single-tx-recursive'
             : 'mint-single-tx'
           : hasDependencies
@@ -2097,8 +2479,11 @@ export default function MintScreen(props: MintScreenProps) {
         const dependencyArg = listCV(
           mintInputs.dependencyIds.map((id) => uintCV(id))
         );
+        const parentArg = listCV(mintInputs.parentIds.map((id) => uintCV(id)));
         const singleTxArgs = shouldUseNativeSingleTx
-          ? hasDependencies
+          ? hasParents
+            ? [...coreArgs, dependencyArg, parentArg]
+            : hasDependencies
             ? [...coreArgs, dependencyArg]
             : coreArgs
           : hasDependencies
@@ -2120,6 +2505,7 @@ export default function MintScreen(props: MintScreenProps) {
             totalChunks: chunks.length,
             tokenUriLength: mintInputs.tokenUriValue.length,
             dependencyCount: mintInputs.dependencyIds.length,
+            parentCount: mintInputs.parentIds.length,
             expectedHash: bytesToHex(expectedHash)
           }
         });
@@ -2198,11 +2584,7 @@ export default function MintScreen(props: MintScreenProps) {
       activeStage = 'seal';
       setSealState('pending');
       appendLog(
-        mintInputs.dependencyIds.length > 0
-          ? `Step 3: seal-recursive (deps: ${mintInputs.dependencyIds
-              .map((id) => id.toString())
-              .join(', ')})`
-          : 'Step 3: seal-inscription'
+        getSealLogLabel(mintInputs.dependencyIds, mintInputs.parentIds)
       );
       const dependencyCheck = await checkDependencyPresence(
         mintInputs.dependencyIds
@@ -2237,30 +2619,40 @@ export default function MintScreen(props: MintScreenProps) {
         setResumeCheckKey((prev) => prev + 1);
         return;
       }
+      const parentCheck = await checkParentOwnership(mintInputs.parentIds);
+      if (!parentCheck.ok) {
+        const message = formatParentCheckFailure(parentCheck);
+        setMintStatus(message);
+        appendLog(`Mint blocked: ${message}`);
+        logWarn('mint', 'Mint blocked: parent ownership check failed', {
+          missing: parentCheck.missing.map((id) => id.toString()),
+          notOwned: parentCheck.notOwned.map((id) => id.toString())
+        });
+        setSealState('error');
+        setResumeCheckKey((prev) => prev + 1);
+        return;
+      }
       await pauseBeforeNextTx('Sealing in');
       const sealPostConditions = resolveFeePostConditions(feeEstimate.sealMicroStx);
+      const sealFunctionName = getSealFunctionName(
+        mintInputs.dependencyIds,
+        mintInputs.parentIds
+      );
       const sealTx = await requestContractCall({
-        functionName:
-          mintInputs.dependencyIds.length > 0
-            ? 'seal-recursive'
-            : 'seal-inscription',
-        functionArgs:
-          mintInputs.dependencyIds.length > 0
-            ? [
-                bufferCV(expectedHash),
-                stringAsciiCV(mintInputs.tokenUriValue),
-                listCV(mintInputs.dependencyIds.map((id) => uintCV(id)))
-              ]
-            : [bufferCV(expectedHash), stringAsciiCV(mintInputs.tokenUriValue)],
+        functionName: sealFunctionName,
+        functionArgs: buildSealFunctionArgs(
+          expectedHash,
+          mintInputs.tokenUriValue,
+          mintInputs.dependencyIds,
+          mintInputs.parentIds
+        ),
         postConditionMode: sealPostConditions ? PostConditionMode.Deny : undefined,
         postConditions: sealPostConditions,
         logDetails: {
-          action:
-            mintInputs.dependencyIds.length > 0
-              ? 'seal-recursive'
-              : 'seal-inscription',
+          action: sealFunctionName,
           tokenUriLength: mintInputs.tokenUriValue.length,
           dependencyCount: mintInputs.dependencyIds.length,
+          parentCount: mintInputs.parentIds.length,
           expectedHash: bytesToHex(expectedHash)
         }
       });
@@ -2367,6 +2759,7 @@ export default function MintScreen(props: MintScreenProps) {
       batchSize: batchLimit,
       tokenUriLength: mintInputs.tokenUriValue.length,
       dependencyCount: mintInputs.dependencyIds.length,
+      parentCount: mintInputs.parentIds.length,
       expectedHash: bytesToHex(expectedHash)
     });
     setMintPending(true);
@@ -2454,11 +2847,7 @@ export default function MintScreen(props: MintScreenProps) {
       activeStage = 'seal';
       setSealState('pending');
       appendLog(
-        mintInputs.dependencyIds.length > 0
-          ? `Step 3: seal-recursive (deps: ${mintInputs.dependencyIds
-              .map((id) => id.toString())
-              .join(', ')})`
-          : 'Step 3: seal-inscription'
+        getSealLogLabel(mintInputs.dependencyIds, mintInputs.parentIds)
       );
       const dependencyCheck = await checkDependencyPresence(
         mintInputs.dependencyIds
@@ -2493,32 +2882,42 @@ export default function MintScreen(props: MintScreenProps) {
         setResumeCheckKey((prev) => prev + 1);
         return;
       }
+      const parentCheck = await checkParentOwnership(mintInputs.parentIds);
+      if (!parentCheck.ok) {
+        const message = formatParentCheckFailure(parentCheck);
+        setMintStatus(message);
+        appendLog(`Resume blocked: ${message}`);
+        logWarn('mint', 'Resume blocked: parent ownership check failed', {
+          missing: parentCheck.missing.map((id) => id.toString()),
+          notOwned: parentCheck.notOwned.map((id) => id.toString())
+        });
+        setSealState('error');
+        setResumeCheckKey((prev) => prev + 1);
+        return;
+      }
       if (didUploadBatches) {
         await pauseBeforeNextTx('Sealing in');
       }
       const sealPostConditions = resolveFeePostConditions(feeEstimate.sealMicroStx);
+      const sealFunctionName = getSealFunctionName(
+        mintInputs.dependencyIds,
+        mintInputs.parentIds
+      );
       const sealTx = await requestContractCall({
-        functionName:
-          mintInputs.dependencyIds.length > 0
-            ? 'seal-recursive'
-            : 'seal-inscription',
-        functionArgs:
-          mintInputs.dependencyIds.length > 0
-            ? [
-                bufferCV(expectedHash),
-                stringAsciiCV(mintInputs.tokenUriValue),
-                listCV(mintInputs.dependencyIds.map((id) => uintCV(id)))
-              ]
-            : [bufferCV(expectedHash), stringAsciiCV(mintInputs.tokenUriValue)],
+        functionName: sealFunctionName,
+        functionArgs: buildSealFunctionArgs(
+          expectedHash,
+          mintInputs.tokenUriValue,
+          mintInputs.dependencyIds,
+          mintInputs.parentIds
+        ),
         postConditionMode: sealPostConditions ? PostConditionMode.Deny : undefined,
         postConditions: sealPostConditions,
         logDetails: {
-          action:
-            mintInputs.dependencyIds.length > 0
-              ? 'seal-recursive'
-              : 'seal-inscription',
+          action: sealFunctionName,
           tokenUriLength: mintInputs.tokenUriValue.length,
           dependencyCount: mintInputs.dependencyIds.length,
+          parentCount: mintInputs.parentIds.length,
           expectedHash: bytesToHex(expectedHash)
         }
       });
@@ -2736,10 +3135,10 @@ export default function MintScreen(props: MintScreenProps) {
           <LabelWithInfo
             tone="meta"
             label="Dependencies (optional)"
-            info="Dependency token IDs create on-chain dependency links between inscriptions."
+            info="Dependency token IDs create recursive links and only need to exist on-chain."
           />
           <p className="meta-value">
-            Add one or more dependency IDs to link inscriptions through on-chain dependencies.
+            Add recursive dependency IDs. These can be owned by any wallet.
           </p>
           <label className="field">
             <LabelWithInfo
@@ -2793,10 +3192,141 @@ export default function MintScreen(props: MintScreenProps) {
               ))}
             </div>
           )}
-          {importedDependencyIds.length > 0 && (
+          {resolvedDependencyIds.length > 0 && (
+            <span className="meta-value">
+              Resolved dependencies: {resolvedDependencyIds.map((id) => id.toString()).join(', ')}
+            </span>
+          )}
+          {resolvedDependencyIds.length > 0 && (
+            <div className="relation-panel">
+              <LabelWithInfo
+                tone="meta"
+                label="Dependency thumbnails"
+                info="Preview cards for selected dependencies, including existence and migration status checks."
+              />
+              {dependencyStatusSummary.loading.length > 0 && (
+                <span className="meta-value">Loading dependency status...</span>
+              )}
+              {dependencyStatusSummary.legacyOnly.length > 0 && (
+                <span className="relation-status relation-status--warn">
+                  Needs migration: {dependencyStatusSummary.legacyOnly.map((id) => id.toString()).join(', ')}
+                </span>
+              )}
+              {dependencyStatusSummary.missing.length > 0 && (
+                <span className="relation-status relation-status--error">
+                  Missing on-chain: {dependencyStatusSummary.missing.map((id) => id.toString()).join(', ')}
+                </span>
+              )}
+              <div className="relation-grid">
+                {visibleDependencyItems.map((item) => (
+                  <div key={item.id.toString()} className="relation-card">
+                    <div className="relation-frame">
+                      {item.summary ? (
+                        <TokenCardMedia
+                          token={item.summary}
+                          contractId={item.summaryContractId}
+                          senderAddress={readOnlySender}
+                          client={item.summaryClient}
+                          isActiveTab={!props.collapsed}
+                        />
+                      ) : (
+                        <span className="relation-placeholder">
+                          {item.status === 'loading' ? 'Loading...' : 'No preview'}
+                        </span>
+                      )}
+                    </div>
+                    <span className="relation-label">#{item.id.toString()}</span>
+                    {item.status === 'available' && (
+                      <span className="relation-status relation-status--ok">Found</span>
+                    )}
+                    {item.status === 'legacy' && (
+                      <span className="relation-status relation-status--warn">Legacy only</span>
+                    )}
+                    {item.status === 'missing' && (
+                      <span className="relation-status relation-status--error">Missing</span>
+                    )}
+                    {item.status === 'loading' && (
+                      <span className="relation-status">Checking...</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {dependencyOverflowCount > 0 && (
+                <span className="meta-value">+{dependencyOverflowCount} more dependencies</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="mint-panel mint-dependencies">
+          <LabelWithInfo
+            tone="meta"
+            label="Parents (optional)"
+            info="Parent token IDs create v3 parent-child links and must exist in the connected wallet."
+          />
+          <p className="meta-value">
+            Add parent IDs only when this inscription should become a child of inscriptions you own.
+          </p>
+          {!capabilities.supportsRelationships && (
+            <span className="relation-status relation-status--warn">
+              Parent-child links require a v3 relationship-aware contract.
+            </span>
+          )}
+          <label className="field">
+            <LabelWithInfo
+              tone="field"
+              label="Parent IDs"
+              info="Enter one or more existing token IDs separated by spaces, commas, or new lines."
+            />
+            <textarea
+              className="textarea"
+              placeholder="e.g. 12, 48 102"
+              value={parentInput}
+              onChange={(event) => {
+                setParentInput(event.target.value);
+                setParentUiError(null);
+              }}
+              disabled={!capabilities.supportsRelationships}
+            />
+          </label>
+          <div className="mint-actions">
+            <button
+              className="button button--ghost"
+              type="button"
+              onClick={applyParentInput}
+              disabled={!parentInput.trim() || !capabilities.supportsRelationships}
+            >
+              Add parents
+            </button>
+            {manualParentIds.length > 0 && (
+              <button
+                className="button button--ghost"
+                type="button"
+                onClick={clearManualParents}
+              >
+                Clear parents
+              </button>
+            )}
+          </div>
+          {parentUiError && <span className="meta-value">{parentUiError}</span>}
+          {manualParentIds.length > 0 && (
+            <div className="mint-actions">
+              {manualParentIds.map((id) => (
+                <button
+                  key={id.toString()}
+                  className="button button--ghost"
+                  type="button"
+                  onClick={() => removeManualParent(id)}
+                >
+                  {id.toString()}
+                </button>
+              ))}
+            </div>
+          )}
+          {importedParentIds.length > 0 && (
             <div className="mint-actions">
               <span className="meta-value">
-                Imported dependencies: {importedDependencyIds.map((id) => id.toString()).join(', ')}
+                Imported parents: {importedParentIds.map((id) => id.toString()).join(', ')}
               </span>
               {props.onClearParentDrafts && (
                 <button
@@ -2809,20 +3339,20 @@ export default function MintScreen(props: MintScreenProps) {
               )}
             </div>
           )}
-          {resolvedDependencyIds.length > 0 && (
+          {resolvedParentIds.length > 0 && (
             <span className="meta-value">
-              Resolved dependencies: {resolvedDependencyIds.map((id) => id.toString()).join(', ')}
+              Resolved parents: {resolvedParentIds.map((id) => id.toString()).join(', ')}
             </span>
           )}
-          {resolvedDependencyIds.length > 0 && (
+          {resolvedParentIds.length > 0 && (
             <div className="relation-panel">
               <LabelWithInfo
                 tone="meta"
-                label="Dependency thumbnails"
-                info="Preview cards for selected dependencies, including wallet and migration status checks."
+                label="Parent thumbnails"
+                info="Preview cards for selected parents, including wallet ownership and migration status checks."
               />
               {parentStatusSummary.loading.length > 0 && (
-                <span className="meta-value">Loading dependency status...</span>
+                <span className="meta-value">Loading parent status...</span>
               )}
               {parentStatusSummary.legacyOnly.length > 0 && (
                 <span className="relation-status relation-status--warn">
@@ -2877,7 +3407,7 @@ export default function MintScreen(props: MintScreenProps) {
                 ))}
               </div>
               {parentOverflowCount > 0 && (
-                <span className="meta-value">+{parentOverflowCount} more dependencies</span>
+                <span className="meta-value">+{parentOverflowCount} more parents</span>
               )}
             </div>
           )}
@@ -3031,6 +3561,20 @@ export default function MintScreen(props: MintScreenProps) {
                     />
                     <span className="meta-value">
                       {resolvedDependencyIds
+                        .map((id) => id.toString())
+                        .join(', ')}
+                    </span>
+                  </div>
+                )}
+                {resolvedParentIds.length > 0 && (
+                  <div>
+                    <LabelWithInfo
+                      tone="meta"
+                      label="Parents"
+                      info="Resolved parent token IDs that will be linked during seal."
+                    />
+                    <span className="meta-value">
+                      {resolvedParentIds
                         .map((id) => id.toString())
                         .join(', ')}
                     </span>

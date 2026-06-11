@@ -77,9 +77,13 @@ const isCoreEntry = (entry: { protocolVersion?: string; contractName?: string })
   entry.protocolVersion === '2.1.0' ||
   entry.protocolVersion === '2.1.1' ||
   entry.protocolVersion === '3.0.0' ||
+  entry.protocolVersion === '3.2.3' ||
+  entry.protocolVersion === '3.4.0' ||
   entry.contractName?.toLowerCase().includes('v2-1-0') === true ||
   entry.contractName?.toLowerCase().includes('v2-1-1') === true ||
-  entry.contractName?.toLowerCase().includes('v3-0-0') === true;
+  entry.contractName?.toLowerCase().includes('v3-0-0') === true ||
+  entry.contractName?.toLowerCase().includes('v3-2-3') === true ||
+  entry.contractName?.toLowerCase().includes('v3-4-0') === true;
 
 const SELECTABLE_CONTRACTS = CONTRACT_REGISTRY.filter(isCoreEntry);
 const ACTIVE_CONTRACTS =

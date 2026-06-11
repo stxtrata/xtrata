@@ -11,6 +11,7 @@ describe('contract capabilities', () => {
     expect(capabilities.supportsNextTokenId).toBe(true);
     expect(capabilities.supportsChunkBatchRead).toBe(true);
     expect(capabilities.supportsMintedIndex).toBe(false);
+    expect(capabilities.supportsRelationships).toBe(false);
   });
 
   it('infers v1.1.1 from contract name', () => {
@@ -42,6 +43,16 @@ describe('contract capabilities', () => {
     });
     expect(capabilities.version).toBe('3.0.0');
     expect(capabilities.supportsMintedIndex).toBe(true);
+    expect(capabilities.supportsRelationships).toBe(true);
+  });
+
+  it('infers v3.4.0 relationship capabilities from contract name', () => {
+    const capabilities = resolveContractCapabilities({
+      contractName: 'xtrata-v3-4-0'
+    });
+    expect(capabilities.version).toBe('3.4.0');
+    expect(capabilities.supportsRelationships).toBe(true);
+    expect(capabilities.supportsNativeSingleTx).toBe(true);
   });
 
   it('defaults to v1.1.1 when version is missing', () => {

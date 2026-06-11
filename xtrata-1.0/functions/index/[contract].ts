@@ -41,6 +41,18 @@ const asString = (node: any): string | null => {
   const v = unwrap(node);
   return typeof v === 'string' ? v : v === null || v === undefined ? null : String(v);
 };
+// Clarity (list uint) -> number[]. cvToJSON renders a list as { value: [ {uint},
+// ... ] }; unwrap yields the element array, each element unwrapped to a number.
+const asUintList = (node: any): number[] => {
+  const v = unwrap(node);
+  if (!Array.isArray(v)) return [];
+  const out: number[] = [];
+  for (const el of v) {
+    const n = asNumber(el);
+    if (n !== null && Number.isInteger(n) && n > 0) out.push(n);
+  }
+  return out;
+};
 
 const readOkUint = async (
   env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef, functionName: string
@@ -97,7 +109,9 @@ const readSummary = async (env: RuntimeEnv, apiBases: string[], contract: Runtim
       const sourceContract = asString(t['source-contract']);
       const sourceId = asNumber(t['source-id']);
       return sourceContract != null && sourceId != null ? `${sourceContract}:${sourceId}` : null;
-    })()
+    })(),
+    // Direct parents (v3.2.0+ summaries carry this list; empty on older cores).
+    parents: asUintList(fields['parents'])
   };
 };
 
@@ -140,7 +154,9 @@ const readMetaSummary = async (env: RuntimeEnv, apiBases: string[], contract: Ru
     totalChunks: asNumber(fields['total-chunks']),
     sealed: unwrap(fields['sealed']) === true ? 1 : 0,
     tokenUri,
-    migrationSource: null as string | null
+    migrationSource: null as string | null,
+    // v1/v2 cores predate parent relationships.
+    parents: [] as number[]
   };
 };
 
@@ -167,7 +183,7 @@ const getState = async (env: RuntimeEnv, contractId: string) => {
 type IndexSummary = {
   owner: string | null; creator: string | null; finalHash: string | null; mime: string | null;
   totalSize: number | null; totalChunks: number | null; sealed: number;
-  tokenUri: string | null; migrationSource: string | null;
+  tokenUri: string | null; migrationSource: string | null; parents: number[];
 };
 type Caps = { hasMintedList: boolean; hasSummary: boolean };
 
@@ -178,8 +194,30 @@ const readToken = (
     ? readSummary(env, apiBases, contract, id)
     : readMetaSummary(env, apiBases, contract, id);
 
-const upsertToken = (env: RuntimeEnv, contractId: string, tokenId: number, s: IndexSummary) =>
-  run(
+// Replace a child's parent edge set: clear its existing edges, then insert the
+// current parents. Wrapped so a deploy that hasn't applied migration 006 (no
+// inscription_parents table) never breaks core summary indexing.
+const syncTokenParents = async (
+  env: RuntimeEnv, contractId: string, childId: number, parents: number[]
+) => {
+  try {
+    await run(env, 'DELETE FROM inscription_parents WHERE contract = ? AND child_id = ?', [contractId, childId]);
+    const now = Date.now();
+    for (const parentId of parents) {
+      if (!Number.isInteger(parentId) || parentId <= 0 || parentId === childId) continue;
+      await run(
+        env,
+        'INSERT OR IGNORE INTO inscription_parents (contract, child_id, parent_id, updated_at) VALUES (?,?,?,?)',
+        [contractId, childId, parentId, now]
+      );
+    }
+  } catch {
+    // inscription_parents absent / not yet migrated — skip edge sync.
+  }
+};
+
+const upsertToken = async (env: RuntimeEnv, contractId: string, tokenId: number, s: IndexSummary) => {
+  await run(
     env,
     `INSERT INTO inscription_index
        (contract, token_id, owner, creator, final_hash, mime, total_size, total_chunks, sealed, token_uri, migration_source, updated_at)
@@ -192,6 +230,8 @@ const upsertToken = (env: RuntimeEnv, contractId: string, tokenId: number, s: In
     [contractId, tokenId, s.owner, s.creator, s.finalHash, s.mime,
      s.totalSize, s.totalChunks, s.sealed, s.tokenUri, s.migrationSource, Date.now()]
   );
+  await syncTokenParents(env, contractId, tokenId, s.parents ?? []);
+};
 
 // Soft self-expiring lock TTL. Generous relative to a batch sync (which reads
 // at most maxPerRun tokens) so a slow run doesn't release early, but short

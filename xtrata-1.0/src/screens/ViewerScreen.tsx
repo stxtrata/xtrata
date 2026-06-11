@@ -1329,7 +1329,7 @@ const TokenDetails = (props: {
                   type="button"
                   onClick={() => props.onAddParentDraft?.(props.token!.id)}
                 >
-                  Use as dependency
+                  Add as parent
                 </button>
               </div>
             )}
