@@ -5110,6 +5110,42 @@
       return byDepth;
     };
 
+    // Walk the descendant chain downward through the local reverse index
+    // (loadIndexedChildren), recording the shallowest depth each descendant is
+    // reached at. There is no on-chain get-children, so this only sees edges the
+    // index already holds — but the live ancestor walk seeds those edges as you
+    // browse, and the Scan control fills the rest. Mirrors walkAncestorsLive.
+    const walkDescendantsLocal = async (tokenId, contractId, maxDepth = 16) => {
+      const byDepth = new Map();
+      const seen = new Set([tokenId.toString()]);
+      let frontier = [tokenId];
+      let depth = 1;
+      while (frontier.length > 0 && depth <= maxDepth) {
+        const lists = await Promise.all(
+          frontier.map((id) =>
+            loadIndexedChildren({ contractId, parentId: id }).catch(() => [])
+          )
+        );
+        const levelIds = [];
+        const next = [];
+        for (const list of lists) {
+          for (const childId of list ?? []) {
+            const key = childId.toString();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            levelIds.push(childId);
+            next.push(childId);
+          }
+        }
+        if (levelIds.length > 0) {
+          byDepth.set(depth, levelIds);
+        }
+        frontier = next;
+        depth += 1;
+      }
+      return byDepth;
+    };
+
     // Upward navigation: full ancestor lineage (Parents, Grandparents, …) read
     // live from the chain, depth-grouped.
     const renderAncestorsSection = async (token, contractId, section) => {
@@ -5222,11 +5258,11 @@
       status.textContent = 'Reading child index…';
       section.replaceChildren(heading, status);
 
-      let children = [];
+      let byDepth = new Map();
       try {
-        children = await loadIndexedChildren({ contractId, parentId: token.id });
+        byDepth = await walkDescendantsLocal(token.id, contractId);
       } catch (error) {
-        children = [];
+        byDepth = new Map();
       }
       if (
         requestId !== state.selectedChildrenRequestId ||
@@ -5235,18 +5271,15 @@
         return;
       }
 
-      heading.textContent = `Children (${children.length})`;
-      if (children.length > 0) {
-        const ids = document.createElement('div');
-        ids.className = 'selected-relationships__ids';
-        ids.textContent = children.map((id) => formatTokenId(id)).join(', ');
-        const thumbs = document.createElement('div');
-        thumbs.className = 'selected-relationships__thumbs';
-        for (const childId of children) {
-          thumbs.append(buildRelationshipThumbCard(contractId, childId, 'child'));
+      let totalFound = 0;
+      if (byDepth.size > 0) {
+        section.replaceChildren();
+        for (const [depth, ids] of [...byDepth.entries()].sort((a, b) => a[0] - b[0])) {
+          totalFound += ids.length;
+          appendRelationGroup(section, contractId, depthLabel(depth, 'down'), ids, 'child');
         }
-        section.replaceChildren(heading, ids, thumbs);
       } else {
+        heading.textContent = 'Children (0)';
         status.textContent = 'No indexed children yet.';
       }
 
@@ -5285,7 +5318,7 @@
       }
       scanButton.textContent = state.childScanRunning
         ? 'Cancel scan'
-        : children.length > 0
+        : totalFound > 0
           ? 'Rescan for children'
           : 'Scan for children';
       scanButton.disabled = state.childScanRunning && state.childScanTokenId !== token.id;
