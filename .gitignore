@@ -21,3 +21,6 @@ coverage
 
 
 *.mp3
+
+# Ignore recursive apps generated/local work
+xtrata-1.0/recursive-apps/

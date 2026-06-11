@@ -16,6 +16,19 @@ export type UploadState = {
   runningHash: Uint8Array;
 };
 
+export type ContractInfo = {
+  version: string;
+  chunkSize: bigint;
+  uploadBatchLimit: bigint;
+  uploadPayloadLimit: bigint;
+  singleTxChunkLimit: bigint;
+  singleTxPayloadLimit: bigint;
+  generalListLimit: bigint;
+  sealBatchLimit: bigint;
+  maxTotalChunks: bigint;
+  maxTotalSize: bigint;
+};
+
 export const CONTRACT_ERROR_CODES = {
   '100': 'ERR_NOT_AUTHORIZED',
   '101': 'ERR_NOT_FOUND',
