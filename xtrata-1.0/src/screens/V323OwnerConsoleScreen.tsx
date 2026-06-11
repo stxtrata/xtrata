@@ -22,6 +22,7 @@ type V323OwnerConsoleScreenProps = {
   walletSession: WalletSession;
   collapsed: boolean;
   onToggleCollapse: () => void;
+  onSelectContract: () => void;
 };
 
 type FeeField =
@@ -34,6 +35,8 @@ type FeeField =
 type TxPayload = {
   txId: string;
 };
+
+type StatusReadErrors = Record<string, string>;
 
 const FEE_FIELDS: Array<{
   key: FeeField;
@@ -165,6 +168,15 @@ export default function V323OwnerConsoleScreen(props: V323OwnerConsoleScreenProp
   const statusQuery = useQuery({
     queryKey: ['v323-owner-console', contractId, readOnlySender],
     queryFn: async () => {
+      const errors: StatusReadErrors = {};
+      const read = async <T,>(label: string, task: () => Promise<T>) => {
+        try {
+          return await task();
+        } catch (error) {
+          errors[label] = error instanceof Error ? error.message : String(error);
+          return null;
+        }
+      };
       const [
         admin,
         royaltyRecipient,
@@ -179,18 +191,18 @@ export default function V323OwnerConsoleScreen(props: V323OwnerConsoleScreenProp
         sealFee,
         singleTxFee
       ] = await Promise.all([
-        client.getAdmin(readOnlySender),
-        client.getRoyaltyRecipient(readOnlySender),
-        client.isPaused(readOnlySender),
-        client.getNextTokenId(readOnlySender),
-        client.getLastTokenId(readOnlySender),
-        client.getMintedCount(readOnlySender),
-        client.getContractInfo(readOnlySender),
-        client.getBeginFeeUnit(readOnlySender),
-        client.getUploadChunkFeeUnit(readOnlySender),
-        client.getUploadBatchFeeUnit(readOnlySender),
-        client.getSealFeeUnit(readOnlySender),
-        client.getSingleTxFeeUnit(readOnlySender)
+        read('Owner', () => client.getAdmin(readOnlySender)),
+        read('Royalty recipient', () => client.getRoyaltyRecipient(readOnlySender)),
+        read('Pause state', () => client.isPaused(readOnlySender)),
+        read('Next token ID', () => client.getNextTokenId(readOnlySender)),
+        read('Last token ID', () => client.getLastTokenId(readOnlySender)),
+        read('Minted count', () => client.getMintedCount(readOnlySender)),
+        read('Runtime limits', () => client.getContractInfo(readOnlySender)),
+        read('Begin fee', () => client.getBeginFeeUnit(readOnlySender)),
+        read('Upload chunk fee', () => client.getUploadChunkFeeUnit(readOnlySender)),
+        read('Upload batch fee', () => client.getUploadBatchFeeUnit(readOnlySender)),
+        read('Seal fee', () => client.getSealFeeUnit(readOnlySender)),
+        read('Single-tx fee', () => client.getSingleTxFeeUnit(readOnlySender))
       ]);
       return {
         admin,
@@ -204,7 +216,8 @@ export default function V323OwnerConsoleScreen(props: V323OwnerConsoleScreenProp
         uploadChunkFee,
         uploadBatchFee,
         sealFee,
-        singleTxFee
+        singleTxFee,
+        errors
       };
     },
     enabled: isV323 && readOnlySender.length > 0,
@@ -213,6 +226,8 @@ export default function V323OwnerConsoleScreen(props: V323OwnerConsoleScreenProp
   });
 
   const status = statusQuery.data ?? null;
+  const statusErrors = status?.errors ?? {};
+  const statusErrorEntries = Object.entries(statusErrors);
   const isAdminWallet = addressesEqual(status?.admin, props.walletSession.address);
   const canTransact = !!props.walletSession.address && !mismatch;
   const canAdmin = canTransact && isAdminWallet;
@@ -250,8 +265,19 @@ export default function V323OwnerConsoleScreen(props: V323OwnerConsoleScreenProp
       seal: current.seal || toStxInput(status.sealFee),
       singleTx: current.singleTx || toStxInput(status.singleTxFee)
     }));
-    setRoyaltyInput((current) => current || status.royaltyRecipient);
+    setRoyaltyInput((current) => current || status.royaltyRecipient || '');
   }, [status]);
+
+  const handleSelectContract = () => {
+    setActionMessage(null);
+    try {
+      props.onSelectContract();
+      setActionMessage('Selected xtrata-v3-2-3. Loading contract state...');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setActionMessage(`Unable to select xtrata-v3-2-3: ${message}`);
+    }
+  };
 
   const requireAdmin = (label: string) => {
     if (!props.walletSession.address) {
@@ -438,9 +464,17 @@ export default function V323OwnerConsoleScreen(props: V323OwnerConsoleScreenProp
           <p>Dedicated controls and diagnostics for the deployed v3.2.3 core.</p>
         </div>
         <div className="panel__actions">
-          <span className={`badge badge--${props.contract.network}`}>
-            {isV323 ? 'v3.2.3' : 'select v3.2.3'}
-          </span>
+          {isV323 ? (
+            <span className={`badge badge--${props.contract.network}`}>v3.2.3</span>
+          ) : (
+            <button
+              className="button button--ghost"
+              type="button"
+              onClick={handleSelectContract}
+            >
+              Select v3.2.3
+            </button>
+          )}
           <button
             className="button button--ghost"
             type="button"
@@ -463,6 +497,17 @@ export default function V323OwnerConsoleScreen(props: V323OwnerConsoleScreenProp
         {!isV323 && (
           <div className="alert">
             Select the deployed xtrata-v3-2-3 contract to use this console.
+          </div>
+        )}
+        {isV323 && statusQuery.isLoading && (
+          <div className="alert">Loading contract state from {contractId}...</div>
+        )}
+        {isV323 && statusErrorEntries.length > 0 && (
+          <div className="alert">
+            Some contract state could not be read from {contractId}:{' '}
+            {statusErrorEntries
+              .map(([label, message]) => `${label}: ${message}`)
+              .join(' | ')}
           </div>
         )}
 

@@ -223,7 +223,7 @@ plan:
             contract-name: xtrata-v3-2-3
             emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
             path: contracts/xtrata-v3.2.3.clar
-            clarity-version: 4
+            clarity-version: 3
         - emulated-contract-publish:
             contract-name: xtrata-vault
             emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM

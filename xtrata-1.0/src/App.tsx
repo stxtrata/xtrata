@@ -93,6 +93,11 @@ const contractSelectionStore = createContractSelectionStore(ACTIVE_CONTRACTS);
 const ACTIVE_CONTRACT_IDS = new Set(
   ACTIVE_CONTRACTS.map((entry) => getContractId(entry))
 );
+const V323_CONTRACT = ACTIVE_CONTRACTS.find(
+  (entry) =>
+    entry.protocolVersion === '3.2.3' &&
+    entry.contractName === 'xtrata-v3-2-3'
+);
 const walletSessionStore = createWalletSessionStore();
 
 const CONTRACT_NAME_PATTERN = /^[a-zA-Z][a-zA-Z0-9-_]{0,127}$/;
@@ -793,6 +798,16 @@ export default function App() {
       ACTIVE_CONTRACTS[0];
     setSelectedContract(next);
     contractSelectionStore.save(next);
+  };
+
+  const handleSelectV323Contract = () => {
+    if (!V323_CONTRACT) {
+      throw new Error(
+        'The deployed xtrata-v3-2-3 contract is missing from the contract registry.'
+      );
+    }
+    setSelectedContract(V323_CONTRACT);
+    contractSelectionStore.save(V323_CONTRACT);
   };
 
   const handleAddParentDraft = (id: bigint) => {
@@ -1836,6 +1851,7 @@ export default function App() {
           walletSession={walletSession}
           collapsed={collapsedSections['v323-owner-console']}
           onToggleCollapse={() => toggleSection('v323-owner-console')}
+          onSelectContract={handleSelectV323Contract}
         />
 
         <CollectionMintAdminScreen
