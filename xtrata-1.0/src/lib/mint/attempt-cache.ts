@@ -10,6 +10,7 @@ export type MintAttempt = {
   batchSize: number;
   tokenUri: string | null;
   dependencyIds?: string[];
+  parentIds?: string[];
   updatedAt: number;
 };
 

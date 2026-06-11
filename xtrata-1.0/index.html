@@ -1037,6 +1037,225 @@
       margin-top: 3px;
     }
 
+    .relationship-panel {
+      display: grid;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-soft);
+      padding: 12px;
+    }
+
+    .relationship-panel__head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: baseline;
+    }
+
+    .relationship-panel__title {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .relationship-panel__copy,
+    .relationship-status-list {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .relationship-actions,
+    .relationship-chip-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .relationship-chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--ink);
+      padding: 6px 9px;
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .relationship-chip:hover {
+      border-color: var(--blue);
+    }
+
+    .relationship-status {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      border-radius: 999px;
+      padding: 3px 8px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 12px;
+      margin: 0 6px 6px 0;
+    }
+
+    .relationship-status.ok {
+      border-color: rgba(36, 95, 69, 0.3);
+      background: var(--green-soft);
+      color: var(--green);
+    }
+
+    .relationship-status.warn {
+      border-color: rgba(132, 96, 27, 0.3);
+      background: var(--amber-soft);
+      color: #6b4d11;
+    }
+
+    .relationship-status.error {
+      border-color: rgba(159, 54, 54, 0.3);
+      background: var(--rose-soft);
+      color: var(--rose);
+    }
+
+    .selected-relationships {
+      display: grid;
+      gap: 14px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .selected-relationships__group {
+      display: grid;
+      gap: 8px;
+    }
+
+    .selected-relationships__scan {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .selected-relationships__head {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .selected-relationships__ids {
+      font-size: 12px;
+      color: var(--ink);
+      word-break: break-word;
+    }
+
+    .selected-relationships__status {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .selected-relationships__thumbs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .parent-thumb {
+      position: relative;
+      width: 64px;
+      height: 64px;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface-soft);
+      overflow: hidden;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .parent-thumb:hover {
+      border-color: var(--blue);
+    }
+
+    .parent-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .parent-thumb__id {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 2px 4px;
+      font-size: 10px;
+      font-weight: 700;
+      text-align: center;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.55);
+    }
+
+    .parent-thumb--error {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    /* Selected-parent picker tiles in the Add Parents panel: a thumbnail with a
+       remove control, tinted by the wallet-ownership check. */
+    .parent-thumb--pick {
+      cursor: default;
+    }
+
+    .parent-thumb--pick.parent-thumb--ok {
+      border-color: var(--green);
+    }
+
+    .parent-thumb--pick.parent-thumb--error {
+      border-color: var(--rose);
+    }
+
+    .parent-thumb--pick.parent-thumb--warn {
+      border-color: var(--amber, #b9881f);
+    }
+
+    .parent-thumb__remove {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 18px;
+      height: 18px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      font-size: 11px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .parent-thumb__remove:hover {
+      background: var(--rose);
+    }
+
+    .parent-thumb__remove:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     .actions {
       display: flex;
       flex-wrap: wrap;
@@ -2882,6 +3101,26 @@
               <span class="label">Text payload</span>
               <textarea class="textarea" id="textPayload" spellcheck="false" placeholder="Optional text, JSON, SVG, or HTML"></textarea>
             </label>
+
+            <div class="relationship-panel" id="parentRelationshipPanel">
+              <div class="relationship-panel__head">
+                <span class="relationship-panel__title">Add Parents</span>
+                <span class="badge" id="parentRelationshipBadge">optional</span>
+              </div>
+              <div class="relationship-panel__copy">
+                Link this inscription as a child of one or more inscriptions owned by the connected wallet.
+              </div>
+              <label class="field">
+                <span class="label">Parent IDs</span>
+                <textarea class="textarea" id="parentIdsInput" spellcheck="false" placeholder="e.g. 12, 48 102"></textarea>
+              </label>
+              <div class="relationship-actions">
+                <button class="btn secondary" id="addParentsButton" type="button">Add parents</button>
+                <button class="btn secondary" id="clearParentsButton" type="button">Clear parents</button>
+              </div>
+              <div class="relationship-chip-list" id="parentChipList"></div>
+              <div class="relationship-status-list" id="parentStatusList">No parents selected.</div>
+            </div>
           </form>
 
           <div class="prepare-grid">
@@ -3113,6 +3352,7 @@
                   <span class="meta-value">None selected</span>
                 </div>
               </div>
+              <div class="selected-relationships" id="selectedRelationships" hidden></div>
               <div class="preview-actions">
                 <a class="small-link" id="explorerLink" href="#" target="_blank" rel="noreferrer" hidden>Blockchain Explorer</a>
                 <a class="small-link" id="xtrataExplorerLink" href="#" target="_blank" rel="noreferrer" hidden>Xtrata Explorer</a>
@@ -3324,6 +3564,11 @@
     } from '/src/lib/viewer/runtime-inline.ts';
     import { buildRuntimeInscriptionContentUrl } from '/src/lib/collections/cover-image.ts';
     import { resolveInscriptionMimeType } from '/src/lib/mint/mime.ts';
+    import {
+      mergeDependencySources,
+      parseDependencyInput,
+      validateDependencyIds
+    } from '/src/lib/mint/dependencies.ts';
     import { createImageThumbnail, THUMBNAIL_SIZE } from '/src/lib/viewer/thumbnail.ts';
     import {
       getSquareFramedImageStyle,
@@ -3334,6 +3579,13 @@
       fetchTokenSummaryWithFallback
     } from '/src/lib/viewer/queries.ts';
     import { fetchIndexedSummaries } from '/src/lib/viewer/index-summaries.ts';
+    import {
+      loadIndexedChildren,
+      loadChildIndexCursor,
+      recordChildParents,
+      syncChildIndex
+    } from '/src/lib/viewer/parent-child-index.ts';
+    import { fetchLineage } from '/src/lib/viewer/relations-api.ts';
     import {
       decodeTokenUriToImage,
       fetchTokenImageFromUri,
@@ -3352,13 +3604,18 @@
       entry.protocolVersion === '2.1.1' ||
       entry.protocolVersion === '3.0.0' ||
       entry.protocolVersion === '3.2.3' ||
+      entry.protocolVersion === '3.4.0' ||
       entry.contractName?.toLowerCase().includes('v2-1-0') === true ||
       entry.contractName?.toLowerCase().includes('v2-1-1') === true ||
       entry.contractName?.toLowerCase().includes('v3-0-0') === true ||
-      entry.contractName?.toLowerCase().includes('v3-2-3') === true;
+      entry.contractName?.toLowerCase().includes('v3-2-3') === true ||
+      entry.contractName?.toLowerCase().includes('v3-4-0') === true;
 
     const coreContracts = CONTRACT_REGISTRY.filter(isCoreEntry);
     const versionWeight = (entry) => {
+      if (entry.protocolVersion === '3.4.0' || entry.contractName?.includes('v3-4-0')) {
+        return 30400;
+      }
       if (entry.protocolVersion === '3.2.3' || entry.contractName?.includes('v3-2-3')) {
         return 30203;
       }
@@ -3379,6 +3636,8 @@
     const DEFAULT_CONTRACT =
       ACTIVE_CONTRACTS.find(
         (entry) =>
+          entry.protocolVersion === '3.4.0' ||
+          entry.contractName?.toLowerCase().includes('v3-4-0') ||
           entry.protocolVersion === '3.2.3' ||
           entry.contractName?.toLowerCase().includes('v3-2-3')
       ) ?? ACTIVE_CONTRACTS[0];
@@ -3410,6 +3669,13 @@
       dropzone: $('dropzone'),
       dropzoneText: $('dropzoneText'),
       textPayload: $('textPayload'),
+      parentRelationshipPanel: $('parentRelationshipPanel'),
+      parentRelationshipBadge: $('parentRelationshipBadge'),
+      parentIdsInput: $('parentIdsInput'),
+      addParentsButton: $('addParentsButton'),
+      clearParentsButton: $('clearParentsButton'),
+      parentChipList: $('parentChipList'),
+      parentStatusList: $('parentStatusList'),
       payloadPreview: $('payloadPreview'),
       preparedMeta: $('preparedMeta'),
       duplicateWarning: $('duplicateWarning'),
@@ -3438,6 +3704,7 @@
       tokenPreviewPanel: $('tokenPreviewPanel'),
       tokenPreviewMedia: $('tokenPreviewMedia'),
       tokenPreviewMeta: $('tokenPreviewMeta'),
+      selectedRelationships: $('selectedRelationships'),
       previewExpandButton: $('previewExpandButton'),
       fullscreenButton: $('fullscreenButton'),
       explorerLink: $('explorerLink'),
@@ -3697,6 +3964,11 @@
       selectedFile: null,
       prepared: null,
       handoffDependencyIds: [],
+      parentIds: [],
+      parentStatusById: new Map(),
+      parentStatusMessage: null,
+      parentChecking: false,
+      parentCheckRequestId: 0,
       duplicateId: null,
       uploadState: null,
       busy: false,
@@ -3712,6 +3984,11 @@
       tokenPreviewHtmlDoc: null,
       tokenPreviewRequestId: 0,
       selectedOwnerNameRequestId: 0,
+      selectedParentsRequestId: 0,
+      selectedChildrenRequestId: 0,
+      childScanRunning: false,
+      childScanCancel: false,
+      childScanTokenId: null,
       fullscreenUrl: null,
       fullscreenOpen: false,
       tokenThumbUrls: new Map(),
@@ -3810,6 +4087,271 @@
       const a = normalizeAddress(left);
       const b = normalizeAddress(right);
       return a.length > 0 && a === b;
+    };
+
+    const runReadOnlyLimited = async (items, limit, task) => {
+      const results = new Array(items.length);
+      let cursor = 0;
+      const workers = Array.from(
+        { length: Math.max(1, Math.min(limit, items.length)) },
+        async () => {
+          while (cursor < items.length) {
+            const index = cursor;
+            cursor += 1;
+            results[index] = await task(items[index], index);
+          }
+        }
+      );
+      await Promise.all(workers);
+      return results;
+    };
+
+    const supportsParentRelationships = () =>
+      resolveContractCapabilities(state.contract).supportsRelationships === true;
+
+    const renderParentSelection = () => {
+      const parentIds = state.parentIds ?? [];
+      const supportsParents = supportsParentRelationships();
+      dom.parentIdsInput.disabled = state.busy || !supportsParents;
+      dom.addParentsButton.disabled =
+        state.busy || !supportsParents || !dom.parentIdsInput.value.trim();
+      dom.clearParentsButton.disabled = state.busy || parentIds.length === 0;
+      dom.parentRelationshipBadge.textContent = supportsParents
+        ? parentIds.length > 0
+          ? `${parentIds.length} selected`
+          : 'optional'
+        : 'v3 required';
+      dom.parentChipList.replaceChildren();
+      const pickContractId = getContractId(state.contract);
+      for (const id of parentIds) {
+        const status = state.parentStatusById.get(id.toString());
+        const tone =
+          status?.status === 'owned'
+            ? 'ok'
+            : status?.status === 'missing' || status?.status === 'not-owned'
+              ? 'error'
+              : status?.status === 'error'
+                ? 'warn'
+                : '';
+        const tile = document.createElement('div');
+        tile.className = `parent-thumb parent-thumb--pick${tone ? ` parent-thumb--${tone}` : ''}`;
+        const img = document.createElement('img');
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.alt = `Parent ${formatTokenId(id)}`;
+        img.src = buildRuntimeInscriptionContentUrl({
+          coreContractId: pickContractId,
+          tokenId: id
+        });
+        img.addEventListener('error', () => {
+          img.remove();
+          tile.classList.add('parent-thumb--error');
+        });
+        const tag = document.createElement('span');
+        tag.className = 'parent-thumb__id';
+        tag.textContent = formatTokenId(id);
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'parent-thumb__remove';
+        remove.textContent = '✕';
+        remove.title = `Remove parent ${formatTokenId(id)}`;
+        remove.setAttribute('aria-label', `Remove parent ${formatTokenId(id)}`);
+        remove.disabled = state.busy;
+        remove.addEventListener('click', () => removeParentId(id));
+        tile.append(img, tag, remove);
+        dom.parentChipList.append(tile);
+      }
+      dom.parentStatusList.replaceChildren();
+      if (!supportsParents) {
+        dom.parentStatusList.textContent =
+          'Parent-child links require a v3 relationship-aware contract.';
+        return;
+      }
+      if (parentIds.length === 0) {
+        dom.parentStatusList.textContent = 'No parents selected.';
+        return;
+      }
+      if (state.parentStatusMessage) {
+        const message = document.createElement('div');
+        message.textContent = state.parentStatusMessage;
+        dom.parentStatusList.append(message);
+      }
+      for (const id of parentIds) {
+        const key = id.toString();
+        const status = state.parentStatusById.get(key);
+        const pill = document.createElement('span');
+        let tone = '';
+        let label = state.parentChecking ? 'checking' : 'pending';
+        if (status?.status === 'owned') {
+          tone = 'ok';
+          label = 'in wallet';
+        } else if (status?.status === 'missing') {
+          tone = 'error';
+          label = 'missing';
+        } else if (status?.status === 'not-owned') {
+          tone = 'error';
+          label = 'not in wallet';
+        } else if (status?.status === 'error') {
+          tone = 'warn';
+          label = 'check failed';
+        }
+        pill.className = `relationship-status${tone ? ` ${tone}` : ''}`;
+        pill.textContent = `#${key}: ${label}`;
+        dom.parentStatusList.append(pill);
+      }
+    };
+
+    const getParentBlockingMessage = () => {
+      const parentIds = state.parentIds ?? [];
+      if (parentIds.length === 0) {
+        return null;
+      }
+      if (!supportsParentRelationships()) {
+        return 'Parent-child links require a v3 relationship-aware contract.';
+      }
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        return 'Connect the wallet that owns every selected parent inscription.';
+      }
+      if (state.parentChecking) {
+        return 'Waiting for parent ownership checks to finish.';
+      }
+      if (state.parentStatusMessage?.startsWith('Parent check failed')) {
+        return state.parentStatusMessage;
+      }
+      for (const id of parentIds) {
+        const status = state.parentStatusById.get(id.toString());
+        if (!status || status.status === 'pending') {
+          return 'Waiting for parent ownership checks to finish.';
+        }
+        if (status.status === 'missing') {
+          return `Parent ID #${id.toString()} was not found on-chain.`;
+        }
+        if (status.status === 'not-owned') {
+          return `Parent ID #${id.toString()} is not in the connected wallet.`;
+        }
+        if (status.status === 'error') {
+          return `Parent ID #${id.toString()} could not be confirmed.`;
+        }
+      }
+      return null;
+    };
+
+    const refreshParentChecks = async () => {
+      const parentIds = state.parentIds ?? [];
+      const requestId = state.parentCheckRequestId + 1;
+      state.parentCheckRequestId = requestId;
+      state.parentStatusById = new Map();
+      state.parentStatusMessage = null;
+      if (parentIds.length === 0 || !supportsParentRelationships()) {
+        state.parentChecking = false;
+        renderParentSelection();
+        updateControls();
+        return;
+      }
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        state.parentChecking = false;
+        state.parentStatusMessage =
+          'Connect the wallet that owns every selected parent inscription.';
+        renderParentSelection();
+        updateControls();
+        return;
+      }
+      state.parentChecking = true;
+      state.parentStatusMessage = 'Checking selected parents in the connected wallet.';
+      renderParentSelection();
+      updateControls();
+      try {
+        const sender = state.walletSession.address;
+        const owners = await runReadOnlyLimited(parentIds, 4, (id) =>
+          state.client.getOwner(id, sender)
+        );
+        if (requestId !== state.parentCheckRequestId) {
+          return;
+        }
+        const nextStatus = new Map();
+        parentIds.forEach((id, index) => {
+          const owner = owners[index];
+          const status = !owner
+            ? 'missing'
+            : addressesEqual(owner, sender)
+              ? 'owned'
+              : 'not-owned';
+          nextStatus.set(id.toString(), { status, owner: owner ?? null });
+        });
+        state.parentStatusById = nextStatus;
+        state.parentStatusMessage = null;
+      } catch (error) {
+        if (requestId !== state.parentCheckRequestId) {
+          return;
+        }
+        const message = error instanceof Error ? error.message : String(error);
+        state.parentStatusMessage = `Parent check failed: ${message}`;
+        state.parentStatusById = new Map(
+          parentIds.map((id) => [id.toString(), { status: 'error', owner: null }])
+        );
+      } finally {
+        if (requestId === state.parentCheckRequestId) {
+          state.parentChecking = false;
+          renderParentSelection();
+          updateControls();
+        }
+      }
+    };
+
+    const markRelationshipPreparedDirty = () => {
+      state.prepared = null;
+      state.duplicateId = null;
+      state.uploadState = null;
+      resetSteps();
+      renderPreparedState();
+    };
+
+    const applyParentInput = () => {
+      const parsed = parseDependencyInput(dom.parentIdsInput.value);
+      if (parsed.invalidTokens.length > 0) {
+        state.parentStatusMessage = `Invalid parent IDs: ${parsed.invalidTokens.join(', ')}.`;
+        renderParentSelection();
+        updateControls();
+        return;
+      }
+      if (parsed.ids.length === 0) {
+        state.parentStatusMessage = 'Enter at least one parent ID.';
+        renderParentSelection();
+        updateControls();
+        return;
+      }
+      const merged = mergeDependencySources(state.parentIds ?? [], parsed.ids);
+      const validation = validateDependencyIds(merged);
+      if (!validation.ok) {
+        state.parentStatusMessage =
+          validation.reason === 'max-50'
+            ? 'A maximum of 50 parent IDs is allowed.'
+            : 'Parent IDs are invalid.';
+        renderParentSelection();
+        updateControls();
+        return;
+      }
+      state.parentIds = merged;
+      dom.parentIdsInput.value = '';
+      state.parentStatusMessage = null;
+      markRelationshipPreparedDirty();
+      void refreshParentChecks();
+    };
+
+    const removeParentId = (id) => {
+      state.parentIds = (state.parentIds ?? []).filter((value) => value !== id);
+      markRelationshipPreparedDirty();
+      void refreshParentChecks();
+    };
+
+    const clearParentIds = () => {
+      state.parentIds = [];
+      state.parentStatusById = new Map();
+      state.parentStatusMessage = null;
+      dom.parentIdsInput.value = '';
+      markRelationshipPreparedDirty();
+      renderParentSelection();
+      updateControls();
     };
 
     const isLikelyStacksAddressInput = (value) =>
@@ -4271,6 +4813,7 @@
         !state.uploadState &&
         prepared.chunks.length > 0 &&
         (prepared.dependencyIds ?? []).length <= 50 &&
+        (prepared.parentIds ?? []).length <= 50 &&
         prepared.chunks.length <= SMALL_MINT_HELPER_MAX_CHUNKS
       );
     };
@@ -4397,6 +4940,7 @@
 
     const renderNoSelectedInscriptionMeta = () => {
       state.selectedOwnerNameRequestId += 1;
+      clearSelectedInscriptionRelationships();
       renderMeta(dom.tokenPreviewMeta, [['Status', 'None selected']]);
     };
 
@@ -4409,10 +4953,430 @@
         [
           'Owner',
           ownerName ?? (token.owner ? truncateMiddle(token.owner, 8, 8) : 'unknown')
-        ]
+        ],
+        ['ID', formatTokenId(token.id)]
       ]);
       if (!ownerName) {
         void resolveSelectedInscriptionOwnerName(token);
+      }
+      void renderSelectedInscriptionRelationships(token);
+    };
+
+    const clearSelectedInscriptionRelationships = () => {
+      state.selectedParentsRequestId += 1;
+      state.selectedChildrenRequestId += 1;
+      if (dom.selectedRelationships) {
+        dom.selectedRelationships.replaceChildren();
+        dom.selectedRelationships.hidden = true;
+      }
+    };
+
+    // Shared thumbnail tile for a related inscription (parent or child). Loads
+    // straight from the runtime content endpoint (image/svg render inline; any
+    // other media triggers the error fallback to an ID-only tile) and navigates
+    // to the inscription on click.
+    const buildRelationshipThumbCard = (contractId, relatedId, role) => {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'parent-thumb';
+      card.title = `View ${role} ${formatTokenId(relatedId)}`;
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.alt = `${role} ${formatTokenId(relatedId)}`;
+      img.src = buildRuntimeInscriptionContentUrl({
+        coreContractId: contractId,
+        tokenId: relatedId
+      });
+      img.addEventListener('error', () => {
+        img.remove();
+        card.classList.add('parent-thumb--error');
+      });
+      const tag = document.createElement('span');
+      tag.className = 'parent-thumb__id';
+      tag.textContent = formatTokenId(relatedId);
+      card.append(img, tag);
+      card.addEventListener('click', () => {
+        void focusWalletTokenById(relatedId);
+      });
+      return card;
+    };
+
+    // Renders one labelled group of related inscriptions (heading + id list +
+    // thumbnail row). Returns nothing; appends into `section`.
+    const appendRelationGroup = (section, contractId, title, ids, role) => {
+      if (!ids || ids.length === 0) {
+        return;
+      }
+      const heading = document.createElement('div');
+      heading.className = 'selected-relationships__head';
+      heading.textContent = `${title} (${ids.length})`;
+      const idLine = document.createElement('div');
+      idLine.className = 'selected-relationships__ids';
+      idLine.textContent = ids.map((id) => formatTokenId(id)).join(', ');
+      const thumbs = document.createElement('div');
+      thumbs.className = 'selected-relationships__thumbs';
+      for (const id of ids) {
+        thumbs.append(buildRelationshipThumbCard(contractId, id, role));
+      }
+      section.append(heading, idLine, thumbs);
+    };
+
+    // Depth -> human label for lineage tiers beyond the direct relation.
+    const depthLabel = (depth, direction) => {
+      if (direction === 'down') {
+        if (depth === 1) return 'Children';
+        if (depth === 2) return 'Grandchildren';
+        return `Descendants · depth ${depth}`;
+      }
+      if (depth === 1) return 'Parents';
+      if (depth === 2) return 'Grandparents';
+      return `Ancestors · depth ${depth}`;
+    };
+
+    const groupByDepth = (nodes) => {
+      const byDepth = new Map();
+      for (const node of nodes) {
+        const list = byDepth.get(node.depth) ?? [];
+        list.push(node.id);
+        byDepth.set(node.depth, list);
+      }
+      return [...byDepth.entries()].sort((a, b) => a[0] - b[0]);
+    };
+
+    // Orchestrates every relationship direction for the selected inscription:
+    // its live on-chain parents, then the full server-indexed lineage (children,
+    // grandchildren, …, ancestors above direct parents, and half-siblings). Falls
+    // back to the local IndexedDB child index + scan when the server lineage
+    // endpoint is unavailable.
+    const renderSelectedInscriptionRelationships = async (token) => {
+      const container = dom.selectedRelationships;
+      if (!container) {
+        return;
+      }
+      state.selectedParentsRequestId += 1;
+      state.selectedChildrenRequestId += 1;
+      if (!token || !supportsParentRelationships()) {
+        container.replaceChildren();
+        container.hidden = true;
+        return;
+      }
+      container.hidden = false;
+      container.replaceChildren();
+      const contractId = getTokenCacheContractId(token);
+      const parentsSection = document.createElement('div');
+      parentsSection.className = 'selected-relationships__group';
+      const lineageSection = document.createElement('div');
+      lineageSection.className = 'selected-relationships__group';
+      container.append(parentsSection, lineageSection);
+      void renderAncestorsSection(token, contractId, parentsSection);
+      void renderLineageSection(token, contractId, lineageSection);
+    };
+
+    // Walk the ancestor chain live from the chain: BFS up via get-parents,
+    // recording the shallowest depth each ancestor is reached at (so a node
+    // reachable by multiple paths is listed once, at its closest tier). Cheap —
+    // lineages are shallow — and works with or without the server index. Each
+    // visited child -> parents edge is opportunistically recorded so the local
+    // reverse index is seeded as a side effect.
+    const walkAncestorsLive = async (tokenId, sender, contractId, maxDepth = 16) => {
+      const byDepth = new Map();
+      const seen = new Set([tokenId.toString()]);
+      let frontier = [tokenId];
+      let depth = 1;
+      while (frontier.length > 0 && depth <= maxDepth) {
+        const lists = await runReadOnlyLimited(frontier, 4, (id) =>
+          state.client.getParents(id, sender)
+        );
+        const levelIds = [];
+        const next = [];
+        frontier.forEach((childId, index) => {
+          const parents = lists[index] ?? [];
+          void recordChildParents({ contractId, childId, parentIds: parents });
+          for (const parentId of parents) {
+            const key = parentId.toString();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            levelIds.push(parentId);
+            next.push(parentId);
+          }
+        });
+        if (levelIds.length > 0) {
+          byDepth.set(depth, levelIds);
+        }
+        frontier = next;
+        depth += 1;
+      }
+      return byDepth;
+    };
+
+    // Walk the descendant chain downward through the local reverse index
+    // (loadIndexedChildren), recording the shallowest depth each descendant is
+    // reached at. There is no on-chain get-children, so this only sees edges the
+    // index already holds — but the live ancestor walk seeds those edges as you
+    // browse, and the Scan control fills the rest. Mirrors walkAncestorsLive.
+    const walkDescendantsLocal = async (tokenId, contractId, maxDepth = 16) => {
+      const byDepth = new Map();
+      const seen = new Set([tokenId.toString()]);
+      let frontier = [tokenId];
+      let depth = 1;
+      while (frontier.length > 0 && depth <= maxDepth) {
+        const lists = await Promise.all(
+          frontier.map((id) =>
+            loadIndexedChildren({ contractId, parentId: id }).catch(() => [])
+          )
+        );
+        const levelIds = [];
+        const next = [];
+        for (const list of lists) {
+          for (const childId of list ?? []) {
+            const key = childId.toString();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            levelIds.push(childId);
+            next.push(childId);
+          }
+        }
+        if (levelIds.length > 0) {
+          byDepth.set(depth, levelIds);
+        }
+        frontier = next;
+        depth += 1;
+      }
+      return byDepth;
+    };
+
+    // Upward navigation: full ancestor lineage (Parents, Grandparents, …) read
+    // live from the chain, depth-grouped.
+    const renderAncestorsSection = async (token, contractId, section) => {
+      const requestId = ++state.selectedParentsRequestId;
+      const heading = document.createElement('div');
+      heading.className = 'selected-relationships__head';
+      heading.textContent = 'Parents';
+      const status = document.createElement('div');
+      status.className = 'selected-relationships__status';
+      status.textContent = 'Loading lineage…';
+      section.replaceChildren(heading, status);
+
+      let byDepth;
+      try {
+        const sender = getReadOnlySenderAddress();
+        byDepth = await walkAncestorsLive(token.id, sender, contractId);
+      } catch (error) {
+        if (
+          requestId !== state.selectedParentsRequestId ||
+          state.selectedTokenId !== token.id
+        ) {
+          return;
+        }
+        status.textContent = 'Parent relationships unavailable.';
+        return;
+      }
+      if (
+        requestId !== state.selectedParentsRequestId ||
+        state.selectedTokenId !== token.id
+      ) {
+        return;
+      }
+      if (byDepth.size === 0) {
+        heading.textContent = 'Parents (0)';
+        status.textContent = 'No parents.';
+        return;
+      }
+      section.replaceChildren();
+      for (const [depth, ids] of [...byDepth.entries()].sort((a, b) => a[0] - b[0])) {
+        appendRelationGroup(
+          section,
+          contractId,
+          depthLabel(depth, 'up'),
+          ids,
+          depth === 1 ? 'parent' : 'ancestor'
+        );
+      }
+    };
+
+    // Downward + lateral navigation. Prefers the server lineage index (one
+    // round-trip: children, grandchildren, …, ancestors above direct parents,
+    // and half-siblings). Degrades to the local IndexedDB child index + scan
+    // button when the endpoint is unavailable (e.g. local/static hosting).
+    const renderLineageSection = async (token, contractId, section) => {
+      const requestId = ++state.selectedChildrenRequestId;
+      const status = document.createElement('div');
+      status.className = 'selected-relationships__status';
+      status.textContent = 'Loading lineage…';
+      section.replaceChildren(status);
+
+      const lineage = await fetchLineage({ contractId, id: token.id });
+      if (
+        requestId !== state.selectedChildrenRequestId ||
+        state.selectedTokenId !== token.id
+      ) {
+        return;
+      }
+      if (!lineage) {
+        // Server lineage unavailable — fall back to the local child index.
+        void renderLocalChildrenSection(token, contractId, section);
+        return;
+      }
+
+      section.replaceChildren();
+      // Descendants grouped by depth: Children, Grandchildren, deeper tiers.
+      // (Ancestors are rendered live in the parents section above.)
+      for (const [depth, ids] of groupByDepth(lineage.descendants)) {
+        appendRelationGroup(section, contractId, depthLabel(depth, 'down'), ids, 'child');
+      }
+      // Half-siblings.
+      appendRelationGroup(section, contractId, 'Siblings', lineage.siblings, 'sibling');
+
+      const hasAny =
+        lineage.descendants.length > 0 || lineage.siblings.length > 0;
+      const coverage = document.createElement('span');
+      coverage.className = 'selected-relationships__status';
+      if (!hasAny) {
+        coverage.textContent = lineage.complete
+          ? 'No children, siblings, or deeper lineage.'
+          : 'No lineage indexed yet — the index is still catching up.';
+      } else if (!lineage.complete) {
+        coverage.textContent =
+          `Index ${lineage.syncedCount.toString()}/${lineage.mintedCount.toString()} — newer relations may still be syncing.`;
+      } else {
+        coverage.textContent = `Lineage complete across ${lineage.mintedCount.toString()} inscriptions.`;
+      }
+      section.append(coverage);
+    };
+
+    // Local fallback: children read from the persisted reverse index, plus a
+    // Scan control to build/refresh it (used only when the server lineage
+    // endpoint is unreachable).
+    const renderLocalChildrenSection = async (token, contractId, section) => {
+      const requestId = ++state.selectedChildrenRequestId;
+      const heading = document.createElement('div');
+      heading.className = 'selected-relationships__head';
+      heading.textContent = 'Children';
+      const status = document.createElement('div');
+      status.className = 'selected-relationships__status';
+      status.textContent = 'Reading child index…';
+      section.replaceChildren(heading, status);
+
+      let byDepth = new Map();
+      try {
+        byDepth = await walkDescendantsLocal(token.id, contractId);
+      } catch (error) {
+        byDepth = new Map();
+      }
+      if (
+        requestId !== state.selectedChildrenRequestId ||
+        state.selectedTokenId !== token.id
+      ) {
+        return;
+      }
+
+      let totalFound = 0;
+      if (byDepth.size > 0) {
+        section.replaceChildren();
+        for (const [depth, ids] of [...byDepth.entries()].sort((a, b) => a[0] - b[0])) {
+          totalFound += ids.length;
+          appendRelationGroup(section, contractId, depthLabel(depth, 'down'), ids, 'child');
+        }
+      } else {
+        heading.textContent = 'Children (0)';
+        status.textContent = 'No indexed children yet.';
+      }
+
+      // Coverage line + scan control. The index is contract-wide, so the cursor
+      // tells us how much of the minted list has been scanned regardless of
+      // which token is selected.
+      const controls = document.createElement('div');
+      controls.className = 'selected-relationships__scan';
+      const coverage = document.createElement('span');
+      coverage.className = 'selected-relationships__status';
+      const scanButton = document.createElement('button');
+      scanButton.type = 'button';
+      scanButton.className = 'small-link';
+      controls.append(scanButton, coverage);
+      section.append(controls);
+
+      const supportsScan = state.client.supportsMintedIndex === true;
+      try {
+        const cursor = await loadChildIndexCursor(contractId);
+        if (
+          requestId !== state.selectedChildrenRequestId ||
+          state.selectedTokenId !== token.id
+        ) {
+          return;
+        }
+        coverage.textContent =
+          cursor > 0n ? `Indexed ${cursor.toString()} inscriptions so far.` : 'Not indexed yet.';
+      } catch (error) {
+        coverage.textContent = '';
+      }
+
+      if (!supportsScan) {
+        scanButton.hidden = true;
+        coverage.textContent = 'Child indexing requires a minted-index contract (v2.1.0+).';
+        return;
+      }
+      scanButton.textContent = state.childScanRunning
+        ? 'Cancel scan'
+        : totalFound > 0
+          ? 'Rescan for children'
+          : 'Scan for children';
+      scanButton.disabled = state.childScanRunning && state.childScanTokenId !== token.id;
+      scanButton.addEventListener('click', () => {
+        if (state.childScanRunning) {
+          state.childScanCancel = true;
+          return;
+        }
+        void runChildIndexScan(token, contractId, scanButton, coverage);
+      });
+    };
+
+    // Runs the bounded, cancellable reverse-index scan for the selected token's
+    // contract, streaming progress into the Children section and re-rendering
+    // it on completion so newly-found children appear.
+    const runChildIndexScan = async (token, contractId, scanButton, coverage) => {
+      if (state.childScanRunning) {
+        return;
+      }
+      state.childScanRunning = true;
+      state.childScanCancel = false;
+      state.childScanTokenId = token.id;
+      scanButton.textContent = 'Cancel scan';
+      coverage.textContent = 'Starting scan…';
+      try {
+        const sender = getReadOnlySenderAddress();
+        const result = await syncChildIndex({
+          client: state.client,
+          contractId,
+          senderAddress: sender,
+          parentId: token.id,
+          shouldCancel: () => state.childScanCancel,
+          onProgress: (progress) => {
+            if (state.selectedTokenId !== token.id) {
+              return;
+            }
+            coverage.textContent =
+              `Scanning ${progress.scanned.toString()}/${progress.total.toString()}… ` +
+              `${progress.found.toString()} child${progress.found === 1n ? '' : 'ren'} found.`;
+          }
+        });
+        coverage.textContent = result.cancelled
+          ? `Scan paused at ${result.nextMintedIndex.toString()}/${result.mintedCount.toString()}.`
+          : `Scan complete — covered ${result.mintedCount.toString()} inscriptions.`;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        coverage.textContent = `Scan failed: ${message}`;
+      } finally {
+        state.childScanRunning = false;
+        state.childScanCancel = false;
+        state.childScanTokenId = null;
+        // Re-render with the freshly indexed children if the token is still selected.
+        if (state.selectedTokenId === token.id) {
+          const section = scanButton.closest('.selected-relationships__group');
+          if (section) {
+            void renderLocalChildrenSection(token, contractId, section);
+          }
+        }
       }
     };
 
@@ -5134,6 +6098,7 @@
       const mismatch = getMismatch();
       const viewingAddress = getViewingWalletAddress();
       const duplicateBlocked = state.duplicateId !== null && !dom.allowDuplicateInput.checked;
+      const parentBlocked = getParentBlockingMessage();
       const visibleWalletCount = state.walletUsesPagedHoldings
         ? state.walletTotalCount
         : state.walletTokenIds.length;
@@ -5151,16 +6116,22 @@
         !connected ||
         !!mismatch ||
         !state.prepared ||
-        duplicateBlocked;
+        duplicateBlocked ||
+        !!parentBlocked;
       dom.inscribeButton.textContent = state.uploadState
         ? 'Resume inscription'
         : shouldUseSingleTx()
-          ? (state.prepared?.dependencyIds?.length ?? 0) > 0
+          ? (state.prepared?.parentIds?.length ?? 0) > 0
+            ? 'Start relationship single-tx inscription'
+            : (state.prepared?.dependencyIds?.length ?? 0) > 0
             ? 'Start recursive single-tx inscription'
             : 'Start single-tx inscription'
-          : (state.prepared?.dependencyIds?.length ?? 0) > 0
+          : (state.prepared?.parentIds?.length ?? 0) > 0
+            ? 'Start relationship inscription'
+            : (state.prepared?.dependencyIds?.length ?? 0) > 0
             ? 'Start recursive inscription'
             : 'Start inscription';
+      renderParentSelection();
       dom.refreshWalletButton.disabled = state.busy || state.walletLoadingPage || (!viewingAddress && !state.explorerMode);
       dom.walletLookupButton.textContent = shouldClearWalletLookupOnSubmit()
         ? 'Clear'
@@ -5287,6 +6258,12 @@
       state.prepared = null;
       state.duplicateId = null;
       state.uploadState = null;
+      state.parentIds = [];
+      state.parentStatusById = new Map();
+      state.parentStatusMessage = null;
+      state.parentChecking = false;
+      state.parentCheckRequestId += 1;
+      dom.parentIdsInput.value = '';
       state.walletTokenIds = [];
       state.walletPageIds = [];
       state.walletTotalCount = 0;
@@ -5417,6 +6394,8 @@
       );
       const dependencyIds = state.prepared.dependencyIds ?? [];
       const dependencyLabel = dependencyIds.map((id) => id.toString()).join(', ');
+      const parentIds = state.prepared.parentIds ?? [];
+      const parentLabel = parentIds.map((id) => id.toString()).join(', ');
 
       // Per-stage protocol fee breakdown, so the user sees what is charged when.
       // Fees are only really paid on delivery: a small anti-spam fee up front,
@@ -5429,7 +6408,7 @@
           {
             key: 'Inscription fee',
             subkey: 'Charged on mint — one transaction',
-            value: formatMicroStxWithUsd(BigInt(Math.round(singleTxFeeMicroStx)), usdBook),
+            value: formatMicroStxWithUsd(BigInt(Math.round(singleTxFeeMicroStx)), usdBook).combined,
             layout: 'stack'
           }
         ];
@@ -5439,7 +6418,7 @@
           {
             key: 'Begin — anti-spam fee',
             subkey: 'Paid now, on the first transaction',
-            value: formatMicroStxWithUsd(BigInt(Math.round(stagedFee.beginMicroStx)), usdBook),
+            value: formatMicroStxWithUsd(BigInt(Math.round(stagedFee.beginMicroStx)), usdBook).combined,
             layout: 'stack'
           },
           {
@@ -5451,7 +6430,7 @@
           {
             key: 'Seal — mints your token',
             subkey: 'The remaining fee, paid only on delivery',
-            value: formatMicroStxWithUsd(BigInt(Math.round(stagedFee.sealMicroStx)), usdBook),
+            value: formatMicroStxWithUsd(BigInt(Math.round(stagedFee.sealMicroStx)), usdBook).combined,
             layout: 'stack'
           }
         ];
@@ -5483,7 +6462,17 @@
               {
                 key: 'Dependencies',
                 value: dependencyLabel,
-                title: `Recursive parent inscription ID${dependencyIds.length === 1 ? '' : 's'}: ${dependencyLabel}`,
+                title: `Recursive dependency inscription ID${dependencyIds.length === 1 ? '' : 's'}: ${dependencyLabel}`,
+                wide: true
+              }
+            ]
+          : []),
+        ...(parentIds.length > 0
+          ? [
+              {
+                key: 'Parents',
+                value: parentLabel,
+                title: `Parent inscription ID${parentIds.length === 1 ? '' : 's'}: ${parentLabel}`,
                 wide: true
               }
             ]
@@ -5673,6 +6662,7 @@
       const batches = batchChunks(chunks, Math.min(DEFAULT_BATCH_SIZE, MAX_UPLOAD_BATCH_SIZE));
       const expectedHashHex = bytesToHex(expectedHash);
       const dependencyIds = state.handoffDependencyIds ?? [];
+      const parentIds = state.parentIds ?? [];
 
       state.prepared = {
         file,
@@ -5683,7 +6673,8 @@
         expectedHashHex,
         tokenUriValue,
         mimeType,
-        dependencyIds
+        dependencyIds,
+        parentIds
       };
       state.duplicateId = null;
       state.uploadState = null;
@@ -5790,6 +6781,10 @@
       if (!state.prepared) {
         await preparePayload();
       }
+      const parentBlocked = getParentBlockingMessage();
+      if (parentBlocked) {
+        throw new Error(parentBlocked);
+      }
       if (state.duplicateId !== null && !dom.allowDuplicateInput.checked) {
         throw new Error('Existing payload must be acknowledged before continuing.');
       }
@@ -5809,6 +6804,103 @@
       }
     };
 
+    const checkDependencyPresence = async (dependencyIds) => {
+      if (dependencyIds.length === 0) {
+        return { ok: true, missing: [], legacyAvailable: [] };
+      }
+      appendLog('Checking dependency IDs on-chain...');
+      const sender = getReadOnlySenderAddress();
+      const metaResults = await runReadOnlyLimited(dependencyIds, 4, (id) =>
+        state.client.getInscriptionMeta(id, sender)
+      );
+      const missing = dependencyIds.filter((id, index) => !metaResults[index]);
+      if (missing.length === 0) {
+        return { ok: true, missing, legacyAvailable: [] };
+      }
+      let legacyAvailable = [];
+      if (state.legacyClient) {
+        const legacyResults = await runReadOnlyLimited(missing, 4, (id) =>
+          state.legacyClient.getInscriptionMeta(id, sender)
+        );
+        legacyAvailable = missing.filter((id, index) => !!legacyResults[index]);
+      }
+      return { ok: false, missing, legacyAvailable };
+    };
+
+    const formatDependencyPresenceFailure = (dependencyCheck) => {
+      const missingList = dependencyCheck.missing.map((id) => id.toString()).join(', ');
+      const legacyList = dependencyCheck.legacyAvailable.map((id) => id.toString()).join(', ');
+      const legacyLabel = state.legacyContract?.label ?? 'legacy contract';
+      const stillMissing = dependencyCheck.missing.filter(
+        (id) => !dependencyCheck.legacyAvailable.includes(id)
+      );
+      const stillMissingList = stillMissing.map((id) => id.toString()).join(', ');
+      if (dependencyCheck.legacyAvailable.length > 0) {
+        return stillMissing.length > 0
+          ? `Dependency IDs missing in ${state.contract.label}: ${stillMissingList}. IDs found in ${legacyLabel}: ${legacyList}. Migrate legacy dependencies before sealing.`
+          : `Dependency IDs found in ${legacyLabel} but not yet migrated: ${legacyList}. Migrate them before sealing.`;
+      }
+      return `Dependency IDs not found in ${state.contract.label}: ${missingList}.`;
+    };
+
+    const checkPreparedRelationships = async (prepared) => {
+      const dependencyCheck = await checkDependencyPresence(prepared.dependencyIds ?? []);
+      if (!dependencyCheck.ok) {
+        throw new Error(formatDependencyPresenceFailure(dependencyCheck));
+      }
+      const parentIds = prepared.parentIds ?? [];
+      if (parentIds.length === 0) {
+        return;
+      }
+      await refreshParentChecks();
+      const parentBlocked = getParentBlockingMessage();
+      if (parentBlocked) {
+        throw new Error(parentBlocked);
+      }
+    };
+
+    const getSealFunctionName = (dependencyIds, parentIds) => {
+      if (parentIds.length > 0) {
+        return 'seal-with-relationships';
+      }
+      return dependencyIds.length > 0 ? 'seal-recursive' : 'seal-inscription';
+    };
+
+    const getSealLogLabel = (dependencyIds, parentIds) => {
+      if (parentIds.length > 0) {
+        const parentLabel = parentIds.map((id) => id.toString()).join(', ');
+        const dependencyLabel =
+          dependencyIds.length > 0
+            ? `, deps: ${dependencyIds.map((id) => id.toString()).join(', ')}`
+            : '';
+        return `Step 3: seal-with-relationships (parents: ${parentLabel}${dependencyLabel})`;
+      }
+      return dependencyIds.length > 0
+        ? `Step 3: seal-recursive (deps: ${dependencyIds.map((id) => id.toString()).join(', ')})`
+        : 'Step 3: seal-inscription';
+    };
+
+    const buildSealFunctionArgs = (prepared) => {
+      const dependencyIds = prepared.dependencyIds ?? [];
+      const parentIds = prepared.parentIds ?? [];
+      if (parentIds.length > 0) {
+        return [
+          bufferCV(prepared.expectedHash),
+          stringAsciiCV(prepared.tokenUriValue),
+          listCV(dependencyIds.map((id) => uintCV(id))),
+          listCV(parentIds.map((id) => uintCV(id)))
+        ];
+      }
+      if (dependencyIds.length > 0) {
+        return [
+          bufferCV(prepared.expectedHash),
+          stringAsciiCV(prepared.tokenUriValue),
+          listCV(dependencyIds.map((id) => uintCV(id)))
+        ];
+      }
+      return [bufferCV(prepared.expectedHash), stringAsciiCV(prepared.tokenUriValue)];
+    };
+
     const runInscription = async () => {
       setBusy(true);
       resetSteps();
@@ -5817,6 +6909,8 @@
         await validateMintReadiness();
         const prepared = state.prepared;
         const dependencyIds = prepared.dependencyIds ?? [];
+        const parentIds = prepared.parentIds ?? [];
+        await checkPreparedRelationships(prepared);
         await refreshUploadState(prepared.expectedHash);
         flowStarted = true;
         const feeEstimate = getFeeEstimate(prepared.chunks.length);
@@ -5830,7 +6924,9 @@
           setStep('seal', 'pending', 'Single tx');
           appendLog(
             `Native single-tx mint on ${getContractId(state.contract)} (<=${SMALL_MINT_HELPER_MAX_CHUNKS} chunks)${
-              dependencyIds.length > 0 ? ` with ${dependencyIds.length} recursive dependency${dependencyIds.length === 1 ? '' : 'ies'}` : ''
+              parentIds.length > 0
+                ? ` with ${parentIds.length} parent${parentIds.length === 1 ? '' : 's'}`
+                : dependencyIds.length > 0 ? ` with ${dependencyIds.length} recursive dependency${dependencyIds.length === 1 ? '' : 'ies'}` : ''
             }.`
           );
           const coreArgs = [
@@ -5848,9 +6944,17 @@
               : feeEstimate.totalMicroStx;
           const singleTx = await requestContractCall({
             functionName:
-              dependencyIds.length > 0 ? 'mint-single-tx-recursive' : 'mint-single-tx',
+              parentIds.length > 0
+                ? 'mint-single-tx-with-relationships'
+                : dependencyIds.length > 0 ? 'mint-single-tx-recursive' : 'mint-single-tx',
             functionArgs:
-              dependencyIds.length > 0
+              parentIds.length > 0
+                ? [
+                    ...coreArgs,
+                    listCV(dependencyIds.map((id) => uintCV(id))),
+                    listCV(parentIds.map((id) => uintCV(id)))
+                  ]
+                : dependencyIds.length > 0
                 ? [...coreArgs, listCV(dependencyIds.map((id) => uintCV(id)))]
                 : coreArgs,
             postConditions: resolveFeePostConditions(singleTxCapMicroStx)
@@ -5995,27 +7099,15 @@
 
         setStep('seal', 'pending', 'Wallet prompt');
         appendLog(
-          dependencyIds.length > 0
-            ? `Step 3: seal-recursive (deps: ${dependencyIds.map((id) => id.toString()).join(', ')})`
-            : 'Step 3: seal-inscription'
+          getSealLogLabel(dependencyIds, parentIds)
         );
         if (didSendBeforeSeal) {
           await pauseBeforeNext('Sealing in');
         }
+        const sealFunctionName = getSealFunctionName(dependencyIds, parentIds);
         const sealTx = await requestContractCall({
-          functionName:
-            dependencyIds.length > 0 ? 'seal-recursive' : 'seal-inscription',
-          functionArgs:
-            dependencyIds.length > 0
-              ? [
-                  bufferCV(prepared.expectedHash),
-                  stringAsciiCV(prepared.tokenUriValue),
-                  listCV(dependencyIds.map((id) => uintCV(id)))
-                ]
-              : [
-                  bufferCV(prepared.expectedHash),
-                  stringAsciiCV(prepared.tokenUriValue)
-                ],
+          functionName: sealFunctionName,
+          functionArgs: buildSealFunctionArgs(prepared),
           postConditions: resolveFeePostConditions(
             prepared.stagedFee?.sealMicroStx ?? feeEstimate.sealMicroStx
           )
@@ -9204,6 +10296,7 @@ const openCuratedGallery = async (galleryId) => {
         appendLog(state.walletSession.address ? `Wallet connected: ${truncateMiddle(state.walletSession.address)}` : 'Wallet connection cancelled.');
         updateWalletStatus();
         await fetchAdminStatus();
+        await refreshParentChecks();
         if (state.prepared) {
           await refreshUploadState(state.prepared.expectedHash);
           renderPreparedState();
@@ -9239,6 +10332,7 @@ const openCuratedGallery = async (galleryId) => {
         appendLog('Wallet disconnected.');
         updateWalletStatus();
         await fetchAdminStatus();
+        await refreshParentChecks();
         await loadWalletInscriptions();
         renderPreparedState();
       } finally {
@@ -9861,6 +10955,13 @@ const openCuratedGallery = async (galleryId) => {
     });
     dom.inscribeButton.addEventListener('click', runInscription);
     dom.allowDuplicateInput.addEventListener('change', updateControls);
+    dom.parentIdsInput.addEventListener('input', () => {
+      state.parentStatusMessage = null;
+      renderParentSelection();
+      updateControls();
+    });
+    dom.addParentsButton.addEventListener('click', applyParentInput);
+    dom.clearParentsButton.addEventListener('click', clearParentIds);
     dom.transferRecipientInput.addEventListener('input', updateTransferControls);
     dom.transferButton.addEventListener('click', transferSelectedToken);
     dom.fullscreenButton?.addEventListener('click', openFullscreenViewer);
