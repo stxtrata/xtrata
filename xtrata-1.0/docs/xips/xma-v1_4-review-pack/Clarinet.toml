@@ -1,0 +1,26 @@
+[project]
+name = "xma-v1-4-review"
+
+[[project.requirements]]
+contract_id = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait"
+
+# Legacy stubs: compile-time only, so the live core source resolves in simnet.
+[contracts.xtrata-v1-1-1]
+path = "contracts/xtrata-v1-1-1.clar"
+clarity_version = 2
+epoch = 2.4
+
+[contracts.xtrata-v2-1-0]
+path = "contracts/xtrata-v2-1-0.clar"
+clarity_version = 2
+epoch = 2.4
+
+[contracts.xtrata-v3-2-3]
+path = "contracts/xtrata-v3-2-3.clar"
+clarity_version = 3
+epoch = 3.0
+
+[contracts.xtrata-manifest-authority-v1]
+path = "contracts/helpers/xtrata-manifest-authority-v1.clar"
+clarity_version = 4
+epoch = 3.3

@@ -135,4 +135,6 @@ okc("legacy mint #9 to w1 (big)", pub(L,"test-mint",[Cl.uint(9),Cl.buffer(h9)],w
 console.log("\n============ MIGRATION RESULTS ============");
 if(fails.length){console.log("FAILURES:");for(const f of fails)console.log("  ✗ "+f);}
 console.log(`\n  ${pass} passed, ${fail} failed`);
-process.exit(fail?1:0);
+if (fail) {
+  throw new Error(`${fail} v3.4.0 migration checks failed`);
+}

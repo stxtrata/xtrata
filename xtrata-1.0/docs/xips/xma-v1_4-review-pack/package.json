@@ -1,0 +1,12 @@
+{
+  "name": "xma-v1-4-review-pack",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/smoke.mjs && node tests/scope-key-vector.mjs"
+  },
+  "dependencies": {
+    "@hirosystems/clarinet-sdk": "^3",
+    "@stacks/transactions": "^7"
+  }
+}

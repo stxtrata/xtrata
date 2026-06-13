@@ -4647,7 +4647,9 @@
         target.replaceChildren(img);
       };
 
-      if (preserveAnimation) {
+      // SVG/XML image animation runs inside the image document. Drawing it to a
+      // canvas captures only the current frame, so keep SVG sources live.
+      if (preserveAnimation || isSvgSource) {
         renderNativeImage();
         return;
       }
