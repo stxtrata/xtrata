@@ -1,0 +1,7 @@
+# Add to your Clarinet.toml. The helper requires Clarity 4 / epoch 3.3.
+# The core keeps its existing pin.
+
+[contracts.xtrata-manifest-authority-v1]
+path = "contracts/helpers/xtrata-manifest-authority-v1.clar"
+clarity_version = 4
+epoch = 3.3

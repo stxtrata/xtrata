@@ -112,6 +112,121 @@ describe('/runtime/content', () => {
     expect(Array.from(new Uint8Array(await response.arrayBuffer()))).toEqual([9, 8]);
   });
 
+  it('rewrites direct Hiro API bases to the site proxy for cached HTML', async () => {
+    const html =
+      '<html><script>fetch("https://api.mainnet.hiro.so/v2/contracts/call-read/SP1/board/get-owner")</script></html>';
+    const htmlBytes = new TextEncoder().encode(html);
+    const get = vi.fn(async () => ({
+      body: streamFrom(htmlBytes),
+      size: htmlBytes.length,
+      httpMetadata: {
+        contentType: 'text/html'
+      },
+      customMetadata: {
+        sourceContractId: CONTRACT_ID
+      }
+    }));
+    const fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            okay: true,
+            result: metaResult({
+              mimeType: 'text/html',
+              totalSize: BigInt(htmlBytes.length)
+            })
+          }),
+          {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+        )
+    );
+    vi.stubGlobal('fetch', fetch);
+    const env = {
+      RUNTIME_CONTENT_CACHE: {
+        get,
+        put: vi.fn(),
+        delete: vi.fn(),
+        list: vi.fn(),
+        getUploadUrl: vi.fn()
+      }
+    } as unknown as RuntimeEnv;
+
+    const response = await onRequest({
+      request: new Request(
+        `https://xtrata.xyz/runtime/content?contractId=${CONTRACT_ID}&tokenId=350&network=mainnet`
+      ),
+      env
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('X-Xtrata-Runtime-Api-Rewrite')).toBe('hiro-proxy');
+    const body = await response.text();
+    expect(body).toContain('https://xtrata.xyz/hiro/mainnet/v2/contracts/call-read/SP1/board/get-owner');
+    expect(body).not.toContain('api.mainnet.hiro.so');
+    expect(response.headers.get('Content-Length')).toBe(
+      new TextEncoder().encode(body).length.toString()
+    );
+  });
+
+  it('serves canonical HTML bytes when raw=1 is requested', async () => {
+    const html =
+      '<html><script>fetch("https://api.mainnet.hiro.so/v2/info")</script></html>';
+    const htmlBytes = new TextEncoder().encode(html);
+    const get = vi.fn(async () => ({
+      body: streamFrom(htmlBytes),
+      size: htmlBytes.length,
+      httpMetadata: {
+        contentType: 'text/html'
+      },
+      customMetadata: {
+        sourceContractId: CONTRACT_ID
+      }
+    }));
+    const fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            okay: true,
+            result: metaResult({
+              mimeType: 'text/html',
+              totalSize: BigInt(htmlBytes.length)
+            })
+          }),
+          {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+        )
+    );
+    vi.stubGlobal('fetch', fetch);
+    const env = {
+      RUNTIME_CONTENT_CACHE: {
+        get,
+        put: vi.fn(),
+        delete: vi.fn(),
+        list: vi.fn(),
+        getUploadUrl: vi.fn()
+      }
+    } as unknown as RuntimeEnv;
+
+    const response = await onRequest({
+      request: new Request(
+        `https://xtrata.xyz/runtime/content?contractId=${CONTRACT_ID}&tokenId=350&network=mainnet&raw=1`
+      ),
+      env
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('X-Xtrata-Runtime-Api-Rewrite')).toBeNull();
+    expect(await response.text()).toBe(html);
+  });
+
   it('serves cached byte ranges for media playback', async () => {
     const get = vi.fn(
       async (_key: string, options?: { range?: { offset: number; length: number } }) => {

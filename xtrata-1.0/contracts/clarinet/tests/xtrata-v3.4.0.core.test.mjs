@@ -258,4 +258,6 @@ function stagedMint(who, cs, uri, deps=[], parents=[]){
 console.log("\n================ RESULTS ================");
 if(fails.length){ console.log("FAILURES:"); for(const f of fails) console.log("  ✗ "+f); }
 console.log(`\n  ${pass} passed, ${fail} failed`);
-process.exit(fail?1:0);
+if (fail) {
+  throw new Error(`${fail} v3.4.0 core checks failed`);
+}

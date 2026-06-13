@@ -26,10 +26,13 @@ import {
 import { resolveContractCapabilities } from './capabilities';
 import {
   parseGetChunk,
+  parseGetBeginFeeUnit,
+  parseGetContractInfo,
   parseGetDependencies,
   parseGetParents,
   parseGetAdmin,
   parseGetFeeUnit,
+  parseGetMigrationSource,
   parseQuoteSingleTxFee,
   parseQuoteStagedFee,
   parseGetInscriptionMeta,
@@ -41,14 +44,19 @@ import {
   parseGetPendingChunk,
   parseGetRoyaltyRecipient,
   parseGetIdByHash,
+  parseGetSealFeeUnit,
+  parseGetSingleTxFeeUnit,
   parseIsPaused,
+  parseIsAllowedCaller,
   parseGetSvg,
   parseGetSvgDataUri,
   parseGetTokenUri,
+  parseGetUploadBatchFeeUnit,
+  parseGetUploadChunkFeeUnit,
   parseGetUploadState,
   parseGetChunkBatch
 } from '../protocol/parsers';
-import type { InscriptionMeta, UploadState } from '../protocol/types';
+import type { ContractInfo, InscriptionMeta, UploadState } from '../protocol/types';
 import { logWarn } from '../utils/logger';
 
 export type ReadOnlyCallOptions = {
@@ -376,6 +384,13 @@ export type XtrataClient = {
   getAdmin: (senderAddress: string) => Promise<string>;
   getRoyaltyRecipient: (senderAddress: string) => Promise<string>;
   getFeeUnit: (senderAddress: string) => Promise<bigint>;
+  getBeginFeeUnit: (senderAddress: string) => Promise<bigint>;
+  getUploadChunkFeeUnit: (senderAddress: string) => Promise<bigint>;
+  getUploadBatchFeeUnit: (senderAddress: string) => Promise<bigint>;
+  getSealFeeUnit: (senderAddress: string) => Promise<bigint>;
+  getSingleTxFeeUnit: (senderAddress: string) => Promise<bigint>;
+  getContractInfo: (senderAddress: string) => Promise<ContractInfo>;
+  isAllowedCaller: (callerPrincipal: string, senderAddress: string) => Promise<boolean>;
   // Exact protocol fee (microSTX) the core charges for a one-transaction
   // mint-single-tx of the given payload. Used to quote and post-condition the
   // native single-tx route accurately.
@@ -399,6 +414,10 @@ export type XtrataClient = {
   getInscriptionMeta: (id: bigint, senderAddress: string) => Promise<InscriptionMeta | null>;
   getDependencies: (id: bigint, senderAddress: string) => Promise<bigint[]>;
   getParents: (id: bigint, senderAddress: string) => Promise<bigint[]>;
+  getMigrationSource: (
+    id: bigint,
+    senderAddress: string
+  ) => Promise<{ contract: string; tokenId: bigint } | null>;
   getChunk: (id: bigint, index: bigint, senderAddress: string) => Promise<Uint8Array | null>;
   getChunkBatch: (
     id: bigint,
@@ -524,6 +543,72 @@ export const createXtrataClient = (params: {
       });
       return parseGetFeeUnit(value);
     },
+    getBeginFeeUnit: async (senderAddress) => {
+      const value = await callReadOnly({
+        caller,
+        contract: params.contract,
+        network: stacksNetwork,
+        functionName: 'get-begin-fee-unit',
+        functionArgs: [],
+        senderAddress
+      });
+      return parseGetBeginFeeUnit(value);
+    },
+    getUploadChunkFeeUnit: async (senderAddress) => {
+      const value = await callReadOnly({
+        caller,
+        contract: params.contract,
+        network: stacksNetwork,
+        functionName: 'get-upload-chunk-fee-unit',
+        functionArgs: [],
+        senderAddress
+      });
+      return parseGetUploadChunkFeeUnit(value);
+    },
+    getUploadBatchFeeUnit: async (senderAddress) => {
+      const value = await callReadOnly({
+        caller,
+        contract: params.contract,
+        network: stacksNetwork,
+        functionName: 'get-upload-batch-fee-unit',
+        functionArgs: [],
+        senderAddress
+      });
+      return parseGetUploadBatchFeeUnit(value);
+    },
+    getSealFeeUnit: async (senderAddress) => {
+      const value = await callReadOnly({
+        caller,
+        contract: params.contract,
+        network: stacksNetwork,
+        functionName: 'get-seal-fee-unit',
+        functionArgs: [],
+        senderAddress
+      });
+      return parseGetSealFeeUnit(value);
+    },
+    getSingleTxFeeUnit: async (senderAddress) => {
+      const value = await callReadOnly({
+        caller,
+        contract: params.contract,
+        network: stacksNetwork,
+        functionName: 'get-single-tx-fee-unit',
+        functionArgs: [],
+        senderAddress
+      });
+      return parseGetSingleTxFeeUnit(value);
+    },
+    getContractInfo: async (senderAddress) => {
+      const value = await callReadOnly({
+        caller,
+        contract: params.contract,
+        network: stacksNetwork,
+        functionName: 'get-contract-info',
+        functionArgs: [],
+        senderAddress
+      });
+      return parseGetContractInfo(value);
+    },
     quoteSingleTxFee: async (totalSize, totalChunks, senderAddress) => {
       const value = await callReadOnly({
         caller,
@@ -556,6 +641,17 @@ export const createXtrataClient = (params: {
         senderAddress
       });
       return parseIsPaused(value);
+    },
+    isAllowedCaller: async (callerPrincipal, senderAddress) => {
+      const value = await callReadOnly({
+        caller,
+        contract: params.contract,
+        network: stacksNetwork,
+        functionName: 'is-allowed-caller',
+        functionArgs: [principalCV(callerPrincipal)],
+        senderAddress
+      });
+      return parseIsAllowedCaller(value);
     },
     getTokenUri: async (id, senderAddress) => {
       const value = await callReadOnly({
@@ -636,6 +732,17 @@ export const createXtrataClient = (params: {
         senderAddress
       });
       return parseGetParents(value);
+    },
+    getMigrationSource: async (id, senderAddress) => {
+      const value = await callReadOnly({
+        caller,
+        contract: params.contract,
+        network: stacksNetwork,
+        functionName: 'get-migration-source',
+        functionArgs: [uintCV(id)],
+        senderAddress
+      });
+      return parseGetMigrationSource(value);
     },
     getChunk: async (id, index, senderAddress) => {
       const value = await callReadOnly({

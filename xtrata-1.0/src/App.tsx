@@ -61,6 +61,7 @@ import PreinscribedCollectionSaleScreen from './screens/PreinscribedCollectionSa
 import MarketScreen from './screens/MarketScreen';
 import CommerceScreen from './screens/CommerceScreen';
 import VaultScreen from './screens/VaultScreen';
+import V323OwnerConsoleScreen from './screens/V323OwnerConsoleScreen';
 import collectionMintTemplateSource from '../contracts/clarinet/contracts/xtrata-collection-mint-v1.4.clar?raw';
 import {
   buildCollectionMintContractSource,
@@ -91,6 +92,11 @@ const ACTIVE_CONTRACTS =
 const contractSelectionStore = createContractSelectionStore(ACTIVE_CONTRACTS);
 const ACTIVE_CONTRACT_IDS = new Set(
   ACTIVE_CONTRACTS.map((entry) => getContractId(entry))
+);
+const V323_CONTRACT = ACTIVE_CONTRACTS.find(
+  (entry) =>
+    entry.protocolVersion === '3.2.3' &&
+    entry.contractName === 'xtrata-v3-2-3'
 );
 const walletSessionStore = createWalletSessionStore();
 
@@ -135,6 +141,7 @@ const SECTION_KEYS = [
   'active-contract',
   'deploy-contract',
   'contract-admin',
+  'v323-owner-console',
   'collection-mint-admin',
   'preinscribed-sale-admin',
   'preinscribed-sale',
@@ -681,6 +688,7 @@ export default function App() {
   const [collapsedSections, setCollapsedSections] = useState(() => {
     const initial = buildCollapsedState(true);
     initial['collection-viewer'] = false;
+    initial['v323-owner-console'] = false;
     return initial;
   });
   const tabGuard = useActiveTabGuard();
@@ -790,6 +798,16 @@ export default function App() {
       ACTIVE_CONTRACTS[0];
     setSelectedContract(next);
     contractSelectionStore.save(next);
+  };
+
+  const handleSelectV323Contract = () => {
+    if (!V323_CONTRACT) {
+      throw new Error(
+        'The deployed xtrata-v3-2-3 contract is missing from the contract registry.'
+      );
+    }
+    setSelectedContract(V323_CONTRACT);
+    contractSelectionStore.save(V323_CONTRACT);
   };
 
   const handleAddParentDraft = (id: bigint) => {
@@ -1411,6 +1429,13 @@ export default function App() {
                   </a>
                   <a
                     className="button button--ghost app__nav-link"
+                    href="#v323-owner-console"
+                    onClick={(event) => handleNavJump(event, 'v323-owner-console')}
+                  >
+                    v3.2.3 owner
+                  </a>
+                  <a
+                    className="button button--ghost app__nav-link"
                     href="#collection-mint-admin"
                     onClick={(event) => handleNavJump(event, 'collection-mint-admin')}
                   >
@@ -1819,6 +1844,14 @@ export default function App() {
           walletSession={walletSession}
           collapsed={collapsedSections['contract-admin']}
           onToggleCollapse={() => toggleSection('contract-admin')}
+        />
+
+        <V323OwnerConsoleScreen
+          contract={selectedContract}
+          walletSession={walletSession}
+          collapsed={collapsedSections['v323-owner-console']}
+          onToggleCollapse={() => toggleSection('v323-owner-console')}
+          onSelectContract={handleSelectV323Contract}
         />
 
         <CollectionMintAdminScreen
