@@ -3256,7 +3256,7 @@
 
               </div>
 
-              <div class="explorer-tools" id="xtrataExplorerTools" aria-label="Xtrata explorer controls">
+              <div class="explorer-tools" id="xtrataExplorerTools" aria-label="Xtrata Xplorer controls">
                 <p class="explorer-mode-note" id="xtrataExplorerStatus">Browse inscriptions from the selected contract.</p>
                 <div class="explorer-tools__row">
                   <label class="field">
@@ -3355,7 +3355,7 @@
               <div class="selected-relationships" id="selectedRelationships" hidden></div>
               <div class="preview-actions">
                 <a class="small-link" id="explorerLink" href="#" target="_blank" rel="noreferrer" hidden>Blockchain Explorer</a>
-                <a class="small-link" id="xtrataExplorerLink" href="#" target="_blank" rel="noreferrer" hidden>Xtrata Explorer</a>
+                <a class="small-link" id="xtrataExplorerLink" href="#" target="_blank" rel="noreferrer" hidden>Xtrata Xplorer</a>
                 <button class="small-link" id="backToGridButton" type="button" hidden>Back to grid</button>
               </div>
               <div class="transfer-tools">
@@ -3984,6 +3984,7 @@
       tokenPreviewHtmlDoc: null,
       tokenPreviewRequestId: 0,
       selectedOwnerNameRequestId: 0,
+      selectedEscrowHolderRequestId: 0,
       selectedParentsRequestId: 0,
       selectedChildrenRequestId: 0,
       childScanRunning: false,
@@ -3995,6 +3996,7 @@
       thumbnailCache: new Map(),
       gridLiveMediaCache: new Map(),
       summaryCacheScopes: new Map(),
+      escrowHolderCache: new Map(),
       thumbnailHydrationQueue: [],
       thumbnailHydrationQueued: new Set(),
       thumbnailHydrationInFlight: new Set(),
@@ -4955,26 +4957,155 @@
       dom.resumeNotice.hidden = false;
     };
 
+    const PEPE_ESCROW_RESOLVERS = new Map([
+      [
+        'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-fakfun-xtrata',
+        {
+          sourceContractId: 'SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe',
+          sourceAssetName: 'bitcoin-pepe',
+          label: 'Pepe holder'
+        }
+      ]
+    ]);
+
+    const clarityUintHex = (value) => {
+      const hex = BigInt(value).toString(16).padStart(32, '0');
+      return `0x01${hex}`;
+    };
+
+    const buildHiroApiUrl = (path, network = 'mainnet') => {
+      const [baseUrl] = getApiBaseUrls(network);
+      if (!baseUrl) {
+        return null;
+      }
+      return `${baseUrl.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+    };
+
+    const fetchHiroJson = async (path, network = 'mainnet') => {
+      const url = buildHiroApiUrl(path, network);
+      if (!url) {
+        throw new Error('No Hiro API endpoint configured.');
+      }
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Hiro request failed (${response.status}).`);
+      }
+      return await response.json();
+    };
+
+    const parseUintRepr = (value) => {
+      const match = String(value ?? '').trim().match(/^u(\d+)$/);
+      return match ? BigInt(match[1]) : null;
+    };
+
+    const findPepeEscrowResolver = (owner) => {
+      const normalizedOwner = owner?.trim() ?? '';
+      if (!normalizedOwner) {
+        return null;
+      }
+      return PEPE_ESCROW_RESOLVERS.get(normalizedOwner) ?? null;
+    };
+
+    const resolvePepeEscrowHolder = async (token) => {
+      const resolver = findPepeEscrowResolver(token.owner);
+      if (!resolver) {
+        return null;
+      }
+      const cacheKey = `${getTokenCacheContractId(token)}:${token.id.toString()}`;
+      const cached = state.escrowHolderCache.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+      const coreAssetId = `${getTokenCacheContractId(token)}::xtrata-inscription`;
+      const coreHistory = await fetchHiroJson(
+        `/extended/v1/tokens/nft/history?asset_identifier=${encodeURIComponent(coreAssetId)}` +
+          `&value=${encodeURIComponent(clarityUintHex(token.id))}&limit=20`,
+        state.contract.network
+      );
+      const escrowTransfer = (coreHistory.results ?? []).find(
+        (event) =>
+          event?.asset_event_type === 'transfer' &&
+          event?.recipient === token.owner &&
+          typeof event?.tx_id === 'string'
+      );
+      if (!escrowTransfer) {
+        return null;
+      }
+      const tx = await fetchHiroJson(
+        `/extended/v1/tx/${encodeURIComponent(escrowTransfer.tx_id)}`,
+        state.contract.network
+      );
+      const sourceTokenArg = tx?.contract_call?.function_args?.find(
+        (arg) => arg?.name === 'token-id'
+      );
+      const sourceTokenId = parseUintRepr(sourceTokenArg?.repr);
+      if (sourceTokenId === null) {
+        return null;
+      }
+      const sourceAssetId = `${resolver.sourceContractId}::${resolver.sourceAssetName}`;
+      const sourceHistory = await fetchHiroJson(
+        `/extended/v1/tokens/nft/history?asset_identifier=${encodeURIComponent(sourceAssetId)}` +
+          `&value=${encodeURIComponent(clarityUintHex(sourceTokenId))}&limit=1`,
+        state.contract.network
+      );
+      const latest = sourceHistory.results?.[0] ?? null;
+      const holder =
+        latest?.recipient ??
+        tx?.sender_address ??
+        escrowTransfer.sender ??
+        null;
+      if (!holder) {
+        return null;
+      }
+      const result = {
+        label: resolver.label,
+        holder,
+        sourceTokenId,
+        sourceContractId: resolver.sourceContractId,
+        txId: escrowTransfer.tx_id
+      };
+      state.escrowHolderCache.set(cacheKey, result);
+      return result;
+    };
+
     const renderNoSelectedInscriptionMeta = () => {
       state.selectedOwnerNameRequestId += 1;
+      state.selectedEscrowHolderRequestId += 1;
       clearSelectedInscriptionRelationships();
       renderMeta(dom.tokenPreviewMeta, [['Status', 'None selected']]);
     };
 
-    const renderSelectedInscriptionMeta = (token, ownerName = null, mimeTypeOverride = null) => {
+    const renderSelectedInscriptionMeta = (
+      token,
+      ownerName = null,
+      mimeTypeOverride = null,
+      escrowHolder = null
+    ) => {
       const effectiveMimeType =
         mimeTypeOverride ?? state.tokenPreviewMimeType ?? token.meta?.mimeType ?? null;
-      renderMeta(dom.tokenPreviewMeta, [
+      const lines = [
         ['Type', getGridMimeLabel(effectiveMimeType)],
         ['Size', token.meta?.totalSize ? formatBytes(token.meta.totalSize) : 'unknown'],
         [
           'Owner',
           ownerName ?? (token.owner ? truncateMiddle(token.owner, 8, 8) : 'unknown')
         ],
+        ...(escrowHolder
+          ? [[
+              escrowHolder.label,
+              truncateMiddle(escrowHolder.holder, 8, 8)
+            ]]
+          : findPepeEscrowResolver(token.owner)
+            ? [['Pepe holder', 'Resolving...']]
+            : []),
         ['ID', formatTokenId(token.id)]
-      ]);
+      ];
+      renderMeta(dom.tokenPreviewMeta, lines);
       if (!ownerName) {
         void resolveSelectedInscriptionOwnerName(token);
+      }
+      if (!escrowHolder && findPepeEscrowResolver(token.owner)) {
+        void resolveSelectedEscrowHolder(token);
       }
       void renderSelectedInscriptionRelationships(token);
     };
@@ -5425,6 +5556,34 @@
           'selected owner name lookup failed',
           {
             owner: truncateMiddle(owner, 8, 8),
+            error: error instanceof Error ? error.message : String(error)
+          },
+          'warn'
+        );
+      }
+    };
+
+    const resolveSelectedEscrowHolder = async (token) => {
+      const requestId = ++state.selectedEscrowHolderRequestId;
+      try {
+        const escrowHolder = await resolvePepeEscrowHolder(token);
+        const currentToken = getSelectedToken();
+        if (
+          !escrowHolder ||
+          requestId !== state.selectedEscrowHolderRequestId ||
+          state.selectedTokenId !== token.id ||
+          !addressesEqual(currentToken?.owner, token.owner)
+        ) {
+          return;
+        }
+        renderSelectedInscriptionMeta(token, null, null, escrowHolder);
+      } catch (error) {
+        debugLog(
+          'readonly',
+          'selected escrow holder lookup failed',
+          {
+            tokenId: token.id.toString(),
+            owner: token.owner ? truncateMiddle(token.owner, 8, 8) : null,
             error: error instanceof Error ? error.message : String(error)
           },
           'warn'
@@ -6071,7 +6230,7 @@
       document.body.classList.toggle('explorer-mode', state.explorerMode);
       document.body.classList.toggle('intro-mode', !hasLedger && !state.explorerMode);
       if (dom.walletTitle) {
-        dom.walletTitle.textContent = state.explorerMode ? 'Xtrata Explorer' : 'Wallet Inscriptions';
+        dom.walletTitle.textContent = state.explorerMode ? 'Xtrata Xplorer' : 'Wallet Inscriptions';
       }
       if (dom.introNetworkValue) {
         dom.introNetworkValue.textContent = `Stacks ${state.contract.network}`;
@@ -6316,7 +6475,7 @@
       if (state.explorerMode) {
         setStatus(
           dom.walletStatus,
-          `<strong>Explorer</strong> ${getContractId(state.contract)}`,
+          `<strong>Xplorer</strong> ${getContractId(state.contract)}`,
           'ready',
           'blue'
         );
