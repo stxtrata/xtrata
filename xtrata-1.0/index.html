@@ -4438,10 +4438,20 @@
       );
     };
 
+    const getPrettyExplorerTokenId = () => {
+      const pathParts = window.location.pathname.split('/').filter(Boolean);
+      if (pathParts[0]?.toLowerCase() !== 'x' || pathParts.length !== 2) {
+        return null;
+      }
+      return parsePositiveBigInt(pathParts[1]);
+    };
+
     const getExplorerRequest = () => {
       const params = new URLSearchParams(window.location.search);
+      const prettyTokenId = getPrettyExplorerTokenId();
       const view = params.get('view')?.trim().toLowerCase() ?? '';
       const enabled =
+        prettyTokenId !== null ||
         view === 'explorer' ||
         params.has('explorer') ||
         params.has('token') ||
@@ -4451,6 +4461,7 @@
       }
       const contract = findContractById(params.get('contract')) ?? DEFAULT_CONTRACT;
       const tokenId =
+        prettyTokenId ??
         parsePositiveBigInt(params.get('token')) ??
         parsePositiveBigInt(params.get('inscription')) ??
         parsePositiveBigInt(params.get('explorer'));
@@ -4461,6 +4472,10 @@
       const url = new URL(window.location.href);
       url.hash = '';
       url.search = '';
+      if (id !== null && getContractId(contract) === getContractId(DEFAULT_CONTRACT)) {
+        url.pathname = `/x/${encodeURIComponent(id.toString())}`;
+        return url.toString();
+      }
       url.searchParams.set('view', 'explorer');
       url.searchParams.set('contract', getContractId(contract));
       if (id !== null) {

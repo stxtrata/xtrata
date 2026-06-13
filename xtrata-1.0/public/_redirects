@@ -12,6 +12,7 @@
 /x-board/ /recursive-apps/x-board/xboard-version-testing/ 302
 /x-board/:version /recursive-apps/x-board/xboard-version-testing/:version.html 200
 /x-board/:version.html /recursive-apps/x-board/xboard-version-testing/:version.html 200
+/x/* / 200
 /workspace/* /workspace 200
 /admin /workspace 200
 /admin/* /workspace 200
