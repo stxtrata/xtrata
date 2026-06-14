@@ -3,7 +3,6 @@
 // Assuming DOM elements are defined globally or imported (e.g., from dom-elements.js)
 // const base64Container = document.getElementById('base64Container');
 // const base64Output = document.getElementById('base64Output'); // Assumed textarea or pre
-// const base64Result = document.getElementById('base64Result'); // Assumed div for player
 // const copyBase64Btn = document.getElementById('copyBase64Btn');
 // const downloadBase64Btn = document.getElementById('downloadBase64Btn');
 
@@ -56,7 +55,7 @@ const convertBlobToBase64 = blob => new Promise((resolve, reject) => {
 const setupBase64DisplayAndActions = async (audioBlob, outputFormat, originalNameBase) => {
   // Ensure necessary DOM elements are available
   // (Replace with proper checks if using imports/modules)
-  const elementsExist = base64Container && base64Output && base64Result && copyBase64Btn && downloadBase64Btn;
+  const elementsExist = base64Container && base64Output && copyBase64Btn && downloadBase64Btn;
   if (!elementsExist) {
       console.error("Base64 UI elements not found. Cannot proceed.");
       updateStatus("Error: Base64 UI components missing.", true);
@@ -89,16 +88,6 @@ const setupBase64DisplayAndActions = async (audioBlob, outputFormat, originalNam
     } else {
        base64Output.textContent = generatedBase64String; // Display the string
     }
-
-
-    // Clear previous player and create a new one for the Base64 audio (optional but good for verification)
-    base64Result.innerHTML = ''; // Clear previous results
-    const mimeType = outputConfig.mimeType;
-    
-    // Create player using the original blob, as converting Base64 back to blob just for player is inefficient
-    const base64PlayerContainer = createAudioPlayer(audioBlob, mimeType, 'Converted Audio (Preview)');
-    base64Result.appendChild(base64PlayerContainer);
-    // If using observer in createAudioPlayer: base64PlayerContainer.startObserving(base64Result);
 
     // Setup Copy Button
     copyBase64Btn.onclick = () => {
@@ -157,7 +146,6 @@ const setupBase64DisplayAndActions = async (audioBlob, outputFormat, originalNam
     updateStatus(`Base64 processing failed: ${e.message || 'Unknown error'}`, true);
     console.error("Base64 Processing Error:", e);
     base64Container.style.display = 'none'; // Hide section on error
-    base64Result.innerHTML = ''; // Clear any partial results
     copyBase64Btn.disabled = true;
     downloadBase64Btn.disabled = true;
     // Ensure HTML generator knows data is invalid/missing if needed (though it relies on events)

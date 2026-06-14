@@ -105,12 +105,12 @@ const runConversion = async () => {
             updateActualSizeInfoDisplay(selectedFile, convertedAudioBlob);
         }
 
-        // --- Display Results (Standard Audio Player + Download Link) ---
+        // --- Display compact result actions; playback lives in the A/B player below. ---
         if (resultEl) {
             resultEl.innerHTML = '';
             const resultTitle = document.createElement('h3');
-            resultTitle.textContent = 'Conversion Result';
-            resultTitle.style.margin = '15px 0 10px 0';
+            resultTitle.textContent = 'Converted file';
+            resultTitle.style.margin = '0 0 10px 0';
             const sizeSummary = createConversionSizeSummary(selectedFile, convertedAudioBlob, outputConfig);
             const downloadUrl = URL.createObjectURL(convertedAudioBlob);
             const dlLink = Object.assign(document.createElement('a'), {
@@ -120,13 +120,7 @@ const runConversion = async () => {
                 style: 'display: block; margin-bottom: 10px;'
             });
 
-            const audioPlayerContainer = createAudioPlayer(
-                convertedAudioBlob,
-                mimeType,
-                `Converted Audio (${outputConfig.label})`
-            );
-
-            resultEl.append(resultTitle, sizeSummary, dlLink, audioPlayerContainer);
+            resultEl.append(resultTitle, sizeSummary, dlLink);
 
             dlLink.addEventListener('click', () => {
                 // Optional: setTimeout(() => URL.revokeObjectURL(downloadUrl), 1500);
@@ -266,10 +260,6 @@ const runBatchConversion = async () => {
             successInfo.style.color = 'green';
             fileResultContainer.appendChild(successInfo);
 
-            // Simple Player for this file
-            const audioPlayer = createAudioPlayer(convertedBlob, mimeType, `Play ${originalNameBase}`);
-            fileResultContainer.appendChild(audioPlayer);
-
             // Download Link for Converted File
             const dlUrl = URL.createObjectURL(convertedBlob);
             const dlLink = Object.assign(document.createElement('a'), {
@@ -327,7 +317,7 @@ const runBatchConversion = async () => {
     if (playSampleBtn) playSampleBtn.disabled = !(selectedFiles && selectedFiles.length > 0);
 };
 /**
- * Shows the A/B Quality Comparison player robustly. Handles async or sync A/B modules.
+ * Shows the A/B comparison player robustly. Handles async or sync A/B modules.
  * If conversion failed, disables B or shows error message in UI.
  */
 function showABComparisonPlayer(originalBlob, originalMimeType, convertedBlob, convertedMimeType, conversionSucceeded, conversionError) {
@@ -335,12 +325,6 @@ function showABComparisonPlayer(originalBlob, originalMimeType, convertedBlob, c
     // Remove previous A/B player if present
     const prevAB = resultEl.querySelector('.ab-player-container');
     if (prevAB && typeof prevAB.revokeUrls === 'function') prevAB.revokeUrls();
-
-    const abPlayerTitle = document.createElement('h3');
-    abPlayerTitle.textContent = 'A/B Quality Comparison';
-    abPlayerTitle.style.margin = '25px 0 10px 0';
-    abPlayerTitle.style.borderTop = '1px dashed var(--border-color)';
-    abPlayerTitle.style.paddingTop = '15px';
 
     // Remove old AB player(s) before appending
     // (Some browsers won't garbage collect otherwise.)
@@ -363,34 +347,34 @@ function showABComparisonPlayer(originalBlob, originalMimeType, convertedBlob, c
         // If it's a Promise (async Web Audio version), handle as Promise
         if (abPlayerElement && typeof abPlayerElement.then === 'function') {
             abPlayerElement.then(element => {
-                insertABSection(resultEl, abPlayerTitle, element, conversionSucceeded, conversionError);
+                insertABSection(resultEl, element, conversionSucceeded, conversionError);
             }).catch(e => {
                 // fallback UI
                 const fallback = document.createElement('div');
                 fallback.textContent = "Failed to load A/B player.";
-                resultEl.append(abPlayerTitle, fallback);
+                resultEl.append(fallback);
             });
         } else {
-            insertABSection(resultEl, abPlayerTitle, abPlayerElement, conversionSucceeded, conversionError);
+            insertABSection(resultEl, abPlayerElement, conversionSucceeded, conversionError);
         }
     } catch (err) {
         const fallback = document.createElement('div');
         fallback.textContent = "Could not display A/B player.";
-        resultEl.append(abPlayerTitle, fallback);
+        resultEl.append(fallback);
     }
 }
 
 /**
  * Actually insert the AB player and display error if B is missing.
  */
-function insertABSection(container, titleNode, abPlayerElement, conversionSucceeded, conversionError) {
+function insertABSection(container, abPlayerElement, conversionSucceeded, conversionError) {
     if (!abPlayerElement) {
         const fallback = document.createElement('div');
         fallback.textContent = "Failed to create A/B comparison UI.";
-        container.append(titleNode, fallback);
+        container.append(fallback);
         return;
     }
-    container.append(titleNode, abPlayerElement);
+    container.append(abPlayerElement);
     // If B (converted) is missing, visually indicate
     if (!conversionSucceeded) {
         // If your ab-player.js supports disabling B, do it here

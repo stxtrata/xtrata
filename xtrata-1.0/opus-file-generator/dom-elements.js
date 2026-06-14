@@ -40,12 +40,10 @@ const sizeSavingsInfoEl = document.getElementById('sizeSavingsInfo');
 // const estSizeWebmSpan = document.getElementById('estSizeWebm');
 
 const base64Container = document.getElementById('base64Container');
-const base64Result = document.getElementById('base64Result');
 const base64Output = document.getElementById('base64Output');
 const copyBase64Btn = document.getElementById('copyBase64Btn');
 const downloadBase64Btn = document.getElementById('downloadBase64Btn');
 const playSampleBtn = document.getElementById('playSampleBtn');
-const originalAudioContainer = document.getElementById('originalAudioContainer');
 
 const showAudioInfoBtn = document.getElementById('showAudioInfoBtn');
 const audioInfoContainer = document.getElementById('audioInfoContainer');
