@@ -12,6 +12,10 @@ const staticApps = [
   {
     source: 'recursive-apps/x-board',
     target: 'dist/recursive-apps/x-board'
+  },
+  {
+    source: 'forever-twins',
+    target: 'dist/forever-twins'
   }
 ];
 

@@ -1,0 +1,7 @@
+Drop the hero artwork here as:
+
+    bitcoin-pepe-maxi.png
+
+The landing page (index.html) loads ./assets/bitcoin-pepe-maxi.png automatically.
+If this file is absent, the page falls back to a built-in pixel-art Bitcoin Pepe MAXI
+so it never renders broken. A square image (e.g. 760x760) looks best in the hero frame.
