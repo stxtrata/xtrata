@@ -3658,6 +3658,7 @@
       decodeTokenUriToImage,
       fetchTokenImageFromUri,
       fetchOnChainContent,
+      getFiniteAnimatedImageReplayDelayMs,
       getMediaKind,
       getMimeTypeEssence,
       getTextPreview,
@@ -4730,6 +4731,7 @@
         isSvgSource = false,
         alt = 'Image preview',
         preserveAnimation = false,
+        replayDelayMs = null,
         onError = null
       } = {}
     ) => {
@@ -4748,6 +4750,22 @@
         }
         img.src = sourceUrl;
         target.replaceChildren(img);
+        if (Number.isFinite(replayDelayMs) && replayDelayMs > 0) {
+          const replay = () => {
+            if (!img.isConnected || img.parentElement !== target) {
+              return;
+            }
+            img.src = '';
+            requestAnimationFrame(() => {
+              if (!img.isConnected || img.parentElement !== target) {
+                return;
+              }
+              img.src = sourceUrl;
+              window.setTimeout(replay, replayDelayMs);
+            });
+          };
+          window.setTimeout(replay, replayDelayMs);
+        }
       };
 
       // SVG/XML image animation runs inside the image document. Drawing it to a
@@ -6014,7 +6032,11 @@
             isSvgSource: kind === 'svg',
             alt: 'Inscription preview',
             preserveAnimation:
-              kind === 'image' && isAnimatedImagePayload(bytes, previewMimeType)
+              kind === 'image' && isAnimatedImagePayload(bytes, previewMimeType),
+            replayDelayMs:
+              kind === 'image'
+                ? getFiniteAnimatedImageReplayDelayMs(bytes, previewMimeType)
+                : null
           });
           return;
         }
@@ -6033,6 +6055,9 @@
       if (kind === 'video') {
         const video = document.createElement('video');
         video.controls = true;
+        video.loop = true;
+        video.playsInline = true;
+        video.preload = 'auto';
         video.setAttribute('controlsList', 'nodownload');
         video.src = getObjectUrl();
         target.append(video);
@@ -7822,7 +7847,8 @@
           isSvgSource: kind === 'svg',
           alt: 'Inscription preview',
           preserveAnimation:
-            kind === 'image' && isPotentialAnimatedRasterMimeType(mimeType)
+            kind === 'image' && isPotentialAnimatedRasterMimeType(mimeType),
+          replayDelayMs: null
         });
         return;
       }
@@ -7850,7 +7876,11 @@
           isSvgSource: kind === 'svg',
           alt: 'Inscription preview',
           preserveAnimation:
-            kind === 'image' && isAnimatedImagePayload(bytes, fullscreenMimeType)
+            kind === 'image' && isAnimatedImagePayload(bytes, fullscreenMimeType),
+          replayDelayMs:
+            kind === 'image'
+              ? getFiniteAnimatedImageReplayDelayMs(bytes, fullscreenMimeType)
+              : null
         });
         return;
       }
@@ -7860,8 +7890,9 @@
       if (kind === 'video') {
         const video = document.createElement('video');
         video.controls = true;
+        video.loop = true;
         video.playsInline = true;
-        video.preload = 'metadata';
+        video.preload = 'auto';
         video.src = url;
         dom.fullscreenStage.append(video);
         return;
@@ -8441,6 +8472,34 @@
         });
         img.src = url;
         thumbElement.append(img);
+        const replayDelayMs =
+          media.kind === 'image'
+            ? getFiniteAnimatedImageReplayDelayMs(media.bytes, media.mimeType ?? null)
+            : null;
+        if (Number.isFinite(replayDelayMs) && replayDelayMs > 0) {
+          const replay = () => {
+            if (
+              !img.isConnected ||
+              thumbElement.dataset.thumbnailKey !== cacheKey ||
+              state.tokenThumbUrls.get(cacheKey) !== url
+            ) {
+              return;
+            }
+            img.src = '';
+            requestAnimationFrame(() => {
+              if (
+                !img.isConnected ||
+                thumbElement.dataset.thumbnailKey !== cacheKey ||
+                state.tokenThumbUrls.get(cacheKey) !== url
+              ) {
+                return;
+              }
+              img.src = url;
+              window.setTimeout(replay, replayDelayMs);
+            });
+          };
+          window.setTimeout(replay, replayDelayMs);
+        }
         return true;
       }
 
@@ -9041,6 +9100,30 @@
       const cacheKey = getThumbnailKey(token);
       const liveMedia = state.gridLiveMediaCache.get(cacheKey);
       if (
+        liveMedia?.bytes &&
+        (liveMedia.kind === 'video' ||
+          (liveMedia.kind === 'image' &&
+            isAnimatedImagePayload(liveMedia.bytes, liveMedia.mimeType ?? null)))
+      ) {
+        const mimeType =
+          liveMedia.mimeType ??
+          token.meta.mimeType ??
+          'application/octet-stream';
+        if (
+          renderSelectedTokenPreviewPayload(
+            token,
+            requestId,
+            liveMedia.bytes,
+            mimeType,
+            null,
+            startedAt,
+            'grid-live-media-cache'
+          )
+        ) {
+          return;
+        }
+      }
+      if (
         liveMedia?.kind === 'html' &&
         liveMedia.bytes &&
         isGridHtmlDocument(liveMedia.mimeType)
@@ -9191,6 +9274,18 @@
             });
           }
           updateControls();
+          return;
+        }
+        const cachedLiveMedia = state.gridLiveMediaCache.get(getThumbnailKey(token));
+        if (
+          cachedLiveMedia?.kind === 'image' &&
+          cachedLiveMedia.bytes &&
+          isAnimatedImagePayload(
+            cachedLiveMedia.bytes,
+            cachedLiveMedia.mimeType ?? token.meta.mimeType ?? null
+          )
+        ) {
+          await loadSelectedTokenPreviewLocally(token, requestId);
           return;
         }
         const runtimeImageUrl = getTokenRuntimeImageUrl(token);
