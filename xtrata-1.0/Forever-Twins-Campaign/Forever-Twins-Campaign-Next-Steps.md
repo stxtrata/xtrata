@@ -45,7 +45,7 @@ Create or update the campaign board with these columns:
 5. **Proof / screenshots / clips**
 6. **Founder outreach**
 7. **Finalization**
-8. **Blocked / waiting on Rapha**
+8. **Blocked / waiting on Rapha or Jim**
 
 For every task, track:
 
