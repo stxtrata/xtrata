@@ -4792,6 +4792,20 @@
       img.src = sourceUrl;
     };
 
+    const playPreviewVideoWhenReady = (video) => {
+      const play = () => {
+        const playAttempt = video.play();
+        if (playAttempt && typeof playAttempt.catch === 'function') {
+          void playAttempt.catch(() => {});
+        }
+      };
+      if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        play();
+        return;
+      }
+      video.addEventListener('loadeddata', play, { once: true });
+    };
+
     const getBuildHiroKeyFlag = () => {
       try {
         return typeof __XSTRATA_HAS_HIRO_KEY__ !== 'undefined'
@@ -6055,12 +6069,14 @@
       if (kind === 'video') {
         const video = document.createElement('video');
         video.controls = true;
+        video.autoplay = true;
         video.loop = true;
         video.playsInline = true;
         video.preload = 'auto';
         video.setAttribute('controlsList', 'nodownload');
         video.src = getObjectUrl();
         target.append(video);
+        playPreviewVideoWhenReady(video);
         return;
       }
 
@@ -7890,11 +7906,13 @@
       if (kind === 'video') {
         const video = document.createElement('video');
         video.controls = true;
+        video.autoplay = true;
         video.loop = true;
         video.playsInline = true;
         video.preload = 'auto';
         video.src = url;
         dom.fullscreenStage.append(video);
+        playPreviewVideoWhenReady(video);
         return;
       }
 
