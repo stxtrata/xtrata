@@ -59,12 +59,4 @@ const metadataModal = document.getElementById('metadataModal');
 const cancelMetadataBtn = document.getElementById('cancelMetadataBtn');
 const metadataForm = document.getElementById('metadataForm');
 
-const imageFileInput = document.getElementById('image-file-input');
-const imagePreview = document.getElementById('image-preview');
-const fileSizeInfo = document.getElementById('file-size-info');
-const convertImageButton = document.getElementById('convert-image-button');
-const imageBase64Output = document.getElementById('image-base64-output');
-const copyImageBase64Button = document.getElementById('copy-image-base64-button');
-const downloadImageBase64Button = document.getElementById('download-image-base64-button');
-
 const generateHtmlButton = document.getElementById('generateHtmlButton');

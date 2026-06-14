@@ -623,36 +623,6 @@
       font-weight: 800;
     }
 
-    .media-frame {
-      display: grid;
-      place-items: center;
-      width: 100%;
-      aspect-ratio: 1 / 1;
-      border: 1px dashed var(--line-strong);
-      border-radius: 8px;
-      background: #f8faf8;
-      overflow: hidden;
-    }
-
-    .image-tool-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(120px, 180px);
-      gap: 10px;
-      align-items: start;
-    }
-
-    #image-preview {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-    }
-
-    #file-size-info {
-      margin: 0;
-      color: var(--muted);
-      font-size: 0.88rem;
-    }
-
     .export-panel {
       background: #fffaf0;
     }
@@ -926,8 +896,7 @@
       .settings-grid,
       .format-options,
       .html-mode-options,
-      .info-summary-section,
-      .image-tool-grid {
+      .info-summary-section {
         grid-template-columns: 1fr;
       }
     }
@@ -942,7 +911,6 @@
     </div>
     <nav class="tool-nav" aria-label="Tool sections">
       <a href="#audio-section">Audio</a>
-      <a href="#image-section">Image</a>
       <a href="#export-section">Export</a>
       <a href="./">Classic UI</a>
     </nav>
@@ -1078,37 +1046,6 @@
         </div>
       </section>
 
-    <section id="image-section" class="tool-panel">
-      <div class="tool-panel__header">
-        <div>
-          <h2>Image base64</h2>
-          <p>Optional standalone image export.</p>
-        </div>
-      </div>
-      <div class="tool-panel__body">
-        <div class="image-tool-grid">
-          <div class="form-stack">
-            <label class="field" for="image-file-input">
-              <span>Image file</span>
-              <input type="file" id="image-file-input" accept="image/*">
-            </label>
-            <p id="file-size-info"></p>
-            <div class="button-container">
-              <button id="convert-image-button" type="button" disabled>Convert image</button>
-              <button id="copy-image-base64-button" class="copy-button" type="button" disabled>Copy image base64</button>
-              <button id="download-image-base64-button" class="download-button" type="button" disabled>Download image TXT</button>
-            </div>
-            <details>
-              <summary>Show image base64</summary>
-              <textarea id="image-base64-output" class="base64-output" readonly></textarea>
-            </details>
-          </div>
-          <div class="media-frame">
-            <img id="image-preview" alt="Image preview" style="display: none;">
-          </div>
-        </div>
-      </div>
-    </section>
     </aside>
 
       <section id="export-section" class="tool-panel export-panel">
