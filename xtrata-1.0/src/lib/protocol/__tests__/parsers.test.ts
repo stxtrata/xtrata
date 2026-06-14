@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   bufferCV,
+  contractPrincipalCV,
+  falseCV,
   listCV,
   noneCV,
   responseErrorCV,
@@ -15,11 +17,14 @@ import {
 import {
   parseGetChunk,
   parseGetChunkBatch,
+  parseGetBeginFeeUnit,
+  parseGetContractInfo,
   parseGetDependencies,
   parseGetAdmin,
   parseGetFeeUnit,
   parseGetInscriptionMeta,
   parseGetIdByHash,
+  parseGetMigrationSource,
   parseGetLastTokenId,
   parseGetMintedCount,
   parseGetMintedId,
@@ -28,7 +33,12 @@ import {
   parseGetParents,
   parseGetPendingChunk,
   parseGetRoyaltyRecipient,
+  parseGetSealFeeUnit,
+  parseGetSingleTxFeeUnit,
+  parseGetUploadBatchFeeUnit,
+  parseGetUploadChunkFeeUnit,
   parseIsPaused,
+  parseIsAllowedCaller,
   parseGetSvgDataUri,
   parseGetTokenUri,
   parseGetUploadState
@@ -44,6 +54,37 @@ describe('contract parsers', () => {
   it('parses fee unit', () => {
     const value = responseOkCV(uintCV(100000));
     expect(parseGetFeeUnit(value)).toBe(100000n);
+  });
+
+  it('parses v3.2.3 fee unit readers', () => {
+    expect(parseGetBeginFeeUnit(responseOkCV(uintCV(100000)))).toBe(100000n);
+    expect(parseGetUploadChunkFeeUnit(responseOkCV(uintCV(2000)))).toBe(2000n);
+    expect(parseGetUploadBatchFeeUnit(responseOkCV(uintCV(100000)))).toBe(100000n);
+    expect(parseGetSealFeeUnit(responseOkCV(uintCV(100000)))).toBe(100000n);
+    expect(parseGetSingleTxFeeUnit(responseOkCV(uintCV(100000)))).toBe(100000n);
+  });
+
+  it('parses v3.2.3 contract info', () => {
+    const info = parseGetContractInfo(
+      responseOkCV(
+        tupleCV({
+          version: stringAsciiCV('xtrata-v3.2.3'),
+          'chunk-size': uintCV(16384),
+          'upload-batch-limit': uintCV(32),
+          'upload-payload-limit': uintCV(524288),
+          'single-tx-chunk-limit': uintCV(32),
+          'single-tx-payload-limit': uintCV(524288),
+          'general-list-limit': uintCV(50),
+          'seal-batch-limit': uintCV(50),
+          'max-total-chunks': uintCV(256),
+          'max-total-size': uintCV(4194304)
+        })
+      )
+    );
+    expect(info.version).toBe('xtrata-v3.2.3');
+    expect(info.chunkSize).toBe(16384n);
+    expect(info.generalListLimit).toBe(50n);
+    expect(info.maxTotalSize).toBe(4194304n);
   });
 
   it('parses next token id', () => {
@@ -70,6 +111,10 @@ describe('contract parsers', () => {
   it('parses pause status', () => {
     const value = responseOkCV(trueCV());
     expect(parseIsPaused(value)).toBe(true);
+  });
+
+  it('parses allowed caller status', () => {
+    expect(parseIsAllowedCaller(responseOkCV(falseCV()))).toBe(false);
   });
 
   it('parses token uri option', () => {
@@ -144,6 +189,25 @@ describe('contract parsers', () => {
   it('parses parents list', () => {
     const list = listCV([uintCV(4), uintCV(8)]);
     expect(parseGetParents(list)).toEqual([4n, 8n]);
+  });
+
+  it('parses migration source option', () => {
+    const parsed = parseGetMigrationSource(
+      someCV(
+        tupleCV({
+          contract: contractPrincipalCV(
+            'SP2JXKMSH007NPYAQHKJPQMAQYAD90NQGTVJVQ02B',
+            'xtrata-v2-1-0'
+          ),
+          'token-id': uintCV(19)
+        })
+      )
+    );
+    expect(parsed).toEqual({
+      contract: 'SP2JXKMSH007NPYAQHKJPQMAQYAD90NQGTVJVQ02B.xtrata-v2-1-0',
+      tokenId: 19n
+    });
+    expect(parseGetMigrationSource(noneCV())).toBeNull();
   });
 
   it('parses large dependency ids', () => {

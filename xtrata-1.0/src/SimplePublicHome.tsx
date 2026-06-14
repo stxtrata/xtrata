@@ -751,7 +751,11 @@ export default function SimplePublicHome() {
     if (typeof window === 'undefined') {
       return null;
     }
-    const raw = new URLSearchParams(window.location.search).get('viewer-token');
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    const raw =
+      pathParts[0]?.toLowerCase() === 'x' && pathParts.length === 2
+        ? pathParts[1]
+        : new URLSearchParams(window.location.search).get('viewer-token');
     if (!raw) {
       return null;
     }

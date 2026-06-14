@@ -37,6 +37,7 @@ import {
   inlineRuntimeContentUrls,
   RUNTIME_INLINE_HTML_VERSION
 } from '../lib/viewer/runtime-inline';
+import { rewriteHiroApiBasesForEmbeddedHtml } from '../lib/viewer/hiro-api-rewrite';
 import {
   getSquareFramedImageStyle,
   shouldUsePixelatedImageRendering
@@ -1145,7 +1146,9 @@ export default function TokenContentPreview(props: TokenContentPreviewProps) {
     if (!contentQuery.data || !isHtmlDocument) {
       return null;
     }
-    return new TextDecoder().decode(contentQuery.data);
+    return rewriteHiroApiBasesForEmbeddedHtml(
+      new TextDecoder().decode(contentQuery.data)
+    ).html;
   }, [contentQuery.data, isHtmlDocument]);
   const htmlNeedsInlining = useMemo(
     () => (htmlPreview ? hasRuntimeContentUrls(htmlPreview) : false),

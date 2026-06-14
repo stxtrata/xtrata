@@ -24,6 +24,10 @@ import {
   type RuntimeEnv,
   type RuntimeReconstructionDiagnostics
 } from './lib';
+import {
+  rewriteHiroApiBasesInBytes,
+  shouldRewriteHiroBases
+} from './html-hiro-rewrite';
 
 const RUNTIME_CONTENT_BUILD = 'stream-v1';
 
@@ -150,6 +154,7 @@ const buildRuntimeContentHeaders = (params: {
   contentLength: number | null;
   contentRange?: string;
   responseMode: 'cache' | 'head' | 'range' | 'stream';
+  apiRewrite?: boolean;
   readBatchSize?: number;
   readConcurrency?: number;
   readRetries?: number;
@@ -176,6 +181,9 @@ const buildRuntimeContentHeaders = (params: {
     'X-Xtrata-Runtime-Total-Chunks': params.totalChunks.toString(),
     'X-Xtrata-Runtime-Response-Mode': params.responseMode
   };
+  if (params.apiRewrite) {
+    headers['X-Xtrata-Runtime-Api-Rewrite'] = 'hiro-proxy';
+  }
   if (params.totalSize <= BigInt(Number.MAX_SAFE_INTEGER)) {
     headers['Accept-Ranges'] = 'bytes';
   }
@@ -415,11 +423,33 @@ export const onRequest = async (context: {
         cached.customMetadata?.sourceContractId ?? getRuntimeContractId(resolvedMeta.contract);
       const rangeContentLength =
         requestedRange.status === 'valid' ? requestedRange.range.length : null;
+      const cachedMimeType =
+        resolvedMeta.meta.mimeType ||
+        cached.httpMetadata?.contentType ||
+        'application/octet-stream';
+      let cachedResponseBody: BodyInit | null =
+        request.method === 'HEAD' ? null : cached.body;
+      let cachedContentLength = rangeContentLength ?? cached.size;
+      let cachedApiRewrite = false;
+      if (
+        cachedResponseBody &&
+        shouldRewriteHiroBases({
+          requestUrl: url,
+          mimeType: cachedMimeType,
+          method: request.method,
+          isRangeResponse: requestedRange.status === 'valid'
+        })
+      ) {
+        const cachedBytes = new Uint8Array(
+          await new Response(cachedResponseBody as BodyInit).arrayBuffer()
+        );
+        const rewritten = rewriteHiroApiBasesInBytes(cachedBytes, url.origin);
+        cachedResponseBody = rewritten.bytes;
+        cachedContentLength = rewritten.bytes.length;
+        cachedApiRewrite = rewritten.changed;
+      }
       const headers = buildRuntimeContentHeaders({
-        mimeType:
-          resolvedMeta.meta.mimeType ||
-          cached.httpMetadata?.contentType ||
-          'application/octet-stream',
+        mimeType: cachedMimeType,
         cacheStatus: 'HIT',
         network,
         contractId: getRuntimeContractId(resolvedMeta.contract),
@@ -429,7 +459,7 @@ export const onRequest = async (context: {
         finalHash,
         totalSize: resolvedMeta.meta.totalSize,
         totalChunks: resolvedMeta.meta.totalChunks,
-        contentLength: rangeContentLength ?? cached.size,
+        contentLength: cachedContentLength,
         contentRange: requestedRange.status === 'valid' ? requestedRange.contentRange : undefined,
         responseMode:
           request.method === 'HEAD'
@@ -437,13 +467,14 @@ export const onRequest = async (context: {
             : requestedRange.status === 'valid'
               ? 'range'
               : 'cache',
+        apiRewrite: cachedApiRewrite,
         readBatchSize: readConfig.batchSize,
         readConcurrency: readConfig.concurrency,
         readRetries: readConfig.retries,
         upstreamRequests: upstreamTracker.attempts,
         preparedMs: performance.now() - startedAt
       });
-      return new Response(request.method === 'HEAD' ? null : cached.body, {
+      return new Response(cachedResponseBody, {
         status: requestedRange.status === 'valid' ? 206 : 200,
         headers
       });
@@ -650,9 +681,24 @@ export const onRequest = async (context: {
       sourceContractId: resolvedContractId,
       diagnostics: toRuntimeDiagnosticsSummary(resolved.diagnostics)
     });
+    const streamMimeType = resolved.meta.mimeType || 'application/octet-stream';
+    let streamBytes = resolved.bytes;
+    let streamApiRewrite = false;
+    if (
+      shouldRewriteHiroBases({
+        requestUrl: url,
+        mimeType: streamMimeType,
+        method: request.method,
+        isRangeResponse: false
+      })
+    ) {
+      const rewritten = rewriteHiroApiBasesInBytes(streamBytes, url.origin);
+      streamBytes = rewritten.bytes;
+      streamApiRewrite = rewritten.changed;
+    }
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(resolved.bytes);
+        controller.enqueue(streamBytes);
         controller.close();
       }
     });
@@ -660,7 +706,7 @@ export const onRequest = async (context: {
     return new Response(stream, {
       status: 200,
       headers: buildRuntimeContentHeaders({
-        mimeType: resolved.meta.mimeType || 'application/octet-stream',
+        mimeType: streamMimeType,
         cacheStatus: cacheEnabled ? 'MISS' : 'BYPASS',
         network,
         contractId: cacheContractId,
@@ -670,8 +716,9 @@ export const onRequest = async (context: {
         finalHash: resolvedFinalHash,
         totalSize: resolved.meta.totalSize,
         totalChunks: resolved.meta.totalChunks,
-        contentLength: resolved.bytes.length,
+        contentLength: streamBytes.length,
         responseMode: 'stream',
+        apiRewrite: streamApiRewrite,
         readBatchSize: readConfig.batchSize,
         readConcurrency: readConfig.concurrency,
         readRetries: readConfig.retries,

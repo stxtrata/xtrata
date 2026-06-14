@@ -41,6 +41,7 @@ import {
   registerRecursiveBridge
 } from '../lib/viewer/recursive';
 import { injectGridThumbnailHtml } from '../lib/viewer/html-preview';
+import { rewriteHiroApiBasesForEmbeddedHtml } from '../lib/viewer/hiro-api-rewrite';
 import {
   hasRuntimeContentUrls,
   inlineRuntimeContentUrls,
@@ -439,7 +440,9 @@ export default function TokenCardMedia(props: TokenCardMediaProps) {
     if (!contentQuery.data || !isHtmlDocument) {
       return null;
     }
-    return new TextDecoder().decode(contentQuery.data);
+    return rewriteHiroApiBasesForEmbeddedHtml(
+      new TextDecoder().decode(contentQuery.data)
+    ).html;
   }, [contentQuery.data, isHtmlDocument]);
   const htmlNeedsInlining = useMemo(
     () => (htmlPreview ? hasRuntimeContentUrls(htmlPreview) : false),

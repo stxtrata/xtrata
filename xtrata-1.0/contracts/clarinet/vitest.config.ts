@@ -21,6 +21,8 @@ import {
 
 export default defineConfig({
   test: {
+    // The v3.4.0 .mjs checks are standalone Node scripts run by test:v3.4.0.
+    include: ["tests/**/*.test.ts"],
     // use vitest-environment-clarinet
     environment: "clarinet",
     pool: "forks",
