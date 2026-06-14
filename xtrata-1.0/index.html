@@ -1185,11 +1185,26 @@
       border-color: var(--blue);
     }
 
-    .parent-thumb img {
+    .parent-thumb__media {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .parent-thumb img,
+    .parent-thumb video,
+    .parent-thumb iframe,
+    .parent-thumb__media img,
+    .parent-thumb__media video,
+    .parent-thumb__media iframe {
       width: 100%;
       height: 100%;
       object-fit: cover;
       display: block;
+      border: 0;
     }
 
     .parent-thumb__id {
@@ -4137,18 +4152,13 @@
                 : '';
         const tile = document.createElement('div');
         tile.className = `parent-thumb parent-thumb--pick${tone ? ` parent-thumb--${tone}` : ''}`;
-        const img = document.createElement('img');
-        img.loading = 'lazy';
-        img.decoding = 'async';
-        img.alt = `Parent ${formatTokenId(id)}`;
-        img.src = buildRuntimeInscriptionContentUrl({
-          coreContractId: pickContractId,
-          tokenId: id
-        });
-        img.addEventListener('error', () => {
-          img.remove();
-          tile.classList.add('parent-thumb--error');
-        });
+        tile.dataset.tokenId = id.toString();
+        tile.dataset.contractId = pickContractId;
+        const media = document.createElement('span');
+        media.className = 'parent-thumb__media';
+        media.dataset.tokenId = id.toString();
+        media.dataset.contractId = pickContractId;
+        setTokenThumbLabel(media, 'loading');
         const tag = document.createElement('span');
         tag.className = 'parent-thumb__id';
         tag.textContent = formatTokenId(id);
@@ -4160,9 +4170,15 @@
         remove.setAttribute('aria-label', `Remove parent ${formatTokenId(id)}`);
         remove.disabled = state.busy;
         remove.addEventListener('click', () => removeParentId(id));
-        tile.append(img, tag, remove);
+        tile.append(media, tag, remove);
         dom.parentChipList.append(tile);
       }
+      void hydrateRelationGroupSummaries(
+        pickContractId,
+        parentIds,
+        dom.parentChipList,
+        'Parent'
+      );
       dom.parentStatusList.replaceChildren();
       if (!supportsParents) {
         dom.parentStatusList.textContent =
@@ -4440,20 +4456,30 @@
       );
     };
 
-    const getPrettyExplorerTokenId = () => {
+    const getPrettyExplorerRequest = () => {
       const pathParts = window.location.pathname.split('/').filter(Boolean);
-      if (pathParts[0]?.toLowerCase() !== 'x' || pathParts.length !== 2) {
-        return null;
+      const route = pathParts[0]?.toLowerCase() ?? '';
+      if (route === 'xplorer' && pathParts.length === 1) {
+        return { enabled: true, tokenId: null };
       }
-      return parsePositiveBigInt(pathParts[1]);
+      if (route === 'x') {
+        if (pathParts.length === 1) {
+          return { enabled: true, tokenId: null };
+        }
+        if (pathParts.length === 2) {
+          const tokenId = parsePositiveBigInt(pathParts[1]);
+          return { enabled: tokenId !== null, tokenId };
+        }
+      }
+      return { enabled: false, tokenId: null };
     };
 
     const getExplorerRequest = () => {
       const params = new URLSearchParams(window.location.search);
-      const prettyTokenId = getPrettyExplorerTokenId();
+      const prettyRequest = getPrettyExplorerRequest();
       const view = params.get('view')?.trim().toLowerCase() ?? '';
       const enabled =
-        prettyTokenId !== null ||
+        prettyRequest.enabled ||
         view === 'explorer' ||
         params.has('explorer') ||
         params.has('token') ||
@@ -4463,7 +4489,7 @@
       }
       const contract = findContractById(params.get('contract')) ?? DEFAULT_CONTRACT;
       const tokenId =
-        prettyTokenId ??
+        prettyRequest.tokenId ??
         parsePositiveBigInt(params.get('token')) ??
         parsePositiveBigInt(params.get('inscription')) ??
         parsePositiveBigInt(params.get('explorer'));
@@ -4476,6 +4502,10 @@
       url.search = '';
       if (id !== null && getContractId(contract) === getContractId(DEFAULT_CONTRACT)) {
         url.pathname = `/x/${encodeURIComponent(id.toString())}`;
+        return url.toString();
+      }
+      if (id === null && getContractId(contract) === getContractId(DEFAULT_CONTRACT)) {
+        url.pathname = '/xplorer';
         return url.toString();
       }
       url.searchParams.set('view', 'explorer');
@@ -5119,35 +5149,86 @@
       }
     };
 
-    // Shared thumbnail tile for a related inscription (parent or child). Loads
-    // straight from the runtime content endpoint (image/svg render inline; any
-    // other media triggers the error fallback to an ID-only tile) and navigates
-    // to the inscription on click.
+    const getCachedRelationshipSummary = (id) =>
+      state.walletTokenCache.get(id.toString()) ?? null;
+
+    const hydrateRelationshipThumbCard = async (contractId, relatedId, media, role) => {
+      if (!media.isConnected) {
+        return;
+      }
+      const token = getCachedRelationshipSummary(relatedId);
+      if (!token) {
+        media.dataset.thumbnailState = 'summary-miss';
+        setTokenThumbLabel(media, 'loading');
+        return;
+      }
+      await renderRelationshipThumbMedia(token, media, role);
+    };
+
+    // Shared thumbnail tile for a related inscription (parent or child). It
+    // renders from already-cached summary/thumbnail/live-media data first; the
+    // relation group batches any missing summary reads after initial paint.
     const buildRelationshipThumbCard = (contractId, relatedId, role) => {
       const card = document.createElement('button');
       card.type = 'button';
       card.className = 'parent-thumb';
+      card.dataset.tokenId = relatedId.toString();
+      card.dataset.contractId = contractId;
       card.title = `View ${role} ${formatTokenId(relatedId)}`;
-      const img = document.createElement('img');
-      img.loading = 'lazy';
-      img.decoding = 'async';
-      img.alt = `${role} ${formatTokenId(relatedId)}`;
-      img.src = buildRuntimeInscriptionContentUrl({
-        coreContractId: contractId,
-        tokenId: relatedId
-      });
-      img.addEventListener('error', () => {
-        img.remove();
-        card.classList.add('parent-thumb--error');
-      });
+      const media = document.createElement('span');
+      media.className = 'parent-thumb__media';
+      media.dataset.tokenId = relatedId.toString();
+      media.dataset.contractId = contractId;
+      setTokenThumbLabel(media, 'loading');
       const tag = document.createElement('span');
       tag.className = 'parent-thumb__id';
       tag.textContent = formatTokenId(relatedId);
-      card.append(img, tag);
+      card.append(media, tag);
       card.addEventListener('click', () => {
         void focusWalletTokenById(relatedId);
       });
+      void hydrateRelationshipThumbCard(contractId, relatedId, media, role);
       return card;
+    };
+
+    const hydrateRelationGroupSummaries = async (contractId, ids, thumbs, role) => {
+      const missingIds = [
+        ...new Map(
+          ids
+            .filter((id) => !getCachedRelationshipSummary(id))
+            .map((id) => [id.toString(), id])
+        ).values()
+      ];
+      if (missingIds.length > 0 && state.client) {
+        try {
+          const summaries = await fetchWalletTokenSummaries(missingIds);
+          for (const token of summaries) {
+            state.walletTokenCache.set(token.id.toString(), token);
+          }
+          debugLog('relationships', 'relationship summaries fetched', {
+            contractId,
+            role,
+            requested: missingIds.length,
+            returned: summaries.length
+          });
+        } catch (error) {
+          debugLog(
+            'relationships',
+            'relationship summary fetch failed',
+            {
+              contractId,
+              role,
+              requested: missingIds.length,
+              error: error instanceof Error ? error.message : String(error)
+            },
+            'warn'
+          );
+        }
+      }
+      for (const media of thumbs.querySelectorAll('.parent-thumb__media')) {
+        const id = BigInt(media.dataset.tokenId);
+        void hydrateRelationshipThumbCard(contractId, id, media, role);
+      }
     };
 
     // Renders one labelled group of related inscriptions (heading + id list +
@@ -5168,6 +5249,7 @@
         thumbs.append(buildRelationshipThumbCard(contractId, id, role));
       }
       section.append(heading, idLine, thumbs);
+      void hydrateRelationGroupSummaries(contractId, ids, thumbs, role);
     };
 
     // Depth -> human label for lineage tiers beyond the direct relation.
@@ -7962,7 +8044,7 @@
       return false;
     };
 
-    const applyCachedThumbnail = async (token, thumbElement) => {
+    const applyCachedThumbnail = async (token, thumbElement, options = {}) => {
       if (token.svgDataUri) {
         thumbElement.classList.add('has-thumbnail');
         thumbElement.dataset.thumbnailState = 'inline-svg';
@@ -8004,9 +8086,11 @@
         });
         return false;
       }
-      const activePageIds = new Set(getWalletPageIds().map((id) => id.toString()));
-      if (!activePageIds.has(token.id.toString())) {
-        return false;
+      if (options.requireActivePage !== false) {
+        const activePageIds = new Set(getWalletPageIds().map((id) => id.toString()));
+        if (!activePageIds.has(token.id.toString())) {
+          return false;
+        }
       }
       const oldUrl = state.tokenThumbUrls.get(cacheKey);
       if (oldUrl) {
@@ -8544,7 +8628,9 @@
           thumbElement.isConnected &&
           thumbElement.dataset.thumbnailKey === cacheKey
         ) {
-          await applyCachedThumbnail(token, thumbElement);
+          await applyCachedThumbnail(token, thumbElement, {
+            requireActivePage: thumbElement.dataset.thumbnailContext !== 'relationship'
+          });
         } else if (getWalletPageIds().some((id) => id === token.id)) {
           scheduleGridRender();
         }
@@ -8563,7 +8649,9 @@
           thumbElement.isConnected &&
           thumbElement.dataset.thumbnailKey === cacheKey
         ) {
-          const applied = await applyCachedThumbnail(token, thumbElement);
+          const applied = await applyCachedThumbnail(token, thumbElement, {
+            requireActivePage: thumbElement.dataset.thumbnailContext !== 'relationship'
+          });
           if (!applied) {
             setTokenThumbLabel(
               thumbElement,
@@ -8622,6 +8710,56 @@
       });
       pumpBackgroundThumbnailHydrationQueue();
       return true;
+    };
+
+    const renderRelationshipThumbMedia = async (token, media, role) => {
+      if (!media.isConnected) {
+        return false;
+      }
+      const cacheKey = getThumbnailKey(token);
+      media.dataset.thumbnailKey = cacheKey;
+      media.dataset.thumbnailContext = 'relationship';
+      media.classList.remove('parent-thumb--error');
+
+      if (token.svgDataUri) {
+        const img = document.createElement('img');
+        img.alt = `${role} ${formatTokenId(token.id)}`;
+        applyPixelPerfectImageRendering(img, {
+          mimeType: 'image/svg+xml',
+          sourceUrl: token.svgDataUri,
+          isSvgSource: true
+        });
+        img.src = token.svgDataUri;
+        media.classList.add('has-thumbnail');
+        media.dataset.thumbnailState = 'inline-svg';
+        media.replaceChildren(img);
+        return true;
+      }
+
+      const liveMedia = state.gridLiveMediaCache.get(cacheKey);
+      if (liveMedia && renderGridLiveMedia(token, media, liveMedia)) {
+        return true;
+      }
+
+      const cached = await applyCachedThumbnail(token, media, {
+        requireActivePage: false
+      });
+      if (cached) {
+        return true;
+      }
+
+      if (renderGridRuntimeImage(token, media)) {
+        return true;
+      }
+
+      const label = getGridMimeLabel(token.meta?.mimeType ?? null);
+      setTokenThumbLabel(media, label);
+      media.dataset.thumbnailState = 'pending-live-media';
+      const queued = scheduleBackgroundThumbnailHydration(token, media);
+      if (!queued) {
+        media.dataset.thumbnailState = 'fallback-label';
+      }
+      return queued;
     };
 
     // Coalesce hydration-triggered re-renders into one per frame. A full

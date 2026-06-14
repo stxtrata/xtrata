@@ -3,23 +3,22 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Bitcoin Pepes · Forever Twins on Xtrata</title>
-<meta name="description" content="Make your Bitcoin Pepe permanent. Inscribe a forever twin on Xtrata — a permanent, on-chain copy bound 1:1 to your original. The first 87 are free." />
+<title>Forever Twins · Permanent on-chain counterparts for NFT collections</title>
+<meta name="description" content="Forever Twins give existing NFT collections a permanent, on-chain counterpart — no re-mint, no migration. Powered by Xtrata, built with Fak.fun. Bitcoin Pepes are first." />
 <style>
   :root{
-    --bg:#1f2024;          /* charcoal */
+    --bg:#1f2024;
     --bg-2:#26272c;
     --panel:#2c2e34;
     --panel-2:#34363d;
     --ink:#f5f3ee;
     --muted:#a7a9b0;
-    --gold:#f7931a;        /* bitcoin orange-gold */
+    --gold:#f7931a;
     --gold-2:#ffc24b;
-    --pepe:#f08a1d;        /* pepe orange */
-    --blue:#1f5fe0;        /* MAXI blue */
-    --blue-2:#3d7bff;
-    --red:#e23b3b;
+    --pepe:#f08a1d;
+    --blue:#1f5fe0;
     --green:#37c87a;
+    --red:#e23b3b;
     --line:rgba(255,255,255,.08);
     --shadow:0 10px 40px rgba(0,0,0,.45);
     --mono:"DM Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
@@ -27,162 +26,95 @@
   }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
-  body{
-    margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
-    line-height:1.55;-webkit-font-smoothing:antialiased;
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased;
     background-image:
-      radial-gradient(900px 500px at 85% -5%, rgba(247,147,26,.12), transparent 60%),
-      radial-gradient(700px 500px at 5% 0%, rgba(31,95,224,.10), transparent 55%);
-  }
+      radial-gradient(900px 520px at 82% -8%, rgba(247,147,26,.13), transparent 60%),
+      radial-gradient(720px 520px at 8% 0%, rgba(31,95,224,.10), transparent 55%);}
   a{color:var(--gold-2);text-decoration:none}
   a:hover{text-decoration:underline}
   .wrap{max-width:1080px;margin:0 auto;padding:0 22px}
-  .pixel{font-family:var(--mono);letter-spacing:.5px}
 
-  /* top bar */
-  header.nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
-    background:rgba(31,32,36,.78);border-bottom:1px solid var(--line)}
+  header.nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);background:rgba(31,32,36,.78);border-bottom:1px solid var(--line)}
   .nav-inner{display:flex;align-items:center;justify-content:space-between;height:62px}
   .brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.3px}
-  .brand .b-mark{width:26px;height:26px;border-radius:6px;background:linear-gradient(135deg,var(--gold),var(--gold-2));
-    display:grid;place-items:center;color:#1b1b1b;font-weight:900;font-family:var(--mono)}
+  .brand .b-mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--gold),var(--gold-2));display:grid;place-items:center;color:#1b1b1b;font-weight:900;font-family:var(--mono)}
   .nav-links{display:flex;gap:22px;align-items:center}
   .nav-links a{color:var(--muted);font-size:14px;font-weight:600}
   .nav-links a:hover{color:var(--ink);text-decoration:none}
-  .btn{display:inline-flex;align-items:center;gap:8px;border:none;cursor:pointer;
-    font-weight:800;font-size:15px;padding:12px 20px;border-radius:12px;
-    background:linear-gradient(135deg,var(--gold),var(--gold-2));color:#1b1b1b;
-    box-shadow:0 6px 18px rgba(247,147,26,.35);transition:transform .12s ease,box-shadow .12s ease}
+  .btn{display:inline-flex;align-items:center;gap:8px;border:none;cursor:pointer;font-weight:800;font-size:15px;padding:12px 20px;border-radius:12px;
+    background:linear-gradient(135deg,var(--gold),var(--gold-2));color:#1b1b1b;box-shadow:0 6px 18px rgba(247,147,26,.35);transition:transform .12s ease,box-shadow .12s ease}
   .btn:hover{transform:translateY(-1px);text-decoration:none;box-shadow:0 10px 24px rgba(247,147,26,.45)}
   .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);box-shadow:none}
   .btn.ghost:hover{border-color:var(--gold)}
   .btn.sm{padding:9px 14px;font-size:13px;border-radius:10px}
 
   /* hero */
-  .hero{padding:64px 0 40px;display:grid;grid-template-columns:1.15fr .85fr;gap:40px;align-items:center}
-  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;
-    text-transform:uppercase;letter-spacing:1.5px;color:var(--gold-2);
+  .hero{padding:70px 0 30px;text-align:center}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gold-2);
     background:rgba(247,147,26,.10);border:1px solid rgba(247,147,26,.25);padding:6px 12px;border-radius:999px}
-  .hero h1{font-size:clamp(34px,5vw,56px);line-height:1.04;margin:18px 0 14px;font-weight:900;letter-spacing:-1px}
+  .hero h1{font-size:clamp(36px,6vw,62px);line-height:1.03;margin:20px auto 16px;font-weight:900;letter-spacing:-1.2px;max-width:880px}
   .hero h1 .ink-gold{background:linear-gradient(135deg,var(--gold),var(--gold-2));-webkit-background-clip:text;background-clip:text;color:transparent}
-  .hero p.lede{font-size:18px;color:var(--muted);max-width:540px;margin:0 0 26px}
-  .hero-cta{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-  .hero-note{font-size:12.5px;color:var(--muted);margin-top:14px;font-family:var(--mono)}
+  .hero p.lede{font-size:19px;color:var(--muted);max-width:620px;margin:0 auto 28px}
+  .hero-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .trust{margin-top:22px;font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+  .trust b{color:var(--ink)}
 
-  .hero-art{position:relative;justify-self:center}
-  .art-frame{position:relative;width:330px;max-width:78vw;border-radius:20px;overflow:hidden;
-    border:1px solid var(--line);box-shadow:var(--shadow);background:#2a2b30}
-  .art-frame img,.art-frame svg{display:block;width:100%;height:auto}
-  .art-badge{position:absolute;bottom:12px;left:12px;right:12px;display:flex;justify-content:space-between;
-    align-items:center;font-family:var(--mono);font-size:11px;color:var(--ink);
-    background:rgba(20,20,22,.66);backdrop-filter:blur(4px);padding:8px 12px;border-radius:10px;border:1px solid var(--line)}
-  .pill-forever{color:var(--gold-2);font-weight:700}
+  /* problem band */
+  .band{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:linear-gradient(180deg,rgba(226,59,59,.05),transparent);margin-top:40px}
+  .band-inner{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;padding:26px 0}
+  .band-stat{text-align:center}
+  .band-stat .n{font-size:30px;font-weight:900;color:var(--gold-2);letter-spacing:-.5px}
+  .band-stat .t{font-size:13px;color:var(--muted);margin-top:2px}
 
-  /* stat strip */
-  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:8px 0 10px}
-  .stat{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px 18px 16px}
-  .stat .label{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-family:var(--mono)}
-  .stat .value{font-size:30px;font-weight:900;margin-top:6px;letter-spacing:-.5px}
-  .stat .sub{font-size:12.5px;color:var(--muted);margin-top:2px}
-  .stat .value.live::after{content:"";display:inline-block;width:8px;height:8px;margin-left:8px;border-radius:50%;
-    background:var(--green);box-shadow:0 0 0 0 rgba(55,200,122,.6);animation:pulse 2s infinite;vertical-align:middle}
-  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(55,200,122,.5)}70%{box-shadow:0 0 0 8px rgba(55,200,122,0)}100%{box-shadow:0 0 0 0 rgba(55,200,122,0)}}
-
-  /* progress */
-  .progress-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;margin:18px 0 8px}
-  .progress-head{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}
-  .progress-head h3{margin:0;font-size:16px}
-  .progress-head .free-left{font-family:var(--mono);color:var(--gold-2);font-weight:700}
-  .bar{height:16px;border-radius:999px;background:#1b1c20;border:1px solid var(--line);margin-top:14px;overflow:hidden}
-  .bar > span{display:block;height:100%;width:0%;border-radius:999px;
-    background:linear-gradient(90deg,var(--gold),var(--gold-2));transition:width .8s cubic-bezier(.2,.8,.2,1)}
-  .progress-foot{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:10px;font-family:var(--mono)}
-
-  /* sections */
-  section{padding:46px 0}
+  section{padding:50px 0}
   .section-tag{font-family:var(--mono);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold-2)}
-  h2.sec{font-size:clamp(26px,3.4vw,36px);margin:10px 0 8px;font-weight:900;letter-spacing:-.5px}
-  .sec-lede{color:var(--muted);max-width:680px;margin:0 0 26px;font-size:16.5px}
+  h2.sec{font-size:clamp(26px,3.6vw,38px);margin:10px 0 8px;font-weight:900;letter-spacing:-.6px}
+  .sec-lede{color:var(--muted);max-width:680px;margin:0 0 28px;font-size:16.5px}
 
+  /* how (generic, 3 steps) */
   .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-  .step{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;position:relative}
-  .step .n{font-family:var(--mono);font-weight:800;color:#1b1b1b;background:linear-gradient(135deg,var(--gold),var(--gold-2));
-    width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:15px}
+  .step{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px}
+  .step .n{font-family:var(--mono);font-weight:800;color:#1b1b1b;background:linear-gradient(135deg,var(--gold),var(--gold-2));width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:15px}
   .step h4{margin:14px 0 6px;font-size:17px}
   .step p{margin:0;color:var(--muted);font-size:14.5px}
 
-  .twin-visual{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:center;margin-top:26px}
-  .twin-box{background:var(--panel-2);border:1px solid var(--line);border-radius:16px;padding:20px;text-align:center}
-  .twin-box .t-emoji{font-size:30px}
-  .twin-box h5{margin:10px 0 4px;font-size:15px}
-  .twin-box p{margin:0;font-size:12.5px;color:var(--muted)}
-  .twin-box.escrow{border-color:rgba(247,147,26,.4);box-shadow:inset 0 0 0 1px rgba(247,147,26,.15)}
-  .swap-arrow{font-family:var(--mono);color:var(--gold-2);font-size:13px;text-align:center;line-height:1.3}
-  .swap-arrow .big{font-size:24px;display:block}
+  /* collections grid */
+  .collections{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+  .col-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;transition:transform .14s ease,border-color .14s ease}
+  .col-card.active:hover{transform:translateY(-3px);border-color:rgba(247,147,26,.5)}
+  .col-top{display:flex;gap:16px;padding:22px 22px 0}
+  .col-thumb{flex:0 0 auto;width:84px;height:84px;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:#2a2b30}
+  .col-thumb img,.col-thumb svg{display:block;width:100%;height:100%}
+  .col-head{flex:1;min-width:0}
+  .col-badge{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.5px}
+  .col-badge.live{background:rgba(55,200,122,.15);color:var(--green)}
+  .col-badge.soon{background:rgba(167,169,176,.14);color:var(--muted)}
+  .col-card h3{margin:10px 0 4px;font-size:21px;font-weight:900;letter-spacing:-.3px}
+  .col-card .chain{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .col-body{padding:14px 22px 0;color:var(--muted);font-size:14.5px;flex:1}
+  .col-metrics{display:flex;gap:22px;padding:16px 22px 0}
+  .col-metric .v{font-size:22px;font-weight:900;letter-spacing:-.5px}
+  .col-metric .v.live::after{content:"";display:inline-block;width:7px;height:7px;margin-left:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(55,200,122,.6);animation:pulse 2s infinite;vertical-align:middle}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(55,200,122,.5)}70%{box-shadow:0 0 0 7px rgba(55,200,122,0)}100%{box-shadow:0 0 0 0 rgba(55,200,122,0)}}
+  .col-metric .k{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-family:var(--mono);margin-top:2px}
+  .col-foot{padding:20px 22px;margin-top:6px}
+  .col-card.soon{border-style:dashed;opacity:.92}
+  .col-card.soon .col-thumb{display:grid;place-items:center;color:var(--muted);font-size:30px}
+  .col-card.cta-card{background:linear-gradient(160deg,rgba(247,147,26,.12),rgba(31,95,224,.10));border-style:dashed;align-items:flex-start;justify-content:center;text-align:left}
 
-  /* why / link rot */
-  .why-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-  .why{background:linear-gradient(180deg,var(--panel),var(--bg-2));border:1px solid var(--line);border-radius:16px;padding:22px}
-  .why .big-stat{font-size:38px;font-weight:900;color:var(--gold-2);letter-spacing:-1px}
-  .why p{margin:8px 0 0;color:var(--muted);font-size:14px}
-  .cases{margin-top:18px;display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-  .case{display:flex;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
-  .case .dot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;background:var(--red);margin-top:6px}
-  .case h5{margin:0 0 3px;font-size:14.5px}
-  .case p{margin:0;font-size:13px;color:var(--muted)}
+  /* founder cta */
+  .founder{background:linear-gradient(135deg,rgba(247,147,26,.16),rgba(31,95,224,.12));border:1px solid var(--line);border-radius:22px;padding:40px;text-align:center}
+  .founder h2{font-size:clamp(24px,3.4vw,34px);margin:0 0 10px;font-weight:900}
+  .founder p{color:var(--muted);max-width:560px;margin:0 auto 22px}
 
-  /* checker */
-  .checker{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:24px}
-  .checker .row{display:flex;gap:10px;flex-wrap:wrap}
-  .checker input{flex:1;min-width:200px;background:#1b1c20;border:1px solid var(--line);color:var(--ink);
-    border-radius:12px;padding:13px 16px;font-size:16px;font-family:var(--mono)}
-  .checker input:focus{outline:none;border-color:var(--gold)}
-  .check-result{margin-top:16px;font-family:var(--mono);font-size:14px;display:none}
-  .check-result.show{display:block}
-  .res-line{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px dashed var(--line)}
-  .res-line:last-child{border-bottom:none}
-  .tag{font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;font-family:var(--mono)}
-  .tag.ok{background:rgba(55,200,122,.15);color:var(--green)}
-  .tag.no{background:rgba(226,59,59,.15);color:#ff7a7a}
-  .tag.warn{background:rgba(247,147,26,.15);color:var(--gold-2)}
-
-  /* contracts */
-  .contracts{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-  .ctr{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
-  .ctr .role{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--gold-2)}
-  .ctr h4{margin:8px 0 6px;font-size:15px}
-  .ctr code{display:block;font-family:var(--mono);font-size:11.5px;color:var(--muted);word-break:break-all;margin-bottom:12px}
-
-  /* faq */
-  details{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:4px 18px;margin-bottom:10px}
-  details summary{cursor:pointer;padding:16px 0;font-weight:700;font-size:15.5px;list-style:none;display:flex;justify-content:space-between;align-items:center}
-  details summary::-webkit-details-marker{display:none}
-  details summary::after{content:"+";font-family:var(--mono);color:var(--gold-2);font-size:20px}
-  details[open] summary::after{content:"–"}
-  details p{margin:0 0 16px;color:var(--muted);font-size:14.5px}
-
-  /* cta banner */
-  .cta-banner{background:linear-gradient(135deg,rgba(247,147,26,.16),rgba(31,95,224,.12));
-    border:1px solid var(--line);border-radius:22px;padding:40px;text-align:center;margin:10px 0}
-  .cta-banner h2{font-size:clamp(24px,3.5vw,34px);margin:0 0 10px;font-weight:900}
-  .cta-banner p{color:var(--muted);max-width:520px;margin:0 auto 22px}
-
-  footer{border-top:1px solid var(--line);padding:30px 0;color:var(--muted);font-size:13px}
+  footer{border-top:1px solid var(--line);padding:30px 0;color:var(--muted);font-size:13px;margin-top:10px}
   .foot-inner{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:center}
   .disclaimer{font-size:11.5px;color:#7e8087;max-width:760px;margin-top:10px;line-height:1.5}
 
-  .err-note{display:none;font-family:var(--mono);font-size:12px;color:#ff9a9a;margin-top:8px}
-
-  @media(max-width:860px){
-    .hero{grid-template-columns:1fr;text-align:center}
-    .hero p.lede{margin-left:auto;margin-right:auto}
-    .hero-cta{justify-content:center}
-    .stats{grid-template-columns:repeat(2,1fr)}
-    .steps,.why-grid,.contracts{grid-template-columns:1fr}
-    .cases{grid-template-columns:1fr}
-    .twin-visual{grid-template-columns:1fr}
-    .swap-arrow .big{transform:rotate(90deg)}
+  @media(max-width:820px){
+    .band-inner,.steps,.collections{grid-template-columns:1fr}
     .nav-links{display:none}
+    .col-metrics{gap:28px}
   }
 </style>
 </head>
@@ -190,13 +122,12 @@
 
 <header class="nav">
   <div class="wrap nav-inner">
-    <div class="brand"><span class="b-mark">₿</span> Bitcoin Pepes <span style="color:var(--muted);font-weight:600">· Forever Twins</span></div>
+    <a href="./" class="brand" style="text-decoration:none;color:inherit"><span class="b-mark">♾️</span> Forever Twins</a>
     <nav class="nav-links">
       <a href="#how">How it works</a>
-      <a href="#why">Why forever</a>
-      <a href="#check">Check a Pepe</a>
-      <a href="#contracts">Contracts</a>
-      <a class="btn sm" id="nav-cta" href="#inscribe">Claim a twin</a>
+      <a href="#collections">Collections</a>
+      <a href="#founders">For founders</a>
+      <a class="btn sm" href="#founders">Protect a collection</a>
     </nav>
   </div>
 </header>
@@ -204,435 +135,189 @@
 <!-- HERO -->
 <div class="wrap">
   <section class="hero">
-    <div>
-      <span class="eyebrow">◎ Powered by Xtrata · Built with Fak.fun</span>
-      <h1>Your NFT can survive<br><span class="ink-gold">while the art disappears.</span></h1>
-      <p class="lede">Most NFTs don't store the artwork inside the token — they point to files, gateways, and servers that can break. A <strong>Forever Twin</strong> gives the art a permanent on-chain counterpart, bound 1:1 to your Bitcoin Pepe. Bitcoin Pepes are the first public Forever Twins collection.</p>
-      <div class="hero-cta">
-        <a class="btn" id="hero-claim" href="#inscribe">Claim your Forever Twin →</a>
-        <a class="btn ghost" href="#how">Verify how it works</a>
-      </div>
-      <div class="hero-note" id="hero-free-note">Loading live mint status…</div>
+    <span class="eyebrow">◎ Powered by Xtrata · Built with Fak.fun</span>
+    <h1>Make any NFT collection <span class="ink-gold">permanent.</span></h1>
+    <p class="lede">A <strong>Forever Twin</strong> is a permanent, on-chain counterpart for an existing NFT — bound 1:1 to the original. No re-mint. No migration. When the old link rots, the art lives on.</p>
+    <div class="hero-cta">
+      <a class="btn" href="#collections">Explore live collections →</a>
+      <a class="btn ghost" href="#how">How it works</a>
     </div>
-    <div class="hero-art">
-      <div class="art-frame">
-        <!-- Drop a real PNG at ./assets/bitcoin-pepe-maxi.png to replace the built-in art -->
-        <img id="pepe-img" src="./assets/bitcoin-pepe-maxi.png" alt="Bitcoin Pepe MAXI"
-             onerror="this.style.display='none';document.getElementById('pepe-svg').style.display='block';" />
-        <svg id="pepe-svg" style="display:none" viewBox="0 0 16 16" shape-rendering="crispEdges" width="100%">
-          <rect width="16" height="16" fill="#2c2d31"/>
-          <!-- bitcoin glyphs -->
-          <text x="1.6" y="3" font-size="2.4" fill="#f7931a" font-family="monospace" font-weight="bold">₿</text>
-          <text x="12" y="3" font-size="2.4" fill="#f7931a" font-family="monospace" font-weight="bold">₿</text>
-          <text x="0.6" y="14.5" font-size="2.4" fill="#f7931a" font-family="monospace" font-weight="bold">₿</text>
-          <text x="13" y="15" font-size="2.4" fill="#f7931a" font-family="monospace" font-weight="bold">₿</text>
-          <!-- head -->
-          <rect x="4" y="3" width="8" height="7" fill="#f08a1d"/>
-          <rect x="3" y="4" width="1" height="5" fill="#f08a1d"/>
-          <rect x="12" y="4" width="1" height="5" fill="#f08a1d"/>
-          <rect x="4" y="3" width="8" height="1" fill="#1b1b1b"/>
-          <!-- 3d glasses -->
-          <rect x="4" y="5" width="4" height="2" fill="#fff" stroke="#1b1b1b" stroke-width=".25"/>
-          <rect x="8" y="5" width="4" height="2" fill="#fff" stroke="#1b1b1b" stroke-width=".25"/>
-          <rect x="4.5" y="5.4" width="3" height="1.2" fill="#1f5fe0"/>
-          <rect x="8.5" y="5.4" width="3" height="1.2" fill="#e23b3b"/>
-          <!-- snout + cigar -->
-          <rect x="5" y="8" width="6" height="1.4" fill="#d97a14"/>
-          <rect x="7" y="8.3" width="5" height="1" fill="#6b4324"/>
-          <rect x="11.4" y="8.4" width="1" height=".8" fill="#e23b3b"/>
-          <!-- MAXI shirt -->
-          <rect x="3" y="11" width="10" height="5" fill="#1f5fe0"/>
-          <text x="4.4" y="14.6" font-size="2.1" fill="#fff" font-family="monospace" font-weight="bold">MAXI</text>
-        </svg>
-        <div class="art-badge"><span>Bitcoin Pepe</span><span class="pill-forever">♾️ forever twin</span></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- LIVE STATS -->
-  <section id="inscribe" style="padding-top:6px">
-    <div class="stats">
-      <div class="stat">
-        <div class="label">Twins inscribed</div>
-        <div class="value live" id="s-inscribed">—</div>
-        <div class="sub">forever copies minted</div>
-      </div>
-      <div class="stat">
-        <div class="label">Free twins left</div>
-        <div class="value" id="s-free">—</div>
-        <div class="sub" id="s-free-sub">of first 87 free</div>
-      </div>
-      <div class="stat">
-        <div class="label">Current price</div>
-        <div class="value" id="s-price">—</div>
-        <div class="sub" id="s-price-sub">to inscribe now</div>
-      </div>
-      <div class="stat">
-        <div class="label">Canonical record</div>
-        <div class="value" id="s-final" style="font-size:22px">—</div>
-        <div class="sub" id="s-final-sub">permanence anchor</div>
-      </div>
-    </div>
-
-    <div class="progress-card">
-      <div class="progress-head">
-        <h3 id="p-title">The Free 87</h3>
-        <span class="free-left" id="p-left">—</span>
-      </div>
-      <div class="bar"><span id="p-bar"></span></div>
-      <div class="progress-foot">
-        <span id="p-count">— inscribed</span>
-        <span id="p-updated">live from chain</span>
-      </div>
-      <div class="err-note" id="err-note">Couldn't reach the chain right now — showing last known values. Retrying…</div>
-    </div>
-
-    <div class="hero-cta" style="margin-top:18px">
-      <a class="btn" id="main-inscribe" href="#how">Claim your Forever Twin →</a>
-      <a class="btn ghost" id="explorer-link" href="https://explorer.hiro.so/txid/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun?chain=mainnet" target="_blank" rel="noopener">View contract on explorer ↗</a>
-    </div>
-    <p class="hero-note">Stats refresh automatically every 30 seconds, read live from the <code>pepe-4ever-fakfun</code> contract.</p>
+    <div class="trust">First public collection: <b>Bitcoin Pepes</b> · <span id="trust-count">live on Stacks</span></div>
   </section>
 </div>
 
-<!-- HOW IT WORKS -->
+<!-- PROBLEM BAND -->
+<div class="band">
+  <div class="wrap band-inner">
+    <div class="band-stat"><div class="n">~20%</div><div class="t">of NFTs already have broken art or metadata</div></div>
+    <div class="band-stat"><div class="n">98 / 1,000</div><div class="t">top collections point at URLs that no longer exist</div></div>
+    <div class="band-stat"><div class="n">$1.5M</div><div class="t">of Coachella NFTs went blank when FTX's domain died</div></div>
+  </div>
+</div>
+
+<!-- HOW -->
 <div class="wrap">
   <section id="how">
-    <span class="section-tag">The mechanic</span>
-    <h2 class="sec">How forever twins work</h2>
-    <p class="sec-lede">No re-minting. No migration. Your original Pepe is never destroyed — it gains a permanent, on-chain twin that the two of you can never be separated from.</p>
+    <span class="section-tag">The model</span>
+    <h2 class="sec">One permanent twin, bound to your original</h2>
+    <p class="sec-lede">Most NFTs don't store their art — they point to a file on a server or gateway that can disappear. Forever Twins fix that for collections that already exist, without asking holders to migrate anything.</p>
     <div class="steps">
-      <div class="step"><div class="n">1</div><h4>Inscribe</h4><p>You call <code>inscribe</code> on your Pepe. Xtrata writes a permanent, fully on-chain copy of the artwork and binds a <strong>forever twin</strong> to your token 1:1.</p></div>
-      <div class="step"><div class="n">2</div><h4>One is always locked</h4><p>At any moment you hold exactly one of the pair; the contract escrows the other. <code>swap-pepe-for-xtrata</code> and <code>swap-xtrata-for-pepe</code> flip which one you hold — they can never both be loose, and never be split apart.</p></div>
-      <div class="step"><div class="n">3</div><h4>Finalized forever</h4><p>Each twin carries a <strong>canonical content hash</strong>. Once the collection is <code>finalize</code>d, that record is locked permanently — no one, not even the contract owner, can alter it.</p></div>
-    </div>
-
-    <div class="twin-visual">
-      <div class="twin-box">
-        <div class="t-emoji">🐸</div>
-        <h5>Your Bitcoin Pepe</h5>
-        <p>The original token on <code>bitcoin-pepe</code></p>
-      </div>
-      <div class="swap-arrow"><span class="big">⇄</span> bound &amp; swappable<br>one always escrowed</div>
-      <div class="twin-box escrow">
-        <div class="t-emoji">♾️</div>
-        <h5>The Forever Twin</h5>
-        <p>Permanent on-chain copy on <code>xtrata-v3-2-3</code></p>
-      </div>
+      <div class="step"><div class="n">1</div><h4>Inscribe</h4><p>The original token's artwork is written permanently and fully on-chain via Xtrata, and a <strong>forever twin</strong> is bound to it 1:1.</p></div>
+      <div class="step"><div class="n">2</div><h4>Bound &amp; inseparable</h4><p>One of the pair is always escrowed in the contract; the holder always keeps the other. They can be swapped, but never split apart.</p></div>
+      <div class="step"><div class="n">3</div><h4>Finalized forever</h4><p>Each twin carries a canonical content hash. Once finalized, that record is immutable — independent of any hosting bill, gateway, or company.</p></div>
     </div>
   </section>
 </div>
 
-<!-- WHY -->
+<!-- COLLECTIONS -->
 <div class="wrap">
-  <section id="why">
-    <span class="section-tag">Why this matters</span>
-    <h2 class="sec">"Permanent" ownership has a dirty secret</h2>
-    <p class="sec-lede">Most NFTs don't contain their art — they point to a file hosted somewhere off-chain. When that host stops paying the bill, the art disappears. This isn't theoretical; it's measured, and it has already happened to blue-chip collections.</p>
-    <div class="why-grid">
-      <div class="why"><div class="big-stat">~20%</div><p>of NFTs are <strong>already broken</strong> — dead links, missing images, or IPFS that no longer resolves — across scans of ~498,000 and 400,000+ tokens.</p></div>
-      <div class="why"><div class="big-stat">98</div><p>of the <strong>top 1,000</strong> collections by volume already point at URLs that <strong>no longer exist</strong>. 277 sit entirely on centralized servers.</p></div>
-      <div class="why"><div class="big-stat">$1.5M</div><p>of Coachella NFTs went to <strong>blank gray boxes</strong> the moment FTX's domain was redirected after bankruptcy.</p></div>
-    </div>
-    <div class="cases">
-      <div class="case"><span class="dot"></span><div><h5>FTX / Coachella</h5><p>Lifetime-pass NFTs broke instantly when the FTX.us domain went to a restructuring page. Ownership intact; the asset, gone.</p></div></div>
-      <div class="case"><span class="dot"></span><div><h5>nft.storage Classic</h5><p>Data was safe on Filecoin, but millions of contracts hardcoded the dead gateway. Art vanished from wallets anyway.</p></div></div>
-      <div class="case"><span class="dot"></span><div><h5>CloneX / RTFKT (Nike)</h5><p>~19,000 NFTs replaced with a Cloudflare "terms violation" message after a downgrade to a free plan (Apr 2025).</p></div></div>
-      <div class="case"><span class="dot"></span><div><h5>Infura gateway (2022)</h5><p>Thousands of tokens bricked overnight when one hardcoded gateway URL was deprecated.</p></div></div>
-    </div>
-    <p class="hero-note" style="margin-top:18px">Backups (pinning services, Arweave copies) keep data alive but <strong>don't fix the original token's pointer</strong>. A forever twin gives you a second, permanent token you actually own — independent of anyone's hosting bill.</p>
-  </section>
-</div>
+  <section id="collections">
+    <span class="section-tag">Live collections</span>
+    <h2 class="sec">Collections going forever</h2>
+    <p class="sec-lede">The growing list of collections with permanent on-chain counterparts on Xtrata. Bitcoin Pepes are first — more on the way.</p>
+    <div class="collections">
 
-<!-- CHECKER -->
-<div class="wrap">
-  <section id="check">
-    <span class="section-tag">Verify it yourself</span>
-    <h2 class="sec">Check any Bitcoin Pepe</h2>
-    <p class="sec-lede">Enter a Pepe token ID to read its live status straight from the contract — whether it's eligible for a canonical twin and whether it's already been inscribed.</p>
-    <div class="checker">
-      <div class="row">
-        <input id="check-id" type="number" min="0" placeholder="e.g. 42" inputmode="numeric" />
-        <button class="btn" id="check-btn">Check status</button>
-      </div>
-      <div class="check-result" id="check-result"></div>
-    </div>
-  </section>
-</div>
+      <!-- ACTIVE: Bitcoin Pepes -->
+      <a class="col-card active" href="./bitcoin-pepes.html" style="color:inherit">
+        <div class="col-top">
+          <div class="col-thumb">
+            <svg viewBox="0 0 16 16" shape-rendering="crispEdges">
+              <rect width="16" height="16" fill="#2c2d31"/>
+              <text x="1.4" y="3" font-size="2.2" fill="#f7931a" font-family="monospace" font-weight="bold">₿</text>
+              <text x="12.2" y="3" font-size="2.2" fill="#f7931a" font-family="monospace" font-weight="bold">₿</text>
+              <rect x="4" y="3" width="8" height="7" fill="#f08a1d"/>
+              <rect x="3" y="4" width="1" height="5" fill="#f08a1d"/><rect x="12" y="4" width="1" height="5" fill="#f08a1d"/>
+              <rect x="4" y="3" width="8" height="1" fill="#1b1b1b"/>
+              <rect x="4" y="5" width="4" height="2" fill="#fff" stroke="#1b1b1b" stroke-width=".25"/>
+              <rect x="8" y="5" width="4" height="2" fill="#fff" stroke="#1b1b1b" stroke-width=".25"/>
+              <rect x="4.5" y="5.4" width="3" height="1.2" fill="#1f5fe0"/><rect x="8.5" y="5.4" width="3" height="1.2" fill="#e23b3b"/>
+              <rect x="5" y="8" width="6" height="1.4" fill="#d97a14"/><rect x="7" y="8.3" width="5" height="1" fill="#6b4324"/>
+              <rect x="3" y="11" width="10" height="5" fill="#1f5fe0"/>
+              <text x="4.4" y="14.6" font-size="2.0" fill="#fff" font-family="monospace" font-weight="bold">MAXI</text>
+            </svg>
+          </div>
+          <div class="col-head">
+            <span class="col-badge live">● Live</span>
+            <h3>Bitcoin Pepes</h3>
+            <div class="chain">Stacks · bitcoin-pepe → pepe-4ever-fakfun</div>
+          </div>
+        </div>
+        <div class="col-body">The first public Forever Twins collection. Holders give their Pepe a permanent on-chain twin, claimable on Fak.fun.</div>
+        <div class="col-metrics">
+          <div class="col-metric"><div class="v live" id="c-inscribed">—</div><div class="k">Twins inscribed</div></div>
+          <div class="col-metric"><div class="v" id="c-status">—</div><div class="k">Canonical record</div></div>
+        </div>
+        <div class="col-foot"><span class="btn sm">View Bitcoin Pepes →</span></div>
+      </a>
 
-<!-- CONTRACTS -->
-<div class="wrap">
-  <section id="contracts">
-    <span class="section-tag">On-chain</span>
-    <h2 class="sec">The contracts</h2>
-    <p class="sec-lede">Everything on this page is read live from these contracts on Stacks mainnet. Verify any claim yourself.</p>
-    <div class="contracts">
-      <div class="ctr">
-        <div class="role">Original collection</div>
-        <h4>bitcoin-pepe</h4>
-        <code>SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe</code>
-        <a class="btn ghost sm" target="_blank" rel="noopener" href="https://explorer.hiro.so/txid/SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe?chain=mainnet">View ↗</a>
+      <!-- PLACEHOLDER: next project -->
+      <div class="col-card soon">
+        <div class="col-top">
+          <div class="col-thumb">＋</div>
+          <div class="col-head">
+            <span class="col-badge soon">Coming soon</span>
+            <h3>Your collection?</h3>
+            <div class="chain">Any existing Stacks collection</div>
+          </div>
+        </div>
+        <div class="col-body">Forever Twins works for any collection carrying off-chain link-rot risk. The next flagship could be yours.</div>
+        <div class="col-metrics">
+          <div class="col-metric"><div class="v" style="color:var(--muted)">—</div><div class="k">Awaiting launch</div></div>
+        </div>
+        <div class="col-foot"><a class="btn ghost sm" href="#founders">Request a slot</a></div>
       </div>
-      <div class="ctr">
-        <div class="role">Forever-twin contract</div>
-        <h4>pepe-4ever-fakfun</h4>
-        <code>SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun</code>
-        <a class="btn ghost sm" target="_blank" rel="noopener" href="https://explorer.hiro.so/txid/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun?chain=mainnet">View ↗</a>
-      </div>
-      <div class="ctr">
-        <div class="role">Permanence layer</div>
-        <h4>xtrata-v3-2-3</h4>
-        <code>SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3</code>
-        <a class="btn ghost sm" target="_blank" rel="noopener" href="https://explorer.hiro.so/txid/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3?chain=mainnet">View ↗</a>
-      </div>
+
     </div>
   </section>
 </div>
 
-<!-- FAQ -->
+<!-- FOUNDERS CTA -->
 <div class="wrap">
-  <section>
-    <span class="section-tag">Questions</span>
-    <h2 class="sec">FAQ</h2>
-    <details open><summary>Do I lose my original Pepe?</summary><p>No. Your Pepe is never burned or altered. Inscribing creates a <em>second</em> token — the forever twin — bound to it. One of the pair always sits in the contract; you can swap which one you hold at any time, but they can never be separated.</p></details>
-    <details><summary>Why are there two tokens?</summary><p>The original Pepe lives on a contract whose art could rot. The forever twin is a permanent, fully on-chain copy on Xtrata. Keeping them bound 1:1 — with one always escrowed — means the permanent record travels with the collectible as a single economic unit.</p></details>
-    <details><summary>What makes it "forever"?</summary><p>Each twin stores a canonical content hash and the artwork itself on-chain via Xtrata. Once the collection's canonical records are <code>finalize</code>d, they're immutable — no one can change or remove them, including the team. The live "Canonical record" stat above shows the current state.</p></details>
-    <details><summary>How much does it cost?</summary><p>The first 87 inscriptions are completely free. After that it's a flat 3 STX inscribe fee (plus the small Xtrata storage fee for writing your art on-chain). The live counter above shows how many free spots remain.</p></details>
-    <details><summary>I run another collection — can I do this?</summary><p>Yes. The forever-twin model is designed to repoint <em>existing</em> collections without re-minting or migrating holders. Bitcoin Pepes is the flagship; the same pattern works for any Stacks collection. Reach out about a repointing audit.</p></details>
-  </section>
-</div>
-
-<!-- CTA -->
-<div class="wrap">
-  <section>
-    <div class="cta-banner">
-      <h2>Don't be part of the 20%.</h2>
-      <p>Give your Bitcoin Pepe a permanent on-chain counterpart. Claim its Forever Twin on Fak.fun.</p>
-      <a class="btn" href="#inscribe" id="cta-final">Claim your Forever Twin →</a>
+  <section id="founders">
+    <div class="founder">
+      <h2>Run a collection? Don't be part of the 20%.</h2>
+      <p>If your art depends on IPFS gateways, centralized servers, or pinning bills, your collection has infrastructure risk. Forever Twins gives it a permanent on-chain counterpart — without re-minting or migrating holders.</p>
+      <div class="hero-cta">
+        <a class="btn" href="https://x.com/XtrataLayers" target="_blank" rel="noopener">Request a permanence audit →</a>
+        <a class="btn ghost" href="./bitcoin-pepes.html">See the Pepes case study</a>
+      </div>
     </div>
-    <p class="disclaimer">This page reads public, read-only data directly from Stacks mainnet contracts and is for informational purposes only. It is not financial advice and makes no promise about price or returns. "Permanence" refers to the finalized on-chain canonical record on Xtrata, not to any repair of the original collection's off-chain art. Always verify contract addresses before signing any transaction.</p>
+    <p class="disclaimer">Forever Twins create a permanent on-chain counterpart on Xtrata; they do not repair an original collection's existing off-chain art or pointer. This page is informational only and is not financial advice. Live figures are read directly from public Stacks mainnet contracts. Always verify contract addresses before signing any transaction.</p>
   </section>
 </div>
 
 <footer>
   <div class="wrap foot-inner">
-    <div class="brand"><span class="b-mark">₿</span> Bitcoin Pepes · Forever Twins</div>
-    <div>Powered by <a href="https://explorer.hiro.so/txid/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3?chain=mainnet" target="_blank" rel="noopener">Xtrata</a> · Built with <a href="https://fak.fun/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun" target="_blank" rel="noopener">Fak.fun</a> · <span id="foot-updated">—</span></div>
+    <div class="brand"><span class="b-mark">♾️</span> Forever Twins</div>
+    <div>Powered by <a href="https://explorer.hiro.so/txid/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3?chain=mainnet" target="_blank" rel="noopener">Xtrata</a> · Built with <a href="https://fak.fun/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun" target="_blank" rel="noopener">Fak.fun</a></div>
   </div>
 </footer>
 
 <script>
-/* ============================================================
-   CONFIG
-   ============================================================ */
-const CONFIG = {
-  apiBase: "https://api.hiro.so",
-  fwdAddr: "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22",
-  fwdName: "pepe-4ever-fakfun",
-  sender:  "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22",
-  // Live claim route on Fak.fun. The Claim buttons launch this in a new tab.
-  // Set to "" to make buttons simply scroll to the "How it works" section instead.
-  inscribeUrl: "https://fak.fun/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun",
-  refreshMs: 30000
-};
+/* Live mini-stats for the Bitcoin Pepes card — read straight from the helper contract.
+   To add another live collection later, copy the collection card markup, give its
+   metrics unique IDs, and add a matching entry to COLLECTIONS below. */
+const COLLECTIONS = [
+  {
+    addr: "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22",
+    name: "pepe-4ever-fakfun",
+    countEl: "c-inscribed",
+    statusEl: "c-status",
+    trustEl: "trust-count"
+  }
+];
+const API = "https://api.hiro.so";
 
-/* ============================================================
-   Minimal Clarity hex decoder (uint / bool / optional / buffer)
-   ============================================================ */
-function hexToBytes(hex){
-  hex = (hex||"").replace(/^0x/,"");
-  const out = [];
-  for (let i=0;i<hex.length;i+=2) out.push(parseInt(hex.substr(i,2),16));
-  return out;
-}
 function decodeClarity(hex){
-  const b = hexToBytes(hex);
+  const b = (hex||"").replace(/^0x/,"").match(/.{1,2}/g)?.map(x=>parseInt(x,16)) || [];
   let i = 0;
   function read(){
     const t = b[i++];
     switch(t){
-      case 0x07: // (ok x)
-      case 0x08: // (err x)
-        return read();
-      case 0x00: // int
-      case 0x01: { // uint
-        let v = 0n;
-        for (let k=0;k<16;k++) v = (v<<8n) | BigInt(b[i++]);
-        return v;
-      }
-      case 0x03: return true;   // bool true
-      case 0x04: return false;  // bool false
-      case 0x09: return null;   // optional none
-      case 0x0a: return read(); // optional some -> inner
-      case 0x02: { // buffer
-        let len = 0;
-        for (let k=0;k<4;k++) len = (len<<8) | b[i++];
-        const buf = b.slice(i,i+len); i += len;
-        return "0x" + buf.map(x=>x.toString(16).padStart(2,"0")).join("");
-      }
+      case 0x07: case 0x08: return read();
+      case 0x00: case 0x01: { let v=0n; for(let k=0;k<16;k++) v=(v<<8n)|BigInt(b[i++]); return v; }
+      case 0x03: return true; case 0x04: return false;
+      case 0x09: return null; case 0x0a: return read();
       default: return undefined;
     }
   }
   return read();
 }
-
-async function callRead(fnName, args=[]){
-  const url = `${CONFIG.apiBase}/v2/contracts/call-read/${CONFIG.fwdAddr}/${CONFIG.fwdName}/${fnName}`;
-  const res = await fetch(url, {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ sender: CONFIG.sender, arguments: args })
+async function callRead(addr, name, fn){
+  const r = await fetch(`${API}/v2/contracts/call-read/${addr}/${name}/${fn}`, {
+    method:"POST", headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ sender: addr, arguments: [] })
   });
-  if (!res.ok) throw new Error("HTTP "+res.status);
-  const data = await res.json();
-  if (!data.okay) throw new Error("call-read not okay: "+(data.cause||""));
-  return decodeClarity(data.result);
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  const d = await r.json();
+  if(!d.okay) throw new Error("not okay");
+  return decodeClarity(d.result);
 }
-
-// Clarity uint argument encoder (for the token checker)
-function uintArg(n){
-  let hex = BigInt(n).toString(16).padStart(32,"0");
-  return "0x01" + hex;
-}
-
-/* ============================================================
-   Live stats
-   ============================================================ */
-const $ = (id)=>document.getElementById(id);
-let lastGood = null;
-
-function fmtTime(){
-  const d = new Date();
-  return d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
-}
-
-async function refreshStats(){
+async function loadCollection(c){
   try{
-    const [count, threshold, fee, finalized] = await Promise.all([
-      callRead("get-inscribed-count"),
-      callRead("get-free-threshold"),
-      callRead("get-fee"),
-      callRead("is-finalized")
+    const [count, finalized] = await Promise.all([
+      callRead(c.addr, c.name, "get-inscribed-count"),
+      callRead(c.addr, c.name, "is-finalized")
     ]);
-
-    const c = Number(count), th = Number(threshold);
-    const freeLeft = Math.max(0, th - c);
-    const feeSTX = Number(fee) / 1_000_000;
-    const isFree = c < th;
-
-    $("s-inscribed").textContent = c.toLocaleString();
-    $("s-free").textContent = freeLeft.toLocaleString();
-    $("s-free-sub").textContent = `of first ${th} free`;
-
-    if (isFree){
-      $("s-price").textContent = "FREE";
-      $("s-price-sub").textContent = `until twin #${th}`;
-    } else {
-      $("s-price").textContent = feeSTX % 1 === 0 ? feeSTX + " STX" : feeSTX.toFixed(2)+" STX";
-      $("s-price-sub").textContent = "+ small on-chain storage fee";
+    const n = Number(count);
+    const elC = document.getElementById(c.countEl);
+    if(elC) elC.textContent = n.toLocaleString();
+    const elS = document.getElementById(c.statusEl);
+    if(elS){
+      elS.textContent = finalized ? "🔒 Final" : "Seeding";
+      elS.style.color = finalized ? "var(--green)" : "var(--gold-2)";
+      elS.style.fontSize = "18px";
     }
-
-    if (finalized){
-      $("s-final").textContent = "🔒 Finalized";
-      $("s-final").style.color = "var(--green)";
-      $("s-final-sub").textContent = "immutable forever";
-    } else {
-      $("s-final").textContent = "Seeding";
-      $("s-final").style.color = "var(--gold-2)";
-      $("s-final-sub").textContent = "not yet finalized";
-    }
-
-    // progress card — adapts before vs. after the free-87 milestone
-    if (isFree){
-      $("p-title").textContent = "The Free 87";
-      const pct = Math.min(100, th>0 ? (c/th*100) : 0);
-      $("p-bar").style.width = pct.toFixed(1)+"%";
-      $("p-left").textContent = `${freeLeft} free left`;
-      $("p-count").textContent = `${c} / ${th} inscribed`;
-    } else {
-      $("p-title").textContent = "Forever Twins claimed";
-      $("p-bar").style.width = "100%";
-      $("p-left").textContent = `${c.toLocaleString()} on Xtrata`;
-      $("p-count").textContent = `Free 87 era complete · ${c.toLocaleString()} twins minted`;
-    }
-    $("p-updated").textContent = "updated "+fmtTime();
-    $("foot-updated").textContent = "updated "+fmtTime();
-
-    $("hero-free-note").textContent = freeLeft>0
-      ? `⚡ ${freeLeft} of the first ${th} Forever Twins are still FREE to claim`
-      : `${c.toLocaleString()} Pepes already added to Xtrata · claim yours for ${feeSTX} STX`;
-
-    $("err-note").style.display = "none";
-    lastGood = {c, th, freeLeft};
+    const elT = document.getElementById(c.trustEl);
+    if(elT) elT.innerHTML = `<b>${n.toLocaleString()}</b> Pepes already made permanent`;
   }catch(e){
-    console.warn("stats refresh failed", e);
-    $("err-note").style.display = "block";
-    if (!lastGood){
-      // first-load failure: show sensible placeholders from known contract defaults
-      $("s-free").textContent = "87";
-      $("s-free-sub").textContent = "of first 87 free";
-      $("s-price").textContent = "FREE";
-      $("hero-free-note").textContent = "⚡ The first 87 forever twins are FREE";
-    }
+    console.warn("collection load failed", c.name, e);
+    const elC = document.getElementById(c.countEl);
+    if(elC) elC.textContent = "live";
   }
 }
-
-/* ============================================================
-   Token checker
-   ============================================================ */
-async function checkToken(){
-  const idRaw = $("check-id").value.trim();
-  const box = $("check-result");
-  if (idRaw === "" || isNaN(Number(idRaw)) || Number(idRaw) < 0){
-    box.className = "check-result show";
-    box.innerHTML = `<div class="res-line"><span class="tag warn">!</span> Enter a valid token ID.</div>`;
-    return;
-  }
-  const id = Number(idRaw);
-  box.className = "check-result show";
-  box.innerHTML = `<div class="res-line">Reading token #${id} from chain…</div>`;
-  try{
-    const arg = uintArg(id);
-    const [canonical, inscribed] = await Promise.all([
-      callRead("get-canonical-hash", [arg]),   // optional buff
-      callRead("is-inscribed", [arg])           // (ok bool)
-    ]);
-    const isCanonical = canonical !== null && canonical !== undefined;
-    const isInscribed = inscribed === true;
-
-    let lines = "";
-    lines += `<div class="res-line"><span class="tag ${isCanonical?'ok':'no'}">${isCanonical?'YES':'NO'}</span> Eligible for a forever twin (canonical record exists)</div>`;
-    lines += `<div class="res-line"><span class="tag ${isInscribed?'ok':'warn'}">${isInscribed?'INSCRIBED':'NOT YET'}</span> ${isInscribed?'A forever twin has already been minted for this Pepe.':'No twin minted yet — this Pepe can still be inscribed.'}</div>`;
-    if (isCanonical){
-      lines += `<div class="res-line" style="color:var(--muted);font-size:12px">canonical hash: ${String(canonical).slice(0,22)}…</div>`;
-    }
-    if (!isCanonical){
-      lines += `<div class="res-line" style="color:var(--muted);font-size:12px">No canonical record found for #${id}. Double-check the token ID exists in the collection.</div>`;
-    }
-    box.innerHTML = lines;
-  }catch(e){
-    console.warn(e);
-    box.innerHTML = `<div class="res-line"><span class="tag no">ERR</span> Couldn't read that token right now. Try again in a moment.</div>`;
-  }
-}
-
-/* ============================================================
-   Wire up + boot
-   ============================================================ */
-function wireInscribeButtons(){
-  if (!CONFIG.inscribeUrl) return;
-  ["nav-cta","hero-claim","main-inscribe","cta-final"].forEach(id=>{
-    const el = $(id);
-    if (el){ el.setAttribute("href", CONFIG.inscribeUrl); el.setAttribute("target","_blank"); el.setAttribute("rel","noopener"); }
-  });
-}
-
-$("check-btn").addEventListener("click", checkToken);
-$("check-id").addEventListener("keydown", e=>{ if(e.key==="Enter") checkToken(); });
-
-wireInscribeButtons();
-refreshStats();
-setInterval(refreshStats, CONFIG.refreshMs);
+COLLECTIONS.forEach(loadCollection);
+setInterval(()=>COLLECTIONS.forEach(loadCollection), 30000);
 </script>
 </body>
 </html>
