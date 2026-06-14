@@ -30,7 +30,7 @@ Body: The original keeps its identity. The Xtrata twin gives the artwork a perma
 
 Headline: Bitcoin Pepes are first.
 
-Body: First 87 appear to be free, then 3 STX. Claim at Fak.fun. Verify it yourself. TBC final promo and URL.
+Body: Helper source default: first 87 free, then 3 STX. Claim at Fak.fun. Verify it yourself. TBC final URL and live state.
 
 ## 7-Card Version
 
@@ -74,5 +74,4 @@ Body: Intended model: one side live, one side escrowed, one economic unit. Needs
 
 Headline: Bitcoin Pepes are first.
 
-Body: First 87 appear to be free, then 3 STX. Claim at Fak.fun. Verify on Xtrata. TBC final promo and URL.
-
+Body: Helper source default: first 87 free, then 3 STX. Claim at Fak.fun. Verify on Xtrata. TBC final URL and live state.

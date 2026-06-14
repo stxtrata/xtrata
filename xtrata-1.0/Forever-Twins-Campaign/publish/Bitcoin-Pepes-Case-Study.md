@@ -53,13 +53,13 @@ Expected model, needs helper-contract confirmation:
 ## Current Claim Stats
 
 - Current claimed: TBC.
-- Promo threshold: first 87 TBC.
-- Paid price after promo: 3 STX TBC.
+- Promo threshold: helper source default first 87; live state TBC.
+- Paid price after promo: helper source default 3 STX; live state TBC.
 - Network transaction fee behavior: TBC.
 
 ## First 87 Promo
 
-The public promo appears to be first 87 free, then 3 STX. This must be confirmed against the live contract and Fak.fun docs before publication.
+The deployed-name helper source defaults to first 87 free, then 3 STX. Confirm live `get-free-threshold` and `get-fee` before publication.
 
 ## Verification Links
 
@@ -94,4 +94,3 @@ The public promo appears to be first 87 free, then 3 STX. This must be confirmed
 - Xtrata inscription view.
 - Contract read-only verification.
 - Claim counter.
-

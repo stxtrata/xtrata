@@ -44,7 +44,7 @@ Shot: Claim flow screen capture from Fak.fun. Then Xtrata inscription view.
 
 ### 50-60 Seconds
 
-Narration: The first 87 appear to be free, then 3 STX. Claim at Fak.fun. Powered by Xtrata.
+Narration: The helper source defaults to the first 87 free, then 3 STX. Claim at Fak.fun. Powered by Xtrata.
 
 Caption: First 87 free. Then 3 STX. TBC.
 
@@ -68,7 +68,6 @@ In many collections, the token points to a file somewhere else. If that path bre
 
 Forever Twins give existing NFTs a permanent on-chain counterpart.
 
-Bitcoin Pepes are first, powered by Xtrata and built with Fak.fun. The first 87 appear to be free, then 3 STX. TBC.
+Bitcoin Pepes are first, powered by Xtrata and built with Fak.fun. Helper source default: first 87 free, then 3 STX. Confirm live state before recording.
 
 Claim at Fak.fun. TBC URL.
-

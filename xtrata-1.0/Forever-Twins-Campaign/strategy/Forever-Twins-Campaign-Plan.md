@@ -49,7 +49,7 @@ This section is the campaign's spine — every piece of content must be able to 
 
 **The pricing mechanic is a built-in campaign engine:**
 
-- **The first 87 inscriptions appear to be free** (`free-threshold` likely 87; while `inscribed-count` < 87, the fee is expected to be `u0`). This is our scarcity/urgency lever, but the live helper contract and Fak.fun docs need confirmation before public release.
+- **The helper source defaults to the first 87 inscriptions free** (`free-threshold` = 87; while `inscribed-count` < 87, `fee-for` returns `u0`). This is our scarcity/urgency lever. Check live `get-free-threshold` before posting in case the owner has changed it.
 - After that, **3 STX** per inscription (`inscribe-fee` = 3,000,000 µSTX), with optional per-wallet discounts the team can grant (allowlists, OG holders, partner collections).
 - Fees split between two payout addresses — useful for a transparent "where the money goes" / treasury story if we want one.
 
@@ -188,5 +188,5 @@ Turn proof into adoption by other projects. This is where the business actually 
 ### Appendix — source anchors
 
 - Contracts: original `SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe`; forever `SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun`; Xtrata master `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3`.
-- Mechanic partly verified from local Xtrata core source. Helper-contract specifics still need Rapha / contract confirmation: inscribe, swap escrow, canonical-hash finalize, free-87 threshold, and 3-STX fee.
+- Mechanic verified from local Xtrata core source and copied Rapha helper source. Live-state values still need read-only checks before posting: current claim count, free threshold, fee, and finalization status.
 - Statistics and failure cases drawn from the two research reports in *Research/IPFS and Link Rot/* (AlwaysNFT ~498k scan, Pinata top-1000 study, Hedera scans, FTX/Coachella, nft.storage Classic, CloneX/RTFKT, Infura, Binance 2026 shutdown).

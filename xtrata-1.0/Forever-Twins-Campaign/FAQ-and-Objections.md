@@ -34,9 +34,7 @@ Needs Rapha / contract confirmation.
 
 ## Can both tokens circulate at once?
 
-The intended answer is no. The helper contract is expected to keep one counterpart escrowed so both sides cannot freely circulate at the same time.
-
-Needs contract verification.
+The helper source enforces an escrow state in `Bindings`: when `xtrata-escrowed` is true, the registry holds the Xtrata twin and the holder keeps the Pepe; when false, the registry holds the Pepe and the holder keeps the Xtrata twin.
 
 ## What is escrowed?
 
@@ -54,7 +52,7 @@ Exact UI wording TBC.
 
 In the intended model, swapping moves the currently live side into escrow and releases the counterpart to the holder.
 
-Needs helper-contract verification.
+Confirmed in helper source by `swap-pepe-for-xtrata` and `swap-xtrata-for-pepe`.
 
 ## What happens if I sell or transfer?
 
@@ -129,4 +127,3 @@ Xtrata can store larger files, including music and other media. The local v3.2.3
 ## Is this financial advice or investment-related?
 
 No. This campaign is about media permanence, ownership clarity, and infrastructure risk. It is not investment advice and does not make price or return claims.
-

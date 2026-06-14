@@ -48,7 +48,7 @@ TBC.
 
 Potential calls:
 
-- `finalize-canonical` from existing campaign notes. Needs contract verification.
+- `finalize-canonical` is present in `pepe-4ever-fakfun.clar`.
 - manifest inscription or manifest pointer call. TBC.
 
 ## Livestream Run-of-Show
@@ -103,4 +103,3 @@ Links:
 - Finalization tx: TBC
 - Verify guide: TBC
 - Claim: TBC
-

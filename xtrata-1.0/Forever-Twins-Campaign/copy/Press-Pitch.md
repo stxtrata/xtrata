@@ -17,13 +17,13 @@ NFTs promised permanence, but many tokens still point to media paths that can br
 
 Xtrata and Fak.fun are launching the first public Forever Twins campaign with Bitcoin Pepes. The idea is simple: give an existing NFT a permanent on-chain counterpart, so the original keeps its identity while the artwork gets a durable Xtrata-backed twin.
 
-The public promo appears to be first 87 free, then 3 STX. TBC final confirmation.
+The deployed-name helper source defaults to first 87 free, then 3 STX. Live state should be confirmed before publication.
 
 Happy to share verification links, claim stats, and quotes from Jim and Rapha.
 
 ## One-Paragraph Pitch
 
-Xtrata and Fak.fun are launching Bitcoin Pepes as the first public Forever Twins collection. The campaign addresses a basic NFT infrastructure problem: a token can remain valid while the media it points to disappears. Forever Twins give existing NFTs permanent on-chain counterparts, preserving the original collection identity while storing the artwork on Xtrata. The launch is expected to include a first 87 free promo, then 3 STX, pending final contract and Fak.fun confirmation.
+Xtrata and Fak.fun are launching Bitcoin Pepes as the first public Forever Twins collection. The campaign addresses a basic NFT infrastructure problem: a token can remain valid while the media it points to disappears. Forever Twins give existing NFTs permanent on-chain counterparts, preserving the original collection identity while storing the artwork on Xtrata. The deployed-name helper source defaults to first 87 free, then 3 STX, with live state to be confirmed before publication.
 
 ## Longer Pitch
 
@@ -38,7 +38,7 @@ The campaign is deliberately pain-first: the token can survive while the artwork
 - Xtrata stores content bytes on-chain in chunks.
 - Local v3.2.3 source confirms a 32 MiB hard cap and single-transaction small-file path up to 32 chunks.
 - Bitcoin Pepes are planned as the first public Forever Twins collection. TBC.
-- First 87 free, then 3 STX. TBC.
+- Helper source default: first 87 free, then 3 STX. Live state TBC.
 - Claim URL: TBC.
 - Current claim count: TBC.
 
@@ -56,4 +56,3 @@ The campaign is deliberately pain-first: the token can survive while the artwork
 - Bitcoin Pepes Become the First Public Forever Twins Collection on Xtrata
 - Xtrata and Fak.fun Want to Make NFT Art Permanent, Starting With Bitcoin Pepes
 - The Token Survived. The Art Did Not. Forever Twins Are Built for That Problem.
-

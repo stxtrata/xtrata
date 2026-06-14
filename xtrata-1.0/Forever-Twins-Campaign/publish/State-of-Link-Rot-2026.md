@@ -110,7 +110,7 @@ Bitcoin Pepes are the first public Forever Twins collection. TBC final wording.
 
 The campaign is powered by Xtrata and built with Fak.fun. TBC final wording.
 
-The public promo appears to be first 87 free, then 3 STX. Needs contract and Fak.fun confirmation.
+The deployed-name helper source defaults to first 87 free, then 3 STX. Check live state before publication.
 
 ## What Founders Should Do Next
 
@@ -127,4 +127,3 @@ Founders should map their collection's infrastructure:
 Optional CTA:
 
 Request a collection permanence audit.
-

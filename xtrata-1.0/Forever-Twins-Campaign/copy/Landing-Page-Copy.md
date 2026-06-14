@@ -68,7 +68,7 @@ This must be confirmed against the live helper contract and Fak.fun docs before 
 2. Select a Bitcoin Pepe you hold.
 3. Claim or inscribe the Forever Twin.
 4. The artwork is stored on Xtrata.
-5. The original and twin are intended to remain bound as one pair. Needs contract confirmation.
+5. The helper source binds the original and twin as one escrowed pair.
 6. View the Xtrata copy at `https://xtrata.xyz/inscription/{id}`.
 
 ## Verify It Yourself
@@ -94,4 +94,3 @@ If your collection depends on IPFS gateways, centralized servers, marketplace ho
 Xtrata and Fak.fun can help collections create permanent on-chain counterparts without pretending the original collection never existed.
 
 CTA: Request a collection permanence audit.
-

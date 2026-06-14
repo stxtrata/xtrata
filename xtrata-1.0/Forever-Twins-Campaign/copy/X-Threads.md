@@ -28,7 +28,7 @@ A Forever Twin gives an existing NFT a permanent on-chain counterpart, powered b
 
 6/ Bitcoin Pepes are first. TBC final name and partner wording.
 
-The first 87 appear to be free, then 3 STX. TBC against Fak.fun/live contract.
+The deployed-name helper source defaults to first 87 free, then 3 STX. Check live state before posting.
 
 7/ This is not pin it and pray.
 
@@ -86,9 +86,9 @@ Your Pepe should not depend forever on a fragile media path.
 
 The twin gives it permanence.
 
-The pair is intended to stay bound. Needs contract confirmation.
+The helper source binds the pair through escrow.
 
-5/ First 87 appear to be free. Then 3 STX. TBC final promo confirmation.
+5/ Helper source default: first 87 free. Then 3 STX. Check live state before posting.
 
 Claim: TBC.
 
@@ -130,7 +130,7 @@ One side escrowed.
 
 The holder controls the live side.
 
-Needs contract confirmation before final publication.
+Confirmed in helper source; live behavior should still be tested in the UI before final publication.
 
 4/ This should not create two freely circulating Pepes.
 
@@ -188,7 +188,7 @@ Do not post named examples until sourced.
 
 ## 8. First 87 / Claim Urgency Thread
 
-1/ First 87 Bitcoin Pepes Forever Twins appear to be free. TBC final confirmation.
+1/ Helper source default: first 87 Bitcoin Pepes Forever Twins are free.
 
 After that: 3 STX. TBC final confirmation.
 
@@ -221,4 +221,3 @@ Has the record been finalized?
 4/ For Bitcoin Pepes, manifest/finalization details are TBC with Rapha and the helper contract.
 
 5/ We will publish the verification path before asking people to trust the claim.
-
