@@ -9291,6 +9291,14 @@
         const runtimeImageUrl = getTokenRuntimeImageUrl(token);
         if (runtimeImageUrl) {
           const mimeType = token.meta.mimeType ?? 'application/octet-stream';
+          if (
+            state.explorerMode &&
+            token.meta.totalSize <= MAX_GRID_EAGER_FULL_LOAD_BYTES &&
+            isPotentialAnimatedRasterMimeType(mimeType)
+          ) {
+            await loadSelectedTokenPreviewLocally(token, requestId);
+            return;
+          }
           state.tokenPreviewTokenId = token.id.toString();
           state.tokenPreviewBytes = null;
           state.tokenPreviewMimeType = mimeType;
