@@ -350,7 +350,7 @@ The live counter should be central:
 
 > 12 / 87 Forever Twins claimed.  
 > 38 / 87 Forever Twins claimed.  
-> 71 / 87 Forever Twins claimed.
+> 61 / 87 Forever Twins claimed.
 
 Every post should turn the count into pressure.
 
