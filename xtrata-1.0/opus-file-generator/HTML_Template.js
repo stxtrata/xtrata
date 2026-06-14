@@ -216,6 +216,42 @@ const buildVisualSource = (config) => {
   };
 };
 
+const normalizeArtFit = (value) =>
+  String(value || '').trim().toLowerCase() === 'contain' ? 'contain' : 'cover';
+
+const buildExportAssets = ({ config, source, visual }) => {
+  const audioBase64 = normalizeBase64(config.audioBase64);
+  const visualBase64 = normalizeBase64(config.visualBase64 || config.imageBase64);
+  return {
+    audio:
+      source.sourceKind === 'embedded-base64'
+        ? {
+            encoding: 'base64',
+            mimeType: source.audioMimeType,
+            data: audioBase64
+          }
+        : {
+            source: source.source,
+            sourceKind: source.sourceKind,
+            mimeType: source.audioMimeType
+          },
+    visual:
+      visual.sourceKind === 'embedded-base64'
+        ? {
+            encoding: 'base64',
+            mimeType: sanitizeVisualMimeType(config.visualMimeType || config.imageMimeType),
+            kind: visual.kind,
+            data: visualBase64
+          }
+        : {
+            source: visual.source,
+            sourceKind: visual.sourceKind,
+            mimeType: sanitizeVisualMimeType(config.visualMimeType || config.imageMimeType),
+            kind: visual.kind
+          }
+  };
+};
+
 const buildCoverMarkup = (config, title) => {
   const visual = buildVisualSource(config);
   if (!visual.source) {
@@ -232,9 +268,11 @@ const buildCoverMarkup = (config, title) => {
       title
     )} visual"><source src="${escapeAttr(
       visual.source
-    )}"${typeAttribute}>This browser cannot play the visual.</video>`;
+    )}"${typeAttribute} data-xtrata-asset="visual">This browser cannot play the visual.</video>`;
   }
-  return `<img src="${escapeAttr(visual.source)}" alt="${escapeAttr(title)} cover art">`;
+  return `<img src="${escapeAttr(
+    visual.source
+  )}" alt="${escapeAttr(title)} cover art" data-xtrata-asset="visual">`;
 };
 
 const buildXtrataAudioPlayerHtml = (config) => {
@@ -255,6 +293,7 @@ const buildXtrataAudioPlayerHtml = (config) => {
   const source = buildPlayerSource(config);
   const visual = buildVisualSource(config);
   const dependencies = buildDependencies(config);
+  const artFit = normalizeArtFit(config.artFit || metadata.artFit);
 
   if (!source.source) {
     return `<!DOCTYPE html><html><head><title>Error</title></head><body><h1>Error generating Xtrata audio player: missing audio source.</h1></body></html>`;
@@ -272,6 +311,7 @@ const buildXtrataAudioPlayerHtml = (config) => {
     visualSourceMode: getVisualSourceMode(config),
     visualSourceKind: visual.sourceKind,
     visualMimeType: sanitizeVisualMimeType(config.visualMimeType || config.imageMimeType),
+    assets: buildExportAssets({ config, source, visual }),
     dependencies,
     metadata: {
       assetType,
@@ -363,6 +403,7 @@ const buildXtrataAudioPlayerHtml = (config) => {
     .player {
       position: relative;
       width: min(100vmin, 760px);
+      height: auto;
       max-width: 100%;
       max-height: 100%;
       aspect-ratio: 1 / 1;
@@ -371,6 +412,7 @@ const buildXtrataAudioPlayerHtml = (config) => {
       background: #151812;
       box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
       overflow: hidden;
+      container-type: size;
     }
 
     .stage {
@@ -405,6 +447,12 @@ const buildXtrataAudioPlayerHtml = (config) => {
       object-fit: cover;
       display: block;
       pointer-events: none;
+    }
+
+    .player[data-art-fit="contain"] .cover-media img,
+    .player[data-art-fit="contain"] .cover-media video {
+      object-fit: contain;
+      background: #dfe8df;
     }
 
     .cover-placeholder {
@@ -466,6 +514,10 @@ const buildXtrataAudioPlayerHtml = (config) => {
       letter-spacing: 0;
       max-width: 16ch;
       overflow-wrap: anywhere;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
 
     .artist {
@@ -838,12 +890,84 @@ const buildXtrataAudioPlayerHtml = (config) => {
       .top-bar { padding: 10px; }
       .transport-row button { font-size: 0.72rem; }
     }
+
+    @container (max-width: 320px) {
+      .player {
+        width: 100%;
+        height: 100%;
+        border-radius: 6px;
+        box-shadow: none;
+      }
+
+      .top-bar {
+        grid-template-columns: minmax(0, 1fr);
+        padding: clamp(6px, 5cqw, 10px);
+      }
+
+      .eyebrow,
+      .artist,
+      .top-actions,
+      .drawer,
+      .click-hint {
+        display: none;
+      }
+
+      h1 {
+        max-width: 13ch;
+        font-size: clamp(0.72rem, 8cqw, 1.15rem);
+        line-height: 1.02;
+        -webkit-line-clamp: 2;
+      }
+
+      .stage-scrim {
+        background:
+          linear-gradient(180deg, rgba(0, 0, 0, 0.58), transparent 34%),
+          linear-gradient(0deg, rgba(0, 0, 0, 0.35), transparent 34%);
+      }
+
+      .cover-placeholder {
+        width: 40%;
+        font-size: clamp(1.8rem, 18cqw, 3.2rem);
+      }
+    }
+
+    @media (max-width: 320px), (max-height: 320px) {
+      .player {
+        width: 100vmin;
+        height: 100vmin;
+        box-shadow: none;
+      }
+
+      .eyebrow,
+      .artist,
+      .top-actions,
+      .drawer,
+      .click-hint {
+        display: none;
+      }
+
+      .top-bar {
+        grid-template-columns: minmax(0, 1fr);
+        padding: 8px;
+      }
+
+      h1 {
+        max-width: 13ch;
+        font-size: clamp(0.72rem, 8vmin, 1.15rem);
+        line-height: 1.02;
+        -webkit-line-clamp: 2;
+      }
+    }
   </style>
 </head>
 <body>
   <main id="xtrataPlayer" class="player" data-panel="closed" data-playback="idle" data-xtrata-player-mode="${escapeAttr(
     source.mode
-  )}" data-xtrata-dependencies="${escapeAttr(dependencies.join(','))}">
+  )}" data-xtrata-dependencies="${escapeAttr(
+    dependencies.join(',')
+  )}" data-art-fit="${escapeAttr(artFit)}" data-xtrata-template="${escapeAttr(
+    XTRATA_PLAYER_TEMPLATE_VERSION
+  )}">
     <section id="xtrataCover" class="stage" role="button" tabindex="0" aria-label="Click artwork to play or pause. Double click to stop and reset." title="Click to play or pause. Double click to stop and reset.">
       <div class="cover-media" aria-hidden="true">${buildCoverMarkup(config, title)}</div>
       <div class="stage-scrim" aria-hidden="true"></div>
@@ -904,7 +1028,7 @@ const buildXtrataAudioPlayerHtml = (config) => {
         </div>
       </section>
     </section>
-    <audio id="xtrataAudio" class="audio-native" preload="metadata"${
+    <audio id="xtrataAudio" class="audio-native" preload="metadata" data-xtrata-asset="audio"${
       isLoop ? ' loop' : ''
     }>
       <source src="${escapeAttr(source.source)}" type="${escapeAttr(
