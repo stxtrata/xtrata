@@ -1,6 +1,6 @@
 # Press Pitch
 
-Draft status: needs sourced claims, claim count, final name, and quotes.
+Draft status: needs fresh sourced claim count, fee state, and quotes before sending.
 
 ## Subject Lines
 
@@ -15,21 +15,21 @@ Hi [name],
 
 NFTs promised permanence, but many tokens still point to media paths that can break: gateways, servers, marketplace URLs, metadata endpoints, and pinning services.
 
-Xtrata and Fak.fun are launching the first public Forever Twins campaign with Bitcoin Pepes. The idea is simple: give an existing NFT a permanent on-chain counterpart, so the original keeps its identity while the artwork gets a durable Xtrata-backed twin.
+Xtrata and Fak.fun have launched the first public Forever Twins campaign with Bitcoin Pepes. Holders are already claiming on Fak.fun, giving existing Pepes permanent on-chain counterparts while the original collection keeps its identity.
 
-The deployed-name helper source defaults to first 87 free, then 3 STX. Live state should be confirmed before publication.
+Around 200 Pepes have already been added to Xtrata in casual campaign tracking; pull a fresh `get-inscribed-count` before sending this as a hard number.
 
 Happy to share verification links, claim stats, and quotes from Jim and Rapha.
 
 ## One-Paragraph Pitch
 
-Xtrata and Fak.fun are launching Bitcoin Pepes as the first public Forever Twins collection. The campaign addresses a basic NFT infrastructure problem: a token can remain valid while the media it points to disappears. Forever Twins give existing NFTs permanent on-chain counterparts, preserving the original collection identity while storing the artwork on Xtrata. The deployed-name helper source defaults to first 87 free, then 3 STX, with live state to be confirmed before publication.
+Xtrata and Fak.fun have launched Bitcoin Pepes as the first public Forever Twins collection. The campaign addresses a basic NFT infrastructure problem: a token can remain valid while the media it points to disappears. Forever Twins give existing NFTs permanent on-chain counterparts, preserving the original collection identity while storing the artwork on Xtrata. Holders are already claiming through Fak.fun, with the exact live count to be refreshed from contract state before publication.
 
 ## Longer Pitch
 
 Most NFTs do not store the artwork inside the token. They point to files, gateways, servers, marketplace URLs, metadata endpoints, or pinning services. If those paths break, holders can still own a valid token while the image, audio, animation, or metadata disappears.
 
-Xtrata is positioning Forever Twins as a practical answer. Instead of telling holders to abandon the original collection, a Forever Twin gives the existing NFT a permanent on-chain counterpart. Bitcoin Pepes are the first public campaign, built with Fak.fun and powered by Xtrata. TBC final wording.
+Xtrata is positioning Forever Twins as a practical answer. Instead of telling holders to abandon the original collection, a Forever Twin gives the existing NFT a permanent on-chain counterpart. Bitcoin Pepes are the first public campaign, built with Fak.fun and powered by Xtrata, and holders have already started claiming.
 
 The campaign is deliberately pain-first: the token can survive while the artwork disappears. The fix is a permanent twin that can be independently verified.
 
@@ -37,10 +37,10 @@ The campaign is deliberately pain-first: the token can survive while the artwork
 
 - Xtrata stores content bytes on-chain in chunks.
 - Local v3.2.3 source confirms a 32 MiB hard cap and single-transaction small-file path up to 32 chunks.
-- Bitcoin Pepes are planned as the first public Forever Twins collection. TBC.
-- Helper source default: first 87 free, then 3 STX. Live state TBC.
-- Claim URL: TBC.
-- Current claim count: TBC.
+- Bitcoin Pepes are the first public Forever Twins collection.
+- Helper source default: first 87 free, then 3 STX. Live state still needs refresh before active fee language.
+- Claim URL: `https://fak.fun/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun`.
+- Current claim count: around 200 in casual copy; exact count needs a fresh `get-inscribed-count` read before formal publication.
 
 ## Quote Placeholder: Jim
 

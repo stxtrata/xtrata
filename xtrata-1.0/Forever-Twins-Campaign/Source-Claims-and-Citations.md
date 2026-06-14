@@ -296,11 +296,11 @@ Bitcoin Pepes are the first public Forever Twins collection.
 
 ### Approved Public Wording
 
-Bitcoin Pepes are planned as the first public Forever Twins collection, powered by Xtrata and built with Fak.fun.
+Bitcoin Pepes are the first public Forever Twins collection, powered by Xtrata and built with Fak.fun. Holders are already claiming Forever Twins on Fak.fun.
 
 ### Source
 
-Campaign notes from Jim / user prompt. Needs Rapha confirmation.
+Campaign notes from Jim / user prompt and local contract reference route.
 
 ### Evidence / Quote
 
@@ -341,5 +341,5 @@ Low for source default. Medium for live state until `get-free-threshold` and `ge
 - Infura gateway deprecation impact.
 - Binance NFT marketplace timing and asset orphaning details.
 - KnownOrigin shutdown/preservation details.
-- Bitcoin Pepes current claim count.
+- Bitcoin Pepes exact current claim count. Casual wording may use "around 200" until refreshed from `get-inscribed-count`.
 - Exact free promo threshold and live fee.

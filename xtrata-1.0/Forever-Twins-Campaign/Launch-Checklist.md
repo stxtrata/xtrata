@@ -1,6 +1,6 @@
 # Launch Checklist
 
-Live-campaign push checklist. Treat unchecked items as blockers for broad publication.
+Post-launch live-operations checklist. Treat unchecked items as verification/support work, not evidence that the campaign has not launched. Do not publish hard exact claims until the relevant item is verified.
 
 ## Immediate Fixes
 
@@ -9,15 +9,15 @@ Live-campaign push checklist. Treat unchecked items as blockers for broad public
 | Confirm public promo wording: first 87 free, then 3 STX | Rapha / Fak.fun | TBC | Live contract or Fak.fun docs | Promo appears consistently in all public copy |
 | Confirm old promo language has been removed from active docs | Codex | Drafted | Promo confirmation | No active public docs use old promo numbers unless contract proves them |
 | Confirm final campaign name | Rapha / Fak.fun | TBC | Partner signoff | One approved name used in public assets |
-| Confirm exact claim URL | Rapha / Fak.fun | TBC | Live site | Claim buttons point to correct URL |
+| Confirm exact claim URL | Rapha / Fak.fun | Working URL recorded | Live site | Claim buttons point to `https://fak.fun/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun` or approved redirect |
 | Confirm Xtrata explorer URL format | Jim / Xtrata | Partial | Xtrata docs | Use `/inscription/{id}` for human docs and `/i/{id}` for compact references |
 
 ## Rapha Confirmations
 
 | Task | Owner | Status | Dependency | Done Criteria |
 |---|---|---|---|---|
-| Confirm helper contract address | Rapha / Fak.fun | TBC | Deployed contract | Address added to `data/contracts.json` |
-| Confirm claim count | Rapha / Fak.fun | TBC | Helper read-only call | Current count appears in launch posts |
+| Confirm helper contract address | Rapha / Fak.fun | Live | Deployed contract | Address added to `data/contracts.json` |
+| Confirm claim count | Rapha / Fak.fun | Needs exact verification | Helper read-only call | Current count appears in public posts only with as-of date |
 | Confirm listed-token behavior | Rapha / Fak.fun | TBC | Contract/site logic | FAQ gives clear holder instruction |
 | Confirm sale/transfer behavior after twin creation | Rapha / Fak.fun | TBC | Helper contract | FAQ can say what happens on transfer |
 | Confirm whether both sides can ever circulate freely | Rapha / Fak.fun | TBC | Helper contract | FAQ answer is definitive |
@@ -26,7 +26,7 @@ Live-campaign push checklist. Treat unchecked items as blockers for broad public
 
 | Task | Owner | Status | Dependency | Done Criteria |
 |---|---|---|---|---|
-| Locate helper contract source or ABI | Codex | TBC | Repo or explorer | Script TODOs replaced with real function names |
+| Locate helper contract source or ABI | Codex | Source located | Repo or explorer | Script TODOs replaced with real function names |
 | Confirm promo threshold read-only | Codex | TBC | Helper ABI | `get-inscription-count.mjs` can read live state |
 | Confirm pair mapping read-only | Codex | TBC | Helper ABI | `verify-pepe-twin.mjs` can resolve token ID |
 | Confirm canonical hash/finalization functions | Codex | TBC | Helper ABI | Verification guide includes exact calls |
@@ -48,7 +48,7 @@ Live-campaign push checklist. Treat unchecked items as blockers for broad public
 | Landing page copy | Codex | Drafted | Promo/name confirmation | Ready for web implementation |
 | Pain-first master X thread | Jim / Xtrata | Drafted | Claim URL | Ready to post |
 | Invisible failure thread | Jim / Xtrata | Drafted | None | Ready to post |
-| First 87 urgency thread | Fak.fun / Rapha | Drafted | Claim count | Ready to post |
+| Live traction thread | Fak.fun / Rapha | Drafted | Fresh claim count | Ready to post |
 | Hero video script | Codex | Drafted | UI capture | Ready for production |
 
 ## Community Activation
@@ -80,7 +80,7 @@ Live-campaign push checklist. Treat unchecked items as blockers for broad public
 
 | Task | Owner | Status | Dependency | Done Criteria |
 |---|---|---|---|---|
-| Claims ledger maintained | Rapha / Fak.fun | Created | Export path | First 87 data captured |
+| Claims ledger maintained | Rapha / Fak.fun | Created | Export path | Live claim data captured |
 | Case study screenshots collected | Jim / Rapha | TBC | Claims and UI | Publish doc has real proof |
 | Finalization event scheduled | Jim / Rapha | TBC | Manifest/finalization plan | Runbook has date and operator |
 
@@ -90,4 +90,4 @@ Live-campaign push checklist. Treat unchecked items as blockers for broad public
 - Claim URL, promo, wallet support, and transfer/listing behavior are confirmed.
 - Verification guide includes real explorer links and read-only functions.
 - Source claim register marks every hard stat as sourced or not public.
-- Launch threads and landing copy use first 87, unless contract proves otherwise.
+- Launch threads and landing copy say the campaign is live, use "around 200" only as approximate casual wording, and reserve hard numbers for fresh contract reads.

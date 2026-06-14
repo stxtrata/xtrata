@@ -61,5 +61,4 @@ Think of it as one pair with two possible faces. One side is active. The other s
 
 - FAQ: `../FAQ-and-Objections.md`
 - Verify guide: `../publish/Verify-It-Yourself-Guide.md`
-- Claim URL: TBC
-
+- Claim URL: `https://fak.fun/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun`

@@ -1,6 +1,6 @@
 # Verify It Yourself Guide
 
-Draft status: needs helper-contract function names, final claim URL, and explorer links.
+Draft status: live verification draft. Needs fresh explorer links and sample token IDs before publication.
 
 ## 1. What You Are Verifying
 
@@ -18,7 +18,7 @@ You are checking:
 
 ## 2. Simple Holder Version
 
-1. Go to `TBC claim URL`.
+1. Go to `https://fak.fun/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun`.
 2. Connect a supported wallet. Leather first, Xverse also expected. Needs confirmation.
 3. Confirm your wallet holds the original Bitcoin Pepe.
 4. Use the Fak.fun claim/checker flow to find your Pepe.
@@ -30,20 +30,22 @@ You are checking:
 
 Use the Stacks explorer to inspect:
 
-- Original Bitcoin Pepes contract: `SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe` TBC final.
-- Helper contract: `SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun` TBC final.
+- Original Bitcoin Pepes contract: `SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe`.
+- Helper contract: `SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun`.
 - Xtrata core contract: `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3` TBC live explorer.
 
 Read-only function placeholders:
 
-- Claim count: `TBC`.
-- Promo threshold: `TBC`.
-- Original token to twin mapping: `TBC`.
-- Twin to original mapping: `TBC`.
-- Escrow state: `TBC`.
+- Claim count: `get-inscribed-count`.
+- Promo threshold: `get-free-threshold`.
+- Current helper fee: `get-fee`.
+- Fee for a token/claim state: `fee-for`.
+- Original token to twin mapping: `get-binding`.
+- Inscription status: `is-inscribed`.
+- Escrow state: `get-binding`.
 - Live side / active side: `TBC`.
-- Canonical hash: `TBC`.
-- Finalization status: `TBC`.
+- Canonical hash: `get-canonical-hash`.
+- Finalization status: `is-finalized`.
 
 ## 4. Xtrata Explorer Version
 
@@ -82,5 +84,4 @@ Verification steps for Xtrata bytes:
 6. Hash the reconstructed bytes and compare to `final-hash`.
 7. Render by `mime-type`.
 
-Helper-contract verification is TBC until the `pepe-4ever-fakfun` ABI/source is confirmed.
-
+Helper-contract source is present locally at `contracts-reference/rapha-fakfun/pepe-4ever-fakfun.clar`. Run fresh read-only checks before using exact count, fee, canonical-hash, or finalization claims.

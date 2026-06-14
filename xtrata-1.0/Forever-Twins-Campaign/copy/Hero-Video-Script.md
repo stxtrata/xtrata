@@ -44,15 +44,15 @@ Shot: Claim flow screen capture from Fak.fun. Then Xtrata inscription view.
 
 ### 50-60 Seconds
 
-Narration: The helper source defaults to the first 87 free, then 3 STX. Claim at Fak.fun. Powered by Xtrata.
+Narration: Bitcoin Pepes Forever Twins are live. Holders are already claiming through Fak.fun. Powered by Xtrata.
 
-Caption: First 87 free. Then 3 STX. TBC.
+Caption: Live on Fak.fun. Powered by Xtrata.
 
-Shot: Claim CTA, count `TBC / 69`, final logo lockup.
+Shot: Claim CTA, live count if freshly verified, final logo lockup.
 
 ## UI Capture Notes
 
-- Capture claim flow from `TBC claim URL`.
+- Capture claim flow from `https://fak.fun/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun`.
 - Show Leather first if approved.
 - Avoid showing private wallet balances.
 - Show the final Xtrata inscription page at `https://xtrata.xyz/inscription/{id}`.
@@ -68,6 +68,6 @@ In many collections, the token points to a file somewhere else. If that path bre
 
 Forever Twins give existing NFTs a permanent on-chain counterpart.
 
-Bitcoin Pepes are first, powered by Xtrata and built with Fak.fun. Helper source default: first 87 free, then 3 STX. Confirm live state before recording.
+Bitcoin Pepes are first, powered by Xtrata and built with Fak.fun. Holders are already claiming Forever Twins on Fak.fun. Confirm live count and fee state before recording.
 
-Claim at Fak.fun. TBC URL.
+Claim at Fak.fun: `https://fak.fun/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun`.

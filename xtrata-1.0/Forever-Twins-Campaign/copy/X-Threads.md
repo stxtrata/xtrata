@@ -1,6 +1,6 @@
 # X Threads
 
-Draft status: add claim URL, current count, and final naming before posting.
+Draft status: live campaign copy. Refresh exact count and promo state before posting hard numbers.
 
 ## 1. Pain-First Master Thread
 
@@ -26,15 +26,15 @@ If the pointer leads nowhere, the token still exists, but the thing people cared
 
 A Forever Twin gives an existing NFT a permanent on-chain counterpart, powered by Xtrata.
 
-6/ Bitcoin Pepes are first. TBC final name and partner wording.
+6/ Bitcoin Pepes are first.
 
-The deployed-name helper source defaults to first 87 free, then 3 STX. Check live state before posting.
+Holders are already creating Forever Twins on Xtrata through Fak.fun.
 
 7/ This is not pin it and pray.
 
 This does not fix the old IPFS pointer. It gives the artwork a permanent on-chain twin.
 
-8/ Claim link: TBC.
+8/ Claim link: https://fak.fun/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun
 
 Verify guide: TBC.
 
@@ -72,9 +72,9 @@ Permanent ownership needs permanent media.
 
 ## 3. Bitcoin Pepes Announcement Thread
 
-1/ Bitcoin Pepes are becoming the first public Forever Twins collection. TBC final wording.
+1/ Bitcoin Pepes are the first public Forever Twins collection.
 
-Powered by Xtrata. Built with Fak.fun. TBC final wording.
+Powered by Xtrata. Built with Fak.fun.
 
 2/ The point is simple:
 
@@ -88,9 +88,9 @@ The twin gives it permanence.
 
 The helper source binds the pair through escrow.
 
-5/ Helper source default: first 87 free. Then 3 STX. Check live state before posting.
+5/ Holders are already claiming, with around 200 Pepes added to Xtrata so far.
 
-Claim: TBC.
+Claim: https://fak.fun/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun
 
 ## 4. Is This Just Pinning?
 
@@ -154,7 +154,7 @@ Your collection can decay in public, and the original contract may not give you 
 
 Create permanent on-chain counterparts for existing NFTs without pretending the original collection never existed.
 
-5/ Bitcoin Pepes are the first public case. TBC final wording.
+5/ Bitcoin Pepes are the first public case.
 
 Stacks-first, then broader.
 
@@ -186,19 +186,19 @@ Metadata endpoints disappear.
 
 Do not post named examples until sourced.
 
-## 8. First 87 / Claim Urgency Thread
+## 8. Live Claim Momentum Thread
 
-1/ Helper source default: first 87 Bitcoin Pepes Forever Twins are free.
+1/ Bitcoin Pepes Forever Twins are live.
 
-After that: 3 STX. TBC final confirmation.
+Holders are already creating permanent Xtrata twins through Fak.fun.
 
-2/ This is not fake scarcity.
+2/ Around 200 Pepes have already been added to Xtrata.
 
-It is a contract-defined launch window. Needs live contract confirmation.
+Use the exact live contract count when posting formally.
 
-3/ Current count: TBC / 87.
+3/ This is now live proof, not a concept.
 
-4/ Claim: TBC.
+4/ Claim: https://fak.fun/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun
 
 ## 9. Manifest / Finalization Thread
 
@@ -220,4 +220,4 @@ Has the record been finalized?
 
 4/ For Bitcoin Pepes, manifest/finalization details are TBC with Rapha and the helper contract.
 
-5/ We will publish the verification path before asking people to trust the claim.
+5/ We will keep publishing the verification path as the live case study develops.

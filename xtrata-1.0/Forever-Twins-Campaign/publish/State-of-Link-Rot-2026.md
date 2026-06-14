@@ -106,9 +106,9 @@ This does not fix the old IPFS pointer. It gives the artwork a permanent on-chai
 
 ## Bitcoin Pepes Case
 
-Bitcoin Pepes are the first public Forever Twins collection. TBC final wording.
+Bitcoin Pepes are the first public Forever Twins collection, powered by Xtrata and built with Fak.fun. Holders are already claiming through Fak.fun.
 
-The campaign is powered by Xtrata and built with Fak.fun. TBC final wording.
+The campaign is powered by Xtrata and built with Fak.fun.
 
 The deployed-name helper source defaults to first 87 free, then 3 STX. Check live state before publication.
 

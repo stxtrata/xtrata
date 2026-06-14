@@ -1,12 +1,12 @@
 # Bitcoin Pepes Case Study
 
-Draft status: template. Fill final numbers, screenshots, claim data, and verified contract behavior before publication.
+Draft status: live case-study draft. Fill exact fresh numbers, screenshots, claim data, and verified contract behavior before formal publication.
 
 ## Context
 
-Bitcoin Pepes are the first public Forever Twins collection. TBC final wording.
+Bitcoin Pepes are the first public Forever Twins collection, powered by Xtrata and built with Fak.fun.
 
-This campaign is a joint effort between Xtrata and Rapha / Fak.fun. Xtrata provides the permanence layer. Rapha / Fak.fun built the Bitcoin Pepes helper flow. Needs final partner wording.
+This campaign is a joint effort between Xtrata and Rapha / Fak.fun. Xtrata provides the permanence layer. Rapha / Fak.fun built the Bitcoin Pepes helper flow.
 
 ## Problem
 
@@ -20,11 +20,7 @@ Pepes are meme-native, culturally legible, and holder-driven. If any art deserve
 
 ## What Rapha / Fak.fun Built
 
-TBC from Rapha.
-
-Expected description:
-
-Rapha built a helper contract and claim flow that lets Bitcoin Pepes holders create or claim a Forever Twin connected to their original Pepe.
+Rapha / Fak.fun built a helper contract and claim flow that lets Bitcoin Pepes holders create or claim a Forever Twin connected to their original Pepe.
 
 ## What Xtrata Provides
 
@@ -40,8 +36,6 @@ The local Xtrata v3.2.3 contract source confirms:
 
 ## How The Twin Flow Works
 
-Expected model, needs helper-contract confirmation:
-
 1. Holder owns original Bitcoin Pepe.
 2. Holder claims/inscribes a Forever Twin through Fak.fun.
 3. Xtrata stores the media bytes on-chain.
@@ -52,7 +46,7 @@ Expected model, needs helper-contract confirmation:
 
 ## Current Claim Stats
 
-- Current claimed: TBC.
+- Current claimed: around 200 in casual copy; pull `get-inscribed-count` before publishing a hard number.
 - Promo threshold: helper source default first 87; live state TBC.
 - Paid price after promo: helper source default 3 STX; live state TBC.
 - Network transaction fee behavior: TBC.
@@ -63,7 +57,7 @@ The deployed-name helper source defaults to first 87 free, then 3 STX. Confirm l
 
 ## Verification Links
 
-- Claim URL: TBC.
+- Claim URL: `https://fak.fun/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun`.
 - Original contract explorer: TBC.
 - Helper contract explorer: TBC.
 - Xtrata contract explorer: TBC.

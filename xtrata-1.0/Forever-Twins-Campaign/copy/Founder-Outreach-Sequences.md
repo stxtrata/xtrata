@@ -10,7 +10,7 @@ Your collection may be fine today, but if the media path breaks, holders can be 
 
 I am not saying your collection is broken. I am saying this is becoming a visible infrastructure risk for NFT projects generally: gateways change, marketplaces shut down, metadata endpoints move, pinning accounts lapse.
 
-Bitcoin Pepes just became the first public Forever Twins collection, powered by Xtrata and built with Fak.fun. TBC final wording.
+Bitcoin Pepes are already live as the first public Forever Twins collection, powered by Xtrata and built with Fak.fun. Holders have started claiming on Fak.fun, with around 200 Pepes added to Xtrata so far.
 
 The model gives an existing NFT a permanent on-chain counterpart without pretending the original collection never existed.
 
@@ -26,7 +26,7 @@ That is the gap between token ownership and media permanence.
 
 Xtrata creates permanent on-chain media inscriptions. With a Forever Twin flow, an existing collection can give holders permanent on-chain counterparts without forcing a full migration.
 
-Bitcoin Pepes are the first public campaign, built with Fak.fun. TBC final wording.
+Bitcoin Pepes are the first public campaign, built with Fak.fun and powered by Xtrata. Holders are already claiming their Forever Twins.
 
 Open to a quick permanence audit?
 
@@ -92,4 +92,3 @@ Cons:
 Use this line often:
 
 I am not saying your collection is broken. I am saying every collection that depends on external media paths should understand exactly what those paths are and what happens if they fail.
-

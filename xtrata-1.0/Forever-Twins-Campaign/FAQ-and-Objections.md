@@ -1,12 +1,16 @@
 # FAQ and Objections
 
-Draft status: public-facing, but TBC markers must be resolved before final publication.
+Draft status: public-facing live FAQ. Exact numbers and contract-state claims need fresh verification before formal publication.
 
 ## What is a Forever Twin?
 
 A Forever Twin is a permanent on-chain counterpart to an existing NFT. For Bitcoin Pepes, the goal is to give each original Pepe a Xtrata-backed twin that preserves the artwork on-chain while keeping the original collection identity intact.
 
-Final name TBC with Rapha.
+Bitcoin Pepes are the first public Forever Twins collection, powered by Xtrata and built with Fak.fun.
+
+## Has this already launched?
+
+Yes. Bitcoin Pepes Forever Twins are live, holders are already claiming through Fak.fun, and around 200 Pepes have already been added to Xtrata. Use that count as approximate until a fresh contract read is recorded.
 
 ## Is this just pinning?
 
@@ -62,7 +66,7 @@ Public wording until confirmed: sale and transfer behavior depends on the helper
 
 ## What happens if my Pepe is listed?
 
-TBC. Holders should confirm with Fak.fun before trying to claim from a listed token.
+Listing behavior still needs exact support confirmation. Holders should check the live Fak.fun flow before trying to claim from a listed token.
 
 ## What does Xtrata store?
 
@@ -114,7 +118,7 @@ Use this carefully. It is an infrastructure explanation, not an accusation again
 
 ## Is this only for Bitcoin Pepes?
 
-No. Bitcoin Pepes are the first public Forever Twins collection, pending final wording confirmation. The same pattern can be adapted for other collections.
+No. Bitcoin Pepes are the first public Forever Twins collection. The same pattern can be adapted for other collections.
 
 ## Can other collections use this?
 

@@ -17,6 +17,9 @@ This is the control document for the Forever Twins campaign. Use it to separate 
 - The helper source default `inscribe-fee` is `u3000000`, 3 STX.
 - The helper source exposes `get-binding`, `is-inscribed`, `get-fee`, `get-free-threshold`, `get-inscribed-count`, `get-canonical-hash`, and `is-finalized`.
 - The helper source includes `seed-canonical` and `finalize-canonical`.
+- The Bitcoin Pepes helper contract is live at `SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun`.
+- Bitcoin Pepes holders are already creating Forever Twins on Xtrata through Fak.fun.
+- Working public claim route: `https://fak.fun/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun`.
 - The local v3.2.3 contract comments and constants say Xtrata stores content in fixed `16 KiB` chunks.
 - The local v3.2.3 contract comments and constants say hard caps are `2048` chunks and `32 MiB`.
 - The local v3.2.3 contract has a core-native small-file single-transaction mint path capped at `32` chunks.
@@ -33,11 +36,10 @@ This is the control document for the Forever Twins campaign. Use it to separate 
 - Bitcoin Pepes assets are small enough for a one-transaction claim flow.
 - For this Bitcoin Pepes flow, media files are around 5 KB each.
 - Leather and Xverse are both supported, with Leather listed first.
-- Holders claim through Fak.fun.
-- The helper contract is deployed at `SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun`.
+- Holder-facing wallet recommendation and exact support copy still need confirmation.
 - Bitcoin Pepes original contract is `SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe`.
 - Xtrata master/core is `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3`.
-- Bitcoin Pepes have already started inscribing twins.
+- Around 200 Bitcoin Pepes have already been added to Xtrata. Use only as approximate casual wording until a fresh `get-inscribed-count` check is recorded.
 - The helper contract creates a bound pair where one side is live and one side is escrowed.
 - The buyer can later switch between the original/IPFS-side token and the Xtrata/on-chain-side token.
 
@@ -46,8 +48,8 @@ This is the control document for the Forever Twins campaign. Use it to separate 
 1. Final public campaign name?
 2. Is public messaging definitely first 87 free, then 3 STX, matching `pepe-4ever-fakfun.clar`, or has live state/public copy changed?
 3. Were early 1 STX inscriptions an issue, and should that be ignored publicly?
-4. Current claim count?
-5. Exact claim URL?
+4. Exact current claim count from `get-inscribed-count`?
+5. Confirmed holder-facing claim URL and any preferred redirect?
 6. Does Fak.fun have a token ID checker?
 7. Which wallet should be recommended first?
 8. What happens if a Pepe is listed on a marketplace?
@@ -95,11 +97,10 @@ This is the control document for the Forever Twins campaign. Use it to separate 
 - Do not publish the possible early 1 STX issue unless Rapha explicitly wants it public.
 - Do not name specific at-risk collections publicly unless evidence has been reviewed.
 
-## Open Questions Before Launch Push
+## Live Checks Before Formal Publication
 
-- Exact public name and claim URL.
+- Exact current claim count.
 - Exact promo threshold and fee.
-- Exact claim count.
 - Wallet support and recommended holder instructions.
 - Whether marketplace-listed tokens can claim.
 - Verification read-only calls and explorer URLs.

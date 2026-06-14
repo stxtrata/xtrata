@@ -1,6 +1,6 @@
 # Landing Page Copy
 
-Draft status: replace TBC fields before publishing.
+Draft status: live campaign copy. Refresh exact count and promo state before publishing hard numbers.
 
 ## Hero
 
@@ -9,6 +9,8 @@ Draft status: replace TBC fields before publishing.
 Most NFTs do not store the artwork inside the token. They point to files, gateways, servers, marketplace URLs, pinning services, or metadata endpoints that can break.
 
 Forever Twins give the artwork a permanent on-chain counterpart, powered by Xtrata and built with Fak.fun.
+
+Bitcoin Pepes holders are already claiming Forever Twins on Fak.fun, with around 200 Pepes added to Xtrata so far.
 
 Primary CTA: Claim your Forever Twin  
 Secondary CTA: Verify how it works
@@ -50,21 +52,19 @@ For Bitcoin Pepes, the original Pepe keeps its identity. The Xtrata twin gives t
 
 ## Bitcoin Pepes Are First
 
-Bitcoin Pepes are the first public Forever Twins collection. TBC final wording.
+Bitcoin Pepes are the first public Forever Twins collection.
 
-The campaign is powered by Xtrata and built with Fak.fun. TBC final wording.
+The campaign is powered by Xtrata and built with Fak.fun.
 
-## First 87 Promo
+## Live Claim Status
 
-The public promo appears to be:
+Bitcoin Pepes Forever Twins are live. Holders have already started claiming through Fak.fun, and around 200 Pepes have already been added to Xtrata.
 
-First 87 Forever Twins free. Then 3 STX.
-
-This must be confirmed against the live helper contract and Fak.fun docs before final publication. Holders should still expect normal network transaction fees unless Fak.fun confirms otherwise.
+The helper source default was first 87 free, then 3 STX. Confirm the current live `get-free-threshold` and `get-fee` values before publishing active promo or fee language. Holders should still expect normal network transaction fees unless Fak.fun confirms otherwise.
 
 ## How It Works
 
-1. Connect your wallet at `TBC claim URL`.
+1. Connect your wallet at `https://fak.fun/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun`.
 2. Select a Bitcoin Pepe you hold.
 3. Claim or inscribe the Forever Twin.
 4. The artwork is stored on Xtrata.
