@@ -38,7 +38,8 @@
       font-family:
         Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
         "Segoe UI", sans-serif;
-      line-height: 1.45;
+      font-size: 13px;
+      line-height: 1.35;
     }
 
     button,
@@ -55,9 +56,10 @@
       border-radius: 8px;
       background: var(--ink);
       color: #fff;
-      padding: 0 14px;
+      padding: 0 10px;
       cursor: pointer;
       font-weight: 700;
+      font-size: 0.82rem;
     }
 
     button:hover:not(:disabled),
@@ -112,16 +114,16 @@
 
     .tool-title {
       margin: 0;
-      font-size: clamp(1.8rem, 3vw, 3rem);
+      font-size: clamp(1.8rem, 2.4vw, 2.55rem);
       line-height: 1;
       letter-spacing: 0;
     }
 
     .tool-subtitle {
-      max-width: 700px;
-      margin: 10px 0 0;
+      max-width: 520px;
+      margin: 7px 0 0;
       color: var(--muted);
-      font-size: 1rem;
+      font-size: 0.86rem;
     }
 
     .tool-nav {
@@ -140,7 +142,7 @@
       background: var(--panel);
       color: var(--ink);
       padding: 0 11px;
-      font-size: 0.88rem;
+      font-size: 0.78rem;
       box-shadow: 0 1px 0 rgba(20, 25, 21, 0.04);
     }
 
@@ -165,7 +167,7 @@
       color: var(--green);
       display: flex;
       align-items: center;
-      padding: 8px 12px;
+      padding: 7px 10px;
       font-weight: 700;
     }
 
@@ -224,7 +226,7 @@
     .tool-panel__header p {
       margin: 4px 0 0;
       color: var(--muted);
-      font-size: 0.88rem;
+      font-size: 0.78rem;
     }
 
     .tool-panel__body {
@@ -245,7 +247,7 @@
     legend,
     .label {
       color: var(--muted);
-      font-size: 0.84rem;
+      font-size: 0.68rem;
       font-weight: 800;
       text-transform: uppercase;
     }
@@ -268,7 +270,8 @@
       border-radius: 8px;
       background: #fff;
       color: var(--ink);
-      padding: 8px 10px;
+      padding: 7px 9px;
+      font-size: 0.86rem;
     }
 
     textarea,
@@ -299,25 +302,26 @@
     .format-option {
       display: grid;
       grid-template-columns: auto minmax(0, 1fr);
-      gap: 8px;
+      gap: 7px;
       align-items: start;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fbfdfb;
-      padding: 8px;
-      min-height: 66px;
+      padding: 7px;
+      min-height: 46px;
     }
 
     .format-option strong {
       display: block;
-      font-size: 0.95rem;
+      font-size: 0.84rem;
+      line-height: 1.15;
     }
 
     .format-option small {
       display: block;
       margin-top: 3px;
       color: var(--muted);
-      font-size: 0.78rem;
+      font-size: 0.7rem;
     }
 
     .settings-grid {
@@ -340,7 +344,11 @@
     .profile-description {
       margin: 0;
       color: var(--muted);
-      font-size: 0.86rem;
+      font-size: 0.72rem;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
 
     .info-summary-section {
@@ -356,14 +364,14 @@
     .info-summary-section p {
       margin: 0;
       color: var(--muted);
-      font-size: 0.82rem;
+      font-size: 0.72rem;
     }
 
     .info-summary-section span {
       display: block;
       margin-top: 3px;
       color: var(--blue);
-      font-size: 0.9rem;
+      font-size: 0.78rem;
       font-weight: 800;
       text-transform: none;
     }
@@ -397,6 +405,10 @@
       display: none;
     }
 
+    .output-stack .tool-panel__body:has(#result:empty):has(#batchResultEl:empty) {
+      padding: 0;
+    }
+
     audio {
       width: 100%;
     }
@@ -414,8 +426,8 @@
     }
 
     .compact-box h3 {
-      margin: 0 0 10px;
-      font-size: 0.95rem;
+      margin: 0 0 8px;
+      font-size: 0.86rem;
     }
 
     .ab-player-container {
@@ -447,7 +459,7 @@
     .ab-player-header p {
       margin: 4px 0 0;
       color: var(--muted);
-      font-size: 0.84rem;
+      font-size: 0.74rem;
     }
 
     .ab-size-summary {
@@ -587,7 +599,7 @@
 
     .ab-track-meta {
       color: var(--muted);
-      font-size: 0.86rem;
+      font-size: 0.76rem;
       font-weight: 800;
       text-align: right;
     }
@@ -642,18 +654,18 @@
     }
 
     .export-panel {
-      background: linear-gradient(180deg, #fff, var(--amber-soft));
+      background: #fffaf0;
     }
 
     .html-player-options {
       display: grid;
-      gap: 10px;
+      gap: 8px;
     }
 
     .html-mode-options {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
+      gap: 6px;
     }
 
     .html-export-status {
@@ -663,7 +675,7 @@
       background: rgba(255, 255, 255, 0.62);
       color: var(--muted);
       padding: 8px;
-      font-size: 0.86rem;
+      font-size: 0.76rem;
       font-weight: 700;
     }
 
@@ -675,7 +687,7 @@
 
     .standalone-artwork-grid {
       display: grid;
-      grid-template-columns: 104px minmax(0, 1fr);
+      grid-template-columns: 90px minmax(0, 1fr);
       gap: 8px;
       align-items: center;
     }
@@ -707,7 +719,7 @@
       min-height: 22px;
       margin: 0 0 8px;
       color: var(--muted);
-      font-size: 0.84rem;
+      font-size: 0.74rem;
       font-weight: 700;
     }
 
@@ -723,7 +735,7 @@
     .preview-value {
       overflow-wrap: anywhere;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 0.78rem;
+      font-size: 0.7rem;
       text-transform: none;
     }
 
@@ -736,6 +748,10 @@
       padding: 10px;
     }
 
+    details.live-preview-panel {
+      display: block;
+    }
+
     .live-preview-panel h3 {
       margin: 0;
       font-size: 0.95rem;
@@ -743,7 +759,7 @@
 
     .live-preview-frame {
       width: 100%;
-      max-width: 240px;
+      max-width: 180px;
       aspect-ratio: 1 / 1;
       border: 1px solid var(--line-strong);
       border-radius: 8px;
@@ -764,7 +780,7 @@
       min-height: 22px;
       margin: 0;
       color: var(--muted);
-      font-size: 0.84rem;
+      font-size: 0.72rem;
       font-weight: 800;
     }
 
@@ -780,19 +796,42 @@
       margin-top: 10px;
     }
 
-    @media (min-width: 1300px) {
-      .export-panel .html-player-options {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        align-items: start;
-      }
+    .export-panel .tool-panel__header p,
+    .export-panel .format-option small,
+    #embeddedPlayerOptions,
+    #embeddedVisualOptions > h3,
+    .export-panel .info-summary-section p:not(:first-child),
+    .html-live-preview-status {
+      display: none;
+    }
 
-      #recursivePlayerOptions,
-      #recursiveVisualOptions,
-      .export-panel .info-summary-section,
-      .html-export-status,
-      .export-panel .button-container {
-        grid-column: 1 / -1;
-      }
+    .export-panel fieldset {
+      padding: 8px;
+    }
+
+    .export-panel .format-option {
+      min-height: 34px;
+      align-items: center;
+      background: #fff;
+    }
+
+    .export-panel .format-option input {
+      margin-top: 0;
+    }
+
+    #playerMetadataPanel #metadataForm {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    #playerMetadataPanel h3,
+    #playerMetadataPanel .metadata-extra {
+      grid-column: 1 / -1;
+    }
+
+    #titleInput,
+    #albumInput {
+      min-width: 0;
     }
 
     .modal,
@@ -898,8 +937,8 @@
 <main>
   <header class="tool-header">
     <div>
-      <h1 class="tool-title">Xtrata Opus Audio Tool</h1>
-      <p class="tool-subtitle">Convert source audio to WebM Audio with Opus, generate base64, add optional image data, and export an HTML player.</p>
+      <h1 class="tool-title">Xtrata Opus</h1>
+      <p class="tool-subtitle">Convert audio, attach artwork, export an inscription-ready HTML player.</p>
     </div>
     <nav class="tool-nav" aria-label="Tool sections">
       <a href="#audio-section">Audio</a>
@@ -919,11 +958,11 @@
       <div class="tool-panel__header">
         <div>
           <h2 id="audio-section-heading">Audio conversion</h2>
-          <p>WebM Audio with Opus is selected by default.</p>
+          <p>Source, format, and conversion settings.</p>
         </div>
         <div class="button-row">
-          <button id="showAudioInfoBtn" class="button-small" type="button">Format info</button>
-          <button id="showAudionalInfoBtn" class="button-small" type="button">Audional info</button>
+          <button id="showAudioInfoBtn" class="button-small" type="button">Format</button>
+          <button id="showAudionalInfoBtn" class="button-small" type="button">Guide</button>
         </div>
       </div>
       <div class="tool-panel__body">
@@ -1006,7 +1045,7 @@
 
           <div class="button-container">
             <button id="playSampleBtn" class="button-secondary" type="button" disabled>Play original</button>
-            <button id="convertBtn" type="button" disabled>Convert to WebM Audio</button>
+            <button id="convertBtn" type="button" disabled>Convert</button>
             <button id="batchConvertBtn" class="button-secondary" type="button" disabled>Batch convert</button>
             <button id="downloadBatchZipBtn" class="button-secondary" type="button" disabled>Download ZIP</button>
           </div>
@@ -1019,7 +1058,7 @@
         <div class="tool-panel__header">
           <div>
             <h2>Audio output</h2>
-            <p>Compare A/B, download output, and export base64.</p>
+            <p>A/B, downloads, and base64.</p>
           </div>
         </div>
         <div class="tool-panel__body output-stack">
@@ -1043,7 +1082,7 @@
       <div class="tool-panel__header">
         <div>
           <h2>Image base64</h2>
-          <p>Optional visual data for the exported player.</p>
+          <p>Optional standalone image export.</p>
         </div>
       </div>
       <div class="tool-panel__body">
@@ -1076,7 +1115,7 @@
         <div class="tool-panel__header">
           <div>
             <h2>HTML player</h2>
-            <p>Export a standalone embedded player or a recursive player.</p>
+            <p>Embedded or recursive player export.</p>
           </div>
         </div>
         <div class="tool-panel__body">
@@ -1087,14 +1126,14 @@
                 <label class="format-option">
                   <input type="radio" name="htmlPlayerMode" value="embedded" checked>
                   <span>
-                    <strong>Embedded audio</strong>
+                    <strong>Embedded</strong>
                     <small>Use the converted Base64 audio in this HTML file</small>
                   </span>
                 </label>
                 <label class="format-option">
                   <input type="radio" name="htmlPlayerMode" value="recursive">
                   <span>
-                    <strong>Recursive audio</strong>
+                    <strong>Recursive</strong>
                     <small>Load an existing audio inscription by URL or token ID</small>
                   </span>
                 </label>
@@ -1149,14 +1188,14 @@
                 <label class="format-option">
                   <input type="radio" name="visualSourceMode" value="embedded" checked>
                   <span>
-                    <strong>Embedded visual</strong>
+                    <strong>Embedded</strong>
                     <small>Upload image, GIF, or video into the HTML</small>
                   </span>
                 </label>
                 <label class="format-option">
                   <input type="radio" name="visualSourceMode" value="recursive">
                   <span>
-                    <strong>Recursive visual</strong>
+                    <strong>Recursive</strong>
                     <small>Load cover art from an existing inscription</small>
                   </span>
                 </label>
@@ -1298,18 +1337,18 @@
 
             <p id="htmlExportStatus" class="html-export-status">Convert audio first or switch to recursive mode.</p>
             <div class="button-container">
-              <button id="generateHtmlButton" type="button" disabled>Download HTML player</button>
+              <button id="generateHtmlButton" type="button" disabled>Download HTML</button>
               <button id="previewHtmlButton" class="button-secondary" type="button" disabled>Preview HTML</button>
-              <button id="inscribeHtmlButton" class="button-secondary" type="button" disabled>Prepare inscription</button>
+              <button id="inscribeHtmlButton" class="button-secondary" type="button" disabled>Inscribe</button>
               <button id="testGeneratedHtmlButton" class="button-secondary" type="button">Open tester</button>
             </div>
-            <section class="live-preview-panel" aria-label="Generated player live preview">
-              <h3>Live player preview</h3>
+            <details class="live-preview-panel" aria-label="Generated player live preview">
+              <summary>Preview</summary>
               <p id="htmlLivePreviewStatus" class="html-live-preview-status">Waiting for an audio source.</p>
               <div class="live-preview-frame">
                 <iframe id="htmlPlayerLivePreview" title="Generated HTML player live preview" sandbox="allow-scripts allow-same-origin"></iframe>
               </div>
-            </section>
+            </details>
           </div>
         </div>
       </section>
