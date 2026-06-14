@@ -84,7 +84,7 @@
   .col-card.active:hover{transform:translateY(-3px);border-color:rgba(247,147,26,.5)}
   .col-top{display:flex;gap:16px;padding:22px 22px 0}
   .col-thumb{flex:0 0 auto;width:84px;height:84px;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:#2a2b30}
-  .col-thumb img,.col-thumb svg{display:block;width:100%;height:100%}
+  .col-thumb img,.col-thumb svg{display:block;width:100%;height:100%;object-fit:cover}
   .col-head{flex:1;min-width:0}
   .col-badge{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.5px}
   .col-badge.live{background:rgba(55,200,122,.15);color:var(--green)}
@@ -181,20 +181,7 @@
       <a class="col-card active" href="./bitcoin-pepes.html" style="color:inherit">
         <div class="col-top">
           <div class="col-thumb">
-            <svg viewBox="0 0 16 16" shape-rendering="crispEdges">
-              <rect width="16" height="16" fill="#2c2d31"/>
-              <text x="1.4" y="3" font-size="2.2" fill="#f7931a" font-family="monospace" font-weight="bold">₿</text>
-              <text x="12.2" y="3" font-size="2.2" fill="#f7931a" font-family="monospace" font-weight="bold">₿</text>
-              <rect x="4" y="3" width="8" height="7" fill="#f08a1d"/>
-              <rect x="3" y="4" width="1" height="5" fill="#f08a1d"/><rect x="12" y="4" width="1" height="5" fill="#f08a1d"/>
-              <rect x="4" y="3" width="8" height="1" fill="#1b1b1b"/>
-              <rect x="4" y="5" width="4" height="2" fill="#fff" stroke="#1b1b1b" stroke-width=".25"/>
-              <rect x="8" y="5" width="4" height="2" fill="#fff" stroke="#1b1b1b" stroke-width=".25"/>
-              <rect x="4.5" y="5.4" width="3" height="1.2" fill="#1f5fe0"/><rect x="8.5" y="5.4" width="3" height="1.2" fill="#e23b3b"/>
-              <rect x="5" y="8" width="6" height="1.4" fill="#d97a14"/><rect x="7" y="8.3" width="5" height="1" fill="#6b4324"/>
-              <rect x="3" y="11" width="10" height="5" fill="#1f5fe0"/>
-              <text x="4.4" y="14.6" font-size="2.0" fill="#fff" font-family="monospace" font-weight="bold">MAXI</text>
-            </svg>
+            <img src="./assets/bitcoin-pepe-maxi.png" alt="Bitcoin Pepe MAXI" />
           </div>
           <div class="col-head">
             <span class="col-badge live">● Live</span>
