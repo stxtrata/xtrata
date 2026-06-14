@@ -14,8 +14,8 @@ const staticApps = [
     target: 'dist/recursive-apps/x-board'
   },
   {
-    source: 'Forever-Twins-Campaign',
-    target: 'dist/Forever-Twins-Campaign'
+    source: 'forever-twins',
+    target: 'dist/forever-twins'
   }
 ];
 
