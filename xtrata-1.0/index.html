@@ -8523,6 +8523,7 @@
         if (isGridHtmlDocument(mimeType)) {
           state.gridLiveMediaCache.set(cacheKey, {
             kind: 'html',
+            bytes,
             html: await prepareRuntimeHtmlForToken(
               token,
               new TextDecoder().decode(bytes),
@@ -8916,10 +8917,74 @@
       });
     };
 
+    const renderSelectedTokenPreviewPayload = (token, requestId, bytes, mimeType, htmlDoc, startedAt, source) => {
+      if (
+        requestId !== state.tokenPreviewRequestId ||
+        state.selectedTokenId !== token.id
+      ) {
+        debugLog('preview', 'discarding stale selected inscription preview', {
+          tokenId: token.id.toString(),
+          source
+        });
+        return false;
+      }
+      revokeTokenPreview();
+      state.tokenPreviewTokenId = token.id.toString();
+      state.tokenPreviewBytes = bytes;
+      state.tokenPreviewMimeType = mimeType;
+      state.tokenPreviewSourceUrl = null;
+      state.tokenPreviewHtmlDoc = htmlDoc;
+      renderSelectedInscriptionMeta(token, null, mimeType);
+      renderBytesPreview(dom.tokenPreviewMedia, bytes, mimeType, (url) => {
+        state.tokenPreviewUrl = url;
+      }, { truthfulImageSizing: true, htmlDoc });
+      void warmThumbnailCacheFromBytes(token, bytes, mimeType);
+      debugLog('preview', 'selected inscription preview rendered', {
+        tokenId: token.id.toString(),
+        contractId: getTokenCacheContractId(token),
+        bytes: bytes.length,
+        mimeType,
+        requestId,
+        source,
+        ms: Math.round(performance.now() - startedAt)
+      });
+      updateControls();
+      return true;
+    };
+
     const loadSelectedTokenPreviewLocally = async (token, requestId) => {
       const contentClient = getTokenClient(token);
       const cacheContractId = token.sourceContractId ?? getContractId(contentClient.contract);
       const startedAt = performance.now();
+      const cacheKey = getThumbnailKey(token);
+      const liveMedia = state.gridLiveMediaCache.get(cacheKey);
+      if (
+        liveMedia?.kind === 'html' &&
+        liveMedia.bytes &&
+        isGridHtmlDocument(liveMedia.mimeType)
+      ) {
+        const mimeType = liveMedia.mimeType ?? token.meta.mimeType ?? 'text/html';
+        const htmlDoc =
+          liveMedia.html ??
+          (await prepareRuntimeHtmlForToken(
+            token,
+            new TextDecoder().decode(liveMedia.bytes),
+            'preview-cache'
+          ));
+        if (
+          renderSelectedTokenPreviewPayload(
+            token,
+            requestId,
+            liveMedia.bytes,
+            mimeType,
+            htmlDoc,
+            startedAt,
+            'grid-live-media-cache'
+          )
+        ) {
+          return;
+        }
+      }
       debugLog('preview', 'local preview content fetch started', {
         tokenId: token.id.toString(),
         contractId: cacheContractId,
@@ -8940,35 +9005,15 @@
       const htmlDoc = getMediaKind(mimeType) === 'html'
         ? await prepareRuntimeHtmlForToken(token, new TextDecoder().decode(bytes), 'preview')
         : null;
-      if (
-        requestId !== state.tokenPreviewRequestId ||
-        state.selectedTokenId !== token.id
-      ) {
-        debugLog('preview', 'discarding stale selected inscription preview', {
-          tokenId: token.id.toString()
-        });
-        return;
-      }
-      revokeTokenPreview();
-      state.tokenPreviewTokenId = token.id.toString();
-      state.tokenPreviewBytes = bytes;
-      state.tokenPreviewMimeType = mimeType;
-      state.tokenPreviewSourceUrl = null;
-      state.tokenPreviewHtmlDoc = htmlDoc;
-      renderSelectedInscriptionMeta(token, null, mimeType);
-      renderBytesPreview(dom.tokenPreviewMedia, bytes, mimeType, (url) => {
-        state.tokenPreviewUrl = url;
-      }, { truthfulImageSizing: true, htmlDoc });
-      void warmThumbnailCacheFromBytes(token, bytes, mimeType);
-      debugLog('preview', 'local preview content rendered', {
-        tokenId: token.id.toString(),
-        contractId: cacheContractId,
-        bytes: bytes.length,
-        mimeType,
+      renderSelectedTokenPreviewPayload(
+        token,
         requestId,
-        ms: Math.round(performance.now() - startedAt)
-      });
-      updateControls();
+        bytes,
+        mimeType,
+        htmlDoc,
+        startedAt,
+        'local-reconstruction'
+      );
     };
 
     const handleSelectedTokenPreviewFailure = (token, requestId, error) => {
