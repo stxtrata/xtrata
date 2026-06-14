@@ -97,17 +97,17 @@
     }
 
     main {
-      width: min(1180px, calc(100vw - 32px));
+      width: min(1540px, calc(100vw - 24px));
       margin: 0 auto;
-      padding: 24px 0 36px;
+      padding: 18px 0 28px;
     }
 
     .tool-header {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
-      gap: 18px;
+      gap: 14px;
       align-items: end;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
 
     .tool-title {
@@ -153,8 +153,8 @@
       border-radius: var(--radius);
       background: var(--panel);
       box-shadow: var(--shadow);
-      padding: 12px;
-      margin-bottom: 16px;
+      padding: 10px;
+      margin-bottom: 12px;
     }
 
     #status {
@@ -184,9 +184,17 @@
 
     .tool-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
-      gap: 16px;
+      grid-template-columns:
+        minmax(330px, 0.95fr)
+        minmax(340px, 0.95fr)
+        minmax(340px, 1fr);
+      gap: 12px;
       align-items: start;
+    }
+
+    .tool-grid > .tool-panel,
+    .tool-grid > .output-stack {
+      min-width: 0;
     }
 
     .tool-panel {
@@ -203,7 +211,7 @@
       gap: 12px;
       align-items: center;
       border-bottom: 1px solid var(--line);
-      padding: 14px 16px;
+      padding: 11px 12px;
       background: #fbfdfb;
     }
 
@@ -220,12 +228,12 @@
     }
 
     .tool-panel__body {
-      padding: 16px;
+      padding: 12px;
     }
 
     .form-stack {
       display: grid;
-      gap: 14px;
+      gap: 10px;
     }
 
     .field {
@@ -260,13 +268,13 @@
       border-radius: 8px;
       background: #fff;
       color: var(--ink);
-      padding: 10px 11px;
+      padding: 8px 10px;
     }
 
     textarea,
     .base64-output {
-      min-height: 180px;
-      max-height: 280px;
+      min-height: 120px;
+      max-height: 220px;
       overflow: auto;
       white-space: pre-wrap;
       word-break: break-all;
@@ -279,7 +287,7 @@
       margin: 0;
       border: 1px solid var(--line);
       border-radius: 8px;
-      padding: 12px;
+      padding: 10px;
     }
 
     .format-options {
@@ -296,8 +304,8 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fbfdfb;
-      padding: 10px;
-      min-height: 78px;
+      padding: 8px;
+      min-height: 66px;
     }
 
     .format-option strong {
@@ -315,7 +323,7 @@
     .settings-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
+      gap: 10px;
     }
 
     .settings-grid .field-wide {
@@ -337,12 +345,12 @@
 
     .info-summary-section {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: var(--blue-soft);
-      padding: 10px;
+      padding: 8px;
     }
 
     .info-summary-section p {
@@ -373,7 +381,7 @@
     .button-group {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 8px;
       align-items: center;
     }
 
@@ -395,14 +403,14 @@
 
     .output-stack {
       display: grid;
-      gap: 16px;
+      gap: 12px;
     }
 
     .compact-box {
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fbfdfb;
-      padding: 12px;
+      padding: 10px;
     }
 
     .compact-box h3 {
@@ -420,13 +428,14 @@
     }
 
     .ab-player-header {
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
       justify-content: space-between;
-      gap: 12px;
+      gap: 10px;
       align-items: flex-start;
       border-bottom: 1px solid var(--line);
       background: #fbfdfb;
-      padding: 12px;
+      padding: 10px;
     }
 
     .ab-player-header h4 {
@@ -442,12 +451,12 @@
     }
 
     .ab-size-summary {
-      min-width: min(240px, 100%);
+      min-width: min(190px, 100%);
       border: 1px solid #cfe0d4;
       border-radius: 8px;
       background: var(--green-soft);
       color: var(--green);
-      padding: 8px 10px;
+      padding: 7px 8px;
       text-align: right;
     }
 
@@ -468,10 +477,10 @@
 
     .ab-controls {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(150px, 190px);
-      gap: 8px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
       align-items: stretch;
-      padding: 12px;
+      padding: 10px;
       border-bottom: 1px solid var(--line);
       background: #fff;
     }
@@ -480,7 +489,7 @@
       display: inline-flex;
       align-items: center;
       width: 100%;
-      min-height: 44px;
+      min-height: 38px;
       justify-content: center;
     }
 
@@ -492,10 +501,11 @@
 
     .ab-offset-field {
       display: grid;
+      grid-column: 1 / -1;
       grid-template-columns: 1fr 70px auto;
       gap: 6px;
       align-items: center;
-      min-height: 44px;
+      min-height: 38px;
       border: 1px solid var(--line-strong);
       border-radius: 8px;
       padding: 6px 8px;
@@ -523,16 +533,16 @@
     .ab-track-list {
       display: grid;
       gap: 10px;
-      padding: 12px;
+      padding: 10px;
     }
 
     .ab-track {
       display: grid;
-      gap: 8px;
+      gap: 6px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fbfdfb;
-      padding: 10px;
+      padding: 8px;
       opacity: 0.72;
       transition: border-color 0.15s ease, background 0.15s ease, opacity 0.15s ease;
     }
@@ -592,7 +602,7 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fff;
-      padding: 10px;
+      padding: 8px;
     }
 
     summary {
@@ -610,6 +620,13 @@
       border-radius: 8px;
       background: #f8faf8;
       overflow: hidden;
+    }
+
+    .image-tool-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(120px, 180px);
+      gap: 10px;
+      align-items: start;
     }
 
     #image-preview {
@@ -630,7 +647,7 @@
 
     .html-player-options {
       display: grid;
-      gap: 12px;
+      gap: 10px;
     }
 
     .html-mode-options {
@@ -640,12 +657,12 @@
     }
 
     .html-export-status {
-      min-height: 42px;
+      min-height: 38px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: rgba(255, 255, 255, 0.62);
       color: var(--muted);
-      padding: 10px;
+      padding: 8px;
       font-size: 0.86rem;
       font-weight: 700;
     }
@@ -658,8 +675,8 @@
 
     .standalone-artwork-grid {
       display: grid;
-      grid-template-columns: 132px minmax(0, 1fr);
-      gap: 10px;
+      grid-template-columns: 104px minmax(0, 1fr);
+      gap: 8px;
       align-items: center;
     }
 
@@ -700,7 +717,7 @@
 
     .metadata-fieldset {
       display: grid;
-      gap: 10px;
+      gap: 8px;
     }
 
     .preview-value {
@@ -712,11 +729,11 @@
 
     .live-preview-panel {
       display: grid;
-      gap: 10px;
+      gap: 8px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fff;
-      padding: 12px;
+      padding: 10px;
     }
 
     .live-preview-panel h3 {
@@ -726,11 +743,13 @@
 
     .live-preview-frame {
       width: 100%;
+      max-width: 240px;
       aspect-ratio: 1 / 1;
       border: 1px solid var(--line-strong);
       border-radius: 8px;
       background: #10120f;
       overflow: hidden;
+      justify-self: center;
     }
 
     .live-preview-frame iframe {
@@ -751,6 +770,29 @@
 
     .html-live-preview-status.error {
       color: var(--error);
+    }
+
+    .metadata-extra {
+      background: #fff;
+    }
+
+    .metadata-extra > .form-stack {
+      margin-top: 10px;
+    }
+
+    @media (min-width: 1300px) {
+      .export-panel .html-player-options {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: start;
+      }
+
+      #recursivePlayerOptions,
+      #recursiveVisualOptions,
+      .export-panel .info-summary-section,
+      .html-export-status,
+      .export-panel .button-container {
+        grid-column: 1 / -1;
+      }
     }
 
     .modal,
@@ -804,7 +846,7 @@
       display: none !important;
     }
 
-    @media (max-width: 920px) {
+    @media (max-width: 1040px) {
       main {
         width: min(100% - 20px, 720px);
         padding-top: 14px;
@@ -845,7 +887,8 @@
       .settings-grid,
       .format-options,
       .html-mode-options,
-      .info-summary-section {
+      .info-summary-section,
+      .image-tool-grid {
         grid-template-columns: 1fr;
       }
     }
@@ -995,6 +1038,39 @@
           </div>
         </div>
       </section>
+
+    <section id="image-section" class="tool-panel">
+      <div class="tool-panel__header">
+        <div>
+          <h2>Image base64</h2>
+          <p>Optional visual data for the exported player.</p>
+        </div>
+      </div>
+      <div class="tool-panel__body">
+        <div class="image-tool-grid">
+          <div class="form-stack">
+            <label class="field" for="image-file-input">
+              <span>Image file</span>
+              <input type="file" id="image-file-input" accept="image/*">
+            </label>
+            <p id="file-size-info"></p>
+            <div class="button-container">
+              <button id="convert-image-button" type="button" disabled>Convert image</button>
+              <button id="copy-image-base64-button" class="copy-button" type="button" disabled>Copy image base64</button>
+              <button id="download-image-base64-button" class="download-button" type="button" disabled>Download image TXT</button>
+            </div>
+            <details>
+              <summary>Show image base64</summary>
+              <textarea id="image-base64-output" class="base64-output" readonly></textarea>
+            </details>
+          </div>
+          <div class="media-frame">
+            <img id="image-preview" alt="Image preview" style="display: none;">
+          </div>
+        </div>
+      </div>
+    </section>
+    </aside>
 
       <section id="export-section" class="tool-panel export-panel">
         <div class="tool-panel__header">
@@ -1168,50 +1244,55 @@
                   <span>Album</span>
                   <input type="text" id="albumInput" name="album">
                 </label>
-                <fieldset id="stemMetadataFields" class="metadata-fieldset hidden">
-                  <legend>Stem details</legend>
-                  <label class="field" for="stemRoleInput">
-                    <span>Stem role</span>
-                    <input type="text" id="stemRoleInput" name="stemRole" placeholder="Drums, vocal, guitar">
-                  </label>
-                </fieldset>
-                <fieldset id="sampleMetadataFields" class="metadata-fieldset hidden">
-                  <legend>Sample details</legend>
-                  <label class="field" for="instrumentInput">
-                    <span>Instrument</span>
-                    <input type="text" id="instrumentInput" name="instrument">
-                  </label>
-                  <label class="field" for="noteInput">
-                    <span>Note</span>
-                    <input type="text" id="noteInput" name="note" list="noteList" placeholder="C4">
-                    <datalist id="noteList"></datalist>
-                  </label>
-                  <label class="field" for="frequencyInput">
-                    <span>Frequency</span>
-                    <input type="text" id="frequencyInput" name="frequency" readonly>
-                  </label>
-                </fieldset>
-                <label class="format-option" for="loopCheckbox">
-                  <input type="checkbox" id="loopCheckbox" name="isLoop">
-                  <span>
-                    <strong>Loop</strong>
-                    <small>Enable tempo metadata</small>
-                  </span>
-                </label>
-                <div id="bpmGroup" class="field hidden">
-                  <label for="bpmInput">
-                    <span>BPM</span>
-                    <input type="number" id="bpmInput" name="bpm" min="1">
-                  </label>
-                </div>
-                <label class="field" for="descriptionInput">
-                  <span>Description</span>
-                  <textarea id="descriptionInput" name="description"></textarea>
-                </label>
-                <label class="field" for="licenseInput">
-                  <span>License</span>
-                  <input type="text" id="licenseInput" name="license" placeholder="All rights reserved">
-                </label>
+                <details class="metadata-extra">
+                  <summary>More metadata</summary>
+                  <div class="form-stack">
+                    <fieldset id="stemMetadataFields" class="metadata-fieldset hidden">
+                      <legend>Stem details</legend>
+                      <label class="field" for="stemRoleInput">
+                        <span>Stem role</span>
+                        <input type="text" id="stemRoleInput" name="stemRole" placeholder="Drums, vocal, guitar">
+                      </label>
+                    </fieldset>
+                    <fieldset id="sampleMetadataFields" class="metadata-fieldset hidden">
+                      <legend>Sample details</legend>
+                      <label class="field" for="instrumentInput">
+                        <span>Instrument</span>
+                        <input type="text" id="instrumentInput" name="instrument">
+                      </label>
+                      <label class="field" for="noteInput">
+                        <span>Note</span>
+                        <input type="text" id="noteInput" name="note" list="noteList" placeholder="C4">
+                        <datalist id="noteList"></datalist>
+                      </label>
+                      <label class="field" for="frequencyInput">
+                        <span>Frequency</span>
+                        <input type="text" id="frequencyInput" name="frequency" readonly>
+                      </label>
+                    </fieldset>
+                    <label class="format-option" for="loopCheckbox">
+                      <input type="checkbox" id="loopCheckbox" name="isLoop">
+                      <span>
+                        <strong>Loop</strong>
+                        <small>Enable tempo metadata</small>
+                      </span>
+                    </label>
+                    <div id="bpmGroup" class="field hidden">
+                      <label for="bpmInput">
+                        <span>BPM</span>
+                        <input type="number" id="bpmInput" name="bpm" min="1">
+                      </label>
+                    </div>
+                    <label class="field" for="descriptionInput">
+                      <span>Description</span>
+                      <textarea id="descriptionInput" name="description"></textarea>
+                    </label>
+                    <label class="field" for="licenseInput">
+                      <span>License</span>
+                      <input type="text" id="licenseInput" name="license" placeholder="All rights reserved">
+                    </label>
+                  </div>
+                </details>
               </form>
             </section>
 
@@ -1232,39 +1313,6 @@
           </div>
         </div>
       </section>
-    </aside>
-
-    <section id="image-section" class="tool-panel">
-      <div class="tool-panel__header">
-        <div>
-          <h2>Image base64</h2>
-          <p>Optional visual data for the exported player.</p>
-        </div>
-      </div>
-      <div class="tool-panel__body">
-        <div class="tool-grid">
-          <div class="form-stack">
-            <label class="field" for="image-file-input">
-              <span>Image file</span>
-              <input type="file" id="image-file-input" accept="image/*">
-            </label>
-            <p id="file-size-info"></p>
-            <div class="button-container">
-              <button id="convert-image-button" type="button" disabled>Convert image</button>
-              <button id="copy-image-base64-button" class="copy-button" type="button" disabled>Copy image base64</button>
-              <button id="download-image-base64-button" class="download-button" type="button" disabled>Download image TXT</button>
-            </div>
-            <details>
-              <summary>Show image base64</summary>
-              <textarea id="image-base64-output" class="base64-output" readonly></textarea>
-            </details>
-          </div>
-          <div class="media-frame">
-            <img id="image-preview" alt="Image preview" style="display: none;">
-          </div>
-        </div>
-      </div>
-    </section>
   </div>
 
   <div id="audioInfoContainer" class="info-popup hidden" role="dialog" aria-modal="true" aria-labelledby="audio-section-heading">
