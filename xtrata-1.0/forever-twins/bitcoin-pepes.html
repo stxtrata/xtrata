@@ -46,7 +46,7 @@
   .brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.3px}
   .brand .b-mark{width:26px;height:26px;border-radius:6px;background:linear-gradient(135deg,var(--gold),var(--gold-2));
     display:grid;place-items:center;color:#1b1b1b;font-weight:900;font-family:var(--mono)}
-  .brand-logo{width:30px;height:30px;border-radius:8px;object-fit:contain;background:rgba(255,255,255,.06);border:1px solid var(--line);padding:3px}
+  .brand-logo{width:34px;height:34px;object-fit:contain;display:block}
   .nav-links{display:flex;gap:22px;align-items:center}
   .nav-links a{color:var(--muted);font-size:14px;font-weight:600}
   .nav-links a:hover{color:var(--ink);text-decoration:none}
@@ -61,14 +61,8 @@
 
   /* hero */
   .hero{padding:64px 0 40px;display:grid;grid-template-columns:1.15fr .85fr;gap:40px;align-items:center}
-  .hero-brand-strip{display:flex;align-items:center;gap:14px;margin:0 0 18px;flex-wrap:wrap}
-  .hero-logo-card{display:grid;place-items:center;border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.03));box-shadow:0 10px 28px rgba(0,0,0,.22)}
-  .hero-logo-card img{object-fit:contain}
-  .hero-logo-card span{display:block;margin-top:5px;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.9px;color:var(--muted);text-align:center}
-  .hero-logo-card.fakfun{width:132px;height:94px;border-color:rgba(247,147,26,.34);background:linear-gradient(180deg,rgba(247,147,26,.13),rgba(255,255,255,.04))}
-  .hero-logo-card.fakfun img{width:68px;height:68px}
-  .hero-logo-card.xtrata{width:88px;height:66px}
-  .hero-logo-card.xtrata img{width:42px;height:42px}
+  .hero-brand-strip{display:flex;align-items:center;gap:16px;margin:0 0 18px;flex-wrap:wrap}
+  .hero-brand-strip img{width:68px;height:68px;object-fit:contain;display:block}
   .hero-logo-plus{font-family:var(--mono);font-weight:900;color:var(--gold-2)}
   .eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;
     text-transform:uppercase;letter-spacing:1.5px;color:var(--gold-2);
@@ -180,8 +174,7 @@
   footer{border-top:1px solid var(--line);padding:30px 0;color:var(--muted);font-size:13px}
   .foot-inner{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:center}
   .footer-logos{display:flex;align-items:center;gap:10px}
-  .footer-logos img{width:28px;height:28px;object-fit:contain;border-radius:7px;background:rgba(255,255,255,.05);border:1px solid var(--line);padding:3px}
-  .footer-logos img.fakfun-footer-logo{width:34px;height:34px;border-color:rgba(247,147,26,.34)}
+  .footer-logos img{width:34px;height:34px;object-fit:contain;display:block}
   .disclaimer{font-size:11.5px;color:#7e8087;max-width:760px;margin-top:10px;line-height:1.5}
 
   .err-note{display:none;font-family:var(--mono);font-size:12px;color:#ff9a9a;margin-top:8px}
@@ -221,19 +214,9 @@
   <section class="hero">
     <div>
       <div class="hero-brand-strip" aria-label="Built with Fak.fun and powered by Xtrata">
-        <div class="hero-logo-card fakfun">
-          <div>
-            <img src="./assets/fakfun-logo-256x256.png" alt="Fak.fun logo" />
-            <span>Fak.fun</span>
-          </div>
-        </div>
+        <img src="./assets/fakfun-logo-256x256.png" alt="Fak.fun logo" />
         <span class="hero-logo-plus">+</span>
-        <div class="hero-logo-card xtrata">
-          <div>
-            <img src="./assets/xtrata-X-no-text-256x256.png" alt="Xtrata logo" />
-            <span>Xtrata</span>
-          </div>
-        </div>
+        <img src="./assets/xtrata-X-no-text-256x256.png" alt="Xtrata logo" />
       </div>
       <span class="eyebrow">◎ Powered by Xtrata · Built with Fak.fun</span>
       <h1>Your NFT can survive<br><span class="ink-gold">while the art disappears.</span></h1>
@@ -448,7 +431,7 @@
   <div class="wrap foot-inner">
     <div class="brand"><img class="brand-logo" src="./assets/fakfun-logo-256x256.png" alt="Fak.fun" /> Bitcoin Pepes · Forever Twins</div>
     <div class="footer-logos" aria-label="Fak.fun and Xtrata">
-      <img class="fakfun-footer-logo" src="./assets/fakfun-logo-256x256.png" alt="Fak.fun" />
+      <img src="./assets/fakfun-logo-256x256.png" alt="Fak.fun" />
       <img src="./assets/xtrata-X-no-text-256x256.png" alt="Xtrata" />
     </div>
     <div>Powered by <a href="https://explorer.hiro.so/txid/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3?chain=mainnet" target="_blank" rel="noopener">Xtrata</a> · Built with <a href="https://fak.fun/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun" target="_blank" rel="noopener">Fak.fun</a> · <span id="foot-updated">—</span></div>
