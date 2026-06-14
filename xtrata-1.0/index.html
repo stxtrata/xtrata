@@ -386,7 +386,7 @@
 
     .topbar {
       display: grid;
-      grid-template-columns: minmax(220px, 1fr) auto;
+      grid-template-columns: minmax(220px, 0.8fr) minmax(280px, 1.6fr) auto;
       align-items: center;
       gap: 16px;
       min-height: 116px;
@@ -426,6 +426,49 @@
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 12px;
       overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .connected-readout {
+      min-width: 0;
+      justify-self: center;
+      width: min(100%, 620px);
+      text-align: center;
+    }
+
+    .connected-readout[hidden] {
+      display: none;
+    }
+
+    .connected-readout__label {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .connected-readout__value {
+      display: block;
+      overflow: hidden;
+      color: var(--ink);
+      font-size: clamp(22px, 3vw, 42px);
+      font-weight: 900;
+      line-height: 1;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .connected-readout__address {
+      display: block;
+      margin-top: 5px;
+      overflow: hidden;
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
@@ -2594,6 +2637,11 @@
         grid-template-columns: 1fr;
       }
 
+      .connected-readout {
+        justify-self: stretch;
+        text-align: left;
+      }
+
       .top-actions {
         justify-content: flex-start;
       }
@@ -3009,6 +3057,11 @@
           <img class="brand-logo" src="https://nxhyvj3lifp2q34nklffzxslfje426oxeruo3lkuj56srwgctdlq.arweave.net/bc-Kp2tBX6hvjVLKXN5LKknNedckaO2tVE99KNjCmNc" alt="" />
           <span>XTRATA</span>
         </a>
+      </div>
+      <div class="connected-readout" id="connectedReadout" aria-live="polite" hidden>
+        <span class="connected-readout__label">Connected wallet</span>
+        <span class="connected-readout__value" id="connectedReadoutValue"></span>
+        <span class="connected-readout__address" id="connectedReadoutAddress"></span>
       </div>
       <div class="top-actions">
         <button class="btn" id="connectButton" type="button">Connect wallet</button>
@@ -3668,6 +3721,9 @@
     const dom = {
       themeSelect: $('themeSelect'),
       refreshWalletButton: $('refreshWalletButton'),
+      connectedReadout: $('connectedReadout'),
+      connectedReadoutValue: $('connectedReadoutValue'),
+      connectedReadoutAddress: $('connectedReadoutAddress'),
       connectButton: $('connectButton'),
       disconnectButton: $('disconnectButton'),
       viewInscriptionsButton: $('viewInscriptionsButton'),
@@ -6056,6 +6112,30 @@
         : truncateMiddle(connectedAddress, 8, 8);
     };
 
+    const updateConnectedReadout = () => {
+      const connectedAddress = state.walletSession.address ?? null;
+      const connected = state.walletSession.isConnected && !!connectedAddress;
+      if (!dom.connectedReadout || !dom.connectedReadoutValue || !dom.connectedReadoutAddress) {
+        return;
+      }
+      dom.connectedReadout.hidden = !connected || state.explorerMode;
+      if (!connected || state.explorerMode) {
+        dom.connectedReadoutValue.textContent = '';
+        dom.connectedReadoutAddress.textContent = '';
+        return;
+      }
+      const label = getConnectedWalletLabel() ?? truncateMiddle(connectedAddress, 8, 8);
+      const hasResolvedName =
+        !!state.connectedWalletName &&
+        addressesEqual(state.connectedWalletNameAddress, connectedAddress);
+      dom.connectedReadoutValue.textContent = label;
+      dom.connectedReadout.title = hasResolvedName
+        ? `${state.connectedWalletName} (${connectedAddress})`
+        : connectedAddress;
+      dom.connectedReadoutAddress.textContent = hasResolvedName ? connectedAddress : '';
+      dom.connectedReadoutAddress.hidden = !hasResolvedName;
+    };
+
     const resolveConnectedWalletName = async () => {
       const connectedAddress = state.walletSession.address?.trim() ?? '';
       if (!connectedAddress) {
@@ -6085,6 +6165,7 @@
         }
         state.connectedWalletName = namesResult.primary;
         state.connectedWalletNameResolved = true;
+        updateConnectedReadout();
         updateWalletStatus();
       } catch (error) {
         if (requestId !== state.connectedWalletNameRequestId) {
@@ -6409,6 +6490,7 @@
         dom.explorerTokenInput.disabled = explorerControlsDisabled;
       }
       updateWalletLookupInputMode();
+      updateConnectedReadout();
       updateWalletLookupStatus();
       updateTransferControls();
       updateWalletPagerControls();
