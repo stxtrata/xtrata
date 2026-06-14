@@ -1,0 +1,16 @@
+// vitest.config.ts
+import { defineConfig } from "file:///sessions/wonderful-fervent-faraday/mnt/xtrata-1.0/node_modules/vitest/dist/config.js";
+var vitest_config_default = defineConfig({
+  test: {
+    environment: "node",
+    include: [
+      "src/**/*.test.ts",
+      "functions/**/*.test.ts",
+      "packages/**/*.test.ts"
+    ]
+  }
+});
+export {
+  vitest_config_default as default
+};
+//# sourceMappingURL=data:application/json;base64,ewogICJ2ZXJzaW9uIjogMywKICAic291cmNlcyI6IFsidml0ZXN0LmNvbmZpZy50cyJdLAogICJzb3VyY2VzQ29udGVudCI6IFsiY29uc3QgX192aXRlX2luamVjdGVkX29yaWdpbmFsX2Rpcm5hbWUgPSBcIi9zZXNzaW9ucy93b25kZXJmdWwtZmVydmVudC1mYXJhZGF5L21udC94dHJhdGEtMS4wXCI7Y29uc3QgX192aXRlX2luamVjdGVkX29yaWdpbmFsX2ZpbGVuYW1lID0gXCIvc2Vzc2lvbnMvd29uZGVyZnVsLWZlcnZlbnQtZmFyYWRheS9tbnQveHRyYXRhLTEuMC92aXRlc3QuY29uZmlnLnRzXCI7Y29uc3QgX192aXRlX2luamVjdGVkX29yaWdpbmFsX2ltcG9ydF9tZXRhX3VybCA9IFwiZmlsZTovLy9zZXNzaW9ucy93b25kZXJmdWwtZmVydmVudC1mYXJhZGF5L21udC94dHJhdGEtMS4wL3ZpdGVzdC5jb25maWcudHNcIjtpbXBvcnQgeyBkZWZpbmVDb25maWcgfSBmcm9tICd2aXRlc3QvY29uZmlnJztcblxuZXhwb3J0IGRlZmF1bHQgZGVmaW5lQ29uZmlnKHtcbiAgdGVzdDoge1xuICAgIGVudmlyb25tZW50OiAnbm9kZScsXG4gICAgaW5jbHVkZTogW1xuICAgICAgJ3NyYy8qKi8qLnRlc3QudHMnLFxuICAgICAgJ2Z1bmN0aW9ucy8qKi8qLnRlc3QudHMnLFxuICAgICAgJ3BhY2thZ2VzLyoqLyoudGVzdC50cydcbiAgICBdXG4gIH1cbn0pO1xuIl0sCiAgIm1hcHBpbmdzIjogIjtBQUE0VSxTQUFTLG9CQUFvQjtBQUV6VyxJQUFPLHdCQUFRLGFBQWE7QUFBQSxFQUMxQixNQUFNO0FBQUEsSUFDSixhQUFhO0FBQUEsSUFDYixTQUFTO0FBQUEsTUFDUDtBQUFBLE1BQ0E7QUFBQSxNQUNBO0FBQUEsSUFDRjtBQUFBLEVBQ0Y7QUFDRixDQUFDOyIsCiAgIm5hbWVzIjogW10KfQo=
