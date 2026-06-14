@@ -386,7 +386,7 @@
 
     .topbar {
       display: grid;
-      grid-template-columns: minmax(220px, 1fr) auto;
+      grid-template-columns: minmax(220px, 0.8fr) minmax(280px, 1.6fr) auto;
       align-items: center;
       gap: 16px;
       min-height: 116px;
@@ -426,6 +426,49 @@
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 12px;
       overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .connected-readout {
+      min-width: 0;
+      justify-self: center;
+      width: min(100%, 620px);
+      text-align: center;
+    }
+
+    .connected-readout[hidden] {
+      display: none;
+    }
+
+    .connected-readout__label {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .connected-readout__value {
+      display: block;
+      overflow: hidden;
+      color: var(--ink);
+      font-size: clamp(22px, 3vw, 42px);
+      font-weight: 900;
+      line-height: 1;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .connected-readout__address {
+      display: block;
+      margin-top: 5px;
+      overflow: hidden;
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
@@ -2594,6 +2637,11 @@
         grid-template-columns: 1fr;
       }
 
+      .connected-readout {
+        justify-self: stretch;
+        text-align: left;
+      }
+
       .top-actions {
         justify-content: flex-start;
       }
@@ -3009,6 +3057,11 @@
           <img class="brand-logo" src="https://nxhyvj3lifp2q34nklffzxslfje426oxeruo3lkuj56srwgctdlq.arweave.net/bc-Kp2tBX6hvjVLKXN5LKknNedckaO2tVE99KNjCmNc" alt="" />
           <span>XTRATA</span>
         </a>
+      </div>
+      <div class="connected-readout" id="connectedReadout" aria-live="polite" hidden>
+        <span class="connected-readout__label">Connected wallet</span>
+        <span class="connected-readout__value" id="connectedReadoutValue"></span>
+        <span class="connected-readout__address" id="connectedReadoutAddress"></span>
       </div>
       <div class="top-actions">
         <button class="btn" id="connectButton" type="button">Connect wallet</button>
@@ -3605,6 +3658,7 @@
       decodeTokenUriToImage,
       fetchTokenImageFromUri,
       fetchOnChainContent,
+      getFiniteAnimatedImageReplayDelayMs,
       getMediaKind,
       getMimeTypeEssence,
       getTextPreview,
@@ -3668,6 +3722,9 @@
     const dom = {
       themeSelect: $('themeSelect'),
       refreshWalletButton: $('refreshWalletButton'),
+      connectedReadout: $('connectedReadout'),
+      connectedReadoutValue: $('connectedReadoutValue'),
+      connectedReadoutAddress: $('connectedReadoutAddress'),
       connectButton: $('connectButton'),
       disconnectButton: $('disconnectButton'),
       viewInscriptionsButton: $('viewInscriptionsButton'),
@@ -4674,6 +4731,7 @@
         isSvgSource = false,
         alt = 'Image preview',
         preserveAnimation = false,
+        replayDelayMs = null,
         onError = null
       } = {}
     ) => {
@@ -4692,6 +4750,22 @@
         }
         img.src = sourceUrl;
         target.replaceChildren(img);
+        if (Number.isFinite(replayDelayMs) && replayDelayMs > 0) {
+          const replay = () => {
+            if (!img.isConnected || img.parentElement !== target) {
+              return;
+            }
+            img.src = '';
+            requestAnimationFrame(() => {
+              if (!img.isConnected || img.parentElement !== target) {
+                return;
+              }
+              img.src = sourceUrl;
+              window.setTimeout(replay, replayDelayMs);
+            });
+          };
+          window.setTimeout(replay, replayDelayMs);
+        }
       };
 
       // SVG/XML image animation runs inside the image document. Drawing it to a
@@ -4716,6 +4790,20 @@
       };
       img.onerror = onError ?? renderNativeImage;
       img.src = sourceUrl;
+    };
+
+    const playPreviewVideoWhenReady = (video) => {
+      const play = () => {
+        const playAttempt = video.play();
+        if (playAttempt && typeof playAttempt.catch === 'function') {
+          void playAttempt.catch(() => {});
+        }
+      };
+      if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        play();
+        return;
+      }
+      video.addEventListener('loadeddata', play, { once: true });
     };
 
     const getBuildHiroKeyFlag = () => {
@@ -5958,7 +6046,11 @@
             isSvgSource: kind === 'svg',
             alt: 'Inscription preview',
             preserveAnimation:
-              kind === 'image' && isAnimatedImagePayload(bytes, previewMimeType)
+              kind === 'image' && isAnimatedImagePayload(bytes, previewMimeType),
+            replayDelayMs:
+              kind === 'image'
+                ? getFiniteAnimatedImageReplayDelayMs(bytes, previewMimeType)
+                : null
           });
           return;
         }
@@ -5977,9 +6069,14 @@
       if (kind === 'video') {
         const video = document.createElement('video');
         video.controls = true;
+        video.autoplay = true;
+        video.loop = true;
+        video.playsInline = true;
+        video.preload = 'auto';
         video.setAttribute('controlsList', 'nodownload');
         video.src = getObjectUrl();
         target.append(video);
+        playPreviewVideoWhenReady(video);
         return;
       }
 
@@ -6056,6 +6153,30 @@
         : truncateMiddle(connectedAddress, 8, 8);
     };
 
+    const updateConnectedReadout = () => {
+      const connectedAddress = state.walletSession.address ?? null;
+      const connected = state.walletSession.isConnected && !!connectedAddress;
+      if (!dom.connectedReadout || !dom.connectedReadoutValue || !dom.connectedReadoutAddress) {
+        return;
+      }
+      dom.connectedReadout.hidden = !connected || state.explorerMode;
+      if (!connected || state.explorerMode) {
+        dom.connectedReadoutValue.textContent = '';
+        dom.connectedReadoutAddress.textContent = '';
+        return;
+      }
+      const label = getConnectedWalletLabel() ?? truncateMiddle(connectedAddress, 8, 8);
+      const hasResolvedName =
+        !!state.connectedWalletName &&
+        addressesEqual(state.connectedWalletNameAddress, connectedAddress);
+      dom.connectedReadoutValue.textContent = label;
+      dom.connectedReadout.title = hasResolvedName
+        ? `${state.connectedWalletName} (${connectedAddress})`
+        : connectedAddress;
+      dom.connectedReadoutAddress.textContent = hasResolvedName ? connectedAddress : '';
+      dom.connectedReadoutAddress.hidden = !hasResolvedName;
+    };
+
     const resolveConnectedWalletName = async () => {
       const connectedAddress = state.walletSession.address?.trim() ?? '';
       if (!connectedAddress) {
@@ -6085,6 +6206,7 @@
         }
         state.connectedWalletName = namesResult.primary;
         state.connectedWalletNameResolved = true;
+        updateConnectedReadout();
         updateWalletStatus();
       } catch (error) {
         if (requestId !== state.connectedWalletNameRequestId) {
@@ -6409,6 +6531,7 @@
         dom.explorerTokenInput.disabled = explorerControlsDisabled;
       }
       updateWalletLookupInputMode();
+      updateConnectedReadout();
       updateWalletLookupStatus();
       updateTransferControls();
       updateWalletPagerControls();
@@ -7740,7 +7863,8 @@
           isSvgSource: kind === 'svg',
           alt: 'Inscription preview',
           preserveAnimation:
-            kind === 'image' && isPotentialAnimatedRasterMimeType(mimeType)
+            kind === 'image' && isPotentialAnimatedRasterMimeType(mimeType),
+          replayDelayMs: null
         });
         return;
       }
@@ -7768,7 +7892,11 @@
           isSvgSource: kind === 'svg',
           alt: 'Inscription preview',
           preserveAnimation:
-            kind === 'image' && isAnimatedImagePayload(bytes, fullscreenMimeType)
+            kind === 'image' && isAnimatedImagePayload(bytes, fullscreenMimeType),
+          replayDelayMs:
+            kind === 'image'
+              ? getFiniteAnimatedImageReplayDelayMs(bytes, fullscreenMimeType)
+              : null
         });
         return;
       }
@@ -7778,10 +7906,13 @@
       if (kind === 'video') {
         const video = document.createElement('video');
         video.controls = true;
+        video.autoplay = true;
+        video.loop = true;
         video.playsInline = true;
-        video.preload = 'metadata';
+        video.preload = 'auto';
         video.src = url;
         dom.fullscreenStage.append(video);
+        playPreviewVideoWhenReady(video);
         return;
       }
 
@@ -8359,6 +8490,34 @@
         });
         img.src = url;
         thumbElement.append(img);
+        const replayDelayMs =
+          media.kind === 'image'
+            ? getFiniteAnimatedImageReplayDelayMs(media.bytes, media.mimeType ?? null)
+            : null;
+        if (Number.isFinite(replayDelayMs) && replayDelayMs > 0) {
+          const replay = () => {
+            if (
+              !img.isConnected ||
+              thumbElement.dataset.thumbnailKey !== cacheKey ||
+              state.tokenThumbUrls.get(cacheKey) !== url
+            ) {
+              return;
+            }
+            img.src = '';
+            requestAnimationFrame(() => {
+              if (
+                !img.isConnected ||
+                thumbElement.dataset.thumbnailKey !== cacheKey ||
+                state.tokenThumbUrls.get(cacheKey) !== url
+              ) {
+                return;
+              }
+              img.src = url;
+              window.setTimeout(replay, replayDelayMs);
+            });
+          };
+          window.setTimeout(replay, replayDelayMs);
+        }
         return true;
       }
 
@@ -8959,6 +9118,30 @@
       const cacheKey = getThumbnailKey(token);
       const liveMedia = state.gridLiveMediaCache.get(cacheKey);
       if (
+        liveMedia?.bytes &&
+        (liveMedia.kind === 'video' ||
+          (liveMedia.kind === 'image' &&
+            isAnimatedImagePayload(liveMedia.bytes, liveMedia.mimeType ?? null)))
+      ) {
+        const mimeType =
+          liveMedia.mimeType ??
+          token.meta.mimeType ??
+          'application/octet-stream';
+        if (
+          renderSelectedTokenPreviewPayload(
+            token,
+            requestId,
+            liveMedia.bytes,
+            mimeType,
+            null,
+            startedAt,
+            'grid-live-media-cache'
+          )
+        ) {
+          return;
+        }
+      }
+      if (
         liveMedia?.kind === 'html' &&
         liveMedia.bytes &&
         isGridHtmlDocument(liveMedia.mimeType)
@@ -9111,9 +9294,29 @@
           updateControls();
           return;
         }
+        const cachedLiveMedia = state.gridLiveMediaCache.get(getThumbnailKey(token));
+        if (
+          cachedLiveMedia?.kind === 'image' &&
+          cachedLiveMedia.bytes &&
+          isAnimatedImagePayload(
+            cachedLiveMedia.bytes,
+            cachedLiveMedia.mimeType ?? token.meta.mimeType ?? null
+          )
+        ) {
+          await loadSelectedTokenPreviewLocally(token, requestId);
+          return;
+        }
         const runtimeImageUrl = getTokenRuntimeImageUrl(token);
         if (runtimeImageUrl) {
           const mimeType = token.meta.mimeType ?? 'application/octet-stream';
+          if (
+            state.explorerMode &&
+            token.meta.totalSize <= MAX_GRID_EAGER_FULL_LOAD_BYTES &&
+            isPotentialAnimatedRasterMimeType(mimeType)
+          ) {
+            await loadSelectedTokenPreviewLocally(token, requestId);
+            return;
+          }
           state.tokenPreviewTokenId = token.id.toString();
           state.tokenPreviewBytes = null;
           state.tokenPreviewMimeType = mimeType;
