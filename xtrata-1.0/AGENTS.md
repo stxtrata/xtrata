@@ -15,6 +15,9 @@ This file captures the core development rules and app constraints for V16.
    - Use `scripts/contract-variants.mjs` (`npm run contracts:sync`) to keep
      clarinet/testnet/mainnet SIP-009 trait blocks aligned.
 9) Add or update tests for lib changes; prefer targeted unit tests in `src/lib/**/__tests__`.
+10) After completing any change, write a summary and notes, then commit it.
+    - The user handles all pushing. Do not push unless explicitly requested.
+    - Commit all completed changes with summaries and notes where appropriate.
 
 ## App Overview
 
