@@ -5,6 +5,166 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Forever Twins · Permanent on-chain counterparts for NFT collections</title>
 <meta name="description" content="Forever Twins give existing NFT collections a permanent, on-chain counterpart — no re-mint, no migration. Powered by Xtrata, built with Fak.fun. Bitcoin Pepes are first." />
+<script>
+  (() => {
+    const THEME_STORAGE_KEY = 'xtrata.simple-homepage.theme';
+    const themes = {
+      classic: {
+        colorScheme: 'light',
+        bg: '#f6f8f5', panel: '#ffffff', ink: '#151a17', muted: '#617067',
+        line: '#d2ddd6', lineStrong: '#9caf9f', green: '#245f45',
+        greenSoft: '#e6f1ea', blue: '#214f73', blueSoft: '#e5eef5',
+        rose: '#a43f58', roseSoft: '#f7e6eb', amber: '#84601b',
+        amberSoft: '#f7edd7', shadow: '0 18px 50px rgba(19, 31, 25, 0.08)',
+        control: '#ffffff', surfaceSoft: '#fbfdfb', thumb: '#f1f5f2',
+        buttonHover: '#27302b', ghostHover: 'rgba(21, 26, 23, 0.06)',
+        topbarAccent: 'transparent', buttonBg: '#151a17', buttonInk: '#f6f8f5',
+        buttonBorder: '#151a17', secondaryInk: '#151a17'
+      },
+      terminal: {
+        colorScheme: 'dark',
+        bg: '#0d120f', panel: '#101813', ink: '#e7f5ec', muted: '#8fa498',
+        line: '#26362d', lineStrong: '#4a715a', green: '#70d18d',
+        greenSoft: '#14281c', blue: '#8fc7ff', blueSoft: '#122235',
+        rose: '#ff8da8', roseSoft: '#351823', amber: '#f0be63',
+        amberSoft: '#302411', shadow: '0 20px 58px rgba(0, 0, 0, 0.42)',
+        control: '#0c1510', surfaceSoft: '#0c1510', thumb: '#0a100d',
+        buttonHover: '#c8ead4', ghostHover: 'rgba(112, 209, 141, 0.10)',
+        topbarAccent: 'rgba(112, 209, 141, 0.16)'
+      },
+      midnight: {
+        colorScheme: 'dark',
+        bg: '#101521', panel: '#161d2b', ink: '#f3f7ff', muted: '#9ba8bb',
+        line: '#2b3649', lineStrong: '#556a8c', green: '#76d6c2',
+        greenSoft: '#12302d', blue: '#9fc3ff', blueSoft: '#172945',
+        rose: '#ff9ab0', roseSoft: '#3a1d2a', amber: '#ffd27a',
+        amberSoft: '#332713', shadow: '0 20px 62px rgba(0, 0, 0, 0.36)',
+        control: '#101827', surfaceSoft: '#111a29', thumb: '#0f1724',
+        buttonHover: '#d8e6ff', ghostHover: 'rgba(159, 195, 255, 0.10)',
+        topbarAccent: 'rgba(159, 195, 255, 0.16)'
+      },
+      neon: {
+        colorScheme: 'dark',
+        bg: '#05020b', panel: '#0c0715', ink: '#f8f4ff', muted: '#b79fd2',
+        line: '#3b1859', lineStrong: '#ff36d7', green: '#00ff9c',
+        greenSoft: '#06251c', blue: '#00d9ff', blueSoft: '#051c2a',
+        rose: '#ff36d7', roseSoft: '#2a0724', amber: '#ffe66d',
+        amberSoft: '#251f05', shadow: '0 0 34px rgba(255, 54, 215, 0.20), 0 0 68px rgba(0, 217, 255, 0.12)',
+        control: '#10071b', surfaceSoft: '#0a0611', thumb: '#09040f',
+        buttonHover: '#d9b8ff', ghostHover: 'rgba(0, 217, 255, 0.13)',
+        topbarAccent: 'rgba(0, 255, 156, 0.28)'
+      },
+      monochrome: {
+        colorScheme: 'dark',
+        bg: '#050505', panel: '#111111', ink: '#f7f7f7', muted: '#c9c9c9',
+        line: '#303030', lineStrong: '#d8d8d8', green: '#ffffff',
+        greenSoft: '#1d1d1d', blue: '#e7e7e7', blueSoft: '#181818',
+        rose: '#ffffff', roseSoft: '#1f1f1f', amber: '#d4d4d4',
+        amberSoft: '#202020', shadow: '0 24px 70px rgba(0, 0, 0, 0.62), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
+        control: '#0b0b0b', surfaceSoft: '#151515', thumb: '#0d0d0d',
+        buttonHover: '#d8d8d8', ghostHover: 'rgba(255, 255, 255, 0.08)',
+        topbarAccent: 'rgba(255, 255, 255, 0.20)', buttonBg: '#f7f7f7',
+        buttonInk: '#050505', buttonBorder: '#f7f7f7', secondaryInk: '#f7f7f7'
+      },
+      obsidian: {
+        colorScheme: 'dark',
+        bg: '#070b10', panel: '#0e141b', ink: '#eef6ff', muted: '#8fa2b6',
+        line: '#253241', lineStrong: '#50677d', green: '#7ee2c7',
+        greenSoft: '#102a27', blue: '#86b7ff', blueSoft: '#111f32',
+        rose: '#ff8fb3', roseSoft: '#311522', amber: '#ffcc78',
+        amberSoft: '#2a2010', shadow: '0 26px 76px rgba(0, 0, 0, 0.54)',
+        control: '#0a1118', surfaceSoft: '#0b1219', thumb: '#060b10',
+        buttonHover: '#d6e9ff', ghostHover: 'rgba(134, 183, 255, 0.10)',
+        topbarAccent: 'rgba(126, 226, 199, 0.16)'
+      },
+      ember: {
+        colorScheme: 'dark',
+        bg: '#130905', panel: '#1b0f0a', ink: '#fff5ee', muted: '#c09b85',
+        line: '#3b2116', lineStrong: '#a64f26', green: '#f0a35b',
+        greenSoft: '#331a0d', blue: '#ffc36f', blueSoft: '#2b1d0e',
+        rose: '#ff6d4d', roseSoft: '#35120c', amber: '#ffd27f',
+        amberSoft: '#30200d', shadow: '0 24px 68px rgba(0, 0, 0, 0.50), 0 0 42px rgba(255, 109, 77, 0.10)',
+        control: '#170b07', surfaceSoft: '#160c08', thumb: '#110704',
+        buttonHover: '#ffd3b0', ghostHover: 'rgba(255, 195, 111, 0.10)',
+        topbarAccent: 'rgba(255, 109, 77, 0.18)'
+      },
+      ultraviolet: {
+        colorScheme: 'dark',
+        bg: '#10071f', panel: '#170d2a', ink: '#fbf7ff', muted: '#b5a2d2',
+        line: '#33204e', lineStrong: '#8257d6', green: '#c7ff7a',
+        greenSoft: '#1f2b10', blue: '#b08cff', blueSoft: '#211338',
+        rose: '#ff91d6', roseSoft: '#35142d', amber: '#f4d27c',
+        amberSoft: '#2d230d', shadow: '0 24px 72px rgba(0, 0, 0, 0.46), 0 0 46px rgba(130, 87, 214, 0.16)',
+        control: '#120820', surfaceSoft: '#130a22', thumb: '#0e0619',
+        buttonHover: '#dac7ff', ghostHover: 'rgba(176, 140, 255, 0.12)',
+        topbarAccent: 'rgba(199, 255, 122, 0.18)'
+      },
+      arctic: {
+        colorScheme: 'dark',
+        bg: '#061018', panel: '#0c1a25', ink: '#f0fbff', muted: '#91aec0',
+        line: '#213a4a', lineStrong: '#63c6e8', green: '#9df7ff',
+        greenSoft: '#0c2b32', blue: '#72b7ff', blueSoft: '#0d2438',
+        rose: '#ff9fc8', roseSoft: '#321827', amber: '#f4dc95',
+        amberSoft: '#2a2412', shadow: '0 24px 72px rgba(0, 0, 0, 0.48), 0 0 38px rgba(114, 183, 255, 0.12)',
+        control: '#07131d', surfaceSoft: '#081722', thumb: '#05101a',
+        buttonHover: '#c6f4ff', ghostHover: 'rgba(157, 247, 255, 0.12)',
+        topbarAccent: 'rgba(99, 198, 232, 0.18)'
+      },
+      ruby: {
+        colorScheme: 'dark',
+        bg: '#120611', panel: '#1d0b1a', ink: '#fff3fb', muted: '#c39ab9',
+        line: '#3e1c37', lineStrong: '#b84d94', green: '#ffb3df',
+        greenSoft: '#331429', blue: '#d9a8ff', blueSoft: '#271633',
+        rose: '#ff6fbd', roseSoft: '#3a1130', amber: '#ffd18d',
+        amberSoft: '#2d2110', shadow: '0 24px 72px rgba(0, 0, 0, 0.50), 0 0 42px rgba(255, 111, 189, 0.14)',
+        control: '#150713', surfaceSoft: '#160914', thumb: '#10050f',
+        buttonHover: '#ffd0ef', ghostHover: 'rgba(255, 111, 189, 0.11)',
+        topbarAccent: 'rgba(255, 179, 223, 0.18)'
+      }
+    };
+    const valid = new Set(Object.keys(themes));
+    let theme = 'monochrome';
+    try {
+      const saved = window.localStorage?.getItem(THEME_STORAGE_KEY);
+      if (valid.has(saved)) theme = saved;
+    } catch {}
+    const values = themes[theme] || themes.monochrome;
+    const root = document.documentElement;
+    root.dataset.theme = theme;
+    const set = (name, value) => root.style.setProperty(name, value);
+    set('color-scheme', values.colorScheme);
+    set('--bg', values.bg);
+    set('--bg-2', values.surfaceSoft);
+    set('--panel', values.panel);
+    set('--panel-2', values.thumb);
+    set('--ink', values.ink);
+    set('--muted', values.muted);
+    set('--line', values.line);
+    set('--line-strong', values.lineStrong);
+    set('--green', values.green);
+    set('--green-soft', values.greenSoft);
+    set('--gold', values.green);
+    set('--gold-2', values.green);
+    set('--blue', values.blue);
+    set('--red', values.rose);
+    set('--amber', values.amber);
+    set('--amber-soft', values.amberSoft);
+    set('--shadow', values.shadow);
+    set('--control', values.control);
+    set('--surface-soft', values.surfaceSoft);
+    set('--thumb', values.thumb);
+    set('--button-hover', values.buttonHover);
+    set('--ghost-hover', values.ghostHover);
+    set('--topbar-accent', values.topbarAccent);
+    set('--button-bg', values.buttonBg || values.ink);
+    set('--button-ink', values.buttonInk || values.bg);
+    set('--button-border', values.buttonBorder || values.ink);
+    set('--secondary-ink', values.secondaryInk || values.ink);
+    document.addEventListener('DOMContentLoaded', () => {
+      document.body.dataset.theme = theme;
+    });
+  })();
+</script>
 <style>
   :root{
     color-scheme:light;
@@ -32,12 +192,15 @@
   }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
-  body{margin:0;min-width:320px;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.45;-webkit-font-smoothing:antialiased}
+  body{margin:0;min-width:320px;background:
+    radial-gradient(circle at 18% 10%, var(--topbar-accent), transparent 30%),
+    radial-gradient(circle at 82% 0%, rgba(255,255,255,.035), transparent 26%),
+    var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.45;-webkit-font-smoothing:antialiased}
   a{color:var(--green);text-decoration:none}
   a:hover{text-decoration:underline}
   .wrap{width:min(1240px,calc(100vw - 32px));margin:0 auto}
 
-  header.nav{position:sticky;top:0;z-index:50;background:rgba(246,248,245,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line-strong)}
+  header.nav{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line-strong)}
   .nav-inner{display:grid;grid-template-columns:minmax(220px,1fr) auto;align-items:center;gap:16px;min-height:100px}
   .brand{display:flex;align-items:center;gap:14px;font-weight:800;letter-spacing:0;text-transform:uppercase;color:var(--ink)}
   .brand .b-mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--gold),var(--gold-2));display:grid;place-items:center;color:#1b1b1b;font-weight:900;font-family:var(--mono)}
@@ -45,11 +208,11 @@
   .nav-links{display:flex;gap:18px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
   .nav-links a{color:var(--muted);font-size:14px;font-weight:600}
   .nav-links a:hover{color:var(--ink);text-decoration:none}
-  .btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--ink);cursor:pointer;font-weight:800;font-size:15px;padding:12px 18px;border-radius:var(--radius);
-    background:var(--ink);color:var(--bg);box-shadow:none;transition:background .12s ease,color .12s ease,border-color .12s ease}
-  .btn:hover{background:#27302b;color:var(--bg);text-decoration:none}
-  .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line-strong);box-shadow:none}
-  .btn.ghost:hover{background:rgba(21,26,23,.06);border-color:var(--ink)}
+  .btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--button-border);cursor:pointer;font-weight:800;font-size:15px;padding:12px 18px;border-radius:var(--radius);
+    background:var(--button-bg);color:var(--button-ink);box-shadow:none;transition:background .12s ease,color .12s ease,border-color .12s ease}
+  .btn:hover{background:var(--button-hover);color:var(--bg);text-decoration:none}
+  .btn.ghost{background:transparent;color:var(--secondary-ink);border:1px solid var(--line-strong);box-shadow:none}
+  .btn.ghost:hover{background:var(--ghost-hover);border-color:var(--ink)}
   .btn.sm{padding:9px 14px;font-size:13px;border-radius:var(--radius)}
 
   /* hero */
@@ -122,7 +285,7 @@
   /* founder cta */
   .founder{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:40px;text-align:left;box-shadow:var(--shadow)}
   .founder h2{font-size:clamp(24px,3.4vw,34px);margin:0 0 10px;font-weight:900}
-  .founder p{color:var(--muted);max-width:560px;margin:0 auto 22px}
+  .founder p{color:var(--muted);max-width:560px;margin:0 0 22px}
 
   footer{border-top:1px solid var(--line-strong);padding:30px 0;color:var(--muted);font-size:13px;margin-top:10px}
   .foot-inner{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:center}
