@@ -378,8 +378,6 @@
     }
 
     #result,
-    #base64Result,
-    #originalAudioContainer,
     #batchResultEl {
       display: grid;
       gap: 10px;
@@ -387,7 +385,6 @@
     }
 
     #result:empty,
-    #originalAudioContainer:empty,
     #batchResultEl:empty {
       display: none;
     }
@@ -979,16 +976,14 @@
         <div class="tool-panel__header">
           <div>
             <h2>Audio output</h2>
-            <p>Preview, download, and base64 output.</p>
+            <p>Compare A/B, download output, and export base64.</p>
           </div>
         </div>
         <div class="tool-panel__body output-stack">
-          <div id="originalAudioContainer" class="compact-box"></div>
           <div id="result" class="compact-box"></div>
           <div id="batchResultEl" class="compact-box"></div>
           <div id="base64Container" class="compact-box hidden">
             <h3>Audio base64</h3>
-            <div id="base64Result"></div>
             <details>
               <summary>Show audio base64</summary>
               <div id="base64Output" class="base64-output"></div>

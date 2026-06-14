@@ -314,16 +314,11 @@ const enableConvertButtonIfNeeded = () => {
       // --- Audio Section Resets ---
       if (resultEl) resultEl.innerHTML = '';
       if (base64Container) base64Container.style.display = 'none';
-      if (base64Result) base64Result.innerHTML = '';
       if (base64Output) base64Output.textContent = '';
       if (copyBase64Btn) copyBase64Btn.disabled = true;
       if (downloadBase64Btn) {
           downloadBase64Btn.disabled = true;
           downloadBase64Btn.textContent = 'Download Audio Base64 as TXT';
-      }
-      if (originalAudioContainer) {
-          originalAudioContainer.style.display = 'none';
-          originalAudioContainer.innerHTML = '';
       }
       if (playSampleBtn) {
           playSampleBtn.textContent = 'Play Original';
@@ -410,9 +405,8 @@ const enableConvertButtonIfNeeded = () => {
                 abPlayer.revokeUrls();
             }
             resultEl.innerHTML = ''; // Clear previous player and download link
-        }
+      }
       if (base64Container) base64Container.style.display = 'none'; 
-      if (base64Result) base64Result.innerHTML = ''; 
       if (base64Output) base64Output.textContent = ''; 
       if (copyBase64Btn) copyBase64Btn.disabled = true;
       if (downloadBase64Btn) {
