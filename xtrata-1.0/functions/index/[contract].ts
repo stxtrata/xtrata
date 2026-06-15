@@ -354,7 +354,9 @@ const backfillParentEdges = async (
   const hiroKeyCount = getHiroApiKeys(env).length;
   const hiroApiBases = apiBases.filter((base) => base.includes('hiro.so'));
   const readApiBases = hiroKeyCount > 0 && hiroApiBases.length > 0 ? hiroApiBases : apiBases;
-  const caps = await probeCaps(env, apiBases, contract);
+  // Probe with the same (Hiro-only, when keyed) bases used for the rereads, so a
+  // bulk backfill doesn't hit the unauthenticated fallback and get rate-limited.
+  const caps = await probeCaps(env, readApiBases, contract);
   const rows = await queryAll(
     env,
     `SELECT token_id FROM inscription_index
@@ -384,7 +386,7 @@ const backfillParentEdges = async (
     upstream: {
       hiroKeyCount,
       hiroOnly: readApiBases === hiroApiBases,
-      apiBases: readApiBases
+      apiBaseCount: readApiBases.length
     }
   };
 };
@@ -411,6 +413,14 @@ export const onRequest = async (context: {
       const url = new URL(request.url);
       const parentBackfill = url.searchParams.get('parents')?.trim().toLowerCase();
       if (parentBackfill === 'backfill') {
+        // Opt-in guard: when INDEX_ADMIN_TOKEN is configured, the maintenance
+        // backfill requires a matching x-admin-token header. If unset, behaviour
+        // is unchanged (open) — and the internal self-healing sync/refresh, which
+        // never sets this param, is never gated.
+        const adminToken = (env as { INDEX_ADMIN_TOKEN?: string }).INDEX_ADMIN_TOKEN;
+        if (adminToken && request.headers.get('x-admin-token') !== adminToken) {
+          return json({ error: 'Unauthorized.' }, 401);
+        }
         const fromRaw = Number(url.searchParams.get('from') ?? 1);
         const limitRaw = Number(url.searchParams.get('limit') ?? 50);
         const fromTokenId =
