@@ -672,12 +672,12 @@ const buildXtrataAudioPlayerHtml = (config) => {
       bottom: 0;
       height: 49%;
       display: grid;
-      grid-template-rows: 44px minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
       border-top: 1px solid rgba(248, 243, 231, 0.16);
       background: linear-gradient(180deg, rgba(16, 18, 15, 0.72), rgba(16, 18, 15, 0.96));
       color: var(--ink);
       backdrop-filter: blur(16px);
-      transform: translateY(calc(100% - 44px));
+      transform: translateY(100%);
       transition: transform 0.2s ease;
       pointer-events: auto;
     }
@@ -686,44 +686,6 @@ const buildXtrataAudioPlayerHtml = (config) => {
     .player[data-panel="info"] .drawer,
     .player[data-panel="metadata"] .drawer {
       transform: translateY(0);
-    }
-
-    .drawer-peek {
-      width: 100%;
-      min-height: 44px;
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr) auto;
-      gap: 10px;
-      align-items: center;
-      border: 0;
-      border-radius: 0;
-      background: transparent;
-      color: var(--ink);
-      padding: 7px 12px;
-      text-align: left;
-    }
-
-    .mini-track {
-      position: relative;
-      height: 6px;
-      border-radius: 999px;
-      background: rgba(248, 243, 231, 0.22);
-      overflow: hidden;
-    }
-
-    .mini-track span {
-      position: absolute;
-      inset: 0 auto 0 0;
-      width: 0%;
-      border-radius: inherit;
-      background: var(--accent);
-    }
-
-    .mini-label,
-    .mini-time {
-      font-size: 0.8rem;
-      font-weight: 900;
-      white-space: nowrap;
     }
 
     .drawer-body {
@@ -943,34 +905,13 @@ const buildXtrataAudioPlayerHtml = (config) => {
 
       .drawer {
         height: min(78%, 240px);
-        grid-template-rows: clamp(30px, 14cqw, 38px) minmax(0, 1fr);
-        transform: translateY(calc(100% - clamp(30px, 14cqw, 38px)));
-      }
-
-      .drawer-peek {
-        min-height: clamp(30px, 14cqw, 38px);
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 6px;
-        padding: 5px 8px;
-      }
-
-      .mini-label {
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      .mini-track {
-        display: none;
-      }
-
-      .mini-label,
-      .mini-time {
-        font-size: clamp(0.62rem, 4cqw, 0.76rem);
+        grid-template-rows: minmax(0, 1fr);
+        transform: translateY(100%);
       }
 
       .drawer-body {
         gap: 6px;
-        padding: 0 8px 8px;
+        padding: 8px;
       }
 
       .drawer-tabs {
@@ -1067,34 +1008,13 @@ const buildXtrataAudioPlayerHtml = (config) => {
 
       .drawer {
         height: min(78%, 240px);
-        grid-template-rows: clamp(30px, 14vmin, 38px) minmax(0, 1fr);
-        transform: translateY(calc(100% - clamp(30px, 14vmin, 38px)));
-      }
-
-      .drawer-peek {
-        min-height: clamp(30px, 14vmin, 38px);
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 6px;
-        padding: 5px 8px;
-      }
-
-      .mini-label {
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      .mini-track {
-        display: none;
-      }
-
-      .mini-label,
-      .mini-time {
-        font-size: clamp(0.62rem, 4vmin, 0.76rem);
+        grid-template-rows: minmax(0, 1fr);
+        transform: translateY(100%);
       }
 
       .drawer-body {
         gap: 6px;
-        padding: 0 8px 8px;
+        padding: 8px;
       }
 
       .drawer-tabs {
@@ -1168,11 +1088,6 @@ const buildXtrataAudioPlayerHtml = (config) => {
       </header>
       <div id="clickHint" class="click-hint" aria-hidden="true">Click artwork to play</div>
       <section id="playerDrawer" class="drawer" data-player-control aria-label="Player controls and information">
-        <button id="drawerToggle" class="drawer-peek" type="button" aria-expanded="false" aria-controls="drawerBody">
-          <span id="miniLabel" class="mini-label">Controls</span>
-          <span class="mini-track" aria-hidden="true"><span id="miniProgress"></span></span>
-          <span id="miniTime" class="mini-time">0:00</span>
-        </button>
         <div id="drawerBody" class="drawer-body">
           <div class="drawer-tabs" role="tablist" aria-label="Player panel">
             <button type="button" role="tab" data-panel-target="controls" aria-selected="false">Controls</button>
@@ -1229,7 +1144,6 @@ const buildXtrataAudioPlayerHtml = (config) => {
       const audio = document.getElementById('xtrataAudio');
       const cover = document.getElementById('xtrataCover');
       const status = document.getElementById('playerStatus');
-      const drawerToggle = document.getElementById('drawerToggle');
       const infoToggle = document.getElementById('infoToggle');
       const controlsToggle = document.getElementById('controlsToggle');
       const playToggleButton = document.getElementById('playToggleButton');
@@ -1240,9 +1154,6 @@ const buildXtrataAudioPlayerHtml = (config) => {
       const seekRange = document.getElementById('seekRange');
       const currentTimeLabel = document.getElementById('currentTime');
       const durationTimeLabel = document.getElementById('durationTime');
-      const miniProgress = document.getElementById('miniProgress');
-      const miniTime = document.getElementById('miniTime');
-      const miniLabel = document.getElementById('miniLabel');
       const clickHint = document.getElementById('clickHint');
       const waveformBars = document.getElementById('waveformBars');
       const panelButtons = Array.from(document.querySelectorAll('[data-panel-target]'));
@@ -1296,7 +1207,7 @@ const buildXtrataAudioPlayerHtml = (config) => {
         activePanel = panelName;
         if (player) player.dataset.panel = panelName;
         const isOpen = panelName !== 'closed';
-        [drawerToggle, infoToggle, controlsToggle].forEach((button) => {
+        [infoToggle, controlsToggle].forEach((button) => {
           if (button) button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
         });
         panelButtons.forEach((button) => {
@@ -1307,9 +1218,6 @@ const buildXtrataAudioPlayerHtml = (config) => {
         panelViews.forEach((view) => {
           view.hidden = view.dataset.panelView !== panelName;
         });
-        if (miniLabel) {
-          miniLabel.textContent = panelName === 'closed' ? 'Controls' : panelName.slice(0, 1).toUpperCase() + panelName.slice(1);
-        }
       };
 
       const togglePanel = (panelName) => {
@@ -1392,8 +1300,6 @@ const buildXtrataAudioPlayerHtml = (config) => {
         const fraction = duration ? Math.max(0, Math.min(1, current / duration)) : 0;
         if (currentTimeLabel) currentTimeLabel.textContent = formatTime(current);
         if (durationTimeLabel) durationTimeLabel.textContent = formatTime(duration);
-        if (miniTime) miniTime.textContent = formatTime(current);
-        if (miniProgress) miniProgress.style.width = Math.round(fraction * 100) + '%';
         if (seekRange && document.activeElement !== seekRange) {
           seekRange.value = Math.round(fraction * 1000);
           seekRange.setAttribute('aria-valuetext', formatTime(current) + ' of ' + formatTime(duration));
@@ -1432,7 +1338,6 @@ const buildXtrataAudioPlayerHtml = (config) => {
         });
       }
 
-      if (drawerToggle) drawerToggle.addEventListener('click', () => togglePanel('controls'));
       if (infoToggle) infoToggle.addEventListener('click', () => togglePanel('info'));
       if (controlsToggle) controlsToggle.addEventListener('click', () => togglePanel('controls'));
       panelButtons.forEach((button) => {
