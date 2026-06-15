@@ -5021,15 +5021,26 @@
       return state.usdPriceBookLoading ? 'Fetching...' : 'Unavailable';
     };
 
+    // Network (miner) fee for a contract call carrying `byteLength` payload
+    // bytes. Base rate is ~1 STX/MB, but large calls need headroom above the
+    // mempool minimum (the wallet's own default floors near 0.0005 STX and is
+    // rejected for big inscriptions). We add a margin + a small floor, and use
+    // this for BOTH the displayed estimate and the fee passed to the wallet so
+    // the prompt matches the panel.
+    const walletMinerFeeMicroStx = (byteLength) => {
+      const base = estimateDataMiningFeeMicroStx(BigInt(byteLength));
+      const withHeadroom = (base * 5n) / 4n; // +25% over the 1 STX/MB base
+      const floor = 6_000n; // ~0.006 STX so tiny calls still clear the mempool
+      return withHeadroom > floor ? withHeadroom : floor;
+    };
+
     const formatDataMiningEstimate = (bytes) => {
-      const miningFeeMicroStx = estimateDataMiningFeeMicroStx(
-        BigInt(bytes.length)
-      );
+      const miningFeeMicroStx = walletMinerFeeMicroStx(bytes.length);
       const display = formatMicroStxWithUsd(miningFeeMicroStx, state.usdPriceBook);
       return {
         miningFeeMicroStx,
         label: display.combined,
-        detail: `${display.combined} at 1 STX/MB`
+        detail: `${display.combined} network fee (set automatically in the wallet)`
       };
     };
 
@@ -7400,6 +7411,9 @@
           stxAddress: walletAddress,
           postConditionMode: options.postConditions ? PostConditionMode.Deny : undefined,
           postConditions: options.postConditions,
+          // Size-based miner fee for payload-bearing calls; omitted lets the
+          // wallet estimate (fine for the tiny begin/seal transactions).
+          ...(options.feeMicroStx != null ? { fee: options.feeMicroStx } : {}),
           onFinish: (payload) => resolve(payload),
           onCancel: () => reject(new Error('Wallet cancelled or failed to broadcast.'))
         });
@@ -7601,7 +7615,8 @@
                 : dependencyIds.length > 0
                 ? [...coreArgs, listCV(dependencyIds.map((id) => uintCV(id)))]
                 : coreArgs,
-            postConditions: resolveFeePostConditions(singleTxCapMicroStx)
+            postConditions: resolveFeePostConditions(singleTxCapMicroStx),
+            feeMicroStx: walletMinerFeeMicroStx(prepared.bytes.length)
           });
           const singleTxId = normalizeTxId(singleTx);
           state.lastSubmittedTxId = singleTxId;
@@ -7657,7 +7672,8 @@
                     listCV(prepared.chunks.map((chunk) => bufferCV(chunk))),
                     stringAsciiCV(prepared.tokenUriValue)
                   ],
-            postConditions: resolveFeePostConditions(feeEstimate.totalMicroStx)
+            postConditions: resolveFeePostConditions(feeEstimate.totalMicroStx),
+            feeMicroStx: walletMinerFeeMicroStx(prepared.bytes.length)
           });
           const singleTxId = normalizeTxId(singleTx);
           state.lastSubmittedTxId = singleTxId;
@@ -7723,12 +7739,14 @@
           for (let index = 0; index < remainingBatches.length; index += 1) {
             const batch = remainingBatches[index];
             appendLog(`Step 2: upload batch ${index + 1}/${remainingBatches.length}`);
+            const batchBytes = batch.reduce((sum, chunk) => sum + chunk.length, 0);
             const uploadTx = await requestContractCall({
               functionName: 'add-chunk-batch',
               functionArgs: [
                 bufferCV(prepared.expectedHash),
                 listCV(batch.map((chunk) => bufferCV(chunk)))
-              ]
+              ],
+              feeMicroStx: walletMinerFeeMicroStx(batchBytes)
             });
             appendLog(`Batch ${index + 1}/${remainingBatches.length} tx sent: ${normalizeTxId(uploadTx)}`);
             didSendBeforeSeal = true;
@@ -9178,11 +9196,28 @@
       const label = getGridMimeLabel(token.meta?.mimeType ?? null);
       setTokenThumbLabel(media, label);
       media.dataset.thumbnailState = 'pending-live-media';
-      const queued = scheduleBackgroundThumbnailHydration(token, media);
-      if (!queued) {
-        media.dataset.thumbnailState = 'fallback-label';
+      // Relationship thumbs (e.g. HTML inscriptions) render via a direct one-off
+      // fetch rather than the grid's shared background queue. That queue is reset
+      // (runId bump) on every grid re-render and is size-sorted, so large HTML is
+      // deprioritised or cancelled and never paints here — which is why images
+      // (handled synchronously above) appeared but HTML did not. This paints into
+      // `media` once fetched, guarded by isConnected + key, and reuses the shared
+      // live-media cache so the grid benefits too.
+      if (
+        !state.thumbnailHydrationAttempted.has(cacheKey) &&
+        shouldBackgroundHydrateThumbnail(token)
+      ) {
+        state.thumbnailHydrationAttempted.add(cacheKey);
+        void runBackgroundThumbnailHydration({
+          token,
+          thumbElement: media,
+          cacheKey,
+          runId: state.thumbnailHydrationRunId
+        });
+        return true;
       }
-      return queued;
+      media.dataset.thumbnailState = 'fallback-label';
+      return false;
     };
 
     // Coalesce hydration-triggered re-renders into one per frame. A full
