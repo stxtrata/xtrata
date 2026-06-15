@@ -1639,6 +1639,21 @@
       overflow-wrap: anywhere;
     }
 
+    /* In the small (64px) relationship/parent tiles, keep placeholder labels
+       (e.g. "loading", "JAVASCRIPT") on a single line instead of wrapping. */
+    .parent-thumb__media .token-thumb-label {
+      padding: 4px;
+      font-size: 9px;
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      overflow-wrap: normal;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     .preview-media--pixelated {
       image-rendering: -webkit-optimize-contrast;
       image-rendering: pixelated;
@@ -3311,6 +3326,8 @@
           <div class="actions">
             <button class="btn secondary" id="prepareButton" type="button">Prepare</button>
             <button class="btn" id="inscribeButton" type="button" disabled>Start inscription</button>
+            <button class="btn secondary" id="resetInscriberButton" type="button" title="Unlock the controls and reset progress if a transaction was cancelled or failed. Keeps your prepared file.">Reset</button>
+            <button class="btn secondary" id="clearInscriberButton" type="button" title="Remove the current file and form fields to start fresh.">Clear</button>
           </div>
 
           <div class="steps" aria-live="polite">
@@ -3853,6 +3870,8 @@
       resumeNotice: $('resumeNotice'),
       prepareButton: $('prepareButton'),
       inscribeButton: $('inscribeButton'),
+      resetInscriberButton: $('resetInscriberButton'),
+      clearInscriberButton: $('clearInscriberButton'),
       stepBegin: $('stepBegin'),
       stepUpload: $('stepUpload'),
       stepSeal: $('stepSeal'),
@@ -5498,13 +5517,14 @@
       }
       const role =
         kind === 'focus' ? 'sibling' : kind === 'up' ? (depth === 1 ? 'parent' : 'ancestor') : 'child';
+      track.dataset.relRole = role;
       for (const id of ids ?? []) {
         track.append(buildRelationshipThumbCard(contractId, id, role));
       }
       row.append(track);
-      if (ids && ids.length > 0) {
-        void hydrateRelationGroupSummaries(contractId, ids, track, role);
-      }
+      // Hydration is deferred to the orchestrator, AFTER the rows are attached to
+      // the live viewport: hydrateRelationshipThumbCard() no-ops on detached
+      // media, so hydrating here (before append) would leave tiles stuck loading.
       return row;
     };
 
@@ -5598,6 +5618,23 @@
         viewport.append(
           buildRelationshipRow({ contractId, ids, kind: 'down', depth, label: depthLabel(depth, 'down') })
         );
+      }
+
+      // Now that every row is attached to the live viewport, hydrate the tiles —
+      // one batched summary fetch per row (covers the selected piece too), then
+      // each tile renders from cache. Doing this here (post-append) is what makes
+      // detached-media hydration no-op irrelevant.
+      for (const track of viewport.querySelectorAll('.rel-row__track')) {
+        const trackIds = Array.from(track.querySelectorAll('.parent-thumb__media'), (mediaEl) => {
+          try {
+            return BigInt(mediaEl.dataset.tokenId);
+          } catch (error) {
+            return null;
+          }
+        }).filter((id) => id !== null);
+        if (trackIds.length > 0) {
+          void hydrateRelationGroupSummaries(contractId, trackIds, track, track.dataset.relRole || 'relation');
+        }
       }
 
       const hasAny =
@@ -11345,6 +11382,50 @@ const openCuratedGallery = async (galleryId) => {
       renderPreparedState();
     };
 
+    // Manual recovery. If a wallet transaction is cancelled or fails — in
+    // particular if a wallet popup leaves the request pending so the flow's
+    // finally never runs — the busy lock can persist and disable every control.
+    // Reset force-clears the lock and the step indicators so the user can prepare
+    // or start again without reloading the page. The prepared file is kept.
+    // These two controls are deliberately never gated by state.busy, so they keep
+    // working even when the rest of the panel is locked.
+    const resetInscriberFlow = () => {
+      setBusy(false);
+      resetSteps();
+      updateWalletStatus();
+      renderPreparedState();
+      updateControls();
+      appendLog('Controls reset — you can prepare or start the inscription again.', 'support');
+    };
+
+    // Clear the inscription panel back to an empty state for a fresh file: drops
+    // the selected file, prepared payload, parents, and form fields.
+    const clearInscriberPanel = () => {
+      if (state.payloadPreviewUrl) {
+        URL.revokeObjectURL(state.payloadPreviewUrl);
+        state.payloadPreviewUrl = null;
+      }
+      setSelectedFile(null);
+      clearParentIds();
+      dom.nameInput.value = '';
+      dom.tokenUriInput.value = '';
+      if (dom.textPayload) {
+        dom.textPayload.value = '';
+      }
+      if (dom.payloadType) {
+        dom.payloadType.selectedIndex = 0;
+      }
+      if (dom.allowDuplicateInput) {
+        dom.allowDuplicateInput.checked = false;
+      }
+      setBusy(false);
+      resetSteps();
+      updateWalletStatus();
+      renderPreparedState();
+      updateControls();
+      appendLog('Inscription panel cleared — drop a new file to begin.', 'support');
+    };
+
     const clearOpusHtmlHandoffRequest = () => {
       if (window.location.search.includes('handoff=opus-player')) {
         const cleanUrl = new URL(window.location.href);
@@ -11742,6 +11823,8 @@ const openCuratedGallery = async (galleryId) => {
       }
     });
     dom.inscribeButton.addEventListener('click', runInscription);
+    dom.resetInscriberButton.addEventListener('click', resetInscriberFlow);
+    dom.clearInscriberButton.addEventListener('click', clearInscriberPanel);
     dom.allowDuplicateInput.addEventListener('change', updateControls);
     dom.parentIdsInput.addEventListener('input', () => {
       state.parentStatusMessage = null;
