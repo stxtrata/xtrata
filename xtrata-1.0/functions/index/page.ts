@@ -181,15 +181,18 @@ export const onRequest = async (context: {
       }
     }
 
+    const shouldCacheResponse = tokens.length > 0;
     const response = new Response(JSON.stringify({ primary, lineage, tokens }), {
       status: 200,
       headers: {
         'content-type': 'application/json',
-        'Cache-Control': 'public, max-age=15, s-maxage=60, stale-while-revalidate=300',
+        'Cache-Control': shouldCacheResponse
+          ? 'public, max-age=15, s-maxage=60, stale-while-revalidate=300'
+          : 'no-store',
         ...CORS
       }
     });
-    if (edgeCache && context.waitUntil) {
+    if (shouldCacheResponse && edgeCache && context.waitUntil) {
       context.waitUntil(edgeCache.put(cacheRequest, response.clone()));
     }
     return response;
