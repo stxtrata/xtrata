@@ -910,10 +910,100 @@ const buildXtrataAudioPlayerHtml = (config) => {
 
       .eyebrow,
       .artist,
-      .top-actions,
-      .drawer,
       .click-hint {
         display: none;
+      }
+
+      .top-actions {
+        justify-self: end;
+        gap: 5px;
+      }
+
+      .icon-button {
+        width: clamp(26px, 12cqw, 34px);
+        min-height: clamp(26px, 12cqw, 34px);
+        border-radius: 6px;
+      }
+
+      .eye-icon {
+        width: 14px;
+        height: 9px;
+      }
+
+      .eye-icon::after {
+        width: 4px;
+        height: 4px;
+      }
+
+      .dots-icon {
+        width: 3px;
+        height: 3px;
+        box-shadow: -5px 0 0 currentColor, 5px 0 0 currentColor;
+      }
+
+      .drawer {
+        height: min(78%, 240px);
+        grid-template-rows: clamp(30px, 14cqw, 38px) minmax(0, 1fr);
+        transform: translateY(calc(100% - clamp(30px, 14cqw, 38px)));
+      }
+
+      .drawer-peek {
+        min-height: clamp(30px, 14cqw, 38px);
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 6px;
+        padding: 5px 8px;
+      }
+
+      .mini-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .mini-track {
+        display: none;
+      }
+
+      .mini-label,
+      .mini-time {
+        font-size: clamp(0.62rem, 4cqw, 0.76rem);
+      }
+
+      .drawer-body {
+        gap: 6px;
+        padding: 0 8px 8px;
+      }
+
+      .drawer-tabs {
+        gap: 4px;
+      }
+
+      .drawer-tabs button,
+      .transport-row button {
+        min-height: clamp(26px, 12cqw, 32px);
+        padding: 0 4px;
+        font-size: clamp(0.58rem, 4cqw, 0.72rem);
+      }
+
+      .transport-row {
+        gap: 4px;
+      }
+
+      .time-row {
+        gap: 6px;
+        font-size: clamp(0.58rem, 4cqw, 0.72rem);
+      }
+
+      .waveform {
+        min-height: clamp(34px, 18cqw, 48px);
+      }
+
+      .description,
+      dd {
+        font-size: clamp(0.62rem, 4cqw, 0.76rem);
+      }
+
+      dt {
+        font-size: clamp(0.5rem, 3cqw, 0.62rem);
       }
 
       h1 {
@@ -944,10 +1034,100 @@ const buildXtrataAudioPlayerHtml = (config) => {
 
       .eyebrow,
       .artist,
-      .top-actions,
-      .drawer,
       .click-hint {
         display: none;
+      }
+
+      .top-actions {
+        justify-self: end;
+        gap: 5px;
+      }
+
+      .icon-button {
+        width: clamp(26px, 12vmin, 34px);
+        min-height: clamp(26px, 12vmin, 34px);
+        border-radius: 6px;
+      }
+
+      .eye-icon {
+        width: 14px;
+        height: 9px;
+      }
+
+      .eye-icon::after {
+        width: 4px;
+        height: 4px;
+      }
+
+      .dots-icon {
+        width: 3px;
+        height: 3px;
+        box-shadow: -5px 0 0 currentColor, 5px 0 0 currentColor;
+      }
+
+      .drawer {
+        height: min(78%, 240px);
+        grid-template-rows: clamp(30px, 14vmin, 38px) minmax(0, 1fr);
+        transform: translateY(calc(100% - clamp(30px, 14vmin, 38px)));
+      }
+
+      .drawer-peek {
+        min-height: clamp(30px, 14vmin, 38px);
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 6px;
+        padding: 5px 8px;
+      }
+
+      .mini-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .mini-track {
+        display: none;
+      }
+
+      .mini-label,
+      .mini-time {
+        font-size: clamp(0.62rem, 4vmin, 0.76rem);
+      }
+
+      .drawer-body {
+        gap: 6px;
+        padding: 0 8px 8px;
+      }
+
+      .drawer-tabs {
+        gap: 4px;
+      }
+
+      .drawer-tabs button,
+      .transport-row button {
+        min-height: clamp(26px, 12vmin, 32px);
+        padding: 0 4px;
+        font-size: clamp(0.58rem, 4vmin, 0.72rem);
+      }
+
+      .transport-row {
+        gap: 4px;
+      }
+
+      .time-row {
+        gap: 6px;
+        font-size: clamp(0.58rem, 4vmin, 0.72rem);
+      }
+
+      .waveform {
+        min-height: clamp(34px, 18vmin, 48px);
+      }
+
+      .description,
+      dd {
+        font-size: clamp(0.62rem, 4vmin, 0.76rem);
+      }
+
+      dt {
+        font-size: clamp(0.5rem, 3vmin, 0.62rem);
       }
 
       .top-bar {
