@@ -1349,6 +1349,7 @@
       align-items: center;
       justify-content: center;
       overflow: hidden;
+      pointer-events: none;
     }
 
     .parent-thumb img,
@@ -1509,6 +1510,52 @@
 
     .log li.support time {
       color: var(--green);
+    }
+
+    .log li.action {
+      color: var(--blue);
+    }
+
+    .log li.waiting {
+      color: var(--amber);
+      border-left: 3px solid var(--amber);
+      padding-left: 8px;
+    }
+
+    .log li.confirmed {
+      color: var(--green);
+      border-left: 3px solid var(--green);
+      padding-left: 8px;
+    }
+
+    .batch-guide {
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+      padding: 12px;
+      border: 1px solid color-mix(in srgb, var(--blue) 55%, var(--line));
+      border-radius: var(--radius);
+      background: color-mix(in srgb, var(--blue) 11%, var(--panel));
+    }
+
+    .batch-guide[hidden] {
+      display: none;
+    }
+
+    .batch-guide strong {
+      color: var(--blue);
+      font-size: 14px;
+    }
+
+    .batch-guide__status {
+      color: var(--ink);
+      font-weight: 800;
+    }
+
+    .batch-guide__note {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
     }
 
     .wallet-layout {
@@ -3350,6 +3397,17 @@
 
           <div class="support-note" id="resumeNotice" hidden></div>
 
+          <div class="batch-guide" id="batchGuide" hidden aria-live="polite">
+            <strong id="batchGuideTitle">Large inscription workflow</strong>
+            <div class="batch-guide__status" id="batchGuideStatus"></div>
+            <div class="batch-guide__note">
+              Each upload is a separate wallet transaction. Xtrata waits for each
+              transaction to confirm on-chain before opening the next wallet prompt.
+              This can take several minutes. You can safely reload and resume from
+              the last confirmed batch.
+            </div>
+          </div>
+
           <div class="actions">
             <button class="btn secondary" id="prepareButton" type="button">Prepare</button>
             <button class="btn" id="inscribeButton" type="button" disabled>Start inscription</button>
@@ -3743,13 +3801,17 @@
       SMALL_MINT_HELPER_CONTRACT_NAME,
       SMALL_MINT_HELPER_MAINNET_ADDRESS,
       SMALL_MINT_HELPER_MAX_CHUNKS,
-      MAX_TOKEN_URI_LENGTH,
-      TX_DELAY_SECONDS
+      MAX_TOKEN_URI_LENGTH
     } from '/src/lib/mint/constants.ts';
     import {
       estimateDataMiningFeeMicroStx,
       estimateSequentialMintTransactions
     } from '/src/lib/mint/estimates.ts';
+    import {
+      clearMintAttempt,
+      loadMintAttempt,
+      saveMintAttempt
+    } from '/src/lib/mint/attempt-cache.ts';
     import { bytesToHex } from '/src/lib/utils/encoding.ts';
     import { formatBytes, truncateMiddle } from '/src/lib/utils/format.ts';
     import { resolveBnsNames } from '/src/lib/bns/resolver.ts';
@@ -3899,6 +3961,9 @@
       duplicateText: $('duplicateText'),
       allowDuplicateInput: $('allowDuplicateInput'),
       resumeNotice: $('resumeNotice'),
+      batchGuide: $('batchGuide'),
+      batchGuideTitle: $('batchGuideTitle'),
+      batchGuideStatus: $('batchGuideStatus'),
       prepareButton: $('prepareButton'),
       inscribeButton: $('inscribeButton'),
       resetInscriberButton: $('resetInscriberButton'),
@@ -4182,6 +4247,7 @@
       adminStatus: null,
       selectedFile: null,
       prepared: null,
+      lastMintAttempt: null,
       handoffDependencyIds: [],
       parentIds: [],
       parentStatusById: new Map(),
@@ -4297,6 +4363,9 @@
     };
 
     const normalizeTxId = (payload) => {
+      if (typeof payload === 'string' && payload.length > 0) {
+        return payload;
+      }
       const raw = payload?.txId ?? payload?.txid ?? '';
       return typeof raw === 'string' && raw.length > 0 ? raw : 'submitted';
     };
@@ -4727,6 +4796,9 @@
       const body = document.createElement('span');
       if (tone === 'support' || isSupportiveLogMessage(message)) {
         item.classList.add('support');
+      }
+      if (tone && tone !== 'support') {
+        item.classList.add(tone);
       }
       time.textContent = nowLabel();
       body.textContent = message;
@@ -5217,19 +5289,62 @@
       }
     };
 
+    const getUploadBatchProgress = (currentIndex, totalChunks) => {
+      const batchSize = Math.min(DEFAULT_BATCH_SIZE, MAX_UPLOAD_BATCH_SIZE);
+      const totalBatches = Math.ceil(totalChunks / batchSize);
+      const confirmedBatches =
+        currentIndex <= 0 ? 0 : Math.ceil(currentIndex / batchSize);
+      const nextBatch = Math.min(totalBatches, confirmedBatches + 1);
+      return { batchSize, totalBatches, confirmedBatches, nextBatch };
+    };
+
+    const renderBatchGuide = () => {
+      if (!dom.batchGuide || !dom.batchGuideStatus || !dom.batchGuideTitle) {
+        return;
+      }
+      const totalChunks =
+        state.prepared?.chunks.length ??
+        Number(state.uploadState?.totalChunks ?? state.lastMintAttempt?.totalChunks ?? 0);
+      if (!Number.isSafeInteger(totalChunks) || totalChunks <= SMALL_MINT_HELPER_MAX_CHUNKS) {
+        dom.batchGuide.hidden = true;
+        return;
+      }
+      const currentIndex = Number(state.uploadState?.currentIndex ?? 0);
+      const progress = getUploadBatchProgress(currentIndex, totalChunks);
+      dom.batchGuideTitle.textContent =
+        `${progress.totalBatches} confirmed upload transactions required`;
+      dom.batchGuideStatus.textContent =
+        progress.confirmedBatches >= progress.totalBatches
+          ? `All ${progress.totalBatches} upload batches are confirmed. The inscription is ready to seal.`
+          : `${progress.confirmedBatches} of ${progress.totalBatches} upload batches confirmed. Next: batch ${progress.nextBatch} of ${progress.totalBatches}.`;
+      dom.batchGuide.hidden = false;
+    };
+
     const renderResumeNotice = () => {
       dom.resumeNotice.hidden = true;
       dom.resumeNotice.replaceChildren();
-      if (!state.prepared || !state.uploadState) {
+      renderBatchGuide();
+      if (!state.uploadState) {
+        if (state.lastMintAttempt && !state.selectedFile) {
+          const heading = document.createElement('strong');
+          heading.textContent = 'Unfinished inscription remembered.';
+          const body = document.createElement('span');
+          body.textContent = state.lastMintAttempt.payloadBlob
+            ? 'The saved file will be restored automatically.'
+            : `Re-select ${state.lastMintAttempt.fileName ?? 'the original file'} to continue safely.`;
+          dom.resumeNotice.append(heading, body);
+          dom.resumeNotice.hidden = false;
+        }
         return;
       }
       const current = state.uploadState.currentIndex.toString();
       const total = state.uploadState.totalChunks.toString();
+      const progress = getUploadBatchProgress(Number(current), Number(total));
       const heading = document.createElement('strong');
       heading.textContent = 'Existing upload data found. No problem.';
       const body = document.createElement('span');
       body.textContent =
-        `${current}/${total} chunks are already saved. Click Resume inscription to continue from the saved data.`;
+        `${current}/${total} chunks are confirmed. ${progress.confirmedBatches}/${progress.totalBatches} upload batches are complete. Click Resume inscription to continue with batch ${progress.nextBatch}/${progress.totalBatches}.`;
       dom.resumeNotice.append(heading, body);
       dom.resumeNotice.hidden = false;
     };
@@ -5431,11 +5546,31 @@
       tag.className = 'parent-thumb__id';
       tag.textContent = formatTokenId(relatedId);
       card.append(media, tag);
-      card.addEventListener('click', () => {
-        void focusWalletTokenById(relatedId);
+      card.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void selectRelationshipToken(contractId, relatedId);
       });
       void hydrateRelationshipThumbCard(contractId, relatedId, media, role);
       return card;
+    };
+
+    const selectRelationshipToken = async (contractId, relatedId) => {
+      let token = getCachedRelationshipSummary(relatedId);
+      if (!token) {
+        const summaries = await fetchWalletTokenSummaries([relatedId]).catch(() => []);
+        token = summaries.find((entry) => entry.id === relatedId) ?? null;
+        if (token) {
+          state.walletTokenCache.set(token.id.toString(), token);
+        }
+      }
+      if (!token) {
+        appendLog(
+          `Could not load relationship ${formatTokenId(relatedId)} from ${contractId}.`
+        );
+        return;
+      }
+      await selectToken(relatedId, { scrollToPreview: true });
     };
 
     const hydrateRelationGroupSummaries = async (contractId, ids, thumbs, role) => {
@@ -7430,6 +7565,22 @@
         dependencyIds,
         parentIds
       };
+      const mintAttempt = {
+        contractId: getContractId(state.contract),
+        expectedHashHex,
+        fileName: file.name,
+        mimeType,
+        totalBytes: bytes.length,
+        totalChunks: chunks.length,
+        batchSize: Math.min(DEFAULT_BATCH_SIZE, MAX_UPLOAD_BATCH_SIZE),
+        tokenUri: tokenUriValue,
+        dependencyIds: dependencyIds.map((id) => id.toString()),
+        parentIds: parentIds.map((id) => id.toString()),
+        payloadBlob: file.slice(0, file.size, file.type || mimeType),
+        updatedAt: Date.now()
+      };
+      state.lastMintAttempt = mintAttempt;
+      void saveMintAttempt(mintAttempt);
       state.duplicateId = null;
       state.uploadState = null;
       dom.allowDuplicateInput.checked = false;
@@ -7519,12 +7670,73 @@
       });
     };
 
-    const pauseBeforeNext = async (label) => {
-      for (let remaining = TX_DELAY_SECONDS; remaining > 0; remaining -= 1) {
-        setStatus(dom.walletStatus, `<strong>${label}</strong> ${remaining}s`, 'wait', 'amber');
-        await sleep(1000);
+    const waitForTransactionConfirmation = async (txId, label) => {
+      const normalizedTxId = normalizeTxId({ txId });
+      const apiBases = getApiBaseUrls(state.contract.network);
+      const startedAt = Date.now();
+      const timeoutMs = 45 * 60 * 1000;
+      appendLog(
+        `${label} submitted. Waiting for on-chain confirmation before continuing.`,
+        'waiting'
+      );
+      while (Date.now() - startedAt < timeoutMs) {
+        setStatus(
+          dom.walletStatus,
+          `<strong>Waiting for confirmation</strong> ${label}`,
+          'wait',
+          'amber'
+        );
+        await sleep(8000);
+        for (const apiBase of apiBases) {
+          try {
+            const response = await fetch(
+              `${apiBase}/extended/v1/tx/${normalizedTxId}`
+            );
+            if (!response.ok) {
+              continue;
+            }
+            const payload = await response.json();
+            const txStatus = String(payload?.tx_status ?? '').toLowerCase();
+            if (!txStatus || txStatus === 'pending') {
+              continue;
+            }
+            if (txStatus !== 'success') {
+              throw new Error(`${label} finished with status ${txStatus}.`);
+            }
+            appendLog(`${label} confirmed on-chain.`, 'confirmed');
+            return;
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            if (message.includes('finished with status')) {
+              throw error;
+            }
+          }
+        }
       }
-      updateWalletStatus();
+      throw new Error(
+        `${label} confirmation timed out. The transaction may still confirm. Reload and resume to check the saved on-chain progress.`
+      );
+    };
+
+    const waitForUploadIndex = async (expectedHash, expectedIndex, label) => {
+      const owner = state.walletSession.address;
+      if (!owner) {
+        throw new Error('Wallet disconnected while checking upload confirmation.');
+      }
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const uploadState = await state.client
+          .getUploadState(expectedHash, owner, owner)
+          .catch(() => null);
+        if (uploadState && Number(uploadState.currentIndex) >= expectedIndex) {
+          state.uploadState = uploadState;
+          renderPreparedState();
+          return uploadState;
+        }
+        await sleep(3000);
+      }
+      throw new Error(
+        `${label} confirmed, but the upload index has not updated yet. Reload and resume; confirmed chunks will not be lost.`
+      );
     };
 
     const validateMintReadiness = async () => {
@@ -7672,7 +7884,6 @@
         flowStarted = true;
         const feeEstimate = getFeeEstimate(prepared.chunks.length);
         const hasUploadState = !!state.uploadState;
-        let didSendBeforeSeal = false;
 
         if (shouldUseNativeSingleTx()) {
           // v3+ native one-transaction mint directly on the core.
@@ -7719,15 +7930,21 @@
           });
           const singleTxId = normalizeTxId(singleTx);
           state.lastSubmittedTxId = singleTxId;
-          appendLog(`Single-tx mint sent: ${singleTxId}`);
-          setStep('begin', 'done', 'Submitted');
-          setStep('upload', 'done', 'Submitted');
-          setStep('seal', 'done', 'Submitted');
+          appendLog(`Single-tx mint sent: ${singleTxId}`, 'action');
+          setStep('begin', 'pending', 'Confirming');
+          setStep('upload', 'pending', 'Confirming');
+          setStep('seal', 'pending', 'Confirming');
+          await waitForTransactionConfirmation(singleTxId, 'Single-transaction mint');
+          setStep('begin', 'done', 'Confirmed');
+          setStep('upload', 'done', 'Confirmed');
+          setStep('seal', 'done', 'Confirmed');
+          state.lastMintAttempt = null;
+          void clearMintAttempt(getContractId(state.contract));
           setStatus(
             dom.walletStatus,
-            `<strong>Submitted</strong> ${truncateMiddle(singleTxId, 8, 8)}`,
-            'pending',
-            'blue'
+            `<strong>Confirmed</strong> ${truncateMiddle(singleTxId, 8, 8)}`,
+            'ready',
+            'green'
           );
           await loadWalletInscriptions();
           return;
@@ -7776,15 +7993,21 @@
           });
           const singleTxId = normalizeTxId(singleTx);
           state.lastSubmittedTxId = singleTxId;
-          appendLog(`Single-tx mint sent: ${singleTxId}`);
-          setStep('begin', 'done', 'Submitted');
-          setStep('upload', 'done', 'Submitted');
-          setStep('seal', 'done', 'Submitted');
+          appendLog(`Single-tx mint sent: ${singleTxId}`, 'action');
+          setStep('begin', 'pending', 'Confirming');
+          setStep('upload', 'pending', 'Confirming');
+          setStep('seal', 'pending', 'Confirming');
+          await waitForTransactionConfirmation(singleTxId, 'Single-transaction mint');
+          setStep('begin', 'done', 'Confirmed');
+          setStep('upload', 'done', 'Confirmed');
+          setStep('seal', 'done', 'Confirmed');
+          state.lastMintAttempt = null;
+          void clearMintAttempt(getContractId(state.contract));
           setStatus(
             dom.walletStatus,
-            `<strong>Submitted</strong> ${truncateMiddle(singleTxId, 8, 8)}`,
-            'pending',
-            'blue'
+            `<strong>Confirmed</strong> ${truncateMiddle(singleTxId, 8, 8)}`,
+            'ready',
+            'green'
           );
           await loadWalletInscriptions();
           return;
@@ -7805,10 +8028,17 @@
               prepared.stagedFee?.beginMicroStx ?? feeEstimate.beginMicroStx
             )
           });
-          appendLog(`Begin tx sent: ${normalizeTxId(beginTx)}`);
-          setStep('begin', 'done', 'Submitted');
-          didSendBeforeSeal = true;
-          await pauseBeforeNext('Next transaction in');
+          const beginTxId = normalizeTxId(beginTx);
+          appendLog(`Begin transaction sent: ${beginTxId}`, 'action');
+          setStep('begin', 'pending', 'Confirming');
+          await waitForTransactionConfirmation(beginTxId, 'Begin transaction');
+          await refreshUploadState(prepared.expectedHash);
+          if (!state.uploadState) {
+            throw new Error(
+              'Begin confirmed, but the upload session is not visible yet. Reload and resume in a moment.'
+            );
+          }
+          setStep('begin', 'done', 'Confirmed');
         } else {
           setStep('begin', 'done', 'Already started');
           appendLog(
@@ -7827,17 +8057,33 @@
           throw new Error('On-chain upload state is ahead of this payload.');
         }
 
+        const uploadBatchSize = Math.min(DEFAULT_BATCH_SIZE, MAX_UPLOAD_BATCH_SIZE);
+        const totalBatches = Math.ceil(prepared.chunks.length / uploadBatchSize);
+        const confirmedBatches =
+          currentIndex <= 0 ? 0 : Math.ceil(currentIndex / uploadBatchSize);
         const remainingChunks = prepared.chunks.slice(currentIndex);
         const remainingBatches = batchChunks(
           remainingChunks,
-          Math.min(DEFAULT_BATCH_SIZE, MAX_UPLOAD_BATCH_SIZE)
+          uploadBatchSize
         );
 
         if (remainingBatches.length > 0) {
-          setStep('upload', 'pending', `${remainingBatches.length} batch${remainingBatches.length === 1 ? '' : 'es'}`);
+          setStep(
+            'upload',
+            'pending',
+            `${confirmedBatches}/${totalBatches} confirmed`
+          );
           for (let index = 0; index < remainingBatches.length; index += 1) {
             const batch = remainingBatches[index];
-            appendLog(`Step 2: upload batch ${index + 1}/${remainingBatches.length}`);
+            const absoluteBatchNumber = confirmedBatches + index + 1;
+            const expectedIndex = currentIndex +
+              remainingBatches
+                .slice(0, index + 1)
+                .reduce((sum, entry) => sum + entry.length, 0);
+            appendLog(
+              `Wallet action required: upload batch ${absoluteBatchNumber} of ${totalBatches}.`,
+              'action'
+            );
             const batchBytes = batch.reduce((sum, chunk) => sum + chunk.length, 0);
             const uploadTx = await requestContractCall({
               functionName: 'add-chunk-batch',
@@ -7847,13 +8093,32 @@
               ],
               feeMicroStx: walletMinerFeeMicroStx(batchBytes)
             });
-            appendLog(`Batch ${index + 1}/${remainingBatches.length} tx sent: ${normalizeTxId(uploadTx)}`);
-            didSendBeforeSeal = true;
-            if (index < remainingBatches.length - 1) {
-              await pauseBeforeNext('Next batch in');
-            }
+            const uploadTxId = normalizeTxId(uploadTx);
+            appendLog(
+              `Batch ${absoluteBatchNumber}/${totalBatches} sent: ${uploadTxId}`,
+              'action'
+            );
+            setStep(
+              'upload',
+              'pending',
+              `Confirming ${absoluteBatchNumber}/${totalBatches}`
+            );
+            await waitForTransactionConfirmation(
+              uploadTxId,
+              `Upload batch ${absoluteBatchNumber}/${totalBatches}`
+            );
+            await waitForUploadIndex(
+              prepared.expectedHash,
+              expectedIndex,
+              `Upload batch ${absoluteBatchNumber}/${totalBatches}`
+            );
+            setStep(
+              'upload',
+              'pending',
+              `${absoluteBatchNumber}/${totalBatches} confirmed`
+            );
           }
-          setStep('upload', 'done', 'Submitted');
+          setStep('upload', 'done', `${totalBatches}/${totalBatches} confirmed`);
         } else {
           setStep('upload', 'done', 'Already uploaded');
         }
@@ -7862,9 +8127,6 @@
         appendLog(
           getSealLogLabel(dependencyIds, parentIds)
         );
-        if (didSendBeforeSeal) {
-          await pauseBeforeNext('Sealing in');
-        }
         const sealFunctionName = getSealFunctionName(dependencyIds, parentIds);
         const sealTx = await requestContractCall({
           functionName: sealFunctionName,
@@ -7875,13 +8137,17 @@
         });
         const sealTxId = normalizeTxId(sealTx);
         state.lastSubmittedTxId = sealTxId;
-        appendLog(`Seal tx sent: ${sealTxId}`);
-        setStep('seal', 'done', 'Submitted');
+        appendLog(`Seal transaction sent: ${sealTxId}`, 'action');
+        setStep('seal', 'pending', 'Confirming');
+        await waitForTransactionConfirmation(sealTxId, 'Seal transaction');
+        setStep('seal', 'done', 'Confirmed');
+        state.lastMintAttempt = null;
+        void clearMintAttempt(getContractId(state.contract));
         setStatus(
           dom.walletStatus,
-          `<strong>Submitted</strong> ${truncateMiddle(sealTxId, 8, 8)}`,
-          'pending',
-          'blue'
+          `<strong>Confirmed</strong> ${truncateMiddle(sealTxId, 8, 8)}`,
+          'ready',
+          'green'
         );
         await loadWalletInscriptions();
       } catch (error) {
@@ -11668,11 +11934,52 @@ const openCuratedGallery = async (galleryId) => {
         dom.allowDuplicateInput.checked = false;
       }
       setBusy(false);
+      state.lastMintAttempt = null;
+      void clearMintAttempt(getContractId(state.contract));
       resetSteps();
       updateWalletStatus();
       renderPreparedState();
       updateControls();
       appendLog('Inscription panel cleared — drop a new file to begin.', 'support');
+    };
+
+    const restoreSavedMintAttempt = async () => {
+      if (window.location.search.includes('handoff=opus-player')) {
+        return false;
+      }
+      const attempt = await loadMintAttempt(getContractId(state.contract));
+      state.lastMintAttempt = attempt;
+      if (!attempt) {
+        renderResumeNotice();
+        return false;
+      }
+      dom.tokenUriInput.value = attempt.tokenUri || DEFAULT_TOKEN_URI;
+      state.handoffDependencyIds = (attempt.dependencyIds ?? []).map((id) => BigInt(id));
+      state.parentIds = (attempt.parentIds ?? []).map((id) => BigInt(id));
+      if (attempt.payloadBlob instanceof Blob) {
+        const file = new File(
+          [attempt.payloadBlob],
+          attempt.fileName || 'unfinished-inscription',
+          { type: attempt.mimeType || attempt.payloadBlob.type }
+        );
+        setSelectedFile(file);
+        state.handoffDependencyIds = (attempt.dependencyIds ?? []).map((id) => BigInt(id));
+        state.parentIds = (attempt.parentIds ?? []).map((id) => BigInt(id));
+        appendLog(
+          `Restored unfinished inscription ${file.name}. Checking confirmed on-chain progress.`,
+          'support'
+        );
+        await preparePayload();
+        void refreshParentChecks();
+        return true;
+      }
+      appendLog(
+        `Unfinished inscription found. Re-select ${attempt.fileName ?? 'the original file'} to resume.`,
+        'support'
+      );
+      renderParentSelection();
+      renderResumeNotice();
+      return false;
     };
 
     const clearOpusHtmlHandoffRequest = () => {
@@ -11853,7 +12160,10 @@ const openCuratedGallery = async (galleryId) => {
       resetSteps();
       renderTokenGridPlaceholders();
       updateWalletStatus();
-      await consumeOpusHtmlHandoff();
+      const consumedHandoff = await consumeOpusHtmlHandoff();
+      if (!consumedHandoff) {
+        await restoreSavedMintAttempt();
+      }
       if (state.explorerMode) {
         await loadExplorerMode();
       } else {
