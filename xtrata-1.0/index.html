@@ -831,6 +831,23 @@
       align-items: start;
     }
 
+    .payload-preview-stage {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .payload-preview-stage .preview-expand-button {
+      position: static;
+      justify-self: start;
+      opacity: 1;
+      transform: none;
+    }
+
+    .payload-preview-stage .preview-expand-button[hidden] {
+      display: none;
+    }
+
     .preview-square {
       aspect-ratio: 1 / 1;
       width: 100%;
@@ -3304,7 +3321,17 @@
           </form>
 
           <div class="prepare-grid">
-            <div class="preview-square" id="payloadPreview">No payload</div>
+            <div class="payload-preview-stage">
+              <div class="preview-square" id="payloadPreview">No payload</div>
+              <button class="preview-expand-button" id="payloadPreviewExpandButton" type="button" aria-label="View prepared payload large" title="View prepared payload large" disabled hidden>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M14 4h6v6" />
+                  <path d="m20 4-7 7" />
+                  <path d="M10 20H4v-6" />
+                  <path d="m4 20 7-7" />
+                </svg>
+              </button>
+            </div>
             <div class="prepared-meta" id="preparedMeta">
               <div class="meta-line">
                 <span class="meta-key">Status</span>
@@ -3863,6 +3890,7 @@
       parentChipList: $('parentChipList'),
       parentStatusList: $('parentStatusList'),
       payloadPreview: $('payloadPreview'),
+      payloadPreviewExpandButton: $('payloadPreviewExpandButton'),
       preparedMeta: $('preparedMeta'),
       duplicateWarning: $('duplicateWarning'),
       duplicateText: $('duplicateText'),
@@ -4180,6 +4208,7 @@
       childScanTokenId: null,
       fullscreenUrl: null,
       fullscreenOpen: false,
+      fullscreenSource: null,
       tokenThumbUrls: new Map(),
       thumbnailCache: new Map(),
       gridLiveMediaCache: new Map(),
@@ -6785,6 +6814,10 @@
             : (state.prepared?.dependencyIds?.length ?? 0) > 0
             ? 'Start recursive inscription'
             : 'Start inscription';
+      if (dom.payloadPreviewExpandButton) {
+        dom.payloadPreviewExpandButton.disabled = state.busy || !state.prepared;
+        dom.payloadPreviewExpandButton.hidden = !state.prepared;
+      }
       renderParentSelection();
       dom.refreshWalletButton.disabled = state.busy || state.walletLoadingPage || (!viewingAddress && !state.explorerMode);
       dom.walletLookupButton.textContent = shouldClearWalletLookupOnSubmit()
@@ -8013,7 +8046,8 @@
       const selectedToken = getSelectedToken();
       const pageCount = getWalletPageCount();
       const { pageIds, index } = getFullscreenPagePosition();
-      const hasSelectedPagePosition = !!selectedToken && index >= 0;
+      const isTokenFullscreen = state.fullscreenSource !== 'prepared';
+      const hasSelectedPagePosition = isTokenFullscreen && !!selectedToken && index >= 0;
       const canGoPrevious =
         hasSelectedPagePosition && (index > 0 || state.walletPageIndex > 0);
       const canGoNext =
@@ -8251,11 +8285,110 @@
       }
     };
 
+    const renderFullscreenPreparedPayload = () => {
+      revokeFullscreenPreview();
+      const prepared = state.prepared;
+      dom.fullscreenRawLink.hidden = true;
+      dom.fullscreenRawLink.removeAttribute('href');
+      dom.fullscreenRawLink.removeAttribute('download');
+      dom.fullscreenRawLink.removeAttribute('aria-label');
+
+      if (!prepared || !prepared.bytes || prepared.bytes.length === 0) {
+        dom.fullscreenTitle.textContent = 'Prepared payload';
+        dom.fullscreenMeta.textContent = 'No payload prepared';
+        setFullscreenNotice('Prepare a payload first.');
+        return;
+      }
+
+      const fullscreenMimeType =
+        resolveMimeType(prepared.mimeType ?? null, prepared.bytes) ??
+        prepared.mimeType ??
+        'application/octet-stream';
+      const kind = getMediaKind(fullscreenMimeType);
+      const blob = new Blob([prepared.bytes], { type: fullscreenMimeType });
+      const url = URL.createObjectURL(blob);
+      state.fullscreenUrl = url;
+      dom.fullscreenTitle.textContent = 'Prepared payload';
+      dom.fullscreenMeta.textContent =
+        `${kind.toUpperCase()} · ${formatBytes(BigInt(prepared.bytes.length))} · ${prepared.file.name}`;
+      dom.fullscreenRawLink.href = url;
+      dom.fullscreenRawLink.textContent = 'Open payload';
+      dom.fullscreenRawLink.download = prepared.file.name;
+      dom.fullscreenRawLink.setAttribute('aria-label', 'Open prepared payload in a new tab');
+      dom.fullscreenRawLink.hidden = false;
+
+      if (kind === 'image' || kind === 'svg') {
+        renderSquareImagePreview(dom.fullscreenStage, url, {
+          mimeType: fullscreenMimeType,
+          isSvgSource: kind === 'svg',
+          alt: 'Prepared payload preview',
+          preserveAnimation:
+            kind === 'image' && isAnimatedImagePayload(prepared.bytes, fullscreenMimeType),
+          replayDelayMs:
+            kind === 'image'
+              ? getFiniteAnimatedImageReplayDelayMs(prepared.bytes, fullscreenMimeType)
+              : null
+        });
+        return;
+      }
+
+      dom.fullscreenStage.replaceChildren();
+
+      if (kind === 'video') {
+        const video = document.createElement('video');
+        video.controls = true;
+        video.autoplay = true;
+        video.loop = true;
+        video.playsInline = true;
+        video.preload = 'auto';
+        video.src = url;
+        dom.fullscreenStage.append(video);
+        playPreviewVideoWhenReady(video);
+        return;
+      }
+
+      if (kind === 'audio') {
+        const audio = document.createElement('audio');
+        audio.controls = true;
+        audio.src = url;
+        dom.fullscreenStage.append(audio);
+        return;
+      }
+
+      if (kind === 'html') {
+        const frame = document.createElement('iframe');
+        frame.title = 'prepared-inscription-preview';
+        frame.referrerPolicy = 'no-referrer';
+        frame.loading = 'lazy';
+        frame.sandbox = 'allow-scripts';
+        frame.src = url;
+        dom.fullscreenStage.append(frame);
+        return;
+      }
+
+      if (kind === 'text') {
+        const pre = document.createElement('pre');
+        pre.textContent = new TextDecoder().decode(prepared.bytes);
+        dom.fullscreenStage.append(pre);
+        return;
+      }
+
+      const link = document.createElement('a');
+      link.className = 'btn ghost';
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noreferrer';
+      link.download = prepared.file.name;
+      link.textContent = 'Open prepared payload';
+      dom.fullscreenStage.append(link);
+    };
+
     const openFullscreenViewer = async () => {
       const token = getSelectedToken();
       if (!token) {
         return;
       }
+      state.fullscreenSource = 'token';
       state.fullscreenOpen = true;
       dom.fullscreenViewer.hidden = false;
       dom.fullscreenViewer.setAttribute('aria-hidden', 'false');
@@ -8265,12 +8398,27 @@
       dom.fullscreenCloseButton.focus({ preventScroll: true });
     };
 
+    const openPreparedPayloadFullscreen = () => {
+      if (!state.prepared) {
+        return;
+      }
+      state.fullscreenSource = 'prepared';
+      state.fullscreenOpen = true;
+      dom.fullscreenViewer.hidden = false;
+      dom.fullscreenViewer.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('fullscreen-viewer-open');
+      updateFullscreenControls();
+      renderFullscreenPreparedPayload();
+      dom.fullscreenCloseButton.focus({ preventScroll: true });
+    };
+
     const closeFullscreenViewer = async () => {
       if (!state.fullscreenOpen) {
         updateFullscreenControls();
         return;
       }
       state.fullscreenOpen = false;
+      state.fullscreenSource = null;
       dom.fullscreenViewer.hidden = true;
       dom.fullscreenViewer.setAttribute('aria-hidden', 'true');
       document.body.classList.remove('fullscreen-viewer-open');
@@ -8280,7 +8428,7 @@
     };
 
     const navigateFullscreenSelection = async (direction) => {
-      if (state.busy || state.walletLoadingPage) {
+      if (state.busy || state.walletLoadingPage || state.fullscreenSource === 'prepared') {
         return;
       }
       const { pageIds, index } = getFullscreenPagePosition();
@@ -11870,6 +12018,7 @@ const openCuratedGallery = async (galleryId) => {
     dom.clearParentsButton.addEventListener('click', clearParentIds);
     dom.transferRecipientInput.addEventListener('input', updateTransferControls);
     dom.transferButton.addEventListener('click', transferSelectedToken);
+    dom.payloadPreviewExpandButton?.addEventListener('click', openPreparedPayloadFullscreen);
     dom.fullscreenButton?.addEventListener('click', openFullscreenViewer);
     dom.previewExpandButton.addEventListener('click', openFullscreenViewer);
     dom.fullscreenCloseButton.addEventListener('click', () => {
