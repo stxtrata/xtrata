@@ -5621,6 +5621,46 @@
         coverageText = lineage.complete
           ? `Lineage complete across ${lineage.mintedCount.toString()} inscriptions.`
           : `Index ${lineage.syncedCount.toString()}/${lineage.mintedCount.toString()} — newer relations may still be syncing.`;
+
+        // The server edge index can briefly lag a freshly sealed inscription.
+        // Always reconcile direct parents from the contract so confirmed
+        // relationships appear immediately, while deeper lineage continues to
+        // come from the indexed endpoint.
+        try {
+          const sender = getReadOnlySenderAddress();
+          const liveParents = await state.client.getParents(token.id, sender);
+          if (
+            requestId !== state.selectedChildrenRequestId ||
+            state.selectedTokenId !== token.id
+          ) {
+            return;
+          }
+          if (liveParents.length > 0) {
+            const indexedDirectParents =
+              ancestorGroups.find(([depth]) => depth === 1)?.[1] ?? [];
+            const directParents = new Map(
+              [...indexedDirectParents, ...liveParents].map((id) => [
+                id.toString(),
+                id
+              ])
+            );
+            ancestorGroups = [
+              ...ancestorGroups.filter(([depth]) => depth !== 1),
+              [1, [...directParents.values()]]
+            ];
+            void recordChildParents({
+              contractId,
+              childId: token.id,
+              parentIds: liveParents
+            });
+            if (lineage.parents.length === 0) {
+              coverageText = `${coverageText} Direct parents confirmed on-chain.`;
+            }
+          }
+        } catch (error) {
+          // Keep the indexed lineage when the live read is temporarily
+          // unavailable; the existing fallback still handles endpoint failure.
+        }
       } else {
         // Server lineage unavailable: live ancestor walk + local descendant index.
         try {
