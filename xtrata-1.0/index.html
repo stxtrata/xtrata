@@ -7041,8 +7041,23 @@
 
     const renderPreparedState = () => {
       if (!state.prepared) {
-        clearElement(dom.payloadPreview, 'No payload');
-        renderMeta(dom.preparedMeta, [['Status', 'Not prepared']]);
+        revokePayloadPreview();
+        if (state.selectedFile) {
+          clearElement(dom.payloadPreview, 'Ready to prepare');
+          renderMeta(dom.preparedMeta, [
+            ['Status', 'Selected - not prepared'],
+            {
+              key: 'File',
+              value: state.selectedFile.name,
+              title: state.selectedFile.name
+            },
+            ['Size', formatBytes(BigInt(state.selectedFile.size))],
+            ['Next step', 'Add parents, then click Prepare']
+          ]);
+        } else {
+          clearElement(dom.payloadPreview, 'No payload');
+          renderMeta(dom.preparedMeta, [['Status', 'Not prepared']]);
+        }
         dom.duplicateWarning.classList.remove('on');
         renderResumeNotice();
         updateControls();
@@ -11613,6 +11628,7 @@ const openCuratedGallery = async (galleryId) => {
       if (window.location.search.includes('handoff=opus-player')) {
         const cleanUrl = new URL(window.location.href);
         cleanUrl.searchParams.delete('handoff');
+        cleanUrl.searchParams.delete('handoffId');
         window.history.replaceState(null, '', `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
       }
     };
@@ -11696,19 +11712,27 @@ const openCuratedGallery = async (galleryId) => {
     const consumeOpusHtmlHandoff = async () => {
       let raw = null;
       let pointer = null;
+      const requestedId = new URL(window.location.href).searchParams.get('handoffId');
       try {
         raw = window.localStorage.getItem(OPUS_HTML_HANDOFF_KEY);
       } catch (error) {
         raw = null;
       }
 
-      if (!raw) {
+      if (!raw && !requestedId) {
         clearOpusHtmlHandoffRequest();
         return false;
       }
 
       try {
-        pointer = JSON.parse(raw);
+        const pendingPointer = raw ? JSON.parse(raw) : null;
+        pointer =
+          requestedId && pendingPointer?.id !== requestedId
+            ? { id: requestedId, storage: 'indexeddb' }
+            : pendingPointer;
+        if (!pointer?.id) {
+          throw new Error('Generated HTML handoff identifier was missing.');
+        }
         const payload = await readOpusHtmlHandoffRecord(pointer);
         const html = typeof payload.html === 'string' ? payload.html : '';
         if (!html.trim()) {
@@ -11729,10 +11753,10 @@ const openCuratedGallery = async (galleryId) => {
         state.handoffDependencyIds = normalizeOpusHandoffDependencyIds(payload.dependencies);
         appendLog(
           originalFilename === filename
-            ? `Loaded generated Opus HTML player: ${filename}.`
-            : `Loaded generated Opus HTML player: ${filename} (from ${originalFilename}).`
+            ? `Selected generated Opus HTML player: ${filename}. Add parents, then click Prepare.`
+            : `Selected generated Opus HTML player: ${filename} (from ${originalFilename}). Add parents, then click Prepare.`
         );
-        await preparePayload();
+        renderPreparedState();
         document
           .getElementById('inscribeTitle')
           ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -11744,7 +11768,11 @@ const openCuratedGallery = async (galleryId) => {
         return false;
       } finally {
         try {
-          window.localStorage.removeItem(OPUS_HTML_HANDOFF_KEY);
+          const currentRaw = window.localStorage.getItem(OPUS_HTML_HANDOFF_KEY);
+          const currentPointer = currentRaw ? JSON.parse(currentRaw) : null;
+          if (currentPointer?.id === pointer?.id) {
+            window.localStorage.removeItem(OPUS_HTML_HANDOFF_KEY);
+          }
         } catch (error) {}
         await deleteOpusHtmlHandoffRecord(pointer);
         clearOpusHtmlHandoffRequest();

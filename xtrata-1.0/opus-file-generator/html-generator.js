@@ -626,30 +626,27 @@ function handlePreviewClick() {
 async function prepareGeneratedHtmlForInscription() {
   let inscribeWindow = null;
   try {
-    inscribeWindow = window.open('', '_blank');
-    if (inscribeWindow) {
-      inscribeWindow.opener = null;
-    }
     const bundle = buildGeneratedHtmlBundle();
-    if (!bundle) {
-      if (inscribeWindow) inscribeWindow.close();
-      return;
-    }
-    await storeHtmlHandoff(bundle);
+    if (!bundle) return;
+    inscribeWindow = window.open('', 'xtrata-inscriber');
+    const handoff = await storeHtmlHandoff(bundle);
     const url = new URL('../', window.location.href);
     url.searchParams.set('handoff', 'opus-player');
+    url.searchParams.set('handoffId', handoff.id);
     url.hash = 'inscribe';
     setHtmlExportStatus(
-      `Prepared ${bundle.filename} for inscription. Opening Xtrata home in a new tab...`
+      `Sent ${bundle.filename} to the Xtrata inscriber. Add parents, then prepare it there.`
     );
     if (inscribeWindow) {
       inscribeWindow.location.href = url.toString();
       inscribeWindow.focus();
     } else {
-      window.open(url.toString(), '_blank', 'noopener,noreferrer');
+      window.open(url.toString(), 'xtrata-inscriber');
     }
   } catch (error) {
-    if (inscribeWindow) inscribeWindow.close();
+    if (inscribeWindow && inscribeWindow.location.href === 'about:blank') {
+      inscribeWindow.close();
+    }
     const message = error instanceof Error ? error.message : String(error);
     console.error('HTML inscription handoff failed:', error);
     setHtmlExportStatus(`Could not prepare inscription: ${message}`, true);
