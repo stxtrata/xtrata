@@ -1209,6 +1209,103 @@
       gap: 8px;
     }
 
+    /* Focused family-tree view: ancestors above, selected + siblings on the
+       focus row, descendants below. Vertical scroll on the viewport, horizontal
+       scroll per row, always contained inside the preview column. */
+    .rel-tree {
+      margin-top: 4px;
+    }
+
+    .rel-tree__viewport {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: min(56vh, 500px);
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 5px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface-soft);
+    }
+
+    .rel-row {
+      position: relative;
+      min-width: 0;
+      border-left: 3px solid var(--rel-acc, var(--line));
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--ink) 3%, transparent);
+    }
+
+    /* Binary banding so adjacent generations are easy to separate at a glance. */
+    .rel-row:nth-child(even) {
+      background: color-mix(in srgb, var(--ink) 7%, transparent);
+    }
+
+    .rel-row--focus {
+      border-left-color: var(--blue);
+      background: color-mix(in srgb, var(--blue) 16%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--blue) 45%, transparent);
+    }
+
+    .rel-row__track {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 8px;
+      scrollbar-width: thin;
+    }
+
+    /* Generation label stays pinned while the row scrolls horizontally. */
+    .rel-row__label {
+      position: sticky;
+      left: 0;
+      z-index: 1;
+      flex: 0 0 auto;
+      align-self: stretch;
+      display: flex;
+      align-items: center;
+      width: 82px;
+      padding: 0 8px 0 4px;
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: var(--rel-acc, var(--muted));
+      background: linear-gradient(90deg, var(--panel) 72%, transparent);
+    }
+
+    .rel-row--focus .rel-row__label {
+      color: var(--blue);
+    }
+
+    /* The selected piece, highlighted on the focus row. */
+    .rel-card--self {
+      outline: 2px solid var(--blue);
+      outline-offset: 1px;
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--blue) 28%, transparent);
+    }
+
+    .rel-card--self::after {
+      content: "\2605";
+      position: absolute;
+      top: 2px;
+      left: 4px;
+      z-index: 2;
+      font-size: 10px;
+      color: var(--blue);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+    }
+
+    .rel-tree__status {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
     .parent-thumb {
       position: relative;
       width: 64px;
@@ -5345,11 +5442,13 @@
       if (direction === 'down') {
         if (depth === 1) return 'Children';
         if (depth === 2) return 'Grandchildren';
-        return `Descendants · depth ${depth}`;
+        if (depth === 3) return 'Great-grandchildren';
+        return `Descendants +${depth}`;
       }
       if (depth === 1) return 'Parents';
       if (depth === 2) return 'Grandparents';
-      return `Ancestors · depth ${depth}`;
+      if (depth === 3) return 'Great-grandparents';
+      return `Ancestors -${depth}`;
     };
 
     const groupByDepth = (nodes) => {
@@ -5367,6 +5466,56 @@
     // grandchildren, …, ancestors above direct parents, and half-siblings). Falls
     // back to the local IndexedDB child index + scan when the server lineage
     // endpoint is unavailable.
+    // Generation accent colour: a warm scale upward (ancestors) and a cool scale
+    // downward (descendants), brand blue for the focus row. Lightness steps with
+    // depth so each tier reads as distinct at any depth, in a confined space.
+    const relGenAccent = (kind, depth) => {
+      if (kind === 'focus') return 'var(--blue)';
+      const light = Math.max(48, 72 - depth * 7);
+      return kind === 'up' ? `hsl(34 92% ${light}%)` : `hsl(190 70% ${light}%)`;
+    };
+
+    // One generation row: a sticky generation label plus a horizontally
+    // scrollable track of thumbnail cards. The focus row places the selected
+    // piece first (highlighted) followed by its siblings.
+    const buildRelationshipRow = ({ contractId, ids, kind, depth, label, selectedId = null }) => {
+      const row = document.createElement('div');
+      row.className = `rel-row rel-row--${kind}`;
+      row.dataset.depth = String(depth);
+      row.style.setProperty('--rel-acc', relGenAccent(kind, depth));
+      const track = document.createElement('div');
+      track.className = 'rel-row__track';
+      const labelEl = document.createElement('span');
+      labelEl.className = 'rel-row__label';
+      const count = (selectedId != null ? 1 : 0) + (ids ? ids.length : 0);
+      labelEl.textContent = `${label} · ${count}`;
+      track.append(labelEl);
+      if (selectedId != null) {
+        const selfCard = buildRelationshipThumbCard(contractId, selectedId, 'self');
+        selfCard.classList.add('rel-card--self');
+        selfCard.title = `Selected ${formatTokenId(selectedId)}`;
+        track.append(selfCard);
+      }
+      const role =
+        kind === 'focus' ? 'sibling' : kind === 'up' ? (depth === 1 ? 'parent' : 'ancestor') : 'child';
+      for (const id of ids ?? []) {
+        track.append(buildRelationshipThumbCard(contractId, id, role));
+      }
+      row.append(track);
+      if (ids && ids.length > 0) {
+        void hydrateRelationGroupSummaries(contractId, ids, track, role);
+      }
+      return row;
+    };
+
+    // Focused, scrollable family-tree view of the selected inscription:
+    // ancestors above (deepest generation at the top, parents nearest the focus),
+    // the selected piece + siblings on the focus row, descendants below. Prefers
+    // the one-round-trip server lineage (depth-tagged ancestors + descendants +
+    // half-siblings); falls back to the live ancestor walk + local child index
+    // when the endpoint is unavailable. Each row scrolls horizontally, the
+    // viewport scrolls vertically, and the whole tree stays inside the preview
+    // column.
     const renderSelectedInscriptionRelationships = async (token) => {
       const container = dom.selectedRelationships;
       if (!container) {
@@ -5374,21 +5523,98 @@
       }
       state.selectedParentsRequestId += 1;
       state.selectedChildrenRequestId += 1;
+      const requestId = state.selectedChildrenRequestId;
       if (!token || !supportsParentRelationships()) {
         container.replaceChildren();
         container.hidden = true;
         return;
       }
       container.hidden = false;
-      container.replaceChildren();
       const contractId = getTokenCacheContractId(token);
-      const parentsSection = document.createElement('div');
-      parentsSection.className = 'selected-relationships__group';
-      const lineageSection = document.createElement('div');
-      lineageSection.className = 'selected-relationships__group';
-      container.append(parentsSection, lineageSection);
-      void renderAncestorsSection(token, contractId, parentsSection);
-      void renderLineageSection(token, contractId, lineageSection);
+
+      const tree = document.createElement('div');
+      tree.className = 'rel-tree';
+      const viewport = document.createElement('div');
+      viewport.className = 'rel-tree__viewport';
+      const status = document.createElement('div');
+      status.className = 'rel-tree__status';
+      status.textContent = 'Loading lineage…';
+      tree.append(viewport, status);
+      container.replaceChildren(tree);
+
+      const lineage = await fetchLineage({ contractId, id: token.id }).catch(() => null);
+      if (requestId !== state.selectedChildrenRequestId || state.selectedTokenId !== token.id) {
+        return;
+      }
+
+      let ancestorGroups = [];
+      let descendantGroups = [];
+      let siblings = [];
+      let coverageText = '';
+      if (lineage) {
+        ancestorGroups = groupByDepth(lineage.ancestors);
+        descendantGroups = groupByDepth(lineage.descendants);
+        siblings = lineage.siblings ?? [];
+        coverageText = lineage.complete
+          ? `Lineage complete across ${lineage.mintedCount.toString()} inscriptions.`
+          : `Index ${lineage.syncedCount.toString()}/${lineage.mintedCount.toString()} — newer relations may still be syncing.`;
+      } else {
+        // Server lineage unavailable: live ancestor walk + local descendant index.
+        try {
+          const sender = getReadOnlySenderAddress();
+          ancestorGroups = [...(await walkAncestorsLive(token.id, sender, contractId)).entries()];
+        } catch (error) {
+          ancestorGroups = [];
+        }
+        try {
+          descendantGroups = [...(await walkDescendantsLocal(token.id, contractId)).entries()];
+        } catch (error) {
+          descendantGroups = [];
+        }
+        if (requestId !== state.selectedChildrenRequestId || state.selectedTokenId !== token.id) {
+          return;
+        }
+        coverageText = 'Local index — server lineage unavailable.';
+      }
+
+      // Ancestors: deepest generation at the very top, parents just above focus.
+      for (const [depth, ids] of [...ancestorGroups].sort((a, b) => b[0] - a[0])) {
+        viewport.append(
+          buildRelationshipRow({ contractId, ids, kind: 'up', depth, label: depthLabel(depth, 'up') })
+        );
+      }
+      // Focus row: the selected piece plus its siblings.
+      const focusRow = buildRelationshipRow({
+        contractId,
+        ids: siblings,
+        kind: 'focus',
+        depth: 0,
+        label: 'Selected',
+        selectedId: token.id
+      });
+      viewport.append(focusRow);
+      // Descendants: children just below focus, deeper generations further down.
+      for (const [depth, ids] of [...descendantGroups].sort((a, b) => a[0] - b[0])) {
+        viewport.append(
+          buildRelationshipRow({ contractId, ids, kind: 'down', depth, label: depthLabel(depth, 'down') })
+        );
+      }
+
+      const hasAny =
+        ancestorGroups.length > 0 || descendantGroups.length > 0 || siblings.length > 0;
+      status.textContent = hasAny ? coverageText : 'No parents, children, or siblings.';
+
+      // Focus row sits in the vertical middle when there are ancestors above it;
+      // a root piece (no ancestors) sits at the top instead.
+      requestAnimationFrame(() => {
+        if (requestId !== state.selectedChildrenRequestId) {
+          return;
+        }
+        viewport.scrollTop =
+          ancestorGroups.length > 0
+            ? Math.max(0, focusRow.offsetTop - (viewport.clientHeight - focusRow.clientHeight) / 2)
+            : 0;
+      });
     };
 
     // Walk the ancestor chain live from the chain: BFS up via get-parents,
