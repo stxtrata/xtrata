@@ -1,0 +1,1892 @@
+## Relationship index doc
+# Inscription relationship index — operations & maintenance
+
+How the D1-backed inscription index records parent/child relationships, how it
+stays current **automatically**, and the one **manual maintenance** action
+(parent-edge backfill) — including the auth it now requires.
+
+Audience: operators and agents maintaining the homepage/Xplorer relationship
+navigation. For the caching/performance history of the index, see
+[`perf/inscription-index-optimisations.md`](perf/inscription-index-optimisations.md).
+
+---
+
+## 1. What the index is
+
+The index is a D1 (SQLite) cache populated from the core contracts' read-only
+functions, so a page render is one D1 query instead of N per-token chain reads.
+
+| Table | Holds |
+| --- | --- |
+| `inscription_index` | One summary row per token (owner, creator, hashes, mime, size, sealed, token-uri, migration source). |
+| `inscription_parents` | One row per **edge**: `(contract, child_id, parent_id)`. The graph that powers relationship navigation. |
+| `inscription_index_state` | Per-contract sync bookkeeping: `minted_count`, `synced_count`, `updated_at`, `sync_lock_until`. |
+
+Endpoints (`functions/index/`):
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /index/<contract>?ids=…` or `?from=&limit=&order=` | Token summaries for a contract, served from D1 (edge-cached). |
+| `GET /index/page?primary=&lineage=&ids=…` | Whole lineage resolved in one D1 query, deduped primary-first. |
+| `GET /index/relations/<contract>?id=<id>` | Derived relationship graph for a token (see §3). |
+| `POST /index/<contract>` | Sync / targeted refresh / **backfill** (see §2 and §4). |
+
+`<contract>` is the full `address.name` id, e.g.
+`SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3`.
+
+---
+
+## 2. Automated indexing (the default — no action needed)
+
+Ongoing relationship indexing is automatic. New mints and edits flow into the
+index over normal traffic; you do **not** run anything by hand for day-to-day
+operation.
+
+The flow, all in `functions/index/[contract].ts`:
+
+1. **Sync reads summaries.** `sync()` → `runSync()` walks the contract's
+   minted-id list (v3) or token range (v1/v2) and calls `readSummary()` per
+   token. `readSummary()` extracts the `parents` list from
+   `get-inscription-summary` (v3.2.0+ cores; older cores carry no parents).
+2. **Upsert writes the edges.** `upsertToken()` writes the summary row, then
+   calls `syncTokenParents()`, which **replaces** that child's rows in
+   `inscription_parents` (delete-then-insert) with the current parent set.
+   New parents on a fresh mint therefore create edges with no extra step.
+3. **Lazy background sync.** `GET /index/<contract>` and `GET /index/page` fire
+   a throttled background `sync()` (via `waitUntil`) whenever the contract is
+   `behind` (`synced_count < minted_count`) or `stale` (`updated_at` older than
+   ~60s). The backlog fills over successive page views; there is no cron (Pages
+   has none).
+4. **Stampede guard.** `sync()` takes a soft, self-expiring D1 lock
+   (`sync_lock_until`, TTL ~120s) so concurrent page views don't launch
+   redundant chain reads; a crashed run can't wedge the index — the lock
+   expires.
+5. **Relations are derived on read.** `GET /index/relations/<contract>` walks
+   `inscription_parents`:
+   - parents / ancestors: `child_id -> parent_id`
+   - children / descendants: `parent_id -> child_id`
+   - siblings: shared parent
+
+**Net:** once migration 006 is applied (§5) and the table is populated, every
+new mint that carries parents creates its `inscription_parents` rows during the
+normal sync. The manual backfill in §4 is only for **old rows that predate the
+edge table**.
+
+---
+
+## 3. Reading relationships
+
+```bash
+curl "https://<host>/index/relations/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3?id=287"
+```
+
+Returns the derived graph for token `287` (parents, ancestors, children,
+descendants, siblings). Example expectation from the production backfill:
+`id=287` resolves `children: [577]` with descendants including `577`, `688`,
+`689`.
+
+`<host>` is the deployment serving the functions — the Pages alias
+(`opus.xtrata.pages.dev`, `main-staging.xtrata.pages.dev`) or the production
+custom domain once it is confirmed to point at that deployment (see §7).
+
+---
+
+## 4. Maintenance: parent-edge backfill (manual, occasional)
+
+**When you need it:** only after the edge table is introduced (migration 006) or
+after importing old summary rows that predate edge indexing. In those cases the
+summary rows already exist and the main sync may report complete, so there is no
+natural backlog pass left to populate `inscription_parents` for the old rows.
+
+**What it does:** `POST /index/<contract>?parents=backfill` walks existing
+`inscription_index` rows, re-reads each token's summary from the chain, and
+repopulates its edges via the same `syncTokenParents()` path used by normal
+sync. It only reads public chain data and writes idempotent rows.
+
+### Auth (required when configured)
+
+The backfill is gated by an **opt-in** secret:
+
+- If the Pages env var **`INDEX_ADMIN_TOKEN`** is set, every backfill call must
+  send a matching **`x-admin-token`** header, or it returns `401`.
+- If `INDEX_ADMIN_TOKEN` is **not** set, backfill stays open (unchanged).
+- The guard is scoped to the backfill branch only. Normal sync and targeted
+  refresh (which the app fires automatically) are never gated.
+
+Set a **different** token per environment (preview vs production) in
+Cloudflare → Pages → Settings → Environment variables, marked **Encrypt**.
+Never commit the token; the code only reads `env.INDEX_ADMIN_TOKEN`.
+
+### Parameters
+
+| Param | Default | Notes |
+| --- | --- | --- |
+| `from` | `1` | First `token_id` to scan (inclusive). |
+| `limit` | `50` | Rows per call, **capped at 100**. |
+
+Response includes `refreshed`, `scanned`, `fromTokenId`, `lastTokenId`,
+`nextFromTokenId`, `complete` (true when fewer than `limit` rows remained), and
+an `upstream` diagnostic (`hiroKeyCount`, `hiroOnly`, `apiBaseCount`). The reread
+uses **Hiro-only** API bases when Hiro keys are configured (including the
+capability probe), to avoid `429` from the unauthenticated public fallback.
+
+### Run it (paginated loop)
+
+```bash
+HOST="https://opus.xtrata.pages.dev"
+CONTRACT="SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3"
+TOKEN="<the INDEX_ADMIN_TOKEN for this environment>"   # omit -H if env var unset
+FROM=1
+
+while : ; do
+  resp=$(curl -s -X POST \
+    -H "x-admin-token: $TOKEN" \
+    "$HOST/index/$CONTRACT?parents=backfill&from=$FROM&limit=100")
+  echo "$resp"
+  complete=$(echo "$resp" | jq -r '.complete')
+  next=$(echo "$resp" | jq -r '.nextFromTokenId')
+  [ "$complete" = "true" ] || [ "$next" = "null" ] && break
+  FROM="$next"
+done
+```
+
+Run once per contract that has pre-existing rows. After it completes, ongoing
+indexing is automatic again (§2).
+
+---
+
+## 5. Migrations
+
+Relationship indexing depends on:
+
+- `functions/migrations/005_inscription_index_sync_lock.sql` — sync stampede lock.
+- `functions/migrations/006_inscription_parents.sql` — the edge table.
+
+Apply (add `--remote` for live D1):
+
+```bash
+wrangler d1 migrations apply xtrata-manage --config functions/wrangler.toml --remote
+```
+
+`syncTokenParents()` is wrapped defensively: if 006 has not been applied yet
+(no `inscription_parents` table), core summary indexing still works — only edge
+writes are skipped — so a partial deploy can't break the index.
+
+---
+
+## 6. Verification checklist (after deploy / merge)
+
+- `GET /index/page?primary=<c>&lineage=<…>&ids=753,…,768` returns `tokens`, not
+  an empty array. (Empty index pages are intentionally **not** edge-cached, so a
+  targeted refresh shows up immediately — see §7.)
+- `GET /index/relations/<v3-contract>?id=287` returns child/descendant data
+  (e.g. `children: [577]`).
+- Mint a token with parents and confirm `inscription_parents` rows appear
+  **without** running the backfill.
+- `GET /index/relations/...` no longer errors with
+  `no such table: inscription_parents` (confirms 006 applied).
+
+---
+
+## 7. Operational notes
+
+- **Empty pages are not cached.** `/index/page` returns `Cache-Control:
+  no-store` for empty results and skips writing them to `caches.default`, so a
+  targeted refresh that populates D1 is visible immediately instead of being
+  shadowed by a stale empty edge-cache entry. Non-empty pages are still
+  edge-cached (`s-maxage=60`, SWR 300).
+- **Deployment/domain mapping.** Confirm which deployment the production custom
+  domain (`xtrata.xyz`) maps to before assuming production serves the latest
+  functions. During testing, `opus.xtrata.pages.dev` served the new functions
+  while `xtrata.xyz` lagged/pointed elsewhere; use the Pages alias to validate
+  function behaviour, then verify the custom-domain mapping in the Pages
+  dashboard.
+- **Rate limits.** Configure Hiro API keys so sync and backfill use authenticated
+  Hiro bases; the backfill (probe + rereads) is Hiro-only when keys are present.
+- **Backfill bounds.** `limit` is capped at 100 per call; the loop in §4 paginates
+  via `nextFromTokenId`.
+
+---
+
+## 8. Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `no such table: inscription_parents` | Migration 006 not applied | Apply migrations (§5). |
+| Relations return parents but no children for old tokens | Edge table added after those summaries were indexed | Run the backfill (§4). |
+| Backfill returns `401` | `INDEX_ADMIN_TOKEN` is set; header missing/wrong | Send `x-admin-token` matching that environment's secret. |
+| Backfill / sync hits `429` | Unauthenticated public fallback under load | Configure Hiro API keys (reads go Hiro-only when keyed). |
+| `/index/page` keeps returning empty after a refresh | (Pre-fix) stale empty edge-cache entry | Resolved: empty pages are now `no-store`; redeploy if on an old build. |
+
+## Frontend relations API client
+// Client for the server-side relationship lineage endpoint
+// (functions/index/relations/[contract].ts). Returns the full ancestor and
+// descendant lineage (depth-tagged) plus half-siblings for one inscription,
+// resolved from the D1 edge index in a single round-trip. Falls back to null on
+// any failure so the caller can degrade to the local IndexedDB scan.
+
+export type LineageNode = { id: bigint; depth: number };
+
+export type LineageResult = {
+  parents: bigint[];
+  children: bigint[];
+  ancestors: LineageNode[];
+  descendants: LineageNode[];
+  siblings: bigint[];
+  mintedCount: bigint;
+  syncedCount: bigint;
+  complete: boolean;
+};
+
+const toBigInt = (value: unknown): bigint | null => {
+  try {
+    return BigInt(value as string | number | bigint);
+  } catch {
+    return null;
+  }
+};
+
+const toIdList = (value: unknown): bigint[] => {
+  if (!Array.isArray(value)) return [];
+  const out: bigint[] = [];
+  for (const entry of value) {
+    const id = toBigInt(entry);
+    if (id !== null) out.push(id);
+  }
+  return out;
+};
+
+const toNodeList = (value: unknown): LineageNode[] => {
+  if (!Array.isArray(value)) return [];
+  const out: LineageNode[] = [];
+  for (const entry of value) {
+    const id = toBigInt((entry as { id?: unknown })?.id);
+    const depthRaw = Number((entry as { depth?: unknown })?.depth);
+    if (id !== null && Number.isFinite(depthRaw) && depthRaw > 0) {
+      out.push({ id, depth: Math.floor(depthRaw) });
+    }
+  }
+  return out;
+};
+
+export const fetchLineage = async (params: {
+  contractId: string;
+  id: bigint;
+  origin?: string;
+}): Promise<LineageResult | null> => {
+  const origin = params.origin ?? '';
+  const url =
+    `${origin}/index/relations/${params.contractId}?id=${params.id.toString()}`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const body = (await response.json()) as Record<string, unknown>;
+    if (body && typeof body === 'object' && 'error' in body) return null;
+    return {
+      parents: toIdList(body.parents),
+      children: toIdList(body.children),
+      ancestors: toNodeList(body.ancestors),
+      descendants: toNodeList(body.descendants),
+      siblings: toIdList(body.siblings),
+      mintedCount: toBigInt(body.mintedCount) ?? 0n,
+      syncedCount: toBigInt(body.syncedCount) ?? 0n,
+      complete: body.complete === true
+    };
+  } catch {
+    return null;
+  }
+};
+
+## Server relationship endpoint
+import { parseRuntimeContractRef, type RuntimeEnv } from '../../runtime/lib';
+import { queryAll } from '../../lib/db';
+
+// Relationship lineage endpoint. There is no on-chain get-children reader, so
+// child navigation is derived from the inscription_parents edge table (populated
+// by the index sync). Because the edges form a mint-ordered DAG, one table
+// answers every direction via recursive CTEs:
+//
+//   GET /index/relations/<contract>?id=42
+//
+// Returns, for the given id:
+//   - ancestors:   parents, grandparents, … (depth-tagged, all depths)
+//   - descendants: children, grandchildren, … (depth-tagged, all depths)
+//   - siblings:    other inscriptions sharing at least one parent (half-siblings)
+// Convenience: parents/children are the depth-1 slices of ancestors/descendants.
+
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,OPTIONS',
+  'Access-Control-Allow-Headers': 'content-type'
+};
+const json = (body: unknown, status = 200, extraHeaders: Record<string, string> = {}) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json', ...CORS, ...extraHeaders }
+  });
+
+// Safety bounds: depth caps the recursion (DAGs are shallow in practice) and the
+// row LIMIT caps payload size for pathological fan-out.
+const MAX_DEPTH = 32;
+const MAX_ROWS = 2000;
+
+const getState = async (env: RuntimeEnv, contractId: string) => {
+  const res = await queryAll(
+    env,
+    'SELECT minted_count, synced_count FROM inscription_index_state WHERE contract = ?',
+    [contractId]
+  );
+  const row = (res.results ?? [])[0] as { minted_count?: number; synced_count?: number } | undefined;
+  return { mintedCount: row?.minted_count ?? 0, syncedCount: row?.synced_count ?? 0 };
+};
+
+// Descendants: walk parent_id -> child_id. MIN(depth) collapses ids reachable by
+// multiple paths to their shallowest distance (UNION dedups (id,depth) pairs and
+// guarantees termination under the depth cap).
+const queryDescendants = async (env: RuntimeEnv, contractId: string, id: number) => {
+  const res = await queryAll(
+    env,
+    `WITH RECURSIVE descs(id, depth) AS (
+       SELECT child_id, 1 FROM inscription_parents
+        WHERE contract = ?1 AND parent_id = ?2
+       UNION
+       SELECT ip.child_id, descs.depth + 1
+         FROM inscription_parents ip
+         JOIN descs ON ip.parent_id = descs.id
+        WHERE ip.contract = ?1 AND descs.depth < ?3
+     )
+     SELECT id, MIN(depth) AS depth FROM descs
+     GROUP BY id ORDER BY depth ASC, id ASC LIMIT ?4`,
+    [contractId, id, MAX_DEPTH, MAX_ROWS]
+  );
+  return (res.results ?? []) as Array<{ id: number; depth: number }>;
+};
+
+// Ancestors: walk child_id -> parent_id.
+const queryAncestors = async (env: RuntimeEnv, contractId: string, id: number) => {
+  const res = await queryAll(
+    env,
+    `WITH RECURSIVE ancs(id, depth) AS (
+       SELECT parent_id, 1 FROM inscription_parents
+        WHERE contract = ?1 AND child_id = ?2
+       UNION
+       SELECT ip.parent_id, ancs.depth + 1
+         FROM inscription_parents ip
+         JOIN ancs ON ip.child_id = ancs.id
+        WHERE ip.contract = ?1 AND ancs.depth < ?3
+     )
+     SELECT id, MIN(depth) AS depth FROM ancs
+     GROUP BY id ORDER BY depth ASC, id ASC LIMIT ?4`,
+    [contractId, id, MAX_DEPTH, MAX_ROWS]
+  );
+  return (res.results ?? []) as Array<{ id: number; depth: number }>;
+};
+
+// Half-siblings: other children of any of this id's parents.
+const querySiblings = async (env: RuntimeEnv, contractId: string, id: number) => {
+  const res = await queryAll(
+    env,
+    `SELECT DISTINCT child_id AS id FROM inscription_parents
+      WHERE contract = ?1
+        AND parent_id IN (
+          SELECT parent_id FROM inscription_parents WHERE contract = ?1 AND child_id = ?2
+        )
+        AND child_id <> ?2
+      ORDER BY child_id ASC LIMIT ?3`,
+    [contractId, id, MAX_ROWS]
+  );
+  return (res.results ?? []) as Array<{ id: number }>;
+};
+
+export const onRequest = async (context: {
+  request: Request;
+  params: { contract?: string };
+  env: RuntimeEnv;
+  waitUntil?: (promise: Promise<unknown>) => void;
+}) => {
+  const { request, params, env } = context;
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+  if (request.method !== 'GET') return json({ error: 'Method not allowed.' }, 405);
+
+  const contractId = params.contract ?? '';
+  const contract = parseRuntimeContractRef(contractId);
+  if (!contract) return json({ error: 'Invalid contract id.' }, 400);
+
+  const url = new URL(request.url);
+  const idRaw = Number(url.searchParams.get('id'));
+  if (!Number.isInteger(idRaw) || idRaw <= 0) {
+    return json({ error: 'Missing or invalid id.' }, 400);
+  }
+
+  try {
+    const [descendants, ancestors, siblings, state] = await Promise.all([
+      queryDescendants(env, contractId, idRaw),
+      queryAncestors(env, contractId, idRaw),
+      querySiblings(env, contractId, idRaw),
+      getState(env, contractId)
+    ]);
+
+    // Keep the index moving toward completeness: if the summary index is behind,
+    // kick a throttled background sync on the sibling /index/<contract> route
+    // (which carries the edge-sync). Same-origin, fire-and-forget.
+    if (context.waitUntil && state.syncedCount < state.mintedCount) {
+      const syncUrl = new URL(`/index/${contractId}`, url.origin);
+      context.waitUntil(
+        fetch(syncUrl.toString(), { method: 'POST' }).then(() => undefined).catch(() => undefined)
+      );
+    }
+
+    const complete = state.syncedCount >= state.mintedCount && state.mintedCount > 0;
+    const payload = {
+      contract: contractId,
+      id: idRaw,
+      mintedCount: state.mintedCount,
+      syncedCount: state.syncedCount,
+      complete,
+      parents: ancestors.filter((r) => r.depth === 1).map((r) => r.id),
+      children: descendants.filter((r) => r.depth === 1).map((r) => r.id),
+      ancestors: ancestors.map((r) => ({ id: r.id, depth: r.depth })),
+      descendants: descendants.map((r) => ({ id: r.id, depth: r.depth })),
+      siblings: siblings.map((r) => r.id)
+    };
+    return json(payload, 200, {
+      // Brief browser cache; longer edge TTL with SWR. The edges only change when
+      // new children are minted, which the rolling sync picks up.
+      'Cache-Control': 'public, max-age=15, s-maxage=60, stale-while-revalidate=300'
+    });
+  } catch (error) {
+    return json({ error: error instanceof Error ? error.message : String(error) }, 500);
+  }
+};
+
+## Local parent-child fallback index
+import { isReadOnlyBackoffActive } from '../contract/read-only';
+import type { XtrataClient } from '../contract/client';
+import {
+  loadRelationshipChildren,
+  loadRelationshipSyncCursor,
+  saveRelationshipChildDependencies,
+  saveRelationshipSyncCursor
+} from './relationship-index';
+
+// The v3.4.0 core exposes two distinct relationship edges: `get-parents`
+// (owned-parent links surfaced by the "Add Parents" panel) and
+// `get-dependencies` (recursive content deps). There is no on-chain
+// `get-children` reader, so child navigation is derived by walking every
+// minted inscription's parent list and persisting the reverse edge.
+//
+// We reuse the generic adjacency storage in relationship-index.ts but under a
+// dedicated namespace so the parents reverse-index never collides with the
+// (separately maintained) dependencies index that module also serves. The
+// namespace is folded into the contractId the storage layer keys on.
+export const PARENT_CHILD_NAMESPACE_SUFFIX = '#parents';
+
+export const parentChildNamespace = (contractId: string) =>
+  `${contractId}${PARENT_CHILD_NAMESPACE_SUFFIX}`;
+
+export type ChildIndexProgress = {
+  scanned: bigint;
+  total: bigint;
+  found: bigint;
+  currentId: bigint;
+};
+
+export type ChildIndexResult = {
+  scanned: bigint;
+  total: bigint;
+  found: bigint;
+  cancelled: boolean;
+  nextMintedIndex: bigint;
+  mintedCount: bigint;
+};
+
+// How many ids we ingest between cursor flushes, so an interrupted scan
+// resumes near where it stopped instead of restarting the contract.
+const CURSOR_FLUSH_INTERVAL = 20n;
+
+// Read the children of `parentId` from the persisted reverse index. Returns
+// only what has been indexed so far (empty until a scan has covered the
+// children that reference this parent).
+export const loadIndexedChildren = (params: {
+  contractId: string;
+  parentId: bigint;
+}): Promise<bigint[]> =>
+  loadRelationshipChildren({
+    contractId: parentChildNamespace(params.contractId),
+    parentId: params.parentId
+  });
+
+// The minted-index position the next scan will resume from for this contract.
+export const loadChildIndexCursor = (contractId: string): Promise<bigint> =>
+  loadRelationshipSyncCursor(parentChildNamespace(contractId));
+
+// Persist (childId -> parentIds) and its reverse links for a single token.
+// Used both by the full scan and opportunistically when the selected
+// inscription's parents are fetched for display.
+export const recordChildParents = (params: {
+  contractId: string;
+  childId: bigint;
+  parentIds: bigint[];
+}): Promise<void> =>
+  saveRelationshipChildDependencies({
+    contractId: parentChildNamespace(params.contractId),
+    childId: params.childId,
+    parentIds: params.parentIds
+  });
+
+// Walk the contract's minted-id list, reading each token's on-chain parents
+// and writing the reverse (parent -> child) edge to IndexedDB. Resumable via
+// the persisted cursor, cancellable, and progress-reporting so the UI can show
+// a live count. When `parentId` is provided, `found` counts children of that
+// specific parent (so the caller can refresh a single token's view), but the
+// scan always indexes every token it visits.
+export const syncChildIndex = async (params: {
+  client: XtrataClient;
+  contractId: string;
+  senderAddress: string;
+  parentId?: bigint;
+  shouldCancel?: () => boolean;
+  onProgress?: (progress: ChildIndexProgress) => void;
+}): Promise<ChildIndexResult> => {
+  if (isReadOnlyBackoffActive()) {
+    throw new Error('Read-only backoff active');
+  }
+  if (!params.client.supportsMintedIndex) {
+    throw new Error(
+      'Child indexing requires xtrata-v2.1.0+ tokens. Migrate v1 inscriptions to v2.'
+    );
+  }
+
+  const namespace = parentChildNamespace(params.contractId);
+  const shouldCancel = params.shouldCancel ?? (() => false);
+  let nextMintedIndex = await loadRelationshipSyncCursor(namespace);
+  const mintedCount = await params.client.getMintedCount(params.senderAddress);
+  if (nextMintedIndex > mintedCount) {
+    nextMintedIndex = mintedCount;
+  }
+  // A child can only reference a parent minted before it, so ids at or below
+  // the focused parent can never be its children — skip them when scanning for
+  // a specific parent's children.
+  const minChildTokenId =
+    params.parentId !== undefined ? params.parentId + 1n : null;
+  const startIndex = nextMintedIndex;
+  const total = mintedCount - startIndex;
+  let scanned = 0n;
+  let found = 0n;
+  let cancelled = false;
+
+  const flushCursor = async () => {
+    if ((nextMintedIndex - startIndex) % CURSOR_FLUSH_INTERVAL === 0n) {
+      await saveRelationshipSyncCursor({
+        contractId: namespace,
+        nextMintedIndex
+      });
+    }
+  };
+
+  for (let index = startIndex; index < mintedCount; index += 1n) {
+    if (shouldCancel()) {
+      cancelled = true;
+      nextMintedIndex = index;
+      break;
+    }
+    if (isReadOnlyBackoffActive()) {
+      throw new Error('Read-only backoff active');
+    }
+    const tokenId = await params.client.getMintedId(index, params.senderAddress);
+    nextMintedIndex = index + 1n;
+    scanned += 1n;
+
+    if (tokenId === null) {
+      params.onProgress?.({ scanned, total, found, currentId: 0n });
+      await flushCursor();
+      continue;
+    }
+    if (minChildTokenId !== null && tokenId < minChildTokenId) {
+      params.onProgress?.({ scanned, total, found, currentId: tokenId });
+      await flushCursor();
+      continue;
+    }
+
+    const parents = await params.client.getParents(tokenId, params.senderAddress);
+    await saveRelationshipChildDependencies({
+      contractId: namespace,
+      childId: tokenId,
+      parentIds: parents
+    });
+    if (
+      params.parentId !== undefined &&
+      parents.some((id) => id === params.parentId)
+    ) {
+      found += 1n;
+    }
+    params.onProgress?.({ scanned, total, found, currentId: tokenId });
+    await flushCursor();
+  }
+
+  await saveRelationshipSyncCursor({
+    contractId: namespace,
+    nextMintedIndex
+  });
+
+  return { scanned, total, found, cancelled, nextMintedIndex, mintedCount };
+};
+
+## Relationship tree renderer
+
+    // Orchestrates every relationship direction for the selected inscription:
+    // its live on-chain parents, then the full server-indexed lineage (children,
+    // grandchildren, …, ancestors above direct parents, and half-siblings). Falls
+    // back to the local IndexedDB child index + scan when the server lineage
+    // endpoint is unavailable.
+    // Generation accent colour: a warm scale upward (ancestors) and a cool scale
+    // downward (descendants), brand blue for the focus row. Lightness steps with
+    // depth so each tier reads as distinct at any depth, in a confined space.
+    const relGenAccent = (kind, depth) => {
+      if (kind === 'focus') return 'var(--blue)';
+      const light = Math.max(48, 72 - depth * 7);
+      return kind === 'up' ? `hsl(34 92% ${light}%)` : `hsl(190 70% ${light}%)`;
+    };
+
+    // One generation row: a sticky generation label plus a horizontally
+    // scrollable track of thumbnail cards. The focus row places the selected
+    // piece first (highlighted) followed by its siblings.
+    const buildRelationshipRow = ({ contractId, ids, kind, depth, label, selectedId = null }) => {
+      const row = document.createElement('div');
+      row.className = `rel-row rel-row--${kind}`;
+      row.dataset.depth = String(depth);
+      row.style.setProperty('--rel-acc', relGenAccent(kind, depth));
+      const track = document.createElement('div');
+      track.className = 'rel-row__track';
+      const labelEl = document.createElement('span');
+      labelEl.className = 'rel-row__label';
+      const count = (selectedId != null ? 1 : 0) + (ids ? ids.length : 0);
+      labelEl.textContent = `${label} · ${count}`;
+      track.append(labelEl);
+      if (selectedId != null) {
+        const selfCard = buildRelationshipThumbCard(contractId, selectedId, 'self');
+        selfCard.classList.add('rel-card--self');
+        selfCard.title = `Selected ${formatTokenId(selectedId)}`;
+        track.append(selfCard);
+      }
+      const role =
+        kind === 'focus' ? 'sibling' : kind === 'up' ? (depth === 1 ? 'parent' : 'ancestor') : 'child';
+      track.dataset.relRole = role;
+      for (const id of ids ?? []) {
+        track.append(buildRelationshipThumbCard(contractId, id, role));
+      }
+      row.append(track);
+      // Hydration is deferred to the orchestrator, AFTER the rows are attached to
+      // the live viewport: hydrateRelationshipThumbCard() no-ops on detached
+      // media, so hydrating here (before append) would leave tiles stuck loading.
+      return row;
+    };
+
+    // Focused, scrollable family-tree view of the selected inscription:
+    // ancestors above (deepest generation at the top, parents nearest the focus),
+    // the selected piece + siblings on the focus row, descendants below. Prefers
+    // the one-round-trip server lineage (depth-tagged ancestors + descendants +
+    // half-siblings); falls back to the live ancestor walk + local child index
+    // when the endpoint is unavailable. Each row scrolls horizontally, the
+    // viewport scrolls vertically, and the whole tree stays inside the preview
+    // column.
+    const renderSelectedInscriptionRelationships = async (token) => {
+      const container = dom.selectedRelationships;
+      if (!container) {
+        return;
+      }
+      state.selectedParentsRequestId += 1;
+      state.selectedChildrenRequestId += 1;
+      const requestId = state.selectedChildrenRequestId;
+      if (!token || !supportsParentRelationships()) {
+        container.replaceChildren();
+        container.hidden = true;
+        return;
+      }
+      container.hidden = false;
+      const contractId = getTokenCacheContractId(token);
+
+      const tree = document.createElement('div');
+      tree.className = 'rel-tree';
+      const viewport = document.createElement('div');
+      viewport.className = 'rel-tree__viewport';
+      const status = document.createElement('div');
+      status.className = 'rel-tree__status';
+      status.textContent = 'Loading lineage…';
+      tree.append(viewport, status);
+      container.replaceChildren(tree);
+
+      const lineage = await fetchLineage({ contractId, id: token.id }).catch(() => null);
+      if (requestId !== state.selectedChildrenRequestId || state.selectedTokenId !== token.id) {
+        return;
+      }
+
+      let ancestorGroups = [];
+      let descendantGroups = [];
+      let siblings = [];
+      let coverageText = '';
+      if (lineage) {
+        ancestorGroups = groupByDepth(lineage.ancestors);
+        descendantGroups = groupByDepth(lineage.descendants);
+        siblings = lineage.siblings ?? [];
+        coverageText = lineage.complete
+          ? `Lineage complete across ${lineage.mintedCount.toString()} inscriptions.`
+          : `Index ${lineage.syncedCount.toString()}/${lineage.mintedCount.toString()} — newer relations may still be syncing.`;
+
+        // The server edge index can briefly lag a freshly sealed inscription.
+        // Always reconcile direct parents from the contract so confirmed
+        // relationships appear immediately, while deeper lineage continues to
+        // come from the indexed endpoint.
+        try {
+          const sender = getReadOnlySenderAddress();
+          const liveParents = await state.client.getParents(token.id, sender);
+          if (
+            requestId !== state.selectedChildrenRequestId ||
+            state.selectedTokenId !== token.id
+          ) {
+            return;
+          }
+          if (liveParents.length > 0) {
+            const indexedDirectParents =
+              ancestorGroups.find(([depth]) => depth === 1)?.[1] ?? [];
+            const directParents = new Map(
+              [...indexedDirectParents, ...liveParents].map((id) => [
+                id.toString(),
+                id
+              ])
+            );
+            ancestorGroups = [
+              ...ancestorGroups.filter(([depth]) => depth !== 1),
+              [1, [...directParents.values()]]
+            ];
+            void recordChildParents({
+              contractId,
+              childId: token.id,
+              parentIds: liveParents
+            });
+            if (lineage.parents.length === 0) {
+              coverageText = `${coverageText} Direct parents confirmed on-chain.`;
+            }
+          }
+        } catch (error) {
+          // Keep the indexed lineage when the live read is temporarily
+          // unavailable; the existing fallback still handles endpoint failure.
+        }
+      } else {
+        // Server lineage unavailable: live ancestor walk + local descendant index.
+        try {
+          const sender = getReadOnlySenderAddress();
+          ancestorGroups = [...(await walkAncestorsLive(token.id, sender, contractId)).entries()];
+        } catch (error) {
+          ancestorGroups = [];
+        }
+        try {
+          descendantGroups = [...(await walkDescendantsLocal(token.id, contractId)).entries()];
+        } catch (error) {
+          descendantGroups = [];
+        }
+        if (requestId !== state.selectedChildrenRequestId || state.selectedTokenId !== token.id) {
+          return;
+        }
+        coverageText = 'Local index — server lineage unavailable.';
+      }
+
+      // Ancestors: deepest generation at the very top, parents just above focus.
+      for (const [depth, ids] of [...ancestorGroups].sort((a, b) => b[0] - a[0])) {
+        viewport.append(
+          buildRelationshipRow({ contractId, ids, kind: 'up', depth, label: depthLabel(depth, 'up') })
+        );
+      }
+      // Focus row: the selected piece plus its siblings.
+      const focusRow = buildRelationshipRow({
+        contractId,
+        ids: siblings,
+        kind: 'focus',
+        depth: 0,
+        label: 'Selected',
+        selectedId: token.id
+      });
+      viewport.append(focusRow);
+      // Descendants: children just below focus, deeper generations further down.
+      for (const [depth, ids] of [...descendantGroups].sort((a, b) => a[0] - b[0])) {
+        viewport.append(
+          buildRelationshipRow({ contractId, ids, kind: 'down', depth, label: depthLabel(depth, 'down') })
+        );
+      }
+
+      // Now that every row is attached to the live viewport, hydrate the tiles —
+      // one batched summary fetch per row (covers the selected piece too), then
+      // each tile renders from cache. Doing this here (post-append) is what makes
+      // detached-media hydration no-op irrelevant.
+      for (const track of viewport.querySelectorAll('.rel-row__track')) {
+        const trackIds = Array.from(track.querySelectorAll('.parent-thumb__media'), (mediaEl) => {
+          try {
+            return BigInt(mediaEl.dataset.tokenId);
+          } catch (error) {
+            return null;
+          }
+        }).filter((id) => id !== null);
+        if (trackIds.length > 0) {
+          void hydrateRelationGroupSummaries(contractId, trackIds, track, track.dataset.relRole || 'relation');
+        }
+      }
+
+      const hasAny =
+        ancestorGroups.length > 0 || descendantGroups.length > 0 || siblings.length > 0;
+      status.textContent = hasAny ? coverageText : 'No parents, children, or siblings.';
+
+      // Focus row sits in the vertical middle when there are ancestors above it;
+      // a root piece (no ancestors) sits at the top instead.
+      requestAnimationFrame(() => {
+        if (requestId !== state.selectedChildrenRequestId) {
+          return;
+        }
+        viewport.scrollTop =
+          ancestorGroups.length > 0
+            ? Math.max(0, focusRow.offsetTop - (viewport.clientHeight - focusRow.clientHeight) / 2)
+            : 0;
+      });
+    };
+
+    // Walk the ancestor chain live from the chain: BFS up via get-parents,
+    // recording the shallowest depth each ancestor is reached at (so a node
+    // reachable by multiple paths is listed once, at its closest tier). Cheap —
+    // lineages are shallow — and works with or without the server index. Each
+    // visited child -> parents edge is opportunistically recorded so the local
+    // reverse index is seeded as a side effect.
+    const walkAncestorsLive = async (tokenId, sender, contractId, maxDepth = 16) => {
+      const byDepth = new Map();
+      const seen = new Set([tokenId.toString()]);
+      let frontier = [tokenId];
+      let depth = 1;
+      while (frontier.length > 0 && depth <= maxDepth) {
+        const lists = await runReadOnlyLimited(frontier, 4, (id) =>
+          state.client.getParents(id, sender)
+        );
+        const levelIds = [];
+        const next = [];
+        frontier.forEach((childId, index) => {
+          const parents = lists[index] ?? [];
+          void recordChildParents({ contractId, childId, parentIds: parents });
+          for (const parentId of parents) {
+            const key = parentId.toString();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            levelIds.push(parentId);
+            next.push(parentId);
+          }
+        });
+        if (levelIds.length > 0) {
+          byDepth.set(depth, levelIds);
+        }
+        frontier = next;
+        depth += 1;
+      }
+      return byDepth;
+    };
+
+    // Walk the descendant chain downward through the local reverse index
+    // (loadIndexedChildren), recording the shallowest depth each descendant is
+    // reached at. There is no on-chain get-children, so this only sees edges the
+    // index already holds — but the live ancestor walk seeds those edges as you
+    // browse, and the Scan control fills the rest. Mirrors walkAncestorsLive.
+    const walkDescendantsLocal = async (tokenId, contractId, maxDepth = 16) => {
+      const byDepth = new Map();
+      const seen = new Set([tokenId.toString()]);
+      let frontier = [tokenId];
+      let depth = 1;
+      while (frontier.length > 0 && depth <= maxDepth) {
+        const lists = await Promise.all(
+          frontier.map((id) =>
+            loadIndexedChildren({ contractId, parentId: id }).catch(() => [])
+          )
+        );
+        const levelIds = [];
+        const next = [];
+        for (const list of lists) {
+          for (const childId of list ?? []) {
+            const key = childId.toString();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            levelIds.push(childId);
+            next.push(childId);
+          }
+        }
+        if (levelIds.length > 0) {
+          byDepth.set(depth, levelIds);
+        }
+        frontier = next;
+        depth += 1;
+      }
+      return byDepth;
+    };
+
+    // Upward navigation: full ancestor lineage (Parents, Grandparents, …) read
+    // live from the chain, depth-grouped.
+    const renderAncestorsSection = async (token, contractId, section) => {
+      const requestId = ++state.selectedParentsRequestId;
+      const heading = document.createElement('div');
+      heading.className = 'selected-relationships__head';
+      heading.textContent = 'Parents';
+      const status = document.createElement('div');
+      status.className = 'selected-relationships__status';
+      status.textContent = 'Loading lineage…';
+      section.replaceChildren(heading, status);
+
+      let byDepth;
+      try {
+        const sender = getReadOnlySenderAddress();
+        byDepth = await walkAncestorsLive(token.id, sender, contractId);
+      } catch (error) {
+        if (
+          requestId !== state.selectedParentsRequestId ||
+          state.selectedTokenId !== token.id
+        ) {
+          return;
+        }
+        status.textContent = 'Parent relationships unavailable.';
+        return;
+      }
+      if (
+        requestId !== state.selectedParentsRequestId ||
+        state.selectedTokenId !== token.id
+      ) {
+        return;
+      }
+      if (byDepth.size === 0) {
+        heading.textContent = 'Parents (0)';
+        status.textContent = 'No parents.';
+        return;
+      }
+      section.replaceChildren();
+      for (const [depth, ids] of [...byDepth.entries()].sort((a, b) => a[0] - b[0])) {
+        appendRelationGroup(
+          section,
+          contractId,
+          depthLabel(depth, 'up'),
+          ids,
+          depth === 1 ? 'parent' : 'ancestor'
+        );
+      }
+    };
+
+    // Downward + lateral navigation. Prefers the server lineage index (one
+    // round-trip: children, grandchildren, …, ancestors above direct parents,
+    // and half-siblings). Degrades to the local IndexedDB child index + scan
+    // button when the endpoint is unavailable (e.g. local/static hosting).
+    const renderLineageSection = async (token, contractId, section) => {
+      const requestId = ++state.selectedChildrenRequestId;
+      const status = document.createElement('div');
+      status.className = 'selected-relationships__status';
+      status.textContent = 'Loading lineage…';
+      section.replaceChildren(status);
+
+      const lineage = await fetchLineage({ contractId, id: token.id });
+      if (
+        requestId !== state.selectedChildrenRequestId ||
+        state.selectedTokenId !== token.id
+      ) {
+        return;
+      }
+      if (!lineage) {
+        // Server lineage unavailable — fall back to the local child index.
+        void renderLocalChildrenSection(token, contractId, section);
+        return;
+      }
+
+      section.replaceChildren();
+      // Descendants grouped by depth: Children, Grandchildren, deeper tiers.
+      // (Ancestors are rendered live in the parents section above.)
+      for (const [depth, ids] of groupByDepth(lineage.descendants)) {
+        appendRelationGroup(section, contractId, depthLabel(depth, 'down'), ids, 'child');
+      }
+      // Half-siblings.
+      appendRelationGroup(section, contractId, 'Siblings', lineage.siblings, 'sibling');
+
+      const hasAny =
+        lineage.descendants.length > 0 || lineage.siblings.length > 0;
+      const coverage = document.createElement('span');
+      coverage.className = 'selected-relationships__status';
+      if (!hasAny) {
+        coverage.textContent = lineage.complete
+          ? 'No children, siblings, or deeper lineage.'
+          : 'No lineage indexed yet — the index is still catching up.';
+      } else if (!lineage.complete) {
+        coverage.textContent =
+          `Index ${lineage.syncedCount.toString()}/${lineage.mintedCount.toString()} — newer relations may still be syncing.`;
+      } else {
+        coverage.textContent = `Lineage complete across ${lineage.mintedCount.toString()} inscriptions.`;
+      }
+      section.append(coverage);
+    };
+
+    // Local fallback: children read from the persisted reverse index, plus a
+    // Scan control to build/refresh it (used only when the server lineage
+    // endpoint is unreachable).
+    const renderLocalChildrenSection = async (token, contractId, section) => {
+      const requestId = ++state.selectedChildrenRequestId;
+      const heading = document.createElement('div');
+      heading.className = 'selected-relationships__head';
+      heading.textContent = 'Children';
+      const status = document.createElement('div');
+      status.className = 'selected-relationships__status';
+      status.textContent = 'Reading child index…';
+      section.replaceChildren(heading, status);
+
+      let byDepth = new Map();
+      try {
+        byDepth = await walkDescendantsLocal(token.id, contractId);
+      } catch (error) {
+        byDepth = new Map();
+      }
+      if (
+        requestId !== state.selectedChildrenRequestId ||
+        state.selectedTokenId !== token.id
+      ) {
+        return;
+      }
+
+      let totalFound = 0;
+      if (byDepth.size > 0) {
+        section.replaceChildren();
+        for (const [depth, ids] of [...byDepth.entries()].sort((a, b) => a[0] - b[0])) {
+          totalFound += ids.length;
+          appendRelationGroup(section, contractId, depthLabel(depth, 'down'), ids, 'child');
+        }
+      } else {
+        heading.textContent = 'Children (0)';
+        status.textContent = 'No indexed children yet.';
+      }
+
+      // Coverage line + scan control. The index is contract-wide, so the cursor
+      // tells us how much of the minted list has been scanned regardless of
+      // which token is selected.
+      const controls = document.createElement('div');
+      controls.className = 'selected-relationships__scan';
+      const coverage = document.createElement('span');
+      coverage.className = 'selected-relationships__status';
+      const scanButton = document.createElement('button');
+      scanButton.type = 'button';
+      scanButton.className = 'small-link';
+      controls.append(scanButton, coverage);
+      section.append(controls);
+
+      const supportsScan = state.client.supportsMintedIndex === true;
+      try {
+        const cursor = await loadChildIndexCursor(contractId);
+        if (
+          requestId !== state.selectedChildrenRequestId ||
+          state.selectedTokenId !== token.id
+        ) {
+          return;
+        }
+        coverage.textContent =
+          cursor > 0n ? `Indexed ${cursor.toString()} inscriptions so far.` : 'Not indexed yet.';
+      } catch (error) {
+        coverage.textContent = '';
+      }
+
+      if (!supportsScan) {
+        scanButton.hidden = true;
+        coverage.textContent = 'Child indexing requires a minted-index contract (v2.1.0+).';
+        return;
+      }
+      scanButton.textContent = state.childScanRunning
+        ? 'Cancel scan'
+        : totalFound > 0
+          ? 'Rescan for children'
+          : 'Scan for children';
+      scanButton.disabled = state.childScanRunning && state.childScanTokenId !== token.id;
+      scanButton.addEventListener('click', () => {
+        if (state.childScanRunning) {
+          state.childScanCancel = true;
+          return;
+        }
+        void runChildIndexScan(token, contractId, scanButton, coverage);
+      });
+    };
+
+    // Runs the bounded, cancellable reverse-index scan for the selected token's
+    // contract, streaming progress into the Children section and re-rendering
+    // it on completion so newly-found children appear.
+    const runChildIndexScan = async (token, contractId, scanButton, coverage) => {
+      if (state.childScanRunning) {
+        return;
+      }
+      state.childScanRunning = true;
+      state.childScanCancel = false;
+      state.childScanTokenId = token.id;
+      scanButton.textContent = 'Cancel scan';
+      coverage.textContent = 'Starting scan…';
+      try {
+        const sender = getReadOnlySenderAddress();
+        const result = await syncChildIndex({
+          client: state.client,
+          contractId,
+          senderAddress: sender,
+          parentId: token.id,
+          shouldCancel: () => state.childScanCancel,
+          onProgress: (progress) => {
+            if (state.selectedTokenId !== token.id) {
+              return;
+            }
+            coverage.textContent =
+              `Scanning ${progress.scanned.toString()}/${progress.total.toString()}… ` +
+              `${progress.found.toString()} child${progress.found === 1n ? '' : 'ren'} found.`;
+          }
+        });
+        coverage.textContent = result.cancelled
+          ? `Scan paused at ${result.nextMintedIndex.toString()}/${result.mintedCount.toString()}.`
+          : `Scan complete — covered ${result.mintedCount.toString()} inscriptions.`;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        coverage.textContent = `Scan failed: ${message}`;
+      } finally {
+        state.childScanRunning = false;
+        state.childScanCancel = false;
+        state.childScanTokenId = null;
+        // Re-render with the freshly indexed children if the token is still selected.
+        if (state.selectedTokenId === token.id) {
+          const section = scanButton.closest('.selected-relationships__group');
+          if (section) {
+            void renderLocalChildrenSection(token, contractId, section);
+          }
+        }
+      }
+    };
+
+    const resolveSelectedInscriptionOwnerName = async (token) => {
+      const owner = token.owner?.trim() ?? '';
+      if (!owner) {
+        return;
+
+## D1 relationship/index SQL references
+functions/cloudflare-types.d.ts:10:interface D1Result<T = Record<string, unknown>> {
+functions/cloudflare-types.d.ts:14:interface D1PreparedStatement {
+functions/cloudflare-types.d.ts:15:  bind(...values: unknown[]): D1PreparedStatement;
+functions/cloudflare-types.d.ts:16:  all<T = Record<string, unknown>>(): Promise<D1Result<T>>;
+functions/cloudflare-types.d.ts:20:interface D1Database {
+functions/cloudflare-types.d.ts:21:  prepare(query: string): D1PreparedStatement;
+docs/xtrata-quickstart.md:28:3. Optional fields (token URI, parents, delegate) can be left unchanged for a first inscription.
+docs/let-africa-build-partnership-proposal.md:10:The goal is to reduce adoption friction, expand the builder ecosystem, and create a durable commercial relationship without giving up control of the core protocol economics.
+docs/mainnet-v3.2.1-handover.md:40:- Parents and dependencies remain separate relationship concepts.
+docs/mainnet-v3.2.1-handover.md:41:- Reverse parent-child discovery remains an indexer/resolver/manifest concern.
+functions/collections/health.ts:8:    `SELECT COUNT(*) AS total FROM ${table}`
+docs/recursive-inscriptions.md:40:2) **Build the parent content.**
+docs/recursive-inscriptions.md:41:   - Encode dependency IDs inside the parent file (JSON/HTML/JS).
+docs/recursive-inscriptions.md:44:3) **Seal the parent with `seal-recursive`.**
+docs/recursive-inscriptions.md:65:## In-app minting (multi-parent support)
+docs/recursive-inscriptions.md:67:The mint screen now supports multiple parents:
+docs/recursive-inscriptions.md:69:- Enter parent IDs as comma/space/newline separated values.
+docs/recursive-inscriptions.md:71:- If a delegate parent is set, it is merged into the same canonical list.
+docs/recursive-inscriptions.md:73:  preserves your parent selections.
+docs/recursive-inscriptions.md:74:- When at least one parent is present, the app uses `seal-recursive`.
+docs/recursive-inscriptions.md:77:## Viewer relationships (parents + children)
+docs/recursive-inscriptions.md:79:The viewer shows relationships in both directions:
+docs/recursive-inscriptions.md:82:- **Children**: resolved from a local reverse-relationship index (IndexedDB),
+docs/recursive-inscriptions.md:165:### 3) Read dependencies + resolve child content
+docs/recursive-inscriptions.md:231:- **Seal children before parents.** Dependency validation requires that
+docs/perf/inscription-index-optimisations.md:3:Running log of caching/loading optimisations for the D1-backed inscription
+docs/perf/inscription-index-optimisations.md:18:  popular gallery) is served from the edge with **zero Worker D1 work**.
+docs/perf/inscription-index-optimisations.md:33:## Task 3 — D1 index tuning (done)
+docs/perf/inscription-index-optimisations.md:35:**File:** `functions/migrations/004_inscription_index_tuning.sql` (new)
+docs/perf/inscription-index-optimisations.md:37:- Dropped `idx_inscription_index_contract_id` — an exact duplicate of the
+docs/perf/inscription-index-optimisations.md:39:- Added `idx_inscription_index_refresh ON inscription_index(contract, updated_at)`
+docs/perf/inscription-index-optimisations.md:46:(add `--remote` for the live D1).
+docs/perf/inscription-index-optimisations.md:48:## Task 2 — Combined lineage endpoint, one round-trip (done)
+docs/perf/inscription-index-optimisations.md:52:- New endpoint `GET /index/page?primary=<id>&lineage=<id,id>&ids=1,2,3` resolves
+docs/perf/inscription-index-optimisations.md:53:  the whole lineage in **one D1 query** (`WHERE contract IN (...) AND token_id IN
+docs/perf/inscription-index-optimisations.md:58:  on normalised `primary`+`lineage`+`ids`. One cache entry per page instead of
+docs/perf/inscription-index-optimisations.md:100:  the D1 index and those above the eager-load window.
+docs/perf/inscription-index-optimisations.md:108:**Files:** `functions/migrations/005_inscription_index_sync_lock.sql` (new),
+docs/perf/inscription-index-optimisations.md:111:- Added `sync_lock_until` to `inscription_index_state`. `sync()` now acquires a
+docs/perf/inscription-index-optimisations.md:153:  drop SVG rows — SVG summaries now serve straight from D1 (no chain
+docs/perf/inscription-index-optimisations.md:171:## Task #8 — Parent relationship edges + auth-guarded backfill (done)
+docs/perf/inscription-index-optimisations.md:173:**Files:** `functions/migrations/006_inscription_parents.sql` (new),
+docs/perf/inscription-index-optimisations.md:176:- New `inscription_parents` edge table. `readSummary()` extracts the `parents`
+docs/perf/inscription-index-optimisations.md:178:  `syncTokenParents()`, which replaces a child's edge rows on every sync. New
+docs/perf/inscription-index-optimisations.md:179:  mints with parents are indexed automatically — no manual step.
+docs/perf/inscription-index-optimisations.md:180:- `GET /index/relations/<contract>` derives parents/ancestors,
+docs/perf/inscription-index-optimisations.md:181:  children/descendants, and siblings from the edge table.
+docs/perf/inscription-index-optimisations.md:182:- `POST /index/<contract>?parents=backfill&from=&limit=` repopulates edges for
+docs/perf/inscription-index-optimisations.md:190:  refresh that populates D1 is visible immediately instead of being shadowed by
+docs/perf/inscription-index-optimisations.md:193:**Full runbook:** [`../inscription-relationship-index.md`](../inscription-relationship-index.md)
+docs/perf/inscription-index-optimisations.md:194:(automated flow, relations endpoints, migrations, the backfill procedure with
+docs/mainnet-v3.2.1-announcement-inscription.md:13:hardening upload, relationship, migration, and reconstruction behavior.
+docs/mainnet-v3.2.1-announcement-inscription.md:24:- parent relationships and dependency relationships remain separate;
+docs/mainnet-v3.2.1-announcement-inscription.md:36:different ownership or relationship contexts.
+docs/mainnet-v3.2.1-announcement-inscription.md:42:holder wants the v3 ownership, relationship, and resolver surface.
+docs/mainnet-v3.2.3-announcement-inscription.md:19:          same id · owner · content · lineage
+docs/mainnet-v3.2.3-announcement-inscription.md:26:and lineage. Nothing is left behind; the past is brought forward intact.
+docs/mainnet-v3.2.3-announcement-inscription.md:120:Inscriptions can also declare dependencies and parents, so relationship and
+functions/collections/[collectionId]/oversight.ts:173:      'SELECT * FROM collections WHERE id = ?',
+functions/collections/[collectionId]/oversight.ts:187:      `SELECT
+functions/collections/[collectionId]/oversight.ts:199:      'SELECT state, COUNT(*) as total FROM assets WHERE collection_id = ? GROUP BY state',
+functions/collections/[collectionId]/oversight.ts:204:      `SELECT storage_key
+functions/collections/[collectionId]/oversight.ts:214:      'SELECT COUNT(*) as total FROM reservations WHERE collection_id = ?',
+functions/collections/[collectionId]/oversight.ts:219:      'SELECT status as state, COUNT(*) as total FROM reservations WHERE collection_id = ? GROUP BY status',
+docs/LEGAL/data-model-and-retention.md:5:## D1 tables
+docs/LEGAL/data-model-and-retention.md:91:Create a new migration under `functions/migrations/` (for example `002_legal_signatures.sql`) and apply it in every environment with D1:
+docs/standards/xtrata-manifest-templates/MANIFEST_USE_GUIDE.md:450:- an art drop or music collection needs transparent royalty routing;
+docs/claude-v3.2.1-contract-review-prompt.md:33:- Parents and dependencies are intentionally separate relationship types.
+docs/claude-v3.2.1-contract-review-prompt.md:34:- Reverse parent-child indexes are not core state; they belong in manifests,
+docs/claude-v3.2.1-contract-review-prompt.md:51:- relationship split: dependency on another wallet succeeds, parent link to
+docs/claude-v3.2.1-contract-review-prompt.md:52:  another wallet fails, parent link to owned token succeeds;
+docs/inscription-relationship-index.md:1:# Inscription relationship index — operations & maintenance
+docs/inscription-relationship-index.md:3:How the D1-backed inscription index records parent/child relationships, how it
+docs/inscription-relationship-index.md:5:(parent-edge backfill) — including the auth it now requires.
+docs/inscription-relationship-index.md:7:Audience: operators and agents maintaining the homepage/Xplorer relationship
+docs/inscription-relationship-index.md:15:The index is a D1 (SQLite) cache populated from the core contracts' read-only
+docs/inscription-relationship-index.md:16:functions, so a page render is one D1 query instead of N per-token chain reads.
+docs/inscription-relationship-index.md:20:| `inscription_index` | One summary row per token (owner, creator, hashes, mime, size, sealed, token-uri, migration source). |
+docs/inscription-relationship-index.md:21:| `inscription_parents` | One row per **edge**: `(contract, child_id, parent_id)`. The graph that powers relationship navigation. |
+docs/inscription-relationship-index.md:22:| `inscription_index_state` | Per-contract sync bookkeeping: `minted_count`, `synced_count`, `updated_at`, `sync_lock_until`. |
+docs/inscription-relationship-index.md:28:| `GET /index/<contract>?ids=…` or `?from=&limit=&order=` | Token summaries for a contract, served from D1 (edge-cached). |
+docs/inscription-relationship-index.md:29:| `GET /index/page?primary=&lineage=&ids=…` | Whole lineage resolved in one D1 query, deduped primary-first. |
+docs/inscription-relationship-index.md:30:| `GET /index/relations/<contract>?id=<id>` | Derived relationship graph for a token (see §3). |
+docs/inscription-relationship-index.md:40:Ongoing relationship indexing is automatic. New mints and edits flow into the
+docs/inscription-relationship-index.md:48:   token. `readSummary()` extracts the `parents` list from
+docs/inscription-relationship-index.md:49:   `get-inscription-summary` (v3.2.0+ cores; older cores carry no parents).
+docs/inscription-relationship-index.md:51:   calls `syncTokenParents()`, which **replaces** that child's rows in
+docs/inscription-relationship-index.md:52:   `inscription_parents` (delete-then-insert) with the current parent set.
+docs/inscription-relationship-index.md:53:   New parents on a fresh mint therefore create edges with no extra step.
+docs/inscription-relationship-index.md:59:4. **Stampede guard.** `sync()` takes a soft, self-expiring D1 lock
+docs/inscription-relationship-index.md:63:5. **Relations are derived on read.** `GET /index/relations/<contract>` walks
+docs/inscription-relationship-index.md:64:   `inscription_parents`:
+docs/inscription-relationship-index.md:65:   - parents / ancestors: `child_id -> parent_id`
+docs/inscription-relationship-index.md:66:   - children / descendants: `parent_id -> child_id`
+docs/inscription-relationship-index.md:67:   - siblings: shared parent
+docs/inscription-relationship-index.md:70:new mint that carries parents creates its `inscription_parents` rows during the
+docs/inscription-relationship-index.md:76:## 3. Reading relationships
+docs/inscription-relationship-index.md:79:curl "https://<host>/index/relations/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3?id=287"
+docs/inscription-relationship-index.md:82:Returns the derived graph for token `287` (parents, ancestors, children,
+docs/inscription-relationship-index.md:84:`id=287` resolves `children: [577]` with descendants including `577`, `688`,
+docs/inscription-relationship-index.md:93:## 4. Maintenance: parent-edge backfill (manual, occasional)
+docs/inscription-relationship-index.md:98:natural backlog pass left to populate `inscription_parents` for the old rows.
+docs/inscription-relationship-index.md:100:**What it does:** `POST /index/<contract>?parents=backfill` walks existing
+docs/inscription-relationship-index.md:101:`inscription_index` rows, re-reads each token's summary from the chain, and
+docs/inscription-relationship-index.md:143:    "$HOST/index/$CONTRACT?parents=backfill&from=$FROM&limit=100")
+docs/inscription-relationship-index.md:161:- `functions/migrations/005_inscription_index_sync_lock.sql` — sync stampede lock.
+docs/inscription-relationship-index.md:162:- `functions/migrations/006_inscription_parents.sql` — the edge table.
+docs/inscription-relationship-index.md:164:Apply (add `--remote` for live D1):
+docs/inscription-relationship-index.md:171:(no `inscription_parents` table), core summary indexing still works — only edge
+docs/inscription-relationship-index.md:178:- `GET /index/page?primary=<c>&lineage=<…>&ids=753,…,768` returns `tokens`, not
+docs/inscription-relationship-index.md:181:- `GET /index/relations/<v3-contract>?id=287` returns child/descendant data
+docs/inscription-relationship-index.md:182:  (e.g. `children: [577]`).
+docs/inscription-relationship-index.md:183:- Mint a token with parents and confirm `inscription_parents` rows appear
+docs/inscription-relationship-index.md:185:- `GET /index/relations/...` no longer errors with
+docs/inscription-relationship-index.md:186:  `no such table: inscription_parents` (confirms 006 applied).
+docs/inscription-relationship-index.md:194:  targeted refresh that populates D1 is visible immediately instead of being
+docs/inscription-relationship-index.md:214:| `no such table: inscription_parents` | Migration 006 not applied | Apply migrations (§5). |
+docs/inscription-relationship-index.md:215:| Relations return parents but no children for old tokens | Edge table added after those summaries were indexed | Run the backfill (§4). |
+functions/collections/[collectionId]/reserve.ts:14:        'SELECT * FROM reservations WHERE collection_id = ? ORDER BY created_at DESC',
+functions/collections/[collectionId]/reserve.ts:35:        `INSERT INTO reservations (reservation_id, collection_id, asset_id, buyer_address, hash_hex, status, tx_id, expires_at, created_at, updated_at)
+functions/collections/[collectionId]/reserve.ts:41:        'SELECT * FROM reservations WHERE reservation_id = ?',
+functions/collections/[collectionId]/reserve.ts:70:        'SELECT * FROM reservations WHERE reservation_id = ?',
+docs/LEGAL/rollout-and-test-plan.md:15:- Add D1 migration for legal tables.
+functions/collections/[collectionId]/fee-guidance.ts:40:  const byId = await queryAll(env, 'SELECT * FROM collections WHERE id = ?', [normalized]);
+functions/collections/[collectionId]/fee-guidance.ts:45:  const bySlug = await queryAll(env, 'SELECT * FROM collections WHERE slug = ?', [normalized]);
+functions/collections/[collectionId]/fee-guidance.ts:71:      `SELECT asset_id, path, filename, total_bytes, total_chunks, state
+functions/collections/[collectionId]/fee-guidance.ts:83:      `SELECT
+docs/ai-skills/README.md:28:Reading and displaying inscription relationships (parents/children/descendants)
+docs/ai-skills/README.md:29:is backed by the D1 inscription index, which **stays current automatically** —
+docs/ai-skills/README.md:30:new mints with parents are indexed during normal sync, with no agent action
+docs/ai-skills/README.md:31:required. Agents that read relationships should use:
+docs/ai-skills/README.md:33:- `GET /index/relations/<contract>?id=<id>` — derived relationship graph.
+docs/ai-skills/README.md:34:- `GET /index/page?primary=&lineage=&ids=…` — lineage summaries in one query.
+docs/ai-skills/README.md:36:The one manual maintenance action is the **parent-edge backfill**
+docs/ai-skills/README.md:37:(`POST /index/<contract>?parents=backfill`), needed only after the edge table is
+docs/ai-skills/README.md:41:[`../inscription-relationship-index.md`](../inscription-relationship-index.md).
+docs/xips/XIP-000-XIP-Process.md:33:to stay faithful to on-chain facts (e.g. "MUST NOT invent a relationship the
+docs/xtrata-inscription-handbook.md:199:- Resolve child content by reading each dependency.
+functions/collections/[collectionId]/assets.ts:76:        'SELECT state, metadata FROM collections WHERE id = ? LIMIT 1',
+functions/collections/[collectionId]/assets.ts:95:        'SELECT * FROM assets WHERE collection_id = ? ORDER BY created_at DESC',
+functions/collections/[collectionId]/assets.ts:161:        'SELECT COALESCE(SUM(total_bytes), 0) as total FROM assets WHERE collection_id = ? AND state != ?',
+functions/collections/[collectionId]/assets.ts:180:        `INSERT INTO assets (asset_id, collection_id, path, filename, mime_type, total_bytes, total_chunks, expected_hash, storage_key, edition_cap, state, expires_at, created_at, updated_at)
+functions/collections/[collectionId]/assets.ts:201:        'SELECT * FROM assets WHERE asset_id = ?',
+functions/collections/[collectionId]/assets.ts:230:  if (request.method === 'DELETE') {
+functions/collections/[collectionId]/assets.ts:239:        'SELECT state, metadata FROM collections WHERE id = ? LIMIT 1',
+functions/collections/[collectionId]/assets.ts:260:        'SELECT * FROM assets WHERE collection_id = ? AND asset_id = ? LIMIT 1',
+functions/collections/[collectionId]/assets.ts:279:        'SELECT COUNT(*) as total FROM reservations WHERE collection_id = ? AND asset_id = ?',
+functions/collections/[collectionId]/assets.ts:298:      await run(env, 'DELETE FROM assets WHERE collection_id = ? AND asset_id = ?', [
+functions/collections/[collectionId]/assets.ts:308:          'SELECT COUNT(*) as total FROM assets WHERE storage_key = ?',
+docs/standards/xtrata-collection-manifest-standard.md:27:Without a standard manifest, each collection invents a different structure. That makes integrations fragile. Marketplaces must guess. Preservation teams lose context. Wallets cannot display relationships. Indexers cannot verify mappings. Future tools cannot safely reconstruct the collection.
+functions/collections/[collectionId]/asset-preview.ts:83:      `SELECT
+docs/xips/XIP-006-Indexer-Resolver-Conformance.md:88:`latestVersion` returns **UNRESOLVED on a fork** (≥2 parent-chain tips); the
+docs/xips/XIP-006-Indexer-Resolver-Conformance.md:125:4. Select latest versions by parent-chain tip; **fail closed on forks**.
+docs/xips/XIP-006-Indexer-Resolver-Conformance.md:138:- Read facts (creator, hash, parents, dependencies, migration source) are
+docs/app-reference.md:82:- `functions/collections/health.ts` provides the `/collections/health` check used by the diagnostics panel to confirm D1 connectivity, table counts, storage bindings, and runtime inscription cache budget warnings.
+docs/app-reference.md:117:- `src/lib/mint/dependencies.ts` parses and validates recursive parent IDs for minting.
+docs/app-reference.md:124:- `src/lib/viewer/relationships.ts` fetches parent IDs and scans for child relationships.
+docs/app-reference.md:168:- `docs/LEGAL/data-model-and-retention.md` defines D1 schema and audit retention rules for signature records.
+functions/collections/[collectionId]/publish.ts:54:          .prepare(
+functions/collections/[collectionId]/publish.ts:55:            'SELECT COUNT(*) as total FROM assets WHERE collection_id = ? AND state NOT IN (?, ?)'
+functions/collections/[collectionId]/publish.ts:73:        .prepare('SELECT * FROM collections WHERE id = ?')
+docs/xips/XIP-004-Provenance-Graph-Standard.md:41:`final-hash`, `parents`, `dependencies`, single-hop `migration-source`,
+docs/xips/XIP-004-Provenance-Graph-Standard.md:42:`sealed`, and the advisory first-seen `get-id-by-hash`. List caps (`parents`,
+docs/xips/XIP-004-Provenance-Graph-Standard.md:53:| `parent` | `get-parents` | **authoritative + ownership-attested** (§3) | child → parent |
+docs/xips/XIP-004-Provenance-Graph-Standard.md:69:    { "type": "parent",
+docs/xips/XIP-004-Provenance-Graph-Standard.md:82:The core enforces **different invariants** on the two relations, and a faithful
+docs/xips/XIP-004-Provenance-Graph-Standard.md:85:- **`parent`** — at seal time the core requires that **the creator owned each
+docs/xips/XIP-004-Provenance-Graph-Standard.md:86:  parent** (`validate-parent` asserts the parent's NFT owner equals the sealing
+docs/xips/XIP-004-Provenance-Graph-Standard.md:87:  `tx-sender`). A `parent` edge therefore attests *"the creator held this work
+docs/xips/XIP-004-Provenance-Graph-Standard.md:88:  when descending from it"* — a stronger, ownership-backed lineage claim. An
+docs/xips/XIP-004-Provenance-Graph-Standard.md:89:  edition that *descends from* another is a `parent`.
+docs/xips/XIP-004-Provenance-Graph-Standard.md:95:(treating a dependency as lineage) or discard it (treating lineage as a mere
+docs/xips/XIP-004-Provenance-Graph-Standard.md:96:reference). Consumers presenting "descends from" semantics **SHOULD** use `parent`
+docs/xips/XIP-004-Provenance-Graph-Standard.md:118:intent, authorship, or relationship. The `derivedHash` edge:
+docs/xips/XIP-004-Provenance-Graph-Standard.md:129:  have smaller ids (existed before seal) and `parent` targets are
+docs/xips/XIP-004-Provenance-Graph-Standard.md:131:  a contract, so native `parent`/`dependency` subgraphs are **DAGs by
+docs/xips/XIP-004-Provenance-Graph-Standard.md:157:- Authoritative edges (`parent`, `dependency`, verified `migratedFrom`) and
+docs/xips/XIP-004-Provenance-Graph-Standard.md:169:- Economic lineage (who got paid) → XIP-007.
+docs/xips/XIP-004-Provenance-Graph-Standard.md:174:- **SHOULD** preserve the parent/dependency asymmetry (§3).
+docs/xips/XIP-004-Provenance-Graph-Standard.md:182:preserving the parent/dependency distinction, treating identical-hash as advisory,
+docs/xips/XIP-008-Software-Package-Standard.md:93:> declare file/runtime relationships through the core's on-chain `dependency`
+docs/xips/XIP-008-Software-Package-Standard.md:101:The core caps `dependencies`/`parents` at **50 each** per inscription (XIP-002
+docs/xips/XIP-008-Software-Package-Standard.md:137:- Package versions form a chain via the XIP-001 parent graph; the latest
+docs/xips/XIP-008-Software-Package-Standard.md:138:  authoritative release is the parent-chain tip (XIP-001 §6); forks fail closed.
+docs/xips/XIP-008-Software-Package-Standard.md:145:  parent, updated `packageDependencies`). Consumers follow the authority's
+docs/xips/XIP-008-Software-Package-Standard.md:146:  parent-chain tip to get patched releases.
+functions/collections/[collectionId].ts:49:  const byId = await queryAll(params.env, 'SELECT * FROM collections WHERE id = ?', [
+functions/collections/[collectionId].ts:58:    'SELECT * FROM collections WHERE slug = ?',
+functions/collections/[collectionId].ts:193:        'SELECT * FROM collections WHERE id = ?',
+functions/collections/[collectionId].ts:206:  if (request.method === 'DELETE') {
+functions/collections/[collectionId].ts:244:        'SELECT COUNT(*) as total FROM assets WHERE collection_id = ?',
+functions/collections/[collectionId].ts:249:        'SELECT COUNT(*) as total FROM reservations WHERE collection_id = ?',
+functions/collections/[collectionId].ts:262:          'SELECT storage_key FROM assets WHERE collection_id = ? AND storage_key IS NOT NULL AND TRIM(storage_key) != ?',
+functions/collections/[collectionId].ts:284:      await run(env, 'DELETE FROM reservations WHERE collection_id = ?', [
+functions/collections/[collectionId].ts:287:      await run(env, 'DELETE FROM assets WHERE collection_id = ?', [
+functions/collections/[collectionId].ts:290:      await run(env, 'DELETE FROM collections WHERE id = ?', [resolvedCollectionId]);
+docs/xips/XIP-005-Namespace-Standard.md:118:        root = latestVersion(A, cands)          # XIP-001 §6 parent-chain tip
+docs/xips/XIP-005-Namespace-Standard.md:126:    for seg in path: node = node.child(seg)     # sub-collections within manifest
+docs/xips/XIP-005-Namespace-Standard.md:135:candidates that do not reduce to a single parent-chain tip are a **fork** and
+src/lib/protocol/__tests__/parsers.test.ts:189:  it('parses parents list', () => {
+docs/xips/XIP-002-Identity-Standard.md:26:2. that **migration lineage on the core is single-hop**, not a stored chain; and
+docs/xips/XIP-002-Identity-Standard.md:119:This is the token's **immediate** predecessor — **not** a full lineage chain.
+docs/xips/XIP-002-Identity-Standard.md:133:presents multi-hop lineage as "a single core fact" is incorrect.
+docs/xips/XIP-002-Identity-Standard.md:218:| `get-parents(id)` | list ≤50 | lineage (XIP-004) |
+docs/xips/XIP-002-Identity-Standard.md:223:**List caps.** `parents` and `dependencies` are capped at **50 each** per
+docs/xips/XIP-003-Organisational-Manifests.md:127:- A collection **MAY** reference sub-collections by including child manifest
+docs/xips/XIP-003-Organisational-Manifests.md:132:  express membership through the contract's `dependencies`/`parents` graph so the
+docs/xips/XIP-003-Organisational-Manifests.md:133:  relationship becomes an on-chain fact (surfaced by XIP-004). The on-chain
+docs/xips/XIP-003-Organisational-Manifests.md:138:Per XIP-001 §6: a new version is a new inscription with the prior as `parent`;
+docs/xips/XIP-003-Organisational-Manifests.md:139:the latest authoritative version is the unique parent-chain tip; forks fail
+src/lib/protocol/parsers.ts:310:  const list = expectList(value, 'get-parents');
+src/lib/protocol/parsers.ts:312:    expectUInt(entry, `get-parents[${index}]`)
+docs/xips/README.md:69:The parent/supersession graph provides discoverability and historical continuity. It lets people and indexers discover the XIP family and trace the history of each individual XIP.
+docs/xips/README.md:71:However, the parent graph SHOULD NOT be the only mechanism used to decide which version is current. A corpus manifest SHOULD provide the current map of the standards set.
+functions/collections.ts:54:                ? 'SELECT * FROM collections WHERE UPPER(artist_address) = UPPER(?) ORDER BY created_at DESC'
+functions/collections.ts:55:                : "SELECT * FROM collections WHERE UPPER(artist_address) = UPPER(?) AND LOWER(COALESCE(state, 'draft')) != 'archived' ORDER BY created_at DESC",
+functions/collections.ts:61:                ? 'SELECT * FROM collections ORDER BY created_at DESC'
+functions/collections.ts:62:                : "SELECT * FROM collections WHERE LOWER(COALESCE(state, 'draft')) != 'archived' ORDER BY created_at DESC"
+functions/collections.ts:108:        'SELECT * FROM collections WHERE slug = ? LIMIT 1',
+functions/collections.ts:148:            'SELECT * FROM collections WHERE id = ?',
+functions/collections.ts:170:        'INSERT INTO collections (id, slug, artist_address, contract_address, display_name, metadata, state, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+functions/collections.ts:185:        'SELECT * FROM collections WHERE id = ?',
+docs/xips/manifest authority files/manifest-authority-v1-spec.md:35:- parent links
+docs/xips/manifest authority files/manifest-authority-v1-spec.md:37:- migration lineage
+docs/xips/manifest authority files/manifest-authority-v1-spec.md:61:> A XIP-001 manifest MAY be registered in a recognised Manifest Authority contract. Such registration does not alter the manifest bytes, manifest hash, Xtrata inscription hash, creator, parents or integrity root. It records additional on-chain metadata for discovery, authority class, target scope, lifecycle state, current pointers and verification status.
+docs/xips/manifest authority files/manifest-authority-v1-spec.md:124:4. prove successor relationship at the manifest-chain level
+functions/index/[contract].ts:12:// Cached per-token summary index. Reading a page is one D1 query instead of N
+functions/index/[contract].ts:114:    // Direct parents (v3.2.0+ summaries carry this list; empty on older cores).
+functions/index/[contract].ts:115:    parents: asUintList(fields['parents'])
+functions/index/[contract].ts:159:    // v1/v2 cores predate parent relationships.
+functions/index/[contract].ts:160:    parents: [] as number[]
+functions/index/[contract].ts:179:  const res = await queryAll(env, 'SELECT minted_count, synced_count FROM inscription_index_state WHERE contract = ?', [contractId]);
+functions/index/[contract].ts:187:  tokenUri: string | null; migrationSource: string | null; parents: number[];
+functions/index/[contract].ts:198:// Replace a child's parent edge set: clear its existing edges, then insert the
+functions/index/[contract].ts:199:// current parents. Wrapped so a deploy that hasn't applied migration 006 (no
+functions/index/[contract].ts:200:// inscription_parents table) never breaks core summary indexing.
+functions/index/[contract].ts:202:  env: RuntimeEnv, contractId: string, childId: number, parents: number[]
+functions/index/[contract].ts:205:    await run(env, 'DELETE FROM inscription_parents WHERE contract = ? AND child_id = ?', [contractId, childId]);
+functions/index/[contract].ts:207:    for (const parentId of parents) {
+functions/index/[contract].ts:208:      if (!Number.isInteger(parentId) || parentId <= 0 || parentId === childId) continue;
+functions/index/[contract].ts:211:        'INSERT OR IGNORE INTO inscription_parents (contract, child_id, parent_id, updated_at) VALUES (?,?,?,?)',
+functions/index/[contract].ts:212:        [contractId, childId, parentId, now]
+functions/index/[contract].ts:216:    // inscription_parents absent / not yet migrated — skip edge sync.
+functions/index/[contract].ts:223:    `INSERT INTO inscription_index
+functions/index/[contract].ts:234:  await syncTokenParents(env, contractId, tokenId, s.parents ?? []);
+functions/index/[contract].ts:249:    `INSERT OR IGNORE INTO inscription_index_state
+functions/index/[contract].ts:256:    `UPDATE inscription_index_state SET sync_lock_until = ?
+functions/index/[contract].ts:271:      'UPDATE inscription_index_state SET sync_lock_until = 0 WHERE contract = ?',
+functions/index/[contract].ts:301:    `INSERT INTO inscription_index_state (contract, minted_count, synced_count, updated_at)
+functions/index/[contract].ts:317:      'SELECT token_id FROM inscription_index WHERE contract = ? ORDER BY updated_at ASC LIMIT ?',
+functions/index/[contract].ts:343:// Backfill parent-child edges for rows already present in inscription_index.
+functions/index/[contract].ts:346:// backlog pass left to populate inscription_parents.
+functions/index/[contract].ts:362:    `SELECT token_id FROM inscription_index
+functions/index/[contract].ts:414:      const parentBackfill = url.searchParams.get('parents')?.trim().toLowerCase();
+functions/index/[contract].ts:415:      if (parentBackfill === 'backfill') {
+functions/index/[contract].ts:451:    // GET: serve from D1. Either an explicit id set (?ids=1,2,3 — used by grids
+functions/index/[contract].ts:476:    // Cloudflare edge with zero Worker D1 work. Short s-maxage + SWR keeps it
+functions/index/[contract].ts:498:        `SELECT ${cols} FROM inscription_index
+functions/index/[contract].ts:505:        `SELECT ${cols} FROM inscription_index
+functions/index/[contract].ts:517:      const stale = await queryAll(env, 'SELECT updated_at FROM inscription_index_state WHERE contract = ?', [contractId]);
+functions/index/page.ts:4:// Combined lineage page endpoint. The grids resolve a visible page primary-first
+functions/index/page.ts:5:// across [primary, ...lineage]. Hitting /index/<contract> once per contract cost
+functions/index/page.ts:7:// endpoint does it in ONE round-trip: a single D1 query across all contracts in
+functions/index/page.ts:8:// the lineage, deduped primary-first server-side, and edge-cached as one entry.
+functions/index/page.ts:10://   GET /index/page?primary=<id>&lineage=<id,id>&ids=1,2,3
+functions/index/page.ts:13:// so the client can attribute ownership/lineage exactly as the per-contract path
+functions/index/page.ts:60:    // primary at the head and preserve the caller's lineage ordering, de-duped.
+functions/index/page.ts:61:    const lineage = (url.searchParams.get('lineage') || '')
+functions/index/page.ts:65:    const contracts = Array.from(new Set([primary, ...lineage]));
+functions/index/page.ts:81:    // Normalized edge-cache key: equivalent requests (any id/lineage ordering)
+functions/index/page.ts:86:    cacheKeyUrl.searchParams.set('lineage', lineage.join(','));
+functions/index/page.ts:95:    // One query across the whole lineage instead of one request per contract.
+functions/index/page.ts:98:      `SELECT ${COLS} FROM inscription_index
+functions/index/page.ts:157:        `SELECT contract, minted_count, synced_count, updated_at
+functions/index/page.ts:158:           FROM inscription_index_state
+functions/index/page.ts:185:    const response = new Response(JSON.stringify({ primary, lineage, tokens }), {
+functions/index/relations/[contract].ts:4:// Relationship lineage endpoint. There is no on-chain get-children reader, so
+functions/index/relations/[contract].ts:5:// child navigation is derived from the inscription_parents edge table (populated
+functions/index/relations/[contract].ts:9://   GET /index/relations/<contract>?id=42
+functions/index/relations/[contract].ts:12://   - ancestors:   parents, grandparents, … (depth-tagged, all depths)
+functions/index/relations/[contract].ts:13://   - descendants: children, grandchildren, … (depth-tagged, all depths)
+functions/index/relations/[contract].ts:14://   - siblings:    other inscriptions sharing at least one parent (half-siblings)
+functions/index/relations/[contract].ts:15:// Convenience: parents/children are the depth-1 slices of ancestors/descendants.
+functions/index/relations/[contract].ts:36:    'SELECT minted_count, synced_count FROM inscription_index_state WHERE contract = ?',
+functions/index/relations/[contract].ts:43:// Descendants: walk parent_id -> child_id. MIN(depth) collapses ids reachable by
+functions/index/relations/[contract].ts:49:    `WITH RECURSIVE descs(id, depth) AS (
+functions/index/relations/[contract].ts:50:       SELECT child_id, 1 FROM inscription_parents
+functions/index/relations/[contract].ts:51:        WHERE contract = ?1 AND parent_id = ?2
+functions/index/relations/[contract].ts:53:       SELECT ip.child_id, descs.depth + 1
+functions/index/relations/[contract].ts:54:         FROM inscription_parents ip
+functions/index/relations/[contract].ts:55:         JOIN descs ON ip.parent_id = descs.id
+functions/index/relations/[contract].ts:58:     SELECT id, MIN(depth) AS depth FROM descs
+functions/index/relations/[contract].ts:65:// Ancestors: walk child_id -> parent_id.
+functions/index/relations/[contract].ts:69:    `WITH RECURSIVE ancs(id, depth) AS (
+functions/index/relations/[contract].ts:70:       SELECT parent_id, 1 FROM inscription_parents
+functions/index/relations/[contract].ts:71:        WHERE contract = ?1 AND child_id = ?2
+functions/index/relations/[contract].ts:73:       SELECT ip.parent_id, ancs.depth + 1
+functions/index/relations/[contract].ts:74:         FROM inscription_parents ip
+functions/index/relations/[contract].ts:75:         JOIN ancs ON ip.child_id = ancs.id
+functions/index/relations/[contract].ts:78:     SELECT id, MIN(depth) AS depth FROM ancs
+functions/index/relations/[contract].ts:85:// Half-siblings: other children of any of this id's parents.
+functions/index/relations/[contract].ts:89:    `SELECT DISTINCT child_id AS id FROM inscription_parents
+functions/index/relations/[contract].ts:91:        AND parent_id IN (
+functions/index/relations/[contract].ts:92:          SELECT parent_id FROM inscription_parents WHERE contract = ?1 AND child_id = ?2
+functions/index/relations/[contract].ts:94:        AND child_id <> ?2
+functions/index/relations/[contract].ts:95:      ORDER BY child_id ASC LIMIT ?3`,
+functions/index/relations/[contract].ts:146:      parents: ancestors.filter((r) => r.depth === 1).map((r) => r.id),
+functions/index/relations/[contract].ts:147:      children: descendants.filter((r) => r.depth === 1).map((r) => r.id),
+functions/index/relations/[contract].ts:154:      // new children are minted, which the rolling sync picks up.
+functions/lib/db.ts:2:  DB?: D1Database;
+functions/lib/db.ts:3:  D1?: D1Database;
+functions/lib/db.ts:4:  db?: D1Database;
+functions/lib/db.ts:12:    (env.DB as D1Database | undefined) ??
+functions/lib/db.ts:13:    (env.D1 as D1Database | undefined) ??
+functions/lib/db.ts:14:    (env.db as D1Database | undefined);
+functions/lib/db.ts:21:      `Missing D1 binding. Configure D1 as binding \`DB\` for this Pages environment. Available bindings: ${
+functions/lib/db.ts:30:  const statement = resolveDb(env).prepare(query);
+functions/lib/db.ts:38:  const statement = resolveDb(env).prepare(query);
+src/lib/deploy/__tests__/artist-deploy.test.ts:206:  it('injects default parent inscription IDs for standard collection mints', () => {
+src/lib/deploy/__tests__/artist-deploy.test.ts:211:        description: 'Has parent inscriptions',
+src/lib/deploy/__tests__/artist-deploy.test.ts:215:        parentInscriptions: '9, 3 9\n12',
+src/lib/deploy/__tests__/artist-deploy.test.ts:243:        parentInscriptions: 'abc',
+docs/xips/xma-v1_4-review-pack/docs/XIP-009-Manifest-Authority-Registry.md:21:resolver should verify. Core facts (creator, owner, hash, parents, sealed
+docs/xips/xma-v1_4-review-pack/docs/XIP-009-Manifest-Authority-Registry.md:32:an on-chain parent relation. What it deliberately does not provide is a cheap,
+docs/xips/xma-v1_4-review-pack/docs/XIP-009-Manifest-Authority-Registry.md:35:Without a registry, every resolver must independently walk parent DAGs and apply
+docs/xips/xma-v1_4-review-pack/docs/XIP-009-Manifest-Authority-Registry.md:64:| existence, sealed, MIME, parent edges, creator | **contract-checked** at call time against `xtrata-v3-2-3` (not stored; re-derivable). |
+docs/xips/xma-v1_4-review-pack/docs/XIP-009-Manifest-Authority-Registry.md:77:5. If `previous-manifest-id` is supplied, the core parent list of the new
+docs/xips/xma-v1_4-review-pack/docs/XIP-009-Manifest-Authority-Registry.md:78:   inscription contains it — the XIP-001 §6 parent edge is authoritative and
+docs/xips/xma-v1_4-review-pack/docs/XIP-009-Manifest-Authority-Registry.md:167:- the **core parent edge** new → previous exists (XIP-001 §6);
+docs/xips/xma-v1_4-review-pack/docs/XIP-009-Manifest-Authority-Registry.md:182:#### 6.4 Core parent-ownership constraint (workflow requirement)
+docs/xips/xma-v1_4-review-pack/docs/XIP-009-Manifest-Authority-Registry.md:184:`xtrata-v3-2-3` requires the minter to **own** every declared parent at seal
+docs/xips/xma-v1_4-review-pack/docs/XIP-009-Manifest-Authority-Registry.md:197:| `mark-superseded` | registrar / contract owner | **Rejected** while current; otherwise requires declared predecessor **and** core parent edge. |
+docs/xips/xma-v1_4-review-pack/docs/XIP-009-Manifest-Authority-Registry.md:259:scenarios: scope front-running, fabricated verification, missing parent edge,
+docs/xips/xma-v1_4-review-pack/docs/XIP-009-Manifest-Authority-Registry.md:280:  parent edges where possible) is the recovery path.
+docs/xips/xma-v1_4-review-pack/docs/XIP-009-Manifest-Authority-Registry.md:296:Requires XIP-000 (process) and XIP-001 (envelope, canonicalisation, parent-edge
+docs/xips/xma-v1_4-review-pack/docs/XIP-009-Manifest-Authority-Registry.md:299:Registration does not alter manifest bytes, hashes, creators, parents, or
+docs/xips/xma-v1_4-review-pack/docs/XIP-009-Manifest-Authority-Registry.md:306:MIME, hash, creator, parent edges, policy, immutable commitments, pointer
+docs/xips/xma-v1_4-review-pack/docs/codex-remediation-map.md:7:| 3 | Parent edge unchecked | Core get-parents consulted: at registration when a predecessor is declared, at succession, and in mark-superseded (u120). XIP-001 s6 edge is authoritative. | contract core-parent-edge; XIP-009 s3.5, s6.2 |
+docs/xips/xma-v1_4-review-pack/docs/codex-remediation-map.md:15:- Core validate-parents requires OWNING each declared parent at seal time ->
+src/lib/deploy/artist-deploy.ts:25:  parentInscriptions?: string;
+src/lib/deploy/artist-deploy.ts:265:    params.input.parentInscriptions ?? ''
+src/lib/deploy/artist-deploy.ts:275:  const parentValidation = validateDependencyIds(defaultDependencyIds);
+src/lib/deploy/artist-deploy.ts:276:  if (!parentValidation.ok) {
+src/lib/deploy/artist-deploy.ts:277:    if (parentValidation.reason === 'max-50') {
+docs/xips/xma-v1_4-review-pack/tests/xtrata-manifest-authority-v1.test-plan.md:12:- declared predecessor without core parent edge -> ERR-PARENT-EDGE-MISSING u120 (R3)
+docs/xips/xma-v1_4-review-pack/tests/xtrata-manifest-authority-v1.test-plan.md:37:  predecessor at registration (u109) AND carry the core parent edge (u120) (R3)
+docs/xips/xma-v1_4-review-pack/tests/xtrata-manifest-authority-v1.test-plan.md:46:  core parent edge
+docs/xips/xma-v1_4-review-pack/tests/xtrata-manifest-authority-v1.test-plan.md:56:- core validate-parents requires the minter to OWN each declared parent at
+src/lib/skills/__tests__/xtrata-agent-skill.test.ts:1:import { execFileSync } from 'node:child_process';
+docs/mainnet-v3.2.2-announcement-inscription.md:26:- parent relationships and dependency relationships remain separate;
+docs/mainnet-v3.2.2-announcement-inscription.md:49:different ownership or relationship contexts.
+docs/mainnet-v3.2.2-announcement-inscription.md:55:holder wants the v3 ownership, relationship, and resolver surface.
+docs/xips/xma-v1_4-review-pack/tests/smoke.mjs:26:function mint(sender, { parents = [], mime = MIME } = {}) {
+docs/xips/xma-v1_4-review-pack/tests/smoke.mjs:29:  const r = simnet.callPublicFn(CORE, "mint-single-tx-with-relationships",
+docs/xips/xma-v1_4-review-pack/tests/smoke.mjs:32:     Cl.list([]), Cl.list(parents.map(Cl.uint))], sender);
+docs/xips/xma-v1_4-review-pack/tests/smoke.mjs:71:const noEdge = mint(w1); // no core parents
+docs/xips/xma-v1_4-review-pack/tests/smoke.mjs:73:t("R3: declared predecessor without core parent edge -> u120", j(r).includes("u120"), j(r));
+docs/xips/xma-v1_4-review-pack/tests/smoke.mjs:115:// CORE CONSTRAINT (validate-parents): declaring a parent requires OWNING the
+docs/xips/xma-v1_4-review-pack/tests/smoke.mjs:116:// parent inscription at seal time. The authority hands the predecessor token
+docs/xips/xma-v1_4-review-pack/tests/smoke.mjs:119:t("transfer m1 -> delegate (core parent-ownership rule)", j(r).includes("ok"), j(r));
+docs/xips/xma-v1_4-review-pack/tests/smoke.mjs:120:const m2 = mint(w2, { parents: [m1.id] });
+docs/xips/xma-v1_4-review-pack/tests/smoke.mjs:121:t("mint m2 (core parent edge -> m1)", m2.id !== null, m2.raw);
+docs/xips/xma-v1_4-review-pack/tests/smoke.mjs:160:const m3 = mint(w2, { parents: [m2.id] });
+docs/xips/xma-v1_4-review-pack/tests/smoke.mjs:169:// (w1 needs to own m2 to declare it as parent - core rule.)
+docs/xips/xma-v1_4-review-pack/tests/smoke.mjs:172:const m4 = mint(w1, { parents: [m2.id] });
+docs/xips/xma-v1_4-review-pack/tests/smoke.mjs:178:const m5 = mint(w1, { parents: [m2.id] });
+docs/xips/xma-v1_4-review-pack/tests/smoke.mjs:192:const m6 = mint(w1, { parents: [m5.id] });
+docs/mainnet-v3.2.2-handover.md:43:- Parents and dependencies remain separate relationship concepts.
+docs/xtrata-v3-migration-reference.md:16:- become eligible to participate in v3 parent-child relationships
+docs/xtrata-v3-migration-reference.md:89:- parent-child relationships
+docs/xtrata-v3-migration-reference.md:92:separate parent registry compatible with the proposed v3 model.
+docs/xtrata-v3-migration-reference.md:96:- do not invent parent relationships during migration
+docs/xtrata-v3-migration-reference.md:97:- after migration, the migrated inscription may be used as a v3 parent for new
+docs/xtrata-v3-migration-reference.md:98:  children created in v3
+docs/xtrata-v3-migration-reference.md:100:That means migrated legacy items become parent-eligible in v3, but they do not
+docs/xtrata-v3-migration-reference.md:101:retroactively gain child edges unless new v3 children are created against them.
+docs/xtrata-v3-migration-reference.md:171:- test that migrated items can be used as parents in v3
+functions/lib/__tests__/collection-staging-flow.test.ts:87:      if (query.startsWith('INSERT INTO assets')) {
+functions/lib/__tests__/collection-staging-flow.test.ts:114:      if (query.startsWith('DELETE FROM assets WHERE collection_id = ? AND asset_id = ?')) {
+functions/lib/__tests__/collection-staging-flow.test.ts:124:      if (query.includes('SELECT state, metadata FROM collections WHERE id = ? LIMIT 1')) {
+functions/lib/__tests__/collection-staging-flow.test.ts:134:      if (query.includes('SELECT COALESCE(SUM(total_bytes), 0) as total FROM assets')) {
+functions/lib/__tests__/collection-staging-flow.test.ts:141:      if (query.includes('SELECT * FROM assets WHERE collection_id = ? AND asset_id = ?')) {
+functions/lib/__tests__/collection-staging-flow.test.ts:150:      if (query.includes('SELECT * FROM assets WHERE asset_id = ?')) {
+functions/lib/__tests__/collection-staging-flow.test.ts:155:      if (query.includes('SELECT COUNT(*) as total FROM reservations WHERE collection_id = ? AND asset_id = ?')) {
+functions/lib/__tests__/collection-staging-flow.test.ts:164:      if (query.includes('SELECT COUNT(*) as total FROM assets WHERE storage_key = ?')) {
+functions/lib/__tests__/collection-staging-flow.test.ts:171:      if (query.includes('SELECT * FROM assets WHERE collection_id = ?')) {
+functions/lib/__tests__/collection-staging-flow.test.ts:292:        { method: 'DELETE' }
+functions/lib/__tests__/collection-staging-flow.test.ts:365:        { method: 'DELETE' }
+functions/lib/__tests__/collection-staging-flow.test.ts:456:        { method: 'DELETE' }
+docs/xips/XIP-001-Manifest-Standard.md:36:parents, dependencies, migration lineage, fee recipient — see XIP-002). Where the
+docs/xips/XIP-001-Manifest-Standard.md:58:| `supersedes` | string | MAY | Canonical reference (XIP-002) of the manifest this one replaces. Advisory mirror of the on-chain parent relation (§6). |
+docs/xips/XIP-001-Manifest-Standard.md:107:- **Versioning is on-chain** — a new version is a new inscription whose `parents`
+docs/xips/XIP-001-Manifest-Standard.md:476:Ties **within** a tier are broken by the latest tip of the on-chain parent chain
+docs/xips/XIP-001-Manifest-Standard.md:489:  new inscription whose `parents` include the prior version's id. The advisory
+docs/xips/XIP-001-Manifest-Standard.md:490:  `supersedes` field **MAY** mirror this but the parent edge is authoritative.
+docs/xips/XIP-001-Manifest-Standard.md:498:    build DAG over cands via on-chain `parents`
+docs/xips/XIP-001-Manifest-Standard.md:499:    tips = cands with no child in the set
+docs/xips/XIP-001-Manifest-Standard.md:504:- **Retraction:** a parent edge reads as *continuity*, so it cannot express "this
+docs/xips/XIP-001-Manifest-Standard.md:506:  `withdrawn: true` (and the prior as parent). Consumers **MUST** honour
+docs/xips/XIP-001-Manifest-Standard.md:528:## 8. Profiles & relationship to other XIPs
+docs/documentation-index.md:102:| [`docs/inscription-relationship-index.md`](inscription-relationship-index.md) | How the D1 relationship index stays current automatically, the relations endpoints, and the auth-guarded parent-edge backfill maintenance procedure. |
+docs/documentation-index.md:120:| [`docs/standards/xtrata-collection-manifest-standard.md`](standards/xtrata-collection-manifest-standard.md) | Draft standard for Xtrata Collection Manifests, including schema, tiers, sequential collection mapping, resolver relationships, use cases, validation rules, and security guidance. |
+functions/lib/collection-deploy.ts:263:    'SELECT * FROM collections WHERE id = ?',
+src/lib/viewer/relationship-sync.ts:7:} from './relationship-index';
+src/lib/viewer/relationship-sync.ts:30:  parentId?: bigint;
+src/lib/viewer/relationship-sync.ts:50:    params.parentId !== undefined ? params.parentId + 1n : null;
+src/lib/viewer/relationship-sync.ts:105:      childId: tokenId,
+src/lib/viewer/relationship-sync.ts:106:      parentIds: dependencies
+src/lib/viewer/relationship-sync.ts:109:      params.parentId !== undefined &&
+src/lib/viewer/relationship-sync.ts:110:      dependencies.some((dependencyId) => dependencyId === params.parentId)
+functions/migrations/004_inscription_index_tuning.sql:3:-- 1) Drop idx_inscription_index_contract_id: it is an exact duplicate of the
+functions/migrations/004_inscription_index_tuning.sql:8:--      SELECT token_id FROM inscription_index
+functions/migrations/004_inscription_index_tuning.sql:13:DROP INDEX IF EXISTS idx_inscription_index_contract_id;
+functions/migrations/004_inscription_index_tuning.sql:15:CREATE INDEX IF NOT EXISTS idx_inscription_index_refresh
+functions/migrations/004_inscription_index_tuning.sql:16:  ON inscription_index(contract, updated_at);
+src/lib/viewer/content.ts:1340:  // Ordered legacy lineage to try when the primary (and single fallback) miss
+src/lib/viewer/content.ts:1394:  // Try the primary, then each legacy core in the lineage, until one holds the
+src/lib/viewer/content.ts:1397:  const lineage = (
+src/lib/viewer/content.ts:1402:  const candidates: XtrataClient[] = [params.client, ...lineage];
+src/lib/viewer/relationship-index.ts:5:const CHILD_STORE_NAME = 'child-dependencies';
+src/lib/viewer/relationship-index.ts:6:const PARENT_STORE_NAME = 'parent-children';
+src/lib/viewer/relationship-index.ts:12:  childId: string;
+src/lib/viewer/relationship-index.ts:13:  parentIds: string[];
+src/lib/viewer/relationship-index.ts:20:  parentId: string;
+src/lib/viewer/relationship-index.ts:21:  childIds: string[];
+src/lib/viewer/relationship-index.ts:96:      logWarn('viewer-relationships', 'Relationship index DB open failed', {
+src/lib/viewer/relationship-index.ts:161:export const buildRelationshipChildKey = (contractId: string, childId: bigint) =>
+src/lib/viewer/relationship-index.ts:162:  `${contractId}:${childId.toString()}`;
+src/lib/viewer/relationship-index.ts:166:  parentId: bigint
+src/lib/viewer/relationship-index.ts:167:) => `${contractId}:${parentId.toString()}`;
+src/lib/viewer/relationship-index.ts:171:  childId: bigint;
+src/lib/viewer/relationship-index.ts:177:  const key = buildRelationshipChildKey(params.contractId, params.childId);
+src/lib/viewer/relationship-index.ts:183:  return parseIdStrings(record?.parentIds);
+src/lib/viewer/relationship-index.ts:188:  parentId: bigint;
+src/lib/viewer/relationship-index.ts:194:  const key = buildRelationshipParentKey(params.contractId, params.parentId);
+src/lib/viewer/relationship-index.ts:200:  return parseIdStrings(record?.childIds);
+src/lib/viewer/relationship-index.ts:206:  parentId: string;
+src/lib/viewer/relationship-index.ts:207:  childId: string;
+src/lib/viewer/relationship-index.ts:209:  const parentIdBigInt = BigInt(params.parentId);
+src/lib/viewer/relationship-index.ts:210:  const key = buildRelationshipParentKey(params.contractId, parentIdBigInt);
+src/lib/viewer/relationship-index.ts:216:  const childIds = normalizeIdStrings([
+src/lib/viewer/relationship-index.ts:217:    ...(existing?.childIds ?? []),
+src/lib/viewer/relationship-index.ts:218:    params.childId
+src/lib/viewer/relationship-index.ts:223:    parentId: params.parentId,
+src/lib/viewer/relationship-index.ts:224:    childIds,
+src/lib/viewer/relationship-index.ts:233:  parentId: string;
+src/lib/viewer/relationship-index.ts:234:  childId: string;
+src/lib/viewer/relationship-index.ts:236:  const parentIdBigInt = BigInt(params.parentId);
+src/lib/viewer/relationship-index.ts:237:  const key = buildRelationshipParentKey(params.contractId, parentIdBigInt);
+src/lib/viewer/relationship-index.ts:246:  const childIds = normalizeIdStrings(
+src/lib/viewer/relationship-index.ts:247:    existing.childIds.filter((id) => id !== params.childId)
+src/lib/viewer/relationship-index.ts:249:  if (childIds.length === 0) {
+src/lib/viewer/relationship-index.ts:255:    childIds,
+src/lib/viewer/relationship-index.ts:262:  childId: bigint;
+src/lib/viewer/relationship-index.ts:263:  parentIds: bigint[];
+src/lib/viewer/relationship-index.ts:269:  const childKey = buildRelationshipChildKey(params.contractId, params.childId);
+src/lib/viewer/relationship-index.ts:270:  const childId = params.childId.toString();
+src/lib/viewer/relationship-index.ts:271:  const nextParentIds = normalizeBigIntIds(params.parentIds);
+src/lib/viewer/relationship-index.ts:275:    childKey
+src/lib/viewer/relationship-index.ts:277:  const previousParentIds = normalizeIdStrings(existing?.parentIds ?? []);
+src/lib/viewer/relationship-index.ts:285:        parentId: previousParent,
+src/lib/viewer/relationship-index.ts:286:        childId
+src/lib/viewer/relationship-index.ts:295:      parentId: nextParent,
+src/lib/viewer/relationship-index.ts:296:      childId
+src/lib/viewer/relationship-index.ts:300:  const childRecord: ChildDependenciesRecord = {
+src/lib/viewer/relationship-index.ts:301:    key: childKey,
+src/lib/viewer/relationship-index.ts:303:    childId,
+src/lib/viewer/relationship-index.ts:304:    parentIds: nextParentIds,
+src/lib/viewer/relationship-index.ts:307:  await writeRecord(db, CHILD_STORE_NAME, childRecord);
+docs/xtrata-v2.1.0/one-pager.md:95:- Artists get paid directly and transparently
+functions/migrations/002_create_inscription_index.sql:5:CREATE TABLE IF NOT EXISTS inscription_index (
+functions/migrations/002_create_inscription_index.sql:20:CREATE INDEX IF NOT EXISTS idx_inscription_index_contract_id
+functions/migrations/002_create_inscription_index.sql:21:  ON inscription_index(contract, token_id);
+functions/migrations/002_create_inscription_index.sql:24:CREATE TABLE IF NOT EXISTS inscription_index_state (
+src/lib/viewer/index-summaries.ts:11:// Client for the D1-backed inscription index (functions/index/[contract].ts).
+src/lib/viewer/index-summaries.ts:13:// chain reads; resolves primary-first across the migration lineage and falls
+src/lib/viewer/index-summaries.ts:78:// Single round-trip: the combined endpoint resolves the whole lineage server-
+src/lib/viewer/index-summaries.ts:79:// side in one D1 query and returns each id's primary-first winner already
+src/lib/viewer/index-summaries.ts:85:  lineageContractIds: string[],
+src/lib/viewer/index-summaries.ts:90:    `&lineage=${encodeURIComponent(lineageContractIds.join(','))}` +
+src/lib/viewer/index-summaries.ts:104:// Resolve the given ids from the index, primary-first across [primary, ...lineage].
+src/lib/viewer/index-summaries.ts:108:// given ids primary-first across [primary, ...lineage].
+src/lib/viewer/index-summaries.ts:112:  lineageContractIds: string[],
+src/lib/viewer/index-summaries.ts:116:  const contracts = [primaryContractId, ...lineageContractIds];
+src/lib/viewer/index-summaries.ts:142:// Resolve the given ids from the index, primary-first across [primary, ...lineage].
+src/lib/viewer/index-summaries.ts:147:  lineageContractIds: string[];
+src/lib/viewer/index-summaries.ts:157:  //    contract so the index keyspace is stable regardless of which lineage
+src/lib/viewer/index-summaries.ts:182:      params.lineageContractIds,
+src/lib/viewer/index-summaries.ts:189:      params.lineageContractIds,
+functions/migrations/005_inscription_index_sync_lock.sql:10:ALTER TABLE inscription_index_state ADD COLUMN sync_lock_until INTEGER DEFAULT 0;
+src/lib/viewer/html-preview.ts:21:body > main:only-child,
+src/lib/viewer/html-preview.ts:22:body > div:only-child,
+functions/migrations/006_inscription_parents.sql:1:-- Parent/child edge table for relationship navigation. Each row is one directed
+functions/migrations/006_inscription_parents.sql:2:-- edge child_id -> parent_id, populated from each token's get-inscription-summary
+functions/migrations/006_inscription_parents.sql:3:-- `parents` list during the index sync (no extra chain reads — the summary the
+functions/migrations/006_inscription_parents.sql:4:-- index already reads carries the parents list on v3.2.0+ cores).
+functions/migrations/006_inscription_parents.sql:6:-- There is no on-chain get-children reader, so this table IS the children index.
+functions/migrations/006_inscription_parents.sql:7:-- Because relationships form a mint-ordered DAG (a token can only name parents
+functions/migrations/006_inscription_parents.sql:10:--   - direct children:   parent_id = X
+functions/migrations/006_inscription_parents.sql:11:--   - descendants:        recurse parent_id -> child_id
+functions/migrations/006_inscription_parents.sql:12:--   - direct parents:     child_id = X
+functions/migrations/006_inscription_parents.sql:13:--   - ancestors:          recurse child_id -> parent_id
+functions/migrations/006_inscription_parents.sql:14:--   - siblings:           other children of X's parents
+functions/migrations/006_inscription_parents.sql:15:CREATE TABLE IF NOT EXISTS inscription_parents (
+functions/migrations/006_inscription_parents.sql:17:  child_id INTEGER NOT NULL,
+functions/migrations/006_inscription_parents.sql:18:  parent_id INTEGER NOT NULL,
+functions/migrations/006_inscription_parents.sql:20:  PRIMARY KEY (contract, child_id, parent_id)
+functions/migrations/006_inscription_parents.sql:23:-- Forward traversal: parents/ancestors of a child (also used to refresh a
+functions/migrations/006_inscription_parents.sql:24:-- child's edge set in one delete).
+functions/migrations/006_inscription_parents.sql:25:CREATE INDEX IF NOT EXISTS idx_inscription_parents_child
+functions/migrations/006_inscription_parents.sql:26:  ON inscription_parents(contract, child_id);
+functions/migrations/006_inscription_parents.sql:28:-- Reverse traversal: children/descendants of a parent — the core children lookup.
+functions/migrations/006_inscription_parents.sql:29:CREATE INDEX IF NOT EXISTS idx_inscription_parents_parent
+functions/migrations/006_inscription_parents.sql:30:  ON inscription_parents(contract, parent_id);
+src/lib/viewer/recursive.ts:260:      if (!window.parent || window.parent === window) {
+src/lib/viewer/recursive.ts:261:        reject(new Error('No parent bridge available'));
+src/lib/viewer/recursive.ts:270:      window.parent.postMessage(
+src/lib/viewer/queries.ts:178:  // Ordered legacy lineage (e.g. [v2, v1]). When provided, resolution is
+src/lib/viewer/queries.ts:179:  // primary-first: read the primary core, then each lineage core until a token
+src/lib/viewer/queries.ts:183:  lineageClients?: Array<XtrataClient | null> | null;
+src/lib/viewer/queries.ts:196:  const lineage = (params.lineageClients ?? []).filter(
+src/lib/viewer/queries.ts:199:  if (lineage.length > 0) {
+src/lib/viewer/queries.ts:208:    for (const candidate of lineage) {
+src/lib/viewer/queries.ts:366:  // When provided, the whole page is served from the D1 index first (primary-
+src/lib/viewer/queries.ts:367:  // first across [primary, ...lineage]); only ids the index hasn't synced (or
+src/lib/viewer/queries.ts:397:        lineageContractIds: params.indexLineageContractIds!,
+functions/migrations/003_inscription_index_token_uri.sql:3:ALTER TABLE inscription_index ADD COLUMN token_uri TEXT;
+src/lib/contract/client.ts:217:  parents: bigint[];
+src/lib/contract/client.ts:223:    functionName: 'seal-with-relationships',
+src/lib/contract/client.ts:228:      listCV(params.parents.map((parent) => uintCV(parent)))
+src/lib/contract/client.ts:243:  parents: bigint[];
+src/lib/contract/client.ts:249:    functionName: 'mint-single-tx-with-relationships',
+src/lib/contract/client.ts:257:      listCV(params.parents.map((parent) => uintCV(parent)))
+src/lib/contract/client.ts:730:        functionName: 'get-parents',
+docs/artist-guides/collection-launch-guide.md:132:   - Use the diagnostics panel to verify the Cloudflare D1 (`/collections/health`) and R2 upload flows before inviting collaborators.
+docs/artist-guides/collection-launch-guide.md:147:   - Uploads go through `/collections/:id/upload-url` (R2 PUT) and then `/collections/:id/assets` (D1 manifest). Review the TTL (`COLLECTION_ASSET_TTL_MS`) and storage cap (`MAX_COLLECTION_STORAGE_BYTES`) in the portal to avoid truncation.
+docs/artist-guides/collection-launch-guide.md:156:   - Pull the diagnostics data again if you suspect D1/R2 drift; the same health endpoint shows counts for collections/assets/reservations.
+src/lib/contract/__tests__/client.test.ts:127:  it('builds relationship seal call options', () => {
+src/lib/contract/__tests__/client.test.ts:133:      tokenUri: 'ipfs://xtrata/child',
+src/lib/contract/__tests__/client.test.ts:135:      parents: [1n, 3n]
+src/lib/contract/__tests__/client.test.ts:138:    expect(options.functionName).toBe('seal-with-relationships');
+src/lib/contract/__tests__/client.test.ts:144:  it('builds relationship single-tx call options', () => {
+src/lib/contract/__tests__/client.test.ts:153:      tokenUri: 'ipfs://xtrata/child',
+src/lib/contract/__tests__/client.test.ts:155:      parents: [1n]
+src/lib/contract/__tests__/client.test.ts:158:    expect(options.functionName).toBe('mint-single-tx-with-relationships');
+src/lib/contract/__tests__/client.test.ts:200:  it('calls relationship reader for v3 contracts', async () => {
+src/lib/contract/__tests__/client.test.ts:213:    const parents = await client.getParents(
+src/lib/contract/__tests__/client.test.ts:218:    expect(parents).toEqual([1n, 2n]);
+src/lib/contract/__tests__/client.test.ts:219:    expect(calls[0].functionName).toBe('get-parents');
+src/lib/viewer/relationships.ts:22:  parentId: bigint,
+src/lib/viewer/relationships.ts:27:    if (token.id <= parentId) {
+src/lib/viewer/relationships.ts:32:    if (deps.some((dep) => dep === parentId)) {
+src/lib/viewer/relationships.ts:43:  parentId: bigint;
+src/lib/viewer/relationships.ts:57:  const startId = params.parentId + 1n;
+src/lib/viewer/relationships.ts:85:      if (deps.some((dep) => dep === params.parentId)) {
+src/lib/viewer/relationships.ts:107:  parentIds: bigint[];
+src/lib/viewer/relationships.ts:110:  loadIndexedChildren: (parentId: bigint) => Promise<bigint[]>;
+src/lib/viewer/relationships.ts:117:  for (const parentId of params.parentIds) {
+src/lib/viewer/relationships.ts:121:    const indexedChildren = await params.loadIndexedChildren(parentId);
+src/lib/viewer/relationships.ts:125:      params.lastTokenId !== null && params.lastTokenId > parentId;
+src/lib/viewer/relationships.ts:132:        parentId,
+src/lib/viewer/relationships.ts:145:    combinedChildren.forEach((childId) => {
+src/lib/viewer/relationships.ts:146:      if (childId.toString() !== selectedKey) {
+src/lib/viewer/relationships.ts:147:        merged.add(childId.toString());
+src/lib/viewer/relations-api.ts:1:// Client for the server-side relationship lineage endpoint
+src/lib/viewer/relations-api.ts:2:// (functions/index/relations/[contract].ts). Returns the full ancestor and
+src/lib/viewer/relations-api.ts:3:// descendant lineage (depth-tagged) plus half-siblings for one inscription,
+src/lib/viewer/relations-api.ts:4:// resolved from the D1 edge index in a single round-trip. Falls back to null on
+src/lib/viewer/relations-api.ts:10:  parents: bigint[];
+src/lib/viewer/relations-api.ts:11:  children: bigint[];
+src/lib/viewer/relations-api.ts:58:    `${origin}/index/relations/${params.contractId}?id=${params.id.toString()}`;
+src/lib/viewer/relations-api.ts:65:      parents: toIdList(body.parents),
+src/lib/viewer/relations-api.ts:66:      children: toIdList(body.children),
+docs/artist-guides/collection-mint-setup-flow-blueprint.md:208:4. Phase 4: copy polish and child-level usability pass
+src/lib/viewer/parent-child-index.ts:8:} from './relationship-index';
+src/lib/viewer/parent-child-index.ts:10:// The v3.4.0 core exposes two distinct relationship edges: `get-parents`
+src/lib/viewer/parent-child-index.ts:11:// (owned-parent links surfaced by the "Add Parents" panel) and
+src/lib/viewer/parent-child-index.ts:13:// `get-children` reader, so child navigation is derived by walking every
+src/lib/viewer/parent-child-index.ts:14:// minted inscription's parent list and persisting the reverse edge.
+src/lib/viewer/parent-child-index.ts:16:// We reuse the generic adjacency storage in relationship-index.ts but under a
+src/lib/viewer/parent-child-index.ts:17:// dedicated namespace so the parents reverse-index never collides with the
+src/lib/viewer/parent-child-index.ts:20:export const PARENT_CHILD_NAMESPACE_SUFFIX = '#parents';
+src/lib/viewer/parent-child-index.ts:22:export const parentChildNamespace = (contractId: string) =>
+src/lib/viewer/parent-child-index.ts:45:// Read the children of `parentId` from the persisted reverse index. Returns
+src/lib/viewer/parent-child-index.ts:47:// children that reference this parent).
+src/lib/viewer/parent-child-index.ts:50:  parentId: bigint;
+src/lib/viewer/parent-child-index.ts:53:    contractId: parentChildNamespace(params.contractId),
+src/lib/viewer/parent-child-index.ts:54:    parentId: params.parentId
+src/lib/viewer/parent-child-index.ts:59:  loadRelationshipSyncCursor(parentChildNamespace(contractId));
+src/lib/viewer/parent-child-index.ts:61:// Persist (childId -> parentIds) and its reverse links for a single token.
+src/lib/viewer/parent-child-index.ts:63:// inscription's parents are fetched for display.
+src/lib/viewer/parent-child-index.ts:66:  childId: bigint;
+src/lib/viewer/parent-child-index.ts:67:  parentIds: bigint[];
+src/lib/viewer/parent-child-index.ts:70:    contractId: parentChildNamespace(params.contractId),
+src/lib/viewer/parent-child-index.ts:71:    childId: params.childId,
+src/lib/viewer/parent-child-index.ts:72:    parentIds: params.parentIds
+src/lib/viewer/parent-child-index.ts:75:// Walk the contract's minted-id list, reading each token's on-chain parents
+src/lib/viewer/parent-child-index.ts:76:// and writing the reverse (parent -> child) edge to IndexedDB. Resumable via
+src/lib/viewer/parent-child-index.ts:78:// a live count. When `parentId` is provided, `found` counts children of that
+src/lib/viewer/parent-child-index.ts:79:// specific parent (so the caller can refresh a single token's view), but the
+src/lib/viewer/parent-child-index.ts:85:  parentId?: bigint;
+src/lib/viewer/parent-child-index.ts:98:  const namespace = parentChildNamespace(params.contractId);
+src/lib/viewer/parent-child-index.ts:105:  // A child can only reference a parent minted before it, so ids at or below
+src/lib/viewer/parent-child-index.ts:106:  // the focused parent can never be its children — skip them when scanning for
+src/lib/viewer/parent-child-index.ts:107:  // a specific parent's children.
+src/lib/viewer/parent-child-index.ts:109:    params.parentId !== undefined ? params.parentId + 1n : null;
+src/lib/viewer/parent-child-index.ts:149:    const parents = await params.client.getParents(tokenId, params.senderAddress);
+src/lib/viewer/parent-child-index.ts:152:      childId: tokenId,
+src/lib/viewer/parent-child-index.ts:153:      parentIds: parents
+src/lib/viewer/parent-child-index.ts:156:      params.parentId !== undefined &&
+src/lib/viewer/parent-child-index.ts:157:      parents.some((id) => id === params.parentId)
+src/lib/contract/__tests__/capabilities.test.ts:49:  it('infers v3.4.0 relationship capabilities from contract name', () => {
+src/lib/mint/attempt-cache.ts:13:  parentIds?: string[];
+docs/contract-todos/xtrata-v2.1.1.md:12:- Inherits the same dependency-versus-parent problem as `xtrata-v2.1.0`.
+docs/contract-todos/xtrata-v2.1.1.md:15:- Does not provide a richer migration lineage model for clients.
+docs/contract-todos/xtrata-v2.1.1.md:25:- Add separate parent/child storage and read-only access instead of overloading dependencies.
+docs/contract-todos/xtrata-v2.1.1.md:29:## Parent/child target model
+docs/contract-todos/xtrata-v2.1.1.md:31:- Introduce parent relationships as a separate ownership-gated graph.
+docs/contract-todos/xtrata-v2.1.1.md:32:- Require parent ownership at child creation time, not for ordinary dependencies.
+docs/contract-todos/xtrata-vault.md:19:- Keep vault state concerns separate from dependency or parent/child graph concerns.
+src/lib/market/selection.ts:6:export const MARKET_SELECTION_EVENT = 'xtrata-market-selection';
+src/lib/market/selection.ts:51:    window.dispatchEvent(new Event(MARKET_SELECTION_EVENT));
+docs/contract-todos/xtrata-market-usdc-v1.0.md:13:- No lineage-aware listing migration exists.
+docs/contract-todos/xtrata-v1.1.0.md:11:- Same broad dependency-versus-parent limitations as the rest of the legacy core line.
+src/lib/viewer/__tests__/relationship-index.test.ts:10:} from '../relationship-index';
+src/lib/viewer/__tests__/relationship-index.test.ts:12:describe('relationship index', () => {
+src/lib/viewer/__tests__/relationship-index.test.ts:13:  it('builds stable relationship keys', () => {
+src/lib/viewer/__tests__/relationship-index.test.ts:23:    const children = await loadRelationshipChildren({
+src/lib/viewer/__tests__/relationship-index.test.ts:25:      parentId: 1n
+src/lib/viewer/__tests__/relationship-index.test.ts:27:    const parents = await loadRelationshipParents({
+src/lib/viewer/__tests__/relationship-index.test.ts:29:      childId: 2n
+src/lib/viewer/__tests__/relationship-index.test.ts:33:    expect(children).toEqual([]);
+src/lib/viewer/__tests__/relationship-index.test.ts:34:    expect(parents).toEqual([]);
+src/lib/viewer/__tests__/relationship-index.test.ts:42:        childId: 9n,
+src/lib/viewer/__tests__/relationship-index.test.ts:43:        parentIds: [1n, 2n]
+docs/contract-todos/xtrata-arcade-scores-v1.3.md:12:- Not directly relevant to the core dependency-versus-parent problem.
+docs/contract-todos/xtrata-arcade-scores-v1.3.md:16:- Keep this contract family independent from core parent/child work unless an arcade feature explicitly needs core asset ownership checks.
+docs/contract-todos/xtrata-arcade-scores-v1.3.md:17:- If arcade experiences reference Xtrata assets, document that relationship in the product layer, not by overloading the score contract.
+src/lib/viewer/__tests__/relationships.test.ts:9:} from "../relationships";
+src/lib/viewer/__tests__/relationships.test.ts:18:describe("viewer relationships", () => {
+src/lib/viewer/__tests__/relationships.test.ts:21:    const parents = await fetchParents({
+src/lib/viewer/__tests__/relationships.test.ts:26:    expect(parents).toEqual([1n, 2n, 3n]);
+src/lib/viewer/__tests__/relationships.test.ts:29:  it("finds children from known token summaries", () => {
+src/lib/viewer/__tests__/relationships.test.ts:40:    const children = findChildrenFromKnownTokens(tokens, 1n, map);
+src/lib/viewer/__tests__/relationships.test.ts:41:    expect(children).toEqual([2n, 3n]);
+src/lib/viewer/__tests__/relationships.test.ts:46:    const children = await scanChildren({
+src/lib/viewer/__tests__/relationships.test.ts:48:      parentId: 1n,
+src/lib/viewer/__tests__/relationships.test.ts:53:    expect(children).toEqual([2n, 4n]);
+src/lib/viewer/__tests__/relationships.test.ts:59:    const children = await scanChildren({
+src/lib/viewer/__tests__/relationships.test.ts:61:      parentId: 0n,
+src/lib/viewer/__tests__/relationships.test.ts:72:    expect(children).toEqual([1n, 2n]);
+src/lib/viewer/__tests__/relationships.test.ts:88:      parentId: 2n,
+src/lib/viewer/__tests__/relationships.test.ts:96:  it("finds siblings from indexed parent children when coverage exists", async () => {
+src/lib/viewer/__tests__/relationships.test.ts:101:      parentIds: [3n],
+src/lib/viewer/__tests__/relationships.test.ts:109:  it("falls back to forward scan when parent index is missing selected child", async () => {
+src/lib/viewer/__tests__/relationships.test.ts:119:      parentIds: [3n],
+docs/contract-todos/xtrata-preinscribed-collection-sale-v1.0.md:15:- Has no special awareness of future parent/child provenance semantics.
+docs/contract-todos/xtrata-preinscribed-collection-sale-v1.0.md:21:- Document clearly that parent/child and dependency rules belong to the core protocol, not this sale layer.
+docs/contract-todos/xtrata-v2.1.0.md:11:- Keeps recursive references and intended parent-style references in the same field.
+docs/contract-todos/xtrata-v2.1.0.md:17:- This means recursion works, but parent/child provenance is not modeled separately.
+docs/contract-todos/xtrata-v2.1.0.md:20:- Dependency and parent/child provenance are conflated.
+docs/contract-todos/xtrata-v2.1.0.md:23:  - parent only
+docs/contract-todos/xtrata-v2.1.0.md:24:  - both dependency and parent
+docs/contract-todos/xtrata-v2.1.0.md:27:- Migration records do not expose a general source-contract lineage map for clients.
+docs/contract-todos/xtrata-v2.1.0.md:31:- Add a separate parent model:
+docs/contract-todos/xtrata-v2.1.0.md:32:  - `InscriptionParents` or similar child-to-parent map
+docs/contract-todos/xtrata-v2.1.0.md:33:  - `get-parents(id)` read-only
+docs/contract-todos/xtrata-v2.1.0.md:34:  - deterministic child lookup strategy, either indexed or contract-assisted
+docs/contract-todos/xtrata-v2.1.0.md:35:- Add a parent-aware seal path:
+docs/contract-todos/xtrata-v2.1.0.md:36:  - verify `tx-sender` owns each declared parent at seal time
+docs/contract-todos/xtrata-v2.1.0.md:37:  - decide whether multiple parents are allowed
+docs/contract-todos/xtrata-v2.1.0.md:38:  - decide whether parent order should be canonicalized
+docs/contract-todos/xtrata-v2.1.0.md:40:- Add explicit lineage metadata for migrated items:
+docs/contract-todos/xtrata-v2.1.0.md:45:- If a new v3 core is created, do not restart ids at `u0` if legacy items are expected to migrate and become normal v3 parents.
+docs/contract-todos/xtrata-v2.1.0.md:47:- Add migration from v1 and v2 into the next core line if old items need to participate in regular parent/child relationships there.
+docs/contract-todos/xtrata-v2.1.0.md:49:## Parent/child target model
+docs/contract-todos/xtrata-v2.1.0.md:51:- `parent` = ownership-gated provenance relationship.
+src/lib/viewer/__tests__/relations-api.test.ts:2:import { fetchLineage } from '../relations-api';
+src/lib/viewer/__tests__/relations-api.test.ts:18:          parents: [1, '2'],
+src/lib/viewer/__tests__/relations-api.test.ts:19:          children: [10],
+src/lib/viewer/__tests__/relations-api.test.ts:31:    expect(result!.parents).toEqual([1n, 2n]);
+src/lib/viewer/__tests__/relations-api.test.ts:32:    expect(result!.children).toEqual([10n]);
+docs/contract-todos/xtrata-v1.1.1.md:13:- Dependency and parent/child provenance are conflated.
+docs/contract-todos/xtrata-v1.1.1.md:14:- No ownership-gated parent concept exists.
+docs/contract-todos/xtrata-v1.1.1.md:20:- Do not add new parent/child semantics here unless there is a hard requirement to support them directly on v1.
+docs/contract-todos/xtrata-v1.1.1.md:24:## Parent/child note
+docs/contract-todos/xtrata-v1.1.1.md:25:- If legacy v1 items must become normal parents in a future core line, migrate them into that new line rather than extending v1 in place.
+src/lib/viewer/__tests__/html-preview.test.ts:15:    expect(result).toContain('body > main:only-child');
+src/lib/viewer/__tests__/parent-child-index.test.ts:6:  parentChildNamespace,
+src/lib/viewer/__tests__/parent-child-index.test.ts:8:} from '../parent-child-index';
+src/lib/viewer/__tests__/parent-child-index.test.ts:10:describe('parent-child index', () => {
+src/lib/viewer/__tests__/parent-child-index.test.ts:11:  it('namespaces the contract id for the parents edge', () => {
+src/lib/viewer/__tests__/parent-child-index.test.ts:12:    expect(parentChildNamespace('SP123.contract')).toBe(
+src/lib/viewer/__tests__/parent-child-index.test.ts:15:    // The namespace must differ from the bare contract id so the parents
+src/lib/viewer/__tests__/parent-child-index.test.ts:17:    expect(parentChildNamespace('SP123.contract')).not.toBe('SP123.contract');
+src/lib/viewer/__tests__/parent-child-index.test.ts:21:    const children = await loadIndexedChildren({
+src/lib/viewer/__tests__/parent-child-index.test.ts:23:      parentId: 1n
+src/lib/viewer/__tests__/parent-child-index.test.ts:26:    expect(children).toEqual([]);
+src/lib/viewer/__tests__/parent-child-index.test.ts:34:        childId: 9n,
+src/lib/viewer/__tests__/parent-child-index.test.ts:35:        parentIds: [1n, 2n]
+src/lib/viewer/__tests__/relationship-sync.test.ts:4:vi.mock('../relationship-index', () => ({
+src/lib/viewer/__tests__/relationship-sync.test.ts:14:} from '../relationship-index';
+src/lib/viewer/__tests__/relationship-sync.test.ts:15:import { syncRelationshipIndex } from '../relationship-sync';
+src/lib/viewer/__tests__/relationship-sync.test.ts:55:describe('relationship sync', () => {
+src/lib/viewer/__tests__/relationship-sync.test.ts:98:      parentId: 5n,
+src/lib/viewer/__tests__/relationship-sync.test.ts:115:      childId: 10n,
+src/lib/viewer/__tests__/relationship-sync.test.ts:116:      parentIds: [5n]
+src/lib/viewer/__tests__/relationship-sync.test.ts:120:      childId: 11n,
+src/lib/viewer/__tests__/relationship-sync.test.ts:121:      parentIds: [6n, 5n]
+src/lib/viewer/__tests__/relationship-sync.test.ts:166:  it('skips dependency reads at or below the parent id floor', async () => {
+src/lib/viewer/__tests__/relationship-sync.test.ts:184:      parentId: 8n
+src/lib/viewer/__tests__/relationship-sync.test.ts:195:      childId: 9n,
+src/lib/viewer/__tests__/relationship-sync.test.ts:196:      parentIds: [8n]
+docs/claude-v3.2.1-final-review-prompt.md:83:- Parents and dependencies are separate relationship types.
+docs/claude-v3.2.1-final-review-prompt.md:84:- Reverse parent-child indexes are resolver/indexer/manifest responsibility, not
+docs/contract-todos/README.md:6:- make parent/child upgrade work explicit in the core line before code changes start
+docs/contract-todos/README.md:45:Parent/child focus:
+docs/contract-todos/README.md:46:- The main parent/child upgrade problem lives in the core `xtrata` line.
+docs/contract-todos/README.md:47:- Today the core line stores one dependency list, but that is not the same thing as ownership-gated parent/child provenance.
+docs/contract-todos/README.md:50:  - `parent` = provenance link created only when the inscribing wallet controls the parent at seal time
+docs/contract-todos/xtrata-small-mint-v1.0.md:14:- It does not help distinguish dependency-only references from parent/child provenance.
+docs/contract-todos/xtrata-small-mint-v1.0.md:15:- It does not provide a dedicated helper path for future parent-aware seal operations.
+docs/contract-todos/xtrata-small-mint-v1.0.md:19:- If the next core adds a parent-aware seal entrypoint, add a matching helper wrapper here.
+docs/contract-todos/xtrata-small-mint-v1.0.md:22:  - parent-aware helper path
+docs/testnet-v3.2.1-rehearsal.md:170:- relationship split: dependency on another wallet succeeds, parent link to another wallet fails, parent link to owned token succeeds
+docs/contract-todos/xtrata-commerce.md:19:- Keep parent/child semantics out of this layer unless entitlement products explicitly need them.
+docs/contract-todos/xtrata-collection-mint-v1.4.md:15:- Default dependencies are not separate from future parent/child provenance because the core line does not separate them yet.
+docs/contract-todos/xtrata-collection-mint-v1.4.md:20:- Do not overload collection-level default dependencies as default parents.
+docs/contract-todos/xtrata-collection-mint-v1.4.md:21:- If parent/child becomes a separate protocol feature, keep collection defaults dependency-only unless there is an explicit product need for collection-level parent rules.
