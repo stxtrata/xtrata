@@ -13,6 +13,9 @@ describe('html grid preview injection', () => {
     expect(result).toContain('body > canvas:first-of-type');
     expect(result).toContain('min-width: 0 !important');
     expect(result).toContain('min-height: 0 !important');
+    expect(result).toContain('data-xtrata-grid-fit-script');
+    expect(result).toContain('applyXtrataGridPreviewScale');
+    expect(result).toContain('viewportWidth / contentWidth');
   });
 
   it('avoids duplicate injection', () => {
