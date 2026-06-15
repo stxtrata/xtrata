@@ -168,6 +168,32 @@ chain-fall-back as before.
 reads and risk the Worker subrequest budget); the runtime content handler
 already populates R2 lazily on first view, which covers the same ground.
 
+## Task #8 — Parent relationship edges + auth-guarded backfill (done)
+
+**Files:** `functions/migrations/006_inscription_parents.sql` (new),
+`functions/index/[contract].ts`, `functions/index/page.ts`
+
+- New `inscription_parents` edge table. `readSummary()` extracts the `parents`
+  list from `get-inscription-summary`; `upsertToken()` calls
+  `syncTokenParents()`, which replaces a child's edge rows on every sync. New
+  mints with parents are indexed automatically — no manual step.
+- `GET /index/relations/<contract>` derives parents/ancestors,
+  children/descendants, and siblings from the edge table.
+- `POST /index/<contract>?parents=backfill&from=&limit=` repopulates edges for
+  rows that predate the table. Rereads use Hiro-only bases (incl. the capability
+  probe) when keys are configured, to avoid `429` from the public fallback.
+- The backfill is gated by an opt-in `INDEX_ADMIN_TOKEN` env var (requires a
+  matching `x-admin-token` header when set; open when unset). Scoped to the
+  backfill branch only, so the automatic self-healing sync/refresh is never
+  gated.
+- `/index/page` no longer caches empty responses (`no-store`), so a targeted
+  refresh that populates D1 is visible immediately instead of being shadowed by
+  a stale empty edge-cache entry.
+
+**Full runbook:** [`../inscription-relationship-index.md`](../inscription-relationship-index.md)
+(automated flow, relations endpoints, migrations, the backfill procedure with
+auth, verification, and troubleshooting).
+
 ## Next
 
 - (Optional) Pre-warm R2 with SVG bytes during sync if cold-first-view latency

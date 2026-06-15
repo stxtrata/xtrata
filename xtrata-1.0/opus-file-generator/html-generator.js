@@ -382,6 +382,59 @@ function setLivePreviewStatus(message, isError = false) {
   status.classList.toggle('error', Boolean(isError));
 }
 
+// Soft ceiling for a comfortable single Ordinal inscription. Used only to tint
+// the size readout amber as a heads-up; it never blocks generation.
+const INSCRIPTION_SIZE_WARN_BYTES = 4 * 1024 * 1024;
+
+function formatSizeLabel(bytes) {
+  if (typeof window.formatBytes === 'function') return window.formatBytes(bytes);
+  return `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+// Measures the byte size of the actual generated HTML (UTF-8), so the figure
+// reflects exactly what gets inscribed/downloaded.
+function updateInscriptionSizeReadout(htmlContent, config) {
+  const sizeEl = getElement('estInscriptionSize');
+  const hintEl = getElement('estInscriptionBreakdown');
+  const panel = getElement('inscriptionSizePanel');
+  if (!sizeEl) return;
+
+  if (!htmlContent) {
+    sizeEl.innerHTML = '&mdash;';
+    if (panel) panel.classList.remove('is-warn');
+    if (hintEl) {
+      hintEl.textContent =
+        'Convert audio or add a recursive source to estimate the final HTML size.';
+    }
+    return;
+  }
+
+  let bytes;
+  try {
+    bytes = new Blob([htmlContent]).size;
+  } catch (e) {
+    bytes = (typeof TextEncoder === 'function'
+      ? new TextEncoder().encode(htmlContent)
+      : htmlContent).length;
+  }
+
+  sizeEl.textContent = formatSizeLabel(bytes);
+
+  const warn = bytes > INSCRIPTION_SIZE_WARN_BYTES;
+  if (panel) panel.classList.toggle('is-warn', warn);
+  if (hintEl) {
+    const audioNote = config && config.audioSourceMode === 'recursive'
+      ? 'audio referenced recursively'
+      : 'audio embedded';
+    const visualNote = config && config.visualSourceMode === 'recursive'
+      ? 'visual referenced recursively'
+      : 'visual embedded';
+    hintEl.textContent = warn
+      ? `Full HTML file size (${audioNote}, ${visualNote}). Large for a single inscription — consider a lower bitrate or recursive sources.`
+      : `Full HTML file size (${audioNote}, ${visualNote}).`;
+  }
+}
+
 function updateLivePreview() {
   const frame = getElement('htmlPlayerLivePreview');
   if (!frame) return;
@@ -393,12 +446,14 @@ function updateLivePreview() {
         : 'Convert audio first to preview the standalone player.'
     );
     setLivePreviewStatus('Waiting for an audio source.');
+    updateInscriptionSizeReadout(null);
     return;
   }
 
   if (typeof window.HTML_Template !== 'function') {
     frame.srcdoc = buildPreviewPlaceholder('The player template is still loading.');
     setLivePreviewStatus('Template loading.');
+    updateInscriptionSizeReadout(null);
     return;
   }
 
@@ -412,10 +467,12 @@ function updateLivePreview() {
         config.visualSourceMode === 'recursive' ? 'recursive visual' : 'embedded visual'
       } preview.`
     );
+    updateInscriptionSizeReadout(htmlContent, config);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     frame.srcdoc = buildPreviewPlaceholder(message);
     setLivePreviewStatus(`Preview failed: ${message}`, true);
+    updateInscriptionSizeReadout(null);
   }
 }
 

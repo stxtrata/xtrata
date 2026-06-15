@@ -7,6 +7,7 @@ import {
   type RuntimeEnv
 } from '../runtime/lib';
 import { queryAll, run } from '../lib/db';
+import { getHiroApiKeys } from '../lib/hiro-keys';
 
 // Cached per-token summary index. Reading a page is one D1 query instead of N
 // per-token chain reads; the index is populated incrementally from the core's
@@ -339,6 +340,57 @@ const refreshTokens = async (
   return { refreshed, ids };
 };
 
+// Backfill parent-child edges for rows already present in inscription_index.
+// This is useful after deploying the edge-table migration: summary rows may
+// already exist and the main sync can be complete, so there is no natural
+// backlog pass left to populate inscription_parents.
+const backfillParentEdges = async (
+  env: RuntimeEnv,
+  apiBases: string[],
+  contract: RuntimeContractRef,
+  contractId: string,
+  params: { fromTokenId: number; limit: number }
+) => {
+  const hiroKeyCount = getHiroApiKeys(env).length;
+  const hiroApiBases = apiBases.filter((base) => base.includes('hiro.so'));
+  const readApiBases = hiroKeyCount > 0 && hiroApiBases.length > 0 ? hiroApiBases : apiBases;
+  // Probe with the same (Hiro-only, when keyed) bases used for the rereads, so a
+  // bulk backfill doesn't hit the unauthenticated fallback and get rate-limited.
+  const caps = await probeCaps(env, readApiBases, contract);
+  const rows = await queryAll(
+    env,
+    `SELECT token_id FROM inscription_index
+       WHERE contract = ? AND token_id >= ?
+       ORDER BY token_id ASC LIMIT ?`,
+    [contractId, params.fromTokenId, params.limit]
+  );
+  const tokenIds = (rows.results ?? [])
+    .map((row: any) => Number(row.token_id))
+    .filter((id) => Number.isInteger(id) && id > 0);
+  let refreshed = 0;
+  for (const id of tokenIds) {
+    const summary = await readToken(env, readApiBases, contract, caps, id);
+    if (summary) {
+      await upsertToken(env, contractId, id, summary);
+      refreshed += 1;
+    }
+  }
+  const lastTokenId = tokenIds[tokenIds.length - 1] ?? null;
+  return {
+    refreshed,
+    scanned: tokenIds.length,
+    fromTokenId: params.fromTokenId,
+    lastTokenId,
+    nextFromTokenId: lastTokenId === null ? null : lastTokenId + 1,
+    complete: tokenIds.length < params.limit,
+    upstream: {
+      hiroKeyCount,
+      hiroOnly: readApiBases === hiroApiBases,
+      apiBaseCount: readApiBases.length
+    }
+  };
+};
+
 export const onRequest = async (context: {
   request: Request;
   params: { contract?: string };
@@ -358,7 +410,33 @@ export const onRequest = async (context: {
     if (request.method === 'POST') {
       // Targeted refresh: POST ...?id=14 or ?id=14,15,16 re-reads just those
       // tokens (instant accuracy after a migration/transfer). Otherwise: sync.
-      const idParam = new URL(request.url).searchParams.get('id');
+      const url = new URL(request.url);
+      const parentBackfill = url.searchParams.get('parents')?.trim().toLowerCase();
+      if (parentBackfill === 'backfill') {
+        // Opt-in guard: when INDEX_ADMIN_TOKEN is configured, the maintenance
+        // backfill requires a matching x-admin-token header. If unset, behaviour
+        // is unchanged (open) — and the internal self-healing sync/refresh, which
+        // never sets this param, is never gated.
+        const adminToken = (env as { INDEX_ADMIN_TOKEN?: string }).INDEX_ADMIN_TOKEN;
+        if (adminToken && request.headers.get('x-admin-token') !== adminToken) {
+          return json({ error: 'Unauthorized.' }, 401);
+        }
+        const fromRaw = Number(url.searchParams.get('from') ?? 1);
+        const limitRaw = Number(url.searchParams.get('limit') ?? 50);
+        const fromTokenId =
+          Number.isInteger(fromRaw) && fromRaw > 0 ? Math.floor(fromRaw) : 1;
+        const limit =
+          Number.isInteger(limitRaw) && limitRaw > 0
+            ? Math.min(Math.floor(limitRaw), 100)
+            : 50;
+        const result = await backfillParentEdges(env, apiBases, contract, contractId, {
+          fromTokenId,
+          limit
+        });
+        return json({ ok: true, ...result });
+      }
+
+      const idParam = url.searchParams.get('id');
       if (idParam) {
         const ids = idParam.split(',').map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0);
         if (ids.length === 0) return json({ error: 'No valid id(s).' }, 400);
