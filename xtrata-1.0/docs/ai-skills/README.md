@@ -23,6 +23,23 @@ query, batch seal, full API tables) remains at:
 Individual `skill-*.md` files are lean subsets optimised for single-purpose
 agent training and on-chain inscription.
 
+## Index & Relationship Maintenance
+
+Reading and displaying inscription relationships (parents/children/descendants)
+is backed by the D1 inscription index, which **stays current automatically** —
+new mints with parents are indexed during normal sync, with no agent action
+required. Agents that read relationships should use:
+
+- `GET /index/relations/<contract>?id=<id>` — derived relationship graph.
+- `GET /index/page?primary=&lineage=&ids=…` — lineage summaries in one query.
+
+The one manual maintenance action is the **parent-edge backfill**
+(`POST /index/<contract>?parents=backfill`), needed only after the edge table is
+introduced or old rows are imported. When `INDEX_ADMIN_TOKEN` is configured it
+requires a matching `x-admin-token` header (else `401`). Full procedure, auth,
+pagination, and troubleshooting:
+[`../inscription-relationship-index.md`](../inscription-relationship-index.md).
+
 ## Training Tracks
 
 - **aibtc track**: [`aibtc-agent-training.md`](aibtc-agent-training.md) — For

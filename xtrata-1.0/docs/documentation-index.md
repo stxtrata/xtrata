@@ -99,6 +99,7 @@ Historical SDK planning docs:
 | [`docs/xtrata-inscription-handbook.md`](xtrata-inscription-handbook.md) | Primary technical guide for inscription data, reads, reconstruction, and display. |
 | [`docs/xtrata-backup-migration-service.md`](xtrata-backup-migration-service.md) | Backup migration service spec for IPFS-backed collections. |
 | [`docs/recursive-inscriptions.md`](recursive-inscriptions.md) | Recursive inscription model, dependency rules, and examples. |
+| [`docs/inscription-relationship-index.md`](inscription-relationship-index.md) | How the D1 relationship index stays current automatically, the relations endpoints, and the auth-guarded parent-edge backfill maintenance procedure. |
 | [`docs/contract-inventory.md`](contract-inventory.md) | Contract source/function inventory. |
 | [`docs/product-contract-ui-reference.md`](product-contract-ui-reference.md) | Product role map for core, market, commerce, vault, and collection-sale contracts. |
 | [`docs/xtrata-v3-migration-reference.md`](xtrata-v3-migration-reference.md) | v3 migration design reference. |
