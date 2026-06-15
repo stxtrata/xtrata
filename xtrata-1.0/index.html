@@ -3766,7 +3766,10 @@
       loadInscriptionThumbnailFromCache,
       saveInscriptionThumbnailToCache
     } from '/src/lib/viewer/cache.ts';
-    import { injectGridThumbnailHtml } from '/src/lib/viewer/html-preview.ts';
+    import {
+      injectGridThumbnailHtml,
+      injectInteractivePreviewHtml
+    } from '/src/lib/viewer/html-preview.ts';
     import {
       hasRuntimeContentUrls,
       inlineRuntimeContentUrls
@@ -6401,7 +6404,9 @@
           ? ''
           : 'allow-scripts';
         if (options.htmlDoc && previewMimeType?.trim().toLowerCase() !== 'application/pdf') {
-          frame.srcdoc = injectGridThumbnailHtml(options.htmlDoc);
+          frame.srcdoc = options.interactiveHtml
+            ? injectInteractivePreviewHtml(options.htmlDoc)
+            : injectGridThumbnailHtml(options.htmlDoc);
         } else {
           frame.src = getObjectUrl();
         }
@@ -7213,6 +7218,12 @@
       revokePayloadPreview();
       renderBytesPreview(dom.payloadPreview, state.prepared.bytes, state.prepared.mimeType, (url) => {
         state.payloadPreviewUrl = url;
+      }, {
+        htmlDoc:
+          getMediaKind(state.prepared.mimeType) === 'html'
+            ? new TextDecoder().decode(state.prepared.bytes)
+            : null,
+        interactiveHtml: true
       });
 
       if (state.duplicateId !== null) {
@@ -9557,7 +9568,7 @@
       renderSelectedInscriptionMeta(token, null, mimeType);
       renderBytesPreview(dom.tokenPreviewMedia, bytes, mimeType, (url) => {
         state.tokenPreviewUrl = url;
-      }, { truthfulImageSizing: true, htmlDoc });
+      }, { truthfulImageSizing: true, htmlDoc, interactiveHtml: true });
       void warmThumbnailCacheFromBytes(token, bytes, mimeType);
       debugLog('preview', 'selected inscription preview rendered', {
         tokenId: token.id.toString(),

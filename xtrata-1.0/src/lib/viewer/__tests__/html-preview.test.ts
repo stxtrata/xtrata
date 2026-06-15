@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { injectGridThumbnailHtml } from '../html-preview';
+import {
+  injectGridThumbnailHtml,
+  injectInteractivePreviewHtml
+} from '../html-preview';
 
 describe('html grid preview injection', () => {
   it('injects thumbnail support styles into head', () => {
@@ -33,5 +36,15 @@ describe('html grid preview injection', () => {
     expect(result.indexOf('data-xtrata-grid-preview')).toBeLessThan(
       result.indexOf('<canvas id="stage">')
     );
+  });
+});
+
+describe('injectInteractivePreviewHtml', () => {
+  it('keeps player click hints visible in interactive preview canvases', () => {
+    const html = '<html><head></head><body><div class="click-hint">Click to play</div></body></html>';
+    const result = injectInteractivePreviewHtml(html);
+
+    expect(result).toContain('data-xtrata-interactive-preview="true"');
+    expect(result).toContain('display: flex !important');
   });
 });
