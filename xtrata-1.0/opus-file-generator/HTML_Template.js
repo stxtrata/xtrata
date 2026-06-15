@@ -220,15 +220,19 @@ const normalizeArtFit = (value) =>
   String(value || '').trim().toLowerCase() === 'contain' ? 'contain' : 'cover';
 
 const buildExportAssets = ({ config, source, visual }) => {
-  const audioBase64 = normalizeBase64(config.audioBase64);
-  const visualBase64 = normalizeBase64(config.visualBase64 || config.imageBase64);
+  // NOTE: For embedded assets the actual base64 payload already lives in the
+  // DOM (the <audio><source src="data:..."> element and the cover markup).
+  // We deliberately do NOT repeat the base64 here. Doing so doubled the size of
+  // every embedded inscription (e.g. a 2MB audio + 360KB image produced a ~6MB
+  // file). The manifest keeps only the descriptive metadata; the runtime reads
+  // the media straight from the DOM, never from manifest.assets.
   return {
     audio:
       source.sourceKind === 'embedded-base64'
         ? {
             encoding: 'base64',
             mimeType: source.audioMimeType,
-            data: audioBase64
+            inlinedIn: 'audio#xtrataAudio'
           }
         : {
             source: source.source,
@@ -241,7 +245,7 @@ const buildExportAssets = ({ config, source, visual }) => {
             encoding: 'base64',
             mimeType: sanitizeVisualMimeType(config.visualMimeType || config.imageMimeType),
             kind: visual.kind,
-            data: visualBase64
+            inlinedIn: 'cover'
           }
         : {
             source: visual.source,

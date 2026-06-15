@@ -1104,6 +1104,55 @@
       background: #fffaf0;
     }
 
+    /* Estimated inscription size readout */
+    .inscription-size {
+      display: grid;
+      gap: 4px;
+      border: 1px solid #cfe0d4;
+      border-radius: var(--radius);
+      background: var(--green-soft);
+      padding: 10px 12px;
+    }
+
+    .inscription-size > div {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .inscription-size__label {
+      color: var(--green);
+      font-size: 0.7rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .inscription-size strong {
+      color: var(--green);
+      font-size: 1.25rem;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .inscription-size.is-warn {
+      border-color: #e6d2a6;
+      background: var(--amber-soft);
+    }
+
+    .inscription-size.is-warn .inscription-size__label,
+    .inscription-size.is-warn strong {
+      color: var(--amber);
+    }
+
+    .inscription-size__hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
     @media (max-width: 920px) {
       .wiz-two-col {
         grid-template-columns: 1fr;
@@ -1583,6 +1632,14 @@
             <p>Dependencies <span id="recursiveDependencyPreview" class="preview-value">None yet</span></p>
             <p>Player output <span>Embedded and recursive sources can be mixed.</span></p>
             <p>Preview <span>Updates automatically from the current form.</span></p>
+          </div>
+
+          <div class="inscription-size" id="inscriptionSizePanel">
+            <div>
+              <span class="inscription-size__label">Estimated inscription size</span>
+              <strong id="estInscriptionSize">&mdash;</strong>
+            </div>
+            <p id="estInscriptionBreakdown" class="inscription-size__hint">Convert audio or add a recursive source to estimate the final HTML size.</p>
           </div>
 
           <p id="htmlExportStatus" class="html-export-status">Convert audio first or switch to recursive mode.</p>
