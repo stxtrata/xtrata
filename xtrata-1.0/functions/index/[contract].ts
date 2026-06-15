@@ -7,6 +7,7 @@ import {
   type RuntimeEnv
 } from '../runtime/lib';
 import { queryAll, run } from '../lib/db';
+import { getHiroApiKeys } from '../lib/hiro-keys';
 
 // Cached per-token summary index. Reading a page is one D1 query instead of N
 // per-token chain reads; the index is populated incrementally from the core's
@@ -350,6 +351,9 @@ const backfillParentEdges = async (
   contractId: string,
   params: { fromTokenId: number; limit: number }
 ) => {
+  const hiroKeyCount = getHiroApiKeys(env).length;
+  const hiroApiBases = apiBases.filter((base) => base.includes('hiro.so'));
+  const readApiBases = hiroKeyCount > 0 && hiroApiBases.length > 0 ? hiroApiBases : apiBases;
   const caps = await probeCaps(env, apiBases, contract);
   const rows = await queryAll(
     env,
@@ -363,7 +367,7 @@ const backfillParentEdges = async (
     .filter((id) => Number.isInteger(id) && id > 0);
   let refreshed = 0;
   for (const id of tokenIds) {
-    const summary = await readToken(env, apiBases, contract, caps, id);
+    const summary = await readToken(env, readApiBases, contract, caps, id);
     if (summary) {
       await upsertToken(env, contractId, id, summary);
       refreshed += 1;
@@ -376,7 +380,12 @@ const backfillParentEdges = async (
     fromTokenId: params.fromTokenId,
     lastTokenId,
     nextFromTokenId: lastTokenId === null ? null : lastTokenId + 1,
-    complete: tokenIds.length < params.limit
+    complete: tokenIds.length < params.limit,
+    upstream: {
+      hiroKeyCount,
+      hiroOnly: readApiBases === hiroApiBases,
+      apiBases: readApiBases
+    }
   };
 };
 
