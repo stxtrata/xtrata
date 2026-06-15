@@ -624,18 +624,32 @@ function handlePreviewClick() {
 }
 
 async function prepareGeneratedHtmlForInscription() {
+  let inscribeWindow = null;
   try {
+    inscribeWindow = window.open('', '_blank');
+    if (inscribeWindow) {
+      inscribeWindow.opener = null;
+    }
     const bundle = buildGeneratedHtmlBundle();
-    if (!bundle) return;
+    if (!bundle) {
+      if (inscribeWindow) inscribeWindow.close();
+      return;
+    }
     await storeHtmlHandoff(bundle);
     const url = new URL('../', window.location.href);
     url.searchParams.set('handoff', 'opus-player');
     url.hash = 'inscribe';
     setHtmlExportStatus(
-      `Prepared ${bundle.filename} for inscription. Opening Xtrata home...`
+      `Prepared ${bundle.filename} for inscription. Opening Xtrata home in a new tab...`
     );
-    window.location.assign(url.toString());
+    if (inscribeWindow) {
+      inscribeWindow.location.href = url.toString();
+      inscribeWindow.focus();
+    } else {
+      window.open(url.toString(), '_blank', 'noopener,noreferrer');
+    }
   } catch (error) {
+    if (inscribeWindow) inscribeWindow.close();
     const message = error instanceof Error ? error.message : String(error);
     console.error('HTML inscription handoff failed:', error);
     setHtmlExportStatus(`Could not prepare inscription: ${message}`, true);
