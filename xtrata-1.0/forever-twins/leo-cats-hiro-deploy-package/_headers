@@ -1,4 +1,0 @@
-/*
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'unsafe-inline' https://esm.sh https://esm.run https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-src https:; form-action 'self'; upgrade-insecure-requests
-  X-Content-Type-Options: nosniff
-  Referrer-Policy: strict-origin-when-cross-origin
