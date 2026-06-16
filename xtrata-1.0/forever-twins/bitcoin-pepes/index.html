@@ -1500,7 +1500,11 @@
       }
       const ol = $('ownershipLine');
       if (ol) {
-        if (!state.wallet) {
+        if (state.binding) {
+          // A twin already exists — ownership only matters for swapping, so the
+          // "not in your wallet" note is not relevant here. Hide it.
+          ol.textContent = '';
+        } else if (!state.wallet) {
           ol.innerHTML = 'Connect your wallet to see whether this Pepe is already in it — you’re welcome to inscribe its twin either way.';
         } else if (!state.sourceOwner) {
           ol.textContent = '';
