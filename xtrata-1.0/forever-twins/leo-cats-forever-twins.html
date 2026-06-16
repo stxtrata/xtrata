@@ -617,6 +617,66 @@
     .manifest-output { width: 100%; min-height: 132px; resize: vertical; font-family: var(--mono); font-size: 0.64rem; line-height: 1.4; color: var(--muted-2); background: oklch(0.06 0.01 60 / 0.84); border: 1px solid oklch(0.72 0.18 70 / 0.18); border-radius: 0.55rem; padding: 0.58rem; }
     @media (max-width: 760px) { .manifest-grid { grid-template-columns: 1fr 1fr; } }
 
+    /* Full collection gallery */
+    .gallery-section { padding: 1rem 0 4rem; }
+    .gallery-shell { border: 1px solid oklch(0.72 0.18 70 / 0.18); border-radius: 0.75rem; background: oklch(0.10 0.01 60 / 0.76); overflow: hidden; }
+    .gallery-head { display: flex; align-items: start; justify-content: space-between; gap: 1rem; padding: 1rem; border-bottom: 1px solid oklch(0.72 0.18 70 / 0.12); }
+    .gallery-head h2 { margin: 0 0 0.18rem; font-size: 1.2rem; }
+    .gallery-head p { margin: 0; color: var(--muted); font-size: 0.82rem; max-width: 680px; }
+    .gallery-controls { display: grid; grid-template-columns: 0.6fr 0.6fr 0.55fr 0.55fr 0.55fr minmax(0, 1fr); gap: 0.55rem; padding: 0.9rem 1rem 0.2rem; align-items: end; }
+    .gallery-actions { display: flex; flex-wrap: wrap; gap: 0.42rem; align-items: center; justify-content: flex-end; }
+    .gallery-status { display: flex; justify-content: space-between; gap: 0.75rem; align-items: center; padding: 0.65rem 1rem 0.85rem; color: var(--muted-2); font-family: var(--mono); font-size: 0.68rem; }
+    .gallery-progress { height: 0.42rem; flex: 1; min-width: 160px; overflow: hidden; border-radius: 999px; border: 1px solid oklch(0.72 0.18 70 / 0.12); background: oklch(0.72 0.18 70 / 0.07); }
+    .gallery-progress span { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, var(--amber), oklch(0.82 0.17 82)); transition: width 180ms var(--ease-out); }
+    .gallery-grid-wrap { padding: 0.25rem 1rem 1rem; }
+    .gallery-grid {
+      --gallery-tile-size: 86px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(var(--gallery-tile-size), 1fr));
+      gap: 0.45rem;
+      align-items: start;
+    }
+    .gallery-tile {
+      position: relative;
+      aspect-ratio: 1;
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid oklch(0.72 0.18 70 / 0.14);
+      border-radius: 0.5rem;
+      background: oklch(0.06 0.01 60);
+      color: var(--muted-2);
+      padding: 0;
+      transition: border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out), transform 160ms var(--ease-out);
+    }
+    .gallery-tile:hover { border-color: oklch(0.78 0.15 172 / 0.48); box-shadow: 0 0 18px oklch(0.78 0.15 172 / 0.12); }
+    .gallery-tile.selected { border-color: var(--amber); box-shadow: 0 0 0 2px oklch(0.78 0.15 172 / 0.22), 0 0 26px oklch(0.78 0.15 172 / 0.18); }
+    .gallery-tile.error { border-style: dashed; }
+    .gallery-tile img { width: 100%; height: 100%; object-fit: cover; display: block; background: oklch(0.08 0.01 60); }
+    .gallery-tile .tile-fallback { height: 100%; display: grid; place-items: center; padding: 0.45rem; color: oklch(0.52 0.04 70); font-family: var(--mono); font-size: 0.66rem; text-align: center; }
+    .gallery-token {
+      position: absolute;
+      left: 0.28rem;
+      top: 0.28rem;
+      border-radius: 999px;
+      padding: 0.12rem 0.38rem;
+      background: oklch(0.06 0.01 60 / 0.72);
+      border: 1px solid oklch(0.78 0.15 172 / 0.20);
+      color: var(--amber);
+      font-family: var(--mono);
+      font-size: 0.58rem;
+      font-weight: 800;
+      backdrop-filter: blur(8px);
+    }
+    @media (max-width: 1120px) {
+      .gallery-controls { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .gallery-actions { justify-content: flex-start; grid-column: 1 / -1; }
+    }
+    @media (max-width: 760px) {
+      .gallery-head, .gallery-status { flex-direction: column; align-items: stretch; }
+      .gallery-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .gallery-grid { --gallery-tile-size: 74px; gap: 0.36rem; }
+    }
+
     /* LEO Cats visual pass */
     body::before {
       content: "";
@@ -885,6 +945,39 @@
       </div>
     </section>
 
+    <section id="collectionGallery" class="gallery-section">
+      <div class="container">
+        <div class="gallery-shell">
+          <div class="gallery-head">
+            <div>
+              <h2>Full Collection Gallery</h2>
+              <p>Cache-first source collection view. Tiles resolve from the on-chain LEO Cats token URI through metadata JSON, then reuse cached image URLs on later loads.</p>
+            </div>
+            <div class="gallery-actions">
+              <button id="galleryLoadBtn" class="btn-amber" type="button">Load Gallery</button>
+              <button id="galleryStopBtn" class="btn-outline" type="button" disabled>Stop</button>
+              <button id="galleryClearCacheBtn" class="btn-muted" type="button">Clear Cache</button>
+            </div>
+          </div>
+          <div class="gallery-controls">
+            <div class="row"><label for="galleryStartId">Start ID</label><input id="galleryStartId" class="shrine-input" type="number" min="1" value="1" /></div>
+            <div class="row"><label for="galleryEndId">End ID</label><input id="galleryEndId" class="shrine-input" type="number" min="1" value="3000" /></div>
+            <div class="row"><label for="galleryConcurrency">Parallel</label><input id="galleryConcurrency" class="shrine-input" type="number" min="1" max="12" value="4" /></div>
+            <div class="row"><label for="galleryDelayMs">Delay ms</label><input id="galleryDelayMs" class="shrine-input" type="number" min="0" max="5000" value="80" /></div>
+            <div class="row"><label for="galleryRetries">Retries</label><input id="galleryRetries" class="shrine-input" type="number" min="0" max="8" value="2" /></div>
+            <div class="row"><label for="galleryTileSize">Tile size</label><input id="galleryTileSize" class="shrine-input" type="range" min="58" max="150" value="86" /></div>
+          </div>
+          <div class="gallery-status">
+            <div id="galleryStatus">Ready. Load a range to populate the collection grid.</div>
+            <div class="gallery-progress"><span id="galleryProgressBar"></span></div>
+          </div>
+          <div class="gallery-grid-wrap">
+            <div id="galleryGrid" class="gallery-grid" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="how">
       <div class="container">
         <h2>How It Works</h2>
@@ -953,6 +1046,7 @@
       masterFee: null,
       direction: 'pepe-to-xtrata',
       manifest: { running: false, stop: false, items: [], errors: [], output: null },
+      gallery: { running: false, stop: false, items: new Map(), selectedId: null, done: 0, total: 0, cacheHits: 0, errors: 0, renderTimer: null, lastProgressLog: 0 },
     };
 
     function jsonBigInt(_, value) { return typeof value === 'bigint' ? value.toString() : value; }
@@ -1496,6 +1590,207 @@
       downloadTextFile(`leo-cats-hash-manifest-${payload.range.start}-${payload.range.end}.csv`, manifestToCsv(payload), 'text/csv');
     }
 
+    function galleryCachePrefix() {
+      return `leo-cats-gallery:v1:${networkName()}:${$('sourceContract').value.trim()}`;
+    }
+    function galleryCacheKey(tokenId) { return `${galleryCachePrefix()}:${tokenId}`; }
+    function readGalleryCache(tokenId) {
+      try {
+        const raw = localStorage.getItem(galleryCacheKey(tokenId));
+        if (!raw) return null;
+        const item = JSON.parse(raw);
+        return item?.id ? item : null;
+      } catch { return null; }
+    }
+    function writeGalleryCache(item) {
+      try { localStorage.setItem(galleryCacheKey(item.id), JSON.stringify(item)); } catch {}
+    }
+    function clearGalleryCache() {
+      const prefix = galleryCachePrefix();
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i);
+        if (key?.startsWith(prefix)) keys.push(key);
+      }
+      for (const key of keys) localStorage.removeItem(key);
+      for (const [id, item] of state.gallery.items) {
+        if (item.status !== 'pending') state.gallery.items.set(id, { id, status: 'pending' });
+      }
+      state.gallery.cacheHits = 0;
+      renderGallery();
+      updateGalleryStatus();
+      log('Gallery cache cleared', { removed: keys.length, source: $('sourceContract').value.trim(), network: networkName() });
+    }
+    function galleryIds() {
+      const start = Number($('galleryStartId').value || 1);
+      const end = Number($('galleryEndId').value || start);
+      if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start) throw new Error('Enter a valid gallery ID range');
+      return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+    }
+    function galleryPlaceholder(id) { return { id, status: 'pending' }; }
+    async function resolveGalleryItem(tokenId, options = {}) {
+      const cached = options.useCache !== false ? readGalleryCache(tokenId) : null;
+      if (cached) return { ...cached, fromCache: true };
+
+      const source = $('sourceContract').value.trim();
+      const tokenArg = asUint(BigInt(tokenId));
+      const tokenUriRaw = await readContract(source, 'get-token-uri', [tokenArg]);
+      const tokenUri = unwrapOptional(tokenUriRaw);
+      if (!tokenUri || typeof tokenUri !== 'string') throw new Error('No token URI returned by source contract');
+
+      const metadataCandidates = uriToHttpCandidates(tokenUri, tokenId);
+      if (!metadataCandidates.length) throw new Error('Token URI could not be converted to an HTTP/IPFS gateway URL');
+      const metadataResult = await fetchFirstOk(metadataCandidates, 'json', { retries: options.retries ?? 0, retryDelayMs: options.delayMs ?? 0 });
+      const image = extractImageValue(metadataResult.json);
+      if (!image) throw new Error('Metadata JSON did not contain a usable image field');
+      const imageCandidates = /^data:image\//i.test(image.value) ? [image.value] : uriToHttpCandidates(image.value, tokenId);
+      const imageUrl = imageCandidates[0] || image.value;
+      if (!imageUrl) throw new Error('Image URI could not be converted to a browser URL');
+
+      const item = {
+        id: Number(tokenId),
+        status: 'loaded',
+        token_uri: tokenUri,
+        resolved_metadata_uri: metadataResult.url,
+        image_field: image.field,
+        image_uri: image.value,
+        resolved_image_uri: imageUrl,
+        cached_at: new Date().toISOString(),
+      };
+      writeGalleryCache(item);
+      return item;
+    }
+    function updateGalleryStatus() {
+      const loaded = [...state.gallery.items.values()].filter((item) => item.status === 'loaded').length;
+      const pending = Math.max(0, state.gallery.total - state.gallery.done);
+      const pct = state.gallery.total ? Math.round((state.gallery.done / state.gallery.total) * 100) : 0;
+      $('galleryProgressBar').style.width = `${pct}%`;
+      $('galleryStatus').textContent = state.gallery.running
+        ? `Loading gallery: ${state.gallery.done}/${state.gallery.total} checked · ${loaded} loaded · ${state.gallery.cacheHits} cached · ${state.gallery.errors} errors · ${pending} pending`
+        : state.gallery.total
+          ? `Gallery ready: ${loaded}/${state.gallery.total} loaded · ${state.gallery.cacheHits} cached · ${state.gallery.errors} errors`
+          : 'Ready. Load a range to populate the collection grid.';
+    }
+    function tileHtml(item) {
+      const selected = state.gallery.selectedId === item.id ? ' selected' : '';
+      const statusClass = item.status === 'error' ? ' error' : '';
+      const label = `#${escapeHtml(item.id)}`;
+      const title = item.status === 'error' ? `Token ${item.id}: ${item.error || 'Error'}` : `Token ${item.id}`;
+      const body = item.resolved_image_uri
+        ? `<img src="${escapeHtml(item.resolved_image_uri)}" alt="LEO Cat #${escapeHtml(item.id)}" loading="lazy" decoding="async" />`
+        : `<span class="tile-fallback">${escapeHtml(item.status === 'error' ? 'Error' : 'Pending')}</span>`;
+      return `<button class="gallery-tile${selected}${statusClass}" type="button" data-token-id="${escapeHtml(item.id)}" title="${escapeHtml(title)}">${body}<span class="gallery-token">${label}</span></button>`;
+    }
+    function renderGallery() {
+      const items = [...state.gallery.items.values()].sort((a, b) => a.id - b.id);
+      $('galleryGrid').innerHTML = items.map(tileHtml).join('');
+      updateGalleryStatus();
+    }
+    function scheduleGalleryRender() {
+      if (state.gallery.renderTimer) return;
+      state.gallery.renderTimer = setTimeout(() => {
+        state.gallery.renderTimer = null;
+        renderGallery();
+      }, 160);
+    }
+    async function loadGallery() {
+      log('Gallery load handler entered');
+      $('galleryStatus').textContent = 'Gallery click received. Validating range and preparing workers...';
+      if (state.gallery.running) {
+        log('Gallery load ignored because a scan is already running', { checked: state.gallery.done, total: state.gallery.total });
+        return;
+      }
+      const ids = galleryIds();
+      const concurrency = Math.min(12, Math.max(1, Number($('galleryConcurrency').value || 4)));
+      const delayMs = Math.min(5000, Math.max(0, Number($('galleryDelayMs').value || 0)));
+      const retries = Math.min(8, Math.max(0, Number($('galleryRetries')?.value || 0)));
+
+      log('Gallery range accepted', { start: ids[0], end: ids[ids.length - 1], count: ids.length });
+      $('galleryStatus').textContent = `Preparing ${ids.length} gallery slots...`;
+      state.gallery.running = true;
+      state.gallery.stop = false;
+      state.gallery.items = new Map(ids.map((id) => [id, readGalleryCache(id) || galleryPlaceholder(id)]));
+      state.gallery.selectedId = /^\d+$/.test($('tokenId').value.trim()) ? Number($('tokenId').value.trim()) : null;
+      state.gallery.done = 0;
+      state.gallery.total = ids.length;
+      state.gallery.cacheHits = 0;
+      state.gallery.errors = 0;
+      state.gallery.lastProgressLog = Date.now();
+      $('galleryLoadBtn').disabled = true;
+      $('galleryStopBtn').disabled = false;
+      renderGallery();
+      log('Gallery load started', { start: ids[0], end: ids[ids.length - 1], count: ids.length, concurrency, delayMs, retries });
+
+      let next = 0;
+      async function worker() {
+        while (!state.gallery.stop) {
+          const id = ids[next++];
+          if (id === undefined) return;
+          try {
+            const item = await resolveGalleryItem(id, { retries, delayMs });
+            if (item.fromCache) state.gallery.cacheHits += 1;
+            state.gallery.items.set(id, item);
+          } catch (err) {
+            state.gallery.errors += 1;
+            state.gallery.items.set(id, { id, status: 'error', error: err.message });
+            if (state.gallery.errors <= 5) log('Gallery token failed', { tokenId: id, error: err.message });
+          } finally {
+            state.gallery.done += 1;
+            scheduleGalleryRender();
+            const now = Date.now();
+            if (state.gallery.done === 1 || state.gallery.done === state.gallery.total || now - state.gallery.lastProgressLog > 3000) {
+              state.gallery.lastProgressLog = now;
+              log('Gallery load progress', {
+                checked: state.gallery.done,
+                total: state.gallery.total,
+                cached: state.gallery.cacheHits,
+                errors: state.gallery.errors,
+              });
+            }
+            if (delayMs) await sleep(delayMs);
+          }
+        }
+      }
+
+      try {
+        await Promise.all(Array.from({ length: Math.min(concurrency, ids.length) }, worker));
+      } finally {
+        state.gallery.running = false;
+        $('galleryLoadBtn').disabled = false;
+        $('galleryStopBtn').disabled = true;
+        if (state.gallery.renderTimer) { clearTimeout(state.gallery.renderTimer); state.gallery.renderTimer = null; }
+        renderGallery();
+        log(state.gallery.stop ? 'Gallery load stopped' : 'Gallery load finished', { checked: state.gallery.done, total: state.gallery.total, cached: state.gallery.cacheHits, errors: state.gallery.errors });
+      }
+    }
+    function stopGallery() {
+      log('Gallery stop clicked', { checked: state.gallery.done, total: state.gallery.total });
+      state.gallery.stop = true;
+      $('galleryStatus').textContent = 'Stopping after current in-flight gallery reads finish...';
+      $('galleryStopBtn').disabled = true;
+    }
+    async function handleGalleryLoadClick() {
+      log('Load Gallery button clicked', {
+        start: $('galleryStartId').value,
+        end: $('galleryEndId').value,
+        concurrency: $('galleryConcurrency').value,
+        delayMs: $('galleryDelayMs').value,
+        retries: $('galleryRetries').value,
+      });
+      $('galleryStatus').textContent = 'Load Gallery button clicked. Starting gallery loader...';
+      await loadGallery();
+    }
+    function selectGalleryToken(tokenId) {
+      state.gallery.selectedId = Number(tokenId);
+      $('tokenId').value = String(tokenId);
+      if (!$('swapTokenId').value.trim()) $('swapTokenId').value = String(tokenId);
+      $('lookupToken').textContent = String(tokenId);
+      resetChainOnlyDisplays();
+      renderGallery();
+      document.getElementById('inscribe')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      log('Gallery token selected', { tokenId: String(tokenId) });
+    }
+
     async function readMetadataAndRawImage(uri, tokenId, showLog = false) {
       if (!uri) { renderRawImageStatus(`${badge('No chain URI to read', 'warn')}<br>Fetch the source token URI first.`); return null; }
       state.sourceMetadataUri = null;
@@ -1786,6 +2081,9 @@
     bind('stopManifestBtn', 'click', stopCollectionManifest);
     bind('downloadManifestJsonBtn', 'click', downloadManifestJson);
     bind('downloadManifestCsvBtn', 'click', downloadManifestCsv);
+    bind('galleryLoadBtn', 'click', handleGalleryLoadClick);
+    bind('galleryStopBtn', 'click', stopGallery);
+    bind('galleryClearCacheBtn', 'click', clearGalleryCache);
     bind('quoteBtn', 'click', () => quoteFee(true));
     bind('mediaFile', 'change', (event) => handleFile(event.target.files?.[0]));
     bind('useRawImageBtn', 'click', useFetchedRawImage);
@@ -1811,6 +2109,15 @@
       state.sourceImageUrl = null;
       state.sourceImageCandidates = [];
       if (!state.sourceTokenUri) setStatus('rawImageStatus', 'Not loaded from chain URI');
+    });
+    $('galleryTileSize').addEventListener('input', () => {
+      $('galleryGrid').style.setProperty('--gallery-tile-size', `${$('galleryTileSize').value}px`);
+    });
+    $('galleryGrid').addEventListener('click', (event) => {
+      const tile = event.target.closest('.gallery-tile');
+      if (!tile) return;
+      const tokenId = tile.dataset.tokenId;
+      if (/^\d+$/.test(tokenId || '')) selectGalleryToken(tokenId);
     });
 
     syncLabels();
