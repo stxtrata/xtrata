@@ -956,7 +956,7 @@
             <div class="gallery-actions">
               <button id="galleryLoadBtn" class="btn-amber" type="button">Load Gallery</button>
               <button id="galleryStopBtn" class="btn-outline" type="button" disabled>Stop</button>
-              <button id="galleryClearCacheBtn" class="btn-muted" type="button">Clear Cache</button>
+              <button id="galleryClearCacheBtn" class="btn-muted" type="button">Clear Local Cache</button>
             </div>
           </div>
           <div class="gallery-controls">
@@ -1046,7 +1046,7 @@
       masterFee: null,
       direction: 'pepe-to-xtrata',
       manifest: { running: false, stop: false, items: [], errors: [], output: null },
-      gallery: { running: false, stop: false, items: new Map(), selectedId: null, done: 0, total: 0, cacheHits: 0, errors: 0, renderTimer: null, lastProgressLog: 0 },
+      gallery: { running: false, stop: false, items: new Map(), selectedId: null, done: 0, total: 0, cacheHits: 0, sharedHits: 0, errors: 0, renderTimer: null, lastProgressLog: 0, sharedCacheAvailable: null, sharedWriteQueue: [] },
     };
 
     function jsonBigInt(_, value) { return typeof value === 'bigint' ? value.toString() : value; }
@@ -1605,6 +1605,58 @@
     function writeGalleryCache(item) {
       try { localStorage.setItem(galleryCacheKey(item.id), JSON.stringify(item)); } catch {}
     }
+    function gallerySharedParams(start, end) {
+      const params = new URLSearchParams({
+        collection: 'leo-cats',
+        network: networkName(),
+        source: $('sourceContract').value.trim(),
+        start: String(start),
+        end: String(end),
+      });
+      return params.toString();
+    }
+    async function readSharedGalleryCache(ids) {
+      const start = ids[0];
+      const end = ids[ids.length - 1];
+      try {
+        const response = await fetch(`/api/gallery-cache?${gallerySharedParams(start, end)}`, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        const items = new Map((payload.items || []).map((item) => [Number(item.id), { ...item, status: item.status || 'loaded', fromSharedCache: true }]));
+        state.gallery.sharedCacheAvailable = true;
+        log('Shared D1 gallery cache read', { range: `${start}-${end}`, hits: items.size });
+        return items;
+      } catch (err) {
+        state.gallery.sharedCacheAvailable = false;
+        log('Shared D1 gallery cache unavailable; using browser cache fallback', { error: err.message });
+        return new Map();
+      }
+    }
+    async function flushSharedGalleryWrites(force = false) {
+      if (state.gallery.sharedCacheAvailable === false) return;
+      if (!force && state.gallery.sharedWriteQueue.length < 20) return;
+      const items = state.gallery.sharedWriteQueue.splice(0, 100);
+      if (!items.length) return;
+      try {
+        const response = await fetch('/api/gallery-cache', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            collection: 'leo-cats',
+            network: networkName(),
+            source_contract: $('sourceContract').value.trim(),
+            items,
+          }),
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        state.gallery.sharedCacheAvailable = true;
+        log('Shared D1 gallery cache updated', { saved: items.length });
+      } catch (err) {
+        state.gallery.sharedCacheAvailable = false;
+        state.gallery.sharedWriteQueue.unshift(...items);
+        log('Shared D1 gallery cache write failed; keeping browser cache only', { error: err.message });
+      }
+    }
     function clearGalleryCache() {
       const prefix = galleryCachePrefix();
       const keys = [];
@@ -1617,6 +1669,7 @@
         if (item.status !== 'pending') state.gallery.items.set(id, { id, status: 'pending' });
       }
       state.gallery.cacheHits = 0;
+      state.gallery.sharedHits = 0;
       renderGallery();
       updateGalleryStatus();
       log('Gallery cache cleared', { removed: keys.length, source: $('sourceContract').value.trim(), network: networkName() });
@@ -1629,6 +1682,11 @@
     }
     function galleryPlaceholder(id) { return { id, status: 'pending' }; }
     async function resolveGalleryItem(tokenId, options = {}) {
+      const existing = state.gallery.items.get(Number(tokenId));
+      if (existing?.fromSharedCache && existing.resolved_image_uri) {
+        writeGalleryCache(existing);
+        return existing;
+      }
       const cached = options.useCache !== false ? readGalleryCache(tokenId) : null;
       if (cached) return { ...cached, fromCache: true };
 
@@ -1664,11 +1722,12 @@
       const loaded = [...state.gallery.items.values()].filter((item) => item.status === 'loaded').length;
       const pending = Math.max(0, state.gallery.total - state.gallery.done);
       const pct = state.gallery.total ? Math.round((state.gallery.done / state.gallery.total) * 100) : 0;
+      const shared = state.gallery.sharedCacheAvailable === false ? ' · D1 unavailable' : ` · ${state.gallery.sharedHits} D1`;
       $('galleryProgressBar').style.width = `${pct}%`;
       $('galleryStatus').textContent = state.gallery.running
-        ? `Loading gallery: ${state.gallery.done}/${state.gallery.total} checked · ${loaded} loaded · ${state.gallery.cacheHits} cached · ${state.gallery.errors} errors · ${pending} pending`
+        ? `Loading gallery: ${state.gallery.done}/${state.gallery.total} checked · ${loaded} loaded · ${state.gallery.cacheHits} local${shared} · ${state.gallery.errors} errors · ${pending} pending`
         : state.gallery.total
-          ? `Gallery ready: ${loaded}/${state.gallery.total} loaded · ${state.gallery.cacheHits} cached · ${state.gallery.errors} errors`
+          ? `Gallery ready: ${loaded}/${state.gallery.total} loaded · ${state.gallery.cacheHits} local${shared} · ${state.gallery.errors} errors`
           : 'Ready. Load a range to populate the collection grid.';
     }
     function tileHtml(item) {
@@ -1709,13 +1768,16 @@
       $('galleryStatus').textContent = `Preparing ${ids.length} gallery slots...`;
       state.gallery.running = true;
       state.gallery.stop = false;
-      state.gallery.items = new Map(ids.map((id) => [id, readGalleryCache(id) || galleryPlaceholder(id)]));
+      const sharedItems = await readSharedGalleryCache(ids);
+      state.gallery.items = new Map(ids.map((id) => [id, sharedItems.get(id) || readGalleryCache(id) || galleryPlaceholder(id)]));
       state.gallery.selectedId = /^\d+$/.test($('tokenId').value.trim()) ? Number($('tokenId').value.trim()) : null;
       state.gallery.done = 0;
       state.gallery.total = ids.length;
       state.gallery.cacheHits = 0;
+      state.gallery.sharedHits = 0;
       state.gallery.errors = 0;
       state.gallery.lastProgressLog = Date.now();
+      state.gallery.sharedWriteQueue = [];
       $('galleryLoadBtn').disabled = true;
       $('galleryStopBtn').disabled = false;
       renderGallery();
@@ -1729,7 +1791,12 @@
           try {
             const item = await resolveGalleryItem(id, { retries, delayMs });
             if (item.fromCache) state.gallery.cacheHits += 1;
+            if (item.fromSharedCache) state.gallery.sharedHits += 1;
             state.gallery.items.set(id, item);
+            if (!item.fromCache && !item.fromSharedCache && item.status === 'loaded') {
+              state.gallery.sharedWriteQueue.push(item);
+              await flushSharedGalleryWrites(false);
+            }
           } catch (err) {
             state.gallery.errors += 1;
             state.gallery.items.set(id, { id, status: 'error', error: err.message });
@@ -1743,7 +1810,8 @@
               log('Gallery load progress', {
                 checked: state.gallery.done,
                 total: state.gallery.total,
-                cached: state.gallery.cacheHits,
+                localCached: state.gallery.cacheHits,
+                sharedCached: state.gallery.sharedHits,
                 errors: state.gallery.errors,
               });
             }
@@ -1759,8 +1827,9 @@
         $('galleryLoadBtn').disabled = false;
         $('galleryStopBtn').disabled = true;
         if (state.gallery.renderTimer) { clearTimeout(state.gallery.renderTimer); state.gallery.renderTimer = null; }
+        await flushSharedGalleryWrites(true);
         renderGallery();
-        log(state.gallery.stop ? 'Gallery load stopped' : 'Gallery load finished', { checked: state.gallery.done, total: state.gallery.total, cached: state.gallery.cacheHits, errors: state.gallery.errors });
+        log(state.gallery.stop ? 'Gallery load stopped' : 'Gallery load finished', { checked: state.gallery.done, total: state.gallery.total, localCached: state.gallery.cacheHits, sharedCached: state.gallery.sharedHits, errors: state.gallery.errors, d1: state.gallery.sharedCacheAvailable === false ? 'unavailable' : 'available' });
       }
     }
     function stopGallery() {
