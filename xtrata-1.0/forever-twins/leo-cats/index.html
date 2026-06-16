@@ -1255,7 +1255,17 @@
       if (type === 'some' || type.includes('optional')) return cv.value === undefined || cv.value === null ? null : { some: plainCV(cv.value) };
       if (type === 'none') return null;
       if (type.includes('uint') || type.includes('int')) return cv.value?.toString?.() ?? String(cv.value);
-      if (type.includes('buffer')) return '0x' + toHex(cv.value);
+      if (type.includes('buffer')) {
+        // In Stacks.js v7 a buffer CV's `value` is already a hex string; only
+        // raw byte arrays need toHex(). The old code ran toHex() on the string,
+        // expanding each hex digit into its own byte (e.g. "3a" -> "030a"),
+        // which corrupted the canonical hash so it never matched a real SHA-256.
+        const v = cv.value;
+        if (typeof v === 'string') return '0x' + v.replace(/^0x/i, '').toLowerCase();
+        if (v instanceof Uint8Array || Array.isArray(v)) return '0x' + toHex(v);
+        if (cv.buffer instanceof Uint8Array) return '0x' + toHex(cv.buffer);
+        return '0x' + toHex(v);
+      }
       if (type.includes('string')) return cv.value;
       if (type.includes('principal')) return cv.value || cv.address || String(cv);
       if (type === 'booltrue' || type === 'true') return true;
