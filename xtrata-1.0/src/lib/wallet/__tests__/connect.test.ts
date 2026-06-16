@@ -47,6 +47,21 @@ describe('wallet connect helpers', () => {
     expect(params.postConditions?.[0]).toMatch(/^[0-9a-f]+$/);
   });
 
+  it('serializes bigint fees before sending legacy wallet contract calls', () => {
+    const options = __testing.toLegacyContractCallOptions({
+      contractAddress: ADDRESS,
+      contractName: 'xtrata-core',
+      functionName: 'add-chunk-batch',
+      functionArgs: [uintCV(1)],
+      network: 'mainnet',
+      stxAddress: ADDRESS,
+      fee: 625000n
+    });
+
+    expect(options.fee).toBe('625000');
+    expect(options.sponsored).toBe(false);
+  });
+
   it('builds SIP-030 STX transfer params for runtime wallet bridge requests', () => {
     const params = __testing.buildStxTransferParams({
       recipient: ADDRESS,

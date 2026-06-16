@@ -1,5 +1,6 @@
 const GRID_PREVIEW_MARKER = 'data-xtrata-grid-preview';
 const GRID_PREVIEW_SCRIPT_MARKER = 'data-xtrata-grid-fit-script';
+const INTERACTIVE_PREVIEW_MARKER = 'data-xtrata-interactive-preview';
 
 const buildGridPreviewStyle = () => `<style ${GRID_PREVIEW_MARKER}="true">
 html, body {
@@ -88,21 +89,36 @@ const insertAfterTag = (html: string, tagName: string, content: string) => {
   return `${html.slice(0, index)}${content}${html.slice(index)}`;
 };
 
-export const injectGridThumbnailHtml = (html: string) => {
-  if (!html || html.includes(GRID_PREVIEW_MARKER)) {
+const injectPreviewContent = (html: string, marker: string, content: string) => {
+  if (!html || html.includes(marker)) {
     return html;
   }
-  const style = `${buildGridPreviewStyle()}${buildGridPreviewScript()}`;
   if (html.includes('</head>')) {
-    return html.replace('</head>', `${style}</head>`);
+    return html.replace('</head>', `${content}</head>`);
   }
-  const afterHead = insertAfterTag(html, 'head', style);
+  const afterHead = insertAfterTag(html, 'head', content);
   if (afterHead) {
     return afterHead;
   }
-  const afterBody = insertAfterTag(html, 'body', style);
+  const afterBody = insertAfterTag(html, 'body', content);
   if (afterBody) {
     return afterBody;
   }
-  return `${style}${html}`;
+  return `${content}${html}`;
 };
+
+export const injectGridThumbnailHtml = (html: string) => {
+  const style = `${buildGridPreviewStyle()}${buildGridPreviewScript()}`;
+  return injectPreviewContent(html, GRID_PREVIEW_MARKER, style);
+};
+
+export const injectInteractivePreviewHtml = (html: string) =>
+  injectPreviewContent(
+    html,
+    INTERACTIVE_PREVIEW_MARKER,
+    `<style ${INTERACTIVE_PREVIEW_MARKER}="true">
+.click-hint {
+  display: flex !important;
+}
+</style>`
+  );

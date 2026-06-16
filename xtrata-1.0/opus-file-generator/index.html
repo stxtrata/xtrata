@@ -1153,6 +1153,76 @@
       font-weight: 700;
     }
 
+    .asset-breakdown {
+      margin-top: 8px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .asset-breakdown__empty {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.74rem;
+    }
+
+    .asset-group {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .asset-group__head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 7px 10px;
+      background: #f3f7f3;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .asset-group__title {
+      font-size: 0.72rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      color: var(--ink);
+    }
+
+    .asset-group__tag {
+      font-size: 0.64rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      padding: 2px 7px;
+      border-radius: 999px;
+    }
+
+    .asset-group__tag.is-embedded { background: var(--green-soft); color: var(--green); }
+    .asset-group__tag.is-recursive { background: var(--blue-soft); color: var(--blue); }
+    .asset-group__tag.is-none { background: #eee; color: var(--muted); }
+
+    .asset-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 5px 10px;
+      font-size: 0.78rem;
+    }
+
+    .asset-row + .asset-row { border-top: 1px solid #eef2ee; }
+    .asset-row span:first-child { color: var(--muted); font-weight: 600; }
+    .asset-row span:last-child { font-variant-numeric: tabular-nums; font-weight: 800; }
+    .asset-row.is-arrow span:last-child { color: var(--green); }
+    .asset-row.is-total {
+      background: var(--green-soft);
+      border-top: 1px solid #cfe0d4;
+    }
+    .asset-row.is-total span { color: var(--green); font-weight: 900; }
+    .asset-row__note { color: var(--muted); font-weight: 600; font-size: 0.7rem; }
+
     @media (max-width: 920px) {
       .wiz-two-col {
         grid-template-columns: 1fr;
@@ -1642,6 +1712,13 @@
             <p id="estInscriptionBreakdown" class="inscription-size__hint">Convert audio or add a recursive source to estimate the final HTML size.</p>
           </div>
 
+          <details class="compact-box" id="assetBreakdownPanel" open>
+            <summary>What's being inscribed — full breakdown</summary>
+            <div id="assetBreakdown" class="asset-breakdown">
+              <p class="asset-breakdown__empty">Convert audio or add a recursive source to see the breakdown.</p>
+            </div>
+          </details>
+
           <p id="htmlExportStatus" class="html-export-status">Convert audio first or switch to recursive mode.</p>
           <div class="button-container">
             <button id="generateHtmlButton" type="button" disabled>Download HTML</button>
@@ -1749,7 +1826,9 @@
 <script src="main.js" defer></script>
 <script type="module">
   import { initializeImageConverter } from './image-to-base64.js';
+  import { initImageCompressorUI } from './image-compressor-ui.js';
   document.addEventListener('DOMContentLoaded', initializeImageConverter);
+  document.addEventListener('DOMContentLoaded', initImageCompressorUI);
 
   document.addEventListener('audionalBase64Generated', () => {
     if (typeof window.updateHtmlGenerateButtonState === 'function') {
