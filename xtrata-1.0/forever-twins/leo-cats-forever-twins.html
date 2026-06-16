@@ -245,6 +245,7 @@
 
     .main-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 1.35rem; padding-bottom: 4rem; align-items: start; }
     .span-2 { grid-column: span 2; }
+    #inscribe, #lookup, #swap, #activity { scroll-margin-top: 5.5rem; }
 
     .shrine-card {
       background: var(--card);
@@ -479,6 +480,7 @@
       .main-grid { grid-template-columns: 1fr 1fr; }
       .span-2 { grid-column: span 2; }
       .stats-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      #inscribe, #lookup, #swap, #activity { scroll-margin-top: 1rem; }
     }
     @media (max-width: 760px) {
       .header { position: sticky; padding: 0.8rem 1rem; align-items: flex-start; }
@@ -654,7 +656,7 @@
 <body>
   <header class="header">
     <div class="brand">
-      <img src="assets/leo-cat-forever-twin-logo.jpg" alt="LEO Cats Forever Twins seal" />
+      <img src="assets/leo-cat-forever-twin-logo-1.jpg" alt="LEO Cats Forever Twins seal" />
       <div>
         <div class="brand-title">LEO Cats</div>
         <div class="brand-subtitle">Forever Twins</div>
@@ -681,7 +683,7 @@
           </div>
         </div>
         <div class="hero-art fade-in-up stagger-2">
-          <img src="assets/leo-cat-forever-twin-logo.jpg" alt="LEO Cats Xtrata twin artwork" />
+          <img src="assets/leo-cat-forever-twin-logo-1.jpg" alt="LEO Cats Xtrata twin artwork" />
         </div>
       </div>
     </div>
@@ -858,7 +860,7 @@
             <div class="card-title"><span class="icon-box">⇄</span><h2>Swap</h2></div>
             <p class="card-sub">Exactly one side stays liquid. Swap the LEO Cat for the Xtrata inscription or back again.</p>
             <div class="swap-direction">
-              <button id="dirPepe" class="swap-token active" type="button"><img class="coin-img" src="assets/leo-cat-forever-twin-logo.jpg" alt="" aria-hidden="true" /><span>LEO CAT</span></button>
+              <button id="dirPepe" class="swap-token active" type="button"><img class="coin-img" src="assets/leo-cat-forever-twin-logo-1.jpg" alt="" aria-hidden="true" /><span>LEO CAT</span></button>
               <div class="swap-arrow">→</div>
               <button id="dirXtrata" class="swap-token" type="button"><span class="coin">₿</span><span>XTRATA</span></button>
             </div>
@@ -918,7 +920,7 @@
 
   <footer>
     <div class="container footer-flex">
-      <div><img src="assets/leo-cat-forever-twin-logo.jpg" alt="LEO Cats seal" />LEO Cats Forever Twins</div>
+      <div><img src="assets/leo-cat-forever-twin-logo-1.jpg" alt="LEO Cats seal" />LEO Cats Forever Twins</div>
       <div>Permanent by design · Powered by Xtrata</div>
     </div>
   </footer>
