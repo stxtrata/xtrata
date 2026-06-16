@@ -895,7 +895,7 @@
   </footer>
 
   <script type="module">
-    import { connect, disconnect, isConnected, getLocalStorage, openContractCall } from 'https://esm.sh/@stacks/connect@8.2.6';
+    import { connect, disconnect, isConnected, getLocalStorage, clearLocalStorage, clearSelectedProviderId, openContractCall } from 'https://esm.sh/@stacks/connect@8.2.6';
     import { fetchCallReadOnlyFunction, cvToJSON, cvToValue, Cl, Pc, PostConditionMode } from 'https://esm.sh/@stacks/transactions@7.4.0';
     import { STACKS_MAINNET, STACKS_TESTNET } from 'https://esm.sh/@stacks/network@7.3.1';
 
@@ -1746,7 +1746,7 @@
         // isConnected() meant a stale "connected" flag left in local storage
         // (e.g. from a previous session) made the button do nothing, so the
         // wallet never opened.
-        const result = await connect();
+        const result = await connect({ forceWalletSelect: true });
         const addr = getStoredWallet() || addressFromConnectResult(result);
         setWallet(addr);
         if (addr) { log('Wallet connected', { address: addr }); await quoteFee(false); }
@@ -1772,7 +1772,15 @@
     }
 
     bind('connectBtn', 'click', onConnect);
-    bind('disconnectBtn', 'click', async () => { disconnect(); setWallet(null); log('Wallet disconnected'); });
+    bind('disconnectBtn', 'click', async () => {
+      // Fully clear connection state so reconnecting prompts the wallet picker
+      // again and lets you choose a different wallet/address.
+      try { disconnect(); } catch {}
+      try { clearLocalStorage(); } catch {}
+      try { clearSelectedProviderId(); } catch {}
+      setWallet(null);
+      log('Wallet disconnected');
+    });
     bind('networkToggle', 'click', () => { $('network').value = networkName() === 'mainnet' ? 'testnet' : 'mainnet'; syncLabels(); resetChainOnlyDisplays(); });
     bind('refreshBtn', 'click', refreshContractStatus);
     bind('checkBtn', 'click', checkToken);
