@@ -6,6 +6,7 @@ let audionalVisualBase64 = null;
 let audionalMimeType = 'audio/webm; codecs=opus';
 let audionalVisualMimeType = 'image/png';
 let audionalVisualName = '';
+let audionalVisualOriginalBytes = null; // size of the originally-uploaded cover, before any compression
 let livePreviewTimer = 0;
 
 const SUPPORTED_VISUAL_PREFIXES = ['image/', 'video/'];
@@ -406,6 +407,7 @@ function updateInscriptionSizeReadout(htmlContent, config) {
       hintEl.textContent =
         'Convert audio or add a recursive source to estimate the final HTML size.';
     }
+    updateAssetBreakdown(null, 0);
     return;
   }
 
@@ -433,6 +435,126 @@ function updateInscriptionSizeReadout(htmlContent, config) {
       ? `Full HTML file size (${audioNote}, ${visualNote}). Large for a single inscription — consider a lower bitrate or recursive sources.`
       : `Full HTML file size (${audioNote}, ${visualNote}).`;
   }
+
+  updateAssetBreakdown(config, bytes);
+}
+
+// Number of bytes a base64 string adds to the HTML (1 char = 1 UTF-8 byte).
+function base64TextBytes(b64) {
+  return typeof b64 === 'string' ? b64.length : 0;
+}
+
+// Decoded binary size represented by a base64 string.
+function base64BinaryBytes(b64) {
+  if (typeof b64 !== 'string' || !b64) return 0;
+  const len = b64.length;
+  const pad = b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0;
+  return Math.max(0, Math.floor((len * 3) / 4) - pad);
+}
+
+function savingsLabel(originalBytes, finalBytes) {
+  if (!originalBytes || originalBytes <= 0) return '';
+  const pct = ((originalBytes - finalBytes) / originalBytes) * 100;
+  if (!Number.isFinite(pct) || Math.abs(pct) < 0.1) return '';
+  return pct >= 0 ? ` (−${pct.toFixed(0)}%)` : ` (+${Math.abs(pct).toFixed(0)}%)`;
+}
+
+function breakdownRow(label, value, opts = {}) {
+  const cls = ['asset-row'];
+  if (opts.arrow) cls.push('is-arrow');
+  if (opts.total) cls.push('is-total');
+  return `<div class="${cls.join(' ')}"><span>${escapeHtml(label)}</span><span>${escapeHtml(value)}</span></div>`;
+}
+
+function breakdownGroup(title, tag, tagClass, rowsHtml) {
+  return (
+    `<div class="asset-group">` +
+    `<div class="asset-group__head"><span class="asset-group__title">${escapeHtml(title)}</span>` +
+    `<span class="asset-group__tag ${tagClass}">${escapeHtml(tag)}</span></div>` +
+    rowsHtml +
+    `</div>`
+  );
+}
+
+// Renders the "what's being inscribed" breakdown: per-asset source mode plus a
+// running original → compressed → base64 cost calculation that sums to the
+// measured inscription size.
+function updateAssetBreakdown(config, htmlBytes) {
+  const host = getElement('assetBreakdown');
+  if (!host) return;
+
+  if (!config) {
+    host.innerHTML =
+      '<p class="asset-breakdown__empty">Convert audio or add a recursive source to see the breakdown.</p>';
+    return;
+  }
+
+  const fmt = (b) => formatSizeLabel(b);
+  const recursive = config.recursive || {};
+  let html = '';
+
+  // ---- Audio ----
+  if (config.audioSourceMode === 'recursive') {
+    const ref = recursive.audioUrl || (recursive.audioTokenId ? `Token #${recursive.audioTokenId}` : 'Recursive source');
+    html += breakdownGroup('Audio', 'Recursive', 'is-recursive',
+      breakdownRow('Reference', ref) +
+      breakdownRow('Embedded in HTML', '0 B', { note: true }));
+  } else {
+    const audioB64 = config.audioBase64 || '';
+    const compressedAudioBytes =
+      (typeof convertedAudioBlob !== 'undefined' && convertedAudioBlob && convertedAudioBlob.size)
+        ? convertedAudioBlob.size
+        : base64BinaryBytes(audioB64);
+    const originalAudioBytes =
+      (typeof selectedFile !== 'undefined' && selectedFile && selectedFile.size) ? selectedFile.size : 0;
+    let rows = '';
+    if (originalAudioBytes) {
+      rows += breakdownRow('Original file', fmt(originalAudioBytes));
+      rows += breakdownRow('Compressed audio', fmt(compressedAudioBytes) + savingsLabel(originalAudioBytes, compressedAudioBytes), { arrow: true });
+    } else {
+      rows += breakdownRow('Compressed audio', fmt(compressedAudioBytes), { arrow: true });
+    }
+    rows += breakdownRow('Base64 in HTML', fmt(base64TextBytes(audioB64)));
+    html += breakdownGroup('Audio', 'Embedded', 'is-embedded', rows);
+  }
+
+  // ---- Visual ----
+  if (config.visualSourceMode === 'recursive') {
+    const ref = recursive.coverUrl || (recursive.coverTokenId ? `Token #${recursive.coverTokenId}` : 'Recursive source');
+    html += breakdownGroup('Visual', 'Recursive', 'is-recursive',
+      breakdownRow('Reference', ref) +
+      breakdownRow('Embedded in HTML', '0 B'));
+  } else {
+    const imgB64 = config.imageBase64 || config.visualBase64 || '';
+    if (!imgB64) {
+      html += breakdownGroup('Visual', 'None', 'is-none',
+        breakdownRow('Cover art', 'No image embedded'));
+    } else {
+      const embeddedImgBytes = base64BinaryBytes(imgB64);
+      let rows = '';
+      if (audionalVisualOriginalBytes) {
+        rows += breakdownRow('Original file', fmt(audionalVisualOriginalBytes));
+        rows += breakdownRow('Embedded image', fmt(embeddedImgBytes) + savingsLabel(audionalVisualOriginalBytes, embeddedImgBytes), { arrow: true });
+      } else {
+        rows += breakdownRow('Embedded image', fmt(embeddedImgBytes), { arrow: true });
+      }
+      rows += breakdownRow('Base64 in HTML', fmt(base64TextBytes(imgB64)));
+      html += breakdownGroup('Visual', 'Embedded', 'is-embedded', rows);
+    }
+  }
+
+  // ---- Cost calculation ----
+  const audioTextBytes = config.audioSourceMode === 'embedded' ? base64TextBytes(config.audioBase64 || '') : 0;
+  const imageTextBytes = config.visualSourceMode === 'embedded' ? base64TextBytes(config.imageBase64 || config.visualBase64 || '') : 0;
+  const overhead = Math.max(0, htmlBytes - audioTextBytes - imageTextBytes);
+  let costRows = '';
+  if (audioTextBytes) costRows += breakdownRow('Audio base64', fmt(audioTextBytes));
+  if (imageTextBytes) costRows += breakdownRow('Image base64', fmt(imageTextBytes));
+  costRows += breakdownRow('Player template + markup', fmt(overhead));
+  costRows += breakdownRow('Total inscription size', fmt(htmlBytes), { total: true });
+  html += breakdownGroup('Cost calculation', 'HTML', 'is-none', costRows);
+
+  host.innerHTML = html;
 }
 
 function updateLivePreview() {
@@ -720,6 +842,7 @@ function updateaudionalVisualBase64(base64Data, mimeType, fileName = '', options
   if (output) output.value = base64Data ? stripDataURIPrefix(base64Data) : '';
   if (!base64Data) {
     audionalVisualName = '';
+    audionalVisualOriginalBytes = null;
     if (options.renderPreview !== false) resetStandaloneArtworkPreview();
   } else if (options.renderPreview !== false) {
     const dataUrl = String(base64Data).startsWith('data:')
@@ -750,6 +873,7 @@ async function handleStandaloneArtworkChange(event) {
   }
 
   setStandaloneArtworkStatus(`Reading ${file.name}...`);
+  audionalVisualOriginalBytes = file.size;
   try {
     const dataUrl = await readFileAsDataUrl(file);
     updateaudionalVisualBase64(dataUrl, file.type, file.name, {

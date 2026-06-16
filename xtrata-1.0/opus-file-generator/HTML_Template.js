@@ -1127,7 +1127,7 @@ const buildXtrataAudioPlayerHtml = (config) => {
         </div>
       </section>
     </section>
-    <audio id="xtrataAudio" class="audio-native" preload="metadata" data-xtrata-asset="audio"${
+    <audio id="xtrataAudio" class="audio-native" preload="auto" data-xtrata-asset="audio"${
       isLoop ? ' loop' : ''
     }>
       <source src="${escapeAttr(source.source)}" type="${escapeAttr(
@@ -1161,6 +1161,11 @@ const buildXtrataAudioPlayerHtml = (config) => {
       const manifestNode = document.getElementById('xtrataPlayerManifest');
       let coverClickTimer = 0;
       let activePanel = 'closed';
+      // Buffering gate: hold the "click to play" affordance until enough audio is
+      // buffered that the first click starts cleanly at 0:00 with no clipped intro.
+      let isAudioReady = false;
+      let playWhenReady = false;
+      const BUFFER_TARGET_SECONDS = 8;
       let manifest = {};
       try {
         manifest = JSON.parse(manifestNode.textContent || '{}');
@@ -1251,6 +1256,14 @@ const buildXtrataAudioPlayerHtml = (config) => {
           return;
         }
 
+        // Not buffered enough yet: queue the play so it fires the instant we're
+        // ready, from the true start, instead of starting mid-decode.
+        if (!isAudioReady) {
+          playWhenReady = true;
+          setStatus('Buffering audio… playback will start automatically.');
+          return;
+        }
+
         if (audio.ended) {
           try {
             audio.currentTime = 0;
@@ -1283,12 +1296,15 @@ const buildXtrataAudioPlayerHtml = (config) => {
         if (player) {
           player.dataset.playback = isPlaying ? 'playing' : audio.currentTime > 0 ? 'paused' : 'idle';
         }
-        if (playToggleButton) playToggleButton.textContent = isPlaying ? 'Pause' : 'Play';
+        if (playToggleButton) {
+          playToggleButton.textContent = isPlaying ? 'Pause' : 'Play';
+          playToggleButton.disabled = !isAudioReady && !isPlaying;
+        }
         if (clickHint) {
-          clickHint.textContent = isPlaying
-            ? 'Click artwork to pause'
-            : audio.currentTime > 0
-              ? 'Click artwork to play'
+          clickHint.textContent = !isAudioReady
+            ? 'Buffering audio…'
+            : isPlaying
+              ? 'Click artwork to pause'
               : 'Click artwork to play';
         }
         if (muteButton) muteButton.textContent = audio.muted ? 'Unmute' : 'Mute';
@@ -1367,18 +1383,63 @@ const buildXtrataAudioPlayerHtml = (config) => {
         setStatus('This browser may not support this audio type. Try a newer Safari, Chrome, Firefox, or an MP3 fallback.', true);
       }
 
+      // How many contiguous seconds from 0:00 are currently buffered.
+      const bufferedFromStart = () => {
+        try {
+          for (let i = 0; i < audio.buffered.length; i += 1) {
+            if (audio.buffered.start(i) <= 0.05) return audio.buffered.end(i);
+          }
+        } catch (_error) {}
+        return 0;
+      };
+
+      const markAudioReady = () => {
+        if (isAudioReady) return;
+        isAudioReady = true;
+        // Ensure the first play begins exactly at the start (no clipped intro).
+        try { if (audio.currentTime > 0 && audio.paused) audio.currentTime = 0; } catch (_error) {}
+        updatePlaybackUi();
+        if (playWhenReady) {
+          playWhenReady = false;
+          toggleAudioPlayback();
+        } else {
+          setStatus('Ready to play.');
+        }
+      };
+
+      // Consider playback safe once the whole track (short clips/loops) or at
+      // least BUFFER_TARGET_SECONDS from the start is buffered.
+      const evaluateReadiness = () => {
+        if (isAudioReady) return;
+        const duration = getDuration();
+        const buffered = bufferedFromStart();
+        const target = duration ? Math.min(BUFFER_TARGET_SECONDS, duration - 0.1) : BUFFER_TARGET_SECONDS;
+        if (buffered >= target && buffered > 0) {
+          markAudioReady();
+        } else if (!playWhenReady) {
+          const pct = duration ? Math.min(99, Math.round((buffered / duration) * 100)) : null;
+          setStatus(pct !== null ? 'Buffering audio… ' + pct + '%' : 'Buffering audio…');
+        }
+      };
+
       audio.addEventListener('loadedmetadata', () => {
         const duration = Number.isFinite(audio.duration)
           ? Math.round(audio.duration)
           : null;
-        setStatus(duration ? 'Loaded. Duration: ' + duration + ' seconds.' : 'Loaded.');
+        if (!isAudioReady) {
+          setStatus(duration ? 'Buffering audio… (' + duration + 's track)' : 'Buffering audio…');
+        }
         updateProgress();
+        evaluateReadiness();
       });
 
-      audio.addEventListener('canplay', () => {
-        setStatus('Ready to play.');
-        updateProgress();
-      });
+      audio.addEventListener('progress', evaluateReadiness);
+      audio.addEventListener('canplay', evaluateReadiness);
+      // Whole file decoded end-to-end — definitely safe to play.
+      audio.addEventListener('canplaythrough', markAudioReady);
+      // Kick off buffering immediately (preload="auto" already requests this).
+      try { audio.load(); } catch (_error) {}
+      updatePlaybackUi();
 
       audio.addEventListener('timeupdate', updateProgress);
       audio.addEventListener('durationchange', updateProgress);
