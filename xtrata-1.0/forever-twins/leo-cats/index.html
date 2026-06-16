@@ -800,7 +800,7 @@
               <summary>Contract setup</summary>
               <div class="row" style="margin-top:0.9rem">
                 <div class="field-head">
-                  <label for="helperContract">LEO Cats Forever helper contract</label>
+                  <label for="helperContract">Forever Twins registry — mapping layer (local ID → Xtrata ID)</label>
                   <span class="contract-actions"><a id="helperExplorerLink" class="mini-link" target="_blank" rel="noopener noreferrer">Explorer</a><a id="helperSourceLink" class="mini-link" target="_blank" rel="noopener noreferrer">Source</a></span>
                 </div>
                 <input id="helperContract" class="shrine-input" value="SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata" readonly />
@@ -821,7 +821,7 @@
               <div class="two">
                 <div class="row">
                   <div class="field-head">
-                    <label for="masterContract">Xtrata v3.2.3 master contract</label>
+                    <label for="masterContract">Xtrata core contract — canonical inscription layer</label>
                     <span class="contract-actions"><a id="masterExplorerLink" class="mini-link" target="_blank" rel="noopener noreferrer">Explorer</a><a id="masterSourceLink" class="mini-link" target="_blank" rel="noopener noreferrer">Source</a></span>
                   </div>
                   <input id="masterContract" class="shrine-input" value="SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3" />
@@ -886,10 +886,12 @@
                 <div class="status-card conversion-card"><small>ID conversion</small><strong id="idConversionStatus">LEO Cat ID → Xtrata ID will appear here after a chain read.</strong></div>
                 <div class="status-card image-card"><small>Raw image from token metadata</small><strong id="rawImageStatus">Not loaded from chain URI</strong></div>
                 <div class="status-card uri-card"><small>Token URI from source NFT</small><strong id="tokenUriStatus">Not loaded from chain</strong></div>
-                <div class="status-card canonical-card"><small>Canonical hash</small><strong id="canonicalStatus">Not loaded from chain</strong></div>
-                <div class="status-card binding-card"><small>Binding</small><strong id="bindingStatus">Not loaded from chain</strong></div>
+                <div class="status-card canonical-card"><small>Canonical seed hash (registry)</small><strong id="canonicalStatus">Not loaded from chain</strong></div>
+                <div class="status-card binding-card"><small>Binding · local→Xtrata (registry mapping)</small><strong id="bindingStatus">Not loaded from chain</strong></div>
                 <div class="status-card owner-card"><small>Source owner</small><strong id="sourceOwnerStatus">Not loaded from chain</strong></div>
               </div>
+
+              <div class="status-card wide" style="margin-top:0.5rem"><small>Canonical inscription · Xtrata core contract</small><strong id="coreInscriptionStatus">Resolve a token to read its canonical inscription from the Xtrata core.</strong></div>
 
               <div class="file-prep-grid">
                 <label class="drop compact-drop" for="mediaFile">
@@ -1090,6 +1092,7 @@
       wallet: null,
       canonicalHash: null,
       binding: null,
+      coreInscription: null,
       sourceOwner: null,
       sourceTokenUri: null,
       sourceMetadataUri: null,
@@ -1137,6 +1140,52 @@
     function helperParts() { return splitPrincipal($('helperContract').value.trim()); }
     function sourceParts() { return splitPrincipal($('sourceContract').value.trim()); }
     function masterParts() { return splitPrincipal($('masterContract').value.trim()); }
+
+    // ── Forever Twins contract architecture ──────────────────────────────────
+    // CORE     = the Xtrata core contract (xtrata-v3-2-3). The CANONICAL on-chain
+    //            inscription / content / metadata layer. An indexer only needs to
+    //            index this ONE contract; it is shared across every Forever Twins
+    //            collection. All final inscription data is read from here.
+    // REGISTRY = this collection's Forever Twins helper contract. A MAPPING layer
+    //            ONLY: it resolves a local collection token ID -> an Xtrata
+    //            inscription ID (get-binding), holds the canonical seed hash, and
+    //            charges the collection's inscribe/swap fees. It is NOT the source
+    //            of canonical inscription content.
+    // SOURCE   = the original NFT collection contract (ownership + original URI).
+    // (Backed by the existing DOM inputs so the contract addresses stay editable.)
+    const XTRATA_CORE_CONTRACT = () => $('masterContract').value.trim();            // CORE – canonical inscription layer
+    const FOREVER_TWINS_REGISTRY_CONTRACT = () => $('helperContract').value.trim(); // REGISTRY – mapping layer only
+    const COLLECTION_SOURCE_CONTRACT = () => $('sourceContract').value.trim();      // SOURCE – original collection
+
+    // REGISTRY (mapping): resolve a local collection token ID -> Xtrata inscription ID.
+    async function resolveTwinXtrataId(localTokenId) {
+      const binding = unwrapOptional(await readContract(FOREVER_TWINS_REGISTRY_CONTRACT(), 'get-binding', [asUint(localTokenId)]));
+      return binding && binding['xtrata-id'] != null ? binding['xtrata-id'] : null;
+    }
+    // CORE (canonical): read the inscription / content / metadata for an Xtrata ID
+    // straight from the Xtrata core contract. This is the canonical data source and
+    // is identical no matter which collection registry mapped to it.
+    async function loadCoreInscription(xtrataId) {
+      if (xtrataId == null) return null;
+      const core = XTRATA_CORE_CONTRACT();
+      const idArg = asUint(xtrataId);
+      const [meta, tokenUri] = await Promise.all([
+        readContract(core, 'get-inscription-meta', [idArg]).catch(() => null),
+        readContract(core, 'get-token-uri', [idArg]).catch(() => null),
+      ]);
+      return { xtrataId: String(xtrataId), meta: unwrapOptional(meta), tokenUri: unwrapOptional(tokenUri) };
+    }
+    function renderCoreInscription(ci) {
+      if (!ci) { setStatus('coreInscriptionStatus', 'No twin yet — inscribe to create the canonical Xtrata inscription.'); return; }
+      const m = ci.meta || {};
+      const parts = [`Xtrata #${escapeHtml(ci.xtrataId)}`];
+      if (m['mime-type']) parts.push(escapeHtml(m['mime-type']));
+      if (m['total-size'] != null) parts.push(`${escapeHtml(m['total-size'])} bytes`);
+      if (m['total-chunks'] != null) parts.push(`${escapeHtml(m['total-chunks'])} chunk${String(m['total-chunks']) === '1' ? '' : 's'}`);
+      if (m['sealed'] != null) parts.push(m['sealed'] ? 'sealed' : 'unsealed');
+      const uri = ci.tokenUri ? `<br><span class="data-mono">${escapeHtml(shortMiddle(ci.tokenUri, 30, 22))}</span>` : '';
+      setStatus('coreInscriptionStatus', `${badge('Read from Xtrata core', 'ok')}<br><span class="data-mono">${escapeHtml(parts.join(' · '))}</span>${uri}${chainProof(XTRATA_CORE_CONTRACT(), 'get-inscription-meta', [asUint(ci.xtrataId)])}`);
+    }
     function networkName() { return $('network').value; }
     
     // Safely generate an augmented network object that forwards our API key to Hiro endpoint reads
@@ -1391,6 +1440,7 @@
     function resetChainOnlyDisplays() {
       state.canonicalHash = null;
       state.binding = null;
+      state.coreInscription = null;
       state.sourceOwner = null;
       state.sourceTokenUri = null;
       state.sourceMetadataUri = null;
@@ -1408,6 +1458,7 @@
       $('progressBar').style.width = '0%';
       setStatus('canonicalStatus', 'Not loaded from chain');
       setStatus('bindingStatus', 'Not loaded from chain');
+      setStatus('coreInscriptionStatus', 'Resolve a token to read its canonical inscription from the Xtrata core.');
       setStatus('sourceOwnerStatus', 'Not loaded from chain');
       setStatus('tokenUriStatus', 'Not loaded from chain');
       setStatus('rawImageStatus', 'Not loaded from chain URI');
@@ -2120,7 +2171,11 @@
       }
       const ol = $('ownershipLine');
       if (ol) {
-        if (!state.wallet) {
+        if (state.binding) {
+          // A twin already exists — ownership only matters for swapping, so the
+          // "not in your wallet" note is not relevant here. Hide it.
+          ol.textContent = '';
+        } else if (!state.wallet) {
           ol.innerHTML = 'Connect your wallet to see whether this cat is already in it — you’re welcome to inscribe its twin either way.';
         } else if (!state.sourceOwner) {
           ol.textContent = '';
@@ -2194,6 +2249,21 @@
         setStatus('idConversionStatus', renderIdConversion(null, tokenId));
         setStatus('lookupXtrata', 'No binding');
         setStatus('lookupLiquid', 'Not forevered yet');
+      }
+
+      // Architecture: the REGISTRY binding above only maps local ID -> Xtrata ID.
+      // The CANONICAL inscription / content / metadata is read from the Xtrata
+      // CORE contract, keyed by that Xtrata ID.
+      state.coreInscription = null;
+      if (state.binding && state.binding['xtrata-id'] != null) {
+        try {
+          state.coreInscription = await loadCoreInscription(state.binding['xtrata-id']);
+          renderCoreInscription(state.coreInscription);
+        } catch (err) {
+          setStatus('coreInscriptionStatus', `${badge('Core read failed', 'bad')}<br>${escapeHtml(err.message)}`);
+        }
+      } else {
+        renderCoreInscription(null);
       }
 
       if (state.sourceOwner) {
