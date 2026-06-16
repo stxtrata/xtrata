@@ -1162,8 +1162,15 @@
       const options = { contractAddress, contractName, functionName, functionArgs, network: networkName() };
       if ($('usePostConditions').checked && postConditions.length) {
         options.postConditions = postConditions;
-        options.postConditionMode = PostConditionMode.Allow;
       }
+      // Always allow the transaction's internal STX movements: the wrapper
+      // inscription fee (split to the two payout addresses once past the free
+      // threshold), the Xtrata master mint fee, and the wrapper->master hop.
+      // The contract enforces the exact amounts on-chain, so Allow is safe here.
+      // Without this the wallet defaults to Deny and rolls the tx back AFTER the
+      // contract already returned (ok ...) — the "STX moved but not checked"
+      // post-condition failure.
+      options.postConditionMode = PostConditionMode.Allow;
       return new Promise((resolve, reject) => {
         openContractCall({
           ...options,
@@ -1728,7 +1735,7 @@
     function inscribePostConditions() {
       if (!state.wallet) return [];
       const total = (state.appFee || 0n) + (state.masterFee || 0n);
-      try { return total > 0n ? [Pc.principal(state.wallet).willSendEq(total).ustx()] : []; }
+      try { return total > 0n ? [Pc.principal(state.wallet).willSendLte(total).ustx()] : []; }
       catch { return []; }
     }
     async function foreverNFT() {
