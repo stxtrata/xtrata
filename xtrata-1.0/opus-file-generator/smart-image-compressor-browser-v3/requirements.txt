@@ -1,0 +1,3 @@
+pillow>=10.0.0
+# Optional, only needed for iPhone HEIC/HEIF files:
+# pillow-heif>=0.16.0

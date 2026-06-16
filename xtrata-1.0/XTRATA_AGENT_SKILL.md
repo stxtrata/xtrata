@@ -1043,6 +1043,23 @@ export async function withRetry(fn, { maxRetries = 4, baseDelayMs = 1000 } = {})
 - `tuple` -> `tupleCV(...)`
 - parse responses with `cvToJSON(...)`
 
+### Inscription Index & Relationships
+The D1-backed inscription index serves token summaries and relationship graphs
+without per-token chain reads, and **stays current automatically** (new mints
+with parents are indexed during normal sync — no agent action required).
+
+- `GET /index/<contract>?ids=…` (or `?from=&limit=&order=`) — token summaries.
+- `GET /index/page?primary=&lineage=&ids=…` — lineage summaries in one query.
+- `GET /index/relations/<contract>?id=<id>` — derived parents/ancestors,
+  children/descendants, and siblings.
+
+Maintenance (occasional, manual): `POST /index/<contract>?parents=backfill&from=&limit=`
+repopulates parent edges for rows that predate the edge table. `limit` is capped
+at 100; paginate via `nextFromTokenId` until `complete`. When the
+`INDEX_ADMIN_TOKEN` env var is set, the backfill requires a matching
+`x-admin-token` header (else `401`); normal sync/refresh is never gated. Full
+runbook: [`docs/inscription-relationship-index.md`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/docs/inscription-relationship-index.md).
+
 ## Security Notes
 - Never log private keys or seed phrases.
 - Always use `PostConditionMode.Deny` on writes.

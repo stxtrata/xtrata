@@ -38,7 +38,8 @@
       font-family:
         Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
         "Segoe UI", sans-serif;
-      line-height: 1.45;
+      font-size: 13px;
+      line-height: 1.35;
     }
 
     button,
@@ -55,9 +56,10 @@
       border-radius: 8px;
       background: var(--ink);
       color: #fff;
-      padding: 0 14px;
+      padding: 0 10px;
       cursor: pointer;
       font-weight: 700;
+      font-size: 0.82rem;
     }
 
     button:hover:not(:disabled),
@@ -97,31 +99,31 @@
     }
 
     main {
-      width: min(1180px, calc(100vw - 32px));
+      width: min(1540px, calc(100vw - 24px));
       margin: 0 auto;
-      padding: 24px 0 36px;
+      padding: 18px 0 28px;
     }
 
     .tool-header {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
-      gap: 18px;
+      gap: 14px;
       align-items: end;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
 
     .tool-title {
       margin: 0;
-      font-size: clamp(1.8rem, 3vw, 3rem);
+      font-size: clamp(1.8rem, 2.4vw, 2.55rem);
       line-height: 1;
       letter-spacing: 0;
     }
 
     .tool-subtitle {
-      max-width: 700px;
-      margin: 10px 0 0;
+      max-width: 520px;
+      margin: 7px 0 0;
       color: var(--muted);
-      font-size: 1rem;
+      font-size: 0.86rem;
     }
 
     .tool-nav {
@@ -140,7 +142,7 @@
       background: var(--panel);
       color: var(--ink);
       padding: 0 11px;
-      font-size: 0.88rem;
+      font-size: 0.78rem;
       box-shadow: 0 1px 0 rgba(20, 25, 21, 0.04);
     }
 
@@ -153,8 +155,8 @@
       border-radius: var(--radius);
       background: var(--panel);
       box-shadow: var(--shadow);
-      padding: 12px;
-      margin-bottom: 16px;
+      padding: 10px;
+      margin-bottom: 12px;
     }
 
     #status {
@@ -165,7 +167,7 @@
       color: var(--green);
       display: flex;
       align-items: center;
-      padding: 8px 12px;
+      padding: 7px 10px;
       font-weight: 700;
     }
 
@@ -184,9 +186,17 @@
 
     .tool-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
-      gap: 16px;
+      grid-template-columns:
+        minmax(330px, 0.95fr)
+        minmax(340px, 0.95fr)
+        minmax(340px, 1fr);
+      gap: 12px;
       align-items: start;
+    }
+
+    .tool-grid > .tool-panel,
+    .tool-grid > .output-stack {
+      min-width: 0;
     }
 
     .tool-panel {
@@ -203,7 +213,7 @@
       gap: 12px;
       align-items: center;
       border-bottom: 1px solid var(--line);
-      padding: 14px 16px;
+      padding: 11px 12px;
       background: #fbfdfb;
     }
 
@@ -216,16 +226,16 @@
     .tool-panel__header p {
       margin: 4px 0 0;
       color: var(--muted);
-      font-size: 0.88rem;
+      font-size: 0.78rem;
     }
 
     .tool-panel__body {
-      padding: 16px;
+      padding: 12px;
     }
 
     .form-stack {
       display: grid;
-      gap: 14px;
+      gap: 10px;
     }
 
     .field {
@@ -237,7 +247,7 @@
     legend,
     .label {
       color: var(--muted);
-      font-size: 0.84rem;
+      font-size: 0.68rem;
       font-weight: 800;
       text-transform: uppercase;
     }
@@ -260,13 +270,14 @@
       border-radius: 8px;
       background: #fff;
       color: var(--ink);
-      padding: 10px 11px;
+      padding: 7px 9px;
+      font-size: 0.86rem;
     }
 
     textarea,
     .base64-output {
-      min-height: 180px;
-      max-height: 280px;
+      min-height: 120px;
+      max-height: 220px;
       overflow: auto;
       white-space: pre-wrap;
       word-break: break-all;
@@ -279,7 +290,7 @@
       margin: 0;
       border: 1px solid var(--line);
       border-radius: 8px;
-      padding: 12px;
+      padding: 10px;
     }
 
     .format-options {
@@ -291,31 +302,32 @@
     .format-option {
       display: grid;
       grid-template-columns: auto minmax(0, 1fr);
-      gap: 8px;
+      gap: 7px;
       align-items: start;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fbfdfb;
-      padding: 10px;
-      min-height: 78px;
+      padding: 7px;
+      min-height: 46px;
     }
 
     .format-option strong {
       display: block;
-      font-size: 0.95rem;
+      font-size: 0.84rem;
+      line-height: 1.15;
     }
 
     .format-option small {
       display: block;
       margin-top: 3px;
       color: var(--muted);
-      font-size: 0.78rem;
+      font-size: 0.7rem;
     }
 
     .settings-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
+      gap: 10px;
     }
 
     .settings-grid .field-wide {
@@ -332,30 +344,34 @@
     .profile-description {
       margin: 0;
       color: var(--muted);
-      font-size: 0.86rem;
+      font-size: 0.72rem;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
 
     .info-summary-section {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: var(--blue-soft);
-      padding: 10px;
+      padding: 8px;
     }
 
     .info-summary-section p {
       margin: 0;
       color: var(--muted);
-      font-size: 0.82rem;
+      font-size: 0.72rem;
     }
 
     .info-summary-section span {
       display: block;
       margin-top: 3px;
       color: var(--blue);
-      font-size: 0.9rem;
+      font-size: 0.78rem;
       font-weight: 800;
       text-transform: none;
     }
@@ -373,13 +389,11 @@
     .button-group {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 8px;
       align-items: center;
     }
 
     #result,
-    #base64Result,
-    #originalAudioContainer,
     #batchResultEl {
       display: grid;
       gap: 10px;
@@ -387,9 +401,12 @@
     }
 
     #result:empty,
-    #originalAudioContainer:empty,
     #batchResultEl:empty {
       display: none;
+    }
+
+    .output-stack .tool-panel__body:has(#result:empty):has(#batchResultEl:empty) {
+      padding: 0;
     }
 
     audio {
@@ -398,19 +415,19 @@
 
     .output-stack {
       display: grid;
-      gap: 16px;
+      gap: 12px;
     }
 
     .compact-box {
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fbfdfb;
-      padding: 12px;
+      padding: 10px;
     }
 
     .compact-box h3 {
-      margin: 0 0 10px;
-      font-size: 0.95rem;
+      margin: 0 0 8px;
+      font-size: 0.86rem;
     }
 
     .ab-player-container {
@@ -423,13 +440,14 @@
     }
 
     .ab-player-header {
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
       justify-content: space-between;
-      gap: 12px;
+      gap: 10px;
       align-items: flex-start;
       border-bottom: 1px solid var(--line);
       background: #fbfdfb;
-      padding: 12px;
+      padding: 10px;
     }
 
     .ab-player-header h4 {
@@ -441,16 +459,16 @@
     .ab-player-header p {
       margin: 4px 0 0;
       color: var(--muted);
-      font-size: 0.84rem;
+      font-size: 0.74rem;
     }
 
     .ab-size-summary {
-      min-width: min(240px, 100%);
+      min-width: min(190px, 100%);
       border: 1px solid #cfe0d4;
       border-radius: 8px;
       background: var(--green-soft);
       color: var(--green);
-      padding: 8px 10px;
+      padding: 7px 8px;
       text-align: right;
     }
 
@@ -471,10 +489,10 @@
 
     .ab-controls {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(150px, 190px);
-      gap: 8px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
       align-items: stretch;
-      padding: 12px;
+      padding: 10px;
       border-bottom: 1px solid var(--line);
       background: #fff;
     }
@@ -483,7 +501,7 @@
       display: inline-flex;
       align-items: center;
       width: 100%;
-      min-height: 44px;
+      min-height: 38px;
       justify-content: center;
     }
 
@@ -495,10 +513,11 @@
 
     .ab-offset-field {
       display: grid;
+      grid-column: 1 / -1;
       grid-template-columns: 1fr 70px auto;
       gap: 6px;
       align-items: center;
-      min-height: 44px;
+      min-height: 38px;
       border: 1px solid var(--line-strong);
       border-radius: 8px;
       padding: 6px 8px;
@@ -526,16 +545,16 @@
     .ab-track-list {
       display: grid;
       gap: 10px;
-      padding: 12px;
+      padding: 10px;
     }
 
     .ab-track {
       display: grid;
-      gap: 8px;
+      gap: 6px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fbfdfb;
-      padding: 10px;
+      padding: 8px;
       opacity: 0.72;
       transition: border-color 0.15s ease, background 0.15s ease, opacity 0.15s ease;
     }
@@ -580,7 +599,7 @@
 
     .ab-track-meta {
       color: var(--muted);
-      font-size: 0.86rem;
+      font-size: 0.76rem;
       font-weight: 800;
       text-align: right;
     }
@@ -595,7 +614,7 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fff;
-      padding: 10px;
+      padding: 8px;
     }
 
     summary {
@@ -604,52 +623,29 @@
       font-weight: 800;
     }
 
-    .media-frame {
-      display: grid;
-      place-items: center;
-      width: 100%;
-      aspect-ratio: 1 / 1;
-      border: 1px dashed var(--line-strong);
-      border-radius: 8px;
-      background: #f8faf8;
-      overflow: hidden;
-    }
-
-    #image-preview {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-    }
-
-    #file-size-info {
-      margin: 0;
-      color: var(--muted);
-      font-size: 0.88rem;
-    }
-
     .export-panel {
-      background: linear-gradient(180deg, #fff, var(--amber-soft));
+      background: #fffaf0;
     }
 
     .html-player-options {
       display: grid;
-      gap: 12px;
+      gap: 8px;
     }
 
     .html-mode-options {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
+      gap: 6px;
     }
 
     .html-export-status {
-      min-height: 42px;
+      min-height: 38px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: rgba(255, 255, 255, 0.62);
       color: var(--muted);
-      padding: 10px;
-      font-size: 0.86rem;
+      padding: 8px;
+      font-size: 0.76rem;
       font-weight: 700;
     }
 
@@ -661,8 +657,8 @@
 
     .standalone-artwork-grid {
       display: grid;
-      grid-template-columns: 132px minmax(0, 1fr);
-      gap: 10px;
+      grid-template-columns: 90px minmax(0, 1fr);
+      gap: 8px;
       align-items: center;
     }
 
@@ -693,7 +689,7 @@
       min-height: 22px;
       margin: 0 0 8px;
       color: var(--muted);
-      font-size: 0.84rem;
+      font-size: 0.74rem;
       font-weight: 700;
     }
 
@@ -703,23 +699,27 @@
 
     .metadata-fieldset {
       display: grid;
-      gap: 10px;
+      gap: 8px;
     }
 
     .preview-value {
       overflow-wrap: anywhere;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 0.78rem;
+      font-size: 0.7rem;
       text-transform: none;
     }
 
     .live-preview-panel {
       display: grid;
-      gap: 10px;
+      gap: 8px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fff;
-      padding: 12px;
+      padding: 10px;
+    }
+
+    details.live-preview-panel {
+      display: block;
     }
 
     .live-preview-panel h3 {
@@ -729,11 +729,13 @@
 
     .live-preview-frame {
       width: 100%;
+      max-width: 180px;
       aspect-ratio: 1 / 1;
       border: 1px solid var(--line-strong);
       border-radius: 8px;
       background: #10120f;
       overflow: hidden;
+      justify-self: center;
     }
 
     .live-preview-frame iframe {
@@ -748,12 +750,58 @@
       min-height: 22px;
       margin: 0;
       color: var(--muted);
-      font-size: 0.84rem;
+      font-size: 0.72rem;
       font-weight: 800;
     }
 
     .html-live-preview-status.error {
       color: var(--error);
+    }
+
+    .metadata-extra {
+      background: #fff;
+    }
+
+    .metadata-extra > .form-stack {
+      margin-top: 10px;
+    }
+
+    .export-panel .tool-panel__header p,
+    .export-panel .format-option small,
+    #embeddedPlayerOptions,
+    #embeddedVisualOptions > h3,
+    .export-panel .info-summary-section p:not(:first-child),
+    .html-live-preview-status {
+      display: none;
+    }
+
+    .export-panel fieldset {
+      padding: 8px;
+    }
+
+    .export-panel .format-option {
+      min-height: 34px;
+      align-items: center;
+      background: #fff;
+    }
+
+    .export-panel .format-option input {
+      margin-top: 0;
+    }
+
+    #playerMetadataPanel #metadataForm {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    #playerMetadataPanel h3,
+    #playerMetadataPanel .metadata-extra {
+      grid-column: 1 / -1;
+    }
+
+    #titleInput,
+    #albumInput {
+      min-width: 0;
     }
 
     .modal,
@@ -807,7 +855,7 @@
       display: none !important;
     }
 
-    @media (max-width: 920px) {
+    @media (max-width: 1040px) {
       main {
         width: min(100% - 20px, 720px);
         padding-top: 14px;
@@ -852,20 +900,351 @@
         grid-template-columns: 1fr;
       }
     }
+
+    /* ===== Guided wizard layer (alt UI only) ===== */
+    main {
+      width: min(1040px, calc(100vw - 24px));
+    }
+
+    .tool-subtitle {
+      max-width: 640px;
+    }
+
+    /* Progress stepper */
+    .wiz-steps {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin: 4px 0 14px;
+    }
+
+    .wiz-step-tab {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 9px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: 0 1px 0 rgba(20, 25, 21, 0.04);
+      padding: 9px 11px;
+      cursor: pointer;
+      text-align: left;
+      color: var(--ink);
+      min-height: 52px;
+      transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .wiz-step-tab:hover:not(:disabled) {
+      border-color: var(--line-strong);
+      background: #fbfdfb;
+    }
+
+    .wiz-step-tab .wiz-num {
+      display: grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      color: var(--muted);
+      font-weight: 900;
+      font-size: 0.82rem;
+    }
+
+    .wiz-step-tab .wiz-label {
+      display: grid;
+      gap: 1px;
+      min-width: 0;
+    }
+
+    .wiz-step-tab .wiz-label strong {
+      font-size: 0.86rem;
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .wiz-step-tab .wiz-label small {
+      color: var(--muted);
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .wiz-step-tab.is-active {
+      border-color: var(--green);
+      background: var(--green-soft);
+      box-shadow: inset 3px 0 0 var(--green);
+    }
+
+    .wiz-step-tab.is-active .wiz-num {
+      border-color: var(--green);
+      background: var(--green);
+      color: #fff;
+    }
+
+    .wiz-step-tab.is-active .wiz-label small {
+      color: var(--green);
+    }
+
+    .wiz-step-tab.is-complete .wiz-num {
+      border-color: var(--green);
+      background: #fff;
+      color: var(--green);
+    }
+
+    .wiz-step-tab.is-complete .wiz-num::after {
+      content: "\2713";
+    }
+
+    .wiz-step-tab.is-complete .wiz-num span {
+      display: none;
+    }
+
+    /* Step panels */
+    .wiz-step {
+      display: none;
+    }
+
+    .wiz-step.is-active {
+      display: block;
+      animation: wizFade 0.18s ease;
+    }
+
+    @keyframes wizFade {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .wiz-step-intro {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 0 0 12px;
+    }
+
+    .wiz-step-intro h2 {
+      margin: 0;
+      font-size: 1.18rem;
+    }
+
+    .wiz-step-intro p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    /* Two-column inner layout for steps that benefit from it */
+    .wiz-two-col {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    .wiz-stack {
+      display: grid;
+      gap: 12px;
+      align-items: start;
+    }
+
+    /* Sticky footer navigation */
+    .wiz-footer {
+      position: sticky;
+      bottom: 0;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(6px);
+      box-shadow: var(--shadow);
+    }
+
+    .wiz-footer .wiz-hint {
+      flex: 1 1 auto;
+      min-width: 0;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .wiz-footer .wiz-hint b {
+      color: var(--ink);
+    }
+
+    .wiz-back {
+      background: transparent;
+      color: var(--ink);
+      border-color: var(--line-strong);
+    }
+
+    .wiz-back:hover:not(:disabled) {
+      background: rgba(20, 25, 21, 0.06);
+    }
+
+    .wiz-next {
+      min-width: 132px;
+      justify-content: center;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    /* Let the export panel keep its warm tint inside the step */
+    .wiz-step .export-panel {
+      background: #fffaf0;
+    }
+
+    /* Estimated inscription size readout */
+    .inscription-size {
+      display: grid;
+      gap: 4px;
+      border: 1px solid #cfe0d4;
+      border-radius: var(--radius);
+      background: var(--green-soft);
+      padding: 10px 12px;
+    }
+
+    .inscription-size > div {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .inscription-size__label {
+      color: var(--green);
+      font-size: 0.7rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .inscription-size strong {
+      color: var(--green);
+      font-size: 1.25rem;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .inscription-size.is-warn {
+      border-color: #e6d2a6;
+      background: var(--amber-soft);
+    }
+
+    .inscription-size.is-warn .inscription-size__label,
+    .inscription-size.is-warn strong {
+      color: var(--amber);
+    }
+
+    .inscription-size__hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
+    .asset-breakdown {
+      margin-top: 8px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .asset-breakdown__empty {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.74rem;
+    }
+
+    .asset-group {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .asset-group__head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 7px 10px;
+      background: #f3f7f3;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .asset-group__title {
+      font-size: 0.72rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      color: var(--ink);
+    }
+
+    .asset-group__tag {
+      font-size: 0.64rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      padding: 2px 7px;
+      border-radius: 999px;
+    }
+
+    .asset-group__tag.is-embedded { background: var(--green-soft); color: var(--green); }
+    .asset-group__tag.is-recursive { background: var(--blue-soft); color: var(--blue); }
+    .asset-group__tag.is-none { background: #eee; color: var(--muted); }
+
+    .asset-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 5px 10px;
+      font-size: 0.78rem;
+    }
+
+    .asset-row + .asset-row { border-top: 1px solid #eef2ee; }
+    .asset-row span:first-child { color: var(--muted); font-weight: 600; }
+    .asset-row span:last-child { font-variant-numeric: tabular-nums; font-weight: 800; }
+    .asset-row.is-arrow span:last-child { color: var(--green); }
+    .asset-row.is-total {
+      background: var(--green-soft);
+      border-top: 1px solid #cfe0d4;
+    }
+    .asset-row.is-total span { color: var(--green); font-weight: 900; }
+    .asset-row__note { color: var(--muted); font-weight: 600; font-size: 0.7rem; }
+
+    @media (max-width: 920px) {
+      .wiz-two-col {
+        grid-template-columns: 1fr;
+      }
+      .wiz-steps {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .wiz-step-tab .wiz-label small {
+        display: none;
+      }
+    }
   </style>
 </head>
 <body>
 <main>
   <header class="tool-header">
     <div>
-      <h1 class="tool-title">Xtrata Opus Audio Tool</h1>
-      <p class="tool-subtitle">Convert source audio to WebM Audio with Opus, generate base64, add optional image data, and export an HTML player.</p>
+      <h1 class="tool-title">Xtrata Opus</h1>
+      <p class="tool-subtitle">A guided path: convert your audio, add a visual, describe it, then export an inscription-ready HTML player.</p>
     </div>
-    <nav class="tool-nav" aria-label="Tool sections">
-      <a href="#audio-section">Audio</a>
-      <a href="#image-section">Image</a>
-      <a href="#export-section">Export</a>
-      <a href="./">Classic UI</a>
+    <nav class="tool-nav" aria-label="Tool links">
+      <a href="./index.html">Classic layout</a>
     </nav>
   </header>
 
@@ -874,402 +1253,495 @@
     <progress id="progress" value="0" max="100" class="hidden" aria-labelledby="status"></progress>
   </section>
 
-  <div class="tool-grid">
-    <section id="audio-section" class="tool-panel">
+  <!-- Progress stepper -->
+  <nav class="wiz-steps" aria-label="Steps">
+    <button type="button" class="wiz-step-tab is-active" data-go="1" aria-current="step">
+      <span class="wiz-num"><span>1</span></span>
+      <span class="wiz-label"><strong>Audio</strong><small>Convert &amp; source</small></span>
+    </button>
+    <button type="button" class="wiz-step-tab" data-go="2">
+      <span class="wiz-num"><span>2</span></span>
+      <span class="wiz-label"><strong>Visual</strong><small>Cover art</small></span>
+    </button>
+    <button type="button" class="wiz-step-tab" data-go="3">
+      <span class="wiz-num"><span>3</span></span>
+      <span class="wiz-label"><strong>Details</strong><small>Metadata</small></span>
+    </button>
+    <button type="button" class="wiz-step-tab" data-go="4">
+      <span class="wiz-num"><span>4</span></span>
+      <span class="wiz-label"><strong>Export</strong><small>Player &amp; inscribe</small></span>
+    </button>
+  </nav>
+
+  <!-- ============ STEP 1 — AUDIO ============ -->
+  <div class="wiz-step is-active" data-step="1">
+    <div class="wiz-step-intro">
+      <h2>1 &middot; Convert your audio</h2>
+      <p>Pick a file, choose quality, and convert. Then tell the player where its audio comes from.</p>
+    </div>
+
+    <div class="wiz-two-col">
+      <section id="audio-section" class="tool-panel">
+        <div class="tool-panel__header">
+          <div>
+            <h2 id="audio-section-heading">Audio conversion</h2>
+            <p>Source, format, and conversion settings.</p>
+          </div>
+          <div class="button-row">
+            <button id="showAudioInfoBtn" class="button-small" type="button">Format</button>
+            <button id="showAudionalInfoBtn" class="button-small" type="button">Guide</button>
+          </div>
+        </div>
+        <div class="tool-panel__body">
+          <div class="form-stack">
+            <label class="field" for="fileInput">
+              <span>Audio file</span>
+              <input type="file" id="fileInput" accept="audio/*,.wav,.mp3,.flac,.ogg,.aac" multiple>
+            </label>
+
+            <fieldset id="formatOptions">
+              <legend>Output</legend>
+              <div class="format-options">
+                <label class="format-option">
+                  <input type="radio" name="format" value="weba" checked>
+                  <span>
+                    <strong>WebM Audio</strong>
+                    <small>.weba, Opus codec</small>
+                  </span>
+                </label>
+                <label class="format-option">
+                  <input type="radio" name="format" value="mp3">
+                  <span>
+                    <strong>MP3</strong>
+                    <small>Compatibility fallback</small>
+                  </span>
+                </label>
+              </div>
+            </fieldset>
+
+            <div id="opusSettings" class="settings-grid">
+              <label class="field field-wide" for="audioProfileSelect">
+                <span>Profile</span>
+                <select id="audioProfileSelect"></select>
+              </label>
+              <p id="audioProfileDescription" class="profile-description field-wide"></p>
+
+              <label class="field field-wide" for="opusBitrate">
+                <span>Opus bitrate <span id="opusBitrateValue" class="inline-value">96 kbps</span></span>
+                <input type="range" id="opusBitrate" min="16" max="256" value="96" step="8">
+              </label>
+
+              <label class="field" for="opusVbrMode">
+                <span>VBR mode</span>
+                <select id="opusVbrMode">
+                  <option value="on" selected>VBR</option>
+                  <option value="constrained">Constrained VBR</option>
+                  <option value="off">CBR</option>
+                </select>
+              </label>
+
+              <label class="field" for="opusApplication">
+                <span>Application</span>
+                <select id="opusApplication">
+                  <option value="audio" selected>General audio</option>
+                  <option value="voip">Voice</option>
+                  <option value="lowdelay">Low latency</option>
+                </select>
+              </label>
+
+              <label class="field field-wide" for="opusCompressionLevel">
+                <span>Compression level <span id="opusCompressionLevelValue" class="inline-value">10</span></span>
+                <input type="range" id="opusCompressionLevel" min="0" max="10" value="10" step="1">
+              </label>
+            </div>
+
+            <div id="mp3Settings" class="settings-grid hidden" style="display: none;">
+              <label class="field field-wide" for="mp3Quality">
+                <span>MP3 quality <span id="mp3QualityValue" class="inline-value">4</span></span>
+                <input type="range" id="mp3Quality" min="0" max="9" value="4" step="1">
+              </label>
+            </div>
+
+            <div class="info-summary-section" id="outputInfoSection">
+              <p>Original <span id="originalFileInfo">N/A</span></p>
+              <p>Estimate <span id="currentEstimatedOutputSize">Select file</span></p>
+              <p>Actual <span id="actualOutputFileInfo">Not converted</span></p>
+              <p>Saving <span id="sizeSavingsInfo">Convert to compare</span></p>
+              <p>Xtrata type <span><code>audio/webm; codecs=opus</code></span></p>
+            </div>
+
+            <div class="button-container">
+              <button id="playSampleBtn" class="button-secondary" type="button" disabled>Play original</button>
+              <button id="convertBtn" type="button" disabled>Convert</button>
+              <button id="batchConvertBtn" class="button-secondary" type="button" disabled>Batch convert</button>
+              <button id="downloadBatchZipBtn" class="button-secondary" type="button" disabled>Download ZIP</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="wiz-stack">
+        <section class="tool-panel">
+          <div class="tool-panel__header">
+            <div>
+              <h2>Audio output</h2>
+              <p>A/B, downloads, and base64.</p>
+            </div>
+          </div>
+          <div class="tool-panel__body output-stack">
+            <div id="result" class="compact-box"></div>
+            <div id="batchResultEl" class="compact-box"></div>
+            <div id="base64Container" class="compact-box hidden">
+              <h3>Audio base64</h3>
+              <details>
+                <summary>Show audio base64</summary>
+                <div id="base64Output" class="base64-output"></div>
+              </details>
+              <div class="button-group">
+                <button id="copyBase64Btn" class="copy-button" type="button" disabled>Copy audio base64</button>
+                <button id="downloadBase64Btn" class="download-button" type="button" disabled>Download audio TXT</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="tool-panel">
+          <div class="tool-panel__header">
+            <div>
+              <h2>Player audio source</h2>
+              <p>Where the exported player reads its audio.</p>
+            </div>
+          </div>
+          <div class="tool-panel__body">
+            <div class="html-player-options">
+              <fieldset>
+                <legend>Audio source</legend>
+                <div class="html-mode-options">
+                  <label class="format-option">
+                    <input type="radio" name="htmlPlayerMode" value="embedded" checked>
+                    <span>
+                      <strong>Embedded</strong>
+                      <small>Use the converted Base64 audio in this HTML file</small>
+                    </span>
+                  </label>
+                  <label class="format-option">
+                    <input type="radio" name="htmlPlayerMode" value="recursive">
+                    <span>
+                      <strong>Recursive</strong>
+                      <small>Load an existing audio inscription by URL or token ID</small>
+                    </span>
+                  </label>
+                </div>
+              </fieldset>
+
+              <div id="embeddedPlayerOptions" class="compact-box">
+                <h3>Embedded audio</h3>
+                <p>Convert audio first. The exported player will carry the WebM/Opus data inside the HTML.</p>
+              </div>
+
+              <div id="recursivePlayerOptions" class="compact-box hidden">
+                <h3>Recursive audio source</h3>
+                <div class="form-stack">
+                  <label class="field" for="recursiveAudioTokenId">
+                    <span>Audio token ID</span>
+                    <input type="text" id="recursiveAudioTokenId" placeholder="315">
+                  </label>
+                  <label class="field" for="recursiveAudioUrl">
+                    <span>Direct audio URL</span>
+                    <input type="text" id="recursiveAudioUrl" placeholder="Optional: https://xtrata.xyz/inscription/315">
+                  </label>
+                  <label class="field" for="recursiveContractId">
+                    <span>Contract ID</span>
+                    <input type="text" id="recursiveContractId" value="SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0">
+                  </label>
+                  <label class="field" for="recursiveEndpointMode">
+                    <span>Endpoint</span>
+                    <select id="recursiveEndpointMode">
+                      <option value="readable" selected>Readable /inscription/{ID}</option>
+                      <option value="compact">Compact /i/{ID}</option>
+                    </select>
+                  </label>
+                  <label class="field" for="recursiveNetwork">
+                    <span>Network</span>
+                    <select id="recursiveNetwork">
+                      <option value="mainnet" selected>Mainnet</option>
+                      <option value="testnet">Testnet</option>
+                    </select>
+                  </label>
+                  <div class="info-summary-section">
+                    <p>Audio URL <span id="recursiveUrlPreview" class="preview-value">Enter an audio token ID or audio URL.</span></p>
+                    <p>Endpoint <span>Use /inscription for clarity or /i for compact recursive references.</span></p>
+                    <p>Mint note <span>Add the audio token as a recursive parent.</span></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div class="wiz-footer">
+      <span class="wiz-hint">Step 1 of 4 &middot; <b>Convert</b> your audio, or switch the source to <b>Recursive</b>.</span>
+      <button type="button" class="wiz-back" data-nav="back" disabled>Back</button>
+      <button type="button" class="wiz-next" data-nav="next">Next: Visual &rarr;</button>
+    </div>
+  </div>
+
+  <!-- ============ STEP 2 — VISUAL ============ -->
+  <div class="wiz-step" data-step="2">
+    <div class="wiz-step-intro">
+      <h2>2 &middot; Add a visual</h2>
+      <p>Give your audio a cover. Embed an image, GIF or video, or reference an existing inscription.</p>
+    </div>
+
+    <section class="tool-panel">
       <div class="tool-panel__header">
         <div>
-          <h2 id="audio-section-heading">Audio conversion</h2>
-          <p>WebM Audio with Opus is selected by default.</p>
-        </div>
-        <div class="button-row">
-          <button id="showAudioInfoBtn" class="button-small" type="button">Format info</button>
-          <button id="showAudionalInfoBtn" class="button-small" type="button">Audional info</button>
+          <h2>Visual source</h2>
+          <p>Cover art for the player.</p>
         </div>
       </div>
       <div class="tool-panel__body">
-        <div class="form-stack">
-          <label class="field" for="fileInput">
-            <span>Audio file</span>
-            <input type="file" id="fileInput" accept="audio/*,.wav,.mp3,.flac,.ogg,.aac" multiple>
-          </label>
-
-          <fieldset id="formatOptions">
-            <legend>Output</legend>
-            <div class="format-options">
+        <div class="html-player-options">
+          <fieldset>
+            <legend>Visual source</legend>
+            <div class="html-mode-options">
               <label class="format-option">
-                <input type="radio" name="format" value="weba" checked>
+                <input type="radio" name="visualSourceMode" value="embedded" checked>
                 <span>
-                  <strong>WebM Audio</strong>
-                  <small>.weba, Opus codec</small>
+                  <strong>Embedded</strong>
+                  <small>Upload image, GIF, or video into the HTML</small>
                 </span>
               </label>
               <label class="format-option">
-                <input type="radio" name="format" value="mp3">
+                <input type="radio" name="visualSourceMode" value="recursive">
                 <span>
-                  <strong>MP3</strong>
-                  <small>Compatibility fallback</small>
+                  <strong>Recursive</strong>
+                  <small>Load cover art from an existing inscription</small>
                 </span>
               </label>
             </div>
           </fieldset>
 
-          <div id="opusSettings" class="settings-grid">
-            <label class="field field-wide" for="audioProfileSelect">
-              <span>Profile</span>
-              <select id="audioProfileSelect"></select>
-            </label>
-            <p id="audioProfileDescription" class="profile-description field-wide"></p>
-
-            <label class="field field-wide" for="opusBitrate">
-              <span>Opus bitrate <span id="opusBitrateValue" class="inline-value">96 kbps</span></span>
-              <input type="range" id="opusBitrate" min="16" max="256" value="96" step="8">
-            </label>
-
-            <label class="field" for="opusVbrMode">
-              <span>VBR mode</span>
-              <select id="opusVbrMode">
-                <option value="on" selected>VBR</option>
-                <option value="constrained">Constrained VBR</option>
-                <option value="off">CBR</option>
-              </select>
-            </label>
-
-            <label class="field" for="opusApplication">
-              <span>Application</span>
-              <select id="opusApplication">
-                <option value="audio" selected>General audio</option>
-                <option value="voip">Voice</option>
-                <option value="lowdelay">Low latency</option>
-              </select>
-            </label>
-
-            <label class="field field-wide" for="opusCompressionLevel">
-              <span>Compression level <span id="opusCompressionLevelValue" class="inline-value">10</span></span>
-              <input type="range" id="opusCompressionLevel" min="0" max="10" value="10" step="1">
-            </label>
+          <div id="embeddedVisualOptions" class="compact-box">
+            <h3>Embedded visual</h3>
+            <div class="form-stack">
+              <label class="field" for="standaloneArtworkInput">
+                <span>Artwork / visual</span>
+                <input type="file" id="standaloneArtworkInput" accept="image/*,video/*,.gif,.webp,.mp4,.webm,.mov">
+              </label>
+              <div class="standalone-artwork-grid">
+                <div id="standaloneArtworkPreview" class="standalone-artwork-preview">
+                  <span>No visual selected</span>
+                </div>
+                <div>
+                  <p id="standaloneArtworkStatus" class="standalone-artwork-status">No artwork selected.</p>
+                  <button id="clearStandaloneArtworkButton" class="button-small" type="button" disabled>Clear visual</button>
+                </div>
+              </div>
+              <details>
+                <summary>Show visual base64</summary>
+                <textarea id="standaloneArtworkBase64Output" class="base64-output" readonly></textarea>
+              </details>
+            </div>
           </div>
 
-          <div id="mp3Settings" class="settings-grid hidden" style="display: none;">
-            <label class="field field-wide" for="mp3Quality">
-              <span>MP3 quality <span id="mp3QualityValue" class="inline-value">4</span></span>
-              <input type="range" id="mp3Quality" min="0" max="9" value="4" step="1">
-            </label>
-          </div>
-
-          <div class="info-summary-section" id="outputInfoSection">
-            <p>Original <span id="originalFileInfo">N/A</span></p>
-            <p>Estimate <span id="currentEstimatedOutputSize">Select file</span></p>
-            <p>Actual <span id="actualOutputFileInfo">Not converted</span></p>
-            <p>Saving <span id="sizeSavingsInfo">Convert to compare</span></p>
-            <p>Xtrata type <span><code>audio/webm; codecs=opus</code></span></p>
-          </div>
-
-          <div class="button-container">
-            <button id="playSampleBtn" class="button-secondary" type="button" disabled>Play original</button>
-            <button id="convertBtn" type="button" disabled>Convert to WebM Audio</button>
-            <button id="batchConvertBtn" class="button-secondary" type="button" disabled>Batch convert</button>
-            <button id="downloadBatchZipBtn" class="button-secondary" type="button" disabled>Download ZIP</button>
+          <div id="recursiveVisualOptions" class="compact-box hidden">
+            <h3>Recursive cover visual</h3>
+            <div class="form-stack">
+              <label class="field" for="recursiveCoverTokenId">
+                <span>Cover token ID</span>
+                <input type="text" id="recursiveCoverTokenId" placeholder="Optional: 314">
+              </label>
+              <label class="field" for="recursiveCoverUrl">
+                <span>Direct cover URL</span>
+                <input type="text" id="recursiveCoverUrl" placeholder="Optional: https://xtrata.xyz/inscription/314">
+              </label>
+              <label class="field" for="recursiveCoverKind">
+                <span>Visual type</span>
+                <select id="recursiveCoverKind">
+                  <option value="image" selected>Image / GIF</option>
+                  <option value="video">Video</option>
+                </select>
+              </label>
+              <div class="info-summary-section">
+                <p>Cover URL <span id="recursiveCoverUrlPreview" class="preview-value">Upload embedded artwork or enter a cover token ID/URL.</span></p>
+                <p>Visual type <span>Image/GIF uses an image tag; video uses a muted looping visual.</span></p>
+                <p>Mint note <span>Add the cover token as a recursive parent.</span></p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <aside class="output-stack">
-      <section class="tool-panel">
-        <div class="tool-panel__header">
-          <div>
-            <h2>Audio output</h2>
-            <p>Preview, download, and base64 output.</p>
-          </div>
-        </div>
-        <div class="tool-panel__body output-stack">
-          <div id="originalAudioContainer" class="compact-box"></div>
-          <div id="result" class="compact-box"></div>
-          <div id="batchResultEl" class="compact-box"></div>
-          <div id="base64Container" class="compact-box hidden">
-            <h3>Audio base64</h3>
-            <div id="base64Result"></div>
-            <details>
-              <summary>Show audio base64</summary>
-              <div id="base64Output" class="base64-output"></div>
-            </details>
-            <div class="button-group">
-              <button id="copyBase64Btn" class="copy-button" type="button" disabled>Copy audio base64</button>
-              <button id="downloadBase64Btn" class="download-button" type="button" disabled>Download audio TXT</button>
-            </div>
-          </div>
-        </div>
-      </section>
+    <div class="wiz-footer">
+      <span class="wiz-hint">Step 2 of 4 &middot; A visual is optional &mdash; you can skip ahead.</span>
+      <button type="button" class="wiz-back" data-nav="back">Back</button>
+      <button type="button" class="wiz-next" data-nav="next">Next: Details &rarr;</button>
+    </div>
+  </div>
 
-      <section id="export-section" class="tool-panel export-panel">
-        <div class="tool-panel__header">
-          <div>
-            <h2>HTML player</h2>
-            <p>Export a standalone embedded player or a recursive player.</p>
-          </div>
-        </div>
-        <div class="tool-panel__body">
-          <div class="html-player-options">
-            <fieldset>
-              <legend>Audio source</legend>
-              <div class="html-mode-options">
-                <label class="format-option">
-                  <input type="radio" name="htmlPlayerMode" value="embedded" checked>
-                  <span>
-                    <strong>Embedded audio</strong>
-                    <small>Use the converted Base64 audio in this HTML file</small>
-                  </span>
-                </label>
-                <label class="format-option">
-                  <input type="radio" name="htmlPlayerMode" value="recursive">
-                  <span>
-                    <strong>Recursive audio</strong>
-                    <small>Load an existing audio inscription by URL or token ID</small>
-                  </span>
-                </label>
-              </div>
-            </fieldset>
+  <!-- ============ STEP 3 — DETAILS ============ -->
+  <div class="wiz-step" data-step="3">
+    <div class="wiz-step-intro">
+      <h2>3 &middot; Describe it</h2>
+      <p>Add the metadata that travels with your inscription. Title is required; the rest is optional.</p>
+    </div>
 
-            <div id="embeddedPlayerOptions" class="compact-box">
-              <h3>Embedded audio</h3>
-              <p>Convert audio first. The exported player will carry the WebM/Opus data inside the HTML.</p>
-            </div>
-
-            <div id="recursivePlayerOptions" class="compact-box hidden">
-              <h3>Recursive audio source</h3>
-              <div class="form-stack">
-                <label class="field" for="recursiveAudioTokenId">
-                  <span>Audio token ID</span>
-                  <input type="text" id="recursiveAudioTokenId" placeholder="315">
-                </label>
-                <label class="field" for="recursiveAudioUrl">
-                  <span>Direct audio URL</span>
-                  <input type="text" id="recursiveAudioUrl" placeholder="Optional: https://xtrata.xyz/inscription/315">
-                </label>
-                <label class="field" for="recursiveContractId">
-                  <span>Contract ID</span>
-                  <input type="text" id="recursiveContractId" value="SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0">
-                </label>
-                <label class="field" for="recursiveEndpointMode">
-                  <span>Endpoint</span>
-                  <select id="recursiveEndpointMode">
-                    <option value="readable" selected>Readable /inscription/{ID}</option>
-                    <option value="compact">Compact /i/{ID}</option>
-                  </select>
-                </label>
-                <label class="field" for="recursiveNetwork">
-                  <span>Network</span>
-                  <select id="recursiveNetwork">
-                    <option value="mainnet" selected>Mainnet</option>
-                    <option value="testnet">Testnet</option>
-                  </select>
-                </label>
-                <div class="info-summary-section">
-                  <p>Audio URL <span id="recursiveUrlPreview" class="preview-value">Enter an audio token ID or audio URL.</span></p>
-                  <p>Endpoint <span>Use /inscription for clarity or /i for compact recursive references.</span></p>
-                  <p>Mint note <span>Add the audio token as a recursive parent.</span></p>
-                </div>
-              </div>
-            </div>
-
-            <fieldset>
-              <legend>Visual source</legend>
-              <div class="html-mode-options">
-                <label class="format-option">
-                  <input type="radio" name="visualSourceMode" value="embedded" checked>
-                  <span>
-                    <strong>Embedded visual</strong>
-                    <small>Upload image, GIF, or video into the HTML</small>
-                  </span>
-                </label>
-                <label class="format-option">
-                  <input type="radio" name="visualSourceMode" value="recursive">
-                  <span>
-                    <strong>Recursive visual</strong>
-                    <small>Load cover art from an existing inscription</small>
-                  </span>
-                </label>
-              </div>
-            </fieldset>
-
-            <div id="embeddedVisualOptions" class="compact-box">
-              <h3>Embedded visual</h3>
-              <div class="form-stack">
-                <label class="field" for="standaloneArtworkInput">
-                  <span>Artwork / visual</span>
-                  <input type="file" id="standaloneArtworkInput" accept="image/*,video/*,.gif,.webp,.mp4,.webm,.mov">
-                </label>
-                <div class="standalone-artwork-grid">
-                  <div id="standaloneArtworkPreview" class="standalone-artwork-preview">
-                    <span>No visual selected</span>
-                  </div>
-                  <div>
-                    <p id="standaloneArtworkStatus" class="standalone-artwork-status">No artwork selected.</p>
-                    <button id="clearStandaloneArtworkButton" class="button-small" type="button" disabled>Clear visual</button>
-                  </div>
-                </div>
-                <details>
-                  <summary>Show visual base64</summary>
-                  <textarea id="standaloneArtworkBase64Output" class="base64-output" readonly></textarea>
-                </details>
-              </div>
-            </div>
-
-            <div id="recursiveVisualOptions" class="compact-box hidden">
-              <h3>Recursive cover visual</h3>
-              <div class="form-stack">
-                <label class="field" for="recursiveCoverTokenId">
-                  <span>Cover token ID</span>
-                  <input type="text" id="recursiveCoverTokenId" placeholder="Optional: 314">
-                </label>
-                <label class="field" for="recursiveCoverUrl">
-                  <span>Direct cover URL</span>
-                  <input type="text" id="recursiveCoverUrl" placeholder="Optional: https://xtrata.xyz/inscription/314">
-                </label>
-                <label class="field" for="recursiveCoverKind">
-                  <span>Visual type</span>
-                  <select id="recursiveCoverKind">
-                    <option value="image" selected>Image / GIF</option>
-                    <option value="video">Video</option>
-                  </select>
-                </label>
-                <div class="info-summary-section">
-                  <p>Cover URL <span id="recursiveCoverUrlPreview" class="preview-value">Upload embedded artwork or enter a cover token ID/URL.</span></p>
-                  <p>Visual type <span>Image/GIF uses an image tag; video uses a muted looping visual.</span></p>
-                  <p>Mint note <span>Add the cover token as a recursive parent.</span></p>
-                </div>
-              </div>
-            </div>
-
-            <div class="info-summary-section">
-              <p>Dependencies <span id="recursiveDependencyPreview" class="preview-value">None yet</span></p>
-              <p>Player output <span>Embedded and recursive sources can be mixed.</span></p>
-              <p>Preview <span>Updates automatically from the current form.</span></p>
-            </div>
-
-            <section id="playerMetadataPanel" class="compact-box">
-              <h3>Player metadata</h3>
-              <form id="metadataForm" class="form-stack">
-                <label class="field" for="titleInput">
-                  <span>Title</span>
-                  <input type="text" id="titleInput" name="title" required>
-                </label>
-                <label class="field" for="assetTypeInput">
-                  <span>Audio type</span>
-                  <select id="assetTypeInput" name="assetType">
-                    <option value="song" selected>Song</option>
-                    <option value="sample">Sample</option>
-                    <option value="stem">Stem</option>
-                    <option value="loop">Loop</option>
-                    <option value="voice">Voice</option>
-                    <option value="other">Other audio</option>
-                  </select>
-                </label>
-                <label class="field" for="artistInput">
-                  <span>Artist</span>
-                  <input type="text" id="artistInput" name="artist">
-                </label>
-                <label class="field" for="albumInput">
-                  <span>Album</span>
-                  <input type="text" id="albumInput" name="album">
-                </label>
-                <fieldset id="stemMetadataFields" class="metadata-fieldset hidden">
-                  <legend>Stem details</legend>
-                  <label class="field" for="stemRoleInput">
-                    <span>Stem role</span>
-                    <input type="text" id="stemRoleInput" name="stemRole" placeholder="Drums, vocal, guitar">
-                  </label>
-                </fieldset>
-                <fieldset id="sampleMetadataFields" class="metadata-fieldset hidden">
-                  <legend>Sample details</legend>
-                  <label class="field" for="instrumentInput">
-                    <span>Instrument</span>
-                    <input type="text" id="instrumentInput" name="instrument">
-                  </label>
-                  <label class="field" for="noteInput">
-                    <span>Note</span>
-                    <input type="text" id="noteInput" name="note" list="noteList" placeholder="C4">
-                    <datalist id="noteList"></datalist>
-                  </label>
-                  <label class="field" for="frequencyInput">
-                    <span>Frequency</span>
-                    <input type="text" id="frequencyInput" name="frequency" readonly>
-                  </label>
-                </fieldset>
-                <label class="format-option" for="loopCheckbox">
-                  <input type="checkbox" id="loopCheckbox" name="isLoop">
-                  <span>
-                    <strong>Loop</strong>
-                    <small>Enable tempo metadata</small>
-                  </span>
-                </label>
-                <div id="bpmGroup" class="field hidden">
-                  <label for="bpmInput">
-                    <span>BPM</span>
-                    <input type="number" id="bpmInput" name="bpm" min="1">
-                  </label>
-                </div>
-                <label class="field" for="descriptionInput">
-                  <span>Description</span>
-                  <textarea id="descriptionInput" name="description"></textarea>
-                </label>
-                <label class="field" for="licenseInput">
-                  <span>License</span>
-                  <input type="text" id="licenseInput" name="license" placeholder="All rights reserved">
-                </label>
-              </form>
-            </section>
-
-            <p id="htmlExportStatus" class="html-export-status">Convert audio first or switch to recursive mode.</p>
-            <div class="button-container">
-              <button id="generateHtmlButton" type="button" disabled>Download HTML player</button>
-              <button id="previewHtmlButton" class="button-secondary" type="button" disabled>Preview HTML</button>
-              <button id="inscribeHtmlButton" class="button-secondary" type="button" disabled>Prepare inscription</button>
-              <button id="testGeneratedHtmlButton" class="button-secondary" type="button">Open tester</button>
-            </div>
-            <section class="live-preview-panel" aria-label="Generated player live preview">
-              <h3>Live player preview</h3>
-              <p id="htmlLivePreviewStatus" class="html-live-preview-status">Waiting for an audio source.</p>
-              <div class="live-preview-frame">
-                <iframe id="htmlPlayerLivePreview" title="Generated HTML player live preview" sandbox="allow-scripts allow-same-origin"></iframe>
-              </div>
-            </section>
-          </div>
-        </div>
-      </section>
-    </aside>
-
-    <section id="image-section" class="tool-panel">
+    <section id="playerMetadataPanel" class="tool-panel">
       <div class="tool-panel__header">
         <div>
-          <h2>Image base64</h2>
-          <p>Optional visual data for the exported player.</p>
+          <h2>Player metadata</h2>
+          <p>Title, artist, and type. Expand for stem, sample, and loop details.</p>
         </div>
       </div>
       <div class="tool-panel__body">
-        <div class="tool-grid">
-          <div class="form-stack">
-            <label class="field" for="image-file-input">
-              <span>Image file</span>
-              <input type="file" id="image-file-input" accept="image/*">
-            </label>
-            <p id="file-size-info"></p>
-            <div class="button-container">
-              <button id="convert-image-button" type="button" disabled>Convert image</button>
-              <button id="copy-image-base64-button" class="copy-button" type="button" disabled>Copy image base64</button>
-              <button id="download-image-base64-button" class="download-button" type="button" disabled>Download image TXT</button>
+        <form id="metadataForm" class="form-stack">
+          <label class="field" for="titleInput">
+            <span>Title</span>
+            <input type="text" id="titleInput" name="title" required>
+          </label>
+          <label class="field" for="assetTypeInput">
+            <span>Audio type</span>
+            <select id="assetTypeInput" name="assetType">
+              <option value="song" selected>Song</option>
+              <option value="sample">Sample</option>
+              <option value="stem">Stem</option>
+              <option value="loop">Loop</option>
+              <option value="voice">Voice</option>
+              <option value="other">Other audio</option>
+            </select>
+          </label>
+          <label class="field" for="artistInput">
+            <span>Artist</span>
+            <input type="text" id="artistInput" name="artist">
+          </label>
+          <label class="field" for="albumInput">
+            <span>Album</span>
+            <input type="text" id="albumInput" name="album">
+          </label>
+          <details class="metadata-extra">
+            <summary>More metadata</summary>
+            <div class="form-stack">
+              <fieldset id="stemMetadataFields" class="metadata-fieldset hidden">
+                <legend>Stem details</legend>
+                <label class="field" for="stemRoleInput">
+                  <span>Stem role</span>
+                  <input type="text" id="stemRoleInput" name="stemRole" placeholder="Drums, vocal, guitar">
+                </label>
+              </fieldset>
+              <fieldset id="sampleMetadataFields" class="metadata-fieldset hidden">
+                <legend>Sample details</legend>
+                <label class="field" for="instrumentInput">
+                  <span>Instrument</span>
+                  <input type="text" id="instrumentInput" name="instrument">
+                </label>
+                <label class="field" for="noteInput">
+                  <span>Note</span>
+                  <input type="text" id="noteInput" name="note" list="noteList" placeholder="C4">
+                  <datalist id="noteList"></datalist>
+                </label>
+                <label class="field" for="frequencyInput">
+                  <span>Frequency</span>
+                  <input type="text" id="frequencyInput" name="frequency" readonly>
+                </label>
+              </fieldset>
+              <label class="format-option" for="loopCheckbox">
+                <input type="checkbox" id="loopCheckbox" name="isLoop">
+                <span>
+                  <strong>Loop</strong>
+                  <small>Enable tempo metadata</small>
+                </span>
+              </label>
+              <div id="bpmGroup" class="field hidden">
+                <label for="bpmInput">
+                  <span>BPM</span>
+                  <input type="number" id="bpmInput" name="bpm" min="1">
+                </label>
+              </div>
+              <label class="field" for="descriptionInput">
+                <span>Description</span>
+                <textarea id="descriptionInput" name="description"></textarea>
+              </label>
+              <label class="field" for="licenseInput">
+                <span>License</span>
+                <input type="text" id="licenseInput" name="license" placeholder="All rights reserved">
+              </label>
             </div>
-            <details>
-              <summary>Show image base64</summary>
-              <textarea id="image-base64-output" class="base64-output" readonly></textarea>
-            </details>
+          </details>
+        </form>
+      </div>
+    </section>
+
+    <div class="wiz-footer">
+      <span class="wiz-hint">Step 3 of 4 &middot; A <b>Title</b> makes your inscription easy to find.</span>
+      <button type="button" class="wiz-back" data-nav="back">Back</button>
+      <button type="button" class="wiz-next" data-nav="next">Next: Export &rarr;</button>
+    </div>
+  </div>
+
+  <!-- ============ STEP 4 — EXPORT ============ -->
+  <div class="wiz-step" data-step="4">
+    <div class="wiz-step-intro">
+      <h2>4 &middot; Export your player</h2>
+      <p>Review dependencies, preview the player, then download the HTML or inscribe it.</p>
+    </div>
+
+    <section id="export-section" class="tool-panel export-panel">
+      <div class="tool-panel__header">
+        <div>
+          <h2>HTML player</h2>
+          <p>Embedded or recursive player export.</p>
+        </div>
+      </div>
+      <div class="tool-panel__body">
+        <div class="html-player-options">
+          <div class="info-summary-section">
+            <p>Dependencies <span id="recursiveDependencyPreview" class="preview-value">None yet</span></p>
+            <p>Player output <span>Embedded and recursive sources can be mixed.</span></p>
+            <p>Preview <span>Updates automatically from the current form.</span></p>
           </div>
-          <div class="media-frame">
-            <img id="image-preview" alt="Image preview" style="display: none;">
+
+          <div class="inscription-size" id="inscriptionSizePanel">
+            <div>
+              <span class="inscription-size__label">Estimated inscription size</span>
+              <strong id="estInscriptionSize">&mdash;</strong>
+            </div>
+            <p id="estInscriptionBreakdown" class="inscription-size__hint">Convert audio or add a recursive source to estimate the final HTML size.</p>
           </div>
+
+          <details class="compact-box" id="assetBreakdownPanel" open>
+            <summary>What's being inscribed — full breakdown</summary>
+            <div id="assetBreakdown" class="asset-breakdown">
+              <p class="asset-breakdown__empty">Convert audio or add a recursive source to see the breakdown.</p>
+            </div>
+          </details>
+
+          <p id="htmlExportStatus" class="html-export-status">Convert audio first or switch to recursive mode.</p>
+          <div class="button-container">
+            <button id="generateHtmlButton" type="button" disabled>Download HTML</button>
+            <button id="previewHtmlButton" class="button-secondary" type="button" disabled>Preview HTML</button>
+            <button id="inscribeHtmlButton" class="button-secondary" type="button" disabled>Inscribe</button>
+            <button id="testGeneratedHtmlButton" class="button-secondary" type="button">Open tester</button>
+          </div>
+          <details class="live-preview-panel" open aria-label="Generated player live preview">
+            <summary>Preview</summary>
+            <p id="htmlLivePreviewStatus" class="html-live-preview-status">Waiting for an audio source.</p>
+            <div class="live-preview-frame">
+              <iframe id="htmlPlayerLivePreview" title="Generated HTML player live preview" sandbox="allow-scripts allow-same-origin"></iframe>
+            </div>
+          </details>
         </div>
       </div>
     </section>
+
+    <div class="wiz-footer">
+      <span class="wiz-hint">Step 4 of 4 &middot; <b>Download HTML</b> or <b>Inscribe</b> when you're ready.</span>
+      <button type="button" class="wiz-back" data-nav="back">Back</button>
+      <button type="button" class="wiz-next" data-nav="restart">Start over</button>
+    </div>
   </div>
 
   <div id="audioInfoContainer" class="info-popup hidden" role="dialog" aria-modal="true" aria-labelledby="audio-section-heading">
@@ -1286,8 +1758,53 @@
     </div>
   </div>
 
-</main>
+  <!-- Wizard step controller (additive; does not touch existing listeners) -->
+  <script>
+    (function () {
+      var steps = Array.prototype.slice.call(document.querySelectorAll('.wiz-step'));
+      var tabs = Array.prototype.slice.call(document.querySelectorAll('.wiz-step-tab'));
+      var maxReached = 1;
+      var current = 1;
 
+      function render() {
+        steps.forEach(function (s) {
+          s.classList.toggle('is-active', Number(s.getAttribute('data-step')) === current);
+        });
+        tabs.forEach(function (t) {
+          var n = Number(t.getAttribute('data-go'));
+          t.classList.toggle('is-active', n === current);
+          t.classList.toggle('is-complete', n < current || (n < maxReached && n !== current));
+          if (n === current) { t.setAttribute('aria-current', 'step'); }
+          else { t.removeAttribute('aria-current'); }
+        });
+        try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { window.scrollTo(0, 0); }
+      }
+
+      function go(n) {
+        n = Math.max(1, Math.min(steps.length, n));
+        current = n;
+        if (n > maxReached) { maxReached = n; }
+        render();
+      }
+
+      tabs.forEach(function (t) {
+        t.addEventListener('click', function () { go(Number(t.getAttribute('data-go'))); });
+      });
+
+      document.querySelectorAll('[data-nav]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var action = btn.getAttribute('data-nav');
+          if (action === 'back') { go(current - 1); }
+          else if (action === 'restart') { go(1); }
+          else { go(current + 1); }
+        });
+      });
+
+      render();
+    })();
+  </script>
+
+</main>
 <script src="metadata-modal-handler.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -1309,7 +1826,9 @@
 <script src="main.js" defer></script>
 <script type="module">
   import { initializeImageConverter } from './image-to-base64.js';
+  import { initImageCompressorUI } from './image-compressor-ui.js';
   document.addEventListener('DOMContentLoaded', initializeImageConverter);
+  document.addEventListener('DOMContentLoaded', initImageCompressorUI);
 
   document.addEventListener('audionalBase64Generated', () => {
     if (typeof window.updateHtmlGenerateButtonState === 'function') {

@@ -89,4 +89,16 @@ describe("mint attempt cache", () => {
     const loaded = await loadMintAttempt(contractId);
     expect(loaded).toEqual(attempt);
   });
+
+  it("omits payload blobs from the localStorage fallback", async () => {
+    const attempt = {
+      ...baseAttempt,
+      payloadBlob: new Blob(["payload"], { type: "text/plain" })
+    };
+    await saveMintAttempt(attempt);
+
+    expect(
+      JSON.parse(store[`xtrata.mint.attempt.${contractId}`])
+    ).not.toHaveProperty("payloadBlob");
+  });
 });

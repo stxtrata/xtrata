@@ -40,12 +40,10 @@ const sizeSavingsInfoEl = document.getElementById('sizeSavingsInfo');
 // const estSizeWebmSpan = document.getElementById('estSizeWebm');
 
 const base64Container = document.getElementById('base64Container');
-const base64Result = document.getElementById('base64Result');
 const base64Output = document.getElementById('base64Output');
 const copyBase64Btn = document.getElementById('copyBase64Btn');
 const downloadBase64Btn = document.getElementById('downloadBase64Btn');
 const playSampleBtn = document.getElementById('playSampleBtn');
-const originalAudioContainer = document.getElementById('originalAudioContainer');
 
 const showAudioInfoBtn = document.getElementById('showAudioInfoBtn');
 const audioInfoContainer = document.getElementById('audioInfoContainer');
@@ -60,13 +58,5 @@ const closeAudionalInfoBtn = document.getElementById('closeAudionalInfoBtn');
 const metadataModal = document.getElementById('metadataModal');
 const cancelMetadataBtn = document.getElementById('cancelMetadataBtn');
 const metadataForm = document.getElementById('metadataForm');
-
-const imageFileInput = document.getElementById('image-file-input');
-const imagePreview = document.getElementById('image-preview');
-const fileSizeInfo = document.getElementById('file-size-info');
-const convertImageButton = document.getElementById('convert-image-button');
-const imageBase64Output = document.getElementById('image-base64-output');
-const copyImageBase64Button = document.getElementById('copy-image-base64-button');
-const downloadImageBase64Button = document.getElementById('download-image-base64-button');
 
 const generateHtmlButton = document.getElementById('generateHtmlButton');

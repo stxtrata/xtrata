@@ -8,6 +8,7 @@ export * from './clarity.js';
 export * from './parsers.js';
 export * from './client.js';
 export * from './mint.js';
+export * from './upload-guard.js';
 export * from './collections.js';
 export * from './market.js';
 export * from './deploy.js';

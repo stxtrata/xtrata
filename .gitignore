@@ -5,6 +5,9 @@ coverage
 .env
 .env.local
 
+# Claude / Cowork agent scratch dirs (any level)
+.claude/
+
 
 # FOLDERS
 

@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Image Compressor — self test</title>
+<style>
+  body { font-family: ui-monospace, Menlo, monospace; background:#101114; color:#e7ecf5; padding:20px; }
+  .case { border:1px solid #333; border-radius:8px; padding:12px; margin:10px 0; }
+  .ok { color:#74f0b4; } .bad { color:#ff7882; } .warn { color:#ffd479; }
+  img { max-width:120px; border:1px solid #444; vertical-align:middle; margin-right:10px; }
+  h2 { font-size:15px; }
+  #summary { font-size:16px; margin:14px 0; }
+</style>
+</head>
+<body>
+<h1>Image Compressor — automated self test</h1>
+<div id="summary">Running…</div>
+<div id="out"></div>
+
+<script type="module">
+/**
+ * image-compressor.js
+ * -------------------
+ * Client-side image compression engine for the Audional Art Tools wizard.
+ *
+ * This is a browser port of the Python/Pillow "Smart Image Compressor" so that
+ * compression runs entirely in the user's browser (no server, no upload) -- the
+ * same privacy guarantee as the FFmpeg-WASM audio path.
+ *
+ * Public API:
+ *   - QUALITY_PROFILES
+ *   - compressImage(file, settings)  -> Promise<CompressResult>
+ *   - humanSize(bytes)               -> string
+ *
+ * A CompressResult looks like:
+ *   {
+ *     status: 'ok' | 'skipped' | 'error',
+ *     blob, mime, ext, dataUrl,           // null when skipped/error
+ *     report: { originalBytes, compressedBytes, savedBytes, savedPercent,
+ *               format, ext, originalWidth, originalHeight,
+ *               compressedWidth, compressedHeight, wouldSkip, detail }
+ *   }
+ *
+ * Settings (all optional, sensible defaults applied):
+ *   {
+ *     mode: 'high' | 'balanced' | 'small',          // default 'balanced'
+ *     outputFormat: 'auto'|'same'|'jpeg'|'png'|'webp', // default 'auto'
+ *     maxLongEdge: number,   // 0 = keep original size; default 0
+ *     skipLarger: boolean,   // default true
+ *     jpegBackground: [r,g,b] // default white, used when flattening alpha to JPEG
+ *   }
+ */
+
+// Quality profiles mirror encode_profile() in the Python original.
+// (PNG color-quantization from the "small" profile is not available natively
+// in the browser, so PNG is always lossless here; WebP/JPEG normally win in
+// "auto" mode anyway.)
+const QUALITY_PROFILES = {
+  high:     { jpeg: 0.90, webp: 0.92 },
+  balanced: { jpeg: 0.82, webp: 0.82 },
+  small:    { jpeg: 0.72, webp: 0.72 },
+};
+
+const EXT_FOR_FORMAT = { JPEG: '.jpg', PNG: '.png', WEBP: '.webp' };
+const MIME_FOR_FORMAT = { JPEG: 'image/jpeg', PNG: 'image/png', WEBP: 'image/webp' };
+
+// File types we will attempt to compress as still images.
+// Animated GIF / video are intentionally excluded (canvas only captures one frame).
+const STILL_IMAGE_TYPES = /^image\/(png|jpeg|jpg|webp|bmp|tiff|x-icon|heic|heif|avif)$/i;
+
+function isCompressibleImage(file) {
+  if (!file) return false;
+  if (file.type && STILL_IMAGE_TYPES.test(file.type)) return true;
+  // Fall back to extension when the browser reports no/odd MIME type.
+  return /\.(png|jpe?g|webp|bmp|tiff?|heic|heif|avif)$/i.test(file.name || '');
+}
+
+function humanSize(num) {
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let n = Number(num) || 0;
+  for (let i = 0; i < units.length; i++) {
+    if (n < 1024 || i === units.length - 1) {
+      return units[i] === 'B' ? `${Math.round(n)} B` : `${n.toFixed(1)} ${units[i]}`;
+    }
+    n /= 1024;
+  }
+  return `${num} B`;
+}
+
+function defaults(settings = {}) {
+  return {
+    mode: settings.mode || 'balanced',
+    outputFormat: (settings.outputFormat || 'auto').toLowerCase(),
+    maxLongEdge: Math.max(0, parseInt(settings.maxLongEdge, 10) || 0),
+    skipLarger: settings.skipLarger !== false,
+    jpegBackground: settings.jpegBackground || [255, 255, 255],
+  };
+}
+
+// ---- Decoding -------------------------------------------------------------
+
+async function decodeImage(file) {
+  // Prefer createImageBitmap (fast, off-thread, honours orientation when asked).
+  if (typeof createImageBitmap === 'function') {
+    try {
+      return await createImageBitmap(file, { imageOrientation: 'from-image' });
+    } catch (_) {
+      try {
+        return await createImageBitmap(file);
+      } catch (_) { /* fall through */ }
+    }
+  }
+  // Fallback: HTMLImageElement via object URL.
+  return await new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not decode image.')); };
+    img.src = url;
+  });
+}
+
+function naturalSize(decoded) {
+  const w = decoded.width || decoded.naturalWidth;
+  const h = decoded.height || decoded.naturalHeight;
+  return { w, h };
+}
+
+function drawToCanvas(decoded, targetW, targetH) {
+  const canvas = document.createElement('canvas');
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(decoded, 0, 0, targetW, targetH);
+  return canvas;
+}
+
+// ---- Analysis (ports has_alpha + looks_graphic) --------------------------
+
+function canvasHasAlpha(canvas) {
+  try {
+    const ctx = canvas.getContext('2d');
+    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    // Sample every 4th pixel for speed on large images.
+    const step = 4 * Math.max(1, Math.floor(data.length / 4 / 200000));
+    for (let i = 3; i < data.length; i += step) {
+      if (data[i] < 255) return true;
+    }
+    return false;
+  } catch (_) {
+    return false;
+  }
+}
+
+function looksGraphic(decoded) {
+  try {
+    const tw = Math.min(128, naturalSize(decoded).w || 128);
+    const th = Math.min(128, naturalSize(decoded).h || 128);
+    const c = drawToCanvas(decoded, Math.max(1, tw), Math.max(1, th));
+    const { data } = c.getContext('2d').getImageData(0, 0, c.width, c.height);
+    const colors = new Set();
+    for (let i = 0; i < data.length; i += 4) {
+      // Pack RGB into one int; cap the set to bail out early.
+      colors.add((data[i] << 16) | (data[i + 1] << 8) | data[i + 2]);
+      if (colors.size > 512) return false;
+    }
+    return colors.size <= 512;
+  } catch (_) {
+    return false;
+  }
+}
+
+// ---- Format selection (ports candidate_formats) --------------------------
+
+function candidateFormats(alpha, graphic, requested, sourceType) {
+  const src = (sourceType || '').toLowerCase();
+  if (requested === 'same') {
+    if (src.includes('png')) return ['PNG'];
+    if (src.includes('jpeg') || src.includes('jpg')) return ['JPEG'];
+    if (src.includes('webp')) return ['WEBP'];
+    return ['WEBP'];
+  }
+  if (requested === 'jpeg') return ['JPEG'];
+  if (requested === 'png') return ['PNG'];
+  if (requested === 'webp') return ['WEBP'];
+
+  // auto
+  if (alpha) return ['WEBP', 'PNG'];
+  if (graphic) return ['WEBP', 'PNG', 'JPEG'];
+  return ['WEBP', 'JPEG'];
+}
+
+// ---- Encoding -------------------------------------------------------------
+
+function toBlob(canvas, mime, quality) {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), mime, quality);
+  });
+}
+
+function flattenedCanvas(srcCanvas, background) {
+  const c = document.createElement('canvas');
+  c.width = srcCanvas.width;
+  c.height = srcCanvas.height;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = `rgb(${background[0]},${background[1]},${background[2]})`;
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.drawImage(srcCanvas, 0, 0);
+  return c;
+}
+
+async function encodeOne(srcCanvas, fmt, profile, opts) {
+  if (fmt === 'JPEG') {
+    const flat = flattenedCanvas(srcCanvas, opts.jpegBackground);
+    return toBlob(flat, 'image/jpeg', profile.jpeg);
+  }
+  if (fmt === 'WEBP') {
+    // Graphics/alpha at high quality approximate the Python "lossless" path.
+    const q = (opts.alpha || opts.graphic) && (opts.mode === 'high' || opts.mode === 'balanced')
+      ? 1.0
+      : profile.webp;
+    return toBlob(srcCanvas, 'image/webp', q);
+  }
+  if (fmt === 'PNG') {
+    // PNG is lossless; browsers ignore the quality argument.
+    return toBlob(srcCanvas, 'image/png');
+  }
+  return null;
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Could not read compressed blob.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+// ---- Public entry point ---------------------------------------------------
+
+async function compressImage(file, settings = {}) {
+  const opts = defaults(settings);
+  const originalBytes = file.size;
+
+  const report = {
+    source: file.name,
+    status: 'error',
+    originalBytes,
+    compressedBytes: 0,
+    savedBytes: 0,
+    savedPercent: 0,
+    format: null,
+    ext: null,
+    originalWidth: null,
+    originalHeight: null,
+    compressedWidth: null,
+    compressedHeight: null,
+    wouldSkip: false,
+    detail: '',
+  };
+
+  let decoded;
+  try {
+    decoded = await decodeImage(file);
+  } catch (err) {
+    report.detail = err.message || 'Decode failed.';
+    return { status: 'error', blob: null, mime: null, ext: null, dataUrl: null, report };
+  }
+
+  const { w: ow, h: oh } = naturalSize(decoded);
+  report.originalWidth = ow;
+  report.originalHeight = oh;
+
+  // Resize (ports resize_if_needed).
+  let tw = ow, th = oh;
+  if (opts.maxLongEdge > 0 && Math.max(ow, oh) > opts.maxLongEdge) {
+    const scale = opts.maxLongEdge / Math.max(ow, oh);
+    tw = Math.max(1, Math.round(ow * scale));
+    th = Math.max(1, Math.round(oh * scale));
+  }
+  report.compressedWidth = tw;
+  report.compressedHeight = th;
+
+  const srcCanvas = drawToCanvas(decoded, tw, th);
+  if (decoded.close) decoded.close();
+
+  const alpha = canvasHasAlpha(srcCanvas);
+  const graphic = looksGraphic(srcCanvas);
+  const profile = QUALITY_PROFILES[opts.mode] || QUALITY_PROFILES.balanced;
+  const candidates = candidateFormats(alpha, graphic, opts.outputFormat, file.type);
+  const encodeOpts = { ...opts, alpha, graphic };
+
+  let best = null; // { fmt, blob }
+  for (const fmt of candidates) {
+    let blob = null;
+    try {
+      blob = await encodeOne(srcCanvas, fmt, profile, encodeOpts);
+    } catch (_) { /* skip this format */ }
+    if (blob && (!best || blob.size < best.blob.size)) {
+      best = { fmt, blob };
+    }
+  }
+
+  if (!best) {
+    report.detail = 'No supported encoder could save this image.';
+    return { status: 'error', blob: null, mime: null, ext: null, dataUrl: null, report };
+  }
+
+  const compressedBytes = best.blob.size;
+  const saved = originalBytes - compressedBytes;
+  const pct = originalBytes ? (saved / originalBytes) * 100 : 0;
+  const wouldSkip = opts.skipLarger && compressedBytes >= originalBytes;
+
+  report.compressedBytes = compressedBytes;
+  report.savedBytes = saved;
+  report.savedPercent = pct;
+  report.format = best.fmt;
+  report.ext = EXT_FOR_FORMAT[best.fmt];
+  report.wouldSkip = wouldSkip;
+  report.detail = saved >= 0
+    ? `${best.fmt} · saved ${humanSize(saved)} (${pct.toFixed(1)}%)`
+    : `${best.fmt} · larger by ${humanSize(-saved)} (${Math.abs(pct).toFixed(1)}%)`;
+
+  if (wouldSkip) {
+    report.status = 'skipped';
+    return { status: 'skipped', blob: null, mime: null, ext: null, dataUrl: null, report };
+  }
+
+  report.status = 'ok';
+  const mime = MIME_FOR_FORMAT[best.fmt];
+  const dataUrl = await blobToDataUrl(best.blob);
+  return { status: 'ok', blob: best.blob, mime, ext: EXT_FOR_FORMAT[best.fmt], dataUrl, report };
+}
+
+
+const out = document.getElementById('out');
+const summary = document.getElementById('summary');
+let pass = 0, fail = 0;
+
+function log(html) { const d = document.createElement('div'); d.className='case'; d.innerHTML = html; out.appendChild(d); }
+function assert(cond, msg) { if (cond) { pass++; return `<span class="ok">PASS</span> ${msg}`; } fail++; return `<span class="bad">FAIL</span> ${msg}`; }
+
+// --- build synthetic test images as Files -----------------------------------
+function canvasToFile(canvas, type, name) {
+  return new Promise((res) => canvas.toBlob((b) => res(new File([b], name, { type })), type, 0.98));
+}
+
+function photoCanvas(w, h) {
+  // Noisy gradient — behaves like a photo (many colours, no alpha).
+  const c = document.createElement('canvas'); c.width=w; c.height=h;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(w, h);
+  for (let y=0; y<h; y++) for (let x=0; x<w; x++) {
+    const i=(y*w+x)*4;
+    img.data[i]   = (x*255/w + Math.random()*40) & 255;
+    img.data[i+1] = (y*255/h + Math.random()*40) & 255;
+    img.data[i+2] = ((x+y)*255/(w+h) + Math.random()*40) & 255;
+    img.data[i+3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  return c;
+}
+
+function graphicCanvas(w, h) {
+  // Flat blocks — few colours, opaque (logo/graphic-like).
+  const c = document.createElement('canvas'); c.width=w; c.height=h;
+  const ctx = c.getContext('2d');
+  const cols = ['#1b9e77','#d95f02','#7570b3','#e7298a'];
+  for (let i=0;i<4;i++){ ctx.fillStyle=cols[i]; ctx.fillRect((i%2)*w/2,(i<2?0:h/2),w/2,h/2); }
+  return c;
+}
+
+function alphaCanvas(w, h) {
+  // Transparent background with a solid circle — has alpha.
+  const c = document.createElement('canvas'); c.width=w; c.height=h;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle = '#ff5500';
+  ctx.beginPath(); ctx.arc(w/2, h/2, Math.min(w,h)/3, 0, Math.PI*2); ctx.fill();
+  return c;
+}
+
+async function run() {
+  // 1) Photo, balanced auto -> should compress and pick JPEG or WebP, smaller.
+  const photo = await canvasToFile(photoCanvas(900,700), 'image/png', 'photo.png');
+  let r = await compressImage(photo, { mode:'balanced', outputFormat:'auto' });
+  log(`<h2>Photo (PNG in, auto)</h2>
+    <img src="${r.dataUrl || ''}">
+    ${assert(r.status==='ok', 'status ok')}<br>
+    ${assert(['JPEG','WEBP'].includes(r.report.format), 'chose JPEG/WebP, got '+r.report.format)}<br>
+    ${assert(r.report.compressedBytes < r.report.originalBytes, `smaller (${humanSize(r.report.originalBytes)} → ${humanSize(r.report.compressedBytes)})`)}`);
+
+  // 2) Graphic auto -> alpha false, should include PNG/WebP candidates, smaller.
+  const gfx = await canvasToFile(graphicCanvas(600,600), 'image/png', 'logo.png');
+  r = await compressImage(gfx, { mode:'small', outputFormat:'auto' });
+  log(`<h2>Graphic (PNG in, smallest)</h2>
+    <img src="${r.dataUrl || ''}">
+    ${assert(r.status==='ok' || r.status==='skipped', 'status ok/skipped: '+r.status)}<br>
+    ${assert(r.report.format!=null, 'picked a format: '+r.report.format)}`);
+
+  // 3) Alpha image, auto -> must keep alpha => WebP or PNG, never JPEG.
+  const alpha = await canvasToFile(alphaCanvas(500,500), 'image/png', 'sticker.png');
+  r = await compressImage(alpha, { mode:'balanced', outputFormat:'auto' });
+  log(`<h2>Alpha image (PNG in, auto)</h2>
+    <img src="${r.dataUrl || ''}" style="background:repeating-conic-gradient(#444 0% 25%, #222 0% 50%) 0/16px 16px">
+    ${assert(r.report.format !== 'JPEG', 'did NOT flatten alpha to JPEG, got '+r.report.format)}`);
+
+  // 4) Resize: max long edge 200 on a 900px image.
+  r = await compressImage(photo, { mode:'balanced', outputFormat:'webp', maxLongEdge:200 });
+  log(`<h2>Resize to 200px long edge (WebP)</h2>
+    ${assert(Math.max(r.report.compressedWidth, r.report.compressedHeight) === 200, `long edge = ${r.report.compressedWidth}×${r.report.compressedHeight}`)}<br>
+    ${assert(r.report.format==='WEBP', 'forced WebP')}`);
+
+  // 5) Forced PNG keeps alpha and is lossless.
+  r = await compressImage(alpha, { mode:'high', outputFormat:'png' });
+  log(`<h2>Forced PNG</h2>${assert(r.report.format==='PNG', 'format PNG')}`);
+
+  // 6) Skip-if-larger: re-compressing an already tiny webp should skip.
+  const tinyWebp = await canvasToFile(graphicCanvas(40,40), 'image/webp', 't.webp');
+  r = await compressImage(tinyWebp, { mode:'high', outputFormat:'png', skipLarger:true });
+  log(`<h2>Skip-if-larger (tiny webp → forced PNG)</h2>
+    ${assert(r.status==='skipped' || r.report.compressedBytes < r.report.originalBytes, 'skipped or smaller: '+r.status)}`);
+
+  // 7) Type gating
+  log(`<h2>isCompressibleImage gating</h2>
+    ${assert(isCompressibleImage({type:'image/png',name:'a.png'}), 'png allowed')}<br>
+    ${assert(!isCompressibleImage({type:'video/mp4',name:'a.mp4'}), 'mp4 rejected')}<br>
+    ${assert(!isCompressibleImage({type:'image/gif',name:'a.gif'}), 'gif rejected (animation safety)')}`);
+
+  summary.innerHTML = fail===0
+    ? `<span class="ok">ALL ${pass} CHECKS PASSED</span>`
+    : `<span class="bad">${fail} FAILED</span>, ${pass} passed`;
+  document.title = fail===0 ? `PASS ${pass}` : `FAIL ${fail}`;
+}
+run().catch(e => { summary.innerHTML = `<span class="bad">CRASH: ${e.message}</span>`; console.error(e); });
+</script>
+</body>
+</html>

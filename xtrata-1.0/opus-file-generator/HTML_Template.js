@@ -216,6 +216,46 @@ const buildVisualSource = (config) => {
   };
 };
 
+const normalizeArtFit = (value) =>
+  String(value || '').trim().toLowerCase() === 'contain' ? 'contain' : 'cover';
+
+const buildExportAssets = ({ config, source, visual }) => {
+  // NOTE: For embedded assets the actual base64 payload already lives in the
+  // DOM (the <audio><source src="data:..."> element and the cover markup).
+  // We deliberately do NOT repeat the base64 here. Doing so doubled the size of
+  // every embedded inscription (e.g. a 2MB audio + 360KB image produced a ~6MB
+  // file). The manifest keeps only the descriptive metadata; the runtime reads
+  // the media straight from the DOM, never from manifest.assets.
+  return {
+    audio:
+      source.sourceKind === 'embedded-base64'
+        ? {
+            encoding: 'base64',
+            mimeType: source.audioMimeType,
+            inlinedIn: 'audio#xtrataAudio'
+          }
+        : {
+            source: source.source,
+            sourceKind: source.sourceKind,
+            mimeType: source.audioMimeType
+          },
+    visual:
+      visual.sourceKind === 'embedded-base64'
+        ? {
+            encoding: 'base64',
+            mimeType: sanitizeVisualMimeType(config.visualMimeType || config.imageMimeType),
+            kind: visual.kind,
+            inlinedIn: 'cover'
+          }
+        : {
+            source: visual.source,
+            sourceKind: visual.sourceKind,
+            mimeType: sanitizeVisualMimeType(config.visualMimeType || config.imageMimeType),
+            kind: visual.kind
+          }
+  };
+};
+
 const buildCoverMarkup = (config, title) => {
   const visual = buildVisualSource(config);
   if (!visual.source) {
@@ -232,9 +272,11 @@ const buildCoverMarkup = (config, title) => {
       title
     )} visual"><source src="${escapeAttr(
       visual.source
-    )}"${typeAttribute}>This browser cannot play the visual.</video>`;
+    )}"${typeAttribute} data-xtrata-asset="visual">This browser cannot play the visual.</video>`;
   }
-  return `<img src="${escapeAttr(visual.source)}" alt="${escapeAttr(title)} cover art">`;
+  return `<img src="${escapeAttr(
+    visual.source
+  )}" alt="${escapeAttr(title)} cover art" data-xtrata-asset="visual">`;
 };
 
 const buildXtrataAudioPlayerHtml = (config) => {
@@ -255,6 +297,7 @@ const buildXtrataAudioPlayerHtml = (config) => {
   const source = buildPlayerSource(config);
   const visual = buildVisualSource(config);
   const dependencies = buildDependencies(config);
+  const artFit = normalizeArtFit(config.artFit || metadata.artFit);
 
   if (!source.source) {
     return `<!DOCTYPE html><html><head><title>Error</title></head><body><h1>Error generating Xtrata audio player: missing audio source.</h1></body></html>`;
@@ -272,6 +315,7 @@ const buildXtrataAudioPlayerHtml = (config) => {
     visualSourceMode: getVisualSourceMode(config),
     visualSourceKind: visual.sourceKind,
     visualMimeType: sanitizeVisualMimeType(config.visualMimeType || config.imageMimeType),
+    assets: buildExportAssets({ config, source, visual }),
     dependencies,
     metadata: {
       assetType,
@@ -363,6 +407,7 @@ const buildXtrataAudioPlayerHtml = (config) => {
     .player {
       position: relative;
       width: min(100vmin, 760px);
+      height: auto;
       max-width: 100%;
       max-height: 100%;
       aspect-ratio: 1 / 1;
@@ -371,6 +416,7 @@ const buildXtrataAudioPlayerHtml = (config) => {
       background: #151812;
       box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
       overflow: hidden;
+      container-type: size;
     }
 
     .stage {
@@ -405,6 +451,12 @@ const buildXtrataAudioPlayerHtml = (config) => {
       object-fit: cover;
       display: block;
       pointer-events: none;
+    }
+
+    .player[data-art-fit="contain"] .cover-media img,
+    .player[data-art-fit="contain"] .cover-media video {
+      object-fit: contain;
+      background: #dfe8df;
     }
 
     .cover-placeholder {
@@ -466,6 +518,10 @@ const buildXtrataAudioPlayerHtml = (config) => {
       letter-spacing: 0;
       max-width: 16ch;
       overflow-wrap: anywhere;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
 
     .artist {
@@ -616,12 +672,12 @@ const buildXtrataAudioPlayerHtml = (config) => {
       bottom: 0;
       height: 49%;
       display: grid;
-      grid-template-rows: 44px minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
       border-top: 1px solid rgba(248, 243, 231, 0.16);
       background: linear-gradient(180deg, rgba(16, 18, 15, 0.72), rgba(16, 18, 15, 0.96));
       color: var(--ink);
       backdrop-filter: blur(16px);
-      transform: translateY(calc(100% - 44px));
+      transform: translateY(100%);
       transition: transform 0.2s ease;
       pointer-events: auto;
     }
@@ -630,44 +686,6 @@ const buildXtrataAudioPlayerHtml = (config) => {
     .player[data-panel="info"] .drawer,
     .player[data-panel="metadata"] .drawer {
       transform: translateY(0);
-    }
-
-    .drawer-peek {
-      width: 100%;
-      min-height: 44px;
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr) auto;
-      gap: 10px;
-      align-items: center;
-      border: 0;
-      border-radius: 0;
-      background: transparent;
-      color: var(--ink);
-      padding: 7px 12px;
-      text-align: left;
-    }
-
-    .mini-track {
-      position: relative;
-      height: 6px;
-      border-radius: 999px;
-      background: rgba(248, 243, 231, 0.22);
-      overflow: hidden;
-    }
-
-    .mini-track span {
-      position: absolute;
-      inset: 0 auto 0 0;
-      width: 0%;
-      border-radius: inherit;
-      background: var(--accent);
-    }
-
-    .mini-label,
-    .mini-time {
-      font-size: 0.8rem;
-      font-weight: 900;
-      white-space: nowrap;
     }
 
     .drawer-body {
@@ -838,12 +856,222 @@ const buildXtrataAudioPlayerHtml = (config) => {
       .top-bar { padding: 10px; }
       .transport-row button { font-size: 0.72rem; }
     }
+
+    @container (max-width: 320px) {
+      .player {
+        width: 100%;
+        height: 100%;
+        border-radius: 6px;
+        box-shadow: none;
+      }
+
+      .top-bar {
+        grid-template-columns: minmax(0, 1fr);
+        padding: clamp(6px, 5cqw, 10px);
+      }
+
+      .eyebrow,
+      .artist,
+      .click-hint {
+        display: none;
+      }
+
+      .top-actions {
+        justify-self: end;
+        gap: 5px;
+      }
+
+      .icon-button {
+        width: clamp(26px, 12cqw, 34px);
+        min-height: clamp(26px, 12cqw, 34px);
+        border-radius: 6px;
+      }
+
+      .eye-icon {
+        width: 14px;
+        height: 9px;
+      }
+
+      .eye-icon::after {
+        width: 4px;
+        height: 4px;
+      }
+
+      .dots-icon {
+        width: 3px;
+        height: 3px;
+        box-shadow: -5px 0 0 currentColor, 5px 0 0 currentColor;
+      }
+
+      .drawer {
+        height: min(78%, 240px);
+        grid-template-rows: minmax(0, 1fr);
+        transform: translateY(100%);
+      }
+
+      .drawer-body {
+        gap: 6px;
+        padding: 8px;
+      }
+
+      .drawer-tabs {
+        gap: 4px;
+      }
+
+      .drawer-tabs button,
+      .transport-row button {
+        min-height: clamp(26px, 12cqw, 32px);
+        padding: 0 4px;
+        font-size: clamp(0.58rem, 4cqw, 0.72rem);
+      }
+
+      .transport-row {
+        gap: 4px;
+      }
+
+      .time-row {
+        gap: 6px;
+        font-size: clamp(0.58rem, 4cqw, 0.72rem);
+      }
+
+      .waveform {
+        min-height: clamp(34px, 18cqw, 48px);
+      }
+
+      .description,
+      dd {
+        font-size: clamp(0.62rem, 4cqw, 0.76rem);
+      }
+
+      dt {
+        font-size: clamp(0.5rem, 3cqw, 0.62rem);
+      }
+
+      h1 {
+        max-width: 13ch;
+        font-size: clamp(0.72rem, 8cqw, 1.15rem);
+        line-height: 1.02;
+        -webkit-line-clamp: 2;
+      }
+
+      .stage-scrim {
+        background:
+          linear-gradient(180deg, rgba(0, 0, 0, 0.58), transparent 34%),
+          linear-gradient(0deg, rgba(0, 0, 0, 0.35), transparent 34%);
+      }
+
+      .cover-placeholder {
+        width: 40%;
+        font-size: clamp(1.8rem, 18cqw, 3.2rem);
+      }
+    }
+
+    @media (max-width: 320px), (max-height: 320px) {
+      .player {
+        width: 100vmin;
+        height: 100vmin;
+        box-shadow: none;
+      }
+
+      .eyebrow,
+      .artist,
+      .click-hint {
+        display: none;
+      }
+
+      .top-actions {
+        justify-self: end;
+        gap: 5px;
+      }
+
+      .icon-button {
+        width: clamp(26px, 12vmin, 34px);
+        min-height: clamp(26px, 12vmin, 34px);
+        border-radius: 6px;
+      }
+
+      .eye-icon {
+        width: 14px;
+        height: 9px;
+      }
+
+      .eye-icon::after {
+        width: 4px;
+        height: 4px;
+      }
+
+      .dots-icon {
+        width: 3px;
+        height: 3px;
+        box-shadow: -5px 0 0 currentColor, 5px 0 0 currentColor;
+      }
+
+      .drawer {
+        height: min(78%, 240px);
+        grid-template-rows: minmax(0, 1fr);
+        transform: translateY(100%);
+      }
+
+      .drawer-body {
+        gap: 6px;
+        padding: 8px;
+      }
+
+      .drawer-tabs {
+        gap: 4px;
+      }
+
+      .drawer-tabs button,
+      .transport-row button {
+        min-height: clamp(26px, 12vmin, 32px);
+        padding: 0 4px;
+        font-size: clamp(0.58rem, 4vmin, 0.72rem);
+      }
+
+      .transport-row {
+        gap: 4px;
+      }
+
+      .time-row {
+        gap: 6px;
+        font-size: clamp(0.58rem, 4vmin, 0.72rem);
+      }
+
+      .waveform {
+        min-height: clamp(34px, 18vmin, 48px);
+      }
+
+      .description,
+      dd {
+        font-size: clamp(0.62rem, 4vmin, 0.76rem);
+      }
+
+      dt {
+        font-size: clamp(0.5rem, 3vmin, 0.62rem);
+      }
+
+      .top-bar {
+        grid-template-columns: minmax(0, 1fr);
+        padding: 8px;
+      }
+
+      h1 {
+        max-width: 13ch;
+        font-size: clamp(0.72rem, 8vmin, 1.15rem);
+        line-height: 1.02;
+        -webkit-line-clamp: 2;
+      }
+    }
   </style>
 </head>
 <body>
   <main id="xtrataPlayer" class="player" data-panel="closed" data-playback="idle" data-xtrata-player-mode="${escapeAttr(
     source.mode
-  )}" data-xtrata-dependencies="${escapeAttr(dependencies.join(','))}">
+  )}" data-xtrata-dependencies="${escapeAttr(
+    dependencies.join(',')
+  )}" data-art-fit="${escapeAttr(artFit)}" data-xtrata-template="${escapeAttr(
+    XTRATA_PLAYER_TEMPLATE_VERSION
+  )}">
     <section id="xtrataCover" class="stage" role="button" tabindex="0" aria-label="Click artwork to play or pause. Double click to stop and reset." title="Click to play or pause. Double click to stop and reset.">
       <div class="cover-media" aria-hidden="true">${buildCoverMarkup(config, title)}</div>
       <div class="stage-scrim" aria-hidden="true"></div>
@@ -860,11 +1088,6 @@ const buildXtrataAudioPlayerHtml = (config) => {
       </header>
       <div id="clickHint" class="click-hint" aria-hidden="true">Click artwork to play</div>
       <section id="playerDrawer" class="drawer" data-player-control aria-label="Player controls and information">
-        <button id="drawerToggle" class="drawer-peek" type="button" aria-expanded="false" aria-controls="drawerBody">
-          <span id="miniLabel" class="mini-label">Controls</span>
-          <span class="mini-track" aria-hidden="true"><span id="miniProgress"></span></span>
-          <span id="miniTime" class="mini-time">0:00</span>
-        </button>
         <div id="drawerBody" class="drawer-body">
           <div class="drawer-tabs" role="tablist" aria-label="Player panel">
             <button type="button" role="tab" data-panel-target="controls" aria-selected="false">Controls</button>
@@ -904,7 +1127,7 @@ const buildXtrataAudioPlayerHtml = (config) => {
         </div>
       </section>
     </section>
-    <audio id="xtrataAudio" class="audio-native" preload="metadata"${
+    <audio id="xtrataAudio" class="audio-native" preload="auto" data-xtrata-asset="audio"${
       isLoop ? ' loop' : ''
     }>
       <source src="${escapeAttr(source.source)}" type="${escapeAttr(
@@ -921,7 +1144,6 @@ const buildXtrataAudioPlayerHtml = (config) => {
       const audio = document.getElementById('xtrataAudio');
       const cover = document.getElementById('xtrataCover');
       const status = document.getElementById('playerStatus');
-      const drawerToggle = document.getElementById('drawerToggle');
       const infoToggle = document.getElementById('infoToggle');
       const controlsToggle = document.getElementById('controlsToggle');
       const playToggleButton = document.getElementById('playToggleButton');
@@ -932,9 +1154,6 @@ const buildXtrataAudioPlayerHtml = (config) => {
       const seekRange = document.getElementById('seekRange');
       const currentTimeLabel = document.getElementById('currentTime');
       const durationTimeLabel = document.getElementById('durationTime');
-      const miniProgress = document.getElementById('miniProgress');
-      const miniTime = document.getElementById('miniTime');
-      const miniLabel = document.getElementById('miniLabel');
       const clickHint = document.getElementById('clickHint');
       const waveformBars = document.getElementById('waveformBars');
       const panelButtons = Array.from(document.querySelectorAll('[data-panel-target]'));
@@ -942,6 +1161,11 @@ const buildXtrataAudioPlayerHtml = (config) => {
       const manifestNode = document.getElementById('xtrataPlayerManifest');
       let coverClickTimer = 0;
       let activePanel = 'closed';
+      // Buffering gate: hold the "click to play" affordance until enough audio is
+      // buffered that the first click starts cleanly at 0:00 with no clipped intro.
+      let isAudioReady = false;
+      let playWhenReady = false;
+      const BUFFER_TARGET_SECONDS = 8;
       let manifest = {};
       try {
         manifest = JSON.parse(manifestNode.textContent || '{}');
@@ -988,7 +1212,7 @@ const buildXtrataAudioPlayerHtml = (config) => {
         activePanel = panelName;
         if (player) player.dataset.panel = panelName;
         const isOpen = panelName !== 'closed';
-        [drawerToggle, infoToggle, controlsToggle].forEach((button) => {
+        [infoToggle, controlsToggle].forEach((button) => {
           if (button) button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
         });
         panelButtons.forEach((button) => {
@@ -999,9 +1223,6 @@ const buildXtrataAudioPlayerHtml = (config) => {
         panelViews.forEach((view) => {
           view.hidden = view.dataset.panelView !== panelName;
         });
-        if (miniLabel) {
-          miniLabel.textContent = panelName === 'closed' ? 'Controls' : panelName.slice(0, 1).toUpperCase() + panelName.slice(1);
-        }
       };
 
       const togglePanel = (panelName) => {
@@ -1032,6 +1253,14 @@ const buildXtrataAudioPlayerHtml = (config) => {
         if (!audio.paused && !audio.ended) {
           audio.pause();
           setStatus('Paused.');
+          return;
+        }
+
+        // Not buffered enough yet: queue the play so it fires the instant we're
+        // ready, from the true start, instead of starting mid-decode.
+        if (!isAudioReady) {
+          playWhenReady = true;
+          setStatus('Buffering audio… playback will start automatically.');
           return;
         }
 
@@ -1067,12 +1296,15 @@ const buildXtrataAudioPlayerHtml = (config) => {
         if (player) {
           player.dataset.playback = isPlaying ? 'playing' : audio.currentTime > 0 ? 'paused' : 'idle';
         }
-        if (playToggleButton) playToggleButton.textContent = isPlaying ? 'Pause' : 'Play';
+        if (playToggleButton) {
+          playToggleButton.textContent = isPlaying ? 'Pause' : 'Play';
+          playToggleButton.disabled = !isAudioReady && !isPlaying;
+        }
         if (clickHint) {
-          clickHint.textContent = isPlaying
-            ? 'Click artwork to pause'
-            : audio.currentTime > 0
-              ? 'Click artwork to play'
+          clickHint.textContent = !isAudioReady
+            ? 'Buffering audio…'
+            : isPlaying
+              ? 'Click artwork to pause'
               : 'Click artwork to play';
         }
         if (muteButton) muteButton.textContent = audio.muted ? 'Unmute' : 'Mute';
@@ -1084,8 +1316,6 @@ const buildXtrataAudioPlayerHtml = (config) => {
         const fraction = duration ? Math.max(0, Math.min(1, current / duration)) : 0;
         if (currentTimeLabel) currentTimeLabel.textContent = formatTime(current);
         if (durationTimeLabel) durationTimeLabel.textContent = formatTime(duration);
-        if (miniTime) miniTime.textContent = formatTime(current);
-        if (miniProgress) miniProgress.style.width = Math.round(fraction * 100) + '%';
         if (seekRange && document.activeElement !== seekRange) {
           seekRange.value = Math.round(fraction * 1000);
           seekRange.setAttribute('aria-valuetext', formatTime(current) + ' of ' + formatTime(duration));
@@ -1124,7 +1354,6 @@ const buildXtrataAudioPlayerHtml = (config) => {
         });
       }
 
-      if (drawerToggle) drawerToggle.addEventListener('click', () => togglePanel('controls'));
       if (infoToggle) infoToggle.addEventListener('click', () => togglePanel('info'));
       if (controlsToggle) controlsToggle.addEventListener('click', () => togglePanel('controls'));
       panelButtons.forEach((button) => {
@@ -1154,18 +1383,63 @@ const buildXtrataAudioPlayerHtml = (config) => {
         setStatus('This browser may not support this audio type. Try a newer Safari, Chrome, Firefox, or an MP3 fallback.', true);
       }
 
+      // How many contiguous seconds from 0:00 are currently buffered.
+      const bufferedFromStart = () => {
+        try {
+          for (let i = 0; i < audio.buffered.length; i += 1) {
+            if (audio.buffered.start(i) <= 0.05) return audio.buffered.end(i);
+          }
+        } catch (_error) {}
+        return 0;
+      };
+
+      const markAudioReady = () => {
+        if (isAudioReady) return;
+        isAudioReady = true;
+        // Ensure the first play begins exactly at the start (no clipped intro).
+        try { if (audio.currentTime > 0 && audio.paused) audio.currentTime = 0; } catch (_error) {}
+        updatePlaybackUi();
+        if (playWhenReady) {
+          playWhenReady = false;
+          toggleAudioPlayback();
+        } else {
+          setStatus('Ready to play.');
+        }
+      };
+
+      // Consider playback safe once the whole track (short clips/loops) or at
+      // least BUFFER_TARGET_SECONDS from the start is buffered.
+      const evaluateReadiness = () => {
+        if (isAudioReady) return;
+        const duration = getDuration();
+        const buffered = bufferedFromStart();
+        const target = duration ? Math.min(BUFFER_TARGET_SECONDS, duration - 0.1) : BUFFER_TARGET_SECONDS;
+        if (buffered >= target && buffered > 0) {
+          markAudioReady();
+        } else if (!playWhenReady) {
+          const pct = duration ? Math.min(99, Math.round((buffered / duration) * 100)) : null;
+          setStatus(pct !== null ? 'Buffering audio… ' + pct + '%' : 'Buffering audio…');
+        }
+      };
+
       audio.addEventListener('loadedmetadata', () => {
         const duration = Number.isFinite(audio.duration)
           ? Math.round(audio.duration)
           : null;
-        setStatus(duration ? 'Loaded. Duration: ' + duration + ' seconds.' : 'Loaded.');
+        if (!isAudioReady) {
+          setStatus(duration ? 'Buffering audio… (' + duration + 's track)' : 'Buffering audio…');
+        }
         updateProgress();
+        evaluateReadiness();
       });
 
-      audio.addEventListener('canplay', () => {
-        setStatus('Ready to play.');
-        updateProgress();
-      });
+      audio.addEventListener('progress', evaluateReadiness);
+      audio.addEventListener('canplay', evaluateReadiness);
+      // Whole file decoded end-to-end — definitely safe to play.
+      audio.addEventListener('canplaythrough', markAudioReady);
+      // Kick off buffering immediately (preload="auto" already requests this).
+      try { audio.load(); } catch (_error) {}
+      updatePlaybackUi();
 
       audio.addEventListener('timeupdate', updateProgress);
       audio.addEventListener('durationchange', updateProgress);

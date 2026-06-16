@@ -57,10 +57,7 @@ const createAudioPlayer = (blob, mimeType, label) => {
     });
   
     // We need to observe the PARENT node to detect when the container is removed.
-    // This assumes the container will be appended to something (like resultEl).
-    // We start observing *after* appending it. It's slightly tricky.
-    // An alternative is manual cleanup when replacing content. Let's rely on manual cleanup
-    // by clearing resultEl/base64Result innerHTML for simplicity here, but keep the observer code
+    // This assumes the container will be appended to something and observed after append.
     // commented as a reference for a more robust approach.
     /*
     // To make observer work: Call this *after* appending the container to its parent
@@ -87,7 +84,7 @@ const createAudioPlayer = (blob, mimeType, label) => {
    * Sets up the audio player for the original selected WAV file.
    */
   const setupOriginalAudioPlayer = () => {
-      if (!selectedFile || !originalAudioContainer || !playSampleBtn) return;
+      if (!selectedFile || !playSampleBtn) return;
   
       // Ensure previous player is fully cleaned up
       if (originalAudioElement) {
@@ -98,27 +95,14 @@ const createAudioPlayer = (blob, mimeType, label) => {
       if (originalAudioUrl) {
           URL.revokeObjectURL(originalAudioUrl);
       }
-      originalAudioContainer.innerHTML = ''; // Clear previous player elements
-      originalAudioContainer.style.display = 'none';
   
       try {
           originalAudioUrl = URL.createObjectURL(selectedFile);
           originalAudioElement = Object.assign(document.createElement('audio'), {
-              controls: true,
-              style: 'width:100%;',
               src: originalAudioUrl,
               preload: 'metadata' // Load enough to get duration
           });
           originalAudioElement.type = selectedFile.type; // Set MIME type
-          originalAudioElement.setAttribute('controlsList', 'nodownload');
-  
-          const audioTitle = document.createElement('h3');
-          audioTitle.textContent = 'Original File';
-          audioTitle.style.margin = '0 0 10px 0';
-  
-          originalAudioContainer.appendChild(audioTitle);
-          originalAudioContainer.appendChild(originalAudioElement);
-          originalAudioContainer.style.display = 'block'; // Show the container
   
           // Update the separate "Play Original" button text when audio state changes
           originalAudioElement.onplay = () => playSampleBtn.textContent = 'Pause Original';
@@ -128,7 +112,6 @@ const createAudioPlayer = (blob, mimeType, label) => {
       } catch (error) {
           console.error("Error creating original audio player:", error);
           updateStatus("Could not create player for original file.", true);
-          originalAudioContainer.style.display = 'none';
           originalAudioUrl = null;
           originalAudioElement = null;
       }
@@ -144,7 +127,7 @@ const createAudioPlayer = (blob, mimeType, label) => {
       }
   
       // Ensure the player exists if a file is selected
-      if (!originalAudioElement && originalAudioContainer) {
+      if (!originalAudioElement) {
           setupOriginalAudioPlayer(); // Attempt to set it up
       }
   
@@ -158,7 +141,7 @@ const createAudioPlayer = (blob, mimeType, label) => {
           } else {
               originalAudioElement.pause();
           }
-      } else if (originalAudioContainer.style.display !== 'none') {
+      } else {
           // Player setup failed previously, but container might be visible
           updateStatus('Could not create audio player for original file.', true);
       }

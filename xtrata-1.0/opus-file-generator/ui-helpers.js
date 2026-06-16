@@ -314,16 +314,11 @@ const enableConvertButtonIfNeeded = () => {
       // --- Audio Section Resets ---
       if (resultEl) resultEl.innerHTML = '';
       if (base64Container) base64Container.style.display = 'none';
-      if (base64Result) base64Result.innerHTML = '';
       if (base64Output) base64Output.textContent = '';
       if (copyBase64Btn) copyBase64Btn.disabled = true;
       if (downloadBase64Btn) {
           downloadBase64Btn.disabled = true;
           downloadBase64Btn.textContent = 'Download Audio Base64 as TXT';
-      }
-      if (originalAudioContainer) {
-          originalAudioContainer.style.display = 'none';
-          originalAudioContainer.innerHTML = '';
       }
       if (playSampleBtn) {
           playSampleBtn.textContent = 'Play Original';
@@ -356,29 +351,32 @@ const enableConvertButtonIfNeeded = () => {
       if (audionalInfoContainer) audionalInfoContainer.style.display = 'none';
   
       // --- Image Section Resets ---
-      if (imageFileInput) imageFileInput.value = '';
-      if (imagePreview) {
+      // The standalone image-to-base64 section is optional and may not be present
+      // in every layout. Guard each reference with typeof so a missing element
+      // (undeclared global) never throws a ReferenceError and aborts this reset.
+      if (typeof imageFileInput !== 'undefined' && imageFileInput) imageFileInput.value = '';
+      if (typeof imagePreview !== 'undefined' && imagePreview) {
           imagePreview.style.display = 'none';
-          imagePreview.src = '#'; 
+          imagePreview.src = '#';
       }
-      if (fileSizeInfo) fileSizeInfo.textContent = '';
-      if (convertImageButton) {
+      if (typeof fileSizeInfo !== 'undefined' && fileSizeInfo) fileSizeInfo.textContent = '';
+      if (typeof convertImageButton !== 'undefined' && convertImageButton) {
           convertImageButton.disabled = true;
           convertImageButton.textContent = 'Convert to Base64';
       }
 
       // ** CORRECTED VARIABLE NAMES FOR IMAGE SECTION **
-      if (imageBase64Output) { // Use the name from dom-elements.js
+      if (typeof imageBase64Output !== 'undefined' && imageBase64Output) { // Use the name from dom-elements.js
           const detailsParent = imageBase64Output.closest('details');
           if(detailsParent) detailsParent.open = false;
           // imageBase64Output.style.display = 'none'; // This is handled by image-to-base64.js on file input change
           imageBase64Output.value = '';
       }
-      if (copyImageBase64Button) { // Use the name from dom-elements.js
+      if (typeof copyImageBase64Button !== 'undefined' && copyImageBase64Button) { // Use the name from dom-elements.js
           copyImageBase64Button.disabled = true;
           copyImageBase64Button.textContent = 'Copy Image Base64';
       }
-      if (downloadImageBase64Button) { // Use the name from dom-elements.js
+      if (typeof downloadImageBase64Button !== 'undefined' && downloadImageBase64Button) { // Use the name from dom-elements.js
           downloadImageBase64Button.disabled = true;
           downloadImageBase64Button.textContent = 'Download Image Base64 as TXT';
       }
@@ -410,9 +408,8 @@ const enableConvertButtonIfNeeded = () => {
                 abPlayer.revokeUrls();
             }
             resultEl.innerHTML = ''; // Clear previous player and download link
-        }
+      }
       if (base64Container) base64Container.style.display = 'none'; 
-      if (base64Result) base64Result.innerHTML = ''; 
       if (base64Output) base64Output.textContent = ''; 
       if (copyBase64Btn) copyBase64Btn.disabled = true;
       if (downloadBase64Btn) {

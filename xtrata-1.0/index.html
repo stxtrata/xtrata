@@ -831,6 +831,23 @@
       align-items: start;
     }
 
+    .payload-preview-stage {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .payload-preview-stage .preview-expand-button {
+      position: static;
+      justify-self: start;
+      opacity: 1;
+      transform: none;
+    }
+
+    .payload-preview-stage .preview-expand-button[hidden] {
+      display: none;
+    }
+
     .preview-square {
       aspect-ratio: 1 / 1;
       width: 100%;
@@ -1209,6 +1226,103 @@
       gap: 8px;
     }
 
+    /* Focused family-tree view: ancestors above, selected + siblings on the
+       focus row, descendants below. Vertical scroll on the viewport, horizontal
+       scroll per row, always contained inside the preview column. */
+    .rel-tree {
+      margin-top: 4px;
+    }
+
+    .rel-tree__viewport {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: min(56vh, 500px);
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 5px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface-soft);
+    }
+
+    .rel-row {
+      position: relative;
+      min-width: 0;
+      border-left: 3px solid var(--rel-acc, var(--line));
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--ink) 3%, transparent);
+    }
+
+    /* Binary banding so adjacent generations are easy to separate at a glance. */
+    .rel-row:nth-child(even) {
+      background: color-mix(in srgb, var(--ink) 7%, transparent);
+    }
+
+    .rel-row--focus {
+      border-left-color: var(--blue);
+      background: color-mix(in srgb, var(--blue) 16%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--blue) 45%, transparent);
+    }
+
+    .rel-row__track {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 8px;
+      scrollbar-width: thin;
+    }
+
+    /* Generation label stays pinned while the row scrolls horizontally. */
+    .rel-row__label {
+      position: sticky;
+      left: 0;
+      z-index: 1;
+      flex: 0 0 auto;
+      align-self: stretch;
+      display: flex;
+      align-items: center;
+      width: 82px;
+      padding: 0 8px 0 4px;
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: var(--rel-acc, var(--muted));
+      background: linear-gradient(90deg, var(--panel) 72%, transparent);
+    }
+
+    .rel-row--focus .rel-row__label {
+      color: var(--blue);
+    }
+
+    /* The selected piece, highlighted on the focus row. */
+    .rel-card--self {
+      outline: 2px solid var(--blue);
+      outline-offset: 1px;
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--blue) 28%, transparent);
+    }
+
+    .rel-card--self::after {
+      content: "\2605";
+      position: absolute;
+      top: 2px;
+      left: 4px;
+      z-index: 2;
+      font-size: 10px;
+      color: var(--blue);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+    }
+
+    .rel-tree__status {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
     .parent-thumb {
       position: relative;
       width: 64px;
@@ -1235,6 +1349,7 @@
       align-items: center;
       justify-content: center;
       overflow: hidden;
+      pointer-events: none;
     }
 
     .parent-thumb img,
@@ -1397,6 +1512,52 @@
       color: var(--green);
     }
 
+    .log li.action {
+      color: var(--blue);
+    }
+
+    .log li.waiting {
+      color: var(--amber);
+      border-left: 3px solid var(--amber);
+      padding-left: 8px;
+    }
+
+    .log li.confirmed {
+      color: var(--green);
+      border-left: 3px solid var(--green);
+      padding-left: 8px;
+    }
+
+    .batch-guide {
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+      padding: 12px;
+      border: 1px solid color-mix(in srgb, var(--blue) 55%, var(--line));
+      border-radius: var(--radius);
+      background: color-mix(in srgb, var(--blue) 11%, var(--panel));
+    }
+
+    .batch-guide[hidden] {
+      display: none;
+    }
+
+    .batch-guide strong {
+      color: var(--blue);
+      font-size: 14px;
+    }
+
+    .batch-guide__status {
+      color: var(--ink);
+      font-weight: 800;
+    }
+
+    .batch-guide__note {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
     .wallet-layout {
       display: grid;
       grid-template-columns: minmax(0, 640px) minmax(240px, 300px);
@@ -1540,6 +1701,21 @@
       line-height: 1.15;
       text-align: center;
       overflow-wrap: anywhere;
+    }
+
+    /* In the small (64px) relationship/parent tiles, keep placeholder labels
+       (e.g. "loading", "JAVASCRIPT") on a single line instead of wrapping. */
+    .parent-thumb__media .token-thumb-label {
+      padding: 4px;
+      font-size: 9px;
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      overflow-wrap: normal;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .preview-media--pixelated {
@@ -3192,7 +3368,17 @@
           </form>
 
           <div class="prepare-grid">
-            <div class="preview-square" id="payloadPreview">No payload</div>
+            <div class="payload-preview-stage">
+              <div class="preview-square" id="payloadPreview">No payload</div>
+              <button class="preview-expand-button" id="payloadPreviewExpandButton" type="button" aria-label="View prepared payload large" title="View prepared payload large" disabled hidden>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M14 4h6v6" />
+                  <path d="m20 4-7 7" />
+                  <path d="M10 20H4v-6" />
+                  <path d="m4 20 7-7" />
+                </svg>
+              </button>
+            </div>
             <div class="prepared-meta" id="preparedMeta">
               <div class="meta-line">
                 <span class="meta-key">Status</span>
@@ -3211,9 +3397,22 @@
 
           <div class="support-note" id="resumeNotice" hidden></div>
 
+          <div class="batch-guide" id="batchGuide" hidden aria-live="polite">
+            <strong id="batchGuideTitle">Large inscription workflow</strong>
+            <div class="batch-guide__status" id="batchGuideStatus"></div>
+            <div class="batch-guide__note">
+              Each upload is a separate wallet transaction. Xtrata waits for each
+              transaction to confirm on-chain before opening the next wallet prompt.
+              This can take several minutes. You can safely reload and resume from
+              the last confirmed batch.
+            </div>
+          </div>
+
           <div class="actions">
             <button class="btn secondary" id="prepareButton" type="button">Prepare</button>
             <button class="btn" id="inscribeButton" type="button" disabled>Start inscription</button>
+            <button class="btn secondary" id="resetInscriberButton" type="button" title="Unlock the controls and reset progress if a transaction was cancelled or failed. Keeps your prepared file.">Reset</button>
+            <button class="btn secondary" id="clearInscriberButton" type="button" title="Remove the current file and form fields to start fresh.">Clear</button>
           </div>
 
           <div class="steps" aria-live="polite">
@@ -3602,13 +3801,17 @@
       SMALL_MINT_HELPER_CONTRACT_NAME,
       SMALL_MINT_HELPER_MAINNET_ADDRESS,
       SMALL_MINT_HELPER_MAX_CHUNKS,
-      MAX_TOKEN_URI_LENGTH,
-      TX_DELAY_SECONDS
+      MAX_TOKEN_URI_LENGTH
     } from '/src/lib/mint/constants.ts';
     import {
       estimateDataMiningFeeMicroStx,
       estimateSequentialMintTransactions
     } from '/src/lib/mint/estimates.ts';
+    import {
+      clearMintAttempt,
+      loadMintAttempt,
+      saveMintAttempt
+    } from '/src/lib/mint/attempt-cache.ts';
     import { bytesToHex } from '/src/lib/utils/encoding.ts';
     import { formatBytes, truncateMiddle } from '/src/lib/utils/format.ts';
     import { resolveBnsNames } from '/src/lib/bns/resolver.ts';
@@ -3625,7 +3828,10 @@
       loadInscriptionThumbnailFromCache,
       saveInscriptionThumbnailToCache
     } from '/src/lib/viewer/cache.ts';
-    import { injectGridThumbnailHtml } from '/src/lib/viewer/html-preview.ts';
+    import {
+      injectGridThumbnailHtml,
+      injectInteractivePreviewHtml
+    } from '/src/lib/viewer/html-preview.ts';
     import {
       hasRuntimeContentUrls,
       inlineRuntimeContentUrls
@@ -3749,13 +3955,19 @@
       parentChipList: $('parentChipList'),
       parentStatusList: $('parentStatusList'),
       payloadPreview: $('payloadPreview'),
+      payloadPreviewExpandButton: $('payloadPreviewExpandButton'),
       preparedMeta: $('preparedMeta'),
       duplicateWarning: $('duplicateWarning'),
       duplicateText: $('duplicateText'),
       allowDuplicateInput: $('allowDuplicateInput'),
       resumeNotice: $('resumeNotice'),
+      batchGuide: $('batchGuide'),
+      batchGuideTitle: $('batchGuideTitle'),
+      batchGuideStatus: $('batchGuideStatus'),
       prepareButton: $('prepareButton'),
       inscribeButton: $('inscribeButton'),
+      resetInscriberButton: $('resetInscriberButton'),
+      clearInscriberButton: $('clearInscriberButton'),
       stepBegin: $('stepBegin'),
       stepUpload: $('stepUpload'),
       stepSeal: $('stepSeal'),
@@ -3822,7 +4034,7 @@
           {
             id: 'jim-music',
             title: 'music',
-            tokenIds: [577n, 312n, 288n, 269n, 315n]
+            tokenIds: [785n, 577n, 688n, 689n, 312n, 288n, 269n, 315n]
           },
           {
             id: 'code-various',
@@ -3853,7 +4065,7 @@
         });
 
         const CURATED_GALLERY_DEFAULT_TOKEN_IDS = Object.freeze({
-          'jim-music': 577n,
+          'jim-music': 785n,
           'code-various': 287n
         });
 
@@ -4035,6 +4247,7 @@
       adminStatus: null,
       selectedFile: null,
       prepared: null,
+      lastMintAttempt: null,
       handoffDependencyIds: [],
       parentIds: [],
       parentStatusById: new Map(),
@@ -4064,6 +4277,7 @@
       childScanTokenId: null,
       fullscreenUrl: null,
       fullscreenOpen: false,
+      fullscreenSource: null,
       tokenThumbUrls: new Map(),
       thumbnailCache: new Map(),
       gridLiveMediaCache: new Map(),
@@ -4149,6 +4363,9 @@
     };
 
     const normalizeTxId = (payload) => {
+      if (typeof payload === 'string' && payload.length > 0) {
+        return payload;
+      }
       const raw = payload?.txId ?? payload?.txid ?? '';
       return typeof raw === 'string' && raw.length > 0 ? raw : 'submitted';
     };
@@ -4580,6 +4797,9 @@
       if (tone === 'support' || isSupportiveLogMessage(message)) {
         item.classList.add('support');
       }
+      if (tone && tone !== 'support') {
+        item.classList.add(tone);
+      }
       time.textContent = nowLabel();
       body.textContent = message;
       item.append(time, body);
@@ -4905,15 +5125,26 @@
       return state.usdPriceBookLoading ? 'Fetching...' : 'Unavailable';
     };
 
+    // Network (miner) fee for a contract call carrying `byteLength` payload
+    // bytes. Base rate is ~1 STX/MB, but large calls need headroom above the
+    // mempool minimum (the wallet's own default floors near 0.0005 STX and is
+    // rejected for big inscriptions). We add a margin + a small floor, and use
+    // this for BOTH the displayed estimate and the fee passed to the wallet so
+    // the prompt matches the panel.
+    const walletMinerFeeMicroStx = (byteLength) => {
+      const base = estimateDataMiningFeeMicroStx(BigInt(byteLength));
+      const withHeadroom = (base * 5n) / 4n; // +25% over the 1 STX/MB base
+      const floor = 6_000n; // ~0.006 STX so tiny calls still clear the mempool
+      return withHeadroom > floor ? withHeadroom : floor;
+    };
+
     const formatDataMiningEstimate = (bytes) => {
-      const miningFeeMicroStx = estimateDataMiningFeeMicroStx(
-        BigInt(bytes.length)
-      );
+      const miningFeeMicroStx = walletMinerFeeMicroStx(bytes.length);
       const display = formatMicroStxWithUsd(miningFeeMicroStx, state.usdPriceBook);
       return {
         miningFeeMicroStx,
         label: display.combined,
-        detail: `${display.combined} at 1 STX/MB`
+        detail: `${display.combined} network fee (set automatically in the wallet)`
       };
     };
 
@@ -5058,19 +5289,62 @@
       }
     };
 
+    const getUploadBatchProgress = (currentIndex, totalChunks) => {
+      const batchSize = Math.min(DEFAULT_BATCH_SIZE, MAX_UPLOAD_BATCH_SIZE);
+      const totalBatches = Math.ceil(totalChunks / batchSize);
+      const confirmedBatches =
+        currentIndex <= 0 ? 0 : Math.ceil(currentIndex / batchSize);
+      const nextBatch = Math.min(totalBatches, confirmedBatches + 1);
+      return { batchSize, totalBatches, confirmedBatches, nextBatch };
+    };
+
+    const renderBatchGuide = () => {
+      if (!dom.batchGuide || !dom.batchGuideStatus || !dom.batchGuideTitle) {
+        return;
+      }
+      const totalChunks =
+        state.prepared?.chunks.length ??
+        Number(state.uploadState?.totalChunks ?? state.lastMintAttempt?.totalChunks ?? 0);
+      if (!Number.isSafeInteger(totalChunks) || totalChunks <= SMALL_MINT_HELPER_MAX_CHUNKS) {
+        dom.batchGuide.hidden = true;
+        return;
+      }
+      const currentIndex = Number(state.uploadState?.currentIndex ?? 0);
+      const progress = getUploadBatchProgress(currentIndex, totalChunks);
+      dom.batchGuideTitle.textContent =
+        `${progress.totalBatches} confirmed upload transactions required`;
+      dom.batchGuideStatus.textContent =
+        progress.confirmedBatches >= progress.totalBatches
+          ? `All ${progress.totalBatches} upload batches are confirmed. The inscription is ready to seal.`
+          : `${progress.confirmedBatches} of ${progress.totalBatches} upload batches confirmed. Next: batch ${progress.nextBatch} of ${progress.totalBatches}.`;
+      dom.batchGuide.hidden = false;
+    };
+
     const renderResumeNotice = () => {
       dom.resumeNotice.hidden = true;
       dom.resumeNotice.replaceChildren();
-      if (!state.prepared || !state.uploadState) {
+      renderBatchGuide();
+      if (!state.uploadState) {
+        if (state.lastMintAttempt && !state.selectedFile) {
+          const heading = document.createElement('strong');
+          heading.textContent = 'Unfinished inscription remembered.';
+          const body = document.createElement('span');
+          body.textContent = state.lastMintAttempt.payloadBlob
+            ? 'The saved file will be restored automatically.'
+            : `Re-select ${state.lastMintAttempt.fileName ?? 'the original file'} to continue safely.`;
+          dom.resumeNotice.append(heading, body);
+          dom.resumeNotice.hidden = false;
+        }
         return;
       }
       const current = state.uploadState.currentIndex.toString();
       const total = state.uploadState.totalChunks.toString();
+      const progress = getUploadBatchProgress(Number(current), Number(total));
       const heading = document.createElement('strong');
       heading.textContent = 'Existing upload data found. No problem.';
       const body = document.createElement('span');
       body.textContent =
-        `${current}/${total} chunks are already saved. Click Resume inscription to continue from the saved data.`;
+        `${current}/${total} chunks are confirmed. ${progress.confirmedBatches}/${progress.totalBatches} upload batches are complete. Click Resume inscription to continue with batch ${progress.nextBatch}/${progress.totalBatches}.`;
       dom.resumeNotice.append(heading, body);
       dom.resumeNotice.hidden = false;
     };
@@ -5272,11 +5546,31 @@
       tag.className = 'parent-thumb__id';
       tag.textContent = formatTokenId(relatedId);
       card.append(media, tag);
-      card.addEventListener('click', () => {
-        void focusWalletTokenById(relatedId);
+      card.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void selectRelationshipToken(contractId, relatedId);
       });
       void hydrateRelationshipThumbCard(contractId, relatedId, media, role);
       return card;
+    };
+
+    const selectRelationshipToken = async (contractId, relatedId) => {
+      let token = getCachedRelationshipSummary(relatedId);
+      if (!token) {
+        const summaries = await fetchWalletTokenSummaries([relatedId]).catch(() => []);
+        token = summaries.find((entry) => entry.id === relatedId) ?? null;
+        if (token) {
+          state.walletTokenCache.set(token.id.toString(), token);
+        }
+      }
+      if (!token) {
+        appendLog(
+          `Could not load relationship ${formatTokenId(relatedId)} from ${contractId}.`
+        );
+        return;
+      }
+      await selectToken(relatedId, { scrollToPreview: true });
     };
 
     const hydrateRelationGroupSummaries = async (contractId, ids, thumbs, role) => {
@@ -5345,11 +5639,13 @@
       if (direction === 'down') {
         if (depth === 1) return 'Children';
         if (depth === 2) return 'Grandchildren';
-        return `Descendants · depth ${depth}`;
+        if (depth === 3) return 'Great-grandchildren';
+        return `Descendants +${depth}`;
       }
       if (depth === 1) return 'Parents';
       if (depth === 2) return 'Grandparents';
-      return `Ancestors · depth ${depth}`;
+      if (depth === 3) return 'Great-grandparents';
+      return `Ancestors -${depth}`;
     };
 
     const groupByDepth = (nodes) => {
@@ -5367,6 +5663,57 @@
     // grandchildren, …, ancestors above direct parents, and half-siblings). Falls
     // back to the local IndexedDB child index + scan when the server lineage
     // endpoint is unavailable.
+    // Generation accent colour: a warm scale upward (ancestors) and a cool scale
+    // downward (descendants), brand blue for the focus row. Lightness steps with
+    // depth so each tier reads as distinct at any depth, in a confined space.
+    const relGenAccent = (kind, depth) => {
+      if (kind === 'focus') return 'var(--blue)';
+      const light = Math.max(48, 72 - depth * 7);
+      return kind === 'up' ? `hsl(34 92% ${light}%)` : `hsl(190 70% ${light}%)`;
+    };
+
+    // One generation row: a sticky generation label plus a horizontally
+    // scrollable track of thumbnail cards. The focus row places the selected
+    // piece first (highlighted) followed by its siblings.
+    const buildRelationshipRow = ({ contractId, ids, kind, depth, label, selectedId = null }) => {
+      const row = document.createElement('div');
+      row.className = `rel-row rel-row--${kind}`;
+      row.dataset.depth = String(depth);
+      row.style.setProperty('--rel-acc', relGenAccent(kind, depth));
+      const track = document.createElement('div');
+      track.className = 'rel-row__track';
+      const labelEl = document.createElement('span');
+      labelEl.className = 'rel-row__label';
+      const count = (selectedId != null ? 1 : 0) + (ids ? ids.length : 0);
+      labelEl.textContent = `${label} · ${count}`;
+      track.append(labelEl);
+      if (selectedId != null) {
+        const selfCard = buildRelationshipThumbCard(contractId, selectedId, 'self');
+        selfCard.classList.add('rel-card--self');
+        selfCard.title = `Selected ${formatTokenId(selectedId)}`;
+        track.append(selfCard);
+      }
+      const role =
+        kind === 'focus' ? 'sibling' : kind === 'up' ? (depth === 1 ? 'parent' : 'ancestor') : 'child';
+      track.dataset.relRole = role;
+      for (const id of ids ?? []) {
+        track.append(buildRelationshipThumbCard(contractId, id, role));
+      }
+      row.append(track);
+      // Hydration is deferred to the orchestrator, AFTER the rows are attached to
+      // the live viewport: hydrateRelationshipThumbCard() no-ops on detached
+      // media, so hydrating here (before append) would leave tiles stuck loading.
+      return row;
+    };
+
+    // Focused, scrollable family-tree view of the selected inscription:
+    // ancestors above (deepest generation at the top, parents nearest the focus),
+    // the selected piece + siblings on the focus row, descendants below. Prefers
+    // the one-round-trip server lineage (depth-tagged ancestors + descendants +
+    // half-siblings); falls back to the live ancestor walk + local child index
+    // when the endpoint is unavailable. Each row scrolls horizontally, the
+    // viewport scrolls vertically, and the whole tree stays inside the preview
+    // column.
     const renderSelectedInscriptionRelationships = async (token) => {
       const container = dom.selectedRelationships;
       if (!container) {
@@ -5374,21 +5721,155 @@
       }
       state.selectedParentsRequestId += 1;
       state.selectedChildrenRequestId += 1;
+      const requestId = state.selectedChildrenRequestId;
       if (!token || !supportsParentRelationships()) {
         container.replaceChildren();
         container.hidden = true;
         return;
       }
       container.hidden = false;
-      container.replaceChildren();
       const contractId = getTokenCacheContractId(token);
-      const parentsSection = document.createElement('div');
-      parentsSection.className = 'selected-relationships__group';
-      const lineageSection = document.createElement('div');
-      lineageSection.className = 'selected-relationships__group';
-      container.append(parentsSection, lineageSection);
-      void renderAncestorsSection(token, contractId, parentsSection);
-      void renderLineageSection(token, contractId, lineageSection);
+
+      const tree = document.createElement('div');
+      tree.className = 'rel-tree';
+      const viewport = document.createElement('div');
+      viewport.className = 'rel-tree__viewport';
+      const status = document.createElement('div');
+      status.className = 'rel-tree__status';
+      status.textContent = 'Loading lineage…';
+      tree.append(viewport, status);
+      container.replaceChildren(tree);
+
+      const lineage = await fetchLineage({ contractId, id: token.id }).catch(() => null);
+      if (requestId !== state.selectedChildrenRequestId || state.selectedTokenId !== token.id) {
+        return;
+      }
+
+      let ancestorGroups = [];
+      let descendantGroups = [];
+      let siblings = [];
+      let coverageText = '';
+      if (lineage) {
+        ancestorGroups = groupByDepth(lineage.ancestors);
+        descendantGroups = groupByDepth(lineage.descendants);
+        siblings = lineage.siblings ?? [];
+        coverageText = lineage.complete
+          ? `Lineage complete across ${lineage.mintedCount.toString()} inscriptions.`
+          : `Index ${lineage.syncedCount.toString()}/${lineage.mintedCount.toString()} — newer relations may still be syncing.`;
+
+        // The server edge index can briefly lag a freshly sealed inscription.
+        // Always reconcile direct parents from the contract so confirmed
+        // relationships appear immediately, while deeper lineage continues to
+        // come from the indexed endpoint.
+        try {
+          const sender = getReadOnlySenderAddress();
+          const liveParents = await state.client.getParents(token.id, sender);
+          if (
+            requestId !== state.selectedChildrenRequestId ||
+            state.selectedTokenId !== token.id
+          ) {
+            return;
+          }
+          if (liveParents.length > 0) {
+            const indexedDirectParents =
+              ancestorGroups.find(([depth]) => depth === 1)?.[1] ?? [];
+            const directParents = new Map(
+              [...indexedDirectParents, ...liveParents].map((id) => [
+                id.toString(),
+                id
+              ])
+            );
+            ancestorGroups = [
+              ...ancestorGroups.filter(([depth]) => depth !== 1),
+              [1, [...directParents.values()]]
+            ];
+            void recordChildParents({
+              contractId,
+              childId: token.id,
+              parentIds: liveParents
+            });
+            if (lineage.parents.length === 0) {
+              coverageText = `${coverageText} Direct parents confirmed on-chain.`;
+            }
+          }
+        } catch (error) {
+          // Keep the indexed lineage when the live read is temporarily
+          // unavailable; the existing fallback still handles endpoint failure.
+        }
+      } else {
+        // Server lineage unavailable: live ancestor walk + local descendant index.
+        try {
+          const sender = getReadOnlySenderAddress();
+          ancestorGroups = [...(await walkAncestorsLive(token.id, sender, contractId)).entries()];
+        } catch (error) {
+          ancestorGroups = [];
+        }
+        try {
+          descendantGroups = [...(await walkDescendantsLocal(token.id, contractId)).entries()];
+        } catch (error) {
+          descendantGroups = [];
+        }
+        if (requestId !== state.selectedChildrenRequestId || state.selectedTokenId !== token.id) {
+          return;
+        }
+        coverageText = 'Local index — server lineage unavailable.';
+      }
+
+      // Ancestors: deepest generation at the very top, parents just above focus.
+      for (const [depth, ids] of [...ancestorGroups].sort((a, b) => b[0] - a[0])) {
+        viewport.append(
+          buildRelationshipRow({ contractId, ids, kind: 'up', depth, label: depthLabel(depth, 'up') })
+        );
+      }
+      // Focus row: the selected piece plus its siblings.
+      const focusRow = buildRelationshipRow({
+        contractId,
+        ids: siblings,
+        kind: 'focus',
+        depth: 0,
+        label: 'Selected',
+        selectedId: token.id
+      });
+      viewport.append(focusRow);
+      // Descendants: children just below focus, deeper generations further down.
+      for (const [depth, ids] of [...descendantGroups].sort((a, b) => a[0] - b[0])) {
+        viewport.append(
+          buildRelationshipRow({ contractId, ids, kind: 'down', depth, label: depthLabel(depth, 'down') })
+        );
+      }
+
+      // Now that every row is attached to the live viewport, hydrate the tiles —
+      // one batched summary fetch per row (covers the selected piece too), then
+      // each tile renders from cache. Doing this here (post-append) is what makes
+      // detached-media hydration no-op irrelevant.
+      for (const track of viewport.querySelectorAll('.rel-row__track')) {
+        const trackIds = Array.from(track.querySelectorAll('.parent-thumb__media'), (mediaEl) => {
+          try {
+            return BigInt(mediaEl.dataset.tokenId);
+          } catch (error) {
+            return null;
+          }
+        }).filter((id) => id !== null);
+        if (trackIds.length > 0) {
+          void hydrateRelationGroupSummaries(contractId, trackIds, track, track.dataset.relRole || 'relation');
+        }
+      }
+
+      const hasAny =
+        ancestorGroups.length > 0 || descendantGroups.length > 0 || siblings.length > 0;
+      status.textContent = hasAny ? coverageText : 'No parents, children, or siblings.';
+
+      // Focus row sits in the vertical middle when there are ancestors above it;
+      // a root piece (no ancestors) sits at the top instead.
+      requestAnimationFrame(() => {
+        if (requestId !== state.selectedChildrenRequestId) {
+          return;
+        }
+        viewport.scrollTop =
+          ancestorGroups.length > 0
+            ? Math.max(0, focusRow.offsetTop - (viewport.clientHeight - focusRow.clientHeight) / 2)
+            : 0;
+      });
     };
 
     // Walk the ancestor chain live from the chain: BFS up via get-parents,
@@ -6098,7 +6579,9 @@
           ? ''
           : 'allow-scripts';
         if (options.htmlDoc && previewMimeType?.trim().toLowerCase() !== 'application/pdf') {
-          frame.srcdoc = injectGridThumbnailHtml(options.htmlDoc);
+          frame.srcdoc = options.interactiveHtml
+            ? injectInteractivePreviewHtml(options.htmlDoc)
+            : injectGridThumbnailHtml(options.htmlDoc);
         } else {
           frame.src = getObjectUrl();
         }
@@ -6511,6 +6994,10 @@
             : (state.prepared?.dependencyIds?.length ?? 0) > 0
             ? 'Start recursive inscription'
             : 'Start inscription';
+      if (dom.payloadPreviewExpandButton) {
+        dom.payloadPreviewExpandButton.disabled = state.busy || !state.prepared;
+        dom.payloadPreviewExpandButton.hidden = !state.prepared;
+      }
       renderParentSelection();
       dom.refreshWalletButton.disabled = state.busy || state.walletLoadingPage || (!viewingAddress && !state.explorerMode);
       dom.walletLookupButton.textContent = shouldClearWalletLookupOnSubmit()
@@ -6734,8 +7221,23 @@
 
     const renderPreparedState = () => {
       if (!state.prepared) {
-        clearElement(dom.payloadPreview, 'No payload');
-        renderMeta(dom.preparedMeta, [['Status', 'Not prepared']]);
+        revokePayloadPreview();
+        if (state.selectedFile) {
+          clearElement(dom.payloadPreview, 'Ready to prepare');
+          renderMeta(dom.preparedMeta, [
+            ['Status', 'Selected - not prepared'],
+            {
+              key: 'File',
+              value: state.selectedFile.name,
+              title: state.selectedFile.name
+            },
+            ['Size', formatBytes(BigInt(state.selectedFile.size))],
+            ['Next step', 'Add parents, then click Prepare']
+          ]);
+        } else {
+          clearElement(dom.payloadPreview, 'No payload');
+          renderMeta(dom.preparedMeta, [['Status', 'Not prepared']]);
+        }
         dom.duplicateWarning.classList.remove('on');
         renderResumeNotice();
         updateControls();
@@ -6891,6 +7393,12 @@
       revokePayloadPreview();
       renderBytesPreview(dom.payloadPreview, state.prepared.bytes, state.prepared.mimeType, (url) => {
         state.payloadPreviewUrl = url;
+      }, {
+        htmlDoc:
+          getMediaKind(state.prepared.mimeType) === 'html'
+            ? new TextDecoder().decode(state.prepared.bytes)
+            : null,
+        interactiveHtml: true
       });
 
       if (state.duplicateId !== null) {
@@ -7057,6 +7565,22 @@
         dependencyIds,
         parentIds
       };
+      const mintAttempt = {
+        contractId: getContractId(state.contract),
+        expectedHashHex,
+        fileName: file.name,
+        mimeType,
+        totalBytes: bytes.length,
+        totalChunks: chunks.length,
+        batchSize: Math.min(DEFAULT_BATCH_SIZE, MAX_UPLOAD_BATCH_SIZE),
+        tokenUri: tokenUriValue,
+        dependencyIds: dependencyIds.map((id) => id.toString()),
+        parentIds: parentIds.map((id) => id.toString()),
+        payloadBlob: file.slice(0, file.size, file.type || mimeType),
+        updatedAt: Date.now()
+      };
+      state.lastMintAttempt = mintAttempt;
+      void saveMintAttempt(mintAttempt);
       state.duplicateId = null;
       state.uploadState = null;
       dom.allowDuplicateInput.checked = false;
@@ -7137,18 +7661,82 @@
           stxAddress: walletAddress,
           postConditionMode: options.postConditions ? PostConditionMode.Deny : undefined,
           postConditions: options.postConditions,
+          // Size-based miner fee for payload-bearing calls; omitted lets the
+          // wallet estimate (fine for the tiny begin/seal transactions).
+          ...(options.feeMicroStx != null ? { fee: options.feeMicroStx } : {}),
           onFinish: (payload) => resolve(payload),
           onCancel: () => reject(new Error('Wallet cancelled or failed to broadcast.'))
         });
       });
     };
 
-    const pauseBeforeNext = async (label) => {
-      for (let remaining = TX_DELAY_SECONDS; remaining > 0; remaining -= 1) {
-        setStatus(dom.walletStatus, `<strong>${label}</strong> ${remaining}s`, 'wait', 'amber');
-        await sleep(1000);
+    const waitForTransactionConfirmation = async (txId, label) => {
+      const normalizedTxId = normalizeTxId({ txId });
+      const apiBases = getApiBaseUrls(state.contract.network);
+      const startedAt = Date.now();
+      const timeoutMs = 45 * 60 * 1000;
+      appendLog(
+        `${label} submitted. Waiting for on-chain confirmation before continuing.`,
+        'waiting'
+      );
+      while (Date.now() - startedAt < timeoutMs) {
+        setStatus(
+          dom.walletStatus,
+          `<strong>Waiting for confirmation</strong> ${label}`,
+          'wait',
+          'amber'
+        );
+        await sleep(8000);
+        for (const apiBase of apiBases) {
+          try {
+            const response = await fetch(
+              `${apiBase}/extended/v1/tx/${normalizedTxId}`
+            );
+            if (!response.ok) {
+              continue;
+            }
+            const payload = await response.json();
+            const txStatus = String(payload?.tx_status ?? '').toLowerCase();
+            if (!txStatus || txStatus === 'pending') {
+              continue;
+            }
+            if (txStatus !== 'success') {
+              throw new Error(`${label} finished with status ${txStatus}.`);
+            }
+            appendLog(`${label} confirmed on-chain.`, 'confirmed');
+            return;
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            if (message.includes('finished with status')) {
+              throw error;
+            }
+          }
+        }
       }
-      updateWalletStatus();
+      throw new Error(
+        `${label} confirmation timed out. The transaction may still confirm. Reload and resume to check the saved on-chain progress.`
+      );
+    };
+
+    const waitForUploadIndex = async (expectedHash, expectedIndex, label) => {
+      const owner = state.walletSession.address;
+      if (!owner) {
+        throw new Error('Wallet disconnected while checking upload confirmation.');
+      }
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const uploadState = await state.client
+          .getUploadState(expectedHash, owner, owner)
+          .catch(() => null);
+        if (uploadState && Number(uploadState.currentIndex) >= expectedIndex) {
+          state.uploadState = uploadState;
+          renderPreparedState();
+          return uploadState;
+        }
+        await sleep(3000);
+      }
+      throw new Error(
+        `${label} confirmed, but the upload index has not updated yet. Reload and resume; confirmed chunks will not be lost.`
+      );
     };
 
     const validateMintReadiness = async () => {
@@ -7296,7 +7884,6 @@
         flowStarted = true;
         const feeEstimate = getFeeEstimate(prepared.chunks.length);
         const hasUploadState = !!state.uploadState;
-        let didSendBeforeSeal = false;
 
         if (shouldUseNativeSingleTx()) {
           // v3+ native one-transaction mint directly on the core.
@@ -7338,19 +7925,26 @@
                 : dependencyIds.length > 0
                 ? [...coreArgs, listCV(dependencyIds.map((id) => uintCV(id)))]
                 : coreArgs,
-            postConditions: resolveFeePostConditions(singleTxCapMicroStx)
+            postConditions: resolveFeePostConditions(singleTxCapMicroStx),
+            feeMicroStx: walletMinerFeeMicroStx(prepared.bytes.length)
           });
           const singleTxId = normalizeTxId(singleTx);
           state.lastSubmittedTxId = singleTxId;
-          appendLog(`Single-tx mint sent: ${singleTxId}`);
-          setStep('begin', 'done', 'Submitted');
-          setStep('upload', 'done', 'Submitted');
-          setStep('seal', 'done', 'Submitted');
+          appendLog(`Single-tx mint sent: ${singleTxId}`, 'action');
+          setStep('begin', 'pending', 'Confirming');
+          setStep('upload', 'pending', 'Confirming');
+          setStep('seal', 'pending', 'Confirming');
+          await waitForTransactionConfirmation(singleTxId, 'Single-transaction mint');
+          setStep('begin', 'done', 'Confirmed');
+          setStep('upload', 'done', 'Confirmed');
+          setStep('seal', 'done', 'Confirmed');
+          state.lastMintAttempt = null;
+          void clearMintAttempt(getContractId(state.contract));
           setStatus(
             dom.walletStatus,
-            `<strong>Submitted</strong> ${truncateMiddle(singleTxId, 8, 8)}`,
-            'pending',
-            'blue'
+            `<strong>Confirmed</strong> ${truncateMiddle(singleTxId, 8, 8)}`,
+            'ready',
+            'green'
           );
           await loadWalletInscriptions();
           return;
@@ -7394,19 +7988,26 @@
                     listCV(prepared.chunks.map((chunk) => bufferCV(chunk))),
                     stringAsciiCV(prepared.tokenUriValue)
                   ],
-            postConditions: resolveFeePostConditions(feeEstimate.totalMicroStx)
+            postConditions: resolveFeePostConditions(feeEstimate.totalMicroStx),
+            feeMicroStx: walletMinerFeeMicroStx(prepared.bytes.length)
           });
           const singleTxId = normalizeTxId(singleTx);
           state.lastSubmittedTxId = singleTxId;
-          appendLog(`Single-tx mint sent: ${singleTxId}`);
-          setStep('begin', 'done', 'Submitted');
-          setStep('upload', 'done', 'Submitted');
-          setStep('seal', 'done', 'Submitted');
+          appendLog(`Single-tx mint sent: ${singleTxId}`, 'action');
+          setStep('begin', 'pending', 'Confirming');
+          setStep('upload', 'pending', 'Confirming');
+          setStep('seal', 'pending', 'Confirming');
+          await waitForTransactionConfirmation(singleTxId, 'Single-transaction mint');
+          setStep('begin', 'done', 'Confirmed');
+          setStep('upload', 'done', 'Confirmed');
+          setStep('seal', 'done', 'Confirmed');
+          state.lastMintAttempt = null;
+          void clearMintAttempt(getContractId(state.contract));
           setStatus(
             dom.walletStatus,
-            `<strong>Submitted</strong> ${truncateMiddle(singleTxId, 8, 8)}`,
-            'pending',
-            'blue'
+            `<strong>Confirmed</strong> ${truncateMiddle(singleTxId, 8, 8)}`,
+            'ready',
+            'green'
           );
           await loadWalletInscriptions();
           return;
@@ -7427,10 +8028,17 @@
               prepared.stagedFee?.beginMicroStx ?? feeEstimate.beginMicroStx
             )
           });
-          appendLog(`Begin tx sent: ${normalizeTxId(beginTx)}`);
-          setStep('begin', 'done', 'Submitted');
-          didSendBeforeSeal = true;
-          await pauseBeforeNext('Next transaction in');
+          const beginTxId = normalizeTxId(beginTx);
+          appendLog(`Begin transaction sent: ${beginTxId}`, 'action');
+          setStep('begin', 'pending', 'Confirming');
+          await waitForTransactionConfirmation(beginTxId, 'Begin transaction');
+          await refreshUploadState(prepared.expectedHash);
+          if (!state.uploadState) {
+            throw new Error(
+              'Begin confirmed, but the upload session is not visible yet. Reload and resume in a moment.'
+            );
+          }
+          setStep('begin', 'done', 'Confirmed');
         } else {
           setStep('begin', 'done', 'Already started');
           appendLog(
@@ -7449,31 +8057,68 @@
           throw new Error('On-chain upload state is ahead of this payload.');
         }
 
+        const uploadBatchSize = Math.min(DEFAULT_BATCH_SIZE, MAX_UPLOAD_BATCH_SIZE);
+        const totalBatches = Math.ceil(prepared.chunks.length / uploadBatchSize);
+        const confirmedBatches =
+          currentIndex <= 0 ? 0 : Math.ceil(currentIndex / uploadBatchSize);
         const remainingChunks = prepared.chunks.slice(currentIndex);
         const remainingBatches = batchChunks(
           remainingChunks,
-          Math.min(DEFAULT_BATCH_SIZE, MAX_UPLOAD_BATCH_SIZE)
+          uploadBatchSize
         );
 
         if (remainingBatches.length > 0) {
-          setStep('upload', 'pending', `${remainingBatches.length} batch${remainingBatches.length === 1 ? '' : 'es'}`);
+          setStep(
+            'upload',
+            'pending',
+            `${confirmedBatches}/${totalBatches} confirmed`
+          );
           for (let index = 0; index < remainingBatches.length; index += 1) {
             const batch = remainingBatches[index];
-            appendLog(`Step 2: upload batch ${index + 1}/${remainingBatches.length}`);
+            const absoluteBatchNumber = confirmedBatches + index + 1;
+            const expectedIndex = currentIndex +
+              remainingBatches
+                .slice(0, index + 1)
+                .reduce((sum, entry) => sum + entry.length, 0);
+            appendLog(
+              `Wallet action required: upload batch ${absoluteBatchNumber} of ${totalBatches}.`,
+              'action'
+            );
+            const batchBytes = batch.reduce((sum, chunk) => sum + chunk.length, 0);
             const uploadTx = await requestContractCall({
               functionName: 'add-chunk-batch',
               functionArgs: [
                 bufferCV(prepared.expectedHash),
                 listCV(batch.map((chunk) => bufferCV(chunk)))
-              ]
+              ],
+              feeMicroStx: walletMinerFeeMicroStx(batchBytes)
             });
-            appendLog(`Batch ${index + 1}/${remainingBatches.length} tx sent: ${normalizeTxId(uploadTx)}`);
-            didSendBeforeSeal = true;
-            if (index < remainingBatches.length - 1) {
-              await pauseBeforeNext('Next batch in');
-            }
+            const uploadTxId = normalizeTxId(uploadTx);
+            appendLog(
+              `Batch ${absoluteBatchNumber}/${totalBatches} sent: ${uploadTxId}`,
+              'action'
+            );
+            setStep(
+              'upload',
+              'pending',
+              `Confirming ${absoluteBatchNumber}/${totalBatches}`
+            );
+            await waitForTransactionConfirmation(
+              uploadTxId,
+              `Upload batch ${absoluteBatchNumber}/${totalBatches}`
+            );
+            await waitForUploadIndex(
+              prepared.expectedHash,
+              expectedIndex,
+              `Upload batch ${absoluteBatchNumber}/${totalBatches}`
+            );
+            setStep(
+              'upload',
+              'pending',
+              `${absoluteBatchNumber}/${totalBatches} confirmed`
+            );
           }
-          setStep('upload', 'done', 'Submitted');
+          setStep('upload', 'done', `${totalBatches}/${totalBatches} confirmed`);
         } else {
           setStep('upload', 'done', 'Already uploaded');
         }
@@ -7482,9 +8127,6 @@
         appendLog(
           getSealLogLabel(dependencyIds, parentIds)
         );
-        if (didSendBeforeSeal) {
-          await pauseBeforeNext('Sealing in');
-        }
         const sealFunctionName = getSealFunctionName(dependencyIds, parentIds);
         const sealTx = await requestContractCall({
           functionName: sealFunctionName,
@@ -7495,13 +8137,17 @@
         });
         const sealTxId = normalizeTxId(sealTx);
         state.lastSubmittedTxId = sealTxId;
-        appendLog(`Seal tx sent: ${sealTxId}`);
-        setStep('seal', 'done', 'Submitted');
+        appendLog(`Seal transaction sent: ${sealTxId}`, 'action');
+        setStep('seal', 'pending', 'Confirming');
+        await waitForTransactionConfirmation(sealTxId, 'Seal transaction');
+        setStep('seal', 'done', 'Confirmed');
+        state.lastMintAttempt = null;
+        void clearMintAttempt(getContractId(state.contract));
         setStatus(
           dom.walletStatus,
-          `<strong>Submitted</strong> ${truncateMiddle(sealTxId, 8, 8)}`,
-          'pending',
-          'blue'
+          `<strong>Confirmed</strong> ${truncateMiddle(sealTxId, 8, 8)}`,
+          'ready',
+          'green'
         );
         await loadWalletInscriptions();
       } catch (error) {
@@ -7732,7 +8378,8 @@
       const selectedToken = getSelectedToken();
       const pageCount = getWalletPageCount();
       const { pageIds, index } = getFullscreenPagePosition();
-      const hasSelectedPagePosition = !!selectedToken && index >= 0;
+      const isTokenFullscreen = state.fullscreenSource !== 'prepared';
+      const hasSelectedPagePosition = isTokenFullscreen && !!selectedToken && index >= 0;
       const canGoPrevious =
         hasSelectedPagePosition && (index > 0 || state.walletPageIndex > 0);
       const canGoNext =
@@ -7970,11 +8617,110 @@
       }
     };
 
+    const renderFullscreenPreparedPayload = () => {
+      revokeFullscreenPreview();
+      const prepared = state.prepared;
+      dom.fullscreenRawLink.hidden = true;
+      dom.fullscreenRawLink.removeAttribute('href');
+      dom.fullscreenRawLink.removeAttribute('download');
+      dom.fullscreenRawLink.removeAttribute('aria-label');
+
+      if (!prepared || !prepared.bytes || prepared.bytes.length === 0) {
+        dom.fullscreenTitle.textContent = 'Prepared payload';
+        dom.fullscreenMeta.textContent = 'No payload prepared';
+        setFullscreenNotice('Prepare a payload first.');
+        return;
+      }
+
+      const fullscreenMimeType =
+        resolveMimeType(prepared.mimeType ?? null, prepared.bytes) ??
+        prepared.mimeType ??
+        'application/octet-stream';
+      const kind = getMediaKind(fullscreenMimeType);
+      const blob = new Blob([prepared.bytes], { type: fullscreenMimeType });
+      const url = URL.createObjectURL(blob);
+      state.fullscreenUrl = url;
+      dom.fullscreenTitle.textContent = 'Prepared payload';
+      dom.fullscreenMeta.textContent =
+        `${kind.toUpperCase()} · ${formatBytes(BigInt(prepared.bytes.length))} · ${prepared.file.name}`;
+      dom.fullscreenRawLink.href = url;
+      dom.fullscreenRawLink.textContent = 'Open payload';
+      dom.fullscreenRawLink.download = prepared.file.name;
+      dom.fullscreenRawLink.setAttribute('aria-label', 'Open prepared payload in a new tab');
+      dom.fullscreenRawLink.hidden = false;
+
+      if (kind === 'image' || kind === 'svg') {
+        renderSquareImagePreview(dom.fullscreenStage, url, {
+          mimeType: fullscreenMimeType,
+          isSvgSource: kind === 'svg',
+          alt: 'Prepared payload preview',
+          preserveAnimation:
+            kind === 'image' && isAnimatedImagePayload(prepared.bytes, fullscreenMimeType),
+          replayDelayMs:
+            kind === 'image'
+              ? getFiniteAnimatedImageReplayDelayMs(prepared.bytes, fullscreenMimeType)
+              : null
+        });
+        return;
+      }
+
+      dom.fullscreenStage.replaceChildren();
+
+      if (kind === 'video') {
+        const video = document.createElement('video');
+        video.controls = true;
+        video.autoplay = true;
+        video.loop = true;
+        video.playsInline = true;
+        video.preload = 'auto';
+        video.src = url;
+        dom.fullscreenStage.append(video);
+        playPreviewVideoWhenReady(video);
+        return;
+      }
+
+      if (kind === 'audio') {
+        const audio = document.createElement('audio');
+        audio.controls = true;
+        audio.src = url;
+        dom.fullscreenStage.append(audio);
+        return;
+      }
+
+      if (kind === 'html') {
+        const frame = document.createElement('iframe');
+        frame.title = 'prepared-inscription-preview';
+        frame.referrerPolicy = 'no-referrer';
+        frame.loading = 'lazy';
+        frame.sandbox = 'allow-scripts';
+        frame.src = url;
+        dom.fullscreenStage.append(frame);
+        return;
+      }
+
+      if (kind === 'text') {
+        const pre = document.createElement('pre');
+        pre.textContent = new TextDecoder().decode(prepared.bytes);
+        dom.fullscreenStage.append(pre);
+        return;
+      }
+
+      const link = document.createElement('a');
+      link.className = 'btn ghost';
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noreferrer';
+      link.download = prepared.file.name;
+      link.textContent = 'Open prepared payload';
+      dom.fullscreenStage.append(link);
+    };
+
     const openFullscreenViewer = async () => {
       const token = getSelectedToken();
       if (!token) {
         return;
       }
+      state.fullscreenSource = 'token';
       state.fullscreenOpen = true;
       dom.fullscreenViewer.hidden = false;
       dom.fullscreenViewer.setAttribute('aria-hidden', 'false');
@@ -7984,12 +8730,27 @@
       dom.fullscreenCloseButton.focus({ preventScroll: true });
     };
 
+    const openPreparedPayloadFullscreen = () => {
+      if (!state.prepared) {
+        return;
+      }
+      state.fullscreenSource = 'prepared';
+      state.fullscreenOpen = true;
+      dom.fullscreenViewer.hidden = false;
+      dom.fullscreenViewer.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('fullscreen-viewer-open');
+      updateFullscreenControls();
+      renderFullscreenPreparedPayload();
+      dom.fullscreenCloseButton.focus({ preventScroll: true });
+    };
+
     const closeFullscreenViewer = async () => {
       if (!state.fullscreenOpen) {
         updateFullscreenControls();
         return;
       }
       state.fullscreenOpen = false;
+      state.fullscreenSource = null;
       dom.fullscreenViewer.hidden = true;
       dom.fullscreenViewer.setAttribute('aria-hidden', 'true');
       document.body.classList.remove('fullscreen-viewer-open');
@@ -7999,7 +8760,7 @@
     };
 
     const navigateFullscreenSelection = async (direction) => {
-      if (state.busy || state.walletLoadingPage) {
+      if (state.busy || state.walletLoadingPage || state.fullscreenSource === 'prepared') {
         return;
       }
       const { pageIds, index } = getFullscreenPagePosition();
@@ -8915,11 +9676,28 @@
       const label = getGridMimeLabel(token.meta?.mimeType ?? null);
       setTokenThumbLabel(media, label);
       media.dataset.thumbnailState = 'pending-live-media';
-      const queued = scheduleBackgroundThumbnailHydration(token, media);
-      if (!queued) {
-        media.dataset.thumbnailState = 'fallback-label';
+      // Relationship thumbs (e.g. HTML inscriptions) render via a direct one-off
+      // fetch rather than the grid's shared background queue. That queue is reset
+      // (runId bump) on every grid re-render and is size-sorted, so large HTML is
+      // deprioritised or cancelled and never paints here — which is why images
+      // (handled synchronously above) appeared but HTML did not. This paints into
+      // `media` once fetched, guarded by isConnected + key, and reuses the shared
+      // live-media cache so the grid benefits too.
+      if (
+        !state.thumbnailHydrationAttempted.has(cacheKey) &&
+        shouldBackgroundHydrateThumbnail(token)
+      ) {
+        state.thumbnailHydrationAttempted.add(cacheKey);
+        void runBackgroundThumbnailHydration({
+          token,
+          thumbElement: media,
+          cacheKey,
+          runId: state.thumbnailHydrationRunId
+        });
+        return true;
       }
-      return queued;
+      media.dataset.thumbnailState = 'fallback-label';
+      return false;
     };
 
     // Coalesce hydration-triggered re-renders into one per frame. A full
@@ -9096,7 +9874,7 @@
       renderSelectedInscriptionMeta(token, null, mimeType);
       renderBytesPreview(dom.tokenPreviewMedia, bytes, mimeType, (url) => {
         state.tokenPreviewUrl = url;
-      }, { truthfulImageSizing: true, htmlDoc });
+      }, { truthfulImageSizing: true, htmlDoc, interactiveHtml: true });
       void warmThumbnailCacheFromBytes(token, bytes, mimeType);
       debugLog('preview', 'selected inscription preview rendered', {
         tokenId: token.id.toString(),
@@ -11119,10 +11897,96 @@ const openCuratedGallery = async (galleryId) => {
       renderPreparedState();
     };
 
+    // Manual recovery. If a wallet transaction is cancelled or fails — in
+    // particular if a wallet popup leaves the request pending so the flow's
+    // finally never runs — the busy lock can persist and disable every control.
+    // Reset force-clears the lock and the step indicators so the user can prepare
+    // or start again without reloading the page. The prepared file is kept.
+    // These two controls are deliberately never gated by state.busy, so they keep
+    // working even when the rest of the panel is locked.
+    const resetInscriberFlow = () => {
+      setBusy(false);
+      resetSteps();
+      updateWalletStatus();
+      renderPreparedState();
+      updateControls();
+      appendLog('Controls reset — you can prepare or start the inscription again.', 'support');
+    };
+
+    // Clear the inscription panel back to an empty state for a fresh file: drops
+    // the selected file, prepared payload, parents, and form fields.
+    const clearInscriberPanel = () => {
+      if (state.payloadPreviewUrl) {
+        URL.revokeObjectURL(state.payloadPreviewUrl);
+        state.payloadPreviewUrl = null;
+      }
+      setSelectedFile(null);
+      clearParentIds();
+      dom.nameInput.value = '';
+      dom.tokenUriInput.value = '';
+      if (dom.textPayload) {
+        dom.textPayload.value = '';
+      }
+      if (dom.payloadType) {
+        dom.payloadType.selectedIndex = 0;
+      }
+      if (dom.allowDuplicateInput) {
+        dom.allowDuplicateInput.checked = false;
+      }
+      setBusy(false);
+      state.lastMintAttempt = null;
+      void clearMintAttempt(getContractId(state.contract));
+      resetSteps();
+      updateWalletStatus();
+      renderPreparedState();
+      updateControls();
+      appendLog('Inscription panel cleared — drop a new file to begin.', 'support');
+    };
+
+    const restoreSavedMintAttempt = async () => {
+      if (window.location.search.includes('handoff=opus-player')) {
+        return false;
+      }
+      const attempt = await loadMintAttempt(getContractId(state.contract));
+      state.lastMintAttempt = attempt;
+      if (!attempt) {
+        renderResumeNotice();
+        return false;
+      }
+      dom.tokenUriInput.value = attempt.tokenUri || DEFAULT_TOKEN_URI;
+      state.handoffDependencyIds = (attempt.dependencyIds ?? []).map((id) => BigInt(id));
+      state.parentIds = (attempt.parentIds ?? []).map((id) => BigInt(id));
+      if (attempt.payloadBlob instanceof Blob) {
+        const file = new File(
+          [attempt.payloadBlob],
+          attempt.fileName || 'unfinished-inscription',
+          { type: attempt.mimeType || attempt.payloadBlob.type }
+        );
+        setSelectedFile(file);
+        state.handoffDependencyIds = (attempt.dependencyIds ?? []).map((id) => BigInt(id));
+        state.parentIds = (attempt.parentIds ?? []).map((id) => BigInt(id));
+        appendLog(
+          `Restored unfinished inscription ${file.name}. Checking confirmed on-chain progress.`,
+          'support'
+        );
+        await preparePayload();
+        void refreshParentChecks();
+        return true;
+      }
+      appendLog(
+        `Unfinished inscription found. Re-select ${attempt.fileName ?? 'the original file'} to resume.`,
+        'support'
+      );
+      renderParentSelection();
+      renderResumeNotice();
+      return false;
+    };
+
     const clearOpusHtmlHandoffRequest = () => {
       if (window.location.search.includes('handoff=opus-player')) {
         const cleanUrl = new URL(window.location.href);
         cleanUrl.searchParams.delete('handoff');
+        cleanUrl.searchParams.delete('handoffId');
         window.history.replaceState(null, '', `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
       }
     };
@@ -11206,19 +12070,27 @@ const openCuratedGallery = async (galleryId) => {
     const consumeOpusHtmlHandoff = async () => {
       let raw = null;
       let pointer = null;
+      const requestedId = new URL(window.location.href).searchParams.get('handoffId');
       try {
         raw = window.localStorage.getItem(OPUS_HTML_HANDOFF_KEY);
       } catch (error) {
         raw = null;
       }
 
-      if (!raw) {
+      if (!raw && !requestedId) {
         clearOpusHtmlHandoffRequest();
         return false;
       }
 
       try {
-        pointer = JSON.parse(raw);
+        const pendingPointer = raw ? JSON.parse(raw) : null;
+        pointer =
+          requestedId && pendingPointer?.id !== requestedId
+            ? { id: requestedId, storage: 'indexeddb' }
+            : pendingPointer;
+        if (!pointer?.id) {
+          throw new Error('Generated HTML handoff identifier was missing.');
+        }
         const payload = await readOpusHtmlHandoffRecord(pointer);
         const html = typeof payload.html === 'string' ? payload.html : '';
         if (!html.trim()) {
@@ -11239,10 +12111,10 @@ const openCuratedGallery = async (galleryId) => {
         state.handoffDependencyIds = normalizeOpusHandoffDependencyIds(payload.dependencies);
         appendLog(
           originalFilename === filename
-            ? `Loaded generated Opus HTML player: ${filename}.`
-            : `Loaded generated Opus HTML player: ${filename} (from ${originalFilename}).`
+            ? `Selected generated Opus HTML player: ${filename}. Add parents, then click Prepare.`
+            : `Selected generated Opus HTML player: ${filename} (from ${originalFilename}). Add parents, then click Prepare.`
         );
-        await preparePayload();
+        renderPreparedState();
         document
           .getElementById('inscribeTitle')
           ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -11254,7 +12126,11 @@ const openCuratedGallery = async (galleryId) => {
         return false;
       } finally {
         try {
-          window.localStorage.removeItem(OPUS_HTML_HANDOFF_KEY);
+          const currentRaw = window.localStorage.getItem(OPUS_HTML_HANDOFF_KEY);
+          const currentPointer = currentRaw ? JSON.parse(currentRaw) : null;
+          if (currentPointer?.id === pointer?.id) {
+            window.localStorage.removeItem(OPUS_HTML_HANDOFF_KEY);
+          }
         } catch (error) {}
         await deleteOpusHtmlHandoffRecord(pointer);
         clearOpusHtmlHandoffRequest();
@@ -11284,7 +12160,10 @@ const openCuratedGallery = async (galleryId) => {
       resetSteps();
       renderTokenGridPlaceholders();
       updateWalletStatus();
-      await consumeOpusHtmlHandoff();
+      const consumedHandoff = await consumeOpusHtmlHandoff();
+      if (!consumedHandoff) {
+        await restoreSavedMintAttempt();
+      }
       if (state.explorerMode) {
         await loadExplorerMode();
       } else {
@@ -11516,6 +12395,8 @@ const openCuratedGallery = async (galleryId) => {
       }
     });
     dom.inscribeButton.addEventListener('click', runInscription);
+    dom.resetInscriberButton.addEventListener('click', resetInscriberFlow);
+    dom.clearInscriberButton.addEventListener('click', clearInscriberPanel);
     dom.allowDuplicateInput.addEventListener('change', updateControls);
     dom.parentIdsInput.addEventListener('input', () => {
       state.parentStatusMessage = null;
@@ -11526,6 +12407,7 @@ const openCuratedGallery = async (galleryId) => {
     dom.clearParentsButton.addEventListener('click', clearParentIds);
     dom.transferRecipientInput.addEventListener('input', updateTransferControls);
     dom.transferButton.addEventListener('click', transferSelectedToken);
+    dom.payloadPreviewExpandButton?.addEventListener('click', openPreparedPayloadFullscreen);
     dom.fullscreenButton?.addEventListener('click', openFullscreenViewer);
     dom.previewExpandButton.addEventListener('click', openFullscreenViewer);
     dom.fullscreenCloseButton.addEventListener('click', () => {

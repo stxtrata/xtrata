@@ -11,6 +11,7 @@ export type MintAttempt = {
   tokenUri: string | null;
   dependencyIds?: string[];
   parentIds?: string[];
+  payloadBlob?: Blob;
   updatedAt: number;
 };
 
@@ -80,7 +81,11 @@ const saveToStorage = (attempt: MintAttempt) => {
     return;
   }
   try {
-    window.localStorage.setItem(buildKey(attempt.contractId), JSON.stringify(attempt));
+    const { payloadBlob: _payloadBlob, ...serializableAttempt } = attempt;
+    window.localStorage.setItem(
+      buildKey(attempt.contractId),
+      JSON.stringify(serializableAttempt)
+    );
   } catch (error) {
     // Ignore storage write failures.
   }

@@ -1,0 +1,1372 @@
+## functions/index/[contract].ts sync + POST handling
+import { serializeCV, uintCV, cvToJSON } from '@stacks/transactions';
+import {
+  callRuntimeReadOnly,
+  getRuntimeApiBases,
+  parseRuntimeContractRef,
+  type RuntimeContractRef,
+  type RuntimeEnv
+} from '../runtime/lib';
+import { queryAll, run } from '../lib/db';
+import { getHiroApiKeys } from '../lib/hiro-keys';
+
+// Cached per-token summary index. Reading a page is one D1 query instead of N
+// per-token chain reads; the index is populated incrementally from the core's
+// append-only minted-id list. Content bytes remain served by /runtime/content.
+
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  'Access-Control-Allow-Headers': 'content-type'
+};
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json', ...CORS }
+  });
+
+const toHex = (bytes: Uint8Array) =>
+  Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+const uintArg = (value: bigint) => {
+  const serialized = serializeCV(uintCV(value)) as unknown as Uint8Array | string;
+  return '0x' + (typeof serialized === 'string' ? serialized.replace(/^0x/, '') : toHex(serialized));
+};
+
+// cvToJSON unwrappers (defensive against version shape differences).
+const unwrap = (node: any): any =>
+  node && typeof node === 'object' && 'value' in node ? node.value : node;
+const asNumber = (node: any): number | null => {
+  const v = unwrap(node);
+  return v === null || v === undefined ? null : Number(v);
+};
+const asString = (node: any): string | null => {
+  const v = unwrap(node);
+  return typeof v === 'string' ? v : v === null || v === undefined ? null : String(v);
+};
+// Clarity (list uint) -> number[]. cvToJSON renders a list as { value: [ {uint},
+// ... ] }; unwrap yields the element array, each element unwrapped to a number.
+const asUintList = (node: any): number[] => {
+  const v = unwrap(node);
+  if (!Array.isArray(v)) return [];
+  const out: number[] = [];
+  for (const el of v) {
+    const n = asNumber(el);
+    if (n !== null && Number.isInteger(n) && n > 0) out.push(n);
+  }
+  return out;
+};
+
+const readOkUint = async (
+  env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef, functionName: string
+) => {
+  const cv = await callRuntimeReadOnly({
+    env, apiBases, contract, functionName, functionArgs: [], senderAddress: contract.address
+  });
+  // (ok uint): cvToJSON -> { value: { value: "56" } } — unwrap twice.
+  return Number(unwrap(unwrap(cvToJSON(cv))));
+};
+const readMintedCount = (env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef) =>
+  readOkUint(env, apiBases, contract, 'get-minted-count');
+const readLastTokenId = (env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef) =>
+  readOkUint(env, apiBases, contract, 'get-last-token-id');
+
+const readMintedId = async (env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef, index: number) => {
+  const cv = await callRuntimeReadOnly({
+    env, apiBases, contract,
+    functionName: 'get-minted-id', functionArgs: [uintArg(BigInt(index))], senderAddress: contract.address
+  });
+  const json0 = cvToJSON(cv);
+  // (ok (optional uint)) -> ok -> optional -> uint
+  const v = unwrap(unwrap(json0));
+  return v === null || v === undefined ? null : Number(unwrap(v));
+};
+
+const readSummary = async (env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef, id: number) => {
+  const cv = await callRuntimeReadOnly({
+    env, apiBases, contract,
+    functionName: 'get-inscription-summary', functionArgs: [uintArg(BigInt(id))], senderAddress: contract.address
+  });
+  // (ok (optional { tuple })) -> ok -> optional -> tuple.value (field map)
+  const okVal = unwrap(cvToJSON(cv));
+  const optVal = unwrap(okVal);
+  if (optVal === null || optVal === undefined) return null;
+  const fields = optVal.value ?? optVal; // tuple field map
+  return {
+    owner: asString(fields['owner']),
+    creator: asString(fields['creator']),
+    finalHash: asString(fields['final-hash']),
+    mime: asString(fields['mime-type']),
+    totalSize: asNumber(fields['total-size']),
+    totalChunks: asNumber(fields['total-chunks']),
+    sealed: unwrap(fields['sealed']) === true ? 1 : 0,
+    tokenUri: asString(unwrap(fields['token-uri'])),
+    // migration-source is (optional { source-contract: principal, source-id: uint }).
+    // Store the XIP-002 canonical reference "<contract>:<id>", or null.
+    migrationSource: (() => {
+      const ms = fields['migration-source'];
+      if (!ms) return null;
+      const inner = unwrap(ms); // optional -> tuple json or null
+      if (inner === null || inner === undefined) return null;
+      const t = inner.value ?? inner;
+      const sourceContract = asString(t['source-contract']);
+      const sourceId = asNumber(t['source-id']);
+      return sourceContract != null && sourceId != null ? `${sourceContract}:${sourceId}` : null;
+    })(),
+    // Direct parents (v3.2.0+ summaries carry this list; empty on older cores).
+    parents: asUintList(fields['parents'])
+  };
+};
+
+// Older cores (v1/v2) lack get-inscription-summary: read get-inscription-meta
+// (+ get-owner when the meta tuple carries no owner). v1/v2 are migration sources
+// themselves, so migration-source is null.
+const readMetaSummary = async (env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef, id: number) => {
+  const cv = await callRuntimeReadOnly({
+    env, apiBases, contract,
+    functionName: 'get-inscription-meta', functionArgs: [uintArg(BigInt(id))], senderAddress: contract.address
+  });
+  const optVal = unwrap(unwrap(cvToJSON(cv)));
+  if (optVal === null || optVal === undefined) return null;
+  const fields = optVal.value ?? optVal;
+  let owner = asString(fields['owner']);
+  if (owner === null) {
+    try {
+      const oc = await callRuntimeReadOnly({
+        env, apiBases, contract,
+        functionName: 'get-owner', functionArgs: [uintArg(BigInt(id))], senderAddress: contract.address
+      });
+      owner = asString(unwrap(unwrap(cvToJSON(oc))));
+    } catch { owner = null; }
+  }
+  // get-inscription-meta has no token-uri; read it separately (one-time at sync).
+  let tokenUri: string | null = null;
+  try {
+    const tc = await callRuntimeReadOnly({
+      env, apiBases, contract,
+      functionName: 'get-token-uri', functionArgs: [uintArg(BigInt(id))], senderAddress: contract.address
+    });
+    tokenUri = asString(unwrap(unwrap(unwrap(cvToJSON(tc)))));
+  } catch { tokenUri = null; }
+  return {
+    owner,
+    creator: asString(fields['creator']),
+    finalHash: asString(fields['final-hash']),
+    mime: asString(fields['mime-type']),
+    totalSize: asNumber(fields['total-size']),
+    totalChunks: asNumber(fields['total-chunks']),
+    sealed: unwrap(fields['sealed']) === true ? 1 : 0,
+    tokenUri,
+    migrationSource: null as string | null,
+    // v1/v2 cores predate parent relationships.
+    parents: [] as number[]
+  };
+};
+
+// Detect the contract's reader shape so v1/v2/v3 all index from one endpoint.
+const probeCaps = async (env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef) => {
+  let hasMintedList = true;
+  let hasSummary = true;
+  try { await readMintedCount(env, apiBases, contract); } catch { hasMintedList = false; }
+  try {
+    await callRuntimeReadOnly({
+      env, apiBases, contract,
+      functionName: 'get-inscription-summary', functionArgs: [uintArg(1n)], senderAddress: contract.address
+    });
+  } catch { hasSummary = false; }
+  return { hasMintedList, hasSummary };
+};
+
+const getState = async (env: RuntimeEnv, contractId: string) => {
+  const res = await queryAll(env, 'SELECT minted_count, synced_count FROM inscription_index_state WHERE contract = ?', [contractId]);
+  const row = (res.results ?? [])[0] as { minted_count?: number; synced_count?: number } | undefined;
+  return { mintedCount: row?.minted_count ?? 0, syncedCount: row?.synced_count ?? 0 };
+};
+
+type IndexSummary = {
+  owner: string | null; creator: string | null; finalHash: string | null; mime: string | null;
+  totalSize: number | null; totalChunks: number | null; sealed: number;
+  tokenUri: string | null; migrationSource: string | null; parents: number[];
+};
+type Caps = { hasMintedList: boolean; hasSummary: boolean };
+
+const readToken = (
+  env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef, caps: Caps, id: number
+): Promise<IndexSummary | null> =>
+  caps.hasSummary
+    ? readSummary(env, apiBases, contract, id)
+    : readMetaSummary(env, apiBases, contract, id);
+
+// Replace a child's parent edge set: clear its existing edges, then insert the
+// current parents. Wrapped so a deploy that hasn't applied migration 006 (no
+// inscription_parents table) never breaks core summary indexing.
+const syncTokenParents = async (
+  env: RuntimeEnv, contractId: string, childId: number, parents: number[]
+) => {
+  try {
+    await run(env, 'DELETE FROM inscription_parents WHERE contract = ? AND child_id = ?', [contractId, childId]);
+    const now = Date.now();
+    for (const parentId of parents) {
+      if (!Number.isInteger(parentId) || parentId <= 0 || parentId === childId) continue;
+      await run(
+        env,
+        'INSERT OR IGNORE INTO inscription_parents (contract, child_id, parent_id, updated_at) VALUES (?,?,?,?)',
+        [contractId, childId, parentId, now]
+      );
+    }
+  } catch {
+    // inscription_parents absent / not yet migrated — skip edge sync.
+  }
+};
+
+const upsertToken = async (env: RuntimeEnv, contractId: string, tokenId: number, s: IndexSummary) => {
+  await run(
+    env,
+    `INSERT INTO inscription_index
+       (contract, token_id, owner, creator, final_hash, mime, total_size, total_chunks, sealed, token_uri, migration_source, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+     ON CONFLICT(contract, token_id) DO UPDATE SET
+       owner=excluded.owner, creator=excluded.creator, final_hash=excluded.final_hash,
+       mime=excluded.mime, total_size=excluded.total_size, total_chunks=excluded.total_chunks,
+       sealed=excluded.sealed, token_uri=excluded.token_uri,
+       migration_source=excluded.migration_source, updated_at=excluded.updated_at`,
+    [contractId, tokenId, s.owner, s.creator, s.finalHash, s.mime,
+     s.totalSize, s.totalChunks, s.sealed, s.tokenUri, s.migrationSource, Date.now()]
+  );
+  await syncTokenParents(env, contractId, tokenId, s.parents ?? []);
+};
+
+// Soft self-expiring lock TTL. Generous relative to a batch sync (which reads
+// at most maxPerRun tokens) so a slow run doesn't release early, but short
+// enough that a crashed run frees the lock quickly.
+const SYNC_LOCK_TTL_MS = 120_000;
+
+const sync = async (env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef, contractId: string, maxPerRun: number) => {
+  // Acquire the stampede lock. Ensure a state row exists, then conditionally
+  // claim the lock only if it is free or expired. If the UPDATE changes no rows,
+  // another sync holds the lock — back off rather than duplicate the work.
+  const now = Date.now();
+  await run(
+    env,
+    `INSERT OR IGNORE INTO inscription_index_state
+       (contract, minted_count, synced_count, updated_at, sync_lock_until)
+     VALUES (?,0,0,0,0)`,
+    [contractId]
+  );
+  const lockRes = await run(
+    env,
+    `UPDATE inscription_index_state SET sync_lock_until = ?
+      WHERE contract = ? AND (sync_lock_until IS NULL OR sync_lock_until <= ?)`,
+    [now + SYNC_LOCK_TTL_MS, contractId, now]
+  );
+  const acquired = Number((lockRes as { meta?: { changes?: number } })?.meta?.changes ?? 0) > 0;
+  if (!acquired) {
+    return { skipped: true as const };
+  }
+
+  try {
+    return await runSync(env, apiBases, contract, contractId, maxPerRun);
+  } finally {
+    // Release the lock so the next sync can run immediately (don't wait for TTL).
+    await run(
+      env,
+      'UPDATE inscription_index_state SET sync_lock_until = 0 WHERE contract = ?',
+      [contractId]
+    ).catch(() => undefined);
+  }
+};
+
+const runSync = async (env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef, contractId: string, maxPerRun: number) => {
+  const caps = await probeCaps(env, apiBases, contract);
+  // total = number of enumerable entries. Sparse cores (v2/v3) enumerate the
+  // minted-id list; dense cores (v1) enumerate ids 1..last-token-id.
+  const total = caps.hasMintedList
+    ? await readMintedCount(env, apiBases, contract)
+    : await readLastTokenId(env, apiBases, contract);
+  const { syncedCount } = await getState(env, contractId);
+  const start = syncedCount;
+  const end = Math.min(total, start + maxPerRun);
+  let ingested = 0;
+  for (let index = start; index < end; index += 1) {
+    const tokenId = caps.hasMintedList
+      ? await readMintedId(env, apiBases, contract, index)
+      : index + 1; // dense 1-based ids
+    if (tokenId === null) continue;
+    const summary = await readToken(env, apiBases, contract, caps, tokenId);
+    if (!summary) continue;
+    await upsertToken(env, contractId, tokenId, summary);
+    ingested += 1;
+  }
+  const newSynced = end;
+  await run(
+    env,
+    `INSERT INTO inscription_index_state (contract, minted_count, synced_count, updated_at)
+     VALUES (?,?,?,?)
+     ON CONFLICT(contract) DO UPDATE SET minted_count=excluded.minted_count, synced_count=excluded.synced_count, updated_at=excluded.updated_at`,
+    [contractId, total, newSynced, Date.now()]
+  );
+  const complete = newSynced >= total;
+
+  // Rolling owner-refresh: once the backlog is ingested, re-read the least-
+  // recently-refreshed rows so transfers and migrations (which change owner on
+  // already-indexed tokens, e.g. the v2 side of a v2->v3 migration) self-heal
+  // over traffic without any per-event trigger.
+  let refreshed = 0;
+  if (complete) {
+    const window = Number((env as any).INSCRIPTION_INDEX_REFRESH_WINDOW) || 12;
+    const stale = await queryAll(
+      env,
+      'SELECT token_id FROM inscription_index WHERE contract = ? ORDER BY updated_at ASC LIMIT ?',
+      [contractId, window]
+    );
+    for (const row of (stale.results ?? []) as Array<{ token_id: number }>) {
+      const summary = await readToken(env, apiBases, contract, caps, row.token_id);
+      if (summary) { await upsertToken(env, contractId, row.token_id, summary); refreshed += 1; }
+    }
+  }
+
+  return { mintedCount: total, syncedCount: newSynced, ingested, refreshed, complete };
+};
+
+// Re-read specific token ids on demand (targeted trigger, e.g. after a migration
+// confirms). Returns how many were updated.
+const refreshTokens = async (
+  env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef, contractId: string, ids: number[]
+) => {
+  const caps = await probeCaps(env, apiBases, contract);
+  let refreshed = 0;
+  for (const id of ids) {
+    const summary = await readToken(env, apiBases, contract, caps, id);
+    if (summary) { await upsertToken(env, contractId, id, summary); refreshed += 1; }
+  }
+  return { refreshed, ids };
+};
+
+// Backfill parent-child edges for rows already present in inscription_index.
+// This is useful after deploying the edge-table migration: summary rows may
+// already exist and the main sync can be complete, so there is no natural
+// backlog pass left to populate inscription_parents.
+const backfillParentEdges = async (
+  env: RuntimeEnv,
+  apiBases: string[],
+  contract: RuntimeContractRef,
+  contractId: string,
+  params: { fromTokenId: number; limit: number }
+) => {
+  const hiroKeyCount = getHiroApiKeys(env).length;
+  const hiroApiBases = apiBases.filter((base) => base.includes('hiro.so'));
+  const readApiBases = hiroKeyCount > 0 && hiroApiBases.length > 0 ? hiroApiBases : apiBases;
+  // Probe with the same (Hiro-only, when keyed) bases used for the rereads, so a
+  // bulk backfill doesn't hit the unauthenticated fallback and get rate-limited.
+  const caps = await probeCaps(env, readApiBases, contract);
+  const rows = await queryAll(
+    env,
+    `SELECT token_id FROM inscription_index
+       WHERE contract = ? AND token_id >= ?
+       ORDER BY token_id ASC LIMIT ?`,
+    [contractId, params.fromTokenId, params.limit]
+  );
+  const tokenIds = (rows.results ?? [])
+    .map((row: any) => Number(row.token_id))
+    .filter((id) => Number.isInteger(id) && id > 0);
+  let refreshed = 0;
+  for (const id of tokenIds) {
+    const summary = await readToken(env, readApiBases, contract, caps, id);
+    if (summary) {
+      await upsertToken(env, contractId, id, summary);
+      refreshed += 1;
+    }
+  }
+  const lastTokenId = tokenIds[tokenIds.length - 1] ?? null;
+  return {
+    refreshed,
+    scanned: tokenIds.length,
+    fromTokenId: params.fromTokenId,
+    lastTokenId,
+    nextFromTokenId: lastTokenId === null ? null : lastTokenId + 1,
+    complete: tokenIds.length < params.limit,
+    upstream: {
+      hiroKeyCount,
+      hiroOnly: readApiBases === hiroApiBases,
+      apiBaseCount: readApiBases.length
+    }
+  };
+};
+
+export const onRequest = async (context: {
+  request: Request;
+  params: { contract?: string };
+  env: RuntimeEnv;
+  waitUntil?: (promise: Promise<unknown>) => void;
+}) => {
+  const { request, params, env } = context;
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+
+  const contractId = params.contract ?? '';
+  const contract = parseRuntimeContractRef(contractId);
+  if (!contract) return json({ error: 'Invalid contract id.' }, 400);
+  const apiBases = getRuntimeApiBases('mainnet', env);
+  if (apiBases.length === 0) return json({ error: 'No API base configured.' }, 503);
+
+  try {
+    if (request.method === 'POST') {
+      // Targeted refresh: POST ...?id=14 or ?id=14,15,16 re-reads just those
+      // tokens (instant accuracy after a migration/transfer). Otherwise: sync.
+      const url = new URL(request.url);
+      const parentBackfill = url.searchParams.get('parents')?.trim().toLowerCase();
+      if (parentBackfill === 'backfill') {
+        // Opt-in guard: when INDEX_ADMIN_TOKEN is configured, the maintenance
+        // backfill requires a matching x-admin-token header. If unset, behaviour
+        // is unchanged (open) — and the internal self-healing sync/refresh, which
+        // never sets this param, is never gated.
+        const adminToken = (env as { INDEX_ADMIN_TOKEN?: string }).INDEX_ADMIN_TOKEN;
+        if (adminToken && request.headers.get('x-admin-token') !== adminToken) {
+          return json({ error: 'Unauthorized.' }, 401);
+        }
+        const fromRaw = Number(url.searchParams.get('from') ?? 1);
+        const limitRaw = Number(url.searchParams.get('limit') ?? 50);
+        const fromTokenId =
+          Number.isInteger(fromRaw) && fromRaw > 0 ? Math.floor(fromRaw) : 1;
+        const limit =
+          Number.isInteger(limitRaw) && limitRaw > 0
+            ? Math.min(Math.floor(limitRaw), 100)
+            : 50;
+        const result = await backfillParentEdges(env, apiBases, contract, contractId, {
+          fromTokenId,
+          limit
+        });
+        return json({ ok: true, ...result });
+      }
+
+      const idParam = url.searchParams.get('id');
+      if (idParam) {
+        const ids = idParam.split(',').map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0);
+        if (ids.length === 0) return json({ error: 'No valid id(s).' }, 400);
+        const result = await refreshTokens(env, apiBases, contract, contractId, ids);
+        return json({ ok: true, ...result });
+      }
+      const maxPerRun = Number((env as any).INSCRIPTION_INDEX_SYNC_BATCH) || 20;
+      const result = await sync(env, apiBases, contract, contractId, maxPerRun);
+      return json({ ok: true, ...result });
+    }
+
+    // GET: serve from D1. Either an explicit id set (?ids=1,2,3 — used by grids
+    // to fetch exactly the visible page) or a range (?from=&limit=&order=).
+    const url = new URL(request.url);
+    const cols = 'token_id, owner, creator, final_hash, mime, total_size, total_chunks, sealed, token_uri, migration_source';
+
+    // Parse + normalize the query first so equivalent requests (e.g. the same
+    // ids in a different order, or with duplicates) collapse to one edge-cache
+    // entry. The normalized form is also what we key the Cloudflare Cache API on.
+    const idsParam = url.searchParams.get('ids');
+    let parsedIds: number[] | null = null;
+    let from = 1;
+    let limit = 16;
+    let order: 'ASC' | 'DESC' = 'ASC';
+    if (idsParam) {
+      const ids = idsParam.split(',').map((s) => Number(s.trim()))
+        .filter((n) => Number.isInteger(n) && n > 0).slice(0, 200);
+      if (ids.length === 0) return json({ error: 'No valid ids.' }, 400);
+      parsedIds = Array.from(new Set(ids)).sort((a, b) => a - b);
+    } else {
+      from = Math.max(1, Number(url.searchParams.get('from') || '1'));
+      limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || '16')));
+      order = (url.searchParams.get('order') || 'asc').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+    }
+
+    // Edge cache: a hot page (page 1 of a popular gallery) is served from the
+    // Cloudflare edge with zero Worker D1 work. Short s-maxage + SWR keeps it
+    // fresh — owner/migration changes already self-heal via the rolling sync, so
+    // a brief staleness window is acceptable and the SWR revalidation is silent.
+    const cacheKeyUrl = new URL(url.origin + url.pathname);
+    if (parsedIds) {
+      cacheKeyUrl.searchParams.set('ids', parsedIds.join(','));
+    } else {
+      cacheKeyUrl.searchParams.set('from', String(from));
+      cacheKeyUrl.searchParams.set('limit', String(limit));
+      cacheKeyUrl.searchParams.set('order', order);
+    }
+    const edgeCache = (globalThis as { caches?: { default?: Cache } }).caches?.default ?? null;
+    const cacheRequest = new Request(cacheKeyUrl.toString(), { method: 'GET' });
+    if (edgeCache) {
+      const hit = await edgeCache.match(cacheRequest);
+      if (hit) return hit;
+    }
+
+    let rows;
+    if (parsedIds) {
+      rows = await queryAll(
+        env,
+        `SELECT ${cols} FROM inscription_index
+          WHERE contract = ? AND token_id IN (${parsedIds.map(() => '?').join(',')})`,
+        [contractId, ...parsedIds]
+      );
+    } else {
+      rows = await queryAll(
+        env,
+        `SELECT ${cols} FROM inscription_index
+          WHERE contract = ? AND token_id >= ?
+          ORDER BY token_id ${order} LIMIT ?`,
+        [contractId, from, limit]
+      );
+    }
+    const state = await getState(env, contractId);
+
+    // Lazily keep the index fresh: kick a throttled background sync when behind
+    // or stale, so the backlog fills over successive page views and new mints
+    // are picked up — without a separate scheduler (Pages has no cron).
+    if (context.waitUntil) {
+      const stale = await queryAll(env, 'SELECT updated_at FROM inscription_index_state WHERE contract = ?', [contractId]);
+      const updatedAt = ((stale.results ?? [])[0] as { updated_at?: number } | undefined)?.updated_at ?? 0;
+      const behind = state.syncedCount < state.mintedCount;
+      if (behind || Date.now() - updatedAt > 60_000) {
+        const maxPerRun = Number((env as any).INSCRIPTION_INDEX_SYNC_BATCH) || 20;
+        context.waitUntil(sync(env, apiBases, contract, contractId, maxPerRun).catch(() => undefined));
+      }
+    }
+
+    const payload = {
+      contract: contractId,
+      mintedCount: state.mintedCount,
+      syncedCount: state.syncedCount,
+      tokens: (rows.results ?? []).map((r: any) => ({
+        id: r.token_id,
+        owner: r.owner,
+        creator: r.creator,
+        finalHash: r.final_hash,
+        mime: r.mime,
+        totalSize: r.total_size,
+        totalChunks: r.total_chunks,
+        sealed: r.sealed === 1,
+        tokenUri: r.token_uri ?? null,
+        migrationSource: r.migration_source
+
+## contract client minted index methods
+contracts/live/xtrata-v3.2.1.clar:161:(define-map MintedIndex uint uint)
+contracts/live/xtrata-v3.2.1.clar:492:      (map-set MintedIndex count id)
+contracts/live/xtrata-v3.2.1.clar:597:(define-read-only (get-minted-count)
+contracts/live/xtrata-v3.2.1.clar:601:(define-read-only (get-minted-id (index uint))
+contracts/live/xtrata-v3.2.1.clar:602:  (map-get? MintedIndex index)
+contracts/live/xtrata-v3.4.0.clar:194:(define-map MintedIndex uint uint)
+contracts/live/xtrata-v3.4.0.clar:524:      (map-set MintedIndex count id)
+contracts/live/xtrata-v3.4.0.clar:631:(define-read-only (get-minted-count)
+contracts/live/xtrata-v3.4.0.clar:635:(define-read-only (get-minted-id (index uint))
+contracts/live/xtrata-v3.4.0.clar:636:  (map-get? MintedIndex index)
+contracts/other/xtrata-v3.1.0.clar:138:(define-map MintedIndex uint uint)
+contracts/other/xtrata-v3.1.0.clar:574:      (map-set MintedIndex count id)
+contracts/other/xtrata-v3.1.0.clar:732:(define-read-only (get-minted-count)
+contracts/other/xtrata-v3.1.0.clar:736:(define-read-only (get-minted-id (index uint))
+contracts/other/xtrata-v3.1.0.clar:737:  (map-get? MintedIndex index)
+contracts/live/xtrata-v3.1.1.clar:214:(define-map MintedIndex uint uint)
+contracts/live/xtrata-v3.1.1.clar:674:      (map-set MintedIndex count id)
+contracts/live/xtrata-v3.1.1.clar:832:(define-read-only (get-minted-count)
+contracts/live/xtrata-v3.1.1.clar:836:(define-read-only (get-minted-id (index uint))
+contracts/live/xtrata-v3.1.1.clar:837:  (map-get? MintedIndex index)
+contracts/live/xtrata-v3.1.0.clar:138:(define-map MintedIndex uint uint)
+contracts/live/xtrata-v3.1.0.clar:574:      (map-set MintedIndex count id)
+contracts/live/xtrata-v3.1.0.clar:732:(define-read-only (get-minted-count)
+contracts/live/xtrata-v3.1.0.clar:736:(define-read-only (get-minted-id (index uint))
+contracts/live/xtrata-v3.1.0.clar:737:  (map-get? MintedIndex index)
+contracts/live/xtrata-collection-mint-v1.0.clar:502:(define-read-only (get-minted-count)
+contracts/live/xtrata-v3.2.3.clar:158:(define-map MintedIndex uint uint)
+contracts/live/xtrata-v3.2.3.clar:489:      (map-set MintedIndex count id)
+contracts/live/xtrata-v3.2.3.clar:594:(define-read-only (get-minted-count)
+contracts/live/xtrata-v3.2.3.clar:598:(define-read-only (get-minted-id (index uint))
+contracts/live/xtrata-v3.2.3.clar:599:  (map-get? MintedIndex index)
+contracts/live/xtrata-v3.2.2.clar:158:(define-map MintedIndex uint uint)
+contracts/live/xtrata-v3.2.2.clar:489:      (map-set MintedIndex count id)
+contracts/live/xtrata-v3.2.2.clar:594:(define-read-only (get-minted-count)
+contracts/live/xtrata-v3.2.2.clar:598:(define-read-only (get-minted-id (index uint))
+contracts/live/xtrata-v3.2.2.clar:599:  (map-get? MintedIndex index)
+contracts/other/xtrata-v2.1.0.clar:143:(define-map MintedIndex uint uint)
+contracts/other/xtrata-v2.1.0.clar:365:      (map-set MintedIndex count id)
+contracts/other/xtrata-v2.1.0.clar:391:(define-read-only (get-minted-count)
+contracts/other/xtrata-v2.1.0.clar:395:(define-read-only (get-minted-id (index uint))
+contracts/other/xtrata-v2.1.0.clar:396:  (map-get? MintedIndex index)
+contracts/live/xtrata-v2.1.0.clar:143:(define-map MintedIndex uint uint)
+contracts/live/xtrata-v2.1.0.clar:365:      (map-set MintedIndex count id)
+contracts/live/xtrata-v2.1.0.clar:391:(define-read-only (get-minted-count)
+contracts/live/xtrata-v2.1.0.clar:395:(define-read-only (get-minted-id (index uint))
+contracts/live/xtrata-v2.1.0.clar:396:  (map-get? MintedIndex index)
+contracts/live/xtrata-collection-mint-v1.2.clar:122:(define-map MintedIndex
+contracts/live/xtrata-collection-mint-v1.2.clar:691:      (map-set MintedIndex { index: index } { token-id: token-id })
+contracts/live/xtrata-collection-mint-v1.2.clar:721:      MintedIndex
+contracts/live/xtrata-collection-mint-v1.2.clar:1356:(define-read-only (get-minted-count)
+contracts/live/xtrata-collection-mint-v1.2.clar:1454:(define-read-only (get-minted-id (index uint))
+contracts/live/xtrata-collection-mint-v1.2.clar:1455:  (map-get? MintedIndex { index: index })
+contracts/live/xtrata-collection-mint-v1.4.clar:130:(define-map MintedIndex
+contracts/live/xtrata-collection-mint-v1.4.clar:752:      (map-set MintedIndex { index: index } { token-id: token-id })
+contracts/live/xtrata-collection-mint-v1.4.clar:782:      MintedIndex
+contracts/live/xtrata-collection-mint-v1.4.clar:1592:(define-read-only (get-minted-count)
+contracts/live/xtrata-collection-mint-v1.4.clar:1694:(define-read-only (get-minted-id (index uint))
+contracts/live/xtrata-collection-mint-v1.4.clar:1695:  (map-get? MintedIndex { index: index })
+contracts/live/xtrata-collection-mint-v1.3.clar:125:(define-map MintedIndex
+contracts/live/xtrata-collection-mint-v1.3.clar:738:      (map-set MintedIndex { index: index } { token-id: token-id })
+contracts/live/xtrata-collection-mint-v1.3.clar:768:      MintedIndex
+contracts/live/xtrata-collection-mint-v1.3.clar:1468:(define-read-only (get-minted-count)
+contracts/live/xtrata-collection-mint-v1.3.clar:1570:(define-read-only (get-minted-id (index uint))
+contracts/live/xtrata-collection-mint-v1.3.clar:1571:  (map-get? MintedIndex { index: index })
+contracts/live/xtrata-collection-mint-v1.1.clar:121:(define-map MintedIndex
+contracts/live/xtrata-collection-mint-v1.1.clar:664:      (map-set MintedIndex { index: index } { token-id: token-id })
+contracts/live/xtrata-collection-mint-v1.1.clar:694:      MintedIndex
+contracts/live/xtrata-collection-mint-v1.1.clar:1318:(define-read-only (get-minted-count)
+contracts/live/xtrata-collection-mint-v1.1.clar:1416:(define-read-only (get-minted-id (index uint))
+contracts/live/xtrata-collection-mint-v1.1.clar:1417:  (map-get? MintedIndex { index: index })
+contracts/live/xtrata-v3.2.0.clar:160:(define-map MintedIndex uint uint)
+contracts/live/xtrata-v3.2.0.clar:491:      (map-set MintedIndex count id)
+contracts/live/xtrata-v3.2.0.clar:589:(define-read-only (get-minted-count)
+contracts/live/xtrata-v3.2.0.clar:593:(define-read-only (get-minted-id (index uint))
+contracts/live/xtrata-v3.2.0.clar:594:  (map-get? MintedIndex index)
+contracts/live/xtrata-v3.0.0.clar:125:(define-map MintedIndex uint uint)
+contracts/live/xtrata-v3.0.0.clar:505:      (map-set MintedIndex count id)
+contracts/live/xtrata-v3.0.0.clar:639:(define-read-only (get-minted-count)
+contracts/live/xtrata-v3.0.0.clar:643:(define-read-only (get-minted-id (index uint))
+contracts/live/xtrata-v3.0.0.clar:644:  (map-get? MintedIndex index)
+contracts/other/xtrata-v3.2.0.clar:160:(define-map MintedIndex uint uint)
+contracts/other/xtrata-v3.2.0.clar:491:      (map-set MintedIndex count id)
+contracts/other/xtrata-v3.2.0.clar:589:(define-read-only (get-minted-count)
+contracts/other/xtrata-v3.2.0.clar:593:(define-read-only (get-minted-id (index uint))
+contracts/other/xtrata-v3.2.0.clar:594:  (map-get? MintedIndex index)
+contracts/other/xtrata-v3.4.0.clar:194:(define-map MintedIndex uint uint)
+contracts/other/xtrata-v3.4.0.clar:524:      (map-set MintedIndex count id)
+contracts/other/xtrata-v3.4.0.clar:631:(define-read-only (get-minted-count)
+contracts/other/xtrata-v3.4.0.clar:635:(define-read-only (get-minted-id (index uint))
+contracts/other/xtrata-v3.4.0.clar:636:  (map-get? MintedIndex index)
+contracts/other/xtrata-collection-mint-v1.4.clar:130:(define-map MintedIndex
+contracts/other/xtrata-collection-mint-v1.4.clar:752:      (map-set MintedIndex { index: index } { token-id: token-id })
+contracts/other/xtrata-collection-mint-v1.4.clar:782:      MintedIndex
+contracts/other/xtrata-collection-mint-v1.4.clar:1592:(define-read-only (get-minted-count)
+contracts/other/xtrata-collection-mint-v1.4.clar:1694:(define-read-only (get-minted-id (index uint))
+contracts/other/xtrata-collection-mint-v1.4.clar:1695:  (map-get? MintedIndex { index: index })
+contracts/other/xtrata-v3.1.1.clar:214:(define-map MintedIndex uint uint)
+contracts/other/xtrata-v3.1.1.clar:674:      (map-set MintedIndex count id)
+contracts/other/xtrata-v3.1.1.clar:832:(define-read-only (get-minted-count)
+contracts/other/xtrata-v3.1.1.clar:836:(define-read-only (get-minted-id (index uint))
+contracts/other/xtrata-v3.1.1.clar:837:  (map-get? MintedIndex index)
+contracts/other/xtrata-collection-mint-v1.0.clar:502:(define-read-only (get-minted-count)
+contracts/other/xtrata-v3.2.2.clar:158:(define-map MintedIndex uint uint)
+contracts/other/xtrata-v3.2.2.clar:489:      (map-set MintedIndex count id)
+contracts/other/xtrata-v3.2.2.clar:594:(define-read-only (get-minted-count)
+contracts/other/xtrata-v3.2.2.clar:598:(define-read-only (get-minted-id (index uint))
+contracts/other/xtrata-v3.2.2.clar:599:  (map-get? MintedIndex index)
+contracts/other/xtrata-v3.2.1.clar:161:(define-map MintedIndex uint uint)
+contracts/other/xtrata-v3.2.1.clar:492:      (map-set MintedIndex count id)
+contracts/other/xtrata-v3.2.1.clar:597:(define-read-only (get-minted-count)
+contracts/other/xtrata-v3.2.1.clar:601:(define-read-only (get-minted-id (index uint))
+contracts/other/xtrata-v3.2.1.clar:602:  (map-get? MintedIndex index)
+contracts/other/xtrata-v3.2.3.clar:158:(define-map MintedIndex uint uint)
+contracts/other/xtrata-v3.2.3.clar:489:      (map-set MintedIndex count id)
+contracts/other/xtrata-v3.2.3.clar:594:(define-read-only (get-minted-count)
+contracts/other/xtrata-v3.2.3.clar:598:(define-read-only (get-minted-id (index uint))
+contracts/other/xtrata-v3.2.3.clar:599:  (map-get? MintedIndex index)
+contracts/other/xtrata-collection-mint-v1.2.clar:122:(define-map MintedIndex
+contracts/other/xtrata-collection-mint-v1.2.clar:691:      (map-set MintedIndex { index: index } { token-id: token-id })
+contracts/other/xtrata-collection-mint-v1.2.clar:721:      MintedIndex
+contracts/other/xtrata-collection-mint-v1.2.clar:1356:(define-read-only (get-minted-count)
+contracts/other/xtrata-collection-mint-v1.2.clar:1454:(define-read-only (get-minted-id (index uint))
+contracts/other/xtrata-collection-mint-v1.2.clar:1455:  (map-get? MintedIndex { index: index })
+contracts/other/xtrata-v3.0.0.clar:125:(define-map MintedIndex uint uint)
+contracts/other/xtrata-v3.0.0.clar:505:      (map-set MintedIndex count id)
+contracts/other/xtrata-v3.0.0.clar:639:(define-read-only (get-minted-count)
+contracts/other/xtrata-v3.0.0.clar:643:(define-read-only (get-minted-id (index uint))
+contracts/other/xtrata-v3.0.0.clar:644:  (map-get? MintedIndex index)
+functions/index/[contract].ts:68:  readOkUint(env, apiBases, contract, 'get-minted-count');
+functions/index/[contract].ts:75:    functionName: 'get-minted-id', functionArgs: [uintArg(BigInt(index))], senderAddress: contract.address
+functions/index/[contract].ts:181:  return { mintedCount: row?.minted_count ?? 0, syncedCount: row?.synced_count ?? 0 };
+functions/index/[contract].ts:326:  return { mintedCount: total, syncedCount: newSynced, ingested, refreshed, complete };
+functions/index/[contract].ts:519:      const behind = state.syncedCount < state.mintedCount;
+functions/index/[contract].ts:528:      mintedCount: state.mintedCount,
+contracts/other/xtrata-collection-mint-v1.3.clar:125:(define-map MintedIndex
+contracts/other/xtrata-collection-mint-v1.3.clar:738:      (map-set MintedIndex { index: index } { token-id: token-id })
+contracts/other/xtrata-collection-mint-v1.3.clar:768:      MintedIndex
+contracts/other/xtrata-collection-mint-v1.3.clar:1468:(define-read-only (get-minted-count)
+contracts/other/xtrata-collection-mint-v1.3.clar:1570:(define-read-only (get-minted-id (index uint))
+contracts/other/xtrata-collection-mint-v1.3.clar:1571:  (map-get? MintedIndex { index: index })
+functions/index/relations/[contract].ts:40:  return { mintedCount: row?.minted_count ?? 0, syncedCount: row?.synced_count ?? 0 };
+functions/index/relations/[contract].ts:132:    if (context.waitUntil && state.syncedCount < state.mintedCount) {
+functions/index/relations/[contract].ts:139:    const complete = state.syncedCount >= state.mintedCount && state.mintedCount > 0;
+functions/index/relations/[contract].ts:143:      mintedCount: state.mintedCount,
+contracts/clarinet/tests/xtrata-collection-mint-v1.4.test.ts:370:    expect(simnet.callReadOnlyFn(mintContract, 'get-minted-count', [], deployer).result).toBeOk(
+contracts/clarinet/tests/xtrata-collection-mint-v1.4.test.ts:393:    expect(simnet.callReadOnlyFn(mintContract, 'get-minted-count', [], deployer).result).toBeOk(
+contracts/clarinet/tests/xtrata-collection-mint-v1.4.test.ts:438:    expect(simnet.callReadOnlyFn(mintContract, 'get-minted-count', [], deployer).result).toBeOk(
+src/migrate-ui.ts:105:  const count = uintFromJson(await readOnly(CORE, 'get-minted-count')) ?? 0;
+src/migrate-ui.ts:108:    const id = uintFromJson(await readOnly(CORE, 'get-minted-id', [uintCV(BigInt(i))]));
+contracts/clarinet/tests/xtrata-v3.2.0.test.ts:211:    expect(simnet.callReadOnlyFn(contract, 'get-minted-count', [], deployer).result).toBeOk(Cl.uint(1));
+contracts/clarinet/tests/xtrata-v3.2.0.test.ts:212:    expect(simnet.callReadOnlyFn(contract, 'get-minted-id', [Cl.uint(0)], deployer).result).toBeSome(Cl.uint(0));
+contracts/clarinet/tests/xtrata-v3.2.0.test.ts:344:    expect(simnet.callReadOnlyFn(contract, 'get-minted-count', [], deployer).result).toBeOk(Cl.uint(0));
+src/lib/skills/__tests__/xtrata-agent-skill.test.ts:40:  'get-minted-count',
+src/lib/skills/__tests__/xtrata-agent-skill.test.ts:41:  'get-minted-id',
+src/lib/protocol/parsers.ts:250:  expectUInt(expectContractOk(value, 'get-minted-count'), 'get-minted-count');
+src/lib/protocol/parsers.ts:253:  const optional = expectOptional(value, 'get-minted-id');
+src/lib/protocol/parsers.ts:257:  return expectUInt(optional, 'get-minted-id');
+contracts/clarinet/tests/xtrata-v3.2.1.test.ts:267:    expect(simnet.callReadOnlyFn(contract, 'get-minted-count', [], deployer).result).toBeOk(Cl.uint(1));
+contracts/clarinet/tests/xtrata-v3.2.1.test.ts:268:    expect(simnet.callReadOnlyFn(contract, 'get-minted-id', [Cl.uint(0)], deployer).result).toBeSome(Cl.uint(0));
+contracts/clarinet/tests/xtrata-v3.2.1.test.ts:669:    expect(simnet.callReadOnlyFn(contract, 'get-minted-count', [], deployer).result).toBeOk(Cl.uint(0));
+contracts/clarinet/tests/xtrata-v3.2.2.test.ts:266:    expect(simnet.callReadOnlyFn(contract, 'get-minted-count', [], deployer).result).toBeOk(Cl.uint(1));
+contracts/clarinet/tests/xtrata-v3.2.2.test.ts:267:    expect(simnet.callReadOnlyFn(contract, 'get-minted-id', [Cl.uint(0)], deployer).result).toBeSome(Cl.uint(0));
+contracts/clarinet/tests/xtrata-v3.2.2.test.ts:668:    expect(simnet.callReadOnlyFn(contract, 'get-minted-count', [], deployer).result).toBeOk(Cl.uint(0));
+src/lib/contract/client.ts:379:  supportsMintedIndex: boolean;
+src/lib/contract/client.ts:382:  getMintedCount: (senderAddress: string) => Promise<bigint>;
+src/lib/contract/client.ts:383:  getMintedId: (index: bigint, senderAddress: string) => Promise<bigint | null>;
+src/lib/contract/client.ts:462:    supportsMintedIndex: capabilities.supportsMintedIndex,
+src/lib/contract/client.ts:485:    getMintedCount: async (senderAddress) => {
+src/lib/contract/client.ts:486:      if (!capabilities.supportsMintedIndex) {
+src/lib/contract/client.ts:493:        functionName: 'get-minted-count',
+src/lib/contract/client.ts:499:    getMintedId: async (index, senderAddress) => {
+src/lib/contract/client.ts:500:      if (!capabilities.supportsMintedIndex) {
+src/lib/contract/client.ts:507:        functionName: 'get-minted-id',
+contracts/clarinet/tests/xtrata-collection-mint-v1.1.test.ts:514:      "get-minted-id",
+contracts/clarinet/tests/xtrata-collection-mint-v1.1.test.ts:632:    const minted0 = simnet.callReadOnlyFn(mintContract, "get-minted-id", [Cl.uint(0)], minter).result;
+contracts/clarinet/tests/xtrata-collection-mint-v1.1.test.ts:633:    const minted1 = simnet.callReadOnlyFn(mintContract, "get-minted-id", [Cl.uint(1)], minter).result;
+contracts/clarinet/tests/xtrata-collection-mint-v1.0.test.ts:270:    const mintedCount = simnet.callReadOnlyFn(
+contracts/clarinet/tests/xtrata-collection-mint-v1.0.test.ts:272:      "get-minted-count",
+contracts/clarinet/tests/xtrata-collection-mint-v1.0.test.ts:276:    expect(mintedCount).toBeOk(Cl.uint(1));
+contracts/clarinet/tests/xtrata-collection-mint-v1.0.test.ts:699:    const mintedCount = simnet.callReadOnlyFn(
+contracts/clarinet/tests/xtrata-collection-mint-v1.0.test.ts:701:      "get-minted-count",
+contracts/clarinet/tests/xtrata-collection-mint-v1.0.test.ts:705:    expect(mintedCount).toBeOk(Cl.uint(2));
+src/lib/contract/__tests__/client.test.ts:169:        if (options.functionName === 'get-minted-count') {
+src/lib/contract/__tests__/client.test.ts:172:        if (options.functionName === 'get-minted-id') {
+src/lib/contract/__tests__/client.test.ts:183:    const count = await client.getMintedCount(
+src/lib/contract/__tests__/client.test.ts:186:    const tokenId = await client.getMintedId(
+src/lib/contract/__tests__/client.test.ts:191:    expect(client.supportsMintedIndex).toBe(true);
+src/lib/contract/__tests__/client.test.ts:195:      'get-minted-count',
+src/lib/contract/__tests__/client.test.ts:196:      'get-minted-id'
+contracts/clarinet/contracts/xtrata-v2.1.0.clar:143:(define-map MintedIndex uint uint)
+contracts/clarinet/contracts/xtrata-v2.1.0.clar:365:      (map-set MintedIndex count id)
+contracts/clarinet/contracts/xtrata-v2.1.0.clar:391:(define-read-only (get-minted-count)
+contracts/clarinet/contracts/xtrata-v2.1.0.clar:395:(define-read-only (get-minted-id (index uint))
+contracts/clarinet/contracts/xtrata-v2.1.0.clar:396:  (map-get? MintedIndex index)
+src/lib/contract/capabilities.ts:34:  supportsMintedIndex: boolean;
+src/lib/contract/capabilities.ts:56:    supportsMintedIndex: false,
+src/lib/contract/capabilities.ts:73:    supportsMintedIndex: true,
+src/lib/contract/capabilities.ts:90:    supportsMintedIndex: true,
+src/lib/contract/capabilities.ts:107:    supportsMintedIndex: true,
+src/lib/contract/capabilities.ts:124:    supportsMintedIndex: true,
+src/lib/contract/capabilities.ts:141:    supportsMintedIndex: true,
+src/lib/contract/__tests__/admin-status.test.ts:13:    supportsMintedIndex: false,
+src/lib/contract/__tests__/admin-status.test.ts:20:    getMintedCount: vi.fn().mockResolvedValue(0n),
+src/lib/contract/__tests__/admin-status.test.ts:21:    getMintedId: vi.fn().mockResolvedValue(null),
+contracts/clarinet/contracts/xtrata-collection-mint-v1.2.clar:122:(define-map MintedIndex
+contracts/clarinet/contracts/xtrata-collection-mint-v1.2.clar:691:      (map-set MintedIndex { index: index } { token-id: token-id })
+contracts/clarinet/contracts/xtrata-collection-mint-v1.2.clar:721:      MintedIndex
+contracts/clarinet/contracts/xtrata-collection-mint-v1.2.clar:1356:(define-read-only (get-minted-count)
+contracts/clarinet/contracts/xtrata-collection-mint-v1.2.clar:1454:(define-read-only (get-minted-id (index uint))
+contracts/clarinet/contracts/xtrata-collection-mint-v1.2.clar:1455:  (map-get? MintedIndex { index: index })
+src/lib/contract/__tests__/capabilities.test.ts:13:    expect(capabilities.supportsMintedIndex).toBe(false);
+src/lib/contract/__tests__/capabilities.test.ts:29:    expect(capabilities.supportsMintedIndex).toBe(true);
+src/lib/contract/__tests__/capabilities.test.ts:37:    expect(capabilities.supportsMintedIndex).toBe(true);
+src/lib/contract/__tests__/capabilities.test.ts:45:    expect(capabilities.supportsMintedIndex).toBe(true);
+contracts/clarinet/contracts/xtrata-v3.0.0.clar:125:(define-map MintedIndex uint uint)
+contracts/clarinet/contracts/xtrata-v3.0.0.clar:505:      (map-set MintedIndex count id)
+contracts/clarinet/contracts/xtrata-v3.0.0.clar:639:(define-read-only (get-minted-count)
+contracts/clarinet/contracts/xtrata-v3.0.0.clar:643:(define-read-only (get-minted-id (index uint))
+contracts/clarinet/contracts/xtrata-v3.0.0.clar:644:  (map-get? MintedIndex index)
+contracts/clarinet/contracts/xtrata-collection-mint-v1.3.clar:125:(define-map MintedIndex
+contracts/clarinet/contracts/xtrata-collection-mint-v1.3.clar:738:      (map-set MintedIndex { index: index } { token-id: token-id })
+contracts/clarinet/contracts/xtrata-collection-mint-v1.3.clar:768:      MintedIndex
+contracts/clarinet/contracts/xtrata-collection-mint-v1.3.clar:1468:(define-read-only (get-minted-count)
+contracts/clarinet/contracts/xtrata-collection-mint-v1.3.clar:1570:(define-read-only (get-minted-id (index uint))
+contracts/clarinet/contracts/xtrata-collection-mint-v1.3.clar:1571:  (map-get? MintedIndex { index: index })
+contracts/clarinet/contracts/xtrata-v3.2.0.clar:160:(define-map MintedIndex uint uint)
+contracts/clarinet/contracts/xtrata-v3.2.0.clar:491:      (map-set MintedIndex count id)
+contracts/clarinet/contracts/xtrata-v3.2.0.clar:589:(define-read-only (get-minted-count)
+contracts/clarinet/contracts/xtrata-v3.2.0.clar:593:(define-read-only (get-minted-id (index uint))
+contracts/clarinet/contracts/xtrata-v3.2.0.clar:594:  (map-get? MintedIndex index)
+contracts/clarinet/contracts/xtrata-v2.1.1.clar:143:(define-map MintedIndex uint uint)
+contracts/clarinet/contracts/xtrata-v2.1.1.clar:365:      (map-set MintedIndex count id)
+contracts/clarinet/contracts/xtrata-v2.1.1.clar:391:(define-read-only (get-minted-count)
+contracts/clarinet/contracts/xtrata-v2.1.1.clar:395:(define-read-only (get-minted-id (index uint))
+contracts/clarinet/contracts/xtrata-v2.1.1.clar:396:  (map-get? MintedIndex index)
+src/lib/viewer/relationship-sync.ts:21:  nextMintedIndex: bigint;
+src/lib/viewer/relationship-sync.ts:37:  if (!params.client.supportsMintedIndex) {
+src/lib/viewer/relationship-sync.ts:44:  let nextMintedIndex = await loadRelationshipSyncCursor(params.contractId);
+src/lib/viewer/relationship-sync.ts:45:  const mintedCount = await params.client.getMintedCount(params.senderAddress);
+src/lib/viewer/relationship-sync.ts:46:  if (nextMintedIndex > mintedCount) {
+src/lib/viewer/relationship-sync.ts:47:    nextMintedIndex = mintedCount;
+src/lib/viewer/relationship-sync.ts:51:  const startIndex = nextMintedIndex;
+src/lib/viewer/relationship-sync.ts:52:  const total = mintedCount - startIndex;
+src/lib/viewer/relationship-sync.ts:57:  for (let index = startIndex; index < mintedCount; index += 1n) {
+src/lib/viewer/relationship-sync.ts:60:      nextMintedIndex = index;
+src/lib/viewer/relationship-sync.ts:66:    const tokenId = await params.client.getMintedId(index, params.senderAddress);
+src/lib/viewer/relationship-sync.ts:67:    nextMintedIndex = index + 1n;
+src/lib/viewer/relationship-sync.ts:76:      if ((nextMintedIndex - startIndex) % CURSOR_FLUSH_INTERVAL === 0n) {
+src/lib/viewer/relationship-sync.ts:79:          nextMintedIndex
+src/lib/viewer/relationship-sync.ts:91:      if ((nextMintedIndex - startIndex) % CURSOR_FLUSH_INTERVAL === 0n) {
+src/lib/viewer/relationship-sync.ts:94:          nextMintedIndex
+src/lib/viewer/relationship-sync.ts:120:    if ((nextMintedIndex - startIndex) % CURSOR_FLUSH_INTERVAL === 0n) {
+src/lib/viewer/relationship-sync.ts:123:        nextMintedIndex
+src/lib/viewer/relationship-sync.ts:130:    nextMintedIndex
+src/lib/viewer/relationship-sync.ts:138:    nextMintedIndex
+contracts/clarinet/contracts/xtrata-collection-mint-v1.0.clar:502:(define-read-only (get-minted-count)
+contracts/clarinet/contracts/xtrata-v3.2.3.clar:158:(define-map MintedIndex uint uint)
+contracts/clarinet/contracts/xtrata-v3.2.3.clar:489:      (map-set MintedIndex count id)
+contracts/clarinet/contracts/xtrata-v3.2.3.clar:594:(define-read-only (get-minted-count)
+contracts/clarinet/contracts/xtrata-v3.2.3.clar:598:(define-read-only (get-minted-id (index uint))
+contracts/clarinet/contracts/xtrata-v3.2.3.clar:599:  (map-get? MintedIndex index)
+contracts/clarinet/contracts/xtrata-collection-mint-v1.4.clar:130:(define-map MintedIndex
+contracts/clarinet/contracts/xtrata-collection-mint-v1.4.clar:752:      (map-set MintedIndex { index: index } { token-id: token-id })
+contracts/clarinet/contracts/xtrata-collection-mint-v1.4.clar:782:      MintedIndex
+contracts/clarinet/contracts/xtrata-collection-mint-v1.4.clar:1592:(define-read-only (get-minted-count)
+contracts/clarinet/contracts/xtrata-collection-mint-v1.4.clar:1694:(define-read-only (get-minted-id (index uint))
+contracts/clarinet/contracts/xtrata-collection-mint-v1.4.clar:1695:  (map-get? MintedIndex { index: index })
+src/lib/viewer/relationship-index.ts:27:  nextMintedIndex: string;
+src/lib/viewer/relationship-index.ts:324:    return BigInt(record.nextMintedIndex);
+src/lib/viewer/relationship-index.ts:332:  nextMintedIndex: bigint;
+src/lib/viewer/relationship-index.ts:340:    nextMintedIndex: params.nextMintedIndex.toString(),
+contracts/clarinet/contracts/xtrata-v3.4.0.clar:194:(define-map MintedIndex uint uint)
+contracts/clarinet/contracts/xtrata-v3.4.0.clar:524:      (map-set MintedIndex count id)
+contracts/clarinet/contracts/xtrata-v3.4.0.clar:631:(define-read-only (get-minted-count)
+contracts/clarinet/contracts/xtrata-v3.4.0.clar:635:(define-read-only (get-minted-id (index uint))
+contracts/clarinet/contracts/xtrata-v3.4.0.clar:636:  (map-get? MintedIndex index)
+contracts/clarinet/contracts/mock-ipfs-collection.clar:17:(define-map MintedIndex uint uint)
+contracts/clarinet/contracts/mock-ipfs-collection.clar:32:      (map-set MintedIndex count id)
+contracts/clarinet/contracts/mock-ipfs-collection.clar:78:(define-read-only (get-minted-count)
+contracts/clarinet/contracts/mock-ipfs-collection.clar:82:(define-read-only (get-minted-id (index uint))
+contracts/clarinet/contracts/mock-ipfs-collection.clar:83:  (map-get? MintedIndex index)
+contracts/clarinet/contracts/xtrata-v3.2.2.clar:158:(define-map MintedIndex uint uint)
+contracts/clarinet/contracts/xtrata-v3.2.2.clar:489:      (map-set MintedIndex count id)
+contracts/clarinet/contracts/xtrata-v3.2.2.clar:594:(define-read-only (get-minted-count)
+contracts/clarinet/contracts/xtrata-v3.2.2.clar:598:(define-read-only (get-minted-id (index uint))
+contracts/clarinet/contracts/xtrata-v3.2.2.clar:599:  (map-get? MintedIndex index)
+src/lib/viewer/__tests__/relationship-index.test.ts:49:        nextMintedIndex: 25n
+contracts/clarinet/contracts/xtrata-collection-mint-v1.1.clar:121:(define-map MintedIndex
+contracts/clarinet/contracts/xtrata-collection-mint-v1.1.clar:664:      (map-set MintedIndex { index: index } { token-id: token-id })
+contracts/clarinet/contracts/xtrata-collection-mint-v1.1.clar:694:      MintedIndex
+contracts/clarinet/contracts/xtrata-collection-mint-v1.1.clar:1318:(define-read-only (get-minted-count)
+contracts/clarinet/contracts/xtrata-collection-mint-v1.1.clar:1416:(define-read-only (get-minted-id (index uint))
+contracts/clarinet/contracts/xtrata-collection-mint-v1.1.clar:1417:  (map-get? MintedIndex { index: index })
+contracts/clarinet/contracts/xtrata-v3.2.1.clar:161:(define-map MintedIndex uint uint)
+contracts/clarinet/contracts/xtrata-v3.2.1.clar:492:      (map-set MintedIndex count id)
+contracts/clarinet/contracts/xtrata-v3.2.1.clar:597:(define-read-only (get-minted-count)
+contracts/clarinet/contracts/xtrata-v3.2.1.clar:601:(define-read-only (get-minted-id (index uint))
+contracts/clarinet/contracts/xtrata-v3.2.1.clar:602:  (map-get? MintedIndex index)
+src/lib/viewer/relations-api.ts:15:  mintedCount: bigint;
+src/lib/viewer/relations-api.ts:70:      mintedCount: toBigInt(body.mintedCount) ?? 0n,
+src/lib/viewer/parent-child-index.ts:37:  nextMintedIndex: bigint;
+src/lib/viewer/parent-child-index.ts:38:  mintedCount: bigint;
+src/lib/viewer/parent-child-index.ts:92:  if (!params.client.supportsMintedIndex) {
+src/lib/viewer/parent-child-index.ts:100:  let nextMintedIndex = await loadRelationshipSyncCursor(namespace);
+src/lib/viewer/parent-child-index.ts:101:  const mintedCount = await params.client.getMintedCount(params.senderAddress);
+src/lib/viewer/parent-child-index.ts:102:  if (nextMintedIndex > mintedCount) {
+src/lib/viewer/parent-child-index.ts:103:    nextMintedIndex = mintedCount;
+src/lib/viewer/parent-child-index.ts:110:  const startIndex = nextMintedIndex;
+src/lib/viewer/parent-child-index.ts:111:  const total = mintedCount - startIndex;
+src/lib/viewer/parent-child-index.ts:117:    if ((nextMintedIndex - startIndex) % CURSOR_FLUSH_INTERVAL === 0n) {
+src/lib/viewer/parent-child-index.ts:120:        nextMintedIndex
+src/lib/viewer/parent-child-index.ts:125:  for (let index = startIndex; index < mintedCount; index += 1n) {
+src/lib/viewer/parent-child-index.ts:128:      nextMintedIndex = index;
+src/lib/viewer/parent-child-index.ts:134:    const tokenId = await params.client.getMintedId(index, params.senderAddress);
+src/lib/viewer/parent-child-index.ts:135:    nextMintedIndex = index + 1n;
+src/lib/viewer/parent-child-index.ts:167:    nextMintedIndex
+src/lib/viewer/parent-child-index.ts:170:  return { scanned, total, found, cancelled, nextMintedIndex, mintedCount };
+src/lib/viewer/__tests__/relationship-sync.test.ts:32:    supportsMintedIndex: true,
+src/lib/viewer/__tests__/relationship-sync.test.ts:35:    getMintedCount: vi.fn(),
+src/lib/viewer/__tests__/relationship-sync.test.ts:36:    getMintedId: vi.fn(),
+src/lib/viewer/__tests__/relationship-sync.test.ts:67:      supportsMintedIndex: false
+src/lib/viewer/__tests__/relationship-sync.test.ts:82:      getMintedCount: vi.fn().mockResolvedValue(3n),
+src/lib/viewer/__tests__/relationship-sync.test.ts:83:      getMintedId: vi
+src/lib/viewer/__tests__/relationship-sync.test.ts:111:    expect(result.nextMintedIndex).toBe(3n);
+src/lib/viewer/__tests__/relationship-sync.test.ts:125:      nextMintedIndex: 3n
+src/lib/viewer/__tests__/relationship-sync.test.ts:136:      getMintedCount: vi.fn().mockResolvedValue(3n),
+src/lib/viewer/__tests__/relationship-sync.test.ts:137:      getMintedId: vi
+src/lib/viewer/__tests__/relationship-sync.test.ts:159:    expect(result.nextMintedIndex).toBe(1n);
+src/lib/viewer/__tests__/relationship-sync.test.ts:162:      nextMintedIndex: 1n
+src/lib/viewer/__tests__/relationship-sync.test.ts:171:      getMintedCount: vi.fn().mockResolvedValue(3n),
+src/lib/viewer/__tests__/relationship-sync.test.ts:172:      getMintedId: vi
+src/lib/viewer/__tests__/relations-api.test.ts:23:          mintedCount: 100,
+src/lib/viewer/__tests__/relations-api.test.ts:38:    expect(result!.mintedCount).toBe(100n);
+
+## relevant tests
+src/manage/lib/asset-utils.test.ts:16:    for (let index = 0; index < bytes.length; index += 1) {
+src/manage/lib/asset-utils.test.ts:17:      bytes[index] = index % 251;
+functions/collections/[collectionId].ts:72:  for (let index = 0; index < values.length; index += size) {
+functions/collections/[collectionId].ts:73:    chunks.push(values.slice(index, index + size));
+src/manage/lib/journey.ts:278:  return JOURNEY_STEPS.map((step, index) => {
+src/manage/lib/journey.ts:279:    const pendingPrerequisite = JOURNEY_STEPS.slice(0, index).find(
+src/manage/lib/upload-prep.ts:75:  for (let index = 0; index < source.length; index += 1) {
+src/manage/lib/upload-prep.ts:76:    hash ^= source.charCodeAt(index);
+src/manage/lib/upload-prep.ts:141:    .map((item, index) => ({ item, index }))
+src/manage/lib/upload-prep.ts:144:        return left.index - right.index;
+functions/index/[contract].ts:12:// Cached per-token summary index. Reading a page is one D1 query instead of N
+functions/index/[contract].ts:13:// per-token chain reads; the index is populated incrementally from the core's
+functions/index/[contract].ts:72:const readMintedId = async (env: RuntimeEnv, apiBases: string[], contract: RuntimeContractRef, index: number) => {
+functions/index/[contract].ts:75:    functionName: 'get-minted-id', functionArgs: [uintArg(BigInt(index))], senderAddress: contract.address
+functions/index/[contract].ts:164:// Detect the contract's reader shape so v1/v2/v3 all index from one endpoint.
+functions/index/[contract].ts:179:  const res = await queryAll(env, 'SELECT minted_count, synced_count FROM inscription_index_state WHERE contract = ?', [contractId]);
+functions/index/[contract].ts:181:  return { mintedCount: row?.minted_count ?? 0, syncedCount: row?.synced_count ?? 0 };
+functions/index/[contract].ts:200:// inscription_parents table) never breaks core summary indexing.
+functions/index/[contract].ts:201:const syncTokenParents = async (
+functions/index/[contract].ts:223:    `INSERT INTO inscription_index
+functions/index/[contract].ts:234:  await syncTokenParents(env, contractId, tokenId, s.parents ?? []);
+functions/index/[contract].ts:249:    `INSERT OR IGNORE INTO inscription_index_state
+functions/index/[contract].ts:256:    `UPDATE inscription_index_state SET sync_lock_until = ?
+functions/index/[contract].ts:271:      'UPDATE inscription_index_state SET sync_lock_until = 0 WHERE contract = ?',
+functions/index/[contract].ts:284:  const { syncedCount } = await getState(env, contractId);
+functions/index/[contract].ts:285:  const start = syncedCount;
+functions/index/[contract].ts:288:  for (let index = start; index < end; index += 1) {
+functions/index/[contract].ts:290:      ? await readMintedId(env, apiBases, contract, index)
+functions/index/[contract].ts:291:      : index + 1; // dense 1-based ids
+functions/index/[contract].ts:301:    `INSERT INTO inscription_index_state (contract, minted_count, synced_count, updated_at)
+functions/index/[contract].ts:310:  // already-indexed tokens, e.g. the v2 side of a v2->v3 migration) self-heal
+functions/index/[contract].ts:317:      'SELECT token_id FROM inscription_index WHERE contract = ? ORDER BY updated_at ASC LIMIT ?',
+functions/index/[contract].ts:326:  return { mintedCount: total, syncedCount: newSynced, ingested, refreshed, complete };
+functions/index/[contract].ts:329:// Re-read specific token ids on demand (targeted trigger, e.g. after a migration
+functions/index/[contract].ts:343:// Backfill parent-child edges for rows already present in inscription_index.
+functions/index/[contract].ts:362:    `SELECT token_id FROM inscription_index
+functions/index/[contract].ts:451:    // GET: serve from D1. Either an explicit id set (?ids=1,2,3 — used by grids
+functions/index/[contract].ts:498:        `SELECT ${cols} FROM inscription_index
+functions/index/[contract].ts:505:        `SELECT ${cols} FROM inscription_index
+functions/index/[contract].ts:513:    // Lazily keep the index fresh: kick a throttled background sync when behind
+functions/index/[contract].ts:517:      const stale = await queryAll(env, 'SELECT updated_at FROM inscription_index_state WHERE contract = ?', [contractId]);
+functions/index/[contract].ts:519:      const behind = state.syncedCount < state.mintedCount;
+functions/index/[contract].ts:528:      mintedCount: state.mintedCount,
+functions/index/[contract].ts:529:      syncedCount: state.syncedCount,
+functions/index/page.ts:5:// across [primary, ...lineage]. Hitting /index/<contract> once per contract cost
+functions/index/page.ts:10://   GET /index/page?primary=<id>&lineage=<id,id>&ids=1,2,3
+functions/index/page.ts:98:      `SELECT ${COLS} FROM inscription_index
+functions/index/page.ts:158:           FROM inscription_index_state
+functions/index/page.ts:178:          const syncUrl = `${url.origin}/index/${encodeURIComponent(contractId)}`;
+functions/index/relations/[contract].ts:6:// by the index sync). Because the edges form a mint-ordered DAG, one table
+functions/index/relations/[contract].ts:9://   GET /index/relations/<contract>?id=42
+functions/index/relations/[contract].ts:36:    'SELECT minted_count, synced_count FROM inscription_index_state WHERE contract = ?',
+functions/index/relations/[contract].ts:40:  return { mintedCount: row?.minted_count ?? 0, syncedCount: row?.synced_count ?? 0 };
+functions/index/relations/[contract].ts:129:    // Keep the index moving toward completeness: if the summary index is behind,
+functions/index/relations/[contract].ts:130:    // kick a throttled background sync on the sibling /index/<contract> route
+functions/index/relations/[contract].ts:132:    if (context.waitUntil && state.syncedCount < state.mintedCount) {
+functions/index/relations/[contract].ts:133:      const syncUrl = new URL(`/index/${contractId}`, url.origin);
+functions/index/relations/[contract].ts:139:    const complete = state.syncedCount >= state.mintedCount && state.mintedCount > 0;
+functions/index/relations/[contract].ts:143:      mintedCount: state.mintedCount,
+functions/index/relations/[contract].ts:144:      syncedCount: state.syncedCount,
+src/lib/vault/client.ts:65:  for (let index = 0; index < networks.length; index += 1) {
+src/lib/vault/client.ts:66:    const activeNetwork = networks[index];
+src/lib/vault/client.ts:85:      const hasFallback = index < networks.length - 1;
+src/lib/vault/client.ts:92:          to: getNetworkUrl(networks[index + 1])
+functions/lib/__tests__/collection-deploy.test.ts:81:  it('returns not ready when deploy tx id is missing and contract source is not indexed', async () => {
+src/lib/vault/contract.ts:18:  const dotIndex = trimmed.indexOf('.');
+functions/lib/hiro-keys.ts:44:        index: Number.parseInt(match[1], 10),
+functions/lib/hiro-keys.ts:48:    .filter((entry): entry is { index: number; value: string } => entry !== null)
+functions/lib/hiro-keys.ts:49:    .sort((left, right) => left.index - right.index)
+functions/lib/collection-deploy.ts:114:  const dotIndex = normalized.indexOf('.');
+functions/lib/collection-deploy.ts:443:    reason: 'Deployment transaction is not indexed yet. Wait for confirmation, then retry.',
+src/lib/viewer/audio-waveform.ts:8:  return Array.from({ length: count }, (_, index) => {
+src/lib/viewer/audio-waveform.ts:9:    const swing = Math.abs(Math.sin((index + 1) * 0.43));
+src/lib/viewer/audio-waveform.ts:10:    const pulse = Math.abs(Math.cos((index + 2) * 0.21));
+src/lib/viewer/audio-waveform.ts:28:  for (let index = 0; index < count; index += 1) {
+src/lib/viewer/audio-waveform.ts:29:    const start = Math.floor(index * step);
+src/lib/viewer/audio-waveform.ts:30:    const end = Math.max(start + 1, Math.floor((index + 1) * step));
+src/lib/viewer/audio-waveform.ts:38:    bins[index] = peak;
+src/lib/viewer/audio-waveform.ts:60:    for (let index = 0; index < length; index += 1) {
+src/lib/viewer/audio-waveform.ts:61:      const amplitude = Math.abs(channelData[index] ?? 0);
+src/lib/viewer/audio-waveform.ts:62:      if (amplitude > mixed[index]) {
+src/lib/viewer/audio-waveform.ts:63:        mixed[index] = amplitude;
+src/lib/viewer/relationship-sync.ts:7:} from './relationship-index';
+src/lib/viewer/relationship-sync.ts:39:      'Child indexing requires xtrata-v2.1.0 tokens. Migrate v1 inscriptions to v2.'
+src/lib/viewer/relationship-sync.ts:45:  const mintedCount = await params.client.getMintedCount(params.senderAddress);
+src/lib/viewer/relationship-sync.ts:46:  if (nextMintedIndex > mintedCount) {
+src/lib/viewer/relationship-sync.ts:47:    nextMintedIndex = mintedCount;
+src/lib/viewer/relationship-sync.ts:52:  const total = mintedCount - startIndex;
+src/lib/viewer/relationship-sync.ts:57:  for (let index = startIndex; index < mintedCount; index += 1n) {
+src/lib/viewer/relationship-sync.ts:60:      nextMintedIndex = index;
+src/lib/viewer/relationship-sync.ts:66:    const tokenId = await params.client.getMintedId(index, params.senderAddress);
+src/lib/viewer/relationship-sync.ts:67:    nextMintedIndex = index + 1n;
+src/lib/viewer/relations-api.ts:2:// (functions/index/relations/[contract].ts). Returns the full ancestor and
+src/lib/viewer/relations-api.ts:4:// resolved from the D1 edge index in a single round-trip. Falls back to null on
+src/lib/viewer/relations-api.ts:15:  mintedCount: bigint;
+src/lib/viewer/relations-api.ts:16:  syncedCount: bigint;
+src/lib/viewer/relations-api.ts:58:    `${origin}/index/relations/${params.contractId}?id=${params.id.toString()}`;
+src/lib/viewer/relations-api.ts:70:      mintedCount: toBigInt(body.mintedCount) ?? 0n,
+src/lib/viewer/relations-api.ts:71:      syncedCount: toBigInt(body.syncedCount) ?? 0n,
+src/lib/collections/contract-link.ts:76:  const dotIndex = normalized.indexOf('.');
+src/lib/viewer/wallet-index.ts:80:  const markerIndex = assetIdentifier.indexOf('::');
+src/lib/viewer/wallet-index.ts:211:  for (let index = 0; index < baseUrls.length; index += 1) {
+src/lib/viewer/wallet-index.ts:212:    const baseUrl = baseUrls[index];
+src/lib/viewer/wallet-index.ts:257:      const hasFallback = index < baseUrls.length - 1;
+src/lib/viewer/wallet-index.ts:311:  for (let index = 0; index < baseUrls.length; index += 1) {
+src/lib/viewer/wallet-index.ts:312:    const baseUrl = baseUrls[index];
+src/lib/viewer/wallet-index.ts:368:      const hasFallback = index < baseUrls.length - 1;
+functions/runtime/modules/handler.ts:70:  const index = new Map<string, bigint>();
+functions/runtime/modules/handler.ts:71:  modulePathIndexCache.set(cacheKey, index);
+functions/runtime/modules/handler.ts:73:  return index;
+functions/runtime/modules/handler.ts:239:const indexResolvedModulePath = (params: {
+functions/runtime/modules/handler.ts:240:  index: ModulePathIndex;
+functions/runtime/modules/handler.ts:248:  if (!params.index.has(normalizedPath)) {
+functions/runtime/modules/handler.ts:249:    params.index.set(normalizedPath, params.tokenId);
+functions/runtime/modules/handler.ts:253:  if (!params.index.has(comparablePath)) {
+functions/runtime/modules/handler.ts:254:    params.index.set(comparablePath, params.tokenId);
+functions/runtime/modules/handler.ts:268:  index: ModulePathIndex;
+functions/runtime/modules/handler.ts:298:      const indexed = indexResolvedModulePath({
+functions/runtime/modules/handler.ts:299:        index: params.index,
+functions/runtime/modules/handler.ts:304:        indexed &&
+functions/runtime/modules/handler.ts:305:        (indexed.normalizedPath === params.requestedPath ||
+functions/runtime/modules/handler.ts:306:          indexed.comparablePath === comparableRequestedPath)
+functions/runtime/modules/handler.ts:348:  const index = getOrCreateModulePathIndex(cacheKey);
+functions/runtime/modules/handler.ts:352:    index.get(params.requestedPath) ?? index.get(comparableRequestedPath);
+functions/runtime/modules/handler.ts:364:        index
+functions/runtime/modules/handler.ts:392:          const indexed = indexResolvedModulePath({
+functions/runtime/modules/handler.ts:393:            index,
+functions/runtime/modules/handler.ts:397:          if (!indexed) {
+functions/runtime/modules/handler.ts:401:            indexed.normalizedPath === params.requestedPath ||
+functions/runtime/modules/handler.ts:402:            indexed.comparablePath === comparableRequestedPath
+src/migrate-ui.ts:205:            // Keep the cached index accurate immediately: the new v3 token and
+src/migrate-ui.ts:209:              void fetch(`/index/${contractId}?id=${id}`, { method: 'POST' }).catch(() => undefined);
+src/lib/chunking/__tests__/hash.test.ts:38:    const chunks = Array.from({ length: 120 }, (_, index) => new Uint8Array([index]));
+src/lib/chunking/__tests__/hash.test.ts:50:    const chunks = Array.from({ length: 65 }, (_, index) => new Uint8Array([index]));
+src/lib/commerce/client.ts:68:  for (let index = 0; index < networks.length; index += 1) {
+src/lib/commerce/client.ts:69:    const activeNetwork = networks[index];
+src/lib/commerce/client.ts:88:      const hasFallback = index < networks.length - 1;
+src/lib/commerce/client.ts:95:          to: getNetworkUrl(networks[index + 1])
+src/lib/market/listing-resolution.ts:2:import { buildMarketListingKey } from './indexer';
+src/lib/market/listing-resolution.ts:78:  const queue = candidates.map((_, index) => index);
+src/lib/viewer/relationship-index.ts:34:  typeof indexedDB !== 'undefined' && indexedDB !== null;
+src/lib/viewer/relationship-index.ts:79:    const request = indexedDB.open(DB_NAME, DB_VERSION);
+src/lib/viewer/relationship-index.ts:96:      logWarn('viewer-relationships', 'Relationship index DB open failed', {
+src/lib/market/client.ts:88:  for (let index = 0; index < networks.length; index += 1) {
+src/lib/market/client.ts:89:    const activeNetwork = networks[index];
+src/lib/market/client.ts:108:      const hasFallback = index < networks.length - 1;
+src/lib/market/client.ts:115:          to: getNetworkUrl(networks[index + 1])
+src/lib/market/client.ts:194:      for (let index = 0; index < stacksNetwork.length; index += 1) {
+src/lib/market/client.ts:195:        const activeNetwork = stacksNetwork[index];
+src/lib/market/client.ts:211:          const hasFallback = index < stacksNetwork.length - 1;
+src/lib/cache/query-persist.ts:20:  typeof indexedDB !== 'undefined' && indexedDB !== null;
+src/lib/cache/query-persist.ts:27:    const request = indexedDB.open(DB_NAME, DB_VERSION);
+src/types/vitest-expect-fix.d.ts:2:export * from '@vitest/expect/dist/index';
+src/lib/market/cache.ts:11:const STORE_NAME = 'market-index';
+src/lib/market/cache.ts:12:const NFT_STORE_NAME = 'nft-index';
+src/lib/market/cache.ts:51:  typeof indexedDB !== 'undefined' && indexedDB !== null;
+src/lib/market/cache.ts:61:    const request = indexedDB.open(DB_NAME, DB_VERSION);
+functions/runtime/modules/source-transform.ts:16:    const workspaceIndex = currentUrl.pathname.indexOf(workspacePrefix);
+src/lib/commerce/contract.ts:20:  const dotIndex = trimmed.indexOf('.');
+src/lib/mint/mime.ts:34:const indexOfBytes = (haystack: Uint8Array, needle: Uint8Array) => {
+src/lib/mint/mime.ts:41:    for (let index = 0; index < needle.length; index += 1) {
+src/lib/mint/mime.ts:42:      if (haystack[offset + index] !== needle[index]) {
+src/lib/mint/mime.ts:93:    (marker) => indexOfBytes(head, marker) !== -1
+src/lib/mint/mime.ts:96:    (marker) => indexOfBytes(head, marker) !== -1
+src/lib/viewer/recursive.ts:224:    const index = url.indexOf(marker);
+src/lib/viewer/recursive.ts:225:    if (index === -1) return null;
+src/lib/viewer/recursive.ts:226:    const tail = url.slice(index + marker.length);
+src/lib/viewer/recursive.ts:350:  if (!match || match.index === undefined) {
+src/lib/viewer/recursive.ts:353:  const index = match.index + match[0].length;
+src/lib/viewer/recursive.ts:354:  return `${html.slice(0, index)}${content}${html.slice(index)}`;
+src/lib/mint/attempt-cache.ts:32:  typeof indexedDB !== 'undefined' && indexedDB !== null;
+src/lib/mint/attempt-cache.ts:42:    const request = indexedDB.open(DB_NAME, DB_VERSION);
+src/lib/market/__tests__/listing-resolution.test.ts:6:import { buildMarketListingKey } from '../indexer';
+src/lib/market/__tests__/listing-resolution.test.ts:29:  it('skips lookup when token already exists in listing index', async () => {
+src/lib/market/__tests__/listing-resolution.test.ts:147:  it('merges listing indexes with deterministic override behavior', () => {
+functions/runtime/lib.ts:6:} from '../../packages/xtrata-reconstruction/src/index';
+functions/runtime/lib.ts:226:  index: bigint;
+functions/runtime/lib.ts:234:    functionArgs: [encodeUintArg(params.tokenId), encodeUintArg(params.index)],
+functions/runtime/lib.ts:246:  indexes: bigint[];
+functions/runtime/lib.ts:249:  if (params.indexes.length === 0) {
+functions/runtime/lib.ts:257:    functionArgs: [encodeUintArg(params.tokenId), encodeUintListArg(params.indexes)],
+functions/runtime/lib.ts:455:    getChunk: (tokenId, index) =>
+functions/runtime/lib.ts:461:        index,
+functions/runtime/lib.ts:466:    getChunkBatch: async (tokenId, indexes) => {
+functions/runtime/lib.ts:472:        indexes,
+functions/runtime/lib.ts:542:  index: bigint;
+functions/runtime/lib.ts:552:        throw new Error(`Missing chunk ${params.index.toString()}.`);
+functions/runtime/lib.ts:568:  throw lastError || new Error(`Missing chunk ${params.index.toString()}.`);
+functions/runtime/lib.ts:576:  indexes: bigint[];
+functions/runtime/lib.ts:585:      return params.indexes.map((index, position) => ({
+functions/runtime/lib.ts:586:        index,
+src/lib/mint/__tests__/attempt-cache.test.ts:31:  (globalThis as any).indexedDB = undefined;
+src/lib/mint/__tests__/attempt-cache.test.ts:40:  (globalThis as any).indexedDB = originalIndexedDb;
+src/lib/mint/__tests__/attempt-cache.test.ts:50:    originalIndexedDb = (globalThis as any).indexedDB;
+src/lib/contract/config.ts:24:  const dotIndex = trimmed.indexOf('.');
+src/lib/market/__tests__/indexer.test.ts:10:} from '../indexer';
+src/lib/market/__tests__/indexer.test.ts:13:describe('market indexer', () => {
+src/lib/market/__tests__/indexer.test.ts:84:  it('builds active listing index from events', () => {
+src/lib/market/__tests__/indexer.test.ts:158:        event_index: 12,
+src/lib/protocol/parsers.ts:122:    getTupleValue(tuple, 'current-index', context),
+src/lib/protocol/parsers.ts:123:    `${context}.current-index`
+src/lib/protocol/parsers.ts:297:  return list.map((entry, index) =>
+src/lib/protocol/parsers.ts:298:    parseOptionalBuffer(entry, `get-chunk-batch[${index}]`)
+src/lib/protocol/parsers.ts:304:  return list.map((entry, index) =>
+src/lib/protocol/parsers.ts:305:    expectUInt(entry, `get-dependencies[${index}]`)
+src/lib/protocol/parsers.ts:311:  return list.map((entry, index) =>
+src/lib/protocol/parsers.ts:312:    expectUInt(entry, `get-parents[${index}]`)
+src/lib/viewer/cache.ts:93:  typeof indexedDB !== 'undefined' && indexedDB !== null;
+src/lib/viewer/cache.ts:103:    const request = indexedDB.open(DB_NAME, DB_VERSION);
+src/lib/viewer/content.ts:183:const indexOfBytes = (
+src/lib/viewer/content.ts:193:    for (let index = 0; index < needle.length; index += 1) {
+src/lib/viewer/content.ts:194:      if (haystack[offset + index] !== needle[index]) {
+src/lib/viewer/content.ts:242:    (marker) => indexOfBytes(head, marker) !== -1
+src/lib/viewer/content.ts:245:    (marker) => indexOfBytes(head, marker) !== -1
+src/lib/viewer/content.ts:1058:  index: bigint;
+src/lib/viewer/content.ts:1070:        index: params.index.toString(),
+src/lib/viewer/content.ts:1075:        params.index,
+src/lib/viewer/content.ts:1079:        throw new Error(`Missing chunk ${params.index.toString()}`);
+src/lib/viewer/content.ts:1084:        index: params.index.toString(),
+src/lib/viewer/content.ts:1093:        index: params.index.toString(),
+src/lib/viewer/content.ts:1105:    index: params.index.toString(),
+src/lib/viewer/content.ts:1108:  throw lastError ?? new Error(`Missing chunk ${params.index.toString()}`);
+src/lib/viewer/content.ts:1114:  indexes: bigint[];
+src/lib/viewer/content.ts:1119:  if (params.indexes.length === 0) {
+src/lib/viewer/content.ts:1120:    return [] as { index: bigint; chunk: Uint8Array | null }[];
+src/lib/viewer/content.ts:1129:        count: params.indexes.length,
+src/lib/viewer/content.ts:1130:        start: params.indexes[0]?.toString(),
+src/lib/viewer/content.ts:1131:        end: params.indexes[params.indexes.length - 1]?.toString(),
+src/lib/viewer/content.ts:1136:        params.indexes,
+src/lib/viewer/content.ts:1139:      if (batch.length !== params.indexes.length) {
+src/lib/viewer/content.ts:1143:          expected: params.indexes.length,
+src/lib/viewer/content.ts:1152:      return params.indexes.map((index, idx) => ({
+src/lib/viewer/content.ts:1153:        index,
+src/lib/viewer/content.ts:1180:  indexes: bigint[];
+src/lib/viewer/content.ts:1185:  if (params.indexes.length === 0) {
+src/lib/viewer/content.ts:1190:    Math.min(params.concurrency ?? READ_CHUNK_CONCURRENCY, params.indexes.length)
+src/lib/viewer/content.ts:1197:      if (current >= params.indexes.length) {
+src/lib/viewer/content.ts:1200:      const index = params.indexes[current];
+src/lib/viewer/content.ts:1204:        index,
+src/lib/viewer/content.ts:1207:      results.set(index, chunk);
+src/lib/viewer/content.ts:1233:      for (let index = offset; index < params.totalCount; index += 1) {
+src/lib/viewer/content.ts:1234:        remaining.push(BigInt(index));
+src/lib/viewer/content.ts:1243:        indexes: remaining,
+src/lib/viewer/content.ts:1246:      for (const [index, chunk] of results.entries()) {
+src/lib/viewer/content.ts:1247:        chunkMap.set(index, chunk);
+src/lib/viewer/content.ts:1253:    for (let index = offset; index < params.totalCount; index += 1) {
+src/lib/viewer/content.ts:1254:      batchIndexes.push(BigInt(index));
+src/lib/viewer/content.ts:1256:        offset = index + 1;
+src/lib/viewer/content.ts:1259:      offset = index + 1;
+src/lib/viewer/content.ts:1262:    let entries: { index: bigint; chunk: Uint8Array | null }[];
+src/lib/viewer/content.ts:1267:        indexes: batchIndexes,
+src/lib/viewer/content.ts:1292:        indexes: batchIndexes,
+src/lib/viewer/content.ts:1295:      for (const [index, chunk] of results.entries()) {
+src/lib/viewer/content.ts:1296:        chunkMap.set(index, chunk);
+src/lib/viewer/content.ts:1303:        chunkMap.set(entry.index, entry.chunk);
+src/lib/viewer/content.ts:1305:        missing.push(entry.index);
+src/lib/viewer/content.ts:1318:      indexes: missing,
+src/lib/viewer/content.ts:1321:    for (const [index, chunk] of results.entries()) {
+src/lib/viewer/content.ts:1322:      chunkMap.set(index, chunk);
+src/lib/viewer/content.ts:1327:  for (let index = 1; index < params.totalCount; index += 1) {
+src/lib/viewer/content.ts:1328:    const chunk = chunkMap.get(BigInt(index));
+src/lib/viewer/content.ts:1330:      throw new Error(`Missing chunk ${index.toString()}`);
+src/lib/viewer/content.ts:1413:        index: 0n,
+src/lib/viewer/content.ts:1489:        (_, index) => BigInt(index + 1)
+src/lib/viewer/content.ts:1492:        indices.map((index) =>
+src/lib/viewer/content.ts:1496:            index,
+src/lib/viewer/content.ts:1519:    let index = 1n;
+src/lib/viewer/content.ts:1524:        index,
+src/lib/viewer/content.ts:1529:      index += 1n;
+functions/runtime/__tests__/lib.test.ts:2:import { chunkBytes, computeExpectedHash } from '../../../packages/xtrata-reconstruction/src/index';
+functions/runtime/__tests__/lib.test.ts:74:      fetchChunk: vi.fn(async ({ index }) => chunks.get(index.toString()) ?? null),
+functions/runtime/__tests__/lib.test.ts:75:      fetchChunkBatch: vi.fn(async ({ indexes }) =>
+functions/runtime/__tests__/lib.test.ts:76:        indexes.map((index) => chunks.get(index.toString()) ?? null)
+functions/runtime/__tests__/lib.test.ts:92:    expect(vi.mocked(reader.fetchChunkBatch).mock.calls[0][0].indexes).toEqual([1n, 2n]);
+functions/runtime/__tests__/lib.test.ts:111:      fetchChunk: vi.fn(async ({ index }) => chunks.get(index.toString()) ?? null),
+functions/runtime/__tests__/lib.test.ts:112:      fetchChunkBatch: vi.fn(async ({ indexes }) =>
+functions/runtime/__tests__/lib.test.ts:113:        indexes.map((index) => chunks.get(index.toString()) ?? null)
+functions/runtime/__tests__/lib.test.ts:138:      Array.from({ length: 9 }, (_, index) => [index.toString(), new Uint8Array([index + 1])])
+functions/runtime/__tests__/lib.test.ts:150:      fetchChunk: vi.fn(async ({ index }) => chunks.get(index.toString()) ?? null),
+functions/runtime/__tests__/lib.test.ts:151:      fetchChunkBatch: vi.fn(async ({ indexes }) => {
+functions/runtime/__tests__/lib.test.ts:156:        return indexes.map((index) => chunks.get(index.toString()) ?? null);
+functions/runtime/__tests__/lib.test.ts:180:    const bytes = Uint8Array.from({ length: 61 }, (_entry, index) => index + 1);
+functions/runtime/__tests__/lib.test.ts:182:      Array.from({ length: 61 }, (_, index) => [index.toString(), new Uint8Array([index + 1])])
+functions/runtime/__tests__/lib.test.ts:192:      fetchChunk: vi.fn(async ({ index }) => chunks.get(index.toString()) ?? null),
+functions/runtime/__tests__/lib.test.ts:193:      fetchChunkBatch: vi.fn(async ({ indexes }) => {
+functions/runtime/__tests__/lib.test.ts:194:        if (indexes.length > 25) {
+functions/runtime/__tests__/lib.test.ts:197:        return indexes.map((index) => chunks.get(index.toString()) ?? null);
+functions/runtime/__tests__/lib.test.ts:214:    expect(batchCalls.map(([params]) => params.indexes.length)).toEqual(
+functions/runtime/__tests__/lib.test.ts:235:      fetchChunk: vi.fn(async ({ index }) => chunks.get(index.toString()) ?? null),
+functions/runtime/__tests__/lib.test.ts:236:      fetchChunkBatch: vi.fn(async ({ indexes }) =>
+functions/runtime/__tests__/lib.test.ts:237:        indexes.map((index) => (index === 2n ? null : (chunks.get(index.toString()) ?? null)))
+functions/runtime/__tests__/lib.test.ts:252:    expect(vi.mocked(reader.fetchChunk).mock.calls.some((call) => call[0].index === 2n)).toBe(true);
+functions/runtime/__tests__/lib.test.ts:270:      fetchChunk: vi.fn(async ({ index }) => chunks.get(index.toString()) ?? null),
+functions/runtime/__tests__/lib.test.ts:305:      fetchChunk: vi.fn(async ({ index }) => chunks.get(index.toString()) ?? null),
+functions/runtime/__tests__/lib.test.ts:344:      fetchChunk: vi.fn(async ({ contract, index }) => {
+functions/runtime/__tests__/lib.test.ts:345:        if (contract.contractName === primaryContract.contractName && index === 0n) {
+functions/runtime/__tests__/lib.test.ts:348:        if (contract.contractName === fallbackContract.contractName && index === 0n) {
+functions/runtime/__tests__/lib.test.ts:353:      fetchChunkBatch: vi.fn(async ({ contract, indexes }) => {
+functions/runtime/__tests__/lib.test.ts:355:          return indexes.map(() => null);
+functions/runtime/__tests__/lib.test.ts:357:        return indexes.map(() => new Uint8Array([2]));
+src/lib/contract/client.ts:334:  for (let index = 0; index < networks.length; index += 1) {
+src/lib/contract/client.ts:335:    const activeNetwork = networks[index];
+src/lib/contract/client.ts:354:      const hasFallback = index < networks.length - 1;
+src/lib/contract/client.ts:361:          to: getNetworkUrl(networks[index + 1])
+src/lib/contract/client.ts:383:  getMintedId: (index: bigint, senderAddress: string) => Promise<bigint | null>;
+src/lib/contract/client.ts:421:  getChunk: (id: bigint, index: bigint, senderAddress: string) => Promise<Uint8Array | null>;
+src/lib/contract/client.ts:424:    indexes: bigint[],
+src/lib/contract/client.ts:438:    index: bigint,
+src/lib/contract/client.ts:487:        throw new Error('Minted index readers not supported by this contract');
+src/lib/contract/client.ts:499:    getMintedId: async (index, senderAddress) => {
+src/lib/contract/client.ts:501:        throw new Error('Minted index readers not supported by this contract');
+src/lib/contract/client.ts:508:        functionArgs: [uintCV(index)],
+src/lib/contract/client.ts:747:    getChunk: async (id, index, senderAddress) => {
+src/lib/contract/client.ts:753:        functionArgs: [uintCV(id), uintCV(index)],
+src/lib/contract/client.ts:762:    getChunkBatch: async (id, indexes, senderAddress) => {
+src/lib/contract/client.ts:763:      if (indexes.length === 0) {
+src/lib/contract/client.ts:774:        functionArgs: [uintCV(id), listCV(indexes.map((index) => uintCV(index)))],
+src/lib/contract/client.ts:805:    getPendingChunk: async (expectedHash, index, senderAddress, creator) => {
+src/lib/contract/client.ts:810:            uintCV(index)
+src/lib/contract/client.ts:812:        : [bufferCV(expectedHash), uintCV(index)];
+src/lib/market/indexer.ts:37:  event_index?: number;
+src/lib/market/indexer.ts:57:  event_index?: number;
+src/lib/market/indexer.ts:191:      eventIndex: event.event_index,
+src/lib/market/indexer.ts:205:  const indexA = a.eventIndex ?? 0;
+src/lib/market/indexer.ts:206:  const indexB = b.eventIndex ?? 0;
+src/lib/market/indexer.ts:207:  return indexB - indexA;
+src/lib/market/indexer.ts:216:  const indexA = a.eventIndex ?? 0;
+src/lib/market/indexer.ts:217:  const indexB = b.eventIndex ?? 0;
+src/lib/market/indexer.ts:218:  return indexB - indexA;
+src/lib/market/indexer.ts:227:  const indexA = a.eventIndex ?? 0;
+src/lib/market/indexer.ts:228:  const indexB = b.eventIndex ?? 0;
+src/lib/market/indexer.ts:229:  return indexB - indexA;
+src/lib/market/indexer.ts:331:  const id = `${event.tx_id ?? 'unknown'}:${event.event_index ?? tokenId?.toString() ?? 'event'}`;
+src/lib/market/indexer.ts:341:    eventIndex: event.event_index,
+src/lib/market/indexer.ts:410:    for (let index = 0; index < apiBaseUrls.length; index += 1) {
+src/lib/market/indexer.ts:411:      const baseUrl = apiBaseUrls[index];
+src/lib/market/indexer.ts:424:        const hasFallback = index < apiBaseUrls.length - 1;
+src/lib/market/indexer.ts:504:    for (let index = 0; index < apiBaseUrls.length; index += 1) {
+src/lib/market/indexer.ts:505:      const baseUrl = apiBaseUrls[index];
+src/lib/market/indexer.ts:519:        const hasFallback = index < apiBaseUrls.length - 1;
+src/lib/collection-mint/random-drop.ts:30:  index: number
+src/lib/collection-mint/random-drop.ts:35:      return { asset: null, error: `Asset ${index + 1} url is empty.` };
+src/lib/collection-mint/random-drop.ts:40:        error: `Asset ${index + 1} url must use http or https.`
+src/lib/collection-mint/random-drop.ts:43:    return { asset: { url, label: `Drop item ${index + 1}` }, error: null };
+src/lib/collection-mint/random-drop.ts:47:    return { asset: null, error: `Asset ${index + 1} is invalid.` };
+src/lib/collection-mint/random-drop.ts:57:    return { asset: null, error: `Asset ${index + 1} is missing url.` };
+src/lib/collection-mint/random-drop.ts:62:      error: `Asset ${index + 1} url must use http or https.`
+src/lib/collection-mint/random-drop.ts:73:      : `Drop item ${index + 1}`;
+src/lib/collection-mint/random-drop.ts:93:  source.forEach((entry, index) => {
+src/lib/collection-mint/random-drop.ts:94:    const normalized = normalizeAsset(entry as RandomDropAssetInput, index);
+src/lib/collection-mint/random-drop.ts:104:      errors.push(`Asset ${index + 1} duplicates an existing url.`);
+src/lib/collection-mint/random-drop.ts:128:  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+src/lib/collection-mint/random-drop.ts:129:    const swapIndex = Math.floor(random() * (index + 1));
+src/lib/collection-mint/random-drop.ts:130:    const temp = shuffled[index];
+src/lib/collection-mint/random-drop.ts:131:    shuffled[index] = shuffled[swapIndex] as RandomDropAsset;
+src/lib/viewer/index-summaries.ts:11:// Client for the D1-backed inscription index (functions/index/[contract].ts).
+src/lib/viewer/index-summaries.ts:14:// back to the chain (in the caller) for any id the index hasn't synced yet.
+src/lib/viewer/index-summaries.ts:46:  // index no longer needs to chain-fetch a data-uri for them.
+src/lib/viewer/index-summaries.ts:67:  const url = `${origin}/index/${contractId}?ids=${ids.map((id) => id.toString()).join(',')}`;
+src/lib/viewer/index-summaries.ts:70:    throw new Error(`index ${contractId} HTTP ${response.status}`);
+src/lib/viewer/index-summaries.ts:89:    `${origin}/index/page?primary=${encodeURIComponent(primaryContractId)}` +
+src/lib/viewer/index-summaries.ts:91:    `&ids=${ids.map((id) => id.toString()).join(',')}`;
+src/lib/viewer/index-summaries.ts:94:    throw new Error(`index page HTTP ${response.status}`);
+src/lib/viewer/index-summaries.ts:104:// Resolve the given ids from the index, primary-first across [primary, ...lineage].
+src/lib/viewer/index-summaries.ts:105:// Returns a map of id-string -> TokenSummary for the ids the index actually has.
+src/lib/viewer/index-summaries.ts:107:// Per-contract fan-out fallback for deploys without /index/page. Resolves the
+src/lib/viewer/index-summaries.ts:142:// Resolve the given ids from the index, primary-first across [primary, ...lineage].
+src/lib/viewer/index-summaries.ts:143:// Returns a map of id-string -> TokenSummary for the ids the index actually has.
+src/lib/viewer/index-summaries.ts:157:  //    contract so the index keyspace is stable regardless of which lineage
+src/lib/market/contract.ts:17:  const dotIndex = trimmed.indexOf('.');
+src/lib/protocol/__tests__/parsers.test.ts:95:  it('parses minted index readers', () => {
+src/lib/protocol/__tests__/parsers.test.ts:230:      'current-index': uintCV(1),
+functions/runtime/__tests__/content.test.ts:14:import { chunkBytes, computeExpectedHash } from '../../../packages/xtrata-reconstruction/src/index';
+src/lib/contract/__tests__/client.test.ts:164:  it('calls minted index readers for v2 contracts', async () => {
+src/lib/viewer/__tests__/content-fetch.test.ts:52:    const getChunk = vi.fn(async (_id: bigint, index: bigint) => {
+src/lib/viewer/__tests__/content-fetch.test.ts:53:      if (index === 0n) {
+src/lib/viewer/__tests__/content-fetch.test.ts:82:    const getChunk = vi.fn(async (_id: bigint, index: bigint) => {
+src/lib/viewer/__tests__/content-fetch.test.ts:83:      if (index === 0n) {
+src/lib/viewer/__tests__/content-fetch.test.ts:86:      if (index === 1n) {
+src/lib/viewer/__tests__/content-fetch.test.ts:89:      if (index === 2n) {
+src/lib/viewer/__tests__/content-fetch.test.ts:118:    const getChunk = vi.fn(async (_id: bigint, index: bigint) =>
+src/lib/viewer/__tests__/content-fetch.test.ts:119:      index === 0n ? first : null
+src/lib/viewer/__tests__/content-fetch.test.ts:168:    const legacyGetChunk = vi.fn(async (_id: bigint, index: bigint) => {
+src/lib/viewer/__tests__/content-fetch.test.ts:169:      if (index === 0n) {
+src/lib/viewer/__tests__/content-fetch.test.ts:172:      if (index === 1n) {
+src/lib/viewer/__tests__/content-fetch.test.ts:214:    const getChunk = vi.fn(async (_id: bigint, index: bigint) => {
+src/lib/viewer/__tests__/content-fetch.test.ts:215:      if (index === 0n) {
+src/lib/viewer/__tests__/content-fetch.test.ts:218:      if (index === 1n) {
+src/lib/viewer/__tests__/content-fetch.test.ts:221:      if (index === 2n) {
+src/lib/viewer/__tests__/content-fetch.test.ts:253:    const getChunk = vi.fn(async (_id: bigint, index: bigint) => {
+src/lib/viewer/__tests__/content-fetch.test.ts:254:      if (index === 0n) {
+src/lib/viewer/__tests__/content-fetch.test.ts:257:      if (index === 1n) {
+src/lib/viewer/__tests__/content-fetch.test.ts:290:    const getChunk = vi.fn(async (_id: bigint, index: bigint) => {
+src/lib/viewer/__tests__/content-fetch.test.ts:291:      if (index === 0n) {
+src/lib/viewer/__tests__/content-fetch.test.ts:323:    const getChunk = vi.fn(async (_id: bigint, index: bigint) => {
+src/lib/viewer/__tests__/content-fetch.test.ts:324:      if (index === 0n) {
+src/lib/viewer/runtime-inline.ts:34:  for (let index = 0; index < bytes.length; index += chunkSize) {
+src/lib/viewer/runtime-inline.ts:35:    const chunk = bytes.subarray(index, index + chunkSize);
+src/lib/viewer/__tests__/relationship-index.test.ts:10:} from '../relationship-index';
+src/lib/viewer/__tests__/relationship-index.test.ts:12:describe('relationship index', () => {
+src/lib/viewer/__tests__/relationship-index.test.ts:22:  it('returns empty/default values when indexeddb is unavailable', async () => {
+src/lib/viewer/__tests__/relationship-index.test.ts:38:  it('noops writes when indexeddb is unavailable', async () => {
+src/lib/viewer/html-preview.ts:85:  if (!match || match.index === undefined) {
+src/lib/viewer/html-preview.ts:88:  const index = match.index + match[0].length;
+src/lib/viewer/html-preview.ts:89:  return `${html.slice(0, index)}${content}${html.slice(index)}`;
+functions/runtime/content.ts:85:        missingChunks: diagnostics.missingChunks.map((index) => index.toString()),
+functions/runtime/content.ts:89:          index: error.index?.toString(),
+functions/runtime/content.ts:90:          indexes: error.indexes?.map((index) => index.toString()),
+functions/runtime/content.ts:258:  const separator = spec.indexOf('-');
+src/lib/collection-mint/resume-scan.ts:4:  predicate: (item: T, index: number) => Promise<boolean>;
+src/lib/viewer/relationships.ts:121:    const indexedChildren = await params.loadIndexedChildren(parentId);
+src/lib/viewer/relationships.ts:122:    const indexedSet = new Set(indexedChildren.map((id) => id.toString()));
+src/lib/viewer/relationships.ts:126:    const needsForwardScan = canScanForward && !indexedSet.has(selectedKey);
+src/lib/viewer/relationships.ts:128:    let combinedChildren = indexedChildren;
+src/lib/viewer/relationships.ts:139:        ...indexedChildren.map((id) => id.toString()),
+src/lib/viewer/__tests__/relationships.test.ts:96:  it("finds siblings from indexed parent children when coverage exists", async () => {
+src/lib/viewer/__tests__/relationships.test.ts:109:  it("falls back to forward scan when parent index is missing selected child", async () => {
+src/lib/viewer/parent-child-index.ts:8:} from './relationship-index';
+src/lib/viewer/parent-child-index.ts:16:// We reuse the generic adjacency storage in relationship-index.ts but under a
+src/lib/viewer/parent-child-index.ts:17:// dedicated namespace so the parents reverse-index never collides with the
+src/lib/viewer/parent-child-index.ts:18:// (separately maintained) dependencies index that module also serves. The
+src/lib/viewer/parent-child-index.ts:38:  mintedCount: bigint;
+src/lib/viewer/parent-child-index.ts:45:// Read the children of `parentId` from the persisted reverse index. Returns
+src/lib/viewer/parent-child-index.ts:46:// only what has been indexed so far (empty until a scan has covered the
+src/lib/viewer/parent-child-index.ts:57:// The minted-index position the next scan will resume from for this contract.
+src/lib/viewer/parent-child-index.ts:80:// scan always indexes every token it visits.
+src/lib/viewer/parent-child-index.ts:94:      'Child indexing requires xtrata-v2.1.0+ tokens. Migrate v1 inscriptions to v2.'
+src/lib/viewer/parent-child-index.ts:101:  const mintedCount = await params.client.getMintedCount(params.senderAddress);
+src/lib/viewer/parent-child-index.ts:102:  if (nextMintedIndex > mintedCount) {
+src/lib/viewer/parent-child-index.ts:103:    nextMintedIndex = mintedCount;
+src/lib/viewer/parent-child-index.ts:111:  const total = mintedCount - startIndex;
+src/lib/viewer/parent-child-index.ts:125:  for (let index = startIndex; index < mintedCount; index += 1n) {
+src/lib/viewer/parent-child-index.ts:128:      nextMintedIndex = index;
+src/lib/viewer/parent-child-index.ts:134:    const tokenId = await params.client.getMintedId(index, params.senderAddress);
+src/lib/viewer/parent-child-index.ts:135:    nextMintedIndex = index + 1n;
+src/lib/viewer/parent-child-index.ts:170:  return { scanned, total, found, cancelled, nextMintedIndex, mintedCount };
+src/lib/viewer/queries.ts:12:import { fetchIndexedSummaries } from './index-summaries';
+src/lib/viewer/queries.ts:32:  index: bigint
+src/lib/viewer/queries.ts:33:) => [...getViewerKey(contractId), 'chunk', id.toString(), index.toString()];
+src/lib/viewer/queries.ts:366:  // When provided, the whole page is served from the D1 index first (primary-
+src/lib/viewer/queries.ts:367:  // first across [primary, ...lineage]); only ids the index hasn't synced (or
+src/lib/viewer/queries.ts:369:  indexLineageContractIds?: string[];
+src/lib/viewer/queries.ts:386:    !!params.indexLineageContractIds &&
+src/lib/viewer/queries.ts:387:    params.indexLineageContractIds.length > 0;
+src/lib/viewer/queries.ts:388:  const indexQuery = useQuery({
+src/lib/viewer/queries.ts:391:      'index-batch',
+src/lib/viewer/queries.ts:397:        lineageContractIds: params.indexLineageContractIds!,
+src/lib/viewer/queries.ts:404:  const indexMap = indexQuery.data ?? null;
+src/lib/viewer/queries.ts:405:  // Don't start per-token chain reads until the batch index has settled, so
+src/lib/viewer/queries.ts:406:  // index hits never trigger a redundant chain read.
+src/lib/viewer/queries.ts:407:  const indexSettled = !useIndex || indexQuery.isSuccess || indexQuery.isError;
+src/lib/viewer/queries.ts:412:      const indexed = indexMap?.get(id.toString());
+src/lib/viewer/queries.ts:413:      if (indexed) {
+src/lib/viewer/queries.ts:414:        return Promise.resolve(indexed);
+src/lib/viewer/queries.ts:427:      // Short-circuit index hits: when the batch index already holds this id,
+src/lib/viewer/queries.ts:432:        ? () => indexMap?.get(id.toString())
+src/lib/viewer/queries.ts:438:        indexSettled,
+src/lib/viewer/__tests__/html-preview.test.ts:12:    expect(result.indexOf('data-xtrata-grid-preview')).toBeLessThan(
+src/lib/viewer/__tests__/html-preview.test.ts:13:      result.indexOf('</head>')
+src/lib/viewer/__tests__/html-preview.test.ts:36:    expect(result.indexOf('data-xtrata-grid-preview')).toBeLessThan(
+src/lib/viewer/__tests__/html-preview.test.ts:37:      result.indexOf('<canvas id="stage">')
+src/lib/campaign/storage.ts:12:  typeof indexedDB !== 'undefined' && indexedDB !== null;
+src/lib/campaign/storage.ts:22:    const request = indexedDB.open(DB_NAME, DB_VERSION);
+src/lib/preinscribed-sale/contract.ts:23:  const dotIndex = trimmed.indexOf('.');
+src/lib/viewer/module-paths.ts:32:  const dotIndex = trimmed.indexOf('.');
+src/lib/viewer/module-paths.ts:155:  if (!match || match.index === undefined) {
+src/lib/viewer/module-paths.ts:158:  const insertionPoint = match.index + match[0].length;
+src/lib/viewer/module-paths.ts:182:  if (beforeBody && beforeBody.index !== undefined) {
+src/lib/viewer/module-paths.ts:183:    return `${html.slice(0, beforeBody.index)}<head>${baseTag}</head>${html.slice(
+src/lib/viewer/module-paths.ts:184:      beforeBody.index
+src/lib/viewer/__tests__/wallet-index.test.ts:6:} from '../wallet-index';
+src/lib/viewer/__tests__/wallet-index.test.ts:15:describe('wallet holdings index', () => {
+src/lib/viewer/__tests__/content.test.ts:51:  for (let index = 0; index < frameCount; index += 1) {
+src/lib/viewer/__tests__/content.test.ts:127:  for (let index = 0; index < frameCount; index += 1) {
+src/lib/viewer/__tests__/content.test.ts:129:      ...writeUint32BE(index),
+src/lib/viewer/__tests__/content.test.ts:173:  for (let index = 0; index < frameCount; index += 1) {
+src/lib/viewer/__tests__/parent-child-index.test.ts:8:} from '../parent-child-index';
+src/lib/viewer/__tests__/parent-child-index.test.ts:10:describe('parent-child index', () => {
+src/lib/viewer/__tests__/parent-child-index.test.ts:16:    // reverse-index never collides with the dependencies index.
+src/lib/viewer/__tests__/parent-child-index.test.ts:20:  it('returns empty/default values when indexeddb is unavailable', async () => {
+src/lib/viewer/__tests__/parent-child-index.test.ts:30:  it('noops writes when indexeddb is unavailable', async () => {
+src/lib/viewer/__tests__/cache.test.ts:52:  it('reports unavailable when indexedDB is missing', async () => {
+functions/prices/spot.ts:10:  'https://api.coingecko.com/api/v3/simple/price?ids=stacks,sbtc,usd-coin,bitcoin&vs_currencies=usd&include_last_updated_at=true';
+src/lib/viewer/__tests__/recursive.test.ts:9:    expect(result.indexOf('data-xtrata-bridge')).toBeLessThan(
+src/lib/viewer/__tests__/recursive.test.ts:10:      result.indexOf('</head>')
+src/lib/viewer/__tests__/recursive.test.ts:18:    expect(result.indexOf('data-xtrata-bridge')).toBeLessThan(
+src/lib/viewer/__tests__/recursive.test.ts:19:      result.indexOf('<div>Hi</div>')
+src/lib/viewer/__tests__/relationship-sync.test.ts:4:vi.mock('../relationship-index', () => ({
+src/lib/viewer/__tests__/relationship-sync.test.ts:14:} from '../relationship-index';
+src/lib/viewer/__tests__/relationship-sync.test.ts:65:  it('requires minted index support', async () => {
+src/lib/viewer/__tests__/relationship-sync.test.ts:79:  it('indexes newly minted ids and updates cursor', async () => {
+src/lib/viewer/__tests__/relations-api.test.ts:23:          mintedCount: 100,
+src/lib/viewer/__tests__/relations-api.test.ts:24:          syncedCount: '100',
+src/lib/viewer/__tests__/relations-api.test.ts:38:    expect(result!.mintedCount).toBe(100n);

@@ -466,23 +466,32 @@ const normalizeTxResultForCallback = (payload: unknown): WalletTxResult => {
 const toLegacyContractCallOptions = (
   options: WalletContractCallOptions
 ): ContractCallOptions =>
-  (options.sponsored === true
-    ? { ...options, sponsored: true }
-    : { ...options, sponsored: false }) as ContractCallOptions;
+  ({
+    ...options,
+    fee: normalizeBigIntLike(options.fee),
+    nonce: normalizeBigIntLike(options.nonce),
+    sponsored: options.sponsored === true
+  }) as ContractCallOptions;
 
 const toLegacyContractDeployOptions = (
   options: WalletContractDeployOptions
 ): ContractDeployOptions =>
-  (options.sponsored === true
-    ? { ...options, sponsored: true }
-    : { ...options, sponsored: false }) as ContractDeployOptions;
+  ({
+    ...options,
+    fee: normalizeBigIntLike(options.fee),
+    nonce: normalizeBigIntLike(options.nonce),
+    sponsored: options.sponsored === true
+  }) as ContractDeployOptions;
 
 const toLegacyStxTransferOptions = (
   options: WalletStxTransferOptions
 ): STXTransferOptions =>
-  (options.sponsored === true
-    ? { ...options, sponsored: true }
-    : { ...options, sponsored: false }) as STXTransferOptions;
+  ({
+    ...options,
+    fee: normalizeBigIntLike(options.fee),
+    nonce: normalizeBigIntLike(options.nonce),
+    sponsored: options.sponsored === true
+  }) as STXTransferOptions;
 
 const buildContractCallParams = (options: WalletContractCallOptions) => {
   const postConditions =
@@ -889,6 +898,7 @@ export const __testing = {
   isMethodUnsupportedError,
   isUserCancelledError,
   normalizeNetwork,
+  toLegacyContractCallOptions,
   normalizeTxResultForCallback,
   normalizeTxResultPayload,
   normalizeTxResult
