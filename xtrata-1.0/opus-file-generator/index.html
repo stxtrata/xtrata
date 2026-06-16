@@ -1749,7 +1749,9 @@
 <script src="main.js" defer></script>
 <script type="module">
   import { initializeImageConverter } from './image-to-base64.js';
+  import { initImageCompressorUI } from './image-compressor-ui.js';
   document.addEventListener('DOMContentLoaded', initializeImageConverter);
+  document.addEventListener('DOMContentLoaded', initImageCompressorUI);
 
   document.addEventListener('audionalBase64Generated', () => {
     if (typeof window.updateHtmlGenerateButtonState === 'function') {
