@@ -1037,7 +1037,7 @@
   </footer>
 
   <script type="module">
-    import { connect, disconnect, isConnected, getLocalStorage, request } from 'https://esm.sh/@stacks/connect@8.2.6';
+    import { connect, disconnect, isConnected, getLocalStorage, openContractCall } from 'https://esm.sh/@stacks/connect@8.2.6';
     import { fetchCallReadOnlyFunction, cvToJSON, cvToValue, Cl, Pc, PostConditionMode } from 'https://esm.sh/@stacks/transactions@7.4.0';
     import { STACKS_MAINNET, STACKS_TESTNET } from 'https://esm.sh/@stacks/network@7.3.1';
 
@@ -1293,15 +1293,30 @@
     }
     async function callHelper(functionName, functionArgs = [], postConditions = []) {
       const { contractAddress, contractName } = helperParts();
-      const payload = { contractAddress, contractName, functionName, functionArgs, network: networkName() };
+      // Route through @stacks/connect v8 openContractCall, the supported compat
+      // wrapper that maps these legacy-style options to the SIP-030
+      // `stx_callContract` RPC with the correct payload shape (single `contract`
+      // id, serialized args/post-conditions). This mirrors what the Xtrata
+      // program's wallet layer does and is accepted by Leather and Xverse alike.
+      const options = { contractAddress, contractName, functionName, functionArgs, network: networkName() };
       if ($('usePostConditions').checked && postConditions.length) {
-        payload.postConditions = postConditions;
-        payload.postConditionMode = PostConditionMode.Allow;
+        options.postConditions = postConditions;
+        options.postConditionMode = PostConditionMode.Allow;
       }
-      const response = await request('stx_callContract', payload);
-      const txId = response.txId || response.txid;
-      log(`Transaction submitted: ${functionName}`, { txId, explorer: explorerTx(txId) });
-      return response;
+      return new Promise((resolve, reject) => {
+        openContractCall({
+          ...options,
+          onFinish: (data) => {
+            const txId = data?.txId || data?.txid;
+            log(`Transaction submitted: ${functionName}`, { txId, explorer: txId ? explorerTx(txId) : undefined });
+            resolve(data);
+          },
+          onCancel: () => {
+            log(`Transaction cancelled in wallet: ${functionName}`);
+            reject(new Error('Transaction was cancelled in the wallet'));
+          },
+        });
+      });
     }
 
     function getTokenId() {
