@@ -1,6 +1,9 @@
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
   'cache-control': 'no-store',
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET,POST,OPTIONS',
+  'access-control-allow-headers': 'content-type, x-api-key',
 };
 
 function json(body, status = 200) {
@@ -10,24 +13,24 @@ function json(body, status = 200) {
 async function ensureSchema(db) {
   await db.prepare(`
     CREATE TABLE IF NOT EXISTS gallery_cache (
-      collection TEXT NOT NULL,
-      network TEXT NOT NULL,
-      source_contract TEXT NOT NULL,
-      token_id INTEGER NOT NULL,
-      status TEXT NOT NULL,
+      collection TEXT,
+      network TEXT,
+      source_contract TEXT,
+      id INTEGER,
+      status TEXT,
       token_uri TEXT,
       resolved_metadata_uri TEXT,
       image_field TEXT,
       image_uri TEXT,
       resolved_image_uri TEXT,
       error TEXT,
-      updated_at TEXT NOT NULL,
-      PRIMARY KEY (collection, network, source_contract, token_id)
+      cached_at TEXT,
+      PRIMARY KEY (collection, network, source_contract, id)
     )
   `).run();
   await db.prepare(`
     CREATE INDEX IF NOT EXISTS idx_gallery_cache_range
-    ON gallery_cache (collection, network, source_contract, token_id)
+    ON gallery_cache (collection, network, source_contract, id)
   `).run();
 }
 
@@ -58,11 +61,11 @@ export async function onRequestGet({ env, request }) {
 
   await ensureSchema(env.DB);
   const result = await env.DB.prepare(`
-    SELECT token_id AS id, status, token_uri, resolved_metadata_uri, image_field, image_uri,
-      resolved_image_uri, error, updated_at AS cached_at
+    SELECT collection, network, source_contract, id, status, token_uri,
+      resolved_metadata_uri, image_field, image_uri, resolved_image_uri, error, cached_at
     FROM gallery_cache
-    WHERE collection = ? AND network = ? AND source_contract = ? AND token_id BETWEEN ? AND ?
-    ORDER BY token_id ASC
+    WHERE collection = ? AND network = ? AND source_contract = ? AND id BETWEEN ? AND ?
+    ORDER BY id ASC
   `).bind(collection, network, source, range.start, range.end).all();
 
   return json({ collection, network, source_contract: source, range, items: result.results || [] });
@@ -82,15 +85,15 @@ export async function onRequestPost({ env, request }) {
   if (!items.length) return json({ error: 'items must be a non-empty array' }, 400);
 
   await ensureSchema(env.DB);
-  const updatedAt = new Date().toISOString();
+  const cachedAt = new Date().toISOString();
   const statements = items
     .filter((item) => Number.isInteger(Number(item.id)) && Number(item.id) > 0)
     .map((item) => env.DB.prepare(`
       INSERT INTO gallery_cache (
-        collection, network, source_contract, token_id, status, token_uri,
-        resolved_metadata_uri, image_field, image_uri, resolved_image_uri, error, updated_at
+        collection, network, source_contract, id, status, token_uri,
+        resolved_metadata_uri, image_field, image_uri, resolved_image_uri, error, cached_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(collection, network, source_contract, token_id) DO UPDATE SET
+      ON CONFLICT(collection, network, source_contract, id) DO UPDATE SET
         status = excluded.status,
         token_uri = excluded.token_uri,
         resolved_metadata_uri = excluded.resolved_metadata_uri,
@@ -98,7 +101,7 @@ export async function onRequestPost({ env, request }) {
         image_uri = excluded.image_uri,
         resolved_image_uri = excluded.resolved_image_uri,
         error = excluded.error,
-        updated_at = excluded.updated_at
+        cached_at = excluded.cached_at
     `).bind(
       collection,
       network,
@@ -111,10 +114,14 @@ export async function onRequestPost({ env, request }) {
       item.image_uri || null,
       item.resolved_image_uri || null,
       item.error || null,
-      updatedAt,
+      item.cached_at || cachedAt,
     ));
 
   if (!statements.length) return json({ error: 'No valid item IDs supplied' }, 400);
   await env.DB.batch(statements);
-  return json({ ok: true, saved: statements.length, updated_at: updatedAt });
+  return json({ ok: true, saved: statements.length, cached_at: cachedAt });
+}
+
+export async function onRequestOptions() {
+  return new Response(null, { status: 204, headers: JSON_HEADERS });
 }
