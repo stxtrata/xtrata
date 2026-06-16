@@ -2314,11 +2314,27 @@
     }
 
     async function onConnect() {
-      if (!isConnected()) await connect();
-      const addr = getStoredWallet();
-      setWallet(addr);
-      if (addr) { log('Wallet connected', { address: addr }); await quoteFee(false); }
-      else log('Wallet connected, but no STX address was returned. Try refreshing or checking wallet permissions.');
+      try {
+        // Always open the wallet selector on an explicit click. Gating on
+        // isConnected() meant a stale "connected" flag left in local storage
+        // (e.g. from a previous session) made the button do nothing, so the
+        // wallet never opened.
+        const result = await connect();
+        const addr = getStoredWallet() || addressFromConnectResult(result);
+        setWallet(addr);
+        if (addr) { log('Wallet connected', { address: addr }); await quoteFee(false); }
+        else log('Wallet connected, but no STX address was returned. Try refreshing or checking wallet permissions.');
+      } catch (err) {
+        const msg = err?.message || String(err);
+        if (/cancel|reject|denied|closed|user/i.test(msg)) { log('Wallet connection cancelled'); return; }
+        log('Wallet connect failed', { error: msg });
+      }
+    }
+    function addressFromConnectResult(result) {
+      const list = result?.addresses || result?.result?.addresses || [];
+      const arr = Array.isArray(list) ? list : [];
+      const stx = arr.find((a) => /^S[PM][0-9A-Z]+/.test(a?.address || ''));
+      return stx?.address || null;
     }
 
     function bind(id, event, fn) {
