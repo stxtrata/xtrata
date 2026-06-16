@@ -1046,7 +1046,7 @@
       masterFee: null,
       direction: 'pepe-to-xtrata',
       manifest: { running: false, stop: false, items: [], errors: [], output: null },
-      gallery: { running: false, stop: false, items: new Map(), selectedId: null, done: 0, total: 0, cacheHits: 0, errors: 0, renderTimer: null },
+      gallery: { running: false, stop: false, items: new Map(), selectedId: null, done: 0, total: 0, cacheHits: 0, errors: 0, renderTimer: null, lastProgressLog: 0 },
     };
 
     function jsonBigInt(_, value) { return typeof value === 'bigint' ? value.toString() : value; }
@@ -1694,12 +1694,19 @@
       }, 160);
     }
     async function loadGallery() {
-      if (state.gallery.running) return;
+      log('Gallery load handler entered');
+      $('galleryStatus').textContent = 'Gallery click received. Validating range and preparing workers...';
+      if (state.gallery.running) {
+        log('Gallery load ignored because a scan is already running', { checked: state.gallery.done, total: state.gallery.total });
+        return;
+      }
       const ids = galleryIds();
       const concurrency = Math.min(12, Math.max(1, Number($('galleryConcurrency').value || 4)));
       const delayMs = Math.min(5000, Math.max(0, Number($('galleryDelayMs').value || 0)));
       const retries = Math.min(8, Math.max(0, Number($('galleryRetries')?.value || 0)));
 
+      log('Gallery range accepted', { start: ids[0], end: ids[ids.length - 1], count: ids.length });
+      $('galleryStatus').textContent = `Preparing ${ids.length} gallery slots...`;
       state.gallery.running = true;
       state.gallery.stop = false;
       state.gallery.items = new Map(ids.map((id) => [id, readGalleryCache(id) || galleryPlaceholder(id)]));
@@ -1708,6 +1715,7 @@
       state.gallery.total = ids.length;
       state.gallery.cacheHits = 0;
       state.gallery.errors = 0;
+      state.gallery.lastProgressLog = Date.now();
       $('galleryLoadBtn').disabled = true;
       $('galleryStopBtn').disabled = false;
       renderGallery();
@@ -1725,9 +1733,20 @@
           } catch (err) {
             state.gallery.errors += 1;
             state.gallery.items.set(id, { id, status: 'error', error: err.message });
+            if (state.gallery.errors <= 5) log('Gallery token failed', { tokenId: id, error: err.message });
           } finally {
             state.gallery.done += 1;
             scheduleGalleryRender();
+            const now = Date.now();
+            if (state.gallery.done === 1 || state.gallery.done === state.gallery.total || now - state.gallery.lastProgressLog > 3000) {
+              state.gallery.lastProgressLog = now;
+              log('Gallery load progress', {
+                checked: state.gallery.done,
+                total: state.gallery.total,
+                cached: state.gallery.cacheHits,
+                errors: state.gallery.errors,
+              });
+            }
             if (delayMs) await sleep(delayMs);
           }
         }
@@ -1745,9 +1764,21 @@
       }
     }
     function stopGallery() {
+      log('Gallery stop clicked', { checked: state.gallery.done, total: state.gallery.total });
       state.gallery.stop = true;
       $('galleryStatus').textContent = 'Stopping after current in-flight gallery reads finish...';
       $('galleryStopBtn').disabled = true;
+    }
+    async function handleGalleryLoadClick() {
+      log('Load Gallery button clicked', {
+        start: $('galleryStartId').value,
+        end: $('galleryEndId').value,
+        concurrency: $('galleryConcurrency').value,
+        delayMs: $('galleryDelayMs').value,
+        retries: $('galleryRetries').value,
+      });
+      $('galleryStatus').textContent = 'Load Gallery button clicked. Starting gallery loader...';
+      await loadGallery();
     }
     function selectGalleryToken(tokenId) {
       state.gallery.selectedId = Number(tokenId);
@@ -2050,7 +2081,7 @@
     bind('stopManifestBtn', 'click', stopCollectionManifest);
     bind('downloadManifestJsonBtn', 'click', downloadManifestJson);
     bind('downloadManifestCsvBtn', 'click', downloadManifestCsv);
-    bind('galleryLoadBtn', 'click', loadGallery);
+    bind('galleryLoadBtn', 'click', handleGalleryLoadClick);
     bind('galleryStopBtn', 'click', stopGallery);
     bind('galleryClearCacheBtn', 'click', clearGalleryCache);
     bind('quoteBtn', 'click', () => quoteFee(true));
