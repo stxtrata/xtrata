@@ -923,7 +923,7 @@
               <div class="callout">Batch mode can follow the LEO Cats token URI through metadata, or use a direct raw image template once one has been identified. Chain URI mode is safest for a new collection because it reads from the source contract first.</div>
               <div class="manifest-grid">
                 <div class="row"><label for="manifestStartId">Start ID</label><input id="manifestStartId" class="shrine-input" type="number" min="1" value="1" /></div>
-                <div class="row"><label for="manifestEndId">End ID</label><input id="manifestEndId" class="shrine-input" type="number" min="1" value="3000" /></div>
+                <div class="row"><label for="manifestEndId">End ID</label><input id="manifestEndId" class="shrine-input" type="number" min="1" value="9999" /></div>
                 <div class="row"><label for="manifestConcurrency">Parallel</label><input id="manifestConcurrency" class="shrine-input" type="number" min="1" max="12" value="2" /></div>
                 <div class="row"><label for="manifestDelayMs">Delay ms</label><input id="manifestDelayMs" class="shrine-input" type="number" min="0" max="5000" value="180" /></div>
                 <div class="row"><label for="manifestRetries">Retries</label><input id="manifestRetries" class="shrine-input" type="number" min="0" max="8" value="3" /></div>
@@ -1005,7 +1005,7 @@
           </div>
           <div class="gallery-controls">
             <div class="row"><label for="galleryStartId">Start ID</label><input id="galleryStartId" class="shrine-input" type="number" min="1" value="1" /></div>
-            <div class="row"><label for="galleryEndId">End ID</label><input id="galleryEndId" class="shrine-input" type="number" min="1" value="3000" /></div>
+            <div class="row"><label for="galleryEndId">End ID</label><input id="galleryEndId" class="shrine-input" type="number" min="1" value="9999" /></div>
             <div class="row"><label for="galleryConcurrency">Parallel</label><input id="galleryConcurrency" class="shrine-input" type="number" min="1" max="12" value="4" /></div>
             <div class="row"><label for="galleryDelayMs">Delay ms</label><input id="galleryDelayMs" class="shrine-input" type="number" min="0" max="5000" value="80" /></div>
             <div class="row"><label for="galleryRetries">Retries</label><input id="galleryRetries" class="shrine-input" type="number" min="0" max="8" value="2" /></div>
@@ -1231,6 +1231,21 @@
     }
 
     function toHex(bytes) { return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join(''); }
+    // Xtrata's on-chain content hash is NOT a plain sha256 of the file. The
+    // master contract folds a rolling sha256 over the 16KB chunks:
+    //   run = 0x00*32; for each chunk: run = sha256(run || chunk); final = run
+    // We must reproduce that exactly so the canonical-hash check and the
+    // inscribe `expected-hash` match what the contract computes.
+    async function rollingHashHex(chunks) {
+      let run = new Uint8Array(32);
+      for (const chunk of chunks) {
+        const cat = new Uint8Array(run.length + chunk.length);
+        cat.set(run, 0);
+        cat.set(chunk, run.length);
+        run = new Uint8Array(await crypto.subtle.digest('SHA-256', cat));
+      }
+      return '0x' + toHex(run);
+    }
     function fromHex(hex) {
       const clean = String(hex).replace(/^0x/i, '');
       if (clean.length % 2 !== 0) throw new Error('Hex value has odd length');
@@ -2236,11 +2251,11 @@
       $('progressBar').style.width = '20%';
       const buffer = await file.arrayBuffer();
       const bytes = new Uint8Array(buffer);
-      const digest = await crypto.subtle.digest('SHA-256', buffer);
       state.fileBytes = bytes;
-      state.fileHash = '0x' + toHex(new Uint8Array(digest));
       state.chunks = [];
       for (let i = 0; i < bytes.length; i += CHUNK_SIZE) state.chunks.push(bytes.slice(i, i + CHUNK_SIZE));
+      // Use the contract's rolling chunk hash, not a plain sha256 of the file.
+      state.fileHash = await rollingHashHex(state.chunks);
       $('mime').value = file.type || $('mime').value || 'application/octet-stream';
       $('computedHash').value = state.fileHash;
       $('sizeChunks').value = `${bytes.length.toLocaleString()} bytes · ${state.chunks.length} chunk${state.chunks.length === 1 ? '' : 's'}`;
