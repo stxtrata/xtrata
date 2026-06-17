@@ -1701,6 +1701,45 @@
       pointer-events: none;
     }
 
+    /* Poster shown for gated HTML inscriptions that are not currently running
+       a live iframe (off-screen, or over the live-frame budget). Clicking it
+       forces the live preview to render. */
+    .token-thumb-gate {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 8px;
+      text-align: center;
+      cursor: pointer;
+      pointer-events: auto;
+      background: var(--control);
+      color: var(--muted);
+      z-index: 2;
+    }
+
+    .token-thumb-gate[hidden] {
+      display: none;
+    }
+
+    .token-thumb-gate__label {
+      font-weight: 800;
+      font-size: clamp(11px, 1.2vw, 13px);
+      line-height: 1.15;
+      overflow-wrap: anywhere;
+    }
+
+    .token-thumb-gate__hint {
+      font-weight: 700;
+      font-size: 9px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      opacity: 0.7;
+    }
+
     .token-thumb.has-thumbnail {
       background: var(--control);
       color: transparent;
@@ -4486,6 +4525,12 @@
     const WALLET_FALLBACK_SCAN_LIMIT = 2000;
     const MAX_GRID_EAGER_FULL_LOAD_BYTES = 10n * 1024n * 1024n;
     const GRID_THUMBNAIL_HYDRATION_CONCURRENCY = 2;
+    // Max number of HTML inscription iframes allowed to execute simultaneously
+    // in the grid. Tiles beyond this budget (or off-screen) show a static poster
+    // until they scroll into view and a slot frees, or the user clicks them.
+    // Boards that complete the embed handshake (phase two) are exempt — they
+    // self-throttle internally and run in the trusted lane.
+    const MAX_LIVE_HTML_FRAMES = 4;
     const GRID_SUMMARY_CACHE_MAX_SCOPES = 12;
     const GRID_SUMMARY_CACHE_MAX_ENTRIES = 512;
     const EXPLORER_FILTER_INDEX_CHUNK_SIZE = 48;
@@ -6455,6 +6500,7 @@
       state.thumbnailHydrationQueued.clear();
       state.thumbnailHydrationAttempted.clear();
       state.gridLiveMediaCache.clear();
+      liveHtmlFrameManager.reset();
       debugLog('cache', 'background thumbnail queue reset', {
         runId: state.thumbnailHydrationRunId,
         discardedQueued,
@@ -9404,6 +9450,222 @@
       return true;
     };
 
+    // ------------------------------------------------------------------
+    // Live HTML-frame manager (phase one: execution gate + budget + poster)
+    //
+    // HTML inscriptions (e.g. embedded X-Board apps) are expensive: each one
+    // runs its own scripts, network fetches and ~hundreds of slot renders. The
+    // byte-hydration queue throttles *fetching*; this manager throttles
+    // *executing*. A tile's iframe srcdoc is only set when the tile is in the
+    // viewport AND within MAX_LIVE_HTML_FRAMES. Everything else shows a static
+    // poster the user can click to force-render.
+    //
+    // Trusted lane (phase two): a board that completes the embed handshake is
+    // marked trusted and exempted from the budget, because it self-throttles
+    // internally. Trusted status persists for the session so scroll-back is
+    // cheap. See docs/grid-embed-contract.md.
+    // ------------------------------------------------------------------
+    const liveHtmlFrameManager = (() => {
+      const tiles = new Map(); // thumbElement -> record
+      let observer = null;
+
+      const now = () =>
+        typeof performance !== 'undefined' && performance.now
+          ? performance.now()
+          : Date.now();
+
+      const liveCount = () => {
+        let n = 0;
+        tiles.forEach((r) => {
+          if (r.active && !r.trusted) n += 1;
+        });
+        return n;
+      };
+
+      const activate = (record) => {
+        if (record.active || !record.frame.isConnected) return;
+        record.frame.srcdoc = injectGridThumbnailHtml(record.html);
+        record.active = true;
+        record.activatedAt = now();
+        if (record.poster) record.poster.hidden = true;
+      };
+
+      const deactivate = (record) => {
+        if (!record.active) return;
+        record.frame.srcdoc = '';
+        record.active = false;
+        // NB: record.trusted persists for the session so a known-good board is
+        // not budget-blocked when scrolled back into view.
+        if (record.poster) record.poster.hidden = false;
+      };
+
+      // Oldest active, non-trusted tile to evict so a visible tile can run.
+      const pickEvictable = (exclude, allowIntersecting) => {
+        let victim = null;
+        tiles.forEach((r) => {
+          if (r === exclude || !r.active || r.trusted) return;
+          if (!allowIntersecting && r.intersecting) return;
+          if (!victim || r.activatedAt < victim.activatedAt) victim = r;
+        });
+        return victim;
+      };
+
+      const requestActivation = (record) => {
+        if (record.active) return;
+        if (record.trusted) {
+          activate(record);
+          return;
+        }
+        if (liveCount() < MAX_LIVE_HTML_FRAMES) {
+          activate(record);
+          return;
+        }
+        const victim = pickEvictable(record, false);
+        if (victim) {
+          deactivate(victim);
+          activate(record);
+        }
+        // else: all live slots are on-screen; leave this tile as a poster.
+      };
+
+      const fillFreeSlots = () => {
+        tiles.forEach((r) => {
+          if (r.active || !r.intersecting) return;
+          if (r.trusted) {
+            activate(r);
+          } else if (liveCount() < MAX_LIVE_HTML_FRAMES) {
+            activate(r);
+          }
+        });
+      };
+
+      const forceActivate = (record) => {
+        if (record.active) return;
+        if (!record.trusted && liveCount() >= MAX_LIVE_HTML_FRAMES) {
+          const victim = pickEvictable(record, true);
+          if (victim) deactivate(victim);
+        }
+        activate(record);
+      };
+
+      const ensureObserver = () => {
+        if (observer || typeof IntersectionObserver !== 'function') {
+          return observer;
+        }
+        observer = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              const record = tiles.get(entry.target);
+              if (!record) continue;
+              record.intersecting = entry.isIntersecting;
+              if (entry.isIntersecting) {
+                requestActivation(record);
+              } else {
+                deactivate(record);
+              }
+            }
+            fillFreeSlots();
+          },
+          { root: null, rootMargin: '300px', threshold: 0 }
+        );
+        return observer;
+      };
+
+      // Phase-two receiver: a cooperating board posts {type:'xtrata:embed:hello'}
+      // once its script runs. We mark that frame trusted (exempt from budget)
+      // and ack so it can switch into lite/embedded rendering.
+      if (typeof window !== 'undefined' && window.addEventListener) {
+        window.addEventListener('message', (event) => {
+          const data = event && event.data;
+          if (!data || data.type !== 'xtrata:embed:hello') return;
+          tiles.forEach((record) => {
+            if (
+              record.frame.contentWindow &&
+              record.frame.contentWindow === event.source
+            ) {
+              record.trusted = true;
+              if (record.poster) record.poster.hidden = true;
+              if (event.source && typeof event.source.postMessage === 'function') {
+                event.source.postMessage(
+                  {
+                    type: 'xtrata:embed:ack',
+                    mode: 'grid-thumbnail',
+                    budget: 'trusted'
+                  },
+                  '*'
+                );
+              }
+            }
+          });
+        });
+      }
+
+      const register = (thumbElement, media) => {
+        const existing = tiles.get(thumbElement);
+        if (existing) {
+          if (observer) observer.unobserve(thumbElement);
+          tiles.delete(thumbElement);
+        }
+
+        const frame = document.createElement('iframe');
+        frame.title = 'inscription-preview';
+        frame.sandbox = 'allow-scripts';
+        frame.referrerPolicy = 'no-referrer';
+        frame.loading = 'lazy';
+
+        const poster = document.createElement('div');
+        poster.className = 'token-thumb-gate';
+        const label = document.createElement('div');
+        label.className = 'token-thumb-gate__label';
+        label.textContent = getGridMimeLabel(media.mimeType ?? null) || 'HTML';
+        const hint = document.createElement('div');
+        hint.className = 'token-thumb-gate__hint';
+        hint.textContent = 'Tap to load';
+        poster.append(label, hint);
+
+        const record = {
+          frame,
+          poster,
+          html: media.html,
+          active: false,
+          intersecting: false,
+          trusted: false,
+          activatedAt: 0
+        };
+
+        poster.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          forceActivate(record);
+        });
+
+        tiles.set(thumbElement, record);
+        thumbElement.append(frame, poster);
+
+        const obs = ensureObserver();
+        if (obs) {
+          obs.observe(thumbElement);
+        } else {
+          // No IntersectionObserver: activate now, still bounded by budget.
+          record.intersecting = true;
+          requestActivation(record);
+        }
+      };
+
+      const reset = () => {
+        if (observer) {
+          observer.disconnect();
+          observer = null;
+        }
+        tiles.forEach((record) => {
+          record.frame.srcdoc = '';
+        });
+        tiles.clear();
+      };
+
+      return { register, reset };
+    })();
+
     const renderGridLiveMedia = (token, thumbElement, media) => {
       const cacheKey = getThumbnailKey(token);
       const oldUrl = state.tokenThumbUrls.get(cacheKey);
@@ -9491,13 +9753,10 @@
       }
 
       if (media.kind === 'html') {
-        const frame = document.createElement('iframe');
-        frame.title = 'inscription-preview';
-        frame.sandbox = 'allow-scripts';
-        frame.referrerPolicy = 'no-referrer';
-        frame.loading = 'lazy';
-        frame.srcdoc = injectGridThumbnailHtml(media.html);
-        thumbElement.append(frame);
+        // Gated mount: the iframe only executes when on-screen and within the
+        // live-frame budget (or on click). Prevents N heavy board inscriptions
+        // from running at once. See liveHtmlFrameManager above.
+        liveHtmlFrameManager.register(thumbElement, media);
         return true;
       }
 
