@@ -1588,26 +1588,33 @@
     .wallet-grid-toolbar {
       min-width: 0;
       display: grid;
-      grid-template-columns: auto minmax(0, 1fr) auto auto;
+      grid-template-columns: max-content minmax(0, 1fr) max-content;
       gap: 8px;
       align-items: center;
     }
 
     .wallet-grid-toolbar__primary,
+    .wallet-grid-toolbar__status,
     .wallet-grid-toolbar__secondary {
       min-width: 0;
       display: flex;
       align-items: center;
-      flex-wrap: wrap;
       gap: 8px;
     }
 
     .wallet-grid-toolbar__primary {
+      justify-content: flex-start;
+      flex-wrap: nowrap;
+    }
+
+    .wallet-grid-toolbar__status {
       justify-content: center;
+      white-space: nowrap;
     }
 
     .wallet-grid-toolbar__secondary {
       justify-content: flex-end;
+      flex-wrap: nowrap;
     }
 
     .wallet-grid-toolbar .btn {
@@ -1621,12 +1628,16 @@
     }
 
     .page-readout {
-      min-width: 86px;
       color: var(--muted);
       font-size: 12px;
       font-weight: 800;
       text-align: center;
       white-space: nowrap;
+    }
+
+    .wallet-grid-toolbar__separator {
+      color: var(--line-strong);
+      font-weight: 900;
     }
 
     .token-grid {
@@ -1749,8 +1760,10 @@
 
     .token-card.empty .token-thumb {
       border-style: dashed;
+      border-color: color-mix(in srgb, var(--line) 55%, transparent);
       background: transparent;
-      color: #b6c3ba;
+      color: color-mix(in srgb, var(--muted) 48%, transparent);
+      opacity: 0.52;
     }
 
     .token-card.empty .token-meta {
@@ -2520,38 +2533,62 @@
     }
 
     body.explorer-mode .explorer-filter-options {
-      order: 2;
-      flex: 1 1 100%;
+      order: 1;
+      flex: 0 1 auto;
       flex-wrap: nowrap;
       overflow-x: auto;
       padding-bottom: 1px;
     }
 
     body.explorer-mode #explorerClearFiltersButton {
-      order: 1;
+      order: 2;
       min-height: 26px;
-      margin-left: auto;
+      margin-left: 4px;
+    }
+
+    body.explorer-mode .explorer-tools {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 10px;
+      width: 100%;
+    }
+
+    body.explorer-mode .explorer-filter-group {
+      order: 1;
+      flex: 1 1 520px;
+      min-width: 0;
     }
 
     body.explorer-mode .explorer-tools__row {
+      order: 2;
+      flex: 0 0 auto;
+      display: grid;
+      grid-template-columns: auto minmax(5rem, 6rem) auto minmax(5rem, 6rem) auto;
       align-items: center;
+      gap: 6px;
     }
 
     body.explorer-mode .explorer-tools__row .field {
-      gap: 0;
+      display: contents;
     }
 
     body.explorer-mode .explorer-tools__row .label {
-      position: absolute;
-      width: 1px;
-      height: 1px;
+      position: static;
+      width: auto;
+      height: auto;
       margin: 0;
       padding: 0;
-      overflow: hidden;
-      clip: rect(0 0 0 0);
-      clip-path: inset(50%);
+      overflow: visible;
+      clip: auto;
+      clip-path: none;
       border: 0;
       white-space: nowrap;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0;
+      text-transform: none;
     }
 
     body.explorer-mode .explorer-filter-chip {
@@ -2729,7 +2766,7 @@
       .panel[aria-labelledby="walletTitle"] .wallet-grid-toolbar {
         width: 100%;
         display: grid;
-        grid-template-columns: auto minmax(0, 1fr) auto auto;
+        grid-template-columns: max-content minmax(0, 1fr) max-content;
         justify-content: stretch;
       }
 
@@ -2896,6 +2933,7 @@
       body.explorer-mode .explorer-filter-options,
       body.explorer-mode .wallet-grid-toolbar,
       body.explorer-mode .wallet-grid-toolbar__primary,
+      body.explorer-mode .wallet-grid-toolbar__status,
       body.explorer-mode .wallet-grid-toolbar__secondary {
         width: 100%;
         min-width: 0;
@@ -2949,48 +2987,49 @@
       }
 
       body.explorer-mode .panel[aria-labelledby="walletTitle"] .wallet-grid-toolbar {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: minmax(0, 1fr);
         align-items: stretch;
       }
 
       body.explorer-mode .wallet-grid-toolbar__primary,
+      body.explorer-mode .wallet-grid-toolbar__status,
       body.explorer-mode .wallet-grid-toolbar__secondary {
         display: grid;
-        grid-template-columns: minmax(0, 1fr);
         justify-content: stretch;
       }
 
       body.explorer-mode .wallet-grid-toolbar__primary {
         grid-column: 1 / -1;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         order: 1;
+      }
+
+      body.explorer-mode .wallet-grid-toolbar__status {
+        grid-column: 1 / -1;
+        grid-template-columns: minmax(0, auto) auto minmax(0, auto);
+        justify-content: center;
+        order: 2;
       }
 
       body.explorer-mode .wallet-grid-toolbar__secondary {
         grid-column: 1 / -1;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         order: 3;
-      }
-
-      body.explorer-mode #walletPrevButton {
-        order: 2;
-      }
-
-      body.explorer-mode #walletNextButton {
-        order: 2;
       }
 
       body.explorer-mode .page-readout,
       body.explorer-mode #walletCountBadge {
-        width: 100%;
+        width: auto;
         justify-content: center;
         text-align: center;
-        white-space: normal;
+        white-space: nowrap;
       }
 
-      .panel[aria-labelledby="walletTitle"] .wallet-grid-toolbar {
+      body:not(.explorer-mode) .panel[aria-labelledby="walletTitle"] .wallet-grid-toolbar {
         grid-template-columns: repeat(3, minmax(0, 1fr));
       }
 
-      #refreshWalletButton {
+      body:not(.explorer-mode) #refreshWalletButton {
         grid-column: 1 / -1;
         width: 100%;
       }
@@ -3641,12 +3680,12 @@
                 <p class="explorer-mode-note" id="xtrataExplorerStatus">Browse inscriptions from the selected contract.</p>
                 <div class="explorer-tools__row">
                   <label class="field">
-                    <span class="label">Page</span>
-                    <input class="input" id="explorerPageInput" type="number" min="1" step="1" inputmode="numeric" placeholder="1" />
+                    <span class="label">Go to page:</span>
+                    <input class="input" id="explorerPageInput" type="number" min="1" step="1" inputmode="numeric" placeholder="Page" />
                   </label>
                   <label class="field">
-                    <span class="label">Inscription #</span>
-                    <input class="input" id="explorerTokenInput" type="number" min="1" step="1" inputmode="numeric" placeholder="Token ID" />
+                    <span class="label">ID:</span>
+                    <input class="input" id="explorerTokenInput" type="number" min="1" step="1" inputmode="numeric" placeholder="ID" />
                   </label>
                   <button class="btn ghost" id="explorerJumpButton" type="button">Go</button>
                 </div>
@@ -3695,17 +3734,20 @@
 
             <div class="wallet-grid-stack">
               <div class="wallet-grid-toolbar" aria-label="Grid page controls">
-                <button class="btn ghost" id="walletPrevButton" type="button" disabled>Prev</button>
                 <div class="wallet-grid-toolbar__primary">
-                  <button class="btn secondary explorer-grid-action" id="explorerLatestButton" type="button">Latest</button>
+                  <button class="btn ghost" id="walletPrevButton" type="button" disabled>Prev</button>
                   <a class="btn secondary explorer-grid-action" href="/" id="explorerHomeLink">Home</a>
+                  <button class="btn secondary explorer-grid-action" id="explorerLatestButton" type="button">Latest</button>
+                </div>
+                <div class="wallet-grid-toolbar__status">
                   <span class="page-readout" id="walletPageReadout">Page 0 / 0</span>
+                  <span class="wallet-grid-toolbar__separator" aria-hidden="true">·</span>
+                  <span class="badge blue" id="walletCountBadge">0 inscriptions</span>
                 </div>
                 <div class="wallet-grid-toolbar__secondary">
-                  <span class="badge blue" id="walletCountBadge">0 inscriptions</span>
                   <button class="btn ghost" id="refreshWalletButton" type="button">Refresh</button>
+                  <button class="btn ghost" id="walletNextButton" type="button" disabled>Next</button>
                 </div>
-                <button class="btn ghost" id="walletNextButton" type="button" disabled>Next</button>
               </div>
               <div class="status" id="walletGridStatus" data-status="empty">
                 <span><strong>Grid</strong> waiting for wallet</span>
@@ -3829,7 +3871,7 @@
         <a href="/manage">Artist portal</a>
         <a href="/web/migrate.html">Migrate to v3</a>
         <a href="https://x.com/XtrataLayers" target="_blank" rel="noreferrer">Xtrata on X</a>
-        <a href="/?explorer=1">Xplorer</a>
+        <a href="/?explorer=latest">Xplorer</a>
       </nav>
       <label class="footer-theme">
         <span>Style</span>
@@ -7141,8 +7183,7 @@
         const explorerControlsDisabled =
           !state.explorerMode ||
           state.busy ||
-          state.walletLoadingPage ||
-          state.explorerFilterIndexLoading;
+          state.walletLoadingPage;
         dom.explorerJumpButton.disabled = explorerControlsDisabled;
         dom.explorerLatestButton.disabled = explorerControlsDisabled;
         dom.explorerPageInput.disabled = explorerControlsDisabled;
@@ -7226,9 +7267,7 @@
     const syncExplorerFilterControls = () => {
       const disabled =
         !state.explorerMode ||
-        state.busy ||
-        state.walletLoadingPage ||
-        state.explorerFilterIndexLoading;
+        state.busy;
       dom.explorerFilterInputs.forEach((input) => {
         const kind = input.dataset.explorerFilter ?? '';
         input.checked = state.explorerFilterKinds.has(kind);
