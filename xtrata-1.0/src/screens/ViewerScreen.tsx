@@ -1339,9 +1339,9 @@ const TokenDetails = (props: {
               </div>
               {twin && (
                 <div>
-                  <span className="meta-label">Collection token</span>
+                  <span className="meta-label">{twin.collection.itemNoun}</span>
                   <span className="meta-value" title={twin.collection.name}>
-                    {twinLocalLabel}
+                    {`#${twin.localTokenId.toString()}`}
                   </span>
                 </div>
               )}

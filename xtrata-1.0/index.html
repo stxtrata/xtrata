@@ -4073,6 +4073,9 @@
     import {
       bufferCV,
       FungibleConditionCode,
+      cvToHex,
+      cvToJSON,
+      hexToCV,
       listCV,
       makeStandardSTXPostCondition,
       PostConditionMode,
@@ -5804,6 +5807,97 @@
       return promise;
     };
 
+    // Some original NFTs are not held directly in a wallet but custodied by a
+    // marketplace/escrow contract (e.g. listed for sale). In that case the NFT
+    // owner resolves to the marketplace contract, so we hop once more to recover
+    // the real owner (the seller who listed it). Keyed by custody contract id.
+    const NFT_CUSTODY_RESOLVERS = new Map([
+      [
+        'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-nft-marketplace',
+        {
+          label: 'pepe-nft-marketplace',
+          // Read the listing and return its seller principal.
+          resolve: async (localTokenId, network) => {
+            const json = await callReadOnlyJson({
+              contractId:
+                'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-nft-marketplace',
+              functionName: 'get-listing',
+              args: [uintCV(localTokenId)],
+              network
+            }).catch(() => null);
+            return readTuplePrincipal(json, 'seller');
+          }
+        }
+      ]
+    ]);
+
+    // POST a read-only call and return the decoded cvToJSON result.
+    const callReadOnlyJson = async ({ contractId, functionName, args = [], network = 'mainnet' }) => {
+      const [address, name] = contractId.split('.');
+      if (!address || !name) {
+        throw new Error(`Invalid contract id: ${contractId}`);
+      }
+      const url = buildHiroApiUrl(
+        `/v2/contracts/call-read/${address}/${name}/${functionName}`,
+        network
+      );
+      if (!url) {
+        throw new Error('No Hiro API endpoint configured.');
+      }
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sender: address,
+          arguments: args.map((arg) => cvToHex(arg))
+        })
+      });
+      if (!response.ok) {
+        throw new Error(`Read-only call failed (${response.status}).`);
+      }
+      const payload = await response.json();
+      if (!payload?.okay || typeof payload.result !== 'string') {
+        throw new Error('Read-only call returned no result.');
+      }
+      return cvToJSON(hexToCV(payload.result));
+    };
+
+    // Read a principal field from a cvToJSON (optional (tuple ...)) result.
+    const readTuplePrincipal = (node, key) => {
+      let current = node;
+      while (
+        current &&
+        typeof current.type === 'string' &&
+        (current.type.startsWith('(optional') || current.type.startsWith('(response'))
+      ) {
+        current = current.value ?? null;
+      }
+      const tuple =
+        current && typeof current.type === 'string' && current.type.startsWith('(tuple')
+          ? current.value
+          : null;
+      const field = tuple?.[key];
+      return field && typeof field.value === 'string' ? field.value : null;
+    };
+
+    // Given an address that may be a custody contract, resolve through to the
+    // real owner (e.g. marketplace listing seller). Bounded to avoid loops.
+    const resolveCustodyOwner = async (address, localTokenId, network) => {
+      let current = address;
+      for (let hops = 0; hops < 3; hops += 1) {
+        const resolver = NFT_CUSTODY_RESOLVERS.get(current);
+        if (!resolver) {
+          return current;
+        }
+        const next = await resolver.resolve(localTokenId, network);
+        if (!next || next === current) {
+          return current;
+        }
+        current = next;
+      }
+      return current;
+    };
+
     const clarityUintHex = (value) => {
       const hex = BigInt(value).toString(16).padStart(32, '0');
       return `0x01${hex}`;
@@ -5897,7 +5991,17 @@
         state.contract.network
       ).catch(() => null);
       const latest = sourceHistory?.results?.[0] ?? null;
-      const holder = latest?.recipient ?? null;
+      const rawHolder = latest?.recipient ?? null;
+      if (!rawHolder) {
+        return null;
+      }
+      // If the NFT is custodied by a known marketplace/escrow contract (e.g.
+      // listed for sale), resolve through to the real owner (the seller).
+      const holder = await resolveCustodyOwner(
+        rawHolder,
+        sourceTokenId,
+        state.contract.network
+      ).catch(() => rawHolder);
       if (!holder) {
         return null;
       }
@@ -5963,11 +6067,11 @@
           : []),
         ...(escrowHolder
           ? [[
-              `${escrowHolder.itemNoun ?? 'Collection'} token`,
+              escrowHolder.itemNoun ?? 'Collection',
               `#${escrowHolder.sourceTokenId.toString()}`
             ]]
           : []),
-        ['ID', formatTokenId(token.id)]
+        ['Xtrata ID', formatTokenId(token.id)]
       ];
       renderMeta(dom.tokenPreviewMeta, lines);
       if (!ownerName) {

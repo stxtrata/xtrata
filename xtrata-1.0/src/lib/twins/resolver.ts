@@ -2,6 +2,7 @@ import {
   FOREVER_TWIN_COLLECTIONS,
   getCollectionByHelperId,
   getCollectionsForMaster,
+  getCustodyResolver,
   type ForeverTwinCollection
 } from './registry';
 import {
@@ -122,7 +123,11 @@ export const getBinding = async (
   };
 };
 
-/** Current owner of the original collection NFT (the real holder when escrowed). */
+/**
+ * Current owner of the original collection NFT (the real holder when escrowed).
+ * If the NFT is custodied by a known marketplace/escrow contract (e.g. listed
+ * for sale), hop through to the real owner (the listing seller).
+ */
 export const getSourceOwner = async (
   collection: ForeverTwinCollection,
   localTokenId: bigint
@@ -133,7 +138,39 @@ export const getSourceOwner = async (
     args: [uintArg(localTokenId)],
     network: collection.network
   });
-  return unwrapOwnerResult(json);
+  const owner = unwrapOwnerResult(json);
+  return resolveThroughCustody(owner, localTokenId, collection.network);
+};
+
+/**
+ * Given an address that may be a custody contract (marketplace/escrow), resolve
+ * through to the real owner using the registered custody resolver. Bounded to
+ * avoid loops.
+ */
+const resolveThroughCustody = async (
+  address: string | null,
+  localTokenId: bigint,
+  network: ForeverTwinCollection['network']
+): Promise<string | null> => {
+  let current = address;
+  for (let hops = 0; hops < 3 && current; hops += 1) {
+    const custody = getCustodyResolver(current);
+    if (!custody) {
+      return current;
+    }
+    const json = await callReadOnly({
+      contractId: custody.contractId,
+      functionName: custody.functionName,
+      args: [uintArg(localTokenId)],
+      network
+    }).catch(() => null);
+    const next = json ? tuplePrincipal(unwrapTuple(json), custody.ownerField) : null;
+    if (!next || next === current) {
+      return current;
+    }
+    current = next;
+  }
+  return current;
 };
 
 const candidateCollections = (

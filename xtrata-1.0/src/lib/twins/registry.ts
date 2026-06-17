@@ -87,8 +87,43 @@ export const FOREVER_TWIN_COLLECTIONS: readonly ForeverTwinCollection[] = [
   }
 ];
 
+/**
+ * NFT custody contracts: when an original collection NFT is held by one of
+ * these (e.g. listed on a marketplace), `get-owner` returns the custody
+ * contract rather than a wallet. The resolver hops through to the real owner
+ * using the named read-only function + field (e.g. marketplace `get-listing` →
+ * `seller`). Add an entry to support a new marketplace/escrow custodian.
+ */
+export type NftCustodyResolver = {
+  readonly contractId: string;
+  readonly label: string;
+  /** Read-only function taking the local token id, returning a tuple. */
+  readonly functionName: string;
+  /** Principal field on the returned tuple that holds the real owner. */
+  readonly ownerField: string;
+};
+
+export const NFT_CUSTODY_RESOLVERS: readonly NftCustodyResolver[] = [
+  {
+    contractId: 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-nft-marketplace',
+    label: 'pepe-nft-marketplace',
+    functionName: 'get-listing',
+    ownerField: 'seller'
+  }
+];
+
+const CUSTODY_BY_ID = new Map<string, NftCustodyResolver>(
+  NFT_CUSTODY_RESOLVERS.map((entry) => [entry.contractId, entry])
+);
+
 const normalizePrincipal = (value: string | null | undefined): string =>
   (value ?? '').trim();
+
+/** Look up a custody resolver by contract id (the principal `get-owner` returns). */
+export const getCustodyResolver = (
+  contractId: string | null | undefined
+): NftCustodyResolver | null =>
+  CUSTODY_BY_ID.get(normalizePrincipal(contractId)) ?? null;
 
 const HELPER_BY_ID = new Map<string, ForeverTwinCollection>(
   FOREVER_TWIN_COLLECTIONS.map((collection) => [
