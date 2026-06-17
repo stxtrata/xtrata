@@ -1,8 +1,18 @@
-# XMA-1 v1.4 Test Plan
+# XMA-1 v1.5 Test Plan
 
-The executable reference suite is `tests/smoke.mjs` (58 assertions, all passing
-against the live xtrata-v3-2-3 source in Clarinet simnet, helper compiled as
-Clarity 4 / epoch 3.3). This plan maps suites to the codex review findings (R#).
+Executable suites (all against the live xtrata-v3-2-3 source in Clarinet simnet,
+helper compiled as Clarity 4 / epoch 3.3), run together via `npm test`:
+
+- `tests/smoke.mjs` — 58 assertions mapping to the codex review findings (R#).
+- `tests/edge.mjs` — 53 assertions over feature seams not tied to a finding
+  (E1–E8), including the v1.5 permanent-seal behaviour (E8).
+- `tests/fuzz.mjs` — randomized property suite: long sequences of registry
+  operations with a global-invariant sweep after every step (`npm run fuzz` for
+  ad-hoc/longer runs; `npm test` pins SEED=1 OPS=150). A failing run prints its
+  SEED for exact replay.
+- `tests/scope-key-vector.mjs` — XIP-000 §9 derive-scope-key vector (TV-1).
+
+This plan maps the scenario suites to the codex review findings (R#).
 
 ## Registration
 - unknown/unsealed inscription -> ERR-CORE-NOT-SEALED u117
@@ -75,7 +85,37 @@ Clarity 4 / epoch 3.3). This plan maps suites to the codex review findings (R#).
 - set-scope-authority transfers operational authority; key-authority immutable
 - re-derivation from (key-authority,label) still equals the stored key
 
-## Not yet covered (for codex / future work)
-- scope deactivation paths (no deactivate function exists yet - decide)
-- fuzz/property tests over enum ranges and succession orderings
+## Edge-case suite (tests/edge.mjs, E1-E8)
+- E1 derived-key squat: a derived key can be claimed by a non-deriving
+  principal; resolvers MUST verify key-authority == derived-from (XIP-009 s4.2)
+- E2 contract-owner may revoke a manifest it did not register; withdraw remains
+  registrar-only (documented asymmetry, XIP-009 s7)
+- E3 fork resolution: two competing successors of one head; loser stranded (u109)
+- E4 authority-transfer aftermath: old authority defanged (u113); delegates
+  inherited by the new authority
+- E5 idempotent re-withdraw; orphan predecessor declaration (core edge only)
+- E6 boundary inputs: claim=0, item-count=0, self-referential predecessor (u120)
+- E7 manifest-type frozen by the first scope head; later type change -> u123
+- E8 permanent seal (close-scope, v1.5 S1): key-authority-only, one-way, sealed
+  scope rejects all mutation (u125), final manifest preserved, revoke-still-works
+  but no recovery
+
+## Seal / scope finality (v1.5 S1)
+- close-scope gated to immutable key-authority; operational authority cannot seal
+  (u113); one-way (double-seal -> u125)
+- sealed scope rejects add/remove-delegate, set-authority, register-initial,
+  update-scope-manifest (all u125)
+- is-scope-active reflects sealed state; get-current-active-manifest preserved
+
+## Property / fuzz (tests/fuzz.mjs)
+- randomized op sequences (create/register/seed/succeed/revoke/withdraw/seal/
+  transfer/set-authority/add+remove-delegate) with a global-invariant sweep
+  after every step. Invariants: pointer consistency (INV1), single-scope
+  currency (INV2), active-view correctness (INV3), seal immutability (INV4),
+  no resurrection to ACTIVE (INV5), succession continuity (INV6)
+- reproducible via SEED; negative-control confirmed the sweep catches a
+  deliberately corrupted invariant
+
+## Not yet covered (for future work)
 - gas/cost profiling of succession with contract-calls to core
+- external audit (the contract remains DRAFT / NOT AUDITED)

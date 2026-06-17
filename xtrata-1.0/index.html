@@ -617,6 +617,15 @@
       line-height: 1.1;
     }
 
+    .panel-title__brand-x {
+      width: 1.15em;
+      height: 1.15em;
+      display: inline-block;
+      margin-right: 0.04em;
+      vertical-align: -0.16em;
+      object-fit: contain;
+    }
+
     .token-uri-head-preview {
       width: 36px;
       height: 36px;
@@ -1627,6 +1636,10 @@
       display: none;
     }
 
+    body:not(.explorer-mode) .explorer-filter-popover {
+      display: none;
+    }
+
     .page-readout {
       color: var(--muted);
       font-size: 12px;
@@ -1699,6 +1712,45 @@
     .token-thumb iframe {
       border: 0;
       pointer-events: none;
+    }
+
+    /* Poster shown for gated HTML inscriptions that are not currently running
+       a live iframe (off-screen, or over the live-frame budget). Clicking it
+       forces the live preview to render. */
+    .token-thumb-gate {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 8px;
+      text-align: center;
+      cursor: pointer;
+      pointer-events: auto;
+      background: var(--control);
+      color: var(--muted);
+      z-index: 2;
+    }
+
+    .token-thumb-gate[hidden] {
+      display: none;
+    }
+
+    .token-thumb-gate__label {
+      font-weight: 800;
+      font-size: clamp(11px, 1.2vw, 13px);
+      line-height: 1.15;
+      overflow-wrap: anywhere;
+    }
+
+    .token-thumb-gate__hint {
+      font-weight: 700;
+      font-size: 9px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      opacity: 0.7;
     }
 
     .token-thumb.has-thumbnail {
@@ -2283,15 +2335,15 @@
 
     .explorer-tools {
       display: grid;
-      gap: 8px;
-      margin: 0 0 8px;
+      gap: 5px;
+      margin: 0 0 5px;
     }
 
     .explorer-tools__row {
       display: grid;
-      grid-template-columns: minmax(86px, 0.65fr) minmax(150px, 1fr) auto;
-      gap: 8px;
-      align-items: end;
+      grid-template-columns: minmax(62px, 0.6fr) minmax(58px, 0.5fr) auto minmax(64px, auto) minmax(82px, auto);
+      gap: 5px;
+      align-items: center;
     }
 
     .explorer-tools .field {
@@ -2299,13 +2351,40 @@
     }
 
     .explorer-tools .input {
-      min-height: 34px;
-      padding: 8px 10px;
+      min-height: 26px;
+      padding: 5px 8px;
+      font-size: 12px;
     }
 
     .explorer-tools .btn {
-      min-height: 34px;
-      padding: 7px 10px;
+      min-height: 26px;
+      padding: 4px 8px;
+      font-size: 11px;
+    }
+
+    .explorer-tools__metric {
+      min-width: 0;
+      justify-self: end;
+      font-size: 11px;
+      line-height: 1;
+    }
+
+    .explorer-tools__metric .badge {
+      min-height: 22px;
+      max-width: 100%;
+      padding: 4px 7px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .badge.explorer-tools__metric {
+      min-height: 22px;
+      max-width: 100%;
+      padding: 4px 7px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .explorer-filter-group {
@@ -2314,6 +2393,47 @@
       margin: 0;
       padding: 0;
       border: 0;
+      justify-items: start;
+    }
+
+    .explorer-filter-popover {
+      position: relative;
+      display: inline-grid;
+      place-items: center;
+      flex: 0 0 auto;
+    }
+
+    .explorer-filter-toggle {
+      display: inline-grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      min-height: 26px;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--control);
+      color: var(--ink);
+      font: inherit;
+      font-size: 14px;
+      font-weight: 900;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .explorer-filter-toggle:hover,
+    .explorer-filter-toggle:focus-visible {
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px var(--focus-ring);
+      outline: none;
+    }
+
+    .explorer-filter-group.is-collapsed .explorer-filter-menu {
+      display: none;
+    }
+
+    .explorer-filter-group.is-collapsed > .label {
+      display: none;
     }
 
     .explorer-filter-options {
@@ -2508,65 +2628,83 @@
     }
 
     body.explorer-mode .panel[aria-labelledby="walletTitle"] .panel-head {
-      padding: 14px 16px;
+      padding: 8px 14px 6px;
     }
 
     body.explorer-mode .panel[aria-labelledby="walletTitle"] .panel-body {
-      padding: 14px 16px 16px;
+      padding: 7px 14px 14px;
     }
 
     body.explorer-mode .explorer-mode-note {
       display: none;
     }
 
+    body.explorer-mode #walletSubtitle {
+      display: none;
+    }
+
     body.explorer-mode .explorer-filter-group {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: auto;
+      align-items: start;
       gap: 6px;
     }
 
     body.explorer-mode .explorer-filter-group > .label {
-      order: 0;
-      margin: 0;
-      flex: 0 0 auto;
+      display: none;
+    }
+
+    body.explorer-mode .explorer-filter-toggle {
+      grid-column: 1;
+    }
+
+    body.explorer-mode .explorer-filter-menu {
+      position: absolute;
+      z-index: 20;
+      top: calc(100% + 6px);
+      left: 0;
+      width: min(540px, calc(100vw - 48px));
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 8px;
     }
 
     body.explorer-mode .explorer-filter-options {
-      order: 1;
-      flex: 0 1 auto;
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      padding-bottom: 1px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+      align-items: center;
+      overflow: visible;
     }
 
     body.explorer-mode #explorerClearFiltersButton {
-      order: 2;
+      justify-self: start;
       min-height: 26px;
-      margin-left: 4px;
+      margin-left: 0;
     }
 
     body.explorer-mode .explorer-tools {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 8px 10px;
+      gap: 5px 7px;
       width: 100%;
     }
 
     body.explorer-mode .explorer-filter-group {
-      order: 1;
-      flex: 1 1 520px;
       min-width: 0;
     }
 
     body.explorer-mode .explorer-tools__row {
-      order: 2;
-      flex: 0 0 auto;
+      order: 1;
+      flex: 1 1 300px;
       display: grid;
-      grid-template-columns: auto minmax(5rem, 6rem) auto minmax(5rem, 6rem) auto;
+      grid-template-columns: minmax(3.8rem, 4.6rem) minmax(3.4rem, 4.2rem) auto minmax(4.2rem, auto) minmax(5rem, auto);
       align-items: center;
-      gap: 6px;
+      gap: 5px;
     }
 
     body.explorer-mode .explorer-tools__row .field {
@@ -2574,21 +2712,16 @@
     }
 
     body.explorer-mode .explorer-tools__row .label {
-      position: static;
-      width: auto;
-      height: auto;
-      margin: 0;
-      padding: 0;
-      overflow: visible;
-      clip: auto;
-      clip-path: none;
-      border: 0;
-      white-space: nowrap;
-      color: var(--muted);
-      font-size: 11px;
-      font-weight: 900;
-      letter-spacing: 0;
-      text-transform: none;
+      display: none;
+    }
+
+    body.explorer-mode .wallet-grid-toolbar {
+      grid-template-columns: max-content max-content;
+      justify-content: space-between;
+    }
+
+    body.explorer-mode .wallet-grid-toolbar__status {
+      display: none;
     }
 
     body.explorer-mode .explorer-filter-chip {
@@ -2942,26 +3075,28 @@
 
       body.explorer-mode .explorer-tools__row {
         display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        gap: 8px;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto minmax(0, 0.72fr) minmax(0, 0.9fr);
+        gap: 5px;
+        align-items: center;
       }
 
       body.explorer-mode .explorer-tools__row .field,
       body.explorer-mode .explorer-tools__row .input,
       body.explorer-mode #explorerJumpButton {
-        width: 100%;
+        width: auto;
         min-width: 0;
         max-width: 100%;
       }
 
       body.explorer-mode .explorer-filter-group {
         display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        gap: 8px;
+        grid-template-columns: none;
+        gap: 6px;
         overflow: hidden;
       }
 
       body.explorer-mode .explorer-filter-group > .label,
+      body.explorer-mode .explorer-filter-toggle,
       body.explorer-mode #explorerClearFiltersButton {
         order: initial;
         margin-left: 0;
@@ -2987,7 +3122,7 @@
       }
 
       body.explorer-mode .panel[aria-labelledby="walletTitle"] .wallet-grid-toolbar {
-        grid-template-columns: minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         align-items: stretch;
       }
 
@@ -3000,21 +3135,18 @@
 
       body.explorer-mode .wallet-grid-toolbar__primary {
         grid-column: 1 / -1;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: auto repeat(3, minmax(0, 1fr));
         order: 1;
       }
 
       body.explorer-mode .wallet-grid-toolbar__status {
-        grid-column: 1 / -1;
-        grid-template-columns: minmax(0, auto) auto minmax(0, auto);
-        justify-content: center;
-        order: 2;
+        display: none;
       }
 
       body.explorer-mode .wallet-grid-toolbar__secondary {
         grid-column: 1 / -1;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        order: 3;
+        order: 2;
       }
 
       body.explorer-mode .page-readout,
@@ -3688,45 +3820,9 @@
                     <input class="input" id="explorerTokenInput" type="number" min="1" step="1" inputmode="numeric" placeholder="ID" />
                   </label>
                   <button class="btn ghost" id="explorerJumpButton" type="button">Go</button>
+                  <span class="page-readout explorer-tools__metric" id="walletPageReadout">Page 0 / 0</span>
+                  <span class="badge blue explorer-tools__metric" id="walletCountBadge" title="0 inscriptions">0 insc.</span>
                 </div>
-                <fieldset class="explorer-filter-group" id="explorerFilterGroup">
-                  <legend class="label">Type filters</legend>
-                  <div class="explorer-filter-options">
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="image" />
-                      Images
-                    </label>
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="html" />
-                      HTML
-                    </label>
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="video" />
-                      Video
-                    </label>
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="audio" />
-                      Audio
-                    </label>
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="text" />
-                      Text
-                    </label>
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="code" />
-                      Code
-                    </label>
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="document" />
-                      Docs
-                    </label>
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="other" />
-                      Other
-                    </label>
-                  </div>
-                  <button class="small-link" id="explorerClearFiltersButton" type="button">Clear filters</button>
-                </fieldset>
               </div>
 
               <!-- <div class="wallet-example-description" id="walletExampleDescription" hidden></div> -->
@@ -3735,15 +3831,62 @@
             <div class="wallet-grid-stack">
               <div class="wallet-grid-toolbar" aria-label="Grid page controls">
                 <div class="wallet-grid-toolbar__primary">
+                  <div class="explorer-filter-popover">
+                    <fieldset class="explorer-filter-group is-collapsed" id="explorerFilterGroup">
+                      <legend class="label">Type filters</legend>
+                      <button
+                        class="explorer-filter-toggle"
+                        id="explorerFilterToggle"
+                        type="button"
+                        aria-controls="explorerFilterMenu"
+                        aria-expanded="false"
+                        aria-label="Show type filters"
+                        title="Show type filters"
+                      >▸</button>
+                      <div class="explorer-filter-menu" id="explorerFilterMenu">
+                        <div class="explorer-filter-options" id="explorerFilterOptions">
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="image" />
+                            Images
+                          </label>
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="html" />
+                            HTML
+                          </label>
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="video" />
+                            Video
+                          </label>
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="audio" />
+                            Audio
+                          </label>
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="text" />
+                            Text
+                          </label>
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="code" />
+                            Code
+                          </label>
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="document" />
+                            Docs
+                          </label>
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="other" />
+                            Other
+                          </label>
+                        </div>
+                        <button class="small-link" id="explorerClearFiltersButton" type="button">Clear filters</button>
+                      </div>
+                    </fieldset>
+                  </div>
                   <button class="btn ghost" id="walletPrevButton" type="button" disabled>Prev</button>
                   <a class="btn secondary explorer-grid-action" href="/" id="explorerHomeLink">Home</a>
                   <button class="btn secondary explorer-grid-action" id="explorerLatestButton" type="button">Latest</button>
                 </div>
-                <div class="wallet-grid-toolbar__status">
-                  <span class="page-readout" id="walletPageReadout">Page 0 / 0</span>
-                  <span class="wallet-grid-toolbar__separator" aria-hidden="true">·</span>
-                  <span class="badge blue" id="walletCountBadge">0 inscriptions</span>
-                </div>
+                <div class="wallet-grid-toolbar__status" aria-hidden="true"></div>
                 <div class="wallet-grid-toolbar__secondary">
                   <button class="btn ghost" id="refreshWalletButton" type="button">Refresh</button>
                   <button class="btn ghost" id="walletNextButton" type="button" disabled>Next</button>
@@ -4073,6 +4216,8 @@
           entry.protocolVersion === '3.2.3' ||
           entry.contractName?.toLowerCase().includes('v3-2-3')
       ) ?? ACTIVE_CONTRACTS[0];
+    const XTRATA_BRAND_MARK_URL =
+      'https://nxhyvj3lifp2q34nklffzxslfje426oxeruo3lkuj56srwgctdlq.arweave.net/bc-Kp2tBX6hvjVLKXN5LKknNedckaO2tVE99KNjCmNc';
     const SMALL_MINT_HELPER_TARGET_CORE_CONTRACT_ID =
       `${SMALL_MINT_HELPER_MAINNET_ADDRESS}.xtrata-v2-1-0`;
     const walletAdapter = createStacksWalletAdapter({
@@ -4157,6 +4302,8 @@
       explorerTokenInput: $('explorerTokenInput'),
       explorerJumpButton: $('explorerJumpButton'),
       explorerLatestButton: $('explorerLatestButton'),
+      explorerFilterGroup: $('explorerFilterGroup'),
+      explorerFilterToggle: $('explorerFilterToggle'),
       explorerClearFiltersButton: $('explorerClearFiltersButton'),
       explorerHomeLink: $('explorerHomeLink'),
       explorerFilterInputs: [...document.querySelectorAll('[data-explorer-filter]')],
@@ -4475,6 +4622,7 @@
       explorerFilterIndexLoading: false,
       explorerFilterIndexComplete: false,
       explorerFilterBackgroundLoading: false,
+      explorerFiltersCollapsed: true,
       explorerFollowLatestFiltered: false,
       explorerFilterIndexRunId: 0,
       lastSubmittedTxId: null,
@@ -4486,6 +4634,12 @@
     const WALLET_FALLBACK_SCAN_LIMIT = 2000;
     const MAX_GRID_EAGER_FULL_LOAD_BYTES = 10n * 1024n * 1024n;
     const GRID_THUMBNAIL_HYDRATION_CONCURRENCY = 2;
+    // Max number of HTML inscription iframes allowed to execute simultaneously
+    // in the grid. Tiles beyond this budget (or off-screen) show a static poster
+    // until they scroll into view and a slot frees, or the user clicks them.
+    // Boards that complete the embed handshake (phase two) are exempt — they
+    // self-throttle internally and run in the trusted lane.
+    const MAX_LIVE_HTML_FRAMES = 4;
     const GRID_SUMMARY_CACHE_MAX_SCOPES = 12;
     const GRID_SUMMARY_CACHE_MAX_ENTRIES = 512;
     const EXPLORER_FILTER_INDEX_CHUNK_SIZE = 48;
@@ -6455,6 +6609,7 @@
       state.thumbnailHydrationQueued.clear();
       state.thumbnailHydrationAttempted.clear();
       state.gridLiveMediaCache.clear();
+      liveHtmlFrameManager.reset();
       debugLog('cache', 'background thumbnail queue reset', {
         runId: state.thumbnailHydrationRunId,
         discardedQueued,
@@ -6557,6 +6712,22 @@
         state.tokenUriPreviewTimer = null;
         void updateTokenUriHeadPreview();
       }, 180);
+    };
+
+    const setWalletCountLabel = (countOrLabel) => {
+      if (!dom.walletCountBadge) {
+        return;
+      }
+      if (typeof countOrLabel === 'number') {
+        const full = `${countOrLabel} inscription${countOrLabel === 1 ? '' : 's'}`;
+        dom.walletCountBadge.textContent = state.explorerMode
+          ? `${countOrLabel} insc.`
+          : full;
+        dom.walletCountBadge.title = full;
+        return;
+      }
+      dom.walletCountBadge.textContent = countOrLabel;
+      dom.walletCountBadge.title = countOrLabel;
     };
 
     const GRID_MIME_LABELS = new Map([
@@ -7086,7 +7257,15 @@
       document.body.classList.toggle('explorer-mode', state.explorerMode);
       document.body.classList.toggle('intro-mode', !hasLedger && !state.explorerMode);
       if (dom.walletTitle) {
-        dom.walletTitle.textContent = state.explorerMode ? 'Xtrata Xplorer' : 'Wallet Inscriptions';
+        if (state.explorerMode) {
+          dom.walletTitle.setAttribute('aria-label', 'Xtrata Xplorer');
+          dom.walletTitle.innerHTML =
+            `<img class="panel-title__brand-x" src="${XTRATA_BRAND_MARK_URL}" alt="X" />trata ` +
+            `<img class="panel-title__brand-x" src="${XTRATA_BRAND_MARK_URL}" alt="X" />plorer`;
+        } else {
+          dom.walletTitle.removeAttribute('aria-label');
+          dom.walletTitle.textContent = 'Wallet Inscriptions';
+        }
       }
       if (dom.introNetworkValue) {
         dom.introNetworkValue.textContent = `Stacks ${state.contract.network}`;
@@ -7268,6 +7447,24 @@
       const disabled =
         !state.explorerMode ||
         state.busy;
+      if (dom.explorerFilterGroup) {
+        dom.explorerFilterGroup.classList.toggle('is-collapsed', state.explorerFiltersCollapsed);
+      }
+      if (dom.explorerFilterToggle) {
+        dom.explorerFilterToggle.disabled = disabled;
+        dom.explorerFilterToggle.setAttribute(
+          'aria-expanded',
+          state.explorerFiltersCollapsed ? 'false' : 'true'
+        );
+        dom.explorerFilterToggle.setAttribute(
+          'aria-label',
+          state.explorerFiltersCollapsed ? 'Show type filters' : 'Hide type filters'
+        );
+        dom.explorerFilterToggle.title = state.explorerFiltersCollapsed
+          ? 'Show type filters'
+          : 'Hide type filters';
+        dom.explorerFilterToggle.textContent = state.explorerFiltersCollapsed ? '▸' : '▾';
+      }
       dom.explorerFilterInputs.forEach((input) => {
         const kind = input.dataset.explorerFilter ?? '';
         input.checked = state.explorerFilterKinds.has(kind);
@@ -9404,6 +9601,222 @@
       return true;
     };
 
+    // ------------------------------------------------------------------
+    // Live HTML-frame manager (phase one: execution gate + budget + poster)
+    //
+    // HTML inscriptions (e.g. embedded X-Board apps) are expensive: each one
+    // runs its own scripts, network fetches and ~hundreds of slot renders. The
+    // byte-hydration queue throttles *fetching*; this manager throttles
+    // *executing*. A tile's iframe srcdoc is only set when the tile is in the
+    // viewport AND within MAX_LIVE_HTML_FRAMES. Everything else shows a static
+    // poster the user can click to force-render.
+    //
+    // Trusted lane (phase two): a board that completes the embed handshake is
+    // marked trusted and exempted from the budget, because it self-throttles
+    // internally. Trusted status persists for the session so scroll-back is
+    // cheap. See docs/grid-embed-contract.md.
+    // ------------------------------------------------------------------
+    const liveHtmlFrameManager = (() => {
+      const tiles = new Map(); // thumbElement -> record
+      let observer = null;
+
+      const now = () =>
+        typeof performance !== 'undefined' && performance.now
+          ? performance.now()
+          : Date.now();
+
+      const liveCount = () => {
+        let n = 0;
+        tiles.forEach((r) => {
+          if (r.active && !r.trusted) n += 1;
+        });
+        return n;
+      };
+
+      const activate = (record) => {
+        if (record.active || !record.frame.isConnected) return;
+        record.frame.srcdoc = injectGridThumbnailHtml(record.html);
+        record.active = true;
+        record.activatedAt = now();
+        if (record.poster) record.poster.hidden = true;
+      };
+
+      const deactivate = (record) => {
+        if (!record.active) return;
+        record.frame.srcdoc = '';
+        record.active = false;
+        // NB: record.trusted persists for the session so a known-good board is
+        // not budget-blocked when scrolled back into view.
+        if (record.poster) record.poster.hidden = false;
+      };
+
+      // Oldest active, non-trusted tile to evict so a visible tile can run.
+      const pickEvictable = (exclude, allowIntersecting) => {
+        let victim = null;
+        tiles.forEach((r) => {
+          if (r === exclude || !r.active || r.trusted) return;
+          if (!allowIntersecting && r.intersecting) return;
+          if (!victim || r.activatedAt < victim.activatedAt) victim = r;
+        });
+        return victim;
+      };
+
+      const requestActivation = (record) => {
+        if (record.active) return;
+        if (record.trusted) {
+          activate(record);
+          return;
+        }
+        if (liveCount() < MAX_LIVE_HTML_FRAMES) {
+          activate(record);
+          return;
+        }
+        const victim = pickEvictable(record, false);
+        if (victim) {
+          deactivate(victim);
+          activate(record);
+        }
+        // else: all live slots are on-screen; leave this tile as a poster.
+      };
+
+      const fillFreeSlots = () => {
+        tiles.forEach((r) => {
+          if (r.active || !r.intersecting) return;
+          if (r.trusted) {
+            activate(r);
+          } else if (liveCount() < MAX_LIVE_HTML_FRAMES) {
+            activate(r);
+          }
+        });
+      };
+
+      const forceActivate = (record) => {
+        if (record.active) return;
+        if (!record.trusted && liveCount() >= MAX_LIVE_HTML_FRAMES) {
+          const victim = pickEvictable(record, true);
+          if (victim) deactivate(victim);
+        }
+        activate(record);
+      };
+
+      const ensureObserver = () => {
+        if (observer || typeof IntersectionObserver !== 'function') {
+          return observer;
+        }
+        observer = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              const record = tiles.get(entry.target);
+              if (!record) continue;
+              record.intersecting = entry.isIntersecting;
+              if (entry.isIntersecting) {
+                requestActivation(record);
+              } else {
+                deactivate(record);
+              }
+            }
+            fillFreeSlots();
+          },
+          { root: null, rootMargin: '300px', threshold: 0 }
+        );
+        return observer;
+      };
+
+      // Phase-two receiver: a cooperating board posts {type:'xtrata:embed:hello'}
+      // once its script runs. We mark that frame trusted (exempt from budget)
+      // and ack so it can switch into lite/embedded rendering.
+      if (typeof window !== 'undefined' && window.addEventListener) {
+        window.addEventListener('message', (event) => {
+          const data = event && event.data;
+          if (!data || data.type !== 'xtrata:embed:hello') return;
+          tiles.forEach((record) => {
+            if (
+              record.frame.contentWindow &&
+              record.frame.contentWindow === event.source
+            ) {
+              record.trusted = true;
+              if (record.poster) record.poster.hidden = true;
+              if (event.source && typeof event.source.postMessage === 'function') {
+                event.source.postMessage(
+                  {
+                    type: 'xtrata:embed:ack',
+                    mode: 'grid-thumbnail',
+                    budget: 'trusted'
+                  },
+                  '*'
+                );
+              }
+            }
+          });
+        });
+      }
+
+      const register = (thumbElement, media) => {
+        const existing = tiles.get(thumbElement);
+        if (existing) {
+          if (observer) observer.unobserve(thumbElement);
+          tiles.delete(thumbElement);
+        }
+
+        const frame = document.createElement('iframe');
+        frame.title = 'inscription-preview';
+        frame.sandbox = 'allow-scripts';
+        frame.referrerPolicy = 'no-referrer';
+        frame.loading = 'lazy';
+
+        const poster = document.createElement('div');
+        poster.className = 'token-thumb-gate';
+        const label = document.createElement('div');
+        label.className = 'token-thumb-gate__label';
+        label.textContent = getGridMimeLabel(media.mimeType ?? null) || 'HTML';
+        const hint = document.createElement('div');
+        hint.className = 'token-thumb-gate__hint';
+        hint.textContent = 'Tap to load';
+        poster.append(label, hint);
+
+        const record = {
+          frame,
+          poster,
+          html: media.html,
+          active: false,
+          intersecting: false,
+          trusted: false,
+          activatedAt: 0
+        };
+
+        poster.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          forceActivate(record);
+        });
+
+        tiles.set(thumbElement, record);
+        thumbElement.append(frame, poster);
+
+        const obs = ensureObserver();
+        if (obs) {
+          obs.observe(thumbElement);
+        } else {
+          // No IntersectionObserver: activate now, still bounded by budget.
+          record.intersecting = true;
+          requestActivation(record);
+        }
+      };
+
+      const reset = () => {
+        if (observer) {
+          observer.disconnect();
+          observer = null;
+        }
+        tiles.forEach((record) => {
+          record.frame.srcdoc = '';
+        });
+        tiles.clear();
+      };
+
+      return { register, reset };
+    })();
+
     const renderGridLiveMedia = (token, thumbElement, media) => {
       const cacheKey = getThumbnailKey(token);
       const oldUrl = state.tokenThumbUrls.get(cacheKey);
@@ -9491,13 +9904,10 @@
       }
 
       if (media.kind === 'html') {
-        const frame = document.createElement('iframe');
-        frame.title = 'inscription-preview';
-        frame.sandbox = 'allow-scripts';
-        frame.referrerPolicy = 'no-referrer';
-        frame.loading = 'lazy';
-        frame.srcdoc = injectGridThumbnailHtml(media.html);
-        thumbElement.append(frame);
+        // Gated mount: the iframe only executes when on-screen and within the
+        // live-frame budget (or on click). Prevents N heavy board inscriptions
+        // from running at once. See liveHtmlFrameManager above.
+        liveHtmlFrameManager.register(thumbElement, media);
         return true;
       }
 
@@ -9912,7 +10322,7 @@
       const totalCount = state.walletUsesPagedHoldings
         ? state.walletTotalCount
         : state.walletTokenIds.length;
-      dom.walletCountBadge.textContent = `${totalCount} inscription${totalCount === 1 ? '' : 's'}`;
+      setWalletCountLabel(totalCount);
       updateWalletPagerControls();
       debugLog('grid', 'render grid page', {
         ...getGridDebugContext(pageIds),
@@ -11166,7 +11576,7 @@ const openCuratedGallery = async (galleryId) => {
       state.explorerFilterIndexLoading = true;
       updateControls();
       if (missingIds.length > 0) {
-        dom.walletCountBadge.textContent = 'filtering';
+        setWalletCountLabel('filtering');
         renderTokenGridPlaceholders('...');
       }
       const scanIds = options.preferLatest ? [...missingIds].reverse() : missingIds;
@@ -11653,7 +12063,7 @@ const openCuratedGallery = async (galleryId) => {
         void updateWalletTokenUriHeadPreview(null);
         resetBackgroundThumbnailHydration();
         revokeGridThumbUrls();
-        dom.walletCountBadge.textContent = '0 inscriptions';
+        setWalletCountLabel(0);
         setStatus(
           dom.walletGridStatus,
           '<strong>Grid</strong> enter a wallet address or connect',
@@ -12415,6 +12825,10 @@ const openCuratedGallery = async (galleryId) => {
       input.addEventListener('change', () => {
         void applyExplorerFilterControls();
       });
+    });
+    dom.explorerFilterToggle?.addEventListener('click', () => {
+      state.explorerFiltersCollapsed = !state.explorerFiltersCollapsed;
+      syncExplorerFilterControls();
     });
     dom.explorerClearFiltersButton?.addEventListener('click', () => {
       void clearExplorerFilters();

@@ -23,3 +23,4 @@ tests/xtrata-manifest-authority-v1.test-plan.md      Plan + open items
 - Immutable key-authority anchors derived scope identity; operational
   authority remains transferable (XIP-009 s4.2.1)
 - README core-source wording corrected; test-plan heading fixed
+
