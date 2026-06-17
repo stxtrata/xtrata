@@ -10584,14 +10584,7 @@
             kind: 'audio',
             mimeType
           });
-          if (
-            thumbElement.isConnected &&
-            thumbElement.dataset.thumbnailKey === cacheKey
-          ) {
-            renderGridLiveMedia(token, thumbElement, state.gridLiveMediaCache.get(cacheKey));
-          } else if (getWalletPageIds().some((id) => id === token.id)) {
-            scheduleGridRender();
-          }
+          displayResolvedGridMedia(token, thumbElement, cacheKey);
           debugLog('cache', 'background audio grid display ready', {
             tokenId: token.id.toString(),
             contractId: cacheContractId,
@@ -10606,14 +10599,7 @@
             bytes,
             mimeType
           });
-          if (
-            thumbElement.isConnected &&
-            thumbElement.dataset.thumbnailKey === cacheKey
-          ) {
-            renderGridLiveMedia(token, thumbElement, state.gridLiveMediaCache.get(cacheKey));
-          } else if (getWalletPageIds().some((id) => id === token.id)) {
-            scheduleGridRender();
-          }
+          displayResolvedGridMedia(token, thumbElement, cacheKey);
           debugLog('cache', 'background video grid display ready', {
             tokenId: token.id.toString(),
             contractId: cacheContractId,
@@ -10633,14 +10619,7 @@
             ),
             mimeType
           });
-          if (
-            thumbElement.isConnected &&
-            thumbElement.dataset.thumbnailKey === cacheKey
-          ) {
-            renderGridLiveMedia(token, thumbElement, state.gridLiveMediaCache.get(cacheKey));
-          } else if (getWalletPageIds().some((id) => id === token.id)) {
-            scheduleGridRender();
-          }
+          displayResolvedGridMedia(token, thumbElement, cacheKey);
           debugLog('cache', 'background html grid display ready', {
             tokenId: token.id.toString(),
             contractId: cacheContractId,
@@ -10655,14 +10634,7 @@
             bytes,
             mimeType
           });
-          if (
-            thumbElement.isConnected &&
-            thumbElement.dataset.thumbnailKey === cacheKey
-          ) {
-            renderGridLiveMedia(token, thumbElement, state.gridLiveMediaCache.get(cacheKey));
-          } else if (getWalletPageIds().some((id) => id === token.id)) {
-            scheduleGridRender();
-          }
+          displayResolvedGridMedia(token, thumbElement, cacheKey);
           return;
         }
         if (kind === 'svg') {
@@ -10675,14 +10647,7 @@
             bytes,
             mimeType: 'image/svg+xml'
           });
-          if (
-            thumbElement.isConnected &&
-            thumbElement.dataset.thumbnailKey === cacheKey
-          ) {
-            renderGridLiveMedia(token, thumbElement, state.gridLiveMediaCache.get(cacheKey));
-          } else if (getWalletPageIds().some((id) => id === token.id)) {
-            scheduleGridRender();
-          }
+          displayResolvedGridMedia(token, thumbElement, cacheKey);
           debugLog('cache', 'background svg grid display ready', {
             tokenId: token.id.toString(),
             contractId: cacheContractId,
@@ -10705,14 +10670,7 @@
             bytes,
             mimeType
           });
-          if (
-            thumbElement.isConnected &&
-            thumbElement.dataset.thumbnailKey === cacheKey
-          ) {
-            renderGridLiveMedia(token, thumbElement, state.gridLiveMediaCache.get(cacheKey));
-          } else if (getWalletPageIds().some((id) => id === token.id)) {
-            scheduleGridRender();
-          }
+          displayResolvedGridMedia(token, thumbElement, cacheKey);
           debugLog('cache', 'background animated image grid display ready', {
             tokenId: token.id.toString(),
             contractId: cacheContractId,
@@ -10727,15 +10685,15 @@
         if (!thumbnail) {
           return;
         }
-        if (
-          thumbElement.isConnected &&
-          thumbElement.dataset.thumbnailKey === cacheKey
-        ) {
-          await applyCachedThumbnail(token, thumbElement, {
-            requireActivePage: thumbElement.dataset.thumbnailContext !== 'relationship'
+        const cachedThumbTarget =
+          thumbElement.isConnected && thumbElement.dataset.thumbnailKey === cacheKey
+            ? thumbElement
+            : findLiveGridThumb(token.id, cacheKey);
+        if (cachedThumbTarget) {
+          await applyCachedThumbnail(token, cachedThumbTarget, {
+            requireActivePage:
+              cachedThumbTarget.dataset.thumbnailContext !== 'relationship'
           });
-        } else if (getWalletPageIds().some((id) => id === token.id)) {
-          scheduleGridRender();
         }
       } catch (error) {
         debugLog(
@@ -10902,6 +10860,38 @@
         requestAnimationFrame(run);
       } else {
         setTimeout(run, 16);
+      }
+    };
+
+    // Find the current live thumb element for a token's grid square (matching
+    // the expected thumbnail key), so a single cell can be updated in place.
+    const findLiveGridThumb = (tokenId, cacheKey) => {
+      if (!dom.tokenGrid) {
+        return null;
+      }
+      const card = dom.tokenGrid.querySelector(
+        `.token-card[data-token-id="${tokenId.toString()}"]`
+      );
+      const thumb = card ? card.querySelector('.token-thumb') : null;
+      return thumb && thumb.dataset.thumbnailKey === cacheKey ? thumb : null;
+    };
+
+    // Render freshly-resolved live media into ONE grid square without rebuilding
+    // the whole grid. A full re-render (scheduleGridRender) tears down and
+    // reloads every other iframe, so HTML squares would all reload whenever any
+    // one finished loading. Targeting the single current cell keeps each square
+    // independent: once loaded it stays loaded.
+    const displayResolvedGridMedia = (token, thumbElement, cacheKey) => {
+      const media = state.gridLiveMediaCache.get(cacheKey);
+      if (!media) {
+        return;
+      }
+      const target =
+        thumbElement.isConnected && thumbElement.dataset.thumbnailKey === cacheKey
+          ? thumbElement
+          : findLiveGridThumb(token.id, cacheKey);
+      if (target) {
+        renderGridLiveMedia(token, target, media);
       }
     };
 
