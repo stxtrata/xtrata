@@ -10265,30 +10265,16 @@
         // Gated tiles (e.g. relationship pair/child thumbs) never auto-activate;
         // they stay as a poster until the user clicks (forceActivate).
         if (record.gated) return;
-        if (record.trusted) {
-          activate(record);
-          return;
-        }
-        if (liveCount() < MAX_LIVE_HTML_FRAMES) {
-          activate(record);
-          return;
-        }
-        const victim = pickEvictable(record, false);
-        if (victim) {
-          deactivate(victim);
-          activate(record);
-        }
-        // else: all live slots are on-screen; leave this tile as a poster.
+        // Grid tiles render eagerly: every on-screen HTML inscription runs, no
+        // per-tile clicking. Off-screen tiles are still deactivated by the
+        // IntersectionObserver, so concurrency stays bounded to what's visible.
+        activate(record);
       };
 
       const fillFreeSlots = () => {
         tiles.forEach((r) => {
           if (r.active || !r.intersecting || r.gated) return;
-          if (r.trusted) {
-            activate(r);
-          } else if (liveCount() < MAX_LIVE_HTML_FRAMES) {
-            activate(r);
-          }
+          activate(r);
         });
       };
 
