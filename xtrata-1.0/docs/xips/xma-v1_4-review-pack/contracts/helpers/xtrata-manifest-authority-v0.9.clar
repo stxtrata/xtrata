@@ -38,16 +38,6 @@
 ;;      entry points reject a candidate whose current-scope is already set
 ;;      (ERR-MANIFEST-IS-CURRENT), closing the multi-scope marker clobber.
 ;;
-;; v1.5 changes:
-;;  S1 close-scope permanently SEALS a scope (one-way). Only the immutable
-;;     key-authority (the original creator) may seal it. A sealed scope keeps
-;;     its current manifest as the final, authoritative answer but rejects all
-;;     further mutation: no new delegates, no authority transfer, no initial
-;;     registration, no succession. Emergency revoke-manifest still acts on the
-;;     final manifest (manifest-level), but no successor can be appointed -
-;;     finality and recovery are deliberately in tension (see spec). Resolves
-;;     the previously dead `active` flag (it was read but never settable).
-;;
 ;; v1.4 changes (third codex review):
 ;;  R11 scopes carry an IMMUTABLE key-authority (the creating principal),
 ;;      separate from the transferable operational authority. Derived scope
@@ -94,9 +84,6 @@
 (define-constant ERR-INVALID-VERIFICATION-CLASS (err u122))
 (define-constant ERR-SCOPE-POLICY-MISMATCH (err u123))
 (define-constant ERR-TARGET-NOT-IN-CORE (err u124))
-;; v1.5: a scope that has been permanently sealed (closed) rejects all further
-;; mutation (S1). Only the immutable key-authority may seal; sealing is one-way.
-(define-constant ERR-SCOPE-CLOSED (err u125))
 
 ;; Authority classes
 (define-constant AUTH-CURATOR u1)
@@ -518,31 +505,15 @@
 
 (define-public (set-scope-authority (scope-key (buff 32)) (new-authority principal))
   (let ((scope (unwrap! (map-get? scopes scope-key) ERR-SCOPE-NOT-FOUND)))
-    (asserts! (get active scope) ERR-SCOPE-CLOSED)
     (asserts! (is-eq tx-sender (get authority scope)) ERR-NOT-SCOPE-AUTHORITY)
     (map-set scopes scope-key (merge scope { authority: new-authority, updated-at: stacks-block-height }))
     (ok true)
   )
 )
 
-;; S1: permanently seal a scope. One-way; only the immutable key-authority (the
-;; original creator) may seal. The current manifest is preserved as the final,
-;; authoritative answer; all further scope mutation is rejected with
-;; ERR-SCOPE-CLOSED. Emergency revoke-manifest still works at the manifest level,
-;; but no successor can be appointed (finality vs recovery, by design). Resolvers
-;; read `active` (false == sealed) via get-scope or is-scope-active.
-(define-public (close-scope (scope-key (buff 32)))
-  (let ((scope (unwrap! (map-get? scopes scope-key) ERR-SCOPE-NOT-FOUND)))
-    (asserts! (get active scope) ERR-SCOPE-CLOSED)
-    (asserts! (is-eq tx-sender (get key-authority scope)) ERR-NOT-SCOPE-AUTHORITY)
-    (map-set scopes scope-key (merge scope { active: false, updated-at: stacks-block-height }))
-    (ok true)
-  )
-)
-
 (define-public (add-scope-delegate (scope-key (buff 32)) (delegate principal))
   (let ((scope (unwrap! (map-get? scopes scope-key) ERR-SCOPE-NOT-FOUND)))
-    (asserts! (get active scope) ERR-SCOPE-CLOSED)
+    (asserts! (get active scope) ERR-SCOPE-NOT-FOUND)
     (asserts! (is-eq tx-sender (get authority scope)) ERR-NOT-SCOPE-AUTHORITY)
     (map-set scope-delegates { scope-key: scope-key, delegate: delegate } {
       added-by: tx-sender,
@@ -558,7 +529,6 @@
       (scope (unwrap! (map-get? scopes scope-key) ERR-SCOPE-NOT-FOUND))
       (entry (unwrap! (map-get? scope-delegates { scope-key: scope-key, delegate: delegate }) ERR-NOT-DELEGATE))
     )
-    (asserts! (get active scope) ERR-SCOPE-CLOSED)
     (asserts! (is-eq tx-sender (get authority scope)) ERR-NOT-SCOPE-AUTHORITY)
     (map-set scope-delegates { scope-key: scope-key, delegate: delegate } (merge entry { active: false }))
     (ok true)
@@ -575,7 +545,7 @@
       (scope (unwrap! (map-get? scopes scope-key) ERR-SCOPE-NOT-FOUND))
       (record (unwrap! (map-get? manifests manifest-id) ERR-NOT-REGISTERED))
     )
-    (asserts! (get active scope) ERR-SCOPE-CLOSED)
+    (asserts! (get active scope) ERR-SCOPE-NOT-FOUND)
     (asserts! (is-eq tx-sender (get authority scope)) ERR-NOT-SCOPE-AUTHORITY)
     (asserts! (is-none (get current-manifest-id scope)) ERR-WRONG-PREVIOUS-MANIFEST)
     (asserts! (is-eq (get status record) STATUS-ACTIVE) ERR-MANIFEST-NOT-ACTIVE)
@@ -613,7 +583,7 @@
       (old (unwrap! (map-get? manifests previous-manifest-id) ERR-NOT-REGISTERED))
       (new (unwrap! (map-get? manifests new-manifest-id) ERR-NOT-REGISTERED))
     )
-    (asserts! (get active scope) ERR-SCOPE-CLOSED)
+    (asserts! (get active scope) ERR-SCOPE-NOT-FOUND)
     (asserts! (is-eq tx-sender (get authority scope)) ERR-NOT-SCOPE-AUTHORITY)
     (asserts! (is-eq (get current-manifest-id scope) (some previous-manifest-id)) ERR-WRONG-PREVIOUS-MANIFEST)
     (asserts! (is-eq (get status new) STATUS-ACTIVE) ERR-MANIFEST-NOT-ACTIVE)
@@ -690,16 +660,6 @@
 
 (define-read-only (get-scope (scope-key (buff 32)))
   (map-get? scopes scope-key)
-)
-
-;; S1: true while the scope is open; false once permanently sealed via
-;; close-scope. Resolvers MAY surface a sealed scope's current manifest as the
-;; final, authoritative answer.
-(define-read-only (is-scope-active (scope-key (buff 32)))
-  (match (map-get? scopes scope-key)
-    scope (get active scope)
-    false
-  )
 )
 
 (define-read-only (get-current-manifest (scope-key (buff 32)))

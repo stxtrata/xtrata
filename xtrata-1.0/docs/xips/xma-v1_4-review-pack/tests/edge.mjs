@@ -233,5 +233,58 @@ const transfer = (id, from, to) =>
   t("E7: type change across succession rejected -> u123", j(r).includes("u123"), j(r));
 }
 
+// ============================================================ E8 permanent seal (close-scope, v1.5 S1)
+// One-way seal, gated to the IMMUTABLE key-authority (original creator) even
+// after operational authority is transferred away. A sealed scope preserves its
+// current manifest as the final answer and rejects all further mutation.
+{
+  const SCOPE = scopeBuf("seal-scope");
+  let r = createScope(SCOPE, w1);            // w1 = key-authority AND operational authority
+  t("E8: create scope", j(r).includes("ok"), j(r));
+  const head = mint(w1);
+  reg(head.id, head.hash, w1);
+  r = simnet.callPublicFn(XMA, "register-initial-scope-manifest", [Cl.buffer(SCOPE), Cl.uint(head.id)], w1);
+  t("E8: register initial head", j(r).includes("ok"), j(r));
+  // pre-register a perfectly valid successor so the later rejection proves the
+  // SEAL is what blocks succession (not a bad candidate).
+  const succ = mint(w1, { parents: [head.id] });
+  reg(succ.id, succ.hash, w1, head.id);
+
+  // hand operational control to w2; key-authority stays w1
+  r = simnet.callPublicFn(XMA, "set-scope-authority", [Cl.buffer(SCOPE), Cl.principal(w2)], w1);
+  t("E8: operational authority transferred to w2", j(r).includes("ok"), j(r));
+
+  // current operational authority (w2) is NOT the original creator -> cannot seal
+  r = simnet.callPublicFn(XMA, "close-scope", [Cl.buffer(SCOPE)], w2);
+  t("E8: operational authority w2 CANNOT seal (not key-authority) -> u113", j(r).includes("u113"), j(r));
+
+  // original creator w1 can still seal even after giving up operational control
+  r = simnet.callPublicFn(XMA, "close-scope", [Cl.buffer(SCOPE)], w1);
+  t("E8: original creator w1 seals the scope", j(r).includes("ok"), j(r));
+  r = simnet.callReadOnlyFn(XMA, "is-scope-active", [Cl.buffer(SCOPE)], w1);
+  t("E8: is-scope-active now false (sealed)", j(r) === "false", j(r));
+
+  // final answer preserved
+  r = simnet.callReadOnlyFn(XMA, "get-current-active-manifest", [Cl.buffer(SCOPE)], w1);
+  t("E8: sealed scope still resolves to its final manifest", j(r).includes("u" + head.id), j(r));
+
+  // all further mutation rejected with u125
+  r = simnet.callPublicFn(XMA, "add-scope-delegate", [Cl.buffer(SCOPE), Cl.principal(w1)], w2);
+  t("E8: add-delegate on sealed scope -> u125", j(r).includes("u125"), j(r));
+  r = simnet.callPublicFn(XMA, "set-scope-authority", [Cl.buffer(SCOPE), Cl.principal(w1)], w2);
+  t("E8: set-authority on sealed scope -> u125", j(r).includes("u125"), j(r));
+  r = simnet.callPublicFn(XMA, "update-scope-manifest", [Cl.buffer(SCOPE), Cl.uint(head.id), Cl.uint(succ.id)], w2);
+  t("E8: succession on sealed scope rejected even with a valid successor -> u125", j(r).includes("u125"), j(r));
+  r = simnet.callPublicFn(XMA, "close-scope", [Cl.buffer(SCOPE)], w1);
+  t("E8: double-seal rejected (one-way) -> u125", j(r).includes("u125"), j(r));
+
+  // finality vs recovery: emergency revoke still works at the manifest level,
+  // but no successor can be appointed afterwards (scope is sealed).
+  r = simnet.callPublicFn(XMA, "revoke-manifest", [Cl.uint(head.id)], w1);
+  t("E8: emergency revoke of the final manifest still works (manifest-level)", j(r).includes("ok"), j(r));
+  r = simnet.callReadOnlyFn(XMA, "get-current-active-manifest", [Cl.buffer(SCOPE)], w1);
+  t("E8: after revoke, sealed scope has no active answer and cannot recover", j(r) === "none", j(r));
+}
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

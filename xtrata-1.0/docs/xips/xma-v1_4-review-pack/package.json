@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/smoke.mjs && node tests/scope-key-vector.mjs"
+    "test": "node tests/smoke.mjs && node tests/edge.mjs && node tests/scope-key-vector.mjs"
   },
   "dependencies": {
     "@hirosystems/clarinet-sdk": "^3",
