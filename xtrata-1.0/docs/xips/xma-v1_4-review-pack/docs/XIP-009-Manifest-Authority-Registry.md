@@ -5,7 +5,7 @@
 - Status: Draft
 - Category: Standards Track
 - Requires: XIP-000, XIP-001
-- Spec version: 0.4.0
+- Spec version: 0.5.0
 
 > The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**,
 > **SHOULD**, **SHOULD NOT**, **RECOMMENDED**, **MAY**, and **OPTIONAL** in this
@@ -24,7 +24,9 @@ authoritative for manifest bytes, canonicalisation, and integrity roots.
 
 This document supersedes the informal "manifest-authority-v1-spec" draft and
 incorporates the remediations from the first, second, and third external
-(codex) security reviews.
+(codex) security reviews. Spec version 0.5.0 adds permanent scope **sealing**
+(§4.4) and an explicit statement of the lifecycle-operation authority model
+(§7).
 
 ## Motivation
 
@@ -112,7 +114,7 @@ A derived key is bound to the scope's **immutable `key-authority`** — the
 principal that created the scope, recorded once and never modifiable.
 Resolvers recompute the key from `(key-authority, label)` and **MUST** treat a
 scope whose stored `key-authority` does not match the derivation input as
-invalid. The transferable *operational* `authority` (§4.4) plays no role in
+invalid. The transferable *operational* `authority` (§4.2.1) plays no role in
 key validation, so transferring a scope does not invalidate its derived
 identity. Well-known ecosystem scopes (e.g. the XIP corpus) **SHOULD** publish
 their `(key-authority, label)` pair so the key is independently computable.
@@ -130,6 +132,32 @@ A scope fixes `authority-class` and `lifecycle` at creation. A manifest **MUST
 NOT** become current for a scope unless its registered `lifecycle` and
 `authority-class` equal the scope's. Successive current manifests **MUST**
 keep the same `manifest-type`.
+
+#### 4.4 Sealing a scope (`close-scope`)
+
+A scope **MAY** be permanently *sealed* by calling `close-scope`. Sealing is a
+**one-way** operation: a sealed scope can never be reopened. Only the immutable
+`key-authority` (the original creator, §4.2.1) **MAY** seal a scope; the
+transferable operational `authority` **MUST NOT** be able to seal, so the power
+to finalise a scope always remains with its originator even after operational
+control has been handed off. Attempts by any other principal **MUST** be
+rejected with `ERR-NOT-SCOPE-AUTHORITY` (`u113`).
+
+A sealed scope (`active = false`) **MUST** reject every further mutation —
+`add-scope-delegate`, `remove-scope-delegate`, `set-scope-authority`,
+`register-initial-scope-manifest`, and `update-scope-manifest` — with
+`ERR-SCOPE-CLOSED` (`u125`). Re-sealing an already-sealed scope is likewise
+rejected with `u125`. The scope retains its current-manifest pointer, which a
+resolver **SHOULD** surface as the scope's final, authoritative answer. The
+read-only `is-scope-active` returns `false` for a sealed scope.
+
+Sealing deliberately trades recoverability for finality. Emergency
+`revoke-manifest` (§7) still acts at the manifest level on a sealed scope's
+final head, but because succession is closed, **no successor can be appointed
+afterwards**: a sealed scope whose final head is revoked has no active answer
+and cannot recover. Authorities **SHOULD** seal only when they intend the
+current head to be final, and **SHOULD NOT** seal a scope whose head they may
+later need to replace.
 
 ### 5. Delegates
 
@@ -197,10 +225,20 @@ the immutable core **creator**.
 | `mark-superseded` | registrar / contract owner | **Rejected** while current; otherwise requires declared predecessor **and** core parent edge. |
 | `revoke-manifest` | registrar / contract owner | **Allowed** (emergency path). The scope pointer is *not* cleared so the continuity chain survives and a successor can be appointed. |
 
+The authority model is deliberately asymmetric: `revoke-manifest` and
+`mark-superseded` accept either the registrar **or** the contract owner (revoke
+is an emergency governance lever), whereas `withdraw-manifest` is the
+registrar's housekeeping path and accepts the registrar **only** — the contract
+owner cannot withdraw a manifest it did not register. Implementations **MUST
+NOT** collapse this distinction.
+
 Because a revoked manifest can remain the structural chain head, resolvers
 **MUST** check the status of a scope's current manifest. The read-only
 `get-current-active-manifest` returns the head only while ACTIVE and **SHOULD**
 be preferred over `get-current-manifest` for display.
+
+Scope-level finality is separate from these manifest-level operations: see
+`close-scope` (§4.4), which permanently seals a whole scope.
 
 ### 8. Duplicate-hash advisory
 
@@ -285,6 +323,12 @@ the **chained** digest `H_i = sha256(H_{i-1} || chunk_i)` with
 - **Contract-call trust:** XMA-1's guarantees are only as good as the bound
   core contract; the `.xtrata-v3-2-3` reference **MUST** resolve to the
   audited deployed core (fully qualify if deployers differ).
+- **Scope sealing is irreversible (finality vs recovery):** `close-scope`
+  (§4.4) cannot be undone, is restricted to the immutable `key-authority`, and
+  closes succession permanently. Emergency revoke still works at the manifest
+  level, but a sealed scope whose head is later revoked cannot appoint a
+  successor. Authorities **SHOULD** seal only when the current head is intended
+  to be final.
 
 ## Conformance
 
