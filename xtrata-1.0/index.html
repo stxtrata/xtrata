@@ -1636,6 +1636,10 @@
       display: none;
     }
 
+    body:not(.explorer-mode) .explorer-filter-popover {
+      display: none;
+    }
+
     .page-readout {
       color: var(--muted);
       font-size: 12px;
@@ -2361,10 +2365,17 @@
     .explorer-filter-group {
       display: grid;
       gap: 6px;
-      margin: 1px 0 2px;
+      margin: 0;
       padding: 0;
       border: 0;
       justify-items: start;
+    }
+
+    .explorer-filter-popover {
+      position: relative;
+      display: inline-grid;
+      place-items: center;
+      flex: 0 0 auto;
     }
 
     .explorer-filter-toggle {
@@ -2392,8 +2403,7 @@
       outline: none;
     }
 
-    .explorer-filter-group.is-collapsed .explorer-filter-options,
-    .explorer-filter-group.is-collapsed #explorerClearFiltersButton {
+    .explorer-filter-group.is-collapsed .explorer-filter-menu {
       display: none;
     }
 
@@ -2613,7 +2623,6 @@
       grid-template-columns: auto;
       align-items: start;
       gap: 6px;
-      width: 100%;
     }
 
     body.explorer-mode .explorer-filter-group > .label {
@@ -2624,19 +2633,29 @@
       grid-column: 1;
     }
 
+    body.explorer-mode .explorer-filter-menu {
+      position: absolute;
+      z-index: 20;
+      top: calc(100% + 6px);
+      left: 0;
+      width: min(540px, calc(100vw - 48px));
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 8px;
+    }
+
     body.explorer-mode .explorer-filter-options {
-      grid-column: 1 / -1;
-      justify-self: stretch;
-      width: 100%;
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
       align-items: center;
       overflow: visible;
-      padding-bottom: 0;
     }
 
     body.explorer-mode #explorerClearFiltersButton {
-      grid-column: 1 / -1;
       justify-self: start;
       min-height: 26px;
       margin-left: 0;
@@ -3096,7 +3115,7 @@
 
       body.explorer-mode .wallet-grid-toolbar__primary {
         grid-column: 1 / -1;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: auto repeat(3, minmax(0, 1fr));
         order: 1;
       }
 
@@ -3786,53 +3805,6 @@
                   <button class="btn ghost" id="explorerJumpButton" type="button">Go</button>
                 </div>
               </div>
-              <fieldset class="explorer-filter-group is-collapsed" id="explorerFilterGroup">
-                <legend class="label">Type filters</legend>
-                <button
-                  class="explorer-filter-toggle"
-                  id="explorerFilterToggle"
-                  type="button"
-                  aria-controls="explorerFilterOptions explorerClearFiltersButton"
-                  aria-expanded="false"
-                  aria-label="Show type filters"
-                  title="Show type filters"
-                >▸</button>
-                <div class="explorer-filter-options" id="explorerFilterOptions">
-                  <label class="explorer-filter-chip">
-                    <input type="checkbox" data-explorer-filter="image" />
-                    Images
-                  </label>
-                  <label class="explorer-filter-chip">
-                    <input type="checkbox" data-explorer-filter="html" />
-                    HTML
-                  </label>
-                  <label class="explorer-filter-chip">
-                    <input type="checkbox" data-explorer-filter="video" />
-                    Video
-                  </label>
-                  <label class="explorer-filter-chip">
-                    <input type="checkbox" data-explorer-filter="audio" />
-                    Audio
-                  </label>
-                  <label class="explorer-filter-chip">
-                    <input type="checkbox" data-explorer-filter="text" />
-                    Text
-                  </label>
-                  <label class="explorer-filter-chip">
-                    <input type="checkbox" data-explorer-filter="code" />
-                    Code
-                  </label>
-                  <label class="explorer-filter-chip">
-                    <input type="checkbox" data-explorer-filter="document" />
-                    Docs
-                  </label>
-                  <label class="explorer-filter-chip">
-                    <input type="checkbox" data-explorer-filter="other" />
-                    Other
-                  </label>
-                </div>
-                <button class="small-link" id="explorerClearFiltersButton" type="button">Clear filters</button>
-              </fieldset>
 
               <!-- <div class="wallet-example-description" id="walletExampleDescription" hidden></div> -->
             </div>
@@ -3840,6 +3812,57 @@
             <div class="wallet-grid-stack">
               <div class="wallet-grid-toolbar" aria-label="Grid page controls">
                 <div class="wallet-grid-toolbar__primary">
+                  <div class="explorer-filter-popover">
+                    <fieldset class="explorer-filter-group is-collapsed" id="explorerFilterGroup">
+                      <legend class="label">Type filters</legend>
+                      <button
+                        class="explorer-filter-toggle"
+                        id="explorerFilterToggle"
+                        type="button"
+                        aria-controls="explorerFilterMenu"
+                        aria-expanded="false"
+                        aria-label="Show type filters"
+                        title="Show type filters"
+                      >▸</button>
+                      <div class="explorer-filter-menu" id="explorerFilterMenu">
+                        <div class="explorer-filter-options" id="explorerFilterOptions">
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="image" />
+                            Images
+                          </label>
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="html" />
+                            HTML
+                          </label>
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="video" />
+                            Video
+                          </label>
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="audio" />
+                            Audio
+                          </label>
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="text" />
+                            Text
+                          </label>
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="code" />
+                            Code
+                          </label>
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="document" />
+                            Docs
+                          </label>
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="other" />
+                            Other
+                          </label>
+                        </div>
+                        <button class="small-link" id="explorerClearFiltersButton" type="button">Clear filters</button>
+                      </div>
+                    </fieldset>
+                  </div>
                   <button class="btn ghost" id="walletPrevButton" type="button" disabled>Prev</button>
                   <a class="btn secondary explorer-grid-action" href="/" id="explorerHomeLink">Home</a>
                   <button class="btn secondary explorer-grid-action" id="explorerLatestButton" type="button">Latest</button>
