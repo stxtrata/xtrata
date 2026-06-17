@@ -5993,8 +5993,29 @@
         return;
       }
       state.escrowTwinInjection = { address: walletAddress, ids, requestId };
-      if (ids.length > 0 && state.walletPageIndex === 0) {
-        await loadWalletPage({ pageAlreadyLoaded: true, deferSelection: true });
+      if (ids.length > 0) {
+        // Reveal the grid/ledger even when the wallet has no other inscriptions,
+        // then (re)render page 0 so the escrowed twins appear and get selected.
+        setExperienceMode();
+        const baseCount = state.walletUsesPagedHoldings
+          ? state.walletTotalCount
+          : state.walletTokenIds.length;
+        const totalCount = baseCount + ids.length;
+        setStatus(
+          dom.walletGridStatus,
+          `<strong>Grid</strong> ${totalCount} inscription${totalCount === 1 ? '' : 's'} available`,
+          'ready',
+          'blue'
+        );
+        if (state.walletPageIndex === 0) {
+          await loadWalletPage({ pageAlreadyLoaded: true });
+        }
+        // If nothing is selected yet (e.g. an otherwise-empty wallet), select
+        // the first injected twin so the preview panel opens.
+        if (state.selectedTokenId === null && state.walletTokens.length > 0) {
+          await selectToken(state.walletTokens[0].id);
+        }
+        updateControls();
       } else {
         updateWalletPagerControls();
       }
@@ -7797,7 +7818,11 @@
     const setExperienceMode = () => {
       const connected = state.walletSession.isConnected && !!state.walletSession.address;
       const viewingAddress = getViewingWalletAddress();
-      const count = state.walletUsesPagedHoldings ? state.walletTotalCount : state.walletTokenIds.length;
+      // Escrowed twins injected for this wallet count as visible holdings, so a
+      // wallet that holds *only* an escrowed twin still opens the grid/ledger.
+      const count =
+        (state.walletUsesPagedHoldings ? state.walletTotalCount : state.walletTokenIds.length) +
+        getInjectedEscrowTwinIds().length;
       const viewingConnectedWallet = isConnectedWalletAddress(viewingAddress);
       const connectedWalletHasVisibleLedger = viewingConnectedWallet && count > 0;
       const hasCuratedGallery = !!state.curatedGalleryId && count > 0;
