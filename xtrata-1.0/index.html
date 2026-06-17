@@ -2361,9 +2361,10 @@
     .explorer-filter-group {
       display: grid;
       gap: 6px;
-      margin: 0;
+      margin: 1px 0 2px;
       padding: 0;
       border: 0;
+      justify-items: start;
     }
 
     .explorer-filter-toggle {
@@ -2608,34 +2609,37 @@
     }
 
     body.explorer-mode .explorer-filter-group {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: auto;
+      align-items: start;
       gap: 6px;
+      width: 100%;
     }
 
     body.explorer-mode .explorer-filter-group > .label {
-      order: 0;
-      margin: 0;
-      flex: 0 0 auto;
+      display: none;
     }
 
     body.explorer-mode .explorer-filter-toggle {
-      flex: 0 0 auto;
+      grid-column: 1;
     }
 
     body.explorer-mode .explorer-filter-options {
-      order: 1;
-      flex: 0 1 auto;
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      padding-bottom: 1px;
+      grid-column: 1 / -1;
+      justify-self: stretch;
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+      align-items: center;
+      overflow: visible;
+      padding-bottom: 0;
     }
 
     body.explorer-mode #explorerClearFiltersButton {
-      order: 2;
+      grid-column: 1 / -1;
+      justify-self: start;
       min-height: 26px;
-      margin-left: 4px;
+      margin-left: 0;
     }
 
     body.explorer-mode .explorer-tools {
@@ -2647,8 +2651,6 @@
     }
 
     body.explorer-mode .explorer-filter-group {
-      order: 2;
-      flex: 0 0 auto;
       min-width: 0;
     }
 
@@ -2656,7 +2658,7 @@
       order: 1;
       flex: 1 1 300px;
       display: grid;
-      grid-template-columns: auto minmax(4rem, 4.8rem) auto minmax(4rem, 4.8rem) auto auto;
+      grid-template-columns: auto minmax(4rem, 4.8rem) auto minmax(4rem, 4.8rem) auto;
       align-items: center;
       gap: 5px;
     }
@@ -3034,7 +3036,7 @@
 
       body.explorer-mode .explorer-tools__row {
         display: grid;
-        grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr) auto auto;
+        grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr) auto;
         gap: 5px;
         align-items: end;
       }
@@ -3048,7 +3050,7 @@
       }
 
       body.explorer-mode .explorer-filter-group {
-        display: flex;
+        display: grid;
         grid-template-columns: none;
         gap: 6px;
         overflow: hidden;
@@ -3782,55 +3784,55 @@
                     <input class="input" id="explorerTokenInput" type="number" min="1" step="1" inputmode="numeric" placeholder="ID" />
                   </label>
                   <button class="btn ghost" id="explorerJumpButton" type="button">Go</button>
-                  <fieldset class="explorer-filter-group is-collapsed" id="explorerFilterGroup">
-                    <legend class="label">Type filters</legend>
-                    <button
-                      class="explorer-filter-toggle"
-                      id="explorerFilterToggle"
-                      type="button"
-                      aria-controls="explorerFilterOptions explorerClearFiltersButton"
-                      aria-expanded="false"
-                      aria-label="Show type filters"
-                      title="Show type filters"
-                    >▸</button>
-                    <div class="explorer-filter-options" id="explorerFilterOptions">
-                      <label class="explorer-filter-chip">
-                        <input type="checkbox" data-explorer-filter="image" />
-                        Images
-                      </label>
-                      <label class="explorer-filter-chip">
-                        <input type="checkbox" data-explorer-filter="html" />
-                        HTML
-                      </label>
-                      <label class="explorer-filter-chip">
-                        <input type="checkbox" data-explorer-filter="video" />
-                        Video
-                      </label>
-                      <label class="explorer-filter-chip">
-                        <input type="checkbox" data-explorer-filter="audio" />
-                        Audio
-                      </label>
-                      <label class="explorer-filter-chip">
-                        <input type="checkbox" data-explorer-filter="text" />
-                        Text
-                      </label>
-                      <label class="explorer-filter-chip">
-                        <input type="checkbox" data-explorer-filter="code" />
-                        Code
-                      </label>
-                      <label class="explorer-filter-chip">
-                        <input type="checkbox" data-explorer-filter="document" />
-                        Docs
-                      </label>
-                      <label class="explorer-filter-chip">
-                        <input type="checkbox" data-explorer-filter="other" />
-                        Other
-                      </label>
-                    </div>
-                    <button class="small-link" id="explorerClearFiltersButton" type="button">Clear filters</button>
-                  </fieldset>
                 </div>
               </div>
+              <fieldset class="explorer-filter-group is-collapsed" id="explorerFilterGroup">
+                <legend class="label">Type filters</legend>
+                <button
+                  class="explorer-filter-toggle"
+                  id="explorerFilterToggle"
+                  type="button"
+                  aria-controls="explorerFilterOptions explorerClearFiltersButton"
+                  aria-expanded="false"
+                  aria-label="Show type filters"
+                  title="Show type filters"
+                >▸</button>
+                <div class="explorer-filter-options" id="explorerFilterOptions">
+                  <label class="explorer-filter-chip">
+                    <input type="checkbox" data-explorer-filter="image" />
+                    Images
+                  </label>
+                  <label class="explorer-filter-chip">
+                    <input type="checkbox" data-explorer-filter="html" />
+                    HTML
+                  </label>
+                  <label class="explorer-filter-chip">
+                    <input type="checkbox" data-explorer-filter="video" />
+                    Video
+                  </label>
+                  <label class="explorer-filter-chip">
+                    <input type="checkbox" data-explorer-filter="audio" />
+                    Audio
+                  </label>
+                  <label class="explorer-filter-chip">
+                    <input type="checkbox" data-explorer-filter="text" />
+                    Text
+                  </label>
+                  <label class="explorer-filter-chip">
+                    <input type="checkbox" data-explorer-filter="code" />
+                    Code
+                  </label>
+                  <label class="explorer-filter-chip">
+                    <input type="checkbox" data-explorer-filter="document" />
+                    Docs
+                  </label>
+                  <label class="explorer-filter-chip">
+                    <input type="checkbox" data-explorer-filter="other" />
+                    Other
+                  </label>
+                </div>
+                <button class="small-link" id="explorerClearFiltersButton" type="button">Clear filters</button>
+              </fieldset>
 
               <!-- <div class="wallet-example-description" id="walletExampleDescription" hidden></div> -->
             </div>
