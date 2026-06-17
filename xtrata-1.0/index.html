@@ -2520,21 +2520,39 @@
     }
 
     body.explorer-mode .explorer-filter-options {
-      order: 2;
-      flex: 1 1 100%;
+      order: 1;
+      flex: 0 1 auto;
       flex-wrap: nowrap;
       overflow-x: auto;
       padding-bottom: 1px;
     }
 
     body.explorer-mode #explorerClearFiltersButton {
-      order: 1;
+      order: 2;
       min-height: 26px;
-      margin-left: auto;
+      margin-left: 4px;
+    }
+
+    body.explorer-mode .explorer-tools {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 10px;
+    }
+
+    body.explorer-mode .explorer-filter-group {
+      order: 1;
+      flex: 1 1 520px;
+      min-width: 0;
     }
 
     body.explorer-mode .explorer-tools__row {
+      order: 2;
+      flex: 0 0 auto;
+      display: grid;
+      grid-template-columns: minmax(5.5rem, 6.5rem) minmax(5.5rem, 6.5rem) auto;
       align-items: center;
+      gap: 6px;
     }
 
     body.explorer-mode .explorer-tools__row .field {
@@ -3642,11 +3660,11 @@
                 <div class="explorer-tools__row">
                   <label class="field">
                     <span class="label">Page</span>
-                    <input class="input" id="explorerPageInput" type="number" min="1" step="1" inputmode="numeric" placeholder="1" />
+                    <input class="input" id="explorerPageInput" type="number" min="1" step="1" inputmode="numeric" placeholder="Page" />
                   </label>
                   <label class="field">
                     <span class="label">Inscription #</span>
-                    <input class="input" id="explorerTokenInput" type="number" min="1" step="1" inputmode="numeric" placeholder="Token ID" />
+                    <input class="input" id="explorerTokenInput" type="number" min="1" step="1" inputmode="numeric" placeholder="ID" />
                   </label>
                   <button class="btn ghost" id="explorerJumpButton" type="button">Go</button>
                 </div>
@@ -3829,7 +3847,7 @@
         <a href="/manage">Artist portal</a>
         <a href="/web/migrate.html">Migrate to v3</a>
         <a href="https://x.com/XtrataLayers" target="_blank" rel="noreferrer">Xtrata on X</a>
-        <a href="/?explorer=1">Xplorer</a>
+        <a href="/?explorer=latest">Xplorer</a>
       </nav>
       <label class="footer-theme">
         <span>Style</span>
@@ -7141,8 +7159,7 @@
         const explorerControlsDisabled =
           !state.explorerMode ||
           state.busy ||
-          state.walletLoadingPage ||
-          state.explorerFilterIndexLoading;
+          state.walletLoadingPage;
         dom.explorerJumpButton.disabled = explorerControlsDisabled;
         dom.explorerLatestButton.disabled = explorerControlsDisabled;
         dom.explorerPageInput.disabled = explorerControlsDisabled;
@@ -7226,9 +7243,7 @@
     const syncExplorerFilterControls = () => {
       const disabled =
         !state.explorerMode ||
-        state.busy ||
-        state.walletLoadingPage ||
-        state.explorerFilterIndexLoading;
+        state.busy;
       dom.explorerFilterInputs.forEach((input) => {
         const kind = input.dataset.explorerFilter ?? '';
         input.checked = state.explorerFilterKinds.has(kind);
