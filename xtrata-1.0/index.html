@@ -941,6 +941,25 @@
       font-size: 12px;
     }
 
+    .meta-value--link {
+      cursor: pointer;
+      color: var(--accent, #3aa0ff);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      text-decoration-thickness: 1px;
+      transition: opacity 0.12s ease;
+    }
+
+    .meta-value--link:hover,
+    .meta-value--link:focus-visible {
+      opacity: 0.82;
+      outline: none;
+    }
+
+    .meta-value--link:focus-visible {
+      text-decoration-thickness: 2px;
+    }
+
     .prepared-meta .meta-value {
       overflow: visible;
       text-overflow: clip;
@@ -3885,6 +3904,7 @@
                   <button class="btn ghost" id="refreshWalletButton" type="button">Refresh</button>
                   <a class="btn secondary explorer-grid-action" href="/" id="explorerHomeLink">Home</a>
                   <button class="btn secondary explorer-grid-action" id="explorerLatestButton" type="button">Latest</button>
+                  <button class="btn secondary explorer-grid-action" id="explorerExitWalletButton" type="button" hidden>Back to Xplorer</button>
                 </div>
                 <div class="wallet-grid-toolbar__status" aria-hidden="true"></div>
                 <div class="wallet-grid-toolbar__secondary">
@@ -4305,6 +4325,7 @@
       explorerFilterGroup: $('explorerFilterGroup'),
       explorerFilterToggle: $('explorerFilterToggle'),
       explorerClearFiltersButton: $('explorerClearFiltersButton'),
+      explorerExitWalletButton: $('explorerExitWalletButton'),
       explorerHomeLink: $('explorerHomeLink'),
       explorerFilterInputs: [...document.querySelectorAll('[data-explorer-filter]')],
       transferRecipientInput: $('transferRecipientInput'),
@@ -5606,6 +5627,25 @@
           body.tabIndex = 0;
           body.setAttribute('aria-label', `${meta.key}: ${meta.tooltip}`);
         }
+        if (typeof meta.onClick === 'function') {
+          body.classList.add('meta-value--link');
+          body.setAttribute('role', 'button');
+          body.tabIndex = 0;
+          if (meta.actionLabel) {
+            body.setAttribute('aria-label', meta.actionLabel);
+            body.title = meta.actionLabel;
+          }
+          const handler = (event) => {
+            event.preventDefault();
+            meta.onClick();
+          };
+          body.addEventListener('click', handler);
+          body.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              handler(event);
+            }
+          });
+        }
         row.append(label, body);
         target.append(row);
       }
@@ -5898,10 +5938,25 @@
       const ownerValue = escrowHolder
         ? truncateMiddle(escrowHolder.holder, 8, 8)
         : ownerName ?? (token.owner ? truncateMiddle(token.owner, 8, 8) : 'unknown');
+      // Effective wallet address to open in the grid when the Owner is clicked:
+      // the real holder when escrowed, otherwise the token owner. Skip contract
+      // principals (still escrow-resolving) so we never load a contract id.
+      const ownerWalletAddress = escrowHolder
+        ? escrowHolder.holder
+        : !isEscrowed && token.owner
+          ? token.owner
+          : null;
+      const ownerLine = { key: 'Owner', value: ownerValue };
+      if (ownerWalletAddress) {
+        ownerLine.onClick = () => {
+          void viewWalletByAddress(ownerWalletAddress);
+        };
+        ownerLine.actionLabel = `View this wallet's inscriptions in the grid`;
+      }
       const lines = [
         ['Type', getGridMimeLabel(effectiveMimeType)],
         ['Size', token.meta?.totalSize ? formatBytes(token.meta.totalSize) : 'unknown'],
-        ['Owner', ownerValue],
+        ownerLine,
         ...(isEscrowed
           ? [['State', escrowHolder ? 'Escrowed' : 'Escrowed (resolving owner...)']]
           : []),
@@ -7426,6 +7481,14 @@
       dom.viewInscriptionsButton.hidden = !hasConnectedInscriptionView || state.explorerMode;
       dom.viewInscriptionsButton.disabled = state.busy;
       dom.backToGridButton.hidden = !hasGridBackTarget;
+      if (dom.explorerExitWalletButton) {
+        // In Xplorer, a clicked owner takes over the grid with that wallet's
+        // holdings; surface a way back to the normal (latest) explorer view.
+        const inExplorerWalletView =
+          state.explorerMode &&
+          !!(state.walletViewAddress || state.walletViewName);
+        dom.explorerExitWalletButton.hidden = !inExplorerWalletView;
+      }
       dom.inscribeButton.disabled =
         state.busy ||
         !connected ||
@@ -10864,6 +10927,45 @@
       updateControls();
     };
 
+    // Programmatically load a wallet's holdings into the grid (e.g. when the
+    // owner/holder address in the preview panel is clicked). Mirrors the
+    // resolved-address branch of viewWalletFromInput so it behaves identically
+    // in both homepage and Xplorer (explorer-mode) contexts.
+    const viewWalletByAddress = async (address) => {
+      const normalized = (address ?? '').trim();
+      if (!normalized) {
+        return;
+      }
+      state.walletViewRequestId += 1;
+      cancelWalletLookup();
+      state.walletLookupNotice = null;
+
+      const isConnectedAddress =
+        state.walletSession.address &&
+        addressesEqual(normalized, state.walletSession.address);
+      state.walletViewAddress = isConnectedAddress ? null : normalized;
+      state.walletViewName = null;
+      state.curatedGalleryId = null;
+      state.curatedGalleryTitle = null;
+      state.homeLatestView = false;
+      clearExampleDescription();
+
+      if (dom.walletLookupInput) {
+        dom.walletLookupInput.value = isConnectedAddress ? '' : normalized;
+        updateWalletLookupInputMode();
+      }
+      appendLog(`Viewing wallet: ${truncateMiddle(normalized, 8, 8)}.`);
+      updateWalletStatus();
+      // Bring the grid into view (helpful in explorer-mode where the click
+      // originates from the preview panel).
+      const scrollTarget = dom.tokenGrid ?? dom.walletGridStatus;
+      if (scrollTarget?.scrollIntoView) {
+        scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      await loadWalletInscriptions();
+      updateControls();
+    };
+
     const viewWalletFromInput = async (options = {}) => {
       if (shouldClearWalletLookupOnSubmit()) {
         await clearWalletLookupToConnectedWallet();
@@ -12914,6 +13016,26 @@ const openCuratedGallery = async (galleryId) => {
       void handleExplorerJump();
     });
     dom.explorerLatestButton?.addEventListener('click', () => {
+      void showLatestExplorerPage();
+    });
+    dom.explorerExitWalletButton?.addEventListener('click', () => {
+      // Leave the clicked-owner wallet takeover and return to the normal
+      // (latest) Xplorer grid.
+      state.walletViewRequestId += 1;
+      cancelWalletLookup();
+      state.walletLookupNotice = null;
+      state.walletViewAddress = null;
+      state.walletViewName = null;
+      state.curatedGalleryId = null;
+      state.curatedGalleryTitle = null;
+      state.homeLatestView = false;
+      clearExampleDescription();
+      if (dom.walletLookupInput) {
+        dom.walletLookupInput.value = '';
+        updateWalletLookupInputMode();
+      }
+      updateWalletStatus();
+      updateControls();
       void showLatestExplorerPage();
     });
     dom.explorerPageInput?.addEventListener('input', () => {
