@@ -3904,7 +3904,6 @@
                   <button class="btn ghost" id="refreshWalletButton" type="button">Refresh</button>
                   <a class="btn secondary explorer-grid-action" href="/" id="explorerHomeLink">Home</a>
                   <button class="btn secondary explorer-grid-action" id="explorerLatestButton" type="button">Latest</button>
-                  <button class="btn secondary explorer-grid-action" id="explorerExitWalletButton" type="button" hidden>Back to Xplorer</button>
                 </div>
                 <div class="wallet-grid-toolbar__status" aria-hidden="true"></div>
                 <div class="wallet-grid-toolbar__secondary">
@@ -4325,7 +4324,6 @@
       explorerFilterGroup: $('explorerFilterGroup'),
       explorerFilterToggle: $('explorerFilterToggle'),
       explorerClearFiltersButton: $('explorerClearFiltersButton'),
-      explorerExitWalletButton: $('explorerExitWalletButton'),
       explorerHomeLink: $('explorerHomeLink'),
       explorerFilterInputs: [...document.querySelectorAll('[data-explorer-filter]')],
       transferRecipientInput: $('transferRecipientInput'),
@@ -5936,7 +5934,7 @@
       // resolved real holder (current owner of the original NFT) as Owner and
       // flag the twin as Escrowed for clarity.
       const ownerValue = escrowHolder
-        ? truncateMiddle(escrowHolder.holder, 8, 8)
+        ? escrowHolder.holderName ?? truncateMiddle(escrowHolder.holder, 8, 8)
         : ownerName ?? (token.owner ? truncateMiddle(token.owner, 8, 8) : 'unknown');
       // Effective wallet address to open in the grid when the Owner is clicked:
       // the real holder when escrowed, otherwise the token owner. Skip contract
@@ -5947,7 +5945,10 @@
           ? token.owner
           : null;
       const ownerLine = { key: 'Owner', value: ownerValue };
-      if (ownerWalletAddress) {
+      // Click-to-load-wallet is homepage-only. In the Xplorer the twin lives in
+      // the helper contract (not the holder's wallet), so loading the holder's
+      // wallet would not show the twin — disable the click-through there.
+      if (ownerWalletAddress && !state.explorerMode) {
         ownerLine.onClick = () => {
           void viewWalletByAddress(ownerWalletAddress);
         };
@@ -6702,6 +6703,32 @@
           !addressesEqual(currentToken?.owner, token.owner)
         ) {
           return;
+        }
+        // Resolve a BNS name for the *real* holder (the escrowed twin's owner is
+        // the helper contract, so token.owner never resolves to a name). This
+        // lets the preview panel show the holder's .btc name when they have one.
+        try {
+          const holderNames = await resolveBnsNames({
+            address: escrowHolder.holder,
+            network: state.contract.network
+          });
+          if (
+            holderNames.primary &&
+            requestId === state.selectedEscrowHolderRequestId &&
+            state.selectedTokenId === token.id
+          ) {
+            escrowHolder.holderName = holderNames.primary;
+          }
+        } catch (bnsError) {
+          debugLog(
+            'bns',
+            'escrow holder name lookup failed',
+            {
+              holder: truncateMiddle(escrowHolder.holder, 8, 8),
+              error: bnsError instanceof Error ? bnsError.message : String(bnsError)
+            },
+            'warn'
+          );
         }
         renderSelectedInscriptionMeta(token, null, null, escrowHolder);
       } catch (error) {
@@ -7481,14 +7508,6 @@
       dom.viewInscriptionsButton.hidden = !hasConnectedInscriptionView || state.explorerMode;
       dom.viewInscriptionsButton.disabled = state.busy;
       dom.backToGridButton.hidden = !hasGridBackTarget;
-      if (dom.explorerExitWalletButton) {
-        // In Xplorer, a clicked owner takes over the grid with that wallet's
-        // holdings; surface a way back to the normal (latest) explorer view.
-        const inExplorerWalletView =
-          state.explorerMode &&
-          !!(state.walletViewAddress || state.walletViewName);
-        dom.explorerExitWalletButton.hidden = !inExplorerWalletView;
-      }
       dom.inscribeButton.disabled =
         state.busy ||
         !connected ||
@@ -13016,26 +13035,6 @@ const openCuratedGallery = async (galleryId) => {
       void handleExplorerJump();
     });
     dom.explorerLatestButton?.addEventListener('click', () => {
-      void showLatestExplorerPage();
-    });
-    dom.explorerExitWalletButton?.addEventListener('click', () => {
-      // Leave the clicked-owner wallet takeover and return to the normal
-      // (latest) Xplorer grid.
-      state.walletViewRequestId += 1;
-      cancelWalletLookup();
-      state.walletLookupNotice = null;
-      state.walletViewAddress = null;
-      state.walletViewName = null;
-      state.curatedGalleryId = null;
-      state.curatedGalleryTitle = null;
-      state.homeLatestView = false;
-      clearExampleDescription();
-      if (dom.walletLookupInput) {
-        dom.walletLookupInput.value = '';
-        updateWalletLookupInputMode();
-      }
-      updateWalletStatus();
-      updateControls();
       void showLatestExplorerPage();
     });
     dom.explorerPageInput?.addEventListener('input', () => {
