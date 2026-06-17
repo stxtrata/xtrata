@@ -617,6 +617,15 @@
       line-height: 1.1;
     }
 
+    .panel-title__brand-x {
+      width: 1.15em;
+      height: 1.15em;
+      display: inline-block;
+      margin-right: 0.04em;
+      vertical-align: -0.16em;
+      object-fit: contain;
+    }
+
     .token-uri-head-preview {
       width: 36px;
       height: 36px;
@@ -2322,14 +2331,14 @@
 
     .explorer-tools {
       display: grid;
-      gap: 8px;
-      margin: 0 0 8px;
+      gap: 5px;
+      margin: 0 0 5px;
     }
 
     .explorer-tools__row {
       display: grid;
-      grid-template-columns: minmax(86px, 0.65fr) minmax(150px, 1fr) auto;
-      gap: 8px;
+      grid-template-columns: minmax(70px, 0.55fr) minmax(92px, 0.7fr) auto auto;
+      gap: 5px;
       align-items: end;
     }
 
@@ -2338,13 +2347,15 @@
     }
 
     .explorer-tools .input {
-      min-height: 34px;
-      padding: 8px 10px;
+      min-height: 26px;
+      padding: 5px 8px;
+      font-size: 12px;
     }
 
     .explorer-tools .btn {
-      min-height: 34px;
-      padding: 7px 10px;
+      min-height: 26px;
+      padding: 4px 8px;
+      font-size: 11px;
     }
 
     .explorer-filter-group {
@@ -2358,9 +2369,9 @@
     .explorer-filter-toggle {
       display: inline-grid;
       place-items: center;
-      width: 24px;
-      height: 24px;
-      min-height: 24px;
+      width: 26px;
+      height: 26px;
+      min-height: 26px;
       padding: 0;
       border: 1px solid var(--line);
       border-radius: 999px;
@@ -2581,14 +2592,18 @@
     }
 
     body.explorer-mode .panel[aria-labelledby="walletTitle"] .panel-head {
-      padding: 14px 16px;
+      padding: 8px 14px 6px;
     }
 
     body.explorer-mode .panel[aria-labelledby="walletTitle"] .panel-body {
-      padding: 14px 16px 16px;
+      padding: 7px 14px 14px;
     }
 
     body.explorer-mode .explorer-mode-note {
+      display: none;
+    }
+
+    body.explorer-mode #walletSubtitle {
       display: none;
     }
 
@@ -2627,23 +2642,23 @@
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 8px 10px;
+      gap: 5px 7px;
       width: 100%;
     }
 
     body.explorer-mode .explorer-filter-group {
-      order: 1;
-      flex: 1 1 520px;
+      order: 2;
+      flex: 0 0 auto;
       min-width: 0;
     }
 
     body.explorer-mode .explorer-tools__row {
-      order: 2;
-      flex: 0 0 auto;
+      order: 1;
+      flex: 1 1 300px;
       display: grid;
-      grid-template-columns: auto minmax(5rem, 6rem) auto minmax(5rem, 6rem) auto;
+      grid-template-columns: auto minmax(4rem, 4.8rem) auto minmax(4rem, 4.8rem) auto auto;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
     }
 
     body.explorer-mode .explorer-tools__row .field {
@@ -3019,22 +3034,23 @@
 
       body.explorer-mode .explorer-tools__row {
         display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        gap: 8px;
+        grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr) auto auto;
+        gap: 5px;
+        align-items: end;
       }
 
       body.explorer-mode .explorer-tools__row .field,
       body.explorer-mode .explorer-tools__row .input,
       body.explorer-mode #explorerJumpButton {
-        width: 100%;
+        width: auto;
         min-width: 0;
         max-width: 100%;
       }
 
       body.explorer-mode .explorer-filter-group {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        gap: 8px;
+        display: flex;
+        grid-template-columns: none;
+        gap: 6px;
         overflow: hidden;
       }
 
@@ -3766,54 +3782,54 @@
                     <input class="input" id="explorerTokenInput" type="number" min="1" step="1" inputmode="numeric" placeholder="ID" />
                   </label>
                   <button class="btn ghost" id="explorerJumpButton" type="button">Go</button>
+                  <fieldset class="explorer-filter-group is-collapsed" id="explorerFilterGroup">
+                    <legend class="label">Type filters</legend>
+                    <button
+                      class="explorer-filter-toggle"
+                      id="explorerFilterToggle"
+                      type="button"
+                      aria-controls="explorerFilterOptions explorerClearFiltersButton"
+                      aria-expanded="false"
+                      aria-label="Show type filters"
+                      title="Show type filters"
+                    >▸</button>
+                    <div class="explorer-filter-options" id="explorerFilterOptions">
+                      <label class="explorer-filter-chip">
+                        <input type="checkbox" data-explorer-filter="image" />
+                        Images
+                      </label>
+                      <label class="explorer-filter-chip">
+                        <input type="checkbox" data-explorer-filter="html" />
+                        HTML
+                      </label>
+                      <label class="explorer-filter-chip">
+                        <input type="checkbox" data-explorer-filter="video" />
+                        Video
+                      </label>
+                      <label class="explorer-filter-chip">
+                        <input type="checkbox" data-explorer-filter="audio" />
+                        Audio
+                      </label>
+                      <label class="explorer-filter-chip">
+                        <input type="checkbox" data-explorer-filter="text" />
+                        Text
+                      </label>
+                      <label class="explorer-filter-chip">
+                        <input type="checkbox" data-explorer-filter="code" />
+                        Code
+                      </label>
+                      <label class="explorer-filter-chip">
+                        <input type="checkbox" data-explorer-filter="document" />
+                        Docs
+                      </label>
+                      <label class="explorer-filter-chip">
+                        <input type="checkbox" data-explorer-filter="other" />
+                        Other
+                      </label>
+                    </div>
+                    <button class="small-link" id="explorerClearFiltersButton" type="button">Clear filters</button>
+                  </fieldset>
                 </div>
-                <fieldset class="explorer-filter-group is-collapsed" id="explorerFilterGroup">
-                  <legend class="label">Type filters</legend>
-                  <button
-                    class="explorer-filter-toggle"
-                    id="explorerFilterToggle"
-                    type="button"
-                    aria-controls="explorerFilterOptions explorerClearFiltersButton"
-                    aria-expanded="false"
-                    aria-label="Show type filters"
-                    title="Show type filters"
-                  >▸</button>
-                  <div class="explorer-filter-options" id="explorerFilterOptions">
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="image" />
-                      Images
-                    </label>
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="html" />
-                      HTML
-                    </label>
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="video" />
-                      Video
-                    </label>
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="audio" />
-                      Audio
-                    </label>
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="text" />
-                      Text
-                    </label>
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="code" />
-                      Code
-                    </label>
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="document" />
-                      Docs
-                    </label>
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="other" />
-                      Other
-                    </label>
-                  </div>
-                  <button class="small-link" id="explorerClearFiltersButton" type="button">Clear filters</button>
-                </fieldset>
               </div>
 
               <!-- <div class="wallet-example-description" id="walletExampleDescription" hidden></div> -->
@@ -4160,6 +4176,8 @@
           entry.protocolVersion === '3.2.3' ||
           entry.contractName?.toLowerCase().includes('v3-2-3')
       ) ?? ACTIVE_CONTRACTS[0];
+    const XTRATA_BRAND_MARK_URL =
+      'https://nxhyvj3lifp2q34nklffzxslfje426oxeruo3lkuj56srwgctdlq.arweave.net/bc-Kp2tBX6hvjVLKXN5LKknNedckaO2tVE99KNjCmNc';
     const SMALL_MINT_HELPER_TARGET_CORE_CONTRACT_ID =
       `${SMALL_MINT_HELPER_MAINNET_ADDRESS}.xtrata-v2-1-0`;
     const walletAdapter = createStacksWalletAdapter({
@@ -7183,7 +7201,15 @@
       document.body.classList.toggle('explorer-mode', state.explorerMode);
       document.body.classList.toggle('intro-mode', !hasLedger && !state.explorerMode);
       if (dom.walletTitle) {
-        dom.walletTitle.textContent = state.explorerMode ? 'Xtrata Xplorer' : 'Wallet Inscriptions';
+        if (state.explorerMode) {
+          dom.walletTitle.setAttribute('aria-label', 'Xtrata Xplorer');
+          dom.walletTitle.innerHTML =
+            `<img class="panel-title__brand-x" src="${XTRATA_BRAND_MARK_URL}" alt="X" />trata ` +
+            `<img class="panel-title__brand-x" src="${XTRATA_BRAND_MARK_URL}" alt="X" />plorer`;
+        } else {
+          dom.walletTitle.removeAttribute('aria-label');
+          dom.walletTitle.textContent = 'Wallet Inscriptions';
+        }
       }
       if (dom.introNetworkValue) {
         dom.introNetworkValue.textContent = `Stacks ${state.contract.network}`;
