@@ -3677,7 +3677,7 @@
               </div>
 
               <div class="explorer-tools" id="xtrataExplorerTools" aria-label="Xtrata Xplorer controls">
-                <p class="explorer-mode-note" id="xtrataExplorerStatus">Browse inscriptions from the selected contract.</p>
+                <p class="explorer-mode-note" id="xtrataExplorerStatus">Browse inscriptions.</p>
                 <div class="explorer-tools__row">
                   <label class="field">
                     <span class="label">Go to page:</span>
@@ -4484,7 +4484,7 @@
 
     const WALLET_PAGE_SIZE = 16;
     const WALLET_FALLBACK_SCAN_LIMIT = 2000;
-    const MAX_GRID_EAGER_FULL_LOAD_BYTES = 4n * 1024n * 1024n;
+    const MAX_GRID_EAGER_FULL_LOAD_BYTES = 10n * 1024n * 1024n;
     const GRID_THUMBNAIL_HYDRATION_CONCURRENCY = 2;
     const GRID_SUMMARY_CACHE_MAX_SCOPES = 12;
     const GRID_SUMMARY_CACHE_MAX_ENTRIES = 512;
@@ -7341,7 +7341,7 @@
           'ready',
           'blue'
         );
-        dom.walletSubtitle.textContent = `Browse ${state.contract.label} inscriptions.`;
+        dom.walletSubtitle.textContent = `Browse Xtrata inscriptions.`;
         return;
       }
       if (state.curatedGalleryTitle) {
