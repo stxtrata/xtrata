@@ -3882,13 +3882,13 @@
                       </div>
                     </fieldset>
                   </div>
-                  <button class="btn ghost" id="walletPrevButton" type="button" disabled>Prev</button>
+                  <button class="btn ghost" id="refreshWalletButton" type="button">Refresh</button>
                   <a class="btn secondary explorer-grid-action" href="/" id="explorerHomeLink">Home</a>
                   <button class="btn secondary explorer-grid-action" id="explorerLatestButton" type="button">Latest</button>
                 </div>
                 <div class="wallet-grid-toolbar__status" aria-hidden="true"></div>
                 <div class="wallet-grid-toolbar__secondary">
-                  <button class="btn ghost" id="refreshWalletButton" type="button">Refresh</button>
+                  <button class="btn ghost" id="walletPrevButton" type="button" disabled>Prev</button>
                   <button class="btn ghost" id="walletNextButton" type="button" disabled>Next</button>
                 </div>
               </div>
@@ -4597,6 +4597,7 @@
       gridLiveMediaCache: new Map(),
       summaryCacheScopes: new Map(),
       escrowHolderCache: new Map(),
+      twinReverseIndexCache: new Map(),
       thumbnailHydrationQueue: [],
       thumbnailHydrationQueued: new Set(),
       thumbnailHydrationInFlight: new Set(),
@@ -5670,16 +5671,100 @@
       dom.resumeNotice.hidden = false;
     };
 
+    // Forever Twin registry: maps each helper/escrow contract to its original
+    // collection. The helper is both the escrow holder and the on-chain twin
+    // index (owns a Bindings map keyed by local token id, emitting an
+    // "inscribed" print event carrying { token-id, xtrata-id }). To add a
+    // collection, add an entry here — resolution is fully generic.
     const PEPE_ESCROW_RESOLVERS = new Map([
       [
-        'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-fakfun-xtrata',
+        'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun',
         {
+          helperContractId:
+            'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun',
           sourceContractId: 'SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe',
           sourceAssetName: 'bitcoin-pepe',
+          collectionName: 'Bitcoin Pepes',
+          itemNoun: 'Bitcoin Pepe',
           label: 'Pepe holder'
+        }
+      ],
+      [
+        'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata',
+        {
+          helperContractId:
+            'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata',
+          sourceContractId: 'SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats',
+          sourceAssetName: 'leo-cats',
+          collectionName: 'LeoCats',
+          itemNoun: 'LeoCat',
+          label: 'LeoCat holder'
         }
       ]
     ]);
+
+    // Build (and cache) the xtrata-id -> local-id map for a helper contract by
+    // scanning its "inscribed" print events. This is the reverse lookup the
+    // contract does not expose directly, and works for every bound token
+    // (including those minted straight into escrow that never had a swap tx).
+    const buildTwinReverseIndex = async (resolver) => {
+      const cacheKey = resolver.helperContractId;
+      const cached = state.twinReverseIndexCache.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+      const promise = (async () => {
+        const index = new Map();
+        const pageSize = 50;
+        const maxEvents = 5000;
+        let offset = 0;
+        let seen = 0;
+        while (seen < maxEvents) {
+          let page;
+          try {
+            page = await fetchHiroJson(
+              `/extended/v1/contract/${encodeURIComponent(
+                resolver.helperContractId
+              )}/events?limit=${pageSize}&offset=${offset}`,
+              state.contract.network
+            );
+          } catch (error) {
+            break;
+          }
+          const results = page?.results ?? [];
+          if (results.length === 0) {
+            break;
+          }
+          for (const event of results) {
+            seen += 1;
+            const repr = event?.contract_log?.value?.repr;
+            if (
+              event?.contract_log?.topic !== 'print' ||
+              typeof repr !== 'string' ||
+              repr.indexOf('"inscribed"') === -1
+            ) {
+              continue;
+            }
+            const localMatch = repr.match(/\(token-id u(\d+)\)/);
+            const xtrataMatch = repr.match(/\(xtrata-id u(\d+)\)/);
+            if (!localMatch || !xtrataMatch) {
+              continue;
+            }
+            if (!index.has(xtrataMatch[1])) {
+              index.set(xtrataMatch[1], BigInt(localMatch[1]));
+            }
+          }
+          if (results.length < pageSize) {
+            break;
+          }
+          offset += pageSize;
+        }
+        return index;
+      })();
+      state.twinReverseIndexCache.set(cacheKey, promise);
+      promise.catch(() => state.twinReverseIndexCache.delete(cacheKey));
+      return promise;
+    };
 
     const clarityUintHex = (value) => {
       const hex = BigInt(value).toString(16).padStart(32, '0');
@@ -5729,53 +5814,63 @@
       if (cached) {
         return cached;
       }
-      const coreAssetId = `${getTokenCacheContractId(token)}::xtrata-inscription`;
-      const coreHistory = await fetchHiroJson(
-        `/extended/v1/tokens/nft/history?asset_identifier=${encodeURIComponent(coreAssetId)}` +
-          `&value=${encodeURIComponent(clarityUintHex(token.id))}&limit=20`,
-        state.contract.network
-      );
-      const escrowTransfer = (coreHistory.results ?? []).find(
-        (event) =>
-          event?.asset_event_type === 'transfer' &&
-          event?.recipient === token.owner &&
-          typeof event?.tx_id === 'string'
-      );
-      if (!escrowTransfer) {
-        return null;
+      // Reverse-resolve the original (local) collection token id for this
+      // Xtrata inscription using the helper's inscribed events.
+      const reverseIndex = await buildTwinReverseIndex(resolver).catch(() => null);
+      let sourceTokenId =
+        reverseIndex?.get(token.id.toString()) ?? null;
+
+      // Fallback: recover the local id from the escrow-deposit transaction
+      // (covers tokens swapped back into escrow if events are unavailable).
+      let escrowTxId = null;
+      if (sourceTokenId === null) {
+        const coreAssetId = `${getTokenCacheContractId(token)}::xtrata-inscription`;
+        const coreHistory = await fetchHiroJson(
+          `/extended/v1/tokens/nft/history?asset_identifier=${encodeURIComponent(coreAssetId)}` +
+            `&value=${encodeURIComponent(clarityUintHex(token.id))}&limit=20`,
+          state.contract.network
+        ).catch(() => null);
+        const escrowTransfer = (coreHistory?.results ?? []).find(
+          (event) =>
+            event?.asset_event_type === 'transfer' &&
+            event?.recipient === token.owner &&
+            typeof event?.tx_id === 'string'
+        );
+        if (escrowTransfer) {
+          escrowTxId = escrowTransfer.tx_id;
+          const tx = await fetchHiroJson(
+            `/extended/v1/tx/${encodeURIComponent(escrowTransfer.tx_id)}`,
+            state.contract.network
+          ).catch(() => null);
+          const sourceTokenArg = tx?.contract_call?.function_args?.find(
+            (arg) => arg?.name === 'token-id'
+          );
+          sourceTokenId = parseUintRepr(sourceTokenArg?.repr);
+        }
       }
-      const tx = await fetchHiroJson(
-        `/extended/v1/tx/${encodeURIComponent(escrowTransfer.tx_id)}`,
-        state.contract.network
-      );
-      const sourceTokenArg = tx?.contract_call?.function_args?.find(
-        (arg) => arg?.name === 'token-id'
-      );
-      const sourceTokenId = parseUintRepr(sourceTokenArg?.repr);
       if (sourceTokenId === null) {
         return null;
       }
+      // The real owner is the current holder of the original collection NFT.
       const sourceAssetId = `${resolver.sourceContractId}::${resolver.sourceAssetName}`;
       const sourceHistory = await fetchHiroJson(
         `/extended/v1/tokens/nft/history?asset_identifier=${encodeURIComponent(sourceAssetId)}` +
           `&value=${encodeURIComponent(clarityUintHex(sourceTokenId))}&limit=1`,
         state.contract.network
-      );
-      const latest = sourceHistory.results?.[0] ?? null;
-      const holder =
-        latest?.recipient ??
-        tx?.sender_address ??
-        escrowTransfer.sender ??
-        null;
+      ).catch(() => null);
+      const latest = sourceHistory?.results?.[0] ?? null;
+      const holder = latest?.recipient ?? null;
       if (!holder) {
         return null;
       }
       const result = {
         label: resolver.label,
+        collectionName: resolver.collectionName,
+        itemNoun: resolver.itemNoun,
         holder,
         sourceTokenId,
         sourceContractId: resolver.sourceContractId,
-        txId: escrowTransfer.tx_id
+        txId: escrowTxId
       };
       state.escrowHolderCache.set(cacheKey, result);
       return result;
@@ -5796,21 +5891,26 @@
     ) => {
       const effectiveMimeType =
         mimeTypeOverride ?? state.tokenPreviewMimeType ?? token.meta?.mimeType ?? null;
+      const isEscrowed = !!findPepeEscrowResolver(token.owner);
+      // When escrowed, the on-chain owner is the helper contract; show the
+      // resolved real holder (current owner of the original NFT) as Owner and
+      // flag the twin as Escrowed for clarity.
+      const ownerValue = escrowHolder
+        ? truncateMiddle(escrowHolder.holder, 8, 8)
+        : ownerName ?? (token.owner ? truncateMiddle(token.owner, 8, 8) : 'unknown');
       const lines = [
         ['Type', getGridMimeLabel(effectiveMimeType)],
         ['Size', token.meta?.totalSize ? formatBytes(token.meta.totalSize) : 'unknown'],
-        [
-          'Owner',
-          ownerName ?? (token.owner ? truncateMiddle(token.owner, 8, 8) : 'unknown')
-        ],
+        ['Owner', ownerValue],
+        ...(isEscrowed
+          ? [['State', escrowHolder ? 'Escrowed' : 'Escrowed (resolving owner...)']]
+          : []),
         ...(escrowHolder
           ? [[
-              escrowHolder.label,
-              truncateMiddle(escrowHolder.holder, 8, 8)
+              `${escrowHolder.itemNoun ?? 'Collection'} token`,
+              `#${escrowHolder.sourceTokenId.toString()}`
             ]]
-          : findPepeEscrowResolver(token.owner)
-            ? [['Pepe holder', 'Resolving...']]
-            : []),
+          : []),
         ['ID', formatTokenId(token.id)]
       ];
       renderMeta(dom.tokenPreviewMeta, lines);

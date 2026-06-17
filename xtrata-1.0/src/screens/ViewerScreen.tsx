@@ -104,6 +104,7 @@ import {
   type RelationshipSyncProgress
 } from '../lib/viewer/relationship-sync';
 import { loadWalletHoldingsIndex } from '../lib/viewer/wallet-index';
+import { resolveTwinOwnership, type TwinOwnership } from '../lib/twins';
 
 const PAGE_SIZE = 16;
 const REFRESH_INTERVAL_MS = 6_000;
@@ -729,7 +730,38 @@ const TokenDetails = (props: {
         )
       : null;
   const marketLabel = props.marketContractId ?? 'Select in Market module';
-  const detailOwnerAddress = props.token?.owner ?? null;
+
+  // Forever Twin resolution: link this Xtrata inscription to its original
+  // collection token (e.g. Bitcoin Pepe #44) and surface escrow state + the
+  // real owner when the twin is held by a helper contract.
+  const selectedTokenId = props.token?.id ?? null;
+  const selectedTokenOwner = props.token?.owner ?? null;
+  const twinQuery = useQuery<TwinOwnership | null>({
+    queryKey: [
+      'forever-twin',
+      getContractId(props.contract),
+      selectedTokenId?.toString() ?? 'none',
+      selectedTokenOwner ?? 'none'
+    ],
+    enabled: selectedTokenId !== null,
+    staleTime: 60_000,
+    retry: 1,
+    queryFn: () =>
+      resolveTwinOwnership({
+        xtrataId: selectedTokenId as bigint,
+        rawOwner: selectedTokenOwner,
+        masterContractId: getContractId(props.contract)
+      })
+  });
+  const twin = twinQuery.data ?? null;
+  const twinEscrowed = !!twin?.escrowed;
+  const twinLocalLabel = twin
+    ? `${twin.collection.itemNoun} #${twin.localTokenId.toString()}`
+    : null;
+  const detailOwnerAddress =
+    twinEscrowed && twin?.effectiveOwner
+      ? twin.effectiveOwner
+      : props.token?.owner ?? null;
   const detailCreatorAddress = props.token?.meta?.creator ?? null;
   const detailTokenUri = props.token?.tokenUri ?? null;
   const detailTokenUriLabel = detailTokenUri
@@ -1054,7 +1086,17 @@ const TokenDetails = (props: {
               network={props.contract.network}
               className="meta-value"
             />
+            {twinEscrowed && (
+              <span className="twin-escrow-badge" title="Xtrata twin held in escrow; owner shown is the original NFT holder.">
+                Escrowed
+              </span>
+            )}
           </p>
+          {twinLocalLabel && (
+            <p className="preview-pill">
+              {twin?.collection.name} · {twinLocalLabel}
+            </p>
+          )}
           {props.listing?.price !== undefined && (
             <p className="preview-pill preview-pill--strong">
               Listed ·{' '}
@@ -1278,13 +1320,31 @@ const TokenDetails = (props: {
             </div>
             <div className="meta-grid meta-grid--dense">
               <div>
-                <span className="meta-label">Owner</span>
+                <span className="meta-label">
+                  Owner
+                  {twinEscrowed && (
+                    <span
+                      className="twin-escrow-badge"
+                      title="The Xtrata twin is held in escrow by the Forever Twin contract. The address shown is the current holder of the original collection NFT."
+                    >
+                      Escrowed
+                    </span>
+                  )}
+                </span>
                 <AddressLabel
                   address={detailOwnerAddress}
                   network={props.contract.network}
                   className="meta-value"
                 />
               </div>
+              {twin && (
+                <div>
+                  <span className="meta-label">Collection token</span>
+                  <span className="meta-value" title={twin.collection.name}>
+                    {twinLocalLabel}
+                  </span>
+                </div>
+              )}
               <div>
                 <span className="meta-label">Creator</span>
                 <AddressLabel
