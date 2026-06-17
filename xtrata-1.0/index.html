@@ -2355,6 +2355,40 @@
       border: 0;
     }
 
+    .explorer-filter-toggle {
+      display: inline-grid;
+      place-items: center;
+      width: 24px;
+      height: 24px;
+      min-height: 24px;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--control);
+      color: var(--ink);
+      font: inherit;
+      font-size: 14px;
+      font-weight: 900;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .explorer-filter-toggle:hover,
+    .explorer-filter-toggle:focus-visible {
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px var(--focus-ring);
+      outline: none;
+    }
+
+    .explorer-filter-group.is-collapsed .explorer-filter-options,
+    .explorer-filter-group.is-collapsed #explorerClearFiltersButton {
+      display: none;
+    }
+
+    .explorer-filter-group.is-collapsed > .label {
+      display: none;
+    }
+
     .explorer-filter-options {
       display: flex;
       flex-wrap: wrap;
@@ -2568,6 +2602,10 @@
     body.explorer-mode .explorer-filter-group > .label {
       order: 0;
       margin: 0;
+      flex: 0 0 auto;
+    }
+
+    body.explorer-mode .explorer-filter-toggle {
       flex: 0 0 auto;
     }
 
@@ -3001,6 +3039,7 @@
       }
 
       body.explorer-mode .explorer-filter-group > .label,
+      body.explorer-mode .explorer-filter-toggle,
       body.explorer-mode #explorerClearFiltersButton {
         order: initial;
         margin-left: 0;
@@ -3728,9 +3767,18 @@
                   </label>
                   <button class="btn ghost" id="explorerJumpButton" type="button">Go</button>
                 </div>
-                <fieldset class="explorer-filter-group" id="explorerFilterGroup">
+                <fieldset class="explorer-filter-group is-collapsed" id="explorerFilterGroup">
                   <legend class="label">Type filters</legend>
-                  <div class="explorer-filter-options">
+                  <button
+                    class="explorer-filter-toggle"
+                    id="explorerFilterToggle"
+                    type="button"
+                    aria-controls="explorerFilterOptions explorerClearFiltersButton"
+                    aria-expanded="false"
+                    aria-label="Show type filters"
+                    title="Show type filters"
+                  >▸</button>
+                  <div class="explorer-filter-options" id="explorerFilterOptions">
                     <label class="explorer-filter-chip">
                       <input type="checkbox" data-explorer-filter="image" />
                       Images
@@ -4196,6 +4244,8 @@
       explorerTokenInput: $('explorerTokenInput'),
       explorerJumpButton: $('explorerJumpButton'),
       explorerLatestButton: $('explorerLatestButton'),
+      explorerFilterGroup: $('explorerFilterGroup'),
+      explorerFilterToggle: $('explorerFilterToggle'),
       explorerClearFiltersButton: $('explorerClearFiltersButton'),
       explorerHomeLink: $('explorerHomeLink'),
       explorerFilterInputs: [...document.querySelectorAll('[data-explorer-filter]')],
@@ -4514,6 +4564,7 @@
       explorerFilterIndexLoading: false,
       explorerFilterIndexComplete: false,
       explorerFilterBackgroundLoading: false,
+      explorerFiltersCollapsed: true,
       explorerFollowLatestFiltered: false,
       explorerFilterIndexRunId: 0,
       lastSubmittedTxId: null,
@@ -7314,6 +7365,24 @@
       const disabled =
         !state.explorerMode ||
         state.busy;
+      if (dom.explorerFilterGroup) {
+        dom.explorerFilterGroup.classList.toggle('is-collapsed', state.explorerFiltersCollapsed);
+      }
+      if (dom.explorerFilterToggle) {
+        dom.explorerFilterToggle.disabled = disabled;
+        dom.explorerFilterToggle.setAttribute(
+          'aria-expanded',
+          state.explorerFiltersCollapsed ? 'false' : 'true'
+        );
+        dom.explorerFilterToggle.setAttribute(
+          'aria-label',
+          state.explorerFiltersCollapsed ? 'Show type filters' : 'Hide type filters'
+        );
+        dom.explorerFilterToggle.title = state.explorerFiltersCollapsed
+          ? 'Show type filters'
+          : 'Hide type filters';
+        dom.explorerFilterToggle.textContent = state.explorerFiltersCollapsed ? '▸' : '▾';
+      }
       dom.explorerFilterInputs.forEach((input) => {
         const kind = input.dataset.explorerFilter ?? '';
         input.checked = state.explorerFilterKinds.has(kind);
@@ -12674,6 +12743,10 @@ const openCuratedGallery = async (galleryId) => {
       input.addEventListener('change', () => {
         void applyExplorerFilterControls();
       });
+    });
+    dom.explorerFilterToggle?.addEventListener('click', () => {
+      state.explorerFiltersCollapsed = !state.explorerFiltersCollapsed;
+      syncExplorerFilterControls();
     });
     dom.explorerClearFiltersButton?.addEventListener('click', () => {
       void clearExplorerFilters();
