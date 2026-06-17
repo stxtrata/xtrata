@@ -109,6 +109,12 @@ export const NFT_CUSTODY_RESOLVERS: readonly NftCustodyResolver[] = [
     label: 'pepe-nft-marketplace',
     functionName: 'get-listing',
     ownerField: 'seller'
+  },
+  {
+    contractId: 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-nft-market-faktory',
+    label: 'leo-nft-market-faktory',
+    functionName: 'get-listing',
+    ownerField: 'seller'
   }
 ];
 
