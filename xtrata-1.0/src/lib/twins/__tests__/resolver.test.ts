@@ -134,6 +134,32 @@ describe('resolveTwinOwnership', () => {
     expect(result?.rawOwner).toBe(HELPER);
   });
 
+  it('hops through a marketplace custodian to the real seller', async () => {
+    const MARKET = 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-nft-marketplace';
+    mockEvents([printEvent(44, 578)]);
+    vi.mocked(hiro.callReadOnly).mockImplementation(
+      async ({ contractId, functionName }: { contractId: string; functionName: string }) => {
+        if (functionName === 'get-binding') return bindingJson(578, true);
+        // Source NFT is held by the marketplace contract...
+        if (contractId.endsWith('.bitcoin-pepe')) return ownerJson(MARKET);
+        // ...whose listing names the real seller.
+        if (functionName === 'get-listing') {
+          return {
+            type: '(optional (tuple (seller principal)))',
+            value: {
+              type: '(tuple (seller principal))',
+              value: { seller: { type: 'principal', value: HOLDER } }
+            }
+          };
+        }
+        return ownerJson(HOLDER);
+      }
+    );
+    const result = await resolveTwinOwnership({ xtrataId: 578n, rawOwner: HELPER });
+    expect(result?.escrowed).toBe(true);
+    expect(result?.effectiveOwner).toBe(HOLDER);
+  });
+
   it('shows the normal owner when not escrowed', async () => {
     mockEvents([printEvent(44, 578)]);
     vi.mocked(hiro.callReadOnly).mockResolvedValue(
