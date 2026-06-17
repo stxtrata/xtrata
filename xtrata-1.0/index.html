@@ -4694,11 +4694,13 @@
     const MAX_GRID_EAGER_FULL_LOAD_BYTES = 10n * 1024n * 1024n;
     const GRID_THUMBNAIL_HYDRATION_CONCURRENCY = 2;
     // Max number of HTML inscription iframes allowed to execute simultaneously
-    // in the grid. Tiles beyond this budget (or off-screen) show a static poster
-    // until they scroll into view and a slot frees, or the user clicks them.
-    // Boards that complete the embed handshake (phase two) are exempt — they
-    // self-throttle internally and run in the trusted lane.
-    const MAX_LIVE_HTML_FRAMES = 4;
+    // in the grid. Sized to a full visible grid page so the whole 4x4 page can
+    // render at once without per-tile clicking — off-screen tiles are torn down
+    // by the IntersectionObserver, so concurrency stays bounded to ~one page as
+    // the user scrolls. Tiles still beyond this budget show a static poster
+    // until a slot frees or the user clicks them. Boards that complete the embed
+    // handshake (phase two) are exempt — they self-throttle in the trusted lane.
+    const MAX_LIVE_HTML_FRAMES = WALLET_PAGE_SIZE;
     const GRID_SUMMARY_CACHE_MAX_SCOPES = 12;
     const GRID_SUMMARY_CACHE_MAX_ENTRIES = 512;
     const EXPLORER_FILTER_INDEX_CHUNK_SIZE = 48;
@@ -10260,6 +10262,9 @@
 
       const requestActivation = (record) => {
         if (record.active) return;
+        // Gated tiles (e.g. relationship pair/child thumbs) never auto-activate;
+        // they stay as a poster until the user clicks (forceActivate).
+        if (record.gated) return;
         if (record.trusted) {
           activate(record);
           return;
@@ -10278,7 +10283,7 @@
 
       const fillFreeSlots = () => {
         tiles.forEach((r) => {
-          if (r.active || !r.intersecting) return;
+          if (r.active || !r.intersecting || r.gated) return;
           if (r.trusted) {
             activate(r);
           } else if (liveCount() < MAX_LIVE_HTML_FRAMES) {
@@ -10348,7 +10353,7 @@
         });
       }
 
-      const register = (thumbElement, media) => {
+      const register = (thumbElement, media, options = {}) => {
         const existing = tiles.get(thumbElement);
         if (existing) {
           if (observer) observer.unobserve(thumbElement);
@@ -10378,6 +10383,7 @@
           active: false,
           intersecting: false,
           trusted: false,
+          gated: !!options.gated,
           activatedAt: 0
         };
 
@@ -10414,7 +10420,7 @@
       return { register, reset };
     })();
 
-    const renderGridLiveMedia = (token, thumbElement, media) => {
+    const renderGridLiveMedia = (token, thumbElement, media, options = {}) => {
       const cacheKey = getThumbnailKey(token);
       const oldUrl = state.tokenThumbUrls.get(cacheKey);
       if (oldUrl) {
@@ -10503,8 +10509,11 @@
       if (media.kind === 'html') {
         // Gated mount: the iframe only executes when on-screen and within the
         // live-frame budget (or on click). Prevents N heavy board inscriptions
-        // from running at once. See liveHtmlFrameManager above.
-        liveHtmlFrameManager.register(thumbElement, media);
+        // from running at once. See liveHtmlFrameManager above. Relationship
+        // thumbs pass { gated: true } so they stay click-to-load.
+        liveHtmlFrameManager.register(thumbElement, media, {
+          gated: !!options.gated
+        });
         return true;
       }
 
@@ -10845,7 +10854,7 @@
       }
 
       const liveMedia = state.gridLiveMediaCache.get(cacheKey);
-      if (liveMedia && renderGridLiveMedia(token, media, liveMedia)) {
+      if (liveMedia && renderGridLiveMedia(token, media, liveMedia, { gated: true })) {
         return true;
       }
 
