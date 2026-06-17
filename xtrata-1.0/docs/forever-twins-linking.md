@@ -107,6 +107,36 @@ changes required for a standard helper; the rest keep docs and tests in sync.
 6. **Run checks.** `npx vitest run src/lib/twins` and a full `npx vitest run`
    before publishing.
 
+## NFT custody resolvers (marketplaces / escrow)
+
+When an original NFT is listed for sale, its on-chain owner is the marketplace
+contract, not a wallet. A custody-resolver registry hops one step further to the
+real owner (the listing seller) via the marketplace's `get-listing → seller`:
+
+- TS: `NFT_CUSTODY_RESOLVERS` in `src/lib/twins/registry.ts` (consumed by
+  `getSourceOwner` in `resolver.ts`).
+- Standalone viewer: `NFT_CUSTODY_RESOLVERS` in `index.html` (consumed by
+  `resolvePepeEscrowHolder`), which also surfaces a "Listed" hint + a link.
+
+Registered custodians: `pepe-nft-marketplace`, `leo-nft-market-faktory` (both use
+the identical `get-listing(token-id) → { seller, price, ... }` shape). Add a new
+marketplace by appending an entry with its `functionName` + `ownerField`.
+
+## Escrowed-twin injection into wallet grids (standalone viewer)
+
+A wallet that holds the original Pepe/Leo but whose Xtrata twin sits in escrow
+will not have the twin in its holdings (the helper contract owns it). The
+standalone viewer injects these onto page 0 of the wallet grid, marked with a
+padlock + coloured border:
+
+- `fetchWalletSourceTokenIds` reads the wallet's source-NFT holdings (Hiro
+  holdings endpoint); `buildTwinForwardIndex` maps local → xtrata id; each
+  candidate is confirmed escrowed via `get-binding`.
+- `refreshEscrowTwinInjection` computes these once per viewed wallet and
+  re-renders; `getWalletPageIds`/`withInjectedEscrowTwins` prepend them to page 0
+  and the grid renders extra cells so no real holdings are hidden.
+- Grid marker styles: `.token-card--escrowed` + `.token-escrow-badge`.
+
 ## Design notes for future scaling
 
 - **Registry-driven, not branch-driven.** Adding collections should be data, not

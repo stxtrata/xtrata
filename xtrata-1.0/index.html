@@ -4661,6 +4661,10 @@
       walletPageIds: [],
       walletTotalCount: 0,
       walletUsesPagedHoldings: false,
+      // Forever Twins escrowed on behalf of the viewed wallet (the wallet holds
+      // the original Pepe/Leo; the Xtrata twin is in the helper contract). These
+      // are injected onto page 0 of the wallet grid, marked with the padlock.
+      escrowTwinInjection: { address: null, ids: [], requestId: 0 },
       walletTokenCache: new Map(),
       walletTokens: [],
       walletPageIndex: 0,
@@ -5845,6 +5849,155 @@
       state.twinReverseIndexCache.set(cacheKey, promise);
       promise.catch(() => state.twinReverseIndexCache.delete(cacheKey));
       return promise;
+    };
+
+    // Invert the xtrata-id -> local-id reverse index to local-id -> xtrata-id.
+    const buildTwinForwardIndex = async (resolver) => {
+      const reverse = await buildTwinReverseIndex(resolver);
+      const forward = new Map();
+      for (const [xtrataIdStr, localId] of reverse.entries()) {
+        forward.set(localId.toString(), BigInt(xtrataIdStr));
+      }
+      return forward;
+    };
+
+    // Fetch the token ids of a source collection (Pepe/Leo) held directly by a
+    // wallet, via the Hiro NFT holdings endpoint. Bounded + paginated.
+    const fetchWalletSourceTokenIds = async (walletAddress, resolver, network) => {
+      const assetId = `${resolver.sourceContractId}::${resolver.sourceAssetName}`;
+      const ids = [];
+      const pageSize = 50;
+      const maxItems = 2000;
+      let offset = 0;
+      while (ids.length < maxItems) {
+        let page;
+        try {
+          page = await fetchHiroJson(
+            `/extended/v1/tokens/nft/holdings?principal=${encodeURIComponent(walletAddress)}` +
+              `&asset_identifiers=${encodeURIComponent(assetId)}` +
+              `&limit=${pageSize}&offset=${offset}`,
+            network
+          );
+        } catch (error) {
+          break;
+        }
+        const results = page?.results ?? [];
+        for (const item of results) {
+          const localId = parseUintRepr(item?.value?.repr);
+          if (localId !== null) {
+            ids.push(localId);
+          }
+        }
+        const total = Number(page?.total ?? results.length);
+        offset += pageSize;
+        if (results.length < pageSize || offset >= total) {
+          break;
+        }
+      }
+      return ids;
+    };
+
+    // Determine the Xtrata twin ids that are escrowed on behalf of a wallet:
+    // the wallet holds the original Pepe/Leo while the twin sits in the helper.
+    const computeEscrowedTwinIdsForWallet = async (walletAddress, network) => {
+      const seen = new Set();
+      const out = [];
+      const resolvers = [...PEPE_ESCROW_RESOLVERS.values()];
+      for (const resolver of resolvers) {
+        let sourceIds = [];
+        let forward = new Map();
+        try {
+          [sourceIds, forward] = await Promise.all([
+            fetchWalletSourceTokenIds(walletAddress, resolver, network),
+            buildTwinForwardIndex(resolver)
+          ]);
+        } catch (error) {
+          continue;
+        }
+        // Candidate twins: source tokens the wallet holds that have a binding.
+        const candidates = sourceIds
+          .map((localId) => ({ localId, xtrataId: forward.get(localId.toString()) ?? null }))
+          .filter((entry) => entry.xtrataId !== null);
+        // Confirm each twin is currently escrowed via the live binding.
+        await runLimited(candidates, 4, async (entry) => {
+          try {
+            const json = await callReadOnlyJson({
+              contractId: resolver.helperContractId,
+              functionName: 'get-binding',
+              args: [uintCV(entry.localId)],
+              network
+            });
+            const tuple = unwrapBindingTuple(json);
+            const escrowed = tuple?.['xtrata-escrowed']?.value === true;
+            const xtrataId = entry.xtrataId;
+            if (escrowed && xtrataId !== null && !seen.has(xtrataId.toString())) {
+              seen.add(xtrataId.toString());
+              out.push(xtrataId);
+            }
+          } catch (error) {
+            // Ignore individual binding read failures.
+          }
+        });
+      }
+      // Newest twins first.
+      out.sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
+      return out;
+    };
+
+    // Navigate a cvToJSON (optional (tuple ...)) binding result to its tuple map.
+    const unwrapBindingTuple = (node) => {
+      let current = node;
+      while (
+        current &&
+        typeof current.type === 'string' &&
+        (current.type.startsWith('(optional') || current.type.startsWith('(response'))
+      ) {
+        current = current.value ?? null;
+      }
+      return current && typeof current.type === 'string' && current.type.startsWith('(tuple')
+        ? current.value
+        : null;
+    };
+
+    const getInjectedEscrowTwinIds = () => {
+      const injection = state.escrowTwinInjection;
+      if (
+        state.explorerMode ||
+        !injection ||
+        !injection.address ||
+        !addressesEqual(injection.address, getViewingWalletAddress())
+      ) {
+        return [];
+      }
+      return injection.ids;
+    };
+
+    // Kick off (once per viewed wallet) the escrowed-twin computation and, when
+    // it finds any, re-render the wallet page so they appear on page 0.
+    const refreshEscrowTwinInjection = async (walletAddress) => {
+      if (!walletAddress || state.explorerMode) {
+        return;
+      }
+      const requestId = (state.escrowTwinInjection.requestId ?? 0) + 1;
+      state.escrowTwinInjection = { address: walletAddress, ids: [], requestId };
+      let ids = [];
+      try {
+        ids = await computeEscrowedTwinIdsForWallet(walletAddress, state.contract.network);
+      } catch (error) {
+        return;
+      }
+      if (
+        requestId !== state.escrowTwinInjection.requestId ||
+        !addressesEqual(walletAddress, getViewingWalletAddress())
+      ) {
+        return;
+      }
+      state.escrowTwinInjection = { address: walletAddress, ids, requestId };
+      if (ids.length > 0 && state.walletPageIndex === 0) {
+        await loadWalletPage({ pageAlreadyLoaded: true, deferSelection: true });
+      } else {
+        updateWalletPagerControls();
+      }
     };
 
     // Some original NFTs are not held directly in a wallet but custodied by a
@@ -7799,13 +7952,31 @@
       );
     };
 
+    // Prepend escrowed-twin ids to page 0 of the wallet view (deduped against
+    // the wallet's actual holdings). They ride along page 0 only so the
+    // server-side holdings pagination math is unaffected.
+    const withInjectedEscrowTwins = (pageIds) => {
+      if (state.walletPageIndex !== 0) {
+        return pageIds;
+      }
+      const injected = getInjectedEscrowTwinIds();
+      if (injected.length === 0) {
+        return pageIds;
+      }
+      const existing = new Set(pageIds.map((id) => id.toString()));
+      const prefix = injected.filter((id) => !existing.has(id.toString()));
+      return prefix.length > 0 ? [...prefix, ...pageIds] : pageIds;
+    };
+
     const getWalletPageIds = () => {
       clampWalletPageIndex();
       if (state.walletUsesPagedHoldings) {
-        return state.walletPageIds;
+        return withInjectedEscrowTwins(state.walletPageIds);
       }
       const start = state.walletPageIndex * WALLET_PAGE_SIZE;
-      return state.walletTokenIds.slice(start, start + WALLET_PAGE_SIZE);
+      return withInjectedEscrowTwins(
+        state.walletTokenIds.slice(start, start + WALLET_PAGE_SIZE)
+      );
     };
 
     const updateWalletPagerControls = () => {
@@ -10720,9 +10891,13 @@
       dom.tokenGrid.innerHTML = '';
       clampWalletPageIndex();
       const pageIds = getWalletPageIds();
-      const totalCount = state.walletUsesPagedHoldings
+      const baseCount = state.walletUsesPagedHoldings
         ? state.walletTotalCount
         : state.walletTokenIds.length;
+      // Escrowed twins ride along page 0 in addition to the wallet's holdings,
+      // so include them in the count and render enough cells to show them all.
+      const injectedCount = getInjectedEscrowTwinIds().length;
+      const totalCount = baseCount + injectedCount;
       setWalletCountLabel(totalCount);
       updateWalletPagerControls();
       debugLog('grid', 'render grid page', {
@@ -10731,7 +10906,8 @@
         deferHydration: !!options.deferHydration
       });
 
-      for (let index = 0; index < WALLET_PAGE_SIZE; index += 1) {
+      const cellCount = Math.max(WALLET_PAGE_SIZE, pageIds.length);
+      for (let index = 0; index < cellCount; index += 1) {
         const id = pageIds[index] ?? null;
         const token = id !== null
           ? state.walletTokenCache.get(id.toString()) ?? null
@@ -12576,6 +12752,9 @@ const openCuratedGallery = async (galleryId) => {
             void updateWalletTokenUriHeadPreview(null);
             renderTokenGrid();
             setExperienceMode();
+            // A wallet with no Xtrata holdings may still have escrowed twins
+            // (it holds the original Pepe/Leo). Surface those if present.
+            void refreshEscrowTwinInjection(viewingAddress);
             return;
           }
           setStatus(
@@ -12589,6 +12768,8 @@ const openCuratedGallery = async (galleryId) => {
             deferSelection: !!options.deferSelection,
             deferHydration: !!options.deferHydration
           });
+          // Surface any Forever Twins escrowed on behalf of this wallet.
+          void refreshEscrowTwinInjection(viewingAddress);
           return;
         } catch (pageError) {
           state.walletUsesPagedHoldings = false;
@@ -12660,6 +12841,7 @@ const openCuratedGallery = async (galleryId) => {
             deferHydration: !!options.deferHydration
           });
         }
+        void refreshEscrowTwinInjection(viewingAddress);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         state.walletTokenIds = [];
