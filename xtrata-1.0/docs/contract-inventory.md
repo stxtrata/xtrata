@@ -676,3 +676,27 @@ Source: `contracts/live/xtrata-vault.clar`
 ## Notes
 - No withdrawals or vault ownership migration in this MVP.
 - Vault actions re-check core asset ownership before allowing top-ups or reserve-state changes.
+
+## Forever Twin Helper Contracts
+
+Helper/escrow contracts that port an existing collection into Xtrata. Each owns
+a `Bindings` map keyed by the original (local) token id, stores `xtrata-id` +
+`xtrata-escrowed`, exposes `get-binding`, and emits an `inscribed` print event
+carrying `{ token-id, xtrata-id }`. They mint into the core
+`SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3` (MASTER). The app
+registry that drives linking + escrow display is `src/lib/twins/registry.ts`
+(mirrored in `index.html`'s `PEPE_ESCROW_RESOLVERS`). Reference data:
+`forever-twins/data/contracts.json`.
+
+| Collection | Helper / escrow contract | Source collection contract | Source asset |
+|---|---|---|---|
+| Bitcoin Pepes | `SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun` | `SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe` | `bitcoin-pepe` |
+| LeoCats | `SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata` | `SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats` | `leo-cats` |
+
+Escrow state: on `inscribe` the twin is minted to the helper (`xtrata-escrowed = true`);
+`swap-pepe-for-xtrata` releases it (`false`); `swap-xtrata-for-pepe` re-escrows it.
+A twin is escrowed when its on-chain owner is a registered helper contract, in
+which case the real owner is the current holder of the source NFT.
+
+To add a collection/contract, see the "Adding a new Forever Twin collection"
+checklist in `docs/app-reference.md` and `docs/forever-twins-linking.md`.

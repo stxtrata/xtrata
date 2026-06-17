@@ -941,6 +941,25 @@
       font-size: 12px;
     }
 
+    .meta-value--link {
+      cursor: pointer;
+      color: var(--accent, #3aa0ff);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      text-decoration-thickness: 1px;
+      transition: opacity 0.12s ease;
+    }
+
+    .meta-value--link:hover,
+    .meta-value--link:focus-visible {
+      opacity: 0.82;
+      outline: none;
+    }
+
+    .meta-value--link:focus-visible {
+      text-decoration-thickness: 2px;
+    }
+
     .prepared-meta .meta-value {
       overflow: visible;
       text-overflow: clip;
@@ -1674,6 +1693,34 @@
 
     .token-card:disabled {
       cursor: default;
+    }
+
+    .token-card--escrowed {
+      position: relative;
+    }
+
+    .token-card--escrowed .token-thumb {
+      border-color: var(--accent, #3aa0ff);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #3aa0ff) 55%, transparent);
+    }
+
+    .token-escrow-badge {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.62);
+      border: 1px solid var(--accent, #3aa0ff);
+      font-size: 12px;
+      line-height: 1;
+      cursor: help;
+      pointer-events: auto;
     }
 
     .token-thumb {
@@ -3882,13 +3929,13 @@
                       </div>
                     </fieldset>
                   </div>
-                  <button class="btn ghost" id="walletPrevButton" type="button" disabled>Prev</button>
+                  <button class="btn ghost" id="refreshWalletButton" type="button">Refresh</button>
                   <a class="btn secondary explorer-grid-action" href="/" id="explorerHomeLink">Home</a>
                   <button class="btn secondary explorer-grid-action" id="explorerLatestButton" type="button">Latest</button>
                 </div>
                 <div class="wallet-grid-toolbar__status" aria-hidden="true"></div>
                 <div class="wallet-grid-toolbar__secondary">
-                  <button class="btn ghost" id="refreshWalletButton" type="button">Refresh</button>
+                  <button class="btn ghost" id="walletPrevButton" type="button" disabled>Prev</button>
                   <button class="btn ghost" id="walletNextButton" type="button" disabled>Next</button>
                 </div>
               </div>
@@ -4054,6 +4101,9 @@
     import {
       bufferCV,
       FungibleConditionCode,
+      cvToHex,
+      cvToJSON,
+      hexToCV,
       listCV,
       makeStandardSTXPostCondition,
       PostConditionMode,
@@ -4584,6 +4634,10 @@
       tokenPreviewRequestId: 0,
       selectedOwnerNameRequestId: 0,
       selectedEscrowHolderRequestId: 0,
+      // Last resolved escrow holder for the selected token, so re-renders
+      // (e.g. from the BNS owner-name path) keep showing the real holder +
+      // listed state instead of racing back to the helper contract owner.
+      selectedEscrowHolder: null,
       selectedParentsRequestId: 0,
       selectedChildrenRequestId: 0,
       childScanRunning: false,
@@ -4597,6 +4651,7 @@
       gridLiveMediaCache: new Map(),
       summaryCacheScopes: new Map(),
       escrowHolderCache: new Map(),
+      twinReverseIndexCache: new Map(),
       thumbnailHydrationQueue: [],
       thumbnailHydrationQueued: new Set(),
       thumbnailHydrationInFlight: new Set(),
@@ -5593,17 +5648,44 @@
         } else {
           label.textContent = meta.key;
         }
-        const body = document.createElement('span');
+        const body = meta.href
+          ? document.createElement('a')
+          : document.createElement('span');
         body.className = `meta-value${
           meta.valueClass ? ` ${meta.valueClass}` : ''
         }`;
         body.title = String(meta.title ?? meta.value);
         body.textContent = String(meta.value);
+        if (meta.href) {
+          body.href = meta.href;
+          body.target = '_blank';
+          body.rel = 'noreferrer';
+          body.classList.add('meta-value--link');
+        }
         if (meta.tooltip) {
           body.classList.add('meta-value--tooltip');
           body.dataset.tooltip = String(meta.tooltip);
           body.tabIndex = 0;
           body.setAttribute('aria-label', `${meta.key}: ${meta.tooltip}`);
+        }
+        if (typeof meta.onClick === 'function') {
+          body.classList.add('meta-value--link');
+          body.setAttribute('role', 'button');
+          body.tabIndex = 0;
+          if (meta.actionLabel) {
+            body.setAttribute('aria-label', meta.actionLabel);
+            body.title = meta.actionLabel;
+          }
+          const handler = (event) => {
+            event.preventDefault();
+            meta.onClick();
+          };
+          body.addEventListener('click', handler);
+          body.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              handler(event);
+            }
+          });
         }
         row.append(label, body);
         target.append(row);
@@ -5670,16 +5752,226 @@
       dom.resumeNotice.hidden = false;
     };
 
+    // Forever Twin registry: maps each helper/escrow contract to its original
+    // collection. The helper is both the escrow holder and the on-chain twin
+    // index (owns a Bindings map keyed by local token id, emitting an
+    // "inscribed" print event carrying { token-id, xtrata-id }). To add a
+    // collection, add an entry here — resolution is fully generic.
     const PEPE_ESCROW_RESOLVERS = new Map([
       [
-        'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-fakfun-xtrata',
+        'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun',
         {
+          helperContractId:
+            'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun',
           sourceContractId: 'SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe',
           sourceAssetName: 'bitcoin-pepe',
+          collectionName: 'Bitcoin Pepes',
+          itemNoun: 'Bitcoin Pepe',
           label: 'Pepe holder'
+        }
+      ],
+      [
+        'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata',
+        {
+          helperContractId:
+            'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata',
+          sourceContractId: 'SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats',
+          sourceAssetName: 'leo-cats',
+          collectionName: 'LeoCats',
+          itemNoun: 'LeoCat',
+          label: 'LeoCat holder'
         }
       ]
     ]);
+
+    // Build (and cache) the xtrata-id -> local-id map for a helper contract by
+    // scanning its "inscribed" print events. This is the reverse lookup the
+    // contract does not expose directly, and works for every bound token
+    // (including those minted straight into escrow that never had a swap tx).
+    const buildTwinReverseIndex = async (resolver) => {
+      const cacheKey = resolver.helperContractId;
+      const cached = state.twinReverseIndexCache.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+      const promise = (async () => {
+        const index = new Map();
+        const pageSize = 50;
+        const maxEvents = 5000;
+        let offset = 0;
+        let seen = 0;
+        while (seen < maxEvents) {
+          let page;
+          try {
+            page = await fetchHiroJson(
+              `/extended/v1/contract/${encodeURIComponent(
+                resolver.helperContractId
+              )}/events?limit=${pageSize}&offset=${offset}`,
+              state.contract.network
+            );
+          } catch (error) {
+            break;
+          }
+          const results = page?.results ?? [];
+          if (results.length === 0) {
+            break;
+          }
+          for (const event of results) {
+            seen += 1;
+            const repr = event?.contract_log?.value?.repr;
+            if (
+              event?.contract_log?.topic !== 'print' ||
+              typeof repr !== 'string' ||
+              repr.indexOf('"inscribed"') === -1
+            ) {
+              continue;
+            }
+            const localMatch = repr.match(/\(token-id u(\d+)\)/);
+            const xtrataMatch = repr.match(/\(xtrata-id u(\d+)\)/);
+            if (!localMatch || !xtrataMatch) {
+              continue;
+            }
+            if (!index.has(xtrataMatch[1])) {
+              index.set(xtrataMatch[1], BigInt(localMatch[1]));
+            }
+          }
+          if (results.length < pageSize) {
+            break;
+          }
+          offset += pageSize;
+        }
+        return index;
+      })();
+      state.twinReverseIndexCache.set(cacheKey, promise);
+      promise.catch(() => state.twinReverseIndexCache.delete(cacheKey));
+      return promise;
+    };
+
+    // Some original NFTs are not held directly in a wallet but custodied by a
+    // marketplace/escrow contract (e.g. listed for sale). In that case the NFT
+    // owner resolves to the marketplace contract, so we hop once more to recover
+    // the real owner (the seller who listed it). Keyed by custody contract id.
+    const NFT_CUSTODY_RESOLVERS = new Map([
+      [
+        'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-nft-marketplace',
+        {
+          contractId:
+            'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-nft-marketplace',
+          label: 'Marketplace',
+          // Human-facing hint shown when the underlying NFT is custodied here.
+          stateHint: 'Listed',
+          // Link target for the "Marketplace" line. Defaults to the Stacks
+          // explorer contract page; set to a marketplace URL when known.
+          buildUrl: () =>
+            'https://explorer.hiro.so/address/' +
+            'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-nft-marketplace?chain=mainnet',
+          // Read the listing and return its seller principal.
+          resolve: async (localTokenId, network) => {
+            const json = await callReadOnlyJson({
+              contractId:
+                'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-nft-marketplace',
+              functionName: 'get-listing',
+              args: [uintCV(localTokenId)],
+              network
+            }).catch(() => null);
+            return readTuplePrincipal(json, 'seller');
+          }
+        }
+      ],
+      [
+        'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-nft-market-faktory',
+        {
+          contractId:
+            'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-nft-market-faktory',
+          label: 'Marketplace',
+          stateHint: 'Listed',
+          buildUrl: () =>
+            'https://explorer.hiro.so/address/' +
+            'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-nft-market-faktory?chain=mainnet',
+          resolve: async (localTokenId, network) => {
+            const json = await callReadOnlyJson({
+              contractId:
+                'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-nft-market-faktory',
+              functionName: 'get-listing',
+              args: [uintCV(localTokenId)],
+              network
+            }).catch(() => null);
+            return readTuplePrincipal(json, 'seller');
+          }
+        }
+      ]
+    ]);
+
+    // POST a read-only call and return the decoded cvToJSON result.
+    const callReadOnlyJson = async ({ contractId, functionName, args = [], network = 'mainnet' }) => {
+      const [address, name] = contractId.split('.');
+      if (!address || !name) {
+        throw new Error(`Invalid contract id: ${contractId}`);
+      }
+      const url = buildHiroApiUrl(
+        `/v2/contracts/call-read/${address}/${name}/${functionName}`,
+        network
+      );
+      if (!url) {
+        throw new Error('No Hiro API endpoint configured.');
+      }
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sender: address,
+          arguments: args.map((arg) => cvToHex(arg))
+        })
+      });
+      if (!response.ok) {
+        throw new Error(`Read-only call failed (${response.status}).`);
+      }
+      const payload = await response.json();
+      if (!payload?.okay || typeof payload.result !== 'string') {
+        throw new Error('Read-only call returned no result.');
+      }
+      return cvToJSON(hexToCV(payload.result));
+    };
+
+    // Read a principal field from a cvToJSON (optional (tuple ...)) result.
+    const readTuplePrincipal = (node, key) => {
+      let current = node;
+      while (
+        current &&
+        typeof current.type === 'string' &&
+        (current.type.startsWith('(optional') || current.type.startsWith('(response'))
+      ) {
+        current = current.value ?? null;
+      }
+      const tuple =
+        current && typeof current.type === 'string' && current.type.startsWith('(tuple')
+          ? current.value
+          : null;
+      const field = tuple?.[key];
+      return field && typeof field.value === 'string' ? field.value : null;
+    };
+
+    // Given an address that may be a custody contract, resolve through to the
+    // real owner (e.g. marketplace listing seller). Bounded to avoid loops.
+    // Returns the real owner plus the custodian (if any) so callers can show a
+    // "Listed" hint and marketplace link.
+    const resolveCustodyOwner = async (address, localTokenId, network) => {
+      let current = address;
+      let custodian = null;
+      for (let hops = 0; hops < 3; hops += 1) {
+        const resolver = NFT_CUSTODY_RESOLVERS.get(current);
+        if (!resolver) {
+          break;
+        }
+        custodian = resolver;
+        const next = await resolver.resolve(localTokenId, network);
+        if (!next || next === current) {
+          break;
+        }
+        current = next;
+      }
+      return { owner: current, custodian };
+    };
 
     const clarityUintHex = (value) => {
       const hex = BigInt(value).toString(16).padStart(32, '0');
@@ -5729,53 +6021,81 @@
       if (cached) {
         return cached;
       }
-      const coreAssetId = `${getTokenCacheContractId(token)}::xtrata-inscription`;
-      const coreHistory = await fetchHiroJson(
-        `/extended/v1/tokens/nft/history?asset_identifier=${encodeURIComponent(coreAssetId)}` +
-          `&value=${encodeURIComponent(clarityUintHex(token.id))}&limit=20`,
-        state.contract.network
-      );
-      const escrowTransfer = (coreHistory.results ?? []).find(
-        (event) =>
-          event?.asset_event_type === 'transfer' &&
-          event?.recipient === token.owner &&
-          typeof event?.tx_id === 'string'
-      );
-      if (!escrowTransfer) {
-        return null;
+      // Reverse-resolve the original (local) collection token id for this
+      // Xtrata inscription using the helper's inscribed events.
+      const reverseIndex = await buildTwinReverseIndex(resolver).catch(() => null);
+      let sourceTokenId =
+        reverseIndex?.get(token.id.toString()) ?? null;
+
+      // Fallback: recover the local id from the escrow-deposit transaction
+      // (covers tokens swapped back into escrow if events are unavailable).
+      let escrowTxId = null;
+      if (sourceTokenId === null) {
+        const coreAssetId = `${getTokenCacheContractId(token)}::xtrata-inscription`;
+        const coreHistory = await fetchHiroJson(
+          `/extended/v1/tokens/nft/history?asset_identifier=${encodeURIComponent(coreAssetId)}` +
+            `&value=${encodeURIComponent(clarityUintHex(token.id))}&limit=20`,
+          state.contract.network
+        ).catch(() => null);
+        const escrowTransfer = (coreHistory?.results ?? []).find(
+          (event) =>
+            event?.asset_event_type === 'transfer' &&
+            event?.recipient === token.owner &&
+            typeof event?.tx_id === 'string'
+        );
+        if (escrowTransfer) {
+          escrowTxId = escrowTransfer.tx_id;
+          const tx = await fetchHiroJson(
+            `/extended/v1/tx/${encodeURIComponent(escrowTransfer.tx_id)}`,
+            state.contract.network
+          ).catch(() => null);
+          const sourceTokenArg = tx?.contract_call?.function_args?.find(
+            (arg) => arg?.name === 'token-id'
+          );
+          sourceTokenId = parseUintRepr(sourceTokenArg?.repr);
+        }
       }
-      const tx = await fetchHiroJson(
-        `/extended/v1/tx/${encodeURIComponent(escrowTransfer.tx_id)}`,
-        state.contract.network
-      );
-      const sourceTokenArg = tx?.contract_call?.function_args?.find(
-        (arg) => arg?.name === 'token-id'
-      );
-      const sourceTokenId = parseUintRepr(sourceTokenArg?.repr);
       if (sourceTokenId === null) {
         return null;
       }
+      // The real owner is the current holder of the original collection NFT.
       const sourceAssetId = `${resolver.sourceContractId}::${resolver.sourceAssetName}`;
       const sourceHistory = await fetchHiroJson(
         `/extended/v1/tokens/nft/history?asset_identifier=${encodeURIComponent(sourceAssetId)}` +
           `&value=${encodeURIComponent(clarityUintHex(sourceTokenId))}&limit=1`,
         state.contract.network
-      );
-      const latest = sourceHistory.results?.[0] ?? null;
-      const holder =
-        latest?.recipient ??
-        tx?.sender_address ??
-        escrowTransfer.sender ??
-        null;
+      ).catch(() => null);
+      const latest = sourceHistory?.results?.[0] ?? null;
+      const rawHolder = latest?.recipient ?? null;
+      if (!rawHolder) {
+        return null;
+      }
+      // If the NFT is custodied by a known marketplace/escrow contract (e.g.
+      // listed for sale), resolve through to the real owner (the seller).
+      const custodyResult = await resolveCustodyOwner(
+        rawHolder,
+        sourceTokenId,
+        state.contract.network
+      ).catch(() => ({ owner: rawHolder, custodian: null }));
+      const holder = custodyResult.owner ?? rawHolder;
+      const custodian = custodyResult.custodian ?? null;
       if (!holder) {
         return null;
       }
       const result = {
         label: resolver.label,
+        collectionName: resolver.collectionName,
+        itemNoun: resolver.itemNoun,
         holder,
         sourceTokenId,
         sourceContractId: resolver.sourceContractId,
-        txId: escrowTransfer.tx_id
+        txId: escrowTxId,
+        listed: !!custodian,
+        marketplaceLabel: custodian?.label ?? null,
+        marketplaceHint: custodian?.stateHint ?? null,
+        marketplaceUrl: custodian?.buildUrl
+          ? custodian.buildUrl(sourceTokenId)
+          : null
       };
       state.escrowHolderCache.set(cacheKey, result);
       return result;
@@ -5784,6 +6104,7 @@
     const renderNoSelectedInscriptionMeta = () => {
       state.selectedOwnerNameRequestId += 1;
       state.selectedEscrowHolderRequestId += 1;
+      state.selectedEscrowHolder = null;
       clearSelectedInscriptionRelationships();
       renderMeta(dom.tokenPreviewMeta, [['Status', 'None selected']]);
     };
@@ -5796,28 +6117,80 @@
     ) => {
       const effectiveMimeType =
         mimeTypeOverride ?? state.tokenPreviewMimeType ?? token.meta?.mimeType ?? null;
+      const isEscrowed = !!findPepeEscrowResolver(token.owner);
+      // Reuse the previously resolved escrow holder for this token if the caller
+      // didn't pass one (e.g. the BNS owner-name re-render). This prevents a
+      // late owner-name render from clobbering the resolved holder/listed state.
+      if (!escrowHolder && state.selectedEscrowHolder?.tokenId === token.id) {
+        escrowHolder = state.selectedEscrowHolder.data;
+      }
+      // When escrowed, the on-chain owner is the helper contract; show the
+      // resolved real holder (current owner of the original NFT) as Owner and
+      // flag the twin as Escrowed for clarity.
+      const ownerValue = escrowHolder
+        ? escrowHolder.holderName ?? truncateMiddle(escrowHolder.holder, 8, 8)
+        : ownerName ?? (token.owner ? truncateMiddle(token.owner, 8, 8) : 'unknown');
+      // Effective wallet address to open in the grid when the Owner is clicked:
+      // the real holder when escrowed, otherwise the token owner. Skip contract
+      // principals (still escrow-resolving) so we never load a contract id.
+      const ownerWalletAddress = escrowHolder
+        ? escrowHolder.holder
+        : !isEscrowed && token.owner
+          ? token.owner
+          : null;
+      const ownerLine = { key: 'Owner', value: ownerValue };
+      // Owner is click-to-load-wallet. On the homepage it loads the wallet's
+      // grid in place. In the Xplorer (which has no wallet grid of its own) it
+      // opens the wallet back on the homepage via /?wallet=<address>.
+      if (ownerWalletAddress) {
+        if (state.explorerMode) {
+          ownerLine.onClick = () => {
+            window.location.assign(
+              `/?wallet=${encodeURIComponent(ownerWalletAddress)}`
+            );
+          };
+          ownerLine.actionLabel = `Open this wallet's inscriptions on the homepage`;
+        } else {
+          ownerLine.onClick = () => {
+            void viewWalletByAddress(ownerWalletAddress);
+          };
+          ownerLine.actionLabel = `View this wallet's inscriptions in the grid`;
+        }
+      }
+      const stateValue = escrowHolder
+        ? escrowHolder.listed
+          ? `Escrowed · ${escrowHolder.marketplaceHint ?? 'Listed'}`
+          : 'Escrowed'
+        : 'Escrowed (resolving owner...)';
       const lines = [
         ['Type', getGridMimeLabel(effectiveMimeType)],
         ['Size', token.meta?.totalSize ? formatBytes(token.meta.totalSize) : 'unknown'],
-        [
-          'Owner',
-          ownerName ?? (token.owner ? truncateMiddle(token.owner, 8, 8) : 'unknown')
-        ],
+        ownerLine,
+        ...(isEscrowed ? [['State', stateValue]] : []),
+        ...(escrowHolder && escrowHolder.listed && escrowHolder.marketplaceUrl
+          ? [{
+              key: escrowHolder.marketplaceLabel ?? 'Marketplace',
+              value: 'View listing',
+              href: escrowHolder.marketplaceUrl,
+              title: 'Open the marketplace listing for the underlying NFT'
+            }]
+          : []),
         ...(escrowHolder
           ? [[
-              escrowHolder.label,
-              truncateMiddle(escrowHolder.holder, 8, 8)
+              escrowHolder.itemNoun ?? 'Collection',
+              `#${escrowHolder.sourceTokenId.toString()}`
             ]]
-          : findPepeEscrowResolver(token.owner)
-            ? [['Pepe holder', 'Resolving...']]
-            : []),
-        ['ID', formatTokenId(token.id)]
+          : []),
+        ['Xtrata ID', formatTokenId(token.id)]
       ];
       renderMeta(dom.tokenPreviewMeta, lines);
-      if (!ownerName) {
+      // Don't resolve a BNS name for the raw owner when escrowed — the owner is
+      // the helper contract; the real holder's name is resolved by the escrow
+      // path. This also avoids a late render overwriting the holder display.
+      if (!ownerName && !isEscrowed) {
         void resolveSelectedInscriptionOwnerName(token);
       }
-      if (!escrowHolder && findPepeEscrowResolver(token.owner)) {
+      if (!escrowHolder && isEscrowed) {
         void resolveSelectedEscrowHolder(token);
       }
       void renderSelectedInscriptionRelationships(token);
@@ -6548,6 +6921,34 @@
         ) {
           return;
         }
+        // Resolve a BNS name for the *real* holder (the escrowed twin's owner is
+        // the helper contract, so token.owner never resolves to a name). This
+        // lets the preview panel show the holder's .btc name when they have one.
+        try {
+          const holderNames = await resolveBnsNames({
+            address: escrowHolder.holder,
+            network: state.contract.network
+          });
+          if (
+            holderNames.primary &&
+            requestId === state.selectedEscrowHolderRequestId &&
+            state.selectedTokenId === token.id
+          ) {
+            escrowHolder.holderName = holderNames.primary;
+          }
+        } catch (bnsError) {
+          debugLog(
+            'bns',
+            'escrow holder name lookup failed',
+            {
+              holder: truncateMiddle(escrowHolder.holder, 8, 8),
+              error: bnsError instanceof Error ? bnsError.message : String(bnsError)
+            },
+            'warn'
+          );
+        }
+        // Remember the resolved holder so later re-renders keep showing it.
+        state.selectedEscrowHolder = { tokenId: token.id, data: escrowHolder };
         renderSelectedInscriptionMeta(token, null, null, escrowHolder);
       } catch (error) {
         debugLog(
@@ -10341,6 +10742,22 @@
         if (token) {
           card.dataset.tokenId = token.id.toString();
         }
+        // Forever Twin escrow marker: a twin owned by a registered helper
+        // contract is locked in escrow (the holder keeps the original NFT).
+        // Flag the card with a padlock + coloured border so it's easy to
+        // differentiate escrowed/locked twins from regular inscriptions.
+        if (token && findPepeEscrowResolver(token.owner)) {
+          card.classList.add('token-card--escrowed');
+          const lock = document.createElement('span');
+          lock.className = 'token-escrow-badge';
+          lock.textContent = '🔒';
+          lock.setAttribute('aria-hidden', 'false');
+          lock.setAttribute('role', 'img');
+          lock.setAttribute('aria-label', 'Escrowed Forever Twin');
+          lock.title =
+            'Escrowed Forever Twin — the Xtrata twin is locked in the Forever Twin contract while the holder keeps the original collection NFT.';
+          card.append(lock);
+        }
         const thumb = document.createElement('div');
         thumb.className = 'token-thumb';
         const meta = document.createElement('div');
@@ -10760,6 +11177,45 @@
       appendLog('Returned to connected wallet view.');
 
       updateWalletStatus();
+      await loadWalletInscriptions();
+      updateControls();
+    };
+
+    // Programmatically load a wallet's holdings into the grid (e.g. when the
+    // owner/holder address in the preview panel is clicked). Mirrors the
+    // resolved-address branch of viewWalletFromInput so it behaves identically
+    // in both homepage and Xplorer (explorer-mode) contexts.
+    const viewWalletByAddress = async (address) => {
+      const normalized = (address ?? '').trim();
+      if (!normalized) {
+        return;
+      }
+      state.walletViewRequestId += 1;
+      cancelWalletLookup();
+      state.walletLookupNotice = null;
+
+      const isConnectedAddress =
+        state.walletSession.address &&
+        addressesEqual(normalized, state.walletSession.address);
+      state.walletViewAddress = isConnectedAddress ? null : normalized;
+      state.walletViewName = null;
+      state.curatedGalleryId = null;
+      state.curatedGalleryTitle = null;
+      state.homeLatestView = false;
+      clearExampleDescription();
+
+      if (dom.walletLookupInput) {
+        dom.walletLookupInput.value = isConnectedAddress ? '' : normalized;
+        updateWalletLookupInputMode();
+      }
+      appendLog(`Viewing wallet: ${truncateMiddle(normalized, 8, 8)}.`);
+      updateWalletStatus();
+      // Bring the grid into view (helpful in explorer-mode where the click
+      // originates from the preview panel).
+      const scrollTarget = dom.tokenGrid ?? dom.walletGridStatus;
+      if (scrollTarget?.scrollIntoView) {
+        scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
       await loadWalletInscriptions();
       updateControls();
     };
@@ -12793,7 +13249,14 @@ const openCuratedGallery = async (galleryId) => {
         await loadExplorerMode();
       } else {
         await fetchAdminStatus();
-        if (walletViewRequestId === state.walletViewRequestId && !consumedHandoff) {
+        // Deep link: /?wallet=<address> opens straight into that wallet's grid
+        // (used by the Xplorer owner click, which routes back to the homepage).
+        const requestedWallet = new URLSearchParams(window.location.search)
+          .get('wallet')
+          ?.trim();
+        if (requestedWallet) {
+          await viewWalletByAddress(requestedWallet);
+        } else if (walletViewRequestId === state.walletViewRequestId && !consumedHandoff) {
           await loadHomeLatestView();
         }
       }
