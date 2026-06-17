@@ -2222,11 +2222,11 @@
 
     .wallet-examples {
       display: grid;
-      grid-template-columns: max-content max-content;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 7px 10px;
       align-items: center;
-      justify-content: start;
-      width: fit-content;
+      justify-content: stretch;
+      width: 100%;
       max-width: 100%;
       margin: 8px 0 10px;
       color: var(--muted);
@@ -2242,7 +2242,7 @@
     }
 
     .wallet-example-chip {
-      width: auto;
+      width: 100%;
       min-height: 30px;
       display: inline-flex;
       align-items: center;
@@ -2255,8 +2255,9 @@
       font: inherit;
       font-weight: 800;
       cursor: pointer;
-      white-space: nowrap;
+      white-space: normal;
       text-align: center;
+      line-height: 1.15;
     }
 
     .wallet-example-chip:hover,
@@ -3625,6 +3626,14 @@
                   Stacksboard
                 </button>
 
+                <button
+                  class="wallet-example-chip"
+                  type="button"
+                  data-latest-view="true"
+                  title="Newest inscriptions from the active Xtrata core."
+                >
+                  Latest
+                </button>
 
               </div>
 
@@ -4274,6 +4283,14 @@
         tooltip: 'The Stacksboard inscription (#350).',
         description:
           'A single featured inscription: Stacksboard, recorded on-chain through Xtrata as #350.'
+      },
+
+      latest: {
+        label: 'Latest',
+        heading: 'Viewing latest inscriptions',
+        tooltip: 'Newest inscriptions from the active Xtrata core.',
+        description:
+          'The newest page of inscriptions from the active Xtrata core.'
       }
     });
     
@@ -4285,6 +4302,7 @@
         const buttonKey =
           button.dataset.walletShowcase?.trim().toLowerCase() ??
           button.dataset.curatedGallery?.trim() ??
+          (button.dataset.latestView ? 'latest' : '') ??
           '';
 
         const buttonInfo = EXAMPLE_VIEW_DESCRIPTIONS[buttonKey] ?? null;
@@ -4345,6 +4363,7 @@
       connectedWalletNameRequestId: 0,
       curatedGalleryId: null,
       curatedGalleryTitle: null,
+      homeLatestView: false,
       walletLookupPending: false,
       walletLookupNotice: null,
       walletLookupAbortController: null,
@@ -7015,9 +7034,11 @@
       const viewingConnectedWallet = isConnectedWalletAddress(viewingAddress);
       const connectedWalletHasVisibleLedger = viewingConnectedWallet && count > 0;
       const hasCuratedGallery = !!state.curatedGalleryId && count > 0;
+      const hasHomeLatestView = state.homeLatestView && count > 0;
       const hasLedger =
         connected && (state.connectedWalletMatureMode || connectedWalletHasVisibleLedger);
-      const hasPublicLedger = (!connected && !!viewingAddress && count > 0) || hasCuratedGallery;
+      const hasPublicLedger =
+        (!connected && !!viewingAddress && count > 0) || hasCuratedGallery || hasHomeLatestView;
       document.body.classList.toggle('has-ledger', hasLedger);
       document.body.classList.toggle('has-public-ledger', hasPublicLedger);
       document.body.classList.toggle('explorer-mode', state.explorerMode);
@@ -7037,6 +7058,8 @@
       if (dom.registryIntroLead) {
         dom.registryIntroLead.textContent = state.curatedGalleryTitle
           ? `${state.curatedGalleryTitle} is open below in Wallet Inscriptions.`
+          : state.homeLatestView
+          ? 'The latest Xtrata inscriptions are open below in Wallet Inscriptions.'
           : !viewingAddress
           ? 'Create and hold durable records for songs, masters, artwork, credits, documents, apps, and collaboration history, anchored to Bitcoin through Stacks.'
           : !connected && count === 0
@@ -7050,6 +7073,8 @@
       if (dom.introStateValue) {
         dom.introStateValue.textContent = state.curatedGalleryTitle
           ? `${count} selected inscription${count === 1 ? '' : 's'} loaded.`
+          : state.homeLatestView
+          ? `Latest page loaded with ${state.walletPageIds.length} inscription${state.walletPageIds.length === 1 ? '' : 's'}.`
           : !viewingAddress
           ? 'Connect a wallet or enter an address to inspect a ledger.'
           : count === 0
@@ -7282,6 +7307,16 @@
       }
       if (state.curatedGalleryTitle) {
         dom.walletSubtitle.textContent = `Viewing ${state.curatedGalleryTitle}.`;
+      }
+      if (state.homeLatestView) {
+        setStatus(
+          dom.walletStatus,
+          `<strong>Latest</strong> ${getContractId(state.contract)}`,
+          'ready',
+          'blue'
+        );
+        dom.walletSubtitle.textContent = `Viewing latest ${state.contract.label} inscriptions.`;
+        return;
       }
       if (!connected) {
         setStatus(
@@ -10264,6 +10299,7 @@
       state.walletViewName = null;
       state.curatedGalleryId = null;
       state.curatedGalleryTitle = null;
+      state.homeLatestView = false;
 
       clearExampleDescription();
 
@@ -10298,6 +10334,7 @@
         state.walletViewName = null;
         state.curatedGalleryId = null;
         state.curatedGalleryTitle = null;
+        state.homeLatestView = false;
         clearExampleDescription();
 
         clearSelectedTokenPreview();
@@ -10322,6 +10359,7 @@
         state.walletViewName = null;
         state.curatedGalleryId = null;
         state.curatedGalleryTitle = null;
+        state.homeLatestView = false;
         clearExampleDescription();
 
         dom.walletLookupInput.value = isConnectedAddress ? '' : baseLookupState.lookupAddress;
@@ -10374,6 +10412,7 @@
         state.walletViewName = isConnectedAddress ? null : lookupName;
         state.curatedGalleryId = null;
         state.curatedGalleryTitle = null;
+        state.homeLatestView = false;
         dom.walletLookupInput.value = isConnectedAddress ? '' : toBtcLookupLabel(lookupName);
         updateWalletLookupInputMode();
         state.walletLookupNotice = null;
@@ -10422,6 +10461,7 @@ const openCuratedGallery = async (galleryId) => {
 
   state.curatedGalleryId = gallery.id;
   state.curatedGalleryTitle = gallery.title;
+  state.homeLatestView = false;
   state.walletViewAddress = null;
   state.walletViewName = null;
   state.walletLookupNotice = null;
@@ -11217,7 +11257,9 @@ const openCuratedGallery = async (galleryId) => {
 
     const loadExplorerPage = async (options = {}) => {
       const startedAt = performance.now();
-      state.explorerMode = true;
+      const homeLatest = !!options.homeLatest;
+      state.explorerMode = !homeLatest;
+      state.homeLatestView = homeLatest;
       state.walletViewAddress = null;
       state.walletViewName = null;
       state.curatedGalleryId = null;
@@ -11799,6 +11841,7 @@ const openCuratedGallery = async (galleryId) => {
 
     const loadExplorerMode = async () => {
       state.explorerMode = true;
+      state.homeLatestView = false;
       state.walletLookupNotice = null;
       state.walletViewAddress = null;
       state.walletViewName = null;
@@ -11944,6 +11987,33 @@ const openCuratedGallery = async (galleryId) => {
       dom.explorerTokenInput.value = '';
       await loadExplorerPage({ force: true, selectLatestOnPage: true });
       scrollToWalletGrid();
+    };
+
+    const loadHomeLatestView = async (options = {}) => {
+      if (state.walletLoadingPage) {
+        return;
+      }
+      debugLog('grid', 'home latest view requested', {
+        currentPageIndex: state.walletPageIndex,
+        latestTokenId: state.explorerLatestTokenId?.toString() ?? null
+      });
+      activeExampleDescriptionKey = 'latest';
+      setExampleDescription('latest');
+      clearSelectedTokenPreview();
+      setStatus(dom.walletGridStatus, '<strong>Grid</strong> loading latest inscriptions', 'loading', 'blue');
+      renderTokenGridPlaceholders('...');
+      await refreshExplorerLatestTokenId();
+      state.walletPageIndex = getExplorerLatestPageIndex();
+      dom.explorerTokenInput.value = '';
+      await loadExplorerPage({
+        ...options,
+        homeLatest: true,
+        force: true,
+        selectLatestOnPage: true
+      });
+      if (options.scrollToGrid) {
+        scrollToWalletGrid();
+      }
     };
 
     const readExplorerFilterControls = () =>
@@ -12274,8 +12344,8 @@ const openCuratedGallery = async (galleryId) => {
         await loadExplorerMode();
       } else {
         await fetchAdminStatus();
-        if (walletViewRequestId === state.walletViewRequestId) {
-          await loadWalletInscriptions();
+        if (walletViewRequestId === state.walletViewRequestId && !consumedHandoff) {
+          await loadHomeLatestView();
         }
       }
       updateControls();
@@ -12348,6 +12418,7 @@ const openCuratedGallery = async (galleryId) => {
 
         state.curatedGalleryId = null;
         state.curatedGalleryTitle = null;
+        state.homeLatestView = false;
         state.walletViewAddress = null;
         state.walletViewName = null;
         state.walletLookupNotice = null;
@@ -12450,6 +12521,15 @@ const openCuratedGallery = async (galleryId) => {
 
         activeExampleDescriptionKey = galleryId;
         void openCuratedGallery(galleryId);
+      });
+    });
+    document.querySelectorAll('[data-latest-view]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const isTogglingOff = activeExampleDescriptionKey === 'latest';
+        if (isTogglingOff) {
+          return;
+        }
+        void loadHomeLatestView({ scrollToGrid: true });
       });
     });
     dom.walletLookupInput.addEventListener('input', () => {
