@@ -227,6 +227,68 @@ describe('/runtime/content', () => {
     expect(await response.text()).toBe(html);
   });
 
+  it('injects module base hrefs into cached HTML module shells', async () => {
+    const html =
+      '<html><head><title>JMS10</title></head><body><script type="module">import("../../../System/shared/patch_runtime.js")</script></body></html>';
+    const htmlBytes = new TextEncoder().encode(html);
+    const moduleBaseHref =
+      '/runtime/modules/mainnet/SP123/test-contract/237/on-chain-modules/workspace/Plugins/Instruments/JMS10/';
+    const get = vi.fn(async () => ({
+      body: streamFrom(htmlBytes),
+      size: htmlBytes.length,
+      httpMetadata: {
+        contentType: 'text/html'
+      },
+      customMetadata: {
+        sourceContractId: CONTRACT_ID,
+        moduleBaseHref
+      }
+    }));
+    const fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            okay: true,
+            result: metaResult({
+              mimeType: 'text/html',
+              totalSize: BigInt(htmlBytes.length)
+            })
+          }),
+          {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+        )
+    );
+    vi.stubGlobal('fetch', fetch);
+
+    const response = await onRequest({
+      request: new Request(
+        `https://xtrata.xyz/runtime/content?contractId=${CONTRACT_ID}&tokenId=237&network=mainnet`
+      ),
+      env: {
+        RUNTIME_CONTENT_CACHE: {
+          get,
+          put: vi.fn(),
+          delete: vi.fn(),
+          list: vi.fn(),
+          getUploadUrl: vi.fn()
+        }
+      } as unknown as RuntimeEnv
+    });
+
+    const body = await response.text();
+    expect(response.status).toBe(200);
+    expect(response.headers.get('X-Xtrata-Runtime-Module-Base-Injected')).toBe('true');
+    expect(body).toContain(`<base href="${moduleBaseHref}">`);
+    expect(body).toContain('import("../../../System/shared/patch_runtime.js")');
+    expect(response.headers.get('Content-Length')).toBe(
+      new TextEncoder().encode(body).length.toString()
+    );
+  });
+
   it('serves cached byte ranges for media playback', async () => {
     const get = vi.fn(
       async (_key: string, options?: { range?: { offset: number; length: number } }) => {

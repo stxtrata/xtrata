@@ -19,6 +19,21 @@ describe('html grid preview injection', () => {
     expect(result).toContain('data-xtrata-grid-fit-script');
     expect(result).toContain('applyXtrataGridPreviewScale');
     expect(result).toContain('viewportWidth / contentWidth');
+    expect(result).toContain('compactAppLike');
+    expect(result).toContain("body.style.height = compactAppLike");
+  });
+
+  it('keeps tall document pages width-fit instead of scaling by full height', () => {
+    const html =
+      '<html><head><title>Agent 27</title></head><body><h1>AGENT 27</h1><p>Long journal entry</p></body></html>';
+    const result = injectGridThumbnailHtml(html);
+
+    expect(result).toContain('contentHeight <= viewportHeight * 1.5');
+    expect(result).toContain(
+      '? Math.min(1, viewportWidth / contentWidth, viewportHeight / contentHeight)'
+    );
+    expect(result).toContain(': Math.min(1, viewportWidth / contentWidth)');
+    expect(result).toContain(": 'auto'");
   });
 
   it('avoids duplicate injection', () => {

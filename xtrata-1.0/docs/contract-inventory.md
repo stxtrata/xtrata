@@ -692,6 +692,7 @@ registry that drives linking + escrow display is `src/lib/twins/registry.ts`
 |---|---|---|---|
 | Bitcoin Pepes | `SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun` | `SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe` | `bitcoin-pepe` |
 | LeoCats | `SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata` | `SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats` | `leo-cats` |
+| Miami Degens | `SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.miami-degens-fakfun-xtrata` | `SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.miami-degens` | `miami-degens` |
 
 Escrow state: on `inscribe` the twin is minted to the helper (`xtrata-escrowed = true`);
 `swap-pepe-for-xtrata` releases it (`false`); `swap-xtrata-for-pepe` re-escrows it.
