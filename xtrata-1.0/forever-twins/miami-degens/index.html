@@ -1107,7 +1107,7 @@
       masterFee: null,
       direction: 'pepe-to-xtrata',
       manifest: { running: false, stop: false, items: [], errors: [], output: null },
-      gallery: { running: false, stop: false, items: new Map(), selectedId: null, done: 0, total: 0, cacheHits: 0, sharedHits: 0, errors: 0, renderTimer: null, lastProgressLog: 0, sharedCacheAvailable: null, sharedWriteQueue: [] },
+      gallery: { running: false, stop: false, items: new Map(), selectedId: null, done: 0, total: 0, cacheHits: 0, sharedHits: 0, errors: 0, renderTimer: null, lastProgressLog: 0, sharedCacheAvailable: null, sharedWriteQueue: [], sharedWriteInFlight: null },
     };
 
     function jsonBigInt(_, value) { return typeof value === 'bigint' ? value.toString() : value; }
@@ -1828,64 +1828,90 @@
       });
       return params.toString();
     }
-    
-    async function readSharedGalleryCache(ids) {
-      const start = ids[0];
-      const end = ids[ids.length - 1];
+    async function fetchSharedGalleryCacheRange(start, end) {
+      const headers = { 'Accept': 'application/json' };
+      if (HIRO_API_KEY) headers['x-api-key'] = HIRO_API_KEY;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 9000);
       try {
-        const headers = { 'Accept': 'application/json' };
-        if (HIRO_API_KEY) headers['x-api-key'] = HIRO_API_KEY;
-
-        // FIX 2: Added CORS response headers explicitly
-        const response = await fetch(`/api/gallery-cache?${gallerySharedParams(start, end)}`, { 
-            cache: 'no-store',
-            mode: 'cors',
-            headers
+        const response = await fetch(`/api/gallery-cache?${gallerySharedParams(start, end)}`, {
+          cache: 'no-store',
+          mode: 'cors',
+          headers,
+          signal: controller.signal,
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const payload = await response.json();
-        const items = new Map((payload.items || []).map((item) => [Number(item.id), { ...item, status: item.status || 'loaded', fromSharedCache: true }]));
+        return await response.json();
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    
+    async function readSharedGalleryCache(ids) {
+      const chunkSize = 50;
+      const items = new Map();
+      try {
+        for (let i = 0; i < ids.length; i += chunkSize) {
+          const chunk = ids.slice(i, i + chunkSize);
+          const payload = await fetchSharedGalleryCacheRange(chunk[0], chunk[chunk.length - 1]);
+          for (const item of payload.items || []) {
+            items.set(Number(item.id), { ...item, status: item.status || 'loaded', fromSharedCache: true });
+          }
+        }
         state.gallery.sharedCacheAvailable = true;
-        log('Shared D1 gallery cache read', { range: `${start}-${end}`, hits: items.size });
+        log('Shared D1 gallery cache read', { range: `${ids[0]}-${ids[ids.length - 1]}`, chunks: Math.ceil(ids.length / chunkSize), hits: items.size });
         return items;
       } catch (err) {
         state.gallery.sharedCacheAvailable = false;
-        log('Shared D1 gallery cache unavailable; using browser cache fallback', { error: err.message });
-        return new Map();
+        log('Shared D1 gallery cache unavailable; using browser cache fallback', { range: `${ids[0]}-${ids[ids.length - 1]}`, hitsBeforeFailure: items.size, error: err.message });
+        return items;
       }
     }
     async function flushSharedGalleryWrites(force = false) {
       if (state.gallery.sharedCacheAvailable === false) return;
+      if (state.gallery.sharedWriteInFlight) {
+        if (force) await state.gallery.sharedWriteInFlight;
+        else return;
+      }
       if (!force && state.gallery.sharedWriteQueue.length < 20) return;
       const items = state.gallery.sharedWriteQueue.splice(0, 100);
       if (!items.length) return;
-      try {
-        const headers = {
-          'content-type': 'application/json',
-          'Accept': 'application/json'
-        };
-        if (HIRO_API_KEY) headers['x-api-key'] = HIRO_API_KEY;
+      state.gallery.sharedWriteInFlight = (async () => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 9000);
+        try {
+          const headers = {
+            'content-type': 'application/json',
+            'Accept': 'application/json'
+          };
+          if (HIRO_API_KEY) headers['x-api-key'] = HIRO_API_KEY;
 
-        // FIX 2: Added CORS response headers explicitly
-        const response = await fetch('/api/gallery-cache', {
-          method: 'POST',
-          mode: 'cors',
-          headers,
-          body: JSON.stringify({
-            collection: 'miami-degens',
-            network: networkName(),
-            source_contract: $('sourceContract').value.trim(),
-            items,
-          }),
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        state.gallery.sharedCacheAvailable = true;
-        log('Shared D1 gallery cache updated', { saved: items.length });
-      } catch (err) {
-        state.gallery.sharedCacheAvailable = false;
-        state.gallery.sharedWriteQueue.unshift(...items);
-        log('Shared D1 gallery cache write failed; keeping browser cache only', { error: err.message });
-      }
+          // FIX 2: Added CORS response headers explicitly
+          const response = await fetch('/api/gallery-cache', {
+            method: 'POST',
+            mode: 'cors',
+            headers,
+            signal: controller.signal,
+            body: JSON.stringify({
+              collection: 'miami-degens',
+              network: networkName(),
+              source_contract: $('sourceContract').value.trim(),
+              items,
+            }),
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          state.gallery.sharedCacheAvailable = true;
+          log('Shared D1 gallery cache updated', { saved: items.length });
+        } catch (err) {
+          state.gallery.sharedCacheAvailable = false;
+          state.gallery.sharedWriteQueue.unshift(...items);
+          log('Shared D1 gallery cache write failed; keeping browser cache only', { error: err.message });
+        } finally {
+          clearTimeout(timer);
+          state.gallery.sharedWriteInFlight = null;
+        }
+      })();
+      if (force) await state.gallery.sharedWriteInFlight;
     }
     
     function clearGalleryCache() {
@@ -2026,7 +2052,7 @@
             state.gallery.items.set(id, item);
             if (!item.fromCache && !item.fromSharedCache && item.status === 'loaded') {
               state.gallery.sharedWriteQueue.push(item);
-              await flushSharedGalleryWrites(false);
+              void flushSharedGalleryWrites(false);
             }
           } catch (err) {
             state.gallery.errors += 1;
