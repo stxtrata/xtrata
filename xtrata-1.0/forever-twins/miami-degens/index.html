@@ -838,7 +838,7 @@
                 </div>
                 <div class="row">
                   <label for="apiBase">API base</label>
-                  <input id="apiBase" class="shrine-input" value="https://api.mainnet.hiro.so" />
+                  <input id="apiBase" class="shrine-input" value="/hiro/mainnet" />
                 </div>
               </div>
               
@@ -1188,7 +1188,7 @@
     }
     function networkName() { return $('network').value; }
     
-    // Safely generate an augmented network object that forwards our API key to Hiro endpoint reads
+    // Use the same-origin Hiro proxy by default so Pages Functions can attach the server-side API key.
     function networkObj() { 
       const isMain = networkName() === 'mainnet';
       const baseNet = isMain ? STACKS_MAINNET : STACKS_TESTNET;
@@ -1206,7 +1206,9 @@
       return customNet; 
     }
     
-    function defaultApiBase() { return networkName() === 'mainnet' ? 'https://api.mainnet.hiro.so' : 'https://api.testnet.hiro.so'; }
+    function defaultApiBase() {
+      return networkName() === 'mainnet' ? '/hiro/mainnet' : '/hiro/testnet';
+    }
     function cleanApiBase() { return ($('apiBase')?.value?.trim() || defaultApiBase()).replace(/\/+$/, ''); }
     function explorerTx(txId) { return `https://explorer.hiro.so/txid/${txId}?chain=${networkName()}`; }
     function explorerContractUrl(principal) { return `https://explorer.hiro.so/token/${encodeURIComponent(principal)}?chain=${networkName()}`; }
