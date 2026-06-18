@@ -6,30 +6,30 @@
   
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: data: blob: 'unsafe-inline'; script-src 'self' https://esm.sh 'unsafe-inline'; connect-src 'self' https: wss:; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;" />
   
-  <title>LEO Cats Forever Twins</title>
+  <title>Miami Degens Forever Twins</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <style>
     /* ============================================================
-       LEO CATS FOREVER TWINS - neon feline Xtrata working UI
+       MIAMI DEGENS FOREVER TWINS - neon degen Xtrata working UI
        New feline dashboard aesthetic. Aqua, lime and violet on deep black.
        ============================================================ */
 
     :root {
       --radius: 0.75rem;
-      --bg: oklch(0.075 0.024 185);
-      --bg-soft: oklch(0.105 0.030 190);
-      --card: oklch(0.125 0.035 190);
-      --card-2: oklch(0.16 0.045 205);
+      --bg: oklch(0.075 0.035 292);
+      --bg-soft: oklch(0.105 0.045 292);
+      --card: oklch(0.125 0.045 292);
+      --card-2: oklch(0.16 0.055 310);
       --text: oklch(0.92 0.01 80);
       --text-strong: oklch(0.96 0.01 80);
       --muted: oklch(0.55 0.05 65);
       --muted-2: oklch(0.70 0.03 75);
-      --amber: oklch(0.78 0.15 172);
-      --amber-bright: oklch(0.88 0.14 150);
-      --amber-soft: oklch(0.78 0.15 172 / 0.13);
-      --amber-border: oklch(0.78 0.15 172 / 0.30);
+      --amber: oklch(0.78 0.18 54);
+      --amber-bright: oklch(0.86 0.20 76);
+      --amber-soft: oklch(0.78 0.18 54 / 0.13);
+      --amber-border: oklch(0.78 0.18 54 / 0.30);
       --green: oklch(0.74 0.16 145);
       --red: oklch(0.60 0.22 25);
       --purple: oklch(0.70 0.15 280);
@@ -692,7 +692,7 @@
       .gallery-grid { --gallery-tile-size: 74px; gap: 0.36rem; }
     }
 
-    /* LEO Cats visual pass */
+    /* Miami Degens visual pass */
     body::before {
       content: "";
       position: fixed;
@@ -744,9 +744,9 @@
 <body>
   <header class="header">
     <div class="brand">
-      <img src="../assets/leo-cat-forever-twin-logo-1.jpg" alt="LEO Cats Forever Twins seal" />
+      <img src="../assets/miami-degens-forever-twin-logo.png" alt="Miami Degens Forever Twins seal" />
       <div>
-        <div class="brand-title">LEO Cats</div>
+        <div class="brand-title">Miami Degens</div>
         <div class="brand-subtitle">Forever Twins</div>
       </div>
     </div>
@@ -763,15 +763,15 @@
       <div class="hero-grid">
         <div class="hero-copy">
           <div class="eyebrow fade-in-up"><span class="dot"></span>Powered by Stacks · Xtrata Protocol</div>
-          <h1 class="fade-in-up stagger-1">Twin Your LEO Cat<br><span>Into Xtrata.</span><br>Forever.</h1>
-          <p class="lead fade-in-up stagger-2">Create a permanent Xtrata twin for a LEO Cat, then swap which side stays liquid: the original NFT or the on-chain inscription.</p>
+          <h1 class="fade-in-up stagger-1">Twin Your Miami Degen<br><span>Into Xtrata.</span><br>Forever.</h1>
+          <p class="lead fade-in-up stagger-2">Create a permanent Xtrata twin for a Miami Degen, then swap which side stays liquid: the original NFT or the on-chain inscription.</p>
           <div class="hero-actions fade-in-up stagger-3">
             <a href="#inscribe" class="btn-amber">Inscribe Now</a>
             <a href="#lookup" class="btn-outline">Check Status</a>
           </div>
         </div>
         <div class="hero-art fade-in-up stagger-2">
-          <img src="../assets/leo-cat-forever-twin-logo-1.jpg" alt="LEO Cats Xtrata twin artwork" />
+          <img src="../assets/miami-degens-forever-twin-logo.png" alt="Miami Degens Xtrata twin artwork" />
         </div>
       </div>
     </div>
@@ -793,8 +793,8 @@
       <div class="main-grid">
         <section id="inscribe" class="shrine-card span-2">
           <div class="card-inner">
-            <div class="card-title"><span class="icon-box">🔥</span><h2>Inscribe LEO Cat Forever</h2></div>
-            <p class="card-sub">Enter a LEO Cat number to see it, check anything you like, then inscribe its permanent Xtrata twin in one click. We handle the chain reads, image fetch and hash check for you.</p>
+            <div class="card-title"><span class="icon-box">🔥</span><h2>Inscribe Miami Degen Forever</h2></div>
+            <p class="card-sub">Enter a Miami Degen number to see it, check anything you like, then inscribe its permanent Xtrata twin in one click. We handle the chain reads, image fetch and hash check for you.</p>
 
             <details>
               <summary>Contract setup</summary>
@@ -803,7 +803,7 @@
                   <label for="helperContract">Forever Twins registry — mapping layer (local ID → Xtrata ID)</label>
                   <span class="contract-actions"><a id="helperExplorerLink" class="mini-link" target="_blank" rel="noopener noreferrer">Explorer</a><a id="helperSourceLink" class="mini-link" target="_blank" rel="noopener noreferrer">Source</a></span>
                 </div>
-                <input id="helperContract" class="shrine-input" value="SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata" readonly />
+                <input id="helperContract" class="shrine-input" value="SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.miami-degens-fakfun-xtrata" readonly />
               </div>
               <div class="two">
                 <div class="row">
@@ -811,11 +811,11 @@
                     <label for="sourceContract">Source NFT contract</label>
                     <span class="contract-actions"><a id="sourceExplorerLink" class="mini-link" target="_blank" rel="noopener noreferrer">Explorer</a><a id="sourceSourceLink" class="mini-link" target="_blank" rel="noopener noreferrer">Source</a></span>
                   </div>
-                  <input id="sourceContract" class="shrine-input" value="SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats" />
+                  <input id="sourceContract" class="shrine-input" value="SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.miami-degens" />
                 </div>
                 <div class="row">
                   <label for="sourceAssetName">Source asset name</label>
-                  <input id="sourceAssetName" class="shrine-input" value="leo-cats" />
+                  <input id="sourceAssetName" class="shrine-input" value="miami-degens" />
                 </div>
               </div>
               <div class="two">
@@ -838,7 +838,7 @@
                 </div>
                 <div class="row">
                   <label for="apiBase">API base</label>
-                  <input id="apiBase" class="shrine-input" value="https://api.mainnet.hiro.so" />
+                  <input id="apiBase" class="shrine-input" value="/hiro/mainnet" />
                 </div>
               </div>
               
@@ -847,30 +847,30 @@
               </label>
             </details>
 
-            <!-- Journey-led flow: pick a cat, see it, inscribe its twin. Everything technical runs automatically and lives in the panel below. -->
+            <!-- Journey-led flow: pick a Miami Degen, see it, inscribe its twin. Everything technical runs automatically and lives in the panel below. -->
             <div class="journey">
               <div class="row journey-pick">
-                <label for="tokenId">Which LEO Cat?</label>
+                <label for="tokenId">Which Miami Degen?</label>
                 <div class="journey-pick-row">
-                  <input id="tokenId" class="shrine-input" inputmode="numeric" placeholder="Enter any LEO Cat number, e.g. 370" />
-                  <button id="checkBtn" class="btn-amber" type="button">Show me this cat</button>
+                  <input id="tokenId" class="shrine-input" inputmode="numeric" placeholder="Enter any Miami Degen number, e.g. 101" />
+                  <button id="checkBtn" class="btn-amber" type="button">Show me this degen</button>
                 </div>
               </div>
 
-              <div id="journeyImage" class="journey-image">Enter a LEO Cat number above and select “Show me this cat”.</div>
+              <div id="journeyImage" class="journey-image">Enter a Miami Degen number above and select “Show me this degen”.</div>
 
-              <div id="journeyStatus" class="callout journey-status">Pick any LEO Cat number to see it. You can browse as many as you like before choosing one to make permanent.</div>
-              <div id="ownershipLine" class="journey-owner">Connect your wallet to see whether a cat is already in it — you’re welcome to inscribe its twin either way.</div>
+              <div id="journeyStatus" class="callout journey-status">Pick any Miami Degen number to see it. You can browse as many as you like before choosing one to make permanent.</div>
+              <div id="ownershipLine" class="journey-owner">Connect your wallet to see whether a Miami Degen is already in it — you’re welcome to inscribe its twin either way.</div>
 
               <div class="journey-action">
                 <div class="status-card fee-card journey-fee"><small>Cost to inscribe</small><strong id="feeStatus">Connect wallet to calculate</strong></div>
-                <button id="inscribeBtn" class="btn-amber journey-inscribe" type="button" disabled>Inscribe this LEO Cat's twin</button>
+                <button id="inscribeBtn" class="btn-amber journey-inscribe" type="button" disabled>Inscribe this Miami Degen's twin</button>
               </div>
             </div>
 
             <details class="tech-details">
               <summary>Technical details &amp; on-chain proof</summary>
-              <div class="callout">Everything here runs automatically when you load a cat — it follows the source token URI to its metadata, fetches the raw image, hashes it, and checks the hash against the canonical record seeded on-chain. It is shown so anyone can verify the chain reads and the exact bytes being inscribed. You don’t need to touch it.</div>
+              <div class="callout">Everything here runs automatically when you load a Miami Degen — it follows the source token URI to its metadata, fetches the raw image, hashes it, and checks the hash against the canonical record seeded on-chain. It is shown so anyone can verify the chain reads and the exact bytes being inscribed. You don’t need to touch it.</div>
               <div class="button-row">
                 <button id="tokenUriBtn" class="btn-outline" type="button">Fetch URI + Image</button>
                 <button id="metadataBtn" class="btn-outline" type="button">Read URI / Raw Image</button>
@@ -883,7 +883,7 @@
               </div>
 
               <div class="status-grid dense-dashboard">
-                <div class="status-card conversion-card"><small>ID conversion</small><strong id="idConversionStatus">LEO Cat ID → Xtrata ID will appear here after a chain read.</strong></div>
+                <div class="status-card conversion-card"><small>ID conversion</small><strong id="idConversionStatus">Miami Degen ID → Xtrata ID will appear here after a chain read.</strong></div>
                 <div class="status-card image-card"><small>Raw image from token metadata</small><strong id="rawImageStatus">Not loaded from chain URI</strong></div>
                 <div class="status-card uri-card"><small>Token URI from source NFT</small><strong id="tokenUriStatus">Not loaded from chain</strong></div>
                 <div class="status-card canonical-card"><small>Canonical seed hash (registry)</small><strong id="canonicalStatus">Not loaded from chain</strong></div>
@@ -896,7 +896,7 @@
               <div class="file-prep-grid">
                 <label class="drop compact-drop" for="mediaFile">
                   <input id="mediaFile" type="file" />
-                  <span><b>Override image (optional)</b><small>normally the fetched cat image is used automatically</small></span>
+                  <span><b>Override image (optional)</b><small>normally the fetched Miami Degen image is used automatically</small></span>
                 </label>
                 <div class="row">
                   <label for="mime">MIME</label>
@@ -913,7 +913,7 @@
               </div>
               <div class="progress"><span id="progressBar"></span></div>
               <div class="hash-action-row">
-                <div id="hashMatch" class="callout compact-hash">Load a cat to check whether its image hash matches the canonical hash seeded in the helper contract.</div>
+                <div id="hashMatch" class="callout compact-hash">Load a Miami Degen to check whether its image hash matches the canonical hash seeded in the helper contract.</div>
                 <div class="button-row compact-actions">
                   <button id="useRawImageBtn" class="btn-outline" type="button" disabled>Use Raw Image</button>
                 </div>
@@ -922,10 +922,10 @@
 
             <details class="manifest-builder">
               <summary>Build collection hash manifest</summary>
-              <div class="callout">Batch mode can follow the LEO Cats token URI through metadata, or use a direct raw image template once one has been identified. Chain URI mode is safest for a new collection because it reads from the source contract first.</div>
+              <div class="callout">Batch mode can follow the Miami Degens token URI through metadata, or use a direct raw image template once one has been identified. Chain URI mode is safest for a new collection because it reads from the source contract first.</div>
               <div class="manifest-grid">
                 <div class="row"><label for="manifestStartId">Start ID</label><input id="manifestStartId" class="shrine-input" type="number" min="1" value="1" /></div>
-                <div class="row"><label for="manifestEndId">End ID</label><input id="manifestEndId" class="shrine-input" type="number" min="1" value="9999" /></div>
+                <div class="row"><label for="manifestEndId">End ID</label><input id="manifestEndId" class="shrine-input" type="number" min="1" value="420" /></div>
                 <div class="row"><label for="manifestConcurrency">Parallel</label><input id="manifestConcurrency" class="shrine-input" type="number" min="1" max="12" value="2" /></div>
                 <div class="row"><label for="manifestDelayMs">Delay ms</label><input id="manifestDelayMs" class="shrine-input" type="number" min="0" max="5000" value="180" /></div>
                 <div class="row"><label for="manifestRetries">Retries</label><input id="manifestRetries" class="shrine-input" type="number" min="0" max="8" value="3" /></div>
@@ -964,9 +964,9 @@
         <aside id="swap" class="shrine-card">
           <div class="card-inner">
             <div class="card-title"><span class="icon-box">⇄</span><h2>Swap</h2></div>
-            <p class="card-sub">Exactly one side stays liquid. Swap the LEO Cat for the Xtrata inscription or back again.</p>
+            <p class="card-sub">Exactly one side stays liquid. Swap the Miami Degen for the Xtrata inscription or back again.</p>
             <div class="swap-direction">
-              <button id="dirPepe" class="swap-token active" type="button"><img class="coin-img" src="../assets/leo-cat-forever-twin-logo-1.jpg" alt="" aria-hidden="true" /><span>LEO CAT</span></button>
+              <button id="dirPepe" class="swap-token active" type="button"><img class="coin-img" src="../assets/miami-degens-forever-twin-logo.png" alt="" aria-hidden="true" /><span>DEGEN</span></button>
               <div class="swap-arrow">→</div>
               <button id="dirXtrata" class="swap-token" type="button"><span class="coin">₿</span><span>XTRATA</span></button>
             </div>
@@ -974,9 +974,9 @@
               <label for="swapTokenId">Token ID</label>
               <input id="swapTokenId" class="shrine-input" inputmode="numeric" placeholder="Uses selected token if blank" />
             </div>
-            <div class="callout" id="swapHint">LEO Cat → Xtrata sends your source LEO Cat to escrow and releases the Xtrata twin.</div>
+            <div class="callout" id="swapHint">Miami Degen → Xtrata sends your source Miami Degen to escrow and releases the Xtrata twin.</div>
             <div class="button-row">
-              <button id="swapBtn" class="btn-amber full" type="button" disabled>Swap LEO Cat for Xtrata</button>
+              <button id="swapBtn" class="btn-amber full" type="button" disabled>Swap Miami Degen for Xtrata</button>
             </div>
           </div>
         </aside>
@@ -997,7 +997,7 @@
           <div class="gallery-head">
             <div>
               <h2>Full Collection Gallery</h2>
-              <p>Cache-first source collection view. Tiles resolve from the on-chain LEO Cats token URI through metadata JSON, then reuse cached image URLs on later loads.</p>
+              <p>Cache-first source collection view. Tiles resolve from the on-chain Miami Degens token URI through metadata JSON, then reuse cached image URLs on later loads.</p>
             </div>
             <div class="gallery-actions">
               <button id="galleryLoadBtn" class="btn-amber" type="button">Load Gallery</button>
@@ -1007,7 +1007,7 @@
           </div>
           <div class="gallery-controls">
             <div class="row"><label for="galleryStartId">Start ID</label><input id="galleryStartId" class="shrine-input" type="number" min="1" value="1" /></div>
-            <div class="row"><label for="galleryEndId">End ID</label><input id="galleryEndId" class="shrine-input" type="number" min="1" value="9999" /></div>
+            <div class="row"><label for="galleryEndId">End ID</label><input id="galleryEndId" class="shrine-input" type="number" min="1" value="420" /></div>
             <div class="row"><label for="galleryConcurrency">Parallel</label><input id="galleryConcurrency" class="shrine-input" type="number" min="1" max="12" value="4" /></div>
             <div class="row"><label for="galleryDelayMs">Delay ms</label><input id="galleryDelayMs" class="shrine-input" type="number" min="0" max="5000" value="80" /></div>
             <div class="row"><label for="galleryRetries">Retries</label><input id="galleryRetries" class="shrine-input" type="number" min="0" max="8" value="2" /></div>
@@ -1029,9 +1029,9 @@
         <h2>How It Works</h2>
         <p>Three steps. We do the first two for you.</p>
         <div class="how-grid">
-          <div class="shrine-card step-card"><div class="card-inner"><div class="step-num">01</div><h3>Pick a cat</h3><p>Type any LEO Cat number. We load it straight from the chain and show you the artwork — browse as many as you like.</p></div></div>
-          <div class="shrine-card step-card"><div class="card-inner"><div class="step-num">02</div><h3>We verify it</h3><p>Behind the scenes we fetch the cat’s real image and confirm it matches the canonical hash sealed on-chain. No files to upload.</p></div></div>
-          <div class="shrine-card step-card"><div class="card-inner"><div class="step-num">03</div><h3>Inscribe its twin</h3><p>One click opens your wallet to create the permanent Xtrata twin. Later, the cat’s owner can swap which side stays liquid.</p></div></div>
+          <div class="shrine-card step-card"><div class="card-inner"><div class="step-num">01</div><h3>Pick a degen</h3><p>Type any Miami Degen number. We load it straight from the chain and show you the artwork — browse as many as you like.</p></div></div>
+          <div class="shrine-card step-card"><div class="card-inner"><div class="step-num">02</div><h3>We verify it</h3><p>Behind the scenes we fetch the Miami Degen’s real image and confirm it matches the canonical hash sealed on-chain. No files to upload.</p></div></div>
+          <div class="shrine-card step-card"><div class="card-inner"><div class="step-num">03</div><h3>Inscribe its twin</h3><p>One click opens your wallet to create the permanent Xtrata twin. Later, the Miami Degen’s owner can swap which side stays liquid.</p></div></div>
         </div>
       </div>
     </section>
@@ -1039,13 +1039,13 @@
     <section class="contract-strip">
       <div class="container contract-grid">
         <div class="contract-card">
-          <label>LEO Cats Forever Helper</label>
-          <a id="footerHelper" class="data-mono contract-link" target="_blank" rel="noopener noreferrer">SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata</a>
+          <label>Miami Degens Forever Helper</label>
+          <a id="footerHelper" class="data-mono contract-link" target="_blank" rel="noopener noreferrer">SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.miami-degens-fakfun-xtrata</a>
           <div class="contract-actions"><a id="footerHelperExplorer" class="mini-link" target="_blank" rel="noopener noreferrer">Explorer</a><a id="footerHelperSource" class="mini-link" target="_blank" rel="noopener noreferrer">Source</a></div>
         </div>
         <div class="contract-card">
-          <label>LEO Cats Source NFT</label>
-          <a id="footerSource" class="data-mono contract-link" target="_blank" rel="noopener noreferrer">SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats</a>
+          <label>Miami Degens Source NFT</label>
+          <a id="footerSource" class="data-mono contract-link" target="_blank" rel="noopener noreferrer">SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.miami-degens</a>
           <div class="contract-actions"><a id="footerSourceExplorer" class="mini-link" target="_blank" rel="noopener noreferrer">Explorer</a><a id="footerSourceSource" class="mini-link" target="_blank" rel="noopener noreferrer">Source</a></div>
         </div>
         <div class="contract-card">
@@ -1059,7 +1059,7 @@
 
   <footer>
     <div class="container footer-flex">
-      <div><img src="../assets/leo-cat-forever-twin-logo-1.jpg" alt="LEO Cats seal" />LEO Cats Forever Twins</div>
+      <div><img src="../assets/miami-degens-forever-twin-logo.png" alt="Miami Degens seal" />Miami Degens Forever Twins</div>
       <div>Permanent by design · Powered by Xtrata</div>
     </div>
   </footer>
@@ -1107,7 +1107,7 @@
       masterFee: null,
       direction: 'pepe-to-xtrata',
       manifest: { running: false, stop: false, items: [], errors: [], output: null },
-      gallery: { running: false, stop: false, items: new Map(), selectedId: null, done: 0, total: 0, cacheHits: 0, sharedHits: 0, errors: 0, renderTimer: null, lastProgressLog: 0, sharedCacheAvailable: null, sharedWriteQueue: [] },
+      gallery: { running: false, stop: false, items: new Map(), selectedId: null, done: 0, total: 0, cacheHits: 0, sharedHits: 0, errors: 0, renderTimer: null, lastProgressLog: 0, sharedCacheAvailable: null, sharedWriteQueue: [], sharedWriteInFlight: null },
     };
 
     function jsonBigInt(_, value) { return typeof value === 'bigint' ? value.toString() : value; }
@@ -1188,7 +1188,7 @@
     }
     function networkName() { return $('network').value; }
     
-    // Safely generate an augmented network object that forwards our API key to Hiro endpoint reads
+    // Use the same-origin Hiro proxy by default so Pages Functions can attach the server-side API key.
     function networkObj() { 
       const isMain = networkName() === 'mainnet';
       const baseNet = isMain ? STACKS_MAINNET : STACKS_TESTNET;
@@ -1206,7 +1206,9 @@
       return customNet; 
     }
     
-    function defaultApiBase() { return networkName() === 'mainnet' ? 'https://api.mainnet.hiro.so' : 'https://api.testnet.hiro.so'; }
+    function defaultApiBase() {
+      return networkName() === 'mainnet' ? '/hiro/mainnet' : '/hiro/testnet';
+    }
     function cleanApiBase() { return ($('apiBase')?.value?.trim() || defaultApiBase()).replace(/\/+$/, ''); }
     function explorerTx(txId) { return `https://explorer.hiro.so/txid/${txId}?chain=${networkName()}`; }
     function explorerContractUrl(principal) { return `https://explorer.hiro.so/token/${encodeURIComponent(principal)}?chain=${networkName()}`; }
@@ -1366,13 +1368,13 @@
       const xId = binding?.['xtrata-id'] ? String(binding['xtrata-id']) : 'Pending';
       const hasBinding = !!binding;
       const liquid = hasBinding
-        ? (binding['xtrata-escrowed'] === true ? 'LEO Cat liquid · Xtrata escrowed' : 'Xtrata liquid · LEO Cat escrowed')
+        ? (binding['xtrata-escrowed'] === true ? 'Miami Degen liquid · Xtrata escrowed' : 'Xtrata liquid · Miami Degen escrowed')
         : 'Not forevered yet';
       const escrow = hasBinding
-        ? (binding['xtrata-escrowed'] === true ? 'Xtrata held by helper' : 'LEO Cat held by helper')
+        ? (binding['xtrata-escrowed'] === true ? 'Xtrata held by helper' : 'Miami Degen held by helper')
         : 'No escrow binding';
       return `<div class="id-map">
-        <div class="id-map-box"><em>LEO Cat</em><b>#${escapeHtml(pepeId)}</b></div>
+        <div class="id-map-box"><em>Miami Degen</em><b>#${escapeHtml(pepeId)}</b></div>
         <div class="id-map-arrow">↔</div>
         <div class="id-map-box"><em>Xtrata twin</em><b>${hasBinding ? '#' : ''}${escapeHtml(xId)}</b></div>
         <div class="id-map-meta"><span><b>Liquid:</b><br>${escapeHtml(liquid)}</span><span><b>Escrow:</b><br>${escapeHtml(escrow)}</span></div>
@@ -1448,7 +1450,7 @@
       state.sourceImageUrl = null;
       state.sourceImageCandidates = [];
       // Clear any previously prepared image bytes so a new token can't reuse a
-      // stale hash/chunk set from the cat we were just looking at.
+      // stale hash/chunk set from the Miami Degen we were just looking at.
       state.fileBytes = null;
       state.fileHash = null;
       state.chunks = [];
@@ -1473,7 +1475,25 @@
     function decodeUriTemplate(uri) { return String(uri || '').trim().replace(/%7B/ig, '{').replace(/%7D/ig, '}'); }
     function resolveUriTemplate(uri, tokenId) {
       const id = String(tokenId ?? $('tokenId').value.trim() ?? '').trim();
-      let resolved = decodeUriTemplate(uri).replace(/\{id\}/ig, id).replace(/\{token_id\}/ig, id).replace(/\{tokenId\}/g, id);
+      let resolved = decodeUriTemplate(uri);
+      // Miami Degens returns token URIs as e.g.
+      //   ipfs://.../$TOKEN_ID.json
+      // The earlier clone only replaced {id}-style placeholders, leaving the
+      // literal $TOKEN_ID in the gateway URL. That produced 404s for every
+      // gateway and stopped the artwork from loading. Support the common
+      // placeholder forms used by Stacks NFT contracts and metadata folders.
+      if (id) {
+        resolved = resolved
+          .replace(/\{id\}/ig, id)
+          .replace(/\{token_id\}/ig, id)
+          .replace(/\{tokenId\}/g, id)
+          .replace(/\$TOKEN_ID\b/ig, id)
+          .replace(/\$TOKENID\b/ig, id)
+          .replace(/\$ID\b/ig, id)
+          .replace(/%24TOKEN_ID\b/ig, id)
+          .replace(/%24TOKENID\b/ig, id)
+          .replace(/%24ID\b/ig, id);
+      }
       resolved = resolved.replace(/^ipfs:\/\/ipfs\//i, 'ipfs://');
       try {
         const parsed = new URL(resolved);
@@ -1666,7 +1686,7 @@
       return {
         type: 'xtrata.collection-hash-manifest',
         version: 1,
-        collection: 'LEO Cats Forever source image hash manifest',
+        collection: 'Miami Degens Forever source image hash manifest',
         hash_algorithm: 'sha256',
         hash_target: 'raw-image-bytes',
         metadata_hash_target: $('manifestMode')?.value === 'direct-image' ? 'not-fetched-in-direct-image-mode' : 'metadata-json-text-as-fetched',
@@ -1775,16 +1795,16 @@
 
     function downloadManifestJson() {
       const payload = state.manifest.output || buildManifestPayload();
-      downloadTextFile(`leo-cats-hash-manifest-${payload.range.start}-${payload.range.end}.json`, JSON.stringify(payload, jsonBigInt, 2), 'application/json');
+      downloadTextFile(`miami-degens-hash-manifest-${payload.range.start}-${payload.range.end}.json`, JSON.stringify(payload, jsonBigInt, 2), 'application/json');
     }
 
     function downloadManifestCsv() {
       const payload = state.manifest.output || buildManifestPayload();
-      downloadTextFile(`leo-cats-hash-manifest-${payload.range.start}-${payload.range.end}.csv`, manifestToCsv(payload), 'text/csv');
+      downloadTextFile(`miami-degens-hash-manifest-${payload.range.start}-${payload.range.end}.csv`, manifestToCsv(payload), 'text/csv');
     }
 
     function galleryCachePrefix() {
-      return `leo-cats-gallery:v1:${networkName()}:${$('sourceContract').value.trim()}`;
+      return `miami-degens-gallery:v1:${networkName()}:${$('sourceContract').value.trim()}`;
     }
     function galleryCacheKey(tokenId) { return `${galleryCachePrefix()}:${tokenId}`; }
     function readGalleryCache(tokenId) {
@@ -1800,7 +1820,7 @@
     }
     function gallerySharedParams(start, end) {
       const params = new URLSearchParams({
-        collection: 'leo-cats',
+        collection: 'miami-degens',
         network: networkName(),
         source: $('sourceContract').value.trim(),
         start: String(start),
@@ -1808,64 +1828,90 @@
       });
       return params.toString();
     }
-    
-    async function readSharedGalleryCache(ids) {
-      const start = ids[0];
-      const end = ids[ids.length - 1];
+    async function fetchSharedGalleryCacheRange(start, end) {
+      const headers = { 'Accept': 'application/json' };
+      if (HIRO_API_KEY) headers['x-api-key'] = HIRO_API_KEY;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 9000);
       try {
-        const headers = { 'Accept': 'application/json' };
-        if (HIRO_API_KEY) headers['x-api-key'] = HIRO_API_KEY;
-
-        // FIX 2: Added CORS response headers explicitly
-        const response = await fetch(`/api/gallery-cache?${gallerySharedParams(start, end)}`, { 
-            cache: 'no-store',
-            mode: 'cors',
-            headers
+        const response = await fetch(`/api/gallery-cache?${gallerySharedParams(start, end)}`, {
+          cache: 'no-store',
+          mode: 'cors',
+          headers,
+          signal: controller.signal,
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const payload = await response.json();
-        const items = new Map((payload.items || []).map((item) => [Number(item.id), { ...item, status: item.status || 'loaded', fromSharedCache: true }]));
+        return await response.json();
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    
+    async function readSharedGalleryCache(ids) {
+      const chunkSize = 50;
+      const items = new Map();
+      try {
+        for (let i = 0; i < ids.length; i += chunkSize) {
+          const chunk = ids.slice(i, i + chunkSize);
+          const payload = await fetchSharedGalleryCacheRange(chunk[0], chunk[chunk.length - 1]);
+          for (const item of payload.items || []) {
+            items.set(Number(item.id), { ...item, status: item.status || 'loaded', fromSharedCache: true });
+          }
+        }
         state.gallery.sharedCacheAvailable = true;
-        log('Shared D1 gallery cache read', { range: `${start}-${end}`, hits: items.size });
+        log('Shared D1 gallery cache read', { range: `${ids[0]}-${ids[ids.length - 1]}`, chunks: Math.ceil(ids.length / chunkSize), hits: items.size });
         return items;
       } catch (err) {
         state.gallery.sharedCacheAvailable = false;
-        log('Shared D1 gallery cache unavailable; using browser cache fallback', { error: err.message });
-        return new Map();
+        log('Shared D1 gallery cache unavailable; using browser cache fallback', { range: `${ids[0]}-${ids[ids.length - 1]}`, hitsBeforeFailure: items.size, error: err.message });
+        return items;
       }
     }
     async function flushSharedGalleryWrites(force = false) {
       if (state.gallery.sharedCacheAvailable === false) return;
+      if (state.gallery.sharedWriteInFlight) {
+        if (force) await state.gallery.sharedWriteInFlight;
+        else return;
+      }
       if (!force && state.gallery.sharedWriteQueue.length < 20) return;
       const items = state.gallery.sharedWriteQueue.splice(0, 100);
       if (!items.length) return;
-      try {
-        const headers = {
-          'content-type': 'application/json',
-          'Accept': 'application/json'
-        };
-        if (HIRO_API_KEY) headers['x-api-key'] = HIRO_API_KEY;
+      state.gallery.sharedWriteInFlight = (async () => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 9000);
+        try {
+          const headers = {
+            'content-type': 'application/json',
+            'Accept': 'application/json'
+          };
+          if (HIRO_API_KEY) headers['x-api-key'] = HIRO_API_KEY;
 
-        // FIX 2: Added CORS response headers explicitly
-        const response = await fetch('/api/gallery-cache', {
-          method: 'POST',
-          mode: 'cors',
-          headers,
-          body: JSON.stringify({
-            collection: 'leo-cats',
-            network: networkName(),
-            source_contract: $('sourceContract').value.trim(),
-            items,
-          }),
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        state.gallery.sharedCacheAvailable = true;
-        log('Shared D1 gallery cache updated', { saved: items.length });
-      } catch (err) {
-        state.gallery.sharedCacheAvailable = false;
-        state.gallery.sharedWriteQueue.unshift(...items);
-        log('Shared D1 gallery cache write failed; keeping browser cache only', { error: err.message });
-      }
+          // FIX 2: Added CORS response headers explicitly
+          const response = await fetch('/api/gallery-cache', {
+            method: 'POST',
+            mode: 'cors',
+            headers,
+            signal: controller.signal,
+            body: JSON.stringify({
+              collection: 'miami-degens',
+              network: networkName(),
+              source_contract: $('sourceContract').value.trim(),
+              items,
+            }),
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          state.gallery.sharedCacheAvailable = true;
+          log('Shared D1 gallery cache updated', { saved: items.length });
+        } catch (err) {
+          state.gallery.sharedCacheAvailable = false;
+          state.gallery.sharedWriteQueue.unshift(...items);
+          log('Shared D1 gallery cache write failed; keeping browser cache only', { error: err.message });
+        } finally {
+          clearTimeout(timer);
+          state.gallery.sharedWriteInFlight = null;
+        }
+      })();
+      if (force) await state.gallery.sharedWriteInFlight;
     }
     
     function clearGalleryCache() {
@@ -1947,7 +1993,7 @@
       const label = `#${escapeHtml(item.id)}`;
       const title = item.status === 'error' ? `Token ${item.id}: ${item.error || 'Error'}` : `Token ${item.id}`;
       const body = item.resolved_image_uri
-        ? `<img src="${escapeHtml(item.resolved_image_uri)}" alt="LEO Cat #${escapeHtml(item.id)}" loading="lazy" decoding="async" />`
+        ? `<img src="${escapeHtml(item.resolved_image_uri)}" alt="Miami Degen #${escapeHtml(item.id)}" loading="lazy" decoding="async" />`
         : `<span class="tile-fallback">${escapeHtml(item.status === 'error' ? 'Error' : 'Pending')}</span>`;
       return `<button class="gallery-tile${selected}${statusClass}" type="button" data-token-id="${escapeHtml(item.id)}" title="${escapeHtml(title)}">${body}<span class="gallery-token">${label}</span></button>`;
     }
@@ -2006,7 +2052,7 @@
             state.gallery.items.set(id, item);
             if (!item.fromCache && !item.fromSharedCache && item.status === 'loaded') {
               state.gallery.sharedWriteQueue.push(item);
-              await flushSharedGalleryWrites(false);
+              void flushSharedGalleryWrites(false);
             }
           } catch (err) {
             state.gallery.errors += 1;
@@ -2142,8 +2188,8 @@
         if (imgBox.dataset.url !== url) {
           imgBox.dataset.url = url;
           imgBox.innerHTML = url
-            ? `<img src="${escapeHtml(url)}" alt="LEO Cat preview" loading="lazy" />`
-            : 'Enter a LEO Cat number above and select “Show me this cat”.';
+            ? `<img src="${escapeHtml(url)}" alt="Miami Degen preview" loading="lazy" />`
+            : 'Enter a Miami Degen number above and select “Show me this degen”.';
         }
       }
       const tokenReady = /^\d+$/.test($('tokenId').value.trim());
@@ -2152,20 +2198,20 @@
       if (js) {
         let html;
         if (!tokenReady || (!state.canonicalHash && !state.binding && !state.sourceImageUrl)) {
-          html = 'Pick any LEO Cat number to see it. You can browse as many as you like before choosing one to make permanent.';
+          html = 'Pick any Miami Degen number to see it. You can browse as many as you like before choosing one to make permanent.';
         } else if (state.binding) {
           const xId = state.binding['xtrata-id'];
-          html = `${badge('Already forevered', 'ok')} This LEO Cat already has its twin (Xtrata #${escapeHtml(xId)}). Use Swap to choose which side stays liquid.`;
+          html = `${badge('Already forevered', 'ok')} This Miami Degen already has its twin (Xtrata #${escapeHtml(xId)}). Use Swap to choose which side stays liquid.`;
         } else if (!state.canonicalHash) {
-          html = `${badge('Not in the seed list', 'warn')} This cat isn’t in the canonical seed list yet, so its twin can’t be inscribed.`;
+          html = `${badge('Not in the seed list', 'warn')} This Miami Degen isn’t in the canonical seed list yet, so its twin can’t be inscribed.`;
         } else if (matched) {
           html = state.wallet
-            ? `${badge('Ready to inscribe', 'ok')} This cat’s artwork matches the canonical hash sealed on-chain. Select <b>“Inscribe this LEO Cat's twin”</b> below to open your wallet.`
-            : `${badge('Ready', 'ok')} This cat is verified and ready. Connect your wallet to inscribe its twin.`;
+            ? `${badge('Ready to inscribe', 'ok')} This Miami Degen’s artwork matches the canonical hash sealed on-chain. Select <b>“Inscribe this Miami Degen's twin”</b> below to open your wallet.`
+            : `${badge('Ready', 'ok')} This Miami Degen is verified and ready. Connect your wallet to inscribe its twin.`;
         } else if (state.fileHash) {
-          html = `${badge('Image mismatch', 'bad')} The image we fetched doesn’t match the canonical seed for this cat, so inscription would be rejected. Open Technical details to investigate.`;
+          html = `${badge('Image mismatch', 'bad')} The image we fetched doesn’t match the canonical seed for this Miami Degen, so inscription would be rejected. Open Technical details to investigate.`;
         } else {
-          html = `${badge('Preparing', 'warn')} Loading and verifying this cat’s artwork…`;
+          html = `${badge('Preparing', 'warn')} Loading and verifying this Miami Degen’s artwork…`;
         }
         js.innerHTML = html;
       }
@@ -2176,14 +2222,14 @@
           // "not in your wallet" note is not relevant here. Hide it.
           ol.textContent = '';
         } else if (!state.wallet) {
-          ol.innerHTML = 'Connect your wallet to see whether this cat is already in it — you’re welcome to inscribe its twin either way.';
+          ol.innerHTML = 'Connect your wallet to see whether this Miami Degen is already in it — you’re welcome to inscribe its twin either way.';
         } else if (!state.sourceOwner) {
           ol.textContent = '';
         } else {
           const ownerText = typeof state.sourceOwner === 'object' ? JSON.stringify(state.sourceOwner) : String(state.sourceOwner);
           ol.innerHTML = ownerText === state.wallet
-            ? `${badge('In your wallet', 'ok')} This LEO Cat is in your connected wallet.`
-            : `${badge('Not in your wallet', 'warn')} This LEO Cat isn’t in your wallet — you can still inscribe its twin. (You’d need to own the cat to later swap the twin into your wallet.)`;
+            ? `${badge('In your wallet', 'ok')} This Miami Degen is in your connected wallet.`
+            : `${badge('Not in your wallet', 'warn')} This Miami Degen isn’t in your wallet — you can still inscribe its twin. (You’d need to own the Miami Degen to later swap the twin into your wallet.)`;
         }
       }
     }
@@ -2238,8 +2284,8 @@
 
       if (state.binding) {
         const xId = state.binding['xtrata-id'];
-        const escrow = state.binding['xtrata-escrowed'] === true ? 'Xtrata currently escrowed' : 'LEO Cat currently escrowed';
-        const liquid = state.binding['xtrata-escrowed'] === true ? 'LEO Cat is liquid, Xtrata is escrowed' : 'Xtrata is liquid, LEO Cat is escrowed';
+        const escrow = state.binding['xtrata-escrowed'] === true ? 'Xtrata currently escrowed' : 'Miami Degen currently escrowed';
+        const liquid = state.binding['xtrata-escrowed'] === true ? 'Miami Degen is liquid, Xtrata is escrowed' : 'Xtrata is liquid, Miami Degen is escrowed';
         setStatus('bindingStatus', `${badge('Binding found on chain', 'ok')}<br><span class="data-mono">Xtrata #${escapeHtml(xId)} · ${escapeHtml(escrow)}</span>${chainProof(helper, 'get-binding', [tokenArg])}`);
         setStatus('idConversionStatus', renderIdConversion(state.binding, tokenId));
         setStatus('lookupXtrata', `<span class="data-mono">#${escapeHtml(xId)}</span>`);
@@ -2295,13 +2341,16 @@
         const raw = await readContract(source, 'get-token-uri', args);
         const uri = unwrapOptional(raw);
         if (uri && typeof uri === 'string') {
+          const resolvedUri = resolveUriTemplate(uri, tokenId);
           const currentInput = $('tokenUri').value.trim();
-          const canSyncInput = !currentInput || currentInput === state.fetchedTokenUri;
-          if (canSyncInput) $('tokenUri').value = uri;
-          state.fetchedTokenUri = uri;
+          const canSyncInput = !currentInput || currentInput === state.fetchedTokenUri || currentInput === uri;
+          // Store the token-specific URI on the Xtrata inscription, not the
+          // collection-level template with $TOKEN_ID still inside it.
+          if (canSyncInput) $('tokenUri').value = resolvedUri;
+          state.fetchedTokenUri = resolvedUri;
           renderTokenUriStatus(uri, source, args, tokenId);
           await readMetadataAndRawImage(uri, tokenId, showLog);
-          if (showLog) log('Fetched source token URI from chain', { sourceContract: source, function: 'get-token-uri', tokenId: tokenId.toString(), tokenUri: uri, copiedToXtrataInput: canSyncInput });
+          if (showLog) log('Fetched source token URI from chain', { sourceContract: source, function: 'get-token-uri', tokenId: tokenId.toString(), tokenUri: uri, resolvedTokenUri: resolvedUri, copiedToXtrataInput: canSyncInput });
           updateActionButtons();
           return uri;
         }
@@ -2410,8 +2459,8 @@
       const leo = state.direction === 'pepe-to-xtrata';
       $('dirPepe').classList.toggle('active', leo);
       $('dirXtrata').classList.toggle('active', !leo);
-      $('swapBtn').textContent = leo ? 'Swap LEO Cat for Xtrata' : 'Swap Xtrata for LEO Cat';
-      $('swapHint').textContent = leo ? 'LEO Cat → Xtrata sends your source LEO Cat to escrow and releases the Xtrata twin.' : 'Xtrata → LEO Cat sends your Xtrata twin to escrow and releases the source LEO Cat.';
+      $('swapBtn').textContent = leo ? 'Swap Miami Degen for Xtrata' : 'Swap Xtrata for Miami Degen';
+      $('swapHint').textContent = leo ? 'Miami Degen → Xtrata sends your source Miami Degen to escrow and releases the Xtrata twin.' : 'Xtrata → Miami Degen sends your Xtrata twin to escrow and releases the source Miami Degen.';
       updateActionButtons();
     }
 
@@ -2509,7 +2558,7 @@
     setWallet(getStoredWallet());
     updateSwapUi();
     refreshContractStatus();
-    log('LEO Cats Forever Twins UI loaded. Connect wallet, check a token, then fetch the chain URI and raw image.');
+    log('Miami Degens Forever Twins UI loaded. Connect wallet, check a token, then fetch the chain URI and raw image.');
 
     // Auto-load Token ID 1 on initialization
     $('tokenId').value = '1';

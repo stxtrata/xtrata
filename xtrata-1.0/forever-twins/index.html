@@ -423,8 +423,8 @@
         </div>
         <div class="col-body">LEO Cats holders can create a permanent on-chain counterpart backed by Xtrata, with collection tools for inscription, lookup, and gallery verification.</div>
         <div class="col-metrics">
-          <div class="col-metric"><div class="v live">Live</div><div class="k">Twin portal</div></div>
-          <div class="col-metric"><div class="v">1:1</div><div class="k">Forever binding</div></div>
+          <div class="col-metric"><div class="v live" id="l-inscribed">—</div><div class="k">Twins inscribed</div></div>
+          <div class="col-metric"><div class="v" id="l-status">—</div><div class="k">Canonical record</div></div>
         </div>
         <div class="col-foot"><span class="btn sm">View LEO Cats →</span></div>
       </a>
@@ -477,16 +477,33 @@
 </footer>
 
 <script>
-/* Live mini-stats for the Bitcoin Pepes card — read straight from the helper contract.
-   To add another live collection later, copy the collection card markup, give its
-   metrics unique IDs, and add a matching entry to COLLECTIONS below. */
+/* ── Forever Twins architecture ────────────────────────────────────────────
+   CORE     = the Xtrata core contract: the canonical inscription/content layer,
+              shared across every collection and indexed once. Each collection
+              page reads its final inscription data from CORE.
+   REGISTRY = a collection's Forever Twins helper contract: a MAPPING layer only
+              (local ID -> Xtrata ID + per-collection seed/fee/count).
+   The cards below show a per-collection twin COUNT, which is inherently a
+   registry stat, so each entry points at that collection's REGISTRY contract.
+   This is decoration only — it is NOT the source of canonical inscription
+   content. To add a collection: copy a card, give its metrics unique IDs, and
+   add a { registry, countEl, statusEl } entry here. No core/indexer change. */
+const XTRATA_CORE_CONTRACT = "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3"; // canonical inscription layer (reference)
 const COLLECTIONS = [
   {
+    // REGISTRY (mapping layer) for Bitcoin Pepes — used here only for its twin count.
     addr: "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22",
     name: "pepe-4ever-fakfun",
     countEl: "c-inscribed",
     statusEl: "c-status",
     trustEl: "trust-count"
+  },
+  {
+    // REGISTRY (mapping layer) for LEO Cats — used here only for its twin count.
+    addr: "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22",
+    name: "leo-fakfun-xtrata",
+    countEl: "l-inscribed",
+    statusEl: "l-status"
   }
 ];
 const API = "https://api.hiro.so";

@@ -1,4 +1,7 @@
-import { buildRuntimeModuleBaseHref } from '../../src/lib/viewer/module-paths';
+import {
+  buildRuntimeModuleBaseHref,
+  injectHtmlBaseHref
+} from '../../src/lib/viewer/module-paths';
 import {
   buildRuntimeContentCacheKey,
   getRuntimeContractId,
@@ -25,11 +28,15 @@ import {
   type RuntimeReconstructionDiagnostics
 } from './lib';
 import {
+  isHtmlMimeType,
+  isRawSourceRequested,
   rewriteHiroApiBasesInBytes,
   shouldRewriteHiroBases
 } from './html-hiro-rewrite';
 
 const RUNTIME_CONTENT_BUILD = 'stream-v1';
+const textDecoder = new TextDecoder();
+const textEncoder = new TextEncoder();
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -49,6 +56,7 @@ const CORS_HEADERS = {
     'X-Xtrata-Runtime-Network',
     'X-Xtrata-Runtime-Token-Uri',
     'X-Xtrata-Runtime-Module-Base',
+    'X-Xtrata-Runtime-Module-Base-Injected',
     'X-Xtrata-Runtime-Final-Hash',
     'X-Xtrata-Runtime-Total-Size',
     'X-Xtrata-Runtime-Total-Chunks',
@@ -326,6 +334,35 @@ const shouldHonorRange = (request: Request, finalHash: string) => {
 const sliceBytes = (bytes: Uint8Array, range: RuntimeByteRange) =>
   bytes.slice(range.start, range.end + 1);
 
+const injectRuntimeModuleBaseInBytes = (params: {
+  bytes: Uint8Array;
+  mimeType: string | null | undefined;
+  moduleBaseHref: string | null | undefined;
+  requestUrl: URL;
+}) => {
+  if (
+    !params.moduleBaseHref ||
+    !isHtmlMimeType(params.mimeType) ||
+    isRawSourceRequested(params.requestUrl)
+  ) {
+    return { bytes: params.bytes, changed: false };
+  }
+  let html: string;
+  try {
+    html = textDecoder.decode(params.bytes);
+  } catch {
+    return { bytes: params.bytes, changed: false };
+  }
+  const injected = injectHtmlBaseHref(html, params.moduleBaseHref);
+  if (injected === html) {
+    return { bytes: params.bytes, changed: false };
+  }
+  return {
+    bytes: textEncoder.encode(injected),
+    changed: true
+  };
+};
+
 export const onRequest = async (context: {
   request: Request;
   env: RuntimeEnv;
@@ -421,6 +458,14 @@ export const onRequest = async (context: {
     if (cached) {
       const sourceContractId =
         cached.customMetadata?.sourceContractId ?? getRuntimeContractId(resolvedMeta.contract);
+      const cachedModuleBaseHref =
+        cached.customMetadata?.moduleBaseHref ??
+        buildRuntimeModuleBaseHref({
+          network,
+          contractId: sourceContractId,
+          tokenUriPath: cached.customMetadata?.tokenUri,
+          entryTokenId: tokenId
+        });
       const rangeContentLength =
         requestedRange.status === 'valid' ? requestedRange.range.length : null;
       const cachedMimeType =
@@ -431,6 +476,7 @@ export const onRequest = async (context: {
         request.method === 'HEAD' ? null : cached.body;
       let cachedContentLength = rangeContentLength ?? cached.size;
       let cachedApiRewrite = false;
+      let cachedModuleBaseInjected = false;
       if (
         cachedResponseBody &&
         shouldRewriteHiroBases({
@@ -448,6 +494,24 @@ export const onRequest = async (context: {
         cachedContentLength = rewritten.bytes.length;
         cachedApiRewrite = rewritten.changed;
       }
+      if (
+        cachedResponseBody &&
+        request.method === 'GET' &&
+        requestedRange.status !== 'valid'
+      ) {
+        const cachedBytes = new Uint8Array(
+          await new Response(cachedResponseBody as BodyInit).arrayBuffer()
+        );
+        const baseInjected = injectRuntimeModuleBaseInBytes({
+          bytes: cachedBytes,
+          mimeType: cachedMimeType,
+          moduleBaseHref: cachedModuleBaseHref,
+          requestUrl: url
+        });
+        cachedResponseBody = baseInjected.bytes;
+        cachedContentLength = baseInjected.bytes.length;
+        cachedModuleBaseInjected = baseInjected.changed;
+      }
       const headers = buildRuntimeContentHeaders({
         mimeType: cachedMimeType,
         cacheStatus: 'HIT',
@@ -455,7 +519,7 @@ export const onRequest = async (context: {
         contractId: getRuntimeContractId(resolvedMeta.contract),
         sourceContractId,
         tokenUri: cached.customMetadata?.tokenUri ?? '',
-        moduleBaseHref: cached.customMetadata?.moduleBaseHref ?? '',
+        moduleBaseHref: cachedModuleBaseHref ?? '',
         finalHash,
         totalSize: resolvedMeta.meta.totalSize,
         totalChunks: resolvedMeta.meta.totalChunks,
@@ -474,6 +538,9 @@ export const onRequest = async (context: {
         upstreamRequests: upstreamTracker.attempts,
         preparedMs: performance.now() - startedAt
       });
+      if (cachedModuleBaseInjected) {
+        headers['X-Xtrata-Runtime-Module-Base-Injected'] = 'true';
+      }
       return new Response(cachedResponseBody, {
         status: requestedRange.status === 'valid' ? 206 : 200,
         headers
@@ -684,6 +751,7 @@ export const onRequest = async (context: {
     const streamMimeType = resolved.meta.mimeType || 'application/octet-stream';
     let streamBytes = resolved.bytes;
     let streamApiRewrite = false;
+    let streamModuleBaseInjected = false;
     if (
       shouldRewriteHiroBases({
         requestUrl: url,
@@ -696,6 +764,14 @@ export const onRequest = async (context: {
       streamBytes = rewritten.bytes;
       streamApiRewrite = rewritten.changed;
     }
+    const baseInjected = injectRuntimeModuleBaseInBytes({
+      bytes: streamBytes,
+      mimeType: streamMimeType,
+      moduleBaseHref,
+      requestUrl: url
+    });
+    streamBytes = baseInjected.bytes;
+    streamModuleBaseInjected = baseInjected.changed;
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         controller.enqueue(streamBytes);
@@ -703,29 +779,34 @@ export const onRequest = async (context: {
       }
     });
 
+    const headers = buildRuntimeContentHeaders({
+      mimeType: streamMimeType,
+      cacheStatus: cacheEnabled ? 'MISS' : 'BYPASS',
+      network,
+      contractId: cacheContractId,
+      sourceContractId: resolvedContractId,
+      tokenUri: tokenUri ?? '',
+      moduleBaseHref: moduleBaseHref ?? '',
+      finalHash: resolvedFinalHash,
+      totalSize: resolved.meta.totalSize,
+      totalChunks: resolved.meta.totalChunks,
+      contentLength: streamBytes.length,
+      responseMode: 'stream',
+      apiRewrite: streamApiRewrite,
+      readBatchSize: readConfig.batchSize,
+      readConcurrency: readConfig.concurrency,
+      readRetries: readConfig.retries,
+      upstreamRequests: upstreamTracker.attempts,
+      diagnostics: resolved.diagnostics,
+      preparedMs: performance.now() - startedAt
+    });
+    if (streamModuleBaseInjected) {
+      headers['X-Xtrata-Runtime-Module-Base-Injected'] = 'true';
+    }
+
     return new Response(stream, {
       status: 200,
-      headers: buildRuntimeContentHeaders({
-        mimeType: streamMimeType,
-        cacheStatus: cacheEnabled ? 'MISS' : 'BYPASS',
-        network,
-        contractId: cacheContractId,
-        sourceContractId: resolvedContractId,
-        tokenUri: tokenUri ?? '',
-        moduleBaseHref: moduleBaseHref ?? '',
-        finalHash: resolvedFinalHash,
-        totalSize: resolved.meta.totalSize,
-        totalChunks: resolved.meta.totalChunks,
-        contentLength: streamBytes.length,
-        responseMode: 'stream',
-        apiRewrite: streamApiRewrite,
-        readBatchSize: readConfig.batchSize,
-        readConcurrency: readConfig.concurrency,
-        readRetries: readConfig.retries,
-        upstreamRequests: upstreamTracker.attempts,
-        diagnostics: resolved.diagnostics,
-        preparedMs: performance.now() - startedAt
-      })
+      headers
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);

@@ -155,6 +155,7 @@ The current core contract documentation set lives under
 | [`docs/artist-guides/collection-template-deploy-guide.md`](artist-guides/collection-template-deploy-guide.md) | Collection template deployment guide. |
 | [`docs/artist-guides/collection-mint-setup-flow-blueprint.md`](artist-guides/collection-mint-setup-flow-blueprint.md) | Setup flow blueprint for collection mints. |
 | [`docs/standards/xtrata-collection-manifest-standard.md`](standards/xtrata-collection-manifest-standard.md) | Collection manifest standard for marketplace-facing item maps, provenance, rights, reconstruction, and preservation context. |
+| [`docs/forever-twins-linking.md`](forever-twins-linking.md) | Forever Twins: collection ⇄ Xtrata id linking, escrow display, and the checklist for adding new collections/contracts. |
 
 ## AI Agent Training Docs
 

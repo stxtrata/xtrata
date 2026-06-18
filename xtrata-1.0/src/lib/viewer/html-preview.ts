@@ -58,11 +58,14 @@ const buildGridPreviewScript = () => `<script ${GRID_PREVIEW_SCRIPT_MARKER}="tru
       body.offsetHeight,
       viewportHeight
     );
-    const scale = Math.min(1, viewportWidth / contentWidth, viewportHeight / contentHeight);
+    const compactAppLike = contentHeight <= viewportHeight * 1.5;
+    const scale = compactAppLike
+      ? Math.min(1, viewportWidth / contentWidth, viewportHeight / contentHeight)
+      : Math.min(1, viewportWidth / contentWidth);
     body.style.transformOrigin = 'top left';
     body.style.transform = \`scale(\${scale})\`;
     body.style.width = \`\${100 / scale}%\`;
-    body.style.height = \`\${100 / scale}%\`;
+    body.style.height = compactAppLike ? \`\${100 / scale}%\` : 'auto';
   };
   const schedule = () => requestAnimationFrame(() => {
     applyXtrataGridPreviewScale();

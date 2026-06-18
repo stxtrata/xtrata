@@ -617,6 +617,15 @@
       line-height: 1.1;
     }
 
+    .panel-title__brand-x {
+      width: 1.15em;
+      height: 1.15em;
+      display: inline-block;
+      margin-right: 0.04em;
+      vertical-align: -0.16em;
+      object-fit: contain;
+    }
+
     .token-uri-head-preview {
       width: 36px;
       height: 36px;
@@ -930,6 +939,25 @@
       white-space: nowrap;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 12px;
+    }
+
+    .meta-value--link {
+      cursor: pointer;
+      color: var(--accent, #3aa0ff);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      text-decoration-thickness: 1px;
+      transition: opacity 0.12s ease;
+    }
+
+    .meta-value--link:hover,
+    .meta-value--link:focus-visible {
+      opacity: 0.82;
+      outline: none;
+    }
+
+    .meta-value--link:focus-visible {
+      text-decoration-thickness: 2px;
     }
 
     .prepared-meta .meta-value {
@@ -1588,26 +1616,33 @@
     .wallet-grid-toolbar {
       min-width: 0;
       display: grid;
-      grid-template-columns: auto minmax(0, 1fr) auto auto;
+      grid-template-columns: max-content minmax(0, 1fr) max-content;
       gap: 8px;
       align-items: center;
     }
 
     .wallet-grid-toolbar__primary,
+    .wallet-grid-toolbar__status,
     .wallet-grid-toolbar__secondary {
       min-width: 0;
       display: flex;
       align-items: center;
-      flex-wrap: wrap;
       gap: 8px;
     }
 
     .wallet-grid-toolbar__primary {
+      justify-content: flex-start;
+      flex-wrap: nowrap;
+    }
+
+    .wallet-grid-toolbar__status {
       justify-content: center;
+      white-space: nowrap;
     }
 
     .wallet-grid-toolbar__secondary {
       justify-content: flex-end;
+      flex-wrap: nowrap;
     }
 
     .wallet-grid-toolbar .btn {
@@ -1620,13 +1655,21 @@
       display: none;
     }
 
+    body:not(.explorer-mode) .explorer-filter-popover {
+      display: none;
+    }
+
     .page-readout {
-      min-width: 86px;
       color: var(--muted);
       font-size: 12px;
       font-weight: 800;
       text-align: center;
       white-space: nowrap;
+    }
+
+    .wallet-grid-toolbar__separator {
+      color: var(--line-strong);
+      font-weight: 900;
     }
 
     .token-grid {
@@ -1650,6 +1693,34 @@
 
     .token-card:disabled {
       cursor: default;
+    }
+
+    .token-card--escrowed {
+      position: relative;
+    }
+
+    .token-card--escrowed .token-thumb {
+      border-color: var(--accent, #3aa0ff);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #3aa0ff) 55%, transparent);
+    }
+
+    .token-escrow-badge {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.62);
+      border: 1px solid var(--accent, #3aa0ff);
+      font-size: 12px;
+      line-height: 1;
+      cursor: help;
+      pointer-events: auto;
     }
 
     .token-thumb {
@@ -1688,6 +1759,45 @@
     .token-thumb iframe {
       border: 0;
       pointer-events: none;
+    }
+
+    /* Poster shown for gated HTML inscriptions that are not currently running
+       a live iframe (off-screen, or over the live-frame budget). Clicking it
+       forces the live preview to render. */
+    .token-thumb-gate {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 8px;
+      text-align: center;
+      cursor: pointer;
+      pointer-events: auto;
+      background: var(--control);
+      color: var(--muted);
+      z-index: 2;
+    }
+
+    .token-thumb-gate[hidden] {
+      display: none;
+    }
+
+    .token-thumb-gate__label {
+      font-weight: 800;
+      font-size: clamp(11px, 1.2vw, 13px);
+      line-height: 1.15;
+      overflow-wrap: anywhere;
+    }
+
+    .token-thumb-gate__hint {
+      font-weight: 700;
+      font-size: 9px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      opacity: 0.7;
     }
 
     .token-thumb.has-thumbnail {
@@ -1749,8 +1859,10 @@
 
     .token-card.empty .token-thumb {
       border-style: dashed;
+      border-color: color-mix(in srgb, var(--line) 55%, transparent);
       background: transparent;
-      color: #b6c3ba;
+      color: color-mix(in srgb, var(--muted) 48%, transparent);
+      opacity: 0.52;
     }
 
     .token-card.empty .token-meta {
@@ -2222,11 +2334,11 @@
 
     .wallet-examples {
       display: grid;
-      grid-template-columns: max-content max-content;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 7px 10px;
       align-items: center;
-      justify-content: start;
-      width: fit-content;
+      justify-content: stretch;
+      width: 100%;
       max-width: 100%;
       margin: 8px 0 10px;
       color: var(--muted);
@@ -2242,7 +2354,7 @@
     }
 
     .wallet-example-chip {
-      width: auto;
+      width: 100%;
       min-height: 30px;
       display: inline-flex;
       align-items: center;
@@ -2255,8 +2367,9 @@
       font: inherit;
       font-weight: 800;
       cursor: pointer;
-      white-space: nowrap;
+      white-space: normal;
       text-align: center;
+      line-height: 1.15;
     }
 
     .wallet-example-chip:hover,
@@ -2269,15 +2382,15 @@
 
     .explorer-tools {
       display: grid;
-      gap: 8px;
-      margin: 0 0 8px;
+      gap: 5px;
+      margin: 0 0 5px;
     }
 
     .explorer-tools__row {
       display: grid;
-      grid-template-columns: minmax(86px, 0.65fr) minmax(150px, 1fr) auto;
-      gap: 8px;
-      align-items: end;
+      grid-template-columns: minmax(62px, 0.6fr) minmax(58px, 0.5fr) auto minmax(64px, auto) minmax(82px, auto);
+      gap: 5px;
+      align-items: center;
     }
 
     .explorer-tools .field {
@@ -2285,13 +2398,40 @@
     }
 
     .explorer-tools .input {
-      min-height: 34px;
-      padding: 8px 10px;
+      min-height: 26px;
+      padding: 5px 8px;
+      font-size: 12px;
     }
 
     .explorer-tools .btn {
-      min-height: 34px;
-      padding: 7px 10px;
+      min-height: 26px;
+      padding: 4px 8px;
+      font-size: 11px;
+    }
+
+    .explorer-tools__metric {
+      min-width: 0;
+      justify-self: end;
+      font-size: 11px;
+      line-height: 1;
+    }
+
+    .explorer-tools__metric .badge {
+      min-height: 22px;
+      max-width: 100%;
+      padding: 4px 7px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .badge.explorer-tools__metric {
+      min-height: 22px;
+      max-width: 100%;
+      padding: 4px 7px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .explorer-filter-group {
@@ -2300,6 +2440,47 @@
       margin: 0;
       padding: 0;
       border: 0;
+      justify-items: start;
+    }
+
+    .explorer-filter-popover {
+      position: relative;
+      display: inline-grid;
+      place-items: center;
+      flex: 0 0 auto;
+    }
+
+    .explorer-filter-toggle {
+      display: inline-grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      min-height: 26px;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--control);
+      color: var(--ink);
+      font: inherit;
+      font-size: 14px;
+      font-weight: 900;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .explorer-filter-toggle:hover,
+    .explorer-filter-toggle:focus-visible {
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px var(--focus-ring);
+      outline: none;
+    }
+
+    .explorer-filter-group.is-collapsed .explorer-filter-menu {
+      display: none;
+    }
+
+    .explorer-filter-group.is-collapsed > .label {
+      display: none;
     }
 
     .explorer-filter-options {
@@ -2494,63 +2675,100 @@
     }
 
     body.explorer-mode .panel[aria-labelledby="walletTitle"] .panel-head {
-      padding: 14px 16px;
+      padding: 8px 14px 6px;
     }
 
     body.explorer-mode .panel[aria-labelledby="walletTitle"] .panel-body {
-      padding: 14px 16px 16px;
+      padding: 7px 14px 14px;
     }
 
     body.explorer-mode .explorer-mode-note {
       display: none;
     }
 
+    body.explorer-mode #walletSubtitle {
+      display: none;
+    }
+
     body.explorer-mode .explorer-filter-group {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: auto;
+      align-items: start;
       gap: 6px;
     }
 
     body.explorer-mode .explorer-filter-group > .label {
-      order: 0;
-      margin: 0;
-      flex: 0 0 auto;
+      display: none;
+    }
+
+    body.explorer-mode .explorer-filter-toggle {
+      grid-column: 1;
+    }
+
+    body.explorer-mode .explorer-filter-menu {
+      position: absolute;
+      z-index: 20;
+      top: calc(100% + 6px);
+      left: 0;
+      width: min(540px, calc(100vw - 48px));
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 8px;
     }
 
     body.explorer-mode .explorer-filter-options {
-      order: 2;
-      flex: 1 1 100%;
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      padding-bottom: 1px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+      align-items: center;
+      overflow: visible;
     }
 
     body.explorer-mode #explorerClearFiltersButton {
-      order: 1;
+      justify-self: start;
       min-height: 26px;
-      margin-left: auto;
+      margin-left: 0;
+    }
+
+    body.explorer-mode .explorer-tools {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 5px 7px;
+      width: 100%;
+    }
+
+    body.explorer-mode .explorer-filter-group {
+      min-width: 0;
     }
 
     body.explorer-mode .explorer-tools__row {
+      order: 1;
+      flex: 1 1 300px;
+      display: grid;
+      grid-template-columns: minmax(3.8rem, 4.6rem) minmax(3.4rem, 4.2rem) auto minmax(4.2rem, auto) minmax(5rem, auto);
       align-items: center;
+      gap: 5px;
     }
 
     body.explorer-mode .explorer-tools__row .field {
-      gap: 0;
+      display: contents;
     }
 
     body.explorer-mode .explorer-tools__row .label {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      clip: rect(0 0 0 0);
-      clip-path: inset(50%);
-      border: 0;
-      white-space: nowrap;
+      display: none;
+    }
+
+    body.explorer-mode .wallet-grid-toolbar {
+      grid-template-columns: max-content max-content;
+      justify-content: space-between;
+    }
+
+    body.explorer-mode .wallet-grid-toolbar__status {
+      display: none;
     }
 
     body.explorer-mode .explorer-filter-chip {
@@ -2728,7 +2946,7 @@
       .panel[aria-labelledby="walletTitle"] .wallet-grid-toolbar {
         width: 100%;
         display: grid;
-        grid-template-columns: auto minmax(0, 1fr) auto auto;
+        grid-template-columns: max-content minmax(0, 1fr) max-content;
         justify-content: stretch;
       }
 
@@ -2740,6 +2958,11 @@
       #tokenPreviewPanel .preview-stage {
         width: min(100%, 560px);
         margin-inline: auto;
+      }
+
+      #tokenPreviewPanel {
+        position: static;
+        align-self: stretch;
       }
     }
 
@@ -2880,11 +3103,112 @@
         font-size: 11px;
       }
 
-      .panel[aria-labelledby="walletTitle"] .wallet-grid-toolbar {
+      body.explorer-mode .panel[aria-labelledby="walletTitle"] .panel-body {
+        padding-inline: 12px;
+      }
+
+      body.explorer-mode .explorer-tools,
+      body.explorer-mode .explorer-filter-group,
+      body.explorer-mode .explorer-tools__row,
+      body.explorer-mode .explorer-filter-options,
+      body.explorer-mode .wallet-grid-toolbar,
+      body.explorer-mode .wallet-grid-toolbar__primary,
+      body.explorer-mode .wallet-grid-toolbar__status,
+      body.explorer-mode .wallet-grid-toolbar__secondary {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+      }
+
+      body.explorer-mode .explorer-tools__row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto minmax(0, 0.72fr) minmax(0, 0.9fr);
+        gap: 5px;
+        align-items: center;
+      }
+
+      body.explorer-mode .explorer-tools__row .field,
+      body.explorer-mode .explorer-tools__row .input,
+      body.explorer-mode #explorerJumpButton {
+        width: auto;
+        min-width: 0;
+        max-width: 100%;
+      }
+
+      body.explorer-mode .explorer-filter-group {
+        display: grid;
+        grid-template-columns: none;
+        gap: 6px;
+        overflow: hidden;
+      }
+
+      body.explorer-mode .explorer-filter-group > .label,
+      body.explorer-mode .explorer-filter-toggle,
+      body.explorer-mode #explorerClearFiltersButton {
+        order: initial;
+        margin-left: 0;
+      }
+
+      body.explorer-mode #explorerClearFiltersButton {
+        justify-self: start;
+      }
+
+      body.explorer-mode .explorer-filter-options {
+        order: initial;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        overflow-x: visible;
+        padding-bottom: 0;
+      }
+
+      body.explorer-mode .explorer-filter-chip {
+        justify-content: flex-start;
+        padding: 6px 8px;
+        min-width: 0;
+      }
+
+      body.explorer-mode .panel[aria-labelledby="walletTitle"] .wallet-grid-toolbar {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        align-items: stretch;
+      }
+
+      body.explorer-mode .wallet-grid-toolbar__primary,
+      body.explorer-mode .wallet-grid-toolbar__status,
+      body.explorer-mode .wallet-grid-toolbar__secondary {
+        display: grid;
+        justify-content: stretch;
+      }
+
+      body.explorer-mode .wallet-grid-toolbar__primary {
+        grid-column: 1 / -1;
+        grid-template-columns: auto repeat(3, minmax(0, 1fr));
+        order: 1;
+      }
+
+      body.explorer-mode .wallet-grid-toolbar__status {
+        display: none;
+      }
+
+      body.explorer-mode .wallet-grid-toolbar__secondary {
+        grid-column: 1 / -1;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        order: 2;
+      }
+
+      body.explorer-mode .page-readout,
+      body.explorer-mode #walletCountBadge {
+        width: auto;
+        justify-content: center;
+        text-align: center;
+        white-space: nowrap;
+      }
+
+      body:not(.explorer-mode) .panel[aria-labelledby="walletTitle"] .wallet-grid-toolbar {
         grid-template-columns: repeat(3, minmax(0, 1fr));
       }
 
-      #refreshWalletButton {
+      body:not(.explorer-mode) #refreshWalletButton {
         grid-column: 1 / -1;
         width: 100%;
       }
@@ -3520,60 +3844,32 @@
                   Stacksboard
                 </button>
 
+                <button
+                  class="wallet-example-chip"
+                  type="button"
+                  data-latest-view="true"
+                  title="Newest inscriptions from the active Xtrata core."
+                >
+                  Latest
+                </button>
 
               </div>
 
               <div class="explorer-tools" id="xtrataExplorerTools" aria-label="Xtrata Xplorer controls">
-                <p class="explorer-mode-note" id="xtrataExplorerStatus">Browse inscriptions from the selected contract.</p>
+                <p class="explorer-mode-note" id="xtrataExplorerStatus">Browse inscriptions.</p>
                 <div class="explorer-tools__row">
                   <label class="field">
-                    <span class="label">Page</span>
-                    <input class="input" id="explorerPageInput" type="number" min="1" step="1" inputmode="numeric" placeholder="1" />
+                    <span class="label">Go to page:</span>
+                    <input class="input" id="explorerPageInput" type="number" min="1" step="1" inputmode="numeric" placeholder="Page" />
                   </label>
                   <label class="field">
-                    <span class="label">Inscription #</span>
-                    <input class="input" id="explorerTokenInput" type="number" min="1" step="1" inputmode="numeric" placeholder="Token ID" />
+                    <span class="label">ID:</span>
+                    <input class="input" id="explorerTokenInput" type="number" min="1" step="1" inputmode="numeric" placeholder="ID" />
                   </label>
                   <button class="btn ghost" id="explorerJumpButton" type="button">Go</button>
+                  <span class="page-readout explorer-tools__metric" id="walletPageReadout">Page 0 / 0</span>
+                  <span class="badge blue explorer-tools__metric" id="walletCountBadge" title="0 inscriptions">0 insc.</span>
                 </div>
-                <fieldset class="explorer-filter-group" id="explorerFilterGroup">
-                  <legend class="label">Type filters</legend>
-                  <div class="explorer-filter-options">
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="image" />
-                      Images
-                    </label>
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="html" />
-                      HTML
-                    </label>
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="video" />
-                      Video
-                    </label>
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="audio" />
-                      Audio
-                    </label>
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="text" />
-                      Text
-                    </label>
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="code" />
-                      Code
-                    </label>
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="document" />
-                      Docs
-                    </label>
-                    <label class="explorer-filter-chip">
-                      <input type="checkbox" data-explorer-filter="other" />
-                      Other
-                    </label>
-                  </div>
-                  <button class="small-link" id="explorerClearFiltersButton" type="button">Clear filters</button>
-                </fieldset>
               </div>
 
               <!-- <div class="wallet-example-description" id="walletExampleDescription" hidden></div> -->
@@ -3581,17 +3877,67 @@
 
             <div class="wallet-grid-stack">
               <div class="wallet-grid-toolbar" aria-label="Grid page controls">
-                <button class="btn ghost" id="walletPrevButton" type="button" disabled>Prev</button>
                 <div class="wallet-grid-toolbar__primary">
-                  <button class="btn secondary explorer-grid-action" id="explorerLatestButton" type="button">Latest</button>
-                  <a class="btn secondary explorer-grid-action" href="/" id="explorerHomeLink">Home</a>
-                  <span class="page-readout" id="walletPageReadout">Page 0 / 0</span>
-                </div>
-                <div class="wallet-grid-toolbar__secondary">
-                  <span class="badge blue" id="walletCountBadge">0 inscriptions</span>
+                  <div class="explorer-filter-popover">
+                    <fieldset class="explorer-filter-group is-collapsed" id="explorerFilterGroup">
+                      <legend class="label">Type filters</legend>
+                      <button
+                        class="explorer-filter-toggle"
+                        id="explorerFilterToggle"
+                        type="button"
+                        aria-controls="explorerFilterMenu"
+                        aria-expanded="false"
+                        aria-label="Show type filters"
+                        title="Show type filters"
+                      >▸</button>
+                      <div class="explorer-filter-menu" id="explorerFilterMenu">
+                        <div class="explorer-filter-options" id="explorerFilterOptions">
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="image" />
+                            Images
+                          </label>
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="html" />
+                            HTML
+                          </label>
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="video" />
+                            Video
+                          </label>
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="audio" />
+                            Audio
+                          </label>
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="text" />
+                            Text
+                          </label>
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="code" />
+                            Code
+                          </label>
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="document" />
+                            Docs
+                          </label>
+                          <label class="explorer-filter-chip">
+                            <input type="checkbox" data-explorer-filter="other" />
+                            Other
+                          </label>
+                        </div>
+                        <button class="small-link" id="explorerClearFiltersButton" type="button">Clear filters</button>
+                      </div>
+                    </fieldset>
+                  </div>
                   <button class="btn ghost" id="refreshWalletButton" type="button">Refresh</button>
+                  <a class="btn secondary explorer-grid-action" href="/" id="explorerHomeLink">Home</a>
+                  <button class="btn secondary explorer-grid-action" id="explorerLatestButton" type="button">Latest</button>
                 </div>
-                <button class="btn ghost" id="walletNextButton" type="button" disabled>Next</button>
+                <div class="wallet-grid-toolbar__status" aria-hidden="true"></div>
+                <div class="wallet-grid-toolbar__secondary">
+                  <button class="btn ghost" id="walletPrevButton" type="button" disabled>Prev</button>
+                  <button class="btn ghost" id="walletNextButton" type="button" disabled>Next</button>
+                </div>
               </div>
               <div class="status" id="walletGridStatus" data-status="empty">
                 <span><strong>Grid</strong> waiting for wallet</span>
@@ -3715,6 +4061,7 @@
         <a href="/manage">Artist portal</a>
         <a href="/web/migrate.html">Migrate to v3</a>
         <a href="https://x.com/XtrataLayers" target="_blank" rel="noreferrer">Xtrata on X</a>
+        <a href="/?explorer=latest">Xplorer</a>
       </nav>
       <label class="footer-theme">
         <span>Style</span>
@@ -3754,6 +4101,9 @@
     import {
       bufferCV,
       FungibleConditionCode,
+      cvToHex,
+      cvToJSON,
+      hexToCV,
       listCV,
       makeStandardSTXPostCondition,
       PostConditionMode,
@@ -3832,6 +4182,10 @@
       injectGridThumbnailHtml,
       injectInteractivePreviewHtml
     } from '/src/lib/viewer/html-preview.ts';
+    import {
+      buildRuntimeModuleBaseHref,
+      injectHtmlBaseHref
+    } from '/src/lib/viewer/module-paths.ts';
     import {
       hasRuntimeContentUrls,
       inlineRuntimeContentUrls
@@ -3916,6 +4270,8 @@
           entry.protocolVersion === '3.2.3' ||
           entry.contractName?.toLowerCase().includes('v3-2-3')
       ) ?? ACTIVE_CONTRACTS[0];
+    const XTRATA_BRAND_MARK_URL =
+      'https://nxhyvj3lifp2q34nklffzxslfje426oxeruo3lkuj56srwgctdlq.arweave.net/bc-Kp2tBX6hvjVLKXN5LKknNedckaO2tVE99KNjCmNc';
     const SMALL_MINT_HELPER_TARGET_CORE_CONTRACT_ID =
       `${SMALL_MINT_HELPER_MAINNET_ADDRESS}.xtrata-v2-1-0`;
     const walletAdapter = createStacksWalletAdapter({
@@ -4000,6 +4356,8 @@
       explorerTokenInput: $('explorerTokenInput'),
       explorerJumpButton: $('explorerJumpButton'),
       explorerLatestButton: $('explorerLatestButton'),
+      explorerFilterGroup: $('explorerFilterGroup'),
+      explorerFilterToggle: $('explorerFilterToggle'),
       explorerClearFiltersButton: $('explorerClearFiltersButton'),
       explorerHomeLink: $('explorerHomeLink'),
       explorerFilterInputs: [...document.querySelectorAll('[data-explorer-filter]')],
@@ -4168,6 +4526,14 @@
         tooltip: 'The Stacksboard inscription (#350).',
         description:
           'A single featured inscription: Stacksboard, recorded on-chain through Xtrata as #350.'
+      },
+
+      latest: {
+        label: 'Latest',
+        heading: 'Viewing latest inscriptions',
+        tooltip: 'Newest inscriptions from the active Xtrata core.',
+        description:
+          'The newest page of inscriptions from the active Xtrata core.'
       }
     });
     
@@ -4179,6 +4545,7 @@
         const buttonKey =
           button.dataset.walletShowcase?.trim().toLowerCase() ??
           button.dataset.curatedGallery?.trim() ??
+          (button.dataset.latestView ? 'latest' : '') ??
           '';
 
         const buttonInfo = EXAMPLE_VIEW_DESCRIPTIONS[buttonKey] ?? null;
@@ -4239,6 +4606,7 @@
       connectedWalletNameRequestId: 0,
       curatedGalleryId: null,
       curatedGalleryTitle: null,
+      homeLatestView: false,
       walletLookupPending: false,
       walletLookupNotice: null,
       walletLookupAbortController: null,
@@ -4270,6 +4638,10 @@
       tokenPreviewRequestId: 0,
       selectedOwnerNameRequestId: 0,
       selectedEscrowHolderRequestId: 0,
+      // Last resolved escrow holder for the selected token, so re-renders
+      // (e.g. from the BNS owner-name path) keep showing the real holder +
+      // listed state instead of racing back to the helper contract owner.
+      selectedEscrowHolder: null,
       selectedParentsRequestId: 0,
       selectedChildrenRequestId: 0,
       childScanRunning: false,
@@ -4283,6 +4655,7 @@
       gridLiveMediaCache: new Map(),
       summaryCacheScopes: new Map(),
       escrowHolderCache: new Map(),
+      twinReverseIndexCache: new Map(),
       thumbnailHydrationQueue: [],
       thumbnailHydrationQueued: new Set(),
       thumbnailHydrationInFlight: new Set(),
@@ -4292,6 +4665,10 @@
       walletPageIds: [],
       walletTotalCount: 0,
       walletUsesPagedHoldings: false,
+      // Forever Twins escrowed on behalf of the viewed wallet (the wallet holds
+      // the original Pepe/Leo; the Xtrata twin is in the helper contract). These
+      // are injected onto page 0 of the wallet grid, marked with the padlock.
+      escrowTwinInjection: { address: null, ids: [], requestId: 0 },
       walletTokenCache: new Map(),
       walletTokens: [],
       walletPageIndex: 0,
@@ -4308,6 +4685,7 @@
       explorerFilterIndexLoading: false,
       explorerFilterIndexComplete: false,
       explorerFilterBackgroundLoading: false,
+      explorerFiltersCollapsed: true,
       explorerFollowLatestFiltered: false,
       explorerFilterIndexRunId: 0,
       lastSubmittedTxId: null,
@@ -4317,8 +4695,16 @@
 
     const WALLET_PAGE_SIZE = 16;
     const WALLET_FALLBACK_SCAN_LIMIT = 2000;
-    const MAX_GRID_EAGER_FULL_LOAD_BYTES = 4n * 1024n * 1024n;
+    const MAX_GRID_EAGER_FULL_LOAD_BYTES = 10n * 1024n * 1024n;
     const GRID_THUMBNAIL_HYDRATION_CONCURRENCY = 2;
+    // Max number of HTML inscription iframes allowed to execute simultaneously
+    // in the grid. Sized to a full visible grid page so the whole 4x4 page can
+    // render at once without per-tile clicking — off-screen tiles are torn down
+    // by the IntersectionObserver, so concurrency stays bounded to ~one page as
+    // the user scrolls. Tiles still beyond this budget show a static poster
+    // until a slot frees or the user clicks them. Boards that complete the embed
+    // handshake (phase two) are exempt — they self-throttle in the trusted lane.
+    const MAX_LIVE_HTML_FRAMES = WALLET_PAGE_SIZE;
     const GRID_SUMMARY_CACHE_MAX_SCOPES = 12;
     const GRID_SUMMARY_CACHE_MAX_ENTRIES = 512;
     const EXPLORER_FILTER_INDEX_CHUNK_SIZE = 48;
@@ -5272,17 +5658,44 @@
         } else {
           label.textContent = meta.key;
         }
-        const body = document.createElement('span');
+        const body = meta.href
+          ? document.createElement('a')
+          : document.createElement('span');
         body.className = `meta-value${
           meta.valueClass ? ` ${meta.valueClass}` : ''
         }`;
         body.title = String(meta.title ?? meta.value);
         body.textContent = String(meta.value);
+        if (meta.href) {
+          body.href = meta.href;
+          body.target = '_blank';
+          body.rel = 'noreferrer';
+          body.classList.add('meta-value--link');
+        }
         if (meta.tooltip) {
           body.classList.add('meta-value--tooltip');
           body.dataset.tooltip = String(meta.tooltip);
           body.tabIndex = 0;
           body.setAttribute('aria-label', `${meta.key}: ${meta.tooltip}`);
+        }
+        if (typeof meta.onClick === 'function') {
+          body.classList.add('meta-value--link');
+          body.setAttribute('role', 'button');
+          body.tabIndex = 0;
+          if (meta.actionLabel) {
+            body.setAttribute('aria-label', meta.actionLabel);
+            body.title = meta.actionLabel;
+          }
+          const handler = (event) => {
+            event.preventDefault();
+            meta.onClick();
+          };
+          body.addEventListener('click', handler);
+          body.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              handler(event);
+            }
+          });
         }
         row.append(label, body);
         target.append(row);
@@ -5349,16 +5762,408 @@
       dom.resumeNotice.hidden = false;
     };
 
+    // Forever Twin registry: maps each helper/escrow contract to its original
+    // collection. The helper is both the escrow holder and the on-chain twin
+    // index (owns a Bindings map keyed by local token id, emitting an
+    // "inscribed" print event carrying { token-id, xtrata-id }). To add a
+    // collection, add an entry here — resolution is fully generic.
     const PEPE_ESCROW_RESOLVERS = new Map([
       [
-        'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-fakfun-xtrata',
+        'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun',
         {
+          helperContractId:
+            'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun',
           sourceContractId: 'SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe',
           sourceAssetName: 'bitcoin-pepe',
+          collectionName: 'Bitcoin Pepes',
+          itemNoun: 'Bitcoin Pepe',
           label: 'Pepe holder'
+        }
+      ],
+      [
+        'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata',
+        {
+          helperContractId:
+            'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata',
+          sourceContractId: 'SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats',
+          sourceAssetName: 'leo-cats',
+          collectionName: 'LeoCats',
+          itemNoun: 'LeoCat',
+          label: 'LeoCat holder'
+        }
+      ],
+      [
+        'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.miami-degens-fakfun-xtrata',
+        {
+          helperContractId:
+            'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.miami-degens-fakfun-xtrata',
+          sourceContractId: 'SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.miami-degens',
+          sourceAssetName: 'miami-degens',
+          collectionName: 'Miami Degens',
+          itemNoun: 'Miami Degen',
+          label: 'Miami Degen holder'
         }
       ]
     ]);
+
+    // Build (and cache) the xtrata-id -> local-id map for a helper contract by
+    // scanning its "inscribed" print events. This is the reverse lookup the
+    // contract does not expose directly, and works for every bound token
+    // (including those minted straight into escrow that never had a swap tx).
+    const buildTwinReverseIndex = async (resolver) => {
+      const cacheKey = resolver.helperContractId;
+      const cached = state.twinReverseIndexCache.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+      const promise = (async () => {
+        const index = new Map();
+        const pageSize = 50;
+        const maxEvents = 5000;
+        let offset = 0;
+        let seen = 0;
+        while (seen < maxEvents) {
+          let page;
+          try {
+            page = await fetchHiroJson(
+              `/extended/v1/contract/${encodeURIComponent(
+                resolver.helperContractId
+              )}/events?limit=${pageSize}&offset=${offset}`,
+              state.contract.network
+            );
+          } catch (error) {
+            break;
+          }
+          const results = page?.results ?? [];
+          if (results.length === 0) {
+            break;
+          }
+          for (const event of results) {
+            seen += 1;
+            const repr = event?.contract_log?.value?.repr;
+            if (
+              event?.contract_log?.topic !== 'print' ||
+              typeof repr !== 'string' ||
+              repr.indexOf('"inscribed"') === -1
+            ) {
+              continue;
+            }
+            const localMatch = repr.match(/\(token-id u(\d+)\)/);
+            const xtrataMatch = repr.match(/\(xtrata-id u(\d+)\)/);
+            if (!localMatch || !xtrataMatch) {
+              continue;
+            }
+            if (!index.has(xtrataMatch[1])) {
+              index.set(xtrataMatch[1], BigInt(localMatch[1]));
+            }
+          }
+          if (results.length < pageSize) {
+            break;
+          }
+          offset += pageSize;
+        }
+        return index;
+      })();
+      state.twinReverseIndexCache.set(cacheKey, promise);
+      promise.catch(() => state.twinReverseIndexCache.delete(cacheKey));
+      return promise;
+    };
+
+    // Invert the xtrata-id -> local-id reverse index to local-id -> xtrata-id.
+    const buildTwinForwardIndex = async (resolver) => {
+      const reverse = await buildTwinReverseIndex(resolver);
+      const forward = new Map();
+      for (const [xtrataIdStr, localId] of reverse.entries()) {
+        forward.set(localId.toString(), BigInt(xtrataIdStr));
+      }
+      return forward;
+    };
+
+    // Fetch the token ids of a source collection (Pepe/Leo) held directly by a
+    // wallet, via the Hiro NFT holdings endpoint. Bounded + paginated.
+    const fetchWalletSourceTokenIds = async (walletAddress, resolver, network) => {
+      const assetId = `${resolver.sourceContractId}::${resolver.sourceAssetName}`;
+      const ids = [];
+      const pageSize = 50;
+      const maxItems = 2000;
+      let offset = 0;
+      while (ids.length < maxItems) {
+        let page;
+        try {
+          page = await fetchHiroJson(
+            `/extended/v1/tokens/nft/holdings?principal=${encodeURIComponent(walletAddress)}` +
+              `&asset_identifiers=${encodeURIComponent(assetId)}` +
+              `&limit=${pageSize}&offset=${offset}`,
+            network
+          );
+        } catch (error) {
+          break;
+        }
+        const results = page?.results ?? [];
+        for (const item of results) {
+          const localId = parseUintRepr(item?.value?.repr);
+          if (localId !== null) {
+            ids.push(localId);
+          }
+        }
+        const total = Number(page?.total ?? results.length);
+        offset += pageSize;
+        if (results.length < pageSize || offset >= total) {
+          break;
+        }
+      }
+      return ids;
+    };
+
+    // Determine the Xtrata twin ids that are escrowed on behalf of a wallet:
+    // the wallet holds the original Pepe/Leo while the twin sits in the helper.
+    const computeEscrowedTwinIdsForWallet = async (walletAddress, network) => {
+      const seen = new Set();
+      const out = [];
+      const resolvers = [...PEPE_ESCROW_RESOLVERS.values()];
+      for (const resolver of resolvers) {
+        let sourceIds = [];
+        let forward = new Map();
+        try {
+          [sourceIds, forward] = await Promise.all([
+            fetchWalletSourceTokenIds(walletAddress, resolver, network),
+            buildTwinForwardIndex(resolver)
+          ]);
+        } catch (error) {
+          continue;
+        }
+        // Candidate twins: source tokens the wallet holds that have a binding.
+        const candidates = sourceIds
+          .map((localId) => ({ localId, xtrataId: forward.get(localId.toString()) ?? null }))
+          .filter((entry) => entry.xtrataId !== null);
+        // Confirm each twin is currently escrowed via the live binding.
+        await runLimited(candidates, 4, async (entry) => {
+          try {
+            const json = await callReadOnlyJson({
+              contractId: resolver.helperContractId,
+              functionName: 'get-binding',
+              args: [uintCV(entry.localId)],
+              network
+            });
+            const tuple = unwrapBindingTuple(json);
+            const escrowed = tuple?.['xtrata-escrowed']?.value === true;
+            const xtrataId = entry.xtrataId;
+            if (escrowed && xtrataId !== null && !seen.has(xtrataId.toString())) {
+              seen.add(xtrataId.toString());
+              out.push(xtrataId);
+            }
+          } catch (error) {
+            // Ignore individual binding read failures.
+          }
+        });
+      }
+      // Newest twins first.
+      out.sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
+      return out;
+    };
+
+    // Navigate a cvToJSON (optional (tuple ...)) binding result to its tuple map.
+    const unwrapBindingTuple = (node) => {
+      let current = node;
+      while (
+        current &&
+        typeof current.type === 'string' &&
+        (current.type.startsWith('(optional') || current.type.startsWith('(response'))
+      ) {
+        current = current.value ?? null;
+      }
+      return current && typeof current.type === 'string' && current.type.startsWith('(tuple')
+        ? current.value
+        : null;
+    };
+
+    const getInjectedEscrowTwinIds = () => {
+      const injection = state.escrowTwinInjection;
+      if (
+        state.explorerMode ||
+        !injection ||
+        !injection.address ||
+        !addressesEqual(injection.address, getViewingWalletAddress())
+      ) {
+        return [];
+      }
+      return injection.ids;
+    };
+
+    // Kick off (once per viewed wallet) the escrowed-twin computation and, when
+    // it finds any, re-render the wallet page so they appear on page 0.
+    const refreshEscrowTwinInjection = async (walletAddress) => {
+      if (!walletAddress || state.explorerMode) {
+        return;
+      }
+      const requestId = (state.escrowTwinInjection.requestId ?? 0) + 1;
+      state.escrowTwinInjection = { address: walletAddress, ids: [], requestId };
+      let ids = [];
+      try {
+        ids = await computeEscrowedTwinIdsForWallet(walletAddress, state.contract.network);
+      } catch (error) {
+        return;
+      }
+      if (
+        requestId !== state.escrowTwinInjection.requestId ||
+        !addressesEqual(walletAddress, getViewingWalletAddress())
+      ) {
+        return;
+      }
+      state.escrowTwinInjection = { address: walletAddress, ids, requestId };
+      if (ids.length > 0) {
+        // Reveal the grid/ledger even when the wallet has no other inscriptions,
+        // then (re)render page 0 so the escrowed twins appear and get selected.
+        setExperienceMode();
+        const baseCount = state.walletUsesPagedHoldings
+          ? state.walletTotalCount
+          : state.walletTokenIds.length;
+        const totalCount = baseCount + ids.length;
+        setStatus(
+          dom.walletGridStatus,
+          `<strong>Grid</strong> ${totalCount} inscription${totalCount === 1 ? '' : 's'} available`,
+          'ready',
+          'blue'
+        );
+        if (state.walletPageIndex === 0) {
+          await loadWalletPage({ pageAlreadyLoaded: true });
+        }
+        // If nothing is selected yet (e.g. an otherwise-empty wallet), select
+        // the first injected twin so the preview panel opens.
+        if (state.selectedTokenId === null && state.walletTokens.length > 0) {
+          await selectToken(state.walletTokens[0].id);
+        }
+        updateControls();
+      } else {
+        updateWalletPagerControls();
+      }
+    };
+
+    // Some original NFTs are not held directly in a wallet but custodied by a
+    // marketplace/escrow contract (e.g. listed for sale). In that case the NFT
+    // owner resolves to the marketplace contract, so we hop once more to recover
+    // the real owner (the seller who listed it). Keyed by custody contract id.
+    const NFT_CUSTODY_RESOLVERS = new Map([
+      [
+        'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-nft-marketplace',
+        {
+          contractId:
+            'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-nft-marketplace',
+          label: 'Marketplace',
+          // Human-facing hint shown when the underlying NFT is custodied here.
+          stateHint: 'Listed',
+          // Link target for the "Marketplace" line. Defaults to the Stacks
+          // explorer contract page; set to a marketplace URL when known.
+          buildUrl: () =>
+            'https://explorer.hiro.so/address/' +
+            'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-nft-marketplace?chain=mainnet',
+          // Read the listing and return its seller principal.
+          resolve: async (localTokenId, network) => {
+            const json = await callReadOnlyJson({
+              contractId:
+                'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-nft-marketplace',
+              functionName: 'get-listing',
+              args: [uintCV(localTokenId)],
+              network
+            }).catch(() => null);
+            return readTuplePrincipal(json, 'seller');
+          }
+        }
+      ],
+      [
+        'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-nft-market-faktory',
+        {
+          contractId:
+            'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-nft-market-faktory',
+          label: 'Marketplace',
+          stateHint: 'Listed',
+          buildUrl: () =>
+            'https://explorer.hiro.so/address/' +
+            'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-nft-market-faktory?chain=mainnet',
+          resolve: async (localTokenId, network) => {
+            const json = await callReadOnlyJson({
+              contractId:
+                'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-nft-market-faktory',
+              functionName: 'get-listing',
+              args: [uintCV(localTokenId)],
+              network
+            }).catch(() => null);
+            return readTuplePrincipal(json, 'seller');
+          }
+        }
+      ]
+    ]);
+
+    // POST a read-only call and return the decoded cvToJSON result.
+    const callReadOnlyJson = async ({ contractId, functionName, args = [], network = 'mainnet' }) => {
+      const [address, name] = contractId.split('.');
+      if (!address || !name) {
+        throw new Error(`Invalid contract id: ${contractId}`);
+      }
+      const url = buildHiroApiUrl(
+        `/v2/contracts/call-read/${address}/${name}/${functionName}`,
+        network
+      );
+      if (!url) {
+        throw new Error('No Hiro API endpoint configured.');
+      }
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sender: address,
+          arguments: args.map((arg) => cvToHex(arg))
+        })
+      });
+      if (!response.ok) {
+        throw new Error(`Read-only call failed (${response.status}).`);
+      }
+      const payload = await response.json();
+      if (!payload?.okay || typeof payload.result !== 'string') {
+        throw new Error('Read-only call returned no result.');
+      }
+      return cvToJSON(hexToCV(payload.result));
+    };
+
+    // Read a principal field from a cvToJSON (optional (tuple ...)) result.
+    const readTuplePrincipal = (node, key) => {
+      let current = node;
+      while (
+        current &&
+        typeof current.type === 'string' &&
+        (current.type.startsWith('(optional') || current.type.startsWith('(response'))
+      ) {
+        current = current.value ?? null;
+      }
+      const tuple =
+        current && typeof current.type === 'string' && current.type.startsWith('(tuple')
+          ? current.value
+          : null;
+      const field = tuple?.[key];
+      return field && typeof field.value === 'string' ? field.value : null;
+    };
+
+    // Given an address that may be a custody contract, resolve through to the
+    // real owner (e.g. marketplace listing seller). Bounded to avoid loops.
+    // Returns the real owner plus the custodian (if any) so callers can show a
+    // "Listed" hint and marketplace link.
+    const resolveCustodyOwner = async (address, localTokenId, network) => {
+      let current = address;
+      let custodian = null;
+      for (let hops = 0; hops < 3; hops += 1) {
+        const resolver = NFT_CUSTODY_RESOLVERS.get(current);
+        if (!resolver) {
+          break;
+        }
+        custodian = resolver;
+        const next = await resolver.resolve(localTokenId, network);
+        if (!next || next === current) {
+          break;
+        }
+        current = next;
+      }
+      return { owner: current, custodian };
+    };
 
     const clarityUintHex = (value) => {
       const hex = BigInt(value).toString(16).padStart(32, '0');
@@ -5408,53 +6213,81 @@
       if (cached) {
         return cached;
       }
-      const coreAssetId = `${getTokenCacheContractId(token)}::xtrata-inscription`;
-      const coreHistory = await fetchHiroJson(
-        `/extended/v1/tokens/nft/history?asset_identifier=${encodeURIComponent(coreAssetId)}` +
-          `&value=${encodeURIComponent(clarityUintHex(token.id))}&limit=20`,
-        state.contract.network
-      );
-      const escrowTransfer = (coreHistory.results ?? []).find(
-        (event) =>
-          event?.asset_event_type === 'transfer' &&
-          event?.recipient === token.owner &&
-          typeof event?.tx_id === 'string'
-      );
-      if (!escrowTransfer) {
-        return null;
+      // Reverse-resolve the original (local) collection token id for this
+      // Xtrata inscription using the helper's inscribed events.
+      const reverseIndex = await buildTwinReverseIndex(resolver).catch(() => null);
+      let sourceTokenId =
+        reverseIndex?.get(token.id.toString()) ?? null;
+
+      // Fallback: recover the local id from the escrow-deposit transaction
+      // (covers tokens swapped back into escrow if events are unavailable).
+      let escrowTxId = null;
+      if (sourceTokenId === null) {
+        const coreAssetId = `${getTokenCacheContractId(token)}::xtrata-inscription`;
+        const coreHistory = await fetchHiroJson(
+          `/extended/v1/tokens/nft/history?asset_identifier=${encodeURIComponent(coreAssetId)}` +
+            `&value=${encodeURIComponent(clarityUintHex(token.id))}&limit=20`,
+          state.contract.network
+        ).catch(() => null);
+        const escrowTransfer = (coreHistory?.results ?? []).find(
+          (event) =>
+            event?.asset_event_type === 'transfer' &&
+            event?.recipient === token.owner &&
+            typeof event?.tx_id === 'string'
+        );
+        if (escrowTransfer) {
+          escrowTxId = escrowTransfer.tx_id;
+          const tx = await fetchHiroJson(
+            `/extended/v1/tx/${encodeURIComponent(escrowTransfer.tx_id)}`,
+            state.contract.network
+          ).catch(() => null);
+          const sourceTokenArg = tx?.contract_call?.function_args?.find(
+            (arg) => arg?.name === 'token-id'
+          );
+          sourceTokenId = parseUintRepr(sourceTokenArg?.repr);
+        }
       }
-      const tx = await fetchHiroJson(
-        `/extended/v1/tx/${encodeURIComponent(escrowTransfer.tx_id)}`,
-        state.contract.network
-      );
-      const sourceTokenArg = tx?.contract_call?.function_args?.find(
-        (arg) => arg?.name === 'token-id'
-      );
-      const sourceTokenId = parseUintRepr(sourceTokenArg?.repr);
       if (sourceTokenId === null) {
         return null;
       }
+      // The real owner is the current holder of the original collection NFT.
       const sourceAssetId = `${resolver.sourceContractId}::${resolver.sourceAssetName}`;
       const sourceHistory = await fetchHiroJson(
         `/extended/v1/tokens/nft/history?asset_identifier=${encodeURIComponent(sourceAssetId)}` +
           `&value=${encodeURIComponent(clarityUintHex(sourceTokenId))}&limit=1`,
         state.contract.network
-      );
-      const latest = sourceHistory.results?.[0] ?? null;
-      const holder =
-        latest?.recipient ??
-        tx?.sender_address ??
-        escrowTransfer.sender ??
-        null;
+      ).catch(() => null);
+      const latest = sourceHistory?.results?.[0] ?? null;
+      const rawHolder = latest?.recipient ?? null;
+      if (!rawHolder) {
+        return null;
+      }
+      // If the NFT is custodied by a known marketplace/escrow contract (e.g.
+      // listed for sale), resolve through to the real owner (the seller).
+      const custodyResult = await resolveCustodyOwner(
+        rawHolder,
+        sourceTokenId,
+        state.contract.network
+      ).catch(() => ({ owner: rawHolder, custodian: null }));
+      const holder = custodyResult.owner ?? rawHolder;
+      const custodian = custodyResult.custodian ?? null;
       if (!holder) {
         return null;
       }
       const result = {
         label: resolver.label,
+        collectionName: resolver.collectionName,
+        itemNoun: resolver.itemNoun,
         holder,
         sourceTokenId,
         sourceContractId: resolver.sourceContractId,
-        txId: escrowTransfer.tx_id
+        txId: escrowTxId,
+        listed: !!custodian,
+        marketplaceLabel: custodian?.label ?? null,
+        marketplaceHint: custodian?.stateHint ?? null,
+        marketplaceUrl: custodian?.buildUrl
+          ? custodian.buildUrl(sourceTokenId)
+          : null
       };
       state.escrowHolderCache.set(cacheKey, result);
       return result;
@@ -5463,6 +6296,7 @@
     const renderNoSelectedInscriptionMeta = () => {
       state.selectedOwnerNameRequestId += 1;
       state.selectedEscrowHolderRequestId += 1;
+      state.selectedEscrowHolder = null;
       clearSelectedInscriptionRelationships();
       renderMeta(dom.tokenPreviewMeta, [['Status', 'None selected']]);
     };
@@ -5475,28 +6309,80 @@
     ) => {
       const effectiveMimeType =
         mimeTypeOverride ?? state.tokenPreviewMimeType ?? token.meta?.mimeType ?? null;
+      const isEscrowed = !!findPepeEscrowResolver(token.owner);
+      // Reuse the previously resolved escrow holder for this token if the caller
+      // didn't pass one (e.g. the BNS owner-name re-render). This prevents a
+      // late owner-name render from clobbering the resolved holder/listed state.
+      if (!escrowHolder && state.selectedEscrowHolder?.tokenId === token.id) {
+        escrowHolder = state.selectedEscrowHolder.data;
+      }
+      // When escrowed, the on-chain owner is the helper contract; show the
+      // resolved real holder (current owner of the original NFT) as Owner and
+      // flag the twin as Escrowed for clarity.
+      const ownerValue = escrowHolder
+        ? escrowHolder.holderName ?? truncateMiddle(escrowHolder.holder, 8, 8)
+        : ownerName ?? (token.owner ? truncateMiddle(token.owner, 8, 8) : 'unknown');
+      // Effective wallet address to open in the grid when the Owner is clicked:
+      // the real holder when escrowed, otherwise the token owner. Skip contract
+      // principals (still escrow-resolving) so we never load a contract id.
+      const ownerWalletAddress = escrowHolder
+        ? escrowHolder.holder
+        : !isEscrowed && token.owner
+          ? token.owner
+          : null;
+      const ownerLine = { key: 'Owner', value: ownerValue };
+      // Owner is click-to-load-wallet. On the homepage it loads the wallet's
+      // grid in place. In the Xplorer (which has no wallet grid of its own) it
+      // opens the wallet back on the homepage via /?wallet=<address>.
+      if (ownerWalletAddress) {
+        if (state.explorerMode) {
+          ownerLine.onClick = () => {
+            window.location.assign(
+              `/?wallet=${encodeURIComponent(ownerWalletAddress)}`
+            );
+          };
+          ownerLine.actionLabel = `Open this wallet's inscriptions on the homepage`;
+        } else {
+          ownerLine.onClick = () => {
+            void viewWalletByAddress(ownerWalletAddress);
+          };
+          ownerLine.actionLabel = `View this wallet's inscriptions in the grid`;
+        }
+      }
+      const stateValue = escrowHolder
+        ? escrowHolder.listed
+          ? `Escrowed · ${escrowHolder.marketplaceHint ?? 'Listed'}`
+          : 'Escrowed'
+        : 'Escrowed (resolving owner...)';
       const lines = [
         ['Type', getGridMimeLabel(effectiveMimeType)],
         ['Size', token.meta?.totalSize ? formatBytes(token.meta.totalSize) : 'unknown'],
-        [
-          'Owner',
-          ownerName ?? (token.owner ? truncateMiddle(token.owner, 8, 8) : 'unknown')
-        ],
+        ownerLine,
+        ...(isEscrowed ? [['State', stateValue]] : []),
+        ...(escrowHolder && escrowHolder.listed && escrowHolder.marketplaceUrl
+          ? [{
+              key: escrowHolder.marketplaceLabel ?? 'Marketplace',
+              value: 'View listing',
+              href: escrowHolder.marketplaceUrl,
+              title: 'Open the marketplace listing for the underlying NFT'
+            }]
+          : []),
         ...(escrowHolder
           ? [[
-              escrowHolder.label,
-              truncateMiddle(escrowHolder.holder, 8, 8)
+              escrowHolder.itemNoun ?? 'Collection',
+              `#${escrowHolder.sourceTokenId.toString()}`
             ]]
-          : findPepeEscrowResolver(token.owner)
-            ? [['Pepe holder', 'Resolving...']]
-            : []),
-        ['ID', formatTokenId(token.id)]
+          : []),
+        ['Xtrata ID', formatTokenId(token.id)]
       ];
       renderMeta(dom.tokenPreviewMeta, lines);
-      if (!ownerName) {
+      // Don't resolve a BNS name for the raw owner when escrowed — the owner is
+      // the helper contract; the real holder's name is resolved by the escrow
+      // path. This also avoids a late render overwriting the holder display.
+      if (!ownerName && !isEscrowed) {
         void resolveSelectedInscriptionOwnerName(token);
       }
-      if (!escrowHolder && findPepeEscrowResolver(token.owner)) {
+      if (!escrowHolder && isEscrowed) {
         void resolveSelectedEscrowHolder(token);
       }
       void renderSelectedInscriptionRelationships(token);
@@ -6227,6 +7113,34 @@
         ) {
           return;
         }
+        // Resolve a BNS name for the *real* holder (the escrowed twin's owner is
+        // the helper contract, so token.owner never resolves to a name). This
+        // lets the preview panel show the holder's .btc name when they have one.
+        try {
+          const holderNames = await resolveBnsNames({
+            address: escrowHolder.holder,
+            network: state.contract.network
+          });
+          if (
+            holderNames.primary &&
+            requestId === state.selectedEscrowHolderRequestId &&
+            state.selectedTokenId === token.id
+          ) {
+            escrowHolder.holderName = holderNames.primary;
+          }
+        } catch (bnsError) {
+          debugLog(
+            'bns',
+            'escrow holder name lookup failed',
+            {
+              holder: truncateMiddle(escrowHolder.holder, 8, 8),
+              error: bnsError instanceof Error ? bnsError.message : String(bnsError)
+            },
+            'warn'
+          );
+        }
+        // Remember the resolved holder so later re-renders keep showing it.
+        state.selectedEscrowHolder = { tokenId: token.id, data: escrowHolder };
         renderSelectedInscriptionMeta(token, null, null, escrowHolder);
       } catch (error) {
         debugLog(
@@ -6288,6 +7202,7 @@
       state.thumbnailHydrationQueued.clear();
       state.thumbnailHydrationAttempted.clear();
       state.gridLiveMediaCache.clear();
+      liveHtmlFrameManager.reset();
       debugLog('cache', 'background thumbnail queue reset', {
         runId: state.thumbnailHydrationRunId,
         discardedQueued,
@@ -6390,6 +7305,22 @@
         state.tokenUriPreviewTimer = null;
         void updateTokenUriHeadPreview();
       }, 180);
+    };
+
+    const setWalletCountLabel = (countOrLabel) => {
+      if (!dom.walletCountBadge) {
+        return;
+      }
+      if (typeof countOrLabel === 'number') {
+        const full = `${countOrLabel} inscription${countOrLabel === 1 ? '' : 's'}`;
+        dom.walletCountBadge.textContent = state.explorerMode
+          ? `${countOrLabel} insc.`
+          : full;
+        dom.walletCountBadge.title = full;
+        return;
+      }
+      dom.walletCountBadge.textContent = countOrLabel;
+      dom.walletCountBadge.title = countOrLabel;
     };
 
     const GRID_MIME_LABELS = new Map([
@@ -6905,19 +7836,33 @@
     const setExperienceMode = () => {
       const connected = state.walletSession.isConnected && !!state.walletSession.address;
       const viewingAddress = getViewingWalletAddress();
-      const count = state.walletUsesPagedHoldings ? state.walletTotalCount : state.walletTokenIds.length;
+      // Escrowed twins injected for this wallet count as visible holdings, so a
+      // wallet that holds *only* an escrowed twin still opens the grid/ledger.
+      const count =
+        (state.walletUsesPagedHoldings ? state.walletTotalCount : state.walletTokenIds.length) +
+        getInjectedEscrowTwinIds().length;
       const viewingConnectedWallet = isConnectedWalletAddress(viewingAddress);
       const connectedWalletHasVisibleLedger = viewingConnectedWallet && count > 0;
       const hasCuratedGallery = !!state.curatedGalleryId && count > 0;
+      const hasHomeLatestView = state.homeLatestView && count > 0;
       const hasLedger =
         connected && (state.connectedWalletMatureMode || connectedWalletHasVisibleLedger);
-      const hasPublicLedger = (!connected && !!viewingAddress && count > 0) || hasCuratedGallery;
+      const hasPublicLedger =
+        (!connected && !!viewingAddress && count > 0) || hasCuratedGallery || hasHomeLatestView;
       document.body.classList.toggle('has-ledger', hasLedger);
       document.body.classList.toggle('has-public-ledger', hasPublicLedger);
       document.body.classList.toggle('explorer-mode', state.explorerMode);
       document.body.classList.toggle('intro-mode', !hasLedger && !state.explorerMode);
       if (dom.walletTitle) {
-        dom.walletTitle.textContent = state.explorerMode ? 'Xtrata Xplorer' : 'Wallet Inscriptions';
+        if (state.explorerMode) {
+          dom.walletTitle.setAttribute('aria-label', 'Xtrata Xplorer');
+          dom.walletTitle.innerHTML =
+            `<img class="panel-title__brand-x" src="${XTRATA_BRAND_MARK_URL}" alt="X" />trata ` +
+            `<img class="panel-title__brand-x" src="${XTRATA_BRAND_MARK_URL}" alt="X" />plorer`;
+        } else {
+          dom.walletTitle.removeAttribute('aria-label');
+          dom.walletTitle.textContent = 'Wallet Inscriptions';
+        }
       }
       if (dom.introNetworkValue) {
         dom.introNetworkValue.textContent = `Stacks ${state.contract.network}`;
@@ -6931,6 +7876,8 @@
       if (dom.registryIntroLead) {
         dom.registryIntroLead.textContent = state.curatedGalleryTitle
           ? `${state.curatedGalleryTitle} is open below in Wallet Inscriptions.`
+          : state.homeLatestView
+          ? 'The latest Xtrata inscriptions are open below in Wallet Inscriptions.'
           : !viewingAddress
           ? 'Create and hold durable records for songs, masters, artwork, credits, documents, apps, and collaboration history, anchored to Bitcoin through Stacks.'
           : !connected && count === 0
@@ -6944,6 +7891,8 @@
       if (dom.introStateValue) {
         dom.introStateValue.textContent = state.curatedGalleryTitle
           ? `${count} selected inscription${count === 1 ? '' : 's'} loaded.`
+          : state.homeLatestView
+          ? `Latest page loaded with ${state.walletPageIds.length} inscription${state.walletPageIds.length === 1 ? '' : 's'}.`
           : !viewingAddress
           ? 'Connect a wallet or enter an address to inspect a ledger.'
           : count === 0
@@ -7010,8 +7959,7 @@
         const explorerControlsDisabled =
           !state.explorerMode ||
           state.busy ||
-          state.walletLoadingPage ||
-          state.explorerFilterIndexLoading;
+          state.walletLoadingPage;
         dom.explorerJumpButton.disabled = explorerControlsDisabled;
         dom.explorerLatestButton.disabled = explorerControlsDisabled;
         dom.explorerPageInput.disabled = explorerControlsDisabled;
@@ -7047,13 +7995,31 @@
       );
     };
 
+    // Prepend escrowed-twin ids to page 0 of the wallet view (deduped against
+    // the wallet's actual holdings). They ride along page 0 only so the
+    // server-side holdings pagination math is unaffected.
+    const withInjectedEscrowTwins = (pageIds) => {
+      if (state.walletPageIndex !== 0) {
+        return pageIds;
+      }
+      const injected = getInjectedEscrowTwinIds();
+      if (injected.length === 0) {
+        return pageIds;
+      }
+      const existing = new Set(pageIds.map((id) => id.toString()));
+      const prefix = injected.filter((id) => !existing.has(id.toString()));
+      return prefix.length > 0 ? [...prefix, ...pageIds] : pageIds;
+    };
+
     const getWalletPageIds = () => {
       clampWalletPageIndex();
       if (state.walletUsesPagedHoldings) {
-        return state.walletPageIds;
+        return withInjectedEscrowTwins(state.walletPageIds);
       }
       const start = state.walletPageIndex * WALLET_PAGE_SIZE;
-      return state.walletTokenIds.slice(start, start + WALLET_PAGE_SIZE);
+      return withInjectedEscrowTwins(
+        state.walletTokenIds.slice(start, start + WALLET_PAGE_SIZE)
+      );
     };
 
     const updateWalletPagerControls = () => {
@@ -7095,9 +8061,25 @@
     const syncExplorerFilterControls = () => {
       const disabled =
         !state.explorerMode ||
-        state.busy ||
-        state.walletLoadingPage ||
-        state.explorerFilterIndexLoading;
+        state.busy;
+      if (dom.explorerFilterGroup) {
+        dom.explorerFilterGroup.classList.toggle('is-collapsed', state.explorerFiltersCollapsed);
+      }
+      if (dom.explorerFilterToggle) {
+        dom.explorerFilterToggle.disabled = disabled;
+        dom.explorerFilterToggle.setAttribute(
+          'aria-expanded',
+          state.explorerFiltersCollapsed ? 'false' : 'true'
+        );
+        dom.explorerFilterToggle.setAttribute(
+          'aria-label',
+          state.explorerFiltersCollapsed ? 'Show type filters' : 'Hide type filters'
+        );
+        dom.explorerFilterToggle.title = state.explorerFiltersCollapsed
+          ? 'Show type filters'
+          : 'Hide type filters';
+        dom.explorerFilterToggle.textContent = state.explorerFiltersCollapsed ? '▸' : '▾';
+      }
       dom.explorerFilterInputs.forEach((input) => {
         const kind = input.dataset.explorerFilter ?? '';
         input.checked = state.explorerFilterKinds.has(kind);
@@ -7171,11 +8153,21 @@
           'ready',
           'blue'
         );
-        dom.walletSubtitle.textContent = `Browse ${state.contract.label} inscriptions.`;
+        dom.walletSubtitle.textContent = `Browse Xtrata inscriptions.`;
         return;
       }
       if (state.curatedGalleryTitle) {
         dom.walletSubtitle.textContent = `Viewing ${state.curatedGalleryTitle}.`;
+      }
+      if (state.homeLatestView) {
+        setStatus(
+          dom.walletStatus,
+          `<strong>Latest</strong> ${getContractId(state.contract)}`,
+          'ready',
+          'blue'
+        );
+        dom.walletSubtitle.textContent = `Viewing latest ${state.contract.label} inscriptions.`;
+        return;
       }
       if (!connected) {
         setStatus(
@@ -8332,8 +9324,18 @@
       });
 
     const prepareRuntimeHtmlForToken = async (token, html, contextLabel = 'preview') => {
-      if (!html || !hasRuntimeContentUrls(html)) {
+      if (!html) {
         return html;
+      }
+      const moduleBaseHref = buildRuntimeModuleBaseHref({
+        network: state.network,
+        contractId: getTokenCacheContractId(token),
+        tokenUriPath: token.tokenUri,
+        entryTokenId: token.id
+      });
+      const htmlWithBase = injectHtmlBaseHref(html, moduleBaseHref);
+      if (!hasRuntimeContentUrls(htmlWithBase)) {
+        return htmlWithBase;
       }
       const contentClient = getTokenClient(token);
       try {
@@ -8343,7 +9345,7 @@
           context: contextLabel
         });
         return await inlineRuntimeContentUrls({
-          html,
+          html: htmlWithBase,
           client: contentClient,
           fallbackClients: getContentFallbackClients(contentClient)
         });
@@ -8361,7 +9363,7 @@
           'warn'
         );
         appendLog(`Runtime preview fallback for ${formatTokenId(token.id)}: ${message}`);
-        return html;
+        return htmlWithBase;
       }
     };
 
@@ -9224,7 +10226,213 @@
       return true;
     };
 
-    const renderGridLiveMedia = (token, thumbElement, media) => {
+    // ------------------------------------------------------------------
+    // Live HTML-frame manager (phase one: execution gate + budget + poster)
+    //
+    // HTML inscriptions (e.g. embedded X-Board apps) are expensive: each one
+    // runs its own scripts, network fetches and ~hundreds of slot renders. The
+    // byte-hydration queue throttles *fetching*; this manager throttles
+    // *executing*. A tile's iframe srcdoc is only set when the tile is in the
+    // viewport AND within MAX_LIVE_HTML_FRAMES. Everything else shows a static
+    // poster the user can click to force-render.
+    //
+    // Trusted lane (phase two): a board that completes the embed handshake is
+    // marked trusted and exempted from the budget, because it self-throttles
+    // internally. Trusted status persists for the session so scroll-back is
+    // cheap. See docs/grid-embed-contract.md.
+    // ------------------------------------------------------------------
+    const liveHtmlFrameManager = (() => {
+      const tiles = new Map(); // thumbElement -> record
+      let observer = null;
+
+      const now = () =>
+        typeof performance !== 'undefined' && performance.now
+          ? performance.now()
+          : Date.now();
+
+      const liveCount = () => {
+        let n = 0;
+        tiles.forEach((r) => {
+          if (r.active && !r.trusted) n += 1;
+        });
+        return n;
+      };
+
+      const activate = (record) => {
+        if (record.active || !record.frame.isConnected) return;
+        record.frame.srcdoc = injectGridThumbnailHtml(record.html);
+        record.active = true;
+        record.activatedAt = now();
+        if (record.poster) record.poster.hidden = true;
+      };
+
+      const deactivate = (record) => {
+        if (!record.active) return;
+        record.frame.srcdoc = '';
+        record.active = false;
+        // NB: record.trusted persists for the session so a known-good board is
+        // not budget-blocked when scrolled back into view.
+        if (record.poster) record.poster.hidden = false;
+      };
+
+      // Oldest active, non-trusted tile to evict so a visible tile can run.
+      const pickEvictable = (exclude, allowIntersecting) => {
+        let victim = null;
+        tiles.forEach((r) => {
+          if (r === exclude || !r.active || r.trusted) return;
+          if (!allowIntersecting && r.intersecting) return;
+          if (!victim || r.activatedAt < victim.activatedAt) victim = r;
+        });
+        return victim;
+      };
+
+      const requestActivation = (record) => {
+        if (record.active) return;
+        // Gated tiles (e.g. relationship pair/child thumbs) never auto-activate;
+        // they stay as a poster until the user clicks (forceActivate).
+        if (record.gated) return;
+        // Grid tiles render eagerly: every on-screen HTML inscription runs, no
+        // per-tile clicking. Off-screen tiles are still deactivated by the
+        // IntersectionObserver, so concurrency stays bounded to what's visible.
+        activate(record);
+      };
+
+      const fillFreeSlots = () => {
+        tiles.forEach((r) => {
+          if (r.active || !r.intersecting || r.gated) return;
+          activate(r);
+        });
+      };
+
+      const forceActivate = (record) => {
+        if (record.active) return;
+        if (!record.trusted && liveCount() >= MAX_LIVE_HTML_FRAMES) {
+          const victim = pickEvictable(record, true);
+          if (victim) deactivate(victim);
+        }
+        activate(record);
+      };
+
+      const ensureObserver = () => {
+        if (observer || typeof IntersectionObserver !== 'function') {
+          return observer;
+        }
+        observer = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              const record = tiles.get(entry.target);
+              if (!record) continue;
+              record.intersecting = entry.isIntersecting;
+              if (entry.isIntersecting) {
+                requestActivation(record);
+              } else {
+                deactivate(record);
+              }
+            }
+            fillFreeSlots();
+          },
+          { root: null, rootMargin: '300px', threshold: 0 }
+        );
+        return observer;
+      };
+
+      // Phase-two receiver: a cooperating board posts {type:'xtrata:embed:hello'}
+      // once its script runs. We mark that frame trusted (exempt from budget)
+      // and ack so it can switch into lite/embedded rendering.
+      if (typeof window !== 'undefined' && window.addEventListener) {
+        window.addEventListener('message', (event) => {
+          const data = event && event.data;
+          if (!data || data.type !== 'xtrata:embed:hello') return;
+          tiles.forEach((record) => {
+            if (
+              record.frame.contentWindow &&
+              record.frame.contentWindow === event.source
+            ) {
+              record.trusted = true;
+              if (record.poster) record.poster.hidden = true;
+              if (event.source && typeof event.source.postMessage === 'function') {
+                event.source.postMessage(
+                  {
+                    type: 'xtrata:embed:ack',
+                    mode: 'grid-thumbnail',
+                    budget: 'trusted'
+                  },
+                  '*'
+                );
+              }
+            }
+          });
+        });
+      }
+
+      const register = (thumbElement, media, options = {}) => {
+        const existing = tiles.get(thumbElement);
+        if (existing) {
+          if (observer) observer.unobserve(thumbElement);
+          tiles.delete(thumbElement);
+        }
+
+        const frame = document.createElement('iframe');
+        frame.title = 'inscription-preview';
+        frame.sandbox = 'allow-scripts';
+        frame.referrerPolicy = 'no-referrer';
+        frame.loading = 'lazy';
+
+        const poster = document.createElement('div');
+        poster.className = 'token-thumb-gate';
+        const label = document.createElement('div');
+        label.className = 'token-thumb-gate__label';
+        label.textContent = getGridMimeLabel(media.mimeType ?? null) || 'HTML';
+        const hint = document.createElement('div');
+        hint.className = 'token-thumb-gate__hint';
+        hint.textContent = 'Tap to load';
+        poster.append(label, hint);
+
+        const record = {
+          frame,
+          poster,
+          html: media.html,
+          active: false,
+          intersecting: false,
+          trusted: false,
+          gated: !!options.gated,
+          activatedAt: 0
+        };
+
+        poster.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          forceActivate(record);
+        });
+
+        tiles.set(thumbElement, record);
+        thumbElement.append(frame, poster);
+
+        const obs = ensureObserver();
+        if (obs) {
+          obs.observe(thumbElement);
+        } else {
+          // No IntersectionObserver: activate now, still bounded by budget.
+          record.intersecting = true;
+          requestActivation(record);
+        }
+      };
+
+      const reset = () => {
+        if (observer) {
+          observer.disconnect();
+          observer = null;
+        }
+        tiles.forEach((record) => {
+          record.frame.srcdoc = '';
+        });
+        tiles.clear();
+      };
+
+      return { register, reset };
+    })();
+
+    const renderGridLiveMedia = (token, thumbElement, media, options = {}) => {
       const cacheKey = getThumbnailKey(token);
       const oldUrl = state.tokenThumbUrls.get(cacheKey);
       if (oldUrl) {
@@ -9311,13 +10519,13 @@
       }
 
       if (media.kind === 'html') {
-        const frame = document.createElement('iframe');
-        frame.title = 'inscription-preview';
-        frame.sandbox = 'allow-scripts';
-        frame.referrerPolicy = 'no-referrer';
-        frame.loading = 'lazy';
-        frame.srcdoc = injectGridThumbnailHtml(media.html);
-        thumbElement.append(frame);
+        // Gated mount: the iframe only executes when on-screen and within the
+        // live-frame budget (or on click). Prevents N heavy board inscriptions
+        // from running at once. See liveHtmlFrameManager above. Relationship
+        // thumbs pass { gated: true } so they stay click-to-load.
+        liveHtmlFrameManager.register(thumbElement, media, {
+          gated: !!options.gated
+        });
         return true;
       }
 
@@ -9402,14 +10610,7 @@
             kind: 'audio',
             mimeType
           });
-          if (
-            thumbElement.isConnected &&
-            thumbElement.dataset.thumbnailKey === cacheKey
-          ) {
-            renderGridLiveMedia(token, thumbElement, state.gridLiveMediaCache.get(cacheKey));
-          } else if (getWalletPageIds().some((id) => id === token.id)) {
-            scheduleGridRender();
-          }
+          displayResolvedGridMedia(token, thumbElement, cacheKey);
           debugLog('cache', 'background audio grid display ready', {
             tokenId: token.id.toString(),
             contractId: cacheContractId,
@@ -9424,14 +10625,7 @@
             bytes,
             mimeType
           });
-          if (
-            thumbElement.isConnected &&
-            thumbElement.dataset.thumbnailKey === cacheKey
-          ) {
-            renderGridLiveMedia(token, thumbElement, state.gridLiveMediaCache.get(cacheKey));
-          } else if (getWalletPageIds().some((id) => id === token.id)) {
-            scheduleGridRender();
-          }
+          displayResolvedGridMedia(token, thumbElement, cacheKey);
           debugLog('cache', 'background video grid display ready', {
             tokenId: token.id.toString(),
             contractId: cacheContractId,
@@ -9451,14 +10645,7 @@
             ),
             mimeType
           });
-          if (
-            thumbElement.isConnected &&
-            thumbElement.dataset.thumbnailKey === cacheKey
-          ) {
-            renderGridLiveMedia(token, thumbElement, state.gridLiveMediaCache.get(cacheKey));
-          } else if (getWalletPageIds().some((id) => id === token.id)) {
-            scheduleGridRender();
-          }
+          displayResolvedGridMedia(token, thumbElement, cacheKey);
           debugLog('cache', 'background html grid display ready', {
             tokenId: token.id.toString(),
             contractId: cacheContractId,
@@ -9473,14 +10660,7 @@
             bytes,
             mimeType
           });
-          if (
-            thumbElement.isConnected &&
-            thumbElement.dataset.thumbnailKey === cacheKey
-          ) {
-            renderGridLiveMedia(token, thumbElement, state.gridLiveMediaCache.get(cacheKey));
-          } else if (getWalletPageIds().some((id) => id === token.id)) {
-            scheduleGridRender();
-          }
+          displayResolvedGridMedia(token, thumbElement, cacheKey);
           return;
         }
         if (kind === 'svg') {
@@ -9493,14 +10673,7 @@
             bytes,
             mimeType: 'image/svg+xml'
           });
-          if (
-            thumbElement.isConnected &&
-            thumbElement.dataset.thumbnailKey === cacheKey
-          ) {
-            renderGridLiveMedia(token, thumbElement, state.gridLiveMediaCache.get(cacheKey));
-          } else if (getWalletPageIds().some((id) => id === token.id)) {
-            scheduleGridRender();
-          }
+          displayResolvedGridMedia(token, thumbElement, cacheKey);
           debugLog('cache', 'background svg grid display ready', {
             tokenId: token.id.toString(),
             contractId: cacheContractId,
@@ -9523,14 +10696,7 @@
             bytes,
             mimeType
           });
-          if (
-            thumbElement.isConnected &&
-            thumbElement.dataset.thumbnailKey === cacheKey
-          ) {
-            renderGridLiveMedia(token, thumbElement, state.gridLiveMediaCache.get(cacheKey));
-          } else if (getWalletPageIds().some((id) => id === token.id)) {
-            scheduleGridRender();
-          }
+          displayResolvedGridMedia(token, thumbElement, cacheKey);
           debugLog('cache', 'background animated image grid display ready', {
             tokenId: token.id.toString(),
             contractId: cacheContractId,
@@ -9545,15 +10711,15 @@
         if (!thumbnail) {
           return;
         }
-        if (
-          thumbElement.isConnected &&
-          thumbElement.dataset.thumbnailKey === cacheKey
-        ) {
-          await applyCachedThumbnail(token, thumbElement, {
-            requireActivePage: thumbElement.dataset.thumbnailContext !== 'relationship'
+        const cachedThumbTarget =
+          thumbElement.isConnected && thumbElement.dataset.thumbnailKey === cacheKey
+            ? thumbElement
+            : findLiveGridThumb(token.id, cacheKey);
+        if (cachedThumbTarget) {
+          await applyCachedThumbnail(token, cachedThumbTarget, {
+            requireActivePage:
+              cachedThumbTarget.dataset.thumbnailContext !== 'relationship'
           });
-        } else if (getWalletPageIds().some((id) => id === token.id)) {
-          scheduleGridRender();
         }
       } catch (error) {
         debugLog(
@@ -9658,7 +10824,7 @@
       }
 
       const liveMedia = state.gridLiveMediaCache.get(cacheKey);
-      if (liveMedia && renderGridLiveMedia(token, media, liveMedia)) {
+      if (liveMedia && renderGridLiveMedia(token, media, liveMedia, { gated: true })) {
         return true;
       }
 
@@ -9723,16 +10889,52 @@
       }
     };
 
+    // Find the current live thumb element for a token's grid square (matching
+    // the expected thumbnail key), so a single cell can be updated in place.
+    const findLiveGridThumb = (tokenId, cacheKey) => {
+      if (!dom.tokenGrid) {
+        return null;
+      }
+      const card = dom.tokenGrid.querySelector(
+        `.token-card[data-token-id="${tokenId.toString()}"]`
+      );
+      const thumb = card ? card.querySelector('.token-thumb') : null;
+      return thumb && thumb.dataset.thumbnailKey === cacheKey ? thumb : null;
+    };
+
+    // Render freshly-resolved live media into ONE grid square without rebuilding
+    // the whole grid. A full re-render (scheduleGridRender) tears down and
+    // reloads every other iframe, so HTML squares would all reload whenever any
+    // one finished loading. Targeting the single current cell keeps each square
+    // independent: once loaded it stays loaded.
+    const displayResolvedGridMedia = (token, thumbElement, cacheKey) => {
+      const media = state.gridLiveMediaCache.get(cacheKey);
+      if (!media) {
+        return;
+      }
+      const target =
+        thumbElement.isConnected && thumbElement.dataset.thumbnailKey === cacheKey
+          ? thumbElement
+          : findLiveGridThumb(token.id, cacheKey);
+      if (target) {
+        renderGridLiveMedia(token, target, media);
+      }
+    };
+
     const renderTokenGrid = (options = {}) => {
       const allowBackgroundHydration = !options.deferHydration;
       revokeGridThumbUrls();
       dom.tokenGrid.innerHTML = '';
       clampWalletPageIndex();
       const pageIds = getWalletPageIds();
-      const totalCount = state.walletUsesPagedHoldings
+      const baseCount = state.walletUsesPagedHoldings
         ? state.walletTotalCount
         : state.walletTokenIds.length;
-      dom.walletCountBadge.textContent = `${totalCount} inscription${totalCount === 1 ? '' : 's'}`;
+      // Escrowed twins ride along page 0 in addition to the wallet's holdings,
+      // so include them in the count and render enough cells to show them all.
+      const injectedCount = getInjectedEscrowTwinIds().length;
+      const totalCount = baseCount + injectedCount;
+      setWalletCountLabel(totalCount);
       updateWalletPagerControls();
       debugLog('grid', 'render grid page', {
         ...getGridDebugContext(pageIds),
@@ -9740,7 +10942,8 @@
         deferHydration: !!options.deferHydration
       });
 
-      for (let index = 0; index < WALLET_PAGE_SIZE; index += 1) {
+      const cellCount = Math.max(WALLET_PAGE_SIZE, pageIds.length);
+      for (let index = 0; index < cellCount; index += 1) {
         const id = pageIds[index] ?? null;
         const token = id !== null
           ? state.walletTokenCache.get(id.toString()) ?? null
@@ -9750,6 +10953,22 @@
         card.className = `token-card${token ? '' : ' empty'}${token && state.selectedTokenId === token.id ? ' active' : ''}`;
         if (token) {
           card.dataset.tokenId = token.id.toString();
+        }
+        // Forever Twin escrow marker: a twin owned by a registered helper
+        // contract is locked in escrow (the holder keeps the original NFT).
+        // Flag the card with a padlock + coloured border so it's easy to
+        // differentiate escrowed/locked twins from regular inscriptions.
+        if (token && findPepeEscrowResolver(token.owner)) {
+          card.classList.add('token-card--escrowed');
+          const lock = document.createElement('span');
+          lock.className = 'token-escrow-badge';
+          lock.textContent = '🔒';
+          lock.setAttribute('aria-hidden', 'false');
+          lock.setAttribute('role', 'img');
+          lock.setAttribute('aria-label', 'Escrowed Forever Twin');
+          lock.title =
+            'Escrowed Forever Twin — the Xtrata twin is locked in the Forever Twin contract while the holder keeps the original collection NFT.';
+          card.append(lock);
         }
         const thumb = document.createElement('div');
         thumb.className = 'token-thumb';
@@ -10158,6 +11377,7 @@
       state.walletViewName = null;
       state.curatedGalleryId = null;
       state.curatedGalleryTitle = null;
+      state.homeLatestView = false;
 
       clearExampleDescription();
 
@@ -10169,6 +11389,45 @@
       appendLog('Returned to connected wallet view.');
 
       updateWalletStatus();
+      await loadWalletInscriptions();
+      updateControls();
+    };
+
+    // Programmatically load a wallet's holdings into the grid (e.g. when the
+    // owner/holder address in the preview panel is clicked). Mirrors the
+    // resolved-address branch of viewWalletFromInput so it behaves identically
+    // in both homepage and Xplorer (explorer-mode) contexts.
+    const viewWalletByAddress = async (address) => {
+      const normalized = (address ?? '').trim();
+      if (!normalized) {
+        return;
+      }
+      state.walletViewRequestId += 1;
+      cancelWalletLookup();
+      state.walletLookupNotice = null;
+
+      const isConnectedAddress =
+        state.walletSession.address &&
+        addressesEqual(normalized, state.walletSession.address);
+      state.walletViewAddress = isConnectedAddress ? null : normalized;
+      state.walletViewName = null;
+      state.curatedGalleryId = null;
+      state.curatedGalleryTitle = null;
+      state.homeLatestView = false;
+      clearExampleDescription();
+
+      if (dom.walletLookupInput) {
+        dom.walletLookupInput.value = isConnectedAddress ? '' : normalized;
+        updateWalletLookupInputMode();
+      }
+      appendLog(`Viewing wallet: ${truncateMiddle(normalized, 8, 8)}.`);
+      updateWalletStatus();
+      // Bring the grid into view (helpful in explorer-mode where the click
+      // originates from the preview panel).
+      const scrollTarget = dom.tokenGrid ?? dom.walletGridStatus;
+      if (scrollTarget?.scrollIntoView) {
+        scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
       await loadWalletInscriptions();
       updateControls();
     };
@@ -10192,6 +11451,7 @@
         state.walletViewName = null;
         state.curatedGalleryId = null;
         state.curatedGalleryTitle = null;
+        state.homeLatestView = false;
         clearExampleDescription();
 
         clearSelectedTokenPreview();
@@ -10216,6 +11476,7 @@
         state.walletViewName = null;
         state.curatedGalleryId = null;
         state.curatedGalleryTitle = null;
+        state.homeLatestView = false;
         clearExampleDescription();
 
         dom.walletLookupInput.value = isConnectedAddress ? '' : baseLookupState.lookupAddress;
@@ -10268,6 +11529,7 @@
         state.walletViewName = isConnectedAddress ? null : lookupName;
         state.curatedGalleryId = null;
         state.curatedGalleryTitle = null;
+        state.homeLatestView = false;
         dom.walletLookupInput.value = isConnectedAddress ? '' : toBtcLookupLabel(lookupName);
         updateWalletLookupInputMode();
         state.walletLookupNotice = null;
@@ -10316,6 +11578,7 @@ const openCuratedGallery = async (galleryId) => {
 
   state.curatedGalleryId = gallery.id;
   state.curatedGalleryTitle = gallery.title;
+  state.homeLatestView = false;
   state.walletViewAddress = null;
   state.walletViewName = null;
   state.walletLookupNotice = null;
@@ -10981,7 +12244,7 @@ const openCuratedGallery = async (galleryId) => {
       state.explorerFilterIndexLoading = true;
       updateControls();
       if (missingIds.length > 0) {
-        dom.walletCountBadge.textContent = 'filtering';
+        setWalletCountLabel('filtering');
         renderTokenGridPlaceholders('...');
       }
       const scanIds = options.preferLatest ? [...missingIds].reverse() : missingIds;
@@ -11111,7 +12374,9 @@ const openCuratedGallery = async (galleryId) => {
 
     const loadExplorerPage = async (options = {}) => {
       const startedAt = performance.now();
-      state.explorerMode = true;
+      const homeLatest = !!options.homeLatest;
+      state.explorerMode = !homeLatest;
+      state.homeLatestView = homeLatest;
       state.walletViewAddress = null;
       state.walletViewName = null;
       state.curatedGalleryId = null;
@@ -11466,7 +12731,7 @@ const openCuratedGallery = async (galleryId) => {
         void updateWalletTokenUriHeadPreview(null);
         resetBackgroundThumbnailHydration();
         revokeGridThumbUrls();
-        dom.walletCountBadge.textContent = '0 inscriptions';
+        setWalletCountLabel(0);
         setStatus(
           dom.walletGridStatus,
           '<strong>Grid</strong> enter a wallet address or connect',
@@ -11523,6 +12788,9 @@ const openCuratedGallery = async (galleryId) => {
             void updateWalletTokenUriHeadPreview(null);
             renderTokenGrid();
             setExperienceMode();
+            // A wallet with no Xtrata holdings may still have escrowed twins
+            // (it holds the original Pepe/Leo). Surface those if present.
+            void refreshEscrowTwinInjection(viewingAddress);
             return;
           }
           setStatus(
@@ -11536,6 +12804,8 @@ const openCuratedGallery = async (galleryId) => {
             deferSelection: !!options.deferSelection,
             deferHydration: !!options.deferHydration
           });
+          // Surface any Forever Twins escrowed on behalf of this wallet.
+          void refreshEscrowTwinInjection(viewingAddress);
           return;
         } catch (pageError) {
           state.walletUsesPagedHoldings = false;
@@ -11607,6 +12877,7 @@ const openCuratedGallery = async (galleryId) => {
             deferHydration: !!options.deferHydration
           });
         }
+        void refreshEscrowTwinInjection(viewingAddress);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         state.walletTokenIds = [];
@@ -11693,6 +12964,7 @@ const openCuratedGallery = async (galleryId) => {
 
     const loadExplorerMode = async () => {
       state.explorerMode = true;
+      state.homeLatestView = false;
       state.walletLookupNotice = null;
       state.walletViewAddress = null;
       state.walletViewName = null;
@@ -11838,6 +13110,33 @@ const openCuratedGallery = async (galleryId) => {
       dom.explorerTokenInput.value = '';
       await loadExplorerPage({ force: true, selectLatestOnPage: true });
       scrollToWalletGrid();
+    };
+
+    const loadHomeLatestView = async (options = {}) => {
+      if (state.walletLoadingPage) {
+        return;
+      }
+      debugLog('grid', 'home latest view requested', {
+        currentPageIndex: state.walletPageIndex,
+        latestTokenId: state.explorerLatestTokenId?.toString() ?? null
+      });
+      activeExampleDescriptionKey = 'latest';
+      setExampleDescription('latest');
+      clearSelectedTokenPreview();
+      setStatus(dom.walletGridStatus, '<strong>Grid</strong> loading latest inscriptions', 'loading', 'blue');
+      renderTokenGridPlaceholders('...');
+      await refreshExplorerLatestTokenId();
+      state.walletPageIndex = getExplorerLatestPageIndex();
+      dom.explorerTokenInput.value = '';
+      await loadExplorerPage({
+        ...options,
+        homeLatest: true,
+        force: true,
+        selectLatestOnPage: true
+      });
+      if (options.scrollToGrid) {
+        scrollToWalletGrid();
+      }
     };
 
     const readExplorerFilterControls = () =>
@@ -12168,8 +13467,15 @@ const openCuratedGallery = async (galleryId) => {
         await loadExplorerMode();
       } else {
         await fetchAdminStatus();
-        if (walletViewRequestId === state.walletViewRequestId) {
-          await loadWalletInscriptions();
+        // Deep link: /?wallet=<address> opens straight into that wallet's grid
+        // (used by the Xplorer owner click, which routes back to the homepage).
+        const requestedWallet = new URLSearchParams(window.location.search)
+          .get('wallet')
+          ?.trim();
+        if (requestedWallet) {
+          await viewWalletByAddress(requestedWallet);
+        } else if (walletViewRequestId === state.walletViewRequestId && !consumedHandoff) {
+          await loadHomeLatestView();
         }
       }
       updateControls();
@@ -12200,6 +13506,10 @@ const openCuratedGallery = async (galleryId) => {
       input.addEventListener('change', () => {
         void applyExplorerFilterControls();
       });
+    });
+    dom.explorerFilterToggle?.addEventListener('click', () => {
+      state.explorerFiltersCollapsed = !state.explorerFiltersCollapsed;
+      syncExplorerFilterControls();
     });
     dom.explorerClearFiltersButton?.addEventListener('click', () => {
       void clearExplorerFilters();
@@ -12242,6 +13552,7 @@ const openCuratedGallery = async (galleryId) => {
 
         state.curatedGalleryId = null;
         state.curatedGalleryTitle = null;
+        state.homeLatestView = false;
         state.walletViewAddress = null;
         state.walletViewName = null;
         state.walletLookupNotice = null;
@@ -12344,6 +13655,15 @@ const openCuratedGallery = async (galleryId) => {
 
         activeExampleDescriptionKey = galleryId;
         void openCuratedGallery(galleryId);
+      });
+    });
+    document.querySelectorAll('[data-latest-view]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const isTogglingOff = activeExampleDescriptionKey === 'latest';
+        if (isTogglingOff) {
+          return;
+        }
+        void loadHomeLatestView({ scrollToGrid: true });
       });
     });
     dom.walletLookupInput.addEventListener('input', () => {

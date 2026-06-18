@@ -107,6 +107,59 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 - `src/lib/wallet/session.ts` and `src/lib/wallet/storage.ts` persist wallet sessions.
 - `src/lib/wallet/adapter.ts` centralizes wallet request calls and types.
 
+## Forever Twins (collection linking + escrow display)
+
+The Forever Twins system links an Xtrata inscription id to its original
+collection token (e.g. Bitcoin Pepe #44 ⇄ Xtrata #512) and resolves the real
+owner when the twin is held in escrow. The helper/escrow contract for each
+collection is itself the on-chain twin index — it owns a `Bindings` map keyed
+by the original (local) token id storing `{ xtrata-id, xtrata-escrowed, ... }`
+and emits an `inscribed` print event carrying `{ token-id, xtrata-id }`.
+
+- `src/lib/twins/registry.ts` is the single source of truth: `FOREVER_TWIN_COLLECTIONS`
+  lists each ported collection (name, item noun, helper/escrow contract id,
+  source contract id, source asset name, master contract). Helper lookups:
+  `getCollectionByHelperId`, `getCollectionsForMaster`, `isForeverTwinHelper`.
+- `src/lib/twins/hiro.ts` provides the cross-contract read layer (read-only
+  `call-read`, contract event streaming, and Clarity decoding) used to read any
+  helper or source contract regardless of the selected app contract.
+- `src/lib/twins/resolver.ts` builds the xtrata-id → local-id reverse index from
+  the helper's `inscribed` events (the contract has no reverse lookup), confirms
+  the live `get-binding`, and exposes `resolveTwinOwnership` which returns escrow
+  state, the effective owner (the current source NFT holder when escrowed), and
+  the local collection number + name. `clearTwinCaches` forces a rebuild.
+- `src/lib/twins/index.ts` is the barrel export consumed by the viewers.
+- Consumers: `src/screens/ViewerScreen.tsx` (React Details/header panels show the
+  `Escrowed` badge, real owner, and collection token) and the standalone
+  `index.html` Xplorer (`PEPE_ESCROW_RESOLVERS` registry + `buildTwinReverseIndex`
+  + `resolvePepeEscrowHolder` render the same in the Selected inscription panel).
+- Escrow model: on `inscribe` the twin is minted to the helper (`xtrata-escrowed = true`,
+  original stays with the holder); `swap-pepe-for-xtrata` releases the twin
+  (`xtrata-escrowed = false`); `swap-xtrata-for-pepe` re-escrows it. A twin is
+  escrowed when its on-chain owner is a registered helper contract.
+
+### Adding a new Forever Twin collection (or contract)
+
+To onboard a new collection — and keep the standalone viewer in sync — do all of:
+
+1. Append an entry to `FOREVER_TWIN_COLLECTIONS` in `src/lib/twins/registry.ts`
+   with `key`, `name`, `itemNoun`, `network`, `masterContractId`,
+   `helperContractId`, `sourceContractId`, `sourceAssetName` (and optional
+   `claimUrl`). No other React code changes — the resolver and `ViewerScreen`
+   are fully generic over the registry.
+2. Mirror the entry in `index.html`'s `PEPE_ESCROW_RESOLVERS` map (keyed by the
+   helper contract id) so the standalone Xplorer resolves the same collection.
+   This is the one intentional duplication because `index.html` is a
+   self-contained bundle; keep the two in lockstep.
+3. Confirm the new helper contract matches the expected shape: a `Bindings` map
+   keyed by local token id with `xtrata-id` + `xtrata-escrowed`, a `get-binding`
+   read-only, and an `inscribed` print event with `token-id` + `xtrata-id`. If a
+   future contract diverges, extend the registry entry with the differing
+   function/field names rather than branching in the resolver.
+4. Add the collection to `forever-twins/data/contracts.json` reference data and
+   `docs/contract-inventory.md` for provenance.
+5. Add/extend tests in `src/lib/twins/__tests__/resolver.test.ts`.
+
 ## Protocol, chunking, and viewer data
 
 - `src/lib/protocol/types.ts` defines protocol types for inscriptions.

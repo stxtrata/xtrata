@@ -272,6 +272,35 @@ need staged resume behavior.
 | `get-core-contract` | none | `(response principal uint)` |
 | `get-max-small-chunks` | none | `(response uint uint)` |
 
+## Forever Twin Helper Contracts (collection linking)
+
+Forever Twin helpers port an existing NFT collection into Xtrata and act as the
+on-chain twin index linking each original (local) token id to its minted Xtrata
+inscription id. Registered collections live in `src/lib/twins/registry.ts`
+(mirrored in `index.html`); the app uses them to display the local collection
+number, name, and an `Escrowed` state with the real owner.
+
+### Shared contract shape
+| Item | Definition |
+|---|---|
+| `Bindings` map | key `local-token-id: uint` → `{ xtrata-id: uint, content-hash: (buff 32), inscriber: principal, xtrata-escrowed: bool, at: uint }` |
+| `get-binding` | `(token-id uint)` → `(optional { … })` — local id to binding |
+| `inscribe` | mints the twin to the helper (escrowed) and inserts the binding |
+| `swap-pepe-for-xtrata` / `swap-xtrata-for-pepe` | release / re-escrow the twin, flipping `xtrata-escrowed` |
+| `get-inscribed-count` | `(response uint uint)` |
+| `inscribed` print event | `{ event: "inscribed", token-id, xtrata-id, … }` — used to build the xtrata-id → local-id reverse index |
+
+### Registered collections
+| Collection | Helper contract | Source contract / asset |
+|---|---|---|
+| Bitcoin Pepes | `SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun` | `SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe` / `bitcoin-pepe` |
+| LeoCats | `SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata` | `SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats` / `leo-cats` |
+
+A twin is escrowed when its on-chain owner is a registered helper contract; the
+real owner is then the current holder of the source NFT (`source get-owner`).
+To add a collection/contract, follow the checklist in
+`docs/forever-twins-linking.md` and `docs/app-reference.md`.
+
 ## Transaction Construction
 
 ### Imports

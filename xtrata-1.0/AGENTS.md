@@ -31,6 +31,25 @@ This file captures the core development rules and app constraints for V16.
 - `docs/` project documentation, assumptions, and contract inventory.
 - `contracts/` contract sources and references (`contracts/clarinet/`, `contracts/live/`, `contracts/other/`).
 - `recursive-apps/` supporting recursive app assets.
+- `src/lib/twins/` Forever Twins registry + resolver (collection ⇄ Xtrata id linking and escrow owner resolution).
+
+## Forever Twins (collection linking)
+
+- The Forever Twins feature links an Xtrata inscription id to its original
+  collection token (e.g. Bitcoin Pepe #44 ⇄ Xtrata #512) and shows an `Escrowed`
+  state plus the real owner when the twin is held by a helper contract.
+- Source of truth is the registry in `src/lib/twins/registry.ts`
+  (`FOREVER_TWIN_COLLECTIONS`). The resolver and React `ViewerScreen` are fully
+  generic over it — never hard-code a collection in resolver/UI logic.
+- To add a collection or contract: (1) append one entry to
+  `FOREVER_TWIN_COLLECTIONS`; (2) mirror it in `index.html`'s
+  `PEPE_ESCROW_RESOLVERS` (standalone bundle, kept in lockstep); (3) verify the
+  helper contract exposes a `Bindings` map keyed by local id with `xtrata-id` +
+  `xtrata-escrowed`, a `get-binding` read-only, and an `inscribed` print event;
+  (4) update `forever-twins/data/contracts.json` and `docs/contract-inventory.md`;
+  (5) add tests in `src/lib/twins/__tests__/`.
+- Full process and rationale: `docs/app-reference.md` (Forever Twins section) and
+  `docs/forever-twins-linking.md`.
 
 ## UI/UX Constraints
 
