@@ -84,6 +84,17 @@ export const FOREVER_TWIN_COLLECTIONS: readonly ForeverTwinCollection[] = [
     helperContractId: 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata',
     sourceContractId: 'SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats',
     sourceAssetName: 'leo-cats'
+  },
+  {
+    key: 'miami-degens',
+    name: 'Miami Degens',
+    itemNoun: 'Miami Degen',
+    network: 'mainnet',
+    masterContractId: XTRATA_MASTER,
+    helperContractId:
+      'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.miami-degens-fakfun-xtrata',
+    sourceContractId: 'SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.miami-degens',
+    sourceAssetName: 'miami-degens'
   }
 ];
 

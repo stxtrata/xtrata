@@ -19,6 +19,41 @@
   "xtrataExplorerBase": "https://xtrata.xyz/inscription/",
   "xtrataCompactBase": "https://xtrata.xyz/i/",
   "stacksExplorerBase": "TBC",
+  "collections": [
+    {
+      "key": "bitcoin-pepes",
+      "label": "Bitcoin Pepes",
+      "helperContractId": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun",
+      "sourceContractId": "SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe",
+      "sourceAssetName": "bitcoin-pepe",
+      "xtrataMasterContractId": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+      "mappingFunction": "get-binding",
+      "sourceOwnerFunction": "get-owner",
+      "inscribedEvent": "inscribed"
+    },
+    {
+      "key": "leo-cats",
+      "label": "LeoCats",
+      "helperContractId": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata",
+      "sourceContractId": "SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats",
+      "sourceAssetName": "leo-cats",
+      "xtrataMasterContractId": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+      "mappingFunction": "get-binding",
+      "sourceOwnerFunction": "get-owner",
+      "inscribedEvent": "inscribed"
+    },
+    {
+      "key": "miami-degens",
+      "label": "Miami Degens",
+      "helperContractId": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.miami-degens-fakfun-xtrata",
+      "sourceContractId": "SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.miami-degens",
+      "sourceAssetName": "miami-degens",
+      "xtrataMasterContractId": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+      "mappingFunction": "get-binding",
+      "sourceOwnerFunction": "get-owner",
+      "inscribedEvent": "inscribed"
+    }
+  ],
   "promoFreeCount": 87,
   "postPromoFeeMicroStx": 3000000,
   "status": "Post-launch live operations. Bitcoin Pepes holders are already claiming Forever Twins through Fak.fun. Deployed-name helper source defaults to 87 free and 3 STX after, but live state should be checked with get-free-threshold and get-fee before formal publication."

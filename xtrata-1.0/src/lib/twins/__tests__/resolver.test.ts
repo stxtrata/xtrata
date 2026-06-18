@@ -24,7 +24,9 @@ import {
 } from '../registry';
 
 const PEPE = FOREVER_TWIN_COLLECTIONS.find((c) => c.key === 'bitcoin-pepes')!;
+const MIAMI = FOREVER_TWIN_COLLECTIONS.find((c) => c.key === 'miami-degens')!;
 const HELPER = PEPE.helperContractId;
+const MIAMI_HELPER = MIAMI.helperContractId;
 const HOLDER = 'SP2JXKMSH007NPYAQHKJPQMAQYAD90NQGTVJVQ02B';
 
 const printEvent = (localId: number, xtrataId: number) => ({
@@ -42,6 +44,12 @@ async function* gen(events: unknown[]) {
 const mockEvents = (events: unknown[]) => {
   vi.mocked(hiro.fetchContractPrintEvents).mockImplementation(
     () => gen(events)
+  );
+};
+
+const mockEventsByHelper = (eventsByHelper: Record<string, unknown[]>) => {
+  vi.mocked(hiro.fetchContractPrintEvents).mockImplementation(
+    ({ contractId }: { contractId: string }) => gen(eventsByHelper[contractId] ?? [])
   );
 };
 
@@ -178,5 +186,18 @@ describe('resolveTwinOwnership', () => {
 
   it('registry maps helper id back to its collection', () => {
     expect(getCollectionByHelperId(HELPER)?.key).toBe('bitcoin-pepes');
+  });
+
+  it('registry maps Miami Degens helper and resolves its xtrata/local ids', async () => {
+    mockEventsByHelper({ [MIAMI_HELPER]: [printEvent(17, 888)] });
+    vi.mocked(hiro.callReadOnly).mockResolvedValue(
+      bindingJson(888, true)
+    );
+    expect(getCollectionByHelperId(MIAMI_HELPER)?.key).toBe('miami-degens');
+
+    const binding = await resolveTwinByXtrataId(888n);
+    expect(binding?.collection.key).toBe('miami-degens');
+    expect(binding?.localTokenId).toBe(17n);
+    expect(binding?.xtrataEscrowed).toBe(true);
   });
 });
