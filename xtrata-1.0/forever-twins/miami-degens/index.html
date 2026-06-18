@@ -1111,12 +1111,33 @@
     };
 
     function jsonBigInt(_, value) { return typeof value === 'bigint' ? value.toString() : value; }
+    const DEBUG_TO_CONSOLE = true;
     function log(message, data) {
       const line = document.createElement('div');
       line.className = 'log-line';
       line.textContent = `[${new Date().toLocaleTimeString()}] ${message}${data ? '\n' + JSON.stringify(data, jsonBigInt, 2) : ''}`;
       $('log').prepend(line);
+      if (DEBUG_TO_CONSOLE) {
+        const payload = data === undefined ? '' : data;
+        const level = /fail|error|rejected|unhandled|could not/i.test(message) ? 'error' : /warn|missing|none/i.test(message) ? 'warn' : 'info';
+        console[level](`[Miami Degens FT] ${message}`, payload);
+      }
     }
+    function serialiseErrorForLog(err) {
+      if (!err) return { message: 'Unknown error' };
+      if (err instanceof Error) return { name: err.name, message: err.message, stack: err.stack };
+      if (typeof err === 'object') {
+        try { return JSON.parse(JSON.stringify(err, jsonBigInt)); } catch { return { message: String(err) }; }
+      }
+      return { message: String(err) };
+    }
+    window.addEventListener('error', (event) => {
+      log('Browser error', { message: event.message, source: event.filename, line: event.lineno, column: event.colno, error: serialiseErrorForLog(event.error) });
+    });
+    window.addEventListener('unhandledrejection', (event) => {
+      log('Unhandled promise rejection', { reason: serialiseErrorForLog(event.reason) });
+    });
+
     function escapeHtml(value) {
       return String(value ?? '')
         .replaceAll('&', '&amp;')
@@ -1381,15 +1402,37 @@
 
     async function readContract(contractPrincipal, functionName, functionArgs = []) {
       const { contractAddress, contractName } = splitPrincipal(contractPrincipal);
-      const result = await fetchCallReadOnlyFunction({
-        contractAddress,
-        contractName,
-        functionName,
-        functionArgs,
-        senderAddress: state.wallet || FALLBACK_SENDER,
-        network: networkObj(), // Forward network configuration complete with API key logic
+      const started = performance.now();
+      const argsForLog = formatFunctionArgs(functionArgs);
+      log(`READ start: ${contractPrincipal}::${functionName}`, {
+        args: argsForLog,
+        sender: state.wallet || FALLBACK_SENDER,
+        network: networkName(),
+        apiBase: cleanApiBase(),
       });
-      return plainCV(result);
+      try {
+        const result = await fetchCallReadOnlyFunction({
+          contractAddress,
+          contractName,
+          functionName,
+          functionArgs,
+          senderAddress: state.wallet || FALLBACK_SENDER,
+          network: networkObj(), // Forward network configuration complete with API key logic
+        });
+        const plain = plainCV(result);
+        log(`READ ok: ${contractPrincipal}::${functionName}`, {
+          ms: Math.round(performance.now() - started),
+          result: plain,
+        });
+        return plain;
+      } catch (err) {
+        log(`READ failed: ${contractPrincipal}::${functionName}`, {
+          ms: Math.round(performance.now() - started),
+          args: argsForLog,
+          error: serialiseErrorForLog(err),
+        });
+        throw err;
+      }
     }
     async function callHelper(functionName, functionArgs = [], postConditions = []) {
       const { contractAddress, contractName } = helperParts();
@@ -1527,6 +1570,7 @@
 
     async function fetchFirstOk(candidates, mode = 'json', options = {}) {
       let lastError = null;
+      log(`Fetch candidates: ${mode}`, { candidates });
       const retries = Math.max(0, Number(options.retries ?? $('manifestRetries')?.value ?? 0));
       const retryDelayMs = Math.max(0, Number(options.retryDelayMs ?? $('manifestDelayMs')?.value ?? 0));
       const timeoutMs = Math.max(2000, Number(options.timeoutMs ?? 16000));
@@ -1551,13 +1595,19 @@
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             if (mode === 'blob') {
               const blob = await response.blob();
+              log(`Fetch ok: ${mode}`, { url, status: response.status, contentType: response.headers.get('content-type') || blob.type || '', size: blob.size });
               return { url, blob, contentType: response.headers.get('content-type') || blob.type || '' };
             }
             const text = await response.text();
-            try { return { url, json: JSON.parse(text), text, contentType: response.headers.get('content-type') || '' }; }
+            try {
+              const parsedJson = JSON.parse(text);
+              log(`Fetch ok: ${mode}`, { url, status: response.status, contentType: response.headers.get('content-type') || '', bytes: text.length });
+              return { url, json: parsedJson, text, contentType: response.headers.get('content-type') || '' };
+            }
             catch { throw new Error('Response was not valid JSON'); }
           } catch (err) {
             lastError = err;
+            log(`Fetch failed: ${mode}`, { url, attempt: attempt + 1, error: serialiseErrorForLog(err) });
           }
         }
         if (attempt < retries && retryDelayMs) await sleep(retryDelayMs * (attempt + 1));
@@ -2101,7 +2151,8 @@
         return { metadataUri: metadataResult.url, metadata: metadataResult.json, imageField: image.field, imageValue: image.value, imageUrl };
       } catch (err) {
         renderRawImageStatus(`${badge('Could not read URI metadata', 'bad')}<br>${escapeHtml(err.message)}<details class="metadata-box"><summary>Tried gateways</summary>${metadataCandidates.map((u) => `<span>${escapeHtml(u)}</span>`).join('')}</details>`);
-        if (showLog) log('Could not read token metadata URI', { tokenId: String(tokenId), tokenUri: uri, tried: metadataCandidates, error: err.message });
+        updateJourneyStatus();
+        if (showLog) log('Could not read token metadata URI', { tokenId: String(tokenId), tokenUri: uri, tried: metadataCandidates, error: serialiseErrorForLog(err) });
         return null;
       }
     }
@@ -2156,6 +2207,8 @@
         } else if (state.binding) {
           const xId = state.binding['xtrata-id'];
           html = `${badge('Already forevered', 'ok')} This Miami Degen already has its twin (Xtrata #${escapeHtml(xId)}). Use Swap to choose which side stays liquid.`;
+        } else if (state.sourceTokenUri && !state.sourceImageUrl) {
+          html = `${badge('Image not resolved yet', 'bad')} The source token URI was read, but the metadata image has not loaded. Open Technical details or Activity to see which URI/gateway failed.`;
         } else if (!state.canonicalHash) {
           html = `${badge('Not in the seed list', 'warn')} This Miami Degen isn’t in the canonical seed list yet, so its twin can’t be inscribed.`;
         } else if (matched) {
@@ -2213,6 +2266,7 @@
 
     async function checkToken() {
       const tokenId = getTokenId();
+      log('Check token started', { tokenId: tokenId.toString(), helper: $('helperContract').value.trim(), source: $('sourceContract').value.trim(), master: $('masterContract').value.trim(), network: networkName(), apiBase: cleanApiBase() });
       const helper = $('helperContract').value.trim();
       const source = $('sourceContract').value.trim();
       const tokenArg = asUint(tokenId);
@@ -2273,7 +2327,7 @@
       } else if (ownerRaw?.err) setStatus('sourceOwnerStatus', `${badge('Owner read failed', 'bad')}<br>${escapeHtml(ownerRaw.err)}${chainProof(source, 'get-owner', [tokenArg])}`);
       else setStatus('sourceOwnerStatus', `${badge('No owner returned by chain', 'bad')}<br>Source contract returned none.${chainProof(source, 'get-owner', [tokenArg])}`);
 
-      await maybeFetchTokenUri(tokenId);
+      await maybeFetchTokenUri(tokenId, true);
       // Journey-led: automatically fetch + hash the resolved cat image so the
       // user never has to drop a file or click "Use Raw Image". Only worth doing
       // when the cat is seedable and not already inscribed.
@@ -2441,8 +2495,9 @@
 
     function bind(id, event, fn) {
       $(id).addEventListener(event, async (...args) => {
+        log(`UI event: ${id}.${event}`);
         try { await fn(...args); }
-        catch (err) { log('Error', { message: err.message }); }
+        catch (err) { log(`UI handler failed: ${id}.${event}`, { error: serialiseErrorForLog(err) }); }
       });
     }
 
@@ -2517,7 +2572,10 @@
     $('lookupToken').textContent = '1';
     resetChainOnlyDisplays();
     setTimeout(() => {
-      checkToken();
+      checkToken().catch((err) => {
+        log('Auto-load token check failed', { error: serialiseErrorForLog(err) });
+        $('journeyStatus').innerHTML = `${badge('Auto-load failed', 'bad')} ${escapeHtml(err.message || String(err))}. Open Activity for the exact contract/function call that failed.`;
+      });
     }, 300);
 
   </script>
