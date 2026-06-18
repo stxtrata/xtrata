@@ -4183,6 +4183,10 @@
       injectInteractivePreviewHtml
     } from '/src/lib/viewer/html-preview.ts';
     import {
+      buildRuntimeModuleBaseHref,
+      injectHtmlBaseHref
+    } from '/src/lib/viewer/module-paths.ts';
+    import {
       hasRuntimeContentUrls,
       inlineRuntimeContentUrls
     } from '/src/lib/viewer/runtime-inline.ts';
@@ -9308,8 +9312,18 @@
       });
 
     const prepareRuntimeHtmlForToken = async (token, html, contextLabel = 'preview') => {
-      if (!html || !hasRuntimeContentUrls(html)) {
+      if (!html) {
         return html;
+      }
+      const moduleBaseHref = buildRuntimeModuleBaseHref({
+        network: state.network,
+        contractId: getTokenCacheContractId(token),
+        tokenUriPath: token.tokenUri,
+        entryTokenId: token.id
+      });
+      const htmlWithBase = injectHtmlBaseHref(html, moduleBaseHref);
+      if (!hasRuntimeContentUrls(htmlWithBase)) {
+        return htmlWithBase;
       }
       const contentClient = getTokenClient(token);
       try {
@@ -9319,7 +9333,7 @@
           context: contextLabel
         });
         return await inlineRuntimeContentUrls({
-          html,
+          html: htmlWithBase,
           client: contentClient,
           fallbackClients: getContentFallbackClients(contentClient)
         });
@@ -9337,7 +9351,7 @@
           'warn'
         );
         appendLog(`Runtime preview fallback for ${formatTokenId(token.id)}: ${message}`);
-        return html;
+        return htmlWithBase;
       }
     };
 

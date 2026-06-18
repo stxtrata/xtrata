@@ -39,6 +39,10 @@ import {
 } from '../lib/viewer/runtime-inline';
 import { rewriteHiroApiBasesForEmbeddedHtml } from '../lib/viewer/hiro-api-rewrite';
 import {
+  buildRuntimeModuleBaseHref,
+  injectHtmlBaseHref
+} from '../lib/viewer/module-paths';
+import {
   getSquareFramedImageStyle,
   shouldUsePixelatedImageRendering
 } from '../lib/viewer/image-rendering';
@@ -1146,10 +1150,25 @@ export default function TokenContentPreview(props: TokenContentPreviewProps) {
     if (!contentQuery.data || !isHtmlDocument) {
       return null;
     }
-    return rewriteHiroApiBasesForEmbeddedHtml(
+    const rewritten = rewriteHiroApiBasesForEmbeddedHtml(
       new TextDecoder().decode(contentQuery.data)
     ).html;
-  }, [contentQuery.data, isHtmlDocument]);
+    const moduleBaseHref = buildRuntimeModuleBaseHref({
+      network: props.client.network,
+      contractId: props.token.sourceContractId ?? props.contractId,
+      tokenUriPath: props.token.tokenUri,
+      entryTokenId: props.token.id
+    });
+    return injectHtmlBaseHref(rewritten, moduleBaseHref);
+  }, [
+    contentQuery.data,
+    isHtmlDocument,
+    props.client.network,
+    props.token.sourceContractId,
+    props.contractId,
+    props.token.tokenUri,
+    props.token.id
+  ]);
   const htmlNeedsInlining = useMemo(
     () => (htmlPreview ? hasRuntimeContentUrls(htmlPreview) : false),
     [htmlPreview]
@@ -1544,7 +1563,13 @@ export default function TokenContentPreview(props: TokenContentPreviewProps) {
       tokenId: props.token.id,
       network: props.client.network,
       fallbackContractId,
-      sourceUrl: fallbackSource
+      sourceUrl: fallbackSource,
+      moduleBaseHref: buildRuntimeModuleBaseHref({
+        network: props.client.network,
+        contractId: props.token.sourceContractId ?? props.contractId,
+        tokenUriPath: props.token.tokenUri,
+        entryTokenId: props.token.id
+      })
     });
   }, [
     resolvedMimeType,
@@ -1552,6 +1577,8 @@ export default function TokenContentPreview(props: TokenContentPreviewProps) {
     props.fallbackClient,
     props.contractId,
     props.token.id,
+    props.token.sourceContractId,
+    props.token.tokenUri,
     props.client.network,
     contentUrl,
     svgPreview,

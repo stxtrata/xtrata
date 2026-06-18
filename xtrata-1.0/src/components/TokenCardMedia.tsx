@@ -43,6 +43,10 @@ import {
 import { injectGridThumbnailHtml } from '../lib/viewer/html-preview';
 import { rewriteHiroApiBasesForEmbeddedHtml } from '../lib/viewer/hiro-api-rewrite';
 import {
+  buildRuntimeModuleBaseHref,
+  injectHtmlBaseHref
+} from '../lib/viewer/module-paths';
+import {
   hasRuntimeContentUrls,
   inlineRuntimeContentUrls,
   RUNTIME_INLINE_HTML_VERSION
@@ -440,10 +444,25 @@ export default function TokenCardMedia(props: TokenCardMediaProps) {
     if (!contentQuery.data || !isHtmlDocument) {
       return null;
     }
-    return rewriteHiroApiBasesForEmbeddedHtml(
+    const rewritten = rewriteHiroApiBasesForEmbeddedHtml(
       new TextDecoder().decode(contentQuery.data)
     ).html;
-  }, [contentQuery.data, isHtmlDocument]);
+    const moduleBaseHref = buildRuntimeModuleBaseHref({
+      network: props.client.network,
+      contractId: props.token.sourceContractId ?? props.contractId,
+      tokenUriPath: props.token.tokenUri,
+      entryTokenId: props.token.id
+    });
+    return injectHtmlBaseHref(rewritten, moduleBaseHref);
+  }, [
+    contentQuery.data,
+    isHtmlDocument,
+    props.client.network,
+    props.token.sourceContractId,
+    props.contractId,
+    props.token.tokenUri,
+    props.token.id
+  ]);
   const htmlNeedsInlining = useMemo(
     () => (htmlPreview ? hasRuntimeContentUrls(htmlPreview) : false),
     [htmlPreview]
