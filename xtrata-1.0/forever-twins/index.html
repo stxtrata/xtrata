@@ -386,7 +386,7 @@
   <section id="collections">
     <span class="section-tag">Live collections</span>
     <h2 class="sec">Collections going forever</h2>
-    <p class="sec-lede">The growing list of collections with permanent on-chain counterparts on Xtrata. Bitcoin Pepes and LEO Cats are live — more on the way.</p>
+    <p class="sec-lede">The growing list of collections with permanent on-chain counterparts on Xtrata. Bitcoin Pepes, LEO Cats, and Miami Degens are live — more on the way.</p>
     <div class="collections">
 
       <!-- ACTIVE: Bitcoin Pepes -->
@@ -427,6 +427,26 @@
           <div class="col-metric"><div class="v" id="l-status">—</div><div class="k">Canonical record</div></div>
         </div>
         <div class="col-foot"><span class="btn sm">View LEO Cats →</span></div>
+      </a>
+
+      <!-- ACTIVE: Miami Degens -->
+      <a class="col-card active" href="./miami-degens/index.html" style="color:inherit">
+        <div class="col-top">
+          <div class="col-thumb">
+            <img src="./assets/miami-degens-forever-twin-logo.jpg" alt="Miami Degens Forever Twins" />
+          </div>
+          <div class="col-head">
+            <span class="col-badge live">● Live</span>
+            <h3>Miami Degens</h3>
+            <div class="chain">Stacks · miami-degens → miami-degens-fakfun-xtrata</div>
+          </div>
+        </div>
+        <div class="col-body">Miami Degens holders can create a permanent Xtrata twin, then swap which side stays liquid: the original NFT or the on-chain inscription.</div>
+        <div class="col-metrics">
+          <div class="col-metric"><div class="v live" id="m-inscribed">—</div><div class="k">Twins inscribed</div></div>
+          <div class="col-metric"><div class="v" id="m-status">—</div><div class="k">Canonical record</div></div>
+        </div>
+        <div class="col-foot"><span class="btn sm">View Miami Degens →</span></div>
       </a>
 
       <!-- PLACEHOLDER: next project -->
@@ -504,6 +524,13 @@ const COLLECTIONS = [
     name: "leo-fakfun-xtrata",
     countEl: "l-inscribed",
     statusEl: "l-status"
+  },
+  {
+    // REGISTRY (mapping layer) for Miami Degens — used here only for its twin count.
+    addr: "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22",
+    name: "miami-degens-fakfun-xtrata",
+    countEl: "m-inscribed",
+    statusEl: "m-status"
   }
 ];
 const API = "https://api.hiro.so";
