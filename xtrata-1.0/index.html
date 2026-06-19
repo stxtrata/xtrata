@@ -2171,6 +2171,82 @@
       display: none !important;
     }
 
+    .current-campaign {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 16px;
+      margin: 18px 0 0;
+      border: 1px solid var(--line-strong);
+      border-radius: calc(var(--radius) + 6px);
+      background:
+        linear-gradient(135deg, color-mix(in srgb, var(--panel) 92%, transparent), color-mix(in srgb, var(--thumb) 76%, transparent)),
+        var(--panel);
+      color: var(--ink);
+      box-shadow: var(--shadow);
+      padding: 14px 16px;
+      text-decoration: none;
+    }
+
+    .current-campaign:hover {
+      border-color: var(--green);
+      text-decoration: none;
+    }
+
+    .current-campaign:focus-visible {
+      outline: 2px solid var(--green);
+      outline-offset: 3px;
+    }
+
+    .current-campaign__logo {
+      width: 64px;
+      height: 64px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--control);
+      object-fit: contain;
+      padding: 6px;
+    }
+
+    .current-campaign__body {
+      min-width: 0;
+    }
+
+    .current-campaign__kicker {
+      display: block;
+      color: var(--green);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .current-campaign__title {
+      display: block;
+      margin-top: 3px;
+      overflow: hidden;
+      color: var(--ink);
+      font-size: clamp(18px, 2.4vw, 26px);
+      font-weight: 900;
+      line-height: 1.05;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .current-campaign__description {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .current-campaign__cta {
+      justify-self: end;
+      white-space: nowrap;
+    }
+
 
 
     /* Registry Ledger refactor: simple landing state, platform state once records exist */
@@ -3036,6 +3112,15 @@
         grid-template-columns: 1fr;
       }
 
+      .current-campaign {
+        grid-template-columns: auto minmax(0, 1fr);
+      }
+
+      .current-campaign__cta {
+        grid-column: 2;
+        justify-self: start;
+      }
+
       .connected-readout {
         justify-self: stretch;
         text-align: left;
@@ -3059,6 +3144,29 @@
 
       .topbar {
         min-height: 92px;
+      }
+
+      .current-campaign {
+        grid-template-columns: 52px minmax(0, 1fr);
+        gap: 12px;
+        padding: 12px;
+      }
+
+      .current-campaign__logo {
+        width: 52px;
+        height: 52px;
+      }
+
+      .current-campaign__title {
+        white-space: normal;
+      }
+
+      .current-campaign__description {
+        font-size: 12px;
+      }
+
+      .current-campaign__cta {
+        width: 100%;
       }
 
       .brand {
@@ -3569,6 +3677,17 @@
         <button class="btn" id="viewInscriptionsButton" type="button" hidden>View inscriptions</button>
       </div>
     </header>
+
+    <!-- Current campaign: edit this block to feature the next public campaign. -->
+    <a class="current-campaign" href="/forever-twins/" aria-label="Open the Forever Twins campaign page">
+      <img class="current-campaign__logo" src="/forever-twins/assets/forever-twins-logo.webp" alt="" />
+      <span class="current-campaign__body">
+        <span class="current-campaign__kicker">On-Chain Legacy Mode</span>
+        <span class="current-campaign__title">Forever Twins</span>
+        <span class="current-campaign__description">Permanent on-chain counterparts for existing NFT collections, starting with Bitcoin Pepes.</span>
+      </span>
+      <span class="btn secondary current-campaign__cta" aria-hidden="true">Activate Forever Twin</span>
+    </a>
 
     <section class="registry-intro" id="registryIntro" aria-labelledby="registryIntroTitle">
       <div class="registry-copy">
