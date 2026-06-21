@@ -1,22 +1,12 @@
-I’d keep our version as the base. The main useful things to carry forward from the 5.2 pass are: keep the trait/reference implementation as a separate artifact, explicitly require compile-tested Clarity files before Review, tighten duplicate-key behaviour, and make the non-XIP-009 fallback binding deterministic rather than leaving it vague.
-
-Here’s the next cleaned-up draft as **v0.3.0**.
-
 # XIP-010: Dynamic State Resolver Profile
 
-```text
-XIP:        010
-Title:      Dynamic State Resolver Profile
-Status:     Draft
-Type:       Standards Track
-Created:    2026-06-18
-Requires:   XIP-000, XIP-001, XIP-003, XIP-006
-Optional:   XIP-009
-Document Version: 0.3.0
-Supersedes: (none)
-Superseded By: (none)
-Author:     [author redacted]
-```
+- XIP: 010
+- Title: Dynamic State Resolver Profile
+- Status: Draft
+- Category: Standards Track
+- Requires: XIP-000, XIP-001, XIP-003, XIP-006
+- Optional: XIP-009
+- Spec version: 0.3.0
 
 ## 1. Abstract
 

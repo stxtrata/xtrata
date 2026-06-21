@@ -25,6 +25,7 @@ The current XIP corpus is:
 | [006](XIP-006-Indexer-Resolver-Conformance.md) | Indexer & Resolver Conformance | Standards Track | Draft | 001–005 |
 | [007](XIP-007-Marketplace-Standard.md) | Marketplace | Standards Track | Draft | 001, 002, 003, 005, 006 |
 | [008](XIP-008-Software-Package-Standard.md) | Software Package | Standards Track | Draft | 001, 002, 004, 006 |
+| [009](XIP-009-Manifest-Authority-Registry.md) | Manifest Authority Registry | Standards Track | Draft | 000, 001 |
 
 Dependencies are declared explicitly in each XIP's `Requires` header. The table above mirrors those headers.
 
@@ -41,6 +42,7 @@ XIP numbers are stable identifiers, not the dependency graph itself. The real de
 - **XIP-006** defines resolver and indexer conformance, trust tiers and deterministic interpretation rules, so independent systems reach the same answer.
 - **XIP-007** defines marketplace interoperability: verified collection identity, marketplace traits, deployed economics and safe listing behaviour.
 - **XIP-008** defines software package manifests: entry points, verified file closure, pinned dependencies and safe no-egress execution.
+- **XIP-009** defines the on-chain Manifest Authority Registry (XMA-1): which manifest is the recognised current head of a scope, who governs it, and scope succession and permanent sealing.
 
 Together, these standards turn Xtrata from a system that stores permanent bytes into a shared ecosystem for permanent, verifiable, composable data.
 
@@ -118,8 +120,8 @@ Recommended order:
 
 1. **XIP-001** and **XIP-002**  
    Manifest integrity and canonical identity.
-2. **XIP-003**, **XIP-004**, **XIP-005** and **XIP-006**  
-   Organisational vocabulary, provenance views, namespaces and resolver conformance.
+2. **XIP-003**, **XIP-004**, **XIP-005**, **XIP-006** and **XIP-009**  
+   Organisational vocabulary, provenance views, namespaces, resolver conformance and manifest authority registry.
 3. **XIP-007** and **XIP-008**  
    Marketplace interoperability and software packages.
 

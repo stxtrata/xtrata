@@ -5,7 +5,7 @@
 - Status: Draft
 - Category: Standards Track
 - Requires: XIP-000, XIP-001
-- Spec version: 0.5.0
+- Spec version: 1.0.0
 
 > The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**,
 > **SHOULD**, **SHOULD NOT**, **RECOMMENDED**, **MAY**, and **OPTIONAL** in this
@@ -23,10 +23,9 @@ status, MIME type) remain authoritative in `xtrata-v3-2-3`; XIP-001 remains
 authoritative for manifest bytes, canonicalisation, and integrity roots.
 
 This document supersedes the informal "manifest-authority-v1-spec" draft and
-incorporates the remediations from the first, second, and third external
-(codex) security reviews. Spec version 0.5.0 adds permanent scope **sealing**
-(§4.4) and an explicit statement of the lifecycle-operation authority model
-(§7).
+incorporates the remediations from three external security reviews. It specifies
+permanent scope **sealing** (§4.4) and an explicit lifecycle-operation authority
+model (§7).
 
 ## Motivation
 
