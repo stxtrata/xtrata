@@ -26,6 +26,8 @@ The current XIP corpus is:
 | [007](XIP-007-Marketplace-Standard.md) | Marketplace | Standards Track | Draft | 001, 002, 003, 005, 006 |
 | [008](XIP-008-Software-Package-Standard.md) | Software Package | Standards Track | Draft | 001, 002, 004, 006 |
 | [009](XIP-009-Manifest-Authority-Registry.md) | Manifest Authority Registry | Standards Track | Draft | 000, 001 |
+| [010](XIP-010-Dynamic-State-Resolver-Profile.md) | Dynamic State Resolver Profile | Standards Track | Draft | 000, 001, 003, 006 |
+| [011](XIP-011-Agent-Inscription-Standard.md) | Agent Inscription Standard | Standards Track | Draft | 000, 001, 002, 004 |
 
 Dependencies are declared explicitly in each XIP's `Requires` header. The table above mirrors those headers.
 
@@ -43,6 +45,8 @@ XIP numbers are stable identifiers, not the dependency graph itself. The real de
 - **XIP-007** defines marketplace interoperability: verified collection identity, marketplace traits, deployed economics and safe listing behaviour.
 - **XIP-008** defines software package manifests: entry points, verified file closure, pinned dependencies and safe no-egress execution.
 - **XIP-009** defines the on-chain Manifest Authority Registry (XMA-1): which manifest is the recognised current head of a scope, who governs it, and scope succession and permanent sealing.
+- **XIP-010** defines the Dynamic State Resolver profile: an optional `state` manifest field binding a manifest to a contract that holds live, mutating token attributes, with bidirectional endorsement.
+- **XIP-011** defines the Agent Inscription Standard: how an autonomous agent records identity, directives, and model-stamped memory as inscriptions, with provable-signer / advisory-model trust and fork-by-dependency lineage.
 
 Together, these standards turn Xtrata from a system that stores permanent bytes into a shared ecosystem for permanent, verifiable, composable data.
 
@@ -124,6 +128,8 @@ Recommended order:
    Organisational vocabulary, provenance views, namespaces, resolver conformance and manifest authority registry.
 3. **XIP-007** and **XIP-008**  
    Marketplace interoperability and software packages.
+4. **XIP-010** and **XIP-011**  
+   Dynamic on-chain state and autonomous agent inscriptions.
 
 A XIP SHOULD NOT advance beyond the status of a XIP it requires.
 
