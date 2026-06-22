@@ -5,8 +5,8 @@
 - Status: Draft
 - Category: Standards Track
 - Requires: XIP-000
-- Required-By: XIP-002, XIP-003, XIP-004, XIP-005, XIP-006, XIP-007, XIP-008
-- Spec version: 1.0.0
+- Required-By: XIP-002, XIP-003, XIP-004, XIP-005, XIP-006, XIP-007, XIP-008, XIP-009, XIP-010, XIP-011
+- Spec version: 1.1.0
 
 > The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**,
 > **SHOULD**, **SHOULD NOT**, **RECOMMENDED**, **MAY**, and **OPTIONAL** in this
@@ -70,6 +70,7 @@ field they introduce in their own XIP.
 | `provenance-graph` | XIP-004 | view |
 | `software-package` | XIP-008 | profile |
 | `namespace-root` | XIP-005 | profile |
+| `agent` | XIP-011 | profile |
 
 `type` values **MUST NOT** be invented ad hoc; a new type requires a XIP that
 profiles this envelope.
