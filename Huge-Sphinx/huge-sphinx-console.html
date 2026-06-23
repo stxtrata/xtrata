@@ -34,6 +34,7 @@
   .tab.active{color:var(--text);background:var(--bg);border-color:var(--line2)}
   .tab .count{font-size:11px;color:var(--dim);margin-left:5px;background:var(--chip);padding:1px 6px;border-radius:999px}
   .tab.active .count{color:var(--accent)}
+  .tab .count.alert{background:var(--accent);color:#1a1300;font-weight:700;box-shadow:0 0 0 2px rgba(247,147,26,.25)}
   main{padding:18px 20px 80px;max-width:1080px;margin:0 auto}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
   .muted{color:var(--dim)} .empty{padding:44px;text-align:center;color:var(--dim)}
@@ -116,7 +117,7 @@ const API = (location.protocol==='http:'||location.protocol==='https:') ? '/api'
 const LS = { msgs:'hs_archive_msgs', queue:'hs_queue', compose:'hs_compose' };
 
 let state = {
-  tab:'queue', inbox:null, outbox:null,
+  tab:'queue', inbox:null, outbox:null, replies:[],
   agents:[], agentsOffset:0, agentsTotal:null, search:'',
   allAgents:null, scanning:false, scanProgress:0, openSeg:{},
   qfilter:'all', compose:loadLS(LS.compose)||{to:'',body:''}, live:null
@@ -136,6 +137,9 @@ const esc = s => (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'
 const shortAddr = a => a ? a.slice(0,6)+'…'+a.slice(-4) : '';
 const fmt = t => { try{ return new Date(t).toLocaleString(); }catch{ return t||''; } };
 const initials = n => (n||'?').split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
+const INBOX_MAX = 500;
+const isAddr = a => { a=(a||'').trim(); return /^S[PT][0-9A-HJ-NP-Z]{37,40}$/i.test(a) || /^(bc1|tb1)[0-9a-z]{20,80}$/i.test(a); };
+const counter = (key,val)=>`<div class="muted" data-count="${esc(key)}" style="font-size:11px;text-align:right;margin-top:3px">${(val||'').length}/${INBOX_MAX}</div>`;
 function loadLS(k){ try{ return JSON.parse(localStorage.getItem(k)||'null'); }catch{ return null; } }
 function saveLS(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch{} }
 
@@ -148,8 +152,25 @@ function showBanner(h){ const b=$('#banner'); b.style.display='block'; b.innerHT
 function clearBanner(){ $('#banner').style.display='none'; }
 
 /* ---------------- data loads ---------------- */
-async function loadInbox(){ const d=await api('/inbox/'+HS.stx+'?view=all&limit=100'); state.inbox=d.inbox||d; archiveMessages(state.inbox.messages||[]); }
-async function loadOutbox(){ try{ const d=await api('/outbox/'+HS.stx+'?limit=100'); state.outbox=d.outbox||d; }catch{ state.outbox={replies:[]}; } }
+// The AIBTC inbox/outbox are keyed by the BTC (bc1…) address, NOT the STX address.
+// "received" = messages other agents sent us; "sent" = our outreach (the real outbox).
+async function loadInbox(){ const d=await api('/inbox/'+HS.btc+'?view=received&limit=100'); state.inbox=d.inbox||d; archiveMessages(state.inbox.messages||[]); }
+async function loadOutbox(){ try{ const d=await api('/inbox/'+HS.btc+'?view=sent&limit=100'); state.outbox=d.inbox||d; archiveMessages(state.outbox.messages||[]); }catch{ state.outbox={messages:[]}; } }
+// Replies to OUR outreach are stored in each replier's PUBLIC outbox, keyed by our messageId.
+// Gather them so any message addressed to Huge Sphinx — free reply or paid — shows in the Inbox.
+async function loadReplies(){
+  const sent=(state.outbox&&state.outbox.messages)||[]; const byId={}; sent.forEach(m=>{ byId[m.messageId]=m; });
+  const peers=[...new Set(sent.filter(m=>m.repliedAt&&m.peerBtcAddress).map(m=>m.peerBtcAddress))];
+  const out=[];
+  for(const peer of peers){
+    try{ const d=await api('/outbox/'+peer); const reps=(d.outbox&&(d.outbox.replies||d.outbox.messages))||d.replies||[];
+      reps.forEach(r=>{ const orig=byId[r.messageId];
+        if(orig && r.toBtcAddress===HS.btc){ out.push({messageId:r.messageId,content:r.reply,peerDisplayName:orig.peerDisplayName,peerBtcAddress:peer,peerStxAddress:orig.toStxAddress,sentAt:r.repliedAt||orig.repliedAt,isReply:true,_origContent:orig.content}); }
+      });
+    }catch{}
+  }
+  out.sort((a,b)=>new Date(b.sentAt)-new Date(a.sentAt)); state.replies=out; archiveMessages(out);
+}
 async function loadAgents(reset){ if(reset){state.agents=[];state.agentsOffset=0;} const d=await api('/agents?limit=50&offset='+state.agentsOffset); state.agents=state.agents.concat(d.agents||[]); state.agentsTotal=d.pagination?.total??state.agents.length; state.agentsOffset+=(d.agents||[]).length; }
 function archiveMessages(list){ const s=loadLS(LS.msgs)||{}; for(const m of list){ const id=m.id||m.messageId; if(id) s[id]={...m,_a:Date.now()}; } saveLS(LS.msgs,s); }
 async function loadBalances(){
@@ -170,7 +191,7 @@ async function loadBalances(){
 async function refreshAll(){
   clearBanner();
   loadBalances();
-  try{ await Promise.all([loadInbox(),loadOutbox()]); $('#updated').textContent='updated '+new Date().toLocaleTimeString(); }
+  try{ await Promise.all([loadInbox(),loadOutbox()]); await loadReplies(); $('#updated').textContent='updated '+new Date().toLocaleTimeString(); }
   catch(e){ showBanner('⚠️ Could not reach the AIBTC API (<b>'+esc(e.message)+'</b>). The API has no CORS headers — run <code>node console-server.mjs</code> in this folder and open <a href="http://localhost:8777/huge-sphinx-console.html">localhost:8777</a>.'); }
   renderView();
 }
@@ -187,8 +208,11 @@ function queueItems(){
 }
 function addToQueue(addr,name){
   const ov=qOverrides();
-  if(!ov[addr]){ setQ(addr,{added:true,agent:name||shortAddr(addr),to:addr,
+  // Don't clobber a curated draft (from OUTREACH) or an existing edit with the generic template.
+  const inOutreach=(window.OUTREACH||[]).some(m=>m.to===addr);
+  if(!inOutreach && !ov[addr]){ setQ(addr,{added:true,agent:name||shortAddr(addr),to:addr,
     body:`Hi${name?' ('+name+')':''} — Huge Sphinx here. I run Xtrata: permanent, contract-native inscriptions on Stacks (SIP-009 NFTs with SHA-256 hash chains). [One line on why your work is worth sealing permanently on Bitcoin.] Want the inscription skill or a quick demo?`}); }
+  else if(name && ov[addr] && !ov[addr].agent){ setQ(addr,{agent:name}); }
   setTab('queue');
 }
 
@@ -218,7 +242,7 @@ async function sendAll(items){
     const it=items[i], o=out();
     if(o) o.innerHTML=`<p class="muted">Sending ${i+1}/${items.length} → <b>${esc(it.agent)}</b>… (${okN} sent, ${fail} failed). Don't close this tab.</p>`;
     try{
-      const d=await fetch('/local/send',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({to:it.id,content:it.body})}).then(r=>r.json());
+      const d=await fetch('/local/send',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(sendPayload(it.id,it.body))}).then(r=>r.json());
       if(d.ok){ setQ(it.id,{status:'sent'}); okN++; }
       else { fail++; if(/insufficient/i.test(d.error||'')){ const e=out(); if(e) e.innerHTML=`<p style="color:var(--bad)">Stopped — insufficient sBTC after ${okN} sent.</p>`; break; } }
     }catch(e){ fail++; }
@@ -233,11 +257,13 @@ async function sendAll(items){
 /* ---------------- command builders ---------------- */
 function sendCmd(to,body){
   return `# Send a NEW message from Huge Sphinx (costs 100 sats sBTC, x402).
-# In your agent client with the AIBTC MCP server:
+# In your agent client with the AIBTC MCP server, unlock the wallet first:
 wallet_unlock
-execute_x402_endpoint POST ${API.replace(/^\/api$/,'https://aibtc.com/api')}/inbox/${to}
-  body: ${JSON.stringify({message:body})}
-# Pays 100 sats from Huge Sphinx and signs automatically.`;
+send_inbox_message_direct
+  recipientStxAddress: ${JSON.stringify(to)}
+  content: ${JSON.stringify(body)}
+# This resolves the recipient's bc1… address, signs the 100-sat sBTC payment,
+# and settles it directly. Needs sBTC (message) + STX (gas) in the wallet.`;
 }
 function replyCmd(msgId,text){
   return `# FREE reply (0 sats) — run in ~/Documents/GitHub/xtrata/Huge-Sphinx
@@ -246,6 +272,9 @@ REPLY=${JSON.stringify(text)} \\
 WALLET_MNEMONIC="<Huge Sphinx 24 words — lowercase 'olympic'>" \\
 node scripts/hs-reply.mjs`;
 }
+// Pass any address we already know so the server can skip a lookup (it still resolves the BTC address).
+function sendPayload(addr,content){ const p={to:addr,content}; const a=(addr||'').trim();
+  if(/^S[PT]/i.test(a)) p.toStxAddress=a; else if(/^(bc1|tb1)/i.test(a)) p.toBtcAddress=a; return p; }
 
 /* ---------------- navigation ---------------- */
 const NAV = [
@@ -254,8 +283,8 @@ const NAV = [
   {grp:'History', tabs:[['archive','Crafty Puma Archive']]},
 ];
 function counts(k){
-  if(k==='inbox') return state.inbox?(state.inbox.totalCount??(state.inbox.messages||[]).length):'';
-  if(k==='outbox') return state.outbox?(state.outbox.totalCount??(state.outbox.replies||[]).length):'';
+  if(k==='inbox') return state.inbox?inboxAwaiting():'';
+  if(k==='outbox') return state.outbox?(state.outbox.totalCount??(state.outbox.messages||[]).length):'';
   if(k==='queue'){ const q=queueItems(); return q.filter(x=>x.status==='pending').length+'/'+q.length; }
   if(k==='segments') return state.allAgents?state.allAgents.length:'';
   if(k==='directory') return state.agentsTotal??'';
@@ -264,20 +293,22 @@ function counts(k){
 }
 function renderNav(){
   $('#nav').innerHTML = NAV.map((g,i)=>`${i?'<div class="navsep"></div>':''}<div class="navgroup">`+
-    g.tabs.map(([k,label])=>{ const c=counts(k); return `<div class="tab ${state.tab===k?'active':''}" data-action="tab" data-tab="${k}">${label}${c!==''?`<span class="count">${c}</span>`:''}</div>`; }).join('')+`</div>`).join('');
+    g.tabs.map(([k,label])=>{ const c=counts(k); const alert=(k==='inbox'&&state.inbox&&inboxAwaiting()>0)?' alert':''; return `<div class="tab ${state.tab===k?'active':''}" data-action="tab" data-tab="${k}">${label}${c!==''?`<span class="count${alert}">${c}</span>`:''}</div>`; }).join('')+`</div>`).join('');
 }
 function setTab(t){ state.tab=t; if(t==='directory'&&state.agents.length===0){ loadAgents(true).then(renderAll); return; } renderAll(); }
 
 /* ---------------- views ---------------- */
 function msgCard(m,dir){
   const out=dir==='out';
-  const who=m.agent||m.senderName||m.recipientName||shortAddr(m.from||m.sender||m.to||m.recipient);
-  const body=m.message||m.body||m.text||''; const id=m.id||m.messageId;
+  const who=m.agent||m.peerDisplayName||m.senderName||m.recipientName||shortAddr(m.from||m.fromAddress||m.sender||m.to||m.toStxAddress||m.toBtcAddress||m.recipient||m.peerBtcAddress);
+  const body=m.message||m.body||m.text||m.content||''; const id=m.id||m.messageId;
+  const sats=m.paymentSats||m.paymentSatoshis;
   const canReply=!out&&id;
   return `<div class="msg">
     <div class="meta"><span class="tag ${out?'out':'in'}">${out?'sent':'received'}</span>
       <span class="name">${esc(who)}</span><span>· ${esc(fmt(m.sentAt||m.createdAt||m.timestamp))}</span>
-      ${m.paymentSats?`<span>· ${m.paymentSats} sats</span>`:''}
+      ${sats?`<span>· ${sats} sats</span>`:''}
+      ${m.repliedAt?`<span class="tag in" title="Replied ${esc(fmt(m.repliedAt))}">✓ replied</span>`:''}
       ${m.paymentTxid?`<a href="https://explorer.hiro.so/txid/${esc(m.paymentTxid)}?chain=mainnet" target="_blank">tx</a>`:''}
       <button class="sm" data-action="tts" data-kind="text" data-text="${esc(body)}" data-label="🔊" title="Read aloud">🔊</button>
       ${canReply?`<button class="sm" style="margin-left:auto" data-action="reply-toggle" data-id="${esc(id)}">↩ Reply (free)</button>`:''}</div>
@@ -288,20 +319,63 @@ function msgCard(m,dir){
       <div data-cmd-out="reply-${esc(id)}"></div></div>`:''}
   </div>`;
 }
+// Has Huge Sphinx sent anything to this peer AFTER their reply? (= we've already answered)
+function hsAnswered(m){ const sent=(state.outbox&&state.outbox.messages)||[];
+  return sent.some(s=>s.peerBtcAddress===m.peerBtcAddress && new Date(s.sentAt)>new Date(m.sentAt)); }
+// Count of inbox items needing attention: unanswered replies (latest per peer) + new received messages.
+function inboxAwaiting(){
+  const latest={}; (state.replies||[]).forEach(r=>{ const k=r.peerBtcAddress; if(!latest[k]||new Date(r.sentAt)>new Date(latest[k].sentAt)) latest[k]=r; });
+  const awaiting=Object.values(latest).filter(r=>!hsAnswered(r)).length;
+  const rec=state.inbox?(state.inbox.receivedCount??(state.inbox.messages||[]).length):0;
+  return awaiting+rec;
+}
+// Full ordered conversation with a peer: our sent messages + their replies, oldest→newest.
+function threadFor(peerBtc){
+  const sent=((state.outbox&&state.outbox.messages)||[]).filter(s=>s.peerBtcAddress===peerBtc).map(s=>({dir:'out',content:s.content,at:s.sentAt}));
+  const reps=(state.replies||[]).filter(r=>r.peerBtcAddress===peerBtc).map(r=>({dir:'in',content:r.content,at:r.sentAt}));
+  return [...sent,...reps].sort((a,b)=>new Date(a.at)-new Date(b.at));
+}
 function viewInbox(){
-  const i=state.inbox, msgs=(i?.messages)||[], ec=i?.economics;
-  return `<h2>Inbox</h2><p class="sub">Messages received by Huge Sphinx. Replies are free.</p>
+  const i=state.inbox, recv=(i?.messages)||[];
+  const latest={}; (state.replies||[]).forEach(r=>{ const k=r.peerBtcAddress; if(!latest[k]||new Date(r.sentAt)>new Date(latest[k].sentAt)) latest[k]=r; });
+  const reps=Object.values(latest).sort((a,b)=>new Date(b.sentAt)-new Date(a.sentAt));
+  const awaiting=reps.filter(r=>!hsAnswered(r)).length;
+  const all=[...reps.map(r=>({...r,_t:'reply'})), ...recv.map(m=>({...m,_t:'recv'}))];
+  return `<h2>Inbox</h2><p class="sub">Everything addressed to Huge Sphinx — replies to your outreach (free) and new messages agents send you (paid). Reply free to anything new.</p>
   <div class="panel"><div class="toolbar">
-    <div class="stat"><b>${i?.receivedCount??0}</b><span>received</span></div>
-    <div class="stat"><b>${i?.sentCount??0}</b><span>sent</span></div>
-    <div class="stat"><b>${i?.unreadCount??0}</b><span>unread</span></div>
-    <div class="stat"><b>${ec?ec.satsNet:0}</b><span>sats net</span></div></div>
-    ${msgs.length?msgs.map(m=>msgCard(m,(m.direction==='outbound'||m.from===HS.stx)?'out':'in')).join(''):`<div class="empty">No messages yet — every conversation from here is captured and archived locally.</div>`}</div>`;
+    <div class="stat"><b>${awaiting}</b><span>awaiting you</span></div>
+    <div class="stat"><b>${reps.length}</b><span>conversations</span></div>
+    <div class="stat"><b>${i?.receivedCount??0}</b><span>new messages</span></div>
+    <div class="stat"><b>${state.outbox?.totalCount??0}</b><span>sent</span></div></div>
+    ${all.length?all.map(x=>x._t==='reply'?replyCard(x):msgCard(x,'in')).join(''):`<div class="empty">Nothing here yet. Your ${state.outbox?.totalCount||0} sent message(s) are in the Outbox — replies and new inbound messages will land here.</div>`}</div>`;
+}
+function replyCard(m){
+  const who=m.peerDisplayName||shortAddr(m.peerBtcAddress);
+  const to=m.peerStxAddress||m.peerBtcAddress;
+  const answered=hsAnswered(m);
+  const ai=state.live&&state.live.draftEnabled;
+  return `<div class="msg">
+    <div class="meta"><span class="tag in">↩ reply</span>
+      <span class="name">${esc(who)}</span><span>· ${esc(fmt(m.sentAt))}</span>
+      ${answered?'<span class="tag sent">✓ you replied</span>':''}
+      <button class="sm" data-action="tts" data-kind="text" data-text="${esc(m.content)}" data-label="🔊" title="Read aloud">🔊</button>
+      <span style="margin-left:auto"></span>
+      ${answered
+        ? `<button class="sm" data-action="thread-toggle" data-role="threadbtn" data-id="${esc(m.peerBtcAddress)}">View thread →</button>`
+        : `${ai?`<button class="sm primary" data-action="ai-draft" data-id="${esc(to)}" data-rid="${esc(m.messageId)}" data-name="${esc(who)}" title="Claude reads the thread and drafts a reply">✨ Draft with AI</button>`:''}<button class="sm" data-action="reply-continue" data-id="${esc(to)}" data-name="${esc(who)}">Continue · 100 sats →</button>`}</div>
+    <div data-action="thread-toggle" data-id="${esc(m.peerBtcAddress)}" style="cursor:pointer" title="Click to show / hide the full thread">
+      ${m._origContent?`<div class="muted" style="font-size:12px;border-left:2px solid var(--line2);padding-left:8px;margin:0 0 7px">Your message: ${esc(m._origContent.slice(0,150))}${m._origContent.length>150?'…':''}</div>`:''}
+      <div>${esc(m.content)}</div>
+    </div>
+    <div class="hidden" data-thread="${esc(m.peerBtcAddress)}" style="margin-top:10px"></div>
+    <div data-draft-out="${esc(m.messageId)}"></div>
+  </div>`;
 }
 function viewOutbox(){
-  const r=(state.outbox?.replies)||(state.outbox?.messages)||[];
-  return `<h2>Outbox</h2><p class="sub">Replies Huge Sphinx has sent.</p>
-  <div class="panel">${r.length?r.map(m=>msgCard(m,'out')).join(''):`<div class="empty">No replies sent yet.</div>`}</div>`;
+  const r=(state.outbox?.messages)||[];
+  const replied=r.filter(m=>m.repliedAt).length;
+  return `<h2>Outbox</h2><p class="sub">Every message Huge Sphinx has sent — outreach &amp; replies. ${r.length?`<b>${r.length}</b> sent · <b>${replied}</b> got a reply.`:''}</p>
+  <div class="panel">${r.length?r.map(m=>msgCard(m,'out')).join(''):`<div class="empty">No sent messages yet.</div>`}</div>`;
 }
 function tierTag(t){ return t==='+'?`<span class="tag">custom</span>`:`<span class="tag t${t}">tier ${t}</span>`; }
 function viewQueue(){
@@ -330,7 +404,8 @@ function viewQueue(){
       <span class="muted" style="font-size:12px">· ${esc(x.useCase||'')}</span>
       ${x.status==='sent'?'<span class="tag sent">✓ sent</span>':''}${x.status==='skip'?'<span class="tag skip">skipped</span>':''}
       <span style="margin-left:auto"></span><small class="mono">${esc(x.to)}</small></div>
-    <textarea data-edit="q-body" data-id="${esc(x.id)}">${esc(x.body)}</textarea>
+    <textarea data-edit="q-body" data-id="${esc(x.id)}" maxlength="${INBOX_MAX}">${esc(x.body)}</textarea>
+    ${counter('q-'+x.id, x.body)}
     <div class="rowbtns">
       ${livePaid()?`<button class="primary sm" data-action="q-send" data-id="${esc(x.id)}" data-name="${esc(x.agent)}">⚡ Send now · 100 sats</button>
         <button class="ghost sm" data-action="q-cmd" data-id="${esc(x.id)}">Command</button>`
@@ -347,15 +422,42 @@ function viewCompose(){
   const c=state.compose;
   return `<h2>Compose</h2><p class="sub">Free-form message to any agent. Pick a recipient from Directory/Segments (the “Message →” button) or paste an address. New sends cost 100 sats.</p>
   <div class="panel">
-    <label>Recipient STX address</label>
-    <input data-edit="compose-to" value="${esc(c.to)}" placeholder="SP…">
+    <label>Recipient address (SP… or bc1…)</label>
+    <input data-edit="compose-to" value="${esc(c.to)}" placeholder="SP… or bc1…">
+    <div class="muted" data-addrhint style="font-size:11px;margin-top:3px">${c.to?(isAddr(c.to)?'✓ looks like a valid address':'⚠️ doesn’t look like a Stacks/Bitcoin address — sending wastes 100 sats'):''}</div>
     <label>Message</label>
-    <textarea data-edit="compose-body" placeholder="Introduce Huge Sphinx, pitch a collaboration…">${esc(c.body)}</textarea>
+    <textarea data-edit="compose-body" maxlength="${INBOX_MAX}" placeholder="Introduce Huge Sphinx, pitch a collaboration…">${esc(c.body)}</textarea>
+    ${counter('compose', c.body)}
     <div class="rowbtns">${livePaid()?`<button class="primary" data-action="compose-send">⚡ Send now · 100 sats</button><button class="ghost" data-action="compose-cmd">Command</button>`:`<button class="primary" data-action="compose-cmd">Generate send command</button>`}
       <button class="ghost" data-action="compose-queue">Add to queue</button>
       <button class="ghost" data-action="tts" data-kind="compose" data-label="🔊 Read">🔊 Read</button></div>
     <div data-cmd-out="compose"></div>
+    ${c.ctx?`<div class="rowbtns" style="margin-top:8px">${(state.live&&state.live.draftEnabled)?`<button class="ghost" data-action="compose-explain">🧭 Explain this draft in plain English</button>`:`<span class="muted" style="font-size:12px">Tip: start the server with <code>ANTHROPIC_API_KEY</code> for a plain-English explanation of this draft.</span>`}</div>`:''}
+    ${composeExplainPanel()}
   </div>`;
+}
+function composeExplainPanel(){
+  const e=state.compose&&state.compose._explain; if(!e) return '';
+  if(e._loading) return `<div class="panel" style="margin-top:12px;background:var(--panel2)"><p class="muted">🧭 Explaining this draft in plain English…</p></div>`;
+  if(e._error) return `<div class="panel" style="margin-top:12px"><p style="color:var(--bad)">✗ ${esc(e._error)}</p></div>`;
+  const row=(icon,label,txt)=> txt?`<div style="margin:0 0 11px"><div style="font-weight:600;font-size:13px;color:var(--text)">${icon} ${esc(label)}</div><div style="font-size:13px;color:var(--dim);margin-top:3px;line-height:1.5">${esc(txt)}</div></div>`:'';
+  return `<div class="panel" style="margin-top:12px;background:linear-gradient(180deg,#15203a,#141823);border-color:var(--line2)">
+    <h4 style="margin:0 0 12px">In plain English <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">· read-only context</span></h4>
+    ${row('💬','What they said',e.their_message)}
+    ${row('🎯','What they want',e.their_intent)}
+    ${row('🧠','Our thinking',e.our_thinking)}
+    ${row('✍️','What we’re saying back',e.our_response)}
+  </div>`;
+}
+function composeExplain(){
+  const c=state.compose; if(!c||!c.ctx) return;
+  const ta=document.querySelector('[data-edit="compose-body"]'); const draft=ta?ta.value:c.body; c.body=draft;
+  saveLS(LS.compose,{to:c.to,body:c.body,ctx:c.ctx}); // persist draft+context, never the transient explanation
+  c._explain={_loading:true}; renderView();
+  const thread=c.ctx.peer?threadFor(c.ctx.peer):[];
+  fetch('/local/explain',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({agent:c.ctx.agent,theirReply:c.ctx.theirReply,myMessage:c.ctx.myMessage,thread,draft})})
+    .then(r=>r.json()).then(d=>{ state.compose._explain = (d.ok&&d.explanation)?d.explanation:{_error:d.error||'Could not explain this draft.'}; renderView(); })
+    .catch(e=>{ state.compose._explain={_error:e.message}; renderView(); });
 }
 function viewDirectory(){
   const q=state.search.toLowerCase();
@@ -445,7 +547,7 @@ function help(title,bodyHtml,open){
 }
 const HELP_GLOSSARY = `<li><b>sBTC / sats:</b> sBTC is Bitcoin on Stacks; a "sat" is the smallest unit (1 sBTC = 100,000,000 sats). Sending a brand-new message to an agent costs <b>100 sats</b>. Replying is free.</li>
   <li><b>⚡ Send now / Send reply:</b> if you started the local server with your Huge Sphinx seed (see below), these buttons sign and send directly — one click, no Terminal. The chip at the top right shows the status: <b>⚡ live send on</b> (paid + free), <b>↩ replies on</b> (free replies only), or <b>● read-only</b>.</li>
-  <li><b>Enable one-click sending:</b> stop the server and restart it as <code>WALLET_MNEMONIC="…lowercase olympic…" node console-server.mjs</code> for free replies, or <code>ALLOW_PAID_SEND=1 WALLET_MNEMONIC="…" node console-server.mjs</code> (after <code>npm install x402-stacks</code>) for paid sends too. The key stays in the local server on your machine — never in this page.</li>
+  <li><b>Enable one-click sending:</b> stop the server and restart it as <code>WALLET_MNEMONIC="…lowercase olympic…" node console-server.mjs</code> — paid sends (100 sats each) are <b>on by default</b> once the wallet loads. Add <code>ALLOW_PAID_SEND=0</code> to run read-only (free replies only). The key stays in the local server on your machine — never in this page.</li>
   <li><b>"Generate send command" / "Command":</b> the fallback when live send is off — writes out the exact command to run yourself in Terminal/your agent. Always available.</li>
   <li><b>x402:</b> the pay-per-request method AIBTC uses — your wallet attaches a tiny 100-sat sBTC payment to the message. The command handles it automatically.</li>`;
 function helpFor(tab){
@@ -463,10 +565,11 @@ function helpFor(tab){
        <li><span class="kbd">Generate send command</span> builds the send command (100 sats) for you to run.</li>
        <li><span class="kbd">Add to queue</span> drops it into the Outreach Queue to send later.</li>${HELP_GLOSSARY}</ul>`);
     case 'inbox': return help('How the Inbox works',
-      `<ul><li>Shows messages other agents have sent Huge Sphinx (currently empty — fills as conversations start).</li>
-       <li><span class="kbd">↩ Reply (free)</span> opens a reply box. Replies cost <b>0 sats</b> — only brand-new messages cost 100.</li>
-       <li><span class="kbd">Generate reply command</span> writes the command to run <code>scripts/hs-reply.mjs</code>, which signs and sends your reply for free.</li>
-       <li>Everything here is also archived to your browser so you keep a permanent local copy.</li></ul>`);
+      `<ul><li>Shows everything addressed to Huge Sphinx: <b>replies to your outreach</b> (free) and brand-new messages other agents send you (they pay 100 sats).</li>
+       <li><span class="kbd">Continue · 100 sats →</span> opens Compose pre-filled with a tailored follow-up to keep the conversation moving (a new message costs 100 sats).</li>
+       <li><span class="kbd">✨ Draft with AI</span> reads the thread for context and drafts a fresh reply for you — start the server with <code>ANTHROPIC_API_KEY</code> set to enable it.</li>
+       <li>Once you've replied, that button becomes <span class="kbd">View thread →</span> (the full back-and-forth) and flips back to <b>Continue</b> when a new reply lands.</li>
+       <li><b>awaiting you</b> counts conversations where the latest message is theirs.</li></ul>`);
     case 'outbox': return help('What the Outbox shows',
       `<ul><li>The replies Huge Sphinx has sent back to incoming messages. (New outbound pitches show in the Inbox stats once sent.)</li></ul>`);
     case 'segments': return help('How Segments / targeting works',
@@ -516,11 +619,41 @@ document.addEventListener('click',e=>{
     out.innerHTML=cmdBlock(sendCmd(to,body),'compose'); return;
   }
   if(a==='compose-queue'){ const to=$('[data-edit="compose-to"]').value.trim(); if(to){ setQ(to,{added:true,agent:shortAddr(to),to,body:$('[data-edit="compose-body"]').value}); setTab('queue'); } return; }
+  if(a==='compose-explain'){ composeExplain(); return; }
   if(a==='add-q'){ addToQueue(id, el.dataset.name); return; }
   if(a==='more-agents'){ loadAgents(false).then(renderAll); return; }
   if(a==='scan'){ scanAllAgents(); return; }
   if(a==='toggle-seg'){ state.openSeg[id]=!state.openSeg[id]; renderView(); return; }
   if(a==='reply-toggle'){ const el2=document.querySelector(`[data-reply="${id}"]`); if(el2) el2.classList.toggle('hidden'); return; }
+  if(a==='reply-continue'){
+    const id=el.dataset.id||'';
+    const rep=(state.replies||[]).find(r=>r.peerStxAddress===id||r.peerBtcAddress===id);
+    const who=el.dataset.name||(rep&&rep.peerDisplayName)||'there';
+    let body=(window.REPLY_DRAFTS&&window.REPLY_DRAFTS[id])||'';
+    if(!body){ body=`${who} — thanks for the reply. To keep momentum: I can inscribe a sample of your work via Xtrata as a permanent, independently verifiable record so you can see it end-to-end. Want the inscription skill, or shall I inscribe one item as a live demo? Happy to align on the best next step from your side.`; }
+    state.compose={to:id,body,ctx:rep?{agent:who,theirReply:rep.content,myMessage:rep._origContent,peer:rep.peerBtcAddress}:null}; saveLS(LS.compose,state.compose); setTab('compose'); return;
+  }
+  if(a==='thread-toggle'){
+    const peer=el.dataset.id, box=document.querySelector(`[data-thread="${peer}"]`); if(!box) return;
+    const show=box.classList.contains('hidden');
+    if(show){ box.innerHTML=threadFor(peer).map(t=>`<div class="msg" style="margin:0 0 8px;background:var(--bg)"><div class="meta"><span class="tag ${t.dir}">${t.dir==='out'?'you →':'← them'}</span><span>· ${esc(fmt(t.at))}</span></div><div>${esc(t.content)}</div></div>`).join('')||'<p class="muted">No earlier messages.</p>'; box.classList.remove('hidden'); }
+    else box.classList.add('hidden');
+    const btn=document.querySelector(`[data-role="threadbtn"][data-id="${peer}"]`); if(btn) btn.textContent=show?'Hide thread':'View thread →';
+    return;
+  }
+  if(a==='ai-draft'){
+    const to=el.dataset.id||'', rid=el.dataset.rid;
+    const rep=(state.replies||[]).find(r=>r.messageId===rid)||{};
+    const thread=rep.peerBtcAddress?threadFor(rep.peerBtcAddress):[];
+    const out=document.querySelector(`[data-draft-out="${rid}"]`);
+    if(out) out.innerHTML='<p class="muted">✨ Reading the thread and drafting a reply…</p>';
+    fetch('/local/draft',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({agent:el.dataset.name,recipient:to,theirReply:rep.content,myMessage:rep._origContent,thread})})
+      .then(r=>r.json()).then(d=>{
+        if(d.ok&&d.draft){ state.compose={to,body:d.draft,ctx:{agent:el.dataset.name,theirReply:rep.content,myMessage:rep._origContent,peer:rep.peerBtcAddress}}; saveLS(LS.compose,state.compose); setTab('compose'); composeExplain(); }
+        else if(out) out.innerHTML='<p style="color:var(--bad)">✗ '+esc(d.error||'Draft failed')+'</p>';
+      }).catch(e=>{ if(out) out.innerHTML='<p style="color:var(--bad)">✗ '+esc(e.message)+'</p>'; });
+    return;
+  }
   if(a==='reply-cmd'){
     const ta=document.querySelector(`textarea[data-edit="reply-text"][data-id="${id}"]`);
     const out=document.querySelector(`[data-cmd-out="reply-${id}"]`);
@@ -533,8 +666,8 @@ document.addEventListener('click',e=>{
     if(!confirm('Send this message to '+(el.dataset.name||id)+'?\n\nThis spends 100 sats sBTC from Huge Sphinx.')) return;
     setQ(id,{body:txt});
     const out=document.querySelector(`[data-cmd-out="q-${id}"]`); out.innerHTML='<p class="muted">Sending… (paying 100 sats)</p>';
-    fetch('/local/send',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({to:id,content:txt})}).then(r=>r.json()).then(d=>{
-      if(d.ok){ setQ(id,{status:'sent'}); out.innerHTML='<p style="color:var(--good)">✓ Sent'+(d.messageId?' · '+esc(d.messageId):'')+'</p>'; renderNav(); refreshAll(); }
+    fetch('/local/send',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(sendPayload(id,txt))}).then(r=>r.json()).then(d=>{
+      if(d.ok){ setQ(id,{status:'sent'}); out.innerHTML='<p style="color:var(--good)">'+(d.pending?'⏳ Staged — settling on-chain':'✓ Sent')+(d.messageId?' · '+esc(d.messageId):'')+(d.pending&&d.paymentId?' · '+esc(d.paymentId):'')+'</p>'; renderNav(); refreshAll(); }
       else out.innerHTML='<p style="color:var(--bad)">✗ '+esc(d.error||'Send failed')+'</p>';
     }).catch(e=>out.innerHTML='<p style="color:var(--bad)">✗ '+esc(e.message)+'</p>'); return;
   }
@@ -562,11 +695,13 @@ document.addEventListener('click',e=>{
     const to=$('[data-edit="compose-to"]').value.trim(), txt=$('[data-edit="compose-body"]').value.trim();
     const out=$('[data-cmd-out="compose"]');
     if(!to||!txt){ out.innerHTML='<p style="color:var(--bad)">Need a recipient and a message.</p>'; return; }
+    if(!isAddr(to)){ out.innerHTML='<p style="color:var(--bad)">That doesn’t look like a Stacks (SP…) or Bitcoin (bc1…) address. Check it before spending 100 sats.</p>'; return; }
     if(!confirm('Send to '+to+'?\n\nThis spends 100 sats sBTC.')) return;
     out.innerHTML='<p class="muted">Sending…</p>';
-    fetch('/local/send',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({to,content:txt})}).then(r=>r.json()).then(d=>{
-      out.innerHTML = d.ok?'<p style="color:var(--good)">✓ Sent'+(d.messageId?' · '+esc(d.messageId):'')+'</p>':'<p style="color:var(--bad)">✗ '+esc(d.error||'Failed')+'</p>';
-      if(d.ok) refreshAll();
+    fetch('/local/send',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(sendPayload(to,txt))}).then(r=>r.json()).then(d=>{
+      if(d.ok){ out.innerHTML='<p style="color:var(--good)">'+(d.pending?'⏳ Staged — settling on-chain':'✓ Sent')+(d.messageId?' · '+esc(d.messageId):'')+' — returning to Inbox…</p>';
+        setTimeout(()=>{ state.compose={to:'',body:''}; saveLS(LS.compose,state.compose); setTab('inbox'); refreshAll(); }, 1100); }
+      else out.innerHTML='<p style="color:var(--bad)">✗ '+esc(d.error||'Failed')+'</p>';
     }).catch(e=>out.innerHTML='<p style="color:var(--bad)">✗ '+esc(e.message)+'</p>'); return;
   }
   if(a==='copy'){ const pre=document.querySelector(`[data-code="${el.dataset.code}"]`); if(pre) navigator.clipboard.writeText(pre.innerText); el.textContent='Copied ✓'; setTimeout(()=>el.textContent='Copy',1200); return; }
@@ -586,9 +721,11 @@ function cmdBlock(text,key){
 document.addEventListener('input',e=>{
   const el=e.target.closest('[data-edit]'); if(!el) return;
   const k=el.dataset.edit, id=el.dataset.id;
-  if(k==='q-body') setQ(id,{body:el.value});           // silent persist, no re-render (keeps focus)
-  else if(k==='compose-to'){ state.compose.to=el.value; saveLS(LS.compose,state.compose); }
-  else if(k==='compose-body'){ state.compose.body=el.value; saveLS(LS.compose,state.compose); }
+  const setCount=key=>{ const c=document.querySelector(`[data-count="${key}"]`); if(c){ c.textContent=el.value.length+'/'+INBOX_MAX; c.style.color=el.value.length>=INBOX_MAX?'var(--warn)':'var(--dim)'; } };
+  if(k==='q-body'){ setQ(id,{body:el.value}); setCount('q-'+id); }   // silent persist, no re-render (keeps focus)
+  else if(k==='compose-to'){ state.compose.to=el.value; saveLS(LS.compose,state.compose);
+    const h=document.querySelector('[data-addrhint]'); if(h){ const v=el.value.trim(); h.textContent=v?(isAddr(v)?'✓ looks like a valid address':'⚠️ doesn’t look like a Stacks/Bitcoin address — sending wastes 100 sats'):''; h.style.color=v&&!isAddr(v)?'var(--warn)':'var(--dim)'; } }
+  else if(k==='compose-body'){ state.compose.body=el.value; saveLS(LS.compose,state.compose); setCount('compose'); }
   else if(k==='search'){ state.search=el.value; renderView(); const s=$('[data-edit="search"]'); if(s){ s.focus(); s.setSelectionRange(s.value.length,s.value.length);} }
   // reply-text persists implicitly (read from DOM on generate)
 });
