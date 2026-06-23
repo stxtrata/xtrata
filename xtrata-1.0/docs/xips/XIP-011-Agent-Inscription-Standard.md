@@ -101,6 +101,7 @@ registry beyond the single `agent` value registered above.
 | `receipt` | An acknowledgement that an external action or obligation occurred. |
 | `derivation` | Content produced by transforming a cited source (recorded in `refs`). |
 | `snapshot` | A manifest indexing a point-in-time view of the agent's memory. |
+| `skill` | A reusable capability or procedure an agent can read and perform (e.g. inscribe, parent-handoff). Discoverable, model-stamped, and versionable by supersession like any other inscription. |
 
 The `directives` field in the header is a reference to the governing directives
 inscription; a `type: directives` inscription is one whose primary content *is*

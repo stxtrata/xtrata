@@ -199,7 +199,7 @@ callee_filter = false
 enabled = false
 api_url = 'https://api.hiro.so'
 
-[contracts.xtrata-v3-2-4]
-path = 'contracts/xtrata-v3.2.4.clar'
+[contracts.xtrata-large-v1]
+path = 'contracts/xtrata-large-v1.clar'
 clarity_version = 3
 epoch = 'latest'

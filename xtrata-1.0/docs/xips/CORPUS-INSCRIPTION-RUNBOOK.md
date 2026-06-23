@@ -50,11 +50,22 @@ Key facts that shape this change set:
   supersedes **both**: a new manifest JSON (parent #1063) and a new viewer
   (parent #1064).
 
-> Verify before inscribing: confirm #1063/#1064 are still the chain tip for the
-> corpus (no newer manifest), and confirm whether an XMA-1 scope (XIP-009) points
-> at the manifest — the inaugural manifest is a plain XIP-001 collection, so
-> supersession may be by parent edge + namespace pointer rather than XMA-1
-> succession. If a scope exists, also run §B step 5.
+> **Governance — RESOLVED (checked on-chain).** The corpus is **NOT** governed by
+> XMA-1. The Manifest Authority contract is not deployed (Hiro API
+> `/v2/contracts/interface/SP3JNS….xtrata-manifest-authority-v1` →
+> "No contract interface data found"), there is no deployment record in the repo,
+> and #1063 is a plain XIP-001 `collection` that the #1064 viewer verifies by
+> Merkle root, not by a scope pointer. **Supersession is therefore by XIP-001
+> parent edge + Merkle self-verification only** — skip all XMA-1
+> register/succession steps (§B step 5 does not apply).
+>
+> Still verify before inscribing: that #1063/#1064 are the current corpus tip
+> (no newer manifest already inscribed).
+>
+> How this was checked (so it's repeatable): open
+> `https://api.hiro.so/v2/contracts/interface/<deployer>/<contract-name>` in a
+> browser. JSON back = deployed; "No contract interface data found" = not
+> deployed. Same for any contract you want to confirm exists on mainnet.
 
 ---
 
@@ -193,9 +204,8 @@ XIP-001), **#1063** and **#1064** (to parent the new manifest + viewer) at seal.
    4. new corpus viewer HTML  (supersedes #1064, parent = #1064)
       - point it at the new manifest JSON inscription id
                                   ▼
-   5. IF an XMA-1 scope governs the corpus (verify first):
-      register-manifest(new JSON, prev=#1063) → update-scope-manifest(...)
-      ELSE supersession is the parent edge + namespace pointer
+   5. (XMA-1 succession NOT required — corpus is not scope-governed; see §0.
+       Supersession is the parent edges from steps 3 & 4 alone.)
                                   ▼
    6. (optional) repoint BNS/namespace pointer → new viewer/manifest
                                   ▼
@@ -214,12 +224,15 @@ additive refresh); (c) whether XMA-1 succession applies (step 5).
   root `0x5596…` from #1063's members before emitting anything.
 - **Draft manifest:** `corpus-manifest-v1.1.0.draft.json` — supersedes #1063,
   covers XIP-000–011 + README, `type: collection`, `membershipSemantics: current`.
-- **Viewer builder:** `vectors/build-corpus-viewer.py` — patches a byte-exact
-  saved copy of the #1064 viewer (the app hardcodes the manifest id, the expected
-  integrity root, the "Inaugural" branding, "through XIP-009", the description, and
-  the #1052–1062 range). Run it AFTER the manifest is finalized, passing the new
-  manifest id + final root; it asserts each edit and reports the viewer finalHash.
-  Inscribe the result with core parent = #1064.
+- **Dynamic viewer:** `corpus-viewer-dynamic-v1.html` — replaces the pinned #1064
+  viewer. It hardcodes nothing about the member set: it walks the supersession
+  chain forward from the root manifest **#1063** via the relationship-index API
+  (`/index/relations/<contract>?id=1063`, deepest corpus-manifest descendant =
+  current tip), loads that manifest, and verifies its `xtrata-merkle-v1` root plus
+  every member's content `finalHash` live in the browser. Inscribe it **once**
+  with core parent = **#1064**. Because it resolves the latest manifest at runtime,
+  every future corpus update appears automatically — no new viewer needed again.
+  (The old `vectors/build-corpus-viewer.py` patch approach is obsolete.)
 
 Verified document final-hashes (byte-exact, ready to inscribe):
 
