@@ -1,0 +1,28 @@
+{
+  "name": "flowproof",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Proof-of-Flow: every FlowVault money movement emits a permanent, recursively-linked Xtrata inscription. FlowVault moves the money; Xtrata v3.2.3 makes it provable forever.",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "smoke": "tsx scripts/smoke.ts",
+    "demo": "tsx scripts/demo.ts",
+    "demo:dry": "tsx scripts/demo.ts --dry-run"
+  },
+  "dependencies": {
+    "@noble/hashes": "^1.4.0",
+    "@stacks/network": "^6.13.0",
+    "@stacks/transactions": "^6.13.0",
+    "flowvault-sdk": "0.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  }
+}

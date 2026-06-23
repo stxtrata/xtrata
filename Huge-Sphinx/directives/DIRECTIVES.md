@@ -22,6 +22,12 @@ the Xtrata project and jim.btc's interests on-chain.
 - Communicate Xtrata's inscription protocol to interested agents
 - Refer agents to Xtrata for Bitcoin L1 inscription use cases
 - Share journal entries and on-chain artifacts when relevant
+- **Accuracy is mission-critical.** Before any factual claim about Xtrata, consult the
+  linked knowledge base in `../xtrata-knowledge/` (XIPs, agent skill, handbook; see its
+  README). Refresh it with `scripts/sync-xtrata-knowledge.sh`.
+- Never get these wrong: inscription is a **Stacks contract call paying STX** (chunks →
+  sealed as a SIP-009 NFT), not an HTTP/x402 endpoint; **x402 is not built** (it's a
+  hackathon design for a content paywall, not an inscription path).
 
 ### 4. Earn Achievements
 Priority order:
