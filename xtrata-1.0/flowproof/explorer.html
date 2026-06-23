@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FlowProof — Proof-of-Flow lineage</title>
+<style>
+  :root {
+    --bg: #0e0e14; --card: #171722; --line: #2a2a3a; --ink: #ECECF2; --mut: #9a9ab0;
+    --brand: #7c6cff; --ok: #2ecc71; --lock: #e1a100; --split: #38bdf8;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: radial-gradient(1200px 600px at 50% -10%, #1b1b2e, var(--bg)); color: var(--ink);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; min-height: 100vh; }
+  header { padding: 28px 32px 8px; }
+  h1 { margin: 0; font-size: 22px; letter-spacing: .2px; }
+  h1 .pill { font-size: 11px; vertical-align: middle; background: var(--brand); color: #fff; padding: 3px 8px; border-radius: 999px; margin-left: 8px; }
+  .sub { color: var(--mut); font-size: 13px; margin-top: 6px; }
+  .sub code { color: #cfcfe6; background: #ffffff10; padding: 1px 6px; border-radius: 6px; }
+  .wrap { padding: 18px 32px 60px; }
+  .chain { display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding: 14px 2px 26px; }
+  .node { opacity: 0; transform: translateY(10px); animation: rise .5s ease forwards; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  .card { width: 290px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px;
+    box-shadow: 0 10px 30px #0006; height: 100%; }
+  .card.asset { border-color: #3a3a52; background: linear-gradient(180deg, #1d1d2e, #15151f); }
+  .tok { font-size: 12px; color: var(--mut); display: flex; justify-content: space-between; align-items: center; }
+  .tok b { color: var(--ink); }
+  .badge { font-size: 11px; padding: 3px 8px; border-radius: 999px; background: #ffffff14; color: var(--ink); }
+  .badge.flow { background: var(--brand); color: #fff; }
+  .title { font-size: 16px; font-weight: 650; margin: 10px 0 4px; }
+  .amount { font-size: 26px; font-weight: 750; margin: 4px 0 10px; }
+  .amount span { font-size: 13px; color: var(--mut); font-weight: 500; }
+  .rows { display: grid; gap: 7px; margin-top: 6px; }
+  .row { display: flex; justify-content: space-between; font-size: 13px; }
+  .row .k { color: var(--mut); } .row .v { font-variant-numeric: tabular-nums; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: middle; }
+  .dot.split { background: var(--split); } .dot.lock { background: var(--lock); } .dot.hold { background: var(--ok); }
+  .meta { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--mut); word-break: break-all; }
+  .meta a { color: #9fb6ff; text-decoration: none; } .meta a:hover { text-decoration: underline; }
+  .assetbody { font-size: 13px; color: #cdd; margin-top: 8px; word-break: break-word; max-height: 120px; overflow: auto; }
+  .arrow { align-self: center; flex: 0 0 46px; display: flex; flex-direction: column; align-items: center; color: var(--mut); }
+  .arrow .ln { width: 100%; height: 2px; background: linear-gradient(90deg, #ffffff20, var(--brand)); }
+  .arrow .lbl { font-size: 10px; margin-top: 6px; color: var(--mut); white-space: nowrap; }
+  .foot { color: var(--mut); font-size: 13px; max-width: 820px; }
+  .err { background: #2a1620; border: 1px solid #5a2740; color: #ffd7e0; padding: 16px; border-radius: 12px; max-width: 720px; }
+  code.k { color: #cbd5ff; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>FlowProof <span class="pill">Proof-of-Flow</span></h1>
+    <div class="sub" id="sub">Loading lineage…</div>
+  </header>
+  <div class="wrap">
+    <div id="chain" class="chain"></div>
+    <p class="foot" id="foot"></p>
+  </div>
+
+<script>
+  const fmt = (micro) => {
+    const n = BigInt(micro || "0");
+    const whole = n / 1000000n, frac = (n % 1000000n).toString().padStart(6, "0").replace(/0+$/, "");
+    return frac ? `${whole}.${frac}` : `${whole}`;
+  };
+  const isTxid = (s) => typeof s === "string" && /^0x?[0-9a-f]{64}$/i.test(s);
+  const txLink = (s) => `https://explorer.hiro.so/txid/${String(s).replace(/^0x/, "")}?chain=testnet`;
+  const el = (html) => { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; };
+
+  function receiptCard(node, i) {
+    const r = node.receipt;
+    const split = r.split ? `<div class="row"><span class="k"><span class="dot split"></span>Split → ${r.split.to.slice(0,6)}…${r.split.to.slice(-4)}</span><span class="v">${fmt(r.split.amount)}</span></div>` : "";
+    const lock = r.lock ? `<div class="row"><span class="k"><span class="dot lock"></span>Locked → block ${r.lock.untilBlock}</span><span class="v">${fmt(r.lock.amount)}</span></div>` : "";
+    const hold = `<div class="row"><span class="k"><span class="dot hold"></span>Held (unlocked)</span><span class="v">${fmt(r.unlocked)}</span></div>`;
+    const dep = isTxid(r.depositTxid)
+      ? `deposit <a href="${txLink(r.depositTxid)}" target="_blank">${String(r.depositTxid).slice(0,10)}…</a>`
+      : `deposit <code class="k">${r.depositTxid}</code>`;
+    return el(`<div class="node" style="animation-delay:${i*120}ms"><div class="card">
+      <div class="tok"><span>inscription <b>#${node.id}</b></span><span class="badge flow">${r.flow}</span></div>
+      <div class="title">Royalty receipt</div>
+      <div class="amount">${fmt(r.amount)} <span>${r.token.toUpperCase()} in</span></div>
+      <div class="rows">${split}${lock}${hold}</div>
+      <div class="meta">${dep}<br/>vault <code class="k">${(r.vault||'').split('.').pop()}</code> · block ${r.block}
+      <br/>links: parents ${JSON.stringify(node.parents)} · deps ${JSON.stringify(node.dependencies)}</div>
+    </div></div>`);
+  }
+  function assetCard(asset, i) {
+    return el(`<div class="node" style="animation-delay:${i*120}ms"><div class="card asset">
+      <div class="tok"><span>inscription <b>#${asset.id}</b></span><span class="badge">asset</span></div>
+      <div class="title">The work</div>
+      <div class="assetbody">${(asset.content||"(binary)").replace(/[<>&]/g, c=>({ "<":"&lt;",">":"&gt;","&":"&amp;" }[c]))}</div>
+      <div class="meta">fully on-chain · the thing every receipt links back to</div>
+    </div></div>`);
+  }
+  const arrow = (lbl) => el(`<div class="arrow node"><div class="ln"></div><div class="lbl">${lbl}</div></div>`);
+
+  (async () => {
+    let data;
+    try { const res = await fetch("./lineage.json", { cache: "no-store" }); if (!res.ok) throw 0; data = await res.json(); }
+    catch {
+      document.getElementById("sub").textContent = "";
+      document.getElementById("chain").innerHTML =
+        `<div class="err"><b>No lineage.json yet.</b><br/>Generate it from the chain:<br/><br/>
+         <code class="k">cd flowproof &amp;&amp; npm run lineage</code><br/><br/>then reload this page (served via <code class="k">npx serve .</code>).</div>`;
+      return;
+    }
+    const when = new Date(data.generatedAt).toLocaleString();
+    document.getElementById("sub").innerHTML =
+      `Live on-chain lineage from <code>${data.contract}</code> · ${data.network} · pulled ${when}`;
+
+    const chain = document.getElementById("chain");
+    let i = 0;
+    if (data.asset) { chain.appendChild(assetCard(data.asset, i++)); }
+    for (const node of data.receipts) {
+      if (chain.children.length) chain.appendChild(arrow("links →"));
+      chain.appendChild(receiptCard(node, i++));
+    }
+    const total = data.receipts.reduce((s, n) => s + BigInt(n.receipt.amount || "0"), 0n);
+    document.getElementById("foot").innerHTML =
+      `${data.receipts.length} receipt${data.receipts.length===1?"":"s"} · ${fmt(total.toString())} ${(data.receipts[0]?.receipt.token||"usdcx").toUpperCase()} routed.
+       Every receipt is stored <b>fully on-chain</b> in <code class="k">${data.contract.split('.').pop()}</code> and linked by
+       Clarity <code class="k">dependencies</code>/<code class="k">parents</code> — a permanent, verifiable financial lineage that
+       can't be edited or lost. FlowVault moved the money; Xtrata made it provable forever.`;
+  })();
+</script>
+</body>
+</html>
