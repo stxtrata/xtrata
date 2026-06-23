@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Xtrata Improvement Proposals — Corpus</title>
+<style>
+  :root{--bg:#0a0c10;--panel:#12161d;--line:#222a35;--fg:#e7edf5;--mut:#8b97a8;--ok:#3fd07f;--bad:#ff5c6c;--accent:#5aa9ff}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  .wrap{max-width:880px;margin:0 auto;padding:32px 20px 64px}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:var(--mut);font-size:13px;margin-bottom:24px}
+  .stats{display:flex;flex-wrap:wrap;gap:14px;margin:18px 0 8px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 16px;min-width:120px}
+  .stat .k{color:var(--mut);font-size:11px;letter-spacing:.04em;text-transform:uppercase}
+  .stat .v{font-size:18px;margin-top:2px;font-variant-numeric:tabular-nums}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .root{word-break:break-all;color:var(--mut);font-size:12px;margin:10px 0 0}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600}
+  .badge.ok{background:rgba(63,208,127,.14);color:var(--ok)}
+  .badge.bad{background:rgba(255,92,108,.14);color:var(--bad)}
+  .badge.warn{background:rgba(255,200,80,.14);color:#ffc850}
+  table{width:100%;border-collapse:collapse;margin-top:18px}
+  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--mut);font-size:11px;letter-spacing:.04em;text-transform:uppercase;font-weight:600}
+  td a{color:var(--accent);text-decoration:none}
+  td a:hover{text-decoration:underline}
+  .id{color:var(--mut);font-variant-numeric:tabular-nums}
+  .hash{color:var(--mut);font-size:11px}
+  .status{font-size:13px;color:var(--mut);margin:8px 0 0}
+  footer{margin-top:28px;color:var(--mut);font-size:12px;border-top:1px solid var(--line);padding-top:16px}
+  .err{color:var(--bad)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>XIP Corpus</h1>
+  <div class="sub">Inscribed standards · self-verifying on Stacks · resolves the current corpus manifest live</div>
+  <div id="app"><div class="status">Resolving current corpus from chain…</div></div>
+  <footer id="foot"></footer>
+</div>
+<script>
+const CONFIG = {
+  contractId: "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+  rootManifestId: 1063,            // inaugural corpus manifest; resolver walks forward from here
+  manifestMime: "application/vnd.xtrata.manifest+json",
+  base: location.origin && location.origin.startsWith("http") ? location.origin : "https://xtrata.xyz",
+  chunkSize: 16384,
+};
+
+const $ = (id) => document.getElementById(id);
+const hx = (buf) => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,"0")).join("");
+async function sha(bytes){ return new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)); }
+const concat = (a,b) => { const o = new Uint8Array(a.length+b.length); o.set(a,0); o.set(b,a.length); return o; };
+
+// core final-hash: H0 = 32 zero bytes; Hi = sha256(H(i-1) || chunk_i), 16KiB chunks
+async function finalHash(bytes){
+  let h = new Uint8Array(32);
+  if (bytes.length === 0) return hx(await sha(new Uint8Array(0)).then(x=>x)); // not expected
+  for (let i=0;i<bytes.length;i+=CONFIG.chunkSize){
+    h = await sha(concat(h, bytes.subarray(i, i+CONFIG.chunkSize)));
+  }
+  return hx(h);
+}
+// xtrata-merkle-v1 over members {contract,finalHash,inscriptionId,order}
+function jcsLeaf(m){
+  return new TextEncoder().encode(JSON.stringify({
+    contract: CONFIG.contractId, finalHash: m.finalHash,
+    inscriptionId: m.inscriptionId, order: m.order
+  }));
+}
+async function merkleRoot(items){
+  if (!items.length) return "0x" + await finalHash(new Uint8Array(0));
+  const ordered = [...items].sort((a,b)=> a.inscriptionId - b.inscriptionId);
+  let level = [];
+  for (const m of ordered) level.push(await sha(concat(new Uint8Array([0x00]), jcsLeaf(m))));
+  while (level.length > 1){
+    const next = [];
+    for (let i=0;i<level.length;i+=2){
+      const L = level[i], R = (i+1<level.length)?level[i+1]:level[i];
+      next.push(await sha(concat(new Uint8Array([0x01]), concat(L,R))));
+    }
+    level = next;
+  }
+  return "0x" + hx(level[0]);
+}
+
+const api = (path) => fetch(CONFIG.base + path, {headers:{accept:"application/json"}}).then(r=>r.json());
+const raw = (id) => fetch(`${CONFIG.base}/i/${id}`).then(r=>r.arrayBuffer());
+
+// Walk forward from the root to the newest corpus-manifest tip.
+async function resolveCurrentManifestId(){
+  const rel = await api(`/index/relations/${CONFIG.contractId}?id=${CONFIG.rootManifestId}`);
+  const desc = Array.isArray(rel.descendants) ? rel.descendants : [];
+  if (!desc.length) return { id: CONFIG.rootManifestId, complete: rel.complete, note: rel.complete===false?"index still syncing":"" };
+  // fetch summaries to keep only corpus-manifest descendants
+  const ids = [...new Set(desc.map(d=>d.id))];
+  let summaries = [];
+  try { summaries = (await api(`/index/${CONFIG.contractId}?ids=${ids.join(",")}`)).results || (await api(`/index/${CONFIG.contractId}?ids=${ids.join(",")}`)); } catch(e){ summaries = []; }
+  const mimeById = {};
+  (Array.isArray(summaries)?summaries:[]).forEach(s=>{ if(s && s.id!=null) mimeById[s.id] = s.mime || s.mime_type || s.mimeType; });
+  const depthById = {}; desc.forEach(d=>{ depthById[d.id] = d.depth; });
+  // candidate manifests = descendants whose mime is the corpus manifest mime (fallback: all if mime unknown)
+  let manifests = ids.filter(id => mimeById[id] === CONFIG.manifestMime);
+  if (!manifests.length) manifests = ids; // mime unknown (index lean) -> treat all, deepest wins
+  manifests.sort((a,b)=> (depthById[b]-depthById[a]) || (b-a)); // deepest, then highest id
+  return { id: manifests[0], complete: rel.complete, note: rel.complete===false?"index still syncing":"" };
+}
+
+function firstHeading(text){
+  for (const line of text.split(/\r?\n/)){
+    const m = /^#\s+(.+)/.exec(line.trim());
+    if (m) return m[1].trim();
+  }
+  return null;
+}
+
+async function main(){
+  try {
+    const resolved = await resolveCurrentManifestId();
+    const manifestId = resolved.id;
+    const manifestBytes = await raw(manifestId);
+    const manifestText = new TextDecoder().decode(manifestBytes);
+    const manifest = JSON.parse(manifestText);
+    const items = (manifest.mapping && manifest.mapping.items) || [];
+
+    const computedRoot = await merkleRoot(items);
+    const declaredRoot = manifest.integrity && manifest.integrity.root;
+    const rootOk = declaredRoot && computedRoot.toLowerCase() === String(declaredRoot).toLowerCase();
+
+    // verify each member's content hash + grab a label from its first heading
+    let verified = 0;
+    const rows = [];
+    for (const it of items.sort((a,b)=>a.order-b.order)){
+      let ok=false, label=null;
+      try {
+        const buf = await raw(it.inscriptionId);
+        const fh = "0x" + await finalHash(new Uint8Array(buf));
+        ok = fh.toLowerCase() === String(it.finalHash).toLowerCase();
+        if (ok) verified++;
+        const t = new TextDecoder().decode(buf);
+        label = firstHeading(t) || `#${it.inscriptionId}`;
+      } catch(e){ label = `#${it.inscriptionId}`; }
+      rows.push({...it, ok, label});
+    }
+
+    const ids = items.map(i=>i.inscriptionId).sort((a,b)=>a-b);
+    const range = ids.length ? `#${ids[0]}–${ids[ids.length-1]}` : "—";
+    const isLatest = manifestId !== CONFIG.rootManifestId;
+
+    $("app").innerHTML = `
+      <div class="stats">
+        <div class="stat"><div class="k">Inscriptions</div><div class="v">${items.length}</div></div>
+        <div class="stat"><div class="k">Verified</div><div class="v">${verified}/${items.length}</div></div>
+        <div class="stat"><div class="k">Token range</div><div class="v mono">${range}</div></div>
+        <div class="stat"><div class="k">Manifest</div><div class="v mono">#${manifestId}${isLatest?'':' (root)'}</div></div>
+      </div>
+      <div>integrity.root ${rootOk?'<span class="badge ok">root verified</span>':'<span class="badge bad">root MISMATCH</span>'}
+        ${verified===items.length?'<span class="badge ok">all members verified</span>':'<span class="badge warn">'+(items.length-verified)+' unverified</span>'}
+        ${resolved.note?'<span class="badge warn">'+resolved.note+'</span>':''}
+      </div>
+      <div class="root mono">${declaredRoot||'(no root in manifest)'}</div>
+      <table>
+        <thead><tr><th>#</th><th>Document</th><th>Inscription</th><th>Status</th></tr></thead>
+        <tbody>
+          ${rows.map(r=>`<tr>
+            <td class="id">${r.order}</td>
+            <td><a href="${CONFIG.base}/inscription/${r.inscriptionId}">${(r.label||'').replace(/</g,'&lt;')}</a><div class="hash mono">${String(r.finalHash).slice(0,18)}…</div></td>
+            <td class="id"><a href="${CONFIG.base}/inscription/${r.inscriptionId}">#${r.inscriptionId}</a></td>
+            <td>${r.ok?'<span class="badge ok">✓</span>':'<span class="badge bad">✗</span>'}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>`;
+    $("foot").innerHTML = `Resolved live from the chain via the supersession chain rooted at
+      <span class="mono">#${CONFIG.rootManifestId}</span> on <span class="mono">${CONFIG.contractId}</span>.
+      Future corpus updates (a new manifest inscribed with #${CONFIG.rootManifestId}'s chain as parent) appear here automatically.`;
+  } catch(e){
+    $("app").innerHTML = `<div class="status err">Could not resolve the corpus: ${String(e).replace(/</g,'&lt;')}</div>`;
+  }
+}
+main();
+</script>
+</body>
+</html>

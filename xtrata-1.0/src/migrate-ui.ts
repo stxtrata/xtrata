@@ -15,10 +15,12 @@ const ASSET = 'xtrata-inscription';
 // HIRO_API_KEY server-side (avoids browser rate limits).
 const apiBase = getApiBaseUrls('mainnet')[0];
 const network = toStacksNetwork('mainnet', apiBase);
-// Explicit fee so migrations confirm promptly instead of stalling on a low
-// wallet-estimated fee. Kept as a number (not bigint) — @stacks/connect
+// A migration is a tiny contract call — one uint arg, no inscription data — so
+// the fee is pinned low and FIXED. Wallets otherwise offer wildly varying
+// estimates (seen as high as 0.34 STX) for what should cost a fraction of a cent.
+// 5000 uSTX = 0.005 STX. Kept as a number (not bigint) — @stacks/connect
 // JSON-serializes the call options and cannot serialize a BigInt.
-const FEE_USTX = 30000;
+const FEE_USTX = 5000;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -58,6 +60,8 @@ type State = {
   busyId: string | null;
   busyPhase: 'signing' | 'confirming' | null;
   scanning: boolean;
+  owned: number;
+  scanned: number;
   log: string[];
 };
 
@@ -69,6 +73,8 @@ const state: State = {
   busyId: null,
   busyPhase: null,
   scanning: false,
+  owned: 0,
+  scanned: 0,
   log: []
 };
 
@@ -92,61 +98,62 @@ const readOnly = async (contractName: string, functionName: string, args: Return
   return cvToJSON(res);
 };
 
-const uintFromJson = (json: unknown): number | null => {
-  let v: unknown = json;
-  while (v && typeof v === 'object' && 'value' in (v as Record<string, unknown>)) {
-    v = (v as Record<string, unknown>).value;
-  }
-  return v == null ? null : Number(v);
+// True if the id already exists on the v3 core (i.e. already migrated). Migrated
+// tokens keep their source id and native v3 ids start above the legacy range, so
+// a low source id existing on v3 means it was migrated. One cheap read per token,
+// instead of loading the entire v3 mint set up front.
+const existsOnV3 = async (id: bigint): Promise<boolean> => {
+  const j = (await readOnly(CORE, 'get-owner', [uintCV(id)])) as { value?: { value?: unknown } };
+  return j.value?.value != null;
 };
 
-// The set of token ids already minted on v3 (any of these would collide).
-const loadV3Minted = async () => {
-  const count = uintFromJson(await readOnly(CORE, 'get-minted-count')) ?? 0;
-  const set = new Set<string>();
-  for (let i = 0; i < count; i += 1) {
-    const id = uintFromJson(await readOnly(CORE, 'get-minted-id', [uintCV(BigInt(i))]));
-    if (id != null) set.add(String(id));
-  }
-  return set;
-};
-
-// Token ids the connected wallet holds on the source contract (via Hiro API).
-const loadOwnedIds = async (address: string, sourceName: string): Promise<bigint[]> => {
-  const assetId = `${DEPLOYER}.${sourceName}::${ASSET}`;
-  const ids: bigint[] = [];
-  let offset = 0;
-  for (;;) {
-    const url = `${apiBase}/extended/v1/tokens/nft/holdings?principal=${address}&asset_identifiers=${encodeURIComponent(assetId)}&limit=200&offset=${offset}`;
-    const res = await fetch(url);
-    if (!res.ok) {
-      throw new Error(`Holdings lookup failed (${res.status}).`);
-    }
-    const json = (await res.json()) as { total: number; results: Array<{ value: { repr?: string; hex?: string } }> };
-    for (const entry of json.results ?? []) {
-      const repr = entry.value?.repr ?? '';
-      const m = repr.match(/^u(\d+)$/);
-      if (m) ids.push(BigInt(m[1]));
-    }
-    offset += 200;
-    if (offset >= (json.total ?? 0) || (json.results ?? []).length === 0) break;
-  }
-  return ids.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-};
-
+// Opt-in, incremental scan. Pages the wallet's source-core holdings and checks
+// each id against v3 as it is found — updating status and listing eligible
+// tokens live, so nothing looks hung. Press Scan again to stop.
 const scan = async () => {
   if (!state.session.isConnected || !state.session.address) return;
+  if (state.scanning) { state.scanning = false; return; }   // second press = stop
+  const address = state.session.address;
+  const sourceName = SOURCES[state.source].name;
+  const assetId = `${DEPLOYER}.${sourceName}::${ASSET}`;
   state.scanning = true;
   state.eligible = [];
+  state.owned = 0;
+  state.scanned = 0;
+  note(`Scanning ${SOURCES[state.source].label} holdings for ${address}…`);
   render();
   try {
-    const sourceName = SOURCES[state.source].name;
-    note(`Loading v3 minted ids…`);
-    state.v3Minted = await loadV3Minted();
-    note(`Loading your ${SOURCES[state.source].label} holdings…`);
-    const owned = await loadOwnedIds(state.session.address, sourceName);
-    state.eligible = owned.filter((id) => !state.v3Minted.has(id.toString()));
-    note(`You own ${owned.length} on ${state.source}; ${owned.length - state.eligible.length} already on v3; ${state.eligible.length} eligible.`);
+    let offset = 0;
+    let total = 0;
+    do {
+      if (!state.scanning) { note('Scan stopped.'); break; }
+      const url = `${apiBase}/extended/v1/tokens/nft/holdings?principal=${address}&asset_identifiers=${encodeURIComponent(assetId)}&limit=200&offset=${offset}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Holdings lookup failed (${res.status}).`);
+      const json = (await res.json()) as { total: number; results: Array<{ value: { repr?: string } }> };
+      total = json.total ?? 0;
+      const pageIds: bigint[] = [];
+      for (const entry of json.results ?? []) {
+        const m = (entry.value?.repr ?? '').match(/^u(\d+)$/);
+        if (m) pageIds.push(BigInt(m[1]));
+      }
+      state.owned += pageIds.length;
+      note(`Found ${state.owned}/${total} on ${state.source}; checking which are already on v3…`);
+      render();
+      for (const id of pageIds) {
+        if (!state.scanning) break;
+        const onV3 = await existsOnV3(id);
+        state.scanned += 1;
+        if (!onV3) {
+          state.eligible.push(id);
+          state.eligible.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+          render();   // tiles appear as they are found
+        }
+        if (state.scanned % 10 === 0) { note(`Checked ${state.scanned}/${state.owned}; ${state.eligible.length} eligible so far…`); render(); }
+      }
+      offset += 200;
+    } while (offset < total && state.scanning);
+    if (state.scanning) note(`Scan complete: ${state.owned} owned on ${state.source}, ${state.eligible.length} eligible (not yet on v3).`);
   } catch (error) {
     note(`Scan error: ${error instanceof Error ? error.message : String(error)}`);
   } finally {
@@ -243,8 +250,8 @@ const connect = async () => {
     note('Wallet connection cancelled.');
     return;
   }
-  note(`Connected ${state.session.address}.`);
-  await scan();
+  note(`Connected ${state.session.address}. Pick a source core, then press Scan.`);
+  render();
 };
 
 const disconnect = async () => {
@@ -268,22 +275,25 @@ const render = () => {
       </div>
       <div class="row">
         <label>Source core:
-          <select id="source" ${connected ? '' : 'disabled'}>
+          <select id="source" ${connected && !state.scanning ? '' : 'disabled'}>
             <option value="v1" ${state.source === 'v1' ? 'selected' : ''}>${SOURCES.v1.label}</option>
             <option value="v2" ${state.source === 'v2' ? 'selected' : ''}>${SOURCES.v2.label}</option>
           </select>
         </label>
-        <button id="scan" ${connected && !state.scanning ? '' : 'disabled'}>${state.scanning ? 'Scanning…' : 'Scan eligible'}</button>
-        <button id="all" ${connected && state.eligible.length > 0 && !state.busyId ? '' : 'disabled'}>Migrate all (sign each)</button>
+        <button id="scan" ${connected && !state.busyId ? '' : 'disabled'}>${state.scanning ? 'Stop scan' : 'Scan eligible'}</button>
+        <button id="all" ${connected && state.eligible.length > 0 && !state.busyId && !state.scanning ? '' : 'disabled'}>Migrate all (sign each)</button>
       </div>
-      <p class="hint">Each migration is a separate Xverse signature. It moves your legacy token into the v3 core and mints the same id on <code>${CORE}</code>. Ids already on v3 are skipped.</p>
+      <p class="hint">Pick a source core, then Scan — nothing runs until you do. Each migration is a separate Xverse signature that moves your legacy token into the v3 core and mints the same id on <code>${CORE}</code>. Ids already on v3 are skipped. Network fee is fixed at <strong>0.005 STX</strong> — if Xverse shows a higher amount, set it manually to 0.005.</p>
+      ${state.scanning || state.owned
+        ? `<p class="hint">${state.scanning ? '⏳ Scanning' : '✓ Scan done'} — ${state.scanned}/${state.owned} checked · ${state.eligible.length} eligible${state.scanning ? '…' : ''}</p>`
+        : ''}
     </section>
 
     <section class="panel">
       <h2>Eligible tokens (${state.eligible.length})</h2>
       <div class="grid">
         ${state.eligible.length === 0
-          ? '<p class="hint">None found — connect, pick a source, and Scan.</p>'
+          ? `<p class="hint">${state.scanning ? 'Scanning… eligible tokens will appear here as they are found.' : 'None yet — connect, pick a source core, then press Scan.'}</p>`
           : state.eligible
               .map(
                 (id) => `

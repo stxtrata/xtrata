@@ -112,7 +112,9 @@ const readSummary = async (env: RuntimeEnv, apiBases: string[], contract: Runtim
       return sourceContract != null && sourceId != null ? `${sourceContract}:${sourceId}` : null;
     })(),
     // Direct parents (v3.2.0+ summaries carry this list; empty on older cores).
-    parents: asUintList(fields['parents'])
+    parents: asUintList(fields['parents']),
+    // Direct dependencies (existence-only edges; v3.2.0+ summaries carry this).
+    dependencies: asUintList(fields['dependencies'])
   };
 };
 
@@ -156,8 +158,9 @@ const readMetaSummary = async (env: RuntimeEnv, apiBases: string[], contract: Ru
     sealed: unwrap(fields['sealed']) === true ? 1 : 0,
     tokenUri,
     migrationSource: null as string | null,
-    // v1/v2 cores predate parent relationships.
-    parents: [] as number[]
+    // v1/v2 cores predate parent/dependency relationships.
+    parents: [] as number[],
+    dependencies: [] as number[]
   };
 };
 
@@ -184,7 +187,7 @@ const getState = async (env: RuntimeEnv, contractId: string) => {
 type IndexSummary = {
   owner: string | null; creator: string | null; finalHash: string | null; mime: string | null;
   totalSize: number | null; totalChunks: number | null; sealed: number;
-  tokenUri: string | null; migrationSource: string | null; parents: number[];
+  tokenUri: string | null; migrationSource: string | null; parents: number[]; dependencies: number[];
 };
 type Caps = { hasMintedList: boolean; hasSummary: boolean };
 
@@ -217,6 +220,28 @@ const syncTokenParents = async (
   }
 };
 
+// Replace a child's dependency edge set (existence-only edges). Mirrors
+// syncTokenParents; wrapped so a deploy that hasn't applied migration 007 (no
+// inscription_dependencies table) never breaks core summary indexing.
+const syncTokenDependencies = async (
+  env: RuntimeEnv, contractId: string, childId: number, dependencies: number[]
+) => {
+  try {
+    await run(env, 'DELETE FROM inscription_dependencies WHERE contract = ? AND child_id = ?', [contractId, childId]);
+    const now = Date.now();
+    for (const dependencyId of dependencies) {
+      if (!Number.isInteger(dependencyId) || dependencyId <= 0 || dependencyId === childId) continue;
+      await run(
+        env,
+        'INSERT OR IGNORE INTO inscription_dependencies (contract, child_id, dependency_id, updated_at) VALUES (?,?,?,?)',
+        [contractId, childId, dependencyId, now]
+      );
+    }
+  } catch {
+    // inscription_dependencies absent / not yet migrated — skip edge sync.
+  }
+};
+
 const upsertToken = async (env: RuntimeEnv, contractId: string, tokenId: number, s: IndexSummary) => {
   await run(
     env,
@@ -232,6 +257,7 @@ const upsertToken = async (env: RuntimeEnv, contractId: string, tokenId: number,
      s.totalSize, s.totalChunks, s.sealed, s.tokenUri, s.migrationSource, Date.now()]
   );
   await syncTokenParents(env, contractId, tokenId, s.parents ?? []);
+  await syncTokenDependencies(env, contractId, tokenId, s.dependencies ?? []);
 };
 
 // Soft self-expiring lock TTL. Generous relative to a batch sync (which reads
