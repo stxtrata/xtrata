@@ -12,6 +12,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "smoke": "tsx scripts/smoke.ts",
     "faucet": "tsx scripts/faucet.ts",
+    "inspect": "tsx scripts/inspect.ts",
     "lineage": "tsx scripts/lineage.ts",
     "demo": "tsx scripts/demo.ts",
     "demo:dry": "tsx scripts/demo.ts --dry-run"
