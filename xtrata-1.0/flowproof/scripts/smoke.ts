@@ -33,7 +33,7 @@ function loadDotEnv() {
 
 async function main() {
   loadDotEnv();
-  const cfg = loadConfig();
+  const cfg = await loadConfig();
   if (!cfg.senderKey || !cfg.senderAddress) {
     console.error("Set STACKS_PRIVATE_KEY in .env (use the deployer/owner account).");
     process.exit(1);

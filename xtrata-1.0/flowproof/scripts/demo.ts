@@ -117,7 +117,7 @@ async function dryRun() {
 
 async function liveRun() {
   loadDotEnv();
-  const cfg = loadConfig();
+  const cfg = await loadConfig();
   if (!cfg.senderKey || !cfg.senderAddress) {
     console.error("Live run needs STACKS_PRIVATE_KEY in .env (a funded testnet account).");
     console.error("Tip: `npm run demo:dry` runs everything locally with no keys.");
