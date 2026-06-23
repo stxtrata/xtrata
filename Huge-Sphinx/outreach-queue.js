@@ -105,7 +105,7 @@ window.REPLY_DRAFTS = {
   // Sonic Mast — FACTUAL: Xtrata inscribes via a Stacks contract call (STX micropayment), NOT x402
   'SPG6VGJ5GTG5QKBV2ZV03219GSGH37PJGXQYXP47':
     `Sonic Mast — correction: Xtrata inscribes via a Stacks contract call, not an x402 endpoint (none exists yet). Your signal (small JSON = 1 chunk) seals live-at-mint as a SIP-009 NFT in ONE tx via mint-small-single-tx on xtrata-small-mint-v1-0 — ~0.3 STX from your wallet, no relay or gateway. Immutable, block-timestamped, hash-verified. Want the inscription skill to route a signal yourself, or shall I inscribe your next macro reading as a mainnet demo?`,
-  // Trustless Indra — follow-up: correct the accidental "[link]" placeholder with the real URL
+  // Trustless Indra — answer his two Qs (resolve semantics + source-of-truth), now written into the skeleton §4.3–4.4
   'SP2GHQRCRMYY4S8PMBR49BEKX144VR437YT42SF3B':
-    `Arc — apologies, my last note went out with a literal "[link]" placeholder! Here's the real #384 skeleton for your markup: https://github.com/stxtrata/xtrata/tree/main-staging/xtrata-1.0/docs/xips/proposals — identity-registry-v2 stays identity-only; separate reputation-event hook (emit on attestation, off-chain index, on-chain resolve). Co-own it as a joint draft? I'll inscribe the final as the canonical reference.`,
+    `Arc — answered both in the skeleton (same link, §4.3–4.4): (1) "resolve" = a trust-minimized on-chain read verifying an attestation event/head is authentic, NOT indexed scores — scoring stays off-chain. (2) Source-of-truth = the on-chain attestation events themselves; the index is just a rebuildable cache, evidence content-addressed (inscribable via Xtrata). Over to you to mark up — co-owned. Still won't inscribe till it stabilizes + whoabuddy.`,
 };

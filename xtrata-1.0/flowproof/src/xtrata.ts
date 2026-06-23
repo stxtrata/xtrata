@@ -109,6 +109,50 @@ export class XtrataClient {
     return list.map((e: any) => Number(e.value));
   }
 
+  async getLastTokenId(): Promise<number> {
+    const parsed = await callReadOnly({
+      network: this.o.network,
+      senderAddress: this.o.senderAddress,
+      ...this.base(),
+      functionName: "get-last-token-id",
+      functionArgs: [],
+    });
+    const v = parsed?.value?.value ?? parsed?.value;
+    return Number(v ?? 0);
+  }
+
+  async getInscriptionChunks(id: number): Promise<number | null> {
+    const parsed = await callReadOnly({
+      network: this.o.network,
+      senderAddress: this.o.senderAddress,
+      ...this.base(),
+      functionName: "get-inscription-chunks",
+      functionArgs: [uintCV(id)],
+    });
+    const inner = unwrapOptional(parsed);
+    return inner ? Number(inner.value) : null;
+  }
+
+  /** Read an inscription's bytes back from its chunks and decode as UTF-8. */
+  async readContentText(id: number): Promise<string> {
+    const n = (await this.getInscriptionChunks(id)) ?? 1;
+    const indexes = Array.from({ length: n }, (_, i) => uintCV(i));
+    const parsed = await callReadOnly({
+      network: this.o.network,
+      senderAddress: this.o.senderAddress,
+      ...this.base(),
+      functionName: "get-chunk-batch",
+      functionArgs: [uintCV(id), listCV(indexes)],
+    });
+    const arr: any[] = Array.isArray(parsed?.value) ? parsed.value : [];
+    let hex = "";
+    for (const e of arr) {
+      const h = e?.value?.value;
+      if (h) hex += String(h).replace(/^0x/, "");
+    }
+    return Buffer.from(hex, "hex").toString("utf8");
+  }
+
   /**
    * Inscribe an arbitrary asset (the "work") via mint-single-tx.
    * Returns the new token id (the demo's asset inscription).

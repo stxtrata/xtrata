@@ -114,13 +114,13 @@
 <script>
 const HS = { name:'Huge Sphinx', stx:'SP13G0F3E48HDK7MMRYXDHQ4RTACKDN5FSV9VEPRC', btc:'bc1q2knwqf77vp9mhru20hqnrxg00hgzmrpjxxsw0l' };
 const API = (location.protocol==='http:'||location.protocol==='https:') ? '/api' : 'https://aibtc.com/api';
-const LS = { msgs:'hs_archive_msgs', queue:'hs_queue', compose:'hs_compose' };
+const LS = { msgs:'hs_archive_msgs', queue:'hs_queue', compose:'hs_compose', muted:'hs_muted' };
 
 let state = {
   tab:'queue', inbox:null, outbox:null, replies:[],
   agents:[], agentsOffset:0, agentsTotal:null, search:'',
   allAgents:null, scanning:false, scanProgress:0, openSeg:{},
-  qfilter:'all', compose:loadLS(LS.compose)||{to:'',body:''}, live:null
+  qfilter:'all', inboxFilter:'active', compose:loadLS(LS.compose)||{to:'',body:''}, live:null
 };
 const liveWallet = ()=> state.live && state.live.walletLoaded;
 const livePaid   = ()=> state.live && state.live.walletLoaded && state.live.paidEnabled && state.live.x402Available;
@@ -322,10 +322,16 @@ function msgCard(m,dir){
 // Has Huge Sphinx sent anything to this peer AFTER their reply? (= we've already answered)
 function hsAnswered(m){ const sent=(state.outbox&&state.outbox.messages)||[];
   return sent.some(s=>s.peerBtcAddress===m.peerBtcAddress && new Date(s.sentAt)>new Date(m.sentAt)); }
-// Count of inbox items needing attention: unanswered replies (latest per peer) + new received messages.
+// ---- downvote / hide stock replies (keyed by peer + exact content, so identical repeats stay hidden) ----
+function mutedMap(){ return loadLS(LS.muted)||{}; }
+function isMuted(r){ const m=mutedMap()[r.peerBtcAddress]; return !!m && m.includes(r.content); }
+function muteReply(r){ const m=mutedMap(); const a=m[r.peerBtcAddress]||[]; if(!a.includes(r.content)) a.push(r.content); m[r.peerBtcAddress]=a; saveLS(LS.muted,m); }
+function unmuteReply(peer,content){ const m=mutedMap(); const a=(m[peer]||[]).filter(c=>c!==content); if(a.length) m[peer]=a; else delete m[peer]; saveLS(LS.muted,m); }
+function latestPerPeer(list){ const o={}; list.forEach(r=>{ const k=r.peerBtcAddress; if(!o[k]||new Date(r.sentAt)>new Date(o[k].sentAt)) o[k]=r; }); return Object.values(o); }
+function activeReplies(){ return (state.replies||[]).filter(r=>!isMuted(r)); }
+// Count of inbox items needing attention: unanswered ACTIVE replies (latest per peer) + new received messages.
 function inboxAwaiting(){
-  const latest={}; (state.replies||[]).forEach(r=>{ const k=r.peerBtcAddress; if(!latest[k]||new Date(r.sentAt)>new Date(latest[k].sentAt)) latest[k]=r; });
-  const awaiting=Object.values(latest).filter(r=>!hsAnswered(r)).length;
+  const awaiting=latestPerPeer(activeReplies()).filter(r=>!hsAnswered(r)).length;
   const rec=state.inbox?(state.inbox.receivedCount??(state.inbox.messages||[]).length):0;
   return awaiting+rec;
 }
@@ -337,17 +343,35 @@ function threadFor(peerBtc){
 }
 function viewInbox(){
   const i=state.inbox, recv=(i?.messages)||[];
-  const latest={}; (state.replies||[]).forEach(r=>{ const k=r.peerBtcAddress; if(!latest[k]||new Date(r.sentAt)>new Date(latest[k].sentAt)) latest[k]=r; });
-  const reps=Object.values(latest).sort((a,b)=>new Date(b.sentAt)-new Date(a.sentAt));
-  const awaiting=reps.filter(r=>!hsAnswered(r)).length;
-  const all=[...reps.map(r=>({...r,_t:'reply'})), ...recv.map(m=>({...m,_t:'recv'}))];
-  return `<h2>Inbox</h2><p class="sub">Everything addressed to Huge Sphinx — replies to your outreach (free) and new messages agents send you (paid). Reply free to anything new.</p>
+  const muted=(state.replies||[]).filter(isMuted);
+  const activeLatest=latestPerPeer(activeReplies()).sort((a,b)=>new Date(b.sentAt)-new Date(a.sentAt));
+  const awaiting=activeLatest.filter(r=>!hsAnswered(r)).length;
+  const f=state.inboxFilter||'active';
+  const fb=(k,l)=>`<div class="f ${f===k?'on':''}" data-action="inbox-filter" data-f="${k}">${l}</div>`;
+  let listHtml;
+  if(f==='downvoted'){
+    const dv=latestPerPeer(muted).sort((a,b)=>new Date(b.sentAt)-new Date(a.sentAt));
+    listHtml = dv.length? dv.map(downvotedCard).join('') : `<div class="empty">No downvoted replies. Use 👎 on a low-value or stock reply to hide it here.</div>`;
+  } else {
+    const all=[...activeLatest.map(r=>({...r,_t:'reply'})), ...recv.map(m=>({...m,_t:'recv'}))];
+    listHtml = all.length? all.map(x=>x._t==='reply'?replyCard(x):msgCard(x,'in')).join('') : `<div class="empty">Nothing needs you right now. Your ${state.outbox?.totalCount||0} sent message(s) are in the Outbox.</div>`;
+  }
+  return `<h2>Inbox</h2><p class="sub">Everything addressed to Huge Sphinx — replies to your outreach (free) and new messages agents send you (paid). 👎 Downvote stock/auto-responses so they stop asking for a reply.</p>
   <div class="panel"><div class="toolbar">
     <div class="stat"><b>${awaiting}</b><span>awaiting you</span></div>
-    <div class="stat"><b>${reps.length}</b><span>conversations</span></div>
-    <div class="stat"><b>${i?.receivedCount??0}</b><span>new messages</span></div>
-    <div class="stat"><b>${state.outbox?.totalCount??0}</b><span>sent</span></div></div>
-    ${all.length?all.map(x=>x._t==='reply'?replyCard(x):msgCard(x,'in')).join(''):`<div class="empty">Nothing here yet. Your ${state.outbox?.totalCount||0} sent message(s) are in the Outbox — replies and new inbound messages will land here.</div>`}</div>`;
+    <div class="stat"><b>${activeLatest.length}</b><span>conversations</span></div>
+    <div class="stat"><b>${state.outbox?.totalCount??0}</b><span>sent</span></div>
+    <div class="stat"><b>${muted.length}</b><span>downvoted</span></div></div>
+    <div class="filterbar">${fb('active','Active')}${fb('downvoted','Downvoted'+(muted.length?' · '+latestPerPeer(muted).length:''))}</div>
+    ${listHtml}</div>`;
+}
+function downvotedCard(m){
+  const who=m.peerDisplayName||shortAddr(m.peerBtcAddress);
+  return `<div class="msg" style="opacity:.65">
+    <div class="meta"><span class="tag skip">👎 downvoted</span><span class="name">${esc(who)}</span><span>· ${esc(fmt(m.sentAt))}</span>
+      <button class="sm" style="margin-left:auto" data-action="reply-restore" data-rid="${esc(m.messageId)}">↩ Restore</button></div>
+    <div style="font-size:13px;color:var(--dim)">${esc(m.content)}</div>
+  </div>`;
 }
 function replyCard(m){
   const who=m.peerDisplayName||shortAddr(m.peerBtcAddress);
@@ -359,6 +383,7 @@ function replyCard(m){
       <span class="name">${esc(who)}</span><span>· ${esc(fmt(m.sentAt))}</span>
       ${answered?'<span class="tag sent">✓ you replied</span>':''}
       <button class="sm" data-action="tts" data-kind="text" data-text="${esc(m.content)}" data-label="🔊" title="Read aloud">🔊</button>
+      <button class="sm" data-action="reply-downvote" data-rid="${esc(m.messageId)}" title="Downvote & hide this stock/auto-reply so it stops asking for a response">👎</button>
       <span style="margin-left:auto"></span>
       ${answered
         ? `<button class="sm" data-action="thread-toggle" data-role="threadbtn" data-id="${esc(m.peerBtcAddress)}">View thread →</button>`
@@ -641,6 +666,9 @@ document.addEventListener('click',e=>{
     const btn=document.querySelector(`[data-role="threadbtn"][data-id="${peer}"]`); if(btn) btn.textContent=show?'Hide thread':'View thread →';
     return;
   }
+  if(a==='inbox-filter'){ state.inboxFilter=el.dataset.f; renderView(); return; }
+  if(a==='reply-downvote'){ const r=(state.replies||[]).find(x=>x.messageId===el.dataset.rid); if(r) muteReply(r); renderAll(); return; }
+  if(a==='reply-restore'){ const r=(state.replies||[]).find(x=>x.messageId===el.dataset.rid); if(r) unmuteReply(r.peerBtcAddress,r.content); renderAll(); return; }
   if(a==='ai-draft'){
     const to=el.dataset.id||'', rid=el.dataset.rid;
     const rep=(state.replies||[]).find(r=>r.messageId===rid)||{};
