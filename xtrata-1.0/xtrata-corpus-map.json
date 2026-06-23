@@ -1,0 +1,13 @@
+{
+  "xip-011": {
+    "tokenId": "1077",
+    "txid": "0b96fb0c554dc2340f8f839e98c40abc921ae2528ca7ea77a88db9ca6adaee3c",
+    "hash": "9400e2a7e5e0015727360dc560bac21a004767f8b13064321133c808f13fd002",
+    "uri": "xtrata:xip/011",
+    "mime": "text/markdown",
+    "dependencies": [
+      "1052"
+    ],
+    "parents": []
+  }
+}
