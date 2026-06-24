@@ -20,6 +20,10 @@ const staticApps = [
   {
     source: 'flowproof',
     target: 'dist/flowproof'
+  },
+  {
+    source: 'UMG',
+    target: 'dist/UMG'
   }
 ];
 
