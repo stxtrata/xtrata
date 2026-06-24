@@ -240,11 +240,13 @@
   .master .ma{ color:var(--ink-mut); font-size:13px; }
   .master .mstat{ margin-left:auto; text-align:right; font-size:11px; color:var(--ink-faint); }
 
-  .vis-area{ flex:1; position:relative; margin-top:18px; }
+  .vis-area{ flex:1; position:relative; margin-top:18px; min-height:300px; }
 
   /* waveform / lock / shards / split bar / lineage all positioned in .vis-area panels */
   .vpanel{ position:absolute; inset:0; opacity:0; transform:translateY(8px); transition:opacity .5s, transform .5s; pointer-events:none; }
-  .vpanel.show{ opacity:1; transform:none; pointer-events:auto; }
+  /* panels are display-only — never let them intercept clicks meant for the nav arrows */
+  .vpanel{ pointer-events:none; }
+  .vpanel.show{ opacity:1; transform:none; }
 
   .label-row{ display:flex; justify-content:space-between; font-size:12px; color:var(--ink-mut); margin-bottom:8px; }
 
@@ -264,7 +266,7 @@
   .lrow .pct{ color:var(--ink-faint); font-size:11.5px; margin-left:7px; }
 
   /* lineage svg */
-  .lineage-wrap{ width:100%; height:100%; min-height:230px; display:grid; place-items:center; }
+  .lineage-wrap{ width:100%; min-height:230px; display:grid; place-items:center; }
   svg .edge{ stroke:var(--line); stroke-width:1.6; fill:none; stroke-dasharray:200; stroke-dashoffset:200; transition:stroke-dashoffset .7s ease, stroke .4s; }
   svg .edge.on{ stroke-dashoffset:0; stroke:rgba(52,211,192,0.55); }
   svg .node{ opacity:0; transition:opacity .5s, transform .5s; transform-box:fill-box; transform-origin:center; }
@@ -410,6 +412,12 @@
     .vpanel{ position:relative; inset:auto; display:none; opacity:1; transform:none; transition:none; }
     .vpanel.show{ display:block; }
     .lineage-wrap{ min-height:200px; }
+    /* panel sub-label stacks under the main label instead of colliding with it */
+    .label-row{ flex-direction:column; align-items:flex-start; gap:3px; }
+    /* master card: status drops to its own line so it can't overlap the title/artist */
+    .master{ flex-wrap:wrap; }
+    .master > div:not(.cover):not(.mstat){ flex:1 1 auto; min-width:0; }
+    .master .mstat{ flex-basis:100%; margin:8px 0 0; text-align:left; }
 
     /* nav arrows drop into a tidy footer control row */
     .stage-foot{ flex-wrap:wrap; gap:12px; }
