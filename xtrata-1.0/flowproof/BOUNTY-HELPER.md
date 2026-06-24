@@ -63,9 +63,12 @@ The headline: a `flowproof-treasury` contract whose **`deposit-and-prove` routes
 ### Fill these in before submitting
 | Link | What it is | Status |
 |---|---|---|
-| `<REPO_URL>` | Your public GitHub repo (push the `flowproof/` folder as its own repo, or link the subfolder of your xtrata repo) | ⬜ push + paste |
-| `<VIDEO_URL>` | The demo video (record `demo-reel.html`, upload to YouTube/Loom) | ⬜ record + paste |
-| `<TELEGRAM/REGISTRATION>` | The bounty's registration/submission channel from the original post | ⬜ confirm |
+| (https://github.com/stxtrata/xtrata/tree/main-staging/xtrata-1.0/flowproof) | Your public GitHub repo (push the `flowproof/` folder as its own repo, or link the subfolder of your xtrata repo) | ⬜ push + paste |
+| (https://xtrata.xyz/inscription/1081) | The demo video (record `demo-reel.html`, upload to YouTube/Loom) | ⬜ record + paste |
+
+| (https://flow-vault.dev/bounty) | The bounty's URL from the original post | ⬜ confirm |
+
+| (https://t.me/+3ke553QKoj0yZTY1) | The bounty's registration/submission channel from the original post | ⬜ confirm |
 
 ### On-chain evidence (testnet) — live and verifiable
 Explorer base: `https://explorer.hiro.so/...?chain=testnet`
