@@ -16,10 +16,16 @@ const staticApps = [
   {
     source: 'forever-twins',
     target: 'dist/forever-twins'
+  },
+  {
+    source: 'flowproof',
+    target: 'dist/flowproof'
   }
 ];
 
-const ignoredNames = new Set(['.DS_Store', '.git', '.gitignore', '.gitIgnore', 'node_modules']);
+// NOTE: .env / .env.local are excluded so secrets (e.g. a signer key) can never
+// be published to the static site. node_modules/dist excluded for size.
+const ignoredNames = new Set(['.DS_Store', '.git', '.gitignore', '.gitIgnore', 'node_modules', '.env', '.env.local', 'dist']);
 
 const copyStaticApp = async ({ source, target }) => {
   const sourcePath = join(repoRoot, source);
