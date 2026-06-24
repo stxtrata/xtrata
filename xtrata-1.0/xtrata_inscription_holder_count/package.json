@@ -1,0 +1,15 @@
+{
+  "name": "xtrata-holders",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Enumerate all Stacks wallets holding/minting Xtrata inscriptions across v1/v2/v3 for an airdrop.",
+  "scripts": {
+    "start": "node xtrata_holders.mjs",
+    "test": "node test_offline.mjs"
+  },
+  "dependencies": {
+    "@stacks/transactions": "^7.5.0"
+  },
+  "engines": { "node": ">=18" }
+}

@@ -1,0 +1,43 @@
+
+> xtrata-holders@1.0.0 test
+> node test_offline.mjs
+
+
+[1/2] SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1
+  nft asset(s): xtrata | owner fn: get-owner
+  minted tokens: 3
+  current owners: 3/3   
+
+[2/2] SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0
+  nft asset(s): inscription | owner fn: get-owner
+  minted tokens: 2
+  current owners: 2/2   
+
+================ XTRATA HOLDERS SUMMARY ================
+  SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1
+      current holders: 2
+  SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0
+      current holders: 2
+  total inscriptions scanned : 5
+  burned / no owner          : 1
+  owner lookup errors        : 0
+  -----------------------------------------------------
+  UNIQUE WALLETS holding now  : 2   <- holders_current.csv (airdrop list)
+  unique wallets that minted  : 3   <- minters.csv
+  wallets holding in ALL 3    : 1
+  contract/escrow holders     : 1 (holding 1 token(s) — e.g. marketplace listings)
+  -----------------------------------------------------
+  files written to /tmp/xt_test/  (holders_current.csv, minters.csv, detailed.csv)
+=======================================================
+
+--- assertions ---
+PASS current wallets = W1,W2 (W2 in both, marketplace excluded, burned excluded)  got=["SP2X0TZ59D5SZ8ACQ6YMCHHNR2ZN51Z32E2CJ173","SP3BK1NNSWN719Z6KDW05RBGVS940YCN6X84STYPR"]
+PASS minter wallets = W1,W2,W3  got=["SP176ZMV706NZGDDX8VSQRGMB7QN33BBDVZ6BMNHD","SP2X0TZ59D5SZ8ACQ6YMCHHNR2ZN51Z32E2CJ173","SP3BK1NNSWN719Z6KDW05RBGVS940YCN6X84STYPR"]
+PASS holds in ALL contracts = W2  got=["SP2X0TZ59D5SZ8ACQ6YMCHHNR2ZN51Z32E2CJ173"]
+PASS contract/escrow holder = marketplace  got=["SPNWZ5V2TPWGQGVDR6T7B6RQ4XMGZ4PXTEE0VQ0S.marketplace-v4"]
+detailed.csv:
+   address,type,held_v1,held_v2,held_total,minted_total
+   SP176ZMV706NZGDDX8VSQRGMB7QN33BBDVZ6BMNHD,wallet,0,0,0,1
+   SP2X0TZ59D5SZ8ACQ6YMCHHNR2ZN51Z32E2CJ173,wallet,1,1,2,2
+   SP3BK1NNSWN719Z6KDW05RBGVS940YCN6X84STYPR,wallet,1,0,1,2
+   SPNWZ5V2TPWGQGVDR6T7B6RQ4XMGZ4PXTEE0VQ0S.marketplace-v4,contract,0,1,1,0
