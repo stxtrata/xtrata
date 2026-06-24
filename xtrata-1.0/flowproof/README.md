@@ -34,11 +34,17 @@ User/Agent ─▶ FlowVault (money)            ─▶ split → lock → hold   
 
 Two integration patterns (see `docs/ARCHITECTURE.md`):
 
-- **Pattern A — app/agent orchestration** *(this scaffold)*. Autonomous server
-  signer runs the FlowVault flow, then inscribes the receipt. Ships fast.
-- **Pattern B — on-chain composing contract** *(roadmap)*. A `flowproof-treasury`
-  Clarity contract that deposits to FlowVault and inscribes via Xtrata
-  atomically in one tx.
+- **Pattern A — app/agent orchestration.** Autonomous server signer runs the
+  FlowVault flow, then inscribes the receipt (`npm run demo`).
+- **Pattern B — atomic on-chain composing contract** *(implemented)*. The
+  `flowproof-treasury` Clarity contract's `deposit-and-prove` routes a FlowVault
+  deposit **and** inscribes the Xtrata receipt in **one transaction** — both
+  succeed or both revert (`npm run demo:atomic`). This is the composable
+  primitive, not two SDK calls in sequence.
+
+Every receipt is independently checkable with `npm run verify <id>`: it recomputes
+the content hash from on-chain chunks, confirms the lineage edges, and cross-checks
+the amounts against the **real FlowVault event** (the same tx, for atomic receipts).
 
 ## Modeled on the live contracts
 
@@ -79,15 +85,40 @@ npm run demo
 ## Layout
 
 ```
+contracts/
+  flowproof-usdcx.clar     faucet SIP-010 stand-in (testnet; official USDCx is bridge-only)
+  flowproof-treasury.clar  Pattern B: atomic deposit-and-prove (FlowVault + Xtrata in 1 tx)
 src/
-  config.ts        env + both protocols' coordinates (single source of truth)
-  types.ts         FlowReceipt schema + flow/rule/state types
+  config.ts        env + all contract coordinates (single source of truth)
+  types.ts         FlowReceipt schema (mode: orchestrated|atomic) + flow/rule/state types
   receipt.ts       canonical JSON, incremental SHA-256 (matches process-chunk), chunking
-  xtrata.ts        Xtrata v3.2.3 client: single-tx (recursive) mint + reads
-  flowvault.ts     FlowVault SDK wrapper (backend signer mode)
-  orchestrator.ts  ProofOfFlow.runFlow(): money → state → receipt → inscribe
+  xtrata.ts        Xtrata v3.2.3 client: single-tx (recursive) mint + content/lineage reads
+  flowvault.ts     FlowVault SDK wrapper (backend signer, waits for confirmation)
+  treasury.ts      Pattern B client: deposit-and-prove (atomic)
+  orchestrator.ts  ProofOfFlow.runFlow() + buildReceipt
 scripts/
-  demo.ts          royalty scenario (+ payroll), dry-run and live
+  demo.ts          Pattern A royalty scenario (dry-run + live)
+  demo-atomic.ts   Pattern B: atomic sales + withdrawal (full lifecycle)
+  verify.ts        independent receipt verifier (integrity + lineage + money)
+  lineage.ts       walk the chain -> lineage.json (for explorer.html)
+  deploy-token.ts  deploy the faucet USDCx stand-in
+  deploy-treasury.ts  deploy the Pattern B composing contract
+  faucet.ts / inspect.ts / usdcx-state.ts / smoke.ts   funding + diagnostics
+explorer.html      live lineage visualizer (renders lineage.json)
+deploy.html        wallet-signed contract deployer (Leather/Xverse)
+```
+
+## Run the full thing (testnet)
+
+```bash
+npm install
+cp .env.example .env          # add STACKS_PRIVATE_KEY (or seed); XTRATA address is preset
+npm run deploy-token          # faucet USDCx stand-in (FlowVault takes any SIP-010)
+npm run faucet 1000           # mint test USDCx to yourself
+npm run deploy-treasury       # Pattern B composing contract
+npm run demo:atomic           # atomic deposit+inscribe x2, then a withdrawal receipt
+npm run verify <receiptId>    # independently verify any receipt against the chain
+npm run lineage && npx serve . # open explorer.html to see the lineage
 ```
 
 ## Judging-criteria map
@@ -105,6 +136,8 @@ script, and the day-by-day plan.
 
 ## Status
 
-Pattern A scaffold: clients, orchestrator, receipt pipeline, dry-run demo.
-Next: deploy Xtrata to testnet, wire a funded key, record the live run; then the
-minimal lineage UI and the Pattern B composing contract.
+Live on Stacks testnet, end-to-end:
+- Xtrata `xtrata-v3-2-3` deployed; full inscription + recursive lineage verified (`npm run smoke`).
+- Pattern A orchestrated flow (`npm run demo`) and **Pattern B atomic** `deposit-and-prove` (`npm run demo:atomic`).
+- Full lifecycle: deposit, split, time-lock, **withdrawal** receipts — all inscribed and linked.
+- Independent verifier (`npm run verify`) and live lineage explorer (`explorer.html`).

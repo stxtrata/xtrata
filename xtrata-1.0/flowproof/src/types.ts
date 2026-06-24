@@ -11,7 +11,10 @@
  * receipt is independently verifiable and the chain cannot be edited or lost.
  */
 
-export type FlowKind = "royalty-split" | "payroll" | "dao-payout" | "savings-lock";
+export type FlowKind = "royalty-split" | "payroll" | "dao-payout" | "savings-lock" | "withdrawal";
+
+/** How the receipt was produced: app-orchestrated (2 txs) or atomic (1 tx, Pattern B). */
+export type ReceiptMode = "orchestrated" | "atomic";
 
 /** Mirrors FlowVault's principal-scoped routing rule model. */
 export interface RoutingRules {
@@ -42,6 +45,7 @@ export interface ReceiptLinks {
 export interface FlowReceipt {
   std: "flowproof.receipt";
   v: 1;
+  mode: ReceiptMode;
   flow: FlowKind;
   /** "<address>.<name>" of the FlowVault contract used. */
   vault: string;

@@ -28,6 +28,8 @@
   .tok b { color: var(--ink); }
   .badge { font-size: 11px; padding: 3px 8px; border-radius: 999px; background: #ffffff14; color: var(--ink); }
   .badge.flow { background: var(--brand); color: #fff; }
+  .badge.atomic { background: #16a34a; color: #fff; }
+  .card.wd { border-color: #6b7a3a; background: linear-gradient(180deg, #1c2014, #15170f); }
   .title { font-size: 16px; font-weight: 650; margin: 10px 0 4px; }
   .amount { font-size: 26px; font-weight: 750; margin: 4px 0 10px; }
   .amount span { font-size: 13px; color: var(--mut); font-weight: 500; }
@@ -36,9 +38,10 @@
   .row .k { color: var(--mut); } .row .v { font-variant-numeric: tabular-nums; }
   .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: middle; }
   .dot.split { background: var(--split); } .dot.lock { background: var(--lock); } .dot.hold { background: var(--ok); }
-  .meta { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--mut); word-break: break-all; }
+  .meta { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--mut); overflow-wrap: anywhere; word-break: normal; hyphens: none; }
+  .meta a, .meta code { overflow-wrap: anywhere; word-break: break-all; }
   .meta a { color: #9fb6ff; text-decoration: none; } .meta a:hover { text-decoration: underline; }
-  .assetbody { font-size: 13px; color: #cdd; margin-top: 8px; word-break: break-word; max-height: 120px; overflow: auto; }
+  .assetbody { font-size: 13px; color: #cdd; margin-top: 8px; overflow-wrap: anywhere; word-break: normal; hyphens: none; max-height: 120px; overflow: auto; }
   .arrow { align-self: center; flex: 0 0 46px; display: flex; flex-direction: column; align-items: center; color: var(--mut); }
   .arrow .ln { width: 100%; height: 2px; background: linear-gradient(90deg, #ffffff20, var(--brand)); }
   .arrow .lbl { font-size: 10px; margin-top: 6px; color: var(--mut); white-space: nowrap; }
@@ -69,18 +72,32 @@
 
   function receiptCard(node, i) {
     const r = node.receipt;
-    const split = r.split ? `<div class="row"><span class="k"><span class="dot split"></span>Split → ${r.split.to.slice(0,6)}…${r.split.to.slice(-4)}</span><span class="v">${fmt(r.split.amount)}</span></div>` : "";
-    const lock = r.lock ? `<div class="row"><span class="k"><span class="dot lock"></span>Locked → block ${r.lock.untilBlock}</span><span class="v">${fmt(r.lock.amount)}</span></div>` : "";
-    const hold = `<div class="row"><span class="k"><span class="dot hold"></span>Held (unlocked)</span><span class="v">${fmt(r.unlocked)}</span></div>`;
-    const dep = isTxid(r.depositTxid)
-      ? `deposit <a href="${txLink(r.depositTxid)}" target="_blank">${String(r.depositTxid).slice(0,10)}…</a>`
-      : `deposit <code class="k">${r.depositTxid}</code>`;
-    return el(`<div class="node" style="animation-delay:${i*120}ms"><div class="card">
-      <div class="tok"><span>inscription <b>#${node.id}</b></span><span class="badge flow">${r.flow}</span></div>
-      <div class="title">Royalty receipt</div>
-      <div class="amount">${fmt(r.amount)} <span>${r.token.toUpperCase()} in</span></div>
-      <div class="rows">${split}${lock}${hold}</div>
-      <div class="meta">${dep}<br/>vault <code class="k">${(r.vault||'').split('.').pop()}</code> · block ${r.block}
+    const isW = r.flow === "withdrawal";
+    const modeBadge = r.mode === "atomic"
+      ? `<span class="badge atomic">atomic</span>`
+      : `<span class="badge">orchestrated</span>`;
+    let title, amountLabel, rows;
+    if (isW) {
+      title = "Withdrawal";
+      amountLabel = `${(r.token||'').toUpperCase()} out`;
+      rows = `<div class="row"><span class="k"><span class="dot hold"></span>Withdrawn to owner</span><span class="v">${fmt(r.amount)}</span></div>`;
+    } else {
+      title = "Royalty receipt";
+      amountLabel = `${(r.token||'').toUpperCase()} in`;
+      const split = r.split ? `<div class="row"><span class="k"><span class="dot split"></span>Split &rarr; ${r.split.to.slice(0,6)}…${r.split.to.slice(-4)}</span><span class="v">${fmt(r.split.amount)}</span></div>` : "";
+      const lock = r.lock ? `<div class="row"><span class="k"><span class="dot lock"></span>Locked &rarr; block ${r.lock.untilBlock}</span><span class="v">${fmt(r.lock.amount)}</span></div>` : "";
+      const hold = `<div class="row"><span class="k"><span class="dot hold"></span>Held (unlocked)</span><span class="v">${fmt(r.unlocked)}</span></div>`;
+      rows = split + lock + hold;
+    }
+    const tx = isTxid(r.depositTxid)
+      ? `${isW ? "withdraw" : "deposit"} <a href="${txLink(r.depositTxid)}" target="_blank">${String(r.depositTxid).slice(0,10)}…</a>`
+      : (r.mode === "atomic" ? `<b>one atomic tx</b> (deposit + receipt minted together)` : `deposit <code class="k">${r.depositTxid||"-"}</code>`);
+    return el(`<div class="node" style="animation-delay:${i*120}ms"><div class="card${isW?' wd':''}">
+      <div class="tok"><span>inscription <b>#${node.id}</b></span><span>${modeBadge} <span class="badge flow">${r.flow}</span></span></div>
+      <div class="title">${title}</div>
+      <div class="amount">${fmt(r.amount)} <span>${amountLabel}</span></div>
+      <div class="rows">${rows}</div>
+      <div class="meta">${tx}<br/>vault <code class="k">${(r.vault||'').split('.').pop()}</code> · block ${r.block}
       <br/>links: parents ${JSON.stringify(node.parents)} · deps ${JSON.stringify(node.dependencies)}</div>
     </div></div>`);
   }

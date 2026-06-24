@@ -11,10 +11,16 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "smoke": "tsx scripts/smoke.ts",
+    "deploy-token": "tsx scripts/deploy-token.ts",
+    "deploy-treasury": "tsx scripts/deploy-treasury.ts",
     "faucet": "tsx scripts/faucet.ts",
+    "mint-usdcx": "tsx scripts/mint-usdcx.ts",
     "inspect": "tsx scripts/inspect.ts",
+    "usdcx:state": "tsx scripts/usdcx-state.ts",
     "lineage": "tsx scripts/lineage.ts",
+    "verify": "tsx scripts/verify.ts",
     "demo": "tsx scripts/demo.ts",
+    "demo:atomic": "tsx scripts/demo-atomic.ts",
     "demo:dry": "tsx scripts/demo.ts --dry-run"
   },
   "dependencies": {

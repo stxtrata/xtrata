@@ -38,13 +38,38 @@ Receipt content hash MUST equal the contract's `process-chunk` chain:
 `next = sha256(concat(running, chunk))` from 32 zero bytes. Implemented in
 `receipt.ts::computeExpectedHash`. Divergence → `ERR-HASH-MISMATCH (u103)`.
 
-## Pattern B — on-chain composing contract (roadmap)
-A `flowproof-treasury` Clarity contract that, in one transaction, calls
-`flowvault-v2.deposit` (passing the SIP-010 token trait) and
-`xtrata-v3-2-3.mint-single-tx-with-relationships`. Strongest possible
-"composability + deep integration" proof. Note: FlowVault rules are
-principal-scoped, so the contract becomes the treasury principal — ideal for the
-DAO/escrow treasury case, not per-user vaults.
+## Pattern B — atomic on-chain composing contract (implemented)
+`flowproof-treasury.deposit-and-prove` calls, in ONE transaction:
+`flowvault-v2.deposit` (token passed as SIP-010 trait) then
+`xtrata-v3-2-3.mint-single-tx-with-relationships`. Both succeed or both revert —
+money movement and its permanent record are atomic. This is the composable
+primitive (not two SDK calls in sequence).
+
+Key property: `tx-sender` propagates through `contract-call?` (no `as-contract`),
+so FlowVault applies the **user's** routing rules and moves the **user's** tokens,
+and Xtrata records the **user** as the inscription creator/owner. The treasury
+contract is pure glue with no custody. (While Xtrata is paused, the user must be
+the Xtrata owner or the treasury must be an allow-listed caller; for the live demo
+the deployer is the owner.)
+
+Atomic receipts carry `mode: "atomic"` and an empty `depositTxid` — the receipt's
+own mint tx *is* the deposit tx.
+
+## Full lifecycle
+Receipts are inscribed for the whole money lifecycle, each linked into the chain:
+deposit/split/lock (`royalty-split`, `payroll`, ...) and `withdrawal`. The result
+is a complete, append-only, on-chain audit trail per asset/treasury.
+
+## Independent verifier (`scripts/verify.ts`)
+Trustless check of any receipt from public chain data only:
+1. **Integrity** — recompute the content hash from on-chain chunks; must equal the
+   inscription's stored `final-hash`.
+2. **Lineage** — on-chain `get-parents`/`get-dependencies` must equal the receipt's
+   `links` (prevReceipt / assetInscription).
+3. **Money** — the receipt's amounts must equal the real FlowVault `deposit`/
+   `withdraw` print event. For atomic receipts the mint tx is found via the NFT
+   history API and must be a `flowproof-treasury` call carrying that same event —
+   proving the money and the record happened in one transaction.
 
 ## Trust model
 - Receipts are stored *in* the inscription (on-chain bytes), not a link to

@@ -9,10 +9,13 @@
  * Routing pipeline (deterministic, from docs.flow-vault.dev/docs/contracts):
  *   deposit -> split (to splitAddress) -> lock (until block) -> hold remainder.
  */
+import type { StacksNetwork } from "@stacks/network";
+import { waitForConfirmation } from "./stacks.js";
 import type { RoutingRules, VaultStateSnapshot } from "./types.js";
 
 export interface FlowVaultClientOpts {
   networkName: "testnet" | "mainnet";
+  network: StacksNetwork;
   contractAddress: string;
   contractName: string; // "flowvault-v2"
   tokenContractAddress: string;
@@ -50,6 +53,12 @@ export class FlowVaultClient {
     return this.vault;
   }
 
+  /** Broadcast, then wait for confirmation so subsequent txs get a clean nonce. */
+  private async confirmed(txid: string): Promise<string> {
+    await waitForConfirmation(txid, this.o.network);
+    return txid;
+  }
+
   async setRoutingRules(rules: RoutingRules): Promise<string> {
     const v = await this.sdk();
     const res = await v.setRoutingRules({
@@ -58,22 +67,22 @@ export class FlowVaultClient {
       splitAddress: rules.splitAddress,
       splitAmount: rules.splitAmount,
     });
-    return normalizeTxid(res);
+    return this.confirmed(normalizeTxid(res));
   }
 
   async deposit(amount: string): Promise<string> {
     const v = await this.sdk();
-    return normalizeTxid(await v.deposit(amount));
+    return this.confirmed(normalizeTxid(await v.deposit(amount)));
   }
 
   async withdraw(amount: string): Promise<string> {
     const v = await this.sdk();
-    return normalizeTxid(await v.withdraw(amount));
+    return this.confirmed(normalizeTxid(await v.withdraw(amount)));
   }
 
   async clearRoutingRules(): Promise<string> {
     const v = await this.sdk();
-    return normalizeTxid(await v.clearRoutingRules());
+    return this.confirmed(normalizeTxid(await v.clearRoutingRules()));
   }
 
   async getCurrentBlockHeight(): Promise<number> {

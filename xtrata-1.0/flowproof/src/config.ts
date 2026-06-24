@@ -30,6 +30,8 @@ export interface FlowProofConfig {
   flowvault: { address: string; name: string };
   usdcx: { address: string; name: string };
   xtrata: { address: string; name: string };
+  /** Pattern B composing contract (deposit-and-prove). */
+  treasury: { address: string; name: string };
 
   xtrataIndexBaseUrl: string;
 }
@@ -76,6 +78,10 @@ export async function loadConfig(): Promise<FlowProofConfig> {
     flowvault: { address: req("FLOWVAULT_CONTRACT_ADDRESS"), name: req("FLOWVAULT_CONTRACT_NAME") },
     usdcx: { address: req("USDCX_CONTRACT_ADDRESS"), name: req("USDCX_CONTRACT_NAME") },
     xtrata: { address: req("XTRATA_CONTRACT_ADDRESS"), name: opt("XTRATA_CONTRACT_NAME", "xtrata-v3-2-3") },
+    treasury: {
+      address: opt("TREASURY_CONTRACT_ADDRESS") || senderAddress || req("XTRATA_CONTRACT_ADDRESS"),
+      name: opt("TREASURY_CONTRACT_NAME", "flowproof-treasury"),
+    },
     xtrataIndexBaseUrl: opt("XTRATA_INDEX_BASE_URL"),
   };
 }
