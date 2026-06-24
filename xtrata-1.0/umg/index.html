@@ -181,7 +181,7 @@
     position:relative;
     border:1px solid var(--line); border-radius:22px; overflow:hidden;
     background:linear-gradient(180deg, rgba(23,25,34,0.7), rgba(12,13,17,0.7));
-    backdrop-filter:blur(4px);
+    -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px);
   }
   .stepper{
     display:flex; gap:4px; padding:14px 16px; border-bottom:1px solid var(--line-2);
@@ -388,6 +388,63 @@
 
   ::selection{ background:rgba(247,147,26,0.3); color:#fff; }
 
+  /* ============================================================
+     MOBILE / VERTICAL SCREENS — distinct, non-overlapping layout
+     ============================================================ */
+  @media(max-width:880px){
+    .wrap{ padding:0 20px; }
+    .sec{ padding:64px 0; }
+    .sec-head{ margin-bottom:34px; }
+
+    /* hero */
+    .hero{ padding:124px 0 60px; }
+    .hero p.lede{ font-size:15.5px; }
+    .hero-vis{ max-width:300px; margin:6px auto 0; }
+
+    /* demo: panels flow vertically instead of stacking on top of each other */
+    .stage-body{ min-height:0; }
+    .stage-vis{ padding:20px; }
+    .stage-narr{ padding:24px 20px; }
+    .stage-narr h3{ font-size:24px; }
+    .vis-area{ flex:none; min-height:0; margin-top:16px; }
+    .vpanel{ position:relative; inset:auto; display:none; opacity:1; transform:none; transition:none; }
+    .vpanel.show{ display:block; }
+    .lineage-wrap{ min-height:200px; }
+
+    /* nav arrows drop into a tidy footer control row */
+    .stage-foot{ flex-wrap:wrap; gap:12px; }
+    .nav-arrow, .nav-arrow:hover, .nav-arrow:disabled:hover{ position:static; transform:none; }
+    .nav-arrow{ width:46px; height:46px; font-size:24px; }
+    .nav-arrow.prev{ order:1; }
+    .progress-label{ order:2; flex:1; text-align:center; }
+    .nav-arrow.next{ order:3; }
+    .nav-hint{ display:none; }
+
+    /* expand cards: stack the today / with-Xtrata comparison */
+    .contrast{ flex-direction:column; gap:0; }
+    .contrast .col:first-child{ padding:0 0 14px; border-right:none; border-bottom:1px solid var(--line-2); }
+    .contrast .col:last-child{ padding:14px 0 0; }
+  }
+
+  @media(max-width:560px){
+    .wrap{ padding:0 16px; }
+    .verbs span{ font-size:40px; }
+    .hero h1.sub{ font-size:21px; line-height:1.3; }
+    .sec-head h2{ font-size:29px; }
+    .navtag{ display:none; }
+    .brand{ letter-spacing:0.2em; font-size:13px; }
+    .brand .lock{ display:none; }
+    /* compact numbered stepper (the active step name shows in the footer) */
+    .stepper{ padding:10px; gap:6px; }
+    .step-dot{ padding:6px; }
+    .step-dot span:not(.b){ display:none; }
+    .xcard{ padding:24px 20px; }
+    .xcard h3{ font-size:25px; }
+    .feat{ padding:24px 20px; }
+    .tcard{ padding:26px 22px; }
+    .pilot-card{ padding:30px 20px; }
+  }
+
   @media (prefers-reduced-motion: reduce){
     *{ animation:none !important; transition-duration:.01ms !important; scroll-behavior:auto; }
     .reveal{ opacity:1; transform:none; }
@@ -503,16 +560,12 @@
     <div class="sec-head reveal">
       <span class="eyebrow">The demonstration · interactive</span>
       <h2>A master's life on Xtrata</h2>
-      <p>Follow one recording from ingest to a self-documenting revenue stream. <b style="color:var(--ink-soft)">Press play</b>, or click through each step. Watch how <span class="x">Xtrata</span> records provenance and <span class="f">FlowVault</span> moves the money — and how the two compose into a proof chain that builds itself.</p>
+      <p>Follow one recording from ingest to a self-documenting revenue stream. <b style="color:var(--ink-soft)">Step through with the arrows</b> (or your ← → keys). Watch how <span class="x">Xtrata</span> records provenance and <span class="f">FlowVault</span> moves the money — and how the two compose into a proof chain that builds itself.</p>
     </div>
 
     <div class="stage reveal d1">
       <!-- stepper -->
       <div class="stepper" id="stepper"></div>
-
-      <!-- side navigation arrows -->
-      <button class="nav-arrow prev" id="prevBtn" aria-label="Previous step">‹</button>
-      <button class="nav-arrow next" id="nextBtn" aria-label="Next step">›</button>
 
       <div class="stage-body">
         <!-- visual side -->
@@ -652,10 +705,12 @@
         </div>
       </div>
 
-      <!-- footer: progress + hint -->
+      <!-- footer: nav arrows (pinned to stage edges on desktop, inline row on mobile) + progress -->
       <div class="stage-foot">
+        <button class="nav-arrow prev" id="prevBtn" aria-label="Previous step">‹</button>
         <div class="progress-label"><span id="stepNo">1</span> / 7 · <span id="stepName">Ingest &amp; fingerprint</span></div>
         <div class="nav-hint">Use the arrows, or your ← → keys</div>
+        <button class="nav-arrow next" id="nextBtn" aria-label="Next step">›</button>
       </div>
     </div>
   </div>
