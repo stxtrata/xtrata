@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { loadConfig } from "../src/config.js";
 import { XtrataClient } from "../src/xtrata.js";
+import { cvToHex, uintCV } from "@stacks/transactions";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -22,6 +23,22 @@ function loadDotEnv() {
     if (m && m[1] && process.env[m[1]] === undefined) {
       process.env[m[1]] = (m[2] ?? "").replace(/^["']|["']$/g, "");
     }
+  }
+}
+
+/** Find the tx that minted a given inscription, via the public NFT history API. */
+async function findMintTx(api: string, addr: string, name: string, id: number): Promise<string | null> {
+  const asset = `${addr}.${name}::xtrata-inscription`;
+  const value = cvToHex(uintCV(id));
+  try {
+    const r = await fetch(`${api}/extended/v1/tokens/nft/history?asset_identifier=${encodeURIComponent(asset)}&value=${value}`);
+    if (!r.ok) return null;
+    const j: any = await r.json();
+    const results: any[] = j.results ?? [];
+    const mint = results.find((e) => e.asset_event_type === "mint") ?? results[results.length - 1];
+    return mint?.tx_id ? String(mint.tx_id).replace(/^0x/, "") : null;
+  } catch {
+    return null;
   }
 }
 
@@ -41,6 +58,8 @@ async function main() {
     senderKey: cfg.senderKey ?? "00".repeat(32),
     senderAddress: cfg.senderAddress ?? cfg.xtrata.address,
   });
+
+  const api = cfg.networkName === "mainnet" ? "https://api.hiro.so" : "https://api.testnet.hiro.so";
 
   const argTip = process.argv.slice(2).find((a) => /^\d+$/.test(a));
   const tip = argTip ? Number(argTip) : await record.getLastTokenId();
@@ -72,12 +91,23 @@ async function main() {
   if (assetId != null) {
     let content = "";
     try { content = await record.readContentText(assetId); } catch { /* ignore */ }
-    asset = { id: assetId, content };
+    asset = { id: assetId, content, mintTxid: await findMintTx(api, cfg.xtrata.address, cfg.xtrata.name, assetId) };
+  }
+
+  // Deep-link data for the explorer: each inscription's mint tx (via NFT history).
+  for (const r of receipts) {
+    r.mintTxid = await findMintTx(api, cfg.xtrata.address, cfg.xtrata.name, r.id);
   }
 
   const out = {
     network: cfg.networkName,
     contract: `${cfg.xtrata.address}.${cfg.xtrata.name}`,
+    contracts: {
+      xtrata: `${cfg.xtrata.address}.${cfg.xtrata.name}`,
+      treasury: `${cfg.treasury.address}.${cfg.treasury.name}`,
+      flowvault: `${cfg.flowvault.address}.${cfg.flowvault.name}`,
+      token: `${cfg.usdcx.address}.${cfg.usdcx.name}`,
+    },
     generatedAt: new Date().toISOString(),
     asset,
     receipts,

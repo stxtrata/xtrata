@@ -1,14 +1,22 @@
 {
   "network": "testnet",
   "contract": "STRNRHWSD7REAEXVTHDQWKPD4MFBG41024WQKBBM.xtrata-v3-2-3",
+  "contracts": {
+    "xtrata": "STRNRHWSD7REAEXVTHDQWKPD4MFBG41024WQKBBM.xtrata-v3-2-3",
+    "treasury": "STRNRHWSD7REAEXVTHDQWKPD4MFBG41024WQKBBM.flowproof-treasury",
+    "flowvault": "STD7QG84VQQ0C35SZM2EYTHZV4M8FQ0R7YNSQWPD.flowvault-v2",
+    "token": "STRNRHWSD7REAEXVTHDQWKPD4MFBG41024WQKBBM.usdcx"
+  },
   "generatedAt": "2026-06-23T21:45:36.113Z",
   "asset": {
     "id": 8,
+    "mintTxid": "5c6c3e7f0089e9b63869180a50557d5f14e038a3554a5d93eb37ee55a6e11ad1",
     "content": "FlowProof atomic demo track - (c) creator 2026-06-23T21:41:26.055Z"
   },
   "receipts": [
     {
       "id": 9,
+      "mintTxid": "be12e2843a5896eda9834d01dab9da9b39c587d2a49a4f3cde2ccd97acc3e07b",
       "parents": [],
       "dependencies": [
         8
@@ -41,6 +49,7 @@
     },
     {
       "id": 10,
+      "mintTxid": "846ffe6a696432345ee3eaf819327395d2d859ab2d35cc17700e5018be2c73fa",
       "parents": [
         9
       ],
@@ -75,6 +84,7 @@
     },
     {
       "id": 11,
+      "mintTxid": "effbfc7021edd9cb9d43153ace946ed1f54c53689168173bf1036fdbb01bc21b",
       "parents": [
         10
       ],

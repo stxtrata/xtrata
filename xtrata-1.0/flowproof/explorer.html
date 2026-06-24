@@ -40,6 +40,11 @@
   .dot.split { background: var(--split); } .dot.lock { background: var(--lock); } .dot.hold { background: var(--ok); }
   .meta { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--mut); overflow-wrap: anywhere; word-break: normal; hyphens: none; }
   .meta a, .meta code { overflow-wrap: anywhere; word-break: break-all; }
+  .meta a, .tok a, .row a, .assetbody a { color: #9fb6ff; text-decoration: none; }
+  .meta a:hover, .tok a:hover, .row a:hover { text-decoration: underline; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .chips a { font-size: 12px; color: #cfd3ff; background: #ffffff10; border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; text-decoration: none; }
+  .chips a:hover { background: #ffffff1f; }
   .meta a { color: #9fb6ff; text-decoration: none; } .meta a:hover { text-decoration: underline; }
   .assetbody { font-size: 13px; color: #cdd; margin-top: 8px; overflow-wrap: anywhere; word-break: normal; hyphens: none; max-height: 120px; overflow: auto; }
   .arrow { align-self: center; flex: 0 0 46px; display: flex; flex-direction: column; align-items: center; color: var(--mut); }
@@ -54,6 +59,7 @@
   <header>
     <h1>FlowProof <span class="pill">Proof-of-Flow</span></h1>
     <div class="sub" id="sub">Loading lineage…</div>
+    <div class="chips" id="chips"></div>
   </header>
   <div class="wrap">
     <div id="chain" class="chain"></div>
@@ -67,7 +73,13 @@
     return frac ? `${whole}.${frac}` : `${whole}`;
   };
   const isTxid = (s) => typeof s === "string" && /^0x?[0-9a-f]{64}$/i.test(s);
-  const txLink = (s) => `https://explorer.hiro.so/txid/${String(s).replace(/^0x/, "")}?chain=testnet`;
+  let NET = "testnet";
+  const ID2TX = {};
+  const hiro = (p) => `https://explorer.hiro.so/${p}?chain=${NET}`;
+  const txLink = (s) => hiro(`txid/0x${String(s).replace(/^0x/, "")}`);
+  const addrLink = (a) => hiro(`address/${a}`);
+  const ctrLink = (id) => hiro(`txid/${id}`);
+  const linkId = (n) => ID2TX[n] ? `<a href="${txLink(ID2TX[n])}" target="_blank">#${n}</a>` : `#${n}`;
   const el = (html) => { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; };
 
   function receiptCard(node, i) {
@@ -84,29 +96,35 @@
     } else {
       title = "Royalty receipt";
       amountLabel = `${(r.token||'').toUpperCase()} in`;
-      const split = r.split ? `<div class="row"><span class="k"><span class="dot split"></span>Split &rarr; ${r.split.to.slice(0,6)}…${r.split.to.slice(-4)}</span><span class="v">${fmt(r.split.amount)}</span></div>` : "";
+      const split = r.split ? `<div class="row"><span class="k"><span class="dot split"></span>Split &rarr; <a href="${addrLink(r.split.to)}" target="_blank">${r.split.to.slice(0,6)}…${r.split.to.slice(-4)} ↗</a></span><span class="v">${fmt(r.split.amount)}</span></div>` : "";
       const lock = r.lock ? `<div class="row"><span class="k"><span class="dot lock"></span>Locked &rarr; block ${r.lock.untilBlock}</span><span class="v">${fmt(r.lock.amount)}</span></div>` : "";
       const hold = `<div class="row"><span class="k"><span class="dot hold"></span>Held (unlocked)</span><span class="v">${fmt(r.unlocked)}</span></div>`;
       rows = split + lock + hold;
     }
-    const tx = isTxid(r.depositTxid)
-      ? `${isW ? "withdraw" : "deposit"} <a href="${txLink(r.depositTxid)}" target="_blank">${String(r.depositTxid).slice(0,10)}…</a>`
-      : (r.mode === "atomic" ? `<b>one atomic tx</b> (deposit + receipt minted together)` : `deposit <code class="k">${r.depositTxid||"-"}</code>`);
+    const mintUrl = node.mintTxid ? txLink(node.mintTxid) : null;
+    const moneyTxid = isW ? r.depositTxid : (r.mode === "atomic" ? node.mintTxid : r.depositTxid);
+    const moneyLabel = isW ? "withdraw tx" : (r.mode === "atomic" ? "atomic tx — deposit + receipt" : "deposit tx");
+    const moneyLink = isTxid(String(moneyTxid||"")) ? `<a href="${txLink(moneyTxid)}" target="_blank">${moneyLabel} ↗</a>` : `${moneyLabel}: pending`;
+    const idCell = mintUrl ? `inscription <a href="${mintUrl}" target="_blank"><b>#${node.id}</b> ↗</a>` : `inscription <b>#${node.id}</b>`;
+    const vaultCell = `vault <a href="${ctrLink(r.vault)}" target="_blank">${(r.vault||'').split('.').pop()} ↗</a>`;
     return el(`<div class="node" style="animation-delay:${i*120}ms"><div class="card${isW?' wd':''}">
-      <div class="tok"><span>inscription <b>#${node.id}</b></span><span>${modeBadge} <span class="badge flow">${r.flow}</span></span></div>
+      <div class="tok"><span>${idCell}</span><span>${modeBadge} <span class="badge flow">${r.flow}</span></span></div>
       <div class="title">${title}</div>
       <div class="amount">${fmt(r.amount)} <span>${amountLabel}</span></div>
       <div class="rows">${rows}</div>
-      <div class="meta">${tx}<br/>vault <code class="k">${(r.vault||'').split('.').pop()}</code> · block ${r.block}
-      <br/>links: parents ${JSON.stringify(node.parents)} · deps ${JSON.stringify(node.dependencies)}</div>
+      <div class="meta">${moneyLink}<br/>${vaultCell} · block ${r.block}
+      <br/>links: parents ${node.parents.map(linkId).join(', ')||'—'} · deps ${node.dependencies.map(linkId).join(', ')||'—'}</div>
     </div></div>`);
   }
   function assetCard(asset, i) {
+    const mintUrl = asset.mintTxid ? txLink(asset.mintTxid) : null;
+    const idCell = mintUrl ? `inscription <a href="${mintUrl}" target="_blank"><b>#${asset.id}</b> ↗</a>` : `inscription <b>#${asset.id}</b>`;
+    const link = mintUrl ? `<a href="${mintUrl}" target="_blank">view inscription tx ↗</a> · ` : "";
     return el(`<div class="node" style="animation-delay:${i*120}ms"><div class="card asset">
-      <div class="tok"><span>inscription <b>#${asset.id}</b></span><span class="badge">asset</span></div>
+      <div class="tok"><span>${idCell}</span><span class="badge">asset</span></div>
       <div class="title">The work</div>
       <div class="assetbody">${(asset.content||"(binary)").replace(/[<>&]/g, c=>({ "<":"&lt;",">":"&gt;","&":"&amp;" }[c]))}</div>
-      <div class="meta">fully on-chain · the thing every receipt links back to</div>
+      <div class="meta">${link}fully on-chain · every receipt links back to this</div>
     </div></div>`);
   }
   const arrow = (lbl) => el(`<div class="arrow node"><div class="ln"></div><div class="lbl">${lbl}</div></div>`);
@@ -121,9 +139,28 @@
          <code class="k">cd flowproof &amp;&amp; npm run lineage</code><br/><br/>then reload this page (served via <code class="k">npx serve .</code>).</div>`;
       return;
     }
+    NET = data.network || "testnet";
     const when = new Date(data.generatedAt).toLocaleString();
     document.getElementById("sub").innerHTML =
       `Live on-chain lineage from <code>${data.contract}</code> · ${data.network} · pulled ${when}`;
+
+    // id -> mint tx, so cards (and parent/dep refs) can deep-link
+    if (data.asset) ID2TX[data.asset.id] = data.asset.mintTxid;
+    data.receipts.forEach((n) => { ID2TX[n.id] = n.mintTxid; });
+
+    // header chips: click straight to each contract / wallet on the explorer
+    const c = data.contracts || {};
+    const xtrata = c.xtrata || data.contract;
+    const flowvault = c.flowvault || (data.receipts.find((n) => n.receipt && n.receipt.vault) || {}).receipt?.vault;
+    const chipsArr = [];
+    if (c.treasury) chipsArr.push(["Treasury — atomic composer", ctrLink(c.treasury)]);
+    if (xtrata) chipsArr.push(["Xtrata — records", ctrLink(xtrata)]);
+    if (flowvault) chipsArr.push(["FlowVault — money", ctrLink(flowvault)]);
+    if (c.token) chipsArr.push(["USDCx token", ctrLink(c.token)]);
+    const deployer = String(xtrata || "").split(".")[0];
+    if (deployer) chipsArr.push(["Deployer wallet", addrLink(deployer)]);
+    const chipsEl = document.getElementById("chips");
+    if (chipsEl) chipsEl.innerHTML = chipsArr.map(([t, u]) => `<a href="${u}" target="_blank">${t} ↗</a>`).join("");
 
     const chain = document.getElementById("chain");
     let i = 0;
