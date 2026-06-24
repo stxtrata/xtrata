@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FlowProof — Bounty Form Answers</title>
+<style>
+  :root{--bg:#0e0e14;--card:#16161f;--ink:#ECECF2;--mut:#9a9ab0;--line:#2a2a3a;--brand:#7c6cff;--ok:#2ecc71;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,system-ui,sans-serif;padding:28px 16px 80px}
+  .wrap{max-width:820px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:var(--mut);font-size:13px;margin-bottom:8px}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 22px}
+  .bar button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid #8886;background:#6c5ce7;color:#fff;cursor:pointer}
+  .f{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:12px 0}
+  .h{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .lbl{font-weight:650}
+  .lbl em{font-style:normal;color:var(--mut);font-weight:400;font-size:12px;margin-left:6px}
+  .hint{color:var(--mut);font-size:12.5px;margin:4px 0 8px}
+  textarea{width:100%;background:#0e0e16;color:var(--ink);border:1px solid var(--line);border-radius:8px;
+    padding:10px 12px;font:14px/1.55 ui-monospace,Menlo,Consolas,monospace;resize:vertical;overflow:hidden}
+  .cp{font:inherit;font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid #8886;background:transparent;color:var(--ink);cursor:pointer;white-space:nowrap}
+  .cp.done{background:var(--ok);color:#06210f;border-color:var(--ok)}
+  .opts{margin:6px 0 0;padding:0;list-style:none}
+  .opts li{padding:3px 0}
+  .tick{color:var(--ok);font-weight:700;margin-right:8px}
+  .no{color:#6b6b80;margin-right:8px}
+  .note{color:var(--mut);font-size:12.5px;margin-top:8px}
+  .req{color:#e06c75}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>FlowProof — Bounty form answers</h1>
+  <div class="sub">Draft answers for every field in the FlowVault Builder Bounty form. Click <b>Copy</b>, paste into the form. Edit any box first if you like. Fields marked <span class="req">*</span> are required.</div>
+  <div class="bar">
+    <button id="copyAll">Copy everything (labelled)</button>
+    <span class="sub" id="allmsg"></span>
+  </div>
+
+  <!-- Builder Information -->
+  <div class="f">
+    <div class="h"><span class="lbl">Builder Information <span class="req">*</span><em>Name / Team Name</em></span><button class="cp" data-t="f_name">Copy</button></div>
+    <textarea id="f_name" rows="1">Jim.btc / FlowProof</textarea>
+  </div>
+
+  <div class="f">
+    <div class="h"><span class="lbl">Email Address <span class="req">*</span></span><button class="cp" data-t="f_email">Copy</button></div>
+    <textarea id="f_email" rows="1">jimdotbtc@gmail.com</textarea>
+  </div>
+
+  <div class="f">
+    <div class="h"><span class="lbl">Telegram / X Username <span class="req">*</span></span><button class="cp" data-t="f_social">Copy</button></div>
+    <textarea id="f_social" rows="1">jim.btc / @jimdotbtc</textarea>
+  </div>
+
+  <div class="f">
+    <div class="h"><span class="lbl">Stacks Wallet Address <span class="req">*</span></span><button class="cp" data-t="f_wallet">Copy</button></div>
+    <div class="hint">Your mainnet identity wallet (where the prize would go). Note: the on-chain proof below uses the testnet deployer wallet — that's expected.</div>
+    <textarea id="f_wallet" rows="1">SP10W2EEM7S7922QTVDZZ6CSEW55JEFNN30J69TM7</textarea>
+  </div>
+
+  <!-- Project Name -->
+  <div class="f">
+    <div class="h"><span class="lbl">Project Name <span class="req">*</span></span><button class="cp" data-t="f_pname">Copy</button></div>
+    <textarea id="f_pname" rows="1">FlowProof — Proof-of-Flow</textarea>
+  </div>
+
+  <!-- One-line description -->
+  <div class="f">
+    <div class="h"><span class="lbl">One-Line Description <span class="req">*</span></span><button class="cp" data-t="f_oneline">Copy</button></div>
+    <textarea id="f_oneline" rows="2">Self-documenting money on Stacks: every FlowVault flow mints its own permanent, verifiable proof on Xtrata.</textarea>
+  </div>
+
+  <!-- Category (checkboxes) -->
+  <div class="f">
+    <div class="h"><span class="lbl">Project Category <span class="req">*</span><em>select as many as you like</em></span></div>
+    <div class="hint">Tick all of these — the problem answer explains how the same primitive covers payroll &amp; goal-based savings:</div>
+    <ul class="opts">
+      <li><span class="tick">☑</span>Creator Revenue Flows <span class="note">— flagship, demonstrated live</span></li>
+      <li><span class="tick">☑</span>Treasury Automation <span class="note">— self-documenting treasury, deposit→split→lock→withdraw</span></li>
+      <li><span class="tick">☑</span>Experimental Financial Behaviors <span class="note">— "Proof-of-Flow" is a new primitive</span></li>
+      <li><span class="tick">☑</span>Payroll &amp; Compensation <span class="note">— same engine, config-only (see problem answer)</span></li>
+      <li><span class="tick">☑</span>Goal-Based Savings <span class="note">— same engine, time-lock to goal block (see problem answer)</span></li>
+    </ul>
+  </div>
+
+  <!-- Problem -->
+  <div class="f">
+    <div class="h"><span class="lbl">What problem does your project solve? <span class="req">*</span></span><button class="cp" data-t="f_problem">Copy</button></div>
+    <textarea id="f_problem" rows="6">On-chain treasuries move money well, but their history lives in mutable, off-chain indexers and block explorers you have to trust — there is no native, tamper-proof record of what a treasury did or how it routed each payment. For payroll, creator royalties, and DAOs, provenance and auditability are bolted on after the fact.
+
+FlowProof makes the proof a first-class output of every money movement: FlowVault routes the funds (split → time-lock → hold) and Xtrata inscribes a permanent, fully on-chain, recursively-linked receipt for each flow. The result is a verifiable financial lineage (asset ← R1 ← R2 ← …) that cannot be edited or lost, and that anyone can independently audit against the real on-chain money events.
+
+The live demo covers creator royalties end-to-end, but FlowProof is ONE primitive that generalizes — the same flowproof-treasury + Xtrata flow covers the other categories by changing only the routing-rule config and the receipt's "flow" tag:
+• Payroll & compensation: per pay run, split a fixed cut to a tax/benefits address, time-lock the vesting portion to a cliff block, and hold the take-home; each period inscribes a linked payroll receipt — an immutable, tamper-proof compensation ledger (payslips that can't be forged).
+• Goal-based savings: time-lock the saved portion until the goal block and hold the rest; funds unlock at the target and each contribution inscribes a linked savings receipt — a verifiable savings history toward the goal.
+Given more time these ship as one-click templates — the engine, contracts and verifier are already in place; only the routing config differs.</textarea>
+  </div>
+
+  <!-- How uses FlowVault -->
+  <div class="f">
+    <div class="h"><span class="lbl">How does your project use FlowVault? <span class="req">*</span><em>Lock / Split / Hold / Combination</em></span><button class="cp" data-t="f_uses">Copy</button></div>
+    <textarea id="f_uses" rows="9">FlowProof drives FlowVault's full routing pipeline via set-routing-rules + deposit, and reads get-vault-state:
+
+- Split: a fixed cut of each deposit is routed to a collaborator (e.g. 0.5 USDCx) at deposit time.
+- Lock: a reserve is time-locked until a future block height (lock-amount + lock-until-block).
+- Hold: the remainder stays as the user's unlocked vault balance; withdrawals exercise the unlock/withdraw path.
+- Combination: every demo deposit uses split + lock + hold together — the full pipeline in one call.
+
+Deepest integration: our flowproof-treasury Clarity contract calls flowvault-v2.deposit (the token passed as a SIP-010 trait, since FlowVault is token-agnostic) AND inscribes the Xtrata receipt in a SINGLE atomic transaction — both succeed or both revert. Money movement and its permanent record are composed on-chain, not just stitched together off-chain.</textarea>
+  </div>
+
+  <!-- GitHub -->
+  <div class="f">
+    <div class="h"><span class="lbl">GitHub Repository <span class="req">*</span></span><button class="cp" data-t="f_github">Copy</button></div>
+    <div class="hint">Make sure the repo/branch is public before submitting.</div>
+    <textarea id="f_github" rows="1">https://github.com/stxtrata/xtrata/tree/main-staging/xtrata-1.0/flowproof</textarea>
+  </div>
+
+  <!-- Live demo -->
+  <div class="f">
+    <div class="h"><span class="lbl">Live Demo URL <em>optional</em></span><button class="cp" data-t="f_demo">Copy</button></div>
+    <div class="hint">Live on-chain contracts + transactions on the Hiro explorer. (If you host explorer.html somewhere, swap that URL in for a richer interactive view.)</div>
+    <textarea id="f_demo" rows="1">https://explorer.hiro.so/address/STRNRHWSD7REAEXVTHDQWKPD4MFBG41024WQKBBM?chain=testnet</textarea>
+  </div>
+
+  <!-- Video -->
+  <div class="f">
+    <div class="h"><span class="lbl">Demo Video (YouTube/Loom) <span class="req">*</span></span><button class="cp" data-t="f_video">Copy</button></div>
+    <div class="hint">Record demo-reel.html with your voiceover, upload, then paste the link here (replace the placeholder).</div>
+    <textarea id="f_video" rows="1">PASTE_YOUR_YOUTUBE_OR_LOOM_LINK_HERE</textarea>
+  </div>
+
+  <!-- Presentation / docs -->
+  <div class="f">
+    <div class="h"><span class="lbl">Presentation / Documentation Link <em>optional</em></span><button class="cp" data-t="f_docs">Copy</button></div>
+    <textarea id="f_docs" rows="1">https://github.com/stxtrata/xtrata/blob/main-staging/xtrata-1.0/flowproof/SUBMISSION.md</textarea>
+  </div>
+
+  <!-- On-chain proof -->
+  <div class="f">
+    <div class="h"><span class="lbl">On-Chain Proof <span class="req">*</span></span><button class="cp" data-t="f_proof">Copy</button></div>
+    <div class="hint">At least one successful tx demonstrating FlowVault integration. The atomic tx below contains the FlowVault deposit event AND the Xtrata receipt mint.</div>
+    <textarea id="f_proof" rows="6">Atomic "deposit-and-prove" tx (one transaction = FlowVault deposit event + Xtrata receipt mint):
+https://explorer.hiro.so/txid/0x846ffe6a696432345ee3eaf819327395d2d859ab2d35cc17700e5018be2c73fa?chain=testnet
+
+More: second atomic sale (receipt #9) 0xbe12e2843a5896eda9834d01dab9da9b39c587d2a49a4f3cde2ccd97acc3e07b ; withdrawal receipt #11 0xeffbfc7021edd9cb9d43153ace946ed1f54c53689168173bf1036fdbb01bc21b. Verify any receipt with `npm run verify <id>` (integrity, lineage, money, atomicity all PASS).</textarea>
+  </div>
+
+  <!-- Funding continuation -->
+  <div class="f">
+    <div class="h"><span class="lbl">If given additional funding, how would you continue building? <em>optional</em></span><button class="cp" data-t="f_funding">Copy</button></div>
+    <textarea id="f_funding" rows="8">With funding we would:
+1) Ship the AI treasury agent — an autonomous agent that adjusts FlowVault routing rules on conditions/schedule and inscribes every decision and its rationale on Xtrata, making AI treasury actions accountable and independently auditable.
+2) Release a Proof-of-Flow SDK + receipt standard so any FlowVault app emits verifiable on-chain receipts with one call.
+3) Ship one-click templates for payroll, DAO treasuries and goal-based savings on the same engine.
+4) Launch on mainnet with real USDCx, plus a hosted public explorer and verifier.
+5) Add recursive "statement" inscriptions that aggregate a period's receipts into a single verifiable summary.</textarea>
+  </div>
+
+  <!-- Suggestions / bugs -->
+  <div class="f">
+    <div class="h"><span class="lbl">Any Suggestions / Bugs <span class="req">*</span></span><button class="cp" data-t="f_sugg">Copy</button></div>
+    <textarea id="f_sugg" rows="6">FlowVault's token-agnostic deposit (SIP-010 trait) is excellent — it let us compose a custom flow without forking anything and made our atomic deposit-and-prove possible.
+
+One onboarding friction: testnet USDCx (ST1PQHQKV….usdcx) is a Circle CCTP bridge token with no faucet, so new builders can't easily get test liquidity — a faucet or public test-mint would speed adoption (we shipped our own SIP-010 stand-in to work around it). Minor: a docs note on nonce/confirmation sequencing for back-to-back deposits would help SDK users.</textarea>
+  </div>
+
+  <!-- Final confirmation -->
+  <div class="f">
+    <div class="h"><span class="lbl">Final Confirmation <span class="req">*</span><em>select all</em></span></div>
+    <ul class="opts">
+      <li><span class="tick">☑</span>I confirm this project uses FlowVault contracts and/or SDK.</li>
+      <li><span class="tick">☑</span>I confirm all submitted links are publicly accessible.</li>
+      <li><span class="tick">☑</span>I confirm the project was built during the bounty period.</li>
+    </ul>
+    <div class="note">Before ticking #2: double-check the GitHub repo/branch is public and the video link is viewable (unlisted is fine).</div>
+  </div>
+
+</div>
+
+<script>
+  function flash(btn){ const t=btn.textContent; btn.textContent="Copied!"; btn.classList.add("done");
+    setTimeout(()=>{btn.textContent=t;btn.classList.remove("done");},1100); }
+  async function copyText(text){
+    try{ await navigator.clipboard.writeText(text); return true; }
+    catch(e){ const ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta);
+      ta.select(); try{document.execCommand("copy");}catch(_){} ta.remove(); return true; }
+  }
+  document.querySelectorAll(".cp").forEach(b=>{
+    b.addEventListener("click", async ()=>{ const el=document.getElementById(b.dataset.t); await copyText(el.value); flash(b); });
+  });
+  // auto-size textareas
+  function fit(ta){ ta.style.height="auto"; ta.style.height=(ta.scrollHeight+2)+"px"; }
+  document.querySelectorAll("textarea").forEach(ta=>{ fit(ta); ta.addEventListener("input",()=>fit(ta)); });
+  // copy everything labelled
+  document.getElementById("copyAll").addEventListener("click", async ()=>{
+    const map=[["Name/Team","f_name"],["Email","f_email"],["Telegram/X","f_social"],["Stacks Wallet","f_wallet"],
+      ["Project Name","f_pname"],["One-line Description","f_oneline"],
+      ["Category","Creator Revenue Flows; Treasury Automation; Experimental Financial Behaviors"],
+      ["Problem","f_problem"],["How it uses FlowVault","f_uses"],["GitHub","f_github"],["Live Demo","f_demo"],
+      ["Demo Video","f_video"],["Presentation/Docs","f_docs"],["On-Chain Proof","f_proof"],
+      ["Funding continuation","f_funding"],["Suggestions/Bugs","f_sugg"],
+      ["Final Confirmation","tick all three"]];
+    const out=map.map(([k,v])=>{ const el=document.getElementById(v); return k+":\n"+(el?el.value:v); }).join("\n\n");
+    await copyText(out); const m=document.getElementById("allmsg"); m.textContent="Copied all fields to clipboard."; setTimeout(()=>m.textContent="",1600);
+  });
+</script>
+</body>
+</html>
