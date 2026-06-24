@@ -19,6 +19,7 @@ import type {
   FlowKind,
   FlowReceipt,
   ProofOfFlowResult,
+  ReceiptMode,
   RoutingRules,
 } from "./types.js";
 
@@ -79,6 +80,8 @@ export interface BuildReceiptInput {
   block: number;
   assetInscription: number;
   prevReceipt: number | null;
+  /** "orchestrated" (default) or "atomic" (Pattern B, deposit+inscribe in one tx). */
+  mode?: ReceiptMode;
 }
 
 /** Pure: derive the canonical receipt from inputs + the rules that executed. */
@@ -94,6 +97,7 @@ export function buildReceipt(i: BuildReceiptInput): FlowReceipt {
   return {
     std: "flowproof.receipt",
     v: 1,
+    mode: i.mode ?? "orchestrated",
     flow: i.flow,
     vault: i.vaultId,
     token: i.tokenSymbol,

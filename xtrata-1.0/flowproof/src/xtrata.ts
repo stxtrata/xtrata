@@ -133,8 +133,23 @@ export class XtrataClient {
     return inner ? Number(inner.value) : null;
   }
 
-  /** Read an inscription's bytes back from its chunks and decode as UTF-8. */
-  async readContentText(id: number): Promise<string> {
+  /** On-chain content hash (final-hash) for an inscription, as 0x-hex. */
+  async getInscriptionHash(id: number): Promise<string | null> {
+    const parsed = await callReadOnly({
+      network: this.o.network,
+      senderAddress: this.o.senderAddress,
+      ...this.base(),
+      functionName: "get-inscription-hash",
+      functionArgs: [uintCV(id)],
+    });
+    const inner = unwrapOptional(parsed);
+    if (!inner) return null;
+    const v = String(inner.value ?? "");
+    return v.startsWith("0x") ? v : `0x${v}`;
+  }
+
+  /** Read an inscription's raw bytes back from its on-chain chunks. */
+  async readContentBytes(id: number): Promise<Uint8Array> {
     const n = (await this.getInscriptionChunks(id)) ?? 1;
     const indexes = Array.from({ length: n }, (_, i) => uintCV(i));
     const parsed = await callReadOnly({
@@ -150,7 +165,12 @@ export class XtrataClient {
       const h = e?.value?.value;
       if (h) hex += String(h).replace(/^0x/, "");
     }
-    return Buffer.from(hex, "hex").toString("utf8");
+    return new Uint8Array(Buffer.from(hex, "hex"));
+  }
+
+  /** Read an inscription's bytes back and decode as UTF-8. */
+  async readContentText(id: number): Promise<string> {
+    return Buffer.from(await this.readContentBytes(id)).toString("utf8");
   }
 
   /**

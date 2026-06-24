@@ -130,6 +130,7 @@ async function liveRun() {
 
   const money = new FlowVaultClient({
     networkName: cfg.networkName,
+    network: cfg.network,
     contractAddress: cfg.flowvault.address,
     contractName: cfg.flowvault.name,
     tokenContractAddress: cfg.usdcx.address,

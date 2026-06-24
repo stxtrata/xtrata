@@ -19,6 +19,7 @@ export function canonicalJson(receipt: FlowReceipt): string {
   const ordered = {
     std: receipt.std,
     v: receipt.v,
+    mode: receipt.mode,
     flow: receipt.flow,
     vault: receipt.vault,
     token: receipt.token,

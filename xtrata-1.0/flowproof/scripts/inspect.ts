@@ -4,7 +4,7 @@
  *   npm run inspect                                   # inspects the configured USDCx
  *   npm run inspect ST1....usdcx                      # inspects a specific contract
  */
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -49,6 +49,18 @@ async function main() {
 
   const minty = pub.filter((f) => /mint|faucet|gift|drip|claim|get-token/i.test(f.name));
   console.log("\nLikely token-getters:", minty.length ? minty.map((f) => f.name).join(", ") : "none found");
+
+  if (process.argv.includes("--source")) {
+    const sres = await fetch(`${api}/v2/contracts/source/${addr}/${name}?proof=0`);
+    if (sres.ok) {
+      const sj: any = await sres.json();
+      const outp = resolve(__dirname, `../${name}-source.clar`);
+      writeFileSync(outp, sj.source || "");
+      console.log(`\nWrote source → ${outp}`);
+    } else {
+      console.error(`\nsource HTTP ${sres.status}`);
+    }
+  }
 }
 
 main().catch((e) => {

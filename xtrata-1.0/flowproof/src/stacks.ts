@@ -55,7 +55,7 @@ export async function waitForConfirmation(
       const data: any = await res.json();
       if (data.tx_status === "success") return data;
       if (data.tx_status?.startsWith("abort")) {
-        throw new Error(`Tx ${txid} failed: ${data.tx_status}`);
+        throw new Error(`Tx ${txid} failed: ${data.tx_status}${data.tx_result?.repr ? " — " + data.tx_result.repr : ""}`);
       }
     }
     await new Promise((r) => setTimeout(r, intervalMs));

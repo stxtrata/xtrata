@@ -1,73 +1,103 @@
 {
   "network": "testnet",
   "contract": "STRNRHWSD7REAEXVTHDQWKPD4MFBG41024WQKBBM.xtrata-v3-2-3",
-  "generatedAt": "2026-06-23T18:52:58.975Z",
+  "generatedAt": "2026-06-23T21:45:36.113Z",
   "asset": {
-    "id": 0,
-    "content": "FlowProof smoke asset 2026-06-23T18:32:30.884Z"
+    "id": 8,
+    "content": "FlowProof atomic demo track - (c) creator 2026-06-23T21:41:26.055Z"
   },
   "receipts": [
     {
-      "id": 1,
+      "id": 9,
       "parents": [],
       "dependencies": [
-        0
+        8
       ],
       "receipt": {
         "std": "flowproof.receipt",
         "v": 1,
+        "mode": "atomic",
         "flow": "royalty-split",
         "vault": "STD7QG84VQQ0C35SZM2EYTHZV4M8FQ0R7YNSQWPD.flowvault-v2",
         "token": "usdcx",
         "amount": "5000000",
         "split": {
-          "to": "STRNRHWSD7REAEXVTHDQWKPD4MFBG41024WQKBBM",
+          "to": "ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG",
           "amount": "500000"
         },
         "lock": {
           "amount": "1000000",
-          "untilBlock": 0
+          "untilBlock": 4022241
         },
         "unlocked": "3500000",
-        "depositTxid": "0xsmoke-1",
-        "block": 0,
-        "ts": "2026-06-23T18:32:45.616Z",
+        "depositTxid": "",
+        "block": 4021243,
+        "ts": "2026-06-23T21:41:37.566Z",
         "links": {
-          "assetInscription": 0,
+          "assetInscription": 8,
           "prevReceipt": null
         }
       }
     },
     {
-      "id": 2,
+      "id": 10,
       "parents": [
-        1
+        9
       ],
       "dependencies": [
-        0
+        8
       ],
       "receipt": {
         "std": "flowproof.receipt",
         "v": 1,
+        "mode": "atomic",
         "flow": "royalty-split",
         "vault": "STD7QG84VQQ0C35SZM2EYTHZV4M8FQ0R7YNSQWPD.flowvault-v2",
         "token": "usdcx",
         "amount": "5000000",
         "split": {
-          "to": "STRNRHWSD7REAEXVTHDQWKPD4MFBG41024WQKBBM",
+          "to": "ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG",
           "amount": "500000"
         },
         "lock": {
           "amount": "1000000",
-          "untilBlock": 0
+          "untilBlock": 4022241
         },
         "unlocked": "3500000",
-        "depositTxid": "0xsmoke-2",
-        "block": 0,
-        "ts": "2026-06-23T18:33:01.795Z",
+        "depositTxid": "",
+        "block": 4021244,
+        "ts": "2026-06-23T21:41:49.491Z",
         "links": {
-          "assetInscription": 0,
-          "prevReceipt": 1
+          "assetInscription": 8,
+          "prevReceipt": 9
+        }
+      }
+    },
+    {
+      "id": 11,
+      "parents": [
+        10
+      ],
+      "dependencies": [
+        8
+      ],
+      "receipt": {
+        "std": "flowproof.receipt",
+        "v": 1,
+        "mode": "orchestrated",
+        "flow": "withdrawal",
+        "vault": "STD7QG84VQQ0C35SZM2EYTHZV4M8FQ0R7YNSQWPD.flowvault-v2",
+        "token": "usdcx",
+        "amount": "3000000",
+        "split": null,
+        "lock": null,
+        "unlocked": "3000000",
+        "depositTxid": "ded661f41e3d2957be889cdc967650ba1eebf85c13139d7c93c4f48af8ed83e4",
+        "block": 4021248,
+        "ts": "2026-06-23T21:42:12.073Z",
+        "links": {
+          "assetInscription": 8,
+          "prevReceipt": 10
         }
       }
     }

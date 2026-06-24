@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FlowProof — demo reel</title>
+<style>
+  :root{
+    --bg:#0b0b12; --panel:#13131d; --ink:#ECECF2; --mut:#9a9ab0; --line:#2a2a3a;
+    --brand:#7c6cff; --green:#2ecc71; --atomic:#16a34a; --lock:#e1a100; --split:#38bdf8;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:radial-gradient(1400px 700px at 50% -10%,#1a1a2e,var(--bg));
+    color:var(--ink);font:16px/1.5 -apple-system,system-ui,sans-serif;overflow:hidden}
+  #stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  .scene{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;opacity:0;transition:opacity .5s ease;padding:40px;pointer-events:none}
+  .scene.active{opacity:1}
+
+  /* terminal */
+  .term{width:min(980px,92vw);background:#0e0e16;border:1px solid var(--line);border-radius:12px;
+    box-shadow:0 30px 80px #0008;overflow:hidden}
+  .term .bar{display:flex;gap:8px;align-items:center;padding:10px 14px;background:#15151f;border-bottom:1px solid var(--line)}
+  .dot{width:12px;height:12px;border-radius:50%}
+  .r{background:#ff5f56}.y{background:#ffbd2e}.g{background:#27c93f}
+  .term .ttl{margin-left:10px;color:var(--mut);font:12px/1 var(--mono)}
+  .term pre{margin:0;padding:18px 20px;font:14.5px/1.7 var(--mono);min-height:340px;white-space:pre-wrap;word-break:normal;overflow-wrap:anywhere}
+  .ln{display:block}
+  .cmd{color:#cfcfe6}.cmd .p{color:var(--green)}
+  .dim{color:var(--mut)}
+  .ok{color:var(--green)}
+  .pass{color:var(--green);font-weight:600}
+  .hl{color:#ffd479}
+  .blink::after{content:"\2588";color:var(--brand);animation:bl 1s steps(1) infinite}
+  @keyframes bl{50%{opacity:0}}
+
+  /* titles */
+  .pill{display:inline-block;background:var(--brand);color:#fff;font-size:13px;font-weight:600;
+    padding:4px 12px;border-radius:999px;letter-spacing:.3px}
+  h1{font-size:clamp(32px,5vw,60px);margin:14px 0 6px;letter-spacing:-.5px}
+  .tag{font-size:clamp(16px,2.4vw,24px);color:var(--mut);max-width:760px;text-align:center}
+  .big{font-size:clamp(28px,4vw,46px);font-weight:750;text-align:center;line-height:1.15;max-width:900px}
+  .grad{background:linear-gradient(90deg,#9b8cff,#38bdf8);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .ids{margin-top:22px;color:var(--mut);font:12.5px/1.7 var(--mono);text-align:center}
+
+  /* lineage cards */
+  .chain{display:flex;align-items:stretch;gap:0;transform:scale(1);max-width:96vw}
+  .node{opacity:0;transform:translateY(14px);transition:opacity .5s ease,transform .5s ease}
+  .node.show{opacity:1;transform:none}
+  .card{width:232px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px;box-shadow:0 12px 30px #0006}
+  .card.asset{background:linear-gradient(180deg,#1d1d2e,#15151f)}
+  .card.wd{border-color:#6b7a3a;background:linear-gradient(180deg,#1c2014,#15170f)}
+  .tok{display:flex;justify-content:space-between;align-items:center;font:12px/1 var(--mono);color:var(--mut)}
+  .tok b{color:var(--ink)}
+  .badge{font-size:10.5px;padding:3px 8px;border-radius:999px;background:#ffffff14;color:var(--ink)}
+  .badge.flow{background:var(--brand);color:#fff}.badge.atomic{background:var(--atomic);color:#fff}
+  .ti{font-size:15px;font-weight:650;margin:9px 0 3px}
+  .amt{font-size:23px;font-weight:750;margin:2px 0 9px}.amt span{font-size:12px;color:var(--mut);font-weight:500}
+  .row{display:flex;justify-content:space-between;font-size:12.5px;margin:5px 0}
+  .row .k{color:var(--mut)} .sw{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
+  .sp{background:var(--split)}.lk{background:var(--lock)}.hd{background:var(--green)}
+  .mini{margin-top:10px;padding-top:9px;border-top:1px solid var(--line);font:11px/1.5 var(--mono);color:var(--mut)}
+  .arrow{align-self:center;flex:0 0 38px;display:flex;flex-direction:column;align-items:center;color:var(--mut)}
+  .arrow .l{width:100%;height:2px;background:linear-gradient(90deg,#ffffff20,var(--brand))}
+  .arrow .t{font-size:10px;margin-top:6px}
+
+  .stamp{position:absolute;font-size:64px;font-weight:800;color:var(--green);border:5px solid var(--green);
+    padding:6px 22px;border-radius:14px;transform:rotate(-9deg) scale(.6);opacity:0;letter-spacing:2px}
+  .stamp.show{animation:st .5s ease forwards}
+  @keyframes st{to{opacity:1;transform:rotate(-9deg) scale(1)}}
+
+  .sceneTitle{position:fixed;top:26px;left:50%;transform:translateX(-50%);font:13px/1 var(--mono);color:var(--mut);opacity:.0;transition:opacity .4s}
+  #progress{position:fixed;left:0;right:0;bottom:0;height:3px;background:#ffffff12;opacity:1}
+  #bar{height:100%;width:0;background:linear-gradient(90deg,var(--brand),#38bdf8)}
+  #cap{position:fixed;left:50%;transform:translateX(-50%);bottom:34px;max-width:80vw;text-align:center;
+    background:#000a;border:1px solid var(--line);border-radius:10px;padding:10px 16px;font-size:17px;color:#eee;opacity:0;transition:opacity .3s}
+  #cap.on{opacity:1}
+  #play{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:radial-gradient(1200px 600px at 50% 0,#1a1a2e,#0b0b12);cursor:pointer;z-index:20}
+  #play .btn{font-size:22px;font-weight:650;background:var(--brand);color:#fff;padding:14px 30px;border-radius:999px;box-shadow:0 14px 40px #6c5ce766}
+  #play .sub{color:var(--mut);margin-top:16px;font-size:14px}
+  #hint{position:fixed;top:14px;right:16px;font:12px/1 var(--mono);color:#7a7a90;z-index:15;transition:opacity .4s}
+  .hidden{opacity:0 !important;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="stage">
+  <!-- Scene 1: hook -->
+  <section class="scene" id="s1">
+    <span class="pill">Proof-of-Flow</span>
+    <h1>FlowProof</h1>
+    <div class="tag">Self-documenting money on Stacks. Every FlowVault flow mints its own permanent, verifiable proof on Xtrata.</div>
+  </section>
+
+  <!-- Scene 2: atomic terminal -->
+  <section class="scene" id="s2">
+    <div class="term"><div class="bar"><i class="dot r"></i><i class="dot y"></i><i class="dot g"></i>
+      <span class="ttl">flowproof — npm run demo:atomic</span></div>
+      <pre id="t2"></pre>
+    </div>
+  </section>
+
+  <!-- Scene 3: lineage -->
+  <section class="scene" id="s3">
+    <div class="chain" id="chain">
+      <div class="node" data-i="0"><div class="card asset">
+        <div class="tok"><span>inscription <b>#8</b></span><span class="badge">asset</span></div>
+        <div class="ti">The work</div>
+        <div class="mini" style="border:none;margin:0;padding:0;color:#cdd;font:13px/1.4 var(--mono)">FlowProof atomic demo track — (c) creator</div>
+        <div class="mini">fully on-chain · every receipt links back to this</div>
+      </div></div>
+      <div class="arrow node" data-i="1"><div class="l"></div><div class="t">links →</div></div>
+      <div class="node" data-i="2"><div class="card">
+        <div class="tok"><span>inscription <b>#9</b></span><span><span class="badge atomic">atomic</span> <span class="badge flow">royalty-split</span></span></div>
+        <div class="ti">Royalty receipt</div>
+        <div class="amt">5 <span>USDCx in</span></div>
+        <div class="row"><span class="k"><span class="sw sp"></span>Split → ST2CY5…K9AG</span><span>0.5</span></div>
+        <div class="row"><span class="k"><span class="sw lk"></span>Locked → block 4022241</span><span>1</span></div>
+        <div class="row"><span class="k"><span class="sw hd"></span>Held (unlocked)</span><span>3.5</span></div>
+        <div class="mini"><b>one atomic tx</b> (deposit + receipt)<br>parents [] · deps [8]</div>
+      </div></div>
+      <div class="arrow node" data-i="3"><div class="l"></div><div class="t">links →</div></div>
+      <div class="node" data-i="4"><div class="card">
+        <div class="tok"><span>inscription <b>#10</b></span><span><span class="badge atomic">atomic</span> <span class="badge flow">royalty-split</span></span></div>
+        <div class="ti">Royalty receipt</div>
+        <div class="amt">5 <span>USDCx in</span></div>
+        <div class="row"><span class="k"><span class="sw sp"></span>Split → ST2CY5…K9AG</span><span>0.5</span></div>
+        <div class="row"><span class="k"><span class="sw lk"></span>Locked → block 4022241</span><span>1</span></div>
+        <div class="row"><span class="k"><span class="sw hd"></span>Held (unlocked)</span><span>3.5</span></div>
+        <div class="mini"><b>one atomic tx</b> (deposit + receipt)<br>parents [9] · deps [8]</div>
+      </div></div>
+      <div class="arrow node" data-i="5"><div class="l"></div><div class="t">links →</div></div>
+      <div class="node" data-i="6"><div class="card wd">
+        <div class="tok"><span>inscription <b>#11</b></span><span><span class="badge">orchestrated</span> <span class="badge flow">withdrawal</span></span></div>
+        <div class="ti">Withdrawal</div>
+        <div class="amt">3 <span>USDCx out</span></div>
+        <div class="row"><span class="k"><span class="sw hd"></span>Withdrawn to owner</span><span>3</span></div>
+        <div class="mini">withdraw ded661f4…83e4<br>parents [10] · deps [8]</div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- Scene 4: verify terminal -->
+  <section class="scene" id="s4">
+    <div class="term"><div class="bar"><i class="dot r"></i><i class="dot y"></i><i class="dot g"></i>
+      <span class="ttl">flowproof — npm run verify 10</span></div>
+      <pre id="t4"></pre>
+    </div>
+    <div class="stamp" id="stamp">✓ VERIFIED</div>
+  </section>
+
+  <!-- Scene 5: close -->
+  <section class="scene" id="s5">
+    <span class="pill">Proof-of-Flow</span>
+    <div class="big" style="margin-top:16px">FlowVault moved the money.<br><span class="grad">Xtrata made it provable forever.</span></div>
+    <div class="ids">
+      flowproof-treasury · xtrata-v3-2-3 · flowvault-v2 — live on Stacks testnet<br>
+      one engine: royalties · payroll · DAO treasuries
+    </div>
+  </section>
+
+  <div class="sceneTitle" id="sceneTitle"></div>
+  <div id="cap"></div>
+  <div id="progress"><div id="bar"></div></div>
+  <div id="hint">▶ Space play · R restart · C captions · P bar</div>
+  <div id="play"><div class="btn">▶ Play demo reel</div><div class="sub">~75s · matches DEMO-SCRIPT.md · record this window, then lay your VO on top</div></div>
+</div>
+
+<script>
+const TOTAL = 75000;
+const $ = (s)=>document.querySelector(s);
+const scenes = ["s1","s2","s3","s4","s5"];
+let timers=[], raf=null, captionsOn=false, barOn=true;
+
+const caps = {
+  s1:"This is a treasury that documents itself.",
+  s2:"One transaction routes a sale through FlowVault and inscribes a recursive receipt on Xtrata.",
+  s3:"Each receipt is stored fully on-chain and linked — the whole money lifecycle, one chain.",
+  s4:"You don't have to trust us — the verifier checks it all against the chain.",
+  s5:"FlowVault moved the money; Xtrata made it provable forever. That's FlowProof.",
+};
+
+function showScene(id){
+  scenes.forEach(s=>$("#"+s).classList.toggle("active", s===id));
+  if(captionsOn){ const c=$("#cap"); c.textContent=caps[id]||""; c.classList.add("on"); }
+}
+function line(preId, html, cls){
+  const pre=$("#"+preId); const span=document.createElement("span");
+  span.className="ln"+(cls?(" "+cls):""); span.innerHTML=html; pre.appendChild(span);
+}
+function typeCmd(preId, text, ms){
+  const pre=$("#"+preId); const span=document.createElement("span");
+  span.className="ln cmd blink"; pre.appendChild(span);
+  const chars=[...text]; let i=0; const step=Math.max(12, ms/chars.length);
+  const iv=setInterval(()=>{ span.innerHTML='<span class="p">$</span> '+text.slice(0,++i); if(i>=chars.length){clearInterval(iv); setTimeout(()=>span.classList.remove("blink"),600);} }, step);
+  timers.push({iv});
+}
+function at(ms, fn){ timers.push(setTimeout(fn, ms)); }
+
+function reset(){
+  timers.forEach(t=> t&&t.iv?clearInterval(t.iv):clearTimeout(t)); timers=[];
+  cancelAnimationFrame(raf);
+  $("#t2").innerHTML=""; $("#t4").innerHTML="";
+  document.querySelectorAll(".node").forEach(n=>n.classList.remove("show"));
+  $("#stamp").classList.remove("show");
+  $("#bar").style.width="0%";
+  scenes.forEach(s=>$("#"+s).classList.remove("active"));
+  $("#cap").classList.remove("on");
+}
+
+function play(){
+  reset();
+  $("#play").classList.add("hidden");
+  $("#hint").classList.add("hidden");
+  $("#progress").style.opacity = barOn? "1":"0";
+  const start=performance.now();
+  (function tick(now){ $("#bar").style.width=Math.min(100,(now-start)/TOTAL*100)+"%"; if(now-start<TOTAL) raf=requestAnimationFrame(tick); })(start);
+
+  // Scene 1 (0-10s)
+  at(0, ()=>showScene("s1"));
+
+  // Scene 2 (10-30s) — atomic
+  at(10000, ()=>{ showScene("s2"); typeCmd("t2","npm run demo:atomic",700); });
+  at(11400, ()=>line("t2","FlowProof ATOMIC demo — testnet as STRNRHWSD7…WQKBBM","dim"));
+  at(12100, ()=>line("t2","treasury: STRNRHWSD7…WQKBBM.flowproof-treasury","dim"));
+  at(13100, ()=>line("t2","Setting routing rules…"));
+  at(14100, ()=>line("t2","Inscribing asset…"));
+  at(15100, ()=>line("t2","  asset #8  tx 5c6c3e7f…6e11ad1","ok"));
+  at(16600, ()=>line("t2","Atomic sale 1: deposit-and-prove 5000000 usdcx…"));
+  at(17900, ()=>line("t2","  receipt #9   atomic tx be12e284…cc3e07b","ok"));
+  at(18800, ()=>line("t2","  ↑ one tx routed the deposit AND inscribed the receipt","hl"));
+  at(20800, ()=>line("t2","Atomic sale 2: deposit-and-prove 5000000 usdcx…"));
+  at(22100, ()=>line("t2","  receipt #10  atomic tx 846ffe6a…2c73fa","ok"));
+  at(23800, ()=>line("t2","Withdrawing 3000000 usdcx (unlocked)…"));
+  at(25100, ()=>line("t2","  withdrawal receipt #11  tx effbfc70…1bc21b","ok"));
+  at(26600, ()=>line("t2","Lineage tip: #11","hl"));
+
+  // Scene 3 (30-48s) — lineage
+  at(30000, ()=>showScene("s3"));
+  [0,1,2,3,4,5,6].forEach((i,k)=> at(30300+k*1500, ()=>{ const n=document.querySelector('.node[data-i="'+i+'"]'); if(n) n.classList.add("show"); }));
+
+  // Scene 4 (48-65s) — verify
+  at(48000, ()=>{ showScene("s4"); typeCmd("t4","npm run verify 10",650); });
+  at(49300, ()=>line("t4","Verifying receipt #10 on STRNRHWSD7…WQKBBM.xtrata-v3-2-3","dim"));
+  at(50600, ()=>line("t4","  PASS  integrity: content hash == on-chain final-hash","pass"));
+  at(52000, ()=>line("t4","  receipt: mode=atomic flow=royalty-split amount=5000000 token=usdcx","dim"));
+  at(53600, ()=>line("t4","  PASS  lineage: on-chain parents/deps == receipt links  parents [9] deps [8]","pass"));
+  at(55600, ()=>line("t4","  PASS  money: matches real FlowVault deposit  amount 5000000, split 500000, lock 1000000, hold 4500000","pass"));
+  at(58000, ()=>line("t4","  PASS  atomicity: deposit + inscription in one flowproof-treasury tx","pass"));
+  at(60200, ()=>$("#stamp").classList.add("show"));
+
+  // Scene 5 (65-75s)
+  at(65000, ()=>showScene("s5"));
+  at(TOTAL, ()=>{ $("#hint").classList.remove("hidden"); });
+}
+
+$("#play").addEventListener("click", play);
+document.addEventListener("keydown",(e)=>{
+  if(e.code==="Space"){ e.preventDefault(); play(); }
+  else if(e.key==="r"||e.key==="R"){ play(); }
+  else if(e.key==="c"||e.key==="C"){ captionsOn=!captionsOn; if(!captionsOn) $("#cap").classList.remove("on"); }
+  else if(e.key==="p"||e.key==="P"){ barOn=!barOn; $("#progress").style.opacity=barOn?"1":"0"; }
+});
+</script>
+</body>
+</html>
