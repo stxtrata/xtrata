@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Xtrata × FlowVault — Protect · Enhance · Expand the UMG Catalogue</title>
+<meta name="description" content="How Xtrata, paired with programmable-money apps like FlowVault, protects, enhances, and expands the utility of a music catalogue — anchored to Bitcoin via Stacks. Confidential proposal prepared for Universal Music Group." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* ============================================================
+     XTRATA × FLOWVAULT — UMG CATALOGUE DEMONSTRATION
+     Single-file. Bitcoin-orange = Xtrata (record/provenance layer)
+     Teal = FlowVault (money/flow layer)
+     ============================================================ */
+
+  :root{
+    --bg:        #0a0a0c;
+    --bg-2:      #0e0f13;
+    --panel:     #131419;
+    --panel-2:   #171922;
+    --line:      rgba(255,255,255,0.09);
+    --line-2:    rgba(255,255,255,0.05);
+
+    --ink:       #f4f1ea;   /* warm off-white */
+    --ink-soft:  #c7c5cb;
+    --ink-mut:   #8a8a93;
+    --ink-faint: #5e5e67;
+
+    --xtrata:    #f7931a;   /* Bitcoin orange — Xtrata */
+    --xtrata-lo: #fbb35a;
+    --xtrata-dim:rgba(247,147,26,0.14);
+
+    --flow:      #34d3c0;   /* teal — FlowVault */
+    --flow-lo:   #74e6da;
+    --flow-dim:  rgba(52,211,192,0.13);
+
+    --gold:      #c9a24b;
+
+    --maxw: 1180px;
+    --r: 16px;
+    --serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+    --sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html{ scroll-behavior:smooth; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:17px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+    overflow-x:hidden;
+  }
+  body::before{ /* ambient warm glow */
+    content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+    background:
+      radial-gradient(900px 600px at 78% -8%, rgba(247,147,26,0.10), transparent 60%),
+      radial-gradient(800px 620px at 8% 18%, rgba(52,211,192,0.07), transparent 60%);
+  }
+  .wrap{ max-width:var(--maxw); margin:0 auto; padding:0 28px; position:relative; z-index:1; }
+  section{ position:relative; z-index:1; }
+
+  a{ color:inherit; text-decoration:none; }
+  h1,h2,h3{ font-weight:500; line-height:1.08; letter-spacing:-0.01em; }
+
+  .serif{ font-family:var(--serif); }
+  .eyebrow{
+    font-size:12px; letter-spacing:0.26em; text-transform:uppercase;
+    color:var(--ink-mut); font-weight:600;
+  }
+  .mono{ font-family:var(--mono); font-size:0.82em; }
+  .x{ color:var(--xtrata); } .f{ color:var(--flow); }
+
+  /* ---------- NAV ---------- */
+  header.nav{
+    position:fixed; top:0; left:0; right:0; z-index:50;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 28px;
+    background:rgba(10,10,12,0);
+    border-bottom:1px solid transparent;
+    transition:background .4s ease, border-color .4s ease, padding .4s ease;
+    backdrop-filter:blur(0px);
+  }
+  header.nav.solid{
+    background:rgba(10,10,12,0.78);
+    border-bottom:1px solid var(--line-2);
+    backdrop-filter:blur(14px);
+    padding:12px 28px;
+  }
+  .brand{ display:flex; align-items:center; gap:11px; font-weight:600; letter-spacing:0.34em; font-size:14px; }
+  .brand .dot{ width:9px; height:9px; border-radius:50%; background:var(--xtrata); box-shadow:0 0 14px var(--xtrata); }
+  .brand .lock{ color:var(--ink-faint); font-weight:400; letter-spacing:0.18em; font-size:12px; }
+  .navlinks{ display:flex; align-items:center; gap:26px; font-size:13.5px; color:var(--ink-soft); }
+  .navlinks a{ position:relative; padding:4px 0; transition:color .2s; }
+  .navlinks a:hover{ color:var(--ink); }
+  .navlinks a::after{ content:""; position:absolute; left:0; bottom:-2px; width:0; height:1px; background:var(--xtrata); transition:width .25s; }
+  .navlinks a:hover::after{ width:100%; }
+  .navtag{ font-size:11px; letter-spacing:0.14em; color:var(--ink-faint); text-transform:uppercase; border:1px solid var(--line); padding:5px 10px; border-radius:999px; }
+  @media(max-width:820px){ .navlinks{ display:none; } }
+
+  /* ---------- HERO ---------- */
+  .hero{ padding:178px 0 90px; }
+  .hero .eyebrow{ margin-bottom:26px; }
+  .hero-grid{ display:grid; grid-template-columns:1.15fr 0.85fr; gap:48px; align-items:center; }
+  @media(max-width:900px){ .hero-grid{ grid-template-columns:1fr; gap:36px; } }
+
+  .verbs{ display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; margin-bottom:8px; }
+  .verbs span{ font-family:var(--serif); font-size:clamp(44px,8vw,86px); line-height:0.96; font-weight:500; }
+  .verbs .v1{ color:var(--ink); }
+  .verbs .v2{ color:var(--xtrata); }
+  .verbs .v3{ color:var(--flow); }
+  .verbs .pd{ color:var(--ink-faint); font-family:var(--sans); font-weight:300; font-size:clamp(40px,7vw,72px); transform:translateY(-0.06em); }
+
+  .hero h1.sub{
+    font-family:var(--serif); font-weight:400; font-size:clamp(23px,3vw,32px);
+    color:var(--ink-soft); line-height:1.28; margin:18px 0 22px; max-width:30ch;
+    font-style:italic;
+  }
+  .hero p.lede{ color:var(--ink-mut); max-width:52ch; font-size:16.5px; }
+  .hero p.lede b{ color:var(--ink-soft); font-weight:600; }
+  .cta-row{ display:flex; gap:14px; margin-top:34px; flex-wrap:wrap; }
+  .btn{
+    display:inline-flex; align-items:center; gap:10px;
+    font-size:14px; font-weight:600; letter-spacing:0.02em;
+    padding:13px 22px; border-radius:999px; cursor:pointer; border:1px solid var(--line);
+    background:transparent; color:var(--ink); transition:all .22s ease;
+  }
+  .btn.primary{ background:var(--xtrata); color:#1a1206; border-color:var(--xtrata); }
+  .btn.primary:hover{ background:var(--xtrata-lo); transform:translateY(-2px); box-shadow:0 12px 30px rgba(247,147,26,0.25); }
+  .btn.ghost:hover{ border-color:var(--ink-mut); transform:translateY(-2px); }
+
+  /* hero visual: waveform resolving into a provenance chain */
+  .hero-vis{ position:relative; aspect-ratio:1/1; max-width:420px; margin-left:auto; }
+  @media(max-width:900px){ .hero-vis{ margin:0 auto; } }
+
+  /* ---------- SECTION SCAFFOLD ---------- */
+  .sec{ padding:96px 0; border-top:1px solid var(--line-2); }
+  .sec-head{ max-width:64ch; margin-bottom:54px; }
+  .sec-head .eyebrow{ display:block; margin-bottom:18px; }
+  .sec-head h2{ font-family:var(--serif); font-size:clamp(32px,4.6vw,52px); font-weight:500; line-height:1.04; }
+  .sec-head p{ color:var(--ink-mut); margin-top:18px; font-size:17px; max-width:58ch; }
+
+  /* reveal on scroll */
+  .reveal{ opacity:0; transform:translateY(26px); transition:opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); }
+  .reveal.in{ opacity:1; transform:none; }
+  .reveal.d1{ transition-delay:.08s; } .reveal.d2{ transition-delay:.16s; } .reveal.d3{ transition-delay:.24s; } .reveal.d4{ transition-delay:.32s; }
+
+  /* ---------- TRIPTYCH ---------- */
+  .trip{ display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+  @media(max-width:860px){ .trip{ grid-template-columns:1fr; } }
+  .tcard{
+    background:linear-gradient(180deg, var(--panel), var(--bg-2));
+    border:1px solid var(--line); border-radius:var(--r); padding:30px 26px 28px;
+    position:relative; overflow:hidden; transition:transform .3s, border-color .3s;
+  }
+  .tcard:hover{ transform:translateY(-4px); }
+  .tcard .num{ font-family:var(--serif); font-size:15px; color:var(--ink-faint); letter-spacing:0.1em; }
+  .tcard .ic{ width:44px; height:44px; margin:6px 0 16px; }
+  .tcard h3{ font-family:var(--serif); font-size:27px; margin-bottom:10px; }
+  .tcard p{ color:var(--ink-mut); font-size:15px; }
+  .tcard .meaning{ color:var(--ink-soft); font-size:13.5px; margin-top:14px; padding-top:14px; border-top:1px solid var(--line-2); }
+  .tcard.protect{ border-top:2px solid var(--xtrata); }
+  .tcard.enhance{ border-top:2px solid var(--gold); }
+  .tcard.expand{ border-top:2px solid var(--flow); }
+  .tcard.protect h3{ color:var(--xtrata-lo); }
+  .tcard.enhance h3{ color:var(--gold); }
+  .tcard.expand h3{ color:var(--flow-lo); }
+
+  /* ---------- INTERACTIVE DEMO ---------- */
+  .demo{ background:
+      radial-gradient(700px 400px at 85% 0%, rgba(247,147,26,0.06), transparent 65%),
+      radial-gradient(700px 500px at 0% 100%, rgba(52,211,192,0.06), transparent 60%);
+  }
+  .stage{
+    border:1px solid var(--line); border-radius:22px; overflow:hidden;
+    background:linear-gradient(180deg, rgba(23,25,34,0.7), rgba(12,13,17,0.7));
+    backdrop-filter:blur(4px);
+  }
+  .stepper{
+    display:flex; gap:4px; padding:14px 16px; border-bottom:1px solid var(--line-2);
+    overflow-x:auto; align-items:center;
+  }
+  .step-dot{
+    display:flex; align-items:center; gap:9px; padding:8px 14px; border-radius:999px;
+    cursor:pointer; white-space:nowrap; color:var(--ink-mut); font-size:12.5px; font-weight:500;
+    border:1px solid transparent; transition:all .25s; flex:0 0 auto;
+  }
+  .step-dot .b{ width:20px; height:20px; border-radius:50%; display:grid; place-items:center;
+    font-size:11px; font-weight:700; background:var(--panel-2); color:var(--ink-mut); border:1px solid var(--line); transition:all .25s; }
+  .step-dot:hover{ color:var(--ink-soft); }
+  .step-dot.active{ background:rgba(255,255,255,0.04); color:var(--ink); border-color:var(--line); }
+  .step-dot.active .b{ background:var(--xtrata); color:#1a1206; border-color:var(--xtrata); }
+  .step-dot.done .b{ background:rgba(247,147,26,0.18); color:var(--xtrata-lo); border-color:transparent; }
+
+  .stage-body{ display:grid; grid-template-columns:1fr 0.92fr; min-height:430px; }
+  @media(max-width:880px){ .stage-body{ grid-template-columns:1fr; } }
+  .stage-vis{ position:relative; padding:30px; border-right:1px solid var(--line-2); display:flex; flex-direction:column; }
+  @media(max-width:880px){ .stage-vis{ border-right:none; border-bottom:1px solid var(--line-2); } }
+  .stage-narr{ padding:34px 32px; display:flex; flex-direction:column; }
+
+  .stage-narr .k{ font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:var(--xtrata); font-weight:700; margin-bottom:6px; }
+  .stage-narr .k.flowk{ color:var(--flow); }
+  .stage-narr h3{ font-family:var(--serif); font-size:30px; margin-bottom:14px; line-height:1.05; }
+  .stage-narr p{ color:var(--ink-soft); font-size:15.5px; }
+  .stage-narr .detail{ color:var(--ink-mut); font-size:14px; margin-top:14px; }
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; margin-top:20px; }
+  .chip{ font-family:var(--mono); font-size:11.5px; padding:6px 11px; border-radius:8px; border:1px solid var(--line); color:var(--ink-soft); background:rgba(255,255,255,0.02); }
+  .chip.x{ border-color:rgba(247,147,26,0.4); color:var(--xtrata-lo); background:var(--xtrata-dim); }
+  .chip.f{ border-color:rgba(52,211,192,0.4); color:var(--flow-lo); background:var(--flow-dim); }
+
+  .stage-foot{ display:flex; align-items:center; justify-content:space-between; gap:14px; padding:16px 20px; border-top:1px solid var(--line-2); }
+  .controls{ display:flex; gap:8px; }
+  .ctl{ width:40px; height:40px; border-radius:11px; border:1px solid var(--line); background:var(--panel-2); color:var(--ink-soft); cursor:pointer; display:grid; place-items:center; transition:all .2s; }
+  .ctl:hover{ border-color:var(--ink-mut); color:var(--ink); }
+  .ctl.play{ width:auto; padding:0 18px; gap:9px; font-weight:600; font-size:13.5px; color:var(--ink); }
+  .ctl.play.on{ background:var(--xtrata); color:#1a1206; border-color:var(--xtrata); }
+  .progress-label{ font-size:12.5px; color:var(--ink-mut); }
+
+  /* master card */
+  .master{ display:flex; gap:16px; align-items:center; padding:16px; border:1px solid var(--line); border-radius:14px; background:rgba(255,255,255,0.02); }
+  .cover{ width:62px; height:62px; border-radius:10px; flex:0 0 auto; position:relative; overflow:hidden;
+    background:conic-gradient(from 210deg, #f7931a, #b9472e, #34d3c0, #f7931a); }
+  .cover::after{ content:""; position:absolute; inset:0; background:radial-gradient(circle at 32% 30%, rgba(255,255,255,0.5), transparent 42%); mix-blend-mode:overlay; }
+  .master .mt{ font-family:var(--serif); font-size:20px; line-height:1.1; }
+  .master .ma{ color:var(--ink-mut); font-size:13px; }
+  .master .mstat{ margin-left:auto; text-align:right; font-size:11px; color:var(--ink-faint); }
+
+  .vis-area{ flex:1; position:relative; margin-top:18px; }
+
+  /* waveform / lock / shards / split bar / lineage all positioned in .vis-area panels */
+  .vpanel{ position:absolute; inset:0; opacity:0; transform:translateY(8px); transition:opacity .5s, transform .5s; pointer-events:none; }
+  .vpanel.show{ opacity:1; transform:none; pointer-events:auto; }
+
+  .label-row{ display:flex; justify-content:space-between; font-size:12px; color:var(--ink-mut); margin-bottom:8px; }
+
+  /* split/flow bar */
+  .flowbar{ height:34px; border-radius:9px; overflow:hidden; display:flex; border:1px solid var(--line); background:var(--panel-2); }
+  .flowbar > div{ height:100%; width:0; transition:width .9s cubic-bezier(.2,.7,.2,1); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#0c0d10; overflow:hidden; white-space:nowrap; }
+  .seg-split{ background:linear-gradient(90deg,#34d3c0,#2bb8a8); }
+  .seg-lock{ background:linear-gradient(90deg,#5b8def,#3f6fd8); color:#fff; }
+  .seg-hold{ background:linear-gradient(90deg,#f7931a,#e07d10); }
+  .legend{ display:flex; gap:18px; flex-wrap:wrap; margin-top:16px; font-size:12.5px; color:var(--ink-soft); }
+  .legend i{ width:11px; height:11px; border-radius:3px; display:inline-block; margin-right:7px; vertical-align:-1px; }
+
+  .ledger{ margin-top:18px; display:flex; flex-direction:column; gap:8px; }
+  .lrow{ display:flex; justify-content:space-between; align-items:center; font-size:13.5px; padding:9px 12px; border:1px solid var(--line-2); border-radius:9px; background:rgba(255,255,255,0.015); }
+  .lrow .who{ color:var(--ink-soft); display:flex; align-items:center; gap:9px; }
+  .lrow .amt{ font-family:var(--mono); color:var(--ink); }
+  .lrow .pct{ color:var(--ink-faint); font-size:11.5px; margin-left:7px; }
+
+  /* lineage svg */
+  .lineage-wrap{ width:100%; height:100%; min-height:230px; display:grid; place-items:center; }
+  svg .edge{ stroke:var(--line); stroke-width:1.6; fill:none; stroke-dasharray:200; stroke-dashoffset:200; transition:stroke-dashoffset .7s ease, stroke .4s; }
+  svg .edge.on{ stroke-dashoffset:0; stroke:rgba(52,211,192,0.55); }
+  svg .node{ opacity:0; transition:opacity .5s, transform .5s; transform-box:fill-box; transform-origin:center; }
+  svg .node.on{ opacity:1; }
+  svg .nlabel{ font-family:var(--mono); font-size:9.5px; fill:var(--ink-mut); }
+  svg .ntitle{ font-family:var(--sans); font-size:10px; font-weight:600; }
+
+  /* ---------- FEATURE BLOCKS (Protect / Enhance) ---------- */
+  .feat-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+  @media(max-width:900px){ .feat-grid{ grid-template-columns:1fr; } }
+  .feat{
+    border:1px solid var(--line); border-radius:var(--r); padding:28px 24px;
+    background:linear-gradient(180deg,var(--panel),var(--bg-2)); position:relative;
+    transition:transform .3s, border-color .3s;
+  }
+  .feat:hover{ transform:translateY(-3px); border-color:var(--line); }
+  .feat .ic{ width:40px; height:40px; margin-bottom:16px; }
+  .feat h3{ font-family:var(--serif); font-size:24px; margin-bottom:9px; }
+  .feat p{ color:var(--ink-mut); font-size:14.5px; }
+  .feat ul{ list-style:none; margin-top:16px; display:flex; flex-direction:column; gap:9px; }
+  .feat li{ color:var(--ink-soft); font-size:13.5px; padding-left:22px; position:relative; }
+  .feat li::before{ content:""; position:absolute; left:0; top:7px; width:9px; height:9px; border-radius:2px; border:1.5px solid var(--xtrata); }
+  .feat.enh li::before{ border-color:var(--gold); }
+
+  /* mini interactives */
+  .mini{ margin-top:18px; padding-top:18px; border-top:1px solid var(--line-2); }
+  .mini .mlabel{ font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color:var(--ink-faint); margin-bottom:12px; }
+  .toggle-row{ display:flex; gap:8px; }
+  .tg{ flex:1; text-align:center; font-size:12.5px; font-weight:600; padding:10px; border-radius:10px; border:1px solid var(--line); background:var(--panel-2); cursor:pointer; color:var(--ink-soft); transition:all .2s; }
+  .tg:hover{ border-color:var(--ink-mut); }
+  .verdict{ margin-top:12px; font-size:13px; padding:12px 14px; border-radius:10px; min-height:46px; display:flex; align-items:center; gap:10px; transition:all .3s; background:var(--panel-2); border:1px solid var(--line-2); color:var(--ink-mut); }
+  .verdict.ok{ background:var(--xtrata-dim); border-color:rgba(247,147,26,0.4); color:var(--xtrata-lo); }
+  .verdict.bad{ background:rgba(220,70,60,0.12); border-color:rgba(220,70,60,0.4); color:#f0857c; }
+  .verdict.flow{ background:var(--flow-dim); border-color:rgba(52,211,192,0.4); color:var(--flow-lo); }
+
+  .access-state{ display:flex; align-items:center; gap:12px; margin-top:12px; font-size:13px; padding:12px 14px; border-radius:10px; background:var(--panel-2); border:1px solid var(--line-2); transition:all .3s; }
+  .access-state .pulse{ width:10px; height:10px; border-radius:50%; background:var(--flow); box-shadow:0 0 0 0 rgba(52,211,192,0.6); animation:pulse 1.8s infinite; }
+  @keyframes pulse{ 0%{ box-shadow:0 0 0 0 rgba(52,211,192,0.5);} 70%{ box-shadow:0 0 0 9px rgba(52,211,192,0);} 100%{ box-shadow:0 0 0 0 rgba(52,211,192,0);} }
+  .access-state.revoked{ background:rgba(220,70,60,0.1); border-color:rgba(220,70,60,0.35); color:#f0857c; }
+  .access-state.revoked .pulse{ background:#f0857c; animation:none; box-shadow:none; }
+
+  /* live royalty mini */
+  .rsplit{ display:flex; flex-direction:column; gap:10px; margin-top:8px; }
+  .rrow{ display:flex; align-items:center; gap:12px; }
+  .rrow .rname{ width:96px; font-size:13px; color:var(--ink-soft); }
+  .rrow .rtrack{ flex:1; height:8px; background:var(--panel-2); border-radius:99px; overflow:hidden; border:1px solid var(--line-2); }
+  .rrow .rfill{ height:100%; width:0; border-radius:99px; transition:width 1.1s cubic-bezier(.2,.7,.2,1); }
+  .rrow .rval{ width:84px; text-align:right; font-family:var(--mono); font-size:12.5px; color:var(--ink); }
+  .recon{ display:flex; justify-content:space-between; margin-top:18px; padding-top:16px; border-top:1px solid var(--line-2); font-size:13px; }
+  .recon .big{ font-family:var(--serif); font-size:30px; color:var(--flow-lo); line-height:1; }
+  .recon .lbl{ color:var(--ink-mut); font-size:12px; }
+
+  /* ---------- EXPAND ---------- */
+  .expand{ background:
+      radial-gradient(800px 500px at 10% 0%, rgba(52,211,192,0.07), transparent 60%),
+      radial-gradient(700px 500px at 95% 100%, rgba(247,147,26,0.06), transparent 60%);
+  }
+  .xgrid{ display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+  @media(max-width:880px){ .xgrid{ grid-template-columns:1fr; } }
+  .xcard{
+    border:1px solid var(--line); border-radius:18px; padding:30px;
+    background:linear-gradient(180deg, rgba(23,25,34,0.85), rgba(12,13,17,0.9));
+    position:relative; overflow:hidden; transition:transform .3s, border-color .3s;
+  }
+  .xcard:hover{ transform:translateY(-4px); border-color:rgba(52,211,192,0.35); }
+  .xcard .tagn{ display:inline-flex; align-items:center; gap:8px; font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color:var(--flow); font-weight:700; margin-bottom:16px; }
+  .xcard .tagn .nn{ font-family:var(--serif); color:var(--ink-faint); font-size:13px; letter-spacing:0; }
+  .xcard h3{ font-family:var(--serif); font-size:30px; margin-bottom:12px; line-height:1.04; }
+  .xcard p{ color:var(--ink-soft); font-size:15px; }
+  .xcard .vis{ height:120px; margin:20px 0 18px; border-radius:12px; border:1px solid var(--line-2); background:rgba(255,255,255,0.015); position:relative; overflow:hidden; }
+  .contrast{ display:flex; gap:0; margin-top:18px; border-top:1px solid var(--line-2); padding-top:16px; font-size:13px; }
+  .contrast .col{ flex:1; }
+  .contrast .col:first-child{ padding-right:16px; border-right:1px solid var(--line-2); }
+  .contrast .col:last-child{ padding-left:16px; }
+  .contrast .h{ font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase; margin-bottom:6px; }
+  .contrast .today .h{ color:var(--ink-faint); }
+  .contrast .now .h{ color:var(--flow); }
+  .contrast .today{ color:var(--ink-mut); }
+  .contrast .now{ color:var(--ink-soft); }
+
+  /* ---------- HOW IT WORKS ---------- */
+  .steps4{ display:grid; grid-template-columns:repeat(4,1fr); gap:0; border:1px solid var(--line); border-radius:var(--r); overflow:hidden; }
+  @media(max-width:880px){ .steps4{ grid-template-columns:1fr 1fr; } }
+  @media(max-width:520px){ .steps4{ grid-template-columns:1fr; } }
+  .s4{ padding:28px 24px; border-right:1px solid var(--line-2); position:relative; background:linear-gradient(180deg,var(--panel),var(--bg-2)); }
+  .s4:last-child{ border-right:none; }
+  .s4 .n{ font-family:var(--serif); font-size:38px; color:var(--xtrata); opacity:.85; line-height:1; }
+  .s4 h4{ font-size:16px; margin:14px 0 8px; font-weight:600; }
+  .s4 p{ color:var(--ink-mut); font-size:13.5px; }
+  .s4.settle .n{ color:var(--flow); }
+  .badges{ display:flex; gap:12px; flex-wrap:wrap; margin-top:26px; justify-content:center; }
+  .badge{ display:flex; align-items:center; gap:9px; font-size:13px; color:var(--ink-soft); padding:10px 16px; border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,0.02); }
+  .badge .ck{ color:var(--xtrata); }
+
+  /* ---------- PILOT ---------- */
+  .pilot{ border-top:1px solid var(--line-2); }
+  .pilot-card{
+    border:1px solid var(--line); border-radius:22px; padding:48px 44px;
+    background:
+      radial-gradient(600px 300px at 100% 0%, rgba(247,147,26,0.10), transparent 60%),
+      linear-gradient(180deg, var(--panel-2), var(--bg-2));
+  }
+  @media(max-width:680px){ .pilot-card{ padding:34px 24px; } }
+  .pilot-card h2{ font-family:var(--serif); font-size:clamp(30px,4.4vw,46px); font-weight:500; max-width:18ch; }
+  .pilot-card p.intro{ color:var(--ink-soft); margin-top:20px; max-width:62ch; font-size:16.5px; }
+  .pilot-list{ display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin:32px 0; }
+  @media(max-width:680px){ .pilot-list{ grid-template-columns:1fr; } }
+  .pilot-item{ display:flex; gap:14px; align-items:flex-start; }
+  .pilot-item .pn{ font-family:var(--mono); font-size:12px; color:var(--xtrata); border:1px solid var(--line); border-radius:8px; padding:4px 8px; flex:0 0 auto; }
+  .pilot-item .pt{ font-size:14.5px; color:var(--ink-soft); }
+  .pilot-item .pt b{ color:var(--ink); font-weight:600; display:block; margin-bottom:2px; }
+  .lowrisk{ display:flex; align-items:center; gap:13px; margin-top:6px; padding:18px 20px; border-radius:14px; border:1px solid rgba(247,147,26,0.3); background:var(--xtrata-dim); font-size:14.5px; color:var(--xtrata-lo); }
+
+  /* ---------- FOOTER ---------- */
+  footer{ border-top:1px solid var(--line-2); padding:54px 0 70px; margin-top:30px; }
+  .foot-grid{ display:flex; justify-content:space-between; align-items:flex-end; gap:30px; flex-wrap:wrap; }
+  footer .fbrand{ font-weight:600; letter-spacing:0.32em; font-size:18px; }
+  footer .ftag{ color:var(--ink-mut); font-size:13.5px; margin-top:10px; max-width:42ch; }
+  footer .fmeta{ text-align:right; font-size:12.5px; color:var(--ink-faint); line-height:1.9; }
+  footer .fmeta .conf{ color:var(--ink-mut); }
+
+  ::selection{ background:rgba(247,147,26,0.3); color:#fff; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation:none !important; transition-duration:.01ms !important; scroll-behavior:auto; }
+    .reveal{ opacity:1; transform:none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= NAV ================= -->
+<header class="nav" id="nav">
+  <a href="#top" class="brand"><span class="dot"></span>XTRATA <span class="lock">× FlowVault</span></a>
+  <nav class="navlinks">
+    <a href="#demo">The demonstration</a>
+    <a href="#protect">Protect</a>
+    <a href="#enhance">Enhance</a>
+    <a href="#expand">Expand</a>
+    <a href="#pilot">The pilot</a>
+  </nav>
+  <span class="navtag">Confidential · For UMG</span>
+</header>
+
+<!-- ================= HERO ================= -->
+<section class="hero" id="top">
+  <div class="wrap">
+    <div class="eyebrow reveal">Authenticated masters · Programmable rights · Durable distribution</div>
+    <div class="hero-grid">
+      <div>
+        <div class="verbs reveal d1">
+          <span class="v1 serif">Protect.</span>
+          <span class="v2 serif">Enhance.</span>
+          <span class="v3 serif">Expand.</span>
+        </div>
+        <h1 class="sub reveal d2">The world's most valuable catalogue — secured on Bitcoin, and made to do more than it ever could.</h1>
+        <p class="lede reveal d3">Xtrata anchors every master's <b>authenticity and rights to Bitcoin</b>, via Stacks. Paired with programmable-money apps like <b class="f">FlowVault</b>, the same catalogue becomes a living financial asset — settling royalties in real time and unlocking <b>entirely new behaviors</b> that simply weren't possible before.</p>
+        <div class="cta-row reveal d4">
+          <a class="btn primary" href="#demo">Watch a master's life on Xtrata <span aria-hidden="true">↓</span></a>
+          <a class="btn ghost" href="#expand">Skip to what's now possible</a>
+        </div>
+      </div>
+      <div class="hero-vis reveal d3">
+        <svg viewBox="0 0 420 420" width="100%" height="100%" aria-hidden="true">
+          <defs>
+            <linearGradient id="hg" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#f7931a"/><stop offset="1" stop-color="#34d3c0"/>
+            </linearGradient>
+            <radialGradient id="hglow" cx="50%" cy="50%" r="50%">
+              <stop offset="0" stop-color="rgba(247,147,26,0.25)"/><stop offset="1" stop-color="rgba(247,147,26,0)"/>
+            </radialGradient>
+          </defs>
+          <circle cx="210" cy="210" r="180" fill="url(#hglow)"/>
+          <!-- outer rotating ring -->
+          <g style="transform-origin:210px 210px;" id="ring">
+            <circle cx="210" cy="210" r="150" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+            <circle cx="210" cy="60" r="4" fill="#f7931a"/>
+            <circle cx="360" cy="210" r="3" fill="#34d3c0"/>
+            <circle cx="210" cy="360" r="3" fill="rgba(255,255,255,0.4)"/>
+            <circle cx="60" cy="210" r="3" fill="#34d3c0"/>
+          </g>
+          <!-- waveform resolving into chained nodes -->
+          <g id="wave" stroke="url(#hg)" stroke-width="2.4" fill="none" stroke-linecap="round"></g>
+          <!-- provenance chain -->
+          <g id="chain">
+            <line x1="150" y1="250" x2="200" y2="210" stroke="rgba(52,211,192,0.5)" stroke-width="1.6"/>
+            <line x1="200" y1="210" x2="262" y2="232" stroke="rgba(52,211,192,0.5)" stroke-width="1.6"/>
+            <rect x="138" y="238" width="24" height="24" rx="5" fill="#0e0f13" stroke="#f7931a" stroke-width="2"/>
+            <circle cx="200" cy="210" r="12" fill="#0e0f13" stroke="#34d3c0" stroke-width="2"/>
+            <circle cx="262" cy="232" r="12" fill="#0e0f13" stroke="#34d3c0" stroke-width="2"/>
+          </g>
+          <text x="210" y="408" text-anchor="middle" font-family="var(--mono)" font-size="10" fill="#5e5e67">authenticity · rights · flow → one chain</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= TRIPTYCH ================= -->
+<section class="sec" id="thesis">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">The thesis</span>
+      <h2>A catalogue's long-term value rests on three things — proving a master is authentic, controlling who can use it, and distributing it without surrendering the rails.</h2>
+      <p>Xtrata secures all three. Then, composed with money apps like FlowVault, it goes further — turning a protected archive into programmable financial infrastructure.</p>
+    </div>
+    <div class="trip">
+      <div class="tcard protect reveal d1">
+        <span class="num">01 — Defend</span>
+        <svg class="ic" viewBox="0 0 44 44" fill="none"><path d="M22 4l15 6v9c0 11-7 18-15 21-8-3-15-10-15-21v-9l15-6z" stroke="#f7931a" stroke-width="2" stroke-linejoin="round"/><path d="M15 22l5 5 9-10" stroke="#f7931a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <h3>Protect</h3>
+        <p>Anchor authenticity to Bitcoin, encrypt every master, and keep access revocable. The archive becomes tamper-evident and forgery-proof.</p>
+        <div class="meaning">For UMG: provable masters in an age of AI audio fakes — and a takedown you can enforce cryptographically.</div>
+      </div>
+      <div class="tcard enhance reveal d2">
+        <span class="num">02 — Operate</span>
+        <svg class="ic" viewBox="0 0 44 44" fill="none"><circle cx="22" cy="22" r="18" stroke="#c9a24b" stroke-width="2"/><path d="M22 12v10l7 4" stroke="#c9a24b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <h3>Enhance</h3>
+        <p>Encode ownership and royalty splits on-chain so revenue settles automatically, in Bitcoin, in real time — fully transparent and auditable.</p>
+        <div class="meaning">For UMG: reconciliation friction and royalty disputes collapse toward zero. Everyone is paid as the money arrives.</div>
+      </div>
+      <div class="tcard expand reveal d3">
+        <span class="num">03 — Unlock</span>
+        <svg class="ic" viewBox="0 0 44 44" fill="none"><path d="M10 30c0-7 5-12 12-12s12 5 12 12" stroke="#34d3c0" stroke-width="2" stroke-linecap="round"/><circle cx="22" cy="14" r="5" stroke="#34d3c0" stroke-width="2"/><path d="M22 30v6M14 36h16" stroke="#34d3c0" stroke-width="2" stroke-linecap="round"/></svg>
+        <h3>Expand</h3>
+        <p>Once each master carries a permanent, linked financial history, apps like FlowVault unlock behaviors that don't exist in music today.</p>
+        <div class="meaning">For UMG: cascading sample royalties, proof-gated licensing, catalogue-backed credit, and self-justifying payouts.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= INTERACTIVE DEMO ================= -->
+<section class="sec demo" id="demo">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">The demonstration · interactive</span>
+      <h2>A master's life on Xtrata</h2>
+      <p>Follow one recording from ingest to a self-documenting revenue stream. <b style="color:var(--ink-soft)">Press play</b>, or click through each step. Watch how <span class="x">Xtrata</span> records provenance and <span class="f">FlowVault</span> moves the money — and how the two compose into a proof chain that builds itself.</p>
+    </div>
+
+    <div class="stage reveal d1">
+      <!-- stepper -->
+      <div class="stepper" id="stepper"></div>
+
+      <div class="stage-body">
+        <!-- visual side -->
+        <div class="stage-vis">
+          <div class="master">
+            <div class="cover"></div>
+            <div>
+              <div class="mt">"Midnight Signal"</div>
+              <div class="ma">Aria Vance · UMG master</div>
+            </div>
+            <div class="mstat" id="masterStat">awaiting ingest</div>
+          </div>
+
+          <div class="vis-area" id="visArea">
+            <!-- PANEL 0: fingerprint -->
+            <div class="vpanel" data-panel="0">
+              <div class="label-row"><span>Audio → content fingerprint</span><span class="mono">SHA-256</span></div>
+              <svg viewBox="0 0 360 130" width="100%" height="120" aria-hidden="true">
+                <g id="fpWave" stroke="#f7931a" stroke-width="2.2" fill="none" stroke-linecap="round"></g>
+              </svg>
+              <div class="chips">
+                <span class="chip mono">hash 9f3a·c1d7·…·4e2b</span>
+                <span class="chip x">⛓ anchored to Bitcoin</span>
+                <span class="chip x">inscription #1024</span>
+              </div>
+            </div>
+
+            <!-- PANEL 1: encrypt + store -->
+            <div class="vpanel" data-panel="1">
+              <div class="label-row"><span>Encrypt · shard · store redundantly</span><span class="mono">content-addressed</span></div>
+              <svg viewBox="0 0 360 150" width="100%" height="140" aria-hidden="true">
+                <rect x="150" y="14" width="60" height="46" rx="9" fill="none" stroke="#f7931a" stroke-width="2"/>
+                <path d="M163 32v-6a17 17 0 0 1 34 0v6" fill="none" stroke="#f7931a" stroke-width="2"/>
+                <circle cx="180" cy="40" r="4" fill="#f7931a"/>
+                <g stroke="rgba(52,211,192,0.6)" stroke-width="1.4">
+                  <line x1="180" y1="60" x2="60" y2="112"/><line x1="180" y1="60" x2="130" y2="120"/>
+                  <line x1="180" y1="60" x2="230" y2="120"/><line x1="180" y1="60" x2="300" y2="112"/>
+                </g>
+                <g fill="#0e0f13" stroke="#34d3c0" stroke-width="1.8">
+                  <rect x="44" y="112" width="32" height="24" rx="5"/><rect x="116" y="120" width="32" height="24" rx="5"/>
+                  <rect x="214" y="120" width="32" height="24" rx="5"/><rect x="286" y="112" width="32" height="24" rx="5"/>
+                </g>
+              </svg>
+              <div class="chips">
+                <span class="chip">encrypted by default</span>
+                <span class="chip">never publicly downloadable</span>
+                <span class="chip x">UMG holds the keys</span>
+              </div>
+            </div>
+
+            <!-- PANEL 2: rights / splits -->
+            <div class="vpanel" data-panel="2">
+              <div class="label-row"><span>Ownership &amp; royalty splits, on-chain</span><span class="mono">programmable rights</span></div>
+              <div class="flowbar" id="rightsBar">
+                <div class="seg-hold"  data-w="50">UMG 50%</div>
+                <div class="seg-split" data-w="30">Artist 30%</div>
+                <div class="seg-lock"  data-w="12">Prod 12%</div>
+                <div class="seg-split" data-w="8" style="background:linear-gradient(90deg,#9caf9f,#7d927f)">Writer 8%</div>
+              </div>
+              <div class="ledger">
+                <div class="lrow"><span class="who"><i style="color:var(--xtrata)">◆</i> UMG (master owner)</span><span class="amt">50%</span></div>
+                <div class="lrow"><span class="who"><i style="color:var(--flow)">●</i> Aria Vance (artist)</span><span class="amt">30%</span></div>
+                <div class="lrow"><span class="who"><i style="color:#5b8def">●</i> Producer</span><span class="amt">12%</span></div>
+                <div class="lrow"><span class="who"><i style="color:#9caf9f">●</i> Songwriter</span><span class="amt">8%</span></div>
+              </div>
+            </div>
+
+            <!-- PANEL 3: revenue + flowvault routing -->
+            <div class="vpanel" data-panel="3">
+              <div class="label-row"><span><span class="f">FlowVault</span> routes a $5,000 sync placement</span><span class="mono">split → lock → hold</span></div>
+              <div class="flowbar" id="moneyBar">
+                <div class="seg-split" data-w="50" id="segSplit">collaborators</div>
+                <div class="seg-lock"  data-w="10" id="segLock">reserve</div>
+                <div class="seg-hold"  data-w="40" id="segHold">UMG</div>
+              </div>
+              <div class="legend">
+                <span><i class="seg-split" style="background:#34d3c0"></i>Split to collaborators — <b id="vSplit">$2,500</b></span>
+                <span><i class="seg-lock" style="background:#5b8def"></i>Time-locked reserve — <b id="vLock">$500</b></span>
+                <span><i class="seg-hold" style="background:#f7931a"></i>Held to UMG — <b id="vHold">$2,000</b></span>
+              </div>
+              <div class="ledger" style="margin-top:16px">
+                <div class="lrow"><span class="who">Settles in</span><span class="amt f">Bitcoin · real time</span></div>
+                <div class="lrow"><span class="who">Reconciliation delay</span><span class="amt">0 days</span></div>
+              </div>
+            </div>
+
+            <!-- PANEL 4 & 5 & 6: lineage graph -->
+            <div class="vpanel" data-panel="4"></div>
+            <div class="vpanel" data-panel="5"></div>
+            <div class="vpanel" data-panel="6"></div>
+
+            <!-- shared lineage svg lives here, shown for steps >=4 -->
+            <div class="vpanel" data-panel="lineage" id="lineagePanel">
+              <div class="label-row"><span>Receipt lineage — built automatically as money moves</span><span class="mono" id="lineageMeta">querying /index/relations</span></div>
+              <div class="lineage-wrap">
+                <svg viewBox="0 0 380 230" width="100%" height="100%" id="lineageSvg" aria-hidden="true">
+                  <!-- edges -->
+                  <path class="edge" id="e_aR1" d="M70 115 H150"/>
+                  <path class="edge" id="e_R1R2" d="M178 115 H258"/>
+                  <path class="edge" id="e_R2R3" d="M286 115 H336" style="display:none"/>
+                  <!-- asset node -->
+                  <g class="node" id="n_asset">
+                    <rect x="34" y="92" width="44" height="44" rx="8" fill="#0e0f13" stroke="#f7931a" stroke-width="2.2"/>
+                    <text x="56" y="118" text-anchor="middle" class="ntitle" fill="#f7931a">♪</text>
+                    <text x="56" y="152" text-anchor="middle" class="nlabel">master #1024</text>
+                  </g>
+                  <!-- R1 -->
+                  <g class="node" id="n_r1">
+                    <circle cx="164" cy="114" r="22" fill="#0e0f13" stroke="#34d3c0" stroke-width="2.2"/>
+                    <text x="164" y="118" text-anchor="middle" class="ntitle" fill="#34d3c0">R1</text>
+                    <text x="164" y="150" text-anchor="middle" class="nlabel">$5,000</text>
+                  </g>
+                  <!-- R2 -->
+                  <g class="node" id="n_r2">
+                    <circle cx="272" cy="114" r="22" fill="#0e0f13" stroke="#34d3c0" stroke-width="2.2"/>
+                    <text x="272" y="118" text-anchor="middle" class="ntitle" fill="#34d3c0">R2</text>
+                    <text x="272" y="150" text-anchor="middle" class="nlabel">$3,200</text>
+                  </g>
+                </svg>
+              </div>
+              <div class="chips">
+                <span class="chip x" id="chipReceipts">2 receipts inscribed</span>
+                <span class="chip">tamper-evident</span>
+                <span class="chip">independently verifiable</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- narration side -->
+        <div class="stage-narr">
+          <div class="k" id="narrK">Step 01</div>
+          <h3 id="narrTitle">Ingest &amp; fingerprint</h3>
+          <p id="narrBody">Each master is cryptographically fingerprinted on ingest, creating a permanent authenticity anchor recorded on Bitcoin via Stacks.</p>
+          <div class="detail" id="narrDetail">This fingerprint is the master's identity for life — any later copy can be checked against it in seconds.</div>
+          <div class="chips" id="narrChips"></div>
+        </div>
+      </div>
+
+      <!-- footer controls -->
+      <div class="stage-foot">
+        <div class="controls">
+          <button class="ctl" id="prevBtn" aria-label="Previous step">‹</button>
+          <button class="ctl play" id="playBtn"><span id="playIcon">▶</span> <span id="playTxt">Play</span></button>
+          <button class="ctl" id="nextBtn" aria-label="Next step">›</button>
+        </div>
+        <div class="progress-label"><span id="stepNo">1</span> / 7 · <span id="stepName">Ingest &amp; fingerprint</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PROTECT ================= -->
+<section class="sec" id="protect">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow" style="color:var(--xtrata)">01 · Protect</span>
+      <h2>Make the catalogue tamper-evident, forgery-proof, and revocable.</h2>
+      <p>Everything below is enforced by cryptography, not policy. The master never leaves UMG's control — even while it earns.</p>
+    </div>
+    <div class="feat-grid">
+      <!-- Authenticity -->
+      <div class="feat reveal d1">
+        <svg class="ic" viewBox="0 0 40 40" fill="none"><path d="M20 3l13 5v8c0 10-6.5 16-13 19-6.5-3-13-9-13-19V8l13-5z" stroke="#f7931a" stroke-width="2" stroke-linejoin="round"/><path d="M14 20l4 4 8-9" stroke="#f7931a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <h3>Authenticity, anchored to Bitcoin</h3>
+        <p>Every master gets a permanent cryptographic fingerprint on Bitcoin — a tamper-evident chain of custody proving it's the genuine UMG master.</p>
+        <ul>
+          <li>Survives any format, transfer, or platform</li>
+          <li>Independently verifiable by anyone, forever</li>
+          <li>As AI makes audio forgery trivial, this becomes a core catalogue asset</li>
+        </ul>
+        <div class="mini">
+          <div class="mlabel">Try it — authenticity check</div>
+          <div class="toggle-row">
+            <div class="tg" data-auth="ok">Genuine UMG master</div>
+            <div class="tg" data-auth="bad">AI deepfake / leak</div>
+          </div>
+          <div class="verdict" id="authVerdict">Select a file to verify against the Bitcoin anchor.</div>
+        </div>
+      </div>
+      <!-- Control -->
+      <div class="feat reveal d2">
+        <svg class="ic" viewBox="0 0 40 40" fill="none"><rect x="8" y="18" width="24" height="17" rx="3" stroke="#f7931a" stroke-width="2"/><path d="M13 18v-4a7 7 0 0 1 14 0v4" stroke="#f7931a" stroke-width="2"/><circle cx="20" cy="26" r="2.4" fill="#f7931a"/></svg>
+        <h3>Control, not exposure</h3>
+        <p>Masters are encrypted by default and never publicly downloadable. Access is granted, time- and territory-bound, and instantly revocable.</p>
+        <ul>
+          <li>Takedown enforced cryptographically, in one transaction</li>
+          <li>Territory- and window-aware licensing</li>
+          <li>UMG holds the keys — always</li>
+        </ul>
+        <div class="mini">
+          <div class="mlabel">Try it — cryptographic takedown</div>
+          <div class="access-state" id="accessState"><span class="pulse"></span><span id="accessTxt">Licensee streaming in 14 territories</span></div>
+          <div class="toggle-row" style="margin-top:10px">
+            <div class="tg" data-access="grant">Grant access</div>
+            <div class="tg" data-access="revoke">Revoke now</div>
+          </div>
+        </div>
+      </div>
+      <!-- Durability -->
+      <div class="feat reveal d3">
+        <svg class="ic" viewBox="0 0 40 40" fill="none"><ellipse cx="20" cy="11" rx="13" ry="5" stroke="#f7931a" stroke-width="2"/><path d="M7 11v18c0 2.8 5.8 5 13 5s13-2.2 13-5V11" stroke="#f7931a" stroke-width="2"/><path d="M7 20c0 2.8 5.8 5 13 5s13-2.2 13-5" stroke="#f7931a" stroke-width="2"/></svg>
+        <h3>Durable distribution</h3>
+        <p>Content is stored redundantly across resilient networks and addressed by content hash — so it can't be silently altered or quietly lost.</p>
+        <ul>
+          <li>Content-addressed: the address <i>is</i> the integrity check</li>
+          <li>No single point of failure or deletion</li>
+          <li>Feeds authorised players and streaming experiences directly</li>
+        </ul>
+        <div class="mini">
+          <div class="mlabel">Why it matters</div>
+          <div class="verdict flow" style="background:var(--panel-2);border-color:var(--line-2);color:var(--ink-mut)">Own the rails. Distribute the catalogue without renting someone else's infrastructure — or trusting it to stay honest.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ENHANCE ================= -->
+<section class="sec" id="enhance" style="border-top-color:var(--line-2)">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow" style="color:var(--gold)">02 · Enhance</span>
+      <h2>Turn rights into money that moves itself.</h2>
+      <p>Ownership and splits live on-chain. When revenue arrives, FlowVault routes it the instant it lands — and Xtrata records the proof. No quarterly statements, no spreadsheet reconciliation, no disputes about what was paid.</p>
+    </div>
+    <div class="feat-grid">
+      <div class="feat enh reveal d1">
+        <svg class="ic" viewBox="0 0 40 40" fill="none"><path d="M6 20h28M20 6v28" stroke="#c9a24b" stroke-width="2" stroke-linecap="round"/><circle cx="20" cy="20" r="15" stroke="#c9a24b" stroke-width="2"/></svg>
+        <h3>Programmable rights &amp; transparent royalties</h3>
+        <p>Encode ownership, licences, and splits once. Every party can see, in real time, exactly what they are owed and why — auditable down to the transaction.</p>
+        <ul>
+          <li>One source of truth, shared by all rights-holders</li>
+          <li>Reconciliation friction and disputes cut to near-zero</li>
+          <li>Audit-grade transparency without opening the books manually</li>
+        </ul>
+      </div>
+      <div class="feat enh reveal d2">
+        <svg class="ic" viewBox="0 0 40 40" fill="none"><path d="M20 5v6M20 29v6M5 20h6M29 20h6" stroke="#c9a24b" stroke-width="2" stroke-linecap="round"/><circle cx="20" cy="20" r="8" stroke="#c9a24b" stroke-width="2"/><path d="M20 16v4l3 2" stroke="#c9a24b" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <h3>Real-time settlement via FlowVault</h3>
+        <p>Money moves the instant revenue lands — split to collaborators, a reserve time-locked, the remainder held to UMG — settling in Bitcoin with no intermediary.</p>
+        <ul>
+          <li>Collaborators paid continuously, not two quarters later</li>
+          <li>Deterministic routing: split → lock → hold</li>
+          <li>Every settlement emits a permanent, linked receipt</li>
+        </ul>
+      </div>
+      <!-- live royalty mini -->
+      <div class="feat enh reveal d3">
+        <h3 style="margin-bottom:6px">Live: a $5,000 placement settles</h3>
+        <p style="margin-bottom:6px">Watch the split land in real time.</p>
+        <div class="mini" style="border-top:none;padding-top:8px">
+          <div class="rsplit" id="rsplit">
+            <div class="rrow"><span class="rname">UMG</span><span class="rtrack"><span class="rfill" data-pct="40" style="background:linear-gradient(90deg,#f7931a,#e07d10)"></span></span><span class="rval" data-amt="2000">$0</span></div>
+            <div class="rrow"><span class="rname">Aria Vance</span><span class="rtrack"><span class="rfill" data-pct="30" style="background:linear-gradient(90deg,#34d3c0,#2bb8a8)"></span></span><span class="rval" data-amt="1500">$0</span></div>
+            <div class="rrow"><span class="rname">Producer</span><span class="rtrack"><span class="rfill" data-pct="12" style="background:linear-gradient(90deg,#5b8def,#3f6fd8)"></span></span><span class="rval" data-amt="600">$0</span></div>
+            <div class="rrow"><span class="rname">Songwriter</span><span class="rtrack"><span class="rfill" data-pct="8" style="background:linear-gradient(90deg,#9caf9f,#7d927f)"></span></span><span class="rval" data-amt="400">$0</span></div>
+            <div class="rrow"><span class="rname">Reserve</span><span class="rtrack"><span class="rfill" data-pct="10" style="background:linear-gradient(90deg,#6b6f86,#4a4e63)"></span></span><span class="rval" data-amt="500">$0</span></div>
+          </div>
+          <div class="recon">
+            <div><div class="big" id="reconDays">0</div><div class="lbl">days to reconcile</div></div>
+            <div style="text-align:right"><div class="big" id="reconParties">5</div><div class="lbl">parties paid · in Bitcoin</div></div>
+          </div>
+          <div class="toggle-row" style="margin-top:16px">
+            <div class="tg" id="replaySplit" style="flex:0 0 auto;color:var(--gold);border-color:rgba(201,162,75,0.4)">↻ Replay settlement</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= EXPAND ================= -->
+<section class="sec expand" id="expand">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow" style="color:var(--flow)">03 · Expand — the headline</span>
+      <h2>What becomes possible when the catalogue can think.</h2>
+      <p>Once every master carries a permanent, linked financial history, it stops being a static archive and starts behaving like programmable infrastructure. Four new behaviors — <b style="color:var(--ink-soft)">none of which exist in the music business today</b> — fall out of composing Xtrata with FlowVault.</p>
+    </div>
+    <div class="xgrid">
+      <!-- Cascading royalties -->
+      <div class="xcard reveal d1">
+        <div class="tagn"><span class="nn">01</span> Cascading ancestral royalties</div>
+        <h3>Samples that pay their whole family tree — forever.</h3>
+        <p>When a master is sampled, interpolated, or remixed, the derivative's revenue automatically pays the entire lineage it descends from. The receipt graph already knows the family tree, so no one negotiates a one-off licence — the money simply flows upstream.</p>
+        <div class="vis"><svg viewBox="0 0 360 120" width="100%" height="100%" id="casVis" aria-hidden="true">
+          <g stroke="rgba(52,211,192,0.5)" stroke-width="1.6" fill="none">
+            <path d="M60 60 L160 30" class="casflow"/><path d="M60 60 L160 90" class="casflow"/>
+            <path d="M160 30 L280 60" class="casflow"/><path d="M160 90 L280 60" class="casflow"/>
+          </g>
+          <g fill="#0e0f13" stroke="#f7931a" stroke-width="2"><rect x="44" y="46" width="28" height="28" rx="6"/></g>
+          <g fill="#0e0f13" stroke="#34d3c0" stroke-width="2"><circle cx="160" cy="30" r="13"/><circle cx="160" cy="90" r="13"/><circle cx="280" cy="60" r="14"/></g>
+          <text x="58" y="100" text-anchor="middle" class="nlabel" font-family="var(--mono)" font-size="9" fill="#8a8a93">original</text>
+          <text x="280" y="92" text-anchor="middle" class="nlabel" font-family="var(--mono)" font-size="9" fill="#8a8a93">new hit</text>
+          <text x="208" y="22" class="nlabel" font-family="var(--mono)" font-size="9" fill="#34d3c0">$ flows up ↑</text>
+        </svg></div>
+        <div class="contrast">
+          <div class="col today"><div class="h">Today</div>Sample clearances are slow, manual, and often skipped. Originators rarely see downstream upside.</div>
+          <div class="col now"><div class="h">With Xtrata × FlowVault</div>Every derivative pays its ancestry automatically — turning the catalogue into a perpetual, self-collecting royalty base.</div>
+        </div>
+      </div>
+
+      <!-- Proof-gated licensing -->
+      <div class="xcard reveal d2">
+        <div class="tagn"><span class="nn">02</span> Proof-gated licensing</div>
+        <h3>Payment that unlocks the instant use is proven.</h3>
+        <p>A sync or sample licence holds payment in FlowVault until proof-of-use is inscribed on-chain — then releases automatically, with the proof permanently bonded to the payment. The "used it but never paid" problem disappears by construction.</p>
+        <div class="vis"><svg viewBox="0 0 360 120" width="100%" height="100%" id="gateVis" aria-hidden="true">
+          <rect x="40" y="46" width="40" height="30" rx="5" fill="none" stroke="#5b8def" stroke-width="2"/>
+          <path d="M48 46v-5a12 12 0 0 1 24 0" fill="none" stroke="#5b8def" stroke-width="2" id="gateShackle"/>
+          <text x="60" y="98" text-anchor="middle" font-family="var(--mono)" font-size="9" fill="#8a8a93">locked</text>
+          <path d="M96 61 H188" stroke="rgba(52,211,192,0.5)" stroke-width="1.6" stroke-dasharray="4 4"/>
+          <rect x="150" y="46" width="40" height="30" rx="5" fill="#0e0f13" stroke="#f7931a" stroke-width="2"/>
+          <text x="170" y="66" text-anchor="middle" font-size="13" fill="#f7931a">⛓</text>
+          <text x="170" y="98" text-anchor="middle" font-family="var(--mono)" font-size="9" fill="#8a8a93">proof inscribed</text>
+          <path d="M206 61 H280" stroke="rgba(52,211,192,0.5)" stroke-width="1.6"/>
+          <circle cx="300" cy="61" r="16" fill="#0e0f13" stroke="#34d3c0" stroke-width="2"/>
+          <text x="300" y="65" text-anchor="middle" font-size="13" fill="#34d3c0">$</text>
+          <text x="300" y="98" text-anchor="middle" font-family="var(--mono)" font-size="9" fill="#8a8a93">paid</text>
+        </svg></div>
+        <div class="contrast">
+          <div class="col today"><div class="h">Today</div>Licences are paid on trust and chased after the fact, with leakage and audit costs.</div>
+          <div class="col now"><div class="h">With Xtrata × FlowVault</div>Money and proof are the same event — enforceable, instant, and self-documenting.</div>
+        </div>
+      </div>
+
+      <!-- Catalog-backed credit -->
+      <div class="xcard reveal d3">
+        <div class="tagn"><span class="nn">03</span> Catalogue-backed credit</div>
+        <h3>Advances underwritten by provable cashflow.</h3>
+        <p>A master's tamper-proof royalty lineage <i>is</i> its credit file. Advances can be sized against verifiable history instead of opaque projections — letting UMG extend or syndicate capital to artists who keep their ownership, with risk anyone can audit.</p>
+        <div class="vis"><svg viewBox="0 0 360 120" width="100%" height="100%" id="creditVis" aria-hidden="true">
+          <polyline points="30,90 70,82 110,84 150,70 190,72 230,55 270,48 310,34 340,30" fill="none" stroke="#34d3c0" stroke-width="2.2"/>
+          <g fill="#34d3c0"><circle cx="70" cy="82" r="2.5"/><circle cx="150" cy="70" r="2.5"/><circle cx="230" cy="55" r="2.5"/><circle cx="310" cy="34" r="2.5"/></g>
+          <line x1="30" y1="100" x2="340" y2="100" stroke="var(--line)" stroke-width="1"/>
+          <rect x="250" y="20" width="96" height="34" rx="7" fill="rgba(52,211,192,0.1)" stroke="rgba(52,211,192,0.4)" stroke-width="1"/>
+          <text x="298" y="34" text-anchor="middle" font-family="var(--mono)" font-size="9" fill="#74e6da">provable</text>
+          <text x="298" y="46" text-anchor="middle" font-family="var(--mono)" font-size="9" fill="#74e6da">cashflow</text>
+        </svg></div>
+        <div class="contrast">
+          <div class="col today"><div class="h">Today</div>Advances rely on estimates and often demand a slice of ownership as security.</div>
+          <div class="col now"><div class="h">With Xtrata × FlowVault</div>Capital priced off a verifiable receipt chain — ownership stays put, terms are transparent.</div>
+        </div>
+      </div>
+
+      <!-- Accountable treasury -->
+      <div class="xcard reveal d4">
+        <div class="tagn"><span class="nn">04</span> Accountable payouts</div>
+        <h3>Every payment explains itself — and can't be rewritten.</h3>
+        <p>Before money moves, the distribution writes its own permanent, linked justification: which master, which split, which period. Artists and auditors see exactly why they were paid what — ending the royalty-statement dispute for good.</p>
+        <div class="vis"><svg viewBox="0 0 360 120" width="100%" height="100%" id="acctVis" aria-hidden="true">
+          <g fill="#0e0f13" stroke="#34d3c0" stroke-width="1.8">
+            <rect x="40" y="34" width="54" height="52" rx="6"/><rect x="150" y="34" width="54" height="52" rx="6"/><rect x="260" y="34" width="54" height="52" rx="6"/>
+          </g>
+          <g stroke="rgba(247,147,26,0.6)" stroke-width="1.5"><path d="M94 60 H150"/><path d="M204 60 H260"/></g>
+          <g font-family="var(--mono)" font-size="8" fill="#8a8a93" text-anchor="middle">
+            <text x="67" y="58">why</text><text x="67" y="70">$2,000</text>
+            <text x="177" y="58">why</text><text x="177" y="70">$1,500</text>
+            <text x="287" y="58">why</text><text x="287" y="70">$600</text>
+          </g>
+          <text x="180" y="108" text-anchor="middle" font-family="var(--mono)" font-size="9" fill="#f7931a">immutable rationale, linked to each payout</text>
+        </svg></div>
+        <div class="contrast">
+          <div class="col today"><div class="h">Today</div>Statements arrive late, are hard to audit, and disputes are he-said-she-said.</div>
+          <div class="col now"><div class="h">With Xtrata × FlowVault</div>The reason is inscribed before the money moves and is independently checkable forever.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= HOW IT WORKS ================= -->
+<section class="sec" id="how">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">How it works</span>
+      <h2>Four steps, end to end.</h2>
+    </div>
+    <div class="steps4 reveal d1">
+      <div class="s4"><div class="n">01</div><h4>Ingest &amp; fingerprint</h4><p>Each master is cryptographically fingerprinted, creating its permanent authenticity anchor.</p></div>
+      <div class="s4"><div class="n">02</div><h4>Encrypt &amp; store</h4><p>Encrypted, split, and stored redundantly across resilient networks — never in the open.</p></div>
+      <div class="s4"><div class="n">03</div><h4>Anchor rights on Bitcoin</h4><p>Ownership, licences, and royalty splits are recorded on Stacks and anchored to Bitcoin.</p></div>
+      <div class="s4 settle"><div class="n">04</div><h4>Distribute &amp; settle</h4><p>Authorised players stream; <span class="f">FlowVault</span> settles royalties automatically in Bitcoin, in real time.</p></div>
+    </div>
+    <div class="badges reveal d2">
+      <span class="badge"><span class="ck">✓</span> Encrypted by default</span>
+      <span class="badge"><span class="ck">✓</span> Revocable &amp; territory-aware</span>
+      <span class="badge"><span class="ck">✓</span> UMG holds the keys</span>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PILOT ================= -->
+<section class="sec pilot" id="pilot">
+  <div class="wrap">
+    <div class="pilot-card reveal">
+      <span class="eyebrow" style="color:var(--xtrata)">The proposal</span>
+      <h2 style="margin-top:16px">A focused, low-risk pilot.</h2>
+      <p class="intro">Ingest a defined catalogue slice and demonstrate, end to end — while we jointly define a key-custody model that keeps ultimate control with UMG.</p>
+      <div class="pilot-list">
+        <div class="pilot-item"><span class="pn">01</span><span class="pt"><b>Authenticated storage</b>Fingerprint and encrypt the slice; anchor each master to Bitcoin.</span></div>
+        <div class="pilot-item"><span class="pn">02</span><span class="pt"><b>Access-controlled streaming</b>Authorised playback, territory-aware and revocable.</span></div>
+        <div class="pilot-item"><span class="pn">03</span><span class="pt"><b>Automated settlement</b>Royalties split and settle in Bitcoin in real time, via FlowVault.</span></div>
+        <div class="pilot-item"><span class="pn">04</span><span class="pt"><b>Cryptographic takedown</b>Revoke access on demand and prove it on-chain.</span></div>
+      </div>
+      <div class="lowrisk"><span style="font-size:18px">🛡</span> Low-risk by design: masters stay encrypted, access stays revocable, and ownership stays with UMG throughout.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FOOTER ================= -->
+<footer>
+  <div class="wrap foot-grid">
+    <div>
+      <div class="fbrand">XTRATA</div>
+      <div class="ftag">Durable provenance infrastructure on Bitcoin, via Stacks. Composed here with FlowVault — programmable money on the same rails.</div>
+    </div>
+    <div class="fmeta">
+      <div class="conf">Confidential proposal — prepared for discussion with Universal Music Group.</div>
+      <div>Authenticated masters · Programmable rights · Durable distribution</div>
+      <div>xtrata.xyz</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- NAV solidify ---------- */
+  var nav = document.getElementById('nav');
+  function onScroll(){ if(window.scrollY > 40) nav.classList.add('solid'); else nav.classList.remove('solid'); }
+  window.addEventListener('scroll', onScroll, {passive:true}); onScroll();
+
+  /* ---------- reveal on scroll ---------- */
+  var io = new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, {threshold:0.12, rootMargin:'0px 0px -8% 0px'});
+  document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+
+  /* ---------- hero waveform ---------- */
+  (function(){
+    var g = document.getElementById('wave'); if(!g) return;
+    var pts = [], cx=210, baseY=210, n=26, span=300;
+    var d = 'M'+(cx-span/2)+' '+baseY+' ';
+    for(var i=0;i<=n;i++){
+      var x = (cx-span/2) + (span*i/n);
+      var amp = 46*Math.exp(-Math.pow((i-n/2)/(n/3),2)) ;
+      var y = baseY - Math.sin(i*0.9)*amp*0.5 - (i%2? amp*0.18:0);
+      d += 'L'+x.toFixed(1)+' '+y.toFixed(1)+' ';
+    }
+    var p = document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('d', d); p.setAttribute('opacity','0.85'); g.appendChild(p);
+    if(!reduce){
+      var ring = document.getElementById('ring'), t=0;
+      (function spin(){ t+=0.12; if(ring) ring.style.transform='rotate('+t+'deg)'; requestAnimationFrame(function(){ setTimeout(spin,40); }); })();
+    }
+  })();
+
+  /* ---------- fingerprint mini wave ---------- */
+  (function(){
+    var g=document.getElementById('fpWave'); if(!g) return;
+    var n=46, w=360, baseY=70, d='M0 '+baseY+' ';
+    for(var i=0;i<=n;i++){
+      var x=w*i/n;
+      var amp=42*Math.exp(-Math.pow((i-n/2)/(n/2.4),2));
+      var y=baseY - (Math.sin(i*1.3)+Math.sin(i*0.5))*amp*0.32;
+      d+='L'+x.toFixed(1)+' '+y.toFixed(1)+' ';
+    }
+    var p=document.createElementNS('http://www.w3.org/2000/svg','path'); p.setAttribute('d',d); g.appendChild(p);
+  })();
+
+  /* ============================================================
+     INTERACTIVE LIFECYCLE DEMO
+     ============================================================ */
+  var STEPS = [
+    { k:'Step 01', kf:false, title:'Ingest &amp; fingerprint',
+      body:'Each master is cryptographically fingerprinted on ingest, creating a permanent authenticity anchor recorded on Bitcoin via Stacks.',
+      detail:'This fingerprint is the master’s identity for life — any later copy can be checked against it in seconds.',
+      panel:'0', stat:'fingerprinted · #1024', chips:[['x','Xtrata inscription #1024'],['','SHA-256 content hash']] },
+
+    { k:'Step 02', kf:false, title:'Encrypt &amp; store',
+      body:'The master is encrypted, split, and stored redundantly across resilient networks — never in the open, never publicly downloadable.',
+      detail:'Addressed by content hash across multiple networks: it cannot be silently altered or quietly lost.',
+      panel:'1', stat:'encrypted · distributed', chips:[['','encrypted by default'],['x','UMG holds the keys']] },
+
+    { k:'Step 03', kf:false, title:'Anchor rights on Bitcoin',
+      body:'Ownership and royalty splits are encoded on-chain — UMG 50%, artist 30%, producer 12%, songwriter 8% — a single source of truth shared by every rights-holder.',
+      detail:'Rights become programmable: the split is now code that money will obey automatically.',
+      panel:'2', stat:'rights anchored', chips:[['x','splits on-chain'],['','one shared truth']] },
+
+    { k:'Step 04', kf:true, title:'A sync placement arrives',
+      body:'A $5,000 sync licence lands. FlowVault routes it deterministically — split to collaborators, a reserve time-locked, the remainder held to UMG — settling in Bitcoin in real time.',
+      detail:'Split → lock → hold. No intermediary, no quarterly delay, no manual reconciliation.',
+      panel:'3', stat:'settling · $5,000', chips:[['f','FlowVault: split → lock → hold'],['f','settles in Bitcoin']] },
+
+    { k:'Step 05', kf:false, title:'Proof appears — automatically',
+      body:'As the money settles, Xtrata inscribes a canonical receipt (R1) and links it to the master. The payout has written its own permanent proof.',
+      detail:'Nobody pressed “save.” The record is a side-effect of paying — self-documenting money.',
+      panel:'lineage', show:['asset','r1'], edges:['aR1'], stat:'receipt R1 inscribed',
+      chips:[['x','receipt #R1 → master #1024'],['','tamper-evident']] , receipts:'1 receipt inscribed', meta:'R1 linked to master #1024' },
+
+    { k:'Step 06', kf:false, title:'It compounds into a lineage',
+      body:'A second placement settles — receipt R2 links to R1 and to the master. Repeated over a catalogue, this becomes an audit trail that builds itself and can’t be edited or lost.',
+      detail:'Query it any time via Xtrata’s relationship index: parents, ancestors, children — the master’s entire financial life as one graph.',
+      panel:'lineage', show:['asset','r1','r2'], edges:['aR1','R1R2'], stat:'lineage: master ← R1 ← R2',
+      chips:[['x','2 receipts · 1 chain'],['','independently verifiable']], receipts:'2 receipts inscribed', meta:'master ← R1 ← R2' },
+
+    { k:'Step 07', kf:true, title:'The catalogue wakes up',
+      body:'That self-built lineage is the unlock. It can collateralise an advance, gate a licence until use is proven, and cascade royalties to everything this master ever spawns.',
+      detail:'Protected, then enhanced, then expanded — the same master, now programmable financial infrastructure. ↓ See what’s possible.',
+      panel:'lineage', show:['asset','r1','r2','r3'], edges:['aR1','R1R2','R2R3'], stat:'live financial asset',
+      chips:[['f','collateral · gated · cascading'],['x','one chain, many behaviors']], receipts:'an open-ended chain', meta:'master ← R1 ← R2 ← …' }
+  ];
+
+  var cur = 0, playing=false, timer=null, moneyAnimated=false, rightsAnimated=false;
+  var stepper=document.getElementById('stepper');
+  var panels={}; document.querySelectorAll('.vpanel').forEach(function(p){ panels[p.getAttribute('data-panel')]=p; });
+
+  // build stepper
+  STEPS.forEach(function(s,i){
+    var d=document.createElement('div'); d.className='step-dot'; d.setAttribute('data-i',i);
+    d.innerHTML='<span class="b">'+(i+1)+'</span><span>'+s.title.replace(/&amp;/g,'&')+'</span>';
+    d.addEventListener('click', function(){ stop(); go(i); });
+    stepper.appendChild(d);
+  });
+  var dots=Array.prototype.slice.call(stepper.children);
+
+  // lineage node/edge helpers
+  var lineNodes={ asset:document.getElementById('n_asset'), r1:document.getElementById('n_r1'), r2:document.getElementById('n_r2') };
+  var lineEdges={ aR1:document.getElementById('e_aR1'), R1R2:document.getElementById('e_R1R2'), R2R3:document.getElementById('e_R2R3') };
+  var r3node=null;
+  function ensureR3(){
+    if(r3node) return;
+    var svg=document.getElementById('lineageSvg'); if(!svg) return;
+    var g=document.createElementNS('http://www.w3.org/2000/svg','g'); g.setAttribute('class','node'); g.setAttribute('id','n_r3');
+    g.innerHTML='<circle cx="358" cy="114" r="20" fill="#0e0f13" stroke="#34d3c0" stroke-width="2.2" stroke-dasharray="3 3"/><text x="358" y="118" text-anchor="middle" class="ntitle" fill="#34d3c0">R3</text><text x="358" y="148" text-anchor="middle" class="nlabel">…</text>';
+    // extend viewBox so r3 is visible
+    svg.setAttribute('viewBox','0 0 400 230');
+    svg.appendChild(g); r3node=g; lineNodes.r3=g;
+    var ed=document.getElementById('e_R2R3'); if(ed) ed.style.display='';
+  }
+
+  function setLineage(show, edges){
+    // reset
+    Object.keys(lineNodes).forEach(function(k){ if(lineNodes[k]) lineNodes[k].classList.remove('on'); });
+    Object.keys(lineEdges).forEach(function(k){ if(lineEdges[k]) lineEdges[k].classList.remove('on'); });
+    if(show && show.indexOf('r3')>-1) ensureR3();
+    // staggered reveal
+    (show||[]).forEach(function(id,idx){
+      setTimeout(function(){ if(lineNodes[id]) lineNodes[id].classList.add('on'); }, reduce?0:idx*180);
+    });
+    (edges||[]).forEach(function(id,idx){
+      setTimeout(function(){ if(lineEdges[id]) lineEdges[id].classList.add('on'); }, reduce?0:160+idx*220);
+    });
+  }
+
+  function animateMoney(){
+    var bar=document.getElementById('moneyBar'); if(!bar) return;
+    bar.querySelectorAll('div').forEach(function(seg){
+      var w=seg.getAttribute('data-w'); seg.style.width='0';
+      requestAnimationFrame(function(){ setTimeout(function(){ seg.style.width=w+'%'; }, 60); });
+    });
+  }
+  function animateRights(){
+    var bar=document.getElementById('rightsBar'); if(!bar) return;
+    bar.querySelectorAll('div').forEach(function(seg){
+      var w=seg.getAttribute('data-w'); seg.style.width='0';
+      requestAnimationFrame(function(){ setTimeout(function(){ seg.style.width=w+'%'; }, 60); });
+    });
+  }
+
+  function showPanel(name){
+    Object.keys(panels).forEach(function(k){ panels[k].classList.remove('show'); });
+    if(panels[name]) panels[name].classList.add('show');
+  }
+
+  function go(i){
+    cur=(i+STEPS.length)%STEPS.length;
+    var s=STEPS[cur];
+    // narration
+    document.getElementById('narrK').textContent=s.k;
+    document.getElementById('narrK').className='k'+(s.kf?' flowk':'');
+    document.getElementById('narrTitle').innerHTML=s.title;
+    document.getElementById('narrBody').innerHTML=s.body;
+    document.getElementById('narrDetail').innerHTML=s.detail;
+    var nc=document.getElementById('narrChips'); nc.innerHTML='';
+    (s.chips||[]).forEach(function(c){ var sp=document.createElement('span'); sp.className='chip '+(c[0]||''); sp.textContent=c[1]; nc.appendChild(sp); });
+    document.getElementById('masterStat').textContent=s.stat;
+    document.getElementById('stepNo').textContent=(cur+1);
+    document.getElementById('stepName').innerHTML=s.title;
+
+    // dots
+    dots.forEach(function(d,idx){ d.classList.toggle('active',idx===cur); d.classList.toggle('done',idx<cur); });
+
+    // panels
+    showPanel(s.panel);
+    if(s.panel==='3' && !reduce){ animateMoney(); }
+    if(s.panel==='3' && reduce){ document.querySelectorAll('#moneyBar div').forEach(function(seg){ seg.style.width=seg.getAttribute('data-w')+'%'; }); }
+    if(s.panel==='2'){ if(!reduce) animateRights(); else document.querySelectorAll('#rightsBar div').forEach(function(seg){ seg.style.width=seg.getAttribute('data-w')+'%'; }); }
+    if(s.panel==='lineage'){
+      setLineage(s.show, s.edges);
+      var cr=document.getElementById('chipReceipts'); if(cr&&s.receipts) cr.textContent=s.receipts;
+      var lm=document.getElementById('lineageMeta'); if(lm&&s.meta) lm.textContent=s.meta;
+    }
+  }
+
+  function next(){ go(cur+1); }
+  function prev(){ go(cur-1); }
+
+  function play(){
+    playing=true;
+    document.getElementById('playBtn').classList.add('on');
+    document.getElementById('playIcon').textContent='❚❚';
+    document.getElementById('playTxt').textContent='Pause';
+    schedule();
+  }
+  function stop(){
+    playing=false; if(timer){ clearTimeout(timer); timer=null; }
+    document.getElementById('playBtn').classList.remove('on');
+    document.getElementById('playIcon').textContent='▶';
+    document.getElementById('playTxt').textContent='Play';
+  }
+  function schedule(){
+    if(!playing) return;
+    timer=setTimeout(function(){
+      if(cur===STEPS.length-1){ stop(); return; }
+      next(); schedule();
+    }, 3400);
+  }
+
+  document.getElementById('nextBtn').addEventListener('click', function(){ stop(); next(); });
+  document.getElementById('prevBtn').addEventListener('click', function(){ stop(); prev(); });
+  document.getElementById('playBtn').addEventListener('click', function(){ if(playing) stop(); else { if(cur===STEPS.length-1) go(0); play(); } });
+
+  go(0);
+
+  // auto-start play when demo scrolls into view (once)
+  var demoStarted=false;
+  var demoIO=new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting && !demoStarted && !reduce){ demoStarted=true; setTimeout(play, 600); } });
+  }, {threshold:0.4});
+  demoIO.observe(document.getElementById('demo'));
+
+  /* ---------- PROTECT: authenticity check ---------- */
+  document.querySelectorAll('[data-auth]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var v=document.getElementById('authVerdict');
+      if(b.getAttribute('data-auth')==='ok'){
+        v.className='verdict ok'; v.innerHTML='✓ &nbsp;Hash matches the Bitcoin anchor (#1024). <b>Verified genuine UMG master.</b>';
+      } else {
+        v.className='verdict bad'; v.innerHTML='✗ &nbsp;No matching anchor on Bitcoin. <b>Rejected — not a genuine master.</b>';
+      }
+    });
+  });
+
+  /* ---------- PROTECT: access / takedown ---------- */
+  document.querySelectorAll('[data-access]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var s=document.getElementById('accessState'), t=document.getElementById('accessTxt');
+      if(b.getAttribute('data-access')==='revoke'){
+        s.classList.add('revoked'); t.innerHTML='Access revoked — takedown enforced on-chain in 1 tx';
+      } else {
+        s.classList.remove('revoked'); t.innerHTML='Licensee streaming in 14 territories';
+      }
+    });
+  });
+
+  /* ---------- ENHANCE: live royalty split ---------- */
+  function runSplit(){
+    document.querySelectorAll('#rsplit .rfill').forEach(function(f){ f.style.width='0'; });
+    document.querySelectorAll('#rsplit .rval').forEach(function(v){ v.textContent='$0'; });
+    requestAnimationFrame(function(){
+      setTimeout(function(){
+        document.querySelectorAll('#rsplit .rfill').forEach(function(f){ f.style.width=f.getAttribute('data-pct')+'%'; });
+        document.querySelectorAll('#rsplit .rval').forEach(function(v){
+          var target=parseInt(v.getAttribute('data-amt'),10), start=null, dur=1100;
+          function tick(ts){ if(!start) start=ts; var p=Math.min((ts-start)/dur,1);
+            v.textContent='$'+Math.round(target*p).toLocaleString(); if(p<1) requestAnimationFrame(tick); }
+          if(reduce){ v.textContent='$'+target.toLocaleString(); } else requestAnimationFrame(tick);
+        });
+      },80);
+    });
+  }
+  var splitRun=false;
+  var splitIO=new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting && !splitRun){ splitRun=true; runSplit(); } });
+  }, {threshold:0.5});
+  var rs=document.getElementById('rsplit'); if(rs) splitIO.observe(rs);
+  var rep=document.getElementById('replaySplit'); if(rep) rep.addEventListener('click', runSplit);
+
+})();
+</script>
+</body>
+</html>
