@@ -178,6 +178,7 @@
       radial-gradient(700px 500px at 0% 100%, rgba(52,211,192,0.06), transparent 60%);
   }
   .stage{
+    position:relative;
     border:1px solid var(--line); border-radius:22px; overflow:hidden;
     background:linear-gradient(180deg, rgba(23,25,34,0.7), rgba(12,13,17,0.7));
     backdrop-filter:blur(4px);
@@ -215,12 +216,20 @@
   .chip.f{ border-color:rgba(52,211,192,0.4); color:var(--flow-lo); background:var(--flow-dim); }
 
   .stage-foot{ display:flex; align-items:center; justify-content:space-between; gap:14px; padding:16px 20px; border-top:1px solid var(--line-2); }
-  .controls{ display:flex; gap:8px; }
-  .ctl{ width:40px; height:40px; border-radius:11px; border:1px solid var(--line); background:var(--panel-2); color:var(--ink-soft); cursor:pointer; display:grid; place-items:center; transition:all .2s; }
-  .ctl:hover{ border-color:var(--ink-mut); color:var(--ink); }
-  .ctl.play{ width:auto; padding:0 18px; gap:9px; font-weight:600; font-size:13.5px; color:var(--ink); }
-  .ctl.play.on{ background:var(--xtrata); color:#1a1206; border-color:var(--xtrata); }
   .progress-label{ font-size:12.5px; color:var(--ink-mut); }
+  .nav-hint{ font-size:12px; color:var(--ink-faint); }
+  /* side navigation arrows */
+  .nav-arrow{ position:absolute; top:50%; transform:translateY(-50%); z-index:6;
+    width:52px; height:52px; border-radius:50%; border:1px solid var(--line);
+    background:rgba(14,15,19,0.82); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); color:var(--ink);
+    font-size:26px; line-height:0; cursor:pointer; display:grid; place-items:center;
+    transition:border-color .2s, color .2s, transform .2s, opacity .2s; box-shadow:0 6px 20px rgba(0,0,0,0.35); }
+  .nav-arrow.prev{ left:14px; } .nav-arrow.next{ right:14px; }
+  .nav-arrow:hover{ border-color:var(--xtrata); color:var(--xtrata-lo); transform:translateY(-50%) scale(1.07); }
+  .nav-arrow:focus-visible{ outline:2px solid var(--xtrata); outline-offset:2px; }
+  .nav-arrow:disabled{ opacity:0.22; cursor:default; box-shadow:none; }
+  .nav-arrow:disabled:hover{ border-color:var(--line); color:var(--ink); transform:translateY(-50%) scale(1); }
+  @media(max-width:880px){ .nav-arrow{ width:44px; height:44px; font-size:22px; } .nav-arrow.prev{ left:8px; } .nav-arrow.next{ right:8px; } }
 
   /* master card */
   .master{ display:flex; gap:16px; align-items:center; padding:16px; border:1px solid var(--line); border-radius:14px; background:rgba(255,255,255,0.02); }
@@ -501,6 +510,10 @@
       <!-- stepper -->
       <div class="stepper" id="stepper"></div>
 
+      <!-- side navigation arrows -->
+      <button class="nav-arrow prev" id="prevBtn" aria-label="Previous step">‹</button>
+      <button class="nav-arrow next" id="nextBtn" aria-label="Next step">›</button>
+
       <div class="stage-body">
         <!-- visual side -->
         <div class="stage-vis">
@@ -639,14 +652,10 @@
         </div>
       </div>
 
-      <!-- footer controls -->
+      <!-- footer: progress + hint -->
       <div class="stage-foot">
-        <div class="controls">
-          <button class="ctl" id="prevBtn" aria-label="Previous step">‹</button>
-          <button class="ctl play" id="playBtn"><span id="playIcon">▶</span> <span id="playTxt">Play</span></button>
-          <button class="ctl" id="nextBtn" aria-label="Next step">›</button>
-        </div>
         <div class="progress-label"><span id="stepNo">1</span> / 7 · <span id="stepName">Ingest &amp; fingerprint</span></div>
+        <div class="nav-hint">Use the arrows, or your ← → keys</div>
       </div>
     </div>
   </div>
@@ -1017,7 +1026,7 @@
       chips:[['f','collateral · gated · cascading'],['x','one chain, many behaviors']], receipts:'an open-ended chain', meta:'master ← R1 ← R2 ← …' }
   ];
 
-  var cur = 0, playing=false, timer=null, moneyAnimated=false, rightsAnimated=false;
+  var cur = 0;
   var stepper=document.getElementById('stepper');
   var panels={}; document.querySelectorAll('.vpanel').forEach(function(p){ panels[p.getAttribute('data-panel')]=p; });
 
@@ -1025,7 +1034,7 @@
   STEPS.forEach(function(s,i){
     var d=document.createElement('div'); d.className='step-dot'; d.setAttribute('data-i',i);
     d.innerHTML='<span class="b">'+(i+1)+'</span><span>'+s.title.replace(/&amp;/g,'&')+'</span>';
-    d.addEventListener('click', function(){ stop(); go(i); });
+    d.addEventListener('click', function(){ go(i); });
     stepper.appendChild(d);
   });
   var dots=Array.prototype.slice.call(stepper.children);
@@ -1080,7 +1089,7 @@
   }
 
   function go(i){
-    cur=(i+STEPS.length)%STEPS.length;
+    cur = Math.max(0, Math.min(STEPS.length - 1, i));
     var s=STEPS[cur];
     // narration
     document.getElementById('narrK').textContent=s.k;
@@ -1107,44 +1116,35 @@
       var cr=document.getElementById('chipReceipts'); if(cr&&s.receipts) cr.textContent=s.receipts;
       var lm=document.getElementById('lineageMeta'); if(lm&&s.meta) lm.textContent=s.meta;
     }
+    updateArrows();
   }
 
   function next(){ go(cur+1); }
   function prev(){ go(cur-1); }
 
-  function play(){
-    playing=true;
-    document.getElementById('playBtn').classList.add('on');
-    document.getElementById('playIcon').textContent='❚❚';
-    document.getElementById('playTxt').textContent='Pause';
-    schedule();
+  var prevBtn=document.getElementById('prevBtn'), nextBtn=document.getElementById('nextBtn');
+  function updateArrows(){
+    if(prevBtn) prevBtn.disabled = (cur===0);
+    if(nextBtn) nextBtn.disabled = (cur===STEPS.length-1);
   }
-  function stop(){
-    playing=false; if(timer){ clearTimeout(timer); timer=null; }
-    document.getElementById('playBtn').classList.remove('on');
-    document.getElementById('playIcon').textContent='▶';
-    document.getElementById('playTxt').textContent='Play';
-  }
-  function schedule(){
-    if(!playing) return;
-    timer=setTimeout(function(){
-      if(cur===STEPS.length-1){ stop(); return; }
-      next(); schedule();
-    }, 3400);
-  }
-
-  document.getElementById('nextBtn').addEventListener('click', function(){ stop(); next(); });
-  document.getElementById('prevBtn').addEventListener('click', function(){ stop(); prev(); });
-  document.getElementById('playBtn').addEventListener('click', function(){ if(playing) stop(); else { if(cur===STEPS.length-1) go(0); play(); } });
+  if(prevBtn) prevBtn.addEventListener('click', prev);
+  if(nextBtn) nextBtn.addEventListener('click', next);
 
   go(0);
 
-  // auto-start play when demo scrolls into view (once)
-  var demoStarted=false;
-  var demoIO=new IntersectionObserver(function(es){
-    es.forEach(function(e){ if(e.isIntersecting && !demoStarted && !reduce){ demoStarted=true; setTimeout(play, 600); } });
-  }, {threshold:0.4});
-  demoIO.observe(document.getElementById('demo'));
+  // keyboard ← / → navigation, active only while the demo is on screen
+  var demoInView=false;
+  var demoEl=document.getElementById('demo');
+  if(demoEl){
+    new IntersectionObserver(function(es){
+      es.forEach(function(e){ demoInView = e.isIntersecting; });
+    }, {threshold:0.25}).observe(demoEl);
+  }
+  document.addEventListener('keydown', function(e){
+    if(!demoInView) return;
+    if(e.key==='ArrowRight' || e.key==='Right'){ e.preventDefault(); next(); }
+    else if(e.key==='ArrowLeft' || e.key==='Left'){ e.preventDefault(); prev(); }
+  });
 
   /* ---------- PROTECT: authenticity check ---------- */
   document.querySelectorAll('[data-auth]').forEach(function(b){
