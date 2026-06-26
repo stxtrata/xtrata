@@ -27,7 +27,8 @@
     </div>
     <div class="header-controls">
         <button class="sm-btn" onclick="openHelpModal()" style="margin-right:10px;">❓ Help</button>
-        <button class="sm-btn" onclick="openProjectModal()" style="margin-right:15px;">📂 Projects</button>
+        <button class="sm-btn" onclick="saveCurrentProject()" style="margin-right:6px;" title="Save the current project">💾 Save</button>
+        <button class="sm-btn" onclick="openProjectModal()" style="margin-right:15px;" title="Open a saved project">📂 Load</button>
         <span id="live-receipt" class="receipt">$0.00 Est. Cost</span>
     </div>
 </header>
@@ -35,16 +36,17 @@
 <div id="project-modal" class="modal-overlay">
     <div class="modal-content">
         <div class="modal-header">
-            <h3>Saved Projects</h3>
+            <h3>Load Project</h3>
             <button onclick="closeProjectModal()" class="sm-btn">✕</button>
         </div>
         <div id="project-list" class="project-list">
             <div style="padding:20px; text-align:center; color:var(--text-dim);">Loading...</div>
         </div>
         <div class="modal-footer" style="display:flex; gap:10px; align-items:center;">
-            <button onclick="createProjectFromSettings()" class="sm-btn" style="white-space:nowrap;">📄 New from Settings</button>
-            <input type="text" id="project-title-input" placeholder="Project Name (optional)" style="flex:1; padding:8px;">
-            <button onclick="saveCurrentProject()" class="primary">Save Project</button>
+            <button onclick="createProjectFromSettings()" class="sm-btn" style="white-space:nowrap;">📄 New Project</button>
+            <span style="flex:1; font-size:0.8rem; color:var(--text-dim); text-align:right;">Save with the 💾 Save button (top right).</span>
+            <!-- kept (hidden) for internal name handling -->
+            <input type="text" id="project-title-input" style="display:none;">
         </div>
     </div>
 </div>

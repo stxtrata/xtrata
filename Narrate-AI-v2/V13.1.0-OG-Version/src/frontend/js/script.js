@@ -30,7 +30,8 @@ const STATE = {
     },
     isProcessing: false,
     isPlaying: false,
-    activePlaybackId: null, 
+    activePlaybackId: null,
+    playingChapterIdx: null, // which chapter is currently playing (for the ⏹ toggle)
     editingChunkId: null, // Track which chunk is in the editor
     activeVoiceSlot: null,
     halt: false,
@@ -70,6 +71,36 @@ function resolveApiUrl(url) {
     if (/^https?:\/\//i.test(url)) return url;
     const base = API_BASE || '';
     return base ? `${base}${url}` : url;
+}
+
+// V13.1: dedicated I/O origin (main port + 1) for project save/load + audio playback.
+// Browsers cap concurrent connections per origin (~6, shared across tabs); long generation
+// requests can starve saves/audio on the main origin. Routing those to a second port gives
+// them their own connection pool. Probed at startup; everything falls back to API_BASE if
+// the second port isn't reachable, so behaviour is never worse than before.
+const IO_BASE = (() => {
+    try {
+        const u = new URL(API_BASE || location.origin);
+        u.port = String((parseInt(u.port || '3000', 10)) + 1);
+        return u.origin;
+    } catch (e) { return API_BASE; }
+})();
+let IO_OK = false;
+function ioBase(){ return IO_OK ? IO_BASE : API_BASE; }
+function resolveMediaUrl(url){
+    if (!url) return url;
+    if (/^https?:\/\//i.test(url)) return url;
+    return (ioBase() || '') + url;
+}
+async function probeIoChannel(){
+    if (!IO_BASE || IO_BASE === API_BASE) return;
+    try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 4000);
+        const r = await fetch(IO_BASE + '/api/projects', { signal: ctrl.signal });
+        clearTimeout(t);
+        if (r.ok) { IO_OK = true; LOG.add(`I/O channel ready (${IO_BASE}); saves & playback stay responsive during generation.`); }
+    } catch (e) { /* second port not available - stay on the main origin */ }
 }
 
 function switchTab(tabName) {
@@ -769,7 +800,22 @@ const TextParser = {
 
 class APIService {
     static async req(url,opts={}){
-        const target = resolveApiUrl(url);
+        // Project save/load goes over the dedicated I/O origin so it never queues behind
+        // generation traffic; everything else uses the main origin.
+        const isProjectIo = /^\/api\/projects(\/|\?|$)/.test(url);
+        const base = isProjectIo ? ioBase() : API_BASE;
+        try {
+            return await this._fetch(base, url, opts);
+        } catch (err) {
+            // If the dedicated I/O origin is unreachable, fall back to the main origin once.
+            if (isProjectIo && base !== API_BASE && /Network error/.test(err.message || '')) {
+                return this._fetch(API_BASE, url, opts);
+            }
+            throw err;
+        }
+    }
+    static async _fetch(base, url, opts={}){
+        const target = /^https?:\/\//i.test(url) ? url : `${base || ''}${url}`;
         const controller = new AbortController();
         const timeoutMs = opts.timeoutMs || 120000;
         const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -783,7 +829,7 @@ class APIService {
             }
             const hint = location.protocol === 'file:'
                 ? 'Open the app via http://localhost:3000 (run `node src/backend/server.js`).'
-                : `Check the server is running at ${API_BASE}.`;
+                : `Check the server is running at ${base}.`;
             throw new Error(`Network error while calling ${target}. ${hint}`);
         }
         clearTimeout(timer);
@@ -804,6 +850,7 @@ class APIService {
     static async deleteProject(id){return this.req(`/api/projects/${id}`,{method:'DELETE'})}
     static async renameProject(id, title){return this.req(`/api/projects/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title})})}
 }
+if (typeof window !== 'undefined') window.APIService = APIService; // debug/tests
 
 function syncChunkVoiceAssignments({ pendingOnly = true, persistReason = '' } = {}) {
     if (!STATE.chapters.length) return 0;
@@ -872,12 +919,12 @@ class AudioEngine{
     playChunk(chunk,overrideVid=null){const pid=`chunk_${chunk.id}`;if(dom.manuscript){dom.manuscript.value=chunk.text;dom.manuscript.scrollTop=0}if(chunk.audioUrl) return this.playAudioBuffer(chunk.audioUrl,pid);const vid=overrideVid||chunk.voiceId||STATE.project.voiceIds[0];const v=STATE.voices.find(vo=>vo.id===vid);if(v&&v.type==='premium')return Promise.reject(new Error('Audio not generated'));if(v&&v.ref){if(!this.synth)return Promise.reject(new Error('No TTS'));return new Promise((res,rej)=>{this.stop(true);STATE.activePlaybackId=pid;STATE.isPlaying=true;this.updateBtn(true);updatePlaybackHighlight();const ut=new SpeechSynthesisUtterance(chunk.text);ut.voice=v.ref;
     this.cancelCurrent=()=>{this.cancelCurrent=null;res()};
     ut.onend=()=>{this.cancelCurrent=null;STATE.activePlaybackId=null;updatePlaybackHighlight();res()};ut.onerror=()=>{this.cancelCurrent=null;STATE.activePlaybackId=null;updatePlaybackHighlight();rej(new Error('Playback failed'))};this.synth.speak(ut)})}return Promise.reject(new Error('Voice unavailable'))}
-    playAudioBuffer(url,pid){return new Promise((res,rej)=>{this.initCtx();this.stop(true);const aud=new Audio(url);aud.crossOrigin="anonymous";this.activeAudio=aud;STATE.activePlaybackId=pid;STATE.isPlaying=true;this.updateBtn(true);updatePlaybackHighlight();const src=this.ctx.createMediaElementSource(aud);src.connect(this.analyser);this.analyser.connect(this.ctx.destination);this.draw();
+    playAudioBuffer(url,pid){return new Promise((res,rej)=>{this.initCtx();this.stop(true);const aud=new Audio(resolveMediaUrl(url));aud.crossOrigin="anonymous";this.activeAudio=aud;STATE.activePlaybackId=pid;STATE.isPlaying=true;this.updateBtn(true);updatePlaybackHighlight();const src=this.ctx.createMediaElementSource(aud);src.connect(this.analyser);this.analyser.connect(this.ctx.destination);this.draw();
     this.cancelCurrent=()=>{this.cancelCurrent=null;res()};
     aud.onended=()=>{this.cancelCurrent=null;cancelAnimationFrame(this.animId);this.activeAudio=null;STATE.activePlaybackId=null;updatePlaybackHighlight();res()};aud.onerror=()=>{this.cancelCurrent=null;cancelAnimationFrame(this.animId);this.activeAudio=null;STATE.activePlaybackId=null;updatePlaybackHighlight();rej(new Error('Play failed'))};if(this.ctx.state==='suspended')this.ctx.resume();aud.play().catch(rej)})}
     stop(int=false){if(this.synth)this.synth.cancel();if(this.activeAudio){this.activeAudio.pause();this.activeAudio.currentTime=0;this.activeAudio=null}
     if(this.cancelCurrent)this.cancelCurrent();
-    if(!int){STATE.activePlaybackId=null;STATE.isPlaying=false;this.updateBtn(false)}if(this.animId)cancelAnimationFrame(this.animId);if(this.cCtx)this.cCtx.clearRect(0,0,this.canvas.width,this.canvas.height);updatePlaybackHighlight()}
+    if(!int){STATE.activePlaybackId=null;STATE.isPlaying=false;STATE.playingChapterIdx=null;this.updateBtn(false)}if(this.animId)cancelAnimationFrame(this.animId);if(this.cCtx)this.cCtx.clearRect(0,0,this.canvas.width,this.canvas.height);updatePlaybackHighlight()}
     updateBtn(p){if(dom.btnPlay){dom.btnPlay.innerText=p?"⏹":"▶";p?dom.btnPlay.classList.add('playing'):dom.btnPlay.classList.remove('playing')}}}
 
 const engine=new AudioEngine();
@@ -888,10 +935,13 @@ const AUTO_SAVE = {
     pending: false,
     pendingReason: '',
     hasSavedSnapshot: false,
-    lastErrorAt: 0
+    lastErrorAt: 0,
+    timer: null,        // V13.1: debounce timer handle
+    lastSavedAt: 0
 };
 
 function resetAutoSaveTracker(savedSnapshot=false){
+    if(AUTO_SAVE.timer){ clearTimeout(AUTO_SAVE.timer); AUTO_SAVE.timer = null; }
     AUTO_SAVE.inFlight = false;
     AUTO_SAVE.pending = false;
     AUTO_SAVE.pendingReason = '';
@@ -975,26 +1025,34 @@ async function ensureAutoSaveSeed(){
     return saveProjectSnapshot('generation-start',true);
 }
 
+// V13.1: debounce autosaves. Previously this re-fired after EVERY chunk, holding a save
+// connection (and writing the whole project JSON) continuously during generation. Now we
+// coalesce rapid progress into at most one save every AUTOSAVE_MIN_INTERVAL ms.
+const AUTOSAVE_MIN_INTERVAL = 4000;
 function queueAutoSave(reason='progress'){
-    if(AUTO_SAVE.inFlight){
-        AUTO_SAVE.pending = true;
-        AUTO_SAVE.pendingReason = reason;
-        return;
-    }
+    AUTO_SAVE.pending = true;
+    AUTO_SAVE.pendingReason = reason;
+    if(AUTO_SAVE.inFlight || AUTO_SAVE.timer) return;
+    const since = Date.now() - (AUTO_SAVE.lastSavedAt || 0);
+    const wait = Math.max(0, AUTOSAVE_MIN_INTERVAL - since);
+    AUTO_SAVE.timer = setTimeout(runDebouncedAutoSave, wait);
+}
+function runDebouncedAutoSave(){
+    AUTO_SAVE.timer = null;
+    if(!AUTO_SAVE.pending) return;
+    AUTO_SAVE.pending = false;
+    const reason = AUTO_SAVE.pendingReason || 'progress';
+    AUTO_SAVE.pendingReason = '';
     AUTO_SAVE.inFlight = true;
     saveProjectSnapshot(reason,false).finally(() => {
         AUTO_SAVE.inFlight = false;
-        if(AUTO_SAVE.pending){
-            const nextReason = AUTO_SAVE.pendingReason || 'progress';
-            AUTO_SAVE.pending = false;
-            AUTO_SAVE.pendingReason = '';
-            queueAutoSave(nextReason);
-        }
+        AUTO_SAVE.lastSavedAt = Date.now();
+        if(AUTO_SAVE.pending) queueAutoSave(AUTO_SAVE.pendingReason || 'progress'); // schedule the next debounced save
     });
 }
 
 function setElStatus(s,t){if(dom.elStatusText)dom.elStatusText.innerText=t;if(dom.elDot){dom.elDot.className='status-dot';if(s==='active')dom.elDot.classList.add('active');if(s==='error')dom.elDot.classList.add('error')}}
-async function init(){await refreshVoiceList();const k=localStorage.getItem('ab_api_el');if(k){try{const p=JSON.parse(k);dom.elKey.value=p.key;dom.elName.value=p.name;connectElevenLabs(true)}catch(e){}}const t=localStorage.getItem('ab_manuscript');if(t)dom.manuscript.value=t;updateReceipt()}
+async function init(){probeIoChannel();await refreshVoiceList();const k=localStorage.getItem('ab_api_el');if(k){try{const p=JSON.parse(k);dom.elKey.value=p.key;dom.elName.value=p.name;connectElevenLabs(true)}catch(e){}}const t=localStorage.getItem('ab_manuscript');if(t)dom.manuscript.value=t;updateReceipt()}
 async function connectElevenLabs(silent=false){
     const key=dom.elKey.value.trim(),name=dom.elName.value.trim()||"My ElevenLabs";if(!key)return;
     setElStatus('idle','Connecting...');
@@ -1060,30 +1118,26 @@ function showFullBookText(){
 }
 async function playChapter(idx,e){
     if(e)e.stopPropagation();
-    const pid=`chapter_${idx}`;
-    if(STATE.activePlaybackId===pid){engine.stop();return}
+    // Clicking the button while THIS chapter is playing (now showing ⏹) stops playback.
+    if(STATE.playingChapterIdx===idx){engine.stop();return}
     const ch=STATE.chapters[idx];if(!ch)return;
-    engine.stop(); // Stop any previous playback properly
-    STATE.isPlaying=true;STATE.activePlaybackId=pid;updatePlaybackHighlight();
+    engine.stop(); // Stop any previous playback properly (also clears playingChapterIdx)
+    STATE.isPlaying=true;STATE.playingChapterIdx=idx;STATE.activePlaybackId=`chapter_${idx}`;updatePlaybackHighlight();
 
     // Play chunks in sequence
     try{
         for(const ck of ch.chunks){
-            // Check if user stopped playback
-            if(!STATE.isPlaying) break;
-            
-            // If another chapter started, activePlaybackId would be different (but handled by stop() breaking isPlaying?)
-            // Actually, if we click another chapter, stop() sets isPlaying=false.
-            
+            // Stop if the user stopped, or switched to another chapter.
+            if(!STATE.isPlaying || STATE.playingChapterIdx!==idx) break;
             await engine.playChunk(ck);
         }
     }catch(e){
         console.error(e);
     }
-    
-    // Only reset if we are still the "active" playback logic
-    if(STATE.isPlaying && (STATE.activePlaybackId===pid || STATE.activePlaybackId===null)){
-        STATE.isPlaying=false;STATE.activePlaybackId=null;updatePlaybackHighlight();
+
+    // Reset only if this chapter is still the active one (i.e. it finished naturally).
+    if(STATE.playingChapterIdx===idx){
+        STATE.isPlaying=false;STATE.playingChapterIdx=null;STATE.activePlaybackId=null;updatePlaybackHighlight();
         engine.stop(); // Ensure cleanup
     }
 }
@@ -1392,17 +1446,23 @@ function updatePlaybackHighlight(){
     });
     tl.querySelectorAll('.sm-btn.playing[data-playbtn]').forEach(b=>{ b.classList.remove('playing'); b.textContent='▶'; });
 
+    // Highlight the active chunk (the id flips to the current chunk during chapter playback).
     const pid = STATE.activePlaybackId;
-    if(!pid) return;
-    if(pid.indexOf('chunk_') === 0){
+    if(pid && pid.indexOf('chunk_') === 0){
         const el = document.getElementById('chunk-' + pid.slice(6));
         if(el){
             el.classList.add('status-playing');
             const ix = el.querySelector('.chunk-idx'); if(ix){ ix.textContent='⏹'; ix.style.color='var(--accent)'; }
             const vt = el.querySelector('.voice-tag'); if(vt) vt.classList.add('playing');
         }
-    } else if(pid.indexOf('chapter_') === 0){
-        const b = tl.querySelector(`.sm-btn[data-playbtn="${pid.slice(8)}"]`);
+    }
+
+    // Keep the chapter's play button showing ⏹ for the WHOLE chapter (driven by
+    // playingChapterIdx, not the per-chunk id) so it can be clicked again to stop.
+    let chIdx = (STATE.playingChapterIdx != null) ? STATE.playingChapterIdx
+              : (pid && pid.indexOf('chapter_') === 0 ? parseInt(pid.slice(8), 10) : null);
+    if(chIdx != null){
+        const b = tl.querySelector(`.sm-btn[data-playbtn="${chIdx}"]`);
         if(b){ b.classList.add('playing'); b.textContent='⏹'; }
     }
 }
@@ -1708,17 +1768,14 @@ document.getElementById('btn-analyze').addEventListener('click', () => {
     if (projectTitleInput) projectTitleInput.placeholder = STATE.projectMeta.displayTitle || 'Project Name (optional)';
     LOG.add(`Metadata detected: "${STATE.projectMeta.displayTitle}" (${meta.language})`);
     
-    // V13: Stable-but-safe project id.
-    // The old scheme hashed only title+author, so untitled or same-named books collided
-    // and overwrote each other's audio - and it blocked running multiple books in parallel
-    // tabs. Now we mint a GLOBALLY-UNIQUE id (timestamp + randomness) the first time a
-    // manuscript is analyzed, keep it stable across re-analyzes of the SAME text (so the
-    // per-chunk cache is reused), and mint a fresh id if the manuscript clearly changes
-    // (so a new book pasted into the same tab never mixes with the previous one).
+    // V13.1: STABLE project id for the life of a project.
+    // We mint a globally-unique id (timestamp + randomness) only when this is a brand-new
+    // project (startup default or "New from Settings"). Re-analyzing the SAME project -
+    // even after editing the text - KEEPS the id, so saving always overwrites the same
+    // project (no accidental duplicate "versions") and unchanged segments stay cached.
+    // A genuinely new book gets a fresh id via the "New" button.
     const srcHash = hashString(raw);
-    const needNewId = !STATE.project.id
-        || !STATE.project.analyzedOnce
-        || (STATE.project.sourceHash && STATE.project.sourceHash !== srcHash);
+    const needNewId = !STATE.project.id || !STATE.project.analyzedOnce;
     if (needNewId) {
         STATE.project.id = generateProjectId(STATE.projectMeta);
         LOG.add(`Project ID: ${STATE.project.id}`);
@@ -2092,19 +2149,50 @@ function createProjectFromSettings() {
 }
 
 async function saveCurrentProject(){
-    if(!STATE.chapters.length&&!dom.manuscript.value.trim()){alert("Empty");return}
+    if(!STATE.chapters.length&&!dom.manuscript.value.trim()){alert("Nothing to save yet.");return}
+    const postProject = (p)=>APIService.req('/api/projects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
+    const norm = s => String(s||'').trim().toLowerCase();
     try{
-        const payload=buildProjectPayload();
-        const r=await APIService.req('/api/projects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-        if(r.id)STATE.project.id=r.id;
+        let payload=buildProjectPayload();
+        const title=(payload.displayTitle||payload.title||'Untitled').trim();
+
+        // Look for a DIFFERENT saved project that already uses this name (the duplicate risk).
+        let existing=[]; try{ existing=await APIService.req('/api/projects'); }catch(_){ existing=[]; }
+        const clash=(existing||[]).find(p=>p&&p.type!=='ghost'&&norm(p.title)===norm(title)&&p.id!==payload.id);
+
+        if(clash){
+            const overwrite=confirm(`A saved project named "${title}" already exists.\n\nOK  =  Save over it (keep a single copy)\nCancel  =  Save as a new version`);
+            if(overwrite){
+                const orphanId=payload.id;
+                payload.id=clash.id;            // adopt the existing project's id -> overwrite it
+                STATE.project.id=clash.id;
+                await postProject(payload);
+                // Remove our separate session file so only one copy remains in the list.
+                if(orphanId&&orphanId!==clash.id&&(existing||[]).some(p=>p.id===orphanId)){
+                    try{ await APIService.deleteProject(orphanId); }catch(_){}
+                }
+                LOG.add(`Saved over existing project "${title}".`,'success');
+            } else {
+                const newTitle=NarrateCore.nextVersionName(title,(existing||[]).map(p=>p.title));
+                STATE.project.id=generateProjectId(STATE.projectMeta);   // fresh id -> separate file
+                STATE.project.customTitle=newTitle;
+                STATE.projectMeta.displayTitle=newTitle;
+                const hdr=document.getElementById('header-project-name'); if(hdr) hdr.value=newTitle;
+                payload=buildProjectPayload();   // rebuild with the versioned name + fresh id
+                await postProject(payload);
+                LOG.add(`Saved as new version "${newTitle}".`,'success');
+            }
+        } else {
+            const r=await postProject(payload);
+            if(r.id)STATE.project.id=r.id;
+            LOG.add(`Saved project: ${title}`,'success');
+        }
+
         AUTO_SAVE.hasSavedSnapshot=true;
         const titleInput=document.getElementById('project-title-input');
-        if(titleInput){
-            titleInput.value='';
-            titleInput.placeholder=payload.displayTitle||payload.title||'Project Name (optional)';
-        }
+        if(titleInput){ titleInput.value=''; titleInput.placeholder=(STATE.project.customTitle||title)||'Project Name (optional)'; }
+        syncHeaderProjectName();
         if(document.getElementById('project-modal').classList.contains('show')) openProjectModal();
-        LOG.add(`Saved project: ${payload.displayTitle||payload.title}`,'success');
     }catch(e){alert("Save failed: "+e.message)}
 }
 

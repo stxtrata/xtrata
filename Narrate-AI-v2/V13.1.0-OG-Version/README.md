@@ -25,6 +25,8 @@ A local, browser-based studio for turning manuscripts into audiobook audio using
 - French chapter numbers parse correctly (e.g. "Chapitre Vingt et Un" = 21) — no more false "Mismatch" warnings.
 - Section counts are type-aware: chapters are counted separately from Titles / Prologue / Epilogue / Introduction, and the analysis log prints the breakdown.
 - **Parallel Requests** setting (Project tab, default 10, up to 15) controls how many segments generate at once — set it to your ElevenLabs plan's concurrency limit (Free 2 · Starter 3 · Creator 5 · Pro 10 · Scale 15) for a big speed-up. Audio stays correctly ordered at any setting. The server's global cap is `NARRATE_TTS_CONCURRENCY` (default 15).
+- **Saving no longer duplicates a project.** The project keeps one stable ID for its lifetime, so editing the text and re-analyzing still overwrites the same project (and reuses cached audio for unchanged segments). On a name clash with a *different* saved project, Save asks: **OK = save over it · Cancel = save as a new version** ("Title (v2)").
+- **Multi-tab fix: saves and playback keep working during generation.** Browsers cap concurrent connections per origin (~6, shared across tabs), so long-running generation requests used to starve saves and audio (they'd hang or play silently with no error). The server now also listens on a **second port (main port + 1, default 3001)** dedicated to project save/load and audio playback, giving them their own connection pool. File writes are async so the shared event loop stays responsive. If the second port isn't reachable, the app falls back to the main port automatically. Override with `NARRATE_IO_PORT`.
 
 ## Quick start
 

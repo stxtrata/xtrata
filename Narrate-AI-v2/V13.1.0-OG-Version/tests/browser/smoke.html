@@ -91,19 +91,19 @@ async function main(){
         assert(/^[a-z0-9]+_[a-z0-9]+$/.test(win.STATE.project.id), 'unexpected id: ' + win.STATE.project.id);
     });
 
-    await run('Re-analyzing identical text keeps the same id (cache reuse)', async () => {
+    await run('Re-analyzing keeps the same project id (so saves overwrite, not duplicate)', async () => {
         const id1 = win.STATE.project.id;
         doc.getElementById('btn-analyze').click();
         await sleep(80);
-        assert(win.STATE.project.id === id1, 'id should be stable for identical text');
+        assert(win.STATE.project.id === id1, 'id should be stable when re-analyzing');
     });
 
-    await run('Analyzing clearly different text mints a new id (no cross-book mixing)', async () => {
+    await run('Editing the manuscript and re-analyzing keeps the same id (V13.1)', async () => {
         const id1 = win.STATE.project.id;
-        doc.getElementById('manuscript').value = 'Chapter 1\n\nA totally different book with different words entirely.';
+        doc.getElementById('manuscript').value = SAMPLE + '\n\nAn extra edited paragraph added by the author.';
         doc.getElementById('btn-analyze').click();
         await sleep(80);
-        assert(win.STATE.project.id !== id1, 'a new id should be minted for new content');
+        assert(win.STATE.project.id === id1, 'editing text must NOT mint a new id (no duplicate version)');
         // restore the 2-chapter sample for later DOM tests
         doc.getElementById('manuscript').value = SAMPLE;
         doc.getElementById('btn-analyze').click();

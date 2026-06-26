@@ -121,3 +121,11 @@ test('clampConcurrency: clamps to [1, max], garbage -> 2', () => {
     assert.strictEqual(core.clampConcurrency('abc', 15), 2); // default
     assert.strictEqual(core.clampConcurrency(8, 5), 5);      // respects a lower cap
 });
+
+test('nextVersionName: produces the next free "(vN)" and never stacks suffixes', () => {
+    assert.strictEqual(core.nextVersionName('My Book', ['My Book']), 'My Book (v2)');
+    assert.strictEqual(core.nextVersionName('My Book', ['My Book', 'My Book (v2)']), 'My Book (v3)');
+    assert.strictEqual(core.nextVersionName('My Book (v2)', ['My Book', 'My Book (v2)']), 'My Book (v3)');
+    assert.strictEqual(core.nextVersionName('My Book', []), 'My Book (v2)');
+    assert.strictEqual(core.nextVersionName('Book', ['book']), 'Book (v2)'); // case-insensitive
+});

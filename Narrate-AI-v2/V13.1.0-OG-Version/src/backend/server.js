@@ -572,21 +572,22 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/projects' && req.method === 'POST') {
         let body = '';
         req.on('data', chunk => body += chunk);
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 const data = JSON.parse(body);
                 // Ensure ID
                 const id = data.id || 'proj_' + Date.now().toString(36);
-                const projectData = { 
-                    ...data, 
-                    id, 
-                    updatedAt: new Date().toISOString() 
+                const projectData = {
+                    ...data,
+                    id,
+                    updatedAt: new Date().toISOString()
                 };
                 if (!projectData.displayTitle) projectData.displayTitle = projectData.title || 'Untitled';
-                
-                // Save to individual file
+
+                // Save to individual file (async so the shared event loop stays responsive
+                // while many chunks are generating in parallel).
                 const filePath = path.join(PROJECTS_DIR, `${id}.json`);
-                fs.writeFileSync(filePath, JSON.stringify(projectData, null, 2));
+                await fs.promises.writeFile(filePath, JSON.stringify(projectData, null, 2));
 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ id, status: 'saved' }));
@@ -629,7 +630,7 @@ const server = http.createServer(async (req, res) => {
 
                 console.log(`[Generating${force ? ' (FORCE)' : ''}] ${fileName} ...`);
                 const audioBuffer = await generateAudio(text, voiceId, apiKey, modelId);
-                fs.writeFileSync(filePath, audioBuffer);
+                await fs.promises.writeFile(filePath, audioBuffer); // async: don't block the event loop
 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ url: publicUrl, filename: fileName, cached: false }));
@@ -773,4 +774,17 @@ server.listen(PORT, () => {
     console.log(`Audiobook Server running at http://localhost:${PORT}`);
     console.log(`Files will be saved to: ${path.resolve(OUTPUT_DIR)}`);
     console.log(`Max concurrent ElevenLabs requests: ${TTS_CONCURRENCY} (set NARRATE_TTS_CONCURRENCY to change)`);
+});
+
+// V13.1: A second listener on a separate port, dedicated to I/O (project save/load + audio
+// playback). Browsers cap concurrent connections PER ORIGIN (~6, shared across ALL tabs), so
+// long-lived generation requests on the main port can starve saves and audio - they queue
+// with no error ("save doesn't work / no sound while generating"). Serving those from a
+// separate origin gives them their own connection pool so they keep working during generation.
+const IO_PORT = parseInt(process.env.NARRATE_IO_PORT, 10) || (PORT + 1);
+const ioHandler = server.listeners('request')[0];
+const ioServer = http.createServer(ioHandler);
+ioServer.on('error', e => console.error(`I/O port ${IO_PORT} unavailable: ${e.message}`));
+ioServer.listen(IO_PORT, () => {
+    console.log(`I/O channel (saves + audio) running at http://localhost:${IO_PORT}`);
 });
