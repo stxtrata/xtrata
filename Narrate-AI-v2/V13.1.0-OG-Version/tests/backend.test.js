@@ -49,6 +49,26 @@ describe('Narrate.AI backend API', () => {
         assert.ok(!/elevenLabsQueue/.test(r.text), 'must not leak server source');
     });
 
+    // ---- Dedicated I/O port (saves + audio served on PORT+1) ----
+    test('a second port (PORT+1) serves saves and audio independently', async () => {
+        const u = new URL(server.origin);
+        const ioOrigin = `${u.protocol}//${u.hostname}:${parseInt(u.port, 10) + 1}`;
+
+        // project save works over the I/O origin
+        const id = 'ioport_' + Date.now().toString(36);
+        const save = await H.request(ioOrigin, 'POST', '/api/projects', { id, title: 'IO Test', chapters: [], projectSettings: {} });
+        assert.strictEqual(save.status, 200, 'I/O port should accept project saves');
+        const list = await H.request(ioOrigin, 'GET', '/api/projects');
+        assert.ok(list.json.some(p => p.id === id), 'saved project visible via I/O port');
+
+        // audio (output) is served over the I/O origin too
+        const fs = require('fs'); const path = require('path');
+        const fname = 'ioport_test_chunk.mp3';
+        fs.writeFileSync(path.join(server.outputDir, 'chunks', fname), 'bytes');
+        const dl = await H.request(ioOrigin, 'GET', `/output/chunks/${fname}`);
+        assert.strictEqual(dl.status, 200, 'I/O port should serve audio files');
+    });
+
     // ---- Projects CRUD ----
     test('projects: create, list, load, rename, delete lifecycle', async () => {
         const id = 'testbook_' + Date.now().toString(36);
