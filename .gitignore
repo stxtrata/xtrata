@@ -55,7 +55,3 @@ xtrata-1.0/functions/.wrangler/
 
 # Local Vitest timestamp temp files
 xtrata-1.0/vitest.config.ts.timestamp-*.mjs
-
-# Local sibling projects, not part of Xtrata repo
-Narrate-AI-v2/
-Huge-Sphinx/
