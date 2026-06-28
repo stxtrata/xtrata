@@ -56,3 +56,13 @@ xtrata-1.0/vitest.config.ts.timestamp-*.mjs
 # Local sibling projects, not part of Xtrata repo
 Narrate-AI-v2/
 Huge-Sphinx/
+
+# Local filesystem temp files
+.fuse_hidden*
+**/.fuse_hidden*
+
+# Local run logs
+*.log
+
+# Local/demo video exports
+xtrata-1.0/flowproof/**/*.mp4
