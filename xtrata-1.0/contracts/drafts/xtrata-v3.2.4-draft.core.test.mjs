@@ -7,6 +7,7 @@ const simnet = await initSimnet('./Clarinet.toml');
 const a = simnet.getAccounts();
 const deployer = a.get('deployer');
 const w1 = a.get('wallet_1');
+// Draft only: this contract is not live and is not part of the active Clarinet suite.
 const V324 = 'xtrata-v3-2-4';
 const V323 = 'xtrata-v3-2-3';
 const CHUNK = 16384;
@@ -26,8 +27,8 @@ const mint1 = (C, cs, uri) => { const h = roll(cs); return simnet.callPublicFn(C
 const tid = (r) => r.result.value.value['token-id'].value;
 
 // 1) source / cap / trait / migration presence
-const cl = readFileSync(new URL('../contracts/xtrata-v3.2.4.clar', import.meta.url), 'utf8');
-const live = readFileSync(new URL('../../live/xtrata-v3.2.4.clar', import.meta.url), 'utf8');
+const cl = readFileSync(new URL('./xtrata-v3.2.4-draft.clar', import.meta.url), 'utf8');
+const live = readFileSync(new URL('./xtrata-v3.2.4-draft.clar', import.meta.url), 'utf8');
 check('cap u8192 in clarinet + live', cl.includes('(define-constant MAX-TOTAL-CHUNKS u8192)') && live.includes('(define-constant MAX-TOTAL-CHUNKS u8192)'));
 check('migrate-from-v3-2-3 present in both', cl.includes('(define-public (migrate-from-v3-2-3') && live.includes('(define-public (migrate-from-v3-2-3'));
 check('no size-gate min — handles all sizes', !cl.includes('MIN-TOTAL-CHUNKS'));
