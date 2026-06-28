@@ -37,3 +37,21 @@ xtrata-1.0/artifacts/
 
 # Local/generated recursive app prototypes
 xtrata-1.0/recursive-apps/
+
+# Local/generated recursive apps
+xtrata-1.0/recursive-apps/
+
+# Local generated Narrate AI outputs/projects
+Narrate-AI-v2/**/output/
+
+# Local Narrate AI app copies not part of Xtrata
+Narrate-AI-v2/V13.1.0-OG-Version/
+
+# Local zip exports
+*.zip
+
+# Local Wrangler/miniflare state
+xtrata-1.0/functions/.wrangler/
+
+# Local Vitest timestamp temp files
+xtrata-1.0/vitest.config.ts.timestamp-*.mjs
