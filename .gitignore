@@ -66,3 +66,6 @@ Huge-Sphinx/
 
 # Local/demo video exports
 xtrata-1.0/flowproof/**/*.mp4
+
+# Local FlowProof video working files
+xtrata-1.0/flowproof/FlowProof-FlowVault-Bounty-video/
