@@ -33,10 +33,11 @@ const XtrataWallet = {
         recipient: opts.recipient,
         amount: String(opts.amount),
         memo: 'Xtrata Agent One',
+        network: (opts.network ?? 'mainnet'),
         appDetails: { name: 'Xtrata Agent One', icon: '/favicon.ico' },
         onFinish: () => resolve(),
         onCancel: () => resolve(),
-      } as Parameters<typeof showStxTransfer>[0]);
+      } as unknown as Parameters<typeof showStxTransfer>[0]);
     });
   },
 };
