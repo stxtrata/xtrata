@@ -23,7 +23,7 @@ const NET = (process.env.XTRATA_NETWORK || 'mainnet').toLowerCase();
 const MOCK = process.env.XTRATA_MOCK === '1';
 const HIRO_KEY = process.env.HIRO_API_KEY || '';
 const JOB_DIR = process.env.JOB_DIR || path.resolve(__dirname, '../svc/job-state');
-const ENGINE = process.env.ENGINE || path.resolve(__dirname, '../../agent-large-inscribe.mjs');
+const ENGINE = process.env.ENGINE || path.resolve(__dirname, '../agent-large-inscribe.mjs');
 const WIZARD_DIR = process.env.WIZARD_DIR || path.resolve(__dirname, '../wizard');
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.resolve(__dirname, '../svc/uploads');
 const MAX_UPLOAD = Number(process.env.MAX_UPLOAD_BYTES || 40 * 1024 * 1024);

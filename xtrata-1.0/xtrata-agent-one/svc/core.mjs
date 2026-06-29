@@ -172,10 +172,12 @@ export async function runJob(opts) {
   }
 
   // Larger files stage through the runway engine (begin -> add-chunk-batch -> seal).
+  const ep = path.resolve(enginePath);
+  if (!fs.existsSync(ep)) throw new Error(`staged-upload engine not found at ${ep} — ensure agent-large-inscribe.mjs is in the project (or set ENGINE)`);
   const env = { ...process.env, WALLET_MNEMONIC: job.ephemeralMnemonic, DRY_RUN: '0', REQUIRE_CONFIRM: '0', LARGE_FILE: job.file, LARGE_URI: job.uri, LARGE_MIME: job.mime, LARGE_DEPS: (job.deps || []).join(','), HIRO_API_KEY: hiroKey };
-  const r = spawnSync('node', [enginePath], { stdio: 'inherit', env, cwd: path.dirname(path.resolve(enginePath)) });
+  const r = spawnSync('node', [ep], { stdio: 'inherit', env, cwd: path.dirname(ep) });
   if (r.status !== 0) throw new Error('engine failed with status ' + r.status);
-  const mapPath = path.join(path.dirname(path.resolve(enginePath)), 'large-map.json');
+  const mapPath = path.join(path.dirname(ep), 'large-map.json');
   const map = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
   const tokenId = map[job.uri] && map[job.uri].tokenId;
   job.tokenId = tokenId; job.status = 'INSCRIBED'; writeJob(jobDir, job);
@@ -222,6 +224,10 @@ function receiptData(job, x) {
   const change = x.change != null ? BigInt(x.change) : (received - fileProtocol - mainMiner - receiptProtocol - receiptMiner - agentFee);
   const changeR = change > 0n ? change : 0n;
   const totalPaid = received - changeR;
+  // Network fee = everything left after protocol + receipt + agent + change, so the
+  // receipt always reconciles (this captures ALL miner fees incl. the delivery/refund txs).
+  let networkFee = received - fileProtocol - receiptProtocol - agentFee - changeR;
+  if (networkFee < 0n) networkFee = 0n;
   const stxUsd = (x.stxUsd != null) ? Number(x.stxUsd) : null;
   const totalPaidUsd = stxUsd != null ? (Number(totalPaid) / 1e6 * stxUsd).toFixed(2) : null;
   return {
@@ -229,7 +235,7 @@ function receiptData(job, x) {
     uri: job.uri, mime: job.mime, bytes: job.bytes, chunks: job.chunks, single: job.single,
     tokenId: job.tokenId, receiptTokenId: x.receiptTokenId || null, recipient: job.user, agentIdentityId: job.agentIdentityId || null,
     depositReceived: received.toString(), xtrataProtocol: fileProtocol.toString(), receiptProtocol: receiptProtocol.toString(),
-    networkFee: (mainMiner + receiptMiner).toString(), agentFeePct: Number(job.agentFeePct ?? AGENT_FEE_PCT),
+    networkFee: networkFee.toString(), agentFeePct: Number(job.agentFeePct ?? AGENT_FEE_PCT),
     agentFee: agentFee.toString(), changeReturned: changeR.toString(),
     totalPaid: totalPaid.toString(), stxUsd, totalPaidUsd,
   };
