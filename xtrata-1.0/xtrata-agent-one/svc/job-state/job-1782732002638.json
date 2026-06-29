@@ -1,0 +1,23 @@
+{
+  "jobId": "job-1782732002638",
+  "core": "xtrata-v3-2-3",
+  "net": "mainnet",
+  "mock": false,
+  "file": "/Users/melophonic/Documents/Claude/Projects/AIBTC/xtrata-agent-one/svc/uploads/1782732002243-Screenshot_2026-06-29_at_12.09.12.png",
+  "uri": "xtrata:image/screenshot-2026-06-29-at-12-09-12",
+  "mime": "image/png",
+  "deps": [],
+  "user": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+  "bytes": 66403,
+  "chunks": 5,
+  "single": true,
+  "batches": 1,
+  "protocolFee": "110000",
+  "minerReserve": "129604",
+  "margin": "0",
+  "requiredUstx": "439604",
+  "depositAddress": "SP2K5MG6Q6GTF51P6E2VG9HR5JT78K94MP5202WSK",
+  "ephemeralMnemonic": "end sponsor calm gown pottery vehicle salad modify wool pen wise surprise keep soccer annual hunt enhance rib mother net unlock drill mountain angle",
+  "status": "AWAITING_DEPOSIT",
+  "createdAt": "2026-06-29T11:20:02.638Z"
+}

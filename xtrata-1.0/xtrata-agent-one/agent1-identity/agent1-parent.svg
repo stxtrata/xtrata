@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 100" role="img" aria-label="Xtrata Agent 1 Variant K-B-W-O-K-W">
+  <!-- Arm 3: Top-Right -->
+  <g fill="#FFFFFF"><polygon points="69,15 89,15 59,50 39,50"/></g>
+  <!-- Arm 2: Bottom-Left (Stem only) -->
+  <g fill="#5546FF"><polygon points="39,50 59,50 29,85 9,85"/></g>
+  <!-- Arm 6: The Crossbar -->
+  <g fill="#FFFFFF"><polygon points="42.714,69 55.286,69 60.429,75 37.571,75"/></g>
+  <!-- Arm 1: Top-Left -->
+  <g fill="#0E0F12"><polygon points="9,15 29,15 59,50 39,50"/></g>
+  <!-- Arm 4: Bottom-Right -->
+  <g fill="#F7931A"><polygon points="39,50 59,50 89,85 69,85"/></g>
+  <!-- Arm 5: The '1' -->
+  <g fill="#0E0F12">
+    <polygon points="95,15 111,15 111,85 95,85"/>
+    <polygon points="95,15 78,35 95,35"/>
+  </g>
+</svg>
