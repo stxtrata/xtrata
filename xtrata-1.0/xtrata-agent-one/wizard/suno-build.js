@@ -92,7 +92,7 @@
         metadata: { assetType: 'song', title, artist, album, lyrics },
       });
       const playerFile = new File([html], slug(file.name) + '.player.html', { type: 'text/html' });
-      return { playerFile, title, artist, album, hasCover: !!coverB64, hasLyrics: !!lyrics, isSuno, opusBytes: weba.length, playerBytes: playerFile.size, sourceBytes: file.size };
+      return { playerFile, html, title, artist, album, hasCover: !!coverB64, hasLyrics: !!lyrics, isSuno, opusBytes: weba.length, playerBytes: playerFile.size, sourceBytes: file.size };
     } finally {
       ['out.weba', 'meta.txt', 'cover.jpg', inName].forEach(cleanup);
     }

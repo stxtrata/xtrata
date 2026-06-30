@@ -81,6 +81,11 @@
       <div class="muted" style="font-size:11px;margin-top:6px">Quoted on the finished player's exact size. Over-collected for fees; unused remainder refunded on delivery.</div>
     </div>
 
+    <div id="preview" style="display:none;margin-top:16px">
+      <div class="muted" style="font-size:12px;margin-bottom:8px">▶ Preview — play it before you inscribe:</div>
+      <iframe id="previewFrame" title="Player preview" style="width:100%;aspect-ratio:1/1;border:1px solid var(--line);border-radius:12px;background:#10120f;display:block"></iframe>
+    </div>
+
     <button id="go" class="btn" disabled>Drop a track to begin</button>
     <div id="hint" class="hint"></div>
 
@@ -117,6 +122,19 @@ const $ = (s)=>document.querySelector(s);
 const stx = (u)=>(Number(u)/1e6).toFixed(6).replace(/0+$/,'').replace(/\.$/,'')+' STX';
 const esc = (s)=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function slug(s){ return String(s||'').toLowerCase().replace(/\.[^.]+$/,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,48)||'track'; }
+// Safety: only audio, with per-format size caps (conversion runs in-browser via ffmpeg.wasm).
+const SIZE_LIMITS={ mp3:32, m4a:48, aac:48, ogg:32, oga:32, opus:32, weba:32, flac:128, wav:128, aiff:128, aif:128 }; // MiB
+const HARD_CAP_MB=150;
+function validateAudio(f){
+  if(!f) return 'No file selected.';
+  const ext=((f.name.match(/\.([a-z0-9]+)$/i)||[])[1]||'').toLowerCase();
+  const known=Object.prototype.hasOwnProperty.call(SIZE_LIMITS,ext);
+  if(!known && !((f.type||'').toLowerCase().startsWith('audio/'))) return 'Please choose an audio file — MP3, WAV, FLAC, OGG, M4A or Opus.';
+  const mb=f.size/1048576, limit=SIZE_LIMITS[ext]||32;
+  if(mb>HARD_CAP_MB) return 'That file is '+mb.toFixed(0)+' MiB — too large to convert in the browser (hard cap '+HARD_CAP_MB+' MiB).';
+  if(mb>limit) return (ext?ext.toUpperCase():'Audio')+' is capped at '+limit+' MiB here — yours is '+mb.toFixed(1)+' MiB. Use a smaller or more compressed file.';
+  return null;
+}
 function xa(){ const A=window.XtrataAgent; if(!A) throw new Error('Agent bundle not loaded (agent-one.js).'); return A; }
 // Backendless data layer: former /api/* → window.XtrataAgent.
 async function api(path, opts){
@@ -159,8 +177,10 @@ picker.onchange=()=>{ if(picker.files[0]) pickFile(picker.files[0]); };
 drop.addEventListener('drop',e=>{ const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) pickFile(f); });
 
 async function pickFile(f){
+  const verr=validateAudio(f);
+  if(verr){ FILE=null;PLAYER=null;EST=null; drop.classList.remove('has'); drop.innerHTML='<div class="drop-main">Drop your Suno track here</div><div class="drop-sub">or <u>browse</u> — MP3, WAV, FLAC, OGG…</div>'; $('#quote').className='quote'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc'); $('#hint').innerHTML='<span class="err">'+esc(verr)+'</span>'; updateGo(); return; }
   FILE=f; PLAYER=null; META=null; EST=null; JOB=null; if(poll){clearInterval(poll);poll=null;}
-  $('#result').className='result'; $('#prog').className='prog'; $('#quote').className='quote';
+  $('#result').className='result'; $('#prog').className='prog'; $('#quote').className='quote'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc');
   drop.classList.add('has');
   drop.innerHTML='<div class="fname">🎵 '+esc(f.name)+'</div><div class="fmeta">'+(f.size/1048576).toFixed(2)+' MiB · click to choose a different file</div>';
   building=true; updateGo();
@@ -168,6 +188,7 @@ async function pickFile(f){
   try{
     const r=await window.XtrataSuno.build(f, (msg)=>{ $('#hint').innerHTML='<span class="spin"></span>'+esc(msg); });
     PLAYER=r.playerFile; META=r;
+    if(r.html){ $('#previewFrame').srcdoc=r.html; $('#preview').style.display='block'; }
     EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size})});
     $('#qName').textContent=(r.title||f.name)+(r.artist?(' — '+r.artist):'');
     $('#qPlayer').textContent=(PLAYER.size/1048576).toFixed(2)+' MiB · Opus'+(r.hasCover?' + cover':'')+(r.hasLyrics?' + lyrics':'');
@@ -250,7 +271,7 @@ function done(job){
 }
 function resetAll(){ FILE=null;PLAYER=null;META=null;EST=null;JOB=null; if(poll){clearInterval(poll);poll=null;}
   picker.value=''; drop.classList.remove('has'); drop.innerHTML='<div class="drop-main">Drop your Suno track here</div><div class="drop-sub">or <u>browse</u> — MP3, WAV, FLAC, OGG…</div>';
-  $('#quote').className='quote'; $('#prog').className='prog'; $('#result').className='result'; $('#hint').textContent=''; updateGo(); }
+  $('#quote').className='quote'; $('#prog').className='prog'; $('#result').className='result'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc'); $('#hint').textContent=''; updateGo(); }
 </script>
 </body>
 </html>

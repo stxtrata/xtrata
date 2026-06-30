@@ -1098,7 +1098,6 @@ const buildXtrataAudioPlayerHtml = (config) => {
       <div class="stage-scrim" aria-hidden="true"></div>
       <header class="top-bar">
         <div class="track-copy">
-          <p class="eyebrow">${escapeHtml(modeLabel)}</p>
           <h1>${escapeHtml(title)}</h1>
           ${subtitle ? `<p class="artist">${escapeHtml(subtitle)}</p>` : ''}
         </div>
