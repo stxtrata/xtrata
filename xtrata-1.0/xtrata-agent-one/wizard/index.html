@@ -202,9 +202,15 @@
 
 </div></main>
 
-<script src="agent-one-wallet.js"></script>
 <script>
-const API = (window.XAO_API != null ? window.XAO_API : (location.protocol === 'file:' ? 'http://127.0.0.1:8787' : ''));
+  // Backendless config. ?mock=1 in the URL runs the whole flow offline (no chain).
+  (function(){ var qs=new URLSearchParams(location.search);
+    var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
+    window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
+</script>
+<script src="agent-one.js"></script>
+<script>
+const API = '';   // backendless — all data flows through window.XtrataAgent (no HTTP API)
 const SERVER = { mock:false };
 let WALLET=null;
 const CONTENT = {
@@ -218,7 +224,22 @@ const ADDR_RE = /^S[PM][0-9A-HJKMNP-Z]{37,41}$/;
 const $ = (s)=>document.querySelector(s);
 const stx = (u)=>(Number(u)/1e6).toFixed(6).replace(/0+$/,'').replace(/\.$/,'')+' STX';
 const esc = (s)=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-async function api(path, opts){ const r = await fetch(API+path, opts); const j = await r.json().catch(()=>({error:'bad response'})); if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); return j; }
+// Backendless data layer: every former /api/* call routes to the in-browser agent (window.XtrataAgent).
+function xa(){ const A=window.XtrataAgent; if(!A) throw new Error('Agent bundle not loaded (agent-one.js).'); return A; }
+async function api(path, opts){
+  const A=xa(); const m=(opts&&opts.method)||'GET';
+  let body={}; if(opts&&opts.body){ body = (typeof opts.body==='string') ? JSON.parse(opts.body) : opts.body; }
+  if(path==='/api/health') return A.health();
+  if(path==='/api/estimate') return A.estimate(body);
+  if(path==='/api/jobs' && m==='POST') return { job: await A.createJob(body) };
+  if(path==='/api/jobs') return { jobs: await A.listJobs() };
+  let mm;
+  if((mm=path.match(/^\/api\/jobs\/([^/]+)\/run$/))) return A.runJob(mm[1]);
+  if((mm=path.match(/^\/api\/jobs\/([^/]+)\/deliver$/))) return A.deliverJob(mm[1]);
+  if((mm=path.match(/^\/api\/jobs\/([^/]+)\/delete$/))) return A.deleteJob(mm[1]);
+  if((mm=path.match(/^\/api\/jobs\/([^/]+)$/))) return A.getJob(mm[1]);
+  throw new Error('no route: '+path);
+}
 function copyBtn(text){ return `<button class="copy" onclick="navigator.clipboard.writeText('${esc(text)}');this.textContent='copied'">copy</button>`; }
 function xtrataWallet(){ return window.XtrataWallet || null; }
 async function openWallet(addr, ustx){
@@ -319,14 +340,12 @@ $('#createBtn').onclick=async()=>{
   if(!deps.every(d=>/^\d+$/.test(d))){ err.textContent='Dependencies must be token-id uints.'; return; }
   $('#createBtn').disabled=true;
   try{
-    let file;
-    if(selectedFile){ err.innerHTML='<span class="muted">Uploading…</span>'; const up=await api('/api/upload?name='+encodeURIComponent(selectedFile.name),{method:'POST',body:selectedFile}); file=up.path; }
-    else file=$('#file').value.trim();
-    const payload={file,uri,mime:CONTENT[catSel.value][ftSel.value],deps,marginUstx:$('#margin').value||'0',fastTrack:fast};
+    if(!selectedFile){ err.textContent='Drop a file or open one — backendless mode inscribes the file straight from your browser (no server paths).'; $('#createBtn').disabled=false; return; }
+    const payload={ file:selectedFile, uri, mime:CONTENT[catSel.value][ftSel.value], deps, marginUstx:$('#margin').value||'0', fastTrack:fast };
     payload.user = fast ? WALLET : user;
     if(fast) payload.expectedFunder = WALLET;   // railroad: ONLY this wallet may fund; any other payer is auto-refunded, nothing inscribed
-    payload.suno = (catSel.value==='audio') && $('#sunoMode').checked;   // SUNO: inscribe a full player built from the audio
-    const {job}=await api('/api/jobs',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
+    payload.suno = (catSel.value==='audio') && $('#sunoMode').checked;   // SUNO: build a full player from the audio (browser-side)
+    const {job}=await api('/api/jobs',{method:'POST',body:payload});   // the File goes straight into XtrataAgent.createJob — no upload
     $('#deposit').innerHTML = SERVER.mock ? `<div class="deposit" style="border-color:#5a4620;background:linear-gradient(180deg,#1c160a,#140f08)">
       <div class="kv"><span>Job</span><span>${esc(job.jobId)}</span></div>
       <div class="kv"><span><b>MOCK mode</b></span><span class="big" style="color:var(--warn)">no real STX</span></div>
@@ -454,7 +473,7 @@ async function renderJob(){
         <button class="btn warn" onclick="act('deliver')" ${st==='INSCRIBED'?'':'disabled'}>Deliver + refund + wipe key</button>
       </div><div class="err" id="jobErr"></div>`:''}
       ${st==='COMPLETE'?`<div class="ok" style="margin-top:12px">✓ Complete — inscription + receipt delivered${job.fastTrack?' to your wallet':''}, change refunded, deposit key wiped.</div>
-      <div class="btnrow"><a class="btn" href="${API}/api/jobs/${esc(job.jobId)}/receipt" target="_blank" rel="noopener">View receipt</a>
+      <div class="btnrow"><button class="btn" onclick="viewReceipt('${esc(job.jobId)}')">View receipt</button>
         <button class="btn ghost" onclick="act('delete')">Delete job</button></div>`:''}
       ${st==='CANCELLED'?`<div class="muted" style="margin-top:12px">↩︎ Cancelled — funds returned to your wallet and the deposit key discarded.${job.cancelReason?(' ('+esc(job.cancelReason)+')'):''}</div>
       <div class="btnrow"><button class="btn ghost" onclick="act('delete')">Delete job</button></div>`:''}
@@ -474,7 +493,8 @@ async function act(which){
   try{ await api('/api/jobs/'+selJob+'/'+which,{method:'POST'}); lastProgAt=Date.now(); renderJob(); startJobsPoll(); }
   catch(e){ const errEl=$('#jobErr'); if(errEl)errEl.textContent=e.message; }
 }
-window.showNode=showNode; window.delNode=delNode; window.toWizard=toWizard; window.selectJob=selectJob; window.act=act;
+function viewReceipt(id){ try{ const A=window.XtrataAgent; const html=A&&A.getReceiptHtml&&A.getReceiptHtml(id); if(!html){ alert('Receipt not generated yet.'); return; } const w=window.open('','_blank'); if(w){ w.document.open(); w.document.write(html); w.document.close(); } else { const b=new Blob([html],{type:'text/html'}); window.open(URL.createObjectURL(b),'_blank'); } }catch(e){ alert('Could not open receipt: '+((e&&e.message)||e)); } }
+window.showNode=showNode; window.delNode=delNode; window.toWizard=toWizard; window.selectJob=selectJob; window.act=act; window.viewReceipt=viewReceipt;
 setInterval(()=>{ const t=$('#progT'); if(t&&lastProgAt){ const s=Math.round((Date.now()-lastProgAt)/1000); let x=''; if(s>=90)x=' · slower than usual — Stacks may be congested, still working'; else if(s>=30)x=' · confirming on-chain'; t.textContent='('+s+'s'+x+')'; }
   const et=$('#expT'); if(et&&expiryAt){ const r=expiryAt-Date.now(); et.textContent = r>0 ? ('Auto-returns in '+Math.floor(r/60000)+':'+String(Math.floor(r/1000)%60).padStart(2,'0')) : 'Returning funds…'; } },1000);
 drawGraph();
