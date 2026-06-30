@@ -92,11 +92,28 @@
         metadata: { assetType: 'song', title, artist, album, lyrics },
       });
       const playerFile = new File([html], slug(file.name) + '.player.html', { type: 'text/html' });
-      return { playerFile, title, artist, album, hasCover: !!coverB64, hasLyrics: !!lyrics, isSuno, opusBytes: weba.length, playerBytes: playerFile.size, sourceBytes: file.size };
+      return { playerFile, html, title, artist, album, hasCover: !!coverB64, hasLyrics: !!lyrics, isSuno, opusBytes: weba.length, playerBytes: playerFile.size, sourceBytes: file.size };
     } finally {
       ['out.weba', 'meta.txt', 'cover.jpg', inName].forEach(cleanup);
     }
   }
 
-  window.XtrataSuno = { build };
+  // Fast pre-check used to GATE the SUNO page: metadata + cover only (no Opus encode).
+  // The page rejects MP3s without cover art / title / artist and sends them to the main wizard.
+  async function probe(file, onStatus) {
+    const f = await ff(onStatus);
+    const inName = 'pr-' + Date.now() + '.' + ((file.name.match(/\.([a-z0-9]+)$/i) || [])[1] || 'mp3');
+    f.FS('writeFile', inName, await fetchFile(file));
+    const clean = (n) => { try { f.FS('unlink', n); } catch (_e) {} };
+    try {
+      let meta = {};
+      try { await f.run('-i', inName, '-f', 'ffmetadata', 'pr-meta.txt'); meta = parseFfmeta(new TextDecoder().decode(f.FS('readFile', 'pr-meta.txt'))); } catch (_e) {}
+      let hasCover = false;
+      try { await f.run('-i', inName, '-an', '-map', '0:v:0', '-frames:v', '1', '-c:v', 'mjpeg', 'pr-cover.jpg'); const cb = f.FS('readFile', 'pr-cover.jpg'); hasCover = !!(cb && cb.length); } catch (_e) {}
+      const title = (meta.title || '').trim(), artist = (meta.artist || '').trim();
+      return { title, artist, hasCover, hasTitle: !!title, hasArtist: !!artist };
+    } finally { ['pr-meta.txt', 'pr-cover.jpg', inName].forEach(clean); }
+  }
+
+  window.XtrataSuno = { build, probe };
 })();

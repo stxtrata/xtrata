@@ -68,10 +68,10 @@
     <h1>Inscribe your Suno track</h1>
     <p class="lead">Drop a Suno MP3 and pay once. Your browser optimises the audio to Opus, pulls in the cover art, title, artist &amp; lyrics, and builds a self-contained player — then the agent inscribes it and returns the token + receipt to your wallet, change refunded. Nothing leaves your browser until you pay.</p>
 
-    <input id="picker" type="file" accept="audio/*,.mp3,.wav,.flac,.ogg,.weba,.opus" hidden />
+    <input id="picker" type="file" accept="audio/mpeg,.mp3" hidden />
     <div id="drop" class="drop">
-      <div class="drop-main">Drop your Suno track here</div>
-      <div class="drop-sub">or <u>browse</u> — MP3, WAV, FLAC, OGG…</div>
+      <div class="drop-main">Drop your Suno MP3 here</div>
+      <div class="drop-sub">or <u>browse</u> — embedded MP3s only (cover art + title + artist)</div>
     </div>
 
     <div id="quote" class="quote">
@@ -79,6 +79,11 @@
       <div class="kv"><span>Player</span><span id="qPlayer">—</span></div>
       <div class="kv tot"><span>Pay once</span><span id="qPay">—</span></div>
       <div class="muted" style="font-size:11px;margin-top:6px">Quoted on the finished player's exact size. Over-collected for fees; unused remainder refunded on delivery.</div>
+    </div>
+
+    <div id="preview" style="display:none;margin-top:16px">
+      <div class="muted" style="font-size:12px;margin-bottom:8px">▶ Preview — play it before you inscribe:</div>
+      <iframe id="previewFrame" title="Player preview" style="width:100%;aspect-ratio:1/1;border:1px solid var(--line);border-radius:12px;background:#10120f;display:block"></iframe>
     </div>
 
     <button id="go" class="btn" disabled>Drop a track to begin</button>
@@ -117,6 +122,27 @@ const $ = (s)=>document.querySelector(s);
 const stx = (u)=>(Number(u)/1e6).toFixed(6).replace(/0+$/,'').replace(/\.$/,'')+' STX';
 const esc = (s)=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function slug(s){ return String(s||'').toLowerCase().replace(/\.[^.]+$/,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,48)||'track'; }
+// SUNO is for Suno MP3 exports ONLY (embedded cover art + title + artist). Everything else
+// (WAV, art-less MP3, etc.) is sent to the modular main wizard.
+const DROP_HTML='<div class="drop-main">Drop your Suno MP3 here</div><div class="drop-sub">or <u>browse</u> — embedded MP3s only (cover art + title + artist)</div>';
+const MP3_MAX_MB=32;
+function validateSuno(f){
+  if(!f) return 'No file selected.';
+  const ext=((f.name.match(/\.([a-z0-9]+)$/i)||[])[1]||'').toLowerCase();
+  const isMp3 = ext==='mp3' || (f.type||'').toLowerCase()==='audio/mpeg';
+  if(!isMp3) return 'The SUNO page only takes Suno MP3 exports (embedded artwork, title &amp; artist). For WAV / other formats — or to choose artwork & metadata yourself — use the main wizard.';
+  const mb=f.size/1048576;
+  if(mb>MP3_MAX_MB) return 'MP3s are capped at '+MP3_MAX_MB+' MiB here — yours is '+mb.toFixed(1)+' MiB.';
+  return null;
+}
+// Block + redirect: reset the page and offer the modular main wizard.
+function rejectToWizard(msg){
+  FILE=null;PLAYER=null;META=null;EST=null; if(poll){clearInterval(poll);poll=null;}
+  drop.classList.remove('has'); drop.innerHTML=DROP_HTML;
+  $('#quote').className='quote'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc'); $('#result').className='result';
+  $('#hint').innerHTML='<span class="err">'+msg+'</span><br><a class="btn ghost" href="./" style="display:inline-block;width:auto;margin-top:10px">Use the main wizard →</a>';
+  building=false; $('#go').disabled=true; $('#go').textContent='Drop a Suno MP3 to begin';
+}
 function xa(){ const A=window.XtrataAgent; if(!A) throw new Error('Agent bundle not loaded (agent-one.js).'); return A; }
 // Backendless data layer: former /api/* → window.XtrataAgent.
 async function api(path, opts){
@@ -159,19 +185,27 @@ picker.onchange=()=>{ if(picker.files[0]) pickFile(picker.files[0]); };
 drop.addEventListener('drop',e=>{ const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) pickFile(f); });
 
 async function pickFile(f){
+  const verr=validateSuno(f);
+  if(verr){ rejectToWizard(verr); return; }
   FILE=f; PLAYER=null; META=null; EST=null; JOB=null; if(poll){clearInterval(poll);poll=null;}
-  $('#result').className='result'; $('#prog').className='prog'; $('#quote').className='quote';
+  $('#result').className='result'; $('#prog').className='prog'; $('#quote').className='quote'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc');
   drop.classList.add('has');
   drop.innerHTML='<div class="fname">🎵 '+esc(f.name)+'</div><div class="fmeta">'+(f.size/1048576).toFixed(2)+' MiB · click to choose a different file</div>';
   building=true; updateGo();
-  $('#hint').innerHTML='<span class="spin"></span>Building your player in-browser…';
   try{
+    // GATE: a Suno export must carry embedded cover art + title + artist. Probe before the heavy encode.
+    $('#hint').innerHTML='<span class="spin"></span>Checking your track…';
+    const p=await window.XtrataSuno.probe(f, (msg)=>{ $('#hint').innerHTML='<span class="spin"></span>'+esc(msg); });
+    const missing=[]; if(!p.hasCover) missing.push('cover art'); if(!p.hasTitle) missing.push('a title'); if(!p.hasArtist) missing.push('an artist');
+    if(missing.length){ rejectToWizard('This MP3 is missing '+missing.join(' / ')+'. The SUNO page needs a Suno export with embedded artwork, title &amp; artist — use the main wizard to set them yourself.'); return; }
+    $('#hint').innerHTML='<span class="spin"></span>Building your player in-browser…';
     const r=await window.XtrataSuno.build(f, (msg)=>{ $('#hint').innerHTML='<span class="spin"></span>'+esc(msg); });
     PLAYER=r.playerFile; META=r;
+    if(r.html){ $('#previewFrame').srcdoc=r.html; $('#preview').style.display='block'; }
     EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size})});
     $('#qName').textContent=(r.title||f.name)+(r.artist?(' — '+r.artist):'');
     $('#qPlayer').textContent=(PLAYER.size/1048576).toFixed(2)+' MiB · Opus'+(r.hasCover?' + cover':'')+(r.hasLyrics?' + lyrics':'');
-    $('#qPay').textContent=stx(EST.requiredUstx);
+    $('#qPay').textContent=stx(EST.requiredUstx)+(EST.stxUsd?(' · ~$'+(Number(EST.requiredUstx)/1e6*EST.stxUsd).toFixed(2)):'');
     $('#quote').className='quote show'; $('#hint').textContent='';
   }catch(e){ $('#hint').innerHTML='<span class="err">Could not build the player: '+esc(e.message)+'</span>'; }
   building=false; updateGo();
@@ -249,8 +283,8 @@ function done(job){
   $('#go').disabled=false; $('#go').textContent='Inscribe my track';
 }
 function resetAll(){ FILE=null;PLAYER=null;META=null;EST=null;JOB=null; if(poll){clearInterval(poll);poll=null;}
-  picker.value=''; drop.classList.remove('has'); drop.innerHTML='<div class="drop-main">Drop your Suno track here</div><div class="drop-sub">or <u>browse</u> — MP3, WAV, FLAC, OGG…</div>';
-  $('#quote').className='quote'; $('#prog').className='prog'; $('#result').className='result'; $('#hint').textContent=''; updateGo(); }
+  picker.value=''; drop.classList.remove('has'); drop.innerHTML=DROP_HTML;
+  $('#quote').className='quote'; $('#prog').className='prog'; $('#result').className='result'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc'); $('#hint').textContent=''; updateGo(); }
 </script>
 </body>
 </html>
