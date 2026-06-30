@@ -41,19 +41,42 @@ function startBackground(id, phase, fn) {
   const job = core.readJob(JOB_DIR, id);
   Promise.resolve().then(() => fn(job))
     .then(() => PROCESSING.delete(id))
-    .catch((e) => { try { const j = core.readJob(JOB_DIR, id); j.error = String((e && e.message) || e); j.status = 'ERROR'; core.writeJob(JOB_DIR, j); } catch {} PROCESSING.delete(id); console.error(`job ${id} failed: ${e}`); });
+    .catch(async (e) => {
+      console.error(`job ${id} failed: ${e} — returning funds`);
+      try { const j = core.readJob(JOB_DIR, id); j.error = String((e && e.message) || e); core.writeJob(JOB_DIR, j); } catch {}
+      try { const j = core.readJob(JOB_DIR, id); await core.refundAndClose({ job: j, hiroKey: HIRO_KEY, jobDir: JOB_DIR, receiptsDir: RECEIPTS_DIR, reason: 'error: ' + String((e && e.message) || e) }); } catch (e2) { console.error(`job ${id} auto-refund failed:`, e2); }
+      PROCESSING.delete(id);
+    });
 }
+// Failsafe reaper: return funds + close any job that doesn't commence/progress within the window.
+async function reapTick() {
+  let jobs; try { jobs = core.listJobs(JOB_DIR); } catch { return; }
+  const now = Date.now();
+  for (const j of jobs) {
+    if (PROCESSING.has(j.jobId)) continue;
+    if (['COMPLETE', 'CANCELLED', 'NEEDS_RECOVERY'].includes(j.status)) continue;
+    const last = Date.parse(j.progressAt || j.createdAt || '') || 0;
+    if (!last || (now - last) < core.JOB_WINDOW_MS) continue;
+    PROCESSING.add(j.jobId);
+    console.log(`reaper: ${j.jobId} (${j.status}) past window → return funds + close`);
+    core.refundAndClose({ job: j, hiroKey: HIRO_KEY, jobDir: JOB_DIR, receiptsDir: RECEIPTS_DIR, reason: 'expired — no progress within window' })
+      .then(() => PROCESSING.delete(j.jobId))
+      .catch((e) => { console.error(`reaper ${j.jobId} failed:`, e); PROCESSING.delete(j.jobId); });
+  }
+}
+setInterval(reapTick, 20000);
 async function fastTrackTick() {
   let jobs; try { jobs = core.listJobs(JOB_DIR); } catch { return; }
   for (const j of jobs) {
-    if (!j.fastTrack || PROCESSING.has(j.jobId) || j.status !== 'AWAITING_DEPOSIT') continue;
+    if (!j.fastTrack || PROCESSING.has(j.jobId)) continue;
+    if (j.status !== 'AWAITING_DEPOSIT' && j.status !== 'FUNDED') continue;   // also resume jobs stuck at FUNDED (e.g. after a restart)
     let funded = false; try { funded = (await core.statusJob({ job: j, hiroKey: HIRO_KEY })).funded; } catch { continue; }
     if (!funded) continue;
     console.log(`fast-track ${j.jobId}: funded → auto-processing`);
     startBackground(j.jobId, 'FUNDED', (job) => core.autoRunJob({ job, enginePath: ENGINE, hiroKey: HIRO_KEY, jobDir: JOB_DIR, receiptsDir: RECEIPTS_DIR, onPhase: (s) => console.log(`  ${j.jobId} → ${s}`) }));
   }
 }
-setInterval(fastTrackTick, 8000);
+setInterval(fastTrackTick, 5000);
 
 function serveStatic(req, res) {
   let rel = decodeURIComponent(req.url.split('?')[0]);
@@ -72,7 +95,7 @@ const server = http.createServer(async (req, res) => {
 
     if (!p.startsWith('/api/')) return serveStatic(req, res);
 
-    if (p === '/api/health') return send(res, 200, { ok: true, core: CORE, net: NET, mock: MOCK, startedAt: STARTED_AT, jobDir: JOB_DIR });
+    if (p === '/api/health') return send(res, 200, { ok: true, core: CORE, net: NET, mock: MOCK, startedAt: STARTED_AT, windowMs: core.JOB_WINDOW_MS, jobDir: JOB_DIR });
 
     if (p === '/api/estimate' && req.method === 'POST') {
       const b = await body(req);
@@ -99,7 +122,7 @@ const server = http.createServer(async (req, res) => {
       const list = core.listJobs(JOB_DIR).sort((a, b) => (b.jobId > a.jobId ? 1 : -1));
       const jobs = await Promise.all(list.map(async (j) => {
         let funded = false, balanceUstx = '0';
-        try { const s = await core.statusJob({ job: j, hiroKey: HIRO_KEY }); funded = s.funded; balanceUstx = s.balanceUstx; } catch {}
+        if (j.status === 'AWAITING_DEPOSIT') { try { const s = await core.statusJob({ job: j, hiroKey: HIRO_KEY }); funded = s.funded; balanceUstx = s.balanceUstx; } catch {} }
         return { ...core.publicJob(j), funded, balanceUstx };
       }));
       return send(res, 200, { jobs });
@@ -108,11 +131,11 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/jobs' && req.method === 'POST') {
       const b = await body(req);
       if (!b.file || !fs.existsSync(b.file)) return send(res, 400, { error: 'file not found on server: ' + (b.file || '(none)') });
-      const job = await core.createJob({ coreName: CORE, net: NET, file: b.file, uri: b.uri, mime: b.mime || 'application/octet-stream', deps: b.deps || [], user: b.user, marginUstx: b.marginUstx || '0', jobDir: JOB_DIR, mock: MOCK, fastTrack: !!b.fastTrack });
+      const job = await core.createJob({ coreName: CORE, net: NET, file: b.file, uri: b.uri, mime: b.mime || 'application/octet-stream', deps: b.deps || [], user: b.user, marginUstx: b.marginUstx || '0', jobDir: JOB_DIR, mock: MOCK, fastTrack: !!b.fastTrack, suno: !!b.suno });
       return send(res, 200, { job: core.publicJob(job) });
     }
 
-    const m = p.match(/^\/api\/jobs\/([^/]+)(\/run|\/deliver|\/receipt)?$/);
+    const m = p.match(/^\/api\/jobs\/([^/]+)(\/run|\/deliver|\/receipt|\/delete)?$/);
     if (m) {
       const id = m[1]; let job;
       try { job = core.readJob(JOB_DIR, id); } catch { return send(res, 404, { error: 'job not found: ' + id }); }
@@ -136,6 +159,11 @@ const server = http.createServer(async (req, res) => {
         if (!job.tokenId) return send(res, 400, { error: 'nothing to deliver yet' });
         startBackground(id, 'DELIVERING', (j) => core.deliverJob({ job: j, hiroKey: HIRO_KEY, jobDir: JOB_DIR, receiptsDir: RECEIPTS_DIR }));
         return send(res, 200, { started: true });
+      }
+      if (m[2] === '/delete' && req.method === 'POST') {
+        if (PROCESSING.has(id)) return send(res, 409, { error: 'job is processing — try again once it settles' });
+        try { return send(res, 200, core.deleteJob({ jobDir: JOB_DIR, id, receiptsDir: RECEIPTS_DIR })); }
+        catch (e) { return send(res, 400, { error: String((e && e.message) || e) }); }
       }
     }
 

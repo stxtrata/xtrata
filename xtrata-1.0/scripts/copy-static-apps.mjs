@@ -24,6 +24,10 @@ const staticApps = [
   {
     source: 'umg',
     target: 'dist/umg'
+  },
+  {
+    source: 'xtrata-agent-one/wizard',
+    target: 'dist/agent-one'
   }
 ];
 

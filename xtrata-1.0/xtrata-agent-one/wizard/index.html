@@ -51,6 +51,8 @@
   .s-COMPLETE{color:var(--ok);border-color:#1f5a45}
   .s-INSCRIBING,.s-DELIVERING{color:var(--acc);border-color:#234a6e}
   .s-ERROR{color:var(--bad);border-color:#5a2222}
+  .s-CANCELLED{color:var(--mut);border-color:var(--line)}
+  .s-NEEDS_RECOVERY{color:var(--bad);border-color:#5a2222}
   .spin{display:inline-block;width:12px;height:12px;border:2px solid var(--line);border-top-color:var(--acc);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:7px}
   @keyframes spin{to{transform:rotate(360deg)}}
   .progress{font-size:13px;color:var(--ink);margin-top:12px;background:#0e1726;border:1px solid var(--line);border-radius:10px;padding:11px 13px}
@@ -116,6 +118,10 @@
         <details class="srvpath"><summary>Or use a file already on the server (paste a path)</summary>
           <input id="file" class="mono" placeholder="/Users/you/media/clip.mp4" style="margin-top:8px" />
         </details>
+        <label id="sunoWrap" style="display:none;align-items:center;gap:9px;cursor:pointer;color:var(--ink);margin-top:12px">
+          <input type="checkbox" id="sunoMode" style="width:auto" checked />
+          <span><b style="color:var(--acc2)">🎵 SUNO track</b> — build a full HTML player (cover art + title + artist embedded with the Opus audio) and inscribe that, in one transaction.</span>
+        </label>
         <div class="btnrow"><button class="btn ghost" id="estimateBtn">Estimate cost</button></div>
         <div id="estimate"></div>
       </div>
@@ -227,12 +233,12 @@ window.openWallet=openWallet;
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x===b));
   ['new','graph','jobs'].forEach(t=>$('#tab-'+t).hidden = (t!==b.dataset.tab));
-  if(b.dataset.tab==='jobs') loadJobs();
+  if(b.dataset.tab==='jobs'){ loadJobs(); startJobsPoll(); } else { stopJobsPoll(); }
   if(b.dataset.tab==='graph') drawGraph();
 });
 
 // ---- health ----
-(async()=>{ try{ const h=await api('/api/health'); SERVER.mock=!!h.mock; SERVER.net=h.net; $('#health').innerHTML =
+(async()=>{ try{ const h=await api('/api/health'); SERVER.mock=!!h.mock; SERVER.net=h.net; SERVER.windowMs=h.windowMs||300000; $('#health').innerHTML =
   `<span class="pill ${h.mock?'mock':'live'}">${h.mock?'MOCK':'LIVE'}</span><span class="pill">${esc(h.core)}</span><span class="pill">${esc(h.net)}</span><span class="pill" title="server started — restart it if this predates your last change">⟳ ${h.startedAt?new Date(h.startedAt).toLocaleTimeString():''}</span>`;
 }catch(e){ $('#health').innerHTML = `<span class="pill" style="color:var(--bad);border-color:#5a2222">server offline</span>`; } })();
 
@@ -255,7 +261,8 @@ $('#walletAddr').onclick=disconnectWallet;
 const catSel=$('#category'), ftSel=$('#ftype');
 Object.keys(CONTENT).forEach(c=>catSel.add(new Option(c,c)));
 function fillTypes(){ ftSel.innerHTML=''; Object.keys(CONTENT[catSel.value]).forEach(t=>ftSel.add(new Option(t+' ('+CONTENT[catSel.value][t]+')',t))); }
-catSel.onchange=fillTypes; fillTypes();
+function updateSunoVis(){ const el=$('#sunoWrap'); if(el) el.style.display=(catSel.value==='audio')?'flex':'none'; }
+catSel.onchange=()=>{ fillTypes(); updateSunoVis(); }; fillTypes(); updateSunoVis();
 function slug(s){ return (s.toLowerCase().replace(/\.[^.]+$/,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,48))||'asset'; }
 // extension → [category,type]; .weba/.opus resolve to AUDIO so Opus-in-WebM is never tagged video
 const EXT={ weba:['audio','weba'],opus:['audio','opus'],mp3:['audio','mp3'],wav:['audio','wav'],ogg:['audio','ogg'],oga:['audio','ogg'],
@@ -265,7 +272,7 @@ const EXT={ weba:['audio','weba'],opus:['audio','opus'],mp3:['audio','mp3'],wav:
   json:['data','json'],bin:['data','bin'] };
 let selectedFile=null;
 function detectFromName(name){ const ext=(name.match(/\.([a-z0-9]+)$/i)||[])[1]; const hit=ext&&EXT[ext.toLowerCase()];
-  if(hit){ catSel.value=hit[0]; fillTypes(); ftSel.value=hit[1]; }
+  if(hit){ catSel.value=hit[0]; fillTypes(); ftSel.value=hit[1]; updateSunoVis(); }
   if(!$('#uri').value){ $('#uri').value=`xtrata:${catSel.value}/${slug(name)}`; } }
 $('#file').addEventListener('input',()=>{ if($('#file').value.trim()){ selectedFile=null; $('#picker').value=''; $('#fileInfo').innerHTML=''; } });
 $('#file').addEventListener('blur',()=>{ const v=$('#file').value.trim(); if(v){ detectFromName(v.split(/[\\/]/).pop()); $('#estimateBtn').click(); } });
@@ -317,6 +324,7 @@ $('#createBtn').onclick=async()=>{
     else file=$('#file').value.trim();
     const payload={file,uri,mime:CONTENT[catSel.value][ftSel.value],deps,marginUstx:$('#margin').value||'0',fastTrack:fast};
     payload.user = fast ? WALLET : user;
+    payload.suno = (catSel.value==='audio') && $('#sunoMode').checked;   // SUNO: inscribe a full player built from the audio
     const {job}=await api('/api/jobs',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
     $('#deposit').innerHTML = SERVER.mock ? `<div class="deposit" style="border-color:#5a4620;background:linear-gradient(180deg,#1c160a,#140f08)">
       <div class="kv"><span>Job</span><span>${esc(job.jobId)}</span></div>
@@ -407,8 +415,12 @@ async function loadJobs(){
   }catch(e){ $('#jobsBody').innerHTML=`<tr><td colspan="6" class="err">${esc(e.message)}</td></tr>`; }
 }
 $('#refreshJobs').onclick=loadJobs;
-let lastProgAt=0;
-async function selectJob(id){ selJob=id; lastProgAt=0; loadJobs(); renderJob(); if(pollTimer)clearInterval(pollTimer); pollTimer=setInterval(renderJob,3500); }
+let lastProgAt=0, expiryAt=0;
+// One steady poll drives BOTH the table and the open detail, so the top row never lags the panel.
+async function jobsTick(){ try{ await Promise.all([ loadJobs(), selJob?renderJob():Promise.resolve() ]); }catch(e){} }
+function startJobsPoll(){ if(pollTimer)clearInterval(pollTimer); pollTimer=setInterval(jobsTick,3000); }
+function stopJobsPoll(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
+async function selectJob(id){ selJob=id; lastProgAt=0; loadJobs(); renderJob(); startJobsPoll(); }
 async function renderJob(){
   if(!selJob)return; const out=$('#jobDetail');
   try{ const {job,status}=await api('/api/jobs/'+selJob);
@@ -418,18 +430,20 @@ async function renderJob(){
     const ds=(st==='AWAITING_DEPOSIT'&&funded)?'FUNDED':st;
     const phaseMsg={FUNDED:'Payment detected — starting…',INSCRIBING:'Inscribing on-chain…',INSCRIBED:'Inscribed — delivering…',DELIVERING:'Delivering inscription + refunding change…'}[st];
     const showDeposit=(st==='AWAITING_DEPOSIT');
+    expiryAt = (showDeposit && job.createdAt && SERVER.windowMs) ? (Date.parse(job.createdAt) + SERVER.windowMs) : 0;
     out.innerHTML=`<div class="card" style="margin-top:16px"><h3>${esc(job.jobId)} <span class="status s-${ds}">${ds.replace(/_/g,' ')}</span>${job.fastTrack?' <span class="status" style="color:var(--acc2);border-color:#3a2f7a">⚡ fast-track</span>':''}</h3>
       ${job.mock?'<div class="muted" style="margin:-2px 0 8px;color:var(--warn)">MOCK job — simulated, no real funds.</div>':''}
       <div class="kv"><span>Inscription</span><span>${esc(job.uri)}</span></div>
       ${showDeposit?`<div class="kv"><span>Deposit address ${copyBtn(job.depositAddress)}</span><span>${esc(job.depositAddress)}</span></div>
       <div class="kv"><span>Send exactly</span><span class="big" style="font-size:19px">${stx(status.requiredUstx)}</span></div>
-      ${!job.mock?`<div class="btnrow"><button class="btn" onclick="openWallet('${esc(job.depositAddress)}','${esc(status.requiredUstx)}')">Open wallet to pay ${stx(status.requiredUstx)}</button></div>`:''}`:''}
+      ${!job.mock?`<div class="btnrow"><button class="btn" onclick="openWallet('${esc(job.depositAddress)}','${esc(status.requiredUstx)}')">Open wallet to pay ${stx(status.requiredUstx)}</button></div>`:''}
+      <div class="muted" style="font-size:12px;margin-top:8px">↩︎ Guaranteed temporary — if not funded &amp; started in time, this auto-cancels and returns any funds. <b id="expT"></b></div>`:''}
       ${job.user?`<div class="kv"><span>${job.fastTrack?'Returns to your wallet':'Delivery address'}</span><span class="mono">${esc(job.user)}</span></div>`:(job.fastTrack?`<div class="kv"><span>Returns to</span><span class="muted">the wallet you pay from (auto-detected)</span></div>`:'')}
       ${job.tokenId?`<div class="kv"><span>Inscription token</span><span class="ok">#${esc(job.tokenId)}</span></div>`:''}
       ${job.receiptTokenId?`<div class="kv"><span>Receipt token</span><span class="ok">#${esc(job.receiptTokenId)}</span></div>`:''}
       ${job.agentFeeUstx?`<div class="kv"><span>Agent fee (${job.agentFeePct||10}%)</span><span style="color:var(--acc2)">${stx(job.agentFeeUstx)}</span></div>`:''}
       ${(job.refundedUstx!=null)?`<div class="kv"><span>Change refunded</span><span>${stx(job.refundedUstx||'0')}</span></div>`:''}
-      ${active?`<div class="progress"><span class="spin"></span>${esc(phaseMsg||'Working…')} <span id="progT" class="muted"></span></div>`:''}
+      ${active?`<div class="progress"><span class="spin"></span>${esc(phaseMsg||'Working…')}${job.progress?(' · '+esc(job.progress)):''} <span id="progT" class="muted"></span></div>`:''}
       ${showDeposit&&!funded?`<div class="muted" style="margin-top:10px;font-size:12px">${job.fastTrack?'Pay from a self-custody wallet (Leather/Xverse) — the inscription and change return to that address, and processing starts automatically on arrival.':'Waiting for your deposit — the Jobs list flips to FUNDED once it lands.'}</div>`:''}
       ${job.error?`<div class="err" style="margin-top:8px">Error: ${esc(job.error)}${!job.fastTrack?` <button class="btn ghost" onclick="act('run')" style="margin-left:8px;padding:5px 10px">Retry</button>`:''}</div>`:''}
       ${(!job.fastTrack&&(st==='AWAITING_DEPOSIT'||st==='INSCRIBED'))?`<div class="btnrow">
@@ -437,18 +451,29 @@ async function renderJob(){
         <button class="btn warn" onclick="act('deliver')" ${st==='INSCRIBED'?'':'disabled'}>Deliver + refund + wipe key</button>
       </div><div class="err" id="jobErr"></div>`:''}
       ${st==='COMPLETE'?`<div class="ok" style="margin-top:12px">✓ Complete — inscription + receipt delivered${job.fastTrack?' to your wallet':''}, change refunded, deposit key wiped.</div>
-      <div class="btnrow"><a class="btn" href="${API}/api/jobs/${esc(job.jobId)}/receipt" target="_blank" rel="noopener">View receipt</a></div>`:''}
+      <div class="btnrow"><a class="btn" href="${API}/api/jobs/${esc(job.jobId)}/receipt" target="_blank" rel="noopener">View receipt</a>
+        <button class="btn ghost" onclick="act('delete')">Delete job</button></div>`:''}
+      ${st==='CANCELLED'?`<div class="muted" style="margin-top:12px">↩︎ Cancelled — funds returned to your wallet and the deposit key discarded.${job.cancelReason?(' ('+esc(job.cancelReason)+')'):''}</div>
+      <div class="btnrow"><button class="btn ghost" onclick="act('delete')">Delete job</button></div>`:''}
+      ${st==='NEEDS_RECOVERY'?`<div class="err" style="margin-top:12px">Auto-refund didn’t confirm — your funds are safe but need a manual sweep: run <b>svc/recover-all.mjs</b>.${job.keepKeyReason?(' '+esc(job.keepKeyReason)):''}</div>`:''}
     </div>`;
-    if(st==='COMPLETE'||st==='ERROR'){ if(pollTimer){clearInterval(pollTimer);pollTimer=null;} loadJobs(); }
+    if(st==='COMPLETE'||st==='ERROR'||st==='CANCELLED'||st==='NEEDS_RECOVERY'){ loadJobs(); }
   }catch(e){ /* transient read (job file mid-write) — keep polling */ }
 }
 async function act(which){
   if(which==='deliver' && !confirm('Deliver the inscription, refund the remainder, and permanently wipe the deposit key?')) return;
-  try{ await api('/api/jobs/'+selJob+'/'+which,{method:'POST'}); lastProgAt=Date.now(); renderJob(); if(!pollTimer)pollTimer=setInterval(renderJob,3500); }
+  if(which==='delete'){
+    if(!confirm('Delete this job from the list?\nThe inscription stays on-chain — this only removes the local record + receipt.')) return;
+    try{ await api('/api/jobs/'+selJob+'/delete',{method:'POST'}); selJob=null; $('#jobDetail').innerHTML=''; loadJobs(); }
+    catch(e){ const errEl=$('#jobErr'); if(errEl){errEl.textContent=e.message;} else alert(e.message); }
+    return;
+  }
+  try{ await api('/api/jobs/'+selJob+'/'+which,{method:'POST'}); lastProgAt=Date.now(); renderJob(); startJobsPoll(); }
   catch(e){ const errEl=$('#jobErr'); if(errEl)errEl.textContent=e.message; }
 }
 window.showNode=showNode; window.delNode=delNode; window.toWizard=toWizard; window.selectJob=selectJob; window.act=act;
-setInterval(()=>{ const t=$('#progT'); if(t&&lastProgAt){ const s=Math.round((Date.now()-lastProgAt)/1000); let x=''; if(s>=90)x=' · slower than usual — Stacks may be congested, still working'; else if(s>=30)x=' · confirming on-chain'; t.textContent='('+s+'s'+x+')'; } },1000);
+setInterval(()=>{ const t=$('#progT'); if(t&&lastProgAt){ const s=Math.round((Date.now()-lastProgAt)/1000); let x=''; if(s>=90)x=' · slower than usual — Stacks may be congested, still working'; else if(s>=30)x=' · confirming on-chain'; t.textContent='('+s+'s'+x+')'; }
+  const et=$('#expT'); if(et&&expiryAt){ const r=expiryAt-Date.now(); et.textContent = r>0 ? ('Auto-returns in '+Math.floor(r/60000)+':'+String(Math.floor(r/1000)%60).padStart(2,'0')) : 'Returning funds…'; } },1000);
 drawGraph();
 </script>
 </body>

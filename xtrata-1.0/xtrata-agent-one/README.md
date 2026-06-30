@@ -46,8 +46,22 @@ HIRO_API_KEY=xxxxxxxx node server/server.mjs
 # open http://127.0.0.1:8787/
 ```
 
-Dependencies (`@stacks/*`, `@scure/*`, `@noble/hashes`) resolve from the AIBTC
-`node_modules`, so run it from anywhere inside the project.
+### Dependencies
+
+This folder ships a `package.json` — install once on the host that runs the backend:
+
+```bash
+npm install
+```
+
+That pulls the Stacks/crypto libs and **`ffmpeg-static`** (used to optimise audio and
+build SUNO players). A system `ffmpeg` on `PATH` is preferred if present (set
+`FFMPEG_PATH` to pin one). The audio + SUNO-player pipeline is documented in
+[`AUDIO_OPTIMIZATION.md`](AUDIO_OPTIMIZATION.md). (Running from inside the AIBTC
+project still works too — its `node_modules` resolves the same deps.)
+
+> `svc/job-state/` (ephemeral deposit-wallet keys), `svc/uploads/`, and
+> `svc/receipts/` are git-ignored — never commit them.
 
 Flow in the wizard:
 
