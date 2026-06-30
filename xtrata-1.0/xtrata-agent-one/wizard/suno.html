@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Xtrata Agent One — SUNO · one-tap track inscription</title>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#121723; --panel2:#0e131d; --line:#243044;
+    --ink:#e6edf6; --mut:#8b9bb4; --acc:#3ea6ff; --acc2:#7c5cff; --ok:#3ddc97; --warn:#ffb454; --bad:#ff6b6b;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:radial-gradient(1000px 520px at 50% -10%,rgba(124,92,255,.16),transparent),var(--bg);
+    color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:12px;padding:16px 22px;border-bottom:1px solid var(--line)}
+  .logo{font-weight:800;letter-spacing:.5px}
+  .logo b{color:var(--acc)} .logo i{color:var(--acc2);font-style:normal}
+  .pill{padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--mut);font-size:12px}
+  .pill.live{color:var(--ok);border-color:#1f5a45} .pill.mock{color:var(--warn);border-color:#5a4620}
+  .spacer{margin-left:auto}
+  main{flex:1;display:flex;align-items:flex-start;justify-content:center;padding:32px 18px 64px}
+  .card{width:100%;max-width:560px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px}
+  h1{margin:0 0 6px;font-size:22px}
+  .lead{color:var(--mut);font-size:13.5px;margin:0 0 20px}
+  .tag{display:inline-block;background:#10203a;border:1px solid #234a6e;color:var(--acc);border-radius:999px;padding:2px 10px;font-size:11px;font-weight:700;margin-bottom:14px}
+  .drop{border:1.6px dashed var(--line);border-radius:14px;padding:34px 18px;text-align:center;transition:.15s;cursor:pointer}
+  .drop.drag{border-color:var(--acc2);background:#140f24}
+  .drop.has{border-style:solid;border-color:#2a3650;background:var(--panel2);text-align:left}
+  .drop-main{font-weight:700} .drop-sub{color:var(--mut);font-size:12.5px;margin-top:6px}
+  .fname{font-weight:700;word-break:break-all} .fmeta{color:var(--mut);font-family:var(--mono);font-size:12px;margin-top:4px}
+  .quote{margin:18px 0 0;background:linear-gradient(180deg,#0f1f17,#0c1812);border:1px solid #1f5a45;border-radius:12px;padding:14px 16px;display:none}
+  .quote.show{display:block}
+  .kv{display:flex;justify-content:space-between;padding:5px 0;font-size:13px}
+  .kv span:first-child{color:var(--mut)} .kv span:last-child{font-family:var(--mono)}
+  .kv.tot span:last-child{color:var(--acc);font-weight:800;font-size:16px}
+  .btn{width:100%;margin-top:18px;background:linear-gradient(180deg,#8b6cff,#6f4cf0);border:0;color:#fff;
+    padding:15px 16px;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink);font-size:13px;padding:10px 14px;width:auto;margin:0}
+  .wallet{display:flex;align-items:center;gap:8px}
+  .addr{color:var(--ok);cursor:pointer}
+  .hint{color:var(--mut);font-size:12px;text-align:center;margin-top:10px;min-height:16px}
+  .err{color:var(--bad)} .ok{color:var(--ok)}
+  .prog{margin-top:18px;display:none;background:#0e1726;border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .prog.show{display:block}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--line);border-top-color:var(--acc2);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:8px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .steps{display:flex;gap:6px;margin-top:12px;font-size:11px;color:var(--mut);flex-wrap:wrap}
+  .step{padding:2px 8px;border:1px solid var(--line);border-radius:999px}
+  .step.on{color:var(--acc2);border-color:#3a2f7a} .step.done{color:var(--ok);border-color:#1f5a45}
+  .result{margin-top:16px;display:none} .result.show{display:block}
+  .result a.btn{display:block;text-align:center;text-decoration:none;background:linear-gradient(180deg,#37cf8e,#23b277)}
+  .muted{color:var(--mut)} a{color:var(--acc)}
+  footer{padding:14px 22px;color:var(--mut);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><b>XTRATA</b> <i>Agent One</i> · SUNO</div>
+  <div class="spacer"></div>
+  <span id="health" class="pill">connecting…</span>
+  <span id="walletAddr" class="pill" style="display:none;cursor:pointer;color:var(--ok);border-color:#1f5a45" title="click to disconnect"></span>
+  <button class="btn ghost" id="connectBtn">Connect wallet</button>
+</header>
+
+<main>
+  <div class="card">
+    <span class="tag">⚡ one payment → full player on-chain</span>
+    <h1>Inscribe your Suno track</h1>
+    <p class="lead">Drop a Suno MP3 and pay once. Agent One optimises the audio to Opus, pulls in the cover art, title, artist &amp; lyrics, builds a self-contained player, and inscribes it — token + receipt returned to your wallet, change refunded.</p>
+
+    <input id="picker" type="file" accept="audio/*,.mp3,.wav,.flac,.ogg,.weba,.opus" hidden />
+    <div id="drop" class="drop">
+      <div class="drop-main">Drop your Suno track here</div>
+      <div class="drop-sub">or <u>browse</u> — MP3, WAV, FLAC, OGG…</div>
+    </div>
+
+    <div id="quote" class="quote">
+      <div class="kv"><span>Track</span><span id="qName">—</span></div>
+      <div class="kv"><span>Size</span><span id="qSize">—</span></div>
+      <div class="kv tot"><span>Pay once</span><span id="qPay">—</span></div>
+      <div class="muted" style="font-size:11px;margin-top:6px">Over-collected to cover fees; unused remainder is refunded to you on delivery.</div>
+    </div>
+
+    <button id="go" class="btn" disabled>Drop a track to begin</button>
+    <div id="hint" class="hint"></div>
+
+    <div id="prog" class="prog">
+      <div><span class="spin"></span><span id="progMsg">Starting…</span></div>
+      <div class="steps">
+        <span class="step" data-s="pay">Payment</span>
+        <span class="step" data-s="opus">Opus</span>
+        <span class="step" data-s="player">Player</span>
+        <span class="step" data-s="inscribe">Inscribe</span>
+        <span class="step" data-s="deliver">Deliver</span>
+      </div>
+    </div>
+
+    <div id="result" class="result"></div>
+  </div>
+</main>
+
+<footer>Localhost-bound agent · need the full controls? Open the <a href="./">Inscription Wizard</a>.</footer>
+
+<script src="agent-one-wallet.js"></script>
+<script>
+const API = (window.XAO_API != null ? window.XAO_API : (location.protocol === 'file:' ? 'http://127.0.0.1:8787' : ''));
+const SERVER = { mock:false, net:'mainnet' };
+let WALLET=null, FILE=null, EST=null, JOB=null, poll=null;
+
+const $ = (s)=>document.querySelector(s);
+const stx = (u)=>(Number(u)/1e6).toFixed(6).replace(/0+$/,'').replace(/\.$/,'')+' STX';
+const esc = (s)=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const slug = (s)=>(s.toLowerCase().replace(/\.[^.]+$/,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,48))||'track';
+async function api(path, opts){ const r=await fetch(API+path,opts); const j=await r.json().catch(()=>({error:'bad response'})); if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); return j; }
+const AUDIO_MIME={ mp3:'audio/mpeg', wav:'audio/wav', flac:'audio/flac', ogg:'audio/ogg', oga:'audio/ogg', weba:'audio/webm; codecs=opus', opus:'audio/ogg; codecs=opus', m4a:'audio/mp4' };
+const mimeOf=(name)=>{ const e=(name.match(/\.([a-z0-9]+)$/i)||[])[1]; return (e&&AUDIO_MIME[e.toLowerCase()])||'audio/mpeg'; };
+
+// ---- wallet (delegates to the Xtrata site's bundled shim: window.XtrataWallet) ----
+function xw(){ return window.XtrataWallet || null; }
+function setWallet(a){ WALLET=a||null; const el=$('#walletAddr'), b=$('#connectBtn');
+  if(WALLET){ el.style.display=''; el.textContent='● '+WALLET.slice(0,5)+'…'+WALLET.slice(-4); b.textContent='Disconnect'; }
+  else { el.style.display='none'; b.textContent='Connect wallet'; } updateGo(); }
+async function connectWallet(){ const w=xw();
+  if(!w||!w.connect){ alert('Wallet bundle not loaded.\nOpen this page from the Xtrata site (it ships the wallet), or use the full wizard.'); return; }
+  try{ const a=await w.connect(); a?setWallet(a):alert('Connected, but no Stacks address returned.'); }catch(e){ alert('Connect failed:\n'+((e&&e.message)||e)); } }
+async function disconnectWallet(){ try{ const w=xw(); if(w&&w.disconnect) await w.disconnect(); }catch{} setWallet(null); }
+$('#connectBtn').onclick=()=>{ WALLET?disconnectWallet():connectWallet(); };
+$('#walletAddr').onclick=disconnectWallet;
+async function payWallet(addr, ustx){ const w=xw();
+  if(!w||!w.pay) throw new Error('wallet cannot pay — copy the address/amount from the full wizard, or open inside the Xtrata site');
+  await w.pay({ recipient:addr, amount:String(ustx), network:(SERVER.net==='testnet'?'testnet':'mainnet') }); }
+
+// ---- health ----
+(async()=>{ try{ const h=await api('/api/health'); SERVER.mock=!!h.mock; SERVER.net=h.net||'mainnet';
+  $('#health').className='pill '+(h.mock?'mock':'live'); $('#health').textContent=(h.mock?'MOCK':'LIVE')+' · '+SERVER.net;
+}catch{ $('#health').textContent='server offline'; $('#health').style.color='var(--bad)'; } updateGo(); })();
+(function(){ try{ const w=xw(); const a=w&&w.getAddress&&w.getAddress(); if(a) setWallet(a); }catch{} })();
+
+// ---- file pick / drop ----
+const drop=$('#drop'), picker=$('#picker');
+drop.onclick=()=>picker.click();
+picker.onchange=()=>{ if(picker.files[0]) pickFile(picker.files[0]); };
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag');}));
+['dragleave','dragend','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag');}));
+drop.addEventListener('drop',e=>{ const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) pickFile(f); });
+
+async function pickFile(f){
+  FILE=f; EST=null; JOB=null; if(poll){clearInterval(poll);poll=null;}
+  $('#result').className='result'; $('#prog').className='prog';
+  drop.classList.add('has');
+  drop.innerHTML='<div class="fname">🎵 '+esc(f.name)+'</div><div class="fmeta">'+(f.size/1048576).toFixed(2)+' MiB · click to choose a different file</div>';
+  $('#hint').textContent='Estimating cost…';
+  try{ EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:f.size})});
+    $('#qName').textContent=f.name.length>34?f.name.slice(0,31)+'…':f.name;
+    $('#qSize').textContent=(f.size/1048576).toFixed(2)+' MiB';
+    $('#qPay').textContent=stx(EST.requiredUstx);
+    $('#quote').className='quote show'; $('#hint').textContent='';
+  }catch(e){ $('#hint').innerHTML='<span class="err">Estimate failed: '+esc(e.message)+'</span>'; }
+  updateGo();
+}
+
+function updateGo(){
+  const b=$('#go');
+  if(!FILE){ b.disabled=true; b.textContent='Drop a track to begin'; return; }
+  if(!SERVER.mock && !WALLET){ b.disabled=true; b.textContent='Connect your wallet to inscribe'; return; }
+  b.disabled=false;
+  b.textContent = EST ? ('Inscribe my track  ·  pay '+stx(EST.requiredUstx)) : 'Inscribe my track';
+}
+
+// ---- the one combined action: create job + pay, then track ----
+$('#go').onclick=async()=>{
+  if(!FILE) return;
+  if(!SERVER.mock && !WALLET){ connectWallet(); return; }
+  const b=$('#go'); b.disabled=true; $('#hint').textContent='';
+  try{
+    setProg('Uploading track…', []);
+    const up=await api('/api/upload?name='+encodeURIComponent(FILE.name),{method:'POST',body:FILE});
+    setProg('Creating your one-shot deposit…', []);
+    const payload={ file:up.path, uri:'xtrata:audio/'+slug(FILE.name), mime:mimeOf(FILE.name), fastTrack:true, suno:true, user:WALLET||undefined };
+    const res=await api('/api/jobs',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
+    JOB=res.job;
+    if(SERVER.mock){ setProg('MOCK — simulating inscription…', ['pay']); }
+    else {
+      setProg('Opening your wallet to pay '+stx(JOB.requiredUstx)+'…', []);
+      try{ await payWallet(JOB.depositAddress, JOB.requiredUstx); }
+      catch(e){ $('#hint').innerHTML='<span class="err">'+esc(e.message)+'</span><br><span class="muted">Send '+stx(JOB.requiredUstx)+' to '+esc(JOB.depositAddress)+' to continue.</span>'; }
+      setProg('Waiting for payment to land…', []);
+    }
+    startPoll();
+  }catch(e){ $('#prog').className='prog'; $('#hint').innerHTML='<span class="err">'+esc(e.message)+'</span>'; b.disabled=false; }
+};
+
+const PHASE={ FUNDED:{msg:'Payment detected — starting…',on:['pay']},
+  INSCRIBING:{msg:'Building the player &amp; inscribing on-chain…',on:['pay','opus','player','inscribe']},
+  INSCRIBED:{msg:'Inscribed — delivering…',on:['pay','opus','player','inscribe']},
+  DELIVERING:{msg:'Delivering token + receipt, refunding change…',on:['pay','opus','player','inscribe','deliver']} };
+function setProg(msg, done){ $('#prog').className='prog show'; $('#progMsg').innerHTML=esc(msg).replace('&amp;','&');
+  document.querySelectorAll('.step').forEach(s=>{ s.className='step'+((done||[]).includes(s.dataset.s)?' done':''); }); }
+function setPhase(st){ const p=PHASE[st]; if(!p) return; $('#progMsg').innerHTML=p.msg;
+  document.querySelectorAll('.step').forEach(s=>{ s.className='step'+(p.on.includes(s.dataset.s)?(st==='DELIVERING'?'':' done'):''); if(p.on.includes(s.dataset.s)) s.classList.add(st&&p.on[p.on.length-1]===s.dataset.s?'on':'done'); }); }
+
+function startPoll(){ if(poll) clearInterval(poll); poll=setInterval(refresh,3500); refresh(); }
+async function refresh(){
+  if(!JOB) return;
+  try{ const {job,status}=await api('/api/jobs/'+JOB.jobId);
+    const funded=status&&status.funded, st=job.status;
+    if(st==='AWAITING_DEPOSIT'){ setProg(funded?'Payment detected — starting…':'Waiting for payment to land…', funded?['pay']:[]); }
+    else if(PHASE[st]){ setPhase(st); }
+    if(st==='COMPLETE'){ clearInterval(poll); poll=null; done(job); }
+    else if(st==='CANCELLED'){ clearInterval(poll); poll=null; $('#prog').className='prog';
+      $('#hint').innerHTML='<span class="muted">↩︎ Cancelled — funds returned'+(job.cancelReason?(' ('+esc(job.cancelReason)+')'):'')+'.</span>'; $('#go').disabled=false; }
+    else if(st==='ERROR'||st==='NEEDS_RECOVERY'){ clearInterval(poll); poll=null; $('#prog').className='prog';
+      $('#hint').innerHTML='<span class="err">'+esc(job.error||'Something went wrong')+(st==='NEEDS_RECOVERY'?' — funds safe, will auto-return.':' — funds returned.')+'</span>'; $('#go').disabled=false; }
+  }catch{ /* transient (job mid-write) — keep polling */ }
+}
+function done(job){
+  $('#prog').className='prog';
+  const tok=job.tokenId, net=(job.net||SERVER.net);
+  const player = (net==='mainnet'&&tok)?('https://xtrata.xyz/inscription/'+tok):null;
+  const sp=job.sunoPlayer||{};
+  $('#result').className='result show';
+  $('#result').innerHTML =
+    '<div class="ok" style="font-weight:800;font-size:16px;margin-bottom:6px">✓ Inscribed'+(sp.title?(' — '+esc(sp.title)):'')+(sp.artist?(' · '+esc(sp.artist)):'')+'</div>'+
+    '<div class="kv"><span>Player token</span><span class="ok">#'+esc(tok||'—')+'</span></div>'+
+    (job.receiptTokenId?'<div class="kv"><span>Receipt token</span><span class="ok">#'+esc(job.receiptTokenId)+'</span></div>':'')+
+    (sp.hasCover||sp.hasLyrics?('<div class="kv"><span>Includes</span><span>Opus'+(sp.hasCover?' + cover':'')+(sp.hasLyrics?' + lyrics':'')+'</span></div>'):'')+
+    (job.refundedUstx!=null?'<div class="kv"><span>Change refunded</span><span>'+stx(job.refundedUstx||'0')+'</span></div>':'')+
+    (player?('<a class="btn" href="'+player+'" target="_blank" rel="noopener">▶ Open your player</a>'):'')+
+    '<a class="btn ghost" style="display:block;text-align:center;margin-top:8px" href="'+API+'/api/jobs/'+esc(job.jobId)+'/receipt" target="_blank" rel="noopener">View receipt</a>'+
+    '<div class="hint" style="margin-top:12px"><a href="#" id="again">Inscribe another track</a></div>';
+  const ag=$('#again'); if(ag) ag.onclick=(e)=>{ e.preventDefault(); resetAll(); };
+  $('#go').disabled=false; $('#go').textContent='Inscribe my track';
+}
+function resetAll(){ FILE=null;EST=null;JOB=null; if(poll){clearInterval(poll);poll=null;}
+  picker.value=''; drop.classList.remove('has'); drop.innerHTML='<div class="drop-main">Drop your Suno track here</div><div class="drop-sub">or <u>browse</u> — MP3, WAV, FLAC, OGG…</div>';
+  $('#quote').className='quote'; $('#prog').className='prog'; $('#result').className='result'; $('#hint').textContent=''; updateGo(); }
+</script>
+</body>
+</html>
