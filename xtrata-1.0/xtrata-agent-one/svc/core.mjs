@@ -565,9 +565,8 @@ export async function refundAndClose(opts) {
       }
     } catch (e) { out.receiptError = String((e && e.message) || e); }
   }
-  // 2) sweep all remaining STX back to the funder
-  let bal = 0n; try { bal = await balance(network, dep.address, hiroKey); } catch {}
-  if (returnTo && bal > REFUND_TX_FEE) { try { out.refundTx = await sendStx(network, dep.key, bal - REFUND_TX_FEE, returnTo, hiroKey, REFUND_TX_FEE); out.refundedUstx = (bal - REFUND_TX_FEE).toString(); } catch (e) { out.refundError = String((e && e.message) || e); } }
+  // 2) sweep all remaining STX back to the funder (retry through the post-confirmation settle race)
+  if (returnTo) { try { const sw = await sweepStxTo(network, dep.key, dep.address, returnTo, hiroKey); if (sw.sent) { out.refundTx = sw.tx; out.refundedUstx = sw.amount; } } catch (e) { out.refundError = String((e && e.message) || e); } }
   // 3) discard the key ONLY once the wallet is confirmed empty; otherwise keep it for manual recovery
   let leftover = null; try { leftover = await balance(network, dep.address, hiroKey); } catch {}
   if (leftover != null && leftover <= REFUND_TX_FEE) { delete job.ephemeralMnemonic; job.status = 'CANCELLED'; }
