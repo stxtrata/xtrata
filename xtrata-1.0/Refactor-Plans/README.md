@@ -55,3 +55,4 @@ Additional Implementation Packs
 - Parent-child relationships (mint + viewer + tests): `Refactor-Plans/parent-child-implementation/README.md`
 - Viewer page-loading optimization (budgeted full-content preload + cache eviction): `Refactor-Plans/viewer-page-loading-optimization/README.md`
 - Market module + wallet controls UX (list/cancel/transfer in wallet view + seller management): `Refactor-Plans/market-module-wallet-controls/README.md`
+- Multi-asset & fiat payments (accept sBTC/USDCx/USDC/USDT + USD/GBP for inscription; STX-settled engine + treasury float): `Refactor-Plans/multi-asset-payments/README.md`
