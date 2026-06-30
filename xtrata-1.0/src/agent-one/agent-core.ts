@@ -30,7 +30,7 @@ const DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const CORE_NAME: string = cfg.core || 'xtrata-v3-2-3';
 const CORE: [string, string] = [DEPLOYER, CORE_NAME];
 const CHUNK = 16384, SINGLE_MAX = 32, BATCH = 32;
-const HIRO_BASE: string = cfg.hiro || '/hiro';                 // same-origin proxy
+const HIRO_BASE: string = cfg.hiro || '/hiro/mainnet';         // same-origin proxy — reuses the site's existing /hiro/<network> Pages Function
 const AGENT_FEE_PCT = BigInt(cfg.agentFeePct ?? 10);
 const AGENT_FEE_ADDRESS: string = cfg.agentFeeAddress || DEPLOYER;
 export const WINDOW_MS: number = Number(cfg.windowMs || 300000); // commence/stall window
@@ -43,7 +43,7 @@ const enc = new TextEncoder();
 const hfetch = (p: string, init?: any) => fetch(location.origin + HIRO_BASE + p, init);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const chunkBytes = (d: Uint8Array) => { const o: Uint8Array[] = []; for (let i = 0; i < d.length; i += CHUNK) o.push(d.slice(i, i + CHUNK)); return o; };
-const incHash = (chunks: Uint8Array[]) => { let h = new Uint8Array(32); for (const c of chunks) { const m = new Uint8Array(h.length + c.length); m.set(h, 0); m.set(c, h.length); h = sha256(m); } return h; };
+const incHash = (chunks: Uint8Array[]) => { let h: Uint8Array = new Uint8Array(32); for (const c of chunks) { const m = new Uint8Array(h.length + c.length); m.set(h, 0); m.set(c, h.length); h = sha256(m); } return h; };
 
 function deriveFrom(mnemonic: string) {
   const c = HDKey.fromMasterSeed(mnemonicToSeedSync(mnemonic.trim())).derive("m/44'/5757'/0'/0/0");
@@ -115,22 +115,325 @@ async function stagedInscribe(job: any, key: string, from: string, data: Uint8Ar
 }
 
 // ============================================================================
-// REMAINING — implement per site-integration/CLIENT-PORT.md (port from svc/core.mjs):
-//   estimate(), buildReceiptHtml() [success+refunded], deliverAndReceipt(),
-//   refundAndClose() [failure receipt + sweep + discard], localStorage job-state
-//   (+ resume-or-refund on reload, file bytes kept in an in-memory Map), the
-//   in-browser watcher (auto-run funded fast-track) + reaper (stall/expiry refund),
-//   and full MOCK paths. Wire them into window.XtrataAgent below.
+// In-browser job lifecycle — ported from svc/core.mjs (same maths + invariants).
+// I/O differs only: fs → localStorage, file bytes → in-memory Map, fetch → /hiro,
+// the staged engine subprocess → the ported stagedInscribe() above. NOTE: audio/SUNO
+// conversion happens in the UI BEFORE createJob (the File passed in is already the
+// final artifact), so there is no server-side ffmpeg step here.
 // ============================================================================
-const TODO = (n: string): never => { throw new Error('XtrataAgent.' + n + ' not implemented yet — see site-integration/CLIENT-PORT.md'); };
+const ustxToStx = (u: any) => (Number(u) / 1e6).toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
+const errMsg = (e: any) => String((e && e.message) || e);
+const addrEq = (a: any, b: any) => !!a && !!b && String(a).trim() === String(b).trim();
+const TRANSIENT_TX = /NotEnoughFunds|ConflictingNonceInMempool|TooMuchChaining|too much chaining|bad nonce|NoSuchAccount/i;
+async function stxUsdPrice(): Promise<number | null> {
+  try { const d: any = await (await fetch('https://api.coingecko.com/api/v3/simple/price?ids=blockstack&vs_currencies=usd')).json(); const p = d && d.blockstack && d.blockstack.usd; return p ? Number(p) : null; } catch { return null; }
+}
+const balOf = async (job: any): Promise<bigint> => (MOCK ? BigInt(job.requiredUstx) : balance(job.depositAddress));
+
+// ---------- localStorage job-state + in-memory file bytes ----------
+const JOB_PREFIX = 'xao-job-';
+const BYTES = new Map<string, Uint8Array>();                 // jobId -> file bytes (MEMORY ONLY; never persisted — quota)
+const jobKey = (id: string) => JOB_PREFIX + id;
+function writeJob(j: any) { try { localStorage.setItem(jobKey(j.jobId), JSON.stringify(j)); } catch {} return j; }
+function readJob(id: string): any { const s = localStorage.getItem(jobKey(id)); if (!s) throw new Error('job not found: ' + id); return JSON.parse(s); }
+function listJobsRaw(): any[] { const o: any[] = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(JOB_PREFIX)) { try { o.push(JSON.parse(localStorage.getItem(k) as string)); } catch {} } } return o; }
+const publicJob = (j: any) => { const { ephemeralMnemonic, ...pub } = j; return { ...pub, hasKey: !!ephemeralMnemonic }; };
+
+// ---------- estimate (mirror core.estimate) ----------
+async function estimate(opts: any) {
+  const { bytes, marginUstx = '0', agentFeePct = AGENT_FEE_PCT } = opts;
+  const chunks = Math.ceil(Number(bytes) / CHUNK) || 1;
+  const q = await quoteFee(Number(bytes), chunks);
+  const minerTxs = q.single ? 1n : BigInt(q.batches + 2);
+  const minerReserve = minerTxs * PERTX_MINER + (BigInt(Math.ceil(Number(bytes))) * 3n) / 2n;
+  const rq = await quoteFee(RECEIPT_EST, 1);                 // quoteFee handles MOCK internally
+  const receiptProtocol = rq.protocolFee;
+  const receiptMiner = PERTX_MINER + (BigInt(RECEIPT_EST) * 3n) / 2n;
+  const baseCosts = q.protocolFee + minerReserve + receiptProtocol + receiptMiner + DELIVERY_RESERVE + BigInt(marginUstx);
+  const pct = BigInt(agentFeePct);
+  const feeExact = (pct > 0n && pct < 100n) ? (baseCosts * pct) / (100n - pct) : 0n;
+  const requiredExact = baseCosts + feeExact;
+  const required = ((requiredExact + 9999n) / 10000n) * 10000n;            // round deposit UP to 0.01 STX
+  const agentFeeUstx = (pct > 0n && pct < 100n) ? (required * pct) / 100n : 0n;
+  return { bytes: Number(bytes), chunks, single: q.single, batches: q.batches,
+    protocolFee: q.protocolFee.toString(), minerReserve: minerReserve.toString(),
+    receiptProtocol: receiptProtocol.toString(), receiptMiner: receiptMiner.toString(),
+    deliveryReserve: DELIVERY_RESERVE.toString(), marginUstx: String(marginUstx),
+    agentFeePct: Number(pct), agentFeeUstx: agentFeeUstx.toString(), requiredUstx: required.toString() };
+}
+
+// ---------- receipt (copied from core: success + refunded) ----------
+function receiptData(job: any, x: any) {
+  const received = BigInt(x.received);
+  const mainMiner = x.mainMinerFee != null ? BigInt(x.mainMinerFee) : (job.mainMinerFee ? BigInt(job.mainMinerFee) : BigInt(job.minerReserve));
+  const fileProtocol = BigInt(job.protocolFee);
+  const receiptProtocol = BigInt(job.receiptProtocol || '0');
+  const receiptMiner = x.receiptMinerFee != null ? BigInt(x.receiptMinerFee) : BigInt(job.receiptMiner || '0');
+  const agentFee = BigInt(x.agentFee);
+  const change = x.change != null ? BigInt(x.change) : (received - fileProtocol - mainMiner - receiptProtocol - receiptMiner - agentFee);
+  const changeR = change > 0n ? change : 0n;
+  const totalPaid = received - changeR;
+  let networkFee = received - fileProtocol - receiptProtocol - agentFee - changeR;
+  if (networkFee < 0n) networkFee = 0n;
+  const stxUsd = (x.stxUsd != null) ? Number(x.stxUsd) : null;
+  const totalPaidUsd = stxUsd != null ? (Number(totalPaid) / 1e6 * stxUsd).toFixed(2) : null;
+  return {
+    jobId: job.jobId, core: job.core, date: new Date().toISOString(),
+    uri: job.uri, mime: job.mime, bytes: job.bytes, chunks: job.chunks, single: job.single,
+    tokenId: job.tokenId, receiptTokenId: x.receiptTokenId || null, recipient: x.recipient || job.user, agentIdentityId: job.agentIdentityId || null,
+    outcome: x.outcome || 'inscribed', note: x.note || null,
+    depositReceived: received.toString(), xtrataProtocol: fileProtocol.toString(), receiptProtocol: receiptProtocol.toString(),
+    networkFee: networkFee.toString(), agentFeePct: Number(job.agentFeePct ?? AGENT_FEE_PCT),
+    agentFee: agentFee.toString(), changeReturned: changeR.toString(),
+    totalPaid: totalPaid.toString(), stxUsd, totalPaidUsd,
+    audioOpt: (job.audioOptimize && job.audioOptimize.ok)
+      ? { from: job.audioOptimize.from, to: job.audioOptimize.to, preset: job.audioOptimize.preset, bitrate: job.audioOptimize.bitrate, savedPct: job.audioOptimize.savedPct } : null,
+    player: (job.sunoPlayer && job.sunoPlayer.ok)
+      ? { title: job.sunoPlayer.title, artist: job.sunoPlayer.artist || '', hasCover: !!job.sunoPlayer.hasCover, playerBytes: job.sunoPlayer.playerBytes } : null,
+  };
+}
+function buildReceiptHtml(d: any) {
+  const row = (k: string, v: string) => `<div class="r"><span>${k}</span><span>${v}</span></div>`;
+  const escHtml = (s: any) => String(s ?? '').replace(/[&<>]/g, (c: string) => (({ '&': '&amp;', '<': '&lt;', '>': '&gt;' } as any)[c]));
+  const stxr = (u: any) => ustxToStx(u) + ' STX';
+  const short = (s: any) => s ? (s.length > 18 ? s.slice(0, 9) + '…' + s.slice(-6) : s) : '—';
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Xtrata Agent One — Receipt ${d.jobId}</title><style>
+:root{--bg:#0b0e14;--pan:#121826;--line:#243044;--ink:#e9eff8;--mut:#8ea0bd;--acc:#3ea6ff;--acc2:#7c5cff;--ok:#3ddc97;--mono:ui-monospace,Menlo,Consolas,monospace}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(820px 420px at 80% -10%,rgba(124,92,255,.14),transparent),var(--bg);color:var(--ink);font:14px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:560px;margin:0 auto;padding:34px 20px}.card{background:var(--pan);border:1px solid var(--line);border-radius:16px;padding:24px}
+.h{display:flex;align-items:center;justify-content:space-between;gap:10px}.logo{font-weight:800;letter-spacing:.4px}.logo b{color:var(--acc)}.logo i{color:var(--acc2);font-style:normal}
+.badge{font-size:11px;color:var(--ok);border:1px solid #1f5a45;border-radius:999px;padding:3px 10px}
+.sub{color:var(--mut);font-size:12px;margin:4px 0 18px}h1{font-size:15px;margin:18px 0 8px}
+.r{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px}
+.r:last-child{border-bottom:0}.r span:first-child{color:var(--mut)}.r span:last-child{font-family:var(--mono);text-align:right;word-break:break-all}
+.tot{margin-top:10px;padding-top:12px;border-top:1px solid var(--line)}.tot .r span:last-child{color:var(--acc);font-size:15px}
+.fee span:last-child{color:var(--acc2)}.tok{color:var(--ok)}.foot{color:var(--mut);font-size:11px;margin-top:18px;text-align:center}
+</style></head><body><div class="wrap"><div class="card">
+<div class="h"><div class="logo"><b>XTRATA</b> <i>Agent One</i></div><span class="badge"${d.outcome !== 'inscribed' ? ' style="color:#ffb454;border-color:#5a4620"' : ''}>${d.outcome === 'inscribed' ? '✓ Inscribed' : '↩︎ Refunded'}</span></div>
+<div class="sub">${d.outcome === 'inscribed' ? 'Inscription receipt' : 'Refund receipt'} · ${d.date.slice(0, 19).replace('T', ' ')} UTC</div>
+<h1>What was inscribed</h1>
+${row('Content URI', escHtml(d.uri))}${row('Type', escHtml(d.mime))}
+${row('Size', (d.bytes / 1048576).toFixed(3) + ' MiB · ' + Number(d.bytes).toLocaleString() + ' B')}
+${row('Chunks', d.chunks + (d.single ? ' · single-tx' : ' · staged'))}
+${d.audioOpt ? row('Audio optimised', `${(d.audioOpt.from / 1048576).toFixed(3)} → ${(d.audioOpt.to / 1048576).toFixed(3)} MiB · Opus ${d.audioOpt.bitrate} · −${d.audioOpt.savedPct}% (${d.audioOpt.preset})`) : ''}
+${d.player ? row('Player', `${escHtml(d.player.title)}${d.player.artist ? ' — ' + escHtml(d.player.artist) : ''} · embedded Opus${d.player.hasCover ? ' + cover art' : ''}`) : ''}
+${row('Inscription token', '<span class="tok">#' + (d.tokenId ?? '—') + '</span>')}
+${row('Receipt token', d.receiptTokenId ? ('<span class="tok">#' + d.receiptTokenId + '</span>') : 'this inscription')}
+${row('Delivered to', short(d.recipient))}
+${d.agentIdentityId ? row('Issued by', 'Agent One · identity <span class="tok">#' + d.agentIdentityId + '</span>') : ''}
+${d.outcome === 'inscribed' ? `<h1>Cost breakdown</h1>
+${row('Deposit received', stxr(d.depositReceived))}
+${row('Xtrata protocol fee', stxr(d.xtrataProtocol))}
+${row('Receipt inscription', stxr(d.receiptProtocol))}
+${row('Network (miner) fee', stxr(d.networkFee))}
+<div class="fee">${row('Agent fee (' + d.agentFeePct + '%)', stxr(d.agentFee))}</div>
+${row('Change returned to you', stxr(d.changeReturned))}
+${d.note ? row('Note', escHtml(d.note)) : ''}
+<div class="tot">${row('Total paid', stxr(d.totalPaid) + (d.totalPaidUsd ? ' · ~$' + d.totalPaidUsd + ' USD' : ''))}</div>` : `<h1>Outcome</h1>
+${row('Status', 'Not completed — funds returned')}
+${d.note ? row('Reason', escHtml(d.note)) : ''}
+${row('Deposit received', stxr(d.depositReceived))}
+<div class="tot">${row('Returned to you', stxr(d.changeReturned))}</div>`}
+<div class="foot">Core ${d.core} · job ${d.jobId}${d.stxUsd ? ' · STX $' + d.stxUsd : ''} · settled on Bitcoin via Stacks</div>
+</div></div></body></html>`;
+}
+
+// ---------- funder + retrying STX sends (mirror core) ----------
+async function detectFunder(addr: string): Promise<string | null> {
+  try { const d: any = await (await hfetch(`/extended/v1/address/${addr}/stx_inbound?limit=20`)).json(); const inbound = (d.results || []).filter((r: any) => r.sender && BigInt(r.amount || '0') > 0n); if (inbound.length) return inbound[0].sender; } catch {}
+  try { const d: any = await (await hfetch(`/extended/v1/address/${addr}/transactions?limit=20`)).json(); for (const r of (d.results || [])) { const tx = r.tx || r; if (tx.token_transfer && tx.token_transfer.recipient_address === addr && tx.sender_address) return tx.sender_address; } } catch {}
+  return null;
+}
+async function resolveFunder(job: any): Promise<string | null> { if (job.mock) return job.funder || 'SP_MOCK_SENDER'; if (job.funder) return job.funder; try { return await detectFunder(job.depositAddress); } catch { return null; } }
+async function sendStxRetry(key: string, amount: bigint, to: string, fee: bigint, tries = 4) { let last: any; for (let i = 0; i < tries; i++) { try { return await sendStx(key, amount, to, fee); } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(8000); continue; } throw e; } } throw last; }
+async function sweepStxTo(key: string, fromAddr: string, to: string, tries = 5): Promise<any> { let last: any; for (let i = 0; i < tries; i++) { let bal = 0n; try { bal = await balance(fromAddr); } catch (e) { last = e; await sleep(5000); continue; } if (bal <= REFUND_TX_FEE) return { sent: false, amount: '0', balance: bal.toString() }; const amount = bal - REFUND_TX_FEE; try { const tx = await sendStx(key, amount, to, REFUND_TX_FEE); return { sent: true, tx, amount: amount.toString() }; } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(8000); continue; } throw e; } } throw last || new Error('sweep failed'); }
+async function inscribeReceipt(key: string, from: string, html: string, uri: string, deps: string[]) { const data = enc.encode(html); const q = await quoteFee(data.length, chunkBytes(data).length); const tokenId = await mintSingle(key, from, data, 'text/html', uri, deps, q.protocolFee); return { tokenId }; }
+
+// ---------- estimate→create→inscribe→deliver→refund (mirror core) ----------
+async function createJob(opts: any) {
+  const { file, uri, mime = 'application/octet-stream', deps = [], user, expectedFunder = null, marginUstx = '0', fastTrack = false, agentFeePct = AGENT_FEE_PCT } = opts;
+  if (!file || !uri) throw new Error('file, uri required');
+  if (!fastTrack && !user) throw new Error('delivery address (user) required unless fastTrack');
+  const data = new Uint8Array(await (file as File).arrayBuffer());
+  const est = await estimate({ bytes: data.length, marginUstx, agentFeePct });
+  const w = newWallet(); const id = `job-${Date.now()}`;
+  BYTES.set(id, data);
+  const job: any = {
+    jobId: id, core: CORE_NAME, net: 'mainnet', mock: MOCK, fastTrack, file: (file as File).name || 'asset', uri, mime, deps, user: user || null,
+    expectedFunder: expectedFunder || null, funder: null,
+    bytes: data.length, chunks: est.chunks, single: est.single, batches: est.batches,
+    protocolFee: est.protocolFee, minerReserve: est.minerReserve, receiptProtocol: est.receiptProtocol, receiptMiner: est.receiptMiner,
+    agentFeePct: est.agentFeePct, agentFeeAddress: AGENT_FEE_ADDRESS, agentFeeExpectedUstx: est.agentFeeUstx, agentIdentityId: cfg.agentIdentityId || null,
+    margin: String(marginUstx), requiredUstx: est.requiredUstx, depositAddress: w.address, ephemeralMnemonic: w.mnemonic,
+    status: 'AWAITING_DEPOSIT', createdAt: new Date().toISOString(),
+  };
+  writeJob(job); return publicJob(job);
+}
+async function statusJob(job: any) {
+  const bal = await balOf(job);
+  return { jobId: job.jobId, status: job.status, depositAddress: job.depositAddress, requiredUstx: job.requiredUstx, balanceUstx: bal.toString(), funded: bal >= BigInt(job.requiredUstx), tokenId: job.tokenId || null };
+}
+async function runInscribe(job: any) {
+  if (job.mock) { const tokenId = String(Math.floor(1000 + Math.random() * 9000)); job.tokenId = tokenId; job.depositReceivedUstx = job.requiredUstx; job.status = 'INSCRIBED'; writeJob(job); return tokenId; }
+  const bal = await balance(job.depositAddress);
+  if (bal < BigInt(job.requiredUstx)) throw new Error(`not funded: need ${job.requiredUstx}, have ${bal}`);
+  job.depositReceivedUstx = bal.toString();
+  const data = BYTES.get(job.jobId); if (!data) throw new Error('file bytes not in memory (tab reloaded) — returning funds');
+  const dep = deriveFrom(job.ephemeralMnemonic);
+  let tokenId: string | null;
+  if (job.single) { tokenId = await mintSingle(dep.key, dep.address, data, job.mime, job.uri, job.deps || [], BigInt(job.protocolFee)); }
+  else { tokenId = await stagedInscribe(job, dep.key, dep.address, data, (m) => { job.progress = m; job.progressAt = new Date().toISOString(); writeJob(job); }); }
+  job.tokenId = tokenId; job.status = 'INSCRIBED'; writeJob(job); return tokenId;
+}
+async function deliver(job: any) {
+  if (!job.tokenId) throw new Error('no tokenId yet — run the inscribe step first');
+  const pct = BigInt(job.agentFeePct ?? AGENT_FEE_PCT);
+  const received = BigInt(job.depositReceivedUstx || job.requiredUstx);
+  const agentFee = pct > 0n ? (received * pct) / 100n : 0n;
+  const stxUsd = await stxUsdPrice();
+  if (job.mock) {
+    const receiptTokenId = String(Math.floor(1000 + Math.random() * 9000));
+    const d = receiptData(job, { received, agentFee, receiptTokenId, stxUsd });
+    job.receiptHtml = buildReceiptHtml(d);
+    const receipt = { ...d, deliverTx: '0xMOCK_DELIVER', receiptDeliverTx: '0xMOCK_RECEIPT', agentFeeTx: '0xMOCK_FEE', refundTx: '0xMOCK_REFUND' };
+    Object.assign(job, { receiptTokenId, agentFeeUstx: agentFee.toString(), refundedUstx: d.changeReturned, receipt });
+    delete job.ephemeralMnemonic; job.status = 'COMPLETE'; writeJob(job); return { receipt };
+  }
+  const dep = deriveFrom(job.ephemeralMnemonic);
+  const refundTo = (await resolveFunder(job)) || job.user;
+  let liveBal0: bigint | null = null; try { liveBal0 = await balance(job.depositAddress); } catch {}
+  let mainMinerForReceipt = BigInt(job.mainMinerFee || job.minerReserve || '0');
+  let estChange: bigint | undefined;
+  if (liveBal0 != null && liveBal0 > 0n) {
+    const spentSoFar = received > liveBal0 ? received - liveBal0 : 0n;
+    if (spentSoFar > BigInt(job.protocolFee)) mainMinerForReceipt = spentSoFar - BigInt(job.protocolFee);
+    const reserveAhead = BigInt(job.receiptProtocol || '0') + BigInt(job.receiptMiner || '0') + agentFee + DELIVERY_RESERVE + REFUND_TX_FEE;
+    estChange = liveBal0 > reserveAhead ? liveBal0 - reserveAhead : 0n;
+  }
+  const prelim = receiptData(job, { received, agentFee, receiptTokenId: null, change: estChange, mainMinerFee: mainMinerForReceipt.toString(), stxUsd });
+  const idDep = job.agentIdentityId;
+  const receiptDeps = idDep ? [String(job.tokenId), String(idDep)] : [String(job.tokenId)];
+  const r = await inscribeReceipt(dep.key, dep.address, buildReceiptHtml(prelim), `xtrata:receipt/${job.jobId}`, receiptDeps);
+  const receiptTokenId = r.tokenId;
+  const deliverTx = await sendNft(dep.key, dep.address, String(job.tokenId), job.user);   // CRITICAL: if this fails the job failed → throw
+  job.deliverTx = deliverTx; job.inscriptionDelivered = true; writeJob(job);              // SUCCESS commit point
+  let receiptDeliverTx: any = null, agentFeeTx: any = null, refundTx: any = null, refundedUstx = '0'; const notes: string[] = [];
+  if (receiptTokenId) { try { receiptDeliverTx = await sendNft(dep.key, dep.address, receiptTokenId, job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
+  try { if (agentFee > 0n) agentFeeTx = await sendStxRetry(dep.key, agentFee, job.agentFeeAddress || AGENT_FEE_ADDRESS, REFUND_TX_FEE); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
+  try { const sw = await sweepStxTo(dep.key, dep.address, refundTo); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } } catch (e) { notes.push('change return pending — recover-all will sweep it (' + errMsg(e) + ')'); }
+  const note = notes.length ? notes.join('; ') : null;
+  const finalD = receiptData(job, { received, agentFee, receiptTokenId, change: BigInt(refundedUstx), mainMinerFee: mainMinerForReceipt.toString(), stxUsd, note });
+  job.receiptHtml = buildReceiptHtml(finalD);
+  const receipt = { ...finalD, deliverTx, receiptDeliverTx, agentFeeTx, refundTx };
+  Object.assign(job, { receiptTokenId, agentFeeUstx: agentFee.toString(), deliverTx, receiptDeliverTx, agentFeeTx, refundTx, refundedUstx, receipt });
+  let leftover: bigint | null = null; try { leftover = await balance(job.depositAddress); } catch {}
+  if (leftover != null && leftover <= REFUND_TX_FEE) delete job.ephemeralMnemonic;
+  else { job.keepKey = true; job.keepKeyReason = leftover == null ? 'balance unconfirmed' : `wallet still holds ${leftover} uSTX — sweep with recover-all`; }
+  job.status = 'COMPLETE'; writeJob(job); return { receipt };
+}
+async function refundAndClose(job: any, reason = 'cancelled') {
+  if (job.mock) {
+    const rid = String(Math.floor(1000 + Math.random() * 9000));
+    const d = receiptData(job, { received: BigInt(job.depositReceivedUstx || job.requiredUstx), agentFee: 0n, change: BigInt(job.depositReceivedUstx || job.requiredUstx), receiptTokenId: rid, outcome: 'refunded', note: reason });
+    job.receiptHtml = buildReceiptHtml(d); job.status = 'CANCELLED'; job.cancelReason = reason; job.cancelledAt = new Date().toISOString(); job.receiptTokenId = rid; delete job.ephemeralMnemonic; writeJob(job);
+    return { cancelled: true, mock: true };
+  }
+  if (job.inscriptionDelivered || job.status === 'COMPLETE') {           // GUARD: delivered jobs only sweep leftover; never a refund receipt/CANCELLED
+    if (job.ephemeralMnemonic) {
+      const dep = deriveFrom(job.ephemeralMnemonic); const to = (await resolveFunder(job)) || job.user;
+      if (to) { try { const sw = await sweepStxTo(dep.key, dep.address, to); if (sw.sent) { job.refundTx = sw.tx; job.refundedUstx = sw.amount; } } catch {} }
+      let leftover: bigint | null = null; try { leftover = await balance(job.depositAddress); } catch {}
+      if (leftover != null && leftover <= REFUND_TX_FEE) delete job.ephemeralMnemonic;
+      else if (leftover != null) { job.keepKey = true; job.keepKeyReason = `~${leftover} uSTX leftover — sweep with recover-all`; }
+    }
+    job.status = 'COMPLETE'; writeJob(job); return { alreadyDelivered: true };
+  }
+  if (!job.ephemeralMnemonic) { writeJob(job); return { noKey: true }; }
+  const dep = deriveFrom(job.ephemeralMnemonic);
+  const returnTo = (await resolveFunder(job)) || job.user;
+  const out: any = { reason, deliveredNfts: [], refundTx: null };
+  if (returnTo) for (const id of [job.tokenId, job.receiptTokenId].filter(Boolean)) {
+    try { if ((await ownerOf(String(id))) === dep.address) { const tx = await sendNft(dep.key, dep.address, String(id), returnTo); out.deliveredNfts.push({ id: String(id), tx }); } } catch (e) { out.nftError = errMsg(e); }
+  }
+  if (returnTo) {
+    try {
+      const b0 = await balance(dep.address);
+      const need = BigInt(job.receiptProtocol || '110000') + 80000n + REFUND_TX_FEE;
+      if (b0 > need + 50000n) {
+        const d = receiptData(job, { received: BigInt(job.depositReceivedUstx || job.requiredUstx), agentFee: 0n, change: b0 - need, receiptTokenId: null, recipient: returnTo, outcome: 'refunded', note: reason });
+        const r = await inscribeReceipt(dep.key, dep.address, buildReceiptHtml(d), `xtrata:receipt/${job.jobId}`, job.tokenId ? [String(job.tokenId)] : []);
+        if (r.tokenId) { try { await sendNft(dep.key, dep.address, r.tokenId, returnTo); } catch {} job.receiptTokenId = r.tokenId; out.receiptTokenId = r.tokenId; job.receiptHtml = buildReceiptHtml(d); }
+      }
+    } catch (e) { out.receiptError = errMsg(e); }
+  }
+  if (returnTo) { try { const sw = await sweepStxTo(dep.key, dep.address, returnTo); if (sw.sent) { out.refundTx = sw.tx; out.refundedUstx = sw.amount; } } catch (e) { out.refundError = errMsg(e); } }
+  let leftover: bigint | null = null; try { leftover = await balance(dep.address); } catch {}
+  if (leftover != null && leftover <= REFUND_TX_FEE) { delete job.ephemeralMnemonic; job.status = 'CANCELLED'; }
+  else { job.keepKey = true; job.status = 'NEEDS_RECOVERY'; job.keepKeyReason = `refund unconfirmed; ~${leftover ?? '?'} uSTX may remain`; }
+  job.cancelReason = reason; job.cancelledAt = new Date().toISOString(); if (out.refundTx) job.refundTx = out.refundTx;
+  writeJob(job); return out;
+}
+// Fast-track auto-pilot (mirror autoRunJob): detect funder → railroad → inscribe → deliver.
+async function autoRun(job: any) {
+  const funder = job.mock ? 'SP_MOCK_SENDER' : await detectFunder(job.depositAddress);
+  if (!funder) throw new Error('could not determine the paying address');
+  job.funder = funder; writeJob(job);
+  if (job.fastTrack && job.expectedFunder && !addrEq(funder, job.expectedFunder)) {
+    await refundAndClose(job, `paid from ${funder} but this job is locked to ${job.expectedFunder} — returned to sender`);
+    return { rejected: true, funder, expected: job.expectedFunder };
+  }
+  if (job.fastTrack || !job.user) { job.user = funder; writeJob(job); }
+  job.status = 'INSCRIBING'; writeJob(job);
+  await runInscribe(job);
+  job.status = 'DELIVERING'; writeJob(job);
+  return await deliver(job);
+}
+
+// ---------- watcher + reaper (mirror server.mjs; run only while the tab is open) ----------
+const PROCESSING = new Set<string>();
+function background(id: string, fn: () => Promise<any>) {
+  PROCESSING.add(id);
+  Promise.resolve().then(fn).then(() => PROCESSING.delete(id)).catch(async (e) => {
+    try { const j = readJob(id); j.error = errMsg(e); writeJob(j); } catch {}
+    try { await refundAndClose(readJob(id), 'error: ' + errMsg(e)); } catch {}
+    PROCESSING.delete(id);
+  });
+}
+async function watchTick() {
+  for (const j of listJobsRaw()) {
+    if (PROCESSING.has(j.jobId)) continue;
+    if (j.status !== 'AWAITING_DEPOSIT' && j.status !== 'FUNDED') continue;
+    let funded = false; try { funded = (await statusJob(j)).funded; } catch { continue; }
+    if (!funded) continue;
+    if (!BYTES.has(j.jobId)) { background(j.jobId, () => refundAndClose(readJob(j.jobId), 'tab reloaded — file bytes gone, returning funds')); continue; } // resume-or-refund
+    if (j.fastTrack) background(j.jobId, () => autoRun(readJob(j.jobId)));
+  }
+}
+async function reapTick() {
+  const now = Date.now();
+  for (const j of listJobsRaw()) {
+    if (PROCESSING.has(j.jobId)) continue;
+    if (['COMPLETE', 'CANCELLED', 'NEEDS_RECOVERY'].includes(j.status)) continue;
+    const last = Date.parse(j.progressAt || j.createdAt || '') || 0;
+    if (!last || (now - last) < WINDOW_MS) continue;
+    background(j.jobId, () => refundAndClose(readJob(j.jobId), 'expired — no progress within window'));
+  }
+}
+
 (window as any).XtrataAgent = {
   health: async () => ({ ok: true, mock: MOCK, core: CORE_NAME, net: 'mainnet', windowMs: WINDOW_MS }),
-  estimate: async (_opts: any) => TODO('estimate'),     // {file|bytes, marginUstx} -> {protocolFee,receiptProtocol,minerReserve,agentFeeUstx,requiredUstx,single,chunks,batches}
-  createJob: async (_opts: any) => TODO('createJob'),   // {file:File, uri, mime, deps, user?, marginUstx, fastTrack} -> publicJob
-  listJobs: async () => TODO('listJobs'),               // -> [{...job, funded, balanceUstx}]
-  getJob: async (_id: string) => TODO('getJob'),        // -> {job, status}
-  runJob: async (_id: string) => TODO('runJob'),        // start inscribe (background)
-  deliverJob: async (_id: string) => TODO('deliverJob'),// start deliver (background)
+  estimate: async (opts: any) => estimate({ ...opts, bytes: opts.bytes != null ? opts.bytes : (opts.file ? (opts.file as File).size : 0) }),
+  createJob: async (opts: any) => createJob(opts),
+  listJobs: async () => Promise.all(listJobsRaw().sort((a, b) => (b.jobId > a.jobId ? 1 : -1)).map(async (j) => { let funded = false, balanceUstx = '0'; if (j.status === 'AWAITING_DEPOSIT') { try { const s = await statusJob(j); funded = s.funded; balanceUstx = s.balanceUstx; } catch {} } return { ...publicJob(j), funded, balanceUstx }; })),
+  getJob: async (id: string) => { const job = readJob(id); return { job: publicJob(job), status: await statusJob(job) }; },
+  runJob: async (id: string) => { if (PROCESSING.has(id)) return { started: true, already: true }; const job = readJob(id); if (job.tokenId) return { error: 'already inscribed' }; const s = await statusJob(job); if (!s.funded) return { error: 'not funded yet' }; background(id, async () => { const j = readJob(id); j.status = 'INSCRIBING'; writeJob(j); await runInscribe(j); }); return { started: true }; },
+  deliverJob: async (id: string) => { if (PROCESSING.has(id)) return { started: true, already: true }; const job = readJob(id); if (!job.tokenId) return { error: 'nothing to deliver yet' }; background(id, async () => { const j = readJob(id); j.status = 'DELIVERING'; writeJob(j); await deliver(j); }); return { started: true }; },
+  deleteJob: async (id: string) => { const job = readJob(id); if (job.ephemeralMnemonic) throw new Error('refusing to delete: job still holds a deposit key — deliver or recover it first'); if (!['COMPLETE', 'CANCELLED'].includes(job.status)) throw new Error(`refusing to delete: job is ${job.status}, not finished`); localStorage.removeItem(jobKey(id)); BYTES.delete(id); return { deleted: true, jobId: id }; },
+  getReceiptHtml: (id: string) => { try { return readJob(id).receiptHtml || null; } catch { return null; } },
 };
+// In-browser watcher + reaper — auto-run funded fast-track jobs; refund stalls/expiries. Tab-open only.
+setInterval(watchTick, MOCK ? 2000 : 8000);
+setInterval(reapTick, 20000);
 // helpers already ported and available to the implementer/tester:
 export { deriveFrom, newWallet, balance, quoteFee, mintSingle, stagedInscribe, getIdByHash, ownerOf, send, sendNft, sendStx, network, MOCK, CORE, DEPLOYER, AGENT_FEE_PCT, AGENT_FEE_ADDRESS, CHUNK, SINGLE_MAX, PERTX_MINER, DELIVERY_RESERVE, REFUND_TX_FEE, RECEIPT_EST, incHash, chunkBytes };

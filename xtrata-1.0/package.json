@@ -6,9 +6,10 @@
   "scripts": {
     "predev": "npm run arcade:games:manifest && npm run xboard:versions:manifest",
     "dev": "vite",
-    "prebuild": "npm run arcade:games:manifest && npm run xboard:versions:manifest && npm run build:agent-one-wallet",
+    "prebuild": "npm run arcade:games:manifest && npm run xboard:versions:manifest && npm run build:agent-one-wallet && npm run build:agent-one",
     "build": "vite build",
     "build:agent-one-wallet": "vite build -c vite.agent-one-wallet.config.ts",
+    "build:agent-one": "vite build -c vite.agent-one.config.ts",
     "postbuild": "node scripts/copy-static-apps.mjs",
     "preview": "vite preview",
     "sdk:build": "npm --prefix packages/xtrata-sdk run build && npm --prefix packages/xtrata-reconstruction run build",
