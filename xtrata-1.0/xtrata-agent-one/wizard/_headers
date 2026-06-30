@@ -10,3 +10,8 @@
 /agent-one/suno.html
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp
+
+# Agent One ships its JS under stable filenames (agent-one.js, suno-build.js, HTML_Template.js).
+# Force revalidation so a redeploy is never served from a stale CDN/browser cache.
+/agent-one/*.js
+  Cache-Control: no-cache
