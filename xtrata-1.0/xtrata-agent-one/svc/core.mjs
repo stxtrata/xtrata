@@ -172,11 +172,12 @@ export async function estimate(opts) {
   const requiredExact = baseCosts + feeExact;
   const required = ((requiredExact + 9999n) / 10000n) * 10000n;                 // round the deposit UP to the nearest 0.01 STX
   const agentFeeUstx = (pct > 0n && pct < 100n) ? (required * pct) / 100n : 0n;  // agent fee = pct% of the (rounded) deposit
+  const stxUsd = await stxUsdPrice();   // live STX/USD so the quote can show $ alongside STX
   return { bytes: Number(bytes), chunks, single: q.single, batches: q.batches,
     protocolFee: q.protocolFee.toString(), minerReserve: minerReserve.toString(),
     receiptProtocol: receiptProtocol.toString(), receiptMiner: receiptMiner.toString(),
     deliveryReserve: DELIVERY_RESERVE.toString(), marginUstx: String(marginUstx),
-    agentFeePct: Number(pct), agentFeeUstx: agentFeeUstx.toString(), requiredUstx: required.toString() };
+    agentFeePct: Number(pct), agentFeeUstx: agentFeeUstx.toString(), requiredUstx: required.toString(), stxUsd };
 }
 
 // ---------- lifecycle ----------
@@ -401,6 +402,7 @@ function buildReceiptHtml(d) {
   const row = (k, v) => `<div class="r"><span>${k}</span><span>${v}</span></div>`;
   const escHtml = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   const stxr = (u) => ustxToStx(u) + ' STX';
+  const usd = (u) => d.stxUsd ? ' · ~$' + (Number(u) / 1e6 * d.stxUsd).toFixed(2) : '';
   const short = (s) => s ? (s.length > 18 ? s.slice(0, 9) + '…' + s.slice(-6) : s) : '—';
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Xtrata Agent One — Receipt ${d.jobId}</title><style>
@@ -428,18 +430,18 @@ ${row('Receipt token', d.receiptTokenId ? ('<span class="tok">#' + d.receiptToke
 ${row('Delivered to', short(d.recipient))}
 ${d.agentIdentityId ? row('Issued by', 'Agent One · identity <span class="tok">#' + d.agentIdentityId + '</span>') : ''}
 ${d.outcome === 'inscribed' ? `<h1>Cost breakdown</h1>
-${row('Deposit received', stxr(d.depositReceived))}
-${row('Xtrata protocol fee', stxr(d.xtrataProtocol))}
-${row('Receipt inscription', stxr(d.receiptProtocol))}
-${row('Network (miner) fee', stxr(d.networkFee))}
-<div class="fee">${row('Agent fee (' + d.agentFeePct + '%)', stxr(d.agentFee))}</div>
-${row('Change returned to you', stxr(d.changeReturned))}
+${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
+${row('Xtrata protocol fee', stxr(d.xtrataProtocol) + usd(d.xtrataProtocol))}
+${row('Receipt inscription', stxr(d.receiptProtocol) + usd(d.receiptProtocol))}
+${row('Network (miner) fee', stxr(d.networkFee) + usd(d.networkFee))}
+<div class="fee">${row('Agent fee (' + d.agentFeePct + '%)', stxr(d.agentFee) + usd(d.agentFee))}</div>
+${row('Change returned to you', stxr(d.changeReturned) + usd(d.changeReturned))}
 ${d.note ? row('Note', escHtml(d.note)) : ''}
-<div class="tot">${row('Total paid', stxr(d.totalPaid) + (d.totalPaidUsd ? ' · ~$' + d.totalPaidUsd + ' USD' : ''))}</div>` : `<h1>Outcome</h1>
+<div class="tot">${row('Total paid', stxr(d.totalPaid) + usd(d.totalPaid))}</div>` : `<h1>Outcome</h1>
 ${row('Status', 'Not completed — funds returned')}
 ${d.note ? row('Reason', d.note) : ''}
-${row('Deposit received', stxr(d.depositReceived))}
-<div class="tot">${row('Returned to you', stxr(d.changeReturned))}</div>`}
+${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
+<div class="tot">${row('Returned to you', stxr(d.changeReturned) + usd(d.changeReturned))}</div>`}
 <div class="foot">Core ${d.core} · job ${d.jobId}${d.stxUsd ? ' · STX $' + d.stxUsd : ''} · settled on Bitcoin via Stacks</div>
 </div></div></body></html>`;
 }

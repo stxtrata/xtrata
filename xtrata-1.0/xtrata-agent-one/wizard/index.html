@@ -305,14 +305,15 @@ $('#estimateBtn').onclick=async()=>{
   let payload; if(selectedFile){ payload={bytes:selectedFile.size,marginUstx:margin}; } else { const file=$('#file').value.trim(); if(!file){ el.innerHTML='<div class="err">Drop a file, open one, or paste a server path.</div>'; return; } payload={file,marginUstx:margin}; }
   el.innerHTML='<div class="muted">Estimating…</div>';
   try{ const e=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
+    const usd=(u)=> e.stxUsd ? ' · ~$'+(Number(u)/1e6*e.stxUsd).toFixed(2) : '';
     el.innerHTML = `<div class="deposit">
       <div class="kv"><span>Size</span><span>${(e.bytes/1048576).toFixed(3)} MiB · ${e.bytes.toLocaleString()} bytes</span></div>
       <div class="kv"><span>Chunks</span><span>${e.chunks} · ${e.single?'single-tx':'staged ('+e.batches+' batches)'}</span></div>
-      <div class="kv"><span>Xtrata protocol fee</span><span>${stx(e.protocolFee)}</span></div>
-      <div class="kv"><span>Receipt inscription</span><span>${stx(e.receiptProtocol||'0')}</span></div>
-      <div class="kv"><span>Network (miner) reserve</span><span>${stx((BigInt(e.minerReserve)+BigInt(e.receiptMiner||'0')).toString())}</span></div>
-      <div class="kv"><span>Agent fee (${e.agentFeePct}%)</span><span style="color:var(--acc2)">${stx(e.agentFeeUstx||'0')}</span></div>
-      <div class="kv"><span><b>Required deposit</b></span><span class="big">${stx(e.requiredUstx)}</span></div>
+      <div class="kv"><span>Xtrata protocol fee</span><span>${stx(e.protocolFee)}${usd(e.protocolFee)}</span></div>
+      <div class="kv"><span>Receipt inscription</span><span>${stx(e.receiptProtocol||'0')}${usd(e.receiptProtocol||'0')}</span></div>
+      <div class="kv"><span>Network (miner) reserve</span><span>${stx((BigInt(e.minerReserve)+BigInt(e.receiptMiner||'0')).toString())}${usd((BigInt(e.minerReserve)+BigInt(e.receiptMiner||'0')).toString())}</span></div>
+      <div class="kv"><span>Agent fee (${e.agentFeePct}%)</span><span style="color:var(--acc2)">${stx(e.agentFeeUstx||'0')}${usd(e.agentFeeUstx||'0')}</span></div>
+      <div class="kv"><span><b>Required deposit</b></span><span class="big">${stx(e.requiredUstx)}${usd(e.requiredUstx)}</span></div>
       <div class="muted" style="font-size:11px;margin-top:8px">Includes a 2nd inscription (the receipt) and the ${e.agentFeePct}% agent fee. Over-collected; unused remainder refunded on delivery.</div>
     </div>`;
   }catch(err){ el.innerHTML='<div class="err">'+esc(err.message)+'</div>'; }
