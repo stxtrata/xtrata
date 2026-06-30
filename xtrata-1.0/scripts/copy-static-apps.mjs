@@ -18,6 +18,10 @@ const staticApps = [
     target: 'dist/forever-twins'
   },
   {
+    source: 'suno-more',
+    target: 'dist/suno-more'
+  },
+  {
     source: 'flowproof',
     target: 'dist/flowproof'
   },
