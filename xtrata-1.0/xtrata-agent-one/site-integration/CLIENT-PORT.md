@@ -84,3 +84,30 @@ No central server holds keys (each throwaway key lives only in the user's browse
 destroyed). `HIRO_API_KEY` stays in the Pages Function. The failsafe guarantees funds return on any
 failure; the only persisted key case is an unconfirmed refund (flagged `NEEDS_RECOVERY`). Tab-open is
 required for processing (backendless tradeoff); reload triggers resume-or-refund.
+## Safety invariants (added after live testing — the browser port MUST reproduce these)
+These came out of a real staged job that succeeded on-chain but was mis-reported. `svc/core.mjs` is the
+source of truth; mirror exactly.
+
+1. **Delivery is the commit point — the tail is best-effort.** Once the inscription NFT is sent to the
+   recipient, set `job.inscriptionDelivered=true` and persist immediately. After that, receipt delivery,
+   agent fee, and change refund must NEVER throw or fail the job. Wrap each in try/catch; on a leftover
+   that can't move, keep the key + flag for recovery but still finish `COMPLETE`. (A delivered inscription
+   must never show as failed/CANCELLED.)
+2. **Refund retry through the settle race.** Right after a tx confirms, the balance endpoint can briefly
+   report funds that aren't spendable yet → `NotEnoughFunds`. Use a retry helper (`sweepStxTo` /
+   `sendStxRetry`): re-read balance, back off ~8s, retry on transient errors
+   (NotEnoughFunds / ConflictingNonceInMempool / TooMuchChaining / bad nonce / NoSuchAccount).
+3. **Failsafe guard.** `refundAndClose` must check `inscriptionDelivered || status==='COMPLETE'` FIRST and,
+   if so, only sweep leftover to the payer — never mint a "refunded" receipt or set CANCELLED. (Prevents
+   the contradictory double-receipt.)
+4. **Refunds always go to the PAYER, never a preset address.** `resolveFunder(job)` = on-chain inbound
+   sender (cache as `job.funder`). deliverJob change-refund and every `refundAndClose` sweep go to the
+   funder. The recipient (`job.user`) and the payer (`job.funder`) are different concepts.
+5. **Fast-track railroad.** Recipient = funder (deposit-once → deliver-to-payer; overrides any preset
+   user). If `job.expectedFunder` is set (the wizard sets it = connected wallet) and a DIFFERENT wallet
+   pays → do NOT inscribe; `refundAndClose` 100% back to the actual sender with reason "returned to
+   sender". Wizard passes `expectedFunder` on fast-track create and shows a "pay from this wallet only"
+   lock on the deposit panel. Arbitrary-recipient (airdrop) stays for the non-fast-track lane.
+6. **Receipt accounting.** Compute the real main-inscription miner fee and the change estimate from the
+   LIVE post-inscription balance (not the up-front reserve). The on-chain receipt is necessarily a
+   pre-delivery estimate; the saved/dashboard receipt uses the actual refunded amount so it reconciles.
