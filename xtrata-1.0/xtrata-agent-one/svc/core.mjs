@@ -101,6 +101,14 @@ async function sendStx(network, key, amount, to, hiroKey, fee) {
 // Broadcast failures that are transient during the post-confirmation balance-settle window — worth retrying.
 const TRANSIENT_TX = /NotEnoughFunds|ConflictingNonceInMempool|TooMuchChaining|too much chaining|bad nonce|NoSuchAccount/i;
 const errMsg = (e) => String((e && e.message) || e);
+const addrEq = (a, b) => !!a && !!b && String(a).trim() === String(b).trim();   // Stacks c32 addresses are case-sensitive → exact compare
+// Source of truth for "who paid": the on-chain inbound sender. ALL refunds/change return here, never a
+// preset delivery address — so money can only ever go back to the wallet it came from.
+async function resolveFunder(job, network, hiroKey) {
+  if (job.mock) return job.funder || 'SP_MOCK_SENDER';
+  if (job.funder) return job.funder;
+  try { return await detectFunder(network, job.depositAddress, hiroKey); } catch { return null; }
+}
 // Retry a FIXED-amount STX transfer through the settle race (e.g. NotEnoughFunds right after a confirm).
 async function sendStxRetry(network, key, amount, to, hiroKey, fee, tries = 4) {
   let last; for (let i = 0; i < tries; i++) {
@@ -173,7 +181,7 @@ export async function estimate(opts) {
 
 // ---------- lifecycle ----------
 export async function createJob(opts) {
-  const { coreName = 'xtrata-v3-2-3', net = 'mainnet', file, uri, mime = 'application/octet-stream', deps = [], user, marginUstx = '0', jobDir, mock = false, fastTrack = false, agentFeePct = AGENT_FEE_PCT, agentFeeAddress = AGENT_FEE_ADDRESS, agentIdentityId = AGENT_IDENTITY_ID, suno = false } = opts;
+  const { coreName = 'xtrata-v3-2-3', net = 'mainnet', file, uri, mime = 'application/octet-stream', deps = [], user, expectedFunder = null, marginUstx = '0', jobDir, mock = false, fastTrack = false, agentFeePct = AGENT_FEE_PCT, agentFeeAddress = AGENT_FEE_ADDRESS, agentIdentityId = AGENT_IDENTITY_ID, suno = false } = opts;
   if (!file || !uri) throw new Error('file, uri required');
   if (!fastTrack && !user) throw new Error('delivery address (user) required unless fastTrack');
   const bytes = fs.statSync(file).size;
@@ -181,6 +189,7 @@ export async function createJob(opts) {
   const w = newWallet(net);
   const job = {
     jobId: `job-${Date.now()}`, core: coreName, net, mock, fastTrack, suno, file, uri, mime, deps, user: user || null,
+    expectedFunder: expectedFunder || null, funder: null,
     bytes, chunks: est.chunks, single: est.single, batches: est.batches,
     protocolFee: est.protocolFee, minerReserve: est.minerReserve,
     receiptProtocol: est.receiptProtocol, receiptMiner: est.receiptMiner,
@@ -460,6 +469,7 @@ export async function deliverJob(opts) {
   }
 
   const dep = deriveFrom(job.ephemeralMnemonic, net); const core = [DEPLOYER, job.core]; const network = netOf(net);
+  const refundTo = (await resolveFunder(job, network, hiroKey)) || job.user;   // change ALWAYS returns to the payer, never a preset address
   // Realistic numbers for the ON-CHAIN receipt: read the wallet AFTER the inscription so we know the
   // real main-inscription miner spend and can estimate the change from what's actually left (not the
   // generous up-front reserve, which previously showed ~8.4 STX "miner fee" / 0.2 STX "change").
@@ -492,7 +502,7 @@ export async function deliverJob(opts) {
   catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); }
   try { if (agentFee > 0n) agentFeeTx = await sendStxRetry(network, dep.key, agentFee, job.agentFeeAddress || AGENT_FEE_ADDRESS, hiroKey); }
   catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
-  try { const sw = await sweepStxTo(network, dep.key, dep.address, job.user, hiroKey); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } }
+  try { const sw = await sweepStxTo(network, dep.key, dep.address, refundTo, hiroKey); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } }
   catch (e) { notes.push('change return pending — recover-all will sweep it (' + errMsg(e) + ')'); }
 
   const note = notes.length ? notes.join('; ') : null;
@@ -526,7 +536,8 @@ export async function refundAndClose(opts) {
   if (job.inscriptionDelivered || job.status === 'COMPLETE') {
     if (job.ephemeralMnemonic) {
       const network = netOf(net); const dep = deriveFrom(job.ephemeralMnemonic, net);
-      if (job.user) { try { const sw = await sweepStxTo(network, dep.key, dep.address, job.user, hiroKey); if (sw.sent) { job.refundTx = sw.tx; job.refundedUstx = sw.amount; } } catch {} }
+      const to = (await resolveFunder(job, network, hiroKey)) || job.user;
+      if (to) { try { const sw = await sweepStxTo(network, dep.key, dep.address, to, hiroKey); if (sw.sent) { job.refundTx = sw.tx; job.refundedUstx = sw.amount; } } catch {} }
       let leftover = null; try { leftover = await balance(network, dep.address, hiroKey); } catch {}
       if (leftover != null && leftover <= REFUND_TX_FEE) delete job.ephemeralMnemonic;
       else if (leftover != null) { job.keepKey = true; job.keepKeyReason = `~${leftover} uSTX leftover — sweep with recover-all`; }
@@ -536,7 +547,7 @@ export async function refundAndClose(opts) {
   }
   if (!job.ephemeralMnemonic) { writeJob(jobDir, job); return { noKey: true }; }
   const network = netOf(net); const core = [DEPLOYER, job.core]; const dep = deriveFrom(job.ephemeralMnemonic, net);
-  let returnTo = job.user; if (!returnTo) { try { returnTo = await detectFunder(network, job.depositAddress, hiroKey); } catch {} }
+  let returnTo = (await resolveFunder(job, network, hiroKey)) || job.user;   // prefer the actual payer; fall back to recipient only if undetectable
   const out = { reason, deliveredNfts: [], refundTx: null };
   // 1) hand back any inscription/receipt this wallet actually minted (never strand an NFT)
   if (returnTo) for (const id of [job.tokenId, job.receiptTokenId].filter(Boolean)) {
@@ -585,11 +596,21 @@ export async function autoRunJob(opts) {
   const { job, enginePath, hiroKey = '', jobDir, receiptsDir, onPhase } = opts;
   const net = job.net || 'mainnet'; const network = netOf(net);
   const phase = (status) => { job.status = status; writeJob(jobDir, job); if (onPhase) { try { onPhase(status, job); } catch {} } };
-  if (!job.user) {
-    const funder = job.mock ? 'SP_MOCK_SENDER' : await detectFunder(network, job.depositAddress, hiroKey);
-    if (!funder) throw new Error('could not determine the sending address to return to');
-    job.user = funder; writeJob(jobDir, job);
+  // Who actually paid? Source of truth for delivery (fast-track) AND refunds.
+  const funder = job.mock ? 'SP_MOCK_SENDER' : await detectFunder(network, job.depositAddress, hiroKey);
+  if (!funder) throw new Error('could not determine the paying address');
+  job.funder = funder; writeJob(jobDir, job);
+  // RAILROAD: if this job is locked to a specific funding wallet and a DIFFERENT wallet paid, do not
+  // inscribe — return everything straight back to whoever actually paid. (No misdirected inscriptions.)
+  if (job.fastTrack && job.expectedFunder && !addrEq(funder, job.expectedFunder)) {
+    if (onPhase) { try { onPhase('CANCELLED', job); } catch {} }
+    await refundAndClose({ job, hiroKey, jobDir, receiptsDir, reason: `paid from ${funder} but this job is locked to ${job.expectedFunder} — returned to sender` });
+    return { rejected: true, funder, expected: job.expectedFunder };
   }
+  // Fast-track = deposit-once, deliver-to-payer: the payer IS the recipient (overrides any preset).
+  // The arbitrary-recipient "airdrop" case is the non-fast-track lane (job.user honoured; change still
+  // returns to the funder via resolveFunder).
+  if (job.fastTrack || !job.user) { job.user = funder; writeJob(jobDir, job); }
   phase('INSCRIBING');
   await runJob({ job, enginePath, hiroKey, jobDir });   // sets tokenId + status INSCRIBED
   phase('DELIVERING');

@@ -324,6 +324,7 @@ $('#createBtn').onclick=async()=>{
     else file=$('#file').value.trim();
     const payload={file,uri,mime:CONTENT[catSel.value][ftSel.value],deps,marginUstx:$('#margin').value||'0',fastTrack:fast};
     payload.user = fast ? WALLET : user;
+    if(fast) payload.expectedFunder = WALLET;   // railroad: ONLY this wallet may fund; any other payer is auto-refunded, nothing inscribed
     payload.suno = (catSel.value==='audio') && $('#sunoMode').checked;   // SUNO: inscribe a full player built from the audio
     const {job}=await api('/api/jobs',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
     $('#deposit').innerHTML = SERVER.mock ? `<div class="deposit" style="border-color:#5a4620;background:linear-gradient(180deg,#1c160a,#140f08)">
@@ -437,6 +438,8 @@ async function renderJob(){
       ${showDeposit?`<div class="kv"><span>Deposit address ${copyBtn(job.depositAddress)}</span><span>${esc(job.depositAddress)}</span></div>
       <div class="kv"><span>Send exactly</span><span class="big" style="font-size:19px">${stx(status.requiredUstx)}</span></div>
       ${!job.mock?`<div class="btnrow"><button class="btn" onclick="openWallet('${esc(job.depositAddress)}','${esc(status.requiredUstx)}')">Open wallet to pay ${stx(status.requiredUstx)}</button></div>`:''}
+      ${job.fastTrack&&job.expectedFunder?`<div class="kv"><span>Pay from this wallet only ${copyBtn(job.expectedFunder)}</span><span class="mono" style="color:var(--ok)">${esc(job.expectedFunder)}</span></div>
+      <div class="muted" style="font-size:12px;margin-top:6px;color:var(--warn)">⚠ Locked to the wallet above. A payment from any other wallet is automatically returned to the sender — nothing is inscribed.</div>`:''}
       <div class="muted" style="font-size:12px;margin-top:8px">↩︎ Guaranteed temporary — if not funded &amp; started in time, this auto-cancels and returns any funds. <b id="expT"></b></div>`:''}
       ${job.user?`<div class="kv"><span>${job.fastTrack?'Returns to your wallet':'Delivery address'}</span><span class="mono">${esc(job.user)}</span></div>`:(job.fastTrack?`<div class="kv"><span>Returns to</span><span class="muted">the wallet you pay from (auto-detected)</span></div>`:'')}
       ${job.tokenId?`<div class="kv"><span>Inscription token</span><span class="ok">#${esc(job.tokenId)}</span></div>`:''}
@@ -444,7 +447,7 @@ async function renderJob(){
       ${job.agentFeeUstx?`<div class="kv"><span>Agent fee (${job.agentFeePct||10}%)</span><span style="color:var(--acc2)">${stx(job.agentFeeUstx)}</span></div>`:''}
       ${(job.refundedUstx!=null)?`<div class="kv"><span>Change refunded</span><span>${stx(job.refundedUstx||'0')}</span></div>`:''}
       ${active?`<div class="progress"><span class="spin"></span>${esc(phaseMsg||'Working…')}${job.progress?(' · '+esc(job.progress)):''} <span id="progT" class="muted"></span></div>`:''}
-      ${showDeposit&&!funded?`<div class="muted" style="margin-top:10px;font-size:12px">${job.fastTrack?'Pay from a self-custody wallet (Leather/Xverse) — the inscription and change return to that address, and processing starts automatically on arrival.':'Waiting for your deposit — the Jobs list flips to FUNDED once it lands.'}</div>`:''}
+      ${showDeposit&&!funded?`<div class="muted" style="margin-top:10px;font-size:12px">${job.fastTrack?'Pay from your connected wallet (shown above) — it receives the inscription and any change, and processing starts automatically on arrival. Payments from any other wallet are returned to the sender.':'Waiting for your deposit — the Jobs list flips to FUNDED once it lands.'}</div>`:''}
       ${job.error?`<div class="err" style="margin-top:8px">Error: ${esc(job.error)}${!job.fastTrack?` <button class="btn ghost" onclick="act('run')" style="margin-left:8px;padding:5px 10px">Retry</button>`:''}</div>`:''}
       ${(!job.fastTrack&&(st==='AWAITING_DEPOSIT'||st==='INSCRIBED'))?`<div class="btnrow">
         <button class="btn good" onclick="act('run')" ${(funded&&st==='AWAITING_DEPOSIT')?'':'disabled'}>Run inscription</button>

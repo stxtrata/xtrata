@@ -131,7 +131,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/jobs' && req.method === 'POST') {
       const b = await body(req);
       if (!b.file || !fs.existsSync(b.file)) return send(res, 400, { error: 'file not found on server: ' + (b.file || '(none)') });
-      const job = await core.createJob({ coreName: CORE, net: NET, file: b.file, uri: b.uri, mime: b.mime || 'application/octet-stream', deps: b.deps || [], user: b.user, marginUstx: b.marginUstx || '0', jobDir: JOB_DIR, mock: MOCK, fastTrack: !!b.fastTrack, suno: !!b.suno });
+      const job = await core.createJob({ coreName: CORE, net: NET, file: b.file, uri: b.uri, mime: b.mime || 'application/octet-stream', deps: b.deps || [], user: b.user, expectedFunder: b.expectedFunder || null, marginUstx: b.marginUstx || '0', jobDir: JOB_DIR, mock: MOCK, fastTrack: !!b.fastTrack, suno: !!b.suno });
       return send(res, 200, { job: core.publicJob(job) });
     }
 
