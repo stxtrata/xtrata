@@ -71,7 +71,7 @@
     <input id="picker" type="file" accept="audio/mpeg,.mp3" hidden />
     <div id="drop" class="drop">
       <div class="drop-main">Drop your Suno MP3 here</div>
-      <div class="drop-sub">or <u>browse</u> — a Suno export with cover art, title &amp; artist</div>
+      <div class="drop-sub">or <u>browse</u> — embedded MP3s only (cover art + title + artist)</div>
     </div>
 
     <div id="quote" class="quote">
@@ -124,7 +124,7 @@ const esc = (s)=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
 function slug(s){ return String(s||'').toLowerCase().replace(/\.[^.]+$/,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,48)||'track'; }
 // SUNO is for Suno MP3 exports ONLY (embedded cover art + title + artist). Everything else
 // (WAV, art-less MP3, etc.) is sent to the modular main wizard.
-const DROP_HTML='<div class="drop-main">Drop your Suno MP3 here</div><div class="drop-sub">or <u>browse</u> — a Suno export with cover art, title &amp; artist</div>';
+const DROP_HTML='<div class="drop-main">Drop your Suno MP3 here</div><div class="drop-sub">or <u>browse</u> — embedded MP3s only (cover art + title + artist)</div>';
 const MP3_MAX_MB=32;
 function validateSuno(f){
   if(!f) return 'No file selected.';
