@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Xtrata Agent One — SUNO · one-tap track inscription</title>
+<title>SUNO More — do more with your Suno music · Xtrata Agent One</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="apple-touch-icon" href="/favicons/xtrata-apple-touch-icon.png" />
 <style>
   :root{
     --bg:#0b0e14; --panel:#121723; --panel2:#0e131d; --line:#243044;
@@ -22,6 +24,8 @@
   main{flex:1;display:flex;align-items:flex-start;justify-content:center;padding:32px 18px 64px}
   .card{width:100%;max-width:560px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px}
   h1{margin:0 0 6px;font-size:22px}
+  .suno-logo{margin:2px 0 14px;line-height:0;text-align:center}
+  .suno-logo img{display:inline-block;width:auto;height:auto;max-width:300px;max-height:188px;border-radius:14px;border:1px solid rgba(255,255,255,.06);box-shadow:0 8px 30px rgba(0,0,0,.4)}
   .lead{color:var(--mut);font-size:13.5px;margin:0 0 20px}
   .tag{display:inline-block;background:#10203a;border:1px solid #234a6e;color:var(--acc);border-radius:999px;padding:2px 10px;font-size:11px;font-weight:700;margin-bottom:14px}
   .drop{border:1.6px dashed var(--line);border-radius:14px;padding:34px 18px;text-align:center;transition:.15s;cursor:pointer}
@@ -55,7 +59,8 @@
 </head>
 <body>
 <header>
-  <div class="logo"><b>XTRATA</b> <i>Agent One</i> · SUNO</div>
+  <img src="favicon.svg" alt="Xtrata" style="width:28px;height:28px;border-radius:7px;flex:none" />
+  <div class="logo"><b>XTRATA</b> <i>Agent One</i> · SUNO More</div>
   <div class="spacer"></div>
   <span id="health" class="pill">connecting…</span>
   <span id="walletAddr" class="pill" style="display:none;cursor:pointer;color:var(--ok);border-color:#1f5a45" title="click to disconnect"></span>
@@ -65,8 +70,8 @@
 <main>
   <div class="card">
     <span class="tag">⚡ one payment → full player on-chain</span>
-    <h1>Inscribe your Suno track</h1>
-    <p class="lead">Drop a Suno MP3 and pay once. Your browser optimises the audio to Opus, pulls in the cover art, title, artist &amp; lyrics, and builds a self-contained player — then the agent inscribes it and returns the token + receipt to your wallet, change refunded. Nothing leaves your browser until you pay.</p>
+    <h1 class="suno-logo"><img src="/suno-more/assets/suno-more-logo.webp" alt="SUNO More — one song, infinite possibilities" /></h1>
+    <p class="lead">You made the song — now do more with it. Drop a Suno MP3 and pay once: your browser optimises the audio to Opus, pulls in the cover art, title, artist &amp; lyrics, and builds a self-contained player. The agent inscribes the master and returns the token + receipt to your wallet, change refunded. Nothing leaves your browser until you pay.</p>
 
     <input id="picker" type="file" accept="audio/mpeg,.mp3" hidden />
     <div id="drop" class="drop">
