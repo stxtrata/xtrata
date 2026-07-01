@@ -4563,7 +4563,8 @@
           {
             id: 'jim-music',
             title: 'music',
-            tokenIds: [785n, 1048n, 1050n, 577n]
+            htmlFirst: true,
+            tokenIds: [1107n, 1105n, 1101n, 1099n, 1097n, 1091n, 1065n, 1050n, 1048n, 785n, 577n]
           },
           {
             id: 'code-various',
@@ -4594,7 +4595,6 @@
         });
 
         const CURATED_GALLERY_DEFAULT_TOKEN_IDS = Object.freeze({
-          'jim-music': 785n,
           'code-various': 287n
         });
 
@@ -11729,7 +11729,7 @@
       }
     };
 
-const openCuratedGallery = async (galleryId) => {
+const openCuratedGallery = async (galleryId, options = {}) => {
   const gallery = CURATED_GALLERIES.find((entry) => entry.id === galleryId);
   if (!gallery) {
     return;
@@ -11825,6 +11825,25 @@ const openCuratedGallery = async (galleryId) => {
       loadedTokenIds.has(id.toString())
     );
 
+    // Optional per-gallery ordering: push HTML tokens (they carry their own
+    // artwork, so they preview best) to the top, preserving the configured
+    // order within each group. Used by the music gallery, which mixes
+    // html players, audio, and video.
+    if (gallery.htmlFirst) {
+      state.walletTokenIds = state.walletTokenIds
+        .map((id, index) => ({ id, index }))
+        .sort((a, b) => {
+          const isHtml = (id) =>
+            getMediaKind(
+              state.walletTokenCache.get(id.toString())?.meta?.mimeType ?? null
+            ) === 'html'
+              ? 0
+              : 1;
+          return isHtml(a.id) - isHtml(b.id) || a.index - b.index;
+        })
+        .map((entry) => entry.id);
+    }
+
     state.walletTotalCount = state.walletTokenIds.length;
 
     setStatus(
@@ -11864,10 +11883,12 @@ const openCuratedGallery = async (galleryId) => {
       ms: Math.round(performance.now() - startedAt)
     });
 
-    document.getElementById('walletTitle')?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start'
-    });
+    if (options.scroll !== false) {
+      document.getElementById('walletTitle')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
 
@@ -13646,7 +13667,9 @@ const openCuratedGallery = async (galleryId) => {
         if (requestedWallet) {
           await viewWalletByAddress(requestedWallet);
         } else if (walletViewRequestId === state.walletViewRequestId && !consumedHandoff) {
-          await loadHomeLatestView();
+          // Default homepage view: open the music gallery (HTML players first)
+          // instead of the generic "latest" grid, so there's music to play on load.
+          await openCuratedGallery('jim-music', { scroll: false });
         }
       }
       updateControls();
