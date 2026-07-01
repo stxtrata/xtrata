@@ -82,10 +82,11 @@ export async function quote(core, network, sizeBytes, chunks) {
 }
 async function waitTx(network, txid, hiroKey) {
   const u = `${network.coreApiUrl}/extended/v1/tx/${txid}`;
-  for (let i = 0; i < 90; i++) {
+  // Nakamoto-aware: poll fast (2 s) for the first ~90 s, then 6 s. Same ~16-min ceiling as before.
+  for (let i = 0; i < 210; i++) {
     try { const d = await (await hfetch(u, hiroKey)).json(); if (d.tx_status === 'success') return; if (d.tx_status && d.tx_status.startsWith('abort')) throw new Error('TX ' + d.tx_status); }
     catch (e) { if (String(e).includes('TX abort')) throw e; }
-    await sleep(10000);
+    await sleep(i < 45 ? 2000 : 6000);
   }
   throw new Error('not confirmed: ' + txid);
 }
@@ -207,7 +208,13 @@ export async function statusJob(opts) {
   let bal = 0n;
   if (job.mock) bal = BigInt(job.requiredUstx);
   else if (job.depositAddress) bal = await balance(netOf(net), job.depositAddress, hiroKey);
-  return { jobId: job.jobId, status: job.status, depositAddress: job.depositAddress, requiredUstx: job.requiredUstx, balanceUstx: bal.toString(), funded: bal >= BigInt(job.requiredUstx), tokenId: job.tokenId || null };
+  const funded = bal >= BigInt(job.requiredUstx);
+  // "Payment seen" (mempool) — UI signal only; money decisions still gate on the confirmed balance.
+  let pending = false;
+  if (!funded && !job.mock && job.depositAddress && job.status === 'AWAITING_DEPOSIT') {
+    try { pending = await hasPendingInbound(netOf(net), job.depositAddress, hiroKey, false); } catch {}
+  }
+  return { jobId: job.jobId, status: job.status, depositAddress: job.depositAddress, requiredUstx: job.requiredUstx, balanceUstx: bal.toString(), funded, pending, tokenId: job.tokenId || null };
 }
 /** Adopt a prepared asset as the thing to inscribe and re-derive the chunk/route plan. */
 function adoptAsset(job, file, mime, bytes) {
@@ -293,9 +300,12 @@ export async function runJob(opts) {
     const tokenId = Math.floor(1000 + Math.random() * 9000); job.tokenId = tokenId; job.depositReceivedUstx = job.requiredUstx; job.status = 'INSCRIBED'; writeJob(jobDir, job); return { tokenId, mock: true };
   }
   const network = netOf(net);
-  const bal = await balance(network, job.depositAddress, hiroKey);
-  if (bal < BigInt(job.requiredUstx)) throw new Error(`not funded: need ${job.requiredUstx}, have ${bal}`);
-  job.depositReceivedUstx = bal.toString();   // the agent fee is 10% of what actually arrived
+  // Funding gate — skipped on RESUME (a mid-flight job has already spent part of the deposit).
+  if (!job.depositReceivedUstx) {
+    const bal = await balance(network, job.depositAddress, hiroKey);
+    if (bal < BigInt(job.requiredUstx)) throw new Error(`not funded: need ${job.requiredUstx}, have ${bal}`);
+    job.depositReceivedUstx = bal.toString();   // the agent fee is 10% of what actually arrived
+  }
   await optimizeAudioForInscription(job, jobDir);   // funds are in → shrink audio to Opus/WebM before inscribing (smaller on-chain asset)
 
   // Small files (<=32 chunks / ~512 KB) use the core-native single-tx mint — one cheap tx.
@@ -341,13 +351,25 @@ export async function mintFile({ core, network, key, fromAddr, hiroKey, data, mi
   if (chunks.length === 0) throw new Error('empty file');
   if (chunks.length > SINGLE_TX_MAX_CHUNKS) throw new Error(`${chunks.length} chunks exceeds single-tx max ${SINGLE_TX_MAX_CHUNKS}`);
   const h = incHash(chunks);
+  // IDEMPOTENT: if this exact content is already inscribed (e.g. a retry after a confirmation timeout),
+  // return the existing token instead of re-minting — a resume can never double-inscribe or double-spend.
+  const pre = await getIdByHash(core, network, h);
+  if (pre != null) return { tokenId: pre.toString(), minerFee: 0n, txid: null, resumed: true };
   const depCVs = deps.map((d) => uintCV(BigInt(d)));
   const fn = depCVs.length ? 'mint-single-tx-recursive' : 'mint-single-tx';
   const args = [bufferCV(h), stringAsciiCV(mime), uintCV(BigInt(data.length)), listCV(chunks.map((c) => bufferCV(c))), stringAsciiCV(uri)];
   if (depCVs.length) args.push(listCV(depCVs));
-  const tx = await makeContractCall({ contractAddress: core[0], contractName: core[1], functionName: fn, functionArgs: args, senderKey: key, network, postConditionMode: PostConditionMode.Deny, postConditions: [makeStandardSTXPostCondition(fromAddr, FungibleConditionCode.LessEqual, spendCap)], anchorMode: AnchorMode.Any });
-  const usedFee = BigInt(tx.auth.spendingCondition.fee.toString());
-  if (usedFee > MINT_PER_TX_CAP) throw new Error(`mint miner fee ${usedFee} exceeds cap ${MINT_PER_TX_CAP} (raise MINT_PER_TX_CAP_USTX if mempool is busy)`);
+  // Fee-spike resilience: retry estimation, then fall back to the capped fee instead of failing the job.
+  const mkOpts = { contractAddress: core[0], contractName: core[1], functionName: fn, functionArgs: args, senderKey: key, network, postConditionMode: PostConditionMode.Deny, postConditions: [makeStandardSTXPostCondition(fromAddr, FungibleConditionCode.LessEqual, spendCap)], anchorMode: AnchorMode.Any };
+  let tx, usedFee;
+  for (let attempt = 0; ; attempt++) {
+    tx = await makeContractCall(mkOpts);
+    usedFee = BigInt(tx.auth.spendingCondition.fee.toString());
+    if (usedFee <= MINT_PER_TX_CAP) break;
+    if (attempt < 3) { console.warn(`mint fee estimate ${usedFee} exceeds cap ${MINT_PER_TX_CAP} — estimator spike, retrying (${attempt + 1}/3)`); await sleep(6000); continue; }
+    console.warn(`mint fee estimate still ${usedFee} after retries — using capped fee ${MINT_PER_TX_CAP}`);
+    tx = await makeContractCall({ ...mkOpts, fee: MINT_PER_TX_CAP }); usedFee = MINT_PER_TX_CAP; break;
+  }
   const res = await broadcastTransaction(tx, network);
   if (res.error) throw new Error('mint broadcast: ' + res.error + ' ' + (res.reason || ''));
   const txid = res.txid || res;
@@ -599,11 +621,11 @@ export async function refundAndClose(opts) {
 
 // Is an inbound STX transfer to `addr` sitting in the mempool? (Payment sent but not yet confirmed.)
 // Conservative: on API error returns true, so callers never treat "unknown" as "definitely empty".
-export async function hasPendingInbound(network, addr, hiroKey = '') {
+export async function hasPendingInbound(network, addr, hiroKey = '', onError = true) {
   try {
     const d = await (await hfetch(`${network.coreApiUrl}/extended/v1/address/${addr}/mempool?limit=20`, hiroKey)).json();
     return (d.results || []).some((tx) => tx.token_transfer && tx.token_transfer.recipient_address === addr);
-  } catch { return true; }
+  } catch { return onError; }   // default true = conservative for key-lifecycle decisions; pass false for UI signals
 }
 
 // Who funded the deposit address? Returns the sender principal that paid the MOST STX in total.

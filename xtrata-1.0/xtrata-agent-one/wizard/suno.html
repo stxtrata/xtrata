@@ -69,7 +69,7 @@
   <div class="logo"><b>XTRATA</b> <i>Agent One</i> · SUNO More</div>
   <div class="spacer"></div>
   <span id="health" class="pill">connecting…</span>
-  <span id="walletAddr" class="pill" style="display:none;cursor:pointer;color:var(--ok);border-color:#1f5a45" title="click to disconnect"></span>
+  <span id="walletAddr" class="pill" style="display:none;cursor:pointer;color:var(--ok);border-color:#1f5a45" title="connected wallet — click to show & copy the address"></span>
   <button class="btn ghost" id="connectBtn">Connect wallet</button>
 </header>
 
@@ -170,15 +170,30 @@ async function api(path, opts){
 
 // ---- wallet (window.XtrataWallet from agent-one.js) ----
 function xw(){ return window.XtrataWallet || null; }
-function setWallet(a){ WALLET=a||null; const el=$('#walletAddr'), b=$('#connectBtn');
-  if(WALLET){ el.style.display=''; el.textContent='● '+WALLET.slice(0,5)+'…'+WALLET.slice(-4); b.textContent='Disconnect'; }
-  else { el.style.display='none'; b.textContent='Connect wallet'; } updateGo(); }
+// BNS: show the .btc name; address hidden until the pill is clicked (reveal + copy; click again = name).
+let WALLET_NAME=null, WALLET_REVEAL=false;
+const shortAddr=a=>a.slice(0,5)+'…'+a.slice(-4);
+async function bnsLookup(addr){ try{
+  const base=(window.XAO_CONFIG&&window.XAO_CONFIG.hiro)?window.XAO_CONFIG.hiro.replace(/\/(mainnet|testnet)\/?$/,''):'https://api.hiro.so';
+  const r=await fetch(base+'/v1/addresses/stacks/'+addr); if(!r.ok) return null;
+  const d=await r.json(); return (d&&d.names&&d.names[0])||null; }catch{ return null; } }
+function renderWalletPill(){ const el=$('#walletAddr'); if(!WALLET){ el.style.display='none'; return; }
+  el.style.display='';
+  if(WALLET_NAME&&!WALLET_REVEAL){ el.textContent='● '+WALLET_NAME; el.title='connected as '+WALLET_NAME+' — click to show & copy the address'; }
+  else { el.textContent='● '+shortAddr(WALLET); el.title=WALLET+(WALLET_NAME?' — click to show '+WALLET_NAME:' — click to copy'); } }
+async function walletPillClick(){ if(!WALLET) return;
+  WALLET_REVEAL=!WALLET_NAME||!WALLET_REVEAL;
+  renderWalletPill();
+  if(WALLET_REVEAL){ try{ await navigator.clipboard.writeText(WALLET); $('#walletAddr').textContent='✓ copied'; setTimeout(renderWalletPill,900); }catch{} } }
+function setWallet(a){ WALLET=a||null; WALLET_NAME=null; WALLET_REVEAL=false; const b=$('#connectBtn');
+  if(WALLET){ b.textContent='Disconnect'; renderWalletPill(); bnsLookup(WALLET).then(n=>{ if(n&&WALLET===a){ WALLET_NAME=n; renderWalletPill(); } }); }
+  else { b.textContent='Connect wallet'; renderWalletPill(); } updateGo(); }
 async function connectWallet(){ const w=xw();
   if(!w||!w.connect){ alert('Wallet bundle not loaded. Open this from the Xtrata site so agent-one.js (wallet) is present.'); return; }
   try{ const a=await w.connect(); a?setWallet(a):alert('Connected, but no Stacks address returned.'); }catch(e){ alert('Connect failed:\n'+((e&&e.message)||e)); } }
 async function disconnectWallet(){ try{ const w=xw(); if(w&&w.disconnect) await w.disconnect(); }catch{} setWallet(null); }
 $('#connectBtn').onclick=()=>{ WALLET?disconnectWallet():connectWallet(); };
-$('#walletAddr').onclick=disconnectWallet;
+$('#walletAddr').onclick=walletPillClick;   // disconnect lives on the button; the pill reveals/copies
 async function payWallet(addr, ustx){ const w=xw();
   if(!w||!w.pay) throw new Error('wallet cannot pay — open inside the Xtrata site');
   await w.pay({ recipient:addr, amount:String(ustx), network:(SERVER.net==='testnet'?'testnet':'mainnet') }); }
@@ -276,6 +291,8 @@ function setProg(msg, done, pct){ $('#prog').className='prog show'; $('#progMsg'
   document.querySelectorAll('.step').forEach(s=>{ s.className='step'+((done||[]).includes(s.dataset.s)?' done':''); }); }
 function setPhase(st, job){ const p=PHASE[st]; if(!p) return;
   let msg=p.msg, pct=p.pct;
+  // Auto-resume visibility: a transient hiccup parks the job and it resumes on its own — say so.
+  if(job&&job.retryCount&&/resuming where/.test(job.progress||'')){ msg='Recovered from a network hiccup — resuming automatically (attempt '+job.retryCount+'/4)…'; }
   // Chunk-level progress from the agent (staged uploads): "uploading · X/Y chunks"
   const m=/(\d+)\s*\/\s*(\d+)\s*chunks/.exec((job&&job.progress)||'');
   if(st==='INSCRIBING'&&m){ const a=+m[1], b=+m[2]||1; pct=30+Math.round(52*a/b); msg='Uploading on-chain · '+a+' / '+b+' chunks ('+Math.round(100*a/b)+'%)'; }
