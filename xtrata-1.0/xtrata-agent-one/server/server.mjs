@@ -38,16 +38,36 @@ const send = (res, code, obj) => { const b = JSON.stringify(obj); res.writeHead(
 const body = (req) => new Promise((resolve) => { let s = ''; req.on('data', (d) => (s += d)); req.on('end', () => { try { resolve(s ? JSON.parse(s) : {}); } catch { resolve({}); } }); });
 
 const PROCESSING = new Set();
+// AUTO-RESUME: transient failures (network, timeout, estimator, rate limit) park the job back at
+// FUNDED/INSCRIBED for the watcher to resume where it left off — resume is safe because the protocol is
+// idempotent end-to-end (begin-or-get, on-chain upload index, hash-checked mint pre-check). Only
+// deterministic failures or exhausted retries (4) fall through to the refund failsafe.
+const FATAL_ERR = /TX abort|not funded|locked to|unrecoverable|file bytes|empty file|exceeds single-tx|could not determine/i;
+const MAX_RETRIES = Number(process.env.AGENT_MAX_RETRIES || '4');
 function startBackground(id, phase, fn) {
   PROCESSING.add(id);
   try { const j = core.readJob(JOB_DIR, id); j.status = phase; j.error = null; core.writeJob(JOB_DIR, j); } catch {}
   const job = core.readJob(JOB_DIR, id);
   Promise.resolve().then(() => fn(job))
-    .then(() => PROCESSING.delete(id))
+    .then(() => {
+      try { const j = core.readJob(JOB_DIR, id); if (j.retryCount && j.status === 'COMPLETE') { delete j.retryCount; core.writeJob(JOB_DIR, j); } } catch {}
+      PROCESSING.delete(id);
+    })
     .catch(async (e) => {
-      console.error(`job ${id} failed: ${e} — returning funds`);
-      try { const j = core.readJob(JOB_DIR, id); j.error = String((e && e.message) || e); core.writeJob(JOB_DIR, j); } catch {}
-      try { const j = core.readJob(JOB_DIR, id); await core.refundAndClose({ job: j, hiroKey: HIRO_KEY, jobDir: JOB_DIR, receiptsDir: RECEIPTS_DIR, reason: 'error: ' + String((e && e.message) || e) }); } catch (e2) { console.error(`job ${id} auto-refund failed:`, e2); }
+      const msg = String((e && e.message) || e);
+      try {
+        const j = core.readJob(JOB_DIR, id); j.error = msg;
+        if (!FATAL_ERR.test(msg) && j.status !== 'AWAITING_DEPOSIT' && (j.retryCount = (j.retryCount || 0) + 1) <= MAX_RETRIES) {
+          j.status = j.tokenId ? 'INSCRIBED' : 'FUNDED';
+          j.progress = `recovered from a hiccup — resuming where it left off (attempt ${j.retryCount}/${MAX_RETRIES})`;
+          j.progressAt = new Date().toISOString(); core.writeJob(JOB_DIR, j);
+          console.warn(`job ${id}: transient error — auto-resume scheduled (${j.retryCount}/${MAX_RETRIES}): ${msg}`);
+          PROCESSING.delete(id); return;
+        }
+        core.writeJob(JOB_DIR, j);
+      } catch {}
+      console.error(`job ${id} failed: ${msg} — returning funds`);
+      try { const j = core.readJob(JOB_DIR, id); await core.refundAndClose({ job: j, hiroKey: HIRO_KEY, jobDir: JOB_DIR, receiptsDir: RECEIPTS_DIR, reason: 'error: ' + msg }); } catch (e2) { console.error(`job ${id} auto-refund failed:`, e2); }
       PROCESSING.delete(id);
     });
 }
@@ -103,8 +123,18 @@ async function fastTrackTick() {
   let jobs; try { jobs = core.listJobs(JOB_DIR); } catch { return; }
   for (const j of jobs) {
     if (!j.fastTrack || PROCESSING.has(j.jobId)) continue;
+    // Backoff between auto-resume attempts: 15 s × attempt number.
+    if (j.retryCount && j.status !== 'AWAITING_DEPOSIT' && Date.now() - (Date.parse(j.progressAt || '') || 0) < 15000 * j.retryCount) continue;
+    // Deliver-only resume: already inscribed, delivery was interrupted → finish delivery, never re-mint.
+    if (j.status === 'INSCRIBED' && j.tokenId) {
+      console.log(`fast-track ${j.jobId}: inscribed but undelivered → resuming delivery`);
+      startBackground(j.jobId, 'DELIVERING', (job) => core.deliverJob({ job, hiroKey: HIRO_KEY, jobDir: JOB_DIR, receiptsDir: RECEIPTS_DIR }));
+      continue;
+    }
     if (j.status !== 'AWAITING_DEPOSIT' && j.status !== 'FUNDED') continue;   // also resume jobs stuck at FUNDED (e.g. after a restart)
-    let funded = false; try { funded = (await core.statusJob({ job: j, hiroKey: HIRO_KEY })).funded; } catch { continue; }
+    // A job that was funded once counts as funded — mid-flight resumes have already spent part of the deposit.
+    let funded = !!j.depositReceivedUstx;
+    if (!funded) { try { funded = (await core.statusJob({ job: j, hiroKey: HIRO_KEY })).funded; } catch { continue; } }
     if (!funded) continue;
     console.log(`fast-track ${j.jobId}: funded → auto-processing`);
     startBackground(j.jobId, 'FUNDED', (job) => core.autoRunJob({ job, enginePath: ENGINE, hiroKey: HIRO_KEY, jobDir: JOB_DIR, receiptsDir: RECEIPTS_DIR, onPhase: (s) => console.log(`  ${j.jobId} → ${s}`) }));

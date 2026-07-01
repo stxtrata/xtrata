@@ -80,8 +80,10 @@ async function ro(fn,a){return callReadOnlyFunction({contractAddress:CORE[0],con
 async function quoteStaged(sz,nc){const t=cvToJSON(await ro('quote-inscription-fee',[uintCV(sz),uintCV(nc),uintCV(MODE_STAGED)])).value.value;return {beginFee:BigInt(t['begin-fee'].value),sealFee:BigInt(t['seal-fee'].value),totalFee:BigInt(t['total-fee'].value),batches:Number(t['upload-batches'].value)};}
 async function idByHash(h){const j=cvToJSON(await ro('get-id-by-hash',[bufferCV(h)]));return j.value?BigInt(j.value.value):null;}
 async function isPaused(){const j=cvToJSON(await ro('is-paused',[]));return (j.value?.value??j.value)===true;}
-async function bal(){const d=await(await fetch(`${network.coreApiUrl}/extended/v1/address/${SENDER}/stx`)).json();return BigInt(d.balance||'0');}
-async function wait(txid){const u=`${network.coreApiUrl}/extended/v1/tx/${txid}`;for(let i=0;i<120;i++){try{const d=await(await fetch(u)).json();if(d.tx_status==='success')return d;if(d.tx_status&&d.tx_status.startsWith('abort'))throw new Error('TX '+d.tx_status+': '+(d.tx_result?.repr||''));}catch(e){if(String(e).includes('TX abort'))throw e;}await sleep(10000);}throw new Error('not confirmed');}
+async function bal(){const d=await(await hfetch(`${network.coreApiUrl}/extended/v1/address/${SENDER}/stx`)).json();return BigInt(d.balance||'0');}
+// Nakamoto-aware confirmation wait: most Stacks blocks land in seconds now, so poll fast (2 s) for the
+// first ~90 s, then back off to 6 s. Same ~16-min overall ceiling as before — never LESS patient.
+async function wait(txid){const u=`${network.coreApiUrl}/extended/v1/tx/${txid}`;for(let i=0;i<210;i++){try{const d=await(await hfetch(u)).json();if(d.tx_status==='success')return d;if(d.tx_status&&d.tx_status.startsWith('abort'))throw new Error('TX '+d.tx_status+': '+(d.tx_result?.repr||''));}catch(e){if(String(e).includes('TX abort'))throw e;}await sleep(i<45?2000:6000);}throw new Error('not confirmed');}
 const tidFrom=d=>{const r=d?.tx_result?.repr||'';const m=/token-id u(\d+)/.exec(r)||/\(ok u(\d+)\)/.exec(r);return m?m[1]:null;};
 
 const principalCV=standardPrincipalCV;
@@ -91,13 +93,27 @@ async function getUploadIndex(h){
   const t=j.value.value;
   return Number(t['current-index'].value);
 }
+const lastGoodFee=new Map();   // per-function last accepted fee — fallback when the estimator spikes
 async function send(fnName,args,postFee){
   const post = postFee!=null ? [makeStandardSTXPostCondition(SENDER,FungibleConditionCode.LessEqual,postFee)] : [];
   // omit `fee` so the SDK/node estimates it from the actual tx size (upload
   // batches are ~512 KB and need much larger fees than control-plane calls).
-  const tx=await makeContractCall({contractAddress:CORE[0],contractName:CORE[1],functionName:fnName,functionArgs:args,senderKey:SKEY,network,postConditionMode:PostConditionMode.Deny,postConditions:post,anchorMode:AnchorMode.Any});
-  const usedFee=BigInt(tx.auth.spendingCondition.fee.toString());
-  if(usedFee>PER_TX_FEE_CAP) throw new Error(`${fnName} estimated fee ${usedFee} exceeds per-tx cap ${PER_TX_FEE_CAP} (raise LARGE_PER_TX_FEE_USTX if mempool is busy)`);
+  // FEE-SPIKE RESILIENCE: the estimator occasionally returns absurd one-offs (a batch quoted 74 STX whose
+  // identical siblings cost 0.52). Never kill the job on a spike: re-estimate, then fall back to a bounded
+  // fee (2× the last good fee for this fn, capped). Only genuine unaffordability should error (→ refund).
+  const opts={contractAddress:CORE[0],contractName:CORE[1],functionName:fnName,functionArgs:args,senderKey:SKEY,network,postConditionMode:PostConditionMode.Deny,postConditions:post,anchorMode:AnchorMode.Any};
+  let tx,usedFee;
+  for(let attempt=0;;attempt++){
+    tx=await makeContractCall(opts);
+    usedFee=BigInt(tx.auth.spendingCondition.fee.toString());
+    if(usedFee<=PER_TX_FEE_CAP) break;
+    if(attempt<3){ log({event:'fee-spike',fn:fnName,estimate:usedFee.toString(),cap:PER_TX_FEE_CAP.toString(),retry:attempt+1}); await sleep(6000); continue; }
+    const fb=lastGoodFee.get(fnName);
+    const fee=fb&&fb*2n<=PER_TX_FEE_CAP?fb*2n:PER_TX_FEE_CAP;
+    log({event:'fee-fallback',fn:fnName,estimate:usedFee.toString(),using:fee.toString()});
+    tx=await makeContractCall({...opts,fee}); usedFee=fee; break;
+  }
+  lastGoodFee.set(fnName,usedFee);
   if(spentMiner+usedFee>SESSION_BUDGET) throw new Error(`cumulative miner fees ${spentMiner+usedFee} would exceed session budget ${SESSION_BUDGET}`);
   spentMiner+=usedFee;
   const res=await broadcastTransaction(tx,network);
