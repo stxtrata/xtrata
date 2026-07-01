@@ -37,6 +37,7 @@ const AGENT_FEE_ADDRESS = process.env.AGENT_FEE_ADDRESS || DEPLOYER;          //
 const AGENT_IDENTITY_ID = process.env.AGENT_IDENTITY_ID || null;              // agent identity NFT token-id; receipts depend on it (existence-only, never moved)
 const RECEIPT_SIZE_EST = 9000;                                              // ~1-chunk receipt, for cost estimation
 export const JOB_WINDOW_MS = Number(process.env.AGENT_JOB_WINDOW_MS || '300000');  // 5 min: commence-or-cancel + no-progress stall window
+export const EXPIRE_GRACE_MS = Number(process.env.AGENT_EXPIRE_GRACE_MS || String(48 * 3600 * 1000));  // 48 h: how long an EXPIRED (never-funded) job keeps its key so a late payment is never stranded
 
 export const netOf = (net) => (net === 'testnet' ? new StacksTestnet() : new StacksMainnet());
 const txVer = (net) => (net === 'testnet' ? TransactionVersion.Testnet : TransactionVersion.Mainnet);
@@ -420,14 +421,14 @@ function buildReceiptHtml(d) {
 <div class="h"><div class="logo"><b>XTRATA</b> <i>Agent One</i></div><span class="badge"${d.outcome !== 'inscribed' ? ' style="color:#ffb454;border-color:#5a4620"' : ''}>${d.outcome === 'inscribed' ? '✓ Inscribed' : '↩︎ Refunded'}</span></div>
 <div class="sub">${d.outcome === 'inscribed' ? 'Inscription receipt' : 'Refund receipt'} · ${d.date.slice(0, 19).replace('T', ' ')} UTC</div>
 <h1>What was inscribed</h1>
-${row('Content URI', d.uri)}${row('Type', d.mime)}
+${row('Content URI', escHtml(d.uri))}${row('Type', escHtml(d.mime))}
 ${row('Size', (d.bytes / 1048576).toFixed(3) + ' MiB · ' + Number(d.bytes).toLocaleString() + ' B')}
 ${row('Chunks', d.chunks + (d.single ? ' · single-tx' : ' · staged'))}
 ${d.audioOpt ? row('Audio optimised', `${(d.audioOpt.from / 1048576).toFixed(3)} → ${(d.audioOpt.to / 1048576).toFixed(3)} MiB · Opus ${d.audioOpt.bitrate} · −${d.audioOpt.savedPct}% (${d.audioOpt.preset})`) : ''}
 ${d.player ? row('Player', `${escHtml(d.player.title)}${d.player.artist ? ' — ' + escHtml(d.player.artist) : ''} · embedded Opus${d.player.hasCover ? ' + cover art' : ''}`) : ''}
 ${row('Inscription token', '<span class="tok">#' + (d.tokenId ?? '—') + '</span>')}
 ${row('Receipt token', d.receiptTokenId ? ('<span class="tok">#' + d.receiptTokenId + '</span>') : 'this inscription')}
-${row('Delivered to', short(d.recipient))}
+${row('Delivered to', escHtml(short(d.recipient)))}
 ${d.agentIdentityId ? row('Issued by', 'Agent One · identity <span class="tok">#' + d.agentIdentityId + '</span>') : ''}
 ${d.outcome === 'inscribed' ? `<h1>Cost breakdown</h1>
 ${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
@@ -439,7 +440,7 @@ ${row('Change returned to you', stxr(d.changeReturned) + usd(d.changeReturned))}
 ${d.note ? row('Note', escHtml(d.note)) : ''}
 <div class="tot">${row('Total paid', stxr(d.totalPaid) + usd(d.totalPaid))}</div>` : `<h1>Outcome</h1>
 ${row('Status', 'Not completed — funds returned')}
-${d.note ? row('Reason', d.note) : ''}
+${d.note ? row('Reason', escHtml(d.note)) : ''}
 ${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
 <div class="tot">${row('Returned to you', stxr(d.changeReturned) + usd(d.changeReturned))}</div>`}
 <div class="foot">Core ${d.core} · job ${d.jobId}${d.stxUsd ? ' · STX $' + d.stxUsd : ''} · settled on Bitcoin via Stacks</div>
@@ -549,6 +550,24 @@ export async function refundAndClose(opts) {
   }
   if (!job.ephemeralMnemonic) { writeJob(jobDir, job); return { noKey: true }; }
   const network = netOf(net); const core = [DEPLOYER, job.core]; const dep = deriveFrom(job.ephemeralMnemonic, net);
+  // NEVER-STRAND GUARD: a job that was never funded must NOT have its key deleted on expiry — a slow
+  // payment confirming after cancellation would land at a keyless address and be lost forever. Instead:
+  // park it as EXPIRED (key kept), and only after EXPIRE_GRACE_MS with a confirmed-zero balance and an
+  // empty mempool (opts.final, driven by the reaper) is the key discarded. If funds DID arrive by then,
+  // fall through to the normal refund path below, which sweeps everything back to the payer.
+  if (!job.depositReceivedUstx) {
+    let bal = null; try { bal = await balance(network, dep.address, hiroKey); } catch {}
+    const pending = (bal != null && bal === 0n) ? await hasPendingInbound(network, dep.address, hiroKey) : true;
+    if (bal === 0n && !pending) {
+      if (opts.final) { delete job.ephemeralMnemonic; job.status = 'CANCELLED'; job.cancelReason = reason; job.cancelledAt = new Date().toISOString(); writeJob(jobDir, job); return { cancelled: true, neverFunded: true }; }
+      job.status = 'EXPIRED'; job.expiredAt = job.expiredAt || new Date().toISOString(); job.cancelReason = reason; writeJob(jobDir, job);
+      return { expired: true, keyKept: true };
+    }
+    // balance unknown or funds present/pending → keep the key and let the normal path (or a later tick) handle it
+    if (bal == null) { job.status = 'EXPIRED'; job.expiredAt = job.expiredAt || new Date().toISOString(); writeJob(jobDir, job); return { expired: true, keyKept: true, balanceUnconfirmed: true }; }
+    if (bal === 0n && pending) { job.status = 'EXPIRED'; job.expiredAt = job.expiredAt || new Date().toISOString(); writeJob(jobDir, job); return { expired: true, keyKept: true, pendingInbound: true }; }
+    job.depositReceivedUstx = bal.toString();   // funds arrived late → refund them via the normal path below
+  }
   let returnTo = (await resolveFunder(job, network, hiroKey)) || job.user;   // prefer the actual payer; fall back to recipient only if undetectable
   const out = { reason, deliveredNfts: [], refundTx: null };
   // 1) hand back any inscription/receipt this wallet actually minted (never strand an NFT)
@@ -578,16 +597,45 @@ export async function refundAndClose(opts) {
   return out;
 }
 
-// Who funded the deposit address? Returns the sender principal of the inbound STX.
+// Is an inbound STX transfer to `addr` sitting in the mempool? (Payment sent but not yet confirmed.)
+// Conservative: on API error returns true, so callers never treat "unknown" as "definitely empty".
+export async function hasPendingInbound(network, addr, hiroKey = '') {
+  try {
+    const d = await (await hfetch(`${network.coreApiUrl}/extended/v1/address/${addr}/mempool?limit=20`, hiroKey)).json();
+    return (d.results || []).some((tx) => tx.token_transfer && tx.token_transfer.recipient_address === addr);
+  } catch { return true; }
+}
+
+// Who funded the deposit address? Returns the sender principal that paid the MOST STX in total.
+// DUST-RESISTANT: deposit addresses are public, so an attacker could send 1 uSTX first to try to
+// register as the "funder" (and receive the fast-track inscription + all refunds). Taking the
+// largest cumulative sender — not the first inbound — means the real payer always wins.
+const topSender = (totals) => {
+  let best = null, bestAmt = -1n;
+  for (const [sender, amt] of totals) if (amt > bestAmt) { best = sender; bestAmt = amt; }
+  return best;
+};
 export async function detectFunder(network, addr, hiroKey = '') {
   try {
-    const d = await (await hfetch(`${network.coreApiUrl}/extended/v1/address/${addr}/stx_inbound?limit=20`, hiroKey)).json();
-    const inbound = (d.results || []).filter((r) => r.sender && BigInt(r.amount || '0') > 0n);
-    if (inbound.length) return inbound[0].sender;
+    const d = await (await hfetch(`${network.coreApiUrl}/extended/v1/address/${addr}/stx_inbound?limit=50`, hiroKey)).json();
+    const totals = new Map();
+    for (const r of (d.results || [])) {
+      const amt = BigInt(r.amount || '0');
+      if (r.sender && amt > 0n) totals.set(r.sender, (totals.get(r.sender) || 0n) + amt);
+    }
+    if (totals.size) return topSender(totals);
   } catch {}
   try {
-    const d = await (await hfetch(`${network.coreApiUrl}/extended/v1/address/${addr}/transactions?limit=20`, hiroKey)).json();
-    for (const r of (d.results || [])) { const tx = r.tx || r; if (tx.token_transfer && tx.token_transfer.recipient_address === addr && tx.sender_address) return tx.sender_address; }
+    const d = await (await hfetch(`${network.coreApiUrl}/extended/v1/address/${addr}/transactions?limit=50`, hiroKey)).json();
+    const totals = new Map();
+    for (const r of (d.results || [])) {
+      const tx = r.tx || r;
+      if (tx.token_transfer && tx.token_transfer.recipient_address === addr && tx.sender_address) {
+        const amt = BigInt(tx.token_transfer.amount || '0');
+        if (amt > 0n) totals.set(tx.sender_address, (totals.get(tx.sender_address) || 0n) + amt);
+      }
+    }
+    if (totals.size) return topSender(totals);
   } catch {}
   return null;
 }

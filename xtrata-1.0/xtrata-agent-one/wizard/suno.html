@@ -51,6 +51,12 @@
   .steps{display:flex;gap:6px;margin-top:12px;font-size:11px;color:var(--mut);flex-wrap:wrap}
   .step{padding:2px 8px;border:1px solid var(--line);border-radius:999px}
   .step.on{color:var(--acc2);border-color:#3a2f7a} .step.done{color:var(--ok);border-color:#1f5a45}
+  .bar{height:6px;border-radius:999px;background:#1a2438;margin-top:12px;overflow:hidden}
+  .bar i{display:block;height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,var(--acc2),var(--acc));transition:width .9s ease}
+  .bar.indet i{width:28%;animation:xslide 1.6s ease-in-out infinite}
+  @keyframes xslide{0%{margin-left:-28%}100%{margin-left:100%}}
+  .tip{margin-top:9px;font-size:11px;color:var(--mut);min-height:14px;transition:opacity .4s}
+  .elapsed{float:right;color:var(--mut);font-size:11px;font-variant-numeric:tabular-nums}
   .result{margin-top:16px;display:none} .result.show{display:block}
   .result a.btn{display:block;text-align:center;text-decoration:none;background:linear-gradient(180deg,#37cf8e,#23b277)}
   .muted{color:var(--mut)} a{color:var(--acc)}
@@ -95,7 +101,9 @@
     <div id="hint" class="hint"></div>
 
     <div id="prog" class="prog">
-      <div><span class="spin"></span><span id="progMsg">Starting…</span></div>
+      <div><span class="spin"></span><span id="progMsg">Starting…</span><span class="elapsed" id="elapsed"></span></div>
+      <div class="bar indet" id="bar"><i></i></div>
+      <div class="tip" id="tip"></div>
       <div class="steps">
         <span class="step" data-s="pay">Payment</span>
         <span class="step" data-s="inscribe">Inscribe</span>
@@ -118,7 +126,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 <script src="HTML_Template.js?v=3"></script>
 <script src="suno-build.js?v=3"></script>
-<script src="agent-one.js?v=3"></script>
+<script src="agent-one.js?v=4"></script>
 <script>
 const SERVER = { mock:false, net:'mainnet' };
 let WALLET=null, FILE=null, PLAYER=null, META=null, EST=null, JOB=null, poll=null, building=false;
@@ -245,26 +253,49 @@ $('#go').onclick=async()=>{
   }catch(e){ $('#prog').className='prog'; $('#hint').innerHTML='<span class="err">'+esc(e.message)+'</span>'; b.disabled=false; }
 };
 
-const PHASE={ FUNDED:{msg:'Payment detected — starting…',on:['pay']},
-  INSCRIBING:{msg:'Inscribing your player on-chain…',on:['pay','inscribe']},
-  INSCRIBED:{msg:'Inscribed — delivering…',on:['pay','inscribe']},
-  DELIVERING:{msg:'Delivering token + receipt, refunding change…',on:['pay','inscribe','deliver']} };
-function setProg(msg, done){ $('#prog').className='prog show'; $('#progMsg').textContent=msg;
+const PHASE={ FUNDED:{msg:'Payment confirmed — starting…',on:['pay'],pct:18},
+  INSCRIBING:{msg:'Inscribing your player on-chain…',on:['pay','inscribe'],pct:30},
+  INSCRIBED:{msg:'Inscribed ✓ — minting your receipt…',on:['pay','inscribe'],pct:85},
+  DELIVERING:{msg:'Delivering token + receipt, refunding change…',on:['pay','inscribe','deliver'],pct:92} };
+const TIPS=[
+  'Stacks blocks confirm in seconds since the Nakamoto upgrade — but a full inscription is several transactions (upload → seal → deliver → refund), so allow 2–10 minutes end-to-end.',
+  'Keep this tab open until you see ✓ — the agent runs in your browser. If the tab closes, it resumes (or refunds) when you reopen the page.',
+  'Large files upload in 32-chunk batches. Each batch is confirmed on-chain before the next, so a hiccup never re-inscribes a batch — it picks up exactly where it left off.',
+  'Your deposit sits in a one-shot wallet. Anything unused comes back to you automatically as change.',
+  'The final step mints an on-chain HTML receipt and sends both tokens to your wallet.',
+];
+let tipIdx=0, tipTimer=null, progT0=null, elapsedTimer=null;
+function setBar(pct){ const b=$('#bar'); if(pct==null){ b.className='bar indet'; b.firstElementChild.style.width='28%'; }
+  else { b.className='bar'; b.firstElementChild.style.width=Math.max(2,Math.min(100,pct))+'%'; } }
+function startWaitExtras(){
+  if(!tipTimer){ const rot=()=>{ const t=$('#tip'); t.style.opacity=0; setTimeout(()=>{ t.textContent=TIPS[tipIdx++%TIPS.length]; t.style.opacity=1; },400); }; rot(); tipTimer=setInterval(rot,9000); }
+  if(!elapsedTimer){ progT0=progT0||Date.now(); elapsedTimer=setInterval(()=>{ const s=((Date.now()-progT0)/1000)|0; $('#elapsed').textContent=(s>=60?((s/60)|0)+'m ':'')+ (s%60)+'s'; },1000); }
+}
+function stopWaitExtras(){ if(tipTimer){clearInterval(tipTimer);tipTimer=null;} if(elapsedTimer){clearInterval(elapsedTimer);elapsedTimer=null;} progT0=null; $('#elapsed').textContent=''; $('#tip').textContent=''; }
+function setProg(msg, done, pct){ $('#prog').className='prog show'; $('#progMsg').textContent=msg; setBar(pct); startWaitExtras();
   document.querySelectorAll('.step').forEach(s=>{ s.className='step'+((done||[]).includes(s.dataset.s)?' done':''); }); }
-function setPhase(st){ const p=PHASE[st]; if(!p) return; $('#progMsg').textContent=p.msg;
+function setPhase(st, job){ const p=PHASE[st]; if(!p) return;
+  let msg=p.msg, pct=p.pct;
+  // Chunk-level progress from the agent (staged uploads): "uploading · X/Y chunks"
+  const m=/(\d+)\s*\/\s*(\d+)\s*chunks/.exec((job&&job.progress)||'');
+  if(st==='INSCRIBING'&&m){ const a=+m[1], b=+m[2]||1; pct=30+Math.round(52*a/b); msg='Uploading on-chain · '+a+' / '+b+' chunks ('+Math.round(100*a/b)+'%)'; }
+  else if(st==='INSCRIBING'&&job&&job.progress){ msg=job.progress.charAt(0).toUpperCase()+job.progress.slice(1); }
+  $('#progMsg').textContent=msg; setBar(pct); startWaitExtras();
   document.querySelectorAll('.step').forEach(s=>{ s.className='step'+(p.on.includes(s.dataset.s)?' done':''); }); }
 
-function startPoll(){ if(poll) clearInterval(poll); poll=setInterval(refresh,3500); refresh(); }
+function startPoll(){ if(poll) clearInterval(poll); poll=setInterval(refresh,2000); refresh(); }
 async function refresh(){
   if(!JOB) return;
   try{ const {job,status}=await api('/api/jobs/'+JOB.jobId);
-    const funded=status&&status.funded, st=job.status;
-    if(st==='AWAITING_DEPOSIT'){ setProg(funded?'Payment detected — starting…':'Waiting for payment to land…', funded?['pay']:[]); }
-    else if(PHASE[st]){ setPhase(st); }
-    if(st==='COMPLETE'){ clearInterval(poll); poll=null; done(job); }
-    else if(st==='CANCELLED'){ clearInterval(poll); poll=null; $('#prog').className='prog';
+    const funded=status&&status.funded, pending=status&&status.pending, st=job.status;
+    if(st==='AWAITING_DEPOSIT'){
+      setProg(funded?'Payment confirmed — starting…':(pending?'Payment seen — confirming (usually under 30 s)…':'Waiting for payment to land…'),
+        funded?['pay']:[], funded?18:(pending?10:4)); }
+    else if(PHASE[st]){ setPhase(st, job); }
+    if(st==='COMPLETE'){ clearInterval(poll); poll=null; setBar(100); setTimeout(()=>{ stopWaitExtras(); done(job); },600); }
+    else if(st==='CANCELLED'){ clearInterval(poll); poll=null; stopWaitExtras(); $('#prog').className='prog';
       $('#hint').innerHTML='<span class="muted">↩︎ Cancelled — funds returned'+(job.cancelReason?(' ('+esc(job.cancelReason)+')'):'')+'.</span>'; $('#go').disabled=false; }
-    else if(st==='ERROR'||st==='NEEDS_RECOVERY'){ clearInterval(poll); poll=null; $('#prog').className='prog';
+    else if(st==='ERROR'||st==='NEEDS_RECOVERY'){ clearInterval(poll); poll=null; stopWaitExtras(); $('#prog').className='prog';
       $('#hint').innerHTML='<span class="err">'+esc(job.error||'Something went wrong')+(st==='NEEDS_RECOVERY'?' — funds safe, will auto-return.':' — funds returned.')+'</span>'; $('#go').disabled=false; }
   }catch{ /* transient — keep polling */ }
 }
@@ -287,7 +318,7 @@ function done(job){
   const ag=$('#again'); if(ag) ag.onclick=(e)=>{ e.preventDefault(); resetAll(); };
   $('#go').disabled=false; $('#go').textContent='Inscribe my track';
 }
-function resetAll(){ FILE=null;PLAYER=null;META=null;EST=null;JOB=null; if(poll){clearInterval(poll);poll=null;}
+function resetAll(){ FILE=null;PLAYER=null;META=null;EST=null;JOB=null; if(poll){clearInterval(poll);poll=null;} stopWaitExtras();
   picker.value=''; drop.classList.remove('has'); drop.innerHTML=DROP_HTML;
   $('#quote').className='quote'; $('#prog').className='prog'; $('#result').className='result'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc'); $('#hint').textContent=''; updateGo(); }
 </script>
