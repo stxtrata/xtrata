@@ -118,4 +118,6 @@ Flow in the wizard:
    it (same-origin, simplest) or set the `API` constant at the top of the page's
    script to the server's URL.
 
-The page already falls back to `http://127.0.0.1:8787` when opened from `file://`.
+Note: the API no longer sends CORS headers (a wildcard would let any website in
+your browser drive it), so the wizard must be served same-origin — open it at
+`http://127.0.0.1:8787/`, not from `file://`.
