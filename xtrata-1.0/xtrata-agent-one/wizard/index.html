@@ -259,7 +259,8 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
 
 // ---- health ----
 (async()=>{ try{ const h=await api('/api/health'); SERVER.mock=!!h.mock; SERVER.net=h.net; SERVER.windowMs=h.windowMs||300000; $('#health').innerHTML =
-  `<span class="pill ${h.mock?'mock':'live'}">${h.mock?'MOCK':'LIVE'}</span><span class="pill">${esc(h.core)}</span><span class="pill">${esc(h.net)}</span><span class="pill" title="server started — restart it if this predates your last change">⟳ ${h.startedAt?new Date(h.startedAt).toLocaleTimeString():''}</span>`;
+  `<span class="pill ${h.mock?'mock':'live'}">${h.mock?'MOCK':'LIVE'}</span><span class="pill">${esc(h.core)}</span><span class="pill">${esc(h.net)}</span><span class="pill" title="server started — restart it if this predates your last change">⟳ ${h.startedAt?new Date(h.startedAt).toLocaleTimeString():''}</span><span class="pill" title="agent bundle build">${esc(h.build||window.XAO_AGENT_BUILD||'agent pre-v')}</span>`;
+  if(window.XtrataAgent&&window.XAO_AGENT_BUILD!=='2026-07-01.5'){ $('#health').innerHTML+='<span class="pill" style="color:var(--bad);border-color:#5a2222" title="the deployed agent-one.js is older than this page — rebuild/redeploy it">⚠ stale agent bundle</span>'; }
 }catch(e){ $('#health').innerHTML = `<span class="pill" style="color:var(--bad);border-color:#5a2222">server offline</span>`; } })();
 
 // ---- wallet connect (delegates to the Xtrata site's bundled wallet shim: window.XtrataWallet) ----

@@ -129,6 +129,18 @@
 <script src="agent-one.js?v=5"></script>
 <script>
 const SERVER = { mock:false, net:'mainnet' };
+// VERSION HANDSHAKE: this page requires the agent bundle build below. The site's deploy pipeline
+// rebuilds agent-one.js from src/agent-one/*.ts — if that source hasn't been updated, the stale agent
+// is detected here and live inscriptions are blocked (a stale agent burns real miner fees on refund loops).
+const XAO_EXPECTED_BUILD='2026-07-01.5';
+let AGENT_STALE=false;
+function checkAgentBuild(){
+  const b=window.XAO_AGENT_BUILD||null;
+  if(b===XAO_EXPECTED_BUILD) return;
+  AGENT_STALE=true;
+  $('#hint').innerHTML='<span class="err">⚠ Outdated agent bundle deployed (build '+esc(b||'pre-versioning')+', page expects '+XAO_EXPECTED_BUILD+'). Live inscriptions are disabled — the deployed agent-one.js is missing the fee-spike + auto-resume fixes. Rebuild/redeploy it, then reload.</span>';
+  console.error('[xao] agent bundle build mismatch:',b,'expected',XAO_EXPECTED_BUILD);
+}
 let WALLET=null, FILE=null, PLAYER=null, META=null, EST=null, JOB=null, poll=null, building=false;
 
 const $ = (s)=>document.querySelector(s);
@@ -200,7 +212,8 @@ async function payWallet(addr, ustx){ const w=xw();
 
 // ---- health ----
 (async()=>{ try{ const h=await api('/api/health'); SERVER.mock=!!h.mock; SERVER.net=h.net||'mainnet';
-  $('#health').className='pill '+(h.mock?'mock':'live'); $('#health').textContent=(h.mock?'MOCK':'LIVE')+' · '+SERVER.net;
+  $('#health').className='pill '+(h.mock?'mock':'live'); $('#health').textContent=(h.mock?'MOCK':'LIVE')+' · '+SERVER.net+' · agent '+(window.XAO_AGENT_BUILD||'pre-v');
+  checkAgentBuild();
 }catch(e){ $('#health').textContent='agent not loaded'; $('#health').style.color='var(--bad)'; } updateGo(); })();
 (function(){ try{ const w=xw(); const a=w&&w.getAddress&&w.getAddress(); if(a) setWallet(a); }catch{} })();
 
@@ -242,6 +255,7 @@ async function pickFile(f){
 function updateGo(){
   const b=$('#go');
   if(building){ b.disabled=true; b.textContent='Building player…'; return; }
+  if(AGENT_STALE&&!SERVER.mock){ b.disabled=true; b.textContent='Agent bundle outdated — redeploy required'; return; }
   if(!FILE||!PLAYER){ b.disabled=true; b.textContent='Drop a track to begin'; return; }
   if(!SERVER.mock && !WALLET){ b.disabled=true; b.textContent='Connect your wallet to inscribe'; return; }
   b.disabled=false; b.textContent = EST ? ('Inscribe my track  ·  pay '+stx(EST.requiredUstx)) : 'Inscribe my track';
