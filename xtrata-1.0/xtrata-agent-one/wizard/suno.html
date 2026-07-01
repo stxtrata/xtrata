@@ -245,7 +245,10 @@ async function pickFile(f){
     if(r.html){ $('#previewFrame').srcdoc=r.html; $('#preview').style.display='block'; }
     EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size})});
     $('#qName').textContent=(r.title||f.name)+(r.artist?(' — '+r.artist):'');
-    $('#qPlayer').textContent=(PLAYER.size/1048576).toFixed(2)+' MiB · Opus'+(r.hasCover?' + cover':'')+(r.hasLyrics?' + lyrics':'');
+    const mib=(n)=>(n/1048576).toFixed(2);
+    $('#qPlayer').textContent=mib(PLAYER.size)+' MiB · Opus'+(r.hasCover?' + cover':'')+(r.hasLyrics?' + lyrics':'');
+    // Conversion transparency: source → Opus (Music HQ 96k VBR) → base64-in-player.
+    if(r.opusBytes&&r.sourceBytes){ $('#qPlayer').title='MP3 '+mib(r.sourceBytes)+' MiB → Opus 96k VBR '+mib(r.opusBytes)+' MiB (−'+Math.round((1-r.opusBytes/r.sourceBytes)*100)+'%) → +⅓ base64 embedding'; }
     $('#qPay').textContent=stx(EST.requiredUstx)+(EST.stxUsd?(' · ~$'+(Number(EST.requiredUstx)/1e6*EST.stxUsd).toFixed(2)):'');
     $('#quote').className='quote show'; $('#hint').textContent='';
   }catch(e){ $('#hint').innerHTML='<span class="err">Could not build the player: '+esc(e.message)+'</span>'; }
@@ -285,12 +288,13 @@ $('#go').onclick=async()=>{
 const PHASE={ FUNDED:{msg:'Payment confirmed — starting…',on:['pay'],pct:18},
   INSCRIBING:{msg:'Inscribing your player on-chain…',on:['pay','inscribe'],pct:30},
   INSCRIBED:{msg:'Inscribed ✓ — minting your receipt…',on:['pay','inscribe'],pct:85},
-  DELIVERING:{msg:'Delivering token + receipt, refunding change…',on:['pay','inscribe','deliver'],pct:92} };
+  DELIVERING:{msg:'Delivering your tokens + refunding every unused µSTX of your deposit…',on:['pay','inscribe','deliver'],pct:92} };
 const TIPS=[
   'Stacks blocks confirm in seconds since the Nakamoto upgrade — but a full inscription is several transactions (upload → seal → deliver → refund), so allow 2–10 minutes end-to-end.',
   'Keep this tab open until you see ✓ — the agent runs in your browser. If the tab closes, it resumes (or refunds) when you reopen the page.',
   'Large files upload in 32-chunk batches. Each batch is confirmed on-chain before the next, so a hiccup never re-inscribes a batch — it picks up exactly where it left off.',
   'Your deposit sits in a one-shot wallet. Anything unused comes back to you automatically as change.',
+  'If network fees spike mid-job, the agent pauses and waits for them to settle instead of overpaying — the status line will say so.',
   'The final step mints an on-chain HTML receipt and sends both tokens to your wallet.',
 ];
 let tipIdx=0, tipTimer=null, progT0=null, elapsedTimer=null;
@@ -341,13 +345,29 @@ function done(job){
   $('#prog').className='prog';
   const tok=job.tokenId, net=(job.net||SERVER.net);
   const player=(net==='mainnet'&&tok)?('https://xtrata.xyz/inscription/'+tok):null;
+  // Final settlement: explain what came back and show the true price paid — in STX and, above all, dollars.
+  const R=job.receipt||{};
+  const usdRate=(R.stxUsd!=null)?Number(R.stxUsd):(EST&&EST.stxUsd?Number(EST.stxUsd):null);
+  const usd=u=>usdRate!=null?('$'+(Number(u)/1e6*usdRate).toFixed(2)):null;
+  const both=u=>stx(u)+(usd(u)?(' · '+usd(u)):'');
+  const paidU=R.totalPaid!=null?R.totalPaid:(R.depositReceived!=null&&job.refundedUstx!=null?String(BigInt(R.depositReceived)-BigInt(job.refundedUstx||'0')):null);
+  const settle=
+    '<div style="background:linear-gradient(180deg,#0f1f17,#0c1812);border:1px solid #1f5a45;border-radius:12px;padding:14px 16px;margin:14px 0">'+
+      (R.depositReceived!=null?'<div class="kv"><span>Deposit you paid</span><span>'+both(R.depositReceived)+'</span></div>':'')+
+      (job.refundedUstx!=null?'<div class="kv"><span>Unused funds refunded to you</span><span class="ok">'+both(job.refundedUstx||'0')+'</span></div>':'')+
+      '<div class="muted" style="font-size:11px;margin:4px 0 8px">The deposit is over-collected to guarantee fees; everything not spent on the inscription, receipt, network fees and the agent fee comes straight back to your wallet.</div>'+
+      (paidU!=null?('<div class="kv" style="border-top:1px solid #1f5a45;padding-top:10px"><span style="font-weight:700;color:var(--ink)">Final price to immortalise this song</span>'+
+        '<span style="text-align:right"><span style="display:block;font-weight:800;font-size:19px;color:var(--acc)">'+(usd(paidU)||stx(paidU))+'</span>'+
+        (usd(paidU)?('<span class="muted" style="font-size:12px">'+stx(paidU)+'</span>'):'')+'</span></div>'):'')+
+      '<div class="muted" style="font-size:11px;margin-top:8px">On-chain forever — no renewals, no hosting, no further cost. Full breakdown on your receipt.</div>'+
+    '</div>';
   $('#result').className='result show';
   $('#result').innerHTML =
     '<div class="ok" style="font-weight:800;font-size:16px;margin-bottom:6px">✓ Inscribed'+(META&&META.title?(' — '+esc(META.title)):'')+(META&&META.artist?(' · '+esc(META.artist)):'')+'</div>'+
     '<div class="kv"><span>Player token</span><span class="ok">#'+esc(tok||'—')+'</span></div>'+
     (job.receiptTokenId?'<div class="kv"><span>Receipt token</span><span class="ok">#'+esc(job.receiptTokenId)+'</span></div>':'')+
     ((META&&(META.hasCover||META.hasLyrics))?('<div class="kv"><span>Includes</span><span>Opus'+(META.hasCover?' + cover':'')+(META.hasLyrics?' + lyrics':'')+'</span></div>'):'')+
-    (job.refundedUstx!=null?'<div class="kv"><span>Change refunded</span><span>'+stx(job.refundedUstx||'0')+'</span></div>':'')+
+    settle+
     (player?('<a class="btn" href="'+player+'" target="_blank" rel="noopener">▶ Open your player</a>'):'')+
     '<button class="btn ghost" style="display:block;width:100%;text-align:center;margin-top:8px" onclick="viewReceipt(\''+esc(job.jobId)+'\')">View receipt</button>'+
     '<div class="hint" style="margin-top:12px"><a href="#" id="again">Inscribe another track</a></div>';

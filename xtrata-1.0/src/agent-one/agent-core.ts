@@ -62,21 +62,45 @@ async function quoteFee(sizeBytes: number, chunks: number) {
   const t: any = (await ro('quote-inscription-fee', [uintCV(BigInt(sizeBytes)), uintCV(BigInt(chunks)), uintCV(single ? 2 : 1)])).value.value;
   return { single, protocolFee: BigInt(t['total-fee'].value), batches: Number(t['upload-batches'].value) };
 }
+// Nakamoto-aware: poll 2 s for the first ~90 s (most blocks land in seconds), then 6 s. ~16 min ceiling.
 async function waitTx(txid: string) {
-  for (let i = 0; i < 120; i++) { try { const d = await (await hfetch(`/extended/v1/tx/${txid}`)).json(); if (d.tx_status === 'success') return d; if (d.tx_status && String(d.tx_status).startsWith('abort')) throw new Error('TX ' + d.tx_status); } catch (e: any) { if (String(e).includes('TX abort')) throw e; } await sleep(8000); }
+  for (let i = 0; i < 210; i++) { try { const d = await (await hfetch(`/extended/v1/tx/${txid}`)).json(); if (d.tx_status === 'success') return d; if (d.tx_status && String(d.tx_status).startsWith('abort')) throw new Error('TX ' + d.tx_status); } catch (e: any) { if (String(e).includes('TX abort')) throw e; } await sleep(i < 45 ? 2000 : 6000); }
   throw new Error('not confirmed: ' + txid);
 }
 async function getIdByHash(h: Uint8Array) { const j: any = await ro('get-id-by-hash', [bufferCV(h)]); return j.value ? String(j.value.value) : null; }
 async function ownerOf(id: string) { try { const o: any = await ro('get-owner', [uintCV(BigInt(id))]); const v = o.value && o.value.value; return v ? (v.value ?? v) : null; } catch { return null; } }
 
 // ---- signed sends (browser) ----
-async function send(key: string, from: string, fn: string, args: any[], spendCap: bigint | null) {
+// FEE POLICY — never crash a job on a fee estimate. The node's estimator returns absurd one-off spikes
+// (observed: identical add-chunk-batch txs quoted 0.52 STX then 74–114 STX). Three stages:
+//   1. 3 quick retries (6 s) — catches estimator glitches;
+//   2. WAIT for fees to settle — up to 12 polls, 20 s apart, reported via onFeeWait so the UI can say
+//      "network fees are high — waiting", not look stuck (our own ~512 KB batches can drive fees up);
+//   3. bounded fallback — 2× the last successful fee for this fn, never above the cap.
+const lastGoodFee = new Map<string, bigint>();
+async function send(key: string, from: string, fn: string, args: any[], spendCap: bigint | null, onFeeWait?: (m: string) => void) {
   const post = spendCap != null ? [makeStandardSTXPostCondition(from, FungibleConditionCode.LessEqual, spendCap)] : [];
-  const tx: any = await makeContractCall({ contractAddress: CORE[0], contractName: CORE[1], functionName: fn, functionArgs: args, senderKey: key, network, postConditionMode: PostConditionMode.Deny, postConditions: post, anchorMode: AnchorMode.Any } as any);
-  const fee = BigInt(tx.auth.spendingCondition.fee.toString());
-  if (fee > MINT_CAP) throw new Error(`${fn} fee ${fee} exceeds cap`);
-  const res: any = await broadcastTransaction(tx, network); if (res.error) throw new Error(`${fn}: ${res.error} ${res.reason || ''}`);
-  const txid = res.txid || res; const d = await waitTx(txid); return { txid, d };
+  const opts: any = { contractAddress: CORE[0], contractName: CORE[1], functionName: fn, functionArgs: args, senderKey: key, network, postConditionMode: PostConditionMode.Deny, postConditions: post, anchorMode: AnchorMode.Any };
+  let tx: any, fee: bigint;
+  for (let attempt = 0; ; attempt++) {
+    tx = await makeContractCall(opts);
+    fee = BigInt(tx.auth.spendingCondition.fee.toString());
+    xaoLog(null, `${fn}: fee estimate ${fee} µSTX (cap ${MINT_CAP}, try ${attempt + 1})`);
+    if (fee <= MINT_CAP) break;
+    if (attempt < 3) { xaoLog(null, `${fn}: estimator spike — retrying (${attempt + 1}/3)`); await sleep(6000); continue; }
+    if (attempt < 15) { const m = `network fees are high — waiting for them to settle (${attempt - 2}/12)`; xaoLog(null, `${fn}: ${m}`); if (onFeeWait) try { onFeeWait(m); } catch {} await sleep(20000); continue; }
+    const fb = lastGoodFee.get(fn); const useFee = fb && fb * 2n <= MINT_CAP ? fb * 2n : MINT_CAP;
+    xaoLog(null, `${fn}: fees still elevated after waiting — using bounded fallback fee ${useFee}`);
+    tx = await makeContractCall({ ...opts, fee: useFee }); fee = useFee; break;
+  }
+  lastGoodFee.set(fn, fee);
+  const res: any = await broadcastTransaction(tx, network);
+  if (res.error) { xaoLog(null, `${fn}: broadcast REJECTED — ${res.error} ${res.reason || ''}`); throw new Error(`${fn}: ${res.error} ${res.reason || ''}`); }
+  const txid = res.txid || res;
+  xaoLog(null, `${fn}: broadcast 0x${String(txid).replace(/^0x/, '')} · fee ${fee} µSTX — awaiting confirmation`);
+  const t0 = Date.now(); const d = await waitTx(txid);
+  xaoLog(null, `${fn}: confirmed in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+  return { txid, d };
 }
 async function sendNft(key: string, from: string, id: string, to: string) {
   const tx: any = await makeContractCall({ contractAddress: CORE[0], contractName: CORE[1], functionName: 'transfer', functionArgs: [uintCV(BigInt(id)), standardPrincipalCV(from), standardPrincipalCV(to)], senderKey: key, network, postConditionMode: PostConditionMode.Allow, anchorMode: AnchorMode.Any } as any);
@@ -95,6 +119,9 @@ async function mintSingle(key: string, from: string, data: Uint8Array, mime: str
   const fn = depCV.length ? 'mint-single-tx-recursive' : 'mint-single-tx';
   const args: any[] = [bufferCV(h), stringAsciiCV(mime), uintCV(BigInt(data.length)), listCV(chunks.map((c) => bufferCV(c))), stringAsciiCV(uri)];
   if (depCV.length) args.push(listCV(depCV));
+  // IDEMPOTENT: if this exact hash is already inscribed (e.g. retry after a confirmation timeout),
+  // return the existing token — a resume can never double-mint or double-spend.
+  const pre = await getIdByHash(h); if (pre) return pre;
   const { d } = await send(key, from, fn, args, spendCap);
   return tidFrom(d) || (await getIdByHash(h));
 }
@@ -106,12 +133,13 @@ async function stagedInscribe(job: any, key: string, from: string, data: Uint8Ar
   onProg(`planned · ${total} chunks`);
   let idx: number | null = null;
   try { const st: any = (await ro('get-upload-state', [bufferCV(h), standardPrincipalCV(from)])); idx = st.value ? Number(st.value.value['current-index'].value) : null; } catch { idx = null; }
-  if (idx === null) { await send(key, from, 'begin-or-get', [bufferCV(h), stringAsciiCV(job.mime), uintCV(BigInt(data.length)), uintCV(BigInt(total))], beginFee); idx = 0; onProg(`upload started · 0/${total}`); }
-  while (idx < total) { const batch = chunks.slice(idx, idx + BATCH); await send(key, from, 'add-chunk-batch', [bufferCV(h), listCV(batch.map((c) => bufferCV(c)))], null); const st: any = (await ro('get-upload-state', [bufferCV(h), standardPrincipalCV(from)])); const ni = st.value ? Number(st.value.value['current-index'].value) : null; if (ni === null || ni <= idx) throw new Error(`upload stalled at ${idx}`); idx = ni; onProg(`uploading · ${idx}/${total}`); }
+  if (idx === null) { await send(key, from, 'begin-or-get', [bufferCV(h), stringAsciiCV(job.mime), uintCV(BigInt(data.length)), uintCV(BigInt(total))], beginFee, onProg); idx = 0; onProg(`upload started · 0/${total}`); }
+  else if (idx > 0) { onProg(`resuming upload · ${idx}/${total} chunks already on-chain`); }
+  while (idx < total) { const batch = chunks.slice(idx, idx + BATCH); await send(key, from, 'add-chunk-batch', [bufferCV(h), listCV(batch.map((c) => bufferCV(c)))], null, onProg); const st: any = (await ro('get-upload-state', [bufferCV(h), standardPrincipalCV(from)])); const ni = st.value ? Number(st.value.value['current-index'].value) : null; if (ni === null || ni <= idx) throw new Error(`upload stalled at ${idx}`); idx = ni; onProg(`uploading · ${idx}/${total}`); }
   const deps = (job.deps || []).map((d: string) => uintCV(BigInt(d)));
   const sealFn = deps.length ? 'seal-recursive' : 'seal-inscription';
   const sealArgs: any[] = deps.length ? [bufferCV(h), stringAsciiCV(job.uri), listCV(deps)] : [bufferCV(h), stringAsciiCV(job.uri)];
-  const { d } = await send(key, from, sealFn, sealArgs, sealFee); onProg('sealed'); return tidFrom(d) || (await getIdByHash(h));
+  const { d } = await send(key, from, sealFn, sealArgs, sealFee, onProg); onProg('sealed'); return tidFrom(d) || (await getIdByHash(h));
 }
 
 // ============================================================================
@@ -135,8 +163,41 @@ const balOf = async (job: any): Promise<bigint> => (MOCK ? BigInt(job.requiredUs
 
 // ---------- localStorage job-state + in-memory file bytes ----------
 const JOB_PREFIX = 'xao-job-';
-const BYTES = new Map<string, Uint8Array>();                 // jobId -> file bytes (MEMORY ONLY; never persisted — quota)
+const BYTES = new Map<string, Uint8Array>();                 // jobId -> file bytes (hot copy; also persisted to IndexedDB below)
 const jobKey = (id: string) => JOB_PREFIX + id;
+
+// ---------- IndexedDB byte persistence (survives reloads — localStorage can't hold multi-MiB files) ----------
+const idbOpen = () => new Promise<IDBDatabase>((res, rej) => {
+  try { const r = indexedDB.open('xtrata-agent-one', 1);
+    r.onupgradeneeded = () => { try { r.result.createObjectStore('files'); } catch {} };
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  } catch (e) { rej(e); }
+});
+async function idbSaveBytes(id: string, bytes: Uint8Array) {
+  try { const db = await idbOpen();
+    await new Promise((res, rej) => { const tx = db.transaction('files', 'readwrite'); tx.objectStore('files').put(bytes, id); tx.oncomplete = res as any; tx.onerror = () => rej(tx.error); });
+    db.close();
+  } catch (e) { console.warn('xao: could not persist file bytes (reload-resume disabled for this job):', e); }
+}
+async function idbLoadBytes(id: string): Promise<Uint8Array | null> {
+  try { const db = await idbOpen();
+    const r: any = await new Promise((res, rej) => { const q = db.transaction('files').objectStore('files').get(id); q.onsuccess = () => res(q.result || null); q.onerror = () => rej(q.error); });
+    db.close(); return r ? (r instanceof Uint8Array ? r : new Uint8Array(r)) : null;
+  } catch { return null; }
+}
+async function idbDeleteBytes(id: string) { try { const db = await idbOpen(); db.transaction('files', 'readwrite').objectStore('files').delete(id); db.close(); } catch {} }
+async function restoreBytes(id: string): Promise<boolean> {
+  if (BYTES.has(id)) return true;
+  const b = await idbLoadBytes(id); if (b && b.length) { BYTES.set(id, b); return true; } return false;
+}
+
+// ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
+export const AGENT_BUILD = '2026-07-01.5';
+function xaoLog(id: string | null, msg: string) {
+  try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
+  if (!id) return;
+  try { const j = readJob(id); j.log = ((j.log || []).slice(-199)).concat(new Date().toISOString() + ' ' + msg); writeJob(j); } catch {}
+}
 function writeJob(j: any) { try { localStorage.setItem(jobKey(j.jobId), JSON.stringify(j)); } catch {} return j; }
 function readJob(id: string): any { const s = localStorage.getItem(jobKey(id)); if (!s) throw new Error('job not found: ' + id); return JSON.parse(s); }
 function listJobsRaw(): any[] { const o: any[] = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(JOB_PREFIX)) { try { o.push(JSON.parse(localStorage.getItem(k) as string)); } catch {} } } return o; }
@@ -245,9 +306,22 @@ ${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
 }
 
 // ---------- funder + retrying STX sends (mirror core) ----------
+// DUST-RESISTANT: funder = the sender with the LARGEST CUMULATIVE inbound STX, not the first inbound.
+// Deposit addresses are public — a 1 µSTX dust tx must never claim fast-track delivery + refunds.
 async function detectFunder(addr: string): Promise<string | null> {
-  try { const d: any = await (await hfetch(`/extended/v1/address/${addr}/stx_inbound?limit=20`)).json(); const inbound = (d.results || []).filter((r: any) => r.sender && BigInt(r.amount || '0') > 0n); if (inbound.length) return inbound[0].sender; } catch {}
-  try { const d: any = await (await hfetch(`/extended/v1/address/${addr}/transactions?limit=20`)).json(); for (const r of (d.results || [])) { const tx = r.tx || r; if (tx.token_transfer && tx.token_transfer.recipient_address === addr && tx.sender_address) return tx.sender_address; } } catch {}
+  const top = (m: Map<string, bigint>) => { let best: string | null = null, bestAmt = -1n; for (const [k, v] of m) if (v > bestAmt) { best = k; bestAmt = v; } return best; };
+  try {
+    const d: any = await (await hfetch(`/extended/v1/address/${addr}/stx_inbound?limit=50`)).json();
+    const totals = new Map<string, bigint>();
+    for (const r of (d.results || [])) { const a = BigInt(r.amount || '0'); if (r.sender && a > 0n) totals.set(r.sender, (totals.get(r.sender) || 0n) + a); }
+    if (totals.size) return top(totals);
+  } catch {}
+  try {
+    const d: any = await (await hfetch(`/extended/v1/address/${addr}/transactions?limit=50`)).json();
+    const totals = new Map<string, bigint>();
+    for (const r of (d.results || [])) { const tx = r.tx || r; if (tx.token_transfer && tx.token_transfer.recipient_address === addr && tx.sender_address) { const a = BigInt(tx.token_transfer.amount || '0'); if (a > 0n) totals.set(tx.sender_address, (totals.get(tx.sender_address) || 0n) + a); } }
+    if (totals.size) return top(totals);
+  } catch {}
   return null;
 }
 async function resolveFunder(job: any): Promise<string | null> { if (job.mock) return job.funder || 'SP_MOCK_SENDER'; if (job.funder) return job.funder; try { return await detectFunder(job.depositAddress); } catch { return null; } }
@@ -261,9 +335,15 @@ async function createJob(opts: any) {
   if (!file || !uri) throw new Error('file, uri required');
   if (!fastTrack && !user) throw new Error('delivery address (user) required unless fastTrack');
   const data = new Uint8Array(await (file as File).arrayBuffer());
+  // DUPLICATE-HASH GUARD: the contract rejects re-inscribing an identical hash — refuse BEFORE creating
+  // a job or taking payment, so identical content is never paid for twice.
+  if (!MOCK) {
+    const existing = await getIdByHash(incHash(chunkBytes(data)));
+    if (existing) throw new Error(`This exact content is already inscribed on-chain as token #${existing}. Inscribing an identical hash is blocked by the contract — no payment was taken.`);
+  }
   const est = await estimate({ bytes: data.length, marginUstx, agentFeePct });
-  const w = newWallet(); const id = `job-${Date.now()}`;
-  BYTES.set(id, data);
+  const w = newWallet(); const id = `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  BYTES.set(id, data); await idbSaveBytes(id, data);
   const job: any = {
     jobId: id, core: CORE_NAME, net: 'mainnet', mock: MOCK, fastTrack, file: (file as File).name || 'asset', uri, mime, deps, user: user || null,
     expectedFunder: expectedFunder || null, funder: null,
@@ -277,18 +357,30 @@ async function createJob(opts: any) {
 }
 async function statusJob(job: any) {
   const bal = await balOf(job);
-  return { jobId: job.jobId, status: job.status, depositAddress: job.depositAddress, requiredUstx: job.requiredUstx, balanceUstx: bal.toString(), funded: bal >= BigInt(job.requiredUstx), tokenId: job.tokenId || null };
+  const funded = bal >= BigInt(job.requiredUstx);
+  // "Payment seen" (mempool) — UI signal only; money decisions still gate on the confirmed balance.
+  let pending = false;
+  if (!funded && !MOCK && job.depositAddress && job.status === 'AWAITING_DEPOSIT') {
+    try { const d: any = await (await hfetch(`/extended/v1/address/${job.depositAddress}/mempool?limit=10`)).json(); pending = (d.results || []).some((tx: any) => tx.token_transfer && tx.token_transfer.recipient_address === job.depositAddress); } catch {}
+  }
+  return { jobId: job.jobId, status: job.status, depositAddress: job.depositAddress, requiredUstx: job.requiredUstx, balanceUstx: bal.toString(), funded, pending, tokenId: job.tokenId || null };
 }
 async function runInscribe(job: any) {
   if (job.mock) { const tokenId = String(Math.floor(1000 + Math.random() * 9000)); job.tokenId = tokenId; job.depositReceivedUstx = job.requiredUstx; job.status = 'INSCRIBED'; writeJob(job); return tokenId; }
-  const bal = await balance(job.depositAddress);
-  if (bal < BigInt(job.requiredUstx)) throw new Error(`not funded: need ${job.requiredUstx}, have ${bal}`);
-  job.depositReceivedUstx = bal.toString();
-  const data = BYTES.get(job.jobId); if (!data) throw new Error('file bytes not in memory (tab reloaded) — returning funds');
+  // Funding gate — skipped on RESUME (a mid-flight job has already spent part of its deposit).
+  if (!job.depositReceivedUstx) {
+    const bal = await balance(job.depositAddress);
+    if (bal < BigInt(job.requiredUstx)) throw new Error(`not funded: need ${job.requiredUstx}, have ${bal}`);
+    job.depositReceivedUstx = bal.toString();
+  }
+  let data = BYTES.get(job.jobId);
+  if (!data && await restoreBytes(job.jobId)) data = BYTES.get(job.jobId);   // reload-proof: restore from IndexedDB
+  if (!data) throw new Error('file bytes not in memory or on disk (storage cleared) — returning funds');
   const dep = deriveFrom(job.ephemeralMnemonic);
   let tokenId: string | null;
+  const prog = (m: string) => { job.progress = m; job.progressAt = new Date().toISOString(); writeJob(job); xaoLog(job.jobId, m); };
   if (job.single) { tokenId = await mintSingle(dep.key, dep.address, data, job.mime, job.uri, job.deps || [], BigInt(job.protocolFee)); }
-  else { tokenId = await stagedInscribe(job, dep.key, dep.address, data, (m) => { job.progress = m; job.progressAt = new Date().toISOString(); writeJob(job); }); }
+  else { tokenId = await stagedInscribe(job, dep.key, dep.address, data, prog); }
   job.tokenId = tokenId; job.status = 'INSCRIBED'; writeJob(job); return tokenId;
 }
 async function deliver(job: any) {
@@ -335,7 +427,7 @@ async function deliver(job: any) {
   let leftover: bigint | null = null; try { leftover = await balance(job.depositAddress); } catch {}
   if (leftover != null && leftover <= REFUND_TX_FEE) delete job.ephemeralMnemonic;
   else { job.keepKey = true; job.keepKeyReason = leftover == null ? 'balance unconfirmed' : `wallet still holds ${leftover} uSTX — sweep with recover-all`; }
-  job.status = 'COMPLETE'; writeJob(job); return { receipt };
+  job.status = 'COMPLETE'; writeJob(job); idbDeleteBytes(job.jobId); return { receipt };
 }
 async function refundAndClose(job: any, reason = 'cancelled') {
   if (job.mock) {
@@ -374,9 +466,15 @@ async function refundAndClose(job: any, reason = 'cancelled') {
   }
   if (returnTo) { try { const sw = await sweepStxTo(dep.key, dep.address, returnTo); if (sw.sent) { out.refundTx = sw.tx; out.refundedUstx = sw.amount; } } catch (e) { out.refundError = errMsg(e); } }
   let leftover: bigint | null = null; try { leftover = await balance(dep.address); } catch {}
-  if (leftover != null && leftover <= REFUND_TX_FEE) { delete job.ephemeralMnemonic; job.status = 'CANCELLED'; }
+  if (leftover != null && leftover <= REFUND_TX_FEE) {
+    // NEVER-STRAND GUARD: a never-funded job keeps its key (EXPIRED) — a slow payment confirming after
+    // cancellation must never land at a keyless address.
+    if (job.depositReceivedUstx || leftover > 0n) { delete job.ephemeralMnemonic; job.status = 'CANCELLED'; }
+    else { job.keepKey = true; job.status = 'EXPIRED'; job.keepKeyReason = 'never funded — key kept so a late payment is never stranded'; }
+  }
   else { job.keepKey = true; job.status = 'NEEDS_RECOVERY'; job.keepKeyReason = `refund unconfirmed; ~${leftover ?? '?'} uSTX may remain`; }
   job.cancelReason = reason; job.cancelledAt = new Date().toISOString(); if (out.refundTx) job.refundTx = out.refundTx;
+  if (job.status === 'CANCELLED') idbDeleteBytes(job.jobId);
   writeJob(job); return out;
 }
 // Fast-track auto-pilot (mirror autoRunJob): detect funder → railroad → inscribe → deliver.
@@ -397,48 +495,94 @@ async function autoRun(job: any) {
 
 // ---------- watcher + reaper (mirror server.mjs; run only while the tab is open) ----------
 const PROCESSING = new Set<string>();
+// AUTO-RESUME: transient failures (network, timeouts, rate limits) do NOT refund — the job parks back at
+// FUNDED/INSCRIBED and the watcher resumes exactly where it left off. Resume is safe end-to-end: staged
+// uploads continue from the on-chain index, single-tx mints are idempotent (get-id-by-hash pre-check).
+// Only deterministic failures or exhausted retries (4, with 15 s × attempt backoff) hit the refund failsafe.
+const FATAL_ERR = /TX abort|not funded|locked to|unrecoverable|file bytes|empty file|could not determine/i;
+const MAX_RETRIES = 4;
 function background(id: string, fn: () => Promise<any>) {
   PROCESSING.add(id);
-  Promise.resolve().then(fn).then(() => PROCESSING.delete(id)).catch(async (e) => {
-    try { const j = readJob(id); j.error = errMsg(e); writeJob(j); } catch {}
-    try { await refundAndClose(readJob(id), 'error: ' + errMsg(e)); } catch {}
+  Promise.resolve().then(fn).then(() => {
+    try { const j = readJob(id); if (j.retryCount && j.status === 'COMPLETE') { delete j.retryCount; writeJob(j); } } catch {}
+    PROCESSING.delete(id);
+  }).catch(async (e) => {
+    const msg = errMsg(e);
+    try {
+      const j = readJob(id); j.error = msg;
+      if (!FATAL_ERR.test(msg) && j.status !== 'AWAITING_DEPOSIT' && (j.retryCount = (j.retryCount || 0) + 1) <= MAX_RETRIES) {
+        j.status = j.tokenId ? 'INSCRIBED' : 'FUNDED';
+        j.progress = `recovered from a hiccup — resuming where it left off (attempt ${j.retryCount}/${MAX_RETRIES})`;
+        j.progressAt = new Date().toISOString(); writeJob(j);
+        xaoLog(id, `TRANSIENT error — auto-resume scheduled from ${j.status} (${j.retryCount}/${MAX_RETRIES}): ${msg}`);
+        PROCESSING.delete(id); return;
+      }
+      writeJob(j);
+      xaoLog(id, `FATAL error (${FATAL_ERR.test(msg) ? 'deterministic failure' : 'retries exhausted'}) — refunding: ${msg}`);
+    } catch {}
+    try { await refundAndClose(readJob(id), 'error: ' + msg); } catch {}
     PROCESSING.delete(id);
   });
 }
 async function watchTick() {
   for (const j of listJobsRaw()) {
     if (PROCESSING.has(j.jobId)) continue;
-    if (j.status !== 'AWAITING_DEPOSIT' && j.status !== 'FUNDED') continue;
-    let funded = false; try { funded = (await statusJob(j)).funded; } catch { continue; }
+    // Backoff between auto-resume attempts: 15 s × attempt number.
+    if (j.retryCount && j.status !== 'AWAITING_DEPOSIT' && Date.now() - (Date.parse(j.progressAt || '') || 0) < 15000 * j.retryCount) continue;
+    // Deliver-only resume: inscribed but delivery was interrupted → finish delivery, never re-mint.
+    if (j.status === 'INSCRIBED' && j.fastTrack && j.tokenId) {
+      xaoLog(j.jobId, `inscribed (token #${j.tokenId}) but undelivered — resuming delivery`);
+      background(j.jobId, async () => { const jj = readJob(j.jobId); jj.status = 'DELIVERING'; writeJob(jj); await deliver(jj); });
+      continue;
+    }
+    if (j.status !== 'AWAITING_DEPOSIT' && j.status !== 'FUNDED' && j.status !== 'EXPIRED') continue;
+    // A job funded once counts as funded — mid-flight resumes have already spent part of the deposit.
+    let funded = !!j.depositReceivedUstx;
+    if (!funded) { try { funded = (await statusJob(j)).funded; } catch { continue; } }
     if (!funded) continue;
-    if (!BYTES.has(j.jobId)) { background(j.jobId, () => refundAndClose(readJob(j.jobId), 'tab reloaded — file bytes gone, returning funds')); continue; } // resume-or-refund
-    if (j.fastTrack) background(j.jobId, () => autoRun(readJob(j.jobId)));
+    // Reload-proof: restore bytes from IndexedDB; refund only after 3 consecutive failed restores.
+    if (!await restoreBytes(j.jobId)) {
+      j.bytesMisses = (j.bytesMisses || 0) + 1; writeJob(j);
+      if (j.bytesMisses < 3) continue;
+      background(j.jobId, () => refundAndClose(readJob(j.jobId), 'file bytes unrecoverable (browser storage cleared) — returning funds'));
+      continue;
+    }
+    j.bytesMisses = 0;
+    if (j.fastTrack) {
+      xaoLog(j.jobId, j.retryCount ? `resuming inscription (attempt ${j.retryCount + 1})` : 'funded — starting auto-processing');
+      background(j.jobId, () => autoRun(readJob(j.jobId)));
+    }
   }
 }
 async function reapTick() {
   const now = Date.now();
   for (const j of listJobsRaw()) {
     if (PROCESSING.has(j.jobId)) continue;
-    if (['COMPLETE', 'CANCELLED', 'NEEDS_RECOVERY'].includes(j.status)) continue;
+    if (['COMPLETE', 'CANCELLED', 'NEEDS_RECOVERY', 'EXPIRED'].includes(j.status)) continue;
     const last = Date.parse(j.progressAt || j.createdAt || '') || 0;
-    if (!last || (now - last) < WINDOW_MS) continue;
+    // Payments can take many minutes to confirm — give AWAITING_DEPOSIT 12× the normal window.
+    const win = j.status === 'AWAITING_DEPOSIT' ? WINDOW_MS * 12 : WINDOW_MS;
+    if (!last || (now - last) < win) continue;
     background(j.jobId, () => refundAndClose(readJob(j.jobId), 'expired — no progress within window'));
   }
 }
 
+(window as any).XAO_AGENT_BUILD = AGENT_BUILD;   // version handshake — suno.html blocks live runs on mismatch
 (window as any).XtrataAgent = {
-  health: async () => ({ ok: true, mock: MOCK, core: CORE_NAME, net: 'mainnet', windowMs: WINDOW_MS }),
+  build: AGENT_BUILD,
+  health: async () => ({ ok: true, mock: MOCK, core: CORE_NAME, net: 'mainnet', windowMs: WINDOW_MS, build: AGENT_BUILD }),
   estimate: async (opts: any) => estimate({ ...opts, bytes: opts.bytes != null ? opts.bytes : (opts.file ? (opts.file as File).size : 0) }),
   createJob: async (opts: any) => createJob(opts),
   listJobs: async () => Promise.all(listJobsRaw().sort((a, b) => (b.jobId > a.jobId ? 1 : -1)).map(async (j) => { let funded = false, balanceUstx = '0'; if (j.status === 'AWAITING_DEPOSIT') { try { const s = await statusJob(j); funded = s.funded; balanceUstx = s.balanceUstx; } catch {} } return { ...publicJob(j), funded, balanceUstx }; })),
   getJob: async (id: string) => { const job = readJob(id); return { job: publicJob(job), status: await statusJob(job) }; },
   runJob: async (id: string) => { if (PROCESSING.has(id)) return { started: true, already: true }; const job = readJob(id); if (job.tokenId) return { error: 'already inscribed' }; const s = await statusJob(job); if (!s.funded) return { error: 'not funded yet' }; background(id, async () => { const j = readJob(id); j.status = 'INSCRIBING'; writeJob(j); await runInscribe(j); }); return { started: true }; },
   deliverJob: async (id: string) => { if (PROCESSING.has(id)) return { started: true, already: true }; const job = readJob(id); if (!job.tokenId) return { error: 'nothing to deliver yet' }; background(id, async () => { const j = readJob(id); j.status = 'DELIVERING'; writeJob(j); await deliver(j); }); return { started: true }; },
-  deleteJob: async (id: string) => { const job = readJob(id); if (job.ephemeralMnemonic) throw new Error('refusing to delete: job still holds a deposit key — deliver or recover it first'); if (!['COMPLETE', 'CANCELLED'].includes(job.status)) throw new Error(`refusing to delete: job is ${job.status}, not finished`); localStorage.removeItem(jobKey(id)); BYTES.delete(id); return { deleted: true, jobId: id }; },
+  deleteJob: async (id: string) => { const job = readJob(id); if (job.ephemeralMnemonic) throw new Error('refusing to delete: job still holds a deposit key — deliver or recover it first'); if (!['COMPLETE', 'CANCELLED'].includes(job.status)) throw new Error(`refusing to delete: job is ${job.status}, not finished`); localStorage.removeItem(jobKey(id)); BYTES.delete(id); idbDeleteBytes(id); return { deleted: true, jobId: id }; },
   getReceiptHtml: (id: string) => { try { return readJob(id).receiptHtml || null; } catch { return null; } },
+  getJobLog: (id: string) => { try { return readJob(id).log || []; } catch { return []; } },
 };
 // In-browser watcher + reaper — auto-run funded fast-track jobs; refund stalls/expiries. Tab-open only.
-setInterval(watchTick, MOCK ? 2000 : 8000);
+setInterval(watchTick, MOCK ? 2000 : 4000);
 setInterval(reapTick, 20000);
 // helpers already ported and available to the implementer/tester:
 export { deriveFrom, newWallet, balance, quoteFee, mintSingle, stagedInscribe, getIdByHash, ownerOf, send, sendNft, sendStx, network, MOCK, CORE, DEPLOYER, AGENT_FEE_PCT, AGENT_FEE_ADDRESS, CHUNK, SINGLE_MAX, PERTX_MINER, DELIVERY_RESERVE, REFUND_TX_FEE, RECEIPT_EST, incHash, chunkBytes };
