@@ -188,6 +188,13 @@ export async function createJob(opts) {
   if (!file || !uri) throw new Error('file, uri required');
   if (!fastTrack && !user) throw new Error('delivery address (user) required unless fastTrack');
   const bytes = fs.statSync(file).size;
+  // DUPLICATE-HASH GUARD: the contract rejects re-inscribing an identical hash — check BEFORE creating
+  // the job / taking payment, so identical content is never paid for twice.
+  if (!mock) {
+    const h = incHash(chunkBytes(new Uint8Array(fs.readFileSync(file))));
+    const existing = await getIdByHash([DEPLOYER, coreName], netOf(net), h);
+    if (existing != null) throw new Error(`this exact content is already inscribed on-chain as token #${existing} — inscribing an identical hash is blocked; no job was created`);
+  }
   const est = await estimate({ coreName, net, bytes, marginUstx, mock, agentFeePct });
   const w = newWallet(net);
   const job = {
