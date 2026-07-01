@@ -102,12 +102,18 @@ async function send(fnName,args,postFee){
   // identical siblings cost 0.52). Never kill the job on a spike: re-estimate, then fall back to a bounded
   // fee (2× the last good fee for this fn, capped). Only genuine unaffordability should error (→ refund).
   const opts={contractAddress:CORE[0],contractName:CORE[1],functionName:fnName,functionArgs:args,senderKey:SKEY,network,postConditionMode:PostConditionMode.Deny,postConditions:post,anchorMode:AnchorMode.Any};
+  // Three-stage policy: (1) 3 quick retries catch a one-off estimator glitch; (2) if fees are GENUINELY
+  // high (possibly driven up by our own large batches), WAIT for them to settle — up to FEE_WAIT_MAX
+  // polls, 20 s apart, emitting fee-wait events so the UI can tell the user we're waiting, not stuck;
+  // (3) only then broadcast at a bounded fallback (2× last good fee, never above the cap). Never crash.
+  const FEE_WAIT_MAX=Number(process.env.LARGE_FEE_WAIT_POLLS||'12');
   let tx,usedFee;
   for(let attempt=0;;attempt++){
     tx=await makeContractCall(opts);
     usedFee=BigInt(tx.auth.spendingCondition.fee.toString());
     if(usedFee<=PER_TX_FEE_CAP) break;
     if(attempt<3){ log({event:'fee-spike',fn:fnName,estimate:usedFee.toString(),cap:PER_TX_FEE_CAP.toString(),retry:attempt+1}); await sleep(6000); continue; }
+    if(attempt<3+FEE_WAIT_MAX){ log({event:'fee-wait',fn:fnName,estimate:usedFee.toString(),cap:PER_TX_FEE_CAP.toString(),poll:attempt-2,of:FEE_WAIT_MAX}); await sleep(20000); continue; }
     const fb=lastGoodFee.get(fnName);
     const fee=fb&&fb*2n<=PER_TX_FEE_CAP?fb*2n:PER_TX_FEE_CAP;
     log({event:'fee-fallback',fn:fnName,estimate:usedFee.toString(),using:fee.toString()});

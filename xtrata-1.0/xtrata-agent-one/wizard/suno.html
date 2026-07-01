@@ -291,6 +291,7 @@ const TIPS=[
   'Keep this tab open until you see ✓ — the agent runs in your browser. If the tab closes, it resumes (or refunds) when you reopen the page.',
   'Large files upload in 32-chunk batches. Each batch is confirmed on-chain before the next, so a hiccup never re-inscribes a batch — it picks up exactly where it left off.',
   'Your deposit sits in a one-shot wallet. Anything unused comes back to you automatically as change.',
+  'If network fees spike mid-job, the agent pauses and waits for them to settle instead of overpaying — the status line will say so.',
   'The final step mints an on-chain HTML receipt and sends both tokens to your wallet.',
 ];
 let tipIdx=0, tipTimer=null, progT0=null, elapsedTimer=null;

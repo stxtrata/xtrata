@@ -335,7 +335,10 @@ export async function runJob(opts) {
     else if (e.event === 'batch') setProg(`uploading · ${e.to}/${job.chunks} chunks`);
     else if (e.event === 'sealed') setProg(`sealed · token #${e.tokenId}`);
     else if (e.event === 'already-inscribed') setProg(`already inscribed · #${e.tokenId}`);
-    else if (e.event === 'await-parent') setProg('waiting for parent transfer'); };
+    else if (e.event === 'await-parent') setProg('waiting for parent transfer');
+    else if (e.event === 'fee-wait') setProg(`network fees are high right now — waiting for them to settle before the next batch (check ${e.poll}/${e.of})`);
+    else if (e.event === 'fee-spike') setProg('fee estimator returned a spike — re-checking…');
+    else if (e.event === 'fee-fallback') setProg('fees still elevated — proceeding at a capped fee'); };
   let outBuf = '', errBuf = '', lastActivity = Date.now();
   const code = await new Promise((resolve, reject) => {
     const child = spawn('node', [ep], { stdio: ['ignore', 'pipe', 'pipe'], env, cwd: path.dirname(ep) });
