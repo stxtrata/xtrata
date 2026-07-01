@@ -245,7 +245,10 @@ async function pickFile(f){
     if(r.html){ $('#previewFrame').srcdoc=r.html; $('#preview').style.display='block'; }
     EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size})});
     $('#qName').textContent=(r.title||f.name)+(r.artist?(' — '+r.artist):'');
-    $('#qPlayer').textContent=(PLAYER.size/1048576).toFixed(2)+' MiB · Opus'+(r.hasCover?' + cover':'')+(r.hasLyrics?' + lyrics':'');
+    const mib=(n)=>(n/1048576).toFixed(2);
+    $('#qPlayer').textContent=mib(PLAYER.size)+' MiB · Opus'+(r.hasCover?' + cover':'')+(r.hasLyrics?' + lyrics':'');
+    // Conversion transparency: source → Opus (Music HQ 96k VBR) → base64-in-player.
+    if(r.opusBytes&&r.sourceBytes){ $('#qPlayer').title='MP3 '+mib(r.sourceBytes)+' MiB → Opus 96k VBR '+mib(r.opusBytes)+' MiB (−'+Math.round((1-r.opusBytes/r.sourceBytes)*100)+'%) → +⅓ base64 embedding'; }
     $('#qPay').textContent=stx(EST.requiredUstx)+(EST.stxUsd?(' · ~$'+(Number(EST.requiredUstx)/1e6*EST.stxUsd).toFixed(2)):'');
     $('#quote').className='quote show'; $('#hint').textContent='';
   }catch(e){ $('#hint').innerHTML='<span class="err">Could not build the player: '+esc(e.message)+'</span>'; }
