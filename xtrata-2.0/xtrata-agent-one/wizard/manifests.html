@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Manifest Studio · Xtrata</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="apple-touch-icon" href="/favicons/xtrata-apple-touch-icon.png" />
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#121723; --panel2:#0e131d; --line:#243044;
+    --ink:#e6edf6; --mut:#8b9bb4; --acc:#3ea6ff; --acc2:#7c5cff; --ok:#3ddc97; --warn:#ffb454; --bad:#ff6b6b;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:radial-gradient(1000px 520px at 50% -10%,rgba(62,166,255,.12),transparent),var(--bg);
+    color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:12px;padding:16px 22px;border-bottom:1px solid var(--line)}
+  .logo{font-weight:800;letter-spacing:.5px}
+  .logo b{color:var(--acc)} .logo i{color:var(--acc2);font-style:normal}
+  .pill{padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--mut);font-size:12px}
+  .pill.live{color:var(--ok);border-color:#1f5a45} .pill.mock{color:var(--warn);border-color:#5a4620}
+  .spacer{margin-left:auto}
+  main{flex:1;max-width:1100px;width:100%;margin:0 auto;padding:28px 18px 72px}
+  h1{margin:0 0 6px;font-size:24px}
+  .lead{color:var(--mut);font-size:13.5px;margin:0 0 22px;max-width:760px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:18px}
+  .card h3{margin:0 0 4px;font-size:16px}
+  .hint{color:var(--mut);font-size:12.5px}
+  .levels{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:14px}
+  .level{border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:16px;cursor:pointer;transition:border-color .12s}
+  .level:hover{border-color:var(--acc)}
+  .level.active{border-color:var(--acc2);box-shadow:0 0 0 1px var(--acc2)}
+  .level .lv{font-family:var(--mono);font-size:11px;color:var(--acc2);font-weight:800}
+  .level h4{margin:6px 0 4px;font-size:14.5px}
+  .level p{margin:0;color:var(--mut);font-size:12px}
+  .level .who{margin-top:8px;font-size:11px;color:var(--ok)}
+  label{display:block;font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin:12px 0 4px}
+  input[type=text],textarea,select{width:100%;background:#0b0e14;border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:9px 10px;font:inherit;font-size:13.5px}
+  textarea{resize:vertical;line-height:1.5}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--acc2)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .row3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}
+  .btn{background:linear-gradient(180deg,#4db1ff,#2a86e0);border:0;color:#fff;padding:12px 18px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink);font-size:13px;padding:9px 13px}
+  .btn.big{width:100%;margin-top:16px;padding:15px;background:linear-gradient(180deg,#8b6cff,#6f4cf0)}
+  .btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .muted{color:var(--mut)} .err{color:var(--bad)} .ok{color:var(--ok)} a{color:var(--acc)}
+  .mono{font-family:var(--mono)}
+  /* holdings picker */
+  .holdings{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:10px;max-height:320px;overflow-y:auto;padding:2px}
+  .hold{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer;background:var(--panel2);aspect-ratio:1/1}
+  .hold img{width:100%;height:100%;object-fit:cover;display:block}
+  .hold .hid{position:absolute;left:0;right:0;bottom:0;background:rgba(11,14,20,.82);font-family:var(--mono);font-size:10px;padding:2px 6px}
+  .hold.added{border-color:var(--ok);box-shadow:0 0 0 1px var(--ok)}
+  .hold.added::after{content:"✓";position:absolute;top:4px;right:6px;color:var(--ok);font-weight:900}
+  /* item list */
+  .items{margin-top:10px}
+  .item{display:grid;grid-template-columns:44px minmax(0,1fr) 110px auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;background:var(--panel2);padding:8px 10px;margin-bottom:6px}
+  .item img{width:44px;height:44px;object-fit:cover;border-radius:7px;background:#0b0e14}
+  .item input,.item select{padding:6px 8px;font-size:12.5px}
+  .item .ictl{display:flex;gap:4px}
+  .item .ictl button{background:transparent;border:1px solid var(--line);color:var(--mut);border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:12px}
+  .item .ictl button:hover{color:var(--ink);border-color:var(--acc)}
+  .glist .item{grid-template-columns:minmax(0,1fr) 110px 150px auto}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--line);border-top-color:var(--acc2);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:8px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .quote{margin-top:14px;background:linear-gradient(180deg,#0f1f17,#0c1812);border:1px solid #1f5a45;border-radius:12px;padding:12px 16px;display:none}
+  .quote.show{display:block}
+  .kv{display:flex;justify-content:space-between;padding:4px 0;font-size:13px}
+  .kv span:first-child{color:var(--mut)} .kv span:last-child{font-family:var(--mono)}
+  .prog{margin-top:14px;display:none;background:#0e1726;border:1px solid var(--line);border-radius:12px;padding:13px 16px}
+  .prog.show{display:block}
+  .result{margin-top:14px;display:none}.result.show{display:block}
+  details.docs{border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:14px 18px;margin-bottom:10px}
+  details.docs summary{cursor:pointer;font-weight:800;font-size:14px}
+  details.docs p,details.docs li{color:var(--mut);font-size:13px}
+  details.docs code{font-family:var(--mono);font-size:12px;color:var(--acc);background:#0b0e14;padding:1px 5px;border-radius:5px}
+  iframe.pv{width:100%;height:420px;border:1px solid var(--line);border-radius:12px;background:#0b0e14;display:block;margin-top:10px}
+  footer{padding:14px 22px;color:var(--mut);font-size:12px;text-align:center}
+  @media(max-width:640px){.row,.row3{grid-template-columns:1fr}.item{grid-template-columns:44px minmax(0,1fr)}.item .ictl{grid-column:2}}
+</style>
+</head>
+<body>
+<header>
+  <a href="/" title="Xtrata home" style="flex:none;display:block"><img src="favicon.svg" alt="Xtrata" style="width:28px;height:28px;border-radius:7px;display:block" /></a>
+  <div class="logo"><b>XTRATA</b> <i>Manifest Studio</i></div>
+  <div class="spacer"></div>
+  <span id="health" class="pill">connecting…</span>
+  <span id="walletAddr" class="pill" style="display:none;cursor:pointer;color:var(--ok);border-color:#1f5a45"></span>
+  <button class="btn ghost" id="connectBtn">Connect wallet</button>
+</header>
+
+<main>
+  <h1>Create &amp; inscribe Xtrata manifests</h1>
+  <p class="lead">Manifests are small on-chain JSON records that group inscriptions into galleries, collections and profiles. Anyone can create one. Once inscribed, your gallery is live at <span class="mono">/g/&lt;your-name&gt;.btc</span> — and updating it is just inscribing a newer manifest.</p>
+
+  <!-- LEVEL CHOOSER -->
+  <div class="card">
+    <h3>1 · Choose a manifest level</h3>
+    <div class="hint">Different levels carry different trust. Pick what you're publishing.</div>
+    <div class="levels">
+      <div class="level" data-level="gallery">
+        <div class="lv">L2</div><h4>Curated Gallery</h4>
+        <p>Any inscriptions — yours or anyone's. Viewing, listening or mixed. The everyday gallery.</p>
+        <div class="who">Anyone can create</div>
+      </div>
+      <div class="level" data-level="creator-collection">
+        <div class="lv">L1</div><h4>Creator Collection</h4>
+        <p>Only works your wallet owns. Ownership is verified before inscribing and re-checked by readers — the "owner-attested" badge.</p>
+        <div class="who">Requires owning every item</div>
+      </div>
+      <div class="level" data-level="profile">
+        <div class="lv">L0</div><h4>Profile</h4>
+        <p>The index that makes <span class="mono">/g/you.btc</span> work: lists your published galleries and picks the default one.</p>
+        <div class="who">Publish under your BNS name</div>
+      </div>
+      <div class="level" data-level="collection">
+        <div class="lv">L3</div><h4>Full Collection Manifest</h4>
+        <p>The complete standard for collection teams: identity, item map, provenance, reconstruction, rights.</p>
+        <div class="who">Template-driven — see docs</div>
+      </div>
+    </div>
+    <div id="l3note" class="hint" style="display:none;margin-top:12px">Full Collection Manifests follow the complete standard with dozens of sections — start from the <a href="https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/standards/xtrata-collection-manifest-standard.md" target="_blank" rel="noopener">standard</a> and <a href="/schemas/xtrata-collection-manifest.schema.json" target="_blank">schema</a>, build the JSON with your tooling, then inscribe it below via <b>Paste JSON</b> in step 3.</div>
+  </div>
+
+  <!-- BUILDER -->
+  <div class="card" id="builderCard" style="display:none">
+    <h3>2 · Build it</h3>
+    <div id="metaFields">
+      <div class="row3">
+        <div><label>Title</label><input type="text" id="mTitle" maxlength="160" placeholder="Selected works" /></div>
+        <div><label>Handle <span class="muted" style="text-transform:none">(url: /g/you.btc/<b id="handleEcho">…</b>)</span></label><input type="text" id="mName" maxlength="48" placeholder="selected-works" /></div>
+        <div><label>Mode</label><select id="mMode"><option value="viewing">Viewing</option><option value="listening">Listening</option><option value="mixed">Mixed</option></select></div>
+      </div>
+      <label>Description <span class="muted" style="text-transform:none">(optional)</span></label>
+      <textarea id="mDesc" rows="2" maxlength="2000"></textarea>
+      <div class="row">
+        <div><label>Your BNS name <span class="muted" style="text-transform:none">(binds the gallery to /g/&lt;name&gt;)</span></label><input type="text" id="mBns" placeholder="you.btc" /></div>
+        <div><label>Supersedes <span class="muted" style="text-transform:none">(previous manifest id — set automatically by "Load existing")</span></label><input type="text" id="mSupersedes" class="mono" placeholder="empty for a first version" /></div>
+      </div>
+      <div class="btnrow"><button class="btn ghost" id="loadExisting">↻ Load existing manifest to update…</button><span id="loadHint" class="hint"></span></div>
+    </div>
+
+    <!-- items (L1/L2) -->
+    <div id="itemsSection">
+      <label style="margin-top:18px">Items</label>
+      <div class="hint" id="pickHint">Click your inscriptions below to add them, or add any inscription by id.</div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <input type="text" id="addById" class="mono" placeholder="Add by token id, e.g. 512" style="max-width:220px" />
+        <button class="btn ghost" id="addIdBtn">Add</button>
+        <button class="btn ghost" id="loadHoldings">Load my inscriptions</button>
+      </div>
+      <div id="holdings" class="holdings" style="display:none"></div>
+      <div id="items" class="items"></div>
+    </div>
+
+    <!-- galleries (L0) -->
+    <div id="galleriesSection" style="display:none">
+      <label style="margin-top:18px">Your galleries</label>
+      <div class="hint">Each row points a handle at a gallery manifest id. Mark one as default — that's what /g/you.btc opens.</div>
+      <div id="glist" class="items glist"></div>
+      <div class="btnrow"><button class="btn ghost" id="addGallery">+ Add gallery row</button></div>
+    </div>
+  </div>
+
+  <!-- REVIEW + INSCRIBE -->
+  <div class="card" id="inscribeCard" style="display:none">
+    <h3>3 · Validate, preview &amp; inscribe</h3>
+    <div class="btnrow">
+      <button class="btn ghost" id="validateBtn">Validate</button>
+      <button class="btn ghost" id="previewBtn">Preview gallery</button>
+      <button class="btn ghost" id="jsonBtn">View / paste JSON</button>
+    </div>
+    <div id="valOut" class="hint" style="margin-top:10px;min-height:16px"></div>
+    <textarea id="jsonBox" rows="12" class="mono" style="display:none;margin-top:10px;font-size:12px"></textarea>
+    <iframe id="pvFrame" class="pv" style="display:none" sandbox="allow-scripts"></iframe>
+    <div id="quote" class="quote">
+      <div class="kv"><span>Manifest size</span><span id="qSize">—</span></div>
+      <div class="kv"><span>Pay once</span><span id="qPay" style="color:var(--acc);font-weight:800">—</span></div>
+    </div>
+    <button class="btn big" id="go" disabled>Validate to enable inscribing</button>
+    <div id="hint" class="hint" style="text-align:center;margin-top:8px;min-height:16px"></div>
+    <div id="prog" class="prog"><span class="spin"></span><span id="progMsg">Starting…</span></div>
+    <div id="result" class="result"></div>
+  </div>
+
+  <!-- INSTRUCTIONS -->
+  <div class="card">
+    <h3>How manifests work</h3>
+    <details class="docs"><summary>The four levels</summary>
+      <ul>
+        <li><b>L0 Profile</b> — one per BNS name. Lists your galleries and the default. Readers only trust it if it's held by the address that currently owns your name.</li>
+        <li><b>L1 Creator Collection</b> — your own works only. Ownership is checked at inscribe time and re-checked by readers, earning the owner-attested badge.</li>
+        <li><b>L2 Curated Gallery</b> — anything you want to show: your works, others' works, viewing/listening/mixed. No ownership claim implied.</li>
+        <li><b>L3 Full Collection Manifest</b> — the complete standard (identity, item map, provenance, reconstruction, marketplace, rights) for collection teams. <a href="/schemas/xtrata-collection-manifest.schema.json" target="_blank">Schema</a>.</li>
+      </ul>
+    </details>
+    <details class="docs"><summary>Updating a manifest — the BNS freshness pattern</summary>
+      <p>Inscriptions are immutable, so you never edit a manifest — you inscribe a <b>new</b> one. Resolution at <code>/g/you.btc</code> always reads the <b>newest</b> valid manifest held by the address that owns your name, so the moment your update confirms, the gallery switches over. Set <code>supersedes</code> to your previous manifest's id (the <b>Load existing</b> button does this for you) so the version history stays linked — old ids keep working at <code>/g/&lt;id&gt;</code> forever.</p>
+    </details>
+    <details class="docs"><summary>Envelope format (for tool builders)</summary>
+      <p>Every manifest is JSON with an <code>xtrataManifest</code> envelope: <code>{"kind","version","name","title","bnsName","supersedes"}</code> plus <code>items[]</code> (or <code>galleries[]</code> for profiles) and <code>display</code>. Machine schema: <a href="/schemas/manifest-envelope.schema.json" target="_blank">manifest-envelope.schema.json</a>. Resolve programmatically with <code>/g/&lt;name&gt;?format=json</code>.</p>
+    </details>
+  </div>
+</main>
+
+<footer>Manifests inscribe through Agent One's deposit-wallet flow — pay once, unused funds refunded. · <a href="./">Inscription Wizard</a> · <a href="./suno.html">SUNO fast-track</a></footer>
+
+<script>
+  (function(){ var qs=new URLSearchParams(location.search);
+    var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
+    window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
+</script>
+<script src="agent-one.js?v=5"></script>
+<script>
+const $=(s)=>document.querySelector(s);
+const $$=(s)=>Array.from(document.querySelectorAll(s));
+const esc=(s)=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const stx=(u)=>(Number(u)/1e6).toFixed(6).replace(/0+$/,'').replace(/\.$/,'')+' STX';
+const MASTER='SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3';
+const SERVER={mock:false,net:'mainnet'};
+let WALLET=null,WALLET_NAME=null,LEVEL=null,ITEMS=[],GALLERIES=[],HOLDINGS=new Set(),VALID=null,EST=null,JOB=null,poll=null;
+
+// ---- wallet (same pattern as the wizard/SUNO pages) ----
+function xw(){return window.XtrataWallet||null}
+function xa(){const A=window.XtrataAgent;if(!A)throw new Error('Agent bundle not loaded (agent-one.js).');return A}
+const shortAddr=a=>a.slice(0,5)+'…'+a.slice(-4);
+async function bnsLookup(addr){try{const r=await fetch((window.XAO_CONFIG.hiro||'').replace(/\/(mainnet|testnet)\/?$/,'')+'/v1/addresses/stacks/'+addr);if(!r.ok)return null;const d=await r.json();return (d&&d.names&&d.names[0])||null}catch{return null}}
+function renderWallet(){const el=$('#walletAddr');if(!WALLET){el.style.display='none';return}el.style.display='';el.textContent='● '+(WALLET_NAME||shortAddr(WALLET));el.title=WALLET}
+function setWallet(a){WALLET=a||null;WALLET_NAME=null;$('#connectBtn').textContent=WALLET?'Disconnect':'Connect wallet';renderWallet();
+  if(WALLET){bnsLookup(WALLET).then(n=>{if(n&&WALLET===a){WALLET_NAME=n;renderWallet();if(!$('#mBns').value)$('#mBns').value=n;}});}}
+$('#connectBtn').onclick=async()=>{const w=xw();
+  if(WALLET){try{w&&w.disconnect&&await w.disconnect()}catch{}setWallet(null);return}
+  if(!w||!w.connect){alert('Wallet bundle not loaded — open this page from the Xtrata site.');return}
+  try{const a=await w.connect();a&&setWallet(a)}catch(e){alert('Connect failed: '+((e&&e.message)||e))}};
+(function(){try{const w=xw();const a=w&&w.getAddress&&w.getAddress();if(a)setWallet(a)}catch{}})();
+(async()=>{try{const h=await xa().health();SERVER.mock=!!h.mock;SERVER.net=h.net||'mainnet';
+  $('#health').className='pill '+(h.mock?'mock':'live');$('#health').textContent=(h.mock?'MOCK':'LIVE')+' · '+SERVER.net;
+}catch{$('#health').textContent='agent not loaded';$('#health').style.color='var(--bad)'}})();
+
+// ---- level chooser ----
+$$('.level').forEach(el=>{el.onclick=()=>{
+  $$('.level').forEach(x=>x.classList.remove('active'));el.classList.add('active');
+  LEVEL=el.dataset.level;VALID=null;updateGo();
+  const isL3=LEVEL==='collection',isL0=LEVEL==='profile';
+  $('#l3note').style.display=isL3?'block':'none';
+  $('#builderCard').style.display=isL3?'none':'block';
+  $('#inscribeCard').style.display='block';
+  $('#itemsSection').style.display=isL0?'none':'block';
+  $('#galleriesSection').style.display=isL0?'block':'none';
+  $('#pickHint').textContent=LEVEL==='creator-collection'
+    ?'Creator collections may only contain inscriptions this wallet owns — load your inscriptions and pick from them.'
+    :'Click your inscriptions below to add them, or add any inscription by id.';
+  if(isL0&&GALLERIES.length===0)addGalleryRow({});
+  if(isL3){$('#jsonBox').style.display='block';$('#jsonBox').placeholder='Paste your full collection manifest JSON here, then Validate.';}
+};});
+$('#mName').addEventListener('input',()=>{$('#handleEcho').textContent=$('#mName').value||'…'});
+
+// ---- holdings picker ----
+async function fetchHoldings(){
+  if(!WALLET){alert('Connect your wallet first.');return}
+  $('#loadHoldings').disabled=true;$('#loadHoldings').textContent='Loading…';
+  try{
+    const ids=[];let offset=0;
+    while(ids.length<400){
+      const u=(window.XAO_CONFIG.hiro)+'/extended/v1/tokens/nft/holdings?principal='+encodeURIComponent(WALLET)+'&asset_identifiers='+encodeURIComponent(MASTER+'::xtrata-inscription')+'&limit=50&offset='+offset+'&unanchored=true';
+      const r=await fetch(u);if(!r.ok)throw new Error('holdings fetch failed ('+r.status+')');
+      const d=await r.json();const rows=d.results||[];
+      rows.forEach(x=>{const t=String((x.value&&x.value.repr)||'').replace(/^u/,'');if(/^\d+$/.test(t))ids.push(t)});
+      if(rows.length<50)break;offset+=50;
+    }
+    ids.sort((a,b)=>Number(b)-Number(a));
+    HOLDINGS=new Set(ids);
+    const grid=$('#holdings');grid.style.display='grid';grid.innerHTML='';
+    ids.forEach(id=>{const d=document.createElement('div');d.className='hold'+(ITEMS.some(i=>i.tokenId===id)?' added':'');d.dataset.id=id;
+      d.innerHTML='<img loading="lazy" src="/inscription/'+id+'" alt="#'+id+'" onerror="this.style.display=\'none\'" /><span class="hid">#'+id+'</span>';
+      d.onclick=()=>{ITEMS.some(i=>i.tokenId===id)?removeItem(id):addItem({tokenId:id});};
+      grid.appendChild(d);});
+    if(!ids.length)grid.innerHTML='<div class="hint">No Xtrata inscriptions found in this wallet.</div>';
+  }catch(e){alert(e.message)}
+  $('#loadHoldings').disabled=false;$('#loadHoldings').textContent='Load my inscriptions';
+}
+$('#loadHoldings').onclick=fetchHoldings;
+$('#addIdBtn').onclick=()=>{const v=$('#addById').value.trim().replace(/^#/,'');if(!/^\d+$/.test(v)){alert('Token ids are numeric, e.g. 512');return}addItem({tokenId:v});$('#addById').value='';};
+
+// ---- items list ----
+function addItem(it){if(ITEMS.some(i=>i.tokenId===it.tokenId))return;ITEMS.push({tokenId:it.tokenId,label:it.label||'',media:it.media||''});renderItems();VALID=null;updateGo();}
+function removeItem(id){ITEMS=ITEMS.filter(i=>i.tokenId!==id);renderItems();VALID=null;updateGo();}
+function moveItem(id,dir){const i=ITEMS.findIndex(x=>x.tokenId===id);const j=i+dir;if(i<0||j<0||j>=ITEMS.length)return;[ITEMS[i],ITEMS[j]]=[ITEMS[j],ITEMS[i]];renderItems();}
+function renderItems(){
+  const box=$('#items');box.innerHTML='';
+  ITEMS.forEach(it=>{const d=document.createElement('div');d.className='item';
+    d.innerHTML='<img loading="lazy" src="/inscription/'+esc(it.tokenId)+'" onerror="this.style.opacity=.25" />'
+      +'<input type="text" placeholder="Label (optional) — #'+esc(it.tokenId)+'" value="'+esc(it.label)+'" />'
+      +'<select><option value="">auto</option><option value="image">image</option><option value="audio">audio</option><option value="html">html</option><option value="video">video</option><option value="text">text</option></select>'
+      +'<span class="ictl"><button title="Up">↑</button><button title="Down">↓</button><button title="Remove">✕</button></span>';
+    d.querySelector('input').oninput=(e)=>{it.label=e.target.value;VALID=null;updateGo();};
+    const sel=d.querySelector('select');sel.value=it.media||'';sel.onchange=()=>{it.media=sel.value;VALID=null;updateGo();};
+    const [up,down,del]=d.querySelectorAll('.ictl button');
+    up.onclick=()=>moveItem(it.tokenId,-1);down.onclick=()=>moveItem(it.tokenId,1);del.onclick=()=>removeItem(it.tokenId);
+    box.appendChild(d);});
+  $$('#holdings .hold').forEach(h=>h.classList.toggle('added',ITEMS.some(i=>i.tokenId===h.dataset.id)));
+}
+
+// ---- profile gallery rows ----
+function addGalleryRow(g){GALLERIES.push({name:g.name||'',manifestId:g.manifestId||'',title:g.title||'',default:!!g.default});renderGalleries();}
+function renderGalleries(){
+  const box=$('#glist');box.innerHTML='';
+  GALLERIES.forEach((g,idx)=>{const d=document.createElement('div');d.className='item';
+    d.innerHTML='<input type="text" placeholder="handle, e.g. selected-works" value="'+esc(g.name)+'" />'
+      +'<input type="text" class="mono" placeholder="manifest id" value="'+esc(g.manifestId)+'" />'
+      +'<label style="display:flex;align-items:center;gap:6px;margin:0;text-transform:none;font-size:12px;color:var(--mut)"><input type="radio" name="gdef" style="width:auto" '+(g.default?'checked':'')+' /> default</label>'
+      +'<span class="ictl"><button title="Remove">✕</button></span>';
+    const [nameIn,idIn]=d.querySelectorAll('input[type=text]');
+    nameIn.oninput=()=>{g.name=nameIn.value;VALID=null;updateGo();};
+    idIn.oninput=()=>{g.manifestId=idIn.value;VALID=null;updateGo();};
+    d.querySelector('input[type=radio]').onchange=()=>{GALLERIES.forEach(x=>x.default=false);g.default=true;};
+    d.querySelector('.ictl button').onclick=()=>{GALLERIES.splice(idx,1);renderGalleries();};
+    box.appendChild(d);});
+}
+$('#addGallery').onclick=()=>addGalleryRow({});
+
+// ---- load existing (update mode) ----
+$('#loadExisting').onclick=async()=>{
+  const name=($('#mBns').value||WALLET_NAME||'').trim();
+  const src=prompt('Load which manifest?\nEnter a BNS name (e.g. you.btc), name/handle, or a manifest id:',name||'');
+  if(!src)return;
+  $('#loadHint').innerHTML='<span class="spin"></span>Loading…';
+  try{
+    const path=/^\d+$/.test(src.trim())?src.trim():src.trim().toLowerCase();
+    const r=await fetch('/g/'+path.split('/').map(encodeURIComponent).join('/')+'?format=json');
+    if(!r.ok)throw new Error('No manifest found for "'+src+'"');
+    const d=await r.json();const m=d.manifest||{};const h=m.xtrataManifest||{};
+    $('#mTitle').value=h.title||'';$('#mName').value=h.name||'';$('#handleEcho').textContent=h.name||'…';
+    $('#mDesc').value=h.description||'';$('#mBns').value=h.bnsName||name||'';
+    $('#mSupersedes').value=d.manifestTokenId||'';
+    if(m.display&&m.display.mode)$('#mMode').value=m.display.mode;
+    ITEMS=(m.items||[]).filter(i=>/^\d+$/.test(String(i.tokenId||''))).map(i=>({tokenId:String(i.tokenId),label:i.label||'',media:i.media||''}));renderItems();
+    GALLERIES=(m.galleries||[]).map(g=>({name:g.name||'',manifestId:String(g.manifestId||''),title:g.title||'',default:!!g.default}));renderGalleries();
+    $('#loadHint').innerHTML='<span class="ok">✓ Loaded manifest #'+esc(d.manifestTokenId)+' — supersedes set; inscribe to publish the new version.</span>';
+    VALID=null;updateGo();
+  }catch(e){$('#loadHint').innerHTML='<span class="err">'+esc(e.message)+'</span>'}
+};
+
+// ---- build + validate ----
+function buildManifest(){
+  if(LEVEL==='collection'){try{return JSON.parse($('#jsonBox').value)}catch{return null}}
+  const head={kind:LEVEL,version:1,name:($('#mName').value.trim()||'gallery'),title:$('#mTitle').value.trim()||undefined,
+    description:$('#mDesc').value.trim()||undefined,owner:WALLET||undefined,bnsName:$('#mBns').value.trim()||undefined,
+    supersedes:$('#mSupersedes').value.trim()||null};
+  const m={xtrataManifest:head};
+  if(LEVEL==='profile'){m.galleries=GALLERIES.filter(g=>g.name&&/^\d+$/.test(g.manifestId)).map(g=>({name:g.name,manifestId:g.manifestId,title:g.title||undefined,default:!!g.default}));}
+  else{m.items=ITEMS.map(i=>({tokenId:i.tokenId,label:i.label||undefined,media:i.media||undefined}));
+    m.display={mode:$('#mMode').value,order:'manual'};}
+  return m;
+}
+async function validate(){
+  const out=$('#valOut');out.innerHTML='<span class="spin"></span>Validating…';VALID=null;updateGo();
+  const errs=[];
+  const m=buildManifest();
+  if(!m){out.innerHTML='<span class="err">Not valid JSON.</span>';return}
+  if(LEVEL!=='collection'){
+    const h=m.xtrataManifest;
+    if(!/^[a-z0-9][a-z0-9-]{0,47}$/.test(h.name||''))errs.push('Handle must be lowercase letters, digits and dashes (e.g. selected-works).');
+    if(h.bnsName&&!/^[a-z0-9_-]+\.[a-z]+$/.test(h.bnsName))errs.push('BNS name looks wrong (expected like you.btc).');
+    if(h.supersedes&&!/^\d+$/.test(h.supersedes))errs.push('Supersedes must be a numeric manifest id.');
+    if(LEVEL==='profile'&&(!m.galleries||!m.galleries.length))errs.push('Add at least one gallery row (handle + manifest id).');
+    if(LEVEL!=='profile'&&(!m.items||!m.items.length))errs.push('Add at least one item.');
+    if(LEVEL==='creator-collection'){
+      if(!WALLET)errs.push('Connect your wallet — creator collections verify ownership.');
+      else{if(!HOLDINGS.size)await fetchHoldings();
+        const notOwned=(m.items||[]).filter(i=>!HOLDINGS.has(i.tokenId)).map(i=>'#'+i.tokenId);
+        if(notOwned.length)errs.push('Not owned by this wallet: '+notOwned.join(', ')+'. Use a Curated Gallery (L2) for works you don\'t own.');}
+    }
+  } else if(!m.xtrataManifest){
+    // full standard manifests may omit the envelope; warn but allow
+    out.innerHTML='<span class="ok">✓ JSON parses.</span> <span class="muted">No xtrataManifest envelope found — /g resolution will skip it, but it can still be inscribed. Validate against the full schema in your tooling.</span>';
+    VALID=m;await quote();updateGo();return;
+  }
+  if(errs.length){out.innerHTML='<span class="err">✕ '+errs.map(esc).join('<br>✕ ')+'</span>';return}
+  VALID=m;out.innerHTML='<span class="ok">✓ Valid '+esc(LEVEL)+' manifest.</span>';
+  await quote();updateGo();
+}
+$('#validateBtn').onclick=validate;
+async function quote(){
+  try{const bytes=new Blob([JSON.stringify(VALID)]).size;
+    EST=await xa().estimate({bytes});
+    $('#qSize').textContent=bytes.toLocaleString()+' bytes';
+    $('#qPay').textContent=stx(EST.requiredUstx)+(EST.stxUsd?(' · ~$'+(Number(EST.requiredUstx)/1e6*EST.stxUsd).toFixed(2)):'');
+    $('#quote').className='quote show';
+  }catch{EST=null}
+}
+
+// ---- preview + json ----
+$('#jsonBtn').onclick=()=>{const b=$('#jsonBox');const show=b.style.display==='none';b.style.display=show?'block':'none';
+  if(show&&LEVEL!=='collection'){const m=buildManifest();b.value=m?JSON.stringify(m,null,2):'';}};
+$('#jsonBox').addEventListener('input',()=>{if(LEVEL==='collection'){VALID=null;updateGo();}});
+$('#previewBtn').onclick=()=>{
+  const m=buildManifest();if(!m||!m.xtrataManifest){alert('Build or validate first.');return}
+  const h=m.xtrataManifest,items=m.items||[];
+  const tiles=items.map(i=>{const id=esc(i.tokenId);const media=i.media||((m.display&&m.display.mode)==='listening'?'audio':'image');
+    return '<a class="tile" href="#"><div class="tm">'+(media==='image'?'<img src="/inscription/'+id+'" onerror="this.replaceWith(Object.assign(document.createElement(\'iframe\'),{src:\'/inscription/'+id+'\'}))" />':'<iframe src="/inscription/'+id+'"></iframe>')+'</div><div class="tl">'+esc(i.label||('#'+i.tokenId))+'</div></a>';}).join('');
+  const doc='<!doctype html><meta charset=utf-8><style>body{margin:0;background:#0b0e14;color:#e6edf6;font:14px system-ui;padding:18px}h1{font-size:20px;margin:0 0 4px}.m{color:#8b9bb4;font-size:12px;margin-bottom:16px}.g{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}.tile{display:block;background:#121723;border:1px solid #243044;border-radius:10px;overflow:hidden;color:inherit;text-decoration:none}.tm{aspect-ratio:1/1}.tm img,.tm iframe{width:100%;height:100%;object-fit:cover;border:0;display:block}.tl{padding:7px 10px;font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}</style>'
+    +'<h1>'+esc(h.title||h.name||'Gallery')+'</h1><div class=m>Preview · '+items.length+' items · will resolve at /g/'+esc(h.bnsName||'you.btc')+(h.name?'/'+esc(h.name):'')+'</div><div class=g>'+tiles+'</div>';
+  const f=$('#pvFrame');f.style.display='block';f.srcdoc=doc;
+};
+
+// ---- inscribe ----
+function updateGo(){const b=$('#go');
+  if(!LEVEL){b.disabled=true;b.textContent='Choose a manifest level first';return}
+  if(!VALID){b.disabled=true;b.textContent='Validate to enable inscribing';return}
+  if(!SERVER.mock&&!WALLET){b.disabled=true;b.textContent='Connect your wallet to inscribe';return}
+  b.disabled=false;b.textContent=EST?('Inscribe manifest · pay '+stx(EST.requiredUstx)):'Inscribe manifest';}
+$('#go').onclick=async()=>{
+  if(!VALID)return;
+  const b=$('#go');b.disabled=true;$('#hint').textContent='';
+  try{
+    const jsonText=JSON.stringify(VALID,null,2);
+    const h=(VALID.xtrataManifest||{});
+    const file=new File([jsonText],(h.name||'manifest')+'.manifest.json',{type:'application/json'});
+    $('#prog').className='prog show';$('#progMsg').textContent='Creating your one-shot deposit…';
+    const job=await xa().createJob({file,uri:'xtrata:manifest/'+(h.name||'manifest'),mime:'application/json',fastTrack:true,user:WALLET||undefined,expectedFunder:WALLET||undefined});
+    JOB=job;
+    if(!SERVER.mock){
+      $('#progMsg').textContent='Opening your wallet to pay '+stx(job.requiredUstx)+'…';
+      const w=xw();try{await w.pay({recipient:job.depositAddress,amount:String(job.requiredUstx),network:SERVER.net})}
+      catch(e){$('#hint').innerHTML='<span class="err">'+esc(e.message)+'</span><br><span class="muted">Send '+stx(job.requiredUstx)+' to '+esc(job.depositAddress)+' to continue.</span>'}
+      $('#progMsg').textContent='Waiting for payment to land…';
+    } else {$('#progMsg').textContent='MOCK — simulating inscription…';}
+    if(poll)clearInterval(poll);poll=setInterval(refresh,2000);refresh();
+  }catch(e){$('#prog').className='prog';$('#hint').innerHTML='<span class="err">'+esc(e.message)+'</span>';b.disabled=false;}
+};
+async function refresh(){
+  if(!JOB)return;
+  try{const {job}=await xa().getJob(JOB.jobId);
+    const st=job.status;
+    if(st==='AWAITING_DEPOSIT')$('#progMsg').textContent='Waiting for payment to land…';
+    else if(st==='INSCRIBING')$('#progMsg').textContent=job.progress?('Inscribing — '+job.progress):'Inscribing your manifest on-chain…';
+    else if(st==='DELIVERING')$('#progMsg').textContent='Delivering token + refunding unused deposit…';
+    if(st==='COMPLETE'){clearInterval(poll);poll=null;$('#prog').className='prog';
+      const h=(VALID.xtrataManifest||{});const bns=h.bnsName||'';
+      const gUrl=bns?('/g/'+encodeURIComponent(bns)+(h.kind!=='profile'&&h.name?('/'+encodeURIComponent(h.name)):'')):('/g/'+job.tokenId);
+      $('#result').className='result show';
+      $('#result').innerHTML='<div class="ok" style="font-weight:800;font-size:16px">✓ Manifest inscribed — token #'+esc(job.tokenId||'—')+'</div>'
+        +'<div class="hint" style="text-align:left;margin-top:6px">Immutable link: <a href="/g/'+esc(job.tokenId)+'" target="_blank">/g/'+esc(job.tokenId)+'</a>'
+        +(bns?('<br>Live gallery: <a href="'+gUrl+'" target="_blank">'+esc(gUrl)+'</a> <span class="muted">(newest-manifest resolution switches over as soon as the inscription confirms'+(h.kind!=='profile'?'; publish or update your L0 profile to control the default gallery':'')+')</span>'):'')
+        +(h.supersedes?('<br>Supersedes manifest #'+esc(h.supersedes)+' — its /g/'+esc(h.supersedes)+' link stays valid as history.'):'')+'</div>';
+      $('#go').disabled=false;$('#go').textContent='Inscribe another manifest';VALID=null;updateGo();}
+    else if(st==='CANCELLED'||st==='ERROR'||st==='NEEDS_RECOVERY'){clearInterval(poll);poll=null;$('#prog').className='prog';
+      $('#hint').innerHTML='<span class="err">'+esc(job.error||job.cancelReason||st)+' — funds are returned automatically.</span>';$('#go').disabled=false;}
+  }catch{/* transient */}
+}
+</script>
+</body>
+</html>
