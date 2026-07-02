@@ -3677,3 +3677,81 @@
       .modes .current-campaign__description{margin-top:5px}
       .modes .current-campaign__cta{align-self:flex-start;justify-self:auto;margin:12px 0 0}
       @media (max-width:520px){ .suno-hero,.modes .current-campaign{gap:16px} .suno-hero__logo,.modes .current-campaign__logo{width:104px;height:104px} }
+
+/* --- Xtrata Radio (floating homepage soundtrack toggle) --- */
+.xtrata-radio {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+}
+.xtrata-radio__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 8px 14px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.xtrata-radio__toggle:hover { border-color: var(--ink); }
+.xtrata-radio.is-on .xtrata-radio__toggle {
+  border-color: var(--green);
+  background: var(--green-soft);
+  color: var(--green);
+}
+.xtrata-radio__wave { display: none; align-items: flex-end; gap: 2px; height: 12px; }
+.xtrata-radio.is-playing .xtrata-radio__wave { display: inline-flex; }
+.xtrata-radio__wave i {
+  width: 3px;
+  border-radius: 2px;
+  background: var(--green);
+  animation: xtrata-radio-eq 0.9s ease-in-out infinite;
+  height: 40%;
+}
+.xtrata-radio__wave i:nth-child(2) { animation-delay: 0.2s; height: 90%; }
+.xtrata-radio__wave i:nth-child(3) { animation-delay: 0.4s; height: 60%; }
+@keyframes xtrata-radio-eq {
+  0%, 100% { transform: scaleY(0.5); }
+  50% { transform: scaleY(1); }
+}
+.xtrata-radio__now {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: var(--shadow);
+}
+.xtrata-radio__next {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  font-size: 12px;
+  box-shadow: var(--shadow);
+}
+.xtrata-radio__next:hover { color: var(--ink); border-color: var(--ink); }
+@media (max-width: 560px) {
+  .xtrata-radio__now { max-width: 150px; }
+}

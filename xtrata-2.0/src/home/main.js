@@ -36,6 +36,7 @@
       TWIN_HOLDER_LABELS,
       PEPE_ESCROW_RESOLVERS
     } from '/src/home/config.js';
+    import { initXtrataRadio } from '/src/home/radio.js';
     import { showContractCall } from '/src/lib/wallet/connect.ts';
     import {
       CONTRACT_REGISTRY,
@@ -9667,3 +9668,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     });
 
     void initialize();
+
+    // Xtrata Radio: homepage soundtrack from the curated music gallery.
+    initXtrataRadio({
+      tokenIds: (CURATED_GALLERIES.find((gallery) => gallery.id === 'jim-music')?.tokenIds ?? []),
+      stationName: 'XTRATA FM'
+    });
