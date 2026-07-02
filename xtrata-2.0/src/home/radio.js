@@ -235,6 +235,46 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     return choice;
   };
 
+  // --- warm start: cue the first song while the page idles -----------------
+  // The slow part of starting is fetching the inscription (often an HTML player
+  // whose audio is a large embedded data: URI) and letting the <audio> element
+  // buffer it. We do all of that ahead of time so the first click drops the
+  // needle almost instantly.
+  let preloadedTrack = null;
+  let preloading = false;
+
+  const warmHttpCache = async (src) => {
+    if (src.startsWith('data:')) return; // already in memory
+    try { await (await fetch(src)).arrayBuffer(); } catch { /* best-effort */ }
+  };
+
+  const preloadNextTrack = async () => {
+    if (preloading || preloadedTrack) return;
+    preloading = true;
+    try {
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const tokenId = pickNext();
+        const track = await resolveTrack(tokenId);
+        if (track) {
+          await warmHttpCache(track.src);
+          preloadedTrack = track;
+          // If the radio is idle, stage it in the element so it decodes/buffers now.
+          if (!on) {
+            player.src = track.src;
+            try { player.load(); } catch { /* noop */ }
+          }
+          break;
+        }
+      }
+    } finally {
+      preloading = false;
+    }
+  };
+
+  // Start warming a few seconds after init, off the critical page-load path.
+  const idle = window.requestIdleCallback || ((fn) => window.setTimeout(fn, 2500));
+  idle(() => { void preloadNextTrack(); });
+
   const setNow = (text, playing) => {
     nowLabel.textContent = text;
     nowLabel.hidden = !text;
@@ -250,8 +290,14 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     firstTune = false;
     // Try a few candidates in case some inscriptions have no extractable audio.
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const tokenId = pickNext();
-      const track = await resolveTrack(tokenId);
+      let track;
+      if (preloadedTrack) {
+        track = preloadedTrack;          // cued while the page was idle
+        preloadedTrack = null;
+      } else {
+        const tokenId = pickNext();
+        track = await resolveTrack(tokenId);
+      }
       if (token !== tuneToken || !on) return;
       if (!track) continue;
       // Let the tuning sweep finish before the song lands — feels like a dial.
@@ -260,10 +306,13 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
         await new Promise((resolve) => setTimeout(resolve, (tuningSeconds - elapsed) * 1000));
       }
       if (token !== tuneToken || !on) return;
-      player.src = track.src;
+      if (player.src !== track.src) {
+        player.src = track.src;
+      }
       try {
         await player.play();
         setNow(`♪ ${track.title}`, true);
+        window.setTimeout(() => { void preloadNextTrack(); }, 4000);
         return;
       } catch {
         // Autoplay refusal or decode failure — try another station.
@@ -300,6 +349,8 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     player.pause();
     player.removeAttribute('src');
     try { player.load(); } catch { /* noop */ }
+    // Re-cue for the next switch-on.
+    window.setTimeout(() => { void preloadNextTrack(); }, 1200);
     toggleButton.setAttribute('aria-pressed', 'false');
     root.classList.remove('is-on');
     setNow('', false);
