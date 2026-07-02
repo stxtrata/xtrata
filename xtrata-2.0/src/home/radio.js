@@ -14,10 +14,16 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   const root = document.createElement('div');
   root.className = 'xtrata-radio';
   root.innerHTML = [
-    '<button class="xtrata-radio__toggle" type="button" aria-pressed="false" title="Xtrata Radio — random inscribed songs">',
-    '  <span class="xtrata-radio__icon" aria-hidden="true">📻</span>',
-    '  <span class="xtrata-radio__label">Radio</span>',
-    '  <span class="xtrata-radio__wave" aria-hidden="true"><i></i><i></i><i></i></span>',
+    '<button class="xtrata-radio__set xtrata-radio__toggle" type="button" aria-pressed="false" title="Xtrata Radio — random inscribed songs">',
+    '  <span class="xtrata-radio__grille" aria-hidden="true"></span>',
+    '  <span class="xtrata-radio__face" aria-hidden="true">',
+    '    <span class="xtrata-radio__dial">',
+    '      <span class="xtrata-radio__scale">88&ensp;92&ensp;96&ensp;100&ensp;104&ensp;108</span>',
+    '      <span class="xtrata-radio__needle"></span>',
+    '    </span>',
+    '    <span class="xtrata-radio__brand">XTRATA&nbsp;FM</span>',
+    '  </span>',
+    '  <span class="xtrata-radio__knob" aria-hidden="true"><i></i></span>',
     '</button>',
     '<span class="xtrata-radio__now" hidden></span>',
     '<button class="xtrata-radio__next" type="button" title="Next song" hidden>⏭</button>'
@@ -45,51 +51,136 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     return audioContext;
   };
 
-  // Radio tuning sound: filtered static with a frequency sweep + a soft click.
-  const playTuning = (direction = 1) => {
+  // --- retro sound engine (all synthesized, no assets) ------------------
+  // Layers: a mechanical switch clack, a warm noise bed swept through a
+  // band-pass (the "between stations" wash), a heterodyne whistle that glides
+  // as the dial moves, and a squelch tail when the station locks in.
+  const MASTER_LEVEL = 0.55;
+
+  const makeNoise = (context, seconds) => {
+    const buffer = context.createBuffer(1, Math.ceil(context.sampleRate * seconds), context.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let index = 0; index < data.length; index += 1) {
+      data[index] = Math.random() * 2 - 1;
+    }
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    return source;
+  };
+
+  const playClick = (context, master, at, strength = 1) => {
+    // Bakelite switch: a tight noise tick plus a low, woody thump.
+    const tick = makeNoise(context, 0.03);
+    const tickFilter = context.createBiquadFilter();
+    tickFilter.type = 'highpass';
+    tickFilter.frequency.value = 1800;
+    const tickGain = context.createGain();
+    tickGain.gain.setValueAtTime(0.5 * strength, at);
+    tickGain.gain.exponentialRampToValueAtTime(0.001, at + 0.03);
+    tick.connect(tickFilter).connect(tickGain).connect(master);
+    tick.start(at);
+
+    const thump = context.createOscillator();
+    thump.type = 'sine';
+    thump.frequency.setValueAtTime(140, at);
+    thump.frequency.exponentialRampToValueAtTime(55, at + 0.09);
+    const thumpGain = context.createGain();
+    thumpGain.gain.setValueAtTime(0.6 * strength, at);
+    thumpGain.gain.exponentialRampToValueAtTime(0.001, at + 0.11);
+    thump.connect(thumpGain).connect(master);
+    thump.start(at);
+    thump.stop(at + 0.12);
+  };
+
+  const playStaticSweep = (context, master, at, seconds, fromHz, toHz, level) => {
+    const noise = makeNoise(context, seconds);
+    const band = context.createBiquadFilter();
+    band.type = 'bandpass';
+    band.Q.value = 6;
+    band.frequency.setValueAtTime(fromHz, at);
+    band.frequency.exponentialRampToValueAtTime(toHz, at + seconds * 0.85);
+    // gentle amplitude flutter so the static breathes like a real dial
+    const gain = context.createGain();
+    gain.gain.setValueAtTime(0.0001, at);
+    gain.gain.exponentialRampToValueAtTime(level, at + 0.05);
+    const steps = Math.max(3, Math.floor(seconds * 10));
+    for (let index = 1; index < steps; index += 1) {
+      const when = at + (seconds * index) / steps;
+      gain.gain.linearRampToValueAtTime(level * (0.55 + Math.random() * 0.45), when);
+    }
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + seconds);
+    noise.connect(band).connect(gain).connect(master);
+    noise.start(at);
+    noise.stop(at + seconds);
+  };
+
+  const playHeterodyne = (context, master, at, seconds, direction) => {
+    // The classic passing-station whistle: two close oscillators beating,
+    // pitch gliding with the dial.
+    const osc = context.createOscillator();
+    const osc2 = context.createOscillator();
+    osc.type = 'sine';
+    osc2.type = 'sine';
+    const startHz = direction > 0 ? 1400 : 600;
+    const endHz = direction > 0 ? 500 : 1600;
+    osc.frequency.setValueAtTime(startHz, at);
+    osc.frequency.exponentialRampToValueAtTime(endHz, at + seconds);
+    osc2.frequency.setValueAtTime(startHz * 1.012, at);
+    osc2.frequency.exponentialRampToValueAtTime(endHz * 1.012, at + seconds);
+    const gain = context.createGain();
+    gain.gain.setValueAtTime(0.0001, at);
+    gain.gain.exponentialRampToValueAtTime(0.10, at + seconds * 0.3);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + seconds);
+    osc.connect(gain);
+    osc2.connect(gain);
+    gain.connect(master);
+    osc.start(at); osc2.start(at);
+    osc.stop(at + seconds); osc2.stop(at + seconds);
+  };
+
+  const playSquelchTail = (context, master, at) => {
+    // Station lock: a short "fsst" that snaps shut.
+    const noise = makeNoise(context, 0.16);
+    const band = context.createBiquadFilter();
+    band.type = 'bandpass';
+    band.Q.value = 2.5;
+    band.frequency.setValueAtTime(2600, at);
+    band.frequency.exponentialRampToValueAtTime(900, at + 0.14);
+    const gain = context.createGain();
+    gain.gain.setValueAtTime(0.35, at);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+    noise.connect(band).connect(gain).connect(master);
+    noise.start(at);
+    noise.stop(at + 0.17);
+  };
+
+  // kind: 'on' (full power-up sweep), 'between' (quick squelch retune), 'off'.
+  const playTuning = (direction = 1, kind = 'on') => {
     const context = getContext();
     if (!context) return 0;
-    const duration = 0.55;
+    const master = context.createGain();
+    master.gain.value = MASTER_LEVEL;
+    master.connect(context.destination);
     const now = context.currentTime;
 
-    const noiseBuffer = context.createBuffer(1, Math.ceil(context.sampleRate * duration), context.sampleRate);
-    const channel = noiseBuffer.getChannelData(0);
-    for (let index = 0; index < channel.length; index += 1) {
-      channel[index] = (Math.random() * 2 - 1) * 0.6;
+    if (kind === 'off') {
+      playClick(context, master, now, 1);
+      playStaticSweep(context, master, now + 0.02, 0.38, 2800, 300, 0.22);
+      playHeterodyne(context, master, now + 0.02, 0.3, -1);
+      return 0.42;
     }
-    const noise = context.createBufferSource();
-    noise.buffer = noiseBuffer;
-
-    const bandpass = context.createBiquadFilter();
-    bandpass.type = 'bandpass';
-    bandpass.Q.value = 9;
-    const startHz = direction > 0 ? 500 : 3400;
-    const endHz = direction > 0 ? 3400 : 500;
-    bandpass.frequency.setValueAtTime(startHz, now);
-    bandpass.frequency.exponentialRampToValueAtTime(endHz, now + duration * 0.9);
-
-    const gain = context.createGain();
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.16, now + 0.06);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-
-    // A couple of "passing stations" blips inside the sweep.
-    const blip = context.createOscillator();
-    blip.type = 'sine';
-    blip.frequency.setValueAtTime(direction > 0 ? 640 : 980, now + 0.12);
-    blip.frequency.setValueAtTime(direction > 0 ? 880 : 720, now + 0.3);
-    const blipGain = context.createGain();
-    blipGain.gain.setValueAtTime(0.0001, now);
-    blipGain.gain.exponentialRampToValueAtTime(0.05, now + 0.14);
-    blipGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
-
-    noise.connect(bandpass).connect(gain).connect(context.destination);
-    blip.connect(blipGain).connect(context.destination);
-    noise.start(now);
-    noise.stop(now + duration);
-    blip.start(now + 0.1);
-    blip.stop(now + 0.45);
-    return duration;
+    if (kind === 'between') {
+      playStaticSweep(context, master, now, 0.4, 700, 2600, 0.3);
+      playHeterodyne(context, master, now + 0.05, 0.28, 1);
+      playSquelchTail(context, master, now + 0.32);
+      return 0.5;
+    }
+    // full power-on: clack → warm static sweep with whistle → squelch lock
+    playClick(context, master, now, 1);
+    playStaticSweep(context, master, now + 0.06, 0.85, 350, 3200, 0.34);
+    playHeterodyne(context, master, now + 0.18, 0.5, direction);
+    playSquelchTail(context, master, now + 0.82);
+    return 1.0;
   };
 
   // --- track resolution ---------------------------------------------------
@@ -131,6 +222,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   let on = false;
   let tuneToken = 0;
   let recent = [];
+  let firstTune = true;
 
   const pickNext = () => {
     const candidates = playlist.filter((id) => !recent.includes(id));
@@ -154,7 +246,8 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     const token = ++tuneToken;
     setNow('tuning…', false);
     const startedTuning = performance.now();
-    const tuningSeconds = playTuning(1);
+    const tuningSeconds = playTuning(1, firstTune ? 'on' : 'between');
+    firstTune = false;
     // Try a few candidates in case some inscriptions have no extractable audio.
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const tokenId = pickNext();
@@ -201,8 +294,9 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
 
   const switchOff = () => {
     on = false;
+    firstTune = true;
     tuneToken += 1;
-    playTuning(-1);
+    playTuning(-1, 'off');
     player.pause();
     player.removeAttribute('src');
     try { player.load(); } catch { /* noop */ }
