@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Xtrata — Migrate to v3</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: #101010;
+        color: #f4f1ea;
+      }
+      body { margin: 0; background: #101010; }
+      main { width: min(900px, calc(100vw - 40px)); margin: 0 auto; padding: 28px 0 48px; }
+      h1 { margin: 0 0 6px; font-size: 28px; }
+      h2 { margin: 0 0 12px; font-size: 16px; }
+      p { color: #cfc8bc; line-height: 1.5; }
+      code { color: #f7d36b; }
+      .panel { border: 1px solid #34312d; border-radius: 8px; background: #181715; padding: 16px; margin: 14px 0; }
+      .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+      .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+      .hint { color: #aaa197; font-size: 13px; }
+      select, button {
+        border: 1px solid #5a5146; border-radius: 8px; background: #f4f1ea; color: #101010;
+        padding: 8px 12px; font: inherit; font-weight: 700; cursor: pointer;
+      }
+      select { background: #0c0c0b; color: #f4f1ea; }
+      button.secondary { background: transparent; color: #f4f1ea; }
+      button:disabled { opacity: 0.45; cursor: not-allowed; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+      .tile { display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid #2b2926; border-radius: 8px; padding: 8px 10px; }
+      .tile span { font-weight: 800; }
+      .tile button { padding: 6px 10px; }
+      pre { white-space: pre-wrap; word-break: break-word; background: #0c0c0b; border: 1px solid #2b2926; border-radius: 8px; padding: 12px; max-height: 320px; overflow: auto; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+        <a href="/" title="Xtrata home" style="flex:none"><img src="/favicon.svg" alt="Xtrata" style="width:30px;height:30px;border-radius:8px;display:block" /></a>
+        <h1 style="margin:0">Migrate inscriptions to v3</h1>
+      </header>
+      <p>
+        Your inscriptions themselves never move or change — migration mints the
+        <strong>same token id</strong> on the current v3 core
+        (<code>xtrata-v3-2-3</code>) and retires the legacy token into escrow.
+        One small signed transaction per token. It never asks for a seed phrase.
+      </p>
+      <div class="panel">
+        <h2>How it works — three steps</h2>
+        <ol style="color:#cfc8bc;line-height:1.7;margin:0;padding-left:20px">
+          <li><strong>Connect</strong> the wallet that holds your legacy (v1/v2) inscriptions.</li>
+          <li><strong>Scan</strong> — pick a source core and press Scan. Eligible tokens appear live as they're found; anything already on v3 is skipped automatically. Press Scan again to stop at any time.</li>
+          <li><strong>Migrate</strong> — one token at a time, or <em>Migrate all</em> (one wallet signature each; the next signature only opens after the previous one confirms on-chain, so nothing can double-fire).</li>
+        </ol>
+        <p class="hint" style="margin-bottom:0">
+          Cost: a fixed <strong>0.005 STX</strong> network fee per token (if your wallet
+          suggests more, set it to 0.005 manually). Confirmations usually land in
+          seconds-to-minutes; the activity log below tells you exactly what's
+          happening the whole time, and anything that stalls, drops, or fails is
+          reported with what to do next — this page never hangs silently.
+        </p>
+      </div>
+      <div id="app"></div>
+    </main>
+    <script type="module" src="/src/migrate-ui.ts"></script>
+  </body>
+</html>

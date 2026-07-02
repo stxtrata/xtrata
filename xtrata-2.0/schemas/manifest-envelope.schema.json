@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xtrata.xyz/schemas/manifest-envelope.schema.json",
+  "title": "Xtrata Manifest Envelope",
+  "description": "Lightweight envelope shared by all Xtrata manifest levels (L0 profile, L1 creator-collection, L2 gallery). Full collection manifests (L3) use xtrata-collection-manifest.schema.json and may additionally carry this envelope for resolver discovery. Manifests are immutable inscriptions; updates are published by inscribing a new manifest whose `supersedes` points at the previous one. Resolvers pick the newest valid manifest inscribed by the address that currently owns `bnsName`.",
+  "type": "object",
+  "required": ["xtrataManifest"],
+  "properties": {
+    "xtrataManifest": {
+      "type": "object",
+      "required": ["kind", "version", "name"],
+      "additionalProperties": true,
+      "properties": {
+        "kind": { "enum": ["profile", "creator-collection", "gallery", "collection"] },
+        "version": { "type": "integer", "minimum": 1 },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,47}$",
+          "description": "URL handle for this manifest, scoped to the owner's BNS name (e.g. /g/dyle.btc/selected-works)."
+        },
+        "title": { "type": "string", "maxLength": 160 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "owner": { "type": "string", "description": "Stacks address that inscribed this manifest." },
+        "bnsName": { "type": "string", "description": "BNS name this manifest is published under (must be owned by `owner` at read time)." },
+        "supersedes": {
+          "type": ["string", "null"],
+          "description": "Inscription id of the manifest this one replaces, forming an update chain."
+        }
+      }
+    },
+    "items": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "type": "object",
+        "required": ["tokenId"],
+        "properties": {
+          "tokenId": { "type": "string", "pattern": "^[0-9]+$" },
+          "contractId": { "type": "string" },
+          "label": { "type": "string", "maxLength": 200 },
+          "media": { "enum": ["image", "audio", "html", "video", "text"] }
+        }
+      }
+    },
+    "galleries": {
+      "type": "array",
+      "description": "Profile (L0) manifests only: the owner's published galleries.",
+      "items": {
+        "type": "object",
+        "required": ["name", "manifestId"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,47}$" },
+          "manifestId": { "type": "string", "pattern": "^[0-9]+$" },
+          "title": { "type": "string", "maxLength": 160 },
+          "default": { "type": "boolean" }
+        }
+      }
+    },
+    "display": {
+      "type": "object",
+      "properties": {
+        "mode": { "enum": ["viewing", "listening", "mixed"] },
+        "cover": { "type": "string" },
+        "order": { "enum": ["manual", "newest", "oldest"] }
+      }
+    }
+  }
+}
