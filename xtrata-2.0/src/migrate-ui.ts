@@ -24,18 +24,38 @@ const FEE_USTX = 5000;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// Poll the proxy until the tx leaves the mempool; returns its final status.
-const waitForTx = async (txid: string): Promise<'success' | 'failed'> => {
+// Poll the proxy until the tx leaves the mempool. Bounded and talkative: gives a
+// progress note every ~30s, detects dropped/replaced transactions, and times out
+// after 15 minutes instead of hanging forever.
+const WAIT_TIMEOUT_MS = 15 * 60 * 1000;
+const waitForTx = async (
+  txid: string,
+  onProgress?: (message: string) => void
+): Promise<'success' | 'failed' | 'dropped' | 'timeout'> => {
   const id = `0x${txid.replace(/^0x/, '')}`;
+  const startedAt = Date.now();
+  let lastNoteAt = 0;
   for (;;) {
     await sleep(8000);
+    const elapsed = Date.now() - startedAt;
+    if (elapsed > WAIT_TIMEOUT_MS) {
+      return 'timeout';
+    }
+    if (onProgress && elapsed - lastNoteAt > 30000) {
+      lastNoteAt = elapsed;
+      const minutes = Math.floor(elapsed / 60000);
+      const seconds = Math.floor((elapsed % 60000) / 1000);
+      onProgress(`still waiting for confirmation… ${minutes}m ${seconds}s elapsed (this is normal; blocks can take a few minutes)`);
+    }
     try {
       const res = await fetch(`${apiBase}/extended/v1/tx/${id}`);
       if (!res.ok) continue;
       const json = (await res.json()) as { tx_status?: string };
       const st = json.tx_status;
       if (!st || st === 'pending') continue;
-      return st === 'success' ? 'success' : 'failed';
+      if (st === 'success') return 'success';
+      if (st.startsWith('dropped')) return 'dropped';
+      return 'failed';
     } catch {
       // network blip — keep polling
     }
@@ -202,8 +222,20 @@ const migrate = (id: bigint) =>
             reject(new Error('no txid'));
             return;
           }
-          const result = await waitForTx(txId);
+          const result = await waitForTx(txId, (msg) => note(`#${id}: ${msg}`));
           state.busyId = null;
+          if (result === 'timeout') {
+            note(`#${id}: no confirmation after 15 minutes. The transaction may still land — check it in the explorer (${txId}) before retrying, to avoid a double migration.`);
+            render();
+            reject(new Error('confirmation timeout'));
+            return;
+          }
+          if (result === 'dropped') {
+            note(`#${id}: the transaction was dropped from the mempool (usually a fee/nonce race). Nothing moved — it is safe to press Migrate again.`);
+            render();
+            reject(new Error('tx dropped'));
+            return;
+          }
           if (result === 'success') {
             note(`#${id} confirmed ✓`);
             state.v3Minted.add(id.toString());
@@ -234,14 +266,17 @@ const migrate = (id: bigint) =>
 
 const migrateAll = async () => {
   const queue = [...state.eligible];
+  let done = 0;
   for (const id of queue) {
     try {
       await migrate(id);
-    } catch {
-      // stop the run if the user cancels a signature
-      break;
+      done += 1;
+    } catch (error) {
+      note(`Run stopped after ${done}/${queue.length}: ${error instanceof Error ? error.message : String(error)}. Fix or retry, then press Migrate all again — completed ids are skipped automatically.`);
+      return;
     }
   }
+  note(`Migrate all finished: ${done}/${queue.length} confirmed on v3. ✓`);
 };
 
 const connect = async () => {

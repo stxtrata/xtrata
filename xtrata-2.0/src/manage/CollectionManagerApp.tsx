@@ -773,6 +773,12 @@ export default function CollectionManagerApp() {
           />
         </p>
         <p>Follow the guided steps below. Advanced controls are optional and hidden by default.</p>
+        <p className="meta-value">
+          Pair your launch with the <a href="/manifests">Manifest Studio</a> — group inscribed
+          works into collections and galleries, and publish your own page at{' '}
+          <code>/g/your-name.btc</code>. <a href="/agent-one/">Inscription Wizard</a> ·{' '}
+          <a href="/g/512">Example gallery link format</a>
+        </p>
         <WalletTopBar
           walletSession={walletSession}
           walletPending={walletPending}

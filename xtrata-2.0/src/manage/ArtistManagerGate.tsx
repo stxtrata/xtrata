@@ -288,9 +288,51 @@ function GateContent({ children }: ArtistManagerGateProps) {
               </div>
             )}
             {walletSession.isConnected && !allowed && !awaitingBnsAllowlistResolution && (
-              <div className="alert">This wallet is not allowlisted.</div>
+              <div className="alert">
+                This wallet is not on the managed-collections allowlist — that list only
+                gates the contract-deploy tooling below. Everything else is open to
+                everyone right now via the self-serve tools.
+              </div>
             )}
           </div>
+        </section>
+
+        <section className="panel" style={{ marginTop: 16 }}>
+          <h2 style={{ marginTop: 0 }}>Build without the allowlist — self-serve creator tools</h2>
+          <p style={{ color: 'var(--muted, #617067)', maxWidth: 720 }}>
+            Anyone can inscribe work, group it into collections and galleries, and publish
+            pages under their own BNS name. The safe path, in order:
+          </p>
+          <ol style={{ color: 'var(--muted, #617067)', maxWidth: 760, lineHeight: 1.7 }}>
+            <li>
+              <strong>Inscribe your works</strong> with the{' '}
+              <a href="/agent-one/">Inscription Wizard</a> (music master? use the{' '}
+              <a href="/agent-one/suno.html">SUNO fast-track</a>). Pay once per file;
+              unused deposit is refunded automatically.
+            </li>
+            <li>
+              <strong>Group them</strong> in the <a href="/manifests">Manifest Studio</a>:
+              a Creator Collection (ownership-verified) or a Curated Gallery. Validation
+              blocks anything malformed before you spend a single sat.
+            </li>
+            <li>
+              <strong>Publish your page</strong>: inscribe a Profile manifest and your
+              gallery goes live at <code>/g/your-name.btc</code> — your own on-chain
+              mint-adjacent page, updatable any time by inscribing a newer manifest.
+            </li>
+            <li>
+              <strong>Go bigger</strong>: full collection launches (dedicated mint pages,
+              pricing, reveal mechanics) use the managed tooling on this page — ask for an
+              allowlist slot via <a href="https://x.com/XtrataLayers" target="_blank" rel="noreferrer">@XtrataLayers</a>,
+              or follow the <a href="https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/artist-guides/collection-launch-guide.md" target="_blank" rel="noreferrer">launch guide</a>.
+            </li>
+          </ol>
+          <p style={{ color: 'var(--muted, #617067)', fontSize: 13 }}>
+            Safety by construction: every step quotes the exact cost before you pay,
+            deposits are one-shot wallets with automatic refunds, creator collections are
+            ownership-checked at inscribe time, and gallery names only resolve for the
+            wallet that owns the BNS name — nobody can publish as you.
+          </p>
         </section>
       </main>
     </div>

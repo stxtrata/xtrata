@@ -37,13 +37,31 @@
   </head>
   <body>
     <main>
-      <h1>Migrate inscriptions to v3</h1>
+      <header style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+        <a href="/" title="Xtrata home" style="flex:none"><img src="/favicon.svg" alt="Xtrata" style="width:30px;height:30px;border-radius:8px;display:block" /></a>
+        <h1 style="margin:0">Migrate inscriptions to v3</h1>
+      </header>
       <p>
-        Connect the Xverse wallet that holds your legacy inscriptions. Scan a
-        source core, then migrate each token into
-        <code>SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3</code> by
-        signing in Xverse. It never asks for a seed phrase.
+        Your inscriptions themselves never move or change — migration mints the
+        <strong>same token id</strong> on the current v3 core
+        (<code>xtrata-v3-2-3</code>) and retires the legacy token into escrow.
+        One small signed transaction per token. It never asks for a seed phrase.
       </p>
+      <div class="panel">
+        <h2>How it works — three steps</h2>
+        <ol style="color:#cfc8bc;line-height:1.7;margin:0;padding-left:20px">
+          <li><strong>Connect</strong> the wallet that holds your legacy (v1/v2) inscriptions.</li>
+          <li><strong>Scan</strong> — pick a source core and press Scan. Eligible tokens appear live as they're found; anything already on v3 is skipped automatically. Press Scan again to stop at any time.</li>
+          <li><strong>Migrate</strong> — one token at a time, or <em>Migrate all</em> (one wallet signature each; the next signature only opens after the previous one confirms on-chain, so nothing can double-fire).</li>
+        </ol>
+        <p class="hint" style="margin-bottom:0">
+          Cost: a fixed <strong>0.005 STX</strong> network fee per token (if your wallet
+          suggests more, set it to 0.005 manually). Confirmations usually land in
+          seconds-to-minutes; the activity log below tells you exactly what's
+          happening the whole time, and anything that stalls, drops, or fails is
+          reported with what to do next — this page never hangs silently.
+        </p>
+      </div>
       <div id="app"></div>
     </main>
     <script type="module" src="/src/migrate-ui.ts"></script>
