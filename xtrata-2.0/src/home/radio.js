@@ -5,9 +5,29 @@
 // (the Opus players) are fetched and their embedded data:audio source is
 // extracted and played, so the station works across formats.
 
+import radioCss from './radio.css?inline';
+
+const STORAGE_KEY = 'xtrata.radio.v1';
+const loadState = () => {
+  try { return JSON.parse(window.localStorage.getItem(STORAGE_KEY) || 'null') || {}; }
+  catch { return {}; }
+};
+const saveState = (state) => {
+  try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* noop */ }
+};
+
 export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {}) => {
   if (!tokenIds.length || typeof document === 'undefined') {
     return null;
+  }
+  if (document.querySelector('.xtrata-radio')) {
+    return null; // one radio per page, whichever bundle loads first
+  }
+  if (!document.getElementById('xtrata-radio-css')) {
+    const style = document.createElement('style');
+    style.id = 'xtrata-radio-css';
+    style.textContent = radioCss;
+    document.head.appendChild(style);
   }
 
   // --- UI -------------------------------------------------------------
@@ -263,7 +283,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
       const mime = (response.headers.get('content-type') || '').toLowerCase();
       if (response.ok && mime.startsWith('audio/')) {
         await response.body?.cancel?.();
-        resolved = { src: `/inscription/${tokenId}`, title: `#${tokenId}` };
+        resolved = { src: `/inscription/${tokenId}`, title: `#${tokenId}`, tokenId };
       } else if (response.ok && mime.includes('text/html')) {
         const html = await response.text();
         // Opus players embed their audio as a data: URI on a <source> element.
@@ -274,7 +294,8 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
           resolved = {
             src: match[1].replace(/&amp;/g, '&'),
             title: (titleMatch ? titleMatch[1].trim() : '') || `#${tokenId}`,
-            artist: artistMatch ? artistMatch[1].trim() : ''
+            artist: artistMatch ? artistMatch[1].trim() : '',
+            tokenId
           };
         }
       } else {
@@ -464,8 +485,9 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     sectionTimers.forEach((t) => window.clearTimeout(t));
     sectionTimers = [];
   };
-  // Shows one section; calls onDone only after the text has been fully readable:
-  // fits → dwell; overflows → hold, scroll to the very end, hold, done.
+  // One section at a time: it appears, holds so reading can start, then scrolls
+  // at reading speed until it has left the screen COMPLETELY. Only then does
+  // onDone fire and the next section appear from the right edge.
   const writeScreen = (text, onDone) => {
     if (!screenText) return;
     clearSectionTimers();
@@ -473,21 +495,15 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     screenText.style.removeProperty('--shift');
     screenText.style.removeProperty('--dur');
     screenText.textContent = text;
-    const screen = screenText.parentElement;
-    const overflow = screen ? screenText.scrollWidth - screen.clientWidth : 0;
-    if (overflow > 4) {
-      sectionTimers.push(window.setTimeout(() => {
-        const seconds = Math.max(2, (overflow + 8) / SCROLL_PX_PER_S);
-        screenText.style.setProperty('--shift', `-${overflow + 8}px`);
-        screenText.style.setProperty('--dur', `${seconds}s`);
-        screenText.classList.add('is-scroll');
-        sectionTimers.push(window.setTimeout(() => {
-          if (onDone) onDone();
-        }, seconds * 1000 + END_HOLD_MS));
-      }, HOLD_MS));
-    } else if (onDone) {
-      sectionTimers.push(window.setTimeout(onDone, HOLD_SHORT_MS));
-    }
+    if (!onDone) return; // status messages sit until replaced
+    sectionTimers.push(window.setTimeout(() => {
+      const distance = screenText.scrollWidth + 16; // fully offscreen left
+      const seconds = Math.max(2.5, distance / SCROLL_PX_PER_S);
+      screenText.style.setProperty('--shift', `-${distance}px`);
+      screenText.style.setProperty('--dur', `${seconds}s`);
+      screenText.classList.add('is-scroll');
+      sectionTimers.push(window.setTimeout(onDone, seconds * 1000 + 250));
+    }, HOLD_MS));
   };
 
   const tickerStep = () => {
@@ -558,6 +574,8 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
         setNow('', true);
         startTicker(track);
         startVu();
+        currentTokenId = track.tokenId || null;
+        persist();
         if (history[history.length - 1] !== track) history.push(track);
         if (history.length > 12) history.shift();
         window.setTimeout(() => { void preloadNextTrack(); }, 1500);
@@ -608,6 +626,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     renderKnob();
     stopTicker();
     setNow('', false);
+    persist();
   };
 
   toggleButton.addEventListener('click', () => (on ? switchOff() : switchOn()));
@@ -637,7 +656,69 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     });
   });
 
+  // --- cross-page continuity ----------------------------------------------
+  let currentTokenId = null;
+  const persist = () => {
+    saveState({
+      on,
+      volumeStep,
+      tokenId: currentTokenId,
+      position: Number.isFinite(player.currentTime) ? player.currentTime : 0,
+      savedAt: Date.now()
+    });
+  };
+  let lastPersist = 0;
+  player.addEventListener('timeupdate', () => {
+    const now = Date.now();
+    if (now - lastPersist > 1500) { lastPersist = now; persist(); }
+  });
+  window.addEventListener('pagehide', persist);
+
   renderKnob();
+
+  // Resume a previous session: same song, same position, no retune noise.
+  const saved = loadState();
+  if (saved && typeof saved.volumeStep === 'number') {
+    volumeStep = Math.max(0, Math.min(10, saved.volumeStep));
+    applyVolume();
+    renderKnob();
+  }
+  if (saved && saved.on && saved.tokenId) {
+    const resume = async () => {
+      const track = await resolveTrack(String(saved.tokenId));
+      if (!track) return;
+      on = true;
+      firstTune = false;
+      toggleButton.setAttribute('aria-pressed', 'true');
+      root.classList.add('is-on');
+      applyVolume();
+      renderKnob();
+      player.src = track.src;
+      const begin = () => {
+        try { if (Number(saved.position) > 1 && player.currentTime < 1) player.currentTime = Number(saved.position); } catch { /* noop */ }
+        currentTokenId = track.tokenId || null;
+        setNow('', true);
+        startTicker(track);
+        startVu();
+        if (history[history.length - 1] !== track) history.push(track);
+        window.setTimeout(() => { void preloadNextTrack(); }, 2000);
+        persist();
+      };
+      try { player.currentTime = Math.max(0, Number(saved.position) || 0); } catch { /* pre-metadata */ }
+      try {
+        await player.play();
+        begin();
+      } catch {
+        writeScreen('▶ TAP ANYWHERE TO RESUME');
+        const once = () => {
+          document.removeEventListener('pointerdown', once, true);
+          player.play().then(begin).catch(() => { writeScreen('▶ RADIO PAUSED — CLICK TO RETUNE'); });
+        };
+        document.addEventListener('pointerdown', once, true);
+      }
+    };
+    void resume();
+  }
 
   return { switchOn, switchOff };
 };
