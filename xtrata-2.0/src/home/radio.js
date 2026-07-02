@@ -25,21 +25,21 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     '      <span class="xtrata-radio__vu"><i></i><i></i><i></i><i></i><i></i><i></i></span>',
     '    </span>',
     '  </span>',
-    '  <span class="xtrata-radio__knob" role="slider" aria-label="Volume" aria-valuemin="-1" aria-valuemax="10" title="Volume — scroll or drag; below 0 clicks off"><i></i></span>',
-    '</button>',
-    '<span class="xtrata-radio__now xtrata-radio__analog" hidden>',
-    '  <span class="xtrata-radio__scale">88&ensp;92&ensp;96&ensp;100&ensp;104&ensp;108</span>',
-    '  <span class="xtrata-radio__needle"></span>',
-    '</span>',
-    '<button class="xtrata-radio__next" type="button" title="Next song" hidden>⏭</button>'
+    '  <span class="xtrata-radio__side">',
+    '    <span class="xtrata-radio__knob" role="slider" aria-label="Volume" aria-valuemin="-1" aria-valuemax="10" title="Volume — scroll or drag; below 0 clicks off"><i></i></span>',
+    '    <span class="xtrata-radio__transport">',
+    '      <span class="xtrata-radio__tbtn" role="button" tabindex="0" data-dir="prev" title="Previous song">⏮</span>',
+    '      <span class="xtrata-radio__tbtn" role="button" tabindex="0" data-dir="next" title="Next song">⏭</span>',
+    '    </span>',
+    '  </span>',
+    '</button>'
   ].join('');
   document.body.appendChild(root);
 
   const toggleButton = root.querySelector('.xtrata-radio__toggle');
-  const nowLabel = root.querySelector('.xtrata-radio__now');
   const screenText = root.querySelector('.xtrata-radio__screen-text');
-  const nextButton = root.querySelector('.xtrata-radio__next');
   const knob = root.querySelector('.xtrata-radio__knob');
+  const transportButtons = Array.from(root.querySelectorAll('.xtrata-radio__tbtn'));
 
   // --- audio plumbing ---------------------------------------------------
   const player = new Audio();
@@ -517,12 +517,11 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   const setNow = (text, playing) => {
     if (text) writeScreen(text);
     else if (screenText && !currentTrackInfo) { screenText.textContent = ''; }
-    nowLabel.hidden = !on;
-    nextButton.hidden = !on;
     root.classList.toggle('is-playing', Boolean(playing));
   };
 
-  const tuneToNextTrack = async () => {
+  const history = [];
+  const tuneToNextTrack = async (trackOverride) => {
     const token = ++tuneToken;
     stopTicker();
     setNow('~ TUNING ~', false);
@@ -532,7 +531,10 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     // Try a few candidates in case some inscriptions have no extractable audio.
     for (let attempt = 0; attempt < 5; attempt += 1) {
       let track;
-      if (preloadQueue.length) {
+      if (trackOverride) {
+        track = trackOverride;
+        trackOverride = null;
+      } else if (preloadQueue.length) {
         track = preloadQueue.shift();    // cued ahead of time — instant
       } else {
         const tokenId = pickNext();
@@ -556,6 +558,8 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
         setNow('', true);
         startTicker(track);
         startVu();
+        if (history[history.length - 1] !== track) history.push(track);
+        if (history.length > 12) history.shift();
         window.setTimeout(() => { void preloadNextTrack(); }, 1500);
         return;
       } catch {
@@ -604,15 +608,33 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     renderKnob();
     stopTicker();
     setNow('', false);
-    nextButton.hidden = true;
   };
 
   toggleButton.addEventListener('click', () => (on ? switchOff() : switchOn()));
-  nextButton.addEventListener('click', () => {
-    if (on) {
-      player.pause();
+  const skip = (direction) => {
+    if (!on) return;
+    player.pause();
+    if (direction === 'prev' && history.length > 1) {
+      history.pop(); // current
+      void tuneToNextTrack(history.pop());
+    } else if (direction === 'prev' && history.length === 1) {
+      void tuneToNextTrack(history.pop()); // restart current
+    } else {
       void tuneToNextTrack();
     }
+  };
+  transportButtons.forEach((button) => {
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      skip(button.dataset.dir);
+    });
+    button.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        event.stopPropagation();
+        skip(button.dataset.dir);
+      }
+    });
   });
 
   renderKnob();

@@ -1,0 +1,207 @@
+/* --- Xtrata Radio: little retro set, bottom-left --- */
+.xtrata-radio {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  max-width: calc(100vw - 32px);
+}
+.xtrata-radio { --pulse: 0; }
+.xtrata-radio__set {
+  position: relative;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 11px;
+  width: 236px;
+  height: 76px;
+  padding: 11px 13px;
+  border: 1px solid #3a2a1c;
+  border-radius: 16px 16px 11px 11px;
+  cursor: pointer;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.10), transparent 42%),
+    repeating-linear-gradient(94deg, rgba(0, 0, 0, 0.07) 0 3px, transparent 3px 9px),
+    linear-gradient(180deg, #7f5330 0%, #5d3a1e 55%, #452a14 100%);
+  box-shadow:
+    0 16px 34px rgba(0, 0, 0, 0.38),
+    0 0 calc(var(--pulse) * 34px) rgba(255, 170, 80, calc(var(--pulse) * 0.5)),
+    inset 0 1px 0 rgba(255, 220, 170, 0.28),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.38);
+  transition: transform 0.12s ease;
+}
+.xtrata-radio.is-on .xtrata-radio__set {
+  box-shadow:
+    0 16px 34px rgba(0, 0, 0, 0.38),
+    0 0 calc(14px + var(--pulse) * 34px) rgba(255, 170, 80, calc(0.22 + var(--pulse) * 0.5)),
+    inset 0 1px 0 rgba(255, 220, 170, 0.28),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.38);
+}
+/* telescopic antenna */
+.xtrata-radio__set::before {
+  content: "";
+  position: absolute;
+  top: -26px;
+  right: 18px;
+  width: 2px;
+  height: 28px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #e8e2d6, #8f8878 70%, #4a4238);
+  box-shadow: 0 -1px 0 1px rgba(232, 226, 214, 0.9);
+  transform: rotate(14deg);
+  transform-origin: bottom center;
+}
+/* glass sheen across the cabinet */
+.xtrata-radio__set::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.14) 0%, transparent 28%, transparent 70%, rgba(255, 255, 255, 0.05) 100%);
+}
+.xtrata-radio__set:hover { transform: translateY(-1px); }
+.xtrata-radio__set:active { transform: translateY(1px); }
+
+/* speaker grille — pulses with the bass (--pulse set from the analyser) */
+.xtrata-radio__grille {
+  --pulse: 0;
+  height: 54px;
+  border-radius: 7px;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(255, 190, 110, calc(var(--pulse) * 0.30)), transparent 65%),
+    repeating-linear-gradient(90deg, rgba(20, 12, 6, 0.9) 0 2px, rgba(120, 84, 50, 0.55) 2px 5px);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.55),
+    0 0 calc(var(--pulse) * 18px) rgba(255, 170, 80, calc(var(--pulse) * 0.85));
+  transform: scale(calc(1 + var(--pulse) * 0.09));
+  transition: transform 0.05s linear;
+  will-change: transform, box-shadow;
+}
+.xtrata-radio__face { display: grid; gap: 4px; min-width: 0; }
+
+/* VFD text screen on the set: pause, then scroll section to section */
+.xtrata-radio__screen {
+  position: relative;
+  height: 26px;
+  border-radius: 5px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  padding: 0 7px;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #05170c, #0a2413 60%, #061a0d);
+  border: 1px solid #1d3a28;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.7);
+}
+.xtrata-radio__screen-text {
+  display: inline-block;
+  white-space: nowrap;
+  font: 700 10.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7dffb0;
+  text-shadow: 0 0 5px rgba(90, 255, 160, 0.75);
+}
+.xtrata-radio__screen-text.is-scroll {
+  animation: xtrata-marquee var(--dur, 8s) linear 1 forwards;
+}
+@keyframes xtrata-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(var(--shift, 0px)); }
+}
+
+/* brand plate: logo + name + VU meter */
+.xtrata-radio__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+.xtrata-radio__brandwrap { display: inline-flex; align-items: center; gap: 3px; flex: none; }
+.xtrata-radio__logo {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: block;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
+.xtrata-radio__brand {
+  font: 800 7.5px/1 ui-monospace, monospace;
+  letter-spacing: 0.06em;
+  color: rgba(255, 226, 178, 0.8);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+}
+/* VU meter in a recessed bezel, green -> amber -> red, per-bar --vu (0..1) */
+.xtrata-radio__vu {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  height: 13px;
+  flex: none;
+  margin-left: auto;
+  padding: 2px 2.5px;
+  border-radius: 3px;
+  background: #17100a;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+.xtrata-radio__vu i {
+  --vu: 0;
+  width: 3.5px;
+  height: 100%;
+  border-radius: 1px;
+  background:
+    linear-gradient(0deg, #37e07a 0%, #37e07a 55%, #ffcc4d 55%, #ffcc4d 82%, #ff5a3c 82%, #ff5a3c 100%);
+  -webkit-mask-image: linear-gradient(0deg, #000 calc(var(--vu) * 100%), transparent calc(var(--vu) * 100%));
+  mask-image: linear-gradient(0deg, #000 calc(var(--vu) * 100%), transparent calc(var(--vu) * 100%));
+  box-shadow: 0 0 calc(var(--vu) * 5px) rgba(90, 255, 140, calc(var(--vu) * 0.6));
+}
+.xtrata-radio:not(.is-playing) .xtrata-radio__vu i { --vu: 0; }
+
+/* power knob */
+.xtrata-radio__knob {
+  width: 28px;
+  height: 28px;
+  justify-self: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #f4e3c2, #b9925c 55%, #6d4a26 100%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.55);
+  display: grid;
+  place-items: center;
+  transition: transform 0.25s ease;
+}
+.xtrata-radio__knob i { width: 2px; height: 9px; border-radius: 2px; background: #3a2411; transform: translateY(-4px); }
+.xtrata-radio__knob { cursor: grab; touch-action: none; }
+.xtrata-radio__knob:active { cursor: grabbing; }
+
+/* side column: volume knob + transport buttons built into the body */
+.xtrata-radio__side { display: grid; gap: 5px; justify-items: center; }
+.xtrata-radio__transport { display: flex; gap: 3px; }
+.xtrata-radio__tbtn {
+  width: 15px;
+  height: 13px;
+  display: grid;
+  place-items: center;
+  font-size: 7px;
+  color: rgba(255, 226, 178, 0.85);
+  border-radius: 3px;
+  background: linear-gradient(180deg, #6d4a26, #4a2f15);
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 220, 170, 0.3), 0 1px 2px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  user-select: none;
+  opacity: 0.55;
+  transition: opacity 0.2s ease, transform 0.08s ease;
+}
+.xtrata-radio.is-on .xtrata-radio__tbtn { opacity: 1; }
+.xtrata-radio__tbtn:active { transform: translateY(1px); }
+@media (max-width: 560px) {
+  .xtrata-radio__set { width: 196px; height: 66px; }
+}
