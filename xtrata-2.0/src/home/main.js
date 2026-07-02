@@ -432,6 +432,11 @@
       connectedWalletNameResolved: false,
       connectedWalletNamePending: false,
       connectedWalletNameRequestId: 0,
+      // Reverse-resolved BNS name for a viewed (looked-up) address. Display-only:
+      // never fed back into the lookup state machine.
+      walletViewResolvedName: null,
+      walletViewResolvedNameAddress: null,
+      walletViewResolvedNameRequestId: 0,
       curatedGalleryId: null,
       curatedGalleryTitle: null,
       homeLatestView: false,
@@ -3281,7 +3286,57 @@
         return state.walletViewName;
       }
       const viewingAddress = getViewingWalletAddress();
-      return viewingAddress ? truncateMiddle(viewingAddress, 8, 8) : null;
+      if (!viewingAddress) {
+        return null;
+      }
+      if (
+        state.walletViewResolvedName &&
+        addressesEqual(state.walletViewResolvedNameAddress, viewingAddress)
+      ) {
+        return state.walletViewResolvedName;
+      }
+      return truncateMiddle(viewingAddress, 8, 8);
+    };
+
+    // Reverse-resolve a BNS name for the currently viewed address (display only).
+    const resolveViewingWalletName = async () => {
+      const viewingAddress = getViewingWalletAddress();
+      if (!viewingAddress || state.walletViewName) {
+        return;
+      }
+      if (addressesEqual(state.walletViewResolvedNameAddress, viewingAddress)) {
+        return;
+      }
+      const requestId = ++state.walletViewResolvedNameRequestId;
+      state.walletViewResolvedNameAddress = viewingAddress;
+      state.walletViewResolvedName = null;
+      try {
+        const namesResult = await resolveBnsNames({
+          address: viewingAddress,
+          network: state.contract.network
+        });
+        if (
+          requestId !== state.walletViewResolvedNameRequestId ||
+          !addressesEqual(getViewingWalletAddress(), viewingAddress)
+        ) {
+          return;
+        }
+        state.walletViewResolvedName = namesResult.primary;
+        if (namesResult.primary) {
+          updateWalletStatus();
+          updateConnectedReadout();
+        }
+      } catch (error) {
+        debugLog(
+          'bns',
+          'viewing wallet name lookup failed',
+          {
+            wallet: truncateMiddle(viewingAddress, 8, 8),
+            error: error instanceof Error ? error.message : String(error)
+          },
+          'warn'
+        );
+      }
     };
 
     const getConnectedWalletLabel = () => {
@@ -3909,12 +3964,15 @@
           : viewingAddress
           ? `Viewing ${viewingLabel}.`
           : 'Connect a wallet or enter an address.';
+        if (!state.curatedGalleryTitle && viewingAddress) {
+          void resolveViewingWalletName();
+        }
         return;
       }
       if (mismatch) {
         setStatus(
           dom.walletStatus,
-          `<strong>Wallet</strong> ${truncateMiddle(state.walletSession.address)} · expected ${mismatch.expected}`,
+          `<strong>Wallet</strong> ${getConnectedWalletLabel() ?? truncateMiddle(state.walletSession.address)} · expected ${mismatch.expected}`,
           'network',
           'rose'
         );
@@ -3925,12 +3983,13 @@
       }
       setStatus(
         dom.walletStatus,
-        `<strong>Wallet</strong> ${truncateMiddle(state.walletSession.address)}`,
+        `<strong>Wallet</strong> ${getConnectedWalletLabel() ?? truncateMiddle(state.walletSession.address)}`,
         'ready',
         'blue'
       );
-      if (!state.curatedGalleryTitle && !state.walletViewAddress) {
-        void resolveConnectedWalletName();
+      void resolveConnectedWalletName();
+      if (state.walletViewAddress) {
+        void resolveViewingWalletName();
       }
       dom.walletSubtitle.textContent = state.curatedGalleryTitle
         ? `Viewing ${state.curatedGalleryTitle}.`
