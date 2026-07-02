@@ -22,3 +22,4 @@
 /collection/* /workspace 200
 /lab /workspace 200
 /lab/* /workspace 200
+/gallery/* /g/:splat 200

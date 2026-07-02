@@ -3533,6 +3533,47 @@
       );
     };
 
+    // Gallery discovery: when a BNS name resolves, quietly probe /g/<name> and
+    // offer a "Visit gallery" link if the name has a published gallery manifest.
+    let galleryProbeRequestId = 0;
+    const galleryProbeCache = new Map();
+    const appendGalleryLink = (name) => {
+      const link = document.createElement('a');
+      link.href = `/g/${encodeURIComponent(name)}`;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.className = 'wallet-gallery-link';
+      link.style.marginLeft = '8px';
+      link.style.fontWeight = '700';
+      link.textContent = 'Visit gallery →';
+      dom.walletLookupStatus.appendChild(link);
+    };
+    const maybeOfferGalleryLink = () => {
+      const name = state.walletViewName;
+      if (!name || !dom.walletLookupStatus) {
+        return;
+      }
+      const cached = galleryProbeCache.get(name);
+      if (cached === true) {
+        appendGalleryLink(name);
+        return;
+      }
+      if (cached === false) {
+        return;
+      }
+      const requestId = ++galleryProbeRequestId;
+      fetch(`/g/${encodeURIComponent(name)}?format=json`)
+        .then((response) => {
+          galleryProbeCache.set(name, response.ok);
+          if (response.ok && requestId === galleryProbeRequestId && state.walletViewName === name) {
+            appendGalleryLink(name);
+          }
+        })
+        .catch(() => {
+          galleryProbeCache.set(name, false);
+        });
+    };
+
     const updateWalletLookupStatus = () => {
       dom.walletLookupStatus.hidden = false;
 
@@ -3555,6 +3596,7 @@
 
       if (state.walletViewAddress) {
         dom.walletLookupStatus.textContent = `Viewing ${getViewingWalletLabel()}.`;
+        maybeOfferGalleryLink();
         return;
       }
 
