@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Bitcoin Pepe Twins Board — Xtrata</title>
+<style>
+  :root {
+    --pepe: #54a000;
+    --pepe-bright: #8bd400;
+    --pepe-deep: #2f5e00;
+    --pepe-dark: #14250a;
+    --ink: #0a1404;
+    --bg: #0c1606;
+    --panel: #16240c;
+    --panel-2: #1d3210;
+    --line: rgba(139, 212, 0, 0.22);
+    --line-soft: rgba(139, 212, 0, 0.12);
+    --text: #e8f6d6;
+    --muted: #a8c487;
+    --gold: #f5c542;
+    --warn: #ffb454;
+    --bad: #ff6b6b;
+    --radius: 12px;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--sans);
+    color: var(--text);
+    background:
+      radial-gradient(1200px 700px at 50% -10%, rgba(84,160,0,0.18), transparent 60%),
+      radial-gradient(900px 600px at 90% 110%, rgba(47,94,0,0.22), transparent 60%),
+      var(--bg);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--pepe-bright); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 18px 18px 60px; }
+
+  header.app {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 14px 16px; border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    box-shadow: 0 10px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.03);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; margin-right: auto; }
+  .brand .glyph {
+    width: 42px; height: 42px; border-radius: 10px; display: grid; place-items: center;
+    background: radial-gradient(circle at 35% 30%, var(--pepe-bright), var(--pepe-deep));
+    box-shadow: inset 0 0 0 2px rgba(0,0,0,0.35); font-size: 24px;
+  }
+  .brand h1 { font-size: 17px; margin: 0; letter-spacing: 0.2px; }
+  .brand p { margin: 2px 0 0; font-size: 11.5px; color: var(--muted); }
+
+  .pill {
+    font: 600 11px/1 var(--sans); padding: 6px 10px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--muted); background: rgba(0,0,0,0.25);
+    white-space: nowrap;
+  }
+  .pill.ok { color: #d7ffb0; border-color: rgba(139,212,0,0.5); background: rgba(84,160,0,0.18); }
+  .pill.warn { color: var(--warn); border-color: rgba(255,180,84,0.4); }
+
+  button {
+    font: 700 13px/1 var(--sans); color: var(--ink); cursor: pointer;
+    border: none; border-radius: 10px; padding: 10px 14px;
+    background: linear-gradient(180deg, var(--pepe-bright), var(--pepe));
+    box-shadow: 0 6px 18px rgba(84,160,0,0.35), inset 0 1px 0 rgba(255,255,255,0.4);
+    transition: transform .06s ease, filter .15s ease;
+  }
+  button:hover { filter: brightness(1.06); }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .5; cursor: not-allowed; filter: grayscale(.4); }
+  button.ghost {
+    background: transparent; color: var(--text);
+    border: 1px solid var(--line); box-shadow: none;
+  }
+  button.ghost:hover { background: rgba(139,212,0,0.08); }
+  button.danger { background: linear-gradient(180deg, #ff8a8a, #e85555); }
+
+  .stats { display: flex; gap: 18px; flex-wrap: wrap; margin: 16px 2px 10px; }
+  .stat { font-size: 12px; color: var(--muted); }
+  .stat b { display: block; font-size: 20px; color: var(--text); font-weight: 800; }
+
+  .layout { display: grid; grid-template-columns: 1fr 360px; gap: 18px; margin-top: 8px; }
+  @media (max-width: 920px) { .layout { grid-template-columns: 1fr; } }
+
+  .board-card {
+    border: 1px solid var(--line); border-radius: var(--radius); padding: 14px;
+    background: linear-gradient(180deg, rgba(29,50,16,0.7), rgba(22,36,12,0.7));
+  }
+  .board-frame {
+    position: relative; width: 100%; aspect-ratio: 1 / 1;
+    border-radius: 10px; overflow: hidden;
+    background:
+      linear-gradient(135deg, rgba(84,160,0,0.10), rgba(20,37,10,0.4)),
+      repeating-linear-gradient(0deg, transparent 0 23px, rgba(139,212,0,0.04) 23px 24px),
+      repeating-linear-gradient(90deg, transparent 0 23px, rgba(139,212,0,0.04) 23px 24px),
+      var(--pepe-dark);
+    box-shadow: inset 0 0 0 1px rgba(139,212,0,0.18), inset 0 0 60px rgba(0,0,0,0.5);
+  }
+  #board {
+    position: absolute; inset: 0; display: grid; gap: 2px; padding: 2px;
+  }
+  .slot {
+    position: relative; border-radius: 3px; overflow: hidden; cursor: pointer;
+    background: rgba(139,212,0,0.05);
+    box-shadow: inset 0 0 0 1px rgba(139,212,0,0.10);
+    transition: box-shadow .12s ease, transform .12s ease, background .2s ease;
+  }
+  .slot:hover { box-shadow: inset 0 0 0 1px var(--pepe-bright), 0 0 0 1px var(--pepe-bright); z-index: 5; }
+  .slot.claimed { background: #000; box-shadow: inset 0 0 0 1px rgba(139,212,0,0.35); }
+  .slot.mine { box-shadow: inset 0 0 0 2px var(--gold), 0 0 0 1px var(--gold); }
+  .slot.selected { box-shadow: inset 0 0 0 2px #fff, 0 0 0 2px var(--pepe-bright); z-index: 6; }
+  .slot img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; display: block; }
+  .slot .tag {
+    position: absolute; left: 2px; top: 2px; font: 700 8px/1 var(--mono);
+    color: var(--muted); opacity: 0; transition: opacity .12s; pointer-events: none;
+    background: rgba(0,0,0,0.45); padding: 2px 3px; border-radius: 3px;
+  }
+  .slot:hover .tag { opacity: 1; }
+  .slot .tier-dot {
+    position: absolute; right: 3px; bottom: 3px; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--pepe); opacity: .5;
+  }
+  .slot.t-XL .tier-dot { background: var(--gold); opacity: .9; }
+  .slot.t-L .tier-dot { background: var(--pepe-bright); opacity: .85; }
+  .slot.t-M .tier-dot { background: var(--pepe-bright); opacity: .6; }
+
+  .side { display: flex; flex-direction: column; gap: 14px; }
+  .panel {
+    border: 1px solid var(--line); border-radius: var(--radius); padding: 14px;
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  }
+  .panel h2 { margin: 0 0 4px; font-size: 14px; }
+  .panel .sub { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
+  .kv { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; padding: 5px 0; border-bottom: 1px solid var(--line-soft); }
+  .kv:last-child { border-bottom: none; }
+  .kv span { color: var(--muted); }
+  .kv b { font-family: var(--mono); font-weight: 700; }
+  .mono { font-family: var(--mono); }
+
+  .pepe-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0; }
+  .pepe-pick {
+    aspect-ratio: 1; border-radius: 8px; overflow: hidden; cursor: pointer; position: relative;
+    border: 2px solid transparent; background: #000;
+  }
+  .pepe-pick img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+  .pepe-pick.sel { border-color: var(--gold); }
+  .pepe-pick .num { position: absolute; bottom: 0; left: 0; right: 0; font: 700 9px/1 var(--mono); background: rgba(0,0,0,0.6); color: var(--pepe-bright); padding: 2px; text-align: center; }
+
+  .preview-box {
+    aspect-ratio: 1; width: 100%; border-radius: 10px; overflow: hidden; background: #000;
+    display: grid; place-items: center; border: 1px solid var(--line); margin-bottom: 10px;
+  }
+  .preview-box img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+  .preview-box .empty { color: var(--muted); font-size: 12px; text-align: center; padding: 20px; }
+
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .row.end { justify-content: flex-end; }
+  .grow { flex: 1; }
+  .note { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+  .ok-text { color: #d7ffb0; }
+  .warn-text { color: var(--warn); }
+  .bad-text { color: var(--bad); }
+  .hidden { display: none !important; }
+
+  input[type="text"], input[type="number"] {
+    width: 100%; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line);
+    background: rgba(0,0,0,0.3); color: var(--text); font: 600 13px var(--mono);
+  }
+  label.field { display: block; font-size: 11px; color: var(--muted); margin: 8px 0 4px; text-transform: uppercase; letter-spacing: .5px; }
+
+  details.config { margin-top: 16px; border: 1px dashed var(--line); border-radius: var(--radius); padding: 10px 14px; background: rgba(0,0,0,0.2); }
+  details.config summary { cursor: pointer; font-weight: 700; font-size: 13px; color: var(--warn); }
+  details.config .note { margin-top: 8px; }
+
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; font-size: 11px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(20px);
+    background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+    padding: 12px 18px; border-radius: 10px; font-size: 13px; opacity: 0; pointer-events: none;
+    transition: opacity .2s ease, transform .2s ease; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 50;
+    max-width: 90vw;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.bad { border-color: rgba(255,107,107,0.6); }
+  footer.app { margin-top: 26px; font-size: 11px; color: var(--muted); text-align: center; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="app">
+    <div class="brand">
+      <div class="glyph">🐸</div>
+      <div>
+        <h1>Bitcoin Pepe Twins Board</h1>
+        <p>An Xtrata billboard reserved for the Pepe twins · free to claim · gas only</p>
+      </div>
+    </div>
+    <span class="pill" id="netPill">mainnet</span>
+    <span class="pill" id="walletPill">wallet: not connected</span>
+    <button id="connectBtn">Connect wallet</button>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><b id="statTotal">—</b>total squares</div>
+    <div class="stat"><b id="statClaimed">0</b>claimed</div>
+    <div class="stat"><b id="statOpen">—</b>open</div>
+    <div class="stat"><b id="statMine">0</b>yours</div>
+    <div class="stat"><b id="statPepes">—</b>your Pepes</div>
+  </div>
+
+  <div class="layout">
+    <div class="board-card">
+      <div class="board-frame">
+        <div id="board"></div>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--gold)"></i>5×5 flagship</span>
+        <span><i style="background:var(--pepe-bright)"></i>4×4 / 3×3</span>
+        <span><i style="background:var(--pepe)"></i>2×2 · 1×1</span>
+        <span><i style="background:#fff"></i>selected</span>
+        <span><i style="background:var(--gold);border-radius:50%"></i>yours</span>
+      </div>
+    </div>
+
+    <div class="side">
+      <div class="panel" id="claimPanel">
+        <h2 id="panelTitle">Select a square</h2>
+        <p class="sub" id="panelSub">Click any open square on the board to claim it with one of your Pepes.</p>
+        <div id="panelBody">
+          <p class="note">Every square here is free — you only pay the Stacks network fee to write your claim on-chain. To claim, your connected wallet must hold at least one <b>Bitcoin Pepe twin</b> inscribed with Xtrata.</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Pepe holdings</h2>
+        <p class="sub" id="holdSub">Connect a wallet to scan for your Pepe twins.</p>
+        <div id="holdBody" class="note">No wallet connected.</div>
+      </div>
+    </div>
+  </div>
+
+  <details class="config">
+    <summary>⚙︎ Collection &amp; deployment config (operator only)</summary>
+    <p class="note">
+      This board gates claiming to holders of the <b>Bitcoin Pepe twins</b> Xtrata collection.
+      Before going live, paste the real collection details below so the on-chain ownership check
+      and free-claim contract calls resolve correctly. Values persist in this browser only.
+    </p>
+    <label class="field">Pepe NFT asset identifier (contract::asset)</label>
+    <input type="text" id="cfgAsset" placeholder="SP2CWY47KCSYT6VZDV8CZ1WSBA5JASPHDP95ADB96.xtrata-v2::xtrata" />
+    <label class="field">Pepe twin inscription IDs (comma list and/or a-b ranges)</label>
+    <input type="text" id="cfgIds" placeholder="e.g. 1-329  or  101,102,140-160" />
+    <label class="field">Pepe board registry contract (free-claim) — leave blank for local demo mode</label>
+    <input type="text" id="cfgBoard" placeholder="SP....pepe-board-v1" />
+    <div class="row" style="margin-top:10px">
+      <button id="cfgSave">Save config</button>
+      <button class="ghost" id="cfgDemo">Demo: simulate holding Pepes</button>
+      <button class="ghost" id="cfgReset">Reset board</button>
+    </div>
+    <p class="note" id="cfgStatus" style="margin-top:8px"></p>
+  </details>
+
+  <footer class="app">
+    Bitcoin Pepe Twins Board — a dedicated edition of X-Board, built on Xtrata / Stacks.<br>
+    Squares are claimed free (network gas only) and display your Pepe inscription on-chain.
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+(function () {
+  // ----------------------------------------------------------------------------
+  // CONFIG — Bitcoin Pepe Twins Board
+  // ----------------------------------------------------------------------------
+  const DEFAULT_CONFIG = {
+    title: 'Bitcoin Pepe Twins Board',
+    grid: 25,                 // 25 x 25 logical cells
+    seed: 1337,               // deterministic layout seed (do NOT change after launch)
+    claimFeeUstx: 0,          // FREE — gas only
+    inscriptionUrlTemplate: 'https://xtrata.xyz/inscription/{id}',
+    hiroApiBase: 'https://api.mainnet.hiro.so',
+    network: 'mainnet',
+    // Xtrata inscription contract (used for read-only ownership fallback)
+    xtrataContract: 'SP2CWY47KCSYT6VZDV8CZ1WSBA5JASPHDP95ADB96.xtrata-v2',
+    // --- FILL IN BEFORE LAUNCH ---------------------------------------------
+    // NFT asset identifier of the Pepe collection, "<contract>::<asset-name>".
+    // Used with Hiro's NFT holdings endpoint to detect Pepe ownership.
+    pepeAssetIdentifier: '',  // e.g. 'SP2CWY47KCSYT6VZDV8CZ1WSBA5JASPHDP95ADB96.xtrata-v2::xtrata'
+    // Inscription IDs that ARE Bitcoin Pepe twins. Ranges + explicit IDs both supported.
+    // Placeholder range 1..329 is illustrative ONLY — replace with the real Pepe IDs.
+    pepeRanges: [[1, 329]],
+    pepeIds: [],
+    // Pepe-board free-claim registry contract "<addr>.<name>". Blank => local demo mode.
+    boardContract: ''
+    // -----------------------------------------------------------------------
+  };
+
+  const LS = {
+    config: 'xpepe-config-v1',
+    claims: 'xpepe-claims-v1',
+    demoPepes: 'xpepe-demo-pepes-v1'
+  };
+
+  function loadConfig() {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(LS.config) || '{}'); } catch (e) {}
+    return Object.assign({}, DEFAULT_CONFIG, saved);
+  }
+  let CONFIG = loadConfig();
+
+  // Build the set of valid Pepe inscription ids from ranges + explicit ids.
+  function pepeIdSet() {
+    const s = new Set();
+    (CONFIG.pepeIds || []).forEach(n => { const v = Number(n); if (Number.isFinite(v)) s.add(v); });
+    (CONFIG.pepeRanges || []).forEach(r => {
+      const a = Number(r[0]), b = Number(r[1]);
+      if (Number.isFinite(a) && Number.isFinite(b)) for (let i = Math.min(a,b); i <= Math.max(a,b); i++) s.add(i);
+    });
+    return s;
+  }
+  function isPepe(id) { return pepeIdSet().has(Number(id)); }
+
+  // ----------------------------------------------------------------------------
+  // LAYOUT — deterministic seeded packer (mixed square tiers, all square)
+  // ----------------------------------------------------------------------------
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  const TIER_PLAN = [
+    { tier: 'XL', size: 5, count: 1 },
+    { tier: 'L',  size: 4, count: 4 },
+    { tier: 'M',  size: 3, count: 10 },
+    { tier: 'R',  size: 2, count: 44 }
+  ];
+  function buildLayout() {
+    const G = CONFIG.grid;
+    const rng = mulberry32(CONFIG.seed);
+    const occ = Array.from({ length: G }, () => new Array(G).fill(false));
+    const slots = [];
+    const fits = (r, c, s) => {
+      if (r + s > G || c + s > G) return false;
+      for (let i = r; i < r + s; i++) for (let j = c; j < c + s; j++) if (occ[i][j]) return false;
+      return true;
+    };
+    const place = (r, c, s, tier) => {
+      for (let i = r; i < r + s; i++) for (let j = c; j < c + s; j++) occ[i][j] = true;
+      slots.push({ id: slots.length, r, c, s, tier });
+    };
+    for (const t of TIER_PLAN) {
+      let placed = 0, tries = 0, max = t.count * 600;
+      while (placed < t.count && tries < max) {
+        tries++;
+        const r = Math.floor(rng() * G), c = Math.floor(rng() * G);
+        if (fits(r, c, t.size)) { place(r, c, t.size, t.tier); placed++; }
+      }
+    }
+    for (let i = 0; i < G; i++) for (let j = 0; j < G; j++) if (!occ[i][j]) place(i, j, 1, 'S');
+    return slots;
+  }
+  const SLOTS = buildLayout();
+  const SLOT_BY_ID = new Map(SLOTS.map(s => [s.id, s]));
+
+  // ----------------------------------------------------------------------------
+  // STATE
+  // ----------------------------------------------------------------------------
+  function loadClaims() {
+    try { return JSON.parse(localStorage.getItem(LS.claims) || '{}'); } catch (e) { return {}; }
+  }
+  function saveClaims() { localStorage.setItem(LS.claims, JSON.stringify(claims)); }
+  let claims = loadClaims();          // { slotId: { owner, inscriptionId, ts } }
+
+  let wallet = { address: '', connected: false };
+  let ownedPepes = [];                // array of inscription ids the wallet holds
+  let selectedSlotId = null;
+  let selectedPepeId = null;
+
+  // ----------------------------------------------------------------------------
+  // HELPERS
+  // ----------------------------------------------------------------------------
+  const $ = id => document.getElementById(id);
+  function inscriptionUrl(id) {
+    return CONFIG.inscriptionUrlTemplate.replace('{id}', encodeURIComponent(String(id)));
+  }
+  function shortAddr(a) { return a ? a.slice(0, 5) + '…' + a.slice(-4) : ''; }
+  function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  let toastTimer = 0;
+  function toast(msg, bad) {
+    const t = $('toast'); t.textContent = msg; t.className = 'toast show' + (bad ? ' bad' : '');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.className = 'toast'; }, 3200);
+  }
+
+  // ----------------------------------------------------------------------------
+  // WALLET ADAPTER (injected Leather / Xverse compatible provider)
+  // ----------------------------------------------------------------------------
+  function getProvider() {
+    const cands = [
+      window.LeatherProvider,
+      window.XverseProviders && window.XverseProviders.StacksProvider,
+      window.StacksProvider,
+      window.btc, window.stacks
+    ].filter(p => p && typeof p.request === 'function');
+    return cands[0] || null;
+  }
+  async function providerRequest(method, params) {
+    const p = getProvider();
+    if (!p) throw new Error('No Stacks wallet detected. Install Leather or Xverse.');
+    const res = await p.request(method, params);
+    if (res && res.error) throw new Error(res.error.message || 'Wallet request failed.');
+    return res && (res.result !== undefined ? res.result : res);
+  }
+
+  async function connectWallet() {
+    try {
+      const r = await providerRequest('stx_getAddresses', {});
+      const list = (r && (r.addresses || r.result && r.result.addresses)) || r;
+      let addr = '';
+      if (Array.isArray(list)) {
+        const stx = list.find(a => (a.symbol === 'STX') || /^S[PM]/.test(a.address || ''));
+        addr = (stx && stx.address) || (list[0] && list[0].address) || '';
+      } else if (list && list.address) { addr = list.address; }
+      if (!addr) throw new Error('Wallet returned no Stacks address.');
+      wallet = { address: addr, connected: true };
+      $('walletPill').textContent = 'wallet: ' + shortAddr(addr);
+      $('walletPill').className = 'pill ok';
+      $('connectBtn').textContent = 'Connected';
+      toast('Wallet connected. Scanning for Pepes…');
+      await scanPepes();
+    } catch (e) {
+      toast(e.message || 'Could not connect wallet.', true);
+    }
+  }
+
+  // ----------------------------------------------------------------------------
+  // PEPE OWNERSHIP — on-chain wallet check
+  //  Primary: Hiro NFT holdings filtered to the Pepe asset identifier.
+  //  Fallback: demo override (operator) when collection is not yet configured.
+  // ----------------------------------------------------------------------------
+  async function fetchHiroHoldings(address, assetId) {
+    const out = [];
+    let offset = 0;
+    for (let page = 0; page < 12; page++) {
+      const url = CONFIG.hiroApiBase
+        + '/extended/v1/tokens/nft/holdings?principal=' + encodeURIComponent(address)
+        + '&limit=50&offset=' + offset
+        + '&asset_identifiers=' + encodeURIComponent(assetId);
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Hiro holdings HTTP ' + res.status);
+      const json = await res.json();
+      const results = json.results || [];
+      results.forEach(r => {
+        // token value is a Clarity uint repr; pull the integer out of common shapes
+        const v = r.value && (r.value.repr || r.value.hex || r.value);
+        const m = String(v).match(/\d+/);
+        if (m) out.push(Number(m[0]));
+      });
+      if (offset + results.length >= (json.total || 0) || results.length === 0) break;
+      offset += results.length;
+    }
+    return out;
+  }
+
+  async function scanPepes() {
+    // Operator demo override (lets the board be explored before the collection is wired up).
+    let demo = [];
+    try { demo = JSON.parse(localStorage.getItem(LS.demoPepes) || '[]'); } catch (e) {}
+    if (demo.length) {
+      ownedPepes = demo.filter(isPepe);
+      renderHoldings('demo override');
+      renderAll();
+      return;
+    }
+    if (!wallet.connected) { ownedPepes = []; renderHoldings(); renderAll(); return; }
+
+    if (!CONFIG.pepeAssetIdentifier) {
+      ownedPepes = [];
+      renderHoldings('not-configured');
+      renderAll();
+      return;
+    }
+    try {
+      $('holdBody').innerHTML = '<span class="note">Scanning the chain for your Pepes…</span>';
+      const held = await fetchHiroHoldings(wallet.address, CONFIG.pepeAssetIdentifier);
+      ownedPepes = held.filter(isPepe);
+      renderHoldings('live');
+    } catch (e) {
+      ownedPepes = [];
+      renderHoldings('error', e.message);
+    }
+    renderAll();
+  }
+
+  // ----------------------------------------------------------------------------
+  // CLAIM (free — gas only)
+  // ----------------------------------------------------------------------------
+  async function claimSlot(slotId, inscriptionId) {
+    if (!wallet.connected) { toast('Connect a wallet first.', true); return; }
+    if (!ownedPepes.includes(Number(inscriptionId))) { toast('That Pepe is not in your wallet.', true); return; }
+    if (claims[slotId]) { toast('That square is already claimed.', true); return; }
+
+    if (CONFIG.boardContract) {
+      // Live mode: package a 0-STX contract call to the Pepe board registry.
+      // No STX moves => no post-conditions needed; claim is free (gas only).
+      try {
+        const [addr, name] = CONFIG.boardContract.split('.');
+        await providerRequest('stx_callContract', {
+          contract: CONFIG.boardContract,
+          contractAddress: addr,
+          contractName: name,
+          functionName: 'claim-slot',
+          functionArgs: [
+            { type: 'uint', value: String(slotId) },
+            { type: 'uint', value: String(inscriptionId) }
+          ],
+          postConditionMode: 'deny',
+          postConditions: [],
+          network: CONFIG.network
+        });
+        toast('Claim submitted to the wallet. It appears once confirmed on-chain.');
+      } catch (e) { toast(e.message || 'Wallet rejected the claim.', true); return; }
+    }
+    // Optimistic local render (also the full behaviour in demo mode).
+    claims[slotId] = { owner: wallet.address, inscriptionId: Number(inscriptionId), ts: Date.now() };
+    saveClaims();
+    selectedSlotId = null; selectedPepeId = null;
+    renderAll();
+    toast('Square #' + slotId + ' claimed with Pepe #' + inscriptionId + ' — free.');
+  }
+
+  function releaseSlot(slotId) {
+    const c = claims[slotId];
+    if (!c) return;
+    if (c.owner !== wallet.address) { toast('Only the owner can release this square.', true); return; }
+    delete claims[slotId]; saveClaims();
+    selectedSlotId = null; renderAll();
+    toast('Square #' + slotId + ' released.');
+  }
+
+  // ----------------------------------------------------------------------------
+  // RENDER
+  // ----------------------------------------------------------------------------
+  function renderBoard() {
+    const G = CONFIG.grid;
+    const board = $('board');
+    board.style.gridTemplateColumns = 'repeat(' + G + ', 1fr)';
+    board.style.gridTemplateRows = 'repeat(' + G + ', 1fr)';
+    board.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    for (const s of SLOTS) {
+      const el = document.createElement('div');
+      el.className = 'slot t-' + s.tier;
+      el.style.gridColumn = (s.c + 1) + ' / span ' + s.s;
+      el.style.gridRow = (s.r + 1) + ' / span ' + s.s;
+      el.dataset.id = s.id;
+      const c = claims[s.id];
+      if (c) {
+        el.classList.add('claimed');
+        if (c.owner === wallet.address) el.classList.add('mine');
+        const img = document.createElement('img');
+        img.loading = 'lazy';
+        img.src = inscriptionUrl(c.inscriptionId);
+        img.alt = 'Pepe #' + c.inscriptionId;
+        img.onerror = () => { img.style.display = 'none'; };
+        el.appendChild(img);
+      }
+      if (s.id === selectedSlotId) el.classList.add('selected');
+      const tag = document.createElement('div'); tag.className = 'tag';
+      tag.textContent = '#' + s.id + ' ' + s.s + '×' + s.s;
+      el.appendChild(tag);
+      const dot = document.createElement('div'); dot.className = 'tier-dot'; el.appendChild(dot);
+      el.addEventListener('click', () => selectSlot(s.id));
+      frag.appendChild(el);
+    }
+    board.appendChild(frag);
+  }
+
+  function renderStats() {
+    const total = SLOTS.length;
+    const claimed = Object.keys(claims).length;
+    const mine = Object.values(claims).filter(c => c.owner === wallet.address).length;
+    $('statTotal').textContent = total;
+    $('statClaimed').textContent = claimed;
+    $('statOpen').textContent = total - claimed;
+    $('statMine').textContent = mine;
+    $('statPepes').textContent = wallet.connected || ownedPepes.length ? ownedPepes.length : '—';
+  }
+
+  function renderHoldings(mode, errMsg) {
+    const sub = $('holdSub'), body = $('holdBody');
+    if (!wallet.connected && (!mode || mode === undefined) && !ownedPepes.length) {
+      sub.textContent = 'Connect a wallet to scan for your Pepe twins.';
+      body.innerHTML = 'No wallet connected.';
+      return;
+    }
+    if (mode === 'not-configured') {
+      sub.innerHTML = '<span class="warn-text">Collection not configured</span>';
+      body.innerHTML = '<span class="note">No Pepe asset identifier set yet. An operator can add it under the config panel, or use <b>Demo: simulate holding Pepes</b> to explore.</span>';
+      return;
+    }
+    if (mode === 'error') {
+      sub.innerHTML = '<span class="bad-text">Scan failed</span>';
+      body.innerHTML = '<span class="note">' + esc(errMsg || 'Could not read on-chain holdings.') + '</span>';
+      return;
+    }
+    if (!ownedPepes.length) {
+      sub.innerHTML = '<span class="warn-text">No Pepe twins found</span>';
+      body.innerHTML = '<span class="note">This wallet does not appear to hold a Bitcoin Pepe twin, so claiming is locked. Pick up a Pepe to join the board.</span>';
+      return;
+    }
+    sub.innerHTML = '<span class="ok-text">' + ownedPepes.length + ' Pepe' + (ownedPepes.length > 1 ? 's' : '') + ' detected'
+      + (mode === 'demo' || mode === 'demo override' ? ' (demo)' : '') + '</span>';
+    body.innerHTML = '<div class="pepe-grid">' + ownedPepes.map(id =>
+      '<div class="pepe-pick" title="Pepe #' + id + '"><img loading="lazy" src="' + inscriptionUrl(id) + '" onerror="this.style.display=\'none\'"/><div class="num">#' + id + '</div></div>'
+    ).join('') + '</div>';
+  }
+
+  function selectSlot(id) {
+    selectedSlotId = id;
+    const c = claims[id];
+    if (!c) selectedPepeId = ownedPepes.length ? ownedPepes[0] : null;
+    renderBoard();
+    renderPanel();
+  }
+
+  function renderPanel() {
+    const s = SLOT_BY_ID.get(selectedSlotId);
+    const title = $('panelTitle'), sub = $('panelSub'), body = $('panelBody');
+    if (!s) {
+      title.textContent = 'Select a square';
+      sub.textContent = 'Click any open square on the board to claim it with one of your Pepes.';
+      body.innerHTML = '<p class="note">Every square here is free — you only pay the Stacks network fee. Your wallet must hold a Bitcoin Pepe twin to claim.</p>';
+      return;
+    }
+    const tierName = { XL: 'Flagship 5×5', L: 'Large 4×4', M: 'Medium 3×3', R: 'Small 2×2', S: 'Mini 1×1' }[s.tier];
+    const c = claims[s.id];
+
+    if (c) {
+      title.textContent = 'Square #' + s.id;
+      sub.textContent = tierName + ' · claimed';
+      const mine = c.owner === wallet.address;
+      body.innerHTML =
+        '<div class="preview-box"><img src="' + inscriptionUrl(c.inscriptionId) + '" onerror="this.parentNode.innerHTML=\'<div class=&quot;empty&quot;>Pepe #' + c.inscriptionId + '</div>\'"/></div>'
+        + '<div class="kv"><span>Pepe</span><b>#' + c.inscriptionId + '</b></div>'
+        + '<div class="kv"><span>Owner</span><b>' + esc(shortAddr(c.owner)) + (mine ? ' (you)' : '') + '</b></div>'
+        + '<div class="kv"><span>Size</span><b>' + s.s + '×' + s.s + '</b></div>'
+        + (mine ? '<div class="row end" style="margin-top:12px"><button class="danger" id="releaseBtn">Release square</button></div>'
+                : '<p class="note" style="margin-top:10px">This square belongs to another Pepe holder.</p>');
+      if (mine) $('releaseBtn').addEventListener('click', () => releaseSlot(s.id));
+      return;
+    }
+
+    // open square
+    title.textContent = 'Claim square #' + s.id;
+    sub.textContent = tierName + ' · free (gas only)';
+    if (!wallet.connected) {
+      body.innerHTML = '<p class="note">Connect your wallet to claim this square.</p>'
+        + '<div class="row end"><button id="panelConnect">Connect wallet</button></div>';
+      $('panelConnect').addEventListener('click', connectWallet);
+      return;
+    }
+    if (!ownedPepes.length) {
+      body.innerHTML = '<p class="note warn-text">Claiming is reserved for Bitcoin Pepe twin holders. No Pepe was found in this wallet.</p>';
+      return;
+    }
+    if (selectedPepeId == null || !ownedPepes.includes(selectedPepeId)) selectedPepeId = ownedPepes[0];
+    body.innerHTML =
+      '<div class="preview-box" id="previewBox"></div>'
+      + '<label class="field">Choose which Pepe to display</label>'
+      + '<div class="pepe-grid" id="pepeChoices"></div>'
+      + '<div class="kv"><span>Square</span><b>' + s.s + '×' + s.s + ' · #' + s.id + '</b></div>'
+      + '<div class="kv"><span>Cost</span><b class="ok-text">FREE · gas only</b></div>'
+      + '<div class="row end" style="margin-top:12px"><button id="doClaim">Claim square — free</button></div>';
+    renderPreview();
+    const choices = $('pepeChoices');
+    ownedPepes.forEach(id => {
+      const d = document.createElement('div');
+      d.className = 'pepe-pick' + (id === selectedPepeId ? ' sel' : '');
+      d.innerHTML = '<img loading="lazy" src="' + inscriptionUrl(id) + '" onerror="this.style.display=\'none\'"/><div class="num">#' + id + '</div>';
+      d.addEventListener('click', () => { selectedPepeId = id; renderPanel(); });
+      choices.appendChild(d);
+    });
+    $('doClaim').addEventListener('click', () => claimSlot(s.id, selectedPepeId));
+  }
+
+  function renderPreview() {
+    const box = $('previewBox');
+    if (!box) return;
+    if (selectedPepeId == null) { box.innerHTML = '<div class="empty">Select a Pepe</div>'; return; }
+    box.innerHTML = '<img src="' + inscriptionUrl(selectedPepeId) + '" onerror="this.parentNode.innerHTML=\'<div class=&quot;empty&quot;>Preview unavailable</div>\'"/>';
+  }
+
+  function renderAll() {
+    renderBoard();
+    renderStats();
+    renderPanel();
+  }
+
+  // ----------------------------------------------------------------------------
+  // CONFIG PANEL
+  // ----------------------------------------------------------------------------
+  function parseIdsField(str) {
+    const ids = [], ranges = [];
+    String(str).split(',').forEach(tok => {
+      tok = tok.trim(); if (!tok) return;
+      const m = tok.match(/^(\d+)\s*-\s*(\d+)$/);
+      if (m) ranges.push([Number(m[1]), Number(m[2])]);
+      else if (/^\d+$/.test(tok)) ids.push(Number(tok));
+    });
+    return { ids, ranges };
+  }
+  function syncConfigInputs() {
+    $('cfgAsset').value = CONFIG.pepeAssetIdentifier || '';
+    $('cfgBoard').value = CONFIG.boardContract || '';
+    const parts = [];
+    (CONFIG.pepeRanges || []).forEach(r => parts.push(r[0] + '-' + r[1]));
+    (CONFIG.pepeIds || []).forEach(i => parts.push(String(i)));
+    $('cfgIds').value = parts.join(', ');
+  }
+  function saveConfigFromInputs() {
+    const parsed = parseIdsField($('cfgIds').value);
+    CONFIG.pepeAssetIdentifier = $('cfgAsset').value.trim();
+    CONFIG.boardContract = $('cfgBoard').value.trim();
+    CONFIG.pepeIds = parsed.ids;
+    CONFIG.pepeRanges = parsed.ranges.length || parsed.ids.length ? parsed.ranges : DEFAULT_CONFIG.pepeRanges;
+    localStorage.setItem(LS.config, JSON.stringify({
+      pepeAssetIdentifier: CONFIG.pepeAssetIdentifier,
+      boardContract: CONFIG.boardContract,
+      pepeIds: CONFIG.pepeIds,
+      pepeRanges: CONFIG.pepeRanges
+    }));
+    $('cfgStatus').innerHTML = '<span class="ok-text">Saved.</span> ' + pepeIdSet().size + ' Pepe IDs in scope'
+      + (CONFIG.boardContract ? ', live claim mode.' : ', local demo mode.');
+    scanPepes();
+  }
+  function simulateDemoPepes() {
+    // Sample a handful of ids from the configured Pepe set so the board is explorable.
+    const all = Array.from(pepeIdSet());
+    if (!all.length) { toast('Set some Pepe IDs first.', true); return; }
+    const pick = [];
+    const rng = mulberry32(Date.now() >>> 0);
+    while (pick.length < Math.min(6, all.length)) {
+      const id = all[Math.floor(rng() * all.length)];
+      if (!pick.includes(id)) pick.push(id);
+    }
+    localStorage.setItem(LS.demoPepes, JSON.stringify(pick));
+    if (!wallet.connected) {
+      wallet = { address: 'SP000DEMO000PEPE000HOLDER000000000000DEMO', connected: true };
+      $('walletPill').textContent = 'wallet: demo holder';
+      $('walletPill').className = 'pill ok';
+    }
+    toast('Demo: now holding Pepes ' + pick.map(i => '#' + i).join(', '));
+    scanPepes();
+  }
+  function resetBoard() {
+    if (!confirm('Clear all claims on this board (local state)?')) return;
+    claims = {}; saveClaims();
+    localStorage.removeItem(LS.demoPepes);
+    selectedSlotId = null;
+    renderAll();
+    toast('Board reset.');
+  }
+
+  // ----------------------------------------------------------------------------
+  // BOOT
+  // ----------------------------------------------------------------------------
+  function boot() {
+    $('netPill').textContent = CONFIG.network;
+    $('connectBtn').addEventListener('click', connectWallet);
+    $('cfgSave').addEventListener('click', saveConfigFromInputs);
+    $('cfgDemo').addEventListener('click', simulateDemoPepes);
+    $('cfgReset').addEventListener('click', resetBoard);
+    syncConfigInputs();
+    renderAll();
+    // restore a demo session if one exists
+    scanPepes();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+
+  // expose a tiny debug surface
+  window.PepeBoard = { CONFIG, SLOTS, claims, scanPepes };
+})();
+</script>
+</body>
+</html>

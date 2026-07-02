@@ -1,0 +1,2525 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: data: blob: 'unsafe-inline'; script-src 'self' https://esm.sh 'unsafe-inline'; connect-src 'self' https: wss:; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;" />
+  
+  <title>LEO Cats Forever Twins</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ============================================================
+       LEO CATS FOREVER TWINS - neon feline Xtrata working UI
+       New feline dashboard aesthetic. Aqua, lime and violet on deep black.
+       ============================================================ */
+
+    :root {
+      --radius: 0.75rem;
+      --bg: oklch(0.075 0.024 185);
+      --bg-soft: oklch(0.105 0.030 190);
+      --card: oklch(0.125 0.035 190);
+      --card-2: oklch(0.16 0.045 205);
+      --text: oklch(0.92 0.01 80);
+      --text-strong: oklch(0.96 0.01 80);
+      --muted: oklch(0.55 0.05 65);
+      --muted-2: oklch(0.70 0.03 75);
+      --amber: oklch(0.78 0.15 172);
+      --amber-bright: oklch(0.88 0.14 150);
+      --amber-soft: oklch(0.78 0.15 172 / 0.13);
+      --amber-border: oklch(0.78 0.15 172 / 0.30);
+      --green: oklch(0.74 0.16 145);
+      --red: oklch(0.60 0.22 25);
+      --purple: oklch(0.70 0.15 280);
+      --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --display: 'Space Grotesk', var(--sans);
+      --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+      --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    }
+
+    * { box-sizing: border-box; }
+    html { min-height: 100%; background: var(--bg); color-scheme: dark; scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 15% 0%, oklch(0.72 0.18 70 / 0.08), transparent 34rem),
+        radial-gradient(circle at 85% 18%, oklch(0.72 0.18 70 / 0.045), transparent 26rem),
+        var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      line-height: 1.45;
+    }
+
+    /* Screen Reader Only Utility for Form Labels */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border-width: 0;
+    }
+
+    button, input, textarea, select { font: inherit; }
+    button:not(:disabled), a[href], select:not(:disabled), input[type="file"] { cursor: pointer; }
+    button:active:not(:disabled) { transform: scale(0.97); transition: transform 160ms var(--ease-out); }
+    a { color: var(--amber); }
+    code, pre, .mono { font-family: var(--mono); }
+
+    .container {
+      width: 100%;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding-left: clamp(1rem, 2vw, 2rem);
+      padding-right: clamp(1rem, 2vw, 2rem);
+    }
+
+    .header {
+      position: fixed;
+      z-index: 50;
+      top: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1rem 1.5rem;
+      background: oklch(0.10 0.01 60 / 0.92);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid oklch(0.72 0.18 70 / 0.12);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      min-width: 0;
+    }
+
+    .brand img { width: 2.25rem; height: 2.25rem; object-fit: cover; }
+    .brand-title {
+      font-family: var(--display);
+      font-weight: 800;
+      line-height: 1.04;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+    .brand-subtitle {
+      color: var(--amber);
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .header-controls { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; justify-content: flex-end; }
+    .network-pill, .wallet-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      border-radius: 999px;
+      border: 1px solid var(--amber-border);
+      background: var(--amber-soft);
+      color: var(--amber);
+      font-family: var(--mono);
+      font-size: 0.74rem;
+      font-weight: 700;
+      padding: 0.43rem 0.72rem;
+      min-height: 34px;
+    }
+
+    .dot {
+      width: 0.45rem;
+      height: 0.45rem;
+      border-radius: 999px;
+      background: var(--amber);
+      box-shadow: 0 0 7px var(--amber);
+      flex: 0 0 auto;
+    }
+
+    .hero {
+      position: relative;
+      min-height: 610px;
+      display: flex;
+      align-items: flex-end;
+      overflow: hidden;
+      padding-top: 80px;
+      background-image: url('https://d2xsxph8kpxj0f.cloudfront.net/102523071/kQW5VK9kiFBmts3dYgcbJu/hero-bg-JbZjQi5YLFnb2jPimnPZZj.webp');
+      background-size: cover;
+      background-position: center;
+      border-bottom: 1px solid oklch(0.72 0.18 70 / 0.08);
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to right, oklch(0.10 0.01 60 / 0.94) 0%, oklch(0.10 0.01 60 / 0.68) 52%, oklch(0.10 0.01 60 / 0.32) 100%);
+    }
+    .hero::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, var(--bg) 0%, transparent 42%);
+    }
+    .hero-content { position: relative; z-index: 2; padding-top: 2rem; padding-bottom: 4rem; }
+    .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) 430px; gap: 2rem; align-items: center; }
+    .hero-copy { max-width: 680px; }
+    .hero-art { position: relative; min-height: 430px; display: grid; place-items: center; }
+    .hero-art img { width: min(100%, 420px); aspect-ratio: 1; object-fit: cover; filter: drop-shadow(0 0 40px oklch(0.72 0.18 70 / 0.3)); opacity: 0.95; }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      border: 1px solid var(--amber-border);
+      background: var(--amber-soft);
+      color: var(--amber);
+      border-radius: 999px;
+      padding: 0.42rem 0.75rem;
+      font-family: var(--mono);
+      font-size: 0.74rem;
+      margin-bottom: 1.4rem;
+    }
+    h1, h2, h3 { font-family: var(--display); letter-spacing: -0.025em; }
+    h1 {
+      margin: 0 0 1.05rem;
+      font-size: clamp(3.1rem, 7vw, 6.4rem);
+      line-height: 0.9;
+      color: var(--text-strong);
+    }
+    h1 span { color: var(--amber); }
+    .lead { max-width: 560px; color: var(--muted-2); font-size: clamp(1rem, 1.7vw, 1.16rem); margin: 0 0 1.8rem; }
+    .hero-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+
+    .btn-amber, .btn-outline, .btn-muted, .btn-danger {
+      appearance: none;
+      border-radius: 0.5rem;
+      padding: 0.625rem 1.2rem;
+      min-height: 42px;
+      font-family: var(--display);
+      font-weight: 700;
+      letter-spacing: 0.018em;
+      border: 1px solid transparent;
+      transition: background 180ms var(--ease-out), border-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out), opacity 180ms var(--ease-out), transform 160ms var(--ease-out);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      white-space: nowrap;
+    }
+    .btn-amber { background: var(--amber); color: var(--bg); border-color: var(--amber); }
+    .btn-amber:hover:not(:disabled) { background: var(--amber-bright); box-shadow: 0 0 24px oklch(0.72 0.18 70 / 0.35); }
+    .btn-outline { background: transparent; color: var(--amber); border-color: oklch(0.72 0.18 70 / 0.42); }
+    .btn-outline:hover:not(:disabled) { background: oklch(0.72 0.18 70 / 0.08); border-color: oklch(0.72 0.18 70 / 0.70); box-shadow: 0 0 16px oklch(0.72 0.18 70 / 0.15); }
+    .btn-muted { background: oklch(0.18 0.015 65); color: var(--text); border-color: oklch(0.72 0.18 70 / 0.18); }
+    .btn-muted:hover:not(:disabled) { border-color: var(--amber-border); background: oklch(0.20 0.02 65); }
+    .btn-danger { background: oklch(0.60 0.22 25 / 0.11); color: oklch(0.75 0.15 25); border-color: oklch(0.60 0.22 25 / 0.36); }
+    button:disabled, .btn-amber:disabled, .btn-outline:disabled, .btn-muted:disabled { opacity: 0.42; cursor: not-allowed; box-shadow: none; }
+
+    @keyframes fade-in-up {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in-up { animation: fade-in-up 300ms var(--ease-out) both; }
+    .stagger-1 { animation-delay: 60ms; }
+    .stagger-2 { animation-delay: 120ms; }
+    .stagger-3 { animation-delay: 180ms; }
+    .stagger-4 { animation-delay: 240ms; }
+
+    .stats { padding: 2rem 0; }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 0.75rem; }
+    .stat-card {
+      position: relative;
+      overflow: hidden;
+      background: oklch(0.14 0.01 60);
+      border: 1px solid oklch(0.72 0.18 70 / 0.16);
+      border-radius: 0.75rem;
+      padding: 1rem;
+    }
+    .stat-card::before, .shrine-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at top left, oklch(0.72 0.18 70 / 0.06) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .stat-label { color: var(--muted); font-family: var(--mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.3rem; }
+    .stat-value { color: var(--amber); font-family: var(--display); font-size: 1.5rem; font-weight: 800; }
+    .stat-note { color: oklch(0.45 0.04 65); font-family: var(--mono); font-size: 0.72rem; }
+
+    .main-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 1.35rem; padding-bottom: 4rem; align-items: start; }
+    .span-2 { grid-column: span 2; }
+    #inscribe, #lookup, #swap, #activity { scroll-margin-top: 5.5rem; }
+
+    .shrine-card {
+      background: var(--card);
+      border: 1px solid oklch(0.72 0.18 70 / 0.20);
+      border-radius: 0.75rem;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 200ms var(--ease-out), box-shadow 200ms var(--ease-out);
+    }
+    .shrine-card:hover { border-color: oklch(0.72 0.18 70 / 0.4); box-shadow: 0 0 32px oklch(0.72 0.18 70 / 0.08); }
+    .card-inner { position: relative; z-index: 1; padding: 1.2rem; }
+    .card-title { display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.4rem; }
+    .icon-box {
+      width: 2rem;
+      height: 2rem;
+      display: grid;
+      place-items: center;
+      border-radius: 0.5rem;
+      background: var(--amber-soft);
+      border: 1px solid oklch(0.72 0.18 70 / 0.25);
+      color: var(--amber);
+      font-size: 1.02rem;
+      flex: 0 0 auto;
+    }
+    .card-title h2 { margin: 0; color: var(--text); font-size: 1.1rem; }
+    .card-sub { margin: 0 0 1.05rem; color: var(--muted); font-size: 0.84rem; }
+
+    .row { margin-bottom: 0.9rem; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+    label { display: block; color: var(--muted); font-family: var(--mono); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.38rem; }
+    .shrine-input, select, textarea {
+      width: 100%;
+      background: oklch(0.12 0.01 60);
+      border: 1px solid oklch(0.72 0.18 70 / 0.2);
+      border-radius: 0.5rem;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 0.86rem;
+      padding: 0.68rem 0.82rem;
+      outline: none;
+      transition: border-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out);
+      min-height: 42px;
+    }
+    textarea { min-height: 90px; resize: vertical; }
+    .shrine-input:focus, select:focus, textarea:focus { border-color: oklch(0.72 0.18 70 / 0.6); box-shadow: 0 0 0 3px oklch(0.72 0.18 70 / 0.1); }
+    .shrine-input::placeholder { color: oklch(0.45 0.04 65); }
+
+    details { border: 1px solid oklch(0.72 0.18 70 / 0.14); background: oklch(0.12 0.01 60 / 0.65); border-radius: 0.75rem; padding: 0.8rem; margin-bottom: 1rem; }
+    summary { color: var(--amber); font-family: var(--mono); font-size: 0.78rem; cursor: pointer; font-weight: 700; }
+
+    .button-row { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; }
+    .button-row > button, .button-row > a { flex: 0 0 auto; }
+    .full { width: 100%; }
+
+    .drop {
+      display: grid;
+      place-items: center;
+      min-height: 148px;
+      border: 1px dashed oklch(0.72 0.18 70 / 0.30);
+      background: oklch(0.12 0.01 60);
+      border-radius: 0.75rem;
+      color: var(--muted);
+      padding: 1rem;
+      text-align: center;
+      transition: border-color 180ms var(--ease-out), background 180ms var(--ease-out);
+    }
+    .drop:hover { border-color: oklch(0.72 0.18 70 / 0.55); background: oklch(0.72 0.18 70 / 0.055); }
+    .drop input { display: none; }
+    .drop b { color: var(--text); font-family: var(--display); }
+    .drop small { display: block; margin-top: 0.35rem; font-family: var(--mono); font-size: 0.72rem; }
+
+    .status-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 0.75rem; margin: 1rem 0; }
+    .status-card { background: oklch(0.12 0.01 60); border: 1px solid oklch(0.72 0.18 70 / 0.14); border-radius: 0.7rem; padding: 0.8rem; min-height: 86px; overflow: hidden; }
+    .status-card.wide { grid-column: 1 / -1; }
+    .status-card small { display: block; color: var(--muted); font-family: var(--mono); font-size: 0.70rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.45rem; }
+    .status-card strong { color: var(--text); font-size: 0.83rem; font-weight: 500; word-break: break-word; }
+    .data-mono { font-family: var(--mono); font-size: 0.78rem; color: var(--amber); background: oklch(0.72 0.18 70 / 0.07); border: 1px solid oklch(0.72 0.18 70 / 0.15); border-radius: 0.375rem; padding: 0.25rem 0.55rem; word-break: break-all; display: inline-block; }
+    a.data-mono, .contract-link { text-decoration: none; transition: border-color 180ms var(--ease-out), background 180ms var(--ease-out), color 180ms var(--ease-out); }
+    a.data-mono:hover, .contract-link:hover { border-color: oklch(0.72 0.18 70 / 0.55); background: oklch(0.72 0.18 70 / 0.13); color: var(--amber-bright); }
+    .field-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.32rem; }
+    .field-head label { margin-bottom: 0; }
+    .contract-actions { display: inline-flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+    .mini-link { display: inline-flex; align-items: center; justify-content: center; min-height: 22px; padding: 0.12rem 0.38rem; border-radius: 999px; border: 1px solid oklch(0.72 0.18 70 / 0.20); background: oklch(0.72 0.18 70 / 0.055); color: var(--amber); font-family: var(--mono); font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.055em; text-decoration: none; }
+    .mini-link:hover { border-color: oklch(0.72 0.18 70 / 0.55); background: oklch(0.72 0.18 70 / 0.13); }
+    .contract-card { min-width: 0; }
+    .contract-card label { display: block; margin-bottom: 0.45rem; }
+    .contract-card .data-mono { max-width: 100%; }
+    .contract-card .contract-actions { margin-top: 0.45rem; }
+
+    .badge { display: inline-flex; align-items: center; gap: 0.35rem; border-radius: 999px; padding: 0.32rem 0.58rem; font-family: var(--mono); font-size: 0.72rem; font-weight: 700; border: 1px solid oklch(0.72 0.18 70 / 0.22); background: oklch(0.72 0.18 70 / 0.09); color: var(--amber); margin-bottom: 0.35rem; }
+    .badge.ok { color: var(--green); border-color: oklch(0.74 0.16 145 / 0.28); background: oklch(0.74 0.16 145 / 0.08); }
+    .badge.warn { color: var(--amber); }
+    .badge.bad { color: oklch(0.75 0.15 25); border-color: oklch(0.60 0.22 25 / 0.32); background: oklch(0.60 0.22 25 / 0.08); }
+
+    .callout { padding: 0.8rem; border-radius: 0.7rem; background: oklch(0.72 0.18 70 / 0.07); border: 1px solid oklch(0.72 0.18 70 / 0.18); color: var(--muted-2); font-size: 0.82rem; margin: 0.9rem 0; }
+    .chain-proof, .metadata-box { margin-top: 0.55rem; color: var(--muted); font-family: var(--mono); font-size: 0.69rem; line-height: 1.35; }
+    .chain-proof span, .metadata-box span { display: block; word-break: break-all; color: oklch(0.72 0.18 70 / 0.86); }
+    .metadata-box { padding: 0.7rem; border-radius: 0.55rem; background: oklch(0.10 0.01 60 / 0.6); border: 1px solid oklch(0.72 0.18 70 / 0.10); }
+    .uri-link { display: inline-block; margin-top: 0.45rem; font-family: var(--mono); font-size: 0.72rem; word-break: break-all; }
+
+    .media-preview { margin-top: 0.75rem; border-radius: 0.75rem; overflow: hidden; border: 1px solid oklch(0.72 0.18 70 / 0.16); background: oklch(0.10 0.01 60); }
+    .media-preview img { display: block; width: 100%; max-height: 420px; object-fit: contain; background: oklch(0.10 0.01 60); }
+    .raw-resolved { display: grid; grid-template-columns: minmax(130px, 0.9fr) minmax(0, 1fr); gap: 0.65rem; align-items: start; margin-top: 0.35rem; }
+    .raw-resolved .media-preview { margin-top: 0; }
+    .raw-resolved .metadata-box { margin-top: 0.35rem; }
+    .compact-lines { display: grid; gap: 0.28rem; }
+    .compact-line { display: block; font-family: var(--mono); font-size: 0.68rem; color: var(--muted-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+    .compact-line b { color: var(--amber); font-weight: 700; }
+
+    .progress { height: 0.5rem; background: oklch(0.72 0.18 70 / 0.08); border-radius: 999px; overflow: hidden; margin: 0.8rem 0 1rem; border: 1px solid oklch(0.72 0.18 70 / 0.10); }
+    .progress span { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, var(--amber), oklch(0.78 0.18 70)); box-shadow: 0 0 18px oklch(0.72 0.18 70 / 0.45); transition: width 240ms var(--ease-out); }
+
+    .swap-direction { display: grid; grid-template-columns: 1fr auto 1fr; gap: 0.75rem; align-items: center; margin-bottom: 1rem; }
+    .swap-token { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; border: 1px solid oklch(0.72 0.18 70 / 0.16); background: oklch(0.12 0.01 60); border-radius: 0.75rem; padding: 0.8rem 0.5rem; font-family: var(--mono); font-size: 0.72rem; color: var(--muted); }
+    .swap-token.active { color: var(--amber); border-color: oklch(0.72 0.18 70 / 0.36); background: oklch(0.72 0.18 70 / 0.08); }
+    .swap-token .coin { font-size: 1.4rem; filter: grayscale(0.5) opacity(0.7); }
+    .swap-token.active .coin { filter: none; }
+    .swap-token .coin-img { width: 1.55rem; height: 1.55rem; border-radius: 0.42rem; object-fit: cover; filter: grayscale(0.35) opacity(0.78); box-shadow: 0 0 0 1px oklch(0.78 0.15 172 / 0.20); }
+    .swap-token.active .coin-img { filter: none; box-shadow: 0 0 0 1px var(--amber-border), 0 0 16px oklch(0.78 0.15 172 / 0.26); }
+    .swap-arrow { color: var(--amber); font-family: var(--display); font-size: 1.4rem; }
+
+    .log { max-height: 350px; overflow: auto; border-radius: 0.75rem; border: 1px solid oklch(0.72 0.18 70 / 0.12); background: oklch(0.10 0.01 60 / 0.75); }
+    .log-line { padding: 0.7rem 0.8rem; border-bottom: 1px solid oklch(0.72 0.18 70 / 0.08); color: var(--muted-2); font-family: var(--mono); font-size: 0.72rem; white-space: pre-wrap; word-break: break-word; }
+    .log-line:last-child { border-bottom: 0; }
+
+    .how { padding: 4rem 0; border-top: 1px solid oklch(0.72 0.18 70 / 0.08); }
+    .how h2 { font-size: 1.55rem; margin: 0 0 0.2rem; }
+    .how p { color: var(--muted); margin: 0 0 2rem; font-size: 0.9rem; }
+    .how-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 1rem; }
+    .step-num { font-family: var(--display); font-size: 2rem; font-weight: 800; color: oklch(0.72 0.18 70 / 0.3); margin-bottom: 0.5rem; }
+    .step-card h3 { margin: 0 0 0.4rem; font-size: 1rem; }
+    .step-card p { margin: 0; color: var(--muted); font-size: 0.86rem; line-height: 1.55; }
+
+    .contract-strip, footer { border-top: 1px solid oklch(0.72 0.18 70 / 0.08); padding: 2rem 0; }
+    .contract-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+    footer .footer-flex { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; color: oklch(0.45 0.04 65); font-family: var(--mono); font-size: 0.78rem; }
+    footer img { width: 1.5rem; height: 1.5rem; opacity: 0.62; vertical-align: middle; margin-right: 0.45rem; }
+
+    /* Desktop efficiency pass */
+    @media (min-width: 1121px) {
+      .header { padding: 0.62rem 1.5rem; }
+      .brand img { width: 1.85rem; height: 1.85rem; }
+      .brand-title { font-size: 0.92rem; }
+      .brand-subtitle { font-size: 0.62rem; }
+      .network-pill, .wallet-pill { min-height: 28px; padding: 0.28rem 0.62rem; font-size: 0.66rem; }
+
+      .hero { min-height: 390px; padding-top: 58px; align-items: center; }
+      .hero-content { padding-top: 1.25rem; padding-bottom: 1.55rem; }
+      .hero-grid { grid-template-columns: minmax(0, 1fr) 320px; gap: 1.2rem; }
+      .hero-art { min-height: 300px; }
+      .hero-art img { width: min(100%, 300px); }
+      .eyebrow { margin-bottom: 0.85rem; padding: 0.30rem 0.65rem; font-size: 0.66rem; }
+      h1 { font-size: clamp(2.85rem, 5vw, 4.75rem); line-height: 0.9; margin-bottom: 0.75rem; }
+      .lead { font-size: 0.94rem; max-width: 520px; margin-bottom: 1rem; }
+      .hero-actions { gap: 0.55rem; }
+
+      .btn-amber, .btn-outline, .btn-muted, .btn-danger { min-height: 34px; padding: 0.46rem 0.82rem; font-size: 0.78rem; border-radius: 0.42rem; }
+      .stats { padding: 0.9rem 0; }
+      .stats-grid { gap: 0.55rem; }
+      .stat-card { padding: 0.7rem 0.8rem; border-radius: 0.6rem; }
+      .stat-label { font-size: 0.62rem; margin-bottom: 0.15rem; }
+      .stat-value { font-size: 1.02rem; line-height: 1.1; }
+      .stat-note { font-size: 0.58rem; }
+
+      .main-grid {
+        grid-template-columns: minmax(0, 2fr) minmax(300px, 0.72fr);
+        grid-template-areas:
+          "inscribe lookup"
+          "inscribe swap"
+          "activity activity";
+        gap: 0.9rem;
+        padding-bottom: 2rem;
+        align-items: start;
+      }
+      #inscribe { grid-area: inscribe; }
+      #lookup { grid-area: lookup; }
+      #swap { grid-area: swap; }
+      #activity { grid-area: activity; }
+      .span-2 { grid-column: auto; }
+
+      .card-inner { padding: 0.92rem; }
+      .card-title { margin-bottom: 0.25rem; }
+      .card-title h2 { font-size: 1rem; }
+      .icon-box { width: 1.6rem; height: 1.6rem; font-size: 0.84rem; border-radius: 0.42rem; }
+      .card-sub { font-size: 0.76rem; margin-bottom: 0.65rem; line-height: 1.35; }
+      .row { margin-bottom: 0.58rem; }
+      .two { gap: 0.55rem; }
+      label { font-size: 0.60rem; margin-bottom: 0.25rem; letter-spacing: 0.075em; }
+      .shrine-input, select, textarea { min-height: 34px; padding: 0.46rem 0.58rem; font-size: 0.72rem; border-radius: 0.4rem; }
+      details { padding: 0.55rem; margin-bottom: 0.7rem; border-radius: 0.55rem; }
+      summary { font-size: 0.68rem; }
+      .button-row { gap: 0.42rem; }
+      .callout { padding: 0.58rem; border-radius: 0.55rem; margin: 0.55rem 0; font-size: 0.72rem; line-height: 1.35; }
+
+      .status-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.5rem; margin: 0.65rem 0; }
+      .status-card { min-height: 58px; padding: 0.55rem; border-radius: 0.55rem; }
+      .status-card.wide { grid-column: span 2; }
+      #rawImageStatus { display: block; }
+      #rawImageStatus .media-preview { margin-top: 0; }
+      .status-card:has(#rawImageStatus) { grid-column: span 2; min-height: 188px; }
+      .status-card:has(#tokenUriStatus) { min-height: 188px; }
+      .status-card small { font-size: 0.58rem; margin-bottom: 0.28rem; }
+      .status-card strong { font-size: 0.70rem; line-height: 1.35; }
+      .badge { font-size: 0.62rem; padding: 0.24rem 0.45rem; margin-bottom: 0.22rem; }
+      .data-mono { font-size: 0.64rem; padding: 0.18rem 0.38rem; max-width: 100%; }
+      .chain-proof, .metadata-box { margin-top: 0.36rem; font-size: 0.61rem; }
+      .metadata-box { padding: 0.48rem; }
+      .uri-link { font-size: 0.64rem; margin-top: 0.28rem; }
+      .media-preview img { max-height: 210px; }
+      .raw-resolved { grid-template-columns: minmax(136px, 0.78fr) minmax(0, 1fr); gap: 0.48rem; }
+      .raw-resolved .media-preview img { max-height: 155px; }
+      .raw-resolved .uri-link { margin-top: 0.1rem; }
+      .raw-resolved .metadata-box { padding: 0.36rem; }
+      .compact-line { font-size: 0.60rem; }
+
+      .drop { min-height: 76px; padding: 0.65rem; }
+      .drop small { font-size: 0.62rem; margin-top: 0.22rem; }
+      .progress { height: 0.36rem; margin: 0.55rem 0 0.65rem; }
+      .swap-direction { gap: 0.45rem; margin-bottom: 0.65rem; }
+      .swap-token { padding: 0.52rem 0.4rem; font-size: 0.62rem; border-radius: 0.55rem; }
+      .swap-token .coin { font-size: 1.02rem; }
+      .swap-token .coin-img { width: 1.2rem; height: 1.2rem; border-radius: 0.34rem; }
+      .log { max-height: 210px; }
+      .log-line { padding: 0.5rem 0.6rem; font-size: 0.64rem; }
+      .how { padding: 2rem 0; }
+      .contract-strip, footer { padding: 1.25rem 0; }
+    }
+
+    @media (max-width: 1120px) {
+      .hero-grid { grid-template-columns: 1fr; }
+      .hero-art { display: none; }
+      .main-grid { grid-template-columns: 1fr 1fr; }
+      .span-2 { grid-column: span 2; }
+      .stats-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      #inscribe, #lookup, #swap, #activity { scroll-margin-top: 1rem; }
+    }
+    @media (max-width: 760px) {
+      .header { position: sticky; padding: 0.8rem 1rem; align-items: flex-start; }
+      .brand-title { font-size: 0.9rem; }
+      .brand-subtitle { font-size: 0.64rem; }
+      .header-controls { gap: 0.45rem; }
+      .wallet-pill, .network-pill { max-width: 46vw; overflow: hidden; text-overflow: ellipsis; }
+      .hero { min-height: 560px; padding-top: 30px; }
+      h1 { font-size: clamp(2.85rem, 16vw, 4.7rem); }
+      .main-grid, .stats-grid, .how-grid, .contract-grid, .two, .status-grid { grid-template-columns: 1fr; }
+      .span-2, .status-card.wide { grid-column: auto; }
+      .button-row > button, .button-row > a { width: 100%; }
+      .raw-resolved { grid-template-columns: 1fr; }
+    }
+  
+    /* Compact dashboard pass */
+    .dense-dashboard {
+      grid-template-columns: 0.92fr 0.92fr 1.32fr 1.32fr;
+      grid-auto-flow: dense;
+      gap: 0.46rem;
+      align-items: stretch;
+      margin: 0.55rem 0 0.65rem;
+    }
+    .dense-dashboard .status-card { min-height: 0; padding: 0.58rem; }
+    .dense-dashboard .conversion-card { grid-column: 1 / span 2; grid-row: 1; }
+    .dense-dashboard .uri-card { grid-column: 1 / span 2; grid-row: 2; }
+    .dense-dashboard .canonical-card { grid-column: 1; grid-row: 3; }
+    .dense-dashboard .binding-card { grid-column: 2; grid-row: 3; }
+    .dense-dashboard .owner-card { grid-column: 1; grid-row: 4; }
+    .dense-dashboard .fee-card { grid-column: 2; grid-row: 4; }
+    .dense-dashboard .image-card { grid-column: 3 / span 2; grid-row: 1 / span 4; min-height: 372px; }
+    .id-map { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 0.42rem; align-items: stretch; }
+    .id-map-box { border: 1px solid oklch(0.72 0.18 70 / 0.18); background: oklch(0.10 0.01 60 / 0.6); border-radius: 0.5rem; padding: 0.48rem; min-width: 0; }
+    .id-map-box em { display: block; font-style: normal; color: var(--muted); font-family: var(--mono); font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.2rem; }
+    .id-map-box b { display: block; color: var(--amber); font-family: var(--display); font-size: 1.05rem; line-height: 1.05; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .id-map-arrow { display: grid; place-items: center; color: var(--amber); font-family: var(--mono); font-weight: 800; }
+    .id-map-meta { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.38rem; margin-top: 0.36rem; }
+    .id-map-meta span { border-radius: 0.42rem; padding: 0.34rem 0.44rem; background: oklch(0.72 0.18 70 / 0.055); border: 1px solid oklch(0.72 0.18 70 / 0.13); color: var(--muted-2); font-size: 0.62rem; line-height: 1.2; }
+    .id-map-meta b { color: var(--amber); font-family: var(--mono); font-size: 0.58rem; }
+    .dense-dashboard .image-card strong { display: block; height: 100%; }
+    .dense-dashboard .image-card { display: flex; flex-direction: column; }
+    .dense-dashboard .image-card strong { flex: 1; }
+    .dense-dashboard #rawImageStatus .raw-resolved { grid-template-columns: minmax(0, 1.72fr) minmax(168px, 0.68fr); gap: 0.56rem; height: 100%; align-items: stretch; }
+    .dense-dashboard #rawImageStatus .media-preview { display: grid; align-items: start; justify-items: center; align-content: start; height: 100%; min-height: 302px; margin: 0; padding: 0.18rem; }
+    .dense-dashboard #rawImageStatus .media-preview img { align-self: start; justify-self: center; max-height: 352px; width: 100%; object-fit: contain; object-position: top center; }
+    .dense-dashboard #rawImageStatus .compact-lines { gap: 0.20rem; }
+    .dense-dashboard #rawImageStatus .metadata-box { max-height: 72px; overflow: auto; padding: 0.34rem; }
+    .dense-dashboard #rawImageStatus .uri-link { margin-top: 0.14rem; }
+    .dense-dashboard #tokenUriStatus .chain-proof,
+    .dense-dashboard #canonicalStatus .chain-proof,
+    .dense-dashboard #bindingStatus .chain-proof,
+    .dense-dashboard #sourceOwnerStatus .chain-proof { margin-top: 0.26rem; }
+    .file-prep-grid { display: grid; grid-template-columns: 0.95fr 0.75fr 0.85fr minmax(0, 1.45fr); gap: 0.55rem; align-items: end; margin-top: 0.35rem; }
+    .file-prep-grid .row { margin: 0; }
+    .file-prep-grid .compact-drop { min-height: 58px; padding: 0.45rem; }
+    .file-prep-grid .compact-drop small { margin-top: 0.12rem; }
+    .file-prep-grid .shrine-input { min-height: 34px; padding: 0.44rem 0.55rem; }
+    .hash-action-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.55rem; align-items: stretch; margin-top: 0.5rem; }
+    .compact-hash { margin: 0; min-height: 44px; display: flex; align-items: center; }
+    .compact-actions { align-self: stretch; flex-wrap: nowrap; }
+    .compact-actions button { min-height: 100%; padding-left: 0.9rem; padding-right: 0.9rem; }
+
+    @media (min-width: 1121px) {
+      .main-grid { grid-template-columns: minmax(0, 2.25fr) minmax(320px, 0.75fr); gap: 1rem; }
+      #inscribe { grid-column: 1; }
+      #lookup, #swap { grid-column: 2; }
+      #activity { grid-column: 1 / -1; }
+      .card-inner { padding: 0.9rem; }
+      .card-sub { margin-bottom: 0.55rem; }
+      details { margin-bottom: 0.55rem; }
+      .two { gap: 0.55rem; }
+      .button-row { gap: 0.42rem; }
+      .callout { margin: 0.48rem 0; }
+    }
+
+    @media (max-width: 1120px) {
+      .dense-dashboard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .dense-dashboard .conversion-card,
+      .dense-dashboard .uri-card,
+      .dense-dashboard .image-card { grid-column: 1 / -1; grid-row: auto; }
+      .dense-dashboard .canonical-card,
+      .dense-dashboard .binding-card,
+      .dense-dashboard .owner-card,
+      .dense-dashboard .fee-card { grid-column: auto; grid-row: auto; }
+      .file-prep-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .file-prep-grid .hash-row { grid-column: 1 / -1; }
+      .hash-action-row { grid-template-columns: 1fr; }
+      .compact-actions button { min-height: 36px; }
+    }
+
+
+    /* Force resolved token preview to sit at the top of its frame. */
+    .dense-dashboard #rawImageStatus .raw-resolved .media-preview {
+      align-items: start !important;
+      justify-items: center !important;
+      align-content: start !important;
+      place-items: start center !important;
+    }
+    .dense-dashboard #rawImageStatus .raw-resolved .media-preview img {
+      align-self: start !important;
+      justify-self: center !important;
+      object-position: top center !important;
+      margin-top: 0 !important;
+    }
+    @media (max-width: 760px) {
+      .dense-dashboard, .file-prep-grid { grid-template-columns: 1fr; }
+      .dense-dashboard .status-card,
+      .dense-dashboard .conversion-card,
+      .dense-dashboard .uri-card,
+      .dense-dashboard .image-card,
+      .dense-dashboard .canonical-card,
+      .dense-dashboard .binding-card,
+      .dense-dashboard .owner-card,
+      .dense-dashboard .fee-card,
+      .file-prep-grid .hash-row { grid-column: auto; grid-row: auto; }
+      .id-map { grid-template-columns: 1fr; }
+      .id-map-arrow { transform: rotate(90deg); }
+      .id-map-meta { grid-template-columns: 1fr; }
+      .dense-dashboard #rawImageStatus .raw-resolved { grid-template-columns: 1fr; }
+    }
+
+
+
+    /* Collection manifest builder */
+    .manifest-builder { margin-top: 0.72rem; }
+    .manifest-builder[open] { padding-bottom: 0.7rem; }
+    .manifest-grid { display: grid; grid-template-columns: 0.6fr 0.6fr 0.55fr 0.65fr 0.55fr; gap: 0.55rem; margin-top: 0.72rem; }
+    .manifest-grid .manifest-wide { grid-column: 1 / -1; }
+    .manifest-actions { display: flex; flex-wrap: wrap; gap: 0.42rem; margin: 0.62rem 0; }
+    .manifest-progress { border: 1px solid oklch(0.72 0.18 70 / 0.18); border-radius: 0.55rem; background: oklch(0.08 0.01 60 / 0.62); overflow: hidden; margin: 0.55rem 0; }
+    .manifest-progress > span { display: block; height: 0.42rem; width: 0%; background: linear-gradient(90deg, var(--amber), oklch(0.82 0.17 82)); transition: width 0.18s ease; }
+    .manifest-status { color: var(--muted-2); font-size: 0.72rem; line-height: 1.35; margin: 0.48rem 0; }
+    .manifest-output { width: 100%; min-height: 132px; resize: vertical; font-family: var(--mono); font-size: 0.64rem; line-height: 1.4; color: var(--muted-2); background: oklch(0.06 0.01 60 / 0.84); border: 1px solid oklch(0.72 0.18 70 / 0.18); border-radius: 0.55rem; padding: 0.58rem; }
+    @media (max-width: 760px) { .manifest-grid { grid-template-columns: 1fr 1fr; } }
+
+    /* Full collection gallery */
+    .gallery-section { padding: 1rem 0 4rem; }
+    .gallery-shell { border: 1px solid oklch(0.72 0.18 70 / 0.18); border-radius: 0.75rem; background: oklch(0.10 0.01 60 / 0.76); overflow: hidden; }
+    .gallery-head { display: flex; align-items: start; justify-content: space-between; gap: 1rem; padding: 1rem; border-bottom: 1px solid oklch(0.72 0.18 70 / 0.12); }
+    .gallery-head h2 { margin: 0 0 0.18rem; font-size: 1.2rem; }
+    .gallery-head p { margin: 0; color: var(--muted); font-size: 0.82rem; max-width: 680px; }
+    .gallery-controls { display: grid; grid-template-columns: 0.6fr 0.6fr 0.55fr 0.55fr 0.55fr minmax(0, 1fr); gap: 0.55rem; padding: 0.9rem 1rem 0.2rem; align-items: end; }
+    .gallery-actions { display: flex; flex-wrap: wrap; gap: 0.42rem; align-items: center; justify-content: flex-end; }
+    .gallery-status { display: flex; justify-content: space-between; gap: 0.75rem; align-items: center; padding: 0.65rem 1rem 0.85rem; color: var(--muted-2); font-family: var(--mono); font-size: 0.68rem; }
+    .gallery-progress { height: 0.42rem; flex: 1; min-width: 160px; overflow: hidden; border-radius: 999px; border: 1px solid oklch(0.72 0.18 70 / 0.12); background: oklch(0.72 0.18 70 / 0.07); }
+    .gallery-progress span { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, var(--amber), oklch(0.82 0.17 82)); transition: width 180ms var(--ease-out); }
+    .gallery-grid-wrap { padding: 0.25rem 1rem 1rem; }
+    .gallery-grid {
+      --gallery-tile-size: 86px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(var(--gallery-tile-size), 1fr));
+      gap: 0.45rem;
+      align-items: start;
+    }
+    .gallery-tile {
+      position: relative;
+      aspect-ratio: 1;
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid oklch(0.72 0.18 70 / 0.14);
+      border-radius: 0.5rem;
+      background: oklch(0.06 0.01 60);
+      color: var(--muted-2);
+      padding: 0;
+      transition: border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out), transform 160ms var(--ease-out);
+    }
+    .gallery-tile:hover { border-color: oklch(0.78 0.15 172 / 0.48); box-shadow: 0 0 18px oklch(0.78 0.15 172 / 0.12); }
+    .gallery-tile.selected { border-color: var(--amber); box-shadow: 0 0 0 2px oklch(0.78 0.15 172 / 0.22), 0 0 26px oklch(0.78 0.15 172 / 0.18); }
+    .gallery-tile.error { border-style: dashed; }
+    .gallery-tile img { width: 100%; height: 100%; object-fit: cover; display: block; background: oklch(0.08 0.01 60); }
+    .gallery-tile .tile-fallback { height: 100%; display: grid; place-items: center; padding: 0.45rem; color: oklch(0.52 0.04 70); font-family: var(--mono); font-size: 0.66rem; text-align: center; }
+    .gallery-token {
+      position: absolute;
+      left: 0.28rem;
+      top: 0.28rem;
+      border-radius: 999px;
+      padding: 0.12rem 0.38rem;
+      background: oklch(0.06 0.01 60 / 0.72);
+      border: 1px solid oklch(0.78 0.15 172 / 0.20);
+      color: var(--amber);
+      font-family: var(--mono);
+      font-size: 0.58rem;
+      font-weight: 800;
+      backdrop-filter: blur(8px);
+    }
+    @media (max-width: 1120px) {
+      .gallery-controls { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .gallery-actions { justify-content: flex-start; grid-column: 1 / -1; }
+    }
+    @media (max-width: 760px) {
+      .gallery-head, .gallery-status { flex-direction: column; align-items: stretch; }
+      .gallery-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .gallery-grid { --gallery-tile-size: 74px; gap: 0.36rem; }
+    }
+
+    /* LEO Cats visual pass */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.18;
+      background-image:
+        linear-gradient(120deg, transparent 0 46%, oklch(0.78 0.15 172 / 0.13) 46% 47%, transparent 47% 100%),
+        radial-gradient(circle at 78% 8%, oklch(0.84 0.17 320 / 0.16), transparent 22rem),
+        radial-gradient(circle at 18% 12%, oklch(0.86 0.18 125 / 0.12), transparent 18rem);
+      mix-blend-mode: screen;
+    }
+    .hero-art::before {
+      content: "";
+      position: absolute;
+      width: min(88%, 380px);
+      aspect-ratio: 1;
+      border-radius: 2.25rem;
+      background: linear-gradient(135deg, oklch(0.78 0.15 172 / 0.24), oklch(0.80 0.17 320 / 0.18));
+      filter: blur(28px);
+      opacity: 0.52;
+    }
+    .hero-art img {
+      position: relative;
+      padding: 0.42rem;
+      border-radius: 2rem;
+      background: linear-gradient(135deg, oklch(0.78 0.15 172 / 0.20), oklch(0.80 0.17 320 / 0.16));
+      border: 1px solid var(--amber-border);
+      box-shadow: 0 22px 70px oklch(0.02 0.02 190 / 0.42), 0 0 0 8px oklch(0.78 0.15 172 / 0.045);
+    }
+    .icon-box { text-shadow: 0 0 18px oklch(0.78 0.15 172 / 0.55); }
+    .brand img, footer img { border-radius: 0.85rem; box-shadow: 0 0 0 1px var(--amber-border), 0 0 30px oklch(0.78 0.15 172 / 0.18); }
+
+    /* Journey-led simple flow */
+    .journey { margin: 0.5rem 0 0.4rem; }
+    .journey-pick-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.55rem; align-items: end; margin-top: 0.3rem; }
+    .journey-image { display: grid; place-items: center; min-height: 280px; border: 1px solid var(--amber-border); border-radius: 1.1rem; background: oklch(0.10 0.01 60 / 0.5); padding: 0.7rem; margin: 0.85rem 0; color: var(--muted); font-size: 0.86rem; text-align: center; }
+    .journey-image img { max-height: 380px; width: auto; max-width: 100%; object-fit: contain; border-radius: 0.85rem; box-shadow: 0 14px 50px oklch(0.02 0.02 190 / 0.45); }
+    .journey-status { font-size: 0.95rem; line-height: 1.5; }
+    .journey-owner { color: var(--muted-2); font-size: 0.84rem; margin: 0.4rem 0 0.7rem; line-height: 1.45; }
+    .journey-action { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 0.6rem; align-items: stretch; margin-top: 0.5rem; }
+    .journey-action .journey-fee { margin: 0; display: flex; flex-direction: column; justify-content: center; }
+    .journey-inscribe { font-size: 1.04rem; min-height: 54px; font-family: var(--display); }
+    .tech-details { margin-top: 0.9rem; }
+    @media (max-width: 640px) { .journey-pick-row, .journey-action { grid-template-columns: 1fr; } }
+
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="brand">
+      <img src="../assets/leo-cat-forever-twin-logo-1.jpg" alt="LEO Cats Forever Twins seal" />
+      <div>
+        <div class="brand-title">LEO Cats</div>
+        <div class="brand-subtitle">Forever Twins</div>
+      </div>
+    </div>
+    <div class="header-controls">
+      <button id="networkToggle" class="network-pill" type="button"><span class="dot"></span><span id="networkLabel">mainnet</span></button>
+      <span class="wallet-pill"><span class="dot"></span><span id="walletLabel">Not connected</span></span>
+      <button id="connectBtn" class="btn-amber" type="button">Connect Wallet</button>
+      <button id="disconnectBtn" class="btn-outline" type="button" disabled>Disconnect</button>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container hero-content">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <div class="eyebrow fade-in-up"><span class="dot"></span>Powered by Stacks · Xtrata Protocol</div>
+          <h1 class="fade-in-up stagger-1">Twin Your LEO Cat<br><span>Into Xtrata.</span><br>Forever.</h1>
+          <p class="lead fade-in-up stagger-2">Create a permanent Xtrata twin for a LEO Cat, then swap which side stays liquid: the original NFT or the on-chain inscription.</p>
+          <div class="hero-actions fade-in-up stagger-3">
+            <a href="#inscribe" class="btn-amber">Inscribe Now</a>
+            <a href="#lookup" class="btn-outline">Check Status</a>
+          </div>
+        </div>
+        <div class="hero-art fade-in-up stagger-2">
+          <img src="../assets/leo-cat-forever-twin-logo-1.jpg" alt="LEO Cats Xtrata twin artwork" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <main>
+    <section class="stats">
+      <div class="container">
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-label">Inscribed</div><div id="statInscribed" class="stat-value">-</div><div class="stat-note">from helper contract</div></div>
+          <div class="stat-card"><div class="stat-label">Fee</div><div id="statFee" class="stat-value">-</div><div class="stat-note">current standard fee</div></div>
+          <div class="stat-card"><div class="stat-label">Free Threshold</div><div id="statThreshold" class="stat-value">-</div><div class="stat-note">early inscription window</div></div>
+          <div class="stat-card"><div class="stat-label">Canonical</div><div id="statFinalized" class="stat-value">-</div><div class="stat-note">seed list status</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="container">
+      <div class="main-grid">
+        <section id="inscribe" class="shrine-card span-2">
+          <div class="card-inner">
+            <div class="card-title"><span class="icon-box">🔥</span><h2>Inscribe LEO Cat Forever</h2></div>
+            <p class="card-sub">Enter a LEO Cat number to see it, check anything you like, then inscribe its permanent Xtrata twin in one click. We handle the chain reads, image fetch and hash check for you.</p>
+
+            <details>
+              <summary>Contract setup</summary>
+              <div class="row" style="margin-top:0.9rem">
+                <div class="field-head">
+                  <label for="helperContract">Forever Twins registry — mapping layer (local ID → Xtrata ID)</label>
+                  <span class="contract-actions"><a id="helperExplorerLink" class="mini-link" target="_blank" rel="noopener noreferrer">Explorer</a><a id="helperSourceLink" class="mini-link" target="_blank" rel="noopener noreferrer">Source</a></span>
+                </div>
+                <input id="helperContract" class="shrine-input" value="SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata" readonly />
+              </div>
+              <div class="two">
+                <div class="row">
+                  <div class="field-head">
+                    <label for="sourceContract">Source NFT contract</label>
+                    <span class="contract-actions"><a id="sourceExplorerLink" class="mini-link" target="_blank" rel="noopener noreferrer">Explorer</a><a id="sourceSourceLink" class="mini-link" target="_blank" rel="noopener noreferrer">Source</a></span>
+                  </div>
+                  <input id="sourceContract" class="shrine-input" value="SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats" />
+                </div>
+                <div class="row">
+                  <label for="sourceAssetName">Source asset name</label>
+                  <input id="sourceAssetName" class="shrine-input" value="leo-cats" />
+                </div>
+              </div>
+              <div class="two">
+                <div class="row">
+                  <div class="field-head">
+                    <label for="masterContract">Xtrata core contract — canonical inscription layer</label>
+                    <span class="contract-actions"><a id="masterExplorerLink" class="mini-link" target="_blank" rel="noopener noreferrer">Explorer</a><a id="masterSourceLink" class="mini-link" target="_blank" rel="noopener noreferrer">Source</a></span>
+                  </div>
+                  <input id="masterContract" class="shrine-input" value="SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3" />
+                </div>
+                <div class="row">
+                  <label for="masterAssetName">Xtrata asset name</label>
+                  <input id="masterAssetName" class="shrine-input" value="xtrata-inscription" />
+                </div>
+              </div>
+              <div class="two">
+                <div class="row">
+                  <label for="network">Network</label>
+                  <select id="network"><option value="mainnet" selected>Mainnet</option><option value="testnet">Testnet</option></select>
+                </div>
+                <div class="row">
+                  <label for="apiBase">API base</label>
+                  <input id="apiBase" class="shrine-input" value="https://api.mainnet.hiro.so" />
+                </div>
+              </div>
+              
+              <label for="usePostConditions" style="display:flex;gap:0.5rem;align-items:center;text-transform:none;letter-spacing:0;font-size:0.78rem">
+                <input id="usePostConditions" type="checkbox" style="width:auto" /> Use protective post-conditions where possible
+              </label>
+            </details>
+
+            <!-- Journey-led flow: pick a cat, see it, inscribe its twin. Everything technical runs automatically and lives in the panel below. -->
+            <div class="journey">
+              <div class="row journey-pick">
+                <label for="tokenId">Which LEO Cat?</label>
+                <div class="journey-pick-row">
+                  <input id="tokenId" class="shrine-input" inputmode="numeric" placeholder="Enter any LEO Cat number, e.g. 370" />
+                  <button id="checkBtn" class="btn-amber" type="button">Show me this cat</button>
+                </div>
+              </div>
+
+              <div id="journeyImage" class="journey-image">Enter a LEO Cat number above and select “Show me this cat”.</div>
+
+              <div id="journeyStatus" class="callout journey-status">Pick any LEO Cat number to see it. You can browse as many as you like before choosing one to make permanent.</div>
+              <div id="ownershipLine" class="journey-owner">Connect your wallet to see whether a cat is already in it — you’re welcome to inscribe its twin either way.</div>
+
+              <div class="journey-action">
+                <div class="status-card fee-card journey-fee"><small>Cost to inscribe</small><strong id="feeStatus">Connect wallet to calculate</strong></div>
+                <button id="inscribeBtn" class="btn-amber journey-inscribe" type="button" disabled>Inscribe this LEO Cat's twin</button>
+              </div>
+            </div>
+
+            <details class="tech-details">
+              <summary>Technical details &amp; on-chain proof</summary>
+              <div class="callout">Everything here runs automatically when you load a cat — it follows the source token URI to its metadata, fetches the raw image, hashes it, and checks the hash against the canonical record seeded on-chain. It is shown so anyone can verify the chain reads and the exact bytes being inscribed. You don’t need to touch it.</div>
+              <div class="button-row">
+                <button id="tokenUriBtn" class="btn-outline" type="button">Fetch URI + Image</button>
+                <button id="metadataBtn" class="btn-outline" type="button">Read URI / Raw Image</button>
+                <button id="quoteBtn" class="btn-muted" type="button">Quote Fee</button>
+                <button id="refreshBtn" class="btn-muted" type="button">Refresh Stats</button>
+              </div>
+              <div class="row">
+                <label for="tokenUri">Token URI passed to Xtrata (auto-filled from chain)</label>
+                <input id="tokenUri" class="shrine-input" placeholder="Auto-filled from chain URI if available" maxlength="256" />
+              </div>
+
+              <div class="status-grid dense-dashboard">
+                <div class="status-card conversion-card"><small>ID conversion</small><strong id="idConversionStatus">LEO Cat ID → Xtrata ID will appear here after a chain read.</strong></div>
+                <div class="status-card image-card"><small>Raw image from token metadata</small><strong id="rawImageStatus">Not loaded from chain URI</strong></div>
+                <div class="status-card uri-card"><small>Token URI from source NFT</small><strong id="tokenUriStatus">Not loaded from chain</strong></div>
+                <div class="status-card canonical-card"><small>Canonical seed hash (registry)</small><strong id="canonicalStatus">Not loaded from chain</strong></div>
+                <div class="status-card binding-card"><small>Binding · local→Xtrata (registry mapping)</small><strong id="bindingStatus">Not loaded from chain</strong></div>
+                <div class="status-card owner-card"><small>Source owner</small><strong id="sourceOwnerStatus">Not loaded from chain</strong></div>
+              </div>
+
+              <div class="status-card wide" style="margin-top:0.5rem"><small>Canonical inscription · Xtrata core contract</small><strong id="coreInscriptionStatus">Resolve a token to read its canonical inscription from the Xtrata core.</strong></div>
+
+              <div class="file-prep-grid">
+                <label class="drop compact-drop" for="mediaFile">
+                  <input id="mediaFile" type="file" />
+                  <span><b>Override image (optional)</b><small>normally the fetched cat image is used automatically</small></span>
+                </label>
+                <div class="row">
+                  <label for="mime">MIME</label>
+                  <input id="mime" class="shrine-input" placeholder="image/png" maxlength="64" />
+                </div>
+                <div class="row">
+                  <label for="sizeChunks">Size / chunks</label>
+                  <input id="sizeChunks" class="shrine-input" readonly placeholder="No file" />
+                </div>
+                <div class="row hash-row">
+                  <label for="computedHash">SHA-256</label>
+                  <input id="computedHash" class="shrine-input" readonly placeholder="0x..." />
+                </div>
+              </div>
+              <div class="progress"><span id="progressBar"></span></div>
+              <div class="hash-action-row">
+                <div id="hashMatch" class="callout compact-hash">Load a cat to check whether its image hash matches the canonical hash seeded in the helper contract.</div>
+                <div class="button-row compact-actions">
+                  <button id="useRawImageBtn" class="btn-outline" type="button" disabled>Use Raw Image</button>
+                </div>
+              </div>
+            </details>
+
+            <details class="manifest-builder">
+              <summary>Build collection hash manifest</summary>
+              <div class="callout">Batch mode can follow the LEO Cats token URI through metadata, or use a direct raw image template once one has been identified. Chain URI mode is safest for a new collection because it reads from the source contract first.</div>
+              <div class="manifest-grid">
+                <div class="row"><label for="manifestStartId">Start ID</label><input id="manifestStartId" class="shrine-input" type="number" min="1" value="1" /></div>
+                <div class="row"><label for="manifestEndId">End ID</label><input id="manifestEndId" class="shrine-input" type="number" min="1" value="9999" /></div>
+                <div class="row"><label for="manifestConcurrency">Parallel</label><input id="manifestConcurrency" class="shrine-input" type="number" min="1" max="12" value="2" /></div>
+                <div class="row"><label for="manifestDelayMs">Delay ms</label><input id="manifestDelayMs" class="shrine-input" type="number" min="0" max="5000" value="180" /></div>
+                <div class="row"><label for="manifestRetries">Retries</label><input id="manifestRetries" class="shrine-input" type="number" min="0" max="8" value="3" /></div>
+                <div class="row"><label for="manifestMode">Mode</label><select id="manifestMode" class="shrine-input"><option value="chain-uri" selected>Chain URI → metadata → image</option><option value="direct-image">Direct image template</option></select></div>
+                <div class="row manifest-wide"><label for="manifestImageTemplate">Raw image URI template</label><input id="manifestImageTemplate" class="shrine-input" value="" placeholder="Optional, e.g. ipfs://.../images/{id}.png" /></div>
+                <div class="row manifest-wide"><label for="manifestMetadataTemplate">Metadata URI template / record only</label><input id="manifestMetadataTemplate" class="shrine-input" value="" placeholder="Optional record only, e.g. ipfs://.../json/{id}.json" /></div>
+              </div>
+              <div class="manifest-actions">
+                <button id="buildManifestBtn" class="btn-amber" type="button">Build manifest</button>
+                <button id="stopManifestBtn" class="btn-outline" type="button" disabled>Stop</button>
+                <button id="downloadManifestJsonBtn" class="btn-outline" type="button" disabled>Download JSON</button>
+                <button id="downloadManifestCsvBtn" class="btn-outline" type="button" disabled>Download CSV</button>
+              </div>
+              <div class="manifest-progress"><span id="manifestProgressBar"></span></div>
+              <div id="manifestStatus" class="manifest-status">Ready. Set a range, then build the manifest.</div>
+              
+              <label for="manifestOutput" class="sr-only">Manifest JSON Output</label>
+              <textarea id="manifestOutput" class="manifest-output" readonly placeholder="Manifest JSON will appear here after the scan starts."></textarea>
+            </details>
+          </div>
+        </section>
+
+        <aside id="lookup" class="shrine-card">
+          <div class="card-inner">
+            <div class="card-title"><span class="icon-box">◎</span><h2>Token Lookup</h2></div>
+            <p class="card-sub">Fast chain status for the selected token.</p>
+            <div class="status-grid">
+              <div class="status-card wide"><small>Selected token</small><strong id="lookupToken">None</strong></div>
+              <div class="status-card wide"><small>Resolved Xtrata ID</small><strong id="lookupXtrata">Not loaded</strong></div>
+              <div class="status-card wide"><small>Liquid side</small><strong id="lookupLiquid">Not loaded</strong></div>
+            </div>
+            <div class="button-row"><button id="lookupBtn" class="btn-outline full" type="button">Refresh Selected Token</button></div>
+          </div>
+        </aside>
+
+        <aside id="swap" class="shrine-card">
+          <div class="card-inner">
+            <div class="card-title"><span class="icon-box">⇄</span><h2>Swap</h2></div>
+            <p class="card-sub">Exactly one side stays liquid. Swap the LEO Cat for the Xtrata inscription or back again.</p>
+            <div class="swap-direction">
+              <button id="dirPepe" class="swap-token active" type="button"><img class="coin-img" src="../assets/leo-cat-forever-twin-logo-1.jpg" alt="" aria-hidden="true" /><span>LEO CAT</span></button>
+              <div class="swap-arrow">→</div>
+              <button id="dirXtrata" class="swap-token" type="button"><span class="coin">₿</span><span>XTRATA</span></button>
+            </div>
+            <div class="row">
+              <label for="swapTokenId">Token ID</label>
+              <input id="swapTokenId" class="shrine-input" inputmode="numeric" placeholder="Uses selected token if blank" />
+            </div>
+            <div class="callout" id="swapHint">LEO Cat → Xtrata sends your source LEO Cat to escrow and releases the Xtrata twin.</div>
+            <div class="button-row">
+              <button id="swapBtn" class="btn-amber full" type="button" disabled>Swap LEO Cat for Xtrata</button>
+            </div>
+          </div>
+        </aside>
+
+        <section id="activity" class="shrine-card span-2">
+          <div class="card-inner">
+            <div class="card-title"><span class="icon-box">▣</span><h2>Activity</h2></div>
+            <p class="card-sub">Wallet actions, read-only results, URI resolution and transaction IDs.</p>
+            <div id="log" class="log" aria-live="polite"></div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="collectionGallery" class="gallery-section">
+      <div class="container">
+        <div class="gallery-shell">
+          <div class="gallery-head">
+            <div>
+              <h2>Full Collection Gallery</h2>
+              <p>Cache-first source collection view. Tiles resolve from the on-chain LEO Cats token URI through metadata JSON, then reuse cached image URLs on later loads.</p>
+            </div>
+            <div class="gallery-actions">
+              <button id="galleryLoadBtn" class="btn-amber" type="button">Load Gallery</button>
+              <button id="galleryStopBtn" class="btn-outline" type="button" disabled>Stop</button>
+              <button id="galleryClearCacheBtn" class="btn-muted" type="button">Clear Local Cache</button>
+            </div>
+          </div>
+          <div class="gallery-controls">
+            <div class="row"><label for="galleryStartId">Start ID</label><input id="galleryStartId" class="shrine-input" type="number" min="1" value="1" /></div>
+            <div class="row"><label for="galleryEndId">End ID</label><input id="galleryEndId" class="shrine-input" type="number" min="1" value="9999" /></div>
+            <div class="row"><label for="galleryConcurrency">Parallel</label><input id="galleryConcurrency" class="shrine-input" type="number" min="1" max="12" value="4" /></div>
+            <div class="row"><label for="galleryDelayMs">Delay ms</label><input id="galleryDelayMs" class="shrine-input" type="number" min="0" max="5000" value="80" /></div>
+            <div class="row"><label for="galleryRetries">Retries</label><input id="galleryRetries" class="shrine-input" type="number" min="0" max="8" value="2" /></div>
+            <div class="row"><label for="galleryTileSize">Tile size</label><input id="galleryTileSize" class="shrine-input" type="range" min="58" max="150" value="86" /></div>
+          </div>
+          <div class="gallery-status">
+            <div id="galleryStatus">Ready. Load a range to populate the collection grid.</div>
+            <div class="gallery-progress"><span id="galleryProgressBar"></span></div>
+          </div>
+          <div class="gallery-grid-wrap">
+            <div id="galleryGrid" class="gallery-grid" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="how">
+      <div class="container">
+        <h2>How It Works</h2>
+        <p>Three steps. We do the first two for you.</p>
+        <div class="how-grid">
+          <div class="shrine-card step-card"><div class="card-inner"><div class="step-num">01</div><h3>Pick a cat</h3><p>Type any LEO Cat number. We load it straight from the chain and show you the artwork — browse as many as you like.</p></div></div>
+          <div class="shrine-card step-card"><div class="card-inner"><div class="step-num">02</div><h3>We verify it</h3><p>Behind the scenes we fetch the cat’s real image and confirm it matches the canonical hash sealed on-chain. No files to upload.</p></div></div>
+          <div class="shrine-card step-card"><div class="card-inner"><div class="step-num">03</div><h3>Inscribe its twin</h3><p>One click opens your wallet to create the permanent Xtrata twin. Later, the cat’s owner can swap which side stays liquid.</p></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="contract-strip">
+      <div class="container contract-grid">
+        <div class="contract-card">
+          <label>LEO Cats Forever Helper</label>
+          <a id="footerHelper" class="data-mono contract-link" target="_blank" rel="noopener noreferrer">SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata</a>
+          <div class="contract-actions"><a id="footerHelperExplorer" class="mini-link" target="_blank" rel="noopener noreferrer">Explorer</a><a id="footerHelperSource" class="mini-link" target="_blank" rel="noopener noreferrer">Source</a></div>
+        </div>
+        <div class="contract-card">
+          <label>LEO Cats Source NFT</label>
+          <a id="footerSource" class="data-mono contract-link" target="_blank" rel="noopener noreferrer">SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats</a>
+          <div class="contract-actions"><a id="footerSourceExplorer" class="mini-link" target="_blank" rel="noopener noreferrer">Explorer</a><a id="footerSourceSource" class="mini-link" target="_blank" rel="noopener noreferrer">Source</a></div>
+        </div>
+        <div class="contract-card">
+          <label>Xtrata v3.2.3 Master</label>
+          <a id="footerXtrata" class="data-mono contract-link" target="_blank" rel="noopener noreferrer">SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3</a>
+          <div class="contract-actions"><a id="footerXtrataExplorer" class="mini-link" target="_blank" rel="noopener noreferrer">Explorer</a><a id="footerXtrataSource" class="mini-link" target="_blank" rel="noopener noreferrer">Source</a></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container footer-flex">
+      <div><img src="../assets/leo-cat-forever-twin-logo-1.jpg" alt="LEO Cats seal" />LEO Cats Forever Twins</div>
+      <div>Permanent by design · Powered by Xtrata</div>
+    </div>
+  </footer>
+
+  <script type="module">
+    import { connect, disconnect, isConnected, getLocalStorage, clearLocalStorage, clearSelectedProviderId, openContractCall } from 'https://esm.sh/@stacks/connect@8.2.6';
+    import { fetchCallReadOnlyFunction, cvToJSON, cvToValue, Cl, Pc, PostConditionMode } from 'https://esm.sh/@stacks/transactions@7.4.0';
+    import { STACKS_MAINNET, STACKS_TESTNET } from 'https://esm.sh/@stacks/network@7.3.1';
+
+    // Safely extract Hiro API Key, allowing for Vite contexts or process envs
+    let HIRO_API_KEY = '';
+    try {
+      if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_HIRO_API_KEY) {
+        HIRO_API_KEY = import.meta.env.VITE_HIRO_API_KEY;
+      } else if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.HIRO_API_KEY) {
+        HIRO_API_KEY = import.meta.env.HIRO_API_KEY;
+      } else if (typeof process !== 'undefined' && process.env && process.env.HIRO_API_KEY) {
+        HIRO_API_KEY = process.env.HIRO_API_KEY;
+      }
+    } catch (e) {
+      // Ignore environment extraction errors in pure browser contexts
+    }
+
+    const $ = (id) => document.getElementById(id);
+    const CHUNK_SIZE = 16_384;
+    const MAX_CHUNKS = 32;
+    const FALLBACK_SENDER = 'SP000000000000000000002Q6VF78';
+
+    const state = {
+      wallet: null,
+      canonicalHash: null,
+      binding: null,
+      coreInscription: null,
+      sourceOwner: null,
+      sourceTokenUri: null,
+      sourceMetadataUri: null,
+      sourceMetadata: null,
+      sourceImageUrl: null,
+      sourceImageCandidates: [],
+      fetchedTokenUri: null,
+      fileBytes: null,
+      fileHash: null,
+      chunks: [],
+      appFee: null,
+      masterFee: null,
+      direction: 'pepe-to-xtrata',
+      manifest: { running: false, stop: false, items: [], errors: [], output: null },
+      gallery: { running: false, stop: false, items: new Map(), selectedId: null, done: 0, total: 0, cacheHits: 0, sharedHits: 0, errors: 0, renderTimer: null, lastProgressLog: 0, sharedCacheAvailable: null, sharedWriteQueue: [] },
+    };
+
+    function jsonBigInt(_, value) { return typeof value === 'bigint' ? value.toString() : value; }
+    function log(message, data) {
+      const line = document.createElement('div');
+      line.className = 'log-line';
+      line.textContent = `[${new Date().toLocaleTimeString()}] ${message}${data ? '\n' + JSON.stringify(data, jsonBigInt, 2) : ''}`;
+      $('log').prepend(line);
+    }
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+    function shortAddress(addr) { return !addr ? 'Not connected' : addr.length <= 13 ? addr : `${addr.slice(0, 6)}…${addr.slice(-4)}`; }
+    function shortMiddle(value, start = 30, end = 24) {
+      const text = String(value || '');
+      return text.length <= start + end + 1 ? text : `${text.slice(0, start)}…${text.slice(-end)}`;
+    }
+    function setStatus(id, html) { $(id).innerHTML = html; }
+    function badge(text, mode = '') { return `<span class="badge ${mode}">${escapeHtml(text)}</span>`; }
+    function splitPrincipal(principal) {
+      const dot = principal.indexOf('.');
+      if (dot < 1 || dot === principal.length - 1) throw new Error(`Invalid contract principal: ${principal}`);
+      return { contractAddress: principal.slice(0, dot), contractName: principal.slice(dot + 1) };
+    }
+    function helperParts() { return splitPrincipal($('helperContract').value.trim()); }
+    function sourceParts() { return splitPrincipal($('sourceContract').value.trim()); }
+    function masterParts() { return splitPrincipal($('masterContract').value.trim()); }
+
+    // ── Forever Twins contract architecture ──────────────────────────────────
+    // CORE     = the Xtrata core contract (xtrata-v3-2-3). The CANONICAL on-chain
+    //            inscription / content / metadata layer. An indexer only needs to
+    //            index this ONE contract; it is shared across every Forever Twins
+    //            collection. All final inscription data is read from here.
+    // REGISTRY = this collection's Forever Twins helper contract. A MAPPING layer
+    //            ONLY: it resolves a local collection token ID -> an Xtrata
+    //            inscription ID (get-binding), holds the canonical seed hash, and
+    //            charges the collection's inscribe/swap fees. It is NOT the source
+    //            of canonical inscription content.
+    // SOURCE   = the original NFT collection contract (ownership + original URI).
+    // (Backed by the existing DOM inputs so the contract addresses stay editable.)
+    const XTRATA_CORE_CONTRACT = () => $('masterContract').value.trim();            // CORE – canonical inscription layer
+    const FOREVER_TWINS_REGISTRY_CONTRACT = () => $('helperContract').value.trim(); // REGISTRY – mapping layer only
+    const COLLECTION_SOURCE_CONTRACT = () => $('sourceContract').value.trim();      // SOURCE – original collection
+
+    // REGISTRY (mapping): resolve a local collection token ID -> Xtrata inscription ID.
+    async function resolveTwinXtrataId(localTokenId) {
+      const binding = unwrapOptional(await readContract(FOREVER_TWINS_REGISTRY_CONTRACT(), 'get-binding', [asUint(localTokenId)]));
+      return binding && binding['xtrata-id'] != null ? binding['xtrata-id'] : null;
+    }
+    // CORE (canonical): read the inscription / content / metadata for an Xtrata ID
+    // straight from the Xtrata core contract. This is the canonical data source and
+    // is identical no matter which collection registry mapped to it.
+    async function loadCoreInscription(xtrataId) {
+      if (xtrataId == null) return null;
+      const core = XTRATA_CORE_CONTRACT();
+      const idArg = asUint(xtrataId);
+      const [meta, tokenUri] = await Promise.all([
+        readContract(core, 'get-inscription-meta', [idArg]).catch(() => null),
+        readContract(core, 'get-token-uri', [idArg]).catch(() => null),
+      ]);
+      return { xtrataId: String(xtrataId), meta: unwrapOptional(meta), tokenUri: unwrapOptional(tokenUri) };
+    }
+    function renderCoreInscription(ci) {
+      if (!ci) { setStatus('coreInscriptionStatus', 'No twin yet — inscribe to create the canonical Xtrata inscription.'); return; }
+      const m = ci.meta || {};
+      const parts = [`Xtrata #${escapeHtml(ci.xtrataId)}`];
+      if (m['mime-type']) parts.push(escapeHtml(m['mime-type']));
+      if (m['total-size'] != null) parts.push(`${escapeHtml(m['total-size'])} bytes`);
+      if (m['total-chunks'] != null) parts.push(`${escapeHtml(m['total-chunks'])} chunk${String(m['total-chunks']) === '1' ? '' : 's'}`);
+      if (m['sealed'] != null) parts.push(m['sealed'] ? 'sealed' : 'unsealed');
+      const uri = ci.tokenUri ? `<br><span class="data-mono">${escapeHtml(shortMiddle(ci.tokenUri, 30, 22))}</span>` : '';
+      setStatus('coreInscriptionStatus', `${badge('Read from Xtrata core', 'ok')}<br><span class="data-mono">${escapeHtml(parts.join(' · '))}</span>${uri}${chainProof(XTRATA_CORE_CONTRACT(), 'get-inscription-meta', [asUint(ci.xtrataId)])}`);
+    }
+    function networkName() { return $('network').value; }
+    
+    // Safely generate an augmented network object that forwards our API key to Hiro endpoint reads
+    function networkObj() { 
+      const isMain = networkName() === 'mainnet';
+      const baseNet = isMain ? STACKS_MAINNET : STACKS_TESTNET;
+      const customNet = Object.create(baseNet);
+      customNet.coreApiUrl = cleanApiBase();
+      
+      if (HIRO_API_KEY) {
+        const originalFetchFn = customNet.fetchFn || (typeof window !== 'undefined' ? window.fetch : fetch);
+        customNet.fetchFn = async (input, init) => {
+          const headers = new Headers(init?.headers || {});
+          headers.set('x-api-key', HIRO_API_KEY);
+          return originalFetchFn(input, { ...init, headers });
+        };
+      }
+      return customNet; 
+    }
+    
+    function defaultApiBase() { return networkName() === 'mainnet' ? 'https://api.mainnet.hiro.so' : 'https://api.testnet.hiro.so'; }
+    function cleanApiBase() { return ($('apiBase')?.value?.trim() || defaultApiBase()).replace(/\/+$/, ''); }
+    function explorerTx(txId) { return `https://explorer.hiro.so/txid/${txId}?chain=${networkName()}`; }
+    function explorerContractUrl(principal) { return `https://explorer.hiro.so/token/${encodeURIComponent(principal)}?chain=${networkName()}`; }
+    function contractSourceUrl(principal) {
+      const { contractAddress, contractName } = splitPrincipal(principal);
+      return `${cleanApiBase()}/v2/contracts/source/${contractAddress}/${contractName}?proof=0`;
+    }
+    function setContractLinks(prefix, principal) {
+      const safe = String(principal || '').trim();
+      const ids = {
+        main: `${prefix}`,
+        explorer: `${prefix}Explorer`,
+        source: `${prefix}Source`,
+      };
+      const main = $(ids.main);
+      const explorer = $(ids.explorer);
+      const source = $(ids.source);
+      if (!safe) {
+        for (const el of [main, explorer, source]) if (el) { el.removeAttribute('href'); el.textContent = el === main ? 'Set contract' : el.textContent; }
+        return;
+      }
+      let explorerHref = '#';
+      let sourceHref = '#';
+      try {
+        explorerHref = explorerContractUrl(safe);
+        sourceHref = contractSourceUrl(safe);
+      } catch {}
+      if (main) { main.textContent = safe; main.href = sourceHref; main.title = 'Open contract source via Hiro API'; }
+      if (explorer) { explorer.href = explorerHref; explorer.title = 'Open contract in Hiro Explorer'; }
+      if (source) { source.href = sourceHref; source.title = 'Open contract source via Hiro API'; }
+    }
+    function setInlineContractLinks(kind, principal) {
+      const explorer = $(`${kind}ExplorerLink`);
+      const source = $(`${kind}SourceLink`);
+      if (!principal) return;
+      try {
+        if (explorer) explorer.href = explorerContractUrl(principal);
+        if (source) source.href = contractSourceUrl(principal);
+      } catch {}
+    }
+
+    function syncLabels() {
+      $('networkLabel').textContent = networkName();
+      const helper = $('helperContract').value.trim();
+      const source = $('sourceContract').value.trim();
+      const master = $('masterContract').value.trim();
+      const defaultApi = defaultApiBase();
+      if (!$('apiBase').dataset.touched) $('apiBase').value = defaultApi;
+      setContractLinks('footerHelper', helper);
+      setContractLinks('footerSource', source);
+      setContractLinks('footerXtrata', master);
+      setInlineContractLinks('helper', helper);
+      setInlineContractLinks('source', source);
+      setInlineContractLinks('master', master);
+      updateSwapUi();
+    }
+    function getStoredWallet() {
+      const data = getLocalStorage?.();
+      return data?.addresses?.stx?.[0]?.address
+        || data?.addresses?.find?.((a) => a.symbol === 'STX' || a.type === 'stx')?.address
+        || data?.profile?.stxAddress?.mainnet
+        || data?.profile?.stxAddress?.testnet
+        || null;
+    }
+    function setWallet(address) {
+      state.wallet = address;
+      $('walletLabel').textContent = shortAddress(address);
+      $('connectBtn').disabled = !!address;
+      $('disconnectBtn').disabled = !address;
+      updateActionButtons();
+    }
+
+    function toHex(bytes) { return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join(''); }
+    // Xtrata's on-chain content hash is NOT a plain sha256 of the file. The
+    // master contract folds a rolling sha256 over the 16KB chunks:
+    //   run = 0x00*32; for each chunk: run = sha256(run || chunk); final = run
+    // We must reproduce that exactly so the canonical-hash check and the
+    // inscribe `expected-hash` match what the contract computes.
+    async function rollingHashHex(chunks) {
+      let run = new Uint8Array(32);
+      for (const chunk of chunks) {
+        const cat = new Uint8Array(run.length + chunk.length);
+        cat.set(run, 0);
+        cat.set(chunk, run.length);
+        run = new Uint8Array(await crypto.subtle.digest('SHA-256', cat));
+      }
+      return '0x' + toHex(run);
+    }
+    function fromHex(hex) {
+      const clean = String(hex).replace(/^0x/i, '');
+      if (clean.length % 2 !== 0) throw new Error('Hex value has odd length');
+      return Uint8Array.from(clean.match(/.{1,2}/g).map((x) => parseInt(x, 16)));
+    }
+    function asUint(value) { return Cl.uint(BigInt(value)); }
+    function asBuffer(bytesOrHex) { return Cl.buffer(typeof bytesOrHex === 'string' ? fromHex(bytesOrHex) : bytesOrHex); }
+    function asAscii(value, maxLen, label) {
+      const out = String(value || '').trim();
+      if (!out) throw new Error(`${label} is required`);
+      if (!/^[\x00-\x7F]*$/.test(out)) throw new Error(`${label} must be ASCII for this contract`);
+      if (out.length > maxLen) throw new Error(`${label} must be ${maxLen} characters or fewer`);
+      return Cl.stringAscii(out);
+    }
+    function asPrincipal(value) { return Cl.principal(value); }
+
+    function plainCV(cv) {
+      if (!cv) return null;
+      const type = String(cv.type || '').toLowerCase();
+      if (type === 'ok' || type.includes('responseok')) return { ok: plainCV(cv.value) };
+      if (type === 'err' || type.includes('responseerr')) return { err: plainCV(cv.value) };
+      if (type === 'some' || type.includes('optional')) return cv.value === undefined || cv.value === null ? null : { some: plainCV(cv.value) };
+      if (type === 'none') return null;
+      if (type.includes('uint') || type.includes('int')) return cv.value?.toString?.() ?? String(cv.value);
+      if (type.includes('buffer')) {
+        // In Stacks.js v7 a buffer CV's `value` is already a hex string; only
+        // raw byte arrays need toHex(). The old code ran toHex() on the string,
+        // expanding each hex digit into its own byte (e.g. "3a" -> "030a"),
+        // which corrupted the canonical hash so it never matched a real SHA-256.
+        const v = cv.value;
+        if (typeof v === 'string') return '0x' + v.replace(/^0x/i, '').toLowerCase();
+        if (v instanceof Uint8Array || Array.isArray(v)) return '0x' + toHex(v);
+        if (cv.buffer instanceof Uint8Array) return '0x' + toHex(cv.buffer);
+        return '0x' + toHex(v);
+      }
+      if (type.includes('string')) return cv.value;
+      if (type.includes('principal')) return cv.value || cv.address || String(cv);
+      if (type === 'booltrue' || type === 'true') return true;
+      if (type === 'boolfalse' || type === 'false') return false;
+      if (typeof cv.value === 'boolean') return cv.value;
+      if (Array.isArray(cv.value)) return cv.value.map(plainCV);
+      if (cv.value && typeof cv.value === 'object') {
+        const obj = {};
+        for (const [key, value] of Object.entries(cv.value)) obj[key] = plainCV(value);
+        return obj;
+      }
+      try { return cvToValue(cv); } catch {}
+      try { return cvToJSON(cv); } catch {}
+      return cv;
+    }
+    function unwrapOk(value) {
+      if (value && value.err !== undefined) throw new Error(`Contract returned err ${JSON.stringify(value.err)}`);
+      return value && value.ok !== undefined ? value.ok : value;
+    }
+    function unwrapOptional(value) {
+      const v = unwrapOk(value);
+      if (v && Object.prototype.hasOwnProperty.call(v, 'some')) return v.some;
+      return v ?? null;
+    }
+    function formatFunctionArgs(functionArgs = []) {
+      return functionArgs.map((arg) => { try { return JSON.stringify(plainCV(arg), jsonBigInt); } catch { return '[clarity-value]'; } }).join(', ');
+    }
+    function chainProof(contractPrincipal, functionName, functionArgs = []) {
+      return `<details class="chain-proof"><summary>Chain source</summary><span>${escapeHtml(contractPrincipal)}::${escapeHtml(functionName)}(${escapeHtml(formatFunctionArgs(functionArgs))})</span></details>`;
+    }
+
+    function renderIdConversion(binding, tokenId = $('tokenId').value.trim()) {
+      const pepeId = String(tokenId || '—');
+      const xId = binding?.['xtrata-id'] ? String(binding['xtrata-id']) : 'Pending';
+      const hasBinding = !!binding;
+      const liquid = hasBinding
+        ? (binding['xtrata-escrowed'] === true ? 'LEO Cat liquid · Xtrata escrowed' : 'Xtrata liquid · LEO Cat escrowed')
+        : 'Not forevered yet';
+      const escrow = hasBinding
+        ? (binding['xtrata-escrowed'] === true ? 'Xtrata held by helper' : 'LEO Cat held by helper')
+        : 'No escrow binding';
+      return `<div class="id-map">
+        <div class="id-map-box"><em>LEO Cat</em><b>#${escapeHtml(pepeId)}</b></div>
+        <div class="id-map-arrow">↔</div>
+        <div class="id-map-box"><em>Xtrata twin</em><b>${hasBinding ? '#' : ''}${escapeHtml(xId)}</b></div>
+        <div class="id-map-meta"><span><b>Liquid:</b><br>${escapeHtml(liquid)}</span><span><b>Escrow:</b><br>${escapeHtml(escrow)}</span></div>
+      </div>`;
+    }
+
+    async function readContract(contractPrincipal, functionName, functionArgs = []) {
+      const { contractAddress, contractName } = splitPrincipal(contractPrincipal);
+      const result = await fetchCallReadOnlyFunction({
+        contractAddress,
+        contractName,
+        functionName,
+        functionArgs,
+        senderAddress: state.wallet || FALLBACK_SENDER,
+        network: networkObj(), // Forward network configuration complete with API key logic
+      });
+      return plainCV(result);
+    }
+    async function callHelper(functionName, functionArgs = [], postConditions = []) {
+      const { contractAddress, contractName } = helperParts();
+      // Route through @stacks/connect v8 openContractCall, the supported compat
+      // wrapper that maps these legacy-style options to the SIP-030
+      // `stx_callContract` RPC with the correct payload shape (single `contract`
+      // id, serialized args/post-conditions). This mirrors what the Xtrata
+      // program's wallet layer does and is accepted by Leather and Xverse alike.
+      const options = { contractAddress, contractName, functionName, functionArgs, network: networkName() };
+      if ($('usePostConditions').checked && postConditions.length) {
+        options.postConditions = postConditions;
+      }
+      // Always allow the transaction's internal STX movements: the wrapper
+      // inscription fee (split to the two payout addresses once past the free
+      // threshold), the Xtrata master mint fee, and the wrapper->master hop.
+      // The contract enforces the exact amounts on-chain, so Allow is safe here.
+      // Without this the wallet defaults to Deny and rolls the tx back AFTER the
+      // contract already returned (ok ...) — the "STX moved but not checked"
+      // post-condition failure.
+      options.postConditionMode = PostConditionMode.Allow;
+      return new Promise((resolve, reject) => {
+        openContractCall({
+          ...options,
+          onFinish: (data) => {
+            const txId = data?.txId || data?.txid;
+            log(`Transaction submitted: ${functionName}`, { txId, explorer: txId ? explorerTx(txId) : undefined });
+            resolve(data);
+          },
+          onCancel: () => {
+            log(`Transaction cancelled in wallet: ${functionName}`);
+            reject(new Error('Transaction was cancelled in the wallet'));
+          },
+        });
+      });
+    }
+
+    function getTokenId() {
+      const raw = $('tokenId').value.trim();
+      if (!/^\d+$/.test(raw)) throw new Error('Enter a valid numeric token ID');
+      return BigInt(raw);
+    }
+    function getSwapTokenId() {
+      const raw = $('swapTokenId').value.trim() || $('tokenId').value.trim();
+      if (!/^\d+$/.test(raw)) throw new Error('Enter a valid numeric token ID');
+      return BigInt(raw);
+    }
+
+    function resetChainOnlyDisplays() {
+      state.canonicalHash = null;
+      state.binding = null;
+      state.coreInscription = null;
+      state.sourceOwner = null;
+      state.sourceTokenUri = null;
+      state.sourceMetadataUri = null;
+      state.sourceMetadata = null;
+      state.sourceImageUrl = null;
+      state.sourceImageCandidates = [];
+      // Clear any previously prepared image bytes so a new token can't reuse a
+      // stale hash/chunk set from the cat we were just looking at.
+      state.fileBytes = null;
+      state.fileHash = null;
+      state.chunks = [];
+      $('mime').value = '';
+      $('sizeChunks').value = '';
+      $('computedHash').value = '';
+      $('progressBar').style.width = '0%';
+      setStatus('canonicalStatus', 'Not loaded from chain');
+      setStatus('bindingStatus', 'Not loaded from chain');
+      setStatus('coreInscriptionStatus', 'Resolve a token to read its canonical inscription from the Xtrata core.');
+      setStatus('sourceOwnerStatus', 'Not loaded from chain');
+      setStatus('tokenUriStatus', 'Not loaded from chain');
+      setStatus('rawImageStatus', 'Not loaded from chain URI');
+      setStatus('idConversionStatus', renderIdConversion(null));
+      setStatus('lookupToken', $('tokenId').value.trim() || 'None');
+      setStatus('lookupXtrata', 'Not loaded');
+      setStatus('lookupLiquid', 'Not loaded');
+      setHashStatus();
+      updateActionButtons();
+    }
+
+    function decodeUriTemplate(uri) { return String(uri || '').trim().replace(/%7B/ig, '{').replace(/%7D/ig, '}'); }
+    function resolveUriTemplate(uri, tokenId) {
+      const id = String(tokenId ?? $('tokenId').value.trim() ?? '').trim();
+      let resolved = decodeUriTemplate(uri).replace(/\{id\}/ig, id).replace(/\{token_id\}/ig, id).replace(/\{tokenId\}/g, id);
+      resolved = resolved.replace(/^ipfs:\/\/ipfs\//i, 'ipfs://');
+      try {
+        const parsed = new URL(resolved);
+        if (/^https?:$/i.test(parsed.protocol)) {
+          while (/\/ipfs\/ipfs\//i.test(parsed.pathname)) parsed.pathname = parsed.pathname.replace(/\/ipfs\/ipfs\//i, '/ipfs/');
+          return parsed.toString();
+        }
+      } catch {}
+      return resolved.replace(/\/ipfs\/ipfs\//i, '/ipfs/');
+    }
+    function extractIpfsPath(uri) {
+      const resolved = resolveUriTemplate(uri);
+      if (/^ipfs:\/\//i.test(resolved)) return resolved.replace(/^ipfs:\/\//i, '').replace(/^ipfs\//i, '');
+      try {
+        const parsed = new URL(resolved);
+        const parts = parsed.pathname.split('/').filter(Boolean);
+        const ipfsIndex = parts.findIndex((part) => part.toLowerCase() === 'ipfs');
+        if (ipfsIndex < 0 || !parts[ipfsIndex + 1]) return '';
+        let start = ipfsIndex + 1;
+        if ((parts[start] || '').toLowerCase() === 'ipfs') start += 1;
+        return parts.slice(start).join('/');
+      } catch { return ''; }
+    }
+    function unique(values) { return [...new Set(values.filter(Boolean))]; }
+    function uriToHttpCandidates(uri, tokenId) {
+      const resolved = resolveUriTemplate(uri, tokenId);
+      const candidates = [];
+      if (/^https?:\/\//i.test(resolved)) candidates.push(resolved);
+      if (/^ar:\/\//i.test(resolved)) candidates.push(`https://arweave.net/${resolved.replace(/^ar:\/\//i, '')}`);
+      const ipfsPath = extractIpfsPath(resolved);
+      if (ipfsPath) candidates.push(`https://ipfs.io/ipfs/${ipfsPath}`, `https://nftstorage.link/ipfs/${ipfsPath}`, `https://dweb.link/ipfs/${ipfsPath}`, `https://cloudflare-ipfs.com/ipfs/${ipfsPath}`);
+      return unique(candidates.map((candidate) => encodeURI(candidate)));
+    }
+    function tokenUriToHttp(uri, tokenId) { return uriToHttpCandidates(uri, tokenId)[0] || ''; }
+
+    function renderTokenUriStatus(uri, contractPrincipal, functionArgs = [], tokenId = null) {
+      state.sourceTokenUri = uri || null;
+      const proof = chainProof(contractPrincipal, 'get-token-uri', functionArgs);
+      if (!uri) {
+        setStatus('tokenUriStatus', `${badge('No URI returned by chain', 'warn')}<br>The source contract returned none for this token.${proof}`);
+        return;
+      }
+      const resolved = resolveUriTemplate(uri, tokenId);
+      const href = tokenUriToHttp(uri, tokenId);
+      const resolvedLine = resolved && resolved !== uri ? `<span class="compact-line"><b>resolved:</b> ${escapeHtml(shortMiddle(resolved, 34, 26))}</span>` : '';
+      const link = href ? `<a class="uri-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">Open metadata JSON</a>` : '';
+      const fullDetails = `<details class="metadata-box"><summary>Full URI details</summary><span>chain: ${escapeHtml(uri)}</span><span>resolved: ${escapeHtml(resolved)}</span></details>`;
+      setStatus('tokenUriStatus', `${badge('Fetched from chain', 'ok')}<div class="compact-lines"><span class="compact-line"><b>chain:</b> ${escapeHtml(shortMiddle(uri, 34, 26))}</span>${resolvedLine}${link}</div>${fullDetails}${proof}`);
+    }
+    function renderRawImageStatus(html) { setStatus('rawImageStatus', html); updateActionButtons(); }
+
+    async function fetchFirstOk(candidates, mode = 'json', options = {}) {
+      let lastError = null;
+      const retries = Math.max(0, Number(options.retries ?? $('manifestRetries')?.value ?? 0));
+      const retryDelayMs = Math.max(0, Number(options.retryDelayMs ?? $('manifestDelayMs')?.value ?? 0));
+      const timeoutMs = Math.max(2000, Number(options.timeoutMs ?? 16000));
+
+      for (let attempt = 0; attempt <= retries; attempt += 1) {
+        for (const url of candidates) {
+          try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            
+            // FIX 2: Added CORS modes and explicit accept headers
+            const response = await fetch(url, { 
+                cache: 'no-store', 
+                signal: controller.signal,
+                mode: 'cors', 
+                headers: {
+                    'Accept': mode === 'json' ? 'application/json' : 'image/*, application/octet-stream, */*'
+                }
+            });
+            
+            clearTimeout(timer);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            if (mode === 'blob') {
+              const blob = await response.blob();
+              return { url, blob, contentType: response.headers.get('content-type') || blob.type || '' };
+            }
+            const text = await response.text();
+            try { return { url, json: JSON.parse(text), text, contentType: response.headers.get('content-type') || '' }; }
+            catch { throw new Error('Response was not valid JSON'); }
+          } catch (err) {
+            lastError = err;
+          }
+        }
+        if (attempt < retries && retryDelayMs) await sleep(retryDelayMs * (attempt + 1));
+      }
+      throw lastError || new Error('No usable HTTP gateway URL was available');
+    }
+    function extractImageValue(metadata) {
+      if (!metadata || typeof metadata !== 'object') return null;
+      const candidates = [
+        ['image', metadata.image], ['image_url', metadata.image_url], ['imageUrl', metadata.imageUrl], ['image_uri', metadata.image_uri], ['imageURI', metadata.imageURI], ['imageUri', metadata.imageUri],
+        ['raw_image', metadata.raw_image], ['rawImage', metadata.rawImage], ['properties.image', metadata.properties?.image], ['media.uri', metadata.media?.uri], ['properties.files[0].uri', metadata.properties?.files?.[0]?.uri], ['files[0].uri', metadata.files?.[0]?.uri], ['animation_url', metadata.animation_url],
+      ];
+      const found = candidates.find(([, value]) => typeof value === 'string' && value.trim());
+      if (found) return { field: found[0], value: found[1].trim() };
+      if (typeof metadata.image_data === 'string' && metadata.image_data.trim()) {
+        const data = metadata.image_data.trim();
+        if (/^data:image\//i.test(data)) return { field: 'image_data', value: data };
+        if (/^<svg[\s>]/i.test(data)) return { field: 'image_data', value: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(data)}` };
+      }
+      return null;
+    }
+    function basenameFromUrl(url, fallback = 'raw-image') {
+      try { return new URL(url).pathname.split('/').filter(Boolean).pop() || fallback; } catch { return fallback; }
+    }
+
+
+    async function sha256HexFromArrayBuffer(buffer) {
+      const digest = await crypto.subtle.digest('SHA-256', buffer);
+      return '0x' + toHex(new Uint8Array(digest));
+    }
+
+    function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+
+    async function resolveManifestEntry(tokenId) {
+      const mode = $('manifestMode')?.value || 'chain-uri';
+      const retries = Math.max(0, Number($('manifestRetries')?.value || 0));
+
+      if (mode === 'direct-image') {
+        const imageTemplate = $('manifestImageTemplate').value.trim();
+        if (!imageTemplate) throw new Error('Raw image URI template is required');
+        const metadataTemplate = $('manifestMetadataTemplate').value.trim();
+        const imageUri = resolveUriTemplate(imageTemplate, tokenId);
+        const tokenUri = metadataTemplate ? resolveUriTemplate(metadataTemplate, tokenId) : '';
+        const imageCandidates = /^data:image\//i.test(imageUri) ? [imageUri] : uriToHttpCandidates(imageUri, tokenId);
+        if (!imageCandidates.length) throw new Error('Image template could not be converted to an HTTP/IPFS gateway URL');
+        const imageResult = await fetchFirstOk(imageCandidates, 'blob', { retries });
+        const imageBuffer = await imageResult.blob.arrayBuffer();
+        const imageHash = await sha256HexFromArrayBuffer(imageBuffer);
+        const mime = (imageResult.contentType || imageResult.blob.type || '').split(';')[0] || 'application/octet-stream';
+
+        return {
+          id: Number(tokenId),
+          image_hash: imageHash,
+          metadata_hash: '',
+          token_uri: tokenUri,
+          resolved_metadata_uri: tokenUri ? tokenUriToHttp(tokenUri, tokenId) : '',
+          image_field: 'image-template',
+          image_uri: imageUri,
+          resolved_image_uri: imageResult.url,
+          image_mime: mime,
+          image_size: imageResult.blob.size,
+        };
+      }
+
+      const source = $('sourceContract').value.trim();
+      const tokenArg = asUint(BigInt(tokenId));
+      const tokenUriRaw = await readContract(source, 'get-token-uri', [tokenArg]);
+      const tokenUri = unwrapOptional(tokenUriRaw);
+      if (!tokenUri || typeof tokenUri !== 'string') throw new Error('No token URI returned by source contract');
+
+      const metadataCandidates = uriToHttpCandidates(tokenUri, tokenId);
+      if (!metadataCandidates.length) throw new Error('Token URI could not be converted to an HTTP/IPFS gateway URL');
+      const metadataResult = await fetchFirstOk(metadataCandidates, 'json', { retries });
+      const metadataHash = await sha256HexFromArrayBuffer(new TextEncoder().encode(metadataResult.text).buffer);
+      const image = extractImageValue(metadataResult.json);
+      if (!image) throw new Error('Metadata JSON did not contain a usable image field');
+
+      const imageCandidates = /^data:image\//i.test(image.value) ? [image.value] : uriToHttpCandidates(image.value, tokenId);
+      if (!imageCandidates.length) throw new Error('Image URI could not be converted to an HTTP/IPFS gateway URL');
+      const imageResult = await fetchFirstOk(imageCandidates, 'blob', { retries });
+      const imageBuffer = await imageResult.blob.arrayBuffer();
+      const imageHash = await sha256HexFromArrayBuffer(imageBuffer);
+      const mime = (imageResult.contentType || imageResult.blob.type || '').split(';')[0] || 'application/octet-stream';
+
+      return {
+        id: Number(tokenId),
+        image_hash: imageHash,
+        metadata_hash: metadataHash,
+        token_uri: tokenUri,
+        resolved_metadata_uri: metadataResult.url,
+        image_field: image.field,
+        image_uri: image.value,
+        resolved_image_uri: imageResult.url,
+        image_mime: mime,
+        image_size: imageResult.blob.size,
+      };
+    }
+
+    function buildManifestPayload() {
+      const source = $('sourceContract').value.trim();
+      const helper = $('helperContract').value.trim();
+      const start = Number($('manifestStartId').value || 1);
+      const end = Number($('manifestEndId').value || start);
+      const items = [...state.manifest.items].sort((a, b) => a.id - b.id);
+      const errors = [...state.manifest.errors].sort((a, b) => a.id - b.id);
+      return {
+        type: 'xtrata.collection-hash-manifest',
+        version: 1,
+        collection: 'LEO Cats Forever source image hash manifest',
+        hash_algorithm: 'sha256',
+        hash_target: 'raw-image-bytes',
+        metadata_hash_target: $('manifestMode')?.value === 'direct-image' ? 'not-fetched-in-direct-image-mode' : 'metadata-json-text-as-fetched',
+        source_contract: source,
+        helper_contract: helper,
+        manifest_mode: $('manifestMode')?.value || 'chain-uri',
+        image_uri_template: $('manifestImageTemplate')?.value?.trim?.() || '',
+        metadata_uri_template: $('manifestMetadataTemplate')?.value?.trim?.() || '',
+        range: { start, end },
+        generated_at: new Date().toISOString(),
+        counts: { requested: Math.max(0, end - start + 1), resolved: items.length, failed: errors.length },
+        items,
+        errors,
+      };
+    }
+
+    function updateManifestOutput(done = 0, total = 0) {
+      const payload = buildManifestPayload();
+      state.manifest.output = payload;
+      $('manifestOutput').value = JSON.stringify(payload, jsonBigInt, 2);
+      const pct = total ? Math.round((done / total) * 100) : 0;
+      $('manifestProgressBar').style.width = `${pct}%`;
+      $('manifestStatus').textContent = state.manifest.running
+        ? `Building manifest: ${done}/${total} checked · ${payload.items.length} resolved · ${payload.errors.length} failed`
+        : `Manifest ready: ${payload.items.length} resolved · ${payload.errors.length} failed`;
+      $('downloadManifestJsonBtn').disabled = !payload.items.length;
+      $('downloadManifestCsvBtn').disabled = !payload.items.length;
+    }
+
+    function downloadTextFile(filename, text, type = 'application/json') {
+      const blob = new Blob([text], { type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function manifestToCsv(payload) {
+      const headers = ['id','image_hash','metadata_hash','token_uri','resolved_metadata_uri','image_field','image_uri','resolved_image_uri','image_mime','image_size'];
+      const esc = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
+      return [headers.join(','), ...payload.items.map((item) => headers.map((h) => esc(item[h])).join(','))].join('\n');
+    }
+
+    async function buildCollectionManifest() {
+      if (state.manifest.running) return;
+      const start = Number($('manifestStartId').value || 1);
+      const end = Number($('manifestEndId').value || start);
+      const concurrency = Math.min(12, Math.max(1, Number($('manifestConcurrency').value || 2)));
+      const delayMs = Math.min(5000, Math.max(0, Number($('manifestDelayMs').value || 0)));
+      const retries = Math.min(8, Math.max(0, Number($('manifestRetries')?.value || 0)));
+      const mode = $('manifestMode')?.value || 'chain-uri';
+      if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start) throw new Error('Enter a valid manifest ID range');
+
+      state.manifest.running = true;
+      state.manifest.stop = false;
+      state.manifest.items = [];
+      state.manifest.errors = [];
+      $('buildManifestBtn').disabled = true;
+      $('stopManifestBtn').disabled = false;
+      $('downloadManifestJsonBtn').disabled = true;
+      $('downloadManifestCsvBtn').disabled = true;
+
+      const ids = Array.from({ length: end - start + 1 }, (_, i) => start + i);
+      let next = 0;
+      let done = 0;
+      updateManifestOutput(done, ids.length);
+      log('Manifest build started', { start, end, concurrency, delayMs, retries, mode });
+
+      async function worker() {
+        while (!state.manifest.stop) {
+          const id = ids[next++];
+          if (id === undefined) return;
+          try {
+            const entry = await resolveManifestEntry(id);
+            state.manifest.items.push(entry);
+          } catch (err) {
+            state.manifest.errors.push({ id, error: err.message });
+          } finally {
+            done += 1;
+            updateManifestOutput(done, ids.length);
+            if (delayMs) await sleep(delayMs);
+          }
+        }
+      }
+
+      try {
+        await Promise.all(Array.from({ length: Math.min(concurrency, ids.length) }, worker));
+      } finally {
+        state.manifest.running = false;
+        $('buildManifestBtn').disabled = false;
+        $('stopManifestBtn').disabled = true;
+        updateManifestOutput(done, ids.length);
+        log(state.manifest.stop ? 'Manifest build stopped' : 'Manifest build finished', buildManifestPayload().counts);
+      }
+    }
+
+    function stopCollectionManifest() {
+      state.manifest.stop = true;
+      $('manifestStatus').textContent = 'Stopping after current in-flight reads finish...';
+      $('stopManifestBtn').disabled = true;
+    }
+
+    function downloadManifestJson() {
+      const payload = state.manifest.output || buildManifestPayload();
+      downloadTextFile(`leo-cats-hash-manifest-${payload.range.start}-${payload.range.end}.json`, JSON.stringify(payload, jsonBigInt, 2), 'application/json');
+    }
+
+    function downloadManifestCsv() {
+      const payload = state.manifest.output || buildManifestPayload();
+      downloadTextFile(`leo-cats-hash-manifest-${payload.range.start}-${payload.range.end}.csv`, manifestToCsv(payload), 'text/csv');
+    }
+
+    function galleryCachePrefix() {
+      return `leo-cats-gallery:v1:${networkName()}:${$('sourceContract').value.trim()}`;
+    }
+    function galleryCacheKey(tokenId) { return `${galleryCachePrefix()}:${tokenId}`; }
+    function readGalleryCache(tokenId) {
+      try {
+        const raw = localStorage.getItem(galleryCacheKey(tokenId));
+        if (!raw) return null;
+        const item = JSON.parse(raw);
+        return item?.id ? item : null;
+      } catch { return null; }
+    }
+    function writeGalleryCache(item) {
+      try { localStorage.setItem(galleryCacheKey(item.id), JSON.stringify(item)); } catch {}
+    }
+    function gallerySharedParams(start, end) {
+      const params = new URLSearchParams({
+        collection: 'leo-cats',
+        network: networkName(),
+        source: $('sourceContract').value.trim(),
+        start: String(start),
+        end: String(end),
+      });
+      return params.toString();
+    }
+    
+    async function readSharedGalleryCache(ids) {
+      const start = ids[0];
+      const end = ids[ids.length - 1];
+      try {
+        const headers = { 'Accept': 'application/json' };
+        if (HIRO_API_KEY) headers['x-api-key'] = HIRO_API_KEY;
+
+        // FIX 2: Added CORS response headers explicitly
+        const response = await fetch(`/api/gallery-cache?${gallerySharedParams(start, end)}`, { 
+            cache: 'no-store',
+            mode: 'cors',
+            headers
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        const items = new Map((payload.items || []).map((item) => [Number(item.id), { ...item, status: item.status || 'loaded', fromSharedCache: true }]));
+        state.gallery.sharedCacheAvailable = true;
+        log('Shared D1 gallery cache read', { range: `${start}-${end}`, hits: items.size });
+        return items;
+      } catch (err) {
+        state.gallery.sharedCacheAvailable = false;
+        log('Shared D1 gallery cache unavailable; using browser cache fallback', { error: err.message });
+        return new Map();
+      }
+    }
+    async function flushSharedGalleryWrites(force = false) {
+      if (state.gallery.sharedCacheAvailable === false) return;
+      if (!force && state.gallery.sharedWriteQueue.length < 20) return;
+      const items = state.gallery.sharedWriteQueue.splice(0, 100);
+      if (!items.length) return;
+      try {
+        const headers = {
+          'content-type': 'application/json',
+          'Accept': 'application/json'
+        };
+        if (HIRO_API_KEY) headers['x-api-key'] = HIRO_API_KEY;
+
+        // FIX 2: Added CORS response headers explicitly
+        const response = await fetch('/api/gallery-cache', {
+          method: 'POST',
+          mode: 'cors',
+          headers,
+          body: JSON.stringify({
+            collection: 'leo-cats',
+            network: networkName(),
+            source_contract: $('sourceContract').value.trim(),
+            items,
+          }),
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        state.gallery.sharedCacheAvailable = true;
+        log('Shared D1 gallery cache updated', { saved: items.length });
+      } catch (err) {
+        state.gallery.sharedCacheAvailable = false;
+        state.gallery.sharedWriteQueue.unshift(...items);
+        log('Shared D1 gallery cache write failed; keeping browser cache only', { error: err.message });
+      }
+    }
+    
+    function clearGalleryCache() {
+      const prefix = galleryCachePrefix();
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i);
+        if (key?.startsWith(prefix)) keys.push(key);
+      }
+      for (const key of keys) localStorage.removeItem(key);
+      for (const [id, item] of state.gallery.items) {
+        if (item.status !== 'pending') state.gallery.items.set(id, { id, status: 'pending' });
+      }
+      state.gallery.cacheHits = 0;
+      state.gallery.sharedHits = 0;
+      renderGallery();
+      updateGalleryStatus();
+      log('Gallery cache cleared', { removed: keys.length, source: $('sourceContract').value.trim(), network: networkName() });
+    }
+    function galleryIds() {
+      const start = Number($('galleryStartId').value || 1);
+      const end = Number($('galleryEndId').value || start);
+      if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start) throw new Error('Enter a valid gallery ID range');
+      return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+    }
+    function galleryPlaceholder(id) { return { id, status: 'pending' }; }
+    async function resolveGalleryItem(tokenId, options = {}) {
+      const existing = state.gallery.items.get(Number(tokenId));
+      if (existing?.fromSharedCache && existing.resolved_image_uri) {
+        writeGalleryCache(existing);
+        return existing;
+      }
+      const cached = options.useCache !== false ? readGalleryCache(tokenId) : null;
+      if (cached) return { ...cached, fromCache: true };
+
+      const source = $('sourceContract').value.trim();
+      const tokenArg = asUint(BigInt(tokenId));
+      const tokenUriRaw = await readContract(source, 'get-token-uri', [tokenArg]);
+      const tokenUri = unwrapOptional(tokenUriRaw);
+      if (!tokenUri || typeof tokenUri !== 'string') throw new Error('No token URI returned by source contract');
+
+      const metadataCandidates = uriToHttpCandidates(tokenUri, tokenId);
+      if (!metadataCandidates.length) throw new Error('Token URI could not be converted to an HTTP/IPFS gateway URL');
+      const metadataResult = await fetchFirstOk(metadataCandidates, 'json', { retries: options.retries ?? 0, retryDelayMs: options.delayMs ?? 0 });
+      const image = extractImageValue(metadataResult.json);
+      if (!image) throw new Error('Metadata JSON did not contain a usable image field');
+      const imageCandidates = /^data:image\//i.test(image.value) ? [image.value] : uriToHttpCandidates(image.value, tokenId);
+      const imageUrl = imageCandidates[0] || image.value;
+      if (!imageUrl) throw new Error('Image URI could not be converted to a browser URL');
+
+      const item = {
+        id: Number(tokenId),
+        status: 'loaded',
+        token_uri: tokenUri,
+        resolved_metadata_uri: metadataResult.url,
+        image_field: image.field,
+        image_uri: image.value,
+        resolved_image_uri: imageUrl,
+        cached_at: new Date().toISOString(),
+      };
+      writeGalleryCache(item);
+      return item;
+    }
+    function updateGalleryStatus() {
+      const loaded = [...state.gallery.items.values()].filter((item) => item.status === 'loaded').length;
+      const pending = Math.max(0, state.gallery.total - state.gallery.done);
+      const pct = state.gallery.total ? Math.round((state.gallery.done / state.gallery.total) * 100) : 0;
+      const shared = state.gallery.sharedCacheAvailable === false ? ' · D1 unavailable' : ` · ${state.gallery.sharedHits} D1`;
+      $('galleryProgressBar').style.width = `${pct}%`;
+      $('galleryStatus').textContent = state.gallery.running
+        ? `Loading gallery: ${state.gallery.done}/${state.gallery.total} checked · ${loaded} loaded · ${state.gallery.cacheHits} local${shared} · ${state.gallery.errors} errors · ${pending} pending`
+        : state.gallery.total
+          ? `Gallery ready: ${loaded}/${state.gallery.total} loaded · ${state.gallery.cacheHits} local${shared} · ${state.gallery.errors} errors`
+          : 'Ready. Load a range to populate the collection grid.';
+    }
+    function tileHtml(item) {
+      const selected = state.gallery.selectedId === item.id ? ' selected' : '';
+      const statusClass = item.status === 'error' ? ' error' : '';
+      const label = `#${escapeHtml(item.id)}`;
+      const title = item.status === 'error' ? `Token ${item.id}: ${item.error || 'Error'}` : `Token ${item.id}`;
+      const body = item.resolved_image_uri
+        ? `<img src="${escapeHtml(item.resolved_image_uri)}" alt="LEO Cat #${escapeHtml(item.id)}" loading="lazy" decoding="async" />`
+        : `<span class="tile-fallback">${escapeHtml(item.status === 'error' ? 'Error' : 'Pending')}</span>`;
+      return `<button class="gallery-tile${selected}${statusClass}" type="button" data-token-id="${escapeHtml(item.id)}" title="${escapeHtml(title)}">${body}<span class="gallery-token">${label}</span></button>`;
+    }
+    function renderGallery() {
+      const items = [...state.gallery.items.values()].sort((a, b) => a.id - b.id);
+      $('galleryGrid').innerHTML = items.map(tileHtml).join('');
+      updateGalleryStatus();
+    }
+    function scheduleGalleryRender() {
+      if (state.gallery.renderTimer) return;
+      state.gallery.renderTimer = setTimeout(() => {
+        state.gallery.renderTimer = null;
+        renderGallery();
+      }, 160);
+    }
+    async function loadGallery() {
+      log('Gallery load handler entered');
+      $('galleryStatus').textContent = 'Gallery click received. Validating range and preparing workers...';
+      if (state.gallery.running) {
+        log('Gallery load ignored because a scan is already running', { checked: state.gallery.done, total: state.gallery.total });
+        return;
+      }
+      const ids = galleryIds();
+      const concurrency = Math.min(12, Math.max(1, Number($('galleryConcurrency').value || 4)));
+      const delayMs = Math.min(5000, Math.max(0, Number($('galleryDelayMs').value || 0)));
+      const retries = Math.min(8, Math.max(0, Number($('galleryRetries')?.value || 0)));
+
+      log('Gallery range accepted', { start: ids[0], end: ids[ids.length - 1], count: ids.length });
+      $('galleryStatus').textContent = `Preparing ${ids.length} gallery slots...`;
+      state.gallery.running = true;
+      state.gallery.stop = false;
+      const sharedItems = await readSharedGalleryCache(ids);
+      state.gallery.items = new Map(ids.map((id) => [id, sharedItems.get(id) || readGalleryCache(id) || galleryPlaceholder(id)]));
+      state.gallery.selectedId = /^\d+$/.test($('tokenId').value.trim()) ? Number($('tokenId').value.trim()) : null;
+      state.gallery.done = 0;
+      state.gallery.total = ids.length;
+      state.gallery.cacheHits = 0;
+      state.gallery.sharedHits = 0;
+      state.gallery.errors = 0;
+      state.gallery.lastProgressLog = Date.now();
+      state.gallery.sharedWriteQueue = [];
+      $('galleryLoadBtn').disabled = true;
+      $('galleryStopBtn').disabled = false;
+      renderGallery();
+      log('Gallery load started', { start: ids[0], end: ids[ids.length - 1], count: ids.length, concurrency, delayMs, retries });
+
+      let next = 0;
+      async function worker() {
+        while (!state.gallery.stop) {
+          const id = ids[next++];
+          if (id === undefined) return;
+          try {
+            const item = await resolveGalleryItem(id, { retries, delayMs });
+            if (item.fromCache) state.gallery.cacheHits += 1;
+            if (item.fromSharedCache) state.gallery.sharedHits += 1;
+            state.gallery.items.set(id, item);
+            if (!item.fromCache && !item.fromSharedCache && item.status === 'loaded') {
+              state.gallery.sharedWriteQueue.push(item);
+              await flushSharedGalleryWrites(false);
+            }
+          } catch (err) {
+            state.gallery.errors += 1;
+            state.gallery.items.set(id, { id, status: 'error', error: err.message });
+            if (state.gallery.errors <= 5) log('Gallery token failed', { tokenId: id, error: err.message });
+          } finally {
+            state.gallery.done += 1;
+            scheduleGalleryRender();
+            const now = Date.now();
+            if (state.gallery.done === 1 || state.gallery.done === state.gallery.total || now - state.gallery.lastProgressLog > 3000) {
+              state.gallery.lastProgressLog = now;
+              log('Gallery load progress', {
+                checked: state.gallery.done,
+                total: state.gallery.total,
+                localCached: state.gallery.cacheHits,
+                sharedCached: state.gallery.sharedHits,
+                errors: state.gallery.errors,
+              });
+            }
+            if (delayMs) await sleep(delayMs);
+          }
+        }
+      }
+
+      try {
+        await Promise.all(Array.from({ length: Math.min(concurrency, ids.length) }, worker));
+      } finally {
+        state.gallery.running = false;
+        $('galleryLoadBtn').disabled = false;
+        $('galleryStopBtn').disabled = true;
+        if (state.gallery.renderTimer) { clearTimeout(state.gallery.renderTimer); state.gallery.renderTimer = null; }
+        await flushSharedGalleryWrites(true);
+        renderGallery();
+        log(state.gallery.stop ? 'Gallery load stopped' : 'Gallery load finished', { checked: state.gallery.done, total: state.gallery.total, localCached: state.gallery.cacheHits, sharedCached: state.gallery.sharedHits, errors: state.gallery.errors, d1: state.gallery.sharedCacheAvailable === false ? 'unavailable' : 'available' });
+      }
+    }
+    function stopGallery() {
+      log('Gallery stop clicked', { checked: state.gallery.done, total: state.gallery.total });
+      state.gallery.stop = true;
+      $('galleryStatus').textContent = 'Stopping after current in-flight gallery reads finish...';
+      $('galleryStopBtn').disabled = true;
+    }
+    async function handleGalleryLoadClick() {
+      log('Load Gallery button clicked', {
+        start: $('galleryStartId').value,
+        end: $('galleryEndId').value,
+        concurrency: $('galleryConcurrency').value,
+        delayMs: $('galleryDelayMs').value,
+        retries: $('galleryRetries').value,
+      });
+      $('galleryStatus').textContent = 'Load Gallery button clicked. Starting gallery loader...';
+      await loadGallery();
+    }
+    function selectGalleryToken(tokenId) {
+      state.gallery.selectedId = Number(tokenId);
+      $('tokenId').value = String(tokenId);
+      if (!$('swapTokenId').value.trim()) $('swapTokenId').value = String(tokenId);
+      $('lookupToken').textContent = String(tokenId);
+      resetChainOnlyDisplays();
+      renderGallery();
+      document.getElementById('inscribe')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      log('Gallery token selected', { tokenId: String(tokenId) });
+    }
+
+    async function readMetadataAndRawImage(uri, tokenId, showLog = false) {
+      if (!uri) { renderRawImageStatus(`${badge('No chain URI to read', 'warn')}<br>Fetch the source token URI first.`); return null; }
+      state.sourceMetadataUri = null;
+      state.sourceMetadata = null;
+      state.sourceImageUrl = null;
+      state.sourceImageCandidates = [];
+      renderRawImageStatus('Reading metadata JSON from the chain-provided URI...');
+      const metadataCandidates = uriToHttpCandidates(uri, tokenId);
+      if (!metadataCandidates.length) { renderRawImageStatus(`${badge('URI cannot be fetched in browser', 'bad')}<br><span class="data-mono">${escapeHtml(uri)}</span>`); return null; }
+      try {
+        const metadataResult = await fetchFirstOk(metadataCandidates, 'json');
+        const image = extractImageValue(metadataResult.json);
+        state.sourceMetadataUri = metadataResult.url;
+        state.sourceMetadata = metadataResult.json;
+        if (!image) {
+          renderRawImageStatus(`${badge('Metadata read, no image field found', 'warn')}<br><a class="uri-link" href="${escapeHtml(metadataResult.url)}" target="_blank" rel="noopener noreferrer">Open metadata JSON</a><details class="metadata-box"><summary>Show metadata JSON</summary><span>${escapeHtml(JSON.stringify(metadataResult.json, jsonBigInt, 2)).slice(0, 2500)}</span></details>`);
+          if (showLog) log('Metadata read but no image field found', { metadataUri: metadataResult.url, keys: Object.keys(metadataResult.json || {}) });
+          return null;
+        }
+        const imageCandidates = /^data:image\//i.test(image.value) ? [image.value] : uriToHttpCandidates(image.value, tokenId);
+        const imageUrl = imageCandidates[0] || image.value;
+        state.sourceImageUrl = imageUrl;
+        state.sourceImageCandidates = imageCandidates.length ? imageCandidates : [imageUrl];
+        const rawLink = /^data:image\//i.test(imageUrl) ? '' : `<a class="uri-link" href="${escapeHtml(imageUrl)}" target="_blank" rel="noopener noreferrer">Open raw image</a>`;
+        const rawMeta = `<div class="compact-lines"><span class="compact-line"><b>metadata:</b> ${escapeHtml(shortMiddle(metadataResult.url, 30, 22))}</span><span class="compact-line"><b>${escapeHtml(image.field)}:</b> ${escapeHtml(shortMiddle(image.value, 30, 22))}</span>${rawLink}</div><details class="metadata-box"><summary>Full URI details</summary><span>metadata: ${escapeHtml(metadataResult.url)}</span><span>${escapeHtml(image.field)}: ${escapeHtml(image.value)}</span><span>resolved image: ${escapeHtml(imageUrl)}</span></details>`;
+        renderRawImageStatus(`${badge('Raw image resolved', 'ok')}<div class="raw-resolved"><div class="media-preview"><img src="${escapeHtml(imageUrl)}" alt="Raw token image resolved from token metadata" loading="lazy" /></div><div>${rawMeta}</div></div>`);
+        if (showLog) log('Raw image resolved from chain URI metadata', { tokenId: String(tokenId), metadataUri: metadataResult.url, imageField: image.field, image: image.value, resolvedImage: imageUrl });
+        return { metadataUri: metadataResult.url, metadata: metadataResult.json, imageField: image.field, imageValue: image.value, imageUrl };
+      } catch (err) {
+        renderRawImageStatus(`${badge('Could not read URI metadata', 'bad')}<br>${escapeHtml(err.message)}<details class="metadata-box"><summary>Tried gateways</summary>${metadataCandidates.map((u) => `<span>${escapeHtml(u)}</span>`).join('')}</details>`);
+        if (showLog) log('Could not read token metadata URI', { tokenId: String(tokenId), tokenUri: uri, tried: metadataCandidates, error: err.message });
+        return null;
+      }
+    }
+
+    function setHashStatus() {
+      if (!state.canonicalHash || !state.fileHash) {
+        $('hashMatch').textContent = 'Choose a token and file to check whether the file hash matches the canonical hash seeded in the helper contract.';
+        updateActionButtons();
+        return;
+      }
+      if (state.canonicalHash.toLowerCase() === state.fileHash.toLowerCase()) {
+        $('hashMatch').innerHTML = `${badge('Hash match', 'ok')} This file matches the canonical on-chain hash for the selected token.`;
+      } else {
+        $('hashMatch').innerHTML = `${badge('Hash mismatch', 'bad')} Canonical: <span class="data-mono">${escapeHtml(state.canonicalHash)}</span><br>File: <span class="data-mono">${escapeHtml(state.fileHash)}</span>`;
+      }
+      updateActionButtons();
+    }
+    function updateActionButtons() {
+      const hasWallet = !!state.wallet;
+      const tokenReady = /^\d+$/.test($('tokenId').value.trim());
+      const fileReady = !!state.fileBytes && state.chunks.length > 0 && state.chunks.length <= MAX_CHUNKS;
+      const hashReady = !!state.canonicalHash && !!state.fileHash && state.canonicalHash.toLowerCase() === state.fileHash.toLowerCase();
+      const asciiOk = /^[\x00-\x7F]*$/.test($('mime').value) && /^[\x00-\x7F]*$/.test($('tokenUri').value);
+      const alreadyInscribed = !!state.binding;
+      $('useRawImageBtn').disabled = !state.sourceImageUrl;
+      $('inscribeBtn').disabled = !(hasWallet && tokenReady && fileReady && hashReady && asciiOk && !alreadyInscribed);
+      $('swapBtn').disabled = !(hasWallet && /^\d+$/.test(($('swapTokenId').value.trim() || $('tokenId').value.trim())) && alreadyInscribed);
+      updateJourneyStatus();
+    }
+
+    // Friendly, journey-led summary that mirrors the technical state into the
+    // simple top-of-card view (showcase image, plain-language status, and a
+    // non-blocking wallet-ownership note).
+    function updateJourneyStatus() {
+      const imgBox = $('journeyImage');
+      if (imgBox) {
+        const url = state.sourceImageUrl || '';
+        if (imgBox.dataset.url !== url) {
+          imgBox.dataset.url = url;
+          imgBox.innerHTML = url
+            ? `<img src="${escapeHtml(url)}" alt="LEO Cat preview" loading="lazy" />`
+            : 'Enter a LEO Cat number above and select “Show me this cat”.';
+        }
+      }
+      const tokenReady = /^\d+$/.test($('tokenId').value.trim());
+      const matched = !!state.canonicalHash && !!state.fileHash && state.canonicalHash.toLowerCase() === state.fileHash.toLowerCase();
+      const js = $('journeyStatus');
+      if (js) {
+        let html;
+        if (!tokenReady || (!state.canonicalHash && !state.binding && !state.sourceImageUrl)) {
+          html = 'Pick any LEO Cat number to see it. You can browse as many as you like before choosing one to make permanent.';
+        } else if (state.binding) {
+          const xId = state.binding['xtrata-id'];
+          html = `${badge('Already forevered', 'ok')} This LEO Cat already has its twin (Xtrata #${escapeHtml(xId)}). Use Swap to choose which side stays liquid.`;
+        } else if (!state.canonicalHash) {
+          html = `${badge('Not in the seed list', 'warn')} This cat isn’t in the canonical seed list yet, so its twin can’t be inscribed.`;
+        } else if (matched) {
+          html = state.wallet
+            ? `${badge('Ready to inscribe', 'ok')} This cat’s artwork matches the canonical hash sealed on-chain. Select <b>“Inscribe this LEO Cat's twin”</b> below to open your wallet.`
+            : `${badge('Ready', 'ok')} This cat is verified and ready. Connect your wallet to inscribe its twin.`;
+        } else if (state.fileHash) {
+          html = `${badge('Image mismatch', 'bad')} The image we fetched doesn’t match the canonical seed for this cat, so inscription would be rejected. Open Technical details to investigate.`;
+        } else {
+          html = `${badge('Preparing', 'warn')} Loading and verifying this cat’s artwork…`;
+        }
+        js.innerHTML = html;
+      }
+      const ol = $('ownershipLine');
+      if (ol) {
+        if (state.binding) {
+          // A twin already exists — ownership only matters for swapping, so the
+          // "not in your wallet" note is not relevant here. Hide it.
+          ol.textContent = '';
+        } else if (!state.wallet) {
+          ol.innerHTML = 'Connect your wallet to see whether this cat is already in it — you’re welcome to inscribe its twin either way.';
+        } else if (!state.sourceOwner) {
+          ol.textContent = '';
+        } else {
+          const ownerText = typeof state.sourceOwner === 'object' ? JSON.stringify(state.sourceOwner) : String(state.sourceOwner);
+          ol.innerHTML = ownerText === state.wallet
+            ? `${badge('In your wallet', 'ok')} This LEO Cat is in your connected wallet.`
+            : `${badge('Not in your wallet', 'warn')} This LEO Cat isn’t in your wallet — you can still inscribe its twin. (You’d need to own the cat to later swap the twin into your wallet.)`;
+        }
+      }
+    }
+
+    async function refreshContractStatus() {
+      syncLabels();
+      const helper = $('helperContract').value.trim();
+      if (!helper) return log('Set the helper contract principal first.');
+      try {
+        const [countRaw, feeRaw, thresholdRaw, finalizedRaw] = await Promise.all([
+          readContract(helper, 'get-inscribed-count', []),
+          readContract(helper, 'get-fee', []),
+          readContract(helper, 'get-free-threshold', []),
+          readContract(helper, 'is-finalized', []),
+        ]);
+        const count = unwrapOk(countRaw);
+        const fee = unwrapOk(feeRaw);
+        const threshold = unwrapOk(thresholdRaw);
+        const finalized = unwrapOk(finalizedRaw);
+        $('statInscribed').textContent = count ?? '-';
+        $('statFee').textContent = `${Number(BigInt(fee || 0)) / 1_000_000} STX`;
+        $('statThreshold').textContent = threshold ?? '-';
+        $('statFinalized').textContent = finalized ? 'Finalized' : 'Open';
+        log('Contract stats refreshed from chain', { count, fee, threshold, finalized });
+      } catch (err) { log('Could not refresh contract stats', { error: err.message }); }
+    }
+
+    async function checkToken() {
+      const tokenId = getTokenId();
+      const helper = $('helperContract').value.trim();
+      const source = $('sourceContract').value.trim();
+      const tokenArg = asUint(tokenId);
+      resetChainOnlyDisplays();
+      $('lookupToken').textContent = String(tokenId);
+      setStatus('idConversionStatus', renderIdConversion(null, tokenId));
+      setStatus('canonicalStatus', 'Checking chain...');
+      setStatus('bindingStatus', 'Checking chain...');
+      setStatus('sourceOwnerStatus', 'Checking chain...');
+      setStatus('tokenUriStatus', 'Checking chain...');
+      setStatus('rawImageStatus', 'Waiting for chain URI...');
+      const [canonicalRaw, bindingRaw, ownerRaw] = await Promise.all([
+        readContract(helper, 'get-canonical-hash', [tokenArg]),
+        readContract(helper, 'get-binding', [tokenArg]),
+        readContract(source, 'get-owner', [tokenArg]).catch((err) => ({ err: err.message })),
+      ]);
+      state.canonicalHash = unwrapOptional(canonicalRaw);
+      state.binding = unwrapOptional(bindingRaw);
+      state.sourceOwner = ownerRaw?.err ? null : unwrapOptional(ownerRaw);
+
+      if (state.canonicalHash) setStatus('canonicalStatus', `${badge('Seeded on chain', 'ok')}<br><span class="data-mono">${escapeHtml(state.canonicalHash)}</span>${chainProof(helper, 'get-canonical-hash', [tokenArg])}`);
+      else setStatus('canonicalStatus', `${badge('Not seeded on chain', 'bad')}<br>No canonical hash was returned for token ${tokenId}.${chainProof(helper, 'get-canonical-hash', [tokenArg])}`);
+
+      if (state.binding) {
+        const xId = state.binding['xtrata-id'];
+        const escrow = state.binding['xtrata-escrowed'] === true ? 'Xtrata currently escrowed' : 'LEO Cat currently escrowed';
+        const liquid = state.binding['xtrata-escrowed'] === true ? 'LEO Cat is liquid, Xtrata is escrowed' : 'Xtrata is liquid, LEO Cat is escrowed';
+        setStatus('bindingStatus', `${badge('Binding found on chain', 'ok')}<br><span class="data-mono">Xtrata #${escapeHtml(xId)} · ${escapeHtml(escrow)}</span>${chainProof(helper, 'get-binding', [tokenArg])}`);
+        setStatus('idConversionStatus', renderIdConversion(state.binding, tokenId));
+        setStatus('lookupXtrata', `<span class="data-mono">#${escapeHtml(xId)}</span>`);
+        setStatus('lookupLiquid', liquid);
+      } else {
+        setStatus('bindingStatus', `${badge('No binding on chain', 'warn')}<br>The helper contract returned none. Ready to inscribe if the file hash matches.${chainProof(helper, 'get-binding', [tokenArg])}`);
+        setStatus('idConversionStatus', renderIdConversion(null, tokenId));
+        setStatus('lookupXtrata', 'No binding');
+        setStatus('lookupLiquid', 'Not forevered yet');
+      }
+
+      // Architecture: the REGISTRY binding above only maps local ID -> Xtrata ID.
+      // The CANONICAL inscription / content / metadata is read from the Xtrata
+      // CORE contract, keyed by that Xtrata ID.
+      state.coreInscription = null;
+      if (state.binding && state.binding['xtrata-id'] != null) {
+        try {
+          state.coreInscription = await loadCoreInscription(state.binding['xtrata-id']);
+          renderCoreInscription(state.coreInscription);
+        } catch (err) {
+          setStatus('coreInscriptionStatus', `${badge('Core read failed', 'bad')}<br>${escapeHtml(err.message)}`);
+        }
+      } else {
+        renderCoreInscription(null);
+      }
+
+      if (state.sourceOwner) {
+        const ownerText = typeof state.sourceOwner === 'object' ? JSON.stringify(state.sourceOwner) : String(state.sourceOwner);
+        const mine = state.wallet && ownerText === state.wallet;
+        setStatus('sourceOwnerStatus', `${badge(mine ? 'Owned by connected wallet' : 'Owner read from chain', mine ? 'ok' : 'warn')}<br><span class="data-mono">${escapeHtml(ownerText)}</span>${chainProof(source, 'get-owner', [tokenArg])}`);
+      } else if (ownerRaw?.err) setStatus('sourceOwnerStatus', `${badge('Owner read failed', 'bad')}<br>${escapeHtml(ownerRaw.err)}${chainProof(source, 'get-owner', [tokenArg])}`);
+      else setStatus('sourceOwnerStatus', `${badge('No owner returned by chain', 'bad')}<br>Source contract returned none.${chainProof(source, 'get-owner', [tokenArg])}`);
+
+      await maybeFetchTokenUri(tokenId);
+      // Journey-led: automatically fetch + hash the resolved cat image so the
+      // user never has to drop a file or click "Use Raw Image". Only worth doing
+      // when the cat is seedable and not already inscribed.
+      if (state.sourceImageUrl && state.canonicalHash && !state.binding
+          && !(state.fileHash && state.fileHash.toLowerCase() === state.canonicalHash.toLowerCase())) {
+        try { await useFetchedRawImage(); }
+        catch (err) { log('Auto image preparation failed — open Technical details to retry', { error: err.message }); }
+      }
+      await quoteFee(false);
+      setHashStatus();
+      updateJourneyStatus();
+      log('Token checked from chain', { tokenId: tokenId.toString(), canonical: state.canonicalHash, binding: state.binding, sourceOwner: state.sourceOwner, tokenUri: state.sourceTokenUri });
+    }
+
+    async function maybeFetchTokenUri(tokenId, showLog = false) {
+      const source = $('sourceContract').value.trim();
+      const args = [asUint(tokenId)];
+      try {
+        const raw = await readContract(source, 'get-token-uri', args);
+        const uri = unwrapOptional(raw);
+        if (uri && typeof uri === 'string') {
+          const currentInput = $('tokenUri').value.trim();
+          const canSyncInput = !currentInput || currentInput === state.fetchedTokenUri;
+          if (canSyncInput) $('tokenUri').value = uri;
+          state.fetchedTokenUri = uri;
+          renderTokenUriStatus(uri, source, args, tokenId);
+          await readMetadataAndRawImage(uri, tokenId, showLog);
+          if (showLog) log('Fetched source token URI from chain', { sourceContract: source, function: 'get-token-uri', tokenId: tokenId.toString(), tokenUri: uri, copiedToXtrataInput: canSyncInput });
+          updateActionButtons();
+          return uri;
+        }
+        renderTokenUriStatus(null, source, args);
+        renderRawImageStatus(`${badge('No chain URI to read', 'warn')}<br>The source contract did not return a token URI.`);
+        if (showLog) log('No token URI returned by chain', { sourceContract: source, function: 'get-token-uri', tokenId: tokenId.toString() });
+        return null;
+      } catch (err) {
+        state.sourceTokenUri = null;
+        state.sourceImageUrl = null;
+        state.sourceImageCandidates = [];
+        setStatus('tokenUriStatus', `${badge('Chain read failed', 'bad')}<br>${escapeHtml(err.message)}${chainProof(source, 'get-token-uri', args)}`);
+        renderRawImageStatus(`${badge('No chain URI to read', 'warn')}<br>The source token URI read failed.`);
+        if (showLog) log('Could not fetch token URI from chain', { sourceContract: source, function: 'get-token-uri', tokenId: tokenId.toString(), error: err.message });
+        return null;
+      }
+    }
+
+    async function fetchTokenUriForCurrentToken() { const tokenId = getTokenId(); setStatus('tokenUriStatus', 'Checking chain...'); setStatus('rawImageStatus', 'Waiting for chain URI...'); await maybeFetchTokenUri(tokenId, true); }
+    async function readMetadataForCurrentToken() { const tokenId = getTokenId(); const uri = state.sourceTokenUri || $('tokenUri').value.trim(); await readMetadataAndRawImage(uri, tokenId, true); }
+
+    async function handleFile(file) {
+      if (!file) return;
+      $('progressBar').style.width = '20%';
+      const buffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      state.fileBytes = bytes;
+      state.chunks = [];
+      for (let i = 0; i < bytes.length; i += CHUNK_SIZE) state.chunks.push(bytes.slice(i, i + CHUNK_SIZE));
+      // Use the contract's rolling chunk hash, not a plain sha256 of the file.
+      state.fileHash = await rollingHashHex(state.chunks);
+      $('mime').value = file.type || $('mime').value || 'application/octet-stream';
+      $('computedHash').value = state.fileHash;
+      $('sizeChunks').value = `${bytes.length.toLocaleString()} bytes · ${state.chunks.length} chunk${state.chunks.length === 1 ? '' : 's'}`;
+      $('progressBar').style.width = '100%';
+      if (state.chunks.length > MAX_CHUNKS) $('hashMatch').innerHTML = `${badge('File too large', 'bad')} ${state.chunks.length} chunks. Maximum is ${MAX_CHUNKS}.`;
+      else setHashStatus();
+      await quoteFee(false);
+      log('File prepared', { name: file.name, type: file.type, size: bytes.length, chunks: state.chunks.length, sha256: state.fileHash });
+    }
+    async function useFetchedRawImage() {
+      if (!state.sourceImageUrl) throw new Error('No raw image has been resolved yet');
+      const candidates = state.sourceImageCandidates?.length ? state.sourceImageCandidates : [state.sourceImageUrl];
+      renderRawImageStatus(`${badge('Fetching raw image bytes', 'warn')}<br>Preparing the resolved image for hashing and chunking...`);
+      const result = await fetchFirstOk(candidates, 'blob');
+      const mime = (result.contentType || result.blob.type || '').split(';')[0] || 'application/octet-stream';
+      const filename = basenameFromUrl(result.url, `token-${getTokenId()}-raw-image`);
+      const file = new File([result.blob], filename, { type: mime });
+      await handleFile(file);
+      log('Fetched raw image prepared as inscription file', { imageUrl: result.url, mime, size: result.blob.size, filename });
+    }
+
+    async function quoteFee(showLog = true) {
+      if (!state.wallet) { setStatus('feeStatus', 'Connect wallet to calculate'); return; }
+      const helper = $('helperContract').value.trim();
+      if (!helper) return;
+      try {
+        const feeRaw = await readContract(helper, 'fee-for', [asPrincipal(state.wallet)]);
+        state.appFee = BigInt(unwrapOk(feeRaw) || 0);
+        let masterFee = 0n;
+        if (state.fileBytes && state.chunks.length) {
+          const quoteRaw = await readContract($('masterContract').value.trim(), 'quote-single-tx-fee', [asUint(state.fileBytes.length), asUint(state.chunks.length)]);
+          const quote = unwrapOk(quoteRaw);
+          const totalFee = quote?.['total-fee'] ?? quote?.totalFee ?? quote;
+          masterFee = BigInt(totalFee || 0);
+        }
+        state.masterFee = masterFee;
+        const total = state.appFee + state.masterFee;
+        setStatus('feeStatus', `${badge(`${Number(total) / 1_000_000} STX total`, total === 0n ? 'ok' : 'warn')}<br><span class="data-mono">App: ${state.appFee} uSTX · Xtrata: ${state.masterFee} uSTX</span>`);
+        if (showLog) log('Fee quoted from chain', { appFeeUstx: state.appFee.toString(), masterFeeUstx: state.masterFee.toString(), totalUstx: total.toString() });
+      } catch (err) { setStatus('feeStatus', `${badge('Quote failed', 'bad')}<br>${escapeHtml(err.message)}`); if (showLog) log('Fee quote failed', { error: err.message }); }
+    }
+
+    function inscribePostConditions() {
+      if (!state.wallet) return [];
+      const total = (state.appFee || 0n) + (state.masterFee || 0n);
+      try { return total > 0n ? [Pc.principal(state.wallet).willSendLte(total).ustx()] : []; }
+      catch { return []; }
+    }
+    async function foreverNFT() {
+      const tokenId = getTokenId();
+      if (!state.fileBytes || !state.fileHash) throw new Error('Choose or fetch the canonical media file first');
+      if (state.fileHash.toLowerCase() !== state.canonicalHash?.toLowerCase()) throw new Error('File hash does not match the canonical hash');
+      if (state.chunks.length > MAX_CHUNKS) throw new Error('File has too many chunks for this contract');
+      await quoteFee(false);
+      const args = [asUint(tokenId), asBuffer(state.fileHash), asAscii($('mime').value, 64, 'MIME type'), asUint(state.fileBytes.length), Cl.list(state.chunks.map((chunk) => asBuffer(chunk))), asAscii($('tokenUri').value, 256, 'Token URI')];
+      await callHelper('inscribe', args, inscribePostConditions());
+    }
+
+    function swapPepePostConditions(tokenId) {
+      if (!state.wallet) return [];
+      try { return [Pc.principal(state.wallet).willSendAsset().nft(`${$('sourceContract').value.trim()}::${$('sourceAssetName').value.trim()}`, asUint(tokenId))]; }
+      catch { return []; }
+    }
+    function swapXtrataPostConditions() {
+      if (!state.wallet || !state.binding?.['xtrata-id']) return [];
+      try { return [Pc.principal(state.wallet).willSendAsset().nft(`${$('masterContract').value.trim()}::${$('masterAssetName').value.trim()}`, asUint(state.binding['xtrata-id']))]; }
+      catch { return []; }
+    }
+    async function handleSwap() {
+      const tokenId = getSwapTokenId();
+      if (state.direction === 'pepe-to-xtrata') await callHelper('swap-nft-for-xtrata', [asUint(tokenId)], swapPepePostConditions(tokenId));
+      else await callHelper('swap-xtrata-for-nft', [asUint(tokenId)], swapXtrataPostConditions());
+    }
+    function updateSwapUi() {
+      const leo = state.direction === 'pepe-to-xtrata';
+      $('dirPepe').classList.toggle('active', leo);
+      $('dirXtrata').classList.toggle('active', !leo);
+      $('swapBtn').textContent = leo ? 'Swap LEO Cat for Xtrata' : 'Swap Xtrata for LEO Cat';
+      $('swapHint').textContent = leo ? 'LEO Cat → Xtrata sends your source LEO Cat to escrow and releases the Xtrata twin.' : 'Xtrata → LEO Cat sends your Xtrata twin to escrow and releases the source LEO Cat.';
+      updateActionButtons();
+    }
+
+    async function onConnect() {
+      try {
+        // Always open the wallet selector on an explicit click. Gating on
+        // isConnected() meant a stale "connected" flag left in local storage
+        // (e.g. from a previous session) made the button do nothing, so the
+        // wallet never opened.
+        const result = await connect({ forceWalletSelect: true });
+        const addr = getStoredWallet() || addressFromConnectResult(result);
+        setWallet(addr);
+        if (addr) { log('Wallet connected', { address: addr }); await quoteFee(false); }
+        else log('Wallet connected, but no STX address was returned. Try refreshing or checking wallet permissions.');
+      } catch (err) {
+        const msg = err?.message || String(err);
+        if (/cancel|reject|denied|closed|user/i.test(msg)) { log('Wallet connection cancelled'); return; }
+        log('Wallet connect failed', { error: msg });
+      }
+    }
+    function addressFromConnectResult(result) {
+      const list = result?.addresses || result?.result?.addresses || [];
+      const arr = Array.isArray(list) ? list : [];
+      const stx = arr.find((a) => /^S[PM][0-9A-Z]+/.test(a?.address || ''));
+      return stx?.address || null;
+    }
+
+    function bind(id, event, fn) {
+      $(id).addEventListener(event, async (...args) => {
+        try { await fn(...args); }
+        catch (err) { log('Error', { message: err.message }); }
+      });
+    }
+
+    bind('connectBtn', 'click', onConnect);
+    bind('disconnectBtn', 'click', async () => {
+      // Fully clear connection state so reconnecting prompts the wallet picker
+      // again and lets you choose a different wallet/address.
+      try { disconnect(); } catch {}
+      try { clearLocalStorage(); } catch {}
+      try { clearSelectedProviderId(); } catch {}
+      setWallet(null);
+      log('Wallet disconnected');
+    });
+    bind('networkToggle', 'click', () => { $('network').value = networkName() === 'mainnet' ? 'testnet' : 'mainnet'; syncLabels(); resetChainOnlyDisplays(); });
+    bind('refreshBtn', 'click', refreshContractStatus);
+    bind('checkBtn', 'click', checkToken);
+    bind('lookupBtn', 'click', checkToken);
+    bind('tokenUriBtn', 'click', fetchTokenUriForCurrentToken);
+    bind('metadataBtn', 'click', readMetadataForCurrentToken);
+    bind('buildManifestBtn', 'click', buildCollectionManifest);
+    bind('stopManifestBtn', 'click', stopCollectionManifest);
+    bind('downloadManifestJsonBtn', 'click', downloadManifestJson);
+    bind('downloadManifestCsvBtn', 'click', downloadManifestCsv);
+    bind('galleryLoadBtn', 'click', handleGalleryLoadClick);
+    bind('galleryStopBtn', 'click', stopGallery);
+    bind('galleryClearCacheBtn', 'click', clearGalleryCache);
+    bind('quoteBtn', 'click', () => quoteFee(true));
+    bind('mediaFile', 'change', (event) => handleFile(event.target.files?.[0]));
+    bind('useRawImageBtn', 'click', useFetchedRawImage);
+    bind('inscribeBtn', 'click', foreverNFT);
+    bind('swapBtn', 'click', handleSwap);
+    bind('dirPepe', 'click', () => { state.direction = 'pepe-to-xtrata'; updateSwapUi(); });
+    bind('dirXtrata', 'click', () => { state.direction = 'xtrata-to-pepe'; updateSwapUi(); });
+
+    for (const id of ['helperContract', 'sourceContract', 'masterContract', 'sourceAssetName', 'masterAssetName', 'network', 'mime']) {
+      $(id).addEventListener('input', () => { syncLabels(); updateActionButtons(); });
+      $(id).addEventListener('change', () => { syncLabels(); updateActionButtons(); });
+    }
+    for (const id of ['helperContract', 'network', 'sourceContract', 'tokenId']) {
+      $(id).addEventListener('input', resetChainOnlyDisplays);
+      $(id).addEventListener('change', resetChainOnlyDisplays);
+    }
+    $('tokenId').addEventListener('input', () => { $('lookupToken').textContent = $('tokenId').value.trim() || 'None'; if (!$('swapTokenId').value.trim()) updateActionButtons(); });
+    $('swapTokenId').addEventListener('input', updateActionButtons);
+    $('apiBase').addEventListener('input', () => { $('apiBase').dataset.touched = 'true'; syncLabels(); });
+    $('tokenUri').addEventListener('input', () => {
+      updateActionButtons();
+      if (!state.sourceTokenUri) setStatus('tokenUriStatus', 'Not loaded from chain');
+      state.sourceImageUrl = null;
+      state.sourceImageCandidates = [];
+      if (!state.sourceTokenUri) setStatus('rawImageStatus', 'Not loaded from chain URI');
+    });
+    $('galleryTileSize').addEventListener('input', () => {
+      $('galleryGrid').style.setProperty('--gallery-tile-size', `${$('galleryTileSize').value}px`);
+    });
+    $('galleryGrid').addEventListener('click', (event) => {
+      const tile = event.target.closest('.gallery-tile');
+      if (!tile) return;
+      const tokenId = tile.dataset.tokenId;
+      if (/^\d+$/.test(tokenId || '')) selectGalleryToken(tokenId);
+    });
+
+    syncLabels();
+    setWallet(getStoredWallet());
+    updateSwapUi();
+    refreshContractStatus();
+    log('LEO Cats Forever Twins UI loaded. Connect wallet, check a token, then fetch the chain URI and raw image.');
+
+    // Auto-load Token ID 1 on initialization
+    $('tokenId').value = '1';
+    $('swapTokenId').value = '1';
+    $('lookupToken').textContent = '1';
+    resetChainOnlyDisplays();
+    setTimeout(() => {
+      checkToken();
+    }, 300);
+
+  </script>
+</body>
+</html>

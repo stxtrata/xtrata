@@ -1,0 +1,355 @@
+import { ClarityValue } from '@stacks/transactions';
+import {
+  expectBool,
+  expectBuffer,
+  expectList,
+  expectOptional,
+  expectPrincipal,
+  expectStringAscii,
+  expectTuple,
+  expectUInt,
+  getTupleValue,
+  unwrapResponse
+} from './clarity';
+import {
+  ContractCallError,
+  ContractInfo,
+  CONTRACT_ERROR_CODES,
+  InscriptionMeta,
+  UploadState
+} from './types';
+import { CHUNK_SIZE } from '../chunking/hash';
+
+const estimateTotalChunks = (totalSize: bigint) => {
+  if (totalSize <= 0n) {
+    return 0n;
+  }
+  const chunkSize = BigInt(CHUNK_SIZE);
+  return (totalSize + chunkSize - 1n) / chunkSize;
+};
+
+const decodeContractError = (value: ClarityValue, context: string) => {
+  const code = expectUInt(value, context);
+  const name = CONTRACT_ERROR_CODES[code.toString() as keyof typeof CONTRACT_ERROR_CODES];
+  return new ContractCallError(code, name);
+};
+
+const expectContractOk = (value: ClarityValue, context: string) => {
+  const response = unwrapResponse(value, context);
+  if (!response.ok) {
+    throw decodeContractError(response.value, `${context} error`);
+  }
+  return response.value;
+};
+
+const parseOptionalString = (value: ClarityValue, context: string) => {
+  const optional = expectOptional(value, context);
+  if (!optional) {
+    return null;
+  }
+  return expectStringAscii(optional, context);
+};
+
+const parseOptionalPrincipal = (value: ClarityValue, context: string) => {
+  const optional = expectOptional(value, context);
+  if (!optional) {
+    return null;
+  }
+  return expectPrincipal(optional, context);
+};
+
+const parseOptionalBuffer = (value: ClarityValue, context: string) => {
+  const optional = expectOptional(value, context);
+  if (!optional) {
+    return null;
+  }
+  return expectBuffer(optional, context);
+};
+
+const parseInscriptionMetaTuple = (tupleValue: ClarityValue, context: string) => {
+  const tuple = expectTuple(tupleValue, context);
+  const owner = expectPrincipal(getTupleValue(tuple, 'owner', context), `${context}.owner`);
+  const creatorEntry = tuple['creator'];
+  const creator =
+    creatorEntry === undefined
+      ? null
+      : expectPrincipal(creatorEntry, `${context}.creator`);
+  const mimeType = expectStringAscii(
+    getTupleValue(tuple, 'mime-type', context),
+    `${context}.mime-type`
+  );
+  const totalSize = expectUInt(
+    getTupleValue(tuple, 'total-size', context),
+    `${context}.total-size`
+  );
+  const totalChunksEntry = tuple['total-chunks'];
+  const totalChunks =
+    totalChunksEntry === undefined
+      ? estimateTotalChunks(totalSize)
+      : expectUInt(totalChunksEntry, `${context}.total-chunks`);
+  const sealed = expectBool(getTupleValue(tuple, 'sealed', context), `${context}.sealed`);
+  const finalHash = expectBuffer(
+    getTupleValue(tuple, 'final-hash', context),
+    `${context}.final-hash`
+  );
+
+  return {
+    owner,
+    creator,
+    mimeType,
+    totalSize,
+    totalChunks,
+    sealed,
+    finalHash
+  } satisfies InscriptionMeta;
+};
+
+const parseUploadStateTuple = (tupleValue: ClarityValue, context: string) => {
+  const tuple = expectTuple(tupleValue, context);
+  const mimeType = expectStringAscii(
+    getTupleValue(tuple, 'mime-type', context),
+    `${context}.mime-type`
+  );
+  const totalSize = expectUInt(
+    getTupleValue(tuple, 'total-size', context),
+    `${context}.total-size`
+  );
+  const totalChunks = expectUInt(
+    getTupleValue(tuple, 'total-chunks', context),
+    `${context}.total-chunks`
+  );
+  const currentIndex = expectUInt(
+    getTupleValue(tuple, 'current-index', context),
+    `${context}.current-index`
+  );
+  const runningHash = expectBuffer(
+    getTupleValue(tuple, 'running-hash', context),
+    `${context}.running-hash`
+  );
+
+  return {
+    mimeType,
+    totalSize,
+    totalChunks,
+    currentIndex,
+    runningHash
+  } satisfies UploadState;
+};
+
+export const parseGetLastTokenId = (value: ClarityValue) =>
+  expectUInt(expectContractOk(value, 'get-last-token-id'), 'get-last-token-id');
+
+export const parseGetFeeUnit = (value: ClarityValue) =>
+  expectUInt(expectContractOk(value, 'get-fee-unit'), 'get-fee-unit');
+
+export const parseGetBeginFeeUnit = (value: ClarityValue) =>
+  expectUInt(expectContractOk(value, 'get-begin-fee-unit'), 'get-begin-fee-unit');
+
+export const parseGetUploadChunkFeeUnit = (value: ClarityValue) =>
+  expectUInt(
+    expectContractOk(value, 'get-upload-chunk-fee-unit'),
+    'get-upload-chunk-fee-unit'
+  );
+
+export const parseGetUploadBatchFeeUnit = (value: ClarityValue) =>
+  expectUInt(
+    expectContractOk(value, 'get-upload-batch-fee-unit'),
+    'get-upload-batch-fee-unit'
+  );
+
+export const parseGetSealFeeUnit = (value: ClarityValue) =>
+  expectUInt(expectContractOk(value, 'get-seal-fee-unit'), 'get-seal-fee-unit');
+
+export const parseGetSingleTxFeeUnit = (value: ClarityValue) =>
+  expectUInt(
+    expectContractOk(value, 'get-single-tx-fee-unit'),
+    'get-single-tx-fee-unit'
+  );
+
+export const parseGetContractInfo = (value: ClarityValue): ContractInfo => {
+  const tuple = expectTuple(
+    expectContractOk(value, 'get-contract-info'),
+    'get-contract-info'
+  );
+  return {
+    version: expectStringAscii(
+      getTupleValue(tuple, 'version', 'get-contract-info'),
+      'get-contract-info.version'
+    ),
+    chunkSize: expectUInt(
+      getTupleValue(tuple, 'chunk-size', 'get-contract-info'),
+      'get-contract-info.chunk-size'
+    ),
+    uploadBatchLimit: expectUInt(
+      getTupleValue(tuple, 'upload-batch-limit', 'get-contract-info'),
+      'get-contract-info.upload-batch-limit'
+    ),
+    uploadPayloadLimit: expectUInt(
+      getTupleValue(tuple, 'upload-payload-limit', 'get-contract-info'),
+      'get-contract-info.upload-payload-limit'
+    ),
+    singleTxChunkLimit: expectUInt(
+      getTupleValue(tuple, 'single-tx-chunk-limit', 'get-contract-info'),
+      'get-contract-info.single-tx-chunk-limit'
+    ),
+    singleTxPayloadLimit: expectUInt(
+      getTupleValue(tuple, 'single-tx-payload-limit', 'get-contract-info'),
+      'get-contract-info.single-tx-payload-limit'
+    ),
+    generalListLimit: expectUInt(
+      getTupleValue(tuple, 'general-list-limit', 'get-contract-info'),
+      'get-contract-info.general-list-limit'
+    ),
+    sealBatchLimit: expectUInt(
+      getTupleValue(tuple, 'seal-batch-limit', 'get-contract-info'),
+      'get-contract-info.seal-batch-limit'
+    ),
+    maxTotalChunks: expectUInt(
+      getTupleValue(tuple, 'max-total-chunks', 'get-contract-info'),
+      'get-contract-info.max-total-chunks'
+    ),
+    maxTotalSize: expectUInt(
+      getTupleValue(tuple, 'max-total-size', 'get-contract-info'),
+      'get-contract-info.max-total-size'
+    )
+  };
+};
+
+// quote-single-tx-fee returns (ok { …, single-tx-fee, total-fee, … }); for the
+// single-tx mode total-fee equals the single-tx fee — the exact amount charged.
+export const parseQuoteSingleTxFee = (value: ClarityValue) => {
+  const tuple = expectTuple(
+    expectContractOk(value, 'quote-single-tx-fee'),
+    'quote-single-tx-fee'
+  );
+  return expectUInt(
+    getTupleValue(tuple, 'total-fee', 'quote-single-tx-fee'),
+    'quote-single-tx-fee.total-fee'
+  );
+};
+
+// quote-staged-fee returns (ok { begin-fee, seal-fee, total-fee, … }). The
+// staged flow charges begin-fee on begin-inscription and seal-fee on
+// seal-inscription, so each tx's post-condition must match its own stage.
+export const parseQuoteStagedFee = (value: ClarityValue) => {
+  const tuple = expectTuple(
+    expectContractOk(value, 'quote-staged-fee'),
+    'quote-staged-fee'
+  );
+  return {
+    beginFee: expectUInt(getTupleValue(tuple, 'begin-fee', 'quote-staged-fee'), 'quote-staged-fee.begin-fee'),
+    sealFee: expectUInt(getTupleValue(tuple, 'seal-fee', 'quote-staged-fee'), 'quote-staged-fee.seal-fee'),
+    totalFee: expectUInt(getTupleValue(tuple, 'total-fee', 'quote-staged-fee'), 'quote-staged-fee.total-fee')
+  };
+};
+
+export const parseGetNextTokenId = (value: ClarityValue) =>
+  expectUInt(expectContractOk(value, 'get-next-token-id'), 'get-next-token-id');
+
+export const parseGetMintedCount = (value: ClarityValue) =>
+  expectUInt(expectContractOk(value, 'get-minted-count'), 'get-minted-count');
+
+export const parseGetMintedId = (value: ClarityValue) => {
+  const optional = expectOptional(value, 'get-minted-id');
+  if (!optional) {
+    return null;
+  }
+  return expectUInt(optional, 'get-minted-id');
+};
+
+export const parseGetAdmin = (value: ClarityValue) =>
+  expectPrincipal(expectContractOk(value, 'get-admin'), 'get-admin');
+
+export const parseGetRoyaltyRecipient = (value: ClarityValue) =>
+  expectPrincipal(expectContractOk(value, 'get-royalty-recipient'), 'get-royalty-recipient');
+
+export const parseIsPaused = (value: ClarityValue) =>
+  expectBool(expectContractOk(value, 'is-paused'), 'is-paused');
+
+export const parseIsAllowedCaller = (value: ClarityValue) =>
+  expectBool(expectContractOk(value, 'is-allowed-caller'), 'is-allowed-caller');
+
+export const parseGetTokenUri = (value: ClarityValue) =>
+  parseOptionalString(expectContractOk(value, 'get-token-uri'), 'get-token-uri');
+
+export const parseGetOwner = (value: ClarityValue) =>
+  parseOptionalPrincipal(expectContractOk(value, 'get-owner'), 'get-owner');
+
+export const parseGetSvg = (value: ClarityValue) =>
+  parseOptionalString(expectContractOk(value, 'get-svg'), 'get-svg');
+
+export const parseGetSvgDataUri = (value: ClarityValue) =>
+  parseOptionalString(expectContractOk(value, 'get-svg-data-uri'), 'get-svg-data-uri');
+
+export const parseGetInscriptionMeta = (value: ClarityValue) => {
+  const optional = expectOptional(value, 'get-inscription-meta');
+  if (!optional) {
+    return null;
+  }
+  return parseInscriptionMetaTuple(optional, 'get-inscription-meta');
+};
+
+export const parseGetChunk = (value: ClarityValue) =>
+  parseOptionalBuffer(value, 'get-chunk');
+
+export const parseGetChunkBatch = (value: ClarityValue) => {
+  const list = expectList(value, 'get-chunk-batch');
+  return list.map((entry, index) =>
+    parseOptionalBuffer(entry, `get-chunk-batch[${index}]`)
+  );
+};
+
+export const parseGetDependencies = (value: ClarityValue) => {
+  const list = expectList(value, 'get-dependencies');
+  return list.map((entry, index) =>
+    expectUInt(entry, `get-dependencies[${index}]`)
+  );
+};
+
+export const parseGetParents = (value: ClarityValue) => {
+  const list = expectList(value, 'get-parents');
+  return list.map((entry, index) =>
+    expectUInt(entry, `get-parents[${index}]`)
+  );
+};
+
+export const parseGetMigrationSource = (value: ClarityValue) => {
+  const optional = expectOptional(value, 'get-migration-source');
+  if (!optional) {
+    return null;
+  }
+  const tuple = expectTuple(optional, 'get-migration-source');
+  return {
+    contract: expectPrincipal(
+      getTupleValue(tuple, 'contract', 'get-migration-source'),
+      'get-migration-source.contract'
+    ),
+    tokenId: expectUInt(
+      getTupleValue(tuple, 'token-id', 'get-migration-source'),
+      'get-migration-source.token-id'
+    )
+  };
+};
+
+export const parseGetUploadState = (value: ClarityValue) => {
+  const optional = expectOptional(value, 'get-upload-state');
+  if (!optional) {
+    return null;
+  }
+  return parseUploadStateTuple(optional, 'get-upload-state');
+};
+
+export const parseGetIdByHash = (value: ClarityValue) => {
+  const optional = expectOptional(value, 'get-id-by-hash');
+  if (!optional) {
+    return null;
+  }
+  return expectUInt(optional, 'get-id-by-hash');
+};
+
+export const parseGetPendingChunk = (value: ClarityValue) =>
+  parseOptionalBuffer(value, 'get-pending-chunk');
+
+export const parseContractError = (value: ClarityValue) => {
+  return decodeContractError(value, 'contract-error');
+};
