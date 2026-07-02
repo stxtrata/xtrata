@@ -17,24 +17,27 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     '<button class="xtrata-radio__set xtrata-radio__toggle" type="button" aria-pressed="false" title="Xtrata Radio — random inscribed songs">',
     '  <span class="xtrata-radio__grille" aria-hidden="true"></span>',
     '  <span class="xtrata-radio__face" aria-hidden="true">',
-    '    <span class="xtrata-radio__dial">',
-    '      <span class="xtrata-radio__scale">88&ensp;92&ensp;96&ensp;100&ensp;104&ensp;108</span>',
-    '      <span class="xtrata-radio__needle"></span>',
+    '    <span class="xtrata-radio__screen">',
+    '      <span class="xtrata-radio__screen-text"></span>',
     '    </span>',
     '    <span class="xtrata-radio__meta">',
-    '      <span class="xtrata-radio__brand">XTRATA&nbsp;FM</span>',
+    '      <span class="xtrata-radio__brandwrap"><img class="xtrata-radio__logo" src="/favicon.svg" alt="" /><span class="xtrata-radio__brand">XTRATA&nbsp;FM</span></span>',
     '      <span class="xtrata-radio__vu"><i></i><i></i><i></i><i></i><i></i><i></i></span>',
     '    </span>',
     '  </span>',
     '  <span class="xtrata-radio__knob" aria-hidden="true"><i></i></span>',
     '</button>',
-    '<span class="xtrata-radio__now" hidden></span>',
+    '<span class="xtrata-radio__now xtrata-radio__analog" hidden>',
+    '  <span class="xtrata-radio__scale">88&ensp;92&ensp;96&ensp;100&ensp;104&ensp;108</span>',
+    '  <span class="xtrata-radio__needle"></span>',
+    '</span>',
     '<button class="xtrata-radio__next" type="button" title="Next song" hidden>⏭</button>'
   ].join('');
   document.body.appendChild(root);
 
   const toggleButton = root.querySelector('.xtrata-radio__toggle');
   const nowLabel = root.querySelector('.xtrata-radio__now');
+  const screenText = root.querySelector('.xtrata-radio__screen-text');
   const nextButton = root.querySelector('.xtrata-radio__next');
 
   // --- audio plumbing ---------------------------------------------------
@@ -90,6 +93,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
       vuLevels = vuLevels.map((v) => v * 0.8);
       vuBars.forEach((bar, i) => bar.style.setProperty('--vu', vuLevels[i].toFixed(3)));
       if (grille) grille.style.setProperty('--pulse', '0');
+      root.style.setProperty('--pulse', '0');
       if (vuLevels.some((v) => v > 0.02)) vuFrame = window.requestAnimationFrame(vuLoop);
       return;
     }
@@ -99,7 +103,9 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     let bass = 0;
     for (let i = 1; i < 7; i += 1) bass += bins[i];
     bass = Math.min(1, bass / (6 * 255));
-    if (grille) grille.style.setProperty('--pulse', (bass * bass).toFixed(3));
+    const drive = (bass * bass).toFixed(3);
+    if (grille) grille.style.setProperty('--pulse', drive);
+    root.style.setProperty('--pulse', drive);
     // six log-spaced bands with peak hold
     VU_BANDS.forEach(([lo, hi], index) => {
       let sum = 0;
@@ -346,7 +352,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   // While a song plays the screen cycles: NOW PLAYING info interleaved with a
   // varied pool of station idents, Xtrata facts and plugs — never the same two
   // fillers back to back, and the track info returns every other slot.
-  const TICKER_MS = 6000;
+  const TICKER_MS = 10000; // title -> artist -> info = one filler ~every 30s
   const FILLERS = [
     'ALL MUSIC 100% ON-CHAIN',
     'NO SERVERS · NO STREAMS · JUST STACKS',
@@ -382,24 +388,34 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     return choice;
   };
 
+  let holdTimer = 0;
   const writeScreen = (text) => {
-    nowLabel.textContent = text;
-    nowLabel.classList.remove('is-flick');
-    void nowLabel.offsetWidth; // restart the flicker animation
-    nowLabel.classList.add('is-flick');
+    if (!screenText) return;
+    if (holdTimer) window.clearTimeout(holdTimer);
+    screenText.classList.remove('is-scroll');
+    screenText.textContent = text;
+    screenText.style.removeProperty('--dur');
+    // Pause on the new section, then scroll it across if it overflows.
+    holdTimer = window.setTimeout(() => {
+      const screen = screenText.parentElement;
+      if (screen && screenText.scrollWidth > screen.clientWidth + 4) {
+        const seconds = Math.max(6, screenText.scrollWidth / 18);
+        screenText.style.setProperty('--dur', seconds + 's');
+        screenText.classList.add('is-scroll');
+      }
+    }, 2200);
   };
 
   const tickerStep = () => {
     if (!currentTrackInfo) return;
     tickerSlot += 1;
-    // even slots: track info (alternating title / artist); odd slots: filler
-    if (tickerSlot % 2 === 0) {
-      const { title, artist } = currentTrackInfo;
-      writeScreen(
-        tickerSlot % 4 === 0 && artist
-          ? `BY ${artist.toUpperCase()}`
-          : `♪ NOW PLAYING: ${title}`
-      );
+    const { title, artist } = currentTrackInfo;
+    // Sequential sections: TITLE -> ARTIST -> random info -> repeat.
+    const phase = tickerSlot % 3;
+    if (phase === 0) {
+      writeScreen(`♪ ${title}`);
+    } else if (phase === 1) {
+      writeScreen(artist ? `BY ${artist.toUpperCase()}` : pickFiller());
     } else {
       writeScreen(pickFiller());
     }
@@ -408,7 +424,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   const startTicker = (track) => {
     currentTrackInfo = { title: track.title, artist: track.artist || '' };
     tickerSlot = 0;
-    writeScreen(`♪ NOW PLAYING: ${track.title}${track.artist ? ' — ' + track.artist : ''}`);
+    writeScreen(`♪ ${track.title}`);
     if (tickerTimer) window.clearInterval(tickerTimer);
     tickerTimer = window.setInterval(tickerStep, TICKER_MS);
   };
@@ -420,8 +436,9 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   };
 
   const setNow = (text, playing) => {
-    nowLabel.textContent = text;
-    nowLabel.hidden = !text;
+    if (text) writeScreen(text);
+    else if (screenText && !currentTrackInfo) { screenText.textContent = ''; }
+    nowLabel.hidden = !on;
     nextButton.hidden = !on;
     root.classList.toggle('is-playing', Boolean(playing));
   };
@@ -458,7 +475,6 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
       try {
         await player.play();
         setNow('', true);
-        nowLabel.hidden = false;
         startTicker(track);
         startVu();
         window.setTimeout(() => { void preloadNextTrack(); }, 1500);

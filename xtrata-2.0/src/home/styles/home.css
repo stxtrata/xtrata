@@ -3689,34 +3689,70 @@
   gap: 10px;
   max-width: calc(100vw - 32px);
 }
+.xtrata-radio { --pulse: 0; }
 .xtrata-radio__set {
   position: relative;
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 26px;
+  grid-template-columns: 46px minmax(0, 1fr) 30px;
   align-items: center;
-  gap: 8px;
-  width: 172px;
-  height: 58px;
-  padding: 8px 10px;
+  gap: 11px;
+  width: 236px;
+  height: 76px;
+  padding: 11px 13px;
   border: 1px solid #3a2a1c;
-  border-radius: 14px 14px 10px 10px;
+  border-radius: 16px 16px 11px 11px;
   cursor: pointer;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.10), transparent 40%),
-    linear-gradient(180deg, #7a4f2c 0%, #5d3a1e 55%, #4a2d16 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.10), transparent 42%),
+    repeating-linear-gradient(94deg, rgba(0, 0, 0, 0.07) 0 3px, transparent 3px 9px),
+    linear-gradient(180deg, #7f5330 0%, #5d3a1e 55%, #452a14 100%);
   box-shadow:
-    0 14px 30px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 220, 170, 0.25),
-    inset 0 -2px 4px rgba(0, 0, 0, 0.35);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+    0 16px 34px rgba(0, 0, 0, 0.38),
+    0 0 calc(var(--pulse) * 34px) rgba(255, 170, 80, calc(var(--pulse) * 0.5)),
+    inset 0 1px 0 rgba(255, 220, 170, 0.28),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.38);
+  transition: transform 0.12s ease;
+}
+.xtrata-radio.is-on .xtrata-radio__set {
+  box-shadow:
+    0 16px 34px rgba(0, 0, 0, 0.38),
+    0 0 calc(14px + var(--pulse) * 34px) rgba(255, 170, 80, calc(0.22 + var(--pulse) * 0.5)),
+    inset 0 1px 0 rgba(255, 220, 170, 0.28),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.38);
+}
+/* telescopic antenna */
+.xtrata-radio__set::before {
+  content: "";
+  position: absolute;
+  top: -26px;
+  right: 18px;
+  width: 2px;
+  height: 28px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #e8e2d6, #8f8878 70%, #4a4238);
+  box-shadow: 0 -1px 0 1px rgba(232, 226, 214, 0.9);
+  transform: rotate(14deg);
+  transform-origin: bottom center;
+}
+/* glass sheen across the cabinet */
+.xtrata-radio__set::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.14) 0%, transparent 28%, transparent 70%, rgba(255, 255, 255, 0.05) 100%);
 }
 .xtrata-radio__set:hover { transform: translateY(-1px); }
 .xtrata-radio__set:active { transform: translateY(1px); }
+
+/* speaker grille — pulses with the bass (--pulse set from the analyser) */
 .xtrata-radio__grille {
   --pulse: 0;
-  height: 38px;
-  border-radius: 6px;
+  height: 54px;
+  border-radius: 7px;
   background:
+    radial-gradient(circle at 50% 45%, rgba(255, 190, 110, calc(var(--pulse) * 0.30)), transparent 65%),
     repeating-linear-gradient(90deg, rgba(20, 12, 6, 0.9) 0 2px, rgba(120, 84, 50, 0.55) 2px 5px);
   box-shadow:
     inset 0 2px 5px rgba(0, 0, 0, 0.55),
@@ -3725,52 +3761,41 @@
   transition: transform 0.05s linear;
   will-change: transform, box-shadow;
 }
-.xtrata-radio__face { display: grid; gap: 3px; min-width: 0; }
-.xtrata-radio__dial {
+.xtrata-radio__face { display: grid; gap: 4px; min-width: 0; }
+
+/* VFD text screen on the set: pause, then scroll section to section */
+.xtrata-radio__screen {
   position: relative;
-  height: 20px;
-  border-radius: 4px;
+  height: 26px;
+  border-radius: 5px;
   overflow: hidden;
-  background: linear-gradient(180deg, #17130c, #241b0f);
-  border: 1px solid rgba(0, 0, 0, 0.6);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.7);
-}
-.xtrata-radio__scale {
-  position: absolute;
-  inset: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  font: 700 7.5px/1 ui-monospace, monospace;
-  letter-spacing: 0.06em;
-  color: rgba(255, 213, 140, 0.4);
-  transition: color 0.25s ease, text-shadow 0.25s ease;
+  padding: 0 7px;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #05170c, #0a2413 60%, #061a0d);
+  border: 1px solid #1d3a28;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.7);
+}
+.xtrata-radio__screen-text {
+  display: inline-block;
   white-space: nowrap;
+  font: 700 10.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7dffb0;
+  text-shadow: 0 0 5px rgba(90, 255, 160, 0.75);
 }
-.xtrata-radio.is-on .xtrata-radio__scale {
-  color: #ffd58c;
-  text-shadow: 0 0 8px rgba(255, 190, 90, 0.8);
+.xtrata-radio__screen-text.is-scroll {
+  animation: xtrata-marquee var(--dur, 8s) linear infinite;
 }
-.xtrata-radio__needle {
-  position: absolute;
-  top: 2px;
-  bottom: 2px;
-  left: 30%;
-  width: 2px;
-  background: #ff5a3c;
-  box-shadow: 0 0 6px rgba(255, 90, 60, 0.9);
-  opacity: 0.35;
-  transition: opacity 0.25s ease;
+@keyframes xtrata-marquee {
+  0%, 10% { transform: translateX(0); }
+  90%, 100% { transform: translateX(calc(-100% + 60px)); }
 }
-.xtrata-radio.is-on .xtrata-radio__needle { opacity: 1; }
-.xtrata-radio.is-playing .xtrata-radio__needle { animation: xtrata-needle 7s ease-in-out infinite alternate; }
-@keyframes xtrata-needle {
-  0% { left: 18%; }
-  30% { left: 66%; }
-  55% { left: 40%; }
-  80% { left: 74%; }
-  100% { left: 26%; }
-}
+
+/* brand plate: logo + name + VU meter */
 .xtrata-radio__meta {
   display: flex;
   align-items: center;
@@ -3778,24 +3803,37 @@
   gap: 6px;
   min-width: 0;
 }
+.xtrata-radio__brandwrap { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.xtrata-radio__logo {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: block;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
 .xtrata-radio__brand {
   font: 800 8px/1 ui-monospace, monospace;
-  letter-spacing: 0.18em;
-  color: rgba(255, 226, 178, 0.75);
+  letter-spacing: 0.16em;
+  color: rgba(255, 226, 178, 0.8);
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
   white-space: nowrap;
 }
-/* six-LED VU meter, green -> amber -> red, driven by --vu (0..1) per bar */
+/* VU meter in a recessed bezel, green -> amber -> red, per-bar --vu (0..1) */
 .xtrata-radio__vu {
   display: inline-flex;
   align-items: flex-end;
   gap: 2px;
-  height: 10px;
+  height: 14px;
   flex: none;
+  padding: 2px 3px;
+  border-radius: 3px;
+  background: #17100a;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.7);
 }
 .xtrata-radio__vu i {
   --vu: 0;
-  width: 4px;
+  width: 5px;
   height: 100%;
   border-radius: 1px;
   background:
@@ -3803,59 +3841,67 @@
   -webkit-mask-image: linear-gradient(0deg, #000 calc(var(--vu) * 100%), transparent calc(var(--vu) * 100%));
   mask-image: linear-gradient(0deg, #000 calc(var(--vu) * 100%), transparent calc(var(--vu) * 100%));
   box-shadow: 0 0 calc(var(--vu) * 5px) rgba(90, 255, 140, calc(var(--vu) * 0.6));
-  opacity: 0.9;
 }
 .xtrata-radio:not(.is-playing) .xtrata-radio__vu i { --vu: 0; }
+
+/* power knob */
 .xtrata-radio__knob {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   justify-self: center;
   border-radius: 50%;
-  background:
-    radial-gradient(circle at 35% 30%, #f4e3c2, #b9925c 55%, #6d4a26 100%);
+  background: radial-gradient(circle at 35% 30%, #f4e3c2, #b9925c 55%, #6d4a26 100%);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.55);
   display: grid;
   place-items: center;
   transition: transform 0.25s ease;
 }
-.xtrata-radio__knob i {
-  width: 2px;
-  height: 9px;
-  border-radius: 2px;
-  background: #3a2411;
-  transform: translateY(-4px);
-}
+.xtrata-radio__knob i { width: 2px; height: 9px; border-radius: 2px; background: #3a2411; transform: translateY(-4px); }
 .xtrata-radio.is-on .xtrata-radio__knob { transform: rotate(120deg); }
-/* digital VFD-style screen: cycles song info + station ticker */
-.xtrata-radio__now {
-  font: 700 11px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #7dffb0;
-  text-shadow: 0 0 6px rgba(90, 255, 160, 0.75), 0 0 18px rgba(60, 220, 130, 0.35);
-  background:
-    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px),
-    linear-gradient(180deg, #05170c, #0a2413 60%, #061a0d);
-  border: 1px solid #1d3a28;
+
+/* external analog frequency dial (visible while the set is on) */
+.xtrata-radio__analog {
+  position: relative;
+  width: 168px;
+  height: 30px;
+  margin-bottom: 8px;
   border-radius: 8px;
-  padding: 9px 14px 8px;
-  margin-bottom: 6px;
-  max-width: 300px;
-  min-width: 140px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  box-shadow:
-    inset 0 2px 8px rgba(0, 0, 0, 0.7),
-    0 10px 24px rgba(0, 0, 0, 0.35);
+  border: 1px solid #3a2a1c;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 213, 140, 0.18) 0 1px, transparent 1px 12px),
+    linear-gradient(180deg, #2a1c0d, #382512 55%, #241708);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.65), 0 10px 24px rgba(0, 0, 0, 0.35);
 }
-.xtrata-radio__now.is-flick { animation: xtrata-screen-flick 0.35s ease-out; }
-@keyframes xtrata-screen-flick {
-  0% { opacity: 0.15; filter: brightness(2.2); }
-  40% { opacity: 1; }
-  60% { opacity: 0.6; }
-  100% { opacity: 1; filter: brightness(1); }
+.xtrata-radio__scale {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 9px/1 ui-monospace, monospace;
+  letter-spacing: 0.08em;
+  color: #ffd58c;
+  text-shadow: 0 0 8px rgba(255, 190, 90, 0.8);
 }
+.xtrata-radio__needle {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 30%;
+  width: 2px;
+  background: #ff5a3c;
+  box-shadow: 0 0 7px rgba(255, 90, 60, 0.95);
+}
+.xtrata-radio.is-playing .xtrata-radio__needle { animation: xtrata-needle 7s ease-in-out infinite alternate; }
+@keyframes xtrata-needle {
+  0% { left: 14%; }
+  30% { left: 68%; }
+  55% { left: 38%; }
+  80% { left: 78%; }
+  100% { left: 24%; }
+}
+
 .xtrata-radio__next {
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -3863,13 +3909,13 @@
   color: var(--muted);
   width: 30px;
   height: 30px;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
   cursor: pointer;
   font-size: 12px;
   box-shadow: var(--shadow);
 }
 .xtrata-radio__next:hover { color: var(--ink); border-color: var(--ink); }
 @media (max-width: 560px) {
-  .xtrata-radio__now { max-width: 120px; }
-  .xtrata-radio__set { width: 148px; height: 52px; }
+  .xtrata-radio__set { width: 196px; height: 66px; }
+  .xtrata-radio__analog { width: 120px; }
 }
