@@ -60,6 +60,11 @@
   .result{margin-top:16px;display:none} .result.show{display:block}
   .result a.btn{display:block;text-align:center;text-decoration:none;background:linear-gradient(180deg,#37cf8e,#23b277)}
   .muted{color:var(--mut)} a{color:var(--acc)}
+  .efield{margin-bottom:10px;min-width:0}
+  .efield label{display:block;font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+  .efield input,.efield textarea{width:100%;background:#0b0e14;border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:9px 10px;font:inherit;font-size:13.5px}
+  .efield textarea{resize:vertical;font-size:13px;line-height:1.5}
+  .efield input:focus,.efield textarea:focus{outline:none;border-color:var(--acc2)}
   footer{padding:14px 22px;color:var(--mut);font-size:12px;text-align:center}
 </style>
 </head>
@@ -97,6 +102,37 @@
       <iframe id="previewFrame" title="Player preview" style="width:100%;aspect-ratio:1/1;border:1px solid var(--line);border-radius:12px;background:#10120f;display:block"></iframe>
     </div>
 
+    <!-- Optional edit panel: fast track stays untouched; this expands only on demand. -->
+    <div id="editWrap" style="display:none;margin-top:12px">
+      <button id="editToggle" class="btn ghost" type="button" style="width:100%;text-align:center">✎ Edit details — artwork · title · artist</button>
+      <div id="editPanel" style="display:none;margin-top:10px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px 16px">
+        <div class="efield"><label for="eTitle">Song title</label><input id="eTitle" type="text" maxlength="120" /></div>
+        <div class="efield"><label for="eArtist">Artist</label><input id="eArtist" type="text" maxlength="120" /></div>
+        <div class="efield">
+          <label>Artwork</label>
+          <div style="display:flex;gap:10px;align-items:center">
+            <img id="eCoverThumb" alt="" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#10120f" />
+            <button id="eCoverBtn" class="btn ghost" type="button" style="flex:1">Change artwork…</button>
+            <input id="eCoverPick" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+          </div>
+          <div class="muted" style="font-size:11px;margin-top:4px">PNG / JPEG / WebP · embedded in the player, so smaller files inscribe cheaper.</div>
+        </div>
+        <button id="moreMetaToggle" class="btn ghost" type="button" style="width:100%;text-align:center;margin-top:4px">More metadata ▾</button>
+        <div id="moreMetaPanel" style="display:none;margin-top:8px">
+          <div class="efield"><label for="eAlbum">Album</label><input id="eAlbum" type="text" maxlength="120" /></div>
+          <div style="display:flex;gap:10px">
+            <div class="efield" style="flex:1"><label for="eBpm">BPM</label><input id="eBpm" type="text" inputmode="numeric" maxlength="6" /></div>
+            <div class="efield" style="flex:2"><label for="eNote">Note</label><input id="eNote" type="text" maxlength="120" /></div>
+          </div>
+          <div class="efield"><label for="eLicense">License</label><input id="eLicense" type="text" maxlength="160" placeholder="e.g. All rights reserved · CC BY-NC 4.0" /></div>
+          <div class="efield"><label for="eDescription">Description</label><input id="eDescription" type="text" maxlength="300" /></div>
+          <div class="efield"><label for="eLyrics">Lyrics</label><textarea id="eLyrics" rows="6"></textarea></div>
+        </div>
+        <button id="applyEdits" class="btn" type="button" style="margin-top:12px;font-size:13px;padding:11px 14px">Apply changes → rebuild preview</button>
+        <div id="editHint" class="muted" style="font-size:11px;margin-top:6px;text-align:center"></div>
+      </div>
+    </div>
+
     <button id="go" class="btn" disabled>Drop a track to begin</button>
     <div id="hint" class="hint"></div>
 
@@ -124,8 +160,8 @@
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
-<script src="HTML_Template.js?v=3"></script>
-<script src="suno-build.js?v=3"></script>
+<script src="HTML_Template.js?v=4"></script>
+<script src="suno-build.js?v=4"></script>
 <script src="agent-one.js?v=5"></script>
 <script>
 const SERVER = { mock:false, net:'mainnet' };
@@ -164,7 +200,7 @@ function validateSuno(f){
 function rejectToWizard(msg){
   FILE=null;PLAYER=null;META=null;EST=null; if(poll){clearInterval(poll);poll=null;}
   drop.classList.remove('has'); drop.innerHTML=DROP_HTML;
-  $('#quote').className='quote'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc'); $('#result').className='result';
+  $('#quote').className='quote'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc'); $('#result').className='result'; $('#editWrap').style.display='none';
   $('#hint').innerHTML='<span class="err">'+msg+'</span><br><a class="btn ghost" href="./" style="display:inline-block;width:auto;margin-top:10px">Use the main wizard →</a>';
   building=false; $('#go').disabled=true; $('#go').textContent='Drop a Suno MP3 to begin';
 }
@@ -229,7 +265,7 @@ async function pickFile(f){
   const verr=validateSuno(f);
   if(verr){ rejectToWizard(verr); return; }
   FILE=f; PLAYER=null; META=null; EST=null; JOB=null; if(poll){clearInterval(poll);poll=null;}
-  $('#result').className='result'; $('#prog').className='prog'; $('#quote').className='quote'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc');
+  $('#result').className='result'; $('#prog').className='prog'; $('#quote').className='quote'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc'); $('#editWrap').style.display='none';
   drop.classList.add('has');
   drop.innerHTML='<div class="fname">🎵 '+esc(f.name)+'</div><div class="fmeta">'+(f.size/1048576).toFixed(2)+' MiB · click to choose a different file</div>';
   building=true; updateGo();
@@ -251,9 +287,64 @@ async function pickFile(f){
     if(r.opusBytes&&r.sourceBytes){ $('#qPlayer').title='MP3 '+mib(r.sourceBytes)+' MiB → Opus 96k VBR '+mib(r.opusBytes)+' MiB (−'+Math.round((1-r.opusBytes/r.sourceBytes)*100)+'%) → +⅓ base64 embedding'; }
     $('#qPay').textContent=stx(EST.requiredUstx)+(EST.stxUsd?(' · ~$'+(Number(EST.requiredUstx)/1e6*EST.stxUsd).toFixed(2)):'');
     $('#quote').className='quote show'; $('#hint').textContent='';
+    prefillEdits(r);
   }catch(e){ $('#hint').innerHTML='<span class="err">Could not build the player: '+esc(e.message)+'</span>'; }
   building=false; updateGo();
 }
+
+// ---- optional edit panel (fast track untouched; expands on demand) ----
+let COVER_OVERRIDE; // undefined = keep extracted art; {b64,mime} = replacement
+function prefillEdits(r){
+  COVER_OVERRIDE=undefined;
+  $('#eTitle').value=r.title||''; $('#eArtist').value=r.artist||'';
+  $('#eAlbum').value=r.album||''; $('#eLyrics').value=r.lyrics||'';
+  $('#eBpm').value=''; $('#eNote').value=''; $('#eLicense').value=''; $('#eDescription').value='';
+  $('#eCoverThumb').src=r.coverB64?('data:'+(r.coverMime||'image/jpeg')+';base64,'+r.coverB64):'';
+  $('#editHint').textContent='';
+  $('#editWrap').style.display='block'; $('#editPanel').style.display='none'; $('#moreMetaPanel').style.display='none';
+  $('#editToggle').textContent='✎ Edit details — artwork · title · artist';
+  $('#moreMetaToggle').textContent='More metadata ▾';
+}
+$('#editToggle').onclick=()=>{ const p=$('#editPanel'); const open=p.style.display==='none';
+  p.style.display=open?'block':'none';
+  $('#editToggle').textContent=open?'✎ Edit details ▴':'✎ Edit details — artwork · title · artist'; };
+$('#moreMetaToggle').onclick=()=>{ const p=$('#moreMetaPanel'); const open=p.style.display==='none';
+  p.style.display=open?'block':'none'; $('#moreMetaToggle').textContent=open?'Less metadata ▴':'More metadata ▾'; };
+$('#eCoverBtn').onclick=()=>$('#eCoverPick').click();
+$('#eCoverPick').onchange=()=>{
+  const f=$('#eCoverPick').files[0]; if(!f) return;
+  if(!/^image\/(png|jpeg|webp)$/.test(f.type)){ $('#editHint').innerHTML='<span class="err">Artwork must be PNG, JPEG or WebP.</span>'; return; }
+  if(f.size>4*1048576){ $('#editHint').innerHTML='<span class="err">Artwork over 4 MiB would bloat the inscription — please use a smaller image.</span>'; return; }
+  const rd=new FileReader();
+  rd.onload=()=>{ const s=String(rd.result); const b64=s.slice(s.indexOf(',')+1);
+    COVER_OVERRIDE={ b64, mime:f.type };
+    $('#eCoverThumb').src=s; $('#editHint').textContent='New artwork staged — Apply changes to rebuild.'; };
+  rd.readAsDataURL(f);
+};
+function collectEdits(){
+  const v=(id)=>$(id).value;
+  const o={ title:v('#eTitle'), artist:v('#eArtist'), album:v('#eAlbum'), lyrics:v('#eLyrics'),
+    bpm:v('#eBpm'), note:v('#eNote'), license:v('#eLicense'), description:v('#eDescription') };
+  if(COVER_OVERRIDE){ o.coverB64=COVER_OVERRIDE.b64; o.coverMime=COVER_OVERRIDE.mime; }
+  return o;
+}
+$('#applyEdits').onclick=async()=>{
+  if(!FILE||building) return;
+  building=true; updateGo(); $('#editHint').innerHTML='<span class="spin"></span>Rebuilding player…';
+  try{
+    // Cached extraction in suno-build.js → no re-encode; this is near-instant.
+    const r=await window.XtrataSuno.build(FILE,(m)=>{ $('#editHint').innerHTML='<span class="spin"></span>'+esc(m); },collectEdits());
+    PLAYER=r.playerFile; META=r;
+    if(r.html){ $('#previewFrame').srcdoc=r.html; $('#preview').style.display='block'; }
+    EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size})});
+    const mib=(n)=>(n/1048576).toFixed(2);
+    $('#qName').textContent=(r.title||FILE.name)+(r.artist?(' — '+r.artist):'');
+    $('#qPlayer').textContent=mib(PLAYER.size)+' MiB · Opus'+(r.hasCover?' + cover':'')+(r.hasLyrics?' + lyrics':'');
+    $('#qPay').textContent=stx(EST.requiredUstx)+(EST.stxUsd?(' · ~$'+(Number(EST.requiredUstx)/1e6*EST.stxUsd).toFixed(2)):'');
+    $('#editHint').innerHTML='<span class="ok">✓ Preview updated — quote refreshed on the new exact size.</span>';
+  }catch(e){ $('#editHint').innerHTML='<span class="err">Rebuild failed: '+esc(e.message)+'</span>'; }
+  building=false; updateGo();
+};
 
 function updateGo(){
   const b=$('#go');
@@ -376,7 +467,7 @@ function done(job){
 }
 function resetAll(){ FILE=null;PLAYER=null;META=null;EST=null;JOB=null; if(poll){clearInterval(poll);poll=null;} stopWaitExtras();
   picker.value=''; drop.classList.remove('has'); drop.innerHTML=DROP_HTML;
-  $('#quote').className='quote'; $('#prog').className='prog'; $('#result').className='result'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc'); $('#hint').textContent=''; updateGo(); }
+  $('#quote').className='quote'; $('#prog').className='prog'; $('#result').className='result'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc'); $('#editWrap').style.display='none'; $('#hint').textContent=''; updateGo(); }
 </script>
 </body>
 </html>

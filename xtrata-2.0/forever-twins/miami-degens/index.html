@@ -743,13 +743,13 @@
 </head>
 <body>
   <header class="header">
-    <div class="brand">
+    <a class="brand" href="../" style="text-decoration:none;color:inherit" title="Forever Twins home">
       <img src="../assets/miami-degens-forever-twin-logo.png" alt="Miami Degens Forever Twins seal" />
       <div>
         <div class="brand-title">Miami Degens</div>
         <div class="brand-subtitle">Forever Twins</div>
       </div>
-    </div>
+    </a>
     <div class="header-controls">
       <button id="networkToggle" class="network-pill" type="button"><span class="dot"></span><span id="networkLabel">mainnet</span></button>
       <span class="wallet-pill"><span class="dot"></span><span id="walletLabel">Not connected</span></span>
@@ -1060,7 +1060,7 @@
   <footer>
     <div class="container footer-flex">
       <div><img src="../assets/miami-degens-forever-twin-logo.png" alt="Miami Degens seal" />Miami Degens Forever Twins</div>
-      <div>Permanent by design · Powered by Xtrata</div>
+      <div>Permanent by design · Powered by <a href="/" style="color:inherit;text-decoration:underline">Xtrata</a></div>
     </div>
   </footer>
 
@@ -1276,9 +1276,23 @@
     function setWallet(address) {
       state.wallet = address;
       $('walletLabel').textContent = shortAddress(address);
+      $('walletLabel').title = address || '';
       $('connectBtn').disabled = !!address;
       $('disconnectBtn').disabled = !address;
       updateActionButtons();
+      // BNS: show the .btc name instead of the raw address when one exists.
+      if (address) {
+        fetch('https://api.hiro.so/v1/addresses/stacks/' + address)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => {
+            const name = d && Array.isArray(d.names) ? d.names[0] : null;
+            if (name && state.wallet === address) {
+              $('walletLabel').textContent = name;
+              $('walletLabel').title = address;
+            }
+          })
+          .catch(() => {});
+      }
     }
 
     function toHex(bytes) { return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join(''); }

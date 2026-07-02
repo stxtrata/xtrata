@@ -57,9 +57,14 @@
     '-f', 'webm', 'out.weba',
   ];
 
-  // Build a self-contained player File from an audio File. onStatus(msg) for UI.
-  async function build(file, onStatus) {
-    if (!window.buildXtrataAudioPlayerHtml) throw new Error('player template not loaded (HTML_Template.js)');
+  // Cache of the heavy extraction (Opus encode + tag/cover pull) per source file.
+  // Lets the SUNO page rebuild the player instantly when the user only edits
+  // metadata or swaps the artwork — no re-encode.
+  let _extract = null;
+  const fileKey = (file) => [file.name, file.size, file.lastModified || 0].join('|');
+
+  async function extract(file, onStatus) {
+    if (_extract && _extract.key === fileKey(file)) return _extract;
     const f = await ff(onStatus);
     const inName = 'in-' + Date.now() + '.' + ((file.name.match(/\.([a-z0-9]+)$/i) || [])[1] || 'mp3');
     f.FS('writeFile', inName, await fetchFile(file));
@@ -77,25 +82,50 @@
       let coverB64 = null, coverMime = null;
       try { await f.run('-i', inName, '-an', '-map', '0:v:0', '-frames:v', '1', '-c:v', 'mjpeg', 'cover.jpg'); const cb = f.FS('readFile', 'cover.jpg'); if (cb && cb.length) { coverB64 = b64(cb); coverMime = 'image/jpeg'; } } catch (_e) {}
 
-      const title = (meta.title || '').trim() || (file.name || 'Untitled').replace(/\.[^.]+$/, '');
-      const artist = (meta.artist || '').trim();
-      const album = (meta.album || '').trim();
-      const lyricsKey = Object.keys(meta).find((k) => /^lyrics/.test(k) || k === 'unsyncedlyrics');
-      const lyrics = (meta['lyrics-eng'] || meta['lyrics'] || (lyricsKey ? meta[lyricsKey] : '') || '').trim();
-      const comment = (meta.comment || '').trim();
-      const isSuno = /made with suno/i.test(comment + ' ' + title + ' ' + artist) || /\bsuno\b/i.test(comment);
-
-      onStatus && onStatus('Building the player…');
-      const html = window.buildXtrataAudioPlayerHtml({
-        mode: 'embedded', audioMimeType: 'audio/webm; codecs=opus', audioBase64: b64(weba),
-        imageMimeType: coverMime || undefined, imageBase64: coverB64 || undefined, artFit: 'cover',
-        metadata: { assetType: 'song', title, artist, album, lyrics },
-      });
-      const playerFile = new File([html], slug(file.name) + '.player.html', { type: 'text/html' });
-      return { playerFile, html, title, artist, album, hasCover: !!coverB64, hasLyrics: !!lyrics, isSuno, opusBytes: weba.length, playerBytes: playerFile.size, sourceBytes: file.size };
+      _extract = { key: fileKey(file), audioB64: b64(weba), opusBytes: weba.length, meta, coverB64, coverMime };
+      return _extract;
     } finally {
       ['out.weba', 'meta.txt', 'cover.jpg', inName].forEach(cleanup);
     }
+  }
+
+  // Build a self-contained player File from an audio File. onStatus(msg) for UI.
+  // `overrides` (all optional) lets the page replace what was extracted:
+  //   { title, artist, album, lyrics, description, license, bpm, note,
+  //     coverB64, coverMime }
+  async function build(file, onStatus, overrides) {
+    if (!window.buildXtrataAudioPlayerHtml) throw new Error('player template not loaded (HTML_Template.js)');
+    const o = overrides || {};
+    const ex = await extract(file, onStatus);
+    const meta = ex.meta;
+
+    const pick = (ov, fallback) => {
+      const v = ov != null ? String(ov).trim() : '';
+      return ov != null ? v : fallback;
+    };
+    const title = pick(o.title, (meta.title || '').trim() || (file.name || 'Untitled').replace(/\.[^.]+$/, '')) || (file.name || 'Untitled').replace(/\.[^.]+$/, '');
+    const artist = pick(o.artist, (meta.artist || '').trim());
+    const album = pick(o.album, (meta.album || '').trim());
+    const lyricsKey = Object.keys(meta).find((k) => /^lyrics/.test(k) || k === 'unsyncedlyrics');
+    const extractedLyrics = (meta['lyrics-eng'] || meta['lyrics'] || (lyricsKey ? meta[lyricsKey] : '') || '').trim();
+    const lyrics = pick(o.lyrics, extractedLyrics);
+    const description = pick(o.description, '');
+    const license = pick(o.license, '');
+    const bpm = pick(o.bpm, '');
+    const note = pick(o.note, '');
+    const coverB64 = o.coverB64 !== undefined ? o.coverB64 : ex.coverB64;
+    const coverMime = o.coverMime !== undefined ? o.coverMime : ex.coverMime;
+    const comment = (meta.comment || '').trim();
+    const isSuno = /made with suno/i.test(comment + ' ' + title + ' ' + artist) || /\bsuno\b/i.test(comment);
+
+    onStatus && onStatus('Building the player…');
+    const html = window.buildXtrataAudioPlayerHtml({
+      mode: 'embedded', audioMimeType: 'audio/webm; codecs=opus', audioBase64: ex.audioB64,
+      imageMimeType: coverMime || undefined, imageBase64: coverB64 || undefined, artFit: 'cover',
+      metadata: { assetType: 'song', title, artist, album, lyrics, description, license, bpm, note },
+    });
+    const playerFile = new File([html], slug(title || file.name) + '.player.html', { type: 'text/html' });
+    return { playerFile, html, title, artist, album, lyrics, hasCover: !!coverB64, hasLyrics: !!lyrics, isSuno, opusBytes: ex.opusBytes, playerBytes: playerFile.size, sourceBytes: file.size, coverB64, coverMime };
   }
 
   // Fast pre-check used to GATE the SUNO page: metadata + cover only (no Opus encode).

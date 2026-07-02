@@ -1,7 +1,7 @@
 // HTML_Template.js
 (function () {
 
-const XTRATA_PLAYER_TEMPLATE_VERSION = 'xtrata-opus-player-v4';
+const XTRATA_PLAYER_TEMPLATE_VERSION = 'xtrata-opus-player-v5';
 
 const escapeHtml = (value) =>
   String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -334,16 +334,16 @@ const buildXtrataAudioPlayerHtml = (config) => {
     }
   };
 
+  // Type and Loop are deliberately omitted from the visible metadata panel —
+  // artist + title lead, everything else only shows when supplied.
   const detailRows = [
-    ['Type', assetTypeLabel],
     ['Artist', artist],
     ['Album', album],
     ['Stem', stemRole],
     ['Instrument', instrument],
     ['Note', note],
     ['Frequency', frequency],
-    ['Loop', isLoop ? 'Yes' : 'No'],
-    ['BPM', isLoop ? bpm : ''],
+    ['BPM', bpm],
     ['License', license],
     ['Dependencies', dependencies.join(', ')]
   ]
@@ -731,6 +731,7 @@ const buildXtrataAudioPlayerHtml = (config) => {
     .panel-lyrics {
       overflow: hidden;
       min-height: 0;
+      grid-template-rows: auto minmax(0, 1fr);
     }
 
     .lyrics {
@@ -814,6 +815,105 @@ const buildXtrataAudioPlayerHtml = (config) => {
       margin: 0;
       cursor: pointer;
       opacity: 0;
+    }
+
+    /* Hover transport: high-res waveform + seek bar over the bottom of the artwork.
+       Shown while the cursor is moving over the stage; fades out 2s after the
+       cursor stops. Kept above the scrim, below the drawer. */
+    .hover-transport {
+      position: absolute;
+      z-index: 3;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 14px 14px 12px;
+      background: linear-gradient(0deg, rgba(16, 18, 15, 0.82), rgba(16, 18, 15, 0.4) 70%, transparent);
+      color: var(--muted);
+      font-size: 0.74rem;
+      font-weight: 900;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.22s ease, transform 0.22s ease;
+      pointer-events: none;
+    }
+
+    .player[data-transport="visible"] .hover-transport,
+    .hover-transport:focus-within {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .player:not([data-panel="closed"]) .hover-transport {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .hover-wave {
+      position: relative;
+      height: 64px;
+      min-width: 0;
+    }
+
+    .hover-wave canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: 6px;
+    }
+
+    .lyrics-scroll-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .lyrics-scroll-switch input {
+      appearance: none;
+      width: 34px;
+      height: 18px;
+      margin: 0;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(248, 243, 231, 0.12);
+      position: relative;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .lyrics-scroll-switch input::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--ink);
+      transition: transform 0.15s ease;
+    }
+
+    .lyrics-scroll-switch input:checked {
+      background: rgba(184, 224, 141, 0.4);
+      border-color: var(--accent);
+    }
+
+    .lyrics-scroll-switch input:checked::after {
+      transform: translateX(16px);
+      background: var(--accent);
     }
 
     .description {
@@ -1102,11 +1202,19 @@ const buildXtrataAudioPlayerHtml = (config) => {
           ${subtitle ? `<p class="artist">${escapeHtml(subtitle)}</p>` : ''}
         </div>
         <div class="top-actions" data-player-control>
-          <button id="infoToggle" class="icon-button" type="button" aria-expanded="false" aria-controls="playerDrawer" title="Show player info" aria-label="Show player info"><span class="eye-icon" aria-hidden="true"></span></button>
-          <button id="controlsToggle" class="icon-button" type="button" aria-expanded="false" aria-controls="playerDrawer" title="Show controls" aria-label="Show controls"><span class="dots-icon" aria-hidden="true"></span></button>
+          <button id="infoToggle" class="icon-button" type="button" aria-expanded="false" aria-controls="playerDrawer" title="Show waveform controls" aria-label="Show waveform controls"><span class="eye-icon" aria-hidden="true"></span></button>
+          <button id="controlsToggle" class="icon-button" type="button" aria-expanded="false" aria-controls="playerDrawer" title="Show player info" aria-label="Show player info"><span class="dots-icon" aria-hidden="true"></span></button>
         </div>
       </header>
       <div id="clickHint" class="click-hint" aria-hidden="true">Click artwork to play</div>
+      <div id="hoverTransport" class="hover-transport" data-player-control>
+        <span id="hoverCurrentTime">0:00</span>
+        <div class="hover-wave">
+          <canvas id="hoverWaveCanvas" aria-hidden="true"></canvas>
+          <input id="hoverSeekRange" class="waveform-range" type="range" min="0" max="1000" value="0" aria-label="Seek playback position">
+        </div>
+        <span id="hoverDurationTime">0:00</span>
+      </div>
       <section id="playerDrawer" class="drawer" data-player-control aria-label="Player controls and information">
         <div id="drawerBody" class="drawer-body">
           <div class="drawer-tabs" role="tablist" aria-label="Player panel">
@@ -1145,7 +1253,7 @@ const buildXtrataAudioPlayerHtml = (config) => {
             ${detailRows ? `<dl class="metadata-grid">${detailRows}</dl>` : '<p class="description">No extra metadata supplied.</p>'}
             ${externalLink}
           </section>
-          ${lyrics ? `<section class="panel-view panel-lyrics" data-panel-view="lyrics" role="tabpanel" hidden><pre class="lyrics">${escapeHtml(lyrics)}</pre></section>` : ''}
+          ${lyrics ? `<section class="panel-view panel-lyrics" data-panel-view="lyrics" role="tabpanel" hidden><label class="lyrics-scroll-switch"><input type="checkbox" id="lyricsAutoScroll" checked> Auto-scroll</label><pre id="lyricsText" class="lyrics">${escapeHtml(lyrics)}</pre></section>` : ''}
         </div>
       </section>
     </section>
@@ -1178,6 +1286,13 @@ const buildXtrataAudioPlayerHtml = (config) => {
       const durationTimeLabel = document.getElementById('durationTime');
       const clickHint = document.getElementById('clickHint');
       const waveformBars = document.getElementById('waveformBars');
+      const hoverTransport = document.getElementById('hoverTransport');
+      const hoverWaveCanvas = document.getElementById('hoverWaveCanvas');
+      const hoverSeekRange = document.getElementById('hoverSeekRange');
+      const hoverCurrentTime = document.getElementById('hoverCurrentTime');
+      const hoverDurationTime = document.getElementById('hoverDurationTime');
+      const lyricsAutoScroll = document.getElementById('lyricsAutoScroll');
+      const lyricsText = document.getElementById('lyricsText');
       const panelButtons = Array.from(document.querySelectorAll('[data-panel-target]'));
       const panelViews = Array.from(document.querySelectorAll('[data-panel-view]'));
       const manifestNode = document.getElementById('xtrataPlayerManifest');
@@ -1210,18 +1325,116 @@ const buildXtrataAudioPlayerHtml = (config) => {
 
       if (!audio) return;
 
+      // Waveform peaks. Starts as a seeded placeholder, replaced by the real
+      // decoded waveform (Web Audio) as soon as the track is available.
+      let wavePeaks = null;
+      const HOVER_PEAK_COUNT = 480;
+
+      const placeholderPeaks = () => {
+        const title = (manifest.metadata && manifest.metadata.title) || document.title || 'xtrata';
+        const seed = title.split('').reduce((total, char) => total + char.charCodeAt(0), 0) || 42;
+        const peaks = new Array(HOVER_PEAK_COUNT);
+        for (let index = 0; index < HOVER_PEAK_COUNT; index += 1) {
+          peaks[index] = 0.2 + Math.abs(Math.sin((index + 1) * (seed % 17 + 5)) * Math.cos((index + 3) * 0.37)) * 0.76;
+        }
+        return peaks;
+      };
+
+      const samplePeak = (fraction) => {
+        if (!wavePeaks || !wavePeaks.length) return 0.4;
+        const index = Math.min(wavePeaks.length - 1, Math.max(0, Math.round(fraction * (wavePeaks.length - 1))));
+        return wavePeaks[index];
+      };
+
       const renderWaveform = () => {
         if (!waveformBars) return;
         waveformBars.innerHTML = '';
-        const title = (manifest.metadata && manifest.metadata.title) || document.title || 'xtrata';
-        const seed = title.split('').reduce((total, char) => total + char.charCodeAt(0), 0) || 42;
         for (let index = 0; index < 64; index += 1) {
           const bar = document.createElement('span');
-          const wave = Math.abs(Math.sin((index + 1) * (seed % 17 + 5)) * Math.cos((index + 3) * 0.37));
-          const height = Math.round(20 + wave * 76);
+          const height = Math.round(20 + samplePeak(index / 63) * 76);
           bar.style.setProperty('--bar-height', height + '%');
           waveformBars.appendChild(bar);
         }
+      };
+
+      // High-res waveform canvas over the artwork (crisp at devicePixelRatio).
+      const drawHoverWave = () => {
+        if (!hoverWaveCanvas || !wavePeaks) return;
+        const rect = hoverWaveCanvas.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        const scale = Math.min(window.devicePixelRatio || 1, 3);
+        const width = Math.round(rect.width * scale);
+        const height = Math.round(rect.height * scale);
+        if (hoverWaveCanvas.width !== width) hoverWaveCanvas.width = width;
+        if (hoverWaveCanvas.height !== height) hoverWaveCanvas.height = height;
+        const context = hoverWaveCanvas.getContext('2d');
+        if (!context) return;
+        context.clearRect(0, 0, width, height);
+        const duration = getDuration();
+        const current = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+        const playedFraction = duration ? Math.max(0, Math.min(1, current / duration)) : 0;
+        const count = wavePeaks.length;
+        const step = width / count;
+        const barWidth = Math.max(1, step - Math.max(1, Math.round(scale)));
+        const middle = height / 2;
+        for (let index = 0; index < count; index += 1) {
+          const peak = wavePeaks[index];
+          const barHeight = Math.max(2 * scale, peak * (height - 4 * scale));
+          const x = index * step;
+          context.fillStyle = index / count <= playedFraction
+            ? 'rgba(241, 199, 91, 0.95)'
+            : 'rgba(248, 243, 231, 0.42)';
+          context.fillRect(x, middle - barHeight / 2, barWidth, barHeight);
+        }
+      };
+
+      // Decode the actual audio into peaks for the real waveform. Works for
+      // embedded base64 data URIs and remote recursive sources alike; on any
+      // failure the seeded placeholder remains.
+      const loadRealWaveform = () => {
+        const sourceNode = audio.querySelector('source');
+        const src = sourceNode ? sourceNode.getAttribute('src') : '';
+        if (!src || typeof window.fetch !== 'function') return;
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        fetch(src)
+          .then((response) => response.arrayBuffer())
+          .then((buffer) => {
+            const context = new AudioContextClass();
+            return context.decodeAudioData(buffer).then((decoded) => {
+              try { context.close(); } catch (_error) {}
+              return decoded;
+            });
+          })
+          .then((decoded) => {
+            const channel = decoded.getChannelData(0);
+            const bucketSize = Math.max(1, Math.floor(channel.length / HOVER_PEAK_COUNT));
+            const peaks = new Array(HOVER_PEAK_COUNT);
+            let maxPeak = 0;
+            for (let index = 0; index < HOVER_PEAK_COUNT; index += 1) {
+              const start = index * bucketSize;
+              const end = Math.min(channel.length, start + bucketSize);
+              let peak = 0;
+              for (let cursor = start; cursor < end; cursor += 1) {
+                const value = Math.abs(channel[cursor]);
+                if (value > peak) peak = value;
+              }
+              peaks[index] = peak;
+              if (peak > maxPeak) maxPeak = peak;
+            }
+            if (maxPeak > 0) {
+              for (let index = 0; index < HOVER_PEAK_COUNT; index += 1) {
+                peaks[index] = Math.max(0.04, peaks[index] / maxPeak);
+              }
+            }
+            wavePeaks = peaks;
+            renderWaveform();
+            updateProgress();
+            drawHoverWave();
+          })
+          .catch(() => {
+            // Keep the placeholder waveform.
+          });
       };
 
       const waveformBarNodes = () =>
@@ -1342,11 +1555,82 @@ const buildXtrataAudioPlayerHtml = (config) => {
           seekRange.value = Math.round(fraction * 1000);
           seekRange.setAttribute('aria-valuetext', formatTime(current) + ' of ' + formatTime(duration));
         }
+        if (hoverCurrentTime) hoverCurrentTime.textContent = formatTime(current);
+        if (hoverDurationTime) hoverDurationTime.textContent = formatTime(duration);
+        if (hoverSeekRange && document.activeElement !== hoverSeekRange) {
+          hoverSeekRange.value = Math.round(fraction * 1000);
+          hoverSeekRange.setAttribute('aria-valuetext', formatTime(current) + ' of ' + formatTime(duration));
+        }
         const bars = waveformBarNodes();
         bars.forEach((bar, index) => {
           bar.classList.toggle('is-played', bars.length ? index / bars.length <= fraction : false);
         });
+        drawHoverWave();
+        syncLyricsScroll();
       };
+
+      // --- Hover transport visibility -------------------------------------
+      // Appears when the cursor moves over the artwork; fades out 2 seconds
+      // after movement stops; reappears on the next movement.
+      const HOVER_HIDE_DELAY_MS = 2000;
+      let hoverHideTimer = 0;
+
+      const hideHoverTransport = () => {
+        if (hoverTransport && hoverTransport.contains(document.activeElement)) return;
+        if (player) player.dataset.transport = 'hidden';
+      };
+
+      const showHoverTransport = () => {
+        if (player) player.dataset.transport = 'visible';
+        if (hoverHideTimer) window.clearTimeout(hoverHideTimer);
+        hoverHideTimer = window.setTimeout(hideHoverTransport, HOVER_HIDE_DELAY_MS);
+        drawHoverWave();
+      };
+
+      if (cover) {
+        cover.addEventListener('pointermove', showHoverTransport);
+        cover.addEventListener('pointerdown', showHoverTransport);
+        cover.addEventListener('pointerleave', () => {
+          if (hoverHideTimer) window.clearTimeout(hoverHideTimer);
+          hideHoverTransport();
+        });
+      }
+
+      // --- Lyrics auto-scroll ----------------------------------------------
+      // Scrolls the lyrics in sync with playback position when the switch is on.
+      const syncLyricsScroll = () => {
+        if (!lyricsText || !lyricsAutoScroll || !lyricsAutoScroll.checked) return;
+        const duration = getDuration();
+        if (!duration) return;
+        const range = lyricsText.scrollHeight - lyricsText.clientHeight;
+        if (range <= 0) return;
+        const fraction = Math.max(0, Math.min(1, audio.currentTime / duration));
+        lyricsText.scrollTop = fraction * range;
+      };
+
+      let lyricsFrame = 0;
+      const lyricsScrollLoop = () => {
+        lyricsFrame = 0;
+        if (!audio.paused && !audio.ended) {
+          syncLyricsScroll();
+          lyricsFrame = window.requestAnimationFrame(lyricsScrollLoop);
+        }
+      };
+
+      const startLyricsLoop = () => {
+        if (!lyricsFrame && lyricsText) {
+          lyricsFrame = window.requestAnimationFrame(lyricsScrollLoop);
+        }
+      };
+
+      if (lyricsAutoScroll) {
+        lyricsAutoScroll.addEventListener('change', () => {
+          if (lyricsAutoScroll.checked) {
+            syncLyricsScroll();
+            startLyricsLoop();
+          }
+        });
+      }
 
       const isPlayerControlTarget = (event) =>
         Boolean(event.target.closest('button, input, a, [data-player-control]'));
@@ -1376,8 +1660,9 @@ const buildXtrataAudioPlayerHtml = (config) => {
         });
       }
 
-      if (infoToggle) infoToggle.addEventListener('click', () => togglePanel('info'));
-      if (controlsToggle) controlsToggle.addEventListener('click', () => togglePanel('controls'));
+      // Eye opens the waveform controls tab; the dots button opens player info.
+      if (infoToggle) infoToggle.addEventListener('click', () => togglePanel('controls'));
+      if (controlsToggle) controlsToggle.addEventListener('click', () => togglePanel('info'));
       panelButtons.forEach((button) => {
         button.addEventListener('click', () => togglePanel(button.dataset.panelTarget || 'controls'));
       });
@@ -1397,6 +1682,15 @@ const buildXtrataAudioPlayerHtml = (config) => {
           if (!duration) return;
           audio.currentTime = duration * (Number(seekRange.value) / 1000);
           updateProgress();
+        });
+      }
+      if (hoverSeekRange) {
+        hoverSeekRange.addEventListener('input', () => {
+          const duration = getDuration();
+          if (!duration) return;
+          audio.currentTime = duration * (Number(hoverSeekRange.value) / 1000);
+          updateProgress();
+          showHoverTransport();
         });
       }
 
@@ -1465,6 +1759,7 @@ const buildXtrataAudioPlayerHtml = (config) => {
 
       audio.addEventListener('timeupdate', updateProgress);
       audio.addEventListener('durationchange', updateProgress);
+      audio.addEventListener('play', startLyricsLoop);
       audio.addEventListener('play', updatePlaybackUi);
       audio.addEventListener('pause', updatePlaybackUi);
       audio.addEventListener('ended', () => {
@@ -1494,10 +1789,14 @@ const buildXtrataAudioPlayerHtml = (config) => {
         } catch (_error) {}
       }
 
+      wavePeaks = placeholderPeaks();
+      if (player) player.dataset.transport = 'hidden';
       renderWaveform();
       setPanel('closed');
       updatePlaybackUi();
       updateProgress();
+      loadRealWaveform();
+      window.addEventListener('resize', drawHoverWave);
     })();
   <\/script>
 </body>

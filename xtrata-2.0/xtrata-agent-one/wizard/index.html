@@ -81,7 +81,7 @@
 </head>
 <body>
 <header>
-  <img src="favicon.svg" alt="Xtrata" style="width:30px;height:30px;border-radius:8px;flex:none" />
+  <a href="/" title="Xtrata home" style="flex:none;display:block"><img src="favicon.svg" alt="Xtrata" style="width:30px;height:30px;border-radius:8px;display:block" /></a>
   <div>
     <div class="logo"><b>XTRATA</b> <i>Agent One</i> · Inscription Wizard</div>
     <div class="sub">Large files &amp; recursive dependency graphs → Stacks, via the deposit-wallet service</div>
@@ -319,7 +319,10 @@ picker.onchange=()=>{ if(picker.files[0]) setFile(picker.files[0]); };
 ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));
 ['dragleave','dragend'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag');}));
 dz.addEventListener('drop',e=>{ e.preventDefault(); dz.classList.remove('drag'); const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) setFile(f); });
-function setFile(f){ selectedFile=f; $('#file').value=''; detectFromName(f.name); $('#fileInfo').innerHTML=`<b>${esc(f.name)}</b> · ${(f.size/1048576).toFixed(3)} MiB`; $('#estimateBtn').click(); }
+function setFile(f){ selectedFile=f; $('#file').value=''; detectFromName(f.name); $('#fileInfo').innerHTML=`<b>${esc(f.name)}</b> · ${(f.size/1048576).toFixed(3)} MiB`
+  + ((/\.mp3$/i.test(f.name)||/audio\/mpeg/i.test(f.type||''))
+      ? `<div style="margin-top:6px;color:var(--mut)">🎵 Suno MP3 with embedded art? The <a href="./suno.html">SUNO fast-track</a> auto-builds a full player (Opus + cover + lyrics) in one payment.</div>`
+      : ''); $('#estimateBtn').click(); }
 
 $('#estimateBtn').onclick=async()=>{
   const el=$('#estimate'); const margin=$('#margin').value||'0';
