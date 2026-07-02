@@ -220,6 +220,31 @@ const $$=(s)=>Array.from(document.querySelectorAll(s));
 const esc=(s)=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const stx=(u)=>(Number(u)/1e6).toFixed(6).replace(/0+$/,'').replace(/\.$/,'')+' STX';
 const MASTER='SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3';
+// Content-source ladder: migrated tokens keep their id on v3 but their CHUNKS
+// stay on the core they were minted on, and the runtime only falls back one
+// hop (v3-2-3 -> v2-1-0). Early v1-era ids need an explicit v1 read, so we
+// probe each core in order and use the first real (non-error) response.
+const CORES=['SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3','SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0','SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1'];
+const MEDIA_CACHE=new Map();
+async function resolveMedia(id){
+  if(MEDIA_CACHE.has(id))return MEDIA_CACHE.get(id);
+  const p=(async()=>{
+    for(const core of CORES){
+      const url='/runtime/content?contractId='+encodeURIComponent(core)+'&tokenId='+id+'&network=mainnet';
+      try{const r=await fetch(url);const t=(r.headers.get('content-type')||'').toLowerCase();
+        try{r.body&&r.body.cancel&&r.body.cancel()}catch{}
+        if(r.ok&&!t.includes('application/json'))return{url,type:t};
+      }catch{}
+    }
+    return null;})();
+  MEDIA_CACHE.set(id,p);return p;
+}
+function thumbInto(img,id){resolveMedia(id).then(m=>{
+  if(!m){img.style.opacity=.2;img.title='#'+id+' — content not reachable on any core';return}
+  if(m.type.startsWith('image/')){img.src=m.url;}
+  else{const f=document.createElement('iframe');f.src=m.url;f.setAttribute('sandbox','allow-scripts allow-same-origin');
+    f.style.cssText='width:100%;height:100%;border:0;pointer-events:none';img.replaceWith(f);}});}
+
 const SERVER={mock:false,net:'mainnet'};
 let WALLET=null,WALLET_NAME=null,LEVEL=null,ITEMS=[],GALLERIES=[],HOLDINGS=new Set(),VALID=null,EST=null,JOB=null,poll=null;
 
@@ -275,7 +300,8 @@ async function fetchHoldings(){
     HOLDINGS=new Set(ids);
     const grid=$('#holdings');grid.style.display='grid';grid.innerHTML='';
     ids.forEach(id=>{const d=document.createElement('div');d.className='hold'+(ITEMS.some(i=>i.tokenId===id)?' added':'');d.dataset.id=id;
-      d.innerHTML='<img loading="lazy" src="/inscription/'+id+'" alt="#'+id+'" onerror="this.style.display=\'none\'" /><span class="hid">#'+id+'</span>';
+      d.innerHTML='<img loading="lazy" alt="#'+id+'" /><span class="hid">#'+id+'</span>';
+      thumbInto(d.querySelector('img'),id);
       d.onclick=()=>{ITEMS.some(i=>i.tokenId===id)?removeItem(id):addItem({tokenId:id});};
       grid.appendChild(d);});
     if(!ids.length)grid.innerHTML='<div class="hint">No Xtrata inscriptions found in this wallet.</div>';
@@ -292,10 +318,11 @@ function moveItem(id,dir){const i=ITEMS.findIndex(x=>x.tokenId===id);const j=i+d
 function renderItems(){
   const box=$('#items');box.innerHTML='';
   ITEMS.forEach(it=>{const d=document.createElement('div');d.className='item';
-    d.innerHTML='<img loading="lazy" src="/inscription/'+esc(it.tokenId)+'" onerror="this.style.opacity=.25" />'
+    d.innerHTML='<img loading="lazy" alt="#'+esc(it.tokenId)+'" />'
       +'<input type="text" placeholder="Label (optional) — #'+esc(it.tokenId)+'" value="'+esc(it.label)+'" />'
       +'<select><option value="">auto</option><option value="image">image</option><option value="audio">audio</option><option value="html">html</option><option value="video">video</option><option value="text">text</option></select>'
       +'<span class="ictl"><button title="Up">↑</button><button title="Down">↓</button><button title="Remove">✕</button></span>';
+    thumbInto(d.querySelector('img'),it.tokenId);
     d.querySelector('input').oninput=(e)=>{it.label=e.target.value;VALID=null;updateGo();};
     const sel=d.querySelector('select');sel.value=it.media||'';sel.onchange=()=>{it.media=sel.value;VALID=null;updateGo();};
     const [up,down,del]=d.querySelectorAll('.ictl button');
@@ -397,11 +424,17 @@ async function quote(){
 $('#jsonBtn').onclick=()=>{const b=$('#jsonBox');const show=b.style.display==='none';b.style.display=show?'block':'none';
   if(show&&LEVEL!=='collection'){const m=buildManifest();b.value=m?JSON.stringify(m,null,2):'';}};
 $('#jsonBox').addEventListener('input',()=>{if(LEVEL==='collection'){VALID=null;updateGo();}});
-$('#previewBtn').onclick=()=>{
+$('#previewBtn').onclick=async()=>{
   const m=buildManifest();if(!m||!m.xtrataManifest){alert('Build or validate first.');return}
   const h=m.xtrataManifest,items=m.items||[];
-  const tiles=items.map(i=>{const id=esc(i.tokenId);const media=i.media||((m.display&&m.display.mode)==='listening'?'audio':'image');
-    return '<a class="tile" href="#"><div class="tm">'+(media==='image'?'<img src="/inscription/'+id+'" onerror="this.replaceWith(Object.assign(document.createElement(\'iframe\'),{src:\'/inscription/'+id+'\'}))" />':'<iframe src="/inscription/'+id+'"></iframe>')+'</div><div class="tl">'+esc(i.label||('#'+i.tokenId))+'</div></a>';}).join('');
+  $('#valOut').innerHTML='<span class="spin"></span>Resolving media sources…';
+  const media=await Promise.all(items.map(i=>resolveMedia(String(i.tokenId))));
+  $('#valOut').textContent='';
+  const tiles=items.map((i,ix)=>{const src=media[ix];
+    const inner=!src?'<div style="display:grid;place-items:center;height:100%;color:#556">#'+esc(i.tokenId)+'<br>unreachable</div>'
+      :src.type.startsWith('image/')?'<img src="'+esc(src.url)+'" />'
+      :'<iframe src="'+esc(src.url)+'" sandbox="allow-scripts allow-same-origin"></iframe>';
+    return '<a class="tile" href="#"><div class="tm">'+inner+'</div><div class="tl">'+esc(i.label||('#'+i.tokenId))+'</div></a>';}).join('');
   const doc='<!doctype html><meta charset=utf-8><style>body{margin:0;background:#0b0e14;color:#e6edf6;font:14px system-ui;padding:18px}h1{font-size:20px;margin:0 0 4px}.m{color:#8b9bb4;font-size:12px;margin-bottom:16px}.g{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}.tile{display:block;background:#121723;border:1px solid #243044;border-radius:10px;overflow:hidden;color:inherit;text-decoration:none}.tm{aspect-ratio:1/1}.tm img,.tm iframe{width:100%;height:100%;object-fit:cover;border:0;display:block}.tl{padding:7px 10px;font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}</style>'
     +'<h1>'+esc(h.title||h.name||'Gallery')+'</h1><div class=m>Preview · '+items.length+' items · will resolve at /g/'+esc(h.bnsName||'you.btc')+(h.name?'/'+esc(h.name):'')+'</div><div class=g>'+tiles+'</div>';
   const f=$('#pvFrame');f.style.display='block';f.srcdoc=doc;

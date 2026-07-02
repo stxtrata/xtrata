@@ -153,16 +153,14 @@ const renderGalleryPage = (params: {
   const kind = head.kind === 'creator-collection' ? 'Owner-attested collection' : 'Curated gallery';
   const mode = manifest.display?.mode || 'viewing';
   const curator = curatorName || head.bnsName || (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : 'unknown');
+  // Tiles are hydrated client-side via a content-source ladder: migrated tokens
+  // keep their id on v3 but their chunks stay on the core they were minted on,
+  // so we probe v3-2-3 -> v2-1-0 -> v1-1-1 and use the first real response.
   const tiles = items
     .map((item) => {
       const id = escapeHtml(item.tokenId);
       const label = escapeHtml(item.label || `#${item.tokenId}`);
-      const media = item.media || (mode === 'listening' ? 'audio' : 'image');
-      const inner =
-        media === 'image'
-          ? `<img loading="lazy" src="/inscription/${id}" alt="${label}" onerror="this.closest('.tile').classList.add('as-frame');this.replaceWith(Object.assign(document.createElement('iframe'),{src:'/inscription/${id}',title:'${label}'}))" />`
-          : `<iframe loading="lazy" src="/inscription/${id}" title="${label}" sandbox="allow-scripts allow-same-origin"></iframe>`;
-      return `<a class="tile${media !== 'image' ? ' as-frame' : ''}" href="/inscription/${id}" target="_blank" rel="noopener"><div class="tile-media">${inner}</div><div class="tile-label">${label}</div></a>`;
+      return `<a class="tile" data-token="${id}" href="/inscription/${id}" target="_blank" rel="noopener"><div class="tile-media"><div class="tile-wait">#${id}</div></div><div class="tile-label">${label}</div></a>`;
     })
     .join('\n');
 
@@ -193,6 +191,7 @@ const renderGalleryPage = (params: {
   .tile-media{aspect-ratio:1/1;background:#0e131d}
   .tile-media img,.tile-media iframe{width:100%;height:100%;object-fit:cover;border:0;display:block}
   .tile-label{padding:9px 12px;font-size:12.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tile-wait{display:grid;place-items:center;height:100%;color:var(--mut);font-family:ui-monospace,monospace;font-size:12px;text-align:center}
   footer{padding:18px 20px;color:var(--mut);font-size:12px;text-align:center;border-top:1px solid var(--line)}
   footer a{color:var(--acc)}
 </style>
@@ -209,6 +208,36 @@ const renderGalleryPage = (params: {
   ${head.description ? `<p class="desc">${escapeHtml(head.description)}</p>` : ''}
   <div class="grid">${tiles || '<p class="meta">This manifest lists no items yet.</p>'}</div>
 </main>
+<script>
+(function(){
+  var CORES=['SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3','SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0','SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1'];
+  async function resolve(id){
+    for(var i=0;i<CORES.length;i++){
+      var url='/runtime/content?contractId='+encodeURIComponent(CORES[i])+'&tokenId='+id+'&network=mainnet';
+      try{var r=await fetch(url);var t=(r.headers.get('content-type')||'').toLowerCase();
+        try{r.body&&r.body.cancel&&r.body.cancel()}catch(e){}
+        if(r.ok&&t.indexOf('application/json')===-1)return{url:url,type:t};
+      }catch(e){}
+    }
+    return null;
+  }
+  var tiles=Array.prototype.slice.call(document.querySelectorAll('.tile[data-token]'));
+  var queue=tiles.slice();
+  function next(){
+    var tile=queue.shift();if(!tile)return;
+    var id=tile.getAttribute('data-token');
+    resolve(id).then(function(m){
+      var box=tile.querySelector('.tile-media');
+      if(!m){box.innerHTML='<div class="tile-wait">#'+id+'<br>unreachable</div>';}
+      else if(m.type.indexOf('image/')===0){box.innerHTML='<img loading="lazy" src="'+m.url+'" alt="#'+id+'" />';tile.href=m.url;}
+      else{box.innerHTML='<iframe loading="lazy" src="'+m.url+'" sandbox="allow-scripts allow-same-origin" title="#'+id+'"></iframe>';tile.href=m.url;}
+      next();
+    });
+  }
+  // hydrate 4 tiles at a time
+  for(var k=0;k<4;k++)next();
+})();
+</scr`+`ipt>
 <footer>Galleries are immutable Xtrata manifests — the newest manifest inscribed by the name's owner is always shown. <a href="/g/${escapeHtml(head.bnsName || '')}?format=json">Raw JSON</a></footer>
 </body>
 </html>`;
