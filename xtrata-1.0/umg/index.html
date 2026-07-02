@@ -390,6 +390,40 @@
 
   ::selection{ background:rgba(247,147,26,0.3); color:#fff; }
 
+  /* ---------- TRUST / CUSTODY ---------- */
+  .custody-pick{ display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+  .custody-pick .tg.sel{ border-color:var(--xtrata); color:var(--xtrata-lo); background:var(--xtrata-dim); }
+  .keyviz{ display:flex; gap:10px; align-items:center; justify-content:center; margin:16px 0 4px; min-height:52px; }
+  .keyviz .kslot{ width:44px; height:44px; border-radius:10px; border:1.5px dashed var(--line); display:grid; place-items:center; font-size:18px; color:var(--ink-faint); transition:all .3s; }
+  .keyviz .kslot.on{ border-style:solid; border-color:var(--xtrata); color:var(--xtrata-lo); background:var(--xtrata-dim); }
+  .keyviz .plus{ color:var(--ink-faint); font-size:15px; }
+
+  /* ---------- ROADMAP ---------- */
+  .phases{ display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:36px; }
+  @media(max-width:860px){ .phases{ grid-template-columns:1fr; } }
+  .phase{ border:1px solid var(--line); border-radius:var(--r); padding:26px 24px; background:linear-gradient(180deg,var(--panel),var(--bg-2)); position:relative; }
+  .phase .ptag{ display:inline-block; font-family:var(--mono); font-size:11px; letter-spacing:0.12em; padding:5px 11px; border-radius:999px; border:1px solid rgba(247,147,26,0.4); color:var(--xtrata-lo); background:var(--xtrata-dim); margin-bottom:14px; }
+  .phase.p1 .ptag{ border-color:rgba(247,147,26,0.55); }
+  .phase.p2 .ptag, .phase.p3 .ptag{ border-color:var(--line); color:var(--ink-mut); background:transparent; }
+  .phase h4{ font-family:var(--serif); font-size:23px; margin-bottom:8px; }
+  .phase p{ color:var(--ink-mut); font-size:14px; }
+  .phase .exit{ margin-top:16px; padding-top:14px; border-top:1px solid var(--line-2); }
+  .phase .exit .xh{ font-size:10.5px; letter-spacing:0.16em; text-transform:uppercase; color:var(--flow); font-weight:700; margin-bottom:8px; }
+  .phase .exit li{ color:var(--ink-soft); font-size:13px; list-style:none; padding-left:20px; position:relative; margin-bottom:6px; }
+  .phase .exit li::before{ content:"✓"; position:absolute; left:0; color:var(--flow); font-size:12px; }
+  .phase.dim{ opacity:0.82; }
+
+  /* ---------- FAQ ---------- */
+  .faq{ max-width:820px; }
+  .qa{ border:1px solid var(--line); border-radius:14px; margin-bottom:12px; background:linear-gradient(180deg,var(--panel),var(--bg-2)); overflow:hidden; }
+  .qa .q{ width:100%; text-align:left; background:none; border:none; color:var(--ink); font-family:var(--sans); font-size:16px; font-weight:600; padding:20px 22px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:16px; }
+  .qa .q .tw{ color:var(--xtrata); font-size:20px; font-weight:400; transition:transform .3s; flex:0 0 auto; }
+  .qa.open .q .tw{ transform:rotate(45deg); }
+  .qa .a{ max-height:0; overflow:hidden; transition:max-height .4s ease; }
+  .qa .a > div{ padding:0 22px 20px; color:var(--ink-mut); font-size:14.5px; }
+  .qa .a b{ color:var(--ink-soft); }
+  .qa.open .a{ max-height:320px; }
+
   /* ============================================================
      MOBILE / VERTICAL SCREENS — distinct, non-overlapping layout
      ============================================================ */
@@ -469,7 +503,9 @@
     <a href="#protect">Protect</a>
     <a href="#enhance">Enhance</a>
     <a href="#expand">Expand</a>
+    <a href="#trust">Trust</a>
     <a href="#pilot">The pilot</a>
+    <a href="#faq">Q&amp;A</a>
   </nav>
   <span class="navtag">Confidential · For UMG</span>
 </header>
@@ -965,6 +1001,58 @@
   </div>
 </section>
 
+<!-- ================= TRUST & CONTROL ================= -->
+<section class="sec" id="trust">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow" style="color:var(--xtrata)">Trust &amp; control</span>
+      <h2>UMG keeps the keys. Full stop.</h2>
+      <p>The honest question behind every "put our catalogue on new rails" pitch is: <b style="color:var(--ink-soft)">who can touch the masters?</b> Here, the answer is enforced by cryptography — not by a vendor's promise.</p>
+    </div>
+    <div class="feat-grid">
+      <!-- custody -->
+      <div class="feat reveal d1">
+        <svg class="ic" viewBox="0 0 40 40" fill="none"><circle cx="14" cy="20" r="8" stroke="#f7931a" stroke-width="2"/><path d="M22 20h13M30 20v6M35 20v4" stroke="#f7931a" stroke-width="2" stroke-linecap="round"/></svg>
+        <h3>Key custody, your way</h3>
+        <p>Decryption keys can sit entirely with UMG, or be split so that <b style="color:var(--ink-soft)">no single party — including Xtrata — can ever unlock a master alone</b>. We recommend the split model for the pilot.</p>
+        <div class="mini">
+          <div class="mlabel">Try it — who can open a master?</div>
+          <div class="custody-pick">
+            <div class="tg" data-custody="umg">UMG-held</div>
+            <div class="tg sel" data-custody="mofn">Split 2-of-3</div>
+          </div>
+          <div class="keyviz" id="keyviz">
+            <span class="kslot on">🔑</span><span class="plus">+</span><span class="kslot on">🔑</span><span class="plus">+</span><span class="kslot">🔑</span>
+          </div>
+          <div class="verdict ok" id="custodyVerdict">UMG + escrow approve; Xtrata alone can never open a master.</div>
+        </div>
+      </div>
+      <!-- crypto-shred -->
+      <div class="feat reveal d2">
+        <svg class="ic" viewBox="0 0 40 40" fill="none"><path d="M8 10h24M14 10V7h12v3M12 10l2 24h12l2-24" stroke="#f7931a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <h3>Deletion that actually deletes</h3>
+        <p>When rights expire or a takedown is ordered, the keys are destroyed. Whatever encrypted copies exist anywhere become <b style="color:var(--ink-soft)">permanently unreadable</b> — the recognised standard for erasure of encrypted data, and it satisfies GDPR-style obligations.</p>
+        <ul>
+          <li>Revoke access instantly, on-chain, in one transaction</li>
+          <li>Hard takedown: destroy the key, the content is gone for good</li>
+          <li>Every revocation leaves a provable audit record</li>
+        </ul>
+      </div>
+      <!-- no plaintext -->
+      <div class="feat reveal d3">
+        <svg class="ic" viewBox="0 0 40 40" fill="none"><path d="M6 20s5-9 14-9 14 9 14 9-5 9-14 9S6 20 6 20z" stroke="#f7931a" stroke-width="2"/><circle cx="20" cy="20" r="4" stroke="#f7931a" stroke-width="2"/><line x1="8" y1="32" x2="32" y2="8" stroke="#f7931a" stroke-width="2" stroke-linecap="round"/></svg>
+        <h3>Nobody ever sees the master</h3>
+        <p>Plaintext masters never leave the ingest boundary. Storage networks hold only encrypted fragments; every read is re-verified against the Bitcoin anchor, so <b style="color:var(--ink-soft)">tampered bytes are rejected automatically</b>.</p>
+        <ul>
+          <li>Storage providers hold ciphertext only — never a playable file</li>
+          <li>Streaming keys are short-lived and scope-limited; they never expose the master</li>
+          <li>Integrity is checked on every read, not assumed</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ================= PILOT ================= -->
 <section class="sec pilot" id="pilot">
   <div class="wrap">
@@ -978,7 +1066,81 @@
         <div class="pilot-item"><span class="pn">03</span><span class="pt"><b>Automated settlement</b>Royalties split and settle in Bitcoin in real time, via FlowVault.</span></div>
         <div class="pilot-item"><span class="pn">04</span><span class="pt"><b>Cryptographic takedown</b>Revoke access on demand and prove it on-chain.</span></div>
       </div>
-      <div class="lowrisk"><span style="font-size:18px">🛡</span> Low-risk by design: masters stay encrypted, access stays revocable, and ownership stays with UMG throughout.</div>
+      <div class="lowrisk"><span style="font-size:18px">🛡</span> Low-risk by design: masters stay encrypted, access stays revocable, and ownership stays with UMG throughout. If the pilot ends, the keys are shredded and nothing usable remains anywhere.</div>
+
+      <div class="phases reveal d1">
+        <div class="phase p1">
+          <span class="ptag">PHASE 1 · pilot — starts now</span>
+          <h4>Prove it on a catalogue slice</h4>
+          <p>A defined slice ingested on proven, redundant storage networks. Everything runs end to end with real masters and a jointly agreed custody model.</p>
+          <div class="exit"><div class="xh">You sign off when we've shown</div>
+            <ul>
+              <li>Every master sealed, verifiable, and streamed to an authorised player</li>
+              <li>Royalties split and settled in Bitcoin, automatically</li>
+              <li>A takedown demonstrated live — key shredded, content unreadable</li>
+            </ul>
+          </div>
+        </div>
+        <div class="phase p2 dim">
+          <span class="ptag">PHASE 2 · harden</span>
+          <h4>Staked, audited storage</h4>
+          <p>Storage operators post a financial bond and are continuously audited on-chain; failing an audit costs them money. The catalogue records don't change — only who stores the bytes.</p>
+          <div class="exit"><div class="xh">Exit criteria</div>
+            <ul>
+              <li>Independent operators passing audits over sustained periods</li>
+              <li>Redundancy provably above target at all times</li>
+              <li>Storage migrated with zero change to the record of truth</li>
+            </ul>
+          </div>
+        </div>
+        <div class="phase p3 dim">
+          <span class="ptag">PHASE 3 · scale</span>
+          <h4>Open, self-healing network</h4>
+          <p>The storage market opens to vetted third parties and the network repairs itself economically. UMG's position: anchor tenant of infrastructure it helped shape, on terms set at phase 1.</p>
+          <div class="exit"><div class="xh">Exit criteria</div>
+            <ul>
+              <li>Network self-heals under operator churn</li>
+              <li>Additional catalogues onboarded beyond the pilot</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FAQ ================= -->
+<section class="sec" id="faq">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">The questions your team will ask</span>
+      <h2>Straight answers, before you have to ask.</h2>
+    </div>
+    <div class="faq reveal d1">
+      <div class="qa">
+        <button class="q">Is this "putting our masters on the blockchain"?<span class="tw">+</span></button>
+        <div class="a"><div>No — and that distinction is the whole design. The chain holds only <b>fingerprints, rights, and payments</b> — a few hundred bytes per master. The audio lives off-chain, encrypted, on redundant storage networks. The chain proves <b>what a file is and who may use it</b>; it never exposes the file itself.</div></div>
+      </div>
+      <div class="qa">
+        <button class="q">Why not just use Arweave or Filecoin directly?<span class="tw">+</span></button>
+        <div class="a"><div>They're storage, not rights. Neither can express <b>who owns a master, who may play it, or how royalties split</b> — and neither settles in Bitcoin. Xtrata uses networks like these as interchangeable storage tiers underneath a rights-and-settlement layer anchored to Bitcoin. If one network fails or reprices, the catalogue moves; <b>the record of truth doesn't change</b>.</div></div>
+      </div>
+      <div class="qa">
+        <button class="q">Can decentralised storage actually stream like Spotify?<span class="tw">+</span></button>
+        <div class="a"><div>Yes — because streaming doesn't come off the archival tier. Playable renditions are served from <b>fast, S3-grade storage with edge caching</b>, so latency matches a conventional CDN. The slower, ultra-durable networks hold the archival masters. Listeners notice nothing; the provenance guarantees ride underneath.</div></div>
+      </div>
+      <div class="qa">
+        <button class="q">What about takedowns, GDPR, and rights that expire?<span class="tw">+</span></button>
+        <div class="a"><div>Access is revoked on-chain in one transaction — effective immediately. For hard deletion, the decryption keys are destroyed ("crypto-shredding"): every copy everywhere becomes permanently unreadable. This is the <b>legally recognised standard for erasure of encrypted data</b>. Rights are also time- and territory-bound by design, so expiry enforces itself.</div></div>
+      </div>
+      <div class="qa">
+        <button class="q">Does UMG take crypto-price risk?<span class="tw">+</span></button>
+        <div class="a"><div>No exposure is required. Settlement rails run on Bitcoin (via Stacks), but flows can be <b>denominated and swept to fiat</b>; the rail is about instant, auditable settlement, not holding a volatile asset. Treasury policy stays entirely UMG's call.</div></div>
+      </div>
+      <div class="qa">
+        <button class="q">What does UMG commit to for the pilot?<span class="tw">+</span></button>
+        <div class="a"><div>A defined catalogue slice and a seat at the table on key custody. That's it. Masters stay encrypted and under UMG-controlled keys throughout; if the pilot ends, keys are shredded and <b>nothing usable remains anywhere</b>. Ownership never moves.</div></div>
+      </div>
     </div>
   </div>
 </section>
@@ -1255,6 +1417,34 @@
   }, {threshold:0.5});
   var rs=document.getElementById('rsplit'); if(rs) splitIO.observe(rs);
   var rep=document.getElementById('replaySplit'); if(rep) rep.addEventListener('click', runSplit);
+
+  /* ---------- TRUST: custody model picker ---------- */
+  (function(){
+    var slots=document.querySelectorAll('#keyviz .kslot');
+    var verdict=document.getElementById('custodyVerdict');
+    document.querySelectorAll('[data-custody]').forEach(function(b){
+      b.addEventListener('click', function(){
+        document.querySelectorAll('[data-custody]').forEach(function(o){ o.classList.remove('sel'); });
+        b.classList.add('sel');
+        if(b.getAttribute('data-custody')==='umg'){
+          slots.forEach(function(s,i){ s.classList.toggle('on', i===0); });
+          if(verdict){ verdict.className='verdict ok'; verdict.innerHTML='UMG holds the only key. Xtrata operates the rails but <b>cannot open a master — ever</b>.'; }
+        } else {
+          slots.forEach(function(s,i){ s.classList.toggle('on', i<2); });
+          if(verdict){ verdict.className='verdict ok'; verdict.innerHTML='Any 2 of 3 (UMG + escrow) must approve; <b>Xtrata alone can never open a master</b>.'; }
+        }
+      });
+    });
+  })();
+
+  /* ---------- FAQ accordion ---------- */
+  document.querySelectorAll('.qa .q').forEach(function(q){
+    q.addEventListener('click', function(){
+      var item=q.parentElement, wasOpen=item.classList.contains('open');
+      document.querySelectorAll('.qa.open').forEach(function(o){ o.classList.remove('open'); });
+      if(!wasOpen) item.classList.add('open');
+    });
+  });
 
 })();
 </script>
