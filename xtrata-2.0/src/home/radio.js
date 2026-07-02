@@ -202,9 +202,11 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
         const match = html.match(/<source[^>]+src="(data:audio\/[^"]+)"/i);
         if (match) {
           const titleMatch = html.match(/<title>([^<]*)<\/title>/i);
+          const artistMatch = html.match(/"artist":\s*"([^"]*)"/);
           resolved = {
             src: match[1].replace(/&amp;/g, '&'),
-            title: (titleMatch ? titleMatch[1].trim() : '') || `#${tokenId}`
+            title: (titleMatch ? titleMatch[1].trim() : '') || `#${tokenId}`,
+            artist: artistMatch ? artistMatch[1].trim() : ''
           };
         }
       } else {
@@ -240,7 +242,10 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   // whose audio is a large embedded data: URI) and letting the <audio> element
   // buffer it. We do all of that ahead of time so the first click drops the
   // needle almost instantly.
-  let preloadedTrack = null;
+  // A small queue of fully resolved (and cache-warmed) tracks so both the
+  // first switch-on AND skip-button retunes land instantly.
+  const PRELOAD_TARGET = 3;
+  const preloadQueue = [];
   let preloading = false;
 
   const warmHttpCache = async (src) => {
@@ -249,21 +254,22 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   };
 
   const preloadNextTrack = async () => {
-    if (preloading || preloadedTrack) return;
+    if (preloading) return;
     preloading = true;
     try {
-      for (let attempt = 0; attempt < 4; attempt += 1) {
+      let attempts = 0;
+      while (preloadQueue.length < PRELOAD_TARGET && attempts < PRELOAD_TARGET * 3) {
+        attempts += 1;
         const tokenId = pickNext();
+        if (preloadQueue.some((t) => t.tokenId === tokenId)) continue;
         const track = await resolveTrack(tokenId);
-        if (track) {
-          await warmHttpCache(track.src);
-          preloadedTrack = track;
-          // If the radio is idle, stage it in the element so it decodes/buffers now.
-          if (!on) {
-            player.src = track.src;
-            try { player.load(); } catch { /* noop */ }
-          }
-          break;
+        if (!track) continue;
+        await warmHttpCache(track.src);
+        preloadQueue.push({ ...track, tokenId });
+        // Stage the head of the queue in the element while idle so it decodes now.
+        if (!on && preloadQueue.length === 1) {
+          player.src = preloadQueue[0].src;
+          try { player.load(); } catch { /* noop */ }
         }
       }
     } finally {
@@ -275,6 +281,83 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   const idle = window.requestIdleCallback || ((fn) => window.setTimeout(fn, 2500));
   idle(() => { void preloadNextTrack(); });
 
+  // --- digital screen ticker ---------------------------------------------
+  // While a song plays the screen cycles: NOW PLAYING info interleaved with a
+  // varied pool of station idents, Xtrata facts and plugs — never the same two
+  // fillers back to back, and the track info returns every other slot.
+  const TICKER_MS = 6000;
+  const FILLERS = [
+    'ALL MUSIC 100% ON-CHAIN',
+    'NO SERVERS · NO STREAMS · JUST STACKS',
+    'EVERY SONG IS AN INSCRIPTION',
+    'ANCHORED TO BITCOIN VIA STACKS',
+    'INSCRIBE YOUR OWN → /agent-one',
+    'SUNO TRACK? FAST-TRACK IT → /agent-one/suno',
+    'BUILD A GALLERY → /manifests',
+    'FIND ARTISTS AT /g/name.btc',
+    'RECORD IT · REFERENCE IT · RETRIEVE IT',
+    'NO HOSTING BILLS. EVER.',
+    'THIS RADIO HAS NO PLAYLIST SERVER',
+    'PERMANENT MEDIA RECORDS SINCE BLOCK ONE',
+    'YOU ARE LOCKED TO XTRATA FM',
+    'TELL A FRIEND — IT LIVES ON-CHAIN',
+    'OWN YOUR MASTERS. LITERALLY.',
+    'FOREVER TWINS: NFTS MADE PERMANENT',
+    'THE DIAL NEVER RUSTS',
+    'BROADCASTING FROM THE BLOCKCHAIN',
+    '96K OPUS · INSCRIBED FOREVER',
+    'UPDATES? JUST INSCRIBE A NEW MANIFEST'
+  ];
+  let tickerTimer = 0;
+  let tickerSlot = 0;
+  let currentTrackInfo = null;
+  let lastFillers = [];
+
+  const pickFiller = () => {
+    const pool = FILLERS.filter((f) => !lastFillers.includes(f));
+    const choice = pool[Math.floor(Math.random() * pool.length)];
+    lastFillers.push(choice);
+    if (lastFillers.length > 6) lastFillers.shift();
+    return choice;
+  };
+
+  const writeScreen = (text) => {
+    nowLabel.textContent = text;
+    nowLabel.classList.remove('is-flick');
+    void nowLabel.offsetWidth; // restart the flicker animation
+    nowLabel.classList.add('is-flick');
+  };
+
+  const tickerStep = () => {
+    if (!currentTrackInfo) return;
+    tickerSlot += 1;
+    // even slots: track info (alternating title / artist); odd slots: filler
+    if (tickerSlot % 2 === 0) {
+      const { title, artist } = currentTrackInfo;
+      writeScreen(
+        tickerSlot % 4 === 0 && artist
+          ? `BY ${artist.toUpperCase()}`
+          : `♪ NOW PLAYING: ${title}`
+      );
+    } else {
+      writeScreen(pickFiller());
+    }
+  };
+
+  const startTicker = (track) => {
+    currentTrackInfo = { title: track.title, artist: track.artist || '' };
+    tickerSlot = 0;
+    writeScreen(`♪ NOW PLAYING: ${track.title}${track.artist ? ' — ' + track.artist : ''}`);
+    if (tickerTimer) window.clearInterval(tickerTimer);
+    tickerTimer = window.setInterval(tickerStep, TICKER_MS);
+  };
+
+  const stopTicker = () => {
+    if (tickerTimer) window.clearInterval(tickerTimer);
+    tickerTimer = 0;
+    currentTrackInfo = null;
+  };
+
   const setNow = (text, playing) => {
     nowLabel.textContent = text;
     nowLabel.hidden = !text;
@@ -284,20 +367,22 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
 
   const tuneToNextTrack = async () => {
     const token = ++tuneToken;
-    setNow('tuning…', false);
+    stopTicker();
+    setNow('~ TUNING ~', false);
     const startedTuning = performance.now();
     const tuningSeconds = playTuning(1, firstTune ? 'on' : 'between');
     firstTune = false;
     // Try a few candidates in case some inscriptions have no extractable audio.
     for (let attempt = 0; attempt < 5; attempt += 1) {
       let track;
-      if (preloadedTrack) {
-        track = preloadedTrack;          // cued while the page was idle
-        preloadedTrack = null;
+      if (preloadQueue.length) {
+        track = preloadQueue.shift();    // cued ahead of time — instant
       } else {
         const tokenId = pickNext();
         track = await resolveTrack(tokenId);
       }
+      // Keep the queue topped up in the background.
+      window.setTimeout(() => { void preloadNextTrack(); }, 300);
       if (token !== tuneToken || !on) return;
       if (!track) continue;
       // Let the tuning sweep finish before the song lands — feels like a dial.
@@ -311,15 +396,18 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
       }
       try {
         await player.play();
-        setNow(`♪ ${track.title}`, true);
-        window.setTimeout(() => { void preloadNextTrack(); }, 4000);
+        setNow('', true);
+        nowLabel.hidden = false;
+        startTicker(track);
+        window.setTimeout(() => { void preloadNextTrack(); }, 1500);
         return;
       } catch {
         // Autoplay refusal or decode failure — try another station.
       }
     }
     if (token === tuneToken && on) {
-      setNow('no signal — try again', false);
+      stopTicker();
+      setNow('-- NO SIGNAL — TRY AGAIN --', false);
     }
   };
 
@@ -353,6 +441,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     window.setTimeout(() => { void preloadNextTrack(); }, 1200);
     toggleButton.setAttribute('aria-pressed', 'false');
     root.classList.remove('is-on');
+    stopTicker();
     setNow('', false);
     nextButton.hidden = true;
   };
