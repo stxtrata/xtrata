@@ -21,7 +21,10 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     '      <span class="xtrata-radio__scale">88&ensp;92&ensp;96&ensp;100&ensp;104&ensp;108</span>',
     '      <span class="xtrata-radio__needle"></span>',
     '    </span>',
-    '    <span class="xtrata-radio__brand">XTRATA&nbsp;FM</span>',
+    '    <span class="xtrata-radio__meta">',
+    '      <span class="xtrata-radio__brand">XTRATA&nbsp;FM</span>',
+    '      <span class="xtrata-radio__vu"><i></i><i></i><i></i><i></i><i></i><i></i></span>',
+    '    </span>',
     '  </span>',
     '  <span class="xtrata-radio__knob" aria-hidden="true"><i></i></span>',
     '</button>',
@@ -50,6 +53,64 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     }
     return audioContext;
   };
+
+  // --- live visuals: beat-pulsing speaker + VU meter -----------------------
+  // The <audio> element is routed through an AnalyserNode the first time a
+  // song plays. A rAF loop drives: grille pulse from the bass bins, and six
+  // log-spaced VU LEDs with peak-hold decay.
+  let analyser = null;
+  let mediaWired = false;
+  let vuFrame = 0;
+  let vuLevels = [0, 0, 0, 0, 0, 0];
+  const grille = root.querySelector('.xtrata-radio__grille');
+  const vuBars = Array.from(root.querySelectorAll('.xtrata-radio__vu i'));
+
+  const wireAnalyser = () => {
+    if (mediaWired) return;
+    const context = getContext();
+    if (!context) return;
+    try {
+      const source = context.createMediaElementSource(player);
+      analyser = context.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.75;
+      source.connect(analyser);
+      analyser.connect(context.destination);
+      mediaWired = true;
+    } catch {
+      analyser = null; // element may already be wired elsewhere — degrade gracefully
+    }
+  };
+
+  const VU_BANDS = [[1, 3], [3, 6], [6, 12], [12, 24], [24, 48], [48, 96]];
+  const vuLoop = () => {
+    vuFrame = 0;
+    if (!analyser || player.paused || player.ended) {
+      // power down: let the LEDs and speaker settle
+      vuLevels = vuLevels.map((v) => v * 0.8);
+      vuBars.forEach((bar, i) => bar.style.setProperty('--vu', vuLevels[i].toFixed(3)));
+      if (grille) grille.style.setProperty('--pulse', '0');
+      if (vuLevels.some((v) => v > 0.02)) vuFrame = window.requestAnimationFrame(vuLoop);
+      return;
+    }
+    const bins = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(bins);
+    // bass drive for the speaker pulse
+    let bass = 0;
+    for (let i = 1; i < 7; i += 1) bass += bins[i];
+    bass = Math.min(1, bass / (6 * 255));
+    if (grille) grille.style.setProperty('--pulse', (bass * bass).toFixed(3));
+    // six log-spaced bands with peak hold
+    VU_BANDS.forEach(([lo, hi], index) => {
+      let sum = 0;
+      for (let i = lo; i < hi; i += 1) sum += bins[i];
+      const level = Math.min(1, (sum / (hi - lo) / 255) * 1.35);
+      vuLevels[index] = Math.max(level, vuLevels[index] * 0.88);
+      vuBars[index].style.setProperty('--vu', vuLevels[index].toFixed(3));
+    });
+    vuFrame = window.requestAnimationFrame(vuLoop);
+  };
+  const startVu = () => { wireAnalyser(); if (!vuFrame) vuFrame = window.requestAnimationFrame(vuLoop); };
 
   // --- retro sound engine (all synthesized, no assets) ------------------
   // Layers: a mechanical switch clack, a warm noise bed swept through a
@@ -399,6 +460,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
         setNow('', true);
         nowLabel.hidden = false;
         startTicker(track);
+        startVu();
         window.setTimeout(() => { void preloadNextTrack(); }, 1500);
         return;
       } catch {

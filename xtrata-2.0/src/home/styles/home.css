@@ -3713,11 +3713,17 @@
 .xtrata-radio__set:hover { transform: translateY(-1px); }
 .xtrata-radio__set:active { transform: translateY(1px); }
 .xtrata-radio__grille {
+  --pulse: 0;
   height: 38px;
   border-radius: 6px;
   background:
     repeating-linear-gradient(90deg, rgba(20, 12, 6, 0.9) 0 2px, rgba(120, 84, 50, 0.55) 2px 5px);
-  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.55);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.55),
+    0 0 calc(var(--pulse) * 18px) rgba(255, 170, 80, calc(var(--pulse) * 0.85));
+  transform: scale(calc(1 + var(--pulse) * 0.09));
+  transition: transform 0.05s linear;
+  will-change: transform, box-shadow;
 }
 .xtrata-radio__face { display: grid; gap: 3px; min-width: 0; }
 .xtrata-radio__dial {
@@ -3765,13 +3771,41 @@
   80% { left: 74%; }
   100% { left: 26%; }
 }
+.xtrata-radio__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
 .xtrata-radio__brand {
   font: 800 8px/1 ui-monospace, monospace;
-  letter-spacing: 0.22em;
-  text-align: center;
+  letter-spacing: 0.18em;
   color: rgba(255, 226, 178, 0.75);
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
 }
+/* six-LED VU meter, green -> amber -> red, driven by --vu (0..1) per bar */
+.xtrata-radio__vu {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 10px;
+  flex: none;
+}
+.xtrata-radio__vu i {
+  --vu: 0;
+  width: 4px;
+  height: 100%;
+  border-radius: 1px;
+  background:
+    linear-gradient(0deg, #37e07a 0%, #37e07a 55%, #ffcc4d 55%, #ffcc4d 82%, #ff5a3c 82%, #ff5a3c 100%);
+  -webkit-mask-image: linear-gradient(0deg, #000 calc(var(--vu) * 100%), transparent calc(var(--vu) * 100%));
+  mask-image: linear-gradient(0deg, #000 calc(var(--vu) * 100%), transparent calc(var(--vu) * 100%));
+  box-shadow: 0 0 calc(var(--vu) * 5px) rgba(90, 255, 140, calc(var(--vu) * 0.6));
+  opacity: 0.9;
+}
+.xtrata-radio:not(.is-playing) .xtrata-radio__vu i { --vu: 0; }
 .xtrata-radio__knob {
   width: 24px;
   height: 24px;
