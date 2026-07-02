@@ -25,7 +25,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     '      <span class="xtrata-radio__vu"><i></i><i></i><i></i><i></i><i></i><i></i></span>',
     '    </span>',
     '  </span>',
-    '  <span class="xtrata-radio__knob" aria-hidden="true"><i></i></span>',
+    '  <span class="xtrata-radio__knob" role="slider" aria-label="Volume" aria-valuemin="-1" aria-valuemax="10" title="Volume — scroll or drag; below 0 clicks off"><i></i></span>',
     '</button>',
     '<span class="xtrata-radio__now xtrata-radio__analog" hidden>',
     '  <span class="xtrata-radio__scale">88&ensp;92&ensp;96&ensp;100&ensp;104&ensp;108</span>',
@@ -39,11 +39,12 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   const nowLabel = root.querySelector('.xtrata-radio__now');
   const screenText = root.querySelector('.xtrata-radio__screen-text');
   const nextButton = root.querySelector('.xtrata-radio__next');
+  const knob = root.querySelector('.xtrata-radio__knob');
 
   // --- audio plumbing ---------------------------------------------------
   const player = new Audio();
   player.preload = 'auto';
-  player.volume = 0.9;
+  player.volume = 0.8; // knob default 8/10
 
   let audioContext = null;
   const getContext = () => {
@@ -286,6 +287,72 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     return resolved;
   };
 
+  // --- volume knob ---------------------------------------------------------
+  // 0..10 steps, default 8. Anticlockwise past 0 hits -1: the power-off click.
+  // Turning up from off powers the set back on. Scroll or drag vertically.
+  let volumeStep = 8;
+  const knobAngle = (step) => -132 + (step + 1) * 24; // -1 -> -132deg … 10 -> +132deg
+  const renderKnob = () => {
+    if (!knob) return;
+    knob.style.transform = `rotate(${knobAngle(on ? volumeStep : -1)}deg)`;
+    knob.setAttribute('aria-valuenow', String(on ? volumeStep : -1));
+  };
+  const applyVolume = () => { player.volume = Math.max(0, Math.min(1, volumeStep / 10)); };
+
+  const flashScreen = (text) => {
+    clearSectionTimers();
+    screenText.classList.remove('is-scroll');
+    screenText.style.removeProperty('--shift');
+    screenText.textContent = text;
+    sectionTimers.push(window.setTimeout(() => {
+      if (currentTrackInfo) tickerStep();
+    }, 1100));
+  };
+
+  const knobTick = () => {
+    const context = getContext();
+    if (!context) return;
+    const master = context.createGain();
+    master.gain.value = 0.3;
+    master.connect(context.destination);
+    playClick(context, master, context.currentTime, 0.35);
+  };
+
+  const nudgeVolume = (delta) => {
+    if (!on) {
+      if (delta > 0) { volumeStep = Math.max(1, volumeStep); switchOn(); }
+      return;
+    }
+    const next = volumeStep + delta;
+    if (next < 0) { switchOff(); return; }        // -1: clicks off like the power switch
+    volumeStep = Math.min(10, next);
+    applyVolume();
+    knobTick();
+    renderKnob();
+    flashScreen(`VOL ${'▮'.repeat(volumeStep)}${'▯'.repeat(10 - volumeStep)} ${volumeStep}/10`);
+  };
+
+  if (knob) {
+    knob.addEventListener('click', (event) => event.stopPropagation());
+    knob.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      nudgeVolume(event.deltaY < 0 ? 1 : -1);
+    }, { passive: false });
+    let dragY = null;
+    knob.addEventListener('pointerdown', (event) => {
+      event.stopPropagation();
+      dragY = event.clientY;
+      knob.setPointerCapture(event.pointerId);
+    });
+    knob.addEventListener('pointermove', (event) => {
+      if (dragY === null) return;
+      const moved = dragY - event.clientY;
+      if (Math.abs(moved) >= 12) { nudgeVolume(moved > 0 ? 1 : -1); dragY = event.clientY; }
+    });
+    knob.addEventListener('pointerup', () => { dragY = null; });
+  }
+
   // --- station logic -----------------------------------------------------
   const playlist = tokenIds.map((id) => id.toString());
   let on = false;
@@ -352,7 +419,12 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   // While a song plays the screen cycles: NOW PLAYING info interleaved with a
   // varied pool of station idents, Xtrata facts and plugs — never the same two
   // fillers back to back, and the track info returns every other slot.
-  const TICKER_MS = 10000; // title -> artist -> info = one filler ~every 30s
+  // Self-paced ticker: each section holds, scrolls fully to its end so it can
+  // be read in full, then advances. No fixed timers cutting text off.
+  const HOLD_MS = 2400;        // pause before scrolling starts
+  const HOLD_SHORT_MS = 5000;  // dwell time for text that fits without scrolling
+  const END_HOLD_MS = 1800;    // pause at the end of a scrolled section
+  const SCROLL_PX_PER_S = 26;  // reading-speed scroll
   const FILLERS = [
     'ALL MUSIC 100% ON-CHAIN',
     'NO SERVERS · NO STREAMS · JUST STACKS',
@@ -375,7 +447,6 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     '96K OPUS · INSCRIBED FOREVER',
     'UPDATES? JUST INSCRIBE A NEW MANIFEST'
   ];
-  let tickerTimer = 0;
   let tickerSlot = 0;
   let currentTrackInfo = null;
   let lastFillers = [];
@@ -388,50 +459,58 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     return choice;
   };
 
-  let holdTimer = 0;
-  const writeScreen = (text) => {
+  let sectionTimers = [];
+  const clearSectionTimers = () => {
+    sectionTimers.forEach((t) => window.clearTimeout(t));
+    sectionTimers = [];
+  };
+  // Shows one section; calls onDone only after the text has been fully readable:
+  // fits → dwell; overflows → hold, scroll to the very end, hold, done.
+  const writeScreen = (text, onDone) => {
     if (!screenText) return;
-    if (holdTimer) window.clearTimeout(holdTimer);
+    clearSectionTimers();
     screenText.classList.remove('is-scroll');
-    screenText.textContent = text;
+    screenText.style.removeProperty('--shift');
     screenText.style.removeProperty('--dur');
-    // Pause on the new section, then scroll it across if it overflows.
-    holdTimer = window.setTimeout(() => {
-      const screen = screenText.parentElement;
-      if (screen && screenText.scrollWidth > screen.clientWidth + 4) {
-        const seconds = Math.max(6, screenText.scrollWidth / 18);
-        screenText.style.setProperty('--dur', seconds + 's');
+    screenText.textContent = text;
+    const screen = screenText.parentElement;
+    const overflow = screen ? screenText.scrollWidth - screen.clientWidth : 0;
+    if (overflow > 4) {
+      sectionTimers.push(window.setTimeout(() => {
+        const seconds = Math.max(2, (overflow + 8) / SCROLL_PX_PER_S);
+        screenText.style.setProperty('--shift', `-${overflow + 8}px`);
+        screenText.style.setProperty('--dur', `${seconds}s`);
         screenText.classList.add('is-scroll');
-      }
-    }, 2200);
+        sectionTimers.push(window.setTimeout(() => {
+          if (onDone) onDone();
+        }, seconds * 1000 + END_HOLD_MS));
+      }, HOLD_MS));
+    } else if (onDone) {
+      sectionTimers.push(window.setTimeout(onDone, HOLD_SHORT_MS));
+    }
   };
 
   const tickerStep = () => {
     if (!currentTrackInfo) return;
-    tickerSlot += 1;
     const { title, artist } = currentTrackInfo;
     // Sequential sections: TITLE -> ARTIST -> random info -> repeat.
     const phase = tickerSlot % 3;
-    if (phase === 0) {
-      writeScreen(`♪ ${title}`);
-    } else if (phase === 1) {
-      writeScreen(artist ? `BY ${artist.toUpperCase()}` : pickFiller());
-    } else {
-      writeScreen(pickFiller());
-    }
+    tickerSlot += 1;
+    const text =
+      phase === 0 ? `♪ ${title}`
+      : phase === 1 ? (artist ? `BY ${artist.toUpperCase()}` : pickFiller())
+      : pickFiller();
+    writeScreen(text, tickerStep); // advance only once fully read
   };
 
   const startTicker = (track) => {
     currentTrackInfo = { title: track.title, artist: track.artist || '' };
     tickerSlot = 0;
-    writeScreen(`♪ ${track.title}`);
-    if (tickerTimer) window.clearInterval(tickerTimer);
-    tickerTimer = window.setInterval(tickerStep, TICKER_MS);
+    tickerStep();
   };
 
   const stopTicker = () => {
-    if (tickerTimer) window.clearInterval(tickerTimer);
-    tickerTimer = 0;
+    clearSectionTimers();
     currentTrackInfo = null;
   };
 
@@ -502,6 +581,9 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
 
   const switchOn = () => {
     on = true;
+    if (volumeStep < 1) volumeStep = 8; // knob was clicked off — restore default
+    applyVolume();
+    renderKnob();
     toggleButton.setAttribute('aria-pressed', 'true');
     root.classList.add('is-on');
     void tuneToNextTrack();
@@ -519,6 +601,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     window.setTimeout(() => { void preloadNextTrack(); }, 1200);
     toggleButton.setAttribute('aria-pressed', 'false');
     root.classList.remove('is-on');
+    renderKnob();
     stopTicker();
     setNow('', false);
     nextButton.hidden = true;
@@ -531,6 +614,8 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
       void tuneToNextTrack();
     }
   });
+
+  renderKnob();
 
   return { switchOn, switchOff };
 };

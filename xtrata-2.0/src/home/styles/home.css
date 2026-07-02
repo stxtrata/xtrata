@@ -3788,11 +3788,11 @@
   text-shadow: 0 0 5px rgba(90, 255, 160, 0.75);
 }
 .xtrata-radio__screen-text.is-scroll {
-  animation: xtrata-marquee var(--dur, 8s) linear infinite;
+  animation: xtrata-marquee var(--dur, 8s) linear 1 forwards;
 }
 @keyframes xtrata-marquee {
-  0%, 10% { transform: translateX(0); }
-  90%, 100% { transform: translateX(calc(-100% + 60px)); }
+  from { transform: translateX(0); }
+  to { transform: translateX(var(--shift, 0px)); }
 }
 
 /* brand plate: logo + name + VU meter */
@@ -3803,17 +3803,17 @@
   gap: 6px;
   min-width: 0;
 }
-.xtrata-radio__brandwrap { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.xtrata-radio__brandwrap { display: inline-flex; align-items: center; gap: 3px; flex: none; }
 .xtrata-radio__logo {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 3px;
   display: block;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
 }
 .xtrata-radio__brand {
-  font: 800 8px/1 ui-monospace, monospace;
-  letter-spacing: 0.16em;
+  font: 800 7.5px/1 ui-monospace, monospace;
+  letter-spacing: 0.06em;
   color: rgba(255, 226, 178, 0.8);
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
   white-space: nowrap;
@@ -3822,10 +3822,11 @@
 .xtrata-radio__vu {
   display: inline-flex;
   align-items: flex-end;
-  gap: 2px;
-  height: 14px;
+  gap: 1.5px;
+  height: 13px;
   flex: none;
-  padding: 2px 3px;
+  margin-left: auto;
+  padding: 2px 2.5px;
   border-radius: 3px;
   background: #17100a;
   border: 1px solid rgba(0, 0, 0, 0.6);
@@ -3833,7 +3834,7 @@
 }
 .xtrata-radio__vu i {
   --vu: 0;
-  width: 5px;
+  width: 3.5px;
   height: 100%;
   border-radius: 1px;
   background:
@@ -3857,7 +3858,8 @@
   transition: transform 0.25s ease;
 }
 .xtrata-radio__knob i { width: 2px; height: 9px; border-radius: 2px; background: #3a2411; transform: translateY(-4px); }
-.xtrata-radio.is-on .xtrata-radio__knob { transform: rotate(120deg); }
+.xtrata-radio__knob { cursor: grab; touch-action: none; }
+.xtrata-radio__knob:active { cursor: grabbing; }
 
 /* external analog frequency dial (visible while the set is on) */
 .xtrata-radio__analog {
