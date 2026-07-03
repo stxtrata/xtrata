@@ -24,6 +24,14 @@ const radioLog = (event, detail, tokenId) => {
   // eslint-disable-next-line no-console
   console.log(`[radio ${new Date().toISOString().slice(11, 23)}] ${event}`, detail ?? '');
 };
+const LIKES_KEY = 'xtrata.radio.likes';
+const loadLikes = () => {
+  try { return JSON.parse(window.localStorage.getItem(LIKES_KEY) || '[]') || []; }
+  catch { return []; }
+};
+const saveLikes = (likes) => {
+  try { window.localStorage.setItem(LIKES_KEY, JSON.stringify(likes.slice(0, 200))); } catch { /* noop */ }
+};
 const loadState = () => {
   try { return JSON.parse(window.localStorage.getItem(STORAGE_KEY) || 'null') || {}; }
   catch { return {}; }
@@ -367,10 +375,12 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
         if (match) {
           const titleMatch = html.match(/<title>([^<]*)<\/title>/i);
           const artistMatch = html.match(/"artist":\s*"([^"]*)"/);
+          const coverMatch = html.match(/<img[^>]+src="(data:image\/[^"]+)"/i);
           resolved = {
             src: match[1].replace(/&amp;/g, '&'),
             title: (titleMatch ? titleMatch[1].trim() : '') || `#${tokenId}`,
             artist: artistMatch ? artistMatch[1].trim() : '',
+            cover: coverMatch ? coverMatch[1] : '',
             tokenId
           };
         }
@@ -457,6 +467,63 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     knob.addEventListener('pointerup', () => { dragY = null; });
   }
 
+  // --- likes, bands, presets, events ---------------------------------------
+  let likes = loadLikes();                 // [{tokenId,title,artist,likedAt}]
+  let band = 'fm';                         // 'fm' | 'liked' | 'chain'
+  let preset = 'all';                      // within FM: 'music' | 'all'
+  const listeners = new Set();
+  let nowPlaying = null;                   // {tokenId,title,artist,cover}
+  const emit = () => {
+    const snapshot = { on, band, preset, nowPlaying, likes: likes.slice(), volumeStep };
+    listeners.forEach((cb) => { try { cb(snapshot); } catch { /* listener error */ } });
+  };
+  const isLiked = (id) => likes.some((l) => l.tokenId === String(id));
+  const toggleLike = () => {
+    if (!nowPlaying) return false;
+    if (isLiked(nowPlaying.tokenId)) {
+      likes = likes.filter((l) => l.tokenId !== nowPlaying.tokenId);
+      writeScreen('♡ REMOVED FROM YOUR STATION');
+    } else {
+      likes.unshift({ tokenId: nowPlaying.tokenId, title: nowPlaying.title, artist: nowPlaying.artist || '', likedAt: Date.now() });
+      writeScreen('♥ SAVED TO YOUR STATION');
+      knobTick();
+    }
+    saveLikes(likes);
+    sectionTimers.push(window.setTimeout(() => { if (currentTrackInfo) tickerStep(); }, 1400));
+    emit();
+    return isLiked(nowPlaying.tokenId);
+  };
+  const BANDS = ['fm', 'liked', 'chain'];
+  const setBand = (next) => {
+    if (!BANDS.includes(next)) return;
+    band = next;
+    persistExtras();
+    if (on) {
+      writeScreen(band === 'fm' ? 'BAND: FM — CURATED + CHAIN' : band === 'liked' ? (likes.length ? 'BAND: LIKED — YOUR STATION' : 'BAND: LIKED — NO SONGS SAVED YET (♥ TO ADD)') : 'BAND: CHAIN — FULL EXPLORATION');
+      player.pause();
+      void tuneToNextTrack();
+    }
+    emit();
+  };
+  const cycleBand = () => setBand(BANDS[(BANDS.indexOf(band) + 1) % BANDS.length]);
+  const PRESETS = ['all', 'music'];
+  const cyclePreset = () => {
+    preset = PRESETS[(PRESETS.indexOf(preset) + 1) % PRESETS.length];
+    persistExtras();
+    if (on) {
+      writeScreen(preset === 'music' ? 'PRESET: MUSIC — CURATED ONLY' : 'PRESET: ALL — CURATED + DISCOVERY');
+      if (band === 'fm') { player.pause(); void tuneToNextTrack(); }
+    }
+    emit();
+  };
+  const persistExtras = () => {
+    try {
+      const state = loadState();
+      state.band = band; state.preset = preset;
+      saveState(state);
+    } catch { /* noop */ }
+  };
+
   // --- station logic -----------------------------------------------------
   // The curated ids are seeds; the station also explores the ENTIRE contract.
   // resolveTrack() is the gatekeeper: anything without playable audio returns
@@ -495,11 +562,21 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   let recent = [];
   let firstTune = true;
 
+  let forcedNext = null;
   const pickNext = () => {
     let choice;
-    // Explore the whole chain when we know its size; skip ids already known
-    // to be unplayable (cached as null in trackCache).
-    if (maxTokenId > 0 && Math.random() < EXPLORE_RATIO) {
+    if (forcedNext) { choice = forcedNext; forcedNext = null; recent.push(choice); if (recent.length > 8) recent.shift(); return choice; }
+    // Band routing: LIKED = your station only; CHAIN = pure exploration;
+    // FM = curated (+ discovery unless preset MUSIC).
+    if (band === 'liked' && likes.length) {
+      const pool = likes.map((l) => l.tokenId).filter((id) => !recent.includes(id) && trackCache.get(id) !== null);
+      choice = (pool.length ? pool : likes.map((l) => l.tokenId))[Math.floor(Math.random() * (pool.length || likes.length))];
+      recent.push(choice);
+      if (recent.length > 8) recent.shift();
+      return choice;
+    }
+    const exploreChance = band === 'chain' ? 1 : (band === 'fm' && preset === 'music' ? 0 : EXPLORE_RATIO);
+    if (maxTokenId > 0 && Math.random() < exploreChance) {
       for (let attempt = 0; attempt < 10; attempt += 1) {
         const candidate = String(1 + Math.floor(Math.random() * maxTokenId));
         if (recent.includes(candidate)) continue;
@@ -733,6 +810,8 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
         startTicker(track);
         startVu();
         currentTokenId = track.tokenId || null;
+        nowPlaying = { tokenId: track.tokenId, title: track.title, artist: track.artist || '', cover: track.cover || '', href: `/inscription/${track.tokenId}` };
+        emit();
         persist();
         if (history[history.length - 1] !== track) history.push(track);
         if (history.length > 12) history.shift();
@@ -795,7 +874,9 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     renderKnob();
     stopTicker();
     setNow('', false);
+    nowPlaying = null;
     persist();
+    emit();
   };
 
   toggleButton.addEventListener('click', () => (on ? switchOff() : switchOn()));
@@ -889,5 +970,26 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     void resume();
   }
 
-  return { switchOn, switchOff };
+  if (saved && BANDS.includes(saved.band)) band = saved.band;
+  if (saved && PRESETS.includes(saved.preset)) preset = saved.preset;
+
+  // Public API for the full-screen /radio page (and anything else).
+  const api = {
+    switchOn, switchOff,
+    isOn: () => on,
+    playPause: () => { if (!on) { switchOn(); } else if (player.paused) { void player.play(); } else { player.pause(); } },
+    next: () => skip('next'),
+    prev: () => skip('prev'),
+    toggleLike,
+    isLiked: () => (nowPlaying ? isLiked(nowPlaying.tokenId) : false),
+    getLikes: () => likes.slice(),
+    cycleBand, setBand, cyclePreset,
+    getState: () => ({ on, band, preset, nowPlaying, likes: likes.slice(), volumeStep }),
+    unlike: (id) => { likes = likes.filter((l) => l.tokenId !== String(id)); saveLikes(likes); emit(); },
+    playToken: (id) => { forcedNext = String(id); if (!on) { switchOn(); } else { player.pause(); void tuneToNextTrack(); } },
+    nudgeVolume,
+    subscribe: (cb) => { listeners.add(cb); cb({ on, band, preset, nowPlaying, likes: likes.slice(), volumeStep }); return () => listeners.delete(cb); }
+  };
+  window.XtrataRadio = api;
+  return api;
 };

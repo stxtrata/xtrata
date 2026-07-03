@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Xtrata Radio — inscribed music, live from the chain</title>
+<meta name="description" content="A radio station whose entire catalogue lives on-chain. Every song is an inscription. Tune between curated, liked and full-chain bands." />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<style>
+  :root{color-scheme:dark;--bg:#07090f;--panel:#101623;--line:#243044;--ink:#e6edf6;--mut:#8b9bb4;
+    --acc:#3ea6ff;--acc2:#7c5cff;--cyan:#5ee9ff;--ok:#3ddc97;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    background:radial-gradient(1200px 700px at 50% -12%,rgba(94,233,255,.10),transparent),
+      radial-gradient(900px 600px at 85% 110%,rgba(124,92,255,.12),transparent),var(--bg)}
+  header{display:flex;align-items:center;gap:12px;padding:16px 24px;border-bottom:1px solid var(--line)}
+  header img{width:28px;height:28px;border-radius:7px}
+  .logo{font-weight:800;letter-spacing:.4px}.logo b{color:var(--acc)}.logo i{color:var(--cyan);font-style:normal}
+  .live{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--mut)}
+  .live b{color:#ff5d5d;animation:blink 1.6s steps(2) infinite}
+  @keyframes blink{50%{opacity:.25}}
+  main{max-width:1080px;margin:0 auto;padding:34px 22px 180px;display:grid;grid-template-columns:minmax(0,460px) minmax(0,1fr);gap:34px;align-items:start}
+  /* artwork */
+  .art{position:relative;aspect-ratio:1/1;border-radius:22px;overflow:hidden;border:1px solid var(--line);
+    background:linear-gradient(145deg,#0d1420,#0a0e17);box-shadow:0 30px 80px rgba(0,0,0,.55),0 0 0 1px rgba(94,233,255,.05)}
+  .art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+  .art.has-cover img{display:block}
+  .art .fallback{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+  .art.has-cover .fallback{display:none}
+  .fallback img.mark{width:96px;height:96px;border-radius:22px;opacity:.9;position:static;display:block;object-fit:contain}
+  .eq{display:flex;gap:6px;height:42px;align-items:flex-end}
+  .eq i{width:7px;border-radius:3px;background:linear-gradient(180deg,var(--cyan),var(--acc2));opacity:.85;animation:eq 1.1s ease-in-out infinite}
+  .eq i:nth-child(2){animation-delay:.15s}.eq i:nth-child(3){animation-delay:.32s}.eq i:nth-child(4){animation-delay:.06s}
+  .eq i:nth-child(5){animation-delay:.24s}.eq i:nth-child(6){animation-delay:.4s}.eq i:nth-child(7){animation-delay:.12s}
+  @keyframes eq{0%,100%{height:22%}50%{height:96%}}
+  .paused .eq i{animation-play-state:paused;height:14%}
+  .fallback .fnote{font-family:var(--mono);font-size:12px;color:var(--mut);letter-spacing:.14em}
+  .chainlink{position:absolute;left:14px;bottom:14px;font-family:var(--mono);font-size:12px;background:rgba(7,9,15,.78);
+    border:1px solid var(--line);border-radius:999px;padding:7px 13px;color:var(--cyan);text-decoration:none;backdrop-filter:blur(6px)}
+  .chainlink:hover{border-color:var(--cyan)}
+  /* right column */
+  .vfd{border:1px solid #17323c;border-radius:16px;padding:18px 20px;background:linear-gradient(180deg,#04161c,#031014);
+    box-shadow:inset 0 0 30px rgba(94,233,255,.06);position:relative;overflow:hidden}
+  .vfd::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(0,0,0,.22) 2px 3px)}
+  .stn{font-family:var(--mono);font-size:13px;letter-spacing:.28em;color:var(--cyan);opacity:.85}
+  .ttl{font-family:var(--mono);font-size:clamp(20px,3.2vw,30px);font-weight:700;color:var(--cyan);margin:8px 0 2px;
+    text-shadow:0 0 14px rgba(94,233,255,.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .artst{font-family:var(--mono);font-size:15px;color:#9fd9e6;min-height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .idrow{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap}
+  .idpill{font-family:var(--mono);font-size:12px;color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:5px 11px}
+  .viewbtn{font:inherit;font-size:13px;font-weight:700;color:#04161c;background:linear-gradient(180deg,#7ff0ff,#3ecbe8);
+    border:0;border-radius:999px;padding:8px 16px;cursor:pointer;text-decoration:none;display:none}
+  .viewbtn.show{display:inline-block}
+  /* controls */
+  .ctl{display:flex;gap:12px;align-items:center;margin-top:22px;flex-wrap:wrap}
+  .cbtn{width:56px;height:56px;border-radius:50%;border:1px solid var(--line);background:linear-gradient(180deg,#1a2334,#0e1522);
+    color:var(--ink);font-size:20px;cursor:pointer;transition:border-color .12s,transform .06s}
+  .cbtn:hover{border-color:var(--acc)} .cbtn:active{transform:scale(.94)}
+  .cbtn.big{width:74px;height:74px;font-size:26px;border-color:#2b3a55}
+  .cbtn.heart.on{color:#ff5d7d;border-color:#ff5d7d;box-shadow:0 0 18px rgba(255,93,125,.35)}
+  .power.on{color:var(--ok);border-color:var(--ok);box-shadow:0 0 18px rgba(61,220,151,.3)}
+  .grp{margin-top:26px}
+  .grp label{display:block;font-size:11px;font-weight:800;color:var(--mut);letter-spacing:.16em;margin-bottom:8px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .seg button{font:inherit;font-size:13px;font-weight:700;padding:10px 18px;background:transparent;color:var(--mut);border:0;cursor:pointer;font-family:var(--mono)}
+  .seg button+button{border-left:1px solid var(--line)}
+  .seg button.on{background:rgba(94,233,255,.12);color:var(--cyan)}
+  .preset{margin-left:14px}
+  /* likes */
+  .likes{margin-top:30px;border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:16px 18px}
+  .likes h3{margin:0 0 4px;font-size:14px;letter-spacing:.08em}.likes .hint{font-size:12px;color:var(--mut)}
+  .lrow{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid rgba(36,48,68,.6);font-size:13.5px}
+  .lrow:last-child{border-bottom:0}
+  .lrow .lt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+  .lrow .lt:hover{color:var(--cyan)} .lrow .la{color:var(--mut);font-size:12px}
+  .lrow button{background:none;border:1px solid var(--line);color:var(--mut);border-radius:7px;width:26px;height:26px;cursor:pointer}
+  .lrow button:hover{color:#ff5d7d;border-color:#ff5d7d}
+  .strap{margin-top:26px;font-size:13px;color:var(--mut)} .strap a{color:var(--acc)}
+  @media(max-width:880px){main{grid-template-columns:1fr;gap:24px;padding-bottom:210px}.art{max-width:460px;margin:0 auto}}
+</style>
+</head>
+<body>
+<header>
+  <a href="/" title="Xtrata home"><img src="/favicon.svg" alt="Xtrata" /></a>
+  <div class="logo"><b>XTRATA</b> <i>RADIO</i></div>
+  <div class="live"><b>●</b> BROADCASTING FROM THE CHAIN</div>
+</header>
+<main class="paused" id="stage">
+  <div>
+    <div class="art" id="art">
+      <img id="cover" alt="Inscription artwork" />
+      <div class="fallback">
+        <img class="mark" src="/favicon.svg" alt="" />
+        <span class="eq"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="fnote" id="fnote">PRESS POWER TO TUNE IN</span>
+      </div>
+      <a class="chainlink" id="artLink" target="_blank" rel="noopener" style="display:none">VIEW INSCRIPTION ↗</a>
+    </div>
+  </div>
+  <div>
+    <div class="vfd">
+      <div class="stn" id="stn">XTRATA FM</div>
+      <div class="ttl" id="ttl">— OFF AIR —</div>
+      <div class="artst" id="artst"></div>
+      <div class="idrow">
+        <span class="idpill" id="idpill" style="display:none"></span>
+        <a class="viewbtn" id="viewbtn" target="_blank" rel="noopener">View inscription ↗</a>
+      </div>
+    </div>
+    <div class="ctl">
+      <button class="cbtn power" id="power" title="Power">⏻</button>
+      <button class="cbtn" id="prev" title="Previous">⏮</button>
+      <button class="cbtn big" id="pp" title="Play / pause">▶</button>
+      <button class="cbtn" id="next" title="Next">⏭</button>
+      <button class="cbtn heart" id="heart" title="Like — saves to your station">♥</button>
+    </div>
+    <div class="grp">
+      <label>BAND</label>
+      <span class="seg" id="bands">
+        <button data-b="fm">FM</button><button data-b="liked">LIKED</button><button data-b="chain">CHAIN</button>
+      </span>
+      <span class="seg preset" id="presetSeg" title="FM preset"><button id="presetBtn">PRESET: ALL</button></span>
+    </div>
+    <div class="likes">
+      <h3>♥ YOUR STATION</h3>
+      <div class="hint" id="likesHint">Like songs while they play — they get their own band, and play first when you tune in.</div>
+      <div id="likesList"></div>
+    </div>
+    <p class="strap">Every song on this station is an inscription — full audio files living permanently on-chain.
+      <a href="/agent-one/" target="_blank" rel="noopener">Inscribe your own →</a></p>
+  </div>
+</main>
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  var api=null, state=null;
+  function esc(t){var d=document.createElement('span');d.textContent=t==null?'':String(t);return d.innerHTML}
+  function render(s){
+    state=s;
+    var np=s.nowPlaying, stage=$('stage');
+    $('stn').textContent=(s.band==='liked'?'XTRATA · YOUR STATION':s.band==='chain'?'XTRATA · CHAIN BAND':'XTRATA FM');
+    $('ttl').textContent=np?np.title:(s.on?'TUNING…':'— OFF AIR —');
+    $('artst').textContent=np&&np.artist?np.artist:'';
+    $('power').classList.toggle('on',!!s.on);
+    $('pp').textContent=s.on?'⏸':'▶';
+    stage.classList.toggle('paused',!s.on);
+    $('fnote').textContent=s.on?(np?'NO ARTWORK IN THIS INSCRIPTION':'TUNING…'):'PRESS POWER TO TUNE IN';
+    var art=$('art');
+    if(np&&np.cover){$('cover').src=np.cover;art.classList.add('has-cover');}
+    else{art.classList.remove('has-cover');$('cover').removeAttribute('src');}
+    var pill=$('idpill'),vb=$('viewbtn'),al=$('artLink');
+    if(np){pill.style.display='';pill.textContent='INSCRIPTION #'+np.tokenId;
+      vb.classList.add('show');vb.href=np.href;al.style.display='';al.href=np.href;}
+    else{pill.style.display='none';vb.classList.remove('show');al.style.display='none';}
+    var liked=!!(np&&s.likes.some(function(l){return l.tokenId===String(np.tokenId)}));
+    $('heart').classList.toggle('on',liked);
+    Array.prototype.forEach.call($('bands').children,function(b){b.classList.toggle('on',b.dataset.b===s.band)});
+    $('presetBtn').textContent='PRESET: '+(s.preset==='music'?'MUSIC':'ALL');
+    var list=$('likesList');list.innerHTML='';
+    $('likesHint').style.display=s.likes.length?'none':'';
+    s.likes.forEach(function(l){
+      var row=document.createElement('div');row.className='lrow';
+      row.innerHTML='<span class="lt" title="Play now">'+esc(l.title)+'</span><span class="la">'+esc(l.artist||('#'+l.tokenId))+'</span><button title="Remove">✕</button>';
+      row.querySelector('.lt').addEventListener('click',function(){api.playToken(l.tokenId)});
+      row.querySelector('button').addEventListener('click',function(){api.unlike(l.tokenId)});
+      list.appendChild(row);
+    });
+  }
+  function boot(a){
+    api=a;a.subscribe(render);
+    $('power').addEventListener('click',function(){api.isOn()?api.switchOff():api.switchOn()});
+    $('pp').addEventListener('click',function(){api.playPause()});
+    $('prev').addEventListener('click',function(){api.prev()});
+    $('next').addEventListener('click',function(){api.next()});
+    $('heart').addEventListener('click',function(){api.toggleLike()});
+    Array.prototype.forEach.call($('bands').children,function(b){b.addEventListener('click',function(){api.setBand(b.dataset.b)})});
+    $('presetBtn').addEventListener('click',function(){api.cyclePreset()});
+  }
+  var tries=0,t=setInterval(function(){
+    if(window.XtrataRadio){clearInterval(t);boot(window.XtrataRadio);}
+    else if(++tries>100){clearInterval(t);$('ttl').textContent='RADIO FAILED TO LOAD';}
+  },120);
+})();
+</script>
+<script src="/xtrata-radio.js" defer></script>
+</body>
+</html>
