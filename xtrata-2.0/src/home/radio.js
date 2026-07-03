@@ -159,7 +159,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
       if (!silentSince) silentSince = performance.now();
       else if (performance.now() - silentSince > 8000 && on) {
         radioLog(`silent track detected #${currentTokenId}`, 'no audio signal for 8s — skipping and marking dud', currentTokenId);
-        if (currentTokenId) trackCache.set(String(currentTokenId), null);
+        if (currentTokenId) { trackCache.set(String(currentTokenId), null); persistDud(currentTokenId); }
         silentSince = 0;
         player.pause();
         void tuneToNextTrack();
@@ -321,6 +321,21 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   // air (e.g. #1065 — a video-only mp4 with no decodable audio track).
   const IGNORE_IDS = new Set(['1065', '5', '319', '1090']);
   const trackCache = new Map(); // tokenId -> { src, title } | null
+  // Duds persist across visits so each page load doesn't burn tune attempts
+  // re-discovering the same dead ids (a big source of NO SIGNAL runs).
+  const DUDS_KEY = 'xtrata.radio.duds.v1';
+  try {
+    JSON.parse(window.localStorage.getItem(DUDS_KEY) || '[]').forEach((id) => trackCache.set(String(id), null));
+  } catch { /* fresh cache */ }
+  const persistDud = (tokenId) => {
+    try {
+      const duds = JSON.parse(window.localStorage.getItem(DUDS_KEY) || '[]');
+      if (!duds.includes(String(tokenId))) {
+        duds.push(String(tokenId));
+        window.localStorage.setItem(DUDS_KEY, JSON.stringify(duds.slice(-2000)));
+      }
+    } catch { /* noop */ }
+  };
   const resolveTrack = async (tokenId) => {
     if (IGNORE_IDS.has(String(tokenId))) {
       radioLog(`ignored #${tokenId}`, 'on the hardcoded ignore list', tokenId);
@@ -358,12 +373,17 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
           src = url + '&m=1';
           break;
         }
-        if (!attempt.ok) definitive = false; // transient — retry later
+        // 404/410 mean the content genuinely isn't on this core — that is a
+        // definitive answer. Only server errors / rate limits are transient;
+        // treating 404s as transient made dead ids immortal and caused
+        // recurring NO SIGNAL runs.
+        if (!attempt.ok && attempt.status !== 404 && attempt.status !== 410) definitive = false;
         try { await attempt.body?.cancel(); } catch { /* noop */ }
       }
       if (!response) {
         radioLog(`verdict #${tokenId}`, definitive ? 'DUD (no playable content on any core)' : 'TRANSIENT (will retry; warm requested)', tokenId);
-        if (definitive) trackCache.set(tokenId, null); else trackCache.delete(tokenId);
+        if (definitive) { trackCache.set(tokenId, null); persistDud(tokenId); }
+        else trackCache.delete(tokenId);
         return null;
       }
       if (response.ok && (mime.startsWith('audio/') || mime.startsWith('video/'))) {
@@ -400,6 +420,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     radioLog(`verdict #${tokenId}`, resolved ? { playable: true, src: resolved.src.slice(0, 80), title: resolved.title } : (definitive ? 'DUD' : 'TRANSIENT'), tokenId);
     if (resolved || definitive) {
       trackCache.set(tokenId, resolved);
+      if (!resolved) persistDud(tokenId);
     } else {
       trackCache.delete(tokenId); // transient failure — eligible again next pass
       pingWarm(tokenId); // server reconstructs it into R2 for the retry
