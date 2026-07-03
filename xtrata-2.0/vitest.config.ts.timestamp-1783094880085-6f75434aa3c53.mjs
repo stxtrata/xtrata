@@ -1,0 +1,16 @@
+// vitest.config.ts
+import { defineConfig } from "file:///sessions/wizardly-friendly-ramanujan/mnt/xtrata-2.0/node_modules/vitest/dist/config.js";
+var vitest_config_default = defineConfig({
+  test: {
+    environment: "node",
+    include: [
+      "src/**/*.test.ts",
+      "functions/**/*.test.ts",
+      "packages/**/*.test.ts"
+    ]
+  }
+});
+export {
+  vitest_config_default as default
+};
+//# sourceMappingURL=data:application/json;base64,ewogICJ2ZXJzaW9uIjogMywKICAic291cmNlcyI6IFsidml0ZXN0LmNvbmZpZy50cyJdLAogICJzb3VyY2VzQ29udGVudCI6IFsiY29uc3QgX192aXRlX2luamVjdGVkX29yaWdpbmFsX2Rpcm5hbWUgPSBcIi9zZXNzaW9ucy93aXphcmRseS1mcmllbmRseS1yYW1hbnVqYW4vbW50L3h0cmF0YS0yLjBcIjtjb25zdCBfX3ZpdGVfaW5qZWN0ZWRfb3JpZ2luYWxfZmlsZW5hbWUgPSBcIi9zZXNzaW9ucy93aXphcmRseS1mcmllbmRseS1yYW1hbnVqYW4vbW50L3h0cmF0YS0yLjAvdml0ZXN0LmNvbmZpZy50c1wiO2NvbnN0IF9fdml0ZV9pbmplY3RlZF9vcmlnaW5hbF9pbXBvcnRfbWV0YV91cmwgPSBcImZpbGU6Ly8vc2Vzc2lvbnMvd2l6YXJkbHktZnJpZW5kbHktcmFtYW51amFuL21udC94dHJhdGEtMi4wL3ZpdGVzdC5jb25maWcudHNcIjtpbXBvcnQgeyBkZWZpbmVDb25maWcgfSBmcm9tICd2aXRlc3QvY29uZmlnJztcblxuZXhwb3J0IGRlZmF1bHQgZGVmaW5lQ29uZmlnKHtcbiAgdGVzdDoge1xuICAgIGVudmlyb25tZW50OiAnbm9kZScsXG4gICAgaW5jbHVkZTogW1xuICAgICAgJ3NyYy8qKi8qLnRlc3QudHMnLFxuICAgICAgJ2Z1bmN0aW9ucy8qKi8qLnRlc3QudHMnLFxuICAgICAgJ3BhY2thZ2VzLyoqLyoudGVzdC50cydcbiAgICBdXG4gIH1cbn0pO1xuIl0sCiAgIm1hcHBpbmdzIjogIjtBQUFrVixTQUFTLG9CQUFvQjtBQUUvVyxJQUFPLHdCQUFRLGFBQWE7QUFBQSxFQUMxQixNQUFNO0FBQUEsSUFDSixhQUFhO0FBQUEsSUFDYixTQUFTO0FBQUEsTUFDUDtBQUFBLE1BQ0E7QUFBQSxNQUNBO0FBQUEsSUFDRjtBQUFBLEVBQ0Y7QUFDRixDQUFDOyIsCiAgIm5hbWVzIjogW10KfQo=

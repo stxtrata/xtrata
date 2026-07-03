@@ -536,6 +536,47 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   let maxTokenId = 0;
   const EXPLORE_RATIO = 0.5; // half the picks roam the full id range
 
+  // --- no-repeat memory ----------------------------------------------------
+  // Once a song has actually played, it won't play again until the dial has
+  // cycled through every other known playable song. Persists across visits;
+  // resets automatically when a cycle completes.
+  const PLAYED_KEY = 'xtrata.radio.played.v1';
+  let played = new Set();
+  try { played = new Set(JSON.parse(window.localStorage.getItem(PLAYED_KEY) || '[]')); } catch { /* fresh set */ }
+  const savePlayed = () => { try { window.localStorage.setItem(PLAYED_KEY, JSON.stringify([...played].slice(-5000))); } catch { /* noop */ } };
+  const markPlayed = (id) => { if (id) { played.add(String(id)); savePlayed(); } };
+  const clearPlayed = () => { played = new Set(); savePlayed(); radioLog('no-repeat cycle complete — every known song has aired, starting a fresh cycle'); };
+  // Fresh mints (ids that appear while the radio is on) jump the queue so new songs air fast.
+  const freshIds = [];
+
+  // --- known-song pool (D1-backed) ------------------------------------------
+  // /index/playable serves the FULL list of audio-capable tokens from the edge
+  // in one query (the D1 index syncs incrementally from the append-only
+  // minted-id list, so only new ids are ever scanned). With this pool the dial
+  // never wastes a spin on images/documents, "all known songs" is exact for the
+  // no-repeat cycle, and new mints arrive within a refresh.
+  const PLAYABLE_CONTRACT = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3';
+  let knownPool = [];                 // audio/video first, then html player candidates
+  const knownSet = new Set();
+  const fetchPlayable = async () => {
+    try {
+      const response = await fetch('/index/playable?contract=' + encodeURIComponent(PLAYABLE_CONTRACT));
+      if (!response.ok) return;
+      const data = await response.json();
+      const ids = [...(data.audio || []), ...(data.html || [])].map(String);
+      if (!ids.length) return;
+      const hadPool = knownSet.size > 0;
+      for (const id of ids) {
+        if (!knownSet.has(id)) {
+          knownSet.add(id);
+          if (hadPool) { freshIds.push(id); radioLog('new song indexed — queued for airplay', { tokenId: id }, id); }
+        }
+      }
+      knownPool = ids;
+      if (Number(data.mintedCount) > maxTokenId) maxTokenId = Number(data.mintedCount);
+    } catch { /* endpoint down — random exploration below still works */ }
+  };
+
   const discoverRange = async () => {
     try {
       const response = await fetch(
@@ -552,11 +593,22 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
       // (ok uint): 07 then 01 then 16 bytes big-endian
       if (data.okay && hex.startsWith('0701')) {
         const value = parseInt(hex.slice(2 + 2), 16);
-        if (Number.isFinite(value) && value > 0) maxTokenId = value;
+        if (Number.isFinite(value) && value > 0) {
+          if (maxTokenId > 0 && value > maxTokenId) {
+            for (let id = maxTokenId + 1; id <= value; id += 1) freshIds.push(String(id));
+            radioLog('new inscriptions on-chain — queued for airplay', { from: maxTokenId + 1, to: value });
+          }
+          maxTokenId = value;
+        }
       }
     } catch { /* stay curated-only */ }
   };
   void discoverRange();
+  void fetchPlayable();
+  // Keep the dial aware of new mints: an open tab re-reads the indexed song list
+  // (and the contract ceiling as fallback) every 5 minutes, so a freshly
+  // inscribed song becomes playable without a reload.
+  window.setInterval(() => { void fetchPlayable(); void discoverRange(); }, 5 * 60 * 1000);
   let on = false;
   let tuneToken = 0;
   let recent = [];
@@ -576,19 +628,57 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
       return choice;
     }
     const exploreChance = band === 'chain' ? 1 : (band === 'fm' && preset === 'music' ? 0 : EXPLORE_RATIO);
-    if (maxTokenId > 0 && Math.random() < exploreChance) {
-      for (let attempt = 0; attempt < 10; attempt += 1) {
+    // FRESH-MINT PRIORITY: anything inscribed since load airs next (any band with
+    // discovery enabled) — a new song shouldn't have to win the random lottery.
+    if (exploreChance > 0) {
+      while (!choice && freshIds.length) {
+        const candidate = freshIds.shift();
+        if (recent.includes(candidate) || played.has(candidate) || trackCache.get(candidate) === null) continue;
+        choice = candidate;
+      }
+    }
+    // KNOWN-POOL EXPLORATION: with the D1 station list, pick only from tokens
+    // that can actually carry audio, and the no-repeat cycle is exact — a new
+    // cycle starts precisely when every known song has aired.
+    if (!choice && knownPool.length && Math.random() < exploreChance) {
+      let candidates = knownPool.filter((id) => !recent.includes(id) && !played.has(id) && trackCache.get(id) !== null);
+      if (!candidates.length) {
+        clearPlayed();
+        candidates = knownPool.filter((id) => !recent.includes(id) && trackCache.get(id) !== null);
+      }
+      if (candidates.length) choice = candidates[Math.floor(Math.random() * candidates.length)];
+    }
+    // Fallback (station list unavailable): blind random ids across the range.
+    if (!choice && !knownPool.length && maxTokenId > 0 && Math.random() < exploreChance) {
+      let playedRejects = 0;
+      for (let attempt = 0; attempt < 25; attempt += 1) {
         const candidate = String(1 + Math.floor(Math.random() * maxTokenId));
         if (recent.includes(candidate)) continue;
         if (trackCache.get(candidate) === null) continue; // known dud
+        if (played.has(candidate)) { playedRejects += 1; continue; }  // no repeats within a cycle
         choice = candidate;
         break;
       }
+      // Every sampled candidate had already aired → the cycle is (statistically)
+      // complete. Reset and pick again so the dial keeps spinning, never repeats early.
+      if (!choice && playedRejects >= 20) {
+        clearPlayed();
+        for (let attempt = 0; attempt < 10 && !choice; attempt += 1) {
+          const candidate = String(1 + Math.floor(Math.random() * maxTokenId));
+          if (!recent.includes(candidate) && trackCache.get(candidate) !== null) choice = candidate;
+        }
+      }
     }
     if (!choice) {
-      const candidates = playlist.filter((id) => !recent.includes(id));
-      const pool = candidates.length ? candidates : playlist;
-      choice = pool[Math.floor(Math.random() * pool.length)];
+      let candidates = playlist.filter((id) => !recent.includes(id) && !played.has(id) && trackCache.get(id) !== null);
+      // Curated cycle complete (everything played or a known dud) → open a new cycle for these ids.
+      if (!candidates.length && playlist.every((id) => played.has(id) || trackCache.get(id) === null)) {
+        playlist.forEach((id) => played.delete(id)); savePlayed();
+        candidates = playlist.filter((id) => !recent.includes(id) && trackCache.get(id) !== null);
+      }
+      const pool = candidates.length ? candidates : playlist.filter((id) => !recent.includes(id));
+      const finalPool = pool.length ? pool : playlist;
+      choice = finalPool[Math.floor(Math.random() * finalPool.length)];
     }
     recent.push(choice);
     if (recent.length > 8) recent.shift();
@@ -815,6 +905,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
         persist();
         if (history[history.length - 1] !== track) history.push(track);
         if (history.length > 12) history.shift();
+        markPlayed(track.tokenId);   // no-repeat: this song sits out until the cycle completes
         window.setTimeout(() => { void preloadNextTrack(); }, 1500);
         return;
       } catch (error) {
