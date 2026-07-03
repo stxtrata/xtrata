@@ -1,7 +1,7 @@
 // HTML_Template.js
 (function () {
 
-const XTRATA_PLAYER_TEMPLATE_VERSION = 'xtrata-opus-player-v5';
+const XTRATA_PLAYER_TEMPLATE_VERSION = 'xtrata-opus-player-v6';
 
 const escapeHtml = (value) =>
   String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -561,6 +561,29 @@ const buildXtrataAudioPlayerHtml = (config) => {
     .player[data-playback="playing"][data-panel="closed"]:focus-within .track-copy {
       opacity: 1;
       transform: translateY(0);
+    }
+
+    /* Cursor-idle fade: 2 s after the cursor stops moving, EVERY programmatically
+       layered overlay (title/artist, action buttons, hint, hover transport) fades
+       away so the artwork can be viewed clean. Any movement brings them back.
+       Keyboard focus keeps them visible (accessibility). */
+    .track-copy,
+    .click-hint,
+    .hover-transport {
+      transition: opacity 0.35s ease, transform 0.18s ease;
+    }
+
+    .player[data-idle="true"][data-panel="closed"] .track-copy,
+    .player[data-idle="true"][data-panel="closed"] .top-actions,
+    .player[data-idle="true"][data-panel="closed"] .click-hint,
+    .player[data-idle="true"][data-panel="closed"] .hover-transport {
+      opacity: 0 !important;
+    }
+
+    .player[data-idle="true"][data-panel="closed"]:focus-within .track-copy,
+    .player[data-idle="true"][data-panel="closed"]:focus-within .top-actions,
+    .player[data-idle="true"][data-panel="closed"] .hover-transport:focus-within {
+      opacity: 1 !important;
     }
 
     button {
@@ -1594,6 +1617,26 @@ const buildXtrataAudioPlayerHtml = (config) => {
           if (hoverHideTimer) window.clearTimeout(hoverHideTimer);
           hideHoverTransport();
         });
+      }
+
+      // --- Cursor-idle overlay fade ----------------------------------------
+      // 2 s after the cursor stops moving, ALL layered overlays (title, buttons,
+      // hint, transport) fade so the artwork shows clean; movement wakes them.
+      const IDLE_HIDE_DELAY_MS = 2000;
+      let idleTimer = 0;
+      const goIdle = () => { if (player) player.dataset.idle = 'true'; };
+      const wakeOverlays = () => {
+        if (player) player.dataset.idle = 'false';
+        if (idleTimer) window.clearTimeout(idleTimer);
+        idleTimer = window.setTimeout(goIdle, IDLE_HIDE_DELAY_MS);
+      };
+      if (player) {
+        ['pointermove', 'pointerdown', 'keydown'].forEach((eventName) => player.addEventListener(eventName, wakeOverlays));
+        player.addEventListener('pointerleave', () => {
+          if (idleTimer) window.clearTimeout(idleTimer);
+          goIdle();
+        });
+        wakeOverlays();
       }
 
       // --- Lyrics auto-scroll ----------------------------------------------
