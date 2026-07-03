@@ -34,7 +34,9 @@ const HIRO_BASE: string = cfg.hiro || '/hiro/mainnet';         // same-origin pr
 const AGENT_FEE_PCT = BigInt(cfg.agentFeePct ?? 10);
 const AGENT_FEE_ADDRESS: string = cfg.agentFeeAddress || DEPLOYER;
 export const WINDOW_MS: number = Number(cfg.windowMs || 300000); // commence/stall window
+export const PARENT_WINDOW_MS: number = Number(cfg.parentWindowMs || 900000); // 15 min after funding for parent NFT(s) to arrive, else full refund
 const PERTX_MINER = 30000n, DELIVERY_RESERVE = 200000n, REFUND_TX_FEE = 5000n, MINT_CAP = 2000000n, RECEIPT_EST = 9000;
+const PARENT_RETURN_FEE = 30000n;                                // per-parent NFT return-transfer reserve
 
 const network: any = new StacksMainnet();
 network.coreApiUrl = location.origin + HIRO_BASE;   // routes read-only + broadcast through the proxy
@@ -113,12 +115,15 @@ async function sendStx(key: string, amount: bigint, to: string, fee: bigint) {
 const tidFrom = (d: any) => { const r = d?.tx_result?.repr || ''; const m = /token-id u(\d+)/.exec(r) || /\(ok u(\d+)\)/.exec(r); return m ? m[1] : null; };
 
 // ---- mint paths ----
-async function mintSingle(key: string, from: string, data: Uint8Array, mime: string, uri: string, deps: string[], spendCap: bigint) {
+async function mintSingle(key: string, from: string, data: Uint8Array, mime: string, uri: string, deps: string[], spendCap: bigint, parents: string[] = []) {
   const chunks = chunkBytes(data); const h = incHash(chunks);
   const depCV = (deps || []).map((d) => uintCV(BigInt(d)));
-  const fn = depCV.length ? 'mint-single-tx-recursive' : 'mint-single-tx';
+  const parentCV = (parents || []).map((p) => uintCV(BigInt(p)));
+  // Parents require the -with-relationships entrypoint (contract checks tx-sender OWNS every parent).
+  const fn = parentCV.length ? 'mint-single-tx-with-relationships' : (depCV.length ? 'mint-single-tx-recursive' : 'mint-single-tx');
   const args: any[] = [bufferCV(h), stringAsciiCV(mime), uintCV(BigInt(data.length)), listCV(chunks.map((c) => bufferCV(c))), stringAsciiCV(uri)];
-  if (depCV.length) args.push(listCV(depCV));
+  if (parentCV.length) { args.push(listCV(depCV), listCV(parentCV)); }
+  else if (depCV.length) args.push(listCV(depCV));
   // IDEMPOTENT: if this exact hash is already inscribed (e.g. retry after a confirmation timeout),
   // return the existing token — a resume can never double-mint or double-spend.
   const pre = await getIdByHash(h); if (pre) return pre;
@@ -137,8 +142,11 @@ async function stagedInscribe(job: any, key: string, from: string, data: Uint8Ar
   else if (idx > 0) { onProg(`resuming upload · ${idx}/${total} chunks already on-chain`); }
   while (idx < total) { const batch = chunks.slice(idx, idx + BATCH); await send(key, from, 'add-chunk-batch', [bufferCV(h), listCV(batch.map((c) => bufferCV(c)))], null, onProg); const st: any = (await ro('get-upload-state', [bufferCV(h), standardPrincipalCV(from)])); const ni = st.value ? Number(st.value.value['current-index'].value) : null; if (ni === null || ni <= idx) throw new Error(`upload stalled at ${idx}`); idx = ni; onProg(`uploading · ${idx}/${total}`); }
   const deps = (job.deps || []).map((d: string) => uintCV(BigInt(d)));
-  const sealFn = deps.length ? 'seal-recursive' : 'seal-inscription';
-  const sealArgs: any[] = deps.length ? [bufferCV(h), stringAsciiCV(job.uri), listCV(deps)] : [bufferCV(h), stringAsciiCV(job.uri)];
+  const parents = (job.parents || []).map((p: string) => uintCV(BigInt(p)));
+  // Parents: seal-with-relationships requires the sealer (deposit wallet) to OWN the parents.
+  const sealFn = parents.length ? 'seal-with-relationships' : (deps.length ? 'seal-recursive' : 'seal-inscription');
+  const sealArgs: any[] = parents.length ? [bufferCV(h), stringAsciiCV(job.uri), listCV(deps), listCV(parents)]
+    : deps.length ? [bufferCV(h), stringAsciiCV(job.uri), listCV(deps)] : [bufferCV(h), stringAsciiCV(job.uri)];
   const { d } = await send(key, from, sealFn, sealArgs, sealFee, onProg); onProg('sealed'); return tidFrom(d) || (await getIdByHash(h));
 }
 
@@ -192,7 +200,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-01.5';
+export const AGENT_BUILD = '2026-07-03.1';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -205,7 +213,7 @@ const publicJob = (j: any) => { const { ephemeralMnemonic, ...pub } = j; return 
 
 // ---------- estimate (mirror core.estimate) ----------
 async function estimate(opts: any) {
-  const { bytes, marginUstx = '0', agentFeePct = AGENT_FEE_PCT } = opts;
+  const { bytes, marginUstx = '0', agentFeePct = AGENT_FEE_PCT, parentCount = 0 } = opts;
   const chunks = Math.ceil(Number(bytes) / CHUNK) || 1;
   const q = await quoteFee(Number(bytes), chunks);
   const minerTxs = q.single ? 1n : BigInt(q.batches + 2);
@@ -213,7 +221,8 @@ async function estimate(opts: any) {
   const rq = await quoteFee(RECEIPT_EST, 1);                 // quoteFee handles MOCK internally
   const receiptProtocol = rq.protocolFee;
   const receiptMiner = PERTX_MINER + (BigInt(RECEIPT_EST) * 3n) / 2n;
-  const baseCosts = q.protocolFee + minerReserve + receiptProtocol + receiptMiner + DELIVERY_RESERVE + BigInt(marginUstx);
+  const parentReserve = BigInt(parentCount) * PARENT_RETURN_FEE;   // one NFT-return tx per escrowed parent
+  const baseCosts = q.protocolFee + minerReserve + receiptProtocol + receiptMiner + parentReserve + DELIVERY_RESERVE + BigInt(marginUstx);
   const pct = BigInt(agentFeePct);
   const feeExact = (pct > 0n && pct < 100n) ? (baseCosts * pct) / (100n - pct) : 0n;
   const requiredExact = baseCosts + feeExact;
@@ -223,7 +232,7 @@ async function estimate(opts: any) {
   return { bytes: Number(bytes), chunks, single: q.single, batches: q.batches,
     protocolFee: q.protocolFee.toString(), minerReserve: minerReserve.toString(),
     receiptProtocol: receiptProtocol.toString(), receiptMiner: receiptMiner.toString(),
-    deliveryReserve: DELIVERY_RESERVE.toString(), marginUstx: String(marginUstx),
+    deliveryReserve: DELIVERY_RESERVE.toString(), parentCount: Number(parentCount), parentReserve: parentReserve.toString(), marginUstx: String(marginUstx),
     agentFeePct: Number(pct), agentFeeUstx: agentFeeUstx.toString(), requiredUstx: required.toString(), stxUsd };
 }
 
@@ -325,27 +334,100 @@ async function detectFunder(addr: string): Promise<string | null> {
   return null;
 }
 async function resolveFunder(job: any): Promise<string | null> { if (job.mock) return job.funder || 'SP_MOCK_SENDER'; if (job.funder) return job.funder; try { return await detectFunder(job.depositAddress); } catch { return null; } }
+
+// ---------- parent escrow (mirror svc/core.mjs) ----------
+// The contract requires the MINTER to own every parent at mint/seal (validate-parents →
+// ERR-NOT-AUTHORIZED), so the user sends the parent inscription(s) to the deposit address alongside
+// the STX; they are returned to the payer together with the child + change.
+async function heldInscriptions(addr: string): Promise<string[]> {
+  const asset = `${CORE[0]}.${CORE[1]}::xtrata-inscription`;
+  const ids: string[] = []; let offset = 0;
+  for (;;) {
+    const d: any = await (await hfetch(`/extended/v1/tokens/nft/holdings?principal=${addr}&asset_identifiers=${encodeURIComponent(asset)}&limit=50&offset=${offset}`)).json();
+    const rs = d.results || [];
+    for (const r of rs) { const m = /u?(\d+)/.exec((r.value && r.value.repr) || ''); if (m) ids.push(m[1]); }
+    offset += rs.length;
+    if (rs.length < 50 || offset >= Number(d.total || 0)) break;
+  }
+  return ids;
+}
+async function detectNftSender(addr: string, tokenId: string): Promise<string | null> {
+  try {
+    const asset = `${CORE[0]}.${CORE[1]}::xtrata-inscription`;
+    const d: any = await (await hfetch(`/extended/v1/tokens/nft/history?asset_identifier=${encodeURIComponent(asset)}&value=${encodeURIComponent('u' + tokenId)}&limit=20`)).json();
+    for (const ev of (d.results || [])) if (ev.recipient === addr && ev.sender && ev.sender !== addr) return ev.sender;
+  } catch {}
+  return null;
+}
+async function parentsStatus(job: any) {
+  const required: string[] = (job.parents || []).map(String);
+  if (job.mock || MOCK) return { required, held: required, missing: [], unexpected: [], ok: true };
+  const own = job.depositAddress;
+  let heldAll: string[] | null = null;
+  try { heldAll = await heldInscriptions(own); } catch {}
+  if (heldAll == null) {   // holdings API down → per-parent owner checks (can't see strays)
+    const held: string[] = [], missing: string[] = [];
+    for (const pid of required) (((await ownerOf(pid)) === own) ? held : missing).push(pid);
+    return { required, held, missing, unexpected: [], ok: missing.length === 0, holdingsUnverified: true };
+  }
+  const mine = new Set([...required, job.tokenId, job.receiptTokenId].filter(Boolean).map(String));
+  const held = required.filter((p) => heldAll!.includes(p));
+  const missing = required.filter((p) => !heldAll!.includes(p));
+  const unexpected = heldAll.filter((id) => !mine.has(String(id)));
+  return { required, held, missing, unexpected, ok: missing.length === 0 && unexpected.length === 0 };
+}
+// Return EVERY inscription the deposit wallet holds. Strays go back to whoever sent them; declared
+// parents / minted tokens go to `fallbackTo` (the payer). Never throws.
+async function returnAllHeldNfts(job: any, key: string, fromAddr: string, fallbackTo: string | null) {
+  const out: any[] = [];
+  let ids: string[] = [];
+  try { ids = await heldInscriptions(fromAddr); } catch {}
+  for (const extra of [...(job.parents || []), job.tokenId, job.receiptTokenId].filter(Boolean).map(String)) if (!ids.includes(extra)) ids.push(extra);
+  for (const id of ids) {
+    try {
+      if ((await ownerOf(String(id))) !== fromAddr) continue;
+      const isDeclared = (job.parents || []).map(String).includes(String(id)) || String(id) === String(job.tokenId) || String(id) === String(job.receiptTokenId);
+      const sender = await detectNftSender(fromAddr, String(id));
+      const to = isDeclared ? (fallbackTo || sender) : (sender || fallbackTo);
+      if (!to) continue;
+      const tx = await sendNft(key, fromAddr, String(id), to);
+      out.push({ id: String(id), to, tx });
+      xaoLog(job.jobId, `inscription #${id} returned to ${to}`);
+    } catch (e) { out.push({ id: String(id), error: errMsg(e) }); }
+  }
+  return out;
+}
 async function sendStxRetry(key: string, amount: bigint, to: string, fee: bigint, tries = 4) { let last: any; for (let i = 0; i < tries; i++) { try { return await sendStx(key, amount, to, fee); } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(8000); continue; } throw e; } } throw last; }
 async function sweepStxTo(key: string, fromAddr: string, to: string, tries = 5): Promise<any> { let last: any; for (let i = 0; i < tries; i++) { let bal = 0n; try { bal = await balance(fromAddr); } catch (e) { last = e; await sleep(5000); continue; } if (bal <= REFUND_TX_FEE) return { sent: false, amount: '0', balance: bal.toString() }; const amount = bal - REFUND_TX_FEE; try { const tx = await sendStx(key, amount, to, REFUND_TX_FEE); return { sent: true, tx, amount: amount.toString() }; } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(8000); continue; } throw e; } } throw last || new Error('sweep failed'); }
 async function inscribeReceipt(key: string, from: string, html: string, uri: string, deps: string[]) { const data = enc.encode(html); const q = await quoteFee(data.length, chunkBytes(data).length); const tokenId = await mintSingle(key, from, data, 'text/html', uri, deps, q.protocolFee); return { tokenId }; }
 
 // ---------- estimate→create→inscribe→deliver→refund (mirror core) ----------
 async function createJob(opts: any) {
-  const { file, uri, mime = 'application/octet-stream', deps = [], user, expectedFunder = null, marginUstx = '0', fastTrack = false, agentFeePct = AGENT_FEE_PCT } = opts;
+  const { file, uri, mime = 'application/octet-stream', deps = [], parents = [], user, expectedFunder = null, marginUstx = '0', fastTrack = false, agentFeePct = AGENT_FEE_PCT } = opts;
   if (!file || !uri) throw new Error('file, uri required');
   if (!fastTrack && !user) throw new Error('delivery address (user) required unless fastTrack');
+  // PARENT LINKING (escrow): validate declared parents up-front, before payment is requested.
+  const parentIds: string[] = (parents || []).map((p: any) => String(p).trim()).filter(Boolean);
+  if (parentIds.some((p) => !/^\d+$/.test(p))) throw new Error('parents must be token-id uints');
+  if (new Set(parentIds).size !== parentIds.length) throw new Error('duplicate parent token ids');
+  if (parentIds.length > 50) throw new Error('at most 50 parents');
   const data = new Uint8Array(await (file as File).arrayBuffer());
   // DUPLICATE-HASH GUARD: the contract rejects re-inscribing an identical hash — refuse BEFORE creating
   // a job or taking payment, so identical content is never paid for twice.
   if (!MOCK) {
     const existing = await getIdByHash(incHash(chunkBytes(data)));
     if (existing) throw new Error(`This exact content is already inscribed on-chain as token #${existing}. Inscribing an identical hash is blocked by the contract — no payment was taken.`);
+    // Parent sanity BEFORE taking payment: every declared parent must exist on-chain.
+    for (const pid of parentIds) {
+      const owner = await ownerOf(pid);
+      if (!owner) throw new Error(`Parent token #${pid} does not exist on ${CORE_NAME} — check the token id. No job was created.`);
+    }
   }
-  const est = await estimate({ bytes: data.length, marginUstx, agentFeePct });
+  const est = await estimate({ bytes: data.length, marginUstx, agentFeePct, parentCount: parentIds.length });
   const w = newWallet(); const id = `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   BYTES.set(id, data); await idbSaveBytes(id, data);
   const job: any = {
-    jobId: id, core: CORE_NAME, net: 'mainnet', mock: MOCK, fastTrack, file: (file as File).name || 'asset', uri, mime, deps, user: user || null,
+    jobId: id, core: CORE_NAME, net: 'mainnet', mock: MOCK, fastTrack, file: (file as File).name || 'asset', uri, mime, deps, parents: parentIds, user: user || null,
     expectedFunder: expectedFunder || null, funder: null,
     bytes: data.length, chunks: est.chunks, single: est.single, batches: est.batches,
     protocolFee: est.protocolFee, minerReserve: est.minerReserve, receiptProtocol: est.receiptProtocol, receiptMiner: est.receiptMiner,
@@ -363,7 +445,12 @@ async function statusJob(job: any) {
   if (!funded && !MOCK && job.depositAddress && job.status === 'AWAITING_DEPOSIT') {
     try { const d: any = await (await hfetch(`/extended/v1/address/${job.depositAddress}/mempool?limit=10`)).json(); pending = (d.results || []).some((tx: any) => tx.token_transfer && tx.token_transfer.recipient_address === job.depositAddress); } catch {}
   }
-  return { jobId: job.jobId, status: job.status, depositAddress: job.depositAddress, requiredUstx: job.requiredUstx, balanceUstx: bal.toString(), funded, pending, tokenId: job.tokenId || null };
+  // Parent escrow gate — a parented job is runnable only when funded AND all parents are held.
+  let parents: any = null;
+  if ((job.parents || []).length && ['AWAITING_DEPOSIT', 'AWAITING_PARENT', 'FUNDED'].includes(job.status)) {
+    try { parents = await parentsStatus(job); } catch {}
+  }
+  return { jobId: job.jobId, status: job.status, depositAddress: job.depositAddress, requiredUstx: job.requiredUstx, balanceUstx: bal.toString(), funded, pending, parents, tokenId: job.tokenId || null };
 }
 async function runInscribe(job: any) {
   if (job.mock) { const tokenId = String(Math.floor(1000 + Math.random() * 9000)); job.tokenId = tokenId; job.depositReceivedUstx = job.requiredUstx; job.status = 'INSCRIBED'; writeJob(job); return tokenId; }
@@ -373,13 +460,20 @@ async function runInscribe(job: any) {
     if (bal < BigInt(job.requiredUstx)) throw new Error(`not funded: need ${job.requiredUstx}, have ${bal}`);
     job.depositReceivedUstx = bal.toString();
   }
+  // PARENT GATE: the mint/seal aborts (ERR-NOT-AUTHORIZED) unless the deposit wallet owns every
+  // declared parent, and a mid-mint abort still burns miner fees. Verify BEFORE spending.
+  if ((job.parents || []).length) {
+    const ps = await parentsStatus(job);
+    if (ps.unexpected && ps.unexpected.length) throw new Error(`wrong inscription received: deposit wallet holds unexpected token(s) #${ps.unexpected.join(', #')} — returning everything to sender`);
+    if (ps.missing.length) throw new Error(`parents not yet received: waiting for token(s) #${ps.missing.join(', #')} to arrive at ${job.depositAddress}`);
+  }
   let data = BYTES.get(job.jobId);
   if (!data && await restoreBytes(job.jobId)) data = BYTES.get(job.jobId);   // reload-proof: restore from IndexedDB
   if (!data) throw new Error('file bytes not in memory or on disk (storage cleared) — returning funds');
   const dep = deriveFrom(job.ephemeralMnemonic);
   let tokenId: string | null;
   const prog = (m: string) => { job.progress = m; job.progressAt = new Date().toISOString(); writeJob(job); xaoLog(job.jobId, m); };
-  if (job.single) { tokenId = await mintSingle(dep.key, dep.address, data, job.mime, job.uri, job.deps || [], BigInt(job.protocolFee)); }
+  if (job.single) { tokenId = await mintSingle(dep.key, dep.address, data, job.mime, job.uri, job.deps || [], BigInt(job.protocolFee), job.parents || []); }
   else { tokenId = await stagedInscribe(job, dep.key, dep.address, data, prog); }
   job.tokenId = tokenId; job.status = 'INSCRIBED'; writeJob(job); return tokenId;
 }
@@ -393,7 +487,8 @@ async function deliver(job: any) {
     const receiptTokenId = String(Math.floor(1000 + Math.random() * 9000));
     const d = receiptData(job, { received, agentFee, receiptTokenId, stxUsd });
     job.receiptHtml = buildReceiptHtml(d);
-    const receipt = { ...d, deliverTx: '0xMOCK_DELIVER', receiptDeliverTx: '0xMOCK_RECEIPT', agentFeeTx: '0xMOCK_FEE', refundTx: '0xMOCK_REFUND' };
+    const receipt: any = { ...d, deliverTx: '0xMOCK_DELIVER', receiptDeliverTx: '0xMOCK_RECEIPT', agentFeeTx: '0xMOCK_FEE', refundTx: '0xMOCK_REFUND' };
+    if ((job.parents || []).length) { job.parentReturnTxs = job.parents.map((p: string) => ({ id: String(p), tx: '0xMOCK_PARENT_RETURN' })); receipt.parentReturnTxs = job.parentReturnTxs; }
     Object.assign(job, { receiptTokenId, agentFeeUstx: agentFee.toString(), refundedUstx: d.changeReturned, receipt });
     delete job.ephemeralMnemonic; job.status = 'COMPLETE'; writeJob(job); return { receipt };
   }
@@ -405,7 +500,7 @@ async function deliver(job: any) {
   if (liveBal0 != null && liveBal0 > 0n) {
     const spentSoFar = received > liveBal0 ? received - liveBal0 : 0n;
     if (spentSoFar > BigInt(job.protocolFee)) mainMinerForReceipt = spentSoFar - BigInt(job.protocolFee);
-    const reserveAhead = BigInt(job.receiptProtocol || '0') + BigInt(job.receiptMiner || '0') + agentFee + DELIVERY_RESERVE + REFUND_TX_FEE;
+    const reserveAhead = BigInt(job.receiptProtocol || '0') + BigInt(job.receiptMiner || '0') + agentFee + BigInt((job.parents || []).length) * PARENT_RETURN_FEE + DELIVERY_RESERVE + REFUND_TX_FEE;
     estChange = liveBal0 > reserveAhead ? liveBal0 - reserveAhead : 0n;
   }
   const prelim = receiptData(job, { received, agentFee, receiptTokenId: null, change: estChange, mainMinerFee: mainMinerForReceipt.toString(), stxUsd });
@@ -416,17 +511,33 @@ async function deliver(job: any) {
   const deliverTx = await sendNft(dep.key, dep.address, String(job.tokenId), job.user);   // CRITICAL: if this fails the job failed → throw
   job.deliverTx = deliverTx; job.inscriptionDelivered = true; writeJob(job);              // SUCCESS commit point
   let receiptDeliverTx: any = null, agentFeeTx: any = null, refundTx: any = null, refundedUstx = '0'; const notes: string[] = [];
+  // Parent(s) go home FIRST — the user's own inscription(s) are the most valuable thing in this wallet.
+  const parentReturnTxs: any[] = [];
+  for (const pid of (job.parents || [])) {
+    try {
+      if ((await ownerOf(String(pid))) === dep.address) {
+        const ptx = await sendNft(dep.key, dep.address, String(pid), refundTo);
+        parentReturnTxs.push({ id: String(pid), tx: ptx });
+        xaoLog(job.jobId, `parent #${pid} returned home → ${refundTo}`);
+      }
+    } catch (e) { notes.push(`parent #${pid} return pending — recovery will send it home (` + errMsg(e) + ')'); job.keepKey = true; }
+  }
+  if (parentReturnTxs.length) { job.parentReturnTxs = parentReturnTxs; writeJob(job); }
   if (receiptTokenId) { try { receiptDeliverTx = await sendNft(dep.key, dep.address, receiptTokenId, job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
   try { if (agentFee > 0n) agentFeeTx = await sendStxRetry(dep.key, agentFee, job.agentFeeAddress || AGENT_FEE_ADDRESS, REFUND_TX_FEE); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
   try { const sw = await sweepStxTo(dep.key, dep.address, refundTo); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } } catch (e) { notes.push('change return pending — recover-all will sweep it (' + errMsg(e) + ')'); }
   const note = notes.length ? notes.join('; ') : null;
   const finalD = receiptData(job, { received, agentFee, receiptTokenId, change: BigInt(refundedUstx), mainMinerFee: mainMinerForReceipt.toString(), stxUsd, note });
   job.receiptHtml = buildReceiptHtml(finalD);
-  const receipt = { ...finalD, deliverTx, receiptDeliverTx, agentFeeTx, refundTx };
+  const receipt = { ...finalD, deliverTx, receiptDeliverTx, agentFeeTx, refundTx, parentReturnTxs: parentReturnTxs.length ? parentReturnTxs : undefined };
   Object.assign(job, { receiptTokenId, agentFeeUstx: agentFee.toString(), deliverTx, receiptDeliverTx, agentFeeTx, refundTx, refundedUstx, receipt });
+  // SAFETY: never wipe the key while the wallet still holds STX or ANY inscription (e.g. a parent
+  // whose return transfer failed) — or while we can't confirm it's empty.
   let leftover: bigint | null = null; try { leftover = await balance(job.depositAddress); } catch {}
-  if (leftover != null && leftover <= REFUND_TX_FEE) delete job.ephemeralMnemonic;
-  else { job.keepKey = true; job.keepKeyReason = leftover == null ? 'balance unconfirmed' : `wallet still holds ${leftover} uSTX — sweep with recover-all`; }
+  let holdsNft = (job.parents || []).length > 0;   // assume the worst until proven empty
+  try { holdsNft = (await heldInscriptions(job.depositAddress)).length > 0; } catch {}
+  if (leftover != null && leftover <= REFUND_TX_FEE && !holdsNft) delete job.ephemeralMnemonic;
+  else { job.keepKey = true; job.keepKeyReason = leftover == null ? 'balance unconfirmed' : holdsNft ? 'wallet still holds an inscription — return it via recovery' : `wallet still holds ${leftover} uSTX — sweep with recover-all`; }
   job.status = 'COMPLETE'; writeJob(job); idbDeleteBytes(job.jobId); return { receipt };
 }
 async function refundAndClose(job: any, reason = 'cancelled') {
@@ -439,10 +550,13 @@ async function refundAndClose(job: any, reason = 'cancelled') {
   if (job.inscriptionDelivered || job.status === 'COMPLETE') {           // GUARD: delivered jobs only sweep leftover; never a refund receipt/CANCELLED
     if (job.ephemeralMnemonic) {
       const dep = deriveFrom(job.ephemeralMnemonic); const to = (await resolveFunder(job)) || job.user;
+      const nftReturns = await returnAllHeldNfts(job, dep.key, dep.address, to);   // e.g. a parent whose return failed in the deliver tail
+      if (nftReturns.length) job.nftReturns = [...(job.nftReturns || []), ...nftReturns];
       if (to) { try { const sw = await sweepStxTo(dep.key, dep.address, to); if (sw.sent) { job.refundTx = sw.tx; job.refundedUstx = sw.amount; } } catch {} }
       let leftover: bigint | null = null; try { leftover = await balance(job.depositAddress); } catch {}
-      if (leftover != null && leftover <= REFUND_TX_FEE) delete job.ephemeralMnemonic;
-      else if (leftover != null) { job.keepKey = true; job.keepKeyReason = `~${leftover} uSTX leftover — sweep with recover-all`; }
+      let holdsNft = true; try { holdsNft = (await heldInscriptions(job.depositAddress)).length > 0; } catch {}
+      if (leftover != null && leftover <= REFUND_TX_FEE && !holdsNft) delete job.ephemeralMnemonic;
+      else if (leftover != null) { job.keepKey = true; job.keepKeyReason = holdsNft ? 'wallet still holds an inscription — return it via recovery' : `~${leftover} uSTX leftover — sweep with recover-all`; }
     }
     job.status = 'COMPLETE'; writeJob(job); return { alreadyDelivered: true };
   }
@@ -450,9 +564,11 @@ async function refundAndClose(job: any, reason = 'cancelled') {
   const dep = deriveFrom(job.ephemeralMnemonic);
   const returnTo = (await resolveFunder(job)) || job.user;
   const out: any = { reason, deliveredNfts: [], refundTx: null };
-  if (returnTo) for (const id of [job.tokenId, job.receiptTokenId].filter(Boolean)) {
-    try { if ((await ownerOf(String(id))) === dep.address) { const tx = await sendNft(dep.key, dep.address, String(id), returnTo); out.deliveredNfts.push({ id: String(id), tx }); } } catch (e) { out.nftError = errMsg(e); }
-  }
+  // Hand back EVERY inscription this wallet holds: escrowed parents, anything it minted (token /
+  // receipt), and any WRONG inscription sent by mistake (strays return to whoever sent them).
+  const nftReturns = await returnAllHeldNfts(job, dep.key, dep.address, returnTo);
+  for (const r of nftReturns) { if (r.tx) out.deliveredNfts.push({ id: r.id, tx: r.tx, to: r.to }); else out.nftError = `#${r.id}: ${r.error || 'no return address'}`; }
+  if (nftReturns.length) { job.nftReturns = [...(job.nftReturns || []), ...nftReturns]; writeJob(job); }
   if (returnTo) {
     try {
       const b0 = await balance(dep.address);
@@ -466,7 +582,11 @@ async function refundAndClose(job: any, reason = 'cancelled') {
   }
   if (returnTo) { try { const sw = await sweepStxTo(dep.key, dep.address, returnTo); if (sw.sent) { out.refundTx = sw.tx; out.refundedUstx = sw.amount; } } catch (e) { out.refundError = errMsg(e); } }
   let leftover: bigint | null = null; try { leftover = await balance(dep.address); } catch {}
-  if (leftover != null && leftover <= REFUND_TX_FEE) {
+  // NEVER-STRAND (NFT edition): never discard the key while the wallet still holds an inscription
+  // (e.g. a parent that arrived without enough STX to send it back yet).
+  let holdsNftAfter = false; try { holdsNftAfter = (await heldInscriptions(dep.address)).length > 0; } catch { holdsNftAfter = (job.parents || []).length > 0; }
+  if (holdsNftAfter) { job.keepKey = true; job.status = 'NEEDS_RECOVERY'; job.keepKeyReason = 'wallet still holds an inscription — return it via recovery'; }
+  else if (leftover != null && leftover <= REFUND_TX_FEE) {
     // NEVER-STRAND GUARD: a never-funded job keeps its key (EXPIRED) — a slow payment confirming after
     // cancellation must never land at a keyless address.
     if (job.depositReceivedUstx || leftover > 0n) { delete job.ephemeralMnemonic; job.status = 'CANCELLED'; }
@@ -487,6 +607,29 @@ async function autoRun(job: any) {
     return { rejected: true, funder, expected: job.expectedFunder };
   }
   if (job.fastTrack || !job.user) { job.user = funder; writeJob(job); }
+  // PARENT ESCROW GATE: wrong inscription → return EVERYTHING; parents missing → park as
+  // AWAITING_PARENT (the watcher re-polls), bounded by PARENT_WINDOW_MS from funding.
+  if ((job.parents || []).length) {
+    if (!job.fundedAt) { job.fundedAt = new Date().toISOString(); writeJob(job); }
+    const ps = await parentsStatus(job);
+    if (ps.unexpected && ps.unexpected.length) {
+      await refundAndClose(job, `wrong inscription received (token #${ps.unexpected.join(', #')} is not a declared parent of this job) — all inscriptions and funds returned to sender`);
+      return { rejected: true, unexpected: ps.unexpected };
+    }
+    if (ps.missing.length) {
+      const waited = Date.now() - (Date.parse(job.fundedAt) || Date.now());
+      if (waited > PARENT_WINDOW_MS) {
+        await refundAndClose(job, `parent inscription #${ps.missing.join(', #')} not received within ${Math.round(PARENT_WINDOW_MS / 60000)} min of funding — everything returned to sender`);
+        return { rejected: true, parentTimeout: true, missing: ps.missing };
+      }
+      job.status = 'AWAITING_PARENT';
+      job.progress = `deposit received ✓ — now send parent inscription #${ps.missing.join(', #')} to the deposit address; it will be returned with your new inscription`;
+      job.progressAt = new Date().toISOString(); writeJob(job);
+      xaoLog(job.jobId, `funded but awaiting parent #${ps.missing.join(', #')} (${Math.round((PARENT_WINDOW_MS - waited) / 60000)} min left)`);
+      return { awaitingParent: true, missing: ps.missing };
+    }
+    xaoLog(job.jobId, `parent${ps.required.length > 1 ? 's' : ''} #${ps.required.join(', #')} held ✓ — proceeding to inscribe`);
+  }
   job.status = 'INSCRIBING'; writeJob(job);
   await runInscribe(job);
   job.status = 'DELIVERING'; writeJob(job);
@@ -499,7 +642,7 @@ const PROCESSING = new Set<string>();
 // FUNDED/INSCRIBED and the watcher resumes exactly where it left off. Resume is safe end-to-end: staged
 // uploads continue from the on-chain index, single-tx mints are idempotent (get-id-by-hash pre-check).
 // Only deterministic failures or exhausted retries (4, with 15 s × attempt backoff) hit the refund failsafe.
-const FATAL_ERR = /TX abort|not funded|locked to|unrecoverable|file bytes|empty file|could not determine/i;
+const FATAL_ERR = /TX abort|not funded|locked to|unrecoverable|file bytes|empty file|could not determine|wrong inscription received/i;
 const MAX_RETRIES = 4;
 function background(id: string, fn: () => Promise<any>) {
   PROCESSING.add(id);
@@ -535,7 +678,10 @@ async function watchTick() {
       background(j.jobId, async () => { const jj = readJob(j.jobId); jj.status = 'DELIVERING'; writeJob(jj); await deliver(jj); });
       continue;
     }
-    if (j.status !== 'AWAITING_DEPOSIT' && j.status !== 'FUNDED' && j.status !== 'EXPIRED') continue;
+    // AWAITING_PARENT = funded, waiting for the parent inscription. Poll gently (~20 s): autoRun
+    // re-checks the gate and either proceeds, keeps waiting, or (window over / wrong NFT) refunds all.
+    if (j.status === 'AWAITING_PARENT' && Date.now() - (Date.parse(j.progressAt || '') || 0) < 20000) continue;
+    if (!['AWAITING_DEPOSIT', 'FUNDED', 'EXPIRED', 'AWAITING_PARENT'].includes(j.status)) continue;
     // A job funded once counts as funded — mid-flight resumes have already spent part of the deposit.
     let funded = !!j.depositReceivedUstx;
     if (!funded) { try { funded = (await statusJob(j)).funded; } catch { continue; } }
@@ -570,7 +716,13 @@ async function reapTick() {
 (window as any).XAO_AGENT_BUILD = AGENT_BUILD;   // version handshake — suno.html blocks live runs on mismatch
 (window as any).XtrataAgent = {
   build: AGENT_BUILD,
-  health: async () => ({ ok: true, mock: MOCK, core: CORE_NAME, net: 'mainnet', windowMs: WINDOW_MS, build: AGENT_BUILD }),
+  health: async () => ({ ok: true, mock: MOCK, core: CORE_NAME, net: 'mainnet', windowMs: WINDOW_MS, parentWindowMs: PARENT_WINDOW_MS, deployer: DEPLOYER, build: AGENT_BUILD }),
+  // Parent checker for the UI: who owns each declared parent right now? (connected wallet / deposit / other)
+  parentInfo: async (id: string) => {
+    const job = readJob(id); const out: any[] = [];
+    for (const pid of (job.parents || [])) out.push({ id: String(pid), owner: MOCK ? job.depositAddress : await ownerOf(String(pid)) });
+    return { parents: out, depositAddress: job.depositAddress, core: `${CORE[0]}.${CORE[1]}` };
+  },
   estimate: async (opts: any) => estimate({ ...opts, bytes: opts.bytes != null ? opts.bytes : (opts.file ? (opts.file as File).size : 0) }),
   createJob: async (opts: any) => createJob(opts),
   listJobs: async () => Promise.all(listJobsRaw().sort((a, b) => (b.jobId > a.jobId ? 1 : -1)).map(async (j) => { let funded = false, balanceUstx = '0'; if (j.status === 'AWAITING_DEPOSIT') { try { const s = await statusJob(j); funded = s.funded; balanceUstx = s.balanceUstx; } catch {} } return { ...publicJob(j), funded, balanceUstx }; })),

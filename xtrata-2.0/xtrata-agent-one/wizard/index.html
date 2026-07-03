@@ -261,9 +261,9 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
 });
 
 // ---- health ----
-(async()=>{ try{ const h=await api('/api/health'); SERVER.mock=!!h.mock; SERVER.net=h.net; SERVER.windowMs=h.windowMs||300000; $('#health').innerHTML =
+(async()=>{ try{ const h=await api('/api/health'); SERVER.mock=!!h.mock; SERVER.net=h.net; SERVER.windowMs=h.windowMs||300000; SERVER.parentWindowMs=h.parentWindowMs||900000; $('#health').innerHTML =
   `<span class="pill ${h.mock?'mock':'live'}">${h.mock?'MOCK':'LIVE'}</span><span class="pill">${esc(h.core)}</span><span class="pill">${esc(h.net)}</span><span class="pill" title="server started — restart it if this predates your last change">⟳ ${h.startedAt?new Date(h.startedAt).toLocaleTimeString():''}</span><span class="pill" title="agent bundle build">${esc(h.build||window.XAO_AGENT_BUILD||'agent pre-v')}</span>`;
-  if(window.XtrataAgent&&window.XAO_AGENT_BUILD!=='2026-07-01.5'){ $('#health').innerHTML+='<span class="pill" style="color:var(--bad);border-color:#5a2222" title="the deployed agent-one.js is older than this page — rebuild/redeploy it">⚠ stale agent bundle</span>'; }
+  if(window.XtrataAgent&&window.XAO_AGENT_BUILD!=='2026-07-03.1'){ $('#health').innerHTML+='<span class="pill" style="color:var(--bad);border-color:#5a2222" title="the deployed agent-one.js is older than this page — rebuild/redeploy it">⚠ stale agent bundle</span>'; }
 }catch(e){ $('#health').innerHTML = `<span class="pill" style="color:var(--bad);border-color:#5a2222">server offline</span>`; } })();
 
 // ---- wallet connect (delegates to the Xtrata site's bundled wallet shim: window.XtrataWallet) ----
@@ -477,7 +477,35 @@ async function renderJob(){
     const ds=(st==='AWAITING_DEPOSIT'&&funded)?'FUNDED':st;
     const phaseMsg={FUNDED:'Payment detected — starting…',INSCRIBING:'Inscribing on-chain…',INSCRIBED:'Inscribed — delivering…',DELIVERING:'Delivering inscription + refunding change…'}[st];
     const showDeposit=(st==='AWAITING_DEPOSIT');
-    expiryAt = (showDeposit && job.createdAt && SERVER.windowMs) ? (Date.parse(job.createdAt) + SERVER.windowMs) : 0;
+    // Countdowns: deposits get 12× the window (payments can confirm slowly); a funded job waiting on
+    // its parent inscription gets the dedicated parent window from the moment funding landed.
+    expiryAt = (showDeposit && job.createdAt && SERVER.windowMs) ? (Date.parse(job.createdAt) + SERVER.windowMs*12)
+      : (st==='AWAITING_PARENT' && job.fundedAt && SERVER.parentWindowMs) ? (Date.parse(job.fundedAt) + SERVER.parentWindowMs) : 0;
+    // ---- Parent escrow checklist (jobs with declared parents) ----
+    let parentPanel='';
+    const parents=(job.parents||[]).map(String);
+    if(parents.length && ['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING'].includes(st)){
+      const ps=status.parents||{held:[],missing:parents,unexpected:[]};
+      const pi=PARENT_INFO[job.jobId]||{};
+      const stxDone=funded||!!job.depositReceivedUstx;
+      parentPanel=`<div style="margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px">
+        <div style="font-weight:700;margin-bottom:6px">Escrow checklist <span class="muted" style="font-weight:400">— two sends, any order; parent + child + change all return to you</span></div>
+        <div class="kv"><span>1 · STX deposit (${stx(status.requiredUstx)})</span><span>${stxDone?'<span class="ok">✓ arrived</span>':(status.pending?'<span style="color:var(--warn)">⏳ seen in mempool — confirming…</span>':'<span class="muted">awaiting</span>')}</span></div>
+        ${parents.map((p,i)=>{
+          const held=(ps.held||[]).map(String).includes(p);
+          const own=pi[p];
+          let right;
+          if(held) right='<span class="ok">✓ arrived at deposit wallet</span>';
+          else if(own&&WALLET&&own===WALLET) right=`<span class="ok">✓ in your connected wallet</span> <button class="btn" style="padding:4px 10px;margin-left:8px" onclick="sendParent('${esc(job.jobId)}','${esc(p)}')">Send #${esc(p)} to deposit now</button>`;
+          else if(own&&own===job.depositAddress) right='<span class="ok">✓ arrived at deposit wallet</span>';
+          else if(own) right=`<span style="color:var(--warn)">held by ${esc(own.slice(0,5)+'…'+own.slice(-4))} — connect that wallet, or transfer #${esc(p)} to the deposit address from it</span>`;
+          else right='<span class="muted">checking current owner…</span>';
+          return `<div class="kv"><span>${i+2} · Parent inscription #${esc(p)}</span><span>${right}</span></div>`;}).join('')}
+        ${(ps.unexpected&&ps.unexpected.length)?`<div class="err" style="margin-top:6px">⚠ Unexpected inscription #${ps.unexpected.map(esc).join(', #')} arrived — it is not a declared parent. Everything will be returned to the sender automatically.</div>`:''}
+        <div class="muted" style="font-size:11px;margin-top:6px">The parent is only borrowed for the mint — it comes straight back with your new inscription.${st==='AWAITING_PARENT'?' <b id="expT"></b>':''}</div>
+      </div>`;
+      maybeCheckParents(job.jobId);
+    }
     out.innerHTML=`<div class="card" style="margin-top:16px"><h3>${esc(job.jobId)} <span class="status s-${ds}">${ds.replace(/_/g,' ')}</span>${job.fastTrack?' <span class="status" style="color:var(--acc2);border-color:#3a2f7a">⚡ fast-track</span>':''}</h3>
       ${job.mock?'<div class="muted" style="margin:-2px 0 8px;color:var(--warn)">MOCK job — simulated, no real funds.</div>':''}
       <div class="kv"><span>Inscription</span><span>${esc(job.uri)}</span></div>
@@ -486,7 +514,10 @@ async function renderJob(){
       ${!job.mock?`<div class="btnrow"><button class="btn" onclick="openWallet('${esc(job.depositAddress)}','${esc(status.requiredUstx)}')">Open wallet to pay ${stx(status.requiredUstx)}</button></div>`:''}
       ${job.fastTrack&&job.expectedFunder?`<div class="kv"><span>Pay from this wallet only ${copyBtn(job.expectedFunder)}</span><span class="mono" style="color:var(--ok)">${esc(job.expectedFunder)}</span></div>
       <div class="muted" style="font-size:12px;margin-top:6px;color:var(--warn)">⚠ Locked to the wallet above. A payment from any other wallet is automatically returned to the sender — nothing is inscribed.</div>`:''}
-      <div class="muted" style="font-size:12px;margin-top:8px">↩︎ Guaranteed temporary — if not funded &amp; started in time, this auto-cancels and returns any funds. <b id="expT"></b></div>`:''}
+      <div class="muted" style="font-size:12px;margin-top:8px">↩︎ Guaranteed temporary — if not funded &amp; started in time, this auto-cancels and returns any funds${parents.length?' <b>and inscriptions</b>':''}. <b id="expT"></b></div>`:''}
+      ${st==='AWAITING_PARENT'?`<div class="progress"><span class="spin"></span>Deposit received ✓ — waiting for the parent inscription to arrive at the deposit wallet…</div>`:''}
+      ${parentPanel}
+      ${job.parentReturnTxs&&job.parentReturnTxs.length?`<div class="kv"><span>Parent${job.parentReturnTxs.length>1?'s':''} returned</span><span class="ok">✓ #${job.parentReturnTxs.map(x=>esc(x.id)).join(', #')} sent home</span></div>`:''}
       ${job.user?`<div class="kv"><span>${job.fastTrack?'Returns to your wallet':'Delivery address'}</span><span class="mono">${esc(job.user)}</span></div>`:(job.fastTrack?`<div class="kv"><span>Returns to</span><span class="muted">the wallet you pay from (auto-detected)</span></div>`:'')}
       ${job.tokenId?`<div class="kv"><span>Inscription token</span><span class="ok">#${esc(job.tokenId)}</span></div>`:''}
       ${job.receiptTokenId?`<div class="kv"><span>Receipt token</span><span class="ok">#${esc(job.receiptTokenId)}</span></div>`:''}
@@ -509,6 +540,32 @@ async function renderJob(){
     if(st==='COMPLETE'||st==='ERROR'||st==='CANCELLED'||st==='NEEDS_RECOVERY'){ loadJobs(); }
   }catch(e){ /* transient read (job file mid-write) — keep polling */ }
 }
+// ---- parent escrow: ownership checker + one-click wallet send (aligned to THIS job's deposit only) ----
+const PARENT_INFO={};          // jobId -> { __core:'ADDR.name', <tokenId>: ownerAddress }
+const parentChkAt={};
+async function maybeCheckParents(jobId){
+  if(Date.now()-(parentChkAt[jobId]||0)<10000) return;   // gentle: re-check owners every ~10 s
+  parentChkAt[jobId]=Date.now();
+  try{ const A=window.XtrataAgent; if(!A||!A.parentInfo) return;
+    const r=await A.parentInfo(jobId); const m={__core:r.core};
+    for(const p of (r.parents||[])) m[String(p.id)]=p.owner||null;
+    PARENT_INFO[jobId]=m;
+  }catch{}
+}
+async function sendParent(jobId,pid){
+  const w=xtrataWallet();
+  if(!w||!w.sendInscription){ alert('Wallet bundle too old for one-click NFT send — rebuild agent-one-wallet.js, or transfer inscription #'+pid+' to the deposit address manually from your wallet.'); return; }
+  if(!WALLET){ connectWallet(); return; }
+  try{
+    const {job}=await api('/api/jobs/'+jobId);
+    const core=String((PARENT_INFO[jobId]&&PARENT_INFO[jobId].__core)||'').split('.');
+    await w.sendInscription({ contractAddress:core[0]||'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', contractName:core[1]||'xtrata-v3-2-3',
+      tokenId:pid, sender:WALLET, recipient:job.depositAddress });   // recipient is ALWAYS this job's deposit wallet — nothing else to get wrong
+    parentChkAt[jobId]=0; lastProgAt=Date.now(); renderJob();
+  }catch(e){ alert('Could not open the wallet to send the parent:\n'+((e&&e.message)||e)); }
+}
+window.sendParent=sendParent;
+
 async function act(which){
   if(which==='deliver' && !confirm('Deliver the inscription, refund the remainder, and permanently wipe the deposit key?')) return;
   if(which==='delete'){

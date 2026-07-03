@@ -110,7 +110,10 @@ async function reapTick() {
       continue;
     }
     const last = Date.parse(j.progressAt || j.createdAt || '') || 0;
-    if (!last || (now - last) < core.JOB_WINDOW_MS) continue;
+    // Parented jobs need time for TWO user sends (STX + the parent inscription) — give the deposit
+    // phase the parent window on top of the normal one before auto-returning.
+    const win = (j.status === 'AWAITING_DEPOSIT' && (j.parents || []).length) ? core.JOB_WINDOW_MS + core.PARENT_WINDOW_MS : core.JOB_WINDOW_MS;
+    if (!last || (now - last) < win) continue;
     PROCESSING.add(j.jobId);
     console.log(`reaper: ${j.jobId} (${j.status}) past window → return funds + close`);
     core.refundAndClose({ job: j, hiroKey: HIRO_KEY, jobDir: JOB_DIR, receiptsDir: RECEIPTS_DIR, reason: 'expired — no progress within window' })
@@ -163,7 +166,7 @@ const server = http.createServer(async (req, res) => {
 
     if (!p.startsWith('/api/')) return serveStatic(req, res);
 
-    if (p === '/api/health') return send(res, 200, { ok: true, core: CORE, net: NET, mock: MOCK, startedAt: STARTED_AT, windowMs: core.JOB_WINDOW_MS, jobDir: JOB_DIR });
+    if (p === '/api/health') return send(res, 200, { ok: true, core: CORE, net: NET, mock: MOCK, startedAt: STARTED_AT, windowMs: core.JOB_WINDOW_MS, parentWindowMs: core.PARENT_WINDOW_MS, jobDir: JOB_DIR });
 
     if (p === '/api/estimate' && req.method === 'POST') {
       const b = await body(req);

@@ -1,16 +1,16 @@
 // agent-one-wallet.ts
-// Tiny wallet shim that exposes the Xtrata site's PROVEN wallet-connect logic to the
-// standalone Agent One wizard as a global `window.XtrataWallet`.
+// Exposes the Xtrata site's PROVEN, bundled wallet-connect logic to the standalone
+// Agent One wizard as a global `window.XtrataWallet`. Built by Vite (IIFE) into
+// xtrata-agent-one/wizard/agent-one-wallet.js, which the wizard loads via <script>.
 //
-// Build this with Vite (library/IIFE) into `agent-one-wallet.js` and place it next to
-// the wizard's index.html. The wizard loads it via <script src="agent-one-wallet.js">
-// and calls window.XtrataWallet.{connect,disconnect,getAddress,pay}.
-//
-// Place this file at:  xtrata-1.0/src/agent-one/agent-one-wallet.ts
-// (so the relative imports below resolve to the app's wallet lib).
+// Build:  npx vite build -c vite.agent-one-wallet.config.ts   (from the repo root)
 
 import { createStacksWalletAdapter } from '../lib/wallet/adapter';
-import { showStxTransfer } from '../lib/wallet/connect';
+import { showStxTransfer, showContractCall } from '../lib/wallet/connect';
+import {
+  uintCV, standardPrincipalCV, PostConditionMode,
+  makeStandardNonFungiblePostCondition, NonFungibleConditionCode, createAssetInfo,
+} from '@stacks/transactions';
 
 const adapter = createStacksWalletAdapter({
   appName: 'Xtrata Agent One',
@@ -29,18 +29,43 @@ const XtrataWallet = {
     const s = adapter.getSession();
     return s.isConnected ? (s.address ?? null) : null;
   },
-  // Opens the connected wallet to send STX (deposit). Uses showStxTransfer, which
-  // already prefers the modern stx_transferStx request that current Xverse expects.
+  // Opens the connected wallet to transfer an xtrata inscription NFT (e.g. an escrowed parent) to a
+  // recipient the WIZARD supplies (the job's deposit address) — the user just signs. A Deny-mode NFT
+  // post-condition pins exactly this one token leaving the sender: nothing else can move.
+  sendInscription(opts: { contractAddress: string; contractName: string; tokenId: string | number; sender: string; recipient: string; assetName?: string }): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      try {
+        showContractCall({
+          contractAddress: opts.contractAddress,
+          contractName: opts.contractName,
+          functionName: 'transfer',
+          functionArgs: [uintCV(BigInt(opts.tokenId)), standardPrincipalCV(opts.sender), standardPrincipalCV(opts.recipient)],
+          postConditionMode: PostConditionMode.Deny,
+          postConditions: [makeStandardNonFungiblePostCondition(
+            opts.sender, NonFungibleConditionCode.DoesNotOwn,
+            createAssetInfo(opts.contractAddress, opts.contractName, opts.assetName || 'xtrata-inscription'),
+            uintCV(BigInt(opts.tokenId)),
+          )],
+          appDetails: { name: 'Xtrata Agent One', icon: '/favicon.ico' },
+          onFinish: () => resolve(),
+          onCancel: () => resolve(),
+        } as unknown as Parameters<typeof showContractCall>[0]);
+      } catch (e) { reject(e); }
+    });
+  },
+  // Opens the connected wallet to send STX. showStxTransfer already prefers the
+  // modern stx_transferStx request that current Xverse expects (legacy popup fallback).
   pay(opts: { recipient: string; amount: string | number; network?: string }): Promise<void> {
     return new Promise<void>((resolve) => {
       showStxTransfer({
         recipient: opts.recipient,
         amount: String(opts.amount),
         memo: 'Xtrata Agent One',
+        network: (opts.network ?? 'mainnet'),
         appDetails: { name: 'Xtrata Agent One', icon: '/favicon.ico' },
         onFinish: () => resolve(),
         onCancel: () => resolve(),
-      } as Parameters<typeof showStxTransfer>[0]);
+      } as unknown as Parameters<typeof showStxTransfer>[0]);
     });
   },
 };

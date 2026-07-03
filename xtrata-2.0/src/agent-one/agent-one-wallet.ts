@@ -6,7 +6,11 @@
 // Build:  npx vite build -c vite.agent-one-wallet.config.ts   (from the repo root)
 
 import { createStacksWalletAdapter } from '../lib/wallet/adapter';
-import { showStxTransfer } from '../lib/wallet/connect';
+import { showStxTransfer, showContractCall } from '../lib/wallet/connect';
+import {
+  uintCV, standardPrincipalCV, PostConditionMode,
+  makeStandardNonFungiblePostCondition, NonFungibleConditionCode, createAssetInfo,
+} from '@stacks/transactions';
 
 const adapter = createStacksWalletAdapter({
   appName: 'Xtrata Agent One',
@@ -24,6 +28,30 @@ const XtrataWallet = {
   getAddress(): string | null {
     const s = adapter.getSession();
     return s.isConnected ? (s.address ?? null) : null;
+  },
+  // Opens the connected wallet to transfer an xtrata inscription NFT (e.g. an escrowed parent) to a
+  // recipient the WIZARD supplies (the job's deposit address) — the user just signs. A Deny-mode NFT
+  // post-condition pins exactly this one token leaving the sender: nothing else can move.
+  sendInscription(opts: { contractAddress: string; contractName: string; tokenId: string | number; sender: string; recipient: string; assetName?: string }): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      try {
+        showContractCall({
+          contractAddress: opts.contractAddress,
+          contractName: opts.contractName,
+          functionName: 'transfer',
+          functionArgs: [uintCV(BigInt(opts.tokenId)), standardPrincipalCV(opts.sender), standardPrincipalCV(opts.recipient)],
+          postConditionMode: PostConditionMode.Deny,
+          postConditions: [makeStandardNonFungiblePostCondition(
+            opts.sender, NonFungibleConditionCode.DoesNotOwn,
+            createAssetInfo(opts.contractAddress, opts.contractName, opts.assetName || 'xtrata-inscription'),
+            uintCV(BigInt(opts.tokenId)),
+          )],
+          appDetails: { name: 'Xtrata Agent One', icon: '/favicon.ico' },
+          onFinish: () => resolve(),
+          onCancel: () => resolve(),
+        } as unknown as Parameters<typeof showContractCall>[0]);
+      } catch (e) { reject(e); }
+    });
   },
   // Opens the connected wallet to send STX. showStxTransfer already prefers the
   // modern stx_transferStx request that current Xverse expects (legacy popup fallback).
