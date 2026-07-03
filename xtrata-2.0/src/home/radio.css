@@ -1,207 +1,319 @@
-/* --- Xtrata Radio: little retro set, bottom-left --- */
+/* --- Xtrata Radio v2 "The Receiver" ---
+   Photoreal faceplate (public/radio-face.jpg) with programmable overlays.
+   Collapsed: just the VFD strip as a pill. Expanded: the full receiver.
+   Icon/bezel glows are alpha masks sampled from the artwork's own dark
+   pixels, so lights align with the print exactly. */
+
 .xtrata-radio {
   position: fixed;
   left: 16px;
   bottom: 16px;
   z-index: 60;
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  max-width: calc(100vw - 32px);
+  --pulse: 0;
+  --cyan: #26f5ff;
+  user-select: none;
+  -webkit-user-select: none;
 }
-.xtrata-radio { --pulse: 0; }
-.xtrata-radio__set {
+
+/* ============ the receiver stage ============ */
+.xtrata-radio__stage {
   position: relative;
-  display: grid;
-  grid-template-columns: 46px minmax(0, 1fr) 34px;
-  align-items: center;
-  gap: 11px;
-  width: 236px;
-  height: 76px;
-  padding: 11px 13px;
-  border: 1px solid #3a2a1c;
-  border-radius: 16px 16px 11px 11px;
-  cursor: pointer;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.10), transparent 42%),
-    repeating-linear-gradient(94deg, rgba(0, 0, 0, 0.07) 0 3px, transparent 3px 9px),
-    linear-gradient(180deg, #7f5330 0%, #5d3a1e 55%, #452a14 100%);
-  box-shadow:
-    0 16px 34px rgba(0, 0, 0, 0.38),
-    0 0 calc(var(--pulse) * 34px) rgba(255, 170, 80, calc(var(--pulse) * 0.5)),
-    inset 0 1px 0 rgba(255, 220, 170, 0.28),
-    inset 0 -2px 5px rgba(0, 0, 0, 0.38);
-  transition: transform 0.12s ease;
+  width: min(420px, calc(100vw - 32px));
+  aspect-ratio: 1446 / 1087;
+  filter: drop-shadow(0 18px 22px rgba(0, 0, 0, .55));
+  touch-action: none;
+  container-type: inline-size;
 }
-.xtrata-radio.is-on .xtrata-radio__set {
-  box-shadow:
-    0 16px 34px rgba(0, 0, 0, 0.38),
-    0 0 calc(14px + var(--pulse) * 34px) rgba(255, 170, 80, calc(0.22 + var(--pulse) * 0.5)),
-    inset 0 1px 0 rgba(255, 220, 170, 0.28),
-    inset 0 -2px 5px rgba(0, 0, 0, 0.38);
-}
-/* telescopic antenna */
-.xtrata-radio__set::before {
-  content: "";
-  position: absolute;
-  top: -26px;
-  right: 18px;
-  width: 2px;
-  height: 28px;
-  border-radius: 2px;
-  background: linear-gradient(180deg, #e8e2d6, #8f8878 70%, #4a4238);
-  box-shadow: 0 -1px 0 1px rgba(232, 226, 214, 0.9);
-  transform: rotate(14deg);
-  transform-origin: bottom center;
-}
-/* glass sheen across the cabinet */
-.xtrata-radio__set::after {
+
+.xtrata-radio__stage::before {
   content: "";
   position: absolute;
   inset: 0;
-  border-radius: inherit;
+  background: url("/radio-face.jpg") center / 100% 100% no-repeat;
+  border-radius: 4% / 5%;
   pointer-events: none;
-  background: linear-gradient(115deg, rgba(255, 255, 255, 0.14) 0%, transparent 28%, transparent 70%, rgba(255, 255, 255, 0.05) 100%);
 }
-.xtrata-radio__set:hover { transform: translateY(-1px); }
-.xtrata-radio__set:active { transform: translateY(1px); }
 
-/* speaker grille — pulses with the bass (--pulse set from the analyser) */
-.xtrata-radio__grille {
-  --pulse: 0;
-  height: 54px;
-  border-radius: 7px;
-  background:
-    radial-gradient(circle at 50% 45%, rgba(255, 190, 110, calc(var(--pulse) * 0.30)), transparent 65%),
-    repeating-linear-gradient(90deg, rgba(20, 12, 6, 0.9) 0 2px, rgba(120, 84, 50, 0.55) 2px 5px);
-  box-shadow:
-    inset 0 2px 5px rgba(0, 0, 0, 0.55),
-    0 0 calc(var(--pulse) * 18px) rgba(255, 170, 80, calc(var(--pulse) * 0.85));
-  transform: scale(calc(1 + var(--pulse) * 0.09));
-  transition: transform 0.05s linear;
-  will-change: transform, box-shadow;
+/* bass pulse: warm cabinet glow driven by --pulse */
+.xtrata-radio.is-playing .xtrata-radio__stage::before {
+  box-shadow: 0 0 calc(var(--pulse) * 38px) rgba(255, 170, 80, calc(var(--pulse) * 0.45));
 }
-.xtrata-radio__face { display: grid; gap: 4px; min-width: 0; }
 
-/* VFD text screen on the set: pause, then scroll section to section */
-.xtrata-radio__screen {
-  position: relative;
-  height: 26px;
-  border-radius: 5px;
+/* ============ VFD display ============ */
+.xtrata-radio__display {
+  position: absolute;
+  left: 17.05%;
+  top: 33.55%;
+  width: 66.25%;
+  height: 18.65%;
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(6,16,16,.96), rgba(0,0,0,.98)), #000;
+  box-shadow: inset 0 0 12px rgba(38,245,255,.06), inset 0 0 22px rgba(0,0,0,.9);
   overflow: hidden;
+  padding: 3.5% 4.5%;
   display: flex;
-  align-items: center;
-  padding: 0 7px;
-  background:
-    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px),
-    linear-gradient(180deg, #05170c, #0a2413 60%, #061a0d);
-  border: 1px solid #1d3a28;
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.7);
-}
-.xtrata-radio__screen-text {
-  display: inline-block;
-  white-space: nowrap;
-  font: 700 10.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #7dffb0;
-  text-shadow: 0 0 5px rgba(90, 255, 160, 0.75);
-}
-.xtrata-radio__screen-text.is-scroll {
-  animation: xtrata-marquee var(--dur, 8s) linear 1 forwards;
-}
-@keyframes xtrata-marquee {
-  from { transform: translateX(0); }
-  to { transform: translateX(var(--shift, 0px)); }
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
 }
 
-/* brand plate: logo + name + VU meter */
+.xtrata-radio__display::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0 1px, transparent 2px 5px);
+  opacity: .35;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
 .xtrata-radio__meta {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
-  min-width: 0;
+  gap: 8px;
 }
-.xtrata-radio__brandwrap { display: inline-flex; align-items: center; gap: 3px; flex: none; }
-.xtrata-radio__logo {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  display: block;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
-}
+
 .xtrata-radio__brand {
-  font: 800 7.5px/1 ui-monospace, monospace;
-  letter-spacing: 0.06em;
-  color: rgba(255, 226, 178, 0.8);
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+  color: var(--cyan);
+  font-family: "Courier New", Courier, ui-monospace, monospace;
+  font-weight: 700;
+  font-size: clamp(9px, 2.6cqw, 14px);
+  letter-spacing: .12em;
+  text-shadow: 0 0 4px rgba(38,245,255,.8), 0 0 10px rgba(38,245,255,.35);
   white-space: nowrap;
 }
-/* VU meter in a recessed bezel, green -> amber -> red, per-bar --vu (0..1) */
+
+/* VU: six cyan bars in the display's right edge */
 .xtrata-radio__vu {
-  display: inline-flex;
+  display: flex;
   align-items: flex-end;
-  gap: 1.5px;
-  height: 13px;
-  flex: none;
-  margin-left: auto;
-  padding: 2px 2.5px;
-  border-radius: 3px;
-  background: #17100a;
-  border: 1px solid rgba(0, 0, 0, 0.6);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.7);
+  gap: 2px;
+  height: 12px;
 }
+
 .xtrata-radio__vu i {
   --vu: 0;
-  width: 3.5px;
+  width: 3px;
   height: 100%;
   border-radius: 1px;
-  background:
-    linear-gradient(0deg, #37e07a 0%, #37e07a 55%, #ffcc4d 55%, #ffcc4d 82%, #ff5a3c 82%, #ff5a3c 100%);
+  background: linear-gradient(0deg, var(--cyan), #baf8ff);
   -webkit-mask-image: linear-gradient(0deg, #000 calc(var(--vu) * 100%), transparent calc(var(--vu) * 100%));
   mask-image: linear-gradient(0deg, #000 calc(var(--vu) * 100%), transparent calc(var(--vu) * 100%));
-  box-shadow: 0 0 calc(var(--vu) * 5px) rgba(90, 255, 140, calc(var(--vu) * 0.6));
+  box-shadow: 0 0 calc(var(--vu) * 5px) rgba(38,245,255, calc(var(--vu) * 0.6));
 }
+
 .xtrata-radio:not(.is-playing) .xtrata-radio__vu i { --vu: 0; }
 
-/* power knob */
-.xtrata-radio__knob {
-  width: 28px;
-  height: 28px;
-  justify-self: center;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #f4e3c2, #b9925c 55%, #6d4a26 100%);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.55);
-  display: grid;
-  place-items: center;
-  transition: transform 0.25s ease;
+/* marquee line (the engine's writeScreen contract: --shift/--dur/.is-scroll) */
+.xtrata-radio__screen {
+  position: relative;
+  z-index: 2;
+  overflow: hidden;
+  width: 100%;
 }
-.xtrata-radio__knob i { width: 2px; height: 9px; border-radius: 2px; background: #3a2411; transform: translateY(-4px); }
-.xtrata-radio__knob { cursor: grab; touch-action: none; }
-.xtrata-radio__knob:active { cursor: grabbing; }
 
-/* side column: volume knob + transport buttons built into the body */
-.xtrata-radio__side { display: grid; gap: 5px; justify-items: center; }
-.xtrata-radio__transport { display: flex; gap: 3px; }
-.xtrata-radio__tbtn {
-  width: 15px;
-  height: 13px;
-  display: grid;
-  place-items: center;
-  font-size: 7px;
-  color: rgba(255, 226, 178, 0.85);
-  border-radius: 3px;
-  background: linear-gradient(180deg, #6d4a26, #4a2f15);
-  border: 1px solid rgba(0, 0, 0, 0.5);
-  box-shadow: inset 0 1px 0 rgba(255, 220, 170, 0.3), 0 1px 2px rgba(0, 0, 0, 0.5);
-  cursor: pointer;
-  user-select: none;
-  opacity: 0.55;
-  transition: opacity 0.2s ease, transform 0.08s ease;
+.xtrata-radio__screen-text {
+  display: inline-block;
+  color: var(--cyan);
+  font-family: "Courier New", Courier, ui-monospace, monospace;
+  font-weight: 600;
+  font-size: clamp(11px, 3.4cqw, 17px);
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-shadow: 0 0 4px rgba(38,245,255,.85), 0 0 12px rgba(38,245,255,.4);
+  transition: opacity .35s ease;
 }
-.xtrata-radio.is-on .xtrata-radio__tbtn { opacity: 1; }
-.xtrata-radio__tbtn:active { transform: translateY(1px); }
-@media (max-width: 560px) {
-  .xtrata-radio__set { width: 196px; height: 66px; }
+
+.xtrata-radio__screen-text.is-scroll {
+  animation: xtrata-marquee var(--dur, 8s) linear 1 forwards;
+}
+
+@keyframes xtrata-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(var(--shift, 0px)); }
+}
+
+.xtrata-radio:not(.is-on) .xtrata-radio__screen-text,
+.xtrata-radio:not(.is-on) .xtrata-radio__brand { opacity: .18; text-shadow: none; }
+
+/* ============ top buttons ============ */
+.xtrata-radio__btn {
+  position: absolute;
+  border: 0;
+  border-radius: 14%;
+  background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(0,0,0,.02));
+  box-shadow: inset 0 1px 2px rgba(255,255,255,.3), inset 0 -2px 3px rgba(0,0,0,.22);
+  cursor: pointer;
+  opacity: .55;
+  padding: 0;
+  transform: translateY(0) scale(1);
+  transition: transform .08s ease, opacity .12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.xtrata-radio__btn:hover, .xtrata-radio__btn:focus-visible { opacity: .88; outline: none; }
+.xtrata-radio__btn:active { transform: translateY(6%) scale(.94); }
+
+.xtrata-radio__btn--playlist { left: 33.06%; top: 25.30%; width: 4.91%; height: 4.14%; }
+.xtrata-radio__btn--shuffle  { left: 39.56%; top: 25.30%; width: 5.12%; height: 3.96%; }
+.xtrata-radio__btn--heart    { left: 46.06%; top: 25.39%; width: 5.05%; height: 3.96%; }
+.xtrata-radio__btn--repeat   { left: 52.56%; top: 25.21%; width: 5.12%; height: 4.23%; }
+.xtrata-radio__btn--prev     { left: 61.62%; top: 24.75%; width: 6.64%; height: 4.88%; }
+.xtrata-radio__btn--play     { left: 70.06%; top: 24.29%; width: 6.71%; height: 5.61%; }
+.xtrata-radio__btn--next     { left: 78.63%; top: 24.29%; width: 6.71%; height: 5.43%; }
+
+/* lit layers: icon silhouette + bezel ring, masked from the artwork */
+.xtrata-radio__lit, .xtrata-radio__ring {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+  background: currentColor;
+  transition: opacity .25s ease;
+  z-index: 2;
+}
+
+.xtrata-radio__lit  { inset: 0; -webkit-mask: var(--m) center / 100% 100% no-repeat; mask: var(--m) center / 100% 100% no-repeat; }
+.xtrata-radio__ring { inset: -10%; -webkit-mask: var(--r) center / 100% 100% no-repeat; mask: var(--r) center / 100% 100% no-repeat; filter: drop-shadow(0 0 2px currentColor); }
+
+.xtrata-radio__btn:hover .xtrata-radio__ring,
+.xtrata-radio__btn:focus-visible .xtrata-radio__ring { opacity: .35; }
+.xtrata-radio__btn.is-lit .xtrata-radio__lit,
+.xtrata-radio__btn.is-lit .xtrata-radio__ring { opacity: 1; }
+.xtrata-radio__btn.is-lit .xtrata-radio__lit { filter: drop-shadow(0 0 2px currentColor) drop-shadow(0 0 7px currentColor); }
+
+.xtrata-radio__btn--playlist { color: var(--cyan); --r: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFYAAAA2CAYAAABdom6tAAAC20lEQVR42u2cMWwTMRRAXxCXSkmlBCldOlAkJgaYWLvAGjGWhYHuLAwsLDCwsHRiaQaElAXmsiB1AgmxsMJAkNpKiCEMYchJbQcz3D/qHkdi5+4Kif+XrPhy57Pv5fv7f9uXmjEGlfLlnCL4f8FuAWYBU78IlFoBU7AL3JxDZToC6n85NwaaeZzOQmM35BdNod6XiuclLU04t2zle8BQntGIIrmLMcYn9c2JPPEsO69p2xjzRZ750LWcTwVbFtSNQKCm6a4x5ps8+0OXMj42Nr1wB7gV2CDfBZ4BDWDFxea62tinVj40qACvxeauyPFeWV6BsUbN5YDdU+PqKfh6BR8C9/t7Vv5RUbA3rPxa4GDHVv7xpAvPO9zstpXvBAz1ObBZZoBw1cq3AwbbKjvyauqUCgCDssGOlCkA18oG+12ZAvCxbLBDZQoSdTn3ZBewsTLN7bntomDXlCkAUdmmQDV2Bg4uYDvKtBo/9qcyBeCHamw10ikbrNrYRI7LBttQpqqxc2VjI2Xq33NdwLaUaTVgvyrTaiKvgTIFYFUHrzmJvBRsRX6segUVDV77ylQjr7kCq7NbFZkClUSyq7TDomDfZI63AwXbzhz3Jl3su9vwd7nAoO7x59pfKbsNs2vqnwKC2meGBVVXsNczx1eA9wFA3QXu5Hy/M62gz1b5Q/Jf49kEXiwg1Jec3mnpZQp93/OadPFAfL0YuJxj7EcSxR1LisSFiUkmkYfW9235jC1XZ5jjT9r5A6kjlrKRdb6RaU96vkWy/b0BfJZ2tIB1TrbFe0OdBew0uIsuI+BCVX5sjeTtvtBk3xVqkQBhCbgXENS3wCUv7Svhtfp14AHJRPBFsVF1z3uMOT09GefE6Q3LPqZ2M7LqOnKsN+1t9Sld/kDczFc5QdKZgM2Trjz0qgw6kcw52INWOg+RQnz3j7SxK8rQFKBpmwq1p6Z/BFGN6CSMglWwKgq2OvkF1tbR2+QKG4QAAAAASUVORK5CYII="); }
+.xtrata-radio__btn--shuffle  { color: var(--cyan); --m: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEoAAAArCAYAAADfeB6OAAACXUlEQVR42u2Zu2sUURTGfyuDbGBTTLGFiNhFSIIKNoKFKRIwgRQWESxSmMIijYWFwtoKWtiIFv4TYheLgAQCIiRFQEVTBEyxjcVCEsjCCtfmDBwu+5id7J3dzJ4PLnPnPs7c/fY8Z0rOOQy9ccEoMKKMKCPKiDKijCiDETU2RFWBL0ZUb0wDc0CuJUUUUPY8sALsyXNiuTaBbWAro9xbqu+AJ8Db0ESVAtZ6aQRPCHGdsA68TyFnD7g5KqYXAWVpg8IpcLfDXC0lSQBTo6pRicn+67KmJmbyDWgpzZkTk9RYBD6r+8fAB3W/CSxI/xXwTM29AF4Gd1LOuWE1H8n4Q2888va9U3OreZ23NOT3UfrhJdHUljfWzsxWctGinJx5WvwBrnYgzhJOhXYkvR615O0sGlUWBx0BkyqKTSpnn8yfAid9mmHW84xcwtlUka/hjcfSb6SQcx3YUPdP+zhDrJ7RDKpSQ4x6OOfueBGuIuNHzrmvXfZ8bxMNg7Zh+qhYSpkED8Q8j8R8bwM7bfatATMSHWtFiHrzwCP58QfALnAI1CWhfKPWbgBLKvz/9mTdBz5J/xdwTc21gItFr/UAfgCzZ9ifYEEy+EKmB5sdSMoS+RohDxryNcuytDrwV1KECYmSkdR2B700HliVPcfAT+AjcEOtqQOXi1zr+a2Sct26ipK1cYh6PnolpJfkek+uzzPWe9XzWuv1iylgP+PeSoo/pDBEjW1RbEQFQjlwtM7F9CK6vx4+tzAflaPpRZ4pVAYkswpckbRgkF9+YtMoc+ZGlBFlRBlRBiNqAPgPzhEoqkhT6O4AAAAASUVORK5CYII="); --r: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFkAAAA0CAYAAADhYZQrAAACn0lEQVR42u2cMW8TMRiGn0NckVqkMDQDHdqJgQEWJpBggEoFCRiKxMbATAdmfgIDC7DCwMJCGUAqDCCxwMTCQJcgsRCkqhJEIh2SIQy2wbguPefsqjl/r2Tpznc+3T358n62c04xGo0QpdUBQTAZkK8DG8CogeUz8Ay4VQdQUcMufgEzDQ2+ATDlqV8Fru1FJK/pT9kAvggUDSuHrO0V4DHQAZb1syeNZPvkIjNrfQLM6qAKev4QyDkDNnoH9IArIRyqQn4PnM4csB1s68DxqjwOVrywAfxBOmQUob5cJfE9srbPCGMA7lrb32LYxVdgQaxi/BxVJZIXhOc23ZFhdXrddPbP1rUL6br9n0kUuxDtgwkikUCePMi3BVl6yNOCLD3kliDz6nJMyHPC06stSXwTZhddQQZA39l/K4kvvmZSRrJ4stIgZeIT+fUyJuRSeO7em6gLeSh80/cuREqbKSGLXSjNSySnV08gp1crJWQZjOxB7+KI8A3nEAp5Xfim78KJXfi1JJDT63VMyCeFZ3q7mNvtq5GB7oc2qPIG0Q9PNs35TSIXWB84XDeSb3jq7gngP7oaI5J3uvgK8DAjwBtA28cwlicve+oe8O8L4k3VeeDpuIBDIhnUopRzHj/6AnwEPqHmm0vUeop5awg6rYs53nPq0fWlri9Rv6OV+rg5Zq43dNqg60zpW+cMnXbu+eY6LZ17OsAL4DtwSif6Cx4eldf01VliZtRFza+2gKP4Fxk2TR3gWMzehas1/q5ly1FvgMWU/WSAS9qLXmUG9ydq/d5iaMMiwl8xLOnEeEJ7cWn53NQON7vF9ulC479tx/M3Hf9uV7ingeO5tif3LJ8fWj496xkPdFEvrqwCz8cFVMj/Xey/YbVIIAvkbPUbiVLLQLz9MyIAAAAASUVORK5CYII="); }
+.xtrata-radio__btn--heart    { color: #ff3646;    --m: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEkAAAAsCAYAAAApSpU1AAACbElEQVR42u2ZP2gUQRSHv5UN3MEprGCR9gJRFM4igVSihY0pA5dehAgpbFJYpEkrWGqhhWCrRcBGwerAwiYQRSQptLCxMxCCigbGZo48Hpe9ub3s3EycB8vN7M6//W7eb2beZsYYkpXbmYQgQUqQEqQEKUFKkMa0VcCoaxsojinfAXZE2X3goW9Imad9UgP4NaTMM+COTRfAjyHl7wJPTxMk107eAz3gvmP518Bi/aM3pu5L2yvxrGWM+WTKbVq111XPn9f9DnXPpA7wQeTngS3H2bYJLDnOzvPAXqzCLd3mWwkggFsqvzSk7Rsi/ShmTXoBdB1mkZ4dZ4GDEbUuixXST6Bp003gt0OdOQGzJWDlwKEq+weYih1S3f+0F0g+N5MLFevlJc+mTsOOe1Ok1yq2ceiwKHyNWbi7VrzrcDmjVrperDPppcrfPqF2t1W+F7O7ATxW57NxbQW4KvIzIZ3dOtb3Dyr0s2/3PuO63YI938kN6JuQhPujXU2KCv2cq3jglXZdAVrzAchnFGAQnF3gkmO9WVu+b++Aa74G7TvoJt3sIvDFoc5NBWjLJ6BJQNKg2kNcbwV4q4R/3veAJxXjzhw06h7wROQ3OIpc+jUPQbdRAnIte39d3V8taaMh0m37e9mm28aYC8aYPOSg26hi3tecOZFfHrAp1Wc7eXSRkYOW3XrsOUYggljdXEH17QrwedKDywnDMrvStWsOrUQl3INsBngQGqCQ3C1oS5+5PUAqgOkB2uZD6xoxQMrtQJtqwPkJvUReAibn6AND0JpU2Osv8J3jw6zRWxLuJNwJUoKUICVICdJ/af8AKINSxqVR/pcAAAAASUVORK5CYII="); --r: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFgAAAA0CAYAAAAOo/8VAAACqElEQVR42u2cIWwUQRSGv23YklxFIWkFFZgiaC36QlJdEJiKlqSYVjVpEDVtAgYkaAwgMJgKgqWiJ9DUnCkCcyRwYpv0TtyKq5i5drq3R2d2ZwPHvD/Z7Oxldif77cs/72ZnNur3+4iq0zUP1/gEPBjDe+8AMZACXb3HOL4FHOltq2gjUYkIDjH0XwB7LidMFGjkbQbuChD9x9sm0ASOgV3XwHKNYLPya+BpQNG7DawB9wbsfAM+BaZ0eRd4GaBF1DXoR7aQbS1i3YB7GChcgAbQynDxEsFmpYiwVdf2aGUVrp3cR8lsaQD7PrOIZaPcFb6Qscg3ZQGvGOVpYXuuVk4AFgI8LxGcq7bez5UFPCsRPKRvwF1fHvzbKP8Utuea9AV4SlgOKfaZRfwwyj1h69YXTThebEHYAnDbJ+CaZBHFZQN4bkQ5ZM36BNwxyomw9R/B5tO6Icj8A06LpCciJZvhyl+ZKI4E29Bro8hXmiaqwCJmBFO1gEUVe7C134gHSwSLRQhgkQAWwAJYdIU6ArhapZIHj1Ee3BKe1XrwiWCqFnAzc7weOLNXLpVtPHgJ+GIc94DrAQPOjo83gcUyEXyQOZ4ENgKFu83wC8/FshEM+Uu1Qssm6qjZ/bhwsM2DH45IVVYDgbsxAu6ODw/+U/4HamrVAWrmZRc1UWWwsC/m8mK/nmEzic5Q2rps1o9Rc+Jifd0alyfADOrm/QFIjfaydc1zZoDv+ronqIWHqW6vrb11GrXg505OW4fAfd+AnwHPc35PCO+VvvdlXGaa9i7wVM26/ykyFvFeN5AECPaDa+deZrDnpm5sH7XMdFzU42I07KrpuAnwFXii7/Wxc6hX9DmD5ZxOadDp1IyO5fM/+ACWuBgta5T2EvlexN8fixAJYAEcrM4ALq6hKIKuA50AAAAASUVORK5CYII="); }
+.xtrata-radio__btn--repeat   { color: var(--cyan); --m: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEoAAAAuCAYAAACPtY89AAAC6UlEQVR42u2av4sTQRTHP5EIG0iKCBFOiIV2J1yjhXCFjY2CYmNhcYUWCjYHNidYRMHCwuKwFA7R0sJCDxsFLSwU9A/wOhHP4sADc+hiAmPzFh7Dbi6b3Zn8mgdLZifzZt5858173xm2YowhyP5yIEAQgApABaACUAGoANQYJQKqUl7I+D+Rui+jKoFHTf/Wa6ryBtAZpzHT4lGJkY+BG/ME1EmJQ035PQtsAdtS98Rq/w04qt5PAV9mGag14MEQ7RrAHvADOJLRZhc4AfycNaA2gGvD2mVtuUFyEOi7Nr7qCaROCkjvgU+S7rfEi1rAM9XmtGzL+5ZuTwBKyhX3UdIYH4+WOyPo31L6N6VuSdWtuZ6DD5DW1YTWR+zjkugvq7oz1gI4nYePGGVSYk8ZsmJt0wvA5qwSznYB3U3gg5RfuQTJV9Zz5VFzcYSJSuzrCnB1EnlUXchgGtXoq3PartT1HHrUc+CylA/JmGP3qLYA0MgAL0rhZjYRXCrZ/kWLqU9djNLe9VIykguvMr4YuqsYpQ2+CKwCXeCt1a4FfB5xjKeq/Nf5McYTM896/glZfJhT77pFNpdngZljjFk0xvyxJvfben9hjFlROm1jzBtjzC9jzDtVtqXjYw6+bg9awEfgWMk3B6vAowFxsgrE08SjdoDjAsJtAS3tfumwet8e0N9XoDYApCROxmVNoKhHRSqIjhJMXwPngLvAvQI2xK5XulrAuFoJ3OW8bLEiGSsekqZ49agFASdmsqTUeFQ0RiXeV5vAM2vf9eLl8ahk1WpylOkB35kTyQNUpGJCVQVyeyWbwpTjWQIqz9ZrCQiRCpJxitd1VX1kAZ33eqVu6TdTElCefpuM+L1CnqyXeFJDpeR4wBnP7j+2QB4m3e+pfhpKf2fIrJcFVk28nowrI2+3B5MuC4rkxq6BqsqAsQy4n5ckHtcfwHVaKvZ1C2Yz7YX9DBsjH0DNlYQv7gJQAagAVAAqADU/8h8x9EiTIirr9gAAAABJRU5ErkJggg=="); --r: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFkAAAA3CAYAAABn9eaFAAAC+UlEQVR42u2cL4wTQRSHv16uiJakFa24E2BqMBgMBsQhisCcOQSQ3JnDgECRYMACBoFCgAASMAiCoOIMZzAYDAIMTSjiTrTimnArithpMszOZXd2phfaeb9k0850t5t++/r+zM5sZTKZIJqtlgSBQBbImjaB78BkAbc/wEMfOBVPn/wc2IrIKA+Ak8dlyV11laeAKwu8XQZeAAOgrn739qwt+RewqsGNRVeA68BV1X4K3C5y4LLjifQrEhNggA9AFegAp4BbQB94HNKS7wMPIgVsusqXQLsoCxefPAX8KfKMrAc80dr3QlnyGrAjVlwuNhW15B1harVoqfhmrFpIyGvC06qzISF3hKd1GOFMSMiHwjSjduiyui1MM6qGhjwQphklLnFLLLmcOi5BsAjkL8I0owOXdK4I5JowzagZGnJPmObGqcQXcleYZtQw2iOx5NlnFwNfyBeEaW7G5e0udoVpRmOjfc4XsqkNYUzLaJ/3hbwuTHMtuekL+XROtSOQYRjaXSTCOJNN7PtCXsnxRzHKrPD2fCGPXa5apPK25KpLnR6pT/au+PouXxipu6j6Qq6JT84N/i1fyGZ68k0Y57pUZ8irOXW7QA1QjPx0KSHFcstBfm0ps2MfY667FGhlKr4TlgIlNpl3p2+GhgzpjPNYtYHj+E1RyK+M9iXSRTkx6q3rAUUh37D0bZHOCYtJtsncd0JBBnhn6XsEvI8A7uYRgOHfWfdWua5+su28B3wGvqpXSO/mXlTVYkNLexoqMutVZEN9lqgxgX3SySOJ6q8b7em+I7V/yxhTGFui/RD4rfpr6pi2OvdI9Q/VuX9oGdU68EYFeyu/ItDKLDGbHJFLJ2pbKZKgL4AKL+souyI19kcLOK2bWfI4ybMI4X6kxMKkSoDnXWyT3hK/ZqmEjluHmm+fbjUtJtS0dqL59mlsaBrf1VcxZxe4W9rs5+ihIl1VBFRVDBip92P+87khy3P0V+1pmcVcTR2ryONxZi9ZxyeQBbKooP4CaxXUBbk6W0EAAAAASUVORK5CYII="); }
+.xtrata-radio__btn--prev     { color: var(--cyan); --r: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHMAAABACAYAAAAprUjlAAADuElEQVR42u2dsW/TQBTGvyDSIRkSpGZoBzLAf9CFpQwtUpYuLIBUISGGLhQJsSABEgswsHRggqUMMDCXASTEQOYuLAzAUCSoRC2VDPFQD2HwO+XVTYRs3/lc9/tJlmP7zme/z3f3zr7c1UajESxxB8AGSFo+A3gIoJ/3RDULYvYAvJffewDeAdgBsCvbdVmasgaAaMJ5Gmox1KfE18dDOV9d7WvJEgEIAGxJuHkAKyp+IGGGat8MgAPZ35xyzw1JZy9xL/paWgDa6n66AL6rsOcBzMp+wwMAT32JaSK/BnCdmSwzLyRTGGFrRYs5ypMwmchHAMtZ7XqKQpaKSwA2EzZ2Kua+rLdpeyfcVIJ+c13MMlcWwy9x2GqucuaINi6MdVmvuq4ziXsGqqXgpJjVgVnMuuUPgE4aW1PM8pLa1ixmKwTFpJikYFYoZvU8W2ti9mhTb/RtixnSpqwzSQnFPEtzeaNnW8xd2tQbddtifqJNC2PRtZjEn/faoZjVqSOHFPP4EmZpFlLM40GXYlbce80j5hXa2JuY1otZvs7zV2fSATrGNBLb1r+aDGjjwvjgWswWbVyalwisM6tOGjFnaa7qiBnRXNURs0tzlRt2gi4v7ARdUVZti3mZNvWG9dd5DdrUGy3bYr6hTb3xw7aYS7SpN6y/AWKHLn9Y72pJSu4AsZ3JdiYpI3nEvE/zOeN5lkh5ilkWte7YRzyIYqHFLMcFcpMrtZBPXOXMGxgPBWZ4C+AaNXDi+KQq/dLmzFcT9l0F8Jga5OZW3pIu6xClkyL9BXCGmqRmDcAjxOPkIY9PcjrjBbyUi9C0ReSvUhQPROAO4hfFumNvJIsJo0dQ1uEGst3AeGRlHSaQ32Y05+R5IhW/rR4609utpdIJEL82W8R4pOdZdb3A0c7JJv0QR3vU/Y+e1IcLU45vFJUzgXj04rUK5IwDJWaYEM10Pm6KsPMZ0zDDeW8D+C0PxwUAF6eEfwbgXpFiGs9rnSWlVTI39/I2TW5L4pvUIDebedvtNYtTYQDxn4uWpc45h3gmggYmz3IQIZ59oCXFmPn4nZxFYaai4g0RjxOxBeCulSxtWUxg/H98MxWFFjNMiKkdG7PvAOMpJAIcng5DO0+RxJ1TdZmp88y+nQlxQzl3R5wh4wANVPqh2k46bvqBCxMPXlPdr3lYF1S6P+X4FzkWIJ46BGUV0xdLGM8nUk84MoGIO5QHZUeMO4fDPSiWYP+77aLykvsuDVAlMU88/ARGMQnFJBSTUMwTxz8Lp+4hp7/waQAAAABJRU5ErkJggg=="); }
+.xtrata-radio__btn--next     { color: var(--cyan); --r: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHQAAABGCAYAAAAdKLCBAAADoElEQVR42u2dr48TQRTHPyX0RCta0ZL0SDjBGcwZdBFnMEACAsMfgECduLsEBAoSIEFhQKMQII6EYC4haMwZzBkQd+IqaHKtoKKIvk0fm96P3evstZPvN5nsznZmOv1+98282U7elobDIUI8uCAKJKggQQUJKpy7oG3gEBgqZU6HwKNpiFCagpf7Atiw811gC6gDe0AZaNqx7Or0gR4wsOsLqTbT5WtWNklJmYod/fWKHQep9vqWBqn2B3Y9yfeArmurDrRS31t23wOw7PpQtv769quubM/yB5Zvpn77FnDnvARNKpc02J0Jt4A3wJK7dgP4XqSgEnP6eA1cNzFzcZtXUIkZ1lpXgbU8HF+UmDOHzzb/doBnxvepuc7q5T4Q34Xgkwm6k7ViVgt9b8eP4jw43gENYCWLleZdh9bEdyFYDvlg4XFqXScU4yAFE/SeO18U14WgGVJQP8x2xfVsIougVzTkxiWof956IOrmX1CPiqibf0F7mkPjErQqC43XQvuibv4FHchC4xK0LwuNS1D/YKEp6uZf0M4R86kwp4L6/S51UTf/giILjVdQWWhkgg5EXVyCah1aPNqy0LhwKiPKsi/XFzwALonj4PCcB90k9ltcxzXkag6d0SFXc+j84GtIQRviN65ly66oi0tQ/dsSmaDa9ReZoFVRJwsVZlhQ7ZwPj9UiBd0X38FRKVJQrUPDo1ykoNo5Hx61IgVtie+4nKK6qAuOqixUQ24mQf+68yajGH/CHHu526l8W5wHxUpoQZ+n8teAdfEeDLfzVMoa6y9deA+4LO6njm+MAzhChsicWZ2itVR+kVHwXmF6+JISEzKEWc0TjfOoCg8ZhTMT8uEtcH/CkjBTkMyzhldN4xejvS8/LbUYRU+pWWqmPOaqeXNJ9OsF+yyJPA3jyJRdxlGwK65usoxqAlct33Geoo803bfPfDTphpXr23f84f8I2QPXZs/1e2DtdE6woJuMQrztun523c3/lFF48kmbBp5M8F2CCHqcqH6ZsyDDy83PBvAqtFOUVVQhH14Cm6GXLRNvCBRqdZromUO0mVuQKb77bB24a3PLsvOChZPxw+bUMzuVpXN4mV3bORGrznGpOCen79L3lIPRME8w/RqQrh0X7U7fNyftwzHOSss5ODXXl445MdtH9L/B+FlrUr7iHK+u9Tv5fV2rs2QO4JJz+HYYhSWfCkp6O2Fc0KuyJKggQQUJKkhQQYJKUGHG8Q8sEBkFp8yA7QAAAABJRU5ErkJggg=="); }
+
+/* play/pause: two lit layers on one button */
+.xtrata-radio__btn--play { color: #2eff70; --r: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHQAAABKCAYAAABq6nD6AAADnElEQVR42u2dIWzUUByHvyPckdzEjeQmmDkEBiyITWxiiGEPBAaDATGDYSRDkQwDAjPDBA4BAjQJWUKW4GYQTIDgECNhJOzENdmdOET/zd6VLtn1+spd+X1Jc+3r62v7vrzX117zb6nf7yOKwylVgYQKCRUSKiRUZCt0BehrSjV9zkpCKaPblqRCDoDvwB4Q2NSzqZuQvwKUbQKoA1XLH9j8tK3rWL5oHbYcAG3LG+2z65RfswnnWHD224ul15xyf1l62TmHtnNeZdtvGWjEji2i6+SdBpaBmbiTUUScHlHkR2A+iwMR/DbJfeAJ8CDvLrdvMluSmQlngU2bXwVe5NlCv9nvDnBFLjLjrl2q5oDb1lge+b6G3gOeqZv1ygKwDiwOW8dpulzJ9M82sGXzhz5b6AqwIaG5cWij85KvFrqhOv4nrPlqof2s7pfEifhp96kt4LyETj5D13fa+9B91bV3mnk+WJhRfXtnNk+hwj+f0myU9hraBc6ozotzDa2orscTdbkSKiRUSKgYoCOhxSKQ0Mln2ZmvSmixWuXUSTfSw/nxJrcHC8I/SxrlFouqhBaLmoQWi4sSqhYqoWNML7Z8R0Inm3Js+auEFrvFSuiEEaTZSELHl/iLeNsSOtl01EKLRUVCi4Ue/f2Po1oJVQsVEirU5YpskNDxJf7stimhk82P2PJb30Lvq869Us+7y22qzr1yOW+h88Bz1bs35pz5Vl6DIrVSP7znKPIohLH/vAjdjS3PAF9U/5myBlyNpb32JfRSQtoF4IM8ZMI68DiWtjpMAWm63M2EtEXC1/bVBadjgTD28MOEdU+HKShtROsoBl0SB4T/rrcIIz43CN8xdV9LbBMG3ogiRUfLEW6kaTfSddVJh6MI1vuxbdwI2nXrRc4520T7COx4ewy+lNXm72jZOGUeOOvLDEbJDmLlRWlbCXW1DNwkDKWa6GdYMaOEKD9uw45VCKSMtSPSyRx1lFsC3iSkT5lIyUzPtbQbjnrbcsO6i44cZMKejXDfpW5lGX7MrglcB27Jy9DsEEYOezWKzKyFJl3wGzbYqXD02Y6AwT9vq7FBRzSoqDr5egx+SsMdKPWsh4j2UbcyGrZ+16bokxz7hA++o/LqdhMfDW5qdn/dcbaJ8s06A6C2cy51y9O2QV7gnC+xc2g79/TRoOxlZhdefW5yaJaOGbGOx0hKQouF/g+VUCGhQkKFhAoJlVAhoUJCRWr+ADrdLq8994aUAAAAAElFTkSuQmCC"); }
+.xtrata-radio__lit--play  { --m: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGEAAAA9CAYAAAC9SgcvAAABK0lEQVR42u3bPUrEQACG4S+yjYWtjZ1XUFBQ8ASWNl7ExgN4Ba9g6RW00MJrbGthoaAQm7ERZNlEkzF53ibsz8CSJ5OZFNu0bRuN24ZTAEEQIAgCBEGAIAgQBAGCIEAQBAj6BwjXSdokdxDGa1GOxwXjDMLwvX57fVMwjiAM1/MP798XjAMIf9/2is8fCgaEAdaEVbVJbiGM32nBuIDwu310GHM1pcW7xt3ROn0t3icQ+vUy9yfmRQW/YbPH2MMkj25H/dvqMOYySTMFgFpmwvsa310m2XE7Gm931HhYG+dCWJaTP1mAWmbC29yu/NoX5qc5XPk1IuyW43mS/Tk+JzT+LmUmCAIEQYDQpT27I5kJEAQBgiBAEAQIggBBECAIAgRBgCAIEARh7n0CxdUoI0GGmoAAAAAASUVORK5CYII="); color: #2eff70; }
+.xtrata-radio__lit--pause { --m: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGEAAAA9CAYAAAC9SgcvAAAA+klEQVR42u3bPYrCQBiA4URW0MJiCy0sLbyCl9gr7IEtvYCtsFtYKChajI1FCGaQkMy46/NCIORrQp78FilDCIXyNnAIIAgCBEGAIAgQBAGCIEAQBAiCAEFvjPBdFEW4L5cH81BZIPTUvLI+rM2+XAlpuj4JBKHHfiOzDwhp+mw5g9BhsbP9ACF/Swj5G0NI/4pab9KwfQWh2/aR2U/D9jWEdA/modtRfoQThDQtIrMphDSdI7MjhDSNWs4gdNjur+zof0Y4+VjL36yyvqnNtq+0o6XfpVwJggBBECAIAgRBgCAIEAQBgiBAEAQIggBBECAIAgRBgKAW3QDjxxpfIJqeGwAAAABJRU5ErkJggg=="); color: #3fa9ff; }
+
+.xtrata-radio.is-playing .xtrata-radio__lit--play { opacity: 1; filter: drop-shadow(0 0 2px rgba(46,255,112,.8)); }
+.xtrata-radio.is-playing .xtrata-radio__btn--play .xtrata-radio__ring { opacity: 1; }
+.xtrata-radio.is-on:not(.is-playing) .xtrata-radio__lit--pause { opacity: 1; filter: drop-shadow(0 0 2px rgba(63,169,255,.8)) drop-shadow(0 0 7px rgba(63,169,255,.5)); }
+
+/* ============ knobs ============ */
+.xtrata-radio__pot {
+  position: absolute;
+  width: 5.55%;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  cursor: grab;
+  touch-action: none;
+  transform: translate(-50%, -50%);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.xtrata-radio__pot:active { cursor: grabbing; }
+
+/* rotating core (engine sets style.transform=rotate(...) on __knob) */
+.xtrata-radio__knob,
+.xtrata-radio__potcore {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  transition: transform .12s ease;
+}
+
+.xtrata-radio__knob::after,
+.xtrata-radio__potcore::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 15%;
+  width: 4.5%;
+  height: 30%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--cyan), rgba(38,245,255,.55));
+  box-shadow: 0 0 3px rgba(38,245,255,.9), 0 0 8px rgba(38,245,255,.45);
+  transform: translateX(-50%);
+}
+
+.xtrata-radio__pot--band    { left: 21.51%; top: 71.85%; }
+.xtrata-radio__pot--preset  { left: 34.23%; top: 72.03%; }
+.xtrata-radio__pot--tone    { left: 47.23%; top: 71.39%; }
+.xtrata-radio__pot--balance { left: 59.89%; top: 71.57%; }
+
+.xtrata-radio__pot--volume  {
+  left: 78.01%;
+  top: 72.22%;
+  width: 13.3%;
+}
+
+.xtrata-radio__pot--volume .xtrata-radio__knob::after {
+  width: 2.8%;
+  background: linear-gradient(180deg, #ff9700, rgba(255,151,0,.55));
+  box-shadow: 0 0 3px rgba(255,151,0,.9), 0 0 calc(6px + var(--pulse) * 10px) rgba(255,151,0, calc(.45 + var(--pulse) * .4));
+}
+
+.xtrata-radio:not(.is-on) .xtrata-radio__knob::after { opacity: .35; box-shadow: none; }
+
+/* ============ minimize / expand ============ */
+.xtrata-radio__mini {
+  position: absolute;
+  right: 2.5%;
+  top: 3%;
+  width: 6%;
+  height: 7%;
+  border: 0;
+  border-radius: 30%;
+  background: transparent;
+  color: rgba(255,255,255,.0);
+  cursor: pointer;
+  z-index: 3;
+}
+
+.xtrata-radio__mini::before {
+  content: "";
+  position: absolute;
+  left: 25%;
+  right: 25%;
+  top: 48%;
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(255,255,255,.35);
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+
+.xtrata-radio__stage:hover .xtrata-radio__mini::before { opacity: 1; }
+
+/* collapsed pill: hide the cabinet, keep the VFD strip */
+.xtrata-radio.is-min .xtrata-radio__stage {
+  width: min(280px, calc(100vw - 32px));
+  aspect-ratio: auto;
+  height: 56px;
+  filter: drop-shadow(0 8px 14px rgba(0,0,0,.5));
+}
+
+.xtrata-radio.is-min .xtrata-radio__stage::before,
+.xtrata-radio.is-min .xtrata-radio__btn,
+.xtrata-radio.is-min .xtrata-radio__pot,
+.xtrata-radio.is-min .xtrata-radio__mini { display: none; }
+
+.xtrata-radio.is-min .xtrata-radio__display {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  border: 1px solid #3a2a1c;
+  padding: 7px 12px;
+}
+
+@media (max-width: 640px) {
+  .xtrata-radio__stage { width: min(320px, calc(100vw - 24px)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .xtrata-radio__screen-text.is-scroll { animation-duration: calc(var(--dur, 8s) * 2); }
 }

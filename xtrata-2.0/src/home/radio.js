@@ -58,25 +58,30 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   const root = document.createElement('div');
   root.className = 'xtrata-radio';
   root.innerHTML = [
-    '<button class="xtrata-radio__set xtrata-radio__toggle" type="button" aria-pressed="false" title="Xtrata Radio — random inscribed songs">',
-    '  <span class="xtrata-radio__grille" aria-hidden="true"></span>',
-    '  <span class="xtrata-radio__face" aria-hidden="true">',
-    '    <span class="xtrata-radio__screen">',
-    '      <span class="xtrata-radio__screen-text"></span>',
-    '    </span>',
-    '    <span class="xtrata-radio__meta">',
-    '      <span class="xtrata-radio__brandwrap"><img class="xtrata-radio__logo" src="/favicon.svg" alt="" /><span class="xtrata-radio__brand">XTRATA&nbsp;FM</span></span>',
+    // Hidden power element: the engine binds on/off to .xtrata-radio__toggle.
+    '<button class="xtrata-radio__toggle" type="button" aria-pressed="false" hidden></button>',
+    '<div class="xtrata-radio__stage">',
+    '  <div class="xtrata-radio__display" role="button" tabindex="0" title="Xtrata Radio">',
+    '    <div class="xtrata-radio__meta">',
+    '      <span class="xtrata-radio__brand">XTRATA FM</span>',
     '      <span class="xtrata-radio__vu"><i></i><i></i><i></i><i></i><i></i><i></i></span>',
-    '    </span>',
-    '  </span>',
-    '  <span class="xtrata-radio__side">',
-    '    <span class="xtrata-radio__knob" role="slider" aria-label="Volume" aria-valuemin="-1" aria-valuemax="10" title="Volume — scroll or drag; below 0 clicks off"><i></i></span>',
-    '    <span class="xtrata-radio__transport">',
-    '      <span class="xtrata-radio__tbtn" role="button" tabindex="0" data-dir="prev" title="Previous song">⏮</span>',
-    '      <span class="xtrata-radio__tbtn" role="button" tabindex="0" data-dir="next" title="Next song">⏭</span>',
-    '    </span>',
-    '  </span>',
-    '</button>'
+    '    </div>',
+    '    <div class="xtrata-radio__screen"><span class="xtrata-radio__screen-text"></span></div>',
+    '  </div>',
+    '  <button class="xtrata-radio__btn xtrata-radio__btn--playlist" type="button" title="Your station (liked band)"><span class="xtrata-radio__ring"></span></button>',
+    '  <button class="xtrata-radio__btn xtrata-radio__btn--shuffle" type="button" title="Discovery preset"><span class="xtrata-radio__lit"></span><span class="xtrata-radio__ring"></span></button>',
+    '  <button class="xtrata-radio__btn xtrata-radio__btn--heart" type="button" title="Like this song"><span class="xtrata-radio__lit"></span><span class="xtrata-radio__ring"></span></button>',
+    '  <button class="xtrata-radio__btn xtrata-radio__btn--repeat" type="button" title="Loop this song"><span class="xtrata-radio__lit"></span><span class="xtrata-radio__ring"></span></button>',
+    '  <button class="xtrata-radio__btn xtrata-radio__btn--prev xtrata-radio__tbtn" type="button" data-dir="prev" title="Previous song"><span class="xtrata-radio__ring"></span></button>',
+    '  <button class="xtrata-radio__btn xtrata-radio__btn--play" type="button" title="Play / pause"><span class="xtrata-radio__lit xtrata-radio__lit--play"></span><span class="xtrata-radio__lit xtrata-radio__lit--pause"></span><span class="xtrata-radio__ring"></span></button>',
+    '  <button class="xtrata-radio__btn xtrata-radio__btn--next xtrata-radio__tbtn" type="button" data-dir="next" title="Next song"><span class="xtrata-radio__ring"></span></button>',
+    '  <span class="xtrata-radio__pot xtrata-radio__pot--band" role="button" tabindex="0" title="Band: FM / Liked / Chain"><span class="xtrata-radio__potcore"></span></span>',
+    '  <span class="xtrata-radio__pot xtrata-radio__pot--preset" role="button" tabindex="0" title="Preset: All / Music"><span class="xtrata-radio__potcore"></span></span>',
+    '  <span class="xtrata-radio__pot xtrata-radio__pot--tone" aria-hidden="true"><span class="xtrata-radio__potcore"></span></span>',
+    '  <span class="xtrata-radio__pot xtrata-radio__pot--balance" aria-hidden="true"><span class="xtrata-radio__potcore"></span></span>',
+    '  <span class="xtrata-radio__pot xtrata-radio__pot--volume"><span class="xtrata-radio__knob" role="slider" aria-label="Volume" aria-valuemin="-1" aria-valuemax="10" title="Volume - scroll or drag; below 0 clicks off"></span></span>',
+    '  <button class="xtrata-radio__mini" type="button" title="Minimise radio"></button>',
+    '</div>'
   ].join('');
   document.body.appendChild(root);
 
@@ -1136,6 +1141,67 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     nudgeVolume,
     subscribe: (cb) => { listeners.add(cb); cb(stateSnapshot()); return () => listeners.delete(cb); }
   };
+  // --- receiver faceplate wiring -----------------------------------------
+  const UIMIN_KEY = 'xtrata.radio.ui.min';
+  const displayEl = root.querySelector('.xtrata-radio__display');
+  const faceBtn = (name) => root.querySelector('.xtrata-radio__btn--' + name);
+  const setMin = (min) => {
+    root.classList.toggle('is-min', Boolean(min));
+    try { window.localStorage.setItem(UIMIN_KEY, min ? '1' : '0'); } catch { /* noop */ }
+  };
+  let startMin = true; // default: unobtrusive pill
+  try { startMin = window.localStorage.getItem(UIMIN_KEY) !== '0'; } catch { /* keep default */ }
+  setMin(startMin);
+
+  const onDisplayTap = () => {
+    if (root.classList.contains('is-min')) { setMin(false); return; }
+    if (!on) switchOn();
+  };
+  displayEl.addEventListener('click', onDisplayTap);
+  displayEl.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onDisplayTap(); }
+  });
+  root.querySelector('.xtrata-radio__mini').addEventListener('click', (event) => {
+    event.stopPropagation();
+    setMin(true);
+  });
+
+  faceBtn('play').addEventListener('click', (event) => { event.stopPropagation(); api.playPause(); });
+  faceBtn('heart').addEventListener('click', (event) => { event.stopPropagation(); toggleLike(); });
+  faceBtn('playlist').addEventListener('click', (event) => { event.stopPropagation(); setBand(band === 'liked' ? 'fm' : 'liked'); });
+  faceBtn('shuffle').addEventListener('click', (event) => { event.stopPropagation(); cyclePreset(); });
+
+  let looping = false;
+  faceBtn('repeat').addEventListener('click', (event) => {
+    event.stopPropagation();
+    looping = !looping;
+    player.loop = looping;
+    faceBtn('repeat').classList.toggle('is-lit', looping);
+    writeScreen(looping ? 'LOOP: THIS SONG' : 'LOOP: OFF');
+    sectionTimers.push(window.setTimeout(() => { if (currentTrackInfo) tickerStep(); }, 1400));
+  });
+
+  // band / preset pots: discrete positions, click to cycle
+  const bandCore = root.querySelector('.xtrata-radio__pot--band .xtrata-radio__potcore');
+  const presetCore = root.querySelector('.xtrata-radio__pot--preset .xtrata-radio__potcore');
+  const renderPots = () => {
+    if (bandCore) bandCore.style.transform = 'rotate(' + ((BANDS.indexOf(band) - 1) * 45) + 'deg)';
+    if (presetCore) presetCore.style.transform = 'rotate(' + (preset === 'music' ? 45 : -45) + 'deg)';
+  };
+  root.querySelector('.xtrata-radio__pot--band').addEventListener('click', (event) => { event.stopPropagation(); cycleBand(); });
+  root.querySelector('.xtrata-radio__pot--preset').addEventListener('click', (event) => { event.stopPropagation(); cyclePreset(); });
+
+  // engine state -> lit buttons / pot positions / playing class
+  const renderFace = (snap) => {
+    faceBtn('heart').classList.toggle('is-lit', Boolean(snap.nowPlaying && isLiked(snap.nowPlaying.tokenId)));
+    faceBtn('playlist').classList.toggle('is-lit', snap.band === 'liked');
+    faceBtn('shuffle').classList.toggle('is-lit', snap.preset === 'all');
+    root.classList.toggle('is-playing', Boolean(snap.playing));
+    renderPots();
+  };
+  listeners.add(renderFace);
+  renderFace(stateSnapshot());
+
   window.XtrataRadio = api;
   return api;
 };
