@@ -304,8 +304,15 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   };
 
   // --- track resolution ---------------------------------------------------
+  // Hardcoded ignore list: inscriptions that resolve as media but must never
+  // air (e.g. #1065 — a video-only mp4 with no decodable audio track).
+  const IGNORE_IDS = new Set(['1065']);
   const trackCache = new Map(); // tokenId -> { src, title } | null
   const resolveTrack = async (tokenId) => {
+    if (IGNORE_IDS.has(String(tokenId))) {
+      radioLog(`ignored #${tokenId}`, 'on the hardcoded ignore list', tokenId);
+      return null;
+    }
     if (trackCache.has(tokenId)) {
       return trackCache.get(tokenId);
     }
@@ -457,7 +464,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   // Known-good tracks outside the curated gallery (early-era opus/mp3s that
   // live on legacy cores) join the seed rotation so they play regularly rather
   // than waiting on a lucky random pick.
-  const EXTRA_SEEDS = ['8', '1636', '1122'];
+  const EXTRA_SEEDS = ['8', '315', '1636', '1122'];
   const playlist = [...new Set([...tokenIds.map((id) => id.toString()), ...EXTRA_SEEDS])];
   let maxTokenId = 0;
   const EXPLORE_RATIO = 0.5; // half the picks roam the full id range
