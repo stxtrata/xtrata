@@ -687,7 +687,18 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
       }
       radioLog(`play #${track.tokenId}`, { src: (track.src || '').slice(0, 80) }, track.tokenId);
       try {
-        await player.play();
+        // Watchdog: a broken stream (e.g. bad 206 range responses on big
+        // videos) can leave play() pending forever. If playback hasn't
+        // actually started within 12s, give up on this track and retune.
+        await Promise.race([
+          player.play(),
+          new Promise((_resolve, reject) => {
+            const timer = window.setTimeout(() => {
+              reject(new Error('stall-watchdog: no playback within 12s'));
+            }, 12000);
+            player.addEventListener('playing', () => window.clearTimeout(timer), { once: true });
+          })
+        ]);
         setNow('', true);
         startTicker(track);
         startVu();
@@ -698,8 +709,10 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
         window.setTimeout(() => { void preloadNextTrack(); }, 1500);
         return;
       } catch (error) {
-        radioLog(`play FAILED #${track.tokenId}`, { error: String(error), mediaError: player.error && player.error.code }, track.tokenId);
-        // Autoplay refusal or decode failure — try another station.
+        radioLog(`play FAILED #${track.tokenId}`, { error: String(error), mediaError: player.error && player.error.code, ready: player.readyState, net: player.networkState }, track.tokenId);
+        try { player.pause(); player.removeAttribute('src'); player.load(); } catch { /* reset for next attempt */ }
+        trackCache.delete(track.tokenId); // stalled stream: retry later, don't dud
+        // Autoplay refusal, decode failure, or stall — try another station.
       }
     }
     if (token === tuneToken && on) {
@@ -713,6 +726,13 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
       void tuneToNextTrack();
     }
   });
+  // Trace the media element's life for debugging (watched ids always log).
+  ['loadstart', 'loadedmetadata', 'canplay', 'playing', 'waiting', 'stalled', 'suspend', 'abort', 'emptied'].forEach((name) => {
+    player.addEventListener(name, () => {
+      radioLog(`media:${name}`, { t: player.currentTime.toFixed(1), ready: player.readyState, net: player.networkState }, currentTokenId);
+    });
+  });
+
   player.addEventListener('error', () => {
     radioLog('player element error', { code: player.error && player.error.code, src: (player.currentSrc || '').slice(0, 80) }, currentTokenId);
     if (on) {
