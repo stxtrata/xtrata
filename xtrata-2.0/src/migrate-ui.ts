@@ -264,6 +264,52 @@ const migrate = (id: bigint) =>
     });
   });
 
+// One-signature batch migration via the xtrata-migrate-batch-v1 helper.
+// Set BATCH_CONTRACT after deploying contracts/drafts/xtrata-migrate-batch-v1.clar;
+// until then the button stays hidden and the sign-each flow below is used.
+const BATCH_CONTRACT = ''; // e.g. 'xtrata-migrate-batch-v1'
+const BATCH_LIMIT = 25;
+const migrateBatch = async () => {
+  if (!BATCH_CONTRACT || !state.session.address) return;
+  const ids = state.eligible.slice(0, BATCH_LIMIT);
+  if (!ids.length) return;
+  note(`Batch migrating ${ids.length} token${ids.length === 1 ? '' : 's'} in ONE transaction…`);
+  state.busyId = 'batch';
+  state.busyPhase = 'signing';
+  render();
+  const { listCV } = await import('@stacks/transactions');
+  showContractCall({
+    contractAddress: DEPLOYER,
+    contractName: BATCH_CONTRACT,
+    functionName: state.source === 'v1' ? 'migrate-batch-v1' : 'migrate-batch-v2',
+    functionArgs: [listCV(ids.map((id) => uintCV(id)))],
+    postConditionMode: PostConditionMode.Allow,
+    appDetails,
+    network,
+    stxAddress: state.session.address,
+    onFinish: (payload: unknown) => {
+      const txId = (payload && typeof payload === 'object' && 'txId' in (payload as Record<string, unknown>)
+        ? String((payload as Record<string, unknown>).txId) : '') || '';
+      note(`Batch submitted → ${txId}. One confirmation migrates all ${ids.length}.`);
+      state.busyPhase = 'confirming';
+      render();
+      void (async () => {
+        const result = await waitForTx(txId, (msg) => note(`batch: ${msg}`));
+        state.busyId = null;
+        if (result === 'success') {
+          ids.forEach((id) => state.v3Minted.add(id.toString()));
+          state.eligible = state.eligible.filter((v) => !ids.includes(v));
+          note(`Batch confirmed ✓ — ${ids.length} tokens migrated in one transaction.`);
+        } else {
+          note(`Batch ${result}. Nothing migrated (a batch is all-or-nothing) — rescan and retry, or use sign-each.`);
+        }
+        render();
+      })();
+    },
+    onCancel: () => { note('Batch cancelled.'); state.busyId = null; render(); }
+  });
+};
+
 const migrateAll = async () => {
   const queue = [...state.eligible];
   let done = 0;
@@ -317,6 +363,7 @@ const render = () => {
         </label>
         <button id="scan" ${connected && !state.busyId ? '' : 'disabled'}>${state.scanning ? 'Stop scan' : 'Scan eligible'}</button>
         <button id="all" ${connected && state.eligible.length > 0 && !state.busyId && !state.scanning ? '' : 'disabled'}>Migrate all (sign each)</button>
+        ${BATCH_CONTRACT ? `<button id="batch" ${connected && state.eligible.length > 0 && !state.busyId && !state.scanning ? '' : 'disabled'}>⚡ Batch migrate ${Math.min(state.eligible.length, BATCH_LIMIT)} (1 signature)</button>` : ''}
       </div>
       <p class="hint">Pick a source core, then Scan — nothing runs until you do. Each migration is a separate Xverse signature that moves your legacy token into the v3 core and mints the same id on <code>${CORE}</code>. Ids already on v3 are skipped. Network fee is fixed at <strong>0.005 STX</strong> — if Xverse shows a higher amount, set it manually to 0.005.</p>
       ${state.scanning || state.owned
@@ -357,6 +404,7 @@ const render = () => {
   document.getElementById('disconnect')?.addEventListener('click', () => void disconnect());
   document.getElementById('scan')?.addEventListener('click', () => void scan());
   document.getElementById('all')?.addEventListener('click', () => void migrateAll());
+  document.getElementById('batch')?.addEventListener('click', () => void migrateBatch());
   document.getElementById('source')?.addEventListener('change', (event) => {
     state.source = (event.target as HTMLSelectElement).value as 'v1' | 'v2';
     state.eligible = [];
