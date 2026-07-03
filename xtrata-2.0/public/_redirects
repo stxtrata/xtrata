@@ -24,3 +24,4 @@
 /lab/* /workspace 200
 /gallery/* /g/:splat 200
 /manifests /agent-one/manifests.html 200
+/bip110 /bip110.html 200

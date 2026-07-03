@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>What BIP-110 means for on-chain media · Xtrata</title>
+<meta name="description" content="A fair explainer of BIP-110, how Ordinals are adapting, what it costs — and where permanent media goes next. With a live cost calculator." />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<style>
+  :root{color-scheme:dark;--bg:#0b0e14;--panel:#121723;--line:#243044;--ink:#e6edf6;--mut:#8b9bb4;--acc:#3ea6ff;--acc2:#7c5cff;--ok:#3ddc97;--warn:#ffb454;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1000px 520px at 50% -10%,rgba(124,92,255,.14),transparent),var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  header{display:flex;align-items:center;gap:12px;padding:16px 22px;border-bottom:1px solid var(--line)}
+  header img{width:28px;height:28px;border-radius:7px}
+  .logo{font-weight:800}.logo b{color:var(--acc)}
+  main{max-width:820px;margin:0 auto;padding:36px 20px 80px}
+  h1{font-size:30px;line-height:1.15;margin:0 0 10px}
+  h2{font-size:20px;margin:36px 0 8px}
+  p{color:var(--mut)} strong{color:var(--ink)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px;margin:26px 0}
+  label{display:block;font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin:0 0 4px}
+  input,select{width:100%;background:#0b0e14;border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:10px;font:inherit}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  table{width:100%;border-collapse:collapse;margin-top:18px;font-size:14.5px}
+  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+  td.num{font-family:var(--mono)}
+  .hl{color:var(--ok);font-weight:800}
+  .warnrow{color:var(--warn)}
+  .foot{font-size:12px;color:var(--mut);margin-top:12px}
+  a{color:var(--acc)}
+  .cta{display:inline-block;background:linear-gradient(180deg,#8b6cff,#6f4cf0);color:#fff;font-weight:800;padding:13px 22px;border-radius:11px;text-decoration:none;margin-top:8px}
+  @media(max-width:560px){.grid3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <a href="/" title="Xtrata home"><img src="/favicon.svg" alt="Xtrata" /></a>
+  <div class="logo"><b>XTRATA</b> · BIP-110 &amp; the future of on-chain media</div>
+</header>
+<main>
+  <h1>What BIP-110 means for on-chain media — honestly</h1>
+  <p><strong>The short version:</strong> BIP-110 is a proposed Bitcoin rule change that would make storing data on Bitcoin L1 much harder: data pushes capped at 256 bytes, and the script trick behind today's Ordinals envelope disabled. It is a <em>proposal</em>, not an active rule — and nothing already inscribed is affected either way. Your existing inscriptions live in blocks that are permanent history.</p>
+
+  <h2>Ordinals aren't dying — they're adapting</h2>
+  <p>The ord developers have already drafted a replacement envelope that works within BIP-110's limits: data split into ≤256-byte pushes that are immediately dropped from the stack (<a href="https://github.com/ordinals/ord/pull/4545" rel="noopener" target="_blank">ord PR #4545</a>). Even the <a href="https://bips.dev/110/" rel="noopener" target="_blank">BIP-110 text</a> concedes that data can't be stopped entirely — only made harder and more expensive. That's the real question this page answers: <strong>how much more expensive?</strong></p>
+
+  <div class="card">
+    <h2 style="margin-top:0">Cost calculator</h2>
+    <div class="grid3">
+      <div><label>File size</label><input id="size" value="1 MB" /></div>
+      <div><label>Fee rate (sat/vB)</label><input id="fee" type="number" value="10" min="1" /></div>
+      <div><label>BTC price (USD)</label><input id="btc" type="number" value="70000" min="1" /></div>
+    </div>
+    <table>
+      <thead><tr><th>Destination</th><th>Chunks</th><th>Transactions</th><th>Cost</th></tr></thead>
+      <tbody>
+        <tr><td>Bitcoin L1 today (classic envelope)</td><td class="num" id="c-chunks">—</td><td class="num" id="c-txs">—</td><td class="num" id="c-cost">—</td></tr>
+        <tr class="warnrow"><td>Bitcoin L1 after BIP-110 (256B push-drop)</td><td class="num" id="p-chunks">—</td><td class="num" id="p-txs">—</td><td class="num" id="p-cost">—</td></tr>
+        <tr><td><strong>Xtrata</strong> (full file, Bitcoin-anchored via Stacks)</td><td class="num">1 file</td><td class="num" id="x-txs">—</td><td class="num hl" id="x-cost">—</td></tr>
+      </tbody>
+    </table>
+    <p class="foot" id="verdict"></p>
+    <p class="foot">Assumptions: segwit witness discount (0.25 vB/byte); ~230 vB fixed cost per commit+reveal pair; ~370KB witness budget per pair; post-110 overhead ~3B per 256B chunk. Xtrata pricing from live production rates. All figures estimates — <a href="https://github.com/stxtrata/xtrata" rel="noopener" target="_blank">model source is open</a>.</p>
+  </div>
+
+  <h2>Where Xtrata stands</h2>
+  <p>We think Bitcoin Core's instinct is defensible: L1 is for money. That's exactly why Xtrata exists — full media files, recursive references and composable records on a layer <em>built</em> for them, with every transaction still anchored to Bitcoin's finality through Stacks. No 256-byte chunks, no governance risk to your use case, and costs measured in cents.</p>
+  <p>And because we come from the Ordinals world ourselves (Xtrata's founder built <strong>Audionals</strong> on Bitcoin L1), we're keeping the L1 door open too: if BIP-110 activates, our chunking-and-batching pipeline — the same tech behind Xtrata's large-file inscriptions — will support the new ord envelope, so inscribing to Bitcoin stays painless for those who want it. Either layer. Your choice. Permanent either way.</p>
+  <p><a class="cta" href="/agent-one/">Inscribe on Xtrata today →</a></p>
+
+  <h2>Does my existing Ordinals work disappear?</h2>
+  <p><strong>No.</strong> Consensus changes constrain new transactions only. Everything already inscribed is inside blocks protected by all the proof-of-work mined since — archival nodes carry it forever, and any new node syncing the chain verifies it byte-for-byte. The realistic long-term risk isn't deletion; it's <em>tooling</em>: fewer indexers and viewers being maintained if inscribing declines. Preserving access infrastructure is precisely the layer Xtrata builds — including <a href="/forever-twins/">Forever Twins</a>, permanent counterparts for existing collections.</p>
+</main>
+<script>
+(function(){
+  var WITNESS=0.25, PAIR=230, BUDGET=370000;
+  function parseBytes(s){var m=String(s).trim().toLowerCase().match(/^([\d.]+)\s*(gb|mb|kb|b)?$/);if(!m)return NaN;
+    var mult={gb:1073741824,mb:1048576,kb:1024,b:1}[m[2]||'b'];return Math.round(Number(m[1])*mult);}
+  function plan(bytes,chunk,over,head,fee){
+    var chunks=Math.ceil(bytes/chunk);
+    var perTx=Math.floor(BUDGET/(chunk+over));
+    var txs=Math.max(1,Math.ceil(chunks/perTx));
+    var wb=bytes+chunks*over+txs*head;
+    var vb=Math.ceil(wb*WITNESS+txs*PAIR);
+    return {chunks:chunks,txs:txs,sats:vb*fee};}
+  function usd(n){return '$'+n.toLocaleString(undefined,{maximumFractionDigits:2});}
+  function calc(){
+    var bytes=parseBytes(document.getElementById('size').value);
+    var fee=Number(document.getElementById('fee').value)||10;
+    var btc=Number(document.getElementById('btc').value)||70000;
+    if(!isFinite(bytes)||bytes<=0)return;
+    var c=plan(bytes,520,3,13,fee), p=plan(bytes,256,3,20,fee);
+    var cUsd=c.sats/1e8*btc, pUsd=p.sats/1e8*btc;
+    var xStx=Math.max(0.05,Math.ceil(bytes/102400)*0.1), xUsd=xStx*1.5;
+    document.getElementById('c-chunks').textContent=c.chunks.toLocaleString();
+    document.getElementById('c-txs').textContent=c.txs;
+    document.getElementById('c-cost').textContent=(c.sats/1e8).toFixed(5)+' BTC · '+usd(cUsd);
+    document.getElementById('p-chunks').textContent=p.chunks.toLocaleString();
+    document.getElementById('p-txs').textContent=p.txs;
+    document.getElementById('p-cost').textContent=(p.sats/1e8).toFixed(5)+' BTC · '+usd(pUsd);
+    document.getElementById('x-txs').textContent='handled for you';
+    document.getElementById('x-cost').textContent='~'+xStx.toFixed(2)+' STX · '+usd(xUsd);
+    document.getElementById('verdict').innerHTML='Post-BIP-110, this file costs <strong>'+usd(pUsd)+'</strong> on L1 ('+((pUsd/cUsd-1)*100).toFixed(0)+'% over today) versus <strong>'+usd(xUsd)+'</strong> on Xtrata — roughly <strong>'+Math.round(pUsd/Math.max(xUsd,0.01)).toLocaleString()+'× cheaper</strong>, still anchored to Bitcoin.';
+  }
+  ['size','fee','btc'].forEach(function(id){document.getElementById(id).addEventListener('input',calc);});
+  calc();
+})();
+</script>
+<script src="/xtrata-radio.js" defer></script>
+</body>
+</html>

@@ -102,6 +102,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   let mediaWired = false;
   let vuFrame = 0;
   let vuLevels = [0, 0, 0, 0, 0, 0];
+  let silentSince = 0;
   const grille = root.querySelector('.xtrata-radio__grille');
   const vuBars = Array.from(root.querySelectorAll('.xtrata-radio__vu i'));
 
@@ -136,6 +137,21 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     }
     const bins = new Uint8Array(analyser.frequencyBinCount);
     analyser.getByteFrequencyData(bins);
+    // Silence detector: a "playing" track with no signal for 8s has no usable
+    // audio (e.g. a video-only mp4). Mark it a dud and retune.
+    const totalEnergy = bins.reduce((sum, v) => sum + v, 0);
+    if (totalEnergy > 40) {
+      silentSince = 0;
+    } else if (player.currentTime > 0.5) {
+      if (!silentSince) silentSince = performance.now();
+      else if (performance.now() - silentSince > 8000 && on) {
+        radioLog(`silent track detected #${currentTokenId}`, 'no audio signal for 8s — skipping and marking dud', currentTokenId);
+        if (currentTokenId) trackCache.set(String(currentTokenId), null);
+        silentSince = 0;
+        player.pause();
+        void tuneToNextTrack();
+      }
+    }
     // bass drive for the speaker pulse
     let bass = 0;
     for (let i = 1; i < 7; i += 1) bass += bins[i];
@@ -315,7 +331,10 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
         if (attempt.ok && !attemptMime.includes('application/json')) {
           response = attempt;
           mime = attemptMime;
-          src = url;
+          // '&m=1' gives the media element its own cache entry — Chrome otherwise
+          // replays this probe's cached response (or vice versa a stored 206) and
+          // can wedge large-video loads with mismatched range state.
+          src = url + '&m=1';
           break;
         }
         if (!attempt.ok) definitive = false; // transient — retry later
@@ -435,7 +454,11 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   // The curated ids are seeds; the station also explores the ENTIRE contract.
   // resolveTrack() is the gatekeeper: anything without playable audio returns
   // null and is skipped (cached), so the dial only ever lands on real music.
-  const playlist = tokenIds.map((id) => id.toString());
+  // Known-good tracks outside the curated gallery (early-era opus/mp3s that
+  // live on legacy cores) join the seed rotation so they play regularly rather
+  // than waiting on a lucky random pick.
+  const EXTRA_SEEDS = ['8', '1636', '1122'];
+  const playlist = [...new Set([...tokenIds.map((id) => id.toString()), ...EXTRA_SEEDS])];
   let maxTokenId = 0;
   const EXPLORE_RATIO = 0.5; // half the picks roam the full id range
 
