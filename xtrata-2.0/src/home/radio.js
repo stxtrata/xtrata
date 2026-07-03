@@ -281,13 +281,18 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     try {
       const response = await fetch(`/inscription/${tokenId}`);
       const mime = (response.headers.get('content-type') || '').toLowerCase();
-      if (response.ok && mime.startsWith('audio/')) {
+      if (response.ok && (mime.startsWith('audio/') || mime.startsWith('video/'))) {
+        // Plain audio inscriptions AND movies: the Audio element happily plays
+        // the soundtrack of video containers (webm/mp4), so films join the
+        // station as audio-only broadcasts.
         await response.body?.cancel?.();
-        resolved = { src: `/inscription/${tokenId}`, title: `#${tokenId}`, tokenId };
+        resolved = { src: `/inscription/${tokenId}`, title: `#${tokenId}${mime.startsWith('video/') ? ' (film audio)' : ''}`, tokenId };
       } else if (response.ok && mime.includes('text/html')) {
         const html = await response.text();
         // Opus players embed their audio as a data: URI on a <source> element.
-        const match = html.match(/<source[^>]+src="(data:audio\/[^"]+)"/i);
+        // Opus players embed data:audio; some players/films embed data:video —
+        // both are playable through the audio element.
+        const match = html.match(/<source[^>]+src="(data:(?:audio|video)\/[^"]+)"/i);
         if (match) {
           const titleMatch = html.match(/<title>([^<]*)<\/title>/i);
           const artistMatch = html.match(/"artist":\s*"([^"]*)"/);
