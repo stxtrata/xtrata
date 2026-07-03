@@ -565,26 +565,22 @@ const buildXtrataAudioPlayerHtml = (config) => {
 
     /* Cursor-idle fade: 2 s after the cursor stops moving, EVERY programmatically
        layered overlay (title/artist, action buttons, hint, hover transport) fades
-       away so the artwork can be viewed clean. Any movement brings them back.
-       Keyboard focus keeps them visible (accessibility). */
+       away so the artwork can be viewed clean — in every state, including during
+       playback and with the drawer open. Any pointer movement or key press brings
+       them back (keyboard users stay covered via the keydown wake). */
     .track-copy,
     .click-hint,
     .hover-transport {
       transition: opacity 0.35s ease, transform 0.18s ease;
     }
 
-    .player[data-idle="true"][data-panel="closed"] .track-copy,
-    .player[data-idle="true"][data-panel="closed"] .top-actions,
-    .player[data-idle="true"][data-panel="closed"] .click-hint,
-    .player[data-idle="true"][data-panel="closed"] .hover-transport {
+    .player[data-idle="true"] .track-copy,
+    .player[data-idle="true"] .top-actions,
+    .player[data-idle="true"] .click-hint,
+    .player[data-idle="true"] .hover-transport {
       opacity: 0 !important;
     }
 
-    .player[data-idle="true"][data-panel="closed"]:focus-within .track-copy,
-    .player[data-idle="true"][data-panel="closed"]:focus-within .top-actions,
-    .player[data-idle="true"][data-panel="closed"] .hover-transport:focus-within {
-      opacity: 1 !important;
-    }
 
     button {
       min-height: 34px;
