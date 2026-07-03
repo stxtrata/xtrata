@@ -277,18 +277,43 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     if (trackCache.has(tokenId)) {
       return trackCache.get(tokenId);
     }
+    // Content-source ladder: migrated tokens keep their id on v3 but their
+    // chunks stay on the core they were minted on (early ids like #8 live on
+    // v1-1-1), so probe newest -> oldest and use the first real response.
+    const CORES = [
+      'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3',
+      'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0',
+      'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1'
+    ];
     let resolved = null;
     let definitive = true; // network hiccups must stay retryable, not become duds
     try {
-      const response = await fetch(`/inscription/${tokenId}`);
-      const mime = (response.headers.get('content-type') || '').toLowerCase();
-      if (!response.ok) definitive = false; // 5xx/timeout: big files warm the R2 cache on first hit — retry later
+      let response = null;
+      let mime = '';
+      let src = `/inscription/${tokenId}`;
+      for (const core of CORES) {
+        const url = `/runtime/content?contractId=${encodeURIComponent(core)}&tokenId=${tokenId}&network=mainnet`;
+        const attempt = await fetch(url);
+        const attemptMime = (attempt.headers.get('content-type') || '').toLowerCase();
+        if (attempt.ok && !attemptMime.includes('application/json')) {
+          response = attempt;
+          mime = attemptMime;
+          src = url;
+          break;
+        }
+        if (!attempt.ok) definitive = false; // transient — retry later
+        try { await attempt.body?.cancel(); } catch { /* noop */ }
+      }
+      if (!response) {
+        if (definitive) trackCache.set(tokenId, null); else trackCache.delete(tokenId);
+        return null;
+      }
       if (response.ok && (mime.startsWith('audio/') || mime.startsWith('video/'))) {
         // Plain audio inscriptions AND movies: the Audio element happily plays
         // the soundtrack of video containers (webm/mp4), so films join the
         // station as audio-only broadcasts.
         await response.body?.cancel?.();
-        resolved = { src: `/inscription/${tokenId}`, title: `#${tokenId}${mime.startsWith('video/') ? ' (film audio)' : ''}`, tokenId };
+        resolved = { src, title: `#${tokenId}${mime.startsWith('video/') ? ' (film audio)' : ''}`, tokenId };
       } else if (response.ok && mime.includes('text/html')) {
         const html = await response.text();
         // Opus players embed their audio as a data: URI on a <source> element.
@@ -316,6 +341,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
       trackCache.set(tokenId, resolved);
     } else {
       trackCache.delete(tokenId); // transient failure — eligible again next pass
+      pingWarm(tokenId); // server reconstructs it into R2 for the retry
     }
     return resolved;
   };
@@ -495,9 +521,15 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     }
   };
 
+  // Crowd-warming: every visit asks the server to pre-reconstruct a couple of
+  // random inscriptions into the R2 cache in the background (server-side only —
+  // nothing downloads to this browser). Big films get warm before anyone tunes in.
+  const pingWarm = (ids) => {
+    try { void fetch(ids ? `/warm?ids=${ids}` : '/warm?auto=2'); } catch { /* noop */ }
+  };
   // Start warming a few seconds after init, off the critical page-load path.
   const idle = window.requestIdleCallback || ((fn) => window.setTimeout(fn, 2500));
-  idle(() => { void preloadNextTrack(); });
+  idle(() => { void preloadNextTrack(); pingWarm(); });
 
   // --- digital screen ticker ---------------------------------------------
   // While a song plays the screen cycles: NOW PLAYING info interleaved with a
