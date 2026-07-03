@@ -42,7 +42,7 @@ const PROCESSING = new Set();
 // FUNDED/INSCRIBED for the watcher to resume where it left off — resume is safe because the protocol is
 // idempotent end-to-end (begin-or-get, on-chain upload index, hash-checked mint pre-check). Only
 // deterministic failures or exhausted retries (4) fall through to the refund failsafe.
-const FATAL_ERR = /TX abort|not funded|locked to|unrecoverable|file bytes|empty file|exceeds single-tx|could not determine/i;
+const FATAL_ERR = /TX abort|not funded|locked to|unrecoverable|file bytes|empty file|exceeds single-tx|could not determine|wrong inscription received/i;
 const MAX_RETRIES = Number(process.env.AGENT_MAX_RETRIES || '4');
 function startBackground(id, phase, fn) {
   PROCESSING.add(id);
@@ -131,7 +131,11 @@ async function fastTrackTick() {
       startBackground(j.jobId, 'DELIVERING', (job) => core.deliverJob({ job, hiroKey: HIRO_KEY, jobDir: JOB_DIR, receiptsDir: RECEIPTS_DIR }));
       continue;
     }
-    if (j.status !== 'AWAITING_DEPOSIT' && j.status !== 'FUNDED') continue;   // also resume jobs stuck at FUNDED (e.g. after a restart)
+    // AWAITING_PARENT = funded, waiting for the parent inscription to arrive at the deposit wallet.
+    // Poll it gently (~20 s) — autoRunJob re-checks the gate and either proceeds, keeps waiting, or
+    // (window over / wrong inscription) returns everything to the sender.
+    if (j.status === 'AWAITING_PARENT' && Date.now() - (Date.parse(j.progressAt || '') || 0) < 20000) continue;
+    if (!['AWAITING_DEPOSIT', 'FUNDED', 'AWAITING_PARENT'].includes(j.status)) continue;   // also resume jobs stuck at FUNDED (e.g. after a restart)
     // A job that was funded once counts as funded — mid-flight resumes have already spent part of the deposit.
     let funded = !!j.depositReceivedUstx;
     if (!funded) { try { funded = (await core.statusJob({ job: j, hiroKey: HIRO_KEY })).funded; } catch { continue; } }
@@ -195,7 +199,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/jobs' && req.method === 'POST') {
       const b = await body(req);
       if (!b.file || !fs.existsSync(b.file)) return send(res, 400, { error: 'file not found on server: ' + (b.file || '(none)') });
-      const job = await core.createJob({ coreName: CORE, net: NET, file: b.file, uri: b.uri, mime: b.mime || 'application/octet-stream', deps: b.deps || [], user: b.user, expectedFunder: b.expectedFunder || null, marginUstx: b.marginUstx || '0', jobDir: JOB_DIR, mock: MOCK, fastTrack: !!b.fastTrack, suno: !!b.suno });
+      const job = await core.createJob({ coreName: CORE, net: NET, file: b.file, uri: b.uri, mime: b.mime || 'application/octet-stream', deps: b.deps || [], parents: b.parents || [], user: b.user, expectedFunder: b.expectedFunder || null, marginUstx: b.marginUstx || '0', jobDir: JOB_DIR, mock: MOCK, fastTrack: !!b.fastTrack, suno: !!b.suno });
       return send(res, 200, { job: core.publicJob(job) });
     }
 
@@ -215,6 +219,12 @@ const server = http.createServer(async (req, res) => {
         if (job.tokenId) return send(res, 400, { error: 'already inscribed' });
         const s = await core.statusJob({ job, hiroKey: HIRO_KEY });
         if (!s.funded) return send(res, 400, { error: 'not funded yet' });
+        // Parent gate (manual run): wrong inscription → return everything now; missing → tell the user what to send.
+        if (s.parents && s.parents.unexpected && s.parents.unexpected.length) {
+          startBackground(id, 'CANCELLED', (j) => core.refundAndClose({ job: j, hiroKey: HIRO_KEY, jobDir: JOB_DIR, receiptsDir: RECEIPTS_DIR, reason: `wrong inscription received (token #${s.parents.unexpected.join(', #')}) — all inscriptions and funds returned to sender` }));
+          return send(res, 400, { error: `wrong inscription received (token #${s.parents.unexpected.join(', #')}) — returning everything to the sender` });
+        }
+        if (s.parents && s.parents.missing.length) return send(res, 400, { error: `awaiting parent inscription #${s.parents.missing.join(', #')} — transfer it to ${job.depositAddress} first (it will be returned with your new inscription)` });
         startBackground(id, 'INSCRIBING', (j) => core.runJob({ job: j, enginePath: ENGINE, hiroKey: HIRO_KEY, jobDir: JOB_DIR }));
         return send(res, 200, { started: true });
       }

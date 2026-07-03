@@ -128,7 +128,7 @@
 
       <div class="card">
         <h3>2 · Delivery &amp; links</h3>
-        <div class="hint">Dependencies are existence-only links (recursive references). Parent links aren't used in the deposit model.</div>
+        <div class="hint">Dependencies are existence-only links (recursive references). Parents are ownership links: you send the parent inscription to the deposit wallet with your payment; the child is minted linked to it, then parent + child + change all come back to you.</div>
         <label style="display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--ink)">
           <input type="checkbox" id="fastTrack" style="width:auto" checked />
           <span><b style="color:var(--acc2)">⚡ Fast-track (auto)</b> — pay once and it inscribes &amp; returns the token + change to the wallet you pay from. No address needed.</span>
@@ -139,6 +139,8 @@
         </div>
         <label>Dependencies <span class="muted">(token ids, comma-separated — or build them in the Graph tab)</span></label>
         <input id="deps" class="mono" placeholder="134, 90" />
+        <label>Parent inscriptions <span class="muted">(token ids you own — you'll transfer them to the deposit wallet; they're returned with the child)</span></label>
+        <input id="parents" class="mono" placeholder="134" />
         <label>Content URI</label>
         <input id="uri" class="mono" placeholder="xtrata:video/my-clip" />
         <label>Service margin (µSTX, 0 = none)</label>
@@ -344,7 +346,7 @@ $('#estimateBtn').onclick=async()=>{
   }catch(err){ el.innerHTML='<div class="err">'+esc(err.message)+'</div>'; }
 };
 
-$('#clearBtn').onclick=()=>{ selectedFile=null; ['file','user','deps','uri'].forEach(id=>$('#'+id).value=''); $('#margin').value='0'; $('#picker').value=''; $('#fileInfo').innerHTML=''; $('#estimate').innerHTML=''; $('#deposit').innerHTML=''; $('#newErr').textContent=''; };
+$('#clearBtn').onclick=()=>{ selectedFile=null; ['file','user','deps','parents','uri'].forEach(id=>$('#'+id).value=''); $('#margin').value='0'; $('#picker').value=''; $('#fileInfo').innerHTML=''; $('#estimate').innerHTML=''; $('#deposit').innerHTML=''; $('#newErr').textContent=''; };
 $('#fastTrack').onchange=()=>{ $('#userWrap').style.display=$('#fastTrack').checked?'none':''; };
 $('#fastTrack').onchange();   // apply default (fast-track on) at load
 
@@ -359,10 +361,13 @@ $('#createBtn').onclick=async()=>{
   if(fast && !WALLET){ err.textContent='Connect your wallet (top-right) to use Fast-track — that address receives the inscription + change.'; connectWallet(); return; }
   if(!fast && !ADDR_RE.test(user)){ err.textContent='Delivery address must be a valid SP…/SM… principal (or enable Fast-track).'; return; }
   if(!deps.every(d=>/^\d+$/.test(d))){ err.textContent='Dependencies must be token-id uints.'; return; }
+  const parents=$('#parents').value.split(',').map(s=>s.trim()).filter(Boolean);
+  if(!parents.every(d=>/^\d+$/.test(d))){ err.textContent='Parents must be token-id uints.'; return; }
+  if(new Set(parents).size!==parents.length){ err.textContent='Duplicate parent token ids.'; return; }
   $('#createBtn').disabled=true;
   try{
     if(!selectedFile){ err.textContent='Drop a file or open one — backendless mode inscribes the file straight from your browser (no server paths).'; $('#createBtn').disabled=false; return; }
-    const payload={ file:selectedFile, uri, mime:CONTENT[catSel.value][ftSel.value], deps, marginUstx:$('#margin').value||'0', fastTrack:fast };
+    const payload={ file:selectedFile, uri, mime:CONTENT[catSel.value][ftSel.value], deps, parents, marginUstx:$('#margin').value||'0', fastTrack:fast };
     payload.user = fast ? WALLET : user;
     if(fast) payload.expectedFunder = WALLET;   // railroad: ONLY this wallet may fund; any other payer is auto-refunded, nothing inscribed
     const {job}=await api('/api/jobs',{method:'POST',body:payload});   // the File goes straight into XtrataAgent.createJob — no upload
@@ -374,6 +379,8 @@ $('#createBtn').onclick=async()=>{
       <div class="kv"><span>Job</span><span>${esc(job.jobId)}</span></div>
       <div class="kv"><span>Deposit address ${copyBtn(job.depositAddress)}</span><span>${esc(job.depositAddress)}</span></div>
       <div class="kv"><span><b>Send exactly</b></span><span class="big">${stx(job.requiredUstx)}</span></div>
+      ${parents.length?`<div class="kv"><span><b>Also send parent${parents.length>1?'s':''}</b></span><span>inscription #${parents.map(esc).join(', #')} → this same address</span></div>
+      <div class="muted" style="font-size:11px;margin-top:4px">Transfer the parent inscription${parents.length>1?'s':''} to the deposit address (any order, within 15 min of paying). Wrong or missing parent? Everything — inscriptions and STX — is automatically returned to you.</div>`:''}
       <div class="btnrow"><button class="btn" onclick="openWallet('${esc(job.depositAddress)}','${esc(job.requiredUstx)}')">Open wallet to pay ${stx(job.requiredUstx)}</button></div>
       <div class="muted" style="font-size:11px;margin-top:8px">${fast?'⚡ Fast-track: as soon as this lands, it inscribes and returns the token + change to the wallet you pay from. Tracking in <b>Jobs</b>…':'One-shot address — fund once for this job only. Then open <b>Jobs</b> to run &amp; deliver.'}</div>
     </div>`;
