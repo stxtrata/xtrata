@@ -278,9 +278,11 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
       return trackCache.get(tokenId);
     }
     let resolved = null;
+    let definitive = true; // network hiccups must stay retryable, not become duds
     try {
       const response = await fetch(`/inscription/${tokenId}`);
       const mime = (response.headers.get('content-type') || '').toLowerCase();
+      if (!response.ok) definitive = false; // 5xx/timeout: big files warm the R2 cache on first hit — retry later
       if (response.ok && (mime.startsWith('audio/') || mime.startsWith('video/'))) {
         // Plain audio inscriptions AND movies: the Audio element happily plays
         // the soundtrack of video containers (webm/mp4), so films join the
@@ -308,8 +310,13 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
       }
     } catch {
       resolved = null;
+      definitive = false;
     }
-    trackCache.set(tokenId, resolved);
+    if (resolved || definitive) {
+      trackCache.set(tokenId, resolved);
+    } else {
+      trackCache.delete(tokenId); // transient failure — eligible again next pass
+    }
     return resolved;
   };
 
@@ -447,9 +454,21 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   const preloadQueue = [];
   let preloading = false;
 
+  const WARM_MAX_BYTES = 6 * 1024 * 1024;
   const warmHttpCache = async (src) => {
     if (src.startsWith('data:')) return; // already in memory
-    try { await (await fetch(src)).arrayBuffer(); } catch { /* best-effort */ }
+    try {
+      const response = await fetch(src);
+      const length = Number(response.headers.get('content-length') || '0');
+      if (length > WARM_MAX_BYTES) {
+        // Big file (e.g. an 11MB film): don't hold the whole thing in memory —
+        // reading the headers has already warmed the server-side R2 cache, and
+        // the audio element streams it with range requests when it plays.
+        try { await response.body?.cancel(); } catch { /* noop */ }
+        return;
+      }
+      await response.arrayBuffer();
+    } catch { /* best-effort */ }
   };
 
   const preloadNextTrack = async () => {
