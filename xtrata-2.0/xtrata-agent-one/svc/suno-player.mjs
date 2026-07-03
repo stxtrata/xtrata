@@ -13,7 +13,9 @@
  *   3. base64 the Opus (.weba) produced by opus-convert.mjs + base64 the cover
  *   4. feed an { mode:'embedded', audioBase64, imageBase64, metadata } config to the
  *      vendored template (svc/vendor/HTML_Template.js, byte-identical to the tool)
- *      run in a Node `vm` shim, yielding the same `xtrata-opus-player-v4` player.
+ *      run in a Node `vm` shim, yielding the same `xtrata-opus-player-v6` player
+ *      (eye → Controls tab, hover waveform transport over the artwork, and a
+ *      2 s cursor-idle fade of all layered overlays so the artwork shows clean).
  *
  * The vendored template's `buildXtrataAudioPlayerHtml` is pure string-building, so
  * running it under a minimal `{ window }` context reproduces the browser tool's

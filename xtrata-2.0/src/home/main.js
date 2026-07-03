@@ -9326,9 +9326,24 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         if (requestedWallet) {
           await viewWalletByAddress(requestedWallet);
         } else if (walletViewRequestId === state.walletViewRequestId && !consumedHandoff) {
-          // Default homepage view: open the music gallery (HTML players first)
-          // instead of the generic "latest" grid, so there's music to play on load.
-          await openCuratedGallery('jim-music', { scroll: false });
+          // Default homepage view:
+          //  - a connected wallet WITH inscriptions → its own latest inscriptions;
+          //  - no wallet, or a connected-but-empty wallet → Music by Various,
+          //    so there's always something to play on load.
+          let openedOwnWallet = false;
+          if (state.walletSession.isConnected && state.walletSession.address) {
+            await loadWalletInscriptions();
+            const ownedCount = state.walletUsesPagedHoldings
+              ? state.walletTotalCount
+              : state.walletTokenIds.length;
+            openedOwnWallet = ownedCount > 0;
+            if (!openedOwnWallet) {
+              appendLog('Connected wallet has no inscriptions yet — showing Music by Various.');
+            }
+          }
+          if (!openedOwnWallet) {
+            await openCuratedGallery('jim-music', { scroll: false });
+          }
         }
       }
       updateControls();

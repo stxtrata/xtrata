@@ -68,6 +68,27 @@ stopped. Nothing in the flow needs the user's keys.
    public track record — the agent's reputation lives on-chain.)
 5. **Wipe** — scrub the key from the job state; mark COMPLETE.
 
+## Parent escrow (parent-linked children)
+
+The contract requires the **minter to own every parent** at mint/seal
+(`validate-parents` → `ERR-NOT-AUTHORIZED`), so parent-linked jobs use a brief
+escrow: declare `parents` at job creation; send the parent inscription(s) to
+the **same deposit address** as the STX payment. The gate holds until the
+deposit is funded AND all parents are held (`AWAITING_PARENT`), then the child
+is minted via `mint-single-tx-with-relationships` (or the staged engine's
+`seal-with-relationships`), and **parent + child + receipt + change are all
+returned to the payer**.
+
+Mistake handling (never-strand, NFT edition):
+- **Wrong inscription sent** (not a declared parent): nothing is inscribed —
+  every held inscription and all STX are returned; strays go back to whoever
+  sent them (NFT history), declared items to the payer.
+- **Parent never arrives**: after `AGENT_PARENT_WINDOW_MS` (default 15 min from
+  funding) the deposit is fully refunded.
+- **Parent sent but no/insufficient STX**: on expiry the parent is returned to
+  its sender; the key is never wiped while the wallet holds any inscription or
+  STX above dust.
+
 ## Trust model (honest)
 
 - **Provable:** the deposit wallet's signer/creator, every txid, the delivered
