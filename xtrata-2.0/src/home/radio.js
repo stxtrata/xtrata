@@ -319,6 +319,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   const resolveTrack = async (tokenId) => {
     if (IGNORE_IDS.has(String(tokenId))) {
       radioLog(`ignored #${tokenId}`, 'on the hardcoded ignore list', tokenId);
+      trackCache.set(String(tokenId), null);   // cache as dud so pickers stop selecting it
       return null;
     }
     if (trackCache.has(tokenId)) {
@@ -473,10 +474,21 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   let preset = 'all';                      // within FM: 'music' | 'all'
   const listeners = new Set();
   let nowPlaying = null;                   // {tokenId,title,artist,cover}
+  // One canonical snapshot everywhere (emit / getState / subscribe), including
+  // `playing` — the ACTUAL audio-element state — so UIs never have to guess
+  // play/pause from `on` (which only means "powered").
+  const stateSnapshot = () => ({
+    on,
+    playing: on && !player.paused && !player.ended,
+    band, preset, nowPlaying, likes: likes.slice(), volumeStep
+  });
   const emit = () => {
-    const snapshot = { on, band, preset, nowPlaying, likes: likes.slice(), volumeStep };
+    const snapshot = stateSnapshot();
     listeners.forEach((cb) => { try { cb(snapshot); } catch { /* listener error */ } });
   };
+  // Play/pause state changes must reach subscribers immediately, whatever
+  // triggered them (button, media keys, OS controls, stall, ended).
+  ['play', 'pause', 'playing', 'ended'].forEach((ev) => player.addEventListener(ev, emit));
   const isLiked = (id) => likes.some((l) => l.tokenId === String(id));
   const toggleLike = () => {
     if (!nowPlaying) return false;
@@ -532,7 +544,11 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   // live on legacy cores) join the seed rotation so they play regularly rather
   // than waiting on a lucky random pick.
   const EXTRA_SEEDS = ['8', '315', '1636', '1122'];
-  const playlist = [...new Set([...tokenIds.map((id) => id.toString()), ...EXTRA_SEEDS])];
+  // Curated seeds NEVER include ignored ids (e.g. #1065 is a curated gallery
+  // token but has no decodable audio) — otherwise the picker keeps selecting
+  // them, each one burns a tune attempt, and a run of them ends in NO SIGNAL.
+  const playlist = [...new Set([...tokenIds.map((id) => id.toString()), ...EXTRA_SEEDS])]
+    .filter((id) => !IGNORE_IDS.has(id));
   let maxTokenId = 0;
   const EXPLORE_RATIO = 0.5; // half the picks roam the full id range
 
@@ -609,10 +625,31 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   // (and the contract ceiling as fallback) every 5 minutes, so a freshly
   // inscribed song becomes playable without a reload.
   window.setInterval(() => { void fetchPlayable(); void discoverRange(); }, 5 * 60 * 1000);
+  // STUCK-WATCHDOG: if the radio is switched on but silent for >20 s with no
+  // tune in flight, no user pause, and a prior user gesture (autoplay policy),
+  // retune automatically — the dial recovers by itself instead of needing a
+  // page refresh or an off/on cycle.
+  window.setInterval(() => {
+    if (!on || manualPause || !hadGesture) return;
+    if (!player.paused || player.seeking) return;
+    if (Date.now() - lastTuneAt < 20000) return;   // a tune/backoff is still in progress
+    radioLog('watchdog: radio is on but silent — auto-retuning');
+    void tuneToNextTrack();
+  }, 15000);
   let on = false;
   let tuneToken = 0;
   let recent = [];
   let firstTune = true;
+  // Self-healing state: the radio must never stay silently stuck — see the
+  // NO SIGNAL retry (bottom of tuneToNextTrack) and the stuck-watchdog below.
+  let noSignalRetries = 0;
+  let manualPause = false;       // user pressed pause — the watchdog must respect it
+  let lastTuneAt = 0;
+  let hadGesture = false;        // autoplay policy: only auto-retry after a real user gesture
+  try {
+    if (navigator.userActivation && navigator.userActivation.hasBeenActive) hadGesture = true;
+    document.addEventListener('pointerdown', () => { hadGesture = true; }, { capture: true, passive: true });
+  } catch { /* conservative default: stays false until a click */ }
 
   let forcedNext = null;
   const pickNext = () => {
@@ -854,6 +891,8 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   const history = [];
   const tuneToNextTrack = async (trackOverride) => {
     const token = ++tuneToken;
+    manualPause = false;
+    lastTuneAt = Date.now();
     stopTicker();
     setNow('~ TUNING ~', false);
     const startedTuning = performance.now();
@@ -908,6 +947,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
         if (history[history.length - 1] !== track) history.push(track);
         if (history.length > 12) history.shift();
         markPlayed(track.tokenId);   // no-repeat: this song sits out until the cycle completes
+        noSignalRetries = 0;
         window.setTimeout(() => { void preloadNextTrack(); }, 1500);
         return;
       } catch (error) {
@@ -919,7 +959,16 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     }
     if (token === tuneToken && on) {
       stopTicker();
-      setNow('-- NO SIGNAL — TRY AGAIN --', false);
+      // SELF-HEALING: never park on a dead dial. Widen the pool (forget the
+      // recent list), back off, and retune automatically while switched on.
+      noSignalRetries += 1;
+      recent = [];
+      const delay = Math.min(30000, 5000 * noSignalRetries);
+      setNow(`-- NO SIGNAL — RETUNING IN ${Math.round(delay / 1000)}S --`, false);
+      radioLog('no signal — scheduling auto-retune', { retry: noSignalRetries, delayMs: delay });
+      window.setTimeout(() => {
+        if (on && token === tuneToken && player.paused && hadGesture) void tuneToNextTrack();
+      }, delay);
     }
   };
 
@@ -1070,18 +1119,22 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   const api = {
     switchOn, switchOff,
     isOn: () => on,
-    playPause: () => { if (!on) { switchOn(); } else if (player.paused) { void player.play(); } else { player.pause(); } },
+    playPause: () => {
+      if (!on) { switchOn(); }
+      else if (player.paused) { manualPause = false; player.play().catch(() => { void tuneToNextTrack(); }); }
+      else { manualPause = true; player.pause(); }
+    },
     next: () => skip('next'),
     prev: () => skip('prev'),
     toggleLike,
     isLiked: () => (nowPlaying ? isLiked(nowPlaying.tokenId) : false),
     getLikes: () => likes.slice(),
     cycleBand, setBand, cyclePreset,
-    getState: () => ({ on, band, preset, nowPlaying, likes: likes.slice(), volumeStep }),
+    getState: () => stateSnapshot(),
     unlike: (id) => { likes = likes.filter((l) => l.tokenId !== String(id)); saveLikes(likes); emit(); },
     playToken: (id) => { forcedNext = String(id); if (!on) { switchOn(); } else { player.pause(); void tuneToNextTrack(); } },
     nudgeVolume,
-    subscribe: (cb) => { listeners.add(cb); cb({ on, band, preset, nowPlaying, likes: likes.slice(), volumeStep }); return () => listeners.delete(cb); }
+    subscribe: (cb) => { listeners.add(cb); cb(stateSnapshot()); return () => listeners.delete(cb); }
   };
   window.XtrataRadio = api;
   return api;

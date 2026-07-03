@@ -142,8 +142,10 @@
     $('ttl').textContent=np?np.title:(s.on?'TUNING…':'— OFF AIR —');
     $('artst').textContent=np&&np.artist?np.artist:'';
     $('power').classList.toggle('on',!!s.on);
-    $('pp').textContent=s.on?'⏸':'▶';
-    stage.classList.toggle('paused',!s.on);
+    var playing=(typeof s.playing==='boolean')?s.playing:s.on;   // real audio state (fallback for old bundles)
+    $('pp').textContent=playing?'⏸':'▶';
+    $('pp').title=playing?'Pause':'Play';
+    stage.classList.toggle('paused',!playing);
     $('fnote').textContent=s.on?(np?'NO ARTWORK IN THIS INSCRIPTION':'TUNING…'):'PRESS POWER TO TUNE IN';
     var art=$('art');
     if(np&&np.cover){$('cover').src=np.cover;art.classList.add('has-cover');}
