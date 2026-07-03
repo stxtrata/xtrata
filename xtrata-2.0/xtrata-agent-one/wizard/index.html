@@ -519,5 +519,6 @@ setInterval(()=>{ const t=$('#progT'); if(t&&lastProgAt){ const s=Math.round((Da
   const et=$('#expT'); if(et&&expiryAt){ const r=expiryAt-Date.now(); et.textContent = r>0 ? ('Auto-returns in '+Math.floor(r/60000)+':'+String(Math.floor(r/1000)%60).padStart(2,'0')) : 'Returning funds…'; } },1000);
 drawGraph();
 </script>
+<script src="/xtrata-radio.js" defer></script>
 </body>
 </html>

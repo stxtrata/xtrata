@@ -9669,6 +9669,17 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
     void initialize();
 
+    // Keep the station playing: internal links to other pages open in new
+    // tabs so the homepage (and its radio) is never torn down mid-song.
+    document.querySelectorAll('a[href^="/"]').forEach((link) => {
+      const href = link.getAttribute('href') || '';
+      if (href === '/' || href.startsWith('/?') || href.startsWith('/#') || link.target) {
+        return;
+      }
+      link.target = '_blank';
+      link.rel = link.rel ? link.rel + ' noopener' : 'noopener';
+    });
+
     // Xtrata Radio: homepage soundtrack from the curated music gallery.
     initXtrataRadio({
       tokenIds: (CURATED_GALLERIES.find((gallery) => gallery.id === 'jim-music')?.tokenIds ?? []),

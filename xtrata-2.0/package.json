@@ -6,7 +6,7 @@
   "scripts": {
     "predev": "npm run arcade:games:manifest && npm run xboard:versions:manifest",
     "dev": "vite",
-    "prebuild": "npm run arcade:games:manifest && npm run xboard:versions:manifest && npm run build:agent-one-wallet && npm run build:agent-one",
+    "prebuild": "npm run arcade:games:manifest && npm run xboard:versions:manifest && npm run build:agent-one-wallet && npm run build:agent-one && npm run build:radio",
     "build": "vite build",
     "build:agent-one-wallet": "vite build -c vite.agent-one-wallet.config.ts",
     "build:agent-one": "vite build -c vite.agent-one.config.ts",
@@ -48,7 +48,8 @@
     "test:watch": "vitest",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
-    "test": "npm run test:contracts && npm run test:app && npm run test:clarinet"
+    "test": "npm run test:contracts && npm run test:app && npm run test:clarinet",
+    "build:radio": "vite build -c vite.radio.config.ts"
   },
   "dependencies": {
     "@noble/hashes": "^1.4.0",

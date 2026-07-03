@@ -375,20 +375,59 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   }
 
   // --- station logic -----------------------------------------------------
+  // The curated ids are seeds; the station also explores the ENTIRE contract.
+  // resolveTrack() is the gatekeeper: anything without playable audio returns
+  // null and is skipped (cached), so the dial only ever lands on real music.
   const playlist = tokenIds.map((id) => id.toString());
+  let maxTokenId = 0;
+  const EXPLORE_RATIO = 0.5; // half the picks roam the full id range
+
+  const discoverRange = async () => {
+    try {
+      const response = await fetch(
+        '/hiro/mainnet/v2/contracts/call-read/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/get-last-token-id',
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ sender: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', arguments: [] })
+        }
+      );
+      if (!response.ok) return;
+      const data = await response.json();
+      const hex = String(data.result || '').replace(/^0x/, '');
+      // (ok uint): 07 then 01 then 16 bytes big-endian
+      if (data.okay && hex.startsWith('0701')) {
+        const value = parseInt(hex.slice(2 + 2), 16);
+        if (Number.isFinite(value) && value > 0) maxTokenId = value;
+      }
+    } catch { /* stay curated-only */ }
+  };
+  void discoverRange();
   let on = false;
   let tuneToken = 0;
   let recent = [];
   let firstTune = true;
 
   const pickNext = () => {
-    const candidates = playlist.filter((id) => !recent.includes(id));
-    const pool = candidates.length ? candidates : playlist;
-    const choice = pool[Math.floor(Math.random() * pool.length)];
-    recent.push(choice);
-    if (recent.length > Math.min(4, playlist.length - 1)) {
-      recent.shift();
+    let choice;
+    // Explore the whole chain when we know its size; skip ids already known
+    // to be unplayable (cached as null in trackCache).
+    if (maxTokenId > 0 && Math.random() < EXPLORE_RATIO) {
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        const candidate = String(1 + Math.floor(Math.random() * maxTokenId));
+        if (recent.includes(candidate)) continue;
+        if (trackCache.get(candidate) === null) continue; // known dud
+        choice = candidate;
+        break;
+      }
     }
+    if (!choice) {
+      const candidates = playlist.filter((id) => !recent.includes(id));
+      const pool = candidates.length ? candidates : playlist;
+      choice = pool[Math.floor(Math.random() * pool.length)];
+    }
+    recent.push(choice);
+    if (recent.length > 8) recent.shift();
     return choice;
   };
 
@@ -545,7 +584,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     const tuningSeconds = playTuning(1, firstTune ? 'on' : 'between');
     firstTune = false;
     // Try a few candidates in case some inscriptions have no extractable audio.
-    for (let attempt = 0; attempt < 5; attempt += 1) {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
       let track;
       if (trackOverride) {
         track = trackOverride;
