@@ -314,7 +314,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   // --- track resolution ---------------------------------------------------
   // Hardcoded ignore list: inscriptions that resolve as media but must never
   // air (e.g. #1065 — a video-only mp4 with no decodable audio track).
-  const IGNORE_IDS = new Set(['1065']);
+  const IGNORE_IDS = new Set(['1065', '5', '319', '1090']);
   const trackCache = new Map(); // tokenId -> { src, title } | null
   const resolveTrack = async (tokenId) => {
     if (IGNORE_IDS.has(String(tokenId))) {
@@ -642,7 +642,9 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     // cycle starts precisely when every known song has aired.
     if (!choice && knownPool.length && Math.random() < exploreChance) {
       let candidates = knownPool.filter((id) => !recent.includes(id) && !played.has(id) && trackCache.get(id) !== null);
-      if (!candidates.length) {
+      // Only declare the cycle complete if PLAYED songs were what emptied the pool
+      // (an all-duds/recent pool must not wipe the no-repeat memory).
+      if (!candidates.length && knownPool.some((id) => played.has(id))) {
         clearPlayed();
         candidates = knownPool.filter((id) => !recent.includes(id) && trackCache.get(id) !== null);
       }
