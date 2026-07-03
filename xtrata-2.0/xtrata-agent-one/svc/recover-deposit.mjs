@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Recover STX from a job's one-shot deposit wallet.
+ * Fully clear a job's one-shot deposit wallet: return every inscription it holds
+ * (escrowed parents, undelivered tokens/receipts, strays) to DEST, then sweep the STX.
  * Use when funds were sent to a deposit address you need to reclaim — e.g. a MOCK
  * job, or a job you cancelled. Runs on YOUR machine; YOU broadcast the sweep.
  *
@@ -13,7 +14,7 @@
  *
  * Env: JOB  JOB_DIR(=./job-state)  DEST  FEE_USTX(=6000)  HIRO_API_KEY  DRY_RUN(=1)
  */
-import { readJob, deriveFrom, balance, netOf } from './core.mjs';
+import { readJob, deriveFrom, balance, netOf, heldInscriptions, sendNft, DEPLOYER } from './core.mjs';
 import { makeSTXTokenTransfer, broadcastTransaction, AnchorMode } from '@stacks/transactions';
 
 const JOB_DIR = process.env.JOB_DIR || './job-state';
@@ -36,6 +37,13 @@ if (DRY) { log({ event: 'dry-run', note: 'Saved key controls the deposit address
 if (!DEST) { console.error('Set DEST=<your SP... wallet> to sweep to'); process.exit(2); }
 
 const network = netOf(net);
+// Inscriptions FIRST — the wallet isn't clear until every NFT it holds (escrowed parent,
+// undelivered token/receipt, stray) has gone home to DEST.
+let held = []; try { held = await heldInscriptions(network, [DEPLOYER, job.core || 'xtrata-v3-2-3'], address, HIRO); } catch (e) { log({ warn: 'could not list held inscriptions: ' + ((e && e.message) || e) }); }
+for (const id of held) {
+  try { const tx = await sendNft([DEPLOYER, job.core || 'xtrata-v3-2-3'], network, key, address, id, DEST, HIRO); log({ event: 'inscription-returned', tokenId: id, to: DEST, txid: tx }); }
+  catch (e) { log({ event: 'inscription-return-failed', tokenId: id, error: String((e && e.message) || e) }); }
+}
 const bal = await balance(network, address, HIRO);
 if (bal <= FEE) { console.error(`balance ${bal} uSTX <= fee ${FEE} uSTX; nothing to sweep`); process.exit(1); }
 const amount = bal - FEE;

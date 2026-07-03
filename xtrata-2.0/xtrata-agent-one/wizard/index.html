@@ -486,10 +486,12 @@ async function renderJob(){
     const parents=(job.parents||[]).map(String);
     if(parents.length && ['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING'].includes(st)){
       const ps=status.parents||{held:[],missing:parents,unexpected:[]};
+      if(!(ps.missing||[]).length) delete PARENT_MSG[job.jobId];   // all parents arrived — clear the send-status line
       const pi=PARENT_INFO[job.jobId]||{};
       const stxDone=funded||!!job.depositReceivedUstx;
       parentPanel=`<div style="margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px">
         <div style="font-weight:700;margin-bottom:6px">Escrow checklist <span class="muted" style="font-weight:400">— two sends, any order; parent + child + change all return to you</span></div>
+        <div class="kv"><span>Deposit address ${copyBtn(job.depositAddress)}</span><span class="mono">${esc(job.depositAddress)}</span></div>
         <div class="kv"><span>1 · STX deposit (${stx(status.requiredUstx)})</span><span>${stxDone?'<span class="ok">✓ arrived</span>':(status.pending?'<span style="color:var(--warn)">⏳ seen in mempool — confirming…</span>':'<span class="muted">awaiting</span>')}</span></div>
         ${parents.map((p,i)=>{
           const held=(ps.held||[]).map(String).includes(p);
@@ -501,6 +503,7 @@ async function renderJob(){
           else if(own) right=`<span style="color:var(--warn)">held by ${esc(own.slice(0,5)+'…'+own.slice(-4))} — connect that wallet, or transfer #${esc(p)} to the deposit address from it</span>`;
           else right='<span class="muted">checking current owner…</span>';
           return `<div class="kv"><span>${i+2} · Parent inscription #${esc(p)}</span><span>${right}</span></div>`;}).join('')}
+        ${PARENT_MSG[job.jobId]?`<div style="margin-top:6px;font-size:12px;${PARENT_MSG[job.jobId].err?'color:var(--bad)':'color:var(--ok)'}">${PARENT_MSG[job.jobId].text}</div>`:''}
         ${(ps.unexpected&&ps.unexpected.length)?`<div class="err" style="margin-top:6px">⚠ Unexpected inscription #${ps.unexpected.map(esc).join(', #')} arrived — it is not a declared parent. Everything will be returned to the sender automatically.</div>`:''}
         <div class="muted" style="font-size:11px;margin-top:6px">The parent is only borrowed for the mint — it comes straight back with your new inscription.${st==='AWAITING_PARENT'?' <b id="expT"></b>':''}</div>
       </div>`;
@@ -530,10 +533,10 @@ async function renderJob(){
         <button class="btn good" onclick="act('run')" ${(funded&&st==='AWAITING_DEPOSIT')?'':'disabled'}>Run inscription</button>
         <button class="btn warn" onclick="act('deliver')" ${st==='INSCRIBED'?'':'disabled'}>Deliver + refund + wipe key</button>
       </div><div class="err" id="jobErr"></div>`:''}
-      ${st==='COMPLETE'?`<div class="ok" style="margin-top:12px">✓ Complete — inscription + receipt delivered${job.fastTrack?' to your wallet':''}, change refunded, deposit key wiped.</div>
+      ${st==='COMPLETE'?`<div class="ok" style="margin-top:12px">✓ Complete — inscription + receipt delivered${job.fastTrack?' to your wallet':''}${(job.parents&&job.parents.length)?`, parent${job.parents.length>1?'s':''} #${job.parents.map(esc).join(', #')} returned to your wallet`:''}, change refunded, deposit key wiped.</div>
       <div class="btnrow"><button class="btn" onclick="viewReceipt('${esc(job.jobId)}')">View receipt</button>
         <button class="btn ghost" onclick="act('delete')">Delete job</button></div>`:''}
-      ${st==='CANCELLED'?`<div class="muted" style="margin-top:12px">↩︎ Cancelled — funds returned to your wallet and the deposit key discarded.${job.cancelReason?(' ('+esc(job.cancelReason)+')'):''}</div>
+      ${st==='CANCELLED'?`<div class="muted" style="margin-top:12px">↩︎ Cancelled — ${(job.parents&&job.parents.length)?'all inscriptions (including parents) and funds':'funds'} returned to your wallet and the deposit key discarded.${job.cancelReason?(' ('+esc(job.cancelReason)+')'):''}</div>
       <div class="btnrow"><button class="btn ghost" onclick="act('delete')">Delete job</button></div>`:''}
       ${st==='NEEDS_RECOVERY'?`<div class="err" style="margin-top:12px">Auto-refund didn’t confirm — your funds are safe but need a manual sweep: run <b>svc/recover-all.mjs</b>.${job.keepKeyReason?(' '+esc(job.keepKeyReason)):''}</div>`:''}
     </div>`;
@@ -542,6 +545,7 @@ async function renderJob(){
 }
 // ---- parent escrow: ownership checker + one-click wallet send (aligned to THIS job's deposit only) ----
 const PARENT_INFO={};          // jobId -> { __core:'ADDR.name', <tokenId>: ownerAddress }
+const PARENT_MSG={};           // jobId -> { text, err } — send-status line, survives re-renders
 const parentChkAt={};
 async function maybeCheckParents(jobId){
   if(Date.now()-(parentChkAt[jobId]||0)<10000) return;   // gentle: re-check owners every ~10 s
@@ -553,16 +557,21 @@ async function maybeCheckParents(jobId){
   }catch{}
 }
 async function sendParent(jobId,pid){
+  // Same proven path as the site's "Send selected inscription" (ported into the wallet bundle),
+  // except the recipient is HARD-CODED to the active job's deposit address — not editable, so the
+  // parent can never be sent to the wrong place.
   const w=xtrataWallet();
-  if(!w||!w.sendInscription){ alert('Wallet bundle too old for one-click NFT send — rebuild agent-one-wallet.js, or transfer inscription #'+pid+' to the deposit address manually from your wallet.'); return; }
+  if(!w||!w.sendInscription){ PARENT_MSG[jobId]={err:1,text:'Wallet bundle too old for one-click send — rebuild agent-one-wallet.js, or transfer #'+esc(pid)+' to the deposit address manually.'}; renderJob(); return; }
   if(!WALLET){ connectWallet(); return; }
+  PARENT_MSG[jobId]={text:'Waiting for wallet confirmation…'}; renderJob();
   try{
     const {job}=await api('/api/jobs/'+jobId);
     const core=String((PARENT_INFO[jobId]&&PARENT_INFO[jobId].__core)||'').split('.');
-    await w.sendInscription({ contractAddress:core[0]||'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', contractName:core[1]||'xtrata-v3-2-3',
-      tokenId:pid, sender:WALLET, recipient:job.depositAddress });   // recipient is ALWAYS this job's deposit wallet — nothing else to get wrong
-    parentChkAt[jobId]=0; lastProgAt=Date.now(); renderJob();
-  }catch(e){ alert('Could not open the wallet to send the parent:\n'+((e&&e.message)||e)); }
+    const r=await w.sendInscription({ contractAddress:core[0]||'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', contractName:core[1]||'xtrata-v3-2-3',
+      tokenId:pid, sender:WALLET, recipient:job.depositAddress, network:SERVER.net||'mainnet' });   // recipient is ALWAYS this job's deposit wallet
+    PARENT_MSG[jobId]={text:'✓ Parent #'+esc(pid)+' transfer submitted'+(r&&r.txId?(' · '+esc(String(r.txId).slice(0,10))+'…'):'')+' — it will show as “arrived” once confirmed.'};
+  }catch(e){ PARENT_MSG[jobId]={err:1,text:'Parent send did not go through: '+esc((e&&e.message)||String(e))+' — you can retry, or send #'+esc(pid)+' to the deposit address from your wallet manually.'}; }
+  parentChkAt[jobId]=0; lastProgAt=Date.now(); renderJob();
 }
 window.sendParent=sendParent;
 

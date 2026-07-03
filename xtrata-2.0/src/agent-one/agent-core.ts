@@ -255,6 +255,7 @@ function receiptData(job: any, x: any) {
     jobId: job.jobId, core: job.core, date: new Date().toISOString(),
     uri: job.uri, mime: job.mime, bytes: job.bytes, chunks: job.chunks, single: job.single,
     tokenId: job.tokenId, receiptTokenId: x.receiptTokenId || null, recipient: x.recipient || job.user, agentIdentityId: job.agentIdentityId || null,
+    parents: (job.parents || []).map(String),
     outcome: x.outcome || 'inscribed', note: x.note || null,
     depositReceived: received.toString(), xtrataProtocol: fileProtocol.toString(), receiptProtocol: receiptProtocol.toString(),
     networkFee: networkFee.toString(), agentFeePct: Number(job.agentFeePct ?? AGENT_FEE_PCT),
@@ -293,7 +294,8 @@ ${row('Size', (d.bytes / 1048576).toFixed(3) + ' MiB · ' + Number(d.bytes).toLo
 ${row('Chunks', d.chunks + (d.single ? ' · single-tx' : ' · staged'))}
 ${d.audioOpt ? row('Audio optimised', `${(d.audioOpt.from / 1048576).toFixed(3)} → ${(d.audioOpt.to / 1048576).toFixed(3)} MiB · Opus ${d.audioOpt.bitrate} · −${d.audioOpt.savedPct}% (${d.audioOpt.preset})`) : ''}
 ${d.player ? row('Player', `${escHtml(d.player.title)}${d.player.artist ? ' — ' + escHtml(d.player.artist) : ''} · embedded Opus${d.player.hasCover ? ' + cover art' : ''}`) : ''}
-${row('Inscription token', '<span class="tok">#' + (d.tokenId ?? '—') + '</span>')}
+${(d.parents && d.parents.length) ? row('Parent inscription' + (d.parents.length > 1 ? 's' : ''), d.parents.map((p: string) => '<span class="tok">#' + p + '</span>').join(' ') + ' · escrowed for the mint, returned to you with the child') : ''}
+${row('Inscription token', '<span class="tok">#' + (d.tokenId ?? '—') + '</span>' + ((d.parents && d.parents.length) ? ' · child of #' + d.parents.join(', #') : ''))}
 ${row('Receipt token', d.receiptTokenId ? ('<span class="tok">#' + d.receiptTokenId + '</span>') : 'this inscription')}
 ${row('Delivered to', short(d.recipient))}
 ${d.agentIdentityId ? row('Issued by', 'Agent One · identity <span class="tok">#' + d.agentIdentityId + '</span>') : ''}
@@ -306,8 +308,9 @@ ${row('Network (miner) fee', stxr(d.networkFee) + usd(d.networkFee))}
 ${row('Change returned to you', stxr(d.changeReturned) + usd(d.changeReturned))}
 ${d.note ? row('Note', escHtml(d.note)) : ''}
 <div class="tot">${row('Total paid', stxr(d.totalPaid) + usd(d.totalPaid))}</div>` : `<h1>Outcome</h1>
-${row('Status', 'Not completed — funds returned')}
+${row('Status', 'Not completed — all funds and inscriptions returned to sender')}
 ${d.note ? row('Reason', escHtml(d.note)) : ''}
+${(d.parents && d.parents.length) ? row('Parent inscription' + (d.parents.length > 1 ? 's' : ''), d.parents.map((p: string) => '<span class="tok">#' + p + '</span>').join(' ') + ' · returned to sender') : ''}
 ${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
 <div class="tot">${row('Returned to you', stxr(d.changeReturned) + usd(d.changeReturned))}</div>`}
 <div class="foot">Core ${d.core} · job ${d.jobId}${d.stxUsd ? ' · STX $' + d.stxUsd : ''} · settled on Bitcoin via Stacks</div>

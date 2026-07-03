@@ -7,10 +7,11 @@
 
 import { createStacksWalletAdapter } from '../lib/wallet/adapter';
 import { showStxTransfer, showContractCall } from '../lib/wallet/connect';
-import {
-  uintCV, standardPrincipalCV, PostConditionMode,
-  makeStandardNonFungiblePostCondition, NonFungibleConditionCode, createAssetInfo,
-} from '@stacks/transactions';
+import { buildTransferCall } from '../lib/contract/client';
+import { buildTransferPostCondition } from '../lib/contract/post-conditions';
+import { validateTransferRequest, getTransferValidationMessage } from '../lib/wallet/transfer';
+import { PostConditionMode } from '@stacks/transactions';
+import { StacksMainnet, StacksTestnet } from '@stacks/network';
 
 const adapter = createStacksWalletAdapter({
   appName: 'Xtrata Agent One',
@@ -29,28 +30,46 @@ const XtrataWallet = {
     const s = adapter.getSession();
     return s.isConnected ? (s.address ?? null) : null;
   },
-  // Opens the connected wallet to transfer an xtrata inscription NFT (e.g. an escrowed parent) to a
-  // recipient the WIZARD supplies (the job's deposit address) — the user just signs. A Deny-mode NFT
-  // post-condition pins exactly this one token leaving the sender: nothing else can move.
-  sendInscription(opts: { contractAddress: string; contractName: string; tokenId: string | number; sender: string; recipient: string; assetName?: string }): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
+  // Opens the connected wallet to transfer an xtrata inscription NFT (e.g. an escrowed parent).
+  // This is the SAME proven path as the site's "Send selected inscription" (ViewerScreen/MyWallet):
+  // buildTransferCall + Deny-mode Sends post-condition + stxAddress, via showContractCall — except
+  // the recipient is supplied by the wizard (the active job's deposit address), never user-editable.
+  // Resolves { txId } on submit; REJECTS on cancel/failure so the UI can tell the user what happened.
+  sendInscription(opts: { contractAddress: string; contractName: string; tokenId: string | number; sender: string; recipient: string; assetName?: string; network?: string }): Promise<{ txId?: string }> {
+    return new Promise<{ txId?: string }>((resolve, reject) => {
       try {
+        const validation = validateTransferRequest({
+          senderAddress: opts.sender,
+          recipientAddress: opts.recipient,
+          tokenId: BigInt(opts.tokenId),
+        });
+        if (!validation.ok) { reject(new Error(getTransferValidationMessage(validation) || 'Transfer is not ready yet.')); return; }
+        const contract = { address: opts.contractAddress, contractName: opts.contractName, network: (opts.network === 'testnet' ? 'testnet' : 'mainnet') as 'mainnet' | 'testnet' };
+        const network = opts.network === 'testnet' ? new StacksTestnet() : new StacksMainnet();
+        const callOptions = buildTransferCall({
+          contract,
+          network,
+          id: BigInt(opts.tokenId),
+          sender: opts.sender,
+          recipient: validation.recipient as string,
+          overrides: {
+            postConditionMode: PostConditionMode.Deny,
+            postConditions: [buildTransferPostCondition({
+              contract,
+              senderAddress: opts.sender,
+              tokenId: BigInt(opts.tokenId),
+              ...(opts.assetName ? { assetName: opts.assetName } : {}),
+            })],
+          },
+        });
         showContractCall({
-          contractAddress: opts.contractAddress,
-          contractName: opts.contractName,
-          functionName: 'transfer',
-          functionArgs: [uintCV(BigInt(opts.tokenId)), standardPrincipalCV(opts.sender), standardPrincipalCV(opts.recipient)],
-          postConditionMode: PostConditionMode.Deny,
-          postConditions: [makeStandardNonFungiblePostCondition(
-            opts.sender, NonFungibleConditionCode.DoesNotOwn,
-            createAssetInfo(opts.contractAddress, opts.contractName, opts.assetName || 'xtrata-inscription'),
-            uintCV(BigInt(opts.tokenId)),
-          )],
+          ...(callOptions as Parameters<typeof showContractCall>[0]),
+          stxAddress: opts.sender,
           appDetails: { name: 'Xtrata Agent One', icon: '/favicon.ico' },
-          onFinish: () => resolve(),
-          onCancel: () => resolve(),
-        } as unknown as Parameters<typeof showContractCall>[0]);
-      } catch (e) { reject(e); }
+          onFinish: (payload: any) => resolve({ txId: payload && payload.txId }),
+          onCancel: () => reject(new Error('Transfer cancelled or failed in wallet.')),
+        } as Parameters<typeof showContractCall>[0]);
+      } catch (e) { reject(e instanceof Error ? e : new Error(String(e))); }
     });
   },
   // Opens the connected wallet to send STX. showStxTransfer already prefers the
