@@ -8,6 +8,22 @@
 import radioCss from './radio.css?inline';
 
 const STORAGE_KEY = 'xtrata.radio.v1';
+
+// --- debug logging -----------------------------------------------------
+// Enable everything:  localStorage.setItem('xtrata.radio.debug','1')  or ?radiodebug=1
+// Watched ids always log, even with debug off (e.g. the troublesome #1065).
+const DEBUG_IDS = new Set(['1065', '8']);
+const debugEnabled = () => {
+  try {
+    return window.localStorage.getItem('xtrata.radio.debug') === '1' ||
+      new URLSearchParams(window.location.search).get('radiodebug') === '1';
+  } catch { return false; }
+};
+const radioLog = (event, detail, tokenId) => {
+  if (!debugEnabled() && !(tokenId && DEBUG_IDS.has(String(tokenId)))) return;
+  // eslint-disable-next-line no-console
+  console.log(`[radio ${new Date().toISOString().slice(11, 23)}] ${event}`, detail ?? '');
+};
 const loadState = () => {
   try { return JSON.parse(window.localStorage.getItem(STORAGE_KEY) || 'null') || {}; }
   catch { return {}; }
@@ -295,6 +311,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
         const url = `/runtime/content?contractId=${encodeURIComponent(core)}&tokenId=${tokenId}&network=mainnet`;
         const attempt = await fetch(url);
         const attemptMime = (attempt.headers.get('content-type') || '').toLowerCase();
+        radioLog(`resolve #${tokenId}`, { core: core.split('.').pop(), status: attempt.status, mime: attemptMime, length: attempt.headers.get('content-length') }, tokenId);
         if (attempt.ok && !attemptMime.includes('application/json')) {
           response = attempt;
           mime = attemptMime;
@@ -305,6 +322,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
         try { await attempt.body?.cancel(); } catch { /* noop */ }
       }
       if (!response) {
+        radioLog(`verdict #${tokenId}`, definitive ? 'DUD (no playable content on any core)' : 'TRANSIENT (will retry; warm requested)', tokenId);
         if (definitive) trackCache.set(tokenId, null); else trackCache.delete(tokenId);
         return null;
       }
@@ -337,6 +355,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
       resolved = null;
       definitive = false;
     }
+    radioLog(`verdict #${tokenId}`, resolved ? { playable: true, src: resolved.src.slice(0, 80), title: resolved.title } : (definitive ? 'DUD' : 'TRANSIENT'), tokenId);
     if (resolved || definitive) {
       trackCache.set(tokenId, resolved);
     } else {
@@ -509,6 +528,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
         const track = await resolveTrack(tokenId);
         if (!track) continue;
         await warmHttpCache(track.src);
+        radioLog(`preloaded #${tokenId}`, { queue: preloadQueue.length + 1 }, tokenId);
         preloadQueue.push({ ...track, tokenId });
         // Stage the head of the queue in the element while idle so it decodes now.
         if (!on && preloadQueue.length === 1) {
@@ -525,6 +545,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   // random inscriptions into the R2 cache in the background (server-side only —
   // nothing downloads to this browser). Big films get warm before anyone tunes in.
   const pingWarm = (ids) => {
+    radioLog('warm ping', ids || 'auto=2', ids);
     try { void fetch(ids ? `/warm?ids=${ids}` : '/warm?auto=2'); } catch { /* noop */ }
   };
   // Start warming a few seconds after init, off the critical page-load path.
@@ -664,6 +685,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
       if (player.src !== track.src) {
         player.src = track.src;
       }
+      radioLog(`play #${track.tokenId}`, { src: (track.src || '').slice(0, 80) }, track.tokenId);
       try {
         await player.play();
         setNow('', true);
@@ -675,7 +697,8 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
         if (history.length > 12) history.shift();
         window.setTimeout(() => { void preloadNextTrack(); }, 1500);
         return;
-      } catch {
+      } catch (error) {
+        radioLog(`play FAILED #${track.tokenId}`, { error: String(error), mediaError: player.error && player.error.code }, track.tokenId);
         // Autoplay refusal or decode failure — try another station.
       }
     }
@@ -691,6 +714,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     }
   });
   player.addEventListener('error', () => {
+    radioLog('player element error', { code: player.error && player.error.code, src: (player.currentSrc || '').slice(0, 80) }, currentTokenId);
     if (on) {
       void tuneToNextTrack();
     }
