@@ -363,6 +363,10 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
   // Hardcoded ignore list: inscriptions that resolve as media but must never
   // air (e.g. #1065 — a video-only mp4 with no decodable audio track).
   const IGNORE_IDS = new Set(['1065', '5', '319', '1090']);
+  // ids that failed transiently (502s, network errors) rest for 45s before the
+  // pickers may try them again — prevents tight resolve/warm-ping loops.
+  const transientFailAt = new Map();
+  const isCoolingDown = (id) => (Date.now() - (transientFailAt.get(String(id)) || 0)) < 45000;
   const trackCache = new Map(); // tokenId -> { src, title } | null
   // Duds persist across visits so each page load doesn't burn tune attempts
   // re-discovering the same dead ids (a big source of NO SIGNAL runs).
@@ -416,6 +420,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
     let resolved = null;
     let definitive = true; // network hiccups must stay retryable, not become duds
     let shareable = true;  // only REAL content verdicts may persist/be reported
+    let dudReason = 'no-audio';
     try {
       let response = null;
       let mime = '';
@@ -487,9 +492,14 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
         }
       } else {
         // A real response with a non-audio, non-html mime (video, image, …)
-        // is a definitive "not a song" — remember and share it.
+        // is a definitive "not a song". This is AUTHORITATIVE content from the
+        // token's own core — it must override transient 502s from other cores,
+        // otherwise the id never gets cached and the picker loops on it forever.
         await response.body?.cancel?.();
-        radioLog(`verdict #${tokenId}`, `not a song (mime ${mime}) — dud`, tokenId);
+        definitive = true;
+        shareable = true;
+        dudReason = 'mime:' + mime.split(';')[0];
+        radioLog(`verdict #${tokenId}`, `not a song (${dudReason}) — dud`, tokenId);
       }
     } catch {
       resolved = null;
@@ -498,9 +508,10 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
     radioLog(`verdict #${tokenId}`, resolved ? { playable: true, src: resolved.src.slice(0, 80), title: resolved.title } : (definitive ? 'DUD' : 'TRANSIENT'), tokenId);
     if (resolved || definitive) {
       trackCache.set(tokenId, resolved);
-      if (!resolved && shareable) { persistDud(tokenId); reportVerdict(tokenId, 'dud', 'no-audio'); }
+      if (!resolved && shareable) { persistDud(tokenId); reportVerdict(tokenId, 'dud', dudReason); }
     } else {
       trackCache.delete(tokenId); // transient failure — eligible again next pass
+      transientFailAt.set(String(tokenId), Date.now());
       pingWarm(tokenId); // server reconstructs it into R2 for the retry
     }
     return resolved;
@@ -860,6 +871,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
           for (let step = 1; step <= pool.length; step += 1) {
             const candidate = pool[(start + step) % pool.length];
             if (trackCache.get(candidate) === null) continue;      // known dud
+            if (isCoolingDown(candidate)) continue;                 // resting after a transient failure
             if (candidate === cur && playableCount > 1) continue;  // never the current song while others remain
             if (skipPlayed && played.has(candidate)) continue;     // already aired this cycle
             return candidate;
@@ -908,7 +920,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
     // that can actually carry audio, and the no-repeat cycle is exact — a new
     // cycle starts precisely when every known song has aired.
     if (!choice && knownPool.length && Math.random() < exploreChance) {
-      let candidates = knownPool.filter((id) => !recent.includes(id) && !played.has(id) && trackCache.get(id) !== null);
+      let candidates = knownPool.filter((id) => !recent.includes(id) && !played.has(id) && trackCache.get(id) !== null && !isCoolingDown(id));
       // Only declare the cycle complete if PLAYED songs were what emptied the pool
       // (an all-duds/recent pool must not wipe the no-repeat memory).
       if (!candidates.length && knownPool.some((id) => played.has(id))) {
@@ -924,6 +936,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
         const candidate = String(1 + Math.floor(Math.random() * maxTokenId));
         if (recent.includes(candidate)) continue;
         if (trackCache.get(candidate) === null) continue; // known dud
+        if (isCoolingDown(candidate)) continue;
         if (played.has(candidate)) { playedRejects += 1; continue; }  // no repeats within a cycle
         choice = candidate;
         break;
@@ -939,7 +952,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
       }
     }
     if (!choice) {
-      let candidates = playlist.filter((id) => !recent.includes(id) && !played.has(id) && trackCache.get(id) !== null);
+      let candidates = playlist.filter((id) => !recent.includes(id) && !played.has(id) && trackCache.get(id) !== null && !isCoolingDown(id));
       // Curated cycle complete (everything played or a known dud) → open a new cycle for these ids.
       if (!candidates.length && playlist.every((id) => played.has(id) || trackCache.get(id) === null)) {
         playlist.forEach((id) => played.delete(id)); savePlayed();
