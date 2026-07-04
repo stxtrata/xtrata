@@ -383,6 +383,7 @@
                   </label>
                 </form>
               </details>
+              <a class="btn secondary back-to-xplorer" id="backToXplorerLink" href="/xplorer" target="_self">← Back to the Xplorer</a>
               <div class="wallet-examples" id="walletExamples" aria-label="Example wallet views">
                 <span>View Examples</span>
 
@@ -457,15 +458,16 @@
               <div class="explorer-tools" id="xtrataExplorerTools" aria-label="Xtrata Xplorer controls">
                 <p class="explorer-mode-note" id="xtrataExplorerStatus">Browse inscriptions.</p>
                 <div class="explorer-tools__row">
-                  <label class="field">
+                  <label class="field explorer-page-field">
                     <span class="label">Go to page:</span>
                     <input class="input" id="explorerPageInput" type="number" min="1" step="1" inputmode="numeric" placeholder="Page" />
                   </label>
                   <label class="field">
-                    <span class="label">ID:</span>
-                    <input class="input" id="explorerTokenInput" type="number" min="1" step="1" inputmode="numeric" placeholder="ID" />
+                    <span class="label">Go to:</span>
+                    <input class="input" id="explorerTokenInput" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="#id or p12" title="Enter an inscription id (512 or #512) or a page (p12)" />
                   </label>
                   <button class="btn ghost" id="explorerJumpButton" type="button">Go</button>
+                  <button class="btn ghost" id="explorerRandomButton" type="button" title="Jump to a random inscription">Random</button>
                   <span class="page-readout explorer-tools__metric" id="walletPageReadout">Page 0 / 0</span>
                   <span class="badge blue explorer-tools__metric" id="walletCountBadge" title="0 inscriptions">0 insc.</span>
                 </div>

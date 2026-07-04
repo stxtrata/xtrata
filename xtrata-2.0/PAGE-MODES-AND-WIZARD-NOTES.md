@@ -203,3 +203,47 @@ timeout (240 s), user skip, or a ≥95 % output all fall back to the original fi
   emits dist/wizard with the new files; vitest **713/713**; id audits clean
   (main.js 101 referenced ids all present; wizard 63/63); regenerated
   `public/xtrata-radio.js` committed.
+
+---
+
+# Round 3 — SPA tabs, Xplorer navigation upgrades, My Wallet fit (2026-07-04)
+
+## SPA tabs — the radio never stops
+The four site pages already shared one shell, so tab-style switching was the
+natural next step: same-tab site links (nav, landing cards, example chips,
+intro buttons, the connect→My Wallet hop) are intercepted, `history.pushState`
+updates the URL, and `switchToPage()` swaps `data-page` + runs that page's
+loads — **no reload, so the radio, wallet session and summary caches all
+survive**. `popstate` re-classifies on back/forward. Leaving the Xplorer clears
+`explorerMode`/gallery state so its CSS can't suppress other pages' panels.
+`/wizard`, `/g/…` and static apps still navigate normally (different
+documents); the radio restores from its saved position there. `PAGE_MODE`
+became mutable; shared view logic extracted into `openPublicViewFromParams()`
+and `openMyWalletDefaultView()`.
+
+## Xplorer navigation
+- **Smart jump field** — one "Go to:" input: `512` / `#512` → inscription,
+  `p12` / `page 12` → page (old page input hidden but functional under it).
+- **Random** — jumps anywhere in 1…latest; rolls within the matching set when
+  filters are active and indexed.
+- **Keyboard** — ←/→ turn pages, ↑/↓ move the selection (Xplorer + My Wallet);
+  disabled while typing, with modifiers, or when the fullscreen viewer is open.
+- **Shareable position** — `/xplorer?p=12` deep-links a page; plain grid views
+  keep `?p=` in the address bar (token selections still write `/x/<id>`).
+- **Idle prefetch** — neighbouring pages' summaries warm the cache via
+  `requestIdleCallback`, so Prev/Next are usually instant.
+- **Filter chips always visible** — the popover flattens into an inline chip
+  row in explorer mode (toggle button hidden; Clear filters kept).
+- **Back affordance** — public wallet/gallery views on the Xplorer page show
+  "← Back to the Xplorer".
+
+## My Wallet fit (screenshot feedback)
+The preview column was `1fr` and exploded on wide screens. Now the grid column
+is `clamp(300px, 100vh - 330px, 540px)` and the preview column
+`clamp(230px, 100vh - 560px, 310px)`, with compacted panel chrome and preview
+meta — full 4×4 grid plus preview square, metadata, relationships and send
+controls fit on screen without scrolling (stacks below 900 px).
+
+## Verification (round 3)
+Main build green; vitest **713/713**; id audit clean (102 ids); structural
+greps for smart field / random / back link / classifyPath / popstate all pass.
