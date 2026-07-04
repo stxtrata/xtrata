@@ -116,6 +116,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   let vuFrame = 0;
   let vuLevels = [0, 0, 0, 0, 0, 0];
   let silentSince = 0;
+  let silentClockStart = 0;
   const grille = root.querySelector('.xtrata-radio__grille');
   const vuBars = Array.from(root.querySelectorAll('.xtrata-radio__vu i'));
 
@@ -152,17 +153,35 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     analyser.getByteFrequencyData(bins);
     // Silence detector: a "playing" track with no signal for 8s has no usable
     // audio (e.g. a video-only mp4). Mark it a dud and retune.
+    // CRUCIAL mobile guard: a buffering stall also reads as zeros (element not
+    // paused, analyser silent) and a suspended AudioContext reads zeros while
+    // audio may still be audible. Both froze songs ~15-20s in and skipped them.
+    // Real silent audio ADVANCES the media clock while producing no signal, so
+    // require the clock to have consumed most of the window before skipping.
     const totalEnergy = bins.reduce((sum, v) => sum + v, 0);
+    const contextRunning = !audioContext || audioContext.state === 'running';
     if (totalEnergy > 40) {
       silentSince = 0;
+    } else if (!contextRunning || player.readyState < 3 || player.seeking) {
+      silentSince = 0; // suspended context or buffering — not evidence of silence
     } else if (player.currentTime > 0.5) {
-      if (!silentSince) silentSince = performance.now();
-      else if (performance.now() - silentSince > 8000 && on) {
-        radioLog(`silent track detected #${currentTokenId}`, 'no audio signal for 8s — skipping and marking dud', currentTokenId);
-        if (currentTokenId) { trackCache.set(String(currentTokenId), null); persistDud(currentTokenId); }
-        silentSince = 0;
-        player.pause();
-        void tuneToNextTrack();
+      if (!silentSince) {
+        silentSince = performance.now();
+        silentClockStart = player.currentTime;
+      } else if (performance.now() - silentSince > 8000 && on) {
+        const consumed = player.currentTime - silentClockStart;
+        if (consumed < 6) {
+          // clock barely moved: the network stalled mid-song — give it another
+          // window instead of skipping a perfectly good track
+          silentSince = 0;
+        } else {
+          radioLog(`silent track detected #${currentTokenId}`, 'decoder consumed 8s with no signal — skipping (session-only dud)', currentTokenId);
+          // session-only: a false positive must never permanently blacklist a song
+          if (currentTokenId) trackCache.set(String(currentTokenId), null);
+          silentSince = 0;
+          player.pause();
+          void tuneToNextTrack();
+        }
       }
     }
     // bass drive for the speaker pulse
@@ -829,8 +848,8 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     'NO SERVERS · NO STREAMS · JUST STACKS',
     'EVERY SONG IS AN INSCRIPTION',
     'ANCHORED TO BITCOIN VIA STACKS',
-    'INSCRIBE YOUR OWN → /agent-one',
-    'SUNO TRACK? FAST-TRACK IT → /agent-one/suno',
+    'INSCRIBE YOUR OWN → /wizard',
+    'SUNO TRACK? FAST-TRACK IT → /wizard/suno',
     'BUILD A GALLERY → /manifests',
     'FIND ARTISTS AT /g/name.btc',
     'RECORD IT · REFERENCE IT · RETRIEVE IT',
