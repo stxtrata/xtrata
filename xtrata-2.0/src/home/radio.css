@@ -86,19 +86,28 @@
   z-index: 2;
 }
 
-/* artwork: the FULL display height as a square, flush right */
+/* artwork: bleeds to the display's own edges — a square as tall as the
+   entire display, corners meeting the display's border */
 .xtrata-radio__art {
   display: none;
-  align-self: stretch;
-  height: auto;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  height: 100%;
   aspect-ratio: 1 / 1;
-  flex: none;
-  border-radius: 6px;
+  border-radius: 0 7px 7px 0;   /* nests into the display's rounded border */
   overflow: hidden;
-  border: 1px solid rgba(38,245,255,.35);
-  box-shadow: 0 0 8px rgba(38,245,255,.2), inset 0 0 4px rgba(0,0,0,.6);
+  border-left: 1px solid rgba(38,245,255,.3);
+  box-shadow: -4px 0 10px rgba(0,0,0,.5);
   cursor: pointer;
   z-index: 2;
+}
+
+/* keep the text column clear of the full-bleed art
+   (display height = 18.65% of stage height = ~14cqw of stage width) */
+.xtrata-radio__display:has(.xtrata-radio__art.has-art) .xtrata-radio__dmain {
+  margin-right: 14.6cqw;
 }
 
 .xtrata-radio__art.has-art { display: block; }
