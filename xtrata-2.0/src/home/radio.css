@@ -383,9 +383,118 @@
 
 .xtrata-radio__stage:hover .xtrata-radio__mini::before { opacity: 1; }
 
+/* ---- relatives strip: fullscreen (and /radio hero) context row ---- */
+.xtrata-radio__rel { display: none; }
+
+.xtrata-radio.is-full .xtrata-radio__rel.has-rel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: absolute;
+  left: 50%;
+  bottom: 3vh;
+  transform: translateX(-50%);
+  max-width: 92vw;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgba(5, 8, 12, .72);
+  border: 1px solid rgba(38,245,255,.18);
+  backdrop-filter: blur(8px);
+  z-index: 3;
+}
+
+.xtrata-radio__rel-label {
+  font-family: "Courier New", Courier, ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: .22em;
+  color: rgba(38,245,255,.75);
+  flex: none;
+}
+
+.xtrata-radio__rel-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.xtrata-radio__rtile {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(16, 22, 32, .9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 0;
+  color: rgba(230, 237, 246, .85);
+  object-fit: cover;
+}
+
+.xtrata-radio__rtile span { font-size: 15px; line-height: 1; }
+.xtrata-radio__rtile i { font-style: normal; font-family: ui-monospace, monospace; font-size: 8px; opacity: .75; }
+
+.xtrata-radio__rtile.is-song {
+  cursor: pointer;
+  border-color: rgba(38,245,255,.45);
+  color: var(--cyan);
+  transition: box-shadow .15s ease, border-color .15s ease;
+}
+
+.xtrata-radio__rtile.is-song:hover {
+  border-color: var(--cyan);
+  box-shadow: 0 0 10px rgba(38,245,255,.45);
+}
+
+.xtrata-radio__rtile.is-static { opacity: .8; }
+img.xtrata-radio__rtile { object-fit: cover; }
+
+/* ---- pill quick controls: power / prev / play-pause / next ---- */
+.xtrata-radio__pctl { display: none; }
+
+.xtrata-radio.is-min .xtrata-radio__pctl {
+  display: flex;
+  gap: 4px;
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
+}
+
+.xtrata-radio__pctl button {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.18);
+  background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(0,0,0,.25));
+  color: rgba(230,237,246,.85);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: border-color .12s ease, color .12s ease, box-shadow .12s ease;
+}
+
+.xtrata-radio__pctl button:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.xtrata-radio__pctl button.is-lit {
+  color: #3ddc97;
+  border-color: rgba(61,220,151,.6);
+  box-shadow: 0 0 8px rgba(61,220,151,.35);
+}
+
 /* collapsed pill: hide the cabinet, keep the VFD strip */
 .xtrata-radio.is-min .xtrata-radio__stage {
-  width: min(280px, calc(100vw - 32px));
+  width: min(340px, calc(100vw - 32px));
   aspect-ratio: auto;
   height: 56px;
   filter: drop-shadow(0 8px 14px rgba(0,0,0,.5));
@@ -401,6 +510,7 @@
   inset: 0;
   width: 100%;
   height: 100%;
+  padding-right: 132px; /* room for the quick controls */
   border-radius: 12px;
   border: 1px solid #3a2a1c;
   padding: 7px 12px;

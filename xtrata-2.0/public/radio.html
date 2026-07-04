@@ -79,6 +79,18 @@
   .lrow button{background:none;border:1px solid var(--line);color:var(--mut);border-radius:7px;width:26px;height:26px;cursor:pointer}
   .lrow button:hover{color:#ff5d7d;border-color:#ff5d7d}
   .strap{margin-top:22px;font-size:13px;color:var(--mut)} .strap a{color:var(--acc)}
+  /* relatives of the playing song: songs are playable, the rest is context */
+  .relwrap{margin-top:16px}
+  .relwrap label{display:block;font-size:11px;font-weight:800;color:var(--mut);letter-spacing:.16em;margin-bottom:8px}
+  .relrow{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+  .rtile{flex:none;width:56px;height:56px;border-radius:10px;overflow:hidden;border:1px solid var(--line);
+    background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    color:var(--mut);object-fit:cover;padding:0;font:inherit}
+  .rtile span{font-size:18px;line-height:1}
+  .rtile i{font-style:normal;font-family:var(--mono);font-size:9px;opacity:.8}
+  .rtile.song{cursor:pointer;color:var(--cyan);border-color:rgba(94,233,255,.4);transition:border-color .12s,box-shadow .12s}
+  .rtile.song:hover{border-color:var(--cyan);box-shadow:0 0 12px rgba(94,233,255,.35)}
+  img.rtile{object-fit:cover}
   /* the walnut receiver widget: hero-sized and bottom-right on this page */
   .xtrata-radio{left:auto !important;right:18px}
   .xtrata-radio__stage{width:min(520px,calc(100vw - 36px)) !important}
@@ -111,6 +123,10 @@
         <span class="fnote" id="fnote">PRESS POWER TO TUNE IN</span>
       </div>
       <a class="chainlink" id="artLink" target="_blank" rel="noopener" style="display:none">VIEW INSCRIPTION ↗</a>
+    </div>
+    <div class="relwrap" id="relWrap" style="display:none">
+      <label>RELATED INSCRIPTIONS</label>
+      <div class="relrow" id="relRow"></div>
     </div>
   </div>
   <div>
@@ -184,6 +200,33 @@
       row.querySelector('.lt').addEventListener('click',function(){api.playToken(l.tokenId)});
       row.querySelector('button').addEventListener('click',function(){api.unlike(l.tokenId)});
       list.appendChild(row);
+    });
+    renderRelatives(s.relatives||[]);
+  }
+  var relSig='';
+  function renderRelatives(rels){
+    var sig=rels.map(function(r){return r.id+r.kind+(r.playable?'1':'0')}).join(',');
+    if(sig===relSig)return; relSig=sig;
+    var wrap=$('relWrap'),row=$('relRow');row.innerHTML='';
+    wrap.style.display=rels.length?'':'none';
+    rels.forEach(function(r){
+      if(r.playable){
+        var b=document.createElement('button');b.type='button';b.className='rtile song';
+        b.title='Play inscription #'+r.id;
+        b.innerHTML='<span>♪</span><i>#'+esc(r.id)+'</i>';
+        b.addEventListener('click',function(){api.playToken(r.id)});
+        row.appendChild(b);
+      }else if(r.kind==='image'){
+        var img=document.createElement('img');img.className='rtile';img.loading='lazy';img.alt='';
+        img.title='Related inscription #'+r.id;img.src='/i/'+r.id;
+        img.addEventListener('error',function(){img.remove()});
+        row.appendChild(img);
+      }else{
+        var t=document.createElement('span');t.className='rtile';
+        t.title='Related inscription #'+r.id;
+        t.innerHTML='<span>◇</span><i>#'+esc(r.id)+'</i>';
+        row.appendChild(t);
+      }
     });
   }
   function boot(a){
