@@ -74,6 +74,12 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
     '        <img alt="" loading="lazy" />',
     '      </a>',
     '    </div>',
+    '    <div class="xtrata-radio__pctl" aria-label="Radio controls">',
+    '      <button type="button" data-p="power" title="Power">\u23fb</button>',
+    '      <button type="button" data-p="prev" title="Previous song">\u23ee</button>',
+    '      <button type="button" data-p="pp" title="Play / pause">\u25b6</button>',
+    '      <button type="button" data-p="next" title="Next song">\u23ed</button>',
+    '    </div>',
     '  </div>',
     '  <button class="xtrata-radio__btn xtrata-radio__btn--playlist" type="button" title="Your station (liked band)"><span class="xtrata-radio__ring"></span></button>',
     '  <button class="xtrata-radio__btn xtrata-radio__btn--shuffle" type="button" title="Discovery preset"><span class="xtrata-radio__lit"></span><span class="xtrata-radio__ring"></span></button>',
@@ -93,12 +99,6 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
     '<div class="xtrata-radio__rel" aria-label="Related inscriptions">',
     '  <span class="xtrata-radio__rel-label">RELATED</span>',
     '  <div class="xtrata-radio__rel-row"></div>',
-    '</div>',
-    '<div class="xtrata-radio__pctl" aria-label="Radio controls">',
-    '  <button type="button" data-p="power" title="Power">\u23fb</button>',
-    '  <button type="button" data-p="prev" title="Previous song">\u23ee</button>',
-    '  <button type="button" data-p="pp" title="Play / pause">\u25b6</button>',
-    '  <button type="button" data-p="next" title="Next song">\u23ed</button>',
     '</div>',
     '<div class="xtrata-radio__fs-hint">Click the <b>XTRATA&nbsp;FM</b> logo or press <b>Esc</b> to exit fullscreen — the music keeps playing</div>'
   ].join('');
@@ -1433,21 +1433,6 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
     }
   };
 
-  // engine state -> lit buttons / pot positions / playing class
-  const renderFace = (snap) => {
-    renderArt(snap);
-    renderRelatives(snap);
-    renderPctl(snap);
-    faceBtn('heart').classList.toggle('is-lit', Boolean(snap.nowPlaying && isLiked(snap.nowPlaying.tokenId)));
-    faceBtn('playlist').classList.toggle('is-lit', snap.band === 'liked');
-    faceBtn('shuffle').classList.toggle('is-lit', Boolean(snap.shuffle));
-    faceBtn('repeat').classList.toggle('is-lit', Boolean(snap.loop));
-    root.classList.toggle('is-playing', Boolean(snap.playing));
-    renderPots();
-  };
-  listeners.add(renderFace);
-  renderFace(stateSnapshot());
-
   // relatives strip (fullscreen only, styled in CSS)
   const relRow = root.querySelector('.xtrata-radio__rel-row');
   const relWrap = root.querySelector('.xtrata-radio__rel');
@@ -1503,6 +1488,22 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
     ppBtn.textContent = snap.playing ? '\u23f8' : '\u25b6';
     pctl.querySelector('[data-p="power"]').classList.toggle('is-lit', Boolean(snap.on));
   };
+
+
+  // engine state -> lit buttons / pot positions / playing class
+  const renderFace = (snap) => {
+    renderArt(snap);
+    renderRelatives(snap);
+    renderPctl(snap);
+    faceBtn('heart').classList.toggle('is-lit', Boolean(snap.nowPlaying && isLiked(snap.nowPlaying.tokenId)));
+    faceBtn('playlist').classList.toggle('is-lit', snap.band === 'liked');
+    faceBtn('shuffle').classList.toggle('is-lit', Boolean(snap.shuffle));
+    faceBtn('repeat').classList.toggle('is-lit', Boolean(snap.loop));
+    root.classList.toggle('is-playing', Boolean(snap.playing));
+    renderPots();
+  };
+  listeners.add(renderFace);
+  renderFace(stateSnapshot());
 
   // --- fullscreen mode ----------------------------------------------------
   // Click the XTRATA FM logo (or the docked header pill) to fill the screen;

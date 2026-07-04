@@ -460,7 +460,8 @@ img.xtrata-radio__rtile { object-fit: cover; }
 .xtrata-radio.is-min .xtrata-radio__pctl {
   display: flex;
   gap: 4px;
-  position: absolute;
+  align-items: center;
+  position: absolute;   /* anchored to the pill display itself */
   right: 8px;
   top: 50%;
   transform: translateY(-50%);
