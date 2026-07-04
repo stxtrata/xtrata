@@ -62,11 +62,18 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
     '<button class="xtrata-radio__toggle" type="button" aria-pressed="false" hidden></button>',
     '<div class="xtrata-radio__stage">',
     '  <div class="xtrata-radio__display" role="button" tabindex="0" title="Xtrata Radio">',
-    '    <div class="xtrata-radio__meta">',
-    '      <span class="xtrata-radio__brand">XTRATA FM</span>',
-    '      <span class="xtrata-radio__vu"><i></i><i></i><i></i><i></i><i></i><i></i></span>',
+    '    <div class="xtrata-radio__dmain">',
+    '      <div class="xtrata-radio__meta">',
+    '        <span class="xtrata-radio__brand">XTRATA FM</span>',
+    '      </div>',
+    '      <div class="xtrata-radio__screen"><span class="xtrata-radio__screen-text"></span></div>',
     '    </div>',
-    '    <div class="xtrata-radio__screen"><span class="xtrata-radio__screen-text"></span></div>',
+    '    <div class="xtrata-radio__drail">',
+    '      <span class="xtrata-radio__vu"><i></i><i></i><i></i><i></i><i></i><i></i></span>',
+    '      <a class="xtrata-radio__art" target="_blank" rel="noopener" title="View the inscribed original">',
+    '        <img alt="" loading="lazy" />',
+    '      </a>',
+    '    </div>',
     '  </div>',
     '  <button class="xtrata-radio__btn xtrata-radio__btn--playlist" type="button" title="Your station (liked band)"><span class="xtrata-radio__ring"></span></button>',
     '  <button class="xtrata-radio__btn xtrata-radio__btn--shuffle" type="button" title="Discovery preset"><span class="xtrata-radio__lit"></span><span class="xtrata-radio__ring"></span></button>',
@@ -1334,8 +1341,27 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
   root.querySelector('.xtrata-radio__pot--band').addEventListener('click', (event) => { event.stopPropagation(); cycleBand(); });
   root.querySelector('.xtrata-radio__pot--preset').addEventListener('click', (event) => { event.stopPropagation(); cyclePreset(); });
 
+  // artwork thumb: cover of the playing song, linking to the inscribed original
+  const artEl = root.querySelector('.xtrata-radio__art');
+  const artImg = artEl.querySelector('img');
+  artEl.addEventListener('click', (event) => event.stopPropagation());
+  const renderArt = (snap) => {
+    const np = snap.nowPlaying;
+    const cover = np && np.cover;
+    if (cover) {
+      if (artImg.getAttribute('src') !== cover) artImg.src = cover;
+      artEl.href = '/i/' + np.tokenId;
+      artEl.classList.add('has-art');
+    } else {
+      artEl.classList.remove('has-art');
+      artImg.removeAttribute('src');
+      artEl.removeAttribute('href');
+    }
+  };
+
   // engine state -> lit buttons / pot positions / playing class
   const renderFace = (snap) => {
+    renderArt(snap);
     faceBtn('heart').classList.toggle('is-lit', Boolean(snap.nowPlaying && isLiked(snap.nowPlaying.tokenId)));
     faceBtn('playlist').classList.toggle('is-lit', snap.band === 'liked');
     faceBtn('shuffle').classList.toggle('is-lit', Boolean(snap.shuffle));

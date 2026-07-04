@@ -67,6 +67,53 @@
   pointer-events: none;
 }
 
+.xtrata-radio__display { flex-direction: row; align-items: stretch; gap: 3%; }
+
+.xtrata-radio__dmain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* right rail: VU on top, artwork thumb beneath */
+.xtrata-radio__drail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 4%;
+  z-index: 2;
+}
+
+.xtrata-radio__art {
+  display: none;
+  width: clamp(16px, 8.5cqw, 46px);
+  aspect-ratio: 1 / 1;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid rgba(38,245,255,.35);
+  box-shadow: 0 0 6px rgba(38,245,255,.2), inset 0 0 4px rgba(0,0,0,.6);
+  cursor: pointer;
+}
+
+.xtrata-radio__art.has-art { display: block; }
+
+.xtrata-radio__art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.xtrata-radio__art:hover {
+  border-color: rgba(38,245,255,.8);
+  box-shadow: 0 0 10px rgba(38,245,255,.45);
+}
+
+.xtrata-radio.is-min .xtrata-radio__art { display: none; } /* pill stays lean */
+
 .xtrata-radio__meta {
   position: relative;
   z-index: 2;
