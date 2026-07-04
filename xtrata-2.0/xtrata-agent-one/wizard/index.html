@@ -479,7 +479,7 @@ function enterBatch(files){
   for(const f of files){ if(BATCH.items.length>=40) break;
     const isAudio=mimeFor(f.name).startsWith('audio/');
     BATCH.items.push({ file:f, uri:`xtrata:${catFor(f.name)}/${slug(f.name)}`, mime:mimeFor(f.name), deps:'', parents:'',
-      isAudio, art:{file:null,tokenId:''}, player:{status:'raw',file:null,info:null,err:null} });
+      isAudio, art:{file:null,tokenId:''}, player:{status:(BATCH.playerMode&&isAudio)?'await':'raw',file:null,info:null,err:null} });
   }
   // batch replaces the single-file flow on screen
   FLOW.original=null; FLOW.optimized=null; FLOW.jobId=null; FLOW.done=false;
@@ -488,7 +488,6 @@ function enterBatch(files){
   $('#dropMain').innerHTML=`<span class="filechip">Batch · ${BATCH.items.length} files</span>`;
   $('#dropSub').textContent='drop more files to add them to the batch';
   $('#batchAudioMode').hidden=!BATCH.items.some(it=>it.isAudio);
-  if(BATCH.playerMode) queueAudioBuilds();
   renderBatch(); setStep('review');
   $('#batchCard').hidden=false; $('#batchCard').scrollIntoView({behavior:'smooth',block:'start'});
 }
@@ -496,8 +495,9 @@ const artChip=(it,i)=>{
   const p=it.player;
   const state=p.status==='ready'?`<span class="ok" title="${esc((p.info&&p.info.title)||'')}">✓ player ${mib(p.file.size)}${p.info&&p.info.hasCover?' · art':''}</span>`
     :p.status==='building'?'<span style="color:var(--acc)"><span class="spin"></span> building…</span>'
-    :p.status==='error'?`<span style="color:var(--bad)" title="${esc(p.err||'')}">✗ build failed</span>`
-    :p.status==='queued'?'<span class="muted">queued…</span>':'';
+    :p.status==='error'?`<span style="color:var(--bad)" title="${esc(p.err||'')}">✗ ${esc(String(p.err||'build failed').slice(0,40))}</span> <button class="btn ghost" style="padding:3px 8px;font-size:11px" onclick="batchBuildRow(${i})">Retry</button>`
+    :p.status==='queued'?'<span class="muted">queued…</span>'
+    :`<button class="btn ghost" style="padding:3px 8px;font-size:11px" onclick="batchBuildRow(${i})" title="No artwork chosen — the song's embedded cover art (if any) is used">Build${(it.art.file||it.art.tokenId)?'':' (embedded art)'}</button>`;
   const art=it.art.file?`🖼 ${esc(it.art.file.name.length>14?it.art.file.name.slice(0,11)+'…':it.art.file.name)}`
     :it.art.tokenId?`🖼 #${esc(it.art.tokenId)}`:'';
   return `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
@@ -505,6 +505,9 @@ const artChip=(it,i)=>{
     <input class="mono" placeholder="or img #id" value="${esc(it.art.tokenId)}" data-arti="${i}" style="width:76px;padding:4px 6px;font-size:11px"/>
     ${state}</div>`;
 };
+// Manually (re)build one row — also the retry path after a failure.
+window.batchBuildRow=(i)=>{ const it=BATCH.items[i]; if(!it||!it.isAudio) return;
+  it.player={status:'queued',file:null,info:null,err:null}; renderBatch(); queueAudioBuilds(); };
 function renderBatch(){
   $('#batchCount').textContent=String(BATCH.items.length);
   const pm=BATCH.playerMode;
@@ -561,15 +564,19 @@ async function queueAudioBuilds(){
       }catch(e){ it.player={status:'error',file:null,info:null,err:(e&&e.message)||String(e)}; }
       renderBatch();
     }
-  }catch(e){ $('#batchErr').textContent='Player engine failed to load: '+((e&&e.message)||e)+' — you can still inscribe the audio as-is.';
-    BATCH.items.forEach(it=>{ if(it.player.status==='queued'||it.player.status==='building') it.player.status='error'; }); renderBatch(); }
+  }catch(e){
+    // Engine (ffmpeg/template) failed to load — a RETRYABLE condition, not a per-song
+    // failure: park the rows back at "Build" and surface the reason once.
+    $('#batchErr').textContent='Player engine failed to load: '+((e&&e.message)||e)+' — check the connection and press Build again, or switch back to “inscribe as audio”.';
+    BATCH.items.forEach(it=>{ if(it.player.status==='queued'||it.player.status==='building') it.player={status:'await',file:null,info:null,err:null}; }); renderBatch(); }
   finally{ buildBusy=false; }
 }
 document.querySelectorAll('input[name="bAudioMode"]').forEach(r=>{ r.onchange=()=>{
   BATCH.playerMode=(document.querySelector('input[name="bAudioMode"]:checked')||{}).value==='player';
   $('#batchPlayerHint').hidden=!BATCH.playerMode;
-  BATCH.items.forEach(it=>{ if(it.isAudio) it.player=BATCH.playerMode?{status:it.player.status==='ready'?'ready':'queued',file:it.player.file,info:it.player.info,err:null}:{status:'raw',file:null,info:null,err:null}; });
-  if(BATCH.playerMode) queueAudioBuilds();
+  // Selecting player mode does NOT start building — each song waits for its artwork
+  // (or an explicit Build click); builds auto-start the moment artwork is assigned.
+  BATCH.items.forEach(it=>{ if(it.isAudio) it.player=BATCH.playerMode?{status:it.player.status==='ready'?'ready':'await',file:it.player.file,info:it.player.info,err:null}:{status:'raw',file:null,info:null,err:null}; });
   renderBatch();
 };});
 // The bytes that will ACTUALLY inscribe for a row (player when built, else the raw file).
@@ -617,9 +624,11 @@ $('#batchInscribeBtn').onclick=async()=>{
     const notReady=BATCH.items.filter(it=>it.isAudio&&it.player.status!=='ready');
     if(notReady.length){
       const failed=notReady.filter(it=>it.player.status==='error');
-      err.textContent=failed.length?`Player build failed for ${failed.map(it=>it.file.name).join(', ')} — fix the artwork, remove the row, or switch back to “inscribe as audio”.`
-        :`Still building ${notReady.length} player${notReady.length>1?'s':''} — one moment…`;
-      if(!failed.length) queueAudioBuilds();
+      if(failed.length){ err.textContent=`Player build failed for ${failed.map(it=>it.file.name).join(', ')} — press Retry on the row, change its artwork, remove it, or switch back to “inscribe as audio”.`; return; }
+      // Kick any rows still waiting for artwork (they build with their embedded art), then re-check.
+      notReady.forEach(it=>{ if(it.player.status==='await') it.player.status='queued'; });
+      renderBatch(); queueAudioBuilds();
+      err.textContent=`Building ${notReady.length} player${notReady.length>1?'s':''} — press Inscribe batch again once every row shows ✓.`;
       return;
     }
   }

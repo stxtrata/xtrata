@@ -7,22 +7,31 @@
 //
 // Requires (loaded before this): @ffmpeg/ffmpeg@0.11 (global FFmpeg) + HTML_Template.js.
 (function () {
-  const FF = window.FFmpeg;
   let _ff = null, _loading = null;
   async function ff(onStatus) {
     if (_ff) return _ff;
     if (_loading) return _loading;
     _loading = (async () => {
+      const FF = window.FFmpeg;
       if (!FF || !FF.createFFmpeg) throw new Error('ffmpeg.wasm not loaded');
       onStatus && onStatus('Loading the audio engine…');
-      const f = FF.createFFmpeg({ log: false, corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js' });
+      // The threaded core needs SharedArrayBuffer → cross-origin isolation, which is
+      // only enabled on /suno (COEP breaks wallet popups elsewhere). Everywhere else
+      // (e.g. the batch wizard) fall back to the SINGLE-THREADED core: slower encode,
+      // zero isolation requirements — works on any page.
+      const isolated = typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated && typeof SharedArrayBuffer !== 'undefined';
+      const corePath = isolated
+        ? 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js'
+        : 'https://cdn.jsdelivr.net/npm/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js';
+      const f = FF.createFFmpeg({ log: false, corePath, mainName: isolated ? undefined : 'main' });
       await f.load();
       _ff = f; return f;
     })();
-    return _loading;
+    // Do NOT cache a rejection — a transient CDN/network failure must stay retryable.
+    try { return await _loading; } catch (e) { _loading = null; throw e; }
   }
 
-  const fetchFile = (FF && FF.fetchFile) ? FF.fetchFile : async (file) => new Uint8Array(await file.arrayBuffer());
+  const fetchFile = async (file) => (window.FFmpeg && window.FFmpeg.fetchFile) ? window.FFmpeg.fetchFile(file) : new Uint8Array(await file.arrayBuffer());
   const slug = (s) => String(s || '').toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'track';
   function b64(u8) { let s = ''; const CH = 0x8000; for (let i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, i + CH)); return btoa(s); }
 
