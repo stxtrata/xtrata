@@ -829,19 +829,35 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
     let choice;
     if (forcedNext) { choice = forcedNext; forcedNext = null; recent.push(choice); if (recent.length > 8) recent.shift(); return choice; }
     if (!shuffleMode) {
-      // IN-ORDER MODE: continue from the current song's position, skipping
-      // known duds; wrap at the end. No random lottery, no no-repeat memory —
-      // a fixed order cycles naturally.
+      // IN-ORDER MODE: walk the fixed running order onward from the current
+      // song, skipping known duds AND any song that has already aired in this
+      // cycle, so EVERY other available song plays before the current one comes
+      // round again. When the whole running order has aired, the cycle resets
+      // and the sequence starts over (the current song still held back to last).
       const pool = sequentialPool();
       if (pool.length) {
         const cur = currentTokenId ? String(currentTokenId) : null;
         const start = cur ? pool.indexOf(cur) : -1;
-        for (let step = 1; step <= pool.length; step += 1) {
-          const candidate = pool[(start + step) % pool.length];
-          if (trackCache.get(candidate) === null) continue;
-          if (candidate === cur && pool.length > 1) continue;
-          choice = candidate;
-          break;
+        const playableCount = pool.reduce((n, id) => n + (trackCache.get(id) === null ? 0 : 1), 0);
+        const walk = (skipPlayed) => {
+          for (let step = 1; step <= pool.length; step += 1) {
+            const candidate = pool[(start + step) % pool.length];
+            if (trackCache.get(candidate) === null) continue;      // known dud
+            if (candidate === cur && playableCount > 1) continue;  // never the current song while others remain
+            if (skipPlayed && played.has(candidate)) continue;     // already aired this cycle
+            return candidate;
+          }
+          return null;
+        };
+        // Prefer the next song that has NOT yet aired this cycle.
+        choice = walk(true);
+        // Nothing left unaired → every other available song has played, so open
+        // a fresh cycle and resume the running order (current still held to last).
+        if (!choice && pool.some((id) => trackCache.get(id) !== null && played.has(id))) {
+          pool.forEach((id) => { if (trackCache.get(id) !== null) played.delete(id); });
+          savePlayed();
+          radioLog('no-repeat cycle complete (in-order) — every other song has aired, starting a fresh cycle');
+          choice = walk(false);
         }
       }
       if (choice) {
@@ -1103,6 +1119,13 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
         trackOverride = null;
       } else if (preloadQueue.length) {
         track = preloadQueue.shift();    // cued ahead of time — instant
+        // A track cued before the current song settled can be stale. In normal
+        // (non-loop) play, never let it be the song already on air — that would
+        // repeat the current track ahead of the rest of the running order.
+        if (track && !player.loop && currentTokenId && String(track.tokenId) === String(currentTokenId)) {
+          radioLog(`dropped stale preload #${track.tokenId}`, 'equals the current song — avoiding an early repeat', track.tokenId);
+          track = null;
+        }
       } else {
         const tokenId = pickNext();
         track = await resolveTrack(tokenId);
