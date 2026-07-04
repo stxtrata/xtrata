@@ -720,6 +720,9 @@ async function reapTick() {
 (window as any).XtrataAgent = {
   build: AGENT_BUILD,
   health: async () => ({ ok: true, mock: MOCK, core: CORE_NAME, net: 'mainnet', windowMs: WINDOW_MS, parentWindowMs: PARENT_WINDOW_MS, deployer: DEPLOYER, build: AGENT_BUILD }),
+  // Live owner lookup for the UI (pre-job parent validation): read-only get-owner
+  // on the core contract. Returns the owner principal string or null.
+  ownerOf: async (id: string) => ownerOf(String(id)),
   // Parent checker for the UI: who owns each declared parent right now? (connected wallet / deposit / other)
   parentInfo: async (id: string) => {
     const job = readJob(id); const out: any[] = [];

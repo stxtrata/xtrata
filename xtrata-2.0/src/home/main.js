@@ -307,6 +307,7 @@
       fullscreenCloseButton: $('fullscreenCloseButton'),
       introConnectButton: $('introConnectButton'),
       introPrepareButton: $('introPrepareButton'),
+      introMyWalletLink: $('introMyWalletLink'),
       registryModeBadge: $('registryModeBadge'),
       registryIntroLead: $('registryIntroLead'),
       introNetworkValue: $('introNetworkValue'),
@@ -3737,6 +3738,9 @@
       }
       if (dom.introConnectButton) {
         dom.introConnectButton.hidden = connected;
+      }
+      if (dom.introMyWalletLink) {
+        dom.introMyWalletLink.hidden = !connected;
       }
     };
 
@@ -8308,6 +8312,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       updateFullscreenControls();
       updateExplorerStatus();
 
+      // Everything below runs under one try/finally: a thrown error anywhere
+      // in the page load must never strand walletLoadingPage=true, which used
+      // to grey out Prev/Next (and the jump controls) until a full reload.
+      let pageIds = [];
+      try {
       if (state.walletPageIds.length === 0) {
         state.walletTokens = [];
         state.selectedTokenId = null;
@@ -8324,11 +8333,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           'amber'
         );
         renderTokenGrid();
-        state.walletLoadingPage = false;
-        updateControls();
-        updateWalletPagerControls();
-        updateFullscreenControls();
-        updateExplorerStatus();
         debugLog('grid', 'explorer page load finished empty', {
           ...getGridDebugContext(state.walletPageIds),
           options: formatDebugOptions(options),
@@ -8348,7 +8352,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         'blue'
       );
 
-      const pageIds = getWalletPageIds();
+      pageIds = getWalletPageIds();
       const primedSummaries = primeWalletTokenCacheFromSummaryCache(pageIds, {
         force: !!options.force
       });
@@ -8367,7 +8371,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       });
       renderTokenGrid();
 
-      try {
         if (missingIds.length > 0 || options.force) {
           const idsToFetch = options.force ? pageIds : missingIds;
           const summaries = await fetchWalletTokenSummaries(idsToFetch, {
@@ -8457,6 +8460,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       state.walletLoadingPage = true;
       updateWalletPagerControls();
       updateFullscreenControls();
+      // One try/finally for the whole load — see loadExplorerPage: an error must
+      // never strand walletLoadingPage=true (stuck greyed-out pager buttons).
+      let pageIds = [];
+      try {
       if (state.walletUsesPagedHoldings && !options.pageAlreadyLoaded) {
         try {
           const contractId = getContractId(state.contract);
@@ -8476,9 +8483,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             sourceBase: summarizeApiBase(page.sourceBase)
           });
         } catch (error) {
-          state.walletLoadingPage = false;
-          updateWalletPagerControls();
-          updateFullscreenControls();
           debugLog('grid', 'wallet page holdings request failed', {
             options: formatDebugOptions(options),
             wallet: truncateMiddle(viewingAddress, 8, 8),
@@ -8489,7 +8493,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         }
       }
 
-      const pageIds = getWalletPageIds();
+      pageIds = getWalletPageIds();
       debugLog('grid', 'wallet page ids resolved', {
         ...getGridDebugContext(pageIds),
         options: formatDebugOptions(options)
@@ -8500,9 +8504,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         void closeFullscreenViewer();
         void updateWalletTokenUriHeadPreview(null);
         renderTokenGrid();
-        state.walletLoadingPage = false;
-        updateWalletPagerControls();
-        updateFullscreenControls();
         debugLog('grid', 'wallet page load finished empty', {
           ...getGridDebugContext(pageIds),
           options: formatDebugOptions(options),
@@ -8529,7 +8530,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       });
       renderTokenGrid({ deferHydration: !!options.deferHydration });
 
-      try {
         if (missingIds.length > 0 || options.force) {
           const idsToFetch = options.force ? pageIds : missingIds;
           const summaries = await fetchWalletTokenSummaries(idsToFetch, {
@@ -8774,6 +8774,19 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           renderPreparedState();
         }
         await loadWalletInscriptions();
+        if (PAGE_MODE === 'home' && state.walletSession.isConnected && state.walletSession.address) {
+          // A wallet that connects on the landing page and holds inscriptions
+          // goes straight to its ledger on the My Wallet page.
+          const holdingCount =
+            (state.walletUsesPagedHoldings
+              ? state.walletTotalCount
+              : state.walletTokenIds.length) + getInjectedEscrowTwinIds().length;
+          if (holdingCount > 0) {
+            appendLog('Opening My Wallet with your inscriptions…');
+            window.location.href = '/my-wallet';
+            return;
+          }
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         appendLog(`Wallet connect failed: ${message}`);
@@ -9320,9 +9333,19 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const initialize = async () => {
       applyTheme(loadTheme());
       setExplorerModeFromRequest();
-      if (!state.explorerMode && PAGE_MODE === 'xplorer') {
+      const pageParams = new URLSearchParams(window.location.search);
+      const requestedGallery = pageParams.get('gallery')?.trim() || null;
+      const requestedPublicWallet =
+        pageParams.get('wallet')?.trim() || pageParams.get('showcase')?.trim() || null;
+      if (
+        !state.explorerMode &&
+        PAGE_MODE === 'xplorer' &&
+        !requestedGallery &&
+        !requestedPublicWallet
+      ) {
         // /xplorer always lands in the explorer, even when the URL carried no
         // usable token id (e.g. /x/not-a-number falls back to the latest page).
+        // Gallery/wallet params instead open that public view on this page.
         state.explorerMode = true;
       }
       dom.tokenUriInput.value = DEFAULT_TOKEN_URI;
@@ -9342,13 +9365,31 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         await loadExplorerMode();
       } else {
         await fetchAdminStatus();
-        // Deep link: /?wallet=<address> opens straight into that wallet's grid
-        // (used by the Xplorer owner click, which routes back to the homepage).
-        const requestedWallet = new URLSearchParams(window.location.search)
-          .get('wallet')
-          ?.trim();
-        if (requestedWallet) {
-          await viewWalletByAddress(requestedWallet);
+        // Deep links (rendered on the Xplorer page):
+        //   ?gallery=<id>          → curated example gallery
+        //   ?wallet= / ?showcase=  → any wallet's public ledger (address or .btc
+        //                            name), optional &sel=<tokenId> to focus one.
+        if (requestedGallery) {
+          await openCuratedGallery(requestedGallery, { scroll: false });
+        } else if (requestedPublicWallet) {
+          if (/^S[PM][0-9A-Z]+$/i.test(requestedPublicWallet)) {
+            await viewWalletByAddress(requestedPublicWallet);
+          } else {
+            dom.walletLookupInput.value = requestedPublicWallet.replace(/\.btc$/i, '');
+            updateWalletLookupInputMode();
+            await viewWalletFromInput();
+          }
+          const requestedSel = parsePositiveBigInt(pageParams.get('sel') ?? '');
+          if (requestedSel !== null) {
+            try {
+              await focusWalletTokenById(requestedSel);
+            } catch (error) {
+              debugLog('grid', 'deep-link token focus failed', {
+                sel: requestedSel.toString(),
+                error: error instanceof Error ? error.message : String(error)
+              }, 'warn');
+            }
+          }
         } else if (
           PAGE_MODE === 'my-wallet' &&
           walletViewRequestId === state.walletViewRequestId &&
@@ -9594,7 +9635,13 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         pageCount: getWalletPageCount()
       });
       state.walletPageIndex -= 1;
-      await loadWalletPage();
+      try {
+        await loadWalletPage();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setStatus(dom.walletGridStatus, `<strong>Grid</strong> ${message}`, 'error', 'rose');
+        appendLog(`Page load failed: ${message}`);
+      }
     });
     dom.walletNextButton.addEventListener('click', async () => {
       const pageCount = getWalletPageCount();
@@ -9608,7 +9655,13 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         pageCount
       });
       state.walletPageIndex += 1;
-      await loadWalletPage();
+      try {
+        await loadWalletPage();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setStatus(dom.walletGridStatus, `<strong>Grid</strong> ${message}`, 'error', 'rose');
+        appendLog(`Page load failed: ${message}`);
+      }
     });
     const runPrepare = async () => {
       setBusy(true);
@@ -9726,6 +9779,22 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
     void initialize();
 
+    // Sticky header: condense after a little scroll so the nav, connected
+    // wallet and docked radio stay visible without eating vertical space.
+    const siteHeader = document.getElementById('siteHeader');
+    if (siteHeader) {
+      let headerCondensed = false;
+      const syncHeader = () => {
+        const next = window.scrollY > 24;
+        if (next !== headerCondensed) {
+          headerCondensed = next;
+          siteHeader.classList.toggle('is-condensed', next);
+        }
+      };
+      window.addEventListener('scroll', syncHeader, { passive: true });
+      syncHeader();
+    }
+
     // Keep the station playing: internal links to other pages open in new
     // tabs so the homepage (and its radio) is never torn down mid-song.
     document.querySelectorAll('a[href^="/"]').forEach((link) => {
@@ -9737,8 +9806,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       link.rel = link.rel ? link.rel + ' noopener' : 'noopener';
     });
 
-    // Xtrata Radio: homepage soundtrack from the curated music gallery.
+    // Xtrata Radio: site soundtrack, docked in the sticky header (falls back
+    // to the classic floating widget if the slot is missing).
     initXtrataRadio({
       tokenIds: (CURATED_GALLERIES.find((gallery) => gallery.id === 'jim-music')?.tokenIds ?? []),
-      stationName: 'XTRATA FM'
+      stationName: 'XTRATA FM',
+      mount: document.getElementById('radioSlot')
     });

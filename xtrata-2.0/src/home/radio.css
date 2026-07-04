@@ -319,3 +319,89 @@
 @media (prefers-reduced-motion: reduce) {
   .xtrata-radio__screen-text.is-scroll { animation-duration: calc(var(--dur, 8s) * 2); }
 }
+
+/* ============ docked mode (header slot) ============ */
+/* The homepage mounts the radio inside the sticky header (see .radio-slot).
+   Docked, it always rests as the compact pill; clicking it opens fullscreen.
+   Keep this block ABOVE the fullscreen block so .is-full wins ties. */
+.xtrata-radio.is-docked {
+  position: static;
+  z-index: auto;
+}
+
+.xtrata-radio.is-docked .xtrata-radio__mini { display: none; }
+
+.xtrata-radio.is-docked.is-min .xtrata-radio__stage {
+  width: 224px;
+  height: 36px;
+  filter: drop-shadow(0 3px 7px rgba(0, 0, 0, 0.4));
+}
+
+@media (max-width: 760px) {
+  .xtrata-radio.is-docked.is-min .xtrata-radio__stage { width: 156px; }
+}
+
+/* ============ fullscreen mode ============ */
+/* Toggled by clicking the XTRATA FM logo on the receiver screen (or the
+   docked header pill); Esc or ✕ exits. Pure CSS state on the same element —
+   the audio pipeline is untouched, so the music never stops. */
+.xtrata-radio__brand { cursor: pointer; }
+
+.xtrata-radio__fs-close,
+.xtrata-radio__fs-hint { display: none; }
+
+.xtrata-radio.is-full {
+  position: fixed;
+  inset: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 7, 11, 0.93);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.xtrata-radio.is-full .xtrata-radio__stage {
+  width: min(94vw, calc(84vh * (1446 / 1087)));
+}
+
+.xtrata-radio.is-full .xtrata-radio__mini { display: none; }
+
+.xtrata-radio.is-full .xtrata-radio__fs-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid rgba(140, 170, 210, 0.35);
+  background: rgba(10, 16, 26, 0.7);
+  color: #cfe7ff;
+  cursor: pointer;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.xtrata-radio.is-full .xtrata-radio__fs-close:hover { background: rgba(20, 30, 46, 0.9); }
+
+.xtrata-radio.is-full .xtrata-radio__fs-hint {
+  display: block;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 3.4vh;
+  max-width: 92vw;
+  text-align: center;
+  color: #cfe7ff;
+  font: 12.5px/1.4 system-ui, sans-serif;
+  background: rgba(10, 16, 26, 0.72);
+  border: 1px solid rgba(140, 170, 210, 0.28);
+  padding: 8px 16px;
+  border-radius: 999px;
+}

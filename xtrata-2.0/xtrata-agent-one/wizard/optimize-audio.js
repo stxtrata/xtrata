@@ -17,7 +17,8 @@
 
   const FFMPEG_JS = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js';
   const CORE_ST = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js';
-  const TIMEOUT_MS = 240000; // hard stop — never hold the railroad hostage
+  const TIMEOUT_MS = 240000; // hard stop for the transcode — never hold the railroad hostage
+  const ENGINE_TIMEOUT_MS = 30000; // hard stop for loading ffmpeg.wasm itself (CDN hiccups)
   const MIN_BYTES = 64 * 1024; // below this the saving isn't worth the wait
   const KEEP_RATIO = 0.95; // must save at least 5% or the original is kept
 
@@ -100,8 +101,15 @@
 
     let f;
     try {
-      f = await ff(onStatus);
+      // The engine load itself is raced against a timeout: a stalled CDN fetch
+      // must degrade to "inscribe the original", never to a perpetual spinner.
+      f = await Promise.race([
+        ff(onStatus),
+        new Promise((_r, reject) =>
+          setTimeout(() => reject(new Error('audio engine load timed out')), ENGINE_TIMEOUT_MS)),
+      ]);
     } catch (e) {
+      _loading = null; // let the next file retry a fresh load
       return { file, originalBytes, skipped: 'engine-unavailable' };
     }
     if (aborted()) return { file, originalBytes, skipped: 'skipped-by-user' };

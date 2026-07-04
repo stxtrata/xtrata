@@ -40,7 +40,7 @@ const saveState = (state) => {
   try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* noop */ }
 };
 
-export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {}) => {
+export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', mount = null } = {}) => {
   if (!tokenIds.length || typeof document === 'undefined') {
     return null;
   }
@@ -81,9 +81,16 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     '  <span class="xtrata-radio__pot xtrata-radio__pot--balance" aria-hidden="true"><span class="xtrata-radio__potcore"></span></span>',
     '  <span class="xtrata-radio__pot xtrata-radio__pot--volume"><span class="xtrata-radio__knob" role="slider" aria-label="Volume" aria-valuemin="-1" aria-valuemax="10" title="Volume - scroll or drag; below 0 clicks off"></span></span>',
     '  <button class="xtrata-radio__mini" type="button" title="Minimise radio"></button>',
-    '</div>'
+    '</div>',
+    '<button class="xtrata-radio__fs-close" type="button" title="Exit fullscreen (Esc)">✕</button>',
+    '<div class="xtrata-radio__fs-hint">Click the <b>XTRATA&nbsp;FM</b> logo or press <b>Esc</b> to exit fullscreen — the music keeps playing</div>'
   ].join('');
-  document.body.appendChild(root);
+  // Optional header dock: pass `mount` and the radio lives there as a compact
+  // pill; clicking it opens the fullscreen receiver. No mount → the classic
+  // floating widget (bottom-left) used by the standalone pages.
+  const dockHost = mount && typeof mount.appendChild === 'function' ? mount : null;
+  if (dockHost) root.classList.add('is-docked');
+  (dockHost || document.body).appendChild(root);
 
   const toggleButton = root.querySelector('.xtrata-radio__toggle');
   const screenText = root.querySelector('.xtrata-radio__screen-text');
@@ -1208,13 +1215,21 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   const faceBtn = (name) => root.querySelector('.xtrata-radio__btn--' + name);
   const setMin = (min) => {
     root.classList.toggle('is-min', Boolean(min));
-    try { window.localStorage.setItem(UIMIN_KEY, min ? '1' : '0'); } catch { /* noop */ }
+    if (!dockHost) {
+      try { window.localStorage.setItem(UIMIN_KEY, min ? '1' : '0'); } catch { /* noop */ }
+    }
   };
   let startMin = true; // default: unobtrusive pill
   try { startMin = window.localStorage.getItem(UIMIN_KEY) !== '0'; } catch { /* keep default */ }
-  setMin(startMin);
+  setMin(dockHost ? true : startMin); // docked radio always rests as the header pill
 
   const onDisplayTap = () => {
+    if (dockHost && !root.classList.contains('is-full')) {
+      // Header pill tap = open the full receiver and get music going in one move.
+      setFull(true);
+      if (!on) switchOn();
+      return;
+    }
     if (root.classList.contains('is-min')) { setMin(false); return; }
     if (!on) switchOn();
   };
@@ -1262,6 +1277,49 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   };
   listeners.add(renderFace);
   renderFace(stateSnapshot());
+
+  // --- fullscreen mode ----------------------------------------------------
+  // Click the XTRATA FM logo (or the docked header pill) to fill the screen;
+  // Esc, ✕, or the logo again exits. Pure CSS state on the same element, so
+  // playback is never interrupted entering or leaving fullscreen.
+  const brandEl = root.querySelector('.xtrata-radio__brand');
+  const setFull = (full) => {
+    const want = Boolean(full);
+    if (want && root.classList.contains('is-min')) setMin(false);
+    root.classList.toggle('is-full', want);
+    if (!want && dockHost) setMin(true); // docked radio returns to the header pill
+  };
+  const toggleFull = () => setFull(!root.classList.contains('is-full'));
+  brandEl.title = 'Click to toggle fullscreen radio';
+  brandEl.addEventListener('click', (event) => { event.stopPropagation(); toggleFull(); });
+  root.querySelector('.xtrata-radio__fs-close').addEventListener('click', (event) => {
+    event.stopPropagation();
+    setFull(false);
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && root.classList.contains('is-full')) setFull(false);
+  });
+  api.setFullscreen = setFull;
+  api.toggleFullscreen = toggleFull;
+  api.isFullscreen = () => root.classList.contains('is-full');
+
+  // Deep link for listeners: /?radio=fullscreen (also full/fs/1/on) opens the
+  // page with the receiver already fullscreen. Autoplay needs a gesture, so a
+  // fresh session shows a tap-to-start prompt; a resumed session just plays.
+  try {
+    const wantRadio = (new URLSearchParams(window.location.search).get('radio') || '').toLowerCase();
+    if (['fullscreen', 'full', 'fs', '1', 'on'].includes(wantRadio)) {
+      setFull(true);
+      if (!(saved && saved.on && saved.tokenId)) {
+        writeScreen('▶ TAP ANYWHERE TO START THE RADIO');
+        const onceStart = () => {
+          document.removeEventListener('pointerdown', onceStart, true);
+          if (!on) switchOn();
+        };
+        document.addEventListener('pointerdown', onceStart, true);
+      }
+    }
+  } catch { /* noop */ }
 
   window.XtrataRadio = api;
   return api;

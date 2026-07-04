@@ -130,3 +130,76 @@ timeout (240 s), user skip, or a ≥95 % output all fall back to the original fi
 - Recommended manual smoke before deploy: one real fast-track inscription, one
   `?mock=1` rehearsal, one audio drop (watch the optimiser row), and a click around
   `/` → `/inscribe` → `/xplorer` → `/my-wallet` with a connected wallet.
+
+---
+
+# Round 2 — new-layout branch follow-ups (2026-07-04)
+
+## Wizard
+- **Live parent ownership check** — `window.XtrataAgent.ownerOf(id)` exposed from
+  `src/agent-one/agent-core.ts` (read-only `get-owner`); the Relationships expander
+  verifies each parent id as you type (debounced 500 ms) and on wallet
+  connect/disconnect: green "owned by your connected wallet", red "no owner found" /
+  "owned by <addr>", amber "connect to confirm". MOCK mode shows a neutral note.
+- **The "use original" box explained + fixed** — that row is the automatic audio
+  optimiser (mp3/wav/flac… → Opus HQ before quoting). The perpetual spinner was the
+  ffmpeg.wasm ENGINE LOAD having no timeout (a stalled CDN fetch spun forever, and
+  Skip only took effect between steps). Now: 30 s engine-load timeout (+ retry on next
+  file), Skip resolves instantly via a race (late encoder results are discarded),
+  clearer copy ("Audio optimisation: …", "Use the original file instead"), and every
+  failure path degrades to "inscribe the original as-is".
+- **Working preview before committing** — the review card renders the EXACT bytes to
+  be inscribed: images/video inline, audio with controls (A/B the Opus conversion via
+  the revert toggle), HTML in a sandboxed iframe (note: on-chain `/inscription/…`
+  refs resolve only after inscription), PDF inline, text/JSON excerpt (20 KB cap),
+  byte-for-byte note for other types. Object URLs revoked on change/reset.
+
+## Site
+- **Connect → My Wallet** — an explicit connect on the landing page loads holdings
+  and, if any exist, routes to `/my-wallet`; a restored session shows an
+  "Open My Wallet" intro button instead (no surprise redirect on every visit).
+- **Stuck Prev/Next fixed (root cause)** — both `loadExplorerPage` and
+  `loadWalletPage` ran code between `walletLoadingPage = true` and their `try`
+  blocks; any throw there (cache prime, grid render, status write) stranded the flag
+  and permanently disabled the pager. Both loaders now run under a single
+  try/finally (`pageIds` hoisted so the finally can never hit a TDZ), and the
+  Prev/Next click handlers surface load errors in the grid status instead of
+  unhandled rejections.
+- **Sticky condensing header** — `.site-header` wraps topbar + nav (+ docked radio):
+  sticky at top, slimmer baseline, condenses further past 24 px of scroll
+  (logo 28 px, single-line wallet readout, tighter buttons). Toggled by a passive
+  scroll listener; all previous header elements/ids unchanged.
+- **My Wallet = personal ledger only** — wallet lookup and example chips removed
+  from the page; the layout caps the grid column at
+  `clamp(320px, 100vh - 300px, 560px)` so the full 4×4 grid is on screen with a
+  sticky preview beside it (stacks below 900 px).
+- **Examples & lookup relocated** — landing page gets a "View examples" strip of
+  plain links; `?gallery=<id>` and `?wallet=/?showcase=` (+`&sel=<tokenId>`) are
+  Xplorer-page deep links handled in `initialize()` (BNS names go through the
+  lookup path, addresses direct). The lookup form itself is wrapped in a collapsed
+  "Look up any wallet or .btc name" details, hidden on My Wallet, shown on the
+  Xplorer (overrides the explorer-mode hide with higher specificity).
+
+## Radio
+- **Fullscreen mode** — click the XTRATA FM logo on the receiver screen (or the
+  docked header pill) to toggle a fullscreen overlay (Esc / ✕ / logo exits, hint bar
+  explains); pure CSS state on the same element so playback is never interrupted.
+  `XtrataRadio.setFullscreen/toggleFullscreen/isFullscreen` exposed.
+- **Listener deep link** — `/?radio=fullscreen` (also full/fs/1/on) opens the
+  homepage with the receiver already fullscreen; a fresh session shows
+  "TAP ANYWHERE TO START" (autoplay needs one gesture), a resumed session just plays.
+- **Header dock** — `initXtrataRadio({ mount })`: the homepage mounts the radio in
+  the nav's `.radio-slot` as a compact pill (fullscreen on click); standalone pages
+  keep the floating bottom-left widget. Docked mode never persists the min/max pref.
+- **Tab/window switching** — audio was never paused on tab switch (no
+  visibilitychange handler); background tabs keep playing. The remaining gap is
+  same-tab NAVIGATION (browser autoplay policy requires a gesture after a page
+  load): position is persisted every 1.5 s and restore auto-plays when the browser
+  allows, else one tap resumes. True gapless same-tab navigation would need an SPA
+  shell — noted as a possible future step, not attempted here.
+
+## Verification (round 2)
+- agent-one, radio and main vite builds green in a clean env; `copy-static-apps`
+  emits dist/wizard with the new files; vitest **713/713**; id audits clean
+  (main.js 101 referenced ids all present; wizard 63/63); regenerated
+  `public/xtrata-radio.js` committed.

@@ -89,6 +89,14 @@
   .optrow .savings{color:var(--ok);font-weight:700;font-family:var(--mono)}
   .checkline{display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--ink);font-size:12.5px}
   .checkline input{width:auto}
+  .preview-block{margin-top:14px}
+  .preview-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;font-size:12px;color:var(--mut);margin-bottom:7px}
+  .preview-body{border:1px solid var(--line);border-radius:12px;background:var(--panel2);overflow:hidden;display:flex;justify-content:center;align-items:center;min-height:56px}
+  .preview-body img{max-width:100%;max-height:340px;display:block}
+  .preview-body video{max-width:100%;max-height:340px;display:block;background:#000}
+  .preview-body audio{width:100%;margin:14px 12px}
+  .preview-body iframe{width:100%;height:360px;border:0;background:#fff}
+  .preview-body pre{width:100%;max-height:280px;overflow:auto;margin:0;padding:12px 14px;font:12px/1.5 var(--mono);color:var(--ink);white-space:pre-wrap;word-break:break-word}
   .quote-summary{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:14px}
   .quote-summary .lbl{color:var(--mut);font-size:12px}
   footer{border-top:1px solid var(--line);margin-top:26px;padding:16px 22px;color:var(--mut);font-size:12.5px;display:flex;gap:18px;flex-wrap:wrap}
@@ -140,14 +148,23 @@
     <div class="kv"><span>File</span><span class="filechip" id="fileLine"></span></div>
     <div class="kv"><span>Type</span><span id="typeLine" class="mono"></span></div>
 
+    <div class="preview-block" id="previewBlock" hidden>
+      <div class="preview-head">
+        <span>Preview — this exact file goes on-chain, test it before you commit</span>
+        <span class="muted mono" id="previewNote"></span>
+      </div>
+      <div id="previewBody" class="preview-body"></div>
+      <div class="muted" id="previewFootnote" style="font-size:11px;margin-top:6px" hidden></div>
+    </div>
+
     <div class="optrow" id="optRow" hidden>
       <span id="optSpin" class="spin" hidden></span>
       <span class="grow" id="optText"></span>
       <span class="savings" id="optSavings" hidden></span>
-      <button class="btn ghost" id="optSkipBtn" style="padding:5px 11px" hidden>Skip</button>
+      <button class="btn ghost" id="optSkipBtn" style="padding:5px 11px" hidden>Skip — use original</button>
       <label class="checkline" id="optRevertWrap" hidden>
         <input type="checkbox" id="optRevert" />
-        <span>use original</span>
+        <span>Use the original file instead</span>
       </label>
     </div>
     <div class="muted" id="sunoHint" style="font-size:12px;margin-top:8px" hidden>
@@ -183,6 +200,7 @@
         <input id="deps" class="mono" placeholder="134, 90" />
         <label>Parent inscriptions <span class="muted">(token ids you own — escrowed for the mint, returned with the child)</span></label>
         <input id="parents" class="mono" placeholder="134" />
+        <div id="parentsCheck" style="margin-top:8px;font-size:12.5px;display:flex;flex-direction:column;gap:4px"></div>
         <div class="muted" style="font-size:11.5px;margin-top:8px">
           Dependencies are existence-only links (recursive references). Parents are ownership links:
           you send the parent to the deposit wallet with your payment; the child mints linked to it,
@@ -278,7 +296,7 @@
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=6"></script>
+<script src="agent-one.js?v=7"></script>
 <script src="optimize-audio.js?v=1"></script>
 <script>
 const API = '';   // backendless — all data flows through window.XtrataAgent (no HTTP API)
@@ -345,7 +363,8 @@ async function walletPillClick(){ if(!WALLET) return;
 function setWallet(addr){ WALLET=addr||null; WALLET_NAME=null; WALLET_REVEAL=false; const btn=$('#connectBtn');
   if(WALLET){ btn.textContent='Disconnect'; if(!$('#user').value) $('#user').value=WALLET;
     renderWalletPill(); bnsLookup(WALLET).then(n=>{ if(n&&WALLET===addr){ WALLET_NAME=n; renderWalletPill(); } }); }
-  else { btn.textContent='Connect wallet'; renderWalletPill(); } }
+  else { btn.textContent='Connect wallet'; renderWalletPill(); }
+  try{ checkParents(); }catch{} }   // re-verify declared parents against the (dis)connected wallet
 async function connectWallet(){
   const w=xtrataWallet();
   if(!w||!w.connect){ alert('Wallet bundle not loaded.\n\nThis wizard connects through the bundled wallet shim (window.XtrataWallet). Rebuild agent-one.js, or open the wizard from the Xtrata site.'); return null; }
@@ -361,8 +380,8 @@ $('#walletAddr').onclick=walletPillClick;
 const catSel=$('#category'), ftSel=$('#ftype');
 Object.keys(CONTENT).forEach(c=>catSel.add(new Option(c,c)));
 function fillTypes(){ ftSel.innerHTML=''; Object.keys(CONTENT[catSel.value]).forEach(t=>ftSel.add(new Option(t+' ('+CONTENT[catSel.value][t]+')',t))); }
-catSel.onchange=()=>{ fillTypes(); renderFileLines(); };
-ftSel.onchange=()=>{ renderFileLines(); };
+catSel.onchange=()=>{ fillTypes(); renderFileLines(); renderPreview(); };
+ftSel.onchange=()=>{ renderFileLines(); renderPreview(); };
 fillTypes();
 function slug(s){ return (s.toLowerCase().replace(/\.[^.]+$/,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,48))||'asset'; }
 const EXT={ weba:['audio','weba'],opus:['audio','opus'],mp3:['audio','mp3'],wav:['audio','wav'],ogg:['audio','ogg'],oga:['audio','ogg'],
@@ -413,6 +432,32 @@ function renderFileLines(){
   $('#typeLine').textContent=CONTENT[catSel.value][ftSel.value]||f.type||'—';
 }
 
+// ---- live preview: exactly the bytes that will go on-chain ----
+let previewUrl=null, previewRun=0;
+function clearPreview(){ if(previewUrl){ try{URL.revokeObjectURL(previewUrl);}catch{} previewUrl=null; }
+  $('#previewBody').innerHTML=''; $('#previewBlock').hidden=true; $('#previewFootnote').hidden=true; }
+async function renderPreview(){
+  const f=FLOW.activeFile(); const run=++previewRun;
+  clearPreview(); if(!f) return;
+  const body=$('#previewBody'), note=$('#previewNote'), foot=$('#previewFootnote');
+  const mime=(CONTENT[catSel.value]&&CONTENT[catSel.value][ftSel.value])||f.type||'';
+  $('#previewBlock').hidden=false; note.textContent=mime||'unknown type';
+  const url=()=>{ previewUrl=URL.createObjectURL(f); return previewUrl; };
+  if(mime.startsWith('image/')){ body.innerHTML=`<img alt="Preview of ${esc(f.name)}">`; body.firstChild.src=url(); }
+  else if(mime.startsWith('audio/')){ body.innerHTML=`<audio controls></audio>`; body.firstChild.src=url();
+    if(FLOW.optimized) { foot.hidden=false; foot.textContent='You are hearing the '+(FLOW.useOriginal?'ORIGINAL file.':'OPTIMISED Opus file — toggle “Use the original file instead” below to compare.'); } }
+  else if(mime.startsWith('video/')){ body.innerHTML=`<video controls></video>`; body.firstChild.src=url(); }
+  else if(mime==='text/html'){ body.innerHTML=`<iframe sandbox="allow-scripts" title="HTML preview"></iframe>`; body.firstChild.src=url();
+    foot.hidden=false; foot.textContent='Runs sandboxed. On-chain references (e.g. /inscription/…) only resolve once inscribed, so recursive parts may not load in this local preview.'; }
+  else if(mime==='application/pdf'){ body.innerHTML=`<iframe title="PDF preview"></iframe>`; body.firstChild.src=url(); }
+  else if(mime.startsWith('text/')||mime==='application/json'){
+    const CAP=20000; const txt=await f.slice(0,CAP).text(); if(run!==previewRun) return;
+    body.innerHTML='<pre></pre>';
+    body.firstChild.textContent=txt+(f.size>CAP?`\n… (${(f.size-CAP).toLocaleString()} more bytes not shown)`:'');
+  }
+  else { body.innerHTML=`<div class="muted" style="padding:14px;text-align:center">No inline preview for “${esc(mime||'unknown')}” — the file is inscribed byte-for-byte regardless.</div>`; }
+}
+
 async function onFile(file){
   FLOW.original=file; FLOW.optimized=null; FLOW.useOriginal=false; FLOW.quote=null;
   FLOW.jobId=null; FLOW.done=false; $('#activeJobDetail').innerHTML='';
@@ -424,42 +469,48 @@ async function onFile(file){
   $('#newErr').textContent='';
   detectFromName(file.name);
   $('#uri').value=`xtrata:${catSel.value}/${slug(file.name)}`;
-  renderFileLines();
+  renderFileLines(); renderPreview();
   $('#sunoHint').hidden=!/\.mp3$/i.test(file.name);
   setStep('review');
   $('#reviewCard').scrollIntoView({behavior:'smooth',block:'start'});
 
-  // Auto-optimise audio, then quote on whatever wins.
+  // Auto-optimise audio, then quote on whatever wins. Skip resolves INSTANTLY
+  // (the encoder result is ignored when it lands late) so the railroad is
+  // never held hostage by the audio engine.
   const opt=window.XtrataAudioOptimizer;
   const run=++FLOW.optRun;
   const row=$('#optRow');
   if(opt&&opt.isCandidate(file.name,file.size)){
     row.hidden=false; $('#optSpin').hidden=false; $('#optSkipBtn').hidden=false;
     $('#optSavings').hidden=true; $('#optRevertWrap').hidden=true;
-    $('#optText').textContent='Optimising audio → Opus (best quality, smallest size)…';
+    $('#optText').textContent='Audio optimisation: converting to Opus HQ (smaller file, same listening quality)…';
     const signal={aborted:false};
-    $('#optSkipBtn').onclick=()=>{ signal.aborted=true; };
+    let skipNow; const skipPromise=new Promise((r)=>{ skipNow=r; });
+    $('#optSkipBtn').onclick=()=>{ signal.aborted=true; skipNow({file, originalBytes:file.size, skipped:'skipped-by-user'}); };
     quote(); // provisional quote on the original while the encoder works
-    const res=await opt.optimize(file,(m)=>{ if(run===FLOW.optRun) $('#optText').textContent=m; },{signal});
+    const res=await Promise.race([
+      opt.optimize(file,(m)=>{ if(run===FLOW.optRun) $('#optText').textContent='Audio optimisation: '+m; },{signal}),
+      skipPromise
+    ]);
     if(run!==FLOW.optRun) return; // a newer file replaced this one mid-encode
     $('#optSpin').hidden=true; $('#optSkipBtn').hidden=true;
     if(res.optimizedBytes){
       FLOW.optimized=res;
       const pct=Math.round((1-res.optimizedBytes/res.originalBytes)*100);
-      $('#optText').textContent=`Optimised to Opus HQ — same listening quality`;
+      $('#optText').textContent='Audio optimised to Opus HQ — same listening quality, cheaper to inscribe';
       $('#optSavings').hidden=false;
       $('#optSavings').textContent=`${mib(res.originalBytes)} → ${mib(res.optimizedBytes)} (−${pct}%)`;
       $('#optRevertWrap').hidden=false; $('#optRevert').checked=false;
       detectFromName(res.file.name); $('#uri').value=`xtrata:audio/${slug(file.name)}`;
-      renderFileLines(); quote();
+      renderFileLines(); renderPreview(); quote();
     } else {
       row.hidden=(res.skipped==='not-audio'||res.skipped==='too-small');
       $('#optText').textContent={
-        'already-opus':'Already Opus — nothing to squeeze.',
-        'already-efficient':'Already efficient — keeping the original.',
-        'engine-unavailable':'Audio engine unavailable — inscribing the original.',
-        'failed':'Optimisation failed safely — inscribing the original.',
-        'skipped-by-user':'Optimisation skipped — inscribing the original.',
+        'already-opus':'Audio optimisation: already Opus — nothing to squeeze.',
+        'already-efficient':'Audio optimisation: already efficient — keeping the original.',
+        'engine-unavailable':'Audio optimisation unavailable right now — inscribing the original as-is.',
+        'failed':'Audio optimisation failed safely — inscribing the original as-is.',
+        'skipped-by-user':'Audio optimisation skipped — inscribing the original as-is.',
       }[res.skipped]||'Keeping the original file.';
     }
   } else { row.hidden=true; quote(); }
@@ -470,12 +521,36 @@ $('#optRevert').onchange=()=>{
   const f=FLOW.activeFile();
   detectFromName(f.name);
   $('#uri').value=`xtrata:${catSel.value}/${slug(FLOW.original.name)}`;
-  renderFileLines(); quote();
+  renderFileLines(); renderPreview(); quote();
 };
 
 // ---- quote (auto) ----
 function parentList(){ return $('#parents').value.split(',').map(s=>s.trim()).filter(Boolean); }
 function depsList(){ return $('#deps').value.split(',').map(s=>s.trim()).filter(Boolean); }
+
+// ---- live parent-ownership check: instant green/red per id as you type ----
+let parentsCheckRun=0, parentsCheckTimer=null;
+async function checkParents(){
+  const box=$('#parentsCheck'); if(!box) return;
+  const ids=parentList(); const run=++parentsCheckRun;
+  if(!ids.length){ box.innerHTML=''; return; }
+  if(!ids.every(d=>/^\d+$/.test(d))){ box.innerHTML='<span style="color:var(--bad)">Parents must be numeric token ids.</span>'; return; }
+  if(new Set(ids).size!==ids.length){ box.innerHTML='<span style="color:var(--bad)">Duplicate parent token ids.</span>'; return; }
+  if(SERVER.mock){ box.innerHTML='<span class="muted">MOCK mode — ownership not checked.</span>'; return; }
+  const A=window.XtrataAgent;
+  if(!A||!A.ownerOf){ box.innerHTML='<span class="muted">Ownership check unavailable (old agent bundle).</span>'; return; }
+  box.innerHTML=ids.map(id=>`<span class="muted" data-pid="${esc(id)}">⏳ #${esc(id)} — checking current owner…</span>`).join('');
+  for(const id of ids){
+    let owner=null; try{ owner=await A.ownerOf(id); }catch{ owner=null; }
+    if(run!==parentsCheckRun) return; // input changed mid-flight
+    const el=box.querySelector(`[data-pid="${id}"]`); if(!el) continue;
+    if(owner&&WALLET&&owner===WALLET){ el.innerHTML=`<span class="ok">✓ #${esc(id)} — owned by your connected wallet</span>`; }
+    else if(!owner){ el.innerHTML=`<span style="color:var(--bad)">✗ #${esc(id)} — no owner found (wrong id?)</span>`; }
+    else if(!WALLET){ el.innerHTML=`<span style="color:var(--warn)">#${esc(id)} — owned by ${esc(shortAddr(owner))}. Connect your wallet to confirm it's yours.</span>`; }
+    else { el.innerHTML=`<span style="color:var(--bad)">✗ #${esc(id)} — owned by ${esc(shortAddr(owner))}, not your connected wallet. Escrow would auto-refund.</span>`; }
+  }
+}
+$('#parents').addEventListener('input',()=>{ if(parentsCheckTimer)clearTimeout(parentsCheckTimer); parentsCheckTimer=setTimeout(checkParents,500); });
 async function quote(){
   const f=FLOW.activeFile(); if(!f) return;
   const run=++FLOW.quoteRun;
@@ -553,6 +628,8 @@ function resetFlow(){
   $('#dropSub').textContent='or click to browse — images, audio, video, documents, HTML, JSON, anything';
   ['uri','deps','parents','user'].forEach(id=>$('#'+id).value='');
   $('#margin').value='0'; $('#optRevert').checked=false; $('#optRow').hidden=true; $('#sunoHint').hidden=true;
+  $('#parentsCheck').innerHTML=''; parentsCheckRun++;
+  clearPreview();
   $('#newErr').textContent='';
   setStep('drop');
   window.scrollTo({top:0,behavior:'smooth'});

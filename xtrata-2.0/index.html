@@ -24,12 +24,16 @@
         params.has('token') ||
         params.has('inscription');
       const opusHandoff = params.has('handoff') || params.has('handoffId');
+      // Public views (any wallet, showcases, curated galleries) belong to the
+      // Xplorer; the My Wallet page is reserved for the connected wallet.
+      const publicView =
+        params.has('wallet') || params.has('showcase') || params.has('gallery');
       let page = 'home';
       if (seg === 'inscribe' || opusHandoff) {
         page = 'inscribe';
-      } else if (seg === 'my-wallet' || seg === 'wallet' || params.has('wallet')) {
+      } else if (seg === 'my-wallet' || seg === 'wallet') {
         page = 'my-wallet';
-      } else if (seg === 'xplorer' || seg === 'x' || explorerQuery) {
+      } else if (seg === 'xplorer' || seg === 'x' || explorerQuery || publicView) {
         page = 'xplorer';
       }
       document.documentElement.dataset.page = page;
@@ -47,6 +51,7 @@
 </head>
 <body class="intro-mode">
   <div class="shell">
+    <div class="site-header" id="siteHeader">
     <header class="topbar">
       <div class="brand-wrap">
         <a class="brand" href="/" aria-label="Xtrata home">
@@ -72,7 +77,9 @@
       <a href="/xplorer" data-nav="xplorer" target="_self">Xplorer</a>
       <a href="/my-wallet" data-nav="my-wallet" target="_self">My Wallet</a>
       <a href="/wizard/" data-nav="wizard" target="_self">Inscription Wizard</a>
+      <div class="radio-slot" id="radioSlot" aria-label="Xtrata FM radio"></div>
     </nav>
+    </div>
 
     <!-- Modes shelf: SUNO More (AI Music Permanence) + Forever Twins (On-Chain Legacy) — matched cards -->
     <div class="modes">
@@ -115,8 +122,9 @@
         <p class="registry-lead" id="registryIntroLead">Create and hold durable records for songs, masters, artwork, credits, documents, apps, and collaboration history, anchored to Bitcoin through Stacks.</p>
         <div class="registry-intro-actions">
           <button class="btn" id="introConnectButton" type="button">Connect wallet</button>
+          <a class="btn" id="introMyWalletLink" href="/my-wallet" target="_self" hidden>Open My Wallet</a>
           <button class="btn secondary" id="introPrepareButton" type="button">Inscribe a file</button>
-          <a class="btn secondary" href="/my-wallet" target="_self">Explore examples</a>
+          <a class="btn secondary" href="#homeExamples">Explore examples</a>
         </div>
         <div class="registry-footnotes" aria-label="Registry qualities">
           <p class="registry-note"><strong>Permanent backups</strong>Keep rich media and metadata where the reference can keep working.</p>
@@ -176,6 +184,18 @@
         <p class="page-card__copy">Your inscriptions in one grid — view, send, and look up any wallet or .btc name.</p>
         <span class="page-card__cta">Open My Wallet →</span>
       </a>
+    </section>
+
+    <!-- Example views: open in the Xplorer (home page only). -->
+    <section class="home-examples" id="homeExamples" aria-label="Example views">
+      <span class="home-examples__label">View examples</span>
+      <a class="wallet-example-chip" href="/xplorer?wallet=dyle.btc&amp;sel=296" target="_self" title="Early Stacks-native art inscriptions by DYLE.">Art by DYLE</a>
+      <a class="wallet-example-chip" href="/xplorer?gallery=jim-music" target="_self" title="Early on-chain music, audio, samples, stems, and songs.">Music by Various</a>
+      <a class="wallet-example-chip" href="/xplorer?gallery=code-various" target="_self" title="Early code inscriptions and recursive Web3 experiments.">Code by Various</a>
+      <a class="wallet-example-chip" href="/xplorer?gallery=agent-27" target="_self" title="Early autonomous agent memory inscriptions.">Agent 27</a>
+      <a class="wallet-example-chip" href="/xplorer?gallery=v1-origins" target="_self" title="The original Xtrata core, xtrata-v1-1-1.">v1 origins</a>
+      <a class="wallet-example-chip" href="/xplorer?gallery=stacksboard" target="_self" title="The Stacksboard inscription.">Stacksboard</a>
+      <a class="wallet-example-chip" href="/xplorer" target="_self" title="Newest inscriptions from the active Xtrata core.">Latest</a>
     </section>
 
     <main class="workspace">
@@ -347,19 +367,22 @@
         <div class="panel-body">
           <div class="wallet-layout">
             <div class="wallet-controls">
-              <form class="wallet-browser" id="walletLookupForm">
-                <label class="field">
-                  <span class="label">View wallet</span>
-                  <div class="field-inline">
-                    <div class="wallet-lookup-control" id="walletLookupControl">
-                      <input class="input" id="walletLookupInput" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="name or SP..." />
-                      <span class="wallet-lookup-suffix" aria-hidden="true">.btc</span>
+              <details class="wallet-lookup-details" id="walletLookupDetails">
+                <summary>Look up any wallet or .btc name</summary>
+                <form class="wallet-browser" id="walletLookupForm">
+                  <label class="field">
+                    <span class="label">View wallet</span>
+                    <div class="field-inline">
+                      <div class="wallet-lookup-control" id="walletLookupControl">
+                        <input class="input" id="walletLookupInput" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="name or SP..." />
+                        <span class="wallet-lookup-suffix" aria-hidden="true">.btc</span>
+                      </div>
+                      <button class="btn ghost" id="walletLookupButton" type="submit">View</button>
                     </div>
-                    <button class="btn ghost" id="walletLookupButton" type="submit">View</button>
-                  </div>
-                  <span class="field-note" id="walletLookupStatus">Using connected wallet when available.</span>
-                </label>
-              </form>
+                    <span class="field-note" id="walletLookupStatus">Using connected wallet when available.</span>
+                  </label>
+                </form>
+              </details>
               <div class="wallet-examples" id="walletExamples" aria-label="Example wallet views">
                 <span>View Examples</span>
 

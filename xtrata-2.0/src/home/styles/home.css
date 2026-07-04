@@ -3887,3 +3887,226 @@
         white-space: nowrap;
       }
     }
+
+    /* ==================================================================
+       Sticky site header — topbar + nav + docked radio stay visible while
+       scrolling. Baseline is slimmer than the old header; past ~24px of
+       scroll it condenses further (.is-condensed, toggled in main.js).
+       ================================================================== */
+
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 90;
+      background: var(--bg);
+      transition: box-shadow 0.25s ease;
+    }
+
+    .site-header .topbar {
+      min-height: 78px;
+      transition: min-height 0.25s ease;
+    }
+
+    .site-header .brand {
+      font-size: 22px;
+      gap: 12px;
+      transition: font-size 0.25s ease;
+    }
+
+    .site-header .brand-logo {
+      width: clamp(48px, 4.5vw, 64px);
+      height: clamp(48px, 4.5vw, 64px);
+      flex-basis: clamp(48px, 4.5vw, 64px);
+      transition: width 0.25s ease, height 0.25s ease, flex-basis 0.25s ease;
+    }
+
+    .site-header .connected-readout__label {
+      margin-bottom: 2px;
+      font-size: 10px;
+    }
+
+    .site-header .connected-readout__value {
+      font-size: clamp(17px, 2.2vw, 26px);
+      transition: font-size 0.25s ease;
+    }
+
+    .site-header .connected-readout__address {
+      margin-top: 3px;
+      font-size: 11px;
+    }
+
+    .site-header.is-condensed {
+      box-shadow: 0 10px 26px rgba(12, 20, 16, 0.18);
+    }
+
+    .site-header.is-condensed .topbar {
+      min-height: 50px;
+    }
+
+    .site-header.is-condensed .brand {
+      font-size: 16px;
+      gap: 8px;
+    }
+
+    .site-header.is-condensed .brand-logo {
+      width: 28px;
+      height: 28px;
+      flex-basis: 28px;
+    }
+
+    .site-header.is-condensed .connected-readout__label,
+    .site-header.is-condensed .connected-readout__address {
+      display: none;
+    }
+
+    .site-header.is-condensed .connected-readout__value {
+      font-size: 15px;
+    }
+
+    .site-header.is-condensed .top-actions .btn {
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+
+    .site-header.is-condensed .site-nav a {
+      padding: 5px 10px;
+    }
+
+    /* Docked radio pill sits at the right end of the nav row. */
+    .site-header .site-nav {
+      display: flex;
+      align-items: center;
+    }
+
+    .radio-slot {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      padding: 0 0 4px 10px;
+      min-width: 0;
+    }
+
+    /* ==================================================================
+       My Wallet / Xplorer rework:
+       - lookup + example chips leave My Wallet (examples live on the home
+         strip and open in the Xplorer; lookup collapses into the Xplorer)
+       - My Wallet shows the full 4x4 grid on screen, preview to the right
+       ================================================================== */
+
+    .wallet-lookup-details {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-soft);
+      margin-bottom: 12px;
+    }
+
+    .wallet-lookup-details > summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 9px 12px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--muted);
+      user-select: none;
+    }
+
+    .wallet-lookup-details > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .wallet-lookup-details > summary::before {
+      content: '▸';
+      display: inline-block;
+      margin-right: 8px;
+      transition: transform 0.15s ease;
+    }
+
+    .wallet-lookup-details[open] > summary::before {
+      transform: rotate(90deg);
+    }
+
+    .wallet-lookup-details[open] > summary {
+      color: var(--ink);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .wallet-lookup-details > form {
+      margin: 10px 12px 12px;
+    }
+
+    /* My Wallet: personal ledger only — no lookup, no example chips. */
+    :root[data-page='my-wallet'] .wallet-lookup-details,
+    :root[data-page='my-wallet'] .wallet-examples {
+      display: none;
+    }
+
+    /* My Wallet: cap the grid column against the viewport so all 16 squares
+       are visible at once, with the preview beside them. */
+    :root[data-page='my-wallet'] .wallet-layout {
+      grid-template-columns:
+        minmax(0, clamp(320px, calc(100vh - 300px), 560px))
+        minmax(300px, 1fr);
+      gap: 18px;
+      justify-content: center;
+      align-items: start;
+    }
+
+    :root[data-page='my-wallet'] .token-preview {
+      position: sticky;
+      top: 104px;
+    }
+
+    @media (max-width: 900px) {
+      :root[data-page='my-wallet'] .wallet-layout {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      :root[data-page='my-wallet'] .token-preview {
+        position: static;
+      }
+    }
+
+    /* Xplorer: the lookup lives here, collapsed (beats the explorer-mode
+       display:none on .wallet-browser via higher specificity). */
+    :root[data-page='xplorer'] .wallet-lookup-details {
+      display: block;
+      margin: 0 0 12px;
+    }
+
+    :root[data-page='xplorer'] .wallet-lookup-details .wallet-browser {
+      display: block;
+    }
+
+    /* Home examples strip: chips link into the Xplorer. */
+    .home-examples {
+      display: none;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding-top: 16px;
+    }
+
+    :root[data-page='home'] .home-examples {
+      display: flex;
+    }
+
+    .home-examples__label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-right: 4px;
+    }
+
+    a.wallet-example-chip {
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    /* Xplorer keeps its surface clean when a wallet/gallery view is open
+       (explorer-mode class off): chips stay home-only. */
+    :root[data-page='xplorer'] .wallet-examples {
+      display: none;
+    }
