@@ -13,6 +13,14 @@
 /x-board/:version /recursive-apps/x-board/xboard-version-testing/:version.html 200
 /x-board/:version.html /recursive-apps/x-board/xboard-version-testing/:version.html 200
 /x/* / 200
+/xplorer / 200
+/xplorer/ / 200
+/inscribe / 200
+/inscribe/ / 200
+/my-wallet / 200
+/my-wallet/ / 200
+/wallet /my-wallet 301
+/wallet/ /my-wallet 301
 /workspace/* /workspace 200
 /admin /workspace 200
 /admin/* /workspace 200
@@ -23,4 +31,10 @@
 /lab /workspace 200
 /lab/* /workspace 200
 /gallery/* /g/:splat 200
-/manifests /agent-one/manifests 200
+/agent-one /wizard/ 301
+/agent-one/ /wizard/ 301
+/agent-one/* /wizard/:splat 301
+/inscription-wizard /wizard/ 301
+/inscription-wizard/ /wizard/ 301
+/inscription-wizard/* /wizard/:splat 301
+/manifests /wizard/manifests 200

@@ -4,14 +4,14 @@
 
 # SUNO page builds the player with ffmpeg.wasm → needs SharedArrayBuffer → cross-origin isolation.
 # Scoped to /suno only so the main wizard's wallet flow is unaffected.
-/agent-one/suno
+/wizard/suno
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp
-/agent-one/suno.html
+/wizard/suno.html
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp
 
 # Agent One ships its JS under stable filenames (agent-one.js, suno-build.js, HTML_Template.js).
 # Force revalidation so a redeploy is never served from a stale CDN/browser cache.
-/agent-one/*.js
+/wizard/*.js
   Cache-Control: no-cache

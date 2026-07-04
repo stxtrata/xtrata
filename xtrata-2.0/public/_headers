@@ -2,16 +2,19 @@
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp
 
-# SUNO page builds the player with ffmpeg.wasm → needs SharedArrayBuffer → cross-origin isolation.
-# Scoped to /suno only so the main wizard's wallet flow is unaffected.
-/agent-one/suno
+# SUNO page builds the player with ffmpeg.wasm (multithreaded core) → needs
+# SharedArrayBuffer → cross-origin isolation. Scoped to /suno only so the main
+# wizard's wallet flow is unaffected. The main wizard's audio optimiser uses the
+# single-threaded core (@ffmpeg/core-st), which needs no isolation headers.
+/wizard/suno
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp
-/agent-one/suno.html
+/wizard/suno.html
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp
 
-# Agent One ships its JS under stable filenames (agent-one.js, suno-build.js, HTML_Template.js).
-# Force revalidation so a redeploy is never served from a stale CDN/browser cache.
-/agent-one/*.js
+# The wizard ships its JS under stable filenames (agent-one.js, suno-build.js,
+# HTML_Template.js, optimize-audio.js). Force revalidation so a redeploy is
+# never served from a stale CDN/browser cache.
+/wizard/*.js
   Cache-Control: no-cache

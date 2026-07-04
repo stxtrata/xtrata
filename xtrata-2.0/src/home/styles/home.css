@@ -3678,3 +3678,212 @@
       .modes .current-campaign__cta{align-self:flex-start;justify-self:auto;margin:12px 0 0}
       @media (max-width:520px){ .suno-hero,.modes .current-campaign{gap:16px} .suno-hero__logo,.modes .current-campaign__logo{width:104px;height:104px} }
 
+
+    /* ==================================================================
+       Page modes — data-page router (set pre-paint in index.html <head>).
+       One shell, four pages: home / inscribe / xplorer / my-wallet.
+       Appended last so these rules win specificity ties with mode classes
+       like body.has-ledger / body.intro-mode.
+       ================================================================== */
+
+    .site-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 10px 0 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .site-nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      padding: 8px 12px;
+      border: 1px solid transparent;
+      border-bottom: none;
+      border-radius: var(--radius) var(--radius) 0 0;
+    }
+
+    .site-nav a:hover {
+      color: var(--ink);
+      background: var(--ghost-hover);
+    }
+
+    :root[data-page='home'] .site-nav a[data-nav='home'],
+    :root[data-page='inscribe'] .site-nav a[data-nav='inscribe'],
+    :root[data-page='xplorer'] .site-nav a[data-nav='xplorer'],
+    :root[data-page='my-wallet'] .site-nav a[data-nav='my-wallet'] {
+      color: var(--ink);
+      background: var(--panel);
+      border-color: var(--line);
+    }
+
+    /* Landing cards (home only) */
+    .page-cards {
+      display: none;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      padding-top: 18px;
+    }
+
+    :root[data-page='home'] .page-cards {
+      display: grid;
+    }
+
+    .page-card {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      text-decoration: none;
+      color: var(--ink);
+      box-shadow: var(--shadow);
+      transition: border-color 0.15s ease, transform 0.15s ease;
+    }
+
+    .page-card:hover {
+      border-color: var(--line-strong);
+      transform: translateY(-2px);
+    }
+
+    .page-card__kicker {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--green);
+    }
+
+    .page-card__title {
+      font-size: 17px;
+    }
+
+    .page-card__copy {
+      margin: 0;
+      font-size: 12.5px;
+      line-height: 1.5;
+      color: var(--muted);
+      flex: 1;
+    }
+
+    .page-card__cta {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--green);
+    }
+
+    /* Home: landing only — hide the workspace panels. */
+    :root[data-page='home'] .workspace {
+      display: none;
+    }
+
+    /* Inscribe: the inscribe panel alone, centred. */
+    :root[data-page='inscribe'] .modes,
+    :root[data-page='inscribe'] .registry-intro,
+    :root[data-page='inscribe'] .page-cards,
+    :root[data-page='inscribe'] .homepage-docs,
+    :root[data-page='inscribe'] .panel[aria-labelledby='walletTitle'] {
+      display: none;
+    }
+
+    :root[data-page='inscribe'] .workspace {
+      grid-template-columns: minmax(0, 720px);
+      justify-content: center;
+    }
+
+    /* My Wallet: the wallet/ledger panel alone, full width. */
+    :root[data-page='my-wallet'] .modes,
+    :root[data-page='my-wallet'] .registry-intro,
+    :root[data-page='my-wallet'] .page-cards,
+    :root[data-page='my-wallet'] .homepage-docs,
+    :root[data-page='my-wallet'] .panel[aria-labelledby='inscribeTitle'] {
+      display: none;
+    }
+
+    :root[data-page='my-wallet'] .workspace {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* Xplorer: body.explorer-mode does the detailed styling once JS runs;
+       these pre-paint rules stop the landing content flashing first. */
+    :root[data-page='xplorer'] .modes,
+    :root[data-page='xplorer'] .registry-intro,
+    :root[data-page='xplorer'] .page-cards,
+    :root[data-page='xplorer'] .homepage-docs,
+    :root[data-page='xplorer'] .panel[aria-labelledby='inscribeTitle'] {
+      display: none;
+    }
+
+    :root[data-page='xplorer'] .workspace {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* Collapsible advanced sections in the inscribe form */
+    .inscribe-details {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-soft);
+    }
+
+    .inscribe-details > summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 10px 12px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--muted);
+      user-select: none;
+    }
+
+    .inscribe-details > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .inscribe-details > summary::before {
+      content: '▸';
+      display: inline-block;
+      margin-right: 8px;
+      transition: transform 0.15s ease;
+    }
+
+    .inscribe-details[open] > summary::before {
+      transform: rotate(90deg);
+    }
+
+    .inscribe-details[open] > summary {
+      color: var(--ink);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .inscribe-details > *:not(summary) {
+      margin: 12px;
+    }
+
+    .inscribe-details .relationship-panel {
+      border: none;
+      background: transparent;
+      padding: 0;
+    }
+
+    .inscribe-wizard-note {
+      margin-top: 4px;
+      font-size: 12.5px;
+    }
+
+    .inscribe-wizard-note a {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    @media (max-width: 760px) {
+      .site-nav {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        white-space: nowrap;
+      }
+    }

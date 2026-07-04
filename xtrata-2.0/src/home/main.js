@@ -204,6 +204,16 @@
 
     const $ = (id) => document.getElementById(id);
 
+    // Page mode classified pre-paint by the router script in index.html <head>.
+    // 'home' | 'inscribe' | 'xplorer' | 'my-wallet' — controls which panels are
+    // visible (CSS) and which data loads run at boot (see initialize()). All
+    // other behaviour (wallet session, explorer mode, galleries) is unchanged.
+    const PAGE_MODE = document.documentElement.dataset.page || 'home';
+
+    // Set once the prepare handler exists; lets setSelectedFile auto-prepare a
+    // freshly dropped file so the default flow is drop → (prepared) → inscribe.
+    let autoPrepareHook = null;
+
     const dom = {
       themeSelect: $('themeSelect'),
       refreshWalletButton: $('refreshWalletButton'),
@@ -9045,6 +9055,15 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         dom.dropzoneText.textContent = 'Choose file or drop it here';
       }
       renderPreparedState();
+      if (file && autoPrepareHook && !state.busy) {
+        // Railroad the default flow: a dropped file is prepared immediately,
+        // so the only remaining decision is "Start inscription".
+        window.setTimeout(() => {
+          if (state.selectedFile === file && !state.busy && !state.prepared) {
+            void autoPrepareHook();
+          }
+        }, 0);
+      }
     };
 
     // Manual recovery. If a wallet transaction is cancelled or fails — in
@@ -9301,6 +9320,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const initialize = async () => {
       applyTheme(loadTheme());
       setExplorerModeFromRequest();
+      if (!state.explorerMode && PAGE_MODE === 'xplorer') {
+        // /xplorer always lands in the explorer, even when the URL carried no
+        // usable token id (e.g. /x/not-a-number falls back to the latest page).
+        state.explorerMode = true;
+      }
       dom.tokenUriInput.value = DEFAULT_TOKEN_URI;
       void updateTokenUriHeadPreview();
       dom.walletLookupInput.value = '';
@@ -9325,11 +9349,16 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           ?.trim();
         if (requestedWallet) {
           await viewWalletByAddress(requestedWallet);
-        } else if (walletViewRequestId === state.walletViewRequestId && !consumedHandoff) {
-          // Default homepage view:
+        } else if (
+          PAGE_MODE === 'my-wallet' &&
+          walletViewRequestId === state.walletViewRequestId &&
+          !consumedHandoff
+        ) {
+          // Default My Wallet view (home and inscribe skip the grid preload —
+          // their pages hide the wallet panel):
           //  - a connected wallet WITH inscriptions → its own latest inscriptions;
           //  - no wallet, or a connected-but-empty wallet → Music by Various,
-          //    so there's always something to play on load.
+          //    so there's always something to browse on load.
           let openedOwnWallet = false;
           if (state.walletSession.isConnected && state.walletSession.address) {
             await loadWalletInscriptions();
@@ -9352,11 +9381,22 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     dom.connectButton.addEventListener('click', connectWallet);
     dom.introConnectButton?.addEventListener('click', connectWallet);
     dom.introPrepareButton?.addEventListener('click', () => {
+      if (PAGE_MODE !== 'inscribe') {
+        window.location.href = '/inscribe';
+        return;
+      }
       document.getElementById('inscribeTitle')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       dom.nameInput?.focus();
     });
     dom.disconnectButton.addEventListener('click', disconnectWallet);
-    dom.viewInscriptionsButton.addEventListener('click', scrollToWalletGrid);
+    dom.viewInscriptionsButton.addEventListener('click', () => {
+      if (PAGE_MODE === 'home' || PAGE_MODE === 'inscribe') {
+        // The wallet grid lives on its own page now.
+        window.location.href = '/my-wallet';
+        return;
+      }
+      scrollToWalletGrid();
+    });
     dom.backToGridButton.addEventListener('click', scrollToWalletGrid);
     dom.refreshWalletButton.addEventListener('click', loadWalletInscriptions);
     dom.explorerJumpButton?.addEventListener('click', () => {
@@ -9570,7 +9610,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       state.walletPageIndex += 1;
       await loadWalletPage();
     });
-    dom.prepareButton.addEventListener('click', async () => {
+    const runPrepare = async () => {
       setBusy(true);
       try {
         await preparePayload();
@@ -9581,7 +9621,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       } finally {
         setBusy(false);
       }
-    });
+    };
+    autoPrepareHook = runPrepare;
+    dom.prepareButton.addEventListener('click', runPrepare);
     dom.inscribeButton.addEventListener('click', runInscription);
     dom.resetInscriberButton.addEventListener('click', resetInscriberFlow);
     dom.clearInscriberButton.addEventListener('click', clearInscriberPanel);
