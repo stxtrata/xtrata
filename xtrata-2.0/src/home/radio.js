@@ -474,9 +474,11 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
           shareable = false;
           radioLog(`resolve #${tokenId}`, 'app shell answered the content route — transient, no verdict', tokenId);
         } else if (!match) {
-          // real inscribed html without embedded audio: skip it this session,
-          // but do not brand it forever (extraction rules may improve)
-          shareable = false;
+          // real inscribed html with no embedded audio: inscriptions are
+          // immutable, so this verdict is stable — persist and share it, or
+          // every session (and every listener) re-grinds the same non-player
+          // html at the head of the chain in order mode.
+          dudReason = 'html-no-audio';
         }
         if (match) {
           const titleMatch = html.match(/<title>([^<]*)<\/title>/i);
@@ -865,7 +867,12 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
       const pool = sequentialPool();
       if (pool.length) {
         const cur = currentTokenId ? String(currentTokenId) : null;
-        const start = cur ? pool.indexOf(cur) : -1;
+        // Fresh power-on (nothing playing): seed the running order at a RANDOM
+        // position. The head of the chain is dense with non-song inscriptions,
+        // so walking from index 0 burned every tune attempt on duds; starting
+        // anywhere keeps in-order behaviour (walk onward from the seed) while
+        // giving each session a different playlist.
+        const start = cur ? pool.indexOf(cur) : Math.floor(Math.random() * pool.length) - 1;
         const playableCount = pool.reduce((n, id) => n + (trackCache.get(id) === null ? 0 : 1), 0);
         const walk = (skipPlayed) => {
           for (let step = 1; step <= pool.length; step += 1) {
@@ -995,6 +1002,24 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
     } catch { /* best-effort */ }
   };
 
+  // Power-on readiness: keep working in the background (with backoff) until
+  // at least one resolved song sits cued in the queue, so the first press of
+  // the power switch always has something buffered and ready to play.
+  let readinessDelay = 3000;
+  let readinessTimer = 0;
+  const ensureCued = () => {
+    if (preloadQueue.length > 0) { readinessDelay = 3000; return; }
+    if (readinessTimer) return;
+    readinessTimer = window.setTimeout(() => {
+      readinessTimer = 0;
+      if (!preloadQueue.length) {
+        radioLog('readiness: nothing cued yet — retrying preload', { nextDelayMs: readinessDelay });
+        void preloadNextTrack();
+      }
+    }, readinessDelay);
+    readinessDelay = Math.min(60000, readinessDelay * 2);
+  };
+
   const preloadNextTrack = async () => {
     if (preloading) return;
     preloading = true;
@@ -1017,6 +1042,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
       }
     } finally {
       preloading = false;
+      ensureCued();
     }
   };
 
