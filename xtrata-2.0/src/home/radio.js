@@ -542,6 +542,10 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
   let likes = loadLikes();                 // [{tokenId,title,artist,likedAt}]
   let band = 'fm';                         // 'fm' | 'liked' | 'chain'
   let preset = 'all';                      // within FM: 'music' | 'all'
+  // Shuffle is OFF by default: the dial plays in order (likes/curated/chain
+  // sequence per band). Neither shuffle nor loop persists across visits —
+  // the heart (likes) is the only remembered button.
+  let shuffleMode = false;
   const listeners = new Set();
   let nowPlaying = null;                   // {tokenId,title,artist,cover}
   // One canonical snapshot everywhere (emit / getState / subscribe), including
@@ -550,7 +554,9 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
   const stateSnapshot = () => ({
     on,
     playing: on && !player.paused && !player.ended,
-    band, preset, nowPlaying, likes: likes.slice(), volumeStep
+    band, preset, nowPlaying, likes: likes.slice(), volumeStep,
+    shuffle: shuffleMode,
+    loop: player.loop
   });
   const emit = () => {
     const snapshot = stateSnapshot();
@@ -582,8 +588,9 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
     persistExtras();
     if (on) {
       writeScreen(band === 'fm' ? 'BAND: FM — CURATED + CHAIN' : band === 'liked' ? (likes.length ? 'BAND: LIKED — YOUR STATION' : 'BAND: LIKED — NO SONGS SAVED YET (♥ TO ADD)') : 'BAND: CHAIN — FULL EXPLORATION');
-      player.pause();
-      void tuneToNextTrack();
+      sectionTimers.push(window.setTimeout(() => { if (currentTrackInfo) tickerStep(); }, 1600));
+      // The current song keeps playing — only what's CUED changes.
+      requeueForMode();
     }
     emit();
   };
@@ -594,7 +601,34 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
     persistExtras();
     if (on) {
       writeScreen(preset === 'music' ? 'PRESET: MUSIC — CURATED ONLY' : 'PRESET: ALL — CURATED + DISCOVERY');
-      if (band === 'fm') { player.pause(); void tuneToNextTrack(); }
+      sectionTimers.push(window.setTimeout(() => { if (currentTrackInfo) tickerStep(); }, 1600));
+      requeueForMode(); // current song keeps playing; the queue re-cues
+    }
+    emit();
+  };
+
+  // Flush songs preloaded under the previous mode and cue fresh ones, WITHOUT
+  // touching the song that's currently on air.
+  function requeueForMode() {
+    preloadQueue.length = 0;
+    window.setTimeout(() => { void preloadNextTrack(); }, 150);
+  }
+
+  const setShuffle = (nextOn) => {
+    shuffleMode = Boolean(nextOn);
+    if (on) {
+      writeScreen(shuffleMode ? 'SHUFFLE: ON — RANDOM PICKS' : 'SHUFFLE: OFF — IN ORDER');
+      sectionTimers.push(window.setTimeout(() => { if (currentTrackInfo) tickerStep(); }, 1600));
+      requeueForMode();
+    }
+    emit();
+  };
+
+  const setLoop = (nextOn) => {
+    player.loop = Boolean(nextOn);
+    if (on) {
+      writeScreen(player.loop ? 'LOOP: THIS SONG' : 'LOOP: OFF');
+      sectionTimers.push(window.setTimeout(() => { if (currentTrackInfo) tickerStep(); }, 1600));
     }
     emit();
   };
@@ -725,9 +759,45 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
   } catch { /* conservative default: stays false until a click */ }
 
   let forcedNext = null;
+  // Ordered pool for shuffle-OFF playback: liked band follows your saved list;
+  // FM plays the curated order (then known chain songs ascending, preset ALL);
+  // CHAIN walks every known song by ascending id.
+  const sequentialPool = () => {
+    if (band === 'liked') return likes.map((l) => String(l.tokenId));
+    const known = knownPool.slice().sort((a, b) => Number(a) - Number(b));
+    if (band === 'chain') return known;
+    if (preset === 'music') return playlist.slice();
+    const curatedSet = new Set(playlist);
+    return [...playlist, ...known.filter((id) => !curatedSet.has(id))];
+  };
+
   const pickNext = () => {
     let choice;
     if (forcedNext) { choice = forcedNext; forcedNext = null; recent.push(choice); if (recent.length > 8) recent.shift(); return choice; }
+    if (!shuffleMode) {
+      // IN-ORDER MODE: continue from the current song's position, skipping
+      // known duds; wrap at the end. No random lottery, no no-repeat memory —
+      // a fixed order cycles naturally.
+      const pool = sequentialPool();
+      if (pool.length) {
+        const cur = currentTokenId ? String(currentTokenId) : null;
+        const start = cur ? pool.indexOf(cur) : -1;
+        for (let step = 1; step <= pool.length; step += 1) {
+          const candidate = pool[(start + step) % pool.length];
+          if (trackCache.get(candidate) === null) continue;
+          if (candidate === cur && pool.length > 1) continue;
+          choice = candidate;
+          break;
+        }
+      }
+      if (choice) {
+        recent.push(choice);
+        if (recent.length > 8) recent.shift();
+        return choice;
+      }
+      // nothing playable in order (e.g. empty liked list) — fall through to
+      // the random logic below rather than going silent
+    }
     // Band routing: LIKED = your station only; CHAIN = pure exploration;
     // FM = curated (+ discovery unless preset MUSIC).
     if (band === 'liked' && likes.length) {
@@ -1185,8 +1255,8 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
     void resume();
   }
 
-  if (saved && BANDS.includes(saved.band)) band = saved.band;
-  if (saved && PRESETS.includes(saved.preset)) preset = saved.preset;
+  // Band/preset/shuffle/loop deliberately reset every visit — the heart
+  // (your liked songs) is the only control that remembers.
 
   // Public API for the full-screen /radio page (and anything else).
   const api = {
@@ -1203,6 +1273,8 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
     isLiked: () => (nowPlaying ? isLiked(nowPlaying.tokenId) : false),
     getLikes: () => likes.slice(),
     cycleBand, setBand, cyclePreset,
+    setShuffle, toggleShuffle: () => setShuffle(!shuffleMode),
+    setLoop, toggleLoop: () => setLoop(!player.loop),
     getState: () => stateSnapshot(),
     unlike: (id) => { likes = likes.filter((l) => l.tokenId !== String(id)); saveLikes(likes); emit(); },
     playToken: (id) => { forcedNext = String(id); if (!on) { switchOn(); } else { player.pause(); void tuneToNextTrack(); } },
@@ -1245,17 +1317,8 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
   faceBtn('play').addEventListener('click', (event) => { event.stopPropagation(); api.playPause(); });
   faceBtn('heart').addEventListener('click', (event) => { event.stopPropagation(); toggleLike(); });
   faceBtn('playlist').addEventListener('click', (event) => { event.stopPropagation(); setBand(band === 'liked' ? 'fm' : 'liked'); });
-  faceBtn('shuffle').addEventListener('click', (event) => { event.stopPropagation(); cyclePreset(); });
-
-  let looping = false;
-  faceBtn('repeat').addEventListener('click', (event) => {
-    event.stopPropagation();
-    looping = !looping;
-    player.loop = looping;
-    faceBtn('repeat').classList.toggle('is-lit', looping);
-    writeScreen(looping ? 'LOOP: THIS SONG' : 'LOOP: OFF');
-    sectionTimers.push(window.setTimeout(() => { if (currentTrackInfo) tickerStep(); }, 1400));
-  });
+  faceBtn('shuffle').addEventListener('click', (event) => { event.stopPropagation(); setShuffle(!shuffleMode); });
+  faceBtn('repeat').addEventListener('click', (event) => { event.stopPropagation(); setLoop(!player.loop); });
 
   // band / preset pots: discrete positions, click to cycle
   const bandCore = root.querySelector('.xtrata-radio__pot--band .xtrata-radio__potcore');
@@ -1271,7 +1334,8 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
   const renderFace = (snap) => {
     faceBtn('heart').classList.toggle('is-lit', Boolean(snap.nowPlaying && isLiked(snap.nowPlaying.tokenId)));
     faceBtn('playlist').classList.toggle('is-lit', snap.band === 'liked');
-    faceBtn('shuffle').classList.toggle('is-lit', snap.preset === 'all');
+    faceBtn('shuffle').classList.toggle('is-lit', Boolean(snap.shuffle));
+    faceBtn('repeat').classList.toggle('is-lit', Boolean(snap.loop));
     root.classList.toggle('is-playing', Boolean(snap.playing));
     renderPots();
   };
