@@ -93,8 +93,11 @@
   position: absolute;
   top: 0;
   right: 0;
-  bottom: 0;
   height: 100%;
+  /* explicit square: display height = 18.65% of stage height = 14.02cqw of
+     stage width. iOS Safari mis-sizes aspect-ratio on abs-positioned boxes,
+     so the width is stated outright (aspect-ratio kept as fallback). */
+  width: 14.02cqw;
   aspect-ratio: 1 / 1;
   border-radius: 0 7px 7px 0;   /* nests into the display's rounded border */
   overflow: hidden;
