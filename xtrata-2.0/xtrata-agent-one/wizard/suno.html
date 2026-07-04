@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>SUNO More — do more with your Suno music · Xtrata Agent One</title>
+<title>SUNO More — do more with your Suno music · Xtrata Inscription Wizard</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="apple-touch-icon" href="/favicons/xtrata-apple-touch-icon.png" />
 <style>
@@ -71,7 +71,7 @@
 <body>
 <header>
   <img src="favicon.svg" alt="Xtrata" style="width:28px;height:28px;border-radius:7px;flex:none" />
-  <div class="logo"><b>XTRATA</b> <i>Agent One</i> · SUNO More</div>
+  <div class="logo"><b>XTRATA</b> <i>Inscription Wizard</i> · SUNO More</div>
   <div class="spacer"></div>
   <span id="health" class="pill">connecting…</span>
   <span id="walletAddr" class="pill" style="display:none;cursor:pointer;color:var(--ok);border-color:#1f5a45" title="connected wallet — click to show & copy the address"></span>
@@ -165,17 +165,20 @@
 <script src="agent-one.js?v=5"></script>
 <script>
 const SERVER = { mock:false, net:'mainnet' };
-// VERSION HANDSHAKE: this page requires the agent bundle build below. The site's deploy pipeline
-// rebuilds agent-one.js from src/agent-one/*.ts — if that source hasn't been updated, the stale agent
-// is detected here and live inscriptions are blocked (a stale agent burns real miner fees on refund loops).
-const XAO_EXPECTED_BUILD='2026-07-01.5';
+// VERSION HANDSHAKE: this page requires AT LEAST the agent bundle build below. The site's deploy
+// pipeline rebuilds agent-one.js from src/agent-one/*.ts — if that source hasn't been updated, the
+// stale agent is detected here and live inscriptions are blocked (a stale agent burns real miner
+// fees on refund loops). Builds are date-stamped (YYYY-MM-DD.N) so a string compare orders them;
+// a NEWER deployed bundle must pass — requiring an exact match wrongly locked the page out
+// whenever the agent shipped ahead of the page.
+const XAO_MIN_AGENT_BUILD='2026-07-01.5';
 let AGENT_STALE=false;
 function checkAgentBuild(){
   const b=window.XAO_AGENT_BUILD||null;
-  if(b===XAO_EXPECTED_BUILD) return;
+  if(b&&b>=XAO_MIN_AGENT_BUILD) return;
   AGENT_STALE=true;
-  $('#hint').innerHTML='<span class="err">⚠ Outdated agent bundle deployed (build '+esc(b||'pre-versioning')+', page expects '+XAO_EXPECTED_BUILD+'). Live inscriptions are disabled — the deployed agent-one.js is missing the fee-spike + auto-resume fixes. Rebuild/redeploy it, then reload.</span>';
-  console.error('[xao] agent bundle build mismatch:',b,'expected',XAO_EXPECTED_BUILD);
+  $('#hint').innerHTML='<span class="err">⚠ Outdated agent bundle deployed (build '+esc(b||'pre-versioning')+', page needs '+XAO_MIN_AGENT_BUILD+' or newer). Live inscriptions are disabled — the deployed agent-one.js is missing the fee-spike + auto-resume fixes. Rebuild/redeploy it, then reload.</span>';
+  console.error('[xao] agent bundle build too old:',b,'minimum',XAO_MIN_AGENT_BUILD);
 }
 let WALLET=null, FILE=null, PLAYER=null, META=null, EST=null, JOB=null, poll=null, building=false;
 
