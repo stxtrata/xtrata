@@ -77,20 +77,22 @@
   justify-content: space-between;
 }
 
-/* VU sits mid-display, vertically centred, between the text and the art */
+/* VU floats top-centre of the display, in the gap between brand and art */
 .xtrata-radio__display > .xtrata-radio__vu {
-  align-self: center;
+  position: absolute;
+  top: 8%;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 2;
-  flex: none;
 }
 
-/* artwork: the largest square the display allows, flush right */
+/* artwork: the FULL display height as a square, flush right */
 .xtrata-radio__art {
   display: none;
-  height: 100%;
+  align-self: stretch;
+  height: auto;
   aspect-ratio: 1 / 1;
   flex: none;
-  align-self: center;
   border-radius: 6px;
   overflow: hidden;
   border: 1px solid rgba(38,245,255,.35);
@@ -140,12 +142,12 @@
   display: flex;
   align-items: flex-end;
   gap: 2px;
-  height: clamp(6px, 2.4cqw, 12px);
+  height: clamp(6px, 2.6cqw, 22px);
 }
 
 .xtrata-radio__vu i {
   --vu: 0;
-  width: 3px;
+  width: clamp(2px, 0.5cqw, 5px);
   height: 100%;
   border-radius: 1px;
   background: linear-gradient(0deg, var(--cyan), #baf8ff);
