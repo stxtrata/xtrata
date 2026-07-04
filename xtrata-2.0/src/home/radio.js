@@ -366,7 +366,10 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
   const trackCache = new Map(); // tokenId -> { src, title } | null
   // Duds persist across visits so each page load doesn't burn tune attempts
   // re-discovering the same dead ids (a big source of NO SIGNAL runs).
-  const DUDS_KEY = 'xtrata.radio.duds.v1';
+  // v2: v1 could be mass-poisoned by misrouted content responses (the app
+  // shell answering /runtime/content marks EVERY probed id a dud) — discard it.
+  const DUDS_KEY = 'xtrata.radio.duds.v2';
+  try { window.localStorage.removeItem('xtrata.radio.duds.v1'); } catch { /* noop */ }
   try {
     JSON.parse(window.localStorage.getItem(DUDS_KEY) || '[]').forEach((id) => trackCache.set(String(id), null));
   } catch { /* fresh cache */ }
@@ -412,6 +415,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
     ];
     let resolved = null;
     let definitive = true; // network hiccups must stay retryable, not become duds
+    let shareable = true;  // only REAL content verdicts may persist/be reported
     try {
       let response = null;
       let mime = '';
@@ -456,6 +460,19 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
         // both are playable through the audio element.
         // players must embed data:audio — data:video is no longer accepted
         const match = html.match(/<source[^>]+src="(data:audio\/[^"]+)"/i);
+        if (!match && /<script[^>]+src="\//i.test(html)) {
+          // An inscribed player is self-contained; a same-origin <script src="/…">
+          // means this is OUR APP SHELL misrouted onto the content route (vite
+          // dev without functions, SPA fallback). That's no verdict on the
+          // token — treating it as one poisoned entire dud stores.
+          definitive = false;
+          shareable = false;
+          radioLog(`resolve #${tokenId}`, 'app shell answered the content route — transient, no verdict', tokenId);
+        } else if (!match) {
+          // real inscribed html without embedded audio: skip it this session,
+          // but do not brand it forever (extraction rules may improve)
+          shareable = false;
+        }
         if (match) {
           const titleMatch = html.match(/<title>([^<]*)<\/title>/i);
           const artistMatch = html.match(/"artist":\s*"([^"]*)"/);
@@ -481,7 +498,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
     radioLog(`verdict #${tokenId}`, resolved ? { playable: true, src: resolved.src.slice(0, 80), title: resolved.title } : (definitive ? 'DUD' : 'TRANSIENT'), tokenId);
     if (resolved || definitive) {
       trackCache.set(tokenId, resolved);
-      if (!resolved) { persistDud(tokenId); reportVerdict(tokenId, 'dud', 'no-audio'); }
+      if (!resolved && shareable) { persistDud(tokenId); reportVerdict(tokenId, 'dud', 'no-audio'); }
     } else {
       trackCache.delete(tokenId); // transient failure — eligible again next pass
       pingWarm(tokenId); // server reconstructs it into R2 for the retry
