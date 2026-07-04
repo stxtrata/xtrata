@@ -1302,7 +1302,11 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
       if (!on) switchOn();
       return;
     }
-    if (root.classList.contains('is-min')) { setMin(false); return; }
+    if (root.classList.contains('is-min')) {
+      setMin(false);
+      if (!on) switchOn();   // one tap: open the receiver AND tune in
+      return;
+    }
     if (!on) switchOn();
   };
   displayEl.addEventListener('click', onDisplayTap);
@@ -1384,6 +1388,40 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
       }
     }
   } catch { /* noop */ }
+
+  // --- attract mode: while off, invite the tap ----------------------------
+  // First-ever visitors get the full treatment (pulsing display + cycling
+  // messages); anyone who has tuned in before gets a calm single invitation.
+  const EVER_ON_KEY = 'xtrata.radio.everon';
+  const everOn = () => { try { return window.localStorage.getItem(EVER_ON_KEY) === '1'; } catch { return false; } };
+  const ATTRACT_MESSAGES = [
+    '\u25b6 TAP TO TUNE IN',
+    '\u266a MUSIC LIVE FROM THE CHAIN',
+    'EVERY SONG INSCRIBED FOREVER',
+    '100% ON-CHAIN RADIO'
+  ];
+  let attractSlot = 0;
+  const attractTick = () => {
+    if (on || !screenText) return;        // engine owns the screen while on
+    if (!everOn()) {
+      screenText.textContent = ATTRACT_MESSAGES[attractSlot % ATTRACT_MESSAGES.length];
+      attractSlot += 1;
+    } else if (!screenText.textContent) {
+      screenText.textContent = '\u25b6 TAP TO TUNE IN';
+    }
+  };
+  const applyAttract = () => {
+    const off = !on;
+    root.classList.toggle('is-attract', off);
+    root.classList.toggle('is-attract--strong', off && !everOn());
+    if (off) attractTick();
+  };
+  window.setInterval(() => { if (!on) attractTick(); }, 3600);
+  listeners.add((snap) => {
+    if (snap.on) { try { window.localStorage.setItem(EVER_ON_KEY, '1'); } catch { /* noop */ } }
+    applyAttract();
+  });
+  applyAttract();
 
   window.XtrataRadio = api;
   return api;

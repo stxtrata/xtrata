@@ -3895,11 +3895,22 @@
        ================================================================== */
 
     .site-header {
+      /* The box is height-locked to the EXPANDED size by main.js so condensing
+         never changes document height (prevents scroll feedback oscillation).
+         It stays transparent + click-through; the bars inside carry the
+         background and receive pointer events. */
       position: sticky;
       top: 0;
       z-index: 90;
+      background: transparent;
+      pointer-events: none;
+      overflow: visible;
+    }
+
+    .site-header .topbar,
+    .site-header .site-nav {
       background: var(--bg);
-      transition: box-shadow 0.25s ease;
+      pointer-events: auto;
     }
 
     .site-header .topbar {
@@ -3935,8 +3946,9 @@
       font-size: 11px;
     }
 
-    .site-header.is-condensed {
+    .site-header.is-condensed .site-nav {
       box-shadow: 0 10px 26px rgba(12, 20, 16, 0.18);
+      transition: box-shadow 0.25s ease;
     }
 
     .site-header.is-condensed .topbar {

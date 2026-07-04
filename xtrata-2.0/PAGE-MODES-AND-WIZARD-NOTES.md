@@ -247,3 +247,31 @@ controls fit on screen without scrolling (stacks below 900 px).
 ## Verification (round 3)
 Main build green; vitest **713/713**; id audit clean (102 ids); structural
 greps for smart field / random / back link / classifyPath / popstate all pass.
+
+---
+
+# Round 4 — header condense oscillation fix (2026-07-04)
+
+The condensing header could oscillate when parked near the threshold: shrinking
+the header reduced document height, which pulled `scrollY` back under the
+threshold, which re-expanded the header, which pushed `scrollY` back over it —
+a classic sticky-header feedback loop.
+
+Fix, two independent layers in `main.js` + `home.css`:
+1. **Height lock (the real fix)** — `.site-header`'s layout height is frozen at
+   its EXPANDED size (measured with the class flipped off inside a single frame,
+   so nothing paints mid-measure). Condensing now only shrinks the visible bars
+   inside a constant-height box, so document height — and therefore `scrollY` —
+   can never change as a result of the toggle. The loop is physically
+   impossible. The box is transparent and `pointer-events: none`; the topbar and
+   nav carry the background/shadow and remain clickable, so the reserved strip
+   neither hides nor blocks content scrolling beneath it.
+2. **Hysteresis** — condense above 64 px, expand only below 8 px, so trackpad
+   jitter around a single threshold can't flutter the state.
+
+Re-locks happen on window resize (debounced 150 ms) and via a ResizeObserver on
+the topbar/nav for genuine content changes (connected readout appearing, nav
+wrapping). The observer can't loop: the measurement flip is intra-frame (net
+zero at frame boundaries) and the height write is idempotent.
+
+Verified: build green, vitest 713/713.

@@ -10093,16 +10093,58 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
     // Sticky header: condense after a little scroll so the nav, connected
     // wallet and docked radio stay visible without eating vertical space.
+    //
+    // Oscillation protection (two layers):
+    // 1. The header's LAYOUT height is locked to its expanded size, so
+    //    condensing only shrinks the visible bar inside a constant-height box.
+    //    Document height therefore never changes with the toggle, which makes
+    //    the feedback loop (shrink → scrollY drops → expand → scrollY rises…)
+    //    physically impossible. The box itself is transparent and click-through
+    //    (see CSS), so the reserved space never hides or blocks content.
+    // 2. A hysteresis band (condense above 64px, expand only below 8px) so
+    //    trackpad jitter around a single threshold can't flutter the state.
     const siteHeader = document.getElementById('siteHeader');
     if (siteHeader) {
       let headerCondensed = false;
+      const lockHeaderHeight = () => {
+        // Measure the EXPANDED height (class briefly removed inside one frame
+        // — no paint happens in between) and freeze the box at that size.
+        const wasCondensed = siteHeader.classList.contains('is-condensed');
+        siteHeader.classList.remove('is-condensed');
+        siteHeader.style.height = 'auto';
+        const expandedHeight = siteHeader.offsetHeight;
+        const lockedHeight = `${expandedHeight}px`;
+        if (siteHeader.style.height !== lockedHeight) {
+          siteHeader.style.height = lockedHeight;
+        }
+        siteHeader.classList.toggle('is-condensed', wasCondensed);
+      };
       const syncHeader = () => {
-        const next = window.scrollY > 24;
+        const y = window.scrollY;
+        const next = headerCondensed ? y > 8 : y > 64;
         if (next !== headerCondensed) {
           headerCondensed = next;
           siteHeader.classList.toggle('is-condensed', next);
         }
       };
+      let headerResizeTimer = null;
+      const queueHeaderRelock = () => {
+        if (headerResizeTimer !== null) {
+          window.clearTimeout(headerResizeTimer);
+        }
+        headerResizeTimer = window.setTimeout(lockHeaderHeight, 150);
+      };
+      window.addEventListener('resize', queueHeaderRelock);
+      // Re-lock when the header's CONTENT genuinely changes size (connected
+      // readout appearing, nav wrapping). lockHeaderHeight's class flip is
+      // synchronous within one frame, so it never retriggers the observer.
+      if (typeof ResizeObserver === 'function') {
+        const headerObserver = new ResizeObserver(queueHeaderRelock);
+        siteHeader.querySelectorAll('.topbar, .site-nav').forEach((el) => {
+          headerObserver.observe(el);
+        });
+      }
+      lockHeaderHeight();
       window.addEventListener('scroll', syncHeader, { passive: true });
       syncHeader();
     }
