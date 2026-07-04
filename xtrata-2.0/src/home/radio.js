@@ -346,6 +346,20 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   try {
     JSON.parse(window.localStorage.getItem(DUDS_KEY) || '[]').forEach((id) => trackCache.set(String(id), null));
   } catch { /* fresh cache */ }
+  // Share what this browser learned with every other listener (D1-backed).
+  const reportedVerdicts = new Set();
+  const reportVerdict = (tokenId, verdict, reason) => {
+    const key = String(tokenId) + ':' + verdict;
+    if (reportedVerdicts.has(key)) return;
+    reportedVerdicts.add(key);
+    try {
+      void fetch('/index/verdict', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ contract: PLAYABLE_CONTRACT, tokenId: Number(tokenId), verdict, reason: reason || '' })
+      });
+    } catch { /* advisory only */ }
+  };
   const persistDud = (tokenId) => {
     try {
       const duds = JSON.parse(window.localStorage.getItem(DUDS_KEY) || '[]');
@@ -401,22 +415,23 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
       }
       if (!response) {
         radioLog(`verdict #${tokenId}`, definitive ? 'DUD (no playable content on any core)' : 'TRANSIENT (will retry; warm requested)', tokenId);
-        if (definitive) { trackCache.set(tokenId, null); persistDud(tokenId); }
+        if (definitive) { trackCache.set(tokenId, null); persistDud(tokenId); reportVerdict(tokenId, 'dud', 'no-content'); }
         else trackCache.delete(tokenId);
         return null;
       }
-      if (response.ok && (mime.startsWith('audio/') || mime.startsWith('video/'))) {
-        // Plain audio inscriptions AND movies: the Audio element happily plays
-        // the soundtrack of video containers (webm/mp4), so films join the
-        // station as audio-only broadcasts.
+      if (response.ok && mime.startsWith('audio/')) {
+        // SONGS ONLY: plain audio inscriptions (mp3, opus, weba — including the
+        // films that were re-encoded webm -> weba). Raw video/* is rejected
+        // below: "film audio" mp4s were the main source of silent duds.
         await response.body?.cancel?.();
-        resolved = { src, title: `#${tokenId}${mime.startsWith('video/') ? ' (film audio)' : ''}`, tokenId };
+        resolved = { src, title: `#${tokenId}`, tokenId };
       } else if (response.ok && mime.includes('text/html')) {
         const html = await response.text();
         // Opus players embed their audio as a data: URI on a <source> element.
         // Opus players embed data:audio; some players/films embed data:video —
         // both are playable through the audio element.
-        const match = html.match(/<source[^>]+src="(data:(?:audio|video)\/[^"]+)"/i);
+        // players must embed data:audio — data:video is no longer accepted
+        const match = html.match(/<source[^>]+src="(data:audio\/[^"]+)"/i);
         if (match) {
           const titleMatch = html.match(/<title>([^<]*)<\/title>/i);
           const artistMatch = html.match(/"artist":\s*"([^"]*)"/);
@@ -430,7 +445,10 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
           };
         }
       } else {
+        // A real response with a non-audio, non-html mime (video, image, …)
+        // is a definitive "not a song" — remember and share it.
         await response.body?.cancel?.();
+        radioLog(`verdict #${tokenId}`, `not a song (mime ${mime}) — dud`, tokenId);
       }
     } catch {
       resolved = null;
@@ -439,7 +457,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     radioLog(`verdict #${tokenId}`, resolved ? { playable: true, src: resolved.src.slice(0, 80), title: resolved.title } : (definitive ? 'DUD' : 'TRANSIENT'), tokenId);
     if (resolved || definitive) {
       trackCache.set(tokenId, resolved);
-      if (!resolved) persistDud(tokenId);
+      if (!resolved) { persistDud(tokenId); reportVerdict(tokenId, 'dud', 'no-audio'); }
     } else {
       trackCache.delete(tokenId); // transient failure — eligible again next pass
       pingWarm(tokenId); // server reconstructs it into R2 for the retry
@@ -624,6 +642,9 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
       const response = await fetch('/index/playable?contract=' + encodeURIComponent(PLAYABLE_CONTRACT));
       if (!response.ok) return;
       const data = await response.json();
+      // Pre-seed the dud cache with community-reported unplayables so this
+      // browser never wastes a tune attempt rediscovering them.
+      (data.duds || []).forEach((id) => trackCache.set(String(id), null));
       const ids = [...(data.audio || []), ...(data.html || [])].map(String);
       if (!ids.length) return;
       const hadPool = knownSet.size > 0;
