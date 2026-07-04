@@ -232,8 +232,14 @@
   <section class="card" id="batchCard" hidden>
     <h3>Batch — one payment, <span id="batchCount">0</span> inscriptions, one receipt</h3>
     <div class="hint">Every file below inscribes from a single deposit. Parents (yours, escrowed &amp; returned) can link to every item; deps can reference earlier rows as <span class="mono">@0, @1…</span> A single on-chain receipt records the whole batch.</div>
-    <table style="width:100%"><thead><tr><th style="width:26px">#</th><th>File</th><th style="width:26%">URI</th><th style="width:15%">Deps</th><th style="width:13%">Parents</th><th style="width:30px"></th></tr></thead>
-      <tbody id="batchBody"></tbody></table>
+    <div id="batchAudioMode" hidden style="margin:6px 0 10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px">
+      <div style="font-weight:700;font-size:13px;margin-bottom:6px">🎵 Audio files detected — how should they go on-chain?</div>
+      <label class="checkline"><input type="radio" name="bAudioMode" value="raw" checked><span>Inscribe the audio files as they are</span></label>
+      <label class="checkline"><input type="radio" name="bAudioMode" value="player"><span><b>Build an on-chain player for each song</b> — Opus-optimised audio + title/artist/lyrics + its own artwork (the opus-tool player, per track)</span></label>
+      <div class="muted" id="batchPlayerHint" hidden style="font-size:11.5px;margin-top:6px">Give each song artwork below: attach an image file (embedded in the player) <b>or</b> enter an image inscription id (recursive artwork — zero extra bytes). Songs with embedded cover art use it automatically.</div>
+    </div>
+    <div id="batchTableWrap"></div>
+    <input id="batchArtPicker" type="file" accept="image/*" hidden />
     <div class="btnrow" style="margin-top:8px">
       <button class="btn ghost" id="batchAddBtn" style="padding:6px 12px">+ Add files</button>
       <span class="muted" style="font-size:11.5px;align-self:center">max 40 items · audio is inscribed as dropped (use the SUNO page to pre-build players)</span>
@@ -470,29 +476,110 @@ function mimeFor(name){ const ext=(name.split('.').pop()||'').toLowerCase();
 function catFor(name){ const ext=(name.split('.').pop()||'').toLowerCase();
   for(const cat of Object.keys(CONTENT)) if(Object.keys(CONTENT[cat]).includes(ext)) return cat; return 'data'; }
 function enterBatch(files){
-  for(const f of files){ if(BATCH.items.length>=40) break; BATCH.items.push({ file:f, uri:`xtrata:${catFor(f.name)}/${slug(f.name)}`, mime:mimeFor(f.name), deps:'', parents:'' }); }
+  for(const f of files){ if(BATCH.items.length>=40) break;
+    const isAudio=mimeFor(f.name).startsWith('audio/');
+    BATCH.items.push({ file:f, uri:`xtrata:${catFor(f.name)}/${slug(f.name)}`, mime:mimeFor(f.name), deps:'', parents:'',
+      isAudio, art:{file:null,tokenId:''}, player:{status:'raw',file:null,info:null,err:null} });
+  }
   // batch replaces the single-file flow on screen
   FLOW.original=null; FLOW.optimized=null; FLOW.jobId=null; FLOW.done=false;
   $('#reviewCard').hidden=true; $('#activeJobDetail').innerHTML=''; picker.value='';
   dz.classList.add('compact');
   $('#dropMain').innerHTML=`<span class="filechip">Batch · ${BATCH.items.length} files</span>`;
   $('#dropSub').textContent='drop more files to add them to the batch';
+  $('#batchAudioMode').hidden=!BATCH.items.some(it=>it.isAudio);
+  if(BATCH.playerMode) queueAudioBuilds();
   renderBatch(); setStep('review');
   $('#batchCard').hidden=false; $('#batchCard').scrollIntoView({behavior:'smooth',block:'start'});
 }
+const artChip=(it,i)=>{
+  const p=it.player;
+  const state=p.status==='ready'?`<span class="ok" title="${esc((p.info&&p.info.title)||'')}">✓ player ${mib(p.file.size)}${p.info&&p.info.hasCover?' · art':''}</span>`
+    :p.status==='building'?'<span style="color:var(--acc)"><span class="spin"></span> building…</span>'
+    :p.status==='error'?`<span style="color:var(--bad)" title="${esc(p.err||'')}">✗ build failed</span>`
+    :p.status==='queued'?'<span class="muted">queued…</span>':'';
+  const art=it.art.file?`🖼 ${esc(it.art.file.name.length>14?it.art.file.name.slice(0,11)+'…':it.art.file.name)}`
+    :it.art.tokenId?`🖼 #${esc(it.art.tokenId)}`:'';
+  return `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+    <button class="btn ghost" style="padding:3px 8px;font-size:11px" onclick="batchArtPick(${i})">${art||'attach image'}</button>
+    <input class="mono" placeholder="or img #id" value="${esc(it.art.tokenId)}" data-arti="${i}" style="width:76px;padding:4px 6px;font-size:11px"/>
+    ${state}</div>`;
+};
 function renderBatch(){
   $('#batchCount').textContent=String(BATCH.items.length);
-  $('#batchBody').innerHTML=BATCH.items.map((it,i)=>`<tr>
+  const pm=BATCH.playerMode;
+  $('#batchTableWrap').innerHTML=`<table style="width:100%"><thead><tr><th style="width:26px">#</th><th>File</th><th style="width:${pm?'20%':'26%'}">URI</th>${pm?'<th style="width:24%">Artwork / player</th>':''}<th style="width:12%">Deps</th><th style="width:11%">Parents</th><th style="width:30px"></th></tr></thead>
+    <tbody>${BATCH.items.map((it,i)=>`<tr>
     <td class="mono">${i}</td>
-    <td><span class="filechip" title="${esc(it.file.name)}">${esc(it.file.name.length>26?it.file.name.slice(0,23)+'…':it.file.name)}</span> <span class="muted">${mib(it.file.size)}</span></td>
+    <td><span class="filechip" title="${esc(it.file.name)}">${esc(it.file.name.length>22?it.file.name.slice(0,19)+'…':it.file.name)}</span> <span class="muted">${mib(it.file.size)}</span></td>
     <td><input class="mono" data-bi="${i}" data-bf="uri" value="${esc(it.uri)}" style="padding:6px 8px;font-size:12px"/></td>
+    ${pm?`<td>${it.isAudio?artChip(it,i):'<span class="muted">—</span>'}</td>`:''}
     <td><input class="mono" data-bi="${i}" data-bf="deps" value="${esc(it.deps)}" placeholder="90, @0" style="padding:6px 8px;font-size:12px"/></td>
     <td><input class="mono" data-bi="${i}" data-bf="parents" value="${esc(it.parents)}" placeholder="134" style="padding:6px 8px;font-size:12px"/></td>
     <td><button class="btn ghost" style="padding:3px 8px" onclick="batchRemove(${i})">✕</button></td>
-  </tr>`).join('');
-  document.querySelectorAll('#batchBody input').forEach(inp=>{ inp.oninput=()=>{ BATCH.items[Number(inp.dataset.bi)][inp.dataset.bf]=inp.value; }; });
+  </tr>`).join('')}</tbody></table>`;
+  document.querySelectorAll('#batchTableWrap input[data-bf]').forEach(inp=>{ inp.oninput=()=>{ BATCH.items[Number(inp.dataset.bi)][inp.dataset.bf]=inp.value; }; });
+  document.querySelectorAll('#batchTableWrap input[data-arti]').forEach(inp=>{ inp.onchange=()=>{ const it=BATCH.items[Number(inp.dataset.arti)]; const v=inp.value.trim();
+    if(v&&!/^\d+$/.test(v)){ $('#batchErr').textContent='Artwork inscription id must be a token-id uint.'; return; }
+    $('#batchErr').textContent=''; it.art.tokenId=v; if(v) it.art.file=null;
+    if(BATCH.playerMode&&it.isAudio){ it.player={status:'queued',file:null,info:null,err:null}; queueAudioBuilds(); } renderBatch(); }; });
   batchQuote();
 }
+
+// --- Audio → on-chain player pipeline (the opus tool, per batch row) --------
+// Lazily loads ffmpeg.wasm + the v6 player template + suno-build.js, then builds
+// each queued song sequentially: Opus 96k + tags/lyrics + artwork (attached image,
+// image inscription id, or the song's own embedded cover).
+let sunoStack=null;
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('failed to load '+src)); document.head.appendChild(s); }); }
+async function ensureSunoStack(){
+  if(window.XtrataSuno&&window.buildXtrataAudioPlayerHtml) return;
+  if(!sunoStack) sunoStack=(async()=>{
+    if(!window.FFmpeg) await loadScript('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js');
+    if(!window.buildXtrataAudioPlayerHtml) await loadScript('HTML_Template.js?v=6');
+    if(!window.XtrataSuno) await loadScript('suno-build.js?v=6');
+  })();
+  return sunoStack;
+}
+const readB64=(file)=>new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]||null); r.onerror=()=>rej(r.error); r.readAsDataURL(file); });
+let buildBusy=false;
+async function queueAudioBuilds(){
+  if(buildBusy) return; buildBusy=true;
+  try{
+    await ensureSunoStack();
+    for(;;){
+      const it=BATCH.items.find(x=>BATCH.playerMode&&x.isAudio&&x.player.status==='queued');
+      if(!it) break;
+      it.player.status='building'; renderBatch();
+      try{
+        const overrides={};
+        if(it.art.tokenId) overrides.coverTokenId=it.art.tokenId;
+        else if(it.art.file){ overrides.coverB64=await readB64(it.art.file); overrides.coverMime=it.art.file.type||'image/png'; }
+        const r=await window.XtrataSuno.build(it.file,()=>{},overrides);
+        it.player={status:'ready',file:r.playerFile,info:r,err:null};
+        it.uri=it.uri.replace(/^xtrata:audio\//,'xtrata:song/');
+      }catch(e){ it.player={status:'error',file:null,info:null,err:(e&&e.message)||String(e)}; }
+      renderBatch();
+    }
+  }catch(e){ $('#batchErr').textContent='Player engine failed to load: '+((e&&e.message)||e)+' — you can still inscribe the audio as-is.';
+    BATCH.items.forEach(it=>{ if(it.player.status==='queued'||it.player.status==='building') it.player.status='error'; }); renderBatch(); }
+  finally{ buildBusy=false; }
+}
+document.querySelectorAll('input[name="bAudioMode"]').forEach(r=>{ r.onchange=()=>{
+  BATCH.playerMode=(document.querySelector('input[name="bAudioMode"]:checked')||{}).value==='player';
+  $('#batchPlayerHint').hidden=!BATCH.playerMode;
+  BATCH.items.forEach(it=>{ if(it.isAudio) it.player=BATCH.playerMode?{status:it.player.status==='ready'?'ready':'queued',file:it.player.file,info:it.player.info,err:null}:{status:'raw',file:null,info:null,err:null}; });
+  if(BATCH.playerMode) queueAudioBuilds();
+  renderBatch();
+};});
+// The bytes that will ACTUALLY inscribe for a row (player when built, else the raw file).
+const batchActiveFile=(it)=>(BATCH.playerMode&&it.isAudio&&it.player.status==='ready'&&it.player.file)?it.player.file:it.file;
+window.batchArtPick=(i)=>{ BATCH.artTarget=i; $('#batchArtPicker').click(); };
+$('#batchArtPicker').onchange=()=>{ const f=$('#batchArtPicker').files[0]; $('#batchArtPicker').value='';
+  const it=BATCH.items[BATCH.artTarget]; if(!f||!it) return;
+  it.art.file=f; it.art.tokenId='';
+  if(BATCH.playerMode&&it.isAudio){ it.player={status:'queued',file:null,info:null,err:null}; queueAudioBuilds(); }
+  renderBatch(); };
 function batchRemove(i){ BATCH.items.splice(i,1); if(!BATCH.items.length){ batchClear(); return; } renderBatch(); }
 function batchClear(){ BATCH.items=[]; $('#batchCard').hidden=true; $('#batchQuoteTotal').textContent='—'; $('#batchErr').textContent='';
   dz.classList.remove('compact'); $('#dropMain').textContent='Drop a file to inscribe'; $('#dropSub').textContent='or click to browse — images, audio, video, documents, HTML, JSON, anything'; setStep('drop'); }
@@ -506,9 +593,10 @@ async function batchQuote(){
   if(!A.estimateBatch){ $('#batchQuoteTotal').textContent='agent bundle too old'; return; }
   try{
     const shared=$('#batchParents').value.split(',').map(s=>s.trim()).filter(Boolean);
-    const est=await A.estimateBatch({ items:BATCH.items.map(it=>({file:it.file})), parentCount:new Set([...shared,...BATCH.items.flatMap(it=>it.parents.split(',').map(s=>s.trim()).filter(Boolean))]).size, marginUstx:$('#batchMargin').value||'0' });
+    const est=await A.estimateBatch({ itemsBytes:BATCH.items.map(it=>batchActiveFile(it).size), parentCount:new Set([...shared,...BATCH.items.flatMap(it=>it.parents.split(',').map(s=>s.trim()).filter(Boolean))]).size, marginUstx:$('#batchMargin').value||'0' });
     if(run!==BATCH.quoteRun) return;
-    $('#batchQuoteTotal').textContent=stx(est.requiredUstx)+(est.stxUsd?` · ~$${(Number(est.requiredUstx)/1e6*est.stxUsd).toFixed(2)}`:'');
+    const pendingPlayers=BATCH.playerMode&&BATCH.items.some(it=>it.isAudio&&it.player.status!=='ready');
+    $('#batchQuoteTotal').textContent=stx(est.requiredUstx)+(est.stxUsd?` · ~$${(Number(est.requiredUstx)/1e6*est.stxUsd).toFixed(2)}`:'')+(pendingPlayers?' (finalising after player builds)':'');
     $('#batchInscribeBtn').disabled=false;
   }catch(e){ if(run===BATCH.quoteRun){ $('#batchQuoteTotal').textContent='—'; $('#batchErr').textContent=e.message; } }
 }
@@ -525,10 +613,21 @@ $('#batchInscribeBtn').onclick=async()=>{
     const pars=it.parents.split(',').map(s=>s.trim()).filter(Boolean);
     if(!pars.every(d=>/^\d+$/.test(d))){ err.textContent=`Item ${i}: parents must be token-id uints.`; return; }
   }
+  if(BATCH.playerMode){
+    const notReady=BATCH.items.filter(it=>it.isAudio&&it.player.status!=='ready');
+    if(notReady.length){
+      const failed=notReady.filter(it=>it.player.status==='error');
+      err.textContent=failed.length?`Player build failed for ${failed.map(it=>it.file.name).join(', ')} — fix the artwork, remove the row, or switch back to “inscribe as audio”.`
+        :`Still building ${notReady.length} player${notReady.length>1?'s':''} — one moment…`;
+      if(!failed.length) queueAudioBuilds();
+      return;
+    }
+  }
   $('#batchInscribeBtn').disabled=true;
   try{
-    const payload={ items:BATCH.items.map(it=>({ file:it.file, uri:it.uri.trim(), mime:it.mime,
-        deps:it.deps.split(',').map(s=>s.trim()).filter(Boolean), parents:it.parents.split(',').map(s=>s.trim()).filter(Boolean) })),
+    const payload={ items:BATCH.items.map(it=>{ const f=batchActiveFile(it); const asPlayer=f!==it.file;
+        return { file:f, uri:it.uri.trim(), mime:asPlayer?'text/html':it.mime,
+        deps:it.deps.split(',').map(s=>s.trim()).filter(Boolean), parents:it.parents.split(',').map(s=>s.trim()).filter(Boolean) }; }),
       parents:shared, marginUstx:$('#batchMargin').value||'0', strict:$('#batchStrict').checked,
       fastTrack:true, user:WALLET, expectedFunder:WALLET };
     const {job}=await api('/api/jobs',{method:'POST',body:payload});

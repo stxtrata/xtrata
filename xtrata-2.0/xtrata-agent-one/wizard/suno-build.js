@@ -89,10 +89,12 @@
     }
   }
 
-  // Build a self-contained player File from an audio File. onStatus(msg) for UI.
+  // Build a self-contained player File from an audio File (mp3, wav, flac, m4a —
+  // anything ffmpeg.wasm decodes). onStatus(msg) for UI.
   // `overrides` (all optional) lets the page replace what was extracted:
   //   { title, artist, album, lyrics, description, license, bpm, note,
-  //     coverB64, coverMime }
+  //     coverB64, coverMime,          // embed THIS image as the artwork
+  //     coverTokenId }                // OR reference an existing image INSCRIPTION (recursive artwork)
   async function build(file, onStatus, overrides) {
     if (!window.buildXtrataAudioPlayerHtml) throw new Error('player template not loaded (HTML_Template.js)');
     const o = overrides || {};
@@ -119,13 +121,23 @@
     const isSuno = /made with suno/i.test(comment + ' ' + title + ' ' + artist) || /\bsuno\b/i.test(comment);
 
     onStatus && onStatus('Building the player…');
-    const html = window.buildXtrataAudioPlayerHtml({
+    const coverTokenId = o.coverTokenId != null ? String(o.coverTokenId).trim() : '';
+    const cfg = {
       mode: 'embedded', audioMimeType: 'audio/webm; codecs=opus', audioBase64: ex.audioB64,
-      imageMimeType: coverMime || undefined, imageBase64: coverB64 || undefined, artFit: 'cover',
+      artFit: 'cover',
       metadata: { assetType: 'song', title, artist, album, lyrics, description, license, bpm, note },
-    });
+    };
+    if (coverTokenId) {
+      // Recursive artwork: the player references an already-inscribed image by token id
+      // (audio stays embedded) — zero extra bytes for the art.
+      cfg.visualSourceMode = 'recursive';
+      cfg.recursive = { coverTokenId };
+    } else if (coverB64) {
+      cfg.imageMimeType = coverMime || undefined; cfg.imageBase64 = coverB64;
+    }
+    const html = window.buildXtrataAudioPlayerHtml(cfg);
     const playerFile = new File([html], slug(title || file.name) + '.player.html', { type: 'text/html' });
-    return { playerFile, html, title, artist, album, lyrics, hasCover: !!coverB64, hasLyrics: !!lyrics, isSuno, opusBytes: ex.opusBytes, playerBytes: playerFile.size, sourceBytes: file.size, coverB64, coverMime };
+    return { playerFile, html, title, artist, album, lyrics, hasCover: !!(coverB64 || coverTokenId), coverTokenId: coverTokenId || null, hasLyrics: !!lyrics, isSuno, opusBytes: ex.opusBytes, playerBytes: playerFile.size, sourceBytes: file.size, coverB64, coverMime };
   }
 
   // Fast pre-check used to GATE the SUNO page: metadata + cover only (no Opus encode).
