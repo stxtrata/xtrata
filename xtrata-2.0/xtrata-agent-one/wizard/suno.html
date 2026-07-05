@@ -498,10 +498,11 @@ function resetAll(){ FILE=null;PLAYER=null;META=null;EST=null;JOB=null; if(poll)
 // SEQUENTIALLY (the shared core runs one command at a time). Songs with no embedded cover art
 // are auto-dropped (this page's promise is "embedded artwork"); the rest each get a preview and
 // an optional artwork swap, then inscribe together for one payment + one receipt.
-const SB={ items:[], dropped:[], active:false, busy:false, quoteRun:0, EST:null, droppedNote:'' };
+const SB={ items:[], dropped:[], active:false, busy:false, quoteRun:0, EST:null, stxUsd:null, droppedNote:'' };
 let sbArtTarget=-1;
 const sbReadB64=(file)=>new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]||null); r.onerror=()=>rej(r.error); r.readAsDataURL(file); });
 const sbMib=(n)=>(n/1048576).toFixed(2);
+const sbCostLabel=(ustx)=>stx(ustx)+(SB.stxUsd!=null?(' · ~$'+(Number(ustx)/1e6*Number(SB.stxUsd)).toFixed(2)):'');
 function sbEnterUI(){ SB.active=true;
   $('#quote').className='quote'; $('#preview').style.display='none'; $('#editWrap').style.display='none';
   $('#go').style.display='none'; $('#hint').textContent=''; $('#result').className='result'; $('#prog').className='prog';
@@ -552,7 +553,7 @@ function sbRow(it,i){
   const title = it.info? (esc(it.info.title||it.file.name)+(it.info.artist?(' — '+esc(it.info.artist)):'')) : esc(it.file.name);
   const artSrc = it.info&&it.info.coverB64 ? ('data:'+(it.info.coverMime||'image/jpeg')+';base64,'+it.info.coverB64) : '';
   let status;
-  if(it.status==='ready') status='<span class="ok">'+sbMib(it.player.size)+' MiB · Opus'+(it.info&&it.info.hasCover?' + cover':'')+(it.info&&it.info.hasLyrics?' + lyrics':'')+'</span>';
+  if(it.status==='ready') status='<span class="ok">'+sbMib(it.player.size)+' MiB · Opus'+(it.info&&it.info.hasCover?' + cover':'')+(it.info&&it.info.hasLyrics?' + lyrics':'')+'</span>'+(it.costUstx?(' · <span style="color:var(--acc);font-weight:700">'+sbCostLabel(it.costUstx)+'</span>'):'');
   else if(it.status==='building') status='<span style="color:var(--acc2)"><span class="spin"></span>building player…</span>';
   else if(it.status==='probing') status='<span class="muted"><span class="spin"></span>checking artwork…</span>';
   else if(it.status==='error') status='<span class="err">✗ '+esc(it.err||'failed')+'</span> <a href="#" onclick="sbRetry('+i+');return false" style="margin-left:4px">retry</a>';
@@ -587,15 +588,30 @@ function sbRender(){
 async function sbQuote(){
   const run=++SB.quoteRun; const A=window.XtrataAgent;
   const ready=SB.items.filter(it=>it.status==='ready');
-  if(!ready.length||!A||!A.estimateBatch){ SB.EST=null; $('#sbPay').textContent='—'; sbUpdateGo(); return; }
+  if(!ready.length||!A||!A.estimateBatch){ SB.EST=null; SB.stxUsd=null; ready.forEach(it=>{ it.costUstx=null; }); $('#sbPay').textContent='—'; sbUpdateGo(); return; }
   try{
     const est=await A.estimateBatch({ itemsBytes:ready.map(it=>it.player.size), parentCount:0, marginUstx:'0' });
     if(run!==SB.quoteRun) return;
-    SB.EST=est;
+    SB.EST=est; SB.stxUsd=(est.stxUsd!=null?est.stxUsd:null);
+    // Split the single batch payment across songs in proportion to each one's on-chain
+    // footprint (protocol fee + miner reserve), so the per-song costs sum EXACTLY to the total.
+    try{
+      const req=BigInt(est.requiredUstx);
+      const direct=(est.items||[]).map(x=>BigInt(x.protocolFee||'0')+BigInt(x.minerReserve||'0'));
+      const dsum=direct.reduce((a,b)=>a+b,0n);
+      let allocated=0n;
+      for(let i=0;i<ready.length;i++){
+        let share;
+        if(i===ready.length-1) share=req-allocated;              // last song takes the remainder → exact total
+        else if(dsum>0n) share=req*(direct[i]||0n)/dsum;
+        else share=req/BigInt(ready.length);
+        allocated+=share; ready[i].costUstx=share.toString();
+      }
+    }catch(_e){ ready.forEach(it=>{ it.costUstx=null; }); }
     const pending=SB.items.some(it=>['queued','probing','building'].includes(it.status));
     $('#sbPay').textContent=stx(est.requiredUstx)+(est.stxUsd?(' · ~$'+(Number(est.requiredUstx)/1e6*est.stxUsd).toFixed(2)):'')+(pending?' (updating…)':'');
-    sbUpdateGo();
-  }catch(e){ if(run===SB.quoteRun){ $('#sbPay').textContent='—'; SB.EST=null; sbUpdateGo(); } }
+    sbRender();
+  }catch(e){ if(run===SB.quoteRun){ $('#sbPay').textContent='—'; SB.EST=null; SB.stxUsd=null; sbUpdateGo(); } }
 }
 function sbUpdateGo(){
   const b=$('#sbGo'); if(!b) return;
