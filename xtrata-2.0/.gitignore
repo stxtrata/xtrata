@@ -17,3 +17,6 @@ Archive/
 # generated agent-one bundles (rebuilt by prebuild)
 xtrata-agent-one/wizard/agent-one.js
 xtrata-agent-one/wizard/agent-one-wallet.js
+
+# Vite config bundling artifacts (auto-generated, safe to delete)
+*.timestamp-*.mjs

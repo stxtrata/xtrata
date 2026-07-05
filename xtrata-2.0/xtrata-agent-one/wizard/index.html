@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Xtrata Agent One — Inscription Wizard</title>
+<title>Xtrata — Inscription Wizard</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="apple-touch-icon" href="/favicons/xtrata-apple-touch-icon.png" />
 <style>
@@ -18,20 +18,15 @@
   .logo{font-weight:800;letter-spacing:.5px;font-size:18px}
   .logo b{color:var(--acc)} .logo i{color:var(--acc2);font-style:normal}
   .sub{color:var(--mut);font-size:12px}
-  .badge{margin-left:auto;display:flex;gap:8px;align-items:center;font-size:12px}
+  .badge{display:flex;gap:8px;align-items:center;font-size:12px;flex-wrap:wrap;justify-content:flex-end}
   .pill{padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--mut)}
   .pill.live{color:var(--ok);border-color:#1f5a45} .pill.mock{color:var(--warn);border-color:#5a4620}
-  nav{display:flex;gap:6px;padding:12px 22px 0}
-  nav button{background:transparent;border:1px solid transparent;color:var(--mut);padding:9px 16px;border-radius:9px 9px 0 0;cursor:pointer;font-size:13px;font-weight:600}
-  nav button.active{color:var(--ink);background:var(--panel);border-color:var(--line);border-bottom-color:var(--panel)}
-  main{padding:18px 22px 60px}
-  .wrap{max-width:1080px;margin:0 auto}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  @media(max-width:840px){.grid{grid-template-columns:1fr}}
+  main{padding:22px 22px 80px}
+  .wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
-  .card h3{margin:0 0 4px;font-size:15px} .card .hint{color:var(--mut);font-size:12px;margin-bottom:14px}
+  .card h3{margin:0 0 4px;font-size:15px} .card .hint{color:var(--mut);font-size:12px;margin-bottom:10px}
   label{display:block;font-size:12px;color:var(--mut);margin:12px 0 5px}
-  input,select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;color:var(--ink);padding:10px 11px;font-size:13px;font-family:inherit}
+  input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;color:var(--ink);padding:10px 11px;font-size:13px;font-family:inherit}
   input.mono{font-family:var(--mono)}
   input:focus,select:focus{outline:none;border-color:var(--acc)}
   .row{display:flex;gap:10px} .row>*{flex:1}
@@ -41,13 +36,15 @@
   .btn.alt{background:linear-gradient(180deg,#8b6cff,#6f4cf0)}
   .btn.good{background:linear-gradient(180deg,#37cf8e,#23b277)}
   .btn.warn{background:linear-gradient(180deg,#ffb454,#e89a2e);color:#201400}
+  .btn.big{width:100%;padding:15px 16px;font-size:15px;border-radius:12px}
   .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-  .kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed var(--line)}
-  .kv:last-child{border-bottom:0} .kv span:first-child{color:var(--mut)} .kv span:last-child{font-family:var(--mono)}
-  .big{font-size:26px;font-weight:800;color:var(--acc)}
+  .kv{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px dashed var(--line)}
+  .kv:last-child{border-bottom:0} .kv span:first-child{color:var(--mut)} .kv span:last-child{font-family:var(--mono);text-align:right;word-break:break-all}
+  .big-num{font-size:26px;font-weight:800;color:var(--acc)}
   .mono{font-family:var(--mono)} .muted{color:var(--mut)}
   .status{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid var(--line)}
   .s-AWAITING_DEPOSIT{color:var(--warn);border-color:#5a4620}
+  .s-AWAITING_PARENT{color:var(--warn);border-color:#5a4620}
   .s-FUNDED{color:var(--ok);border-color:#1f5a45}
   .s-INSCRIBED{color:var(--acc);border-color:#234a6e}
   .s-COMPLETE{color:var(--ok);border-color:#1f5a45}
@@ -66,143 +63,232 @@
   .copy{cursor:pointer;border:1px solid var(--line);background:var(--panel2);border-radius:7px;padding:2px 8px;font-size:11px;color:var(--mut)}
   .err{color:var(--bad);font-size:12px;margin-top:8px;min-height:16px}
   .ok{color:var(--ok)}
-  .drop{border:1.5px dashed var(--line);border-radius:12px;padding:22px 16px;text-align:center;margin-top:12px;transition:border-color .15s,background .15s}
+
+  /* ---- railroad stages ---- */
+  .drop{border:1.5px dashed var(--line);border-radius:16px;padding:56px 20px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s,padding .2s;background:var(--panel)}
   .drop.drag{border-color:var(--acc);background:#0e1b2b}
-  .drop-main{font-weight:600} .drop-sub{margin-top:6px}
-  .srvpath{margin-top:10px} .srvpath summary{cursor:pointer;color:var(--mut);font-size:12px}
-  #fileInfo{margin-top:10px;font-family:var(--mono);font-size:12px;color:var(--ink)}
-  svg{width:100%;height:440px;background:var(--panel2);border:1px solid var(--line);border-radius:12px}
+  .drop .drop-main{font-weight:800;font-size:19px}
+  .drop .drop-sub{margin-top:8px;color:var(--mut);font-size:13px}
+  .drop.compact{padding:14px 16px;display:flex;align-items:center;gap:12px;text-align:left}
+  .drop.compact .drop-main{font-size:13.5px;flex:1;font-weight:600}
+  .drop.compact .drop-sub{margin:0;font-size:12px;white-space:nowrap}
+  .filechip{font-family:var(--mono);font-size:12.5px;color:var(--ink);word-break:break-all}
+  .stepper{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 2px}
+  .stepper .step{padding:3px 10px;border:1px solid var(--line);border-radius:999px;font-size:11px;color:var(--mut)}
+  .stepper .step.on{color:var(--acc2);border-color:#3a2f7a}
+  .stepper .step.done{color:var(--ok);border-color:#1f5a45}
+  details.opts{border:1px solid var(--line);border-radius:10px;background:var(--panel2);margin-top:12px}
+  details.opts>summary{cursor:pointer;padding:10px 13px;font-size:12.5px;font-weight:600;color:var(--mut);list-style:none;user-select:none}
+  details.opts>summary::-webkit-details-marker{display:none}
+  details.opts>summary:before{content:'▸';display:inline-block;margin-right:8px;transition:transform .15s}
+  details.opts[open]>summary:before{transform:rotate(90deg)}
+  details.opts[open]>summary{color:var(--ink);border-bottom:1px solid var(--line2)}
+  details.opts>.opts-body{padding:2px 13px 13px}
+  .optrow{display:flex;align-items:center;gap:10px;margin-top:12px;padding:10px 13px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);font-size:12.5px}
+  .optrow .grow{flex:1}
+  .optrow .savings{color:var(--ok);font-weight:700;font-family:var(--mono)}
+  .checkline{display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--ink);font-size:12.5px}
+  .checkline input{width:auto}
+  .preview-block{margin-top:14px}
+  .preview-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;font-size:12px;color:var(--mut);margin-bottom:7px}
+  .preview-body{border:1px solid var(--line);border-radius:12px;background:var(--panel2);overflow:hidden;display:flex;justify-content:center;align-items:center;min-height:56px}
+  .preview-body img{max-width:100%;max-height:340px;display:block}
+  .preview-body video{max-width:100%;max-height:340px;display:block;background:#000}
+  .preview-body audio{width:100%;margin:14px 12px}
+  .preview-body iframe{width:100%;height:360px;border:0;background:#fff}
+  .preview-body pre{width:100%;max-height:280px;overflow:auto;margin:0;padding:12px 14px;font:12px/1.5 var(--mono);color:var(--ink);white-space:pre-wrap;word-break:break-word}
+  .quote-summary{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:14px}
+  .quote-summary .lbl{color:var(--mut);font-size:12px}
+  footer{border-top:1px solid var(--line);margin-top:26px;padding:16px 22px;color:var(--mut);font-size:12.5px;display:flex;gap:18px;flex-wrap:wrap}
+  footer a{color:var(--acc);text-decoration:none;font-weight:600}
+  svg.graph{width:100%;height:440px;background:var(--panel2);border:1px solid var(--line);border-radius:12px}
   .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
   .chip{background:#10203a;border:1px solid #234a6e;color:var(--acc);border-radius:999px;padding:2px 9px;font-size:11px;font-family:var(--mono)}
-  .chip.x{cursor:pointer}
   .legend{display:flex;gap:14px;font-size:11px;color:var(--mut);margin-top:8px}
   .dot{display:inline-block;width:9px;height:9px;border-radius:3px;vertical-align:middle;margin-right:5px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:840px){.grid2{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <header>
   <a href="/" title="Xtrata home" style="flex:none;display:block"><img src="favicon.svg" alt="Xtrata" style="width:30px;height:30px;border-radius:8px;display:block" /></a>
   <div>
-    <div class="logo"><b>XTRATA</b> <i>Agent One</i> · Inscription Wizard</div>
-    <div class="sub">Large files &amp; recursive dependency graphs → Stacks, via the deposit-wallet service</div>
+    <div class="logo"><b>XTRATA</b> <i>Inscription Wizard</i></div>
+    <div class="sub">Drop a file → pay once → it comes back inscribed. Anchored to Bitcoin via Stacks.</div>
   </div>
   <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
-    <div class="badge" id="health" style="margin-left:0"><span class="pill">connecting…</span></div>
+    <div class="badge" id="health"><span class="pill">connecting…</span></div>
     <span id="walletAddr" class="pill" style="display:none;cursor:pointer;color:var(--ok);border-color:#1f5a45" title="connected wallet — click to show & copy the address"></span>
     <button class="btn ghost" id="connectBtn" style="padding:7px 13px">Connect wallet</button>
   </div>
 </header>
-<nav>
-  <button data-tab="new" class="active">New inscription</button>
-  <button data-tab="graph">Dependency graph</button>
-  <button data-tab="jobs">Jobs</button>
-  <a href="./manifests.html" style="margin-left:auto;align-self:center;color:var(--acc);font-size:13px;font-weight:700;text-decoration:none;padding:0 14px">Manifest Studio →</a>
-</nav>
+
 <main><div class="wrap">
 
-  <!-- NEW -->
-  <section id="tab-new">
-    <div class="grid">
-      <div class="card">
-        <h3>1 · Describe &amp; quote</h3>
-        <div class="hint">Constrained choices keep every job inside the deterministic path.</div>
-        <div class="row">
-          <div><label>What are you inscribing?</label>
-            <select id="category"></select></div>
-          <div><label>File type</label>
-            <select id="ftype"></select></div>
-        </div>
-        <label>File</label>
-        <div id="dropzone" class="drop">
-          <input id="picker" type="file" hidden />
-          <div class="drop-main">Drag &amp; drop a file here</div>
-          <div class="drop-sub">or <button class="btn ghost" id="pickBtn" type="button">Open local folder…</button></div>
-          <div id="fileInfo"></div>
-        </div>
-        <details class="srvpath"><summary>Or use a file already on the server (paste a path)</summary>
-          <input id="file" class="mono" placeholder="/Users/you/media/clip.mp4" style="margin-top:8px" />
-        </details>
-        <div class="btnrow"><button class="btn ghost" id="estimateBtn">Estimate cost</button></div>
-        <div id="estimate"></div>
-      </div>
+  <div class="stepper" id="stepper" aria-label="Progress">
+    <span class="step on" data-step="drop">1 · Drop</span>
+    <span class="step" data-step="review">2 · Review</span>
+    <span class="step" data-step="pay">3 · Pay</span>
+    <span class="step" data-step="done">4 · Inscribed</span>
+  </div>
 
-      <div class="card">
-        <h3>2 · Delivery &amp; links</h3>
-        <div class="hint">Dependencies are existence-only links (recursive references). Parents are ownership links: you send the parent inscription to the deposit wallet with your payment; the child is minted linked to it, then parent + child + change all come back to you.</div>
-        <label style="display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--ink)">
-          <input type="checkbox" id="fastTrack" style="width:auto" checked />
-          <span><b style="color:var(--acc2)">⚡ Fast-track (auto)</b> — pay once and it inscribes &amp; returns the token + change to the wallet you pay from. No address needed.</span>
+  <!-- STAGE 1 · DROP -->
+  <div id="dropzone" class="drop" role="button" tabindex="0" aria-label="Drop a file to inscribe">
+    <input id="picker" type="file" hidden />
+    <div class="drop-main" id="dropMain">Drop a file to inscribe</div>
+    <div class="drop-sub" id="dropSub">or click to browse — images, audio, video, documents, HTML, JSON, anything</div>
+  </div>
+  <div class="muted" id="resumeNotice" style="font-size:12.5px" hidden></div>
+
+  <!-- STAGE 2 · REVIEW -->
+  <section class="card" id="reviewCard" hidden>
+    <h3>Review &amp; inscribe</h3>
+    <div class="hint">Everything below is pre-set for the best result — expand only what you want to change.</div>
+    <div class="kv"><span>File</span><span class="filechip" id="fileLine"></span></div>
+    <div class="kv"><span>Type</span><span id="typeLine" class="mono"></span></div>
+
+    <div class="preview-block" id="previewBlock" hidden>
+      <div class="preview-head">
+        <span>Preview — this exact file goes on-chain, test it before you commit</span>
+        <span class="muted mono" id="previewNote"></span>
+      </div>
+      <div id="previewBody" class="preview-body"></div>
+      <div class="muted" id="previewFootnote" style="font-size:11px;margin-top:6px" hidden></div>
+    </div>
+
+    <div class="optrow" id="optRow" hidden>
+      <span id="optSpin" class="spin" hidden></span>
+      <span class="grow" id="optText"></span>
+      <span class="savings" id="optSavings" hidden></span>
+      <button class="btn ghost" id="optSkipBtn" style="padding:5px 11px" hidden>Skip — use original</button>
+      <label class="checkline" id="optRevertWrap" hidden>
+        <input type="checkbox" id="optRevert" />
+        <span>Use the original file instead</span>
+      </label>
+    </div>
+    <div class="muted" id="sunoHint" style="font-size:12px;margin-top:8px" hidden>
+      🎵 MP3 with embedded cover art? The <a href="./suno.html" style="color:var(--acc2)">SUNO fast-track</a> builds a full on-chain player (Opus + art + lyrics) in one payment.
+    </div>
+
+    <details class="opts" id="optionsDetails">
+      <summary>Options — URI, delivery, margin</summary>
+      <div class="opts-body">
+        <div class="row">
+          <div><label>Category</label><select id="category"></select></div>
+          <div><label>File type</label><select id="ftype"></select></div>
+        </div>
+        <label>Content URI</label>
+        <input id="uri" class="mono" placeholder="xtrata:video/my-clip" />
+        <label class="checkline" style="margin-top:12px">
+          <input type="checkbox" id="manualMode" />
+          <span>Manual delivery — send the inscription to a different address (disables ⚡ fast-track)</span>
         </label>
-        <div id="userWrap">
+        <div id="userWrap" style="display:none">
           <label>Delivery address <span class="muted">(gets the inscription + any refund)</span></label>
           <input id="user" class="mono" placeholder="SP… or SM…" />
         </div>
-        <label>Dependencies <span class="muted">(token ids, comma-separated — or build them in the Graph tab)</span></label>
-        <input id="deps" class="mono" placeholder="134, 90" />
-        <label>Parent inscriptions <span class="muted">(token ids you own — you'll transfer them to the deposit wallet; they're returned with the child)</span></label>
-        <input id="parents" class="mono" placeholder="134" />
-        <label>Content URI</label>
-        <input id="uri" class="mono" placeholder="xtrata:video/my-clip" />
         <label>Service margin (µSTX, 0 = none)</label>
         <input id="margin" class="mono" value="0" />
-        <div class="btnrow">
-          <button class="btn" id="createBtn">Create deposit job</button>
-          <button class="btn ghost" id="clearBtn">Clear</button>
-        </div>
-        <div class="err" id="newErr"></div>
-        <div id="deposit"></div>
       </div>
+    </details>
+
+    <details class="opts" id="relDetails">
+      <summary>Relationships — dependencies &amp; parents (optional)</summary>
+      <div class="opts-body">
+        <label>Dependencies <span class="muted">(existing token ids this inscription references, comma-separated)</span></label>
+        <input id="deps" class="mono" placeholder="134, 90" />
+        <label>Parent inscriptions <span class="muted">(token ids you own — escrowed for the mint, returned with the child)</span></label>
+        <input id="parents" class="mono" placeholder="134" />
+        <div id="parentsCheck" style="margin-top:8px;font-size:12.5px;display:flex;flex-direction:column;gap:4px"></div>
+        <div class="muted" style="font-size:11.5px;margin-top:8px">
+          Dependencies are existence-only links (recursive references). Parents are ownership links:
+          you send the parent to the deposit wallet with your payment; the child mints linked to it,
+          then parent + child + change all come back to you.
+          · <a href="#" id="openGraphLink" style="color:var(--acc)">Compose a dependency graph →</a>
+        </div>
+      </div>
+    </details>
+
+    <div class="quote-summary">
+      <span class="lbl">All-in deposit <span class="muted">(over-collected — unused remainder auto-refunded)</span></span>
+      <span class="big-num" id="quoteTotal">—</span>
     </div>
+    <details class="opts" id="quoteDetails">
+      <summary>Cost breakdown</summary>
+      <div class="opts-body" id="quoteBody"><div class="muted">Waiting for a file…</div></div>
+    </details>
+
+    <div class="btnrow">
+      <button class="btn big" id="inscribeBtn" disabled>Inscribe</button>
+    </div>
+    <div class="muted" style="font-size:11.5px;margin-top:6px" id="payHint">
+      ⚡ Fast-track: pay from your connected wallet and the inscription + change return to it automatically.
+    </div>
+    <div class="err" id="newErr"></div>
   </section>
 
-  <!-- GRAPH -->
-  <section id="tab-graph" hidden>
-    <div class="grid">
-      <div class="card">
-        <h3>Compose a recursive dependency graph</h3>
-        <div class="hint">Add nodes for existing inscriptions (by token id) and the new file you want to inscribe, then link dependencies. Send any new node to the wizard with its deps resolved.</div>
-        <label>Node label</label>
-        <input id="nLabel" placeholder="e.g. Smiley master, or Twin #042" />
-        <div class="row">
-          <div><label>Kind</label>
-            <select id="nKind"><option value="new">new (to inscribe)</option><option value="existing">existing (on-chain)</option></select></div>
-          <div id="nIdWrap"><label>Token id (existing)</label><input id="nTokenId" class="mono" placeholder="134" /></div>
-        </div>
-        <div id="nFileWrap"><label>File path (new)</label><input id="nFile" class="mono" placeholder="/Users/you/media/twin-042.png" /></div>
-        <div class="btnrow"><button class="btn alt" id="addNode">Add node</button></div>
-        <hr style="border:0;border-top:1px solid var(--line);margin:16px 0" />
-        <label>Add dependency edge</label>
-        <div class="row">
-          <div><select id="edgeFrom"></select></div>
-          <div class="muted" style="flex:0 0 auto;align-self:center">depends on →</div>
-          <div><select id="edgeTo"></select></div>
-        </div>
-        <div class="btnrow"><button class="btn ghost" id="addEdge">Link</button>
-          <button class="btn ghost" id="clearGraph">Clear graph</button></div>
-        <div class="err" id="graphErr"></div>
-      </div>
-      <div class="card">
-        <h3>Graph</h3>
-        <div class="hint">Layered left→right; arrows point from a node to the inscriptions it depends on.</div>
-        <svg id="svg" viewBox="0 0 760 440" preserveAspectRatio="xMidYMid meet"></svg>
-        <div class="legend"><span><span class="dot" style="background:#7c5cff"></span>new</span><span><span class="dot" style="background:#3ea6ff"></span>existing</span></div>
-        <div id="nodeDetail"></div>
-      </div>
-    </div>
-  </section>
+  <!-- STAGE 3/4 · ACTIVE JOB (deposit → escrow → progress → done) -->
+  <div id="activeJobDetail"></div>
 
-  <!-- JOBS -->
-  <section id="tab-jobs" hidden>
-    <div class="card">
-      <h3>Jobs <button class="btn ghost" id="refreshJobs" style="float:right;padding:6px 12px">Refresh</button></h3>
-      <div class="hint">Click a job to manage its lifecycle: deposit → run → deliver.</div>
+  <!-- HISTORY -->
+  <details class="opts" id="historySection">
+    <summary>History — all jobs on this browser <button class="btn ghost" id="refreshJobs" style="float:right;padding:4px 10px;margin-top:-3px" onclick="event.preventDefault();event.stopPropagation();">Refresh</button></summary>
+    <div class="opts-body">
       <table><thead><tr><th>Job</th><th>URI</th><th>Size</th><th>Required</th><th>Status</th><th>Token</th></tr></thead>
         <tbody id="jobsBody"><tr><td colspan="6" class="muted">No jobs yet.</td></tr></tbody></table>
+      <div id="jobDetail"></div>
     </div>
-    <div id="jobDetail"></div>
-  </section>
+  </details>
+
+  <!-- ADVANCED · DEPENDENCY GRAPH (opened from Relationships) -->
+  <details class="opts" id="graphSection">
+    <summary>Advanced — dependency graph composer</summary>
+    <div class="opts-body">
+      <div class="grid2" style="margin-top:10px">
+        <div class="card">
+          <h3>Compose a recursive dependency graph</h3>
+          <div class="hint">Add nodes for existing inscriptions (by token id) and new files, link dependencies, then send a new node's resolved deps to the wizard.</div>
+          <label>Node label</label>
+          <input id="nLabel" placeholder="e.g. Smiley master, or Twin #042" />
+          <div class="row">
+            <div><label>Kind</label>
+              <select id="nKind"><option value="new">new (to inscribe)</option><option value="existing">existing (on-chain)</option></select></div>
+            <div id="nIdWrap"><label>Token id (existing)</label><input id="nTokenId" class="mono" placeholder="134" /></div>
+          </div>
+          <div id="nFileWrap"><label>File name (new — drop the actual file in step 1)</label><input id="nFile" class="mono" placeholder="twin-042.png" /></div>
+          <div class="btnrow"><button class="btn alt" id="addNode">Add node</button></div>
+          <hr style="border:0;border-top:1px solid var(--line);margin:16px 0" />
+          <label>Add dependency edge</label>
+          <div class="row">
+            <div><select id="edgeFrom"></select></div>
+            <div class="muted" style="flex:0 0 auto;align-self:center">depends on →</div>
+            <div><select id="edgeTo"></select></div>
+          </div>
+          <div class="btnrow"><button class="btn ghost" id="addEdge">Link</button>
+            <button class="btn ghost" id="clearGraph">Clear graph</button></div>
+          <div class="err" id="graphErr"></div>
+        </div>
+        <div class="card">
+          <h3>Graph</h3>
+          <div class="hint">Layered left→right; arrows point from a node to the inscriptions it depends on.</div>
+          <svg id="svg" class="graph" viewBox="0 0 760 440" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="legend"><span><span class="dot" style="background:#7c5cff"></span>new</span><span><span class="dot" style="background:#3ea6ff"></span>existing</span></div>
+          <div id="nodeDetail"></div>
+        </div>
+      </div>
+    </div>
+  </details>
 
 </div></main>
+
+<footer>
+  <a href="./suno.html">SUNO fast-track</a>
+  <a href="./manifests.html">Manifest Studio</a>
+  <a href="/inscribe" target="_self">Simple on-site inscriber</a>
+  <a href="/xplorer" target="_self">Xtrata Xplorer</a>
+  <span class="muted" style="margin-left:auto">Backendless — everything runs in this browser. Add <span class="mono">?mock=1</span> to rehearse offline.</span>
+</footer>
 
 <script>
   // Backendless config. ?mock=1 in the URL runs the whole flow offline (no chain).
@@ -210,7 +296,8 @@
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=5"></script>
+<script src="agent-one.js?v=7"></script>
+<script src="optimize-audio.js?v=1"></script>
 <script>
 const API = '';   // backendless — all data flows through window.XtrataAgent (no HTTP API)
 const SERVER = { mock:false };
@@ -225,6 +312,7 @@ const CONTENT = {
 const ADDR_RE = /^S[PM][0-9A-HJKMNP-Z]{37,41}$/;
 const $ = (s)=>document.querySelector(s);
 const stx = (u)=>(Number(u)/1e6).toFixed(6).replace(/0+$/,'').replace(/\.$/,'')+' STX';
+const mib = (b)=>(b/1048576).toFixed(3)+' MiB';
 const esc = (s)=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 // Backendless data layer: every former /api/* call routes to the in-browser agent (window.XtrataAgent).
 function xa(){ const A=window.XtrataAgent; if(!A) throw new Error('Agent bundle not loaded (agent-one.js).'); return A; }
@@ -246,29 +334,18 @@ function copyBtn(text){ return `<button class="copy" onclick="navigator.clipboar
 function xtrataWallet(){ return window.XtrataWallet || null; }
 async function openWallet(addr, ustx){
   const w=xtrataWallet();
-  if(!w||!w.pay){ alert('Wallet bundle not loaded.\nCopy the address and amount shown and send manually — or run the wizard inside the Xtrata site (see site-integration/HANDOFF.md).'); return; }
+  if(!w||!w.pay){ alert('Wallet bundle not loaded.\nCopy the address and amount shown and send manually.'); return; }
   try{ await w.pay({ recipient:addr, amount:String(ustx), network:(SERVER.net==='testnet'?'testnet':'mainnet') }); }
   catch(e){ alert('Could not open the wallet to pay:\n'+((e&&e.message)||e)+'\n\nCopy the address and amount shown and send manually.'); }
 }
 window.openWallet=openWallet;
 
-// ---- tabs ----
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
-  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x===b));
-  ['new','graph','jobs'].forEach(t=>$('#tab-'+t).hidden = (t!==b.dataset.tab));
-  if(b.dataset.tab==='jobs'){ loadJobs(); startJobsPoll(); } else { stopJobsPoll(); }
-  if(b.dataset.tab==='graph') drawGraph();
-});
-
 // ---- health ----
 (async()=>{ try{ const h=await api('/api/health'); SERVER.mock=!!h.mock; SERVER.net=h.net; SERVER.windowMs=h.windowMs||300000; SERVER.parentWindowMs=h.parentWindowMs||900000; $('#health').innerHTML =
-  `<span class="pill ${h.mock?'mock':'live'}">${h.mock?'MOCK':'LIVE'}</span><span class="pill">${esc(h.core)}</span><span class="pill">${esc(h.net)}</span><span class="pill" title="server started — restart it if this predates your last change">⟳ ${h.startedAt?new Date(h.startedAt).toLocaleTimeString():''}</span><span class="pill" title="agent bundle build">${esc(h.build||window.XAO_AGENT_BUILD||'agent pre-v')}</span>`;
-  if(window.XtrataAgent&&window.XAO_AGENT_BUILD!=='2026-07-03.1'){ $('#health').innerHTML+='<span class="pill" style="color:var(--bad);border-color:#5a2222" title="the deployed agent-one.js is older than this page — rebuild/redeploy it">⚠ stale agent bundle</span>'; }
-}catch(e){ $('#health').innerHTML = `<span class="pill" style="color:var(--bad);border-color:#5a2222">server offline</span>`; } })();
+  `<span class="pill ${h.mock?'mock':'live'}">${h.mock?'MOCK':'LIVE'}</span><span class="pill">${esc(h.core)}</span><span class="pill">${esc(h.net)}</span><span class="pill" title="agent bundle build">${esc(h.build||window.XAO_AGENT_BUILD||'agent pre-v')}</span>`;
+}catch(e){ $('#health').innerHTML = `<span class="pill" style="color:var(--bad);border-color:#5a2222">agent offline</span>`; } })();
 
-// ---- wallet connect (delegates to the Xtrata site's bundled wallet shim: window.XtrataWallet) ----
-// BNS: show the .btc name instead of the address when one exists; the address stays hidden until
-// the pill is clicked (click = reveal + copy to clipboard; click again = back to the name).
+// ---- wallet connect (delegates to the bundled wallet shim: window.XtrataWallet) ----
 let WALLET_NAME=null, WALLET_REVEAL=false;
 const shortAddr=a=>a.slice(0,5)+'…'+a.slice(-4);
 async function bnsLookup(addr){ try{
@@ -280,116 +357,450 @@ function renderWalletPill(){ const el=$('#walletAddr'); if(!WALLET){ el.style.di
   if(WALLET_NAME&&!WALLET_REVEAL){ el.textContent='● '+WALLET_NAME; el.title='connected as '+WALLET_NAME+' — click to show & copy the address'; }
   else { el.textContent='● '+shortAddr(WALLET); el.title=WALLET+(WALLET_NAME?' — click to show '+WALLET_NAME:' — click to copy'); } }
 async function walletPillClick(){ if(!WALLET) return;
-  WALLET_REVEAL=!WALLET_NAME||!WALLET_REVEAL;      // no name → always "revealed"
+  WALLET_REVEAL=!WALLET_NAME||!WALLET_REVEAL;
   renderWalletPill();
   if(WALLET_REVEAL){ try{ await navigator.clipboard.writeText(WALLET); $('#walletAddr').textContent='✓ copied'; setTimeout(renderWalletPill,900); }catch{} } }
 function setWallet(addr){ WALLET=addr||null; WALLET_NAME=null; WALLET_REVEAL=false; const btn=$('#connectBtn');
   if(WALLET){ btn.textContent='Disconnect'; if(!$('#user').value) $('#user').value=WALLET;
     renderWalletPill(); bnsLookup(WALLET).then(n=>{ if(n&&WALLET===addr){ WALLET_NAME=n; renderWalletPill(); } }); }
-  else { btn.textContent='Connect wallet'; renderWalletPill(); } }
+  else { btn.textContent='Connect wallet'; renderWalletPill(); }
+  try{ checkParents(); }catch{} }   // re-verify declared parents against the (dis)connected wallet
 async function connectWallet(){
   const w=xtrataWallet();
-  if(!w||!w.connect){ alert('Wallet bundle not loaded.\n\nThis wizard connects through the Xtrata site’s bundled wallet (window.XtrataWallet). Build site-integration/agent-one-wallet and load it next to this page, or open the wizard inside the Xtrata site. See site-integration/HANDOFF.md.'); return; }
-  try{ const addr=await w.connect(); if(addr) setWallet(addr); else alert('Connected, but no Stacks address was returned.'); }
-  catch(e){ alert('Connect failed:\n'+((e&&e.message)||e)); }
+  if(!w||!w.connect){ alert('Wallet bundle not loaded.\n\nThis wizard connects through the bundled wallet shim (window.XtrataWallet). Rebuild agent-one.js, or open the wizard from the Xtrata site.'); return null; }
+  try{ const addr=await w.connect(); if(addr){ setWallet(addr); return addr; } alert('Connected, but no Stacks address was returned.'); return null; }
+  catch(e){ alert('Connect failed:\n'+((e&&e.message)||e)); return null; }
 }
 async function disconnectWallet(){ try{ const w=xtrataWallet(); if(w&&w.disconnect) await w.disconnect(); }catch{} setWallet(null); }
 $('#connectBtn').onclick=()=>{ WALLET?disconnectWallet():connectWallet(); };
-$('#walletAddr').onclick=walletPillClick;   // disconnect lives on the button; the pill reveals/copies
+$('#walletAddr').onclick=walletPillClick;
 (function(){ try{ const w=xtrataWallet(); const a=w&&w.getAddress&&w.getAddress(); if(a) setWallet(a); }catch{} })();
 
-// ---- New: category/type ----
+// ---- category/type autodetect ----
 const catSel=$('#category'), ftSel=$('#ftype');
 Object.keys(CONTENT).forEach(c=>catSel.add(new Option(c,c)));
 function fillTypes(){ ftSel.innerHTML=''; Object.keys(CONTENT[catSel.value]).forEach(t=>ftSel.add(new Option(t+' ('+CONTENT[catSel.value][t]+')',t))); }
-catSel.onchange=fillTypes; fillTypes();
+catSel.onchange=()=>{ fillTypes(); renderFileLines(); renderPreview(); };
+ftSel.onchange=()=>{ renderFileLines(); renderPreview(); };
+fillTypes();
 function slug(s){ return (s.toLowerCase().replace(/\.[^.]+$/,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,48))||'asset'; }
-// extension → [category,type]; .weba/.opus resolve to AUDIO so Opus-in-WebM is never tagged video
 const EXT={ weba:['audio','weba'],opus:['audio','opus'],mp3:['audio','mp3'],wav:['audio','wav'],ogg:['audio','ogg'],oga:['audio','ogg'],
   mp4:['video','mp4'],m4v:['video','mp4'],webm:['video','webm'],mov:['video','mov'],
   png:['image','png'],jpg:['image','jpeg'],jpeg:['image','jpeg'],gif:['image','gif'],svg:['image','svg'],webp:['image','webp'],
   pdf:['document','pdf'],html:['document','html'],htm:['document','html'],md:['document','md'],txt:['document','txt'],
   json:['data','json'],bin:['data','bin'] };
-let selectedFile=null;
 function detectFromName(name){ const ext=(name.match(/\.([a-z0-9]+)$/i)||[])[1]; const hit=ext&&EXT[ext.toLowerCase()];
   if(hit){ catSel.value=hit[0]; fillTypes(); ftSel.value=hit[1]; }
   if(!$('#uri').value){ $('#uri').value=`xtrata:${catSel.value}/${slug(name)}`; } }
-$('#file').addEventListener('input',()=>{ if($('#file').value.trim()){ selectedFile=null; $('#picker').value=''; $('#fileInfo').innerHTML=''; } });
-$('#file').addEventListener('blur',()=>{ const v=$('#file').value.trim(); if(v){ detectFromName(v.split(/[\\/]/).pop()); $('#estimateBtn').click(); } });
+
+// ============================================================================
+// THE RAILROAD — drop → review (auto-optimise + auto-quote) → pay → inscribed.
+// ============================================================================
+const FLOW = {
+  original:null,     // File as dropped
+  optimized:null,    // { file, originalBytes, optimizedBytes } when conversion won
+  useOriginal:false, // revert toggle
+  optRun:0,          // cancels stale optimisation passes
+  quote:null,        // last estimate for the ACTIVE bytes
+  quoteRun:0,
+  jobId:null,        // active job once created
+  done:false,
+};
+FLOW.activeFile = () => (FLOW.optimized && !FLOW.useOriginal) ? FLOW.optimized.file : FLOW.original;
+
+function setStep(step){
+  const order=['drop','review','pay','done'];
+  const idx=order.indexOf(step);
+  document.querySelectorAll('#stepper .step').forEach((el)=>{
+    const i=order.indexOf(el.dataset.step);
+    el.classList.toggle('done', i<idx);
+    el.classList.toggle('on', i===idx);
+  });
+}
+
 const dz=$('#dropzone'), picker=$('#picker');
-$('#pickBtn').onclick=()=>picker.click();
-picker.onchange=()=>{ if(picker.files[0]) setFile(picker.files[0]); };
+dz.onclick=()=>picker.click();
+dz.onkeydown=(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); picker.click(); } };
+picker.onchange=()=>{ if(picker.files[0]) onFile(picker.files[0]); };
 ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));
 ['dragleave','dragend'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag');}));
-dz.addEventListener('drop',e=>{ e.preventDefault(); dz.classList.remove('drag'); const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) setFile(f); });
-function setFile(f){ selectedFile=f; $('#file').value=''; detectFromName(f.name); $('#fileInfo').innerHTML=`<b>${esc(f.name)}</b> · ${(f.size/1048576).toFixed(3)} MiB`
-  + ((/\.mp3$/i.test(f.name)||/audio\/mpeg/i.test(f.type||''))
-      ? `<div style="margin-top:6px;color:var(--mut)">🎵 Suno MP3 with embedded art? The <a href="./suno.html">SUNO fast-track</a> auto-builds a full player (Opus + cover + lyrics) in one payment.</div>`
-      : ''); $('#estimateBtn').click(); }
+dz.addEventListener('drop',e=>{ e.preventDefault(); dz.classList.remove('drag'); const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) onFile(f); });
 
-$('#estimateBtn').onclick=async()=>{
-  const el=$('#estimate'); const margin=$('#margin').value||'0';
-  let payload; if(selectedFile){ payload={bytes:selectedFile.size,marginUstx:margin}; } else { const file=$('#file').value.trim(); if(!file){ el.innerHTML='<div class="err">Drop a file, open one, or paste a server path.</div>'; return; } payload={file,marginUstx:margin}; }
-  el.innerHTML='<div class="muted">Estimating…</div>';
-  try{ const e=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
+function renderFileLines(){
+  const f=FLOW.activeFile(); if(!f) return;
+  $('#fileLine').textContent=`${f.name} · ${mib(f.size)}`;
+  $('#typeLine').textContent=CONTENT[catSel.value][ftSel.value]||f.type||'—';
+}
+
+// ---- live preview: exactly the bytes that will go on-chain ----
+let previewUrl=null, previewRun=0;
+function clearPreview(){ if(previewUrl){ try{URL.revokeObjectURL(previewUrl);}catch{} previewUrl=null; }
+  $('#previewBody').innerHTML=''; $('#previewBlock').hidden=true; $('#previewFootnote').hidden=true; }
+async function renderPreview(){
+  const f=FLOW.activeFile(); const run=++previewRun;
+  clearPreview(); if(!f) return;
+  const body=$('#previewBody'), note=$('#previewNote'), foot=$('#previewFootnote');
+  const mime=(CONTENT[catSel.value]&&CONTENT[catSel.value][ftSel.value])||f.type||'';
+  $('#previewBlock').hidden=false; note.textContent=mime||'unknown type';
+  const url=()=>{ previewUrl=URL.createObjectURL(f); return previewUrl; };
+  if(mime.startsWith('image/')){ body.innerHTML=`<img alt="Preview of ${esc(f.name)}">`; body.firstChild.src=url(); }
+  else if(mime.startsWith('audio/')){ body.innerHTML=`<audio controls></audio>`; body.firstChild.src=url();
+    if(FLOW.optimized) { foot.hidden=false; foot.textContent='You are hearing the '+(FLOW.useOriginal?'ORIGINAL file.':'OPTIMISED Opus file — toggle “Use the original file instead” below to compare.'); } }
+  else if(mime.startsWith('video/')){ body.innerHTML=`<video controls></video>`; body.firstChild.src=url(); }
+  else if(mime==='text/html'){ body.innerHTML=`<iframe sandbox="allow-scripts" title="HTML preview"></iframe>`; body.firstChild.src=url();
+    foot.hidden=false; foot.textContent='Runs sandboxed. On-chain references (e.g. /inscription/…) only resolve once inscribed, so recursive parts may not load in this local preview.'; }
+  else if(mime==='application/pdf'){ body.innerHTML=`<iframe title="PDF preview"></iframe>`; body.firstChild.src=url(); }
+  else if(mime.startsWith('text/')||mime==='application/json'){
+    const CAP=20000; const txt=await f.slice(0,CAP).text(); if(run!==previewRun) return;
+    body.innerHTML='<pre></pre>';
+    body.firstChild.textContent=txt+(f.size>CAP?`\n… (${(f.size-CAP).toLocaleString()} more bytes not shown)`:'');
+  }
+  else { body.innerHTML=`<div class="muted" style="padding:14px;text-align:center">No inline preview for “${esc(mime||'unknown')}” — the file is inscribed byte-for-byte regardless.</div>`; }
+}
+
+async function onFile(file){
+  FLOW.original=file; FLOW.optimized=null; FLOW.useOriginal=false; FLOW.quote=null;
+  FLOW.jobId=null; FLOW.done=false; $('#activeJobDetail').innerHTML='';
+  picker.value='';
+  dz.classList.add('compact');
+  $('#dropMain').innerHTML=`<span class="filechip">${esc(file.name)} · ${mib(file.size)}</span>`;
+  $('#dropSub').textContent='drop another file to replace';
+  $('#reviewCard').hidden=false;
+  $('#newErr').textContent='';
+  detectFromName(file.name);
+  $('#uri').value=`xtrata:${catSel.value}/${slug(file.name)}`;
+  renderFileLines(); renderPreview();
+  $('#sunoHint').hidden=!/\.mp3$/i.test(file.name);
+  setStep('review');
+  $('#reviewCard').scrollIntoView({behavior:'smooth',block:'start'});
+
+  // Auto-optimise audio, then quote on whatever wins. Skip resolves INSTANTLY
+  // (the encoder result is ignored when it lands late) so the railroad is
+  // never held hostage by the audio engine.
+  const opt=window.XtrataAudioOptimizer;
+  const run=++FLOW.optRun;
+  const row=$('#optRow');
+  if(opt&&opt.isCandidate(file.name,file.size)){
+    row.hidden=false; $('#optSpin').hidden=false; $('#optSkipBtn').hidden=false;
+    $('#optSavings').hidden=true; $('#optRevertWrap').hidden=true;
+    $('#optText').textContent='Audio optimisation: converting to Opus HQ (smaller file, same listening quality)…';
+    const signal={aborted:false};
+    let skipNow; const skipPromise=new Promise((r)=>{ skipNow=r; });
+    $('#optSkipBtn').onclick=()=>{ signal.aborted=true; skipNow({file, originalBytes:file.size, skipped:'skipped-by-user'}); };
+    quote(); // provisional quote on the original while the encoder works
+    const res=await Promise.race([
+      opt.optimize(file,(m)=>{ if(run===FLOW.optRun) $('#optText').textContent='Audio optimisation: '+m; },{signal}),
+      skipPromise
+    ]);
+    if(run!==FLOW.optRun) return; // a newer file replaced this one mid-encode
+    $('#optSpin').hidden=true; $('#optSkipBtn').hidden=true;
+    if(res.optimizedBytes){
+      FLOW.optimized=res;
+      const pct=Math.round((1-res.optimizedBytes/res.originalBytes)*100);
+      $('#optText').textContent='Audio optimised to Opus HQ — same listening quality, cheaper to inscribe';
+      $('#optSavings').hidden=false;
+      $('#optSavings').textContent=`${mib(res.originalBytes)} → ${mib(res.optimizedBytes)} (−${pct}%)`;
+      $('#optRevertWrap').hidden=false; $('#optRevert').checked=false;
+      detectFromName(res.file.name); $('#uri').value=`xtrata:audio/${slug(file.name)}`;
+      renderFileLines(); renderPreview(); quote();
+    } else {
+      row.hidden=(res.skipped==='not-audio'||res.skipped==='too-small');
+      $('#optText').textContent={
+        'already-opus':'Audio optimisation: already Opus — nothing to squeeze.',
+        'already-efficient':'Audio optimisation: already efficient — keeping the original.',
+        'engine-unavailable':'Audio optimisation unavailable right now — inscribing the original as-is.',
+        'failed':'Audio optimisation failed safely — inscribing the original as-is.',
+        'skipped-by-user':'Audio optimisation skipped — inscribing the original as-is.',
+      }[res.skipped]||'Keeping the original file.';
+    }
+  } else { row.hidden=true; quote(); }
+}
+
+$('#optRevert').onchange=()=>{
+  FLOW.useOriginal=$('#optRevert').checked;
+  const f=FLOW.activeFile();
+  detectFromName(f.name);
+  $('#uri').value=`xtrata:${catSel.value}/${slug(FLOW.original.name)}`;
+  renderFileLines(); renderPreview(); quote();
+};
+
+// ---- quote (auto) ----
+function parentList(){ return $('#parents').value.split(',').map(s=>s.trim()).filter(Boolean); }
+function depsList(){ return $('#deps').value.split(',').map(s=>s.trim()).filter(Boolean); }
+
+// ---- live parent-ownership check: instant green/red per id as you type ----
+let parentsCheckRun=0, parentsCheckTimer=null;
+async function checkParents(){
+  const box=$('#parentsCheck'); if(!box) return;
+  const ids=parentList(); const run=++parentsCheckRun;
+  if(!ids.length){ box.innerHTML=''; return; }
+  if(!ids.every(d=>/^\d+$/.test(d))){ box.innerHTML='<span style="color:var(--bad)">Parents must be numeric token ids.</span>'; return; }
+  if(new Set(ids).size!==ids.length){ box.innerHTML='<span style="color:var(--bad)">Duplicate parent token ids.</span>'; return; }
+  if(SERVER.mock){ box.innerHTML='<span class="muted">MOCK mode — ownership not checked.</span>'; return; }
+  const A=window.XtrataAgent;
+  if(!A||!A.ownerOf){ box.innerHTML='<span class="muted">Ownership check unavailable (old agent bundle).</span>'; return; }
+  box.innerHTML=ids.map(id=>`<span class="muted" data-pid="${esc(id)}">⏳ #${esc(id)} — checking current owner…</span>`).join('');
+  for(const id of ids){
+    let owner=null; try{ owner=await A.ownerOf(id); }catch{ owner=null; }
+    if(run!==parentsCheckRun) return; // input changed mid-flight
+    const el=box.querySelector(`[data-pid="${id}"]`); if(!el) continue;
+    if(owner&&WALLET&&owner===WALLET){ el.innerHTML=`<span class="ok">✓ #${esc(id)} — owned by your connected wallet</span>`; }
+    else if(!owner){ el.innerHTML=`<span style="color:var(--bad)">✗ #${esc(id)} — no owner found (wrong id?)</span>`; }
+    else if(!WALLET){ el.innerHTML=`<span style="color:var(--warn)">#${esc(id)} — owned by ${esc(shortAddr(owner))}. Connect your wallet to confirm it's yours.</span>`; }
+    else { el.innerHTML=`<span style="color:var(--bad)">✗ #${esc(id)} — owned by ${esc(shortAddr(owner))}, not your connected wallet. Escrow would auto-refund.</span>`; }
+  }
+}
+$('#parents').addEventListener('input',()=>{ if(parentsCheckTimer)clearTimeout(parentsCheckTimer); parentsCheckTimer=setTimeout(checkParents,500); });
+async function quote(){
+  const f=FLOW.activeFile(); if(!f) return;
+  const run=++FLOW.quoteRun;
+  $('#quoteTotal').textContent='…';
+  $('#inscribeBtn').disabled=true;
+  try{
+    const e=await api('/api/estimate',{method:'POST',body:{bytes:f.size,marginUstx:$('#margin').value||'0',parentCount:parentList().length}});
+    if(run!==FLOW.quoteRun) return;
+    FLOW.quote=e;
     const usd=(u)=> e.stxUsd ? ' · ~$'+(Number(u)/1e6*e.stxUsd).toFixed(2) : '';
-    el.innerHTML = `<div class="deposit">
-      <div class="kv"><span>Size</span><span>${(e.bytes/1048576).toFixed(3)} MiB · ${e.bytes.toLocaleString()} bytes</span></div>
+    $('#quoteTotal').textContent=stx(e.requiredUstx)+(e.stxUsd?` (~$${(Number(e.requiredUstx)/1e6*e.stxUsd).toFixed(2)})`:'');
+    $('#quoteBody').innerHTML=`
+      <div class="kv"><span>Size</span><span>${mib(e.bytes)} · ${e.bytes.toLocaleString()} bytes</span></div>
       <div class="kv"><span>Chunks</span><span>${e.chunks} · ${e.single?'single-tx':'staged ('+e.batches+' batches)'}</span></div>
       <div class="kv"><span>Xtrata protocol fee</span><span>${stx(e.protocolFee)}${usd(e.protocolFee)}</span></div>
       <div class="kv"><span>Receipt inscription</span><span>${stx(e.receiptProtocol||'0')}${usd(e.receiptProtocol||'0')}</span></div>
       <div class="kv"><span>Network (miner) reserve</span><span>${stx((BigInt(e.minerReserve)+BigInt(e.receiptMiner||'0')).toString())}${usd((BigInt(e.minerReserve)+BigInt(e.receiptMiner||'0')).toString())}</span></div>
       <div class="kv"><span>Agent fee (${e.agentFeePct}%)</span><span style="color:var(--acc2)">${stx(e.agentFeeUstx||'0')}${usd(e.agentFeeUstx||'0')}</span></div>
-      <div class="kv"><span><b>Required deposit</b></span><span class="big">${stx(e.requiredUstx)}${usd(e.requiredUstx)}</span></div>
-      <div class="muted" style="font-size:11px;margin-top:8px">Includes a 2nd inscription (the receipt) and the ${e.agentFeePct}% agent fee. Over-collected; unused remainder refunded on delivery.</div>
-    </div>`;
-  }catch(err){ el.innerHTML='<div class="err">'+esc(err.message)+'</div>'; }
+      <div class="kv"><span><b>Required deposit</b></span><span><b>${stx(e.requiredUstx)}${usd(e.requiredUstx)}</b></span></div>
+      <div class="muted" style="font-size:11px;margin-top:8px">Over-collected on purpose; the unused remainder is refunded on delivery.</div>`;
+    $('#inscribeBtn').disabled=false;
+    $('#inscribeBtn').textContent=`Inscribe — pay ${stx(e.requiredUstx)}`;
+  }catch(err){ if(run===FLOW.quoteRun){ $('#quoteTotal').textContent='—'; $('#quoteBody').innerHTML='<div class="err">'+esc(err.message)+'</div>'; } }
+}
+$('#margin').addEventListener('change',quote);
+$('#parents').addEventListener('change',quote);
+
+// ---- options wiring ----
+$('#manualMode').onchange=()=>{ const manual=$('#manualMode').checked;
+  $('#userWrap').style.display=manual?'':'none';
+  $('#payHint').innerHTML=manual
+    ?'Manual mode: fund the one-shot deposit address, then run &amp; deliver from the job card below.'
+    :'⚡ Fast-track: pay from your connected wallet and the inscription + change return to it automatically.';
 };
+$('#openGraphLink').onclick=(e)=>{ e.preventDefault(); const g=$('#graphSection'); g.open=true; g.scrollIntoView({behavior:'smooth',block:'start'}); drawGraph(); };
 
-$('#clearBtn').onclick=()=>{ selectedFile=null; ['file','user','deps','parents','uri'].forEach(id=>$('#'+id).value=''); $('#margin').value='0'; $('#picker').value=''; $('#fileInfo').innerHTML=''; $('#estimate').innerHTML=''; $('#deposit').innerHTML=''; $('#newErr').textContent=''; };
-$('#fastTrack').onchange=()=>{ $('#userWrap').style.display=$('#fastTrack').checked?'none':''; };
-$('#fastTrack').onchange();   // apply default (fast-track on) at load
-
-$('#createBtn').onclick=async()=>{
+// ---- create the job & railroad to payment ----
+$('#inscribeBtn').onclick=async()=>{
   const err=$('#newErr'); err.textContent='';
-  const fast=$('#fastTrack').checked;
+  const file=FLOW.activeFile();
+  if(!file){ err.textContent='Drop a file first.'; return; }
+  const manual=$('#manualMode').checked;
+  const fast=!manual;
   const user=$('#user').value.trim();
-  const deps=$('#deps').value.split(',').map(s=>s.trim()).filter(Boolean);
-  const srcName=selectedFile?selectedFile.name:(($('#file').value.trim().split(/[\\/]/).pop())||'asset');
-  const uri=$('#uri').value.trim()||`xtrata:${catSel.value}/${slug(srcName)}`;
-  if(!selectedFile && !$('#file').value.trim()){ err.textContent='Drop a file, open one, or paste a server path.'; return; }
-  if(fast && !WALLET){ err.textContent='Connect your wallet (top-right) to use Fast-track — that address receives the inscription + change.'; connectWallet(); return; }
-  if(!fast && !ADDR_RE.test(user)){ err.textContent='Delivery address must be a valid SP…/SM… principal (or enable Fast-track).'; return; }
+  const deps=depsList();
+  const parents=parentList();
+  const uri=$('#uri').value.trim()||`xtrata:${catSel.value}/${slug(file.name)}`;
   if(!deps.every(d=>/^\d+$/.test(d))){ err.textContent='Dependencies must be token-id uints.'; return; }
-  const parents=$('#parents').value.split(',').map(s=>s.trim()).filter(Boolean);
   if(!parents.every(d=>/^\d+$/.test(d))){ err.textContent='Parents must be token-id uints.'; return; }
   if(new Set(parents).size!==parents.length){ err.textContent='Duplicate parent token ids.'; return; }
-  $('#createBtn').disabled=true;
+  if(fast&&!WALLET){ const a=await connectWallet(); if(!a){ err.textContent='Connect your wallet to use fast-track — it receives the inscription + change.'; return; } }
+  if(manual&&!ADDR_RE.test(user)){ err.textContent='Delivery address must be a valid SP…/SM… principal (or untick manual delivery).'; return; }
+  $('#inscribeBtn').disabled=true;
   try{
-    if(!selectedFile){ err.textContent='Drop a file or open one — backendless mode inscribes the file straight from your browser (no server paths).'; $('#createBtn').disabled=false; return; }
-    const payload={ file:selectedFile, uri, mime:CONTENT[catSel.value][ftSel.value], deps, parents, marginUstx:$('#margin').value||'0', fastTrack:fast };
+    const payload={ file, uri, mime:CONTENT[catSel.value][ftSel.value]||file.type||'application/octet-stream',
+      deps, parents, marginUstx:$('#margin').value||'0', fastTrack:fast };
     payload.user = fast ? WALLET : user;
-    if(fast) payload.expectedFunder = WALLET;   // railroad: ONLY this wallet may fund; any other payer is auto-refunded, nothing inscribed
-    const {job}=await api('/api/jobs',{method:'POST',body:payload});   // the File goes straight into XtrataAgent.createJob — no upload
-    $('#deposit').innerHTML = SERVER.mock ? `<div class="deposit" style="border-color:#5a4620;background:linear-gradient(180deg,#1c160a,#140f08)">
-      <div class="kv"><span>Job</span><span>${esc(job.jobId)}</span></div>
-      <div class="kv"><span><b>MOCK mode</b></span><span class="big" style="color:var(--warn)">no real STX</span></div>
-      <div class="muted" style="font-size:12px;margin-top:8px">${fast?'⚡ Fast-track auto-runs this simulated job — opening <b>Jobs</b> to watch.':'Dry run — <b style="color:var(--warn)">do not send STX</b>. Open <b>Jobs</b>, select this job, click <b>Run</b>.'}</div>
-    </div>` : `<div class="deposit">
-      <div class="kv"><span>Job</span><span>${esc(job.jobId)}</span></div>
-      <div class="kv"><span>Deposit address ${copyBtn(job.depositAddress)}</span><span>${esc(job.depositAddress)}</span></div>
-      <div class="kv"><span><b>Send exactly</b></span><span class="big">${stx(job.requiredUstx)}</span></div>
-      ${parents.length?`<div class="kv"><span><b>Also send parent${parents.length>1?'s':''}</b></span><span>inscription #${parents.map(esc).join(', #')} → this same address</span></div>
-      <div class="muted" style="font-size:11px;margin-top:4px">Transfer the parent inscription${parents.length>1?'s':''} to the deposit address (any order, within 15 min of paying). Wrong or missing parent? Everything — inscriptions and STX — is automatically returned to you.</div>`:''}
-      <div class="btnrow"><button class="btn" onclick="openWallet('${esc(job.depositAddress)}','${esc(job.requiredUstx)}')">Open wallet to pay ${stx(job.requiredUstx)}</button></div>
-      <div class="muted" style="font-size:11px;margin-top:8px">${fast?'⚡ Fast-track: as soon as this lands, it inscribes and returns the token + change to the wallet you pay from. Tracking in <b>Jobs</b>…':'One-shot address — fund once for this job only. Then open <b>Jobs</b> to run &amp; deliver.'}</div>
-    </div>`;
-    err.innerHTML='<span class="ok">Job created.</span>';
-    if(fast){ document.querySelector('nav button[data-tab="jobs"]').click(); selectJob(job.jobId); }
-  }catch(e){ err.textContent=e.message; } finally{ $('#createBtn').disabled=false; }
+    if(fast) payload.expectedFunder = WALLET;   // railroad: ONLY this wallet may fund; any other payer is auto-refunded
+    const {job}=await api('/api/jobs',{method:'POST',body:payload});
+    FLOW.jobId=job.jobId; FLOW.done=false;
+    setStep('pay');
+    startJobsPoll(); jobsTick();
+    if(!SERVER.mock){ openWallet(job.depositAddress, job.requiredUstx); }
+    setTimeout(()=>{ const el=$('#activeJobDetail'); if(el&&el.firstChild) el.scrollIntoView({behavior:'smooth',block:'start'}); },250);
+  }catch(e){ err.textContent=e.message; $('#inscribeBtn').disabled=false; }
 };
 
-// ---- Graph ----
+function resetFlow(){
+  FLOW.original=null; FLOW.optimized=null; FLOW.useOriginal=false; FLOW.quote=null;
+  FLOW.jobId=null; FLOW.done=false; FLOW.optRun++; FLOW.quoteRun++;
+  $('#activeJobDetail').innerHTML='';
+  $('#reviewCard').hidden=true;
+  dz.classList.remove('compact');
+  $('#dropMain').textContent='Drop a file to inscribe';
+  $('#dropSub').textContent='or click to browse — images, audio, video, documents, HTML, JSON, anything';
+  ['uri','deps','parents','user'].forEach(id=>$('#'+id).value='');
+  $('#margin').value='0'; $('#optRevert').checked=false; $('#optRow').hidden=true; $('#sunoHint').hidden=true;
+  $('#parentsCheck').innerHTML=''; parentsCheckRun++;
+  clearPreview();
+  $('#newErr').textContent='';
+  setStep('drop');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+window.resetFlow=resetFlow;
+
+// ============================================================================
+// Jobs — one steady poll drives the active card, the table and any open
+// history detail. Rendering logic preserved from the tabbed wizard.
+// ============================================================================
+let selJob=null, pollTimer=null;
+let lastProgAt=0, expiryAt=0;   // active-flow countdowns only
+async function loadJobs(){
+  try{ const {jobs}=await api('/api/jobs'); const b=$('#jobsBody');
+    if(!jobs.length){ b.innerHTML='<tr><td colspan="6" class="muted">No jobs yet.</td></tr>'; return jobs; }
+    b.innerHTML=jobs.map(j=>{ const ds=(j.status==='AWAITING_DEPOSIT'&&j.funded)?'FUNDED':j.status; return `<tr onclick="selectJob('${j.jobId}')" class="${selJob===j.jobId?'sel':''}">
+      <td class="mono">${esc(j.jobId.replace('job-',''))}</td><td>${esc(j.uri||'')}</td>
+      <td>${(j.bytes/1048576).toFixed(2)}M</td><td class="mono">${stx(j.requiredUstx)}</td>
+      <td><span class="status s-${ds}">${ds.replace('_',' ')}</span></td><td class="mono">${j.tokenId||'—'}</td></tr>`; }).join('');
+    return jobs;
+  }catch(e){ $('#jobsBody').innerHTML=`<tr><td colspan="6" class="err">${esc(e.message)}</td></tr>`; return []; }
+}
+$('#refreshJobs').onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); loadJobs(); };
+async function jobsTick(){ try{ await Promise.all([
+  ($('#historySection').open||FLOW.jobId)?loadJobs():Promise.resolve(),
+  FLOW.jobId?renderJobDetail(FLOW.jobId,$('#activeJobDetail'),true):Promise.resolve(),
+  (selJob&&selJob!==FLOW.jobId)?renderJobDetail(selJob,$('#jobDetail'),false):Promise.resolve(),
+]); }catch(e){} }
+function startJobsPoll(){ if(pollTimer)clearInterval(pollTimer); pollTimer=setInterval(jobsTick,3000); }
+function stopJobsPoll(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
+async function selectJob(id){ selJob=id; if(id===FLOW.jobId){ $('#jobDetail').innerHTML='<div class="muted" style="margin-top:10px">That job is live in the card above.</div>'; loadJobs(); return; } loadJobs(); renderJobDetail(id,$('#jobDetail'),false); startJobsPoll(); }
+$('#historySection').addEventListener('toggle',()=>{ if($('#historySection').open){ loadJobs(); startJobsPoll(); } else if(!FLOW.jobId){ stopJobsPoll(); } });
+
+async function renderJobDetail(jobId,out,isActive){
+  if(!jobId||!out)return;
+  try{ const {job,status}=await api('/api/jobs/'+jobId);
+    const funded=status.funded, st=job.status;
+    const active=(st==='FUNDED'||st==='INSCRIBING'||st==='DELIVERING'||(st==='INSCRIBED'&&job.fastTrack));
+    if(isActive){ if(active){ if(!lastProgAt) lastProgAt=Date.now(); } else lastProgAt=0; }
+    const ds=(st==='AWAITING_DEPOSIT'&&funded)?'FUNDED':st;
+    const phaseMsg={FUNDED:'Payment detected — starting…',INSCRIBING:'Inscribing on-chain…',INSCRIBED:'Inscribed — delivering…',DELIVERING:'Delivering inscription + refunding change…'}[st];
+    const showDeposit=(st==='AWAITING_DEPOSIT');
+    if(isActive){
+      expiryAt = (showDeposit && job.createdAt && SERVER.windowMs) ? (Date.parse(job.createdAt) + SERVER.windowMs*12)
+        : (st==='AWAITING_PARENT' && job.fundedAt && SERVER.parentWindowMs) ? (Date.parse(job.fundedAt) + SERVER.parentWindowMs) : 0;
+      if(st==='COMPLETE'&&!FLOW.done){ FLOW.done=true; setStep('done'); }
+      else if(st!=='COMPLETE'&&funded&&FLOW.done===false){ /* keep pay step lit until done */ }
+    }
+    // ---- Parent escrow checklist (jobs with declared parents) ----
+    let parentPanel='';
+    const parents=(job.parents||[]).map(String);
+    if(parents.length && ['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING'].includes(st)){
+      const ps=status.parents||{held:[],missing:parents,unexpected:[]};
+      if(!(ps.missing||[]).length) delete PARENT_MSG[job.jobId];
+      const pi=PARENT_INFO[job.jobId]||{};
+      const stxDone=funded||!!job.depositReceivedUstx;
+      parentPanel=`<div style="margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px">
+        <div style="font-weight:700;margin-bottom:6px">Escrow checklist <span class="muted" style="font-weight:400">— two sends, any order; parent + child + change all return to you</span></div>
+        <div class="kv"><span>Deposit address ${copyBtn(job.depositAddress)}</span><span class="mono">${esc(job.depositAddress)}</span></div>
+        <div class="kv"><span>1 · STX deposit (${stx(status.requiredUstx)})</span><span>${stxDone?'<span class="ok">✓ arrived</span>':(status.pending?'<span style="color:var(--warn)">⏳ seen in mempool — confirming…</span>':'<span class="muted">awaiting</span>')}</span></div>
+        ${parents.map((p,i)=>{
+          const held=(ps.held||[]).map(String).includes(p);
+          const own=pi[p];
+          let right;
+          if(held) right='<span class="ok">✓ arrived at deposit wallet</span>';
+          else if(own&&WALLET&&own===WALLET) right=`<span class="ok">✓ in your connected wallet</span> <button class="btn" style="padding:4px 10px;margin-left:8px" onclick="sendParent('${esc(job.jobId)}','${esc(p)}')">Send #${esc(p)} to deposit now</button>`;
+          else if(own&&own===job.depositAddress) right='<span class="ok">✓ arrived at deposit wallet</span>';
+          else if(own) right=`<span style="color:var(--warn)">held by ${esc(own.slice(0,5)+'…'+own.slice(-4))} — connect that wallet, or transfer #${esc(p)} to the deposit address from it</span>`;
+          else right='<span class="muted">checking current owner…</span>';
+          return `<div class="kv"><span>${i+2} · Parent inscription #${esc(p)}</span><span>${right}</span></div>`;}).join('')}
+        ${PARENT_MSG[job.jobId]?`<div style="margin-top:6px;font-size:12px;${PARENT_MSG[job.jobId].err?'color:var(--bad)':'color:var(--ok)'}">${PARENT_MSG[job.jobId].text}</div>`:''}
+        ${(ps.unexpected&&ps.unexpected.length)?`<div class="err" style="margin-top:6px">⚠ Unexpected inscription #${ps.unexpected.map(esc).join(', #')} arrived — it is not a declared parent. Everything will be returned to the sender automatically.</div>`:''}
+        <div class="muted" style="font-size:11px;margin-top:6px">The parent is only borrowed for the mint — it comes straight back with your new inscription.${(st==='AWAITING_PARENT'&&isActive)?' <b id="expT"></b>':''}</div>
+      </div>`;
+      maybeCheckParents(job.jobId);
+    }
+    out.innerHTML=`<div class="card"><h3>${isActive?'Your inscription':esc(job.jobId)} <span class="status s-${ds}">${ds.replace(/_/g,' ')}</span>${job.fastTrack?' <span class="status" style="color:var(--acc2);border-color:#3a2f7a">⚡ fast-track</span>':''}</h3>
+      ${isActive?`<div class="muted" style="font-size:12px;margin:-2px 0 8px">job ${esc(job.jobId)}</div>`:''}
+      ${job.mock?'<div class="muted" style="margin:-2px 0 8px;color:var(--warn)">MOCK job — simulated, no real funds.</div>':''}
+      <div class="kv"><span>Inscription</span><span>${esc(job.uri)}</span></div>
+      ${showDeposit?`<div class="kv"><span>Deposit address ${copyBtn(job.depositAddress)}</span><span>${esc(job.depositAddress)}</span></div>
+      <div class="kv"><span>Send exactly</span><span class="big-num" style="font-size:19px">${stx(status.requiredUstx)}</span></div>
+      ${!job.mock?`<div class="btnrow"><button class="btn" onclick="openWallet('${esc(job.depositAddress)}','${esc(status.requiredUstx)}')">Open wallet to pay ${stx(status.requiredUstx)}</button></div>`:''}
+      ${job.fastTrack&&job.expectedFunder?`<div class="kv"><span>Pay from this wallet only ${copyBtn(job.expectedFunder)}</span><span class="mono" style="color:var(--ok)">${esc(job.expectedFunder)}</span></div>
+      <div class="muted" style="font-size:12px;margin-top:6px;color:var(--warn)">⚠ Locked to the wallet above. A payment from any other wallet is automatically returned to the sender — nothing is inscribed.</div>`:''}
+      <div class="muted" style="font-size:12px;margin-top:8px">↩︎ Guaranteed temporary — if not funded &amp; started in time, this auto-cancels and returns any funds${parents.length?' <b>and inscriptions</b>':''}. ${isActive?'<b id="expT"></b>':''}</div>`:''}
+      ${st==='AWAITING_PARENT'?`<div class="progress"><span class="spin"></span>Deposit received ✓ — waiting for the parent inscription to arrive at the deposit wallet…</div>`:''}
+      ${parentPanel}
+      ${job.parentReturnTxs&&job.parentReturnTxs.length?`<div class="kv"><span>Parent${job.parentReturnTxs.length>1?'s':''} returned</span><span class="ok">✓ #${job.parentReturnTxs.map(x=>esc(x.id)).join(', #')} sent home</span></div>`:''}
+      ${job.user?`<div class="kv"><span>${job.fastTrack?'Returns to your wallet':'Delivery address'}</span><span class="mono">${esc(job.user)}</span></div>`:(job.fastTrack?`<div class="kv"><span>Returns to</span><span class="muted">the wallet you pay from (auto-detected)</span></div>`:'')}
+      ${job.tokenId?`<div class="kv"><span>Inscription token</span><span class="ok">#${esc(job.tokenId)}</span></div>`:''}
+      ${job.receiptTokenId?`<div class="kv"><span>Receipt token</span><span class="ok">#${esc(job.receiptTokenId)}</span></div>`:''}
+      ${job.agentFeeUstx?`<div class="kv"><span>Agent fee (${job.agentFeePct||10}%)</span><span style="color:var(--acc2)">${stx(job.agentFeeUstx)}</span></div>`:''}
+      ${(job.refundedUstx!=null)?`<div class="kv"><span>Change refunded</span><span>${stx(job.refundedUstx||'0')}</span></div>`:''}
+      ${active?`<div class="progress"><span class="spin"></span>${esc(phaseMsg||'Working…')}${job.progress?(' · '+esc(job.progress)):''} ${isActive?'<span id="progT" class="muted"></span>':''}</div>`:''}
+      ${showDeposit&&!funded?`<div class="muted" style="margin-top:10px;font-size:12px">${job.fastTrack?'Pay from your connected wallet (shown above) — it receives the inscription and any change, and processing starts automatically on arrival. Payments from any other wallet are returned to the sender.':'Waiting for your deposit — the status flips to FUNDED once it lands.'}</div>`:''}
+      ${job.error?`<div class="err" style="margin-top:8px">Error: ${esc(job.error)}${!job.fastTrack?` <button class="btn ghost" onclick="act('run','${esc(job.jobId)}')" style="margin-left:8px;padding:5px 10px">Retry</button>`:''}</div>`:''}
+      ${(!job.fastTrack&&(st==='AWAITING_DEPOSIT'||st==='INSCRIBED'))?`<div class="btnrow">
+        <button class="btn good" onclick="act('run','${esc(job.jobId)}')" ${(funded&&st==='AWAITING_DEPOSIT')?'':'disabled'}>Run inscription</button>
+        <button class="btn warn" onclick="act('deliver','${esc(job.jobId)}')" ${st==='INSCRIBED'?'':'disabled'}>Deliver + refund + wipe key</button>
+      </div><div class="err" id="jobErr"></div>`:''}
+      ${st==='COMPLETE'?`<div class="ok" style="margin-top:12px">✓ Complete — inscription + receipt delivered${job.fastTrack?' to your wallet':''}${(job.parents&&job.parents.length)?`, parent${job.parents.length>1?'s':''} #${job.parents.map(esc).join(', #')} returned to your wallet`:''}, change refunded, deposit key wiped.</div>
+      <div class="btnrow"><button class="btn" onclick="viewReceipt('${esc(job.jobId)}')">View receipt</button>
+        ${job.tokenId?`<a class="btn ghost" style="text-decoration:none;display:inline-block" href="/x/${esc(job.tokenId)}" target="_blank" rel="noopener">View on Xplorer</a>`:''}
+        ${isActive?`<button class="btn alt" onclick="resetFlow()">Inscribe another file</button>`:`<button class="btn ghost" onclick="act('delete','${esc(job.jobId)}')">Delete job</button>`}</div>`:''}
+      ${st==='CANCELLED'?`<div class="muted" style="margin-top:12px">↩︎ Cancelled — ${(job.parents&&job.parents.length)?'all inscriptions (including parents) and funds':'funds'} returned to your wallet and the deposit key discarded.${job.cancelReason?(' ('+esc(job.cancelReason)+')'):''}</div>
+      <div class="btnrow">${isActive?`<button class="btn alt" onclick="resetFlow()">Start again</button>`:''}<button class="btn ghost" onclick="act('delete','${esc(job.jobId)}')">Delete job</button></div>`:''}
+      ${st==='NEEDS_RECOVERY'?`<div class="err" style="margin-top:12px">Auto-refund didn’t confirm — your funds are safe but need a manual sweep: run <b>svc/recover-all.mjs</b>.${job.keepKeyReason?(' '+esc(job.keepKeyReason)):''}</div>`:''}
+    </div>`;
+  }catch(e){ /* transient read (job file mid-write) — keep polling */ }
+}
+// ---- parent escrow: ownership checker + one-click wallet send (aligned to THIS job's deposit only) ----
+const PARENT_INFO={};          // jobId -> { __core:'ADDR.name', <tokenId>: ownerAddress }
+const PARENT_MSG={};           // jobId -> { text, err } — send-status line, survives re-renders
+const parentChkAt={};
+async function maybeCheckParents(jobId){
+  if(Date.now()-(parentChkAt[jobId]||0)<10000) return;   // gentle: re-check owners every ~10 s
+  parentChkAt[jobId]=Date.now();
+  try{ const A=window.XtrataAgent; if(!A||!A.parentInfo) return;
+    const r=await A.parentInfo(jobId); const m={__core:r.core};
+    for(const p of (r.parents||[])) m[String(p.id)]=p.owner||null;
+    PARENT_INFO[jobId]=m;
+  }catch{}
+}
+async function sendParent(jobId,pid){
+  // Same proven path as the site's "Send selected inscription" (ported into the wallet bundle),
+  // except the recipient is HARD-CODED to the active job's deposit address — not editable, so the
+  // parent can never be sent to the wrong place.
+  const w=xtrataWallet();
+  if(!w||!w.sendInscription){ PARENT_MSG[jobId]={err:1,text:'Wallet bundle too old for one-click send — rebuild agent-one.js, or transfer #'+esc(pid)+' to the deposit address manually.'}; jobsTick(); return; }
+  if(!WALLET){ connectWallet(); return; }
+  PARENT_MSG[jobId]={text:'Waiting for wallet confirmation…'}; jobsTick();
+  try{
+    const {job}=await api('/api/jobs/'+jobId);
+    const core=String((PARENT_INFO[jobId]&&PARENT_INFO[jobId].__core)||'').split('.');
+    const r=await w.sendInscription({ contractAddress:core[0]||'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', contractName:core[1]||'xtrata-v3-2-3',
+      tokenId:pid, sender:WALLET, recipient:job.depositAddress, network:SERVER.net||'mainnet' });   // recipient is ALWAYS this job's deposit wallet
+    PARENT_MSG[jobId]={text:'✓ Parent #'+esc(pid)+' transfer submitted'+(r&&r.txId?(' · '+esc(String(r.txId).slice(0,10))+'…'):'')+' — it will show as “arrived” once confirmed.'};
+  }catch(e){ PARENT_MSG[jobId]={err:1,text:'Parent send did not go through: '+esc((e&&e.message)||String(e))+' — you can retry, or send #'+esc(pid)+' to the deposit address from your wallet manually.'}; }
+  parentChkAt[jobId]=0; lastProgAt=Date.now(); jobsTick();
+}
+window.sendParent=sendParent;
+
+async function act(which,jobId){
+  const id=jobId||selJob; if(!id) return;
+  if(which==='deliver' && !confirm('Deliver the inscription, refund the remainder, and permanently wipe the deposit key?')) return;
+  if(which==='delete'){
+    if(!confirm('Delete this job from the list?\nThe inscription stays on-chain — this only removes the local record + receipt.')) return;
+    try{ await api('/api/jobs/'+id+'/delete',{method:'POST'}); if(selJob===id){ selJob=null; $('#jobDetail').innerHTML=''; } if(FLOW.jobId===id){ FLOW.jobId=null; $('#activeJobDetail').innerHTML=''; } loadJobs(); }
+    catch(e){ const errEl=$('#jobErr'); if(errEl){errEl.textContent=e.message;} else alert(e.message); }
+    return;
+  }
+  try{ await api('/api/jobs/'+id+'/'+which,{method:'POST'}); lastProgAt=Date.now(); jobsTick(); startJobsPoll(); }
+  catch(e){ const errEl=$('#jobErr'); if(errEl)errEl.textContent=e.message; }
+}
+function viewReceipt(id){ try{ const A=window.XtrataAgent; const html=A&&A.getReceiptHtml&&A.getReceiptHtml(id); if(!html){ alert('Receipt not generated yet.'); return; } const w=window.open('','_blank'); if(w){ w.document.open(); w.document.write(html); w.document.close(); } else { const b=new Blob([html],{type:'text/html'}); window.open(URL.createObjectURL(b),'_blank'); } }catch(e){ alert('Could not open receipt: '+((e&&e.message)||e)); } }
+window.selectJob=selectJob; window.act=act; window.viewReceipt=viewReceipt;
+setInterval(()=>{ const t=$('#progT'); if(t&&lastProgAt){ const s=Math.round((Date.now()-lastProgAt)/1000); let x=''; if(s>=90)x=' · slower than usual — Stacks may be congested, still working'; else if(s>=30)x=' · confirming on-chain'; t.textContent='('+s+'s'+x+')'; }
+  const et=$('#expT'); if(et&&expiryAt){ const r=expiryAt-Date.now(); et.textContent = r>0 ? ('Auto-returns in '+Math.floor(r/60000)+':'+String(Math.floor(r/1000)%60).padStart(2,'0')) : 'Returning funds…'; } },1000);
+
+// Unfinished business from a previous visit? Point at History instead of interrupting the railroad.
+(async()=>{ try{ const jobs=await loadJobs();
+  const open=(jobs||[]).filter(j=>!['COMPLETE','CANCELLED'].includes(j.status));
+  if(open.length){ const n=$('#resumeNotice'); n.hidden=false;
+    n.innerHTML=`↻ ${open.length} unfinished job${open.length>1?'s':''} from a previous session — open <a href="#" style="color:var(--acc)" onclick="document.getElementById('historySection').open=true;document.getElementById('historySection').scrollIntoView({behavior:'smooth'});return false;">History</a> to resume.`;
+    startJobsPoll(); }
+}catch(e){} })();
+
+// ============================================================================
+// Dependency graph composer (advanced) — logic unchanged from the tabbed wizard.
+// ============================================================================
 let G = load('xao-graph',{nodes:[],edges:[]}); let nid = G.nodes.reduce((m,n)=>Math.max(m,n.id),0)+1;
 function load(k,d){ try{return JSON.parse(localStorage.getItem(k))||d}catch{return d} }
 function saveG(){ localStorage.setItem('xao-graph',JSON.stringify(G)); }
@@ -438,7 +849,7 @@ function showNode(id){ const n=nodeById(id); const out=$('#nodeDetail'); if(!n)r
   if(n.kind==='existing') h+=`<div class="kv"><span>Token id</span><span>#${esc(n.tokenId)}</span></div>`;
   if(n.file) h+=`<div class="kv"><span>File</span><span>${esc(n.file)}</span></div>`;
   h+=`<label>Dependencies</label><div class="chips">${deps.length?deps.map((d,i)=>`<span class="chip">${esc(d.label)}${resolved[i]?(' #'+resolved[i]):' (unresolved)'}</span>`).join(''):'<span class="muted">none</span>'}</div>`;
-  if(n.kind==='new'){ h+=`<div class="btnrow"><button class="btn" onclick="toWizard(${id})" ${unresolved.length?'disabled':''}>Send to wizard${unresolved.length?' (resolve deps first)':''}</button>
+  if(n.kind==='new'){ h+=`<div class="btnrow"><button class="btn" onclick="toWizard(${id})" ${unresolved.length?'disabled':''}>Use in the wizard${unresolved.length?' (resolve deps first)':''}</button>
     <button class="btn ghost" onclick="delNode(${id})">Delete node</button></div>`;
     if(unresolved.length) h+=`<div class="err">Unresolved deps must be existing token ids (inscribe those nodes first).</div>`;
   } else h+=`<div class="btnrow"><button class="btn ghost" onclick="delNode(${id})">Delete node</button></div>`;
@@ -446,150 +857,14 @@ function showNode(id){ const n=nodeById(id); const out=$('#nodeDetail'); if(!n)r
 }
 function delNode(id){ G.nodes=G.nodes.filter(n=>n.id!==id); G.edges=G.edges.filter(e=>e.f!==id&&e.t!==id); saveG(); drawGraph(); $('#nodeDetail').innerHTML=''; }
 function toWizard(id){ const n=nodeById(id); const deps=G.edges.filter(e=>e.f===id).map(e=>nodeById(e.t)).map(d=>d.kind==='existing'?d.tokenId:d.inscribedTokenId).filter(Boolean);
-  if(n.file){ selectedFile=null; $('#picker').value=''; $('#fileInfo').innerHTML=''; $('#file').value=n.file; } $('#deps').value=deps.join(', '); if(!$('#uri').value&&n.file) $('#uri').value=`xtrata:asset/${slug(n.file.split(/[\\/]/).pop())}`;
-  document.querySelector('nav button[data-tab="new"]').click(); $('#newErr').innerHTML='<span class="ok">Loaded “'+esc(n.label)+'” from the graph.</span>';
+  $('#deps').value=deps.join(', ');
+  $('#relDetails').open=true;
+  if(FLOW.activeFile()){ quote(); }
+  const msg=n.file?` — now drop “${esc(n.file)}” in step 1`:'';
+  $('#newErr').innerHTML='<span class="ok">Loaded deps from “'+esc(n.label)+'”'+msg+'.</span>';
+  window.scrollTo({top:0,behavior:'smooth'});
 }
-
-// ---- Jobs ----
-let selJob=null, pollTimer=null;
-async function loadJobs(){
-  try{ const {jobs}=await api('/api/jobs'); const b=$('#jobsBody');
-    if(!jobs.length){ b.innerHTML='<tr><td colspan="6" class="muted">No jobs yet.</td></tr>'; return; }
-    b.innerHTML=jobs.map(j=>{ const ds=(j.status==='AWAITING_DEPOSIT'&&j.funded)?'FUNDED':j.status; return `<tr onclick="selectJob('${j.jobId}')" class="${selJob===j.jobId?'sel':''}">
-      <td class="mono">${esc(j.jobId.replace('job-',''))}</td><td>${esc(j.uri||'')}</td>
-      <td>${(j.bytes/1048576).toFixed(2)}M</td><td class="mono">${stx(j.requiredUstx)}</td>
-      <td><span class="status s-${ds}">${ds.replace('_',' ')}</span></td><td class="mono">${j.tokenId||'—'}</td></tr>`; }).join('');
-  }catch(e){ $('#jobsBody').innerHTML=`<tr><td colspan="6" class="err">${esc(e.message)}</td></tr>`; }
-}
-$('#refreshJobs').onclick=loadJobs;
-let lastProgAt=0, expiryAt=0;
-// One steady poll drives BOTH the table and the open detail, so the top row never lags the panel.
-async function jobsTick(){ try{ await Promise.all([ loadJobs(), selJob?renderJob():Promise.resolve() ]); }catch(e){} }
-function startJobsPoll(){ if(pollTimer)clearInterval(pollTimer); pollTimer=setInterval(jobsTick,3000); }
-function stopJobsPoll(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
-async function selectJob(id){ selJob=id; lastProgAt=0; loadJobs(); renderJob(); startJobsPoll(); }
-async function renderJob(){
-  if(!selJob)return; const out=$('#jobDetail');
-  try{ const {job,status}=await api('/api/jobs/'+selJob);
-    const funded=status.funded, st=job.status;
-    const active=(st==='FUNDED'||st==='INSCRIBING'||st==='DELIVERING'||(st==='INSCRIBED'&&job.fastTrack));
-    if(active){ if(!lastProgAt) lastProgAt=Date.now(); } else lastProgAt=0;
-    const ds=(st==='AWAITING_DEPOSIT'&&funded)?'FUNDED':st;
-    const phaseMsg={FUNDED:'Payment detected — starting…',INSCRIBING:'Inscribing on-chain…',INSCRIBED:'Inscribed — delivering…',DELIVERING:'Delivering inscription + refunding change…'}[st];
-    const showDeposit=(st==='AWAITING_DEPOSIT');
-    // Countdowns: deposits get 12× the window (payments can confirm slowly); a funded job waiting on
-    // its parent inscription gets the dedicated parent window from the moment funding landed.
-    expiryAt = (showDeposit && job.createdAt && SERVER.windowMs) ? (Date.parse(job.createdAt) + SERVER.windowMs*12)
-      : (st==='AWAITING_PARENT' && job.fundedAt && SERVER.parentWindowMs) ? (Date.parse(job.fundedAt) + SERVER.parentWindowMs) : 0;
-    // ---- Parent escrow checklist (jobs with declared parents) ----
-    let parentPanel='';
-    const parents=(job.parents||[]).map(String);
-    if(parents.length && ['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING'].includes(st)){
-      const ps=status.parents||{held:[],missing:parents,unexpected:[]};
-      if(!(ps.missing||[]).length) delete PARENT_MSG[job.jobId];   // all parents arrived — clear the send-status line
-      const pi=PARENT_INFO[job.jobId]||{};
-      const stxDone=funded||!!job.depositReceivedUstx;
-      parentPanel=`<div style="margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px">
-        <div style="font-weight:700;margin-bottom:6px">Escrow checklist <span class="muted" style="font-weight:400">— two sends, any order; parent + child + change all return to you</span></div>
-        <div class="kv"><span>Deposit address ${copyBtn(job.depositAddress)}</span><span class="mono">${esc(job.depositAddress)}</span></div>
-        <div class="kv"><span>1 · STX deposit (${stx(status.requiredUstx)})</span><span>${stxDone?'<span class="ok">✓ arrived</span>':(status.pending?'<span style="color:var(--warn)">⏳ seen in mempool — confirming…</span>':'<span class="muted">awaiting</span>')}</span></div>
-        ${parents.map((p,i)=>{
-          const held=(ps.held||[]).map(String).includes(p);
-          const own=pi[p];
-          let right;
-          if(held) right='<span class="ok">✓ arrived at deposit wallet</span>';
-          else if(own&&WALLET&&own===WALLET) right=`<span class="ok">✓ in your connected wallet</span> <button class="btn" style="padding:4px 10px;margin-left:8px" onclick="sendParent('${esc(job.jobId)}','${esc(p)}')">Send #${esc(p)} to deposit now</button>`;
-          else if(own&&own===job.depositAddress) right='<span class="ok">✓ arrived at deposit wallet</span>';
-          else if(own) right=`<span style="color:var(--warn)">held by ${esc(own.slice(0,5)+'…'+own.slice(-4))} — connect that wallet, or transfer #${esc(p)} to the deposit address from it</span>`;
-          else right='<span class="muted">checking current owner…</span>';
-          return `<div class="kv"><span>${i+2} · Parent inscription #${esc(p)}</span><span>${right}</span></div>`;}).join('')}
-        ${PARENT_MSG[job.jobId]?`<div style="margin-top:6px;font-size:12px;${PARENT_MSG[job.jobId].err?'color:var(--bad)':'color:var(--ok)'}">${PARENT_MSG[job.jobId].text}</div>`:''}
-        ${(ps.unexpected&&ps.unexpected.length)?`<div class="err" style="margin-top:6px">⚠ Unexpected inscription #${ps.unexpected.map(esc).join(', #')} arrived — it is not a declared parent. Everything will be returned to the sender automatically.</div>`:''}
-        <div class="muted" style="font-size:11px;margin-top:6px">The parent is only borrowed for the mint — it comes straight back with your new inscription.${st==='AWAITING_PARENT'?' <b id="expT"></b>':''}</div>
-      </div>`;
-      maybeCheckParents(job.jobId);
-    }
-    out.innerHTML=`<div class="card" style="margin-top:16px"><h3>${esc(job.jobId)} <span class="status s-${ds}">${ds.replace(/_/g,' ')}</span>${job.fastTrack?' <span class="status" style="color:var(--acc2);border-color:#3a2f7a">⚡ fast-track</span>':''}</h3>
-      ${job.mock?'<div class="muted" style="margin:-2px 0 8px;color:var(--warn)">MOCK job — simulated, no real funds.</div>':''}
-      <div class="kv"><span>Inscription</span><span>${esc(job.uri)}</span></div>
-      ${showDeposit?`<div class="kv"><span>Deposit address ${copyBtn(job.depositAddress)}</span><span>${esc(job.depositAddress)}</span></div>
-      <div class="kv"><span>Send exactly</span><span class="big" style="font-size:19px">${stx(status.requiredUstx)}</span></div>
-      ${!job.mock?`<div class="btnrow"><button class="btn" onclick="openWallet('${esc(job.depositAddress)}','${esc(status.requiredUstx)}')">Open wallet to pay ${stx(status.requiredUstx)}</button></div>`:''}
-      ${job.fastTrack&&job.expectedFunder?`<div class="kv"><span>Pay from this wallet only ${copyBtn(job.expectedFunder)}</span><span class="mono" style="color:var(--ok)">${esc(job.expectedFunder)}</span></div>
-      <div class="muted" style="font-size:12px;margin-top:6px;color:var(--warn)">⚠ Locked to the wallet above. A payment from any other wallet is automatically returned to the sender — nothing is inscribed.</div>`:''}
-      <div class="muted" style="font-size:12px;margin-top:8px">↩︎ Guaranteed temporary — if not funded &amp; started in time, this auto-cancels and returns any funds${parents.length?' <b>and inscriptions</b>':''}. <b id="expT"></b></div>`:''}
-      ${st==='AWAITING_PARENT'?`<div class="progress"><span class="spin"></span>Deposit received ✓ — waiting for the parent inscription to arrive at the deposit wallet…</div>`:''}
-      ${parentPanel}
-      ${job.parentReturnTxs&&job.parentReturnTxs.length?`<div class="kv"><span>Parent${job.parentReturnTxs.length>1?'s':''} returned</span><span class="ok">✓ #${job.parentReturnTxs.map(x=>esc(x.id)).join(', #')} sent home</span></div>`:''}
-      ${job.user?`<div class="kv"><span>${job.fastTrack?'Returns to your wallet':'Delivery address'}</span><span class="mono">${esc(job.user)}</span></div>`:(job.fastTrack?`<div class="kv"><span>Returns to</span><span class="muted">the wallet you pay from (auto-detected)</span></div>`:'')}
-      ${job.tokenId?`<div class="kv"><span>Inscription token</span><span class="ok">#${esc(job.tokenId)}</span></div>`:''}
-      ${job.receiptTokenId?`<div class="kv"><span>Receipt token</span><span class="ok">#${esc(job.receiptTokenId)}</span></div>`:''}
-      ${job.agentFeeUstx?`<div class="kv"><span>Agent fee (${job.agentFeePct||10}%)</span><span style="color:var(--acc2)">${stx(job.agentFeeUstx)}</span></div>`:''}
-      ${(job.refundedUstx!=null)?`<div class="kv"><span>Change refunded</span><span>${stx(job.refundedUstx||'0')}</span></div>`:''}
-      ${active?`<div class="progress"><span class="spin"></span>${esc(phaseMsg||'Working…')}${job.progress?(' · '+esc(job.progress)):''} <span id="progT" class="muted"></span></div>`:''}
-      ${showDeposit&&!funded?`<div class="muted" style="margin-top:10px;font-size:12px">${job.fastTrack?'Pay from your connected wallet (shown above) — it receives the inscription and any change, and processing starts automatically on arrival. Payments from any other wallet are returned to the sender.':'Waiting for your deposit — the Jobs list flips to FUNDED once it lands.'}</div>`:''}
-      ${job.error?`<div class="err" style="margin-top:8px">Error: ${esc(job.error)}${!job.fastTrack?` <button class="btn ghost" onclick="act('run')" style="margin-left:8px;padding:5px 10px">Retry</button>`:''}</div>`:''}
-      ${(!job.fastTrack&&(st==='AWAITING_DEPOSIT'||st==='INSCRIBED'))?`<div class="btnrow">
-        <button class="btn good" onclick="act('run')" ${(funded&&st==='AWAITING_DEPOSIT')?'':'disabled'}>Run inscription</button>
-        <button class="btn warn" onclick="act('deliver')" ${st==='INSCRIBED'?'':'disabled'}>Deliver + refund + wipe key</button>
-      </div><div class="err" id="jobErr"></div>`:''}
-      ${st==='COMPLETE'?`<div class="ok" style="margin-top:12px">✓ Complete — inscription + receipt delivered${job.fastTrack?' to your wallet':''}${(job.parents&&job.parents.length)?`, parent${job.parents.length>1?'s':''} #${job.parents.map(esc).join(', #')} returned to your wallet`:''}, change refunded, deposit key wiped.</div>
-      <div class="btnrow"><button class="btn" onclick="viewReceipt('${esc(job.jobId)}')">View receipt</button>
-        <button class="btn ghost" onclick="act('delete')">Delete job</button></div>`:''}
-      ${st==='CANCELLED'?`<div class="muted" style="margin-top:12px">↩︎ Cancelled — ${(job.parents&&job.parents.length)?'all inscriptions (including parents) and funds':'funds'} returned to your wallet and the deposit key discarded.${job.cancelReason?(' ('+esc(job.cancelReason)+')'):''}</div>
-      <div class="btnrow"><button class="btn ghost" onclick="act('delete')">Delete job</button></div>`:''}
-      ${st==='NEEDS_RECOVERY'?`<div class="err" style="margin-top:12px">Auto-refund didn’t confirm — your funds are safe but need a manual sweep: run <b>svc/recover-all.mjs</b>.${job.keepKeyReason?(' '+esc(job.keepKeyReason)):''}</div>`:''}
-    </div>`;
-    if(st==='COMPLETE'||st==='ERROR'||st==='CANCELLED'||st==='NEEDS_RECOVERY'){ loadJobs(); }
-  }catch(e){ /* transient read (job file mid-write) — keep polling */ }
-}
-// ---- parent escrow: ownership checker + one-click wallet send (aligned to THIS job's deposit only) ----
-const PARENT_INFO={};          // jobId -> { __core:'ADDR.name', <tokenId>: ownerAddress }
-const PARENT_MSG={};           // jobId -> { text, err } — send-status line, survives re-renders
-const parentChkAt={};
-async function maybeCheckParents(jobId){
-  if(Date.now()-(parentChkAt[jobId]||0)<10000) return;   // gentle: re-check owners every ~10 s
-  parentChkAt[jobId]=Date.now();
-  try{ const A=window.XtrataAgent; if(!A||!A.parentInfo) return;
-    const r=await A.parentInfo(jobId); const m={__core:r.core};
-    for(const p of (r.parents||[])) m[String(p.id)]=p.owner||null;
-    PARENT_INFO[jobId]=m;
-  }catch{}
-}
-async function sendParent(jobId,pid){
-  // Same proven path as the site's "Send selected inscription" (ported into the wallet bundle),
-  // except the recipient is HARD-CODED to the active job's deposit address — not editable, so the
-  // parent can never be sent to the wrong place.
-  const w=xtrataWallet();
-  if(!w||!w.sendInscription){ PARENT_MSG[jobId]={err:1,text:'Wallet bundle too old for one-click send — rebuild agent-one-wallet.js, or transfer #'+esc(pid)+' to the deposit address manually.'}; renderJob(); return; }
-  if(!WALLET){ connectWallet(); return; }
-  PARENT_MSG[jobId]={text:'Waiting for wallet confirmation…'}; renderJob();
-  try{
-    const {job}=await api('/api/jobs/'+jobId);
-    const core=String((PARENT_INFO[jobId]&&PARENT_INFO[jobId].__core)||'').split('.');
-    const r=await w.sendInscription({ contractAddress:core[0]||'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', contractName:core[1]||'xtrata-v3-2-3',
-      tokenId:pid, sender:WALLET, recipient:job.depositAddress, network:SERVER.net||'mainnet' });   // recipient is ALWAYS this job's deposit wallet
-    PARENT_MSG[jobId]={text:'✓ Parent #'+esc(pid)+' transfer submitted'+(r&&r.txId?(' · '+esc(String(r.txId).slice(0,10))+'…'):'')+' — it will show as “arrived” once confirmed.'};
-  }catch(e){ PARENT_MSG[jobId]={err:1,text:'Parent send did not go through: '+esc((e&&e.message)||String(e))+' — you can retry, or send #'+esc(pid)+' to the deposit address from your wallet manually.'}; }
-  parentChkAt[jobId]=0; lastProgAt=Date.now(); renderJob();
-}
-window.sendParent=sendParent;
-
-async function act(which){
-  if(which==='deliver' && !confirm('Deliver the inscription, refund the remainder, and permanently wipe the deposit key?')) return;
-  if(which==='delete'){
-    if(!confirm('Delete this job from the list?\nThe inscription stays on-chain — this only removes the local record + receipt.')) return;
-    try{ await api('/api/jobs/'+selJob+'/delete',{method:'POST'}); selJob=null; $('#jobDetail').innerHTML=''; loadJobs(); }
-    catch(e){ const errEl=$('#jobErr'); if(errEl){errEl.textContent=e.message;} else alert(e.message); }
-    return;
-  }
-  try{ await api('/api/jobs/'+selJob+'/'+which,{method:'POST'}); lastProgAt=Date.now(); renderJob(); startJobsPoll(); }
-  catch(e){ const errEl=$('#jobErr'); if(errEl)errEl.textContent=e.message; }
-}
-function viewReceipt(id){ try{ const A=window.XtrataAgent; const html=A&&A.getReceiptHtml&&A.getReceiptHtml(id); if(!html){ alert('Receipt not generated yet.'); return; } const w=window.open('','_blank'); if(w){ w.document.open(); w.document.write(html); w.document.close(); } else { const b=new Blob([html],{type:'text/html'}); window.open(URL.createObjectURL(b),'_blank'); } }catch(e){ alert('Could not open receipt: '+((e&&e.message)||e)); } }
-window.showNode=showNode; window.delNode=delNode; window.toWizard=toWizard; window.selectJob=selectJob; window.act=act; window.viewReceipt=viewReceipt;
-setInterval(()=>{ const t=$('#progT'); if(t&&lastProgAt){ const s=Math.round((Date.now()-lastProgAt)/1000); let x=''; if(s>=90)x=' · slower than usual — Stacks may be congested, still working'; else if(s>=30)x=' · confirming on-chain'; t.textContent='('+s+'s'+x+')'; }
-  const et=$('#expT'); if(et&&expiryAt){ const r=expiryAt-Date.now(); et.textContent = r>0 ? ('Auto-returns in '+Math.floor(r/60000)+':'+String(Math.floor(r/1000)%60).padStart(2,'0')) : 'Returning funds…'; } },1000);
+window.showNode=showNode; window.delNode=delNode; window.toWizard=toWizard;
 drawGraph();
 </script>
 <script src="/xtrata-radio.js" defer></script>

@@ -8,10 +8,50 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/favicons/xtrata-favicon-32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="/favicons/xtrata-favicon-16.png" />
   <link rel="apple-touch-icon" href="/favicons/xtrata-apple-touch-icon.png" />
+  <script>
+    // Page-mode router: one shell, four pages. Classifies the URL before first
+    // paint so CSS can show only the panels that belong to this page.
+    //   /            → home (landing: intro, mode cards, docs)
+    //   /inscribe    → inscribe panel only (also ?handoff= from the Opus tool)
+    //   /xplorer /x/ → explorer (existing explorer-mode behaviour)
+    //   /my-wallet   → wallet inscriptions panel (lookup, grid, transfers)
+    (() => {
+      const seg = (window.location.pathname.split('/').filter(Boolean)[0] || '').toLowerCase();
+      const params = new URLSearchParams(window.location.search);
+      const explorerQuery =
+        params.get('view') === 'explorer' ||
+        params.has('explorer') ||
+        params.has('token') ||
+        params.has('inscription');
+      const opusHandoff = params.has('handoff') || params.has('handoffId');
+      // Public views (any wallet, showcases, curated galleries) belong to the
+      // Xplorer; the My Wallet page is reserved for the connected wallet.
+      const publicView =
+        params.has('wallet') || params.has('showcase') || params.has('gallery');
+      let page = 'home';
+      if (seg === 'inscribe' || opusHandoff) {
+        page = 'inscribe';
+      } else if (seg === 'my-wallet' || seg === 'wallet') {
+        page = 'my-wallet';
+      } else if (seg === 'xplorer' || seg === 'x' || explorerQuery || publicView) {
+        page = 'xplorer';
+      }
+      document.documentElement.dataset.page = page;
+      const titles = {
+        inscribe: 'Inscribe — Xtrata',
+        'my-wallet': 'My Wallet — Xtrata',
+        xplorer: 'Xtrata Xplorer'
+      };
+      if (titles[page]) {
+        document.title = titles[page];
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="/src/home/styles/home.css" />
 </head>
 <body class="intro-mode">
   <div class="shell">
+    <div class="site-header" id="siteHeader">
     <header class="topbar">
       <div class="brand-wrap">
         <a class="brand" href="/" aria-label="Xtrata home">
@@ -31,9 +71,19 @@
       </div>
     </header>
 
+    <nav class="site-nav" aria-label="Primary">
+      <a href="/" data-nav="home" target="_self">Home</a>
+      <a href="/inscribe" data-nav="inscribe" target="_self">Inscribe</a>
+      <a href="/xplorer" data-nav="xplorer" target="_self">Xplorer</a>
+      <a href="/my-wallet" data-nav="my-wallet" target="_self">My Wallet</a>
+      <a href="/wizard/" data-nav="wizard" target="_self">Inscription Wizard</a>
+      <div class="radio-slot" id="radioSlot" aria-label="Xtrata FM radio"></div>
+    </nav>
+    </div>
+
     <!-- Modes shelf: SUNO More (AI Music Permanence) + Forever Twins (On-Chain Legacy) — matched cards -->
     <div class="modes">
-      <a class="suno-hero" href="/agent-one/suno" aria-label="SUNO More — do more with your Suno music: inscribe the master on Xtrata">
+      <a class="suno-hero" href="/wizard/suno" aria-label="SUNO More — do more with your Suno music: inscribe the master on Xtrata">
         <img class="mode-brand" src="/favicon.svg" alt="Xtrata" width="22" height="22" />
         <img class="suno-hero__logo" src="/suno-more/assets/suno-more-logo.webp" alt="SUNO More — one song, infinite possibilities" />
         <span class="mode-text">
@@ -72,8 +122,9 @@
         <p class="registry-lead" id="registryIntroLead">Create and hold durable records for songs, masters, artwork, credits, documents, apps, and collaboration history, anchored to Bitcoin through Stacks.</p>
         <div class="registry-intro-actions">
           <button class="btn" id="introConnectButton" type="button">Connect wallet</button>
-          <button class="btn secondary" id="introPrepareButton" type="button">Prepare a record</button>
-          <a class="btn secondary" href="#walletExamples">Explore examples</a>
+          <a class="btn" id="introMyWalletLink" href="/my-wallet" target="_self" hidden>Open My Wallet</a>
+          <button class="btn secondary" id="introPrepareButton" type="button">Inscribe a file</button>
+          <a class="btn secondary" href="#homeExamples">Explore examples</a>
         </div>
         <div class="registry-footnotes" aria-label="Registry qualities">
           <p class="registry-note"><strong>Permanent backups</strong>Keep rich media and metadata where the reference can keep working.</p>
@@ -107,6 +158,46 @@
       </aside>
     </section>
 
+    <!-- Landing navigation cards: shown only on the home page (data-page router). -->
+    <section class="page-cards" aria-label="Xtrata tools">
+      <a class="page-card" href="/inscribe" target="_self">
+        <span class="page-card__kicker">Start here</span>
+        <strong class="page-card__title">Inscribe</strong>
+        <p class="page-card__copy">Drop a file and put it on-chain in three guided steps. Text, images, audio, HTML, JSON.</p>
+        <span class="page-card__cta">Open Inscribe →</span>
+      </a>
+      <a class="page-card" href="/wizard/" target="_self">
+        <span class="page-card__kicker">Fully managed</span>
+        <strong class="page-card__title">Inscription Wizard</strong>
+        <p class="page-card__copy">Drop any file — pay once and it comes back inscribed. Large files, auto audio optimisation, relationships.</p>
+        <span class="page-card__cta">Open the Wizard →</span>
+      </a>
+      <a class="page-card" href="/xplorer" target="_self">
+        <span class="page-card__kicker">Browse</span>
+        <strong class="page-card__title">Xtrata Xplorer</strong>
+        <p class="page-card__copy">Explore every inscription on the contract — latest first, filters, deep links to any token.</p>
+        <span class="page-card__cta">Open the Xplorer →</span>
+      </a>
+      <a class="page-card" href="/my-wallet" target="_self">
+        <span class="page-card__kicker">Your ledger</span>
+        <strong class="page-card__title">My Wallet</strong>
+        <p class="page-card__copy">Your inscriptions in one grid — view, send, and look up any wallet or .btc name.</p>
+        <span class="page-card__cta">Open My Wallet →</span>
+      </a>
+    </section>
+
+    <!-- Example views: open in the Xplorer (home page only). -->
+    <section class="home-examples" id="homeExamples" aria-label="Example views">
+      <span class="home-examples__label">View examples</span>
+      <a class="wallet-example-chip" href="/xplorer?wallet=dyle.btc&amp;sel=296" target="_self" title="Early Stacks-native art inscriptions by DYLE.">Art by DYLE</a>
+      <a class="wallet-example-chip" href="/xplorer?gallery=jim-music" target="_self" title="Early on-chain music, audio, samples, stems, and songs.">Music by Various</a>
+      <a class="wallet-example-chip" href="/xplorer?gallery=code-various" target="_self" title="Early code inscriptions and recursive Web3 experiments.">Code by Various</a>
+      <a class="wallet-example-chip" href="/xplorer?gallery=agent-27" target="_self" title="Early autonomous agent memory inscriptions.">Agent 27</a>
+      <a class="wallet-example-chip" href="/xplorer?gallery=v1-origins" target="_self" title="The original Xtrata core, xtrata-v1-1-1.">v1 origins</a>
+      <a class="wallet-example-chip" href="/xplorer?gallery=stacksboard" target="_self" title="The Stacksboard inscription.">Stacksboard</a>
+      <a class="wallet-example-chip" href="/xplorer" target="_self" title="Newest inscriptions from the active Xtrata core.">Latest</a>
+    </section>
+
     <main class="workspace">
       <section class="panel" aria-labelledby="inscribeTitle">
         <div class="panel-head">
@@ -126,11 +217,30 @@
           </div>
 
           <form class="form-grid" id="inscriptionForm">
-            <div class="field-row">
+            <div class="field">
+              <span class="label">Payload</span>
+              <input id="fileInput" type="file" hidden />
+              <div class="dropzone" id="dropzone" tabindex="0" role="button">
+                <span id="dropzoneText">Choose file or drop it here</span>
+              </div>
+              <span class="field-note">Name and type are detected automatically, and the payload is prepared as soon as it lands.</span>
+            </div>
+
+            <label class="field">
+              <span class="label">Name</span>
+              <input class="input" id="nameInput" autocomplete="off" placeholder="inscription.txt" />
+            </label>
+
+            <details class="inscribe-details" id="textPayloadDetails">
+              <summary>Write text instead of dropping a file</summary>
               <label class="field">
-                <span class="label">Name</span>
-                <input class="input" id="nameInput" autocomplete="off" placeholder="inscription.txt" />
+                <span class="label">Text payload</span>
+                <textarea class="textarea" id="textPayload" spellcheck="false" placeholder="Optional text, JSON, SVG, or HTML"></textarea>
               </label>
+            </details>
+
+            <details class="inscribe-details" id="inscribeAdvancedDetails">
+              <summary>Advanced — type &amp; token URI</summary>
               <label class="field">
                 <span class="label">Type</span>
                 <select class="select" id="payloadType">
@@ -141,45 +251,40 @@
                   <option value="application/octet-stream">Binary</option>
                 </select>
               </label>
-            </div>
-
-            <label class="field">
-              <span class="label">Token URI</span>
-              <input class="input" id="tokenUriInput" autocomplete="off" />
-            </label>
-
-            <div class="field">
-              <span class="label">Payload</span>
-              <input id="fileInput" type="file" hidden />
-              <div class="dropzone" id="dropzone" tabindex="0" role="button">
-                <span id="dropzoneText">Choose file or drop it here</span>
-              </div>
-            </div>
-
-            <label class="field">
-              <span class="label">Text payload</span>
-              <textarea class="textarea" id="textPayload" spellcheck="false" placeholder="Optional text, JSON, SVG, or HTML"></textarea>
-            </label>
-
-            <div class="relationship-panel" id="parentRelationshipPanel">
-              <div class="relationship-panel__head">
-                <span class="relationship-panel__title">Add Parents</span>
-                <span class="badge" id="parentRelationshipBadge">optional</span>
-              </div>
-              <div class="relationship-panel__copy">
-                Link this inscription as a child of one or more inscriptions owned by the connected wallet.
-              </div>
               <label class="field">
-                <span class="label">Parent IDs</span>
-                <textarea class="textarea" id="parentIdsInput" spellcheck="false" placeholder="e.g. 12, 48 102"></textarea>
+                <span class="label">Token URI</span>
+                <input class="input" id="tokenUriInput" autocomplete="off" />
               </label>
-              <div class="relationship-actions">
-                <button class="btn secondary" id="addParentsButton" type="button">Add parents</button>
-                <button class="btn secondary" id="clearParentsButton" type="button">Clear parents</button>
+            </details>
+
+            <details class="inscribe-details" id="relationshipsDetails">
+              <summary>Relationships — add parents (optional)</summary>
+              <div class="relationship-panel" id="parentRelationshipPanel">
+                <div class="relationship-panel__head">
+                  <span class="relationship-panel__title">Add Parents</span>
+                  <span class="badge" id="parentRelationshipBadge">optional</span>
+                </div>
+                <div class="relationship-panel__copy">
+                  Link this inscription as a child of one or more inscriptions owned by the connected wallet.
+                </div>
+                <label class="field">
+                  <span class="label">Parent IDs</span>
+                  <textarea class="textarea" id="parentIdsInput" spellcheck="false" placeholder="e.g. 12, 48 102"></textarea>
+                </label>
+                <div class="relationship-actions">
+                  <button class="btn secondary" id="addParentsButton" type="button">Add parents</button>
+                  <button class="btn secondary" id="clearParentsButton" type="button">Clear parents</button>
+                </div>
+                <div class="relationship-chip-list" id="parentChipList"></div>
+                <div class="relationship-status-list" id="parentStatusList">No parents selected.</div>
               </div>
-              <div class="relationship-chip-list" id="parentChipList"></div>
-              <div class="relationship-status-list" id="parentStatusList">No parents selected.</div>
-            </div>
+            </details>
+
+            <p class="support-note inscribe-wizard-note">
+              Large file, audio master, or a hands-off flow? The
+              <a href="/wizard/" target="_self">Inscription Wizard</a> optimises, inscribes and
+              delivers it for a single payment.
+            </p>
           </form>
 
           <div class="prepare-grid">
@@ -262,19 +367,23 @@
         <div class="panel-body">
           <div class="wallet-layout">
             <div class="wallet-controls">
-              <form class="wallet-browser" id="walletLookupForm">
-                <label class="field">
-                  <span class="label">View wallet</span>
-                  <div class="field-inline">
-                    <div class="wallet-lookup-control" id="walletLookupControl">
-                      <input class="input" id="walletLookupInput" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="name or SP..." />
-                      <span class="wallet-lookup-suffix" aria-hidden="true">.btc</span>
+              <details class="wallet-lookup-details" id="walletLookupDetails">
+                <summary>Look up any wallet or .btc name</summary>
+                <form class="wallet-browser" id="walletLookupForm">
+                  <label class="field">
+                    <span class="label">View wallet</span>
+                    <div class="field-inline">
+                      <div class="wallet-lookup-control" id="walletLookupControl">
+                        <input class="input" id="walletLookupInput" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="name or SP..." />
+                        <span class="wallet-lookup-suffix" aria-hidden="true">.btc</span>
+                      </div>
+                      <button class="btn ghost" id="walletLookupButton" type="submit">View</button>
                     </div>
-                    <button class="btn ghost" id="walletLookupButton" type="submit">View</button>
-                  </div>
-                  <span class="field-note" id="walletLookupStatus">Using connected wallet when available.</span>
-                </label>
-              </form>
+                    <span class="field-note" id="walletLookupStatus">Using connected wallet when available.</span>
+                  </label>
+                </form>
+              </details>
+              <a class="btn secondary back-to-xplorer" id="backToXplorerLink" href="/xplorer" target="_self">← Back to the Xplorer</a>
               <div class="wallet-examples" id="walletExamples" aria-label="Example wallet views">
                 <span>View Examples</span>
 
@@ -349,15 +458,16 @@
               <div class="explorer-tools" id="xtrataExplorerTools" aria-label="Xtrata Xplorer controls">
                 <p class="explorer-mode-note" id="xtrataExplorerStatus">Browse inscriptions.</p>
                 <div class="explorer-tools__row">
-                  <label class="field">
+                  <label class="field explorer-page-field">
                     <span class="label">Go to page:</span>
                     <input class="input" id="explorerPageInput" type="number" min="1" step="1" inputmode="numeric" placeholder="Page" />
                   </label>
                   <label class="field">
-                    <span class="label">ID:</span>
-                    <input class="input" id="explorerTokenInput" type="number" min="1" step="1" inputmode="numeric" placeholder="ID" />
+                    <span class="label">Go to:</span>
+                    <input class="input" id="explorerTokenInput" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="#id or p12" title="Enter an inscription id (512 or #512) or a page (p12)" />
                   </label>
                   <button class="btn ghost" id="explorerJumpButton" type="button">Go</button>
+                  <button class="btn ghost" id="explorerRandomButton" type="button" title="Jump to a random inscription">Random</button>
                   <span class="page-readout explorer-tools__metric" id="walletPageReadout">Page 0 / 0</span>
                   <span class="badge blue explorer-tools__metric" id="walletCountBadge" title="0 inscriptions">0 insc.</span>
                 </div>

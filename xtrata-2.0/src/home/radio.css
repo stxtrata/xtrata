@@ -67,6 +67,68 @@
   pointer-events: none;
 }
 
+.xtrata-radio__display { flex-direction: row; align-items: stretch; gap: 3%; }
+
+.xtrata-radio__dmain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* VU floats top-centre of the display, in the gap between brand and art */
+.xtrata-radio__display > .xtrata-radio__vu {
+  position: absolute;
+  top: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+}
+
+/* artwork: bleeds to the display's own edges — a square as tall as the
+   entire display, corners meeting the display's border */
+.xtrata-radio__art {
+  display: none;
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  /* explicit square: display height = 18.65% of stage height = 14.02cqw of
+     stage width. iOS Safari mis-sizes aspect-ratio on abs-positioned boxes,
+     so the width is stated outright (aspect-ratio kept as fallback). */
+  width: 14.02cqw;
+  aspect-ratio: 1 / 1;
+  border-radius: 0 7px 7px 0;   /* nests into the display's rounded border */
+  overflow: hidden;
+  border-left: 1px solid rgba(38,245,255,.3);
+  box-shadow: -4px 0 10px rgba(0,0,0,.5);
+  cursor: pointer;
+  z-index: 2;
+}
+
+/* keep the text column clear of the full-bleed art
+   (display height = 18.65% of stage height = ~14cqw of stage width) */
+.xtrata-radio__display:has(.xtrata-radio__art.has-art) .xtrata-radio__dmain {
+  margin-right: 14.6cqw;
+}
+
+.xtrata-radio__art.has-art { display: block; }
+
+.xtrata-radio__art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.xtrata-radio__art:hover {
+  border-color: rgba(38,245,255,.8);
+  box-shadow: 0 0 10px rgba(38,245,255,.45);
+}
+
+.xtrata-radio.is-min .xtrata-radio__art { display: none; } /* pill stays lean */
+
 .xtrata-radio__meta {
   position: relative;
   z-index: 2;
@@ -92,12 +154,12 @@
   display: flex;
   align-items: flex-end;
   gap: 2px;
-  height: clamp(6px, 2.4cqw, 12px);
+  height: clamp(6px, 2.6cqw, 22px);
 }
 
 .xtrata-radio__vu i {
   --vu: 0;
-  width: 3px;
+  width: clamp(2px, 0.5cqw, 5px);
   height: 100%;
   border-radius: 1px;
   background: linear-gradient(0deg, var(--cyan), #baf8ff);
@@ -141,6 +203,53 @@
 
 .xtrata-radio:not(.is-on) .xtrata-radio__screen-text,
 .xtrata-radio:not(.is-on) .xtrata-radio__brand { opacity: .18; text-shadow: none; }
+
+/* ---- attract mode: powered off, inviting the first tap ---- */
+/* the invitation text breathes at full brightness even though the set is off */
+.xtrata-radio.is-attract:not(.is-on) .xtrata-radio__screen-text {
+  opacity: 1;
+  animation: xtrata-attract-breathe 2.6s ease-in-out infinite;
+}
+
+.xtrata-radio.is-attract:not(.is-on) .xtrata-radio__brand { opacity: .45; }
+
+@keyframes xtrata-attract-breathe {
+  0%, 100% {
+    text-shadow: 0 0 4px rgba(38,245,255,.55), 0 0 10px rgba(38,245,255,.25);
+    opacity: .72;
+  }
+  50% {
+    text-shadow: 0 0 6px rgba(38,245,255,.95), 0 0 16px rgba(38,245,255,.55), 0 0 30px rgba(38,245,255,.3);
+    opacity: 1;
+  }
+}
+
+/* first visit only: the whole display softly pulses to catch the eye */
+.xtrata-radio.is-attract--strong:not(.is-on) .xtrata-radio__display {
+  animation: xtrata-attract-ring 3.4s ease-in-out infinite;
+}
+
+@keyframes xtrata-attract-ring {
+  0%, 100% {
+    box-shadow: inset 0 0 12px rgba(38,245,255,.06), inset 0 0 22px rgba(0,0,0,.9),
+      0 0 0 0 rgba(38,245,255,0);
+  }
+  50% {
+    box-shadow: inset 0 0 18px rgba(38,245,255,.16), inset 0 0 22px rgba(0,0,0,.9),
+      0 0 14px 2px rgba(38,245,255,.28);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .xtrata-radio.is-attract:not(.is-on) .xtrata-radio__screen-text,
+  .xtrata-radio.is-attract--strong:not(.is-on) .xtrata-radio__display {
+    animation: none;
+  }
+  .xtrata-radio.is-attract:not(.is-on) .xtrata-radio__screen-text {
+    opacity: 1;
+    text-shadow: 0 0 5px rgba(38,245,255,.8);
+  }
+}
 
 /* ============ top buttons ============ */
 .xtrata-radio__btn {
@@ -289,9 +398,119 @@
 
 .xtrata-radio__stage:hover .xtrata-radio__mini::before { opacity: 1; }
 
+/* ---- relatives strip: fullscreen (and /radio hero) context row ---- */
+.xtrata-radio__rel { display: none; }
+
+.xtrata-radio.is-full .xtrata-radio__rel.has-rel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: absolute;
+  left: 50%;
+  bottom: 3vh;
+  transform: translateX(-50%);
+  max-width: 92vw;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgba(5, 8, 12, .72);
+  border: 1px solid rgba(38,245,255,.18);
+  backdrop-filter: blur(8px);
+  z-index: 3;
+}
+
+.xtrata-radio__rel-label {
+  font-family: "Courier New", Courier, ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: .22em;
+  color: rgba(38,245,255,.75);
+  flex: none;
+}
+
+.xtrata-radio__rel-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.xtrata-radio__rtile {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(16, 22, 32, .9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 0;
+  color: rgba(230, 237, 246, .85);
+  object-fit: cover;
+}
+
+.xtrata-radio__rtile span { font-size: 15px; line-height: 1; }
+.xtrata-radio__rtile i { font-style: normal; font-family: ui-monospace, monospace; font-size: 8px; opacity: .75; }
+
+.xtrata-radio__rtile.is-song {
+  cursor: pointer;
+  border-color: rgba(38,245,255,.45);
+  color: var(--cyan);
+  transition: box-shadow .15s ease, border-color .15s ease;
+}
+
+.xtrata-radio__rtile.is-song:hover {
+  border-color: var(--cyan);
+  box-shadow: 0 0 10px rgba(38,245,255,.45);
+}
+
+.xtrata-radio__rtile.is-static { opacity: .8; }
+img.xtrata-radio__rtile { object-fit: cover; }
+
+/* ---- pill quick controls: power / prev / play-pause / next ---- */
+.xtrata-radio__pctl { display: none; }
+
+.xtrata-radio.is-min .xtrata-radio__pctl {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  position: absolute;   /* anchored to the pill display itself */
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
+}
+
+.xtrata-radio__pctl button {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.18);
+  background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(0,0,0,.25));
+  color: rgba(230,237,246,.85);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: border-color .12s ease, color .12s ease, box-shadow .12s ease;
+}
+
+.xtrata-radio__pctl button:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.xtrata-radio__pctl button.is-lit {
+  color: #3ddc97;
+  border-color: rgba(61,220,151,.6);
+  box-shadow: 0 0 8px rgba(61,220,151,.35);
+}
+
 /* collapsed pill: hide the cabinet, keep the VFD strip */
 .xtrata-radio.is-min .xtrata-radio__stage {
-  width: min(280px, calc(100vw - 32px));
+  width: min(340px, calc(100vw - 32px));
   aspect-ratio: auto;
   height: 56px;
   filter: drop-shadow(0 8px 14px rgba(0,0,0,.5));
@@ -307,6 +526,7 @@
   inset: 0;
   width: 100%;
   height: 100%;
+  padding-right: 132px; /* room for the quick controls */
   border-radius: 12px;
   border: 1px solid #3a2a1c;
   padding: 7px 12px;
@@ -318,4 +538,90 @@
 
 @media (prefers-reduced-motion: reduce) {
   .xtrata-radio__screen-text.is-scroll { animation-duration: calc(var(--dur, 8s) * 2); }
+}
+
+/* ============ docked mode (header slot) ============ */
+/* The homepage mounts the radio inside the sticky header (see .radio-slot).
+   Docked, it always rests as the compact pill; clicking it opens fullscreen.
+   Keep this block ABOVE the fullscreen block so .is-full wins ties. */
+.xtrata-radio.is-docked {
+  position: static;
+  z-index: auto;
+}
+
+.xtrata-radio.is-docked .xtrata-radio__mini { display: none; }
+
+.xtrata-radio.is-docked.is-min .xtrata-radio__stage {
+  width: 224px;
+  height: 36px;
+  filter: drop-shadow(0 3px 7px rgba(0, 0, 0, 0.4));
+}
+
+@media (max-width: 760px) {
+  .xtrata-radio.is-docked.is-min .xtrata-radio__stage { width: 156px; }
+}
+
+/* ============ fullscreen mode ============ */
+/* Toggled by clicking the XTRATA FM logo on the receiver screen (or the
+   docked header pill); Esc or ✕ exits. Pure CSS state on the same element —
+   the audio pipeline is untouched, so the music never stops. */
+.xtrata-radio__brand { cursor: pointer; }
+
+.xtrata-radio__fs-close,
+.xtrata-radio__fs-hint { display: none; }
+
+.xtrata-radio.is-full {
+  position: fixed;
+  inset: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 7, 11, 0.93);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.xtrata-radio.is-full .xtrata-radio__stage {
+  width: min(94vw, calc(84vh * (1446 / 1087)));
+}
+
+.xtrata-radio.is-full .xtrata-radio__mini { display: none; }
+
+.xtrata-radio.is-full .xtrata-radio__fs-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid rgba(140, 170, 210, 0.35);
+  background: rgba(10, 16, 26, 0.7);
+  color: #cfe7ff;
+  cursor: pointer;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.xtrata-radio.is-full .xtrata-radio__fs-close:hover { background: rgba(20, 30, 46, 0.9); }
+
+.xtrata-radio.is-full .xtrata-radio__fs-hint {
+  display: block;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 3.4vh;
+  max-width: 92vw;
+  text-align: center;
+  color: #cfe7ff;
+  font: 12.5px/1.4 system-ui, sans-serif;
+  background: rgba(10, 16, 26, 0.72);
+  border: 1px solid rgba(140, 170, 210, 0.28);
+  padding: 8px 16px;
+  border-radius: 999px;
 }

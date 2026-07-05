@@ -204,6 +204,24 @@
 
     const $ = (id) => document.getElementById(id);
 
+    // Page mode classified pre-paint by the router script in index.html <head>.
+    // 'home' | 'inscribe' | 'xplorer' | 'my-wallet' — controls which panels are
+    // visible (CSS) and which data loads run (see initialize/switchToPage).
+    // Mutable: nav clicks switch pages CLIENT-SIDE (SPA-style tabs) so the
+    // radio and wallet session are never torn down between site pages.
+    let PAGE_MODE = document.documentElement.dataset.page || 'home';
+
+    const PAGE_TITLES = {
+      home: 'Xtrata - Permanent Media Records',
+      inscribe: 'Inscribe — Xtrata',
+      xplorer: 'Xtrata Xplorer',
+      'my-wallet': 'My Wallet — Xtrata'
+    };
+
+    // Set once the prepare handler exists; lets setSelectedFile auto-prepare a
+    // freshly dropped file so the default flow is drop → (prepared) → inscribe.
+    let autoPrepareHook = null;
+
     const dom = {
       themeSelect: $('themeSelect'),
       refreshWalletButton: $('refreshWalletButton'),
@@ -278,6 +296,7 @@
       explorerPageInput: $('explorerPageInput'),
       explorerTokenInput: $('explorerTokenInput'),
       explorerJumpButton: $('explorerJumpButton'),
+      explorerRandomButton: $('explorerRandomButton'),
       explorerLatestButton: $('explorerLatestButton'),
       explorerFilterGroup: $('explorerFilterGroup'),
       explorerFilterToggle: $('explorerFilterToggle'),
@@ -297,6 +316,7 @@
       fullscreenCloseButton: $('fullscreenCloseButton'),
       introConnectButton: $('introConnectButton'),
       introPrepareButton: $('introPrepareButton'),
+      introMyWalletLink: $('introMyWalletLink'),
       registryModeBadge: $('registryModeBadge'),
       registryIntroLead: $('registryIntroLead'),
       introNetworkValue: $('introNetworkValue'),
@@ -3727,6 +3747,9 @@
       }
       if (dom.introConnectButton) {
         dom.introConnectButton.hidden = connected;
+      }
+      if (dom.introMyWalletLink) {
+        dom.introMyWalletLink.hidden = !connected;
       }
     };
 
@@ -8223,6 +8246,78 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         `Latest inscription #${latest.toString()}. Page ${state.walletPageIndex + 1} of ${pageCount}.`;
     };
 
+    const syncExplorerPageUrl = () => {
+      // Keep the address bar shareable: token selections write /x/<id> (see
+      // selectToken); plain grid pages write /xplorer?p=<n> so copied links and
+      // reload/back restore the position.
+      if (!state.explorerMode || state.selectedTokenId !== null) {
+        return;
+      }
+      try {
+        const url = new URL(window.location.href);
+        url.pathname = '/xplorer';
+        url.search = state.walletPageIndex > 0 ? `?p=${state.walletPageIndex + 1}` : '';
+        url.hash = '';
+        window.history.replaceState(null, '', url.toString());
+      } catch {
+        // Leave the URL untouched if history access fails.
+      }
+    };
+
+    const prefetchAdjacentExplorerPages = () => {
+      // Warm the summary cache for the neighbouring pages while the browser is
+      // idle so Prev/Next feel instant. Unfiltered explorer only — filtered id
+      // sets already live in memory once indexed.
+      if (!state.explorerMode || hasActiveExplorerFilters()) {
+        return;
+      }
+      const latest = state.explorerLatestTokenId;
+      if (!latest || latest <= 0n) {
+        return;
+      }
+      const idle = window.requestIdleCallback || ((fn) => window.setTimeout(fn, 1200));
+      idle(() => {
+        if (!state.explorerMode || state.walletLoadingPage) {
+          return;
+        }
+        const pageCount = getWalletPageCount();
+        const ids = [];
+        for (const pageIndex of [state.walletPageIndex + 1, state.walletPageIndex - 1]) {
+          if (pageIndex < 0 || pageIndex >= pageCount) {
+            continue;
+          }
+          const start = BigInt(pageIndex * WALLET_PAGE_SIZE) + 1n;
+          if (start > latest) {
+            continue;
+          }
+          const end =
+            start + BigInt(WALLET_PAGE_SIZE - 1) > latest
+              ? latest
+              : start + BigInt(WALLET_PAGE_SIZE - 1);
+          for (let id = start; id <= end; id += 1n) {
+            if (!state.walletTokenCache.has(id.toString())) {
+              ids.push(id);
+            }
+          }
+        }
+        if (ids.length === 0) {
+          return;
+        }
+        void fetchWalletTokenSummaries(ids)
+          .then((summaries) => {
+            for (const token of summaries) {
+              state.walletTokenCache.set(token.id.toString(), token);
+            }
+            debugLog('grid', 'adjacent explorer pages prefetched', {
+              prefetched: summaries.length
+            });
+          })
+          .catch(() => {
+            // Prefetch is best-effort; the normal load path handles errors.
+          });
+      });
+    };
+
     const loadExplorerPage = async (options = {}) => {
       const startedAt = performance.now();
       const homeLatest = !!options.homeLatest;
@@ -8298,6 +8393,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       updateFullscreenControls();
       updateExplorerStatus();
 
+      // Everything below runs under one try/finally: a thrown error anywhere
+      // in the page load must never strand walletLoadingPage=true, which used
+      // to grey out Prev/Next (and the jump controls) until a full reload.
+      let pageIds = [];
+      try {
       if (state.walletPageIds.length === 0) {
         state.walletTokens = [];
         state.selectedTokenId = null;
@@ -8314,11 +8414,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           'amber'
         );
         renderTokenGrid();
-        state.walletLoadingPage = false;
-        updateControls();
-        updateWalletPagerControls();
-        updateFullscreenControls();
-        updateExplorerStatus();
         debugLog('grid', 'explorer page load finished empty', {
           ...getGridDebugContext(state.walletPageIds),
           options: formatDebugOptions(options),
@@ -8338,7 +8433,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         'blue'
       );
 
-      const pageIds = getWalletPageIds();
+      pageIds = getWalletPageIds();
       const primedSummaries = primeWalletTokenCacheFromSummaryCache(pageIds, {
         force: !!options.force
       });
@@ -8357,7 +8452,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       });
       renderTokenGrid();
 
-      try {
         if (missingIds.length > 0 || options.force) {
           const idsToFetch = options.force ? pageIds : missingIds;
           const summaries = await fetchWalletTokenSummaries(idsToFetch, {
@@ -8419,6 +8513,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           options: formatDebugOptions(options),
           ms: Math.round(performance.now() - startedAt)
         });
+        if (state.explorerMode && !options.homeLatest) {
+          syncExplorerPageUrl();
+          prefetchAdjacentExplorerPages();
+        }
       }
     };
 
@@ -8447,6 +8545,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       state.walletLoadingPage = true;
       updateWalletPagerControls();
       updateFullscreenControls();
+      // One try/finally for the whole load — see loadExplorerPage: an error must
+      // never strand walletLoadingPage=true (stuck greyed-out pager buttons).
+      let pageIds = [];
+      try {
       if (state.walletUsesPagedHoldings && !options.pageAlreadyLoaded) {
         try {
           const contractId = getContractId(state.contract);
@@ -8466,9 +8568,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             sourceBase: summarizeApiBase(page.sourceBase)
           });
         } catch (error) {
-          state.walletLoadingPage = false;
-          updateWalletPagerControls();
-          updateFullscreenControls();
           debugLog('grid', 'wallet page holdings request failed', {
             options: formatDebugOptions(options),
             wallet: truncateMiddle(viewingAddress, 8, 8),
@@ -8479,7 +8578,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         }
       }
 
-      const pageIds = getWalletPageIds();
+      pageIds = getWalletPageIds();
       debugLog('grid', 'wallet page ids resolved', {
         ...getGridDebugContext(pageIds),
         options: formatDebugOptions(options)
@@ -8490,9 +8589,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         void closeFullscreenViewer();
         void updateWalletTokenUriHeadPreview(null);
         renderTokenGrid();
-        state.walletLoadingPage = false;
-        updateWalletPagerControls();
-        updateFullscreenControls();
         debugLog('grid', 'wallet page load finished empty', {
           ...getGridDebugContext(pageIds),
           options: formatDebugOptions(options),
@@ -8519,7 +8615,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       });
       renderTokenGrid({ deferHydration: !!options.deferHydration });
 
-      try {
         if (missingIds.length > 0 || options.force) {
           const idsToFetch = options.force ? pageIds : missingIds;
           const summaries = await fetchWalletTokenSummaries(idsToFetch, {
@@ -8764,6 +8859,20 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           renderPreparedState();
         }
         await loadWalletInscriptions();
+        if (PAGE_MODE === 'home' && state.walletSession.isConnected && state.walletSession.address) {
+          // A wallet that connects on the landing page and holds inscriptions
+          // goes straight to its ledger on the My Wallet page.
+          const holdingCount =
+            (state.walletUsesPagedHoldings
+              ? state.walletTotalCount
+              : state.walletTokenIds.length) + getInjectedEscrowTwinIds().length;
+          if (holdingCount > 0) {
+            appendLog('Opening My Wallet with your inscriptions…');
+            window.history.pushState(null, '', '/my-wallet');
+            void switchToPage('my-wallet');
+            return;
+          }
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         appendLog(`Wallet connect failed: ${message}`);
@@ -8843,7 +8952,16 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             );
           }
         } else {
-          state.walletPageIndex = getExplorerLatestPageIndex();
+          // Shareable page position: /xplorer?p=12 opens straight onto page 12.
+          const requestedPage = Number.parseInt(
+            new URLSearchParams(window.location.search).get('p') ?? '',
+            10
+          );
+          const pageCount = getWalletPageCount();
+          state.walletPageIndex =
+            Number.isSafeInteger(requestedPage) && requestedPage >= 1 && pageCount > 0
+              ? Math.min(requestedPage - 1, pageCount - 1)
+              : getExplorerLatestPageIndex();
         }
         await loadExplorerPage({
           selectTokenId: initialSelectTokenId,
@@ -8940,11 +9058,52 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       if (!state.explorerMode) {
         return;
       }
+      // Smart field: "512" / "#512" → inscription id, "p12" / "page 12" → page.
+      const raw = dom.explorerTokenInput.value.trim();
+      const pageMatch = raw.match(/^p(?:age)?\s*(\d+)$/i);
+      if (pageMatch) {
+        dom.explorerPageInput.value = pageMatch[1];
+        dom.explorerTokenInput.value = '';
+        await jumpToExplorerPage();
+        return;
+      }
+      if (raw.startsWith('#')) {
+        dom.explorerTokenInput.value = raw.slice(1).trim();
+      }
       if (dom.explorerTokenInput.value.trim()) {
         await jumpToExplorerToken();
         return;
       }
       await jumpToExplorerPage();
+    };
+
+    const jumpToRandomInscription = async () => {
+      if (!state.explorerMode || state.walletLoadingPage) {
+        return;
+      }
+      if (!state.explorerLatestTokenId) {
+        await refreshExplorerLatestTokenId();
+      }
+      const latest = state.explorerLatestTokenId;
+      if (!latest || latest <= 0n) {
+        return;
+      }
+      // With filters active and indexed, roll within the matching set so the
+      // jump always lands on something visible.
+      if (
+        hasActiveExplorerFilters() &&
+        state.explorerFilterIndexComplete &&
+        state.explorerFilteredTokenIds.length > 0
+      ) {
+        const pick =
+          state.explorerFilteredTokenIds[
+            Math.floor(Math.random() * state.explorerFilteredTokenIds.length)
+          ];
+        dom.explorerTokenInput.value = pick.toString();
+      } else {
+        dom.explorerTokenInput.value = String(1 + Math.floor(Math.random() * Number(latest)));
+      }
+      await jumpToExplorerToken();
     };
 
     const showLatestExplorerPage = async () => {
@@ -9045,6 +9204,15 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         dom.dropzoneText.textContent = 'Choose file or drop it here';
       }
       renderPreparedState();
+      if (file && autoPrepareHook && !state.busy) {
+        // Railroad the default flow: a dropped file is prepared immediately,
+        // so the only remaining decision is "Start inscription".
+        window.setTimeout(() => {
+          if (state.selectedFile === file && !state.busy && !state.prepared) {
+            void autoPrepareHook();
+          }
+        }, 0);
+      }
     };
 
     // Manual recovery. If a wallet transaction is cancelled or fails — in
@@ -9298,9 +9466,144 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       renderPreparedState();
     };
 
+    // Public views shared by boot deep-links and SPA tab switches:
+    //   ?gallery=<id>, ?wallet=/?showcase=<addr|name> (+ &sel=<tokenId>).
+    const openPublicViewFromParams = async (params) => {
+      const requestedGallery = params.get('gallery')?.trim() || null;
+      const requestedPublicWallet =
+        params.get('wallet')?.trim() || params.get('showcase')?.trim() || null;
+      if (requestedGallery) {
+        await openCuratedGallery(requestedGallery, { scroll: false });
+        return true;
+      }
+      if (!requestedPublicWallet) {
+        return false;
+      }
+      if (/^S[PM][0-9A-Z]+$/i.test(requestedPublicWallet)) {
+        await viewWalletByAddress(requestedPublicWallet);
+      } else {
+        dom.walletLookupInput.value = requestedPublicWallet.replace(/\.btc$/i, '');
+        updateWalletLookupInputMode();
+        await viewWalletFromInput();
+      }
+      const requestedSel = parsePositiveBigInt(params.get('sel') ?? '');
+      if (requestedSel !== null) {
+        try {
+          await focusWalletTokenById(requestedSel);
+        } catch (error) {
+          debugLog('grid', 'deep-link token focus failed', {
+            sel: requestedSel.toString(),
+            error: error instanceof Error ? error.message : String(error)
+          }, 'warn');
+        }
+      }
+      return true;
+    };
+
+    // Default My Wallet view: a connected wallet WITH inscriptions opens its
+    // own latest page; otherwise Music by Various, so there's always content.
+    const openMyWalletDefaultView = async () => {
+      let openedOwnWallet = false;
+      if (state.walletSession.isConnected && state.walletSession.address) {
+        await loadWalletInscriptions();
+        const ownedCount = state.walletUsesPagedHoldings
+          ? state.walletTotalCount
+          : state.walletTokenIds.length;
+        openedOwnWallet = ownedCount > 0;
+        if (!openedOwnWallet) {
+          appendLog('Connected wallet has no inscriptions yet — showing Music by Various.');
+        }
+      }
+      if (!openedOwnWallet) {
+        await openCuratedGallery('jim-music', { scroll: false });
+      }
+    };
+
+    // SPA tab switching: the four site pages share this shell, so nav clicks
+    // just swap the page mode and run that page's loads — no reload, and the
+    // radio, wallet session and caches all survive the switch.
+    let pageSwitchRun = 0;
+    const switchToPage = async (page, params = null) => {
+      const run = ++pageSwitchRun;
+      PAGE_MODE = page;
+      document.documentElement.dataset.page = page;
+      document.title = PAGE_TITLES[page] ?? PAGE_TITLES.home;
+      window.scrollTo({ top: 0 });
+      if (page === 'xplorer') {
+        if (params && (await openPublicViewFromParams(params))) {
+          if (run === pageSwitchRun) {
+            updateControls();
+          }
+          return;
+        }
+        setExplorerModeFromRequest();
+        state.explorerMode = true;
+        await loadExplorerMode();
+        if (run === pageSwitchRun) {
+          updateControls();
+        }
+        return;
+      }
+      // Leaving the explorer: drop its state so explorer-mode CSS stops
+      // suppressing the other pages' panels.
+      state.explorerMode = false;
+      state.explorerInitialTokenId = null;
+      if (page === 'home' || page === 'inscribe') {
+        state.curatedGalleryId = null;
+        state.curatedGalleryTitle = null;
+        state.homeLatestView = false;
+        clearExampleDescription();
+      }
+      if (page === 'my-wallet') {
+        await openMyWalletDefaultView();
+      }
+      if (run === pageSwitchRun) {
+        updateControls();
+      }
+    };
+
+    const classifyPath = (pathname, params) => {
+      const seg = (pathname.split('/').filter(Boolean)[0] || '').toLowerCase();
+      if (seg === 'inscribe' || params.has('handoff') || params.has('handoffId')) {
+        return 'inscribe';
+      }
+      if (seg === 'my-wallet' || seg === 'wallet') {
+        return 'my-wallet';
+      }
+      if (
+        seg === 'xplorer' ||
+        seg === 'x' ||
+        params.get('view') === 'explorer' ||
+        params.has('explorer') ||
+        params.has('token') ||
+        params.has('inscription') ||
+        params.has('wallet') ||
+        params.has('showcase') ||
+        params.has('gallery')
+      ) {
+        return 'xplorer';
+      }
+      return 'home';
+    };
+
     const initialize = async () => {
       applyTheme(loadTheme());
       setExplorerModeFromRequest();
+      const pageParams = new URLSearchParams(window.location.search);
+      const requestedGallery = pageParams.get('gallery')?.trim() || null;
+      const requestedPublicWallet =
+        pageParams.get('wallet')?.trim() || pageParams.get('showcase')?.trim() || null;
+      if (
+        !state.explorerMode &&
+        PAGE_MODE === 'xplorer' &&
+        !requestedGallery &&
+        !requestedPublicWallet
+      ) {
+        // /xplorer always lands in the explorer, even when the URL carried no
+        // usable token id (e.g. /x/not-a-number falls back to the latest page).
+        // Gallery/wallet params instead open that public view on this page.
+        state.explorerMode = true;
+      }
       dom.tokenUriInput.value = DEFAULT_TOKEN_URI;
       void updateTokenUriHeadPreview();
       dom.walletLookupInput.value = '';
@@ -9318,32 +9621,21 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         await loadExplorerMode();
       } else {
         await fetchAdminStatus();
-        // Deep link: /?wallet=<address> opens straight into that wallet's grid
-        // (used by the Xplorer owner click, which routes back to the homepage).
-        const requestedWallet = new URLSearchParams(window.location.search)
-          .get('wallet')
-          ?.trim();
-        if (requestedWallet) {
-          await viewWalletByAddress(requestedWallet);
-        } else if (walletViewRequestId === state.walletViewRequestId && !consumedHandoff) {
-          // Default homepage view:
-          //  - a connected wallet WITH inscriptions → its own latest inscriptions;
-          //  - no wallet, or a connected-but-empty wallet → Music by Various,
-          //    so there's always something to play on load.
-          let openedOwnWallet = false;
-          if (state.walletSession.isConnected && state.walletSession.address) {
-            await loadWalletInscriptions();
-            const ownedCount = state.walletUsesPagedHoldings
-              ? state.walletTotalCount
-              : state.walletTokenIds.length;
-            openedOwnWallet = ownedCount > 0;
-            if (!openedOwnWallet) {
-              appendLog('Connected wallet has no inscriptions yet — showing Music by Various.');
-            }
-          }
-          if (!openedOwnWallet) {
-            await openCuratedGallery('jim-music', { scroll: false });
-          }
+        // Deep links (rendered on the Xplorer page):
+        //   ?gallery=<id>          → curated example gallery
+        //   ?wallet= / ?showcase=  → any wallet's public ledger (address or .btc
+        //                            name), optional &sel=<tokenId> to focus one.
+        const openedPublicView = await openPublicViewFromParams(pageParams);
+        if (openedPublicView) {
+          // handled above
+        } else if (
+          PAGE_MODE === 'my-wallet' &&
+          walletViewRequestId === state.walletViewRequestId &&
+          !consumedHandoff
+        ) {
+          // Home and inscribe skip the grid preload — their pages hide the
+          // wallet panel entirely.
+          await openMyWalletDefaultView();
         }
       }
       updateControls();
@@ -9352,15 +9644,77 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     dom.connectButton.addEventListener('click', connectWallet);
     dom.introConnectButton?.addEventListener('click', connectWallet);
     dom.introPrepareButton?.addEventListener('click', () => {
+      if (PAGE_MODE !== 'inscribe') {
+        window.history.pushState(null, '', '/inscribe');
+        void switchToPage('inscribe');
+        return;
+      }
       document.getElementById('inscribeTitle')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       dom.nameInput?.focus();
     });
     dom.disconnectButton.addEventListener('click', disconnectWallet);
-    dom.viewInscriptionsButton.addEventListener('click', scrollToWalletGrid);
+    dom.viewInscriptionsButton.addEventListener('click', () => {
+      if (PAGE_MODE === 'home' || PAGE_MODE === 'inscribe') {
+        // The wallet grid lives on its own tab now.
+        window.history.pushState(null, '', '/my-wallet');
+        void switchToPage('my-wallet');
+        return;
+      }
+      scrollToWalletGrid();
+    });
     dom.backToGridButton.addEventListener('click', scrollToWalletGrid);
     dom.refreshWalletButton.addEventListener('click', loadWalletInscriptions);
     dom.explorerJumpButton?.addEventListener('click', () => {
       void handleExplorerJump();
+    });
+    dom.explorerRandomButton?.addEventListener('click', () => {
+      void jumpToRandomInscription();
+    });
+
+    // Grid keyboard navigation (Xplorer + My Wallet): ←/→ turn pages, ↑/↓ move
+    // the selection. Skipped while typing, while the fullscreen viewer is open
+    // (it has its own arrow handling), or with modifier keys held.
+    document.addEventListener('keydown', (event) => {
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+        return;
+      }
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (state.fullscreenOpen) {
+        return;
+      }
+      if ((PAGE_MODE !== 'xplorer' && PAGE_MODE !== 'my-wallet') || state.walletTokens.length === 0) {
+        return;
+      }
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        dom.walletPrevButton?.click();
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        dom.walletNextButton?.click();
+      } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        event.preventDefault();
+        const direction = event.key === 'ArrowDown' ? 1 : -1;
+        const currentIndex = state.walletTokens.findIndex(
+          (token) => token.id === state.selectedTokenId
+        );
+        const nextIndex =
+          currentIndex === -1
+            ? 0
+            : Math.min(state.walletTokens.length - 1, Math.max(0, currentIndex + direction));
+        const nextToken = state.walletTokens[nextIndex];
+        if (nextToken && nextToken.id !== state.selectedTokenId) {
+          void selectToken(nextToken.id);
+        }
+      }
     });
     dom.explorerLatestButton?.addEventListener('click', () => {
       void showLatestExplorerPage();
@@ -9554,7 +9908,13 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         pageCount: getWalletPageCount()
       });
       state.walletPageIndex -= 1;
-      await loadWalletPage();
+      try {
+        await loadWalletPage();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setStatus(dom.walletGridStatus, `<strong>Grid</strong> ${message}`, 'error', 'rose');
+        appendLog(`Page load failed: ${message}`);
+      }
     });
     dom.walletNextButton.addEventListener('click', async () => {
       const pageCount = getWalletPageCount();
@@ -9568,9 +9928,15 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         pageCount
       });
       state.walletPageIndex += 1;
-      await loadWalletPage();
+      try {
+        await loadWalletPage();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setStatus(dom.walletGridStatus, `<strong>Grid</strong> ${message}`, 'error', 'rose');
+        appendLog(`Page load failed: ${message}`);
+      }
     });
-    dom.prepareButton.addEventListener('click', async () => {
+    const runPrepare = async () => {
       setBusy(true);
       try {
         await preparePayload();
@@ -9581,7 +9947,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       } finally {
         setBusy(false);
       }
-    });
+    };
+    autoPrepareHook = runPrepare;
+    dom.prepareButton.addEventListener('click', runPrepare);
     dom.inscribeButton.addEventListener('click', runInscription);
     dom.resetInscriberButton.addEventListener('click', resetInscriberFlow);
     dom.clearInscriberButton.addEventListener('click', clearInscriberPanel);
@@ -9684,6 +10052,103 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
     void initialize();
 
+    // SPA tab navigation: same-tab site links (nav, cards, example chips)
+    // switch pages client-side — the radio and wallet session never restart.
+    // Links outside the four page modes (/wizard, /g/…, static apps) navigate
+    // normally, as do modified-clicks (new tab/window).
+    document.addEventListener('click', (event) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+      const origin = event.target instanceof Element ? event.target : null;
+      const link = origin?.closest('a[target="_self"][href^="/"]');
+      if (!link) {
+        return;
+      }
+      const url = new URL(link.getAttribute('href') ?? '/', window.location.origin);
+      const page = classifyPath(url.pathname, url.searchParams);
+      const seg = (url.pathname.split('/').filter(Boolean)[0] || '').toLowerCase();
+      const isSitePagePath =
+        url.pathname === '/' ||
+        ['inscribe', 'my-wallet', 'wallet', 'xplorer', 'x'].includes(seg);
+      if (!isSitePagePath) {
+        return; // /wizard, /g/…, docs, static apps → real navigation
+      }
+      event.preventDefault();
+      window.history.pushState(null, '', url.pathname + url.search + url.hash);
+      void switchToPage(page, url.searchParams);
+    });
+
+    window.addEventListener('popstate', () => {
+      const params = new URLSearchParams(window.location.search);
+      void switchToPage(classifyPath(window.location.pathname, params), params);
+    });
+
+    // Sticky header: condense after a little scroll so the nav, connected
+    // wallet and docked radio stay visible without eating vertical space.
+    //
+    // Oscillation protection (two layers):
+    // 1. The header's LAYOUT height is locked to its expanded size, so
+    //    condensing only shrinks the visible bar inside a constant-height box.
+    //    Document height therefore never changes with the toggle, which makes
+    //    the feedback loop (shrink → scrollY drops → expand → scrollY rises…)
+    //    physically impossible. The box itself is transparent and click-through
+    //    (see CSS), so the reserved space never hides or blocks content.
+    // 2. A hysteresis band (condense above 64px, expand only below 8px) so
+    //    trackpad jitter around a single threshold can't flutter the state.
+    const siteHeader = document.getElementById('siteHeader');
+    if (siteHeader) {
+      let headerCondensed = false;
+      const lockHeaderHeight = () => {
+        // Measure the EXPANDED height (class briefly removed inside one frame
+        // — no paint happens in between) and freeze the box at that size.
+        const wasCondensed = siteHeader.classList.contains('is-condensed');
+        siteHeader.classList.remove('is-condensed');
+        siteHeader.style.height = 'auto';
+        const expandedHeight = siteHeader.offsetHeight;
+        const lockedHeight = `${expandedHeight}px`;
+        if (siteHeader.style.height !== lockedHeight) {
+          siteHeader.style.height = lockedHeight;
+        }
+        siteHeader.classList.toggle('is-condensed', wasCondensed);
+      };
+      const syncHeader = () => {
+        const y = window.scrollY;
+        const next = headerCondensed ? y > 8 : y > 64;
+        if (next !== headerCondensed) {
+          headerCondensed = next;
+          siteHeader.classList.toggle('is-condensed', next);
+        }
+      };
+      let headerResizeTimer = null;
+      const queueHeaderRelock = () => {
+        if (headerResizeTimer !== null) {
+          window.clearTimeout(headerResizeTimer);
+        }
+        headerResizeTimer = window.setTimeout(lockHeaderHeight, 150);
+      };
+      window.addEventListener('resize', queueHeaderRelock);
+      // Re-lock when the header's CONTENT genuinely changes size (connected
+      // readout appearing, nav wrapping). lockHeaderHeight's class flip is
+      // synchronous within one frame, so it never retriggers the observer.
+      if (typeof ResizeObserver === 'function') {
+        const headerObserver = new ResizeObserver(queueHeaderRelock);
+        siteHeader.querySelectorAll('.topbar, .site-nav').forEach((el) => {
+          headerObserver.observe(el);
+        });
+      }
+      lockHeaderHeight();
+      window.addEventListener('scroll', syncHeader, { passive: true });
+      syncHeader();
+    }
+
     // Keep the station playing: internal links to other pages open in new
     // tabs so the homepage (and its radio) is never torn down mid-song.
     document.querySelectorAll('a[href^="/"]').forEach((link) => {
@@ -9695,8 +10160,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       link.rel = link.rel ? link.rel + ' noopener' : 'noopener';
     });
 
-    // Xtrata Radio: homepage soundtrack from the curated music gallery.
+    // Xtrata Radio: site soundtrack, docked in the sticky header (falls back
+    // to the classic floating widget if the slot is missing).
     initXtrataRadio({
       tokenIds: (CURATED_GALLERIES.find((gallery) => gallery.id === 'jim-music')?.tokenIds ?? []),
-      stationName: 'XTRATA FM'
+      stationName: 'XTRATA FM',
+      mount: document.getElementById('radioSlot')
     });

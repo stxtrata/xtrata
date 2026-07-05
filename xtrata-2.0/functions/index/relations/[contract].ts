@@ -136,6 +136,28 @@ export const onRequest = async (context: {
       );
     }
 
+    // Mimes for the immediate family (parents/children/siblings) so clients can
+    // classify relatives (song vs image vs other) without extra round-trips.
+    const familyIds = [...new Set([
+      ...ancestors.filter((r) => r.depth === 1).map((r) => r.id),
+      ...descendants.filter((r) => r.depth === 1).map((r) => r.id),
+      ...siblings.map((r) => r.id)
+    ])].slice(0, 64);
+    const mimes: Record<number, string> = {};
+    if (familyIds.length) {
+      try {
+        const mimeRows = await queryAll(
+          env,
+          `SELECT token_id, mime FROM inscription_index
+            WHERE contract = ?1 AND token_id IN (${familyIds.map(() => '?').join(',')})`,
+          [contractId, ...familyIds]
+        );
+        for (const row of (mimeRows.results ?? []) as Array<{ token_id: number; mime: string | null }>) {
+          mimes[row.token_id] = row.mime || '';
+        }
+      } catch { /* mime map is best-effort */ }
+    }
+
     const complete = state.syncedCount >= state.mintedCount && state.mintedCount > 0;
     const payload = {
       contract: contractId,
@@ -147,7 +169,8 @@ export const onRequest = async (context: {
       children: descendants.filter((r) => r.depth === 1).map((r) => r.id),
       ancestors: ancestors.map((r) => ({ id: r.id, depth: r.depth })),
       descendants: descendants.map((r) => ({ id: r.id, depth: r.depth })),
-      siblings: siblings.map((r) => r.id)
+      siblings: siblings.map((r) => r.id),
+      mimes
     };
     return json(payload, 200, {
       // Brief browser cache; longer edge TTL with SWR. The edges only change when

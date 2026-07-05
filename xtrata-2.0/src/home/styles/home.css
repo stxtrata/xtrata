@@ -3678,3 +3678,526 @@
       .modes .current-campaign__cta{align-self:flex-start;justify-self:auto;margin:12px 0 0}
       @media (max-width:520px){ .suno-hero,.modes .current-campaign{gap:16px} .suno-hero__logo,.modes .current-campaign__logo{width:104px;height:104px} }
 
+
+    /* ==================================================================
+       Page modes — data-page router (set pre-paint in index.html <head>).
+       One shell, four pages: home / inscribe / xplorer / my-wallet.
+       Appended last so these rules win specificity ties with mode classes
+       like body.has-ledger / body.intro-mode.
+       ================================================================== */
+
+    .site-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 10px 0 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .site-nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      padding: 8px 12px;
+      border: 1px solid transparent;
+      border-bottom: none;
+      border-radius: var(--radius) var(--radius) 0 0;
+    }
+
+    .site-nav a:hover {
+      color: var(--ink);
+      background: var(--ghost-hover);
+    }
+
+    :root[data-page='home'] .site-nav a[data-nav='home'],
+    :root[data-page='inscribe'] .site-nav a[data-nav='inscribe'],
+    :root[data-page='xplorer'] .site-nav a[data-nav='xplorer'],
+    :root[data-page='my-wallet'] .site-nav a[data-nav='my-wallet'] {
+      color: var(--ink);
+      background: var(--panel);
+      border-color: var(--line);
+    }
+
+    /* Landing cards (home only) */
+    .page-cards {
+      display: none;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      padding-top: 18px;
+    }
+
+    :root[data-page='home'] .page-cards {
+      display: grid;
+    }
+
+    .page-card {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      text-decoration: none;
+      color: var(--ink);
+      box-shadow: var(--shadow);
+      transition: border-color 0.15s ease, transform 0.15s ease;
+    }
+
+    .page-card:hover {
+      border-color: var(--line-strong);
+      transform: translateY(-2px);
+    }
+
+    .page-card__kicker {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--green);
+    }
+
+    .page-card__title {
+      font-size: 17px;
+    }
+
+    .page-card__copy {
+      margin: 0;
+      font-size: 12.5px;
+      line-height: 1.5;
+      color: var(--muted);
+      flex: 1;
+    }
+
+    .page-card__cta {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--green);
+    }
+
+    /* Home: landing only — hide the workspace panels. */
+    :root[data-page='home'] .workspace {
+      display: none;
+    }
+
+    /* Inscribe: the inscribe panel alone, centred. */
+    :root[data-page='inscribe'] .modes,
+    :root[data-page='inscribe'] .registry-intro,
+    :root[data-page='inscribe'] .page-cards,
+    :root[data-page='inscribe'] .homepage-docs,
+    :root[data-page='inscribe'] .panel[aria-labelledby='walletTitle'] {
+      display: none;
+    }
+
+    :root[data-page='inscribe'] .workspace {
+      grid-template-columns: minmax(0, 720px);
+      justify-content: center;
+    }
+
+    /* My Wallet: the wallet/ledger panel alone, full width. */
+    :root[data-page='my-wallet'] .modes,
+    :root[data-page='my-wallet'] .registry-intro,
+    :root[data-page='my-wallet'] .page-cards,
+    :root[data-page='my-wallet'] .homepage-docs,
+    :root[data-page='my-wallet'] .panel[aria-labelledby='inscribeTitle'] {
+      display: none;
+    }
+
+    :root[data-page='my-wallet'] .workspace {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* Xplorer: body.explorer-mode does the detailed styling once JS runs;
+       these pre-paint rules stop the landing content flashing first. */
+    :root[data-page='xplorer'] .modes,
+    :root[data-page='xplorer'] .registry-intro,
+    :root[data-page='xplorer'] .page-cards,
+    :root[data-page='xplorer'] .homepage-docs,
+    :root[data-page='xplorer'] .panel[aria-labelledby='inscribeTitle'] {
+      display: none;
+    }
+
+    :root[data-page='xplorer'] .workspace {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* Collapsible advanced sections in the inscribe form */
+    .inscribe-details {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-soft);
+    }
+
+    .inscribe-details > summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 10px 12px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--muted);
+      user-select: none;
+    }
+
+    .inscribe-details > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .inscribe-details > summary::before {
+      content: '▸';
+      display: inline-block;
+      margin-right: 8px;
+      transition: transform 0.15s ease;
+    }
+
+    .inscribe-details[open] > summary::before {
+      transform: rotate(90deg);
+    }
+
+    .inscribe-details[open] > summary {
+      color: var(--ink);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .inscribe-details > *:not(summary) {
+      margin: 12px;
+    }
+
+    .inscribe-details .relationship-panel {
+      border: none;
+      background: transparent;
+      padding: 0;
+    }
+
+    .inscribe-wizard-note {
+      margin-top: 4px;
+      font-size: 12.5px;
+    }
+
+    .inscribe-wizard-note a {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    @media (max-width: 760px) {
+      .site-nav {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        white-space: nowrap;
+      }
+    }
+
+    /* ==================================================================
+       Sticky site header — topbar + nav + docked radio stay visible while
+       scrolling. Baseline is slimmer than the old header; past ~24px of
+       scroll it condenses further (.is-condensed, toggled in main.js).
+       ================================================================== */
+
+    .site-header {
+      /* The box is height-locked to the EXPANDED size by main.js so condensing
+         never changes document height (prevents scroll feedback oscillation).
+         It stays transparent + click-through; the bars inside carry the
+         background and receive pointer events. */
+      position: sticky;
+      top: 0;
+      z-index: 90;
+      background: transparent;
+      pointer-events: none;
+      overflow: visible;
+    }
+
+    .site-header .topbar,
+    .site-header .site-nav {
+      background: var(--bg);
+      pointer-events: auto;
+    }
+
+    .site-header .topbar {
+      min-height: 78px;
+      transition: min-height 0.25s ease;
+    }
+
+    .site-header .brand {
+      font-size: 22px;
+      gap: 12px;
+      transition: font-size 0.25s ease;
+    }
+
+    .site-header .brand-logo {
+      width: clamp(48px, 4.5vw, 64px);
+      height: clamp(48px, 4.5vw, 64px);
+      flex-basis: clamp(48px, 4.5vw, 64px);
+      transition: width 0.25s ease, height 0.25s ease, flex-basis 0.25s ease;
+    }
+
+    .site-header .connected-readout__label {
+      margin-bottom: 2px;
+      font-size: 10px;
+    }
+
+    .site-header .connected-readout__value {
+      font-size: clamp(17px, 2.2vw, 26px);
+      transition: font-size 0.25s ease;
+    }
+
+    .site-header .connected-readout__address {
+      margin-top: 3px;
+      font-size: 11px;
+    }
+
+    .site-header.is-condensed .site-nav {
+      box-shadow: 0 10px 26px rgba(12, 20, 16, 0.18);
+      transition: box-shadow 0.25s ease;
+    }
+
+    .site-header.is-condensed .topbar {
+      min-height: 50px;
+    }
+
+    .site-header.is-condensed .brand {
+      font-size: 16px;
+      gap: 8px;
+    }
+
+    .site-header.is-condensed .brand-logo {
+      width: 28px;
+      height: 28px;
+      flex-basis: 28px;
+    }
+
+    .site-header.is-condensed .connected-readout__label,
+    .site-header.is-condensed .connected-readout__address {
+      display: none;
+    }
+
+    .site-header.is-condensed .connected-readout__value {
+      font-size: 15px;
+    }
+
+    .site-header.is-condensed .top-actions .btn {
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+
+    .site-header.is-condensed .site-nav a {
+      padding: 5px 10px;
+    }
+
+    /* Docked radio pill sits at the right end of the nav row. */
+    .site-header .site-nav {
+      display: flex;
+      align-items: center;
+    }
+
+    .radio-slot {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      padding: 0 0 4px 10px;
+      min-width: 0;
+    }
+
+    /* ==================================================================
+       My Wallet / Xplorer rework:
+       - lookup + example chips leave My Wallet (examples live on the home
+         strip and open in the Xplorer; lookup collapses into the Xplorer)
+       - My Wallet shows the full 4x4 grid on screen, preview to the right
+       ================================================================== */
+
+    .wallet-lookup-details {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-soft);
+      margin-bottom: 12px;
+    }
+
+    .wallet-lookup-details > summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 9px 12px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--muted);
+      user-select: none;
+    }
+
+    .wallet-lookup-details > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .wallet-lookup-details > summary::before {
+      content: '▸';
+      display: inline-block;
+      margin-right: 8px;
+      transition: transform 0.15s ease;
+    }
+
+    .wallet-lookup-details[open] > summary::before {
+      transform: rotate(90deg);
+    }
+
+    .wallet-lookup-details[open] > summary {
+      color: var(--ink);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .wallet-lookup-details > form {
+      margin: 10px 12px 12px;
+    }
+
+    /* My Wallet: personal ledger only — no lookup, no example chips. */
+    :root[data-page='my-wallet'] .wallet-lookup-details,
+    :root[data-page='my-wallet'] .wallet-examples {
+      display: none;
+    }
+
+    /* My Wallet: cap the grid column against the viewport so all 16 squares
+       are visible at once; the preview column stays SMALL so the square plus
+       metadata, relationships, send and advanced controls fit unscrolled. */
+    :root[data-page='my-wallet'] .wallet-layout {
+      grid-template-columns:
+        minmax(0, clamp(300px, calc(100vh - 330px), 540px))
+        minmax(230px, clamp(230px, calc(100vh - 560px), 310px));
+      gap: 18px;
+      justify-content: center;
+      align-items: start;
+    }
+
+    :root[data-page='my-wallet'] .token-preview {
+      position: sticky;
+      top: 104px;
+    }
+
+    /* Compact panel chrome + preview details on My Wallet so the whole right
+       column (square + meta + relationships + send) stays on screen. */
+    :root[data-page='my-wallet'] .panel-head {
+      padding-bottom: 6px;
+    }
+
+    :root[data-page='my-wallet'] .panel-title {
+      font-size: 20px;
+    }
+
+    :root[data-page='my-wallet'] .panel-subtitle {
+      margin: 2px 0 0;
+      font-size: 12px;
+    }
+
+    :root[data-page='my-wallet'] .token-preview .preview-title {
+      margin: 8px 0 4px;
+      font-size: 13.5px;
+    }
+
+    :root[data-page='my-wallet'] .token-preview .prepared-meta {
+      font-size: 11.5px;
+    }
+
+    :root[data-page='my-wallet'] .token-preview .meta-line {
+      padding: 3px 0;
+    }
+
+    :root[data-page='my-wallet'] .token-preview .selected-relationships,
+    :root[data-page='my-wallet'] .token-preview .transfer-tools .field-note {
+      font-size: 11.5px;
+    }
+
+    @media (max-width: 900px) {
+      :root[data-page='my-wallet'] .wallet-layout {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      :root[data-page='my-wallet'] .token-preview {
+        position: static;
+      }
+    }
+
+    /* Xplorer: the lookup lives here, collapsed (beats the explorer-mode
+       display:none on .wallet-browser via higher specificity). */
+    :root[data-page='xplorer'] .wallet-lookup-details {
+      display: block;
+      margin: 0 0 12px;
+    }
+
+    :root[data-page='xplorer'] .wallet-lookup-details .wallet-browser {
+      display: block;
+    }
+
+    /* Home examples strip: chips link into the Xplorer. */
+    .home-examples {
+      display: none;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding-top: 16px;
+    }
+
+    :root[data-page='home'] .home-examples {
+      display: flex;
+    }
+
+    .home-examples__label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-right: 4px;
+    }
+
+    a.wallet-example-chip {
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    /* Xplorer keeps its surface clean when a wallet/gallery view is open
+       (explorer-mode class off): chips stay home-only. */
+    :root[data-page='xplorer'] .wallet-examples {
+      display: none;
+    }
+
+    /* ==================================================================
+       Xplorer navigation upgrades: smart jump field (page input hidden but
+       functional), always-visible filter chips, back link from public views.
+       ================================================================== */
+
+    body.explorer-mode .explorer-page-field {
+      display: none;
+    }
+
+    body.explorer-mode .explorer-filter-toggle {
+      display: none;
+    }
+
+    body.explorer-mode .explorer-filter-menu,
+    body.explorer-mode .explorer-filter-group.is-collapsed .explorer-filter-menu {
+      display: flex;
+      position: static;
+      width: auto;
+      padding: 0;
+      border: none;
+      background: transparent;
+      box-shadow: none;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    body.explorer-mode .explorer-filter-options {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      overflow: visible;
+    }
+
+    .back-to-xplorer {
+      display: none;
+    }
+
+    :root[data-page='xplorer'] body:not(.explorer-mode) .back-to-xplorer {
+      display: inline-flex;
+      align-self: flex-start;
+      margin-bottom: 12px;
+    }
