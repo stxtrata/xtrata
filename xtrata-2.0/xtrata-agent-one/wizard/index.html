@@ -263,6 +263,7 @@
       <span class="lbl">All-in deposit for the batch <span class="muted">(over-collected — unused remainder auto-refunded)</span></span>
       <span class="big-num" id="batchQuoteTotal">—</span>
     </div>
+    <div id="batchParentsCheck" style="font-size:12px;margin:2px 0 10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px" hidden></div>
     <div class="btnrow">
       <button class="btn big" id="batchInscribeBtn" disabled>Inscribe batch</button>
       <button class="btn ghost" id="batchClearBtn">Clear batch</button>
@@ -408,7 +409,7 @@ function setWallet(addr){ WALLET=addr||null; WALLET_NAME=null; WALLET_REVEAL=fal
   if(WALLET){ btn.textContent='Disconnect'; if(!$('#user').value) $('#user').value=WALLET;
     renderWalletPill(); bnsLookup(WALLET).then(n=>{ if(n&&WALLET===addr){ WALLET_NAME=n; renderWalletPill(); } }); }
   else { btn.textContent='Connect wallet'; renderWalletPill(); }
-  try{ checkParents(); }catch{} }   // re-verify declared parents against the (dis)connected wallet
+  try{ checkParents(); }catch{} try{ checkBatchParents(); }catch{} }   // re-verify declared parents (single + batch) against the (dis)connected wallet
 async function connectWallet(){
   const w=xtrataWallet();
   if(!w||!w.connect){ alert('Wallet bundle not loaded.\n\nThis wizard connects through the bundled wallet shim (window.XtrataWallet). Rebuild agent-one.js, or open the wizard from the Xtrata site.'); return null; }
@@ -610,7 +611,7 @@ function renderBatch(){
     <td><input class="mono" data-bi="${i}" data-bf="parents" value="${esc(it.parents)}" placeholder="134" style="padding:6px 8px;font-size:12px"/></td>
     <td><button class="btn ghost" style="padding:3px 8px" onclick="batchRemove(${i})">✕</button></td>
   </tr>${previewRowHtml(it)}`).join('')}</tbody></table>`;
-  document.querySelectorAll('#batchTableWrap input[data-bf]').forEach(inp=>{ inp.oninput=()=>{ BATCH.items[Number(inp.dataset.bi)][inp.dataset.bf]=inp.value; }; });
+  document.querySelectorAll('#batchTableWrap input[data-bf]').forEach(inp=>{ inp.oninput=()=>{ BATCH.items[Number(inp.dataset.bi)][inp.dataset.bf]=inp.value; if(inp.dataset.bf==='parents'){ if(batchParentsCheckTimer)clearTimeout(batchParentsCheckTimer); batchParentsCheckTimer=setTimeout(checkBatchParents,500); } }; });
   document.querySelectorAll('#batchTableWrap input[data-arti]').forEach(inp=>{ inp.onchange=()=>{ const it=BATCH.items[Number(inp.dataset.arti)]; const v=inp.value.trim();
     if(v&&!/^\d+$/.test(v)){ $('#batchErr').textContent='Artwork inscription id must be a token-id uint.'; return; }
     $('#batchErr').textContent=''; it.art.tokenId=v; if(v) it.art.file=null;
@@ -761,6 +762,57 @@ async function batchQuote(){
   }catch(e){ if(run===BATCH.quoteRun){ $('#batchQuoteTotal').textContent='—'; $('#batchErr').textContent=e.message; } }
 }
 ['batchParents','batchMargin'].forEach(id=>{ $('#'+id).addEventListener('change',batchQuote); });
+
+// ---- batch parent-ownership check: green (in wallet) / orange (elsewhere) / red (no owner) ----
+// Covers the SHARED parents and EVERY row's parents, so nothing is missed. Mirrors the single
+// track's checkParents(); re-runs live as you edit and whenever the wallet connects/disconnects.
+let batchParentsCheckRun=0, batchParentsCheckTimer=null;
+function batchParentList(){
+  const set=new Map();
+  const add=(v)=>String(v||'').split(',').map(s=>s.trim()).filter(Boolean).forEach(id=>set.set(id,true));
+  add($('#batchParents').value); BATCH.items.forEach(it=>add(it.parents));
+  return [...set.keys()];
+}
+async function checkBatchParents(){
+  const box=$('#batchParentsCheck'); if(!box) return;
+  const ids=batchParentList(); const run=++batchParentsCheckRun;
+  if(!ids.length){ box.hidden=true; box.innerHTML=''; return; }
+  box.hidden=false;
+  const bad=ids.filter(d=>!/^\d+$/.test(d));
+  if(bad.length){ box.innerHTML=`<span style="color:var(--bad)">Parents must be numeric token ids (fix: ${esc(bad.join(', '))}).</span>`; return; }
+  if(SERVER.mock){ box.innerHTML='<span class="muted">MOCK mode — parent ownership not checked.</span>'; return; }
+  const A=window.XtrataAgent;
+  if(!A||!A.ownerOf){ box.innerHTML='<span class="muted">Ownership check unavailable (old agent bundle).</span>'; return; }
+  box.innerHTML=`<div style="font-weight:600;margin-bottom:5px">Parent ownership <span class="muted" style="font-weight:400">— escrowed for the mint, returned with your inscriptions</span></div>`
+    +ids.map(id=>`<div class="muted" data-bpid="${esc(id)}" style="margin:2px 0">⏳ #${esc(id)} — checking current owner…</div>`).join('')
+    +`<div id="batchParentsSummary" style="margin-top:5px"></div>`;
+  const owners={};
+  for(const id of ids){
+    let owner=null; try{ owner=await A.ownerOf(id); }catch{ owner=null; }
+    if(run!==batchParentsCheckRun) return;   // input changed mid-flight
+    owners[id]=owner;
+    const el=box.querySelector(`[data-bpid="${id}"]`); if(!el) continue;
+    if(owner&&WALLET&&owner===WALLET) el.innerHTML=`<span class="ok">✓ #${esc(id)} — in your connected wallet</span>`;
+    else if(!owner) el.innerHTML=`<span style="color:var(--bad)">✗ #${esc(id)} — no owner found (wrong id?)</span>`;
+    else if(!WALLET) el.innerHTML=`<span style="color:var(--warn)">⚠ #${esc(id)} — owned by ${esc(shortAddr(owner))}. Connect your wallet to confirm it's yours.</span>`;
+    else el.innerHTML=`<span style="color:var(--warn)">⚠ #${esc(id)} — owned by ${esc(shortAddr(owner))}, not your connected wallet.</span>`;
+  }
+  if(run!==batchParentsCheckRun) return;
+  BATCH.parentOwners=owners;
+  const missing=ids.filter(id=>!(owners[id]&&WALLET&&owners[id]===WALLET));
+  const sum=$('#batchParentsSummary');
+  if(sum) sum.innerHTML=!missing.length
+    ? `<span class="ok">✓ All ${ids.length} parent${ids.length>1?'s':''} are in your connected wallet.</span>`
+    : `<span style="color:var(--warn)">⚠ ${missing.length} of ${ids.length} not in your wallet — you'll be asked to confirm before inscribing (affected items auto-refund if their parent never arrives).</span>`;
+}
+$('#batchParents').addEventListener('input',()=>{ if(batchParentsCheckTimer)clearTimeout(batchParentsCheckTimer); batchParentsCheckTimer=setTimeout(checkBatchParents,500); });
+// Fresh re-check that GATES inscribe (confirm-first): the declared parents NOT in the connected wallet.
+async function batchUnownedParents(){
+  const A=window.XtrataAgent; if(SERVER.mock||!A||!A.ownerOf||!WALLET) return [];
+  const ids=batchParentList().filter(d=>/^\d+$/.test(d)); const missing=[];
+  for(const id of ids){ let o=null; try{ o=await A.ownerOf(id); }catch{} if(!(o&&o===WALLET)) missing.push(id); }
+  return missing;
+}
 $('#batchInscribeBtn').onclick=async()=>{
   const err=$('#batchErr'); err.textContent='';
   if(!WALLET){ err.textContent='Connect your wallet (top-right) — the batch fast-tracks: everything returns to the wallet you pay from.'; connectWallet(); return; }
@@ -785,6 +837,14 @@ $('#batchInscribeBtn').onclick=async()=>{
       return;
     }
   }
+  // Confirm-first parent gate: warn before paying if any declared parent isn't in the connected wallet.
+  try{
+    const unowned=await batchUnownedParents();
+    if(unowned.length){
+      const go=confirm(`${unowned.length} parent inscription${unowned.length>1?'s':''} (#${unowned.join(', #')}) ${unowned.length>1?'are':'is'} not in your connected wallet.\n\nAny item that needs a missing parent will wait at “awaiting parent” and be auto-refunded if it never arrives at the deposit wallet.\n\nInscribe the batch anyway?`);
+      if(!go) return;
+    }
+  }catch{}
   $('#batchInscribeBtn').disabled=true;
   try{
     const payload={ items:BATCH.items.map(it=>{ const f=batchActiveFile(it); const asPlayer=BATCH.playerMode&&it.isAudio&&it.player.status==='ready'&&f===it.player.file;
