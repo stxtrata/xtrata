@@ -540,7 +540,7 @@ async function ensureSunoStack(){
   if(!sunoStack) sunoStack=(async()=>{
     if(!window.FFmpeg) await loadScript('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js');
     if(!window.buildXtrataAudioPlayerHtml) await loadScript('HTML_Template.js?v=6');
-    if(!window.XtrataSuno) await loadScript('suno-build.js?v=6');
+    if(!window.XtrataSuno) await loadScript('suno-build.js?v=7');
   })();
   return sunoStack;
 }
