@@ -238,6 +238,7 @@
       <label class="checkline"><input type="radio" name="bAudioMode" value="player"><span><b>Build an on-chain player for each song</b> — Opus-optimised audio + title/artist/lyrics + its own artwork (the opus-tool player, per track)</span></label>
       <div class="muted" id="batchPlayerHint" hidden style="font-size:11.5px;margin-top:6px">Give each song artwork below: attach an image file (embedded in the player) <b>or</b> enter an image inscription id (recursive artwork — zero extra bytes). Songs with embedded cover art use it automatically.</div>
     </div>
+    <div id="batchPairInfo" class="ok" style="font-size:12px;margin:2px 0 8px" hidden></div>
     <div id="batchOptSummary" class="ok" style="font-size:12px;margin:2px 0 8px" hidden></div>
     <div id="batchTableWrap"></div>
     <input id="batchArtPicker" type="file" accept="image/*" hidden />
@@ -477,23 +478,57 @@ function mimeFor(name){ const ext=(name.split('.').pop()||'').toLowerCase();
   return ({jpg:'image/jpeg',htm:'text/html',mpeg:'audio/mpeg',weba:'audio/webm; codecs=opus'})[ext]||'application/octet-stream'; }
 function catFor(name){ const ext=(name.split('.').pop()||'').toLowerCase();
   for(const cat of Object.keys(CONTENT)) if(Object.keys(CONTENT[cat]).includes(ext)) return cat; return 'data'; }
-function enterBatch(files){
-  for(const f of files){ if(BATCH.items.length>=40) break;
-    const mime=mimeFor(f.name);
-    const isAudio=mime.startsWith('audio/');
-    const isImage=!!(window.XtrataImageOptimizer&&window.XtrataImageOptimizer.isCandidate(f.name,f.size));
-    BATCH.items.push({ file:f, uri:`xtrata:${catFor(f.name)}/${slug(f.name)}`, mime, deps:'', parents:'',
-      isAudio, isImage, art:{file:null,tokenId:''}, player:{status:(BATCH.playerMode&&isAudio)?'await':'raw',file:null,info:null,err:null},
-      opt:{status:'pending',file:null,originalBytes:f.size,optimizedBytes:null,mime:null,note:''}, useOptimized:true, showPreview:true });
+function makeItem(f){
+  const mime=mimeFor(f.name);
+  const isAudio=mime.startsWith('audio/');
+  const isImage=!!(window.XtrataImageOptimizer&&window.XtrataImageOptimizer.isCandidate(f.name,f.size));
+  return { file:f, uri:`xtrata:${catFor(f.name)}/${slug(f.name)}`, mime, deps:'', parents:'',
+    isAudio, isImage, art:{file:null,tokenId:''}, player:{status:(BATCH.playerMode&&isAudio)?'await':'raw',file:null,info:null,err:null},
+    opt:{status:'pending',file:null,originalBytes:f.size,optimizedBytes:null,mime:null,note:''}, useOptimized:true, showPreview:true };
+}
+// Same-named audio+image auto-pairing. If EVERY art-less song in the batch has an image
+// sharing its base name (case/extension-insensitive), the drop is taken as "make players":
+// each image becomes that song's embedded artwork (and stops being a standalone inscription),
+// the batch flips to player mode, and the caller builds them. ALL-OR-NOTHING — one art-less
+// song with no match and we bail, leaving a perfectly normal mixed batch. Idempotent (songs
+// that already have art are skipped, so re-running / extra drops don't double-pair).
+function tryAutoPairPlayers(){
+  const base=(n)=>String(n||'').replace(/\.[^.]+$/,'').trim().toLowerCase();
+  const isImg=(it)=>!!(it.mime&&it.mime.startsWith('image/'));
+  const audio=BATCH.items.filter(it=>it.isAudio);
+  const images=BATCH.items.filter(isImg);
+  if(audio.length<1||images.length<1) return 0;
+  const used=new Set(); const plan=[];
+  for(const a of audio){
+    if(a.art.file||a.art.tokenId) continue;         // already has artwork → doesn't need pairing
+    const img=images.find(im=>!used.has(im)&&base(im.file.name)===base(a.file.name));
+    if(!img) return 0;                              // an art-less song with no same-named image → not a player drop
+    used.add(img); plan.push([a,img]);
   }
+  if(!plan.length) return 0;                        // nothing to pair
+  for(const [a,img] of plan){ a.art.file=img.file; a.art.autoPaired=true; img._pairRemove=true; }
+  BATCH.items=BATCH.items.filter(x=>!x._pairRemove);
+  if(!BATCH.playerMode){
+    BATCH.playerMode=true;
+    const r=document.querySelector('input[name="bAudioMode"][value="player"]'); if(r) r.checked=true;
+    $('#batchPlayerHint').hidden=false;
+  }
+  BATCH.items.forEach(it=>{ if(it.isAudio){ const hasArt=!!(it.art.file||it.art.tokenId); const wasReady=it.player&&it.player.status==='ready';
+    it.player={status:wasReady?'ready':(hasArt?'queued':'await'), file:it.player&&it.player.file, info:it.player&&it.player.info, err:null}; } });
+  return plan.length;
+}
+function enterBatch(files){
+  for(const f of files){ if(BATCH.items.length>=40) break; BATCH.items.push(makeItem(f)); }
   // batch replaces the single-file flow on screen
   FLOW.original=null; FLOW.optimized=null; FLOW.jobId=null; FLOW.done=false;
   $('#reviewCard').hidden=true; $('#activeJobDetail').innerHTML=''; picker.value='';
   dz.classList.add('compact');
   $('#dropMain').innerHTML=`<span class="filechip">Batch · ${BATCH.items.length} files</span>`;
   $('#dropSub').textContent='drop more files to add them to the batch';
+  const paired=tryAutoPairPlayers();   // same-named audio+image (every song matched) → auto player mode + art
   $('#batchAudioMode').hidden=!BATCH.items.some(it=>it.isAudio);
   renderBatch(); setStep('review'); queueBatchOptimise();
+  if(paired) queueAudioBuilds();       // auto-build the matched players so the user just previews + inscribes
   $('#batchCard').hidden=false; $('#batchCard').scrollIntoView({behavior:'smooth',block:'start'});
 }
 const artChip=(it,i)=>{
@@ -537,6 +572,12 @@ function batchOptSummary(){
   const pct=Math.round((1-now/orig)*100);
   el.hidden=false; el.textContent=`🗜 Optimised ${n} file${n>1?'s':''}: ${mib(orig)} → ${mib(now)} (−${pct}%) — the deposit below is quoted on the smaller sizes.`;
 }
+function batchPairInfo(){
+  const el=$('#batchPairInfo'); if(!el) return;
+  const n=BATCH.items.filter(it=>it.isAudio&&it.art&&it.art.autoPaired&&it.art.file).length;
+  if(n&&BATCH.playerMode){ el.hidden=false; el.textContent=`🎨 Auto-matched ${n} song${n>1?'s':''} to same-named artwork — switched to player mode; preview each below, then Inscribe.`; }
+  else { el.hidden=true; el.textContent=''; }
+}
 // Live preview of a built player. The player File is self-contained HTML (Opus audio +
 // art + UI), so a blob URL renders it exactly as it will inscribe. One URL per player
 // File, cached (a rebuild yields a new File → new URL); the old one is dropped on unload.
@@ -575,6 +616,7 @@ function renderBatch(){
     $('#batchErr').textContent=''; it.art.tokenId=v; if(v) it.art.file=null;
     if(BATCH.playerMode&&it.isAudio){ it.player={status:'queued',file:null,info:null,err:null}; queueAudioBuilds(); } renderBatch(); }; });
   document.querySelectorAll('#batchTableWrap a[data-revert]').forEach(a=>{ a.onclick=(e)=>{ e.preventDefault(); const it=BATCH.items[Number(a.dataset.revert)]; if(it){ it.useOptimized=!it.useOptimized; renderBatch(); batchQuote(); } }; });
+  batchPairInfo();
   batchOptSummary();
   batchQuote();
 }
@@ -670,6 +712,11 @@ async function queueAudioBuilds(){
 document.querySelectorAll('input[name="bAudioMode"]').forEach(r=>{ r.onchange=()=>{
   BATCH.playerMode=(document.querySelector('input[name="bAudioMode"]:checked')||{}).value==='player';
   $('#batchPlayerHint').hidden=!BATCH.playerMode;
+  if(!BATCH.playerMode){ // leaving player mode → restore auto-matched artwork as its own items so nothing is lost
+    const restore=[];
+    BATCH.items.forEach(it=>{ if(it.isAudio&&it.art&&it.art.autoPaired&&it.art.file){ restore.push(it.art.file); it.art={file:null,tokenId:''}; } });
+    restore.forEach(f=>{ if(BATCH.items.length<40) BATCH.items.push(makeItem(f)); });
+  }
   // Selecting player mode does NOT start building — each song waits for its artwork
   // (or an explicit Build click); builds auto-start the moment artwork is assigned.
   BATCH.items.forEach(it=>{ if(it.isAudio) it.player=BATCH.playerMode?{status:it.player.status==='ready'?'ready':'await',file:it.player.file,info:it.player.info,err:null}:{status:'raw',file:null,info:null,err:null}; });
