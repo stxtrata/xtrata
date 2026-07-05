@@ -339,7 +339,7 @@
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
 <script src="agent-one.js?v=7"></script>
-<script src="optimize-audio.js?v=2"></script>
+<script src="optimize-audio.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script>
 const API = '';   // backendless — all data flows through window.XtrataAgent (no HTTP API)
@@ -484,7 +484,7 @@ function enterBatch(files){
     const isImage=!!(window.XtrataImageOptimizer&&window.XtrataImageOptimizer.isCandidate(f.name,f.size));
     BATCH.items.push({ file:f, uri:`xtrata:${catFor(f.name)}/${slug(f.name)}`, mime, deps:'', parents:'',
       isAudio, isImage, art:{file:null,tokenId:''}, player:{status:(BATCH.playerMode&&isAudio)?'await':'raw',file:null,info:null,err:null},
-      opt:{status:'pending',file:null,originalBytes:f.size,optimizedBytes:null,mime:null,note:''}, useOptimized:true });
+      opt:{status:'pending',file:null,originalBytes:f.size,optimizedBytes:null,mime:null,note:''}, useOptimized:true, showPreview:true });
   }
   // batch replaces the single-file flow on screen
   FLOW.original=null; FLOW.optimized=null; FLOW.jobId=null; FLOW.done=false;
@@ -508,7 +508,7 @@ const artChip=(it,i)=>{
   return `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
     <button class="btn ghost" style="padding:3px 8px;font-size:11px" onclick="batchArtPick(${i})">${art||'attach image'}</button>
     <input class="mono" placeholder="or img #id" value="${esc(it.art.tokenId)}" data-arti="${i}" style="width:76px;padding:4px 6px;font-size:11px"/>
-    ${state}</div>`;
+    ${state}${it.player.status==='ready'?`<button class="btn ghost" style="padding:3px 8px;font-size:11px" onclick="batchTogglePreview(${i})">${it.showPreview?'▾ hide preview':'▸ preview'}</button>`:''}</div>`;
 };
 // Manually (re)build one row — also the retry path after a failure.
 window.batchBuildRow=(i)=>{ const it=BATCH.items[i]; if(!it||!it.isAudio) return;
@@ -537,6 +537,25 @@ function batchOptSummary(){
   const pct=Math.round((1-now/orig)*100);
   el.hidden=false; el.textContent=`🗜 Optimised ${n} file${n>1?'s':''}: ${mib(orig)} → ${mib(now)} (−${pct}%) — the deposit below is quoted on the smaller sizes.`;
 }
+// Live preview of a built player. The player File is self-contained HTML (Opus audio +
+// art + UI), so a blob URL renders it exactly as it will inscribe. One URL per player
+// File, cached (a rebuild yields a new File → new URL); the old one is dropped on unload.
+const _previewUrls=new WeakMap();
+function playerPreviewUrl(it){
+  const f=it.player&&it.player.file; if(!f) return '';
+  let u=_previewUrls.get(f);
+  if(!u){ try{ u=URL.createObjectURL(f); _previewUrls.set(f,u); }catch(_e){ u=''; } }
+  return u;
+}
+function previewRowHtml(it){
+  if(!(BATCH.playerMode&&it.isAudio&&it.player&&it.player.status==='ready'&&it.showPreview)) return '';
+  const url=playerPreviewUrl(it); if(!url) return '';
+  return `<tr class="prevrow"><td colspan="7" style="padding:0 6px 12px 6px">`
+    +`<div class="muted" style="font-size:11px;margin:2px 0 5px">▾ Player preview — exactly what gets inscribed; press play to check it works</div>`
+    +`<iframe src="${url}" title="player preview" loading="lazy" sandbox="allow-scripts allow-same-origin allow-popups" style="width:100%;height:230px;border:1px solid var(--line);border-radius:10px;background:#0b0b0f"></iframe>`
+    +`</td></tr>`;
+}
+window.batchTogglePreview=(i)=>{ const it=BATCH.items[i]; if(it){ it.showPreview=!it.showPreview; renderBatch(); } };
 function renderBatch(){
   $('#batchCount').textContent=String(BATCH.items.length);
   const pm=BATCH.playerMode;
@@ -549,7 +568,7 @@ function renderBatch(){
     <td><input class="mono" data-bi="${i}" data-bf="deps" value="${esc(it.deps)}" placeholder="90, @0" style="padding:6px 8px;font-size:12px"/></td>
     <td><input class="mono" data-bi="${i}" data-bf="parents" value="${esc(it.parents)}" placeholder="134" style="padding:6px 8px;font-size:12px"/></td>
     <td><button class="btn ghost" style="padding:3px 8px" onclick="batchRemove(${i})">✕</button></td>
-  </tr>`).join('')}</tbody></table>`;
+  </tr>${previewRowHtml(it)}`).join('')}</tbody></table>`;
   document.querySelectorAll('#batchTableWrap input[data-bf]').forEach(inp=>{ inp.oninput=()=>{ BATCH.items[Number(inp.dataset.bi)][inp.dataset.bf]=inp.value; }; });
   document.querySelectorAll('#batchTableWrap input[data-arti]').forEach(inp=>{ inp.onchange=()=>{ const it=BATCH.items[Number(inp.dataset.arti)]; const v=inp.value.trim();
     if(v&&!/^\d+$/.test(v)){ $('#batchErr').textContent='Artwork inscription id must be a token-id uint.'; return; }
