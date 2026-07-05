@@ -238,6 +238,7 @@
       <label class="checkline"><input type="radio" name="bAudioMode" value="player"><span><b>Build an on-chain player for each song</b> — Opus-optimised audio + title/artist/lyrics + its own artwork (the opus-tool player, per track)</span></label>
       <div class="muted" id="batchPlayerHint" hidden style="font-size:11.5px;margin-top:6px">Give each song artwork below: attach an image file (embedded in the player) <b>or</b> enter an image inscription id (recursive artwork — zero extra bytes). Songs with embedded cover art use it automatically.</div>
     </div>
+    <div id="batchOptSummary" class="ok" style="font-size:12px;margin:2px 0 8px" hidden></div>
     <div id="batchTableWrap"></div>
     <input id="batchArtPicker" type="file" accept="image/*" hidden />
     <div class="btnrow" style="margin-top:8px">
@@ -338,7 +339,8 @@
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
 <script src="agent-one.js?v=7"></script>
-<script src="optimize-audio.js?v=1"></script>
+<script src="optimize-audio.js?v=2"></script>
+<script src="optimize-image.js?v=1"></script>
 <script>
 const API = '';   // backendless — all data flows through window.XtrataAgent (no HTTP API)
 const SERVER = { mock:false };
@@ -477,9 +479,12 @@ function catFor(name){ const ext=(name.split('.').pop()||'').toLowerCase();
   for(const cat of Object.keys(CONTENT)) if(Object.keys(CONTENT[cat]).includes(ext)) return cat; return 'data'; }
 function enterBatch(files){
   for(const f of files){ if(BATCH.items.length>=40) break;
-    const isAudio=mimeFor(f.name).startsWith('audio/');
-    BATCH.items.push({ file:f, uri:`xtrata:${catFor(f.name)}/${slug(f.name)}`, mime:mimeFor(f.name), deps:'', parents:'',
-      isAudio, art:{file:null,tokenId:''}, player:{status:(BATCH.playerMode&&isAudio)?'await':'raw',file:null,info:null,err:null} });
+    const mime=mimeFor(f.name);
+    const isAudio=mime.startsWith('audio/');
+    const isImage=!!(window.XtrataImageOptimizer&&window.XtrataImageOptimizer.isCandidate(f.name,f.size));
+    BATCH.items.push({ file:f, uri:`xtrata:${catFor(f.name)}/${slug(f.name)}`, mime, deps:'', parents:'',
+      isAudio, isImage, art:{file:null,tokenId:''}, player:{status:(BATCH.playerMode&&isAudio)?'await':'raw',file:null,info:null,err:null},
+      opt:{status:'pending',file:null,originalBytes:f.size,optimizedBytes:null,mime:null,note:''}, useOptimized:true });
   }
   // batch replaces the single-file flow on screen
   FLOW.original=null; FLOW.optimized=null; FLOW.jobId=null; FLOW.done=false;
@@ -488,7 +493,7 @@ function enterBatch(files){
   $('#dropMain').innerHTML=`<span class="filechip">Batch · ${BATCH.items.length} files</span>`;
   $('#dropSub').textContent='drop more files to add them to the batch';
   $('#batchAudioMode').hidden=!BATCH.items.some(it=>it.isAudio);
-  renderBatch(); setStep('review');
+  renderBatch(); setStep('review'); queueBatchOptimise();
   $('#batchCard').hidden=false; $('#batchCard').scrollIntoView({behavior:'smooth',block:'start'});
 }
 const artChip=(it,i)=>{
@@ -508,13 +513,37 @@ const artChip=(it,i)=>{
 // Manually (re)build one row — also the retry path after a failure.
 window.batchBuildRow=(i)=>{ const it=BATCH.items[i]; if(!it||!it.isAudio) return;
   it.player={status:'queued',file:null,info:null,err:null}; renderBatch(); queueAudioBuilds(); };
+// Per-row size readout: original → optimised (−%), with a revert toggle. Audio in
+// player mode is reported by the Artwork/player column instead, so it's skipped here.
+function optCellHtml(it,i){
+  if(BATCH.playerMode&&it.isAudio) return '';
+  const o=it.opt; if(!o) return '';
+  if(o.status==='optimising') return `<div class="muted" style="font-size:11px;margin-top:3px"><span class="spin"></span> optimising…</div>`;
+  if(o.status==='done'&&o.file){
+    const pct=Math.round((1-o.optimizedBytes/o.originalBytes)*100);
+    const act=it.useOptimized;
+    return `<div style="font-size:11px;margin-top:3px">`
+      +`<span class="${act?'savings':'muted'}">${mib(o.originalBytes)} → ${mib(o.optimizedBytes)} (−${pct}%)${o.label?' · '+esc(o.label):''}</span>`
+      +` <a href="#" data-revert="${i}" style="margin-left:4px">${act?'use original':'use optimised'}</a></div>`;
+  }
+  if(o.status==='skipped'&&o.note) return `<div class="muted" style="font-size:11px;margin-top:3px">${esc(o.note)}</div>`;
+  return '';
+}
+function batchOptSummary(){
+  const el=$('#batchOptSummary'); if(!el) return;
+  let orig=0, now=0, n=0;
+  for(const it of BATCH.items){ const o=it.opt; if(o&&o.status==='done'&&it.useOptimized&&o.file){ orig+=o.originalBytes; now+=o.optimizedBytes; n++; } }
+  if(!n){ el.hidden=true; el.textContent=''; return; }
+  const pct=Math.round((1-now/orig)*100);
+  el.hidden=false; el.textContent=`🗜 Optimised ${n} file${n>1?'s':''}: ${mib(orig)} → ${mib(now)} (−${pct}%) — the deposit below is quoted on the smaller sizes.`;
+}
 function renderBatch(){
   $('#batchCount').textContent=String(BATCH.items.length);
   const pm=BATCH.playerMode;
   $('#batchTableWrap').innerHTML=`<table style="width:100%"><thead><tr><th style="width:26px">#</th><th>File</th><th style="width:${pm?'20%':'26%'}">URI</th>${pm?'<th style="width:24%">Artwork / player</th>':''}<th style="width:12%">Deps</th><th style="width:11%">Parents</th><th style="width:30px"></th></tr></thead>
     <tbody>${BATCH.items.map((it,i)=>`<tr>
     <td class="mono">${i}</td>
-    <td><span class="filechip" title="${esc(it.file.name)}">${esc(it.file.name.length>22?it.file.name.slice(0,19)+'…':it.file.name)}</span> <span class="muted">${mib(it.file.size)}</span></td>
+    <td><span class="filechip" title="${esc(it.file.name)}">${esc(it.file.name.length>22?it.file.name.slice(0,19)+'…':it.file.name)}</span> <span class="muted">${mib(it.file.size)}</span>${optCellHtml(it,i)}</td>
     <td><input class="mono" data-bi="${i}" data-bf="uri" value="${esc(it.uri)}" style="padding:6px 8px;font-size:12px"/></td>
     ${pm?`<td>${it.isAudio?artChip(it,i):'<span class="muted">—</span>'}</td>`:''}
     <td><input class="mono" data-bi="${i}" data-bf="deps" value="${esc(it.deps)}" placeholder="90, @0" style="padding:6px 8px;font-size:12px"/></td>
@@ -526,7 +555,53 @@ function renderBatch(){
     if(v&&!/^\d+$/.test(v)){ $('#batchErr').textContent='Artwork inscription id must be a token-id uint.'; return; }
     $('#batchErr').textContent=''; it.art.tokenId=v; if(v) it.art.file=null;
     if(BATCH.playerMode&&it.isAudio){ it.player={status:'queued',file:null,info:null,err:null}; queueAudioBuilds(); } renderBatch(); }; });
+  document.querySelectorAll('#batchTableWrap a[data-revert]').forEach(a=>{ a.onclick=(e)=>{ e.preventDefault(); const it=BATCH.items[Number(a.dataset.revert)]; if(it){ it.useOptimized=!it.useOptimized; renderBatch(); batchQuote(); } }; });
+  batchOptSummary();
   batchQuote();
+}
+
+// --- Auto size-optimisation (Opus for audio, smallest-format for images) ----
+// Every still image, and every audio file in "inscribe as-is" mode, is optimised
+// the moment it enters the batch — the same "best quality, smallest size" the
+// single-file flow applies. Non-destructive: it.file stays the original, it.opt.file
+// holds the smaller version, and each row can revert. In "build player" mode the
+// audio is Opus-encoded inside the player instead, so it's skipped here.
+const OPT_NOTES={ 'already-opus':'already Opus — nothing to squeeze', 'already-efficient':'already efficient — original kept', 'engine-unavailable':'optimiser unavailable — original kept', 'failed':'optimisation failed safely — original kept' };
+const optNote=(reason)=>OPT_NOTES[reason]||'';
+const optApplies=(it)=>it.isImage||(it.isAudio&&!BATCH.playerMode);
+async function optimiseItem(it){
+  try{
+    if(it.isAudio&&window.XtrataAudioOptimizer){
+      const r=await window.XtrataAudioOptimizer.optimize(it.file,(m)=>{ it.opt.note=m; });
+      it.opt = r.optimizedBytes
+        ? {status:'done',file:r.file,originalBytes:r.originalBytes,optimizedBytes:r.optimizedBytes,mime:r.file.type||'audio/webm; codecs=opus',label:'Opus HQ',note:''}
+        : {status:'skipped',file:null,originalBytes:it.file.size,optimizedBytes:null,mime:null,note:optNote(r.skipped)};
+    } else if(it.isImage&&window.XtrataImageOptimizer){
+      const r=await window.XtrataImageOptimizer.optimize(it.file,(m)=>{ it.opt.note=m; });
+      it.opt = r.optimizedBytes
+        ? {status:'done',file:r.file,originalBytes:r.originalBytes,optimizedBytes:r.optimizedBytes,mime:r.file.type,label:(r.format||'').toUpperCase(),note:''}
+        : {status:'skipped',file:null,originalBytes:it.file.size,optimizedBytes:null,mime:null,note:optNote(r.skipped)};
+    } else {
+      it.opt={status:'skipped',file:null,originalBytes:it.file.size,optimizedBytes:null,mime:null,note:''};
+    }
+  }catch(e){ it.opt={status:'skipped',file:null,originalBytes:it.file.size,optimizedBytes:null,mime:null,note:'optimisation failed safely — original kept'}; }
+  if(it.opt.status==='done') it.useOptimized=true;
+}
+let optBusy=false;
+async function queueBatchOptimise(){
+  if(optBusy) return; optBusy=true;
+  try{
+    for(;;){
+      const it=BATCH.items.find(x=>x.opt&&x.opt.status==='pending'&&optApplies(x));
+      if(!it){ // settle files that can never be optimised (video/docs); leave audio pending so a mode switch re-triggers it
+        BATCH.items.forEach(x=>{ if(x.opt&&x.opt.status==='pending'&&!x.isImage&&!x.isAudio) x.opt.status='skipped'; });
+        break;
+      }
+      it.opt.status='optimising'; renderBatch();
+      await optimiseItem(it);
+      renderBatch(); batchQuote();
+    }
+  } finally { optBusy=false; }
 }
 
 // --- Audio → on-chain player pipeline (the opus tool, per batch row) --------
@@ -557,7 +632,9 @@ async function queueAudioBuilds(){
       try{
         const overrides={};
         if(it.art.tokenId) overrides.coverTokenId=it.art.tokenId;
-        else if(it.art.file){ overrides.coverB64=await readB64(it.art.file); overrides.coverMime=it.art.file.type||'image/png'; }
+        else if(it.art.file){ let cover=it.art.file;   // reformat the cover to a smaller filetype before embedding → smallest player
+          try{ if(window.XtrataImageOptimizer){ const cr=await window.XtrataImageOptimizer.optimize(cover,()=>{}); if(cr.optimizedBytes) cover=cr.file; } }catch(_e){}
+          overrides.coverB64=await readB64(cover); overrides.coverMime=cover.type||'image/png'; }
         const r=await window.XtrataSuno.build(it.file,()=>{},overrides);
         it.player={status:'ready',file:r.playerFile,info:r,err:null};
         it.uri=it.uri.replace(/^xtrata:audio\//,'xtrata:song/');
@@ -577,10 +654,20 @@ document.querySelectorAll('input[name="bAudioMode"]').forEach(r=>{ r.onchange=()
   // Selecting player mode does NOT start building — each song waits for its artwork
   // (or an explicit Build click); builds auto-start the moment artwork is assigned.
   BATCH.items.forEach(it=>{ if(it.isAudio) it.player=BATCH.playerMode?{status:it.player.status==='ready'?'ready':'await',file:it.player.file,info:it.player.info,err:null}:{status:'raw',file:null,info:null,err:null}; });
-  renderBatch();
+  renderBatch(); queueBatchOptimise(); // raw mode → Opus-optimise the audio; player mode leaves it to the player build
 };});
 // The bytes that will ACTUALLY inscribe for a row (player when built, else the raw file).
-const batchActiveFile=(it)=>(BATCH.playerMode&&it.isAudio&&it.player.status==='ready'&&it.player.file)?it.player.file:it.file;
+const batchActiveFile=(it)=>{
+  if(BATCH.playerMode&&it.isAudio&&it.player.status==='ready'&&it.player.file) return it.player.file;
+  if(it.opt&&it.opt.status==='done'&&it.useOptimized&&it.opt.file) return it.opt.file;
+  return it.file;
+};
+// mime that will ACTUALLY inscribe (player → html, optimised image → its new type, else original).
+const batchActiveMime=(it)=>{
+  if(BATCH.playerMode&&it.isAudio&&it.player.status==='ready'&&it.player.file) return 'text/html';
+  if(it.opt&&it.opt.status==='done'&&it.useOptimized&&it.opt.file) return it.opt.file.type||it.mime;
+  return it.mime;
+};
 window.batchArtPick=(i)=>{ BATCH.artTarget=i; $('#batchArtPicker').click(); };
 $('#batchArtPicker').onchange=()=>{ const f=$('#batchArtPicker').files[0]; $('#batchArtPicker').value='';
   const it=BATCH.items[BATCH.artTarget]; if(!f||!it) return;
@@ -634,8 +721,8 @@ $('#batchInscribeBtn').onclick=async()=>{
   }
   $('#batchInscribeBtn').disabled=true;
   try{
-    const payload={ items:BATCH.items.map(it=>{ const f=batchActiveFile(it); const asPlayer=f!==it.file;
-        return { file:f, uri:it.uri.trim(), mime:asPlayer?'text/html':it.mime,
+    const payload={ items:BATCH.items.map(it=>{ const f=batchActiveFile(it); const asPlayer=BATCH.playerMode&&it.isAudio&&it.player.status==='ready'&&f===it.player.file;
+        return { file:f, uri:it.uri.trim(), mime:asPlayer?'text/html':batchActiveMime(it),
         deps:it.deps.split(',').map(s=>s.trim()).filter(Boolean), parents:it.parents.split(',').map(s=>s.trim()).filter(Boolean) }; }),
       parents:shared, marginUstx:$('#batchMargin').value||'0', strict:$('#batchStrict').checked,
       fastTrack:true, user:WALLET, expectedFunder:WALLET };
