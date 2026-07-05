@@ -89,6 +89,25 @@ Mistake handling (never-strand, NFT edition):
   its sender; the key is never wiped while the wallet holds any inscription or
   STX above dust.
 
+## Batch inscriptions (one payment, N inscriptions, one receipt)
+
+`createBatchJob({ items, parents, ... })` / `POST /api/jobs { items: [...] }` — up to
+40 items (any mix of types) funded by ONE deposit. Job-level `parents` are escrowed
+once and linked to EVERY item (per-item parents merge on top); deps may reference
+earlier items as `'@k'`, resolved to real token ids as the batch mints — whole
+dependency graphs ship in one payment. Music items take `suno: true` +
+`artworkFile` (per-track cover, overrides embedded art).
+
+Semantics: atomic *payment*, not atomic *minting* — the loop is resume-safe and
+idempotent per item. A deterministic item failure marks that item FAILED and
+continues (`strict: true` skips the rest instead); transient errors retry the batch
+at the failing item. Delivery mints ONE batch receipt (per-item table, outcomes,
+parents, totals; receipt deps = minted tokens + parents + agent identity), delivers
+every minted token + receipt, returns parents, sweeps change → `COMPLETE` or
+`COMPLETE_WITH_SKIPS`. Zero mints → full refund of funds AND all escrowed parents,
+with the batch summary on the refund receipt. All never-strand/key-wipe invariants
+apply unchanged.
+
 ## Trust model (honest)
 
 - **Provable:** the deposit wallet's signer/creator, every txid, the delivered

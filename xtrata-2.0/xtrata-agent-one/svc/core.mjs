@@ -37,6 +37,8 @@ const AGENT_FEE_ADDRESS = process.env.AGENT_FEE_ADDRESS || DEPLOYER;          //
 const AGENT_IDENTITY_ID = process.env.AGENT_IDENTITY_ID || null;              // agent identity NFT token-id; receipts depend on it (existence-only, never moved)
 const RECEIPT_SIZE_EST = 9000;                                              // ~1-chunk receipt, for cost estimation
 const PARENT_RETURN_FEE = 30000n;                                            // per-parent NFT return-transfer reserve
+const ITEM_DELIVERY_FEE = 30000n;                                            // per extra batch-item delivery transfer reserve
+export const MAX_BATCH_ITEMS = 40;                                           // receipt deps cap 50 − parents/identity headroom
 export const JOB_WINDOW_MS = Number(process.env.AGENT_JOB_WINDOW_MS || '300000');  // 5 min: commence-or-cancel + no-progress stall window
 export const PARENT_WINDOW_MS = Number(process.env.AGENT_PARENT_WINDOW_MS || '900000'); // 15 min after funding for the parent NFT(s) to arrive, else full refund
 export const EXPIRE_GRACE_MS = Number(process.env.AGENT_EXPIRE_GRACE_MS || String(48 * 3600 * 1000));  // 48 h: how long an EXPIRED (never-funded) job keeps its key so a late payment is never stranded
@@ -150,7 +152,7 @@ export function publicJob(j) { const { ephemeralMnemonic, ...pub } = j; return {
 export function deleteJob({ jobDir, id, receiptsDir }) {
   const job = readJob(jobDir, id);                                          // throws if missing
   if (job.ephemeralMnemonic) throw new Error('refusing to delete: job still holds a deposit key — deliver or recover it first');
-  if (!['COMPLETE', 'CANCELLED'].includes(job.status)) throw new Error(`refusing to delete: job is ${job.status}, not a finished (receipted) job`);
+  if (!['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED'].includes(job.status)) throw new Error(`refusing to delete: job is ${job.status}, not a finished (receipted) job`);
   try { fs.unlinkSync(jobPath(jobDir, id)); } catch (e) { throw new Error('could not delete job state: ' + ((e && e.message) || e)); }
   if (receiptsDir) { try { fs.unlinkSync(path.join(receiptsDir, `${id}.html`)); } catch {} }
   return { deleted: true, jobId: id };
@@ -184,6 +186,46 @@ export async function estimate(opts) {
     receiptProtocol: receiptProtocol.toString(), receiptMiner: receiptMiner.toString(),
     deliveryReserve: DELIVERY_RESERVE.toString(), parentCount: Number(parentCount), parentReserve: parentReserve.toString(), marginUstx: String(marginUstx),
     agentFeePct: Number(pct), agentFeeUstx: agentFeeUstx.toString(), requiredUstx: required.toString(), stxUsd };
+}
+
+/**
+ * Batch estimate: N files, ONE deposit, ONE receipt. Per-item protocol+miner quotes are
+ * summed; shared overhead (receipt, parent returns, deliveries, agent fee) is added once.
+ */
+export async function estimateBatch(opts) {
+  const { coreName = 'xtrata-v3-2-3', net = 'mainnet', itemsBytes = [], parentCount = 0, marginUstx = '0', mock = false, agentFeePct = AGENT_FEE_PCT } = opts;
+  if (!itemsBytes.length) throw new Error('itemsBytes required');
+  if (itemsBytes.length > MAX_BATCH_ITEMS) throw new Error(`batch too large: ${itemsBytes.length} items (max ${MAX_BATCH_ITEMS})`);
+  const network = netOf(net);
+  const items = [];
+  let sumProtocol = 0n, sumMiner = 0n;
+  for (const bytes of itemsBytes) {
+    const chunks = Math.ceil(Number(bytes) / CHUNK) || 1;
+    let q;
+    if (mock) q = { single: chunks <= SINGLE_TX_MAX_CHUNKS, batches: Math.max(1, Math.ceil(chunks / SINGLE_TX_MAX_CHUNKS)), protocolFee: 100000n + BigInt(chunks) * 2000n };
+    else q = await quote([DEPLOYER, coreName], network, bytes, chunks);
+    const minerTxs = q.single ? 1 : (q.batches + 2);
+    const minerReserve = BigInt(minerTxs) * PERTX_MINER + (BigInt(Math.ceil(Number(bytes))) * 3n) / 2n;
+    items.push({ bytes: Number(bytes), chunks, single: q.single, batches: q.batches, protocolFee: q.protocolFee.toString(), minerReserve: minerReserve.toString() });
+    sumProtocol += q.protocolFee; sumMiner += minerReserve;
+  }
+  const rq = mock ? { protocolFee: 102000n } : await quote([DEPLOYER, coreName], network, RECEIPT_SIZE_EST, 1);
+  const receiptProtocol = rq.protocolFee;
+  const receiptMiner = PERTX_MINER + (BigInt(RECEIPT_SIZE_EST) * 3n) / 2n;
+  const parentReserve = BigInt(parentCount) * PARENT_RETURN_FEE;
+  const deliveryReserve = DELIVERY_RESERVE + BigInt(Math.max(0, itemsBytes.length - 1)) * ITEM_DELIVERY_FEE;   // N token sends + receipt + change
+  const baseCosts = sumProtocol + sumMiner + receiptProtocol + receiptMiner + parentReserve + deliveryReserve + BigInt(marginUstx);
+  const pct = BigInt(agentFeePct);
+  const feeExact = (pct > 0n && pct < 100n) ? (baseCosts * pct) / (100n - pct) : 0n;
+  const required = (((baseCosts + feeExact) + 9999n) / 10000n) * 10000n;
+  const agentFeeUstx = (pct > 0n && pct < 100n) ? (required * pct) / 100n : 0n;
+  const stxUsd = await stxUsdPrice();
+  return { items, count: itemsBytes.length,
+    sumProtocol: sumProtocol.toString(), sumMiner: sumMiner.toString(),
+    receiptProtocol: receiptProtocol.toString(), receiptMiner: receiptMiner.toString(),
+    parentCount: Number(parentCount), parentReserve: parentReserve.toString(), deliveryReserve: deliveryReserve.toString(),
+    marginUstx: String(marginUstx), agentFeePct: Number(pct), agentFeeUstx: agentFeeUstx.toString(),
+    requiredUstx: required.toString(), stxUsd };
 }
 
 // ---------- lifecycle ----------
@@ -229,6 +271,85 @@ export async function createJob(opts) {
   };
   return writeJob(jobDir, job);
 }
+/**
+ * BATCH job: N inscriptions, ONE payment, ONE receipt.
+ *  - `items`: [{ file, uri, mime, deps, parents, suno, artworkFile }] (≤ MAX_BATCH_ITEMS)
+ *  - `parents` (job-level) are linked to EVERY item; per-item parents merge on top.
+ *    All distinct parents are escrowed once at the deposit wallet and returned after the batch.
+ *  - deps may reference earlier batch items as '@k' (k < item index) — resolved to the
+ *    real token id after item k mints, so whole dependency graphs ship in one payment.
+ */
+export async function createBatchJob(opts) {
+  const { coreName = 'xtrata-v3-2-3', net = 'mainnet', items = [], parents = [], user, expectedFunder = null, marginUstx = '0', jobDir, mock = false, fastTrack = false, strict = false, agentFeePct = AGENT_FEE_PCT, agentFeeAddress = AGENT_FEE_ADDRESS, agentIdentityId = AGENT_IDENTITY_ID } = opts;
+  if (!Array.isArray(items) || !items.length) throw new Error('items required');
+  if (items.length > MAX_BATCH_ITEMS) throw new Error(`batch too large: ${items.length} items (max ${MAX_BATCH_ITEMS})`);
+  if (!fastTrack && !user) throw new Error('delivery address (user) required unless fastTrack');
+  const core = [DEPLOYER, coreName]; const network = netOf(net);
+  const validIds = (list, what) => {
+    const ids = (list || []).map((p) => String(p).trim()).filter(Boolean);
+    if (ids.some((p) => !/^\d+$/.test(p))) throw new Error(`${what} must be token-id uints`);
+    return ids;
+  };
+  const sharedParents = validIds(parents, 'parents');
+  const seenHashes = new Set();
+  const built = [];
+  for (let i = 0; i < items.length; i += 1) {
+    const it = items[i] || {};
+    if (!it.file || !it.uri) throw new Error(`item ${i}: file, uri required`);
+    if (!fs.existsSync(it.file)) throw new Error(`item ${i}: file not found: ${it.file}`);
+    const itemParents = validIds(it.parents, `item ${i} parents`);
+    // deps: plain token ids or '@k' intra-batch references (must point BACKWARD to keep order sane)
+    const deps = (it.deps || []).map((d) => String(d).trim()).filter(Boolean);
+    for (const d of deps) {
+      if (/^@\d+$/.test(d)) { const k = Number(d.slice(1)); if (!(k >= 0 && k < i)) throw new Error(`item ${i}: dep '${d}' must reference an EARLIER item (0..${i - 1})`); }
+      else if (!/^\d+$/.test(d)) throw new Error(`item ${i}: deps must be token-id uints or '@k' item refs`);
+    }
+    const bytes = fs.statSync(it.file).size;
+    if (!mock) {
+      const h = incHash(chunkBytes(new Uint8Array(fs.readFileSync(it.file))));
+      const hHex = Buffer.from(h).toString('hex');
+      if (seenHashes.has(hHex)) throw new Error(`item ${i}: duplicate content inside the batch — identical hashes cannot both inscribe`);
+      seenHashes.add(hHex);
+      const existing = await getIdByHash(core, network, h);
+      if (existing != null) throw new Error(`item ${i}: this exact content is already inscribed as token #${existing} — no job was created`);
+    }
+    built.push({ idx: i, file: it.file, uri: String(it.uri), mime: it.mime || 'application/octet-stream', deps, parents: itemParents, suno: !!it.suno, artworkFile: it.artworkFile || null, bytes, status: 'PENDING', tokenId: null, error: null });
+  }
+  // Distinct parents across the whole batch — escrowed once, returned once.
+  const allParents = [...new Set([...sharedParents, ...built.flatMap((b) => b.parents)])];
+  if (allParents.length > 45) throw new Error('too many distinct parents for one batch (max 45)');
+  if (!mock) for (const pid of allParents) {
+    const owner = await ownerOf(core, network, pid);
+    if (!owner) throw new Error(`parent token #${pid} does not exist on ${coreName} — no job was created`);
+  }
+  const est = await estimateBatch({ coreName, net, itemsBytes: built.map((b) => b.bytes), parentCount: allParents.length, marginUstx, mock, agentFeePct });
+  for (let i = 0; i < built.length; i += 1) Object.assign(built[i], {
+    chunks: est.items[i].chunks, single: est.items[i].single, batches: est.items[i].batches,
+    protocolFee: est.items[i].protocolFee, minerReserve: est.items[i].minerReserve,
+  });
+  // Staged engine seals with a single parent — enforce per staged item (merged parent list).
+  for (const b of built) {
+    const merged = [...new Set([...sharedParents, ...b.parents])];
+    if (!b.single && merged.length > 1) throw new Error(`item ${b.idx}: large (staged) inscriptions support at most 1 parent`);
+  }
+  const w = newWallet(net);
+  const job = {
+    jobId: `job-${Date.now()}`, core: coreName, net, mock, fastTrack, strict: !!strict,
+    items: built, batchProgress: { current: 0, total: built.length },
+    sharedParents, parents: allParents,               // job.parents = the ESCROW list (gates, returns, receipts)
+    user: user || null, expectedFunder: expectedFunder || null, funder: null,
+    bytes: built.reduce((s, b) => s + b.bytes, 0), chunks: built.reduce((s, b) => s + b.chunks, 0),
+    sumProtocol: est.sumProtocol, sumMiner: est.sumMiner,
+    protocolFee: est.sumProtocol, minerReserve: est.sumMiner,   // aliases so shared refund/receipt maths keep working
+    receiptProtocol: est.receiptProtocol, receiptMiner: est.receiptMiner,
+    agentFeePct: est.agentFeePct, agentFeeAddress, agentFeeExpectedUstx: est.agentFeeUstx, agentIdentityId: agentIdentityId || null,
+    margin: String(marginUstx), requiredUstx: est.requiredUstx,
+    depositAddress: w.address, ephemeralMnemonic: w.mnemonic,
+    status: 'AWAITING_DEPOSIT', createdAt: new Date().toISOString(),
+  };
+  return writeJob(jobDir, job);
+}
+
 export async function statusJob(opts) {
   const { job, hiroKey = '' } = opts; const net = job.net || 'mainnet';
   let bal = 0n;
@@ -245,7 +366,8 @@ export async function statusJob(opts) {
   if ((job.parents || []).length && ['AWAITING_DEPOSIT', 'AWAITING_PARENT', 'FUNDED'].includes(job.status)) {
     try { parents = await parentsStatus(job, hiroKey); } catch {}
   }
-  return { jobId: job.jobId, status: job.status, depositAddress: job.depositAddress, requiredUstx: job.requiredUstx, balanceUstx: bal.toString(), funded, pending, parents, tokenId: job.tokenId || null };
+  const batch = job.items ? { current: (job.batchProgress || {}).current || 0, total: job.items.length, items: job.items.map((i) => ({ idx: i.idx, uri: i.uri, status: i.status, tokenId: i.tokenId || null, error: i.error || null })) } : null;
+  return { jobId: job.jobId, status: job.status, depositAddress: job.depositAddress, requiredUstx: job.requiredUstx, balanceUstx: bal.toString(), funded, pending, parents, batch, tokenId: job.tokenId || null };
 }
 /** Adopt a prepared asset as the thing to inscribe and re-derive the chunk/route plan. */
 function adoptAsset(job, file, mime, bytes) {
@@ -269,57 +391,61 @@ function adoptAsset(job, file, mime, bytes) {
  * outcome is recorded on job.audioOptimize / job.sunoPlayer for the receipt + UI.
  * Idempotent via job.assetPrepared (resume-safe across restarts).
  */
-async function optimizeAudioForInscription(job, jobDir) {
+async function optimizeAudioForInscription(job, jobDir, target = job) {
+  // `target` = the job itself (single-item flow) or ONE batch item — same pipeline,
+  // per-target bookkeeping (audioOptimize/sunoPlayer/assetPrepared live on the target).
   try {
-    if (job.assetPrepared) return false;                                   // already prepared (resume-safe)
-    const isAudio = /^audio\//i.test(job.mime || '') || isConvertibleAudio(job.mime, job.file);
+    if (target.assetPrepared) return false;                                // already prepared (resume-safe)
+    const isAudio = /^audio\//i.test(target.mime || '') || isConvertibleAudio(target.mime, target.file);
     if (!isAudio) return false;                                            // nothing to do for non-audio
-    const origin = { file: job.file, bytes: job.bytes, mime: job.mime };
+    const origin = { file: target.file, bytes: target.bytes, mime: target.mime };
+    const tag = target === job ? job.jobId : `${job.jobId} item ${target.idx}`;
 
     // 1) Opus optimise (skip if the input is already Opus-in-WebM).
-    let webaPath = job.file, webaBytes = job.bytes, didOpus = false;
-    if (isConvertibleAudio(job.mime, job.file)) {
-      const r = await convertToOpusWebm(job.file, { outDir: path.dirname(job.file) });
-      if (r.ok && r.bytes < job.bytes) {
+    let webaPath = target.file, webaBytes = target.bytes, didOpus = false;
+    if (isConvertibleAudio(target.mime, target.file)) {
+      const r = await convertToOpusWebm(target.file, { outDir: path.dirname(target.file) });
+      if (r.ok && r.bytes < target.bytes) {
         webaPath = r.path; webaBytes = r.bytes; didOpus = true;
-        job.audioOptimize = { ok: true, preset: r.preset, bitrate: r.bitrate, codec: 'opus', container: 'webm',
+        target.audioOptimize = { ok: true, preset: r.preset, bitrate: r.bitrate, codec: 'opus', container: 'webm',
           from: origin.bytes, to: r.bytes, savedPct: Math.round((1 - r.bytes / origin.bytes) * 100) };
-        console.log(`[${job.jobId}] audio optimised → Opus/WebM ${r.bitrate}: ${origin.bytes} → ${r.bytes} bytes (-${job.audioOptimize.savedPct}%)`);
+        console.log(`[${tag}] audio optimised → Opus/WebM ${r.bitrate}: ${origin.bytes} → ${r.bytes} bytes (-${target.audioOptimize.savedPct}%)`);
       } else {
         if (r.ok) { try { fs.unlinkSync(r.path); } catch {} }
-        job.audioOptimize = { ok: false, reason: r.ok ? 'no size gain' : r.reason };
+        target.audioOptimize = { ok: false, reason: r.ok ? 'no size gain' : r.reason };
       }
     }
 
     // 2) SUNO: build a self-contained player (Opus + cover + title/artist) and inscribe it.
-    if (job.suno) {
-      const titleFallback = (job.uri && String(job.uri).split(/[:/]/).pop()) || path.basename(origin.file).replace(/\.[^.]+$/, '');
-      const p = await buildSunoPlayer({ audioWebaPath: webaPath, sourcePath: origin.file, outDir: path.dirname(job.file), titleFallback });
+    //    Batch items may carry their own artwork file — it overrides the embedded cover.
+    if (target.suno) {
+      const titleFallback = (target.uri && String(target.uri).split(/[:/]/).pop()) || path.basename(origin.file).replace(/\.[^.]+$/, '');
+      const p = await buildSunoPlayer({ audioWebaPath: webaPath, sourcePath: origin.file, coverPath: target.artworkFile || undefined, outDir: path.dirname(target.file), titleFallback });
       if (p.ok) {
-        job.audioOriginal = origin;
-        job.sunoPlayer = { ok: true, title: p.title, artist: p.artist, album: p.album || '', hasCover: !!p.hasCover, coverMime: p.coverMime || null, isSuno: !!p.isSuno, audioBytes: webaBytes, playerBytes: p.bytes };
-        adoptAsset(job, p.path, 'text/html', p.bytes);
-        job.assetPrepared = 'suno-player';
+        target.audioOriginal = origin;
+        target.sunoPlayer = { ok: true, title: p.title, artist: p.artist, album: p.album || '', hasCover: !!p.hasCover, coverMime: p.coverMime || null, isSuno: !!p.isSuno, audioBytes: webaBytes, playerBytes: p.bytes };
+        adoptAsset(target, p.path, 'text/html', p.bytes);
+        target.assetPrepared = 'suno-player';
         try { writeJob(jobDir, job); } catch {}
-        console.log(`[${job.jobId}] SUNO player built → ${p.bytes} bytes · "${p.title}"${p.artist ? ' — ' + p.artist : ''}${p.hasCover ? ' · cover' : ''}`);
+        console.log(`[${tag}] SUNO player built → ${p.bytes} bytes · "${p.title}"${p.artist ? ' — ' + p.artist : ''}${p.hasCover ? ' · cover' : ''}`);
         return true;
       }
-      job.sunoPlayer = { ok: false, reason: p.reason };                    // fall through to plain Opus / original
-      console.log(`[${job.jobId}] SUNO player skipped (${p.reason}) — inscribing ${didOpus ? 'Opus' : 'original'} instead`);
+      target.sunoPlayer = { ok: false, reason: p.reason };                 // fall through to plain Opus / original
+      console.log(`[${tag}] SUNO player skipped (${p.reason}) — inscribing ${didOpus ? 'Opus' : 'original'} instead`);
     }
 
     // 3) Non-SUNO (or player failed): inscribe the optimised Opus if we made one.
     if (didOpus) {
-      job.audioOriginal = origin;
-      adoptAsset(job, webaPath, 'audio/webm; codecs=opus', webaBytes);
-      job.assetPrepared = 'opus';
+      target.audioOriginal = origin;
+      adoptAsset(target, webaPath, 'audio/webm; codecs=opus', webaBytes);
+      target.assetPrepared = 'opus';
       try { writeJob(jobDir, job); } catch {}
       return true;
     }
     try { writeJob(jobDir, job); } catch {}
     return false;
   } catch (e) {
-    try { job.audioOptimize = { ...(job.audioOptimize || {}), ok: false, reason: String((e && e.message) || e) }; writeJob(jobDir, job); } catch {}
+    try { target.audioOptimize = { ...(target.audioOptimize || {}), ok: false, reason: String((e && e.message) || e) }; writeJob(jobDir, job); } catch {}
     return false;
   }
 }
@@ -327,8 +453,10 @@ async function optimizeAudioForInscription(job, jobDir) {
 export async function runJob(opts) {
   const { job, enginePath, hiroKey = '', jobDir } = opts; const net = job.net || 'mainnet';
   if (job.mock) {
+    job.depositReceivedUstx = job.requiredUstx;
+    if (job.items) return runBatchItems({ job, enginePath, hiroKey, jobDir });   // offline batch demo (incl. forced failures)
     await optimizeAudioForInscription(job, jobDir);   // offline-safe; the demo shows the shrunk asset + re-derived plan
-    const tokenId = Math.floor(1000 + Math.random() * 9000); job.tokenId = tokenId; job.depositReceivedUstx = job.requiredUstx; job.status = 'INSCRIBED'; writeJob(jobDir, job); return { tokenId, mock: true };
+    const tokenId = Math.floor(1000 + Math.random() * 9000); job.tokenId = tokenId; job.status = 'INSCRIBED'; writeJob(jobDir, job); return { tokenId, mock: true };
   }
   const network = netOf(net);
   // Funding gate — skipped on RESUME (a mid-flight job has already spent part of the deposit).
@@ -344,6 +472,8 @@ export async function runJob(opts) {
     if (ps.unexpected && ps.unexpected.length) throw new Error(`wrong inscription received: deposit wallet holds unexpected token(s) #${ps.unexpected.join(', #')} — returning everything to sender`);
     if (ps.missing.length) throw new Error(`parents not yet received: waiting for token(s) #${ps.missing.join(', #')} to arrive at ${job.depositAddress}`);
   }
+  if (job.items) return runBatchItems({ job, enginePath, hiroKey, jobDir });   // BATCH: N ordered mints from the one funded wallet
+
   await optimizeAudioForInscription(job, jobDir);   // funds are in → shrink audio to Opus/WebM before inscribing (smaller on-chain asset)
 
   // Small files (<=32 chunks / ~512 KB) use the core-native single-tx mint — one cheap tx.
@@ -388,6 +518,85 @@ export async function runJob(opts) {
   const tokenId = map[job.uri] && map[job.uri].tokenId;
   job.tokenId = tokenId; job.status = 'INSCRIBED'; writeJob(jobDir, job);
   return { tokenId, route: 'staged' };
+}
+
+// ---------- batch mint loop ----------
+// Failures that are the ITEM's fault (bad content, contract abort, unresolved intra-batch
+// dep) mark that item FAILED and the batch continues — one bad track must not torpedo an
+// album. Anything else (network, estimator, rate limits) is thrown so the job-level
+// retry/backoff resumes the batch AT THIS ITEM (mints already made are resume-safe).
+const ITEM_FATAL = /TX abort|empty file|exceeds single-tx|unresolved|duplicate|already inscribed|does not exist|file not found|ENOENT|mock forced/i;
+async function runBatchItems({ job, enginePath, hiroKey = '', jobDir }) {
+  const net = job.net || 'mainnet'; const network = netOf(net); const core = [DEPLOYER, job.core];
+  const dep = job.mock ? null : deriveFrom(job.ephemeralMnemonic, net);
+  const prog = (m) => { job.progress = m; job.progressAt = new Date().toISOString(); writeJob(jobDir, job); console.log(`[${job.jobId}] ${m}`); };
+  const resolveDeps = (item) => (item.deps || []).map((d) => {
+    if (!/^@\d+$/.test(d)) return d;
+    const k = Number(d.slice(1)); const ref = job.items[k];
+    if (!ref || !ref.tokenId) throw new Error(`dep '${d}' unresolved — item ${k} is ${ref ? ref.status : 'missing'}`);
+    return String(ref.tokenId);
+  });
+  let minted = 0, failed = 0;
+  for (let i = 0; i < job.items.length; i += 1) {
+    const item = job.items[i];
+    job.batchProgress = { current: i, total: job.items.length };
+    if (item.status === 'INSCRIBED' && item.tokenId) { minted += 1; continue; }          // resume-safe: already on-chain
+    if (item.status === 'FAILED' || item.status === 'SKIPPED') { failed += 1; continue; }
+    try {
+      prog(`batch ${i + 1}/${job.items.length} · preparing ${item.uri}`);
+      await optimizeAudioForInscription(job, jobDir, item);                              // per-item Opus/player (+ artwork) prep
+      const deps = resolveDeps(item);
+      const parents = [...new Set([...(job.sharedParents || []), ...(item.parents || [])])];
+      item.status = 'INSCRIBING'; writeJob(jobDir, job);
+      if (job.mock) {
+        if (/mockfail/i.test(item.uri)) throw new Error('TX abort_by_response (mock forced failure)');
+        item.tokenId = String(Math.floor(1000 + Math.random() * 9000));
+      } else if (item.single) {
+        const data = new Uint8Array(fs.readFileSync(item.file));
+        const m = await mintFile({ core, network, key: dep.key, fromAddr: dep.address, hiroKey, data, mime: item.mime, uri: item.uri, deps, parents, spendCap: BigInt(item.protocolFee) });
+        item.tokenId = m.tokenId; item.itemMinerFee = m.minerFee.toString();
+      } else {
+        item.tokenId = await stagedInscribeViaEngine({ job, item, deps, parent: parents[0] || null, enginePath, hiroKey, jobDir, prog });
+      }
+      item.status = 'INSCRIBED'; item.error = null; minted += 1;
+      prog(`batch ${i + 1}/${job.items.length} · inscribed ${item.uri} → #${item.tokenId}`);
+    } catch (e) {
+      const msg = errMsg(e);
+      if (!ITEM_FATAL.test(msg)) { item.status = 'PENDING'; writeJob(jobDir, job); throw e; }   // transient → job retry resumes here
+      item.status = 'FAILED'; item.error = msg; failed += 1;
+      prog(`batch ${i + 1}/${job.items.length} · item FAILED (${msg}) — ${job.strict ? 'strict mode: stopping' : 'continuing with the rest'}`);
+      if (job.strict) { for (let k = i + 1; k < job.items.length; k += 1) if (job.items[k].status === 'PENDING') job.items[k].status = 'SKIPPED'; writeJob(jobDir, job); break; }
+    }
+  }
+  job.batchProgress = { current: job.items.length, total: job.items.length };
+  if (!minted) { writeJob(jobDir, job); throw new Error('batch failed: no items inscribed — returning everything to sender'); }
+  job.tokenId = job.items.find((it) => it.tokenId)?.tokenId || null;      // compat: "the" token = first minted
+  job.status = 'INSCRIBED'; writeJob(jobDir, job);
+  return { route: 'batch', minted, failed, tokenIds: job.items.map((it) => it.tokenId) };
+}
+// One staged (large-file) engine run for a single batch item — same engine, per-item env.
+async function stagedInscribeViaEngine({ job, item, deps, parent, enginePath, hiroKey, jobDir, prog }) {
+  const ep = path.resolve(enginePath);
+  if (!fs.existsSync(ep)) throw new Error(`staged-upload engine not found at ${ep}`);
+  const env = { ...process.env, WALLET_MNEMONIC: job.ephemeralMnemonic, DRY_RUN: '0', REQUIRE_CONFIRM: '0', LARGE_FILE: item.file, LARGE_URI: item.uri, LARGE_MIME: item.mime, LARGE_DEPS: deps.join(','), HIRO_API_KEY: hiroKey };
+  if (parent) env.LARGE_PARENT = String(parent);
+  let lastActivity = Date.now(); let outBuf = '', errBuf = '';
+  const onLine = (line) => { let e; try { e = JSON.parse(line); } catch { return; }
+    if (e.event === 'batch') prog(`item ${item.idx + 1}: uploading · ${e.to}/${item.chunks} chunks`);
+    else if (e.event === 'sealed') prog(`item ${item.idx + 1}: sealed · token #${e.tokenId}`); };
+  const code = await new Promise((resolve, reject) => {
+    const child = spawn('node', [ep], { stdio: ['ignore', 'pipe', 'pipe'], env, cwd: path.dirname(ep) });
+    const stall = setInterval(() => { if (Date.now() - lastActivity > JOB_WINDOW_MS) { clearInterval(stall); try { child.kill('SIGKILL'); } catch {} reject(new Error(`engine stalled — no progress for ${Math.round(JOB_WINDOW_MS / 60000)} min`)); } }, 15000);
+    child.stdout.on('data', (d) => { lastActivity = Date.now(); outBuf += d.toString(); let i; while ((i = outBuf.indexOf('\n')) >= 0) { onLine(outBuf.slice(0, i)); outBuf = outBuf.slice(i + 1); } });
+    child.stderr.on('data', (d) => { lastActivity = Date.now(); errBuf = (errBuf + d.toString()).slice(-800); });
+    child.on('error', (e) => { clearInterval(stall); reject(e); });
+    child.on('close', (c) => { clearInterval(stall); resolve(c); });
+  });
+  if (code !== 0) throw new Error('engine exited ' + code + (errBuf.trim() ? ': ' + errBuf.trim().split('\n').filter(Boolean).pop() : ''));
+  const map = JSON.parse(fs.readFileSync(path.join(path.dirname(ep), 'large-map.json'), 'utf8'));
+  const tokenId = map[item.uri] && map[item.uri].tokenId;
+  if (!tokenId) throw new Error(`engine finished but no token id recorded for ${item.uri}`);
+  return String(tokenId);
 }
 
 export async function mintFile({ core, network, key, fromAddr, hiroKey, data, mime, uri, deps = [], parents = [], spendCap }) {
@@ -518,6 +727,79 @@ ${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
 <div class="foot">Core ${d.core} · job ${d.jobId}${d.stxUsd ? ' · STX $' + d.stxUsd : ''} · settled on Bitcoin via Stacks</div>
 </div></div></body></html>`;
 }
+// ---------- batch receipt (ONE receipt covering every item) ----------
+function batchReceiptData(job, x) {
+  const received = BigInt(x.received);
+  const minted = job.items.filter((i) => i.tokenId);
+  const sumProtocol = minted.reduce((s, i) => s + BigInt(i.protocolFee || '0'), 0n);
+  const receiptProtocol = BigInt(job.receiptProtocol || '0');
+  const agentFee = BigInt(x.agentFee);
+  const changeR = x.change != null && BigInt(x.change) > 0n ? BigInt(x.change) : 0n;
+  let networkFee = received - sumProtocol - receiptProtocol - agentFee - changeR;
+  if (networkFee < 0n) networkFee = 0n;
+  const totalPaid = received - changeR;
+  const stxUsd = (x.stxUsd != null) ? Number(x.stxUsd) : null;
+  return {
+    jobId: job.jobId, core: job.core, date: new Date().toISOString(), batch: true,
+    outcome: x.outcome || 'inscribed', note: x.note || null,
+    items: job.items.map((i) => ({ idx: i.idx, uri: i.uri, mime: i.mime, bytes: i.bytes, tokenId: i.tokenId || null, status: i.status, error: i.error || null,
+      player: (i.sunoPlayer && i.sunoPlayer.ok) ? { title: i.sunoPlayer.title, artist: i.sunoPlayer.artist || '', hasCover: !!i.sunoPlayer.hasCover } : null })),
+    counts: { total: job.items.length, minted: minted.length, failed: job.items.filter((i) => i.status === 'FAILED').length, skipped: job.items.filter((i) => i.status === 'SKIPPED').length },
+    parents: (job.parents || []).map(String), receiptTokenId: x.receiptTokenId || null,
+    recipient: x.recipient || job.user, agentIdentityId: job.agentIdentityId || null,
+    depositReceived: received.toString(), xtrataProtocol: sumProtocol.toString(), receiptProtocol: receiptProtocol.toString(),
+    networkFee: networkFee.toString(), agentFeePct: Number(job.agentFeePct ?? AGENT_FEE_PCT), agentFee: agentFee.toString(),
+    changeReturned: changeR.toString(), totalPaid: totalPaid.toString(), stxUsd,
+  };
+}
+function buildBatchReceiptHtml(d) {
+  const row = (k, v) => `<div class="r"><span>${k}</span><span>${v}</span></div>`;
+  const escHtml = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const stxr = (u) => ustxToStx(u) + ' STX';
+  const usd = (u) => d.stxUsd ? ' · ~$' + (Number(u) / 1e6 * d.stxUsd).toFixed(2) : '';
+  const short = (s) => s ? (s.length > 18 ? s.slice(0, 9) + '…' + s.slice(-6) : s) : '—';
+  const ok = d.outcome === 'inscribed';
+  const itemRow = (i) => {
+    const mark = i.tokenId ? `<span class="tok">#${i.tokenId}</span> ✓` : (i.status === 'FAILED' ? `✗ failed${i.error ? ' — ' + escHtml(String(i.error).slice(0, 60)) : ''}` : '− skipped');
+    const label = i.player ? `${escHtml(i.player.title)}${i.player.artist ? ' — ' + escHtml(i.player.artist) : ''}${i.player.hasCover ? ' · art' : ''}` : escHtml(i.uri);
+    return row(`${i.idx + 1} · ${label}`, `${escHtml(i.mime)} · ${(i.bytes / 1048576).toFixed(2)} MiB · ${mark}`);
+  };
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Xtrata Agent One — Batch receipt ${d.jobId}</title><style>
+:root{--bg:#0b0e14;--pan:#121826;--line:#243044;--ink:#e9eff8;--mut:#8ea0bd;--acc:#3ea6ff;--acc2:#7c5cff;--ok:#3ddc97;--mono:ui-monospace,Menlo,Consolas,monospace}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(820px 420px at 80% -10%,rgba(124,92,255,.14),transparent),var(--bg);color:var(--ink);font:14px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:640px;margin:0 auto;padding:34px 20px}.card{background:var(--pan);border:1px solid var(--line);border-radius:16px;padding:24px}
+.h{display:flex;align-items:center;justify-content:space-between;gap:10px}.logo{font-weight:800;letter-spacing:.4px}.logo b{color:var(--acc)}.logo i{color:var(--acc2);font-style:normal}
+.badge{font-size:11px;color:var(--ok);border:1px solid #1f5a45;border-radius:999px;padding:3px 10px}
+.sub{color:var(--mut);font-size:12px;margin:4px 0 18px}h1{font-size:15px;margin:18px 0 8px}
+.r{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px}
+.r:last-child{border-bottom:0}.r span:first-child{color:var(--mut)}.r span:last-child{font-family:var(--mono);text-align:right;word-break:break-all}
+.tot{margin-top:10px;padding-top:12px;border-top:1px solid var(--line)}.tot .r span:last-child{color:var(--acc);font-size:15px}
+.fee span:last-child{color:var(--acc2)}.tok{color:var(--ok)}.foot{color:var(--mut);font-size:11px;margin-top:18px;text-align:center}
+</style></head><body><div class="wrap"><div class="card">
+<div class="h"><div class="logo"><b>XTRATA</b> <i>Agent One</i></div><span class="badge"${!ok ? ' style="color:#ffb454;border-color:#5a4620"' : ''}>${ok ? `✓ Batch · ${d.counts.minted}/${d.counts.total} inscribed` : '↩︎ Refunded'}</span></div>
+<div class="sub">Batch ${ok ? 'inscription' : 'refund'} receipt · ${d.counts.total} items · ${d.date.slice(0, 19).replace('T', ' ')} UTC</div>
+<h1>What was inscribed</h1>
+${d.items.map(itemRow).join('')}
+${(d.parents && d.parents.length) ? `<h1>Parent inscription${d.parents.length > 1 ? 's' : ''}</h1>
+${row('Escrowed for the batch', d.parents.map((p) => '<span class="tok">#' + p + '</span>').join(' ') + ` · linked to every item · returned to ${ok ? 'you' : 'sender'}`)}` : ''}
+${row('Receipt token', d.receiptTokenId ? ('<span class="tok">#' + d.receiptTokenId + '</span>') : 'this inscription')}
+${row('Delivered to', escHtml(short(d.recipient)))}
+${d.agentIdentityId ? row('Issued by', 'Agent One · identity <span class="tok">#' + d.agentIdentityId + '</span>') : ''}
+<h1>${ok ? 'Cost breakdown' : 'Outcome'}</h1>
+${ok ? '' : row('Status', 'Not completed — all funds and inscriptions returned to sender')}
+${d.note ? row(ok ? 'Note' : 'Reason', escHtml(d.note)) : ''}
+${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
+${row('Xtrata protocol fees (' + d.counts.minted + ' mints)', stxr(d.xtrataProtocol) + usd(d.xtrataProtocol))}
+${row('Receipt inscription', stxr(d.receiptProtocol) + usd(d.receiptProtocol))}
+${row('Network (miner) fee', stxr(d.networkFee) + usd(d.networkFee))}
+<div class="fee">${row('Agent fee (' + d.agentFeePct + '%)', stxr(d.agentFee) + usd(d.agentFee))}</div>
+${row('Change returned', stxr(d.changeReturned) + usd(d.changeReturned))}
+<div class="tot">${row(ok ? 'Total paid' : 'Returned to you', stxr(ok ? d.totalPaid : d.changeReturned) + usd(ok ? d.totalPaid : d.changeReturned))}</div>
+<div class="foot">Core ${d.core} · job ${d.jobId}${d.stxUsd ? ' · STX $' + d.stxUsd : ''} · one payment, ${d.counts.total} inscriptions · settled on Bitcoin via Stacks</div>
+</div></div></body></html>`;
+}
+
 function saveReceiptHtml(receiptsDir, jobId, html) {
   if (!receiptsDir) return null;
   fs.mkdirSync(receiptsDir, { recursive: true });
@@ -532,6 +814,8 @@ export async function deliverJob(opts) {
   const received = BigInt(job.depositReceivedUstx || job.requiredUstx);
   const agentFee = pct > 0n ? (received * pct) / 100n : 0n;
   const stxUsd = await stxUsdPrice();
+
+  if (job.items) return deliverBatch({ job, hiroKey, jobDir, receiptsDir, received, agentFee, stxUsd });
 
   if (job.mock) {
     const receiptTokenId = String(Math.floor(1000 + Math.random() * 9000));
@@ -608,10 +892,100 @@ export async function deliverJob(opts) {
   return { receipt };
 }
 
+/**
+ * BATCH delivery: mint ONE receipt covering every item, deliver ALL minted tokens + the
+ * receipt to the user, send every escrowed parent home, take the agent fee, sweep change.
+ * The success commit point is the FIRST delivered token (job.inscriptionDelivered) — after
+ * that, everything else is best-effort + recoverable, exactly like the single-item path.
+ */
+async function deliverBatch({ job, hiroKey = '', jobDir, receiptsDir, received, agentFee, stxUsd }) {
+  const net = job.net || 'mainnet';
+  const minted = job.items.filter((i) => i.tokenId);
+  if (!minted.length) throw new Error('nothing to deliver — no batch items inscribed');
+
+  if (job.mock) {
+    const receiptTokenId = String(Math.floor(1000 + Math.random() * 9000));
+    const sumProt = minted.reduce((s, i) => s + BigInt(i.protocolFee || '0'), 0n);
+    const change = received - sumProt - BigInt(job.receiptProtocol || '0') - agentFee;
+    const d = batchReceiptData(job, { received, agentFee, receiptTokenId, change: change > 0n ? change : 0n, stxUsd });
+    saveReceiptHtml(receiptsDir, job.jobId, buildBatchReceiptHtml(d));
+    const receipt = { ...d, deliverTxs: minted.map((i) => ({ id: i.tokenId, tx: '0xMOCK_DELIVER' })), receiptDeliverTx: '0xMOCK_RECEIPT', agentFeeTx: '0xMOCK_FEE', refundTx: '0xMOCK_REFUND' };
+    if ((job.parents || []).length) { job.parentReturnTxs = job.parents.map((p) => ({ id: String(p), tx: '0xMOCK_PARENT_RETURN' })); receipt.parentReturnTxs = job.parentReturnTxs; }
+    Object.assign(job, { receiptTokenId, agentFeeUstx: agentFee.toString(), refundedUstx: d.changeReturned, receipt });
+    delete job.ephemeralMnemonic; job.status = job.items.some((i) => i.status !== 'INSCRIBED') ? 'COMPLETE_WITH_SKIPS' : 'COMPLETE'; writeJob(jobDir, job);
+    return { receipt, mock: true };
+  }
+
+  const dep = deriveFrom(job.ephemeralMnemonic, net); const core = [DEPLOYER, job.core]; const network = netOf(net);
+  const refundTo = (await resolveFunder(job, network, hiroKey)) || job.user;
+  // Change estimate for the preliminary on-chain receipt (mirrors the single-item logic).
+  let liveBal0 = null; try { liveBal0 = await balance(network, job.depositAddress, hiroKey); } catch {}
+  let estChange;
+  if (liveBal0 != null && liveBal0 > 0n) {
+    const reserveAhead = BigInt(job.receiptProtocol || '0') + BigInt(job.receiptMiner || '0') + agentFee
+      + BigInt((job.parents || []).length) * PARENT_RETURN_FEE + BigInt(minted.length) * ITEM_DELIVERY_FEE + DELIVERY_RESERVE + REFUND_TX_FEE;
+    estChange = liveBal0 > reserveAhead ? liveBal0 - reserveAhead : 0n;
+  }
+  const prelim = batchReceiptData(job, { received, agentFee, receiptTokenId: null, change: estChange, stxUsd });
+  // Receipt deps: every minted token + every parent + the agent identity (existence-only links).
+  const idDep = job.agentIdentityId || AGENT_IDENTITY_ID;
+  const receiptDeps = [...minted.map((i) => i.tokenId), ...(job.parents || []), ...(idDep ? [idDep] : [])].slice(0, 50);
+  const r = await inscribeReceipt({ core, network, key: dep.key, fromAddr: dep.address, hiroKey, html: buildBatchReceiptHtml(prelim), uri: `xtrata:receipt/${job.jobId}`, deps: receiptDeps });
+  const receiptTokenId = r.tokenId;
+
+  // Deliver every minted token. First success = the job's commit point; later hiccups are
+  // best-effort (never re-labelled a failure; recovery sweeps whatever is left).
+  const deliverTxs = []; const notes = [];
+  for (const item of minted) {
+    try {
+      const tx = await sendNft(core, network, dep.key, dep.address, item.tokenId, job.user, hiroKey);
+      deliverTxs.push({ id: item.tokenId, tx }); item.deliverTx = tx;
+      if (!job.inscriptionDelivered) { job.deliverTx = tx; job.inscriptionDelivered = true; writeJob(jobDir, job); }
+    } catch (e) {
+      notes.push(`item #${item.tokenId} delivery pending — recovery will send it (` + errMsg(e) + ')');
+      job.keepKey = true;
+      if (!job.inscriptionDelivered) throw e;   // nothing delivered yet → this is a genuine failure → failsafe
+    }
+  }
+
+  // Best-effort tail: parents home FIRST, then receipt, agent fee, change.
+  const parentReturnTxs = [];
+  for (const pid of (job.parents || [])) {
+    try { if ((await ownerOf(core, network, pid)) === dep.address) { const ptx = await sendNft(core, network, dep.key, dep.address, pid, refundTo, hiroKey); parentReturnTxs.push({ id: String(pid), tx: ptx }); } }
+    catch (e) { notes.push(`parent #${pid} return pending — recover-all will send it home (` + errMsg(e) + ')'); job.keepKey = true; }
+  }
+  if (parentReturnTxs.length) { job.parentReturnTxs = parentReturnTxs; writeJob(jobDir, job); }
+  let receiptDeliverTx = null, agentFeeTx = null, refundTx = null, refundedUstx = '0';
+  try { receiptDeliverTx = await sendNft(core, network, dep.key, dep.address, receiptTokenId, job.user, hiroKey); }
+  catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); }
+  try { if (agentFee > 0n) agentFeeTx = await sendStxRetry(network, dep.key, agentFee, job.agentFeeAddress || AGENT_FEE_ADDRESS, hiroKey); }
+  catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
+  try { const sw = await sweepStxTo(network, dep.key, dep.address, refundTo, hiroKey); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } }
+  catch (e) { notes.push('change return pending — recover-all will sweep it (' + errMsg(e) + ')'); }
+
+  const note = notes.length ? notes.join('; ') : null;
+  const finalD = batchReceiptData(job, { received, agentFee, receiptTokenId, change: BigInt(refundedUstx), stxUsd, note });
+  saveReceiptHtml(receiptsDir, job.jobId, buildBatchReceiptHtml(finalD));
+  const receipt = { ...finalD, deliverTxs, receiptDeliverTx, agentFeeTx, refundTx, parentReturnTxs: parentReturnTxs.length ? parentReturnTxs : undefined };
+  Object.assign(job, { receiptTokenId, agentFeeUstx: agentFee.toString(), deliverTxs, receiptDeliverTx, agentFeeTx, refundTx, refundedUstx, receipt });
+  // SAFETY: never wipe the key while the wallet holds STX or ANY inscription.
+  let leftover = null; try { leftover = await balance(network, job.depositAddress, hiroKey); } catch {}
+  let holdsNft = true; try { holdsNft = (await heldInscriptions(network, core, job.depositAddress, hiroKey)).length > 0; } catch {}
+  if (leftover != null && leftover <= REFUND_TX_FEE && !holdsNft) delete job.ephemeralMnemonic;
+  else { job.keepKey = true; job.keepKeyReason = leftover == null ? 'balance unconfirmed' : holdsNft ? 'wallet still holds an inscription — return it with recover-all' : `wallet still holds ${leftover} uSTX — sweep with recover-all`; }
+  job.status = job.items.some((i) => i.status !== 'INSCRIBED') ? 'COMPLETE_WITH_SKIPS' : 'COMPLETE'; writeJob(jobDir, job);
+  return { receipt };
+}
+
 // Failsafe: return EVERYTHING to the funder, then discard the key. Used on error or timeout so a
 // deposit wallet is guaranteed temporary — it never keeps a key while it still holds value.
 export async function refundAndClose(opts) {
-  const { job, hiroKey = '', jobDir, reason = 'cancelled', receiptsDir } = opts;
+  const { job, hiroKey = '', jobDir, reason: reasonIn = 'cancelled', receiptsDir } = opts;
+  // Batch jobs: the refund receipt/reason states exactly how far the batch got — and that
+  // EVERYTHING (minted items, escrowed parents, funds) goes back to the sender.
+  const reason = job.items
+    ? `${reasonIn} · batch: ${job.items.filter((i) => i.tokenId).length}/${job.items.length} items inscribed — all inscriptions and funds returned`
+    : reasonIn;
   const net = job.net || 'mainnet';
   if (job.mock) {
     const rid = String(Math.floor(1000 + Math.random() * 9000));
@@ -623,7 +997,7 @@ export async function refundAndClose(opts) {
   // GUARD: if the inscription was already delivered to the user, this job SUCCEEDED. An error/timeout in
   // the tail must NEVER mint a contradictory "refunded" receipt or mark it CANCELLED — only best-effort
   // sweep any leftover STX back to the user, then finalize COMPLETE. (Fixes the double-receipt / false-fail.)
-  if (job.inscriptionDelivered || job.status === 'COMPLETE') {
+  if (job.inscriptionDelivered || job.status === 'COMPLETE' || job.status === 'COMPLETE_WITH_SKIPS') {
     if (job.ephemeralMnemonic) {
       const network = netOf(net); const dep = deriveFrom(job.ephemeralMnemonic, net); const core = [DEPLOYER, job.core];
       const to = (await resolveFunder(job, network, hiroKey)) || job.user;
@@ -635,7 +1009,8 @@ export async function refundAndClose(opts) {
       if (leftover != null && leftover <= REFUND_TX_FEE && !holdsNft) delete job.ephemeralMnemonic;
       else if (leftover != null) { job.keepKey = true; job.keepKeyReason = holdsNft ? 'wallet still holds an inscription — return it with recover-all' : `~${leftover} uSTX leftover — sweep with recover-all`; }
     }
-    job.status = 'COMPLETE'; writeJob(jobDir, job);
+    if (job.status !== 'COMPLETE_WITH_SKIPS') job.status = 'COMPLETE';
+    writeJob(jobDir, job);
     return { alreadyDelivered: true };
   }
   if (!job.ephemeralMnemonic) { writeJob(jobDir, job); return { noKey: true }; }
@@ -787,7 +1162,7 @@ export async function parentsStatus(job, hiroKey = '') {
     for (const pid of required) ((await ownerOf(core, network, pid)) === own ? held : missing).push(pid);
     return { required, held, missing, unexpected: [], ok: missing.length === 0, holdingsUnverified: true };
   }
-  const mine = new Set([...(required), job.tokenId, job.receiptTokenId].filter(Boolean).map(String));
+  const mine = new Set([...(required), job.tokenId, job.receiptTokenId, ...((job.items || []).map((i) => i.tokenId))].filter(Boolean).map(String));
   const held = required.filter((p) => heldAll.includes(p));
   const missing = required.filter((p) => !heldAll.includes(p));
   const unexpected = heldAll.filter((id) => !mine.has(String(id)));
@@ -801,12 +1176,13 @@ async function returnAllHeldNfts(job, network, core, key, fromAddr, fallbackTo, 
   const out = [];
   let ids = [];
   try { ids = await heldInscriptions(network, core, fromAddr, hiroKey); } catch {}
-  for (const extra of [...(job.parents || []), job.tokenId, job.receiptTokenId].filter(Boolean).map(String))
+  for (const extra of [...(job.parents || []), job.tokenId, job.receiptTokenId, ...((job.items || []).map((i) => i.tokenId))].filter(Boolean).map(String))
     if (!ids.includes(extra)) ids.push(extra);
+  const itemTokenIds = new Set(((job.items || []).map((i) => i.tokenId)).filter(Boolean).map(String));
   for (const id of ids) {
     try {
       if ((await ownerOf(core, network, id)) !== fromAddr) continue;      // not (or no longer) ours to move
-      const isDeclared = (job.parents || []).map(String).includes(String(id)) || String(id) === String(job.tokenId) || String(id) === String(job.receiptTokenId);
+      const isDeclared = (job.parents || []).map(String).includes(String(id)) || String(id) === String(job.tokenId) || String(id) === String(job.receiptTokenId) || itemTokenIds.has(String(id));
       const sender = await detectNftSender(network, core, fromAddr, id, hiroKey);
       const to = isDeclared ? (fallbackTo || sender) : (sender || fallbackTo);   // strays go back to whoever sent them
       if (!to) continue;

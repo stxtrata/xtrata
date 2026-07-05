@@ -54,28 +54,20 @@
     return _script;
   }
 
-  let _ff = null;
-  let _loading = null;
-  async function ff(onStatus) {
-    if (_ff) return _ff;
-    if (_loading) return _loading;
-    _loading = (async () => {
-      await loadScript();
-      const FF = window.FFmpeg;
-      if (!FF || !FF.createFFmpeg) throw new Error('ffmpeg.wasm unavailable');
-      onStatus && onStatus('Loading the audio engine…');
-      // mainName:'main' + core-st = single-threaded build, no SharedArrayBuffer.
-      const f = FF.createFFmpeg({ log: false, mainName: 'main', corePath: CORE_ST });
-      await f.load();
-      _ff = f;
-      return f;
-    })();
-    try {
-      return await _loading;
-    } catch (e) {
-      _loading = null; // allow a retry on the next file
-      throw e;
-    }
+  // The single-threaded core (mainName:'main' + core-st) is SINGLE-USE: after one run()
+  // the wasm runtime exits and the instance is dead. So each optimise() gets a FRESH
+  // instance that is discarded afterwards — reusing one across a batch makes every file
+  // after the first throw "ffmpeg.wasm can only run one command at a time" (which showed
+  // up as every second batch song failing). loadScript stays a one-time global; only the
+  // core instance is per-file.
+  async function createEngine(onStatus) {
+    await loadScript();
+    const FF = window.FFmpeg;
+    if (!FF || !FF.createFFmpeg) throw new Error('ffmpeg.wasm unavailable');
+    onStatus && onStatus('Loading the audio engine…');
+    const f = FF.createFFmpeg({ log: false, mainName: 'main', corePath: CORE_ST });
+    await f.load();
+    return f;
   }
 
   const fetchFile = async (file) => new Uint8Array(await file.arrayBuffer());
@@ -104,18 +96,16 @@
       // The engine load itself is raced against a timeout: a stalled CDN fetch
       // must degrade to "inscribe the original", never to a perpetual spinner.
       f = await Promise.race([
-        ff(onStatus),
+        createEngine(onStatus),
         new Promise((_r, reject) =>
           setTimeout(() => reject(new Error('audio engine load timed out')), ENGINE_TIMEOUT_MS)),
       ]);
     } catch (e) {
-      _loading = null; // let the next file retry a fresh load
       return { file, originalBytes, skipped: 'engine-unavailable' };
     }
     if (aborted()) return { file, originalBytes, skipped: 'skipped-by-user' };
 
     const inName = 'in-' + Date.now() + '.' + ((file.name.match(/\.([a-z0-9]+)$/i) || [])[1] || 'mp3');
-    const cleanup = (n) => { try { f.FS('unlink', n); } catch (_e) { /* noop */ } };
     try {
       onStatus && onStatus('Optimising to Opus (Music HQ) — single-threaded, may take a minute…');
       f.FS('writeFile', inName, await fetchFile(file));
@@ -137,8 +127,9 @@
     } catch (e) {
       return { file, originalBytes, skipped: 'failed' };
     } finally {
-      cleanup(inName);
-      cleanup('out.weba');
+      // Single-use core: discard the whole instance (also frees its in-memory FS), so the
+      // next file in the batch always starts from a clean, live engine.
+      try { f.exit(); } catch (_e) { /* noop */ }
     }
   }
 

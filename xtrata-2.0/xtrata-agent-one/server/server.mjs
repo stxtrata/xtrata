@@ -42,7 +42,7 @@ const PROCESSING = new Set();
 // FUNDED/INSCRIBED for the watcher to resume where it left off — resume is safe because the protocol is
 // idempotent end-to-end (begin-or-get, on-chain upload index, hash-checked mint pre-check). Only
 // deterministic failures or exhausted retries (4) fall through to the refund failsafe.
-const FATAL_ERR = /TX abort|not funded|locked to|unrecoverable|file bytes|empty file|exceeds single-tx|could not determine|wrong inscription received/i;
+const FATAL_ERR = /TX abort|not funded|locked to|unrecoverable|file bytes|empty file|exceeds single-tx|could not determine|wrong inscription received|no items inscribed/i;
 const MAX_RETRIES = Number(process.env.AGENT_MAX_RETRIES || '4');
 function startBackground(id, phase, fn) {
   PROCESSING.add(id);
@@ -50,7 +50,7 @@ function startBackground(id, phase, fn) {
   const job = core.readJob(JOB_DIR, id);
   Promise.resolve().then(() => fn(job))
     .then(() => {
-      try { const j = core.readJob(JOB_DIR, id); if (j.retryCount && j.status === 'COMPLETE') { delete j.retryCount; core.writeJob(JOB_DIR, j); } } catch {}
+      try { const j = core.readJob(JOB_DIR, id); if (j.retryCount && (j.status === 'COMPLETE' || j.status === 'COMPLETE_WITH_SKIPS')) { delete j.retryCount; core.writeJob(JOB_DIR, j); } } catch {}
       PROCESSING.delete(id);
     })
     .catch(async (e) => {
@@ -77,7 +77,7 @@ async function reapTick() {
   const now = Date.now();
   for (const j of jobs) {
     if (PROCESSING.has(j.jobId)) continue;
-    if (['COMPLETE', 'CANCELLED', 'NEEDS_RECOVERY'].includes(j.status)) continue;
+    if (['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED', 'NEEDS_RECOVERY'].includes(j.status)) continue;
     // EXPIRED = never-funded job parked with its key kept (see refundAndClose's never-strand guard).
     // Long-grace pass: after EXPIRE_GRACE_MS, one final close — sweeps any late-arriving funds back to
     // the payer, or (confirmed empty + no mempool inbound) finally discards the key.
@@ -201,6 +201,12 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/jobs' && req.method === 'POST') {
       const b = await body(req);
+      // BATCH: items[] → one deposit, N inscriptions, one receipt.
+      if (Array.isArray(b.items) && b.items.length) {
+        for (const it of b.items) if (!it.file || !fs.existsSync(it.file)) return send(res, 400, { error: 'item file not found on server: ' + (it.file || '(none)') });
+        const job = await core.createBatchJob({ coreName: CORE, net: NET, items: b.items, parents: b.parents || [], user: b.user, expectedFunder: b.expectedFunder || null, marginUstx: b.marginUstx || '0', jobDir: JOB_DIR, mock: MOCK, fastTrack: !!b.fastTrack, strict: !!b.strict });
+        return send(res, 200, { job: core.publicJob(job) });
+      }
       if (!b.file || !fs.existsSync(b.file)) return send(res, 400, { error: 'file not found on server: ' + (b.file || '(none)') });
       const job = await core.createJob({ coreName: CORE, net: NET, file: b.file, uri: b.uri, mime: b.mime || 'application/octet-stream', deps: b.deps || [], parents: b.parents || [], user: b.user, expectedFunder: b.expectedFunder || null, marginUstx: b.marginUstx || '0', jobDir: JOB_DIR, mock: MOCK, fastTrack: !!b.fastTrack, suno: !!b.suno });
       return send(res, 200, { job: core.publicJob(job) });
