@@ -135,6 +135,11 @@
       });
       return { file: optimized, originalBytes, optimizedBytes: optimized.size };
     } catch (e) {
+      // A failed run can wedge the single-thread core's internal `running` flag, which
+      // would poison the NEXT file in a batch ("ffmpeg.wasm can only run one command at
+      // a time"). Discard the instance so the next optimize() loads a clean engine.
+      try { if (_ff) _ff.exit(); } catch (_e) { /* noop */ }
+      _ff = null; _loading = null;
       return { file, originalBytes, skipped: 'failed' };
     } finally {
       cleanup(inName);

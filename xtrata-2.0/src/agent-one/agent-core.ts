@@ -37,6 +37,8 @@ export const WINDOW_MS: number = Number(cfg.windowMs || 300000); // commence/sta
 export const PARENT_WINDOW_MS: number = Number(cfg.parentWindowMs || 900000); // 15 min after funding for parent NFT(s) to arrive, else full refund
 const PERTX_MINER = 30000n, DELIVERY_RESERVE = 200000n, REFUND_TX_FEE = 5000n, MINT_CAP = 2000000n, RECEIPT_EST = 9000;
 const PARENT_RETURN_FEE = 30000n;                                // per-parent NFT return-transfer reserve
+const ITEM_DELIVERY_FEE = 30000n;                                // per extra batch-item delivery transfer reserve
+export const MAX_BATCH_ITEMS = 40;                               // receipt deps cap 50 − parents/identity headroom
 
 const network: any = new StacksMainnet();
 network.coreApiUrl = location.origin + HIRO_BASE;   // routes read-only + broadcast through the proxy
@@ -130,7 +132,8 @@ async function mintSingle(key: string, from: string, data: Uint8Array, mime: str
   const { d } = await send(key, from, fn, args, spendCap);
   return tidFrom(d) || (await getIdByHash(h));
 }
-async function stagedInscribe(job: any, key: string, from: string, data: Uint8Array, onProg: (m: string) => void) {
+async function stagedInscribe(job: any, key: string, from: string, data: Uint8Array, onProg: (m: string) => void, target: any = job) {
+  // `target` = the job (single flow) or ONE batch item — supplies uri/mime/deps/parents.
   const chunks = chunkBytes(data); const total = chunks.length; const h = incHash(chunks);
   const existing = await getIdByHash(h); if (existing) { onProg(`already inscribed #${existing}`); return existing; }
   const q: any = (await ro('quote-inscription-fee', [uintCV(BigInt(data.length)), uintCV(BigInt(total)), uintCV(1)])).value.value;
@@ -138,15 +141,15 @@ async function stagedInscribe(job: any, key: string, from: string, data: Uint8Ar
   onProg(`planned · ${total} chunks`);
   let idx: number | null = null;
   try { const st: any = (await ro('get-upload-state', [bufferCV(h), standardPrincipalCV(from)])); idx = st.value ? Number(st.value.value['current-index'].value) : null; } catch { idx = null; }
-  if (idx === null) { await send(key, from, 'begin-or-get', [bufferCV(h), stringAsciiCV(job.mime), uintCV(BigInt(data.length)), uintCV(BigInt(total))], beginFee, onProg); idx = 0; onProg(`upload started · 0/${total}`); }
+  if (idx === null) { await send(key, from, 'begin-or-get', [bufferCV(h), stringAsciiCV(target.mime), uintCV(BigInt(data.length)), uintCV(BigInt(total))], beginFee, onProg); idx = 0; onProg(`upload started · 0/${total}`); }
   else if (idx > 0) { onProg(`resuming upload · ${idx}/${total} chunks already on-chain`); }
   while (idx < total) { const batch = chunks.slice(idx, idx + BATCH); await send(key, from, 'add-chunk-batch', [bufferCV(h), listCV(batch.map((c) => bufferCV(c)))], null, onProg); const st: any = (await ro('get-upload-state', [bufferCV(h), standardPrincipalCV(from)])); const ni = st.value ? Number(st.value.value['current-index'].value) : null; if (ni === null || ni <= idx) throw new Error(`upload stalled at ${idx}`); idx = ni; onProg(`uploading · ${idx}/${total}`); }
-  const deps = (job.deps || []).map((d: string) => uintCV(BigInt(d)));
-  const parents = (job.parents || []).map((p: string) => uintCV(BigInt(p)));
+  const deps = ((target.resolvedDeps || target.deps) || []).map((d: string) => uintCV(BigInt(d)));
+  const parents = ((target.mergedParents || target.parents) || []).map((p: string) => uintCV(BigInt(p)));
   // Parents: seal-with-relationships requires the sealer (deposit wallet) to OWN the parents.
   const sealFn = parents.length ? 'seal-with-relationships' : (deps.length ? 'seal-recursive' : 'seal-inscription');
-  const sealArgs: any[] = parents.length ? [bufferCV(h), stringAsciiCV(job.uri), listCV(deps), listCV(parents)]
-    : deps.length ? [bufferCV(h), stringAsciiCV(job.uri), listCV(deps)] : [bufferCV(h), stringAsciiCV(job.uri)];
+  const sealArgs: any[] = parents.length ? [bufferCV(h), stringAsciiCV(target.uri), listCV(deps), listCV(parents)]
+    : deps.length ? [bufferCV(h), stringAsciiCV(target.uri), listCV(deps)] : [bufferCV(h), stringAsciiCV(target.uri)];
   const { d } = await send(key, from, sealFn, sealArgs, sealFee, onProg); onProg('sealed'); return tidFrom(d) || (await getIdByHash(h));
 }
 
@@ -200,7 +203,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-03.1';
+export const AGENT_BUILD = '2026-07-04.1';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -234,6 +237,39 @@ async function estimate(opts: any) {
     receiptProtocol: receiptProtocol.toString(), receiptMiner: receiptMiner.toString(),
     deliveryReserve: DELIVERY_RESERVE.toString(), parentCount: Number(parentCount), parentReserve: parentReserve.toString(), marginUstx: String(marginUstx),
     agentFeePct: Number(pct), agentFeeUstx: agentFeeUstx.toString(), requiredUstx: required.toString(), stxUsd };
+}
+
+// ---------- batch estimate (mirror svc/core.estimateBatch) ----------
+async function estimateBatch(opts: any) {
+  const { itemsBytes = [], parentCount = 0, marginUstx = '0', agentFeePct = AGENT_FEE_PCT } = opts;
+  if (!itemsBytes.length) throw new Error('itemsBytes required');
+  if (itemsBytes.length > MAX_BATCH_ITEMS) throw new Error(`batch too large: ${itemsBytes.length} items (max ${MAX_BATCH_ITEMS})`);
+  const items: any[] = [];
+  let sumProtocol = 0n, sumMiner = 0n;
+  for (const bytes of itemsBytes) {
+    const chunks = Math.ceil(Number(bytes) / CHUNK) || 1;
+    const q = await quoteFee(Number(bytes), chunks);
+    const minerTxs = q.single ? 1n : BigInt(q.batches + 2);
+    const minerReserve = minerTxs * PERTX_MINER + (BigInt(Math.ceil(Number(bytes))) * 3n) / 2n;
+    items.push({ bytes: Number(bytes), chunks, single: q.single, batches: q.batches, protocolFee: q.protocolFee.toString(), minerReserve: minerReserve.toString() });
+    sumProtocol += q.protocolFee; sumMiner += minerReserve;
+  }
+  const rq = await quoteFee(RECEIPT_EST, 1);
+  const receiptProtocol = rq.protocolFee;
+  const receiptMiner = PERTX_MINER + (BigInt(RECEIPT_EST) * 3n) / 2n;
+  const parentReserve = BigInt(parentCount) * PARENT_RETURN_FEE;
+  const deliveryReserve = DELIVERY_RESERVE + BigInt(Math.max(0, itemsBytes.length - 1)) * ITEM_DELIVERY_FEE;
+  const baseCosts = sumProtocol + sumMiner + receiptProtocol + receiptMiner + parentReserve + deliveryReserve + BigInt(marginUstx);
+  const pct = BigInt(agentFeePct);
+  const feeExact = (pct > 0n && pct < 100n) ? (baseCosts * pct) / (100n - pct) : 0n;
+  const required = (((baseCosts + feeExact) + 9999n) / 10000n) * 10000n;
+  const agentFeeUstx = (pct > 0n && pct < 100n) ? (required * pct) / 100n : 0n;
+  const stxUsd = await stxUsdPrice();
+  return { items, count: itemsBytes.length, sumProtocol: sumProtocol.toString(), sumMiner: sumMiner.toString(),
+    receiptProtocol: receiptProtocol.toString(), receiptMiner: receiptMiner.toString(),
+    parentCount: Number(parentCount), parentReserve: parentReserve.toString(), deliveryReserve: deliveryReserve.toString(),
+    marginUstx: String(marginUstx), agentFeePct: Number(pct), agentFeeUstx: agentFeeUstx.toString(),
+    requiredUstx: required.toString(), stxUsd };
 }
 
 // ---------- receipt (copied from core: success + refunded) ----------
@@ -373,7 +409,7 @@ async function parentsStatus(job: any) {
     for (const pid of required) (((await ownerOf(pid)) === own) ? held : missing).push(pid);
     return { required, held, missing, unexpected: [], ok: missing.length === 0, holdingsUnverified: true };
   }
-  const mine = new Set([...required, job.tokenId, job.receiptTokenId].filter(Boolean).map(String));
+  const mine = new Set([...required, job.tokenId, job.receiptTokenId, ...((job.items || []).map((i: any) => i.tokenId))].filter(Boolean).map(String));
   const held = required.filter((p) => heldAll!.includes(p));
   const missing = required.filter((p) => !heldAll!.includes(p));
   const unexpected = heldAll.filter((id) => !mine.has(String(id)));
@@ -385,11 +421,12 @@ async function returnAllHeldNfts(job: any, key: string, fromAddr: string, fallba
   const out: any[] = [];
   let ids: string[] = [];
   try { ids = await heldInscriptions(fromAddr); } catch {}
-  for (const extra of [...(job.parents || []), job.tokenId, job.receiptTokenId].filter(Boolean).map(String)) if (!ids.includes(extra)) ids.push(extra);
+  for (const extra of [...(job.parents || []), job.tokenId, job.receiptTokenId, ...((job.items || []).map((i: any) => i.tokenId))].filter(Boolean).map(String)) if (!ids.includes(extra)) ids.push(extra);
+  const itemTokenIds = new Set(((job.items || []).map((i: any) => i.tokenId)).filter(Boolean).map(String));
   for (const id of ids) {
     try {
       if ((await ownerOf(String(id))) !== fromAddr) continue;
-      const isDeclared = (job.parents || []).map(String).includes(String(id)) || String(id) === String(job.tokenId) || String(id) === String(job.receiptTokenId);
+      const isDeclared = (job.parents || []).map(String).includes(String(id)) || String(id) === String(job.tokenId) || String(id) === String(job.receiptTokenId) || itemTokenIds.has(String(id));
       const sender = await detectNftSender(fromAddr, String(id));
       const to = isDeclared ? (fallbackTo || sender) : (sender || fallbackTo);
       if (!to) continue;
@@ -440,6 +477,76 @@ async function createJob(opts: any) {
   };
   writeJob(job); return publicJob(job);
 }
+/**
+ * BATCH job (browser): N inscriptions, ONE payment, ONE receipt. Mirrors svc/core.
+ * items: [{ file: File, uri, mime, deps, parents }] (≤ MAX_BATCH_ITEMS). Job-level
+ * `parents` link to EVERY item; '@k' deps reference earlier items. Per-item bytes are
+ * kept in memory AND IndexedDB (key `jobId:idx`) so a reload can resume mid-batch.
+ * NOTE: audio→player conversion happens in the UI BEFORE createJob (as today) — batch
+ * items are inscribed exactly as provided.
+ */
+async function createBatchJob(opts: any) {
+  const { items = [], parents = [], user, expectedFunder = null, marginUstx = '0', fastTrack = false, strict = false, agentFeePct = AGENT_FEE_PCT } = opts;
+  if (!Array.isArray(items) || !items.length) throw new Error('items required');
+  if (items.length > MAX_BATCH_ITEMS) throw new Error(`batch too large: ${items.length} items (max ${MAX_BATCH_ITEMS})`);
+  if (!fastTrack && !user) throw new Error('delivery address (user) required unless fastTrack');
+  const validIds = (list: any[], what: string) => {
+    const ids = (list || []).map((p: any) => String(p).trim()).filter(Boolean);
+    if (ids.some((p) => !/^\d+$/.test(p))) throw new Error(`${what} must be token-id uints`);
+    return ids;
+  };
+  const sharedParents = validIds(parents, 'parents');
+  const datas: Uint8Array[] = []; const built: any[] = []; const seen = new Set<string>();
+  for (let i = 0; i < items.length; i += 1) {
+    const it = items[i] || {};
+    if (!it.file || !it.uri) throw new Error(`item ${i}: file, uri required`);
+    const itemParents = validIds(it.parents, `item ${i} parents`);
+    const deps = (it.deps || []).map((d: any) => String(d).trim()).filter(Boolean);
+    for (const d of deps) {
+      if (/^@\d+$/.test(d)) { const k = Number(d.slice(1)); if (!(k >= 0 && k < i)) throw new Error(`item ${i}: dep '${d}' must reference an EARLIER item (0..${i - 1})`); }
+      else if (!/^\d+$/.test(d)) throw new Error(`item ${i}: deps must be token-id uints or '@k' item refs`);
+    }
+    const data = new Uint8Array(await (it.file as File).arrayBuffer());
+    if (!MOCK) {
+      const h = incHash(chunkBytes(data)); const hHex = bytesToHex(h);
+      if (seen.has(hHex)) throw new Error(`item ${i}: duplicate content inside the batch`);
+      seen.add(hHex);
+      const existing = await getIdByHash(h);
+      if (existing) throw new Error(`item ${i}: this exact content is already inscribed as token #${existing} — no payment was taken`);
+    }
+    datas.push(data);
+    built.push({ idx: i, file: (it.file as File).name || `item-${i}`, uri: String(it.uri), mime: it.mime || 'application/octet-stream', deps, parents: itemParents, bytes: data.length, status: 'PENDING', tokenId: null, error: null });
+  }
+  const allParents = [...new Set([...sharedParents, ...built.flatMap((b) => b.parents)])];
+  if (allParents.length > 45) throw new Error('too many distinct parents for one batch (max 45)');
+  if (!MOCK) for (const pid of allParents) { const owner = await ownerOf(pid); if (!owner) throw new Error(`Parent token #${pid} does not exist on ${CORE_NAME} — no job was created.`); }
+  const est = await estimateBatch({ itemsBytes: built.map((b) => b.bytes), parentCount: allParents.length, marginUstx, agentFeePct });
+  for (let i = 0; i < built.length; i += 1) Object.assign(built[i], {
+    chunks: est.items[i].chunks, single: est.items[i].single, batches: est.items[i].batches,
+    protocolFee: est.items[i].protocolFee, minerReserve: est.items[i].minerReserve,
+  });
+  for (const b of built) {
+    const merged = [...new Set([...sharedParents, ...b.parents])];
+    if (!b.single && merged.length > 1) throw new Error(`item ${b.idx}: large (staged) inscriptions support at most 1 parent`);
+  }
+  const w = newWallet(); const id = `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  for (let i = 0; i < datas.length; i += 1) { BYTES.set(`${id}:${i}`, datas[i]); await idbSaveBytes(`${id}:${i}`, datas[i]); }
+  const job: any = {
+    jobId: id, core: CORE_NAME, net: 'mainnet', mock: MOCK, fastTrack, strict: !!strict,
+    items: built, batchProgress: { current: 0, total: built.length },
+    sharedParents, parents: allParents,            // job.parents = the ESCROW list (gates, returns, receipts)
+    user: user || null, expectedFunder: expectedFunder || null, funder: null,
+    bytes: built.reduce((s, b) => s + b.bytes, 0), chunks: built.reduce((s, b) => s + b.chunks, 0),
+    sumProtocol: est.sumProtocol, sumMiner: est.sumMiner,
+    protocolFee: est.sumProtocol, minerReserve: est.sumMiner,   // aliases so shared maths keep working
+    receiptProtocol: est.receiptProtocol, receiptMiner: est.receiptMiner,
+    agentFeePct: est.agentFeePct, agentFeeAddress: AGENT_FEE_ADDRESS, agentFeeExpectedUstx: est.agentFeeUstx, agentIdentityId: cfg.agentIdentityId || null,
+    margin: String(marginUstx), requiredUstx: est.requiredUstx, depositAddress: w.address, ephemeralMnemonic: w.mnemonic,
+    status: 'AWAITING_DEPOSIT', createdAt: new Date().toISOString(),
+  };
+  writeJob(job); return publicJob(job);
+}
+
 async function statusJob(job: any) {
   const bal = await balOf(job);
   const funded = bal >= BigInt(job.requiredUstx);
@@ -453,10 +560,65 @@ async function statusJob(job: any) {
   if ((job.parents || []).length && ['AWAITING_DEPOSIT', 'AWAITING_PARENT', 'FUNDED'].includes(job.status)) {
     try { parents = await parentsStatus(job); } catch {}
   }
-  return { jobId: job.jobId, status: job.status, depositAddress: job.depositAddress, requiredUstx: job.requiredUstx, balanceUstx: bal.toString(), funded, pending, parents, tokenId: job.tokenId || null };
+  const batch = job.items ? { current: (job.batchProgress || {}).current || 0, total: job.items.length, items: job.items.map((i: any) => ({ idx: i.idx, uri: i.uri, status: i.status, tokenId: i.tokenId || null, error: i.error || null })) } : null;
+  return { jobId: job.jobId, status: job.status, depositAddress: job.depositAddress, requiredUstx: job.requiredUstx, balanceUstx: bal.toString(), funded, pending, parents, batch, tokenId: job.tokenId || null };
+}
+
+// ---------- batch mint loop (browser mirror of svc runBatchItems) ----------
+const ITEM_FATAL = /TX abort|empty file|exceeds single-tx|unresolved|duplicate|already inscribed|does not exist|bytes missing|mock forced/i;
+async function runBatchItems(job: any) {
+  const dep = job.mock ? null : deriveFrom(job.ephemeralMnemonic);
+  const prog = (m: string) => { job.progress = m; job.progressAt = new Date().toISOString(); writeJob(job); xaoLog(job.jobId, m); };
+  const resolveDeps = (item: any) => (item.deps || []).map((d: string) => {
+    if (!/^@\d+$/.test(d)) return d;
+    const k = Number(d.slice(1)); const ref = job.items[k];
+    if (!ref || !ref.tokenId) throw new Error(`dep '${d}' unresolved — item ${k} is ${ref ? ref.status : 'missing'}`);
+    return String(ref.tokenId);
+  });
+  let minted = 0, failed = 0;
+  for (let i = 0; i < job.items.length; i += 1) {
+    const item = job.items[i];
+    job.batchProgress = { current: i, total: job.items.length };
+    if (item.status === 'INSCRIBED' && item.tokenId) { minted += 1; continue; }
+    if (item.status === 'FAILED' || item.status === 'SKIPPED') { failed += 1; continue; }
+    try {
+      const key = `${job.jobId}:${i}`;
+      let data = BYTES.get(key);
+      if (!data && await restoreBytes(key)) data = BYTES.get(key);
+      if (!data && !job.mock) throw new Error(`item ${i}: bytes missing (storage cleared)`);
+      item.resolvedDeps = resolveDeps(item);
+      item.mergedParents = [...new Set([...(job.sharedParents || []), ...(item.parents || [])])];
+      item.status = 'INSCRIBING'; prog(`batch ${i + 1}/${job.items.length} · inscribing ${item.uri}`);
+      if (job.mock) {
+        if (/mockfail/i.test(item.uri)) throw new Error('TX abort_by_response (mock forced failure)');
+        item.tokenId = String(Math.floor(1000 + Math.random() * 9000));
+      } else if (item.single) {
+        item.tokenId = await mintSingle(dep!.key, dep!.address, data!, item.mime, item.uri, item.resolvedDeps, BigInt(item.protocolFee), item.mergedParents);
+      } else {
+        item.tokenId = await stagedInscribe(job, dep!.key, dep!.address, data!, prog, item);
+      }
+      item.status = 'INSCRIBED'; item.error = null; minted += 1;
+      prog(`batch ${i + 1}/${job.items.length} · inscribed → #${item.tokenId}`);
+    } catch (e) {
+      const msg = errMsg(e);
+      if (!ITEM_FATAL.test(msg)) { item.status = 'PENDING'; writeJob(job); throw e; }   // transient → resume at this item
+      item.status = 'FAILED'; item.error = msg; failed += 1;
+      prog(`batch ${i + 1}/${job.items.length} · item FAILED (${msg}) — ${job.strict ? 'strict: stopping' : 'continuing'}`);
+      if (job.strict) { for (let k = i + 1; k < job.items.length; k += 1) if (job.items[k].status === 'PENDING') job.items[k].status = 'SKIPPED'; writeJob(job); break; }
+    }
+  }
+  job.batchProgress = { current: job.items.length, total: job.items.length };
+  if (!minted) { writeJob(job); throw new Error('batch failed: no items inscribed — returning everything to sender'); }
+  job.tokenId = (job.items.find((it: any) => it.tokenId) || {}).tokenId || null;
+  job.status = 'INSCRIBED'; writeJob(job);
+  return job.tokenId;
 }
 async function runInscribe(job: any) {
-  if (job.mock) { const tokenId = String(Math.floor(1000 + Math.random() * 9000)); job.tokenId = tokenId; job.depositReceivedUstx = job.requiredUstx; job.status = 'INSCRIBED'; writeJob(job); return tokenId; }
+  if (job.mock) {
+    job.depositReceivedUstx = job.requiredUstx;
+    if (job.items) return runBatchItems(job);
+    const tokenId = String(Math.floor(1000 + Math.random() * 9000)); job.tokenId = tokenId; job.status = 'INSCRIBED'; writeJob(job); return tokenId;
+  }
   // Funding gate — skipped on RESUME (a mid-flight job has already spent part of its deposit).
   if (!job.depositReceivedUstx) {
     const bal = await balance(job.depositAddress);
@@ -470,6 +632,7 @@ async function runInscribe(job: any) {
     if (ps.unexpected && ps.unexpected.length) throw new Error(`wrong inscription received: deposit wallet holds unexpected token(s) #${ps.unexpected.join(', #')} — returning everything to sender`);
     if (ps.missing.length) throw new Error(`parents not yet received: waiting for token(s) #${ps.missing.join(', #')} to arrive at ${job.depositAddress}`);
   }
+  if (job.items) return runBatchItems(job);   // BATCH: N ordered mints from the one funded wallet
   let data = BYTES.get(job.jobId);
   if (!data && await restoreBytes(job.jobId)) data = BYTES.get(job.jobId);   // reload-proof: restore from IndexedDB
   if (!data) throw new Error('file bytes not in memory or on disk (storage cleared) — returning funds');
@@ -480,12 +643,149 @@ async function runInscribe(job: any) {
   else { tokenId = await stagedInscribe(job, dep.key, dep.address, data, prog); }
   job.tokenId = tokenId; job.status = 'INSCRIBED'; writeJob(job); return tokenId;
 }
+// ---------- batch receipt (browser mirror of svc batchReceiptData/buildBatchReceiptHtml) ----------
+function batchReceiptData(job: any, x: any) {
+  const received = BigInt(x.received);
+  const minted = job.items.filter((i: any) => i.tokenId);
+  const sumProtocol = minted.reduce((s: bigint, i: any) => s + BigInt(i.protocolFee || '0'), 0n);
+  const receiptProtocol = BigInt(job.receiptProtocol || '0');
+  const agentFee = BigInt(x.agentFee);
+  const changeR = x.change != null && BigInt(x.change) > 0n ? BigInt(x.change) : 0n;
+  let networkFee = received - sumProtocol - receiptProtocol - agentFee - changeR;
+  if (networkFee < 0n) networkFee = 0n;
+  const stxUsd = (x.stxUsd != null) ? Number(x.stxUsd) : null;
+  return {
+    jobId: job.jobId, core: job.core, date: new Date().toISOString(), batch: true,
+    outcome: x.outcome || 'inscribed', note: x.note || null,
+    items: job.items.map((i: any) => ({ idx: i.idx, uri: i.uri, mime: i.mime, bytes: i.bytes, tokenId: i.tokenId || null, status: i.status, error: i.error || null })),
+    counts: { total: job.items.length, minted: minted.length, failed: job.items.filter((i: any) => i.status === 'FAILED').length, skipped: job.items.filter((i: any) => i.status === 'SKIPPED').length },
+    parents: (job.parents || []).map(String), receiptTokenId: x.receiptTokenId || null,
+    recipient: x.recipient || job.user, agentIdentityId: job.agentIdentityId || null,
+    depositReceived: received.toString(), xtrataProtocol: sumProtocol.toString(), receiptProtocol: receiptProtocol.toString(),
+    networkFee: networkFee.toString(), agentFeePct: Number(job.agentFeePct ?? AGENT_FEE_PCT), agentFee: agentFee.toString(),
+    changeReturned: changeR.toString(), totalPaid: (received - changeR).toString(), stxUsd,
+  };
+}
+function buildBatchReceiptHtml(d: any) {
+  const row = (k: string, v: string) => `<div class="r"><span>${k}</span><span>${v}</span></div>`;
+  const escHtml = (s: any) => String(s ?? '').replace(/[&<>]/g, (c: string) => (({ '&': '&amp;', '<': '&lt;', '>': '&gt;' } as any)[c]));
+  const stxr = (u: any) => ustxToStx(u) + ' STX';
+  const usd = (u: any) => d.stxUsd ? ' · ~$' + (Number(u) / 1e6 * d.stxUsd).toFixed(2) : '';
+  const short = (s: any) => s ? (s.length > 18 ? s.slice(0, 9) + '…' + s.slice(-6) : s) : '—';
+  const ok = d.outcome === 'inscribed';
+  const itemRow = (i: any) => {
+    const mark = i.tokenId ? `<span class="tok">#${i.tokenId}</span> ✓` : (i.status === 'FAILED' ? `✗ failed${i.error ? ' — ' + escHtml(String(i.error).slice(0, 60)) : ''}` : '− skipped');
+    return row(`${i.idx + 1} · ${escHtml(i.uri)}`, `${escHtml(i.mime)} · ${(i.bytes / 1048576).toFixed(2)} MiB · ${mark}`);
+  };
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Xtrata Agent One — Batch receipt ${d.jobId}</title><style>
+:root{--bg:#0b0e14;--pan:#121826;--line:#243044;--ink:#e9eff8;--mut:#8ea0bd;--acc:#3ea6ff;--acc2:#7c5cff;--ok:#3ddc97;--mono:ui-monospace,Menlo,Consolas,monospace}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(820px 420px at 80% -10%,rgba(124,92,255,.14),transparent),var(--bg);color:var(--ink);font:14px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:640px;margin:0 auto;padding:34px 20px}.card{background:var(--pan);border:1px solid var(--line);border-radius:16px;padding:24px}
+.h{display:flex;align-items:center;justify-content:space-between;gap:10px}.logo{font-weight:800;letter-spacing:.4px}.logo b{color:var(--acc)}.logo i{color:var(--acc2);font-style:normal}
+.badge{font-size:11px;color:var(--ok);border:1px solid #1f5a45;border-radius:999px;padding:3px 10px}
+.sub{color:var(--mut);font-size:12px;margin:4px 0 18px}h1{font-size:15px;margin:18px 0 8px}
+.r{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px}
+.r:last-child{border-bottom:0}.r span:first-child{color:var(--mut)}.r span:last-child{font-family:var(--mono);text-align:right;word-break:break-all}
+.tot{margin-top:10px;padding-top:12px;border-top:1px solid var(--line)}.tot .r span:last-child{color:var(--acc);font-size:15px}
+.fee span:last-child{color:var(--acc2)}.tok{color:var(--ok)}.foot{color:var(--mut);font-size:11px;margin-top:18px;text-align:center}
+</style></head><body><div class="wrap"><div class="card">
+<div class="h"><div class="logo"><b>XTRATA</b> <i>Agent One</i></div><span class="badge"${!ok ? ' style="color:#ffb454;border-color:#5a4620"' : ''}>${ok ? `✓ Batch · ${d.counts.minted}/${d.counts.total} inscribed` : '↩︎ Refunded'}</span></div>
+<div class="sub">Batch ${ok ? 'inscription' : 'refund'} receipt · ${d.counts.total} items · ${d.date.slice(0, 19).replace('T', ' ')} UTC</div>
+<h1>What was inscribed</h1>
+${d.items.map(itemRow).join('')}
+${(d.parents && d.parents.length) ? `<h1>Parent inscription${d.parents.length > 1 ? 's' : ''}</h1>
+${row('Escrowed for the batch', d.parents.map((p: string) => '<span class="tok">#' + p + '</span>').join(' ') + ` · linked to every item · returned to ${ok ? 'you' : 'sender'}`)}` : ''}
+${row('Receipt token', d.receiptTokenId ? ('<span class="tok">#' + d.receiptTokenId + '</span>') : 'this inscription')}
+${row('Delivered to', escHtml(short(d.recipient)))}
+${d.agentIdentityId ? row('Issued by', 'Agent One · identity <span class="tok">#' + d.agentIdentityId + '</span>') : ''}
+<h1>${ok ? 'Cost breakdown' : 'Outcome'}</h1>
+${ok ? '' : row('Status', 'Not completed — all funds and inscriptions returned to sender')}
+${d.note ? row(ok ? 'Note' : 'Reason', escHtml(d.note)) : ''}
+${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
+${row('Xtrata protocol fees (' + d.counts.minted + ' mints)', stxr(d.xtrataProtocol) + usd(d.xtrataProtocol))}
+${row('Receipt inscription', stxr(d.receiptProtocol) + usd(d.receiptProtocol))}
+${row('Network (miner) fee', stxr(d.networkFee) + usd(d.networkFee))}
+<div class="fee">${row('Agent fee (' + d.agentFeePct + '%)', stxr(d.agentFee) + usd(d.agentFee))}</div>
+${row('Change returned', stxr(d.changeReturned) + usd(d.changeReturned))}
+<div class="tot">${row(ok ? 'Total paid' : 'Returned to you', stxr(ok ? d.totalPaid : d.changeReturned) + usd(ok ? d.totalPaid : d.changeReturned))}</div>
+<div class="foot">Core ${d.core} · job ${d.jobId}${d.stxUsd ? ' · STX $' + d.stxUsd : ''} · one payment, ${d.counts.total} inscriptions · settled on Bitcoin via Stacks</div>
+</div></div></body></html>`;
+}
+async function deliverBatch(job: any, received: bigint, agentFee: bigint, stxUsd: number | null) {
+  const minted = job.items.filter((i: any) => i.tokenId);
+  if (!minted.length) throw new Error('nothing to deliver — no batch items inscribed');
+  const doneStatus = () => job.items.some((i: any) => i.status !== 'INSCRIBED') ? 'COMPLETE_WITH_SKIPS' : 'COMPLETE';
+  if (job.mock) {
+    const receiptTokenId = String(Math.floor(1000 + Math.random() * 9000));
+    const sumProt = minted.reduce((s: bigint, i: any) => s + BigInt(i.protocolFee || '0'), 0n);
+    const change = received - sumProt - BigInt(job.receiptProtocol || '0') - agentFee;
+    const d = batchReceiptData(job, { received, agentFee, receiptTokenId, change: change > 0n ? change : 0n, stxUsd });
+    job.receiptHtml = buildBatchReceiptHtml(d);
+    const receipt: any = { ...d, deliverTxs: minted.map((i: any) => ({ id: i.tokenId, tx: '0xMOCK_DELIVER' })), receiptDeliverTx: '0xMOCK_RECEIPT', agentFeeTx: '0xMOCK_FEE', refundTx: '0xMOCK_REFUND' };
+    if ((job.parents || []).length) { job.parentReturnTxs = job.parents.map((p: string) => ({ id: String(p), tx: '0xMOCK_PARENT_RETURN' })); receipt.parentReturnTxs = job.parentReturnTxs; }
+    Object.assign(job, { receiptTokenId, agentFeeUstx: agentFee.toString(), refundedUstx: d.changeReturned, receipt });
+    delete job.ephemeralMnemonic; job.status = doneStatus(); writeJob(job);
+    job.items.forEach((_: any, i: number) => idbDeleteBytes(`${job.jobId}:${i}`));
+    return { receipt };
+  }
+  const dep = deriveFrom(job.ephemeralMnemonic);
+  const refundTo = (await resolveFunder(job)) || job.user;
+  let liveBal0: bigint | null = null; try { liveBal0 = await balance(job.depositAddress); } catch {}
+  let estChange: bigint | undefined;
+  if (liveBal0 != null && liveBal0 > 0n) {
+    const reserveAhead = BigInt(job.receiptProtocol || '0') + BigInt(job.receiptMiner || '0') + agentFee
+      + BigInt((job.parents || []).length) * PARENT_RETURN_FEE + BigInt(minted.length) * ITEM_DELIVERY_FEE + DELIVERY_RESERVE + REFUND_TX_FEE;
+    estChange = liveBal0 > reserveAhead ? liveBal0 - reserveAhead : 0n;
+  }
+  const prelim = batchReceiptData(job, { received, agentFee, receiptTokenId: null, change: estChange, stxUsd });
+  const idDep = job.agentIdentityId;
+  const receiptDeps = [...minted.map((i: any) => String(i.tokenId)), ...(job.parents || []).map(String), ...(idDep ? [String(idDep)] : [])].slice(0, 50);
+  const r = await inscribeReceipt(dep.key, dep.address, buildBatchReceiptHtml(prelim), `xtrata:receipt/${job.jobId}`, receiptDeps);
+  const receiptTokenId = r.tokenId;
+  const deliverTxs: any[] = []; const notes: string[] = [];
+  for (const item of minted) {
+    try {
+      const tx = await sendNft(dep.key, dep.address, String(item.tokenId), job.user);
+      deliverTxs.push({ id: item.tokenId, tx }); item.deliverTx = tx;
+      if (!job.inscriptionDelivered) { job.deliverTx = tx; job.inscriptionDelivered = true; writeJob(job); }
+    } catch (e) {
+      notes.push(`item #${item.tokenId} delivery pending — recovery will send it (` + errMsg(e) + ')'); job.keepKey = true;
+      if (!job.inscriptionDelivered) throw e;
+    }
+  }
+  const parentReturnTxs: any[] = [];
+  for (const pid of (job.parents || [])) {
+    try { if ((await ownerOf(String(pid))) === dep.address) { const ptx = await sendNft(dep.key, dep.address, String(pid), refundTo); parentReturnTxs.push({ id: String(pid), tx: ptx }); xaoLog(job.jobId, `parent #${pid} returned home → ${refundTo}`); } }
+    catch (e) { notes.push(`parent #${pid} return pending (` + errMsg(e) + ')'); job.keepKey = true; }
+  }
+  if (parentReturnTxs.length) { job.parentReturnTxs = parentReturnTxs; writeJob(job); }
+  let receiptDeliverTx: any = null, agentFeeTx: any = null, refundTx: any = null, refundedUstx = '0';
+  if (receiptTokenId) { try { receiptDeliverTx = await sendNft(dep.key, dep.address, receiptTokenId, job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
+  try { if (agentFee > 0n) agentFeeTx = await sendStxRetry(dep.key, agentFee, job.agentFeeAddress || AGENT_FEE_ADDRESS, REFUND_TX_FEE); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
+  try { const sw = await sweepStxTo(dep.key, dep.address, refundTo); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } } catch (e) { notes.push('change return pending (' + errMsg(e) + ')'); }
+  const note = notes.length ? notes.join('; ') : null;
+  const finalD = batchReceiptData(job, { received, agentFee, receiptTokenId, change: BigInt(refundedUstx), stxUsd, note });
+  job.receiptHtml = buildBatchReceiptHtml(finalD);
+  const receipt = { ...finalD, deliverTxs, receiptDeliverTx, agentFeeTx, refundTx, parentReturnTxs: parentReturnTxs.length ? parentReturnTxs : undefined };
+  Object.assign(job, { receiptTokenId, agentFeeUstx: agentFee.toString(), deliverTxs, receiptDeliverTx, agentFeeTx, refundTx, refundedUstx, receipt });
+  let leftover: bigint | null = null; try { leftover = await balance(job.depositAddress); } catch {}
+  let holdsNft = (job.parents || []).length > 0;
+  try { holdsNft = (await heldInscriptions(job.depositAddress)).length > 0; } catch {}
+  if (leftover != null && leftover <= REFUND_TX_FEE && !holdsNft) delete job.ephemeralMnemonic;
+  else { job.keepKey = true; job.keepKeyReason = leftover == null ? 'balance unconfirmed' : holdsNft ? 'wallet still holds an inscription — return it via recovery' : `wallet still holds ${leftover} uSTX`; }
+  job.status = doneStatus(); writeJob(job);
+  job.items.forEach((_: any, i: number) => idbDeleteBytes(`${job.jobId}:${i}`));
+  return { receipt };
+}
+
 async function deliver(job: any) {
   if (!job.tokenId) throw new Error('no tokenId yet — run the inscribe step first');
   const pct = BigInt(job.agentFeePct ?? AGENT_FEE_PCT);
   const received = BigInt(job.depositReceivedUstx || job.requiredUstx);
   const agentFee = pct > 0n ? (received * pct) / 100n : 0n;
   const stxUsd = await stxUsdPrice();
+  if (job.items) return deliverBatch(job, received, agentFee, stxUsd);
   if (job.mock) {
     const receiptTokenId = String(Math.floor(1000 + Math.random() * 9000));
     const d = receiptData(job, { received, agentFee, receiptTokenId, stxUsd });
@@ -543,14 +843,17 @@ async function deliver(job: any) {
   else { job.keepKey = true; job.keepKeyReason = leftover == null ? 'balance unconfirmed' : holdsNft ? 'wallet still holds an inscription — return it via recovery' : `wallet still holds ${leftover} uSTX — sweep with recover-all`; }
   job.status = 'COMPLETE'; writeJob(job); idbDeleteBytes(job.jobId); return { receipt };
 }
-async function refundAndClose(job: any, reason = 'cancelled') {
+async function refundAndClose(job: any, reasonIn = 'cancelled') {
+  const reason = job.items
+    ? `${reasonIn} · batch: ${job.items.filter((i: any) => i.tokenId).length}/${job.items.length} items inscribed — all inscriptions and funds returned`
+    : reasonIn;
   if (job.mock) {
     const rid = String(Math.floor(1000 + Math.random() * 9000));
     const d = receiptData(job, { received: BigInt(job.depositReceivedUstx || job.requiredUstx), agentFee: 0n, change: BigInt(job.depositReceivedUstx || job.requiredUstx), receiptTokenId: rid, outcome: 'refunded', note: reason });
     job.receiptHtml = buildReceiptHtml(d); job.status = 'CANCELLED'; job.cancelReason = reason; job.cancelledAt = new Date().toISOString(); job.receiptTokenId = rid; delete job.ephemeralMnemonic; writeJob(job);
     return { cancelled: true, mock: true };
   }
-  if (job.inscriptionDelivered || job.status === 'COMPLETE') {           // GUARD: delivered jobs only sweep leftover; never a refund receipt/CANCELLED
+  if (job.inscriptionDelivered || job.status === 'COMPLETE' || job.status === 'COMPLETE_WITH_SKIPS') {   // GUARD: delivered jobs only sweep leftover; never a refund receipt/CANCELLED
     if (job.ephemeralMnemonic) {
       const dep = deriveFrom(job.ephemeralMnemonic); const to = (await resolveFunder(job)) || job.user;
       const nftReturns = await returnAllHeldNfts(job, dep.key, dep.address, to);   // e.g. a parent whose return failed in the deliver tail
@@ -650,13 +953,13 @@ const MAX_RETRIES = 4;
 function background(id: string, fn: () => Promise<any>) {
   PROCESSING.add(id);
   Promise.resolve().then(fn).then(() => {
-    try { const j = readJob(id); if (j.retryCount && j.status === 'COMPLETE') { delete j.retryCount; writeJob(j); } } catch {}
+    try { const j = readJob(id); if (j.retryCount && (j.status === 'COMPLETE' || j.status === 'COMPLETE_WITH_SKIPS')) { delete j.retryCount; writeJob(j); } } catch {}
     PROCESSING.delete(id);
   }).catch(async (e) => {
     const msg = errMsg(e);
     try {
       const j = readJob(id); j.error = msg;
-      if (!FATAL_ERR.test(msg) && j.status !== 'AWAITING_DEPOSIT' && (j.retryCount = (j.retryCount || 0) + 1) <= MAX_RETRIES) {
+      if (!FATAL_ERR.test(msg) && !/no items inscribed/.test(msg) && j.status !== 'AWAITING_DEPOSIT' && (j.retryCount = (j.retryCount || 0) + 1) <= MAX_RETRIES) {
         j.status = j.tokenId ? 'INSCRIBED' : 'FUNDED';
         j.progress = `recovered from a hiccup — resuming where it left off (attempt ${j.retryCount}/${MAX_RETRIES})`;
         j.progressAt = new Date().toISOString(); writeJob(j);
@@ -690,7 +993,14 @@ async function watchTick() {
     if (!funded) { try { funded = (await statusJob(j)).funded; } catch { continue; } }
     if (!funded) continue;
     // Reload-proof: restore bytes from IndexedDB; refund only after 3 consecutive failed restores.
-    if (!await restoreBytes(j.jobId)) {
+    // Batch jobs keep bytes per item (`jobId:idx`) — every UNFINISHED item must restore.
+    const restoreAll = async () => {
+      if (!j.items) return restoreBytes(j.jobId);
+      const pending = j.items.filter((it: any) => !it.tokenId && it.status !== 'FAILED' && it.status !== 'SKIPPED');
+      const results = await Promise.all(pending.map((it: any) => restoreBytes(`${j.jobId}:${it.idx}`)));
+      return results.every(Boolean);
+    };
+    if (!await restoreAll()) {
       j.bytesMisses = (j.bytesMisses || 0) + 1; writeJob(j);
       if (j.bytesMisses < 3) continue;
       background(j.jobId, () => refundAndClose(readJob(j.jobId), 'file bytes unrecoverable (browser storage cleared) — returning funds'));
@@ -707,7 +1017,7 @@ async function reapTick() {
   const now = Date.now();
   for (const j of listJobsRaw()) {
     if (PROCESSING.has(j.jobId)) continue;
-    if (['COMPLETE', 'CANCELLED', 'NEEDS_RECOVERY', 'EXPIRED'].includes(j.status)) continue;
+    if (['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED', 'NEEDS_RECOVERY', 'EXPIRED'].includes(j.status)) continue;
     const last = Date.parse(j.progressAt || j.createdAt || '') || 0;
     // Payments can take many minutes to confirm — give AWAITING_DEPOSIT 12× the normal window.
     const win = j.status === 'AWAITING_DEPOSIT' ? WINDOW_MS * 12 : WINDOW_MS;
@@ -730,12 +1040,13 @@ async function reapTick() {
     return { parents: out, depositAddress: job.depositAddress, core: `${CORE[0]}.${CORE[1]}` };
   },
   estimate: async (opts: any) => estimate({ ...opts, bytes: opts.bytes != null ? opts.bytes : (opts.file ? (opts.file as File).size : 0) }),
-  createJob: async (opts: any) => createJob(opts),
+  createJob: async (opts: any) => (Array.isArray(opts?.items) && opts.items.length ? createBatchJob(opts) : createJob(opts)),
+  estimateBatch: async (opts: any) => estimateBatch({ ...opts, itemsBytes: opts.itemsBytes ?? (opts.items || []).map((it: any) => (it.file ? (it.file as File).size : it.bytes || 0)) }),
   listJobs: async () => Promise.all(listJobsRaw().sort((a, b) => (b.jobId > a.jobId ? 1 : -1)).map(async (j) => { let funded = false, balanceUstx = '0'; if (j.status === 'AWAITING_DEPOSIT') { try { const s = await statusJob(j); funded = s.funded; balanceUstx = s.balanceUstx; } catch {} } return { ...publicJob(j), funded, balanceUstx }; })),
   getJob: async (id: string) => { const job = readJob(id); return { job: publicJob(job), status: await statusJob(job) }; },
   runJob: async (id: string) => { if (PROCESSING.has(id)) return { started: true, already: true }; const job = readJob(id); if (job.tokenId) return { error: 'already inscribed' }; const s = await statusJob(job); if (!s.funded) return { error: 'not funded yet' }; background(id, async () => { const j = readJob(id); j.status = 'INSCRIBING'; writeJob(j); await runInscribe(j); }); return { started: true }; },
   deliverJob: async (id: string) => { if (PROCESSING.has(id)) return { started: true, already: true }; const job = readJob(id); if (!job.tokenId) return { error: 'nothing to deliver yet' }; background(id, async () => { const j = readJob(id); j.status = 'DELIVERING'; writeJob(j); await deliver(j); }); return { started: true }; },
-  deleteJob: async (id: string) => { const job = readJob(id); if (job.ephemeralMnemonic) throw new Error('refusing to delete: job still holds a deposit key — deliver or recover it first'); if (!['COMPLETE', 'CANCELLED'].includes(job.status)) throw new Error(`refusing to delete: job is ${job.status}, not finished`); localStorage.removeItem(jobKey(id)); BYTES.delete(id); idbDeleteBytes(id); return { deleted: true, jobId: id }; },
+  deleteJob: async (id: string) => { const job = readJob(id); if (job.ephemeralMnemonic) throw new Error('refusing to delete: job still holds a deposit key — deliver or recover it first'); if (!['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED'].includes(job.status)) throw new Error(`refusing to delete: job is ${job.status}, not finished`); localStorage.removeItem(jobKey(id)); BYTES.delete(id); idbDeleteBytes(id); (job.items || []).forEach((_: any, i: number) => { BYTES.delete(`${id}:${i}`); idbDeleteBytes(`${id}:${i}`); }); return { deleted: true, jobId: id }; },
   getReceiptHtml: (id: string) => { try { return readJob(id).receiptHtml || null; } catch { return null; } },
   getJobLog: (id: string) => { try { return readJob(id).log || []; } catch { return []; } },
 };

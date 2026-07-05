@@ -128,13 +128,19 @@ export function isSunoSource(meta = {}, filePath = '') {
  * Returns { ok, path, bytes, mime:'text/html', title, artist, hasCover, ... } | { ok:false, reason }.
  */
 export async function buildSunoPlayer(opts = {}) {
-  const { audioWebaPath, sourcePath, outDir, titleFallback = 'Untitled', ffmpeg } = opts;
+  // `coverPath` (batch mode: per-track artwork) overrides any cover embedded in the source file.
+  const { audioWebaPath, sourcePath, coverPath, outDir, titleFallback = 'Untitled', ffmpeg } = opts;
   try {
     if (!audioWebaPath || !fs.existsSync(audioWebaPath)) return { ok: false, reason: 'audio (weba) not found' };
     const ff = ffmpeg || await resolveFfmpeg();
     const metaSrc = (sourcePath && fs.existsSync(sourcePath)) ? sourcePath : audioWebaPath;
     const meta = ff ? await extractMetadata(metaSrc, ff) : { title: '', artist: '', album: '' };
-    const cover = ff ? await extractCover(metaSrc, ff) : null;
+    let cover = ff ? await extractCover(metaSrc, ff) : null;
+    if (coverPath && fs.existsSync(coverPath)) {
+      const buf = fs.readFileSync(coverPath);
+      const mime = sniffImageMime(buf);
+      if (mime) cover = { base64: buf.toString('base64'), mime, bytes: buf.length };
+    }
     const audioBase64 = fs.readFileSync(audioWebaPath).toString('base64');
 
     const title = (meta.title || '').trim() || titleFallback;
