@@ -290,7 +290,7 @@ function receiptData(job: any, x: any) {
   return {
     jobId: job.jobId, core: job.core, date: new Date().toISOString(),
     uri: job.uri, mime: job.mime, bytes: job.bytes, chunks: job.chunks, single: job.single,
-    tokenId: job.tokenId, receiptTokenId: x.receiptTokenId || null, recipient: x.recipient || job.user, agentIdentityId: job.agentIdentityId || null,
+    tokenId: job.tokenId, receiptTokenId: x.receiptTokenId || null, recipient: x.recipient || job.recipient || job.user, agentIdentityId: job.agentIdentityId || null,
     parents: (job.parents || []).map(String),
     outcome: x.outcome || 'inscribed', note: x.note || null,
     depositReceived: received.toString(), xtrataProtocol: fileProtocol.toString(), receiptProtocol: receiptProtocol.toString(),
@@ -443,7 +443,7 @@ async function inscribeReceipt(key: string, from: string, html: string, uri: str
 
 // ---------- estimate→create→inscribe→deliver→refund (mirror core) ----------
 async function createJob(opts: any) {
-  const { file, uri, mime = 'application/octet-stream', deps = [], parents = [], user, expectedFunder = null, marginUstx = '0', fastTrack = false, agentFeePct = AGENT_FEE_PCT } = opts;
+  const { file, uri, mime = 'application/octet-stream', deps = [], parents = [], user, recipient = null, expectedFunder = null, marginUstx = '0', fastTrack = false, agentFeePct = AGENT_FEE_PCT } = opts;
   if (!file || !uri) throw new Error('file, uri required');
   if (!fastTrack && !user) throw new Error('delivery address (user) required unless fastTrack');
   // PARENT LINKING (escrow): validate declared parents up-front, before payment is requested.
@@ -467,7 +467,7 @@ async function createJob(opts: any) {
   const w = newWallet(); const id = `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   BYTES.set(id, data); await idbSaveBytes(id, data);
   const job: any = {
-    jobId: id, core: CORE_NAME, net: 'mainnet', mock: MOCK, fastTrack, file: (file as File).name || 'asset', uri, mime, deps, parents: parentIds, user: user || null,
+    jobId: id, core: CORE_NAME, net: 'mainnet', mock: MOCK, fastTrack, file: (file as File).name || 'asset', uri, mime, deps, parents: parentIds, user: user || null, recipient: recipient || user || null,
     expectedFunder: expectedFunder || null, funder: null,
     bytes: data.length, chunks: est.chunks, single: est.single, batches: est.batches,
     protocolFee: est.protocolFee, minerReserve: est.minerReserve, receiptProtocol: est.receiptProtocol, receiptMiner: est.receiptMiner,
@@ -660,7 +660,7 @@ function batchReceiptData(job: any, x: any) {
     items: job.items.map((i: any) => ({ idx: i.idx, uri: i.uri, mime: i.mime, bytes: i.bytes, tokenId: i.tokenId || null, status: i.status, error: i.error || null })),
     counts: { total: job.items.length, minted: minted.length, failed: job.items.filter((i: any) => i.status === 'FAILED').length, skipped: job.items.filter((i: any) => i.status === 'SKIPPED').length },
     parents: (job.parents || []).map(String), receiptTokenId: x.receiptTokenId || null,
-    recipient: x.recipient || job.user, agentIdentityId: job.agentIdentityId || null,
+    recipient: x.recipient || job.recipient || job.user, agentIdentityId: job.agentIdentityId || null,
     depositReceived: received.toString(), xtrataProtocol: sumProtocol.toString(), receiptProtocol: receiptProtocol.toString(),
     networkFee: networkFee.toString(), agentFeePct: Number(job.agentFeePct ?? AGENT_FEE_PCT), agentFee: agentFee.toString(),
     changeReturned: changeR.toString(), totalPaid: (received - changeR).toString(), stxUsd,
@@ -746,7 +746,7 @@ async function deliverBatch(job: any, received: bigint, agentFee: bigint, stxUsd
   const deliverTxs: any[] = []; const notes: string[] = [];
   for (const item of minted) {
     try {
-      const tx = await sendNft(dep.key, dep.address, String(item.tokenId), job.user);
+      const tx = await sendNft(dep.key, dep.address, String(item.tokenId), job.recipient || job.user);
       deliverTxs.push({ id: item.tokenId, tx }); item.deliverTx = tx;
       if (!job.inscriptionDelivered) { job.deliverTx = tx; job.inscriptionDelivered = true; writeJob(job); }
     } catch (e) {
@@ -761,7 +761,7 @@ async function deliverBatch(job: any, received: bigint, agentFee: bigint, stxUsd
   }
   if (parentReturnTxs.length) { job.parentReturnTxs = parentReturnTxs; writeJob(job); }
   let receiptDeliverTx: any = null, agentFeeTx: any = null, refundTx: any = null, refundedUstx = '0';
-  if (receiptTokenId) { try { receiptDeliverTx = await sendNft(dep.key, dep.address, receiptTokenId, job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
+  if (receiptTokenId) { try { receiptDeliverTx = await sendNft(dep.key, dep.address, receiptTokenId, job.recipient || job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
   try { if (agentFee > 0n) agentFeeTx = await sendStxRetry(dep.key, agentFee, job.agentFeeAddress || AGENT_FEE_ADDRESS, REFUND_TX_FEE); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
   try { const sw = await sweepStxTo(dep.key, dep.address, refundTo); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } } catch (e) { notes.push('change return pending (' + errMsg(e) + ')'); }
   const note = notes.length ? notes.join('; ') : null;
@@ -811,7 +811,7 @@ async function deliver(job: any) {
   const receiptDeps = idDep ? [String(job.tokenId), String(idDep)] : [String(job.tokenId)];
   const r = await inscribeReceipt(dep.key, dep.address, buildReceiptHtml(prelim), `xtrata:receipt/${job.jobId}`, receiptDeps);
   const receiptTokenId = r.tokenId;
-  const deliverTx = await sendNft(dep.key, dep.address, String(job.tokenId), job.user);   // CRITICAL: if this fails the job failed → throw
+  const deliverTx = await sendNft(dep.key, dep.address, String(job.tokenId), job.recipient || job.user);   // inscription → recipient (defaults to payer); CRITICAL: if this fails the job failed → throw
   job.deliverTx = deliverTx; job.inscriptionDelivered = true; writeJob(job);              // SUCCESS commit point
   let receiptDeliverTx: any = null, agentFeeTx: any = null, refundTx: any = null, refundedUstx = '0'; const notes: string[] = [];
   // Parent(s) go home FIRST — the user's own inscription(s) are the most valuable thing in this wallet.
@@ -826,7 +826,7 @@ async function deliver(job: any) {
     } catch (e) { notes.push(`parent #${pid} return pending — recovery will send it home (` + errMsg(e) + ')'); job.keepKey = true; }
   }
   if (parentReturnTxs.length) { job.parentReturnTxs = parentReturnTxs; writeJob(job); }
-  if (receiptTokenId) { try { receiptDeliverTx = await sendNft(dep.key, dep.address, receiptTokenId, job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
+  if (receiptTokenId) { try { receiptDeliverTx = await sendNft(dep.key, dep.address, receiptTokenId, job.recipient || job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
   try { if (agentFee > 0n) agentFeeTx = await sendStxRetry(dep.key, agentFee, job.agentFeeAddress || AGENT_FEE_ADDRESS, REFUND_TX_FEE); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
   try { const sw = await sweepStxTo(dep.key, dep.address, refundTo); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } } catch (e) { notes.push('change return pending — recover-all will sweep it (' + errMsg(e) + ')'); }
   const note = notes.length ? notes.join('; ') : null;
