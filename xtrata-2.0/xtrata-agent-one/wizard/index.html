@@ -108,6 +108,14 @@
   .dot{display:inline-block;width:9px;height:9px;border-radius:3px;vertical-align:middle;margin-right:5px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   @media(max-width:840px){.grid2{grid-template-columns:1fr}}
+  /* ---- two-tab split: file vs text (panels reuse .wrap's 16px column gap) ---- */
+  .tabs{display:flex;gap:6px}
+  .tab{flex:1;padding:11px 14px;border:1px solid var(--line);border-radius:11px;background:var(--panel2);color:var(--mut);font-weight:700;font-size:13.5px;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+  .tab:hover{color:var(--ink)}
+  .tab.on{background:var(--panel);color:var(--ink);border-color:var(--acc)}
+  #panelFile,#panelText{display:flex;flex-direction:column;gap:16px}
+  #panelFile[hidden],#panelText[hidden]{display:none}   /* id specificity beats UA [hidden] — restore it */
+  #txtBody{min-height:200px;resize:vertical;font-family:var(--mono);line-height:1.5}
 </style>
 </head>
 <body>
@@ -125,6 +133,13 @@
 </header>
 
 <main><div class="wrap">
+
+  <div class="tabs" role="tablist" aria-label="Inscription mode">
+    <button class="tab on" id="tabFile" role="tab" aria-selected="true">📄 Inscribe a file</button>
+    <button class="tab" id="tabText" role="tab" aria-selected="false">✍️ Inscribe text</button>
+  </div>
+
+  <div id="panelFile">
 
   <div class="stepper" id="stepper" aria-label="Progress">
     <span class="step on" data-step="drop">1 · Drop</span>
@@ -271,6 +286,26 @@
     <div class="muted" style="font-size:11.5px;margin-top:6px">⚡ Fast-track: pay once from your connected wallet — every inscription, the batch receipt, any parents, and all change return to it automatically.</div>
     <div class="err" id="batchErr"></div>
   </section>
+
+  </div><!-- /#panelFile -->
+
+  <!-- PANEL · INSCRIBE TEXT — paste → instant cost → inscribe (shares the job pipeline below) -->
+  <div id="panelText" hidden>
+    <section class="card">
+      <h3>Inscribe text</h3>
+      <div class="hint">Paste anything — a note, a poem, JSON, a manifesto. It goes on-chain byte-for-byte.</div>
+      <textarea id="txtBody" rows="10" placeholder="Paste or type your text here…" aria-label="Text to inscribe"></textarea>
+      <div class="quote-summary">
+        <span class="lbl"><span id="txtCount" class="mono">0 characters · 0 bytes</span></span>
+        <span class="big-num" id="txtQuoteTotal">—</span>
+      </div>
+      <div class="btnrow">
+        <button class="btn big" id="txtInscribeBtn" disabled>Inscribe</button>
+      </div>
+      <div class="muted" style="font-size:11.5px;margin-top:6px">⚡ Pay from your connected wallet — the inscription + any change return to it automatically.</div>
+      <div class="err" id="txtErr"></div>
+    </section>
+  </div>
 
   <!-- STAGE 3/4 · ACTIVE JOB (deposit → escrow → progress → done) -->
   <div id="activeJobDetail"></div>
@@ -1070,6 +1105,69 @@ function resetFlow(){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 window.resetFlow=resetFlow;
+
+// ============================================================================
+// TEXT TAB — paste → instant byte-accurate quote → inscribe. Own isolated
+// state; reuses the shared estimate + job pipeline (a string wrapped in a File
+// inscribes byte-for-byte, exactly like a dropped .txt). FLOW.jobId is the one
+// shared "active job" handle the poller renders — set it so the card shows.
+// ============================================================================
+const TEXT = { bytes:0, quote:null, quoteRun:0, jobId:null };
+const txtEnc = new TextEncoder();
+
+function showTab(which){
+  const file = which!=='text';
+  $('#tabFile').classList.toggle('on', file);
+  $('#tabText').classList.toggle('on', !file);
+  $('#tabFile').setAttribute('aria-selected', file?'true':'false');
+  $('#tabText').setAttribute('aria-selected', file?'false':'true');
+  $('#panelFile').hidden = !file;      // hides the file stepper + flow with it
+  $('#panelText').hidden = file;
+  if(!file) setTimeout(()=>{ try{ $('#txtBody').focus(); }catch(_){} }, 0);
+}
+$('#tabFile').onclick=()=>showTab('file');
+$('#tabText').onclick=()=>showTab('text');
+
+function txtEstimate(){
+  const s=$('#txtBody').value;
+  const bytes=txtEnc.encode(s).length;                 // exact UTF-8 on-chain size
+  TEXT.bytes=bytes;
+  $('#txtCount').textContent=`${s.length.toLocaleString()} character${s.length===1?'':'s'} · ${bytes.toLocaleString()} byte${bytes===1?'':'s'}`;
+  if(!s.trim()){ $('#txtQuoteTotal').textContent='—'; $('#txtInscribeBtn').disabled=true; $('#txtInscribeBtn').textContent='Inscribe'; TEXT.quote=null; return; }
+  const run=++TEXT.quoteRun;
+  $('#txtQuoteTotal').textContent='…'; $('#txtInscribeBtn').disabled=true;
+  api('/api/estimate',{method:'POST',body:{bytes,marginUstx:'0',parentCount:0}})
+    .then(e=>{ if(run!==TEXT.quoteRun) return;
+      TEXT.quote=e;
+      const usd=e.stxUsd?` (~$${(Number(e.requiredUstx)/1e6*e.stxUsd).toFixed(2)})`:'';
+      $('#txtQuoteTotal').textContent=stx(e.requiredUstx)+usd;
+      $('#txtInscribeBtn').disabled=false;
+      $('#txtInscribeBtn').textContent=`Inscribe — pay ${stx(e.requiredUstx)}`;
+    })
+    .catch(err=>{ if(run===TEXT.quoteRun){ $('#txtQuoteTotal').textContent='—'; $('#txtErr').textContent=(err&&err.message)||String(err); } });
+}
+let txtTimer=null;
+$('#txtBody').addEventListener('input',()=>{ $('#txtErr').textContent=''; clearTimeout(txtTimer); txtTimer=setTimeout(txtEstimate,250); });
+
+$('#txtInscribeBtn').onclick=async()=>{
+  const err=$('#txtErr'); err.textContent='';
+  const s=$('#txtBody').value;
+  if(!s.trim()){ err.textContent='Type or paste some text first.'; return; }
+  if(!WALLET){ const a=await connectWallet(); if(!a){ err.textContent='Connect your wallet to inscribe — it receives the inscription + change.'; return; } }
+  $('#txtInscribeBtn').disabled=true;
+  try{
+    const stamp=new Date().toISOString().slice(0,16).replace(/[-:T]/g,'');
+    const file=new File([s], `text-${stamp}.txt`, {type:'text/plain'});
+    const payload={ file, uri:`xtrata:text/note-${stamp}`, mime:'text/plain', deps:[], parents:[], marginUstx:'0', fastTrack:true, user:WALLET, expectedFunder:WALLET };
+    const {job}=await api('/api/jobs',{method:'POST',body:payload});
+    FLOW.jobId=job.jobId; FLOW.done=false;   // one active job at a time → shared card + poller render it
+    TEXT.jobId=job.jobId;
+    setStep('pay');
+    startJobsPoll(); jobsTick();
+    if(!SERVER.mock) openWallet(job.depositAddress, job.requiredUstx);
+    setTimeout(()=>{ const el=$('#activeJobDetail'); if(el&&el.firstChild) el.scrollIntoView({behavior:'smooth',block:'start'}); },250);
+  }catch(e){ err.textContent=(e&&e.message)||String(e); $('#txtInscribeBtn').disabled=false; }
+};
 
 // ============================================================================
 // Jobs — one steady poll drives the active card, the table and any open
