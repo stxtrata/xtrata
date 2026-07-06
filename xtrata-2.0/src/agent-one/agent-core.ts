@@ -486,7 +486,7 @@ async function createJob(opts: any) {
  * items are inscribed exactly as provided.
  */
 async function createBatchJob(opts: any) {
-  const { items = [], parents = [], user, expectedFunder = null, marginUstx = '0', fastTrack = false, strict = false, agentFeePct = AGENT_FEE_PCT } = opts;
+  const { items = [], parents = [], user, recipient = null, expectedFunder = null, marginUstx = '0', fastTrack = false, strict = false, agentFeePct = AGENT_FEE_PCT } = opts;
   if (!Array.isArray(items) || !items.length) throw new Error('items required');
   if (items.length > MAX_BATCH_ITEMS) throw new Error(`batch too large: ${items.length} items (max ${MAX_BATCH_ITEMS})`);
   if (!fastTrack && !user) throw new Error('delivery address (user) required unless fastTrack');
@@ -535,7 +535,7 @@ async function createBatchJob(opts: any) {
     jobId: id, core: CORE_NAME, net: 'mainnet', mock: MOCK, fastTrack, strict: !!strict,
     items: built, batchProgress: { current: 0, total: built.length },
     sharedParents, parents: allParents,            // job.parents = the ESCROW list (gates, returns, receipts)
-    user: user || null, expectedFunder: expectedFunder || null, funder: null,
+    user: user || null, recipient: recipient || user || null, expectedFunder: expectedFunder || null, funder: null,
     bytes: built.reduce((s, b) => s + b.bytes, 0), chunks: built.reduce((s, b) => s + b.chunks, 0),
     sumProtocol: est.sumProtocol, sumMiner: est.sumMiner,
     protocolFee: est.sumProtocol, minerReserve: est.sumMiner,   // aliases so shared maths keep working

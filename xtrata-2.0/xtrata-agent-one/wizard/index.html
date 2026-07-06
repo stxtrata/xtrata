@@ -253,6 +253,8 @@
         <input id="batchParents" class="mono" placeholder="134" />
         <label>Service margin (µSTX, 0 = none)</label>
         <input id="batchMargin" class="mono" value="0" />
+        <label>Send all inscriptions to a different address <span class="muted">(optional — blank keeps everything in your wallet; your change always returns to you)</span></label>
+        <input id="batchRecipient" class="mono" placeholder="SP… or SM… (optional)" />
         <label class="checkline" style="margin-top:10px">
           <input type="checkbox" id="batchStrict" />
           <span>Strict — if any item fails, skip the rest (default: continue and deliver what succeeded)</span>
@@ -818,6 +820,8 @@ $('#batchInscribeBtn').onclick=async()=>{
   if(!WALLET){ err.textContent='Connect your wallet (top-right) — the batch fast-tracks: everything returns to the wallet you pay from.'; connectWallet(); return; }
   const shared=$('#batchParents').value.split(',').map(s=>s.trim()).filter(Boolean);
   if(!shared.every(d=>/^\d+$/.test(d))){ err.textContent='Shared parents must be token-id uints.'; return; }
+  const batchRecipient=$('#batchRecipient').value.trim();
+  if(batchRecipient&&!ADDR_RE.test(batchRecipient)){ err.textContent='Recipient must be a valid SP…/SM… principal (or clear it to keep everything in your wallet).'; return; }
   for(const [i,it] of BATCH.items.entries()){
     if(!it.uri.trim()){ err.textContent=`Item ${i}: URI required.`; return; }
     const deps=it.deps.split(',').map(s=>s.trim()).filter(Boolean);
@@ -851,7 +855,7 @@ $('#batchInscribeBtn').onclick=async()=>{
         return { file:f, uri:it.uri.trim(), mime:asPlayer?'text/html':batchActiveMime(it),
         deps:it.deps.split(',').map(s=>s.trim()).filter(Boolean), parents:it.parents.split(',').map(s=>s.trim()).filter(Boolean) }; }),
       parents:shared, marginUstx:$('#batchMargin').value||'0', strict:$('#batchStrict').checked,
-      fastTrack:true, user:WALLET, expectedFunder:WALLET };
+      fastTrack:true, user:WALLET, expectedFunder:WALLET, recipient:batchRecipient||WALLET };
     const {job}=await api('/api/jobs',{method:'POST',body:payload});
     FLOW.jobId=job.jobId; FLOW.done=false;
     setStep('pay');
