@@ -799,6 +799,41 @@
       color: var(--green);
     }
 
+    /* ---- Inscribe: file vs text tabs ---- */
+    .inscribe-tabs {
+      display: flex;
+      gap: 6px;
+    }
+
+    .inscribe-tab {
+      flex: 1;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-soft);
+      color: var(--muted);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .inscribe-tab:hover { color: var(--ink); }
+
+    .inscribe-tab.is-active {
+      background: var(--panel);
+      color: var(--ink);
+      border-color: var(--green);
+    }
+
+    #fileFields,
+    #textFields {
+      display: grid;
+      gap: 12px;
+    }
+
+    #inscriptionForm[data-mode='file'] #textFields { display: none; }
+    #inscriptionForm[data-mode='text'] #fileFields { display: none; }
+
     .file-chip {
       display: inline-flex;
       max-width: 100%;

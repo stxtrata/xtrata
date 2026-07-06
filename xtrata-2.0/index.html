@@ -216,28 +216,35 @@
             <span class="badge amber">idle</span>
           </div>
 
-          <form class="form-grid" id="inscriptionForm">
-            <div class="field">
-              <span class="label">Payload</span>
-              <input id="fileInput" type="file" hidden />
-              <div class="dropzone" id="dropzone" tabindex="0" role="button">
-                <span id="dropzoneText">Choose file or drop it here</span>
-              </div>
-              <span class="field-note">Name and type are detected automatically, and the payload is prepared as soon as it lands.</span>
+          <form class="form-grid" id="inscriptionForm" data-mode="file">
+            <div class="inscribe-tabs" role="tablist" aria-label="What to inscribe">
+              <button type="button" class="inscribe-tab is-active" id="tabFile" role="tab" aria-selected="true">📄 Inscribe a file</button>
+              <button type="button" class="inscribe-tab" id="tabText" role="tab" aria-selected="false">✍️ Inscribe text</button>
             </div>
 
-            <label class="field">
-              <span class="label">Name</span>
-              <input class="input" id="nameInput" autocomplete="off" placeholder="inscription.txt" />
-            </label>
+            <div id="fileFields">
+              <div class="field">
+                <span class="label">Payload</span>
+                <input id="fileInput" type="file" hidden />
+                <div class="dropzone" id="dropzone" tabindex="0" role="button">
+                  <span id="dropzoneText">Choose file or drop it here</span>
+                </div>
+                <span class="field-note">Name and type are detected automatically, and the payload is prepared as soon as it lands.</span>
+              </div>
 
-            <details class="inscribe-details" id="textPayloadDetails">
-              <summary>Write text instead of dropping a file</summary>
               <label class="field">
-                <span class="label">Text payload</span>
-                <textarea class="textarea" id="textPayload" spellcheck="false" placeholder="Optional text, JSON, SVG, or HTML"></textarea>
+                <span class="label">Name</span>
+                <input class="input" id="nameInput" autocomplete="off" placeholder="inscription.txt" />
               </label>
-            </details>
+            </div>
+
+            <div id="textFields">
+              <label class="field">
+                <span class="label">Text to inscribe</span>
+                <textarea class="textarea" id="textPayload" spellcheck="false" placeholder="Paste or type text, JSON, SVG or HTML — the cost updates as you type"></textarea>
+                <span class="field-note" id="textStats">0 characters · 0 bytes</span>
+              </label>
+            </div>
 
             <details class="inscribe-details" id="inscribeAdvancedDetails">
               <summary>Advanced — type &amp; token URI</summary>

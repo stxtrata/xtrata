@@ -244,6 +244,10 @@
       dropzone: $('dropzone'),
       dropzoneText: $('dropzoneText'),
       textPayload: $('textPayload'),
+      textStats: $('textStats'),
+      tabFile: $('tabFile'),
+      tabText: $('tabText'),
+      inscriptionForm: $('inscriptionForm'),
       parentRelationshipPanel: $('parentRelationshipPanel'),
       parentRelationshipBadge: $('parentRelationshipBadge'),
       parentIdsInput: $('parentIdsInput'),
@@ -10027,11 +10031,56 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         setSelectedFile(file);
       }
     });
+    // ---- File vs Text tabs: mode toggle, live byte stats, instant text cost ----
+    const textByteEncoder = new TextEncoder();
+    const updateTextStats = () => {
+      if (!dom.textStats) return;
+      const s = dom.textPayload.value;
+      const bytes = textByteEncoder.encode(s).length;
+      dom.textStats.textContent =
+        `${s.length.toLocaleString()} character${s.length === 1 ? '' : 's'} · ${bytes.toLocaleString()} byte${bytes === 1 ? '' : 's'}`;
+    };
+    const setInscribeMode = (mode) => {
+      const form = dom.inscriptionForm;
+      if (!form) return;
+      form.dataset.mode = mode;
+      dom.tabFile?.classList.toggle('is-active', mode === 'file');
+      dom.tabText?.classList.toggle('is-active', mode === 'text');
+      dom.tabFile?.setAttribute('aria-selected', mode === 'file' ? 'true' : 'false');
+      dom.tabText?.setAttribute('aria-selected', mode === 'text' ? 'true' : 'false');
+      if (mode === 'text') {
+        if (state.selectedFile) setSelectedFile(null); // switching to text drops any selected file
+        updateTextStats();
+        dom.textPayload?.focus();
+      } else if (dom.textPayload?.value) {
+        dom.textPayload.value = ''; // switching to file drops the text draft
+        updateTextStats();
+        markPreparedDirty();
+      }
+    };
+    dom.tabFile?.addEventListener('click', () => setInscribeMode('file'));
+    dom.tabText?.addEventListener('click', () => setInscribeMode('text'));
+
+    let textPrepareTimer = null;
     dom.textPayload.addEventListener('input', () => {
       if (dom.textPayload.value.length > 0 && state.selectedFile) {
         setSelectedFile(null);
       }
+      updateTextStats();
       markPreparedDirty();
+      // Instant cost: auto-prepare (debounced) while on the Text tab, mirroring a dropped file.
+      if (textPrepareTimer) clearTimeout(textPrepareTimer);
+      textPrepareTimer = setTimeout(() => {
+        if (
+          dom.inscriptionForm?.dataset.mode === 'text' &&
+          dom.textPayload.value.trim() &&
+          !state.busy &&
+          !state.prepared &&
+          autoPrepareHook
+        ) {
+          void autoPrepareHook();
+        }
+      }, 500);
     });
     dom.nameInput.addEventListener('input', markPreparedDirty);
     dom.payloadType.addEventListener('change', markPreparedDirty);
