@@ -799,10 +799,18 @@
       color: var(--green);
     }
 
-    /* ---- Inscribe: file vs text tabs ---- */
+    /* ---- Inscribe: file vs text — collapsed binary choice, then reveal one path ---- */
+    .inscribe-choice-hint {
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--ink);
+      text-align: center;
+      margin: 4px 0 2px;
+    }
+
     .inscribe-tabs {
       display: flex;
-      gap: 6px;
+      gap: 8px;
     }
 
     .inscribe-tab {
@@ -817,7 +825,7 @@
       cursor: pointer;
     }
 
-    .inscribe-tab:hover { color: var(--ink); }
+    .inscribe-tab:hover { color: var(--ink); border-color: var(--line-strong); }
 
     .inscribe-tab.is-active {
       background: var(--panel);
@@ -825,14 +833,81 @@
       border-color: var(--green);
     }
 
+    .inscribe-change {
+      justify-self: start;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--muted);
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    .inscribe-change:hover { color: var(--ink); }
+
     #fileFields,
     #textFields {
       display: grid;
       gap: 12px;
     }
 
-    #inscriptionForm[data-mode='file'] #textFields { display: none; }
-    #inscriptionForm[data-mode='text'] #fileFields { display: none; }
+    /* Streamlined text card: cost estimate + inscribe button */
+    .text-cost-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .text-cost {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+      color: var(--ink);
+    }
+
+    /* ---- mode gating (scoped to the inscribe panel body) ---- */
+    /* Landing (none): only the binary choice shows. */
+    #inscribePanelBody[data-mode='none'] #fileFields,
+    #inscribePanelBody[data-mode='none'] #textFields,
+    #inscribePanelBody[data-mode='none'] #inscribeAdvancedDetails,
+    #inscribePanelBody[data-mode='none'] #relationshipsDetails,
+    #inscribePanelBody[data-mode='none'] .inscribe-wizard-note,
+    #inscribePanelBody[data-mode='none'] .prepare-grid,
+    #inscribePanelBody[data-mode='none'] .actions,
+    #inscribePanelBody[data-mode='none'] .steps,
+    #inscribePanelBody[data-mode='none'] #duplicateWarning,
+    #inscribePanelBody[data-mode='none'] #resumeNotice,
+    #inscribePanelBody[data-mode='none'] #batchGuide { display: none; }
+
+    /* File path: hide the text card. */
+    #inscribePanelBody[data-mode='file'] #textFields { display: none; }
+
+    /* Text path: strip to just the text card. */
+    #inscribePanelBody[data-mode='text'] #fileFields,
+    #inscribePanelBody[data-mode='text'] #inscribeAdvancedDetails,
+    #inscribePanelBody[data-mode='text'] #relationshipsDetails,
+    #inscribePanelBody[data-mode='text'] .inscribe-wizard-note,
+    #inscribePanelBody[data-mode='text'] .prepare-grid,
+    #inscribePanelBody[data-mode='text'] .actions,
+    #inscribePanelBody[data-mode='text'] .steps,
+    #inscribePanelBody[data-mode='text'] #duplicateWarning,
+    #inscribePanelBody[data-mode='text'] #resumeNotice,
+    #inscribePanelBody[data-mode='text'] #batchGuide { display: none; }
+
+    /* Prepare button is gone — file prep is automatic on load. */
+    #inscribePanelBody #prepareButton { display: none; }
+
+    /* Choice hint only on the landing; Change control only once a path is chosen. */
+    #inscribePanelBody[data-mode='none'] .inscribe-change { display: none; }
+    #inscribePanelBody[data-mode='file'] .inscribe-choice-hint,
+    #inscribePanelBody[data-mode='text'] .inscribe-choice-hint { display: none; }
+
+    /* Landing: make the two choices tall and card-like. */
+    #inscribePanelBody[data-mode='none'] .inscribe-tab {
+      padding: 22px 16px;
+      font-size: 15px;
+    }
 
     .file-chip {
       display: inline-flex;

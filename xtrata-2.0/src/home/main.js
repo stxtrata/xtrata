@@ -248,6 +248,10 @@
       tabFile: $('tabFile'),
       tabText: $('tabText'),
       inscriptionForm: $('inscriptionForm'),
+      inscribePanelBody: $('inscribePanelBody'),
+      textCost: $('textCost'),
+      inscribeTextButton: $('inscribeTextButton'),
+      inscribeChange: $('inscribeChange'),
       parentRelationshipPanel: $('parentRelationshipPanel'),
       parentRelationshipBadge: $('parentRelationshipBadge'),
       parentIdsInput: $('parentIdsInput'),
@@ -4089,6 +4093,7 @@
         }
         dom.duplicateWarning.classList.remove('on');
         renderResumeNotice();
+        if (dom.inscribeTextButton) dom.inscribeTextButton.disabled = true;
         updateControls();
         return;
       }
@@ -4258,6 +4263,14 @@
         dom.duplicateWarning.classList.remove('on');
       }
       renderResumeNotice();
+      // Streamlined text card: mirror the total + enable its inscribe button (<= 1 KB).
+      if (dom.textCost && state.prepared) {
+        dom.textCost.textContent = `≈ ${formatEstimatedTotalFees(effectiveFeeEstimate, dataMiningEstimate.miningFeeMicroStx)}`;
+      }
+      if (dom.inscribeTextButton) {
+        const textCardBytes = new TextEncoder().encode(dom.textPayload.value).length;
+        dom.inscribeTextButton.disabled = !(state.prepared && textCardBytes > 0 && textCardBytes <= 1024 && !state.busy);
+      }
       updateControls();
     };
 
@@ -9193,6 +9206,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       state.handoffDependencyIds = [];
       dom.fileInput.value = '';
       if (file) {
+        applyInscribeMode('file'); // selecting or restoring a file reveals the file path
         dom.dropzoneText.innerHTML = '';
         const chip = document.createElement('span');
         chip.className = 'file-chip';
@@ -10032,7 +10046,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
     });
     // ---- File vs Text tabs: mode toggle, live byte stats, instant text cost ----
+    const TEXT_MAX_BYTES = 1024; // product cap: text inscriptions stay <= 1 KB (always one chunk)
     const textByteEncoder = new TextEncoder();
+    const textBytes = () => textByteEncoder.encode(dom.textPayload.value).length;
     const updateTextStats = () => {
       if (!dom.textStats) return;
       const s = dom.textPayload.value;
@@ -10040,26 +10056,52 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       dom.textStats.textContent =
         `${s.length.toLocaleString()} character${s.length === 1 ? '' : 's'} · ${bytes.toLocaleString()} byte${bytes === 1 ? '' : 's'}`;
     };
-    const setInscribeMode = (mode) => {
-      const form = dom.inscriptionForm;
-      if (!form) return;
-      form.dataset.mode = mode;
+    // Reveal the chosen path. Hoisted (function decl) so setSelectedFile / boot-restore can
+    // call it before the const helpers below are initialised.
+    function applyInscribeMode(mode) {
+      if (dom.inscribePanelBody) dom.inscribePanelBody.dataset.mode = mode;
       dom.tabFile?.classList.toggle('is-active', mode === 'file');
       dom.tabText?.classList.toggle('is-active', mode === 'text');
       dom.tabFile?.setAttribute('aria-selected', mode === 'file' ? 'true' : 'false');
       dom.tabText?.setAttribute('aria-selected', mode === 'text' ? 'true' : 'false');
+    }
+    // Text card placeholder states + button enable. The real cost is written by
+    // renderPreparedState once the live single-tx quote returns.
+    const syncTextCard = () => {
+      if (!dom.inscribeTextButton) return;
+      const bytes = textBytes();
+      const over = bytes > TEXT_MAX_BYTES;
+      if (dom.textCost && (!state.prepared || bytes === 0 || over)) {
+        dom.textCost.textContent =
+          bytes === 0 ? 'Enter text to see the cost'
+          : over ? `Over the 1 KB limit by ${(bytes - TEXT_MAX_BYTES).toLocaleString()} byte${bytes - TEXT_MAX_BYTES === 1 ? '' : 's'} — trim it`
+          : 'Estimating…';
+      }
+      dom.inscribeTextButton.disabled = !(state.prepared && bytes > 0 && !over && !state.busy);
+    };
+    const setInscribeMode = (mode) => {
+      applyInscribeMode(mode);
       if (mode === 'text') {
-        if (state.selectedFile) setSelectedFile(null); // switching to text drops any selected file
+        if (state.selectedFile) setSelectedFile(null); // text drops any selected file
         updateTextStats();
+        syncTextCard();
         dom.textPayload?.focus();
-      } else if (dom.textPayload?.value) {
-        dom.textPayload.value = ''; // switching to file drops the text draft
-        updateTextStats();
+      } else if (mode === 'file') {
+        if (dom.textPayload?.value) { dom.textPayload.value = ''; updateTextStats(); markPreparedDirty(); }
+      } else { // none — back to the landing; clear both sources
+        if (state.selectedFile) setSelectedFile(null);
+        if (dom.textPayload?.value) { dom.textPayload.value = ''; updateTextStats(); }
         markPreparedDirty();
       }
     };
     dom.tabFile?.addEventListener('click', () => setInscribeMode('file'));
     dom.tabText?.addEventListener('click', () => setInscribeMode('text'));
+    dom.inscribeChange?.addEventListener('click', () => setInscribeMode('none'));
+    dom.inscribeTextButton?.addEventListener('click', () => {
+      const bytes = textBytes();
+      if (bytes === 0 || bytes > TEXT_MAX_BYTES) return; // hard guard — never inscribe > 1 KB of text
+      runInscription();
+    });
 
     let textPrepareTimer = null;
     dom.textPayload.addEventListener('input', () => {
@@ -10068,19 +10110,24 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
       updateTextStats();
       markPreparedDirty();
-      // Instant cost: auto-prepare (debounced) while on the Text tab, mirroring a dropped file.
+      syncTextCard();
+      const bytes = textBytes();
+      // Instant cost: auto-prepare (debounced) while on the Text path, within the 1 KB cap.
       if (textPrepareTimer) clearTimeout(textPrepareTimer);
-      textPrepareTimer = setTimeout(() => {
-        if (
-          dom.inscriptionForm?.dataset.mode === 'text' &&
-          dom.textPayload.value.trim() &&
-          !state.busy &&
-          !state.prepared &&
-          autoPrepareHook
-        ) {
-          void autoPrepareHook();
-        }
-      }, 500);
+      if (bytes > 0 && bytes <= TEXT_MAX_BYTES) {
+        textPrepareTimer = setTimeout(() => {
+          if (
+            dom.inscribePanelBody?.dataset.mode === 'text' &&
+            dom.textPayload.value.trim() &&
+            textBytes() <= TEXT_MAX_BYTES &&
+            !state.busy &&
+            !state.prepared &&
+            autoPrepareHook
+          ) {
+            void autoPrepareHook();
+          }
+        }, 500);
+      }
     });
     dom.nameInput.addEventListener('input', markPreparedDirty);
     dom.payloadType.addEventListener('change', markPreparedDirty);

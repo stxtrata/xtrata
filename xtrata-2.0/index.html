@@ -210,17 +210,19 @@
           </div>
           <span class="badge" id="networkBadge">mainnet</span>
         </div>
-        <div class="panel-body">
+        <div class="panel-body" id="inscribePanelBody" data-mode="none">
           <div class="status" id="walletStatus">
             <span><strong>Wallet</strong> not connected</span>
             <span class="badge amber">idle</span>
           </div>
 
-          <form class="form-grid" id="inscriptionForm" data-mode="file">
+          <form class="form-grid" id="inscriptionForm">
+            <div class="inscribe-choice-hint">What would you like to inscribe?</div>
             <div class="inscribe-tabs" role="tablist" aria-label="What to inscribe">
-              <button type="button" class="inscribe-tab is-active" id="tabFile" role="tab" aria-selected="true">📄 Inscribe a file</button>
+              <button type="button" class="inscribe-tab" id="tabFile" role="tab" aria-selected="false">📄 Inscribe a file</button>
               <button type="button" class="inscribe-tab" id="tabText" role="tab" aria-selected="false">✍️ Inscribe text</button>
             </div>
+            <button type="button" class="inscribe-change" id="inscribeChange">← Change what you're inscribing</button>
 
             <div id="fileFields">
               <div class="field">
@@ -240,10 +242,14 @@
 
             <div id="textFields">
               <label class="field">
-                <span class="label">Text to inscribe</span>
-                <textarea class="textarea" id="textPayload" spellcheck="false" placeholder="Paste or type text, JSON, SVG or HTML — the cost updates as you type"></textarea>
+                <span class="label">Text to inscribe <span style="color:var(--muted);font-weight:400">· up to 1 KB, one transaction</span></span>
+                <textarea class="textarea" id="textPayload" spellcheck="false" placeholder="Paste or type text — up to 1 KB. The cost updates as you type."></textarea>
                 <span class="field-note" id="textStats">0 characters · 0 bytes</span>
               </label>
+              <div class="text-cost-row">
+                <span class="text-cost" id="textCost">Enter text to see the cost</span>
+                <button class="btn" id="inscribeTextButton" type="button" disabled>Inscribe text</button>
+              </div>
             </div>
 
             <details class="inscribe-details" id="inscribeAdvancedDetails">
