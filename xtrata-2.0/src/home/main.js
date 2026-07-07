@@ -252,6 +252,8 @@
       textCost: $('textCost'),
       inscribeTextButton: $('inscribeTextButton'),
       inscribeChange: $('inscribeChange'),
+      largeFileNotice: $('largeFileNotice'),
+      largeFileNoticeText: $('largeFileNoticeText'),
       parentRelationshipPanel: $('parentRelationshipPanel'),
       parentRelationshipBadge: $('parentRelationshipBadge'),
       parentIdsInput: $('parentIdsInput'),
@@ -4094,6 +4096,7 @@
         dom.duplicateWarning.classList.remove('on');
         renderResumeNotice();
         if (dom.inscribeTextButton) dom.inscribeTextButton.disabled = true;
+        if (dom.largeFileNotice) dom.largeFileNotice.hidden = true;
         updateControls();
         return;
       }
@@ -4270,6 +4273,15 @@
       if (dom.inscribeTextButton) {
         const textCardBytes = new TextEncoder().encode(dom.textPayload.value).length;
         dom.inscribeTextButton.disabled = !(state.prepared && textCardBytes > 0 && textCardBytes <= 1024 && !state.busy);
+      }
+      // Large-file nudge: over the single-tx limit (> 512 KB) → suggest the Wizard (non-blocking).
+      if (dom.largeFileNotice) {
+        const staged = !!state.prepared && transactionCount > 1;
+        dom.largeFileNotice.hidden = !staged;
+        if (staged && dom.largeFileNoticeText) {
+          dom.largeFileNoticeText.textContent =
+            `At ${formatBytes(BigInt(state.prepared.bytes))} it's over the 512 KB single-transaction limit, so inscribing it here takes ${transactionCount} wallet signatures. It's completely safe — the Wizard just does the whole thing in one click and one payment.`;
+        }
       }
       updateControls();
     };
@@ -9206,7 +9218,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       state.handoffDependencyIds = [];
       dom.fileInput.value = '';
       if (file) {
-        applyInscribeMode('file'); // selecting or restoring a file reveals the file path
         dom.inscribePanelBody?.classList.add('has-payload'); // reveal details + inscribe button
         dom.dropzoneText.innerHTML = '';
         const chip = document.createElement('span');
@@ -9308,6 +9319,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           'support'
         );
         await preparePayload();
+        // Resume safety: if this inscription already has on-chain progress (a begin session /
+        // uploaded chunks), surface the file view so the user can finish it. A partially
+        // committed inscription must never be buried behind the collapsed landing.
+        if (state.uploadState) {
+          applyInscribeMode('file');
+        }
         void refreshParentChecks();
         return true;
       }

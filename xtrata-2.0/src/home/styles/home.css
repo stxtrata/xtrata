@@ -866,6 +866,27 @@
       color: var(--ink);
     }
 
+    .activity-log > summary { font-size: 12px; color: var(--muted); }
+
+    /* Large-file suggestion: non-blocking nudge to the Wizard for > 512 KB (multi-tx) files. */
+    .large-file-notice {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      padding: 14px 16px;
+      border: 1px solid var(--amber);
+      background: var(--amber-soft);
+      border-radius: var(--radius);
+    }
+    .large-file-notice[hidden] { display: none; }
+    .large-file-notice__body { display: grid; gap: 3px; font-size: 13px; color: var(--ink); }
+    .large-file-notice .btn { white-space: nowrap; }
+    #inscribePanelBody[data-mode='none'] #largeFileNotice,
+    #inscribePanelBody[data-mode='text'] #largeFileNotice,
+    #inscribePanelBody[data-mode='file']:not(.has-payload) #largeFileNotice { display: none; }
+
     /* ---- mode gating (scoped to the inscribe panel body) ---- */
     /* Landing (none): only the binary choice shows. */
     #inscribePanelBody[data-mode='none'] #fileFields,
