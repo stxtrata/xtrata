@@ -10071,25 +10071,38 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const TEXT_MAX_BYTES = 16384; // product cap: text stays <= 16 KB = one chunk = one transaction
     const textByteEncoder = new TextEncoder();
     const textBytes = () => textByteEncoder.encode(dom.textPayload.value).length;
-    // Text is always one chunk, so the Xtrata fee is a flat rate: quote it ONCE and reuse it for
-    // every text inscription. The only variable is the network (miner) fee, which we size for a
-    // full 16 KB chunk so the figure is a slight over-estimate, never an under-quote — no
-    // per-keystroke quoting, and a steady "about X STX" the moment you start typing.
-    let textFlatFeeText = null;
-    const paintTextFlatFee = () => {
+    // Text is always one chunk, so the Xtrata protocol fee is flat — quote it ONCE and reuse it.
+    // The network (miner) fee is the only size-dependent part, so we LADDER it by size band:
+    // <=100 B, <=500 B, <=1 KB, then every 1 KB up to 16 KB. Each band is charged at its ceiling
+    // (a slight over-estimate, never an under-quote), so tiny inscriptions read cheap and the cost
+    // only steps up as the text grows. Computed locally — no per-keystroke quoting.
+    let textXtrataFeeMicroStx = null; // flat Xtrata fee for one chunk (quoted once)
+    const textFeeTier = (bytes) => {
+      if (bytes <= 100) return 100;
+      if (bytes <= 500) return 500;
+      if (bytes <= 1024) return 1024;
+      return Math.min(TEXT_MAX_BYTES, Math.ceil(bytes / 1024) * 1024); // every 1 KB up to 16 KB
+    };
+    const textFeeLabel = () => {
+      const bytes = textBytes();
+      if (bytes === 0 || textXtrataFeeMicroStx == null) return null;
+      const total = BigInt(Math.round(textXtrataFeeMicroStx)) + walletMinerFeeMicroStx(textFeeTier(bytes));
+      return `about ${formatMicroStxWithUsd(total, state.usdPriceBook).combined}`;
+    };
+    const paintTextFee = () => {
       if (!dom.textCost || dom.inscribePanelBody?.dataset.mode !== 'text') return;
       const bytes = textBytes();
       if (bytes > 0 && bytes <= TEXT_MAX_BYTES) {
-        dom.textCost.textContent = textFlatFeeText || 'about … STX';
+        dom.textCost.textContent = textFeeLabel() || 'about … STX';
       }
     };
-    const ensureTextFlatFee = async () => {
-      if (textFlatFeeText) { paintTextFlatFee(); return; }
+    const ensureTextXtrataFee = async () => {
+      if (textXtrataFeeMicroStx != null) { paintTextFee(); return; }
       try {
-        const xtrata = await state.client.quoteSingleTxFee(BigInt(TEXT_MAX_BYTES), BigInt(1), getReadOnlySenderAddress());
-        textFlatFeeText = `about ${formatMicroStxWithUsd(BigInt(Math.round(Number(xtrata))) + walletMinerFeeMicroStx(TEXT_MAX_BYTES), state.usdPriceBook).combined}`;
+        const q = await state.client.quoteSingleTxFee(BigInt(TEXT_MAX_BYTES), BigInt(1), getReadOnlySenderAddress());
+        textXtrataFeeMicroStx = Number(q);
       } catch (_) { /* leave the placeholder; retried on next text-mode entry */ }
-      paintTextFlatFee();
+      paintTextFee();
     };
     const updateTextStats = () => {
       if (!dom.textStats) return;
@@ -10116,7 +10129,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         dom.textCost.textContent =
           bytes === 0 ? 'Enter text to see the cost'
           : over ? `Over the 16 KB limit by ${(bytes - TEXT_MAX_BYTES).toLocaleString()} byte${bytes - TEXT_MAX_BYTES === 1 ? '' : 's'} — trim it`
-          : (textFlatFeeText || 'about … STX');
+          : (textFeeLabel() || 'about … STX');
       }
       dom.inscribeTextButton.disabled = !(state.prepared && bytes > 0 && !over && !state.busy);
     };
@@ -10125,7 +10138,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       if (mode === 'text') {
         if (state.selectedFile) setSelectedFile(null); // text drops any selected file
         updateTextStats();
-        void ensureTextFlatFee(); // quote the flat rate once, on entering text mode
+        void ensureTextXtrataFee(); // quote the flat Xtrata rate once, on entering text mode
         syncTextCard();
         dom.textPayload?.focus();
       } else if (mode === 'file') {
