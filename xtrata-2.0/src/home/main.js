@@ -252,6 +252,8 @@
       textCost: $('textCost'),
       inscribeTextButton: $('inscribeTextButton'),
       inscribeChange: $('inscribeChange'),
+      threadReplyTo: $('threadReplyTo'),
+      threadReplyNote: $('threadReplyNote'),
       largeFileNotice: $('largeFileNotice'),
       largeFileNoticeText: $('largeFileNoticeText'),
       parentRelationshipPanel: $('parentRelationshipPanel'),
@@ -9279,6 +9281,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       if (dom.textPayload) {
         dom.textPayload.value = '';
       }
+      if (dom.threadReplyTo) {
+        dom.threadReplyTo.value = '';
+      }
       if (dom.payloadType) {
         dom.payloadType.selectedIndex = 0;
       }
@@ -10120,32 +10125,51 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       dom.tabFile?.setAttribute('aria-selected', mode === 'file' ? 'true' : 'false');
       dom.tabText?.setAttribute('aria-selected', mode === 'text' ? 'true' : 'false');
     }
-    // Text card: flat-rate cost (steady, from the one-time quote) + inscribe button enable.
+    // Threads: a "reply to" inscription id becomes a dependency (existence-only reference), so the
+    // text is minted as an on-chain reply via mint-single-tx-recursive. Anyone can reply to any
+    // inscription — no ownership needed. The reply-to input is the source of truth.
+    const syncThreadDep = () => {
+      const raw = (dom.threadReplyTo?.value || '').trim();
+      const valid = /^\d+$/.test(raw);
+      state.handoffDependencyIds = valid ? [BigInt(raw)] : [];
+      if (dom.threadReplyNote) {
+        dom.threadReplyNote.textContent = valid
+          ? `↳ Your text will be inscribed as a reply to #${raw}`
+          : raw ? "Enter a numeric inscription id (the message you're replying to)."
+          : 'Optional — turns your text into an on-chain reply. Anyone can reply to any inscription.';
+      }
+    };
+    // Text card: cost + inscribe button (label switches to "Inscribe reply" when replying).
     const syncTextCard = () => {
       if (!dom.inscribeTextButton) return;
       const bytes = textBytes();
       const over = bytes > TEXT_MAX_BYTES;
+      const replying = (state.handoffDependencyIds?.length ?? 0) > 0;
       if (dom.textCost) {
         dom.textCost.textContent =
           bytes === 0 ? 'Enter text to see the cost'
           : over ? `Over the 16 KB limit by ${(bytes - TEXT_MAX_BYTES).toLocaleString()} byte${bytes - TEXT_MAX_BYTES === 1 ? '' : 's'} — trim it`
           : (textFeeLabel() || 'about … STX');
       }
+      dom.inscribeTextButton.textContent = replying ? 'Inscribe reply' : 'Inscribe text';
       dom.inscribeTextButton.disabled = !(state.prepared && bytes > 0 && !over && !state.busy);
     };
     const setInscribeMode = (mode) => {
       applyInscribeMode(mode);
       if (mode === 'text') {
-        if (state.selectedFile) setSelectedFile(null); // text drops any selected file
+        if (state.selectedFile) setSelectedFile(null); // text drops any selected file (also clears deps)
         updateTextStats();
         void ensureTextXtrataFee(); // quote the flat Xtrata rate once, on entering text mode
+        syncThreadDep(); // re-apply any reply-to (e.g. a deep link) after the clear above
         syncTextCard();
         dom.textPayload?.focus();
       } else if (mode === 'file') {
         if (dom.textPayload?.value) { dom.textPayload.value = ''; updateTextStats(); markPreparedDirty(); }
+        if (dom.threadReplyTo) dom.threadReplyTo.value = '';
       } else { // none — back to the landing; clear both sources
         if (state.selectedFile) setSelectedFile(null);
         if (dom.textPayload?.value) { dom.textPayload.value = ''; updateTextStats(); }
+        if (dom.threadReplyTo) dom.threadReplyTo.value = '';
         markPreparedDirty();
       }
     };
@@ -10157,19 +10181,23 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       if (bytes === 0 || bytes > TEXT_MAX_BYTES) return; // hard guard — never inscribe > 16 KB of text
       runInscription();
     });
+    // Thread deep link: /inscribe?reply=<tokenId> opens the text tab pre-filled as a reply.
+    if (document.documentElement.dataset.page === 'inscribe' && dom.threadReplyTo) {
+      const replyTo = (new URLSearchParams(window.location.search).get('reply') || '').trim();
+      if (/^\d+$/.test(replyTo)) {
+        dom.threadReplyTo.value = replyTo;
+        const td = document.getElementById('threadDetails');
+        if (td) td.open = true;
+        setInscribeMode('text'); // switches to text + re-applies the reply-to dependency
+      }
+    }
 
     let textPrepareTimer = null;
-    dom.textPayload.addEventListener('input', () => {
-      if (dom.textPayload.value.length > 0 && state.selectedFile) {
-        setSelectedFile(null);
-      }
-      updateTextStats();
-      markPreparedDirty();
-      syncTextCard();
-      const bytes = textBytes();
-      // Ready the inscribe: prepare (debounced, one-shot) in the background, within the 16 KB cap.
+    // Ready the inscribe: prepare (debounced, one-shot) in the background, within the 16 KB cap.
+    // Re-run when the text OR the reply-to changes, so the dependency is baked into the mint.
+    const scheduleTextPrepare = () => {
       if (textPrepareTimer) clearTimeout(textPrepareTimer);
-      if (bytes > 0 && bytes <= TEXT_MAX_BYTES) {
+      if (textBytes() > 0 && textBytes() <= TEXT_MAX_BYTES) {
         textPrepareTimer = setTimeout(() => {
           if (
             dom.inscribePanelBody?.dataset.mode === 'text' &&
@@ -10183,6 +10211,21 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           }
         }, 500);
       }
+    };
+    dom.textPayload.addEventListener('input', () => {
+      if (dom.textPayload.value.length > 0 && state.selectedFile) {
+        setSelectedFile(null);
+      }
+      updateTextStats();
+      markPreparedDirty();
+      syncTextCard();
+      scheduleTextPrepare();
+    });
+    dom.threadReplyTo?.addEventListener('input', () => {
+      syncThreadDep();     // reply-to id → dependency (an on-chain reply, minted recursively)
+      markPreparedDirty(); // re-prepare so the dependency is baked into the mint
+      syncTextCard();
+      scheduleTextPrepare();
     });
     dom.nameInput.addEventListener('input', markPreparedDirty);
     dom.payloadType.addEventListener('change', markPreparedDirty);

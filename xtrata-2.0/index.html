@@ -56,7 +56,10 @@
       <div class="brand-wrap">
         <a class="brand" href="/" aria-label="Xtrata home">
           <img class="brand-logo" src="https://nxhyvj3lifp2q34nklffzxslfje426oxeruo3lkuj56srwgctdlq.arweave.net/bc-Kp2tBX6hvjVLKXN5LKknNedckaO2tVE99KNjCmNc" alt="" />
-          <span>XTRATA</span>
+          <span class="brand-name">
+            <span class="brand-wordmark">XTRATA</span>
+            <span class="brand-tagline">Permanent media records, anchored to Bitcoin</span>
+          </span>
         </a>
       </div>
       <div class="connected-readout" id="connectedReadout" aria-live="polite" hidden>
@@ -241,6 +244,14 @@
                 <textarea class="textarea" id="textPayload" spellcheck="false" placeholder="Paste or type text — up to 16 KB, inscribed in a single transaction."></textarea>
                 <span class="field-note" id="textStats">0 characters · 0 bytes</span>
               </label>
+              <details class="inscribe-details" id="threadDetails">
+                <summary>💬 Reply to a thread (optional)</summary>
+                <label class="field">
+                  <span class="label">Replying to inscription</span>
+                  <input class="input" id="threadReplyTo" inputmode="numeric" autocomplete="off" placeholder="token id — e.g. 2745" />
+                  <span class="field-note" id="threadReplyNote">Optional — turns your text into an on-chain reply. Anyone can reply to any inscription.</span>
+                </label>
+              </details>
               <div class="text-cost-row">
                 <span class="text-cost" id="textCost">Enter text to see the cost</span>
                 <button class="btn" id="inscribeTextButton" type="button" disabled>Inscribe text</button>
