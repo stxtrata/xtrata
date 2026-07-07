@@ -138,7 +138,7 @@
       recordChildParents,
       syncChildIndex
     } from '/src/lib/viewer/parent-child-index.ts';
-    import { fetchLineage } from '/src/lib/viewer/relations-api.ts';
+    import { fetchLineage, fetchDependents } from '/src/lib/viewer/relations-api.ts';
     import {
       decodeTokenUriToImage,
       fetchTokenImageFromUri,
@@ -2224,37 +2224,46 @@
       el.replaceChildren();
       el.hidden = true;
       if (!token || !state.client) return;
-      let deps = [];
-      try {
-        deps = await state.client.getDependencies(token.id, getReadOnlySenderAddress());
-      } catch (_) {
-        return;
-      }
-      if (requestId !== state.selectedThreadRequestId || state.selectedTokenId !== token.id) {
-        return;
-      }
-      if (!deps || deps.length === 0) {
-        return;
-      }
-      const head = document.createElement('div');
-      head.className = 'selected-thread__head';
-      head.textContent = deps.length === 1 ? '↳ In reply to' : '↳ References';
-      const row = document.createElement('div');
-      row.className = 'selected-thread__ids';
-      for (const depId of deps) {
+      const contractId = getTokenCacheContractId(token);
+      // Forward (what this replies to) is a live contract read; reverse (its replies) comes
+      // from the dependents edge index. Fetch both together.
+      const [deps, dependents] = await Promise.all([
+        state.client.getDependencies(token.id, getReadOnlySenderAddress()).catch(() => []),
+        fetchDependents({ contractId, id: token.id }).catch(() => null)
+      ]);
+      if (requestId !== state.selectedThreadRequestId || state.selectedTokenId !== token.id) return;
+      const replies = dependents?.dependents ?? [];
+      if ((!deps || deps.length === 0) && replies.length === 0) return;
+
+      const makeLink = (id) => {
         const link = document.createElement('button');
         link.type = 'button';
         link.className = 'selected-thread__id';
-        link.textContent = formatTokenId(depId);
-        link.title = `Open ${formatTokenId(depId)}`;
+        link.textContent = formatTokenId(id);
+        link.title = `Open ${formatTokenId(id)}`;
         link.addEventListener('click', (event) => {
           event.preventDefault();
           event.stopPropagation();
-          void selectToken(depId, { scrollToPreview: true });
+          void selectToken(id, { scrollToPreview: true });
         });
-        row.append(link);
+        return link;
+      };
+      const appendGroup = (label, ids) => {
+        const head = document.createElement('div');
+        head.className = 'selected-thread__head';
+        head.textContent = label;
+        const row = document.createElement('div');
+        row.className = 'selected-thread__ids';
+        for (const id of ids) row.append(makeLink(id));
+        el.append(head, row);
+      };
+
+      if (deps && deps.length > 0) {
+        appendGroup(deps.length === 1 ? '↳ In reply to' : '↳ References', deps);
       }
-      el.append(head, row);
+      if (replies.length > 0) {
+        appendGroup(`💬 Replies (${replies.length}${dependents?.hasMore ? '+' : ''})`, replies);
+      }
       el.hidden = false;
     };
 

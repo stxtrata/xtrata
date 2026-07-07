@@ -75,3 +75,43 @@ export const fetchLineage = async (params: {
     return null;
   }
 };
+
+// Reverse dependency lookup: the inscriptions that DEPEND ON this id — i.e. its
+// replies in a thread. Backed by functions/index/dependents/[contract].ts (the
+// inscription_dependencies edge table). Returns ids in mint order (chronological).
+export type DependentsResult = {
+  dependents: bigint[];
+  mintedCount: bigint;
+  syncedCount: bigint;
+  complete: boolean;
+  hasMore: boolean;
+};
+
+export const fetchDependents = async (params: {
+  contractId: string;
+  id: bigint;
+  origin?: string;
+  limit?: number;
+}): Promise<DependentsResult | null> => {
+  const origin = params.origin ?? '';
+  const limit = params.limit ?? 100;
+  const url =
+    `${origin}/index/dependents/${params.contractId}?id=${params.id.toString()}&limit=${limit}`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const body = (await response.json()) as Record<string, unknown>;
+    if (body && typeof body === 'object' && 'error' in body) return null;
+    const rows = Array.isArray(body.dependents) ? (body.dependents as Array<{ id?: unknown }>) : [];
+    const pagination = (body.pagination as { hasMore?: unknown } | undefined) ?? {};
+    return {
+      dependents: toIdList(rows.map((row) => row?.id)),
+      mintedCount: toBigInt(body.mintedCount) ?? 0n,
+      syncedCount: toBigInt(body.syncedCount) ?? 0n,
+      complete: body.complete === true,
+      hasMore: pagination.hasMore === true
+    };
+  } catch {
+    return null;
+  }
+};
