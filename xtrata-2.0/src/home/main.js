@@ -4266,13 +4266,11 @@
         dom.duplicateWarning.classList.remove('on');
       }
       renderResumeNotice();
-      // Streamlined text card: mirror the total + enable its inscribe button (<= 1 KB).
-      if (dom.textCost && state.prepared) {
-        dom.textCost.textContent = `≈ ${formatEstimatedTotalFees(effectiveFeeEstimate, dataMiningEstimate.miningFeeMicroStx)}`;
-      }
+      // Streamlined text card: cost is the flat rate (shown by syncTextCard); just keep the
+      // inscribe button in sync once the background prepare is ready.
       if (dom.inscribeTextButton) {
         const textCardBytes = new TextEncoder().encode(dom.textPayload.value).length;
-        dom.inscribeTextButton.disabled = !(state.prepared && textCardBytes > 0 && textCardBytes <= 1024 && !state.busy);
+        dom.inscribeTextButton.disabled = !(state.prepared && textCardBytes > 0 && textCardBytes <= 16384 && !state.busy);
       }
       // Large-file nudge: over the single-tx limit (> 512 KB) → suggest the Wizard (non-blocking).
       if (dom.largeFileNotice) {
@@ -4439,6 +4437,7 @@
         dependencyIds,
         parentIds
       };
+      const prepared = state.prepared; // capture: fee writes below target THIS object, even if a concurrent edit nulls state.prepared
       const mintAttempt = {
         contractId: getContractId(state.contract),
         expectedHashHex,
@@ -4468,11 +4467,15 @@
         state.duplicateId = null;
       }
 
+      // If a keystroke or clear replaced/nulled state.prepared during the hash check above,
+      // this prepare is stale — stop before touching it (a late quote must never crash).
+      if (state.prepared !== prepared) return;
+
       // Quote the exact fees the core will charge so the user is told the real
       // cost and each transaction's post-condition caps at the right amount.
       // Single-tx: one flat fee. Staged: begin-fee on begin, seal-fee on seal.
-      state.prepared.singleTxFeeMicroStx = null;
-      state.prepared.stagedFee = null;
+      prepared.singleTxFeeMicroStx = null;
+      prepared.stagedFee = null;
       const capabilities = resolveContractCapabilities(state.contract);
       if (capabilities.supportsNativeSingleTx === true && chunks.length > 0) {
         if (chunks.length <= SMALL_MINT_HELPER_MAX_CHUNKS) {
@@ -4482,9 +4485,9 @@
               BigInt(chunks.length),
               sender
             );
-            state.prepared.singleTxFeeMicroStx = Number(quoted);
+            prepared.singleTxFeeMicroStx = Number(quoted);
           } catch (error) {
-            state.prepared.singleTxFeeMicroStx = null;
+            prepared.singleTxFeeMicroStx = null;
           }
         }
         try {
@@ -4493,13 +4496,13 @@
             BigInt(chunks.length),
             sender
           );
-          state.prepared.stagedFee = {
+          prepared.stagedFee = {
             beginMicroStx: Number(staged.beginFee),
             sealMicroStx: Number(staged.sealFee),
             totalMicroStx: Number(staged.totalFee)
           };
         } catch (error) {
-          state.prepared.stagedFee = null;
+          prepared.stagedFee = null;
         }
       }
 
@@ -10065,9 +10068,29 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
     });
     // ---- File vs Text tabs: mode toggle, live byte stats, instant text cost ----
-    const TEXT_MAX_BYTES = 1024; // product cap: text inscriptions stay <= 1 KB (always one chunk)
+    const TEXT_MAX_BYTES = 16384; // product cap: text stays <= 16 KB = one chunk = one transaction
     const textByteEncoder = new TextEncoder();
     const textBytes = () => textByteEncoder.encode(dom.textPayload.value).length;
+    // Text is always one chunk, so the Xtrata fee is a flat rate: quote it ONCE and reuse it for
+    // every text inscription. The only variable is the network (miner) fee, which we size for a
+    // full 16 KB chunk so the figure is a slight over-estimate, never an under-quote — no
+    // per-keystroke quoting, and a steady "about X STX" the moment you start typing.
+    let textFlatFeeText = null;
+    const paintTextFlatFee = () => {
+      if (!dom.textCost || dom.inscribePanelBody?.dataset.mode !== 'text') return;
+      const bytes = textBytes();
+      if (bytes > 0 && bytes <= TEXT_MAX_BYTES) {
+        dom.textCost.textContent = textFlatFeeText || 'about … STX';
+      }
+    };
+    const ensureTextFlatFee = async () => {
+      if (textFlatFeeText) { paintTextFlatFee(); return; }
+      try {
+        const xtrata = await state.client.quoteSingleTxFee(BigInt(TEXT_MAX_BYTES), BigInt(1), getReadOnlySenderAddress());
+        textFlatFeeText = `about ${formatMicroStxWithUsd(BigInt(Math.round(Number(xtrata))) + walletMinerFeeMicroStx(TEXT_MAX_BYTES), state.usdPriceBook).combined}`;
+      } catch (_) { /* leave the placeholder; retried on next text-mode entry */ }
+      paintTextFlatFee();
+    };
     const updateTextStats = () => {
       if (!dom.textStats) return;
       const s = dom.textPayload.value;
@@ -10084,17 +10107,16 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       dom.tabFile?.setAttribute('aria-selected', mode === 'file' ? 'true' : 'false');
       dom.tabText?.setAttribute('aria-selected', mode === 'text' ? 'true' : 'false');
     }
-    // Text card placeholder states + button enable. The real cost is written by
-    // renderPreparedState once the live single-tx quote returns.
+    // Text card: flat-rate cost (steady, from the one-time quote) + inscribe button enable.
     const syncTextCard = () => {
       if (!dom.inscribeTextButton) return;
       const bytes = textBytes();
       const over = bytes > TEXT_MAX_BYTES;
-      if (dom.textCost && (!state.prepared || bytes === 0 || over)) {
+      if (dom.textCost) {
         dom.textCost.textContent =
           bytes === 0 ? 'Enter text to see the cost'
-          : over ? `Over the 1 KB limit by ${(bytes - TEXT_MAX_BYTES).toLocaleString()} byte${bytes - TEXT_MAX_BYTES === 1 ? '' : 's'} — trim it`
-          : 'Estimating…';
+          : over ? `Over the 16 KB limit by ${(bytes - TEXT_MAX_BYTES).toLocaleString()} byte${bytes - TEXT_MAX_BYTES === 1 ? '' : 's'} — trim it`
+          : (textFlatFeeText || 'about … STX');
       }
       dom.inscribeTextButton.disabled = !(state.prepared && bytes > 0 && !over && !state.busy);
     };
@@ -10103,6 +10125,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       if (mode === 'text') {
         if (state.selectedFile) setSelectedFile(null); // text drops any selected file
         updateTextStats();
+        void ensureTextFlatFee(); // quote the flat rate once, on entering text mode
         syncTextCard();
         dom.textPayload?.focus();
       } else if (mode === 'file') {
@@ -10118,7 +10141,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     dom.inscribeChange?.addEventListener('click', () => setInscribeMode('none'));
     dom.inscribeTextButton?.addEventListener('click', () => {
       const bytes = textBytes();
-      if (bytes === 0 || bytes > TEXT_MAX_BYTES) return; // hard guard — never inscribe > 1 KB of text
+      if (bytes === 0 || bytes > TEXT_MAX_BYTES) return; // hard guard — never inscribe > 16 KB of text
       runInscription();
     });
 
@@ -10131,7 +10154,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       markPreparedDirty();
       syncTextCard();
       const bytes = textBytes();
-      // Instant cost: auto-prepare (debounced) while on the Text path, within the 1 KB cap.
+      // Ready the inscribe: prepare (debounced, one-shot) in the background, within the 16 KB cap.
       if (textPrepareTimer) clearTimeout(textPrepareTimer);
       if (bytes > 0 && bytes <= TEXT_MAX_BYTES) {
         textPrepareTimer = setTimeout(() => {
