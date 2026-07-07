@@ -298,6 +298,7 @@
       tokenPreviewMedia: $('tokenPreviewMedia'),
       tokenPreviewMeta: $('tokenPreviewMeta'),
       selectedRelationships: $('selectedRelationships'),
+      selectedThread: $('selectedThread'),
       previewExpandButton: $('previewExpandButton'),
       fullscreenButton: $('fullscreenButton'),
       explorerLink: $('explorerLink'),
@@ -510,6 +511,7 @@
       selectedEscrowHolder: null,
       selectedParentsRequestId: 0,
       selectedChildrenRequestId: 0,
+      selectedThreadRequestId: 0,
       childScanRunning: false,
       childScanCancel: false,
       childScanTokenId: null,
@@ -2105,6 +2107,11 @@
       state.selectedEscrowHolderRequestId += 1;
       state.selectedEscrowHolder = null;
       clearSelectedInscriptionRelationships();
+      state.selectedThreadRequestId += 1;
+      if (dom.selectedThread) {
+        dom.selectedThread.replaceChildren();
+        dom.selectedThread.hidden = true;
+      }
       renderMeta(dom.tokenPreviewMeta, [['Status', 'None selected']]);
     };
 
@@ -2193,6 +2200,7 @@
         void resolveSelectedEscrowHolder(token);
       }
       void renderSelectedInscriptionRelationships(token);
+      void renderSelectedInscriptionThread(token);
     };
 
     const clearSelectedInscriptionRelationships = () => {
@@ -2202,6 +2210,52 @@
         dom.selectedRelationships.replaceChildren();
         dom.selectedRelationships.hidden = true;
       }
+    };
+
+    // Thread view: an inscription's dependencies are its "in reply to" links (existence-only
+    // references). Read them live from the contract so a reply shows its thread parent
+    // immediately, and make each one clickable to walk up the thread. (Reverse — a message's
+    // replies — needs a dependency index and is a separate step.)
+    const renderSelectedInscriptionThread = async (token) => {
+      const el = dom.selectedThread;
+      if (!el) return;
+      state.selectedThreadRequestId += 1;
+      const requestId = state.selectedThreadRequestId;
+      el.replaceChildren();
+      el.hidden = true;
+      if (!token || !state.client) return;
+      let deps = [];
+      try {
+        deps = await state.client.getDependencies(token.id, getReadOnlySenderAddress());
+      } catch (_) {
+        return;
+      }
+      if (requestId !== state.selectedThreadRequestId || state.selectedTokenId !== token.id) {
+        return;
+      }
+      if (!deps || deps.length === 0) {
+        return;
+      }
+      const head = document.createElement('div');
+      head.className = 'selected-thread__head';
+      head.textContent = deps.length === 1 ? '↳ In reply to' : '↳ References';
+      const row = document.createElement('div');
+      row.className = 'selected-thread__ids';
+      for (const depId of deps) {
+        const link = document.createElement('button');
+        link.type = 'button';
+        link.className = 'selected-thread__id';
+        link.textContent = formatTokenId(depId);
+        link.title = `Open ${formatTokenId(depId)}`;
+        link.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          void selectToken(depId, { scrollToPreview: true });
+        });
+        row.append(link);
+      }
+      el.append(head, row);
+      el.hidden = false;
     };
 
     const getCachedRelationshipSummary = (id) =>

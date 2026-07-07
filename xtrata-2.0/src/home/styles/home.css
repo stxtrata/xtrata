@@ -905,6 +905,23 @@
     #inscribePanelBody[data-mode='text'] #largeFileNotice,
     #inscribePanelBody[data-mode='file']:not(.has-payload) #largeFileNotice { display: none; }
 
+    /* Xplorer: "in reply to" thread link on the selected inscription. */
+    .selected-thread { margin-top: 8px; }
+    .selected-thread[hidden] { display: none; }
+    .selected-thread__head { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .selected-thread__ids { display: flex; flex-wrap: wrap; gap: 6px; }
+    .selected-thread__id {
+      border: 1px solid var(--line);
+      background: var(--surface-soft);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .selected-thread__id:hover { border-color: var(--green); color: var(--green); }
+
     /* ---- mode gating (scoped to the inscribe panel body) ---- */
     /* Landing (none): only the binary choice shows. */
     #inscribePanelBody[data-mode='none'] #fileFields,
