@@ -4750,6 +4750,19 @@
     };
 
     const runInscription = async () => {
+      // Not an error — inscribing just needs a connected wallet. Prompt gently (amber) and
+      // open the connect flow instead of failing; no busy lock is taken on this path.
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        setStatus(
+          dom.walletStatus,
+          '<strong>Connect your wallet</strong> to inscribe — it only takes a moment.',
+          'connect wallet',
+          'amber'
+        );
+        appendLog('Connect your wallet to inscribe.', 'support');
+        try { await connectWallet(); } catch (_) {}
+        return;
+      }
       setBusy(true);
       resetSteps();
       let flowStarted = false;
@@ -8914,6 +8927,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       } finally {
         setBusy(false);
         updateControls();
+        // The text inscribe button isn't covered by updateControls — re-enable it on connect.
+        if (dom.inscribeTextButton && dom.inscribePanelBody?.dataset.mode === 'text') {
+          const b = new TextEncoder().encode(dom.textPayload?.value || '').length;
+          dom.inscribeTextButton.disabled = !(b > 0 && b <= 16384 && !state.busy);
+        }
       }
     };
 
@@ -10152,7 +10170,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           : (textFeeLabel() || 'about … STX');
       }
       dom.inscribeTextButton.textContent = replying ? 'Inscribe reply' : 'Inscribe text';
-      dom.inscribeTextButton.disabled = !(state.prepared && bytes > 0 && !over && !state.busy);
+      // Enabled on valid text alone — the click handler connects the wallet if needed and
+      // prepares on the fly (runInscription → validateMintReadiness), so we never gate on
+      // state.prepared here (that left the button stuck when the background prepare didn't run).
+      dom.inscribeTextButton.disabled = !(bytes > 0 && !over && !state.busy);
     };
     const setInscribeMode = (mode) => {
       applyInscribeMode(mode);
@@ -10192,40 +10213,18 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
     }
 
-    let textPrepareTimer = null;
-    // Ready the inscribe: prepare (debounced, one-shot) in the background, within the 16 KB cap.
-    // Re-run when the text OR the reply-to changes, so the dependency is baked into the mint.
-    const scheduleTextPrepare = () => {
-      if (textPrepareTimer) clearTimeout(textPrepareTimer);
-      if (textBytes() > 0 && textBytes() <= TEXT_MAX_BYTES) {
-        textPrepareTimer = setTimeout(() => {
-          if (
-            dom.inscribePanelBody?.dataset.mode === 'text' &&
-            dom.textPayload.value.trim() &&
-            textBytes() <= TEXT_MAX_BYTES &&
-            !state.busy &&
-            !state.prepared &&
-            autoPrepareHook
-          ) {
-            void autoPrepareHook();
-          }
-        }, 500);
-      }
-    };
     dom.textPayload.addEventListener('input', () => {
       if (dom.textPayload.value.length > 0 && state.selectedFile) {
         setSelectedFile(null);
       }
       updateTextStats();
-      markPreparedDirty();
-      syncTextCard();
-      scheduleTextPrepare();
+      markPreparedDirty(); // clear any prior prepare; runInscription re-prepares on click
+      syncTextCard();      // cost is the cached flat rate; button enables on valid text
     });
     dom.threadReplyTo?.addEventListener('input', () => {
       syncThreadDep();     // reply-to id → dependency (an on-chain reply, minted recursively)
-      markPreparedDirty(); // re-prepare so the dependency is baked into the mint
+      markPreparedDirty();
       syncTextCard();
-      scheduleTextPrepare();
     });
     dom.nameInput.addEventListener('input', markPreparedDirty);
     dom.payloadType.addEventListener('change', markPreparedDirty);
