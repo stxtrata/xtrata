@@ -231,13 +231,8 @@
                 <div class="dropzone" id="dropzone" tabindex="0" role="button">
                   <span id="dropzoneText">Choose file or drop it here</span>
                 </div>
-                <span class="field-note">Name and type are detected automatically, and the payload is prepared as soon as it lands.</span>
+                <span class="field-note">Drop a file and it's prepared automatically — name, type and cost appear instantly.</span>
               </div>
-
-              <label class="field">
-                <span class="label">Name</span>
-                <input class="input" id="nameInput" autocomplete="off" placeholder="inscription.txt" />
-              </label>
             </div>
 
             <div id="textFields">
@@ -253,7 +248,11 @@
             </div>
 
             <details class="inscribe-details" id="inscribeAdvancedDetails">
-              <summary>Advanced — type &amp; token URI</summary>
+              <summary>Advanced — name, type &amp; token URI</summary>
+              <label class="field">
+                <span class="label">Name</span>
+                <input class="input" id="nameInput" autocomplete="off" placeholder="inscription.txt" />
+              </label>
               <label class="field">
                 <span class="label">Type</span>
                 <select class="select" id="payloadType">

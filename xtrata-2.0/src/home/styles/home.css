@@ -883,6 +883,18 @@
     /* File path: hide the text card. */
     #inscribePanelBody[data-mode='file'] #textFields { display: none; }
 
+    /* File path, before a file lands: show ONLY the dropzone. Everything else
+       (details, advanced, relationships, actions, steps) reveals once .has-payload is set. */
+    #inscribePanelBody[data-mode='file']:not(.has-payload) #inscribeAdvancedDetails,
+    #inscribePanelBody[data-mode='file']:not(.has-payload) #relationshipsDetails,
+    #inscribePanelBody[data-mode='file']:not(.has-payload) .inscribe-wizard-note,
+    #inscribePanelBody[data-mode='file']:not(.has-payload) .prepare-grid,
+    #inscribePanelBody[data-mode='file']:not(.has-payload) .actions,
+    #inscribePanelBody[data-mode='file']:not(.has-payload) .steps,
+    #inscribePanelBody[data-mode='file']:not(.has-payload) #duplicateWarning,
+    #inscribePanelBody[data-mode='file']:not(.has-payload) #resumeNotice,
+    #inscribePanelBody[data-mode='file']:not(.has-payload) #batchGuide { display: none; }
+
     /* Text path: strip to just the text card. */
     #inscribePanelBody[data-mode='text'] #fileFields,
     #inscribePanelBody[data-mode='text'] #inscribeAdvancedDetails,

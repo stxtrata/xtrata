@@ -9207,6 +9207,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       dom.fileInput.value = '';
       if (file) {
         applyInscribeMode('file'); // selecting or restoring a file reveals the file path
+        dom.inscribePanelBody?.classList.add('has-payload'); // reveal details + inscribe button
         dom.dropzoneText.innerHTML = '';
         const chip = document.createElement('span');
         chip.className = 'file-chip';
@@ -9219,6 +9220,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           dom.payloadType.value = file.type;
         }
       } else {
+        dom.inscribePanelBody?.classList.remove('has-payload'); // back to just the dropzone
         dom.dropzoneText.textContent = 'Choose file or drop it here';
       }
       renderPreparedState();
