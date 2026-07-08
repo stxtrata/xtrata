@@ -106,6 +106,49 @@ type WalletStxTransferOptions = WalletActionBase & {
 
 const disconnectedSession = (): WalletSession => ({ isConnected: false });
 
+// Self-heal: @stacks/auth's SessionData.fromJSON() throws
+// "JSON data version undefined not supported by SessionData" when localStorage
+// holds a session written in an incompatible format (a different @stacks/connect
+// major used elsewhere on this origin, or a very old session). After that,
+// UserSession.isUserSignedIn()/loadUserData() throw during connect and the
+// wallet never opens. Drop any stored session that isn't a valid, versioned
+// SessionData so connect always starts from a clean state.
+const STACKS_SESSION_STORAGE_KEYS = ['blockstack-session', 'blockstack'];
+const sanitizeStoredWalletSession = () => {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return;
+  }
+  for (const key of STACKS_SESSION_STORAGE_KEYS) {
+    let raw: string | null = null;
+    try {
+      raw = window.localStorage.getItem(key);
+    } catch {
+      continue;
+    }
+    if (!raw) {
+      continue;
+    }
+    let versionOk = false;
+    try {
+      const parsed = JSON.parse(raw) as { version?: unknown };
+      versionOk = typeof parsed?.version === 'string' && parsed.version.length > 0;
+    } catch {
+      versionOk = false;
+    }
+    if (!versionOk) {
+      try {
+        window.localStorage.removeItem(key);
+      } catch {
+        // ignore storage errors
+      }
+    }
+  }
+};
+
+// Run once at module load so any UserSession use (including inside
+// @stacks/connect's showConnect) starts from a clean, parseable session.
+sanitizeStoredWalletSession();
+
 const stripHexPrefix = (value: string) =>
   value.startsWith('0x') || value.startsWith('0X') ? value.slice(2) : value;
 
@@ -751,6 +794,9 @@ export const connectWallet = async (params: {
   appName: string;
   appIcon: string;
 }): Promise<WalletSession> => {
+  // Re-sanitize right before connecting: a forever-twins page (or another tab)
+  // may have written an incompatible session after this module first loaded.
+  sanitizeStoredWalletSession();
   const provider = await selectProvider({ forceWalletSelect: true });
   if (!provider) {
     return disconnectedSession();
