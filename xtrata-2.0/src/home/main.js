@@ -315,6 +315,8 @@
       explorerJumpButton: $('explorerJumpButton'),
       explorerRandomButton: $('explorerRandomButton'),
       explorerLatestButton: $('explorerLatestButton'),
+      explorerPrevPageButton: $('explorerPrevPageButton'),
+      explorerNextPageButton: $('explorerNextPageButton'),
       explorerFilterGroup: $('explorerFilterGroup'),
       explorerFilterToggle: $('explorerFilterToggle'),
       explorerClearFiltersButton: $('explorerClearFiltersButton'),
@@ -3984,6 +3986,8 @@
         dom.walletPageReadout.textContent = 'Latest matches';
         dom.walletPrevButton.disabled = true;
         dom.walletNextButton.disabled = true;
+        if (dom.explorerPrevPageButton) dom.explorerPrevPageButton.disabled = true;
+        if (dom.explorerNextPageButton) dom.explorerNextPageButton.disabled = true;
         return;
       }
       const pageCount = getWalletPageCount();
@@ -4002,6 +4006,8 @@
         state.walletLoadingPage ||
         !hasPages ||
         state.walletPageIndex >= pageCount - 1;
+      if (dom.explorerPrevPageButton) dom.explorerPrevPageButton.disabled = dom.walletPrevButton.disabled;
+      if (dom.explorerNextPageButton) dom.explorerNextPageButton.disabled = dom.walletNextButton.disabled;
     };
 
     const syncExplorerFilterControls = () => {
@@ -9940,6 +9946,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     });
     dom.explorerLatestButton?.addEventListener('click', () => {
       void showLatestExplorerPage();
+    });
+    // Explorer page arrows: proxy to the existing Prev/Next buttons so they reuse
+    // the exact same paging logic, guards and enabled/disabled state.
+    dom.explorerPrevPageButton?.addEventListener('click', () => {
+      dom.walletPrevButton?.click();
+    });
+    dom.explorerNextPageButton?.addEventListener('click', () => {
+      dom.walletNextButton?.click();
     });
     dom.explorerPageInput?.addEventListener('input', () => {
       if (document.activeElement === dom.explorerPageInput && dom.explorerTokenInput) {

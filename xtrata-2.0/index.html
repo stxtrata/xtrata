@@ -510,7 +510,11 @@
                   </label>
                   <button class="btn ghost" id="explorerJumpButton" type="button">Go</button>
                   <button class="btn ghost" id="explorerRandomButton" type="button" title="Jump to a random inscription">Random</button>
-                  <span class="page-readout explorer-tools__metric" id="walletPageReadout">Page 0 / 0</span>
+                  <span class="explorer-tools__metric" role="group" aria-label="Page navigation" style="display:inline-flex;align-items:center;gap:6px">
+                    <button class="btn ghost" id="explorerPrevPageButton" type="button" aria-label="Previous page" title="Previous page (or use the left arrow key)" style="min-width:34px;padding:6px 9px;font-size:17px;line-height:1" disabled>‹</button>
+                    <span class="page-readout" id="walletPageReadout">Page 0 / 0</span>
+                    <button class="btn ghost" id="explorerNextPageButton" type="button" aria-label="Next page" title="Next page (or use the right arrow key)" style="min-width:34px;padding:6px 9px;font-size:17px;line-height:1" disabled>›</button>
+                  </span>
                   <span class="badge blue explorer-tools__metric" id="walletCountBadge" title="0 inscriptions">0 insc.</span>
                 </div>
               </div>
