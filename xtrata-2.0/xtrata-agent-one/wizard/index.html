@@ -7,14 +7,308 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="apple-touch-icon" href="/favicons/xtrata-apple-touch-icon.png" />
 <style>
-  :root{
-    --bg:#0b0e14; --panel:#121723; --panel2:#0e131d; --line:#243044; --line2:#1a2230;
-    --ink:#e6edf6; --mut:#8b9bb4; --acc:#3ea6ff; --acc2:#7c5cff; --ok:#3ddc97; --warn:#ffb454; --bad:#ff6b6b;
-    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  :root {
+    color-scheme: light;
+    --bg: #f6f8f5;
+    --panel: #ffffff;
+    --ink: #151a17;
+    --muted: #617067;
+    --line: #d2ddd6;
+    --line-strong: #9caf9f;
+    --green: #245f45;
+    --green-soft: #e6f1ea;
+    --blue: #214f73;
+    --blue-soft: #e5eef5;
+    --rose: #a43f58;
+    --rose-soft: #f7e6eb;
+    --amber: #84601b;
+    --amber-soft: #f7edd7;
+    --shadow: 0 18px 50px rgba(19, 31, 25, 0.08);
+    --radius: 8px;
+    --control: #ffffff;
+    --surface-soft: #fbfdfb;
+    --thumb: #f1f5f2;
+    --button-hover: #27302b;
+    --ghost-hover: rgba(21, 26, 23, 0.06);
+    --focus-ring: rgba(36, 95, 69, 0.12);
+    --topbar-accent: transparent;
+    --button-bg: var(--ink);
+    --button-ink: var(--bg);
+    --button-border: var(--ink);
+    --secondary-bg: transparent;
+    --secondary-ink: var(--ink);
+  }
+  /* wizard-only token names aliased onto the site's theme tokens */
+  :root {
+    --panel2: var(--surface-soft);
+    --mut: var(--muted);
+    --line2: var(--line-strong);
+    --acc: var(--green);
+    --acc2: var(--blue);
+    --ok: var(--green);
+    --warn: var(--amber);
+    --bad: var(--rose);
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  body[data-theme="classic"] {
+    --bg: #f6f8f5;
+    --panel: #ffffff;
+    --ink: #151a17;
+    --muted: #617067;
+    --line: #d2ddd6;
+    --line-strong: #9caf9f;
+    --green: #245f45;
+    --green-soft: #e6f1ea;
+    --blue: #214f73;
+    --blue-soft: #e5eef5;
+    --rose: #a43f58;
+    --rose-soft: #f7e6eb;
+    --amber: #84601b;
+    --amber-soft: #f7edd7;
+    --shadow: 0 18px 50px rgba(19, 31, 25, 0.08);
+    --control: #ffffff;
+    --surface-soft: #fbfdfb;
+    --thumb: #f1f5f2;
+    --button-hover: #27302b;
+    --ghost-hover: rgba(21, 26, 23, 0.06);
+    --focus-ring: rgba(36, 95, 69, 0.12);
+    --topbar-accent: transparent;
+  }
+  body[data-theme="terminal"] {
+    color-scheme: dark;
+    --bg: #0d120f;
+    --panel: #101813;
+    --ink: #e7f5ec;
+    --muted: #8fa498;
+    --line: #26362d;
+    --line-strong: #4a715a;
+    --green: #70d18d;
+    --green-soft: #14281c;
+    --blue: #8fc7ff;
+    --blue-soft: #122235;
+    --rose: #ff8da8;
+    --rose-soft: #351823;
+    --amber: #f0be63;
+    --amber-soft: #302411;
+    --shadow: 0 20px 58px rgba(0, 0, 0, 0.42);
+    --control: #0c1510;
+    --surface-soft: #0c1510;
+    --thumb: #0a100d;
+    --button-hover: #c8ead4;
+    --ghost-hover: rgba(112, 209, 141, 0.10);
+    --focus-ring: rgba(112, 209, 141, 0.18);
+    --topbar-accent: rgba(112, 209, 141, 0.16);
+  }
+  body[data-theme="midnight"] {
+    color-scheme: dark;
+    --bg: #101521;
+    --panel: #161d2b;
+    --ink: #f3f7ff;
+    --muted: #9ba8bb;
+    --line: #2b3649;
+    --line-strong: #556a8c;
+    --green: #76d6c2;
+    --green-soft: #12302d;
+    --blue: #9fc3ff;
+    --blue-soft: #172945;
+    --rose: #ff9ab0;
+    --rose-soft: #3a1d2a;
+    --amber: #ffd27a;
+    --amber-soft: #332713;
+    --shadow: 0 20px 62px rgba(0, 0, 0, 0.36);
+    --control: #101827;
+    --surface-soft: #111a29;
+    --thumb: #0f1724;
+    --button-hover: #d8e6ff;
+    --ghost-hover: rgba(159, 195, 255, 0.10);
+    --focus-ring: rgba(159, 195, 255, 0.18);
+    --topbar-accent: rgba(159, 195, 255, 0.16);
+  }
+  body[data-theme="neon"] {
+    color-scheme: dark;
+    --bg: #05020b;
+    --panel: #0c0715;
+    --ink: #f8f4ff;
+    --muted: #b79fd2;
+    --line: #3b1859;
+    --line-strong: #ff36d7;
+    --green: #00ff9c;
+    --green-soft: #06251c;
+    --blue: #00d9ff;
+    --blue-soft: #051c2a;
+    --rose: #ff36d7;
+    --rose-soft: #2a0724;
+    --amber: #ffe66d;
+    --amber-soft: #251f05;
+    --shadow: 0 0 34px rgba(255, 54, 215, 0.20), 0 0 68px rgba(0, 217, 255, 0.12);
+    --control: #10071b;
+    --surface-soft: #0a0611;
+    --thumb: #09040f;
+    --button-hover: #d9b8ff;
+    --ghost-hover: rgba(0, 217, 255, 0.13);
+    --focus-ring: rgba(255, 54, 215, 0.28);
+    --topbar-accent: rgba(0, 255, 156, 0.28);
+  }
+  body[data-theme="monochrome"] {
+    color-scheme: dark;
+    --bg: #050505;
+    --panel: #111111;
+    --ink: #f7f7f7;
+    --muted: #c9c9c9;
+    --line: #303030;
+    --line-strong: #d8d8d8;
+    --green: #ffffff;
+    --green-soft: #1d1d1d;
+    --blue: #e7e7e7;
+    --blue-soft: #181818;
+    --rose: #ffffff;
+    --rose-soft: #1f1f1f;
+    --amber: #d4d4d4;
+    --amber-soft: #202020;
+    --shadow: 0 24px 70px rgba(0, 0, 0, 0.62), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    --control: #0b0b0b;
+    --surface-soft: #151515;
+    --thumb: #0d0d0d;
+    --button-hover: #d8d8d8;
+    --ghost-hover: rgba(255, 255, 255, 0.08);
+    --focus-ring: rgba(255, 255, 255, 0.18);
+    --topbar-accent: rgba(255, 255, 255, 0.20);
+    --button-bg: #f7f7f7;
+    --button-ink: #050505;
+    --button-border: #f7f7f7;
+    --secondary-bg: transparent;
+    --secondary-ink: #f7f7f7;
+  }
+  body[data-theme="obsidian"] {
+    color-scheme: dark;
+    --bg: #070b10;
+    --panel: #0e141b;
+    --ink: #eef6ff;
+    --muted: #8fa2b6;
+    --line: #253241;
+    --line-strong: #50677d;
+    --green: #7ee2c7;
+    --green-soft: #102a27;
+    --blue: #86b7ff;
+    --blue-soft: #111f32;
+    --rose: #ff8fb3;
+    --rose-soft: #311522;
+    --amber: #ffcc78;
+    --amber-soft: #2a2010;
+    --shadow: 0 26px 76px rgba(0, 0, 0, 0.54);
+    --control: #0a1118;
+    --surface-soft: #0b1219;
+    --thumb: #060b10;
+    --button-hover: #d6e9ff;
+    --ghost-hover: rgba(134, 183, 255, 0.10);
+    --focus-ring: rgba(126, 226, 199, 0.20);
+    --topbar-accent: rgba(126, 226, 199, 0.16);
+  }
+  body[data-theme="ember"] {
+    color-scheme: dark;
+    --bg: #130905;
+    --panel: #1b0f0a;
+    --ink: #fff5ee;
+    --muted: #c09b85;
+    --line: #3b2116;
+    --line-strong: #a64f26;
+    --green: #f0a35b;
+    --green-soft: #331a0d;
+    --blue: #ffc36f;
+    --blue-soft: #2b1d0e;
+    --rose: #ff6d4d;
+    --rose-soft: #35120c;
+    --amber: #ffd27f;
+    --amber-soft: #30200d;
+    --shadow: 0 24px 68px rgba(0, 0, 0, 0.50), 0 0 42px rgba(255, 109, 77, 0.10);
+    --control: #170b07;
+    --surface-soft: #160c08;
+    --thumb: #110704;
+    --button-hover: #ffd3b0;
+    --ghost-hover: rgba(255, 195, 111, 0.10);
+    --focus-ring: rgba(255, 109, 77, 0.20);
+    --topbar-accent: rgba(255, 109, 77, 0.18);
+  }
+  body[data-theme="ultraviolet"] {
+    color-scheme: dark;
+    --bg: #10071f;
+    --panel: #170d2a;
+    --ink: #fbf7ff;
+    --muted: #b5a2d2;
+    --line: #33204e;
+    --line-strong: #8257d6;
+    --green: #c7ff7a;
+    --green-soft: #1f2b10;
+    --blue: #b08cff;
+    --blue-soft: #211338;
+    --rose: #ff91d6;
+    --rose-soft: #35142d;
+    --amber: #f4d27c;
+    --amber-soft: #2d230d;
+    --shadow: 0 24px 72px rgba(0, 0, 0, 0.46), 0 0 46px rgba(130, 87, 214, 0.16);
+    --control: #120820;
+    --surface-soft: #130a22;
+    --thumb: #0e0619;
+    --button-hover: #dac7ff;
+    --ghost-hover: rgba(176, 140, 255, 0.12);
+    --focus-ring: rgba(176, 140, 255, 0.20);
+    --topbar-accent: rgba(199, 255, 122, 0.18);
+  }
+  body[data-theme="arctic"] {
+    color-scheme: dark;
+    --bg: #061018;
+    --panel: #0c1a25;
+    --ink: #f0fbff;
+    --muted: #91aec0;
+    --line: #213a4a;
+    --line-strong: #63c6e8;
+    --green: #9df7ff;
+    --green-soft: #0c2b32;
+    --blue: #72b7ff;
+    --blue-soft: #0d2438;
+    --rose: #ff9fc8;
+    --rose-soft: #321827;
+    --amber: #f4dc95;
+    --amber-soft: #2a2412;
+    --shadow: 0 24px 72px rgba(0, 0, 0, 0.48), 0 0 38px rgba(114, 183, 255, 0.12);
+    --control: #07131d;
+    --surface-soft: #081722;
+    --thumb: #05101a;
+    --button-hover: #c6f4ff;
+    --ghost-hover: rgba(157, 247, 255, 0.12);
+    --focus-ring: rgba(157, 247, 255, 0.20);
+    --topbar-accent: rgba(99, 198, 232, 0.18);
+  }
+  body[data-theme="ruby"] {
+    color-scheme: dark;
+    --bg: #120611;
+    --panel: #1d0b1a;
+    --ink: #fff3fb;
+    --muted: #c39ab9;
+    --line: #3e1c37;
+    --line-strong: #b84d94;
+    --green: #ffb3df;
+    --green-soft: #331429;
+    --blue: #d9a8ff;
+    --blue-soft: #271633;
+    --rose: #ff6fbd;
+    --rose-soft: #3a1130;
+    --amber: #ffd18d;
+    --amber-soft: #2d2110;
+    --shadow: 0 24px 72px rgba(0, 0, 0, 0.50), 0 0 42px rgba(255, 111, 189, 0.14);
+    --control: #150713;
+    --surface-soft: #160914;
+    --thumb: #10050f;
+    --button-hover: #ffd0ef;
+    --ghost-hover: rgba(255, 111, 189, 0.11);
+    --focus-ring: rgba(255, 111, 189, 0.22);
+    --topbar-accent: rgba(255, 179, 223, 0.18);
   }
   *{box-sizing:border-box}
-  body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#15203200,#0b0e14),var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-  header{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#101622,#0b0e14)}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans)}
+  header{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--line);background:var(--panel)}
   .logo{font-weight:800;letter-spacing:.5px;font-size:18px}
   .logo b{color:var(--acc)} .logo i{color:var(--acc2);font-style:normal}
   .sub{color:var(--mut);font-size:12px}
@@ -30,7 +324,7 @@
   input.mono{font-family:var(--mono)}
   input:focus,select:focus{outline:none;border-color:var(--acc)}
   .row{display:flex;gap:10px} .row>*{flex:1}
-  .btn{background:linear-gradient(180deg,#2b8fe6,#2378d6);border:0;color:#fff;padding:11px 16px;border-radius:10px;font-weight:700;cursor:pointer;font-size:13px}
+  .btn{background:var(--button-bg);border:1px solid var(--button-border);color:var(--button-ink);padding:11px 16px;border-radius:10px;font-weight:700;cursor:pointer;font-size:13px}
   .btn:disabled{opacity:.45;cursor:not-allowed}
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
   .btn.alt{background:linear-gradient(180deg,#8b6cff,#6f4cf0)}
@@ -111,6 +405,7 @@
 </style>
 </head>
 <body>
+<script>try{var _t=(localStorage.getItem('xtrata.theme.mode')||'').trim().toLowerCase();var _ok=["classic", "terminal", "midnight", "neon", "monochrome", "obsidian", "ember", "ultraviolet", "arctic", "ruby"];document.body.dataset.theme=_ok.indexOf(_t)>=0?_t:'monochrome';}catch(e){document.body.dataset.theme='monochrome';}</script>
 <header>
   <a href="/" title="Xtrata home" style="flex:none;display:block"><img src="favicon.svg" alt="Xtrata" style="width:30px;height:30px;border-radius:8px;display:block" /></a>
   <div>
