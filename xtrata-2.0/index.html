@@ -127,7 +127,7 @@
           <button class="btn" id="introConnectButton" type="button">Connect wallet</button>
           <a class="btn" id="introMyWalletLink" href="/my-wallet" target="_self" hidden>Open My Wallet</a>
           <button class="btn secondary" id="introPrepareButton" type="button">Inscribe a file</button>
-          <a class="btn secondary" href="#homeExamples">Explore examples</a>
+          <a class="btn secondary" href="#homeExamples">Galleries</a>
         </div>
         <div class="registry-footnotes" aria-label="Registry qualities">
           <p class="registry-note"><strong>Permanent backups</strong>Keep rich media and metadata where the reference can keep working.</p>
@@ -190,16 +190,18 @@
     </section>
 
     <!-- Example views: open in the Xplorer (home page only). -->
-    <section class="home-examples" id="homeExamples" aria-label="Example views">
-      <span class="home-examples__label">View examples</span>
-      <a class="wallet-example-chip" href="/xplorer?wallet=dyle.btc&amp;sel=296" target="_self" title="Early Stacks-native art inscriptions by DYLE.">Art by DYLE</a>
-      <a class="wallet-example-chip" href="/xplorer?gallery=jim-music" target="_self" title="Early on-chain music, audio, samples, stems, and songs.">Music by Various</a>
-      <a class="wallet-example-chip" href="/xplorer?gallery=code-various" target="_self" title="Early code inscriptions and recursive Web3 experiments.">Code by Various</a>
-      <a class="wallet-example-chip" href="/xplorer?gallery=agent-27" target="_self" title="Early autonomous agent memory inscriptions.">Agent 27</a>
-      <a class="wallet-example-chip" href="/xplorer?gallery=v1-origins" target="_self" title="The original Xtrata core, xtrata-v1-1-1.">v1 origins</a>
-      <a class="wallet-example-chip" href="/xplorer?gallery=stacksboard" target="_self" title="The Stacksboard inscription.">Stacksboard</a>
-      <a class="wallet-example-chip" href="/xplorer" target="_self" title="Newest inscriptions from the active Xtrata core.">Latest</a>
-    </section>
+    <details class="home-examples" id="homeExamples" aria-label="Galleries">
+      <summary class="home-examples__label">Galleries</summary>
+      <div class="home-examples__list">
+        <a class="wallet-example-chip" href="/xplorer?wallet=dyle.btc&amp;sel=296" target="_self" title="Early Stacks-native art inscriptions by DYLE.">Art by DYLE</a>
+        <a class="wallet-example-chip" href="/xplorer?gallery=jim-music" target="_self" title="Early on-chain music, audio, samples, stems, and songs.">Music by Various</a>
+        <a class="wallet-example-chip" href="/xplorer?gallery=code-various" target="_self" title="Early code inscriptions and recursive Web3 experiments.">Code by Various</a>
+        <a class="wallet-example-chip" href="/xplorer?gallery=agent-27" target="_self" title="Early autonomous agent memory inscriptions.">Agent 27</a>
+        <a class="wallet-example-chip" href="/xplorer?gallery=v1-origins" target="_self" title="The original Xtrata core, xtrata-v1-1-1.">v1 origins</a>
+        <a class="wallet-example-chip" href="/xplorer?gallery=stacksboard" target="_self" title="The Stacksboard inscription.">Stacksboard</a>
+        <a class="wallet-example-chip" href="/xplorer" target="_self" title="Newest inscriptions from the active Xtrata core.">Latest</a>
+      </div>
+    </details>
 
     <main class="workspace">
       <section class="panel" aria-labelledby="inscribeTitle">

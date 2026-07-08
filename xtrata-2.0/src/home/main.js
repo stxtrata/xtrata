@@ -3780,6 +3780,13 @@
       document.body.classList.toggle('has-ledger', hasLedger);
       document.body.classList.toggle('has-public-ledger', hasPublicLedger);
       document.body.classList.toggle('explorer-mode', state.explorerMode);
+      // Viewing a specific wallet inside Xplorer: hide the global-feed controls
+      // (page/token jump + type filters) to avoid confusion — they don't apply
+      // to a single wallet's holdings.
+      document.body.classList.toggle(
+        'explorer-wallet-view',
+        state.explorerMode && !!state.walletViewAddress
+      );
       document.body.classList.toggle('intro-mode', !hasLedger && !state.explorerMode);
       if (dom.walletTitle) {
         if (state.explorerMode) {
@@ -7356,7 +7363,11 @@
       dom.walletLookupInput.value = '';
       updateWalletLookupInputMode();
 
-      appendLog('Returned to connected wallet view.');
+      appendLog(
+        state.explorerMode
+          ? 'Cleared wallet view — showing the latest inscriptions.'
+          : 'Returned to connected wallet view.'
+      );
 
       updateWalletStatus();
       await loadWalletInscriptions();
@@ -8776,7 +8787,13 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     };
 
     const loadWalletInscriptions = async (options = {}) => {
-      if (state.explorerMode) {
+      // In Xplorer (explorer mode) the grid defaults to the global latest feed —
+      // BUT an explicit wallet lookup must take precedence, otherwise submitting a
+      // name/address in the "View wallet" box just reloaded the latest feed and the
+      // requested wallet never appeared (it only worked once explorer mode had been
+      // left). When a wallet is being viewed, fall through and load its holdings;
+      // clearing the lookup (walletViewAddress → null) returns to the default feed.
+      if (state.explorerMode && !state.walletViewAddress) {
         await loadExplorerPage({ refreshLatest: true, force: true });
         return;
       }
@@ -10297,6 +10314,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const bytes = textBytes();
       if (bytes === 0 || bytes > TEXT_MAX_BYTES) return; // hard guard — never inscribe > 16 KB of text
       runInscription();
+    });
+    // Hero "Galleries" button expands the (collapsed-by-default) galleries list as it scrolls to it.
+    document.querySelector('a[href="#homeExamples"]')?.addEventListener('click', () => {
+      const galleries = document.getElementById('homeExamples');
+      if (galleries) galleries.open = true;
     });
     // Thread deep link: /inscribe?reply=<tokenId> opens the text tab pre-filled as a reply.
     if (document.documentElement.dataset.page === 'inscribe' && dom.threadReplyTo) {
