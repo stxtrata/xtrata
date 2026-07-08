@@ -1541,7 +1541,7 @@
       if (/^https?:\/\//i.test(resolved)) candidates.push(resolved);
       if (/^ar:\/\//i.test(resolved)) candidates.push(`https://arweave.net/${resolved.replace(/^ar:\/\//i, '')}`);
       const ipfsPath = extractIpfsPath(resolved);
-      if (ipfsPath) candidates.push(`https://ipfs.io/ipfs/${ipfsPath}`, `https://nftstorage.link/ipfs/${ipfsPath}`, `https://dweb.link/ipfs/${ipfsPath}`, `https://cloudflare-ipfs.com/ipfs/${ipfsPath}`);
+      if (ipfsPath) candidates.push(`https://dweb.link/ipfs/${ipfsPath}`, `https://ipfs.io/ipfs/${ipfsPath}`, `https://w3s.link/ipfs/${ipfsPath}`);
       return unique(candidates.map((candidate) => encodeURI(candidate)));
     }
     function tokenUriToHttp(uri, tokenId) { return uriToHttpCandidates(uri, tokenId)[0] || ''; }
@@ -1566,7 +1566,7 @@
       let lastError = null;
       const retries = Math.max(0, Number(options.retries ?? $('manifestRetries')?.value ?? 0));
       const retryDelayMs = Math.max(0, Number(options.retryDelayMs ?? $('manifestDelayMs')?.value ?? 0));
-      const timeoutMs = Math.max(2000, Number(options.timeoutMs ?? 16000));
+      const timeoutMs = Math.max(2000, Number(options.timeoutMs ?? 8000));
 
       for (let attempt = 0; attempt <= retries; attempt += 1) {
         for (const url of candidates) {
@@ -2213,24 +2213,23 @@
     // Prefer Hiro's cached CDN copy for the on-screen preview (reliable + CORS
     // friendly), while the original IPFS bytes stay in sourceImageCandidates for
     // canonical hashing. Falls back gracefully if Hiro has nothing.
-    async function enrichPreviewFromHiro(tokenId) {
-      try {
-        log('trace: preview enrich - request Hiro metadata (CDN cache)', { tokenId: String(tokenId) });
-        const json = await hiroNftMetadata(tokenId);
-        const md = (json && (json.metadata || json)) || {};
-        const cached = md.cached_image || md.cached_thumbnail_image || '';
-        const existing = (state.sourceImageCandidates || []).filter(Boolean);
-        log('trace: preview enrich - Hiro metadata resolved', { tokenId: String(tokenId), hiroCachedImage: cached || null, ipfsCandidates: existing });
-        if (!cached && !existing.length) { log('trace: preview enrich - no image available', { tokenId: String(tokenId) }); return; }
-        state.previewImageCandidates = cached
-          ? [cached, ...existing.filter((u) => u !== cached)]
-          : existing;
-        if (!state.sourceImageUrl && cached) state.sourceImageUrl = cached;
-        log('trace: preview candidates stored', { tokenId: String(tokenId), previewCandidates: state.previewImageCandidates });
-        updateJourneyStatus();
-      } catch (err) {
-        log('Hiro preview enrich failed', { tokenId: String(tokenId), error: err.message });
-      }
+    // Hiro caches every token image at a predictable CDN URL, so we can show the
+    // preview INSTANTLY without fetching any metadata JSON (that fetch was the
+    // slow, 'Failed to fetch'-prone step). The <img> needs no CORS, and the
+    // resilient loader tries each extension then falls back to IPFS gateways.
+    function hiroAssetImageCandidates(tokenId) {
+      const source = $('sourceContract').value.trim();
+      const net = networkName() === 'testnet' ? 'testnet' : 'mainnet';
+      const base = `https://assets.hiro.so/api/${net}/token-metadata-api/${encodeURIComponent(source)}/${encodeURIComponent(String(tokenId))}`;
+      return [`${base}.png`, `${base}.jpg`, `${base}.jpeg`, `${base}.gif`, `${base}.webp`];
+    }
+    function enrichPreview(tokenId) {
+      const assets = hiroAssetImageCandidates(tokenId);
+      const ipfs = (state.sourceImageCandidates || []).filter(Boolean);
+      state.previewImageCandidates = [...assets, ...ipfs.filter((u) => !assets.includes(u))];
+      if (!state.sourceImageUrl) state.sourceImageUrl = state.previewImageCandidates[0];
+      log('trace: preview candidates ready (Hiro CDN first)', { tokenId: String(tokenId), previewCandidates: state.previewImageCandidates });
+      updateJourneyStatus();
     }
 
     function setHashStatus() {
@@ -2349,6 +2348,7 @@
       const tokenArg = asUint(tokenId);
       log('trace: checkToken start', { tokenId: tokenId.toString() });
       resetChainOnlyDisplays();
+      enrichPreview(tokenId);
       $('lookupToken').textContent = String(tokenId);
       setStatus('idConversionStatus', renderIdConversion(null, tokenId));
       setStatus('canonicalStatus', 'Checking chain...');
@@ -2406,7 +2406,7 @@
       else setStatus('sourceOwnerStatus', `${badge('No owner returned by chain', 'bad')}<br>Source contract returned none.${chainProof(source, 'get-owner', [tokenArg])}`);
 
       await maybeFetchTokenUri(tokenId);
-      await enrichPreviewFromHiro(tokenId);
+      enrichPreview(tokenId);
       // Journey-led: automatically fetch + hash the resolved cat image so the
       // user never has to drop a file or click "Use Raw Image". Only worth doing
       // when the cat is seedable and not already inscribed.
@@ -2525,6 +2525,20 @@
       if (state.fileHash.toLowerCase() !== state.canonicalHash?.toLowerCase()) throw new Error('File hash does not match the canonical hash');
       if (state.chunks.length > MAX_CHUNKS) throw new Error('File has too many chunks for this contract');
       await quoteFee(false);
+      // Guard: a fee-recipient wallet cannot inscribe through this contract. The
+      // fee split runs (stx-transfer? amount payer payout); when payer == payout,
+      // Clarity rejects a self-transfer with (err u2) and aborts the whole tx.
+      // Fail fast (before opening the wallet) so no mining fee is wasted.
+      try {
+        const payouts = unwrapOk(await readContract($('helperContract').value.trim(), 'get-payouts', []));
+        const a = payouts && payouts.a, b = payouts && payouts.b;
+        if (state.wallet && (state.wallet === a || state.wallet === b)) {
+          throw new Error(`This wallet (${shortAddress(state.wallet)}) is a fee-payout address for this collection, so inscribing from it fails on-chain with (err u2) — Clarity blocks the fee's self-transfer. Inscribe from a different wallet (or change the collection payout address).`);
+        }
+      } catch (guardErr) {
+        if (guardErr && /err u2|fee-payout address/i.test(guardErr.message)) throw guardErr;
+        log('Could not pre-check fee payouts (proceeding)', { error: guardErr && guardErr.message });
+      }
       const args = [asUint(tokenId), asBuffer(state.fileHash), asAscii($('mime').value, 64, 'MIME type'), asUint(state.fileBytes.length), Cl.list(state.chunks.map((chunk) => asBuffer(chunk))), asAscii($('tokenUri').value, 256, 'Token URI')];
       await callHelper('inscribe', args, inscribePostConditions());
     }
