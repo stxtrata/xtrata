@@ -9968,7 +9968,23 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     });
     dom.walletLookupForm.addEventListener('submit', async (event) => {
       event.preventDefault();
-      await viewWalletFromInput();
+      // "Clear" (empty box or the wallet already on screen) keeps the in-place
+      // reset that returns to the default feed / connected wallet.
+      if (shouldClearWalletLookupOnSubmit()) {
+        await viewWalletFromInput();
+        return;
+      }
+      const raw = normalizeWalletLookupInputValue(dom.walletLookupInput.value).trim();
+      if (!raw) {
+        await viewWalletFromInput();
+        return;
+      }
+      // "View" → navigate to the wallet's own URL, exactly like clicking an
+      // owner/holder link. This loads the wallet through the same clean boot
+      // path a shared link uses, so the address bar shows ?wallet=<name|address>
+      // and the correct wallet always loads (no stale grid, preview, or URL).
+      const walletParam = raw.replace(/\.btc$/i, '');
+      window.location.assign(`/?wallet=${encodeURIComponent(walletParam)}`);
     });
 
 
