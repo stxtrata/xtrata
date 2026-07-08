@@ -629,16 +629,21 @@ const requestLeatherContractDeploy = async (
 
 const connectViaRequest = async (provider: StacksProvider) => {
   const attempts = [
-    'stx_getAddresses',
+    // Interactive connect methods first: these open the wallet's approval UI,
+    // which prompts an unlock when locked and lets the user choose which account
+    // to connect (the behaviour we want to restore).
+    'wallet_connect',
+    'stx_requestAccounts',
+    'connect',
+    // Address/account reads: these can return the already-active account with no
+    // picker, so they are only fallbacks when the interactive methods are
+    // unsupported by the provider.
     'getAddresses',
+    'stx_getAddresses',
     'stx_getAccounts',
     'getAccounts',
     'wallet_getAccount',
-    'wallet_connect',
-    'stx_requestAccounts',
-    'requestAccounts',
-    'connect',
-    'wallet_connect'
+    'requestAccounts'
   ];
 
   let lastError: unknown = null;
@@ -802,15 +807,22 @@ export const connectWallet = async (params: {
     return disconnectedSession();
   }
 
-  const providerId = getSelectedProviderId();
-  if (isLeatherProviderId(providerId)) {
+  // Prefer the wallet's interactive connect (unlock + account selection) for any
+  // provider that exposes a request() bridge — both Leather and current Xverse do.
+  // This restores the account picker that the silent stx_getAddresses read skipped.
+  // The legacy auth popup is only a fallback when request() is unavailable or every
+  // interactive method is reported unsupported.
+  if (typeof provider.request === 'function') {
     try {
-      return await connectViaRequest(provider);
+      const session = await connectViaRequest(provider);
+      if (session.isConnected) {
+        return session;
+      }
     } catch (error) {
+      if (isUserCancelledError(error)) {
+        return disconnectedSession();
+      }
       if (!isMethodUnsupportedError(error)) {
-        if (isUserCancelledError(error)) {
-          return disconnectedSession();
-        }
         throw error;
       }
     }
