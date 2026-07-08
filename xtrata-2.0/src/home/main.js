@@ -9252,6 +9252,17 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
       // Smart field: "512" / "#512" → inscription id, "p12" / "page 12" → page.
       const raw = dom.explorerTokenInput.value.trim();
+      // A Stacks address or a dotted BNS name (e.g. darthdude.btc) is
+      // unambiguously a wallet lookup — token/page inputs are always numeric,
+      // #id or p12. Route it to the shared /?wallet=<addr|name> deep-link, which
+      // resolves BNS names and opens that wallet's holdings (same path the
+      // homepage uses), instead of falling through to a failed page jump.
+      const looksLikeWalletAddress = /^S[PTMN][0-9A-Z]{20,}$/i.test(raw);
+      const looksLikeBnsName = /^[a-z0-9][a-z0-9-]*\.[a-z0-9-]{2,}$/i.test(raw);
+      if (raw && (looksLikeWalletAddress || looksLikeBnsName)) {
+        window.location.href = `/?wallet=${encodeURIComponent(raw)}`;
+        return;
+      }
       const pageMatch = raw.match(/^p(?:age)?\s*(\d+)$/i);
       if (pageMatch) {
         dom.explorerPageInput.value = pageMatch[1];
