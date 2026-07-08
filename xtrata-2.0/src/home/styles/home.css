@@ -405,6 +405,24 @@
       white-space: nowrap;
     }
 
+    .brand-name {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .brand-tagline {
+      max-width: 32ch;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 1.3;
+      letter-spacing: 0;
+      text-transform: none;
+      white-space: normal;
+    }
+
     .brand-logo {
       width: clamp(88px, 8vw, 112px);
       height: clamp(88px, 8vw, 112px);
@@ -797,6 +815,182 @@
       border-color: var(--green);
       background: var(--green-soft);
       color: var(--green);
+    }
+
+    /* ---- Inscribe: file vs text — collapsed binary choice, then reveal one path ---- */
+    .inscribe-choice-hint {
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--ink);
+      text-align: center;
+      margin: 4px 0 2px;
+    }
+
+    .inscribe-tabs {
+      display: flex;
+      gap: 8px;
+    }
+
+    .inscribe-tab {
+      flex: 1;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-soft);
+      color: var(--muted);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .inscribe-tab:hover { color: var(--ink); border-color: var(--line-strong); }
+
+    .inscribe-tab.is-active {
+      background: var(--panel);
+      color: var(--ink);
+      border-color: var(--green);
+    }
+
+    .inscribe-change {
+      justify-self: start;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--muted);
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    .inscribe-change:hover { color: var(--ink); }
+
+    #fileFields,
+    #textFields {
+      display: grid;
+      gap: 12px;
+    }
+
+    /* Streamlined text card: cost estimate + inscribe button */
+    .text-cost-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .text-cost {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+      color: var(--ink);
+    }
+
+    .activity-log > summary { font-size: 12px; color: var(--muted); }
+
+    /* Large-file suggestion: non-blocking nudge to the Wizard for > 512 KB (multi-tx) files. */
+    .large-file-notice {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      padding: 14px 16px;
+      border: 1px solid var(--amber);
+      background: var(--amber-soft);
+      border-radius: var(--radius);
+    }
+    .large-file-notice[hidden] { display: none; }
+    .large-file-notice__body { display: grid; gap: 3px; font-size: 13px; color: var(--ink); }
+    .large-file-notice .btn { white-space: nowrap; }
+    #inscribePanelBody[data-mode='none'] #largeFileNotice,
+    #inscribePanelBody[data-mode='text'] #largeFileNotice,
+    #inscribePanelBody[data-mode='file']:not(.has-payload) #largeFileNotice { display: none; }
+
+    .processing-notice {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-top: 12px;
+      padding: 12px 14px;
+      border: 1px solid var(--acc, #4f8cff);
+      background: var(--acc-soft, rgba(79, 140, 255, 0.1));
+      border-radius: var(--radius);
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--ink);
+    }
+    .processing-notice[hidden] { display: none; }
+
+    /* Xplorer: "in reply to" thread link on the selected inscription. */
+    .selected-thread { margin-top: 8px; }
+    .selected-thread[hidden] { display: none; }
+    .selected-thread__head { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .selected-thread__ids { display: flex; flex-wrap: wrap; gap: 6px; }
+    .selected-thread__id {
+      border: 1px solid var(--line);
+      background: var(--surface-soft);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .selected-thread__id:hover { border-color: var(--green); color: var(--green); }
+
+    /* ---- mode gating (scoped to the inscribe panel body) ---- */
+    /* Landing (none): only the binary choice shows. */
+    #inscribePanelBody[data-mode='none'] #fileFields,
+    #inscribePanelBody[data-mode='none'] #textFields,
+    #inscribePanelBody[data-mode='none'] #inscribeAdvancedDetails,
+    #inscribePanelBody[data-mode='none'] #relationshipsDetails,
+    #inscribePanelBody[data-mode='none'] .inscribe-wizard-note,
+    #inscribePanelBody[data-mode='none'] .prepare-grid,
+    #inscribePanelBody[data-mode='none'] .actions,
+    #inscribePanelBody[data-mode='none'] .steps,
+    #inscribePanelBody[data-mode='none'] #duplicateWarning,
+    #inscribePanelBody[data-mode='none'] #resumeNotice,
+    #inscribePanelBody[data-mode='none'] #activityLog,
+    #inscribePanelBody[data-mode='none'] #batchGuide { display: none; }
+
+    /* File path: hide the text card. */
+    #inscribePanelBody[data-mode='file'] #textFields { display: none; }
+
+    /* File path, before a file lands: show ONLY the dropzone. Everything else
+       (details, advanced, relationships, actions, steps) reveals once .has-payload is set. */
+    #inscribePanelBody[data-mode='file']:not(.has-payload) #inscribeAdvancedDetails,
+    #inscribePanelBody[data-mode='file']:not(.has-payload) #relationshipsDetails,
+    #inscribePanelBody[data-mode='file']:not(.has-payload) .inscribe-wizard-note,
+    #inscribePanelBody[data-mode='file']:not(.has-payload) .prepare-grid,
+    #inscribePanelBody[data-mode='file']:not(.has-payload) .actions,
+    #inscribePanelBody[data-mode='file']:not(.has-payload) .steps,
+    #inscribePanelBody[data-mode='file']:not(.has-payload) #duplicateWarning,
+    #inscribePanelBody[data-mode='file']:not(.has-payload) #resumeNotice,
+    #inscribePanelBody[data-mode='file']:not(.has-payload) #batchGuide { display: none; }
+
+    /* Text path: strip to just the text card. */
+    #inscribePanelBody[data-mode='text'] #fileFields,
+    #inscribePanelBody[data-mode='text'] #inscribeAdvancedDetails,
+    #inscribePanelBody[data-mode='text'] #relationshipsDetails,
+    #inscribePanelBody[data-mode='text'] .inscribe-wizard-note,
+    #inscribePanelBody[data-mode='text'] .prepare-grid,
+    #inscribePanelBody[data-mode='text'] .actions,
+    #inscribePanelBody[data-mode='text'] .steps,
+    #inscribePanelBody[data-mode='text'] #duplicateWarning,
+    #inscribePanelBody[data-mode='text'] #resumeNotice,
+    #inscribePanelBody[data-mode='text'] #batchGuide { display: none; }
+
+    /* Prepare button is gone — file prep is automatic on load. */
+    #inscribePanelBody #prepareButton { display: none; }
+
+    /* Choice hint only on the landing; Change control only once a path is chosen. */
+    #inscribePanelBody[data-mode='none'] .inscribe-change { display: none; }
+    #inscribePanelBody[data-mode='file'] .inscribe-choice-hint,
+    #inscribePanelBody[data-mode='text'] .inscribe-choice-hint { display: none; }
+
+    /* Landing: make the two choices tall and card-like. */
+    #inscribePanelBody[data-mode='none'] .inscribe-tab {
+      padding: 22px 16px;
+      font-size: 15px;
     }
 
     .file-chip {
@@ -3166,6 +3360,10 @@
         gap: 12px;
       }
 
+      .brand-tagline {
+        display: none;
+      }
+
       .brand-logo {
         width: 72px;
         height: 72px;
@@ -4123,26 +4321,55 @@
       display: block;
     }
 
+    /* Viewing a specific wallet inside Xplorer: hide the global-feed navigation
+       (page/token jump, Go, Random) and the type filters — they act on the whole
+       collection, not one wallet's holdings, so they'd only confuse. The page
+       readout, wallet count, Refresh, Home and Latest stay. Clearing the lookup
+       (the "Clear" button) drops these back in. */
+    body.explorer-wallet-view .explorer-tools__row > .field,
+    body.explorer-wallet-view #explorerJumpButton,
+    body.explorer-wallet-view #explorerRandomButton,
+    body.explorer-wallet-view .explorer-filter-popover {
+      display: none;
+    }
+
     /* Home examples strip: chips link into the Xplorer. */
     .home-examples {
       display: none;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 8px;
       padding-top: 16px;
     }
 
     :root[data-page='home'] .home-examples {
-      display: flex;
+      display: block;
     }
 
     .home-examples__label {
+      display: inline-flex;
+      align-items: center;
       font-size: 12px;
       font-weight: 700;
       letter-spacing: 0.06em;
       text-transform: uppercase;
       color: var(--muted);
-      margin-right: 4px;
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+    }
+    .home-examples__label::-webkit-details-marker { display: none; }
+    .home-examples__label::before {
+      content: '▸';
+      display: inline-block;
+      margin-right: 8px;
+      transition: transform 0.15s ease;
+    }
+    .home-examples[open] .home-examples__label::before { transform: rotate(90deg); }
+
+    .home-examples__list {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
     }
 
     a.wallet-example-chip {

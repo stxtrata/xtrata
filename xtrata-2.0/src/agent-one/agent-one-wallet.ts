@@ -72,6 +72,46 @@ const XtrataWallet = {
       } catch (e) { reject(e instanceof Error ? e : new Error(String(e))); }
     });
   },
+  isConnected(): boolean {
+    return adapter.getSession().isConnected === true;
+  },
+  // Generic contract call over the site's PROVEN showContractCall path (the same
+  // one inscribe/swap use on the core site). Args and post-conditions are passed
+  // as serialized Clarity hex strings so a caller can build them with its own
+  // @stacks/transactions version without cross-version object incompatibility.
+  callContract(opts: {
+    contractAddress: string;
+    contractName: string;
+    functionName: string;
+    functionArgsHex: string[];
+    postConditionsHex?: string[];
+    postConditionMode?: 'allow' | 'deny';
+    sender?: string;
+    network?: string;
+  }): Promise<{ txId?: string }> {
+    return new Promise<{ txId?: string }>((resolve, reject) => {
+      try {
+        showContractCall({
+          contractAddress: opts.contractAddress,
+          contractName: opts.contractName,
+          functionName: opts.functionName,
+          functionArgs: opts.functionArgsHex as unknown as Parameters<typeof showContractCall>[0]['functionArgs'],
+          postConditions: (opts.postConditionsHex && opts.postConditionsHex.length
+            ? opts.postConditionsHex
+            : undefined) as unknown as Parameters<typeof showContractCall>[0]['postConditions'],
+          postConditionMode:
+            opts.postConditionMode === 'allow' ? PostConditionMode.Allow : PostConditionMode.Deny,
+          network: (opts.network === 'testnet' ? 'testnet' : 'mainnet'),
+          stxAddress: opts.sender,
+          appDetails: { name: 'Xtrata', icon: '/favicon.ico' },
+          onFinish: (payload: any) => resolve({ txId: payload && (payload.txId || payload.txid) }),
+          onCancel: () => reject(new Error('Transaction cancelled or failed in wallet.')),
+        } as Parameters<typeof showContractCall>[0]);
+      } catch (e) {
+        reject(e instanceof Error ? e : new Error(String(e)));
+      }
+    });
+  },
   // Opens the connected wallet to send STX. showStxTransfer already prefers the
   // modern stx_transferStx request that current Xverse expects (legacy popup fallback).
   pay(opts: { recipient: string; amount: string | number; network?: string }): Promise<void> {

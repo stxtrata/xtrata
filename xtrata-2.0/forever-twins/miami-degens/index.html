@@ -857,6 +857,13 @@
                 </div>
               </div>
 
+              <div class="row" id="myItemsRow">
+                <div class="button-row">
+                  <button id="myItemsBtn" class="btn-outline" type="button">Show my items in this collection</button>
+                  <span id="myItemsStatus" style="color:var(--muted);font-family:var(--mono);font-size:0.72rem"></span>
+                </div>
+                <div id="myItemsChips" class="button-row" style="margin-top:0.5rem;flex-wrap:wrap"></div>
+              </div>
               <div id="journeyImage" class="journey-image">Enter a Miami Degen number above and select “Show me this degen”.</div>
 
               <div id="journeyStatus" class="callout journey-status">Pick any Miami Degen number to see it. You can browse as many as you like before choosing one to make permanent.</div>
@@ -1111,7 +1118,9 @@
     };
 
     function jsonBigInt(_, value) { return typeof value === 'bigint' ? value.toString() : value; }
+    const DBG_TAG = (location.pathname.match(/forever-twins\/([^/]+)/) || [])[1] || 'forever-twins';
     function log(message, data) {
+      try { if (data !== undefined) console.log(`[${DBG_TAG}] ${message}`, data); else console.log(`[${DBG_TAG}] ${message}`); } catch (_) {}
       const line = document.createElement('div');
       line.className = 'log-line';
       line.textContent = `[${new Date().toLocaleTimeString()}] ${message}${data ? '\n' + JSON.stringify(data, jsonBigInt, 2) : ''}`;
@@ -1463,6 +1472,7 @@
       state.sourceMetadata = null;
       state.sourceImageUrl = null;
       state.sourceImageCandidates = [];
+      state.previewImageCandidates = [];
       // Clear any previously prepared image bytes so a new token can't reuse a
       // stale hash/chunk set from the Miami Degen we were just looking at.
       state.fileBytes = null;
@@ -1538,7 +1548,7 @@
       if (/^https?:\/\//i.test(resolved)) candidates.push(resolved);
       if (/^ar:\/\//i.test(resolved)) candidates.push(`https://arweave.net/${resolved.replace(/^ar:\/\//i, '')}`);
       const ipfsPath = extractIpfsPath(resolved);
-      if (ipfsPath) candidates.push(`https://ipfs.io/ipfs/${ipfsPath}`, `https://nftstorage.link/ipfs/${ipfsPath}`, `https://dweb.link/ipfs/${ipfsPath}`, `https://cloudflare-ipfs.com/ipfs/${ipfsPath}`);
+      if (ipfsPath) candidates.push(`https://dweb.link/ipfs/${ipfsPath}`, `https://ipfs.io/ipfs/${ipfsPath}`, `https://w3s.link/ipfs/${ipfsPath}`);
       return unique(candidates.map((candidate) => encodeURI(candidate)));
     }
     function tokenUriToHttp(uri, tokenId) { return uriToHttpCandidates(uri, tokenId)[0] || ''; }
@@ -1563,22 +1573,15 @@
       let lastError = null;
       const retries = Math.max(0, Number(options.retries ?? $('manifestRetries')?.value ?? 0));
       const retryDelayMs = Math.max(0, Number(options.retryDelayMs ?? $('manifestDelayMs')?.value ?? 0));
-      const timeoutMs = Math.max(2000, Number(options.timeoutMs ?? 16000));
+      const timeoutMs = Math.max(2000, Number(options.timeoutMs ?? 8000));
 
       for (let attempt = 0; attempt <= retries; attempt += 1) {
         for (const url of candidates) {
           try {
             const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), timeoutMs);
-            
-            // FIX 2: Added CORS modes and explicit accept headers
-            const response = await fetch(url, { 
-                cache: 'no-store', 
-                signal: controller.signal,
-                mode: 'cors', 
-                headers: {
-                    'Accept': mode === 'json' ? 'application/json' : 'image/*, application/octet-stream, */*'
-                }
+            const timer = setTimeout(() => controller.abort(), timeoutMs);            const response = await fetch(url, {
+                cache: 'no-store',
+                signal: controller.signal
             });
             
             clearTimeout(timer);
@@ -2137,12 +2140,16 @@
       state.sourceMetadata = null;
       state.sourceImageUrl = null;
       state.sourceImageCandidates = [];
+      state.previewImageCandidates = [];
       renderRawImageStatus('Reading metadata JSON from the chain-provided URI...');
       const metadataCandidates = uriToHttpCandidates(uri, tokenId);
+      log('trace: metadata - gateways to try', { tokenId: String(tokenId), candidates: metadataCandidates });
       if (!metadataCandidates.length) { renderRawImageStatus(`${badge('URI cannot be fetched in browser', 'bad')}<br><span class="data-mono">${escapeHtml(uri)}</span>`); return null; }
       try {
         const metadataResult = await fetchFirstOk(metadataCandidates, 'json');
+        log('trace: metadata - JSON loaded', { tokenId: String(tokenId), fromGateway: metadataResult.url });
         const image = extractImageValue(metadataResult.json);
+        log('trace: metadata - image field extracted', { tokenId: String(tokenId), field: image && image.field, value: image && image.value });
         state.sourceMetadataUri = metadataResult.url;
         state.sourceMetadata = metadataResult.json;
         if (!image) {
@@ -2154,6 +2161,7 @@
         const imageUrl = imageCandidates[0] || image.value;
         state.sourceImageUrl = imageUrl;
         state.sourceImageCandidates = imageCandidates.length ? imageCandidates : [imageUrl];
+        log('trace: build image - source candidates', { tokenId: String(tokenId), candidates: state.sourceImageCandidates });
         const rawLink = /^data:image\//i.test(imageUrl) ? '' : `<a class="uri-link" href="${escapeHtml(imageUrl)}" target="_blank" rel="noopener noreferrer">Open raw image</a>`;
         const rawMeta = `<div class="compact-lines"><span class="compact-line"><b>metadata:</b> ${escapeHtml(shortMiddle(metadataResult.url, 30, 22))}</span><span class="compact-line"><b>${escapeHtml(image.field)}:</b> ${escapeHtml(shortMiddle(image.value, 30, 22))}</span>${rawLink}</div><details class="metadata-box"><summary>Full URI details</summary><span>metadata: ${escapeHtml(metadataResult.url)}</span><span>${escapeHtml(image.field)}: ${escapeHtml(image.value)}</span><span>resolved image: ${escapeHtml(imageUrl)}</span></details>`;
         renderRawImageStatus(`${badge('Raw image resolved', 'ok')}<div class="raw-resolved"><div class="media-preview"><img src="${escapeHtml(imageUrl)}" alt="Raw token image resolved from token metadata" loading="lazy" /></div><div>${rawMeta}</div></div>`);
@@ -2164,6 +2172,71 @@
         if (showLog) log('Could not read token metadata URI', { tokenId: String(tokenId), tokenUri: uri, tried: metadataCandidates, error: err.message });
         return null;
       }
+    }
+
+    // CORS-safe preview fallback: when the direct source-gateway metadata read
+    // fails or yields no image, resolve the token image from Hiro's NFT metadata
+    // API (the same CORS-enabled infrastructure the chain reads already use).
+    // Display uses Hiro's cached image; byte candidates prefer the original so
+    // canonical hashing is unaffected where it already works.
+    async function hiroNftMetadata(tokenId) {
+      const source = $('sourceContract').value.trim();
+      const apiBase = ($('apiBase') && $('apiBase').value.trim()
+        ? $('apiBase').value.trim()
+        : (networkName() === 'testnet' ? 'https://api.testnet.hiro.so' : 'https://api.mainnet.hiro.so')).replace(/\/+$/, '');
+      const url = `${apiBase}/metadata/v1/nft/${encodeURIComponent(source)}/${encodeURIComponent(String(tokenId))}`;
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`Hiro metadata HTTP ${res.status}`);
+      return res.json();
+    }
+    // Mount an <img> that walks every candidate gateway URL in turn: if one
+    // fails to load (a flaky IPFS gateway 404/429/504), it advances to the next
+    // instead of leaving a broken-image icon.
+    function mountFallbackImage(container, candidates, alt) {
+      if (!container) return;
+      const list = (candidates || []).filter(Boolean);
+      log('trace: build image - candidate list', { count: list.length, candidates: list });
+      if (!list.length) { container.textContent = ''; return; }
+      const img = document.createElement('img');
+      img.alt = alt || '';
+      img.loading = 'lazy';
+      let idx = 0;
+      img.addEventListener('load', () => log('trace: image displayed (recalled/loaded)', { index: idx, url: list[idx] }));
+      img.addEventListener('error', () => {
+        log('trace: image candidate FAILED', { index: idx, url: list[idx] });
+        idx += 1;
+        if (idx < list.length) { log('trace: image trying next candidate', { index: idx, url: list[idx] }); img.src = list[idx]; }
+        else {
+          container.dataset.url = '';
+          container.textContent = 'Could not load this image from any gateway — open Technical details to retry.';
+          log('trace: image ALL candidates failed', { tried: list.length });
+        }
+      });
+      log('trace: image trying candidate', { index: 0, url: list[0] });
+      img.src = list[0];
+      container.innerHTML = '';
+      container.appendChild(img);
+    }
+    // Prefer Hiro's cached CDN copy for the on-screen preview (reliable + CORS
+    // friendly), while the original IPFS bytes stay in sourceImageCandidates for
+    // canonical hashing. Falls back gracefully if Hiro has nothing.
+    // Hiro caches every token image at a predictable CDN URL, so we can show the
+    // preview INSTANTLY without fetching any metadata JSON (that fetch was the
+    // slow, 'Failed to fetch'-prone step). The <img> needs no CORS, and the
+    // resilient loader tries each extension then falls back to IPFS gateways.
+    function hiroAssetImageCandidates(tokenId) {
+      const source = $('sourceContract').value.trim();
+      const net = networkName() === 'testnet' ? 'testnet' : 'mainnet';
+      const base = `https://assets.hiro.so/api/${net}/token-metadata-api/${encodeURIComponent(source)}/${encodeURIComponent(String(tokenId))}`;
+      return [`${base}.png`, `${base}.jpg`, `${base}.jpeg`, `${base}.gif`, `${base}.webp`];
+    }
+    function enrichPreview(tokenId) {
+      const assets = hiroAssetImageCandidates(tokenId);
+      const ipfs = (state.sourceImageCandidates || []).filter(Boolean);
+      state.previewImageCandidates = [...assets, ...ipfs.filter((u) => !assets.includes(u))];
+      if (!state.sourceImageUrl) state.sourceImageUrl = state.previewImageCandidates[0];
+      log('trace: preview candidates ready (Hiro CDN first)', { tokenId: String(tokenId), previewCandidates: state.previewImageCandidates });
+      updateJourneyStatus();
     }
 
     function setHashStatus() {
@@ -2198,12 +2271,16 @@
     function updateJourneyStatus() {
       const imgBox = $('journeyImage');
       if (imgBox) {
-        const url = state.sourceImageUrl || '';
-        if (imgBox.dataset.url !== url) {
-          imgBox.dataset.url = url;
-          imgBox.innerHTML = url
-            ? `<img src="${escapeHtml(url)}" alt="Miami Degen preview" loading="lazy" />`
-            : 'Enter a Miami Degen number above and select “Show me this degen”.';
+        const cands = (state.previewImageCandidates && state.previewImageCandidates.length)
+          ? state.previewImageCandidates
+          : (state.sourceImageCandidates && state.sourceImageCandidates.length
+              ? state.sourceImageCandidates
+              : (state.sourceImageUrl ? [state.sourceImageUrl] : []));
+        const key = cands[0] || '';
+        if (imgBox.dataset.url !== key) {
+          imgBox.dataset.url = key;
+          if (key) mountFallbackImage(imgBox, cands, "Miami Degen preview");
+          else imgBox.textContent = 'Enter a Miami Degen number above and select “Show me this degen”.';
         }
       }
       const tokenReady = /^\d+$/.test($('tokenId').value.trim());
@@ -2271,12 +2348,67 @@
       } catch (err) { log('Could not refresh contract stats', { error: err.message }); }
     }
 
+    async function loadMyCollectionItems() {
+      const chips = $('myItemsChips');
+      const status = $('myItemsStatus');
+      if (chips) chips.innerHTML = '';
+      if (!state.wallet) { if (status) status.textContent = 'Connect your wallet first.'; return; }
+      const source = $('sourceContract').value.trim();
+      const asset = $('sourceAssetName').value.trim();
+      const assetId = `${source}::${asset}`;
+      const apiBase = ($('apiBase') && $('apiBase').value.trim()
+        ? $('apiBase').value.trim()
+        : (networkName() === 'testnet' ? 'https://api.testnet.hiro.so' : 'https://api.mainnet.hiro.so')).replace(/\/+$/, '');
+      if (status) status.textContent = 'Loading your items…';
+      log('trace: my-items - request holdings', { wallet: state.wallet, assetId });
+      try {
+        const ids = [];
+        const limit = 50;
+        let offset = 0;
+        for (let page = 0; page < 20; page += 1) {
+          const url = `${apiBase}/extended/v1/tokens/nft/holdings?principal=${encodeURIComponent(state.wallet)}&asset_identifiers=${encodeURIComponent(assetId)}&limit=${limit}&offset=${offset}`;
+          const res = await fetch(url, { cache: 'no-store' });
+          if (!res.ok) throw new Error(`Hiro holdings HTTP ${res.status}`);
+          const json = await res.json();
+          const results = Array.isArray(json.results) ? json.results : [];
+          for (const r of results) {
+            const repr = r && r.value && r.value.repr ? String(r.value.repr) : '';
+            const m = repr.match(/^u?(\d+)$/);
+            if (m) ids.push(m[1]);
+          }
+          const total = Number(json.total || 0);
+          offset += limit;
+          if (results.length === 0 || offset >= total) break;
+        }
+        const unique = [...new Set(ids)].sort((x, y) => Number(x) - Number(y));
+        log('trace: my-items - holdings resolved', { count: unique.length, ids: unique });
+        if (!unique.length) { if (status) status.textContent = 'No items from this collection in your connected wallet.'; return; }
+        if (status) status.textContent = `${unique.length} item${unique.length === 1 ? '' : 's'} in your wallet — select one to load:`;
+        for (const id of unique) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'mini-link';
+          btn.textContent = `#${id}`;
+          btn.addEventListener('click', () => {
+            $('tokenId').value = id;
+            const lt = $('lookupToken'); if (lt) lt.textContent = id;
+            checkToken();
+          });
+          chips.appendChild(btn);
+        }
+      } catch (err) {
+        log('my-items load failed', { error: err.message });
+        if (status) status.textContent = `Could not load your items: ${err.message}`;
+      }
+    }
     async function checkToken() {
       const tokenId = getTokenId();
       const helper = $('helperContract').value.trim();
       const source = $('sourceContract').value.trim();
       const tokenArg = asUint(tokenId);
+      log('trace: checkToken start', { tokenId: tokenId.toString() });
       resetChainOnlyDisplays();
+      enrichPreview(tokenId);
       $('lookupToken').textContent = String(tokenId);
       setStatus('idConversionStatus', renderIdConversion(null, tokenId));
       setStatus('canonicalStatus', 'Checking chain...');
@@ -2334,6 +2466,7 @@
       else setStatus('sourceOwnerStatus', `${badge('No owner returned by chain', 'bad')}<br>Source contract returned none.${chainProof(source, 'get-owner', [tokenArg])}`);
 
       await maybeFetchTokenUri(tokenId);
+      enrichPreview(tokenId);
       // Journey-led: automatically fetch + hash the resolved cat image so the
       // user never has to drop a file or click "Use Raw Image". Only worth doing
       // when the cat is seedable and not already inscribed.
@@ -2354,6 +2487,7 @@
       try {
         const raw = await readContract(source, 'get-token-uri', args);
         const uri = unwrapOptional(raw);
+        log('trace: source token-uri from chain', { tokenId: String(tokenId), tokenUri: uri || null });
         if (uri && typeof uri === 'string') {
           const resolvedUri = resolveUriTemplate(uri, tokenId);
           const currentInput = $('tokenUri').value.trim();
@@ -2376,6 +2510,7 @@
         state.sourceTokenUri = null;
         state.sourceImageUrl = null;
         state.sourceImageCandidates = [];
+        state.previewImageCandidates = [];
         setStatus('tokenUriStatus', `${badge('Chain read failed', 'bad')}<br>${escapeHtml(err.message)}${chainProof(source, 'get-token-uri', args)}`);
         renderRawImageStatus(`${badge('No chain URI to read', 'warn')}<br>The source token URI read failed.`);
         if (showLog) log('Could not fetch token URI from chain', { sourceContract: source, function: 'get-token-uri', tokenId: tokenId.toString(), error: err.message });
@@ -2450,6 +2585,20 @@
       if (state.fileHash.toLowerCase() !== state.canonicalHash?.toLowerCase()) throw new Error('File hash does not match the canonical hash');
       if (state.chunks.length > MAX_CHUNKS) throw new Error('File has too many chunks for this contract');
       await quoteFee(false);
+      // Guard: a fee-recipient wallet cannot inscribe through this contract. The
+      // fee split runs (stx-transfer? amount payer payout); when payer == payout,
+      // Clarity rejects a self-transfer with (err u2) and aborts the whole tx.
+      // Fail fast (before opening the wallet) so no mining fee is wasted.
+      try {
+        const payouts = unwrapOk(await readContract($('helperContract').value.trim(), 'get-payouts', []));
+        const a = payouts && payouts.a, b = payouts && payouts.b;
+        if (state.wallet && (state.wallet === a || state.wallet === b)) {
+          throw new Error(`This wallet (${shortAddress(state.wallet)}) is a fee-payout address for this collection, so inscribing from it fails on-chain with (err u2) — Clarity blocks the fee's self-transfer. Inscribe from a different wallet (or change the collection payout address).`);
+        }
+      } catch (guardErr) {
+        if (guardErr && /err u2|fee-payout address/i.test(guardErr.message)) throw guardErr;
+        log('Could not pre-check fee payouts (proceeding)', { error: guardErr && guardErr.message });
+      }
       const args = [asUint(tokenId), asBuffer(state.fileHash), asAscii($('mime').value, 64, 'MIME type'), asUint(state.fileBytes.length), Cl.list(state.chunks.map((chunk) => asBuffer(chunk))), asAscii($('tokenUri').value, 256, 'Token URI')];
       await callHelper('inscribe', args, inscribePostConditions());
     }
@@ -2522,6 +2671,7 @@
     bind('networkToggle', 'click', () => { $('network').value = networkName() === 'mainnet' ? 'testnet' : 'mainnet'; syncLabels(); resetChainOnlyDisplays(); });
     bind('refreshBtn', 'click', refreshContractStatus);
     bind('checkBtn', 'click', checkToken);
+    bind('myItemsBtn', 'click', loadMyCollectionItems);
     bind('lookupBtn', 'click', checkToken);
     bind('tokenUriBtn', 'click', fetchTokenUriForCurrentToken);
     bind('metadataBtn', 'click', readMetadataForCurrentToken);
@@ -2556,6 +2706,7 @@
       if (!state.sourceTokenUri) setStatus('tokenUriStatus', 'Not loaded from chain');
       state.sourceImageUrl = null;
       state.sourceImageCandidates = [];
+      state.previewImageCandidates = [];
       if (!state.sourceTokenUri) setStatus('rawImageStatus', 'Not loaded from chain URI');
     });
     $('galleryTileSize').addEventListener('input', () => {

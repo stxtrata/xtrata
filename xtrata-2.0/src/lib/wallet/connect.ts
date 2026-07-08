@@ -106,6 +106,49 @@ type WalletStxTransferOptions = WalletActionBase & {
 
 const disconnectedSession = (): WalletSession => ({ isConnected: false });
 
+// Self-heal: @stacks/auth's SessionData.fromJSON() throws
+// "JSON data version undefined not supported by SessionData" when localStorage
+// holds a session written in an incompatible format (a different @stacks/connect
+// major used elsewhere on this origin, or a very old session). After that,
+// UserSession.isUserSignedIn()/loadUserData() throw during connect and the
+// wallet never opens. Drop any stored session that isn't a valid, versioned
+// SessionData so connect always starts from a clean state.
+const STACKS_SESSION_STORAGE_KEYS = ['blockstack-session', 'blockstack'];
+const sanitizeStoredWalletSession = () => {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return;
+  }
+  for (const key of STACKS_SESSION_STORAGE_KEYS) {
+    let raw: string | null = null;
+    try {
+      raw = window.localStorage.getItem(key);
+    } catch {
+      continue;
+    }
+    if (!raw) {
+      continue;
+    }
+    let versionOk = false;
+    try {
+      const parsed = JSON.parse(raw) as { version?: unknown };
+      versionOk = typeof parsed?.version === 'string' && parsed.version.length > 0;
+    } catch {
+      versionOk = false;
+    }
+    if (!versionOk) {
+      try {
+        window.localStorage.removeItem(key);
+      } catch {
+        // ignore storage errors
+      }
+    }
+  }
+};
+
+// Run once at module load so any UserSession use (including inside
+// @stacks/connect's showConnect) starts from a clean, parseable session.
+sanitizeStoredWalletSession();
+
 const stripHexPrefix = (value: string) =>
   value.startsWith('0x') || value.startsWith('0X') ? value.slice(2) : value;
 
@@ -586,16 +629,21 @@ const requestLeatherContractDeploy = async (
 
 const connectViaRequest = async (provider: StacksProvider) => {
   const attempts = [
-    'stx_getAddresses',
+    // Interactive connect methods first: these open the wallet's approval UI,
+    // which prompts an unlock when locked and lets the user choose which account
+    // to connect (the behaviour we want to restore).
+    'wallet_connect',
+    'stx_requestAccounts',
+    'connect',
+    // Address/account reads: these can return the already-active account with no
+    // picker, so they are only fallbacks when the interactive methods are
+    // unsupported by the provider.
     'getAddresses',
+    'stx_getAddresses',
     'stx_getAccounts',
     'getAccounts',
     'wallet_getAccount',
-    'wallet_connect',
-    'stx_requestAccounts',
-    'requestAccounts',
-    'connect',
-    'wallet_connect'
+    'requestAccounts'
   ];
 
   let lastError: unknown = null;
@@ -751,20 +799,30 @@ export const connectWallet = async (params: {
   appName: string;
   appIcon: string;
 }): Promise<WalletSession> => {
+  // Re-sanitize right before connecting: a forever-twins page (or another tab)
+  // may have written an incompatible session after this module first loaded.
+  sanitizeStoredWalletSession();
   const provider = await selectProvider({ forceWalletSelect: true });
   if (!provider) {
     return disconnectedSession();
   }
 
-  const providerId = getSelectedProviderId();
-  if (isLeatherProviderId(providerId)) {
+  // Prefer the wallet's interactive connect (unlock + account selection) for any
+  // provider that exposes a request() bridge — both Leather and current Xverse do.
+  // This restores the account picker that the silent stx_getAddresses read skipped.
+  // The legacy auth popup is only a fallback when request() is unavailable or every
+  // interactive method is reported unsupported.
+  if (typeof provider.request === 'function') {
     try {
-      return await connectViaRequest(provider);
+      const session = await connectViaRequest(provider);
+      if (session.isConnected) {
+        return session;
+      }
     } catch (error) {
+      if (isUserCancelledError(error)) {
+        return disconnectedSession();
+      }
       if (!isMethodUnsupportedError(error)) {
-        if (isUserCancelledError(error)) {
-          return disconnectedSession();
-        }
         throw error;
       }
     }
