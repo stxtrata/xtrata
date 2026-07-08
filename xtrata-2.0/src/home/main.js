@@ -7353,6 +7353,30 @@
       state.walletLookupPending = false;
     };
 
+    // Keep the address bar in step with the wallet actually on screen, so the
+    // URL is correct/shareable and a refresh reopens the same wallet. Uses
+    // replaceState (no history spam) — a .btc name is preferred for readability,
+    // otherwise the raw address.
+    const applyWalletViewUrl = (nameOrAddress) => {
+      const value = (nameOrAddress ?? '').toString().replace(/\.btc$/i, '').trim();
+      try {
+        if (!value) {
+          clearWalletViewUrl();
+          return;
+        }
+        window.history.replaceState(null, '', `/?wallet=${encodeURIComponent(value)}`);
+      } catch (_) {
+        // history API unavailable — non-fatal
+      }
+    };
+    const clearWalletViewUrl = () => {
+      try {
+        window.history.replaceState(null, '', state.explorerMode ? '/xplorer' : '/my-wallet');
+      } catch (_) {
+        // non-fatal
+      }
+    };
+
     const clearWalletLookupToConnectedWallet = async () => {
       state.walletViewRequestId += 1;
       cancelWalletLookup();
@@ -7377,6 +7401,7 @@
           : 'Returned to connected wallet view.'
       );
 
+      clearWalletViewUrl();
       updateWalletStatus();
       await loadWalletInscriptions();
       updateControls();
@@ -7404,10 +7429,18 @@
       state.curatedGalleryTitle = null;
       state.homeLatestView = false;
       clearExampleDescription();
+      // Drop the previous wallet's selected inscription so the preview panel
+      // never shows a stale token from the wallet we just left.
+      clearSelectedTokenPreview();
 
       if (dom.walletLookupInput) {
         dom.walletLookupInput.value = isConnectedAddress ? '' : normalized;
         updateWalletLookupInputMode();
+      }
+      if (isConnectedAddress) {
+        clearWalletViewUrl();
+      } else {
+        applyWalletViewUrl(normalized);
       }
       appendLog(`Viewing wallet: ${truncateMiddle(normalized, 8, 8)}.`);
       updateWalletStatus();
@@ -7467,9 +7500,15 @@
         state.curatedGalleryTitle = null;
         state.homeLatestView = false;
         clearExampleDescription();
+        clearSelectedTokenPreview();
 
         dom.walletLookupInput.value = isConnectedAddress ? '' : baseLookupState.lookupAddress;
         updateWalletLookupInputMode();
+        if (isConnectedAddress) {
+          clearWalletViewUrl();
+        } else {
+          applyWalletViewUrl(baseLookupState.lookupAddress);
+        }
         appendLog(`Viewing wallet: ${truncateMiddle(baseLookupState.lookupAddress, 8, 8)}.`);
         updateWalletStatus();
         await loadWalletInscriptions(options);
@@ -7519,8 +7558,14 @@
         state.curatedGalleryId = null;
         state.curatedGalleryTitle = null;
         state.homeLatestView = false;
+        clearSelectedTokenPreview();
         dom.walletLookupInput.value = isConnectedAddress ? '' : toBtcLookupLabel(lookupName);
         updateWalletLookupInputMode();
+        if (isConnectedAddress) {
+          clearWalletViewUrl();
+        } else {
+          applyWalletViewUrl(lookupName);
+        }
         state.walletLookupNotice = null;
         appendLog(
           `Resolved ${lookupName} to ${truncateMiddle(resolvedLookupState.resolvedAddress, 8, 8)}.`

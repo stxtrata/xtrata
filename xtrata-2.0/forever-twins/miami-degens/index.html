@@ -1569,16 +1569,9 @@
         for (const url of candidates) {
           try {
             const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), timeoutMs);
-            
-            // FIX 2: Added CORS modes and explicit accept headers
-            const response = await fetch(url, { 
-                cache: 'no-store', 
-                signal: controller.signal,
-                mode: 'cors', 
-                headers: {
-                    'Accept': mode === 'json' ? 'application/json' : 'image/*, application/octet-stream, */*'
-                }
+            const timer = setTimeout(() => controller.abort(), timeoutMs);            const response = await fetch(url, {
+                cache: 'no-store',
+                signal: controller.signal
             });
             
             clearTimeout(timer);
@@ -2166,6 +2159,42 @@
       }
     }
 
+    // CORS-safe preview fallback: when the direct source-gateway metadata read
+    // fails or yields no image, resolve the token image from Hiro's NFT metadata
+    // API (the same CORS-enabled infrastructure the chain reads already use).
+    // Display uses Hiro's cached image; byte candidates prefer the original so
+    // canonical hashing is unaffected where it already works.
+    async function hiroNftMetadata(tokenId) {
+      const source = $('sourceContract').value.trim();
+      const apiBase = ($('apiBase') && $('apiBase').value.trim()
+        ? $('apiBase').value.trim()
+        : (networkName() === 'testnet' ? 'https://api.testnet.hiro.so' : 'https://api.mainnet.hiro.so')).replace(/\/+$/, '');
+      const url = `${apiBase}/metadata/v1/nft/${encodeURIComponent(source)}/${encodeURIComponent(String(tokenId))}`;
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`Hiro metadata HTTP ${res.status}`);
+      return res.json();
+    }
+    async function applyHiroImageFallback(tokenId) {
+      try {
+        const json = await hiroNftMetadata(tokenId);
+        const md = (json && (json.metadata || json)) || {};
+        const original = md.image || md.image_url || md.imageUrl || md.image_uri || '';
+        const cached = md.cached_image || md.cached_thumbnail_image || '';
+        const byteCandidates = original ? (/^data:image\//i.test(original) ? [original] : uriToHttpCandidates(original, tokenId)) : [];
+        if (cached) byteCandidates.push(cached);
+        const display = cached || byteCandidates[0] || '';
+        if (!display) return false;
+        state.sourceImageUrl = display;
+        state.sourceImageCandidates = byteCandidates.length ? byteCandidates : [display];
+        renderRawImageStatus(`${badge('Image via Hiro metadata', 'ok')}<div class="raw-resolved"><div class="media-preview"><img src="${escapeHtml(display)}" alt="Token image resolved via Hiro NFT metadata" loading="lazy" /></div><div><div class="compact-lines"><span class="compact-line"><b>source:</b> Hiro NFT metadata API (fallback)</span><a class="uri-link" href="${escapeHtml(display)}" target="_blank" rel="noopener noreferrer">Open raw image</a></div></div></div>`);
+        updateActionButtons();
+        return true;
+      } catch (err) {
+        log('Hiro metadata image fallback failed', { tokenId: String(tokenId), error: err.message });
+        return false;
+      }
+    }
+
     function setHashStatus() {
       if (!state.canonicalHash || !state.fileHash) {
         $('hashMatch').textContent = 'Choose a token and file to check whether the file hash matches the canonical hash seeded in the helper contract.';
@@ -2334,6 +2363,7 @@
       else setStatus('sourceOwnerStatus', `${badge('No owner returned by chain', 'bad')}<br>Source contract returned none.${chainProof(source, 'get-owner', [tokenArg])}`);
 
       await maybeFetchTokenUri(tokenId);
+      if (!state.sourceImageUrl) { await applyHiroImageFallback(tokenId); }
       // Journey-led: automatically fetch + hash the resolved cat image so the
       // user never has to drop a file or click "Use Raw Image". Only worth doing
       // when the cat is seedable and not already inscribed.
