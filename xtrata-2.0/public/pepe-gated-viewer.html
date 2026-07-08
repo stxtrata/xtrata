@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>No Pepes, No Peep — Xtrata holder-gated inscription</title>
+<style>
+  :root {
+    --bg: #0b0f0c;
+    --bg-2: #11170f;
+    --card: #141b12;
+    --edge: #23301d;
+    --frog: #7cb342;
+    --frog-bright: #a6e05b;
+    --ink: #e8f0e2;
+    --muted: #8ba07d;
+    --danger: #e0736b;
+    --gold: #e7c369;
+    --shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #16351a 0%, transparent 60%),
+      radial-gradient(800px 500px at 90% 110%, #10240f 0%, transparent 55%),
+      var(--bg);
+    min-height: 100%;
+    display: grid;
+    place-items: center;
+    padding: 32px 18px;
+  }
+  .wrap { width: 100%; max-width: 560px; }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    justify-content: center; margin-bottom: 18px;
+    color: var(--muted); letter-spacing: 0.16em; font-size: 12px; text-transform: uppercase;
+  }
+  .brand b { color: var(--frog-bright); font-weight: 700; }
+  .card {
+    position: relative;
+    background: linear-gradient(180deg, var(--card), var(--bg-2));
+    border: 1px solid var(--edge);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    padding: 34px 30px 26px;
+    text-align: center;
+    overflow: hidden;
+  }
+  .card::before {
+    content: "";
+    position: absolute; inset: 0 0 auto 0; height: 3px;
+    background: linear-gradient(90deg, transparent, var(--frog), transparent);
+    opacity: 0.7;
+  }
+  .frog { font-size: 60px; line-height: 1; filter: drop-shadow(0 6px 14px rgba(0,0,0,0.5)); }
+  .frog.small { font-size: 34px; }
+  h1 { font-size: 26px; margin: 14px 0 6px; letter-spacing: -0.01em; }
+  h1.lock { font-family: ui-monospace, "SF Mono", Menlo, monospace; color: var(--frog-bright); }
+  .sub { color: var(--muted); font-size: 14px; line-height: 1.55; margin: 0 auto 22px; max-width: 40ch; }
+  .reveal {
+    text-align: left;
+    background: #0c120a;
+    border: 1px solid var(--edge);
+    border-radius: 14px;
+    padding: 18px 18px;
+    margin: 4px 0 18px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 15px; line-height: 1.6;
+  }
+  .reveal h2 { margin: 0 0 8px; font-size: 18px; color: var(--frog-bright); }
+  button {
+    font: inherit; font-weight: 650;
+    color: #0a0f08; background: var(--frog);
+    border: 0; border-radius: 12px;
+    padding: 13px 22px; cursor: pointer;
+    transition: transform 0.06s ease, background 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 8px 22px rgba(124, 179, 66, 0.25);
+  }
+  button:hover { background: var(--frog-bright); }
+  button:active { transform: translateY(1px); }
+  button[disabled] { opacity: 0.55; cursor: default; box-shadow: none; }
+  button.ghost {
+    background: transparent; color: var(--muted);
+    box-shadow: none; border: 1px solid var(--edge); font-weight: 550;
+  }
+  button.ghost:hover { color: var(--ink); border-color: var(--frog); }
+  .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12.5px; color: var(--frog-bright);
+    background: rgba(124,179,66,0.10); border: 1px solid rgba(124,179,66,0.35);
+    padding: 6px 12px; border-radius: 999px; margin-bottom: 14px;
+  }
+  .badge.deny { color: var(--danger); background: rgba(224,115,107,0.08); border-color: rgba(224,115,107,0.3); }
+  .addr { font-family: ui-monospace, Menlo, monospace; color: var(--muted); font-size: 12.5px; margin-top: 8px; }
+  .spinner {
+    width: 34px; height: 34px; margin: 6px auto 0;
+    border: 3px solid var(--edge); border-top-color: var(--frog);
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .foot { color: var(--muted); font-size: 11.5px; line-height: 1.6; text-align: center; margin: 16px auto 0; max-width: 46ch; }
+  .foot code { color: var(--frog-bright); background: #0c120a; padding: 1px 5px; border-radius: 5px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">🜲 <b>Xtrata</b> · holder-gated inscription</div>
+
+    <div class="card" id="card">
+      <!-- LOCKED (default) -->
+      <div id="state-locked">
+        <div class="frog">🐸</div>
+        <h1 class="lock" id="lockLine">No Pepes, No Peep.</h1>
+        <p class="sub">This inscription only reveals itself to Bitcoin&nbsp;Pepe holders. Connect a Stacks wallet to see if it peeps for you.</p>
+        <div class="row">
+          <button id="connectBtn">Connect wallet to peek</button>
+        </div>
+      </div>
+
+      <!-- WORKING -->
+      <div id="state-working" class="hidden">
+        <div class="frog small">🐸</div>
+        <div class="spinner"></div>
+        <p class="sub" id="workingMsg" style="margin-top:16px;">Connecting…</p>
+      </div>
+
+      <!-- GRANTED -->
+      <div id="state-granted" class="hidden">
+        <span class="badge">✓ Verified Bitcoin Pepe holder</span>
+        <div class="frog">🐸✨</div>
+        <div class="reveal" id="revealBox"></div>
+        <div class="row">
+          <button class="ghost" id="disconnectBtn1">Disconnect</button>
+        </div>
+        <div class="addr" id="addrGranted"></div>
+      </div>
+
+      <!-- DENIED -->
+      <div id="state-denied" class="hidden">
+        <span class="badge deny">✕ No Bitcoin Pepe found</span>
+        <div class="frog" style="filter:grayscale(1) opacity(0.6);">🐸</div>
+        <h1>Sorry — you don't have a Pepe.</h1>
+        <p class="sub">This wallet doesn't hold a Bitcoin&nbsp;Pepe, so the message stays sealed. Got another wallet? Try that one.</p>
+        <div class="row">
+          <button id="tryAgainBtn">Try another wallet</button>
+        </div>
+        <div class="addr" id="addrDenied"></div>
+      </div>
+
+      <!-- ERROR -->
+      <div id="state-error" class="hidden">
+        <div class="frog small" style="filter:grayscale(1);">🐸</div>
+        <h1 style="font-size:20px;">Hmm, the swamp is quiet.</h1>
+        <p class="sub" id="errorMsg">Something went wrong.</p>
+        <div class="row">
+          <button id="retryBtn">Try again</button>
+        </div>
+      </div>
+    </div>
+
+    <p class="foot">
+      Demo gate: holdings are checked client-side against the Bitcoin&nbsp;Pepe contract via the Hiro API — great for a tease, not a vault.
+      Edit the revealed message in the <code>CONFIG</code> block at the top of this file.
+    </p>
+  </div>
+
+<script src="./pepe-gate-core.js"></script>
+<script>
+/* ============================================================================
+ * CONFIG — edit this block
+ * ==========================================================================*/
+const CONFIG = {
+  // Bitcoin Pepe SIP-009 asset id, from Xtrata's Forever Twin registry
+  // (src/lib/twins/registry.ts → sourceContractId + "::" + sourceAssetName).
+  pepeAssetId: 'SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe::bitcoin-pepe',
+
+  // Where to read holdings from. Public Hiro API works out of the box.
+  // Inside the Xtrata app you can point this at the same-origin keyed proxy:
+  //   hiroBase: '/hiro/mainnet'
+  hiroBase: 'https://api.mainnet.hiro.so',
+
+  // Shown to EVERYONE (pre-connect and to non-holders).
+  lockLine: 'No Pepes, No Peep.',
+
+  // Shown ONLY to verified Bitcoin Pepe holders. Put the real payload here.
+  secret: {
+    title: 'You peeped. 🐸',
+    body:
+      "Welcome, Pepe holder. This message is only legible to wallets holding a Bitcoin Pepe — " +
+      "everyone else just sees \"No Pepes, No Peep.\"\n\n" +
+      "Drop your secret here: a claim link, a password, a promo code, the alpha. " +
+      "It reveals the instant a Pepe-holding wallet connects, and reseals when they disconnect.",
+  },
+};
+
+/* ============================================================================
+ * Browser wiring — pure gate logic is in pepe-gate-core.js (window.PepeGate),
+ * kept separate so it can be unit-tested in Node (scripts/pepe-gate.test.mjs).
+ * ==========================================================================*/
+if (typeof document !== 'undefined') {
+  const { extractStxAddress, evaluateHoldings } = window.PepeGate;
+  const CONNECT_METHODS = [
+    'stx_getAddresses', 'getAddresses', 'stx_getAccounts',
+    'getAccounts', 'wallet_getAccount',
+  ];
+
+  const $ = (id) => document.getElementById(id);
+  const states = ['locked', 'working', 'granted', 'denied', 'error'];
+  function show(state) {
+    for (const s of states) $('state-' + s).classList.toggle('hidden', s !== state);
+  }
+  const shortAddr = (a) => (a ? a.slice(0, 6) + '…' + a.slice(-5) : '');
+
+  function getProvider() {
+    const w = window;
+    return (
+      w.LeatherProvider ||
+      (w.XverseProviders && w.XverseProviders.StacksProvider) ||
+      w.StacksProvider ||
+      w.BlockstackProvider ||
+      null
+    );
+  }
+
+  function isUnsupported(err) {
+    const m = (err && err.message ? err.message : String(err || '')).toLowerCase();
+    return m.includes('not found') || m.includes('unsupported') ||
+           m.includes('not implemented') || m.includes('no method');
+  }
+  function isCancelled(err) {
+    const code = err && typeof err === 'object' ? err.code : undefined;
+    if (code === 4001 || code === -32000 || code === -31001) return true;
+    const m = (err && err.message ? err.message : String(err || '')).toLowerCase();
+    return m.includes('cancel') || m.includes('reject') || m.includes('denied') || m.includes('closed');
+  }
+
+  async function connectAddress(provider) {
+    if (typeof provider.request !== 'function') {
+      throw new Error('This wallet does not expose a request() API.');
+    }
+    let lastErr = null;
+    for (const method of CONNECT_METHODS) {
+      try {
+        const res = await provider.request(method);
+        const addr = extractStxAddress(res);
+        if (addr) return addr;
+      } catch (err) {
+        lastErr = err;
+        if (isCancelled(err)) throw err;
+        if (isUnsupported(err)) continue;
+        // Some wallets reject unknown methods with a generic error — keep trying.
+      }
+    }
+    if (lastErr) throw lastErr;
+    throw new Error('Could not read a Stacks address from the wallet.');
+  }
+
+  async function fetchHoldings(address) {
+    const base = CONFIG.hiroBase.replace(/\/$/, '');
+    const url = base +
+      '/extended/v1/tokens/nft/holdings' +
+      '?principal=' + encodeURIComponent(address) +
+      '&asset_identifiers=' + encodeURIComponent(CONFIG.pepeAssetId) +
+      '&limit=1';
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error('Holdings lookup failed (HTTP ' + res.status + ').');
+    return evaluateHoldings(await res.json());
+  }
+
+  async function run() {
+    const provider = getProvider();
+    if (!provider) {
+      show('error');
+      $('errorMsg').innerHTML =
+        'No Stacks wallet detected. Install ' +
+        '<a href="https://leather.io" target="_blank" rel="noopener" style="color:var(--frog-bright)">Leather</a> or ' +
+        '<a href="https://www.xverse.app" target="_blank" rel="noopener" style="color:var(--frog-bright)">Xverse</a>, then retry.';
+      return;
+    }
+    try {
+      show('working'); $('workingMsg').textContent = 'Connecting your wallet…';
+      const address = await connectAddress(provider);
+
+      show('working'); $('workingMsg').textContent = 'Checking the swamp for Pepes…';
+      const { holds, count } = await fetchHoldings(address);
+
+      if (holds) {
+        $('revealBox').innerHTML = '';
+        const h = document.createElement('h2');
+        h.textContent = CONFIG.secret.title;
+        const p = document.createElement('div');
+        p.textContent = CONFIG.secret.body;
+        $('revealBox').append(h, p);
+        $('addrGranted').textContent = shortAddr(address) +
+          ' · ' + count + ' Bitcoin Pepe' + (count === 1 ? '' : 's');
+        show('granted');
+      } else {
+        $('addrDenied').textContent = shortAddr(address);
+        show('denied');
+      }
+    } catch (err) {
+      if (isCancelled(err)) { show('locked'); return; }
+      show('error');
+      $('errorMsg').textContent = (err && err.message) ? err.message : 'Something went wrong.';
+    }
+  }
+
+  async function disconnect() {
+    const provider = getProvider();
+    if (provider && typeof provider.request === 'function') {
+      for (const m of ['stx_disconnect', 'wallet_disconnect', 'disconnect']) {
+        try { await provider.request(m); break; } catch (_) { /* best effort */ }
+      }
+    }
+    show('locked');
+  }
+
+  $('lockLine').textContent = CONFIG.lockLine;
+  $('connectBtn').addEventListener('click', run);
+  $('retryBtn').addEventListener('click', run);
+  $('tryAgainBtn').addEventListener('click', async () => { await disconnect(); run(); });
+  $('disconnectBtn1').addEventListener('click', disconnect);
+}
+</script>
+</body>
+</html>
