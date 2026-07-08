@@ -254,6 +254,9 @@
       inscribeChange: $('inscribeChange'),
       threadReplyTo: $('threadReplyTo'),
       threadReplyNote: $('threadReplyNote'),
+      activityLog: $('activityLog'),
+      textAdvancedDetails: $('textAdvancedDetails'),
+      textAdvancedLogSlot: $('textAdvancedLogSlot'),
       largeFileNotice: $('largeFileNotice'),
       largeFileNoticeText: $('largeFileNoticeText'),
       parentRelationshipPanel: $('parentRelationshipPanel'),
@@ -277,6 +280,7 @@
       inscribeButton: $('inscribeButton'),
       resetInscriberButton: $('resetInscriberButton'),
       clearInscriberButton: $('clearInscriberButton'),
+      processingNotice: $('processingNotice'),
       stepBegin: $('stepBegin'),
       stepUpload: $('stepUpload'),
       stepSeal: $('stepSeal'),
@@ -3368,6 +3372,9 @@
       dom.disconnectButton.disabled = busy;
       dom.themeSelect.disabled = busy;
       dom.prepareButton.disabled = busy;
+      if (dom.processingNotice) {
+        dom.processingNotice.hidden = !busy;
+      }
       updateControls();
     };
 
@@ -9351,6 +9358,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // Clear the inscription panel back to an empty state for a fresh file: drops
     // the selected file, prepared payload, parents, and form fields.
     const clearInscriberPanel = () => {
+      if (
+        (state.busy || state.lastMintAttempt) &&
+        !window.confirm(
+          'Clear this inscription?\n\nThere is an inscription in progress. Its on-chain progress is saved and would resume on its own if you left it — clearing removes that local record. Clear anyway?'
+        )
+      ) {
+        return;
+      }
       if (state.payloadPreviewUrl) {
         URL.revokeObjectURL(state.payloadPreviewUrl);
         state.payloadPreviewUrl = null;
@@ -10199,12 +10214,30 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     };
     // Reveal the chosen path. Hoisted (function decl) so setSelectedFile / boot-restore can
     // call it before the const helpers below are initialised.
+    // The activity log is shared by both modes. In text mode it lives inside the
+    // single "Advanced" disclosure (so the text panel reads as just type + inscribe);
+    // in file/none mode it returns to its own top-level spot. Re-parenting keeps one
+    // log node (and its listeners) rather than duplicating it.
+    const activityLogHome = dom.activityLog
+      ? { parent: dom.activityLog.parentNode, next: dom.activityLog.nextSibling }
+      : null;
+    const placeActivityLog = (mode) => {
+      if (!dom.activityLog) return;
+      if (mode === 'text') {
+        if (dom.textAdvancedLogSlot && dom.activityLog.parentNode !== dom.textAdvancedLogSlot) {
+          dom.textAdvancedLogSlot.appendChild(dom.activityLog);
+        }
+      } else if (activityLogHome && dom.activityLog.parentNode !== activityLogHome.parent) {
+        activityLogHome.parent.insertBefore(dom.activityLog, activityLogHome.next);
+      }
+    };
     function applyInscribeMode(mode) {
       if (dom.inscribePanelBody) dom.inscribePanelBody.dataset.mode = mode;
       dom.tabFile?.classList.toggle('is-active', mode === 'file');
       dom.tabText?.classList.toggle('is-active', mode === 'text');
       dom.tabFile?.setAttribute('aria-selected', mode === 'file' ? 'true' : 'false');
       dom.tabText?.setAttribute('aria-selected', mode === 'text' ? 'true' : 'false');
+      placeActivityLog(mode);
     }
     // Threads: a "reply to" inscription id becomes a dependency (existence-only reference), so the
     // text is minted as an on-chain reply via mint-single-tx-recursive. Anyone can reply to any
@@ -10270,7 +10303,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const replyTo = (new URLSearchParams(window.location.search).get('reply') || '').trim();
       if (/^\d+$/.test(replyTo)) {
         dom.threadReplyTo.value = replyTo;
-        const td = document.getElementById('threadDetails');
+        const td = document.getElementById('textAdvancedDetails');
         if (td) td.open = true;
         setInscribeMode('text'); // switches to text + re-applies the reply-to dependency
       }
@@ -10296,7 +10329,18 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       queueTokenUriHeadPreviewUpdate();
     });
 
-    window.addEventListener('beforeunload', () => {
+    window.addEventListener('beforeunload', (event) => {
+      // Warn before leaving mid-inscription: a transaction may be signing or
+      // broadcasting. Progress is saved locally and resumes on reopen, but the
+      // native prompt stops an accidental close from interrupting the current tx.
+      if (state.busy) {
+        event.preventDefault();
+        event.returnValue = '';
+        return '';
+      }
+    });
+
+    window.addEventListener('pagehide', () => {
       if (state.tokenUriPreviewTimer !== null) {
         window.clearTimeout(state.tokenUriPreviewTimer);
       }

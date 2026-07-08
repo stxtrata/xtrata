@@ -210,6 +210,11 @@
       </div>
     </details>
 
+    <label class="checkline" id="receiptWrap" style="margin:12px 0 4px">
+      <input type="checkbox" id="receiptToggle" />
+      <span>Also inscribe an on-chain receipt <span class="muted">— a separate permanent receipt token (~0.1 STX extra). A viewable receipt is always saved either way, so this is off by default.</span></span>
+    </label>
+
     <div class="quote-summary">
       <span class="lbl">All-in deposit <span class="muted">(over-collected — unused remainder auto-refunded)</span></span>
       <span class="big-num" id="quoteTotal">—</span>
@@ -261,6 +266,11 @@
         </label>
       </div>
     </details>
+    <label class="checkline" id="batchReceiptWrap" style="margin:12px 0 4px">
+      <input type="checkbox" id="batchReceiptToggle" />
+      <span>Also inscribe an on-chain batch receipt <span class="muted">— a separate permanent receipt token (~0.1 STX extra). A viewable receipt is always saved either way, so this is off by default.</span></span>
+    </label>
+
     <div class="quote-summary">
       <span class="lbl">All-in deposit for the batch <span class="muted">(over-collected — unused remainder auto-refunded)</span></span>
       <span class="big-num" id="batchQuoteTotal">—</span>
@@ -347,6 +357,10 @@
 <script src="optimize-image.js?v=1"></script>
 <script>
 const API = '';   // backendless — all data flows through window.XtrataAgent (no HTTP API)
+// On-chain receipt: OFF by default. The receipt HTML is always saved + viewable; this
+// only controls whether a separate receipt token is also inscribed (and paid for).
+const RECEIPT_KEY = 'xao-onchain-receipt';
+let RECEIPT = localStorage.getItem(RECEIPT_KEY) === '1';
 const SERVER = { mock:false };
 let WALLET=null;
 const CONTENT = {
@@ -756,7 +770,7 @@ async function batchQuote(){
   if(!A.estimateBatch){ $('#batchQuoteTotal').textContent='agent bundle too old'; return; }
   try{
     const shared=$('#batchParents').value.split(',').map(s=>s.trim()).filter(Boolean);
-    const est=await A.estimateBatch({ itemsBytes:BATCH.items.map(it=>batchActiveFile(it).size), parentCount:new Set([...shared,...BATCH.items.flatMap(it=>it.parents.split(',').map(s=>s.trim()).filter(Boolean))]).size, marginUstx:$('#batchMargin').value||'0' });
+    const est=await A.estimateBatch({ itemsBytes:BATCH.items.map(it=>batchActiveFile(it).size), parentCount:new Set([...shared,...BATCH.items.flatMap(it=>it.parents.split(',').map(s=>s.trim()).filter(Boolean))]).size, marginUstx:$('#batchMargin').value||'0', receipt:RECEIPT });
     if(run!==BATCH.quoteRun) return;
     const pendingPlayers=BATCH.playerMode&&BATCH.items.some(it=>it.isAudio&&it.player.status!=='ready');
     $('#batchQuoteTotal').textContent=stx(est.requiredUstx)+(est.stxUsd?` · ~$${(Number(est.requiredUstx)/1e6*est.stxUsd).toFixed(2)}`:'')+(pendingPlayers?' (finalising after player builds)':'');
@@ -855,7 +869,7 @@ $('#batchInscribeBtn').onclick=async()=>{
         return { file:f, uri:it.uri.trim(), mime:asPlayer?'text/html':batchActiveMime(it),
         deps:it.deps.split(',').map(s=>s.trim()).filter(Boolean), parents:it.parents.split(',').map(s=>s.trim()).filter(Boolean) }; }),
       parents:shared, marginUstx:$('#batchMargin').value||'0', strict:$('#batchStrict').checked,
-      fastTrack:true, user:WALLET, expectedFunder:WALLET, recipient:batchRecipient||WALLET };
+      fastTrack:true, user:WALLET, expectedFunder:WALLET, recipient:batchRecipient||WALLET, receipt:RECEIPT };
     const {job}=await api('/api/jobs',{method:'POST',body:payload});
     FLOW.jobId=job.jobId; FLOW.done=false;
     setStep('pay');
@@ -996,7 +1010,7 @@ async function quote(){
   $('#quoteTotal').textContent='…';
   $('#inscribeBtn').disabled=true;
   try{
-    const e=await api('/api/estimate',{method:'POST',body:{bytes:f.size,marginUstx:$('#margin').value||'0',parentCount:parentList().length}});
+    const e=await api('/api/estimate',{method:'POST',body:{bytes:f.size,marginUstx:$('#margin').value||'0',parentCount:parentList().length,receipt:RECEIPT}});
     if(run!==FLOW.quoteRun) return;
     FLOW.quote=e;
     const usd=(u)=> e.stxUsd ? ' · ~$'+(Number(u)/1e6*e.stxUsd).toFixed(2) : '';
@@ -1005,7 +1019,7 @@ async function quote(){
       <div class="kv"><span>Size</span><span>${mib(e.bytes)} · ${e.bytes.toLocaleString()} bytes</span></div>
       <div class="kv"><span>Chunks</span><span>${e.chunks} · ${e.single?'single-tx':'staged ('+e.batches+' batches)'}</span></div>
       <div class="kv"><span>Xtrata protocol fee</span><span>${stx(e.protocolFee)}${usd(e.protocolFee)}</span></div>
-      <div class="kv"><span>Receipt inscription</span><span>${stx(e.receiptProtocol||'0')}${usd(e.receiptProtocol||'0')}</span></div>
+      ${BigInt(e.receiptProtocol||'0')>0n?`<div class="kv"><span>Receipt inscription</span><span>${stx(e.receiptProtocol)}${usd(e.receiptProtocol)}</span></div>`:'<div class="kv"><span>On-chain receipt</span><span class="muted">off — receipt saved locally, not inscribed</span></div>'}
       <div class="kv"><span>Network (miner) reserve</span><span>${stx((BigInt(e.minerReserve)+BigInt(e.receiptMiner||'0')).toString())}${usd((BigInt(e.minerReserve)+BigInt(e.receiptMiner||'0')).toString())}</span></div>
       <div class="kv"><span>Agent fee (${e.agentFeePct}%)</span><span style="color:var(--acc2)">${stx(e.agentFeeUstx||'0')}${usd(e.agentFeeUstx||'0')}</span></div>
       <div class="kv"><span><b>Required deposit</b></span><span><b>${stx(e.requiredUstx)}${usd(e.requiredUstx)}</b></span></div>
@@ -1044,7 +1058,7 @@ $('#inscribeBtn').onclick=async()=>{
   $('#inscribeBtn').disabled=true;
   try{
     const payload={ file, uri, mime:CONTENT[catSel.value][ftSel.value]||file.type||'application/octet-stream',
-      deps, parents, marginUstx:$('#margin').value||'0', fastTrack:true };
+      deps, parents, marginUstx:$('#margin').value||'0', fastTrack:true, receipt:RECEIPT };
     payload.user = WALLET;                        // payer = change/refund destination (always the connected wallet)
     payload.recipient = differentAddr ? recipientAddr : WALLET;   // inscription + receipt destination
     payload.expectedFunder = WALLET;              // railroad: ONLY this wallet may fund; any other payer is auto-refunded
@@ -1058,6 +1072,9 @@ $('#inscribeBtn').onclick=async()=>{
 };
 
 function resetFlow(){
+  if((FLOW.jobId&&LIVE.has(FLOW.jobId))||SIG_PENDING){
+    if(!confirm('This inscription is still running. Starting again clears it from view — the job keeps going and stays in History, but you\'ll lose the live card here. Start again anyway?')) return;
+  }
   FLOW.original=null; FLOW.optimized=null; FLOW.useOriginal=false; FLOW.quote=null;
   FLOW.jobId=null; FLOW.done=false; FLOW.optRun++; FLOW.quoteRun++;
   $('#activeJobDetail').innerHTML='';
@@ -1081,6 +1098,12 @@ window.resetFlow=resetFlow;
 // ============================================================================
 let selJob=null, pollTimer=null;
 let lastProgAt=0, expiryAt=0;   // active-flow countdowns only
+const LIVE=new Set();           // jobIds mid-inscription (funded → delivering)
+let SIG_PENDING=false;          // a wallet signature is awaiting confirmation
+// Guard against an accidental tab close / refresh that would pause a running job.
+window.addEventListener('beforeunload',(e)=>{
+  if(LIVE.size||SIG_PENDING){ e.preventDefault(); e.returnValue=''; return ''; }
+});
 async function loadJobs(){
   try{ const {jobs}=await api('/api/jobs'); const b=$('#jobsBody');
     if(!jobs.length){ b.innerHTML='<tr><td colspan="6" class="muted">No jobs yet.</td></tr>'; return jobs; }
@@ -1107,6 +1130,7 @@ async function renderJobDetail(jobId,out,isActive){
   try{ const {job,status}=await api('/api/jobs/'+jobId);
     const funded=status.funded, st=job.status;
     const active=(st==='FUNDED'||st==='INSCRIBING'||st==='DELIVERING'||(st==='INSCRIBED'&&job.fastTrack));
+    if(active) LIVE.add(jobId); else LIVE.delete(jobId);
     if(isActive){ if(active){ if(!lastProgAt) lastProgAt=Date.now(); } else lastProgAt=0; }
     const ds=(st==='AWAITING_DEPOSIT'&&funded)?'FUNDED':st;
     const phaseMsg={FUNDED:'Payment detected — starting…',INSCRIBING:'Inscribing on-chain…',INSCRIBED:'Inscribed — delivering…',DELIVERING:'Delivering inscription + refunding change…'}[st];
@@ -1179,13 +1203,14 @@ async function renderJobDetail(jobId,out,isActive){
       ${job.agentFeeUstx?`<div class="kv"><span>Agent fee (${job.agentFeePct||10}%)</span><span style="color:var(--acc2)">${stx(job.agentFeeUstx)}</span></div>`:''}
       ${(job.refundedUstx!=null)?`<div class="kv"><span>Change refunded</span><span>${stx(job.refundedUstx||'0')}</span></div>`:''}
       ${active?`<div class="progress"><span class="spin"></span>${esc(phaseMsg||'Working…')}${job.progress?(' · '+esc(job.progress)):''} ${isActive?'<span id="progT" class="muted"></span>':''}</div>`:''}
+      ${active?`<div class="muted" style="margin-top:6px;font-size:12px;color:var(--ok)">🔒 Safe to close or refresh — this job runs from an escrow wallet on our server, not your browser. Reopen this page and it resumes automatically. Don't send another payment.</div>`:''}
       ${showDeposit&&!funded?`<div class="muted" style="margin-top:10px;font-size:12px">${job.fastTrack?'Pay from your connected wallet (shown above) — it receives the inscription and any change, and processing starts automatically on arrival. Payments from any other wallet are returned to the sender.':'Waiting for your deposit — the status flips to FUNDED once it lands.'}</div>`:''}
       ${job.error?`<div class="err" style="margin-top:8px">Error: ${esc(job.error)}${!job.fastTrack?` <button class="btn ghost" onclick="act('run','${esc(job.jobId)}')" style="margin-left:8px;padding:5px 10px">Retry</button>`:''}</div>`:''}
       ${(!job.fastTrack&&(st==='AWAITING_DEPOSIT'||st==='INSCRIBED'))?`<div class="btnrow">
         <button class="btn good" onclick="act('run','${esc(job.jobId)}')" ${(funded&&st==='AWAITING_DEPOSIT')?'':'disabled'}>Run inscription</button>
         <button class="btn warn" onclick="act('deliver','${esc(job.jobId)}')" ${st==='INSCRIBED'?'':'disabled'}>Deliver + refund + wipe key</button>
       </div><div class="err" id="jobErr"></div>`:''}
-      ${(st==='COMPLETE'||st==='COMPLETE_WITH_SKIPS')?`<div class="ok" style="margin-top:12px">✓ ${job.items?`Batch complete — ${job.items.filter(i=>i.tokenId).length}/${job.items.length} inscriptions + the batch receipt delivered${job.fastTrack?' to your wallet':''}${st==='COMPLETE_WITH_SKIPS'?` (${job.items.filter(i=>i.status==='FAILED').length} failed / ${job.items.filter(i=>i.status==='SKIPPED').length} skipped — their cost came back as change)`:''}`:`Complete — inscription + receipt delivered${job.fastTrack?' to your wallet':''}`}${(job.parents&&job.parents.length)?`, parent${job.parents.length>1?'s':''} #${job.parents.map(esc).join(', #')} returned to your wallet`:''}, change refunded, deposit key wiped.</div>
+      ${(st==='COMPLETE'||st==='COMPLETE_WITH_SKIPS')?`<div class="ok" style="margin-top:12px">✓ ${job.items?`Batch complete — ${job.items.filter(i=>i.tokenId).length}/${job.items.length} inscriptions${job.receipt===false?'':' + the batch receipt'} delivered${job.fastTrack?' to your wallet':''}${st==='COMPLETE_WITH_SKIPS'?` (${job.items.filter(i=>i.status==='FAILED').length} failed / ${job.items.filter(i=>i.status==='SKIPPED').length} skipped — their cost came back as change)`:''}`:`Complete — inscription${job.receipt===false?'':' + receipt'} delivered${job.fastTrack?' to your wallet':''}`}${(job.parents&&job.parents.length)?`, parent${job.parents.length>1?'s':''} #${job.parents.map(esc).join(', #')} returned to your wallet`:''}, change refunded, deposit key wiped.</div>
       <div class="btnrow"><button class="btn" onclick="viewReceipt('${esc(job.jobId)}')">View receipt</button>
         ${job.tokenId?`<a class="btn ghost" style="text-decoration:none;display:inline-block" href="/x/${esc(job.tokenId)}" target="_blank" rel="noopener">View on Xplorer</a>`:''}
         ${isActive?`<button class="btn alt" onclick="resetFlow()">Inscribe another file</button>`:`<button class="btn ghost" onclick="act('delete','${esc(job.jobId)}')">Delete job</button>`}</div>`:''}
@@ -1215,7 +1240,7 @@ async function sendParent(jobId,pid){
   const w=xtrataWallet();
   if(!w||!w.sendInscription){ PARENT_MSG[jobId]={err:1,text:'Wallet bundle too old for one-click send — rebuild agent-one.js, or transfer #'+esc(pid)+' to the deposit address manually.'}; jobsTick(); return; }
   if(!WALLET){ connectWallet(); return; }
-  PARENT_MSG[jobId]={text:'Waiting for wallet confirmation…'}; jobsTick();
+  PARENT_MSG[jobId]={text:'Waiting for wallet confirmation…'}; SIG_PENDING=true; jobsTick();
   try{
     const {job}=await api('/api/jobs/'+jobId);
     const core=String((PARENT_INFO[jobId]&&PARENT_INFO[jobId].__core)||'').split('.');
@@ -1223,7 +1248,7 @@ async function sendParent(jobId,pid){
       tokenId:pid, sender:WALLET, recipient:job.depositAddress, network:SERVER.net||'mainnet' });   // recipient is ALWAYS this job's deposit wallet
     PARENT_MSG[jobId]={text:'✓ Parent #'+esc(pid)+' transfer submitted'+(r&&r.txId?(' · '+esc(String(r.txId).slice(0,10))+'…'):'')+' — it will show as “arrived” once confirmed.'};
   }catch(e){ PARENT_MSG[jobId]={err:1,text:'Parent send did not go through: '+esc((e&&e.message)||String(e))+' — you can retry, or send #'+esc(pid)+' to the deposit address from your wallet manually.'}; }
-  parentChkAt[jobId]=0; lastProgAt=Date.now(); jobsTick();
+  parentChkAt[jobId]=0; SIG_PENDING=false; lastProgAt=Date.now(); jobsTick();
 }
 window.sendParent=sendParent;
 
@@ -1244,13 +1269,45 @@ window.selectJob=selectJob; window.act=act; window.viewReceipt=viewReceipt;
 setInterval(()=>{ const t=$('#progT'); if(t&&lastProgAt){ const s=Math.round((Date.now()-lastProgAt)/1000); let x=''; if(s>=90)x=' · slower than usual — Stacks may be congested, still working'; else if(s>=30)x=' · confirming on-chain'; t.textContent='('+s+'s'+x+')'; }
   const et=$('#expT'); if(et&&expiryAt){ const r=expiryAt-Date.now(); et.textContent = r>0 ? ('Auto-returns in '+Math.floor(r/60000)+':'+String(Math.floor(r/1000)%60).padStart(2,'0')) : 'Returning funds…'; } },1000);
 
+// On-chain receipt toggles (single + batch stay in sync; choice persists; re-quotes live).
+(function initReceiptToggles(){
+  const boxes=[$('#receiptToggle'),$('#batchReceiptToggle')].filter(Boolean);
+  boxes.forEach(b=>{
+    b.checked=RECEIPT;
+    b.addEventListener('change',()=>{
+      RECEIPT=b.checked; localStorage.setItem(RECEIPT_KEY, RECEIPT?'1':'0');
+      boxes.forEach(o=>{ if(o!==b) o.checked=RECEIPT; });
+      try{ if(!$('#reviewCard').hidden) quote(); }catch(e){}
+      try{ if(!$('#batchCard').hidden) batchQuote(); }catch(e){}
+    });
+  });
+})();
+
 // Unfinished business from a previous visit? Point at History instead of interrupting the railroad.
 (async()=>{ try{ const jobs=await loadJobs();
   const open=(jobs||[]).filter(j=>!['COMPLETE','CANCELLED'].includes(j.status));
-  if(open.length){ const n=$('#resumeNotice'); n.hidden=false;
+  // A job that's actively minting (funded → delivering) or any fast-track job in
+  // flight reattaches straight to the live card, so a mid-process refresh/close
+  // drops the user right back on the running inscription.
+  const live=open.find(j=>['FUNDED','INSCRIBING','INSCRIBED','DELIVERING'].includes(j.status)&&(j.funded||j.fastTrack));
+  if(live&&!FLOW.jobId){
+    FLOW.jobId=live.jobId; FLOW.done=false; setStep('pay');
+    renderJobDetail(live.jobId,$('#activeJobDetail'),true);
+    $('#activeJobDetail').scrollIntoView({behavior:'smooth',block:'start'});
+    startJobsPoll();
+  } else if(open.length){ const n=$('#resumeNotice'); n.hidden=false;
     n.innerHTML=`↻ ${open.length} unfinished job${open.length>1?'s':''} from a previous session — open <a href="#" style="color:var(--acc)" onclick="document.getElementById('historySection').open=true;document.getElementById('historySection').scrollIntoView({behavior:'smooth'});return false;">History</a> to resume.`;
     startJobsPoll(); }
 }catch(e){} })();
+
+// Background tabs throttle the 3s poll, which can stall a live job. When the tab
+// comes back to the foreground, tick immediately and make sure the poll is running.
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&(FLOW.jobId||selJob||$('#historySection').open)){
+    jobsTick(); if(!pollTimer) startJobsPoll();
+  }
+});
+window.addEventListener('focus',()=>{ if(FLOW.jobId||selJob){ jobsTick(); if(!pollTimer) startJobsPoll(); } });
 
 // ============================================================================
 // Dependency graph composer (advanced) — logic unchanged from the tabbed wizard.

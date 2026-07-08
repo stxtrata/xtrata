@@ -905,6 +905,21 @@
     #inscribePanelBody[data-mode='text'] #largeFileNotice,
     #inscribePanelBody[data-mode='file']:not(.has-payload) #largeFileNotice { display: none; }
 
+    .processing-notice {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-top: 12px;
+      padding: 12px 14px;
+      border: 1px solid var(--acc, #4f8cff);
+      background: var(--acc-soft, rgba(79, 140, 255, 0.1));
+      border-radius: var(--radius);
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--ink);
+    }
+    .processing-notice[hidden] { display: none; }
+
     /* Xplorer: "in reply to" thread link on the selected inscription. */
     .selected-thread { margin-top: 8px; }
     .selected-thread[hidden] { display: none; }
@@ -934,6 +949,7 @@
     #inscribePanelBody[data-mode='none'] .steps,
     #inscribePanelBody[data-mode='none'] #duplicateWarning,
     #inscribePanelBody[data-mode='none'] #resumeNotice,
+    #inscribePanelBody[data-mode='none'] #activityLog,
     #inscribePanelBody[data-mode='none'] #batchGuide { display: none; }
 
     /* File path: hide the text card. */
