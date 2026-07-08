@@ -3540,18 +3540,26 @@
       !addressesEqual(state.walletViewAddress, state.walletSession.address);
 
     const shouldClearWalletLookupOnSubmit = () => {
-      if (state.curatedGalleryId || state.walletViewAddress || state.walletViewName) {
-        return true;
-      }
-      if (!isViewingExternalConnectedWallet()) {
+      const hasActiveView =
+        !!state.curatedGalleryId ||
+        !!state.walletViewAddress ||
+        !!state.walletViewName ||
+        isViewingExternalConnectedWallet();
+      if (!hasActiveView) {
         return false;
       }
+      // Only treat the submit as "clear" (back to the default view) when the box
+      // is empty or still shows the wallet currently on screen. A NEW, different
+      // address/name means the user wants to jump straight to that wallet, so we
+      // must NOT clear first. Previously this returned true for ANY active view,
+      // which swallowed the second lookup — you had to clear, then retype the
+      // target before it would load.
       const inputValue = normalizeWalletLookupInputValue(dom.walletLookupInput.value);
       const displayValue = getWalletLookupDisplayValue();
       return (
         !inputValue ||
         inputValue === displayValue ||
-        addressesEqual(inputValue, state.walletViewAddress)
+        (!!state.walletViewAddress && addressesEqual(inputValue, state.walletViewAddress))
       );
     };
 
