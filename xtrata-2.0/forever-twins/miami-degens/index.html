@@ -857,6 +857,13 @@
                 </div>
               </div>
 
+              <div class="row" id="myItemsRow">
+                <div class="button-row">
+                  <button id="myItemsBtn" class="btn-outline" type="button">Show my items in this collection</button>
+                  <span id="myItemsStatus" style="color:var(--muted);font-family:var(--mono);font-size:0.72rem"></span>
+                </div>
+                <div id="myItemsChips" class="button-row" style="margin-top:0.5rem;flex-wrap:wrap"></div>
+              </div>
               <div id="journeyImage" class="journey-image">Enter a Miami Degen number above and select “Show me this degen”.</div>
 
               <div id="journeyStatus" class="callout journey-status">Pick any Miami Degen number to see it. You can browse as many as you like before choosing one to make permanent.</div>
@@ -2341,6 +2348,59 @@
       } catch (err) { log('Could not refresh contract stats', { error: err.message }); }
     }
 
+    async function loadMyCollectionItems() {
+      const chips = $('myItemsChips');
+      const status = $('myItemsStatus');
+      if (chips) chips.innerHTML = '';
+      if (!state.wallet) { if (status) status.textContent = 'Connect your wallet first.'; return; }
+      const source = $('sourceContract').value.trim();
+      const asset = $('sourceAssetName').value.trim();
+      const assetId = `${source}::${asset}`;
+      const apiBase = ($('apiBase') && $('apiBase').value.trim()
+        ? $('apiBase').value.trim()
+        : (networkName() === 'testnet' ? 'https://api.testnet.hiro.so' : 'https://api.mainnet.hiro.so')).replace(/\/+$/, '');
+      if (status) status.textContent = 'Loading your items…';
+      log('trace: my-items - request holdings', { wallet: state.wallet, assetId });
+      try {
+        const ids = [];
+        const limit = 50;
+        let offset = 0;
+        for (let page = 0; page < 20; page += 1) {
+          const url = `${apiBase}/extended/v1/tokens/nft/holdings?principal=${encodeURIComponent(state.wallet)}&asset_identifiers=${encodeURIComponent(assetId)}&limit=${limit}&offset=${offset}`;
+          const res = await fetch(url, { cache: 'no-store' });
+          if (!res.ok) throw new Error(`Hiro holdings HTTP ${res.status}`);
+          const json = await res.json();
+          const results = Array.isArray(json.results) ? json.results : [];
+          for (const r of results) {
+            const repr = r && r.value && r.value.repr ? String(r.value.repr) : '';
+            const m = repr.match(/^u?(\d+)$/);
+            if (m) ids.push(m[1]);
+          }
+          const total = Number(json.total || 0);
+          offset += limit;
+          if (results.length === 0 || offset >= total) break;
+        }
+        const unique = [...new Set(ids)].sort((x, y) => Number(x) - Number(y));
+        log('trace: my-items - holdings resolved', { count: unique.length, ids: unique });
+        if (!unique.length) { if (status) status.textContent = 'No items from this collection in your connected wallet.'; return; }
+        if (status) status.textContent = `${unique.length} item${unique.length === 1 ? '' : 's'} in your wallet — select one to load:`;
+        for (const id of unique) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'mini-link';
+          btn.textContent = `#${id}`;
+          btn.addEventListener('click', () => {
+            $('tokenId').value = id;
+            const lt = $('lookupToken'); if (lt) lt.textContent = id;
+            checkToken();
+          });
+          chips.appendChild(btn);
+        }
+      } catch (err) {
+        log('my-items load failed', { error: err.message });
+        if (status) status.textContent = `Could not load your items: ${err.message}`;
+      }
+    }
     async function checkToken() {
       const tokenId = getTokenId();
       const helper = $('helperContract').value.trim();
@@ -2611,6 +2671,7 @@
     bind('networkToggle', 'click', () => { $('network').value = networkName() === 'mainnet' ? 'testnet' : 'mainnet'; syncLabels(); resetChainOnlyDisplays(); });
     bind('refreshBtn', 'click', refreshContractStatus);
     bind('checkBtn', 'click', checkToken);
+    bind('myItemsBtn', 'click', loadMyCollectionItems);
     bind('lookupBtn', 'click', checkToken);
     bind('tokenUriBtn', 'click', fetchTokenUriForCurrentToken);
     bind('metadataBtn', 'click', readMetadataForCurrentToken);
