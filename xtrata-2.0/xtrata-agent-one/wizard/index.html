@@ -8,35 +8,35 @@
 <link rel="apple-touch-icon" href="/favicons/xtrata-apple-touch-icon.png" />
 <style>
   :root {
-    color-scheme: light;
-    --bg: #f6f8f5;
-    --panel: #ffffff;
-    --ink: #151a17;
-    --muted: #617067;
-    --line: #d2ddd6;
-    --line-strong: #9caf9f;
-    --green: #245f45;
-    --green-soft: #e6f1ea;
-    --blue: #214f73;
-    --blue-soft: #e5eef5;
-    --rose: #a43f58;
-    --rose-soft: #f7e6eb;
-    --amber: #84601b;
-    --amber-soft: #f7edd7;
-    --shadow: 0 18px 50px rgba(19, 31, 25, 0.08);
+    color-scheme: dark;
+    --bg: #050505;
+    --panel: #111111;
+    --ink: #f7f7f7;
+    --muted: #c9c9c9;
+    --line: #303030;
+    --line-strong: #d8d8d8;
+    --green: #ffffff;
+    --green-soft: #1d1d1d;
+    --blue: #e7e7e7;
+    --blue-soft: #181818;
+    --rose: #ffffff;
+    --rose-soft: #1f1f1f;
+    --amber: #d4d4d4;
+    --amber-soft: #202020;
+    --shadow: 0 24px 70px rgba(0,0,0,0.62);
     --radius: 8px;
-    --control: #ffffff;
-    --surface-soft: #fbfdfb;
-    --thumb: #f1f5f2;
-    --button-hover: #27302b;
-    --ghost-hover: rgba(21, 26, 23, 0.06);
-    --focus-ring: rgba(36, 95, 69, 0.12);
-    --topbar-accent: transparent;
-    --button-bg: var(--ink);
-    --button-ink: var(--bg);
-    --button-border: var(--ink);
+    --control: #0b0b0b;
+    --surface-soft: #151515;
+    --thumb: #0d0d0d;
+    --button-hover: #d8d8d8;
+    --ghost-hover: rgba(255,255,255,0.08);
+    --focus-ring: rgba(255,255,255,0.18);
+    --topbar-accent: rgba(255,255,255,0.20);
+    --button-bg: #f7f7f7;
+    --button-ink: #050505;
+    --button-border: #f7f7f7;
     --secondary-bg: transparent;
-    --secondary-ink: var(--ink);
+    --secondary-ink: #f7f7f7;
   }
   /* wizard-only token names aliased onto the site's theme tokens */
   :root {
@@ -387,6 +387,7 @@
   .preview-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;font-size:12px;color:var(--mut);margin-bottom:7px}
   .preview-body{border:1px solid var(--line);border-radius:12px;background:var(--panel2);overflow:hidden;display:flex;justify-content:center;align-items:center;min-height:56px}
   .preview-body img{max-width:100%;max-height:340px;display:block}
+  .preview-body.is-image{background:#000}
   .preview-body video{max-width:100%;max-height:340px;display:block;background:#000}
   .preview-body audio{width:100%;margin:14px 12px}
   .preview-body iframe{width:100%;height:360px;border:0;background:#fff}
@@ -1183,7 +1184,7 @@ function renderFileLines(){
 // ---- live preview: exactly the bytes that will go on-chain ----
 let previewUrl=null, previewRun=0;
 function clearPreview(){ if(previewUrl){ try{URL.revokeObjectURL(previewUrl);}catch{} previewUrl=null; }
-  $('#previewBody').innerHTML=''; $('#previewBlock').hidden=true; $('#previewFootnote').hidden=true; }
+  $('#previewBody').innerHTML=''; $('#previewBody').classList.remove('is-image'); $('#previewBlock').hidden=true; $('#previewFootnote').hidden=true; }
 async function renderPreview(){
   const f=FLOW.activeFile(); const run=++previewRun;
   clearPreview(); if(!f) return;
@@ -1191,7 +1192,7 @@ async function renderPreview(){
   const mime=(CONTENT[catSel.value]&&CONTENT[catSel.value][ftSel.value])||f.type||'';
   $('#previewBlock').hidden=false; note.textContent=mime||'unknown type';
   const url=()=>{ previewUrl=URL.createObjectURL(f); return previewUrl; };
-  if(mime.startsWith('image/')){ body.innerHTML=`<img alt="Preview of ${esc(f.name)}">`; body.firstChild.src=url(); }
+  if(mime.startsWith('image/')){ body.innerHTML=`<img alt="Preview of ${esc(f.name)}">`; body.firstChild.src=url(); body.classList.add('is-image'); }
   else if(mime.startsWith('audio/')){ body.innerHTML=`<audio controls></audio>`; body.firstChild.src=url();
     if(FLOW.optimized) { foot.hidden=false; foot.textContent='You are hearing the '+(FLOW.useOriginal?'ORIGINAL file.':'OPTIMISED Opus file — toggle “Use the original file instead” below to compare.'); } }
   else if(mime.startsWith('video/')){ body.innerHTML=`<video controls></video>`; body.firstChild.src=url(); }
