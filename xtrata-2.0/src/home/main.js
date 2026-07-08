@@ -3459,8 +3459,8 @@
       if (!dom.connectedReadout || !dom.connectedReadoutValue || !dom.connectedReadoutAddress) {
         return;
       }
-      dom.connectedReadout.hidden = !connected || state.explorerMode;
-      if (!connected || state.explorerMode) {
+      dom.connectedReadout.hidden = !connected;
+      if (!connected) {
         dom.connectedReadoutValue.textContent = '';
         dom.connectedReadoutAddress.textContent = '';
         return;
@@ -3864,9 +3864,9 @@
         connected && document.body.classList.contains('has-ledger') && visibleWalletCount > 0;
       const hasGridBackTarget =
         (hasConnectedInscriptionView || state.explorerMode) && state.selectedTokenId !== null;
-      dom.connectButton.hidden = connected || state.explorerMode;
-      dom.disconnectButton.hidden = !connected || state.explorerMode;
-      dom.viewInscriptionsButton.hidden = !hasConnectedInscriptionView || state.explorerMode;
+      dom.connectButton.hidden = connected;
+      dom.disconnectButton.hidden = !connected;
+      dom.viewInscriptionsButton.hidden = !hasConnectedInscriptionView;
       dom.viewInscriptionsButton.disabled = state.busy;
       dom.backToGridButton.hidden = !hasGridBackTarget;
       dom.inscribeButton.disabled =
