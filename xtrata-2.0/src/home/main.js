@@ -254,6 +254,9 @@
       inscribeChange: $('inscribeChange'),
       threadReplyTo: $('threadReplyTo'),
       threadReplyNote: $('threadReplyNote'),
+      activityLog: $('activityLog'),
+      textAdvancedDetails: $('textAdvancedDetails'),
+      textAdvancedLogSlot: $('textAdvancedLogSlot'),
       largeFileNotice: $('largeFileNotice'),
       largeFileNoticeText: $('largeFileNoticeText'),
       parentRelationshipPanel: $('parentRelationshipPanel'),
@@ -277,6 +280,7 @@
       inscribeButton: $('inscribeButton'),
       resetInscriberButton: $('resetInscriberButton'),
       clearInscriberButton: $('clearInscriberButton'),
+      processingNotice: $('processingNotice'),
       stepBegin: $('stepBegin'),
       stepUpload: $('stepUpload'),
       stepSeal: $('stepSeal'),
@@ -311,6 +315,8 @@
       explorerJumpButton: $('explorerJumpButton'),
       explorerRandomButton: $('explorerRandomButton'),
       explorerLatestButton: $('explorerLatestButton'),
+      explorerPrevPageButton: $('explorerPrevPageButton'),
+      explorerNextPageButton: $('explorerNextPageButton'),
       explorerFilterGroup: $('explorerFilterGroup'),
       explorerFilterToggle: $('explorerFilterToggle'),
       explorerClearFiltersButton: $('explorerClearFiltersButton'),
@@ -3368,6 +3374,9 @@
       dom.disconnectButton.disabled = busy;
       dom.themeSelect.disabled = busy;
       dom.prepareButton.disabled = busy;
+      if (dom.processingNotice) {
+        dom.processingNotice.hidden = !busy;
+      }
       updateControls();
     };
 
@@ -3452,8 +3461,8 @@
       if (!dom.connectedReadout || !dom.connectedReadoutValue || !dom.connectedReadoutAddress) {
         return;
       }
-      dom.connectedReadout.hidden = !connected || state.explorerMode;
-      if (!connected || state.explorerMode) {
+      dom.connectedReadout.hidden = !connected;
+      if (!connected) {
         dom.connectedReadoutValue.textContent = '';
         dom.connectedReadoutAddress.textContent = '';
         return;
@@ -3533,18 +3542,26 @@
       !addressesEqual(state.walletViewAddress, state.walletSession.address);
 
     const shouldClearWalletLookupOnSubmit = () => {
-      if (state.curatedGalleryId || state.walletViewAddress || state.walletViewName) {
-        return true;
-      }
-      if (!isViewingExternalConnectedWallet()) {
+      const hasActiveView =
+        !!state.curatedGalleryId ||
+        !!state.walletViewAddress ||
+        !!state.walletViewName ||
+        isViewingExternalConnectedWallet();
+      if (!hasActiveView) {
         return false;
       }
+      // Only treat the submit as "clear" (back to the default view) when the box
+      // is empty or still shows the wallet currently on screen. A NEW, different
+      // address/name means the user wants to jump straight to that wallet, so we
+      // must NOT clear first. Previously this returned true for ANY active view,
+      // which swallowed the second lookup — you had to clear, then retype the
+      // target before it would load.
       const inputValue = normalizeWalletLookupInputValue(dom.walletLookupInput.value);
       const displayValue = getWalletLookupDisplayValue();
       return (
         !inputValue ||
         inputValue === displayValue ||
-        addressesEqual(inputValue, state.walletViewAddress)
+        (!!state.walletViewAddress && addressesEqual(inputValue, state.walletViewAddress))
       );
     };
 
@@ -3773,6 +3790,13 @@
       document.body.classList.toggle('has-ledger', hasLedger);
       document.body.classList.toggle('has-public-ledger', hasPublicLedger);
       document.body.classList.toggle('explorer-mode', state.explorerMode);
+      // Viewing a specific wallet inside Xplorer: hide the global-feed controls
+      // (page/token jump + type filters) to avoid confusion — they don't apply
+      // to a single wallet's holdings.
+      document.body.classList.toggle(
+        'explorer-wallet-view',
+        state.explorerMode && !!state.walletViewAddress
+      );
       document.body.classList.toggle('intro-mode', !hasLedger && !state.explorerMode);
       if (dom.walletTitle) {
         if (state.explorerMode) {
@@ -3842,9 +3866,9 @@
         connected && document.body.classList.contains('has-ledger') && visibleWalletCount > 0;
       const hasGridBackTarget =
         (hasConnectedInscriptionView || state.explorerMode) && state.selectedTokenId !== null;
-      dom.connectButton.hidden = connected || state.explorerMode;
-      dom.disconnectButton.hidden = !connected || state.explorerMode;
-      dom.viewInscriptionsButton.hidden = !hasConnectedInscriptionView || state.explorerMode;
+      dom.connectButton.hidden = connected;
+      dom.disconnectButton.hidden = !connected;
+      dom.viewInscriptionsButton.hidden = !hasConnectedInscriptionView;
       dom.viewInscriptionsButton.disabled = state.busy;
       dom.backToGridButton.hidden = !hasGridBackTarget;
       dom.inscribeButton.disabled =
@@ -3962,6 +3986,8 @@
         dom.walletPageReadout.textContent = 'Latest matches';
         dom.walletPrevButton.disabled = true;
         dom.walletNextButton.disabled = true;
+        if (dom.explorerPrevPageButton) dom.explorerPrevPageButton.disabled = true;
+        if (dom.explorerNextPageButton) dom.explorerNextPageButton.disabled = true;
         return;
       }
       const pageCount = getWalletPageCount();
@@ -3980,6 +4006,8 @@
         state.walletLoadingPage ||
         !hasPages ||
         state.walletPageIndex >= pageCount - 1;
+      if (dom.explorerPrevPageButton) dom.explorerPrevPageButton.disabled = dom.walletPrevButton.disabled;
+      if (dom.explorerNextPageButton) dom.explorerNextPageButton.disabled = dom.walletNextButton.disabled;
     };
 
     const syncExplorerFilterControls = () => {
@@ -7331,6 +7359,30 @@
       state.walletLookupPending = false;
     };
 
+    // Keep the address bar in step with the wallet actually on screen, so the
+    // URL is correct/shareable and a refresh reopens the same wallet. Uses
+    // replaceState (no history spam) — a .btc name is preferred for readability,
+    // otherwise the raw address.
+    const applyWalletViewUrl = (nameOrAddress) => {
+      const value = (nameOrAddress ?? '').toString().replace(/\.btc$/i, '').trim();
+      try {
+        if (!value) {
+          clearWalletViewUrl();
+          return;
+        }
+        window.history.replaceState(null, '', `/?wallet=${encodeURIComponent(value)}`);
+      } catch (_) {
+        // history API unavailable — non-fatal
+      }
+    };
+    const clearWalletViewUrl = () => {
+      try {
+        window.history.replaceState(null, '', state.explorerMode ? '/xplorer' : '/my-wallet');
+      } catch (_) {
+        // non-fatal
+      }
+    };
+
     const clearWalletLookupToConnectedWallet = async () => {
       state.walletViewRequestId += 1;
       cancelWalletLookup();
@@ -7349,8 +7401,13 @@
       dom.walletLookupInput.value = '';
       updateWalletLookupInputMode();
 
-      appendLog('Returned to connected wallet view.');
+      appendLog(
+        state.explorerMode
+          ? 'Cleared wallet view — showing the latest inscriptions.'
+          : 'Returned to connected wallet view.'
+      );
 
+      clearWalletViewUrl();
       updateWalletStatus();
       await loadWalletInscriptions();
       updateControls();
@@ -7378,10 +7435,18 @@
       state.curatedGalleryTitle = null;
       state.homeLatestView = false;
       clearExampleDescription();
+      // Drop the previous wallet's selected inscription so the preview panel
+      // never shows a stale token from the wallet we just left.
+      clearSelectedTokenPreview();
 
       if (dom.walletLookupInput) {
         dom.walletLookupInput.value = isConnectedAddress ? '' : normalized;
         updateWalletLookupInputMode();
+      }
+      if (isConnectedAddress) {
+        clearWalletViewUrl();
+      } else {
+        applyWalletViewUrl(normalized);
       }
       appendLog(`Viewing wallet: ${truncateMiddle(normalized, 8, 8)}.`);
       updateWalletStatus();
@@ -7441,9 +7506,15 @@
         state.curatedGalleryTitle = null;
         state.homeLatestView = false;
         clearExampleDescription();
+        clearSelectedTokenPreview();
 
         dom.walletLookupInput.value = isConnectedAddress ? '' : baseLookupState.lookupAddress;
         updateWalletLookupInputMode();
+        if (isConnectedAddress) {
+          clearWalletViewUrl();
+        } else {
+          applyWalletViewUrl(baseLookupState.lookupAddress);
+        }
         appendLog(`Viewing wallet: ${truncateMiddle(baseLookupState.lookupAddress, 8, 8)}.`);
         updateWalletStatus();
         await loadWalletInscriptions(options);
@@ -7493,8 +7564,14 @@
         state.curatedGalleryId = null;
         state.curatedGalleryTitle = null;
         state.homeLatestView = false;
+        clearSelectedTokenPreview();
         dom.walletLookupInput.value = isConnectedAddress ? '' : toBtcLookupLabel(lookupName);
         updateWalletLookupInputMode();
+        if (isConnectedAddress) {
+          clearWalletViewUrl();
+        } else {
+          applyWalletViewUrl(lookupName);
+        }
         state.walletLookupNotice = null;
         appendLog(
           `Resolved ${lookupName} to ${truncateMiddle(resolvedLookupState.resolvedAddress, 8, 8)}.`
@@ -8769,7 +8846,13 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     };
 
     const loadWalletInscriptions = async (options = {}) => {
-      if (state.explorerMode) {
+      // In Xplorer (explorer mode) the grid defaults to the global latest feed —
+      // BUT an explicit wallet lookup must take precedence, otherwise submitting a
+      // name/address in the "View wallet" box just reloaded the latest feed and the
+      // requested wallet never appeared (it only worked once explorer mode had been
+      // left). When a wallet is being viewed, fall through and load its holdings;
+      // clearing the lookup (walletViewAddress → null) returns to the default feed.
+      if (state.explorerMode && !state.walletViewAddress) {
         await loadExplorerPage({ refreshLatest: true, force: true });
         return;
       }
@@ -9175,6 +9258,17 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
       // Smart field: "512" / "#512" → inscription id, "p12" / "page 12" → page.
       const raw = dom.explorerTokenInput.value.trim();
+      // A Stacks address or a dotted BNS name (e.g. darthdude.btc) is
+      // unambiguously a wallet lookup — token/page inputs are always numeric,
+      // #id or p12. Route it to the shared /?wallet=<addr|name> deep-link, which
+      // resolves BNS names and opens that wallet's holdings (same path the
+      // homepage uses), instead of falling through to a failed page jump.
+      const looksLikeWalletAddress = /^S[PTMN][0-9A-Z]{20,}$/i.test(raw);
+      const looksLikeBnsName = /^[a-z0-9][a-z0-9-]*\.[a-z0-9-]{2,}$/i.test(raw);
+      if (raw && (looksLikeWalletAddress || looksLikeBnsName)) {
+        window.location.href = `/?wallet=${encodeURIComponent(raw)}`;
+        return;
+      }
       const pageMatch = raw.match(/^p(?:age)?\s*(\d+)$/i);
       if (pageMatch) {
         dom.explorerPageInput.value = pageMatch[1];
@@ -9351,6 +9445,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // Clear the inscription panel back to an empty state for a fresh file: drops
     // the selected file, prepared payload, parents, and form fields.
     const clearInscriberPanel = () => {
+      if (
+        (state.busy || state.lastMintAttempt) &&
+        !window.confirm(
+          'Clear this inscription?\n\nThere is an inscription in progress. Its on-chain progress is saved and would resume on its own if you left it — clearing removes that local record. Clear anyway?'
+        )
+      ) {
+        return;
+      }
       if (state.payloadPreviewUrl) {
         URL.revokeObjectURL(state.payloadPreviewUrl);
         state.payloadPreviewUrl = null;
@@ -9845,6 +9947,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     dom.explorerLatestButton?.addEventListener('click', () => {
       void showLatestExplorerPage();
     });
+    // Explorer page arrows: proxy to the existing Prev/Next buttons so they reuse
+    // the exact same paging logic, guards and enabled/disabled state.
+    dom.explorerPrevPageButton?.addEventListener('click', () => {
+      dom.walletPrevButton?.click();
+    });
+    dom.explorerNextPageButton?.addEventListener('click', () => {
+      dom.walletNextButton?.click();
+    });
     dom.explorerPageInput?.addEventListener('input', () => {
       if (document.activeElement === dom.explorerPageInput && dom.explorerTokenInput) {
         dom.explorerTokenInput.value = '';
@@ -9872,7 +9982,23 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     });
     dom.walletLookupForm.addEventListener('submit', async (event) => {
       event.preventDefault();
-      await viewWalletFromInput();
+      // "Clear" (empty box or the wallet already on screen) keeps the in-place
+      // reset that returns to the default feed / connected wallet.
+      if (shouldClearWalletLookupOnSubmit()) {
+        await viewWalletFromInput();
+        return;
+      }
+      const raw = normalizeWalletLookupInputValue(dom.walletLookupInput.value).trim();
+      if (!raw) {
+        await viewWalletFromInput();
+        return;
+      }
+      // "View" → navigate to the wallet's own URL, exactly like clicking an
+      // owner/holder link. This loads the wallet through the same clean boot
+      // path a shared link uses, so the address bar shows ?wallet=<name|address>
+      // and the correct wallet always loads (no stale grid, preview, or URL).
+      const walletParam = raw.replace(/\.btc$/i, '');
+      window.location.assign(`/?wallet=${encodeURIComponent(walletParam)}`);
     });
 
 
@@ -10199,12 +10325,30 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     };
     // Reveal the chosen path. Hoisted (function decl) so setSelectedFile / boot-restore can
     // call it before the const helpers below are initialised.
+    // The activity log is shared by both modes. In text mode it lives inside the
+    // single "Advanced" disclosure (so the text panel reads as just type + inscribe);
+    // in file/none mode it returns to its own top-level spot. Re-parenting keeps one
+    // log node (and its listeners) rather than duplicating it.
+    const activityLogHome = dom.activityLog
+      ? { parent: dom.activityLog.parentNode, next: dom.activityLog.nextSibling }
+      : null;
+    const placeActivityLog = (mode) => {
+      if (!dom.activityLog) return;
+      if (mode === 'text') {
+        if (dom.textAdvancedLogSlot && dom.activityLog.parentNode !== dom.textAdvancedLogSlot) {
+          dom.textAdvancedLogSlot.appendChild(dom.activityLog);
+        }
+      } else if (activityLogHome && dom.activityLog.parentNode !== activityLogHome.parent) {
+        activityLogHome.parent.insertBefore(dom.activityLog, activityLogHome.next);
+      }
+    };
     function applyInscribeMode(mode) {
       if (dom.inscribePanelBody) dom.inscribePanelBody.dataset.mode = mode;
       dom.tabFile?.classList.toggle('is-active', mode === 'file');
       dom.tabText?.classList.toggle('is-active', mode === 'text');
       dom.tabFile?.setAttribute('aria-selected', mode === 'file' ? 'true' : 'false');
       dom.tabText?.setAttribute('aria-selected', mode === 'text' ? 'true' : 'false');
+      placeActivityLog(mode);
     }
     // Threads: a "reply to" inscription id becomes a dependency (existence-only reference), so the
     // text is minted as an on-chain reply via mint-single-tx-recursive. Anyone can reply to any
@@ -10265,12 +10409,17 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       if (bytes === 0 || bytes > TEXT_MAX_BYTES) return; // hard guard — never inscribe > 16 KB of text
       runInscription();
     });
+    // Hero "Galleries" button expands the (collapsed-by-default) galleries list as it scrolls to it.
+    document.querySelector('a[href="#homeExamples"]')?.addEventListener('click', () => {
+      const galleries = document.getElementById('homeExamples');
+      if (galleries) galleries.open = true;
+    });
     // Thread deep link: /inscribe?reply=<tokenId> opens the text tab pre-filled as a reply.
     if (document.documentElement.dataset.page === 'inscribe' && dom.threadReplyTo) {
       const replyTo = (new URLSearchParams(window.location.search).get('reply') || '').trim();
       if (/^\d+$/.test(replyTo)) {
         dom.threadReplyTo.value = replyTo;
-        const td = document.getElementById('threadDetails');
+        const td = document.getElementById('textAdvancedDetails');
         if (td) td.open = true;
         setInscribeMode('text'); // switches to text + re-applies the reply-to dependency
       }
@@ -10296,7 +10445,18 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       queueTokenUriHeadPreviewUpdate();
     });
 
-    window.addEventListener('beforeunload', () => {
+    window.addEventListener('beforeunload', (event) => {
+      // Warn before leaving mid-inscription: a transaction may be signing or
+      // broadcasting. Progress is saved locally and resumes on reopen, but the
+      // native prompt stops an accidental close from interrupting the current tx.
+      if (state.busy) {
+        event.preventDefault();
+        event.returnValue = '';
+        return '';
+      }
+    });
+
+    window.addEventListener('pagehide', () => {
       if (state.tokenUriPreviewTimer !== null) {
         window.clearTimeout(state.tokenUriPreviewTimer);
       }

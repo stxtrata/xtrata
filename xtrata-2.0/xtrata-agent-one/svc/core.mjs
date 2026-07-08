@@ -160,7 +160,7 @@ export function deleteJob({ jobDir, id, receiptsDir }) {
 
 // ---------- estimate-only (no wallet, no write) ----------
 export async function estimate(opts) {
-  const { coreName = 'xtrata-v3-2-3', net = 'mainnet', bytes, marginUstx = '0', mock = false, agentFeePct = AGENT_FEE_PCT, parentCount = 0 } = opts;
+  const { coreName = 'xtrata-v3-2-3', net = 'mainnet', bytes, marginUstx = '0', mock = false, agentFeePct = AGENT_FEE_PCT, parentCount = 0, receipt = true } = opts;
   const chunks = Math.ceil(Number(bytes) / CHUNK) || 1;
   let q;
   if (mock) q = { single: chunks <= SINGLE_TX_MAX_CHUNKS, mode: chunks <= SINGLE_TX_MAX_CHUNKS ? 2 : 1, protocolFee: 100000n + BigInt(chunks) * 2000n, batches: Math.max(1, Math.ceil(chunks / SINGLE_TX_MAX_CHUNKS)) };  // mirrors single-tx-fee-unit(100000)+chunks*upload-chunk-fee-unit(2000)
@@ -168,10 +168,11 @@ export async function estimate(opts) {
   // Miner reserve (auto-estimated per tx at runtime; surplus refunded). single-tx = 1 tx; staged = begin + batches + seal.
   const minerTxs = q.single ? 1 : (q.batches + 2);
   const minerReserve = BigInt(minerTxs) * PERTX_MINER + (BigInt(Math.ceil(Number(bytes))) * 3n) / 2n;
-  // Second inscription: the receipt (a small ~1-chunk single-tx mint).
+  // Second inscription: the receipt (a small ~1-chunk single-tx mint). Optional — when
+  // off its cost is left out of the deposit (HTML receipt still saved locally at delivery).
   const rq = mock ? { protocolFee: 102000n } : await quote([DEPLOYER, coreName], netOf(net), RECEIPT_SIZE_EST, 1);
-  const receiptProtocol = rq.protocolFee;
-  const receiptMiner = PERTX_MINER + (BigInt(RECEIPT_SIZE_EST) * 3n) / 2n;
+  const receiptProtocol = receipt === false ? 0n : rq.protocolFee;
+  const receiptMiner = receipt === false ? 0n : PERTX_MINER + (BigInt(RECEIPT_SIZE_EST) * 3n) / 2n;
   // Parent escrow: one extra NFT-return transfer per parent (parent goes home to the sender at delivery).
   const parentReserve = BigInt(parentCount) * PARENT_RETURN_FEE;
   const baseCosts = q.protocolFee + minerReserve + receiptProtocol + receiptMiner + parentReserve + DELIVERY_RESERVE + BigInt(marginUstx);
@@ -193,7 +194,7 @@ export async function estimate(opts) {
  * summed; shared overhead (receipt, parent returns, deliveries, agent fee) is added once.
  */
 export async function estimateBatch(opts) {
-  const { coreName = 'xtrata-v3-2-3', net = 'mainnet', itemsBytes = [], parentCount = 0, marginUstx = '0', mock = false, agentFeePct = AGENT_FEE_PCT } = opts;
+  const { coreName = 'xtrata-v3-2-3', net = 'mainnet', itemsBytes = [], parentCount = 0, marginUstx = '0', mock = false, agentFeePct = AGENT_FEE_PCT, receipt = true } = opts;
   if (!itemsBytes.length) throw new Error('itemsBytes required');
   if (itemsBytes.length > MAX_BATCH_ITEMS) throw new Error(`batch too large: ${itemsBytes.length} items (max ${MAX_BATCH_ITEMS})`);
   const network = netOf(net);
@@ -210,8 +211,8 @@ export async function estimateBatch(opts) {
     sumProtocol += q.protocolFee; sumMiner += minerReserve;
   }
   const rq = mock ? { protocolFee: 102000n } : await quote([DEPLOYER, coreName], network, RECEIPT_SIZE_EST, 1);
-  const receiptProtocol = rq.protocolFee;
-  const receiptMiner = PERTX_MINER + (BigInt(RECEIPT_SIZE_EST) * 3n) / 2n;
+  const receiptProtocol = receipt === false ? 0n : rq.protocolFee;
+  const receiptMiner = receipt === false ? 0n : PERTX_MINER + (BigInt(RECEIPT_SIZE_EST) * 3n) / 2n;
   const parentReserve = BigInt(parentCount) * PARENT_RETURN_FEE;
   const deliveryReserve = DELIVERY_RESERVE + BigInt(Math.max(0, itemsBytes.length - 1)) * ITEM_DELIVERY_FEE;   // N token sends + receipt + change
   const baseCosts = sumProtocol + sumMiner + receiptProtocol + receiptMiner + parentReserve + deliveryReserve + BigInt(marginUstx);
@@ -230,7 +231,7 @@ export async function estimateBatch(opts) {
 
 // ---------- lifecycle ----------
 export async function createJob(opts) {
-  const { coreName = 'xtrata-v3-2-3', net = 'mainnet', file, uri, mime = 'application/octet-stream', deps = [], parents = [], user, recipient = null, expectedFunder = null, marginUstx = '0', jobDir, mock = false, fastTrack = false, agentFeePct = AGENT_FEE_PCT, agentFeeAddress = AGENT_FEE_ADDRESS, agentIdentityId = AGENT_IDENTITY_ID, suno = false } = opts;
+  const { coreName = 'xtrata-v3-2-3', net = 'mainnet', file, uri, mime = 'application/octet-stream', deps = [], parents = [], user, recipient = null, expectedFunder = null, marginUstx = '0', jobDir, mock = false, fastTrack = false, agentFeePct = AGENT_FEE_PCT, agentFeeAddress = AGENT_FEE_ADDRESS, agentIdentityId = AGENT_IDENTITY_ID, suno = false, receipt = true } = opts;
   if (!file || !uri) throw new Error('file, uri required');
   if (!fastTrack && !user) throw new Error('delivery address (user) required unless fastTrack');
   // PARENT LINKING (escrow model): the contract requires the MINTER to own the parents at mint/seal
@@ -254,13 +255,13 @@ export async function createJob(opts) {
       if (!owner) throw new Error(`parent token #${pid} does not exist on ${coreName} — no job was created`);
     }
   }
-  const est = await estimate({ coreName, net, bytes, marginUstx, mock, agentFeePct, parentCount: parentIds.length });
+  const est = await estimate({ coreName, net, bytes, marginUstx, mock, agentFeePct, parentCount: parentIds.length, receipt });
   // Staged (large-file) route seals via the engine, which supports a single parent per seal.
   if (!est.single && parentIds.length > 1) throw new Error('large (staged) inscriptions support at most 1 parent — split the job or use a file ≤ 512 KiB for multi-parent');
   const w = newWallet(net);
   const job = {
     jobId: `job-${Date.now()}`, core: coreName, net, mock, fastTrack, suno, file, uri, mime, deps, parents: parentIds, user: user || null, recipient: recipient || user || null,
-    expectedFunder: expectedFunder || null, funder: null,
+    expectedFunder: expectedFunder || null, funder: null, receipt: receipt !== false,
     bytes, chunks: est.chunks, single: est.single, batches: est.batches,
     protocolFee: est.protocolFee, minerReserve: est.minerReserve,
     receiptProtocol: est.receiptProtocol, receiptMiner: est.receiptMiner,
@@ -280,7 +281,7 @@ export async function createJob(opts) {
  *    real token id after item k mints, so whole dependency graphs ship in one payment.
  */
 export async function createBatchJob(opts) {
-  const { coreName = 'xtrata-v3-2-3', net = 'mainnet', items = [], parents = [], user, recipient = null, expectedFunder = null, marginUstx = '0', jobDir, mock = false, fastTrack = false, strict = false, agentFeePct = AGENT_FEE_PCT, agentFeeAddress = AGENT_FEE_ADDRESS, agentIdentityId = AGENT_IDENTITY_ID } = opts;
+  const { coreName = 'xtrata-v3-2-3', net = 'mainnet', items = [], parents = [], user, recipient = null, expectedFunder = null, marginUstx = '0', jobDir, mock = false, fastTrack = false, strict = false, agentFeePct = AGENT_FEE_PCT, agentFeeAddress = AGENT_FEE_ADDRESS, agentIdentityId = AGENT_IDENTITY_ID, receipt = true } = opts;
   if (!Array.isArray(items) || !items.length) throw new Error('items required');
   if (items.length > MAX_BATCH_ITEMS) throw new Error(`batch too large: ${items.length} items (max ${MAX_BATCH_ITEMS})`);
   if (!fastTrack && !user) throw new Error('delivery address (user) required unless fastTrack');
@@ -322,7 +323,7 @@ export async function createBatchJob(opts) {
     const owner = await ownerOf(core, network, pid);
     if (!owner) throw new Error(`parent token #${pid} does not exist on ${coreName} — no job was created`);
   }
-  const est = await estimateBatch({ coreName, net, itemsBytes: built.map((b) => b.bytes), parentCount: allParents.length, marginUstx, mock, agentFeePct });
+  const est = await estimateBatch({ coreName, net, itemsBytes: built.map((b) => b.bytes), parentCount: allParents.length, marginUstx, mock, agentFeePct, receipt });
   for (let i = 0; i < built.length; i += 1) Object.assign(built[i], {
     chunks: est.items[i].chunks, single: est.items[i].single, batches: est.items[i].batches,
     protocolFee: est.items[i].protocolFee, minerReserve: est.items[i].minerReserve,
@@ -337,6 +338,7 @@ export async function createBatchJob(opts) {
     jobId: `job-${Date.now()}`, core: coreName, net, mock, fastTrack, strict: !!strict,
     items: built, batchProgress: { current: 0, total: built.length },
     sharedParents, parents: allParents,               // job.parents = the ESCROW list (gates, returns, receipts)
+    receipt: receipt !== false,
     user: user || null, recipient: recipient || user || null, expectedFunder: expectedFunder || null, funder: null,
     bytes: built.reduce((s, b) => s + b.bytes, 0), chunks: built.reduce((s, b) => s + b.chunks, 0),
     sumProtocol: est.sumProtocol, sumMiner: est.sumMiner,
@@ -818,10 +820,10 @@ export async function deliverJob(opts) {
   if (job.items) return deliverBatch({ job, hiroKey, jobDir, receiptsDir, received, agentFee, stxUsd });
 
   if (job.mock) {
-    const receiptTokenId = String(Math.floor(1000 + Math.random() * 9000));
+    const receiptTokenId = job.receipt === false ? null : String(Math.floor(1000 + Math.random() * 9000));
     const d = receiptData(job, { received, agentFee, receiptTokenId, stxUsd });
     saveReceiptHtml(receiptsDir, job.jobId, buildReceiptHtml(d));
-    const receipt = { ...d, deliverTx: '0xMOCK_DELIVER', receiptDeliverTx: '0xMOCK_RECEIPT', agentFeeTx: '0xMOCK_FEE', refundTx: '0xMOCK_REFUND' };
+    const receipt = { ...d, deliverTx: '0xMOCK_DELIVER', receiptDeliverTx: receiptTokenId ? '0xMOCK_RECEIPT' : null, agentFeeTx: '0xMOCK_FEE', refundTx: '0xMOCK_REFUND' };
     if ((job.parents || []).length) { job.parentReturnTxs = job.parents.map((p) => ({ id: String(p), tx: '0xMOCK_PARENT_RETURN' })); receipt.parentReturnTxs = job.parentReturnTxs; }
     Object.assign(job, { receiptTokenId, agentFeeUstx: agentFee.toString(), refundedUstx: d.changeReturned, receipt });
     delete job.ephemeralMnemonic; job.status = 'COMPLETE'; writeJob(jobDir, job);
@@ -845,8 +847,14 @@ export async function deliverJob(opts) {
   const prelim = receiptData(job, { received, agentFee, receiptTokenId: null, change: estChange, mainMinerFee: mainMinerForReceipt.toString(), stxUsd });
   const idDep = job.agentIdentityId || AGENT_IDENTITY_ID;
   const receiptDeps = idDep ? [job.tokenId, idDep] : [job.tokenId];   // file + agent identity (existence-only links, no transfers)
-  const r = await inscribeReceipt({ core, network, key: dep.key, fromAddr: dep.address, hiroKey, html: buildReceiptHtml(prelim), uri: `xtrata:receipt/${job.jobId}`, deps: receiptDeps });
-  const receiptTokenId = r.tokenId;
+  // On-chain receipt is optional: when off, skip the extra mint (its cost returns as change);
+  // the HTML receipt is still saved locally below either way.
+  let r = { minerFee: 0n };
+  let receiptTokenId = null;
+  if (job.receipt !== false) {
+    r = await inscribeReceipt({ core, network, key: dep.key, fromAddr: dep.address, hiroKey, html: buildReceiptHtml(prelim), uri: `xtrata:receipt/${job.jobId}`, deps: receiptDeps });
+    receiptTokenId = r.tokenId;
+  }
 
   // CRITICAL step: deliver the inscription itself to the user. If THIS fails the job genuinely failed → throw.
   const deliverTx = await sendNft(core, network, dep.key, dep.address, job.tokenId, job.recipient || job.user, hiroKey);
@@ -869,8 +877,8 @@ export async function deliverJob(opts) {
     } catch (e) { notes.push(`parent #${pid} return pending — recover-all will send it home (` + errMsg(e) + ')'); job.keepKey = true; }
   }
   if (parentReturnTxs.length) { job.parentReturnTxs = parentReturnTxs; writeJob(jobDir, job); }
-  try { receiptDeliverTx = await sendNft(core, network, dep.key, dep.address, receiptTokenId, job.recipient || job.user, hiroKey); }
-  catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); }
+  if (receiptTokenId) { try { receiptDeliverTx = await sendNft(core, network, dep.key, dep.address, receiptTokenId, job.recipient || job.user, hiroKey); }
+  catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
   try { if (agentFee > 0n) agentFeeTx = await sendStxRetry(network, dep.key, agentFee, job.agentFeeAddress || AGENT_FEE_ADDRESS, hiroKey); }
   catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
   try { const sw = await sweepStxTo(network, dep.key, dep.address, refundTo, hiroKey); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } }
@@ -904,12 +912,12 @@ async function deliverBatch({ job, hiroKey = '', jobDir, receiptsDir, received, 
   if (!minted.length) throw new Error('nothing to deliver — no batch items inscribed');
 
   if (job.mock) {
-    const receiptTokenId = String(Math.floor(1000 + Math.random() * 9000));
+    const receiptTokenId = job.receipt === false ? null : String(Math.floor(1000 + Math.random() * 9000));
     const sumProt = minted.reduce((s, i) => s + BigInt(i.protocolFee || '0'), 0n);
     const change = received - sumProt - BigInt(job.receiptProtocol || '0') - agentFee;
     const d = batchReceiptData(job, { received, agentFee, receiptTokenId, change: change > 0n ? change : 0n, stxUsd });
     saveReceiptHtml(receiptsDir, job.jobId, buildBatchReceiptHtml(d));
-    const receipt = { ...d, deliverTxs: minted.map((i) => ({ id: i.tokenId, tx: '0xMOCK_DELIVER' })), receiptDeliverTx: '0xMOCK_RECEIPT', agentFeeTx: '0xMOCK_FEE', refundTx: '0xMOCK_REFUND' };
+    const receipt = { ...d, deliverTxs: minted.map((i) => ({ id: i.tokenId, tx: '0xMOCK_DELIVER' })), receiptDeliverTx: receiptTokenId ? '0xMOCK_RECEIPT' : null, agentFeeTx: '0xMOCK_FEE', refundTx: '0xMOCK_REFUND' };
     if ((job.parents || []).length) { job.parentReturnTxs = job.parents.map((p) => ({ id: String(p), tx: '0xMOCK_PARENT_RETURN' })); receipt.parentReturnTxs = job.parentReturnTxs; }
     Object.assign(job, { receiptTokenId, agentFeeUstx: agentFee.toString(), refundedUstx: d.changeReturned, receipt });
     delete job.ephemeralMnemonic; job.status = job.items.some((i) => i.status !== 'INSCRIBED') ? 'COMPLETE_WITH_SKIPS' : 'COMPLETE'; writeJob(jobDir, job);
@@ -930,8 +938,13 @@ async function deliverBatch({ job, hiroKey = '', jobDir, receiptsDir, received, 
   // Receipt deps: every minted token + every parent + the agent identity (existence-only links).
   const idDep = job.agentIdentityId || AGENT_IDENTITY_ID;
   const receiptDeps = [...minted.map((i) => i.tokenId), ...(job.parents || []), ...(idDep ? [idDep] : [])].slice(0, 50);
-  const r = await inscribeReceipt({ core, network, key: dep.key, fromAddr: dep.address, hiroKey, html: buildBatchReceiptHtml(prelim), uri: `xtrata:receipt/${job.jobId}`, deps: receiptDeps });
-  const receiptTokenId = r.tokenId;
+  // On-chain receipt optional (see single deliver). HTML still saved locally below.
+  let r = { minerFee: 0n };
+  let receiptTokenId = null;
+  if (job.receipt !== false) {
+    r = await inscribeReceipt({ core, network, key: dep.key, fromAddr: dep.address, hiroKey, html: buildBatchReceiptHtml(prelim), uri: `xtrata:receipt/${job.jobId}`, deps: receiptDeps });
+    receiptTokenId = r.tokenId;
+  }
 
   // Deliver every minted token. First success = the job's commit point; later hiccups are
   // best-effort (never re-labelled a failure; recovery sweeps whatever is left).
@@ -956,8 +969,8 @@ async function deliverBatch({ job, hiroKey = '', jobDir, receiptsDir, received, 
   }
   if (parentReturnTxs.length) { job.parentReturnTxs = parentReturnTxs; writeJob(jobDir, job); }
   let receiptDeliverTx = null, agentFeeTx = null, refundTx = null, refundedUstx = '0';
-  try { receiptDeliverTx = await sendNft(core, network, dep.key, dep.address, receiptTokenId, job.recipient || job.user, hiroKey); }
-  catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); }
+  if (receiptTokenId) { try { receiptDeliverTx = await sendNft(core, network, dep.key, dep.address, receiptTokenId, job.recipient || job.user, hiroKey); }
+  catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
   try { if (agentFee > 0n) agentFeeTx = await sendStxRetry(network, dep.key, agentFee, job.agentFeeAddress || AGENT_FEE_ADDRESS, hiroKey); }
   catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
   try { const sw = await sweepStxTo(network, dep.key, dep.address, refundTo, hiroKey); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } }
