@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: data: blob: 'unsafe-inline'; script-src 'self' https://esm.sh 'unsafe-inline'; connect-src 'self' https: wss:; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: data: blob: 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https: wss:; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;" />
   
   <title>LEO Cats Forever Twins</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1073,9 +1073,20 @@
   </footer>
 
   <script type="module">
-    import { connect, disconnect, isConnected, getLocalStorage, clearLocalStorage, clearSelectedProviderId, openContractCall } from 'https://esm.sh/@stacks/connect@8.2.6';
-    import { fetchCallReadOnlyFunction, cvToJSON, cvToValue, Cl, Pc, PostConditionMode } from 'https://esm.sh/@stacks/transactions@7.4.0';
-    import { STACKS_MAINNET, STACKS_TESTNET } from 'https://esm.sh/@stacks/network@7.3.1';
+    import {
+      connectForeverTwinsWallet,
+      disconnectForeverTwinsWallet,
+      getForeverTwinsWalletSession,
+      fetchCallReadOnlyFunction,
+      cvToJSON,
+      cvToValue,
+      Cl,
+      Pc,
+      PostConditionMode,
+      openContractCall,
+      STACKS_MAINNET,
+      STACKS_TESTNET
+    } from '../assets/xtrata-forever-twins.js';
 
     // Safely extract Hiro API Key, allowing for Vite contexts or process envs
     let HIRO_API_KEY = '';
@@ -1274,12 +1285,7 @@
       updateSwapUi();
     }
     function getStoredWallet() {
-      const data = getLocalStorage?.();
-      return data?.addresses?.stx?.[0]?.address
-        || data?.addresses?.find?.((a) => a.symbol === 'STX' || a.type === 'stx')?.address
-        || data?.profile?.stxAddress?.mainnet
-        || data?.profile?.stxAddress?.testnet
-        || null;
+      return getForeverTwinsWalletSession().address || null;
     }
     function setWallet(address) {
       state.wallet = address;
@@ -2611,13 +2617,16 @@
     }
 
     async function onConnect() {
+      if (networkName() !== 'mainnet') {
+        log('Wallet connect is available on mainnet only. Switch the page back to mainnet and retry.');
+        return;
+      }
+      const connectButton = $('connectBtn');
+      connectButton.disabled = true;
+      connectButton.textContent = 'Connecting...';
       try {
-        // Always open the wallet selector on an explicit click. Gating on
-        // isConnected() meant a stale "connected" flag left in local storage
-        // (e.g. from a previous session) made the button do nothing, so the
-        // wallet never opened.
-        const result = await connect({ forceWalletSelect: true });
-        const addr = getStoredWallet() || addressFromConnectResult(result);
+        const session = await connectForeverTwinsWallet();
+        const addr = session.address || null;
         setWallet(addr);
         if (addr) { log('Wallet connected', { address: addr }); await quoteFee(false); }
         else log('Wallet connected, but no STX address was returned. Try refreshing or checking wallet permissions.');
@@ -2625,13 +2634,10 @@
         const msg = err?.message || String(err);
         if (/cancel|reject|denied|closed|user/i.test(msg)) { log('Wallet connection cancelled'); return; }
         log('Wallet connect failed', { error: msg });
+      } finally {
+        connectButton.textContent = 'Connect Wallet';
+        connectButton.disabled = !!state.wallet;
       }
-    }
-    function addressFromConnectResult(result) {
-      const list = result?.addresses || result?.result?.addresses || [];
-      const arr = Array.isArray(list) ? list : [];
-      const stx = arr.find((a) => /^S[PM][0-9A-Z]+/.test(a?.address || ''));
-      return stx?.address || null;
     }
 
     function bind(id, event, fn) {
@@ -2643,11 +2649,7 @@
 
     bind('connectBtn', 'click', onConnect);
     bind('disconnectBtn', 'click', async () => {
-      // Fully clear connection state so reconnecting prompts the wallet picker
-      // again and lets you choose a different wallet/address.
-      try { disconnect(); } catch {}
-      try { clearLocalStorage(); } catch {}
-      try { clearSelectedProviderId(); } catch {}
+      await disconnectForeverTwinsWallet();
       setWallet(null);
       log('Wallet disconnected');
     });
