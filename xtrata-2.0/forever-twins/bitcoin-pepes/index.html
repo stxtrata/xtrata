@@ -618,8 +618,11 @@
     /* Journey-led simple flow (shared framework with the LEO Cats page) */
     .journey { margin: 0.5rem 0 0.4rem; }
     .journey-pick-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.55rem; align-items: end; margin-top: 0.3rem; }
-    .journey-image { display: grid; place-items: center; min-height: 280px; border: 1px solid var(--amber-border); border-radius: 1.1rem; background: oklch(0.10 0.01 60 / 0.5); padding: 0.7rem; margin: 0.85rem 0; color: var(--muted); font-size: 0.86rem; text-align: center; }
+    .journey-image { position: relative; display: grid; place-items: center; min-height: 280px; border: 1px solid var(--amber-border); border-radius: 1.1rem; background: oklch(0.10 0.01 60 / 0.5); padding: 0.7rem; margin: 0.85rem 0; color: var(--muted); font-size: 0.86rem; text-align: center; }
     .journey-image img { max-height: 380px; width: auto; max-width: 100%; object-fit: contain; border-radius: 0.85rem; box-shadow: 0 14px 50px oklch(0.02 0.02 190 / 0.45); }
+    .journey-image[data-twin-state]::after { position: absolute; top: 0.9rem; right: 0.9rem; z-index: 2; padding: 0.32rem 0.55rem; border-radius: 999px; font-family: var(--mono); font-size: 0.67rem; font-weight: 800; letter-spacing: 0.03em; line-height: 1.1; text-shadow: none; }
+    .journey-image[data-twin-state="escrowed"]::after { content: '🔒 Xtrata escrowed'; color: #fff; background: #080808; border: 2px solid #fff; box-shadow: 0 0 0 2px #080808; }
+    .journey-image[data-twin-state="liquid"]::after { content: '∞ Xtrata liquid'; color: #070707; background: #fff; border: 2px solid #070707; box-shadow: 0 0 0 2px #fff; }
     .journey-status { font-size: 0.95rem; line-height: 1.5; }
     .journey-owner { color: var(--muted-2); font-size: 0.84rem; margin: 0.4rem 0 0.7rem; line-height: 1.45; }
     .journey-action { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 0.6rem; align-items: stretch; margin-top: 0.5rem; }
@@ -989,6 +992,7 @@
         startedAt: null,
         finishedAt: null,
       },
+      lookupRequestId: 0,
     };
 
     function jsonBigInt(_, value) { return typeof value === 'bigint' ? value.toString() : value; }
@@ -1600,6 +1604,8 @@
           if (key) mountFallbackImage(imgBox, cands, "Bitcoin Pepe preview");
           else imgBox.textContent = 'Enter a Bitcoin Pepe number above and select “Show me this Pepe”.';
         }
+        if (state.binding) imgBox.dataset.twinState = state.binding['xtrata-escrowed'] === true ? 'escrowed' : 'liquid';
+        else delete imgBox.dataset.twinState;
       }
       const tokenReady = /^\d+$/.test($('tokenId').value.trim());
       const matched = !!state.canonicalHash && !!state.fileHash && state.canonicalHash.toLowerCase() === state.fileHash.toLowerCase();
@@ -1719,7 +1725,11 @@
         const list = [...owned.keys()].map(Number).filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
         log('trace: my-items - resolved', { count: list.length, items: list.map((n) => ({ id: n, where: owned.get(String(n)) })) });
         if (!list.length) { if (status) status.textContent = 'No items from this collection in your wallet (held directly or as an Xtrata twin).'; return; }
-        if (status) status.textContent = `${list.length} item${list.length === 1 ? '' : 's'} — select one to load:`;
+        const firstId = list[0];
+        $('tokenId').value = String(firstId);
+        $('swapTokenId').value = String(firstId);
+        $('lookupToken').textContent = String(firstId);
+        if (status) status.textContent = `${list.length} item${list.length === 1 ? '' : 's'} — loaded #${firstId}; select another to switch.`;
         for (const id of list) {
           const where = owned.get(String(id));
           const btn = document.createElement('button');
@@ -1729,12 +1739,27 @@
           btn.addEventListener('click', () => { $('tokenId').value = String(id); const lt = $('lookupToken'); if (lt) lt.textContent = String(id); checkToken(); });
           chips.appendChild(btn);
         }
+        await checkToken();
       } catch (err) {
         log('my-items load failed', { error: err.message });
         if (status) status.textContent = `Could not load your items: ${err.message}`;
       }
     }
+    let liveTokenLookupTimer = null;
+    function scheduleLiveTokenLookup() {
+      const raw = $('tokenId').value.trim();
+      $('lookupToken').textContent = raw || 'None';
+      state.lookupRequestId += 1;
+      if (liveTokenLookupTimer) clearTimeout(liveTokenLookupTimer);
+      if (!/^\d+$/.test(raw)) { updateActionButtons(); return; }
+      $('swapTokenId').value = raw;
+      enrichPreview(BigInt(raw));
+      liveTokenLookupTimer = setTimeout(() => {
+        checkToken().catch((err) => log('Live token lookup failed', { error: err.message }));
+      }, 350);
+    }
     async function checkToken() {
+      const requestId = ++state.lookupRequestId;
       const tokenId = getTokenId();
       const helper = $('helperContract').value.trim();
       const source = $('sourceContract').value.trim();
@@ -1744,6 +1769,8 @@
       // so users can't accidentally swap a different (stale) token id.
       { const _sw = $('swapTokenId'); if (_sw) _sw.value = String(tokenId); }
       resetChainOnlyDisplays();
+      state.direction = 'pepe-to-xtrata';
+      updateSwapUi();
       enrichPreview(tokenId);
       $('lookupToken').textContent = String(tokenId);
       setStatus('idConversionStatus', renderIdConversion(null, tokenId));
@@ -1757,6 +1784,7 @@
         readContract(helper, 'get-binding', [tokenArg]),
         readContract(source, 'get-owner', [tokenArg]).catch((err) => ({ err: err.message })),
       ]);
+      if (requestId !== state.lookupRequestId) return;
       state.canonicalHash = unwrapOptional(canonicalRaw);
       state.binding = unwrapOptional(bindingRaw);
       if (state.binding && state.binding['xtrata-id'] != null) recordTwinBinding(tokenId, state.binding['xtrata-id']);
@@ -1807,6 +1835,7 @@
       else setStatus('sourceOwnerStatus', `${badge('No owner returned by chain', 'bad')}<br>Source contract returned none.${chainProof(source, 'get-owner', [tokenArg])}`);
 
       await maybeFetchTokenUri(tokenId);
+      if (requestId !== state.lookupRequestId) return;
       enrichPreview(tokenId);
       // Journey-led: automatically fetch + hash the resolved Pepe image so the
       // user never has to drop a file or click "Use Raw Image". Only worth doing
@@ -2242,7 +2271,7 @@
       $(id).addEventListener('input', () => { loadHashExportCache(); updateHashExportUi(); });
       $(id).addEventListener('change', () => { loadHashExportCache(); updateHashExportUi(); });
     }
-    $('tokenId').addEventListener('input', () => { $('lookupToken').textContent = $('tokenId').value.trim() || 'None'; if (!$('swapTokenId').value.trim()) updateActionButtons(); });
+    $('tokenId').addEventListener('input', scheduleLiveTokenLookup);
     $('swapTokenId').addEventListener('input', updateActionButtons);
     $('apiBase').addEventListener('input', () => { $('apiBase').dataset.touched = 'true'; syncLabels(); });
     $('tokenUri').addEventListener('input', () => {
