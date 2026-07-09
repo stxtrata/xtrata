@@ -381,6 +381,7 @@
     .swap-token.active .coin { filter: none; }
     .swap-token .coin-img { width: 1.55rem; height: 1.55rem; border-radius: 0.42rem; object-fit: cover; filter: grayscale(0.35) opacity(0.78); box-shadow: 0 0 0 1px oklch(0.78 0.15 172 / 0.20); }
     .swap-token.active .coin-img { filter: none; box-shadow: 0 0 0 1px var(--amber-border), 0 0 16px oklch(0.78 0.15 172 / 0.26); }
+    .swap-sub { display:block; font-size:0.56rem; letter-spacing:0.03em; text-transform:none; opacity:0.75; margin-top:2px; }
     .swap-arrow { color: var(--amber); font-family: var(--display); font-size: 1.4rem; }
 
     .log { max-height: 350px; overflow: auto; border-radius: 0.75rem; border: 1px solid oklch(0.72 0.18 70 / 0.12); background: oklch(0.10 0.01 60 / 0.75); }
@@ -973,9 +974,9 @@
             <div class="card-title"><span class="icon-box">⇄</span><h2>Swap</h2></div>
             <p class="card-sub">Exactly one side stays liquid. Swap the LEO Cat for the Xtrata inscription or back again.</p>
             <div class="swap-direction">
-              <button id="dirPepe" class="swap-token active" type="button"><img class="coin-img" src="../assets/leo-cat-forever-twin-logo-1.jpg" alt="" aria-hidden="true" /><span>LEO CAT</span></button>
+              <button id="dirPepe" class="swap-token active" type="button"><img class="coin-img" src="../assets/leo-cat-forever-twin-logo-1.jpg" alt="" aria-hidden="true" /><span>LEO CAT</span><span class="swap-sub">Legacy · Stacks</span></button>
               <div class="swap-arrow">→</div>
-              <button id="dirXtrata" class="swap-token" type="button"><span class="coin">₿</span><span>XTRATA</span></button>
+              <button id="dirXtrata" class="swap-token" type="button"><span class="coin">₿</span><span>XTRATA</span><span class="swap-sub">On-chain twin</span></button>
             </div>
             <div class="row">
               <label for="swapTokenId">Token ID</label>
@@ -2396,6 +2397,10 @@
       state.canonicalHash = unwrapOptional(canonicalRaw);
       state.binding = unwrapOptional(bindingRaw);
       if (state.binding && state.binding['xtrata-id'] != null) recordTwinBinding(tokenId, state.binding['xtrata-id']);
+      // Offer the swap that is actually valid for the current state: if the Xtrata
+      // twin is escrowed the source NFT is liquid (Stacks -> Xtrata); otherwise the
+      // twin is liquid and only Xtrata -> Stacks (swap back) is possible.
+      if (state.binding) { state.direction = state.binding['xtrata-escrowed'] === true ? 'pepe-to-xtrata' : 'xtrata-to-pepe'; updateSwapUi(); }
       state.sourceOwner = ownerRaw?.err ? null : unwrapOptional(ownerRaw);
 
       if (state.canonicalHash) setStatus('canonicalStatus', `${badge('Seeded on chain', 'ok')}<br><span class="data-mono">${escapeHtml(state.canonicalHash)}</span>${chainProof(helper, 'get-canonical-hash', [tokenArg])}`);
@@ -2592,6 +2597,14 @@
       const leo = state.direction === 'pepe-to-xtrata';
       $('dirPepe').classList.toggle('active', leo);
       $('dirXtrata').classList.toggle('active', !leo);
+      // Lock the toggle to the only valid direction for the current on-chain state,
+      // so a doomed swap (ERR-WRONG-STATE) can't be selected or submitted. Both
+      // sides stay enabled until a bound token is loaded.
+      const _valid = state.binding
+        ? (state.binding['xtrata-escrowed'] === true ? 'pepe-to-xtrata' : 'xtrata-to-pepe')
+        : null;
+      $('dirPepe').disabled = _valid ? (_valid !== 'pepe-to-xtrata') : false;
+      $('dirXtrata').disabled = _valid ? (_valid !== 'xtrata-to-pepe') : false;
       $('swapBtn').textContent = leo ? 'Swap LEO Cat for Xtrata' : 'Swap Xtrata for LEO Cat';
       $('swapHint').textContent = leo ? 'LEO Cat → Xtrata sends your source LEO Cat to escrow and releases the Xtrata twin.' : 'Xtrata → LEO Cat sends your Xtrata twin to escrow and releases the source LEO Cat.';
       updateActionButtons();
