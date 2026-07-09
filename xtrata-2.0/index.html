@@ -283,15 +283,18 @@
               </label>
             </details>
 
-            <details class="inscribe-details" id="relationshipsDetails">
-              <summary>Relationships — add parents (optional)</summary>
+            <details class="inscribe-details rel-details" id="parentsDetails">
+              <summary>
+                <span class="rel-tag rel-tag--parent">Parent</span>
+                <span class="rel-arrow">→</span>
+                <span class="rel-tag rel-tag--child">child</span>
+                <span class="rel-sub">ownership link — you must own the parent</span>
+              </summary>
               <div class="relationship-panel" id="parentRelationshipPanel">
-                <div class="relationship-panel__head">
-                  <span class="relationship-panel__title">Add Parents</span>
-                  <span class="badge" id="parentRelationshipBadge">optional</span>
-                </div>
                 <div class="relationship-panel__copy">
-                  Link this inscription as a child of one or more inscriptions owned by the connected wallet.
+                  Makes this inscription a <strong class="rel-word rel-word--child">child</strong> of one or more
+                  <strong class="rel-word rel-word--parent">parent</strong> inscriptions <strong>you own</strong>.
+                  Each parent is escrowed for the mint and returned to you with the new inscription.
                 </div>
                 <label class="field">
                   <span class="label">Parent IDs</span>
@@ -303,6 +306,26 @@
                 </div>
                 <div class="relationship-chip-list" id="parentChipList"></div>
                 <div class="relationship-status-list" id="parentStatusList">No parents selected.</div>
+                <span class="badge" id="parentRelationshipBadge" hidden>optional</span>
+              </div>
+            </details>
+
+            <details class="inscribe-details rel-details" id="dependenciesDetails">
+              <summary>
+                <span class="rel-tag rel-tag--dep">Dependencies</span>
+                <span class="rel-sub">reference link — no ownership needed</span>
+              </summary>
+              <div class="relationship-panel">
+                <div class="relationship-panel__copy">
+                  Links this inscription to any existing
+                  <strong class="rel-word rel-word--dep">dependencies</strong> by ID (existence-only references).
+                  You do <strong>not</strong> need to own them — anything can reference anything.
+                </div>
+                <label class="field">
+                  <span class="label">Dependency IDs</span>
+                  <textarea class="textarea" id="dependencyIdsInput" spellcheck="false" placeholder="e.g. 134, 90"></textarea>
+                </label>
+                <div class="relationship-status-list" id="dependencyStatusList">No dependencies added.</div>
               </div>
             </details>
 

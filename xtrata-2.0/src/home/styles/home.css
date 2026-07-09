@@ -936,13 +936,43 @@
       cursor: pointer;
     }
     .selected-thread__id:hover { border-color: var(--green); color: var(--green); }
+    /* dependency group heads read in the dependency accent so parents (lineage
+       tree above) and dependencies are visually distinct on the read side too. */
+    .selected-thread__head--dep { color: var(--rel-dep, #b98cff); font-weight: 700; }
+
+    /* ---- write side: colour-coded parent vs dependency relationship tags ---- */
+    :root {
+      --rel-parent: #35c39a;   /* teal — the thing you own */
+      --rel-child: #f0a53a;    /* amber — what this becomes */
+      --rel-dep: #b98cff;      /* purple — existence-only reference */
+    }
+    .rel-details > summary { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .rel-tag {
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid currentColor;
+    }
+    .rel-tag--parent { color: var(--rel-parent); }
+    .rel-tag--child { color: var(--rel-child); }
+    .rel-tag--dep { color: var(--rel-dep); }
+    .rel-arrow { color: var(--muted); font-weight: 700; }
+    .rel-sub { color: var(--muted); font-size: 12px; font-weight: 400; }
+    .rel-word { font-weight: 700; }
+    .rel-word--parent { color: var(--rel-parent); }
+    .rel-word--child { color: var(--rel-child); }
+    .rel-word--dep { color: var(--rel-dep); }
 
     /* ---- mode gating (scoped to the inscribe panel body) ---- */
     /* Landing (none): only the binary choice shows. */
     #inscribePanelBody[data-mode='none'] #fileFields,
     #inscribePanelBody[data-mode='none'] #textFields,
     #inscribePanelBody[data-mode='none'] #inscribeAdvancedDetails,
-    #inscribePanelBody[data-mode='none'] #relationshipsDetails,
+    #inscribePanelBody[data-mode='none'] #parentsDetails,
+    #inscribePanelBody[data-mode='none'] #dependenciesDetails,
     #inscribePanelBody[data-mode='none'] .inscribe-wizard-note,
     #inscribePanelBody[data-mode='none'] .prepare-grid,
     #inscribePanelBody[data-mode='none'] .actions,
@@ -958,7 +988,8 @@
     /* File path, before a file lands: show ONLY the dropzone. Everything else
        (details, advanced, relationships, actions, steps) reveals once .has-payload is set. */
     #inscribePanelBody[data-mode='file']:not(.has-payload) #inscribeAdvancedDetails,
-    #inscribePanelBody[data-mode='file']:not(.has-payload) #relationshipsDetails,
+    #inscribePanelBody[data-mode='file']:not(.has-payload) #parentsDetails,
+    #inscribePanelBody[data-mode='file']:not(.has-payload) #dependenciesDetails,
     #inscribePanelBody[data-mode='file']:not(.has-payload) .inscribe-wizard-note,
     #inscribePanelBody[data-mode='file']:not(.has-payload) .prepare-grid,
     #inscribePanelBody[data-mode='file']:not(.has-payload) .actions,
@@ -970,7 +1001,8 @@
     /* Text path: strip to just the text card. */
     #inscribePanelBody[data-mode='text'] #fileFields,
     #inscribePanelBody[data-mode='text'] #inscribeAdvancedDetails,
-    #inscribePanelBody[data-mode='text'] #relationshipsDetails,
+    #inscribePanelBody[data-mode='text'] #parentsDetails,
+    #inscribePanelBody[data-mode='text'] #dependenciesDetails,
     #inscribePanelBody[data-mode='text'] .inscribe-wizard-note,
     #inscribePanelBody[data-mode='text'] .prepare-grid,
     #inscribePanelBody[data-mode='text'] .actions,
