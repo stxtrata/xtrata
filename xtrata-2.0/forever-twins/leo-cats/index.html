@@ -977,19 +977,19 @@
         <aside id="swap" class="shrine-card">
           <div class="card-inner">
             <div class="card-title"><span class="icon-box">⇄</span><h2>Swap</h2></div>
-            <p class="card-sub">Exactly one side stays liquid. Swap the LEO Cat for the Xtrata inscription or back again.</p>
+            <p class="card-sub">Choose whether you hold the original IPFS-backed NFT or its permanent Xtrata twin.</p>
             <div class="swap-direction">
-              <button id="dirPepe" class="swap-token active" type="button"><img class="coin-img" src="../assets/leo-cat-forever-twin-logo-1.jpg" alt="" aria-hidden="true" /><span>LEO CAT</span><span class="swap-sub">Legacy · Stacks</span></button>
+              <button id="dirPepe" class="swap-token active" type="button"><img class="coin-img" src="../assets/leo-cat-forever-twin-logo-1.jpg" alt="" aria-hidden="true" /><span>LEO CAT</span><span class="swap-sub">Original NFT · IPFS-backed</span></button>
               <div class="swap-arrow">→</div>
-              <button id="dirXtrata" class="swap-token" type="button"><span class="coin">₿</span><span>XTRATA</span><span class="swap-sub">On-chain twin</span></button>
+              <button id="dirXtrata" class="swap-token" type="button"><span class="coin">₿</span><span>XTRATA</span><span class="swap-sub">Permanent twin</span></button>
             </div>
             <div class="row">
               <label for="swapTokenId">Token ID</label>
               <input id="swapTokenId" class="shrine-input" inputmode="numeric" placeholder="Uses selected token if blank" />
             </div>
-            <div class="callout" id="swapHint">LEO Cat → Xtrata sends your source LEO Cat to escrow and releases the Xtrata twin.</div>
+            <div class="callout" id="swapHint">Original NFT → permanent twin secures the original in escrow and releases the permanent Xtrata twin.</div>
             <div class="button-row">
-              <button id="swapBtn" class="btn-amber full" type="button" disabled>Swap LEO Cat for Xtrata</button>
+              <button id="swapBtn" class="btn-amber full" type="button" disabled>Switch to permanent twin</button>
             </div>
           </div>
         </aside>
@@ -1407,7 +1407,7 @@
       const xId = binding?.['xtrata-id'] ? String(binding['xtrata-id']) : 'Pending';
       const hasBinding = !!binding;
       const liquid = hasBinding
-        ? (binding['xtrata-escrowed'] === true ? 'LEO Cat liquid · Xtrata escrowed' : 'Xtrata liquid · LEO Cat escrowed')
+        ? (binding['xtrata-escrowed'] === true ? 'Original NFT liquid · permanent twin escrowed' : 'Permanent twin liquid · original NFT escrowed')
         : 'Not forevered yet';
       const escrow = hasBinding
         ? (binding['xtrata-escrowed'] === true ? 'Xtrata held by helper' : 'LEO Cat held by helper')
@@ -1427,7 +1427,7 @@
     }
     function renderLiquidState(binding) {
       if (!binding) return 'Not forevered yet';
-      return `${xtrataStateBadge(binding)}<span class="twin-state-detail">${binding['xtrata-escrowed'] === true ? 'LEO Cat is liquid · Xtrata is secured in escrow' : 'Xtrata is liquid · LEO Cat is secured in escrow'}</span>`;
+      return `${xtrataStateBadge(binding)}<span class="twin-state-detail">${binding['xtrata-escrowed'] === true ? 'Original NFT is liquid · permanent twin is secured in escrow' : 'Permanent twin is liquid · original NFT is secured in escrow'}</span>`;
     }
 
     async function readContract(contractPrincipal, functionName, functionArgs = []) {
@@ -2633,8 +2633,8 @@
         : null;
       $('dirPepe').disabled = _valid ? (_valid !== 'pepe-to-xtrata') : false;
       $('dirXtrata').disabled = _valid ? (_valid !== 'xtrata-to-pepe') : false;
-      $('swapBtn').textContent = leo ? 'Swap LEO Cat for Xtrata' : 'Swap Xtrata for LEO Cat';
-      $('swapHint').textContent = leo ? 'LEO Cat → Xtrata sends your source LEO Cat to escrow and releases the Xtrata twin.' : 'Xtrata → LEO Cat sends your Xtrata twin to escrow and releases the source LEO Cat.';
+      $('swapBtn').textContent = leo ? 'Switch to permanent twin' : 'Restore original NFT';
+      $('swapHint').textContent = leo ? 'Original NFT → permanent twin secures the original in escrow and releases the permanent Xtrata twin.' : 'Permanent twin → original NFT secures the twin in escrow and releases the original NFT.';
       updateActionButtons();
     }
 
