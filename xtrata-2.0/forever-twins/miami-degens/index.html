@@ -2348,52 +2348,67 @@
       } catch (err) { log('Could not refresh contract stats', { error: err.message }); }
     }
 
+    function twinStoreKey() { return `xtrata-twins:${networkName()}:${$('sourceContract').value.trim()}`; }
+    function readTwinStore() { try { return JSON.parse(localStorage.getItem(twinStoreKey()) || '{}') || {}; } catch (e) { return {}; } }
+    function recordTwinBinding(localId, xtrataId) {
+      if (localId == null || xtrataId == null) return;
+      try { const m = readTwinStore(); m[String(localId)] = String(xtrataId); localStorage.setItem(twinStoreKey(), JSON.stringify(m)); } catch (e) {}
+    }
+    async function fetchHoldingIds(assetId, apiBase) {
+      const ids = []; const limit = 50; let offset = 0;
+      for (let page = 0; page < 20; page += 1) {
+        const url = `${apiBase}/extended/v1/tokens/nft/holdings?principal=${encodeURIComponent(state.wallet)}&asset_identifiers=${encodeURIComponent(assetId)}&limit=${limit}&offset=${offset}`;
+        const res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`Hiro holdings HTTP ${res.status}`);
+        const json = await res.json();
+        const results = Array.isArray(json.results) ? json.results : [];
+        for (const r of results) { const mm = (r && r.value && r.value.repr ? String(r.value.repr) : '').match(/^u?(\d+)$/); if (mm) ids.push(mm[1]); }
+        const total = Number(json.total || 0); offset += limit;
+        if (results.length === 0 || offset >= total) break;
+      }
+      return ids;
+    }
     async function loadMyCollectionItems() {
-      const chips = $('myItemsChips');
-      const status = $('myItemsStatus');
+      const chips = $('myItemsChips'); const status = $('myItemsStatus');
       if (chips) chips.innerHTML = '';
       if (!state.wallet) { if (status) status.textContent = 'Connect your wallet first.'; return; }
       const source = $('sourceContract').value.trim();
       const asset = $('sourceAssetName').value.trim();
-      const assetId = `${source}::${asset}`;
+      const helper = $('helperContract').value.trim();
+      const master = $('masterContract').value.trim();
       const apiBase = ($('apiBase') && $('apiBase').value.trim()
         ? $('apiBase').value.trim()
         : (networkName() === 'testnet' ? 'https://api.testnet.hiro.so' : 'https://api.mainnet.hiro.so')).replace(/\/+$/, '');
       if (status) status.textContent = 'Loading your items…';
-      log('trace: my-items - request holdings', { wallet: state.wallet, assetId });
+      log('trace: my-items - request holdings', { wallet: state.wallet, source });
       try {
-        const ids = [];
-        const limit = 50;
-        let offset = 0;
-        for (let page = 0; page < 20; page += 1) {
-          const url = `${apiBase}/extended/v1/tokens/nft/holdings?principal=${encodeURIComponent(state.wallet)}&asset_identifiers=${encodeURIComponent(assetId)}&limit=${limit}&offset=${offset}`;
-          const res = await fetch(url, { cache: 'no-store' });
-          if (!res.ok) throw new Error(`Hiro holdings HTTP ${res.status}`);
-          const json = await res.json();
-          const results = Array.isArray(json.results) ? json.results : [];
-          for (const r of results) {
-            const repr = r && r.value && r.value.repr ? String(r.value.repr) : '';
-            const m = repr.match(/^u?(\d+)$/);
-            if (m) ids.push(m[1]);
-          }
-          const total = Number(json.total || 0);
-          offset += limit;
-          if (results.length === 0 || offset >= total) break;
+        const owned = new Map();
+        for (const id of await fetchHoldingIds(`${source}::${asset}`, apiBase)) owned.set(id, 'on Stacks');
+        // Escrowed on Stacks but twin held on Xtrata (source NFT sits in the wrapper,
+        // so it is invisible to the source-holdings query). Recover from remembered
+        // bindings and verify on-chain that this wallet still holds the twin.
+        for (const [localId, xtrataId] of Object.entries(readTwinStore())) {
+          if (owned.has(localId)) continue;
+          try {
+            const binding = unwrapOptional(await readContract(helper, 'get-binding', [asUint(BigInt(localId))]));
+            if (!binding || String(binding['xtrata-id']) !== String(xtrataId)) continue;
+            if (binding['xtrata-escrowed'] === true) continue;
+            const owner = unwrapOptional(await readContract(master, 'get-owner', [asUint(BigInt(xtrataId))]));
+            const ownerText = owner == null ? '' : (typeof owner === 'object' ? JSON.stringify(owner) : String(owner));
+            if (ownerText === state.wallet) owned.set(localId, 'twin on Xtrata');
+          } catch (e) { /* skip */ }
         }
-        const unique = [...new Set(ids)].sort((x, y) => Number(x) - Number(y));
-        log('trace: my-items - holdings resolved', { count: unique.length, ids: unique });
-        if (!unique.length) { if (status) status.textContent = 'No items from this collection in your connected wallet.'; return; }
-        if (status) status.textContent = `${unique.length} item${unique.length === 1 ? '' : 's'} in your wallet — select one to load:`;
-        for (const id of unique) {
+        const list = [...owned.keys()].map(Number).filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
+        log('trace: my-items - resolved', { count: list.length, items: list.map((n) => ({ id: n, where: owned.get(String(n)) })) });
+        if (!list.length) { if (status) status.textContent = 'No items from this collection in your wallet (held directly or as an Xtrata twin).'; return; }
+        if (status) status.textContent = `${list.length} item${list.length === 1 ? '' : 's'} — select one to load:`;
+        for (const id of list) {
+          const where = owned.get(String(id));
           const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'mini-link';
-          btn.textContent = `#${id}`;
-          btn.addEventListener('click', () => {
-            $('tokenId').value = id;
-            const lt = $('lookupToken'); if (lt) lt.textContent = id;
-            checkToken();
-          });
+          btn.type = 'button'; btn.className = 'mini-link'; btn.textContent = `#${id}`;
+          btn.title = where === 'twin on Xtrata' ? 'Escrowed on Stacks - twin held on Xtrata (swap back available)' : 'Held on Stacks';
+          if (where === 'twin on Xtrata') btn.style.borderStyle = 'dashed';
+          btn.addEventListener('click', () => { $('tokenId').value = String(id); const lt = $('lookupToken'); if (lt) lt.textContent = String(id); checkToken(); });
           chips.appendChild(btn);
         }
       } catch (err) {
@@ -2426,6 +2441,7 @@
       ]);
       state.canonicalHash = unwrapOptional(canonicalRaw);
       state.binding = unwrapOptional(bindingRaw);
+      if (state.binding && state.binding['xtrata-id'] != null) recordTwinBinding(tokenId, state.binding['xtrata-id']);
       state.sourceOwner = ownerRaw?.err ? null : unwrapOptional(ownerRaw);
 
       if (state.canonicalHash) setStatus('canonicalStatus', `${badge('Seeded on chain', 'ok')}<br><span class="data-mono">${escapeHtml(state.canonicalHash)}</span>${chainProof(helper, 'get-canonical-hash', [tokenArg])}`);
