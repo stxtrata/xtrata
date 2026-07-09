@@ -6,8 +6,9 @@
   "scripts": {
     "predev": "npm run arcade:games:manifest && npm run xboard:versions:manifest",
     "dev": "vite",
-    "prebuild": "npm run arcade:games:manifest && npm run xboard:versions:manifest && npm run build:agent-one-wallet && npm run build:agent-one && npm run build:radio",
+    "prebuild": "npm run arcade:games:manifest && npm run xboard:versions:manifest && npm run build:agent-one-wallet && npm run build:agent-one && npm run build:radio && npm run build:forever-twins-wallet",
     "build": "vite build",
+    "build:forever-twins-wallet": "vite build -c vite.forever-twins.config.ts",
     "build:agent-one-wallet": "vite build -c vite.agent-one-wallet.config.ts",
     "build:agent-one": "vite build -c vite.agent-one.config.ts",
     "postbuild": "node scripts/copy-static-apps.mjs",
