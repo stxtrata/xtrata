@@ -2361,6 +2361,9 @@
       const source = $('sourceContract').value.trim();
       const tokenArg = asUint(tokenId);
       log('trace: checkToken start', { tokenId: tokenId.toString() });
+      // Keep the Swap box in sync with the cat currently loaded in the display
+      // so users can't accidentally swap a different (stale) token id.
+      { const _sw = $('swapTokenId'); if (_sw) _sw.value = String(tokenId); }
       resetChainOnlyDisplays();
       enrichPreview(tokenId);
       $('lookupToken').textContent = String(tokenId);
