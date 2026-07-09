@@ -382,7 +382,12 @@
     .swap-token .coin-img { width: 1.55rem; height: 1.55rem; border-radius: 0.42rem; object-fit: cover; filter: grayscale(0.35) opacity(0.78); box-shadow: 0 0 0 1px oklch(0.78 0.15 172 / 0.20); }
     .swap-token.active .coin-img { filter: none; box-shadow: 0 0 0 1px var(--amber-border), 0 0 16px oklch(0.78 0.15 172 / 0.26); }
     .swap-sub { display:block; font-size:0.56rem; letter-spacing:0.03em; text-transform:none; opacity:0.75; margin-top:2px; }
-    .swap-arrow { color: var(--amber); font-family: var(--display); font-size: 1.4rem; }
+    .swap-arrow { color: var(--amber); font-family: var(--display); font-size: 1.4rem; min-width: 1.4rem; text-align: center; }
+    .twin-state { display: inline-flex; align-items: center; gap: 0.32rem; width: fit-content; max-width: 100%; padding: 0.28rem 0.48rem; border-radius: 999px; font-family: var(--mono); font-size: 0.67rem; font-weight: 800; letter-spacing: 0.03em; line-height: 1.1; text-shadow: none; }
+    .twin-state--escrowed { color: #fff; background: #080808; border: 2px solid #fff; box-shadow: 0 0 0 2px #080808; }
+    .twin-state--liquid { color: #070707; background: #fff; border: 2px solid #070707; box-shadow: 0 0 0 2px #fff; }
+    .twin-state__icon { font-size: 1rem; line-height: 0.85; }
+    .twin-state-detail { display: block; margin-top: 0.55rem; color: var(--text); font-size: 0.82rem; line-height: 1.35; }
 
     .log { max-height: 350px; overflow: auto; border-radius: 0.75rem; border: 1px solid oklch(0.72 0.18 70 / 0.12); background: oklch(0.10 0.01 60 / 0.75); }
     .log-line { padding: 0.7rem 0.8rem; border-bottom: 1px solid oklch(0.72 0.18 70 / 0.08); color: var(--muted-2); font-family: var(--mono); font-size: 0.72rem; white-space: pre-wrap; word-break: break-word; }
@@ -1346,6 +1351,12 @@
     function plainCV(cv) {
       if (!cv) return null;
       const type = String(cv.type || '').toLowerCase();
+      // The shared Xtrata bridge uses the app's bundled Stacks SDK, whose
+      // Clarity type values are numeric enums. Convert those values first so
+      // the collection UI keeps the same plain data shape as its former SDK.
+      if (/^\d+$/.test(type)) {
+        try { return plainCV(cvToValue(cv)); } catch {}
+      }
       if (type === 'ok' || type.includes('responseok')) return { ok: plainCV(cv.value) };
       if (type === 'err' || type.includes('responseerr')) return { err: plainCV(cv.value) };
       if (type === 'some' || type.includes('optional')) return cv.value === undefined || cv.value === null ? null : { some: plainCV(cv.value) };
@@ -1409,6 +1420,16 @@
         <div class="id-map-box"><em>Xtrata twin</em><b>${hasBinding ? '#' : ''}${escapeHtml(xId)}</b></div>
         <div class="id-map-meta"><span><b>Liquid:</b><br>${escapeHtml(liquid)}</span><span><b>Escrow:</b><br>${escapeHtml(escrow)}</span></div>
       </div>`;
+    }
+    function xtrataStateBadge(binding) {
+      const escrowed = binding?.['xtrata-escrowed'] === true;
+      return escrowed
+        ? '<span class="twin-state twin-state--escrowed" title="The Xtrata twin is held in helper escrow"><span class="twin-state__icon" aria-hidden="true">🔒</span>Xtrata escrowed</span>'
+        : '<span class="twin-state twin-state--liquid" title="The Xtrata twin is held by its owner and can be swapped back"><span class="twin-state__icon" aria-hidden="true">∞</span>Xtrata liquid</span>';
+    }
+    function renderLiquidState(binding) {
+      if (!binding) return 'Not forevered yet';
+      return `${xtrataStateBadge(binding)}<span class="twin-state-detail">${binding['xtrata-escrowed'] === true ? 'Miami Degen is liquid · Xtrata is secured in escrow' : 'Xtrata is liquid · Miami Degen is secured in escrow'}</span>`;
     }
 
     async function readContract(contractPrincipal, functionName, functionArgs = []) {
@@ -2465,7 +2486,7 @@
         setStatus('bindingStatus', `${badge('Binding found on chain', 'ok')}<br><span class="data-mono">Xtrata #${escapeHtml(xId)} · ${escapeHtml(escrow)}</span>${chainProof(helper, 'get-binding', [tokenArg])}`);
         setStatus('idConversionStatus', renderIdConversion(state.binding, tokenId));
         setStatus('lookupXtrata', `<span class="data-mono">#${escapeHtml(xId)}</span>`);
-        setStatus('lookupLiquid', liquid);
+        setStatus('lookupLiquid', renderLiquidState(state.binding));
       } else {
         setStatus('bindingStatus', `${badge('No binding on chain', 'warn')}<br>The helper contract returned none. Ready to inscribe if the file hash matches.${chainProof(helper, 'get-binding', [tokenArg])}`);
         setStatus('idConversionStatus', renderIdConversion(null, tokenId));
@@ -2652,6 +2673,7 @@
       const leo = state.direction === 'pepe-to-xtrata';
       $('dirPepe').classList.toggle('active', leo);
       $('dirXtrata').classList.toggle('active', !leo);
+      $('swap').querySelector('.swap-arrow').textContent = leo ? '→' : '←';
       // Lock the toggle to the only valid direction for the current on-chain state,
       // so a doomed swap (ERR-WRONG-STATE) can't be selected or submitted. Both
       // sides stay enabled until a bound token is loaded.
