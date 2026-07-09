@@ -175,6 +175,10 @@
       font-size: 0.74rem;
       margin-bottom: 1.4rem;
     }
+    .migration-hero { display: inline-flex; align-items: center; gap: 0.45rem; margin: 0.1rem 0 1rem; padding: 0.42rem 0.64rem; border: 1px solid var(--amber-border); border-radius: 999px; color: var(--muted-2); background: oklch(0.10 0.01 60 / 0.55); font-family: var(--mono); font-size: 0.7rem; }
+    .migration-hero strong { color: var(--amber); font-size: 0.78rem; }
+    .migration-hero[data-complete="true"] { color: #06110f; background: #fff; border-color: #070707; }
+    .migration-hero[data-complete="true"] strong { color: #06110f; }
     h1, h2, h3 { font-family: var(--display); letter-spacing: -0.025em; }
     h1 {
       margin: 0 0 1.05rem;
@@ -655,10 +659,11 @@
       <div class="hero-grid">
         <div class="hero-copy">
           <div class="eyebrow fade-in-up"><span class="dot"></span>Powered by Stacks · Xtrata Protocol</div>
+          <div id="heroMigration" class="migration-hero" aria-live="polite">Migration <strong id="heroMigrationCount">Loading…</strong></div>
           <h1 class="fade-in-up stagger-1">Seal Your Pepe<br><span>Into Bitcoin.</span><br>Forever.</h1>
-          <p class="lead fade-in-up stagger-2">Inscribe your Bitcoin Pepe NFT permanently through Xtrata, then swap between the original Pepe and its on-chain twin. Immutable. Rare. Eternal.</p>
+          <p id="heroLead" class="lead fade-in-up stagger-2">Inscribe your Bitcoin Pepe NFT permanently through Xtrata, then swap between the original Pepe and its on-chain twin. Immutable. Rare. Eternal.</p>
           <div class="hero-actions fade-in-up stagger-3">
-            <a href="#inscribe" class="btn-amber">Inscribe Now</a>
+            <a id="heroPrimaryAction" href="#inscribe" class="btn-amber">Inscribe Now</a>
             <a href="#lookup" class="btn-outline">Check Status</a>
           </div>
         </div>
@@ -673,7 +678,7 @@
     <section class="stats">
       <div class="container">
         <div class="stats-grid">
-          <div class="stat-card"><div class="stat-label">Inscribed</div><div id="statInscribed" class="stat-value">-</div><div class="stat-note">from helper contract</div></div>
+          <div class="stat-card"><div class="stat-label">Migration</div><div id="statMigration" class="stat-value">- / -</div><div id="statMigrationNote" class="stat-note">loading on-chain counts</div></div>
           <div class="stat-card"><div class="stat-label">Fee</div><div id="statFee" class="stat-value">-</div><div class="stat-note">current standard fee</div></div>
           <div class="stat-card"><div class="stat-label">Free Threshold</div><div id="statThreshold" class="stat-value">-</div><div class="stat-note">early inscription window</div></div>
           <div class="stat-card"><div class="stat-label">Canonical</div><div id="statFinalized" class="stat-value">-</div><div class="stat-note">seed list status</div></div>
@@ -1649,26 +1654,50 @@
       }
     }
 
+    function formatMigrationNumber(value) { try { return Number(BigInt(value)).toLocaleString(); } catch { return String(value ?? '-'); } }
+    function renderMigrationProgress(count, total) {
+      const migrated = BigInt(count ?? 0);
+      const collectionTotal = total == null ? null : BigInt(total);
+      const progressText = collectionTotal == null ? `${formatMigrationNumber(migrated)} / ?` : `${formatMigrationNumber(migrated)} / ${formatMigrationNumber(collectionTotal)}`;
+      const complete = collectionTotal !== null && collectionTotal > 0n && migrated >= collectionTotal;
+      $('heroMigrationCount').textContent = complete ? `${progressText} · 100% complete` : progressText;
+      $('heroMigration').dataset.complete = String(complete);
+      $('statMigration').textContent = progressText;
+      $('statMigrationNote').textContent = complete ? '100% migration complete' : 'inscribed / source collection';
+      const heroLead = $('heroLead');
+      const heroPrimaryAction = $('heroPrimaryAction');
+      if (heroLead && heroPrimaryAction) {
+        if (!heroLead.dataset.defaultCopy) heroLead.dataset.defaultCopy = heroLead.textContent;
+        heroLead.textContent = complete
+          ? 'Every Bitcoin Pepe now has a permanent Xtrata twin. The collection migration is complete.'
+          : heroLead.dataset.defaultCopy;
+        heroPrimaryAction.textContent = complete ? 'Migration complete' : 'Inscribe Now';
+        heroPrimaryAction.href = complete ? '#lookup' : '#inscribe';
+      }
+    }
     async function refreshContractStatus() {
       syncLabels();
       const helper = $('helperContract').value.trim();
+      const source = $('sourceContract').value.trim();
       if (!helper) return log('Set the helper contract principal first.');
       try {
-        const [countRaw, feeRaw, thresholdRaw, finalizedRaw] = await Promise.all([
+        const [countRaw, feeRaw, thresholdRaw, finalizedRaw, totalRaw] = await Promise.all([
           readContract(helper, 'get-inscribed-count', []),
           readContract(helper, 'get-fee', []),
           readContract(helper, 'get-free-threshold', []),
           readContract(helper, 'is-finalized', []),
+          readContract(source, 'get-last-token-id', []).catch(() => null),
         ]);
         const count = unwrapOk(countRaw);
         const fee = unwrapOk(feeRaw);
         const threshold = unwrapOk(thresholdRaw);
         const finalized = unwrapOk(finalizedRaw);
-        $('statInscribed').textContent = count ?? '-';
+        const total = totalRaw == null ? null : unwrapOk(totalRaw);
+        renderMigrationProgress(count, total);
         $('statFee').textContent = `${Number(BigInt(fee || 0)) / 1_000_000} STX`;
         $('statThreshold').textContent = threshold ?? '-';
         $('statFinalized').textContent = finalized ? 'Finalized' : 'Open';
-        log('Contract stats refreshed from chain', { count, fee, threshold, finalized });
+        log('Contract stats refreshed from chain', { count, total, fee, threshold, finalized });
       } catch (err) { log('Could not refresh contract stats', { error: err.message }); }
     }
 
