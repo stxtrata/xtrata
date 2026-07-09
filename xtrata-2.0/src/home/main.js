@@ -266,6 +266,8 @@
       clearParentsButton: $('clearParentsButton'),
       parentChipList: $('parentChipList'),
       parentStatusList: $('parentStatusList'),
+      dependencyIdsInput: $('dependencyIdsInput'),
+      dependencyStatusList: $('dependencyStatusList'),
       payloadPreview: $('payloadPreview'),
       payloadPreviewExpandButton: $('payloadPreviewExpandButton'),
       preparedMeta: $('preparedMeta'),
@@ -2254,9 +2256,9 @@
         });
         return link;
       };
-      const appendGroup = (label, ids) => {
+      const appendGroup = (label, ids, role = 'dep') => {
         const head = document.createElement('div');
-        head.className = 'selected-thread__head';
+        head.className = `selected-thread__head selected-thread__head--${role}`;
         head.textContent = label;
         const row = document.createElement('div');
         row.className = 'selected-thread__ids';
@@ -2265,10 +2267,10 @@
       };
 
       if (deps && deps.length > 0) {
-        appendGroup(deps.length === 1 ? '↳ In reply to' : '↳ References', deps);
+        appendGroup(`🔗 Dependencies (${deps.length})`, deps, 'dep');
       }
       if (replies.length > 0) {
-        appendGroup(`💬 Replies (${replies.length}${dependents?.hasMore ? '+' : ''})`, replies);
+        appendGroup(`🔗 Dependents (${replies.length}${dependents?.hasMore ? '+' : ''})`, replies, 'dep');
       }
       el.hidden = false;
     };
@@ -9467,6 +9469,13 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       if (dom.threadReplyTo) {
         dom.threadReplyTo.value = '';
       }
+      if (dom.dependencyIdsInput) {
+        dom.dependencyIdsInput.value = '';
+      }
+      if (dom.dependencyStatusList) {
+        dom.dependencyStatusList.textContent = 'No dependencies added.';
+      }
+      state.handoffDependencyIds = [];
       if (dom.payloadType) {
         dom.payloadType.selectedIndex = 0;
       }
@@ -10364,6 +10373,23 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           : 'Optional — turns your text into an on-chain reply. Anyone can reply to any inscription.';
       }
     };
+    // File card: the Dependencies input (existence-only references). Parses a
+    // numeric list into the same handoff dependency slot the mint reads. Kept
+    // separate from Parents so the two are never confused.
+    const syncDependencyInput = () => {
+      const raw = (dom.dependencyIdsInput?.value || '').trim();
+      const ids = raw.split(/[\s,]+/).filter(Boolean);
+      const valid = ids.length > 0 && ids.every((s) => /^\d+$/.test(s));
+      state.handoffDependencyIds = valid ? ids.map((s) => BigInt(s)) : [];
+      if (dom.dependencyStatusList) {
+        dom.dependencyStatusList.textContent = valid
+          ? `Referencing ${ids.length} inscription${ids.length === 1 ? '' : 's'}: #${ids.join(', #')}`
+          : raw
+            ? 'Enter numeric inscription IDs only (e.g. 134, 90).'
+            : 'No dependencies added.';
+      }
+      markPreparedDirty();
+    };
     // Text card: cost + inscribe button (label switches to "Inscribe reply" when replying).
     const syncTextCard = () => {
       if (!dom.inscribeTextButton) return;
@@ -10394,10 +10420,13 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       } else if (mode === 'file') {
         if (dom.textPayload?.value) { dom.textPayload.value = ''; updateTextStats(); markPreparedDirty(); }
         if (dom.threadReplyTo) dom.threadReplyTo.value = '';
+        syncDependencyInput(); // file mode owns dependencies via the Dependencies input
       } else { // none — back to the landing; clear both sources
         if (state.selectedFile) setSelectedFile(null);
         if (dom.textPayload?.value) { dom.textPayload.value = ''; updateTextStats(); }
         if (dom.threadReplyTo) dom.threadReplyTo.value = '';
+        if (dom.dependencyIdsInput) dom.dependencyIdsInput.value = '';
+        state.handoffDependencyIds = [];
         markPreparedDirty();
       }
     };
@@ -10439,6 +10468,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       syncTextCard();
     });
     dom.nameInput.addEventListener('input', markPreparedDirty);
+    dom.dependencyIdsInput?.addEventListener('input', syncDependencyInput);
     dom.payloadType.addEventListener('change', markPreparedDirty);
     dom.tokenUriInput.addEventListener('input', () => {
       markPreparedDirty();
