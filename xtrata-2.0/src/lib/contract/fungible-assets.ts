@@ -9,6 +9,14 @@ export type FungibleAssetConfig = ContractConfig & {
   priceAssetKey: PriceAssetKey | null;
 };
 
+// NOTE (WS-3.1): USDCx is the canonical native USDC on Stacks (Circle xReserve),
+// so there is no separate "USDC" SIP-010 to register — aeUSDC is a deprecated
+// predecessor being migrated into USDCx. USDT is NOT yet listed here: as of
+// 2026-07 no canonical USDT SIP-010 mainnet contract could be verified on the
+// Hiro explorer, and per the improvement harness we must not hardcode an
+// unverified contract id. Pricing already supports 'usdt' (see
+// pricing/types.ts + hooks.ts); add the registry entry below once a mainnet
+// contract id is confirmed, with decimals + priceAssetKey: 'usdt'.
 const KNOWN_FUNGIBLE_ASSETS: FungibleAssetConfig[] = [
   {
     address: 'SP120SBRBQJ00MCWS7TM5R8WJNTTKD5K0HFRC2CNE',
@@ -42,3 +50,7 @@ export const getKnownFungibleAsset = (
   }
   return KNOWN_FUNGIBLE_ASSET_BY_ID.get(contractId) ?? null;
 };
+
+export const listKnownFungibleAssets = (): FungibleAssetConfig[] => [
+  ...KNOWN_FUNGIBLE_ASSETS
+];

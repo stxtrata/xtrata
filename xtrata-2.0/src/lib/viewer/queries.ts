@@ -21,6 +21,11 @@ export const getTokenSummaryKey = (contractId: string, id: bigint) => [
   'token',
   id.toString()
 ];
+export const getTokenExistenceKey = (contractId: string, id: bigint) => [
+  ...getViewerKey(contractId),
+  'existence',
+  id.toString()
+];
 export const getDependenciesKey = (contractId: string, id: bigint) => [
   ...getViewerKey(contractId),
   'dependencies',
@@ -158,6 +163,33 @@ export const fetchTokenSummary = async (params: {
       : undefined
   );
   return summary;
+};
+
+/**
+ * Cheap existence/ownership validation for a token. Unlike
+ * {@link fetchTokenSummary} this issues a single `getOwner` read and never
+ * fetches metadata, token URI, SVG data, or media, and never writes the
+ * full-summary cache. Used to validate selected dependencies/parents up front
+ * without paying for previews the user hasn't asked to see.
+ */
+export const fetchTokenExistence = async (params: {
+  client: XtrataClient;
+  id: bigint;
+  senderAddress: string;
+}): Promise<TokenSummary> => {
+  const sourceContractId = getContractId(params.client.contract);
+  const ownerRead = await safeReadWithStatus(
+    () => params.client.getOwner(params.id, params.senderAddress),
+    null
+  );
+  return {
+    id: params.id,
+    meta: null,
+    tokenUri: null,
+    owner: ownerRead.value,
+    svgDataUri: null,
+    sourceContractId
+  };
 };
 
 const isEmptySummary = (summary: TokenSummary) =>
@@ -436,6 +468,49 @@ export const useTokenSummaries = (params: {
         params.senderAddress.length > 0 &&
         tokenIds.length > 0 &&
         indexSettled,
+      staleTime: 300_000,
+      refetchOnWindowFocus: false
+    }))
+  });
+
+  return {
+    tokenIds,
+    tokenQueries
+  };
+};
+
+/**
+ * Owner-only validation for a set of token ids. Mirrors
+ * {@link useTokenSummaries} but uses {@link fetchTokenExistence} (single
+ * `getOwner` read per id) under a distinct cache key, so it never competes with
+ * or pollutes the full-summary cache. Intended for always-on existence checks
+ * on selected dependencies/parents.
+ */
+export const useTokenExistence = (params: {
+  client: XtrataClient;
+  senderAddress: string;
+  tokenIds: bigint[];
+  enabled?: boolean;
+  contractIdOverride?: string;
+}) => {
+  const contractId =
+    params.contractIdOverride ?? getContractId(params.client.contract);
+  const isEnabled = params.enabled ?? true;
+  const tokenIds = params.tokenIds;
+
+  const tokenQueries = useQueries({
+    queries: tokenIds.map((id) => ({
+      queryKey: getTokenExistenceKey(contractId, id),
+      queryFn: () =>
+        fetchTokenExistence({
+          client: params.client,
+          id,
+          senderAddress: params.senderAddress
+        }),
+      enabled:
+        isEnabled &&
+        params.senderAddress.length > 0 &&
+        tokenIds.length > 0,
       staleTime: 300_000,
       refetchOnWindowFocus: false
     }))

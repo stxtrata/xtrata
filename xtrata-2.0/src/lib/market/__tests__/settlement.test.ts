@@ -50,6 +50,12 @@ const priceBook: UsdPriceBook = {
       updatedAt: now,
       sourceId: 'usd-coin',
       isFallback: false
+    },
+    usdt: {
+      usd: 0.9998,
+      updatedAt: now,
+      sourceId: 'tether',
+      isFallback: false
     }
   }
 };
