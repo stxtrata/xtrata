@@ -72,6 +72,15 @@ template.innerHTML = `
         .texture-dot{fill:var(--nymph-edge);opacity:.22;}
         .nymph-eye{fill:var(--nymph-eye);stroke:#5b0704;stroke-width:1.2;filter:drop-shadow(0 0 3px rgba(80,0,0,.42));}
         .eye-glint{fill:#ffd9a6;opacity:.42;}
+        /* Developing wing pads — a signature nymph feature — flank the thorax. */
+        .nymph-wingpad{fill:url(#nymphPadGrad);stroke:var(--nymph-edge);stroke-width:1.8;stroke-linejoin:round;opacity:.96;}
+        .nymph-wingpad-ridge{fill:none;stroke:var(--nymph-light);stroke-width:1.4;stroke-linecap:round;opacity:.4;}
+        .nymph-wingpad-vein{fill:none;stroke:#160d07;stroke-width:1.1;stroke-linecap:round;opacity:.3;}
+        .antenna-bud{fill:none;stroke:var(--nymph-dark);stroke-width:3.4;stroke-linecap:round;}
+        .antenna-tip{fill:var(--nymph-edge);}
+        .spiracle{fill:#160d07;stroke:var(--nymph-light);stroke-width:.7;opacity:.55;}
+        .body-sheen{fill:url(#nymphSheen);opacity:.5;pointer-events:none;}
+        .mandible{fill:none;stroke:var(--nymph-dark);stroke-width:2.2;stroke-linecap:round;opacity:.7;}
         #front-leg-left .leg-upper,#front-leg-right .leg-upper{stroke-width:12px;}
         #front-leg-left .leg-lower,#front-leg-right .leg-lower{stroke-width:8px;}
         #front-leg-left .leg-tip,#front-leg-right .leg-tip{stroke-width:5.5px;}
@@ -110,6 +119,16 @@ template.innerHTML = `
                         <stop offset="55%" stop-color="var(--nymph-mid)"/>
                         <stop offset="100%" stop-color="var(--nymph-dark)"/>
                     </linearGradient>
+                    <radialGradient id="nymphPadGrad" cx="46%" cy="30%" r="80%">
+                        <stop offset="0%" stop-color="var(--nymph-light)"/>
+                        <stop offset="50%" stop-color="var(--nymph-mid)"/>
+                        <stop offset="100%" stop-color="var(--nymph-dark)"/>
+                    </radialGradient>
+                    <radialGradient id="nymphSheen" cx="42%" cy="20%" r="60%">
+                        <stop offset="0%" stop-color="#fff3dd" stop-opacity="0.85"/>
+                        <stop offset="55%" stop-color="#fff3dd" stop-opacity="0.12"/>
+                        <stop offset="100%" stop-color="#fff3dd" stop-opacity="0"/>
+                    </radialGradient>
                     <clipPath id="nymph-body-clip">
                         <path d="M128 158C118 202 132 247 154 272C126 312 135 391 200 438C265 391 274 312 246 272C268 247 282 202 272 158C252 129 225 118 200 120C175 118 148 129 128 158Z"/>
                     </clipPath>
@@ -154,6 +173,25 @@ template.innerHTML = `
                                 <path class="segment-line" d="M162 394C185 415 215 415 238 394"/>
                                 <path class="ridge-line" d="M200 268C194 314 194 374 200 426"/>
                                 <path class="dark-ridge" d="M174 274C161 318 162 370 181 414M226 274C239 318 238 370 219 414"/>
+                                <ellipse class="spiracle" cx="156" cy="300" rx="2.4" ry="3.4"/>
+                                <ellipse class="spiracle" cx="150" cy="336" rx="2.4" ry="3.4"/>
+                                <ellipse class="spiracle" cx="154" cy="372" rx="2.2" ry="3.1"/>
+                                <ellipse class="spiracle" cx="244" cy="300" rx="2.4" ry="3.4"/>
+                                <ellipse class="spiracle" cx="250" cy="336" rx="2.4" ry="3.4"/>
+                                <ellipse class="spiracle" cx="246" cy="372" rx="2.2" ry="3.1"/>
+                            </g>
+
+                            <g id="nymph-wingpads">
+                                <g id="nymph-wingpad-left">
+                                    <path class="nymph-wingpad" d="M150 196C120 206 104 236 108 276C110 300 122 320 140 330C150 314 156 288 156 258C156 234 154 214 150 196Z"/>
+                                    <path class="nymph-wingpad-ridge" d="M146 206C126 224 120 258 128 300"/>
+                                    <path class="nymph-wingpad-vein" d="M150 220C138 240 134 270 140 306M144 214C130 232 124 262 130 298"/>
+                                </g>
+                                <g id="nymph-wingpad-right">
+                                    <path class="nymph-wingpad" d="M250 196C280 206 296 236 292 276C290 300 278 320 260 330C250 314 244 288 244 258C244 234 246 214 250 196Z"/>
+                                    <path class="nymph-wingpad-ridge" d="M254 206C274 224 280 258 272 300"/>
+                                    <path class="nymph-wingpad-vein" d="M250 220C262 240 266 270 260 306M256 214C270 232 276 262 270 298"/>
+                                </g>
                             </g>
 
                             <g id="nymph-thorax">
@@ -166,6 +204,12 @@ template.innerHTML = `
                             </g>
 
                             <g id="head">
+                                <g id="nymph-antenna-buds">
+                                    <path class="antenna-bud" d="M176 118C168 100 160 88 150 80"/>
+                                    <path class="antenna-bud" d="M224 118C232 100 240 88 250 80"/>
+                                    <circle class="antenna-tip" cx="149" cy="79" r="3"/>
+                                    <circle class="antenna-tip" cx="251" cy="79" r="3"/>
+                                </g>
                                 <path class="head-fill" d="M150 145C150 105 250 105 250 145Z"/>
                                 <g id="eye-classic">
                                     <ellipse class="base-eye nymph-eye" cx="143" cy="128" rx="15" ry="22" transform="rotate(-28 143 128)"/>
@@ -175,6 +219,11 @@ template.innerHTML = `
                                 </g>
                                 <path class="ridge-line" d="M166 145C183 153 217 153 234 145"/>
                                 <path class="dark-ridge" d="M190 155L181 169M210 155L219 169M194 160H206"/>
+                                <path class="mandible" d="M188 168C184 178 186 186 194 190M212 168C216 178 214 186 206 190"/>
+                            </g>
+
+                            <g id="nymph-sheen">
+                                <ellipse class="body-sheen" cx="178" cy="248" rx="60" ry="150"/>
                             </g>
 
                             <path id="head-hitbox" d="M126 102C126 72 150 48 200 48C250 48 274 72 274 102L274 154C274 184 248 198 200 198C152 198 126 184 126 154Z"/>
@@ -277,15 +326,25 @@ export class CicadaNymphGenerator {
         return this._wanderEl;
     }
 
-    _applyWanderTransform(sway = 0) {
+    _applyWanderTransform(sway = 0, bob = 0) {
         const el = this._wanderTarget();
         if (!el) return;
         const w = this._wander || { x: 0, y: 0 };
-        if (!w.x && !w.y && !sway) {
+        const heading = this._heading || 0;
+        const rot = heading + sway;
+        if (!w.x && !w.y && !rot && !bob) {
             el.style.removeProperty('transform');
             return;
         }
-        el.style.transform = `translate(${w.x.toFixed(1)}px, ${w.y.toFixed(1)}px) rotate(${sway.toFixed(2)}deg)`;
+        el.style.transform = `translate(${w.x.toFixed(1)}px, ${(w.y - bob).toFixed(1)}px) rotate(${rot.toFixed(2)}deg)`;
+    }
+
+    // Shortest signed angular delta from `a` to `b` (degrees).
+    _turnDelta(a, b) {
+        let d = (b - a) % 360;
+        if (d > 180) d -= 360;
+        if (d < -180) d += 360;
+        return d;
     }
 
     _reducedMotion() {
@@ -321,8 +380,6 @@ export class CicadaNymphGenerator {
     }
 
     _walkStep(r, tier) {
-        const target = this._wanderTarget();
-        if (!target) return;
         const maxRange = 80 * tier.wander;
         const step = 400 * (0.06 + r() * 0.08);
         let ang = r() * Math.PI * 2;
@@ -333,35 +390,108 @@ export class CicadaNymphGenerator {
             tx = this._wander.x + Math.cos(ang) * step;
             ty = this._wander.y + Math.sin(ang) * step * 0.6;
         }
+        // Idle wander keeps a gentle heading turn so the panel preview does not
+        // flip upside-down; the scene uses full directional turning via walkTo().
+        this._animateWalk(tx, ty, {
+            speed: 0.026 + r() * 0.018,
+            tilt: 2.2 + r() * 2.6,
+            maxTurn: 55
+        });
+    }
+
+    // Core walk animation shared by idle wander and scripted route steps.
+    // Handles directional turning (through the gait's sway channel so planted
+    // feet stay coherent), a gentle walking bob, and per-step callbacks the
+    // scene layer uses to disturb the terrain the nymph passes over.
+    _animateWalk(tx, ty, opts = {}) {
+        const target = this._wanderTarget();
+        if (!target || !this._wander) return;
         const fromX = this._wander.x, fromY = this._wander.y;
         const dist = Math.hypot(tx - fromX, ty - fromY);
-        if (dist < 3) return;
-        const duration = Math.max(900, dist / (0.026 + r() * 0.018));
-        const tiltDir = Math.cos(ang) >= 0 ? 1 : -1;
-        const maxTilt = 2.2 + r() * 2.6;
+        if (dist < 2) { opts.onDone?.(); return; }
+        if (this._wander.frame) cancelAnimationFrame(this._wander.frame);
+
+        const speed = opts.speed ?? 0.03;                 // viewBox px per ms
+        const duration = Math.max(700, dist / speed);
+        const direction = { x: (tx - fromX) / dist, y: (ty - fromY) / dist };
+        const tilt = opts.tilt ?? 3;
+        const tiltDir = direction.x >= 0 ? 1 : -1;
+        const bobAmp = opts.bob ?? 1.6;
+        const strides = Math.max(1, Math.round(dist / 34));
+
+        // Face the direction of travel, taking the shortest arc. maxTurn caps
+        // how sharply the body may reorient on a single step.
+        const fromHeading = this._heading || 0;
+        let wantHeading = Math.atan2(direction.y, direction.x) * 180 / Math.PI + 90;
+        let delta = this._turnDelta(fromHeading, wantHeading);
+        const maxTurn = opts.maxTurn ?? 180;
+        if (Math.abs(delta) > maxTurn) delta = Math.sign(delta) * maxTurn;
+        const toHeading = fromHeading + delta;
+
         this._wander.active = true;
         this._savedWrapperTransition = target.style.transition;
         target.style.transition = 'none';
         target.style.transformOrigin = '200px 250px';
         target.style.transformBox = 'view-box';
-        this.shell.style.setProperty('--walk-step-dur', `${(0.32 + r() * 0.18).toFixed(2)}s`);
+        this.shell.style.setProperty('--walk-step-dur', `${(0.32 + Math.min(0.2, speed * 6)).toFixed(2)}s`);
         this.shell.classList.add('is-walking');
         const start = performance.now();
-        const direction = { x: (tx - fromX) / dist, y: (ty - fromY) / dist };
-        this.gait.begin({ x: fromX, y: fromY, sway: 0 });
+        this.gait.begin({ x: fromX, y: fromY, sway: fromHeading });
+
         const frame = now => {
             if (!this.shell.isConnected || this.shell.classList.contains('is-alert')) return this._endWalk();
             const p = Math.min(1, (now - start) / duration);
             const e = easeInOut(p);
+            // Turn is front-loaded so the nymph pivots toward its target early.
+            this._heading = fromHeading + delta * easeInOut(Math.min(1, p / 0.4));
             this._wander.x = lerp(fromX, tx, e);
             this._wander.y = lerp(fromY, ty, e);
-            const sway = Math.sin(p * Math.PI) * maxTilt * tiltDir;
-            this._applyWanderTransform(sway);
-            this.gait.update({ x: this._wander.x, y: this._wander.y, sway }, now - start, direction);
+            const sway = Math.sin(p * Math.PI) * tilt * tiltDir;
+            const bob = Math.sin(p * Math.PI * strides) * bobAmp * Math.sin(p * Math.PI);
+            this._applyWanderTransform(sway, bob);
+            this.gait.update({ x: this._wander.x, y: this._wander.y, sway: this._heading + sway }, now - start, direction);
+            opts.onStep?.(this._wander.x, this._wander.y, this._heading);
             if (p < 1) this._wander.frame = requestAnimationFrame(frame);
-            else this._endWalk();
+            else { this._heading = toHeading; this._endWalk(); opts.onDone?.(); }
         };
         this._wander.frame = requestAnimationFrame(frame);
+    }
+
+    // ---- Public route API (used by the subterranean scene) ------------------
+    // Ensure the wander state exists even when idle wandering is disabled, so a
+    // scene can drive the nymph along a scripted route.
+    _ensureWander() {
+        if (!this._wander) this._wander = { x: 0, y: 0, timer: null, frame: null, active: false };
+        return this._wander;
+    }
+
+    getWanderPos() {
+        const w = this._ensureWander();
+        return { x: w.x, y: w.y, heading: this._heading || 0 };
+    }
+
+    setWanderPos(x = 0, y = 0, heading) {
+        const w = this._ensureWander();
+        w.x = x; w.y = y;
+        if (heading != null) this._heading = heading;
+        this._applyWanderTransform(0, 0);
+    }
+
+    // Walk to a single target point. Returns a promise that resolves on arrival.
+    walkTo(x, y, opts = {}) {
+        return new Promise(resolve => {
+            this._ensureWander();
+            if (!this.shell?.isConnected || this.shell.classList.contains('is-alert')) return resolve();
+            this._animateWalk(x, y, { ...opts, onDone: () => { opts.onDone?.(); resolve(); } });
+        });
+    }
+
+    // Hold still for a brief pause (used between route legs).
+    holdPause(ms = 600) {
+        return new Promise(resolve => {
+            if (this._pauseTimer) clearTimeout(this._pauseTimer);
+            this._pauseTimer = setTimeout(resolve, Math.max(0, ms));
+        });
     }
 
     _endWalk() {
@@ -389,6 +519,7 @@ export class CicadaNymphGenerator {
 
     destroy() {
         if (this.callTimeout) clearTimeout(this.callTimeout);
+        if (this._pauseTimer) clearTimeout(this._pauseTimer);
         if (this._wander?.timer) clearTimeout(this._wander.timer);
         if (this._wander?.frame) cancelAnimationFrame(this._wander.frame);
         this.host.remove();

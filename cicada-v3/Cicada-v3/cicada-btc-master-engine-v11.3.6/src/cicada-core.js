@@ -1,6 +1,7 @@
 // Public browser API for rendering seeded cicadas.
 import { CicadaGenerator } from './cicada-renderer.js?v=11.3.5-nymph.2';
 import { CicadaNymphGenerator } from './cicada-nymph-renderer.js?v=11.3.5-nymph.2';
+import { NymphScene } from './nymph-scene.js?v=11.3.5-nymph.2';
 import { CicadaSynth } from './cicada-audio.js?v=11.3.5-nymph.2';
 import { playSignatureCall, getSoundIdentity } from './motion-bridge.js?v=11.3.5-nymph.2';
 import { createGroupChorus, groupGenesForSeed } from './group-chorus.js?v=11.3.5-nymph.2';
@@ -433,6 +434,42 @@ function applyBasePageStyles() {
                 badge?.remove();
                 badge = null;
                 nymph.destroy();
+            }
+        };
+    }
+
+    // Subterranean nymph scene: a colony of shared-design nymphs moving through
+    // a layered underground environment on independent routes, each emerging at
+    // the top boundary into the adult cicada (the next visual state the engine
+    // already renders).
+    export function renderNymphScene(options = {}) {
+        const {
+            seed = 1,
+            mount,
+            clearMount = true,
+            pageStyles = true,
+            count = 5
+        } = options;
+
+        if (pageStyles) applyBasePageStyles();
+        const seedNumber = normalizeSeed(seed);
+        const target = resolveMount(mount);
+        if (clearMount) target.replaceChildren();
+
+        const scene = new NymphScene({ mount: target, seed: seedNumber, count, renderCicada });
+
+        if (target) {
+            target.setAttribute('role', 'img');
+            target.setAttribute('aria-label',
+                `Subterranean scene: a colony of cicada nymphs from seed ${seedNumber} moving through tunnels and emerging into adults.`);
+        }
+
+        return {
+            seed: seedNumber,
+            scene,
+            destroy() {
+                scene.destroy();
+                if (target) { target.removeAttribute('role'); target.removeAttribute('aria-label'); }
             }
         };
     }

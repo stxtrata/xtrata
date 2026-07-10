@@ -4,6 +4,16 @@ export type MarketListing = {
   tokenId: bigint;
   price: bigint;
   createdAt: bigint;
+  /** sponsored markets only — STX fee budget escrowed at list time */
+  feeBudget?: bigint;
+  /** sponsored markets only — unclaimed budget still in escrow */
+  budgetRemaining?: bigint;
+  /** sponsored markets only — cumulative sponsor reimbursement */
+  claimed?: bigint;
+  /** sponsored markets only — buyer once sold */
+  buyer?: string | null;
+  /** sponsored markets only — block height of the sale (null while live) */
+  soldAt?: bigint | null;
 };
 
 export type MarketActivityType =

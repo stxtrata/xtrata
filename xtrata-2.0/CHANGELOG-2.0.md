@@ -77,3 +77,19 @@ Per `MARKETPLACE-SPONSORED-TRADING-PLAN.md`. Sellers escrow an STX fee budget at
 - **WS-C lib:** `src/lib/market/sponsor-client.ts` (typed quote/submit/status client, error taxonomy, self-paid fallback signal), `src/lib/market/sponsored.ts` (fee-budget validation, sponsored-buy eligibility, seller budget summary incl. self-refund unlock), registry entry type gains `sponsored`/`sponsorApi`, activity types gain `claim-fee`/`settle-refund` + budget fields. Tests: `__tests__/sponsored.test.ts`, `__tests__/sponsor-client.test.ts`. Full `src/lib` suite: 516 tests green.
 
 Not done yet (deliberately): MarketScreen UI wiring (list-with-deposit, "Buy — no STX needed" flow, seller budget dashboard) — needs the render-test harness first; indexer parsing of the new print events; testnet deploy + registry entries (contracts must be deployed before `market-registry.json` gains sponsored entries); live `estimateBuyFee` calibration.
+
+## Sponsored marketplace — UI wiring complete (session 2026-07-09, cont.)
+
+- **Render-test harness (first in repo):** `@testing-library/react` + `happy-dom` dev deps; vitest config gains the React plugin and `.test.tsx`; component tests opt into the DOM per file via `// @vitest-environment happy-dom` so the global env stays `node`.
+- **Components (test-first):** `src/screens/market/useSponsoredBuy.ts` (sign → submit → poll → settled/failed state machine, race-token cancellation), `SponsoredBuySection.tsx` ("Buy — no STX needed" with live progress + self-paid fallback), `SponsorshipDepositField.tsx` (live relayer quote, min/max validation, refund explanation). 11 render tests.
+- **MarketScreen wiring:** market registry entries with `sponsored: true` + `sponsorApi` activate the deposit field in the list flow (budget arg + exact-amount STX post-condition appended to `list-token`) and swap the Buy button for `SponsoredBuySection`. `requestMarketContractCall` gains `sponsored` passthrough (fee 0); `signSponsoredBuy` returns the wallet's `txRaw` and degrades with a clear message if the wallet doesn't hand the signed tx back. Listing parser now reads the sponsored tuple fields (fee-budget, budget-remaining, claimed, buyer, sold-at) when present; `MarketListing` type extended accordingly.
+- Verified: 572 src tests green (split runs), production `vite build` rc=0.
+
+### How to test locally
+
+1. UI: `npm run dev` → http://localhost:5173/workspace.html → expand the Market panel.
+2. Relayer: `cd xtrata-agent-one && SPONSOR_KEY=<hex-privkey> SPONSOR_MARKETS=<deployer>.xtrata-market-sponsored-sbtc-v1-0 node server/server.mjs` → serves http://127.0.0.1:8787/api/sponsor/{quote,submit,status/:id}.
+3. Deploy the two sponsored contracts to **testnet**, then add each to `src/data/market-registry.json` with `"sponsored": true, "sponsorApi": "http://127.0.0.1:8787/api"` — the sponsored UI activates automatically for those entries.
+4. End-to-end: list from a funded seller wallet (NFT + deposit escrowed) → buy from an STX-empty wallet via "Buy — no STX needed" → watch settle: claim-fee then settle-refund returns the dust to the seller.
+
+Remaining before mainnet: testnet rehearsal incl. the Leather/Xverse sponsored-signing check (wallet must return `txRaw`; the UI falls back gracefully if not), live fee estimate calibration in the relayer, indexer parsing of claim/refund print events for the activity feed.

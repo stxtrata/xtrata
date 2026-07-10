@@ -235,18 +235,16 @@ function showSeed(seed, { updateHash = true } = {}) {
     if (currentRender) currentRender.destroy();
     stage.replaceChildren();
     if (nymphMode) {
-        currentRender = mod.renderCicadaNymph({
+        currentRender = mod.renderNymphScene({
             seed: seedNumber,
             mount: stage,
             clearMount: true,
             pageStyles: false,
-            interactive: true,
-            enableAudio: false,
-            instructionOverrides: { idleWander: true }
+            count: 5
         });
         rarityBox.innerHTML = '';
         traitsList.innerHTML = '';
-        statusEl.textContent = `Nymph Mode: previewing seed ${seedNumber}. Adult traits, rarity visuals, lighting, audio, and animated trait renderers are bypassed.`;
+        statusEl.textContent = `Nymph Mode: subterranean colony from seed ${seedNumber}. Nymphs travel the tunnels on independent routes and emerge into adults at the surface. Adult traits, rarity visuals, audio, and trait renderers are bypassed.`;
         try { localStorage.setItem('cicada:lastSeed', String(seedNumber)); } catch (_) {}
         if (updateHash) {
             suppressHashUpdate = true;

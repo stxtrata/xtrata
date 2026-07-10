@@ -4,10 +4,16 @@ import { showContractCall } from '../lib/wallet/connect';
 import {
   type ClarityValue,
   contractPrincipalCV,
+  FungibleConditionCode,
+  makeStandardSTXPostCondition,
   PostConditionMode,
   type PostCondition,
   uintCV
 } from '@stacks/transactions';
+import SponsoredBuySection from './market/SponsoredBuySection';
+import SponsorshipDepositField from './market/SponsorshipDepositField';
+import { createSponsorClient } from '../lib/market/sponsor-client';
+import { isSponsoredMarket } from '../lib/market/sponsored';
 import type { ContractRegistryEntry } from '../lib/contract/registry';
 import { getLegacyContract } from '../lib/contract/registry';
 import type { WalletSession } from '../lib/wallet/types';
@@ -85,6 +91,8 @@ export type MarketScreenProps = {
 
 type TxPayload = {
   txId: string;
+  /** signed tx hex, present for sponsored (fee 0) requests */
+  txRaw?: string;
 };
 
 const parseUintInput = (value: string) => {
@@ -285,6 +293,29 @@ export default function MarketScreen(props: MarketScreenProps) {
     : null;
   const marketContractIdLabel = marketContract ? getContractId(marketContract) : null;
   const marketRegistryEntry = getMarketRegistryEntry(marketContractIdLabel);
+  const marketIsSponsored = isSponsoredMarket(marketRegistryEntry);
+  const sponsorClient = useMemo(
+    () =>
+      marketIsSponsored && marketRegistryEntry?.sponsorApi
+        ? createSponsorClient(marketRegistryEntry.sponsorApi)
+        : null,
+    [marketIsSponsored, marketRegistryEntry?.sponsorApi]
+  );
+  const [sponsorBudgetUstx, setSponsorBudgetUstx] = useState<bigint | null>(null);
+  const [sponsorRelayerUp, setSponsorRelayerUp] = useState(false);
+  useEffect(() => {
+    if (!sponsorClient) {
+      setSponsorRelayerUp(false);
+      return;
+    }
+    let cancelled = false;
+    void sponsorClient.available().then((up) => {
+      if (!cancelled) setSponsorRelayerUp(up);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [sponsorClient]);
   const nftContractId = getContractId(props.contract);
   const nftNetworkMismatch =
     marketContract && marketContract.network !== props.contract.network;
@@ -686,6 +717,7 @@ export default function MarketScreen(props: MarketScreenProps) {
     functionArgs: ClarityValue[];
     postConditionMode?: PostConditionMode;
     postConditions?: PostCondition[];
+    sponsored?: boolean;
   }) => {
     const contractId = params.contractId ?? getContractId(params.contract);
     const network = props.walletSession.network ?? params.contract.network;
@@ -704,6 +736,8 @@ export default function MarketScreen(props: MarketScreenProps) {
         functionArgs: params.functionArgs,
         network,
         stxAddress,
+        sponsored: params.sponsored === true,
+        fee: params.sponsored === true ? 0 : undefined,
         postConditionMode: params.postConditionMode,
         postConditions: params.postConditions,
         onFinish: (payload) => {
@@ -763,22 +797,37 @@ export default function MarketScreen(props: MarketScreenProps) {
     setListPending(true);
     setListStatus('Submitting listing transaction...');
     try {
-      const postConditions = [
+      if (marketIsSponsored && sponsorBudgetUstx === null) {
+        setListStatus('Enter a valid sponsorship deposit first.');
+        return;
+      }
+      const postConditions: PostCondition[] = [
         buildTransferPostCondition({
           contract: props.contract,
           senderAddress: props.walletSession.address,
           tokenId
         })
       ];
+      const functionArgs = [
+        contractPrincipalCV(props.contract.address, props.contract.contractName),
+        uintCV(tokenId),
+        uintCV(listPriceAmount)
+      ];
+      if (marketIsSponsored && sponsorBudgetUstx !== null) {
+        functionArgs.push(uintCV(sponsorBudgetUstx));
+        postConditions.push(
+          makeStandardSTXPostCondition(
+            props.walletSession.address,
+            FungibleConditionCode.Equal,
+            sponsorBudgetUstx
+          )
+        );
+      }
       const tx = await requestMarketContractCall({
         contract: marketContract,
         contractId: marketContractIdLabel,
         functionName: 'list-token',
-        functionArgs: [
-          contractPrincipalCV(props.contract.address, props.contract.contractName),
-          uintCV(tokenId),
-          uintCV(listPriceAmount)
-        ],
+        functionArgs,
         postConditionMode: PostConditionMode.Deny,
         postConditions
       });
@@ -788,6 +837,56 @@ export default function MarketScreen(props: MarketScreenProps) {
       setListStatus(`Listing failed: ${message}`);
     } finally {
       setListPending(false);
+    }
+  };
+
+  // Sponsored (STX-free) buy: sign the buy with fee 0, sponsored auth; the
+  // relayer attaches and pays the mining fee. Returns the signed tx hex.
+  const signSponsoredBuy = async (params: {
+    listingId: bigint;
+    listing: MarketListing;
+  }): Promise<{ txHex: string } | null> => {
+    if (!marketContract || !marketContractIdLabel || !props.walletSession.address) {
+      throw new Error('Connect a wallet and select a sponsored market first.');
+    }
+    const listingContract = resolveListingContractConfig(params.listing);
+    const postConditions = buildMarketBuyPostConditions({
+      settlement: marketSettlement,
+      buyerAddress: props.walletSession.address,
+      amount: params.listing.price,
+      nftContract: listingContract,
+      senderContract: marketContract,
+      tokenId: params.listing.tokenId
+    });
+    if (!postConditions) {
+      throw new Error(
+        getMarketSettlementSupportMessage(marketSettlement) ?? 'Unsupported payment token.'
+      );
+    }
+    try {
+      const tx = await requestMarketContractCall({
+        contract: marketContract,
+        contractId: marketContractIdLabel,
+        functionName: 'buy',
+        functionArgs: [
+          contractPrincipalCV(listingContract.address, listingContract.contractName),
+          uintCV(params.listingId)
+        ],
+        postConditionMode: PostConditionMode.Deny,
+        postConditions,
+        sponsored: true
+      });
+      if (!tx.txRaw) {
+        throw new Error(
+          'Wallet did not return the signed transaction. This wallet may not support sponsored purchases yet; use the self-paid option.'
+        );
+      }
+      return { txHex: tx.txRaw };
+    } catch (error) {
+      if (error instanceof Error && /cancelled/i.test(error.message)) {
+        return null; // user rejected in wallet
+      }
+      throw error;
     }
   };
 
@@ -2096,11 +2195,22 @@ export default function MarketScreen(props: MarketScreenProps) {
                       onChange={(event) => setListPriceInput(event.target.value)}
                     />
                   </label>
+                  {marketIsSponsored && sponsorClient && (
+                    <SponsorshipDepositField
+                      client={sponsorClient}
+                      onBudgetChange={setSponsorBudgetUstx}
+                    />
+                  )}
                   <button
                     className="button"
                     type="button"
                     onClick={handleList}
-                    disabled={!canTransact || !marketSettlementSupported || listPending}
+                    disabled={
+                      !canTransact ||
+                      !marketSettlementSupported ||
+                      listPending ||
+                      (marketIsSponsored && sponsorBudgetUstx === null)
+                    }
                   >
                     {listPending ? 'Listing...' : 'Create listing'}
                   </button>
@@ -2134,16 +2244,45 @@ export default function MarketScreen(props: MarketScreenProps) {
                       Post condition: buyer spends exactly {buyPriceLabel} (network fee is extra).
                     </p>
                   )}
-                  <button
-                    className="button"
-                    type="button"
-                    onClick={() => {
-                      void handleBuy();
-                    }}
-                    disabled={!canTransact || !marketSettlementSupported || buyPending}
-                  >
-                    {buyPending ? 'Buying...' : 'Buy now'}
-                  </button>
+                  {marketIsSponsored &&
+                  sponsorClient &&
+                  marketContractIdLabel &&
+                  buyTargetListingId !== null &&
+                  activeListing ? (
+                    <SponsoredBuySection
+                      market={marketRegistryEntry}
+                      listing={{
+                        soldAt: activeListing.soldAt ?? null,
+                        budgetRemaining: activeListing.budgetRemaining ?? 0n
+                      }}
+                      estimatedFeeUstx={30_000n}
+                      relayerAvailable={sponsorRelayerUp}
+                      assetSymbol={getMarketSettlementLabel(marketSettlement)}
+                      client={sponsorClient}
+                      contractId={marketContractIdLabel}
+                      listingId={buyTargetListingId}
+                      signSponsoredBuy={() =>
+                        signSponsoredBuy({
+                          listingId: buyTargetListingId,
+                          listing: activeListing
+                        })
+                      }
+                      onSelfPaidBuy={() => {
+                        void handleBuy();
+                      }}
+                    />
+                  ) : (
+                    <button
+                      className="button"
+                      type="button"
+                      onClick={() => {
+                        void handleBuy();
+                      }}
+                      disabled={!canTransact || !marketSettlementSupported || buyPending}
+                    >
+                      {buyPending ? 'Buying...' : 'Buy now'}
+                    </button>
+                  )}
                   {!buyStatus && marketSettlementMessage && (
                     <p className="field__hint">{marketSettlementMessage}</p>
                   )}
