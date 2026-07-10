@@ -113,6 +113,29 @@ function buildEnvironmentSVG(seed) {
     }
     parts.push(`<g>${roots}</g>`);
 
+    // Tree trunks — one rises from the surface at each tunnel's top end, giving
+    // emerging nymphs something to climb and moult on. Trunk anchor points are
+    // returned so the scene can route climbers onto the bark.
+    const trunkAnchors = [];
+    let trunksMarkup = '';
+    for (const pts of tunnelPaths) {
+        const tx = Math.max(50, Math.min(W - 50, pts[0].x));
+        const half = rand(r, 26, 36);
+        const baseY = 96;   // just below the surface light band
+        const footY = rand(r, 168, 200);
+        trunksMarkup += `<g>
+            <path d="M${(tx - half).toFixed(0)} 0 L${(tx - half * 0.86).toFixed(0)} ${baseY} C${(tx - half * 1.5).toFixed(0)} ${footY}, ${(tx - half * 1.9).toFixed(0)} ${(footY + 16).toFixed(0)}, ${(tx - half * 2.3).toFixed(0)} ${(footY + 22).toFixed(0)} L${(tx + half * 2.3).toFixed(0)} ${(footY + 22).toFixed(0)} C${(tx + half * 1.9).toFixed(0)} ${(footY + 16).toFixed(0)}, ${(tx + half * 1.5).toFixed(0)} ${footY}, ${(tx + half * 0.86).toFixed(0)} ${baseY} L${(tx + half).toFixed(0)} 0 Z"
+                fill="url(#trunkGrad)" stroke="#160d06" stroke-width="2"/>
+            <path d="M${(tx - half * 0.5).toFixed(0)} 4 C${(tx - half * 0.42).toFixed(0)} ${(footY * 0.5).toFixed(0)}, ${(tx - half * 0.58).toFixed(0)} ${(footY * 0.8).toFixed(0)}, ${(tx - half * 0.62).toFixed(0)} ${(footY + 10).toFixed(0)}
+                     M${(tx + half * 0.24).toFixed(0)} 2 C${(tx + half * 0.3).toFixed(0)} ${(footY * 0.45).toFixed(0)}, ${(tx + half * 0.2).toFixed(0)} ${(footY * 0.82).toFixed(0)}, ${(tx + half * 0.3).toFixed(0)} ${(footY + 8).toFixed(0)}"
+                fill="none" stroke="#1c1109" stroke-width="2.4" opacity="0.55"/>
+            <path d="M${tx.toFixed(0)} 6 C${(tx - half * 0.1).toFixed(0)} ${(footY * 0.5).toFixed(0)}, ${(tx + half * 0.08).toFixed(0)} ${(footY * 0.8).toFixed(0)}, ${tx.toFixed(0)} ${(footY + 6).toFixed(0)}"
+                fill="none" stroke="#6b4c2a" stroke-width="1.8" opacity="0.4"/>
+        </g>`;
+        trunkAnchors.push({ x: tx, y: footY - 34 });
+    }
+    parts.push(trunksMarkup);
+
     // Stones — embedded pebbles with a lit top edge and a shadow underside.
     let stones = '';
     const stoneCount = 7 + Math.floor(r() * 6);
@@ -139,6 +162,13 @@ function buildEnvironmentSVG(seed) {
                     <stop offset="60%" stop-color="#8a6a34" stop-opacity="0.2"/>
                     <stop offset="100%" stop-color="#8a6a34" stop-opacity="0"/>
                 </radialGradient>
+                <linearGradient id="trunkGrad" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stop-color="#241509"/>
+                    <stop offset="30%" stop-color="#4a2f17"/>
+                    <stop offset="55%" stop-color="#5d3e20"/>
+                    <stop offset="78%" stop-color="#3a2513"/>
+                    <stop offset="100%" stop-color="#1c1008"/>
+                </linearGradient>
                 <linearGradient id="stoneGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stop-color="#6f5c44"/>
                     <stop offset="55%" stop-color="#4a3d2c"/>
@@ -147,7 +177,7 @@ function buildEnvironmentSVG(seed) {
             </defs>
             ${parts.join('\n')}
         </svg>`;
-    return { markup, tunnelPaths };
+    return { markup, tunnelPaths, trunkAnchors };
 }
 
 export class NymphScene {
@@ -166,6 +196,7 @@ export class NymphScene {
         const env = buildEnvironmentSVG(seed);
         this.layer.innerHTML = env.markup;
         this.tunnelPaths = env.tunnelPaths;
+        this.trunkAnchors = env.trunkAnchors;
 
         this.disturb = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         this.disturb.setAttribute('class', 'nymph-scene-disturb');
@@ -258,7 +289,7 @@ export class NymphScene {
             instructions: { seed: nymphSeed, unit: '%', size: 96, idleWander: false, rarityTier: 'common' }
         });
 
-        const actor = { index, host, nymph, rng: r, done: false, emerging: false, path, ti };
+        const actor = { index, host, nymph, rng: r, done: false, emerging: false, path, ti, tunnelIdx };
         this.actors.push(actor);
         this._placeActorAt(actor, path ? path[ti] : { x: rand(r, 100, 900), y: rand(r, 480, 720) });
 
@@ -324,79 +355,132 @@ export class NymphScene {
         if (!this.destroyed && !actor.done) this._emerge(actor);
     }
 
-    // Move to the upper boundary and transition into the adult cicada.
+    // Scene-relative timeout that self-cancels if the scene is torn down.
+    _after(ms, fn) {
+        const id = setTimeout(() => { if (!this.destroyed) fn(); }, ms);
+        (this._timers ||= new Set()).add(id);
+        return id;
+    }
+
+    // Staged ecdysis. The nymph climbs its tunnel to the surface, walks onto
+    // the tree trunk rising there, grips head-up, and moults: the dorsal
+    // cuticle splits, the adult pulls free of the shell stage by stage, its
+    // crumpled wings slowly expand and harden, and it flies off — leaving the
+    // translucent exuvia still clinging to the bark.
     async _emerge(actor) {
         if (this.destroyed || actor.done || actor.emerging) return;
         actor.emerging = true;
         const r = actor.rng;
         const nymph = actor.nymph;
 
+        // 1. Climb: finish the tunnel, then walk up onto the trunk.
         try {
-            // Climb toward the top of the local region, facing up.
-            await nymph.walkTo(rand(r, -30, 30), -120, { speed: rand(r, 0.03, 0.05), tilt: 1.2, bob: 2.2 });
+            await nymph.walkTo(rand(r, -20, 20), -110, { speed: rand(r, 0.03, 0.05), tilt: 1.2, bob: 2.2 });
         } catch (_) {}
-        if (this.destroyed) return;
+        if (this.destroyed || actor.done) return;
 
-        // Drift the actor up its tunnel toward the surface band. A modest climb
-        // keeps the freshly emerged adult visible in the scene; the lift-off
-        // translate then carries it up and out of frame.
         actor.host.classList.add('is-emerging');
-        if (actor.path) {
+        const trunk = (this.trunkAnchors || [])[actor.tunnelIdx];
+        if (trunk) {
+            this._placeActorAt(actor, trunk);
+        } else if (actor.path) {
             const top = actor.path[Math.min(4, actor.path.length - 1)];
-            this._placeActorAt(actor, { x: top.x, y: Math.max(80, top.y - rand(r, 0, 40)) });
-        } else {
-            const curTop = parseFloat(actor.host.style.top) || 40;
-            actor.host.style.top = `${Math.max(8, curTop - rand(r, 6, 14)).toFixed(1)}%`;
+            this._placeActorAt(actor, { x: top.x, y: Math.max(90, top.y - rand(r, 0, 30)) });
         }
+        // Face straight up the bark while the host glides onto the trunk.
+        try {
+            await nymph.walkTo(0, -30, { speed: 0.02, tilt: 0.8, bob: 1.6, maxTurn: 180 });
+        } catch (_) {}
+        if (this.destroyed || actor.done) return;
+        nymph.setWanderPos(0, 0, 0);
 
-        // Swap the nymph for the adult — the next visual state already supported
-        // by the engine — then let it take flight and leave the scene upward.
-        setTimeout(() => {
-            if (this.destroyed) return;
-            this._transitionToAdult(actor);
-        }, 1400);
+        // 2. Grip pause, then the dorsal cuticle splits.
+        await nymph.holdPause(rand(r, 1000, 1800));
+        if (this.destroyed || actor.done) return;
+        nymph.beginMolt();
+        this._after(rand(r, 1400, 2000), () => this._moltReveal(actor));
     }
 
-    _transitionToAdult(actor) {
-        if (this.destroyed) return;
+    // 3-6. Pull-out, wing expansion, hardening, flight; the exuvia remains.
+    _moltReveal(actor) {
+        if (this.destroyed || actor.done) return;
         const r = actor.rng;
         const adultSeed = (this.seed + actor.index * 271 + 7) % 3301 + 1;
 
-        // Fade the shed nymph out.
-        actor.nymph.host.style.transition = 'opacity 1s ease';
-        actor.nymph.host.style.opacity = '0';
-
-        let adult = null;
+        let adult = null, adultMount = null;
         if (typeof this.renderCicada === 'function') {
-            const adultMount = document.createElement('div');
-            adultMount.style.cssText = 'position:absolute;inset:0;opacity:0;transition:opacity 1.2s ease;';
+            adultMount = document.createElement('div');
+            // The adult rides its own wrapper so lift-off leaves the host (and
+            // the clinging exuvia) behind on the trunk.
+            adultMount.style.cssText = 'position:absolute;inset:0;opacity:0;' +
+                'transform:translateY(13%) scale(0.8);will-change:transform,opacity;' +
+                'transition:opacity 2.4s ease, transform 3.2s cubic-bezier(.32,0,.3,1);';
             actor.host.appendChild(adultMount);
             try {
                 adult = this.renderCicada({
                     seed: adultSeed, mount: adultMount, clearMount: true, pageStyles: false,
                     interactive: false, enableAudio: false, keyboard: false, accessibleLabel: false,
-                    // No tree-bark backdrop: the adult emerges against the soil,
-                    // not its above-ground tree, until it flies out of the scene.
-                    instructionOverrides: { unit: '%', size: 96, idleWander: true, barkBackdrop: 'none' }
+                    // No tree-bark backdrop inside the scene; the trunk is drawn
+                    // by the environment itself.
+                    instructionOverrides: { unit: '%', size: 96, idleWander: false, barkBackdrop: 'none' }
                 });
             } catch (_) { adult = null; }
-            requestAnimationFrame(() => { adultMount.style.opacity = '1'; });
             actor.adult = adult;
+
+            // Teneral state: wings crumpled small and milky until they expand.
+            const wingBase = {
+                '#left-wing': 'rotate(-3deg) scaleX(0.92)',
+                '#right-wing': 'rotate(3deg) scaleX(0.92)',
+                '#left-hindwing': 'rotate(-6deg) scaleX(0.88)',
+                '#right-hindwing': 'rotate(6deg) scaleX(0.88)'
+            };
+            const wings = [];
+            for (const [sel, base] of Object.entries(wingBase)) {
+                const el = adult?.cicada?.root?.querySelector(sel);
+                if (!el) continue;
+                el.style.transform = `${base} scale(0.16)`;
+                el.style.opacity = '0.35';
+                wings.push([el, base]);
+            }
+
+            // Stage 3: the adult pulls free — rises out of the split shell while
+            // the vacated cuticle turns to a translucent exuvia beneath it.
+            requestAnimationFrame(() => {
+                adultMount.style.opacity = '1';
+                adultMount.style.transform = 'translateY(-9%) scale(0.97)';
+            });
+            this._after(600, () => actor.nymph.toExuvia());
+
+            // Stage 4: wing expansion — slow unfurl to full span.
+            this._after(3200, () => {
+                if (actor.done) return;
+                for (const [el, base] of wings) {
+                    el.style.transition = 'transform 3.8s cubic-bezier(.3,0,.25,1), opacity 3.8s ease';
+                    el.style.transform = base;
+                    el.style.opacity = '';
+                }
+            });
         }
 
-        // Wing-spreading beat, then lift off and climb out of the top boundary.
-        setTimeout(() => {
-            if (this.destroyed) return;
+        // Stage 5-6: harden, then take flight — the adult alone lifts out of the
+        // scene while the exuvia stays gripping the trunk.
+        this._after(8600, () => {
+            if (actor.done) return;
             try { adult?.cicada?.setFlying?.(true); } catch (_) {}
-            actor.host.style.transition = 'transform 3.6s cubic-bezier(.4,0,.2,1), opacity 2.6s ease';
-            actor.host.style.transform = 'translateY(-140%) scale(1.04)';
-            actor.host.style.opacity = '0';
-        }, 900);
+            if (adultMount) {
+                adultMount.style.transition = 'transform 3.8s cubic-bezier(.4,0,.2,1), opacity 2.8s ease .8s';
+                adultMount.style.transform = 'translateY(-170%) scale(1.05)';
+                adultMount.style.opacity = '0';
+            }
+        });
 
-        // Recycle: remove this actor and spawn a fresh nymph to keep the colony
-        // populated and the scene alive.
-        setTimeout(() => {
-            if (this.destroyed) return;
+        // The exuvia lingers on the bark, then weathers away before the actor
+        // recycles into a fresh nymph deep in the tunnels.
+        this._after(13500, () => {
+            actor.nymph.host.style.transition = 'opacity 4s ease';
+            actor.nymph.host.style.opacity = '0';
+        });
+        this._after(18000, () => {
             actor.done = true;
             try { actor.adult?.destroy?.(); } catch (_) {}
             try { actor.nymph.destroy(); } catch (_) {}
@@ -404,11 +488,13 @@ export class NymphScene {
             this.actors = this.actors.filter(a => a !== actor);
             this._respawnCounts[actor.index] = (this._respawnCounts[actor.index] || 0) + 1;
             this._spawnActor(actor.index);
-        }, 4200);
+        });
     }
 
     destroy() {
         this.destroyed = true;
+        for (const id of this._timers || []) clearTimeout(id);
+        this._timers?.clear();
         for (const actor of this.actors) {
             if (actor.startTimer) clearTimeout(actor.startTimer);
             try { actor.adult?.destroy?.(); } catch (_) {}

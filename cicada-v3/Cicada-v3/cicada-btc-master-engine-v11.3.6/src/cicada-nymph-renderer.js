@@ -89,6 +89,18 @@ template.innerHTML = `
         .foreclaw-tip{fill:#221309;stroke:#0f0804;stroke-width:1.4;}
         .foreclaw-ridge{fill:none;stroke:var(--nymph-light);stroke-width:1.5;stroke-linecap:round;opacity:.5;}
         .underside-shadow{fill:#1b1008;opacity:.2;}
+        /* Ecdysis: the dorsal cuticle splits along the thorax midline, then the
+           vacated shell (exuvia) turns translucent amber and goes still. */
+        .molt-split{opacity:0;pointer-events:none;}
+        .molt-split .split-crack{fill:none;stroke:#170d06;stroke-width:3.6;stroke-linecap:round;}
+        .molt-split .split-gleam{fill:none;stroke:#ffe9bd;stroke-width:1.6;stroke-linecap:round;filter:drop-shadow(0 0 4px rgba(255,222,150,.75));}
+        .is-molting .molt-split{opacity:1;transition:opacity 1.2s ease;}
+        .is-molting .molt-split .split-gleam{animation:moltGleam 1.6s ease-in-out infinite alternate;}
+        @keyframes moltGleam{from{stroke-width:1.2;opacity:.65;}to{stroke-width:2.6;opacity:1;}}
+        .is-exuvia #cicada-body-group{opacity:.6;filter:sepia(.45) brightness(.82) drop-shadow(0 8px 8px rgba(0,0,0,.5));transition:opacity 2.4s ease,filter 2.4s ease;}
+        .is-exuvia .nymph-eye,.is-exuvia .eye-glint{fill:#5d4326;filter:none;transition:fill 2s ease;}
+        .is-exuvia #legs-layer .leg-unit{animation:none !important;}
+        .is-exuvia .body-sheen{opacity:0;transition:opacity 2s ease;}
         .is-alert #cicada-body-group{filter:drop-shadow(0 18px 16px rgba(0,0,0,.68)) saturate(1.04);}
         .is-alert #nymph-thorax{transform:translateY(-3px);transform-origin:200px 205px;transition:transform .24s ease;}
         .is-alert #head{transform:translateY(-5px);transform-origin:200px 138px;transition:transform .24s ease;}
@@ -224,6 +236,11 @@ template.innerHTML = `
 
                             <g id="nymph-sheen">
                                 <ellipse class="body-sheen" cx="178" cy="248" rx="60" ry="150"/>
+                            </g>
+
+                            <g class="molt-split" id="molt-split">
+                                <path class="split-crack" d="M200 112C197 150 202 196 198 238C196 258 201 272 200 284"/>
+                                <path class="split-gleam" d="M200 116C198 152 202 194 199 236C197 256 201 270 200 280"/>
                             </g>
 
                             <path id="head-hitbox" d="M126 102C126 72 150 48 200 48C250 48 274 72 274 102L274 154C274 184 248 198 200 198C152 198 126 184 126 154Z"/>
@@ -507,6 +524,20 @@ export class CicadaNymphGenerator {
             target.style.transition = this._savedWrapperTransition;
             this._savedWrapperTransition = undefined;
         }
+    }
+
+    // ---- Ecdysis hooks (used by the scene's staged emergence) ---------------
+    // Stage 1: the dorsal cuticle splits along the thorax midline.
+    beginMolt() {
+        this._endWalk();
+        this.shell.classList.add('is-molting');
+    }
+
+    // Stage 2: the vacated shell becomes a translucent, motionless exuvia that
+    // stays gripping the bark after the adult has pulled free.
+    toExuvia() {
+        this.shell.classList.add('is-exuvia');
+        this.root.querySelectorAll('#legs-layer .leg-unit').forEach(leg => { leg.style.animation = 'none'; });
     }
 
     triggerCallVisual(durationMs = 600) {
