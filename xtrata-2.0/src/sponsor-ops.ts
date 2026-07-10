@@ -213,6 +213,54 @@ const signSetSponsor = (market: string) => {
   });
 };
 
+// Replace a stuck/doomed pending tx: a 0.000001 STX self-transfer at the
+// same nonce with a higher fee evicts it and unblocks everything behind it.
+const unblockNonce = (nonceRaw: string, feeStxRaw: string) => {
+  if (!requireAdmin('unblock')) return;
+  const nonce = Number(nonceRaw);
+  const feeUstx = BigInt(Math.round(Number(feeStxRaw || '0.51') * 1_000_000));
+  if (!Number.isInteger(nonce) || nonce < 0) {
+    state.errors.unblock = 'enter the stuck nonce (e.g. 330)';
+    render();
+    return;
+  }
+  // Xverse rejects self-transfers (TransferRecipientCannotEqualSender), so
+  // send the dust to the relayer wallet — it stays inside the float.
+  const recipient = state.relayerAddress && state.relayerAddress !== state.session.address
+    ? state.relayerAddress
+    : DEPLOYER;
+  if (recipient === state.session.address) {
+    state.errors.unblock = 'no distinct recipient available - set a relayer address in step 1 first';
+    render();
+    return;
+  }
+  state.busy.unblock = true;
+  state.errors.unblock = '';
+  render();
+  showStxTransfer({
+    recipient,
+    amount: '1',
+    memo: 'nonce unblock',
+    fee: feeUstx.toString(),
+    nonce,
+    appDetails,
+    network: toStacksNetwork('mainnet'),
+    stxAddress: state.session.address,
+    onFinish: (payload) => {
+      const txId = (payload as { txId?: string; txid?: string }).txId ??
+        (payload as { txid?: string }).txid ?? '';
+      state.pendingTx.unblock = txId;
+      state.busy.unblock = false;
+      render();
+    },
+    onCancel: () => {
+      state.busy.unblock = false;
+      state.errors.unblock = 'unblock cancelled in wallet';
+      render();
+    }
+  });
+};
+
 const connect = async () => {
   state.session = await connectWallet(connectParams);
   render();
@@ -363,7 +411,7 @@ const render = () => {
   // Step 5: smoke test
   const step5 = el('div', { className: 'card' });
   const listingSummary = MARKETS
-    .map((m) => `${m.includes('sbtc') ? 'sBTC' : 'USDCx'}: last listing id ${state.lastListingIds[m] ?? '—'}`)
+    .map((m) => `${m.includes('sbtc') ? 'sBTC' : m.includes('usdcx') ? 'USDCx' : 'STX'}: last listing id ${state.lastListingIds[m] ?? '—'}`)
     .join(' · ');
   step5.append(
     el('h2', {}, el('span', { className: 'step-num' }, '5'), 'Smoke test'),
@@ -374,6 +422,24 @@ const render = () => {
       ' with a small price and the quoted deposit, then buy it from a second wallet holding sBTC/USDCx and ZERO STX ("Buy — no STX needed", one signature, fee 0). Watch the relayer log: SPONSORED → CONFIRMED → CLAIMED → SETTLED; the unused deposit returns to the seller automatically.')
   );
   app.append(step5);
+
+  // troubleshooting: replace a stuck pending tx by nonce
+  const trouble = el('div', { className: 'card' });
+  const nonceInput = el('input', { placeholder: 'stuck nonce (e.g. 330)', style: 'min-width:180px' }) as HTMLInputElement;
+  const feeInput = el('input', { placeholder: '0.51', style: 'min-width:100px' }) as HTMLInputElement;
+  trouble.append(
+    el('h2', {}, 'Troubleshooting: unblock a stuck nonce'),
+    el('p', {}, 'If a doomed transaction (e.g. a duplicate deploy) is stuck pending, everything behind it waits. This sends a 0.000001 STX self-transfer at that nonce with a higher fee, replacing it and unblocking the queue. The fee must exceed the stuck transaction\u2019s fee.'),
+    el('div', { className: 'row' },
+      nonceInput, feeInput, el('span', {}, 'STX fee'),
+      el('button', {
+        disabled: !!state.busy.unblock,
+        onclick: () => unblockNonce(nonceInput.value, feeInput.value)
+      }, state.busy.unblock ? 'Waiting for wallet\u2026' : 'Replace (sign)')),
+    ...(state.pendingTx.unblock ? [el('p', { className: 'ok' }, 'Replacement broadcast: ', explorerLink(state.pendingTx.unblock))] : []),
+    ...(state.errors.unblock ? [el('p', { className: 'fail' }, state.errors.unblock)] : [])
+  );
+  app.append(trouble);
 
   // refresh
   app.append(
