@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as core from '../svc/core.mjs';
+import { createSponsorService, makeLiveChain, DEFAULT_MARKET_ALLOWLIST } from '../svc/sponsor-service.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.XAO_PORT || 8787);
@@ -38,6 +39,19 @@ const send = (res, code, obj) => { const b = JSON.stringify(obj); res.writeHead(
 const body = (req) => new Promise((resolve) => { let s = ''; req.on('data', (d) => (s += d)); req.on('end', () => { try { resolve(s ? JSON.parse(s) : {}); } catch { resolve({}); } }); });
 
 const PROCESSING = new Set();
+
+// ---- sponsor relayer (STX-free marketplace buys). Opt-in: set SPONSOR_KEY. ----
+// Allowlist entries come from SPONSOR_MARKETS ("contractId,contractId") or the module default.
+let sponsorSvc = null, sponsorChain = null;
+if (process.env.SPONSOR_KEY) {
+  const allowlist = process.env.SPONSOR_MARKETS
+    ? Object.fromEntries(process.env.SPONSOR_MARKETS.split(',').map((id) => [id.trim(), { buyFunction: 'buy' }]))
+    : DEFAULT_MARKET_ALLOWLIST;
+  sponsorChain = makeLiveChain({ network: NET, sponsorKey: process.env.SPONSOR_KEY, hiroKey: HIRO_KEY });
+  sponsorSvc = createSponsorService({ chain: sponsorChain, allowlist, log: (...a) => console.log('[sponsor]', ...a) });
+  setInterval(() => sponsorSvc.settleAll().catch(() => {}), 15_000);
+  console.log(`  sponsor relayer enabled: ${sponsorChain.sponsorAddress} markets=${Object.keys(allowlist).length}`);
+}
 // AUTO-RESUME: transient failures (network, timeout, estimator, rate limit) park the job back at
 // FUNDED/INSCRIBED for the watcher to resume where it left off — resume is safe because the protocol is
 // idempotent end-to-end (begin-or-get, on-chain upload index, hash-checked mint pre-check). Only
@@ -247,6 +261,29 @@ const server = http.createServer(async (req, res) => {
         if (PROCESSING.has(id)) return send(res, 409, { error: 'job is processing — try again once it settles' });
         try { return send(res, 200, core.deleteJob({ jobDir: JOB_DIR, id, receiptsDir: RECEIPTS_DIR })); }
         catch (e) { return send(res, 400, { error: String((e && e.message) || e) }); }
+      }
+    }
+
+    // ---- sponsor relayer routes ----
+    if (p.startsWith('/api/sponsor/')) {
+      if (!sponsorSvc) return send(res, 503, { code: 'RELAYER_DISABLED', message: 'sponsor relayer not configured (set SPONSOR_KEY)' });
+      try {
+        if (p === '/api/sponsor/quote' && req.method === 'POST') return send(res, 200, await sponsorSvc.quote());
+        if (p === '/api/sponsor/submit' && req.method === 'POST') {
+          const b = await body(req);
+          if (!b.txHex || !b.contractId || b.listingId === undefined) return send(res, 400, { code: 'BAD_REQUEST', message: 'txHex, contractId, listingId required' });
+          const listing = await sponsorChain.getListing(b.contractId, b.listingId);
+          const job = await sponsorSvc.submit({ txHex: b.txHex, contractId: b.contractId, listingId: b.listingId, listing });
+          return send(res, 200, { id: job.id, state: job.state, txids: job.txids });
+        }
+        const sm = p.match(/^\/api\/sponsor\/status\/([^/]+)$/);
+        if (sm && req.method === 'GET') {
+          const job = sponsorSvc.status(sm[1]);
+          if (!job) return send(res, 404, { code: 'NOT_FOUND', message: 'job unknown' });
+          return send(res, 200, { id: job.id, state: job.state, txids: job.txids, error: job.error });
+        }
+      } catch (e) {
+        return send(res, e.code === 'RATE_LIMITED' ? 429 : 400, { code: e.code || 'UNKNOWN', message: String((e && e.message) || e) });
       }
     }
 

@@ -9,6 +9,10 @@ export type MarketRegistryEntry = {
   contractName: string;
   network: NetworkType;
   paymentTokenContractId?: string | null;
+  /** true for xtrata-market-sponsored-* contracts (fee-budget escrow, STX-free buys) */
+  sponsored?: boolean;
+  /** base URL of the sponsor relayer for this market (required when sponsored) */
+  sponsorApi?: string;
 };
 
 const isValidEntry = (entry: MarketRegistryEntry) => {

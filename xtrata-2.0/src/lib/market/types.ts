@@ -6,7 +6,12 @@ export type MarketListing = {
   createdAt: bigint;
 };
 
-export type MarketActivityType = 'list' | 'buy' | 'cancel';
+export type MarketActivityType =
+  | 'list'
+  | 'buy'
+  | 'cancel'
+  | 'claim-fee'
+  | 'settle-refund';
 
 export type MarketActivityEvent = {
   id: string;
@@ -22,6 +27,14 @@ export type MarketActivityEvent = {
   blockHeight?: number;
   eventIndex?: number;
   timestamp?: string;
+  /** sponsored markets: seller's escrowed fee budget at list time */
+  feeBudget?: bigint;
+  /** sponsored markets: budget remaining after a claim, or refunded at settle */
+  budgetRemaining?: bigint;
+  /** sponsored markets: µSTX reimbursed to the sponsor */
+  claimAmount?: bigint;
+  /** sponsored markets: µSTX dust returned to the seller */
+  refunded?: bigint;
 };
 
 export type MarketIndexSnapshot = {
