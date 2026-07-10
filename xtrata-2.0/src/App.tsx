@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type MouseEvent } from 'react';
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+  type MouseEvent
+} from 'react';
 import {
   showContractCall,
   showContractDeploy,
@@ -48,20 +56,37 @@ import {
 import { useActiveTabGuard } from './lib/utils/tab-guard';
 import AddressLabel from './components/AddressLabel';
 import WalletTopBar from './components/WalletTopBar';
+// Core mint/view path stays eager; heavier admin/market/collection/commerce/
+// vault screens are code-split so the mint/wizard bundle doesn't ship them
+// (WS-4.4). They render under the <Suspense> boundary in <main>.
 import MintScreen from './screens/MintScreen';
 import ViewerScreen, { type ViewerMode } from './screens/ViewerScreen';
-import ContractAdminScreen from './screens/ContractAdminScreen';
 import WalletLookupScreen from './screens/WalletLookupScreen';
-import AdminDiagnosticsScreen from './screens/AdminDiagnosticsScreen';
-import CampaignConsoleScreen from './screens/CampaignConsoleScreen';
-import CollectionMintScreen from './screens/CollectionMintScreen';
-import CollectionMintAdminScreen from './screens/CollectionMintAdminScreen';
-import PreinscribedCollectionAdminScreen from './screens/PreinscribedCollectionAdminScreen';
-import PreinscribedCollectionSaleScreen from './screens/PreinscribedCollectionSaleScreen';
-import MarketScreen from './screens/MarketScreen';
-import CommerceScreen from './screens/CommerceScreen';
-import VaultScreen from './screens/VaultScreen';
-import V323OwnerConsoleScreen from './screens/V323OwnerConsoleScreen';
+const ContractAdminScreen = lazy(() => import('./screens/ContractAdminScreen'));
+const AdminDiagnosticsScreen = lazy(
+  () => import('./screens/AdminDiagnosticsScreen')
+);
+const CampaignConsoleScreen = lazy(
+  () => import('./screens/CampaignConsoleScreen')
+);
+const CollectionMintScreen = lazy(
+  () => import('./screens/CollectionMintScreen')
+);
+const CollectionMintAdminScreen = lazy(
+  () => import('./screens/CollectionMintAdminScreen')
+);
+const PreinscribedCollectionAdminScreen = lazy(
+  () => import('./screens/PreinscribedCollectionAdminScreen')
+);
+const PreinscribedCollectionSaleScreen = lazy(
+  () => import('./screens/PreinscribedCollectionSaleScreen')
+);
+const MarketScreen = lazy(() => import('./screens/MarketScreen'));
+const CommerceScreen = lazy(() => import('./screens/CommerceScreen'));
+const VaultScreen = lazy(() => import('./screens/VaultScreen'));
+const V323OwnerConsoleScreen = lazy(
+  () => import('./screens/V323OwnerConsoleScreen')
+);
 import collectionMintTemplateSource from '../contracts/clarinet/contracts/xtrata-collection-mint-v1.4.clar?raw';
 import {
   buildCollectionMintContractSource,
@@ -1552,6 +1577,9 @@ export default function App() {
         </div>
       )}
       <main className="app__main">
+        <Suspense
+          fallback={<div className="app__loading">Loading…</div>}
+        >
         <div className="app__modules app__modules--compact">
           <WalletLookupScreen
             walletSession={walletSession}
@@ -1908,6 +1936,7 @@ export default function App() {
           parentDraftIds={parentDraftIds}
           onClearParentDrafts={handleClearParentDrafts}
         />
+        </Suspense>
       </main>
     </div>
   );
