@@ -1,16 +1,22 @@
 /**
  * Xtrata Deploy Console — browser deploys signed by the admin wallet.
  *
- * Same trust model as the v3.2.3 handover page: the page never sees a key;
- * the connected wallet must be the production deployer, and every deploy is
- * signed physically in the wallet popup. ClarityVersion 3 is passed on the
- * deploy options (verify the wallet honoured it on the explorer after
- * confirmation — Clarity is shown on the contract page).
+ * Same trust model as the v3.2.3 handover page: the page never sees a key
+ * and the connected wallet must be the production deployer.
+ *
+ * DEPLOYS GO THROUGH THE CLI, NOT THE WALLET. Confirmed on mainnet
+ * (tx 0x92046d…7ac4d): wallet popup flows ignore the Clarity 3 hint and
+ * publish at Clarity 4, where `as-contract` is unresolved — the deploy
+ * aborts and the fee is burned. This page therefore runs the preflight and
+ * shows the exact scripts/mainnet-deploy-contract.mjs command to run, then
+ * handles the wallet-signed post-deploy admin calls (set-sponsor), which are
+ * ordinary contract calls and unaffected by the Clarity version issue.
  *
  * The deployable registry mirrors scripts/mainnet-deploy-contract.mjs, and
  * the preflight applies the same rules in-browser.
  */
-import { connectWallet, disconnectWallet, showContractDeploy } from './lib/wallet/connect';
+import { connectWallet, disconnectWallet, showContractCall } from './lib/wallet/connect';
+import { standardPrincipalCV } from '@stacks/transactions';
 import { toStacksNetwork } from './lib/network/stacks';
 import type { WalletSession } from './lib/wallet/types';
 
@@ -117,9 +123,6 @@ const runPreflight = async (entry: Deployable, code: string): Promise<PreflightR
   } catch {
     // network hiccup: leave as unknown/false — the wallet will reject a duplicate anyway
   }
-  if (alreadyDeployed) {
-    problems.push(`contract ${EXPECTED_DEPLOYER}.${entry.name} is already deployed`);
-  }
 
   return {
     ok: problems.length === 0,
@@ -151,21 +154,30 @@ const loadContract = async (name: string) => {
   }
 };
 
-const deployContract = (name: string) => {
+const cliCommand = (entry: Deployable) =>
+  `XTRATA_MAINNET_MNEMONIC="..." node scripts/mainnet-deploy-contract.mjs ${entry.name} --broadcast`;
+
+const setSponsor = (name: string, sponsorPrincipal: string) => {
   const stateEntry = states.get(name)!;
-  if (!stateEntry.source || !stateEntry.preflight?.ok) return;
   if (!session.isConnected || session.address !== EXPECTED_DEPLOYER) {
     stateEntry.error = `connect the deployer wallet (${EXPECTED_DEPLOYER}) first`;
+    render();
+    return;
+  }
+  const principal = sponsorPrincipal.trim();
+  if (!/^S[PM][A-Z0-9]{38,40}$/.test(principal)) {
+    stateEntry.error = 'enter a valid mainnet principal for the relayer sponsor';
     render();
     return;
   }
   stateEntry.busy = true;
   stateEntry.error = null;
   render();
-  showContractDeploy({
+  showContractCall({
+    contractAddress: EXPECTED_DEPLOYER,
     contractName: stateEntry.entry.name,
-    codeBody: stateEntry.source,
-    clarityVersion: 3,
+    functionName: 'set-sponsor',
+    functionArgs: [standardPrincipalCV(principal)],
     appDetails,
     network: toStacksNetwork('mainnet'),
     stxAddress: session.address,
@@ -176,14 +188,11 @@ const deployContract = (name: string) => {
         null;
       stateEntry.txId = txId;
       stateEntry.busy = false;
-      if (!txId) {
-        stateEntry.error = 'wallet response did not include a transaction id';
-      }
       render();
     },
     onCancel: () => {
       stateEntry.busy = false;
-      stateEntry.error = 'deploy cancelled in wallet';
+      stateEntry.error = 'set-sponsor cancelled in wallet';
       render();
     }
   });
@@ -210,7 +219,7 @@ const goLiveChecklist = () =>
   el(
     'ol',
     {},
-    el('li', {}, 'Wait for the deploy to confirm on the explorer.'),
+    el('li', {}, 'Deploy confirmed (this card only appears once the contract is live).'),
     el(
       'li',
       {},
@@ -282,7 +291,11 @@ const render = () => {
         el(
           'dd',
           { className: preflight.ok ? 'ok' : 'fail' },
-          preflight.ok ? 'OK — safe to sign' : 'FAILED'
+          preflight.ok
+            ? preflight.alreadyDeployed
+              ? 'OK — already deployed'
+              : 'OK — ready for CLI deploy'
+            : 'FAILED'
         )
       );
     }
@@ -299,12 +312,9 @@ const render = () => {
         href: `https://explorer.hiro.so/txid/0x${txId.replace(/^0x/, '')}?chain=mainnet`,
         target: '_blank',
         rel: 'noreferrer',
-        textContent: `deploy tx 0x${txId.replace(/^0x/, '').slice(0, 12)}… on the explorer`
+        textContent: `tx 0x${txId.replace(/^0x/, '').slice(0, 12)}… on the explorer`
       });
-      card.append(el('p', { className: 'ok' }, 'Signed and broadcast: ', link));
-      if (entry.sponsoredMarket) {
-        card.append(el('h2', {}, 'Go-live checklist'), goLiveChecklist());
-      }
+      card.append(el('p', { className: 'ok' }, 'set-sponsor signed and broadcast: ', link));
     }
 
     const row = el('div', { className: 'row' });
@@ -313,22 +323,66 @@ const render = () => {
         'button',
         { className: 'ghost', disabled: busy, onclick: () => void loadContract(entry.name) },
         preflight ? 'Re-run preflight' : 'Load + preflight'
-      ),
-      el(
-        'button',
-        {
-          disabled:
-            busy ||
-            !preflight?.ok ||
-            !!txId ||
-            !session.isConnected ||
-            session.address !== EXPECTED_DEPLOYER,
-          onclick: () => deployContract(entry.name)
-        },
-        busy ? 'Working…' : 'Deploy (sign in wallet)'
       )
     );
     card.append(row);
+
+    // Deploy: CLI only. Wallet deploys publish at Clarity 4 and abort with
+    // "use of unresolved function 'as-contract'" (seen live, tx 0x92046d…7ac4d).
+    if (preflight?.ok && !preflight.alreadyDeployed) {
+      card.append(
+        el(
+          'p',
+          { className: 'warn' },
+          'Deploy via the CLI — wallet deploys publish at Clarity 4 and fail (fee is burned). Run:'
+        ),
+        el('pre', {}, cliCommand(entry)),
+        el(
+          'div',
+          { className: 'row' },
+          el(
+            'button',
+            {
+              className: 'ghost',
+              onclick: () => void navigator.clipboard.writeText(cliCommand(entry))
+            },
+            'Copy command'
+          )
+        ),
+        el(
+          'p',
+          {},
+          'Once it confirms, hit Re-run preflight — this card will flip to the post-deploy admin step.'
+        )
+      );
+    }
+
+    // Post-deploy: wallet-signed set-sponsor (ordinary contract call — safe).
+    if (preflight?.alreadyDeployed && entry.sponsoredMarket) {
+      const sponsorInput = el('input', {
+        placeholder: 'Relayer sponsor principal (SP…)',
+        style: 'font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid #3a3733; background: #0c0c0b; color: #f4f1ea; min-width: 340px;'
+      }) as HTMLInputElement;
+      card.append(
+        el('h2', {}, 'Deployed — post-deploy admin'),
+        el(
+          'div',
+          { className: 'row' },
+          sponsorInput,
+          el(
+            'button',
+            {
+              disabled:
+                busy || !session.isConnected || session.address !== EXPECTED_DEPLOYER,
+              onclick: () => setSponsor(entry.name, sponsorInput.value)
+            },
+            busy ? 'Working…' : 'set-sponsor (sign in wallet)'
+          )
+        ),
+        el('h2', {}, 'Go-live checklist'),
+        goLiveChecklist()
+      );
+    }
     app.append(card);
   }
 };
