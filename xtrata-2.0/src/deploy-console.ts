@@ -4,18 +4,19 @@
  * Same trust model as the v3.2.3 handover page: the page never sees a key
  * and the connected wallet must be the production deployer.
  *
- * DEPLOYS GO THROUGH THE CLI, NOT THE WALLET. Confirmed on mainnet
- * (tx 0x92046d…7ac4d): wallet popup flows ignore the Clarity 3 hint and
- * publish at Clarity 4, where `as-contract` is unresolved — the deploy
- * aborts and the fee is burned. This page therefore runs the preflight and
- * shows the exact scripts/mainnet-deploy-contract.mjs command to run, then
- * handles the wallet-signed post-deploy admin calls (set-sponsor), which are
- * ordinary contract calls and unaffected by the Clarity version issue.
+ * Wallet-signed deploys are BACK for these contracts: after mainnet tx
+ * 0x92046d…7ac4d proved wallets publish at Clarity 4 regardless of the
+ * requested version, the sponsored market contracts were ported to
+ * Clarity 4 (`as-contract?` with precise with-nft/with-stx allowances,
+ * `current-contract`), verified by the full clarinet suite. The wallet's
+ * Clarity 4 default now matches the contracts, so physical signing in the
+ * wallet is safe again — no mnemonic ever leaves the wallet. The CLI helper
+ * remains as a fallback (it pins Clarity 4 for these entries).
  *
  * The deployable registry mirrors scripts/mainnet-deploy-contract.mjs, and
  * the preflight applies the same rules in-browser.
  */
-import { connectWallet, disconnectWallet, showContractCall } from './lib/wallet/connect';
+import { connectWallet, disconnectWallet, showContractCall, showContractDeploy } from './lib/wallet/connect';
 import { standardPrincipalCV } from '@stacks/transactions';
 import { toStacksNetwork } from './lib/network/stacks';
 import type { WalletSession } from './lib/wallet/types';
@@ -156,6 +157,45 @@ const loadContract = async (name: string) => {
 
 const cliCommand = (entry: Deployable) =>
   `XTRATA_MAINNET_MNEMONIC="..." node scripts/mainnet-deploy-contract.mjs ${entry.name} --broadcast`;
+
+// Contracts here are Clarity 4, matching what wallets publish — safe to sign.
+const deployContract = (name: string) => {
+  const stateEntry = states.get(name)!;
+  if (!stateEntry.source || !stateEntry.preflight?.ok || stateEntry.preflight.alreadyDeployed) return;
+  if (!session.isConnected || session.address !== EXPECTED_DEPLOYER) {
+    stateEntry.error = `connect the deployer wallet (${EXPECTED_DEPLOYER}) first`;
+    render();
+    return;
+  }
+  stateEntry.busy = true;
+  stateEntry.error = null;
+  render();
+  showContractDeploy({
+    contractName: stateEntry.entry.name,
+    codeBody: stateEntry.source,
+    clarityVersion: 4,
+    appDetails,
+    network: toStacksNetwork('mainnet'),
+    stxAddress: session.address,
+    onFinish: (payload) => {
+      const txId =
+        (payload as { txId?: string; txid?: string }).txId ??
+        (payload as { txid?: string }).txid ??
+        null;
+      stateEntry.txId = txId;
+      stateEntry.busy = false;
+      if (!txId) {
+        stateEntry.error = 'wallet response did not include a transaction id';
+      }
+      render();
+    },
+    onCancel: () => {
+      stateEntry.busy = false;
+      stateEntry.error = 'deploy cancelled in wallet';
+      render();
+    }
+  });
+};
 
 const setSponsor = (name: string, sponsorPrincipal: string) => {
   const stateEntry = states.get(name)!;
@@ -314,7 +354,7 @@ const render = () => {
         rel: 'noreferrer',
         textContent: `tx 0x${txId.replace(/^0x/, '').slice(0, 12)}… on the explorer`
       });
-      card.append(el('p', { className: 'ok' }, 'set-sponsor signed and broadcast: ', link));
+      card.append(el('p', { className: 'ok' }, 'Signed and broadcast: ', link));
     }
 
     const row = el('div', { className: 'row' });
@@ -327,32 +367,33 @@ const render = () => {
     );
     card.append(row);
 
-    // Deploy: CLI only. Wallet deploys publish at Clarity 4 and abort with
-    // "use of unresolved function 'as-contract'" (seen live, tx 0x92046d…7ac4d).
+    // Deploy: wallet-signed. The contracts are Clarity 4, which is exactly
+    // what wallets publish, so physical signing is safe (no key handling).
     if (preflight?.ok && !preflight.alreadyDeployed) {
       card.append(
-        el(
-          'p',
-          { className: 'warn' },
-          'Deploy via the CLI — wallet deploys publish at Clarity 4 and fail (fee is burned). Run:'
-        ),
-        el('pre', {}, cliCommand(entry)),
         el(
           'div',
           { className: 'row' },
           el(
             'button',
             {
-              className: 'ghost',
-              onclick: () => void navigator.clipboard.writeText(cliCommand(entry))
+              disabled:
+                busy || !session.isConnected || session.address !== EXPECTED_DEPLOYER,
+              onclick: () => deployContract(entry.name)
             },
-            'Copy command'
+            busy ? 'Working…' : 'Deploy (sign in wallet)'
           )
         ),
         el(
           'p',
           {},
-          'Once it confirms, hit Re-run preflight — this card will flip to the post-deploy admin step.'
+          'Contract is Clarity 4 — matches what the wallet publishes, verified by the clarinet suite. CLI fallback:'
+        ),
+        el('pre', {}, cliCommand(entry)),
+        el(
+          'p',
+          {},
+          'After it confirms, hit Re-run preflight — this card flips to the post-deploy admin step.'
         )
       );
     }

@@ -17,6 +17,10 @@
 ;; ESCAPE-HATCH INVARIANT: in every reachable state the seller can recover
 ;; their NFT and unclaimed budget without the sponsor's cooperation.
 ;;
+;; CLARITY 4: escrow outflows use as-contract? with precise allowances
+;; (with-nft / with-stx), so wallet-popup deploys (which publish at the
+;; network's latest Clarity version) work without a CLI signer.
+;;
 ;; Clarinet/local lock targets: .xtrata-v2-1-0 and .mock-sbtc
 
 ;; [LOCAL / CLARINET]
@@ -47,7 +51,9 @@
 (define-constant MIN-FEE-BUDGET u50000)
 ;; Blocks after a sale during which only the sponsor may settle (claim window).
 (define-constant REFUND-DELAY u144)
-(define-constant CONTRACT-PRINCIPAL (as-contract tx-sender))
+(define-constant CONTRACT-PRINCIPAL current-contract)
+;; Asset name of the xtrata inscription NFT (for precise C4 allowances).
+(define-constant NFT-ASSET-NAME "xtrata-inscription")
 
 ;; --- STATE ---
 
@@ -127,7 +133,11 @@
   }))
   (let ((remaining (get budget-remaining listing)) (seller (get seller listing)))
     (if (> remaining u0)
-      (as-contract (stx-transfer? remaining tx-sender seller))
+      (match (as-contract? ((with-stx remaining))
+          (unwrap! (stx-transfer? remaining tx-sender seller) ERR-NOT-AUTHORIZED))
+        done (ok true)
+        allowance-violation ERR-NOT-AUTHORIZED
+      )
       (ok true)
     )
   )
@@ -215,16 +225,21 @@
       (asserts! (is-eq (contract-of nft-contract) (get nft-contract listing)) ERR-NOT-FOUND)
       (asserts! (is-eq tx-sender (get seller listing)) ERR-NOT-AUTHORIZED)
       (asserts! (is-none (get sold-at listing)) ERR-ALREADY-SOLD)
-      (try!
-        (as-contract
-          (contract-call?
-            nft-contract
-            transfer
-            (get token-id listing)
-            CONTRACT-PRINCIPAL
-            (get seller listing)
+      (unwrap!
+        (as-contract?
+          ((with-nft (contract-of nft-contract) NFT-ASSET-NAME (list (get token-id listing))))
+          (unwrap!
+            (contract-call?
+              nft-contract
+              transfer
+              (get token-id listing)
+              CONTRACT-PRINCIPAL
+              (get seller listing)
+            )
+            ERR-NOT-AUTHORIZED
           )
         )
+        ERR-NOT-AUTHORIZED
       )
       (try! (refund-budget listing-id listing))
       (map-delete Listings listing-id)
@@ -266,16 +281,21 @@
         (seller-amount (- price fee))
       )
         (begin
-          (try!
-            (as-contract
-              (contract-call?
-                nft-contract
-                transfer
-                token-id
-                CONTRACT-PRINCIPAL
-                buyer
+          (unwrap!
+            (as-contract?
+              ((with-nft (contract-of nft-contract) NFT-ASSET-NAME (list token-id)))
+              (unwrap!
+                (contract-call?
+                  nft-contract
+                  transfer
+                  token-id
+                  CONTRACT-PRINCIPAL
+                  buyer
+                )
+                ERR-NOT-AUTHORIZED
               )
             )
+            ERR-NOT-AUTHORIZED
           )
           (try! (transfer-payment seller-amount buyer seller))
           (if (> fee u0)
@@ -322,7 +342,11 @@
       (asserts! (<= amount (get budget-remaining listing)) ERR-CLAIM-TOO-LARGE)
       (asserts! (<= (+ (get claimed listing) amount) (var-get claim-cap)) ERR-CLAIM-TOO-LARGE)
       (let ((recipient (var-get sponsor)))
-        (try! (as-contract (stx-transfer? amount tx-sender recipient)))
+        (unwrap!
+          (as-contract? ((with-stx amount))
+            (unwrap! (stx-transfer? amount tx-sender recipient) ERR-NOT-AUTHORIZED))
+          ERR-NOT-AUTHORIZED
+        )
       )
       (map-set Listings listing-id (merge listing {
         budget-remaining: (- (get budget-remaining listing) amount),

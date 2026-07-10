@@ -89,12 +89,27 @@ template.innerHTML = `
         .foreclaw-tip{fill:#221309;stroke:#0f0804;stroke-width:1.4;}
         .foreclaw-ridge{fill:none;stroke:var(--nymph-light);stroke-width:1.5;stroke-linecap:round;opacity:.5;}
         .underside-shadow{fill:#1b1008;opacity:.2;}
-        /* Ecdysis: the dorsal cuticle splits along the thorax midline, then the
-           vacated shell (exuvia) turns translucent amber and goes still. */
+        /* Ecdysis: the dorsal cuticle splits along the thorax midline, the two
+           shell halves crack apart in stages revealing the pale teneral adult
+           beneath, then the vacated shell (exuvia) turns translucent amber. */
+        #molt-reveal{opacity:0;pointer-events:none;transition:opacity .8s ease;}
+        .is-molting #molt-reveal{opacity:1;}
+        .teneral-under{fill:url(#nymphTeneral);stroke:#1d3a2f;stroke-width:1.6;}
+        .teneral-ridge{fill:none;stroke:#24493b;stroke-width:2;stroke-linecap:round;opacity:.55;}
+        .teneral-eye{fill:#152a22;opacity:.85;}
+        .is-molting .teneral-under{animation:teneralBreathe 1.5s ease-in-out infinite alternate;transform-origin:200px 200px;}
+        @keyframes teneralBreathe{from{transform:scale(1,1);}to{transform:scale(1.015,1.03);}}
+        .shell-flap{fill:url(#nymphPlateGrad);stroke:var(--nymph-edge);stroke-width:1.8;stroke-linejoin:round;transform-origin:200px 120px;transition:transform 2s cubic-bezier(.35,0,.25,1);}
+        .molt-open-1 .shell-flap-left{transform:rotate(-6deg) translateX(-2.5px);}
+        .molt-open-1 .shell-flap-right{transform:rotate(6deg) translateX(2.5px);}
+        .molt-open-2 .shell-flap-left{transform:rotate(-16deg) translateX(-8px) translateY(2px);}
+        .molt-open-2 .shell-flap-right{transform:rotate(16deg) translateX(8px) translateY(2px);}
         .molt-split{opacity:0;pointer-events:none;}
         .molt-split .split-crack{fill:none;stroke:#170d06;stroke-width:3.6;stroke-linecap:round;}
         .molt-split .split-gleam{fill:none;stroke:#ffe9bd;stroke-width:1.6;stroke-linecap:round;filter:drop-shadow(0 0 4px rgba(255,222,150,.75));}
         .is-molting .molt-split{opacity:1;transition:opacity 1.2s ease;}
+        /* Once the shell halves part, the gap itself replaces the crack line. */
+        .molt-open-1 .molt-split{opacity:0;}
         .is-molting .molt-split .split-gleam{animation:moltGleam 1.6s ease-in-out infinite alternate;}
         @keyframes moltGleam{from{stroke-width:1.2;opacity:.65;}to{stroke-width:2.6;opacity:1;}}
         .is-exuvia #cicada-body-group{opacity:.6;filter:sepia(.45) brightness(.82) drop-shadow(0 8px 8px rgba(0,0,0,.5));transition:opacity 2.4s ease,filter 2.4s ease;}
@@ -136,6 +151,11 @@ template.innerHTML = `
                         <stop offset="50%" stop-color="var(--nymph-mid)"/>
                         <stop offset="100%" stop-color="var(--nymph-dark)"/>
                     </radialGradient>
+                    <linearGradient id="nymphTeneral" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stop-color="#cdeedd"/>
+                        <stop offset="45%" stop-color="#7fbfa3"/>
+                        <stop offset="100%" stop-color="#35604f"/>
+                    </linearGradient>
                     <radialGradient id="nymphSheen" cx="42%" cy="20%" r="60%">
                         <stop offset="0%" stop-color="#fff3dd" stop-opacity="0.85"/>
                         <stop offset="55%" stop-color="#fff3dd" stop-opacity="0.12"/>
@@ -236,6 +256,15 @@ template.innerHTML = `
 
                             <g id="nymph-sheen">
                                 <ellipse class="body-sheen" cx="178" cy="248" rx="60" ry="150"/>
+                            </g>
+
+                            <g id="molt-reveal">
+                                <path class="teneral-under" d="M200 118C166 156 164 242 200 296C236 242 234 156 200 118Z"/>
+                                <path class="teneral-ridge" d="M200 128C198 170 200 240 200 288"/>
+                                <ellipse class="teneral-eye" cx="185" cy="142" rx="5" ry="7"/>
+                                <ellipse class="teneral-eye" cx="215" cy="142" rx="5" ry="7"/>
+                                <path class="shell-flap shell-flap-left" d="M200 116C197 150 202 196 198 238C196 258 201 272 200 290C166 250 165 160 200 116Z"/>
+                                <path class="shell-flap shell-flap-right" d="M200 116C203 150 198 196 202 238C204 258 199 272 200 290C234 250 235 160 200 116Z"/>
                             </g>
 
                             <g class="molt-split" id="molt-split">
@@ -531,6 +560,13 @@ export class CicadaNymphGenerator {
     beginMolt() {
         this._endWalk();
         this.shell.classList.add('is-molting');
+    }
+
+    // Stages 2-3: the shell halves crack apart, progressively revealing the
+    // pale teneral adult beneath. stage 0 = closed, 1 = first gap, 2 = wide.
+    setMoltStage(stage) {
+        this.shell.classList.toggle('molt-open-1', stage >= 1);
+        this.shell.classList.toggle('molt-open-2', stage >= 2);
     }
 
     // Stage 2: the vacated shell becomes a translucent, motionless exuvia that

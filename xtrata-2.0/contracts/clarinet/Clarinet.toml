@@ -153,12 +153,12 @@ epoch = 'latest'
 
 [contracts.xtrata-market-sponsored-sbtc-v1-0]
 path = 'contracts/xtrata-market-sponsored-sbtc-v1.0.clar'
-clarity_version = 3
+clarity_version = 4
 epoch = 'latest'
 
 [contracts.xtrata-market-sponsored-usdcx-v1-0]
 path = 'contracts/xtrata-market-sponsored-usdcx-v1.0.clar'
-clarity_version = 3
+clarity_version = 4
 epoch = 'latest'
 
 [contracts.xtrata-commerce]

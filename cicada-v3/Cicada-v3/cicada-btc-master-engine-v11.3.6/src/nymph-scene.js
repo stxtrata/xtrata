@@ -6,7 +6,7 @@
 // progression it climbs toward the surface at the top boundary and transitions
 // cleanly into the adult cicada — the next visual state the engine already
 // supports — which then takes flight and leaves the scene.
-import { CicadaNymphGenerator } from './cicada-nymph-renderer.js?v=11.3.5-nymph.2';
+import { CicadaNymphGenerator } from './cicada-nymph-renderer.js?v=11.3.8-molt.1';
 import { mulberry32, clamp01, lerp } from './utils.js?v=11.3.5-nymph.2';
 
 const SCENE_STYLE_ID = 'nymph-scene-style';
@@ -274,6 +274,9 @@ export class NymphScene {
 
         const host = document.createElement('div');
         host.className = 'nymph-actor';
+        // New arrivals surface gradually out of the dark rather than popping in.
+        host.style.opacity = '0';
+        requestAnimationFrame(() => requestAnimationFrame(() => { host.style.opacity = '1'; }));
         host.style.width = `${sizePx.toFixed(0)}px`;
         host.style.height = `${(sizePx * 1.3).toFixed(0)}px`;
         // Centre the host on its tunnel point.
@@ -298,6 +301,9 @@ export class NymphScene {
             nymph.setWanderPos(rand(r, -40, 40), rand(r, -30, 30), rand(r, -30, 30));
             return;
         }
+        // Set the initial local offset now, while the actor is still invisible,
+        // so the route later starts from where the nymph faded in.
+        nymph.setWanderPos(rand(r, -30, 30), rand(r, -20, 20), rand(r, -40, 40));
         // Independent start delay, then run this actor's route.
         actor.startTimer = setTimeout(() => this._runRoute(actor), rand(r, 200, 2600));
     }
@@ -315,9 +321,8 @@ export class NymphScene {
         if (this.destroyed || actor.done) return;
         const r = actor.rng;
         const nymph = actor.nymph;
-        nymph.setWanderPos(rand(r, -30, 30), rand(r, -20, 20), rand(r, -40, 40));
 
-        const budgetMs = rand(r, 16000, 34000);
+        const budgetMs = rand(r, 2500, 4500); // TEMP-TEST
         const started = performance.now();
 
         try {
@@ -373,12 +378,25 @@ export class NymphScene {
         const r = actor.rng;
         const nymph = actor.nymph;
 
-        // 1. Climb: finish the tunnel, then walk up onto the trunk.
+        // 1. Flow the remaining tunnel legs up to the surface end — the nymph
+        // keeps walking its pathway the whole way, no positional jumps.
         try {
-            await nymph.walkTo(rand(r, -20, 20), -110, { speed: rand(r, 0.03, 0.05), tilt: 1.2, bob: 2.2 });
+            while (!this.destroyed && !actor.done && actor.path && actor.ti > 3) {
+                const from = actor.path[actor.ti];
+                actor.ti = Math.max(3, actor.ti - 2);
+                const to = actor.path[actor.ti];
+                this._placeActorAt(actor, to);
+                const dx = to.x - from.x, dy = to.y - from.y, mag = Math.hypot(dx, dy) || 1;
+                await nymph.walkTo((dx / mag) * 30, (dy / mag) * 24, { speed: 0.045, tilt: 2, bob: 1.8 });
+                await nymph.holdPause(rand(r, 120, 420));
+            }
         } catch (_) {}
         if (this.destroyed || actor.done) return;
 
+        // 2. Up onto the bark: glide from the tunnel mouth onto the trunk while
+        // still stepping, then settle with a final short upward step so the
+        // walk ends exactly at local origin, facing up — the moult then happens
+        // precisely where the nymph stands.
         actor.host.classList.add('is-emerging');
         const trunk = (this.trunkAnchors || [])[actor.tunnelIdx];
         if (trunk) {
@@ -387,18 +405,27 @@ export class NymphScene {
             const top = actor.path[Math.min(4, actor.path.length - 1)];
             this._placeActorAt(actor, { x: top.x, y: Math.max(90, top.y - rand(r, 0, 30)) });
         }
-        // Face straight up the bark while the host glides onto the trunk.
         try {
-            await nymph.walkTo(0, -30, { speed: 0.02, tilt: 0.8, bob: 1.6, maxTurn: 180 });
+            await nymph.walkTo(0, 22, { speed: 0.02, tilt: 1.2, bob: 1.8, maxTurn: 160 });
+            await nymph.walkTo(0, 0, { speed: 0.014, tilt: 0.7, bob: 1.4 });
         } catch (_) {}
         if (this.destroyed || actor.done) return;
-        nymph.setWanderPos(0, 0, 0);
 
-        // 2. Grip pause, then the dorsal cuticle splits.
-        await nymph.holdPause(rand(r, 1000, 1800));
+        // 3. Grip pause, then the staged moult: the dorsal cuticle cracks, the
+        // shell backs part in two visible stages — each revealing more of the
+        // pale teneral adult beneath — before the adult pulls free.
+        await nymph.holdPause(rand(r, 1100, 1900));
         if (this.destroyed || actor.done) return;
-        nymph.beginMolt();
-        this._after(rand(r, 1400, 2000), () => this._moltReveal(actor));
+        nymph.beginMolt();                            // hairline crack
+        await nymph.holdPause(rand(r, 1500, 2100));
+        if (this.destroyed || actor.done) return;
+        nymph.setMoltStage(1);                        // shell parts: first glimpse
+        await nymph.holdPause(rand(r, 1700, 2300));
+        if (this.destroyed || actor.done) return;
+        nymph.setMoltStage(2);                        // wide open: dorsum exposed
+        await nymph.holdPause(rand(r, 1400, 2000));
+        if (this.destroyed || actor.done) return;
+        this._moltReveal(actor);
     }
 
     // 3-6. Pull-out, wing expansion, hardening, flight; the exuvia remains.

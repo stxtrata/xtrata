@@ -63,12 +63,14 @@ const DEPLOYABLE = {
   'xtrata-market-sponsored-sbtc-v1-0': {
     source: 'contracts/live/xtrata-market-sponsored-sbtc-v1.0.clar',
     sponsoredMarket: true,
+    clarityVersion: 4,
     paymentToken: 'SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token',
     notes: 'sBTC marketplace with seller-funded fee sponsorship (STX-free buys).'
   },
   'xtrata-market-sponsored-usdcx-v1-0': {
     source: 'contracts/live/xtrata-market-sponsored-usdcx-v1.0.clar',
     sponsoredMarket: true,
+    clarityVersion: 4,
     paymentToken: 'SP120SBRBQJ00MCWS7TM5R8WJNTTKD5K0HFRC2CNE.usdcx',
     notes: 'USDCx marketplace with seller-funded fee sponsorship (STX-free buys).'
   }
@@ -198,7 +200,7 @@ const main = async () => {
   console.log('Contract name :', name);
   console.log('Source        :', sourcePath, `(${codeBody.length} bytes)`);
   console.log('Deployer      :', deployerAddress);
-  console.log('ClarityVersion:', 'Clarity3 (pinned)');
+  console.log('ClarityVersion:', entry.clarityVersion === 4 ? 'Clarity4 (pinned)' : 'Clarity3 (pinned)');
   console.log('Fee (uSTX)    :', FEE_USTX.toString());
   console.log('Mode          :', broadcast ? 'BROADCAST' : 'dry run (pass --broadcast to send)');
 
@@ -207,7 +209,7 @@ const main = async () => {
     codeBody,
     senderKey,
     network,
-    clarityVersion: ClarityVersion.Clarity3,
+    clarityVersion: entry.clarityVersion === 4 ? ClarityVersion.Clarity4 : ClarityVersion.Clarity3,
     anchorMode: AnchorMode.Any,
     postConditionMode: PostConditionMode.Deny,
     fee: FEE_USTX

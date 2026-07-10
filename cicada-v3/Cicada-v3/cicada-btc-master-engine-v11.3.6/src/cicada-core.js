@@ -1,6 +1,6 @@
 // Public browser API for rendering seeded cicadas.
 import { CicadaGenerator } from './cicada-renderer.js?v=11.3.5-nymph.2';
-import { CicadaNymphGenerator } from './cicada-nymph-renderer.js?v=11.3.5-nymph.2';
+import { CicadaNymphGenerator } from './cicada-nymph-renderer.js?v=11.3.8-molt.1';
 import { NymphScene } from './nymph-scene.js?v=11.3.5-nymph.2';
 import { CicadaSynth } from './cicada-audio.js?v=11.3.5-nymph.2';
 import { playSignatureCall, getSoundIdentity } from './motion-bridge.js?v=11.3.5-nymph.2';
@@ -52,7 +52,7 @@ export {
     getMetadataCSV
 } from './cicada-traits.js?v=11.3.5-nymph.2';
 export { CicadaGenerator } from './cicada-renderer.js?v=11.3.5-nymph.2';
-export { CicadaNymphGenerator } from './cicada-nymph-renderer.js?v=11.3.5-nymph.2';
+export { CicadaNymphGenerator } from './cicada-nymph-renderer.js?v=11.3.8-molt.1';
 export { CicadaSynth } from './cicada-audio.js?v=11.3.5-nymph.2';
 
 // v11.3: exported ZIPs may include a base64-encoded bark asset map. Load it
