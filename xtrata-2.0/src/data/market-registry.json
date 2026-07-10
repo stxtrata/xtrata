@@ -41,7 +41,7 @@
     "network": "mainnet",
     "paymentTokenContractId": "SP120SBRBQJ00MCWS7TM5R8WJNTTKD5K0HFRC2CNE.usdcx",
     "sponsored": true,
-    "sponsorApi": "http://127.0.0.1:8787/api"
+    "sponsorApi": "/"
   },
   {
     "label": "Xtrata Market sBTC v1.0 (Sponsored \u2014 no STX needed)",
@@ -50,6 +50,6 @@
     "network": "mainnet",
     "paymentTokenContractId": "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token",
     "sponsored": true,
-    "sponsorApi": "http://127.0.0.1:8787/api"
+    "sponsorApi": "/"
   }
 ]

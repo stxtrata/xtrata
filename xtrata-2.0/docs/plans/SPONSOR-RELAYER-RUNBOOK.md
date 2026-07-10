@@ -14,13 +14,11 @@ The relayer pays buyers' mining fees on the sponsored markets and reimburses its
 
 3. **Authorise it on-chain**: open the deploy console (`/web/deploy-console.html`), connect the admin wallet, "Re-run preflight" on each sponsored market card, paste the relayer address into the post-deploy step, and sign `set-sponsor` — once per contract. Until this step the sponsor defaults to the deployer, and the relayer's `claim-fee` calls would fail.
 
-4. **Start the relayer** (from `xtrata-agent-one/`):
+4. **Activate the serverless relayer** (no server, no extra cost — it ships with the site as the Cloudflare Pages Function `functions/sponsor/`):
    ```
-   SPONSOR_KEY=<hex key> \
-   SPONSOR_MARKETS=SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-sbtc-v1-0,SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-usdcx-v1-0 \
-   node server/server.mjs
+   npx wrangler pages secret put SPONSOR_KEY --project-name xtrata
    ```
-   Startup log should show `sponsor relayer enabled: <address> markets=2`. Probe: `curl -X POST http://127.0.0.1:8787/api/sponsor/quote` returns a budget quote.
+   Paste the hot-wallet key when prompted, then redeploy the site. Probe: `curl -X POST https://<your-site>/sponsor/quote` returns a budget quote (503 RELAYER_DISABLED until the secret is set). Settlement is traffic-driven — each incoming relayer request also advances up to 4 pending settlements; if traffic ever stops, sellers can still self-refund after 144 blocks, so nothing strands. Job state lives in the site's existing D1 database. The Node relayer in `xtrata-agent-one/svc/sponsor-service.mjs` remains available for local development (`SPONSOR_KEY=... node server/server.mjs`).
 
 ## End-to-end smoke test (mainnet, small amounts)
 

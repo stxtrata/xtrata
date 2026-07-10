@@ -37,7 +37,7 @@ const MARKETS = [
   'xtrata-market-sponsored-usdcx-v1-0'
 ];
 const RECOMMENDED_FLOAT_USTX = 20_000_000n; // 20 STX
-const RELAYER_URL = 'http://127.0.0.1:8787';
+const RELAYER_URL = ''; // same-origin Pages Function (functions/sponsor)
 
 const appDetails = { name: 'Xtrata Sponsor Ops', icon: `${window.location.origin}/favicon.svg` };
 const connectParams = { appName: appDetails.name, appIcon: appDetails.icon };
@@ -109,11 +109,10 @@ const refreshChainState = async () => {
       state.lastListingIds[market] = null;
     }
   }
-  // Reachability probe only: the relayer serves same-origin (no CORS), so an
-  // opaque no-cors response resolving means "something is listening".
+  // Real health check: the relayer is a same-origin Pages Function.
   try {
-    await fetch(`${RELAYER_URL}/api/health`, { mode: 'no-cors' });
-    state.relayerUp = true;
+    const r = await fetch(`${RELAYER_URL}/sponsor/quote`, { method: 'POST' });
+    state.relayerUp = r.ok; // 503 RELAYER_DISABLED until the secret is set
   } catch {
     state.relayerUp = false;
   }
@@ -242,7 +241,8 @@ const explorerLink = (txId: string) =>
 const formatStx = (ustx: bigint) => `${(Number(ustx) / 1_000_000).toFixed(2)} STX`;
 
 const relayerCommand = () =>
-  `SPONSOR_KEY=${state.relayerKey ?? '<your saved key>'} \\\nSPONSOR_MARKETS=${MARKETS.map((m) => `${DEPLOYER}.${m}`).join(',')} \\\nnode server/server.mjs`;
+  `npx wrangler pages secret put SPONSOR_KEY --project-name xtrata
+# paste the key when prompted: ${state.relayerKey ?? '<your saved key>'}`;
 
 const render = () => {
   const app = document.getElementById('app');
@@ -345,13 +345,17 @@ const render = () => {
   // Step 4: run the relayer
   const step4 = el('div', { className: `card ${state.relayerUp ? 'done' : ''}` });
   step4.append(
-    el('h2', {}, el('span', { className: 'step-num' }, '4'), 'Run the relayer'),
-    el('p', {}, 'From ', el('code', {}, 'xtrata-agent-one/'), ':'),
+    el('h2', {}, el('span', { className: 'step-num' }, '4'), 'Activate the serverless relayer'),
+    el('p', {}, 'No server needed — the relayer ships with the site as a Cloudflare Pages Function. Set the hot-wallet key as a project secret once, then redeploy:'),
     el('pre', {}, relayerCommand()),
     el('div', { className: 'row' },
       el('button', { className: 'ghost', onclick: () => void navigator.clipboard.writeText(relayerCommand().replace(/ \\\n/g, ' ')) }, 'Copy command')),
     el('p', { className: state.relayerUp === null ? '' : state.relayerUp ? 'ok' : 'warn' },
-      state.relayerUp === null ? 'Reachability: checking…' : state.relayerUp ? `Something is listening at ${RELAYER_URL}.` : `Nothing reachable at ${RELAYER_URL} yet.`)
+      state.relayerUp === null
+        ? 'Health: checking…'
+        : state.relayerUp
+          ? 'Relayer live: /sponsor/quote is answering.'
+          : 'Relayer not active yet (secret missing, or running on localhost without wrangler).')
   );
   app.append(step4);
 
