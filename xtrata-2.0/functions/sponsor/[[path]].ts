@@ -49,9 +49,9 @@ import { run, queryAll, type Env } from '../lib/db';
 
 const DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const DEFAULT_MARKETS = [
-  `${DEPLOYER}.xtrata-market-sponsored-stx-v1-0`,
-  `${DEPLOYER}.xtrata-market-sponsored-sbtc-v1-0`,
-  `${DEPLOYER}.xtrata-market-sponsored-usdcx-v1-0`
+  `${DEPLOYER}.xtrata-market-sponsored-stx-v1-1`,
+  `${DEPLOYER}.xtrata-market-sponsored-sbtc-v1-1`,
+  `${DEPLOYER}.xtrata-market-sponsored-usdcx-v1-1`
 ];
 const FEE_MULTIPLIER = 3n;
 const MIN_BUDGET_USTX = 50_000n;

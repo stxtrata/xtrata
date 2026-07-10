@@ -9876,7 +9876,39 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       return results;
     };
 
+    const isLegacyCoreListing = (listing) =>
+      String(listing.nftContract ?? '').endsWith('.xtrata-v2-1-0');
+
+    const marketCancel = async (listing) => {
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        marketDom.status.innerHTML = '<span><strong>Market</strong> connect the seller wallet to cancel.</span>';
+        return;
+      }
+      const [nftAddress, nftName] = listing.nftContract.split('.');
+      marketDom.status.innerHTML = '<span><strong>Market</strong> confirm the cancel in your wallet…</span>';
+      showContractCall({
+        contractAddress: listing.entry.address,
+        contractName: listing.entry.contractName,
+        functionName: 'cancel',
+        functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(listing.listingId)],
+        network: listing.entry.network,
+        stxAddress: state.walletSession.address,
+        postConditionMode: PostConditionMode.Allow,
+        onFinish: (payload) => {
+          const txId = payload?.txId ?? payload?.txid ?? '';
+          marketDom.status.innerHTML = `<span><strong>Market</strong> cancel submitted${txId ? ` — tx ${txId}` : ''}. Migrate the inscription to v3, then relist.</span>`;
+        },
+        onCancel: () => {
+          marketDom.status.innerHTML = '<span><strong>Market</strong> cancel aborted.</span>';
+        }
+      });
+    };
+
     const marketBuy = async (listing) => {
+      if (isLegacyCoreListing(listing)) {
+        marketDom.status.innerHTML = '<span><strong>Market</strong> legacy v2 inscriptions are delisted — the owner must migrate to v3 and relist.</span>';
+        return;
+      }
       if (!state.walletSession.isConnected || !state.walletSession.address) {
         marketDom.status.innerHTML = '<span><strong>Market</strong> connect a wallet to buy.</span>';
         return;
@@ -10240,7 +10272,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     };
     const sellState = { quote: null, quoteRun: 0 };
 
-    const sellEntries = () => marketEntriesForNetwork();
+    // Legacy markets stay in the registry so old listings remain readable,
+    // but new listings must not go to them — exclude from the sell selector.
+    const sellEntries = () =>
+      marketEntriesForNetwork().filter((entry) => !/legacy/i.test(entry.label ?? ''));
 
     const sellSelectedEntry = () => {
       const id = sellDom.market?.value;
@@ -10250,8 +10285,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const populateSellMarkets = () => {
       if (!sellDom.market) return;
       const current = sellDom.market.value;
+      const orderedEntries = [...sellEntries()].sort((a, b) =>
+        Number(isSponsoredMarket(a)) - Number(isSponsoredMarket(b))
+      );
       sellDom.market.replaceChildren(
-        ...sellEntries().map((entry) => {
+        ...orderedEntries.map((entry) => {
           const settlement = getMarketSettlementAsset(entry.paymentTokenContractId ?? null);
           const symbol = getMarketSettlementLabel(settlement);
           const option = document.createElement('option');
@@ -10491,12 +10529,38 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
           const actions = document.createElement('div');
           actions.className = 'market-card__actions';
-          const buy = document.createElement('button');
-          buy.type = 'button';
-          buy.className = 'market-chip';
-          buy.textContent = sponsored ? 'Buy — no STX needed' : 'Buy';
-          buy.addEventListener('click', () => { void marketBuy(listing); });
-          actions.append(buy);
+          if (isLegacyCoreListing(listing)) {
+            // v3-only policy: v2 inscriptions are delisted from sale. The
+            // owner can cancel and migrate, then relist on a v1.1 market.
+            const note = document.createElement('p');
+            note.className = 'market-card__meta';
+            note.textContent = 'Legacy v2 inscription — delisted from sale.';
+            const migrate = document.createElement('a');
+            migrate.className = 'market-chip';
+            migrate.href = '/web/migrate.html';
+            migrate.target = '_self';
+            migrate.textContent = 'Migrate to v3 to relist';
+            card.append(note);
+            actions.append(migrate);
+            if (
+              state.walletSession.address &&
+              listing.seller === state.walletSession.address
+            ) {
+              const cancelBtn = document.createElement('button');
+              cancelBtn.type = 'button';
+              cancelBtn.className = 'market-chip';
+              cancelBtn.textContent = 'Cancel listing (reclaim)';
+              cancelBtn.addEventListener('click', () => { void marketCancel(listing); });
+              actions.append(cancelBtn);
+            }
+          } else {
+            const buy = document.createElement('button');
+            buy.type = 'button';
+            buy.className = 'market-chip';
+            buy.textContent = sponsored ? 'Buy — no STX needed' : 'Buy';
+            buy.addEventListener('click', () => { void marketBuy(listing); });
+            actions.append(buy);
+          }
 
           card.append(thumb, badges, price, meta, details, actions);
           return card;

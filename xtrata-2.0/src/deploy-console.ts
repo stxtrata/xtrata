@@ -23,9 +23,9 @@ import type { WalletSession } from './lib/wallet/types';
 // Contract sources are bundled at build time (?raw) — no dev-server fetch,
 // so the preflight always hashes exactly what is in the repo. (The previous
 // fetch('/contracts/…') could receive the SPA HTML fallback instead.)
-import sponsoredStxSource from '../contracts/live/xtrata-market-sponsored-stx-v1.0.clar?raw';
-import sponsoredSbtcSource from '../contracts/live/xtrata-market-sponsored-sbtc-v1.0.clar?raw';
-import sponsoredUsdcxSource from '../contracts/live/xtrata-market-sponsored-usdcx-v1.0.clar?raw';
+import sponsoredStxSource from '../contracts/live/xtrata-market-sponsored-stx-v1.1.clar?raw';
+import sponsoredSbtcSource from '../contracts/live/xtrata-market-sponsored-sbtc-v1.1.clar?raw';
+import sponsoredUsdcxSource from '../contracts/live/xtrata-market-sponsored-usdcx-v1.1.clar?raw';
 
 const EXPECTED_DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const HIRO_API = 'https://api.hiro.so';
@@ -42,23 +42,23 @@ type Deployable = {
 
 const DEPLOYABLE: Deployable[] = [
   {
-    name: 'xtrata-market-sponsored-stx-v1-0',
-    source: 'contracts/live/xtrata-market-sponsored-stx-v1.0.clar',
+    name: 'xtrata-market-sponsored-stx-v1-1',
+    source: 'contracts/live/xtrata-market-sponsored-stx-v1.1.clar',
     code: sponsoredStxSource,
     sponsoredMarket: true,
     notes: 'STX marketplace with seller-funded fee sponsorship (buyers need only the price).'
   },
   {
-    name: 'xtrata-market-sponsored-sbtc-v1-0',
-    source: 'contracts/live/xtrata-market-sponsored-sbtc-v1.0.clar',
+    name: 'xtrata-market-sponsored-sbtc-v1-1',
+    source: 'contracts/live/xtrata-market-sponsored-sbtc-v1.1.clar',
     code: sponsoredSbtcSource,
     sponsoredMarket: true,
     paymentToken: 'SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token',
     notes: 'sBTC marketplace with seller-funded fee sponsorship (STX-free buys).'
   },
   {
-    name: 'xtrata-market-sponsored-usdcx-v1-0',
-    source: 'contracts/live/xtrata-market-sponsored-usdcx-v1.0.clar',
+    name: 'xtrata-market-sponsored-usdcx-v1-1',
+    source: 'contracts/live/xtrata-market-sponsored-usdcx-v1.1.clar',
     code: sponsoredUsdcxSource,
     sponsoredMarket: true,
     paymentToken: 'SP120SBRBQJ00MCWS7TM5R8WJNTTKD5K0HFRC2CNE.usdcx',

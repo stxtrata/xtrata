@@ -33,9 +33,9 @@ import {
 const DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const HIRO_API = 'https://api.hiro.so';
 const MARKETS = [
-  'xtrata-market-sponsored-stx-v1-0',
-  'xtrata-market-sponsored-sbtc-v1-0',
-  'xtrata-market-sponsored-usdcx-v1-0'
+  'xtrata-market-sponsored-stx-v1-1',
+  'xtrata-market-sponsored-sbtc-v1-1',
+  'xtrata-market-sponsored-usdcx-v1-1'
 ];
 const RECOMMENDED_FLOAT_USTX = 20_000_000n; // 20 STX
 const RELAYER_URL = ''; // same-origin Pages Function (functions/sponsor)
