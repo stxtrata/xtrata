@@ -33,6 +33,7 @@ import {
 const DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const HIRO_API = 'https://api.hiro.so';
 const MARKETS = [
+  'xtrata-market-sponsored-stx-v1-0',
   'xtrata-market-sponsored-sbtc-v1-0',
   'xtrata-market-sponsored-usdcx-v1-0'
 ];

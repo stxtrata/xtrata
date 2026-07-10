@@ -4082,6 +4082,23 @@
       grid-template-columns: minmax(0, 1fr);
     }
 
+    .market-sell {
+      margin-bottom: 12px;
+    }
+
+    .market-sell__body {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+      padding: 12px;
+      align-items: end;
+    }
+
+    .market-sell__body .field-hint,
+    .market-sell__body #marketSellStatus {
+      grid-column: 1 / -1;
+    }
+
     .market-toolbar {
       display: flex;
       flex-wrap: wrap;

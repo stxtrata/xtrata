@@ -60,6 +60,12 @@ const DEPLOYABLE = {
     source: 'contracts/live/xtrata-v3.2.3.clar',
     notes: 'Core inscription contract (see mainnet-v3.2.3-handover.mjs for post-deploy).'
   },
+  'xtrata-market-sponsored-stx-v1-0': {
+    source: 'contracts/live/xtrata-market-sponsored-stx-v1.0.clar',
+    sponsoredMarket: true,
+    clarityVersion: 4,
+    notes: 'STX marketplace with seller-funded fee sponsorship (buyers need only the price).'
+  },
   'xtrata-market-sponsored-sbtc-v1-0': {
     source: 'contracts/live/xtrata-market-sponsored-sbtc-v1.0.clar',
     sponsoredMarket: true,

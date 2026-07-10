@@ -23,6 +23,7 @@ import type { WalletSession } from './lib/wallet/types';
 // Contract sources are bundled at build time (?raw) — no dev-server fetch,
 // so the preflight always hashes exactly what is in the repo. (The previous
 // fetch('/contracts/…') could receive the SPA HTML fallback instead.)
+import sponsoredStxSource from '../contracts/live/xtrata-market-sponsored-stx-v1.0.clar?raw';
 import sponsoredSbtcSource from '../contracts/live/xtrata-market-sponsored-sbtc-v1.0.clar?raw';
 import sponsoredUsdcxSource from '../contracts/live/xtrata-market-sponsored-usdcx-v1.0.clar?raw';
 
@@ -40,6 +41,13 @@ type Deployable = {
 };
 
 const DEPLOYABLE: Deployable[] = [
+  {
+    name: 'xtrata-market-sponsored-stx-v1-0',
+    source: 'contracts/live/xtrata-market-sponsored-stx-v1.0.clar',
+    code: sponsoredStxSource,
+    sponsoredMarket: true,
+    notes: 'STX marketplace with seller-funded fee sponsorship (buyers need only the price).'
+  },
   {
     name: 'xtrata-market-sponsored-sbtc-v1-0',
     source: 'contracts/live/xtrata-market-sponsored-sbtc-v1.0.clar',

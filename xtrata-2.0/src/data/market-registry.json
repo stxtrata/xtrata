@@ -51,5 +51,14 @@
     "paymentTokenContractId": "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token",
     "sponsored": true,
     "sponsorApi": "/"
+  },
+  {
+    "label": "Xtrata Market STX v1.0 (Sponsored - no fee needed)",
+    "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+    "contractName": "xtrata-market-sponsored-stx-v1-0",
+    "network": "mainnet",
+    "paymentTokenContractId": null,
+    "sponsored": true,
+    "sponsorApi": "/"
   }
 ]

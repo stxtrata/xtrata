@@ -658,6 +658,7 @@
                   <div class="field-inline">
                     <input class="input" id="transferRecipientInput" autocomplete="off" placeholder="ST..." />
                     <button class="btn" id="transferButton" type="button" disabled>Send</button>
+                    <button class="btn" id="listForSaleButton" type="button" disabled>List for sale</button>
                   </div>
                 </label>
                 <span class="field-note" id="transferStatus">Select one of your inscriptions to send.</span>
@@ -678,6 +679,26 @@
           <span class="badge" id="marketNetworkBadge">mainnet</span>
         </div>
         <div class="panel-body">
+          <details class="inscribe-details market-sell" id="marketSell">
+            <summary>Sell an inscription</summary>
+            <div class="market-sell__body">
+              <label class="field">
+                <span class="field__label">Inscription #</span>
+                <input class="input" id="marketSellTokenId" inputmode="numeric" placeholder="Token id" />
+              </label>
+              <label class="field">
+                <span class="field__label">Currency &amp; checkout</span>
+                <select class="input" id="marketSellMarket"></select>
+              </label>
+              <label class="field">
+                <span class="field__label" id="marketSellPriceLabel">Price</span>
+                <input class="input" id="marketSellPrice" inputmode="decimal" placeholder="1.25" />
+              </label>
+              <p class="field-hint" id="marketSellDeposit"></p>
+              <button class="btn" id="marketSellButton" type="button">List for sale</button>
+              <p class="field-hint" id="marketSellStatus"></p>
+            </div>
+          </details>
           <div class="market-toolbar" id="marketToolbar" role="tablist" aria-label="Payment asset"></div>
           <div class="status" id="marketStatus"><span>Loading listings…</span></div>
           <div class="market-listings" id="marketListings"></div>

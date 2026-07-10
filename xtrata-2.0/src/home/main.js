@@ -3749,6 +3749,8 @@
       } else if (!walletOwnsToken) {
         message = 'Only the connected owner can send this inscription.';
       }
+      const listBtn = $('listForSaleButton');
+      if (listBtn) listBtn.disabled = state.selectedTokenId === null || !state.walletSession.isConnected;
       dom.transferButton.disabled =
         state.busy ||
         state.transferPending ||
@@ -10224,6 +10226,176 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       body.replaceChildren(frag);
     };
 
+
+    // --- Sell an inscription (any currency, optional sponsorship) ----------
+    const sellDom = {
+      details: $('marketSell'),
+      tokenId: $('marketSellTokenId'),
+      market: $('marketSellMarket'),
+      price: $('marketSellPrice'),
+      priceLabel: $('marketSellPriceLabel'),
+      deposit: $('marketSellDeposit'),
+      button: $('marketSellButton'),
+      status: $('marketSellStatus')
+    };
+    const sellState = { quote: null, quoteRun: 0 };
+
+    const sellEntries = () => marketEntriesForNetwork();
+
+    const sellSelectedEntry = () => {
+      const id = sellDom.market?.value;
+      return sellEntries().find((entry) => getMarketContractId(entry) === id) ?? null;
+    };
+
+    const populateSellMarkets = () => {
+      if (!sellDom.market) return;
+      const current = sellDom.market.value;
+      sellDom.market.replaceChildren(
+        ...sellEntries().map((entry) => {
+          const settlement = getMarketSettlementAsset(entry.paymentTokenContractId ?? null);
+          const symbol = getMarketSettlementLabel(settlement);
+          const option = document.createElement('option');
+          option.value = getMarketContractId(entry);
+          option.textContent = isSponsoredMarket(entry)
+            ? `${symbol} - sponsored (buyer pays no fee)`
+            : `${symbol} - standard`;
+          return option;
+        })
+      );
+      if (current) sellDom.market.value = current;
+      updateSellUi();
+    };
+
+    const parseSellPrice = (raw, decimals) => {
+      const trimmed = String(raw ?? '').trim();
+      if (!/^\d+(\.\d+)?$/.test(trimmed)) return null;
+      const [w, f = ''] = trimmed.split('.');
+      if (f.length > decimals) return null;
+      const amount = BigInt(w) * 10n ** BigInt(decimals) + BigInt((f || '0').padEnd(decimals, '0'));
+      return amount > 0n ? amount : null;
+    };
+
+    const updateSellUi = async () => {
+      const entry = sellSelectedEntry();
+      if (!entry || !sellDom.priceLabel) return;
+      const settlement = getMarketSettlementAsset(entry.paymentTokenContractId ?? null);
+      const symbol = getMarketSettlementLabel(settlement);
+      sellDom.priceLabel.textContent = `Price (${symbol})`;
+      if (isSponsoredMarket(entry) && entry.sponsorApi) {
+        const run = ++sellState.quoteRun;
+        sellDom.deposit.textContent = 'Fetching sponsorship deposit quote...';
+        try {
+          const base = entry.sponsorApi.replace(/\/+$/, '');
+          const r = await fetch(`${base}/sponsor/quote`, { method: 'POST' });
+          if (run !== sellState.quoteRun) return;
+          if (!r.ok) throw new Error('quote unavailable');
+          const q = await r.json();
+          sellState.quote = BigInt(q.budgetUstx ?? 60000);
+          sellDom.deposit.textContent =
+            `Sponsorship deposit: ${formatAssetAmount(sellState.quote, 6, 'STX')} - covers the buyer's network fee so they need no extra STX; the unused part is refunded to you when it sells or you cancel.`;
+        } catch {
+          if (run !== sellState.quoteRun) return;
+          sellState.quote = 60_000n;
+          sellDom.deposit.textContent =
+            'Sponsorship deposit: 0.06 STX (default - live quote unavailable). Unused portion refunds to you.';
+        }
+      } else {
+        sellState.quote = null;
+        sellDom.deposit.textContent = 'Standard listing: the buyer pays their own network fee.';
+      }
+    };
+
+    const marketList = async () => {
+      const entry = sellSelectedEntry();
+      if (!entry) return;
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        sellDom.status.textContent = 'Connect a wallet to list.';
+        return;
+      }
+      const tokenIdRaw = sellDom.tokenId?.value?.trim();
+      if (!/^\d+$/.test(tokenIdRaw ?? '')) {
+        sellDom.status.textContent = 'Enter the inscription number you want to sell.';
+        return;
+      }
+      const tokenId = BigInt(tokenIdRaw);
+      const settlement = getMarketSettlementAsset(entry.paymentTokenContractId ?? null);
+      const decimals = settlement.decimals ?? 6;
+      const priceAmount = parseSellPrice(sellDom.price?.value, decimals);
+      if (priceAmount === null) {
+        sellDom.status.textContent = `Enter a valid price (up to ${decimals} decimals).`;
+        return;
+      }
+      const sponsored = isSponsoredMarket(entry);
+      const budget = sponsored ? (sellState.quote ?? 60_000n) : null;
+
+      // ownership check before the wallet opens
+      sellDom.status.textContent = 'Checking ownership...';
+      try {
+        const owner = await state.client.getOwner(tokenId, state.walletSession.address);
+        if (!owner || owner !== state.walletSession.address) {
+          sellDom.status.textContent = owner
+            ? `Inscription #${tokenId} is owned by ${owner.slice(0, 8)}..., not your wallet.`
+            : `Inscription #${tokenId} not found.`;
+          return;
+        }
+      } catch {
+        sellDom.status.textContent = 'Could not verify ownership - try again.';
+        return;
+      }
+
+      const postConditions = [
+        buildTransferPostCondition({
+          contract: state.contract,
+          senderAddress: state.walletSession.address,
+          tokenId
+        })
+      ];
+      const functionArgs = [
+        contractPrincipalCV(state.contract.address, state.contract.contractName),
+        uintCV(tokenId),
+        uintCV(priceAmount)
+      ];
+      if (sponsored && budget !== null) {
+        functionArgs.push(uintCV(budget));
+        postConditions.push(
+          makeStandardSTXPostCondition(
+            state.walletSession.address,
+            FungibleConditionCode.Equal,
+            budget
+          )
+        );
+      }
+      sellDom.status.textContent = 'Confirm the listing in your wallet...';
+      showContractCall({
+        contractAddress: entry.address,
+        contractName: entry.contractName,
+        functionName: 'list-token',
+        functionArgs,
+        network: entry.network,
+        stxAddress: state.walletSession.address,
+        postConditionMode: PostConditionMode.Deny,
+        postConditions,
+        onFinish: (payload) => {
+          const txId = payload?.txId ?? payload?.txid ?? '';
+          sellDom.status.textContent = `Listing submitted${txId ? ` - tx ${txId}` : ''}. It appears here once confirmed.`;
+        },
+        onCancel: () => {
+          sellDom.status.textContent = 'Listing cancelled.';
+        }
+      });
+    };
+
+    sellDom.market?.addEventListener('change', () => { void updateSellUi(); });
+    sellDom.button?.addEventListener('click', () => { void marketList(); });
+
+    const openSellForToken = (tokenId) => {
+      if (sellDom.details) sellDom.details.open = true;
+      if (sellDom.tokenId) sellDom.tokenId.value = tokenId;
+      populateSellMarkets();
+      void updateSellUi();
+      sellDom.details?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
     const renderMarketToolbar = () => {
       if (!marketDom.toolbar) return;
       const symbols = ['all', ...new Set(marketEntriesForNetwork().map((entry) =>
@@ -10333,11 +10505,16 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       void hydrateMarketThumbnails(run, visible);
     };
 
-    const loadMarketPage = async () => {
+    const loadMarketPage = async (params = null) => {
       const run = ++marketState.run;
       if (!marketDom.listings) return;
       if (marketDom.badge) marketDom.badge.textContent = state.contract.network;
       renderMarketToolbar();
+      populateSellMarkets();
+      const listParam = params?.get?.('list');
+      if (listParam && /^\d+$/.test(listParam)) {
+        openSellForToken(listParam);
+      }
       marketDom.status.innerHTML = '<span><strong>Market</strong> loading listings…</span>';
       try {
         const perContract = await Promise.all(
@@ -10391,7 +10568,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         await openMyWalletDefaultView();
       }
       if (page === 'market') {
-        await loadMarketPage();
+        await loadMarketPage(params);
       }
       if (run === pageSwitchRun) {
         updateControls();
@@ -10468,7 +10645,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         if (openedPublicView) {
           // handled above
         } else if (PAGE_MODE === 'market') {
-          await loadMarketPage();
+          await loadMarketPage(pageParams);
         } else if (
           PAGE_MODE === 'my-wallet' &&
           walletViewRequestId === state.walletViewRequestId &&
@@ -10828,6 +11005,15 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     dom.clearParentsButton.addEventListener('click', clearParentIds);
     dom.transferRecipientInput.addEventListener('input', updateTransferControls);
     dom.transferButton.addEventListener('click', transferSelectedToken);
+    // "List for sale" jumps to the Market page with the selected inscription
+    // prefilled in the sell form (any currency, optional sponsorship).
+    const listForSaleButton = $('listForSaleButton');
+    listForSaleButton?.addEventListener('click', () => {
+      if (state.selectedTokenId === null || state.selectedTokenId === undefined) return;
+      const target = `/market?list=${state.selectedTokenId.toString()}`;
+      window.history.pushState(null, '', target);
+      void switchToPage('market', new URLSearchParams({ list: state.selectedTokenId.toString() }));
+    });
     dom.payloadPreviewExpandButton?.addEventListener('click', openPreparedPayloadFullscreen);
     dom.fullscreenButton?.addEventListener('click', openFullscreenViewer);
     dom.previewExpandButton.addEventListener('click', openFullscreenViewer);
