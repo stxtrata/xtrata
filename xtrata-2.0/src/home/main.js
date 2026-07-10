@@ -51,6 +51,7 @@
       buildMarketBuyPostConditions
     } from '/src/lib/market/settlement.ts';
     import { isSponsoredMarket } from '/src/lib/market/sponsored.ts';
+    import { loadMarketActivity } from '/src/lib/market/indexer.ts';
     import {
       buildTransferCall,
       createXtrataClient
@@ -9772,12 +9773,22 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
     // ------------------------------------------------------------------
     // Market page: multi-asset inscription marketplace (homepage-native).
-    // Reads listings straight from the market contracts via read-only calls
-    // and buys through the same wallet path the inscribe flow uses. Reuses
-    // src/lib/market for registry, settlement assets, and post-conditions.
+    // Listings render as media thumbnails with an expandable details section
+    // (metadata, relationships, price, creation + trading history). All logic
+    // reuses src/lib: market registry/settlement/sponsored, viewer summaries
+    // and content loaders, and the market activity indexer.
     // ------------------------------------------------------------------
     const MARKET_LISTINGS_PER_CONTRACT = 24;
-    const marketState = { filter: 'all', run: 0, listings: [] };
+    const MARKET_THUMB_HYDRATION_CONCURRENCY = 4;
+    const marketState = {
+      filter: 'all',
+      run: 0,
+      listings: [],
+      summaries: new Map(), // `${nftContract}:${tokenId}` -> TokenSummary|null
+      media: new Map(), // same key -> { url, kind } | null
+      activity: new Map(), // market contractId -> MarketIndexSnapshot events
+      clients: new Map() // nftContract principal -> XtrataClient
+    };
     const marketDom = {
       toolbar: $('marketToolbar'),
       status: $('marketStatus'),
@@ -9793,6 +9804,29 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const whole = amount / base;
       const frac = (amount % base).toString().padStart(decimals, '0').replace(/0+$/, '');
       return `${whole.toString()}${frac ? '.' + frac : ''} ${symbol}`;
+    };
+
+    const formatByteSize = (size) => {
+      const n = Number(size);
+      if (!Number.isFinite(n)) return `${size} B`;
+      if (n < 1024) return `${n} B`;
+      if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+      return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+    };
+
+    const shortPrincipal = (value) =>
+      value && value.length > 14 ? `${value.slice(0, 8)}…${value.slice(-4)}` : String(value ?? '');
+
+    const marketTokenKey = (listing) => `${listing.nftContract}:${listing.tokenId}`;
+
+    const marketClientFor = (nftContract, network) => {
+      let client = marketState.clients.get(nftContract);
+      if (!client) {
+        const [address, contractName] = nftContract.split('.');
+        client = createXtrataClient({ contract: { address, contractName, network } });
+        marketState.clients.set(nftContract, client);
+      }
+      return client;
     };
 
     const readMarketListings = async (entry) => {
@@ -9828,6 +9862,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             nftContract: String(tuple['nft-contract'].value),
             tokenId: BigInt(tuple['token-id'].value),
             price: BigInt(tuple.price.value),
+            createdAt: tuple['created-at'] ? BigInt(tuple['created-at'].value) : null,
             budgetRemaining: tuple['budget-remaining'] ? BigInt(tuple['budget-remaining'].value) : null
           });
         } catch {
@@ -9880,6 +9915,252 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       });
     };
 
+    // --- thumbnails -------------------------------------------------------
+    const MARKET_KIND_ICONS = {
+      image: '🖼', audio: '🎵', video: '🎞', html: '🧩', text: '📄',
+      json: '{ }', code: '⌨', unknown: '◼'
+    };
+
+    const marketSummaryFor = async (listing) => {
+      const key = marketTokenKey(listing);
+      if (marketState.summaries.has(key)) return marketState.summaries.get(key);
+      let summary = null;
+      try {
+        summary = await fetchTokenSummary({
+          client: marketClientFor(listing.nftContract, listing.entry.network),
+          id: listing.tokenId,
+          senderAddress: listing.entry.address
+        });
+      } catch {
+        summary = null;
+      }
+      marketState.summaries.set(key, summary);
+      return summary;
+    };
+
+    const marketMediaFor = async (listing) => {
+      const key = marketTokenKey(listing);
+      if (marketState.media.has(key)) return marketState.media.get(key);
+      let media = null;
+      try {
+        const summary = await marketSummaryFor(listing);
+        if (summary?.svgDataUri) {
+          media = { url: summary.svgDataUri, kind: 'image' };
+        } else if (summary?.tokenUri) {
+          const uriImage = await fetchTokenImageFromUri(summary.tokenUri);
+          if (uriImage) media = { url: uriImage, kind: 'image' };
+        }
+        if (!media && summary?.meta) {
+          const kind = getMediaKind(summary.meta.mimeType);
+          if (kind === 'image' && summary.meta.totalSize > 0n && summary.meta.totalSize <= 512n * 1024n) {
+            const bytes = await fetchOnChainContent({
+              client: marketClientFor(listing.nftContract, listing.entry.network),
+              id: listing.tokenId,
+              senderAddress: listing.entry.address,
+              totalSize: summary.meta.totalSize,
+              mimeType: summary.meta.mimeType
+            });
+            const blob = new Blob([bytes], { type: summary.meta.mimeType });
+            media = { url: URL.createObjectURL(blob), kind: 'image' };
+          }
+        }
+      } catch {
+        media = null;
+      }
+      marketState.media.set(key, media);
+      return media;
+    };
+
+    const hydrateMarketThumbnails = async (run, listings) => {
+      await runLimited(listings, MARKET_THUMB_HYDRATION_CONCURRENCY, async (listing) => {
+        if (run !== marketState.run) return;
+        const media = await marketMediaFor(listing);
+        if (run !== marketState.run) return;
+        const slot = marketDom.listings?.querySelector(
+          `[data-market-thumb="${listing.contractId}:${listing.listingId}"]`
+        );
+        if (!slot) return;
+        if (media?.url) {
+          const img = document.createElement('img');
+          img.src = media.url;
+          img.alt = `Inscription #${listing.tokenId}`;
+          img.loading = 'lazy';
+          slot.replaceChildren(img);
+          slot.classList.add('market-thumb--media');
+        } else {
+          const summary = marketState.summaries.get(marketTokenKey(listing));
+          const kind = getMediaKind(summary?.meta?.mimeType);
+          slot.replaceChildren(
+            Object.assign(document.createElement('span'), {
+              className: 'market-thumb__icon',
+              textContent: MARKET_KIND_ICONS[kind] ?? MARKET_KIND_ICONS.unknown
+            }),
+            Object.assign(document.createElement('span'), {
+              className: 'market-thumb__label',
+              textContent: summary?.meta?.mimeType ?? 'no preview'
+            })
+          );
+        }
+      });
+    };
+
+    // --- expandable details ----------------------------------------------
+    const marketActivityFor = async (listing) => {
+      const contractId = listing.contractId;
+      if (!marketState.activity.has(contractId)) {
+        try {
+          const snapshot = await loadMarketActivity({
+            contract: {
+              address: listing.entry.address,
+              contractName: listing.entry.contractName,
+              network: listing.entry.network
+            }
+          });
+          marketState.activity.set(contractId, snapshot?.events ?? []);
+        } catch {
+          marketState.activity.set(contractId, []);
+        }
+      }
+      return marketState.activity
+        .get(contractId)
+        .filter((event) => event.tokenId === listing.tokenId);
+    };
+
+    const detailRow = (label, value) => {
+      const row = document.createElement('div');
+      row.className = 'market-detail__row';
+      const dt = document.createElement('span');
+      dt.className = 'market-detail__label';
+      dt.textContent = label;
+      const dd = document.createElement('span');
+      dd.className = 'market-detail__value';
+      if (value instanceof HTMLElement) dd.append(value);
+      else dd.textContent = String(value);
+      row.append(dt, dd);
+      return row;
+    };
+
+    const xplorerTokenLink = (tokenId, label = null) => {
+      const link = document.createElement('a');
+      link.href = `/xplorer?token=${tokenId}`;
+      link.target = '_self';
+      link.textContent = label ?? `#${tokenId}`;
+      return link;
+    };
+
+    const loadMarketDetails = async (listing, body) => {
+      body.replaceChildren(
+        Object.assign(document.createElement('p'), { className: 'muted', textContent: 'Loading details…' })
+      );
+      const client = marketClientFor(listing.nftContract, listing.entry.network);
+      const sender = listing.entry.address;
+      const [summary, parents, deps, events] = await Promise.all([
+        marketSummaryFor(listing),
+        client.getParents(listing.tokenId, sender).catch(() => []),
+        client.getDependencies(listing.tokenId, sender).catch(() => []),
+        marketActivityFor(listing)
+      ]);
+
+      const frag = document.createDocumentFragment();
+
+      // metadata
+      const metaBlock = document.createElement('div');
+      metaBlock.className = 'market-detail__section';
+      metaBlock.append(Object.assign(document.createElement('strong'), { textContent: 'Metadata' }));
+      if (summary?.meta) {
+        metaBlock.append(
+          detailRow('Type', summary.meta.mimeType),
+          detailRow('Size', formatByteSize(summary.meta.totalSize)),
+          detailRow('Creator', shortPrincipal(summary.meta.creator ?? summary.meta.owner)),
+          detailRow('Owner', shortPrincipal(summary.owner ?? '—'))
+        );
+      } else {
+        metaBlock.append(detailRow('Metadata', 'unavailable'));
+      }
+      if (summary?.tokenUri) {
+        const uriLink = document.createElement('a');
+        if (isHttpUrl(summary.tokenUri)) {
+          uriLink.href = summary.tokenUri;
+          uriLink.target = '_blank';
+          uriLink.rel = 'noreferrer';
+        }
+        uriLink.textContent =
+          summary.tokenUri.length > 48 ? `${summary.tokenUri.slice(0, 48)}…` : summary.tokenUri;
+        metaBlock.append(detailRow('Token URI', uriLink));
+      }
+      frag.append(metaBlock);
+
+      // relationships
+      const relBlock = document.createElement('div');
+      relBlock.className = 'market-detail__section';
+      relBlock.append(Object.assign(document.createElement('strong'), { textContent: 'Relationships' }));
+      const relValue = (ids) => {
+        if (!ids?.length) return '—';
+        const wrap = document.createElement('span');
+        ids.slice(0, 8).forEach((id, index) => {
+          if (index) wrap.append(', ');
+          wrap.append(xplorerTokenLink(id));
+        });
+        if (ids.length > 8) wrap.append(` +${ids.length - 8} more`);
+        return wrap;
+      };
+      relBlock.append(
+        detailRow(`Parents (${parents?.length ?? 0})`, relValue(parents)),
+        detailRow(`Dependencies (${deps?.length ?? 0})`, relValue(deps))
+      );
+      frag.append(relBlock);
+
+      // price + listing
+      const priceBlock = document.createElement('div');
+      priceBlock.className = 'market-detail__section';
+      priceBlock.append(Object.assign(document.createElement('strong'), { textContent: 'Listing' }));
+      const symbol = getMarketSettlementLabel(listing.settlement);
+      priceBlock.append(
+        detailRow('Price', formatAssetAmount(listing.price, listing.settlement.decimals ?? 6, symbol)),
+        detailRow('Listing', `#${listing.listingId} on ${listing.entry.label}`),
+        detailRow('Seller', shortPrincipal(listing.seller))
+      );
+      if (listing.createdAt !== null) {
+        priceBlock.append(detailRow('Listed at block', listing.createdAt.toString()));
+      }
+      if (isSponsoredMarket(listing.entry) && listing.budgetRemaining !== null) {
+        priceBlock.append(
+          detailRow('Sponsorship', `no STX needed — fee budget ${formatAssetAmount(listing.budgetRemaining, 6, 'STX')} remaining`)
+        );
+      }
+      frag.append(priceBlock);
+
+      // trading history
+      const historyBlock = document.createElement('div');
+      historyBlock.className = 'market-detail__section';
+      historyBlock.append(Object.assign(document.createElement('strong'), { textContent: 'Trading history' }));
+      if (events.length) {
+        events
+          .slice(0, 12)
+          .forEach((event) => {
+            const what =
+              event.type === 'buy'
+                ? `Sold${event.price !== undefined ? ` for ${formatAssetAmount(event.price, listing.settlement.decimals ?? 6, symbol)}` : ''}`
+                : event.type === 'list'
+                  ? `Listed${event.price !== undefined ? ` at ${formatAssetAmount(event.price, listing.settlement.decimals ?? 6, symbol)}` : ''}`
+                  : event.type === 'cancel'
+                    ? 'Listing cancelled'
+                    : event.type;
+            const when = event.timestamp
+              ? new Date(event.timestamp).toLocaleDateString()
+              : event.blockHeight
+                ? `block ${event.blockHeight}`
+                : '';
+            historyBlock.append(detailRow(when || '—', what));
+          });
+      } else {
+        historyBlock.append(detailRow('History', 'No prior market activity for this inscription.'));
+      }
+      frag.append(historyBlock);
+
+      body.replaceChildren(frag);
+    };
+
     const renderMarketToolbar = () => {
       if (!marketDom.toolbar) return;
       const symbols = ['all', ...new Set(marketEntriesForNetwork().map((entry) =>
@@ -9905,6 +10186,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
     const renderMarketListings = () => {
       if (!marketDom.listings) return;
+      const run = marketState.run;
       const visible = marketState.listings.filter((listing) =>
         marketState.filter === 'all' ||
         getMarketSettlementLabel(listing.settlement) === marketState.filter
@@ -9922,33 +10204,69 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           const symbol = getMarketSettlementLabel(listing.settlement);
           const decimals = listing.settlement.decimals ?? 6;
           const sponsored = isSponsoredMarket(listing.entry);
-          card.innerHTML = `
-            <div class="market-card__badge-row">
-              <span class="badge">${symbol}</span>
-              ${sponsored ? '<span class="badge green">No STX needed</span>' : ''}
-            </div>
-            <div class="market-card__price"></div>
-            <div class="market-card__meta"></div>
-            <div class="market-card__actions"></div>`;
-          card.querySelector('.market-card__price').textContent =
-            formatAssetAmount(listing.price, decimals, symbol);
-          card.querySelector('.market-card__meta').textContent =
-            `Inscription #${listing.tokenId} · listing #${listing.listingId} · seller ${listing.seller.slice(0, 8)}…${listing.seller.slice(-4)}`;
-          const actions = card.querySelector('.market-card__actions');
-          const view = document.createElement('a');
-          view.className = 'market-chip';
-          view.href = `/xplorer?token=${listing.tokenId}`;
-          view.target = '_self';
-          view.textContent = 'View';
+
+          const thumb = document.createElement('a');
+          thumb.className = 'market-thumb';
+          thumb.href = `/xplorer?token=${listing.tokenId}`;
+          thumb.target = '_self';
+          thumb.dataset.marketThumb = `${listing.contractId}:${listing.listingId}`;
+          thumb.setAttribute('aria-label', `View inscription #${listing.tokenId}`);
+          thumb.append(
+            Object.assign(document.createElement('span'), {
+              className: 'market-thumb__label',
+              textContent: 'Loading…'
+            })
+          );
+
+          const badges = document.createElement('div');
+          badges.className = 'market-card__badge-row';
+          badges.innerHTML = `<span class="badge">${symbol}</span>${
+            sponsored ? '<span class="badge green">No STX needed</span>' : ''
+          }`;
+
+          const price = document.createElement('div');
+          price.className = 'market-card__price';
+          price.textContent = formatAssetAmount(listing.price, decimals, symbol);
+
+          const meta = document.createElement('div');
+          meta.className = 'market-card__meta';
+          meta.textContent = `Inscription #${listing.tokenId} · listing #${listing.listingId} · seller ${shortPrincipal(listing.seller)}`;
+
+          const details = document.createElement('details');
+          details.className = 'market-card__details';
+          const summaryEl = document.createElement('summary');
+          summaryEl.textContent = 'Details';
+          const body = document.createElement('div');
+          body.className = 'market-detail';
+          details.append(summaryEl, body);
+          details.addEventListener('toggle', () => {
+            if (details.open && !details.dataset.loaded) {
+              details.dataset.loaded = '1';
+              void loadMarketDetails(listing, body).catch(() => {
+                body.replaceChildren(
+                  Object.assign(document.createElement('p'), {
+                    className: 'muted',
+                    textContent: 'Details unavailable right now.'
+                  })
+                );
+              });
+            }
+          });
+
+          const actions = document.createElement('div');
+          actions.className = 'market-card__actions';
           const buy = document.createElement('button');
           buy.type = 'button';
           buy.className = 'market-chip';
           buy.textContent = sponsored ? 'Buy — no STX needed' : 'Buy';
           buy.addEventListener('click', () => { void marketBuy(listing); });
-          actions.append(view, buy);
+          actions.append(buy);
+
+          card.append(thumb, badges, price, meta, details, actions);
           return card;
         })
       );
+      void hydrateMarketThumbnails(run, visible);
     };
 
     const loadMarketPage = async () => {
@@ -9972,6 +10290,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         debugLog('market', 'load failed', { error: String(error?.message ?? error) });
       }
     };
+
 
     const switchToPage = async (page, params = null) => {
       const run = ++pageSwitchRun;

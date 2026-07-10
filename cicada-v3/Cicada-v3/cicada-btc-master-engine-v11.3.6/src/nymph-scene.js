@@ -232,8 +232,14 @@ export class NymphScene {
         const tunnels = this.tunnelPaths || [];
         const tunnelIdx = tunnels.length ? (index + Math.floor(r() * tunnels.length)) % tunnels.length : -1;
         const path = tunnelIdx >= 0 ? tunnels[tunnelIdx] : null;
-        // Start deep in the tunnel (higher index = deeper); it will work upward.
-        const ti = path ? Math.floor(rand(r, path.length * 0.55, path.length - 1)) : 0;
+        // Start deep in the tunnel; it will work upward. Depth is judged by the
+        // sampled point's actual y (curves are not monotonic), keeping spawns
+        // in the visible soil band below the surface.
+        let ti = 0;
+        if (path) {
+            const deep = path.map((p, i) => i).filter(i => i >= 4 && path[i].y >= 460 && path[i].y <= 940);
+            ti = deep.length ? deep[Math.floor(r() * deep.length)] : Math.floor(rand(r, path.length * 0.55, path.length - 1));
+        }
 
         const host = document.createElement('div');
         host.className = 'nymph-actor';
