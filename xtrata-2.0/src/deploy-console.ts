@@ -20,6 +20,11 @@ import { connectWallet, disconnectWallet, showContractCall, showContractDeploy }
 import { standardPrincipalCV } from '@stacks/transactions';
 import { toStacksNetwork } from './lib/network/stacks';
 import type { WalletSession } from './lib/wallet/types';
+// Contract sources are bundled at build time (?raw) — no dev-server fetch,
+// so the preflight always hashes exactly what is in the repo. (The previous
+// fetch('/contracts/…') could receive the SPA HTML fallback instead.)
+import sponsoredSbtcSource from '../contracts/live/xtrata-market-sponsored-sbtc-v1.0.clar?raw';
+import sponsoredUsdcxSource from '../contracts/live/xtrata-market-sponsored-usdcx-v1.0.clar?raw';
 
 const EXPECTED_DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const HIRO_API = 'https://api.hiro.so';
@@ -27,6 +32,8 @@ const HIRO_API = 'https://api.hiro.so';
 type Deployable = {
   name: string;
   source: string;
+  /** contract source bundled at build time */
+  code: string;
   notes: string;
   sponsoredMarket?: boolean;
   paymentToken?: string;
@@ -36,6 +43,7 @@ const DEPLOYABLE: Deployable[] = [
   {
     name: 'xtrata-market-sponsored-sbtc-v1-0',
     source: 'contracts/live/xtrata-market-sponsored-sbtc-v1.0.clar',
+    code: sponsoredSbtcSource,
     sponsoredMarket: true,
     paymentToken: 'SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token',
     notes: 'sBTC marketplace with seller-funded fee sponsorship (STX-free buys).'
@@ -43,6 +51,7 @@ const DEPLOYABLE: Deployable[] = [
   {
     name: 'xtrata-market-sponsored-usdcx-v1-0',
     source: 'contracts/live/xtrata-market-sponsored-usdcx-v1.0.clar',
+    code: sponsoredUsdcxSource,
     sponsoredMarket: true,
     paymentToken: 'SP120SBRBQJ00MCWS7TM5R8WJNTTKD5K0HFRC2CNE.usdcx',
     notes: 'USDCx marketplace with seller-funded fee sponsorship (STX-free buys).'
@@ -140,11 +149,10 @@ const loadContract = async (name: string) => {
   stateEntry.error = null;
   render();
   try {
-    const response = await fetch(`/${stateEntry.entry.source}`);
-    if (!response.ok) {
-      throw new Error(`could not fetch /${stateEntry.entry.source} (${response.status})`);
+    const code = stateEntry.entry.code;
+    if (!code || code.trimStart().startsWith('<')) {
+      throw new Error('bundled contract source is missing or invalid');
     }
-    const code = await response.text();
     stateEntry.source = code;
     stateEntry.preflight = await runPreflight(stateEntry.entry, code);
   } catch (error) {
