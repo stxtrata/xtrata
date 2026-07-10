@@ -133,3 +133,7 @@ Both sponsored markets CONFIRMED on mainnet and verified end-to-end:
 - Local sweep all green: 38 clarinet market tests (both sponsored + STX/sBTC/USDC v1.0), 17 relayer tests, 516 lib + 255 screens/components/functions/packages vitest, production build rc=0.
 
 Outstanding (human steps): relayer hot wallet + set-sponsor on both contracts, start relayer with SPONSOR_KEY/SPONSOR_MARKETS, live smoke (list → sponsored buy from STX-empty wallet → claim + dust refund). Note: registry `sponsorApi` currently points at the local relayer (127.0.0.1:8787) — update when the relayer gets a hosted URL.
+
+## Market thumbnails: full media coverage (2026-07-10, cont.)
+
+Every inscription type now renders on /market: HTML inscriptions and script-driven SVG animations mount as sandboxed live iframes (`sandbox="allow-scripts"`, `pointer-events: none`, srcdoc, capped by the grid's MAX_LIVE_HTML_FRAMES — the wallet-grid pattern); on-chain SVGs are sniffed — `<script` → live frame, otherwise blob `<img>` (SMIL/CSS animations play in img); other images ≤512 KB → blob img; videos ≤512 KB → muted looping autoplay `<video>`; fallbacks remain summary svgDataUri → token-URI image → mime placeholder. Live-frame count resets per re-render. Build rc=0, market suites green.

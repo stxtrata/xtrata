@@ -9784,6 +9784,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       filter: 'all',
       run: 0,
       listings: [],
+      liveFrames: 0, // sandboxed iframes currently mounted (shares the grid's cap)
       summaries: new Map(), // `${nftContract}:${tokenId}` -> TokenSummary|null
       media: new Map(), // same key -> { url, kind } | null
       activity: new Map(), // market contractId -> MarketIndexSnapshot events
@@ -9938,31 +9939,72 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       return summary;
     };
 
+    const MARKET_MEDIA_MAX_BYTES = 512n * 1024n;
+
+    const marketFetchContent = async (listing, meta) => {
+      const bytes = await fetchOnChainContent({
+        client: marketClientFor(listing.nftContract, listing.entry.network),
+        id: listing.tokenId,
+        senderAddress: listing.entry.address,
+        totalSize: meta.totalSize,
+        mimeType: meta.mimeType
+      });
+      return bytes;
+    };
+
+    // Resolve a listing's thumbnail media. Kinds:
+    //   image      → <img> (covers static + SMIL/CSS-animated SVG)
+    //   html-live  → sandboxed <iframe srcdoc> (HTML inscriptions and
+    //                script-driven SVG animations, per the wallet-grid pattern)
+    //   video      → muted looping <video>
     const marketMediaFor = async (listing) => {
       const key = marketTokenKey(listing);
       if (marketState.media.has(key)) return marketState.media.get(key);
       let media = null;
       try {
         const summary = await marketSummaryFor(listing);
-        if (summary?.svgDataUri) {
-          media = { url: summary.svgDataUri, kind: 'image' };
-        } else if (summary?.tokenUri) {
-          const uriImage = await fetchTokenImageFromUri(summary.tokenUri);
-          if (uriImage) media = { url: uriImage, kind: 'image' };
-        }
-        if (!media && summary?.meta) {
-          const kind = getMediaKind(summary.meta.mimeType);
-          if (kind === 'image' && summary.meta.totalSize > 0n && summary.meta.totalSize <= 512n * 1024n) {
-            const bytes = await fetchOnChainContent({
-              client: marketClientFor(listing.nftContract, listing.entry.network),
-              id: listing.tokenId,
-              senderAddress: listing.entry.address,
-              totalSize: summary.meta.totalSize,
-              mimeType: summary.meta.mimeType
-            });
-            const blob = new Blob([bytes], { type: summary.meta.mimeType });
-            media = { url: URL.createObjectURL(blob), kind: 'image' };
+        const meta = summary?.meta ?? null;
+        const mime = (meta?.mimeType ?? '').toLowerCase();
+        const kind = getMediaKind(mime);
+        const fetchable =
+          meta && meta.totalSize > 0n && meta.totalSize <= MARKET_MEDIA_MAX_BYTES;
+
+        if (kind === 'image' && fetchable && mime.includes('svg')) {
+          // On-chain SVG: script-driven animations need a real document.
+          const bytes = await marketFetchContent(listing, meta);
+          const text = new TextDecoder().decode(bytes);
+          if (/<script[\s>]/i.test(text)) {
+            media = { kind: 'html-live', html: text };
+          } else {
+            media = {
+              kind: 'image',
+              url: URL.createObjectURL(new Blob([bytes], { type: 'image/svg+xml' }))
+            };
           }
+        } else if (kind === 'image' && fetchable) {
+          const bytes = await marketFetchContent(listing, meta);
+          media = {
+            kind: 'image',
+            url: URL.createObjectURL(new Blob([bytes], { type: meta.mimeType }))
+          };
+        } else if (kind === 'html' && fetchable) {
+          const bytes = await marketFetchContent(listing, meta);
+          media = { kind: 'html-live', html: new TextDecoder().decode(bytes) };
+        } else if (kind === 'video' && fetchable) {
+          const bytes = await marketFetchContent(listing, meta);
+          media = {
+            kind: 'video',
+            url: URL.createObjectURL(new Blob([bytes], { type: meta.mimeType }))
+          };
+        }
+
+        // Fallbacks: inline SVG data URI from the summary, then token-URI image.
+        if (!media && summary?.svgDataUri) {
+          media = { kind: 'image', url: summary.svgDataUri };
+        }
+        if (!media && summary?.tokenUri) {
+          const uriImage = await fetchTokenImageFromUri(summary.tokenUri);
+          if (uriImage) media = { kind: 'image', url: uriImage };
         }
       } catch {
         media = null;
@@ -9980,7 +10022,28 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           `[data-market-thumb="${listing.contractId}:${listing.listingId}"]`
         );
         if (!slot) return;
-        if (media?.url) {
+        if (media?.kind === 'html-live' && marketState.liveFrames < MAX_LIVE_HTML_FRAMES) {
+          marketState.liveFrames += 1;
+          const frame = document.createElement('iframe');
+          frame.className = 'market-thumb__frame';
+          frame.title = `Inscription #${listing.tokenId} preview`;
+          frame.sandbox = 'allow-scripts';
+          frame.referrerPolicy = 'no-referrer';
+          frame.loading = 'lazy';
+          frame.setAttribute('scrolling', 'no');
+          frame.srcdoc = media.html;
+          slot.replaceChildren(frame);
+          slot.classList.add('market-thumb--media');
+        } else if (media?.kind === 'video' && media.url) {
+          const video = document.createElement('video');
+          video.src = media.url;
+          video.muted = true;
+          video.loop = true;
+          video.autoplay = true;
+          video.playsInline = true;
+          slot.replaceChildren(video);
+          slot.classList.add('market-thumb--media');
+        } else if (media?.url) {
           const img = document.createElement('img');
           img.src = media.url;
           img.alt = `Inscription #${listing.tokenId}`;
@@ -10197,6 +10260,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         return;
       }
       marketDom.status.innerHTML = `<span><strong>Market</strong> ${visible.length} live listing${visible.length === 1 ? '' : 's'}.</span>`;
+      marketState.liveFrames = 0; // cards re-render from scratch; recount frames
       marketDom.listings.replaceChildren(
         ...visible.map((listing) => {
           const card = document.createElement('article');
