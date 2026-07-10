@@ -61,7 +61,10 @@ function buildEnvironmentSVG(seed) {
 
     // Tunnels — curved bores carved through the soil, each lined with a soft
     // lit pathway so the colony reads as travelling along glowing channels.
+    // Each tunnel's curve is also sampled into a polyline the scene hands to
+    // its actors, so nymph routes genuinely follow the lit pathways.
     const tunnelCount = 3 + Math.floor(r() * 2);
+    const tunnelPaths = [];
     let tunnels = '', glow = '';
     for (let i = 0; i < tunnelCount; i++) {
         const startX = rand(r, 40, W - 40);
@@ -73,6 +76,16 @@ function buildEnvironmentSVG(seed) {
         glow += `<path d="${d}" fill="none" stroke="url(#tunnelGlow)" stroke-width="${rand(r, 46, 74).toFixed(0)}" stroke-linecap="round" opacity="${(0.16 + r() * 0.14).toFixed(2)}"/>`;
         tunnels += `<path d="${d}" fill="none" stroke="#0c0704" stroke-width="${rand(r, 26, 40).toFixed(0)}" stroke-linecap="round" opacity="0.55"/>`;
         tunnels += `<path d="${d}" fill="none" stroke="#3c2a16" stroke-width="${rand(r, 10, 18).toFixed(0)}" stroke-linecap="round" opacity="0.4"/>`;
+        // Sample the cubic bezier into a polyline (index 0 = top / surface end).
+        const pts = [];
+        for (let s = 0; s <= 24; s++) {
+            const t = s / 24, u = 1 - t;
+            pts.push({
+                x: u * u * u * startX + 3 * u * u * t * c1x + 3 * u * t * t * c2x + t * t * t * endX,
+                y: u * u * u * topY + 3 * u * u * t * c1y + 3 * u * t * t * c2y + t * t * t * endY
+            });
+        }
+        tunnelPaths.push(pts);
     }
     parts.push(`<g>${tunnels}</g>`);
 
@@ -118,8 +131,8 @@ function buildEnvironmentSVG(seed) {
     // Soft light pools drawn last, over the pathways.
     parts.push(`<g>${glow}</g>`);
 
-    return `
-        <svg class="nymph-scene-env" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    const markup = `
+        <svg class="nymph-scene-env" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
             <defs>
                 <radialGradient id="tunnelGlow" cx="50%" cy="50%" r="50%">
                     <stop offset="0%" stop-color="#c9a25a" stop-opacity="0.9"/>
@@ -134,6 +147,7 @@ function buildEnvironmentSVG(seed) {
             </defs>
             ${parts.join('\n')}
         </svg>`;
+    return { markup, tunnelPaths };
 }
 
 export class NymphScene {
@@ -149,7 +163,9 @@ export class NymphScene {
 
         this.layer = document.createElement('div');
         this.layer.className = 'nymph-scene';
-        this.layer.innerHTML = buildEnvironmentSVG(seed);
+        const env = buildEnvironmentSVG(seed);
+        this.layer.innerHTML = env.markup;
+        this.tunnelPaths = env.tunnelPaths;
 
         this.disturb = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         this.disturb.setAttribute('class', 'nymph-scene-disturb');
@@ -197,23 +213,35 @@ export class NymphScene {
         return { x: (cx / lr.width) * 1000, y: (cy / lr.height) * 1000 };
     }
 
+    // Place an actor's host so its body centre sits on a tunnel point
+    // (scene 0..1000 space maps directly to layer percentages).
+    _placeActorAt(actor, point) {
+        actor.host.style.left = `${(point.x / 10).toFixed(1)}%`;
+        actor.host.style.top = `${(point.y / 10).toFixed(1)}%`;
+        actor.host.style.zIndex = String(3 + Math.max(0, Math.floor(point.y / 100)));
+    }
+
     _spawnActor(index) {
         if (this.destroyed) return;
         const r = mulberry32((this.seed * 2654435761 + index * 40503 + this._respawns(index)) >>> 0);
-        // Distribute regions across the scene; keep them below the surface band.
-        // (In the builder the upper stage is overlaid by the controls panel, so
-        // patrol regions start lower; the export/standalone stage is unobscured.)
-        const leftPct = rand(r, 8, 80);
-        const topPct = rand(r, 48, 72);
         const sizePx = rand(r, 150, 240);
+
+        // Route selection: each actor adopts one of the scene's tunnels and a
+        // starting depth along it. Spread actors across tunnels round-robin so
+        // every lit pathway carries traffic.
+        const tunnels = this.tunnelPaths || [];
+        const tunnelIdx = tunnels.length ? (index + Math.floor(r() * tunnels.length)) % tunnels.length : -1;
+        const path = tunnelIdx >= 0 ? tunnels[tunnelIdx] : null;
+        // Start deep in the tunnel (higher index = deeper); it will work upward.
+        const ti = path ? Math.floor(rand(r, path.length * 0.55, path.length - 1)) : 0;
 
         const host = document.createElement('div');
         host.className = 'nymph-actor';
-        host.style.left = `${leftPct.toFixed(1)}%`;
-        host.style.top = `${topPct.toFixed(1)}%`;
         host.style.width = `${sizePx.toFixed(0)}px`;
         host.style.height = `${(sizePx * 1.3).toFixed(0)}px`;
-        host.style.zIndex = String(3 + Math.floor(topPct / 10));
+        // Centre the host on its tunnel point.
+        host.style.marginLeft = `${(-sizePx / 2).toFixed(0)}px`;
+        host.style.marginTop = `${(-sizePx * 0.65).toFixed(0)}px`;
         this.layer.appendChild(host);
 
         // One shared character design; independent per-instance seed for its
@@ -224,8 +252,9 @@ export class NymphScene {
             instructions: { seed: nymphSeed, unit: '%', size: 96, idleWander: false, rarityTier: 'common' }
         });
 
-        const actor = { index, host, nymph, rng: r, done: false, emerging: false };
+        const actor = { index, host, nymph, rng: r, done: false, emerging: false, path, ti };
         this.actors.push(actor);
+        this._placeActorAt(actor, path ? path[ti] : { x: rand(r, 100, 900), y: rand(r, 480, 720) });
 
         if (this._reduced) {
             // Static placement only; still fully legible.
@@ -241,26 +270,37 @@ export class NymphScene {
         return (this._respawnCounts[index] || 0) * 7919;
     }
 
-    // Build and walk an independent multi-waypoint route, with per-leg pauses
-    // and speed variation, then emerge at the top boundary.
+    // Walk an independent route along the actor's chosen tunnel: each leg
+    // advances a few samples along the pathway (mostly upward, with occasional
+    // backtracks), while the nymph's local gait supplies articulation, turning
+    // and pauses. After the timed budget it emerges at the tunnel's top end.
     async _runRoute(actor) {
         if (this.destroyed || actor.done) return;
         const r = actor.rng;
         const nymph = actor.nymph;
-        nymph.setWanderPos(rand(r, -120, 120), rand(r, -90, 90), rand(r, -40, 40));
+        nymph.setWanderPos(rand(r, -30, 30), rand(r, -20, 20), rand(r, -40, 40));
 
-        const legs = 3 + Math.floor(r() * 4);
         const budgetMs = rand(r, 16000, 34000);
         const started = performance.now();
 
         try {
-            for (let i = 0; i < legs; i++) {
-                if (this.destroyed || actor.done) return;
+            while (!this.destroyed && !actor.done) {
                 if (performance.now() - started > budgetMs) break;
-                const tx = rand(r, -150, 150);
-                const ty = rand(r, -110, 110);
-                await nymph.walkTo(tx, ty, {
-                    speed: rand(r, 0.018, 0.045),
+                const path = actor.path;
+                if (!path) break;
+                // Route step: usually climb 1-3 samples toward the surface,
+                // occasionally wander back down a sample.
+                const step = r() < 0.22 ? 1 : -(1 + Math.floor(r() * 3));
+                const nextTi = Math.max(2, Math.min(path.length - 1, actor.ti + step));
+                const from = path[actor.ti], to = path[nextTi];
+                actor.ti = nextTi;
+                this._placeActorAt(actor, to);
+                // Local gait leg in the direction of travel keeps legs, turning
+                // and body bob coherent with the host's glide along the tunnel.
+                const dx = to.x - from.x, dy = to.y - from.y;
+                const mag = Math.hypot(dx, dy) || 1;
+                await nymph.walkTo((dx / mag) * rand(r, 24, 44), (dy / mag) * rand(r, 18, 34), {
+                    speed: rand(r, 0.018, 0.04),
                     tilt: rand(r, 1.6, 4.2),
                     bob: rand(r, 1.1, 2.4),
                     onStep: () => {
@@ -291,12 +331,17 @@ export class NymphScene {
         } catch (_) {}
         if (this.destroyed) return;
 
-        // Drift the actor up to the surface band as it prepares to emerge.
+        // Drift the actor up its tunnel toward the surface band. A modest climb
+        // keeps the freshly emerged adult visible in the scene; the lift-off
+        // translate then carries it up and out of frame.
         actor.host.classList.add('is-emerging');
-        const curTop = parseFloat(actor.host.style.top) || 40;
-        // A modest climb keeps the freshly emerged adult visible in the scene
-        // band; the lift-off translate then carries it up and out of frame.
-        actor.host.style.top = `${Math.max(8, curTop - rand(r, 6, 14)).toFixed(1)}%`;
+        if (actor.path) {
+            const top = actor.path[Math.min(4, actor.path.length - 1)];
+            this._placeActorAt(actor, { x: top.x, y: Math.max(80, top.y - rand(r, 0, 40)) });
+        } else {
+            const curTop = parseFloat(actor.host.style.top) || 40;
+            actor.host.style.top = `${Math.max(8, curTop - rand(r, 6, 14)).toFixed(1)}%`;
+        }
 
         // Swap the nymph for the adult — the next visual state already supported
         // by the engine — then let it take flight and leave the scene upward.

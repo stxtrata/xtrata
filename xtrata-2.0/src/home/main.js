@@ -9,7 +9,8 @@
       PostConditionMode,
       principalCV,
       stringAsciiCV,
-      uintCV
+      uintCV,
+      contractPrincipalCV
     } from '@stacks/transactions';
     import { createStacksWalletAdapter } from '/src/lib/wallet/adapter.ts';
     import {
@@ -43,6 +44,13 @@
       getLegacyContract
     } from '/src/lib/contract/registry.ts';
     import { getContractId } from '/src/lib/contract/config.ts';
+    import { MARKET_REGISTRY, getMarketContractId } from '/src/lib/market/registry.ts';
+    import {
+      getMarketSettlementAsset,
+      getMarketSettlementLabel,
+      buildMarketBuyPostConditions
+    } from '/src/lib/market/settlement.ts';
+    import { isSponsoredMarket } from '/src/lib/market/sponsored.ts';
     import {
       buildTransferCall,
       createXtrataClient
@@ -215,7 +223,8 @@
       home: 'Xtrata - Permanent Media Records',
       inscribe: 'Inscribe — Xtrata',
       xplorer: 'Xtrata Xplorer',
-      'my-wallet': 'My Wallet — Xtrata'
+      'my-wallet': 'My Wallet — Xtrata',
+      market: 'Market — Xtrata'
     };
 
     // Set once the prepare handler exists; lets setSelectedFile auto-prepare a
@@ -9760,6 +9769,210 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // just swap the page mode and run that page's loads — no reload, and the
     // radio, wallet session and caches all survive the switch.
     let pageSwitchRun = 0;
+
+    // ------------------------------------------------------------------
+    // Market page: multi-asset inscription marketplace (homepage-native).
+    // Reads listings straight from the market contracts via read-only calls
+    // and buys through the same wallet path the inscribe flow uses. Reuses
+    // src/lib/market for registry, settlement assets, and post-conditions.
+    // ------------------------------------------------------------------
+    const MARKET_LISTINGS_PER_CONTRACT = 24;
+    const marketState = { filter: 'all', run: 0, listings: [] };
+    const marketDom = {
+      toolbar: $('marketToolbar'),
+      status: $('marketStatus'),
+      listings: $('marketListings'),
+      badge: $('marketNetworkBadge')
+    };
+
+    const marketEntriesForNetwork = () =>
+      MARKET_REGISTRY.filter((entry) => entry.network === state.contract.network);
+
+    const formatAssetAmount = (amount, decimals, symbol) => {
+      const base = 10n ** BigInt(decimals);
+      const whole = amount / base;
+      const frac = (amount % base).toString().padStart(decimals, '0').replace(/0+$/, '');
+      return `${whole.toString()}${frac ? '.' + frac : ''} ${symbol}`;
+    };
+
+    const readMarketListings = async (entry) => {
+      const contractId = getMarketContractId(entry);
+      const settlement = getMarketSettlementAsset(entry.paymentTokenContractId ?? null);
+      const lastJson = await callReadOnlyJson({
+        contractId,
+        functionName: 'get-last-listing-id',
+        network: entry.network
+      });
+      const lastId = BigInt(lastJson?.value?.value ?? 0);
+      const results = [];
+      const from = lastId;
+      const floor = lastId > BigInt(MARKET_LISTINGS_PER_CONTRACT) ? lastId - BigInt(MARKET_LISTINGS_PER_CONTRACT) : 0n;
+      for (let id = from; id >= floor; id -= 1n) {
+        try {
+          const json = await callReadOnlyJson({
+            contractId,
+            functionName: 'get-listing',
+            args: [uintCV(id)],
+            network: entry.network
+          });
+          const tuple = unwrapBindingTuple(json);
+          if (!tuple) continue;
+          const soldAt = tuple['sold-at']?.value ?? null;
+          if (soldAt !== null && soldAt !== undefined) continue; // sponsored: sold, awaiting settle
+          results.push({
+            entry,
+            contractId,
+            settlement,
+            listingId: id,
+            seller: String(tuple.seller.value),
+            nftContract: String(tuple['nft-contract'].value),
+            tokenId: BigInt(tuple['token-id'].value),
+            price: BigInt(tuple.price.value),
+            budgetRemaining: tuple['budget-remaining'] ? BigInt(tuple['budget-remaining'].value) : null
+          });
+        } catch {
+          // sparse ids / deleted listings: skip
+        }
+        if (id === 0n) break;
+      }
+      return results;
+    };
+
+    const marketBuy = async (listing) => {
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        marketDom.status.innerHTML = '<span><strong>Market</strong> connect a wallet to buy.</span>';
+        return;
+      }
+      const [nftAddress, nftName] = listing.nftContract.split('.');
+      const postConditions = buildMarketBuyPostConditions({
+        settlement: listing.settlement,
+        buyerAddress: state.walletSession.address,
+        amount: listing.price,
+        nftContract: { address: nftAddress, contractName: nftName, network: listing.entry.network },
+        senderContract: {
+          address: listing.entry.address,
+          contractName: listing.entry.contractName,
+          network: listing.entry.network
+        },
+        tokenId: listing.tokenId
+      });
+      if (!postConditions) {
+        marketDom.status.innerHTML = '<span><strong>Market</strong> unsupported payment token for this listing.</span>';
+        return;
+      }
+      marketDom.status.innerHTML = '<span><strong>Market</strong> confirm the purchase in your wallet…</span>';
+      showContractCall({
+        contractAddress: listing.entry.address,
+        contractName: listing.entry.contractName,
+        functionName: 'buy',
+        functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(listing.listingId)],
+        network: listing.entry.network,
+        stxAddress: state.walletSession.address,
+        postConditionMode: PostConditionMode.Deny,
+        postConditions,
+        onFinish: (payload) => {
+          const txId = payload?.txId ?? payload?.txid ?? '';
+          marketDom.status.innerHTML = `<span><strong>Market</strong> purchase submitted${txId ? ` — tx ${txId}` : ''}.</span><span class="badge green">sent</span>`;
+        },
+        onCancel: () => {
+          marketDom.status.innerHTML = '<span><strong>Market</strong> purchase cancelled.</span>';
+        }
+      });
+    };
+
+    const renderMarketToolbar = () => {
+      if (!marketDom.toolbar) return;
+      const symbols = ['all', ...new Set(marketEntriesForNetwork().map((entry) =>
+        getMarketSettlementLabel(getMarketSettlementAsset(entry.paymentTokenContractId ?? null))
+      ))];
+      marketDom.toolbar.replaceChildren(
+        ...symbols.map((symbol) => {
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'market-chip';
+          chip.setAttribute('role', 'tab');
+          chip.setAttribute('aria-selected', String(marketState.filter === symbol));
+          chip.textContent = symbol === 'all' ? 'All assets' : symbol;
+          chip.addEventListener('click', () => {
+            marketState.filter = symbol;
+            renderMarketToolbar();
+            renderMarketListings();
+          });
+          return chip;
+        })
+      );
+    };
+
+    const renderMarketListings = () => {
+      if (!marketDom.listings) return;
+      const visible = marketState.listings.filter((listing) =>
+        marketState.filter === 'all' ||
+        getMarketSettlementLabel(listing.settlement) === marketState.filter
+      );
+      if (!visible.length) {
+        marketDom.listings.replaceChildren();
+        marketDom.status.innerHTML = '<span><strong>Market</strong> no live listings right now — list one from My Wallet.</span>';
+        return;
+      }
+      marketDom.status.innerHTML = `<span><strong>Market</strong> ${visible.length} live listing${visible.length === 1 ? '' : 's'}.</span>`;
+      marketDom.listings.replaceChildren(
+        ...visible.map((listing) => {
+          const card = document.createElement('article');
+          card.className = 'market-card';
+          const symbol = getMarketSettlementLabel(listing.settlement);
+          const decimals = listing.settlement.decimals ?? 6;
+          const sponsored = isSponsoredMarket(listing.entry);
+          card.innerHTML = `
+            <div class="market-card__badge-row">
+              <span class="badge">${symbol}</span>
+              ${sponsored ? '<span class="badge green">No STX needed</span>' : ''}
+            </div>
+            <div class="market-card__price"></div>
+            <div class="market-card__meta"></div>
+            <div class="market-card__actions"></div>`;
+          card.querySelector('.market-card__price').textContent =
+            formatAssetAmount(listing.price, decimals, symbol);
+          card.querySelector('.market-card__meta').textContent =
+            `Inscription #${listing.tokenId} · listing #${listing.listingId} · seller ${listing.seller.slice(0, 8)}…${listing.seller.slice(-4)}`;
+          const actions = card.querySelector('.market-card__actions');
+          const view = document.createElement('a');
+          view.className = 'market-chip';
+          view.href = `/xplorer?token=${listing.tokenId}`;
+          view.target = '_self';
+          view.textContent = 'View';
+          const buy = document.createElement('button');
+          buy.type = 'button';
+          buy.className = 'market-chip';
+          buy.textContent = sponsored ? 'Buy — no STX needed' : 'Buy';
+          buy.addEventListener('click', () => { void marketBuy(listing); });
+          actions.append(view, buy);
+          return card;
+        })
+      );
+    };
+
+    const loadMarketPage = async () => {
+      const run = ++marketState.run;
+      if (!marketDom.listings) return;
+      if (marketDom.badge) marketDom.badge.textContent = state.contract.network;
+      renderMarketToolbar();
+      marketDom.status.innerHTML = '<span><strong>Market</strong> loading listings…</span>';
+      try {
+        const perContract = await Promise.all(
+          marketEntriesForNetwork().map((entry) => readMarketListings(entry).catch(() => []))
+        );
+        if (run !== marketState.run) return;
+        marketState.listings = perContract
+          .flat()
+          .sort((a, b) => (b.listingId > a.listingId ? 1 : -1));
+        renderMarketListings();
+      } catch (error) {
+        if (run !== marketState.run) return;
+        marketDom.status.innerHTML = '<span><strong>Market</strong> could not load listings.</span>';
+        debugLog('market', 'load failed', { error: String(error?.message ?? error) });
+      }
+    };
+
     const switchToPage = async (page, params = null) => {
       const run = ++pageSwitchRun;
       PAGE_MODE = page;
@@ -9794,6 +10007,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       if (page === 'my-wallet') {
         await openMyWalletDefaultView();
       }
+      if (page === 'market') {
+        await loadMarketPage();
+      }
       if (run === pageSwitchRun) {
         updateControls();
       }
@@ -9806,6 +10022,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
       if (seg === 'my-wallet' || seg === 'wallet') {
         return 'my-wallet';
+      }
+      if (seg === 'market') {
+        return 'market';
       }
       if (
         seg === 'xplorer' ||
@@ -9865,6 +10084,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         const openedPublicView = await openPublicViewFromParams(pageParams);
         if (openedPublicView) {
           // handled above
+        } else if (PAGE_MODE === 'market') {
+          await loadMarketPage();
         } else if (
           PAGE_MODE === 'my-wallet' &&
           walletViewRequestId === state.walletViewRequestId &&

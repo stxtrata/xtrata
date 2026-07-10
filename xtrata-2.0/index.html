@@ -35,12 +35,15 @@
         page = 'my-wallet';
       } else if (seg === 'xplorer' || seg === 'x' || explorerQuery || publicView) {
         page = 'xplorer';
+      } else if (seg === 'market') {
+        page = 'market';
       }
       document.documentElement.dataset.page = page;
       const titles = {
         inscribe: 'Inscribe — Xtrata',
         'my-wallet': 'My Wallet — Xtrata',
-        xplorer: 'Xtrata Xplorer'
+        xplorer: 'Xtrata Xplorer',
+        market: 'Market — Xtrata'
       };
       if (titles[page]) {
         document.title = titles[page];
@@ -79,6 +82,7 @@
       <a href="/inscribe" data-nav="inscribe" target="_self">Inscribe</a>
       <a href="/xplorer" data-nav="xplorer" target="_self">Xplorer</a>
       <a href="/my-wallet" data-nav="my-wallet" target="_self">My Wallet</a>
+      <a href="/market" data-nav="market" target="_self">Market</a>
       <a href="/wizard/" data-nav="wizard" target="_self">Inscription Wizard</a>
       <div class="radio-slot" id="radioSlot" aria-label="Xtrata FM radio"></div>
     </nav>
@@ -186,6 +190,12 @@
         <strong class="page-card__title">My Wallet</strong>
         <p class="page-card__copy">Your inscriptions in one grid — view, send, and look up any wallet or .btc name.</p>
         <span class="page-card__cta">Open My Wallet →</span>
+      </a>
+      <a class="page-card" href="/market" target="_self">
+        <span class="page-card__kicker">Trade</span>
+        <strong class="page-card__title">Market</strong>
+        <p class="page-card__copy">Buy and sell inscriptions for STX, sBTC, or USDCx — with STX-free checkout on sponsored listings.</p>
+        <span class="page-card__cta">Open the Market →</span>
       </a>
     </section>
 
@@ -654,6 +664,27 @@
               </div>
             </aside>
           </div>
+        </div>
+      </section>
+      <!-- Market page: multi-asset inscription marketplace (data-page router). -->
+      <section class="panel panel-market" aria-labelledby="marketTitle">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title-row">
+              <h1 class="panel-title" id="marketTitle">Market</h1>
+            </div>
+            <p class="panel-subtitle">Buy and sell inscriptions for STX, sBTC, or USDCx.</p>
+          </div>
+          <span class="badge" id="marketNetworkBadge">mainnet</span>
+        </div>
+        <div class="panel-body">
+          <div class="market-toolbar" id="marketToolbar" role="tablist" aria-label="Payment asset"></div>
+          <div class="status" id="marketStatus"><span>Loading listings…</span></div>
+          <div class="market-listings" id="marketListings"></div>
+          <p class="field-hint" id="marketFootnote">
+            Listings settle through the Xtrata market contracts. Sponsored listings can be
+            bought with zero STX — the seller has prepaid the network fee.
+          </p>
         </div>
       </section>
     </main>
