@@ -122,3 +122,14 @@ Answer to "deploy without the 24 words": instead of pinning Clarity 3 (which req
 ## Sponsored markets DEPLOYED to mainnet (2026-07-10)
 
 Both Clarity 4 sponsored market contracts signed in the admin wallet via the deploy console and broadcast: `SP3J…743X.xtrata-market-sponsored-sbtc-v1-0` and `…-usdcx-v1-0`. Registry entries added to `src/data/market-registry.json` (appended after the existing markets so the STX default is unchanged; `sponsored: true`, `sponsorApi` pointing at the local agent-one relayer) — the sponsored deposit field and "no STX needed" buy UI activate from the registry alone. Remaining go-live: confirm both deploys show success + Clarity 4 on the explorer, create + fund a fresh relayer hot wallet, set-sponsor on both contracts (deploy console post-deploy step), start the relayer with SPONSOR_KEY/SPONSOR_MARKETS, end-to-end smoke.
+
+## Post-deploy verification (2026-07-10)
+
+Both sponsored markets CONFIRMED on mainnet and verified end-to-end:
+- sBTC: tx 0xada656…a09c, block 8522301, canonical, **Clarity 4**, epoch 3.4.
+- USDCx: tx 0xa86a83…f1e4, block 8522307, canonical, **Clarity 4**, epoch 3.4.
+- Source integrity: on-chain `source_code` matches the repo live variants; local sha256 (401dbeb9…/d0f4cea5…) identical to the hashes shown in the deploy console before signing — repo bytes = signed bytes = chain bytes.
+- ABI checked: full function set (list-token/buy/cancel/claim-fee/settle-refund + admin + read-onlys), correct Listings tuple incl. budget fields; payment principals point at live sBTC/USDCx; ALLOWED-NFT-CONTRACT at SP3J…743X.xtrata-v2-1-0; sponsor data-var defaults to deployer until set-sponsor.
+- Local sweep all green: 38 clarinet market tests (both sponsored + STX/sBTC/USDC v1.0), 17 relayer tests, 516 lib + 255 screens/components/functions/packages vitest, production build rc=0.
+
+Outstanding (human steps): relayer hot wallet + set-sponsor on both contracts, start relayer with SPONSOR_KEY/SPONSOR_MARKETS, live smoke (list → sponsored buy from STX-empty wallet → claim + dust refund). Note: registry `sponsorApi` currently points at the local relayer (127.0.0.1:8787) — update when the relayer gets a hosted URL.
