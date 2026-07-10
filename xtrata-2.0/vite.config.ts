@@ -61,7 +61,8 @@ export default defineConfig(({ mode }) => {
           workspace: resolve(process.cwd(), 'workspace.html'),
           lab26: resolve(process.cwd(), 'lab26/index.html'),
           migrate: resolve(process.cwd(), 'web/migrate.html'),
-          'deploy-console': resolve(process.cwd(), 'web/deploy-console.html')
+          'deploy-console': resolve(process.cwd(), 'web/deploy-console.html'),
+          'sponsor-ops': resolve(process.cwd(), 'web/sponsor-ops.html')
         },
         output: {
           manualChunks: {
