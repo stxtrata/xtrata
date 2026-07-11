@@ -19,6 +19,10 @@
 /inscribe/ / 200
 /my-wallet / 200
 /my-wallet/ / 200
+/market / 200
+/market/ / 200
+/drops / 200
+/drops/ / 200
 /wallet /my-wallet 301
 /wallet/ /my-wallet 301
 /workspace/* /workspace 200

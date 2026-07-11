@@ -11278,6 +11278,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           // handled above
         } else if (PAGE_MODE === 'market') {
           await loadMarketPage(pageParams);
+        } else if (PAGE_MODE === 'drops') {
+          await loadDropsPage();
         } else if (
           PAGE_MODE === 'my-wallet' &&
           walletViewRequestId === state.walletViewRequestId &&
