@@ -198,6 +198,10 @@ const deployContract = (name: string) => {
     contractName: stateEntry.entry.name,
     codeBody: stateEntry.source,
     clarityVersion: 4,
+    // 0.49 STX, deliberately under Xverse's 0.5 fee-editor cap: if the deploy
+    // sticks in the mempool, a 0.5 STX replacement at the same nonce can still
+    // outbid it from the wallet (RBF requires a strictly higher fee).
+    fee: 490_000n,
     appDetails,
     network: toStacksNetwork('mainnet'),
     stxAddress: session.address,
