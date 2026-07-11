@@ -4,9 +4,24 @@ export type MarketListing = {
   tokenId: bigint;
   price: bigint;
   createdAt: bigint;
+  /** sponsored markets only — STX fee budget escrowed at list time */
+  feeBudget?: bigint;
+  /** sponsored markets only — unclaimed budget still in escrow */
+  budgetRemaining?: bigint;
+  /** sponsored markets only — cumulative sponsor reimbursement */
+  claimed?: bigint;
+  /** sponsored markets only — buyer once sold */
+  buyer?: string | null;
+  /** sponsored markets only — block height of the sale (null while live) */
+  soldAt?: bigint | null;
 };
 
-export type MarketActivityType = 'list' | 'buy' | 'cancel';
+export type MarketActivityType =
+  | 'list'
+  | 'buy'
+  | 'cancel'
+  | 'claim-fee'
+  | 'settle-refund';
 
 export type MarketActivityEvent = {
   id: string;
@@ -22,6 +37,14 @@ export type MarketActivityEvent = {
   blockHeight?: number;
   eventIndex?: number;
   timestamp?: string;
+  /** sponsored markets: seller's escrowed fee budget at list time */
+  feeBudget?: bigint;
+  /** sponsored markets: budget remaining after a claim, or refunded at settle */
+  budgetRemaining?: bigint;
+  /** sponsored markets: µSTX reimbursed to the sponsor */
+  claimAmount?: bigint;
+  /** sponsored markets: µSTX dust returned to the seller */
+  refunded?: bigint;
 };
 
 export type MarketIndexSnapshot = {
