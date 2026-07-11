@@ -4099,6 +4099,28 @@
       grid-column: 1 / -1;
     }
 
+    .market-mine {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 12px;
+    }
+
+    .market-mine__row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 8px;
+    }
+
+    .market-mine__row:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+
     .market-toolbar {
       display: flex;
       flex-wrap: wrap;
