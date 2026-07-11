@@ -10665,6 +10665,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const response = await fetch('/market/listings');
       if (!response.ok) throw new Error(`cache endpoint ${response.status}`);
       const payload = await response.json();
+      // Never trust an empty or degraded cache answer: a transient upstream
+      // failure server-side must not render as "no listings" when listings
+      // exist on-chain. Throwing here falls back to direct reads.
+      if (payload.degraded === true || !(payload.listings ?? []).length) {
+        throw new Error('cache empty or degraded - verifying with direct reads');
+      }
       const byId = new Map(
         marketEntriesForNetwork().map((entry) => [getMarketContractId(entry), entry])
       );
