@@ -51,8 +51,14 @@ const DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const DEFAULT_MARKETS = [
   `${DEPLOYER}.xtrata-market-sponsored-stx-v1-1`,
   `${DEPLOYER}.xtrata-market-sponsored-sbtc-v1-1`,
-  `${DEPLOYER}.xtrata-market-sponsored-usdcx-v1-1`
+  `${DEPLOYER}.xtrata-market-sponsored-usdcx-v1-1`,
+  `${DEPLOYER}.xtrata-drops-v1-0`
 ];
+
+// Buyer-facing function the relayer will sponsor per contract type.
+// Drops contracts expose `claim` (free claim); markets expose `buy`.
+const sponsoredFunction = (contractId: string) =>
+  /\.xtrata-drops-/.test(contractId) ? 'claim' : 'buy';
 const FEE_MULTIPLIER = 3n;
 const MIN_BUDGET_USTX = 50_000n;
 const MAX_FEE_USTX = 2_000_000n;
@@ -174,7 +180,7 @@ const VALIDATION = {
   NONZERO_FEE: 'origin fee must be 0',
   NOT_CONTRACT_CALL: 'payload must be a contract call',
   CONTRACT_NOT_ALLOWED: 'contract not allowlisted',
-  FUNCTION_NOT_ALLOWED: 'function must be buy',
+  FUNCTION_NOT_ALLOWED: 'function must be buy (markets) or claim (drops)',
   NO_POST_CONDITIONS: 'buyer post-conditions required',
   PC_MODE: 'post-condition mode must be deny'
 };
@@ -196,7 +202,9 @@ const validatePayload = (txHex: string, markets: string[]) => {
   };
   const contractId = `${addressToString(payload.contractAddress)}.${payload.contractName.content}`;
   if (!markets.includes(contractId)) return { error: 'CONTRACT_NOT_ALLOWED' as const };
-  if (payload.functionName.content !== 'buy') return { error: 'FUNCTION_NOT_ALLOWED' as const };
+  if (payload.functionName.content !== sponsoredFunction(contractId)) {
+    return { error: 'FUNCTION_NOT_ALLOWED' as const };
+  }
   const pcs = (tx as unknown as { postConditions?: { values?: unknown[] } }).postConditions;
   if (!pcs?.values?.length) return { error: 'NO_POST_CONDITIONS' as const };
   if ((tx as unknown as { postConditionMode: PostConditionMode }).postConditionMode !== PostConditionMode.Deny) {

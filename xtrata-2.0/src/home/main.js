@@ -45,6 +45,7 @@
     } from '/src/lib/contract/registry.ts';
     import { getContractId } from '/src/lib/contract/config.ts';
     import { MARKET_REGISTRY, getMarketContractId } from '/src/lib/market/registry.ts';
+    import DROPS_REGISTRY from '/src/data/drops-registry.json';
     import {
       getMarketSettlementAsset,
       getMarketSettlementLabel,
@@ -225,7 +226,8 @@
       inscribe: 'Inscribe — Xtrata',
       xplorer: 'Xtrata Xplorer',
       'my-wallet': 'My Wallet — Xtrata',
-      market: 'Market — Xtrata'
+      market: 'Market — Xtrata',
+      drops: 'Drops — Claim free inscriptions — Xtrata'
     };
 
     // Set once the prepare handler exists; lets setSelectedFile auto-prepare a
@@ -10723,6 +10725,399 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     };
 
 
+    // --- Drops: sponsored free claims (data-page 'drops') -------------------
+    // Reuses the market module's thumbnail/media caches and card styling; the
+    // drops contract exposes market-shaped read-onlys, so reads look identical.
+    const dropsState = { run: 0, drops: [] };
+    const dropsDom = {
+      status: $('dropsStatus'),
+      listings: $('dropsListings'),
+      badge: $('dropsNetworkBadge'),
+      create: $('dropsCreate'),
+      createTokenId: $('dropsCreateTokenId'),
+      createGroup: $('dropsCreateGroup'),
+      createDeposit: $('dropsCreateDeposit'),
+      createButton: $('dropsCreateButton'),
+      createStatus: $('dropsCreateStatus')
+    };
+    const dropsEntriesForNetwork = () =>
+      DROPS_REGISTRY.filter((entry) => entry.network === state.contract.network);
+    const dropsStxSettlement = () => getMarketSettlementAsset(null);
+    let dropsQuote = null; // deposit quote from the relayer (ustx)
+
+    const readDrops = async (entry) => {
+      const contractId = `${entry.address}.${entry.contractName}`;
+      const lastJson = await callReadOnlyJson({
+        contractId,
+        functionName: 'get-last-drop-id',
+        network: entry.network
+      });
+      const lastId = BigInt(lastJson?.value?.value ?? 0);
+      const results = [];
+      const floor = lastId > BigInt(MARKET_LISTINGS_PER_CONTRACT)
+        ? lastId - BigInt(MARKET_LISTINGS_PER_CONTRACT)
+        : 0n;
+      for (let id = lastId; id >= floor; id -= 1n) {
+        try {
+          const json = await callReadOnlyJson({
+            contractId,
+            functionName: 'get-drop',
+            args: [uintCV(id)],
+            network: entry.network
+          });
+          const tuple = unwrapBindingTuple(json);
+          if (!tuple) continue;
+          const claimedRaw = tuple['claimed-at']?.value ?? null;
+          results.push({
+            entry,
+            contractId,
+            dropId: id,
+            // market-compatible keys so marketMediaFor/thumbnail caches work
+            listingId: id,
+            creator: String(tuple.creator.value),
+            nftContract: String(tuple['nft-contract'].value),
+            tokenId: BigInt(tuple['token-id'].value),
+            groupId: BigInt(tuple['group-id'].value),
+            feeBudget: tuple['fee-budget'] ? BigInt(tuple['fee-budget'].value) : null,
+            budgetRemaining: tuple['budget-remaining'] ? BigInt(tuple['budget-remaining'].value) : null,
+            claimedAt: claimedRaw === null || claimedRaw === undefined ? null : BigInt(claimedRaw.value ?? claimedRaw)
+          });
+        } catch {
+          // sparse ids / settled drops: skip
+        }
+        if (id === 0n) break;
+      }
+      return results;
+    };
+
+    const dropClaimSelfPaid = (drop) => {
+      const [nftAddress, nftName] = drop.nftContract.split('.');
+      const postConditions = buildMarketBuyPostConditions({
+        settlement: dropsStxSettlement(),
+        buyerAddress: state.walletSession.address,
+        amount: 0n,
+        nftContract: { address: nftAddress, contractName: nftName, network: drop.entry.network },
+        senderContract: {
+          address: drop.entry.address,
+          contractName: drop.entry.contractName,
+          network: drop.entry.network
+        },
+        tokenId: drop.tokenId
+      });
+      dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the claim in your wallet…</span>';
+      showContractCall({
+        contractAddress: drop.entry.address,
+        contractName: drop.entry.contractName,
+        functionName: 'claim',
+        functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(drop.dropId)],
+        network: drop.entry.network,
+        stxAddress: state.walletSession.address,
+        postConditionMode: PostConditionMode.Deny,
+        postConditions,
+        onFinish: (payload) => {
+          const txId = payload?.txId ?? payload?.txid ?? '';
+          dropsDom.status.innerHTML = `<span><strong>Drops</strong> claim submitted${txId ? ` — tx ${txId}` : ''}.</span><span class="badge green">claimed</span>`;
+        },
+        onCancel: () => {
+          dropsDom.status.innerHTML = '<span><strong>Drops</strong> claim cancelled.</span>';
+        }
+      });
+    };
+
+    const dropClaim = async (drop) => {
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> connect a wallet to claim — new wallets work, no STX needed.</span>';
+        return;
+      }
+      const [nftAddress, nftName] = drop.nftContract.split('.');
+      const postConditions = buildMarketBuyPostConditions({
+        settlement: dropsStxSettlement(),
+        buyerAddress: state.walletSession.address,
+        amount: 0n,
+        nftContract: { address: nftAddress, contractName: nftName, network: drop.entry.network },
+        senderContract: {
+          address: drop.entry.address,
+          contractName: drop.entry.contractName,
+          network: drop.entry.network
+        },
+        tokenId: drop.tokenId
+      });
+      dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the free claim in your wallet (fee 0)…</span>';
+      showContractCall({
+        contractAddress: drop.entry.address,
+        contractName: drop.entry.contractName,
+        functionName: 'claim',
+        functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(drop.dropId)],
+        network: drop.entry.network,
+        stxAddress: state.walletSession.address,
+        postConditionMode: PostConditionMode.Deny,
+        postConditions,
+        sponsored: true,
+        onFinish: async (payload) => {
+          const txHex = payload?.txRaw ?? null;
+          if (!txHex) {
+            dropsDom.status.innerHTML = '<span><strong>Drops</strong> this wallet did not return the signed sponsored transaction — claiming self-paid instead.</span>';
+            dropClaimSelfPaid(drop);
+            return;
+          }
+          dropsDom.status.innerHTML = '<span><strong>Drops</strong> submitting to the sponsor relayer…</span>';
+          try {
+            const base = (drop.entry.sponsorApi ?? '/').replace(/\/+$/, '');
+            const r = await fetch(`${base}/sponsor/submit`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                txHex,
+                contractId: drop.contractId,
+                listingId: drop.dropId.toString()
+              })
+            });
+            const body = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(body?.message ?? `relayer ${r.status}`);
+            const buyTx = body?.txids?.buy ?? '';
+            dropsDom.status.innerHTML = `<span><strong>Drops</strong> claim sponsored and broadcast${buyTx ? ` — tx ${buyTx}` : ''}. The inscription lands in your wallet when it confirms.</span><span class="badge green">no STX needed</span>`;
+          } catch (error) {
+            dropsDom.status.innerHTML = `<span><strong>Drops</strong> sponsorship failed (${String(error?.message ?? error)}) — you can claim self-paid instead.</span>`;
+          }
+        },
+        onCancel: () => {
+          dropsDom.status.innerHTML = '<span><strong>Drops</strong> claim cancelled.</span>';
+        }
+      });
+    };
+
+    const hydrateDropThumbnails = async (run, drops) => {
+      await runLimited(drops, MARKET_THUMB_HYDRATION_CONCURRENCY, async (drop) => {
+        if (run !== dropsState.run) return;
+        const media = await marketMediaFor(drop);
+        if (run !== dropsState.run) return;
+        const slot = dropsDom.listings?.querySelector(
+          `[data-drop-thumb="${drop.contractId}:${drop.dropId}"]`
+        );
+        if (!slot) return;
+        if (media?.kind === 'video' && media.url) {
+          const video = document.createElement('video');
+          video.src = media.url;
+          video.muted = true;
+          video.loop = true;
+          video.autoplay = true;
+          video.playsInline = true;
+          slot.replaceChildren(video);
+          slot.classList.add('market-thumb--media');
+        } else if (media?.url && media.kind !== 'html-live') {
+          const img = document.createElement('img');
+          img.src = media.url;
+          img.alt = `Inscription #${drop.tokenId}`;
+          img.loading = 'lazy';
+          slot.replaceChildren(img);
+          slot.classList.add('market-thumb--media');
+        } else {
+          slot.replaceChildren(
+            Object.assign(document.createElement('span'), {
+              className: 'market-thumb__label',
+              textContent: `#${drop.tokenId}`
+            })
+          );
+        }
+      });
+    };
+
+    const renderDrops = () => {
+      if (!dropsDom.listings) return;
+      const run = dropsState.run;
+      const live = dropsState.drops.filter((drop) => drop.claimedAt === null);
+      if (!live.length) {
+        dropsDom.listings.replaceChildren();
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> no live drops right now — create one below, or check back soon.</span>';
+        return;
+      }
+      dropsDom.status.innerHTML = `<span><strong>Drops</strong> ${live.length} free claim${live.length === 1 ? '' : 's'} available.</span>`;
+      dropsDom.listings.replaceChildren(
+        ...live.map((drop) => {
+          const card = document.createElement('article');
+          card.className = 'market-card';
+
+          const thumb = document.createElement('a');
+          thumb.className = 'market-thumb';
+          thumb.href = `/xplorer?token=${drop.tokenId}`;
+          thumb.target = '_self';
+          thumb.dataset.dropThumb = `${drop.contractId}:${drop.dropId}`;
+          thumb.setAttribute('aria-label', `View inscription #${drop.tokenId}`);
+          thumb.append(
+            Object.assign(document.createElement('span'), {
+              className: 'market-thumb__label',
+              textContent: 'Loading…'
+            })
+          );
+
+          const badges = document.createElement('div');
+          badges.className = 'market-card__badge-row';
+          badges.innerHTML = '<span class="badge green">Free claim</span><span class="badge">No STX needed</span>';
+
+          const price = document.createElement('div');
+          price.className = 'market-card__price';
+          price.textContent = 'Free';
+
+          const meta = document.createElement('div');
+          meta.className = 'market-card__meta';
+          meta.textContent = `Inscription #${drop.tokenId} · drop #${drop.dropId} · from ${shortPrincipal(drop.creator)}`;
+
+          const actions = document.createElement('div');
+          actions.className = 'market-card__actions';
+          const isMine = state.walletSession.address === drop.creator;
+          if (isMine) {
+            const cancelBtn = document.createElement('button');
+            cancelBtn.type = 'button';
+            cancelBtn.className = 'market-chip';
+            cancelBtn.textContent = 'Cancel drop (reclaim)';
+            cancelBtn.addEventListener('click', () => {
+              const [nftAddress, nftName] = drop.nftContract.split('.');
+              dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the cancel in your wallet…</span>';
+              showContractCall({
+                contractAddress: drop.entry.address,
+                contractName: drop.entry.contractName,
+                functionName: 'cancel',
+                functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(drop.dropId)],
+                network: drop.entry.network,
+                stxAddress: state.walletSession.address,
+                postConditionMode: PostConditionMode.Allow,
+                onFinish: () => {
+                  dropsDom.status.innerHTML = '<span><strong>Drops</strong> cancel submitted — NFT and deposit return when it confirms.</span>';
+                },
+                onCancel: () => {
+                  dropsDom.status.innerHTML = '<span><strong>Drops</strong> cancel aborted.</span>';
+                }
+              });
+            });
+            actions.append(cancelBtn);
+          } else {
+            const claimBtn = document.createElement('button');
+            claimBtn.type = 'button';
+            claimBtn.className = 'market-chip';
+            claimBtn.textContent = 'Claim free — no STX needed';
+            claimBtn.addEventListener('click', () => { void dropClaim(drop); });
+            actions.append(claimBtn);
+          }
+
+          card.append(thumb, badges, price, meta, actions);
+          return card;
+        })
+      );
+      void hydrateDropThumbnails(run, live);
+    };
+
+    const updateDropsDepositHint = async () => {
+      if (!dropsDom.createDeposit) return;
+      const entry = dropsEntriesForNetwork()[0];
+      if (!entry) return;
+      dropsDom.createDeposit.textContent = 'Fetching sponsorship deposit quote...';
+      try {
+        const base = (entry.sponsorApi ?? '/').replace(/\/+$/, '');
+        const r = await fetch(`${base}/sponsor/quote`, { method: 'POST' });
+        if (!r.ok) throw new Error(String(r.status));
+        const body = await r.json();
+        dropsQuote = BigInt(body.budgetUstx ?? '60000');
+      } catch {
+        dropsQuote = 60_000n;
+      }
+      dropsDom.createDeposit.textContent =
+        `Sponsorship deposit: ${formatAssetAmount(dropsQuote, 6, 'STX')} — covers the claimer's network fee so they need zero STX; the unused part refunds to you after the claim or on cancel.`;
+    };
+
+    const dropsCreateDrop = async () => {
+      const entry = dropsEntriesForNetwork()[0];
+      if (!entry) return;
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        dropsDom.createStatus.textContent = 'Connect a wallet to create a drop.';
+        return;
+      }
+      const tokenIdRaw = dropsDom.createTokenId?.value?.trim();
+      if (!/^\d+$/.test(tokenIdRaw ?? '')) {
+        dropsDom.createStatus.textContent = 'Enter the inscription number you want to drop.';
+        return;
+      }
+      const tokenId = BigInt(tokenIdRaw);
+      const groupRaw = dropsDom.createGroup?.value?.trim();
+      // A shared batch id limits claims to one per person per batch; leaving it
+      // blank gives the drop a unique id (no per-person limit).
+      const groupId = /^\d+$/.test(groupRaw ?? '')
+        ? BigInt(groupRaw)
+        : BigInt(Date.now()) * 1000n + BigInt(Math.floor(Math.random() * 1000));
+      const budget = dropsQuote ?? 60_000n;
+
+      dropsDom.createStatus.textContent = 'Checking ownership...';
+      try {
+        const owner = await state.client.getOwner(tokenId, state.walletSession.address);
+        if (!owner || owner !== state.walletSession.address) {
+          dropsDom.createStatus.textContent = owner
+            ? `Inscription #${tokenId} is owned by ${owner.slice(0, 8)}..., not your wallet.`
+            : `Inscription #${tokenId} not found.`;
+          return;
+        }
+      } catch {
+        dropsDom.createStatus.textContent = 'Could not verify ownership - try again.';
+        return;
+      }
+
+      const postConditions = [
+        buildTransferPostCondition({
+          contract: state.contract,
+          senderAddress: state.walletSession.address,
+          tokenId
+        }),
+        makeStandardSTXPostCondition(
+          state.walletSession.address,
+          FungibleConditionCode.Equal,
+          budget
+        )
+      ];
+      dropsDom.createStatus.textContent = 'Confirm the drop in your wallet...';
+      showContractCall({
+        contractAddress: entry.address,
+        contractName: entry.contractName,
+        functionName: 'create-drop',
+        functionArgs: [
+          contractPrincipalCV(state.contract.address, state.contract.contractName),
+          uintCV(tokenId),
+          uintCV(budget),
+          uintCV(groupId)
+        ],
+        network: entry.network,
+        stxAddress: state.walletSession.address,
+        postConditionMode: PostConditionMode.Deny,
+        postConditions,
+        onFinish: (payload) => {
+          const txId = payload?.txId ?? payload?.txid ?? '';
+          dropsDom.createStatus.textContent = `Drop submitted${txId ? ` - tx ${txId}` : ''}. It appears here once confirmed.`;
+        },
+        onCancel: () => {
+          dropsDom.createStatus.textContent = 'Drop cancelled.';
+        }
+      });
+    };
+
+    dropsDom.createButton?.addEventListener('click', () => { void dropsCreateDrop(); });
+
+    const loadDropsPage = async () => {
+      const run = ++dropsState.run;
+      if (!dropsDom.listings) return;
+      if (dropsDom.badge) dropsDom.badge.textContent = state.contract.network;
+      void updateDropsDepositHint();
+      dropsDom.status.innerHTML = '<span><strong>Drops</strong> loading…</span>';
+      try {
+        const perContract = await Promise.all(
+          dropsEntriesForNetwork().map((entry) => readDrops(entry).catch(() => []))
+        );
+        if (run !== dropsState.run) return;
+        dropsState.drops = perContract.flat().sort((a, b) => (b.dropId > a.dropId ? 1 : -1));
+        renderDrops();
+      } catch (error) {
+        if (run !== dropsState.run) return;
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> could not load drops.</span>';
+        debugLog('drops', 'load failed', { error: String(error?.message ?? error) });
+      }
+    };
+
     const switchToPage = async (page, params = null) => {
       const run = ++pageSwitchRun;
       PAGE_MODE = page;
@@ -10760,6 +11155,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       if (page === 'market') {
         await loadMarketPage(params);
       }
+      if (page === 'drops') {
+        await loadDropsPage();
+      }
       if (run === pageSwitchRun) {
         updateControls();
       }
@@ -10775,6 +11173,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
       if (seg === 'market') {
         return 'market';
+      }
+      if (seg === 'drops') {
+        return 'drops';
       }
       if (
         seg === 'xplorer' ||

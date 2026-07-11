@@ -45,8 +45,9 @@ export const DEFAULTS = {
 /** Markets this relayer will sponsor. contractId → { buyFunction } */
 export const DEFAULT_MARKET_ALLOWLIST = {
   // populated at deploy time, e.g.:
-  // 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-sbtc-v1-0': { buyFunction: 'buy' },
-  // 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-usdcx-v1-0': { buyFunction: 'buy' }
+  // 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-sbtc-v1-1': { buyFunction: 'buy' },
+  // drops contracts sponsor the free-claim function instead:
+  // 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-drops-v1-0': { buyFunction: 'claim' }
 };
 
 export const JOB_STATES = ['RECEIVED', 'SPONSORED', 'CONFIRMED', 'CLAIMED', 'SETTLED', 'ABANDONED'];

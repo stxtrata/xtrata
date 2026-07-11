@@ -231,3 +231,8 @@ epoch = 'latest'
 path = 'contracts/xtrata-market-sponsored-usdcx-v1.1.clar'
 clarity_version = 4
 epoch = 'latest'
+
+[contracts.xtrata-drops-v1-0]
+path = 'contracts/xtrata-drops-v1.0.clar'
+clarity_version = 4
+epoch = 'latest'

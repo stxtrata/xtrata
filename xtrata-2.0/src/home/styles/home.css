@@ -3950,7 +3950,8 @@
     :root[data-page='inscribe'] .site-nav a[data-nav='inscribe'],
     :root[data-page='xplorer'] .site-nav a[data-nav='xplorer'],
     :root[data-page='my-wallet'] .site-nav a[data-nav='my-wallet'],
-    :root[data-page='market'] .site-nav a[data-nav='market'] {
+    :root[data-page='market'] .site-nav a[data-nav='market'],
+    :root[data-page='drops'] .site-nav a[data-nav='drops'] {
       color: var(--ink);
       background: var(--panel);
       border-color: var(--line);
@@ -4079,6 +4080,29 @@
     }
 
     :root[data-page='market'] .workspace {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* Drops: the drops panel alone, full width (mirrors the market page). */
+    .panel-drops {
+      display: none;
+    }
+
+    :root[data-page='drops'] .modes,
+    :root[data-page='drops'] .registry-intro,
+    :root[data-page='drops'] .page-cards,
+    :root[data-page='drops'] .homepage-docs,
+    :root[data-page='drops'] .home-examples,
+    :root[data-page='drops'] .panel[aria-labelledby='inscribeTitle'],
+    :root[data-page='drops'] .panel[aria-labelledby='walletTitle'] {
+      display: none;
+    }
+
+    :root[data-page='drops'] .panel-drops {
+      display: block;
+    }
+
+    :root[data-page='drops'] .workspace {
       grid-template-columns: minmax(0, 1fr);
     }
 
