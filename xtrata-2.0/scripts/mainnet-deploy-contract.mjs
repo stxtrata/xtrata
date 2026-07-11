@@ -79,6 +79,12 @@ const DEPLOYABLE = {
     clarityVersion: 4,
     paymentToken: 'SP120SBRBQJ00MCWS7TM5R8WJNTTKD5K0HFRC2CNE.usdcx',
     notes: 'USDCx marketplace with seller-funded fee sponsorship (STX-free buys).'
+  },
+  'xtrata-drops-v1-0': {
+    source: 'contracts/live/xtrata-drops-v1.0.clar',
+    sponsoredMarket: true,
+    clarityVersion: 4,
+    notes: 'Sponsored free-claim drops: creators escrow NFT + fee budget, claimers need zero STX.'
   }
 };
 

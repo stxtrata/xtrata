@@ -26,6 +26,7 @@ import type { WalletSession } from './lib/wallet/types';
 import sponsoredStxSource from '../contracts/live/xtrata-market-sponsored-stx-v1.1.clar?raw';
 import sponsoredSbtcSource from '../contracts/live/xtrata-market-sponsored-sbtc-v1.1.clar?raw';
 import sponsoredUsdcxSource from '../contracts/live/xtrata-market-sponsored-usdcx-v1.1.clar?raw';
+import dropsSource from '../contracts/live/xtrata-drops-v1.0.clar?raw';
 
 const EXPECTED_DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const HIRO_API = 'https://api.hiro.so';
@@ -63,6 +64,13 @@ const DEPLOYABLE: Deployable[] = [
     sponsoredMarket: true,
     paymentToken: 'SP120SBRBQJ00MCWS7TM5R8WJNTTKD5K0HFRC2CNE.usdcx',
     notes: 'USDCx marketplace with seller-funded fee sponsorship (STX-free buys).'
+  },
+  {
+    name: 'xtrata-drops-v1-0',
+    source: 'contracts/live/xtrata-drops-v1.0.clar',
+    code: dropsSource,
+    sponsoredMarket: true,
+    notes: 'Sponsored free-claim drops: creators escrow NFT + fee budget, claimers need zero STX.'
   }
 ];
 
@@ -190,6 +198,10 @@ const deployContract = (name: string) => {
     contractName: stateEntry.entry.name,
     codeBody: stateEntry.source,
     clarityVersion: 4,
+    // 0.49 STX, deliberately under Xverse's 0.5 fee-editor cap: if the deploy
+    // sticks in the mempool, a 0.5 STX replacement at the same nonce can still
+    // outbid it from the wallet (RBF requires a strictly higher fee).
+    fee: 490_000n,
     appDetails,
     network: toStacksNetwork('mainnet'),
     stxAddress: session.address,

@@ -124,18 +124,38 @@ export const onRequestGet: PagesFunction<MarketEnv> = async (context) => {
 
   const entries = (registry as RegistryEntry[]).filter((entry) => entry.network === 'mainnet');
   const perMarket = await Promise.all(
-    entries.map((entry) => readMarket(env, entry).catch(() => []))
+    entries.map((entry) =>
+      readMarket(env, entry).then(
+        (listings) => ({ ok: true as const, listings }),
+        () => ({ ok: false as const, listings: [] as Record<string, unknown>[] })
+      )
+    )
   );
-  const listings = perMarket.flat();
+  // If ANY market read failed (Hiro outage / rate limit), a partial or empty
+  // response would look authoritative and get edge-cached — the market page
+  // would show "no listings" while listings exist on-chain. Serve degraded
+  // results without caching them, and fail loudly when everything failed so
+  // the frontend falls back to its own direct reads.
+  const degraded = perMarket.some((r) => !r.ok);
+  if (perMarket.length > 0 && perMarket.every((r) => !r.ok)) {
+    return jsonResponse(
+      { error: 'UPSTREAM_UNAVAILABLE', message: 'all market reads failed' },
+      503,
+      { 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' }
+    );
+  }
+  const listings = perMarket.flatMap((r) => r.listings);
 
   const response = jsonResponse(
-    { updatedAt: Date.now(), listings },
+    { updatedAt: Date.now(), listings, degraded },
     200,
     {
-      'Cache-Control': `public, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS * 4}`,
+      'Cache-Control': degraded
+        ? 'no-store'
+        : `public, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS * 4}`,
       'Access-Control-Allow-Origin': '*'
     }
   );
-  context.waitUntil(cache.put(cacheKey, response.clone()));
+  if (!degraded) context.waitUntil(cache.put(cacheKey, response.clone()));
   return response;
 };
