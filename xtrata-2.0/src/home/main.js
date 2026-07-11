@@ -9822,6 +9822,35 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const shortPrincipal = (value) =>
       value && value.length > 14 ? `${value.slice(0, 8)}…${value.slice(-4)}` : String(value ?? '');
 
+    // BNS display names for market/drops cards — same resolver the Xplorer
+    // uses, cached per address so each seller is looked up at most once.
+    const marketBnsCache = new Map(); // address -> Promise<string|null>
+    const marketBnsNameFor = (address) => {
+      if (!address) return Promise.resolve(null);
+      let pending = marketBnsCache.get(address);
+      if (!pending) {
+        pending = resolveBnsNames({ address, network: state.contract.network })
+          .then((result) => result.primary ?? null)
+          .catch(() => null);
+        marketBnsCache.set(address, pending);
+      }
+      return pending;
+    };
+    // Renders "name.btc" into the span once resolved; keeps the short
+    // principal until then (and permanently when the address has no name).
+    const applyBnsName = (span, address) => {
+      span.textContent = shortPrincipal(address);
+      span.title = address;
+      void marketBnsNameFor(address).then((name) => {
+        if (name && span.isConnected) span.textContent = name;
+      });
+    };
+    const bnsNameSpan = (address) => {
+      const span = document.createElement('span');
+      applyBnsName(span, address);
+      return span;
+    };
+
     const marketTokenKey = (listing) => `${listing.nftContract}:${listing.tokenId}`;
 
     const marketClientFor = (nftContract, network) => {
@@ -10173,8 +10202,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         metaBlock.append(
           detailRow('Type', summary.meta.mimeType),
           detailRow('Size', formatByteSize(summary.meta.totalSize)),
-          detailRow('Creator', shortPrincipal(summary.meta.creator ?? summary.meta.owner)),
-          detailRow('Owner', shortPrincipal(summary.owner ?? '—'))
+          detailRow('Creator', bnsNameSpan(summary.meta.creator ?? summary.meta.owner)),
+          detailRow('Owner', summary.owner ? bnsNameSpan(summary.owner) : '—')
         );
       } else {
         metaBlock.append(detailRow('Metadata', 'unavailable'));
@@ -10220,7 +10249,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       priceBlock.append(
         detailRow('Price', formatAssetAmount(listing.price, listing.settlement.decimals ?? 6, symbol)),
         detailRow('Listing', `#${listing.listingId} on ${listing.entry.label}`),
-        detailRow('Seller', shortPrincipal(listing.seller))
+        detailRow('Seller', bnsNameSpan(listing.seller))
       );
       if (listing.createdAt !== null) {
         priceBlock.append(detailRow('Listed at block', listing.createdAt.toString()));
@@ -10510,7 +10539,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
           const meta = document.createElement('div');
           meta.className = 'market-card__meta';
-          meta.textContent = `Inscription #${listing.tokenId} · listing #${listing.listingId} · seller ${shortPrincipal(listing.seller)}`;
+          meta.textContent = `Inscription #${listing.tokenId} · listing #${listing.listingId} · seller `;
+          const sellerSpan = document.createElement('span');
+          applyBnsName(sellerSpan, listing.seller);
+          meta.append(sellerSpan);
 
           const details = document.createElement('details');
           details.className = 'market-card__details';
@@ -10966,7 +10998,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
           const meta = document.createElement('div');
           meta.className = 'market-card__meta';
-          meta.textContent = `Inscription #${drop.tokenId} · drop #${drop.dropId} · from ${shortPrincipal(drop.creator)}`;
+          meta.textContent = `Inscription #${drop.tokenId} · drop #${drop.dropId} · from `;
+          const creatorSpan = document.createElement('span');
+          applyBnsName(creatorSpan, drop.creator);
+          meta.append(creatorSpan);
 
           const actions = document.createElement('div');
           actions.className = 'market-card__actions';
@@ -11243,6 +11278,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           // handled above
         } else if (PAGE_MODE === 'market') {
           await loadMarketPage(pageParams);
+        } else if (PAGE_MODE === 'drops') {
+          await loadDropsPage();
         } else if (
           PAGE_MODE === 'my-wallet' &&
           walletViewRequestId === state.walletViewRequestId &&

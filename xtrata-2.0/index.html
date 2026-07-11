@@ -39,13 +39,16 @@
         page = 'xplorer';
       } else if (seg === 'market') {
         page = 'market';
+      } else if (seg === 'drops') {
+        page = 'drops';
       }
       document.documentElement.dataset.page = page;
       const titles = {
         inscribe: 'Inscribe — Xtrata',
         'my-wallet': 'My Wallet — Xtrata',
         xplorer: 'Xtrata Xplorer',
-        market: 'Market — Xtrata'
+        market: 'Market — Xtrata',
+        drops: 'Drops — Claim free inscriptions — Xtrata'
       };
       if (titles[page]) {
         document.title = titles[page];
