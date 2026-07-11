@@ -9854,8 +9854,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           });
           const tuple = unwrapBindingTuple(json);
           if (!tuple) continue;
-          const soldAt = tuple['sold-at']?.value ?? null;
-          if (soldAt !== null && soldAt !== undefined) continue; // sponsored: sold, awaiting settle
+          const soldRaw = tuple['sold-at']?.value ?? null;
           results.push({
             entry,
             contractId,
@@ -9866,7 +9865,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             tokenId: BigInt(tuple['token-id'].value),
             price: BigInt(tuple.price.value),
             createdAt: tuple['created-at'] ? BigInt(tuple['created-at'].value) : null,
-            budgetRemaining: tuple['budget-remaining'] ? BigInt(tuple['budget-remaining'].value) : null
+            feeBudget: tuple['fee-budget'] ? BigInt(tuple['fee-budget'].value) : null,
+            claimed: tuple.claimed ? BigInt(tuple.claimed.value) : null,
+            budgetRemaining: tuple['budget-remaining'] ? BigInt(tuple['budget-remaining'].value) : null,
+            // sold sponsored listings stay visible to their seller for reclaim
+            soldAt: soldRaw === null || soldRaw === undefined ? null : BigInt(soldRaw.value ?? soldRaw)
           });
         } catch {
           // sparse ids / deleted listings: skip
@@ -10461,8 +10464,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       if (!marketDom.listings) return;
       const run = marketState.run;
       const visible = marketState.listings.filter((listing) =>
-        marketState.filter === 'all' ||
-        getMarketSettlementLabel(listing.settlement) === marketState.filter
+        listing.soldAt === null &&
+        (marketState.filter === 'all' ||
+          getMarketSettlementLabel(listing.settlement) === marketState.filter)
       );
       if (!visible.length) {
         marketDom.listings.replaceChildren();
@@ -10569,6 +10573,122 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       void hydrateMarketThumbnails(run, visible);
     };
 
+    // --- Seller dashboard: my listings across all markets -----------------
+    const marketReclaim = async (listing) => {
+      if (!state.walletSession.isConnected || !state.walletSession.address) return;
+      marketDom.status.innerHTML = '<span><strong>Market</strong> confirm the reclaim in your wallet…</span>';
+      showContractCall({
+        contractAddress: listing.entry.address,
+        contractName: listing.entry.contractName,
+        functionName: 'settle-refund',
+        functionArgs: [uintCV(listing.listingId)],
+        network: listing.entry.network,
+        stxAddress: state.walletSession.address,
+        postConditionMode: PostConditionMode.Allow,
+        onFinish: (payload) => {
+          const txId = payload?.txId ?? payload?.txid ?? '';
+          marketDom.status.innerHTML = `<span><strong>Market</strong> reclaim submitted${txId ? ` — tx ${txId}` : ''}. Your unused deposit returns when it confirms.</span>`;
+        },
+        onCancel: () => {
+          marketDom.status.innerHTML = '<span><strong>Market</strong> reclaim cancelled.</span>';
+        }
+      });
+    };
+
+    const renderSellerDashboard = () => {
+      let host = document.getElementById('marketMine');
+      if (!host) {
+        host = document.createElement('details');
+        host.id = 'marketMine';
+        host.className = 'inscribe-details market-sell';
+        marketDom.listings?.parentElement?.insertBefore(host, marketDom.listings);
+      }
+      const mine = state.walletSession.address
+        ? marketState.listings.filter((l) => l.seller === state.walletSession.address)
+        : [];
+      if (!mine.length) {
+        host.hidden = true;
+        return;
+      }
+      host.hidden = false;
+      host.replaceChildren();
+      const summary = document.createElement('summary');
+      summary.textContent = `My listings (${mine.length})`;
+      host.append(summary);
+      const body = document.createElement('div');
+      body.className = 'market-mine';
+      for (const listing of mine) {
+        const row = document.createElement('div');
+        row.className = 'market-mine__row';
+        const symbol = getMarketSettlementLabel(listing.settlement);
+        const sponsored = isSponsoredMarket(listing.entry);
+        const info = document.createElement('div');
+        info.className = 'market-card__meta';
+        const priceText = formatAssetAmount(listing.price, listing.settlement.decimals ?? 6, symbol);
+        const budgetText = sponsored && listing.budgetRemaining !== null
+          ? ` · deposit ${formatAssetAmount(listing.feeBudget ?? listing.budgetRemaining, 6, 'STX')}, ${formatAssetAmount(listing.budgetRemaining, 6, 'STX')} remaining`
+          : '';
+        info.textContent = `#${listing.tokenId} · ${priceText} · ${listing.soldAt !== null ? 'SOLD — settlement pending' : 'live'}${budgetText}`;
+        const actions = document.createElement('div');
+        actions.className = 'market-card__actions';
+        if (listing.soldAt === null) {
+          const cancelBtn = document.createElement('button');
+          cancelBtn.type = 'button';
+          cancelBtn.className = 'market-chip';
+          cancelBtn.textContent = 'Cancel (return NFT + deposit)';
+          cancelBtn.addEventListener('click', () => { void marketCancel(listing); });
+          actions.append(cancelBtn);
+        } else if (sponsored && (listing.budgetRemaining ?? 0n) > 0n) {
+          const reclaimBtn = document.createElement('button');
+          reclaimBtn.type = 'button';
+          reclaimBtn.className = 'market-chip';
+          reclaimBtn.textContent = 'Reclaim deposit';
+          reclaimBtn.addEventListener('click', () => { void marketReclaim(listing); });
+          actions.append(reclaimBtn);
+          const note = document.createElement('span');
+          note.className = 'market-card__meta';
+          note.textContent = 'Usually automatic; self-reclaim unlocks ~24h after the sale if the relayer has not settled.';
+          actions.append(note);
+        }
+        row.append(info, actions);
+        body.append(row);
+      }
+      host.append(body);
+    };
+
+    // Fast path: the edge-cached aggregate endpoint (functions/market/listings)
+    // turns ~1+N Hiro reads per market into ONE cached request. Falls back to
+    // direct reads when unavailable (local dev without wrangler).
+    const loadListingsFromCache = async () => {
+      const response = await fetch('/market/listings');
+      if (!response.ok) throw new Error(`cache endpoint ${response.status}`);
+      const payload = await response.json();
+      const byId = new Map(
+        marketEntriesForNetwork().map((entry) => [getMarketContractId(entry), entry])
+      );
+      return (payload.listings ?? [])
+        .map((row) => {
+          const entry = byId.get(row.contractId);
+          if (!entry) return null;
+          return {
+            entry,
+            contractId: row.contractId,
+            settlement: getMarketSettlementAsset(entry.paymentTokenContractId ?? null),
+            listingId: BigInt(row.listingId),
+            seller: row.seller,
+            nftContract: row.nftContract,
+            tokenId: BigInt(row.tokenId),
+            price: BigInt(row.price),
+            createdAt: row.createdAt !== null ? BigInt(row.createdAt) : null,
+            feeBudget: row.feeBudget !== null ? BigInt(row.feeBudget) : null,
+            claimed: row.claimed !== null ? BigInt(row.claimed) : null,
+            budgetRemaining: row.budgetRemaining !== null ? BigInt(row.budgetRemaining) : null,
+            soldAt: row.soldAt !== null && row.soldAt !== undefined ? BigInt(row.soldAt) : null
+          };
+        })
+        .filter(Boolean);
+    };
+
     const loadMarketPage = async (params = null) => {
       const run = ++marketState.run;
       if (!marketDom.listings) return;
@@ -10581,14 +10701,20 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
       marketDom.status.innerHTML = '<span><strong>Market</strong> loading listings…</span>';
       try {
-        const perContract = await Promise.all(
-          marketEntriesForNetwork().map((entry) => readMarketListings(entry).catch(() => []))
-        );
+        let listings;
+        try {
+          listings = await loadListingsFromCache();
+          debugLog('market', 'listings served from edge cache', { count: listings.length });
+        } catch {
+          const perContract = await Promise.all(
+            marketEntriesForNetwork().map((entry) => readMarketListings(entry).catch(() => []))
+          );
+          listings = perContract.flat();
+        }
         if (run !== marketState.run) return;
-        marketState.listings = perContract
-          .flat()
-          .sort((a, b) => (b.listingId > a.listingId ? 1 : -1));
+        marketState.listings = listings.sort((a, b) => (b.listingId > a.listingId ? 1 : -1));
         renderMarketListings();
+        renderSellerDashboard();
       } catch (error) {
         if (run !== marketState.run) return;
         marketDom.status.innerHTML = '<span><strong>Market</strong> could not load listings.</span>';
