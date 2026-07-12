@@ -17,3 +17,22 @@ database_id = "7d7cf4b8-bc72-41b2-9eea-cc4af9aea54b"
 [[r2_buckets]]
 binding = "COLLECTION_ASSETS"
 bucket_name = "xtrata-manage-assets"
+
+# Preview deployments (branch builds) mirror production bindings exactly, so
+# every branch URL runs against the same D1 and R2 as the live site. Secrets
+# (SPONSOR_KEY, HIRO_API_KEY) are NOT in this file — set them for BOTH the
+# Production and Preview environments in the dashboard:
+# Workers & Pages -> xtrata -> Settings -> Variables and Secrets.
+[env.preview]
+
+[env.preview.vars]
+RUNTIME_CONTENT_CACHE_LIMIT_BYTES = "5368709120"
+
+[[env.preview.d1_databases]]
+binding = "DB"
+database_name = "xtrata-manage"
+database_id = "7d7cf4b8-bc72-41b2-9eea-cc4af9aea54b"
+
+[[env.preview.r2_buckets]]
+binding = "COLLECTION_ASSETS"
+bucket_name = "xtrata-manage-assets"

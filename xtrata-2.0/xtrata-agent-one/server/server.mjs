@@ -45,7 +45,11 @@ const PROCESSING = new Set();
 let sponsorSvc = null, sponsorChain = null;
 if (process.env.SPONSOR_KEY) {
   const allowlist = process.env.SPONSOR_MARKETS
-    ? Object.fromEntries(process.env.SPONSOR_MARKETS.split(',').map((id) => [id.trim(), { buyFunction: 'buy' }]))
+    // Drops contracts sponsor `claim`; markets sponsor `buy`.
+    ? Object.fromEntries(process.env.SPONSOR_MARKETS.split(',').map((id) => [
+        id.trim(),
+        { buyFunction: /\.xtrata-drops-/.test(id.trim()) ? 'claim' : 'buy' }
+      ]))
     : DEFAULT_MARKET_ALLOWLIST;
   sponsorChain = makeLiveChain({ network: NET, sponsorKey: process.env.SPONSOR_KEY, hiroKey: HIRO_KEY });
   sponsorSvc = createSponsorService({ chain: sponsorChain, allowlist, log: (...a) => console.log('[sponsor]', ...a) });

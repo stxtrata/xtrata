@@ -1,7 +1,7 @@
 // Public browser API for rendering seeded cicadas.
 import { CicadaGenerator } from './cicada-renderer.js?v=11.3.5-nymph.2';
 import { CicadaNymphGenerator } from './cicada-nymph-renderer.js?v=11.3.8-molt.1';
-import { NymphScene } from './nymph-scene.js?v=11.3.5-nymph.2';
+import { NymphScene } from './nymph-scene.js?v=11.3.8-molt.1';
 import { CicadaSynth } from './cicada-audio.js?v=11.3.5-nymph.2';
 import { playSignatureCall, getSoundIdentity } from './motion-bridge.js?v=11.3.5-nymph.2';
 import { createGroupChorus, groupGenesForSeed } from './group-chorus.js?v=11.3.5-nymph.2';
