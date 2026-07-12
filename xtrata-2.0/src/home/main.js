@@ -6,10 +6,12 @@
       hexToCV,
       listCV,
       makeStandardSTXPostCondition,
+      makeContractSTXPostCondition,
       PostConditionMode,
       principalCV,
       stringAsciiCV,
-      uintCV
+      uintCV,
+      contractPrincipalCV
     } from '@stacks/transactions';
     import { createStacksWalletAdapter } from '/src/lib/wallet/adapter.ts';
     import {
@@ -43,6 +45,16 @@
       getLegacyContract
     } from '/src/lib/contract/registry.ts';
     import { getContractId } from '/src/lib/contract/config.ts';
+    import { MARKET_REGISTRY, getMarketContractId } from '/src/lib/market/registry.ts';
+    import DROPS_REGISTRY from '/src/data/drops-registry.json';
+    import {
+      getMarketSettlementAsset,
+      getMarketSettlementLabel,
+      buildMarketBuyPostConditions,
+      formatMarketPriceWithUsd
+    } from '/src/lib/market/settlement.ts';
+    import { isSponsoredMarket } from '/src/lib/market/sponsored.ts';
+    import { loadMarketActivity } from '/src/lib/market/indexer.ts';
     import {
       buildTransferCall,
       createXtrataClient
@@ -59,7 +71,10 @@
     } from '/src/lib/pricing/format.ts';
     import { fetchUsdPriceBook } from '/src/lib/pricing/hooks.ts';
     import { resolveContractCapabilities } from '/src/lib/contract/capabilities.ts';
-    import { buildTransferPostCondition } from '/src/lib/contract/post-conditions.ts';
+    import {
+      buildTransferPostCondition,
+      buildContractTransferPostCondition
+    } from '/src/lib/contract/post-conditions.ts';
     import { getNetworkMismatch } from '/src/lib/network/guard.ts';
     import { getApiBaseUrls } from '/src/lib/network/config.ts';
     import { toStacksNetwork } from '/src/lib/network/stacks.ts';
@@ -215,7 +230,9 @@
       home: 'Xtrata - Permanent Media Records',
       inscribe: 'Inscribe — Xtrata',
       xplorer: 'Xtrata Xplorer',
-      'my-wallet': 'My Wallet — Xtrata'
+      'my-wallet': 'My Wallet — Xtrata',
+      market: 'Market — Xtrata',
+      drops: 'Drops — Claim free inscriptions — Xtrata'
     };
 
     // Set once the prepare handler exists; lets setSelectedFile auto-prepare a
@@ -299,6 +316,10 @@
       walletLookupButton: $('walletLookupButton'),
       walletLookupStatus: $('walletLookupStatus'),
       walletGridStatus: $('walletGridStatus'),
+      walletMarketListings: $('walletMarketListings'),
+      walletMarketListingsSummary: $('walletMarketListingsSummary'),
+      walletMarketListingsBody: $('walletMarketListingsBody'),
+      walletMarketListingsStatus: $('walletMarketListingsStatus'),
       tokenGrid: $('tokenGrid'),
       tokenPreviewPanel: $('tokenPreviewPanel'),
       tokenPreviewMedia: $('tokenPreviewMedia'),
@@ -545,6 +566,7 @@
       // the original Pepe/Leo; the Xtrata twin is in the helper contract). These
       // are injected onto page 0 of the wallet grid, marked with the padlock.
       escrowTwinInjection: { address: null, ids: [], requestId: 0 },
+      walletMarketListings: { address: null, listings: [], requestId: 0 },
       walletTokenCache: new Map(),
       walletTokens: [],
       walletPageIndex: 0,
@@ -3739,6 +3761,8 @@
       } else if (!walletOwnsToken) {
         message = 'Only the connected owner can send this inscription.';
       }
+      const listBtn = $('listForSaleButton');
+      if (listBtn) listBtn.disabled = state.selectedTokenId === null || !state.walletSession.isConnected;
       dom.transferButton.disabled =
         state.busy ||
         state.transferPending ||
@@ -6955,12 +6979,12 @@
           card.classList.add('token-card--escrowed');
           const lock = document.createElement('span');
           lock.className = 'token-escrow-badge';
-          lock.textContent = '🔒';
-          lock.setAttribute('aria-hidden', 'false');
+          lock.innerHTML =
+            '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" focusable="false"><path fill="currentColor" d="M18.6 6.62c-1.44 0-2.8.56-3.77 1.53L12 10.66 10.48 12h.01L7.8 14.39c-.64.64-1.49.99-2.4.99-1.87 0-3.39-1.51-3.39-3.38S3.53 8.62 5.4 8.62c.91 0 1.76.35 2.44 1.03l1.13 1 1.51-1.34L9.22 8.2C8.2 7.18 6.84 6.62 5.4 6.62 2.42 6.62 0 9.04 0 12s2.42 5.38 5.4 5.38c1.44 0 2.8-.56 3.77-1.53l2.83-2.5.01.01L14.2 9.61c.64-.64 1.49-.99 2.4-.99 1.87 0 3.39 1.51 3.39 3.38s-1.52 3.38-3.39 3.38c-.9 0-1.76-.35-2.44-1.03l-1.14-1.01-1.51 1.34 1.27 1.12c1.02 1.02 2.37 1.57 3.82 1.57 2.98 0 5.4-2.42 5.4-5.38s-2.42-5.37-5.4-5.37z"/></svg>';
           lock.setAttribute('role', 'img');
-          lock.setAttribute('aria-label', 'Escrowed Forever Twin');
+          lock.setAttribute('aria-label', 'Forever Twin');
           lock.title =
-            'Escrowed Forever Twin — the Xtrata twin is locked in the Forever Twin contract while the holder keeps the original collection NFT.';
+            'Forever Twin — this Xtrata inscription is bound to an original collection NFT through the Forever Twin contract.';
           card.append(lock);
         }
         const thumb = document.createElement('div');
@@ -8860,6 +8884,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
       const viewingAddress = getViewingWalletAddress();
       if (!viewingAddress) {
+        state.walletMarketListings = {
+          address: null,
+          listings: [],
+          requestId: (state.walletMarketListings.requestId ?? 0) + 1
+        };
+        renderWalletMarketListings();
         state.walletTokenIds = [];
         state.walletPageIds = [];
         state.walletTotalCount = 0;
@@ -8885,6 +8915,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         updateTransferControls();
         return;
       }
+
+      // Market escrow is still seller-controlled ownership. Load it alongside
+      // direct NFT holdings so a listed inscription never disappears from the
+      // seller's My Wallet view.
+      void refreshWalletMarketListings(viewingAddress);
 
       setStatus(dom.walletGridStatus, '<strong>Grid</strong> loading wallet holdings', 'loading', 'blue');
       renderTokenGridPlaceholders('...');
@@ -9054,6 +9089,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           renderPreparedState();
         }
         await loadWalletInscriptions();
+        if (PAGE_MODE === 'market') {
+          renderMarketListings();
+          renderSellerDashboard();
+        }
         if (PAGE_MODE === 'home' && state.walletSession.isConnected && state.walletSession.address) {
           // A wallet that connects on the landing page and holds inscriptions
           // goes straight to its ledger on the My Wallet page.
@@ -9105,6 +9144,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         await fetchAdminStatus();
         await refreshParentChecks();
         await loadWalletInscriptions();
+        if (PAGE_MODE === 'market') {
+          renderMarketListings();
+          renderSellerDashboard();
+        }
         renderPreparedState();
       } finally {
         setBusy(false);
@@ -9760,6 +9803,1592 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // just swap the page mode and run that page's loads — no reload, and the
     // radio, wallet session and caches all survive the switch.
     let pageSwitchRun = 0;
+
+    // ------------------------------------------------------------------
+    // Market page: multi-asset inscription marketplace (homepage-native).
+    // Listings render as media thumbnails with an expandable details section
+    // (metadata, relationships, price, creation + trading history). All logic
+    // reuses src/lib: market registry/settlement/sponsored, viewer summaries
+    // and content loaders, and the market activity indexer.
+    // ------------------------------------------------------------------
+    const MARKET_LISTINGS_PER_CONTRACT = 24;
+    const MARKET_THUMB_HYDRATION_CONCURRENCY = 4;
+    const marketState = {
+      filter: 'all',
+      run: 0,
+      listings: [],
+      liveFrames: 0, // sandboxed iframes currently mounted (shares the grid's cap)
+      summaries: new Map(), // `${nftContract}:${tokenId}` -> TokenSummary|null
+      media: new Map(), // same key -> { url, kind } | null
+      activity: new Map(), // market contractId -> MarketIndexSnapshot events
+      clients: new Map() // nftContract principal -> XtrataClient
+    };
+    const marketDom = {
+      toolbar: $('marketToolbar'),
+      status: $('marketStatus'),
+      listings: $('marketListings'),
+      badge: $('marketNetworkBadge')
+    };
+
+    const marketEntriesForNetwork = () =>
+      MARKET_REGISTRY.filter((entry) => entry.network === state.contract.network);
+
+    const formatAssetAmount = (amount, decimals, symbol) => {
+      const base = 10n ** BigInt(decimals);
+      const whole = amount / base;
+      const frac = (amount % base).toString().padStart(decimals, '0').replace(/0+$/, '');
+      return `${whole.toString()}${frac ? '.' + frac : ''} ${symbol}`;
+    };
+
+    const formatByteSize = (size) => {
+      const n = Number(size);
+      if (!Number.isFinite(n)) return `${size} B`;
+      if (n < 1024) return `${n} B`;
+      if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+      return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+    };
+
+    const shortPrincipal = (value) =>
+      value && value.length > 14 ? `${value.slice(0, 8)}…${value.slice(-4)}` : String(value ?? '');
+
+    // BNS display names for market/drops cards — same resolver the Xplorer
+    // uses, cached per address so each seller is looked up at most once.
+    const marketBnsCache = new Map(); // address -> Promise<string|null>
+    const marketBnsNameFor = (address) => {
+      if (!address) return Promise.resolve(null);
+      let pending = marketBnsCache.get(address);
+      if (!pending) {
+        pending = resolveBnsNames({ address, network: state.contract.network })
+          .then((result) => result.primary ?? null)
+          .catch(() => null);
+        marketBnsCache.set(address, pending);
+      }
+      return pending;
+    };
+    // Renders "name.btc" into the span once resolved; keeps the short
+    // principal until then (and permanently when the address has no name).
+    const applyBnsName = (span, address) => {
+      span.textContent = shortPrincipal(address);
+      span.title = address;
+      void marketBnsNameFor(address).then((name) => {
+        if (name && span.isConnected) span.textContent = name;
+      });
+    };
+    const bnsNameSpan = (address) => {
+      const span = document.createElement('span');
+      applyBnsName(span, address);
+      return span;
+    };
+
+    const marketTokenKey = (listing) => `${listing.nftContract}:${listing.tokenId}`;
+
+    const marketClientFor = (nftContract, network) => {
+      let client = marketState.clients.get(nftContract);
+      if (!client) {
+        const [address, contractName] = nftContract.split('.');
+        client = createXtrataClient({ contract: { address, contractName, network } });
+        marketState.clients.set(nftContract, client);
+      }
+      return client;
+    };
+
+    const readMarketListings = async (entry) => {
+      const contractId = getMarketContractId(entry);
+      const settlement = getMarketSettlementAsset(entry.paymentTokenContractId ?? null);
+      const lastJson = await callReadOnlyJson({
+        contractId,
+        functionName: 'get-last-listing-id',
+        network: entry.network
+      });
+      const lastId = BigInt(lastJson?.value?.value ?? 0);
+      const results = [];
+      const from = lastId;
+      const floor = lastId > BigInt(MARKET_LISTINGS_PER_CONTRACT) ? lastId - BigInt(MARKET_LISTINGS_PER_CONTRACT) : 0n;
+      for (let id = from; id >= floor; id -= 1n) {
+        try {
+          const json = await callReadOnlyJson({
+            contractId,
+            functionName: 'get-listing',
+            args: [uintCV(id)],
+            network: entry.network
+          });
+          const tuple = unwrapBindingTuple(json);
+          if (!tuple) continue;
+          const soldRaw = tuple['sold-at']?.value ?? null;
+          results.push({
+            entry,
+            contractId,
+            settlement,
+            listingId: id,
+            seller: String(tuple.seller.value),
+            nftContract: String(tuple['nft-contract'].value),
+            tokenId: BigInt(tuple['token-id'].value),
+            price: BigInt(tuple.price.value),
+            createdAt: tuple['created-at'] ? BigInt(tuple['created-at'].value) : null,
+            feeBudget: tuple['fee-budget'] ? BigInt(tuple['fee-budget'].value) : null,
+            claimed: tuple.claimed ? BigInt(tuple.claimed.value) : null,
+            budgetRemaining: tuple['budget-remaining'] ? BigInt(tuple['budget-remaining'].value) : null,
+            // sold sponsored listings stay visible to their seller for reclaim
+            soldAt: soldRaw === null || soldRaw === undefined ? null : BigInt(soldRaw.value ?? soldRaw)
+          });
+        } catch {
+          // sparse ids / deleted listings: skip
+        }
+        if (id === 0n) break;
+      }
+      return results;
+    };
+
+    const isLegacyCoreListing = (listing) =>
+      String(listing.nftContract ?? '').endsWith('.xtrata-v2-1-0');
+
+    // xtrata-market-v1-0's buy is broken by design: the NFT payout runs inside
+    // as-contract, which rebinds tx-sender, so the market transfers the NFT to
+    // ITSELF and the core rejects it (err u2) — every buy fails and deny-mode
+    // post-conditions roll it back. cancel works (explicit seller recipient),
+    // so sellers can still recover their NFTs and relist on a v1.1 market.
+    const isBrokenBuyMarket = (listing) =>
+      String(listing.contractId ?? '').endsWith('.xtrata-market-v1-0');
+
+    // Deny-mode post-conditions for contract-side payouts (cancel / reclaim /
+    // claim): the exact NFT and STX escrow outflows, so the wallet shows
+    // precisely what moves instead of the Allow-mode "this app may transfer
+    // any of your assets" warning.
+    const marketEscrowPostConditions = (listing, { includeNft = true } = {}) => {
+      const pcs = [];
+      if (includeNft) {
+        const [nftAddress, nftName] = listing.nftContract.split('.');
+        pcs.push(
+          buildContractTransferPostCondition({
+            nftContract: { address: nftAddress, contractName: nftName, network: listing.entry.network },
+            senderContract: {
+              address: listing.entry.address,
+              contractName: listing.entry.contractName,
+              network: listing.entry.network
+            },
+            tokenId: listing.tokenId
+          })
+        );
+      }
+      if (listing.budgetRemaining !== null && listing.budgetRemaining !== undefined) {
+        pcs.push(
+          makeContractSTXPostCondition(
+            listing.entry.address,
+            listing.entry.contractName,
+            FungibleConditionCode.Equal,
+            listing.budgetRemaining
+          )
+        );
+      }
+      return pcs;
+    };
+
+    const setMarketActionStatus = (target, html) => {
+      if (!target) return;
+      target.hidden = false;
+      target.innerHTML = html;
+    };
+
+    const marketCancel = async (listing, statusTarget = marketDom.status) => {
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        setMarketActionStatus(
+          statusTarget,
+          '<span><strong>Market</strong> connect the seller wallet to cancel.</span>'
+        );
+        return;
+      }
+      if (!addressesEqual(state.walletSession.address, listing.seller)) {
+        setMarketActionStatus(
+          statusTarget,
+          '<span><strong>Market</strong> only the listing seller can cancel.</span>'
+        );
+        return;
+      }
+      const [nftAddress, nftName] = listing.nftContract.split('.');
+      setMarketActionStatus(
+        statusTarget,
+        '<span><strong>Market</strong> confirm the unlist in your wallet…</span>'
+      );
+      showContractCall({
+        contractAddress: listing.entry.address,
+        contractName: listing.entry.contractName,
+        functionName: 'cancel',
+        functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(listing.listingId)],
+        network: listing.entry.network,
+        stxAddress: state.walletSession.address,
+        postConditionMode: PostConditionMode.Deny,
+        postConditions: marketEscrowPostConditions(listing),
+        onFinish: (payload) => {
+          const txId = payload?.txId ?? payload?.txid ?? '';
+          setMarketActionStatus(
+            statusTarget,
+            `<span><strong>Market</strong> unlist submitted${txId ? ` — tx ${txId}` : ''}. Once it confirms, the inscription returns to your wallet and you can relist it at the new price.</span>`
+          );
+        },
+        onCancel: () => {
+          setMarketActionStatus(
+            statusTarget,
+            '<span><strong>Market</strong> unlist cancelled.</span>'
+          );
+        }
+      });
+    };
+
+    const marketBuy = async (listing) => {
+      if (isLegacyCoreListing(listing)) {
+        marketDom.status.innerHTML = '<span><strong>Market</strong> legacy v2 inscriptions are delisted — the owner must migrate to v3 and relist.</span>';
+        return;
+      }
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        marketDom.status.innerHTML = '<span><strong>Market</strong> connect a wallet to buy.</span>';
+        return;
+      }
+      const [nftAddress, nftName] = listing.nftContract.split('.');
+      const postConditions = buildMarketBuyPostConditions({
+        settlement: listing.settlement,
+        buyerAddress: state.walletSession.address,
+        amount: listing.price,
+        nftContract: { address: nftAddress, contractName: nftName, network: listing.entry.network },
+        senderContract: {
+          address: listing.entry.address,
+          contractName: listing.entry.contractName,
+          network: listing.entry.network
+        },
+        tokenId: listing.tokenId
+      });
+      if (!postConditions) {
+        marketDom.status.innerHTML = '<span><strong>Market</strong> unsupported payment token for this listing.</span>';
+        return;
+      }
+      marketDom.status.innerHTML = '<span><strong>Market</strong> confirm the purchase in your wallet…</span>';
+      showContractCall({
+        contractAddress: listing.entry.address,
+        contractName: listing.entry.contractName,
+        functionName: 'buy',
+        functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(listing.listingId)],
+        network: listing.entry.network,
+        stxAddress: state.walletSession.address,
+        postConditionMode: PostConditionMode.Deny,
+        postConditions,
+        onFinish: (payload) => {
+          const txId = payload?.txId ?? payload?.txid ?? '';
+          marketDom.status.innerHTML = `<span><strong>Market</strong> purchase submitted${txId ? ` — tx ${txId}` : ''}.</span><span class="badge green">sent</span>`;
+        },
+        onCancel: () => {
+          marketDom.status.innerHTML = '<span><strong>Market</strong> purchase cancelled.</span>';
+        }
+      });
+    };
+
+    // --- thumbnails -------------------------------------------------------
+    const MARKET_KIND_ICONS = {
+      image: '🖼', audio: '🎵', video: '🎞', html: '🧩', text: '📄',
+      json: '{ }', code: '⌨', unknown: '◼'
+    };
+
+    const marketSummaryFor = async (listing) => {
+      const key = marketTokenKey(listing);
+      if (marketState.summaries.has(key)) return marketState.summaries.get(key);
+      let summary = null;
+      try {
+        summary = await fetchTokenSummary({
+          client: marketClientFor(listing.nftContract, listing.entry.network),
+          id: listing.tokenId,
+          senderAddress: listing.entry.address
+        });
+      } catch {
+        summary = null;
+      }
+      marketState.summaries.set(key, summary);
+      return summary;
+    };
+
+    const MARKET_MEDIA_MAX_BYTES = 512n * 1024n;
+
+    const marketFetchContent = async (listing, meta) => {
+      const bytes = await fetchOnChainContent({
+        client: marketClientFor(listing.nftContract, listing.entry.network),
+        id: listing.tokenId,
+        senderAddress: listing.entry.address,
+        totalSize: meta.totalSize,
+        mimeType: meta.mimeType
+      });
+      return bytes;
+    };
+
+    // Resolve a listing's thumbnail media. Kinds:
+    //   image      → <img> (covers static + SMIL/CSS-animated SVG)
+    //   html-live  → sandboxed <iframe srcdoc> (HTML inscriptions and
+    //                script-driven SVG animations, per the wallet-grid pattern)
+    //   video      → muted looping <video>
+    const marketMediaFor = async (listing) => {
+      const key = marketTokenKey(listing);
+      if (marketState.media.has(key)) return marketState.media.get(key);
+      let media = null;
+      try {
+        const summary = await marketSummaryFor(listing);
+        const meta = summary?.meta ?? null;
+        const mime = (meta?.mimeType ?? '').toLowerCase();
+        const kind = getMediaKind(mime);
+        const fetchable =
+          meta && meta.totalSize > 0n && meta.totalSize <= MARKET_MEDIA_MAX_BYTES;
+
+        if (kind === 'image' && fetchable && mime.includes('svg')) {
+          // On-chain SVG: script-driven animations need a real document.
+          const bytes = await marketFetchContent(listing, meta);
+          const text = new TextDecoder().decode(bytes);
+          if (/<script[\s>]/i.test(text)) {
+            media = { kind: 'html-live', html: text };
+          } else {
+            media = {
+              kind: 'image',
+              url: URL.createObjectURL(new Blob([bytes], { type: 'image/svg+xml' }))
+            };
+          }
+        } else if (kind === 'image' && fetchable) {
+          const bytes = await marketFetchContent(listing, meta);
+          media = {
+            kind: 'image',
+            url: URL.createObjectURL(new Blob([bytes], { type: meta.mimeType }))
+          };
+        } else if (kind === 'html' && fetchable) {
+          const bytes = await marketFetchContent(listing, meta);
+          media = { kind: 'html-live', html: new TextDecoder().decode(bytes) };
+        } else if (kind === 'video' && fetchable) {
+          const bytes = await marketFetchContent(listing, meta);
+          media = {
+            kind: 'video',
+            url: URL.createObjectURL(new Blob([bytes], { type: meta.mimeType }))
+          };
+        } else if ((kind === 'text' || kind === 'json' || kind === 'code') && fetchable) {
+          // Text-like inscriptions: show the actual words, not a logo.
+          const bytes = await marketFetchContent(listing, meta);
+          const text = new TextDecoder().decode(bytes).trim().slice(0, 400);
+          if (text) media = { kind: 'text', text };
+        }
+
+        // Fallbacks: inline SVG data URI from the summary, then token-URI image.
+        if (!media && summary?.svgDataUri) {
+          media = { kind: 'image', url: summary.svgDataUri };
+        }
+        if (!media && summary?.tokenUri) {
+          const uriImage = await fetchTokenImageFromUri(summary.tokenUri);
+          if (uriImage) media = { kind: 'image', url: uriImage };
+        }
+      } catch {
+        media = null;
+      }
+      marketState.media.set(key, media);
+      return media;
+    };
+
+    const hydrateMarketThumbnails = async (run, listings) => {
+      await runLimited(listings, MARKET_THUMB_HYDRATION_CONCURRENCY, async (listing) => {
+        if (run !== marketState.run) return;
+        const media = await marketMediaFor(listing);
+        if (run !== marketState.run) return;
+        const slot = marketDom.listings?.querySelector(
+          `[data-market-thumb="${listing.contractId}:${listing.listingId}"]`
+        );
+        if (!slot) return;
+        if (media?.kind === 'html-live' && marketState.liveFrames < MAX_LIVE_HTML_FRAMES) {
+          marketState.liveFrames += 1;
+          const frame = document.createElement('iframe');
+          frame.className = 'market-thumb__frame';
+          frame.title = `Inscription #${listing.tokenId} preview`;
+          frame.sandbox = 'allow-scripts';
+          frame.referrerPolicy = 'no-referrer';
+          frame.loading = 'lazy';
+          frame.setAttribute('scrolling', 'no');
+          frame.srcdoc = media.html;
+          slot.replaceChildren(frame);
+          slot.classList.add('market-thumb--media');
+        } else if (media?.kind === 'video' && media.url) {
+          const video = document.createElement('video');
+          video.src = media.url;
+          video.muted = true;
+          video.loop = true;
+          video.autoplay = true;
+          video.playsInline = true;
+          slot.replaceChildren(video);
+          slot.classList.add('market-thumb--media');
+        } else if (media?.kind === 'text') {
+          const pre = document.createElement('div');
+          pre.className = 'market-thumb__snippet';
+          pre.textContent = media.text;
+          slot.replaceChildren(pre);
+          slot.classList.add('market-thumb--media');
+        } else if (media?.url) {
+          const img = document.createElement('img');
+          img.src = media.url;
+          img.alt = `Inscription #${listing.tokenId}`;
+          img.loading = 'lazy';
+          slot.replaceChildren(img);
+          slot.classList.add('market-thumb--media');
+        } else {
+          const summary = marketState.summaries.get(marketTokenKey(listing));
+          const kind = getMediaKind(summary?.meta?.mimeType);
+          slot.replaceChildren(
+            Object.assign(document.createElement('span'), {
+              className: 'market-thumb__icon',
+              textContent: MARKET_KIND_ICONS[kind] ?? MARKET_KIND_ICONS.unknown
+            }),
+            Object.assign(document.createElement('span'), {
+              className: 'market-thumb__label',
+              textContent: summary?.meta?.mimeType ?? 'no preview'
+            })
+          );
+        }
+      });
+    };
+
+    // --- expandable details ----------------------------------------------
+    const marketActivityFor = async (listing) => {
+      const contractId = listing.contractId;
+      if (!marketState.activity.has(contractId)) {
+        try {
+          const snapshot = await loadMarketActivity({
+            contract: {
+              address: listing.entry.address,
+              contractName: listing.entry.contractName,
+              network: listing.entry.network
+            }
+          });
+          marketState.activity.set(contractId, snapshot?.events ?? []);
+        } catch {
+          marketState.activity.set(contractId, []);
+        }
+      }
+      return marketState.activity
+        .get(contractId)
+        .filter((event) => event.tokenId === listing.tokenId);
+    };
+
+    const detailRow = (label, value) => {
+      const row = document.createElement('div');
+      row.className = 'market-detail__row';
+      const dt = document.createElement('span');
+      dt.className = 'market-detail__label';
+      dt.textContent = label;
+      const dd = document.createElement('span');
+      dd.className = 'market-detail__value';
+      if (value instanceof HTMLElement) dd.append(value);
+      else dd.textContent = String(value);
+      row.append(dt, dd);
+      return row;
+    };
+
+    const xplorerTokenLink = (tokenId, label = null) => {
+      const link = document.createElement('a');
+      link.href = `/xplorer?token=${tokenId}`;
+      link.target = '_self';
+      link.textContent = label ?? `#${tokenId}`;
+      return link;
+    };
+
+    const loadMarketDetails = async (listing, body) => {
+      body.replaceChildren(
+        Object.assign(document.createElement('p'), { className: 'muted', textContent: 'Loading details…' })
+      );
+      const client = marketClientFor(listing.nftContract, listing.entry.network);
+      const sender = listing.entry.address;
+      const [summary, parents, deps, events] = await Promise.all([
+        marketSummaryFor(listing),
+        client.getParents(listing.tokenId, sender).catch(() => []),
+        client.getDependencies(listing.tokenId, sender).catch(() => []),
+        marketActivityFor(listing)
+      ]);
+
+      const frag = document.createDocumentFragment();
+
+      // metadata
+      const metaBlock = document.createElement('div');
+      metaBlock.className = 'market-detail__section';
+      metaBlock.append(Object.assign(document.createElement('strong'), { textContent: 'Metadata' }));
+      if (summary?.meta) {
+        metaBlock.append(
+          detailRow('Type', summary.meta.mimeType),
+          detailRow('Size', formatByteSize(summary.meta.totalSize)),
+          detailRow('Creator', bnsNameSpan(summary.meta.creator ?? summary.meta.owner)),
+          detailRow('Owner', summary.owner ? bnsNameSpan(summary.owner) : '—')
+        );
+      } else {
+        metaBlock.append(detailRow('Metadata', 'unavailable'));
+      }
+      if (summary?.tokenUri) {
+        const uriLink = document.createElement('a');
+        if (isHttpUrl(summary.tokenUri)) {
+          uriLink.href = summary.tokenUri;
+          uriLink.target = '_blank';
+          uriLink.rel = 'noreferrer';
+        }
+        uriLink.textContent =
+          summary.tokenUri.length > 48 ? `${summary.tokenUri.slice(0, 48)}…` : summary.tokenUri;
+        metaBlock.append(detailRow('Token URI', uriLink));
+      }
+      frag.append(metaBlock);
+
+      // relationships
+      const relBlock = document.createElement('div');
+      relBlock.className = 'market-detail__section';
+      relBlock.append(Object.assign(document.createElement('strong'), { textContent: 'Relationships' }));
+      const relValue = (ids) => {
+        if (!ids?.length) return '—';
+        const wrap = document.createElement('span');
+        ids.slice(0, 8).forEach((id, index) => {
+          if (index) wrap.append(', ');
+          wrap.append(xplorerTokenLink(id));
+        });
+        if (ids.length > 8) wrap.append(` +${ids.length - 8} more`);
+        return wrap;
+      };
+      relBlock.append(
+        detailRow(`Parents (${parents?.length ?? 0})`, relValue(parents)),
+        detailRow(`Dependencies (${deps?.length ?? 0})`, relValue(deps))
+      );
+      frag.append(relBlock);
+
+      // price + listing
+      const priceBlock = document.createElement('div');
+      priceBlock.className = 'market-detail__section';
+      priceBlock.append(Object.assign(document.createElement('strong'), { textContent: 'Listing' }));
+      const symbol = getMarketSettlementLabel(listing.settlement);
+      priceBlock.append(
+        detailRow('Price', formatMarketPriceWithUsd(listing.price, listing.settlement, state.usdPriceBook)),
+        detailRow('Listing', `#${listing.listingId} on ${listing.entry.label}`),
+        detailRow('Seller', bnsNameSpan(listing.seller))
+      );
+      if (listing.createdAt !== null) {
+        priceBlock.append(detailRow('Listed at block', listing.createdAt.toString()));
+      }
+      if (isSponsoredMarket(listing.entry) && listing.budgetRemaining !== null) {
+        priceBlock.append(
+          detailRow('Sponsorship', `no STX needed — fee budget ${formatAssetAmount(listing.budgetRemaining, 6, 'STX')} remaining`)
+        );
+      }
+      frag.append(priceBlock);
+
+      // trading history
+      const historyBlock = document.createElement('div');
+      historyBlock.className = 'market-detail__section';
+      historyBlock.append(Object.assign(document.createElement('strong'), { textContent: 'Trading history' }));
+      if (events.length) {
+        events
+          .slice(0, 12)
+          .forEach((event) => {
+            const what =
+              event.type === 'buy'
+                ? `Sold${event.price !== undefined ? ` for ${formatAssetAmount(event.price, listing.settlement.decimals ?? 6, symbol)}` : ''}`
+                : event.type === 'list'
+                  ? `Listed${event.price !== undefined ? ` at ${formatAssetAmount(event.price, listing.settlement.decimals ?? 6, symbol)}` : ''}`
+                  : event.type === 'cancel'
+                    ? 'Listing cancelled'
+                    : event.type;
+            const when = event.timestamp
+              ? new Date(event.timestamp).toLocaleDateString()
+              : event.blockHeight
+                ? `block ${event.blockHeight}`
+                : '';
+            historyBlock.append(detailRow(when || '—', what));
+          });
+      } else {
+        historyBlock.append(detailRow('History', 'No prior market activity for this inscription.'));
+      }
+      frag.append(historyBlock);
+
+      body.replaceChildren(frag);
+    };
+
+
+    // --- Sell an inscription (any currency, optional sponsorship) ----------
+    const sellDom = {
+      details: $('marketSell'),
+      tokenId: $('marketSellTokenId'),
+      market: $('marketSellMarket'),
+      price: $('marketSellPrice'),
+      priceLabel: $('marketSellPriceLabel'),
+      deposit: $('marketSellDeposit'),
+      button: $('marketSellButton'),
+      status: $('marketSellStatus')
+    };
+    const sellState = { quote: null, quoteRun: 0 };
+
+    // Legacy markets stay in the registry so old listings remain readable,
+    // but new listings must not go to them — exclude from the sell selector.
+    const sellEntries = () =>
+      marketEntriesForNetwork().filter((entry) => !/legacy/i.test(entry.label ?? ''));
+
+    const sellSelectedEntry = () => {
+      const id = sellDom.market?.value;
+      return sellEntries().find((entry) => getMarketContractId(entry) === id) ?? null;
+    };
+
+    const populateSellMarkets = () => {
+      if (!sellDom.market) return;
+      const current = sellDom.market.value;
+      const orderedEntries = [...sellEntries()].sort((a, b) =>
+        Number(isSponsoredMarket(a)) - Number(isSponsoredMarket(b))
+      );
+      sellDom.market.replaceChildren(
+        ...orderedEntries.map((entry) => {
+          const settlement = getMarketSettlementAsset(entry.paymentTokenContractId ?? null);
+          const symbol = getMarketSettlementLabel(settlement);
+          const option = document.createElement('option');
+          option.value = getMarketContractId(entry);
+          option.textContent = isSponsoredMarket(entry)
+            ? `${symbol} - sponsored (buyer pays no fee)`
+            : `${symbol} - standard`;
+          return option;
+        })
+      );
+      if (current) sellDom.market.value = current;
+      updateSellUi();
+    };
+
+    const parseSellPrice = (raw, decimals) => {
+      const trimmed = String(raw ?? '').trim();
+      if (!/^\d+(\.\d+)?$/.test(trimmed)) return null;
+      const [w, f = ''] = trimmed.split('.');
+      if (f.length > decimals) return null;
+      const amount = BigInt(w) * 10n ** BigInt(decimals) + BigInt((f || '0').padEnd(decimals, '0'));
+      return amount > 0n ? amount : null;
+    };
+
+    const updateSellUi = async () => {
+      const entry = sellSelectedEntry();
+      if (!entry || !sellDom.priceLabel) return;
+      const settlement = getMarketSettlementAsset(entry.paymentTokenContractId ?? null);
+      const symbol = getMarketSettlementLabel(settlement);
+      sellDom.priceLabel.textContent = `Price (${symbol})`;
+      if (isSponsoredMarket(entry) && entry.sponsorApi) {
+        const run = ++sellState.quoteRun;
+        sellDom.deposit.textContent = 'Fetching sponsorship deposit quote...';
+        try {
+          const base = entry.sponsorApi.replace(/\/+$/, '');
+          const r = await fetch(`${base}/sponsor/quote`, { method: 'POST' });
+          if (run !== sellState.quoteRun) return;
+          if (!r.ok) throw new Error('quote unavailable');
+          const q = await r.json();
+          sellState.quote = BigInt(q.budgetUstx ?? 60000);
+          sellDom.deposit.textContent =
+            `Sponsorship deposit: ${formatAssetAmount(sellState.quote, 6, 'STX')} - covers the buyer's network fee so they need no extra STX; the unused part is refunded to you when it sells or you cancel.`;
+        } catch {
+          if (run !== sellState.quoteRun) return;
+          sellState.quote = 60_000n;
+          sellDom.deposit.textContent =
+            'Sponsorship deposit: 0.06 STX (default - live quote unavailable). Unused portion refunds to you.';
+        }
+      } else {
+        sellState.quote = null;
+        sellDom.deposit.textContent = 'Standard listing: the buyer pays their own network fee.';
+      }
+    };
+
+    const marketList = async () => {
+      const entry = sellSelectedEntry();
+      if (!entry) return;
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        sellDom.status.textContent = 'Connect a wallet to list.';
+        return;
+      }
+      const tokenIdRaw = sellDom.tokenId?.value?.trim();
+      if (!/^\d+$/.test(tokenIdRaw ?? '')) {
+        sellDom.status.textContent = 'Enter the inscription number you want to sell.';
+        return;
+      }
+      const tokenId = BigInt(tokenIdRaw);
+      const settlement = getMarketSettlementAsset(entry.paymentTokenContractId ?? null);
+      const decimals = settlement.decimals ?? 6;
+      const priceAmount = parseSellPrice(sellDom.price?.value, decimals);
+      if (priceAmount === null) {
+        sellDom.status.textContent = `Enter a valid price (up to ${decimals} decimals).`;
+        return;
+      }
+      const sponsored = isSponsoredMarket(entry);
+      const budget = sponsored ? (sellState.quote ?? 60_000n) : null;
+
+      // ownership check before the wallet opens
+      sellDom.status.textContent = 'Checking ownership...';
+      try {
+        const owner = await state.client.getOwner(tokenId, state.walletSession.address);
+        if (!owner || owner !== state.walletSession.address) {
+          sellDom.status.textContent = owner
+            ? `Inscription #${tokenId} is owned by ${owner.slice(0, 8)}..., not your wallet.`
+            : `Inscription #${tokenId} not found.`;
+          return;
+        }
+      } catch {
+        sellDom.status.textContent = 'Could not verify ownership - try again.';
+        return;
+      }
+
+      const postConditions = [
+        buildTransferPostCondition({
+          contract: state.contract,
+          senderAddress: state.walletSession.address,
+          tokenId
+        })
+      ];
+      const functionArgs = [
+        contractPrincipalCV(state.contract.address, state.contract.contractName),
+        uintCV(tokenId),
+        uintCV(priceAmount)
+      ];
+      if (sponsored && budget !== null) {
+        functionArgs.push(uintCV(budget));
+        postConditions.push(
+          makeStandardSTXPostCondition(
+            state.walletSession.address,
+            FungibleConditionCode.Equal,
+            budget
+          )
+        );
+      }
+      sellDom.status.textContent = 'Confirm the listing in your wallet...';
+      showContractCall({
+        contractAddress: entry.address,
+        contractName: entry.contractName,
+        functionName: 'list-token',
+        functionArgs,
+        network: entry.network,
+        stxAddress: state.walletSession.address,
+        postConditionMode: PostConditionMode.Deny,
+        postConditions,
+        onFinish: (payload) => {
+          const txId = payload?.txId ?? payload?.txid ?? '';
+          sellDom.status.textContent = `Listing submitted${txId ? ` - tx ${txId}` : ''}. It appears here once confirmed.`;
+        },
+        onCancel: () => {
+          sellDom.status.textContent = 'Listing cancelled.';
+        }
+      });
+    };
+
+    sellDom.market?.addEventListener('change', () => { void updateSellUi(); });
+    sellDom.button?.addEventListener('click', () => { void marketList(); });
+
+    const openSellForToken = (tokenId) => {
+      if (sellDom.details) sellDom.details.open = true;
+      if (sellDom.tokenId) sellDom.tokenId.value = tokenId;
+      populateSellMarkets();
+      void updateSellUi();
+      sellDom.details?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    const renderMarketToolbar = () => {
+      if (!marketDom.toolbar) return;
+      const symbols = ['all', ...new Set(marketEntriesForNetwork().map((entry) =>
+        getMarketSettlementLabel(getMarketSettlementAsset(entry.paymentTokenContractId ?? null))
+      ))];
+      marketDom.toolbar.replaceChildren(
+        ...symbols.map((symbol) => {
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'market-chip';
+          chip.setAttribute('role', 'tab');
+          chip.setAttribute('aria-selected', String(marketState.filter === symbol));
+          chip.textContent = symbol === 'all' ? 'All assets' : symbol;
+          chip.addEventListener('click', () => {
+            marketState.filter = symbol;
+            renderMarketToolbar();
+            renderMarketListings();
+          });
+          return chip;
+        })
+      );
+    };
+
+    const renderMarketListings = () => {
+      if (!marketDom.listings) return;
+      const run = marketState.run;
+      const visible = marketState.listings.filter((listing) =>
+        listing.soldAt === null &&
+        (marketState.filter === 'all' ||
+          getMarketSettlementLabel(listing.settlement) === marketState.filter)
+      );
+      if (!visible.length) {
+        marketDom.listings.replaceChildren();
+        marketDom.status.innerHTML = '<span><strong>Market</strong> no live listings right now — list one from My Wallet.</span>';
+        return;
+      }
+      marketDom.status.innerHTML = `<span><strong>Market</strong> ${visible.length} live listing${visible.length === 1 ? '' : 's'}.</span>`;
+      marketState.liveFrames = 0; // cards re-render from scratch; recount frames
+      marketDom.listings.replaceChildren(
+        ...visible.map((listing) => {
+          const card = document.createElement('article');
+          card.className = 'market-card';
+          const symbol = getMarketSettlementLabel(listing.settlement);
+          const decimals = listing.settlement.decimals ?? 6;
+          const sponsored = isSponsoredMarket(listing.entry);
+          const isOwnListing = !!state.walletSession.address &&
+            addressesEqual(listing.seller, state.walletSession.address);
+
+          const thumb = document.createElement('a');
+          thumb.className = 'market-thumb';
+          thumb.href = `/xplorer?token=${listing.tokenId}`;
+          thumb.target = '_self';
+          thumb.dataset.marketThumb = `${listing.contractId}:${listing.listingId}`;
+          thumb.setAttribute('aria-label', `View inscription #${listing.tokenId}`);
+          thumb.append(
+            Object.assign(document.createElement('span'), {
+              className: 'market-thumb__label',
+              textContent: 'Loading…'
+            })
+          );
+
+          const badges = document.createElement('div');
+          badges.className = 'market-card__badge-row';
+          badges.innerHTML = `<span class="badge">${symbol}</span>${
+            sponsored ? '<span class="badge green">No STX needed</span>' : ''
+          }${isOwnListing ? '<span class="badge blue">Your listing</span>' : ''}`;
+
+          const price = document.createElement('div');
+          price.className = 'market-card__price';
+          // Always show the USD equivalent next to the asset price (live
+          // Coinbase spot rates; falls back to asset-only while loading).
+          price.textContent = formatMarketPriceWithUsd(
+            listing.price,
+            listing.settlement,
+            state.usdPriceBook
+          );
+
+          const meta = document.createElement('div');
+          meta.className = 'market-card__meta';
+          meta.textContent = `Inscription #${listing.tokenId} · listing #${listing.listingId} · seller `;
+          const sellerSpan = document.createElement('span');
+          applyBnsName(sellerSpan, listing.seller);
+          meta.append(sellerSpan);
+
+          const details = document.createElement('details');
+          details.className = 'market-card__details';
+          const summaryEl = document.createElement('summary');
+          summaryEl.textContent = 'Details';
+          const body = document.createElement('div');
+          body.className = 'market-detail';
+          details.append(summaryEl, body);
+          details.addEventListener('toggle', () => {
+            if (details.open && !details.dataset.loaded) {
+              details.dataset.loaded = '1';
+              void loadMarketDetails(listing, body).catch(() => {
+                body.replaceChildren(
+                  Object.assign(document.createElement('p'), {
+                    className: 'muted',
+                    textContent: 'Details unavailable right now.'
+                  })
+                );
+              });
+            }
+          });
+
+          const actions = document.createElement('div');
+          actions.className = 'market-card__actions';
+          if (isLegacyCoreListing(listing)) {
+            // v3-only policy: v2 inscriptions are delisted from sale. The
+            // owner can cancel and migrate, then relist on a v1.1 market.
+            const note = document.createElement('p');
+            note.className = 'market-card__meta';
+            note.textContent = 'Legacy v2 inscription — delisted from sale.';
+            const migrate = document.createElement('a');
+            migrate.className = 'market-chip';
+            migrate.href = '/web/migrate.html';
+            migrate.target = '_self';
+            migrate.textContent = 'Migrate to v3 to relist';
+            card.append(note);
+            actions.append(migrate);
+            if (isOwnListing) {
+              const cancelBtn = document.createElement('button');
+              cancelBtn.type = 'button';
+              cancelBtn.className = 'market-chip';
+              cancelBtn.textContent = 'Cancel listing (reclaim)';
+              cancelBtn.addEventListener('click', () => { void marketCancel(listing); });
+              actions.append(cancelBtn);
+            }
+          } else if (isOwnListing) {
+            const cancelBtn = document.createElement('button');
+            cancelBtn.type = 'button';
+            cancelBtn.className = 'market-chip';
+            cancelBtn.textContent = 'Cancel / change price';
+            cancelBtn.title = 'Unlist this inscription; once confirmed, relist it at the new price.';
+            cancelBtn.addEventListener('click', () => { void marketCancel(listing); });
+            actions.append(cancelBtn);
+          } else {
+            const buy = document.createElement('button');
+            buy.type = 'button';
+            buy.className = 'market-chip';
+            buy.textContent = sponsored ? 'Buy — no STX needed' : 'Buy';
+            buy.addEventListener('click', () => { void marketBuy(listing); });
+            actions.append(buy);
+          }
+
+          card.append(thumb, badges, price, meta, details, actions);
+          return card;
+        })
+      );
+      void hydrateMarketThumbnails(run, visible);
+    };
+
+    // --- Seller dashboard: my listings across all markets -----------------
+    const marketReclaim = async (listing) => {
+      if (!state.walletSession.isConnected || !state.walletSession.address) return;
+      marketDom.status.innerHTML = '<span><strong>Market</strong> confirm the reclaim in your wallet…</span>';
+      showContractCall({
+        contractAddress: listing.entry.address,
+        contractName: listing.entry.contractName,
+        functionName: 'settle-refund',
+        functionArgs: [uintCV(listing.listingId)],
+        network: listing.entry.network,
+        stxAddress: state.walletSession.address,
+        postConditionMode: PostConditionMode.Deny,
+        postConditions: marketEscrowPostConditions(listing, { includeNft: false }),
+        onFinish: (payload) => {
+          const txId = payload?.txId ?? payload?.txid ?? '';
+          marketDom.status.innerHTML = `<span><strong>Market</strong> reclaim submitted${txId ? ` — tx ${txId}` : ''}. Your unused deposit returns when it confirms.</span>`;
+        },
+        onCancel: () => {
+          marketDom.status.innerHTML = '<span><strong>Market</strong> reclaim cancelled.</span>';
+        }
+      });
+    };
+
+    const renderSellerDashboard = () => {
+      let host = document.getElementById('marketMine');
+      if (!host) {
+        host = document.createElement('details');
+        host.id = 'marketMine';
+        host.className = 'inscribe-details market-sell';
+        marketDom.listings?.parentElement?.insertBefore(host, marketDom.listings);
+      }
+      const mine = state.walletSession.address
+        ? marketState.listings.filter((listing) =>
+            addressesEqual(listing.seller, state.walletSession.address)
+          )
+        : [];
+      if (!mine.length) {
+        host.hidden = true;
+        return;
+      }
+      host.hidden = false;
+      host.replaceChildren();
+      const summary = document.createElement('summary');
+      summary.textContent = `My listings (${mine.length})`;
+      host.append(summary);
+      const body = document.createElement('div');
+      body.className = 'market-mine';
+      for (const listing of mine) {
+        const row = document.createElement('div');
+        row.className = 'market-mine__row';
+        const symbol = getMarketSettlementLabel(listing.settlement);
+        const sponsored = isSponsoredMarket(listing.entry);
+        const info = document.createElement('div');
+        info.className = 'market-card__meta';
+        const priceText = formatMarketPriceWithUsd(listing.price, listing.settlement, state.usdPriceBook);
+        const budgetText = sponsored && listing.budgetRemaining !== null
+          ? ` · deposit ${formatAssetAmount(listing.feeBudget ?? listing.budgetRemaining, 6, 'STX')}, ${formatAssetAmount(listing.budgetRemaining, 6, 'STX')} remaining`
+          : '';
+        info.textContent = `#${listing.tokenId} · ${priceText} · ${listing.soldAt !== null ? 'SOLD — settlement pending' : 'live'}${budgetText}`;
+        const actions = document.createElement('div');
+        actions.className = 'market-card__actions';
+        if (listing.soldAt === null) {
+          const cancelBtn = document.createElement('button');
+          cancelBtn.type = 'button';
+          cancelBtn.className = 'market-chip';
+          cancelBtn.textContent = 'Cancel (return NFT + deposit)';
+          cancelBtn.addEventListener('click', () => { void marketCancel(listing); });
+          actions.append(cancelBtn);
+        } else if (sponsored && (listing.budgetRemaining ?? 0n) > 0n) {
+          const reclaimBtn = document.createElement('button');
+          reclaimBtn.type = 'button';
+          reclaimBtn.className = 'market-chip';
+          reclaimBtn.textContent = 'Reclaim deposit';
+          reclaimBtn.addEventListener('click', () => { void marketReclaim(listing); });
+          actions.append(reclaimBtn);
+          const note = document.createElement('span');
+          note.className = 'market-card__meta';
+          note.textContent = 'Usually automatic; self-reclaim unlocks ~24h after the sale if the relayer has not settled.';
+          actions.append(note);
+        }
+        row.append(info, actions);
+        body.append(row);
+      }
+      host.append(body);
+    };
+
+    // Fast path: the edge-cached aggregate endpoint (functions/market/listings)
+    // turns ~1+N Hiro reads per market into ONE cached request. Falls back to
+    // direct reads when unavailable (local dev without wrangler).
+    const loadListingsFromCache = async ({ seller = null, allowEmpty = false } = {}) => {
+      const query = seller ? `?seller=${encodeURIComponent(seller)}` : '';
+      const response = await fetch(`/market/listings${query}`);
+      if (!response.ok) throw new Error(`cache endpoint ${response.status}`);
+      const payload = await response.json();
+      // Never trust an empty or degraded cache answer: a transient upstream
+      // failure server-side must not render as "no listings" when listings
+      // exist on-chain. Throwing here falls back to direct reads.
+      if (payload.degraded === true || (!allowEmpty && !(payload.listings ?? []).length)) {
+        throw new Error('cache empty or degraded - verifying with direct reads');
+      }
+      const byId = new Map(
+        marketEntriesForNetwork().map((entry) => [getMarketContractId(entry), entry])
+      );
+      return (payload.listings ?? [])
+        .map((row) => {
+          const entry = byId.get(row.contractId);
+          if (!entry) return null;
+          return {
+            entry,
+            contractId: row.contractId,
+            settlement: getMarketSettlementAsset(entry.paymentTokenContractId ?? null),
+            listingId: BigInt(row.listingId),
+            seller: row.seller,
+            nftContract: row.nftContract,
+            tokenId: BigInt(row.tokenId),
+            price: BigInt(row.price),
+            createdAt: row.createdAt !== null ? BigInt(row.createdAt) : null,
+            feeBudget: row.feeBudget !== null ? BigInt(row.feeBudget) : null,
+            claimed: row.claimed !== null ? BigInt(row.claimed) : null,
+            budgetRemaining: row.budgetRemaining !== null ? BigInt(row.budgetRemaining) : null,
+            soldAt: row.soldAt !== null && row.soldAt !== undefined ? BigInt(row.soldAt) : null
+          };
+        })
+        .filter(Boolean);
+    };
+
+    const renderWalletMarketListings = () => {
+      const host = dom.walletMarketListings;
+      const body = dom.walletMarketListingsBody;
+      if (!host || !body) return;
+      const viewingAddress = getViewingWalletAddress();
+      const listingState = state.walletMarketListings;
+      const listings = viewingAddress && addressesEqual(listingState.address, viewingAddress)
+        ? listingState.listings.filter((listing) => listing.soldAt === null)
+        : [];
+      if (listings.length === 0) {
+        host.hidden = true;
+        body.replaceChildren();
+        return;
+      }
+      host.hidden = false;
+      host.open = true;
+      if (dom.walletMarketListingsSummary) {
+        dom.walletMarketListingsSummary.textContent = `Listed / escrowed (${listings.length})`;
+      }
+      body.replaceChildren(
+        ...listings.map((listing) => {
+          const row = document.createElement('div');
+          row.className = 'market-mine__row';
+          const info = document.createElement('div');
+          info.className = 'market-card__meta';
+          info.textContent = `#${listing.tokenId} · ${formatMarketPriceWithUsd(
+            listing.price,
+            listing.settlement,
+            state.usdPriceBook
+          )} · held safely in market escrow · seller: ${getViewingWalletLabel()}`;
+          const actions = document.createElement('div');
+          actions.className = 'market-card__actions';
+          const view = document.createElement('a');
+          view.className = 'market-chip';
+          view.href = '/market';
+          view.target = '_self';
+          view.textContent = 'View market';
+          actions.append(view);
+          if (
+            state.walletSession.address &&
+            addressesEqual(state.walletSession.address, listing.seller)
+          ) {
+            const cancel = document.createElement('button');
+            cancel.type = 'button';
+            cancel.className = 'market-chip';
+            cancel.textContent = 'Unlist / change price';
+            cancel.title = 'The market contract requires cancel and relist to change price.';
+            cancel.addEventListener('click', () => {
+              void marketCancel(listing, dom.walletMarketListingsStatus);
+            });
+            actions.append(cancel);
+          }
+          row.append(info, actions);
+          return row;
+        })
+      );
+    };
+
+    const refreshWalletMarketListings = async (walletAddress) => {
+      if (!walletAddress || state.explorerMode) return;
+      const requestId = (state.walletMarketListings.requestId ?? 0) + 1;
+      state.walletMarketListings = { address: walletAddress, listings: [], requestId };
+      renderWalletMarketListings();
+      let listings = [];
+      try {
+        listings = await loadListingsFromCache({ seller: walletAddress, allowEmpty: true });
+      } catch {
+        const perContract = await Promise.all(
+          marketEntriesForNetwork().map((entry) => readMarketListings(entry).catch(() => []))
+        );
+        listings = perContract.flat();
+      }
+      if (
+        requestId !== state.walletMarketListings.requestId ||
+        !addressesEqual(walletAddress, getViewingWalletAddress())
+      ) {
+        return;
+      }
+      state.walletMarketListings = {
+        address: walletAddress,
+        listings: listings.filter((listing) => addressesEqual(listing.seller, walletAddress)),
+        requestId
+      };
+      renderWalletMarketListings();
+    };
+
+    const loadMarketPage = async (params = null) => {
+      const run = ++marketState.run;
+      if (!marketDom.listings) return;
+      if (marketDom.badge) marketDom.badge.textContent = state.contract.network;
+      // USD conversion: fetch spot rates in the background and re-render the
+      // cards once available (asset-only prices show in the meantime).
+      void loadUsdPriceBook().then(() => {
+        if (run === marketState.run && state.usdPriceBook) {
+          renderMarketListings();
+          renderSellerDashboard();
+        }
+      });
+      renderMarketToolbar();
+      populateSellMarkets();
+      const listParam = params?.get?.('list');
+      if (listParam && /^\d+$/.test(listParam)) {
+        openSellForToken(listParam);
+      }
+      marketDom.status.innerHTML = '<span><strong>Market</strong> loading listings…</span>';
+      try {
+        let listings;
+        try {
+          listings = await loadListingsFromCache();
+          debugLog('market', 'listings served from edge cache', { count: listings.length });
+        } catch {
+          const perContract = await Promise.all(
+            marketEntriesForNetwork().map((entry) => readMarketListings(entry).catch(() => []))
+          );
+          listings = perContract.flat();
+        }
+        if (run !== marketState.run) return;
+        marketState.listings = listings.sort((a, b) => (b.listingId > a.listingId ? 1 : -1));
+        renderMarketListings();
+        renderSellerDashboard();
+      } catch (error) {
+        if (run !== marketState.run) return;
+        marketDom.status.innerHTML = '<span><strong>Market</strong> could not load listings.</span>';
+        debugLog('market', 'load failed', { error: String(error?.message ?? error) });
+      }
+    };
+
+
+    // --- Drops: sponsored free claims (data-page 'drops') -------------------
+    // Reuses the market module's thumbnail/media caches and card styling; the
+    // drops contract exposes market-shaped read-onlys, so reads look identical.
+    const dropsState = { run: 0, drops: [] };
+    const dropsDom = {
+      status: $('dropsStatus'),
+      listings: $('dropsListings'),
+      badge: $('dropsNetworkBadge'),
+      create: $('dropsCreate'),
+      createTokenId: $('dropsCreateTokenId'),
+      createGroup: $('dropsCreateGroup'),
+      createDeposit: $('dropsCreateDeposit'),
+      createButton: $('dropsCreateButton'),
+      createStatus: $('dropsCreateStatus')
+    };
+    const dropsEntriesForNetwork = () =>
+      DROPS_REGISTRY.filter((entry) => entry.network === state.contract.network);
+    let dropsQuote = null; // deposit quote from the relayer (ustx)
+
+    const readDrops = async (entry) => {
+      const contractId = `${entry.address}.${entry.contractName}`;
+      const lastJson = await callReadOnlyJson({
+        contractId,
+        functionName: 'get-last-drop-id',
+        network: entry.network
+      });
+      const lastId = BigInt(lastJson?.value?.value ?? 0);
+      const results = [];
+      const floor = lastId > BigInt(MARKET_LISTINGS_PER_CONTRACT)
+        ? lastId - BigInt(MARKET_LISTINGS_PER_CONTRACT)
+        : 0n;
+      for (let id = lastId; id >= floor; id -= 1n) {
+        try {
+          const json = await callReadOnlyJson({
+            contractId,
+            functionName: 'get-drop',
+            args: [uintCV(id)],
+            network: entry.network
+          });
+          const tuple = unwrapBindingTuple(json);
+          if (!tuple) continue;
+          const claimedRaw = tuple['claimed-at']?.value ?? null;
+          results.push({
+            entry,
+            contractId,
+            dropId: id,
+            // market-compatible keys so marketMediaFor/thumbnail caches work
+            listingId: id,
+            creator: String(tuple.creator.value),
+            nftContract: String(tuple['nft-contract'].value),
+            tokenId: BigInt(tuple['token-id'].value),
+            groupId: BigInt(tuple['group-id'].value),
+            feeBudget: tuple['fee-budget'] ? BigInt(tuple['fee-budget'].value) : null,
+            budgetRemaining: tuple['budget-remaining'] ? BigInt(tuple['budget-remaining'].value) : null,
+            claimedAt: claimedRaw === null || claimedRaw === undefined ? null : BigInt(claimedRaw.value ?? claimedRaw)
+          });
+        } catch {
+          // sparse ids / settled drops: skip
+        }
+        if (id === 0n) break;
+      }
+      return results;
+    };
+
+    // Claims cost the claimer nothing, so the only post-condition is the NFT
+    // leaving escrow — a "send exactly 0 STX" condition just confuses wallets.
+    const dropClaimPostConditions = (drop) => {
+      const [nftAddress, nftName] = drop.nftContract.split('.');
+      return [
+        buildContractTransferPostCondition({
+          nftContract: { address: nftAddress, contractName: nftName, network: drop.entry.network },
+          senderContract: {
+            address: drop.entry.address,
+            contractName: drop.entry.contractName,
+            network: drop.entry.network
+          },
+          tokenId: drop.tokenId
+        })
+      ];
+    };
+
+    const dropClaimSelfPaid = (drop) => {
+      const [nftAddress, nftName] = drop.nftContract.split('.');
+      const postConditions = dropClaimPostConditions(drop);
+      dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the claim in your wallet…</span>';
+      showContractCall({
+        contractAddress: drop.entry.address,
+        contractName: drop.entry.contractName,
+        functionName: 'claim',
+        functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(drop.dropId)],
+        network: drop.entry.network,
+        stxAddress: state.walletSession.address,
+        postConditionMode: PostConditionMode.Deny,
+        postConditions,
+        onFinish: (payload) => {
+          const txId = payload?.txId ?? payload?.txid ?? '';
+          dropsDom.status.innerHTML = `<span><strong>Drops</strong> claim submitted${txId ? ` — tx ${txId}` : ''}.</span><span class="badge green">claimed</span>`;
+        },
+        onCancel: () => {
+          dropsDom.status.innerHTML = '<span><strong>Drops</strong> claim cancelled.</span>';
+        }
+      });
+    };
+
+    const dropClaim = async (drop) => {
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> connect a wallet to claim — new wallets work, no STX needed.</span>';
+        return;
+      }
+      const [nftAddress, nftName] = drop.nftContract.split('.');
+      const postConditions = dropClaimPostConditions(drop);
+      dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the free claim in your wallet (fee 0)…</span>';
+      showContractCall({
+        contractAddress: drop.entry.address,
+        contractName: drop.entry.contractName,
+        functionName: 'claim',
+        functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(drop.dropId)],
+        network: drop.entry.network,
+        stxAddress: state.walletSession.address,
+        postConditionMode: PostConditionMode.Deny,
+        postConditions,
+        sponsored: true,
+        onFinish: async (payload) => {
+          const txHex = payload?.txRaw ?? null;
+          if (!txHex) {
+            dropsDom.status.innerHTML = '<span><strong>Drops</strong> this wallet did not return the signed sponsored transaction — claiming self-paid instead.</span>';
+            dropClaimSelfPaid(drop);
+            return;
+          }
+          dropsDom.status.innerHTML = '<span><strong>Drops</strong> submitting to the sponsor relayer…</span>';
+          try {
+            const base = (drop.entry.sponsorApi ?? '/').replace(/\/+$/, '');
+            const r = await fetch(`${base}/sponsor/submit`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                txHex,
+                contractId: drop.contractId,
+                listingId: drop.dropId.toString()
+              })
+            });
+            const body = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(body?.message ?? `relayer ${r.status}`);
+            const buyTx = body?.txids?.buy ?? '';
+            dropsDom.status.innerHTML = `<span><strong>Drops</strong> claim sponsored and broadcast${buyTx ? ` — tx ${buyTx}` : ''}. The inscription lands in your wallet when it confirms.</span><span class="badge green">no STX needed</span>`;
+          } catch (error) {
+            dropsDom.status.innerHTML = `<span><strong>Drops</strong> sponsorship failed (${String(error?.message ?? error)}) — you can claim self-paid instead.</span>`;
+          }
+        },
+        onCancel: () => {
+          dropsDom.status.innerHTML = '<span><strong>Drops</strong> claim cancelled.</span>';
+        }
+      });
+    };
+
+    const hydrateDropThumbnails = async (run, drops) => {
+      await runLimited(drops, MARKET_THUMB_HYDRATION_CONCURRENCY, async (drop) => {
+        if (run !== dropsState.run) return;
+        const media = await marketMediaFor(drop);
+        if (run !== dropsState.run) return;
+        const slot = dropsDom.listings?.querySelector(
+          `[data-drop-thumb="${drop.contractId}:${drop.dropId}"]`
+        );
+        if (!slot) return;
+        if (media?.kind === 'html-live') {
+          const frame = document.createElement('iframe');
+          frame.className = 'market-thumb__frame';
+          frame.title = `Inscription #${drop.tokenId} preview`;
+          frame.sandbox = 'allow-scripts';
+          frame.referrerPolicy = 'no-referrer';
+          frame.loading = 'lazy';
+          frame.setAttribute('scrolling', 'no');
+          frame.srcdoc = media.html;
+          slot.replaceChildren(frame);
+          slot.classList.add('market-thumb--media');
+        } else if (media?.kind === 'text') {
+          const pre = document.createElement('div');
+          pre.className = 'market-thumb__snippet';
+          pre.textContent = media.text;
+          slot.replaceChildren(pre);
+          slot.classList.add('market-thumb--media');
+        } else if (media?.kind === 'video' && media.url) {
+          const video = document.createElement('video');
+          video.src = media.url;
+          video.muted = true;
+          video.loop = true;
+          video.autoplay = true;
+          video.playsInline = true;
+          slot.replaceChildren(video);
+          slot.classList.add('market-thumb--media');
+        } else if (media?.url && media.kind !== 'html-live') {
+          const img = document.createElement('img');
+          img.src = media.url;
+          img.alt = `Inscription #${drop.tokenId}`;
+          img.loading = 'lazy';
+          slot.replaceChildren(img);
+          slot.classList.add('market-thumb--media');
+        } else {
+          slot.replaceChildren(
+            Object.assign(document.createElement('span'), {
+              className: 'market-thumb__label',
+              textContent: `#${drop.tokenId}`
+            })
+          );
+        }
+      });
+    };
+
+    const renderDrops = () => {
+      if (!dropsDom.listings) return;
+      const run = dropsState.run;
+      const live = dropsState.drops.filter((drop) => drop.claimedAt === null);
+      if (!live.length) {
+        dropsDom.listings.replaceChildren();
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> no live drops right now — create one below, or check back soon.</span>';
+        return;
+      }
+      dropsDom.status.innerHTML = `<span><strong>Drops</strong> ${live.length} free claim${live.length === 1 ? '' : 's'} available.</span>`;
+      dropsDom.listings.replaceChildren(
+        ...live.map((drop) => {
+          const card = document.createElement('article');
+          card.className = 'market-card';
+
+          const thumb = document.createElement('a');
+          thumb.className = 'market-thumb';
+          thumb.href = `/xplorer?token=${drop.tokenId}`;
+          thumb.target = '_self';
+          thumb.dataset.dropThumb = `${drop.contractId}:${drop.dropId}`;
+          thumb.setAttribute('aria-label', `View inscription #${drop.tokenId}`);
+          thumb.append(
+            Object.assign(document.createElement('span'), {
+              className: 'market-thumb__label',
+              textContent: 'Loading…'
+            })
+          );
+
+          const badges = document.createElement('div');
+          badges.className = 'market-card__badge-row';
+          badges.innerHTML = '<span class="badge green">Free claim</span><span class="badge">No STX needed</span>';
+
+          const price = document.createElement('div');
+          price.className = 'market-card__price';
+          price.textContent = 'Free';
+
+          const meta = document.createElement('div');
+          meta.className = 'market-card__meta';
+          meta.textContent = `Inscription #${drop.tokenId} · drop #${drop.dropId} · from `;
+          const creatorSpan = document.createElement('span');
+          applyBnsName(creatorSpan, drop.creator);
+          meta.append(creatorSpan);
+
+          const actions = document.createElement('div');
+          actions.className = 'market-card__actions';
+          const isMine = state.walletSession.address === drop.creator;
+          if (isMine) {
+            const cancelBtn = document.createElement('button');
+            cancelBtn.type = 'button';
+            cancelBtn.className = 'market-chip';
+            cancelBtn.textContent = 'Cancel drop (reclaim)';
+            cancelBtn.addEventListener('click', () => {
+              const [nftAddress, nftName] = drop.nftContract.split('.');
+              dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the cancel in your wallet…</span>';
+              showContractCall({
+                contractAddress: drop.entry.address,
+                contractName: drop.entry.contractName,
+                functionName: 'cancel',
+                functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(drop.dropId)],
+                network: drop.entry.network,
+                stxAddress: state.walletSession.address,
+                postConditionMode: PostConditionMode.Deny,
+                postConditions: marketEscrowPostConditions(drop),
+                onFinish: () => {
+                  dropsDom.status.innerHTML = '<span><strong>Drops</strong> cancel submitted — NFT and deposit return when it confirms.</span>';
+                },
+                onCancel: () => {
+                  dropsDom.status.innerHTML = '<span><strong>Drops</strong> cancel aborted.</span>';
+                }
+              });
+            });
+            actions.append(cancelBtn);
+          } else {
+            const claimBtn = document.createElement('button');
+            claimBtn.type = 'button';
+            claimBtn.className = 'market-chip';
+            claimBtn.textContent = 'Claim free — no STX needed';
+            claimBtn.addEventListener('click', () => { void dropClaim(drop); });
+            actions.append(claimBtn);
+          }
+
+          card.append(thumb, badges, price, meta, actions);
+          return card;
+        })
+      );
+      void hydrateDropThumbnails(run, live);
+    };
+
+    const updateDropsDepositHint = async () => {
+      if (!dropsDom.createDeposit) return;
+      const entry = dropsEntriesForNetwork()[0];
+      if (!entry) return;
+      dropsDom.createDeposit.textContent = 'Fetching sponsorship deposit quote...';
+      try {
+        const base = (entry.sponsorApi ?? '/').replace(/\/+$/, '');
+        const r = await fetch(`${base}/sponsor/quote`, { method: 'POST' });
+        if (!r.ok) throw new Error(String(r.status));
+        const body = await r.json();
+        dropsQuote = BigInt(body.budgetUstx ?? '60000');
+      } catch {
+        dropsQuote = 60_000n;
+      }
+      dropsDom.createDeposit.textContent =
+        `Sponsorship deposit: ${formatAssetAmount(dropsQuote, 6, 'STX')} — covers the claimer's network fee so they need zero STX; the unused part refunds to you after the claim or on cancel.`;
+    };
+
+    const dropsCreateDrop = async () => {
+      const entry = dropsEntriesForNetwork()[0];
+      if (!entry) return;
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        dropsDom.createStatus.textContent = 'Connect a wallet to create a drop.';
+        return;
+      }
+      const tokenIdRaw = dropsDom.createTokenId?.value?.trim();
+      if (!/^\d+$/.test(tokenIdRaw ?? '')) {
+        dropsDom.createStatus.textContent = 'Enter the inscription number you want to drop.';
+        return;
+      }
+      const tokenId = BigInt(tokenIdRaw);
+      const groupRaw = dropsDom.createGroup?.value?.trim();
+      // A shared batch id limits claims to one per person per batch; leaving it
+      // blank gives the drop a unique id (no per-person limit).
+      const groupId = /^\d+$/.test(groupRaw ?? '')
+        ? BigInt(groupRaw)
+        : BigInt(Date.now()) * 1000n + BigInt(Math.floor(Math.random() * 1000));
+      const budget = dropsQuote ?? 60_000n;
+
+      dropsDom.createStatus.textContent = 'Checking ownership...';
+      try {
+        const owner = await state.client.getOwner(tokenId, state.walletSession.address);
+        if (!owner || owner !== state.walletSession.address) {
+          dropsDom.createStatus.textContent = owner
+            ? `Inscription #${tokenId} is owned by ${owner.slice(0, 8)}..., not your wallet.`
+            : `Inscription #${tokenId} not found.`;
+          return;
+        }
+      } catch {
+        dropsDom.createStatus.textContent = 'Could not verify ownership - try again.';
+        return;
+      }
+
+      const postConditions = [
+        buildTransferPostCondition({
+          contract: state.contract,
+          senderAddress: state.walletSession.address,
+          tokenId
+        }),
+        makeStandardSTXPostCondition(
+          state.walletSession.address,
+          FungibleConditionCode.Equal,
+          budget
+        )
+      ];
+      dropsDom.createStatus.textContent = 'Confirm the drop in your wallet...';
+      showContractCall({
+        contractAddress: entry.address,
+        contractName: entry.contractName,
+        functionName: 'create-drop',
+        functionArgs: [
+          contractPrincipalCV(state.contract.address, state.contract.contractName),
+          uintCV(tokenId),
+          uintCV(budget),
+          uintCV(groupId)
+        ],
+        network: entry.network,
+        stxAddress: state.walletSession.address,
+        postConditionMode: PostConditionMode.Deny,
+        postConditions,
+        onFinish: (payload) => {
+          const txId = payload?.txId ?? payload?.txid ?? '';
+          dropsDom.createStatus.textContent = `Drop submitted${txId ? ` - tx ${txId}` : ''}. It appears here once confirmed.`;
+        },
+        onCancel: () => {
+          dropsDom.createStatus.textContent = 'Drop cancelled.';
+        }
+      });
+    };
+
+    dropsDom.createButton?.addEventListener('click', () => { void dropsCreateDrop(); });
+
+    const loadDropsPage = async () => {
+      const run = ++dropsState.run;
+      if (!dropsDom.listings) return;
+      if (dropsDom.badge) dropsDom.badge.textContent = state.contract.network;
+      void updateDropsDepositHint();
+      dropsDom.status.innerHTML = '<span><strong>Drops</strong> loading…</span>';
+      try {
+        const perContract = await Promise.all(
+          dropsEntriesForNetwork().map((entry) => readDrops(entry).catch(() => []))
+        );
+        if (run !== dropsState.run) return;
+        dropsState.drops = perContract.flat().sort((a, b) => (b.dropId > a.dropId ? 1 : -1));
+        renderDrops();
+      } catch (error) {
+        if (run !== dropsState.run) return;
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> could not load drops.</span>';
+        debugLog('drops', 'load failed', { error: String(error?.message ?? error) });
+      }
+    };
+
     const switchToPage = async (page, params = null) => {
       const run = ++pageSwitchRun;
       PAGE_MODE = page;
@@ -9794,6 +11423,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       if (page === 'my-wallet') {
         await openMyWalletDefaultView();
       }
+      if (page === 'market') {
+        await loadMarketPage(params);
+      }
+      if (page === 'drops') {
+        await loadDropsPage();
+      }
       if (run === pageSwitchRun) {
         updateControls();
       }
@@ -9806,6 +11441,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
       if (seg === 'my-wallet' || seg === 'wallet') {
         return 'my-wallet';
+      }
+      if (seg === 'market') {
+        return 'market';
+      }
+      if (seg === 'drops') {
+        return 'drops';
       }
       if (
         seg === 'xplorer' ||
@@ -9865,6 +11506,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         const openedPublicView = await openPublicViewFromParams(pageParams);
         if (openedPublicView) {
           // handled above
+        } else if (PAGE_MODE === 'market') {
+          await loadMarketPage(pageParams);
+        } else if (PAGE_MODE === 'drops') {
+          await loadDropsPage();
         } else if (
           PAGE_MODE === 'my-wallet' &&
           walletViewRequestId === state.walletViewRequestId &&
@@ -10224,6 +11869,15 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     dom.clearParentsButton.addEventListener('click', clearParentIds);
     dom.transferRecipientInput.addEventListener('input', updateTransferControls);
     dom.transferButton.addEventListener('click', transferSelectedToken);
+    // "List for sale" jumps to the Market page with the selected inscription
+    // prefilled in the sell form (any currency, optional sponsorship).
+    const listForSaleButton = $('listForSaleButton');
+    listForSaleButton?.addEventListener('click', () => {
+      if (state.selectedTokenId === null || state.selectedTokenId === undefined) return;
+      const target = `/market?list=${state.selectedTokenId.toString()}`;
+      window.history.pushState(null, '', target);
+      void switchToPage('market', new URLSearchParams({ list: state.selectedTokenId.toString() }));
+    });
     dom.payloadPreviewExpandButton?.addEventListener('click', openPreparedPayloadFullscreen);
     dom.fullscreenButton?.addEventListener('click', openFullscreenViewer);
     dom.previewExpandButton.addEventListener('click', openFullscreenViewer);

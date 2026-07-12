@@ -175,6 +175,10 @@
       font-size: 0.74rem;
       margin-bottom: 1.4rem;
     }
+    .migration-hero { display: inline-flex; align-items: center; gap: 0.45rem; margin: 0.1rem 0 1rem; padding: 0.42rem 0.64rem; border: 1px solid var(--amber-border); border-radius: 999px; color: var(--muted-2); background: oklch(0.10 0.01 60 / 0.55); font-family: var(--mono); font-size: 0.7rem; }
+    .migration-hero strong { color: var(--amber); font-size: 0.78rem; }
+    .migration-hero[data-complete="true"] { color: #06110f; background: #fff; border-color: #070707; }
+    .migration-hero[data-complete="true"] strong { color: #06110f; }
     h1, h2, h3 { font-family: var(--display); letter-spacing: -0.025em; }
     h1 {
       margin: 0 0 1.05rem;
@@ -362,7 +366,13 @@
     .swap-token.active { color: var(--amber); border-color: oklch(0.72 0.18 70 / 0.36); background: oklch(0.72 0.18 70 / 0.08); }
     .swap-token .coin { font-size: 1.4rem; filter: grayscale(0.5) opacity(0.7); }
     .swap-token.active .coin { filter: none; }
-    .swap-arrow { color: var(--amber); font-family: var(--display); font-size: 1.4rem; }
+    .swap-sub { display:block; font-size:0.56rem; letter-spacing:0.03em; text-transform:none; opacity:0.75; margin-top:2px; }
+    .swap-arrow { color: var(--amber); font-family: var(--display); font-size: 1.4rem; min-width: 1.4rem; text-align: center; }
+    .twin-state { display: inline-flex; align-items: center; gap: 0.32rem; width: fit-content; max-width: 100%; padding: 0.28rem 0.48rem; border-radius: 999px; font-family: var(--mono); font-size: 0.67rem; font-weight: 800; letter-spacing: 0.03em; line-height: 1.1; text-shadow: none; }
+    .twin-state--escrowed { color: #fff; background: #080808; border: 2px solid #fff; box-shadow: 0 0 0 2px #080808; }
+    .twin-state--liquid { color: #070707; background: #fff; border: 2px solid #070707; box-shadow: 0 0 0 2px #fff; }
+    .twin-state__icon { font-size: 1rem; line-height: 0.85; }
+    .twin-state-detail { display: block; margin-top: 0.55rem; color: var(--text); font-size: 0.82rem; line-height: 1.35; }
 
     .log { max-height: 350px; overflow: auto; border-radius: 0.75rem; border: 1px solid oklch(0.72 0.18 70 / 0.12); background: oklch(0.10 0.01 60 / 0.75); }
     .log-line { padding: 0.7rem 0.8rem; border-bottom: 1px solid oklch(0.72 0.18 70 / 0.08); color: var(--muted-2); font-family: var(--mono); font-size: 0.72rem; white-space: pre-wrap; word-break: break-word; }
@@ -612,8 +622,11 @@
     /* Journey-led simple flow (shared framework with the LEO Cats page) */
     .journey { margin: 0.5rem 0 0.4rem; }
     .journey-pick-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.55rem; align-items: end; margin-top: 0.3rem; }
-    .journey-image { display: grid; place-items: center; min-height: 280px; border: 1px solid var(--amber-border); border-radius: 1.1rem; background: oklch(0.10 0.01 60 / 0.5); padding: 0.7rem; margin: 0.85rem 0; color: var(--muted); font-size: 0.86rem; text-align: center; }
+    .journey-image { position: relative; display: grid; place-items: center; min-height: 280px; border: 1px solid var(--amber-border); border-radius: 1.1rem; background: oklch(0.10 0.01 60 / 0.5); padding: 0.7rem; margin: 0.85rem 0; color: var(--muted); font-size: 0.86rem; text-align: center; }
     .journey-image img { max-height: 380px; width: auto; max-width: 100%; object-fit: contain; border-radius: 0.85rem; box-shadow: 0 14px 50px oklch(0.02 0.02 190 / 0.45); }
+    .journey-image[data-twin-state]::after { position: absolute; top: 0.9rem; right: 0.9rem; z-index: 2; padding: 0.32rem 0.55rem; border-radius: 999px; font-family: var(--mono); font-size: 0.67rem; font-weight: 800; letter-spacing: 0.03em; line-height: 1.1; text-shadow: none; }
+    .journey-image[data-twin-state="escrowed"]::after { content: '🔒 Xtrata escrowed'; color: #fff; background: #080808; border: 2px solid #fff; box-shadow: 0 0 0 2px #080808; }
+    .journey-image[data-twin-state="liquid"]::after { content: '∞ Xtrata liquid'; color: #070707; background: #fff; border: 2px solid #070707; box-shadow: 0 0 0 2px #fff; }
     .journey-status { font-size: 0.95rem; line-height: 1.5; }
     .journey-owner { color: var(--muted-2); font-size: 0.84rem; margin: 0.4rem 0 0.7rem; line-height: 1.45; }
     .journey-action { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 0.6rem; align-items: stretch; margin-top: 0.5rem; }
@@ -646,10 +659,11 @@
       <div class="hero-grid">
         <div class="hero-copy">
           <div class="eyebrow fade-in-up"><span class="dot"></span>Powered by Stacks · Xtrata Protocol</div>
+          <div id="heroMigration" class="migration-hero" aria-live="polite">Migration <strong id="heroMigrationCount">Loading…</strong></div>
           <h1 class="fade-in-up stagger-1">Seal Your Pepe<br><span>Into Bitcoin.</span><br>Forever.</h1>
-          <p class="lead fade-in-up stagger-2">Inscribe your Bitcoin Pepe NFT permanently through Xtrata, then swap between the original Pepe and its on-chain twin. Immutable. Rare. Eternal.</p>
+          <p id="heroLead" class="lead fade-in-up stagger-2">Inscribe your Bitcoin Pepe NFT permanently through Xtrata, then swap between the original Pepe and its on-chain twin. Immutable. Rare. Eternal.</p>
           <div class="hero-actions fade-in-up stagger-3">
-            <a href="#inscribe" class="btn-amber">Inscribe Now</a>
+            <a id="heroPrimaryAction" href="#inscribe" class="btn-amber">Inscribe Now</a>
             <a href="#lookup" class="btn-outline">Check Status</a>
           </div>
         </div>
@@ -664,7 +678,7 @@
     <section class="stats">
       <div class="container">
         <div class="stats-grid">
-          <div class="stat-card"><div class="stat-label">Inscribed</div><div id="statInscribed" class="stat-value">-</div><div class="stat-note">from helper contract</div></div>
+          <div class="stat-card"><div class="stat-label">Migration</div><div id="statMigration" class="stat-value">- / -</div><div id="statMigrationNote" class="stat-note">loading on-chain counts</div></div>
           <div class="stat-card"><div class="stat-label">Fee</div><div id="statFee" class="stat-value">-</div><div class="stat-note">current standard fee</div></div>
           <div class="stat-card"><div class="stat-label">Free Threshold</div><div id="statThreshold" class="stat-value">-</div><div class="stat-note">early inscription window</div></div>
           <div class="stat-card"><div class="stat-label">Canonical</div><div id="statFinalized" class="stat-value">-</div><div class="stat-note">seed list status</div></div>
@@ -857,6 +871,7 @@
               <div class="status-card wide"><small>Selected token</small><strong id="lookupToken">None</strong></div>
               <div class="status-card wide"><small>Resolved Xtrata ID</small><strong id="lookupXtrata">Not loaded</strong></div>
               <div class="status-card wide"><small>Liquid side</small><strong id="lookupLiquid">Not loaded</strong></div>
+              <div class="status-card wide"><small>Current liquid owner</small><strong id="lookupOwner">Not loaded</strong></div>
             </div>
             <div class="button-row"><button id="lookupBtn" class="btn-outline full" type="button">Refresh Selected Token</button></div>
           </div>
@@ -865,19 +880,19 @@
         <aside id="swap" class="shrine-card">
           <div class="card-inner">
             <div class="card-title"><span class="icon-box">⇄</span><h2>Swap</h2></div>
-            <p class="card-sub">Exactly one side stays liquid. Swap the Pepe for the Xtrata inscription or back again.</p>
+            <p class="card-sub">Choose whether you hold the original IPFS-backed NFT or its permanent Xtrata twin.</p>
             <div class="swap-direction">
-              <button id="dirPepe" class="swap-token active" type="button"><span class="coin">🐸</span><span>PEPE</span></button>
+              <button id="dirPepe" class="swap-token active" type="button"><span class="coin">🐸</span><span>PEPE</span><span class="swap-sub">Original NFT · IPFS-backed</span></button>
               <div class="swap-arrow">→</div>
-              <button id="dirXtrata" class="swap-token" type="button"><span class="coin">₿</span><span>XTRATA</span></button>
+              <button id="dirXtrata" class="swap-token" type="button"><span class="coin">₿</span><span>XTRATA</span><span class="swap-sub">Permanent twin</span></button>
             </div>
             <div class="row">
               <label for="swapTokenId">Token ID</label>
               <input id="swapTokenId" class="shrine-input" inputmode="numeric" placeholder="Uses selected token if blank" />
             </div>
-            <div class="callout" id="swapHint">Pepe → Xtrata sends your source Pepe to escrow and releases the Xtrata twin.</div>
+            <div class="callout" id="swapHint">Original NFT → permanent twin secures the original in escrow and releases the permanent Xtrata twin.</div>
             <div class="button-row">
-              <button id="swapBtn" class="btn-amber full" type="button" disabled>Swap Pepe for Xtrata</button>
+              <button id="swapBtn" class="btn-amber full" type="button" disabled>Switch to permanent twin</button>
             </div>
           </div>
         </aside>
@@ -933,9 +948,20 @@
   </footer>
 
   <script type="module">
-    import { connect, disconnect, isConnected, getLocalStorage, clearLocalStorage, clearSelectedProviderId, openContractCall } from 'https://esm.sh/@stacks/connect@8.2.6';
-    import { fetchCallReadOnlyFunction, cvToJSON, cvToValue, Cl, Pc, PostConditionMode } from 'https://esm.sh/@stacks/transactions@7.4.0';
-    import { STACKS_MAINNET, STACKS_TESTNET } from 'https://esm.sh/@stacks/network@7.3.1';
+    import {
+      connectForeverTwinsWallet,
+      disconnectForeverTwinsWallet,
+      getForeverTwinsWalletSession,
+      fetchCallReadOnlyFunction,
+      cvToJSON,
+      cvToValue,
+      Cl,
+      Pc,
+      PostConditionMode,
+      openContractCall,
+      STACKS_MAINNET,
+      STACKS_TESTNET
+    } from '../assets/xtrata-forever-twins.js';
 
     const $ = (id) => document.getElementById(id);
     const CHUNK_SIZE = 16_384;
@@ -948,6 +974,8 @@
       binding: null,
       coreInscription: null,
       sourceOwner: null,
+      xtrataOwner: null,
+      liquidOwner: null,
       sourceTokenUri: null,
       sourceMetadataUri: null,
       sourceMetadata: null,
@@ -972,6 +1000,7 @@
         startedAt: null,
         finishedAt: null,
       },
+      lookupRequestId: 0,
     };
 
     function jsonBigInt(_, value) { return typeof value === 'bigint' ? value.toString() : value; }
@@ -1112,12 +1141,7 @@
       updateSwapUi();
     }
     function getStoredWallet() {
-      const data = getLocalStorage?.();
-      return data?.addresses?.stx?.[0]?.address
-        || data?.addresses?.find?.((a) => a.symbol === 'STX' || a.type === 'stx')?.address
-        || data?.profile?.stxAddress?.mainnet
-        || data?.profile?.stxAddress?.testnet
-        || null;
+      return getForeverTwinsWalletSession().address || null;
     }
     function setWallet(address) {
       state.wallet = address;
@@ -1176,12 +1200,28 @@
     function plainCV(cv) {
       if (!cv) return null;
       const type = String(cv.type || '').toLowerCase();
+      // The shared Xtrata bridge uses the app's bundled Stacks SDK, whose
+      // Clarity type values are numeric enums. cvToJSON preserves optional,
+      // response and tuple wrappers, which must be decoded before inspecting
+      // scalar names inside a tuple signature (for example "(tuple ... uint)").
+      if (/^\d+$/.test(type)) {
+        try { return plainCV(cvToJSON(cv)); } catch {}
+      }
+      if (type.includes('response') && typeof cv.success === 'boolean') {
+        return cv.success ? { ok: plainCV(cv.value) } : { err: plainCV(cv.value) };
+      }
       if (type === 'ok' || type.includes('responseok')) return { ok: plainCV(cv.value) };
       if (type === 'err' || type.includes('responseerr')) return { err: plainCV(cv.value) };
       if (type === 'some' || type.includes('optional')) return cv.value === undefined || cv.value === null ? null : { some: plainCV(cv.value) };
       if (type === 'none') return null;
-      if (type.includes('uint') || type.includes('int')) return cv.value?.toString?.() ?? String(cv.value);
-      if (type.includes('buffer')) {
+      if (type.includes('tuple') && cv.value && typeof cv.value === 'object' && !Array.isArray(cv.value)) {
+        const obj = {};
+        for (const [key, value] of Object.entries(cv.value)) obj[key] = plainCV(value);
+        return obj;
+      }
+      if (Array.isArray(cv.value)) return cv.value.map(plainCV);
+      if (type === 'uint' || type === 'int') return cv.value?.toString?.() ?? String(cv.value);
+      if (type === 'buffer' || type.startsWith('(buff')) {
         // In Stacks.js v7 a buffer CV's `value` is already a hex string; only
         // raw byte arrays need toHex(). The old code ran toHex() on the string,
         // expanding each hex digit into its own byte (e.g. "3a" -> "030a"),
@@ -1192,12 +1232,11 @@
         if (cv.buffer instanceof Uint8Array) return '0x' + toHex(cv.buffer);
         return '0x' + toHex(v);
       }
-      if (type.includes('string')) return cv.value;
-      if (type.includes('principal')) return cv.value || cv.address || String(cv);
+      if (type.includes('string-ascii') || type.includes('string-utf8') || type === 'string') return cv.value;
+      if (type === 'principal' || type.includes('principal standard') || type.includes('principal contract')) return cv.value || cv.address || String(cv);
       if (type === 'booltrue' || type === 'true') return true;
       if (type === 'boolfalse' || type === 'false') return false;
       if (typeof cv.value === 'boolean') return cv.value;
-      if (Array.isArray(cv.value)) return cv.value.map(plainCV);
       if (cv.value && typeof cv.value === 'object') {
         const obj = {};
         for (const [key, value] of Object.entries(cv.value)) obj[key] = plainCV(value);
@@ -1228,7 +1267,7 @@
       const xId = binding?.['xtrata-id'] ? String(binding['xtrata-id']) : 'Pending';
       const hasBinding = !!binding;
       const liquid = hasBinding
-        ? (binding['xtrata-escrowed'] === true ? 'Pepe liquid · Xtrata escrowed' : 'Xtrata liquid · Pepe escrowed')
+        ? (binding['xtrata-escrowed'] === true ? 'Original NFT liquid · permanent twin escrowed' : 'Permanent twin liquid · original NFT escrowed')
         : 'Not forevered yet';
       const escrow = hasBinding
         ? (binding['xtrata-escrowed'] === true ? 'Xtrata held by helper' : 'Pepe held by helper')
@@ -1239,6 +1278,16 @@
         <div class="id-map-box"><em>Xtrata twin</em><b>${hasBinding ? '#' : ''}${escapeHtml(xId)}</b></div>
         <div class="id-map-meta"><span><b>Liquid:</b><br>${escapeHtml(liquid)}</span><span><b>Escrow:</b><br>${escapeHtml(escrow)}</span></div>
       </div>`;
+    }
+    function xtrataStateBadge(binding) {
+      const escrowed = binding?.['xtrata-escrowed'] === true;
+      return escrowed
+        ? '<span class="twin-state twin-state--escrowed" title="The Xtrata twin is held in helper escrow"><span class="twin-state__icon" aria-hidden="true">🔒</span>Xtrata escrowed</span>'
+        : '<span class="twin-state twin-state--liquid" title="The Xtrata twin is held by its owner and can be swapped back"><span class="twin-state__icon" aria-hidden="true">∞</span>Xtrata liquid</span>';
+    }
+    function renderLiquidState(binding) {
+      if (!binding) return 'Not forevered yet';
+      return `${xtrataStateBadge(binding)}<span class="twin-state-detail">${binding['xtrata-escrowed'] === true ? 'Original NFT is liquid · permanent twin is secured in escrow' : 'Permanent twin is liquid · original NFT is secured in escrow'}</span>`;
     }
 
     async function readContract(contractPrincipal, functionName, functionArgs = []) {
@@ -1304,6 +1353,8 @@
       state.binding = null;
       state.coreInscription = null;
       state.sourceOwner = null;
+      state.xtrataOwner = null;
+      state.liquidOwner = null;
       state.sourceTokenUri = null;
       state.sourceMetadataUri = null;
       state.sourceMetadata = null;
@@ -1327,6 +1378,7 @@
       setStatus('rawImageStatus', 'Not loaded from chain URI');
       setStatus('idConversionStatus', renderIdConversion(null));
       setStatus('lookupToken', $('tokenId').value.trim() || 'None');
+      setStatus('lookupOwner', 'Not loaded');
       setStatus('lookupXtrata', 'Not loaded');
       setStatus('lookupLiquid', 'Not loaded');
       setHashStatus();
@@ -1549,9 +1601,10 @@
       const hashReady = !!state.canonicalHash && !!state.fileHash && state.canonicalHash.toLowerCase() === state.fileHash.toLowerCase();
       const asciiOk = /^[\x00-\x7F]*$/.test($('mime').value) && /^[\x00-\x7F]*$/.test($('tokenUri').value);
       const alreadyInscribed = !!state.binding;
+      const ownsLiquidSide = !!state.wallet && state.liquidOwner === state.wallet;
       $('useRawImageBtn').disabled = !state.sourceImageUrl;
       $('inscribeBtn').disabled = !(hasWallet && tokenReady && fileReady && hashReady && asciiOk && !alreadyInscribed);
-      $('swapBtn').disabled = !(hasWallet && /^\d+$/.test(($('swapTokenId').value.trim() || $('tokenId').value.trim())) && alreadyInscribed);
+      $('swapBtn').disabled = !(hasWallet && /^\d+$/.test(($('swapTokenId').value.trim() || $('tokenId').value.trim())) && alreadyInscribed && ownsLiquidSide);
       updateJourneyStatus();
     }
 
@@ -1572,6 +1625,8 @@
           if (key) mountFallbackImage(imgBox, cands, "Bitcoin Pepe preview");
           else imgBox.textContent = 'Enter a Bitcoin Pepe number above and select “Show me this Pepe”.';
         }
+        if (state.binding) imgBox.dataset.twinState = state.binding['xtrata-escrowed'] === true ? 'escrowed' : 'liquid';
+        else delete imgBox.dataset.twinState;
       }
       const tokenReady = /^\d+$/.test($('tokenId').value.trim());
       const matched = !!state.canonicalHash && !!state.fileHash && state.canonicalHash.toLowerCase() === state.fileHash.toLowerCase();
@@ -1615,83 +1670,141 @@
       }
     }
 
+    function formatMigrationNumber(value) { try { return Number(BigInt(value)).toLocaleString(); } catch { return String(value ?? '-'); } }
+    function renderMigrationProgress(count, total) {
+      const migrated = BigInt(count ?? 0);
+      const collectionTotal = total == null ? null : BigInt(total);
+      const progressText = collectionTotal == null ? `${formatMigrationNumber(migrated)} / ?` : `${formatMigrationNumber(migrated)} / ${formatMigrationNumber(collectionTotal)}`;
+      const complete = collectionTotal !== null && collectionTotal > 0n && migrated >= collectionTotal;
+      $('heroMigrationCount').textContent = complete ? `${progressText} · 100% complete` : progressText;
+      $('heroMigration').dataset.complete = String(complete);
+      $('statMigration').textContent = progressText;
+      $('statMigrationNote').textContent = complete ? '100% migration complete' : 'inscribed / source collection';
+      const heroLead = $('heroLead');
+      const heroPrimaryAction = $('heroPrimaryAction');
+      if (heroLead && heroPrimaryAction) {
+        if (!heroLead.dataset.defaultCopy) heroLead.dataset.defaultCopy = heroLead.textContent;
+        heroLead.textContent = complete
+          ? 'Every Bitcoin Pepe now has a permanent Xtrata twin. The collection migration is complete.'
+          : heroLead.dataset.defaultCopy;
+        heroPrimaryAction.textContent = complete ? 'Migration complete' : 'Inscribe Now';
+        heroPrimaryAction.href = complete ? '#lookup' : '#inscribe';
+      }
+    }
     async function refreshContractStatus() {
       syncLabels();
       const helper = $('helperContract').value.trim();
+      const source = $('sourceContract').value.trim();
       if (!helper) return log('Set the helper contract principal first.');
       try {
-        const [countRaw, feeRaw, thresholdRaw, finalizedRaw] = await Promise.all([
+        const [countRaw, feeRaw, thresholdRaw, finalizedRaw, totalRaw] = await Promise.all([
           readContract(helper, 'get-inscribed-count', []),
           readContract(helper, 'get-fee', []),
           readContract(helper, 'get-free-threshold', []),
           readContract(helper, 'is-finalized', []),
+          readContract(source, 'get-last-token-id', []).catch(() => null),
         ]);
         const count = unwrapOk(countRaw);
         const fee = unwrapOk(feeRaw);
         const threshold = unwrapOk(thresholdRaw);
         const finalized = unwrapOk(finalizedRaw);
-        $('statInscribed').textContent = count ?? '-';
+        const total = totalRaw == null ? null : unwrapOk(totalRaw);
+        renderMigrationProgress(count, total);
         $('statFee').textContent = `${Number(BigInt(fee || 0)) / 1_000_000} STX`;
         $('statThreshold').textContent = threshold ?? '-';
         $('statFinalized').textContent = finalized ? 'Finalized' : 'Open';
-        log('Contract stats refreshed from chain', { count, fee, threshold, finalized });
+        log('Contract stats refreshed from chain', { count, total, fee, threshold, finalized });
       } catch (err) { log('Could not refresh contract stats', { error: err.message }); }
     }
 
+    function twinStoreKey() { return `xtrata-twins:${networkName()}:${$('sourceContract').value.trim()}`; }
+    function readTwinStore() { try { return JSON.parse(localStorage.getItem(twinStoreKey()) || '{}') || {}; } catch (e) { return {}; } }
+    function recordTwinBinding(localId, xtrataId) {
+      if (localId == null || xtrataId == null) return;
+      try { const m = readTwinStore(); m[String(localId)] = String(xtrataId); localStorage.setItem(twinStoreKey(), JSON.stringify(m)); } catch (e) {}
+    }
+    async function fetchHoldingIds(assetId, apiBase) {
+      const ids = []; const limit = 50; let offset = 0;
+      for (let page = 0; page < 20; page += 1) {
+        const url = `${apiBase}/extended/v1/tokens/nft/holdings?principal=${encodeURIComponent(state.wallet)}&asset_identifiers=${encodeURIComponent(assetId)}&limit=${limit}&offset=${offset}`;
+        const res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`Hiro holdings HTTP ${res.status}`);
+        const json = await res.json();
+        const results = Array.isArray(json.results) ? json.results : [];
+        for (const r of results) { const mm = (r && r.value && r.value.repr ? String(r.value.repr) : '').match(/^u?(\d+)$/); if (mm) ids.push(mm[1]); }
+        const total = Number(json.total || 0); offset += limit;
+        if (results.length === 0 || offset >= total) break;
+      }
+      return ids;
+    }
     async function loadMyCollectionItems() {
-      const chips = $('myItemsChips');
-      const status = $('myItemsStatus');
+      const chips = $('myItemsChips'); const status = $('myItemsStatus');
       if (chips) chips.innerHTML = '';
       if (!state.wallet) { if (status) status.textContent = 'Connect your wallet first.'; return; }
       const source = $('sourceContract').value.trim();
       const asset = $('sourceAssetName').value.trim();
-      const assetId = `${source}::${asset}`;
+      const helper = $('helperContract').value.trim();
+      const master = $('masterContract').value.trim();
       const apiBase = ($('apiBase') && $('apiBase').value.trim()
         ? $('apiBase').value.trim()
         : (networkName() === 'testnet' ? 'https://api.testnet.hiro.so' : 'https://api.mainnet.hiro.so')).replace(/\/+$/, '');
       if (status) status.textContent = 'Loading your items…';
-      log('trace: my-items - request holdings', { wallet: state.wallet, assetId });
+      log('trace: my-items - request holdings', { wallet: state.wallet, source });
       try {
-        const ids = [];
-        const limit = 50;
-        let offset = 0;
-        for (let page = 0; page < 20; page += 1) {
-          const url = `${apiBase}/extended/v1/tokens/nft/holdings?principal=${encodeURIComponent(state.wallet)}&asset_identifiers=${encodeURIComponent(assetId)}&limit=${limit}&offset=${offset}`;
-          const res = await fetch(url, { cache: 'no-store' });
-          if (!res.ok) throw new Error(`Hiro holdings HTTP ${res.status}`);
-          const json = await res.json();
-          const results = Array.isArray(json.results) ? json.results : [];
-          for (const r of results) {
-            const repr = r && r.value && r.value.repr ? String(r.value.repr) : '';
-            const m = repr.match(/^u?(\d+)$/);
-            if (m) ids.push(m[1]);
-          }
-          const total = Number(json.total || 0);
-          offset += limit;
-          if (results.length === 0 || offset >= total) break;
+        const owned = new Map();
+        for (const id of await fetchHoldingIds(`${source}::${asset}`, apiBase)) owned.set(id, 'on Stacks');
+        // Escrowed on Stacks but twin held on Xtrata (source NFT sits in the wrapper,
+        // so it is invisible to the source-holdings query). Recover from remembered
+        // bindings and verify on-chain that this wallet still holds the twin.
+        for (const [localId, xtrataId] of Object.entries(readTwinStore())) {
+          if (owned.has(localId)) continue;
+          try {
+            const binding = unwrapOptional(await readContract(helper, 'get-binding', [asUint(BigInt(localId))]));
+            if (!binding || String(binding['xtrata-id']) !== String(xtrataId)) continue;
+            if (binding['xtrata-escrowed'] === true) continue;
+            const owner = unwrapOptional(await readContract(master, 'get-owner', [asUint(BigInt(xtrataId))]));
+            const ownerText = owner == null ? '' : (typeof owner === 'object' ? JSON.stringify(owner) : String(owner));
+            if (ownerText === state.wallet) owned.set(localId, 'twin on Xtrata');
+          } catch (e) { /* skip */ }
         }
-        const unique = [...new Set(ids)].sort((x, y) => Number(x) - Number(y));
-        log('trace: my-items - holdings resolved', { count: unique.length, ids: unique });
-        if (!unique.length) { if (status) status.textContent = 'No items from this collection in your connected wallet.'; return; }
-        if (status) status.textContent = `${unique.length} item${unique.length === 1 ? '' : 's'} in your wallet — select one to load:`;
-        for (const id of unique) {
+        const list = [...owned.keys()].map(Number).filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
+        log('trace: my-items - resolved', { count: list.length, items: list.map((n) => ({ id: n, where: owned.get(String(n)) })) });
+        if (!list.length) { if (status) status.textContent = 'No items from this collection in your wallet (held directly or as an Xtrata twin).'; return; }
+        const firstId = list[0];
+        $('tokenId').value = String(firstId);
+        $('swapTokenId').value = String(firstId);
+        $('lookupToken').textContent = String(firstId);
+        if (status) status.textContent = `${list.length} item${list.length === 1 ? '' : 's'} — loaded #${firstId}; select another to switch.`;
+        for (const id of list) {
+          const where = owned.get(String(id));
           const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'mini-link';
-          btn.textContent = `#${id}`;
-          btn.addEventListener('click', () => {
-            $('tokenId').value = id;
-            const lt = $('lookupToken'); if (lt) lt.textContent = id;
-            checkToken();
-          });
+          btn.type = 'button'; btn.className = 'mini-link'; btn.textContent = `#${id}`;
+          btn.title = where === 'twin on Xtrata' ? 'Escrowed on Stacks - twin held on Xtrata (swap back available)' : 'Held on Stacks';
+          if (where === 'twin on Xtrata') btn.style.borderStyle = 'dashed';
+          btn.addEventListener('click', () => { $('tokenId').value = String(id); const lt = $('lookupToken'); if (lt) lt.textContent = String(id); checkToken(); });
           chips.appendChild(btn);
         }
+        await checkToken();
       } catch (err) {
         log('my-items load failed', { error: err.message });
         if (status) status.textContent = `Could not load your items: ${err.message}`;
       }
     }
+    let liveTokenLookupTimer = null;
+    function scheduleLiveTokenLookup() {
+      const raw = $('tokenId').value.trim();
+      $('lookupToken').textContent = raw || 'None';
+      state.lookupRequestId += 1;
+      if (liveTokenLookupTimer) clearTimeout(liveTokenLookupTimer);
+      if (!/^\d+$/.test(raw)) { updateActionButtons(); return; }
+      $('swapTokenId').value = raw;
+      enrichPreview(BigInt(raw));
+      liveTokenLookupTimer = setTimeout(() => {
+        checkToken().catch((err) => log('Live token lookup failed', { error: err.message }));
+      }, 350);
+    }
     async function checkToken() {
+      const requestId = ++state.lookupRequestId;
       const tokenId = getTokenId();
       const helper = $('helperContract').value.trim();
       const source = $('sourceContract').value.trim();
@@ -1701,6 +1814,8 @@
       // so users can't accidentally swap a different (stale) token id.
       { const _sw = $('swapTokenId'); if (_sw) _sw.value = String(tokenId); }
       resetChainOnlyDisplays();
+      state.direction = 'pepe-to-xtrata';
+      updateSwapUi();
       enrichPreview(tokenId);
       $('lookupToken').textContent = String(tokenId);
       setStatus('idConversionStatus', renderIdConversion(null, tokenId));
@@ -1714,9 +1829,27 @@
         readContract(helper, 'get-binding', [tokenArg]),
         readContract(source, 'get-owner', [tokenArg]).catch((err) => ({ err: err.message })),
       ]);
+      if (requestId !== state.lookupRequestId) return;
       state.canonicalHash = unwrapOptional(canonicalRaw);
       state.binding = unwrapOptional(bindingRaw);
+      if (state.binding && state.binding['xtrata-id'] != null) recordTwinBinding(tokenId, state.binding['xtrata-id']);
+      // Offer the swap that is actually valid for the current state: if the Xtrata
+      // twin is escrowed the source NFT is liquid (Stacks -> Xtrata); otherwise the
+      // twin is liquid and only Xtrata -> Stacks (swap back) is possible.
+      if (state.binding) { state.direction = state.binding['xtrata-escrowed'] === true ? 'pepe-to-xtrata' : 'xtrata-to-pepe'; updateSwapUi(); }
       state.sourceOwner = ownerRaw?.err ? null : unwrapOptional(ownerRaw);
+      state.xtrataOwner = null;
+      if (state.binding?.['xtrata-id'] != null) {
+        const xtrataOwnerRaw = await readContract($('masterContract').value.trim(), 'get-owner', [asUint(state.binding['xtrata-id'])]).catch(() => null);
+        if (requestId !== state.lookupRequestId) return;
+        state.xtrataOwner = unwrapOptional(xtrataOwnerRaw);
+      }
+      state.liquidOwner = state.binding
+        ? (state.binding['xtrata-escrowed'] === true ? state.sourceOwner : state.xtrataOwner)
+        : state.sourceOwner;
+      setStatus('lookupOwner', state.liquidOwner
+        ? `<span class="data-mono">${escapeHtml(state.liquidOwner)}</span>`
+        : 'Owner unavailable');
 
       if (state.canonicalHash) setStatus('canonicalStatus', `${badge('Seeded on chain', 'ok')}<br><span class="data-mono">${escapeHtml(state.canonicalHash)}</span>${chainProof(helper, 'get-canonical-hash', [tokenArg])}`);
       else setStatus('canonicalStatus', `${badge('Not seeded on chain', 'bad')}<br>No canonical hash was returned for token ${tokenId}.${chainProof(helper, 'get-canonical-hash', [tokenArg])}`);
@@ -1728,7 +1861,7 @@
         setStatus('bindingStatus', `${badge('Binding found on chain', 'ok')}<br><span class="data-mono">Xtrata #${escapeHtml(xId)} · ${escapeHtml(escrow)}</span>${chainProof(helper, 'get-binding', [tokenArg])}`);
         setStatus('idConversionStatus', renderIdConversion(state.binding, tokenId));
         setStatus('lookupXtrata', `<span class="data-mono">#${escapeHtml(xId)}</span>`);
-        setStatus('lookupLiquid', liquid);
+        setStatus('lookupLiquid', renderLiquidState(state.binding));
       } else {
         setStatus('bindingStatus', `${badge('No binding on chain', 'warn')}<br>The helper contract returned none. Ready to inscribe if the file hash matches.${chainProof(helper, 'get-binding', [tokenArg])}`);
         setStatus('idConversionStatus', renderIdConversion(null, tokenId));
@@ -1759,6 +1892,7 @@
       else setStatus('sourceOwnerStatus', `${badge('No owner returned by chain', 'bad')}<br>Source contract returned none.${chainProof(source, 'get-owner', [tokenArg])}`);
 
       await maybeFetchTokenUri(tokenId);
+      if (requestId !== state.lookupRequestId) return;
       enrichPreview(tokenId);
       // Journey-led: automatically fetch + hash the resolved Pepe image so the
       // user never has to drop a file or click "Use Raw Image". Only worth doing
@@ -2103,6 +2237,7 @@
     }
     async function handleSwap() {
       const tokenId = getSwapTokenId();
+      if (!state.wallet || state.liquidOwner !== state.wallet) throw new Error('The connected wallet does not own the currently liquid side of this twin.');
       if (state.direction === 'pepe-to-xtrata') await callHelper('swap-pepe-for-xtrata', [asUint(tokenId)], swapPepePostConditions(tokenId));
       else await callHelper('swap-xtrata-for-pepe', [asUint(tokenId)], swapXtrataPostConditions());
     }
@@ -2110,19 +2245,31 @@
       const pepe = state.direction === 'pepe-to-xtrata';
       $('dirPepe').classList.toggle('active', pepe);
       $('dirXtrata').classList.toggle('active', !pepe);
-      $('swapBtn').textContent = pepe ? 'Swap Pepe for Xtrata' : 'Swap Xtrata for Pepe';
-      $('swapHint').textContent = pepe ? 'Pepe → Xtrata sends your source Pepe to escrow and releases the Xtrata twin.' : 'Xtrata → Pepe sends your Xtrata twin to escrow and releases the source Pepe.';
+      $('swap').querySelector('.swap-arrow').textContent = pepe ? '→' : '←';
+      // Lock the toggle to the only valid direction for the current on-chain state,
+      // so a doomed swap (ERR-WRONG-STATE) can't be selected or submitted. Both
+      // sides stay enabled until a bound token is loaded.
+      const _valid = state.binding
+        ? (state.binding['xtrata-escrowed'] === true ? 'pepe-to-xtrata' : 'xtrata-to-pepe')
+        : null;
+      $('dirPepe').disabled = _valid ? (_valid !== 'pepe-to-xtrata') : false;
+      $('dirXtrata').disabled = _valid ? (_valid !== 'xtrata-to-pepe') : false;
+      $('swapBtn').textContent = pepe ? 'Switch to permanent twin' : 'Restore original NFT';
+      $('swapHint').textContent = pepe ? 'Original NFT → permanent twin secures the original in escrow and releases the permanent Xtrata twin.' : 'Permanent twin → original NFT secures the twin in escrow and releases the original NFT.';
       updateActionButtons();
     }
 
     async function onConnect() {
+      if (networkName() !== 'mainnet') {
+        log('Wallet connect is available on mainnet only. Switch the page back to mainnet and retry.');
+        return;
+      }
+      const connectButton = $('connectBtn');
+      connectButton.disabled = true;
+      connectButton.textContent = 'Connecting...';
       try {
-        // Always open the wallet selector on an explicit click. Gating on
-        // isConnected() meant a stale "connected" flag left in local storage
-        // (e.g. from a previous session) made the button do nothing, so the
-        // wallet never opened.
-        const result = await connect({ forceWalletSelect: true });
-        const addr = getStoredWallet() || addressFromConnectResult(result);
+        const session = await connectForeverTwinsWallet();
+        const addr = session.address || null;
         setWallet(addr);
         if (addr) { log('Wallet connected', { address: addr }); await quoteFee(false); }
         else log('Wallet connected, but no STX address was returned. Try refreshing or checking wallet permissions.');
@@ -2130,13 +2277,10 @@
         const msg = err?.message || String(err);
         if (/cancel|reject|denied|closed|user/i.test(msg)) { log('Wallet connection cancelled'); return; }
         log('Wallet connect failed', { error: msg });
+      } finally {
+        connectButton.textContent = 'Connect Wallet';
+        connectButton.disabled = !!state.wallet;
       }
-    }
-    function addressFromConnectResult(result) {
-      const list = result?.addresses || result?.result?.addresses || [];
-      const arr = Array.isArray(list) ? list : [];
-      const stx = arr.find((a) => /^S[PM][0-9A-Z]+/.test(a?.address || ''));
-      return stx?.address || null;
     }
 
     function bind(id, event, fn) {
@@ -2148,11 +2292,7 @@
 
     bind('connectBtn', 'click', onConnect);
     bind('disconnectBtn', 'click', async () => {
-      // Fully clear connection state so reconnecting prompts the wallet picker
-      // again and lets you choose a different wallet/address.
-      try { disconnect(); } catch {}
-      try { clearLocalStorage(); } catch {}
-      try { clearSelectedProviderId(); } catch {}
+      await disconnectForeverTwinsWallet();
       setWallet(null);
       log('Wallet disconnected');
     });
@@ -2189,7 +2329,7 @@
       $(id).addEventListener('input', () => { loadHashExportCache(); updateHashExportUi(); });
       $(id).addEventListener('change', () => { loadHashExportCache(); updateHashExportUi(); });
     }
-    $('tokenId').addEventListener('input', () => { $('lookupToken').textContent = $('tokenId').value.trim() || 'None'; if (!$('swapTokenId').value.trim()) updateActionButtons(); });
+    $('tokenId').addEventListener('input', scheduleLiveTokenLookup);
     $('swapTokenId').addEventListener('input', updateActionButtons);
     $('apiBase').addEventListener('input', () => { $('apiBase').dataset.touched = 'true'; syncLabels(); });
     $('tokenUri').addEventListener('input', () => {

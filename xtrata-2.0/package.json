@@ -6,8 +6,9 @@
   "scripts": {
     "predev": "npm run arcade:games:manifest && npm run xboard:versions:manifest",
     "dev": "vite",
-    "prebuild": "npm run arcade:games:manifest && npm run xboard:versions:manifest && npm run build:agent-one-wallet && npm run build:agent-one && npm run build:radio",
+    "prebuild": "npm run arcade:games:manifest && npm run xboard:versions:manifest && npm run build:agent-one-wallet && npm run build:agent-one && npm run build:radio && npm run build:forever-twins-wallet",
     "build": "vite build",
+    "build:forever-twins-wallet": "vite build -c vite.forever-twins.config.ts",
     "build:agent-one-wallet": "vite build -c vite.agent-one-wallet.config.ts",
     "build:agent-one": "vite build -c vite.agent-one.config.ts",
     "postbuild": "node scripts/copy-static-apps.mjs",
@@ -62,6 +63,8 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^20.12.12",
     "@types/react": "^18.3.2",
     "@types/react-dom": "^18.3.0",
@@ -71,6 +74,7 @@
     "eslint-plugin-react": "^7.34.1",
     "eslint-plugin-react-hooks": "^4.6.2",
     "eslint-plugin-react-refresh": "^0.4.6",
+    "happy-dom": "^20.10.6",
     "playwright": "^1.60.0",
     "prettier": "^3.2.5",
     "typescript": "^5.4.5",

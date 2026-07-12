@@ -33,5 +33,32 @@
     "contractName": "xtrata-market-sbtc-v1-0",
     "network": "mainnet",
     "paymentTokenContractId": "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token"
+  },
+  {
+    "label": "Xtrata Market STX v1.1 (Sponsored - no fee needed)",
+    "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+    "contractName": "xtrata-market-sponsored-stx-v1-1",
+    "network": "mainnet",
+    "paymentTokenContractId": null,
+    "sponsored": true,
+    "sponsorApi": "/"
+  },
+  {
+    "label": "Xtrata Market sBTC v1.1 (Sponsored - no STX needed)",
+    "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+    "contractName": "xtrata-market-sponsored-sbtc-v1-1",
+    "network": "mainnet",
+    "paymentTokenContractId": "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token",
+    "sponsored": true,
+    "sponsorApi": "/"
+  },
+  {
+    "label": "Xtrata Market USDCx v1.1 (Sponsored - no STX needed)",
+    "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+    "contractName": "xtrata-market-sponsored-usdcx-v1-1",
+    "network": "mainnet",
+    "paymentTokenContractId": "SP120SBRBQJ00MCWS7TM5R8WJNTTKD5K0HFRC2CNE.usdcx",
+    "sponsored": true,
+    "sponsorApi": "/"
   }
 ]

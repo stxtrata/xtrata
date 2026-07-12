@@ -12,7 +12,8 @@ const PRICE_ROUTE_PATH = '/prices/spot';
 const COINBASE_SPOT_URLS = {
   stx: 'https://api.coinbase.com/v2/prices/STX-USD/spot',
   bitcoin: 'https://api.coinbase.com/v2/prices/BTC-USD/spot',
-  usdc: 'https://api.coinbase.com/v2/prices/USDC-USD/spot'
+  usdc: 'https://api.coinbase.com/v2/prices/USDC-USD/spot',
+  usdt: 'https://api.coinbase.com/v2/prices/USDT-USD/spot'
 } as const;
 
 const toFinitePositiveNumber = (value: unknown) => {
@@ -125,6 +126,7 @@ export const buildCoinbaseFallbackPriceBook = (payload: {
   stx?: unknown;
   bitcoin?: unknown;
   usdc?: unknown;
+  usdt?: unknown;
 }): UsdPriceBook => {
   const generatedAt = Date.now();
   const stx = parseCoinbaseSpotQuote(payload.stx, 'STX-USD', generatedAt);
@@ -135,6 +137,7 @@ export const buildCoinbaseFallbackPriceBook = (payload: {
     true
   );
   const usdc = parseCoinbaseSpotQuote(payload.usdc, 'USDC-USD', generatedAt);
+  const usdt = parseCoinbaseSpotQuote(payload.usdt, 'USDT-USD', generatedAt);
 
   return {
     provider: 'coinbase',
@@ -142,7 +145,8 @@ export const buildCoinbaseFallbackPriceBook = (payload: {
     prices: {
       stx,
       sbtc: bitcoin,
-      usdc
+      usdc,
+      usdt
     }
   };
 };
@@ -151,7 +155,8 @@ export const fetchCoinbaseFallbackPriceBook = async (signal?: AbortSignal) => {
   const results = await Promise.allSettled([
     fetchCoinbasePayload(COINBASE_SPOT_URLS.stx, signal),
     fetchCoinbasePayload(COINBASE_SPOT_URLS.bitcoin, signal),
-    fetchCoinbasePayload(COINBASE_SPOT_URLS.usdc, signal)
+    fetchCoinbasePayload(COINBASE_SPOT_URLS.usdc, signal),
+    fetchCoinbasePayload(COINBASE_SPOT_URLS.usdt, signal)
   ]);
 
   const rejectedAbort = results.find((result) => {
@@ -164,7 +169,8 @@ export const fetchCoinbaseFallbackPriceBook = async (signal?: AbortSignal) => {
   const priceBook = buildCoinbaseFallbackPriceBook({
     stx: results[0].status === 'fulfilled' ? results[0].value : null,
     bitcoin: results[1].status === 'fulfilled' ? results[1].value : null,
-    usdc: results[2].status === 'fulfilled' ? results[2].value : null
+    usdc: results[2].status === 'fulfilled' ? results[2].value : null,
+    usdt: results[3].status === 'fulfilled' ? results[3].value : null
   });
   if (!hasUsdPriceQuotes(priceBook)) {
     throw new Error('Coinbase fallback returned no usable price data.');
@@ -195,7 +201,8 @@ export const parseUsdPriceBookPayload = (payload: unknown): UsdPriceBook => {
     prices: {
       stx: toQuote(pricesRecord.stx),
       sbtc: toQuote(pricesRecord.sbtc),
-      usdc: toQuote(pricesRecord.usdc)
+      usdc: toQuote(pricesRecord.usdc),
+      usdt: toQuote(pricesRecord.usdt)
     }
   };
 };

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adult / Nymph Comparison</title>
+    <style>
+        html,body{margin:0;width:100%;height:100%;background:#08100c;color:#efe6d3;font:14px ui-monospace,Menlo,Consolas,monospace;}
+        .wrap{display:grid;grid-template-columns:1fr 1fr;height:100%;gap:1px;background:rgba(255,255,255,.12);}
+        .panel{position:relative;background:#0b110e;overflow:hidden;}
+        .label{position:absolute;left:22px;top:20px;z-index:5;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.72);}
+        .stage{position:absolute;inset:0;}
+    </style>
+</head>
+<body>
+    <main class="wrap">
+        <section class="panel">
+            <div class="label">Adult Cicada</div>
+            <div id="adult-stage" class="stage"></div>
+        </section>
+        <section class="panel">
+            <div class="label">Cicada Nymph</div>
+            <div id="nymph-stage" class="stage"></div>
+        </section>
+    </main>
+    <script type="module">
+        import { renderCicada, renderCicadaNymph } from '../src/cicada-core.js?v=11.3.5';
+
+        const seed = 42;
+        const shared = {
+            seed,
+            pageStyles: false,
+            interactive: false,
+            instructionOverrides: {
+                idleWander: false,
+                size: 72,
+                barkBackdrop: 'none',
+                effects: [],
+                aura: 'none',
+                laserType: 'none'
+            }
+        };
+        renderCicada({ ...shared, mount: '#adult-stage', enableAudio: false });
+        renderCicadaNymph({ ...shared, mount: '#nymph-stage' });
+        document.body.dataset.ready = 'true';
+    </script>
+</body>
+</html>
