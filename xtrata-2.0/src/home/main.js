@@ -10182,12 +10182,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       return media;
     };
 
-    const hydrateMarketThumbnails = async (run, listings) => {
+    const hydrateMarketThumbnails = async (run, listings, root = marketDom.listings) => {
       await runLimited(listings, MARKET_THUMB_HYDRATION_CONCURRENCY, async (listing) => {
         if (run !== marketState.run) return;
         const media = await marketMediaFor(listing);
         if (run !== marketState.run) return;
-        const slot = marketDom.listings?.querySelector(
+        const slot = root?.querySelector(
           `[data-market-thumb="${listing.contractId}:${listing.listingId}"]`
         );
         if (!slot) return;
@@ -10875,7 +10875,21 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       body.replaceChildren(
         ...listings.map((listing) => {
           const row = document.createElement('div');
-          row.className = 'market-mine__row';
+          row.className = 'market-mine__row wallet-market-listing__row';
+          const thumb = document.createElement('a');
+          thumb.className = 'market-thumb wallet-market-listing__thumb';
+          thumb.href = `/xplorer?token=${listing.tokenId}`;
+          thumb.target = '_self';
+          thumb.dataset.marketThumb = `${listing.contractId}:${listing.listingId}`;
+          thumb.setAttribute('aria-label', `View inscription #${listing.tokenId}`);
+          thumb.append(
+            Object.assign(document.createElement('span'), {
+              className: 'market-thumb__label',
+              textContent: 'Loading…'
+            })
+          );
+          const content = document.createElement('div');
+          content.className = 'wallet-market-listing__content';
           const info = document.createElement('div');
           info.className = 'market-card__meta';
           info.textContent = `#${listing.tokenId} · ${formatMarketPriceWithUsd(
@@ -10905,10 +10919,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             });
             actions.append(cancel);
           }
-          row.append(info, actions);
+          content.append(info, actions);
+          row.append(thumb, content);
           return row;
         })
       );
+      void hydrateMarketThumbnails(marketState.run, listings, body);
     };
 
     const refreshWalletMarketListings = async (walletAddress) => {

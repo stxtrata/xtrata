@@ -4162,6 +4162,23 @@
       padding-bottom: 0;
     }
 
+    .wallet-market-listing__row {
+      display: grid;
+      grid-template-columns: 88px minmax(0, 1fr);
+      justify-content: initial;
+      align-items: center;
+    }
+
+    .wallet-market-listing__thumb {
+      width: 88px;
+    }
+
+    .wallet-market-listing__content {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+    }
+
     .market-toolbar {
       display: flex;
       flex-wrap: wrap;
@@ -4273,6 +4290,16 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+
+    @media (max-width: 560px) {
+      .wallet-market-listing__row {
+        grid-template-columns: 72px minmax(0, 1fr);
+      }
+
+      .wallet-market-listing__thumb {
+        width: 72px;
+      }
     }
 
     .market-card__details {
