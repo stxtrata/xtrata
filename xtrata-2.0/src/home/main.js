@@ -9089,6 +9089,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           renderPreparedState();
         }
         await loadWalletInscriptions();
+        if (PAGE_MODE === 'market') {
+          renderMarketListings();
+          renderSellerDashboard();
+        }
         if (PAGE_MODE === 'home' && state.walletSession.isConnected && state.walletSession.address) {
           // A wallet that connects on the landing page and holds inscriptions
           // goes straight to its ledger on the My Wallet page.
@@ -9140,6 +9144,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         await fetchAdminStatus();
         await refreshParentChecks();
         await loadWalletInscriptions();
+        if (PAGE_MODE === 'market') {
+          renderMarketListings();
+          renderSellerDashboard();
+        }
         renderPreparedState();
       } finally {
         setBusy(false);
@@ -10612,6 +10620,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           const symbol = getMarketSettlementLabel(listing.settlement);
           const decimals = listing.settlement.decimals ?? 6;
           const sponsored = isSponsoredMarket(listing.entry);
+          const isOwnListing = !!state.walletSession.address &&
+            addressesEqual(listing.seller, state.walletSession.address);
 
           const thumb = document.createElement('a');
           thumb.className = 'market-thumb';
@@ -10630,7 +10640,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           badges.className = 'market-card__badge-row';
           badges.innerHTML = `<span class="badge">${symbol}</span>${
             sponsored ? '<span class="badge green">No STX needed</span>' : ''
-          }`;
+          }${isOwnListing ? '<span class="badge blue">Your listing</span>' : ''}`;
 
           const price = document.createElement('div');
           price.className = 'market-card__price';
@@ -10685,10 +10695,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             migrate.textContent = 'Migrate to v3 to relist';
             card.append(note);
             actions.append(migrate);
-            if (
-              state.walletSession.address &&
-              listing.seller === state.walletSession.address
-            ) {
+            if (isOwnListing) {
               const cancelBtn = document.createElement('button');
               cancelBtn.type = 'button';
               cancelBtn.className = 'market-chip';
@@ -10696,6 +10703,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
               cancelBtn.addEventListener('click', () => { void marketCancel(listing); });
               actions.append(cancelBtn);
             }
+          } else if (isOwnListing) {
+            const cancelBtn = document.createElement('button');
+            cancelBtn.type = 'button';
+            cancelBtn.className = 'market-chip';
+            cancelBtn.textContent = 'Cancel / change price';
+            cancelBtn.title = 'Unlist this inscription; once confirmed, relist it at the new price.';
+            cancelBtn.addEventListener('click', () => { void marketCancel(listing); });
+            actions.append(cancelBtn);
           } else {
             const buy = document.createElement('button');
             buy.type = 'button';
