@@ -3,6 +3,8 @@ import {
   getBuyActionValidationMessage,
   getCancelActionValidationMessage,
   getListActionValidationMessage,
+  getMarketListingPublicBlockReason,
+  isMarketListingPubliclyBuyable,
   isSameAddress,
   normalizeAddress,
   parsePriceMicroStx,
@@ -15,6 +17,36 @@ const WALLET = 'SP2JXKMSH007NPYAQHKJPQMAQYAD90NQGTVJVQ02B';
 const OTHER = 'SPD60B1MGZVZR8758E86SR364N95VSP13E5FHYXE';
 
 describe('market action helpers', () => {
+  it('hides non-buyable legacy listings from public marketplace results', () => {
+    expect(
+      getMarketListingPublicBlockReason({
+        nftContract: 'SP123.xtrata-v2-1-0',
+        marketContractId: 'SP123.xtrata-market-stx-v1-0'
+      })
+    ).toBe('legacy-nft');
+    expect(
+      getMarketListingPublicBlockReason({
+        nftContract: 'SP123.xtrata-v1-1-1',
+        marketContractId: 'SP123.xtrata-market-v1-0'
+      })
+    ).toBe('broken-market');
+  });
+
+  it('keeps supported v3 listings publicly buyable', () => {
+    expect(
+      isMarketListingPubliclyBuyable({
+        nftContract: 'SP123.xtrata-v3-2-3',
+        marketContractId: 'SP123.xtrata-market-sponsored-sbtc-v1-1'
+      })
+    ).toBe(true);
+    expect(
+      isMarketListingPubliclyBuyable({
+        nftContract: 'SP123.xtrata-v3-2-3',
+        marketContractId: 'SP123.xtrata-market-sbtc-v1-0'
+      })
+    ).toBe(true);
+  });
+
   it('normalizes addresses and compares case-insensitively', () => {
     expect(normalizeAddress(` ${WALLET.toLowerCase()} `)).toBe(WALLET);
     expect(isSameAddress(WALLET.toLowerCase(), WALLET)).toBe(true);
