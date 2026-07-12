@@ -10110,6 +10110,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             kind: 'video',
             url: URL.createObjectURL(new Blob([bytes], { type: meta.mimeType }))
           };
+        } else if ((kind === 'text' || kind === 'json' || kind === 'code') && fetchable) {
+          // Text-like inscriptions: show the actual words, not a logo.
+          const bytes = await marketFetchContent(listing, meta);
+          const text = new TextDecoder().decode(bytes).trim().slice(0, 400);
+          if (text) media = { kind: 'text', text };
         }
 
         // Fallbacks: inline SVG data URI from the summary, then token-URI image.
@@ -10156,6 +10161,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           video.autoplay = true;
           video.playsInline = true;
           slot.replaceChildren(video);
+          slot.classList.add('market-thumb--media');
+        } else if (media?.kind === 'text') {
+          const pre = document.createElement('div');
+          pre.className = 'market-thumb__snippet';
+          pre.textContent = media.text;
+          slot.replaceChildren(pre);
           slot.classList.add('market-thumb--media');
         } else if (media?.url) {
           const img = document.createElement('img');
@@ -10974,7 +10985,24 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           `[data-drop-thumb="${drop.contractId}:${drop.dropId}"]`
         );
         if (!slot) return;
-        if (media?.kind === 'video' && media.url) {
+        if (media?.kind === 'html-live') {
+          const frame = document.createElement('iframe');
+          frame.className = 'market-thumb__frame';
+          frame.title = `Inscription #${drop.tokenId} preview`;
+          frame.sandbox = 'allow-scripts';
+          frame.referrerPolicy = 'no-referrer';
+          frame.loading = 'lazy';
+          frame.setAttribute('scrolling', 'no');
+          frame.srcdoc = media.html;
+          slot.replaceChildren(frame);
+          slot.classList.add('market-thumb--media');
+        } else if (media?.kind === 'text') {
+          const pre = document.createElement('div');
+          pre.className = 'market-thumb__snippet';
+          pre.textContent = media.text;
+          slot.replaceChildren(pre);
+          slot.classList.add('market-thumb--media');
+        } else if (media?.kind === 'video' && media.url) {
           const video = document.createElement('video');
           video.src = media.url;
           video.muted = true;
