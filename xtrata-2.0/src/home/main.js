@@ -6,6 +6,7 @@
       hexToCV,
       listCV,
       makeStandardSTXPostCondition,
+      makeContractSTXPostCondition,
       PostConditionMode,
       principalCV,
       stringAsciiCV,
@@ -69,7 +70,10 @@
     } from '/src/lib/pricing/format.ts';
     import { fetchUsdPriceBook } from '/src/lib/pricing/hooks.ts';
     import { resolveContractCapabilities } from '/src/lib/contract/capabilities.ts';
-    import { buildTransferPostCondition } from '/src/lib/contract/post-conditions.ts';
+    import {
+      buildTransferPostCondition,
+      buildContractTransferPostCondition
+    } from '/src/lib/contract/post-conditions.ts';
     import { getNetworkMismatch } from '/src/lib/network/guard.ts';
     import { getApiBaseUrls } from '/src/lib/network/config.ts';
     import { toStacksNetwork } from '/src/lib/network/stacks.ts';
@@ -9913,6 +9917,47 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const isLegacyCoreListing = (listing) =>
       String(listing.nftContract ?? '').endsWith('.xtrata-v2-1-0');
 
+    // xtrata-market-v1-0's buy is broken by design: the NFT payout runs inside
+    // as-contract, which rebinds tx-sender, so the market transfers the NFT to
+    // ITSELF and the core rejects it (err u2) — every buy fails and deny-mode
+    // post-conditions roll it back. cancel works (explicit seller recipient),
+    // so sellers can still recover their NFTs and relist on a v1.1 market.
+    const isBrokenBuyMarket = (listing) =>
+      String(listing.contractId ?? '').endsWith('.xtrata-market-v1-0');
+
+    // Deny-mode post-conditions for contract-side payouts (cancel / reclaim /
+    // claim): the exact NFT and STX escrow outflows, so the wallet shows
+    // precisely what moves instead of the Allow-mode "this app may transfer
+    // any of your assets" warning.
+    const marketEscrowPostConditions = (listing, { includeNft = true } = {}) => {
+      const pcs = [];
+      if (includeNft) {
+        const [nftAddress, nftName] = listing.nftContract.split('.');
+        pcs.push(
+          buildContractTransferPostCondition({
+            nftContract: { address: nftAddress, contractName: nftName, network: listing.entry.network },
+            senderContract: {
+              address: listing.entry.address,
+              contractName: listing.entry.contractName,
+              network: listing.entry.network
+            },
+            tokenId: listing.tokenId
+          })
+        );
+      }
+      if (listing.budgetRemaining !== null && listing.budgetRemaining !== undefined) {
+        pcs.push(
+          makeContractSTXPostCondition(
+            listing.entry.address,
+            listing.entry.contractName,
+            FungibleConditionCode.Equal,
+            listing.budgetRemaining
+          )
+        );
+      }
+      return pcs;
+    };
+
     const marketCancel = async (listing) => {
       if (!state.walletSession.isConnected || !state.walletSession.address) {
         marketDom.status.innerHTML = '<span><strong>Market</strong> connect the seller wallet to cancel.</span>';
@@ -9927,7 +9972,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(listing.listingId)],
         network: listing.entry.network,
         stxAddress: state.walletSession.address,
-        postConditionMode: PostConditionMode.Allow,
+        postConditionMode: PostConditionMode.Deny,
+        postConditions: marketEscrowPostConditions(listing),
         onFinish: (payload) => {
           const txId = payload?.txId ?? payload?.txid ?? '';
           marketDom.status.innerHTML = `<span><strong>Market</strong> cancel submitted${txId ? ` — tx ${txId}` : ''}. Migrate the inscription to v3, then relist.</span>`;
@@ -10618,7 +10664,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         functionArgs: [uintCV(listing.listingId)],
         network: listing.entry.network,
         stxAddress: state.walletSession.address,
-        postConditionMode: PostConditionMode.Allow,
+        postConditionMode: PostConditionMode.Deny,
+        postConditions: marketEscrowPostConditions(listing, { includeNft: false }),
         onFinish: (payload) => {
           const txId = payload?.txId ?? payload?.txid ?? '';
           marketDom.status.innerHTML = `<span><strong>Market</strong> reclaim submitted${txId ? ` — tx ${txId}` : ''}. Your unused deposit returns when it confirms.</span>`;
@@ -10780,7 +10827,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     };
     const dropsEntriesForNetwork = () =>
       DROPS_REGISTRY.filter((entry) => entry.network === state.contract.network);
-    const dropsStxSettlement = () => getMarketSettlementAsset(null);
     let dropsQuote = null; // deposit quote from the relayer (ustx)
 
     const readDrops = async (entry) => {
@@ -10828,20 +10874,26 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       return results;
     };
 
+    // Claims cost the claimer nothing, so the only post-condition is the NFT
+    // leaving escrow — a "send exactly 0 STX" condition just confuses wallets.
+    const dropClaimPostConditions = (drop) => {
+      const [nftAddress, nftName] = drop.nftContract.split('.');
+      return [
+        buildContractTransferPostCondition({
+          nftContract: { address: nftAddress, contractName: nftName, network: drop.entry.network },
+          senderContract: {
+            address: drop.entry.address,
+            contractName: drop.entry.contractName,
+            network: drop.entry.network
+          },
+          tokenId: drop.tokenId
+        })
+      ];
+    };
+
     const dropClaimSelfPaid = (drop) => {
       const [nftAddress, nftName] = drop.nftContract.split('.');
-      const postConditions = buildMarketBuyPostConditions({
-        settlement: dropsStxSettlement(),
-        buyerAddress: state.walletSession.address,
-        amount: 0n,
-        nftContract: { address: nftAddress, contractName: nftName, network: drop.entry.network },
-        senderContract: {
-          address: drop.entry.address,
-          contractName: drop.entry.contractName,
-          network: drop.entry.network
-        },
-        tokenId: drop.tokenId
-      });
+      const postConditions = dropClaimPostConditions(drop);
       dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the claim in your wallet…</span>';
       showContractCall({
         contractAddress: drop.entry.address,
@@ -10868,18 +10920,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         return;
       }
       const [nftAddress, nftName] = drop.nftContract.split('.');
-      const postConditions = buildMarketBuyPostConditions({
-        settlement: dropsStxSettlement(),
-        buyerAddress: state.walletSession.address,
-        amount: 0n,
-        nftContract: { address: nftAddress, contractName: nftName, network: drop.entry.network },
-        senderContract: {
-          address: drop.entry.address,
-          contractName: drop.entry.contractName,
-          network: drop.entry.network
-        },
-        tokenId: drop.tokenId
-      });
+      const postConditions = dropClaimPostConditions(drop);
       dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the free claim in your wallet (fee 0)…</span>';
       showContractCall({
         contractAddress: drop.entry.address,
@@ -11021,7 +11062,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
                 functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(drop.dropId)],
                 network: drop.entry.network,
                 stxAddress: state.walletSession.address,
-                postConditionMode: PostConditionMode.Allow,
+                postConditionMode: PostConditionMode.Deny,
+                postConditions: marketEscrowPostConditions(drop),
                 onFinish: () => {
                   dropsDom.status.innerHTML = '<span><strong>Drops</strong> cancel submitted — NFT and deposit return when it confirms.</span>';
                 },

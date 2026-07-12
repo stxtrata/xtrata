@@ -68,7 +68,7 @@ export function quoteBudget(estimatedBuyFeeUstx, opts = DEFAULTS) {
  * Validate a buyer-signed sponsored `buy` payload before we spend anything.
  * Throws Error with .code on the first violation. Returns parsed facts.
  */
-export function validateSponsorPayload(txHex, { allowlist, listing, intendedFeeUstx, maxFeeUstx = DEFAULTS.maxFeeUstx }) {
+export function validateSponsorPayload(txHex, { allowlist, listing, intendedFeeUstx, maxFeeUstx = DEFAULTS.maxFeeUstx, expectedListingId }) {
   const fail = (code, message) => { const e = new Error(message); e.code = code; throw e; };
 
   let tx;
@@ -83,6 +83,18 @@ export function validateSponsorPayload(txHex, { allowlist, listing, intendedFeeU
   const entry = allowlist[contractId];
   if (!entry) fail('CONTRACT_NOT_ALLOWED', `contract ${contractId} not allowlisted`);
   if (tx.payload.functionName.content !== entry.buyFunction) fail('FUNCTION_NOT_ALLOWED', `function must be ${entry.buyFunction}`);
+
+  // SIGNED-ARG BINDING: buy/claim take (nft-contract <trait>, id uint).
+  // The signed id must match the submitted listingId (when provided) so the
+  // relayer never checks one listing's budget while broadcasting another.
+  const args = tx.payload.functionArgs ?? [];
+  const idArg = args[1];
+  if (args.length !== 2 || typeof idArg?.value !== 'bigint') {
+    fail('BAD_ARGS', 'call arguments must be (nft-contract <trait>, listing-id uint)');
+  }
+  if (expectedListingId !== undefined && idArg.value !== BigInt(expectedListingId)) {
+    fail('LISTING_MISMATCH', 'listingId mismatch with signed transaction');
+  }
 
   if (!tx.postConditions?.values?.length) fail('NO_POST_CONDITIONS', 'buyer post-conditions required');
   if (tx.postConditionMode !== PostConditionMode.Deny) fail('PC_MODE', 'post-condition mode must be deny');
@@ -237,7 +249,8 @@ export function createSponsorService({
 
     const intendedFee = await chain.estimateBuyFee();
     const { tx } = validateSponsorPayload(txHex, {
-      allowlist, listing, intendedFeeUstx: intendedFee, maxFeeUstx: opts.maxFeeUstx
+      allowlist, listing, intendedFeeUstx: intendedFee, maxFeeUstx: opts.maxFeeUstx,
+      expectedListingId: listingId
     });
 
     const buyer = txOriginAddress(tx);

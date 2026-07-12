@@ -322,7 +322,7 @@ export class NymphScene {
         const r = actor.rng;
         const nymph = actor.nymph;
 
-        const budgetMs = rand(r, 2500, 4500); // TEMP-TEST
+        const budgetMs = rand(r, 16000, 34000);
         const started = performance.now();
 
         try {

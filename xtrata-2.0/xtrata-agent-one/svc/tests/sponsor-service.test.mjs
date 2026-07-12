@@ -27,14 +27,14 @@ const MARKET = `${DEPLOYER}.xtrata-market-sponsored-sbtc-v1-0`;
 const SBTC = 'SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token';
 const ALLOWLIST = { [MARKET]: { buyFunction: 'buy' } };
 
-async function buildBuyTx({ sponsored = true, fee = 0n, fn = 'buy', withPc = true, contract = MARKET } = {}) {
+async function buildBuyTx({ sponsored = true, fee = 0n, fn = 'buy', withPc = true, contract = MARKET, listingId = 7n } = {}) {
   const [addr, name] = contract.split('.');
   const [sbtcAddr, sbtcName] = SBTC.split('.');
   const tx = await makeContractCall({
     contractAddress: addr,
     contractName: name,
     functionName: fn,
-    functionArgs: [contractPrincipalCV(DEPLOYER, 'xtrata-v2-1-0'), uintCV(7)],
+    functionArgs: [contractPrincipalCV(DEPLOYER, 'xtrata-v2-1-0'), uintCV(listingId)],
     senderKey: BUYER_KEY,
     network: new StacksMainnet(),
     fee,
@@ -183,7 +183,7 @@ test('failed buy tx → ABANDONED; aborted claim still refunds the seller', asyn
     getTxStatus: async (txid) => (String(txid).startsWith('claim-fee') ? 'abort_by_response' : 'success')
   });
   const s2 = makeService(chainClaimAbort);
-  const job2 = await s2.svc.submit({ txHex: await buildBuyTx(), contractId: MARKET, listingId: 8, listing: LISTING });
+  const job2 = await s2.svc.submit({ txHex: await buildBuyTx({ listingId: 8n }), contractId: MARKET, listingId: 8, listing: LISTING });
   await s2.svc.settleStep(job2.id); // confirmed
   await s2.svc.settleStep(job2.id); // claimed (broadcast)
   const j2 = await s2.svc.settleStep(job2.id); // settled despite claim abort
@@ -244,12 +244,21 @@ test('per-address rate limit', async () => {
   const { svc } = makeService(chain, { maxJobsPerAddress: 1 });
   await svc.submit({ txHex: await buildBuyTx(), contractId: MARKET, listingId: 7, listing: LISTING });
   // different payload, same buyer
-  const hex2 = await buildBuyTx({ fn: 'buy' });
-  const tweak = (h) => h.slice(0, -2) + (h.endsWith('00') ? '01' : '00');
+  const hex2 = await buildBuyTx({ listingId: 9n });
   await assert.rejects(
     svc.submit({ txHex: hex2, contractId: MARKET, listingId: 9, listing: LISTING }),
-    (e) => e.code === 'RATE_LIMITED' || e.code === 'DUPLICATE'
+    (e) => e.code === 'RATE_LIMITED'
   );
+});
+
+test('signed listingId binds: body listingId B with signed A is rejected before any wallet action', async () => {
+  const chain = mockChain();
+  const { svc } = makeService(chain);
+  await assert.rejects(
+    svc.submit({ txHex: await buildBuyTx({ listingId: 7n }), contractId: MARKET, listingId: 8, listing: LISTING }),
+    (e) => e.code === 'LISTING_MISMATCH'
+  );
+  assert.equal(chain.calls.filter((c) => c.op === 'sponsorAndBroadcast').length, 0);
 });
 
 test('pending buy below timeout stays SPONSORED; beyond timeout is ABANDONED', async () => {

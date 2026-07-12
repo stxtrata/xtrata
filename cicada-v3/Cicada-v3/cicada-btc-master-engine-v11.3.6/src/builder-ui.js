@@ -3,7 +3,7 @@
 // control, deep-linkable seeds, an IntersectionObserver-gated gallery, and a
 // lazily-loaded export bundle so the heavy inscription module set is only
 // fetched when the user actually exports.
-import * as mod from './cicada-core.js?v=11.3.5-nymph.2';
+import * as mod from './cicada-core.js?v=11.3.8-molt.1';
 import { initTraitLab } from './trait-lab-ui.js?v=11.3.5-nymph.2';
 import { buildInstructionOverrides } from './trait-registry.js?v=11.3.5-nymph.2';
 import { createZip, tinyHtml } from './zip-utils.js?v=11.3.5-nymph.2';
