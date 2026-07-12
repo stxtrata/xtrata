@@ -1,4 +1,8 @@
-export type PriceAssetKey = 'stx' | 'sbtc' | 'usdc';
+export type PriceAssetKey = 'stx' | 'sbtc' | 'usdc' | 'usdt';
+
+// Display (fiat) currencies. These are presentation-only — settlement is always
+// in the on-chain asset. GBP is derived from USD via an FX rate.
+export type FiatCurrency = 'USD' | 'GBP';
 
 export type UsdPriceQuote = {
   usd: number;

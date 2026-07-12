@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Campaign Console — "One Problem Out of a Million" (thread &amp; cross-posts)</title>
+<style>
+  :root{--bg:#0d0f12;--panel:#15181d;--panel2:#1b1f26;--line:#262c35;--text:#e7ebf0;--muted:#8b95a3;--accent:#a855f7;--good:#3fb950;--warn:#e3b341;--bad:#f85149;--radius:12px;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5}
+  a{color:var(--accent)}
+  button{font-family:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:8px;padding:7px 12px;font-size:13px;transition:.12s}
+  button:hover{border-color:#3a424e;background:#232a33}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  button.primary:hover{filter:brightness(1.08)}
+  button.danger{color:var(--bad);border-color:transparent;background:transparent}
+  button.danger:hover{background:rgba(248,81,73,.12)}
+  input,textarea,select{font-family:inherit;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:14px}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
+  header{position:sticky;top:0;z-index:20;background:rgba(13,15,18,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 20px}
+  .htop{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  h1{font-size:18px;margin:0;letter-spacing:.2px}
+  .sub{color:var(--muted);font-size:12.5px;margin-top:2px}
+  .stats{margin-left:auto;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .stat{text-align:center;min-width:52px}
+  .stat b{display:block;font-size:17px;line-height:1.2}
+  .stat span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .saveind{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+  .saveind .d{width:8px;height:8px;border-radius:50%;background:var(--good)}
+  .saveind.off .d{background:var(--warn)}
+  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{padding:5px 11px;border-radius:20px;border:1px solid var(--line);background:transparent;font-size:12.5px;color:var(--muted);cursor:pointer}
+  .chip.active{background:var(--panel2);color:var(--text);border-color:#3a424e}
+  .grow{flex:1}
+  .daynav{display:flex;align-items:center;gap:10px;margin-top:12px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:8px 12px}
+  .daynav button.nav{font-size:15px;padding:5px 12px}
+  .daynav button.nav:disabled{opacity:.35;cursor:default}
+  .daynav .dlabel{font-weight:650;font-size:15px}
+  .daynav .dmeta{color:var(--muted);font-size:12px}
+  .daynav select{font-size:13px;padding:6px 9px}
+  .daynav .todaybtn{margin-left:auto}
+  main{max-width:960px;margin:0 auto;padding:0 20px 40px}
+  #top{max-width:960px;margin:0 auto;padding:20px 20px 0}
+  .banner{background:linear-gradient(180deg,#171a1f,#14171c);border:1px solid var(--line);border-left:3px solid var(--good);border-radius:var(--radius);padding:15px 17px;margin-bottom:14px}
+  .banner h2{margin:0 0 8px;font-size:14px;letter-spacing:.4px}
+  .banner ul{margin:0;padding-left:18px}
+  .banner li{margin:5px 0;font-size:13.5px;color:#d3d9e0}
+  .banner b{color:#fff}
+  .netwrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:13px 15px;margin-bottom:8px}
+  .netwrap .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+  .netcard{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:7px 0;border-top:1px solid var(--line)}
+  .netcard:first-of-type{border-top:none}
+  .netcard input{font-size:12.5px;padding:6px 8px}
+  .nname{width:150px}.nhandle{width:150px}.nfoll{width:96px}.nfocus{flex:1;min-width:220px}
+  .group{margin-bottom:26px}
+  .ghead{display:flex;align-items:center;gap:9px;font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:22px 0 12px;font-weight:600}
+  .ghead .dot{width:10px;height:10px;border-radius:50%}
+  .gcount{background:var(--panel2);border-radius:20px;padding:1px 8px;font-size:11px;color:var(--muted)}
+  .card{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--pc,#555);border-radius:var(--radius);padding:14px;margin-bottom:12px}
+  .card.sent{opacity:.82}
+  .card-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+  .badge{font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#fff;background:var(--pc,#555);padding:3px 8px;border-radius:6px}
+  .datetag{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:2px 7px}
+  .fmt{flex:1;min-width:140px;background:transparent;border:1px solid transparent;font-weight:600;font-size:14px;padding:5px 6px}
+  .fmt:hover{border-color:var(--line)}
+  .pills{display:flex;gap:4px}
+  .pill{padding:4px 9px;font-size:11.5px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}
+  .pill.on[data-status="draft"]{background:#2a2f38;color:#fff;border-color:#3a424e}
+  .pill.on[data-status="approved"]{background:rgba(63,185,80,.16);color:var(--good);border-color:transparent}
+  .pill.on[data-status="sent"]{background:rgba(168,85,247,.18);color:#c99bff;border-color:transparent}
+  textarea.txt{width:100%;min-height:92px;resize:vertical;line-height:1.55;white-space:pre-wrap}
+  .card-foot{display:flex;align-items:center;gap:6px;margin-top:10px;flex-wrap:wrap}
+  .card-foot .right{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .fromwrap{display:flex;align-items:center;gap:5px}
+  .fromlbl{font-size:11.5px;color:var(--muted)}
+  .origin{font-size:12px;padding:5px 7px}
+  .count{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .count.over{color:var(--bad);font-weight:600}
+  .disc{font-size:11.5px;color:var(--warn)}
+  .sentrow{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);font-size:12.5px;color:var(--muted)}
+  .sentrow input{flex:1;font-size:12.5px;padding:5px 8px}
+  .empty{text-align:center;color:var(--muted);padding:60px 20px}
+  .hidden{display:none!important}
+  .history{max-width:960px;margin:10px auto 0;padding:0 20px 60px}
+  .history h2{font-size:14px;text-transform:uppercase;letter-spacing:.9px;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:8px;display:flex;align-items:center;gap:10px}
+  .history .htoolbar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px}
+  th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;position:sticky;top:0}
+  td[contenteditable]:focus{outline:1px solid var(--accent);background:var(--panel2)}
+  td.txtcell{max-width:320px;white-space:pre-wrap;color:#cdd4dd}
+  .delrow{color:var(--muted);cursor:pointer;font-weight:700;text-align:center}
+  .delrow:hover{color:var(--bad)}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#232a33;border:1px solid var(--line);color:var(--text);padding:10px 18px;border-radius:10px;z-index:60;opacity:0;transition:.2s;pointer-events:none}
+  .toast.show{opacity:1}
+  .foothelp{max-width:960px;margin:0 auto;padding:0 20px 40px;color:var(--muted);font-size:12.5px}
+  code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <div class="htop">
+    <div>
+      <h1>Campaign Console — "One Problem Out of a Million"</h1>
+      <div class="sub" id="sub">X thread + quote-posts from the network + Reddit (r/stacks &amp; music-tech) + Bluesky · draft, route, and keep an auditable record.</div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="s-draft">0</b><span>Draft</span></div>
+      <div class="stat"><b id="s-appr">0</b><span>Approved</span></div>
+      <div class="stat"><b id="s-sent">0</b><span>Sent</span></div>
+      <div class="stat"><b id="s-log">0</b><span>Logged</span></div>
+      <div class="stat"><b id="s-anchor">#1</b><span>Next #</span></div>
+      <div class="saveind" id="saveind"><span class="d"></span><span id="savetxt">Saved</span></div>
+    </div>
+  </div>
+  <div class="toolbar">
+    <div class="chips" id="platChips">
+      <button class="chip active" data-plat="all">All</button>
+      <button class="chip" data-plat="X">X</button>
+      <button class="chip" data-plat="Bluesky">Bluesky</button>
+      <button class="chip" data-plat="Nostr">Nostr</button>
+      <button class="chip" data-plat="LinkedIn">LinkedIn</button>
+      <button class="chip" data-plat="Reddit">Reddit</button>
+    </div>
+    <div class="chips" id="statChips">
+      <button class="chip active" data-stat="all">Any status</button>
+      <button class="chip" data-stat="draft">Draft</button>
+      <button class="chip" data-stat="approved">Approved</button>
+      <button class="chip" data-stat="sent">Sent</button>
+    </div>
+    <input id="search" placeholder="Search…" style="width:150px">
+    <div class="grow"></div>
+    <button class="primary" data-action="add">+ Add</button>
+    <button id="btnExportJson">Export all (JSON)</button>
+    <button id="btnExportSent">Export Sent (.md)</button>
+  </div>
+  <div class="daynav">
+    <button class="nav" id="dayPrev" title="Previous day">◀</button>
+    <div><span class="dlabel" id="dayLabel">—</span> &nbsp;<span class="dmeta" id="dayMeta"></span></div>
+    <button class="nav" id="dayNext" title="Next day">▶</button>
+    <select id="dayJump" title="Jump to a day"></select>
+    <button class="todaybtn" id="dayToday">Latest</button>
+    <button id="dayAll">All days</button>
+  </div>
+</header>
+
+<section id="top">
+  <div class="banner">
+    <h2>Suggested run order — open &amp; disclosed</h2>
+    <ul>
+      <li><b>1. Open with a quote-tweet:</b> tweet 1 goes out from @jimdotbtc as a QT of the @audionals "Memory Layer for Music" Anchor #1 (or #2) — the anchor asks the question, the thread answers it. Then tweets 2–9 as replies in order.</li>
+      <li><b>2. Add the FAQ reply</b> from @jimdotbtc under the thread once it has a little traction.</li>
+      <li><b>3. Quote-post</b> tweet 1 from @audionals, @xtrata and This Is #1 — each has its own angle. Space them hours apart, don't run a mechanical ring.</li>
+      <li><b>4. Reddit &amp; Bluesky</b> the same day or the next: r/stacks is pitch-tolerant, the music-tech sub is discussion-first — the drafts are tailored accordingly. Engage in replies.</li>
+      <li><b>Truth only.</b> No invented stats or milestones. Nothing posts without your sign-off.</li>
+    </ul>
+  </div>
+  <div class="netwrap">
+    <div class="lbl"><span>Account network (editable — kept with your data)</span></div>
+    <div id="network"></div>
+  </div>
+  <p style="color:var(--muted);font-size:12px;margin:4px 2px 0" id="genline"></p>
+</section>
+
+<main id="list"></main>
+
+<div class="history">
+  <h2>Auditable posting history <span class="gcount" id="logcount">0</span></h2>
+  <p style="color:var(--muted);font-size:12.5px;margin:6px 0 0">Every <b>Mark sent</b> appends a permanent row here with the date, account, platform and the exact text that went out. This is the ongoing record — export regularly for an off-browser copy.</p>
+  <div class="htoolbar">
+    <button onclick="addLogRow()">+ Add row</button>
+    <button id="btnExportLogJson">⬇ History (JSON)</button>
+    <button id="btnExportLogCsv">⬇ History (CSV)</button>
+  </div>
+  <div style="overflow:auto">
+  <table id="logtable">
+    <thead><tr>
+      <th style="width:84px">Date</th><th style="width:120px">Platform</th><th style="width:130px">Account</th>
+      <th style="width:150px">Format</th><th>Text posted</th><th style="width:150px">Link</th><th>Response / notes</th><th style="width:24px"></th>
+    </tr></thead>
+    <tbody id="logbody"></tbody>
+  </table>
+  </div>
+</div>
+
+<div class="foothelp">
+  <p><b>How it works.</b> Edits, statuses and the posting history save automatically to this browser. Keep one bookmark to this file. For a durable copy use <code>Export all (JSON)</code> and the history exports.</p>
+  <p style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+    <button id="btnReset">Reset to seed</button>
+    <button id="btnClear" class="danger">Clear everything</button>
+  </p>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script id="seed" type="application/json">{"campaign":"One Problem Out of a Million — on-chain provenance thread","account":"Audionals network (open & disclosed)","lastUpdated":"2026-07-09","network":[{"id":"jimbtc","name":"Jim.btc (you)","handle":"@jimdotbtc","platform":"X","followers":"~3,500","focus":"Personal umbrella — Bitcoin, Stacks & music. Most reach; your own voice. Thread goes here.","role":"umbrella"},{"id":"audionals","name":"Audionals","handle":"@audionals","platform":"X","followers":"~1,000","focus":"Music on Bitcoin/Ordinals; bridging to Stacks. Quote-posts the thread with the memory-layer angle.","role":"amplify"},{"id":"xtrata","name":"Xtrata","handle":"@xtrata","platform":"X","followers":"","focus":"Stacks on-chain composable data. Quote-posts with the infrastructure angle.","role":"amplify"},{"id":"thisis1","name":"This Is #1","handle":"","platform":"X","followers":"~few thousand","focus":"First marketplace on Stacks. Quote-posts with the collector/provenance angle.","role":"amplify"},{"id":"reddit","name":"iCryptoDude","handle":"u/iCryptoDude","platform":"Reddit","followers":"","focus":"r/stacks (pitch-tolerant) + music-tech sub (discussion-first, disclosure required).","role":"umbrella"},{"id":"bluesky_jim","name":"Bluesky","handle":"","platform":"Bluesky","followers":"","focus":"Hype-skeptical, chatty — lead with the problem, disclose the stake.","role":"umbrella"},{"id":"nostr_jim","name":"Jim.btc","handle":"Jim.btc","platform":"Nostr","followers":"","focus":"Bitcoin-native crowd — optional cross-post.","role":"umbrella"}],"log":[],"posts":[{"id":"2026-07-09-thr-0-ref","date":"2026-07-09","platform":"X","account":"jimbtc","format":"REFERENCE — @audionals anchors to quote (do not post from here)","status":"draft","sentAt":null,"link":"","text":"Anchor #1 (posted 2026-07-07 from @audionals, paste its URL into the quote):\n\n\"A song passes through many hands before it reaches you.\nA writer. A session player. An engineer who stayed late.\nWhy does it arrive remembering none of them?\"\n\nAnchor #2 (2026-07-08, if posted):\n\n\"Every song has parents… We call the newest one original. But nothing in music is born from nothing.\"\n\n→ #1 is the stronger setup: it asks the question the thread answers."},{"id":"2026-07-09-thr-1","date":"2026-07-09","platform":"X","account":"jimbtc","format":"Thread 1/9 — hook · post as QUOTE of @audionals Anchor #1 or #2","status":"draft","sentAt":null,"link":"","text":"Everyone is trying to fix music from the top down.\n\nI am going after the one problem underneath all the others:\n\na song should be able to prove its own history, every session, every hand, every split, from the first take to the final master. 🧵 1/9"},{"id":"2026-07-09-thr-2","date":"2026-07-09","platform":"X","account":"jimbtc","format":"Thread 2/9 — already digital","status":"draft","sentAt":null,"link":"","text":"Here is what nobody stops to notice: making music is already 100% digital.\n\nThe takes, the samples, the plug-ins, every synth patch, every EQ move. The whole journey from idea to master is data flowing through machines.\n\n2/9"},{"id":"2026-07-09-thr-3","date":"2026-07-09","platform":"X","account":"jimbtc","format":"Thread 3/9 — the DNA line","status":"draft","sentAt":null,"link":"","text":"And data can be fingerprinted. Hashed. Anchored.\n\nWhich means a song can carry its complete DNA, written in real time as the music is made, and set in stone the moment it happens.\n\n3/9"},{"id":"2026-07-09-thr-4","date":"2026-07-09","platform":"X","account":"jimbtc","format":"Thread 4/9 — the problem","status":"draft","sentAt":null,"link":"","text":"Now the part that ruins friendships.\n\nSplits get agreed backwards: a handshake in the studio and a \"we will sort it later.\" Then the track blows up, and everyone remembers that night differently right when the money shows up.\n\n4/9"},{"id":"2026-07-09-thr-5","date":"2026-07-09","platform":"X","account":"jimbtc","format":"Thread 5/9 — designed out","status":"draft","sentAt":null,"link":"","text":"So flip the order.\n\nSign into the session. Lock the splits on day one, while the song is still nothing and everyone is still friends.\n\nThat is it. That is the fix.\n\n5/9"},{"id":"2026-07-09-thr-6","date":"2026-07-09","platform":"X","account":"jimbtc","format":"Thread 6/9 — still friends","status":"draft","sentAt":null,"link":"","text":"Because once it is sealed, memory stops mattering.\n\nNot a contract in a drawer. Not a text thread someone screenshots for a lawsuit.\n\nA record that cannot be quietly rewritten. By anyone.\n\n6/9"},{"id":"2026-07-09-thr-7","date":"2026-07-09","platform":"X","account":"jimbtc","format":"Thread 7/9 — trivial transition","status":"draft","sentAt":null,"link":"","text":"The wild part? This is the small step.\n\nTape → digital rebuilt every studio on earth. This asks nothing new of the workflow. The workflow is already digital.\n\nWe are just teaching it to remember.\n\n7/9"},{"id":"2026-07-09-thr-8","date":"2026-07-09","platform":"X","account":"jimbtc","format":"Thread 8/9 — who it works for","status":"draft","sentAt":null,"link":"","text":"Tape → digital changed how music gets made.\n\nThis changes who music works for.\n\nCredit that cannot be erased. Attribution that travels with the song into every licence, every sample and every royalty it ever generates.\n\n8/9"},{"id":"2026-07-09-thr-9","date":"2026-07-09","platform":"X","account":"jimbtc","format":"Thread 9/9 — close + disclosure","status":"draft","sentAt":null,"link":"","text":"Will it fix everything in music overnight? No.\n\nBut it kills the problem that poisons all the others: trusting each other’s memory.\n\nWe are building it at Audionals + Xtrata, on Stacks, anchored to Bitcoin.\n\n9/9"},{"id":"2026-07-09-thr-faq","date":"2026-07-09","platform":"X","account":"jimbtc","format":"Reply under thread — FAQ pre-empt","status":"draft","sentAt":null,"link":"","text":"Before anyone asks: no, we are not minting an NFT every time someone touches a fader 😄\n\nSessions log locally, get hashed, and one compact fingerprint anchors per save.\n\nAll of the proof, none of the spam. The chain holds evidence, never the audio."},{"id":"2026-07-09-qt-audionals","date":"2026-07-09","platform":"X","account":"audionals","format":"Quote-post of thread — memory-layer angle","status":"draft","sentAt":null,"link":"","text":"This is what we mean by the memory layer for music.\n\nNot archiving finished songs. Remembering how they were made, while they are being made. Sealed before the money ever shows up. https://[link-to-thread]"},{"id":"2026-07-09-qt-xtrata","date":"2026-07-09","platform":"X","account":"xtrata","format":"Quote-post of thread — infrastructure angle","status":"draft","sentAt":null,"link":"","text":"The plumbing view: no audio ever touches the chain.\n\nHashes, credits and splits. A few hundred bytes per song on Stacks, settling to Bitcoin.\n\nProvenance for the process, not just the product. https://[link]"},{"id":"2026-07-09-qt-thisis1","date":"2026-07-09","platform":"X","account":"thisis1","format":"Quote-post of thread — collector angle","status":"draft","sentAt":null,"link":"","text":"For collectors this is the whole game: music that carries its verifiable making-of.\n\nWho played, when, and on what terms. All part of the asset itself.\n\nProvenance you can check. Not vibes. https://[link-to-thread]"},{"id":"2026-07-09-bluesky","date":"2026-07-09","platform":"Bluesky","account":"bluesky_jim","format":"Single post — problem-first","status":"draft","sentAt":null,"link":"","text":"Music’s ugliest fights all start the same way: \"we’ll sort the splits later.\"\n\nLater = when the money shows up and memories diverge.\n\nWe’re building sessions that seal the deal on day one, while everyone’s still friends. The song remembers, so nobody has to."},{"id":"2026-07-09-reddit-stacks","date":"2026-07-09","platform":"Reddit","account":"reddit","format":"r/stacks — follow-up to the Xtrata radio post (warm audience)","status":"draft","sentAt":null,"link":"","text":"Title: Follow-up to Xtrata: you asked about minting albums and submitting songs. Here is the attribution layer that makes it matter\n\nBody:\n\nLast week I posted about Xtrata, full audio living in Clarity contracts plus the radio station that plays the catalogue straight from the chain. The response was brilliant. People asked about minting entire albums, pairing tokens with physical records, and submitting their own music. And in one reply I promised something big: attribution guaranteed.\n\nThis post is about how that promise actually works, because it is the part I care about most.\n\nDurable audio answers \"will the song survive.\" It does not answer \"who made it, and on what terms.\" In music that record is usually a handshake in the studio, and it falls apart exactly when a song starts earning. Splits get agreed loosely, then the track blows up and memories diverge right when money appears. One of the oldest and most expensive problems in the industry, and at its core it is an evidence problem. Evidence problems are solvable.\n\nThe design:\n\n1. Collaborators sign into a session with their Stacks principals.\n2. Splits are ratified on day one, into a Clarity map, basis points per principal, before anyone knows if the song will matter.\n3. The working session logs locally as it happens (takes, samples, plug-in and parameter changes). Only compact fingerprints anchor on-chain, one per save, so the timeline is tamper-evident without bloating contract state.\n4. The finished master ties back to the whole chain of session roots. The song you hear on Xtrata radio can carry its complete, verifiable making-of.\n\nSo when the relations layer shows parents and dependencies between inscriptions, this extends that same graph back in time, into the studio. Not just which songs share a lineage, but who was in the room when each one was born, sealed while everyone was still friends.\n\nFor those who asked about submitting music: this is what you would be opting into. Your credits travel with the work, into every remix, sample and playlist, forever.\n\nWhy Stacks: Clarity for the split and session registries, Bitcoin finality via PoX, and the audio experiments already proved the storage side. Happy to go deep on any of it in the comments."},{"id":"2026-07-09-reddit-music","date":"2026-07-09","platform":"Reddit","account":"reddit","format":"r/WeAreTheMusicMakers — discussion-first + disclosure","status":"draft","sentAt":null,"link":"","text":"Title: The \"we’ll sort the splits later\" problem, how do you actually handle it?\n\nBody:\n\nEvery collaboration horror story seems to follow the same arc. In the studio everyone’s friends and the splits are a handshake. Then the track does numbers, and suddenly everyone remembers that night differently, precisely when money enters the picture.\n\nI’ve been working on an approach that flips the order: when a session starts, everyone signs in and locks the splits that day, timestamped and tamper-proof, before anyone knows whether the song will matter. The deal gets made while the goodwill is real, and two years later there’s nothing to argue about because nobody’s memory is the evidence.\n\nWhat I’d love to know from people actually making records: how do you handle this today? Split sheets? A message pinned in the group chat? Nothing until a label or distributor forces the question? And has a loose verbal agreement ever come back to bite you?"},{"id":"2026-07-09-nostr","date":"2026-07-09","platform":"Nostr","account":"nostr_jim","format":"Optional cross-post — condensed","status":"draft","sentAt":null,"link":"","text":"A song should be able to prove its own history.\n\nMusic production is already fully digital, every take, sample, plug-in and parameter change is data from the moment a recording exists. So the whole creative journey can be captured as it happens: logged, hashed, anchored. The DNA of a song, written in real time, impossible to rewrite afterwards.\n\nThe payoff is attribution. Today splits are agreed on a handshake and settled backwards, and memories diverge exactly when money appears. Flip the order: sign into the session, lock the splits on day one, while everyone is still friends. From then on nobody’s memory is the evidence.\n\nWe’re building this at Audionals / Xtrata, on Stacks, anchored to Bitcoin. Where does the current system fail you hardest: credit, control, or getting paid?"},{"id":"2026-07-09-bip110-main","date":"2026-07-09","platform":"X","account":"jimbtc","format":"BIP-110 drop — the bomb (reply into the debate)","status":"draft","sentAt":null,"link":"","text":"Been watching the BIP-110 war all week and the funny thing is both sides are closer than they think.\n\nThe maxis are now literally saying it out loud: keep the bytes somewhere cheap, anchor a hash where it is secure.\n\nLads. That is not a compromise. That is the architecture."},{"id":"2026-07-09-bip110-follow","date":"2026-07-09","platform":"X","account":"jimbtc","format":"BIP-110 drop — follow-up with thread link","status":"draft","sentAt":null,"link":"","text":"And it is not hypothetical. Bytes off L1, fingerprint anchored to Bitcoin, settlement in sats. Nodes store nothing extra, creators lose nothing.\n\nWe have been building exactly this for music for years. Same answer, bigger fight: https://[link-to-thread]"},{"id":"2026-07-09-bip110-spicy","date":"2026-07-09","platform":"X","account":"jimbtc","format":"BIP-110 drop — spicier alt (use instead of main if the room is hot)","status":"draft","sentAt":null,"link":"","text":"Wild watching accounts that spent two years calling data on Bitcoin spam now sketching \"data in one place, hash in the other\" like they just invented it.\n\nWelcome aboard. That is what a Bitcoin L2 is for. The music version already exists: https://[link-to-thread]"},{"id":"2026-07-09-bip110-neutral","date":"2026-07-09","platform":"X","account":"jimbtc","format":"BIP-110 drop — above-the-fray reply for specific arguments","status":"draft","sentAt":null,"link":"","text":"I do not need BIP-110 to pass or fail.\n\nWhether the limit is 256 bytes or nothing changes, the answer is the same: L1 for the hash and the money, everywhere else for the bytes.\n\nEveryone in this fight is defending one half of a working system."},{"id":"2026-07-09-bip110-space","date":"2026-07-09","platform":"X","account":"jimbtc","format":"BIP-110 — tuned to the Leonidas Space thread (post fresh in replies)","status":"draft","sentAt":null,"link":"","text":"Best thing about this Space: between the insults you have all quietly agreed.\n\nOne of you quoted OpenTimestamps. One said colored coins. One inscribed \"remembering stuff forever is useful.\"\n\nBytes off L1, hash on Bitcoin, sats settle it. You already believe in the answer."},{"id":"2026-07-09-bip110-selfreply","date":"2026-07-09","platform":"X","account":"jimbtc","format":"BIP-110 — follow-up under your existing Stacks reply (add thread link)","status":"draft","sentAt":null,"link":"","text":"Not even joking. The design half this Space is sketching between insults has been running for years: data lives where storage is cheap, the hash and the money live on Bitcoin.\n\nWe use it for music, where the stakes are real credits and royalties: https://[link-to-thread]"},{"id":"2026-07-09-bip110-soft","date":"2026-07-09","platform":"X","account":"jimbtc","format":"BIP-110 — soft/likeable option (curiosity, no dunk)","status":"draft","sentAt":null,"link":"","text":"Genuinely enjoying this Space because underneath the shouting everyone wants the same two things:\n\nkeep Bitcoin lean, and never lose what matters.\n\nThose are not opposites. Small hash on the chain, everything else somewhere cheap. Both sides have been right the whole time."},{"id":"2026-07-09-reddit-web3dev","date":"2026-07-09","platform":"Reddit","account":"reddit","format":"r/web3dev — follow-up to the Clarity storage post","status":"draft","sentAt":null,"link":"","text":"Title: Follow-up to my on-chain audio experiment: capturing the recording session itself as verifiable provenance\n\nBody:\n\nA few days ago I posted about storing full audio files inside Clarity contract data on Stacks (Xtrata). Good discussion, thanks to everyone who dug into the chunked-write flow. This is the next layer up the stack, and honestly the part I care about most.\n\nStoring the finished song on-chain answers \"will the media survive.\" It does nothing for the harder question: who made it, and on what terms? In music that record is usually a handshake in the studio, and it falls apart exactly when the song starts earning. Splits get agreed loosely, memories diverge when money appears, and the dispute lands two years later with no evidence on either side.\n\nSo the design I am working on treats the session, not the file, as the unit of provenance:\n\n1. Collaborators sign into a session with their Stacks principals.\n2. They ratify splits up front, day one, before anyone knows if the song matters. That goes into a Clarity map keyed by session, with basis-point splits per principal.\n3. The working session logs locally as it happens (takes, samples, plug-in and parameter changes). Nothing bulky goes on-chain: the log is Merkle-rooted and one compact fingerprint is anchored per save.\n4. The final master ties back to the whole chain of session roots, so the finished work carries a verifiable history from first take to master.\n\nThe important property: the agreement is timestamped and tamper-evident from day one. Nobody’s memory is the evidence, and nobody can quietly rewrite the record after the song blows up.\n\nDesign questions I am still chewing on, would love input:\n\n1. Granularity of anchoring. Per save feels right (cheap, natural checkpoint). Per session is cheaper still but weakens the timeline. Anyone built similar audit-log anchoring and regretted their choice?\n2. The logs contain unreleased creative work, so the Merkle leaves stay private and only roots go public. Selective disclosure (prove one contribution without revealing the rest of the session) looks like a job for Merkle proofs, but curious if anyone has a cleaner pattern.\n3. Ratified splits are evidence, not law. A court can still override them. I am fine with that, the goal is to make the honest path the default. Pushback welcome.\n\nStack is the same as the storage experiment: Clarity contracts on Stacks, anchored to Bitcoin via PoX."},{"id":"2026-07-09-reddit-musicprod","date":"2026-07-09","platform":"Reddit","account":"reddit","format":"r/musicproduction — workflow framing (no deal/legal language)","status":"draft","sentAt":null,"link":"","text":"Title: How do you document who actually played what on your tracks?\n\nBody:\n\nSomething I keep running into with collaborative projects: six months after a track is finished, nobody can quite reconstruct how it was made. Who programmed that hat pattern, who found the sample, whose take ended up in the final comp, which session the vocal chain came from. The project file sort of knows, but project files get consolidated, stems get bounced, and the history quietly evaporates.\n\nIt bugs me because the information all existed at some point. Every take, every plug-in choice, every parameter tweak passed through the DAW. We just never keep it.\n\nCurious what people actually do in practice:\n\n1. Do you keep any record of who contributed what beyond the project file itself? Notes doc, track naming conventions, a pinned message in the group chat?\n\n2. For remote collabs, does anything survive beyond the bounced stems and a WhatsApp history?\n\n3. Has the missing history ever actually cost you? A credit that never made it to the release, a part you played that nobody remembered was yours?\n\nI have been experimenting with tooling that logs session activity automatically as you work (locally, from the DAW side) so the making-of survives the project file. Before I go further down that road I want to know whether the problem is as common as I think, or whether everyone else has a system that works and I just never found it.\n\nWhat is your setup?"},{"id":"2026-07-15-reddit-promusicprod","date":"2026-07-15","platform":"Reddit","account":"reddit","format":"r/ProMusicProduction — question only, no tooling mention (wait until ~15 Jul)","status":"draft","sentAt":null,"link":"","text":"Title: How do you document who actually played what on your tracks?\n\nBody:\n\nSomething I keep running into with collaborative projects: six months after a track is finished, nobody can quite reconstruct how it was made. Who programmed that hat pattern, who found the sample, whose take ended up in the final comp, which session the vocal chain came from. The project file sort of knows, but project files get consolidated, stems get bounced, and the history quietly evaporates.\n\nIt bugs me because the information all existed at some point. Every take, every plug-in choice, every parameter tweak passed through the DAW. We just never keep it.\n\nCurious what people actually do in practice:\n\n1. Do you keep any record of who contributed what beyond the project file itself? Notes doc, track naming conventions, a pinned message in the group chat?\n\n2. For remote collabs, does anything survive beyond the bounced stems and a WhatsApp history?\n\n3. Has the missing history ever actually cost you? A credit that never made it to the release, a part you played that nobody remembered was yours?\n\nWhat is your setup?"}]}</script>
+<script>
+"use strict";
+const SEED = JSON.parse(document.getElementById("seed").textContent);
+const KEY = "campaignConsole.oneProblem.v6"; // v2: thread numbering added — forces fresh load of the numbered seed
+const PLATFORMS = ["X","Bluesky","Nostr","LinkedIn","Reddit"];
+const PC = { X:"#1d9bf0", Bluesky:"#2563eb", Nostr:"#a855f7", LinkedIn:"#0a66c2", Reddit:"#ff4500" };
+const LIMITS = { X:280, Bluesky:300, Nostr:2000, LinkedIn:3000, Reddit:10000 };
+
+const uid = () => Math.random().toString(36).slice(2,9);
+const nowISO = () => new Date().toISOString();
+const today = () => new Date().toISOString().slice(0,10);
+const byId = id => state.items.find(x => x.id === id);
+const acctById = id => state.network.find(a => a.id === id);
+const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const escAttr = s => esc(s).replace(/"/g,"&quot;");
+const fmtDate = iso => iso ? (iso.slice(0,10) + " " + iso.slice(11,16)) : "";
+
+let filter = { platform:"all", status:"all", q:"" };
+
+function seedState(){
+  return {
+    items: SEED.posts.map(p => JSON.parse(JSON.stringify(p))),
+    network: JSON.parse(JSON.stringify(SEED.network)),
+    log: (SEED.log||[]).map(l => JSON.parse(JSON.stringify(l)))
+  };
+}
+function load(){ try{ const s=localStorage.getItem(KEY); return s?JSON.parse(s):null; }catch(e){ return null; } }
+
+function mergeSeed(s){
+  s.items = s.items || [];
+  s.network = s.network || [];
+  s.log = s.log || [];
+  const haveItem = new Set(s.items.map(i=>i.id));
+  SEED.posts.forEach(p=>{ if(p.id && !haveItem.has(p.id)) s.items.push(JSON.parse(JSON.stringify(p))); });
+  const haveAcct = new Set(s.network.map(a=>a.id));
+  SEED.network.forEach(a=>{ if(a.id && !haveAcct.has(a.id)) s.network.push(JSON.parse(JSON.stringify(a))); });
+  const haveLog = new Set(s.log.map(l=>l.id));
+  (SEED.log||[]).forEach(l=>{ if(l.id && !haveLog.has(l.id)) s.log.push(JSON.parse(JSON.stringify(l))); });
+  s.items.forEach(it=>{ if(!it.account){ const a=s.network.find(n=>n.platform===it.platform); it.account=a?a.id:null; } if(it.link==null) it.link=""; });
+  return s;
+}
+function allDates(){ return [...new Set(state.items.map(i=>i.date).filter(Boolean))].sort(); }
+const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const WDAYS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+function prettyDate(d){ if(!d) return ""; const dt=new Date(d+"T00:00:00"); return WDAYS[dt.getDay()]+" "+dt.getDate()+" "+MONTHS[dt.getMonth()]+" "+dt.getFullYear(); }
+function dayIndex(d){ const ds=allDates(); return ds.indexOf(d)+1; }
+
+let state = (function(){ const s=load(); return s ? mergeSeed(s) : seedState(); })();
+let dayMode = "day";
+let currentDay = (allDates().slice(-1)[0]) || today();
+
+let saveTimer=null;
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); setSaved(true);}catch(e){ setSaved(false);} }
+function scheduleSave(){ clearTimeout(saveTimer); saveTimer=setTimeout(save,300); }
+function setSaved(ok){ const el=document.getElementById("saveind"),t=document.getElementById("savetxt"); el.classList.toggle("off",!ok); t.textContent=ok?"Saved":"In memory — Export to keep"; }
+
+function renderNetwork(){
+  document.getElementById("network").innerHTML = state.network.map(a=>`<div class="netcard" data-acct="${a.id}">
+    <span class="badge" style="background:${PC[a.platform]||'#555'}">${esc(a.platform)}</span>
+    <input class="nname" data-f="name" value="${escAttr(a.name)}" placeholder="name" spellcheck="false">
+    <input class="nhandle" data-f="handle" value="${escAttr(a.handle)}" placeholder="@handle / npub" spellcheck="false">
+    <input class="nfoll" data-f="followers" value="${escAttr(a.followers)}" placeholder="followers" spellcheck="false">
+    <input class="nfocus" data-f="focus" value="${escAttr(a.focus)}" placeholder="focus / audience" spellcheck="false">
+  </div>`).join("");
+}
+document.getElementById("network").addEventListener("input", e=>{
+  const card=e.target.closest(".netcard"); if(!card) return;
+  const a=acctById(card.dataset.acct); if(!a) return;
+  const f=e.target.dataset.f; if(f){ a[f]=e.target.value; scheduleSave(); }
+});
+
+const list=document.getElementById("list");
+function nextAnchor(){
+  let max=0;
+  const scan=t=>{ const m=(t||"").match(/Memory Layer for Music\s*#(\d+)/i); if(m) max=Math.max(max,parseInt(m[1],10)); };
+  state.items.forEach(it=>scan(it.text));
+  state.log.forEach(r=>scan(r.text));
+  return max+1;
+}
+function updateStats(){
+  const c={draft:0,approved:0,sent:0};
+  state.items.forEach(it=>{ c[it.status]=(c[it.status]||0)+1; });
+  document.getElementById("s-draft").textContent=c.draft;
+  document.getElementById("s-appr").textContent=c.approved;
+  document.getElementById("s-sent").textContent=c.sent;
+  document.getElementById("s-log").textContent=state.log.length;
+  document.getElementById("s-anchor").textContent="#"+nextAnchor();
+  document.getElementById("logcount").textContent=state.log.length;
+}
+function visible(){
+  return state.items.filter(it=>{
+    if(dayMode==="day" && it.date!==currentDay) return false;
+    if(filter.platform!=="all" && it.platform!==filter.platform) return false;
+    if(filter.status!=="all" && it.status!==filter.status) return false;
+    if(filter.q){ const q=filter.q.toLowerCase(); if(!((it.text||"").toLowerCase().includes(q)||(it.format||"").toLowerCase().includes(q))) return false; }
+    return true;
+  });
+}
+function renderDayNav(){
+  const ds=allDates(); const jump=document.getElementById("dayJump");
+  jump.innerHTML=ds.map(d=>`<option value="${d}" ${d===currentDay&&dayMode==="day"?"selected":""}>Day ${dayIndex(d)} · ${prettyDate(d)}</option>`).join("");
+  const idx=ds.indexOf(currentDay);
+  if(dayMode==="all"){
+    document.getElementById("dayLabel").textContent="All days";
+    document.getElementById("dayMeta").textContent=ds.length+" days · "+state.items.length+" posts";
+  } else {
+    document.getElementById("dayLabel").textContent="Day "+(idx+1)+" · "+prettyDate(currentDay);
+    const n=state.items.filter(i=>i.date===currentDay).length;
+    const isToday=currentDay===today();
+    document.getElementById("dayMeta").textContent=n+" post"+(n===1?"":"s")+(isToday?" · today":"");
+  }
+  document.getElementById("dayPrev").disabled=(dayMode==="day"&&idx<=0);
+  document.getElementById("dayNext").disabled=(dayMode==="day"&&idx>=ds.length-1);
+}
+function pill(it,st,label){ return `<button class="pill ${it.status===st?"on":""}" data-action="status" data-status="${st}">${label}</button>`; }
+function hasDisclosure(t){ return /disclos|i'm jim|jim\.btc|audionals|xtrata|building in this space|for transparency|who's (posting|behind)|my bias|same team|same family/i.test(t||""); }
+function originSelect(it){
+  const opts = state.network.filter(a=>a.platform===it.platform)
+    .map(a=>`<option value="${a.id}" ${a.id===it.account?"selected":""}>${esc(a.handle||a.name)}</option>`).join("");
+  return `<div class="fromwrap"><span class="fromlbl">from</span><select class="origin">${opts||`<option>—</option>`}</select></div>`;
+}
+function cardHTML(it){
+  const lim=LIMITS[it.platform]||1000, len=(it.text||"").length, over=len>lim;
+  const disc = "";
+  return `<div class="card ${it.status==="sent"?"sent":""}" data-id="${it.id}" style="--pc:${PC[it.platform]||"#555"}">
+    <div class="card-head">
+      <span class="badge">${esc(it.platform)}</span>
+      ${it.date?`<span class="datetag">${esc(it.date)}</span>`:""}
+      <input class="fmt" value="${escAttr(it.format)}" spellcheck="false">
+      <div class="pills">${pill(it,"draft","Draft")}${pill(it,"approved","Approved")}${pill(it,"sent","Sent")}</div>
+    </div>
+    <textarea class="txt" spellcheck="false">${esc(it.text)}</textarea>
+    <div class="card-foot">
+      ${originSelect(it)}
+      <button data-action="copy">Copy</button>
+      <button data-action="sent">Mark sent</button>
+      <button data-action="dup">Duplicate</button>
+      <button class="danger" data-action="del">Delete</button>
+      <div class="right">${disc}<span class="count ${over?"over":""}">${len} / ${lim}</span></div>
+    </div>
+    ${it.status==="sent" ? `<div class="sentrow">Sent ${fmtDate(it.sentAt)} · <input class="link" placeholder="paste the post URL (optional)" value="${escAttr(it.link)}"></div>` : ""}
+  </div>`;
+}
+function render(){
+  const items=visible(), groups={};
+  PLATFORMS.forEach(p=>groups[p]=[]);
+  items.forEach(it=>{ (groups[it.platform]=groups[it.platform]||[]).push(it); });
+  let html="";
+  PLATFORMS.forEach(p=>{
+    const arr=groups[p]; if(!arr||!arr.length) return;
+    arr.sort((a,b)=>(a.id||"").localeCompare(b.id||""));
+    html+=`<section class="group"><h2 class="ghead"><span class="dot" style="background:${PC[p]}"></span>${p}<span class="gcount">${arr.length}</span></h2>`;
+    arr.forEach(it=>html+=cardHTML(it));
+    html+=`</section>`;
+  });
+  const emptyMsg = dayMode==="day" ? `No posts for ${prettyDate(currentDay)}.` : `Nothing here yet.`;
+  list.innerHTML = items.length ? html : `<div class="empty">${emptyMsg}<br><br><button class="primary" data-action="add">+ Add an item</button></div>`;
+  renderDayNav();
+  updateStats();
+}
+
+function addItem(){
+  const p = filter.platform!=="all" ? filter.platform : "X";
+  const a = state.network.find(n=>n.platform===p);
+  const d = dayMode==="day" ? currentDay : today();
+  const it={ id:uid(), date:d, platform:p, account:a?a.id:null, format:"New draft", status:"draft", sentAt:null, link:"", text:"" };
+  state.items.unshift(it); save(); render();
+  const el=list.querySelector(`.card[data-id="${it.id}"] .txt`); if(el) el.focus();
+}
+function logSent(it){
+  const ac=acctById(it.account);
+  state.log.unshift({ id:uid(), date:today(), platform:it.platform, account:ac?(ac.handle||ac.name):"", format:it.format||"", text:it.text||"", link:it.link||"", note:"" });
+}
+function copyText(text, btn){
+  const done=()=>{ if(btn){ const o=btn.textContent; btn.textContent="Copied ✓"; setTimeout(()=>btn.textContent=o,1100);} toast("Copied to clipboard"); };
+  if(navigator.clipboard && window.isSecureContext){ navigator.clipboard.writeText(text).then(done).catch(()=>fallbackCopy(text,done)); }
+  else fallbackCopy(text,done);
+}
+function fallbackCopy(text,done){ const ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta); ta.select(); try{ document.execCommand("copy"); done(); }catch(e){ toast("Copy failed"); } document.body.removeChild(ta); }
+
+list.addEventListener("input", e=>{
+  const card=e.target.closest(".card"); if(!card) return;
+  const it=byId(card.dataset.id); if(!it) return;
+  if(e.target.classList.contains("txt")){ it.text=e.target.value; const lim=LIMITS[it.platform]||1000,c=card.querySelector(".count"); c.textContent=`${it.text.length} / ${lim}`; c.classList.toggle("over",it.text.length>lim); scheduleSave(); }
+  else if(e.target.classList.contains("fmt")){ it.format=e.target.value; scheduleSave(); }
+  else if(e.target.classList.contains("link")){ it.link=e.target.value; scheduleSave(); }
+});
+list.addEventListener("change", e=>{
+  const card=e.target.closest(".card"); if(!card) return;
+  const it=byId(card.dataset.id); if(!it) return;
+  if(e.target.classList.contains("origin")){ it.account=e.target.value; save(); render(); }
+});
+list.addEventListener("click", e=>{
+  const btn=e.target.closest("[data-action]"); if(!btn) return;
+  const a=btn.dataset.action;
+  if(a==="add"){ addItem(); return; }
+  const card=e.target.closest(".card"); const it=card?byId(card.dataset.id):null; if(!it) return;
+  if(a==="copy") copyText(it.text, btn);
+  else if(a==="sent"){ if(it.status!=="sent"){ logSent(it); } it.status="sent"; if(!it.sentAt) it.sentAt=nowISO(); save(); render(); renderLog(); toast("Marked sent · logged to history"); }
+  else if(a==="status"){ const was=it.status; it.status=btn.dataset.status; if(it.status==="sent"){ if(was!=="sent") logSent(it); if(!it.sentAt) it.sentAt=nowISO(); } save(); render(); renderLog(); }
+  else if(a==="dup"){ const n=JSON.parse(JSON.stringify(it)); n.id=uid(); n.status="draft"; n.sentAt=null; n.link=""; const i=state.items.findIndex(x=>x.id===it.id); state.items.splice(i+1,0,n); save(); render(); }
+  else if(a==="del"){ if(confirm("Delete this draft? (History rows are kept.)")){ state.items=state.items.filter(x=>x.id!==it.id); save(); render(); } }
+});
+
+function renderLog(){
+  const body=document.getElementById("logbody"); body.innerHTML="";
+  state.log.forEach(r=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`
+      <td contenteditable data-k="date">${esc(r.date)}</td>
+      <td contenteditable data-k="platform">${esc(r.platform)}</td>
+      <td contenteditable data-k="account">${esc(r.account)}</td>
+      <td contenteditable data-k="format">${esc(r.format)}</td>
+      <td class="txtcell" contenteditable data-k="text">${esc(r.text)}</td>
+      <td contenteditable data-k="link">${esc(r.link)}</td>
+      <td contenteditable data-k="note">${esc(r.note)}</td>
+      <td class="delrow" title="Remove from history">✕</td>`;
+    tr.querySelectorAll("[contenteditable]").forEach(td=>{ td.addEventListener("input",()=>{ r[td.getAttribute("data-k")]=td.textContent; scheduleSave(); }); });
+    tr.querySelector(".delrow").addEventListener("click",()=>{ if(confirm("Remove this entry from your posting history? Export first if unsure.")){ state.log=state.log.filter(x=>x.id!==r.id); save(); renderLog(); updateStats(); } });
+    body.appendChild(tr);
+  });
+  updateStats();
+}
+function addLogRow(){ state.log.unshift({ id:uid(), date:today(), platform:"", account:"", format:"", text:"", link:"", note:"" }); save(); renderLog(); }
+
+document.getElementById("platChips").addEventListener("click", e=>{ const b=e.target.closest(".chip"); if(!b) return; filter.platform=b.dataset.plat; setActive("platChips",b); render(); });
+document.getElementById("statChips").addEventListener("click", e=>{ const b=e.target.closest(".chip"); if(!b) return; filter.status=b.dataset.stat; setActive("statChips",b); render(); });
+document.getElementById("search").addEventListener("input", e=>{ filter.q=e.target.value.trim(); render(); });
+function setActive(id,btn){ document.getElementById(id).querySelectorAll(".chip").forEach(c=>c.classList.remove("active")); btn.classList.add("active"); }
+
+function goDay(d){ dayMode="day"; currentDay=d; render(); window.scrollTo({top:0,behavior:"smooth"}); }
+document.getElementById("dayPrev").onclick=()=>{ const ds=allDates(),i=ds.indexOf(currentDay); if(dayMode==="all"){ goDay(ds.slice(-1)[0]); } else if(i>0){ goDay(ds[i-1]); } };
+document.getElementById("dayNext").onclick=()=>{ const ds=allDates(),i=ds.indexOf(currentDay); if(dayMode==="all"){ goDay(ds.slice(-1)[0]); } else if(i<ds.length-1){ goDay(ds[i+1]); } };
+document.getElementById("dayJump").onchange=e=>goDay(e.target.value);
+document.getElementById("dayToday").onclick=()=>{ const ds=allDates(); goDay(ds.slice(-1)[0]); };
+document.getElementById("dayAll").onclick=()=>{ dayMode="all"; render(); window.scrollTo({top:0,behavior:"smooth"}); };
+
+function download(name,text,type){ const b=new Blob([text],{type:type||"text/plain"}),u=URL.createObjectURL(b),a=document.createElement("a"); a.href=u; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(u),1500); }
+document.getElementById("btnExportJson").onclick=()=>download(`campaign-console-${today()}.json`, JSON.stringify(state,null,2), "application/json");
+document.getElementById("btnExportSent").onclick=()=>{
+  const sent=state.items.filter(i=>i.status==="sent");
+  if(!sent.length && !state.log.length){ toast("No sent items yet"); return; }
+  let md=`# Sent Archive — One Problem Out of a Million\n_exported ${today()}_\n\n`;
+  PLATFORMS.forEach(p=>{ const arr=state.log.filter(i=>i.platform===p); if(!arr.length) return; md+=`## ${p}\n\n`; arr.forEach(i=>{ md+=`### ${i.format||"post"} — ${i.account||p} — ${i.date}\n\n`; if(i.link) md+=`Link: ${i.link}\n\n`; md+="```\n"+i.text+"\n```\n\n"; }); });
+  download(`Sent-Archive-${today()}.md`, md, "text/markdown");
+};
+document.getElementById("btnExportLogJson").onclick=()=>download(`campaign-posting-history-${today()}.json`, JSON.stringify(state.log,null,2), "application/json");
+document.getElementById("btnExportLogCsv").onclick=()=>{
+  const cols=["date","platform","account","format","text","link","note"];
+  const q=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
+  const rows=[cols.join(",")].concat(state.log.map(r=>cols.map(c=>q(r[c])).join(",")));
+  download(`campaign-posting-history-${today()}.csv`, rows.join("\r\n"), "text/csv");
+};
+
+document.getElementById("btnReset").onclick=()=>{ if(confirm("Replace drafts & network with the seed? (Posting history is kept.)")){ const keptLog=state.log; state=seedState(); state.log=keptLog; save(); renderNetwork(); render(); renderLog(); toast("Reset to seed"); } };
+document.getElementById("btnClear").onclick=()=>{ if(confirm("Delete ALL drafts AND history? Export first if unsure.")){ state={items:[],network:JSON.parse(JSON.stringify(SEED.network)),log:[]}; save(); renderNetwork(); render(); renderLog(); } };
+
+let toastTimer=null;
+function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),1600); }
+
+document.getElementById("genline").innerHTML = "Data generated " + esc(SEED.lastUpdated||today()) + " · Campaign: the \"one problem out of a million\" provenance thread + cross-posts.";
+setSaved(true);
+save();
+renderNetwork();
+render();
+renderLog();
+</script>
+</body>
+</html>

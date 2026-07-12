@@ -71,6 +71,9 @@ describe('pricing hooks', () => {
       )
       .mockResolvedValueOnce(
         jsonResponse({ data: { amount: '1', base: 'USDC', currency: 'USD' } })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({ data: { amount: '0.9997', base: 'USDT', currency: 'USD' } })
       ) as typeof fetch;
 
     const priceBook = await fetchUsdPriceBook();
@@ -80,6 +83,8 @@ describe('pricing hooks', () => {
     expect(priceBook.prices.sbtc?.usd).toBe(69_856.52);
     expect(priceBook.prices.sbtc?.isFallback).toBe(true);
     expect(priceBook.prices.usdc?.usd).toBe(1);
-    expect(global.fetch).toHaveBeenCalledTimes(4);
+    expect(priceBook.prices.usdt?.usd).toBe(0.9997);
+    // route (HTML) + 4 Coinbase spot fetches (stx, btc, usdc, usdt)
+    expect(global.fetch).toHaveBeenCalledTimes(5);
   });
 });

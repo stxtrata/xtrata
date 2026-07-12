@@ -22,6 +22,11 @@ import {
   MAX_BATCH_SIZE,
   MAX_UPLOAD_BATCH_SIZE
 } from '../lib/chunking/hash';
+import { createSelectionGuard } from './mint/selection-guard';
+import {
+  resolveMintTokenUri,
+  type TokenUriChoice
+} from './mint/token-uri';
 import { bytesToHex } from '../lib/utils/encoding';
 import { formatBytes } from '../lib/utils/format';
 import { logInfo, logWarn } from '../lib/utils/logger';
@@ -31,11 +36,13 @@ import { getContractId, type ContractConfig } from '../lib/contract/config';
 import { resolveContractCapabilities } from '../lib/contract/capabilities';
 import { useContractAdminStatus } from '../lib/contract/admin-status';
 import { createXtrataClient } from '../lib/contract/client';
-import { useTokenSummaries } from '../lib/viewer/queries';
-import { injectGridThumbnailHtml } from '../lib/viewer/html-preview';
+import { useTokenSummaries, useTokenExistence } from '../lib/viewer/queries';
 import {
   DEFAULT_BATCH_SIZE,
   DEFAULT_TOKEN_URI,
+  DEFAULT_TEXT_MIME,
+  TEXT_MIME_PRESETS,
+  defaultTextFileName,
   MAX_MIME_LENGTH,
   MAX_TOKEN_URI_LENGTH,
   SIP16_COLLECTION_NAME,
@@ -75,6 +82,13 @@ import {
 } from '../lib/contract/fees';
 import { formatMicroStxWithUsd } from '../lib/pricing/format';
 import { useUsdPriceBook } from '../lib/pricing/hooks';
+import {
+  computeUsdFromBaseUnits,
+  formatFiat,
+  useDisplayCurrency,
+  useGbpPerUsd
+} from '../lib/pricing/fiat';
+import { getAvailablePaymentAssets } from '../lib/contract/payment-assets';
 import type { UsdPriceBook } from '../lib/pricing/types';
 import type { InscriptionMeta, UploadState } from '../lib/protocol/types';
 import TokenCardMedia from '../components/TokenCardMedia';
@@ -132,7 +146,14 @@ const BATCH_OPTIONS = Array.from(
   (_, index) => index + 1
 );
 const MAX_UPLOAD_RETRIES = 3;
-const PARENT_THUMBNAIL_LIMIT = 12;
+// How many relationship previews to fetch per "Load more" page. Selection only
+// runs cheap existence checks; full previews (metadata/media) are fetched on
+// demand, this many at a time.
+const RELATIONSHIP_PREVIEW_PAGE = 12;
+// Byte budget for text/HTML-source previews. HTML renders from a Blob URL, but
+// the "View source" representation is capped to this to avoid decoding large
+// files in full.
+const PREVIEW_SOURCE_BUDGET = 4000;
 const EXPIRED_ERROR_CODE = 'u112';
 const SINGLE_MINT_UPLOAD_EXPIRY_BLOCKS = 4320;
 const CLEANUP_PENDING_STATUS =
@@ -464,6 +485,14 @@ export default function MintScreen(props: MintScreenProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewText, setPreviewText] = useState<string | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  // Blob URL of the original HTML file, fed to the preview iframe so large HTML
+  // renders without a full in-memory decode.
+  const [previewHtmlUrl, setPreviewHtmlUrl] = useState<string | null>(null);
+  // Total HTML byte size when the source view is truncated to the preview
+  // budget; null means the source shown is complete.
+  const [previewHtmlTruncatedBytes, setPreviewHtmlTruncatedBytes] = useState<
+    number | null
+  >(null);
   const [showHtmlSource, setShowHtmlSource] = useState(false);
   const [delegateTargetIdInput, setDelegateTargetIdInput] = useState('');
   const [delegateTargetId, setDelegateTargetId] = useState<bigint | null>(null);
@@ -506,12 +535,37 @@ export default function MintScreen(props: MintScreenProps) {
     resolvedFixedBatchSize ?? DEFAULT_BATCH_SIZE,
     MAX_UPLOAD_BATCH_SIZE
   );
-  const initialTokenUri = fixedTokenUri ?? DEFAULT_TOKEN_URI;
+  // Do NOT pre-fill the opaque default here; the default is only ever used when
+  // the user affirmatively selects it (see tokenUriChoice / resolveMintTokenUri).
+  const initialTokenUri = fixedTokenUri ?? '';
 
   const [allowDuplicate, setAllowDuplicate] = useState(false);
   const duplicateCheckRef = useRef(0);
+  const fileSelectionGuardRef = useRef(createSelectionGuard());
+  // Relationship previews are opt-in: selection only validates existence, full
+  // metadata/media previews are fetched on demand, RELATIONSHIP_PREVIEW_PAGE at
+  // a time.
+  const [showRelationshipPreviews, setShowRelationshipPreviews] =
+    useState(false);
+  const [dependencyPreviewCount, setDependencyPreviewCount] = useState(
+    RELATIONSHIP_PREVIEW_PAGE
+  );
+  const [parentPreviewCount, setParentPreviewCount] = useState(
+    RELATIONSHIP_PREVIEW_PAGE
+  );
   const [batchSize, setBatchSize] = useState(initialBatchSize);
   const [tokenUri, setTokenUri] = useState(initialTokenUri);
+  // Explicit metadata choice: Xtrata default vs a user-supplied URI. The default
+  // is transparent (its URL is shown) and is never applied unless selected here.
+  const [tokenUriChoice, setTokenUriChoice] = useState<TokenUriChoice>(
+    'default'
+  );
+  // "What would you like to inscribe?" — File vs pasted text. Text builds a File
+  // internally and reuses the shared mint pipeline (handleFileSelect).
+  const [inscribeSource, setInscribeSource] = useState<'file' | 'text'>('file');
+  const [textPayload, setTextPayload] = useState('');
+  const [textFileName, setTextFileName] = useState('');
+  const [textMime, setTextMime] = useState<string>(DEFAULT_TEXT_MIME);
   const [tokenUriStatus, setTokenUriStatus] = useState<string | null>(null);
   const [tokenUriStatusTone, setTokenUriStatusTone] = useState<
     'idle' | 'ok' | 'error' | 'pending'
@@ -639,7 +693,9 @@ export default function MintScreen(props: MintScreenProps) {
     [resolvedParentIds]
   );
   const legacyContractId = legacyContract ? getContractId(legacyContract) : null;
-  const { tokenQueries: dependencyPrimaryQueries } = useTokenSummaries({
+  // Cheap, always-on existence/ownership validation for every selected
+  // dependency (single getOwner read each) — no metadata/media fetched here.
+  const { tokenQueries: dependencyPrimaryExistence } = useTokenExistence({
     client,
     senderAddress: readOnlySender,
     tokenIds: resolvedDependencyIds,
@@ -649,22 +705,18 @@ export default function MintScreen(props: MintScreenProps) {
   const dependencyPrimaryStatusById = useMemo(() => {
     const map = new Map<
       string,
-      {
-        summary: TokenSummary | null;
-        isLoading: boolean;
-        isError: boolean;
-      }
+      { owner: string | null; isLoading: boolean; isError: boolean }
     >();
     resolvedDependencyIds.forEach((id, index) => {
-      const query = dependencyPrimaryQueries[index];
+      const query = dependencyPrimaryExistence[index];
       map.set(id.toString(), {
-        summary: query?.data ?? null,
+        owner: query?.data?.owner ?? null,
         isLoading: query?.isLoading ?? false,
         isError: query?.isError ?? false
       });
     });
     return map;
-  }, [dependencyPrimaryQueries, resolvedDependencyIds]);
+  }, [dependencyPrimaryExistence, resolvedDependencyIds]);
   const missingDependencyIds = useMemo(
     () =>
       resolvedDependencyIds.filter((id) => {
@@ -672,11 +724,11 @@ export default function MintScreen(props: MintScreenProps) {
         if (!status || status.isLoading) {
           return false;
         }
-        return !status.summary?.meta;
+        return !status.owner;
       }),
     [resolvedDependencyIds, dependencyPrimaryStatusById]
   );
-  const { tokenQueries: dependencyLegacyQueries } = useTokenSummaries({
+  const { tokenQueries: dependencyLegacyExistence } = useTokenExistence({
     client: legacyClient ?? client,
     senderAddress: readOnlySender,
     tokenIds: missingDependencyIds,
@@ -687,47 +739,110 @@ export default function MintScreen(props: MintScreenProps) {
   const dependencyLegacyStatusById = useMemo(() => {
     const map = new Map<
       string,
-      {
-        summary: TokenSummary | null;
-        isLoading: boolean;
-        isError: boolean;
-      }
+      { owner: string | null; isLoading: boolean; isError: boolean }
     >();
     missingDependencyIds.forEach((id, index) => {
-      const query = dependencyLegacyQueries[index];
+      const query = dependencyLegacyExistence[index];
       map.set(id.toString(), {
-        summary: query?.data ?? null,
+        owner: query?.data?.owner ?? null,
         isLoading: query?.isLoading ?? false,
         isError: query?.isError ?? false
       });
     });
     return map;
-  }, [dependencyLegacyQueries, missingDependencyIds]);
+  }, [dependencyLegacyExistence, missingDependencyIds]);
+  // Full previews (metadata + media) are opt-in and paginated.
+  const dependencyPreviewIds = useMemo(
+    () =>
+      showRelationshipPreviews
+        ? resolvedDependencyIds.slice(0, dependencyPreviewCount)
+        : [],
+    [showRelationshipPreviews, resolvedDependencyIds, dependencyPreviewCount]
+  );
+  const { tokenQueries: dependencyPreviewPrimaryQueries } = useTokenSummaries({
+    client,
+    senderAddress: readOnlySender,
+    tokenIds: dependencyPreviewIds,
+    enabled:
+      !props.collapsed &&
+      showRelationshipPreviews &&
+      dependencyPreviewIds.length > 0,
+    contractIdOverride: contractId
+  });
+  const dependencyPreviewLegacyIds = useMemo(
+    () =>
+      dependencyPreviewIds.filter((id) => {
+        const key = id.toString();
+        return (
+          !dependencyPrimaryStatusById.get(key)?.owner &&
+          !!dependencyLegacyStatusById.get(key)?.owner
+        );
+      }),
+    [
+      dependencyPreviewIds,
+      dependencyPrimaryStatusById,
+      dependencyLegacyStatusById
+    ]
+  );
+  const { tokenQueries: dependencyPreviewLegacyQueries } = useTokenSummaries({
+    client: legacyClient ?? client,
+    senderAddress: readOnlySender,
+    tokenIds: dependencyPreviewLegacyIds,
+    enabled:
+      !props.collapsed &&
+      showRelationshipPreviews &&
+      !!legacyClient &&
+      dependencyPreviewLegacyIds.length > 0,
+    contractIdOverride: legacyContractId ?? contractId
+  });
+  const dependencyPreviewSummaryById = useMemo(() => {
+    const map = new Map<string, TokenSummary>();
+    dependencyPreviewIds.forEach((id, index) => {
+      const summary = dependencyPreviewPrimaryQueries[index]?.data;
+      if (summary?.meta) {
+        map.set(id.toString(), summary);
+      }
+    });
+    dependencyPreviewLegacyIds.forEach((id, index) => {
+      const key = id.toString();
+      if (map.has(key)) {
+        return;
+      }
+      const summary = dependencyPreviewLegacyQueries[index]?.data;
+      if (summary?.meta) {
+        map.set(key, summary);
+      }
+    });
+    return map;
+  }, [
+    dependencyPreviewIds,
+    dependencyPreviewPrimaryQueries,
+    dependencyPreviewLegacyIds,
+    dependencyPreviewLegacyQueries
+  ]);
   const dependencyDisplayItems = useMemo(() => {
     return resolvedDependencyIds.map((id) => {
       const key = id.toString();
-      const v2Status = dependencyPrimaryStatusById.get(key);
-      const legacyStatus = dependencyLegacyStatusById.get(key);
-      const v2Summary = v2Status?.summary ?? null;
-      const legacySummary = legacyStatus?.summary ?? null;
-      const v2Ready = !!v2Summary?.meta;
-      const legacyReady = !!legacySummary?.meta;
+      const primary = dependencyPrimaryStatusById.get(key);
+      const legacy = dependencyLegacyStatusById.get(key);
+      const primaryOwner = primary?.owner ?? null;
+      const legacyOwner = legacy?.owner ?? null;
       const isLoading =
-        v2Status?.isLoading ||
-        (!v2Ready && legacyStatus?.isLoading) ||
-        false;
+        primary?.isLoading || (!primaryOwner && legacy?.isLoading) || false;
       let status: 'loading' | 'available' | 'legacy' | 'missing' = 'loading';
       if (!isLoading) {
-        if (v2Ready) {
+        if (primaryOwner) {
           status = 'available';
-        } else if (legacyReady) {
+        } else if (legacyOwner) {
           status = 'legacy';
         } else {
           status = 'missing';
         }
       }
-      const summary = v2Ready ? v2Summary : legacyReady ? legacySummary : null;
-      const summaryContractId = summary?.sourceContractId ?? contractId;
+      const summary = dependencyPreviewSummaryById.get(key) ?? null;
+      const summaryContractId =
+        summary?.sourceContractId ??
+        (primaryOwner ? contractId : legacyContractId ?? contractId);
       const summaryClient =
         summaryContractId === legacyContractId && legacyClient
           ? legacyClient
@@ -744,6 +859,7 @@ export default function MintScreen(props: MintScreenProps) {
     resolvedDependencyIds,
     dependencyPrimaryStatusById,
     dependencyLegacyStatusById,
+    dependencyPreviewSummaryById,
     contractId,
     legacyContractId,
     legacyClient,
@@ -765,14 +881,18 @@ export default function MintScreen(props: MintScreenProps) {
     return { legacyOnly, missing, loading };
   }, [dependencyDisplayItems]);
   const visibleDependencyItems = useMemo(
-    () => dependencyDisplayItems.slice(0, PARENT_THUMBNAIL_LIMIT),
-    [dependencyDisplayItems]
+    () =>
+      showRelationshipPreviews
+        ? dependencyDisplayItems.slice(0, dependencyPreviewCount)
+        : [],
+    [showRelationshipPreviews, dependencyDisplayItems, dependencyPreviewCount]
   );
-  const dependencyOverflowCount = Math.max(
+  const dependencyPreviewRemaining = Math.max(
     0,
     dependencyDisplayItems.length - visibleDependencyItems.length
   );
-  const { tokenQueries: parentPrimaryQueries } = useTokenSummaries({
+  // Cheap, always-on existence/ownership validation for every selected parent.
+  const { tokenQueries: parentPrimaryExistence } = useTokenExistence({
     client,
     senderAddress: readOnlySender,
     tokenIds: resolvedParentIds,
@@ -782,22 +902,18 @@ export default function MintScreen(props: MintScreenProps) {
   const parentPrimaryStatusById = useMemo(() => {
     const map = new Map<
       string,
-      {
-        summary: TokenSummary | null;
-        isLoading: boolean;
-        isError: boolean;
-      }
+      { owner: string | null; isLoading: boolean; isError: boolean }
     >();
     resolvedParentIds.forEach((id, index) => {
-      const query = parentPrimaryQueries[index];
+      const query = parentPrimaryExistence[index];
       map.set(id.toString(), {
-        summary: query?.data ?? null,
+        owner: query?.data?.owner ?? null,
         isLoading: query?.isLoading ?? false,
         isError: query?.isError ?? false
       });
     });
     return map;
-  }, [parentPrimaryQueries, resolvedParentIds]);
+  }, [parentPrimaryExistence, resolvedParentIds]);
   const missingParentIds = useMemo(
     () =>
       resolvedParentIds.filter((id) => {
@@ -805,11 +921,11 @@ export default function MintScreen(props: MintScreenProps) {
         if (!status || status.isLoading) {
           return false;
         }
-        return !status.summary?.meta;
+        return !status.owner;
       }),
     [resolvedParentIds, parentPrimaryStatusById]
   );
-  const { tokenQueries: parentLegacyQueries } = useTokenSummaries({
+  const { tokenQueries: parentLegacyExistence } = useTokenExistence({
     client: legacyClient ?? client,
     senderAddress: readOnlySender,
     tokenIds: missingParentIds,
@@ -820,50 +936,109 @@ export default function MintScreen(props: MintScreenProps) {
   const parentLegacyStatusById = useMemo(() => {
     const map = new Map<
       string,
-      {
-        summary: TokenSummary | null;
-        isLoading: boolean;
-        isError: boolean;
-      }
+      { owner: string | null; isLoading: boolean; isError: boolean }
     >();
     missingParentIds.forEach((id, index) => {
-      const query = parentLegacyQueries[index];
+      const query = parentLegacyExistence[index];
       map.set(id.toString(), {
-        summary: query?.data ?? null,
+        owner: query?.data?.owner ?? null,
         isLoading: query?.isLoading ?? false,
         isError: query?.isError ?? false
       });
     });
     return map;
-  }, [parentLegacyQueries, missingParentIds]);
+  }, [parentLegacyExistence, missingParentIds]);
+  // Full previews (metadata + media) are opt-in and paginated.
+  const parentPreviewIds = useMemo(
+    () =>
+      showRelationshipPreviews
+        ? resolvedParentIds.slice(0, parentPreviewCount)
+        : [],
+    [showRelationshipPreviews, resolvedParentIds, parentPreviewCount]
+  );
+  const { tokenQueries: parentPreviewPrimaryQueries } = useTokenSummaries({
+    client,
+    senderAddress: readOnlySender,
+    tokenIds: parentPreviewIds,
+    enabled:
+      !props.collapsed &&
+      showRelationshipPreviews &&
+      parentPreviewIds.length > 0,
+    contractIdOverride: contractId
+  });
+  const parentPreviewLegacyIds = useMemo(
+    () =>
+      parentPreviewIds.filter((id) => {
+        const key = id.toString();
+        return (
+          !parentPrimaryStatusById.get(key)?.owner &&
+          !!parentLegacyStatusById.get(key)?.owner
+        );
+      }),
+    [parentPreviewIds, parentPrimaryStatusById, parentLegacyStatusById]
+  );
+  const { tokenQueries: parentPreviewLegacyQueries } = useTokenSummaries({
+    client: legacyClient ?? client,
+    senderAddress: readOnlySender,
+    tokenIds: parentPreviewLegacyIds,
+    enabled:
+      !props.collapsed &&
+      showRelationshipPreviews &&
+      !!legacyClient &&
+      parentPreviewLegacyIds.length > 0,
+    contractIdOverride: legacyContractId ?? contractId
+  });
+  const parentPreviewSummaryById = useMemo(() => {
+    const map = new Map<string, TokenSummary>();
+    parentPreviewIds.forEach((id, index) => {
+      const summary = parentPreviewPrimaryQueries[index]?.data;
+      if (summary?.meta) {
+        map.set(id.toString(), summary);
+      }
+    });
+    parentPreviewLegacyIds.forEach((id, index) => {
+      const key = id.toString();
+      if (map.has(key)) {
+        return;
+      }
+      const summary = parentPreviewLegacyQueries[index]?.data;
+      if (summary?.meta) {
+        map.set(key, summary);
+      }
+    });
+    return map;
+  }, [
+    parentPreviewIds,
+    parentPreviewPrimaryQueries,
+    parentPreviewLegacyIds,
+    parentPreviewLegacyQueries
+  ]);
   const parentDisplayItems = useMemo(() => {
     return resolvedParentIds.map((id) => {
       const key = id.toString();
-      const v2Status = parentPrimaryStatusById.get(key);
-      const legacyStatus = parentLegacyStatusById.get(key);
-      const v2Summary = v2Status?.summary ?? null;
-      const legacySummary = legacyStatus?.summary ?? null;
-      const v2Ready = !!v2Summary?.meta;
-      const legacyReady = !!legacySummary?.meta;
+      const primary = parentPrimaryStatusById.get(key);
+      const legacy = parentLegacyStatusById.get(key);
+      const primaryOwner = primary?.owner ?? null;
+      const legacyOwner = legacy?.owner ?? null;
       const isLoading =
-        v2Status?.isLoading ||
-        (!v2Ready && legacyStatus?.isLoading) ||
-        false;
+        primary?.isLoading || (!primaryOwner && legacy?.isLoading) || false;
       let status: 'loading' | 'owned' | 'not-owned' | 'legacy' | 'missing' =
         'loading';
       if (!isLoading) {
-        if (v2Ready) {
-          status = isSameAddress(v2Summary?.owner, props.walletSession.address)
+        if (primaryOwner) {
+          status = isSameAddress(primaryOwner, props.walletSession.address)
             ? 'owned'
             : 'not-owned';
-        } else if (legacyReady) {
+        } else if (legacyOwner) {
           status = 'legacy';
         } else {
           status = 'missing';
         }
       }
-      const summary = v2Ready ? v2Summary : legacyReady ? legacySummary : null;
-      const summaryContractId = summary?.sourceContractId ?? contractId;
+      const summary = parentPreviewSummaryById.get(key) ?? null;
+      const summaryContractId =
+        summary?.sourceContractId ??
+        (primaryOwner ? contractId : legacyContractId ?? contractId);
       const summaryClient =
         summaryContractId === legacyContractId && legacyClient
           ? legacyClient
@@ -880,6 +1055,7 @@ export default function MintScreen(props: MintScreenProps) {
     resolvedParentIds,
     parentPrimaryStatusById,
     parentLegacyStatusById,
+    parentPreviewSummaryById,
     props.walletSession.address,
     contractId,
     legacyContractId,
@@ -905,10 +1081,13 @@ export default function MintScreen(props: MintScreenProps) {
     return { notOwned, legacyOnly, missing, loading };
   }, [parentDisplayItems]);
   const visibleParentItems = useMemo(
-    () => parentDisplayItems.slice(0, PARENT_THUMBNAIL_LIMIT),
-    [parentDisplayItems]
+    () =>
+      showRelationshipPreviews
+        ? parentDisplayItems.slice(0, parentPreviewCount)
+        : [],
+    [showRelationshipPreviews, parentDisplayItems, parentPreviewCount]
   );
-  const parentOverflowCount = Math.max(
+  const parentPreviewRemaining = Math.max(
     0,
     parentDisplayItems.length - visibleParentItems.length
   );
@@ -1050,15 +1229,37 @@ export default function MintScreen(props: MintScreenProps) {
     () => formatMicroStxWithUsd(dataMiningFeeMicroStx, usdPriceBook),
     [dataMiningFeeMicroStx, usdPriceBook]
   );
-  const combinedFeeDisplay = useMemo(
+  const combinedFeeMicroStx = useMemo(
     () =>
-      formatMicroStxWithUsd(
-        BigInt(Math.max(0, Math.round(feeEstimate.totalMicroStx))) +
-          dataMiningFeeMicroStx,
-        usdPriceBook
-      ),
-    [dataMiningFeeMicroStx, feeEstimate.totalMicroStx, usdPriceBook]
+      BigInt(Math.max(0, Math.round(feeEstimate.totalMicroStx))) +
+      dataMiningFeeMicroStx,
+    [dataMiningFeeMicroStx, feeEstimate.totalMicroStx]
   );
+  const combinedFeeDisplay = useMemo(
+    () => formatMicroStxWithUsd(combinedFeeMicroStx, usdPriceBook),
+    [combinedFeeMicroStx, usdPriceBook]
+  );
+  // Fiat display (WS-3.3): USD by default, GBP via a persisted toggle + FX rate.
+  const [displayCurrency, setDisplayCurrency] = useDisplayCurrency();
+  const gbpRateQuery = useGbpPerUsd({
+    enabled: hasChunks && displayCurrency === 'GBP'
+  });
+  const combinedFeeFiat = useMemo(() => {
+    const usd = computeUsdFromBaseUnits({
+      amount: combinedFeeMicroStx,
+      decimals: 6,
+      assetKey: 'stx',
+      priceBook: usdPriceBook
+    });
+    return formatFiat(usd, displayCurrency, gbpRateQuery.data ?? null);
+  }, [combinedFeeMicroStx, usdPriceBook, displayCurrency, gbpRateQuery.data]);
+  // Payment-asset options (WS-3.2). STX only unless the core advertises
+  // multi-asset payment — no shipped version does, so the picker stays hidden.
+  const paymentAssets = useMemo(
+    () => getAvailablePaymentAssets(capabilities),
+    [capabilities]
+  );
+  const [paymentAssetSymbol, setPaymentAssetSymbol] = useState('STX');
   const feeUnitValue =
     feeSchedule.model === 'fee-unit' ? feeSchedule.feeUnitMicroStx : null;
   const isPaused = adminStatusQuery.data?.paused ?? null;
@@ -1133,6 +1334,14 @@ export default function MintScreen(props: MintScreenProps) {
       }
     };
   }, [previewUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (previewHtmlUrl) {
+        URL.revokeObjectURL(previewHtmlUrl);
+      }
+    };
+  }, [previewHtmlUrl]);
 
   useEffect(() => {
     if (!expectedHash) {
@@ -1255,9 +1464,10 @@ export default function MintScreen(props: MintScreenProps) {
   };
 
   const resolveTokenUri = async () => {
-    const value = tokenUri.trim() || DEFAULT_TOKEN_URI;
-    if (!tokenUri.trim()) {
-      setTokenUri(value);
+    const value = tokenUri.trim();
+    if (!value) {
+      setTokenUriStatusState('Enter a metadata URI to resolve.', 'error');
+      return;
     }
     if (!isHttpUrl(value)) {
       setTokenUriStatusState('Invalid URL. Use http(s).', 'error');
@@ -1443,9 +1653,14 @@ export default function MintScreen(props: MintScreenProps) {
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
     }
+    if (previewHtmlUrl) {
+      URL.revokeObjectURL(previewHtmlUrl);
+    }
     setPreviewUrl(null);
     setPreviewText(null);
     setPreviewHtml(null);
+    setPreviewHtmlUrl(null);
+    setPreviewHtmlTruncatedBytes(null);
     setShowHtmlSource(false);
   };
 
@@ -1453,6 +1668,8 @@ export default function MintScreen(props: MintScreenProps) {
     selected: File,
     options?: { clearDelegate?: boolean }
   ) => {
+    // Invalidate any in-flight selection; a newer pick supersedes this one.
+    const isCurrentSelection = fileSelectionGuardRef.current.begin();
     resetSteps();
     setMintStatus(null);
     setMintLog([]);
@@ -1489,6 +1706,10 @@ export default function MintScreen(props: MintScreenProps) {
     setFile(selected);
     try {
       const bytes = await readFileBytes(selected);
+      if (!isCurrentSelection()) {
+        // A newer file was selected while this one was being read; discard.
+        return;
+      }
       const nextChunks = chunkBytes(bytes, CHUNK_SIZE);
       const expectedHash = computeExpectedHash(nextChunks);
       const expectedHashHex = bytesToHex(expectedHash);
@@ -1499,6 +1720,9 @@ export default function MintScreen(props: MintScreenProps) {
       setChunks(nextChunks);
       setExpectedHash(expectedHash);
       const previousAttempt = lastAttempt ?? (await loadMintAttempt(contractId));
+      if (!isCurrentSelection()) {
+        return;
+      }
       if (previousAttempt) {
         setLastAttempt(previousAttempt);
       }
@@ -1510,8 +1734,17 @@ export default function MintScreen(props: MintScreenProps) {
       } else {
         setResumeHint(null);
       }
-      const resolvedTokenUri =
-        fixedTokenUri ?? (tokenUri.trim() || DEFAULT_TOKEN_URI);
+      // For the saved attempt/resume hint only; the authoritative resolution
+      // (with blank-custom guarding) happens at mint time via resolveMintTokenUri.
+      const tokenUriResolution = resolveMintTokenUri({
+        fixedTokenUri,
+        choice: tokenUriChoice,
+        customValue: tokenUri,
+        defaultTokenUri: DEFAULT_TOKEN_URI
+      });
+      const resolvedTokenUri = tokenUriResolution.ok
+        ? tokenUriResolution.value
+        : '';
       const attempt: MintAttempt = {
         contractId,
         expectedHashHex,
@@ -1553,17 +1786,27 @@ export default function MintScreen(props: MintScreenProps) {
       ) {
         setPreviewUrl(URL.createObjectURL(selected));
       } else if (isHtml) {
+        // Render from a Blob URL (no full decode); cap the source view to the
+        // preview budget so a large HTML file never gets fully decoded.
         const decoder = new TextDecoder();
-        setPreviewHtml(decoder.decode(bytes));
+        setPreviewHtml(decoder.decode(bytes.slice(0, PREVIEW_SOURCE_BUDGET)));
+        setPreviewHtmlTruncatedBytes(
+          bytes.length > PREVIEW_SOURCE_BUDGET ? bytes.length : null
+        );
+        setPreviewHtmlUrl(URL.createObjectURL(selected));
         setShowHtmlSource(false);
       } else if (
         selected.type.startsWith('text/') ||
         selected.type.includes('json')
       ) {
         const decoder = new TextDecoder();
-        setPreviewText(decoder.decode(bytes.slice(0, 4000)));
+        setPreviewText(decoder.decode(bytes.slice(0, PREVIEW_SOURCE_BUDGET)));
       }
     } catch (error) {
+      if (!isCurrentSelection()) {
+        // Newer selection owns the state now; don't clobber it with this error.
+        return;
+      }
       const message = error instanceof Error ? error.message : String(error);
       logWarn('mint', 'Failed to read file', {
         fileName: selected.name,
@@ -1578,7 +1821,11 @@ export default function MintScreen(props: MintScreenProps) {
       setMetadataStatus(null);
       resetPreview();
     } finally {
-      setIsPreparing(false);
+      // Only clear the preparing flag if this is still the active selection;
+      // otherwise a newer in-flight read is still preparing.
+      if (isCurrentSelection()) {
+        setIsPreparing(false);
+      }
     }
   };
 
@@ -1588,6 +1835,23 @@ export default function MintScreen(props: MintScreenProps) {
       return;
     }
     void handleFileSelect(selected);
+  };
+
+  // Byte size of the pasted text (UTF-8), used for the live counter.
+  const textPayloadBytes = useMemo(
+    () => new TextEncoder().encode(textPayload).length,
+    [textPayload]
+  );
+
+  // Build a File from the pasted text and run it through the shared mint
+  // pipeline exactly as a picked file would be.
+  const handlePrepareText = () => {
+    if (!textPayload) {
+      return;
+    }
+    const name = textFileName.trim() || defaultTextFileName(textMime);
+    const textFile = new File([textPayload], name, { type: textMime });
+    void handleFileSelect(textFile);
   };
 
   const applyDependencyInput = () => {
@@ -1856,11 +2120,21 @@ export default function MintScreen(props: MintScreenProps) {
       logWarn('mint', 'Mint blocked: invalid mime type', { mimeType });
       return null;
     }
-    let tokenUriValue = fixedTokenUri ?? tokenUri.trim();
-    if (!tokenUriValue) {
-      tokenUriValue = DEFAULT_TOKEN_URI;
-      setTokenUri(tokenUriValue);
-      appendLog('Token URI default applied.');
+    const tokenUriResolution = resolveMintTokenUri({
+      fixedTokenUri,
+      choice: tokenUriChoice,
+      customValue: tokenUri,
+      defaultTokenUri: DEFAULT_TOKEN_URI
+    });
+    if (!tokenUriResolution.ok) {
+      setMintStatus(tokenUriResolution.error);
+      appendLog('Mint blocked: no metadata URI selected.');
+      logWarn('mint', 'Mint blocked: no token URI selected');
+      return null;
+    }
+    const tokenUriValue = tokenUriResolution.value;
+    if (tokenUriChoice === 'default' && !fixedTokenUri) {
+      appendLog('Token URI: using Xtrata default metadata (explicit choice).');
     }
     if (!isAscii(tokenUriValue) || tokenUriValue.length > MAX_TOKEN_URI_LENGTH) {
       setMintStatus('Token URI must be ASCII and <= 256 characters.');
@@ -3009,11 +3283,7 @@ export default function MintScreen(props: MintScreenProps) {
   const isImagePreview = Boolean(previewUrl && file?.type.startsWith('image/'));
   const isAudioPreview = Boolean(previewUrl && file?.type.startsWith('audio/'));
   const isVideoPreview = Boolean(previewUrl && file?.type.startsWith('video/'));
-  const isRenderedHtmlPreview = Boolean(previewHtml && !showHtmlSource);
-  const previewHtmlFrameDoc = useMemo(
-    () => (previewHtml ? injectGridThumbnailHtml(previewHtml) : null),
-    [previewHtml]
-  );
+  const isRenderedHtmlPreview = Boolean(previewHtmlUrl && !showHtmlSource);
   const useSquareMintPreview =
     isImagePreview || isVideoPreview || isRenderedHtmlPreview;
 
@@ -3057,14 +3327,111 @@ export default function MintScreen(props: MintScreenProps) {
         </div>
       </div>
       <div className="panel__body">
-        <label className="field">
-          <LabelWithInfo
-            tone="field"
-            label="Select a file"
-            info="Choose the asset to inscribe. The file is chunked and uploaded on-chain during mint."
-          />
-          <input className="input" type="file" onChange={onFileChange} />
-        </label>
+        <fieldset className="mint-source-choice">
+          <legend>
+            <LabelWithInfo
+              tone="field"
+              label="What would you like to inscribe?"
+              info="Inscribe an existing file, or paste text to inscribe directly."
+            />
+          </legend>
+          <div
+            className="mint-source-choice__options"
+            role="radiogroup"
+            aria-label="Inscription source"
+          >
+            <label className="mint-source-choice__option">
+              <input
+                type="radio"
+                name="inscribe-source"
+                checked={inscribeSource === 'file'}
+                onChange={() => setInscribeSource('file')}
+              />
+              <span>File</span>
+            </label>
+            <label className="mint-source-choice__option">
+              <input
+                type="radio"
+                name="inscribe-source"
+                checked={inscribeSource === 'text'}
+                onChange={() => setInscribeSource('text')}
+              />
+              <span>Paste text</span>
+            </label>
+          </div>
+        </fieldset>
+        {inscribeSource === 'file' && (
+          <label className="field">
+            <LabelWithInfo
+              tone="field"
+              label="Select a file"
+              info="Choose the asset to inscribe. The file is chunked and uploaded on-chain during mint."
+            />
+            <input className="input" type="file" onChange={onFileChange} />
+          </label>
+        )}
+        {inscribeSource === 'text' && (
+          <div className="mint-text-input">
+            <label className="field">
+              <LabelWithInfo
+                tone="field"
+                label="Text to inscribe"
+                info="Pasted text is turned into a file and inscribed through the same on-chain pipeline as a picked file."
+              />
+              <textarea
+                className="textarea"
+                placeholder="Paste or type the text to inscribe..."
+                value={textPayload}
+                onChange={(event) => setTextPayload(event.target.value)}
+                rows={6}
+              />
+            </label>
+            <label className="field">
+              <LabelWithInfo
+                tone="field"
+                label="Content type"
+                info="The MIME type stored on-chain for this text inscription."
+              />
+              <select
+                className="input"
+                value={textMime}
+                onChange={(event) => setTextMime(event.target.value)}
+              >
+                {TEXT_MIME_PRESETS.map((preset) => (
+                  <option key={preset.mime} value={preset.mime}>
+                    {preset.label} ({preset.mime})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <LabelWithInfo
+                tone="field"
+                label="Filename (optional)"
+                info="Name stored for the inscription. Defaults from the content type if left blank."
+              />
+              <input
+                className="input"
+                placeholder={defaultTextFileName(textMime)}
+                value={textFileName}
+                onChange={(event) => setTextFileName(event.target.value)}
+              />
+            </label>
+            <span className="meta-value">
+              {textPayload.length} characters · {textPayloadBytes} bytes
+            </span>
+            <div className="mint-actions">
+              <button
+                className="button"
+                type="button"
+                onClick={handlePrepareText}
+                disabled={!textPayload || isPreparing}
+              >
+                Use this text
+              </button>
+            </div>
+          </div>
+        )}
         {maxFileBytes !== null && (
           <span className="meta-value">
             Max file size: {formatBytes(BigInt(maxFileBytes))}.
@@ -3072,6 +3439,10 @@ export default function MintScreen(props: MintScreenProps) {
         )}
         {isPreparing && <p>Preparing file for inscription...</p>}
 
+        <details className="mint-advanced">
+          <summary className="mint-advanced__summary">
+            Advanced: relationships &amp; delegate
+          </summary>
         {!hideDelegate && (
           <div className="mint-panel mint-delegate">
             <LabelWithInfo
@@ -3217,6 +3588,16 @@ export default function MintScreen(props: MintScreenProps) {
                   Missing on-chain: {dependencyStatusSummary.missing.map((id) => id.toString()).join(', ')}
                 </span>
               )}
+              {!showRelationshipPreviews && (
+                <button
+                  className="button button--ghost"
+                  type="button"
+                  onClick={() => setShowRelationshipPreviews(true)}
+                >
+                  Show previews
+                </button>
+              )}
+              {showRelationshipPreviews && (
               <div className="relation-grid">
                 {visibleDependencyItems.map((item) => (
                   <div key={item.id.toString()} className="relation-card">
@@ -3251,8 +3632,19 @@ export default function MintScreen(props: MintScreenProps) {
                   </div>
                 ))}
               </div>
-              {dependencyOverflowCount > 0 && (
-                <span className="meta-value">+{dependencyOverflowCount} more dependencies</span>
+              )}
+              {showRelationshipPreviews && dependencyPreviewRemaining > 0 && (
+                <button
+                  className="button button--ghost"
+                  type="button"
+                  onClick={() =>
+                    setDependencyPreviewCount(
+                      (count) => count + RELATIONSHIP_PREVIEW_PAGE
+                    )
+                  }
+                >
+                  Load more ({dependencyPreviewRemaining} more)
+                </button>
               )}
             </div>
           )}
@@ -3369,6 +3761,16 @@ export default function MintScreen(props: MintScreenProps) {
                   Not in connected wallet: {parentStatusSummary.notOwned.map((id) => id.toString()).join(', ')}
                 </span>
               )}
+              {!showRelationshipPreviews && (
+                <button
+                  className="button button--ghost"
+                  type="button"
+                  onClick={() => setShowRelationshipPreviews(true)}
+                >
+                  Show previews
+                </button>
+              )}
+              {showRelationshipPreviews && (
               <div className="relation-grid">
                 {visibleParentItems.map((item) => (
                   <div key={item.id.toString()} className="relation-card">
@@ -3406,12 +3808,24 @@ export default function MintScreen(props: MintScreenProps) {
                   </div>
                 ))}
               </div>
-              {parentOverflowCount > 0 && (
-                <span className="meta-value">+{parentOverflowCount} more parents</span>
+              )}
+              {showRelationshipPreviews && parentPreviewRemaining > 0 && (
+                <button
+                  className="button button--ghost"
+                  type="button"
+                  onClick={() =>
+                    setParentPreviewCount(
+                      (count) => count + RELATIONSHIP_PREVIEW_PAGE
+                    )
+                  }
+                >
+                  Load more ({parentPreviewRemaining} more)
+                </button>
               )}
             </div>
           )}
         </div>
+        </details>
 
         {file && (
           <div className="mint-grid">
@@ -3470,11 +3884,21 @@ export default function MintScreen(props: MintScreenProps) {
                     title="Mint HTML preview"
                     sandbox="allow-scripts"
                     referrerPolicy="no-referrer"
-                    srcDoc={previewHtmlFrameDoc ?? undefined}
+                    src={previewHtmlUrl ?? undefined}
                   />
                 )}
                 {previewHtml && showHtmlSource && (
-                  <pre className="mint-text">{previewHtml}</pre>
+                  <>
+                    {previewHtmlTruncatedBytes !== null && (
+                      <span className="mint-placeholder">
+                        Source preview truncated to the first{' '}
+                        {formatBytes(BigInt(PREVIEW_SOURCE_BUDGET))} of{' '}
+                        {formatBytes(BigInt(previewHtmlTruncatedBytes))}. The full
+                        file will still be inscribed.
+                      </span>
+                    )}
+                    <pre className="mint-text">{previewHtml}</pre>
+                  </>
                 )}
                 {!previewHtml && previewText && (
                   <pre className="mint-text">{previewText}</pre>
@@ -3597,25 +4021,65 @@ export default function MintScreen(props: MintScreenProps) {
           </div>
         )}
 
+        <details className="mint-advanced">
+          <summary className="mint-advanced__summary">
+            Advanced: metadata &amp; batch settings
+          </summary>
         <div className="mint-settings">
           {!hideTokenUri && (
             <label className="field">
               <LabelWithInfo
                 tone="field"
-                label="Token URI (required)"
-                info="Metadata URI stored with the inscription. Use a stable URL or ar:// reference."
+                label="Metadata (token URI)"
+                info="Metadata URI stored with the inscription. Choose Xtrata's shared default metadata, or supply your own stable URL / ar:// reference."
               />
-              <input
-                className="input"
-                placeholder="https://example.com/metadata.json"
-                value={tokenUri}
-                onChange={(event) => {
-                  setTokenUri(event.target.value);
-                  setTokenUriStatus(null);
-                  setTokenUriStatusTone('idle');
-                }}
-              />
-              {!hideMetadataTools && (
+              <div
+                className="token-uri-choice"
+                role="radiogroup"
+                aria-label="Metadata source"
+              >
+                <label className="token-uri-choice__option">
+                  <input
+                    type="radio"
+                    name="token-uri-choice"
+                    checked={tokenUriChoice === 'default'}
+                    onChange={() => {
+                      setTokenUriChoice('default');
+                      setTokenUriStatus(null);
+                      setTokenUriStatusTone('idle');
+                    }}
+                  />
+                  <span>Use Xtrata default metadata</span>
+                </label>
+                <label className="token-uri-choice__option">
+                  <input
+                    type="radio"
+                    name="token-uri-choice"
+                    checked={tokenUriChoice === 'custom'}
+                    onChange={() => setTokenUriChoice('custom')}
+                  />
+                  <span>Enter my own URI</span>
+                </label>
+              </div>
+              {tokenUriChoice === 'default' && (
+                <span className="meta-value">
+                  Xtrata default metadata will be inscribed:{' '}
+                  <span className="mint-hash">{DEFAULT_TOKEN_URI}</span>
+                </span>
+              )}
+              {tokenUriChoice === 'custom' && (
+                <input
+                  className="input"
+                  placeholder="https://example.com/metadata.json"
+                  value={tokenUri}
+                  onChange={(event) => {
+                    setTokenUri(event.target.value);
+                    setTokenUriStatus(null);
+                    setTokenUriStatusTone('idle');
+                  }}
+                />
+              )}
+              {tokenUriChoice === 'custom' && !hideMetadataTools && (
                 <div className="token-uri-actions">
                   <button
                     className="button button--ghost"
@@ -3641,10 +4105,12 @@ export default function MintScreen(props: MintScreenProps) {
                   )}
                 </div>
               )}
-              {!hideMetadataTools && metadataStatus && (
-                <span className="meta-value">{metadataStatus}</span>
-              )}
-              {!hideMetadataTools && metadataJson && (
+              {tokenUriChoice === 'custom' &&
+                !hideMetadataTools &&
+                metadataStatus && (
+                  <span className="meta-value">{metadataStatus}</span>
+                )}
+              {tokenUriChoice === 'custom' && !hideMetadataTools && metadataJson && (
                 <>
                   <LabelWithInfo
                     tone="meta"
@@ -3721,7 +4187,66 @@ export default function MintScreen(props: MintScreenProps) {
             </div>
           )}
         </div>
+        </details>
 
+        <details className="mint-fees-disclosure" open>
+          <summary className="mint-advanced__summary">
+            Fee breakdown &amp; estimate
+          </summary>
+        <div className="mint-cost-controls">
+          <div
+            className="currency-toggle"
+            role="radiogroup"
+            aria-label="Display currency"
+          >
+            <span className="meta-value">Show fiat in:</span>
+            {(['USD', 'GBP'] as const).map((code) => (
+              <label key={code} className="currency-toggle__option">
+                <input
+                  type="radio"
+                  name="display-currency"
+                  checked={displayCurrency === code}
+                  onChange={() => setDisplayCurrency(code)}
+                />
+                <span>{code}</span>
+              </label>
+            ))}
+          </div>
+          {combinedFeeFiat && (
+            <span className="meta-value">
+              Estimated total: {combinedFeeDisplay.primary} (~{combinedFeeFiat})
+            </span>
+          )}
+          {displayCurrency === 'GBP' &&
+            !gbpRateQuery.data &&
+            hasChunks && (
+              <span className="meta-value">
+                GBP rate unavailable right now — showing USD only.
+              </span>
+            )}
+          {paymentAssets.length > 1 && (
+            <label className="field">
+              <LabelWithInfo
+                tone="field"
+                label="Pay protocol fee with"
+                info="Choose the asset used to pay the protocol fee. Only assets the connected contract accepts are listed."
+              />
+              <select
+                className="input"
+                value={paymentAssetSymbol}
+                onChange={(event) =>
+                  setPaymentAssetSymbol(event.target.value)
+                }
+              >
+                {paymentAssets.map((asset) => (
+                  <option key={asset.symbol} value={asset.symbol}>
+                    {asset.symbol}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
         <div className="mint-fees">
           <div>
             <LabelWithInfo
@@ -3852,6 +4377,7 @@ export default function MintScreen(props: MintScreenProps) {
             </div>
           )}
         </div>
+        </details>
 
         {shouldAutoRouteSmallMint ? (
           <div className="alert">
@@ -4087,6 +4613,8 @@ export default function MintScreen(props: MintScreenProps) {
         )}
 
         {mintLog.length > 0 && (
+          <details className="mint-advanced">
+            <summary className="mint-advanced__summary">Diagnostic logs</summary>
           <div className="mint-log">
             {mintLog.map((entry, index) => (
               <div
@@ -4099,6 +4627,7 @@ export default function MintScreen(props: MintScreenProps) {
               </div>
             ))}
           </div>
+          </details>
         )}
       </div>
     </section>

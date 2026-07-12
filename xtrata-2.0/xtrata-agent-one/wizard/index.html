@@ -721,7 +721,7 @@ function setWallet(addr){ WALLET=addr||null; WALLET_NAME=null; WALLET_REVEAL=fal
   if(WALLET){ btn.textContent='Disconnect'; if(!$('#user').value) $('#user').value=WALLET;
     renderWalletPill(); bnsLookup(WALLET).then(n=>{ if(n&&WALLET===addr){ WALLET_NAME=n; renderWalletPill(); } }); }
   else { btn.textContent='Connect wallet'; renderWalletPill(); }
-  try{ checkParents(); }catch{} try{ checkBatchParents(); }catch{} }   // re-verify declared parents (single + batch) against the (dis)connected wallet
+  try{ checkParents().catch(()=>{}); }catch{} try{ checkBatchParents().catch(()=>{}); }catch{} }   // re-verify declared parents (single + batch) against the (dis)connected wallet; both are async so swallow rejections too
 async function connectWallet(){
   const w=xtrataWallet();
   if(!w||!w.connect){ alert('Wallet bundle not loaded.\n\nThis wizard connects through the bundled wallet shim (window.XtrataWallet). Rebuild agent-one.js, or open the wizard from the Xtrata site.'); return null; }
@@ -731,7 +731,10 @@ async function connectWallet(){
 async function disconnectWallet(){ try{ const w=xtrataWallet(); if(w&&w.disconnect) await w.disconnect(); }catch{} setWallet(null); }
 $('#connectBtn').onclick=()=>{ WALLET?disconnectWallet():connectWallet(); };
 $('#walletAddr').onclick=walletPillClick;
-(function(){ try{ const w=xtrataWallet(); const a=w&&w.getAddress&&w.getAddress(); if(a) setWallet(a); }catch{} })();
+// Restore a previously connected wallet. Deferred via queueMicrotask so it runs after
+// this whole script evaluates — setWallet() calls checkParents()/checkBatchParents(),
+// which reference BATCH / parentsCheckRun declared further down (TDZ ReferenceError otherwise).
+queueMicrotask(()=>{ try{ const w=xtrataWallet(); const a=w&&w.getAddress&&w.getAddress(); if(a) setWallet(a); }catch{} });
 
 // ---- category/type autodetect ----
 const catSel=$('#category'), ftSel=$('#ftype');

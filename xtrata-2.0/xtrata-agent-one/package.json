@@ -1,7 +1,7 @@
 {
   "name": "xtrata-agent-one",
   "version": "1.0.0",
-  "description": "Xtrata Agent One — inscription-as-a-service backend (per-job deposit wallets) + the Inscription Wizard. Audio jobs auto-convert to Opus/WebM (Music HQ) the instant funds land; SUNO tracks build a full self-contained HTML player (cover art + title/artist + lyrics) and inscribe that in one job.",
+  "description": "Xtrata Agent One \u2014 inscription-as-a-service backend (per-job deposit wallets) + the Inscription Wizard. Audio jobs auto-convert to Opus/WebM (Music HQ) the instant funds land; SUNO tracks build a full self-contained HTML player (cover art + title/artist + lyrics) and inscribe that in one job.",
   "type": "module",
   "private": true,
   "engines": {
@@ -11,7 +11,8 @@
     "start": "node server/server.mjs",
     "mock": "XTRATA_MOCK=1 node server/server.mjs",
     "opus:selftest": "node svc/opus-convert.mjs --selftest",
-    "player:selftest": "node svc/suno-player.mjs --selftest"
+    "player:selftest": "node svc/suno-player.mjs --selftest",
+    "sponsor:test": "node --test svc/tests/sponsor-service.test.mjs"
   },
   "dependencies": {
     "@noble/hashes": "^1.8.0",
