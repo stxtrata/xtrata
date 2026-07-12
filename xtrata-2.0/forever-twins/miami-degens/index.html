@@ -977,6 +977,7 @@
               <div class="status-card wide"><small>Selected token</small><strong id="lookupToken">None</strong></div>
               <div class="status-card wide"><small>Resolved Xtrata ID</small><strong id="lookupXtrata">Not loaded</strong></div>
               <div class="status-card wide"><small>Liquid side</small><strong id="lookupLiquid">Not loaded</strong></div>
+              <div class="status-card wide"><small>Current liquid owner</small><strong id="lookupOwner">Not loaded</strong></div>
             </div>
             <div class="button-row"><button id="lookupBtn" class="btn-outline full" type="button">Refresh Selected Token</button></div>
           </div>
@@ -1126,6 +1127,8 @@
       binding: null,
       coreInscription: null,
       sourceOwner: null,
+      xtrataOwner: null,
+      liquidOwner: null,
       sourceTokenUri: null,
       sourceMetadataUri: null,
       sourceMetadata: null,
@@ -1361,17 +1364,27 @@
       if (!cv) return null;
       const type = String(cv.type || '').toLowerCase();
       // The shared Xtrata bridge uses the app's bundled Stacks SDK, whose
-      // Clarity type values are numeric enums. Convert those values first so
-      // the collection UI keeps the same plain data shape as its former SDK.
+      // Clarity type values are numeric enums. cvToJSON preserves optional,
+      // response and tuple wrappers, which must be decoded before inspecting
+      // scalar names inside a tuple signature (for example "(tuple ... uint)").
       if (/^\d+$/.test(type)) {
-        try { return plainCV(cvToValue(cv)); } catch {}
+        try { return plainCV(cvToJSON(cv)); } catch {}
+      }
+      if (type.includes('response') && typeof cv.success === 'boolean') {
+        return cv.success ? { ok: plainCV(cv.value) } : { err: plainCV(cv.value) };
       }
       if (type === 'ok' || type.includes('responseok')) return { ok: plainCV(cv.value) };
       if (type === 'err' || type.includes('responseerr')) return { err: plainCV(cv.value) };
       if (type === 'some' || type.includes('optional')) return cv.value === undefined || cv.value === null ? null : { some: plainCV(cv.value) };
       if (type === 'none') return null;
-      if (type.includes('uint') || type.includes('int')) return cv.value?.toString?.() ?? String(cv.value);
-      if (type.includes('buffer')) {
+      if (type.includes('tuple') && cv.value && typeof cv.value === 'object' && !Array.isArray(cv.value)) {
+        const obj = {};
+        for (const [key, value] of Object.entries(cv.value)) obj[key] = plainCV(value);
+        return obj;
+      }
+      if (Array.isArray(cv.value)) return cv.value.map(plainCV);
+      if (type === 'uint' || type === 'int') return cv.value?.toString?.() ?? String(cv.value);
+      if (type === 'buffer' || type.startsWith('(buff')) {
         // In Stacks.js v7 a buffer CV's `value` is already a hex string; only
         // raw byte arrays need toHex(). The old code ran toHex() on the string,
         // expanding each hex digit into its own byte (e.g. "3a" -> "030a"),
@@ -1382,12 +1395,11 @@
         if (cv.buffer instanceof Uint8Array) return '0x' + toHex(cv.buffer);
         return '0x' + toHex(v);
       }
-      if (type.includes('string')) return cv.value;
-      if (type.includes('principal')) return cv.value || cv.address || String(cv);
+      if (type.includes('string-ascii') || type.includes('string-utf8') || type === 'string') return cv.value;
+      if (type === 'principal' || type.includes('principal standard') || type.includes('principal contract')) return cv.value || cv.address || String(cv);
       if (type === 'booltrue' || type === 'true') return true;
       if (type === 'boolfalse' || type === 'false') return false;
       if (typeof cv.value === 'boolean') return cv.value;
-      if (Array.isArray(cv.value)) return cv.value.map(plainCV);
       if (cv.value && typeof cv.value === 'object') {
         const obj = {};
         for (const [key, value] of Object.entries(cv.value)) obj[key] = plainCV(value);
@@ -1504,6 +1516,8 @@
       state.binding = null;
       state.coreInscription = null;
       state.sourceOwner = null;
+      state.xtrataOwner = null;
+      state.liquidOwner = null;
       state.sourceTokenUri = null;
       state.sourceMetadataUri = null;
       state.sourceMetadata = null;
@@ -1527,6 +1541,7 @@
       setStatus('rawImageStatus', 'Not loaded from chain URI');
       setStatus('idConversionStatus', renderIdConversion(null));
       setStatus('lookupToken', $('tokenId').value.trim() || 'None');
+      setStatus('lookupOwner', 'Not loaded');
       setStatus('lookupXtrata', 'Not loaded');
       setStatus('lookupLiquid', 'Not loaded');
       setHashStatus();
@@ -2296,9 +2311,10 @@
       const hashReady = !!state.canonicalHash && !!state.fileHash && state.canonicalHash.toLowerCase() === state.fileHash.toLowerCase();
       const asciiOk = /^[\x00-\x7F]*$/.test($('mime').value) && /^[\x00-\x7F]*$/.test($('tokenUri').value);
       const alreadyInscribed = !!state.binding;
+      const ownsLiquidSide = !!state.wallet && state.liquidOwner === state.wallet;
       $('useRawImageBtn').disabled = !state.sourceImageUrl;
       $('inscribeBtn').disabled = !(hasWallet && tokenReady && fileReady && hashReady && asciiOk && !alreadyInscribed);
-      $('swapBtn').disabled = !(hasWallet && /^\d+$/.test(($('swapTokenId').value.trim() || $('tokenId').value.trim())) && alreadyInscribed);
+      $('swapBtn').disabled = !(hasWallet && /^\d+$/.test(($('swapTokenId').value.trim() || $('tokenId').value.trim())) && alreadyInscribed && ownsLiquidSide);
       updateJourneyStatus();
     }
 
@@ -2532,6 +2548,18 @@
       // twin is liquid and only Xtrata -> Stacks (swap back) is possible.
       if (state.binding) { state.direction = state.binding['xtrata-escrowed'] === true ? 'pepe-to-xtrata' : 'xtrata-to-pepe'; updateSwapUi(); }
       state.sourceOwner = ownerRaw?.err ? null : unwrapOptional(ownerRaw);
+      state.xtrataOwner = null;
+      if (state.binding?.['xtrata-id'] != null) {
+        const xtrataOwnerRaw = await readContract($('masterContract').value.trim(), 'get-owner', [asUint(state.binding['xtrata-id'])]).catch(() => null);
+        if (requestId !== state.lookupRequestId) return;
+        state.xtrataOwner = unwrapOptional(xtrataOwnerRaw);
+      }
+      state.liquidOwner = state.binding
+        ? (state.binding['xtrata-escrowed'] === true ? state.sourceOwner : state.xtrataOwner)
+        : state.sourceOwner;
+      setStatus('lookupOwner', state.liquidOwner
+        ? `<span class="data-mono">${escapeHtml(state.liquidOwner)}</span>`
+        : 'Owner unavailable');
 
       if (state.canonicalHash) setStatus('canonicalStatus', `${badge('Seeded on chain', 'ok')}<br><span class="data-mono">${escapeHtml(state.canonicalHash)}</span>${chainProof(helper, 'get-canonical-hash', [tokenArg])}`);
       else setStatus('canonicalStatus', `${badge('Not seeded on chain', 'bad')}<br>No canonical hash was returned for token ${tokenId}.${chainProof(helper, 'get-canonical-hash', [tokenArg])}`);
@@ -2724,6 +2752,7 @@
     }
     async function handleSwap() {
       const tokenId = getSwapTokenId();
+      if (!state.wallet || state.liquidOwner !== state.wallet) throw new Error('The connected wallet does not own the currently liquid side of this twin.');
       if (state.direction === 'pepe-to-xtrata') await callHelper('swap-nft-for-xtrata', [asUint(tokenId)], swapPepePostConditions(tokenId));
       else await callHelper('swap-xtrata-for-nft', [asUint(tokenId)], swapXtrataPostConditions());
     }
