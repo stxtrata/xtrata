@@ -9913,6 +9913,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const isLegacyCoreListing = (listing) =>
       String(listing.nftContract ?? '').endsWith('.xtrata-v2-1-0');
 
+    // xtrata-market-v1-0's buy is broken by design: the NFT payout runs inside
+    // as-contract, which rebinds tx-sender, so the market transfers the NFT to
+    // ITSELF and the core rejects it (err u2) — every buy fails and deny-mode
+    // post-conditions roll it back. cancel works (explicit seller recipient),
+    // so sellers can still recover their NFTs and relist on a v1.1 market.
+    const isBrokenBuyMarket = (listing) =>
+      String(listing.contractId ?? '').endsWith('.xtrata-market-v1-0');
+
     const marketCancel = async (listing) => {
       if (!state.walletSession.isConnected || !state.walletSession.address) {
         marketDom.status.innerHTML = '<span><strong>Market</strong> connect the seller wallet to cancel.</span>';
@@ -9941,6 +9949,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const marketBuy = async (listing) => {
       if (isLegacyCoreListing(listing)) {
         marketDom.status.innerHTML = '<span><strong>Market</strong> legacy v2 inscriptions are delisted — the owner must migrate to v3 and relist.</span>';
+        return;
+      }
+      if (isBrokenBuyMarket(listing)) {
+        marketDom.status.innerHTML = '<span><strong>Market</strong> this legacy market contract cannot complete purchases — the seller must cancel and relist.</span>';
         return;
       }
       if (!state.walletSession.isConnected || !state.walletSession.address) {
@@ -10578,7 +10590,25 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
           const actions = document.createElement('div');
           actions.className = 'market-card__actions';
-          if (isLegacyCoreListing(listing)) {
+          if (isBrokenBuyMarket(listing)) {
+            // Legacy market whose buy cannot succeed: delist from sale, keep
+            // seller cancel so the NFT can be recovered and relisted on v1.1.
+            const note = document.createElement('p');
+            note.className = 'market-card__meta';
+            note.textContent = 'Legacy market contract — purchases are disabled (buy is broken on-chain).';
+            card.append(note);
+            if (
+              state.walletSession.address &&
+              listing.seller === state.walletSession.address
+            ) {
+              const cancelBtn = document.createElement('button');
+              cancelBtn.type = 'button';
+              cancelBtn.className = 'market-chip';
+              cancelBtn.textContent = 'Cancel listing (reclaim + relist on v1.1)';
+              cancelBtn.addEventListener('click', () => { void marketCancel(listing); });
+              actions.append(cancelBtn);
+            }
+          } else if (isLegacyCoreListing(listing)) {
             // v3-only policy: v2 inscriptions are delisted from sale. The
             // owner can cancel and migrate, then relist on a v1.1 market.
             const note = document.createElement('p');
