@@ -50,7 +50,8 @@
     import {
       getMarketSettlementAsset,
       getMarketSettlementLabel,
-      buildMarketBuyPostConditions
+      buildMarketBuyPostConditions,
+      formatMarketPriceWithUsd
     } from '/src/lib/market/settlement.ts';
     import { isSponsoredMarket } from '/src/lib/market/sponsored.ts';
     import { loadMarketActivity } from '/src/lib/market/indexer.ts';
@@ -10304,7 +10305,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       priceBlock.append(Object.assign(document.createElement('strong'), { textContent: 'Listing' }));
       const symbol = getMarketSettlementLabel(listing.settlement);
       priceBlock.append(
-        detailRow('Price', formatAssetAmount(listing.price, listing.settlement.decimals ?? 6, symbol)),
+        detailRow('Price', formatMarketPriceWithUsd(listing.price, listing.settlement, state.usdPriceBook)),
         detailRow('Listing', `#${listing.listingId} on ${listing.entry.label}`),
         detailRow('Seller', bnsNameSpan(listing.seller))
       );
@@ -10592,7 +10593,13 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
           const price = document.createElement('div');
           price.className = 'market-card__price';
-          price.textContent = formatAssetAmount(listing.price, decimals, symbol);
+          // Always show the USD equivalent next to the asset price (live
+          // Coinbase spot rates; falls back to asset-only while loading).
+          price.textContent = formatMarketPriceWithUsd(
+            listing.price,
+            listing.settlement,
+            state.usdPriceBook
+          );
 
           const meta = document.createElement('div');
           meta.className = 'market-card__meta';
@@ -10716,7 +10723,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         const sponsored = isSponsoredMarket(listing.entry);
         const info = document.createElement('div');
         info.className = 'market-card__meta';
-        const priceText = formatAssetAmount(listing.price, listing.settlement.decimals ?? 6, symbol);
+        const priceText = formatMarketPriceWithUsd(listing.price, listing.settlement, state.usdPriceBook);
         const budgetText = sponsored && listing.budgetRemaining !== null
           ? ` · deposit ${formatAssetAmount(listing.feeBudget ?? listing.budgetRemaining, 6, 'STX')}, ${formatAssetAmount(listing.budgetRemaining, 6, 'STX')} remaining`
           : '';
@@ -10791,6 +10798,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const run = ++marketState.run;
       if (!marketDom.listings) return;
       if (marketDom.badge) marketDom.badge.textContent = state.contract.network;
+      // USD conversion: fetch spot rates in the background and re-render the
+      // cards once available (asset-only prices show in the meantime).
+      void loadUsdPriceBook().then(() => {
+        if (run === marketState.run && state.usdPriceBook) {
+          renderMarketListings();
+          renderSellerDashboard();
+        }
+      });
       renderMarketToolbar();
       populateSellMarkets();
       const listParam = params?.get?.('list');
