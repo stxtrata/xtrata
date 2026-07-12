@@ -69,19 +69,32 @@ const unwrapTuple = (node: unknown): Record<string, { value: unknown }> | null =
     : null;
 };
 
-const readMarket = async (env: MarketEnv, entry: RegistryEntry) => {
+const readMarket = async (
+  env: MarketEnv,
+  entry: RegistryEntry,
+  seller: string | null = null
+) => {
   const contractId = `${entry.address}.${entry.contractName}`;
   const lastJson = (await callRead(env, contractId, 'get-last-listing-id')) as {
     value?: { value?: string };
   };
   const lastId = BigInt(lastJson?.value?.value ?? 0);
-  const floor = lastId > BigInt(LISTINGS_PER_CONTRACT) ? lastId - BigInt(LISTINGS_PER_CONTRACT) : 0n;
+  // The public market only needs the newest window. A seller wallet must scan
+  // the full listing map: otherwise a still-live escrow silently disappears
+  // after enough newer listings are created.
+  const floor = seller === null && lastId > BigInt(LISTINGS_PER_CONTRACT)
+    ? lastId - BigInt(LISTINGS_PER_CONTRACT)
+    : 0n;
   const listings: Record<string, unknown>[] = [];
   for (let id = lastId; id >= floor; id -= 1n) {
     try {
       const json = await callRead(env, contractId, 'get-listing', [cvToHex(uintCV(id))]);
       const tuple = unwrapTuple(json);
       if (!tuple) {
+        if (id === 0n) break;
+        continue;
+      }
+      if (seller !== null && String(tuple.seller.value) !== seller) {
         if (id === 0n) break;
         continue;
       }
@@ -116,6 +129,15 @@ const readMarket = async (env: MarketEnv, entry: RegistryEntry) => {
 
 export const onRequestGet: PagesFunction<MarketEnv> = async (context) => {
   const { request, env } = context;
+  const sellerParam = new URL(request.url).searchParams.get('seller');
+  const seller = sellerParam?.trim().toUpperCase() || null;
+  if (seller !== null && !/^(SP|SM)[0-9A-Z]{20,50}$/.test(seller)) {
+    return jsonResponse(
+      { error: 'INVALID_SELLER', message: 'seller must be a mainnet Stacks address' },
+      400,
+      { 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' }
+    );
+  }
   const cache = (caches as unknown as { default: Cache }).default;
   const cacheKey = new Request(new URL(request.url).toString(), request);
 
@@ -125,7 +147,7 @@ export const onRequestGet: PagesFunction<MarketEnv> = async (context) => {
   const entries = (registry as RegistryEntry[]).filter((entry) => entry.network === 'mainnet');
   const perMarket = await Promise.all(
     entries.map((entry) =>
-      readMarket(env, entry).then(
+      readMarket(env, entry, seller).then(
         (listings) => ({ ok: true as const, listings }),
         () => ({ ok: false as const, listings: [] as Record<string, unknown>[] })
       )

@@ -316,6 +316,10 @@
       walletLookupButton: $('walletLookupButton'),
       walletLookupStatus: $('walletLookupStatus'),
       walletGridStatus: $('walletGridStatus'),
+      walletMarketListings: $('walletMarketListings'),
+      walletMarketListingsSummary: $('walletMarketListingsSummary'),
+      walletMarketListingsBody: $('walletMarketListingsBody'),
+      walletMarketListingsStatus: $('walletMarketListingsStatus'),
       tokenGrid: $('tokenGrid'),
       tokenPreviewPanel: $('tokenPreviewPanel'),
       tokenPreviewMedia: $('tokenPreviewMedia'),
@@ -562,6 +566,7 @@
       // the original Pepe/Leo; the Xtrata twin is in the helper contract). These
       // are injected onto page 0 of the wallet grid, marked with the padlock.
       escrowTwinInjection: { address: null, ids: [], requestId: 0 },
+      walletMarketListings: { address: null, listings: [], requestId: 0 },
       walletTokenCache: new Map(),
       walletTokens: [],
       walletPageIndex: 0,
@@ -8879,6 +8884,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
       const viewingAddress = getViewingWalletAddress();
       if (!viewingAddress) {
+        state.walletMarketListings = {
+          address: null,
+          listings: [],
+          requestId: (state.walletMarketListings.requestId ?? 0) + 1
+        };
+        renderWalletMarketListings();
         state.walletTokenIds = [];
         state.walletPageIds = [];
         state.walletTotalCount = 0;
@@ -8904,6 +8915,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         updateTransferControls();
         return;
       }
+
+      // Market escrow is still seller-controlled ownership. Load it alongside
+      // direct NFT holdings so a listed inscription never disappears from the
+      // seller's My Wallet view.
+      void refreshWalletMarketListings(viewingAddress);
 
       setStatus(dom.walletGridStatus, '<strong>Grid</strong> loading wallet holdings', 'loading', 'blue');
       renderTokenGridPlaceholders('...');
@@ -9959,13 +9975,32 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       return pcs;
     };
 
-    const marketCancel = async (listing) => {
+    const setMarketActionStatus = (target, html) => {
+      if (!target) return;
+      target.hidden = false;
+      target.innerHTML = html;
+    };
+
+    const marketCancel = async (listing, statusTarget = marketDom.status) => {
       if (!state.walletSession.isConnected || !state.walletSession.address) {
-        marketDom.status.innerHTML = '<span><strong>Market</strong> connect the seller wallet to cancel.</span>';
+        setMarketActionStatus(
+          statusTarget,
+          '<span><strong>Market</strong> connect the seller wallet to cancel.</span>'
+        );
+        return;
+      }
+      if (!addressesEqual(state.walletSession.address, listing.seller)) {
+        setMarketActionStatus(
+          statusTarget,
+          '<span><strong>Market</strong> only the listing seller can cancel.</span>'
+        );
         return;
       }
       const [nftAddress, nftName] = listing.nftContract.split('.');
-      marketDom.status.innerHTML = '<span><strong>Market</strong> confirm the cancel in your wallet…</span>';
+      setMarketActionStatus(
+        statusTarget,
+        '<span><strong>Market</strong> confirm the unlist in your wallet…</span>'
+      );
       showContractCall({
         contractAddress: listing.entry.address,
         contractName: listing.entry.contractName,
@@ -9977,10 +10012,16 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         postConditions: marketEscrowPostConditions(listing),
         onFinish: (payload) => {
           const txId = payload?.txId ?? payload?.txid ?? '';
-          marketDom.status.innerHTML = `<span><strong>Market</strong> cancel submitted${txId ? ` — tx ${txId}` : ''}. Migrate the inscription to v3, then relist.</span>`;
+          setMarketActionStatus(
+            statusTarget,
+            `<span><strong>Market</strong> unlist submitted${txId ? ` — tx ${txId}` : ''}. Once it confirms, the inscription returns to your wallet and you can relist it at the new price.</span>`
+          );
         },
         onCancel: () => {
-          marketDom.status.innerHTML = '<span><strong>Market</strong> cancel aborted.</span>';
+          setMarketActionStatus(
+            statusTarget,
+            '<span><strong>Market</strong> unlist cancelled.</span>'
+          );
         }
       });
     };
@@ -10703,7 +10744,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         marketDom.listings?.parentElement?.insertBefore(host, marketDom.listings);
       }
       const mine = state.walletSession.address
-        ? marketState.listings.filter((l) => l.seller === state.walletSession.address)
+        ? marketState.listings.filter((listing) =>
+            addressesEqual(listing.seller, state.walletSession.address)
+          )
         : [];
       if (!mine.length) {
         host.hidden = true;
@@ -10758,14 +10801,15 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // Fast path: the edge-cached aggregate endpoint (functions/market/listings)
     // turns ~1+N Hiro reads per market into ONE cached request. Falls back to
     // direct reads when unavailable (local dev without wrangler).
-    const loadListingsFromCache = async () => {
-      const response = await fetch('/market/listings');
+    const loadListingsFromCache = async ({ seller = null, allowEmpty = false } = {}) => {
+      const query = seller ? `?seller=${encodeURIComponent(seller)}` : '';
+      const response = await fetch(`/market/listings${query}`);
       if (!response.ok) throw new Error(`cache endpoint ${response.status}`);
       const payload = await response.json();
       // Never trust an empty or degraded cache answer: a transient upstream
       // failure server-side must not render as "no listings" when listings
       // exist on-chain. Throwing here falls back to direct reads.
-      if (payload.degraded === true || !(payload.listings ?? []).length) {
+      if (payload.degraded === true || (!allowEmpty && !(payload.listings ?? []).length)) {
         throw new Error('cache empty or degraded - verifying with direct reads');
       }
       const byId = new Map(
@@ -10792,6 +10836,92 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           };
         })
         .filter(Boolean);
+    };
+
+    const renderWalletMarketListings = () => {
+      const host = dom.walletMarketListings;
+      const body = dom.walletMarketListingsBody;
+      if (!host || !body) return;
+      const viewingAddress = getViewingWalletAddress();
+      const listingState = state.walletMarketListings;
+      const listings = viewingAddress && addressesEqual(listingState.address, viewingAddress)
+        ? listingState.listings.filter((listing) => listing.soldAt === null)
+        : [];
+      if (listings.length === 0) {
+        host.hidden = true;
+        body.replaceChildren();
+        return;
+      }
+      host.hidden = false;
+      host.open = true;
+      if (dom.walletMarketListingsSummary) {
+        dom.walletMarketListingsSummary.textContent = `Listed / escrowed (${listings.length})`;
+      }
+      body.replaceChildren(
+        ...listings.map((listing) => {
+          const row = document.createElement('div');
+          row.className = 'market-mine__row';
+          const info = document.createElement('div');
+          info.className = 'market-card__meta';
+          info.textContent = `#${listing.tokenId} · ${formatMarketPriceWithUsd(
+            listing.price,
+            listing.settlement,
+            state.usdPriceBook
+          )} · held safely in market escrow · seller: ${getViewingWalletLabel()}`;
+          const actions = document.createElement('div');
+          actions.className = 'market-card__actions';
+          const view = document.createElement('a');
+          view.className = 'market-chip';
+          view.href = '/market';
+          view.target = '_self';
+          view.textContent = 'View market';
+          actions.append(view);
+          if (
+            state.walletSession.address &&
+            addressesEqual(state.walletSession.address, listing.seller)
+          ) {
+            const cancel = document.createElement('button');
+            cancel.type = 'button';
+            cancel.className = 'market-chip';
+            cancel.textContent = 'Unlist / change price';
+            cancel.title = 'The market contract requires cancel and relist to change price.';
+            cancel.addEventListener('click', () => {
+              void marketCancel(listing, dom.walletMarketListingsStatus);
+            });
+            actions.append(cancel);
+          }
+          row.append(info, actions);
+          return row;
+        })
+      );
+    };
+
+    const refreshWalletMarketListings = async (walletAddress) => {
+      if (!walletAddress || state.explorerMode) return;
+      const requestId = (state.walletMarketListings.requestId ?? 0) + 1;
+      state.walletMarketListings = { address: walletAddress, listings: [], requestId };
+      renderWalletMarketListings();
+      let listings = [];
+      try {
+        listings = await loadListingsFromCache({ seller: walletAddress, allowEmpty: true });
+      } catch {
+        const perContract = await Promise.all(
+          marketEntriesForNetwork().map((entry) => readMarketListings(entry).catch(() => []))
+        );
+        listings = perContract.flat();
+      }
+      if (
+        requestId !== state.walletMarketListings.requestId ||
+        !addressesEqual(walletAddress, getViewingWalletAddress())
+      ) {
+        return;
+      }
+      state.walletMarketListings = {
+        address: walletAddress,
+        listings: listings.filter((listing) => addressesEqual(listing.seller, walletAddress)),
+        requestId
+      };
+      renderWalletMarketListings();
     };
 
     const loadMarketPage = async (params = null) => {
