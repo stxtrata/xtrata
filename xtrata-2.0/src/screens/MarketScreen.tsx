@@ -899,6 +899,16 @@ export default function MarketScreen(props: MarketScreenProps) {
       setBuyStatus('Connect a wallet to buy.');
       return;
     }
+    // xtrata-market-v1-0's buy is broken on-chain (as-contract rebinds
+    // tx-sender, so the NFT payout targets the market itself and aborts with
+    // err u2): every buy fails and costs the buyer the miner fee. Block it
+    // here too, not just on the public market page.
+    if (marketContractIdLabel?.endsWith('.xtrata-market-v1-0')) {
+      setBuyStatus(
+        'This legacy market contract cannot complete purchases - the seller must cancel and relist on a v1.1 market.'
+      );
+      return;
+    }
 
     const inputId = parseUintInput(buyListingIdInput);
     const listingId = params?.listingId ?? inputId ?? activeListingId;
