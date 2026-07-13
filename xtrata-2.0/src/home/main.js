@@ -231,7 +231,7 @@
     let PAGE_MODE = document.documentElement.dataset.page || 'home';
 
     const PAGE_TITLES = {
-      home: 'Xtrata - Permanent Media Records',
+      home: 'Xtrata — Create something the internet cannot forget',
       inscribe: 'Inscribe — Xtrata',
       xplorer: 'Xtrata Xplorer',
       'my-wallet': 'My Wallet — Xtrata',
@@ -3846,22 +3846,30 @@
         dom.introContractValue.textContent = getContractId(state.contract);
       }
       if (dom.registryModeBadge) {
-        dom.registryModeBadge.textContent = hasLedger ? 'Live registry view' : 'Permanent media records';
+        dom.registryModeBadge.textContent =
+          PAGE_MODE === 'home'
+            ? 'A living world of permanent digital objects'
+            : hasLedger
+              ? 'Live registry view'
+              : 'Permanent media records';
       }
       if (dom.registryIntroLead) {
-        dom.registryIntroLead.textContent = state.curatedGalleryTitle
-          ? `${state.curatedGalleryTitle} is open below in Wallet Inscriptions.`
-          : state.homeLatestView
-          ? 'The latest Xtrata inscriptions are open below in Wallet Inscriptions.'
-          : !viewingAddress
-          ? 'Create and hold durable records for songs, masters, artwork, credits, documents, apps, and collaboration history, anchored to Bitcoin through Stacks.'
-          : !connected && count === 0
-            ? 'Public wallet lookup is active, but this contract has no inscriptions for that address yet.'
-            : connected && count === 0
-              ? 'Your wallet is connected, but this contract has no inscriptions for it yet. Start with a simple record, then the page will open into the full registry ledger view.'
-              : connected
-                ? `Wallet connected with ${count} inscription${count === 1 ? '' : 's'}. Switching into the fuller registry view.`
-                : `Public ledger view loaded with ${count} inscription${count === 1 ? '' : 's'} available for this address.`;
+        dom.registryIntroLead.textContent =
+          PAGE_MODE === 'home'
+            ? 'Make, collect, trade, connect and build with songs, art, apps, games and ideas that live fully on-chain.'
+            : state.curatedGalleryTitle
+              ? `${state.curatedGalleryTitle} is open below in Wallet Inscriptions.`
+              : state.homeLatestView
+                ? 'The latest Xtrata inscriptions are open below in Wallet Inscriptions.'
+                : !viewingAddress
+                  ? 'Create and hold durable records for songs, masters, artwork, credits, documents, apps, and collaboration history, anchored to Bitcoin through Stacks.'
+                  : !connected && count === 0
+                    ? 'Public wallet lookup is active, but this contract has no inscriptions for that address yet.'
+                    : connected && count === 0
+                      ? 'Your wallet is connected, but this contract has no inscriptions for it yet. Start with a simple record, then the page will open into the full registry ledger view.'
+                      : connected
+                        ? `Wallet connected with ${count} inscription${count === 1 ? '' : 's'}. Switching into the fuller registry view.`
+                        : `Public ledger view loaded with ${count} inscription${count === 1 ? '' : 's'} available for this address.`;
       }
       if (dom.introStateValue) {
         dom.introStateValue.textContent = state.curatedGalleryTitle

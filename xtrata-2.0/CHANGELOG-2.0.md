@@ -14,6 +14,15 @@ Result: ~980 MB → ~40 MB of source. Built `dist/` output verified identical (s
 - The single 9,700-line inline `<script type="module">` moved verbatim to `src/home/main.js`. Verified: built JS bundles byte-identical to 1.0 after this step.
 - 22 pure-data constants (theme keys, `CURATED_GALLERIES`, `EXAMPLE_VIEW_DESCRIPTIONS`, wallet/grid/explorer tuning constants, `GRID_MIME_LABELS`, `EXPLORER_*`, brand URL, twins maps) extracted to `src/home/config.js`. Each block was machine-checked to reference nothing outside itself before moving.
 
+## Living Archive homepage (session 2026-07-13)
+
+- Repositioned the public homepage around **“Create something the internet cannot forget”**, with the experience ordered as explore → experience → claim/collect → create → connect/build → technical proof.
+- Added a real-object hero and six possibility cards using live Xtrata content (DYLE art #296, music #1107, Stacksboard #394, code #287), sponsored drops, and Forever Twins. Interactive inscriptions are sandboxed and lazy-loaded outside the opening stage.
+- Replaced mechanism-first route names with intent-first doors (`Explore`, `Create`, `Claim`, `Collect`, `My Xtrata`, `Build`) while retaining the existing routes and leaving contract, wallet, market, drop, viewer, and mint mechanics unchanged.
+- Added configurable homepage content in `src/home/homepage-content.js`: featured objects, intent routes, live activity doors, and one reusable campaign slot with artwork, actions, dates, sponsor, and featured-inscription fields. `src/home/homepage.js` renders those surfaces and emits `xtrata:homepage-action` events (plus `dataLayer` events when available).
+- Added the object lifecycle, flagship stories, public-creation flywheel, later-stage technical foundation, builder entry, and final invitation. All new motion respects `prefers-reduced-motion`; responsive layouts collapse at 1060/820/600px.
+- Added focused validation tests in `src/home/__tests__/homepage-content.test.ts` for configuration completeness, unique ids, real navigable routes, and inscription-backed previews.
+
 ## Duplication removed
 
 - `PEPE_ESCROW_RESOLVERS` (homepage) is no longer a hand-synced copy of `src/lib/twins/registry.ts`. It is now derived from `FOREVER_TWIN_COLLECTIONS` plus a small `TWIN_HOLDER_LABELS` override map. Adding a Forever Twins collection now requires only the registry entry (AGENTS.md step 2 "mirror in index.html" is obsolete). Equivalence to the original literal proven by test.
