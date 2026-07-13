@@ -47,6 +47,25 @@ describe('wallet connect helpers', () => {
     expect(params.postConditions?.[0]).toMatch(/^[0-9a-f]+$/);
   });
 
+  it('sends an explicit zero origin fee for sponsored contract calls', () => {
+    const params = __testing.buildContractCallParams({
+      contractAddress: ADDRESS,
+      contractName: 'xtrata-drops-v1-0',
+      functionName: 'claim',
+      functionArgs: [uintCV(0)],
+      network: 'mainnet',
+      stxAddress: ADDRESS,
+      sponsored: true,
+      fee: 0
+    });
+
+    expect(params).toMatchObject({
+      address: ADDRESS,
+      sponsored: true,
+      fee: '0'
+    });
+  });
+
   it('serializes bigint fees before sending legacy wallet contract calls', () => {
     const options = __testing.toLegacyContractCallOptions({
       contractAddress: ADDRESS,

@@ -9097,6 +9097,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       setBusy(true);
       try {
         state.walletSession = await walletAdapter.connect();
+        if (PAGE_MODE === 'drops') {
+          renderDrops();
+        }
         refreshConnectedWalletMatureMode();
         appendLog(state.walletSession.address ? `Wallet connected: ${truncateMiddle(state.walletSession.address)}` : 'Wallet connection cancelled.');
         updateWalletStatus();
@@ -9145,6 +9148,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       try {
         await walletAdapter.disconnect();
         state.walletSession = walletAdapter.getSession();
+        if (PAGE_MODE === 'drops') {
+          // Drop actions depend on the active principal. Replace an owner's
+          // reclaim action as soon as that session ends, before slower wallet
+          // and admin refreshes complete.
+          renderDrops();
+        }
         state.walletTokenIds = [];
         state.walletPageIds = [];
         state.walletTotalCount = 0;
@@ -11249,6 +11258,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         dropsDom.status.innerHTML = '<span><strong>Drops</strong> connect a wallet to claim — new wallets work, no STX needed.</span>';
         return;
       }
+      const claimantAddress = state.walletSession.address;
       const [nftAddress, nftName] = drop.nftContract.split('.');
       const postConditions = dropClaimPostConditions(drop);
       dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the free claim in your wallet (fee 0)…</span>';
@@ -11258,11 +11268,23 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         functionName: 'claim',
         functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(drop.dropId)],
         network: drop.entry.network,
-        stxAddress: state.walletSession.address,
+        stxAddress: claimantAddress,
         postConditionMode: PostConditionMode.Deny,
         postConditions,
         sponsored: true,
+        // Sponsored auth requires the origin spending condition to carry a
+        // literal zero fee. Xverse rejects an omitted/defaulted origin fee as
+        // SignatureValidation before it returns the signed transaction.
+        fee: 0,
         onFinish: async (payload) => {
+          if (
+            !state.walletSession.isConnected ||
+            !addressesEqual(state.walletSession.address, claimantAddress)
+          ) {
+            dropsDom.status.innerHTML = '<span><strong>Drops</strong> wallet changed while signing — claim again with the active account.</span>';
+            renderDrops();
+            return;
+          }
           const txHex = payload?.txRaw ?? null;
           if (!txHex) {
             dropsDom.status.innerHTML = '<span><strong>Drops</strong> this wallet did not return the signed sponsored transaction — claiming self-paid instead.</span>';
@@ -11393,7 +11415,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
           const actions = document.createElement('div');
           actions.className = 'market-card__actions';
-          const isMine = state.walletSession.address === drop.creator;
+          const isMine =
+            state.walletSession.isConnected &&
+            !!state.walletSession.address &&
+            addressesEqual(state.walletSession.address, drop.creator);
           if (isMine) {
             const cancelBtn = document.createElement('button');
             cancelBtn.type = 'button';

@@ -6001,6 +6001,35 @@
       padding: clamp(18px, 3vw, 30px);
     }
 
+    /* Compact laptops need the complete invitation before the artwork.
+       Inside the capped page shell, a two-column hero leaves too little
+       headline measure and pushes every action below a short viewport. */
+    @media (max-width: 1200px), (max-height: 1060px) {
+      .living-hero.registry-intro {
+        grid-template-columns: 1fr;
+        min-height: 0;
+        padding: 44px clamp(38px, 5vw, 56px);
+      }
+
+      .living-hero__copy {
+        max-width: none;
+      }
+
+      .living-hero__title {
+        max-width: 900px;
+        font-size: clamp(54px, 6vw, 68px);
+      }
+
+      .living-hero__stage {
+        width: 100%;
+      }
+
+      .living-object:nth-child(2),
+      .living-object:nth-child(3) {
+        margin-top: 0;
+      }
+    }
+
     @media (max-width: 1060px) {
       .living-hero.registry-intro {
         grid-template-columns: 1fr;

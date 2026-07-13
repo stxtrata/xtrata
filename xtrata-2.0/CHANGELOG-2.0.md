@@ -34,8 +34,15 @@ Result: ~980 MB → ~40 MB of source. Built `dist/` output verified identical (s
 ## Active campaign rail (session 2026-07-13)
 
 - Restored Suno More and Forever Twins as compact, configurable banners immediately below the primary navigation, keeping both active campaigns one click from the top without replacing the new Living Archive hero.
-- Moved the advanced creation entry beside Create and renamed it from `Wizard` to `Creation Wizard`, making the relationship between the simple and guided creation routes explicit.
+- Moved the advanced creation entry beside Create and named it `Inscription Wizard`, making the relationship between the simple and guided creation routes explicit while matching the product terminology everywhere else.
 - Added campaign-banner validation and regression coverage in the homepage content tests; campaign interactions use the existing homepage action event/data-layer instrumentation.
+
+## Compact homepage + wallet-safe Drops (session 2026-07-14)
+
+- Compact and short laptop viewports now put the complete homepage invitation—including its actions, trust line, and `Connect a wallet`—before the featured-object artwork. Rendered geometry was checked at 1131×749, 1280×720, 1366×768, 1440×900, 1536×864, and 1920×1080.
+- Drops re-renders wallet-dependent claim/reclaim actions immediately on connect and disconnect, and an owner action now requires the currently connected principal rather than a stale address.
+- Sponsored drop claims now capture one claimant for the signing flow and send the explicit zero origin fee required by sponsored auth, preventing Xverse `SignatureValidation` failures caused by an omitted/default fee. A focused SIP-030 regression test covers the `sponsored: true` + `fee: '0'` request shape.
+- Verified: 25 focused homepage, wallet, and sponsor-relay tests pass; production build succeeds. Focused ESLint remains blocked before file analysis by the repository's existing ESLint 8 / `react-refresh` recommended-config schema mismatch.
 
 ## Duplication removed
 
