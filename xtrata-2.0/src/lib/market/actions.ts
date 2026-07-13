@@ -2,6 +2,34 @@ import { MICROSTX_PER_STX } from '../contract/fees';
 
 const STX_AMOUNT_PATTERN = /^\d+(\.\d+)?$/;
 
+export type MarketListingPublicBlockReason =
+  | 'legacy-nft'
+  | 'broken-market'
+  | null;
+
+/**
+ * Classifies listings that must not be presented to buyers as live offers.
+ * Sellers still need access to these listings so they can cancel and recover
+ * the escrowed NFT before migrating or relisting on a supported contract.
+ */
+export const getMarketListingPublicBlockReason = (params: {
+  nftContract?: string | null;
+  marketContractId?: string | null;
+}): MarketListingPublicBlockReason => {
+  if (String(params.nftContract ?? '').endsWith('.xtrata-v2-1-0')) {
+    return 'legacy-nft';
+  }
+  if (String(params.marketContractId ?? '').endsWith('.xtrata-market-v1-0')) {
+    return 'broken-market';
+  }
+  return null;
+};
+
+export const isMarketListingPubliclyBuyable = (params: {
+  nftContract?: string | null;
+  marketContractId?: string | null;
+}) => getMarketListingPublicBlockReason(params) === null;
+
 export const normalizeAddress = (value?: string | null) => {
   const trimmed = value?.trim();
   if (!trimmed) {

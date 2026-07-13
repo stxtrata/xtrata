@@ -54,6 +54,10 @@
       formatMarketPriceWithUsd
     } from '/src/lib/market/settlement.ts';
     import { isSponsoredMarket } from '/src/lib/market/sponsored.ts';
+    import {
+      getMarketListingPublicBlockReason,
+      isMarketListingPubliclyBuyable
+    } from '/src/lib/market/actions.ts';
     import { loadMarketActivity } from '/src/lib/market/indexer.ts';
     import {
       buildTransferCall,
@@ -9939,16 +9943,17 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       return results;
     };
 
-    const isLegacyCoreListing = (listing) =>
-      String(listing.nftContract ?? '').endsWith('.xtrata-v2-1-0');
+    const getListingPublicBlockReason = (listing) =>
+      getMarketListingPublicBlockReason({
+        nftContract: listing.nftContract,
+        marketContractId: listing.contractId
+      });
 
-    // xtrata-market-v1-0's buy is broken by design: the NFT payout runs inside
-    // as-contract, which rebinds tx-sender, so the market transfers the NFT to
-    // ITSELF and the core rejects it (err u2) — every buy fails and deny-mode
-    // post-conditions roll it back. cancel works (explicit seller recipient),
-    // so sellers can still recover their NFTs and relist on a v1.1 market.
-    const isBrokenBuyMarket = (listing) =>
-      String(listing.contractId ?? '').endsWith('.xtrata-market-v1-0');
+    const isListingPubliclyBuyable = (listing) =>
+      isMarketListingPubliclyBuyable({
+        nftContract: listing.nftContract,
+        marketContractId: listing.contractId
+      });
 
     // Deny-mode post-conditions for contract-side payouts (cancel / reclaim /
     // claim): the exact NFT and STX escrow outflows, so the wallet shows
@@ -10035,8 +10040,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     };
 
     const marketBuy = async (listing) => {
-      if (isLegacyCoreListing(listing)) {
-        marketDom.status.innerHTML = '<span><strong>Market</strong> legacy v2 inscriptions are delisted — the owner must migrate to v3 and relist.</span>';
+      const publicBlockReason = getListingPublicBlockReason(listing);
+      if (publicBlockReason) {
+        marketDom.status.innerHTML = publicBlockReason === 'legacy-nft'
+          ? '<span><strong>Market</strong> this legacy inscription is not for sale — the seller must cancel, migrate to v3, and relist.</span>'
+          : '<span><strong>Market</strong> this legacy market cannot complete purchases — the seller must cancel and relist on a supported market.</span>';
         return;
       }
       if (!state.walletSession.isConnected || !state.walletSession.address) {
@@ -10104,6 +10112,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     };
 
     const MARKET_MEDIA_MAX_BYTES = 512n * 1024n;
+    const MARKET_REMOTE_THUMBNAIL_MAX_BYTES = 5 * 1024 * 1024;
 
     const marketFetchContent = async (listing, meta) => {
       const bytes = await fetchOnChainContent({
@@ -10116,6 +10125,85 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       return bytes;
     };
 
+    const marketCachedThumbnailFor = async (listing) => {
+      const key = marketTokenKey(listing);
+      const memoryHit = state.thumbnailCache.has(key);
+      let thumbnail = state.thumbnailCache.get(key);
+      if (thumbnail === undefined) {
+        thumbnail = await loadInscriptionThumbnailFromCache(
+          listing.nftContract,
+          listing.tokenId
+        );
+        state.thumbnailCache.set(key, thumbnail);
+      }
+      if (!thumbnail?.data) return null;
+      debugLog('cache', 'market thumbnail cache hit', {
+        tokenId: listing.tokenId.toString(),
+        contractId: listing.nftContract,
+        source: memoryHit ? 'memory' : 'indexeddb',
+        bytes: thumbnail.data.length
+      });
+      return {
+        kind: 'image',
+        url: URL.createObjectURL(
+          new Blob([thumbnail.data], {
+            type: thumbnail.mimeType ?? 'image/webp'
+          })
+        )
+      };
+    };
+
+    const warmMarketThumbnailCache = async (listing, bytes, mimeType) => {
+      try {
+        const thumbnail = await createImageThumbnail({ bytes, mimeType });
+        if (!thumbnail?.data) return null;
+        await saveInscriptionThumbnailToCache(
+          listing.nftContract,
+          listing.tokenId,
+          thumbnail.data,
+          {
+            mimeType: thumbnail.mimeType,
+            width: thumbnail.width,
+            height: thumbnail.height
+          }
+        );
+        state.thumbnailCache.set(marketTokenKey(listing), thumbnail);
+        debugLog('cache', 'market thumbnail cache warmed', {
+          tokenId: listing.tokenId.toString(),
+          contractId: listing.nftContract,
+          bytes: thumbnail.data.length,
+          mimeType: thumbnail.mimeType
+        });
+        return thumbnail;
+      } catch (error) {
+        debugLog('cache', 'market thumbnail cache warm failed', {
+          tokenId: listing.tokenId.toString(),
+          contractId: listing.nftContract,
+          error: error instanceof Error ? error.message : String(error)
+        }, 'warn');
+        return null;
+      }
+    };
+
+    const cacheMarketRemoteImage = async (listing, url) => {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) return;
+        const declaredSize = Number(response.headers.get('content-length') ?? 0);
+        if (declaredSize > MARKET_REMOTE_THUMBNAIL_MAX_BYTES) return;
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        if (!bytes.length || bytes.length > MARKET_REMOTE_THUMBNAIL_MAX_BYTES) return;
+        const declaredMime = response.headers.get('content-type')?.split(';')[0]?.trim() ?? '';
+        const mimeType = getMediaKind(declaredMime) === 'image'
+          ? declaredMime
+          : 'image/png';
+        await warmMarketThumbnailCache(listing, bytes, mimeType);
+      } catch {
+        // Cross-origin or transient image fetch failures only skip caching; the
+        // browser can still render the already-resolved source URL directly.
+      }
+    };
+
     // Resolve a listing's thumbnail media. Kinds:
     //   image      → <img> (covers static + SMIL/CSS-animated SVG)
     //   html-live  → sandboxed <iframe srcdoc> (HTML inscriptions and
@@ -10126,6 +10214,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       if (marketState.media.has(key)) return marketState.media.get(key);
       let media = null;
       try {
+        media = await marketCachedThumbnailFor(listing);
+        if (media) {
+          marketState.media.set(key, media);
+          return media;
+        }
         const summary = await marketSummaryFor(listing);
         const meta = summary?.meta ?? null;
         const mime = (meta?.mimeType ?? '').toLowerCase();
@@ -10140,6 +10233,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           if (/<script[\s>]/i.test(text)) {
             media = { kind: 'html-live', html: text };
           } else {
+            await warmMarketThumbnailCache(listing, bytes, 'image/svg+xml');
             media = {
               kind: 'image',
               url: URL.createObjectURL(new Blob([bytes], { type: 'image/svg+xml' }))
@@ -10147,6 +10241,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           }
         } else if (kind === 'image' && fetchable) {
           const bytes = await marketFetchContent(listing, meta);
+          await warmMarketThumbnailCache(listing, bytes, meta.mimeType);
           media = {
             kind: 'image',
             url: URL.createObjectURL(new Blob([bytes], { type: meta.mimeType }))
@@ -10173,7 +10268,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         }
         if (!media && summary?.tokenUri) {
           const uriImage = await fetchTokenImageFromUri(summary.tokenUri);
-          if (uriImage) media = { kind: 'image', url: uriImage };
+          if (uriImage) {
+            void cacheMarketRemoteImage(listing, uriImage);
+            media = { kind: 'image', url: uriImage };
+          }
         }
       } catch {
         media = null;
@@ -10603,6 +10701,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const run = marketState.run;
       const visible = marketState.listings.filter((listing) =>
         listing.soldAt === null &&
+        isListingPubliclyBuyable(listing) &&
         (marketState.filter === 'all' ||
           getMarketSettlementLabel(listing.settlement) === marketState.filter)
       );
@@ -10682,28 +10781,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
           const actions = document.createElement('div');
           actions.className = 'market-card__actions';
-          if (isLegacyCoreListing(listing)) {
-            // v3-only policy: v2 inscriptions are delisted from sale. The
-            // owner can cancel and migrate, then relist on a v1.1 market.
-            const note = document.createElement('p');
-            note.className = 'market-card__meta';
-            note.textContent = 'Legacy v2 inscription — delisted from sale.';
-            const migrate = document.createElement('a');
-            migrate.className = 'market-chip';
-            migrate.href = '/web/migrate.html';
-            migrate.target = '_self';
-            migrate.textContent = 'Migrate to v3 to relist';
-            card.append(note);
-            actions.append(migrate);
-            if (isOwnListing) {
-              const cancelBtn = document.createElement('button');
-              cancelBtn.type = 'button';
-              cancelBtn.className = 'market-chip';
-              cancelBtn.textContent = 'Cancel listing (reclaim)';
-              cancelBtn.addEventListener('click', () => { void marketCancel(listing); });
-              actions.append(cancelBtn);
-            }
-          } else if (isOwnListing) {
+          if (isOwnListing) {
             const cancelBtn = document.createElement('button');
             cancelBtn.type = 'button';
             cancelBtn.className = 'market-chip';
@@ -10779,22 +10857,40 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         row.className = 'market-mine__row';
         const symbol = getMarketSettlementLabel(listing.settlement);
         const sponsored = isSponsoredMarket(listing.entry);
+        const publicBlockReason = getListingPublicBlockReason(listing);
         const info = document.createElement('div');
         info.className = 'market-card__meta';
         const priceText = formatMarketPriceWithUsd(listing.price, listing.settlement, state.usdPriceBook);
         const budgetText = sponsored && listing.budgetRemaining !== null
           ? ` · deposit ${formatAssetAmount(listing.feeBudget ?? listing.budgetRemaining, 6, 'STX')}, ${formatAssetAmount(listing.budgetRemaining, 6, 'STX')} remaining`
           : '';
-        info.textContent = `#${listing.tokenId} · ${priceText} · ${listing.soldAt !== null ? 'SOLD — settlement pending' : 'live'}${budgetText}`;
+        const listingStatus = publicBlockReason === 'legacy-nft'
+          ? 'not shown to buyers — cancel, migrate to v3, then relist'
+          : publicBlockReason === 'broken-market'
+            ? 'not shown to buyers — cancel and relist on a supported market'
+            : listing.soldAt !== null
+              ? 'SOLD — settlement pending'
+              : 'live';
+        info.textContent = `#${listing.tokenId} · ${priceText} · ${listingStatus}${budgetText}`;
         const actions = document.createElement('div');
         actions.className = 'market-card__actions';
         if (listing.soldAt === null) {
           const cancelBtn = document.createElement('button');
           cancelBtn.type = 'button';
           cancelBtn.className = 'market-chip';
-          cancelBtn.textContent = 'Cancel (return NFT + deposit)';
+          cancelBtn.textContent = publicBlockReason
+            ? 'Cancel listing (return NFT)'
+            : 'Cancel (return NFT + deposit)';
           cancelBtn.addEventListener('click', () => { void marketCancel(listing); });
           actions.append(cancelBtn);
+          if (publicBlockReason === 'legacy-nft') {
+            const migrate = document.createElement('a');
+            migrate.className = 'market-chip';
+            migrate.href = '/web/migrate.html';
+            migrate.target = '_self';
+            migrate.textContent = 'Migration guide';
+            actions.append(migrate);
+          }
         } else if (sponsored && (listing.budgetRemaining ?? 0n) > 0n) {
           const reclaimBtn = document.createElement('button');
           reclaimBtn.type = 'button';
@@ -10860,7 +10956,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const viewingAddress = getViewingWalletAddress();
       const listingState = state.walletMarketListings;
       const listings = viewingAddress && addressesEqual(listingState.address, viewingAddress)
-        ? listingState.listings.filter((listing) => listing.soldAt === null)
+        ? listingState.listings.filter((listing) => {
+            if (listing.soldAt !== null) return false;
+            if (isListingPubliclyBuyable(listing)) return true;
+            return !!state.walletSession.address &&
+              addressesEqual(state.walletSession.address, listing.seller);
+          })
         : [];
       if (listings.length === 0) {
         host.hidden = true;
@@ -10874,6 +10975,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
       body.replaceChildren(
         ...listings.map((listing) => {
+          const publicBlockReason = getListingPublicBlockReason(listing);
           const row = document.createElement('div');
           row.className = 'market-mine__row wallet-market-listing__row';
           const thumb = document.createElement('a');
@@ -10892,19 +10994,26 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           content.className = 'wallet-market-listing__content';
           const info = document.createElement('div');
           info.className = 'market-card__meta';
+          const availabilityText = publicBlockReason === 'legacy-nft'
+            ? 'not shown to buyers — cancel, migrate to v3, then relist'
+            : publicBlockReason === 'broken-market'
+              ? 'not shown to buyers — cancel and relist on a supported market'
+              : 'held safely in market escrow';
           info.textContent = `#${listing.tokenId} · ${formatMarketPriceWithUsd(
             listing.price,
             listing.settlement,
             state.usdPriceBook
-          )} · held safely in market escrow · seller: ${getViewingWalletLabel()}`;
+          )} · ${availabilityText} · seller: ${getViewingWalletLabel()}`;
           const actions = document.createElement('div');
           actions.className = 'market-card__actions';
-          const view = document.createElement('a');
-          view.className = 'market-chip';
-          view.href = '/market';
-          view.target = '_self';
-          view.textContent = 'View market';
-          actions.append(view);
+          if (!publicBlockReason) {
+            const view = document.createElement('a');
+            view.className = 'market-chip';
+            view.href = '/market';
+            view.target = '_self';
+            view.textContent = 'View market';
+            actions.append(view);
+          }
           if (
             state.walletSession.address &&
             addressesEqual(state.walletSession.address, listing.seller)
@@ -10912,12 +11021,22 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             const cancel = document.createElement('button');
             cancel.type = 'button';
             cancel.className = 'market-chip';
-            cancel.textContent = 'Unlist / change price';
+            cancel.textContent = publicBlockReason
+              ? 'Cancel listing (return NFT)'
+              : 'Unlist / change price';
             cancel.title = 'The market contract requires cancel and relist to change price.';
             cancel.addEventListener('click', () => {
               void marketCancel(listing, dom.walletMarketListingsStatus);
             });
             actions.append(cancel);
+            if (publicBlockReason === 'legacy-nft') {
+              const migrate = document.createElement('a');
+              migrate.className = 'market-chip';
+              migrate.href = '/web/migrate.html';
+              migrate.target = '_self';
+              migrate.textContent = 'Migration guide';
+              actions.append(migrate);
+            }
           }
           content.append(info, actions);
           row.append(thumb, content);

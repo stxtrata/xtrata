@@ -42,7 +42,10 @@ import {
   MARKET_SELECTION_EVENT
 } from '../lib/market/selection';
 import { parseMarketContractId } from '../lib/market/contract';
-import { isSameAddress } from '../lib/market/actions';
+import {
+  isMarketListingPubliclyBuyable,
+  isSameAddress
+} from '../lib/market/actions';
 import {
   buildMarketBuyPostConditions,
   formatMarketPriceWithUsd,
@@ -1130,7 +1133,18 @@ export default function MarketScreen(props: MarketScreenProps) {
   const allowedNftMismatch =
     !!statusQuery.data?.nftContract &&
     statusQuery.data.nftContract !== nftContractId;
-  const activeListings = activeListingsQuery.data ?? [];
+  const activeListings = useMemo(() => {
+    const listings = activeListingsQuery.data ?? [];
+    if (!isPublicVariant) {
+      return listings;
+    }
+    return listings.filter((listing) =>
+      isMarketListingPubliclyBuyable({
+        nftContract: listing.nftContract,
+        marketContractId: listing.marketContractId
+      })
+    );
+  }, [activeListingsQuery.data, isPublicVariant]);
 
   useEffect(() => {
     if (activeListings.length === 0) {
