@@ -64,6 +64,8 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 - `src/screens/CommerceScreen.tsx` owns the dedicated USDCx commerce UI (contract selection, listing lookup, listing creation, purchase, and entitlement checks).
 - `src/screens/PublicCommerceScreen.tsx` wraps the public-facing commerce view around the default registry contract.
 - `src/screens/VaultScreen.tsx` owns the dedicated sBTC vault UI (contract selection, vault lookup, tier checks, premium access checks, and owner vault actions).
+- `web/migrate.html` and `src/migrate-ui.ts` own the standalone migration scan, quote, blocker review, and existing wallet-signed migration flow.
+- `src/lib/migration/quote.ts` provides reusable all-source holdings classification, market-escrow merging, summaries, and itemised protocol/mining quote calculations for migration surfaces.
 - `src/components/TokenCardMedia.tsx` renders grid cell media (image/audio/video/html/text) and handles per-token loading.
 - `src/components/TokenContentPreview.tsx` renders the large preview, resolves content, and exposes preview actions.
 
