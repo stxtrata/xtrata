@@ -10112,6 +10112,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     };
 
     const MARKET_MEDIA_MAX_BYTES = 512n * 1024n;
+    const MARKET_REMOTE_THUMBNAIL_MAX_BYTES = 5 * 1024 * 1024;
 
     const marketFetchContent = async (listing, meta) => {
       const bytes = await fetchOnChainContent({
@@ -10124,6 +10125,85 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       return bytes;
     };
 
+    const marketCachedThumbnailFor = async (listing) => {
+      const key = marketTokenKey(listing);
+      const memoryHit = state.thumbnailCache.has(key);
+      let thumbnail = state.thumbnailCache.get(key);
+      if (thumbnail === undefined) {
+        thumbnail = await loadInscriptionThumbnailFromCache(
+          listing.nftContract,
+          listing.tokenId
+        );
+        state.thumbnailCache.set(key, thumbnail);
+      }
+      if (!thumbnail?.data) return null;
+      debugLog('cache', 'market thumbnail cache hit', {
+        tokenId: listing.tokenId.toString(),
+        contractId: listing.nftContract,
+        source: memoryHit ? 'memory' : 'indexeddb',
+        bytes: thumbnail.data.length
+      });
+      return {
+        kind: 'image',
+        url: URL.createObjectURL(
+          new Blob([thumbnail.data], {
+            type: thumbnail.mimeType ?? 'image/webp'
+          })
+        )
+      };
+    };
+
+    const warmMarketThumbnailCache = async (listing, bytes, mimeType) => {
+      try {
+        const thumbnail = await createImageThumbnail({ bytes, mimeType });
+        if (!thumbnail?.data) return null;
+        await saveInscriptionThumbnailToCache(
+          listing.nftContract,
+          listing.tokenId,
+          thumbnail.data,
+          {
+            mimeType: thumbnail.mimeType,
+            width: thumbnail.width,
+            height: thumbnail.height
+          }
+        );
+        state.thumbnailCache.set(marketTokenKey(listing), thumbnail);
+        debugLog('cache', 'market thumbnail cache warmed', {
+          tokenId: listing.tokenId.toString(),
+          contractId: listing.nftContract,
+          bytes: thumbnail.data.length,
+          mimeType: thumbnail.mimeType
+        });
+        return thumbnail;
+      } catch (error) {
+        debugLog('cache', 'market thumbnail cache warm failed', {
+          tokenId: listing.tokenId.toString(),
+          contractId: listing.nftContract,
+          error: error instanceof Error ? error.message : String(error)
+        }, 'warn');
+        return null;
+      }
+    };
+
+    const cacheMarketRemoteImage = async (listing, url) => {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) return;
+        const declaredSize = Number(response.headers.get('content-length') ?? 0);
+        if (declaredSize > MARKET_REMOTE_THUMBNAIL_MAX_BYTES) return;
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        if (!bytes.length || bytes.length > MARKET_REMOTE_THUMBNAIL_MAX_BYTES) return;
+        const declaredMime = response.headers.get('content-type')?.split(';')[0]?.trim() ?? '';
+        const mimeType = getMediaKind(declaredMime) === 'image'
+          ? declaredMime
+          : 'image/png';
+        await warmMarketThumbnailCache(listing, bytes, mimeType);
+      } catch {
+        // Cross-origin or transient image fetch failures only skip caching; the
+        // browser can still render the already-resolved source URL directly.
+      }
+    };
+
     // Resolve a listing's thumbnail media. Kinds:
     //   image      → <img> (covers static + SMIL/CSS-animated SVG)
     //   html-live  → sandboxed <iframe srcdoc> (HTML inscriptions and
@@ -10134,6 +10214,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       if (marketState.media.has(key)) return marketState.media.get(key);
       let media = null;
       try {
+        media = await marketCachedThumbnailFor(listing);
+        if (media) {
+          marketState.media.set(key, media);
+          return media;
+        }
         const summary = await marketSummaryFor(listing);
         const meta = summary?.meta ?? null;
         const mime = (meta?.mimeType ?? '').toLowerCase();
@@ -10148,6 +10233,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           if (/<script[\s>]/i.test(text)) {
             media = { kind: 'html-live', html: text };
           } else {
+            await warmMarketThumbnailCache(listing, bytes, 'image/svg+xml');
             media = {
               kind: 'image',
               url: URL.createObjectURL(new Blob([bytes], { type: 'image/svg+xml' }))
@@ -10155,6 +10241,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           }
         } else if (kind === 'image' && fetchable) {
           const bytes = await marketFetchContent(listing, meta);
+          await warmMarketThumbnailCache(listing, bytes, meta.mimeType);
           media = {
             kind: 'image',
             url: URL.createObjectURL(new Blob([bytes], { type: meta.mimeType }))
@@ -10181,7 +10268,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         }
         if (!media && summary?.tokenUri) {
           const uriImage = await fetchTokenImageFromUri(summary.tokenUri);
-          if (uriImage) media = { kind: 'image', url: uriImage };
+          if (uriImage) {
+            void cacheMarketRemoteImage(listing, uriImage);
+            media = { kind: 'image', url: uriImage };
+          }
         }
       } catch {
         media = null;
