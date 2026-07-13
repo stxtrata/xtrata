@@ -1,3 +1,28 @@
+export const HOMEPAGE_CAMPAIGN_BANNERS = Object.freeze([
+  Object.freeze({
+    id: 'suno-more',
+    status: 'live',
+    eyebrow: 'Music creation campaign',
+    title: 'SUNO More',
+    description: 'Turn a Suno song into a permanent, self-contained on-chain player.',
+    artwork: '/suno-more/assets/suno-more-logo.webp',
+    href: '/wizard/suno',
+    cta: 'Make a song',
+    tone: 'suno'
+  }),
+  Object.freeze({
+    id: 'forever-twins',
+    status: 'live',
+    eyebrow: 'Collection preservation campaign',
+    title: 'Forever Twins',
+    description: 'Activate a permanent on-chain counterpart for an existing collectible.',
+    artwork: '/forever-twins/assets/forever-twins-logo.webp',
+    href: '/forever-twins/',
+    cta: 'Preserve yours',
+    tone: 'twins'
+  })
+]);
+
 export const HOMEPAGE_OBJECTS = Object.freeze([
   {
     id: 'music-history',
@@ -206,6 +231,9 @@ const isNavigableHref = (href) =>
 
 export const validateHomepageContent = () => {
   const errors = [];
+  if (!hasUniqueIds(HOMEPAGE_CAMPAIGN_BANNERS)) {
+    errors.push('Homepage campaign banner ids must be unique.');
+  }
   if (!hasUniqueIds(HOMEPAGE_OBJECTS)) {
     errors.push('Homepage object ids must be unique.');
   }
@@ -215,6 +243,16 @@ export const validateHomepageContent = () => {
   if (!hasUniqueIds(HOMEPAGE_ACTIVITY_DOORS)) {
     errors.push('Homepage activity ids must be unique.');
   }
+  HOMEPAGE_CAMPAIGN_BANNERS.forEach((item) => {
+    if (
+      !item.title ||
+      !item.description ||
+      !item.artwork ||
+      !isNavigableHref(item.href)
+    ) {
+      errors.push(`Homepage campaign banner ${item.id} is missing required content.`);
+    }
+  });
   HOMEPAGE_OBJECTS.forEach((item) => {
     if (!item.title || !item.description || !isNavigableHref(item.href)) {
       errors.push(`Homepage object ${item.id} is missing required content.`);

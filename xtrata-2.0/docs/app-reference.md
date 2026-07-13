@@ -48,6 +48,7 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 ## Public homepage
 
 - The root `index.html` carries the public homepage markup and shell, with behavior and styling in `src/home/*`, including homepage wallet connect, inscription preparation, transaction logs, viewer grid, token preview, examples, explorer mode, and the persistent Wizard tab.
+- `src/home/homepage-content.js` keeps the compact top campaign rail in `HOMEPAGE_CAMPAIGN_BANNERS`; Suno More and Forever Twins are intentionally permanent while their campaigns are active. `src/home/homepage.js` renders and instruments those banners before the living-object hero.
 - Treat `src/PublicApp.tsx`/`src/SimplePublicHome.tsx` as React public-app references or alternate surfaces, not the only homepage implementation. If a requested change affects public homepage behavior or wording, make the effective change in `index.html` and mirror it in React modules only when those modules still expose the same user-facing surface.
 - For inscription UX changes, keep the homepage inline mint flow aligned with `src/screens/MintScreen.tsx`: preserve begin -> batch/chunk -> seal order, keep resume/recovery messaging consistent, and do not hide errors.
 

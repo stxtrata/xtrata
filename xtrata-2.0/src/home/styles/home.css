@@ -4607,6 +4607,7 @@
     }
 
     .radio-slot {
+      flex: 0 0 auto;
       margin-left: auto;
       display: flex;
       align-items: center;
@@ -4936,6 +4937,126 @@
     .text-button:hover {
       color: var(--green);
       text-decoration: none;
+    }
+
+    /* Compact campaign rail: ongoing launches stay one click from the top
+       without displacing the Living Archive hero as the main story. */
+    .campaign-rail {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .campaign-banner {
+      --campaign-accent: 185, 239, 119;
+      position: relative;
+      isolation: isolate;
+      display: grid;
+      grid-template-columns: 58px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 13px;
+      min-height: 88px;
+      padding: 12px 14px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      color: var(--ink);
+      text-decoration: none;
+      transition: border-color 0.16s ease, transform 0.16s ease;
+    }
+
+    .campaign-banner::before {
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      background:
+        radial-gradient(circle at 0 0, rgba(var(--campaign-accent), 0.17), transparent 48%),
+        linear-gradient(110deg, rgba(var(--campaign-accent), 0.035), transparent 58%);
+      content: '';
+    }
+
+    .campaign-banner--suno {
+      --campaign-accent: 178, 121, 255;
+    }
+
+    .campaign-banner--twins {
+      --campaign-accent: 67, 199, 231;
+    }
+
+    .campaign-banner:hover {
+      border-color: rgba(var(--campaign-accent), 0.72);
+      color: var(--ink);
+      transform: translateY(-1px);
+    }
+
+    .campaign-banner:focus-visible {
+      outline: 2px solid rgba(var(--campaign-accent), 0.9);
+      outline-offset: 3px;
+    }
+
+    .campaign-banner__art {
+      width: 58px;
+      height: 58px;
+      border: 1px solid rgba(var(--campaign-accent), 0.28);
+      border-radius: 12px;
+      background: #07090d;
+      object-fit: contain;
+    }
+
+    .campaign-banner__body {
+      display: grid;
+      min-width: 0;
+    }
+
+    .campaign-banner__kicker {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 8.5px;
+      font-weight: 900;
+      letter-spacing: 0.105em;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .campaign-banner__pulse {
+      flex: none;
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: rgb(var(--campaign-accent));
+      box-shadow: 0 0 12px rgba(var(--campaign-accent), 0.75);
+    }
+
+    .campaign-banner__title {
+      margin-top: 3px;
+      overflow: hidden;
+      font-size: 17px;
+      letter-spacing: -0.025em;
+      line-height: 1.05;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .campaign-banner__copy {
+      margin-top: 4px;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 10.5px;
+      line-height: 1.3;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .campaign-banner__cta {
+      color: rgb(var(--campaign-accent));
+      font-size: 10.5px;
+      font-weight: 900;
+      white-space: nowrap;
     }
 
     .living-hero.registry-intro {
@@ -5953,7 +6074,27 @@
       }
     }
 
+    @media (max-width: 760px) {
+      .campaign-rail {
+        grid-template-columns: 1fr;
+      }
+    }
+
     @media (max-width: 600px) {
+      .campaign-banner {
+        grid-template-columns: 52px minmax(0, 1fr);
+        min-height: 80px;
+      }
+
+      .campaign-banner__art {
+        width: 52px;
+        height: 52px;
+      }
+
+      .campaign-banner__cta {
+        display: none;
+      }
+
       .living-hero.registry-intro {
         gap: 38px;
         margin-top: 12px;

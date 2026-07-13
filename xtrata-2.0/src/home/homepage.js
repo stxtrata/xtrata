@@ -1,5 +1,6 @@
 import {
   HOMEPAGE_ACTIVITY_DOORS,
+  HOMEPAGE_CAMPAIGN_BANNERS,
   HOMEPAGE_CAMPAIGN,
   HOMEPAGE_INTENTS,
   HOMEPAGE_OBJECTS,
@@ -66,6 +67,48 @@ const createPreview = (preview, options = {}) => {
   const metadata = element('span', 'object-preview__meta', preview.label);
   frame.append(metadata);
   return frame;
+};
+
+const renderCampaignBanners = () => {
+  const mount = document.getElementById('campaignBannerList');
+  if (!mount) {
+    return;
+  }
+  mount.replaceChildren();
+  HOMEPAGE_CAMPAIGN_BANNERS.forEach((item) => {
+    const banner = actionLink(
+      item.href,
+      '',
+      `campaign-banner campaign-banner--${item.tone}`,
+      `campaign_banner:${item.id}`
+    );
+    banner.dataset.campaignId = item.id;
+    banner.dataset.campaignStatus = item.status;
+
+    const image = document.createElement('img');
+    image.className = 'campaign-banner__art';
+    image.src = item.artwork;
+    image.alt = `${item.title} campaign artwork`;
+    image.decoding = 'async';
+
+    const body = element('span', 'campaign-banner__body');
+    const kicker = element('span', 'campaign-banner__kicker');
+    kicker.append(
+      element('span', 'campaign-banner__pulse'),
+      document.createTextNode(item.eyebrow)
+    );
+    body.append(
+      kicker,
+      element('strong', 'campaign-banner__title', item.title),
+      element('span', 'campaign-banner__copy', item.description)
+    );
+    banner.append(
+      image,
+      body,
+      element('span', 'campaign-banner__cta', `${item.cta} →`)
+    );
+    mount.append(banner);
+  });
 };
 
 const renderHeroStage = () => {
@@ -216,6 +259,7 @@ export const initHomepage = () => {
   if (contentErrors.length > 0) {
     console.warn('[xtrata-homepage] invalid content configuration', contentErrors);
   }
+  renderCampaignBanners();
   renderHeroStage();
   renderObjects();
   renderIntents();

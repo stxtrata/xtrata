@@ -31,6 +31,12 @@ Result: ~980 MB → ~40 MB of source. Built `dist/` output verified identical (s
 - Market and Drops links now use the same client-side tab switching as the other shell pages, which also prevents an active Wizard frame from being torn down when those tabs are opened.
 - Added focused route tests in `src/home/__tests__/page-mode.test.ts`.
 
+## Active campaign rail (session 2026-07-13)
+
+- Restored Suno More and Forever Twins as compact, configurable banners immediately below the primary navigation, keeping both active campaigns one click from the top without replacing the new Living Archive hero.
+- Moved the advanced creation entry beside Create and renamed it from `Wizard` to `Creation Wizard`, making the relationship between the simple and guided creation routes explicit.
+- Added campaign-banner validation and regression coverage in the homepage content tests; campaign interactions use the existing homepage action event/data-layer instrumentation.
+
 ## Duplication removed
 
 - `PEPE_ESCROW_RESOLVERS` (homepage) is no longer a hand-synced copy of `src/lib/twins/registry.ts`. It is now derived from `FOREVER_TWIN_COLLECTIONS` plus a small `TWIN_HOLDER_LABELS` override map. Adding a Forever Twins collection now requires only the registry entry (AGENTS.md step 2 "mirror in index.html" is obsolete). Equivalence to the original literal proven by test.
