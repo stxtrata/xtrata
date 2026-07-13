@@ -3951,7 +3951,8 @@
     :root[data-page='xplorer'] .site-nav a[data-nav='xplorer'],
     :root[data-page='my-wallet'] .site-nav a[data-nav='my-wallet'],
     :root[data-page='market'] .site-nav a[data-nav='market'],
-    :root[data-page='drops'] .site-nav a[data-nav='drops'] {
+    :root[data-page='drops'] .site-nav a[data-nav='drops'],
+    :root[data-page='wizard'] .site-nav a[data-nav='wizard'] {
       color: var(--ink);
       background: var(--panel);
       border-color: var(--line);
@@ -4017,6 +4018,79 @@
     /* Home: landing only — hide the workspace panels. */
     :root[data-page='home'] .workspace {
       display: none;
+    }
+
+    /* Wizard: the full inscription flow mounted inside the shared site shell. */
+    .wizard-shell {
+      display: none;
+      padding-top: 18px;
+    }
+
+    :root[data-page='wizard'] .wizard-shell {
+      display: block;
+    }
+
+    :root[data-page='wizard'] .workspace,
+    :root[data-page='wizard'] .homepage-docs {
+      display: none;
+    }
+
+    .wizard-shell__head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 18px 20px;
+      border: 1px solid var(--line);
+      border-bottom: 0;
+      border-radius: var(--radius) var(--radius) 0 0;
+      background: var(--panel);
+    }
+
+    .wizard-shell__head h1 {
+      margin: 5px 0 3px;
+      font-size: clamp(24px, 3vw, 36px);
+      letter-spacing: -0.045em;
+      line-height: 1;
+    }
+
+    .wizard-shell__head p {
+      max-width: 680px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .wizard-shell__head .btn {
+      flex: none;
+      text-decoration: none;
+    }
+
+    .wizard-shell__frame {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 0 0 var(--radius) var(--radius);
+      background: var(--bg);
+      box-shadow: var(--shadow);
+    }
+
+    .wizard-shell__frame iframe {
+      display: block;
+      width: 100%;
+      height: max(720px, calc(100dvh - 250px));
+      border: 0;
+      background: transparent;
+    }
+
+    @media (max-width: 640px) {
+      .wizard-shell__head {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .wizard-shell__frame iframe {
+        height: max(680px, calc(100dvh - 300px));
+      }
     }
 
     /* Inscribe: the inscribe panel alone, centred. */

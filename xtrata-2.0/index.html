@@ -12,10 +12,11 @@
   <link rel="icon" type="image/png" sizes="16x16" href="/favicons/xtrata-favicon-16.png" />
   <link rel="apple-touch-icon" href="/favicons/xtrata-apple-touch-icon.png" />
   <script>
-    // Page-mode router: one shell, four pages. Classifies the URL before first
+    // Page-mode router: one shell, all primary tabs. Classifies the URL before first
     // paint so CSS can show only the panels that belong to this page.
     //   /            → home (landing: intro, mode cards, docs)
     //   /inscribe    → inscribe panel only (also ?handoff= from the Opus tool)
+    //   /inscribe?wizard=1 → advanced Wizard inside the shared shell
     //   /xplorer /x/ → explorer (existing explorer-mode behaviour)
     //   /my-wallet   → wallet inscriptions panel (lookup, grid, transfers)
     (() => {
@@ -32,7 +33,9 @@
       const publicView =
         params.has('wallet') || params.has('showcase') || params.has('gallery');
       let page = 'home';
-      if (seg === 'inscribe' || opusHandoff) {
+      if (seg === 'inscribe' && params.get('wizard') === '1') {
+        page = 'wizard';
+      } else if (seg === 'inscribe' || opusHandoff) {
         page = 'inscribe';
       } else if (seg === 'my-wallet' || seg === 'wallet') {
         page = 'my-wallet';
@@ -46,6 +49,7 @@
       document.documentElement.dataset.page = page;
       const titles = {
         inscribe: 'Inscribe — Xtrata',
+        wizard: 'Inscription Wizard — Xtrata',
         'my-wallet': 'My Wallet — Xtrata',
         xplorer: 'Xtrata Xplorer',
         market: 'Market — Xtrata',
@@ -90,7 +94,7 @@
       <a href="/drops" data-nav="drops" target="_self">Claim</a>
       <a href="/market" data-nav="market" target="_self">Collect</a>
       <a href="/my-wallet" data-nav="my-wallet" target="_self">My Xtrata</a>
-      <a href="/wizard/" data-nav="wizard" target="_self">Wizard</a>
+      <a href="/inscribe?wizard=1" data-nav="wizard" target="_self">Wizard</a>
       <a href="/#build" data-nav="build" target="_self">Build</a>
       <div class="radio-slot" id="radioSlot" aria-label="Xtrata FM radio"></div>
     </nav>
@@ -235,6 +239,25 @@
         <a class="btn secondary" href="/drops" target="_self" data-home-action="final:drop">Launch a free drop</a>
         <a class="btn secondary" href="/xplorer" target="_self" data-home-action="final:explore">Explore Xtrata</a>
         <a class="btn secondary" href="/#build" target="_self" data-home-action="final:build">Build with the SDK</a>
+      </div>
+    </section>
+
+    <section class="wizard-shell" aria-labelledby="wizardShellTitle">
+      <div class="wizard-shell__head">
+        <div>
+          <span class="section-kicker">Advanced creation</span>
+          <h1 id="wizardShellTitle">Inscription Wizard</h1>
+          <p>Drop a file, review the result, pay once, and follow it through to inscription.</p>
+        </div>
+        <a class="btn secondary" href="/wizard/" target="_blank" rel="noopener noreferrer">Open standalone ↗</a>
+      </div>
+      <div class="wizard-shell__frame">
+        <iframe
+          id="wizardFrame"
+          data-src="/wizard/?embed=1"
+          title="Xtrata Inscription Wizard"
+          allow="clipboard-write"
+        ></iframe>
       </div>
     </section>
 

@@ -43,10 +43,11 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 - `src/styles/app.css` owns layout tokens, widths, grid sizing, square preview frames, and global layout rules.
 - `src/main.tsx` boots the app and wires providers (React Query) and global CSS.
 - `src/lib/theme/preferences.ts` owns theme mode catalog/persistence and document-level theme application.
+- `src/home/page-mode.js` owns shared page-mode route helpers. The Wizard tab uses `/inscribe?wizard=1` so the public shell remains mounted, then lazily mounts the canonical `/wizard/?embed=1` app in a persistent iframe. Embedded mode hides the Wizard's duplicate header/footer and follows the shell theme and wallet-session storage.
 
 ## Public homepage
 
-- The root `index.html` now carries the public homepage UI directly with inline styles and scripts, including homepage wallet connect, inscription preparation, transaction logs, viewer grid, token preview, examples, and explorer mode.
+- The root `index.html` carries the public homepage markup and shell, with behavior and styling in `src/home/*`, including homepage wallet connect, inscription preparation, transaction logs, viewer grid, token preview, examples, explorer mode, and the persistent Wizard tab.
 - Treat `src/PublicApp.tsx`/`src/SimplePublicHome.tsx` as React public-app references or alternate surfaces, not the only homepage implementation. If a requested change affects public homepage behavior or wording, make the effective change in `index.html` and mirror it in React modules only when those modules still expose the same user-facing surface.
 - For inscription UX changes, keep the homepage inline mint flow aligned with `src/screens/MintScreen.tsx`: preserve begin -> batch/chunk -> seal order, keep resume/recovery messaging consistent, and do not hide errors.
 

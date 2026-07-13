@@ -6,6 +6,11 @@
 <title>Xtrata — Inscription Wizard</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="apple-touch-icon" href="/favicons/xtrata-apple-touch-icon.png" />
+<script>
+  if (new URLSearchParams(window.location.search).get('embed') === '1') {
+    document.documentElement.dataset.embed = 'true';
+  }
+</script>
 <style>
   :root {
     color-scheme: dark;
@@ -402,11 +407,29 @@
   .legend{display:flex;gap:14px;font-size:11px;color:var(--mut);margin-top:8px}
   .dot{display:inline-block;width:9px;height:9px;border-radius:3px;vertical-align:middle;margin-right:5px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  html[data-embed="true"] body{min-height:100%;background:transparent}
+  html[data-embed="true"] header,html[data-embed="true"] footer{display:none}
+  html[data-embed="true"] main{padding:20px 20px 56px}
+  html[data-embed="true"] .wrap{max-width:860px}
   @media(max-width:840px){.grid2{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-<script>try{var _t=(localStorage.getItem('xtrata.theme.mode')||'').trim().toLowerCase();var _ok=["classic", "terminal", "midnight", "neon", "monochrome", "obsidian", "ember", "ultraviolet", "arctic", "ruby"];document.body.dataset.theme=_ok.indexOf(_t)>=0?_t:'monochrome';}catch(e){document.body.dataset.theme='monochrome';}</script>
+<script>
+  (function(){
+    var valid=["classic","terminal","midnight","neon","monochrome","obsidian","ember","ultraviolet","arctic","ruby"];
+    var apply=function(value){
+      var theme=String(value||'').trim().toLowerCase();
+      document.body.dataset.theme=valid.indexOf(theme)>=0?theme:'monochrome';
+    };
+    try{
+      apply(localStorage.getItem('xtrata.simple-homepage.theme')||localStorage.getItem('xtrata.theme.mode'));
+    }catch(e){ apply('monochrome'); }
+    window.addEventListener('storage',function(event){
+      if(event.key==='xtrata.simple-homepage.theme') apply(event.newValue);
+    });
+  })();
+</script>
 <header>
   <a href="/" title="Xtrata home" style="flex:none;display:block"><img src="favicon.svg" alt="Xtrata" style="width:30px;height:30px;border-radius:8px;display:block" /></a>
   <div>
@@ -735,6 +758,10 @@ $('#walletAddr').onclick=walletPillClick;
 // this whole script evaluates — setWallet() calls checkParents()/checkBatchParents(),
 // which reference BATCH / parentsCheckRun declared further down (TDZ ReferenceError otherwise).
 queueMicrotask(()=>{ try{ const w=xtrataWallet(); const a=w&&w.getAddress&&w.getAddress(); if(a) setWallet(a); }catch{} });
+window.addEventListener('storage',(event)=>{
+  if(event.key!=='xtrata.v15.1.wallet.session') return;
+  try{ const w=xtrataWallet(); const a=w&&w.getAddress&&w.getAddress(); setWallet(a||null); }catch{ setWallet(null); }
+});
 
 // ---- category/type autodetect ----
 const catSel=$('#category'), ftSel=$('#ftype');
@@ -1677,6 +1704,13 @@ function toWizard(id){ const n=nodeById(id); const deps=G.edges.filter(e=>e.f===
 window.showNode=showNode; window.delNode=delNode; window.toWizard=toWizard;
 drawGraph();
 </script>
-<script src="/xtrata-radio.js" defer></script>
+<script>
+  if(document.documentElement.dataset.embed!=='true'){
+    const radioScript=document.createElement('script');
+    radioScript.src='/xtrata-radio.js';
+    radioScript.defer=true;
+    document.body.append(radioScript);
+  }
+</script>
 </body>
 </html>

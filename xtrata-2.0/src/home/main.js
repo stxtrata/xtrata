@@ -39,6 +39,10 @@
       PEPE_ESCROW_RESOLVERS
     } from '/src/home/config.js';
     import { initXtrataRadio } from '/src/home/radio.js';
+    import {
+      isWizardShellRequest,
+      WIZARD_EMBED_ROUTE
+    } from '/src/home/page-mode.js';
     import { showContractCall } from '/src/lib/wallet/connect.ts';
     import {
       CONTRACT_REGISTRY,
@@ -224,7 +228,7 @@
     const $ = (id) => document.getElementById(id);
 
     // Page mode classified pre-paint by the router script in index.html <head>.
-    // 'home' | 'inscribe' | 'xplorer' | 'my-wallet' — controls which panels are
+    // Primary tab page modes control which panels are
     // visible (CSS) and which data loads run (see initialize/switchToPage).
     // Mutable: nav clicks switch pages CLIENT-SIDE (SPA-style tabs) so the
     // radio and wallet session are never torn down between site pages.
@@ -233,6 +237,7 @@
     const PAGE_TITLES = {
       home: 'Xtrata — Create something the internet cannot forget',
       inscribe: 'Inscribe — Xtrata',
+      wizard: 'Inscription Wizard — Xtrata',
       xplorer: 'Xtrata Xplorer',
       'my-wallet': 'My Wallet — Xtrata',
       market: 'Market — Xtrata',
@@ -252,6 +257,7 @@
       connectButton: $('connectButton'),
       disconnectButton: $('disconnectButton'),
       viewInscriptionsButton: $('viewInscriptionsButton'),
+      wizardFrame: $('wizardFrame'),
       networkBadge: $('networkBadge'),
       mintSubtitle: $('mintSubtitle'),
       walletTitle: $('walletTitle'),
@@ -9811,10 +9817,20 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
     };
 
-    // SPA tab switching: the four site pages share this shell, so nav clicks
+    // SPA tab switching: the primary site pages share this shell, so nav clicks
     // just swap the page mode and run that page's loads — no reload, and the
     // radio, wallet session and caches all survive the switch.
     let pageSwitchRun = 0;
+
+    const ensureWizardFrame = () => {
+      if (!dom.wizardFrame || dom.wizardFrame.getAttribute('src')) {
+        return;
+      }
+      dom.wizardFrame.setAttribute(
+        'src',
+        dom.wizardFrame.dataset.src || WIZARD_EMBED_ROUTE
+      );
+    };
 
     // ------------------------------------------------------------------
     // Market page: multi-asset inscription marketplace (homepage-native).
@@ -11538,6 +11554,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       document.documentElement.dataset.page = page;
       document.title = PAGE_TITLES[page] ?? PAGE_TITLES.home;
       window.scrollTo({ top: 0 });
+      if (page === 'wizard') {
+        // Load once, then leave the frame mounted while users visit other tabs.
+        // This preserves dropped files, active jobs, and progress in the Wizard.
+        ensureWizardFrame();
+      }
       if (page === 'xplorer') {
         if (params && (await openPublicViewFromParams(params))) {
           if (run === pageSwitchRun) {
@@ -11557,7 +11578,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       // suppressing the other pages' panels.
       state.explorerMode = false;
       state.explorerInitialTokenId = null;
-      if (page === 'home' || page === 'inscribe') {
+      if (page === 'home' || page === 'inscribe' || page === 'wizard') {
         state.curatedGalleryId = null;
         state.curatedGalleryTitle = null;
         state.homeLatestView = false;
@@ -11579,6 +11600,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
     const classifyPath = (pathname, params) => {
       const seg = (pathname.split('/').filter(Boolean)[0] || '').toLowerCase();
+      if (isWizardShellRequest(pathname, params)) {
+        return 'wizard';
+      }
       if (seg === 'inscribe' || params.has('handoff') || params.has('handoffId')) {
         return 'inscribe';
       }
@@ -11609,6 +11633,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
     const initialize = async () => {
       applyTheme(loadTheme());
+      if (PAGE_MODE === 'wizard') {
+        ensureWizardFrame();
+      }
       setExplorerModeFromRequest();
       const pageParams = new URLSearchParams(window.location.search);
       const requestedGallery = pageParams.get('gallery')?.trim() || null;
@@ -11658,7 +11685,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           walletViewRequestId === state.walletViewRequestId &&
           !consumedHandoff
         ) {
-          // Home and inscribe skip the grid preload — their pages hide the
+          // Home, inscribe, and Wizard skip the grid preload — their pages hide the
           // wallet panel entirely.
           await openMyWalletDefaultView();
         }
@@ -11679,7 +11706,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     });
     dom.disconnectButton.addEventListener('click', disconnectWallet);
     dom.viewInscriptionsButton.addEventListener('click', () => {
-      if (PAGE_MODE === 'home' || PAGE_MODE === 'inscribe') {
+      if (PAGE_MODE === 'home' || PAGE_MODE === 'inscribe' || PAGE_MODE === 'wizard') {
         // The wallet grid lives on its own tab now.
         window.history.pushState(null, '', '/my-wallet');
         void switchToPage('my-wallet');
@@ -12297,7 +12324,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
     // SPA tab navigation: same-tab site links (nav, cards, example chips)
     // switch pages client-side — the radio and wallet session never restart.
-    // Links outside the four page modes (/wizard, /g/…, static apps) navigate
+    // Links outside the shell page modes (/wizard, /g/…, static apps) navigate
     // normally, as do modified-clicks (new tab/window).
     document.addEventListener('click', (event) => {
       if (
@@ -12320,7 +12347,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const seg = (url.pathname.split('/').filter(Boolean)[0] || '').toLowerCase();
       const isSitePagePath =
         url.pathname === '/' ||
-        ['inscribe', 'my-wallet', 'wallet', 'xplorer', 'x'].includes(seg);
+        ['inscribe', 'my-wallet', 'wallet', 'xplorer', 'x', 'market', 'drops'].includes(seg);
       if (!isSitePagePath) {
         return; // /wizard, /g/…, docs, static apps → real navigation
       }

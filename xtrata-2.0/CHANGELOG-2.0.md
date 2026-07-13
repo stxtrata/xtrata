@@ -23,6 +23,14 @@ Result: ~980 MB → ~40 MB of source. Built `dist/` output verified identical (s
 - Added the object lifecycle, flagship stories, public-creation flywheel, later-stage technical foundation, builder entry, and final invitation. All new motion respects `prefers-reduced-motion`; responsive layouts collapse at 1060/820/600px.
 - Added focused validation tests in `src/home/__tests__/homepage-content.test.ts` for configuration completeness, unique ids, real navigable routes, and inscription-backed previews.
 
+## Wizard shell integration (session 2026-07-13)
+
+- Changed the Wizard nav target from the standalone `/wizard/` page to a first-class shell mode at `/inscribe?wizard=1`, so the Xtrata header, wallet controls, navigation tabs, radio, footer, and selected visual theme remain available.
+- The canonical Wizard is lazy-mounted once at `/wizard/?embed=1` and kept alive while switching tabs, preserving selected files and active progress without adding the heavy Wizard bundle to ordinary homepage loads.
+- Embedded mode hides the duplicate Wizard header/footer and radio, follows the shell theme, and watches the shared wallet-session key so parent-shell connect/disconnect changes are reflected inside the Wizard.
+- Market and Drops links now use the same client-side tab switching as the other shell pages, which also prevents an active Wizard frame from being torn down when those tabs are opened.
+- Added focused route tests in `src/home/__tests__/page-mode.test.ts`.
+
 ## Duplication removed
 
 - `PEPE_ESCROW_RESOLVERS` (homepage) is no longer a hand-synced copy of `src/lib/twins/registry.ts`. It is now derived from `FOREVER_TWIN_COLLECTIONS` plus a small `TWIN_HOLDER_LABELS` override map. Adding a Forever Twins collection now requires only the registry entry (AGENTS.md step 2 "mirror in index.html" is obsolete). Equivalence to the original literal proven by test.
