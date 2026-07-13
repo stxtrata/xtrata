@@ -60,6 +60,27 @@ export type MigrationQuote = {
   }>;
 };
 
+export type MigrationAvailability = {
+  directHoldingsComplete: boolean;
+  marketDiscoveryComplete: boolean;
+  quoteReady: boolean;
+  portfolioComplete: boolean;
+};
+
+export const getMigrationAvailability = (params: {
+  directHoldingsComplete: boolean;
+  marketDiscoveryComplete: boolean;
+  protocolFeeAvailable: boolean;
+}): MigrationAvailability => ({
+  directHoldingsComplete: params.directHoldingsComplete,
+  marketDiscoveryComplete: params.marketDiscoveryComplete,
+  // Market discovery can reveal additional escrowed inscriptions, but it cannot
+  // invalidate an authoritative direct holding. A direct-only quote is usable
+  // once the holdings/status scan and live fee read have both completed.
+  quoteReady: params.directHoldingsComplete && params.protocolFeeAvailable,
+  portfolioComplete: params.directHoldingsComplete && params.marketDiscoveryComplete
+});
+
 export const parseMigrationTokenId = (repr: string | undefined): bigint | null => {
   const match = String(repr ?? '')
     .trim()

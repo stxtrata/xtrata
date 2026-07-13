@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildMigrationQuote,
+  getMigrationAvailability,
   mergeEscrowedMigrationItems,
   parseMigrationTokenId,
   scanMigrationHoldings,
@@ -133,5 +134,28 @@ describe('migration quote helpers', () => {
         estimatedTotalMicroStx: 210_000n
       }
     ]);
+  });
+
+  it('keeps a direct-holdings quote actionable when market discovery is incomplete', () => {
+    expect(
+      getMigrationAvailability({
+        directHoldingsComplete: true,
+        marketDiscoveryComplete: false,
+        protocolFeeAvailable: true
+      })
+    ).toEqual({
+      directHoldingsComplete: true,
+      marketDiscoveryComplete: false,
+      quoteReady: true,
+      portfolioComplete: false
+    });
+
+    expect(
+      getMigrationAvailability({
+        directHoldingsComplete: false,
+        marketDiscoveryComplete: true,
+        protocolFeeAvailable: true
+      }).quoteReady
+    ).toBe(false);
   });
 });

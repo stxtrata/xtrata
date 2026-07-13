@@ -4,6 +4,7 @@ import { getApiBaseUrls } from './lib/network/config';
 import { parseGetBeginFeeUnit } from './lib/protocol/parsers';
 import {
   buildMigrationQuote,
+  getMigrationAvailability,
   mergeEscrowedMigrationItems,
   parseMigrationTokenId,
   scanMigrationHoldings,
@@ -104,6 +105,7 @@ type State = {
   busyId: string | null;
   busyPhase: 'signing' | 'confirming' | null;
   scanning: boolean;
+  marketScanning: boolean;
   scanRun: number;
   hasScanned: boolean;
   owned: number;
@@ -122,6 +124,7 @@ const state: State = {
   busyId: null,
   busyPhase: null,
   scanning: false,
+  marketScanning: false,
   scanRun: 0,
   hasScanned: false,
   owned: 0,
@@ -191,9 +194,10 @@ const loadProtocolFee = async () => {
 
 const fetchSellerEscrowedTokens = async (address: string) => {
   const response = await fetch(`/market/listings?seller=${encodeURIComponent(address)}`);
-  if (!response.ok) throw new Error(`Market listing lookup failed (${response.status}).`);
-  const payload = (await response.json()) as {
+  const payload = (await response.json().catch(() => ({}))) as {
     degraded?: boolean;
+    message?: string;
+    failedMarkets?: Array<{ contractId?: string; label?: string }>;
     listings?: Array<{
       seller?: string;
       nftContract?: string;
@@ -201,9 +205,17 @@ const fetchSellerEscrowedTokens = async (address: string) => {
       soldAt?: string | number | null;
     }>;
   };
-  if (payload.degraded) throw new Error('Market listing lookup is temporarily degraded.');
+  const failedMarketLabels = (payload.failedMarkets ?? []).map(
+    (market) => market.label || market.contractId || 'Unknown market'
+  );
+  if (!response.ok) {
+    const failedDetail = failedMarketLabels.length
+      ? ` Failed: ${failedMarketLabels.join(', ')}.`
+      : '';
+    throw new Error(`Market listing lookup failed (${response.status}).${failedDetail}`);
+  }
   const normalizedAddress = address.toUpperCase();
-  return (payload.listings ?? []).flatMap((listing) => {
+  const tokens = (payload.listings ?? []).flatMap((listing) => {
     if (String(listing.seller ?? '').toUpperCase() !== normalizedAddress) return [];
     if (listing.soldAt !== null && listing.soldAt !== undefined) return [];
     const source = SOURCES.find(
@@ -216,6 +228,14 @@ const fetchSellerEscrowedTokens = async (address: string) => {
       return [];
     }
   });
+  return {
+    tokens,
+    warning: payload.degraded
+      ? `Some registered markets could not be checked${
+          failedMarketLabels.length ? `: ${failedMarketLabels.join(', ')}` : ''
+        }.`
+      : null
+  };
 };
 
 // Opt-in, incremental scan. It pages every known legacy source, classifies each
@@ -278,7 +298,9 @@ const scan = async () => {
     let escrowed: Array<{ sourceKey: string; tokenId: bigint }> = [];
     let listingReadError: string | null = null;
     try {
-      escrowed = await escrowPromise;
+      const marketResult = await escrowPromise;
+      escrowed = marketResult.tokens;
+      listingReadError = marketResult.warning;
     } catch (error) {
       listingReadError = error instanceof Error ? error.message : String(error);
     }
@@ -296,11 +318,14 @@ const scan = async () => {
     state.protocolFeeMicroStx = feeResult.fee;
     state.feeReadError = feeResult.error;
     state.quoteUpdatedAt = feeResult.updatedAt;
-    state.hasScanned =
-      !result.stopped && result.sourceErrors.length === 0 && !state.listingReadError;
+    state.hasScanned = !result.stopped && result.sourceErrors.length === 0;
     const summary = summarizeMigrationItems(state.items);
     if (result.stopped) {
       note('Scan stopped. Partial results are shown but no complete quote is available.');
+    } else if (listingReadError) {
+      note(
+        `Direct holdings scan complete: ${state.items.length} known legacy item${state.items.length === 1 ? '' : 's'} found; ${summary.ready} directly held and ready. Market discovery is incomplete.`
+      );
     } else {
       note(
         `Scan complete: ${state.items.length} legacy item${state.items.length === 1 ? '' : 's'} found; ${summary.ready} ready to migrate.`
@@ -313,6 +338,54 @@ const scan = async () => {
   } finally {
     if (state.scanRun === scanRun) {
       state.scanning = false;
+      render();
+    }
+  }
+};
+
+const retryMarketLookup = async () => {
+  if (
+    !state.session.isConnected ||
+    !state.session.address ||
+    !state.hasScanned ||
+    state.marketScanning ||
+    state.scanning ||
+    state.busyId
+  ) {
+    return;
+  }
+  const address = state.session.address;
+  const scanRun = state.scanRun;
+  state.marketScanning = true;
+  note('Retrying registered-market discovery…');
+  try {
+    const result = await fetchSellerEscrowedTokens(address);
+    if (state.scanRun !== scanRun || state.session.address !== address) return;
+    const nonMarketItems = state.items.filter((item) => item.status !== 'listed-escrowed');
+    state.items = mergeEscrowedMigrationItems({
+      items: nonMarketItems,
+      escrowed: result.tokens,
+      sources: SOURCES
+    });
+    state.listingReadError = result.warning;
+    const summary = summarizeMigrationItems(state.items);
+    if (result.warning) {
+      note(
+        `Market discovery remains partial. ${summary.listedEscrowed} known listed inscription${summary.listedEscrowed === 1 ? '' : 's'} excluded.`
+      );
+    } else {
+      note(
+        `Market discovery complete ✓ — ${summary.listedEscrowed} listed inscription${summary.listedEscrowed === 1 ? '' : 's'} excluded.`
+      );
+    }
+  } catch (error) {
+    if (state.scanRun === scanRun && state.session.address === address) {
+      state.listingReadError = error instanceof Error ? error.message : String(error);
+      note(`Market discovery still unavailable: ${state.listingReadError}`);
+    }
+  } finally {
+    if (state.scanRun === scanRun) {
+      state.marketScanning = false;
       render();
     }
   }
@@ -516,6 +589,7 @@ const disconnect = async () => {
   await disconnectWallet();
   state.scanRun += 1;
   state.scanning = false;
+  state.marketScanning = false;
   state.session = { isConnected: false };
   state.items = [];
   state.sourceErrors = [];
@@ -569,11 +643,21 @@ const render = () => {
           miningAllowancePerItemMicroStx: BigInt(FEE_USTX)
         })
       : null;
-  const discoveryWarnings = [
-    ...state.sourceErrors.map((error) => `${error.sourceLabel}: ${error.message}`),
-    ...(state.listingReadError ? [`Market escrow: ${state.listingReadError}`] : [])
-  ];
-  const quoteReady = state.hasScanned && quote !== null;
+  const sourceWarnings = state.sourceErrors.map(
+    (error) => `${error.sourceLabel}: ${error.message}`
+  );
+  const marketDiscoveryComplete = !state.listingReadError;
+  const availability = getMigrationAvailability({
+    directHoldingsComplete: state.hasScanned,
+    marketDiscoveryComplete,
+    protocolFeeAvailable: quote !== null
+  });
+  const quoteReady = availability.quoteReady;
+  const scanSummary = state.scanning
+    ? `⏳ Scanning direct holdings — ${state.owned} found · ${state.scanned} supported status checks · ${summary.ready} ready…`
+    : state.hasScanned
+      ? `${availability.portfolioComplete ? '✓ Complete scan' : '✓ Direct holdings complete · ⚠ Market discovery incomplete'} — ${state.owned} directly held · ${state.scanned} supported status checks · ${summary.ready} ready`
+      : `⚠ Direct-holdings scan incomplete — ${state.owned} found · ${state.scanned} supported status checks · ${summary.ready} provisionally ready`;
   app.innerHTML = `
     <section class="panel">
       <div class="toolbar">
@@ -587,19 +671,28 @@ const render = () => {
         </div>
       </div>
       <div class="row">
-        <button id="scan" ${connected && !state.busyId ? '' : 'disabled'}>${state.scanning ? 'Stop scan' : 'Scan & quote all'}</button>
-        <button id="all" ${connected && quoteReady && readyItems.length > 0 && !state.busyId && !state.scanning ? '' : 'disabled'}>Migrate all ready (sign each)</button>
-        ${BATCH_CONTRACT ? `<button id="batch" ${connected && quoteReady && readyItems.length > 0 && !state.busyId && !state.scanning ? '' : 'disabled'}>⚡ Batch migrate ${Math.min(readyItems.length, BATCH_LIMIT)} (1 signature)</button>` : ''}
+        <button id="scan" ${connected && !state.busyId && !state.marketScanning ? '' : 'disabled'}>${state.scanning ? 'Stop scan' : 'Scan & quote all'}</button>
+        <button id="all" ${connected && quoteReady && readyItems.length > 0 && !state.busyId && !state.scanning && !state.marketScanning ? '' : 'disabled'}>${state.listingReadError ? 'Migrate directly held (sign each)' : 'Migrate all ready (sign each)'}</button>
+        ${BATCH_CONTRACT ? `<button id="batch" ${connected && quoteReady && readyItems.length > 0 && !state.busyId && !state.scanning && !state.marketScanning ? '' : 'disabled'}>⚡ Batch migrate ${Math.min(readyItems.length, BATCH_LIMIT)} (1 signature)</button>` : ''}
       </div>
       <p class="hint">The scan checks both supported source cores, flags v2.1.1 as unsupported, and checks your active listings on registered Xtrata markets. Nothing is signed or funded by scanning. The quote covers tokens held directly or in those registered markets; unrelated third-party custody contracts cannot be attributed automatically. The <strong>0.005 STX</strong> amount is the mining-fee allowance per transaction; the separate protocol fee is read live from <code>${CORE}</code>.</p>
       ${
-        state.scanning || state.hasScanned || state.items.length || discoveryWarnings.length
-          ? `<p class="hint">${state.scanning ? '⏳ Scanning' : state.hasScanned ? '✓ Complete scan' : '⚠ Incomplete scan'} — ${state.owned} directly held · ${state.scanned} supported status checks · ${summary.ready} ready${state.scanning ? '…' : ''}</p>`
+        state.scanning ||
+        state.hasScanned ||
+        state.items.length ||
+        sourceWarnings.length ||
+        state.listingReadError
+          ? `<p class="hint">${scanSummary}</p>`
           : ''
       }
       ${
-        discoveryWarnings.length
-          ? `<div class="notice warning"><strong>Quote incomplete — retry the scan.</strong>${discoveryWarnings.map((warning) => `<span>${escapeHtml(warning)}</span>`).join('')}</div>`
+        sourceWarnings.length
+          ? `<div class="notice warning"><strong>Direct-holdings scan incomplete — retry the full scan.</strong>${sourceWarnings.map((warning) => `<span>${escapeHtml(warning)}</span>`).join('')}</div>`
+          : ''
+      }
+      ${
+        state.listingReadError
+          ? `<div class="notice warning"><strong>Registered-market discovery incomplete.</strong><span>${escapeHtml(state.listingReadError)}</span><span>${state.hasScanned ? `The quote and enabled migration actions cover the ${readyItems.length} inscriptions confirmed as directly held. Additional market-listed inscriptions may be missing.` : 'Complete the direct-holdings scan before relying on a quote.'}</span>${state.hasScanned ? `<button id="retry-market" class="secondary" ${state.marketScanning || state.busyId || state.scanning ? 'disabled' : ''}>${state.marketScanning ? 'Retrying markets…' : 'Retry market lookup'}</button>` : ''}</div>`
           : ''
       }
     </section>
@@ -610,7 +703,7 @@ const render = () => {
           <h2>Quote only</h2>
           <p class="hint">No temporary wallet is created and no funds are requested in this rollout.</p>
         </div>
-        <span class="status-pill ${quoteReady ? 'ready' : ''}">${quoteReady ? 'Live quote' : 'Awaiting complete scan'}</span>
+        <span class="status-pill ${quoteReady ? 'ready' : ''}">${quoteReady ? (state.listingReadError ? 'Direct holdings quote' : 'Live quote') : 'Awaiting direct scan'}</span>
       </div>
       ${
         quoteReady && quote
@@ -625,6 +718,7 @@ const render = () => {
               ? `<div class="quote-lines">${quote.bySource.map((line) => `<div><span>${escapeHtml(line.sourceLabel)} · ${line.itemCount} token${line.itemCount === 1 ? '' : 's'}</span><strong>${formatMicroStx(line.estimatedTotalMicroStx)}</strong></div>`).join('')}</div>`
               : '<p class="hint">No directly migratable inscriptions were found.</p>'
           }
+          ${state.listingReadError ? '<p class="hint"><strong>Scope:</strong> This total covers confirmed direct holdings only. Registered-market discovery is incomplete, so additional listed inscriptions are not included.</p>' : ''}
           <p class="hint">Fee read ${state.quoteUpdatedAt ? escapeHtml(new Date(state.quoteUpdatedAt).toLocaleString()) : 'during this scan'}. The protocol portion is exact at quote time; mining fees can change or require retrying. Funding, refund, service fee and refundable buffer are not included because automated funding is not enabled.</p>`
           : `<p class="hint">${
               state.feeReadError
@@ -636,6 +730,7 @@ const render = () => {
 
     <section class="panel">
       <h2>Ready to migrate (${readyItems.length})</h2>
+      ${state.listingReadError && state.hasScanned ? '<p class="hint">These inscriptions were confirmed as directly held. Market-listed inscriptions are not actionable until returned from escrow.</p>' : ''}
       <div class="grid">
         ${
           readyItems.length === 0
@@ -645,7 +740,7 @@ const render = () => {
                   (item) => `
                 <div class="tile">
                   <div><span>#${item.tokenId.toString()}</span><small>${escapeHtml(item.sourceLabel)}</small></div>
-                  <button data-source="${escapeHtml(item.sourceKey)}" data-migrate="${item.tokenId.toString()}" ${state.busyId || !quoteReady ? 'disabled' : ''}>
+                  <button data-source="${escapeHtml(item.sourceKey)}" data-migrate="${item.tokenId.toString()}" ${state.busyId || state.marketScanning || !quoteReady ? 'disabled' : ''}>
                     ${
                       state.busyId === migrationItemKey(item)
                         ? state.busyPhase === 'confirming'
@@ -662,11 +757,11 @@ const render = () => {
     </section>
 
     <section class="panel">
-      <h2>Not included in quote (${blockedItems.length})</h2>
+      <h2>${state.listingReadError ? 'Known items not included in quote' : 'Not included in quote'} (${blockedItems.length})</h2>
       <div class="blocked-list">
         ${
           blockedItems.length === 0
-            ? `<p class="hint">${state.hasScanned ? 'No blockers found.' : 'Blocked and already-migrated tokens will be explained here after scanning.'}</p>`
+            ? `<p class="hint">${state.hasScanned ? (state.listingReadError ? 'No known blockers. Additional market-held inscriptions may be missing until market discovery succeeds.' : 'No blockers found.') : 'Blocked and already-migrated tokens will be explained here after scanning.'}</p>`
             : blockedItems
                 .map(
                   (item) => `
@@ -692,6 +787,9 @@ const render = () => {
     ?.addEventListener('click', () => void connect().catch((e) => note(String(e))));
   document.getElementById('disconnect')?.addEventListener('click', () => void disconnect());
   document.getElementById('scan')?.addEventListener('click', () => void scan());
+  document
+    .getElementById('retry-market')
+    ?.addEventListener('click', () => void retryMarketLookup());
   document.getElementById('all')?.addEventListener('click', () => void migrateAll());
   document.getElementById('batch')?.addEventListener('click', () => void migrateBatch());
   app.querySelectorAll<HTMLButtonElement>('[data-migrate]').forEach((button) => {

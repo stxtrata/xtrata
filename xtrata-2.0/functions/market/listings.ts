@@ -23,7 +23,7 @@ const HIRO = 'https://api.hiro.so';
 const LISTINGS_PER_CONTRACT = 24;
 const CACHE_SECONDS = 30;
 
-type RegistryEntry = {
+export type RegistryEntry = {
   label: string;
   address: string;
   contractName: string;
@@ -37,12 +37,7 @@ type MarketEnv = Env & { HIRO_API_KEY?: string };
 const hiroHeaders = (env: MarketEnv): HeadersInit =>
   env.HIRO_API_KEY ? { 'x-api-key': env.HIRO_API_KEY } : {};
 
-const callRead = async (
-  env: MarketEnv,
-  contractId: string,
-  fn: string,
-  args: string[] = []
-) => {
+const callRead = async (env: MarketEnv, contractId: string, fn: string, args: string[] = []) => {
   const [address, name] = contractId.split('.');
   const r = await fetch(`${HIRO}/v2/contracts/call-read/${address}/${name}/${fn}`, {
     method: 'POST',
@@ -53,6 +48,26 @@ const callRead = async (
   const j = (await r.json()) as { okay?: boolean; result?: string };
   if (!j.okay || !j.result) throw new Error(`${fn} no result`);
   return cvToJSON(hexToCV(j.result));
+};
+
+// A seller lookup walks historical listing ids and must not mistake a transient
+// Hiro failure for an empty map entry. Retry once, then fail the whole market so
+// the response can be marked degraded instead of silently omitting escrow.
+const callReadWithRetry = async (
+  env: MarketEnv,
+  contractId: string,
+  fn: string,
+  args: string[] = []
+) => {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await callRead(env, contractId, fn, args);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
 };
 
 const unwrapTuple = (node: unknown): Record<string, { value: unknown }> | null => {
@@ -69,59 +84,58 @@ const unwrapTuple = (node: unknown): Record<string, { value: unknown }> | null =
     : null;
 };
 
-const readMarket = async (
+export const readMarket = async (
   env: MarketEnv,
   entry: RegistryEntry,
   seller: string | null = null
 ) => {
   const contractId = `${entry.address}.${entry.contractName}`;
-  const lastJson = (await callRead(env, contractId, 'get-last-listing-id')) as {
+  const lastJson = (await callReadWithRetry(env, contractId, 'get-last-listing-id')) as {
     value?: { value?: string };
   };
   const lastId = BigInt(lastJson?.value?.value ?? 0);
   // The public market only needs the newest window. A seller wallet must scan
   // the full listing map: otherwise a still-live escrow silently disappears
   // after enough newer listings are created.
-  const floor = seller === null && lastId > BigInt(LISTINGS_PER_CONTRACT)
-    ? lastId - BigInt(LISTINGS_PER_CONTRACT)
-    : 0n;
+  const floor =
+    seller === null && lastId > BigInt(LISTINGS_PER_CONTRACT)
+      ? lastId - BigInt(LISTINGS_PER_CONTRACT)
+      : 0n;
   const listings: Record<string, unknown>[] = [];
   for (let id = lastId; id >= floor; id -= 1n) {
-    try {
-      const json = await callRead(env, contractId, 'get-listing', [cvToHex(uintCV(id))]);
-      const tuple = unwrapTuple(json);
-      if (!tuple) {
-        if (id === 0n) break;
-        continue;
-      }
-      if (seller !== null && String(tuple.seller.value) !== seller) {
-        if (id === 0n) break;
-        continue;
-      }
-      const opt = (field: string) => {
-        const raw = tuple[field]?.value as { value?: unknown } | null | undefined;
-        if (raw === null || raw === undefined) return null;
-        return String((raw as { value?: unknown }).value ?? raw);
-      };
-      listings.push({
-        contractId,
-        label: entry.label,
-        paymentTokenContractId: entry.paymentTokenContractId ?? null,
-        sponsored: entry.sponsored === true,
-        listingId: id.toString(),
-        seller: String(tuple.seller.value),
-        nftContract: String(tuple['nft-contract'].value),
-        tokenId: String(tuple['token-id'].value),
-        price: String(tuple.price.value),
-        createdAt: tuple['created-at'] ? String(tuple['created-at'].value) : null,
-        feeBudget: tuple['fee-budget'] ? String(tuple['fee-budget'].value) : null,
-        budgetRemaining: tuple['budget-remaining'] ? String(tuple['budget-remaining'].value) : null,
-        claimed: tuple.claimed ? String(tuple.claimed.value) : null,
-        soldAt: tuple['sold-at'] ? opt('sold-at') : null
-      });
-    } catch {
-      // sparse / deleted ids
+    const json = await callReadWithRetry(env, contractId, 'get-listing', [cvToHex(uintCV(id))]);
+    const tuple = unwrapTuple(json);
+    // A successful optional-none response is a real sparse/deleted id. Network
+    // and decoding failures throw above and mark this market incomplete.
+    if (!tuple) {
+      if (id === 0n) break;
+      continue;
     }
+    if (seller !== null && String(tuple.seller.value) !== seller) {
+      if (id === 0n) break;
+      continue;
+    }
+    const opt = (field: string) => {
+      const raw = tuple[field]?.value as { value?: unknown } | null | undefined;
+      if (raw === null || raw === undefined) return null;
+      return String((raw as { value?: unknown }).value ?? raw);
+    };
+    listings.push({
+      contractId,
+      label: entry.label,
+      paymentTokenContractId: entry.paymentTokenContractId ?? null,
+      sponsored: entry.sponsored === true,
+      listingId: id.toString(),
+      seller: String(tuple.seller.value),
+      nftContract: String(tuple['nft-contract'].value),
+      tokenId: String(tuple['token-id'].value),
+      price: String(tuple.price.value),
+      createdAt: tuple['created-at'] ? String(tuple['created-at'].value) : null,
+      feeBudget: tuple['fee-budget'] ? String(tuple['fee-budget'].value) : null,
+      budgetRemaining: tuple['budget-remaining'] ? String(tuple['budget-remaining'].value) : null,
+      claimed: tuple.claimed ? String(tuple.claimed.value) : null,
+      soldAt: tuple['sold-at'] ? opt('sold-at') : null
+    });
     if (id === 0n) break;
   }
   return listings;
@@ -148,8 +162,8 @@ export const onRequestGet: PagesFunction<MarketEnv> = async (context) => {
   const perMarket = await Promise.all(
     entries.map((entry) =>
       readMarket(env, entry, seller).then(
-        (listings) => ({ ok: true as const, listings }),
-        () => ({ ok: false as const, listings: [] as Record<string, unknown>[] })
+        (listings) => ({ ok: true as const, entry, listings }),
+        () => ({ ok: false as const, entry, listings: [] as Record<string, unknown>[] })
       )
     )
   );
@@ -159,25 +173,31 @@ export const onRequestGet: PagesFunction<MarketEnv> = async (context) => {
   // results without caching them, and fail loudly when everything failed so
   // the frontend falls back to its own direct reads.
   const degraded = perMarket.some((r) => !r.ok);
+  const failedMarkets = perMarket
+    .filter((result) => !result.ok)
+    .map((result) => ({
+      contractId: `${result.entry.address}.${result.entry.contractName}`,
+      label: result.entry.label
+    }));
   if (perMarket.length > 0 && perMarket.every((r) => !r.ok)) {
     return jsonResponse(
-      { error: 'UPSTREAM_UNAVAILABLE', message: 'all market reads failed' },
+      {
+        error: 'UPSTREAM_UNAVAILABLE',
+        message: 'all market reads failed',
+        failedMarkets
+      },
       503,
       { 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' }
     );
   }
   const listings = perMarket.flatMap((r) => r.listings);
 
-  const response = jsonResponse(
-    { updatedAt: Date.now(), listings, degraded },
-    200,
-    {
-      'Cache-Control': degraded
-        ? 'no-store'
-        : `public, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS * 4}`,
-      'Access-Control-Allow-Origin': '*'
-    }
-  );
+  const response = jsonResponse({ updatedAt: Date.now(), listings, degraded, failedMarkets }, 200, {
+    'Cache-Control': degraded
+      ? 'no-store'
+      : `public, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS * 4}`,
+    'Access-Control-Allow-Origin': '*'
+  });
   if (!degraded) context.waitUntil(cache.put(cacheKey, response.clone()));
   return response;
 };
