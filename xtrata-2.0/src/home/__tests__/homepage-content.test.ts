@@ -59,4 +59,13 @@ describe('homepage content configuration', () => {
       "['inscribe', 'my-wallet', 'wallet', 'xplorer', 'x', 'drops', 'market'].includes(seg)"
     );
   });
+
+  it('hands a selected My Xtrata inscription directly to the free drop form', () => {
+    expect(indexHtml).toContain('id="dropItButton"');
+    expect(indexHtml).toContain('100% gasless for recipients');
+    expect(homeMainSource).toContain('const target = `/drops?drop=${tokenId}`');
+    expect(homeMainSource).toContain("const dropParam = params?.get?.('drop')");
+    expect(homeMainSource).toContain('openDropForToken(dropParam)');
+    expect(homeMainSource).toContain('await loadDropsPage(pageParams)');
+  });
 });
