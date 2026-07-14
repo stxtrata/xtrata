@@ -741,18 +741,40 @@ async function createBatchJob(opts: any) {
 
 async function statusJob(job: any) {
   const alreadyFunded = !!job.depositReceivedUstx;
-  const shouldPollBalance = !alreadyFunded && ['AWAITING_DEPOSIT', 'EXPIRED'].includes(job.status);
-  const bal = alreadyFunded
-    ? BigInt(job.depositReceivedUstx)
-    : shouldPollBalance
-      ? await balOf(job)
-      : 0n;
+  const shouldPollBalance = !alreadyFunded &&
+    ['AWAITING_DEPOSIT', 'EXPIRED', 'FUNDED', 'AWAITING_PARENT'].includes(job.status);
+  let bal = alreadyFunded ? BigInt(job.depositReceivedUstx) : 0n;
+  let verificationUnavailable = false;
+  if (shouldPollBalance) {
+    try {
+      bal = await balOf(job);
+      if (job.depositCheckError) {
+        delete job.depositCheckError;
+        delete job.depositCheckFailedAt;
+        writeJob(job);
+      }
+    } catch (error) {
+      const message = errMsg(error);
+      const lastFailure = Date.parse(job.depositCheckFailedAt || '') || 0;
+      if (job.depositCheckError !== message || Date.now() - lastFailure > 15000) {
+        job.depositCheckError = message;
+        job.depositCheckFailedAt = new Date().toISOString();
+        writeJob(job);
+        xaoLog(job.jobId, `deposit verification unavailable — retrying: ${message}`);
+      }
+      // Keep the job readable and retryable. A temporary Hiro/proxy outage must
+      // not masquerade as an unpaid job or make the wizard detail request fail.
+      verificationUnavailable = true;
+    }
+  }
   const funded = alreadyFunded || bal >= BigInt(job.requiredUstx);
   // Persist the first confirmed observation immediately. This makes UI reads
   // and the background watcher converge on the same durable state, prevents
   // repeat balance calls, and lets a manually funded/reloaded job resume.
   if (funded && !alreadyFunded) {
     job.depositReceivedUstx = bal.toString();
+    delete job.depositCheckError;
+    delete job.depositCheckFailedAt;
     job.fundedAt = job.fundedAt || new Date().toISOString();
     job.progress = 'deposit confirmed — queued for processing';
     job.progressAt = new Date().toISOString();
@@ -761,7 +783,7 @@ async function statusJob(job: any) {
   }
   // "Payment seen" (mempool) — UI signal only; money decisions still gate on the confirmed balance.
   let pending = false;
-  if (!funded && !MOCK && job.depositAddress && job.status === 'AWAITING_DEPOSIT') {
+  if (!funded && !verificationUnavailable && !MOCK && job.depositAddress && job.status === 'AWAITING_DEPOSIT') {
     try { const d: any = await (await hfetch(`/extended/v1/address/${job.depositAddress}/mempool?limit=10`)).json(); pending = (d.results || []).some((tx: any) => tx.token_transfer && tx.token_transfer.recipient_address === job.depositAddress); } catch {}
   }
   // Parent escrow gate — a parented job is runnable only when funded AND all parents are held.
@@ -770,7 +792,7 @@ async function statusJob(job: any) {
     try { parents = await parentsStatus(job); } catch {}
   }
   const batch = job.items ? { current: (job.batchProgress || {}).current || 0, total: job.items.length, items: job.items.map((i: any) => ({ idx: i.idx, uri: i.uri, status: i.status, tokenId: i.tokenId || null, error: i.error || null })) } : null;
-  return { jobId: job.jobId, status: job.status, depositAddress: job.depositAddress, requiredUstx: job.requiredUstx, balanceUstx: bal.toString(), funded, pending, parents, batch, tokenId: job.tokenId || null };
+  return { jobId: job.jobId, status: job.status, depositAddress: job.depositAddress, requiredUstx: job.requiredUstx, balanceUstx: bal.toString(), funded, pending, parents, batch, tokenId: job.tokenId || null, verificationUnavailable };
 }
 
 // ---------- batch mint loop (browser mirror of svc runBatchItems) ----------
@@ -1200,7 +1222,7 @@ async function watchTick() {
   // within ~8 seconds and ten jobs within ~20 seconds.
   const depositCandidates = jobs.filter((job: any) =>
     !job.depositReceivedUstx &&
-    ['AWAITING_DEPOSIT', 'EXPIRED'].includes(job.status) &&
+    ['AWAITING_DEPOSIT', 'EXPIRED', 'FUNDED', 'AWAITING_PARENT'].includes(job.status) &&
     !PROCESSING.has(job.jobId)
   );
   const depositPollBudget = new Set<string>();
@@ -1241,7 +1263,7 @@ async function watchTick() {
     if (!['AWAITING_DEPOSIT', 'FUNDED', 'EXPIRED', 'AWAITING_PARENT'].includes(j.status)) continue;
     // A job funded once counts as funded — mid-flight resumes have already spent part of the deposit.
     let funded = !!j.depositReceivedUstx;
-    if (!funded && ['AWAITING_DEPOSIT', 'EXPIRED'].includes(j.status) && !depositPollBudget.has(j.jobId)) continue;
+    if (!funded && !depositPollBudget.has(j.jobId)) continue;
     if (!funded) { try { funded = (await statusJob(j)).funded; } catch { continue; } }
     if (!funded) continue;
     // Reload-proof: restore bytes from IndexedDB; refund only after 3 consecutive failed restores.
@@ -1304,7 +1326,13 @@ async function reapTick() {
       funded: !!j.depositReceivedUstx,
       balanceUstx: String(j.depositReceivedUstx || '0')
     })),
-  getJob: async (id: string) => { const job = readJob(id); return { job: publicJob(job), status: await statusJob(job) }; },
+  getJob: async (id: string) => {
+    const job = readJob(id);
+    const status = await statusJob(job);
+    // statusJob may persist a newly observed deposit or verification warning;
+    // serialize the job afterwards so the same UI response reflects it.
+    return { job: publicJob(job), status };
+  },
   runJob: async (id: string) => { if (PROCESSING.has(id)) return { started: true, already: true }; const job = readJob(id); if (job.tokenId) return { error: 'already inscribed' }; const s = await statusJob(job); if (!s.funded) return { error: 'not funded yet' }; background(id, async () => { const j = readJob(id); j.status = 'INSCRIBING'; writeJob(j); await runInscribe(j); }); return { started: true }; },
   deliverJob: async (id: string) => { if (PROCESSING.has(id)) return { started: true, already: true }; const job = readJob(id); if (!job.tokenId) return { error: 'nothing to deliver yet' }; background(id, async () => { const j = readJob(id); j.status = 'DELIVERING'; writeJob(j); await deliver(j); }); return { started: true }; },
   recoverJob: async (id: string) => {

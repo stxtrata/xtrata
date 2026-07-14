@@ -1420,7 +1420,7 @@ async function jobsTick(){ try{ await Promise.all([
   FLOW.jobId?renderJobDetail(FLOW.jobId,$('#activeJobDetail'),true):Promise.resolve(),
   (selJob&&selJob!==FLOW.jobId)?renderJobDetail(selJob,$('#jobDetail'),false):Promise.resolve(),
 ]); }catch(e){} }
-function startJobsPoll(){ if(pollTimer)clearInterval(pollTimer); pollTimer=setInterval(jobsTick,3000); }
+function startJobsPoll(){ if(pollTimer)clearInterval(pollTimer); pollTimer=setInterval(jobsTick,5000); }
 function stopJobsPoll(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
 async function selectJob(id){ selJob=id; if(id===FLOW.jobId){ $('#jobDetail').innerHTML='<div class="muted" style="margin-top:10px">That job is live in the card above.</div>'; loadJobs(); return; } loadJobs(); renderJobDetail(id,$('#jobDetail'),false); startJobsPoll(); }
 $('#historySection').addEventListener('toggle',()=>{ if($('#historySection').open){ loadJobs(); startJobsPoll(); } else if(!FLOW.jobId){ stopJobsPoll(); } });
@@ -1504,6 +1504,7 @@ async function renderJobDetail(jobId,out,isActive){
       ${(job.refundedUstx!=null)?`<div class="kv"><span>Change refunded</span><span>${stx(job.refundedUstx||'0')}</span></div>`:''}
       ${active?`<div class="progress"><span class="spin"></span>${esc(phaseMsg||'Working…')}${job.progress?(' · '+esc(job.progress)):''} ${isActive?'<span id="progT" class="muted"></span>':''}</div>`:''}
       ${active?`<div class="muted" style="margin-top:6px;font-size:12px;color:var(--ok)">🔒 Keep this tab open while the browser-held one-shot wallet is working. If it is interrupted, reopen this page in the same browser profile; the saved recovery key remains available. Don't send another payment.</div>`:''}
+      ${showDeposit&&job.depositCheckError?`<div class="muted" style="margin-top:10px;font-size:12px;color:var(--warn)">Deposit verification is temporarily unavailable (${esc(job.depositCheckError)}). Your job, files, and recovery key are safe; checking again automatically.</div>`:''}
       ${showDeposit&&!funded?`<div class="muted" style="margin-top:10px;font-size:12px">${job.fastTrack?'Pay from your connected wallet (shown above) — it receives the inscription and any change, and processing starts automatically on arrival. Payments from any other wallet are returned to the sender.':'Waiting for your deposit — the status flips to FUNDED once it lands.'}</div>`:''}
       ${job.error?`<div class="err" style="margin-top:8px">Error: ${esc(job.error)}${!job.fastTrack?` <button class="btn ghost" onclick="act('run','${esc(job.jobId)}')" style="margin-left:8px;padding:5px 10px">Retry</button>`:''}</div>`:''}
       ${(!job.fastTrack&&(st==='AWAITING_DEPOSIT'||st==='INSCRIBED'))?`<div class="btnrow">

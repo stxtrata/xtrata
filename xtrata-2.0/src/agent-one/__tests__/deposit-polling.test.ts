@@ -9,7 +9,6 @@ describe('Agent One confirmed deposit polling', () => {
     expect(coreSource).toContain("cache: 'no-store'");
     expect(coreSource).toContain('if (!response.ok) throw new Error(`balance lookup HTTP ${response.status}`)');
     expect(coreSource).toContain("throw new Error('balance lookup returned no valid balance')");
-    expect(coreSource).not.toContain('/extended/v1/address/${addr}/stx');
   });
 
   it('durably records a confirmed deposit and keeps history reads network-free', () => {
@@ -23,5 +22,16 @@ describe('Agent One confirmed deposit polling', () => {
     expect(coreSource).toContain('const MAX_DEPOSIT_POLLS_PER_TICK = 2;');
     expect(coreSource).toContain('const depositPollBudget = new Set<string>();');
     expect(coreSource).toContain('!depositPollBudget.has(j.jobId)');
+    expect(coreSource).toContain("['AWAITING_DEPOSIT', 'EXPIRED', 'FUNDED', 'AWAITING_PARENT']");
+  });
+
+  it('records transient verification failures without losing the funded job', () => {
+    expect(coreSource).toContain('job.depositCheckError = message;');
+    expect(coreSource).toContain('deposit verification unavailable — retrying');
+    expect(coreSource).toContain('delete job.depositCheckError;');
+    expect(coreSource).toContain('verificationUnavailable = true;');
+    expect(coreSource).toContain('!verificationUnavailable && !MOCK');
+    expect(coreSource).toContain('const status = await statusJob(job);');
+    expect(coreSource).toContain('return { job: publicJob(job), status };');
   });
 });

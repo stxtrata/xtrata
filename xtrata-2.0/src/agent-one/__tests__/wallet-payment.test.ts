@@ -12,6 +12,13 @@ describe('Agent One wallet payment handoff', () => {
     expect(walletSource).toContain('onError: (error) => reject(');
   });
 
+  it('shows transient deposit verification failures as retrying, not unpaid forever', () => {
+    const html = readFileSync(new URL('index.html', wizardRoot), 'utf8');
+    expect(html).toContain('Deposit verification is temporarily unavailable');
+    expect(html).toContain('checking again automatically');
+    expect(html).toContain('setInterval(jobsTick,5000)');
+  });
+
   it('cache-busts the repaired combined wallet bundle on every wizard surface', () => {
     expect(coreSource).toContain("AGENT_BUILD = '2026-07-14.4'");
     for (const file of ['index.html', 'suno.html', 'manifests.html']) {
