@@ -46,6 +46,11 @@ const XVERSE_SIGNING_PROVIDER_IDS = [
   'xverseProviders.BitcoinProvider',
   'BitcoinProvider'
 ] as const;
+const XVERSE_MAINNET_CONNECT_PARAMS = {
+  addresses: ['stacks'],
+  network: 'Mainnet',
+  message: 'Connect to Xtrata on Stacks mainnet.'
+} as const;
 const PLACEHOLDER_COMPRESSED_PUBLIC_KEY = `02${'00'.repeat(32)}`;
 
 type WalletRpcProvider = {
@@ -802,6 +807,12 @@ const buildXverseStxTransferParams = (options: WalletStxTransferOptions) => ({
   ...(options.memo ? { memo: options.memo } : {})
 });
 
+const buildXverseConnectParams = () => ({
+  addresses: [...XVERSE_MAINNET_CONNECT_PARAMS.addresses],
+  network: XVERSE_MAINNET_CONNECT_PARAMS.network,
+  message: XVERSE_MAINNET_CONNECT_PARAMS.message
+});
+
 const requestLeatherContractCall = async (
   provider: StacksProvider,
   options: WalletContractCallOptions
@@ -951,9 +962,46 @@ const requestStxTransfer = async (
   provider: StacksProvider,
   options: WalletStxTransferOptions
 ) => {
-  const params = isSelectedXverseProvider(provider)
-    ? buildXverseStxTransferParams(options)
-    : buildStxTransferParams(options);
+  const xverse = isSelectedXverseProvider(provider);
+  if (xverse) {
+    // Xverse binds dApp permissions to the network selected when wallet_connect
+    // runs. A locally cached SP address can outlive that permission context, so
+    // refresh it explicitly before every payment. Xverse documents that this is
+    // silent when the Mainnet permission is already current and prompts only
+    // when the wallet must reconnect or switch.
+    // eslint-disable-next-line no-console
+    console.info('[wallet:stx-transfer]', {
+      stage: 'XVERSE_MAINNET_REFRESH',
+      expectedAddress: options.stxAddress ?? null
+    });
+    const connection = toWalletSession(
+      await requestWalletRpc(provider, 'wallet_connect', buildXverseConnectParams())
+    );
+    if (!connection.isConnected || !connection.address) {
+      throw Object.assign(
+        new Error('Xverse did not return a Stacks mainnet account. Reconnect Xverse on Mainnet.'),
+        { code: 'XVERSE_MAINNET_SESSION_UNAVAILABLE' }
+      );
+    }
+    if (
+      options.stxAddress &&
+      connection.address.toUpperCase() !== options.stxAddress.toUpperCase()
+    ) {
+      throw Object.assign(
+        new Error(
+          `Xverse is using ${connection.address}, but this job is locked to ${options.stxAddress}. Switch back to the original account or create a new job.`
+        ),
+        { code: 'XVERSE_ACCOUNT_CHANGED' }
+      );
+    }
+    // eslint-disable-next-line no-console
+    console.info('[wallet:stx-transfer]', {
+      stage: 'XVERSE_MAINNET_READY',
+      address: connection.address,
+      network: connection.network
+    });
+  }
+  const params = xverse ? buildXverseStxTransferParams(options) : buildStxTransferParams(options);
   const response = await requestWalletRpc(
     provider,
     'stx_transferStx',
@@ -1055,7 +1103,13 @@ const connectViaRequest = async (provider: StacksProvider) => {
     try {
       // eslint-disable-next-line no-console
       console.info('[wallet:connect]', { stage: 'REQUEST', method });
-      const response = await requestWalletRpc(provider, method);
+      const response = await requestWalletRpc(
+        provider,
+        method,
+        method === 'wallet_connect' && isSelectedXverseProvider(provider)
+          ? buildXverseConnectParams()
+          : undefined
+      );
       const session = toWalletSession(response);
       if (session.isConnected) {
         // eslint-disable-next-line no-console
@@ -1280,10 +1334,16 @@ export const connectWallet = async (params: {
 
 export const disconnectWallet = async () => {
   const provider = getStacksProvider();
-  if (provider && isLeatherProviderId(getSelectedProviderId())) {
-    for (const method of ['stx_disconnect', 'wallet_disconnect', 'disconnect', 'deactivate']) {
+  const xverse = Boolean(provider && isSelectedXverseProvider(provider));
+  if (provider && (xverse || isLeatherProviderId(getSelectedProviderId()))) {
+    const methods = xverse
+      ? ['wallet_disconnect']
+      : ['stx_disconnect', 'wallet_disconnect', 'disconnect', 'deactivate'];
+    for (const method of methods) {
       try {
-        await requestProvider(provider, method);
+        await (xverse
+          ? requestWalletRpc(provider, method)
+          : requestProvider(provider, method));
         break;
       } catch (error) {
         if (isUserCancelledError(error) || isMethodUnsupportedError(error)) {
@@ -1440,6 +1500,7 @@ export const __testing = {
   buildContractCallParams,
   buildContractDeployParams,
   buildStxTransferParams,
+  buildXverseConnectParams,
   buildXverseStxTransferParams,
   buildUnsignedSponsoredContractCall,
   connectViaRequest,

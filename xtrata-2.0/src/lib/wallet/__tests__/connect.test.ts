@@ -254,9 +254,17 @@ describe('wallet connect helpers', () => {
     const address = getAddressFromPublicKey(publicKey);
     const legacyProvider = { request: vi.fn() };
     const rpcProvider = {
-      request: vi.fn(async (method: string) => {
+      request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
         expect(method).toBe('wallet_connect');
-        return { status: 'success', result: { addresses: [{ address, publicKey }] } };
+        expect(params).toEqual({
+          addresses: ['stacks'],
+          network: 'Mainnet',
+          message: 'Connect to Xtrata on Stacks mainnet.'
+        });
+        return {
+          status: 'success',
+          result: { addresses: [{ address, publicKey, purpose: 'stacks', network: 'Mainnet' }] }
+        };
       })
     };
     window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
@@ -287,6 +295,19 @@ describe('wallet connect helpers', () => {
     };
     const rpcProvider = {
       request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
+        if (method === 'wallet_connect') {
+          expect(params).toEqual({
+            addresses: ['stacks'],
+            network: 'Mainnet',
+            message: 'Connect to Xtrata on Stacks mainnet.'
+          });
+          return {
+            status: 'success',
+            result: {
+              addresses: [{ address: ADDRESS, purpose: 'stacks', network: 'Mainnet' }]
+            }
+          };
+        }
         expect(method).toBe('stx_transferStx');
         expect(params).toMatchObject({
           recipient: ADDRESS,
@@ -320,6 +341,45 @@ describe('wallet connect helpers', () => {
     ).resolves.toMatchObject({ txId: '0xabc123' });
 
     expect(legacyProvider.request).not.toHaveBeenCalled();
+    expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual([
+      'wallet_connect',
+      'stx_transferStx'
+    ]);
+  });
+
+  it('blocks Xverse payment when its refreshed account differs from the job owner', async () => {
+    const otherAddress = 'SP1QJJVMB6NQBGMZQVDR22PADW2E3BEP61R2Z8D7V';
+    const legacyProvider = { request: vi.fn() };
+    const rpcProvider = {
+      request: vi.fn(async (method: string) => {
+        expect(method).toBe('wallet_connect');
+        return {
+          status: 'success',
+          result: {
+            addresses: [{ address: otherAddress, purpose: 'stacks', network: 'Mainnet' }]
+          }
+        };
+      })
+    };
+    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
+    (
+      window as typeof window & {
+        XverseProviders?: { StacksProvider: unknown; BitcoinProvider: unknown };
+      }
+    ).XverseProviders = {
+      StacksProvider: legacyProvider,
+      BitcoinProvider: rpcProvider
+    };
+
+    await expect(
+      __testing.requestStxTransfer(legacyProvider as never, {
+        recipient: ADDRESS,
+        amount: '2550000',
+        memo: 'Xtrata Agent One',
+        network: 'mainnet',
+        stxAddress: ADDRESS
+      })
+    ).rejects.toMatchObject({ code: 'XVERSE_ACCOUNT_CHANGED' });
     expect(rpcProvider.request).toHaveBeenCalledOnce();
   });
 

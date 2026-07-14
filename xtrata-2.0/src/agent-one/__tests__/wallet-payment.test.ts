@@ -10,6 +10,7 @@ describe('Agent One wallet payment handoff', () => {
     expect(walletSource).toContain('const sender = adapter.getSession().address;');
     expect(walletSource).toContain('...(sender ? { stxAddress: sender } : {})');
     expect(walletSource).toContain('onError: (error) => reject(');
+    expect(walletSource).toContain('Payment cancelled or blocked in wallet. No STX was sent.');
   });
 
   it('shows transient deposit verification failures as retrying, not unpaid forever', () => {
@@ -20,10 +21,10 @@ describe('Agent One wallet payment handoff', () => {
   });
 
   it('cache-busts the repaired combined wallet bundle on every wizard surface', () => {
-    expect(coreSource).toContain("AGENT_BUILD = '2026-07-14.4'");
+    expect(coreSource).toContain("AGENT_BUILD = '2026-07-14.5'");
     for (const file of ['index.html', 'suno.html', 'manifests.html']) {
       const html = readFileSync(new URL(file, wizardRoot), 'utf8');
-      expect(html).toContain('<script src="agent-one.js?v=10"></script>');
+      expect(html).toContain('<script src="agent-one.js?v=11"></script>');
     }
   });
 });

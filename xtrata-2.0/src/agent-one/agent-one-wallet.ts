@@ -125,7 +125,7 @@ const XtrataWallet = {
         ...(sender ? { stxAddress: sender } : {}),
         appDetails: { name: 'Xtrata Agent One', icon: '/favicon.ico' },
         onFinish: () => resolve(),
-        onCancel: () => resolve(),
+        onCancel: () => reject(new Error('Payment cancelled or blocked in wallet. No STX was sent.')),
         onError: (error) => reject(error instanceof Error ? error : new Error(String(error))),
       } as unknown as Parameters<typeof showStxTransfer>[0]);
     });
