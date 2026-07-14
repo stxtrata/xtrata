@@ -792,6 +792,16 @@ const buildStxTransferParams = (options: WalletStxTransferOptions) => ({
   sponsored: options.sponsored ?? false
 });
 
+// Xverse's current Sats Connect stx_transferStx contract accepts only these
+// fields. Supplying generic Stacks `network`/`address` hints makes Xverse
+// compare differently encoded network values and reject a mainnet transfer as
+// "Network mismatch".
+const buildXverseStxTransferParams = (options: WalletStxTransferOptions) => ({
+  recipient: options.recipient,
+  amount: normalizeBigIntLike(options.amount) ?? '0',
+  ...(options.memo ? { memo: options.memo } : {})
+});
+
 const requestLeatherContractCall = async (
   provider: StacksProvider,
   options: WalletContractCallOptions
@@ -941,10 +951,13 @@ const requestStxTransfer = async (
   provider: StacksProvider,
   options: WalletStxTransferOptions
 ) => {
+  const params = isSelectedXverseProvider(provider)
+    ? buildXverseStxTransferParams(options)
+    : buildStxTransferParams(options);
   const response = await requestWalletRpc(
     provider,
     'stx_transferStx',
-    buildStxTransferParams(options)
+    params
   );
   return normalizeTxResult(response);
 };
@@ -1427,6 +1440,7 @@ export const __testing = {
   buildContractCallParams,
   buildContractDeployParams,
   buildStxTransferParams,
+  buildXverseStxTransferParams,
   buildUnsignedSponsoredContractCall,
   connectViaRequest,
   extractStacksAddress,

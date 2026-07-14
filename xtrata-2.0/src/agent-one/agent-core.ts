@@ -59,7 +59,22 @@ function newWallet() { const mnemonic = generateMnemonic(wordlist, 256); return 
 async function ro(fn: string, args: any[] = []) {
   return cvToJSON(await callReadOnlyFunction({ contractAddress: CORE[0], contractName: CORE[1], functionName: fn, functionArgs: args, senderAddress: DEPLOYER, network } as any));
 }
-async function balance(addr: string): Promise<bigint> { const d = await (await hfetch(`/extended/v1/address/${addr}/stx`)).json(); return BigInt(d.balance || '0'); }
+async function balance(addr: string): Promise<bigint> {
+  // Hiro retired the v1 address balance route. Its HTTP error body has no
+  // `balance`; the old code converted that into 0 and left confirmed deposits
+  // stuck forever. Use v2, bypass short-lived browser/edge caches, and reject
+  // non-balance responses so callers retry instead of inventing zero.
+  const response = await hfetch(
+    `/extended/v2/addresses/${encodeURIComponent(addr)}/balances/stx?xao=${Date.now()}`,
+    { cache: 'no-store', headers: { accept: 'application/json', 'cache-control': 'no-cache' } }
+  );
+  if (!response.ok) throw new Error(`balance lookup HTTP ${response.status}`);
+  const d: any = await response.json();
+  if (typeof d?.balance !== 'string' || !/^\d+$/.test(d.balance)) {
+    throw new Error('balance lookup returned no valid balance');
+  }
+  return BigInt(d.balance);
+}
 async function quoteFee(sizeBytes: number, chunks: number) {
   if (MOCK) return { single: chunks <= SINGLE_MAX, protocolFee: 100000n + BigInt(chunks) * 2000n, batches: Math.max(1, Math.ceil(chunks / SINGLE_MAX)) };
   const single = chunks <= SINGLE_MAX;
@@ -203,7 +218,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-14.3';
+export const AGENT_BUILD = '2026-07-14.4';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -725,8 +740,25 @@ async function createBatchJob(opts: any) {
 }
 
 async function statusJob(job: any) {
-  const bal = await balOf(job);
-  const funded = bal >= BigInt(job.requiredUstx);
+  const alreadyFunded = !!job.depositReceivedUstx;
+  const shouldPollBalance = !alreadyFunded && ['AWAITING_DEPOSIT', 'EXPIRED'].includes(job.status);
+  const bal = alreadyFunded
+    ? BigInt(job.depositReceivedUstx)
+    : shouldPollBalance
+      ? await balOf(job)
+      : 0n;
+  const funded = alreadyFunded || bal >= BigInt(job.requiredUstx);
+  // Persist the first confirmed observation immediately. This makes UI reads
+  // and the background watcher converge on the same durable state, prevents
+  // repeat balance calls, and lets a manually funded/reloaded job resume.
+  if (funded && !alreadyFunded) {
+    job.depositReceivedUstx = bal.toString();
+    job.fundedAt = job.fundedAt || new Date().toISOString();
+    job.progress = 'deposit confirmed — queued for processing';
+    job.progressAt = new Date().toISOString();
+    writeJob(job);
+    xaoLog(job.jobId, `deposit confirmed · ${bal} µSTX`);
+  }
   // "Payment seen" (mempool) — UI signal only; money decisions still gate on the confirmed balance.
   let pending = false;
   if (!funded && !MOCK && job.depositAddress && job.status === 'AWAITING_DEPOSIT') {
@@ -1130,6 +1162,8 @@ async function autoRun(job: any) {
 
 // ---------- watcher + reaper (mirror server.mjs; run only while the tab is open) ----------
 const PROCESSING = new Set<string>();
+const MAX_DEPOSIT_POLLS_PER_TICK = 2;
+let depositPollCursor = 0;
 // AUTO-RESUME: transient failures (network, timeouts, rate limits) do NOT refund — the job parks back at
 // FUNDED/INSCRIBED and the watcher resumes exactly where it left off. Resume is safe end-to-end: staged
 // uploads continue from the on-chain index, single-tx mints are idempotent (get-id-by-hash pre-check).
@@ -1160,7 +1194,26 @@ function background(id: string, fn: () => Promise<any>) {
   });
 }
 async function watchTick() {
-  for (const j of listJobsRaw()) {
+  const jobs = listJobsRaw();
+  // Bound balance traffic independently of history size. Two deposits every
+  // four seconds keeps the Hiro minute quota healthy while checking four jobs
+  // within ~8 seconds and ten jobs within ~20 seconds.
+  const depositCandidates = jobs.filter((job: any) =>
+    !job.depositReceivedUstx &&
+    ['AWAITING_DEPOSIT', 'EXPIRED'].includes(job.status) &&
+    !PROCESSING.has(job.jobId)
+  );
+  const depositPollBudget = new Set<string>();
+  const depositPollCount = Math.min(MAX_DEPOSIT_POLLS_PER_TICK, depositCandidates.length);
+  for (let offset = 0; offset < depositPollCount; offset += 1) {
+    const index = (depositPollCursor + offset) % depositCandidates.length;
+    depositPollBudget.add(depositCandidates[index].jobId);
+  }
+  if (depositCandidates.length) {
+    depositPollCursor = (depositPollCursor + depositPollCount) % depositCandidates.length;
+  }
+
+  for (const j of jobs) {
     if (PROCESSING.has(j.jobId)) continue;
     // A page close/reload can interrupt the browser-held recovery between
     // transactions. Never strand the job in a non-actionable state: preserve
@@ -1188,6 +1241,7 @@ async function watchTick() {
     if (!['AWAITING_DEPOSIT', 'FUNDED', 'EXPIRED', 'AWAITING_PARENT'].includes(j.status)) continue;
     // A job funded once counts as funded — mid-flight resumes have already spent part of the deposit.
     let funded = !!j.depositReceivedUstx;
+    if (!funded && ['AWAITING_DEPOSIT', 'EXPIRED'].includes(j.status) && !depositPollBudget.has(j.jobId)) continue;
     if (!funded) { try { funded = (await statusJob(j)).funded; } catch { continue; } }
     if (!funded) continue;
     // Reload-proof: restore bytes from IndexedDB; refund only after 3 consecutive failed restores.
@@ -1240,7 +1294,16 @@ async function reapTick() {
   estimate: async (opts: any) => estimate({ ...opts, bytes: opts.bytes != null ? opts.bytes : (opts.file ? (opts.file as File).size : 0) }),
   createJob: async (opts: any) => (Array.isArray(opts?.items) && opts.items.length ? createBatchJob(opts) : createJob(opts)),
   estimateBatch: async (opts: any) => estimateBatch({ ...opts, itemsBytes: opts.itemsBytes ?? (opts.items || []).map((it: any) => (it.file ? (it.file as File).size : it.bytes || 0)) }),
-  listJobs: async () => Promise.all(listJobsRaw().sort((a, b) => (b.jobId > a.jobId ? 1 : -1)).map(async (j) => { let funded = false, balanceUstx = '0'; if (j.status === 'AWAITING_DEPOSIT') { try { const s = await statusJob(j); funded = s.funded; balanceUstx = s.balanceUstx; } catch {} } return { ...publicJob(j), funded, balanceUstx }; })),
+  // The history table is a local-state read. Polling every historical deposit
+  // here multiplied Hiro traffic by the number of old jobs and could exhaust
+  // the API quota before the watcher checked the live job.
+  listJobs: async () => listJobsRaw()
+    .sort((a, b) => (b.jobId > a.jobId ? 1 : -1))
+    .map((j) => ({
+      ...publicJob(j),
+      funded: !!j.depositReceivedUstx,
+      balanceUstx: String(j.depositReceivedUstx || '0')
+    })),
   getJob: async (id: string) => { const job = readJob(id); return { job: publicJob(job), status: await statusJob(job) }; },
   runJob: async (id: string) => { if (PROCESSING.has(id)) return { started: true, already: true }; const job = readJob(id); if (job.tokenId) return { error: 'already inscribed' }; const s = await statusJob(job); if (!s.funded) return { error: 'not funded yet' }; background(id, async () => { const j = readJob(id); j.status = 'INSCRIBING'; writeJob(j); await runInscribe(j); }); return { started: true }; },
   deliverJob: async (id: string) => { if (PROCESSING.has(id)) return { started: true, already: true }; const job = readJob(id); if (!job.tokenId) return { error: 'nothing to deliver yet' }; background(id, async () => { const j = readJob(id); j.status = 'DELIVERING'; writeJob(j); await deliver(j); }); return { started: true }; },

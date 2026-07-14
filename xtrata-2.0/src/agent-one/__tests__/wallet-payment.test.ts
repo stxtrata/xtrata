@@ -13,10 +13,10 @@ describe('Agent One wallet payment handoff', () => {
   });
 
   it('cache-busts the repaired combined wallet bundle on every wizard surface', () => {
-    expect(coreSource).toContain("AGENT_BUILD = '2026-07-14.3'");
+    expect(coreSource).toContain("AGENT_BUILD = '2026-07-14.4'");
     for (const file of ['index.html', 'suno.html', 'manifests.html']) {
       const html = readFileSync(new URL(file, wizardRoot), 'utf8');
-      expect(html).toContain('<script src="agent-one.js?v=9"></script>');
+      expect(html).toContain('<script src="agent-one.js?v=10"></script>');
     }
   });
 });

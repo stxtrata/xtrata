@@ -291,10 +291,11 @@ describe('wallet connect helpers', () => {
         expect(params).toMatchObject({
           recipient: ADDRESS,
           amount: '2550000',
-          memo: 'Xtrata Agent One',
-          network: 'mainnet',
-          address: ADDRESS
+          memo: 'Xtrata Agent One'
         });
+        expect(params).not.toHaveProperty('network');
+        expect(params).not.toHaveProperty('address');
+        expect(params).not.toHaveProperty('sponsored');
         return { status: 'success', result: { txid: '0xabc123' } };
       })
     };
