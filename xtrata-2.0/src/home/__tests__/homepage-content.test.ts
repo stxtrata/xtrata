@@ -10,6 +10,7 @@ import {
 
 const indexHtml = readFileSync(new URL('../../../index.html', import.meta.url), 'utf8');
 const homepageSource = readFileSync(new URL('../homepage.js', import.meta.url), 'utf8');
+const homeMainSource = readFileSync(new URL('../main.js', import.meta.url), 'utf8');
 const radioSource = readFileSync(new URL('../radio.js', import.meta.url), 'utf8');
 const configSource = readFileSync(new URL('../config.js', import.meta.url), 'utf8');
 
@@ -51,5 +52,11 @@ describe('homepage content configuration', () => {
   it('handles rejected best-effort radio requests without unhandled console errors', () => {
     expect(radioSource).toContain("fetch('/index/verdict'");
     expect(radioSource).toContain("fetch(ids ? `/warm?ids=${ids}` : '/warm?auto=2').catch");
+  });
+
+  it('keeps Claim and Collect navigation inside the SPA', () => {
+    expect(homeMainSource).toContain(
+      "['inscribe', 'my-wallet', 'wallet', 'xplorer', 'x', 'drops', 'market'].includes(seg)"
+    );
   });
 });

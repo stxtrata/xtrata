@@ -12584,7 +12584,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const seg = (url.pathname.split('/').filter(Boolean)[0] || '').toLowerCase();
       const isSitePagePath =
         url.pathname === '/' ||
-        ['inscribe', 'my-wallet', 'wallet', 'xplorer', 'x'].includes(seg);
+        ['inscribe', 'my-wallet', 'wallet', 'xplorer', 'x', 'drops', 'market'].includes(seg);
       if (!isSitePagePath) {
         return; // /wizard, /g/…, docs, static apps → real navigation
       }
