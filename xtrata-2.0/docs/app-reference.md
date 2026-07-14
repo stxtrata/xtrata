@@ -188,7 +188,7 @@ To onboard a new collection — and keep the standalone viewer in sync — do al
 - `src/lib/market/settlement.ts` centralizes market settlement asset detection, price parsing/formatting, and buy post-condition building for STX and first-party SIP-010 market flows.
 - `src/lib/market/listing-resolution.ts` resolves page-scoped listing data when activity indexes are incomplete.
 - `src/lib/drops/sponsored-claim.ts` normalizes Xverse/Leather signed sponsored-transaction envelopes, performs the reusable free-claim transaction safety inspection, and polls relayer jobs to a terminal state.
-- `src/home/main.js` owns the public `/drops` claim-round orchestration and embedded diagnostic timeline; `functions/sponsor/[[path]].ts` independently validates and reserves each sponsored drop before broadcast.
+- `src/home/main.js` owns the public `/drops` claim-round orchestration and embedded diagnostic timeline; `functions/sponsor/[[path]].ts` independently validates and reserves each sponsored drop before broadcast. My Xtrata's `Drop It` action hands the selected token to `/drops?drop=<tokenId>`, which opens and prefills the creation form while retaining an explicit wallet confirmation for the creator's refundable sponsorship deposit.
 
 ## SDK and ecosystem docs
 

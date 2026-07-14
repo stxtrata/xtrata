@@ -17,6 +17,7 @@
 import { cvToHex, cvToJSON, hexToCV, uintCV } from '@stacks/transactions';
 import { jsonResponse } from '../lib/utils';
 import type { Env } from '../lib/db';
+import { applyHiroApiKey, getHiroApiKeys, shouldRetryWithNextHiroKey } from '../lib/hiro-keys';
 import registry from '../../src/data/market-registry.json';
 
 const HIRO = 'https://api.hiro.so';
@@ -32,10 +33,33 @@ type RegistryEntry = {
   sponsored?: boolean;
 };
 
-type MarketEnv = Env & { HIRO_API_KEY?: string };
+type MarketEnv = Env & {
+  HIRO_API_KEYS?: string;
+  HIRO_API_KEY?: string;
+  VITE_HIRO_API_KEY?: string;
+};
 
-const hiroHeaders = (env: MarketEnv): HeadersInit =>
-  env.HIRO_API_KEY ? { 'x-api-key': env.HIRO_API_KEY } : {};
+const hiroFetch = async (env: MarketEnv, url: string, init: RequestInit): Promise<Response> => {
+  const attempts: Array<string | null> = [
+    ...getHiroApiKeys(env as unknown as Record<string, unknown>),
+    null
+  ];
+  let lastError: unknown;
+  for (let index = 0; index < attempts.length; index += 1) {
+    const headers = new Headers(init.headers);
+    try {
+      applyHiroApiKey(headers, attempts[index]);
+      const response = await fetch(url, { ...init, headers });
+      if (index < attempts.length - 1 && shouldRetryWithNextHiroKey(response.status)) {
+        continue;
+      }
+      return response;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Hiro request failed');
+};
 
 const callRead = async (
   env: MarketEnv,
@@ -44,9 +68,9 @@ const callRead = async (
   args: string[] = []
 ) => {
   const [address, name] = contractId.split('.');
-  const r = await fetch(`${HIRO}/v2/contracts/call-read/${address}/${name}/${fn}`, {
+  const r = await hiroFetch(env, `${HIRO}/v2/contracts/call-read/${address}/${name}/${fn}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...hiroHeaders(env) },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sender: address, arguments: args })
   });
   if (!r.ok) throw new Error(`${fn} ${r.status}`);

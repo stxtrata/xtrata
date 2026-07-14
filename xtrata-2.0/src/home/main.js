@@ -3804,6 +3804,8 @@
       }
       const listBtn = $('listForSaleButton');
       if (listBtn) listBtn.disabled = state.selectedTokenId === null || !state.walletSession.isConnected;
+      const dropBtn = $('dropItButton');
+      if (dropBtn) dropBtn.disabled = state.busy || !walletOwnsToken;
       dom.transferButton.disabled =
         state.busy ||
         state.transferPending ||
@@ -11838,11 +11840,25 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
     dropsDom.createButton?.addEventListener('click', () => { void dropsCreateDrop(); });
 
-    const loadDropsPage = async () => {
+    const openDropForToken = (tokenId) => {
+      if (dropsDom.create) dropsDom.create.open = true;
+      if (dropsDom.createTokenId) dropsDom.createTokenId.value = tokenId;
+      if (dropsDom.createStatus) {
+        dropsDom.createStatus.textContent =
+          `Inscription #${tokenId} selected. Review the refundable sponsorship deposit, then create the free giveaway.`;
+      }
+      dropsDom.create?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    const loadDropsPage = async (params = null) => {
       const run = ++dropsState.run;
       if (!dropsDom.listings) return;
       if (dropsDom.badge) dropsDom.badge.textContent = state.contract.network;
       void updateDropsDepositHint();
+      const dropParam = params?.get?.('drop');
+      if (dropParam && /^\d+$/.test(dropParam)) {
+        openDropForToken(dropParam);
+      }
       dropsDom.status.innerHTML = '<span><strong>Drops</strong> loading…</span>';
       try {
         const perContract = await Promise.all(
@@ -11896,7 +11912,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         await loadMarketPage(params);
       }
       if (page === 'drops') {
-        await loadDropsPage();
+        await loadDropsPage(params);
       }
       if (run === pageSwitchRun) {
         updateControls();
@@ -11978,7 +11994,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         } else if (PAGE_MODE === 'market') {
           await loadMarketPage(pageParams);
         } else if (PAGE_MODE === 'drops') {
-          await loadDropsPage();
+          await loadDropsPage(pageParams);
         } else if (
           PAGE_MODE === 'my-wallet' &&
           walletViewRequestId === state.walletViewRequestId &&
@@ -12346,6 +12362,17 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const target = `/market?list=${state.selectedTokenId.toString()}`;
       window.history.pushState(null, '', target);
       void switchToPage('market', new URLSearchParams({ list: state.selectedTokenId.toString() }));
+    });
+    // "Drop It" mirrors the market shortcut, opening Drops with the selected
+    // inscription prefilled. Creation still requires an explicit wallet
+    // confirmation because the owner funds the refundable sponsorship deposit.
+    const dropItButton = $('dropItButton');
+    dropItButton?.addEventListener('click', () => {
+      if (state.selectedTokenId === null || state.selectedTokenId === undefined) return;
+      const tokenId = state.selectedTokenId.toString();
+      const target = `/drops?drop=${tokenId}`;
+      window.history.pushState(null, '', target);
+      void switchToPage('drops', new URLSearchParams({ drop: tokenId }));
     });
     dom.payloadPreviewExpandButton?.addEventListener('click', openPreparedPayloadFullscreen);
     dom.fullscreenButton?.addEventListener('click', openFullscreenViewer);
