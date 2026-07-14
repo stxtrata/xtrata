@@ -75,6 +75,11 @@ const LOW_BALANCE_USTX = 5_000_000n; // refuse below 5 STX float
 const MAX_UNSETTLED = 20;
 const SETTLE_BATCH = 4; // jobs advanced per incoming request
 const SETTLE_TIMEOUT_MS = 2 * 3_600_000;
+// Mempool drop statuses can race block ingestion: Hiro may briefly report a
+// transaction as dropped_replace_by_fee from one index while the canonical
+// transaction endpoint is about to expose that exact tx as successful. Do
+// not turn a single early observation into a terminal user-facing failure.
+const TX_TERMINAL_GRACE_MS = 60_000;
 // A sponsored buy/claim tx is a few hundred bytes; cap the hex well above
 // that but low enough to bound deserialization work on garbage input.
 const MAX_TXHEX_CHARS = 20_000;
@@ -507,6 +512,31 @@ const settleBatch = async (env: SponsorEnv, key: string) => {
     [Date.now(), receivedStaleBefore]
   ).catch(() => undefined);
 
+  // Repair jobs that were terminalized from a transient mempool drop before
+  // the canonical transaction record became visible. The exact txid is the
+  // authority here: only that transaction resolving to success can revive
+  // the job, so an unrelated purchase cannot trigger sponsor reimbursement.
+  const recoverable = await rows<JobRow>(
+    env,
+    `SELECT * FROM sponsor_jobs
+     WHERE state='ABANDONED' AND buy_tx IS NOT NULL AND error LIKE 'buy tx %'
+       AND COALESCE(updated_at, created_at) > ?
+     ORDER BY updated_at DESC LIMIT ?`,
+    [Date.now() - SETTLE_TIMEOUT_MS, SETTLE_BATCH]
+  );
+  for (const job of recoverable) {
+    try {
+      if (await getTxStatus(env, job.buy_tx ?? '') === 'success') {
+        await transition(env, job.id, 'ABANDONED', 'CONFIRMED', {
+          sets: 'error=?',
+          binds: [null]
+        });
+      }
+    } catch {
+      // Recovery is best-effort. Normal settlement/status traffic retries it.
+    }
+  }
+
   const pending = await rows<JobRow>(
     env,
     `SELECT * FROM sponsor_jobs WHERE state IN ('SPONSORED','CONFIRMED','CLAIMED') ORDER BY created_at LIMIT ?`,
@@ -526,6 +556,11 @@ const settleBatch = async (env: SponsorEnv, key: string) => {
           continue;
         }
         if (status !== 'success') {
+          if (Date.now() - job.created_at < TX_TERMINAL_GRACE_MS) {
+            // Recheck on the next client poll. A canonical success must win
+            // over a racing mempool drop observation.
+            continue;
+          }
           await transition(env, job.id, 'SPONSORED', 'ABANDONED', {
             sets: 'error=?',
             binds: [`buy tx ${status}`]

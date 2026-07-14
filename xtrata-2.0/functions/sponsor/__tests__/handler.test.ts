@@ -129,6 +129,17 @@ const makeDb = () => {
       const pending = jobs.filter((j) => ['SPONSORED', 'CONFIRMED', 'CLAIMED'].includes(j.state));
       return { results: pending.slice(0, Number(binds[0] ?? 4)), meta: {} };
     }
+    if (q.includes("WHERE state='ABANDONED' AND buy_tx IS NOT NULL AND error LIKE 'buy tx %'")) {
+      const [after, limit] = binds as [number, number];
+      const recoverable = jobs.filter(
+        (j) =>
+          j.state === 'ABANDONED' &&
+          j.buy_tx !== null &&
+          String(j.error ?? '').startsWith('buy tx ') &&
+          Number(j.updated_at ?? j.created_at) > after
+      );
+      return { results: recoverable.slice(0, Number(limit ?? 4)), meta: {} };
+    }
     if (q.includes('WHERE payload_hash=?')) {
       return { results: jobs.filter((j) => j.payload_hash === binds[0]), meta: {} };
     }
@@ -175,6 +186,7 @@ let rejectAuthenticatedBalanceRequests = false;
 let failBalanceLookup = false;
 let failBroadcast = false;
 let transactionKnown = true;
+let transactionStatus = 'success';
 let feeRate = 1;
 
 const stubFetch = () => {
@@ -184,6 +196,7 @@ const stubFetch = () => {
   failBalanceLookup = false;
   failBroadcast = false;
   transactionKnown = true;
+  transactionStatus = 'success';
   feeRate = 1;
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
@@ -203,7 +216,7 @@ const stubFetch = () => {
     }
     if (url.includes('/extended/v1/tx/')) {
       return transactionKnown
-        ? Response.json({ tx_status: 'success' })
+        ? Response.json({ tx_status: transactionStatus })
         : Response.json({ error: 'not found' }, { status: 404 });
     }
     if (url.includes('/v2/transactions')) {
@@ -632,5 +645,65 @@ describe('sponsor relayer Pages handler', () => {
     await Promise.all([status(), status()]);
     expect(broadcasts.length).toBe(1);
     expect(db.jobs[0].state).toBe('CLAIMED');
+  });
+
+  it('keeps a newly broadcast claim alive when Hiro transiently reports dropped_replace_by_fee', async () => {
+    transactionStatus = 'dropped_replace_by_fee';
+    db.jobs.push({
+      id: 'racing-drop', state: 'SPONSORED', contract_id: DROPS, listing_id: '3',
+      buyer: 'SP3W6567DR121BHVV05J5ECQM4G3YXG87137EATW', payload_hash: 'racing', fee_ustx: '3000',
+      buy_tx: 'buytx', claim_tx: null, refund_tx: null, error: null,
+      created_at: Date.now() - 5_000, updated_at: Date.now() - 5_000
+    });
+
+    const response = await onRequest({
+      request: new Request('https://x/sponsor/status/racing-drop'),
+      env
+    } as never) as Response;
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ state: 'SPONSORED' });
+    expect(db.jobs[0].state).toBe('SPONSORED');
+    expect(broadcasts).toHaveLength(0);
+  });
+
+  it('eventually abandons a persistently dropped claim after the confirmation grace window', async () => {
+    transactionStatus = 'dropped_replace_by_fee';
+    db.jobs.push({
+      id: 'real-drop', state: 'SPONSORED', contract_id: DROPS, listing_id: '3',
+      buyer: 'SP3W6567DR121BHVV05J5ECQM4G3YXG87137EATW', payload_hash: 'dropped', fee_ustx: '3000',
+      buy_tx: 'buytx', claim_tx: null, refund_tx: null, error: null,
+      created_at: Date.now() - 61_000, updated_at: Date.now() - 61_000
+    });
+
+    const response = await onRequest({
+      request: new Request('https://x/sponsor/status/real-drop'),
+      env
+    } as never) as Response;
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      state: 'ABANDONED',
+      error: 'buy tx dropped_replace_by_fee'
+    });
+  });
+
+  it('revives an abandoned job when its exact claim transaction later resolves to success', async () => {
+    db.jobs.push({
+      id: 'late-success', state: 'ABANDONED', contract_id: DROPS, listing_id: '3',
+      buyer: 'SP3W6567DR121BHVV05J5ECQM4G3YXG87137EATW', payload_hash: 'late', fee_ustx: '3000',
+      buy_tx: 'buytx', claim_tx: null, refund_tx: null, error: 'buy tx dropped_replace_by_fee',
+      created_at: Date.now() - 61_000, updated_at: Date.now() - 5_000
+    });
+
+    const response = await onRequest({
+      request: new Request('https://x/sponsor/status/late-success'),
+      env
+    } as never) as Response;
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ state: 'CLAIMED' });
+    expect(db.jobs[0]).toMatchObject({ state: 'CLAIMED', error: null });
+    expect(broadcasts).toHaveLength(1);
   });
 });
