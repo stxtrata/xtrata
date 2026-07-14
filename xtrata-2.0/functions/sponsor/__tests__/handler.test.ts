@@ -63,6 +63,39 @@ const makeDb = () => {
       }
       return { results: [], meta: { changes: 1 } };
     }
+    if (
+      q.startsWith("UPDATE sponsor_jobs SET state='ABANDONED', reservation_key=NULL, payload_hash=NULL") &&
+      q.includes('WHERE id=?')
+    ) {
+      const [error, updatedAt, id] = binds as [string, number, string];
+      const row = jobs.find((job) => job.id === id && job.state === 'RECEIVED');
+      if (!row) return { results: [], meta: { changes: 0 } };
+      row.state = 'ABANDONED';
+      row.reservation_key = null;
+      row.payload_hash = null;
+      row.error = error;
+      row.updated_at = updatedAt;
+      return { results: [], meta: { changes: 1 } };
+    }
+    if (
+      q.startsWith("UPDATE sponsor_jobs SET state='ABANDONED', reservation_key=NULL, payload_hash=NULL") &&
+      q.includes("WHERE state='RECEIVED'")
+    ) {
+      const [updatedAt, staleBefore] = binds as [number, number];
+      const stale = jobs.filter(
+        (job) =>
+          job.state === 'RECEIVED' &&
+          Number(job.updated_at ?? job.created_at) < staleBefore
+      );
+      for (const row of stale) {
+        row.state = 'ABANDONED';
+        row.reservation_key = null;
+        row.payload_hash = null;
+        row.error = 'never broadcast';
+        row.updated_at = updatedAt;
+      }
+      return { results: [], meta: { changes: stale.length } };
+    }
     if (q.startsWith("UPDATE sponsor_jobs SET state='")) {
       return { results: [], meta: { changes: 0 } }; // stale-lease reverts: nothing stale in tests
     }
@@ -140,6 +173,8 @@ const broadcasts: string[] = [];
 const balanceApiKeys: Array<string | null> = [];
 let rejectAuthenticatedBalanceRequests = false;
 let failBalanceLookup = false;
+let failBroadcast = false;
+let transactionKnown = true;
 let feeRate = 1;
 
 const stubFetch = () => {
@@ -147,6 +182,8 @@ const stubFetch = () => {
   balanceApiKeys.length = 0;
   rejectAuthenticatedBalanceRequests = false;
   failBalanceLookup = false;
+  failBroadcast = false;
+  transactionKnown = true;
   feeRate = 1;
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
@@ -164,8 +201,13 @@ const stubFetch = () => {
     if (url.includes('/get-listing')) {
       return Response.json({ okay: true, result: cvToHex(listingTuple()) });
     }
-    if (url.includes('/extended/v1/tx/')) return Response.json({ tx_status: 'success' });
+    if (url.includes('/extended/v1/tx/')) {
+      return transactionKnown
+        ? Response.json({ tx_status: 'success' })
+        : Response.json({ error: 'not found' }, { status: 404 });
+    }
     if (url.includes('/v2/transactions')) {
+      if (failBroadcast) throw new Error('upstream connection reset');
       broadcasts.push(String(init?.body ?? ''));
       const txid = broadcasts.length.toString(16).padStart(64, '0');
       return new Response(JSON.stringify(txid), { status: 200 });
@@ -315,6 +357,65 @@ describe('sponsor relayer Pages handler', () => {
       })
     );
     consoleWarn.mockRestore();
+  });
+
+  it('releases an unbroadcast reservation so the same Xverse payload can retry', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const txHex = await fixture({ contract: DROPS, fn: 'claim', listingId: 3n, nonce: 0n });
+    failBroadcast = true;
+    transactionKnown = false;
+    const failed = await submit(env, { txHex, contractId: DROPS, listingId: '3' });
+    expect(failed.status).toBe(503);
+    expect(await failed.json()).toMatchObject({
+      code: 'RELAYER_UNAVAILABLE',
+      stage: 'BROADCAST',
+      message: 'broadcast upstream unavailable; retry shortly'
+    });
+    expect(db.jobs[0]).toMatchObject({
+      state: 'ABANDONED',
+      reservation_key: null,
+      payload_hash: null
+    });
+
+    failBroadcast = false;
+    transactionKnown = true;
+    const retried = await submit(env, { txHex, contractId: DROPS, listingId: '3' });
+    expect(retried.status).toBe(200);
+    expect(db.jobs).toHaveLength(2);
+    expect(db.jobs[1].state).toBe('SPONSORED');
+    consoleError.mockRestore();
+  });
+
+  it('expires a stale RECEIVED reservation before accepting a fresh retry', async () => {
+    db.jobs.push({
+      id: 'stale-xverse',
+      state: 'RECEIVED',
+      contract_id: DROPS,
+      listing_id: '3',
+      buyer: 'SP3W6567DR121BHVV05J5ECQM4G3YXG87137EATW',
+      payload_hash: 'stale-payload',
+      reservation_key: `${DROPS}:3`,
+      fee_ustx: '3000',
+      buy_tx: null,
+      claim_tx: null,
+      refund_tx: null,
+      error: null,
+      created_at: Date.now() - 3 * 60_000,
+      updated_at: Date.now() - 3 * 60_000
+    });
+    const retried = await submit(env, {
+      txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 3n, nonce: 0n }),
+      contractId: DROPS,
+      listingId: '3'
+    });
+    expect(retried.status).toBe(200);
+    expect(db.jobs[0]).toMatchObject({
+      state: 'ABANDONED',
+      reservation_key: null,
+      payload_hash: null,
+      error: 'never broadcast'
+    });
+    expect(db.jobs[1].state).toBe('SPONSORED');
   });
 
   it('keeps the strict insufficient-budget block for sponsored market buys', async () => {
