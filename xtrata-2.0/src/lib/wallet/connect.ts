@@ -51,6 +51,8 @@ const XVERSE_MAINNET_CONNECT_PARAMS = {
   network: 'Mainnet',
   message: 'Connect to Xtrata on Stacks mainnet.'
 } as const;
+const XVERSE_MAINNET_NETWORK_NAME = 'Mainnet';
+const XVERSE_STACKS_ACCOUNT_PARAMS = { addresses: ['stacks'] } as const;
 const PLACEHOLDER_COMPRESSED_PUBLIC_KEY = `02${'00'.repeat(32)}`;
 
 type WalletRpcProvider = {
@@ -243,6 +245,33 @@ const normalizeNetwork = (value: unknown, fallback: NetworkType = 'mainnet'): Ne
     }
   }
   return fallback;
+};
+
+const extractXverseStacksNetworkName = (payload: unknown, depth = 0): string | null => {
+  if (depth > 6 || !payload || typeof payload !== 'object') {
+    return null;
+  }
+  const candidate = payload as Record<string, unknown>;
+  const stacks = candidate.stacks;
+  if (typeof stacks === 'string' && stacks.trim()) {
+    return stacks.trim();
+  }
+  if (stacks && typeof stacks === 'object') {
+    const name = toNonEmptyText((stacks as Record<string, unknown>).name);
+    if (name) {
+      return name;
+    }
+  }
+  for (const key of ['result', 'data', 'network', 'payload', 'response']) {
+    if (!(key in candidate)) {
+      continue;
+    }
+    const nested = extractXverseStacksNetworkName(candidate[key], depth + 1);
+    if (nested) {
+      return nested;
+    }
+  }
+  return null;
 };
 
 const normalizeBigIntLike = (value: unknown) => {
@@ -813,6 +842,59 @@ const buildXverseConnectParams = () => ({
   message: XVERSE_MAINNET_CONNECT_PARAMS.message
 });
 
+const connectXverseMainnet = async (provider: StacksProvider) =>
+  toWalletSession(
+    await requestWalletRpc(provider, 'wallet_connect', buildXverseConnectParams())
+  );
+
+const getXverseStacksAccount = async (provider: StacksProvider) =>
+  toWalletSession(
+    await requestWalletRpc(provider, 'wallet_getAccount', {
+      addresses: [...XVERSE_STACKS_ACCOUNT_PARAMS.addresses]
+    })
+  );
+
+const ensureXverseMainnetPaymentSession = async (provider: StacksProvider) => {
+  let networkName: string | null = null;
+  try {
+    const network = await requestWalletRpc(provider, 'wallet_getNetwork');
+    networkName = extractXverseStacksNetworkName(network);
+  } catch (error) {
+    if (isUserCancelledError(error)) {
+      throw error;
+    }
+    // A cached site session can outlive Xverse's account-read permission.
+    // wallet_connect is the documented recovery path for that condition and
+    // also supports older Xverse builds without wallet_getNetwork.
+    return connectXverseMainnet(provider);
+  }
+
+  if (!networkName) {
+    return connectXverseMainnet(provider);
+  }
+
+  if (networkName.trim().toLowerCase() !== 'mainnet') {
+    // wallet_connect may return an already-authorized account without changing
+    // the wallet's active network. Use Xverse's explicit switch request so the
+    // following transaction opens under the same Mainnet context as the dApp.
+    await requestWalletRpc(provider, 'wallet_changeNetwork', {
+      name: XVERSE_MAINNET_NETWORK_NAME
+    });
+  }
+
+  try {
+    const session = await getXverseStacksAccount(provider);
+    return session.isConnected ? session : connectXverseMainnet(provider);
+  } catch (error) {
+    if (isUserCancelledError(error)) {
+      throw error;
+    }
+    // Switching networks can expose an account which has not yet granted this
+    // origin read access. Connect that active Mainnet account before paying.
+    return connectXverseMainnet(provider);
+  }
+};
+
 const requestLeatherContractCall = async (
   provider: StacksProvider,
   options: WalletContractCallOptions
@@ -964,19 +1046,16 @@ const requestStxTransfer = async (
 ) => {
   const xverse = isSelectedXverseProvider(provider);
   if (xverse) {
-    // Xverse binds dApp permissions to the network selected when wallet_connect
-    // runs. A locally cached SP address can outlive that permission context, so
-    // refresh it explicitly before every payment. Xverse documents that this is
-    // silent when the Mainnet permission is already current and prompts only
-    // when the wallet must reconnect or switch.
+    // Xverse binds dApp permissions to its active network. The site's cached SP
+    // address can remain valid after Xverse changes networks, so inspect/switch
+    // the live wallet context and then re-read the account before requesting a
+    // transfer. This avoids Xverse's "active network" transaction rejection.
     // eslint-disable-next-line no-console
     console.info('[wallet:stx-transfer]', {
-      stage: 'XVERSE_MAINNET_REFRESH',
+      stage: 'XVERSE_MAINNET_PREFLIGHT',
       expectedAddress: options.stxAddress ?? null
     });
-    const connection = toWalletSession(
-      await requestWalletRpc(provider, 'wallet_connect', buildXverseConnectParams())
-    );
+    const connection = await ensureXverseMainnetPaymentSession(provider);
     if (!connection.isConnected || !connection.address) {
       throw Object.assign(
         new Error('Xverse did not return a Stacks mainnet account. Reconnect Xverse on Mainnet.'),
@@ -1504,9 +1583,11 @@ export const __testing = {
   buildXverseStxTransferParams,
   buildUnsignedSponsoredContractCall,
   connectViaRequest,
+  ensureXverseMainnetPaymentSession,
   extractStacksAddress,
   extractStacksPublicKey,
   extractSupportedMethods,
+  extractXverseStacksNetworkName,
   getConnectAttempts,
   isMethodUnsupportedError,
   isUserCancelledError,
