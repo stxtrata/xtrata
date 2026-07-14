@@ -38,9 +38,11 @@ export type SponsoredClaimInspection = {
 
 const RAW_TX_KEYS = [
   'txRaw',
+  'txHex',
   'rawTx',
   'rawTransaction',
   'transaction',
+  'signedTransaction',
   'hex',
   'serializedTx'
 ] as const;

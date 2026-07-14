@@ -52,6 +52,7 @@ describe('sponsored drop claim inspection', () => {
     const { tx, hex } = await fixture();
     expect(extractSponsoredTransactionHex({ status: 'success', result: { txid: tx.txid(), transaction: hex } })).toBe(hex);
     expect(extractSponsoredTransactionHex({ jsonrpc: '2.0', result: { txid: tx.txid(), transaction: `0x${hex}` } })).toBe(hex);
+    expect(extractSponsoredTransactionHex({ jsonrpc: '2.0', result: { txHex: `0x${hex}` } })).toBe(hex);
     expect(extractSponsoredTransactionHex({ txId: tx.txid(), txRaw: hex })).toBe(hex);
   });
 

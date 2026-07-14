@@ -11345,7 +11345,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           'SIGNING_INPUT',
           state.walletSession.publicKey
             ? 'Connected session includes a Stacks public key.'
-            : 'No cached public key; the wallet adapter will request the key for the connected address.',
+            : 'No cached public key; the adapter will request account data, then bind the unsigned origin to the connected address if the wallet omits its STX public key.',
           state.walletSession.publicKey ? 'success' : 'warn'
         );
         recordDropDiagnostic(round, 'WALLET_REQUEST', 'Requesting origin signature only; wallet broadcasting is disabled.');

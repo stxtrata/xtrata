@@ -39,22 +39,25 @@ Run this matrix against one active drop. Use a fresh address with **zero STX** s
 | Round | Wallet | Expected wallet response | Expected diagnostic stages | Pass condition |
 | --- | --- | --- | --- | --- |
 | 1 | disconnected | no wallet call | `BLOCK` at connected-wallet preflight | no prompt, broadcast, or relayer request |
-| 2 | Xverse | signed `transaction`, not broadcast by wallet | `START` → `PREFLIGHT` → `PLAN` → `NONCE_REQUEST` → `ORIGIN_NONCE` → `SIGNING_INPUT` → `WALLET_REQUEST` → signed-tx checks → `RELAY_ACCEPTED` → status states | `SETTLED`, NFT owned by claimer, claimer STX unchanged |
-| 3 | Leather | signed `transaction`, not broadcast by wallet | same sequence as Xverse | same result as Xverse |
+| 2 | Xverse | signed `transaction` from `XverseProviders.BitcoinProvider`, `broadcast:false` | `START` → `PREFLIGHT` → `PLAN` → `NONCE_REQUEST` → `ORIGIN_NONCE` → `SIGNING_INPUT` → `WALLET_REQUEST` → signed-tx checks → `RELAY_ACCEPTED` → status states | `SETTLED`, NFT owned by claimer, claimer STX unchanged |
+| 3 | Leather | signed `txHex` from `stx_signTransaction({ txHex, stxAddress, network })` | same sequence as Xverse | same result as Xverse |
 | 4 | either, reject prompt | cancellation callback | `CANCELLED` | no relayer job created; retry remains enabled |
 | 5 | double-click/reload during an active job | existing reservation returned | `DUPLICATE` or `LISTING_BUSY`, then resume existing job | only one sponsored broadcast and one settlement chain |
 
 The signed transaction gate must pass all of these checks before `/sponsor/submit` is called: decodable transaction, mainnet network, sponsored authorization, origin fee `0`, contract-call payload, exact drops contract, `claim` function, exact NFT/drop arguments, deny post-condition mode, exactly one NFT-send post-condition for the selected inscription, and an origin matching the connected address. Any failure is a hard block; free claims never silently fall back to a self-paid transaction.
 
-The wallet request for rounds 2 and 3 must be `stx_signTransaction` with `broadcast=false`. Do not use `stx_callContract` for a sponsored claim: that method signs and immediately broadcasts the origin-only transaction before the relayer can attach its sponsor signature, which Xverse surfaces as `SignatureValidation`.
+The signing method for rounds 2 and 3 must be `stx_signTransaction`, never `stx_callContract`: the latter signs and immediately broadcasts the origin-only transaction before the relayer can attach its sponsor signature, which Xverse surfaces as `SignatureValidation`. Xverse receives `{ transaction, broadcast:false }` through `XverseProviders.BitcoinProvider.request`. Leather's sign-only API receives `{ txHex, stxAddress, network }`; its documented method does not use Xverse's `broadcast` parameter shape.
+
+An `ORIGIN_NONCE` value of `0` is valid and expected for a fresh Stacks address that has never originated a transaction. It must proceed to signing. This is the primary zero-STX onboarding case, not an error or missing-account sentinel.
 
 ### Retry capture checklist
 
 After deploying a change, hard-refresh `/drops`, disconnect, reconnect the wallet, and start one new claim round. Copy both the Claim diagnostics and the browser console entries beginning `[wallet:connect]` or `[wallet]`.
 
-- Leather selection must log `PROVIDER_SELECTED` with `providerId: LeatherProvider` (new Connect UI) or `provider-object` (older Connect UI), plus `resolved: true` and `requestBridge: true`. `resolved: false` means the extension did not inject the advertised provider; record the Leather version and browser profile.
+- Leather selection must log `PROVIDER_SELECTED` with `providerId: LeatherProvider` (new Connect UI) or `provider-object` (older Connect UI), plus `resolved: true` and `requestBridge: true`. It should then log `CAPABILITIES`, `REQUEST: getAddresses`, and `CONNECTED`. `resolved: false` means the extension did not inject the advertised provider; record the Leather version and browser profile.
+- Xverse must log only the modern connection request (`REQUEST: wallet_connect`) and `CONNECTED`; a cascade of ``request` function is not implemented` messages means the page is still using an older cached adapter build.
 - `ORIGIN_NONCE_UNAVAILABLE` / `ORIGIN_NONCE_INVALID` isolates the failure to the Hiro nonce preflight; the wallet is never opened.
-- `WALLET_PUBLIC_KEY_UNAVAILABLE` means none of the wallet account-read methods returned a public key paired with the connected STX address. Disconnect/reconnect once, then record the `REQUEST_ERROR` method and wallet version.
+- `[wallet:sponsored-sign] SIGNING_REQUEST` records `provider`, `originBinding`, and `broadcast` without printing keys or transaction bytes. Xverse normally reports `wallet-public-key`; Leather may correctly report `connected-address-hash` because its documented `getAddresses` response can omit the STX public key.
 - `WALLET_SIGNING_UNSUPPORTED` or a method-not-found response means the installed wallet does not expose `stx_signTransaction`; no broadcast or relayer request occurs.
 - A `SignatureValidation` popup before `WALLET_RESPONSE` normally means an old cached build is still using `stx_callContract`. Confirm that `PLAN` explicitly says `stx_signTransaction with broadcast=false` before testing again.
 - Bare provider errors such as `cancel` are logged as `WALLET_ERROR`, not `CANCELLED`. Only an explicit user rejection/cancellation or standard user-rejection code is classified as `CANCELLED`.
