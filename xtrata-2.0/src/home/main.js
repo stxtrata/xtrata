@@ -4715,11 +4715,14 @@
       });
     };
 
-    const waitForTransactionConfirmation = async (txId, label) => {
+    const waitForTransactionConfirmation = async (
+      txId,
+      label,
+      { pollIntervalMs = 8000, timeoutMs = 45 * 60 * 1000 } = {}
+    ) => {
       const normalizedTxId = normalizeTxId({ txId });
       const apiBases = getApiBaseUrls(state.contract.network);
       const startedAt = Date.now();
-      const timeoutMs = 45 * 60 * 1000;
       appendLog(
         `${label} submitted. Waiting for on-chain confirmation before continuing.`,
         'waiting'
@@ -4731,7 +4734,7 @@
           'wait',
           'amber'
         );
-        await sleep(8000);
+        await sleep(pollIntervalMs);
         for (const apiBase of apiBases) {
           try {
             const response = await fetch(
@@ -11171,7 +11174,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       drops: [],
       claimRound: 0,
       claimsInFlight: new Set(),
-      recentlyClaimed: new Set()
+      recentlyClaimed: new Set(),
+      createWatchRun: 0
     };
     const dropsDom = {
       status: $('dropsStatus'),
@@ -11702,6 +11706,55 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         `Sponsorship deposit: ${formatAssetAmount(dropsQuote, 6, 'STX')} — covers the claimer's network fee so they need zero STX; the unused part refunds to you after the claim or on cancel.`;
     };
 
+    const watchCreatedDrop = async ({ txId, tokenId, creator, watchRun }) => {
+      const hasTxId = typeof txId === 'string' && txId.length > 0;
+      try {
+        if (hasTxId) {
+          dropsDom.createStatus.textContent = `Drop submitted - waiting for confirmation (${truncateMiddle(txId, 8, 8)})...`;
+          await waitForTransactionConfirmation(txId, 'Drop creation', {
+            pollIntervalMs: 4000,
+            timeoutMs: 15 * 60 * 1000
+          });
+        }
+        for (let attempt = 0; attempt < 75; attempt += 1) {
+          if (watchRun !== dropsState.createWatchRun) return;
+          dropsDom.createStatus.textContent = hasTxId
+            ? 'Drop confirmed - refreshing the live claims list...'
+            : 'Drop submitted - checking for on-chain confirmation...';
+          await loadDropsPage();
+          const createdDrop = dropsState.drops.find(
+            (drop) =>
+              drop.tokenId === tokenId &&
+              addressesEqual(drop.creator, creator) &&
+              drop.claimedAt === null
+          );
+          if (createdDrop) {
+            dropsDom.createStatus.textContent = `Drop #${createdDrop.dropId} confirmed and now live.`;
+            debugLog('drops-create', 'created drop is visible', {
+              dropId: createdDrop.dropId.toString(),
+              tokenId: tokenId.toString(),
+              txId: txId || null
+            });
+            return;
+          }
+          await sleep(4000);
+        }
+        throw new Error('Drop confirmed but did not appear in the live list within five minutes.');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        dropsDom.createStatus.textContent = `${message} Refresh the page to check its latest on-chain state.`;
+        debugLog('drops-create', 'automatic refresh stopped', {
+          tokenId: tokenId.toString(),
+          txId: txId || null,
+          error: message
+        }, 'warn');
+      } finally {
+        if (watchRun === dropsState.createWatchRun && dropsDom.createButton) {
+          dropsDom.createButton.disabled = false;
+        }
+      }
+    };
+
     const dropsCreateDrop = async () => {
       const entry = dropsEntriesForNetwork()[0];
       if (!entry) return;
@@ -11709,6 +11762,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         dropsDom.createStatus.textContent = 'Connect a wallet to create a drop.';
         return;
       }
+      const creator = state.walletSession.address;
       const tokenIdRaw = dropsDom.createTokenId?.value?.trim();
       if (!/^\d+$/.test(tokenIdRaw ?? '')) {
         dropsDom.createStatus.textContent = 'Enter the inscription number you want to drop.';
@@ -11750,6 +11804,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         )
       ];
       dropsDom.createStatus.textContent = 'Confirm the drop in your wallet...';
+      if (dropsDom.createButton) dropsDom.createButton.disabled = true;
       showContractCall({
         contractAddress: entry.address,
         contractName: entry.contractName,
@@ -11766,10 +11821,17 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         postConditions,
         onFinish: (payload) => {
           const txId = payload?.txId ?? payload?.txid ?? '';
-          dropsDom.createStatus.textContent = `Drop submitted${txId ? ` - tx ${txId}` : ''}. It appears here once confirmed.`;
+          const watchRun = ++dropsState.createWatchRun;
+          void watchCreatedDrop({
+            txId,
+            tokenId,
+            creator,
+            watchRun
+          });
         },
         onCancel: () => {
           dropsDom.createStatus.textContent = 'Drop cancelled.';
+          if (dropsDom.createButton) dropsDom.createButton.disabled = false;
         }
       });
     };
