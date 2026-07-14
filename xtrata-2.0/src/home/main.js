@@ -45,6 +45,7 @@
     } from '/src/home/page-mode.js';
     import {
       formatWalletError,
+      getSelectedWalletProviderId,
       showContractCall,
       signSponsoredContractCall
     } from '/src/lib/wallet/connect.ts';
@@ -9145,8 +9146,21 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         }
       } catch (error) {
         const message = formatWalletError(error);
+        const providerId = getSelectedWalletProviderId();
         appendLog(`Wallet connect failed: ${message}`);
+        debugLog(
+          'wallet',
+          'connect failed',
+          {
+            providerId: providerId || 'not-selected',
+            error: message
+          },
+          'error'
+        );
         setStatus(dom.walletStatus, `<strong>Wallet error</strong> ${escapeHtmlText(message)}`, 'error', 'rose');
+        if (PAGE_MODE === 'drops' && dropsDom.status) {
+          dropsDom.status.innerHTML = `<span><strong>Wallet connection failed.</strong> ${escapeHtmlText(message)}</span><span class="badge rose">retry</span>`;
+        }
       } finally {
         setBusy(false);
         updateControls();

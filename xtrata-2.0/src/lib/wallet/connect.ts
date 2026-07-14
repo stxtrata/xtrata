@@ -105,6 +105,15 @@ type WalletStxTransferOptions = WalletActionBase & {
 
 const disconnectedSession = (): WalletSession => ({ isConnected: false });
 
+type ConnectWalletOptions = NonNullable<Parameters<typeof connectStacksWallet>[0]>;
+
+const buildConnectRequestOptions = (): ConnectWalletOptions => ({
+  forceWalletSelect: true,
+  persistWalletSelect: true,
+  enableOverrides: true,
+  enableLocalStorage: true
+});
+
 // Self-heal: @stacks/auth's SessionData.fromJSON() throws
 // "JSON data version undefined not supported by SessionData" when localStorage
 // holds a session written in an incompatible format (a different @stacks/connect
@@ -687,13 +696,19 @@ export const getStacksProvider = (): StacksProvider | undefined => {
 
   const walletWindow = window as typeof window & {
     LeatherProvider?: StacksProvider;
-    XverseProviders?: { StacksProvider?: StacksProvider };
+    XverseProvider?: StacksProvider;
+    XverseProviders?: {
+      BitcoinProvider?: StacksProvider;
+      StacksProvider?: StacksProvider;
+    };
     BlockstackProvider?: StacksProvider;
     StacksProvider?: StacksProvider;
   };
 
   return (
     walletWindow.LeatherProvider ??
+    walletWindow.XverseProvider ??
+    walletWindow.XverseProviders?.BitcoinProvider ??
     walletWindow.XverseProviders?.StacksProvider ??
     walletWindow.StacksProvider ??
     walletWindow.BlockstackProvider
@@ -708,16 +723,17 @@ export const connectWallet = async (_params: {
   // may have written an incompatible session after this module first loaded.
   sanitizeStoredWalletSession();
   try {
-    const response = await connectStacksWallet({
-      forceWalletSelect: true,
-      persistWalletSelect: true,
-      enableOverrides: true,
-      enableLocalStorage: true,
-      network: 'mainnet'
-    });
+    // Keep address discovery on Connect's canonical parameter-free path.
+    // Connect 8 maps Xverse's getAddresses request to wallet_connect and
+    // otherwise forwards the params unchanged. Xverse documents network as an
+    // optional wallet_connect hint, so it is unnecessary here; we enforce
+    // mainnet from the returned STX address below for every wallet.
+    const response = await connectStacksWallet(buildConnectRequestOptions());
     const session = toWalletSession(response, 'mainnet');
     if (!session.isConnected) {
-      throw new Error('Wallet did not return a mainnet STX address.');
+      throw new Error(
+        'Wallet did not return a mainnet STX address. Unlock the wallet, select a Mainnet account, and reconnect.'
+      );
     }
     return session;
   } catch (error) {
@@ -1039,6 +1055,7 @@ export const showStxTransfer = (
 };
 
 export const __testing = {
+  buildConnectRequestOptions,
   buildContractCallParams,
   buildContractDeployParams,
   buildSponsoredSignRequest,

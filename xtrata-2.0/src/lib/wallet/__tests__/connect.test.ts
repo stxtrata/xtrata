@@ -16,6 +16,18 @@ const ADDRESS = 'SP2MF04VAGYHGAZWGTEDW5VYCPDWWSY08Z1QFNDSN';
 const SIGNER_KEY = 'f9d7f5e0d0d81fdd90dcef4e0e2c1b9e3ea361776a5cd91b5c9a52b98b3e1cb601';
 
 describe('wallet connect helpers', () => {
+  it('does not forward a network hint into Xverse wallet_connect', () => {
+    const options = __testing.buildConnectRequestOptions();
+
+    expect(options).toEqual({
+      forceWalletSelect: true,
+      persistWalletSelect: true,
+      enableOverrides: true,
+      enableLocalStorage: true
+    });
+    expect(options).not.toHaveProperty('network');
+  });
+
   it('detects Leather provider ids', () => {
     expect(isLeatherProviderId('LeatherProvider')).toBe(true);
     expect(isLeatherProviderId('XverseProviders.StacksProvider')).toBe(false);
@@ -171,6 +183,13 @@ describe('wallet connect helpers', () => {
     ).toEqual([{ address: ADDRESS, publicKey: '03def' }]);
     expect(
       __testing.toWalletSession({ accounts: [{ address: ADDRESS, publicKey: '03def' }] })
+    ).toMatchObject({ isConnected: true, address: ADDRESS, network: 'mainnet' });
+    expect(
+      __testing.toWalletSession({
+        result: {
+          addresses: [{ symbol: 'STX', address: ADDRESS, publicKey: '03def' }]
+        }
+      })
     ).toMatchObject({ isConnected: true, address: ADDRESS, network: 'mainnet' });
   });
 
