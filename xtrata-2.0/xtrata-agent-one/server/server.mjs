@@ -195,7 +195,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p === '/api/upload' && req.method === 'POST') {
-      const name = (url.searchParams.get('name') || 'upload.bin').replace(/[^\w.\-]+/g, '_').slice(-120);
+      const name = (url.searchParams.get('name') || 'upload.bin').replace(/[^\w.-]+/g, '_').slice(-120);
       fs.mkdirSync(UPLOAD_DIR, { recursive: true });
       const dest = path.join(UPLOAD_DIR, Date.now() + '-' + name);
       const len = Number(req.headers['content-length'] || 0);

@@ -203,7 +203,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-04.1';
+export const AGENT_BUILD = '2026-07-14.1';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -435,9 +435,140 @@ async function returnAllHeldNfts(job: any, key: string, fromAddr: string, fallba
       const tx = await sendNft(key, fromAddr, String(id), to);
       out.push({ id: String(id), to, tx });
       xaoLog(job.jobId, `inscription #${id} returned to ${to}`);
-    } catch (e) { out.push({ id: String(id), error: errMsg(e) }); }
+      try {
+        const current = readJob(job.jobId);
+        if (current.status === 'RECOVERING') {
+          current.progress = `Returned ${out.filter((item: any) => item.tx).length}/${ids.length} inscriptions — #${id} confirmed`;
+          current.progressAt = new Date().toISOString();
+          writeJob(current);
+        }
+      } catch {}
+    } catch (e) {
+      const error = errMsg(e);
+      out.push({ id: String(id), error });
+      xaoLog(job.jobId, `inscription #${id} return failed · ${error}`);
+      try {
+        const current = readJob(job.jobId);
+        if (current.status === 'RECOVERING') {
+          current.progress = `Could not return #${id}; continuing inventory recovery`;
+          current.progressAt = new Date().toISOString();
+          writeJob(current);
+        }
+      } catch {}
+    }
   }
   return out;
+}
+
+// Job-scoped browser recovery. The ephemeral key exists only in this browser, so
+// the server-side svc/recover-*.mjs scripts cannot recover backendless jobs.
+// Inscriptions always move first. STX is swept only after a fresh holdings query
+// positively confirms that the one-shot wallet contains zero inscriptions.
+async function recoverJobAssets(jobIn: any) {
+  let job = jobIn;
+  if (job.status !== 'NEEDS_RECOVERY') throw new Error(`recovery is only available for NEEDS_RECOVERY jobs (this job is ${job.status})`);
+  if (!job.ephemeralMnemonic) throw new Error('recovery key is missing from this browser — do not fund this deposit address again');
+
+  const destination = (await resolveFunder(job)) || job.expectedFunder || job.user;
+  if (!destination || !/^SP[0-9A-HJKMNP-Z]{37,41}$/.test(String(destination))) throw new Error('could not verify the mainnet wallet that funded this job');
+  if (job.fastTrack && job.expectedFunder && !addrEq(destination, job.expectedFunder)) {
+    throw new Error(`recovery destination ${destination} does not match the fast-track wallet ${job.expectedFunder}`);
+  }
+
+  const dep = deriveFrom(job.ephemeralMnemonic);
+  if (dep.address !== job.depositAddress) throw new Error(`saved recovery key controls ${dep.address}, not deposit ${job.depositAddress}`);
+  const knownTokenIds = [...new Set([
+    ...(job.parents || []), job.tokenId, job.receiptTokenId,
+    ...((job.items || []).map((item: any) => item.tokenId)),
+  ].filter(Boolean).map(String))];
+
+  if (job.mock) {
+    const remainingItems = (job.items || []).filter((item: any) => !item.tokenId).map((item: any) => ({ idx: item.idx, file: item.file, uri: item.uri, mime: item.mime }));
+    job.recovery = { destination, returnedTokenIds: knownTokenIds, remainingItems, completedAt: new Date().toISOString(), mock: true };
+    job.recoveryCompletedAt = job.recovery.completedAt;
+    job.cancelReason = `recovery complete — ${knownTokenIds.length} inscription${knownTokenIds.length === 1 ? '' : 's'} and remaining STX returned`;
+    job.progress = job.cancelReason;
+    job.status = 'CANCELLED';
+    delete job.ephemeralMnemonic; delete job.keepKey; delete job.keepKeyReason; delete job.error;
+    writeJob(job);
+    return { recovered: true, ...job.recovery };
+  }
+
+  job.status = 'RECOVERING';
+  job.progress = `Recovery started — returning ${knownTokenIds.length} known inscription${knownTokenIds.length === 1 ? '' : 's'} to ${destination}`;
+  job.progressAt = new Date().toISOString();
+  delete job.error;
+  writeJob(job);
+  xaoLog(job.jobId, `RECOVERY start · deposit ${dep.address} → ${destination} · known tokens ${knownTokenIds.join(', ') || 'none'}`);
+
+  // Fail closed if holdings cannot be read: without a verified inventory it is
+  // unsafe to sweep the STX needed to move any inscription we could not see.
+  let heldBefore: string[];
+  try { heldBefore = await heldInscriptions(dep.address); }
+  catch (e) {
+    job = readJob(job.jobId); job.status = 'NEEDS_RECOVERY'; job.keepKey = true;
+    job.keepKeyReason = 'could not verify the escrow wallet inscription inventory — retry recovery';
+    job.error = errMsg(e); job.progress = job.keepKeyReason; job.progressAt = new Date().toISOString(); writeJob(job);
+    throw new Error(job.keepKeyReason);
+  }
+  job = readJob(job.jobId);
+  job.progress = `Returning ${heldBefore.length} inscription${heldBefore.length === 1 ? '' : 's'} before the STX sweep`;
+  job.progressAt = new Date().toISOString(); writeJob(job);
+
+  const nftReturns = await returnAllHeldNfts(job, dep.key, dep.address, destination);
+  job = readJob(job.jobId);
+  job.nftReturns = [...(job.nftReturns || []), ...nftReturns];
+  job.progressAt = new Date().toISOString(); writeJob(job);
+
+  let heldAfter: string[];
+  try { heldAfter = await heldInscriptions(dep.address); }
+  catch (e) {
+    job = readJob(job.jobId); job.status = 'NEEDS_RECOVERY'; job.keepKey = true;
+    job.keepKeyReason = 'inscription transfers were submitted, but the empty wallet could not be verified — retry after confirmations';
+    job.error = errMsg(e); job.progress = job.keepKeyReason; job.progressAt = new Date().toISOString(); writeJob(job);
+    throw new Error(job.keepKeyReason);
+  }
+  if (heldAfter.length) {
+    const failures = nftReturns.filter((item: any) => item.error).map((item: any) => `#${item.id}: ${item.error}`);
+    job = readJob(job.jobId); job.status = 'NEEDS_RECOVERY'; job.keepKey = true;
+    job.keepKeyReason = `wallet still holds inscription${heldAfter.length === 1 ? '' : 's'} #${heldAfter.join(', #')} — STX retained for transfer fees`;
+    job.error = failures.join('; ') || job.keepKeyReason;
+    job.progress = job.keepKeyReason; job.progressAt = new Date().toISOString(); writeJob(job);
+    return { recovered: false, destination, returned: nftReturns.filter((item: any) => item.tx), pendingTokenIds: heldAfter, errors: failures };
+  }
+
+  job = readJob(job.jobId);
+  job.progress = 'All inscriptions returned ✓ — sweeping remaining STX';
+  job.progressAt = new Date().toISOString(); writeJob(job);
+  const sweep = await sweepStxTo(dep.key, dep.address, destination);
+  const finalBalance = await balance(dep.address);
+  const finalHeld = await heldInscriptions(dep.address);
+  if (finalHeld.length || finalBalance > REFUND_TX_FEE) {
+    job = readJob(job.jobId); job.status = 'NEEDS_RECOVERY'; job.keepKey = true;
+    job.keepKeyReason = finalHeld.length
+      ? `wallet still holds inscription${finalHeld.length === 1 ? '' : 's'} #${finalHeld.join(', #')}`
+      : `wallet still holds ${finalBalance} uSTX — retry recovery after the sweep confirms`;
+    job.progress = job.keepKeyReason; job.progressAt = new Date().toISOString(); writeJob(job);
+    return { recovered: false, destination, returned: nftReturns.filter((item: any) => item.tx), pendingTokenIds: finalHeld, balanceUstx: finalBalance.toString() };
+  }
+
+  job = readJob(job.jobId);
+  // Include successful transfers from earlier recovery rounds too. A refresh can
+  // legitimately split a ten-token recovery across multiple confirmed rounds.
+  const returnedTokenIds = [...new Set((job.nftReturns || []).filter((item: any) => item.tx).map((item: any) => String(item.id)))];
+  const remainingItems = (job.items || []).filter((item: any) => !item.tokenId).map((item: any) => ({ idx: item.idx, file: item.file, uri: item.uri, mime: item.mime }));
+  const completedAt = new Date().toISOString();
+  job.recovery = { destination, returnedTokenIds, remainingItems, refundTx: sweep.tx || null, refundedUstx: sweep.amount || '0', completedAt };
+  job.recoveryCompletedAt = completedAt;
+  job.refundTx = sweep.tx || job.refundTx;
+  job.refundedUstx = sweep.amount || job.refundedUstx || '0';
+  job.cancelReason = `recovery complete — ${returnedTokenIds.length} inscription${returnedTokenIds.length === 1 ? '' : 's'} and remaining STX returned`;
+  job.progress = job.cancelReason;
+  job.status = 'CANCELLED';
+  delete job.ephemeralMnemonic; delete job.keepKey; delete job.keepKeyReason; delete job.error;
+  writeJob(job);
+  xaoLog(job.jobId, `RECOVERY complete · returned tokens ${returnedTokenIds.join(', ') || 'none'} · refund ${sweep.amount || '0'} uSTX`);
+  return { recovered: true, ...job.recovery };
 }
 async function sendStxRetry(key: string, amount: bigint, to: string, fee: bigint, tries = 4) { let last: any; for (let i = 0; i < tries; i++) { try { return await sendStx(key, amount, to, fee); } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(8000); continue; } throw e; } } throw last; }
 async function sweepStxTo(key: string, fromAddr: string, to: string, tries = 5): Promise<any> { let last: any; for (let i = 0; i < tries; i++) { let bal = 0n; try { bal = await balance(fromAddr); } catch (e) { last = e; await sleep(5000); continue; } if (bal <= REFUND_TX_FEE) return { sent: false, amount: '0', balance: bal.toString() }; const amount = bal - REFUND_TX_FEE; try { const tx = await sendStx(key, amount, to, REFUND_TX_FEE); return { sent: true, tx, amount: amount.toString() }; } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(8000); continue; } throw e; } } throw last || new Error('sweep failed'); }
@@ -987,6 +1118,18 @@ function background(id: string, fn: () => Promise<any>) {
 async function watchTick() {
   for (const j of listJobsRaw()) {
     if (PROCESSING.has(j.jobId)) continue;
+    // A page close/reload can interrupt the browser-held recovery between
+    // transactions. Never strand the job in a non-actionable state: preserve
+    // the key and require an explicit click to continue from a fresh inventory.
+    if (j.status === 'RECOVERING') {
+      j.status = 'NEEDS_RECOVERY';
+      j.keepKey = true;
+      j.keepKeyReason = 'recovery was interrupted — verify the latest holdings and continue';
+      j.progress = j.keepKeyReason;
+      j.progressAt = new Date().toISOString();
+      writeJob(j);
+      continue;
+    }
     // Backoff between auto-resume attempts: 15 s × attempt number.
     if (j.retryCount && j.status !== 'AWAITING_DEPOSIT' && Date.now() - (Date.parse(j.progressAt || '') || 0) < 15000 * j.retryCount) continue;
     // Deliver-only resume: inscribed but delivery was interrupted → finish delivery, never re-mint.
@@ -1057,6 +1200,16 @@ async function reapTick() {
   getJob: async (id: string) => { const job = readJob(id); return { job: publicJob(job), status: await statusJob(job) }; },
   runJob: async (id: string) => { if (PROCESSING.has(id)) return { started: true, already: true }; const job = readJob(id); if (job.tokenId) return { error: 'already inscribed' }; const s = await statusJob(job); if (!s.funded) return { error: 'not funded yet' }; background(id, async () => { const j = readJob(id); j.status = 'INSCRIBING'; writeJob(j); await runInscribe(j); }); return { started: true }; },
   deliverJob: async (id: string) => { if (PROCESSING.has(id)) return { started: true, already: true }; const job = readJob(id); if (!job.tokenId) return { error: 'nothing to deliver yet' }; background(id, async () => { const j = readJob(id); j.status = 'DELIVERING'; writeJob(j); await deliver(j); }); return { started: true }; },
+  recoverJob: async (id: string) => {
+    if (PROCESSING.has(id)) return { started: true, already: true };
+    const job = readJob(id);
+    if (job.status !== 'NEEDS_RECOVERY') throw new Error(`job is ${job.status}, not NEEDS_RECOVERY`);
+    PROCESSING.add(id);
+    Promise.resolve().then(() => recoverJobAssets(readJob(id))).catch((e) => {
+      try { const j = readJob(id); j.status = 'NEEDS_RECOVERY'; j.keepKey = true; j.error = errMsg(e); j.progress = `Recovery paused: ${errMsg(e)}`; j.progressAt = new Date().toISOString(); writeJob(j); } catch {}
+    }).finally(() => PROCESSING.delete(id));
+    return { started: true, jobId: id };
+  },
   deleteJob: async (id: string) => { const job = readJob(id); if (job.ephemeralMnemonic) throw new Error('refusing to delete: job still holds a deposit key — deliver or recover it first'); if (!['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED'].includes(job.status)) throw new Error(`refusing to delete: job is ${job.status}, not finished`); localStorage.removeItem(jobKey(id)); BYTES.delete(id); idbDeleteBytes(id); (job.items || []).forEach((_: any, i: number) => { BYTES.delete(`${id}:${i}`); idbDeleteBytes(`${id}:${i}`); }); return { deleted: true, jobId: id }; },
   getReceiptHtml: (id: string) => { try { return readJob(id).receiptHtml || null; } catch { return null; } },
   getJobLog: (id: string) => { try { return readJob(id).log || []; } catch { return []; } },

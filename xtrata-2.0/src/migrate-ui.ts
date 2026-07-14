@@ -1,11 +1,18 @@
 import { uintCV, callReadOnlyFunction, cvToJSON, PostConditionMode } from '@stacks/transactions';
 import { toStacksNetwork } from './lib/network/stacks';
 import { getApiBaseUrls } from './lib/network/config';
+import { parseGetBeginFeeUnit } from './lib/protocol/parsers';
 import {
-  connectWallet,
-  disconnectWallet,
-  showContractCall
-} from './lib/wallet/connect';
+  buildMigrationQuote,
+  mergeEscrowedMigrationItems,
+  parseMigrationTokenId,
+  scanMigrationHoldings,
+  summarizeMigrationItems,
+  type MigrationItem,
+  type MigrationSourceDefinition,
+  type MigrationSourceError
+} from './lib/migration/quote';
+import { connectWallet, disconnectWallet, showContractCall } from './lib/wallet/connect';
 import type { WalletSession } from './lib/wallet/types';
 
 const DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
@@ -45,7 +52,9 @@ const waitForTx = async (
       lastNoteAt = elapsed;
       const minutes = Math.floor(elapsed / 60000);
       const seconds = Math.floor((elapsed % 60000) / 1000);
-      onProgress(`still waiting for confirmation… ${minutes}m ${seconds}s elapsed (this is normal; blocks can take a few minutes)`);
+      onProgress(
+        `still waiting for confirmation… ${minutes}m ${seconds}s elapsed (this is normal; blocks can take a few minutes)`
+      );
     }
     try {
       const res = await fetch(`${apiBase}/extended/v1/tx/${id}`);
@@ -67,34 +76,59 @@ const appDetails = {
   icon: `${window.location.origin}/favicon.svg`
 };
 
-const SOURCES: Record<string, { name: string; fn: string; label: string }> = {
-  v1: { name: 'xtrata-v1-1-1', fn: 'migrate-from-v1', label: 'v1 (xtrata-v1-1-1)' },
-  v2: { name: 'xtrata-v2-1-0', fn: 'migrate-from-v2-1-0', label: 'v2 (xtrata-v2-1-0)' }
-};
+const SOURCES: MigrationSourceDefinition[] = [
+  {
+    key: 'v1',
+    contractName: 'xtrata-v1-1-1',
+    migrationFunction: 'migrate-from-v1',
+    label: 'v1 (xtrata-v1-1-1)'
+  },
+  {
+    key: 'v2',
+    contractName: 'xtrata-v2-1-0',
+    migrationFunction: 'migrate-from-v2-1-0',
+    label: 'v2 (xtrata-v2-1-0)'
+  },
+  {
+    key: 'v2-1-1',
+    contractName: 'xtrata-v2-1-1',
+    label: 'v2.1.1 (unsupported source)'
+  }
+];
 
 type State = {
   session: WalletSession;
-  source: 'v1' | 'v2';
-  eligible: bigint[];
-  v3Minted: Set<string>;
+  items: MigrationItem[];
+  sourceErrors: MigrationSourceError[];
+  listingReadError: string | null;
   busyId: string | null;
   busyPhase: 'signing' | 'confirming' | null;
   scanning: boolean;
+  scanRun: number;
+  hasScanned: boolean;
   owned: number;
   scanned: number;
+  protocolFeeMicroStx: bigint | null;
+  feeReadError: string | null;
+  quoteUpdatedAt: number | null;
   log: string[];
 };
 
 const state: State = {
   session: { isConnected: false },
-  source: 'v1',
-  eligible: [],
-  v3Minted: new Set(),
+  items: [],
+  sourceErrors: [],
+  listingReadError: null,
   busyId: null,
   busyPhase: null,
   scanning: false,
+  scanRun: 0,
+  hasScanned: false,
   owned: 0,
   scanned: 0,
+  protocolFeeMicroStx: null,
+  feeReadError: null,
+  quoteUpdatedAt: null,
   log: []
 };
 
@@ -106,7 +140,11 @@ const note = (message: string) => {
   render();
 };
 
-const readOnly = async (contractName: string, functionName: string, args: ReturnType<typeof uintCV>[] = []) => {
+const readOnly = async (
+  contractName: string,
+  functionName: string,
+  args: ReturnType<typeof uintCV>[] = []
+) => {
   const res = await callReadOnlyFunction({
     contractAddress: DEPLOYER,
     contractName,
@@ -127,74 +165,180 @@ const existsOnV3 = async (id: bigint): Promise<boolean> => {
   return j.value?.value != null;
 };
 
-// Opt-in, incremental scan. Pages the wallet's source-core holdings and checks
-// each id against v3 as it is found — updating status and listing eligible
-// tokens live, so nothing looks hung. Press Scan again to stop.
-const scan = async () => {
-  if (!state.session.isConnected || !state.session.address) return;
-  if (state.scanning) { state.scanning = false; return; }   // second press = stop
-  const address = state.session.address;
-  const sourceName = SOURCES[state.source].name;
-  const assetId = `${DEPLOYER}.${sourceName}::${ASSET}`;
-  state.scanning = true;
-  state.eligible = [];
-  state.owned = 0;
-  state.scanned = 0;
-  note(`Scanning ${SOURCES[state.source].label} holdings for ${address}…`);
-  render();
+const loadProtocolFee = async () => {
   try {
-    let offset = 0;
-    let total = 0;
-    do {
-      if (!state.scanning) { note('Scan stopped.'); break; }
-      const url = `${apiBase}/extended/v1/tokens/nft/holdings?principal=${address}&asset_identifiers=${encodeURIComponent(assetId)}&limit=200&offset=${offset}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`Holdings lookup failed (${res.status}).`);
-      const json = (await res.json()) as { total: number; results: Array<{ value: { repr?: string } }> };
-      total = json.total ?? 0;
-      const pageIds: bigint[] = [];
-      for (const entry of json.results ?? []) {
-        const m = (entry.value?.repr ?? '').match(/^u(\d+)$/);
-        if (m) pageIds.push(BigInt(m[1]));
-      }
-      state.owned += pageIds.length;
-      note(`Found ${state.owned}/${total} on ${state.source}; checking which are already on v3…`);
-      render();
-      for (const id of pageIds) {
-        if (!state.scanning) break;
-        const onV3 = await existsOnV3(id);
-        state.scanned += 1;
-        if (!onV3) {
-          state.eligible.push(id);
-          state.eligible.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-          render();   // tiles appear as they are found
-        }
-        if (state.scanned % 10 === 0) { note(`Checked ${state.scanned}/${state.owned}; ${state.eligible.length} eligible so far…`); render(); }
-      }
-      offset += 200;
-    } while (offset < total && state.scanning);
-    if (state.scanning) note(`Scan complete: ${state.owned} owned on ${state.source}, ${state.eligible.length} eligible (not yet on v3).`);
+    const value = await callReadOnlyFunction({
+      contractAddress: DEPLOYER,
+      contractName: CORE,
+      functionName: 'get-begin-fee-unit',
+      functionArgs: [],
+      senderAddress: state.session.address ?? DEPLOYER,
+      network
+    });
+    return {
+      fee: parseGetBeginFeeUnit(value),
+      error: null,
+      updatedAt: Date.now()
+    };
   } catch (error) {
-    note(`Scan error: ${error instanceof Error ? error.message : String(error)}`);
-  } finally {
-    state.scanning = false;
-    render();
+    return {
+      fee: null,
+      error: error instanceof Error ? error.message : String(error),
+      updatedAt: null
+    };
   }
 };
 
-const migrate = (id: bigint) =>
+const fetchSellerEscrowedTokens = async (address: string) => {
+  const response = await fetch(`/market/listings?seller=${encodeURIComponent(address)}`);
+  if (!response.ok) throw new Error(`Market listing lookup failed (${response.status}).`);
+  const payload = (await response.json()) as {
+    degraded?: boolean;
+    listings?: Array<{
+      seller?: string;
+      nftContract?: string;
+      tokenId?: string | number;
+      soldAt?: string | number | null;
+    }>;
+  };
+  if (payload.degraded) throw new Error('Market listing lookup is temporarily degraded.');
+  const normalizedAddress = address.toUpperCase();
+  return (payload.listings ?? []).flatMap((listing) => {
+    if (String(listing.seller ?? '').toUpperCase() !== normalizedAddress) return [];
+    if (listing.soldAt !== null && listing.soldAt !== undefined) return [];
+    const source = SOURCES.find(
+      (candidate) => `${DEPLOYER}.${candidate.contractName}` === listing.nftContract
+    );
+    if (!source || listing.tokenId === undefined) return [];
+    try {
+      return [{ sourceKey: source.key, tokenId: BigInt(listing.tokenId) }];
+    } catch {
+      return [];
+    }
+  });
+};
+
+// Opt-in, incremental scan. It pages every known legacy source, classifies each
+// holding against v3, and merges the connected seller's market-escrowed tokens.
+// Press Scan again to stop; partial results remain visible and are never quoted
+// as complete.
+const scan = async () => {
+  if (!state.session.isConnected || !state.session.address) return;
+  if (state.scanning) {
+    state.scanning = false;
+    return;
+  } // second press = stop
+  const scanRun = state.scanRun + 1;
+  state.scanRun = scanRun;
+  const address = state.session.address;
+  state.scanning = true;
+  state.hasScanned = false;
+  state.items = [];
+  state.sourceErrors = [];
+  state.listingReadError = null;
+  state.owned = 0;
+  state.scanned = 0;
+  note(`Scanning all known legacy cores for ${address}…`);
+  render();
+  try {
+    const feePromise = loadProtocolFee();
+    const escrowPromise = fetchSellerEscrowedTokens(address);
+    const result = await scanMigrationHoldings({
+      sources: SOURCES,
+      shouldContinue: () => state.scanning && state.scanRun === scanRun,
+      fetchPage: async (source, offset, limit) => {
+        const assetId = `${DEPLOYER}.${source.contractName}::${ASSET}`;
+        const url = `${apiBase}/extended/v1/tokens/nft/holdings?principal=${address}&asset_identifiers=${encodeURIComponent(assetId)}&limit=${limit}&offset=${offset}`;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Holdings lookup failed (${response.status}).`);
+        const json = (await response.json()) as {
+          total?: number;
+          results?: Array<{ value?: { repr?: string } }>;
+        };
+        const results = json.results ?? [];
+        const parsedIds = results.map((entry) => parseMigrationTokenId(entry.value?.repr));
+        if (parsedIds.some((id) => id === null)) {
+          throw new Error('A holding returned an unrecognised token id. Please retry.');
+        }
+        return {
+          total: json.total ?? 0,
+          resultCount: results.length,
+          tokenIds: parsedIds.filter((id): id is bigint => id !== null)
+        };
+      },
+      existsOnTarget: existsOnV3,
+      onProgress: (progress) => {
+        if (state.scanRun !== scanRun) return;
+        state.items = progress.items;
+        state.owned = progress.owned;
+        state.scanned = progress.checked;
+        render();
+      }
+    });
+    let escrowed: Array<{ sourceKey: string; tokenId: bigint }> = [];
+    let listingReadError: string | null = null;
+    try {
+      escrowed = await escrowPromise;
+    } catch (error) {
+      listingReadError = error instanceof Error ? error.message : String(error);
+    }
+    const feeResult = await feePromise;
+    if (state.scanRun !== scanRun || state.session.address !== address) return;
+    state.items = mergeEscrowedMigrationItems({
+      items: result.items,
+      escrowed,
+      sources: SOURCES
+    });
+    state.sourceErrors = result.sourceErrors;
+    state.listingReadError = listingReadError;
+    state.owned = result.owned;
+    state.scanned = result.checked;
+    state.protocolFeeMicroStx = feeResult.fee;
+    state.feeReadError = feeResult.error;
+    state.quoteUpdatedAt = feeResult.updatedAt;
+    state.hasScanned =
+      !result.stopped && result.sourceErrors.length === 0 && !state.listingReadError;
+    const summary = summarizeMigrationItems(state.items);
+    if (result.stopped) {
+      note('Scan stopped. Partial results are shown but no complete quote is available.');
+    } else {
+      note(
+        `Scan complete: ${state.items.length} legacy item${state.items.length === 1 ? '' : 's'} found; ${summary.ready} ready to migrate.`
+      );
+    }
+  } catch (error) {
+    if (state.scanRun === scanRun) {
+      note(`Scan error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  } finally {
+    if (state.scanRun === scanRun) {
+      state.scanning = false;
+      render();
+    }
+  }
+};
+
+const migrationItemKey = (item: Pick<MigrationItem, 'sourceKey' | 'tokenId'>) =>
+  `${item.sourceKey}:${item.tokenId.toString()}`;
+
+const migrate = (item: MigrationItem) =>
   new Promise<void>((resolve, reject) => {
     if (!state.session.isConnected || !state.session.address) {
       reject(new Error('Connect Xverse first.'));
       return;
     }
-    state.busyId = id.toString();
+    if (item.status !== 'ready' || !item.migrationFunction) {
+      reject(new Error('This token is not currently ready to migrate. Rescan first.'));
+      return;
+    }
+    const id = item.tokenId;
+    state.busyId = migrationItemKey(item);
     state.busyPhase = 'signing';
     render();
     showContractCall({
       contractAddress: DEPLOYER,
       contractName: CORE,
-      functionName: SOURCES[state.source].fn,
+      functionName: item.migrationFunction,
       functionArgs: [uintCV(id)],
       // Migration transfers the legacy NFT (and a small begin-fee in STX) into
       // the core. Allow mode is required so those transfers aren't rejected by
@@ -225,27 +369,42 @@ const migrate = (id: bigint) =>
           const result = await waitForTx(txId, (msg) => note(`#${id}: ${msg}`));
           state.busyId = null;
           if (result === 'timeout') {
-            note(`#${id}: no confirmation after 15 minutes. The transaction may still land — check it in the explorer (${txId}) before retrying, to avoid a double migration.`);
+            note(
+              `#${id}: no confirmation after 15 minutes. The transaction may still land — check it in the explorer (${txId}) before retrying, to avoid a double migration.`
+            );
             render();
             reject(new Error('confirmation timeout'));
             return;
           }
           if (result === 'dropped') {
-            note(`#${id}: the transaction was dropped from the mempool (usually a fee/nonce race). Nothing moved — it is safe to press Migrate again.`);
+            note(
+              `#${id}: the transaction was dropped from the mempool (usually a fee/nonce race). Nothing moved — it is safe to press Migrate again.`
+            );
             render();
             reject(new Error('tx dropped'));
             return;
           }
           if (result === 'success') {
             note(`#${id} confirmed ✓`);
-            state.v3Minted.add(id.toString());
-            state.eligible = state.eligible.filter((value) => value !== id);
+            state.items = state.items.map((candidate) =>
+              migrationItemKey(candidate) === migrationItemKey(item)
+                ? {
+                    ...candidate,
+                    status: 'already-migrated',
+                    detail: 'Migration confirmed during this session.'
+                  }
+                : candidate
+            );
             render();
             // Keep the cached index accurate immediately: the new v3 token and
             // the now-escrowed legacy token both changed. Fire-and-forget.
-            const sourceName = SOURCES[state.source].name;
-            for (const contractId of [`${DEPLOYER}.${CORE}`, `${DEPLOYER}.${sourceName}`]) {
-              void fetch(`/index/${contractId}?id=${id}`, { method: 'POST' }).catch(() => undefined);
+            for (const contractId of [
+              `${DEPLOYER}.${CORE}`,
+              `${DEPLOYER}.${item.sourceContractName}`
+            ]) {
+              void fetch(`/index/${contractId}?id=${id}`, { method: 'POST' }).catch(
+                () => undefined
+              );
             }
             resolve();
           } else {
@@ -271,8 +430,12 @@ const BATCH_CONTRACT = ''; // e.g. 'xtrata-migrate-batch-v1'
 const BATCH_LIMIT = 25;
 const migrateBatch = async () => {
   if (!BATCH_CONTRACT || !state.session.address) return;
-  const ids = state.eligible.slice(0, BATCH_LIMIT);
-  if (!ids.length) return;
+  const firstReady = state.items.find((item) => item.status === 'ready' && item.migrationFunction);
+  if (!firstReady) return;
+  const batchItems = state.items
+    .filter((item) => item.status === 'ready' && item.sourceKey === firstReady.sourceKey)
+    .slice(0, BATCH_LIMIT);
+  const ids = batchItems.map((item) => item.tokenId);
   note(`Batch migrating ${ids.length} token${ids.length === 1 ? '' : 's'} in ONE transaction…`);
   state.busyId = 'batch';
   state.busyPhase = 'signing';
@@ -281,15 +444,17 @@ const migrateBatch = async () => {
   showContractCall({
     contractAddress: DEPLOYER,
     contractName: BATCH_CONTRACT,
-    functionName: state.source === 'v1' ? 'migrate-batch-v1' : 'migrate-batch-v2',
+    functionName: firstReady.sourceKey === 'v1' ? 'migrate-batch-v1' : 'migrate-batch-v2',
     functionArgs: [listCV(ids.map((id) => uintCV(id)))],
     postConditionMode: PostConditionMode.Allow,
     appDetails,
     network,
     stxAddress: state.session.address,
     onFinish: (payload: unknown) => {
-      const txId = (payload && typeof payload === 'object' && 'txId' in (payload as Record<string, unknown>)
-        ? String((payload as Record<string, unknown>).txId) : '') || '';
+      const txId =
+        (payload && typeof payload === 'object' && 'txId' in (payload as Record<string, unknown>)
+          ? String((payload as Record<string, unknown>).txId)
+          : '') || '';
       note(`Batch submitted → ${txId}. One confirmation migrates all ${ids.length}.`);
       state.busyPhase = 'confirming';
       render();
@@ -297,28 +462,40 @@ const migrateBatch = async () => {
         const result = await waitForTx(txId, (msg) => note(`batch: ${msg}`));
         state.busyId = null;
         if (result === 'success') {
-          ids.forEach((id) => state.v3Minted.add(id.toString()));
-          state.eligible = state.eligible.filter((v) => !ids.includes(v));
+          const migratedKeys = new Set(batchItems.map(migrationItemKey));
+          state.items = state.items.map((item) =>
+            migratedKeys.has(migrationItemKey(item))
+              ? { ...item, status: 'already-migrated', detail: 'Batch migration confirmed.' }
+              : item
+          );
           note(`Batch confirmed ✓ — ${ids.length} tokens migrated in one transaction.`);
         } else {
-          note(`Batch ${result}. Nothing migrated (a batch is all-or-nothing) — rescan and retry, or use sign-each.`);
+          note(
+            `Batch ${result}. Nothing migrated (a batch is all-or-nothing) — rescan and retry, or use sign-each.`
+          );
         }
         render();
       })();
     },
-    onCancel: () => { note('Batch cancelled.'); state.busyId = null; render(); }
+    onCancel: () => {
+      note('Batch cancelled.');
+      state.busyId = null;
+      render();
+    }
   });
 };
 
 const migrateAll = async () => {
-  const queue = [...state.eligible];
+  const queue = state.items.filter((item) => item.status === 'ready' && item.migrationFunction);
   let done = 0;
-  for (const id of queue) {
+  for (const item of queue) {
     try {
-      await migrate(id);
+      await migrate(item);
       done += 1;
     } catch (error) {
-      note(`Run stopped after ${done}/${queue.length}: ${error instanceof Error ? error.message : String(error)}. Fix or retry, then press Migrate all again — completed ids are skipped automatically.`);
+      note(
+        `Run stopped after ${done}/${queue.length}: ${error instanceof Error ? error.message : String(error)}. Fix or retry, then press Migrate all again — completed ids are skipped automatically.`
+      );
       return;
     }
   }
@@ -331,89 +508,204 @@ const connect = async () => {
     note('Wallet connection cancelled.');
     return;
   }
-  note(`Connected ${state.session.address}. Pick a source core, then press Scan.`);
+  note(`Connected ${state.session.address}. Press Scan & quote to check every legacy core.`);
   render();
 };
 
 const disconnect = async () => {
   await disconnectWallet();
+  state.scanRun += 1;
+  state.scanning = false;
   state.session = { isConnected: false };
-  state.eligible = [];
+  state.items = [];
+  state.sourceErrors = [];
+  state.listingReadError = null;
+  state.hasScanned = false;
+  state.protocolFeeMicroStx = null;
+  state.feeReadError = null;
+  state.quoteUpdatedAt = null;
   render();
+};
+
+const escapeHtml = (value: unknown) =>
+  String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+
+const formatMicroStx = (amount: bigint) => {
+  const whole = amount / 1_000_000n;
+  const fraction = (amount % 1_000_000n).toString().padStart(6, '0').replace(/0+$/, '');
+  return `${whole.toString()}${fraction ? `.${fraction}` : ''} STX`;
+};
+
+const statusLabel = (item: MigrationItem) => {
+  switch (item.status) {
+    case 'ready':
+      return 'Ready';
+    case 'already-migrated':
+      return 'Already on v3';
+    case 'listed-escrowed':
+      return 'Cancel listing first';
+    case 'unsupported':
+      return 'Unsupported source';
+    case 'unreadable':
+      return 'Retry required';
+  }
 };
 
 const render = () => {
   const connected = state.session.isConnected;
+  const readyItems = state.items.filter((item) => item.status === 'ready');
+  const blockedItems = state.items.filter((item) => item.status !== 'ready');
+  const summary = summarizeMigrationItems(state.items);
+  const quote =
+    state.protocolFeeMicroStx !== null
+      ? buildMigrationQuote({
+          items: state.items,
+          protocolFeePerItemMicroStx: state.protocolFeeMicroStx,
+          miningAllowancePerItemMicroStx: BigInt(FEE_USTX)
+        })
+      : null;
+  const discoveryWarnings = [
+    ...state.sourceErrors.map((error) => `${error.sourceLabel}: ${error.message}`),
+    ...(state.listingReadError ? [`Market escrow: ${state.listingReadError}`] : [])
+  ];
+  const quoteReady = state.hasScanned && quote !== null;
   app.innerHTML = `
     <section class="panel">
       <div class="toolbar">
         <div>${connected ? `Connected <code>${state.session.address}</code>` : 'Not connected'}</div>
         <div>
-          ${connected
-            ? '<button id="disconnect" class="secondary">Disconnect</button>'
-            : '<button id="connect">Connect Xverse</button>'}
+          ${
+            connected
+              ? '<button id="disconnect" class="secondary">Disconnect</button>'
+              : '<button id="connect">Connect Xverse</button>'
+          }
         </div>
       </div>
       <div class="row">
-        <label>Source core:
-          <select id="source" ${connected && !state.scanning ? '' : 'disabled'}>
-            <option value="v1" ${state.source === 'v1' ? 'selected' : ''}>${SOURCES.v1.label}</option>
-            <option value="v2" ${state.source === 'v2' ? 'selected' : ''}>${SOURCES.v2.label}</option>
-          </select>
-        </label>
-        <button id="scan" ${connected && !state.busyId ? '' : 'disabled'}>${state.scanning ? 'Stop scan' : 'Scan eligible'}</button>
-        <button id="all" ${connected && state.eligible.length > 0 && !state.busyId && !state.scanning ? '' : 'disabled'}>Migrate all (sign each)</button>
-        ${BATCH_CONTRACT ? `<button id="batch" ${connected && state.eligible.length > 0 && !state.busyId && !state.scanning ? '' : 'disabled'}>⚡ Batch migrate ${Math.min(state.eligible.length, BATCH_LIMIT)} (1 signature)</button>` : ''}
+        <button id="scan" ${connected && !state.busyId ? '' : 'disabled'}>${state.scanning ? 'Stop scan' : 'Scan & quote all'}</button>
+        <button id="all" ${connected && quoteReady && readyItems.length > 0 && !state.busyId && !state.scanning ? '' : 'disabled'}>Migrate all ready (sign each)</button>
+        ${BATCH_CONTRACT ? `<button id="batch" ${connected && quoteReady && readyItems.length > 0 && !state.busyId && !state.scanning ? '' : 'disabled'}>⚡ Batch migrate ${Math.min(readyItems.length, BATCH_LIMIT)} (1 signature)</button>` : ''}
       </div>
-      <p class="hint">Pick a source core, then Scan — nothing runs until you do. Each migration is a separate Xverse signature that moves your legacy token into the v3 core and mints the same id on <code>${CORE}</code>. Ids already on v3 are skipped. Network fee is fixed at <strong>0.005 STX</strong> — if Xverse shows a higher amount, set it manually to 0.005.</p>
-      ${state.scanning || state.owned
-        ? `<p class="hint">${state.scanning ? '⏳ Scanning' : '✓ Scan done'} — ${state.scanned}/${state.owned} checked · ${state.eligible.length} eligible${state.scanning ? '…' : ''}</p>`
-        : ''}
+      <p class="hint">The scan checks both supported source cores, flags v2.1.1 as unsupported, and checks your active listings on registered Xtrata markets. Nothing is signed or funded by scanning. The quote covers tokens held directly or in those registered markets; unrelated third-party custody contracts cannot be attributed automatically. The <strong>0.005 STX</strong> amount is the mining-fee allowance per transaction; the separate protocol fee is read live from <code>${CORE}</code>.</p>
+      ${
+        state.scanning || state.hasScanned || state.items.length || discoveryWarnings.length
+          ? `<p class="hint">${state.scanning ? '⏳ Scanning' : state.hasScanned ? '✓ Complete scan' : '⚠ Incomplete scan'} — ${state.owned} directly held · ${state.scanned} supported status checks · ${summary.ready} ready${state.scanning ? '…' : ''}</p>`
+          : ''
+      }
+      ${
+        discoveryWarnings.length
+          ? `<div class="notice warning"><strong>Quote incomplete — retry the scan.</strong>${discoveryWarnings.map((warning) => `<span>${escapeHtml(warning)}</span>`).join('')}</div>`
+          : ''
+      }
     </section>
 
     <section class="panel">
-      <h2>Eligible tokens (${state.eligible.length})</h2>
+      <div class="section-heading">
+        <div>
+          <h2>Quote only</h2>
+          <p class="hint">No temporary wallet is created and no funds are requested in this rollout.</p>
+        </div>
+        <span class="status-pill ${quoteReady ? 'ready' : ''}">${quoteReady ? 'Live quote' : 'Awaiting complete scan'}</span>
+      </div>
+      ${
+        quoteReady && quote
+          ? `<div class="quote-grid">
+            <div class="quote-card"><span>Ready inscriptions</span><strong>${quote.itemCount}</strong></div>
+            <div class="quote-card"><span>Protocol fee</span><strong>${formatMicroStx(quote.protocolFeeMicroStx)}</strong><small>${formatMicroStx(quote.protocolFeePerItemMicroStx)} each · live on-chain</small></div>
+            <div class="quote-card"><span>Mining allowance</span><strong>${formatMicroStx(quote.miningAllowanceMicroStx)}</strong><small>${formatMicroStx(quote.miningAllowancePerItemMicroStx)} per signed transaction</small></div>
+            <div class="quote-card total"><span>Estimated total</span><strong>${formatMicroStx(quote.estimatedTotalMicroStx)}</strong><small>Protocol + mining allowance</small></div>
+          </div>
+          ${
+            quote.bySource.length
+              ? `<div class="quote-lines">${quote.bySource.map((line) => `<div><span>${escapeHtml(line.sourceLabel)} · ${line.itemCount} token${line.itemCount === 1 ? '' : 's'}</span><strong>${formatMicroStx(line.estimatedTotalMicroStx)}</strong></div>`).join('')}</div>`
+              : '<p class="hint">No directly migratable inscriptions were found.</p>'
+          }
+          <p class="hint">Fee read ${state.quoteUpdatedAt ? escapeHtml(new Date(state.quoteUpdatedAt).toLocaleString()) : 'during this scan'}. The protocol portion is exact at quote time; mining fees can change or require retrying. Funding, refund, service fee and refundable buffer are not included because automated funding is not enabled.</p>`
+          : `<p class="hint">${
+              state.feeReadError
+                ? `The live protocol fee could not be read: ${escapeHtml(state.feeReadError)}. Retry the scan before relying on a total.`
+                : 'Connect your wallet and run a complete scan to calculate the quote.'
+            }</p>`
+      }
+    </section>
+
+    <section class="panel">
+      <h2>Ready to migrate (${readyItems.length})</h2>
       <div class="grid">
-        ${state.eligible.length === 0
-          ? `<p class="hint">${state.scanning ? 'Scanning… eligible tokens will appear here as they are found.' : 'None yet — connect, pick a source core, then press Scan.'}</p>`
-          : state.eligible
-              .map(
-                (id) => `
+        ${
+          readyItems.length === 0
+            ? `<p class="hint">${state.scanning ? 'Scanning… ready tokens will appear here as they are found.' : state.hasScanned ? 'No ready tokens found.' : 'No complete scan yet.'}</p>`
+            : readyItems
+                .map(
+                  (item) => `
                 <div class="tile">
-                  <span>#${id.toString()}</span>
-                  <button data-migrate="${id.toString()}" ${state.busyId ? 'disabled' : ''}>
-                    ${state.busyId === id.toString()
-                      ? state.busyPhase === 'confirming'
-                        ? 'Confirming…'
-                        : 'Signing…'
-                      : 'Migrate'}
+                  <div><span>#${item.tokenId.toString()}</span><small>${escapeHtml(item.sourceLabel)}</small></div>
+                  <button data-source="${escapeHtml(item.sourceKey)}" data-migrate="${item.tokenId.toString()}" ${state.busyId || !quoteReady ? 'disabled' : ''}>
+                    ${
+                      state.busyId === migrationItemKey(item)
+                        ? state.busyPhase === 'confirming'
+                          ? 'Confirming…'
+                          : 'Signing…'
+                        : 'Migrate'
+                    }
                   </button>
                 </div>`
-              )
-              .join('')}
+                )
+                .join('')
+        }
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Not included in quote (${blockedItems.length})</h2>
+      <div class="blocked-list">
+        ${
+          blockedItems.length === 0
+            ? `<p class="hint">${state.hasScanned ? 'No blockers found.' : 'Blocked and already-migrated tokens will be explained here after scanning.'}</p>`
+            : blockedItems
+                .map(
+                  (item) => `
+              <div class="blocked-row">
+                <div><strong>#${item.tokenId.toString()} · ${escapeHtml(item.sourceLabel)}</strong><span>${escapeHtml(item.detail ?? statusLabel(item))}</span></div>
+                <span class="status-pill ${item.status}">${statusLabel(item)}</span>
+                ${item.status === 'listed-escrowed' ? '<a class="button-link" href="/market">Open market</a>' : ''}
+              </div>`
+                )
+                .join('')
+        }
       </div>
     </section>
 
     <section class="panel">
       <h2>Activity</h2>
-      <pre>${state.log.length ? state.log.join('\n') : 'No activity yet.'}</pre>
+      <pre>${state.log.length ? escapeHtml(state.log.join('\n')) : 'No activity yet.'}</pre>
     </section>
   `;
 
-  document.getElementById('connect')?.addEventListener('click', () => void connect().catch((e) => note(String(e))));
+  document
+    .getElementById('connect')
+    ?.addEventListener('click', () => void connect().catch((e) => note(String(e))));
   document.getElementById('disconnect')?.addEventListener('click', () => void disconnect());
   document.getElementById('scan')?.addEventListener('click', () => void scan());
   document.getElementById('all')?.addEventListener('click', () => void migrateAll());
   document.getElementById('batch')?.addEventListener('click', () => void migrateBatch());
-  document.getElementById('source')?.addEventListener('change', (event) => {
-    state.source = (event.target as HTMLSelectElement).value as 'v1' | 'v2';
-    state.eligible = [];
-    render();
-  });
   app.querySelectorAll<HTMLButtonElement>('[data-migrate]').forEach((button) => {
     button.addEventListener('click', () => {
       const id = BigInt(button.dataset.migrate!);
-      void migrate(id).catch((e) => note(String(e)));
+      const sourceKey = button.dataset.source ?? '';
+      const item = state.items.find(
+        (candidate) => candidate.sourceKey === sourceKey && candidate.tokenId === id
+      );
+      if (!item) {
+        note(`Could not find #${id} in the current scan. Please rescan.`);
+        return;
+      }
+      void migrate(item).catch((e) => note(String(e)));
     });
   });
 };

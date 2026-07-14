@@ -9,6 +9,7 @@ export type WalletSession = {
   isConnected: boolean;
   address?: string;
   network?: NetworkType;
+  publicKey?: string;
 };
 
 export type WalletAdapter = {

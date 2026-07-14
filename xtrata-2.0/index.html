@@ -5,7 +5,8 @@
   <link rel="preconnect" href="https://api.hiro.so" crossorigin />
     <link rel="dns-prefetch" href="https://api.hiro.so" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Xtrata - Permanent Media Records</title>
+  <title>Xtrata — Create something the internet cannot forget</title>
+  <meta name="description" content="Make, collect, trade, connect and build with songs, art, apps, games and ideas that live fully on-chain through Xtrata." />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="icon" type="image/png" sizes="32x32" href="/favicons/xtrata-favicon-32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="/favicons/xtrata-favicon-16.png" />
@@ -63,10 +64,10 @@
     <header class="topbar">
       <div class="brand-wrap">
         <a class="brand" href="/" aria-label="Xtrata home">
-          <img class="brand-logo" src="https://nxhyvj3lifp2q34nklffzxslfje426oxeruo3lkuj56srwgctdlq.arweave.net/bc-Kp2tBX6hvjVLKXN5LKknNedckaO2tVE99KNjCmNc" alt="" />
+          <img class="brand-logo" src="/favicon.svg" alt="" />
           <span class="brand-name">
             <span class="brand-wordmark">XTRATA</span>
-            <span class="brand-tagline">Permanent media records, anchored to Bitcoin</span>
+            <span class="brand-tagline">Living on-chain objects, anchored to Bitcoin</span>
           </span>
         </a>
       </div>
@@ -84,146 +85,158 @@
 
     <nav class="site-nav" aria-label="Primary">
       <a href="/" data-nav="home" target="_self">Home</a>
-      <a href="/inscribe" data-nav="inscribe" target="_self">Inscribe</a>
-      <a href="/xplorer" data-nav="xplorer" target="_self">Xplorer</a>
-      <a href="/my-wallet" data-nav="my-wallet" target="_self">My Wallet</a>
-      <a href="/market" data-nav="market" target="_self">Market</a>
-      <a href="/drops" data-nav="drops" target="_self">Drops</a>
-      <a href="/wizard/" data-nav="wizard" target="_self">Inscription Wizard</a>
+      <a href="/xplorer" data-nav="xplorer" target="_self">Explore</a>
+      <a href="/inscribe" data-nav="inscribe" target="_self">Create</a>
+      <a href="/drops" data-nav="drops" target="_self">Claim</a>
+      <a href="/market" data-nav="market" target="_self">Collect</a>
+      <a href="/my-wallet" data-nav="my-wallet" target="_self">My Xtrata</a>
+      <a href="/wizard/" data-nav="wizard" target="_self">Wizard</a>
+      <a href="/#build" data-nav="build" target="_self">Build</a>
       <div class="radio-slot" id="radioSlot" aria-label="Xtrata FM radio"></div>
     </nav>
     </div>
 
-    <!-- Modes shelf: SUNO More (AI Music Permanence) + Forever Twins (On-Chain Legacy) — matched cards -->
-    <div class="modes">
-      <a class="suno-hero" href="/wizard/suno" aria-label="SUNO More — do more with your Suno music: inscribe the master on Xtrata">
-        <img class="mode-brand" src="/favicon.svg" alt="Xtrata" width="22" height="22" />
-        <img class="suno-hero__logo" src="/suno-more/assets/suno-more-logo.webp" alt="SUNO More — one song, infinite possibilities" />
-        <span class="mode-text">
-          <span class="suno-hero__kicker"><span class="suno-hero__dot"></span>AI Music Permanence Mode</span>
-          <span class="suno-hero__lead">Do more with your Suno song: inscribe the master, preserve attribution, create editions, and link remixes.</span>
-          <span class="suno-hero__actions">
-            <span class="suno-hero__cta">Inscribe song →</span>
-            <span class="suno-hero__more">Create editions <span class="suno-hero__soon">soon</span></span>
-          </span>
-        </span>
-      </a>
-
-      <!-- Current campaign: edit this block to feature the next public campaign. -->
-      <a class="current-campaign" href="/forever-twins/" aria-label="Open the Forever Twins campaign page">
-        <img class="mode-brand" src="/favicon.svg" alt="Xtrata" width="22" height="22" />
-        <img class="current-campaign__logo" src="/forever-twins/assets/forever-twins-logo.webp" alt="Forever Twins" />
-        <span class="mode-text">
-          <span class="current-campaign__body">
-            <span class="current-campaign__kicker">On-Chain Legacy Mode</span>
-            <span class="current-campaign__title">Forever Twins</span>
-            <span class="current-campaign__description">Bitcoin Pepes have fully migrated on-chain, and Leo Cats and Miami Degens migrations are underway thanks to Fak.Fun.</span>
-          </span>
-          <span class="btn secondary current-campaign__cta" aria-hidden="true">Activate Forever Twin</span>
-        </span>
-      </a>
-    </div>
-
-    <section class="registry-intro" id="registryIntro" aria-labelledby="registryIntroTitle">
-      <div class="registry-copy">
-        <span class="registry-eyebrow" id="registryModeBadge">Permanent media records</span>
-        <h1 class="registry-title" id="registryIntroTitle">
-          <span>Record it.</span>
-          <span>Reference it.</span>
-          <span>Retrieve it.</span>
-        </h1>
-        <p class="registry-lead" id="registryIntroLead">Create and hold durable records for songs, masters, artwork, credits, documents, apps, and collaboration history, anchored to Bitcoin through Stacks.</p>
-        <div class="registry-intro-actions">
-          <button class="btn" id="introConnectButton" type="button">Connect wallet</button>
-          <a class="btn" id="introMyWalletLink" href="/my-wallet" target="_self" hidden>Open My Wallet</a>
-          <button class="btn secondary" id="introPrepareButton" type="button">Inscribe a file</button>
-          <a class="btn secondary" href="#homeExamples">Galleries</a>
+    <section class="living-hero registry-intro home-only" id="registryIntro" aria-labelledby="registryIntroTitle">
+      <div class="living-hero__copy">
+        <span class="section-kicker section-kicker--live" id="registryModeBadge">A living world of permanent digital objects</span>
+        <h1 class="living-hero__title" id="registryIntroTitle">Create something <em>the internet cannot forget.</em></h1>
+        <p class="living-hero__lead" id="registryIntroLead">Make, collect, trade, connect and build with songs, art, apps, games and ideas that live fully on-chain.</p>
+        <div class="living-hero__actions">
+          <a class="btn hero-btn" href="/xplorer" target="_self" data-home-action="hero:explore">Explore what's alive</a>
+          <button class="btn secondary hero-btn" id="introPrepareButton" type="button" data-home-action="hero:create">Create yours</button>
+          <a class="btn secondary hero-btn" href="/drops" target="_self" data-home-action="hero:claim">Claim free</a>
         </div>
-        <div class="registry-footnotes" aria-label="Registry qualities">
-          <p class="registry-note"><strong>Permanent backups</strong>Keep rich media and metadata where the reference can keep working.</p>
-          <p class="registry-note"><strong>Your own masters</strong>Hold songs, artwork, credits, manifests, and proof links in your wallet.</p>
-          <p class="registry-note"><strong>Verifiable history</strong>Version your collaborations and public record from one durable place.</p>
+        <div class="living-hero__trust">
+          <span>Fully on-chain</span>
+          <span>Made through Stacks</span>
+          <span>Anchored to Bitcoin</span>
+          <span>Sponsored claims need no STX</span>
+        </div>
+        <div class="living-hero__wallet">
+          <button class="text-button" id="introConnectButton" type="button" data-home-action="hero:wallet-connect">Connect a wallet</button>
+          <a class="text-button" id="introMyWalletLink" href="/my-wallet" target="_self" hidden>Open My Xtrata</a>
+          <span>to collect, claim, or create</span>
         </div>
       </div>
-      <aside class="registry-promise-card" aria-label="What Xtrata makes possible">
-        <div class="promise-step">
-          <span>01</span>
-          <div>
-            <strong>Record it</strong>
-            <p>Put high-value files, rich media files like audio and video, manifests, release notes, blogs, reviews, memories and histories directly into an inscription flow.</p>
-          </div>
-        </div>
-        <div class="promise-step">
-          <span>02</span>
-          <div>
-            <strong>Reference it</strong>
-            <p>Use one current record to point at text, code, songs, artworks, agreements, contracts, and more.</p>
-          </div>
-        </div>
-        <div class="promise-step">
-          <span>03</span>
-          <div>
-            <strong>Retrieve it</strong>
-            <p>Keep the media and its proof available through programmable building blocks backed by Bitcoin finality.</p>
-          </div>
-        </div>
-        <p class="promise-callout">Permanent, programmable, reusable media records, anchored to Bitcoin without Ordinals-level wait times or costs.</p>
-      </aside>
+      <div class="living-hero__stage" id="featuredObjectStage" aria-label="Featured Xtrata objects"></div>
     </section>
 
-    <!-- Landing navigation cards: shown only on the home page (data-page router). -->
-    <section class="page-cards" aria-label="Xtrata tools">
-      <a class="page-card" href="/inscribe" target="_self">
-        <span class="page-card__kicker">Start here</span>
-        <strong class="page-card__title">Inscribe</strong>
-        <p class="page-card__copy">Drop a file and put it on-chain in three guided steps. Text, images, audio, HTML, JSON.</p>
-        <span class="page-card__cta">Open Inscribe →</span>
-      </a>
-      <a class="page-card" href="/wizard/" target="_self">
-        <span class="page-card__kicker">Fully managed</span>
-        <strong class="page-card__title">Inscription Wizard</strong>
-        <p class="page-card__copy">Drop any file — pay once and it comes back inscribed. Large files, auto audio optimisation, relationships.</p>
-        <span class="page-card__cta">Open the Wizard →</span>
-      </a>
-      <a class="page-card" href="/xplorer" target="_self">
-        <span class="page-card__kicker">Browse</span>
-        <strong class="page-card__title">Xtrata Xplorer</strong>
-        <p class="page-card__copy">Explore every inscription on the contract — latest first, filters, deep links to any token.</p>
-        <span class="page-card__cta">Open the Xplorer →</span>
-      </a>
-      <a class="page-card" href="/my-wallet" target="_self">
-        <span class="page-card__kicker">Your ledger</span>
-        <strong class="page-card__title">My Wallet</strong>
-        <p class="page-card__copy">Your inscriptions in one grid — view, send, and look up any wallet or .btc name.</p>
-        <span class="page-card__cta">Open My Wallet →</span>
-      </a>
-      <a class="page-card" href="/market" target="_self">
-        <span class="page-card__kicker">Trade</span>
-        <strong class="page-card__title">Market</strong>
-        <p class="page-card__copy">Buy and sell inscriptions for STX, sBTC, or USDCx — with STX-free checkout on sponsored listings.</p>
-        <span class="page-card__cta">Open the Market →</span>
-      </a>
-      <a class="page-card" href="/drops" target="_self">
-        <span class="page-card__kicker">Claim free</span>
-        <strong class="page-card__title">Drops</strong>
-        <p class="page-card__copy">Claim free inscriptions with zero STX — creators prepay the network fee. Connect a wallet and it's yours.</p>
-        <span class="page-card__cta">Open Drops →</span>
-      </a>
-    </section>
-
-    <!-- Example views: open in the Xplorer (home page only). -->
-    <details class="home-examples" id="homeExamples" aria-label="Galleries">
-      <summary class="home-examples__label">Galleries</summary>
-      <div class="home-examples__list">
-        <a class="wallet-example-chip" href="/xplorer?wallet=dyle.btc&amp;sel=296" target="_self" title="Early Stacks-native art inscriptions by DYLE.">Art by DYLE</a>
-        <a class="wallet-example-chip" href="/xplorer?gallery=jim-music" target="_self" title="Early on-chain music, audio, samples, stems, and songs.">Music by Various</a>
-        <a class="wallet-example-chip" href="/xplorer?gallery=code-various" target="_self" title="Early code inscriptions and recursive Web3 experiments.">Code by Various</a>
-        <a class="wallet-example-chip" href="/xplorer?gallery=agent-27" target="_self" title="Early autonomous agent memory inscriptions.">Agent 27</a>
-        <a class="wallet-example-chip" href="/xplorer?gallery=v1-origins" target="_self" title="The original Xtrata core, xtrata-v1-1-1.">v1 origins</a>
-        <a class="wallet-example-chip" href="/xplorer?gallery=stacksboard" target="_self" title="The Stacksboard inscription.">Stacksboard</a>
-        <a class="wallet-example-chip" href="/xplorer" target="_self" title="Newest inscriptions from the active Xtrata core.">Latest</a>
+    <section class="home-activity home-only" aria-labelledby="activityTitle">
+      <div class="home-activity__intro">
+        <span class="section-kicker">Alive now</span>
+        <h2 id="activityTitle">Follow the work, not the transactions.</h2>
       </div>
-    </details>
+      <div class="home-activity__list" id="homeActivityList"></div>
+    </section>
+
+    <section class="homepage-section home-only" id="possibilities" aria-labelledby="possibilitiesTitle">
+      <div class="section-heading">
+        <span class="section-kicker">All of this is Xtrata</span>
+        <h2 id="possibilitiesTitle">A file is only the beginning.</h2>
+        <p>Every example below opens a real Xtrata object, collection, or live product surface.</p>
+      </div>
+      <div class="possibility-grid" id="possibilityGrid"></div>
+    </section>
+
+    <section class="homepage-section home-only" aria-labelledby="intentTitle">
+      <div class="section-heading section-heading--split">
+        <div>
+          <span class="section-kicker">Choose your door</span>
+          <h2 id="intentTitle">What did you come to do?</h2>
+        </div>
+        <p>The mechanics stay powerful. The first step stays human.</p>
+      </div>
+      <div class="intent-grid" id="intentGrid"></div>
+    </section>
+
+    <section class="object-life home-only" aria-labelledby="objectLifeTitle">
+      <div class="object-life__copy">
+        <span class="section-kicker">One object. Many possible lives.</span>
+        <h2 id="objectLifeTitle">Create it once. Let it keep becoming.</h2>
+        <p>An on-chain object can move through culture and software without losing its creator, history, or material.</p>
+        <a class="text-link" href="/inscribe" target="_self" data-home-action="lifecycle:create">Start an object's life →</a>
+      </div>
+      <div class="life-map" aria-label="An object can be created, owned, shared, sold, given, remixed, connected, played, or built with">
+        <div class="life-map__origin"><span>01</span><strong>Create</strong></div>
+        <div class="life-map__trunk" aria-hidden="true"></div>
+        <div class="life-map__core"><span>02</span><strong>Own</strong></div>
+        <div class="life-map__branches">
+          <span>Share</span><span>Sell</span><span>Give</span><span>Remix</span><span>Connect</span><span>Play</span><span>Build with</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="homepage-section home-only" aria-labelledby="storiesTitle">
+      <div class="section-heading">
+        <span class="section-kicker">Flagship stories</span>
+        <h2 id="storiesTitle">Three ways the idea becomes real.</h2>
+      </div>
+      <div class="campaign-slot" id="campaignSlot" aria-live="polite"></div>
+      <div class="story-grid">
+        <article class="story-card story-card--free">
+          <span class="story-card__number">01 / Proof of Free</span>
+          <h3>Nothing to buy. Nothing to fund. Just claim it.</h3>
+          <p>Sponsored transactions turn an on-chain object into a genuine free distribution experience.</p>
+          <a class="text-link" href="/drops" target="_self" data-home-action="story:proof-of-free">See free drops →</a>
+        </article>
+        <article class="story-card story-card--music">
+          <span class="story-card__number">02 / Living credits</span>
+          <h3>Music that can live with its story.</h3>
+          <p>A song can carry artwork, editions, parent works, tools, and provenance as connected objects.</p>
+          <a class="text-link" href="/wizard/suno" data-home-action="story:music">Make a song permanent →</a>
+        </article>
+        <article class="story-card story-card--play">
+          <span class="story-card__number">03 / Composability</span>
+          <h3>From collectible to playable object.</h3>
+          <p>Load an inscription into an app, a game, an instrument, or an experience that did not exist when it was created.</p>
+          <a class="text-link" href="/xplorer?gallery=code-various" target="_self" data-home-action="story:playable">Explore working code →</a>
+        </article>
+      </div>
+    </section>
+
+    <section class="ecosystem-flywheel home-only" aria-labelledby="flywheelTitle">
+      <div class="ecosystem-flywheel__copy">
+        <span class="section-kicker">The public creation flywheel</span>
+        <h2 id="flywheelTitle">The submission is the object.</h2>
+        <p>It is the work, its provenance, its collectible form, and the beginning of what it can become—not merely proof that something happened.</p>
+      </div>
+      <ol class="flywheel" aria-label="Public challenge ecosystem">
+        <li><span>01</span><strong>Challenge</strong><small>A real invitation goes live</small></li>
+        <li><span>02</span><strong>Create</strong><small>Makers submit real work</small></li>
+        <li><span>03</span><strong>Exhibit</strong><small>Objects form a public gallery</small></li>
+        <li><span>04</span><strong>Collect</strong><small>People own and share the work</small></li>
+        <li><span>05</span><strong>Reuse</strong><small>Builders connect new experiences</small></li>
+        <li><span>06</span><strong>Discover</strong><small>New creators enter the cycle</small></li>
+      </ol>
+    </section>
+
+    <section class="technical-foundation home-only" aria-labelledby="foundationTitle">
+      <div class="technical-foundation__heading">
+        <span class="section-kicker">Why it keeps working</span>
+        <h2 id="foundationTitle">Remarkable above. Exact underneath.</h2>
+        <p>Record it. Reference it. Retrieve it. The infrastructure story is the proof behind the experience.</p>
+      </div>
+      <div class="foundation-grid">
+        <article><span>Stored</span><strong>Media lives in inscription data.</strong><p>No required external media host.</p></article>
+        <article><span>Reconstructable</span><strong>Objects can be independently rebuilt.</strong><p>The website is a gateway, not the source of truth.</p></article>
+        <article><span>Programmable</span><strong>Relationships stay machine-readable.</strong><p>Origins, dependencies, and connected works can be used by apps.</p></article>
+        <article><span>Owned</span><strong>Wallets hold and move the object.</strong><p>Market, transfer, and collection flows use the same identity.</p></article>
+        <article><span>Anchored</span><strong>Stacks settles with Bitcoin finality.</strong><p>Fast interaction with a durable settlement layer.</p></article>
+        <article><span>Open</span><strong>SDKs let other applications participate.</strong><p>Build a gallery, game, launchpad, archive, or something new.</p></article>
+      </div>
+    </section>
+
+    <section class="final-invitation home-only" aria-labelledby="finalInvitationTitle">
+      <span class="section-kicker">Your turn</span>
+      <h2 id="finalInvitationTitle">What will you put on-chain?</h2>
+      <p>Make an object, launch a free drop, explore the living archive, or build an experience around it.</p>
+      <div class="final-invitation__actions">
+        <a class="btn" href="/inscribe" target="_self" data-home-action="final:create">Create something</a>
+        <a class="btn secondary" href="/drops" target="_self" data-home-action="final:drop">Launch a free drop</a>
+        <a class="btn secondary" href="/xplorer" target="_self" data-home-action="final:explore">Explore Xtrata</a>
+        <a class="btn secondary" href="/#build" target="_self" data-home-action="final:build">Build with the SDK</a>
+      </div>
+    </section>
 
     <main class="workspace">
       <section class="panel" aria-labelledby="inscribeTitle">
@@ -675,7 +688,18 @@
                   <div class="field-inline">
                     <input class="input" id="transferRecipientInput" autocomplete="off" placeholder="ST..." />
                     <button class="btn" id="transferButton" type="button" disabled>Send</button>
-                    <button class="btn" id="listForSaleButton" type="button" disabled>List for sale</button>
+                    <div class="wallet-action-stack">
+                      <button class="btn" id="listForSaleButton" type="button" disabled>List for sale</button>
+                      <div class="wallet-drop-action">
+                        <button class="btn" id="dropItButton" type="button" disabled>Drop It</button>
+                        <button
+                          class="drop-it-info"
+                          type="button"
+                          aria-label="Recipients claim for zero STX with Xverse or Leather. You prepay a small sponsorship deposit, and unused STX is refunded after the claim or cancellation."
+                          data-tooltip="100% gasless for recipients: anyone with Xverse or Leather claims for 0 STX. You prepay a small sponsorship deposit; unused STX is refunded."
+                        >i</button>
+                      </div>
+                    </div>
                   </div>
                 </label>
                 <span class="field-note" id="transferStatus">Select one of your inscriptions to send.</span>
@@ -754,6 +778,22 @@
             </div>
           </details>
           <div class="status" id="dropsStatus"><span>Loading drops…</span></div>
+          <details class="claim-diagnostics" id="dropsDiagnostics">
+            <summary>
+              <span>Claim diagnostics</span>
+              <span class="badge" id="dropsDiagnosticsBadge">ready</span>
+            </summary>
+            <div class="claim-diagnostics__body">
+              <p class="field-hint">
+                Each sponsored attempt is recorded step by step. Raw signed transactions and private wallet data are never printed.
+              </p>
+              <div class="claim-diagnostics__actions">
+                <button class="market-chip" id="dropsDiagnosticsCopy" type="button">Copy log</button>
+                <button class="market-chip" id="dropsDiagnosticsClear" type="button">Clear</button>
+              </div>
+              <ol class="claim-diagnostics__log" id="dropsDiagnosticsLog" aria-live="polite"></ol>
+            </div>
+          </details>
           <div class="market-listings" id="dropsListings"></div>
           <p class="field-hint" id="dropsFootnote">
             Drops settle through the Xtrata drops contract. Claims are sponsored — the
@@ -763,11 +803,13 @@
       </section>
     </main>
 
-    <section class="panel homepage-docs" id="docs" aria-labelledby="docsTitle">
+    <section class="panel homepage-docs" id="build" aria-labelledby="docsTitle">
+      <span class="anchor-target" id="docs" aria-hidden="true"></span>
       <div class="panel-head">
         <div>
-          <h2 class="panel-title" id="docsTitle">Documentation</h2>
-          <p class="panel-subtitle">Reference paths for users, SDK builders, artists, integrators, and agents.</p>
+          <span class="section-kicker">Build with Xtrata</span>
+          <h2 class="panel-title" id="docsTitle">The object layer is open.</h2>
+          <p class="panel-subtitle">SDKs, contract references, launch guides, and reconstruction tools for builders, artists, integrators, and agents.</p>
         </div>
         <div class="docs-actions">
           <a class="btn ghost" href="https://github.com/stxtrata/xtrata/blob/main-staging/xtrata-1.0/docs/documentation-index.md" target="_blank" rel="noreferrer">Docs index</a>
@@ -838,7 +880,7 @@
         <a href="/manage">Artist portal</a>
         <a href="/web/migrate.html">Migrate to v3</a>
         <a href="https://x.com/XtrataLayers" target="_blank" rel="noreferrer">Xtrata on X</a>
-        <a href="/?explorer=latest">Xplorer</a>
+        <a href="/xplorer">Explore</a>
       </nav>
       <label class="footer-theme">
         <span>Style</span>
@@ -874,6 +916,7 @@
     <div class="fullscreen-viewer__stage" id="fullscreenStage">No selection</div>
   </div>
 
+  <script type="module" src="/src/home/homepage.js"></script>
   <script type="module" src="/src/home/main.js"></script>
 </body>
 </html>

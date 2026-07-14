@@ -32,24 +32,28 @@ import {
   AnchorMode,
   AuthType,
   ClarityType,
+  NonFungibleConditionCode,
   PayloadType,
   PostConditionMode,
   TransactionVersion,
   addressToString,
   AddressVersion,
-  broadcastTransaction,
   cvToJSON,
   cvToHex,
+  createAssetInfo,
   deserializeTransaction,
   getAddressFromPrivateKey,
   hexToCV,
   makeContractCall,
+  makeContractNonFungiblePostCondition,
+  serializePostCondition,
   sponsorTransaction,
   uintCV
 } from '@stacks/transactions';
 import { StacksMainnet } from '@stacks/network';
 import { jsonResponse } from '../lib/utils';
 import { run, queryAll, type Env } from '../lib/db';
+import { applyHiroApiKey, getHiroApiKeys, shouldRetryWithNextHiroKey } from '../lib/hiro-keys';
 
 const DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const DEFAULT_MARKETS = [
@@ -61,8 +65,9 @@ const DEFAULT_MARKETS = [
 
 // Buyer-facing function the relayer will sponsor per contract type.
 // Drops contracts expose `claim` (free claim); markets expose `buy`.
+const isDropsContract = (contractId: string) => /\.xtrata-drops-/.test(contractId);
 const sponsoredFunction = (contractId: string) =>
-  /\.xtrata-drops-/.test(contractId) ? 'claim' : 'buy';
+  isDropsContract(contractId) ? 'claim' : 'buy';
 const FEE_MULTIPLIER = 3n;
 const MIN_BUDGET_USTX = 50_000n;
 const MAX_FEE_USTX = 2_000_000n;
@@ -70,6 +75,11 @@ const LOW_BALANCE_USTX = 5_000_000n; // refuse below 5 STX float
 const MAX_UNSETTLED = 20;
 const SETTLE_BATCH = 4; // jobs advanced per incoming request
 const SETTLE_TIMEOUT_MS = 2 * 3_600_000;
+// Mempool drop statuses can race block ingestion: Hiro may briefly report a
+// transaction as dropped_replace_by_fee from one index while the canonical
+// transaction endpoint is about to expose that exact tx as successful. Do
+// not turn a single early observation into a terminal user-facing failure.
+const TX_TERMINAL_GRACE_MS = 60_000;
 // A sponsored buy/claim tx is a few hundred bytes; cap the hex well above
 // that but low enough to bound deserialization work on garbage input.
 const MAX_TXHEX_CHARS = 20_000;
@@ -77,6 +87,10 @@ const MAX_TXHEX_CHARS = 20_000;
 // wallet cannot fill the global unsettled queue. Mirrors the Node svc.
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW_MS = 3_600_000;
+// A reservation has no durable transaction id until broadcast succeeds. Keep
+// this short so a transport exception cannot block the same free drop for the
+// full settlement lease. Retrying the identical tx is safe and idempotent.
+const RECEIVED_TIMEOUT_MS = 2 * 60_000;
 // A job stuck in an in-flight signing state longer than this is assumed to
 // have crashed between lease and broadcast; it reverts one state and retries.
 // (Crash AFTER broadcast can cause one duplicate claim-fee attempt — bounded
@@ -93,26 +107,123 @@ const CORS = {
 type SponsorEnv = Env & {
   SPONSOR_KEY?: string;
   SPONSOR_MARKETS?: string;
+  HIRO_API_KEYS?: string;
   HIRO_API_KEY?: string;
+  VITE_HIRO_API_KEY?: string;
 };
 
-const hiroHeaders = (env: SponsorEnv): HeadersInit =>
-  env.HIRO_API_KEY ? { 'x-api-key': env.HIRO_API_KEY } : {};
+type RelayerDiagnostics = {
+  requestId: string;
+  traceId?: string;
+  stage: string;
+};
 
 const HIRO = 'https://api.hiro.so';
 
 const allowlist = (env: SponsorEnv) =>
   (env.SPONSOR_MARKETS?.split(',').map((s) => s.trim()).filter(Boolean) ?? DEFAULT_MARKETS);
 
-const err = (code: string, message: string, status = 400) =>
-  jsonResponse({ code, message }, status, CORS);
-
 // ---------------------------------------------------------------- chain helpers
+
+const hiroFetch = async (env: SponsorEnv, path: string, init: RequestInit = {}): Promise<Response> => {
+  // HIRO_API_KEY historically held one key, while current deployments may
+  // store a comma/newline list. Never place the raw secret in a header: an
+  // embedded newline makes the Workers fetch API throw `Invalid header value`
+  // before any request leaves the relayer.
+  const keys = getHiroApiKeys(env as unknown as Record<string, unknown>);
+  const attempts: Array<string | null> = [...keys, null];
+  let lastError: unknown;
+  for (let index = 0; index < attempts.length; index += 1) {
+    const apiKey = attempts[index];
+    const headers = new Headers(init.headers);
+    try {
+      applyHiroApiKey(headers, apiKey);
+    } catch (error) {
+      lastError = error;
+      continue;
+    }
+    try {
+      const response = await fetch(`${HIRO}${path}`, { ...init, headers });
+      const hasAnotherAttempt = index < attempts.length - 1;
+      if (hasAnotherAttempt && shouldRetryWithNextHiroKey(response.status)) {
+        continue;
+      }
+      return response;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Hiro request failed');
+};
+
+const hiroJson = async <T>(env: SponsorEnv, path: string, init: RequestInit = {}): Promise<T> => {
+  const response = await hiroFetch(env, path, init);
+  if (!response.ok) {
+    throw new Error(`Hiro request returned HTTP ${response.status}`);
+  }
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new Error('Hiro request returned invalid JSON');
+  }
+};
+
+type HiroBroadcastResult = { txid: string } | { error: string; reason?: string };
+
+const isTransactionKnown = async (env: SponsorEnv, txid: string): Promise<boolean> => {
+  try {
+    const response = await hiroFetch(env, `/extended/v1/tx/0x${txid.replace(/^0x/, '')}`);
+    return response.ok;
+  } catch {
+    return false;
+  }
+};
+
+const broadcastViaHiro = async (
+  env: SponsorEnv,
+  tx: ReturnType<typeof deserializeTransaction>
+): Promise<HiroBroadcastResult> => {
+  const expectedTxid = tx.txid().replace(/^0x/, '');
+  let response: Response;
+  try {
+    response = await hiroFetch(env, '/v2/transactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: tx.serialize() as BodyInit
+    });
+  } catch (error) {
+    // A transport can lose the response after the node accepted the bytes.
+    // Treat the exact transaction as accepted if Hiro already knows its txid.
+    if (await isTransactionKnown(env, expectedTxid)) return { txid: expectedTxid };
+    throw error;
+  }
+
+  const text = await response.text();
+  if (response.ok) {
+    const txid = text.trim().replace(/^"|"$/g, '').replace(/^0x/, '');
+    if (!/^[0-9a-f]{64}$/i.test(txid)) {
+      throw new Error('Hiro broadcast returned an invalid transaction id');
+    }
+    return { txid };
+  }
+
+  // Retrying after a lost response can produce a duplicate/nonce rejection
+  // even though this exact transaction is already in the mempool.
+  if (await isTransactionKnown(env, expectedTxid)) return { txid: expectedTxid };
+  let rejected: { error?: unknown; reason?: unknown } = {};
+  try {
+    rejected = JSON.parse(text) as { error?: unknown; reason?: unknown };
+  } catch {
+    // Preserve only the HTTP status when the upstream body is not structured.
+  }
+  const error = String(rejected.error ?? `HTTP ${response.status}`);
+  const reason = String(rejected.reason ?? rejected.error ?? `Hiro broadcast returned HTTP ${response.status}`);
+  return { error, reason };
+};
 
 const estimateBuyFee = async (env: SponsorEnv): Promise<bigint> => {
   try {
-    const r = await fetch(`${HIRO}/v2/fees/transfer`, { headers: hiroHeaders(env) });
-    const rate = Number(await r.json());
+    const rate = Number(await hiroJson<unknown>(env, '/v2/fees/transfer'));
     return BigInt(Math.max(3000, rate * 600));
   } catch {
     return 30_000n;
@@ -120,19 +231,20 @@ const estimateBuyFee = async (env: SponsorEnv): Promise<bigint> => {
 };
 
 const getBalance = async (env: SponsorEnv, address: string): Promise<bigint> => {
-  const r = await fetch(`${HIRO}/extended/v1/address/${address}/stx`, { headers: hiroHeaders(env) });
-  const j = (await r.json()) as { balance?: string };
-  return BigInt(j.balance ?? '0');
+  const result = await hiroJson<{ balance?: unknown }>(env, `/extended/v1/address/${address}/stx`);
+  if (typeof result.balance !== 'string' || !/^\d+$/.test(result.balance)) {
+    throw new Error('Hiro balance response is missing a decimal balance');
+  }
+  return BigInt(result.balance);
 };
 
 const getNonce = async (env: SponsorEnv, address: string): Promise<bigint> => {
-  const r = await fetch(`${HIRO}/extended/v1/address/${address}/nonces`, { headers: hiroHeaders(env) });
-  const j = (await r.json()) as { possible_next_nonce?: number };
+  const j = await hiroJson<{ possible_next_nonce?: number }>(env, `/extended/v1/address/${address}/nonces`);
   return BigInt(j.possible_next_nonce ?? 0);
 };
 
 const getTxStatus = async (env: SponsorEnv, txid: string): Promise<string> => {
-  const r = await fetch(`${HIRO}/extended/v1/tx/0x${txid.replace(/^0x/, '')}`, { headers: hiroHeaders(env) });
+  const r = await hiroFetch(env, `/extended/v1/tx/0x${txid.replace(/^0x/, '')}`);
   if (!r.ok) return 'pending';
   const j = (await r.json()) as { tx_status?: string };
   return j.tx_status ?? 'pending';
@@ -140,12 +252,15 @@ const getTxStatus = async (env: SponsorEnv, txid: string): Promise<string> => {
 
 const getListing = async (env: SponsorEnv, contractId: string, listingId: string) => {
   const [address, name] = contractId.split('.');
-  const r = await fetch(`${HIRO}/v2/contracts/call-read/${address}/${name}/get-listing`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...hiroHeaders(env) },
-    body: JSON.stringify({ sender: address, arguments: [cvToHex(uintCV(BigInt(listingId)))] })
-  });
-  const j = (await r.json()) as { okay?: boolean; result?: string };
+  const j = await hiroJson<{ okay?: boolean; result?: string }>(
+    env,
+    `/v2/contracts/call-read/${address}/${name}/get-listing`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sender: address, arguments: [cvToHex(uintCV(BigInt(listingId)))] })
+    }
+  );
   if (!j.okay || !j.result) return null;
   const parsed = cvToJSON(hexToCV(j.result)) as { value?: { value?: Record<string, { value: unknown }> } };
   const rec = parsed?.value?.value;
@@ -154,6 +269,7 @@ const getListing = async (env: SponsorEnv, contractId: string, listingId: string
   return {
     budgetRemaining: BigInt(String((rec['budget-remaining'] as { value: unknown }).value)),
     nftContract: String((rec['nft-contract'] as { value: unknown }).value),
+    tokenId: BigInt(String((rec['token-id'] as { value: unknown }).value)),
     soldAt: soldRaw === null || soldRaw === undefined ? null : String((soldRaw as { value?: unknown }).value ?? soldRaw)
   };
 };
@@ -182,7 +298,7 @@ const sponsorCall = async (
     anchorMode: AnchorMode.Any,
     postConditionMode: PostConditionMode.Allow
   });
-  const res = await broadcastTransaction(tx, network);
+  const res = await broadcastViaHiro(env, tx);
   if ((res as { error?: string }).error) {
     throw new Error((res as { reason?: string; error?: string }).reason ?? (res as { error?: string }).error);
   }
@@ -201,7 +317,37 @@ const VALIDATION = {
   BAD_ARGS: 'call arguments must be (nft-contract <trait>, listing-id uint)',
   WRONG_NETWORK: 'transaction is not a mainnet transaction',
   NO_POST_CONDITIONS: 'buyer post-conditions required',
-  PC_MODE: 'post-condition mode must be deny'
+  PC_MODE: 'post-condition mode must be deny',
+  WRONG_POST_CONDITIONS: 'post-conditions do not exactly authorize the selected NFT claim'
+};
+
+const bytesToHex = (bytes: Uint8Array) =>
+  [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+
+const hasExactDropClaimPostCondition = (
+  tx: ReturnType<typeof deserializeTransaction>,
+  contractId: string,
+  listing: { nftContract: string; tokenId: bigint }
+) => {
+  if (!isDropsContract(contractId)) return true;
+  const actual = (tx as unknown as { postConditions?: { values?: unknown[] } }).postConditions?.values ?? [];
+  if (actual.length !== 1) return false;
+  const [dropAddress, dropName] = contractId.split('.');
+  const [nftAddress, nftName] = listing.nftContract.split('.');
+  if (!dropAddress || !dropName || !nftAddress || !nftName) return false;
+  const expected = makeContractNonFungiblePostCondition(
+    dropAddress,
+    dropName,
+    NonFungibleConditionCode.Sends,
+    createAssetInfo(nftAddress, nftName, 'xtrata-inscription'),
+    uintCV(listing.tokenId)
+  );
+  try {
+    return bytesToHex(serializePostCondition(actual[0] as Parameters<typeof serializePostCondition>[0])) ===
+      bytesToHex(serializePostCondition(expected));
+  } catch {
+    return false;
+  }
 };
 
 const validatePayload = (txHex: string, markets: string[]) => {
@@ -282,6 +428,10 @@ const ensureTable = async (env: SponsorEnv) => {
   )`);
   // Older deployments lack updated_at; ALTER is idempotent via the catch.
   await run(env, `ALTER TABLE sponsor_jobs ADD COLUMN updated_at INTEGER`).catch(() => undefined);
+  await run(env, `ALTER TABLE sponsor_jobs ADD COLUMN reservation_key TEXT`).catch(() => undefined);
+  await run(env, `CREATE UNIQUE INDEX IF NOT EXISTS idx_sponsor_jobs_reservation ON sponsor_jobs (reservation_key)`).catch(
+    () => undefined
+  );
   await run(env, `CREATE INDEX IF NOT EXISTS idx_sponsor_jobs_buyer ON sponsor_jobs (buyer, created_at)`).catch(
     () => undefined
   );
@@ -304,10 +454,18 @@ const transition = async (
 ): Promise<boolean> => {
   const result = (await run(
     env,
-    `UPDATE sponsor_jobs SET state=?, updated_at=?${extra.sets ? `, ${extra.sets}` : ''} WHERE id=? AND state=?`,
-    [to, Date.now(), ...(extra.binds ?? []), id, from]
+    `UPDATE sponsor_jobs SET state=?, updated_at=?, reservation_key=CASE WHEN ? IN ('SETTLED','ABANDONED') THEN NULL ELSE reservation_key END${extra.sets ? `, ${extra.sets}` : ''} WHERE id=? AND state=?`,
+    [to, Date.now(), to, ...(extra.binds ?? []), id, from]
   )) as { meta?: { changes?: number } };
   return (result.meta?.changes ?? 0) === 1;
+};
+
+const abandonUnbroadcastJob = async (env: SponsorEnv, id: string, reason: string) => {
+  await run(
+    env,
+    `UPDATE sponsor_jobs SET state='ABANDONED', reservation_key=NULL, payload_hash=NULL, error=?, updated_at=? WHERE id=? AND state='RECEIVED'`,
+    [`broadcast: ${reason}`, Date.now(), id]
+  );
 };
 
 type JobRow = {
@@ -315,6 +473,7 @@ type JobRow = {
   buyer: string | null; payload_hash: string | null; fee_ustx: string | null;
   buy_tx: string | null; claim_tx: string | null; refund_tx: string | null;
   error: string | null; created_at: number;
+  reservation_key?: string | null;
 };
 
 const jobJson = (job: JobRow) => ({
@@ -335,6 +494,7 @@ const settleBatch = async (env: SponsorEnv, key: string) => {
   // Recover jobs stranded in an in-flight signing state by a crashed worker:
   // after LEASE_TIMEOUT_MS they revert one state and get retried.
   const staleBefore = Date.now() - LEASE_TIMEOUT_MS;
+  const receivedStaleBefore = Date.now() - RECEIVED_TIMEOUT_MS;
   await run(
     env,
     `UPDATE sponsor_jobs SET state='CONFIRMED', updated_at=? WHERE state='CLAIMING' AND COALESCE(updated_at, created_at) < ?`,
@@ -348,9 +508,34 @@ const settleBatch = async (env: SponsorEnv, key: string) => {
   // RECEIVED = reserved but never broadcast (worker crashed pre-broadcast).
   await run(
     env,
-    `UPDATE sponsor_jobs SET state='ABANDONED', error='never broadcast', updated_at=? WHERE state='RECEIVED' AND COALESCE(updated_at, created_at) < ?`,
-    [Date.now(), staleBefore]
+    `UPDATE sponsor_jobs SET state='ABANDONED', reservation_key=NULL, payload_hash=NULL, error='never broadcast', updated_at=? WHERE state='RECEIVED' AND COALESCE(updated_at, created_at) < ?`,
+    [Date.now(), receivedStaleBefore]
   ).catch(() => undefined);
+
+  // Repair jobs that were terminalized from a transient mempool drop before
+  // the canonical transaction record became visible. The exact txid is the
+  // authority here: only that transaction resolving to success can revive
+  // the job, so an unrelated purchase cannot trigger sponsor reimbursement.
+  const recoverable = await rows<JobRow>(
+    env,
+    `SELECT * FROM sponsor_jobs
+     WHERE state='ABANDONED' AND buy_tx IS NOT NULL AND error LIKE 'buy tx %'
+       AND COALESCE(updated_at, created_at) > ?
+     ORDER BY updated_at DESC LIMIT ?`,
+    [Date.now() - SETTLE_TIMEOUT_MS, SETTLE_BATCH]
+  );
+  for (const job of recoverable) {
+    try {
+      if (await getTxStatus(env, job.buy_tx ?? '') === 'success') {
+        await transition(env, job.id, 'ABANDONED', 'CONFIRMED', {
+          sets: 'error=?',
+          binds: [null]
+        });
+      }
+    } catch {
+      // Recovery is best-effort. Normal settlement/status traffic retries it.
+    }
+  }
 
   const pending = await rows<JobRow>(
     env,
@@ -371,6 +556,11 @@ const settleBatch = async (env: SponsorEnv, key: string) => {
           continue;
         }
         if (status !== 'success') {
+          if (Date.now() - job.created_at < TX_TERMINAL_GRACE_MS) {
+            // Recheck on the next client poll. A canonical success must win
+            // over a racing mempool drop observation.
+            continue;
+          }
           await transition(env, job.id, 'SPONSORED', 'ABANDONED', {
             sets: 'error=?',
             binds: [`buy tx ${status}`]
@@ -417,21 +607,41 @@ const settleBatch = async (env: SponsorEnv, key: string) => {
 
 // ---------------------------------------------------------------- handler
 
-export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
+const handleRequest = async (
+  context: Parameters<PagesFunction<SponsorEnv>>[0],
+  diagnostics: RelayerDiagnostics
+): Promise<Response> => {
   const { request, env } = context;
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
 
-  const key = env.SPONSOR_KEY?.trim();
-  if (!key) return err('RELAYER_DISABLED', 'sponsor relayer not configured (set the SPONSOR_KEY secret)', 503);
+  const fail = (code: string, message: string, status = 400, headers: HeadersInit = CORS) =>
+    jsonResponse({ code, message, requestId: diagnostics.requestId, stage: diagnostics.stage }, status, headers);
+  const rawKey = env.SPONSOR_KEY?.trim();
+  if (!rawKey) return fail('RELAYER_DISABLED', 'sponsor relayer not configured (set the SPONSOR_KEY secret)', 503);
+  // Secrets are commonly pasted with 0x, but @stacks/transactions expects
+  // canonical key hex (optionally ending in the 01 compression marker).
+  const key = rawKey.replace(/^0x/i, '');
+  if (!/^[0-9a-f]{64}(?:01)?$/i.test(key)) {
+    return fail('RELAYER_KEY_INVALID', 'sponsor relayer key is not valid Stacks private-key hex', 503);
+  }
+  let sponsorAddress: string;
+  try {
+    sponsorAddress = getAddressFromPrivateKey(key, TransactionVersion.Mainnet);
+  } catch {
+    return fail('RELAYER_KEY_INVALID', 'sponsor relayer key could not derive a Stacks address', 503);
+  }
 
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, '');
+  diagnostics.stage = 'DB_INIT';
   await ensureTable(env);
 
   // advance settlement on every request (bounded)
+  diagnostics.stage = 'SETTLEMENT';
   await settleBatch(env, key);
 
   if (path.endsWith('/sponsor/quote') && request.method === 'POST') {
+    diagnostics.stage = 'QUOTE';
     const est = await estimateBuyFee(env);
     let budget = est * FEE_MULTIPLIER;
     if (budget < MIN_BUDGET_USTX) budget = MIN_BUDGET_USTX;
@@ -449,45 +659,49 @@ export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
   }
 
   if (path.endsWith('/sponsor/submit') && request.method === 'POST') {
+    diagnostics.stage = 'SUBMIT_PARSE';
     const body = (await request.json().catch(() => ({}))) as {
       txHex?: string;
       contractId?: string;
       listingId?: string | number;
     };
     if (!body.txHex || !body.contractId || body.listingId === undefined) {
-      return err('BAD_REQUEST', 'txHex, contractId, listingId required');
+      return fail('BAD_REQUEST', 'txHex, contractId, listingId required');
     }
     // Cheap offline checks FIRST: no chain reads, no wallet, no D1 writes
     // happen until the signed payload itself has been validated.
+    diagnostics.stage = 'SUBMIT_VALIDATE';
     const txHex = String(body.txHex).replace(/^0x/, '');
     if (txHex.length > MAX_TXHEX_CHARS || !/^[0-9a-fA-F]+$/.test(txHex) || txHex.length % 2 !== 0) {
-      return err('VALIDATION', 'txHex must be canonical hex within size limits');
+      return fail('VALIDATION', 'txHex must be canonical hex within size limits');
     }
     if (!/^\d+$/.test(String(body.listingId))) {
-      return err('VALIDATION', 'listingId must be an unsigned decimal integer');
+      return fail('VALIDATION', 'listingId must be an unsigned decimal integer');
     }
 
     const validated = validatePayload(txHex, allowlist(env));
-    if ('error' in validated) return err('VALIDATION', VALIDATION[validated.error]);
+    if ('error' in validated) return fail('VALIDATION', VALIDATION[validated.error]);
     // The SIGNED transaction is authoritative. Request metadata must agree
     // with it exactly — otherwise the relayer would check one listing's
     // budget and settle against it while broadcasting a different call.
-    if (validated.contractId !== body.contractId) return err('VALIDATION', 'contractId mismatch with signed transaction');
+    if (validated.contractId !== body.contractId) return fail('VALIDATION', 'contractId mismatch with signed transaction');
     if (validated.listingId !== BigInt(String(body.listingId))) {
-      return err('VALIDATION', 'listingId mismatch with signed transaction');
+      return fail('VALIDATION', 'listingId mismatch with signed transaction');
     }
     const contractId = validated.contractId;
     const listingId = validated.listingId;
 
     // Rolling per-origin limit: one wallet cannot fill the global queue.
+    diagnostics.stage = 'SUBMIT_RATE_LIMIT';
     const recent = await rows<{ n: number }>(
       env,
       `SELECT COUNT(*) as n FROM sponsor_jobs WHERE buyer=? AND created_at > ? AND state != 'ABANDONED'`,
       [validated.buyer, Date.now() - RATE_LIMIT_WINDOW_MS]
     );
     if ((recent[0]?.n ?? 0) >= RATE_LIMIT_MAX) {
-      return jsonResponse(
-        { code: 'RATE_LIMITED', message: 'too many recent sponsorships for this address' },
+      return fail(
+        'RATE_LIMITED',
+        'too many recent sponsorships for this address',
         429,
         { ...CORS, 'Retry-After': '600' }
       );
@@ -497,42 +711,99 @@ export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
       env,
       `SELECT COUNT(*) as n FROM sponsor_jobs WHERE state NOT IN ('SETTLED','ABANDONED')`
     );
-    if ((unsettled[0]?.n ?? 0) >= MAX_UNSETTLED) return err('AT_CAPACITY', 'too many unsettled sponsorships', 503);
+    if ((unsettled[0]?.n ?? 0) >= MAX_UNSETTLED) return fail('AT_CAPACITY', 'too many unsettled sponsorships', 503);
 
-    const sponsorAddress = getAddressFromPrivateKey(key, TransactionVersion.Mainnet);
-    if ((await getBalance(env, sponsorAddress)) < LOW_BALANCE_USTX) {
-      return err('LOW_BALANCE', 'sponsor wallet below reserve; try a self-paid buy', 503);
+    diagnostics.stage = 'SPONSOR_BALANCE';
+    let sponsorBalance: bigint;
+    try {
+      sponsorBalance = await getBalance(env, sponsorAddress);
+    } catch (error) {
+      console.error('[sponsor:balance]', {
+        requestId: diagnostics.requestId,
+        traceId: diagnostics.traceId,
+        sponsorAddress,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return fail('RELAYER_UNAVAILABLE', 'sponsor balance lookup unavailable; retry shortly', 503);
+    }
+    if (sponsorBalance < LOW_BALANCE_USTX) {
+      return fail('LOW_BALANCE', 'sponsor wallet below reserve; try a self-paid buy', 503);
     }
 
+    diagnostics.stage = 'LISTING_READ';
     const listing = await getListing(env, contractId, listingId.toString());
-    if (!listing) return err('LISTING_NOT_FOUND', 'listing unknown');
-    if (listing.soldAt !== null) return err('LISTING_SOLD', 'listing already sold');
+    if (!listing) return fail('LISTING_NOT_FOUND', 'listing unknown');
+    if (listing.soldAt !== null) return fail('LISTING_SOLD', 'listing already sold');
     if (listing.nftContract !== validated.nftContractId) {
-      return err('VALIDATION', 'nft contract mismatch between signed transaction and listing');
+      return fail('VALIDATION', 'nft contract mismatch between signed transaction and listing');
     }
-    const fee = await estimateBuyFee(env);
-    if (fee > MAX_FEE_USTX) return err('FEE_TOO_LARGE', 'network fee above relayer cap', 503);
-    if (listing.budgetRemaining < fee) return err('BUDGET_TOO_SMALL', 'listing budget cannot cover the fee');
+    if (!hasExactDropClaimPostCondition(validated.tx, contractId, listing)) {
+      return fail('VALIDATION', VALIDATION.WRONG_POST_CONDITIONS);
+    }
+    diagnostics.stage = 'FEE_ESTIMATE';
+    const estimatedFee = await estimateBuyFee(env);
+    let fee = estimatedFee;
+    if (isDropsContract(contractId)) {
+      // A free drop cannot offer a self-paid fallback. Cap transient fee-rate
+      // spikes at the amount the contract can reimburse. The node still
+      // enforces whether that fee is sufficient before accepting broadcast,
+      // and claim-fee can repay the sponsor exactly if it confirms.
+      fee = [estimatedFee, listing.budgetRemaining, MAX_FEE_USTX].reduce(
+        (smallest, candidate) => candidate < smallest ? candidate : smallest
+      );
+      if (fee < estimatedFee) {
+        console.warn('[sponsor:fee-cap]', {
+          requestId: diagnostics.requestId,
+          traceId: diagnostics.traceId,
+          contractId,
+          listingId: listingId.toString(),
+          estimatedFeeUstx: estimatedFee.toString(),
+          budgetRemainingUstx: listing.budgetRemaining.toString(),
+          sponsoredFeeUstx: fee.toString()
+        });
+      }
+    } else {
+      if (fee > MAX_FEE_USTX) return fail('FEE_TOO_LARGE', 'network fee above relayer cap', 503);
+      if (listing.budgetRemaining < fee) {
+        return fail(
+          'BUDGET_TOO_SMALL',
+          `listing budget ${listing.budgetRemaining} µSTX cannot cover estimated fee ${fee} µSTX`
+        );
+      }
+    }
 
     // Reserve the payload hash BEFORE broadcasting: the unique constraint
     // makes concurrent duplicate submissions collide here, not at the wallet.
+    diagnostics.stage = 'JOB_RESERVATION';
     const payloadHash = await sha256Hex(txHex);
     const id = `sp-${Date.now().toString(36)}-${payloadHash.slice(0, 8)}`;
     try {
       await run(
         env,
-        `INSERT INTO sponsor_jobs (id, state, contract_id, listing_id, buyer, payload_hash, fee_ustx, created_at, updated_at)
-         VALUES (?, 'RECEIVED', ?, ?, ?, ?, ?, ?, ?)`,
-        [id, contractId, listingId.toString(), validated.buyer, payloadHash, fee.toString(), Date.now(), Date.now()]
+        `INSERT INTO sponsor_jobs (id, state, contract_id, listing_id, buyer, payload_hash, reservation_key, fee_ustx, created_at, updated_at)
+         VALUES (?, 'RECEIVED', ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, contractId, listingId.toString(), validated.buyer, payloadHash, `${contractId}:${listingId}`, fee.toString(), Date.now(), Date.now()]
       );
     } catch {
       const existing = await rows<JobRow>(env, `SELECT * FROM sponsor_jobs WHERE payload_hash=?`, [payloadHash]);
-      if (existing.length) return jsonResponse(jobJson(existing[0]), 409, CORS);
-      return err('DUPLICATE', 'payload already sponsored', 409);
+      if (existing.length) {
+        return jsonResponse({ code: 'DUPLICATE', message: 'payload already sponsored', requestId: diagnostics.requestId, stage: diagnostics.stage, ...jobJson(existing[0]) }, 409, CORS);
+      }
+      const reserved = await rows<JobRow>(
+        env,
+        `SELECT * FROM sponsor_jobs WHERE reservation_key=? AND state NOT IN ('SETTLED','ABANDONED')`,
+        [`${contractId}:${listingId}`]
+      );
+      if (reserved.length) {
+        return jsonResponse({ code: 'LISTING_BUSY', message: 'this drop or listing already has a sponsorship in progress', requestId: diagnostics.requestId, stage: diagnostics.stage, ...jobJson(reserved[0]) }, 409, CORS);
+      }
+      return fail('DUPLICATE', 'payload already sponsored', 409);
     }
 
     const transaction = deserializeTransaction(txHex);
+    diagnostics.stage = 'SPONSOR_NONCE';
     const nonce = await getNonce(env, sponsorAddress);
+    diagnostics.stage = 'SPONSOR_SIGN';
     const sponsored = await sponsorTransaction({
       transaction,
       sponsorPrivateKey: key,
@@ -540,11 +811,28 @@ export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
       sponsorNonce: nonce,
       network
     });
-    const res = await broadcastTransaction(sponsored, network);
+    diagnostics.stage = 'BROADCAST';
+    const expectedTxid = sponsored.txid().replace(/^0x/, '');
+    let res: HiroBroadcastResult;
+    try {
+      res = await broadcastViaHiro(env, sponsored);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      console.error('[sponsor:broadcast]', {
+        requestId: diagnostics.requestId,
+        traceId: diagnostics.traceId,
+        contractId,
+        listingId: listingId.toString(),
+        expectedTxid,
+        error: reason
+      });
+      await abandonUnbroadcastJob(env, id, 'upstream unavailable');
+      return fail('RELAYER_UNAVAILABLE', 'broadcast upstream unavailable; retry shortly', 503);
+    }
     if ((res as { error?: string }).error) {
       const reason = String((res as { reason?: string }).reason ?? (res as { error?: string }).error);
-      await transition(env, id, 'RECEIVED', 'ABANDONED', { sets: 'error=?', binds: [`broadcast: ${reason}`] });
-      return err('BROADCAST', reason, 502);
+      await abandonUnbroadcastJob(env, id, reason);
+      return fail('BROADCAST', reason, 502);
     }
     const buyTx = String((res as { txid?: string }).txid ?? res);
     await transition(env, id, 'RECEIVED', 'SPONSORED', { sets: 'buy_tx=?', binds: [buyTx] });
@@ -553,10 +841,42 @@ export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
 
   const statusMatch = path.match(/\/sponsor\/status\/([^/]+)$/);
   if (statusMatch && request.method === 'GET') {
+    diagnostics.stage = 'STATUS';
     const found = await rows<JobRow>(env, `SELECT * FROM sponsor_jobs WHERE id=?`, [statusMatch[1]]);
-    if (!found.length) return err('NOT_FOUND', 'job unknown', 404);
+    if (!found.length) return fail('NOT_FOUND', 'job unknown', 404);
     return jsonResponse(jobJson(found[0]), 200, CORS);
   }
 
-  return err('NOT_FOUND', 'no such route', 404);
+  return fail('NOT_FOUND', 'no such route', 404);
+};
+
+export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
+  const requestId = crypto.randomUUID();
+  const traceId = context.request.headers.get('cf-ray') ?? undefined;
+  const diagnostics: RelayerDiagnostics = { requestId, traceId, stage: 'REQUEST_PREFLIGHT' };
+  try {
+    return await handleRequest(context, diagnostics);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const path = new URL(context.request.url).pathname;
+    console.error('[sponsor:request]', {
+      requestId,
+      traceId,
+      stage: diagnostics.stage,
+      method: context.request.method,
+      path,
+      error: message
+    });
+    return jsonResponse(
+      {
+        code: 'RELAYER_INTERNAL',
+        message: `sponsor relayer failed during ${diagnostics.stage}`,
+        requestId,
+        stage: diagnostics.stage,
+        ...(traceId ? { traceId } : {})
+      },
+      500,
+      CORS
+    );
+  }
 };

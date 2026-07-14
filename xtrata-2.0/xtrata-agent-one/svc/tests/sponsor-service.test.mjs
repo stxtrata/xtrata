@@ -178,7 +178,6 @@ test('failed buy tx → ABANDONED; aborted claim still refunds the seller', asyn
   assert.equal(j1.state, 'ABANDONED');
 
   // buy succeeds, claim aborts (e.g. cap race) → refund still issued, dust 0-claim recorded
-  let call = 0;
   const chainClaimAbort = mockChain({
     getTxStatus: async (txid) => (String(txid).startsWith('claim-fee') ? 'abort_by_response' : 'success')
   });

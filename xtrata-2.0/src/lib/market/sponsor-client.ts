@@ -17,7 +17,9 @@ export type SponsorJobState =
   | 'RECEIVED'
   | 'SPONSORED'
   | 'CONFIRMED'
+  | 'CLAIMING'
   | 'CLAIMED'
+  | 'REFUNDING'
   | 'SETTLED'
   | 'ABANDONED';
 
@@ -34,23 +36,53 @@ export type SponsorErrorCode =
   | 'LOW_BALANCE'
   | 'RATE_LIMITED'
   | 'DUPLICATE'
+  | 'LISTING_BUSY'
   | 'BUDGET_TOO_SMALL'
   | 'LISTING_SOLD'
   | 'VALIDATION'
+  | 'RELAYER_INTERNAL'
+  | 'RELAYER_KEY_INVALID'
+  | 'BROADCAST'
   | 'UNKNOWN';
+
+type SponsorErrorDetails = {
+  httpStatus?: number;
+  requestId?: string;
+  stage?: string;
+  traceId?: string;
+  relayerCode?: string;
+};
 
 export class SponsorClientError extends Error {
   code: SponsorErrorCode;
   /** true when the buyer can still complete the purchase self-paid */
   fallbackToSelfPaid: boolean;
-  constructor(code: SponsorErrorCode, message: string) {
+  existingJob?: SponsorJob;
+  httpStatus?: number;
+  requestId?: string;
+  stage?: string;
+  traceId?: string;
+  relayerCode?: string;
+  constructor(
+    code: SponsorErrorCode,
+    message: string,
+    existingJob?: SponsorJob,
+    details: SponsorErrorDetails = {}
+  ) {
     super(message);
     this.code = code;
-    this.fallbackToSelfPaid = code !== 'LISTING_SOLD' && code !== 'DUPLICATE';
+    this.existingJob = existingJob;
+    this.httpStatus = details.httpStatus;
+    this.requestId = details.requestId;
+    this.stage = details.stage;
+    this.traceId = details.traceId;
+    this.relayerCode = details.relayerCode;
+    this.fallbackToSelfPaid = code !== 'LISTING_SOLD' && code !== 'DUPLICATE' && code !== 'LISTING_BUSY';
   }
 }
 
 const VALIDATION_CODES = new Set([
+  'VALIDATION',
   'BAD_TX',
   'NOT_SPONSORED',
   'NONZERO_FEE',
@@ -63,24 +95,36 @@ const VALIDATION_CODES = new Set([
   'FEE_TOO_LARGE'
 ]);
 
-export const mapRelayerError = (code: string | undefined, message: string) => {
+export const mapRelayerError = (
+  code: string | undefined,
+  message: string,
+  existingJob?: SponsorJob,
+  details: SponsorErrorDetails = {}
+) => {
   if (!code) {
-    return new SponsorClientError('UNKNOWN', message);
+    return new SponsorClientError('UNKNOWN', message, existingJob, details);
   }
   if (VALIDATION_CODES.has(code)) {
-    return new SponsorClientError('VALIDATION', message);
+    return new SponsorClientError('VALIDATION', message, existingJob, details);
   }
   const known: SponsorErrorCode[] = [
+    'RELAYER_UNAVAILABLE',
     'AT_CAPACITY',
     'LOW_BALANCE',
     'RATE_LIMITED',
     'DUPLICATE',
+    'LISTING_BUSY',
     'BUDGET_TOO_SMALL',
-    'LISTING_SOLD'
+    'LISTING_SOLD',
+    'RELAYER_INTERNAL',
+    'RELAYER_KEY_INVALID',
+    'BROADCAST'
   ];
   return new SponsorClientError(
     (known as string[]).includes(code) ? (code as SponsorErrorCode) : 'UNKNOWN',
-    message
+    message,
+    existingJob,
+    { ...details, relayerCode: code }
   );
 };
 
@@ -104,9 +148,34 @@ const request = async (
     // fallthrough — handled below
   }
   if (!response.ok) {
+    const possibleJob = typeof body.id === 'string' && typeof body.state === 'string'
+      ? (body as unknown as SponsorJob)
+      : undefined;
+    const requestId = typeof body.requestId === 'string' ? body.requestId : undefined;
+    const stage = typeof body.stage === 'string' ? body.stage : undefined;
+    const traceId = response.headers?.get?.('cf-ray') ?? undefined;
+    const baseMessage =
+      typeof body.message === 'string'
+        ? body.message
+        : typeof body.error === 'string'
+          ? body.error
+          : `relayer returned non-JSON HTTP ${response.status}`;
+    const references = [
+      requestId ? `request ${requestId}` : '',
+      stage ? `stage ${stage}` : '',
+      traceId ? `trace ${traceId}` : ''
+    ].filter(Boolean);
     throw mapRelayerError(
       typeof body.code === 'string' ? body.code : undefined,
-      typeof body.message === 'string' ? body.message : `relayer error ${response.status}`
+      references.length > 0 ? `${baseMessage} (${references.join('; ')})` : baseMessage,
+      possibleJob,
+      {
+        httpStatus: response.status,
+        requestId,
+        stage,
+        traceId,
+        relayerCode: typeof body.code === 'string' ? body.code : undefined
+      }
     );
   }
   return body;

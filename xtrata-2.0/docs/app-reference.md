@@ -64,6 +64,8 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 - `src/screens/CommerceScreen.tsx` owns the dedicated USDCx commerce UI (contract selection, listing lookup, listing creation, purchase, and entitlement checks).
 - `src/screens/PublicCommerceScreen.tsx` wraps the public-facing commerce view around the default registry contract.
 - `src/screens/VaultScreen.tsx` owns the dedicated sBTC vault UI (contract selection, vault lookup, tier checks, premium access checks, and owner vault actions).
+- `web/migrate.html` and `src/migrate-ui.ts` own the standalone migration scan, quote, blocker review, and existing wallet-signed migration flow.
+- `src/lib/migration/quote.ts` provides reusable all-source holdings classification, market-escrow merging, summaries, and itemised protocol/mining quote calculations for migration surfaces.
 - `src/components/TokenCardMedia.tsx` renders grid cell media (image/audio/video/html/text) and handles per-token loading.
 - `src/components/TokenContentPreview.tsx` renders the large preview, resolves content, and exposes preview actions.
 
@@ -185,6 +187,8 @@ To onboard a new collection — and keep the standalone viewer in sync — do al
 - `src/lib/market/actions.ts` centralizes market list/cancel validation helpers.
 - `src/lib/market/settlement.ts` centralizes market settlement asset detection, price parsing/formatting, and buy post-condition building for STX and first-party SIP-010 market flows.
 - `src/lib/market/listing-resolution.ts` resolves page-scoped listing data when activity indexes are incomplete.
+- `src/lib/drops/sponsored-claim.ts` normalizes Xverse/Leather signed sponsored-transaction envelopes, performs the reusable free-claim transaction safety inspection, and polls relayer jobs to a terminal state.
+- `src/home/main.js` owns the public `/drops` claim-round orchestration and embedded diagnostic timeline; `functions/sponsor/[[path]].ts` independently validates and reserves each sponsored drop before broadcast. My Xtrata's `Drop It` action hands the selected token to `/drops?drop=<tokenId>`, which opens and prefills the creation form while retaining an explicit wallet confirmation for the creator's refundable sponsorship deposit.
 
 ## SDK and ecosystem docs
 
@@ -235,6 +239,7 @@ To onboard a new collection — and keep the standalone viewer in sync — do al
 - `src/lib/commerce/__tests__/*.test.ts` covers commerce registry, contract-id parsing, Clarity response parsing, and transaction/read-only helper behavior.
 - `src/lib/vault/__tests__/*.test.ts` covers vault registry, contract-id parsing, Clarity response parsing, and transaction/read-only helper behavior.
 - `src/lib/utils/__tests__/amounts.test.ts` covers fixed-decimal SIP-010 amount parsing/formatting used by commerce and vault input handling.
+- `src/home/__tests__/drops-sponsored-claim.test.ts`, `src/lib/drops/__tests__/sponsored-claim.test.ts`, `src/lib/wallet/__tests__/connect.test.ts`, and `functions/sponsor/__tests__/handler.test.ts` cover the public sponsored-only wiring, Xverse/Leather response normalization, signed free-claim inspection, status polling, exact NFT post-conditions, same-drop concurrency, and complete settlement.
 - `src/lib/collection-mint/__tests__/mining-fee-guidance.test.ts` validates collection mining-fee guidance label formatting.
 - `src/lib/skills/__tests__/xtrata-agent-skill.test.ts` validates the embedded AI training package (`XTRATA_AGENT_SKILL.md` + companion scripts) for required coverage and syntax checks.
 - `functions/lib/__tests__/fee-guidance.test.ts` and `functions/lib/__tests__/collection-fee-guidance-route.test.ts` cover backend mining-fee estimate math and route payload behavior.
