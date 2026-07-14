@@ -66,8 +66,9 @@ const DEFAULT_MARKETS = [
 
 // Buyer-facing function the relayer will sponsor per contract type.
 // Drops contracts expose `claim` (free claim); markets expose `buy`.
+const isDropsContract = (contractId: string) => /\.xtrata-drops-/.test(contractId);
 const sponsoredFunction = (contractId: string) =>
-  /\.xtrata-drops-/.test(contractId) ? 'claim' : 'buy';
+  isDropsContract(contractId) ? 'claim' : 'buy';
 const FEE_MULTIPLIER = 3n;
 const MIN_BUDGET_USTX = 50_000n;
 const MAX_FEE_USTX = 2_000_000n;
@@ -267,7 +268,7 @@ const hasExactDropClaimPostCondition = (
   contractId: string,
   listing: { nftContract: string; tokenId: bigint }
 ) => {
-  if (!/\.xtrata-drops-/.test(contractId)) return true;
+  if (!isDropsContract(contractId)) return true;
   const actual = (tx as unknown as { postConditions?: { values?: unknown[] } }).postConditions?.values ?? [];
   if (actual.length !== 1) return false;
   const [dropAddress, dropName] = contractId.split('.');
@@ -640,9 +641,36 @@ const handleRequest = async (
       return fail('VALIDATION', VALIDATION.WRONG_POST_CONDITIONS);
     }
     diagnostics.stage = 'FEE_ESTIMATE';
-    const fee = await estimateBuyFee(env);
-    if (fee > MAX_FEE_USTX) return fail('FEE_TOO_LARGE', 'network fee above relayer cap', 503);
-    if (listing.budgetRemaining < fee) return fail('BUDGET_TOO_SMALL', 'listing budget cannot cover the fee');
+    const estimatedFee = await estimateBuyFee(env);
+    let fee = estimatedFee;
+    if (isDropsContract(contractId)) {
+      // A free drop cannot offer a self-paid fallback. Cap transient fee-rate
+      // spikes at the amount the contract can reimburse. The node still
+      // enforces whether that fee is sufficient before accepting broadcast,
+      // and claim-fee can repay the sponsor exactly if it confirms.
+      fee = [estimatedFee, listing.budgetRemaining, MAX_FEE_USTX].reduce(
+        (smallest, candidate) => candidate < smallest ? candidate : smallest
+      );
+      if (fee < estimatedFee) {
+        console.warn('[sponsor:fee-cap]', {
+          requestId: diagnostics.requestId,
+          traceId: diagnostics.traceId,
+          contractId,
+          listingId: listingId.toString(),
+          estimatedFeeUstx: estimatedFee.toString(),
+          budgetRemainingUstx: listing.budgetRemaining.toString(),
+          sponsoredFeeUstx: fee.toString()
+        });
+      }
+    } else {
+      if (fee > MAX_FEE_USTX) return fail('FEE_TOO_LARGE', 'network fee above relayer cap', 503);
+      if (listing.budgetRemaining < fee) {
+        return fail(
+          'BUDGET_TOO_SMALL',
+          `listing budget ${listing.budgetRemaining} µSTX cannot cover estimated fee ${fee} µSTX`
+        );
+      }
+    }
 
     // Reserve the payload hash BEFORE broadcasting: the unique constraint
     // makes concurrent duplicate submissions collide here, not at the wallet.

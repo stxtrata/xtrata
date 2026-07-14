@@ -140,15 +140,17 @@ const broadcasts: string[] = [];
 const balanceApiKeys: Array<string | null> = [];
 let rejectAuthenticatedBalanceRequests = false;
 let failBalanceLookup = false;
+let feeRate = 1;
 
 const stubFetch = () => {
   broadcasts.length = 0;
   balanceApiKeys.length = 0;
   rejectAuthenticatedBalanceRequests = false;
   failBalanceLookup = false;
+  feeRate = 1;
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    if (url.includes('/v2/fees/transfer')) return new Response('1', { status: 200 });
+    if (url.includes('/v2/fees/transfer')) return new Response(String(feeRate), { status: 200 });
     if (url.includes('/stx')) {
       const apiKey = new Headers(init?.headers).get('x-api-key');
       balanceApiKeys.push(apiKey);
@@ -291,6 +293,44 @@ describe('sponsor relayer Pages handler', () => {
     });
     expect(broadcasts).toHaveLength(0);
     consoleError.mockRestore();
+  });
+
+  it('caps a free-drop sponsor fee at the exact reimbursable budget during a transient fee spike', async () => {
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    feeRate = 250; // 150,000 µSTX estimate versus the fixture's 100,000 µSTX budget
+    const res = await submit(env, {
+      txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 3n, nonce: 0n }),
+      contractId: DROPS,
+      listingId: '3'
+    });
+    expect(res.status).toBe(200);
+    expect(db.jobs[0].fee_ustx).toBe('100000');
+    expect(broadcasts).toHaveLength(1);
+    expect(consoleWarn).toHaveBeenCalledWith(
+      '[sponsor:fee-cap]',
+      expect.objectContaining({
+        estimatedFeeUstx: '150000',
+        budgetRemainingUstx: '100000',
+        sponsoredFeeUstx: '100000'
+      })
+    );
+    consoleWarn.mockRestore();
+  });
+
+  it('keeps the strict insufficient-budget block for sponsored market buys', async () => {
+    feeRate = 250;
+    const res = await submit(env, {
+      txHex: await fixture({ listingId: 7n }),
+      contractId: MARKET,
+      listingId: '7'
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      code: 'BUDGET_TOO_SMALL',
+      stage: 'FEE_ESTIMATE',
+      message: 'listing budget 100000 µSTX cannot cover estimated fee 150000 µSTX'
+    });
+    expect(broadcasts).toHaveLength(0);
   });
 
   it('normalizes a 0x-prefixed sponsor secret before deriving and signing', async () => {

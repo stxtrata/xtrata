@@ -73,6 +73,7 @@ Useful failure labels:
 - `CANCELLED` / `WALLET_ERROR`: the wallet did not return a usable signed transaction; record wallet name and version.
 - `VALIDATION`: the relayer rejected a payload that passed the client; compare the logged contract, drop, and post-condition checks with server logs.
 - `LISTING_BUSY` / `DUPLICATE`: expected concurrency protection; the UI should resume the returned job.
+- `BUDGET_TOO_SMALL`: sponsored market buys remain blocked when their escrow cannot cover the estimated fee. Free drops instead cap the attached fee at the smaller of the estimate, the remaining reimbursable escrow, and the relayer maximum; `[sponsor:fee-cap]` records all three values. If that capped fee is genuinely too low, the node rejects it safely at `BROADCAST` before the claim confirms.
 - `LOW_BALANCE` / `AT_CAPACITY` / `RELAYER_UNAVAILABLE`: relayer operations issue; no self-paid free-claim fallback occurs.
 - `RELAYER_UNAVAILABLE` at `SPONSOR_BALANCE`: the sponsor balance API could not be read even after key rotation and the public fallback. Retry once, then correlate the request id with `[sponsor:balance]`; this is distinct from `LOW_BALANCE` and does not mean the hot wallet needs funding.
 - `RELAYER_KEY_INVALID`: the Pages secret is not usable Stacks private-key hex; replace it and redeploy.
