@@ -17,6 +17,7 @@ const adapter = createStacksWalletAdapter({
   appName: 'Xtrata Agent One',
   appIcon: '/favicon.ico',
 });
+let activePayment: Promise<void> | null = null;
 
 const XtrataWallet = {
   async connect(): Promise<string | null> {
@@ -115,7 +116,10 @@ const XtrataWallet = {
   // Opens the connected wallet to send STX. showStxTransfer already prefers the
   // modern stx_transferStx request that current Xverse expects (legacy popup fallback).
   pay(opts: { recipient: string; amount: string | number; network?: string }): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
+    if (activePayment) {
+      return activePayment;
+    }
+    const payment = new Promise<void>((resolve, reject) => {
       const sender = adapter.getSession().address;
       showStxTransfer({
         recipient: opts.recipient,
@@ -129,6 +133,13 @@ const XtrataWallet = {
         onError: (error) => reject(error instanceof Error ? error : new Error(String(error))),
       } as unknown as Parameters<typeof showStxTransfer>[0]);
     });
+    activePayment = payment;
+    void payment.finally(() => {
+      if (activePayment === payment) {
+        activePayment = null;
+      }
+    }).catch(() => undefined);
+    return payment;
   },
 };
 

@@ -648,7 +648,7 @@
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=12"></script>
+<script src="agent-one.js?v=13"></script>
 <script src="optimize-audio.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script>
@@ -690,11 +690,15 @@ async function api(path, opts){
 }
 function copyBtn(text){ return `<button class="copy" onclick="navigator.clipboard.writeText('${esc(text)}');this.textContent='copied'">copy</button>`; }
 function xtrataWallet(){ return window.XtrataWallet || null; }
+let WALLET_PAYMENT_PENDING=false;
 async function openWallet(addr, ustx){
+  if(WALLET_PAYMENT_PENDING) return;
   const w=xtrataWallet();
   if(!w||!w.pay){ alert('Wallet bundle not loaded.\nCopy the address and amount shown and send manually.'); return; }
+  WALLET_PAYMENT_PENDING=true;
   try{ await w.pay({ recipient:addr, amount:String(ustx), network:(SERVER.net==='testnet'?'testnet':'mainnet') }); }
   catch(e){ alert('Could not open the wallet to pay:\n'+((e&&e.message)||e)+'\n\nCopy the address and amount shown and send manually.'); }
+  finally{ WALLET_PAYMENT_PENDING=false; }
 }
 window.openWallet=openWallet;
 

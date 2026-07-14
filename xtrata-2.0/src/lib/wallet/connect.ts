@@ -247,33 +247,6 @@ const normalizeNetwork = (value: unknown, fallback: NetworkType = 'mainnet'): Ne
   return fallback;
 };
 
-const extractXverseStacksNetworkName = (payload: unknown, depth = 0): string | null => {
-  if (depth > 6 || !payload || typeof payload !== 'object') {
-    return null;
-  }
-  const candidate = payload as Record<string, unknown>;
-  const stacks = candidate.stacks;
-  if (typeof stacks === 'string' && stacks.trim()) {
-    return stacks.trim();
-  }
-  if (stacks && typeof stacks === 'object') {
-    const name = toNonEmptyText((stacks as Record<string, unknown>).name);
-    if (name) {
-      return name;
-    }
-  }
-  for (const key of ['result', 'data', 'network', 'payload', 'response']) {
-    if (!(key in candidate)) {
-      continue;
-    }
-    const nested = extractXverseStacksNetworkName(candidate[key], depth + 1);
-    if (nested) {
-      return nested;
-    }
-  }
-  return null;
-};
-
 const normalizeBigIntLike = (value: unknown) => {
   if (typeof value === 'undefined' || value === null) {
     return undefined;
@@ -855,33 +828,34 @@ const getXverseStacksAccount = async (provider: StacksProvider) =>
   );
 
 const ensureXverseMainnetPaymentSession = async (provider: StacksProvider) => {
-  let networkName: string | null = null;
+  // Do not put wallet_getNetwork in front of a user-triggered payment. Some
+  // Xverse versions expose the signing bridge but leave the newer silent
+  // permission read pending, which prevents stx_transferStx from ever opening.
+  // wallet_changeNetwork is the explicit, user-facing network guard: it is a
+  // no-op on Mainnet and prompts for a switch otherwise.
+  // eslint-disable-next-line no-console
+  console.info('[wallet:stx-transfer]', { stage: 'XVERSE_MAINNET_ENSURE' });
   try {
-    const network = await requestWalletRpc(provider, 'wallet_getNetwork');
-    networkName = extractXverseStacksNetworkName(network);
+    await requestWalletRpc(provider, 'wallet_changeNetwork', {
+      name: XVERSE_MAINNET_NETWORK_NAME
+    });
   } catch (error) {
     if (isUserCancelledError(error)) {
       throw error;
     }
-    // A cached site session can outlive Xverse's account-read permission.
-    // wallet_connect is the documented recovery path for that condition and
-    // also supports older Xverse builds without wallet_getNetwork.
-    return connectXverseMainnet(provider);
-  }
-
-  if (!networkName) {
-    return connectXverseMainnet(provider);
-  }
-
-  if (networkName.trim().toLowerCase() !== 'mainnet') {
-    // wallet_connect may return an already-authorized account without changing
-    // the wallet's active network. Use Xverse's explicit switch request so the
-    // following transaction opens under the same Mainnet context as the dApp.
-    await requestWalletRpc(provider, 'wallet_changeNetwork', {
-      name: XVERSE_MAINNET_NETWORK_NAME
+    // Older Xverse versions and stale permission sessions can reject the
+    // explicit switch. Reconnect with Mainnet pinned, which is the documented
+    // compatibility path and returns the active Stacks account in one request.
+    // eslint-disable-next-line no-console
+    console.info('[wallet:stx-transfer]', {
+      stage: 'XVERSE_MAINNET_RECONNECT',
+      message: error instanceof Error ? error.message : String(error)
     });
+    return connectXverseMainnet(provider);
   }
 
+  // eslint-disable-next-line no-console
+  console.info('[wallet:stx-transfer]', { stage: 'XVERSE_ACCOUNT_CHECK' });
   try {
     const session = await getXverseStacksAccount(provider);
     return session.isConnected ? session : connectXverseMainnet(provider);
@@ -1587,7 +1561,6 @@ export const __testing = {
   extractStacksAddress,
   extractStacksPublicKey,
   extractSupportedMethods,
-  extractXverseStacksNetworkName,
   getConnectAttempts,
   isMethodUnsupportedError,
   isUserCancelledError,
