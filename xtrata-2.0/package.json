@@ -54,7 +54,7 @@
   },
   "dependencies": {
     "@noble/hashes": "^1.4.0",
-    "@stacks/connect": "^7.8.0",
+    "@stacks/connect": "^8.2.6",
     "@stacks/network": "^6.11.0",
     "@stacks/transactions": "^6.11.0",
     "@stacks/wallet-sdk": "^7.4.0",

@@ -43,7 +43,11 @@
       isWizardShellRequest,
       WIZARD_EMBED_ROUTE
     } from '/src/home/page-mode.js';
-    import { showContractCall, signSponsoredContractCall } from '/src/lib/wallet/connect.ts';
+    import {
+      formatWalletError,
+      showContractCall,
+      signSponsoredContractCall
+    } from '/src/lib/wallet/connect.ts';
     import {
       CONTRACT_REGISTRY,
       getLegacyContract
@@ -226,6 +230,16 @@
     });
 
     const $ = (id) => document.getElementById(id);
+    const escapeHtmlText = (value) => String(value ?? '').replace(
+      /[&<>"']/g,
+      (character) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      })[character]
+    );
 
     // Page mode classified pre-paint by the router script in index.html <head>.
     // Primary tab page modes control which panels are
@@ -9129,9 +9143,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           }
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = formatWalletError(error);
         appendLog(`Wallet connect failed: ${message}`);
-        setStatus(dom.walletStatus, `<strong>Wallet error</strong> ${message}`, 'error', 'rose');
+        setStatus(dom.walletStatus, `<strong>Wallet error</strong> ${escapeHtmlText(message)}`, 'error', 'rose');
       } finally {
         setBusy(false);
         updateControls();
@@ -11230,29 +11244,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       ];
     };
 
-    const dropClaimSelfPaid = (drop) => {
-      const [nftAddress, nftName] = drop.nftContract.split('.');
-      const postConditions = dropClaimPostConditions(drop);
-      dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the claim in your wallet…</span>';
-      showContractCall({
-        contractAddress: drop.entry.address,
-        contractName: drop.entry.contractName,
-        functionName: 'claim',
-        functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(drop.dropId)],
-        network: drop.entry.network,
-        stxAddress: state.walletSession.address,
-        postConditionMode: PostConditionMode.Deny,
-        postConditions,
-        onFinish: (payload) => {
-          const txId = payload?.txId ?? payload?.txid ?? '';
-          dropsDom.status.innerHTML = `<span><strong>Drops</strong> claim submitted${txId ? ` — tx ${txId}` : ''}.</span><span class="badge green">claimed</span>`;
-        },
-        onCancel: () => {
-          dropsDom.status.innerHTML = '<span><strong>Drops</strong> claim cancelled.</span>';
-        }
-      });
-    };
-
     const dropClaim = async (drop) => {
       if (!state.walletSession.isConnected || !state.walletSession.address) {
         dropsDom.status.innerHTML = '<span><strong>Drops</strong> connect a wallet to claim — new wallets work, no STX needed.</span>';
@@ -11280,9 +11271,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           postConditions
         });
       } catch (error) {
-        debugLog('drops', 'sponsored signing unavailable', { error: String(error?.message ?? error) }, 'warn');
-        dropsDom.status.innerHTML = `<span><strong>Drops</strong> sponsored signing unavailable (${String(error?.message ?? error)}) — claiming self-paid instead.</span>`;
-        dropClaimSelfPaid(drop);
+        const message = formatWalletError(error);
+        debugLog('drops', 'sponsored signing unavailable', { error: message }, 'warn');
+        dropsDom.status.innerHTML = `<span><strong>Drops</strong> free sponsored signing is unavailable (${escapeHtmlText(message)}). No transaction was submitted and no wallet fee will be charged. Please reconnect the wallet and retry.</span>`;
         return;
       }
       if (!signed) {
@@ -11320,8 +11311,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           debugLog('drops', 'sponsored claim broadcast', { jobId: body?.id ?? null, buyTx });
           dropsDom.status.innerHTML = `<span><strong>Drops</strong> claim sponsored and broadcast${buyTx ? ` — tx ${buyTx}` : ''}. The inscription lands in your wallet when it confirms.</span><span class="badge green">no STX needed</span>`;
         } catch (error) {
-          debugLog('drops', 'relayer submit failed', { error: String(error?.message ?? error) }, 'warn');
-          dropsDom.status.innerHTML = `<span><strong>Drops</strong> sponsorship failed (${String(error?.message ?? error)}) — you can claim self-paid instead.</span>`;
+          const message = formatWalletError(error);
+          debugLog('drops', 'relayer submit failed', { error: message }, 'warn');
+          dropsDom.status.innerHTML = `<span><strong>Drops</strong> sponsorship failed (${escapeHtmlText(message)}). No self-paid transaction was opened; please retry the free claim.</span>`;
         }
       }
     };
