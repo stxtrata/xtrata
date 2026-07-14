@@ -146,7 +146,7 @@ function decodeJsStringLiteral(raw){
 function extractRuntimePropString(text, key){
   const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const singleRe = new RegExp(`\\b${escapedKey}\\s*[:=]\\s*'((?:\\\\.|[^'\\\\])*)'`, 'i');
-  const doubleRe = new RegExp(`\\b${escapedKey}\\s*[:=]\\s*\"((?:\\\\.|[^\"\\\\])*)\"`, 'i');
+  const doubleRe = new RegExp(`\\b${escapedKey}\\s*[:=]\\s*"((?:\\\\.|[^"\\\\])*)"`, 'i');
   const single = text.match(singleRe);
   if(single) return decodeJsStringLiteral(single[1]);
   const double = text.match(doubleRe);

@@ -40,7 +40,7 @@ const saveState = (state) => {
   try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* noop */ }
 };
 
-export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', mount = null } = {}) => {
+export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
   if (!tokenIds.length || typeof document === 'undefined') {
     return null;
   }
@@ -386,7 +386,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ contract: PLAYABLE_CONTRACT, tokenId: Number(tokenId), verdict, reason: reason || '' })
-      });
+      }).catch(() => undefined);
     } catch { /* advisory only */ }
   };
   const persistDud = (tokenId) => {
@@ -1049,7 +1049,9 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
   // nothing downloads to this browser). Big films get warm before anyone tunes in.
   const pingWarm = (ids) => {
     radioLog('warm ping', ids || 'auto=2', ids);
-    try { void fetch(ids ? `/warm?ids=${ids}` : '/warm?auto=2'); } catch { /* noop */ }
+    try {
+      void fetch(ids ? `/warm?ids=${ids}` : '/warm?auto=2').catch(() => undefined);
+    } catch { /* best-effort */ }
   };
   // Start warming a few seconds after init, off the critical page-load path.
   const idle = window.requestIdleCallback || ((fn) => window.setTimeout(fn, 2500));
@@ -1062,8 +1064,6 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
   // Self-paced ticker: each section holds, scrolls fully to its end so it can
   // be read in full, then advances. No fixed timers cutting text off.
   const HOLD_MS = 2400;        // pause before scrolling starts
-  const HOLD_SHORT_MS = 5000;  // dwell time for text that fits without scrolling
-  const END_HOLD_MS = 1800;    // pause at the end of a scrolled section
   const SCROLL_PX_PER_S = 26;  // reading-speed scroll
   const FILLERS = [
     'ALL MUSIC 100% ON-CHAIN',

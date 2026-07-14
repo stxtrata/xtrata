@@ -64,7 +64,7 @@
     <header class="topbar">
       <div class="brand-wrap">
         <a class="brand" href="/" aria-label="Xtrata home">
-          <img class="brand-logo" src="https://nxhyvj3lifp2q34nklffzxslfje426oxeruo3lkuj56srwgctdlq.arweave.net/bc-Kp2tBX6hvjVLKXN5LKknNedckaO2tVE99KNjCmNc" alt="" />
+          <img class="brand-logo" src="/favicon.svg" alt="" />
           <span class="brand-name">
             <span class="brand-wordmark">XTRATA</span>
             <span class="brand-tagline">Living on-chain objects, anchored to Bitcoin</span>
@@ -767,6 +767,22 @@
             </div>
           </details>
           <div class="status" id="dropsStatus"><span>Loading drops…</span></div>
+          <details class="claim-diagnostics" id="dropsDiagnostics">
+            <summary>
+              <span>Claim diagnostics</span>
+              <span class="badge" id="dropsDiagnosticsBadge">ready</span>
+            </summary>
+            <div class="claim-diagnostics__body">
+              <p class="field-hint">
+                Each sponsored attempt is recorded step by step. Raw signed transactions and private wallet data are never printed.
+              </p>
+              <div class="claim-diagnostics__actions">
+                <button class="market-chip" id="dropsDiagnosticsCopy" type="button">Copy log</button>
+                <button class="market-chip" id="dropsDiagnosticsClear" type="button">Clear</button>
+              </div>
+              <ol class="claim-diagnostics__log" id="dropsDiagnosticsLog" aria-live="polite"></ol>
+            </div>
+          </details>
           <div class="market-listings" id="dropsListings"></div>
           <p class="field-hint" id="dropsFootnote">
             Drops settle through the Xtrata drops contract. Claims are sponsored — the

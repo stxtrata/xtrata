@@ -73,6 +73,105 @@ describe('createSponsorClient', () => {
     ).rejects.toMatchObject({ code: 'LOW_BALANCE', fallbackToSelfPaid: true });
   });
 
+  it('preserves a server-side balance lookup outage as RELAYER_UNAVAILABLE', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      jsonResponse(
+        {
+          code: 'RELAYER_UNAVAILABLE',
+          message: 'sponsor balance lookup unavailable; retry shortly',
+          requestId: 'req-balance',
+          stage: 'SPONSOR_BALANCE'
+        },
+        503
+      )
+    );
+    const client = createSponsorClient('https://relayer.example', fetchImpl);
+    await expect(
+      client.submit({ txHex: '00', contractId: 'SP0.m', listingId: 1n })
+    ).rejects.toMatchObject({
+      code: 'RELAYER_UNAVAILABLE',
+      relayerCode: 'RELAYER_UNAVAILABLE',
+      requestId: 'req-balance',
+      stage: 'SPONSOR_BALANCE'
+    });
+  });
+
+  it('preserves structured relayer failure metadata for embedded diagnostics', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      Response.json(
+        {
+          code: 'RELAYER_INTERNAL',
+          message: 'sponsor relayer failed during LISTING_READ',
+          requestId: 'req-123',
+          stage: 'LISTING_READ'
+        },
+        { status: 500, headers: { 'cf-ray': 'trace-456' } }
+      )
+    );
+    const client = createSponsorClient('https://relayer.example', fetchImpl);
+    await expect(
+      client.submit({ txHex: '00', contractId: 'SP0.m', listingId: 1n })
+    ).rejects.toMatchObject({
+      code: 'RELAYER_INTERNAL',
+      relayerCode: 'RELAYER_INTERNAL',
+      httpStatus: 500,
+      requestId: 'req-123',
+      stage: 'LISTING_READ',
+      traceId: 'trace-456'
+    });
+  });
+
+  it('describes a non-JSON gateway failure without exposing its response body', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response('<html>private upstream detail</html>', {
+        status: 500,
+        headers: { 'content-type': 'text/html', 'cf-ray': 'trace-789' }
+      })
+    );
+    const client = createSponsorClient('https://relayer.example', fetchImpl);
+    let error: SponsorClientError | undefined;
+    try {
+      await client.quote();
+    } catch (caught) {
+      error = caught as SponsorClientError;
+    }
+    expect(error).toMatchObject({
+      code: 'UNKNOWN',
+      httpStatus: 500,
+      traceId: 'trace-789',
+      message: expect.stringContaining('non-JSON HTTP 500')
+    });
+    expect(error?.message).not.toContain('private upstream detail');
+  });
+
+  it('preserves an active job returned by a same-listing reservation conflict', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      jsonResponse(
+        {
+          code: 'LISTING_BUSY',
+          message: 'claim already in progress',
+          id: 'sp-existing',
+          state: 'SPONSORED',
+          txids: { buy: 'abc' }
+        },
+        409
+      )
+    );
+    const client = createSponsorClient('https://relayer.example', fetchImpl);
+
+    await expect(
+      client.submit({ txHex: '00', contractId: 'SP0.m', listingId: 1n })
+    ).rejects.toMatchObject({
+      code: 'LISTING_BUSY',
+      fallbackToSelfPaid: false,
+      existingJob: {
+        id: 'sp-existing',
+        state: 'SPONSORED',
+        txids: { buy: 'abc' }
+      }
+    });
+  });
+
   it('status() fetches by job id', async () => {
     const fetchImpl = vi
       .fn()
@@ -89,7 +188,7 @@ describe('createSponsorClient', () => {
 
 describe('mapRelayerError', () => {
   it('collapses relayer validation codes into VALIDATION', () => {
-    for (const code of ['NOT_SPONSORED', 'NONZERO_FEE', 'NO_POST_CONDITIONS', 'BAD_TX']) {
+    for (const code of ['VALIDATION', 'NOT_SPONSORED', 'NONZERO_FEE', 'NO_POST_CONDITIONS', 'BAD_TX']) {
       expect(mapRelayerError(code, 'x').code).toBe('VALIDATION');
     }
   });
@@ -101,8 +200,9 @@ describe('mapRelayerError', () => {
     expect(mapRelayerError(undefined, 'x').code).toBe('UNKNOWN');
   });
 
-  it('DUPLICATE and LISTING_SOLD do not offer self-paid fallback', () => {
+  it('DUPLICATE, LISTING_BUSY and LISTING_SOLD do not offer self-paid fallback', () => {
     expect(new SponsorClientError('DUPLICATE', 'x').fallbackToSelfPaid).toBe(false);
+    expect(new SponsorClientError('LISTING_BUSY', 'x').fallbackToSelfPaid).toBe(false);
     expect(new SponsorClientError('LISTING_SOLD', 'x').fallbackToSelfPaid).toBe(false);
     expect(new SponsorClientError('AT_CAPACITY', 'x').fallbackToSelfPaid).toBe(true);
   });

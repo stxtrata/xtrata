@@ -35,11 +35,14 @@
       GRID_MIME_LABELS,
       EXPLORER_CODE_MIME_TYPES,
       EXPLORER_FILTER_LABELS,
-      TWIN_HOLDER_LABELS,
       PEPE_ESCROW_RESOLVERS
     } from '/src/home/config.js';
     import { initXtrataRadio } from '/src/home/radio.js';
-    import { showContractCall } from '/src/lib/wallet/connect.ts';
+    import {
+      getSelectedWalletProviderId,
+      showContractCall,
+      showSponsoredContractCall
+    } from '/src/lib/wallet/connect.ts';
     import {
       CONTRACT_REGISTRY,
       getLegacyContract
@@ -55,6 +58,14 @@
     } from '/src/lib/market/settlement.ts';
     import { isSponsoredMarket } from '/src/lib/market/sponsored.ts';
     import {
+      SponsorClientError,
+      createSponsorClient
+    } from '/src/lib/market/sponsor-client.ts';
+    import {
+      inspectSponsoredClaimTransaction,
+      pollSponsorJob
+    } from '/src/lib/drops/sponsored-claim.ts';
+    import {
       getMarketListingPublicBlockReason,
       isMarketListingPubliclyBuyable
     } from '/src/lib/market/actions.ts';
@@ -66,7 +77,6 @@
     import { fetchContractAdminStatus } from '/src/lib/contract/admin-status.ts';
     import {
       estimateContractFees,
-      formatMicroStx,
       getFeeSchedule
     } from '/src/lib/contract/fees.ts';
     import {
@@ -268,7 +278,6 @@
       textStats: $('textStats'),
       tabFile: $('tabFile'),
       tabText: $('tabText'),
-      inscriptionForm: $('inscriptionForm'),
       inscribePanelBody: $('inscribePanelBody'),
       textCost: $('textCost'),
       inscribeTextButton: $('inscribeTextButton'),
@@ -609,7 +618,8 @@
         });
       });
 
-    const isAscii = (value) => /^[\x00-\x7F]*$/.test(value);
+    const isAscii = (value) =>
+      Array.from(value).every((character) => character.codePointAt(0) <= 0x7f);
 
     const nowLabel = () =>
       new Intl.DateTimeFormat(undefined, {
@@ -2033,6 +2043,28 @@
       return await response.json();
     };
 
+    const fetchAddressNonce = async (address, network = 'mainnet') => {
+      const response = await fetchHiroJson(
+        `/extended/v1/address/${encodeURIComponent(address)}/nonces`,
+        network
+      );
+      const value = response?.possible_next_nonce;
+      if (typeof value !== 'number' && typeof value !== 'string') {
+        throw Object.assign(new Error('Hiro nonce response omitted possible_next_nonce.'), {
+          code: 'ORIGIN_NONCE_UNAVAILABLE'
+        });
+      }
+      try {
+        const nonce = BigInt(value);
+        if (nonce < 0n) throw new Error('negative nonce');
+        return nonce;
+      } catch {
+        throw Object.assign(new Error(`Hiro returned an invalid origin nonce (${String(value)}).`), {
+          code: 'ORIGIN_NONCE_INVALID'
+        });
+      }
+    };
+
     const parseUintRepr = (value) => {
       const match = String(value ?? '').trim().match(/^u(\d+)$/);
       return match ? BigInt(match[1]) : null;
@@ -2737,6 +2769,9 @@
 
     // Upward navigation: full ancestor lineage (Parents, Grandparents, …) read
     // live from the chain, depth-grouped.
+    // Retained for the static-host fallback path, which can be re-enabled
+    // independently of the combined relationship renderer.
+    // eslint-disable-next-line no-unused-vars
     const renderAncestorsSection = async (token, contractId, section) => {
       const requestId = ++state.selectedParentsRequestId;
       const heading = document.createElement('div');
@@ -2788,6 +2823,7 @@
     // round-trip: children, grandchildren, …, ancestors above direct parents,
     // and half-siblings). Degrades to the local IndexedDB child index + scan
     // button when the endpoint is unavailable (e.g. local/static hosting).
+    // eslint-disable-next-line no-unused-vars
     const renderLineageSection = async (token, contractId, section) => {
       const requestId = ++state.selectedChildrenRequestId;
       const status = document.createElement('div');
@@ -7932,6 +7968,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
     // Fetch (cached per primary contract) the set of primary-minted token ids
     // that fall within the legacy id range, so reads can be routed in one shot.
+    // Retained with the legacy routing cache while older-contract reads remain
+    // supported; the active bulk path no longer calls it directly.
+    // eslint-disable-next-line no-unused-vars
     const getPrimaryMintedIdSet = async (sender, legacyMaxId) => {
       if (!state.client || legacyMaxId === null) {
         return null;
@@ -10725,7 +10764,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           const card = document.createElement('article');
           card.className = 'market-card';
           const symbol = getMarketSettlementLabel(listing.settlement);
-          const decimals = listing.settlement.decimals ?? 6;
           const sponsored = isSponsoredMarket(listing.entry);
           const isOwnListing = !!state.walletSession.address &&
             addressesEqual(listing.seller, state.walletSession.address);
@@ -10863,7 +10901,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       for (const listing of mine) {
         const row = document.createElement('div');
         row.className = 'market-mine__row';
-        const symbol = getMarketSettlementLabel(listing.settlement);
         const sponsored = isSponsoredMarket(listing.entry);
         const publicBlockReason = getListingPublicBlockReason(listing);
         const info = document.createElement('div');
@@ -11127,7 +11164,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // --- Drops: sponsored free claims (data-page 'drops') -------------------
     // Reuses the market module's thumbnail/media caches and card styling; the
     // drops contract exposes market-shaped read-onlys, so reads look identical.
-    const dropsState = { run: 0, drops: [] };
+    const DROP_DIAGNOSTICS_KEY = 'xtrata:drops:diagnostics:v1';
+    const dropsState = { run: 0, drops: [], claimRound: 0, claimsInFlight: new Set() };
     const dropsDom = {
       status: $('dropsStatus'),
       listings: $('dropsListings'),
@@ -11137,11 +11175,83 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       createGroup: $('dropsCreateGroup'),
       createDeposit: $('dropsCreateDeposit'),
       createButton: $('dropsCreateButton'),
-      createStatus: $('dropsCreateStatus')
+      createStatus: $('dropsCreateStatus'),
+      diagnostics: $('dropsDiagnostics'),
+      diagnosticsBadge: $('dropsDiagnosticsBadge'),
+      diagnosticsLog: $('dropsDiagnosticsLog'),
+      diagnosticsCopy: $('dropsDiagnosticsCopy'),
+      diagnosticsClear: $('dropsDiagnosticsClear')
     };
     const dropsEntriesForNetwork = () =>
       DROPS_REGISTRY.filter((entry) => entry.network === state.contract.network);
     let dropsQuote = null; // deposit quote from the relayer (ustx)
+
+    const readDropDiagnostics = () => {
+      try {
+        const parsed = JSON.parse(sessionStorage.getItem(DROP_DIAGNOSTICS_KEY) ?? '[]');
+        return Array.isArray(parsed) ? parsed.slice(-100) : [];
+      } catch {
+        return [];
+      }
+    };
+    let dropDiagnostics = readDropDiagnostics();
+
+    const renderDropDiagnostics = () => {
+      if (!dropsDom.diagnosticsLog) return;
+      dropsDom.diagnosticsLog.replaceChildren(
+        ...dropDiagnostics.map((entry) => {
+          const item = document.createElement('li');
+          item.className = 'claim-diagnostics__entry';
+          item.dataset.tone = entry.tone ?? '';
+          const time = document.createElement('time');
+          time.className = 'claim-diagnostics__time';
+          time.textContent = entry.time;
+          const body = document.createElement('span');
+          body.textContent = `[round ${entry.round} · ${entry.stage}] ${entry.message}`;
+          item.append(time, body);
+          return item;
+        })
+      );
+      const last = dropDiagnostics.at(-1);
+      if (dropsDom.diagnosticsBadge) {
+        dropsDom.diagnosticsBadge.textContent = last?.stage === 'COMPLETE'
+          ? 'passed'
+          : last?.tone === 'error'
+          ? 'blocked'
+          : last?.stage === 'CANCELLED'
+            ? 'cancelled'
+            : dropDiagnostics.length
+              ? 'running'
+              : 'ready';
+      }
+      dropsDom.diagnosticsLog.scrollTop = dropsDom.diagnosticsLog.scrollHeight;
+    };
+
+    const recordDropDiagnostic = (round, stage, message, tone = '') => {
+      const entry = { round, stage, message, tone, time: nowLabel() };
+      dropDiagnostics = [...dropDiagnostics, entry].slice(-100);
+      try {
+        sessionStorage.setItem(DROP_DIAGNOSTICS_KEY, JSON.stringify(dropDiagnostics));
+      } catch {
+        // Diagnostics remain available for this page even if storage is unavailable.
+      }
+      if (dropsDom.diagnostics) dropsDom.diagnostics.open = true;
+      renderDropDiagnostics();
+      debugLog('drops-claim', `${stage}: ${message}`, { round }, tone === 'error' ? 'error' : tone === 'warn' ? 'warn' : 'info');
+    };
+
+    dropsDom.diagnosticsCopy?.addEventListener('click', () => {
+      const text = dropDiagnostics
+        .map((entry) => `${entry.time} [round ${entry.round} · ${entry.stage}] ${entry.message}`)
+        .join('\n');
+      void navigator.clipboard.writeText(text);
+    });
+    dropsDom.diagnosticsClear?.addEventListener('click', () => {
+      dropDiagnostics = [];
+      sessionStorage.removeItem(DROP_DIAGNOSTICS_KEY);
+      renderDropDiagnostics();
+    });
+    renderDropDiagnostics();
 
     const readDrops = async (entry) => {
       const contractId = `${entry.address}.${entry.contractName}`;
@@ -11205,78 +11315,168 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       ];
     };
 
-    const dropClaimSelfPaid = (drop) => {
-      const [nftAddress, nftName] = drop.nftContract.split('.');
-      const postConditions = dropClaimPostConditions(drop);
-      dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the claim in your wallet…</span>';
-      showContractCall({
-        contractAddress: drop.entry.address,
-        contractName: drop.entry.contractName,
-        functionName: 'claim',
-        functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(drop.dropId)],
-        network: drop.entry.network,
-        stxAddress: state.walletSession.address,
-        postConditionMode: PostConditionMode.Deny,
-        postConditions,
-        onFinish: (payload) => {
-          const txId = payload?.txId ?? payload?.txid ?? '';
-          dropsDom.status.innerHTML = `<span><strong>Drops</strong> claim submitted${txId ? ` — tx ${txId}` : ''}.</span><span class="badge green">claimed</span>`;
-        },
-        onCancel: () => {
-          dropsDom.status.innerHTML = '<span><strong>Drops</strong> claim cancelled.</span>';
-        }
-      });
-    };
-
     const dropClaim = async (drop) => {
-      if (!state.walletSession.isConnected || !state.walletSession.address) {
-        dropsDom.status.innerHTML = '<span><strong>Drops</strong> connect a wallet to claim — new wallets work, no STX needed.</span>';
+      const claimKey = `${drop.contractId}:${drop.dropId}`;
+      const round = ++dropsState.claimRound;
+      if (dropsState.claimsInFlight.has(claimKey)) {
+        recordDropDiagnostic(round, 'BLOCK', `Drop #${drop.dropId} already has a claim round in progress.`, 'warn');
         return;
       }
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> connect a wallet to claim — new wallets work, no STX needed.</span>';
+        recordDropDiagnostic(round, 'BLOCK', 'No connected Stacks wallet address.', 'error');
+        return;
+      }
+      dropsState.claimsInFlight.add(claimKey);
+      renderDrops();
       const [nftAddress, nftName] = drop.nftContract.split('.');
       const postConditions = dropClaimPostConditions(drop);
+      const providerId = getSelectedWalletProviderId() ?? 'injected provider';
+      recordDropDiagnostic(round, 'START', `Free claim for drop #${drop.dropId}, inscription #${drop.tokenId}.`);
+      recordDropDiagnostic(round, 'PREFLIGHT', `Wallet ${providerId}; ${drop.entry.network}; connected ${state.walletSession.address}.`);
+      recordDropDiagnostic(round, 'PLAN', `Build sponsored ${drop.contractId}::claim, then stx_signTransaction with broadcast=false; origin fee=0, deny mode, 1 NFT post-condition.`);
       dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the free claim in your wallet (fee 0)…</span>';
-      showContractCall({
-        contractAddress: drop.entry.address,
-        contractName: drop.entry.contractName,
-        functionName: 'claim',
-        functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(drop.dropId)],
-        network: drop.entry.network,
-        stxAddress: state.walletSession.address,
-        postConditionMode: PostConditionMode.Deny,
-        postConditions,
-        sponsored: true,
-        onFinish: async (payload) => {
-          const txHex = payload?.txRaw ?? null;
-          if (!txHex) {
-            dropsDom.status.innerHTML = '<span><strong>Drops</strong> this wallet did not return the signed sponsored transaction — claiming self-paid instead.</span>';
-            dropClaimSelfPaid(drop);
-            return;
-          }
-          dropsDom.status.innerHTML = '<span><strong>Drops</strong> submitting to the sponsor relayer…</span>';
-          try {
-            const base = (drop.entry.sponsorApi ?? '/').replace(/\/+$/, '');
-            const r = await fetch(`${base}/sponsor/submit`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                txHex,
-                contractId: drop.contractId,
-                listingId: drop.dropId.toString()
-              })
-            });
-            const body = await r.json().catch(() => ({}));
-            if (!r.ok) throw new Error(body?.message ?? `relayer ${r.status}`);
-            const buyTx = body?.txids?.buy ?? '';
-            dropsDom.status.innerHTML = `<span><strong>Drops</strong> claim sponsored and broadcast${buyTx ? ` — tx ${buyTx}` : ''}. The inscription lands in your wallet when it confirms.</span><span class="badge green">no STX needed</span>`;
-          } catch (error) {
-            dropsDom.status.innerHTML = `<span><strong>Drops</strong> sponsorship failed (${String(error?.message ?? error)}) — you can claim self-paid instead.</span>`;
-          }
-        },
-        onCancel: () => {
-          dropsDom.status.innerHTML = '<span><strong>Drops</strong> claim cancelled.</span>';
+      try {
+        recordDropDiagnostic(round, 'NONCE_REQUEST', 'Loading the connected address\'s next origin nonce from Hiro.');
+        const originNonce = await fetchAddressNonce(
+          state.walletSession.address,
+          drop.entry.network
+        );
+        recordDropDiagnostic(round, 'ORIGIN_NONCE', `Using public origin nonce ${originNonce}.`, 'success');
+        recordDropDiagnostic(
+          round,
+          'SIGNING_INPUT',
+          state.walletSession.publicKey
+            ? 'Connected session includes a Stacks public key.'
+            : 'No cached public key; the adapter will request account data, then bind the unsigned origin to the connected address if the wallet omits its STX public key.',
+          state.walletSession.publicKey ? 'success' : 'warn'
+        );
+        recordDropDiagnostic(round, 'WALLET_REQUEST', 'Requesting origin signature only; wallet broadcasting is disabled.');
+        const payload = await new Promise((resolve, reject) => {
+          showSponsoredContractCall({
+            contractAddress: drop.entry.address,
+            contractName: drop.entry.contractName,
+            functionName: 'claim',
+            functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(drop.dropId)],
+            network: drop.entry.network,
+            stxAddress: state.walletSession.address,
+            publicKey: state.walletSession.publicKey,
+            nonce: originNonce,
+            postConditionMode: PostConditionMode.Deny,
+            postConditions,
+            sponsored: true,
+            onFinish: resolve,
+            onCancel: () => reject(Object.assign(new Error('Wallet request cancelled.'), { code: 'WALLET_CANCELLED' })),
+            onError: (error) => reject(Object.assign(
+              error instanceof Error ? error : new Error(String(error)),
+              { code: error?.code ?? 'WALLET_REQUEST_FAILED' }
+            ))
+          });
+        });
+        const payloadKeys = payload && typeof payload === 'object'
+          ? Object.keys(payload).sort().join(', ') || 'none'
+          : typeof payload;
+        recordDropDiagnostic(round, 'WALLET_RESPONSE', `Approval returned. Normalized response keys: ${payloadKeys}.`);
+        const inspection = inspectSponsoredClaimTransaction(payload, {
+          dropsContractId: drop.contractId,
+          nftContractId: drop.nftContract,
+          dropId: drop.dropId,
+          tokenId: drop.tokenId,
+          network: drop.entry.network,
+          claimerAddress: state.walletSession.address
+        });
+        for (const check of inspection.checks) {
+          recordDropDiagnostic(round, `CHECK_${check.code}`, check.message, check.ok ? 'success' : 'error');
         }
-      });
+        if (!inspection.ok || !inspection.txHex) {
+          throw Object.assign(new Error('Wallet-signed transaction failed local safety checks.'), {
+            code: 'SIGNED_TX_VALIDATION_FAILED'
+          });
+        }
+        recordDropDiagnostic(round, 'SIGNED_TX_READY', `Validated ${inspection.txHex.length / 2} bytes; tx ${inspection.txId ?? 'id unavailable'}.`, 'success');
+
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> signed claim validated — submitting to the sponsor relayer…</span>';
+        const sponsorClient = createSponsorClient((drop.entry.sponsorApi ?? '/').replace(/\/+$/, ''));
+        recordDropDiagnostic(round, 'RELAYER_SUBMIT', `Submitting signed claim for ${drop.contractId} drop #${drop.dropId}.`);
+        let job;
+        try {
+          job = await sponsorClient.submit({
+            txHex: inspection.txHex,
+            contractId: drop.contractId,
+            listingId: drop.dropId
+          });
+        } catch (error) {
+          if (error instanceof SponsorClientError && error.existingJob) {
+            job = error.existingJob;
+            recordDropDiagnostic(round, 'RELAYER_RESUME', `${error.code}: resuming existing job ${job.id}.`, 'warn');
+          } else {
+            if (error instanceof SponsorClientError) {
+              const references = [
+                error.httpStatus ? `HTTP ${error.httpStatus}` : '',
+                error.stage ? `stage ${error.stage}` : '',
+                error.requestId ? `request ${error.requestId}` : '',
+                error.traceId ? `trace ${error.traceId}` : ''
+              ].filter(Boolean).join('; ');
+              recordDropDiagnostic(
+                round,
+                'RELAYER_REJECTED',
+                `${error.code}${references ? ` (${references})` : ''}: ${error.message}`,
+                'error'
+              );
+            }
+            throw error;
+          }
+        }
+        const buyTx = job.txids?.buy ?? '';
+        recordDropDiagnostic(round, 'RELAYER_ACCEPTED', `Job ${job.id} entered ${job.state}${buyTx ? `; claim tx ${buyTx}` : ''}.`, 'success');
+        dropsDom.status.innerHTML = `<span><strong>Drops</strong> sponsored claim broadcast${buyTx ? ` — tx ${buyTx}` : ''}. Tracking confirmation and refund settlement…</span><span class="badge green">no STX needed</span>`;
+
+        let previousState = '';
+        const finalJob = await pollSponsorJob({
+          client: sponsorClient,
+          job,
+          onStatus: (nextJob, attempt) => {
+            if (nextJob.state !== previousState || attempt % 6 === 0) {
+              recordDropDiagnostic(round, 'SETTLEMENT', `Job ${nextJob.id}: ${nextJob.state} (poll ${attempt}).`, nextJob.state === 'ABANDONED' ? 'error' : nextJob.state === 'SETTLED' ? 'success' : '');
+              previousState = nextJob.state;
+            }
+          }
+        });
+        if (finalJob.state === 'ABANDONED') {
+          throw Object.assign(new Error(finalJob.error ?? 'Relayer abandoned the sponsored claim.'), {
+            code: 'RELAYER_ABANDONED'
+          });
+        }
+        if (finalJob.state !== 'SETTLED') {
+          throw Object.assign(new Error(`Settlement polling ended in ${finalJob.state}; the on-chain job may still continue.`), {
+            code: 'SETTLEMENT_TIMEOUT'
+          });
+        }
+        recordDropDiagnostic(round, 'COMPLETE', `Free claim settled. Claim ${finalJob.txids?.buy ?? 'n/a'}; reimbursement ${finalJob.txids?.claim ?? 'n/a'}; refund ${finalJob.txids?.refund ?? 'n/a'}.`, 'success');
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> free claim confirmed and sponsorship settled.</span><span class="badge green">complete</span>';
+        await loadDropsPage();
+      } catch (error) {
+        const code = error?.code ?? 'UNKNOWN_BLOCK';
+        const message = String(error?.message ?? error);
+        const cancelled = code === 'WALLET_CANCELLED';
+        const stage = cancelled
+          ? 'CANCELLED'
+          : String(code).startsWith('WALLET_')
+            ? 'WALLET_ERROR'
+            : 'BLOCK';
+        recordDropDiagnostic(round, stage, `${code}: ${message}`, cancelled ? 'warn' : 'error');
+        dropsDom.status.innerHTML = cancelled
+          ? '<span><strong>Drops</strong> claim cancelled in the wallet. No transaction was submitted.</span>'
+          : `<span><strong>Drops</strong> sponsored claim blocked (${code}): ${message}. Open Claim diagnostics, fix the reported stage, then retry.</span>`;
+      } finally {
+        dropsState.claimsInFlight.delete(claimKey);
+        dropsDom.listings?.querySelectorAll('[data-drop-claim]').forEach((button) => {
+          if (button.dataset.dropClaim === claimKey) {
+            button.disabled = false;
+            button.textContent = 'Claim free — no STX needed';
+          }
+        });
+      }
     };
 
     const hydrateDropThumbnails = async (run, drops) => {
@@ -11408,7 +11608,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             const claimBtn = document.createElement('button');
             claimBtn.type = 'button';
             claimBtn.className = 'market-chip';
-            claimBtn.textContent = 'Claim free — no STX needed';
+            const claimKey = `${drop.contractId}:${drop.dropId}`;
+            const claimBusy = dropsState.claimsInFlight.has(claimKey);
+            claimBtn.dataset.dropClaim = claimKey;
+            claimBtn.disabled = claimBusy;
+            claimBtn.textContent = claimBusy ? 'Claim in progress…' : 'Claim free — no STX needed';
             claimBtn.addEventListener('click', () => { void dropClaim(drop); });
             actions.append(claimBtn);
           }
