@@ -48,6 +48,10 @@
     "test:report": "npm --prefix contracts/clarinet run test:report",
     "test:watch": "vitest",
     "lint": "eslint . --ext .js,.mjs,.cjs --max-warnings=0",
+    "smoke:premerge:tests": "vitest run functions/sponsor/__tests__/handler.test.ts functions/market/__tests__/listings.test.ts scripts/__tests__/premerge-live-smoke.test.ts src/lib/wallet/__tests__/connect.test.ts src/lib/wallet/__tests__/session.test.ts src/lib/drops/__tests__/sponsored-claim.test.ts src/lib/market/__tests__/sponsor-client.test.ts src/home/__tests__/drops-sponsored-claim.test.ts src/home/__tests__/homepage-content.test.ts",
+    "smoke:premerge": "npm run contracts:verify && npm run lint && npm run smoke:premerge:tests && npm run build",
+    "smoke:premerge:live": "node scripts/premerge-live-smoke.mjs",
+    "smoke:premerge:all": "npm run smoke:premerge && npm run smoke:premerge:live",
     "format": "prettier --write .",
     "test": "npm run test:contracts && npm run test:app && npm run test:clarinet",
     "build:radio": "vite build -c vite.radio.config.ts"

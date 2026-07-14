@@ -24,6 +24,22 @@ The relayer pays buyers' mining fees on the sponsored markets and reimburses its
 
 ## End-to-end smoke test (mainnet, small amounts)
 
+Before merging `main-staging` to `main`, run the non-spending automated gate:
+
+```sh
+npm run smoke:premerge:all
+```
+
+The deterministic half verifies contract variants, lint, the production build,
+Leather/Xverse wallet adapters, nonce-0 sponsored signing, relayer validation
+and recovery, claim polling/UI state, SPA routes, and the edge market feed. The
+live half performs read-only checks against the `main-staging` Pages alias and
+mainnet: Drops/Market route shells, sponsor CORS, contract ABI, configured
+sponsor, sponsor reserve, and the canonical Leather/Xverse nonce-0 claim
+canaries. It never requests a signature and never calls the transaction
+broadcast endpoint. Override the preview with `XTRATA_SMOKE_BASE_URL` when
+testing a deployment-specific URL.
+
 Cast: **Seller** = a wallet holding an inscription + a little STX. **Buyer** = a second wallet holding a tiny amount of sBTC (or USDCx) and **zero STX** — that's the whole point.
 
 1. **List**: `/market` (or workspace Market panel) with the sponsored sBTC market selected → pick an inscription, set a small price (e.g. 0.0001 sBTC), the sponsorship deposit field prefills from the relayer quote (~0.05–0.1 STX) → sign. Verify on the explorer: the contract holds the NFT and the deposit.
