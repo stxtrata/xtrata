@@ -53,6 +53,7 @@ export const onRequest = async (context: {
 
   try {
     const url = new URL(request.url);
+    const bypassCache = url.searchParams.get('fresh') === '1';
     const primary = (url.searchParams.get('primary') || '').trim();
     if (!primary) return json({ error: 'Missing primary contract.' }, 400);
 
@@ -87,7 +88,7 @@ export const onRequest = async (context: {
     cacheKeyUrl.searchParams.set('ids', ids.join(','));
     const edgeCache = (globalThis as { caches?: { default?: Cache } }).caches?.default ?? null;
     const cacheRequest = new Request(cacheKeyUrl.toString(), { method: 'GET' });
-    if (edgeCache) {
+    if (edgeCache && !bypassCache) {
       const hit = await edgeCache.match(cacheRequest);
       if (hit) return hit;
     }
@@ -186,13 +187,15 @@ export const onRequest = async (context: {
       status: 200,
       headers: {
         'content-type': 'application/json',
-        'Cache-Control': shouldCacheResponse
+        'Cache-Control': bypassCache
+          ? 'no-store'
+          : shouldCacheResponse
           ? 'public, max-age=15, s-maxage=60, stale-while-revalidate=300'
           : 'no-store',
         ...CORS
       }
     });
-    if (shouldCacheResponse && edgeCache && context.waitUntil) {
+    if (!bypassCache && shouldCacheResponse && edgeCache && context.waitUntil) {
       context.waitUntil(edgeCache.put(cacheRequest, response.clone()));
     }
     return response;
