@@ -331,8 +331,15 @@ describe('wallet connect helpers', () => {
         expect(method).toBe('stx_signTransaction');
         expect(params?.broadcast).toBe(false);
         const transaction = String(params?.transaction);
-        expect(deserializeTransaction(transaction).auth.authType).toBe(AuthType.Sponsored);
-        return { status: 'success', result: { transaction } };
+        const unsigned = deserializeTransaction(transaction);
+        expect(unsigned.auth.authType).toBe(AuthType.Sponsored);
+        expect(unsigned.auth.spendingCondition.nonce).toBe(0n);
+        expect(unsigned.auth.spendingCondition.fee).toBe(0n);
+        const signer = new TransactionSigner(unsigned);
+        signer.signOrigin(privateKey);
+        expect(() => signer.transaction.verifyOrigin()).not.toThrow();
+        const signedTransaction = Buffer.from(signer.transaction.serialize()).toString('hex');
+        return { status: 'success', result: { transaction: signedTransaction } };
       })
     };
     window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
@@ -364,6 +371,7 @@ describe('wallet connect helpers', () => {
       'stx_signTransaction'
     ]);
     expect(result.txRaw).toMatch(/^[0-9a-f]+$/i);
+    expect(() => deserializeTransaction(result.txRaw).verifyOrigin()).not.toThrow();
   });
 
   it('builds a nonce-0 Leather origin from the connected address and uses txHex', async () => {

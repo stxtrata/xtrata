@@ -38,7 +38,6 @@ import {
   TransactionVersion,
   addressToString,
   AddressVersion,
-  broadcastTransaction,
   cvToJSON,
   cvToHex,
   createAssetInfo,
@@ -76,6 +75,11 @@ const LOW_BALANCE_USTX = 5_000_000n; // refuse below 5 STX float
 const MAX_UNSETTLED = 20;
 const SETTLE_BATCH = 4; // jobs advanced per incoming request
 const SETTLE_TIMEOUT_MS = 2 * 3_600_000;
+// Mempool drop statuses can race block ingestion: Hiro may briefly report a
+// transaction as dropped_replace_by_fee from one index while the canonical
+// transaction endpoint is about to expose that exact tx as successful. Do
+// not turn a single early observation into a terminal user-facing failure.
+const TX_TERMINAL_GRACE_MS = 60_000;
 // A sponsored buy/claim tx is a few hundred bytes; cap the hex well above
 // that but low enough to bound deserialization work on garbage input.
 const MAX_TXHEX_CHARS = 20_000;
@@ -83,6 +87,10 @@ const MAX_TXHEX_CHARS = 20_000;
 // wallet cannot fill the global unsettled queue. Mirrors the Node svc.
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW_MS = 3_600_000;
+// A reservation has no durable transaction id until broadcast succeeds. Keep
+// this short so a transport exception cannot block the same free drop for the
+// full settlement lease. Retrying the identical tx is safe and idempotent.
+const RECEIVED_TIMEOUT_MS = 2 * 60_000;
 // A job stuck in an in-flight signing state longer than this is assumed to
 // have crashed between lease and broadcast; it reverts one state and retries.
 // (Crash AFTER broadcast can cause one duplicate claim-fee attempt — bounded
@@ -158,6 +166,59 @@ const hiroJson = async <T>(env: SponsorEnv, path: string, init: RequestInit = {}
   } catch {
     throw new Error('Hiro request returned invalid JSON');
   }
+};
+
+type HiroBroadcastResult = { txid: string } | { error: string; reason?: string };
+
+const isTransactionKnown = async (env: SponsorEnv, txid: string): Promise<boolean> => {
+  try {
+    const response = await hiroFetch(env, `/extended/v1/tx/0x${txid.replace(/^0x/, '')}`);
+    return response.ok;
+  } catch {
+    return false;
+  }
+};
+
+const broadcastViaHiro = async (
+  env: SponsorEnv,
+  tx: ReturnType<typeof deserializeTransaction>
+): Promise<HiroBroadcastResult> => {
+  const expectedTxid = tx.txid().replace(/^0x/, '');
+  let response: Response;
+  try {
+    response = await hiroFetch(env, '/v2/transactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: tx.serialize() as BodyInit
+    });
+  } catch (error) {
+    // A transport can lose the response after the node accepted the bytes.
+    // Treat the exact transaction as accepted if Hiro already knows its txid.
+    if (await isTransactionKnown(env, expectedTxid)) return { txid: expectedTxid };
+    throw error;
+  }
+
+  const text = await response.text();
+  if (response.ok) {
+    const txid = text.trim().replace(/^"|"$/g, '').replace(/^0x/, '');
+    if (!/^[0-9a-f]{64}$/i.test(txid)) {
+      throw new Error('Hiro broadcast returned an invalid transaction id');
+    }
+    return { txid };
+  }
+
+  // Retrying after a lost response can produce a duplicate/nonce rejection
+  // even though this exact transaction is already in the mempool.
+  if (await isTransactionKnown(env, expectedTxid)) return { txid: expectedTxid };
+  let rejected: { error?: unknown; reason?: unknown } = {};
+  try {
+    rejected = JSON.parse(text) as { error?: unknown; reason?: unknown };
+  } catch {
+    // Preserve only the HTTP status when the upstream body is not structured.
+  }
+  const error = String(rejected.error ?? `HTTP ${response.status}`);
+  const reason = String(rejected.reason ?? rejected.error ?? `Hiro broadcast returned HTTP ${response.status}`);
+  return { error, reason };
 };
 
 const estimateBuyFee = async (env: SponsorEnv): Promise<bigint> => {
@@ -237,7 +298,7 @@ const sponsorCall = async (
     anchorMode: AnchorMode.Any,
     postConditionMode: PostConditionMode.Allow
   });
-  const res = await broadcastTransaction(tx, network);
+  const res = await broadcastViaHiro(env, tx);
   if ((res as { error?: string }).error) {
     throw new Error((res as { reason?: string; error?: string }).reason ?? (res as { error?: string }).error);
   }
@@ -399,6 +460,14 @@ const transition = async (
   return (result.meta?.changes ?? 0) === 1;
 };
 
+const abandonUnbroadcastJob = async (env: SponsorEnv, id: string, reason: string) => {
+  await run(
+    env,
+    `UPDATE sponsor_jobs SET state='ABANDONED', reservation_key=NULL, payload_hash=NULL, error=?, updated_at=? WHERE id=? AND state='RECEIVED'`,
+    [`broadcast: ${reason}`, Date.now(), id]
+  );
+};
+
 type JobRow = {
   id: string; state: string; contract_id: string; listing_id: string;
   buyer: string | null; payload_hash: string | null; fee_ustx: string | null;
@@ -425,6 +494,7 @@ const settleBatch = async (env: SponsorEnv, key: string) => {
   // Recover jobs stranded in an in-flight signing state by a crashed worker:
   // after LEASE_TIMEOUT_MS they revert one state and get retried.
   const staleBefore = Date.now() - LEASE_TIMEOUT_MS;
+  const receivedStaleBefore = Date.now() - RECEIVED_TIMEOUT_MS;
   await run(
     env,
     `UPDATE sponsor_jobs SET state='CONFIRMED', updated_at=? WHERE state='CLAIMING' AND COALESCE(updated_at, created_at) < ?`,
@@ -438,9 +508,34 @@ const settleBatch = async (env: SponsorEnv, key: string) => {
   // RECEIVED = reserved but never broadcast (worker crashed pre-broadcast).
   await run(
     env,
-    `UPDATE sponsor_jobs SET state='ABANDONED', reservation_key=NULL, error='never broadcast', updated_at=? WHERE state='RECEIVED' AND COALESCE(updated_at, created_at) < ?`,
-    [Date.now(), staleBefore]
+    `UPDATE sponsor_jobs SET state='ABANDONED', reservation_key=NULL, payload_hash=NULL, error='never broadcast', updated_at=? WHERE state='RECEIVED' AND COALESCE(updated_at, created_at) < ?`,
+    [Date.now(), receivedStaleBefore]
   ).catch(() => undefined);
+
+  // Repair jobs that were terminalized from a transient mempool drop before
+  // the canonical transaction record became visible. The exact txid is the
+  // authority here: only that transaction resolving to success can revive
+  // the job, so an unrelated purchase cannot trigger sponsor reimbursement.
+  const recoverable = await rows<JobRow>(
+    env,
+    `SELECT * FROM sponsor_jobs
+     WHERE state='ABANDONED' AND buy_tx IS NOT NULL AND error LIKE 'buy tx %'
+       AND COALESCE(updated_at, created_at) > ?
+     ORDER BY updated_at DESC LIMIT ?`,
+    [Date.now() - SETTLE_TIMEOUT_MS, SETTLE_BATCH]
+  );
+  for (const job of recoverable) {
+    try {
+      if (await getTxStatus(env, job.buy_tx ?? '') === 'success') {
+        await transition(env, job.id, 'ABANDONED', 'CONFIRMED', {
+          sets: 'error=?',
+          binds: [null]
+        });
+      }
+    } catch {
+      // Recovery is best-effort. Normal settlement/status traffic retries it.
+    }
+  }
 
   const pending = await rows<JobRow>(
     env,
@@ -461,6 +556,11 @@ const settleBatch = async (env: SponsorEnv, key: string) => {
           continue;
         }
         if (status !== 'success') {
+          if (Date.now() - job.created_at < TX_TERMINAL_GRACE_MS) {
+            // Recheck on the next client poll. A canonical success must win
+            // over a racing mempool drop observation.
+            continue;
+          }
           await transition(env, job.id, 'SPONSORED', 'ABANDONED', {
             sets: 'error=?',
             binds: [`buy tx ${status}`]
@@ -712,10 +812,26 @@ const handleRequest = async (
       network
     });
     diagnostics.stage = 'BROADCAST';
-    const res = await broadcastTransaction(sponsored, network);
+    const expectedTxid = sponsored.txid().replace(/^0x/, '');
+    let res: HiroBroadcastResult;
+    try {
+      res = await broadcastViaHiro(env, sponsored);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      console.error('[sponsor:broadcast]', {
+        requestId: diagnostics.requestId,
+        traceId: diagnostics.traceId,
+        contractId,
+        listingId: listingId.toString(),
+        expectedTxid,
+        error: reason
+      });
+      await abandonUnbroadcastJob(env, id, 'upstream unavailable');
+      return fail('RELAYER_UNAVAILABLE', 'broadcast upstream unavailable; retry shortly', 503);
+    }
     if ((res as { error?: string }).error) {
       const reason = String((res as { reason?: string }).reason ?? (res as { error?: string }).error);
-      await transition(env, id, 'RECEIVED', 'ABANDONED', { sets: 'error=?', binds: [`broadcast: ${reason}`] });
+      await abandonUnbroadcastJob(env, id, reason);
       return fail('BROADCAST', reason, 502);
     }
     const buyTx = String((res as { txid?: string }).txid ?? res);

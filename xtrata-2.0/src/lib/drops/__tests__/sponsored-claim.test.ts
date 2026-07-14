@@ -11,8 +11,11 @@ import {
 } from '@stacks/transactions';
 import { buildContractTransferPostCondition } from '../../contract/post-conditions';
 import {
+  SPONSOR_JOB_MAX_ATTEMPTS,
+  SPONSOR_JOB_POLL_INTERVAL_MS,
   extractSponsoredTransactionHex,
   inspectSponsoredClaimTransaction,
+  isSponsorClaimConfirmedState,
   pollSponsorJob
 } from '../sponsored-claim';
 
@@ -88,6 +91,32 @@ describe('sponsored drop claim inspection', () => {
 });
 
 describe('sponsor job polling', () => {
+  it('treats origin confirmation as claimed while reimbursement continues', () => {
+    expect(isSponsorClaimConfirmedState('SPONSORED')).toBe(false);
+    expect(isSponsorClaimConfirmedState('CONFIRMED')).toBe(true);
+    expect(isSponsorClaimConfirmedState('CLAIMING')).toBe(true);
+    expect(isSponsorClaimConfirmedState('CLAIMED')).toBe(true);
+    expect(isSponsorClaimConfirmedState('REFUNDING')).toBe(true);
+    expect(isSponsorClaimConfirmedState('SETTLED')).toBe(true);
+    expect(isSponsorClaimConfirmedState('ABANDONED')).toBe(false);
+  });
+
+  it('polls every four seconds for a fifteen-minute settlement window', async () => {
+    const wait = vi.fn().mockResolvedValue(undefined);
+    const client = {
+      status: vi.fn().mockResolvedValue({ id: 'sp-1', state: 'SETTLED', txids: { buy: 'buy' } })
+    };
+    await pollSponsorJob({
+      client: client as never,
+      job: { id: 'sp-1', state: 'SPONSORED', txids: { buy: 'buy' } },
+      wait
+    });
+    expect(SPONSOR_JOB_POLL_INTERVAL_MS).toBe(4_000);
+    expect(SPONSOR_JOB_MAX_ATTEMPTS).toBe(225);
+    expect(wait).toHaveBeenCalledWith(4_000);
+    expect(client.status).toHaveBeenCalledTimes(1);
+  });
+
   it('logs every state transition through settlement', async () => {
     const statuses = [
       { id: 'sp-1', state: 'CONFIRMED', txids: { buy: 'buy' } },

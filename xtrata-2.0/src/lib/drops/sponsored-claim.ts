@@ -182,6 +182,16 @@ export const inspectSponsoredClaimTransaction = (
 export const isTerminalSponsorJobState = (state: SponsorJobState) =>
   state === 'SETTLED' || state === 'ABANDONED';
 
+export const isSponsorClaimConfirmedState = (state: SponsorJobState) =>
+  state === 'CONFIRMED' ||
+  state === 'CLAIMING' ||
+  state === 'CLAIMED' ||
+  state === 'REFUNDING' ||
+  state === 'SETTLED';
+
+export const SPONSOR_JOB_POLL_INTERVAL_MS = 4_000;
+export const SPONSOR_JOB_MAX_ATTEMPTS = 225;
+
 export const pollSponsorJob = async (params: {
   client: SponsorClient;
   job: SponsorJob;
@@ -190,8 +200,8 @@ export const pollSponsorJob = async (params: {
   wait?: (ms: number) => Promise<void>;
   onStatus?: (job: SponsorJob, attempt: number) => void;
 }): Promise<SponsorJob> => {
-  const intervalMs = params.intervalMs ?? 10_000;
-  const maxAttempts = params.maxAttempts ?? 180;
+  const intervalMs = params.intervalMs ?? SPONSOR_JOB_POLL_INTERVAL_MS;
+  const maxAttempts = params.maxAttempts ?? SPONSOR_JOB_MAX_ATTEMPTS;
   const wait = params.wait ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   let job = params.job;
   params.onStatus?.(job, 0);

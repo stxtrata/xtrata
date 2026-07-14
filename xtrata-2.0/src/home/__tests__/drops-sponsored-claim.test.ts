@@ -32,6 +32,13 @@ describe('public Drops sponsored-claim surface', () => {
     expect(homeMain).toContain('error.requestId');
     expect(homeMain).toContain('error.traceId');
     expect(homeMain).toContain('claimsInFlight');
+    expect(homeMain).toContain('recentlyClaimed');
+    expect(homeMain).toContain("'CLAIM_CONFIRMED'");
+    expect(homeMain).toContain('Claimed successfully');
+    expect(homeMain).toContain('isSponsorClaimConfirmedState');
+    expect(homeMain).toContain('watchCreatedDrop({');
+    expect(homeMain).toContain('pollIntervalMs: 4000');
+    expect(homeMain).toContain('confirmed and now live');
     expect(homeMain).not.toContain('dropClaimSelfPaid');
     expect(homeMain).not.toContain('claiming self-paid instead');
   });
