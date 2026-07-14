@@ -28,6 +28,11 @@
       --button-border: var(--ink);
       --secondary-bg: transparent;
       --secondary-ink: var(--ink);
+      /* Tooltips must stay legible independently of the selected visual theme. */
+      --tooltip-bg: #090b0a;
+      --tooltip-ink: #ffffff;
+      --tooltip-border: rgba(255, 255, 255, 0.82);
+      --tooltip-shadow: 0 14px 38px rgba(0, 0, 0, 0.72);
     }
 
 
@@ -2213,6 +2218,9 @@
     }
 
     .wallet-action-stack {
+      position: relative;
+      z-index: 30;
+      isolation: isolate;
       display: grid;
       gap: 8px;
       min-width: 132px;
@@ -2224,6 +2232,8 @@
     }
 
     .wallet-drop-action {
+      position: relative;
+      z-index: 1;
       display: grid;
       grid-template-columns: minmax(0, 1fr) 22px;
       gap: 6px;
@@ -2232,6 +2242,7 @@
 
     .drop-it-info {
       position: relative;
+      z-index: 2;
       display: inline-grid;
       place-items: center;
       width: 20px;
@@ -2249,28 +2260,39 @@
       position: absolute;
       right: 0;
       bottom: calc(100% + 8px);
-      z-index: 20;
+      z-index: 100;
       width: min(270px, calc(100vw - 40px));
       padding: 9px 10px;
-      border: 1px solid var(--line-strong);
+      border: 1px solid var(--tooltip-border);
       border-radius: 8px;
-      background: var(--surface);
-      box-shadow: var(--shadow);
-      color: var(--text);
+      background: var(--tooltip-bg);
+      box-shadow: var(--tooltip-shadow);
+      color: var(--tooltip-ink);
       content: attr(data-tooltip);
       font-size: 11px;
       font-weight: 700;
       line-height: 1.4;
       opacity: 0;
       pointer-events: none;
+      text-align: left;
+      text-transform: none;
       transform: translateY(4px);
       transition: opacity 120ms ease, transform 120ms ease;
+      visibility: hidden;
+      white-space: normal;
     }
 
     .drop-it-info:hover::after,
+    .drop-it-info:focus::after,
     .drop-it-info:focus-visible::after {
       opacity: 1;
       transform: translateY(0);
+      visibility: visible;
+    }
+
+    .drop-it-info:focus-visible {
+      outline: 2px solid var(--green);
+      outline-offset: 2px;
     }
 
     .small-link {

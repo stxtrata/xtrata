@@ -13,6 +13,7 @@ const homepageSource = readFileSync(new URL('../homepage.js', import.meta.url), 
 const homeMainSource = readFileSync(new URL('../main.js', import.meta.url), 'utf8');
 const radioSource = readFileSync(new URL('../radio.js', import.meta.url), 'utf8');
 const configSource = readFileSync(new URL('../config.js', import.meta.url), 'utf8');
+const homeStyles = readFileSync(new URL('../styles/home.css', import.meta.url), 'utf8');
 
 describe('homepage content configuration', () => {
   it('passes the homepage content contract', () => {
@@ -62,10 +63,25 @@ describe('homepage content configuration', () => {
 
   it('hands a selected My Xtrata inscription directly to the free drop form', () => {
     expect(indexHtml).toContain('id="dropItButton"');
+    expect(indexHtml).toContain('class="drop-it-info"');
+    expect(indexHtml).toContain('class="drop-it-info"\n                          type="button"');
     expect(indexHtml).toContain('100% gasless for recipients');
     expect(homeMainSource).toContain('const target = `/drops?drop=${tokenId}`');
     expect(homeMainSource).toContain("const dropParam = params?.get?.('drop')");
     expect(homeMainSource).toContain('openDropForToken(dropParam)');
     expect(homeMainSource).toContain('await loadDropsPage(pageParams)');
+  });
+
+  it('keeps the Drop It explanation readable above every visual theme', () => {
+    const tooltipRule = homeStyles.match(/\.drop-it-info::after\s*\{([\s\S]*?)\n\s*\}/)?.[1] ?? '';
+
+    expect(homeStyles).toContain('--tooltip-bg: #090b0a;');
+    expect(homeStyles).toContain('--tooltip-ink: #ffffff;');
+    expect(tooltipRule).toContain('background: var(--tooltip-bg);');
+    expect(tooltipRule).toContain('color: var(--tooltip-ink);');
+    expect(homeStyles).toContain('isolation: isolate;');
+    expect(homeStyles).toContain('.drop-it-info:focus::after');
+    expect(tooltipRule).not.toContain('background: var(--surface);');
+    expect(tooltipRule).not.toContain('color: var(--text);');
   });
 });
