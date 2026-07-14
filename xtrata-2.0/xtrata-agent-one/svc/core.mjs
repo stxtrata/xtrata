@@ -577,7 +577,7 @@ async function runBatchItems({ job, enginePath, hiroKey = '', jobDir }) {
   return { route: 'batch', minted, failed, tokenIds: job.items.map((it) => it.tokenId) };
 }
 // One staged (large-file) engine run for a single batch item — same engine, per-item env.
-async function stagedInscribeViaEngine({ job, item, deps, parent, enginePath, hiroKey, jobDir, prog }) {
+async function stagedInscribeViaEngine({ job, item, deps, parent, enginePath, hiroKey, prog }) {
   const ep = path.resolve(enginePath);
   if (!fs.existsSync(ep)) throw new Error(`staged-upload engine not found at ${ep}`);
   const env = { ...process.env, WALLET_MNEMONIC: job.ephemeralMnemonic, DRY_RUN: '0', REQUIRE_CONFIRM: '0', LARGE_FILE: item.file, LARGE_URI: item.uri, LARGE_MIME: item.mime, LARGE_DEPS: deps.join(','), HIRO_API_KEY: hiroKey };

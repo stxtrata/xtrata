@@ -13,7 +13,7 @@
  *      HIRO_API_KEY DRY_RUN(=1) CONFIRM(=1)
  */
 import readline from 'node:readline';
-import { createJob, statusJob, runJob, deliverJob, readJob, publicJob } from './core.mjs';
+import { createJob, statusJob, runJob, deliverJob, readJob } from './core.mjs';
 
 const STEP = process.env.SVC_STEP || 'status';
 const JOB_DIR = process.env.JOB_DIR || './job-state';

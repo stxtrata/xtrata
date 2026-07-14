@@ -47,7 +47,7 @@
     "test:clarinet": "npm --prefix contracts/clarinet test",
     "test:report": "npm --prefix contracts/clarinet run test:report",
     "test:watch": "vitest",
-    "lint": "eslint . --max-warnings=0",
+    "lint": "eslint . --ext .js,.mjs,.cjs --max-warnings=0",
     "format": "prettier --write .",
     "test": "npm run test:contracts && npm run test:app && npm run test:clarinet",
     "build:radio": "vite build -c vite.radio.config.ts"
