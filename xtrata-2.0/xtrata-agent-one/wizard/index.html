@@ -342,7 +342,7 @@
   .s-FUNDED{color:var(--ok);border-color:#1f5a45}
   .s-INSCRIBED{color:var(--acc);border-color:#234a6e}
   .s-COMPLETE{color:var(--ok);border-color:#1f5a45}
-  .s-INSCRIBING,.s-DELIVERING{color:var(--acc);border-color:#234a6e}
+  .s-INSCRIBING,.s-DELIVERING,.s-RECOVERING{color:var(--acc);border-color:#234a6e}
   .s-ERROR{color:var(--bad);border-color:#5a2222}
   .s-CANCELLED{color:var(--mut);border-color:var(--line)}
   .s-NEEDS_RECOVERY{color:var(--bad);border-color:#5a2222}
@@ -648,7 +648,7 @@
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=7"></script>
+<script src="agent-one.js?v=8"></script>
 <script src="optimize-audio.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script>
@@ -683,6 +683,7 @@ async function api(path, opts){
   let mm;
   if((mm=path.match(/^\/api\/jobs\/([^/]+)\/run$/))) return A.runJob(mm[1]);
   if((mm=path.match(/^\/api\/jobs\/([^/]+)\/deliver$/))) return A.deliverJob(mm[1]);
+  if((mm=path.match(/^\/api\/jobs\/([^/]+)\/recover$/))) return A.recoverJob(mm[1]);
   if((mm=path.match(/^\/api\/jobs\/([^/]+)\/delete$/))) return A.deleteJob(mm[1]);
   if((mm=path.match(/^\/api\/jobs\/([^/]+)$/))) return A.getJob(mm[1]);
   throw new Error('no route: '+path);
@@ -1428,11 +1429,11 @@ async function renderJobDetail(jobId,out,isActive){
   if(!jobId||!out)return;
   try{ const {job,status}=await api('/api/jobs/'+jobId);
     const funded=status.funded, st=job.status;
-    const active=(st==='FUNDED'||st==='INSCRIBING'||st==='DELIVERING'||(st==='INSCRIBED'&&job.fastTrack));
+    const active=(st==='FUNDED'||st==='INSCRIBING'||st==='DELIVERING'||st==='RECOVERING'||(st==='INSCRIBED'&&job.fastTrack));
     if(active) LIVE.add(jobId); else LIVE.delete(jobId);
     if(isActive){ if(active){ if(!lastProgAt) lastProgAt=Date.now(); } else lastProgAt=0; }
     const ds=(st==='AWAITING_DEPOSIT'&&funded)?'FUNDED':st;
-    const phaseMsg={FUNDED:'Payment detected — starting…',INSCRIBING:'Inscribing on-chain…',INSCRIBED:'Inscribed — delivering…',DELIVERING:'Delivering inscription + refunding change…'}[st];
+    const phaseMsg={FUNDED:'Payment detected — starting…',INSCRIBING:'Inscribing on-chain…',INSCRIBED:'Inscribed — delivering…',DELIVERING:'Delivering inscription + refunding change…',RECOVERING:'Recovery running — returning inscriptions before sweeping STX…'}[st];
     const showDeposit=(st==='AWAITING_DEPOSIT');
     if(isActive){
       expiryAt = (showDeposit && job.createdAt && SERVER.windowMs) ? (Date.parse(job.createdAt) + SERVER.windowMs*12)
@@ -1502,7 +1503,7 @@ async function renderJobDetail(jobId,out,isActive){
       ${job.agentFeeUstx?`<div class="kv"><span>Agent fee (${job.agentFeePct||10}%)</span><span style="color:var(--acc2)">${stx(job.agentFeeUstx)}</span></div>`:''}
       ${(job.refundedUstx!=null)?`<div class="kv"><span>Change refunded</span><span>${stx(job.refundedUstx||'0')}</span></div>`:''}
       ${active?`<div class="progress"><span class="spin"></span>${esc(phaseMsg||'Working…')}${job.progress?(' · '+esc(job.progress)):''} ${isActive?'<span id="progT" class="muted"></span>':''}</div>`:''}
-      ${active?`<div class="muted" style="margin-top:6px;font-size:12px;color:var(--ok)">🔒 Safe to close or refresh — this job runs from an escrow wallet on our server, not your browser. Reopen this page and it resumes automatically. Don't send another payment.</div>`:''}
+      ${active?`<div class="muted" style="margin-top:6px;font-size:12px;color:var(--ok)">🔒 Keep this tab open while the browser-held one-shot wallet is working. If it is interrupted, reopen this page in the same browser profile; the saved recovery key remains available. Don't send another payment.</div>`:''}
       ${showDeposit&&!funded?`<div class="muted" style="margin-top:10px;font-size:12px">${job.fastTrack?'Pay from your connected wallet (shown above) — it receives the inscription and any change, and processing starts automatically on arrival. Payments from any other wallet are returned to the sender.':'Waiting for your deposit — the status flips to FUNDED once it lands.'}</div>`:''}
       ${job.error?`<div class="err" style="margin-top:8px">Error: ${esc(job.error)}${!job.fastTrack?` <button class="btn ghost" onclick="act('run','${esc(job.jobId)}')" style="margin-left:8px;padding:5px 10px">Retry</button>`:''}</div>`:''}
       ${(!job.fastTrack&&(st==='AWAITING_DEPOSIT'||st==='INSCRIBED'))?`<div class="btnrow">
@@ -1513,9 +1514,13 @@ async function renderJobDetail(jobId,out,isActive){
       <div class="btnrow"><button class="btn" onclick="viewReceipt('${esc(job.jobId)}')">View receipt</button>
         ${job.tokenId?`<a class="btn ghost" style="text-decoration:none;display:inline-block" href="/x/${esc(job.tokenId)}" target="_blank" rel="noopener">View on Xplorer</a>`:''}
         ${isActive?`<button class="btn alt" onclick="resetFlow()">Inscribe another file</button>`:`<button class="btn ghost" onclick="act('delete','${esc(job.jobId)}')">Delete job</button>`}</div>`:''}
-      ${st==='CANCELLED'?`<div class="muted" style="margin-top:12px">↩︎ Cancelled — ${(job.parents&&job.parents.length)?'all inscriptions (including parents) and funds':'funds'} returned to your wallet and the deposit key discarded.${job.cancelReason?(' ('+esc(job.cancelReason)+')'):''}</div>
+      ${st==='CANCELLED'?`<div class="muted" style="margin-top:12px">${job.recoveryCompletedAt?`✓ Recovery complete — ${(job.recovery&&job.recovery.returnedTokenIds||[]).length} inscription${(job.recovery&&job.recovery.returnedTokenIds||[]).length===1?'':'s'} and remaining STX returned to ${esc((job.recovery&&job.recovery.destination)||job.funder||job.user||'your wallet')}. ${(job.recovery&&job.recovery.remainingItems||[]).length} uninscribed batch item${(job.recovery&&job.recovery.remainingItems||[]).length===1?' remains':'s remain'} available in this job record for the next batch.`:`↩︎ Cancelled — ${(job.parents&&job.parents.length)?'all inscriptions (including parents) and funds':'funds'} returned to your wallet and the deposit key discarded.${job.cancelReason?(' ('+esc(job.cancelReason)+')'):''}`}</div>
       <div class="btnrow">${isActive?`<button class="btn alt" onclick="resetFlow()">Start again</button>`:''}<button class="btn ghost" onclick="act('delete','${esc(job.jobId)}')">Delete job</button></div>`:''}
-      ${st==='NEEDS_RECOVERY'?`<div class="err" style="margin-top:12px">Auto-refund didn’t confirm — your funds are safe but need a manual sweep: run <b>svc/recover-all.mjs</b>.${job.keepKeyReason?(' '+esc(job.keepKeyReason)):''}</div>`:''}
+      ${st==='NEEDS_RECOVERY'?`<div class="err" style="margin-top:12px">The browser still controls this one-shot wallet.${job.keepKeyReason?(' '+esc(job.keepKeyReason)):''}</div>
+      <div class="kv"><span>Recovery wallet ${copyBtn(job.depositAddress)}</span><span class="mono">${esc(job.depositAddress)}</span></div>
+      <div class="muted" style="margin-top:8px;font-size:12px">Recovery returns every inscription first, verifies the escrow wallet is NFT-empty, then refunds the remaining STX to the recorded payer. No receipt or new inscription is created.</div>
+      ${/NotEnoughFunds|insufficient funds/i.test(job.error||'')?`<div class="muted" style="margin-top:8px;font-size:12px;color:var(--warn)">The recovery wallet needs a small STX top-up to pay the NFT transfer fee. Copy the address above, top it up, then run recovery again.</div>`:''}
+      <div class="btnrow"><button class="btn good" onclick="act('recover','${esc(job.jobId)}')">Recover inscriptions + STX now</button></div><div class="err" id="jobErr"></div>`:''}
     </div>`;
   }catch(e){ /* transient read (job file mid-write) — keep polling */ }
 }
@@ -1554,6 +1559,13 @@ window.sendParent=sendParent;
 async function act(which,jobId){
   const id=jobId||selJob; if(!id) return;
   if(which==='deliver' && !confirm('Deliver the inscription, refund the remainder, and permanently wipe the deposit key?')) return;
+  if(which==='recover'){
+    let j=null; try{ const r=await api('/api/jobs/'+id); j=r.job; }catch(e){ alert('Could not load the recovery details: '+((e&&e.message)||e)); return; }
+    const mintedIds=[...(j.items||[]).map(i=>i.tokenId),j.tokenId,j.receiptTokenId].filter(Boolean).map(String);
+    const minted=mintedIds.length;
+    const dest=j.funder||j.expectedFunder||j.user||'the verified payer';
+    if(!confirm(`Start on-chain recovery now?\n\nThis broadcasts transfers for ${minted} known inscribed token${minted===1?'':'s'}${mintedIds.length?' (#'+mintedIds.join(', #')+')':''} to ${dest}, then sweeps the remaining STX only after the wallet is confirmed NFT-empty. The uninscribed batch items will not be minted or charged.\n\nKeep this tab open until recovery completes.`)) return;
+  }
   if(which==='delete'){
     if(!confirm('Delete this job from the list?\nThe inscription stays on-chain — this only removes the local record + receipt.')) return;
     try{ await api('/api/jobs/'+id+'/delete',{method:'POST'}); if(selJob===id){ selJob=null; $('#jobDetail').innerHTML=''; } if(FLOW.jobId===id){ FLOW.jobId=null; $('#activeJobDetail').innerHTML=''; } loadJobs(); }
