@@ -35,7 +35,6 @@
       GRID_MIME_LABELS,
       EXPLORER_CODE_MIME_TYPES,
       EXPLORER_FILTER_LABELS,
-      TWIN_HOLDER_LABELS,
       PEPE_ESCROW_RESOLVERS
     } from '/src/home/config.js';
     import { initXtrataRadio } from '/src/home/radio.js';
@@ -78,7 +77,6 @@
     import { fetchContractAdminStatus } from '/src/lib/contract/admin-status.ts';
     import {
       estimateContractFees,
-      formatMicroStx,
       getFeeSchedule
     } from '/src/lib/contract/fees.ts';
     import {
@@ -280,7 +278,6 @@
       textStats: $('textStats'),
       tabFile: $('tabFile'),
       tabText: $('tabText'),
-      inscriptionForm: $('inscriptionForm'),
       inscribePanelBody: $('inscribePanelBody'),
       textCost: $('textCost'),
       inscribeTextButton: $('inscribeTextButton'),
@@ -621,7 +618,8 @@
         });
       });
 
-    const isAscii = (value) => /^[\x00-\x7F]*$/.test(value);
+    const isAscii = (value) =>
+      Array.from(value).every((character) => character.codePointAt(0) <= 0x7f);
 
     const nowLabel = () =>
       new Intl.DateTimeFormat(undefined, {
@@ -2771,6 +2769,9 @@
 
     // Upward navigation: full ancestor lineage (Parents, Grandparents, …) read
     // live from the chain, depth-grouped.
+    // Retained for the static-host fallback path, which can be re-enabled
+    // independently of the combined relationship renderer.
+    // eslint-disable-next-line no-unused-vars
     const renderAncestorsSection = async (token, contractId, section) => {
       const requestId = ++state.selectedParentsRequestId;
       const heading = document.createElement('div');
@@ -2822,6 +2823,7 @@
     // round-trip: children, grandchildren, …, ancestors above direct parents,
     // and half-siblings). Degrades to the local IndexedDB child index + scan
     // button when the endpoint is unavailable (e.g. local/static hosting).
+    // eslint-disable-next-line no-unused-vars
     const renderLineageSection = async (token, contractId, section) => {
       const requestId = ++state.selectedChildrenRequestId;
       const status = document.createElement('div');
@@ -7966,6 +7968,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
     // Fetch (cached per primary contract) the set of primary-minted token ids
     // that fall within the legacy id range, so reads can be routed in one shot.
+    // Retained with the legacy routing cache while older-contract reads remain
+    // supported; the active bulk path no longer calls it directly.
+    // eslint-disable-next-line no-unused-vars
     const getPrimaryMintedIdSet = async (sender, legacyMaxId) => {
       if (!state.client || legacyMaxId === null) {
         return null;
@@ -10759,7 +10764,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           const card = document.createElement('article');
           card.className = 'market-card';
           const symbol = getMarketSettlementLabel(listing.settlement);
-          const decimals = listing.settlement.decimals ?? 6;
           const sponsored = isSponsoredMarket(listing.entry);
           const isOwnListing = !!state.walletSession.address &&
             addressesEqual(listing.seller, state.walletSession.address);
@@ -10897,7 +10901,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       for (const listing of mine) {
         const row = document.createElement('div');
         row.className = 'market-mine__row';
-        const symbol = getMarketSettlementLabel(listing.settlement);
         const sponsored = isSponsoredMarket(listing.entry);
         const publicBlockReason = getListingPublicBlockReason(listing);
         const info = document.createElement('div');

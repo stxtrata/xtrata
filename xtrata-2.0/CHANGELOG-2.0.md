@@ -2,6 +2,13 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## ESLint source gate repair (2026-07-14)
+
+- Replaced the incompatible flat-config React Refresh preset with its supported legacy `.eslintrc.cjs` rule equivalent, while preserving constant exports and React/Hook checks.
+- Added explicit lint coverage for authored `.js`, `.mjs`, and `.cjs` files. Generated bundles, build output, vendored snapshots, and standalone classic-script applications are excluded at their complete application boundaries; those applications retain their dedicated build and smoke-test gates.
+- Removed the resulting authored-source lint failures without changing wallet or transaction behavior: duplicate/unused declarations, unnecessary regular-expression escapes, ASCII validation that triggered `no-control-regex`, and deliberately retained legacy homepage fallback helpers with narrow documented suppressions.
+- Verified: post-change `npm run lint` passes with zero warnings; focused Drops homepage tests pass 5/5; sponsor-service tests pass 18/18; the complete app suite passes 812/812 across 150 files; the radio bundle and full production build succeed.
+
 ## Free sponsored claims — Xverse/Leather signing correction (2026-07-14)
 
 - Replaced the Drops free-claim wallet call from broadcasting `stx_callContract` to origin-only `stx_signTransaction` with `broadcast=false`. The page now obtains the public origin nonce, constructs the exact sponsored fee-0 transaction, asks the wallet only for the origin signature, validates the returned bytes, and only then submits them to the sponsor relayer. This addresses Xverse's observed `SignatureValidation` failure caused by broadcasting before the sponsor signature existed.

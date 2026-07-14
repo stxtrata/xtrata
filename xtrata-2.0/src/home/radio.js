@@ -40,7 +40,7 @@ const saveState = (state) => {
   try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* noop */ }
 };
 
-export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', mount = null } = {}) => {
+export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
   if (!tokenIds.length || typeof document === 'undefined') {
     return null;
   }
@@ -1062,8 +1062,6 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM', moun
   // Self-paced ticker: each section holds, scrolls fully to its end so it can
   // be read in full, then advances. No fixed timers cutting text off.
   const HOLD_MS = 2400;        // pause before scrolling starts
-  const HOLD_SHORT_MS = 5000;  // dwell time for text that fits without scrolling
-  const END_HOLD_MS = 1800;    // pause at the end of a scrolled section
   const SCROLL_PX_PER_S = 26;  // reading-speed scroll
   const FILLERS = [
     'ALL MUSIC 100% ON-CHAIN',
