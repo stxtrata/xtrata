@@ -28,6 +28,9 @@ describe('public Drops sponsored-claim surface', () => {
     expect(homeMain).toContain('inspectSponsoredClaimTransaction(payload');
     expect(homeMain).toContain('pollSponsorJob({');
     expect(homeMain).toContain("'RELAYER_RESUME'");
+    expect(homeMain).toContain("'RELAYER_REJECTED'");
+    expect(homeMain).toContain('error.requestId');
+    expect(homeMain).toContain('error.traceId');
     expect(homeMain).toContain('claimsInFlight');
     expect(homeMain).not.toContain('dropClaimSelfPaid');
     expect(homeMain).not.toContain('claiming self-paid instead');

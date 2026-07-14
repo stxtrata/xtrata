@@ -100,6 +100,12 @@ type SponsorEnv = Env & {
   HIRO_API_KEY?: string;
 };
 
+type RelayerDiagnostics = {
+  requestId: string;
+  traceId?: string;
+  stage: string;
+};
+
 const hiroHeaders = (env: SponsorEnv): HeadersInit =>
   env.HIRO_API_KEY ? { 'x-api-key': env.HIRO_API_KEY } : {};
 
@@ -107,9 +113,6 @@ const HIRO = 'https://api.hiro.so';
 
 const allowlist = (env: SponsorEnv) =>
   (env.SPONSOR_MARKETS?.split(',').map((s) => s.trim()).filter(Boolean) ?? DEFAULT_MARKETS);
-
-const err = (code: string, message: string, status = 400) =>
-  jsonResponse({ code, message }, status, CORS);
 
 // ---------------------------------------------------------------- chain helpers
 
@@ -457,21 +460,41 @@ const settleBatch = async (env: SponsorEnv, key: string) => {
 
 // ---------------------------------------------------------------- handler
 
-export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
+const handleRequest = async (
+  context: Parameters<PagesFunction<SponsorEnv>>[0],
+  diagnostics: RelayerDiagnostics
+): Promise<Response> => {
   const { request, env } = context;
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
 
-  const key = env.SPONSOR_KEY?.trim();
-  if (!key) return err('RELAYER_DISABLED', 'sponsor relayer not configured (set the SPONSOR_KEY secret)', 503);
+  const fail = (code: string, message: string, status = 400, headers: HeadersInit = CORS) =>
+    jsonResponse({ code, message, requestId: diagnostics.requestId, stage: diagnostics.stage }, status, headers);
+  const rawKey = env.SPONSOR_KEY?.trim();
+  if (!rawKey) return fail('RELAYER_DISABLED', 'sponsor relayer not configured (set the SPONSOR_KEY secret)', 503);
+  // Secrets are commonly pasted with 0x, but @stacks/transactions expects
+  // canonical key hex (optionally ending in the 01 compression marker).
+  const key = rawKey.replace(/^0x/i, '');
+  if (!/^[0-9a-f]{64}(?:01)?$/i.test(key)) {
+    return fail('RELAYER_KEY_INVALID', 'sponsor relayer key is not valid Stacks private-key hex', 503);
+  }
+  let sponsorAddress: string;
+  try {
+    sponsorAddress = getAddressFromPrivateKey(key, TransactionVersion.Mainnet);
+  } catch {
+    return fail('RELAYER_KEY_INVALID', 'sponsor relayer key could not derive a Stacks address', 503);
+  }
 
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, '');
+  diagnostics.stage = 'DB_INIT';
   await ensureTable(env);
 
   // advance settlement on every request (bounded)
+  diagnostics.stage = 'SETTLEMENT';
   await settleBatch(env, key);
 
   if (path.endsWith('/sponsor/quote') && request.method === 'POST') {
+    diagnostics.stage = 'QUOTE';
     const est = await estimateBuyFee(env);
     let budget = est * FEE_MULTIPLIER;
     if (budget < MIN_BUDGET_USTX) budget = MIN_BUDGET_USTX;
@@ -489,45 +512,49 @@ export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
   }
 
   if (path.endsWith('/sponsor/submit') && request.method === 'POST') {
+    diagnostics.stage = 'SUBMIT_PARSE';
     const body = (await request.json().catch(() => ({}))) as {
       txHex?: string;
       contractId?: string;
       listingId?: string | number;
     };
     if (!body.txHex || !body.contractId || body.listingId === undefined) {
-      return err('BAD_REQUEST', 'txHex, contractId, listingId required');
+      return fail('BAD_REQUEST', 'txHex, contractId, listingId required');
     }
     // Cheap offline checks FIRST: no chain reads, no wallet, no D1 writes
     // happen until the signed payload itself has been validated.
+    diagnostics.stage = 'SUBMIT_VALIDATE';
     const txHex = String(body.txHex).replace(/^0x/, '');
     if (txHex.length > MAX_TXHEX_CHARS || !/^[0-9a-fA-F]+$/.test(txHex) || txHex.length % 2 !== 0) {
-      return err('VALIDATION', 'txHex must be canonical hex within size limits');
+      return fail('VALIDATION', 'txHex must be canonical hex within size limits');
     }
     if (!/^\d+$/.test(String(body.listingId))) {
-      return err('VALIDATION', 'listingId must be an unsigned decimal integer');
+      return fail('VALIDATION', 'listingId must be an unsigned decimal integer');
     }
 
     const validated = validatePayload(txHex, allowlist(env));
-    if ('error' in validated) return err('VALIDATION', VALIDATION[validated.error]);
+    if ('error' in validated) return fail('VALIDATION', VALIDATION[validated.error]);
     // The SIGNED transaction is authoritative. Request metadata must agree
     // with it exactly — otherwise the relayer would check one listing's
     // budget and settle against it while broadcasting a different call.
-    if (validated.contractId !== body.contractId) return err('VALIDATION', 'contractId mismatch with signed transaction');
+    if (validated.contractId !== body.contractId) return fail('VALIDATION', 'contractId mismatch with signed transaction');
     if (validated.listingId !== BigInt(String(body.listingId))) {
-      return err('VALIDATION', 'listingId mismatch with signed transaction');
+      return fail('VALIDATION', 'listingId mismatch with signed transaction');
     }
     const contractId = validated.contractId;
     const listingId = validated.listingId;
 
     // Rolling per-origin limit: one wallet cannot fill the global queue.
+    diagnostics.stage = 'SUBMIT_RATE_LIMIT';
     const recent = await rows<{ n: number }>(
       env,
       `SELECT COUNT(*) as n FROM sponsor_jobs WHERE buyer=? AND created_at > ? AND state != 'ABANDONED'`,
       [validated.buyer, Date.now() - RATE_LIMIT_WINDOW_MS]
     );
     if ((recent[0]?.n ?? 0) >= RATE_LIMIT_MAX) {
-      return jsonResponse(
-        { code: 'RATE_LIMITED', message: 'too many recent sponsorships for this address' },
+      return fail(
+        'RATE_LIMITED',
+        'too many recent sponsorships for this address',
         429,
         { ...CORS, 'Retry-After': '600' }
       );
@@ -537,28 +564,31 @@ export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
       env,
       `SELECT COUNT(*) as n FROM sponsor_jobs WHERE state NOT IN ('SETTLED','ABANDONED')`
     );
-    if ((unsettled[0]?.n ?? 0) >= MAX_UNSETTLED) return err('AT_CAPACITY', 'too many unsettled sponsorships', 503);
+    if ((unsettled[0]?.n ?? 0) >= MAX_UNSETTLED) return fail('AT_CAPACITY', 'too many unsettled sponsorships', 503);
 
-    const sponsorAddress = getAddressFromPrivateKey(key, TransactionVersion.Mainnet);
+    diagnostics.stage = 'SPONSOR_BALANCE';
     if ((await getBalance(env, sponsorAddress)) < LOW_BALANCE_USTX) {
-      return err('LOW_BALANCE', 'sponsor wallet below reserve; try a self-paid buy', 503);
+      return fail('LOW_BALANCE', 'sponsor wallet below reserve; try a self-paid buy', 503);
     }
 
+    diagnostics.stage = 'LISTING_READ';
     const listing = await getListing(env, contractId, listingId.toString());
-    if (!listing) return err('LISTING_NOT_FOUND', 'listing unknown');
-    if (listing.soldAt !== null) return err('LISTING_SOLD', 'listing already sold');
+    if (!listing) return fail('LISTING_NOT_FOUND', 'listing unknown');
+    if (listing.soldAt !== null) return fail('LISTING_SOLD', 'listing already sold');
     if (listing.nftContract !== validated.nftContractId) {
-      return err('VALIDATION', 'nft contract mismatch between signed transaction and listing');
+      return fail('VALIDATION', 'nft contract mismatch between signed transaction and listing');
     }
     if (!hasExactDropClaimPostCondition(validated.tx, contractId, listing)) {
-      return err('VALIDATION', VALIDATION.WRONG_POST_CONDITIONS);
+      return fail('VALIDATION', VALIDATION.WRONG_POST_CONDITIONS);
     }
+    diagnostics.stage = 'FEE_ESTIMATE';
     const fee = await estimateBuyFee(env);
-    if (fee > MAX_FEE_USTX) return err('FEE_TOO_LARGE', 'network fee above relayer cap', 503);
-    if (listing.budgetRemaining < fee) return err('BUDGET_TOO_SMALL', 'listing budget cannot cover the fee');
+    if (fee > MAX_FEE_USTX) return fail('FEE_TOO_LARGE', 'network fee above relayer cap', 503);
+    if (listing.budgetRemaining < fee) return fail('BUDGET_TOO_SMALL', 'listing budget cannot cover the fee');
 
     // Reserve the payload hash BEFORE broadcasting: the unique constraint
     // makes concurrent duplicate submissions collide here, not at the wallet.
+    diagnostics.stage = 'JOB_RESERVATION';
     const payloadHash = await sha256Hex(txHex);
     const id = `sp-${Date.now().toString(36)}-${payloadHash.slice(0, 8)}`;
     try {
@@ -571,7 +601,7 @@ export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
     } catch {
       const existing = await rows<JobRow>(env, `SELECT * FROM sponsor_jobs WHERE payload_hash=?`, [payloadHash]);
       if (existing.length) {
-        return jsonResponse({ code: 'DUPLICATE', message: 'payload already sponsored', ...jobJson(existing[0]) }, 409, CORS);
+        return jsonResponse({ code: 'DUPLICATE', message: 'payload already sponsored', requestId: diagnostics.requestId, stage: diagnostics.stage, ...jobJson(existing[0]) }, 409, CORS);
       }
       const reserved = await rows<JobRow>(
         env,
@@ -579,13 +609,15 @@ export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
         [`${contractId}:${listingId}`]
       );
       if (reserved.length) {
-        return jsonResponse({ code: 'LISTING_BUSY', message: 'this drop or listing already has a sponsorship in progress', ...jobJson(reserved[0]) }, 409, CORS);
+        return jsonResponse({ code: 'LISTING_BUSY', message: 'this drop or listing already has a sponsorship in progress', requestId: diagnostics.requestId, stage: diagnostics.stage, ...jobJson(reserved[0]) }, 409, CORS);
       }
-      return err('DUPLICATE', 'payload already sponsored', 409);
+      return fail('DUPLICATE', 'payload already sponsored', 409);
     }
 
     const transaction = deserializeTransaction(txHex);
+    diagnostics.stage = 'SPONSOR_NONCE';
     const nonce = await getNonce(env, sponsorAddress);
+    diagnostics.stage = 'SPONSOR_SIGN';
     const sponsored = await sponsorTransaction({
       transaction,
       sponsorPrivateKey: key,
@@ -593,11 +625,12 @@ export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
       sponsorNonce: nonce,
       network
     });
+    diagnostics.stage = 'BROADCAST';
     const res = await broadcastTransaction(sponsored, network);
     if ((res as { error?: string }).error) {
       const reason = String((res as { reason?: string }).reason ?? (res as { error?: string }).error);
       await transition(env, id, 'RECEIVED', 'ABANDONED', { sets: 'error=?', binds: [`broadcast: ${reason}`] });
-      return err('BROADCAST', reason, 502);
+      return fail('BROADCAST', reason, 502);
     }
     const buyTx = String((res as { txid?: string }).txid ?? res);
     await transition(env, id, 'RECEIVED', 'SPONSORED', { sets: 'buy_tx=?', binds: [buyTx] });
@@ -606,10 +639,42 @@ export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
 
   const statusMatch = path.match(/\/sponsor\/status\/([^/]+)$/);
   if (statusMatch && request.method === 'GET') {
+    diagnostics.stage = 'STATUS';
     const found = await rows<JobRow>(env, `SELECT * FROM sponsor_jobs WHERE id=?`, [statusMatch[1]]);
-    if (!found.length) return err('NOT_FOUND', 'job unknown', 404);
+    if (!found.length) return fail('NOT_FOUND', 'job unknown', 404);
     return jsonResponse(jobJson(found[0]), 200, CORS);
   }
 
-  return err('NOT_FOUND', 'no such route', 404);
+  return fail('NOT_FOUND', 'no such route', 404);
+};
+
+export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
+  const requestId = crypto.randomUUID();
+  const traceId = context.request.headers.get('cf-ray') ?? undefined;
+  const diagnostics: RelayerDiagnostics = { requestId, traceId, stage: 'REQUEST_PREFLIGHT' };
+  try {
+    return await handleRequest(context, diagnostics);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const path = new URL(context.request.url).pathname;
+    console.error('[sponsor:request]', {
+      requestId,
+      traceId,
+      stage: diagnostics.stage,
+      method: context.request.method,
+      path,
+      error: message
+    });
+    return jsonResponse(
+      {
+        code: 'RELAYER_INTERNAL',
+        message: `sponsor relayer failed during ${diagnostics.stage}`,
+        requestId,
+        stage: diagnostics.stage,
+        ...(traceId ? { traceId } : {})
+      },
+      500,
+      CORS
+    );
+  }
 };

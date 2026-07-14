@@ -18,7 +18,7 @@ The relayer pays buyers' mining fees on the sponsored markets and reimburses its
    ```
    npx wrangler pages secret put SPONSOR_KEY --project-name xtrata
    ```
-   Paste the hot-wallet key when prompted, then redeploy the site. Probe: `curl -X POST https://<your-site>/sponsor/quote` returns a budget quote (503 RELAYER_DISABLED until the secret is set). Settlement is traffic-driven — each incoming relayer request also advances up to 4 pending settlements; if traffic ever stops, sellers can still self-refund after 144 blocks, so nothing strands. Job state lives in the site's existing D1 database. The Node relayer in `xtrata-agent-one/svc/sponsor-service.mjs` remains available for local development (`SPONSOR_KEY=... node server/server.mjs`).
+   Paste the hot-wallet key when prompted, then redeploy the site. Canonical hex and a conventional `0x`-prefixed key are accepted; any other value returns `RELAYER_KEY_INVALID` before a claim is reserved. Probe: `curl -X POST https://<your-site>/sponsor/quote` returns a budget quote (503 RELAYER_DISABLED until the secret is set). Settlement is traffic-driven — each incoming relayer request also advances up to 4 pending settlements; if traffic ever stops, sellers can still self-refund after 144 blocks, so nothing strands. Job state lives in the site's existing D1 database. The Node relayer in `xtrata-agent-one/svc/sponsor-service.mjs` remains available for local development (`SPONSOR_KEY=... node server/server.mjs`).
 
 ## End-to-end smoke test (mainnet, small amounts)
 
@@ -52,7 +52,7 @@ An `ORIGIN_NONCE` value of `0` is valid and expected for a fresh Stacks address 
 
 ### Retry capture checklist
 
-After deploying a change, hard-refresh `/drops`, disconnect, reconnect the wallet, and start one new claim round. Copy both the Claim diagnostics and the browser console entries beginning `[wallet:connect]` or `[wallet]`.
+After deploying a change, hard-refresh `/drops`, disconnect, reconnect the wallet, and start one new claim round. Copy the embedded Claim diagnostics first; once it contains `WALLET_RESPONSE` and the signed-transaction checks, expanded browser console objects are redundant. Include `[wallet:connect]` or `[wallet]` console entries only when connection or signing stops before the embedded panel records a wallet response.
 
 - Leather selection must log `PROVIDER_SELECTED` with `providerId: LeatherProvider` (new Connect UI) or `provider-object` (older Connect UI), plus `resolved: true` and `requestBridge: true`. It should then log `CAPABILITIES`, `REQUEST: getAddresses`, and `CONNECTED`. `resolved: false` means the extension did not inject the advertised provider; record the Leather version and browser profile.
 - Xverse must log only the modern connection request (`REQUEST: wallet_connect`) and `CONNECTED`; a cascade of ``request` function is not implemented` messages means the page is still using an older cached adapter build.
@@ -61,6 +61,7 @@ After deploying a change, hard-refresh `/drops`, disconnect, reconnect the walle
 - `WALLET_SIGNING_UNSUPPORTED` or a method-not-found response means the installed wallet does not expose `stx_signTransaction`; no broadcast or relayer request occurs.
 - A `SignatureValidation` popup before `WALLET_RESPONSE` normally means an old cached build is still using `stx_callContract`. Confirm that `PLAN` explicitly says `stx_signTransaction with broadcast=false` before testing again.
 - Bare provider errors such as `cancel` are logged as `WALLET_ERROR`, not `CANCELLED`. Only an explicit user rejection/cancellation or standard user-rejection code is classified as `CANCELLED`.
+- `RELAYER_REJECTED` records the HTTP status, safe relayer stage, server request id, and Cloudflare trace id. The server stages are `REQUEST_PREFLIGHT`, `DB_INIT`, `SETTLEMENT`, `SUBMIT_PARSE`, `SUBMIT_VALIDATE`, `SUBMIT_RATE_LIMIT`, `SPONSOR_BALANCE`, `LISTING_READ`, `FEE_ESTIMATE`, `JOB_RESERVATION`, `SPONSOR_NONCE`, `SPONSOR_SIGN`, `BROADCAST`, and `STATUS`. Use the request id to correlate the attempt with the server's `[sponsor:request]` log; server exception text is logged there but is never returned to the browser.
 
 The relayer independently repeats the security-critical checks, reserves `contractId:dropId` so concurrent clicks cannot spend the sponsor twice, and returns the active job on `DUPLICATE`/`LISTING_BUSY`. The page then polls that job through `RECEIVED` → `SPONSORED` → `CONFIRMED` → `CLAIMING` → `CLAIMED` → `REFUNDING` → `SETTLED`, or logs `ABANDONED`/timeout with the last known transaction ids.
 
@@ -71,6 +72,9 @@ Useful failure labels:
 - `VALIDATION`: the relayer rejected a payload that passed the client; compare the logged contract, drop, and post-condition checks with server logs.
 - `LISTING_BUSY` / `DUPLICATE`: expected concurrency protection; the UI should resume the returned job.
 - `LOW_BALANCE` / `AT_CAPACITY` / `RELAYER_UNAVAILABLE`: relayer operations issue; no self-paid free-claim fallback occurs.
+- `RELAYER_KEY_INVALID`: the Pages secret is not usable Stacks private-key hex; replace it and redeploy.
+- `RELAYER_INTERNAL`: use its named stage and request id to find the precise server-side exception.
+- `BROADCAST`: signing completed but the Stacks node rejected the fully sponsored transaction; the returned reason is safe to copy.
 - `ABANDONED`: inspect the logged claim/reimbursement/refund tx ids and the relayer job error.
 
 ## Ongoing ops

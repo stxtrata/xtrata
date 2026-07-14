@@ -227,13 +227,73 @@ describe('sponsor relayer Pages handler', () => {
     expect(db.jobs[0].state).toBe('SPONSORED');
   });
 
-  it('accepts a valid drops claim', async () => {
+  it('accepts a valid nonce-0 drops claim from a fresh wallet', async () => {
     const res = await submit(env, {
-      txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 3n }),
+      txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 3n, nonce: 0n }),
       contractId: DROPS,
       listingId: '3'
     });
     expect(res.status).toBe(200);
+  });
+
+  it('normalizes a 0x-prefixed sponsor secret before deriving and signing', async () => {
+    const res = await submit(
+      { ...env, SPONSOR_KEY: `0x${SPONSOR_KEY}` },
+      {
+        txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 3n, nonce: 0n }),
+        contractId: DROPS,
+        listingId: '3'
+      }
+    );
+    expect(res.status).toBe(200);
+    expect((await res.json()).state).toBe('SPONSORED');
+  });
+
+  it('returns a structured preflight block for a malformed sponsor secret', async () => {
+    const res = await submit(
+      { ...env, SPONSOR_KEY: 'not-a-private-key' },
+      {
+        txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 3n }),
+        contractId: DROPS,
+        listingId: '3'
+      }
+    );
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({
+      code: 'RELAYER_KEY_INVALID',
+      stage: 'REQUEST_PREFLIGHT',
+      requestId: expect.any(String)
+    });
+    expect(broadcasts).toHaveLength(0);
+  });
+
+  it('converts unexpected server failures into request-scoped stage diagnostics', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const res = await submit(
+      {
+        SPONSOR_KEY,
+        DB: { prepare: () => { throw new Error('database credentials leaked here'); } }
+      },
+      {
+        txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 3n }),
+        contractId: DROPS,
+        listingId: '3'
+      }
+    );
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      code: 'RELAYER_INTERNAL',
+      message: 'sponsor relayer failed during DB_INIT',
+      stage: 'DB_INIT',
+      requestId: expect.any(String)
+    });
+    expect(JSON.stringify(body)).not.toContain('database credentials');
+    expect(consoleError).toHaveBeenCalledWith(
+      '[sponsor:request]',
+      expect.objectContaining({ requestId: body.requestId, stage: 'DB_INIT' })
+    );
+    consoleError.mockRestore();
   });
 
   it('rejects a drops claim whose deny-mode post-condition cannot authorize the NFT transfer', async () => {

@@ -11410,6 +11410,20 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             job = error.existingJob;
             recordDropDiagnostic(round, 'RELAYER_RESUME', `${error.code}: resuming existing job ${job.id}.`, 'warn');
           } else {
+            if (error instanceof SponsorClientError) {
+              const references = [
+                error.httpStatus ? `HTTP ${error.httpStatus}` : '',
+                error.stage ? `stage ${error.stage}` : '',
+                error.requestId ? `request ${error.requestId}` : '',
+                error.traceId ? `trace ${error.traceId}` : ''
+              ].filter(Boolean).join('; ');
+              recordDropDiagnostic(
+                round,
+                'RELAYER_REJECTED',
+                `${error.code}${references ? ` (${references})` : ''}: ${error.message}`,
+                'error'
+              );
+            }
             throw error;
           }
         }
