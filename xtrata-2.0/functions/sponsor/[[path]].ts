@@ -54,6 +54,7 @@ import {
 import { StacksMainnet } from '@stacks/network';
 import { jsonResponse } from '../lib/utils';
 import { run, queryAll, type Env } from '../lib/db';
+import { applyHiroApiKey, getHiroApiKeys, shouldRetryWithNextHiroKey } from '../lib/hiro-keys';
 
 const DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const DEFAULT_MARKETS = [
@@ -97,7 +98,9 @@ const CORS = {
 type SponsorEnv = Env & {
   SPONSOR_KEY?: string;
   SPONSOR_MARKETS?: string;
+  HIRO_API_KEYS?: string;
   HIRO_API_KEY?: string;
+  VITE_HIRO_API_KEY?: string;
 };
 
 type RelayerDiagnostics = {
@@ -106,9 +109,6 @@ type RelayerDiagnostics = {
   stage: string;
 };
 
-const hiroHeaders = (env: SponsorEnv): HeadersInit =>
-  env.HIRO_API_KEY ? { 'x-api-key': env.HIRO_API_KEY } : {};
-
 const HIRO = 'https://api.hiro.so';
 
 const allowlist = (env: SponsorEnv) =>
@@ -116,10 +116,52 @@ const allowlist = (env: SponsorEnv) =>
 
 // ---------------------------------------------------------------- chain helpers
 
+const hiroFetch = async (env: SponsorEnv, path: string, init: RequestInit = {}): Promise<Response> => {
+  // HIRO_API_KEY historically held one key, while current deployments may
+  // store a comma/newline list. Never place the raw secret in a header: an
+  // embedded newline makes the Workers fetch API throw `Invalid header value`
+  // before any request leaves the relayer.
+  const keys = getHiroApiKeys(env as unknown as Record<string, unknown>);
+  const attempts: Array<string | null> = [...keys, null];
+  let lastError: unknown;
+  for (let index = 0; index < attempts.length; index += 1) {
+    const apiKey = attempts[index];
+    const headers = new Headers(init.headers);
+    try {
+      applyHiroApiKey(headers, apiKey);
+    } catch (error) {
+      lastError = error;
+      continue;
+    }
+    try {
+      const response = await fetch(`${HIRO}${path}`, { ...init, headers });
+      const hasAnotherAttempt = index < attempts.length - 1;
+      if (hasAnotherAttempt && shouldRetryWithNextHiroKey(response.status)) {
+        continue;
+      }
+      return response;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Hiro request failed');
+};
+
+const hiroJson = async <T>(env: SponsorEnv, path: string, init: RequestInit = {}): Promise<T> => {
+  const response = await hiroFetch(env, path, init);
+  if (!response.ok) {
+    throw new Error(`Hiro request returned HTTP ${response.status}`);
+  }
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new Error('Hiro request returned invalid JSON');
+  }
+};
+
 const estimateBuyFee = async (env: SponsorEnv): Promise<bigint> => {
   try {
-    const r = await fetch(`${HIRO}/v2/fees/transfer`, { headers: hiroHeaders(env) });
-    const rate = Number(await r.json());
+    const rate = Number(await hiroJson<unknown>(env, '/v2/fees/transfer'));
     return BigInt(Math.max(3000, rate * 600));
   } catch {
     return 30_000n;
@@ -127,19 +169,20 @@ const estimateBuyFee = async (env: SponsorEnv): Promise<bigint> => {
 };
 
 const getBalance = async (env: SponsorEnv, address: string): Promise<bigint> => {
-  const r = await fetch(`${HIRO}/extended/v1/address/${address}/stx`, { headers: hiroHeaders(env) });
-  const j = (await r.json()) as { balance?: string };
-  return BigInt(j.balance ?? '0');
+  const result = await hiroJson<{ balance?: unknown }>(env, `/extended/v1/address/${address}/stx`);
+  if (typeof result.balance !== 'string' || !/^\d+$/.test(result.balance)) {
+    throw new Error('Hiro balance response is missing a decimal balance');
+  }
+  return BigInt(result.balance);
 };
 
 const getNonce = async (env: SponsorEnv, address: string): Promise<bigint> => {
-  const r = await fetch(`${HIRO}/extended/v1/address/${address}/nonces`, { headers: hiroHeaders(env) });
-  const j = (await r.json()) as { possible_next_nonce?: number };
+  const j = await hiroJson<{ possible_next_nonce?: number }>(env, `/extended/v1/address/${address}/nonces`);
   return BigInt(j.possible_next_nonce ?? 0);
 };
 
 const getTxStatus = async (env: SponsorEnv, txid: string): Promise<string> => {
-  const r = await fetch(`${HIRO}/extended/v1/tx/0x${txid.replace(/^0x/, '')}`, { headers: hiroHeaders(env) });
+  const r = await hiroFetch(env, `/extended/v1/tx/0x${txid.replace(/^0x/, '')}`);
   if (!r.ok) return 'pending';
   const j = (await r.json()) as { tx_status?: string };
   return j.tx_status ?? 'pending';
@@ -147,12 +190,15 @@ const getTxStatus = async (env: SponsorEnv, txid: string): Promise<string> => {
 
 const getListing = async (env: SponsorEnv, contractId: string, listingId: string) => {
   const [address, name] = contractId.split('.');
-  const r = await fetch(`${HIRO}/v2/contracts/call-read/${address}/${name}/get-listing`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...hiroHeaders(env) },
-    body: JSON.stringify({ sender: address, arguments: [cvToHex(uintCV(BigInt(listingId)))] })
-  });
-  const j = (await r.json()) as { okay?: boolean; result?: string };
+  const j = await hiroJson<{ okay?: boolean; result?: string }>(
+    env,
+    `/v2/contracts/call-read/${address}/${name}/get-listing`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sender: address, arguments: [cvToHex(uintCV(BigInt(listingId)))] })
+    }
+  );
   if (!j.okay || !j.result) return null;
   const parsed = cvToJSON(hexToCV(j.result)) as { value?: { value?: Record<string, { value: unknown }> } };
   const rec = parsed?.value?.value;
@@ -567,7 +613,19 @@ const handleRequest = async (
     if ((unsettled[0]?.n ?? 0) >= MAX_UNSETTLED) return fail('AT_CAPACITY', 'too many unsettled sponsorships', 503);
 
     diagnostics.stage = 'SPONSOR_BALANCE';
-    if ((await getBalance(env, sponsorAddress)) < LOW_BALANCE_USTX) {
+    let sponsorBalance: bigint;
+    try {
+      sponsorBalance = await getBalance(env, sponsorAddress);
+    } catch (error) {
+      console.error('[sponsor:balance]', {
+        requestId: diagnostics.requestId,
+        traceId: diagnostics.traceId,
+        sponsorAddress,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return fail('RELAYER_UNAVAILABLE', 'sponsor balance lookup unavailable; retry shortly', 503);
+    }
+    if (sponsorBalance < LOW_BALANCE_USTX) {
       return fail('LOW_BALANCE', 'sponsor wallet below reserve; try a self-paid buy', 503);
     }
 

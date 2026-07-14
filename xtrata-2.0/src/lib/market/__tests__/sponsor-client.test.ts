@@ -73,6 +73,29 @@ describe('createSponsorClient', () => {
     ).rejects.toMatchObject({ code: 'LOW_BALANCE', fallbackToSelfPaid: true });
   });
 
+  it('preserves a server-side balance lookup outage as RELAYER_UNAVAILABLE', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      jsonResponse(
+        {
+          code: 'RELAYER_UNAVAILABLE',
+          message: 'sponsor balance lookup unavailable; retry shortly',
+          requestId: 'req-balance',
+          stage: 'SPONSOR_BALANCE'
+        },
+        503
+      )
+    );
+    const client = createSponsorClient('https://relayer.example', fetchImpl);
+    await expect(
+      client.submit({ txHex: '00', contractId: 'SP0.m', listingId: 1n })
+    ).rejects.toMatchObject({
+      code: 'RELAYER_UNAVAILABLE',
+      relayerCode: 'RELAYER_UNAVAILABLE',
+      requestId: 'req-balance',
+      stage: 'SPONSOR_BALANCE'
+    });
+  });
+
   it('preserves structured relayer failure metadata for embedded diagnostics', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(
       Response.json(

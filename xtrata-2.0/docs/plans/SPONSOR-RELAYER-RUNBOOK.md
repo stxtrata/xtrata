@@ -20,6 +20,8 @@ The relayer pays buyers' mining fees on the sponsored markets and reimburses its
    ```
    Paste the hot-wallet key when prompted, then redeploy the site. Canonical hex and a conventional `0x`-prefixed key are accepted; any other value returns `RELAYER_KEY_INVALID` before a claim is reserved. Probe: `curl -X POST https://<your-site>/sponsor/quote` returns a budget quote (503 RELAYER_DISABLED until the secret is set). Settlement is traffic-driven — each incoming relayer request also advances up to 4 pending settlements; if traffic ever stops, sellers can still self-refund after 144 blocks, so nothing strands. Job state lives in the site's existing D1 database. The Node relayer in `xtrata-agent-one/svc/sponsor-service.mjs` remains available for local development (`SPONSOR_KEY=... node server/server.mjs`).
 
+   `HIRO_API_KEYS` and the legacy `HIRO_API_KEY` may contain comma/newline-separated keys. The relayer splits and sanitizes that list before constructing headers, rotates on `401`, `403`, or `429`, and finally retries without a key. Never paste the unsplit list into an `x-api-key` header; Workers rejects embedded newlines with `Invalid header value` before making the upstream request.
+
 ## End-to-end smoke test (mainnet, small amounts)
 
 Cast: **Seller** = a wallet holding an inscription + a little STX. **Buyer** = a second wallet holding a tiny amount of sBTC (or USDCx) and **zero STX** — that's the whole point.
@@ -72,6 +74,7 @@ Useful failure labels:
 - `VALIDATION`: the relayer rejected a payload that passed the client; compare the logged contract, drop, and post-condition checks with server logs.
 - `LISTING_BUSY` / `DUPLICATE`: expected concurrency protection; the UI should resume the returned job.
 - `LOW_BALANCE` / `AT_CAPACITY` / `RELAYER_UNAVAILABLE`: relayer operations issue; no self-paid free-claim fallback occurs.
+- `RELAYER_UNAVAILABLE` at `SPONSOR_BALANCE`: the sponsor balance API could not be read even after key rotation and the public fallback. Retry once, then correlate the request id with `[sponsor:balance]`; this is distinct from `LOW_BALANCE` and does not mean the hot wallet needs funding.
 - `RELAYER_KEY_INVALID`: the Pages secret is not usable Stacks private-key hex; replace it and redeploy.
 - `RELAYER_INTERNAL`: use its named stage and request id to find the precise server-side exception.
 - `BROADCAST`: signing completed but the Stacks node rejected the fully sponsored transaction; the returned reason is safe to copy.
@@ -79,7 +82,7 @@ Useful failure labels:
 
 ## Ongoing ops
 
-- **Top-up**: send STX to the relayer address whenever the float runs low; the service refuses new sponsorships below `SPONSOR_LOW_BALANCE_USTX` (default 10 STX) rather than failing mid-flight.
+- **Top-up**: send STX to the relayer address whenever the float runs low; the Pages relayer refuses new sponsorships below its 5 STX reserve rather than failing mid-flight.
 - **Key rotation**: generate a new wallet, `set-sponsor` to the new address on both contracts, restart with the new key, sweep the old float.
 - **Kill switch**: stop the relayer. Nothing strands — buyers fall back to self-paid buys, sellers can self-refund after the 144-block window.
 - **Hosted deployment**: when the relayer moves off your machine, update `sponsorApi` in `src/data/market-registry.json` (currently `http://127.0.0.1:8787/api`) and rebuild.

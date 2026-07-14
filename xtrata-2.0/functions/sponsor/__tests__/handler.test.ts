@@ -137,13 +137,27 @@ const listingTuple = () =>
   );
 
 const broadcasts: string[] = [];
+const balanceApiKeys: Array<string | null> = [];
+let rejectAuthenticatedBalanceRequests = false;
+let failBalanceLookup = false;
 
 const stubFetch = () => {
   broadcasts.length = 0;
+  balanceApiKeys.length = 0;
+  rejectAuthenticatedBalanceRequests = false;
+  failBalanceLookup = false;
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.includes('/v2/fees/transfer')) return new Response('1', { status: 200 });
-    if (url.includes('/stx')) return Response.json({ balance: '100000000' });
+    if (url.includes('/stx')) {
+      const apiKey = new Headers(init?.headers).get('x-api-key');
+      balanceApiKeys.push(apiKey);
+      if (failBalanceLookup) return new Response('<html>upstream unavailable</html>', { status: 502 });
+      if (rejectAuthenticatedBalanceRequests && apiKey) {
+        return Response.json({ error: 'rate limited' }, { status: 429 });
+      }
+      return Response.json({ balance: '100000000' });
+    }
     if (url.includes('/nonces')) return Response.json({ possible_next_nonce: 5 });
     if (url.includes('/get-listing')) {
       return Response.json({ okay: true, result: cvToHex(listingTuple()) });
@@ -234,6 +248,49 @@ describe('sponsor relayer Pages handler', () => {
       listingId: '3'
     });
     expect(res.status).toBe(200);
+  });
+
+  it('sanitizes a comma/newline Hiro key list before constructing request headers', async () => {
+    env.HIRO_API_KEY = 'key-one, key-two\nkey-three';
+    const res = await submit(env, {
+      txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 3n, nonce: 0n }),
+      contractId: DROPS,
+      listingId: '3'
+    });
+    expect(res.status).toBe(200);
+    expect(balanceApiKeys[0]).toBe('key-one');
+    expect(balanceApiKeys[0]).not.toMatch(/[\s,]/);
+  });
+
+  it('retries rate-limited Hiro keys and finally uses the public endpoint', async () => {
+    env.HIRO_API_KEYS = 'rate-limited-one\nrate-limited-two';
+    rejectAuthenticatedBalanceRequests = true;
+    const res = await submit(env, {
+      txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 3n, nonce: 0n }),
+      contractId: DROPS,
+      listingId: '3'
+    });
+    expect(res.status).toBe(200);
+    expect(balanceApiKeys).toEqual(['rate-limited-one', 'rate-limited-two', null]);
+  });
+
+  it('returns an actionable 503 when the sponsor balance upstream is unavailable', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    failBalanceLookup = true;
+    const res = await submit(env, {
+      txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 3n, nonce: 0n }),
+      contractId: DROPS,
+      listingId: '3'
+    });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({
+      code: 'RELAYER_UNAVAILABLE',
+      message: 'sponsor balance lookup unavailable; retry shortly',
+      stage: 'SPONSOR_BALANCE',
+      requestId: expect.any(String)
+    });
+    expect(broadcasts).toHaveLength(0);
+    consoleError.mockRestore();
   });
 
   it('normalizes a 0x-prefixed sponsor secret before deriving and signing', async () => {

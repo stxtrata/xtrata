@@ -108,6 +108,7 @@ export const mapRelayerError = (
     return new SponsorClientError('VALIDATION', message, existingJob, details);
   }
   const known: SponsorErrorCode[] = [
+    'RELAYER_UNAVAILABLE',
     'AT_CAPACITY',
     'LOW_BALANCE',
     'RATE_LIMITED',
