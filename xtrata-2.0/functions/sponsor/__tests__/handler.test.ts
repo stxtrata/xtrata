@@ -19,6 +19,7 @@ import {
   cvToHex,
   makeContractCall,
   makeStandardSTXPostCondition,
+  getAddressFromPrivateKey,
   uintCV
 } from '@stacks/transactions';
 import { StacksMainnet } from '@stacks/network';
@@ -31,6 +32,7 @@ const NFT = `${DEPLOYER}.xtrata-v3-2-3`;
 // throwaway keys, never used on-chain
 const BUYER_KEY = 'f9d7f5e0d0d81fdd90dcef4e0e2c1b9e3ea361776a5cd91b5c9a52b98b3e1cb601';
 const SPONSOR_KEY = 'a5c9a52b98b3e1cb6f9d7f5e0d0d81fdd90dcef4e0e2c1b9e3ea361776a5cd9101';
+const SPONSOR_ADDRESS = getAddressFromPrivateKey(SPONSOR_KEY);
 
 type Row = Record<string, unknown> & { id: string; state: string };
 
@@ -133,6 +135,9 @@ const stubFetch = () => {
     if (url.includes('/get-listing')) {
       return Response.json({ okay: true, result: cvToHex(listingTuple()) });
     }
+    if (url.includes('/get-sponsor')) {
+      return Response.json({ okay: true, result: cvToHex(Cl.ok(Cl.standardPrincipal(SPONSOR_ADDRESS))) });
+    }
     if (url.includes('/extended/v1/tx/')) return Response.json({ tx_status: 'success' });
     if (url.includes('/v2/transactions')) {
       broadcasts.push(String(init?.body ?? ''));
@@ -211,6 +216,73 @@ describe('sponsor relayer Pages handler', () => {
       listingId: '3'
     });
     expect(res.status).toBe(200);
+  });
+
+  it('refuses to spend when the relayer key is not the contract-authorised sponsor', async () => {
+    const workingFetch = fetch;
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes('/get-sponsor')) {
+        return Promise.resolve(
+          Response.json({
+            okay: true,
+            result: cvToHex(Cl.ok(Cl.standardPrincipal('SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7')))
+          })
+        );
+      }
+      return workingFetch(input, init);
+    }));
+    const res = await submit(env, {
+      txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 3n }),
+      contractId: DROPS,
+      listingId: '3'
+    });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ code: 'RELAYER_NOT_AUTHORIZED' });
+    expect(db.jobs).toHaveLength(0);
+    expect(broadcasts).toHaveLength(0);
+  });
+
+  it('returns a safe request id when the sponsor key is invalid', async () => {
+    const res = await submit({ ...env, SPONSOR_KEY: 'not-a-private-key' }, {});
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      code: 'RELAYER_CONFIG_INVALID',
+      requestId: expect.any(String)
+    });
+    expect(body.message).toContain(body.requestId);
+    expect(res.headers.get('x-request-id')).toBe(body.requestId);
+    expect(body.message).not.toContain('not-a-private-key');
+  });
+
+  it('identifies a missing D1 binding as a storage failure without exposing bindings', async () => {
+    const res = await submit({ SPONSOR_KEY }, {});
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.code).toBe('RELAYER_STORAGE_UNAVAILABLE');
+    expect(body.message).not.toContain('Available bindings');
+  });
+
+  it('abandons a reserved job and identifies an invalid nonce response as chain-state failure', async () => {
+    const workingFetch = fetch;
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes('/nonces')) return Promise.resolve(Response.json({}));
+      return workingFetch(input, init);
+    }));
+    const res = await submit(env, {
+      txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 3n }),
+      contractId: DROPS,
+      listingId: '3'
+    });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({
+      code: 'RELAYER_CHAIN_UNAVAILABLE',
+      requestId: expect.any(String)
+    });
+    expect(db.jobs).toHaveLength(1);
+    expect(db.jobs[0].state).toBe('ABANDONED');
+    expect(db.jobs[0].error).toMatch(/chain state/);
+    expect(broadcasts).toHaveLength(0);
   });
 
   it('FINDING 1: rejects body listingId B when the signed transaction targets A, before any job or broadcast', async () => {

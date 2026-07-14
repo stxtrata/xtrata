@@ -73,6 +73,26 @@ describe('createSponsorClient', () => {
     ).rejects.toMatchObject({ code: 'LOW_BALANCE', fallbackToSelfPaid: true });
   });
 
+  it('preserves phase-specific relayer messages and request ids for the Drops UI', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      jsonResponse(
+        {
+          code: 'RELAYER_SIGNING_FAILED',
+          message: 'Sponsor relayer could not countersign the claim. Retry with request ID req-123.',
+          requestId: 'req-123'
+        },
+        500
+      )
+    );
+    const client = createSponsorClient('https://relayer.example', fetchImpl);
+    await expect(
+      client.submit({ txHex: '00', contractId: 'SP0.m', listingId: 1n })
+    ).rejects.toMatchObject({
+      code: 'RELAYER_SIGNING_FAILED',
+      message: 'Sponsor relayer could not countersign the claim. Retry with request ID req-123.'
+    });
+  });
+
   it('status() fetches by job id', async () => {
     const fetchImpl = vi
       .fn()
@@ -97,6 +117,7 @@ describe('mapRelayerError', () => {
   it('passes through operational codes and defaults to UNKNOWN', () => {
     expect(mapRelayerError('RATE_LIMITED', 'x').code).toBe('RATE_LIMITED');
     expect(mapRelayerError('DUPLICATE', 'x').code).toBe('DUPLICATE');
+    expect(mapRelayerError('RELAYER_SIGNING_FAILED', 'x').code).toBe('RELAYER_SIGNING_FAILED');
     expect(mapRelayerError('SOMETHING_ELSE', 'x').code).toBe('UNKNOWN');
     expect(mapRelayerError(undefined, 'x').code).toBe('UNKNOWN');
   });

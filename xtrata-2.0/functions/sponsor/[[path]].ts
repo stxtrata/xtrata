@@ -107,6 +107,46 @@ const allowlist = (env: SponsorEnv) =>
 const err = (code: string, message: string, status = 400) =>
   jsonResponse({ code, message }, status, CORS);
 
+type RelayerPhase =
+  | 'request'
+  | 'configuration'
+  | 'storage'
+  | 'settlement'
+  | 'chain state'
+  | 'sponsor signing'
+  | 'broadcast'
+  | 'persistence';
+
+class RelayerInternalError extends Error {
+  readonly phase: RelayerPhase;
+  readonly cause: unknown;
+
+  constructor(phase: RelayerPhase, cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = 'RelayerInternalError';
+    this.phase = phase;
+    this.cause = cause;
+  }
+}
+
+const inPhase = async <T>(phase: RelayerPhase, task: () => Promise<T>): Promise<T> => {
+  try {
+    return await task();
+  } catch (error) {
+    if (error instanceof RelayerInternalError) throw error;
+    throw new RelayerInternalError(phase, error);
+  }
+};
+
+const inSyncPhase = <T>(phase: RelayerPhase, task: () => T): T => {
+  try {
+    return task();
+  } catch (error) {
+    if (error instanceof RelayerInternalError) throw error;
+    throw new RelayerInternalError(phase, error);
+  }
+};
+
 // ---------------------------------------------------------------- chain helpers
 
 const estimateBuyFee = async (env: SponsorEnv): Promise<bigint> => {
@@ -121,14 +161,25 @@ const estimateBuyFee = async (env: SponsorEnv): Promise<bigint> => {
 
 const getBalance = async (env: SponsorEnv, address: string): Promise<bigint> => {
   const r = await fetch(`${HIRO}/extended/v1/address/${address}/stx`, { headers: hiroHeaders(env) });
-  const j = (await r.json()) as { balance?: string };
-  return BigInt(j.balance ?? '0');
+  if (!r.ok) throw new Error(`balance endpoint returned ${r.status}`);
+  const j = (await r.json()) as { balance?: unknown };
+  if (typeof j.balance !== 'string' || !/^\d+$/.test(j.balance)) {
+    throw new Error('balance endpoint returned an invalid response');
+  }
+  return BigInt(j.balance);
 };
 
 const getNonce = async (env: SponsorEnv, address: string): Promise<bigint> => {
   const r = await fetch(`${HIRO}/extended/v1/address/${address}/nonces`, { headers: hiroHeaders(env) });
-  const j = (await r.json()) as { possible_next_nonce?: number };
-  return BigInt(j.possible_next_nonce ?? 0);
+  if (!r.ok) throw new Error(`nonce endpoint returned ${r.status}`);
+  const j = (await r.json()) as { possible_next_nonce?: unknown };
+  if (
+    (typeof j.possible_next_nonce !== 'number' && typeof j.possible_next_nonce !== 'string') ||
+    !/^\d+$/.test(String(j.possible_next_nonce))
+  ) {
+    throw new Error('nonce endpoint returned an invalid response');
+  }
+  return BigInt(j.possible_next_nonce);
 };
 
 const getTxStatus = async (env: SponsorEnv, txid: string): Promise<string> => {
@@ -145,6 +196,7 @@ const getListing = async (env: SponsorEnv, contractId: string, listingId: string
     headers: { 'Content-Type': 'application/json', ...hiroHeaders(env) },
     body: JSON.stringify({ sender: address, arguments: [cvToHex(uintCV(BigInt(listingId)))] })
   });
+  if (!r.ok) throw new Error(`listing endpoint returned ${r.status}`);
   const j = (await r.json()) as { okay?: boolean; result?: string };
   if (!j.okay || !j.result) return null;
   const parsed = cvToJSON(hexToCV(j.result)) as { value?: { value?: Record<string, { value: unknown }> } };
@@ -156,6 +208,24 @@ const getListing = async (env: SponsorEnv, contractId: string, listingId: string
     nftContract: String((rec['nft-contract'] as { value: unknown }).value),
     soldAt: soldRaw === null || soldRaw === undefined ? null : String((soldRaw as { value?: unknown }).value ?? soldRaw)
   };
+};
+
+const getContractSponsor = async (env: SponsorEnv, contractId: string): Promise<string> => {
+  const [address, name] = contractId.split('.');
+  const r = await fetch(`${HIRO}/v2/contracts/call-read/${address}/${name}/get-sponsor`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...hiroHeaders(env) },
+    body: JSON.stringify({ sender: address, arguments: [] })
+  });
+  if (!r.ok) throw new Error(`sponsor endpoint returned ${r.status}`);
+  const j = (await r.json()) as { okay?: boolean; result?: string };
+  if (!j.okay || !j.result) throw new Error('sponsor endpoint returned an invalid response');
+  const parsed = cvToJSON(hexToCV(j.result)) as { value?: { value?: unknown } };
+  const configured = parsed?.value?.value;
+  if (typeof configured !== 'string' || !configured.startsWith('SP')) {
+    throw new Error('sponsor endpoint returned an invalid principal');
+  }
+  return configured;
 };
 
 const network = new StacksMainnet();
@@ -417,19 +487,22 @@ const settleBatch = async (env: SponsorEnv, key: string) => {
 
 // ---------------------------------------------------------------- handler
 
-export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
+const handleRequest: PagesFunction<SponsorEnv> = async (context) => {
   const { request, env } = context;
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
 
   const key = env.SPONSOR_KEY?.trim();
   if (!key) return err('RELAYER_DISABLED', 'sponsor relayer not configured (set the SPONSOR_KEY secret)', 503);
+  const sponsorAddress = inSyncPhase('configuration', () =>
+    getAddressFromPrivateKey(key, TransactionVersion.Mainnet)
+  );
 
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, '');
-  await ensureTable(env);
+  await inPhase('storage', () => ensureTable(env));
 
   // advance settlement on every request (bounded)
-  await settleBatch(env, key);
+  await inPhase('settlement', () => settleBatch(env, key));
 
   if (path.endsWith('/sponsor/quote') && request.method === 'POST') {
     const est = await estimateBuyFee(env);
@@ -441,6 +514,7 @@ export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
         estimatedFeeUstx: est.toString(),
         budgetUstx: budget.toString(),
         minBudgetUstx: MIN_BUDGET_USTX.toString(),
+        sponsorAddress,
         expiresAt: Date.now() + 5 * 60_000
       },
       200,
@@ -480,10 +554,12 @@ export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
     const listingId = validated.listingId;
 
     // Rolling per-origin limit: one wallet cannot fill the global queue.
-    const recent = await rows<{ n: number }>(
-      env,
-      `SELECT COUNT(*) as n FROM sponsor_jobs WHERE buyer=? AND created_at > ? AND state != 'ABANDONED'`,
-      [validated.buyer, Date.now() - RATE_LIMIT_WINDOW_MS]
+    const recent = await inPhase('storage', () =>
+      rows<{ n: number }>(
+        env,
+        `SELECT COUNT(*) as n FROM sponsor_jobs WHERE buyer=? AND created_at > ? AND state != 'ABANDONED'`,
+        [validated.buyer, Date.now() - RATE_LIMIT_WINDOW_MS]
+      )
     );
     if ((recent[0]?.n ?? 0) >= RATE_LIMIT_MAX) {
       return jsonResponse(
@@ -493,22 +569,31 @@ export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
       );
     }
 
-    const unsettled = await rows<{ n: number }>(
-      env,
-      `SELECT COUNT(*) as n FROM sponsor_jobs WHERE state NOT IN ('SETTLED','ABANDONED')`
+    const unsettled = await inPhase('storage', () =>
+      rows<{ n: number }>(
+        env,
+        `SELECT COUNT(*) as n FROM sponsor_jobs WHERE state NOT IN ('SETTLED','ABANDONED')`
+      )
     );
     if ((unsettled[0]?.n ?? 0) >= MAX_UNSETTLED) return err('AT_CAPACITY', 'too many unsettled sponsorships', 503);
 
-    const sponsorAddress = getAddressFromPrivateKey(key, TransactionVersion.Mainnet);
-    if ((await getBalance(env, sponsorAddress)) < LOW_BALANCE_USTX) {
+    if ((await inPhase('chain state', () => getBalance(env, sponsorAddress))) < LOW_BALANCE_USTX) {
       return err('LOW_BALANCE', 'sponsor wallet below reserve; try a self-paid buy', 503);
     }
 
-    const listing = await getListing(env, contractId, listingId.toString());
+    const listing = await inPhase('chain state', () => getListing(env, contractId, listingId.toString()));
     if (!listing) return err('LISTING_NOT_FOUND', 'listing unknown');
     if (listing.soldAt !== null) return err('LISTING_SOLD', 'listing already sold');
     if (listing.nftContract !== validated.nftContractId) {
       return err('VALIDATION', 'nft contract mismatch between signed transaction and listing');
+    }
+    const contractSponsor = await inPhase('chain state', () => getContractSponsor(env, contractId));
+    if (contractSponsor !== sponsorAddress) {
+      return err(
+        'RELAYER_NOT_AUTHORIZED',
+        'sponsor relayer address is not authorised by this contract',
+        503
+      );
     }
     const fee = await estimateBuyFee(env);
     if (fee > MAX_FEE_USTX) return err('FEE_TOO_LARGE', 'network fee above relayer cap', 503);
@@ -519,35 +604,57 @@ export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
     const payloadHash = await sha256Hex(txHex);
     const id = `sp-${Date.now().toString(36)}-${payloadHash.slice(0, 8)}`;
     try {
-      await run(
-        env,
-        `INSERT INTO sponsor_jobs (id, state, contract_id, listing_id, buyer, payload_hash, fee_ustx, created_at, updated_at)
-         VALUES (?, 'RECEIVED', ?, ?, ?, ?, ?, ?, ?)`,
-        [id, contractId, listingId.toString(), validated.buyer, payloadHash, fee.toString(), Date.now(), Date.now()]
+      await inPhase('storage', () =>
+        run(
+          env,
+          `INSERT INTO sponsor_jobs (id, state, contract_id, listing_id, buyer, payload_hash, fee_ustx, created_at, updated_at)
+           VALUES (?, 'RECEIVED', ?, ?, ?, ?, ?, ?, ?)`,
+          [id, contractId, listingId.toString(), validated.buyer, payloadHash, fee.toString(), Date.now(), Date.now()]
+        )
       );
-    } catch {
-      const existing = await rows<JobRow>(env, `SELECT * FROM sponsor_jobs WHERE payload_hash=?`, [payloadHash]);
+    } catch (error) {
+      const existing = await inPhase('storage', () =>
+        rows<JobRow>(env, `SELECT * FROM sponsor_jobs WHERE payload_hash=?`, [payloadHash])
+      );
       if (existing.length) return jsonResponse(jobJson(existing[0]), 409, CORS);
-      return err('DUPLICATE', 'payload already sponsored', 409);
+      throw error;
     }
 
     const transaction = deserializeTransaction(txHex);
-    const nonce = await getNonce(env, sponsorAddress);
-    const sponsored = await sponsorTransaction({
-      transaction,
-      sponsorPrivateKey: key,
-      fee,
-      sponsorNonce: nonce,
-      network
-    });
-    const res = await broadcastTransaction(sponsored, network);
+    let res: Awaited<ReturnType<typeof broadcastTransaction>>;
+    try {
+      const nonce = await inPhase('chain state', () => getNonce(env, sponsorAddress));
+      const sponsored = await inPhase('sponsor signing', () =>
+        sponsorTransaction({
+          transaction,
+          sponsorPrivateKey: key,
+          fee,
+          sponsorNonce: nonce,
+          network
+        })
+      );
+      res = await inPhase('broadcast', () => broadcastTransaction(sponsored, network));
+    } catch (error) {
+      const reason = error instanceof RelayerInternalError
+        ? `${error.phase}: ${error.message}`
+        : 'relayer failed before broadcast';
+      await transition(env, id, 'RECEIVED', 'ABANDONED', {
+        sets: 'error=?',
+        binds: [reason]
+      }).catch(() => undefined);
+      throw error;
+    }
     if ((res as { error?: string }).error) {
       const reason = String((res as { reason?: string }).reason ?? (res as { error?: string }).error);
-      await transition(env, id, 'RECEIVED', 'ABANDONED', { sets: 'error=?', binds: [`broadcast: ${reason}`] });
+      await inPhase('persistence', () =>
+        transition(env, id, 'RECEIVED', 'ABANDONED', { sets: 'error=?', binds: [`broadcast: ${reason}`] })
+      );
       return err('BROADCAST', reason, 502);
     }
     const buyTx = String((res as { txid?: string }).txid ?? res);
-    await transition(env, id, 'RECEIVED', 'SPONSORED', { sets: 'buy_tx=?', binds: [buyTx] });
+    await inPhase('persistence', () =>
+      transition(env, id, 'RECEIVED', 'SPONSORED', { sets: 'buy_tx=?', binds: [buyTx] })
+    );
     return jsonResponse({ id, state: 'SPONSORED', txids: { buy: buyTx } }, 200, CORS);
   }
 
@@ -559,4 +666,80 @@ export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
   }
 
   return err('NOT_FOUND', 'no such route', 404);
+};
+
+const publicFailure = (phase: RelayerPhase) => {
+  switch (phase) {
+    case 'request':
+      return {
+        code: 'RELAYER_INTERNAL',
+        message: 'Sponsor relayer encountered an unexpected error.',
+        status: 500
+      };
+    case 'configuration':
+      return {
+        code: 'RELAYER_CONFIG_INVALID',
+        message: 'Sponsor relayer configuration is invalid.',
+        status: 503
+      };
+    case 'storage':
+    case 'persistence':
+      return {
+        code: 'RELAYER_STORAGE_UNAVAILABLE',
+        message: 'Sponsor relayer storage is temporarily unavailable.',
+        status: 503
+      };
+    case 'chain state':
+      return {
+        code: 'RELAYER_CHAIN_UNAVAILABLE',
+        message: 'Sponsor relayer could not read the current Stacks chain state.',
+        status: 503
+      };
+    case 'sponsor signing':
+      return {
+        code: 'RELAYER_SIGNING_FAILED',
+        message: 'Sponsor relayer could not countersign the claim.',
+        status: 500
+      };
+    case 'broadcast':
+      return {
+        code: 'RELAYER_BROADCAST_UNAVAILABLE',
+        message: 'Sponsor relayer could not reach the Stacks broadcast service.',
+        status: 503
+      };
+    case 'settlement':
+      return {
+        code: 'RELAYER_SETTLEMENT_UNAVAILABLE',
+        message: 'Sponsor relayer settlement is temporarily unavailable.',
+        status: 503
+      };
+  }
+};
+
+export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
+  const requestId = crypto.randomUUID();
+  try {
+    return await handleRequest(context);
+  } catch (error) {
+    const internal = error instanceof RelayerInternalError
+      ? error
+      : new RelayerInternalError('request', error);
+    const failure = publicFailure(internal.phase);
+    const cause = internal.cause instanceof Error ? internal.cause : internal;
+    console.error(`[sponsor][${requestId}] internal failure`, {
+      phase: internal.phase,
+      name: cause.name,
+      message: cause.message,
+      stack: cause.stack ?? null
+    });
+    return jsonResponse(
+      {
+        code: failure.code,
+        message: `${failure.message} Retry with request ID ${requestId}.`,
+        requestId
+      },
+      failure.status,
+      { ...CORS, 'X-Request-Id': requestId }
+    );
+  }
 };

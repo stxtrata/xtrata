@@ -62,6 +62,7 @@
       formatMarketPriceWithUsd
     } from '/src/lib/market/settlement.ts';
     import { isSponsoredMarket } from '/src/lib/market/sponsored.ts';
+    import { createSponsorClient } from '/src/lib/market/sponsor-client.ts';
     import {
       getMarketListingPublicBlockReason,
       isMarketListingPubliclyBuyable
@@ -11296,17 +11297,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       {
         try {
           const base = (drop.entry.sponsorApi ?? '/').replace(/\/+$/, '');
-          const r = await fetch(`${base}/sponsor/submit`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              txHex: signed.txRaw,
-              contractId: drop.contractId,
-              listingId: drop.dropId.toString()
-            })
+          const body = await createSponsorClient(base).submit({
+            txHex: signed.txRaw,
+            contractId: drop.contractId,
+            listingId: drop.dropId
           });
-          const body = await r.json().catch(() => ({}));
-          if (!r.ok) throw new Error(body?.message ?? `relayer ${r.status}`);
           const buyTx = body?.txids?.buy ?? '';
           debugLog('drops', 'sponsored claim broadcast', { jobId: body?.id ?? null, buyTx });
           dropsDom.status.innerHTML = `<span><strong>Drops</strong> claim sponsored and broadcast${buyTx ? ` — tx ${buyTx}` : ''}. The inscription lands in your wallet when it confirms.</span><span class="badge green">no STX needed</span>`;

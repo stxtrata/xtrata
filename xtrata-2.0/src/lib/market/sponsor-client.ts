@@ -30,6 +30,14 @@ export type SponsorJob = {
 
 export type SponsorErrorCode =
   | 'RELAYER_UNAVAILABLE'
+  | 'RELAYER_DISABLED'
+  | 'RELAYER_CONFIG_INVALID'
+  | 'RELAYER_STORAGE_UNAVAILABLE'
+  | 'RELAYER_CHAIN_UNAVAILABLE'
+  | 'RELAYER_SIGNING_FAILED'
+  | 'RELAYER_BROADCAST_UNAVAILABLE'
+  | 'RELAYER_SETTLEMENT_UNAVAILABLE'
+  | 'RELAYER_NOT_AUTHORIZED'
   | 'AT_CAPACITY'
   | 'LOW_BALANCE'
   | 'RATE_LIMITED'
@@ -71,6 +79,14 @@ export const mapRelayerError = (code: string | undefined, message: string) => {
     return new SponsorClientError('VALIDATION', message);
   }
   const known: SponsorErrorCode[] = [
+    'RELAYER_DISABLED',
+    'RELAYER_CONFIG_INVALID',
+    'RELAYER_STORAGE_UNAVAILABLE',
+    'RELAYER_CHAIN_UNAVAILABLE',
+    'RELAYER_SIGNING_FAILED',
+    'RELAYER_BROADCAST_UNAVAILABLE',
+    'RELAYER_SETTLEMENT_UNAVAILABLE',
+    'RELAYER_NOT_AUTHORIZED',
     'AT_CAPACITY',
     'LOW_BALANCE',
     'RATE_LIMITED',
