@@ -1,7 +1,15 @@
-import { describe, expect, it } from 'vitest';
+// @vitest-environment happy-dom
+
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  AuthType,
+  createStacksPrivateKey,
   FungibleConditionCode,
+  getAddressFromPublicKey,
+  getPublicKey,
   PostConditionMode,
+  publicKeyToString,
+  deserializeTransaction,
   makeStandardSTXPostCondition,
   stringAsciiCV,
   uintCV
@@ -11,6 +19,11 @@ import { __testing, isLeatherProviderId } from '../connect';
 const ADDRESS = 'SP2MF04VAGYHGAZWGTEDW5VYCPDWWSY08Z1QFNDSN';
 
 describe('wallet connect helpers', () => {
+  afterEach(() => {
+    window.localStorage.clear();
+    delete (window as typeof window & { LeatherProvider?: unknown }).LeatherProvider;
+  });
+
   it('detects Leather provider ids', () => {
     expect(isLeatherProviderId('LeatherProvider')).toBe(true);
     expect(isLeatherProviderId('XverseProviders.StacksProvider')).toBe(false);
@@ -26,13 +39,7 @@ describe('wallet connect helpers', () => {
       network: 'mainnet',
       stxAddress: ADDRESS,
       postConditionMode: PostConditionMode.Deny,
-      postConditions: [
-        makeStandardSTXPostCondition(
-          ADDRESS,
-          FungibleConditionCode.LessEqual,
-          123n
-        )
-      ]
+      postConditions: [makeStandardSTXPostCondition(ADDRESS, FungibleConditionCode.LessEqual, 123n)]
     });
 
     expect(params).toMatchObject({
@@ -102,7 +109,8 @@ describe('wallet connect helpers', () => {
   });
 
   it('preserves Leather/Xverse transaction fields as canonical txRaw when a txid is also present', async () => {
-    const { AnchorMode, contractPrincipalCV, makeContractCall } = await import('@stacks/transactions');
+    const { AnchorMode, contractPrincipalCV, makeContractCall } =
+      await import('@stacks/transactions');
     const { StacksMainnet } = await import('@stacks/network');
     const tx = await makeContractCall({
       contractAddress: ADDRESS,
@@ -116,9 +124,7 @@ describe('wallet connect helpers', () => {
       sponsored: true,
       anchorMode: AnchorMode.Any,
       postConditionMode: PostConditionMode.Deny,
-      postConditions: [
-        makeStandardSTXPostCondition(ADDRESS, FungibleConditionCode.Equal, 0n)
-      ]
+      postConditions: [makeStandardSTXPostCondition(ADDRESS, FungibleConditionCode.Equal, 0n)]
     });
     const transaction = Buffer.from(tx.serialize()).toString('hex');
     for (const response of [
@@ -151,5 +157,74 @@ describe('wallet connect helpers', () => {
     expect(__testing.normalizeNetwork({ coreApiUrl: 'https://api.testnet.hiro.so' })).toBe(
       'testnet'
     );
+  });
+
+  it('resolves the provider id returned by the wallet modal and persists Leather', () => {
+    const provider = { request: vi.fn() };
+    (window as typeof window & { LeatherProvider?: unknown }).LeatherProvider = provider;
+
+    expect(__testing.resolveProviderSelection('LeatherProvider')).toBe(provider);
+    expect(window.localStorage.getItem('STX_PROVIDER')).toBe('LeatherProvider');
+  });
+
+  it('extracts the public key belonging to the connected Stacks address', () => {
+    const publicKey = `02${'ab'.repeat(32)}`;
+    expect(
+      __testing.extractStacksPublicKey(
+        {
+          result: {
+            addresses: [
+              { address: 'bc1qexample', publicKey: `03${'cd'.repeat(32)}` },
+              { address: ADDRESS, publicKey }
+            ]
+          }
+        },
+        ADDRESS
+      )
+    ).toBe(publicKey);
+  });
+
+  it('does not misclassify a wallet transaction failure named cancel as user cancellation', () => {
+    expect(__testing.isUserCancelledError(new Error('cancel'))).toBe(false);
+    expect(__testing.isUserCancelledError(new Error('SignatureValidation'))).toBe(false);
+    expect(__testing.isUserCancelledError(new Error('Wallet request cancelled.'))).toBe(true);
+    expect(__testing.isUserCancelledError({ code: 4001 })).toBe(true);
+  });
+
+  it('builds a sponsored origin transaction and requests signing without broadcast', async () => {
+    const privateKey = createStacksPrivateKey(
+      'f9d7f5e0d0d81fdd90dcef4e0e2c1b9e3ea361776a5cd91b5c9a52b98b3e1cb601'
+    );
+    const publicKey = publicKeyToString(getPublicKey(privateKey));
+    const address = getAddressFromPublicKey(publicKey);
+    const provider = {
+      request: vi.fn(async (method: string, params: Record<string, unknown>) => {
+        expect(method).toBe('stx_signTransaction');
+        expect(params.broadcast).toBe(false);
+        const transaction = String(params.transaction);
+        const unsigned = deserializeTransaction(transaction);
+        expect(unsigned.auth.authType).toBe(AuthType.Sponsored);
+        expect(unsigned.auth.spendingCondition.fee).toBe(0n);
+        expect(unsigned.auth.spendingCondition.nonce).toBe(9n);
+        return { transaction };
+      })
+    };
+
+    const result = await __testing.requestSponsoredContractCall(provider as never, {
+      contractAddress: ADDRESS,
+      contractName: 'xtrata-drops-v1-0',
+      functionName: 'claim',
+      functionArgs: [uintCV(1)],
+      network: 'mainnet',
+      stxAddress: address,
+      publicKey,
+      nonce: 9n,
+      postConditionMode: PostConditionMode.Deny,
+      postConditions: [makeStandardSTXPostCondition(ADDRESS, FungibleConditionCode.Equal, 0n)],
+      sponsored: true
+    });
+
+    expect(provider.request).toHaveBeenCalledOnce();
+    expect(result.txRaw).toMatch(/^[0-9a-f]+$/i);
   });
 });

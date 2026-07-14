@@ -39,12 +39,25 @@ Run this matrix against one active drop. Use a fresh address with **zero STX** s
 | Round | Wallet | Expected wallet response | Expected diagnostic stages | Pass condition |
 | --- | --- | --- | --- | --- |
 | 1 | disconnected | no wallet call | `BLOCK` at connected-wallet preflight | no prompt, broadcast, or relayer request |
-| 2 | Xverse | `{ txid, transaction }` | `START` → `PREFLIGHT` → `PLAN` → `WALLET_REQUEST` → signed-tx checks → `RELAY_ACCEPTED` → status states | `SETTLED`, NFT owned by claimer, claimer STX unchanged |
-| 3 | Leather | `{ txid, transaction }` | same sequence as Xverse | same result as Xverse |
+| 2 | Xverse | signed `transaction`, not broadcast by wallet | `START` → `PREFLIGHT` → `PLAN` → `NONCE_REQUEST` → `ORIGIN_NONCE` → `SIGNING_INPUT` → `WALLET_REQUEST` → signed-tx checks → `RELAY_ACCEPTED` → status states | `SETTLED`, NFT owned by claimer, claimer STX unchanged |
+| 3 | Leather | signed `transaction`, not broadcast by wallet | same sequence as Xverse | same result as Xverse |
 | 4 | either, reject prompt | cancellation callback | `CANCELLED` | no relayer job created; retry remains enabled |
 | 5 | double-click/reload during an active job | existing reservation returned | `DUPLICATE` or `LISTING_BUSY`, then resume existing job | only one sponsored broadcast and one settlement chain |
 
 The signed transaction gate must pass all of these checks before `/sponsor/submit` is called: decodable transaction, mainnet network, sponsored authorization, origin fee `0`, contract-call payload, exact drops contract, `claim` function, exact NFT/drop arguments, deny post-condition mode, exactly one NFT-send post-condition for the selected inscription, and an origin matching the connected address. Any failure is a hard block; free claims never silently fall back to a self-paid transaction.
+
+The wallet request for rounds 2 and 3 must be `stx_signTransaction` with `broadcast=false`. Do not use `stx_callContract` for a sponsored claim: that method signs and immediately broadcasts the origin-only transaction before the relayer can attach its sponsor signature, which Xverse surfaces as `SignatureValidation`.
+
+### Retry capture checklist
+
+After deploying a change, hard-refresh `/drops`, disconnect, reconnect the wallet, and start one new claim round. Copy both the Claim diagnostics and the browser console entries beginning `[wallet:connect]` or `[wallet]`.
+
+- Leather selection must log `PROVIDER_SELECTED` with `providerId: LeatherProvider` (new Connect UI) or `provider-object` (older Connect UI), plus `resolved: true` and `requestBridge: true`. `resolved: false` means the extension did not inject the advertised provider; record the Leather version and browser profile.
+- `ORIGIN_NONCE_UNAVAILABLE` / `ORIGIN_NONCE_INVALID` isolates the failure to the Hiro nonce preflight; the wallet is never opened.
+- `WALLET_PUBLIC_KEY_UNAVAILABLE` means none of the wallet account-read methods returned a public key paired with the connected STX address. Disconnect/reconnect once, then record the `REQUEST_ERROR` method and wallet version.
+- `WALLET_SIGNING_UNSUPPORTED` or a method-not-found response means the installed wallet does not expose `stx_signTransaction`; no broadcast or relayer request occurs.
+- A `SignatureValidation` popup before `WALLET_RESPONSE` normally means an old cached build is still using `stx_callContract`. Confirm that `PLAN` explicitly says `stx_signTransaction with broadcast=false` before testing again.
+- Bare provider errors such as `cancel` are logged as `WALLET_ERROR`, not `CANCELLED`. Only an explicit user rejection/cancellation or standard user-rejection code is classified as `CANCELLED`.
 
 The relayer independently repeats the security-critical checks, reserves `contractId:dropId` so concurrent clicks cannot spend the sponsor twice, and returns the active job on `DUPLICATE`/`LISTING_BUSY`. The page then polls that job through `RECEIVED` → `SPONSORED` → `CONFIRMED` → `CLAIMING` → `CLAIMED` → `REFUNDING` → `SETTLED`, or logs `ABANDONED`/timeout with the last known transaction ids.
 

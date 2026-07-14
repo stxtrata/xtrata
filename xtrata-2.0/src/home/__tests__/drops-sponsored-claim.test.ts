@@ -15,11 +15,16 @@ describe('public Drops sponsored-claim surface', () => {
     ]) {
       expect(indexHtml).toContain(`id="${id}"`);
     }
-    expect(indexHtml).toContain('Raw signed transactions and private wallet data are never printed.');
+    expect(indexHtml).toContain(
+      'Raw signed transactions and private wallet data are never printed.'
+    );
   });
 
   it('keeps free claims on the validated sponsored path only', () => {
     expect(homeMain).toContain('sponsored: true');
+    expect(homeMain).toContain('showSponsoredContractCall({');
+    expect(homeMain).toContain('stx_signTransaction with broadcast=false');
+    expect(homeMain).toContain('fetchAddressNonce(');
     expect(homeMain).toContain('inspectSponsoredClaimTransaction(payload');
     expect(homeMain).toContain('pollSponsorJob({');
     expect(homeMain).toContain("'RELAYER_RESUME'");

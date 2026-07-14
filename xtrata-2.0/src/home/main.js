@@ -41,7 +41,8 @@
     import { initXtrataRadio } from '/src/home/radio.js';
     import {
       getSelectedWalletProviderId,
-      showContractCall
+      showContractCall,
+      showSponsoredContractCall
     } from '/src/lib/wallet/connect.ts';
     import {
       CONTRACT_REGISTRY,
@@ -2042,6 +2043,28 @@
         throw new Error(`Hiro request failed (${response.status}).`);
       }
       return await response.json();
+    };
+
+    const fetchAddressNonce = async (address, network = 'mainnet') => {
+      const response = await fetchHiroJson(
+        `/extended/v1/address/${encodeURIComponent(address)}/nonces`,
+        network
+      );
+      const value = response?.possible_next_nonce;
+      if (typeof value !== 'number' && typeof value !== 'string') {
+        throw Object.assign(new Error('Hiro nonce response omitted possible_next_nonce.'), {
+          code: 'ORIGIN_NONCE_UNAVAILABLE'
+        });
+      }
+      try {
+        const nonce = BigInt(value);
+        if (nonce < 0n) throw new Error('negative nonce');
+        return nonce;
+      } catch {
+        throw Object.assign(new Error(`Hiro returned an invalid origin nonce (${String(value)}).`), {
+          code: 'ORIGIN_NONCE_INVALID'
+        });
+      }
     };
 
     const parseUintRepr = (value) => {
@@ -11308,18 +11331,34 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const providerId = getSelectedWalletProviderId() ?? 'injected provider';
       recordDropDiagnostic(round, 'START', `Free claim for drop #${drop.dropId}, inscription #${drop.tokenId}.`);
       recordDropDiagnostic(round, 'PREFLIGHT', `Wallet ${providerId}; ${drop.entry.network}; connected ${state.walletSession.address}.`);
-      recordDropDiagnostic(round, 'PLAN', `stx_callContract ${drop.contractId}::claim, sponsored=true, origin fee=0, deny mode, 1 NFT post-condition.`);
+      recordDropDiagnostic(round, 'PLAN', `Build sponsored ${drop.contractId}::claim, then stx_signTransaction with broadcast=false; origin fee=0, deny mode, 1 NFT post-condition.`);
       dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the free claim in your wallet (fee 0)…</span>';
       try {
-        recordDropDiagnostic(round, 'WALLET_REQUEST', 'Waiting for wallet approval.');
+        recordDropDiagnostic(round, 'NONCE_REQUEST', 'Loading the connected address\'s next origin nonce from Hiro.');
+        const originNonce = await fetchAddressNonce(
+          state.walletSession.address,
+          drop.entry.network
+        );
+        recordDropDiagnostic(round, 'ORIGIN_NONCE', `Using public origin nonce ${originNonce}.`, 'success');
+        recordDropDiagnostic(
+          round,
+          'SIGNING_INPUT',
+          state.walletSession.publicKey
+            ? 'Connected session includes a Stacks public key.'
+            : 'No cached public key; the wallet adapter will request the key for the connected address.',
+          state.walletSession.publicKey ? 'success' : 'warn'
+        );
+        recordDropDiagnostic(round, 'WALLET_REQUEST', 'Requesting origin signature only; wallet broadcasting is disabled.');
         const payload = await new Promise((resolve, reject) => {
-          showContractCall({
+          showSponsoredContractCall({
             contractAddress: drop.entry.address,
             contractName: drop.entry.contractName,
             functionName: 'claim',
             functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(drop.dropId)],
             network: drop.entry.network,
             stxAddress: state.walletSession.address,
+            publicKey: state.walletSession.publicKey,
+            nonce: originNonce,
             postConditionMode: PostConditionMode.Deny,
             postConditions,
             sponsored: true,
@@ -11403,7 +11442,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         const code = error?.code ?? 'UNKNOWN_BLOCK';
         const message = String(error?.message ?? error);
         const cancelled = code === 'WALLET_CANCELLED';
-        recordDropDiagnostic(round, cancelled ? 'CANCELLED' : 'BLOCK', `${code}: ${message}`, cancelled ? 'warn' : 'error');
+        const stage = cancelled
+          ? 'CANCELLED'
+          : String(code).startsWith('WALLET_')
+            ? 'WALLET_ERROR'
+            : 'BLOCK';
+        recordDropDiagnostic(round, stage, `${code}: ${message}`, cancelled ? 'warn' : 'error');
         dropsDom.status.innerHTML = cancelled
           ? '<span><strong>Drops</strong> claim cancelled in the wallet. No transaction was submitted.</span>'
           : `<span><strong>Drops</strong> sponsored claim blocked (${code}): ${message}. Open Claim diagnostics, fix the reported stage, then retry.</span>`;

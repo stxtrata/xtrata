@@ -2,6 +2,13 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Free sponsored claims — Xverse/Leather signing correction (2026-07-14)
+
+- Replaced the Drops free-claim wallet call from broadcasting `stx_callContract` to origin-only `stx_signTransaction` with `broadcast=false`. The page now obtains the public origin nonce, constructs the exact sponsored fee-0 transaction, asks the wallet only for the origin signature, validates the returned bytes, and only then submits them to the sponsor relayer. This addresses Xverse's observed `SignatureValidation` failure caused by broadcasting before the sponsor signature existed.
+- Corrected the wallet modal callback contract: Connect UI returns a provider ID, which is now resolved to the injected provider object and persisted. Previously the Leather ID string was treated as the provider itself, so clicking Leather could close/stall without opening the extension.
+- Added public-key capture/persistence with address-matched wallet fallback reads, structured provider error unwrapping, conservative user-cancellation classification, and new diagnostic stages for nonce/public-key/sign-only preflight. Added focused wallet and public Drops smoke tests plus a failure-by-failure retry checklist in the sponsor runbook.
+- Verified: production `npm run build` succeeds; `npm run test:app` passes 805/805 tests across 150 files. The repo-wide TypeScript command still reports the documented pre-existing dependency/test typing baseline and unrelated application errors; no new wallet source errors remain after filtering the output.
+
 ## Excluded from 2.0 (dead weight — still in 1.0)
 
 node_modules trees (569 MB), `dist/` build output, `.wrangler`, `.artifacts`, `.DS_Store`, 11 `vitest.config.ts.timestamp-*.mjs` junk files, `forever-twins.zip`, one-off bug-report `.txt` files, `homepage-themes.html`, `homepage-registry-ledger.html`, comparison/hardening report `.md` files, `reports/`, `Refactor-Plans/`, `OPTIMISATION/`, `Launch-Campaign/`, `Dora-Hacks/`, `LetafricaBuild/`, `AAA-Collection/`, `ledger-native-systems/`, `protocol-primitives/`, `SVGs/`, `xtrata_inscription_holder_count/`, non-shipping `recursive-apps/*` (only `x-board` and `21-arcade` are needed by the build), clarinet `lcov.info` + `costs-reports.json`, and most of `docs/` (kept: app-reference, assumptions, contract-inventory, forever-twins-linking, ai-skills).

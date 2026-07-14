@@ -16,11 +16,15 @@ import {
   getInstalledProviders,
   getProviderFromId,
   getSelectedProviderId,
+  setSelectedProviderId,
   type WebBTCProvider
 } from '@stacks/connect-ui';
 import { defineCustomElements } from '@stacks/connect-ui/loader';
 import {
+  AnchorMode,
   deserializeTransaction,
+  getAddressFromPublicKey,
+  makeUnsignedContractCall,
   PostConditionMode,
   serializeCV,
   serializePostCondition,
@@ -35,13 +39,13 @@ export type { ContractCallOptions, ContractDeployOptions, StacksProvider };
 
 const DEFAULT_SCOPES = ['store_write'];
 const MANIFEST_PATH = '/manifest.json';
-const USER_CANCEL_ERROR_CODES = new Set([4001, -32000, -31001]);
+const USER_CANCEL_ERROR_CODES = new Set([4001, -31001]);
 
 type ConnectModalElement = HTMLElement & {
   defaultProviders: WebBTCProvider[];
   installedProviders: WebBTCProvider[];
   persistSelection: boolean;
-  callback?: (provider: StacksProvider) => void;
+  callback?: (selection: string | StacksProvider) => void;
   cancelCallback?: () => void;
 };
 
@@ -91,6 +95,12 @@ type WalletContractCallOptions = WalletActionBase & {
   contractName: string;
   functionName: string;
   functionArgs: ContractCallOptions['functionArgs'];
+};
+
+type SponsoredWalletContractCallOptions = WalletContractCallOptions & {
+  nonce: ContractCallOptions['nonce'] | string | bigint;
+  stxAddress: string;
+  publicKey?: string;
 };
 
 type WalletContractDeployOptions = WalletActionBase & {
@@ -179,20 +189,13 @@ const normalizeRawTxHex = (value: unknown) => {
     return null;
   }
   const normalized = stripHexPrefix(text);
-  if (
-    normalized.length < 128 ||
-    normalized.length % 2 !== 0 ||
-    !/^[0-9a-f]+$/i.test(normalized)
-  ) {
+  if (normalized.length < 128 || normalized.length % 2 !== 0 || !/^[0-9a-f]+$/i.test(normalized)) {
     return null;
   }
   return normalized;
 };
 
-const normalizeNetwork = (
-  value: unknown,
-  fallback: NetworkType = 'mainnet'
-): NetworkType => {
+const normalizeNetwork = (value: unknown, fallback: NetworkType = 'mainnet'): NetworkType => {
   if (typeof value === 'string') {
     const lower = value.toLowerCase();
     if (lower.includes('testnet') || lower === 'test') {
@@ -242,7 +245,7 @@ const normalizePostCondition = (value: WalletContractPostCondition) =>
     ? stripHexPrefix(value)
     : bytesToHex(serializePostCondition(value as SerializablePostCondition));
 
-const normalizePostConditionMode = (value?: PostConditionMode) =>
+const normalizePostConditionMode = (value?: number) =>
   value === PostConditionMode.Allow ? 'allow' : 'deny';
 
 const extractStacksAddress = (payload: unknown, depth = 0): string | null => {
@@ -303,6 +306,74 @@ const extractStacksAddress = (payload: unknown, depth = 0): string | null => {
   return null;
 };
 
+const normalizePublicKey = (value: unknown) => {
+  const text = toNonEmptyText(value);
+  if (!text) {
+    return null;
+  }
+  const normalized = stripHexPrefix(text);
+  return /^[0-9a-f]{66}$/i.test(normalized) ? normalized : null;
+};
+
+const extractStacksPublicKey = (
+  payload: unknown,
+  expectedAddress?: string,
+  depth = 0
+): string | null => {
+  if (depth > 8 || !payload) {
+    return null;
+  }
+  if (Array.isArray(payload)) {
+    for (const entry of payload) {
+      const nested = extractStacksPublicKey(entry, expectedAddress, depth + 1);
+      if (nested) {
+        return nested;
+      }
+    }
+    return null;
+  }
+  if (typeof payload !== 'object') {
+    return expectedAddress ? null : normalizePublicKey(payload);
+  }
+
+  const candidate = payload as Record<string, unknown>;
+  const directAddress = [candidate.address, candidate.stxAddress, candidate.selectedAddress]
+    .map((value) => toNonEmptyText(value))
+    .find((value) => value && validateStacksAddress(value));
+  const directPublicKey = [candidate.publicKey, candidate.public_key, candidate.stxPublicKey]
+    .map((value) => normalizePublicKey(value))
+    .find(Boolean);
+
+  if (
+    directPublicKey &&
+    (!expectedAddress || (directAddress && directAddress === expectedAddress))
+  ) {
+    return directPublicKey;
+  }
+
+  for (const key of [
+    'addresses',
+    'accounts',
+    'result',
+    'data',
+    'payload',
+    'response',
+    'params',
+    'profile',
+    'userData'
+  ]) {
+    if (!(key in candidate)) {
+      continue;
+    }
+    const nested = extractStacksPublicKey(candidate[key], expectedAddress, depth + 1);
+    if (nested) {
+      return nested;
+    }
+  }
+
+  return null;
+};
+
 const deriveWalletSession = (userData: UserData): WalletSession => {
   const profile = (userData.profile ?? {}) as {
     stxAddress?:
@@ -354,10 +425,12 @@ const toWalletSession = (
   if (network !== 'mainnet') {
     return disconnectedSession();
   }
+  const publicKey = extractStacksPublicKey(payload, address);
   return {
     isConnected: true,
     address,
-    network
+    network,
+    ...(publicKey ? { publicKey } : {})
   };
 };
 
@@ -380,13 +453,48 @@ const isUserCancelledError = (error: unknown) => {
     }
   }
   const message = error instanceof Error ? error.message : String(error ?? '');
-  const lower = message.toLowerCase();
+  const lower = message.trim().toLowerCase();
   return (
-    lower.includes('cancel') ||
-    lower.includes('reject') ||
-    lower.includes('denied') ||
-    lower.includes('closed')
+    /\buser (?:cancelled|canceled|rejected|denied|closed)\b/.test(lower) ||
+    /\b(?:cancelled|canceled|rejected|denied) by (?:the )?user\b/.test(lower) ||
+    /\b(?:wallet )?request (?:cancelled|canceled|rejected|denied)\b/.test(lower) ||
+    lower === 'cancelled' ||
+    lower === 'canceled'
   );
+};
+
+const providerError = (value: unknown) => {
+  if (value instanceof Error) {
+    return value;
+  }
+  const candidate = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  const nested =
+    candidate.error && typeof candidate.error === 'object'
+      ? (candidate.error as Record<string, unknown>)
+      : null;
+  const message =
+    toNonEmptyText(nested?.message) ??
+    toNonEmptyText(candidate.message) ??
+    toNonEmptyText(candidate.error) ??
+    toNonEmptyText(value) ??
+    'Wallet provider request failed.';
+  const error = new Error(message) as Error & { code?: unknown; data?: unknown };
+  error.code = nested?.code ?? candidate.code;
+  error.data = nested?.data ?? candidate.data;
+  return error;
+};
+
+const unwrapProviderResponse = (response: unknown) => {
+  if (response && typeof response === 'object') {
+    const candidate = response as Record<string, unknown>;
+    if (candidate.error) {
+      throw providerError(candidate);
+    }
+    if (candidate.status === 'error') {
+      throw providerError(candidate.result ?? candidate);
+    }
+  }
+  return response;
 };
 
 const requestProvider = async (
@@ -397,7 +505,12 @@ const requestProvider = async (
   if (typeof provider.request !== 'function') {
     throw new Error(`Wallet provider does not support request("${method}").`);
   }
-  return provider.request(method, params as unknown as any[]);
+  try {
+    const response = await provider.request(method as never, params as never);
+    return unwrapProviderResponse(response);
+  } catch (error) {
+    throw providerError(error);
+  }
 };
 
 const deriveTxIdFromRawPayload = (value: unknown) => {
@@ -413,10 +526,7 @@ const deriveTxIdFromRawPayload = (value: unknown) => {
   }
 };
 
-const normalizeTxResultPayload = (
-  payload: unknown,
-  depth = 0
-): WalletTxResult | null => {
+const normalizeTxResultPayload = (payload: unknown, depth = 0): WalletTxResult | null => {
   if (depth > 6 || typeof payload === 'undefined' || payload === null) {
     return null;
   }
@@ -427,7 +537,7 @@ const normalizeTxResultPayload = (
     return {
       txId: standaloneTxId,
       txid: standaloneTxId,
-      txRaw: standaloneRawTxId ? toNonEmptyText(payload) ?? undefined : undefined
+      txRaw: standaloneRawTxId ? (toNonEmptyText(payload) ?? undefined) : undefined
     };
   }
 
@@ -516,9 +626,7 @@ const normalizeTxResultForCallback = (payload: unknown): WalletTxResult => {
   return { result: payload };
 };
 
-const toLegacyContractCallOptions = (
-  options: WalletContractCallOptions
-): ContractCallOptions =>
+const toLegacyContractCallOptions = (options: WalletContractCallOptions): ContractCallOptions =>
   ({
     ...options,
     fee: normalizeBigIntLike(options.fee),
@@ -536,9 +644,7 @@ const toLegacyContractDeployOptions = (
     sponsored: options.sponsored === true
   }) as ContractDeployOptions;
 
-const toLegacyStxTransferOptions = (
-  options: WalletStxTransferOptions
-): STXTransferOptions =>
+const toLegacyStxTransferOptions = (options: WalletStxTransferOptions): STXTransferOptions =>
   ({
     ...options,
     fee: normalizeBigIntLike(options.fee),
@@ -549,9 +655,7 @@ const toLegacyStxTransferOptions = (
 const buildContractCallParams = (options: WalletContractCallOptions) => {
   const postConditions =
     options.postConditions && options.postConditions.length > 0
-      ? options.postConditions.map((entry) =>
-          normalizePostCondition(entry)
-        )
+      ? options.postConditions.map((entry) => normalizePostCondition(entry))
       : undefined;
 
   return {
@@ -571,9 +675,7 @@ const buildContractCallParams = (options: WalletContractCallOptions) => {
 const buildContractDeployParams = (options: WalletContractDeployOptions) => {
   const postConditions =
     options.postConditions && options.postConditions.length > 0
-      ? options.postConditions.map((entry) =>
-          normalizePostCondition(entry)
-        )
+      ? options.postConditions.map((entry) => normalizePostCondition(entry))
       : undefined;
 
   return {
@@ -610,6 +712,92 @@ const requestLeatherContractCall = async (
     'stx_callContract',
     buildContractCallParams(options)
   );
+  return normalizeTxResult(response);
+};
+
+const WALLET_ACCOUNT_READ_METHODS = [
+  'getAddresses',
+  'stx_getAddresses',
+  'stx_getAccounts',
+  'getAccounts',
+  'wallet_getAccount'
+] as const;
+
+const publicKeyMatchesAddress = (publicKey: string, address: string) => {
+  try {
+    return getAddressFromPublicKey(publicKey) === address;
+  } catch {
+    return false;
+  }
+};
+
+const resolveWalletPublicKey = async (
+  provider: StacksProvider,
+  address: string,
+  preferredPublicKey?: string
+) => {
+  const preferred = normalizePublicKey(preferredPublicKey);
+  if (preferred && publicKeyMatchesAddress(preferred, address)) {
+    return preferred;
+  }
+
+  let lastError: unknown = null;
+  for (const method of WALLET_ACCOUNT_READ_METHODS) {
+    try {
+      const response = await requestProvider(provider, method);
+      const publicKey = extractStacksPublicKey(response, address);
+      if (publicKey && publicKeyMatchesAddress(publicKey, address)) {
+        return publicKey;
+      }
+    } catch (error) {
+      lastError = error;
+      if (!isMethodUnsupportedError(error)) {
+        break;
+      }
+    }
+  }
+
+  throw Object.assign(
+    new Error(
+      lastError instanceof Error
+        ? `Wallet did not expose the public key for ${address}: ${lastError.message}`
+        : `Wallet did not expose the public key for ${address}. Reconnect the wallet and retry.`
+    ),
+    { code: 'WALLET_PUBLIC_KEY_UNAVAILABLE' }
+  );
+};
+
+const buildUnsignedSponsoredContractCall = async (
+  options: SponsoredWalletContractCallOptions,
+  publicKey: string
+) => {
+  const transaction = await makeUnsignedContractCall({
+    contractAddress: options.contractAddress,
+    contractName: options.contractName,
+    functionName: options.functionName,
+    functionArgs: options.functionArgs,
+    publicKey,
+    network: normalizeNetwork(options.network),
+    fee: 0n,
+    nonce: options.nonce,
+    anchorMode: AnchorMode.Any,
+    postConditionMode: options.postConditionMode ?? PostConditionMode.Deny,
+    postConditions: options.postConditions ?? [],
+    sponsored: true
+  } as Parameters<typeof makeUnsignedContractCall>[0]);
+  return bytesToHex(transaction.serialize());
+};
+
+const requestSponsoredContractCall = async (
+  provider: StacksProvider,
+  options: SponsoredWalletContractCallOptions
+) => {
+  const publicKey = await resolveWalletPublicKey(provider, options.stxAddress, options.publicKey);
+  const unsignedTransaction = await buildUnsignedSponsoredContractCall(options, publicKey);
+  const response = await requestProvider(provider, 'stx_signTransaction', {
+    transaction: unsignedTransaction,
+    broadcast: false
+  });
   return normalizeTxResult(response);
 };
 
@@ -659,13 +847,30 @@ const connectViaRequest = async (provider: StacksProvider) => {
   let lastError: unknown = null;
   for (const method of attempts) {
     try {
+      // eslint-disable-next-line no-console
+      console.info('[wallet:connect]', { stage: 'REQUEST', method });
       const response = await requestProvider(provider, method);
       const session = toWalletSession(response);
       if (session.isConnected) {
+        // eslint-disable-next-line no-console
+        console.info('[wallet:connect]', {
+          stage: 'CONNECTED',
+          method,
+          hasPublicKey: Boolean(session.publicKey)
+        });
         return session;
       }
+      // eslint-disable-next-line no-console
+      console.warn('[wallet:connect]', { stage: 'EMPTY_RESPONSE', method });
     } catch (error) {
       lastError = error;
+      // eslint-disable-next-line no-console
+      console.warn('[wallet:connect]', {
+        stage: 'REQUEST_ERROR',
+        method,
+        code: error && typeof error === 'object' && 'code' in error ? error.code : undefined,
+        message: error instanceof Error ? error.message : String(error)
+      });
       if (isUserCancelledError(error)) {
         return disconnectedSession();
       }
@@ -713,10 +918,24 @@ const connectViaLegacyAuth = async (
   });
 };
 
-const selectProvider = (options?: {
-  forceWalletSelect?: boolean;
-  persistSelection?: boolean;
-}) => {
+const resolveProviderSelection = (
+  selection: string | StacksProvider,
+  persistSelection = true
+): StacksProvider | null => {
+  if (typeof selection !== 'string') {
+    return selection;
+  }
+  const provider = getProviderFromId(selection) as StacksProvider | undefined;
+  if (!provider) {
+    return null;
+  }
+  if (persistSelection) {
+    setSelectedProviderId(selection);
+  }
+  return provider;
+};
+
+const selectProvider = (options?: { forceWalletSelect?: boolean; persistSelection?: boolean }) => {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     return Promise.resolve<StacksProvider | null>(null);
   }
@@ -756,7 +975,18 @@ const selectProvider = (options?: {
     modal.defaultProviders = defaultProviders;
     modal.installedProviders = installedProviders;
     modal.persistSelection = persistSelection;
-    modal.callback = (provider) => {
+    modal.callback = (selection) => {
+      const provider = resolveProviderSelection(selection, persistSelection);
+      // eslint-disable-next-line no-console
+      console.info('[wallet:connect]', {
+        stage: 'PROVIDER_SELECTED',
+        providerId:
+          typeof selection === 'string'
+            ? selection
+            : (getSelectedProviderId() ?? 'provider-object'),
+        resolved: Boolean(provider),
+        requestBridge: typeof provider?.request === 'function'
+      });
       cleanup();
       resolve(provider);
     };
@@ -844,12 +1074,7 @@ export const connectWallet = async (params: {
 export const disconnectWallet = async () => {
   const provider = getStacksProvider();
   if (provider && isLeatherProviderId(getSelectedProviderId())) {
-    for (const method of [
-      'stx_disconnect',
-      'wallet_disconnect',
-      'disconnect',
-      'deactivate'
-    ]) {
+    for (const method of ['stx_disconnect', 'wallet_disconnect', 'disconnect', 'deactivate']) {
       try {
         await requestProvider(provider, method);
         break;
@@ -865,10 +1090,7 @@ export const disconnectWallet = async () => {
   clearSelectedProviderId();
 };
 
-export const showContractCall = (
-  options: WalletContractCallOptions,
-  provider?: StacksProvider
-) => {
+export const showContractCall = (options: WalletContractCallOptions, provider?: StacksProvider) => {
   const activeProvider = provider ?? getStacksProvider();
   const legacyOptions = toLegacyContractCallOptions(options);
 
@@ -899,6 +1121,39 @@ export const showContractCall = (
         return;
       }
       options.onCancel?.();
+    });
+};
+
+// Sponsored claims must stop after the origin signature. stx_callContract
+// broadcasts immediately, before the relayer can attach the sponsor signature,
+// which current Xverse reports as SignatureValidation.
+export const showSponsoredContractCall = (
+  options: SponsoredWalletContractCallOptions,
+  provider?: StacksProvider
+) => {
+  const activeProvider = provider ?? getStacksProvider();
+  if (!activeProvider || typeof activeProvider.request !== 'function') {
+    options.onError?.(
+      Object.assign(
+        new Error('Selected wallet does not support origin-only transaction signing.'),
+        { code: 'WALLET_SIGNING_UNSUPPORTED' }
+      )
+    );
+    return;
+  }
+
+  return void requestSponsoredContractCall(activeProvider, options)
+    .then((payload) => {
+      options.onFinish?.(payload);
+    })
+    .catch((error) => {
+      // eslint-disable-next-line no-console
+      console.error('[wallet] sponsored contract signing failed', error);
+      if (isUserCancelledError(error)) {
+        options.onCancel?.();
+        return;
+      }
+      options.onError?.(error);
     });
 };
 
@@ -933,10 +1188,7 @@ export const showContractDeploy = (
     });
 };
 
-export const showStxTransfer = (
-  options: WalletStxTransferOptions,
-  provider?: StacksProvider
-) => {
+export const showStxTransfer = (options: WalletStxTransferOptions, provider?: StacksProvider) => {
   const activeProvider = provider ?? getStacksProvider();
   const legacyOptions = toLegacyStxTransferOptions({
     ...options,
@@ -970,12 +1222,17 @@ export const __testing = {
   buildContractCallParams,
   buildContractDeployParams,
   buildStxTransferParams,
+  buildUnsignedSponsoredContractCall,
   extractStacksAddress,
+  extractStacksPublicKey,
   isMethodUnsupportedError,
   isUserCancelledError,
   normalizeNetwork,
   toLegacyContractCallOptions,
   normalizeTxResultForCallback,
   normalizeTxResultPayload,
-  normalizeTxResult
+  normalizeTxResult,
+  requestSponsoredContractCall,
+  resolveProviderSelection,
+  unwrapProviderResponse
 };
