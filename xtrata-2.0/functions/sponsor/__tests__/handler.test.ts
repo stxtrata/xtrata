@@ -14,10 +14,13 @@ import {
   AnchorMode,
   Cl,
   FungibleConditionCode,
+  NonFungibleConditionCode,
   PostConditionMode,
   contractPrincipalCV,
+  createAssetInfo,
   cvToHex,
   makeContractCall,
+  makeContractNonFungiblePostCondition,
   makeStandardSTXPostCondition,
   uintCV
 } from '@stacks/transactions';
@@ -43,7 +46,7 @@ const makeDb = () => {
     }
     if (q.startsWith('ALTER TABLE')) throw new Error('duplicate column');
     if (q.startsWith('UPDATE sponsor_jobs SET state=?')) {
-      // transition(): binds = [to, now, ...extra, id, from]
+      // transition(): binds = [to, now, to-for-reservation, ...extra, id, from]
       const to = binds[0] as string;
       const from = binds[binds.length - 1] as string;
       const id = binds[binds.length - 2] as string;
@@ -51,10 +54,11 @@ const makeDb = () => {
       if (!row) return { results: [], meta: { changes: 0 } };
       row.state = to;
       row.updated_at = binds[1];
-      const extra = q.match(/SET state=\?, updated_at=\?, (.+?) WHERE/);
+      if (to === 'SETTLED' || to === 'ABANDONED') row.reservation_key = null;
+      const extra = q.match(/reservation_key END, (.+?) WHERE/);
       if (extra) {
         extra[1].split(',').forEach((part, index) => {
-          row[part.trim().split('=')[0]] = binds[2 + index];
+          row[part.trim().split('=')[0]] = binds[3 + index];
         });
       }
       return { results: [], meta: { changes: 1 } };
@@ -74,13 +78,16 @@ const makeDb = () => {
       return { results: [{ n }], meta: {} };
     }
     if (q.startsWith('INSERT INTO sponsor_jobs')) {
-      const [id, contract_id, listing_id, buyer, payload_hash, fee_ustx, created_at, updated_at] =
-        binds as [string, string, string, string, string, string, number, number];
+      const [id, contract_id, listing_id, buyer, payload_hash, reservation_key, fee_ustx, created_at, updated_at] =
+        binds as [string, string, string, string, string, string, string, number, number];
       if (jobs.some((j) => j.payload_hash === payload_hash)) {
         throw new Error('UNIQUE constraint failed: sponsor_jobs.payload_hash');
       }
+      if (jobs.some((j) => j.reservation_key === reservation_key)) {
+        throw new Error('UNIQUE constraint failed: sponsor_jobs.reservation_key');
+      }
       jobs.push({
-        id, state: 'RECEIVED', contract_id, listing_id, buyer, payload_hash, fee_ustx,
+        id, state: 'RECEIVED', contract_id, listing_id, buyer, payload_hash, reservation_key, fee_ustx,
         buy_tx: null, claim_tx: null, refund_tx: null, error: null, created_at, updated_at
       });
       return { results: [], meta: { changes: 1 } };
@@ -91,6 +98,14 @@ const makeDb = () => {
     }
     if (q.includes('WHERE payload_hash=?')) {
       return { results: jobs.filter((j) => j.payload_hash === binds[0]), meta: {} };
+    }
+    if (q.includes('WHERE reservation_key=?')) {
+      return {
+        results: jobs.filter(
+          (j) => j.reservation_key === binds[0] && !['SETTLED', 'ABANDONED'].includes(j.state)
+        ),
+        meta: {}
+      };
     }
     if (q.includes('WHERE id=?')) {
       return { results: jobs.filter((j) => j.id === binds[0]), meta: {} };
@@ -148,6 +163,8 @@ const fixture = async (params: {
   fn?: string;
   listingId?: bigint;
   sponsored?: boolean;
+  nonce?: bigint;
+  postConditions?: ReturnType<typeof makeStandardSTXPostCondition>[];
 } = {}) => {
   const contract = params.contract ?? MARKET;
   const [addr, name] = contract.split('.');
@@ -160,17 +177,23 @@ const fixture = async (params: {
     senderKey: BUYER_KEY,
     network: new StacksMainnet(),
     fee: 0n,
-    nonce: 0n,
+    nonce: params.nonce ?? 0n,
     sponsored: params.sponsored ?? true,
     anchorMode: AnchorMode.Any,
     postConditionMode: PostConditionMode.Deny,
-    postConditions: [
-      makeStandardSTXPostCondition(
-        'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7',
-        FungibleConditionCode.Equal,
-        0n
-      )
-    ]
+    postConditions: params.postConditions ?? (contract === DROPS
+      ? [makeContractNonFungiblePostCondition(
+          DEPLOYER,
+          'xtrata-drops-v1-0',
+          NonFungibleConditionCode.Sends,
+          createAssetInfo(DEPLOYER, 'xtrata-v3-2-3', 'xtrata-inscription'),
+          uintCV(2759n)
+        )]
+      : [makeStandardSTXPostCondition(
+          'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7',
+          FungibleConditionCode.Equal,
+          0n
+        )])
   });
   return Buffer.from(tx.serialize()).toString('hex');
 };
@@ -211,6 +234,61 @@ describe('sponsor relayer Pages handler', () => {
       listingId: '3'
     });
     expect(res.status).toBe(200);
+  });
+
+  it('rejects a drops claim whose deny-mode post-condition cannot authorize the NFT transfer', async () => {
+    const wrongPostCondition = makeStandardSTXPostCondition(
+      'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7',
+      FungibleConditionCode.Equal,
+      0n
+    );
+    const res = await submit(env, {
+      txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 3n, postConditions: [wrongPostCondition] }),
+      contractId: DROPS,
+      listingId: '3'
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json()).message).toMatch(/post-conditions/);
+    expect(broadcasts).toHaveLength(0);
+  });
+
+  it('reserves one sponsorship per drop across different signed payloads', async () => {
+    const [first, second] = await Promise.all([
+      submit(env, {
+        txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 3n, nonce: 0n }),
+        contractId: DROPS,
+        listingId: '3'
+      }),
+      submit(env, {
+        txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 3n, nonce: 1n }),
+        contractId: DROPS,
+        listingId: '3'
+      })
+    ]);
+    expect([first.status, second.status].sort()).toEqual([200, 409]);
+    const blocked = first.status === 409 ? first : second;
+    expect((await blocked.json()).code).toBe('LISTING_BUSY');
+    expect(db.jobs).toHaveLength(1);
+    expect(broadcasts).toHaveLength(1);
+  });
+
+  it('advances a drops sponsorship through reimbursement and creator refund', async () => {
+    const submitted = await submit(env, {
+      txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 3n }),
+      contractId: DROPS,
+      listingId: '3'
+    });
+    const initial = await submitted.json();
+    const status = () => onRequest({
+      request: new Request(`https://x/sponsor/status/${initial.id}`, { method: 'GET' }),
+      env
+    } as never) as Promise<Response>;
+    await status();
+    const settled = await status();
+    const body = await settled.json();
+    expect(body.state).toBe('SETTLED');
+    expect(body.txids).toMatchObject({ buy: expect.any(String), claim: expect.any(String), refund: expect.any(String) });
+    expect(db.jobs[0].reservation_key).toBeNull();
   });
 
   it('FINDING 1: rejects body listingId B when the signed transaction targets A, before any job or broadcast', async () => {

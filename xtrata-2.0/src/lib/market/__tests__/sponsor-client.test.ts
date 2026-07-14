@@ -73,6 +73,34 @@ describe('createSponsorClient', () => {
     ).rejects.toMatchObject({ code: 'LOW_BALANCE', fallbackToSelfPaid: true });
   });
 
+  it('preserves an active job returned by a same-listing reservation conflict', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      jsonResponse(
+        {
+          code: 'LISTING_BUSY',
+          message: 'claim already in progress',
+          id: 'sp-existing',
+          state: 'SPONSORED',
+          txids: { buy: 'abc' }
+        },
+        409
+      )
+    );
+    const client = createSponsorClient('https://relayer.example', fetchImpl);
+
+    await expect(
+      client.submit({ txHex: '00', contractId: 'SP0.m', listingId: 1n })
+    ).rejects.toMatchObject({
+      code: 'LISTING_BUSY',
+      fallbackToSelfPaid: false,
+      existingJob: {
+        id: 'sp-existing',
+        state: 'SPONSORED',
+        txids: { buy: 'abc' }
+      }
+    });
+  });
+
   it('status() fetches by job id', async () => {
     const fetchImpl = vi
       .fn()
@@ -89,7 +117,7 @@ describe('createSponsorClient', () => {
 
 describe('mapRelayerError', () => {
   it('collapses relayer validation codes into VALIDATION', () => {
-    for (const code of ['NOT_SPONSORED', 'NONZERO_FEE', 'NO_POST_CONDITIONS', 'BAD_TX']) {
+    for (const code of ['VALIDATION', 'NOT_SPONSORED', 'NONZERO_FEE', 'NO_POST_CONDITIONS', 'BAD_TX']) {
       expect(mapRelayerError(code, 'x').code).toBe('VALIDATION');
     }
   });
@@ -101,8 +129,9 @@ describe('mapRelayerError', () => {
     expect(mapRelayerError(undefined, 'x').code).toBe('UNKNOWN');
   });
 
-  it('DUPLICATE and LISTING_SOLD do not offer self-paid fallback', () => {
+  it('DUPLICATE, LISTING_BUSY and LISTING_SOLD do not offer self-paid fallback', () => {
     expect(new SponsorClientError('DUPLICATE', 'x').fallbackToSelfPaid).toBe(false);
+    expect(new SponsorClientError('LISTING_BUSY', 'x').fallbackToSelfPaid).toBe(false);
     expect(new SponsorClientError('LISTING_SOLD', 'x').fallbackToSelfPaid).toBe(false);
     expect(new SponsorClientError('AT_CAPACITY', 'x').fallbackToSelfPaid).toBe(true);
   });

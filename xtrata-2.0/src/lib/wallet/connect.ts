@@ -83,6 +83,7 @@ type WalletActionBase = {
   sponsored?: boolean;
   onFinish?: (payload: WalletTxResult) => void;
   onCancel?: () => void;
+  onError?: (error: unknown) => void;
 };
 
 type WalletContractCallOptions = WalletActionBase & {
@@ -420,12 +421,13 @@ const normalizeTxResultPayload = (
     return null;
   }
 
-  const standaloneTxId =
-    normalizeStandaloneTxId(payload) ?? deriveTxIdFromRawPayload(payload);
+  const standaloneRawTxId = deriveTxIdFromRawPayload(payload);
+  const standaloneTxId = normalizeStandaloneTxId(payload) ?? standaloneRawTxId;
   if (standaloneTxId) {
     return {
       txId: standaloneTxId,
-      txid: standaloneTxId
+      txid: standaloneTxId,
+      txRaw: standaloneRawTxId ? toNonEmptyText(payload) ?? undefined : undefined
     };
   }
 
@@ -444,6 +446,13 @@ const normalizeTxResultPayload = (
   }
 
   const candidate = payload as Record<string, unknown>;
+  let canonicalRawTx: string | null = null;
+  for (const key of TX_RESULT_RAW_KEYS) {
+    if (deriveTxIdFromRawPayload(candidate[key])) {
+      canonicalRawTx = toNonEmptyText(candidate[key]);
+      break;
+    }
+  }
   const explicitTxId =
     toNonEmptyText(candidate.txId) ||
     toNonEmptyText(candidate.txid) ||
@@ -452,7 +461,8 @@ const normalizeTxResultPayload = (
     return {
       ...candidate,
       txId: explicitTxId,
-      txid: explicitTxId
+      txid: explicitTxId,
+      txRaw: canonicalRawTx ?? toNonEmptyText(candidate.txRaw) ?? undefined
     };
   }
 
@@ -880,6 +890,14 @@ export const showContractCall = (
       }
       // eslint-disable-next-line no-console
       console.error('[wallet] contract call request failed', error);
+      if (isUserCancelledError(error)) {
+        options.onCancel?.();
+        return;
+      }
+      if (options.onError) {
+        options.onError(error);
+        return;
+      }
       options.onCancel?.();
     });
 };

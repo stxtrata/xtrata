@@ -30,6 +30,33 @@ Cast: **Seller** = a wallet holding an inscription + a little STX. **Buyer** = a
 4. **Verify balances**: buyer spent exactly the sBTC price and 0 STX; seller received price minus fee-bps plus the unused deposit; relayer float back to ~where it started.
 5. **Escape hatch check (optional)**: list + buy again, stop the relayer before settlement, wait 144 blocks (~24h), call `settle-refund` from the seller wallet — the deposit comes back without the relayer.
 
+## Free Claims smoke test (Xverse + Leather)
+
+The public `/drops` page contains a persistent **Claim diagnostics** panel. Each click starts a numbered round and logs the last completed stage without exposing raw transaction hex or private wallet data. Copy the log after a failed round before retrying.
+
+Run this matrix against one active drop. Use a fresh address with **zero STX** so a successful result proves the sponsored path was used.
+
+| Round | Wallet | Expected wallet response | Expected diagnostic stages | Pass condition |
+| --- | --- | --- | --- | --- |
+| 1 | disconnected | no wallet call | `BLOCK` at connected-wallet preflight | no prompt, broadcast, or relayer request |
+| 2 | Xverse | `{ txid, transaction }` | `START` → `PREFLIGHT` → `PLAN` → `WALLET_REQUEST` → signed-tx checks → `RELAY_ACCEPTED` → status states | `SETTLED`, NFT owned by claimer, claimer STX unchanged |
+| 3 | Leather | `{ txid, transaction }` | same sequence as Xverse | same result as Xverse |
+| 4 | either, reject prompt | cancellation callback | `CANCELLED` | no relayer job created; retry remains enabled |
+| 5 | double-click/reload during an active job | existing reservation returned | `DUPLICATE` or `LISTING_BUSY`, then resume existing job | only one sponsored broadcast and one settlement chain |
+
+The signed transaction gate must pass all of these checks before `/sponsor/submit` is called: decodable transaction, mainnet network, sponsored authorization, origin fee `0`, contract-call payload, exact drops contract, `claim` function, exact NFT/drop arguments, deny post-condition mode, exactly one NFT-send post-condition for the selected inscription, and an origin matching the connected address. Any failure is a hard block; free claims never silently fall back to a self-paid transaction.
+
+The relayer independently repeats the security-critical checks, reserves `contractId:dropId` so concurrent clicks cannot spend the sponsor twice, and returns the active job on `DUPLICATE`/`LISTING_BUSY`. The page then polls that job through `RECEIVED` → `SPONSORED` → `CONFIRMED` → `CLAIMING` → `CLAIMED` → `REFUNDING` → `SETTLED`, or logs `ABANDONED`/timeout with the last known transaction ids.
+
+Useful failure labels:
+
+- `BLOCK`: local preflight or signed transaction shape is unsafe; inspect the immediately preceding check.
+- `CANCELLED` / `WALLET_ERROR`: the wallet did not return a usable signed transaction; record wallet name and version.
+- `VALIDATION`: the relayer rejected a payload that passed the client; compare the logged contract, drop, and post-condition checks with server logs.
+- `LISTING_BUSY` / `DUPLICATE`: expected concurrency protection; the UI should resume the returned job.
+- `LOW_BALANCE` / `AT_CAPACITY` / `RELAYER_UNAVAILABLE`: relayer operations issue; no self-paid free-claim fallback occurs.
+- `ABANDONED`: inspect the logged claim/reimbursement/refund tx ids and the relayer job error.
+
 ## Ongoing ops
 
 - **Top-up**: send STX to the relayer address whenever the float runs low; the service refuses new sponsorships below `SPONSOR_LOW_BALANCE_USTX` (default 10 STX) rather than failing mid-flight.

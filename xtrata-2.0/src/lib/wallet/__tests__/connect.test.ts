@@ -101,6 +101,35 @@ describe('wallet connect helpers', () => {
     });
   });
 
+  it('preserves Leather/Xverse transaction fields as canonical txRaw when a txid is also present', async () => {
+    const { AnchorMode, contractPrincipalCV, makeContractCall } = await import('@stacks/transactions');
+    const { StacksMainnet } = await import('@stacks/network');
+    const tx = await makeContractCall({
+      contractAddress: ADDRESS,
+      contractName: 'xtrata-drops-v1-0',
+      functionName: 'claim',
+      functionArgs: [contractPrincipalCV(ADDRESS, 'xtrata-core'), uintCV(7)],
+      senderKey: 'f9d7f5e0d0d81fdd90dcef4e0e2c1b9e3ea361776a5cd91b5c9a52b98b3e1cb601',
+      network: new StacksMainnet(),
+      fee: 0n,
+      nonce: 0n,
+      sponsored: true,
+      anchorMode: AnchorMode.Any,
+      postConditionMode: PostConditionMode.Deny,
+      postConditions: [
+        makeStandardSTXPostCondition(ADDRESS, FungibleConditionCode.Equal, 0n)
+      ]
+    });
+    const transaction = Buffer.from(tx.serialize()).toString('hex');
+    for (const response of [
+      { status: 'success', result: { txid: tx.txid(), transaction } },
+      { jsonrpc: '2.0', id: '1', result: { txid: tx.txid(), transaction: `0x${transaction}` } }
+    ]) {
+      expect(__testing.normalizeTxResult(response).txRaw?.replace(/^0x/, '')).toBe(transaction);
+    }
+    expect(__testing.normalizeTxResult(transaction).txRaw).toBe(transaction);
+  });
+
   it('keeps non-standard wallet finish payloads available for callbacks', () => {
     expect(__testing.normalizeTxResultForCallback({ pending: true })).toEqual({
       pending: true

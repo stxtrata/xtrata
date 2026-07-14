@@ -32,6 +32,7 @@ import {
   AnchorMode,
   AuthType,
   ClarityType,
+  NonFungibleConditionCode,
   PayloadType,
   PostConditionMode,
   TransactionVersion,
@@ -40,10 +41,13 @@ import {
   broadcastTransaction,
   cvToJSON,
   cvToHex,
+  createAssetInfo,
   deserializeTransaction,
   getAddressFromPrivateKey,
   hexToCV,
   makeContractCall,
+  makeContractNonFungiblePostCondition,
+  serializePostCondition,
   sponsorTransaction,
   uintCV
 } from '@stacks/transactions';
@@ -154,6 +158,7 @@ const getListing = async (env: SponsorEnv, contractId: string, listingId: string
   return {
     budgetRemaining: BigInt(String((rec['budget-remaining'] as { value: unknown }).value)),
     nftContract: String((rec['nft-contract'] as { value: unknown }).value),
+    tokenId: BigInt(String((rec['token-id'] as { value: unknown }).value)),
     soldAt: soldRaw === null || soldRaw === undefined ? null : String((soldRaw as { value?: unknown }).value ?? soldRaw)
   };
 };
@@ -201,7 +206,37 @@ const VALIDATION = {
   BAD_ARGS: 'call arguments must be (nft-contract <trait>, listing-id uint)',
   WRONG_NETWORK: 'transaction is not a mainnet transaction',
   NO_POST_CONDITIONS: 'buyer post-conditions required',
-  PC_MODE: 'post-condition mode must be deny'
+  PC_MODE: 'post-condition mode must be deny',
+  WRONG_POST_CONDITIONS: 'post-conditions do not exactly authorize the selected NFT claim'
+};
+
+const bytesToHex = (bytes: Uint8Array) =>
+  [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+
+const hasExactDropClaimPostCondition = (
+  tx: ReturnType<typeof deserializeTransaction>,
+  contractId: string,
+  listing: { nftContract: string; tokenId: bigint }
+) => {
+  if (!/\.xtrata-drops-/.test(contractId)) return true;
+  const actual = (tx as unknown as { postConditions?: { values?: unknown[] } }).postConditions?.values ?? [];
+  if (actual.length !== 1) return false;
+  const [dropAddress, dropName] = contractId.split('.');
+  const [nftAddress, nftName] = listing.nftContract.split('.');
+  if (!dropAddress || !dropName || !nftAddress || !nftName) return false;
+  const expected = makeContractNonFungiblePostCondition(
+    dropAddress,
+    dropName,
+    NonFungibleConditionCode.Sends,
+    createAssetInfo(nftAddress, nftName, 'xtrata-inscription'),
+    uintCV(listing.tokenId)
+  );
+  try {
+    return bytesToHex(serializePostCondition(actual[0] as Parameters<typeof serializePostCondition>[0])) ===
+      bytesToHex(serializePostCondition(expected));
+  } catch {
+    return false;
+  }
 };
 
 const validatePayload = (txHex: string, markets: string[]) => {
@@ -282,6 +317,10 @@ const ensureTable = async (env: SponsorEnv) => {
   )`);
   // Older deployments lack updated_at; ALTER is idempotent via the catch.
   await run(env, `ALTER TABLE sponsor_jobs ADD COLUMN updated_at INTEGER`).catch(() => undefined);
+  await run(env, `ALTER TABLE sponsor_jobs ADD COLUMN reservation_key TEXT`).catch(() => undefined);
+  await run(env, `CREATE UNIQUE INDEX IF NOT EXISTS idx_sponsor_jobs_reservation ON sponsor_jobs (reservation_key)`).catch(
+    () => undefined
+  );
   await run(env, `CREATE INDEX IF NOT EXISTS idx_sponsor_jobs_buyer ON sponsor_jobs (buyer, created_at)`).catch(
     () => undefined
   );
@@ -304,8 +343,8 @@ const transition = async (
 ): Promise<boolean> => {
   const result = (await run(
     env,
-    `UPDATE sponsor_jobs SET state=?, updated_at=?${extra.sets ? `, ${extra.sets}` : ''} WHERE id=? AND state=?`,
-    [to, Date.now(), ...(extra.binds ?? []), id, from]
+    `UPDATE sponsor_jobs SET state=?, updated_at=?, reservation_key=CASE WHEN ? IN ('SETTLED','ABANDONED') THEN NULL ELSE reservation_key END${extra.sets ? `, ${extra.sets}` : ''} WHERE id=? AND state=?`,
+    [to, Date.now(), to, ...(extra.binds ?? []), id, from]
   )) as { meta?: { changes?: number } };
   return (result.meta?.changes ?? 0) === 1;
 };
@@ -315,6 +354,7 @@ type JobRow = {
   buyer: string | null; payload_hash: string | null; fee_ustx: string | null;
   buy_tx: string | null; claim_tx: string | null; refund_tx: string | null;
   error: string | null; created_at: number;
+  reservation_key?: string | null;
 };
 
 const jobJson = (job: JobRow) => ({
@@ -348,7 +388,7 @@ const settleBatch = async (env: SponsorEnv, key: string) => {
   // RECEIVED = reserved but never broadcast (worker crashed pre-broadcast).
   await run(
     env,
-    `UPDATE sponsor_jobs SET state='ABANDONED', error='never broadcast', updated_at=? WHERE state='RECEIVED' AND COALESCE(updated_at, created_at) < ?`,
+    `UPDATE sponsor_jobs SET state='ABANDONED', reservation_key=NULL, error='never broadcast', updated_at=? WHERE state='RECEIVED' AND COALESCE(updated_at, created_at) < ?`,
     [Date.now(), staleBefore]
   ).catch(() => undefined);
 
@@ -510,6 +550,9 @@ export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
     if (listing.nftContract !== validated.nftContractId) {
       return err('VALIDATION', 'nft contract mismatch between signed transaction and listing');
     }
+    if (!hasExactDropClaimPostCondition(validated.tx, contractId, listing)) {
+      return err('VALIDATION', VALIDATION.WRONG_POST_CONDITIONS);
+    }
     const fee = await estimateBuyFee(env);
     if (fee > MAX_FEE_USTX) return err('FEE_TOO_LARGE', 'network fee above relayer cap', 503);
     if (listing.budgetRemaining < fee) return err('BUDGET_TOO_SMALL', 'listing budget cannot cover the fee');
@@ -521,13 +564,23 @@ export const onRequest: PagesFunction<SponsorEnv> = async (context) => {
     try {
       await run(
         env,
-        `INSERT INTO sponsor_jobs (id, state, contract_id, listing_id, buyer, payload_hash, fee_ustx, created_at, updated_at)
-         VALUES (?, 'RECEIVED', ?, ?, ?, ?, ?, ?, ?)`,
-        [id, contractId, listingId.toString(), validated.buyer, payloadHash, fee.toString(), Date.now(), Date.now()]
+        `INSERT INTO sponsor_jobs (id, state, contract_id, listing_id, buyer, payload_hash, reservation_key, fee_ustx, created_at, updated_at)
+         VALUES (?, 'RECEIVED', ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, contractId, listingId.toString(), validated.buyer, payloadHash, `${contractId}:${listingId}`, fee.toString(), Date.now(), Date.now()]
       );
     } catch {
       const existing = await rows<JobRow>(env, `SELECT * FROM sponsor_jobs WHERE payload_hash=?`, [payloadHash]);
-      if (existing.length) return jsonResponse(jobJson(existing[0]), 409, CORS);
+      if (existing.length) {
+        return jsonResponse({ code: 'DUPLICATE', message: 'payload already sponsored', ...jobJson(existing[0]) }, 409, CORS);
+      }
+      const reserved = await rows<JobRow>(
+        env,
+        `SELECT * FROM sponsor_jobs WHERE reservation_key=? AND state NOT IN ('SETTLED','ABANDONED')`,
+        [`${contractId}:${listingId}`]
+      );
+      if (reserved.length) {
+        return jsonResponse({ code: 'LISTING_BUSY', message: 'this drop or listing already has a sponsorship in progress', ...jobJson(reserved[0]) }, 409, CORS);
+      }
       return err('DUPLICATE', 'payload already sponsored', 409);
     }
 

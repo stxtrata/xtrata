@@ -17,7 +17,9 @@ export type SponsorJobState =
   | 'RECEIVED'
   | 'SPONSORED'
   | 'CONFIRMED'
+  | 'CLAIMING'
   | 'CLAIMED'
+  | 'REFUNDING'
   | 'SETTLED'
   | 'ABANDONED';
 
@@ -34,6 +36,7 @@ export type SponsorErrorCode =
   | 'LOW_BALANCE'
   | 'RATE_LIMITED'
   | 'DUPLICATE'
+  | 'LISTING_BUSY'
   | 'BUDGET_TOO_SMALL'
   | 'LISTING_SOLD'
   | 'VALIDATION'
@@ -43,14 +46,17 @@ export class SponsorClientError extends Error {
   code: SponsorErrorCode;
   /** true when the buyer can still complete the purchase self-paid */
   fallbackToSelfPaid: boolean;
-  constructor(code: SponsorErrorCode, message: string) {
+  existingJob?: SponsorJob;
+  constructor(code: SponsorErrorCode, message: string, existingJob?: SponsorJob) {
     super(message);
     this.code = code;
-    this.fallbackToSelfPaid = code !== 'LISTING_SOLD' && code !== 'DUPLICATE';
+    this.existingJob = existingJob;
+    this.fallbackToSelfPaid = code !== 'LISTING_SOLD' && code !== 'DUPLICATE' && code !== 'LISTING_BUSY';
   }
 }
 
 const VALIDATION_CODES = new Set([
+  'VALIDATION',
   'BAD_TX',
   'NOT_SPONSORED',
   'NONZERO_FEE',
@@ -63,24 +69,30 @@ const VALIDATION_CODES = new Set([
   'FEE_TOO_LARGE'
 ]);
 
-export const mapRelayerError = (code: string | undefined, message: string) => {
+export const mapRelayerError = (
+  code: string | undefined,
+  message: string,
+  existingJob?: SponsorJob
+) => {
   if (!code) {
-    return new SponsorClientError('UNKNOWN', message);
+    return new SponsorClientError('UNKNOWN', message, existingJob);
   }
   if (VALIDATION_CODES.has(code)) {
-    return new SponsorClientError('VALIDATION', message);
+    return new SponsorClientError('VALIDATION', message, existingJob);
   }
   const known: SponsorErrorCode[] = [
     'AT_CAPACITY',
     'LOW_BALANCE',
     'RATE_LIMITED',
     'DUPLICATE',
+    'LISTING_BUSY',
     'BUDGET_TOO_SMALL',
     'LISTING_SOLD'
   ];
   return new SponsorClientError(
     (known as string[]).includes(code) ? (code as SponsorErrorCode) : 'UNKNOWN',
-    message
+    message,
+    existingJob
   );
 };
 
@@ -104,9 +116,13 @@ const request = async (
     // fallthrough — handled below
   }
   if (!response.ok) {
+    const possibleJob = typeof body.id === 'string' && typeof body.state === 'string'
+      ? (body as unknown as SponsorJob)
+      : undefined;
     throw mapRelayerError(
       typeof body.code === 'string' ? body.code : undefined,
-      typeof body.message === 'string' ? body.message : `relayer error ${response.status}`
+      typeof body.message === 'string' ? body.message : `relayer error ${response.status}`,
+      possibleJob
     );
   }
   return body;
