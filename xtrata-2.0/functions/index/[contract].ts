@@ -477,6 +477,7 @@ export const onRequest = async (context: {
     // GET: serve from D1. Either an explicit id set (?ids=1,2,3 — used by grids
     // to fetch exactly the visible page) or a range (?from=&limit=&order=).
     const url = new URL(request.url);
+    const bypassCache = url.searchParams.get('fresh') === '1';
     const cols = 'token_id, owner, creator, final_hash, mime, total_size, total_chunks, sealed, token_uri, migration_source';
 
     // Parse + normalize the query first so equivalent requests (e.g. the same
@@ -512,7 +513,7 @@ export const onRequest = async (context: {
     }
     const edgeCache = (globalThis as { caches?: { default?: Cache } }).caches?.default ?? null;
     const cacheRequest = new Request(cacheKeyUrl.toString(), { method: 'GET' });
-    if (edgeCache) {
+    if (edgeCache && !bypassCache) {
       const hit = await edgeCache.match(cacheRequest);
       if (hit) return hit;
     }
@@ -572,11 +573,13 @@ export const onRequest = async (context: {
         'content-type': 'application/json',
         // max-age: brief browser cache. s-maxage: edge TTL. SWR: serve stale
         // instantly while a background revalidation refreshes the entry.
-        'Cache-Control': 'public, max-age=15, s-maxage=60, stale-while-revalidate=300',
+        'Cache-Control': bypassCache
+          ? 'no-store'
+          : 'public, max-age=15, s-maxage=60, stale-while-revalidate=300',
         ...CORS
       }
     });
-    if (edgeCache && context.waitUntil) {
+    if (!bypassCache && edgeCache && context.waitUntil) {
       // Store under the normalized key; clone so the body stream stays readable
       // for the response we return now.
       context.waitUntil(edgeCache.put(cacheRequest, response.clone()));

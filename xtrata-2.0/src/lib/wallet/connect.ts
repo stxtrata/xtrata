@@ -932,11 +932,16 @@ const requestSponsoredContractCall = async (
   return normalizeTxResult(response);
 };
 
-const requestLeatherStxTransfer = async (
+// Keep Xverse on the same modern BitcoinProvider RPC bridge used for
+// wallet_connect. Calling stx_transferStx on XverseProviders.StacksProvider
+// falls back into the legacy @stacks/auth UserSession flow, where loadUserData()
+// necessarily fails because a modern wallet_connect does not create that
+// legacy session. Leather and other providers continue through requestProvider.
+const requestStxTransfer = async (
   provider: StacksProvider,
   options: WalletStxTransferOptions
 ) => {
-  const response = await requestProvider(
+  const response = await requestWalletRpc(
     provider,
     'stx_transferStx',
     buildStxTransferParams(options)
@@ -1392,17 +1397,28 @@ export const showStxTransfer = (options: WalletStxTransferOptions, provider?: St
     return legacyShowSTXTransfer(legacyOptions, provider);
   }
 
-  return void requestLeatherStxTransfer(activeProvider, options)
+  return void requestStxTransfer(activeProvider, options)
     .then((payload) => {
       options.onFinish?.(payload);
     })
     .catch((error) => {
-      if (isMethodUnsupportedError(error)) {
+      // A modern Xverse connection has no legacy UserSession to fall back to.
+      // Keep unsupported/error responses on the modern bridge and surface them
+      // to the caller instead of triggering loadUserData() in @stacks/connect.
+      if (isMethodUnsupportedError(error) && !isSelectedXverseProvider(activeProvider)) {
         legacyShowSTXTransfer(legacyOptions, activeProvider);
         return;
       }
       // eslint-disable-next-line no-console
       console.error('[wallet] STX transfer request failed', error);
+      if (isUserCancelledError(error)) {
+        options.onCancel?.();
+        return;
+      }
+      if (options.onError) {
+        options.onError(error);
+        return;
+      }
       options.onCancel?.();
     });
 };
@@ -1420,6 +1436,7 @@ export const __testing = {
   isMethodUnsupportedError,
   isUserCancelledError,
   normalizeNetwork,
+  requestStxTransfer,
   toLegacyContractCallOptions,
   normalizeTxResultForCallback,
   normalizeTxResultPayload,

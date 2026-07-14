@@ -131,7 +131,8 @@
     import { getWalletLookupState } from '/src/lib/wallet/lookup.ts';
     import {
       loadInscriptionThumbnailFromCache,
-      saveInscriptionThumbnailToCache
+      saveInscriptionThumbnailToCache,
+      saveTokenSummaryToCache
     } from '/src/lib/viewer/cache.ts';
     import {
       injectGridThumbnailHtml,
@@ -5288,6 +5289,133 @@
     const getTokenCacheContractId = (token) =>
       token.sourceContractId ?? getContractId(getTokenClient(token).contract);
 
+    const requestIndexedOwnerRefresh = async (tokens) => {
+      const byContract = new Map();
+      for (const token of tokens) {
+        const contractId = getTokenCacheContractId(token);
+        const ids = byContract.get(contractId) ?? new Set();
+        ids.add(token.id.toString());
+        byContract.set(contractId, ids);
+      }
+      for (const [contractId, ids] of byContract.entries()) {
+        try {
+          const response = await fetch(
+            `/index/${encodeURIComponent(contractId)}?id=${encodeURIComponent([...ids].join(','))}`,
+            { method: 'POST', headers: { accept: 'application/json' } }
+          );
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          debugLog('readonly', 'ownership index repair requested', {
+            contractId,
+            tokenIds: [...ids]
+          });
+        } catch (error) {
+          debugLog('readonly', 'ownership index repair request failed', {
+            contractId,
+            tokenIds: [...ids],
+            error: error instanceof Error ? error.message : String(error)
+          }, 'warn');
+        }
+      }
+    };
+
+    // Content summaries are aggressively cached, but ownership is mutable.
+    // Whenever a live get-owner read or Hiro holdings page gives us a newer
+    // owner, repair every in-memory summary view and the short-lived IndexedDB
+    // summary so stale mint-time ownership cannot leak back into Xplorer.
+    const updateCachedTokenOwner = (token, owner) => {
+      const normalizedOwner = owner?.trim() ?? '';
+      if (!token || !normalizedOwner) {
+        return token;
+      }
+      const metaOwner = token.meta?.owner ?? null;
+      const ownerChanged = !addressesEqual(token.owner, normalizedOwner);
+      const metaOwnerChanged = token.meta && !addressesEqual(metaOwner, normalizedOwner);
+      if (!ownerChanged && !metaOwnerChanged) {
+        return token;
+      }
+      const updated = {
+        ...token,
+        owner: normalizedOwner,
+        meta: token.meta ? { ...token.meta, owner: normalizedOwner } : token.meta
+      };
+      const key = token.id.toString();
+      state.walletTokenCache.set(key, updated);
+      state.walletTokens = state.walletTokens.map((entry) =>
+        entry.id === token.id ? updated : entry
+      );
+      for (const cache of state.summaryCacheScopes.values()) {
+        if (cache.has(key)) {
+          cache.set(key, updated);
+        }
+      }
+      void saveTokenSummaryToCache(
+        getTokenCacheContractId(updated),
+        updated.id,
+        updated,
+        { maxAgeMs: 5 * 60 * 1000 }
+      );
+      return updated;
+    };
+
+    // IDs returned by Hiro's wallet-holdings endpoint are authoritative direct
+    // holdings. Do not apply this shortcut to injected Forever Twins, whose
+    // Xtrata owner is intentionally an escrow helper contract.
+    const applyKnownWalletOwner = (ids, walletAddress) => {
+      const injected = new Set(getInjectedEscrowTwinIds().map((id) => id.toString()));
+      const corrected = [];
+      for (const id of ids) {
+        if (injected.has(id.toString())) {
+          continue;
+        }
+        const token = state.walletTokenCache.get(id.toString()) ?? null;
+        if (token) {
+          const ownerWasStale = !addressesEqual(token.owner, walletAddress);
+          const updated = updateCachedTokenOwner(token, walletAddress);
+          if (ownerWasStale) corrected.push(updated);
+        }
+      }
+      if (corrected.length) void requestIndexedOwnerRefresh(corrected);
+    };
+
+    const refreshSelectedTokenOwner = async (token, requestId) => {
+      try {
+        const sourceClient = token.sourceContractId
+          ? getGalleryReadClient(token.sourceContractId)
+          : null;
+        const client = sourceClient ?? getTokenClient(token);
+        const liveOwner = await client.getOwner(token.id, getReadOnlySenderAddress());
+        if (
+          !liveOwner ||
+          requestId !== state.tokenPreviewRequestId ||
+          state.selectedTokenId !== token.id
+        ) {
+          return;
+        }
+        const current = getSelectedToken() ?? token;
+        const previousOwner = current.owner ?? null;
+        const updated = updateCachedTokenOwner(current, liveOwner);
+        if (!addressesEqual(previousOwner, liveOwner)) {
+          state.selectedOwnerNameRequestId += 1;
+          state.selectedEscrowHolder = null;
+          debugLog('readonly', 'selected owner corrected from live chain state', {
+            tokenId: token.id.toString(),
+            indexedOwner: previousOwner ? truncateMiddle(previousOwner, 8, 8) : null,
+            liveOwner: truncateMiddle(liveOwner, 8, 8)
+          });
+          renderSelectedInscriptionMeta(updated);
+          updateTransferControls();
+          void requestIndexedOwnerRefresh([updated]);
+        }
+      } catch (error) {
+        debugLog('readonly', 'selected live owner check failed', {
+          tokenId: token.id.toString(),
+          error: error instanceof Error ? error.message : String(error)
+        }, 'warn');
+      }
+    };
+
     const getThumbnailKey = (token) =>
       `${getTokenCacheContractId(token)}:${token.id.toString()}`;
 
@@ -7319,6 +7447,7 @@
 
       clearElement(dom.tokenPreviewMedia, 'Loading');
       renderSelectedInscriptionMeta(token);
+      void refreshSelectedTokenOwner(token, requestId);
       if (options.scrollToPreview && isMatureMobileWalletView()) {
         window.requestAnimationFrame(scrollToSelectedPreview);
       }
@@ -8186,7 +8315,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           indexedSummaries = await fetchIndexedSummaries({
             primaryContractId: summaryContext.primaryContractId,
             lineageContractIds: summaryContext.lineageContractIds,
-            ids: idsToResolve
+            ids: idsToResolve,
+            bypassCache: options.force === true
           });
         } catch (error) {
           indexedSummaries = null;
@@ -8904,6 +9034,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             summaryCacheSize: state.walletTokenCache.size
           });
         }
+        applyKnownWalletOwner(pageIds, viewingAddress);
         state.walletTokens = pageIds
           .map((id) => state.walletTokenCache.get(id.toString()) ?? null)
           .filter((token) => !!token);

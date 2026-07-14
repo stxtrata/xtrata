@@ -115,15 +115,18 @@ const XtrataWallet = {
   // Opens the connected wallet to send STX. showStxTransfer already prefers the
   // modern stx_transferStx request that current Xverse expects (legacy popup fallback).
   pay(opts: { recipient: string; amount: string | number; network?: string }): Promise<void> {
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
+      const sender = adapter.getSession().address;
       showStxTransfer({
         recipient: opts.recipient,
         amount: String(opts.amount),
         memo: 'Xtrata Agent One',
         network: (opts.network ?? 'mainnet'),
+        ...(sender ? { stxAddress: sender } : {}),
         appDetails: { name: 'Xtrata Agent One', icon: '/favicon.ico' },
         onFinish: () => resolve(),
         onCancel: () => resolve(),
+        onError: (error) => reject(error instanceof Error ? error : new Error(String(error))),
       } as unknown as Parameters<typeof showStxTransfer>[0]);
     });
   },
