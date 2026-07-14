@@ -67,6 +67,8 @@ After deploying a change, hard-refresh `/drops`, disconnect, reconnect the walle
 
 The relayer independently repeats the security-critical checks, reserves `contractId:dropId` so concurrent clicks cannot spend the sponsor twice, and returns the active job on `DUPLICATE`/`LISTING_BUSY`. The page then polls that job through `RECEIVED` → `SPONSORED` → `CONFIRMED` → `CLAIMING` → `CLAIMED` → `REFUNDING` → `SETTLED`, or logs `ABANDONED`/timeout with the last known transaction ids.
 
+The Claims page polls every 4 seconds for up to 15 minutes, which detects 10–20 second blocks without waiting a full block between checks and also drives traffic-based reimbursement forward. `CONFIRMED` and every later non-abandoned state mean the NFT claim itself is complete: the card immediately changes to **Claimed successfully** while `claim-fee` and `settle-refund` continue. A slow reimbursement must not turn a confirmed claim back into a blocked/claiming UI state.
+
 Useful failure labels:
 
 - `BLOCK`: local preflight or signed transaction shape is unsafe; inspect the immediately preceding check.

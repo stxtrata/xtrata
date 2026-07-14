@@ -62,6 +62,7 @@
       createSponsorClient
     } from '/src/lib/market/sponsor-client.ts';
     import {
+      isSponsorClaimConfirmedState,
       inspectSponsoredClaimTransaction,
       pollSponsorJob
     } from '/src/lib/drops/sponsored-claim.ts';
@@ -11165,7 +11166,13 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // Reuses the market module's thumbnail/media caches and card styling; the
     // drops contract exposes market-shaped read-onlys, so reads look identical.
     const DROP_DIAGNOSTICS_KEY = 'xtrata:drops:diagnostics:v1';
-    const dropsState = { run: 0, drops: [], claimRound: 0, claimsInFlight: new Set() };
+    const dropsState = {
+      run: 0,
+      drops: [],
+      claimRound: 0,
+      claimsInFlight: new Set(),
+      recentlyClaimed: new Set()
+    };
     const dropsDom = {
       status: $('dropsStatus'),
       listings: $('dropsListings'),
@@ -11431,13 +11438,39 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         recordDropDiagnostic(round, 'RELAYER_ACCEPTED', `Job ${job.id} entered ${job.state}${buyTx ? `; claim tx ${buyTx}` : ''}.`, 'success');
         dropsDom.status.innerHTML = `<span><strong>Drops</strong> sponsored claim broadcast${buyTx ? ` — tx ${buyTx}` : ''}. Tracking confirmation and refund settlement…</span><span class="badge green">no STX needed</span>`;
 
+        let claimConfirmed = false;
+        const markClaimConfirmed = (confirmedJob) => {
+          if (claimConfirmed || !isSponsorClaimConfirmedState(confirmedJob.state)) return;
+          claimConfirmed = true;
+          dropsState.recentlyClaimed.add(claimKey);
+          drop.claimedAt = drop.claimedAt ?? 0n;
+          recordDropDiagnostic(
+            round,
+            'CLAIM_CONFIRMED',
+            `Inscription #${drop.tokenId} is claimed. Sponsor reimbursement continues in job ${confirmedJob.id}.`,
+            'success'
+          );
+          renderDrops();
+          dropsDom.status.innerHTML = '<span><strong>Drops</strong> inscription claimed successfully. Sponsor reimbursement is finishing in the background.</span><span class="badge green">claimed</span>';
+        };
+        markClaimConfirmed(job);
         let previousState = '';
         const finalJob = await pollSponsorJob({
           client: sponsorClient,
           job,
           onStatus: (nextJob, attempt) => {
-            if (nextJob.state !== previousState || attempt % 6 === 0) {
-              recordDropDiagnostic(round, 'SETTLEMENT', `Job ${nextJob.id}: ${nextJob.state} (poll ${attempt}).`, nextJob.state === 'ABANDONED' ? 'error' : nextJob.state === 'SETTLED' ? 'success' : '');
+            markClaimConfirmed(nextJob);
+            if (nextJob.state !== previousState || attempt % 5 === 0) {
+              recordDropDiagnostic(
+                round,
+                'SETTLEMENT',
+                `Job ${nextJob.id}: ${nextJob.state} (poll ${attempt}).`,
+                nextJob.state === 'ABANDONED'
+                  ? 'error'
+                  : isSponsorClaimConfirmedState(nextJob.state)
+                    ? 'success'
+                    : ''
+              );
               previousState = nextJob.state;
             }
           }
@@ -11448,13 +11481,24 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           });
         }
         if (finalJob.state !== 'SETTLED') {
+          if (claimConfirmed) {
+            recordDropDiagnostic(
+              round,
+              'SETTLEMENT_PENDING',
+              `Inscription is claimed; reimbursement job ${finalJob.id} remains ${finalJob.state} and can continue on later relayer traffic.`,
+              'warn'
+            );
+            await loadDropsPage();
+            dropsDom.status.innerHTML = '<span><strong>Drops</strong> inscription claimed successfully. Sponsor reimbursement remains pending.</span><span class="badge green">claimed</span>';
+            return;
+          }
           throw Object.assign(new Error(`Settlement polling ended in ${finalJob.state}; the on-chain job may still continue.`), {
             code: 'SETTLEMENT_TIMEOUT'
           });
         }
         recordDropDiagnostic(round, 'COMPLETE', `Free claim settled. Claim ${finalJob.txids?.buy ?? 'n/a'}; reimbursement ${finalJob.txids?.claim ?? 'n/a'}; refund ${finalJob.txids?.refund ?? 'n/a'}.`, 'success');
-        dropsDom.status.innerHTML = '<span><strong>Drops</strong> free claim confirmed and sponsorship settled.</span><span class="badge green">complete</span>';
         await loadDropsPage();
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> free claim confirmed and sponsorship settled.</span><span class="badge green">complete</span>';
       } catch (error) {
         const code = error?.code ?? 'UNKNOWN_BLOCK';
         const message = String(error?.message ?? error);
@@ -11472,8 +11516,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         dropsState.claimsInFlight.delete(claimKey);
         dropsDom.listings?.querySelectorAll('[data-drop-claim]').forEach((button) => {
           if (button.dataset.dropClaim === claimKey) {
-            button.disabled = false;
-            button.textContent = 'Claim free — no STX needed';
+            const claimed = dropsState.recentlyClaimed.has(claimKey);
+            button.disabled = claimed;
+            button.textContent = claimed ? 'Claimed successfully' : 'Claim free — no STX needed';
           }
         });
       }
@@ -11536,14 +11581,20 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       if (!dropsDom.listings) return;
       const run = dropsState.run;
       const live = dropsState.drops.filter((drop) => drop.claimedAt === null);
-      if (!live.length) {
+      const visible = dropsState.drops.filter((drop) => {
+        const claimKey = `${drop.contractId}:${drop.dropId}`;
+        return drop.claimedAt === null || dropsState.recentlyClaimed.has(claimKey);
+      });
+      if (!visible.length) {
         dropsDom.listings.replaceChildren();
         dropsDom.status.innerHTML = '<span><strong>Drops</strong> no live drops right now — create one below, or check back soon.</span>';
         return;
       }
       dropsDom.status.innerHTML = `<span><strong>Drops</strong> ${live.length} free claim${live.length === 1 ? '' : 's'} available.</span>`;
       dropsDom.listings.replaceChildren(
-        ...live.map((drop) => {
+        ...visible.map((drop) => {
+          const claimKey = `${drop.contractId}:${drop.dropId}`;
+          const claimed = drop.claimedAt !== null || dropsState.recentlyClaimed.has(claimKey);
           const card = document.createElement('article');
           card.className = 'market-card';
 
@@ -11562,11 +11613,13 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
           const badges = document.createElement('div');
           badges.className = 'market-card__badge-row';
-          badges.innerHTML = '<span class="badge green">Free claim</span><span class="badge">No STX needed</span>';
+          badges.innerHTML = claimed
+            ? '<span class="badge green">Claimed</span><span class="badge">No STX spent</span>'
+            : '<span class="badge green">Free claim</span><span class="badge">No STX needed</span>';
 
           const price = document.createElement('div');
           price.className = 'market-card__price';
-          price.textContent = 'Free';
+          price.textContent = claimed ? 'Claimed' : 'Free';
 
           const meta = document.createElement('div');
           meta.className = 'market-card__meta';
@@ -11578,7 +11631,15 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           const actions = document.createElement('div');
           actions.className = 'market-card__actions';
           const isMine = state.walletSession.address === drop.creator;
-          if (isMine) {
+          if (claimed) {
+            const claimedButton = document.createElement('button');
+            claimedButton.type = 'button';
+            claimedButton.className = 'market-chip';
+            claimedButton.disabled = true;
+            claimedButton.dataset.dropClaim = claimKey;
+            claimedButton.textContent = 'Claimed successfully';
+            actions.append(claimedButton);
+          } else if (isMine) {
             const cancelBtn = document.createElement('button');
             cancelBtn.type = 'button';
             cancelBtn.className = 'market-chip';
@@ -11608,7 +11669,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             const claimBtn = document.createElement('button');
             claimBtn.type = 'button';
             claimBtn.className = 'market-chip';
-            const claimKey = `${drop.contractId}:${drop.dropId}`;
             const claimBusy = dropsState.claimsInFlight.has(claimKey);
             claimBtn.dataset.dropClaim = claimKey;
             claimBtn.disabled = claimBusy;
@@ -11621,7 +11681,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           return card;
         })
       );
-      void hydrateDropThumbnails(run, live);
+      void hydrateDropThumbnails(run, visible);
     };
 
     const updateDropsDepositHint = async () => {
