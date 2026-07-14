@@ -43,7 +43,7 @@
       isWizardShellRequest,
       WIZARD_EMBED_ROUTE
     } from '/src/home/page-mode.js';
-    import { showContractCall } from '/src/lib/wallet/connect.ts';
+    import { showContractCall, signSponsoredContractCall } from '/src/lib/wallet/connect.ts';
     import {
       CONTRACT_REGISTRY,
       getLegacyContract
@@ -11262,59 +11262,68 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const [nftAddress, nftName] = drop.nftContract.split('.');
       const postConditions = dropClaimPostConditions(drop);
       dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the free claim in your wallet (fee 0)…</span>';
-      showContractCall({
-        contractAddress: drop.entry.address,
-        contractName: drop.entry.contractName,
-        functionName: 'claim',
-        functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(drop.dropId)],
-        network: drop.entry.network,
-        stxAddress: claimantAddress,
-        postConditionMode: PostConditionMode.Deny,
-        postConditions,
-        sponsored: true,
-        // Sponsored auth requires the origin spending condition to carry a
-        // literal zero fee. Xverse rejects an omitted/defaulted origin fee as
-        // SignatureValidation before it returns the signed transaction.
-        fee: 0,
-        onFinish: async (payload) => {
-          if (
-            !state.walletSession.isConnected ||
-            !addressesEqual(state.walletSession.address, claimantAddress)
-          ) {
-            dropsDom.status.innerHTML = '<span><strong>Drops</strong> wallet changed while signing — claim again with the active account.</span>';
-            renderDrops();
-            return;
-          }
-          const txHex = payload?.txRaw ?? null;
-          if (!txHex) {
-            dropsDom.status.innerHTML = '<span><strong>Drops</strong> this wallet did not return the signed sponsored transaction — claiming self-paid instead.</span>';
-            dropClaimSelfPaid(drop);
-            return;
-          }
-          dropsDom.status.innerHTML = '<span><strong>Drops</strong> submitting to the sponsor relayer…</span>';
-          try {
-            const base = (drop.entry.sponsorApi ?? '/').replace(/\/+$/, '');
-            const r = await fetch(`${base}/sponsor/submit`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                txHex,
-                contractId: drop.contractId,
-                listingId: drop.dropId.toString()
-              })
-            });
-            const body = await r.json().catch(() => ({}));
-            if (!r.ok) throw new Error(body?.message ?? `relayer ${r.status}`);
-            const buyTx = body?.txids?.buy ?? '';
-            dropsDom.status.innerHTML = `<span><strong>Drops</strong> claim sponsored and broadcast${buyTx ? ` — tx ${buyTx}` : ''}. The inscription lands in your wallet when it confirms.</span><span class="badge green">no STX needed</span>`;
-          } catch (error) {
-            dropsDom.status.innerHTML = `<span><strong>Drops</strong> sponsorship failed (${String(error?.message ?? error)}) — you can claim self-paid instead.</span>`;
-          }
-        },
-        onCancel: () => {
-          dropsDom.status.innerHTML = '<span><strong>Drops</strong> claim cancelled.</span>';
-        }
+      // Xverse's stx_callContract signs AND broadcasts even with
+      // sponsored: true; broadcasting a sponsored tx before the relayer
+      // countersigns fails SignatureValidation (the sponsor slot is empty).
+      // So we build the unsigned sponsored tx ourselves and ask the wallet
+      // to sign it via stx_signTransaction with broadcast: false.
+      let signed = null;
+      try {
+        signed = await signSponsoredContractCall({
+          contractAddress: drop.entry.address,
+          contractName: drop.entry.contractName,
+          functionName: 'claim',
+          functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(drop.dropId)],
+          network: drop.entry.network,
+          stxAddress: claimantAddress,
+          postConditionMode: PostConditionMode.Deny,
+          postConditions
+        });
+      } catch (error) {
+        debugLog('drops', 'sponsored signing unavailable', { error: String(error?.message ?? error) }, 'warn');
+        dropsDom.status.innerHTML = `<span><strong>Drops</strong> sponsored signing unavailable (${String(error?.message ?? error)}) — claiming self-paid instead.</span>`;
+        dropClaimSelfPaid(drop);
+        return;
+      }
+      if (!signed) {
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> claim cancelled.</span>';
+        return;
+      }
+      if (
+        !state.walletSession.isConnected ||
+        !addressesEqual(state.walletSession.address, claimantAddress)
+      ) {
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> wallet changed while signing — claim again with the active account.</span>';
+        renderDrops();
+        return;
+      }
+      debugLog('drops', 'sponsored claim signed', {
+        dropId: drop.dropId.toString(),
+        txBytes: signed.txRaw.length / 2
       });
+      dropsDom.status.innerHTML = '<span><strong>Drops</strong> submitting to the sponsor relayer…</span>';
+      {
+        try {
+          const base = (drop.entry.sponsorApi ?? '/').replace(/\/+$/, '');
+          const r = await fetch(`${base}/sponsor/submit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              txHex: signed.txRaw,
+              contractId: drop.contractId,
+              listingId: drop.dropId.toString()
+            })
+          });
+          const body = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(body?.message ?? `relayer ${r.status}`);
+          const buyTx = body?.txids?.buy ?? '';
+          debugLog('drops', 'sponsored claim broadcast', { jobId: body?.id ?? null, buyTx });
+          dropsDom.status.innerHTML = `<span><strong>Drops</strong> claim sponsored and broadcast${buyTx ? ` — tx ${buyTx}` : ''}. The inscription lands in your wallet when it confirms.</span><span class="badge green">no STX needed</span>`;
+        } catch (error) {
+          debugLog('drops', 'relayer submit failed', { error: String(error?.message ?? error) }, 'warn');
+          dropsDom.status.innerHTML = `<span><strong>Drops</strong> sponsorship failed (${String(error?.message ?? error)}) — you can claim self-paid instead.</span>`;
+        }
+      }
     };
 
     const hydrateDropThumbnails = async (run, drops) => {

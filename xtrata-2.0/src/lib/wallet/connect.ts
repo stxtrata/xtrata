@@ -20,12 +20,15 @@ import {
 } from '@stacks/connect-ui';
 import { defineCustomElements } from '@stacks/connect-ui/loader';
 import {
+  AnchorMode,
   deserializeTransaction,
+  makeUnsignedContractCall,
   PostConditionMode,
   serializeCV,
   serializePostCondition,
   validateStacksAddress
 } from '@stacks/transactions';
+import { StacksMainnet } from '@stacks/network';
 import { getNetworkFromAddress } from '../network/guard';
 import type { NetworkType } from '../network/types';
 import { bytesToHex } from '../utils/encoding';
@@ -882,6 +885,101 @@ export const showContractCall = (
       console.error('[wallet] contract call request failed', error);
       options.onCancel?.();
     });
+};
+
+// ---------------------------------------------------------------------------
+// Sponsored signing WITHOUT broadcast.
+//
+// Xverse's modern stx_callContract request signs AND broadcasts regardless of
+// the `sponsored` flag; a sponsored transaction broadcast without its sponsor
+// signature is rejected by the node with SignatureValidation. The reliable
+// path is: build the unsigned sponsored transaction ourselves (using the
+// wallet's public key), then ask the wallet to sign it via stx_signTransaction
+// with broadcast: false, and hand the signed hex to the sponsor relayer.
+// ---------------------------------------------------------------------------
+
+const fetchWalletPublicKey = async (
+  provider: StacksProvider,
+  stxAddress: string
+): Promise<string> => {
+  const response = (await requestProvider(provider, 'stx_getAddresses')) as {
+    result?: { addresses?: Array<{ address?: string; publicKey?: string }> };
+    addresses?: Array<{ address?: string; publicKey?: string }>;
+  };
+  const addresses = response?.result?.addresses ?? response?.addresses ?? [];
+  const match =
+    addresses.find((entry) => entry.address === stxAddress && entry.publicKey) ??
+    addresses.find((entry) => entry.publicKey && validateStacksAddress(String(entry.address ?? '')));
+  if (!match?.publicKey) {
+    throw new Error('Wallet did not return a public key for the connected address.');
+  }
+  return match.publicKey;
+};
+
+const fetchAccountNonce = async (address: string): Promise<bigint> => {
+  const response = await fetch(`https://api.hiro.so/extended/v1/address/${address}/nonces`);
+  const payload = (await response.json()) as { possible_next_nonce?: number };
+  return BigInt(payload.possible_next_nonce ?? 0);
+};
+
+/**
+ * Sign a sponsored (fee 0) contract call and return the signed hex WITHOUT
+ * broadcasting. Throws with a descriptive message when the wallet cannot do
+ * this (caller should fall back to a self-paid call). Resolves null when the
+ * user rejects in the wallet.
+ */
+export const signSponsoredContractCall = async (
+  options: WalletContractCallOptions
+): Promise<{ txRaw: string } | null> => {
+  const provider = getStacksProvider();
+  if (!provider || typeof provider.request !== 'function') {
+    throw new Error('No wallet request bridge available for sponsored signing.');
+  }
+  if (!options.stxAddress) {
+    throw new Error('Connect a wallet first.');
+  }
+  const publicKey = await fetchWalletPublicKey(provider, options.stxAddress);
+  const nonce = await fetchAccountNonce(options.stxAddress);
+  const transaction = await makeUnsignedContractCall({
+    contractAddress: options.contractAddress,
+    contractName: options.contractName,
+    functionName: options.functionName,
+    functionArgs: options.functionArgs,
+    publicKey,
+    network: new StacksMainnet(),
+    fee: 0n,
+    nonce,
+    sponsored: true,
+    anchorMode: AnchorMode.Any,
+    postConditionMode: options.postConditionMode ?? PostConditionMode.Deny,
+    postConditions: options.postConditions ?? []
+  });
+  const unsignedHex = bytesToHex(transaction.serialize());
+  try {
+    const response = (await requestProvider(provider, 'stx_signTransaction', {
+      transaction: unsignedHex,
+      broadcast: false
+    })) as {
+      result?: { transaction?: string; txHex?: string };
+      transaction?: string;
+      txHex?: string;
+    };
+    const signed =
+      response?.result?.transaction ??
+      response?.result?.txHex ??
+      response?.transaction ??
+      response?.txHex ??
+      null;
+    if (!signed) {
+      throw new Error('Wallet did not return the signed transaction hex.');
+    }
+    return { txRaw: String(signed).replace(/^0x/, '') };
+  } catch (error) {
+    if (isUserCancelledError(error)) {
+      return null;
+    }
+    throw error;
+  }
 };
 
 export const showContractDeploy = (
