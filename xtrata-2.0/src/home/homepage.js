@@ -7,6 +7,15 @@ import {
 } from './homepage-content.js';
 
 const HOME_ACTION_EVENT = 'xtrata:homepage-action';
+const HOME_MOUNT_IDS = [
+  'featuredObjectStage',
+  'possibilityGrid',
+  'intentGrid',
+  'homeActivityList',
+  'campaignSlot'
+];
+let actionTrackingInstalled = false;
+let contentValidated = false;
 
 const element = (tagName, className, text) => {
   const node = document.createElement(tagName);
@@ -193,6 +202,10 @@ const renderCampaign = () => {
 };
 
 const installActionTracking = () => {
+  if (actionTrackingInstalled) {
+    return;
+  }
+  actionTrackingInstalled = true;
   document.addEventListener('click', (event) => {
     const origin = event.target instanceof Element ? event.target : null;
     const target = origin?.closest('[data-home-action]');
@@ -211,10 +224,25 @@ const installActionTracking = () => {
   });
 };
 
+const clearHomepage = () => {
+  HOME_MOUNT_IDS.forEach((id) => document.getElementById(id)?.replaceChildren());
+};
+
 export const initHomepage = () => {
-  const contentErrors = validateHomepageContent();
-  if (contentErrors.length > 0) {
-    console.warn('[xtrata-homepage] invalid content configuration', contentErrors);
+  installActionTracking();
+  if (!contentValidated) {
+    contentValidated = true;
+    const contentErrors = validateHomepageContent();
+    if (contentErrors.length > 0) {
+      console.warn('[xtrata-homepage] invalid content configuration', contentErrors);
+    }
+  }
+  if (document.documentElement.dataset.page !== 'home') {
+    // These mounts contain sandboxed live inscriptions. Removing them when a
+    // different SPA page is active prevents hidden third-party frames from
+    // issuing requests and polluting that page's browser diagnostics.
+    clearHomepage();
+    return;
   }
   renderHeroStage();
   renderObjects();
@@ -225,3 +253,8 @@ export const initHomepage = () => {
 };
 
 initHomepage();
+const pageModeObserver = new MutationObserver(() => initHomepage());
+pageModeObserver.observe(document.documentElement, {
+  attributes: true,
+  attributeFilter: ['data-page']
+});

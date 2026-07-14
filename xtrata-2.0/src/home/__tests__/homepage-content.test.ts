@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   HOMEPAGE_ACTIVITY_DOORS,
@@ -6,6 +7,11 @@ import {
   HOMEPAGE_OBJECTS,
   validateHomepageContent
 } from '../homepage-content.js';
+
+const indexHtml = readFileSync(new URL('../../../index.html', import.meta.url), 'utf8');
+const homepageSource = readFileSync(new URL('../homepage.js', import.meta.url), 'utf8');
+const radioSource = readFileSync(new URL('../radio.js', import.meta.url), 'utf8');
+const configSource = readFileSync(new URL('../config.js', import.meta.url), 'utf8');
 
 describe('homepage content configuration', () => {
   it('passes the homepage content contract', () => {
@@ -32,5 +38,18 @@ describe('homepage content configuration', () => {
 
     expect(hrefs.every((href) => href.startsWith('/') || href.startsWith('https://'))).toBe(true);
     expect(HOMEPAGE_OBJECTS.some((item) => item.preview.src?.includes('/i/'))).toBe(true);
+  });
+
+  it('keeps off-page previews and third-party signed brand assets out of other routes', () => {
+    expect(indexHtml).toContain('class="brand-logo" src="/favicon.svg"');
+    expect(configSource).toContain("XTRATA_BRAND_MARK_URL = '/favicon.svg'");
+    expect(homepageSource).toContain("dataset.page !== 'home'");
+    expect(homepageSource).toContain('clearHomepage();');
+    expect(homepageSource).toContain("attributeFilter: ['data-page']");
+  });
+
+  it('handles rejected best-effort radio requests without unhandled console errors', () => {
+    expect(radioSource).toContain("fetch('/index/verdict'");
+    expect(radioSource).toContain("fetch(ids ? `/warm?ids=${ids}` : '/warm?auto=2').catch");
   });
 });

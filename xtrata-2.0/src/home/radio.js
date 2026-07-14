@@ -386,7 +386,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ contract: PLAYABLE_CONTRACT, tokenId: Number(tokenId), verdict, reason: reason || '' })
-      });
+      }).catch(() => undefined);
     } catch { /* advisory only */ }
   };
   const persistDud = (tokenId) => {
@@ -1049,7 +1049,9 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
   // nothing downloads to this browser). Big films get warm before anyone tunes in.
   const pingWarm = (ids) => {
     radioLog('warm ping', ids || 'auto=2', ids);
-    try { void fetch(ids ? `/warm?ids=${ids}` : '/warm?auto=2'); } catch { /* noop */ }
+    try {
+      void fetch(ids ? `/warm?ids=${ids}` : '/warm?auto=2').catch(() => undefined);
+    } catch { /* best-effort */ }
   };
   // Start warming a few seconds after init, off the critical page-load path.
   const idle = window.requestIdleCallback || ((fn) => window.setTimeout(fn, 2500));
