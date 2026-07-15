@@ -6,7 +6,7 @@
 // Build:  npx vite build -c vite.agent-one-wallet.config.ts   (from the repo root)
 
 import { createStacksWalletAdapter } from '../lib/wallet/adapter';
-import { showStxTransfer, showContractCall } from '../lib/wallet/connect';
+import { showStxTransferViaSelectedProvider, showContractCall } from '../lib/wallet/connect';
 import { buildTransferCall } from '../lib/contract/client';
 import { buildTransferPostCondition } from '../lib/contract/post-conditions';
 import { validateTransferRequest, getTransferValidationMessage } from '../lib/wallet/transfer';
@@ -16,6 +16,7 @@ import { StacksMainnet, StacksTestnet } from '@stacks/network';
 const adapter = createStacksWalletAdapter({
   appName: 'Xtrata Agent One',
   appIcon: '/favicon.ico',
+  requestTransport: 'selected-provider',
 });
 
 const XtrataWallet = {
@@ -112,17 +113,15 @@ const XtrataWallet = {
       }
     });
   },
-  // Opens the connected wallet to send STX. showStxTransfer already prefers the
-  // modern stx_transferStx request that current Xverse expects (legacy popup fallback).
+  // Keep connect, STX payment, and parent transfer on the same provider chosen
+  // in the wallet picker. This is the flow proven on main-staging-fable.
   pay(opts: { recipient: string; amount: string | number; network?: string }): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const sender = adapter.getSession().address;
-      showStxTransfer({
+      showStxTransferViaSelectedProvider({
         recipient: opts.recipient,
         amount: String(opts.amount),
         memo: 'Xtrata Agent One',
         network: (opts.network ?? 'mainnet'),
-        ...(sender ? { stxAddress: sender } : {}),
         appDetails: { name: 'Xtrata Agent One', icon: '/favicon.ico' },
         onFinish: () => resolve(),
         onCancel: () => resolve(),

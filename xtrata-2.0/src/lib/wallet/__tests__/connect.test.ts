@@ -279,6 +279,35 @@ describe('wallet connect helpers', () => {
     expect(rpcProvider.request).toHaveBeenCalledOnce();
   });
 
+  it('retains the fable wizard connection on the selected Xverse provider', async () => {
+    const selectedProvider = {
+      request: vi.fn(async (method: string) => {
+        expect(method).toBe('wallet_connect');
+        return { addresses: [{ address: ADDRESS }] };
+      })
+    };
+    const rpcProvider = { request: vi.fn() };
+    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
+    (
+      window as typeof window & {
+        XverseProviders?: { StacksProvider: unknown; BitcoinProvider: unknown };
+      }
+    ).XverseProviders = {
+      StacksProvider: selectedProvider,
+      BitcoinProvider: rpcProvider
+    };
+
+    await expect(
+      __testing.connectViaRequest(selectedProvider as never, 'selected-provider')
+    ).resolves.toMatchObject({
+      isConnected: true,
+      address: ADDRESS,
+      network: 'mainnet'
+    });
+    expect(selectedProvider.request).toHaveBeenCalledOnce();
+    expect(rpcProvider.request).not.toHaveBeenCalled();
+  });
+
   it('routes Xverse STX payments through BitcoinProvider without touching legacy auth', async () => {
     const legacyProvider = {
       request: vi.fn(async () => {
@@ -320,6 +349,47 @@ describe('wallet connect helpers', () => {
 
     expect(legacyProvider.request).not.toHaveBeenCalled();
     expect(rpcProvider.request).toHaveBeenCalledOnce();
+  });
+
+  it('retains fable wizard payments on the selected Xverse provider', async () => {
+    const selectedProvider = {
+      request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
+        expect(method).toBe('stx_transferStx');
+        expect(params).toMatchObject({
+          recipient: ADDRESS,
+          amount: '2550000',
+          memo: 'Xtrata Agent One',
+          network: 'mainnet'
+        });
+        expect(params?.address).toBeUndefined();
+        return { txid: '0xfable123' };
+      })
+    };
+    const rpcProvider = { request: vi.fn() };
+    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
+    (
+      window as typeof window & {
+        XverseProviders?: { StacksProvider: unknown; BitcoinProvider: unknown };
+      }
+    ).XverseProviders = {
+      StacksProvider: selectedProvider,
+      BitcoinProvider: rpcProvider
+    };
+
+    await expect(
+      __testing.requestStxTransfer(
+        selectedProvider as never,
+        {
+          recipient: ADDRESS,
+          amount: '2550000',
+          memo: 'Xtrata Agent One',
+          network: 'mainnet'
+        },
+        'selected-provider'
+      )
+    ).resolves.toMatchObject({ txId: '0xfable123' });
+    expect(selectedProvider.request).toHaveBeenCalledOnce();
+    expect(rpcProvider.request).not.toHaveBeenCalled();
   });
 
   it('builds a sponsored origin transaction and requests signing without broadcast', async () => {

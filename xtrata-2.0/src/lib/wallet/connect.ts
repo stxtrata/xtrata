@@ -52,6 +52,8 @@ type WalletRpcProvider = {
   request: (method: string, params?: Record<string, unknown>) => Promise<unknown>;
 };
 
+type WalletRequestTransport = 'wallet-rpc' | 'selected-provider';
+
 type ConnectModalElement = HTMLElement & {
   defaultProviders: WebBTCProvider[];
   installedProviders: WebBTCProvider[];
@@ -932,20 +934,17 @@ const requestSponsoredContractCall = async (
   return normalizeTxResult(response);
 };
 
-// Keep Xverse on the same modern BitcoinProvider RPC bridge used for
-// wallet_connect. Calling stx_transferStx on XverseProviders.StacksProvider
-// falls back into the legacy @stacks/auth UserSession flow, where loadUserData()
-// necessarily fails because a modern wallet_connect does not create that
-// legacy session. Leather and other providers continue through requestProvider.
+// The main app uses the wallet RPC bridge for Xverse sponsored flows. The
+// standalone wizard can opt into its proven fable behavior and keep payment on
+// the provider selected by the wallet picker.
 const requestStxTransfer = async (
   provider: StacksProvider,
-  options: WalletStxTransferOptions
+  options: WalletStxTransferOptions,
+  requestTransport: WalletRequestTransport = 'wallet-rpc'
 ) => {
-  const response = await requestWalletRpc(
-    provider,
-    'stx_transferStx',
-    buildStxTransferParams(options)
-  );
+  const request =
+    requestTransport === 'selected-provider' ? requestProvider : requestWalletRpc;
+  const response = await request(provider, 'stx_transferStx', buildStxTransferParams(options));
   return normalizeTxResult(response);
 };
 
@@ -995,7 +994,16 @@ const GENERIC_CONNECT_METHODS = [
   'requestAccounts'
 ] as const;
 
-const getConnectAttempts = async (provider: StacksProvider) => {
+const getConnectAttempts = async (
+  provider: StacksProvider,
+  requestTransport: WalletRequestTransport = 'wallet-rpc'
+) => {
+  // The standalone wizard deliberately retains the provider flow proven on
+  // main-staging-fable: connect and transact through the exact provider picked
+  // by the user, without switching Xverse to a second injected RPC bridge.
+  if (requestTransport === 'selected-provider') {
+    return GENERIC_CONNECT_METHODS;
+  }
   const providerId = getSelectedProviderId();
   if (isSelectedXverseProvider(provider)) {
     return ['wallet_connect', 'stx_getAccounts', 'wallet_getAccount'] as const;
@@ -1034,15 +1042,20 @@ const getConnectAttempts = async (provider: StacksProvider) => {
   }
 };
 
-const connectViaRequest = async (provider: StacksProvider) => {
-  const attempts = await getConnectAttempts(provider);
+const connectViaRequest = async (
+  provider: StacksProvider,
+  requestTransport: WalletRequestTransport = 'wallet-rpc'
+) => {
+  const attempts = await getConnectAttempts(provider, requestTransport);
+  const request =
+    requestTransport === 'selected-provider' ? requestProvider : requestWalletRpc;
 
   let lastError: unknown = null;
   for (const method of attempts) {
     try {
       // eslint-disable-next-line no-console
       console.info('[wallet:connect]', { stage: 'REQUEST', method });
-      const response = await requestWalletRpc(provider, method);
+      const response = await request(provider, method);
       const session = toWalletSession(response);
       if (session.isConnected) {
         // eslint-disable-next-line no-console
@@ -1232,6 +1245,7 @@ export const getStacksProvider = (): StacksProvider | undefined => {
 export const connectWallet = async (params: {
   appName: string;
   appIcon: string;
+  requestTransport?: WalletRequestTransport;
 }): Promise<WalletSession> => {
   // Re-sanitize right before connecting: a forever-twins page (or another tab)
   // may have written an incompatible session after this module first loaded.
@@ -1248,7 +1262,7 @@ export const connectWallet = async (params: {
   // interactive method is reported unsupported.
   if (typeof provider.request === 'function') {
     try {
-      const session = await connectViaRequest(provider);
+      const session = await connectViaRequest(provider, params.requestTransport);
       if (session.isConnected) {
         return session;
       }
@@ -1382,7 +1396,11 @@ export const showContractDeploy = (
     });
 };
 
-export const showStxTransfer = (options: WalletStxTransferOptions, provider?: StacksProvider) => {
+const showStxTransferWithTransport = (
+  options: WalletStxTransferOptions,
+  provider: StacksProvider | undefined,
+  requestTransport: WalletRequestTransport
+) => {
   const activeProvider = provider ?? getStacksProvider();
   const legacyOptions = toLegacyStxTransferOptions({
     ...options,
@@ -1397,15 +1415,18 @@ export const showStxTransfer = (options: WalletStxTransferOptions, provider?: St
     return legacyShowSTXTransfer(legacyOptions, provider);
   }
 
-  return void requestStxTransfer(activeProvider, options)
+  return void requestStxTransfer(activeProvider, options, requestTransport)
     .then((payload) => {
       options.onFinish?.(payload);
     })
     .catch((error) => {
-      // A modern Xverse connection has no legacy UserSession to fall back to.
-      // Keep unsupported/error responses on the modern bridge and surface them
-      // to the caller instead of triggering loadUserData() in @stacks/connect.
-      if (isMethodUnsupportedError(error) && !isSelectedXverseProvider(activeProvider)) {
+      // The main app's modern Xverse connection has no legacy UserSession to
+      // fall back to. The selected-provider wizard path intentionally retains
+      // the fallback behavior used by the working fable deployment.
+      if (
+        isMethodUnsupportedError(error) &&
+        (requestTransport === 'selected-provider' || !isSelectedXverseProvider(activeProvider))
+      ) {
         legacyShowSTXTransfer(legacyOptions, activeProvider);
         return;
       }
@@ -1422,6 +1443,14 @@ export const showStxTransfer = (options: WalletStxTransferOptions, provider?: St
       options.onCancel?.();
     });
 };
+
+export const showStxTransfer = (options: WalletStxTransferOptions, provider?: StacksProvider) =>
+  showStxTransferWithTransport(options, provider, 'wallet-rpc');
+
+export const showStxTransferViaSelectedProvider = (
+  options: WalletStxTransferOptions,
+  provider?: StacksProvider
+) => showStxTransferWithTransport(options, provider, 'selected-provider');
 
 export const __testing = {
   buildContractCallParams,

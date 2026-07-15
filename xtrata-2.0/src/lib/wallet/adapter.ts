@@ -5,6 +5,7 @@ import type { WalletSession } from './types';
 export const createStacksWalletAdapter = (params: {
   appName: string;
   appIcon: string;
+  requestTransport?: 'wallet-rpc' | 'selected-provider';
 }) => {
   const sessionStore = createWalletSessionStore();
   const clearSession = () => {
@@ -21,7 +22,8 @@ export const createStacksWalletAdapter = (params: {
 
     const session = await connectWallet({
       appName: params.appName,
-      appIcon: params.appIcon
+      appIcon: params.appIcon,
+      requestTransport: params.requestTransport
     });
     sessionStore.save(session);
     return session;
