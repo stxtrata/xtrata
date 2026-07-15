@@ -671,6 +671,21 @@
       font-size: 13px;
     }
 
+    .drops-version-helpers {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .drops-version-helpers .badge {
+      min-height: 22px;
+      padding: 2px 8px;
+      font-size: 10px;
+      letter-spacing: 0.03em;
+    }
+
     .badge {
       display: inline-flex;
       align-items: center;

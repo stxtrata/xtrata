@@ -11335,6 +11335,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       status: $('dropsStatus'),
       listings: $('dropsListings'),
       badge: $('dropsNetworkBadge'),
+      contractVersion: $('dropsContractVersion'),
+      protocolVersion: $('dropsProtocolVersion'),
       create: $('dropsCreate'),
       createTokenId: $('dropsCreateTokenId'),
       createGroup: $('dropsCreateGroup'),
@@ -11351,6 +11353,27 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     };
     const dropsEntriesForNetwork = () =>
       DROPS_REGISTRY.filter((entry) => entry.network === state.contract.network);
+    const dropsContractVersionLabel = (contractName) => {
+      const match = String(contractName ?? '').match(/-v(\d+(?:-\d+)*)$/);
+      return match ? `v${match[1].replaceAll('-', '.')}` : 'current';
+    };
+    const syncDropsVersionHelpers = () => {
+      const entry = dropsEntriesForNetwork()[0] ?? null;
+      if (dropsDom.badge) dropsDom.badge.textContent = state.contract.network;
+      if (dropsDom.contractVersion) {
+        dropsDom.contractVersion.textContent = `Drops ${dropsContractVersionLabel(entry?.contractName)}`;
+        dropsDom.contractVersion.title = entry
+          ? `Active drops contract: ${entry.address}.${entry.contractName}`
+          : 'No drops contract is registered for this network';
+      }
+      if (dropsDom.protocolVersion) {
+        const version = state.contract.protocolVersion
+          ? `v${state.contract.protocolVersion}`
+          : dropsContractVersionLabel(state.contract.contractName);
+        dropsDom.protocolVersion.textContent = `Protocol ${version}`;
+        dropsDom.protocolVersion.title = `Active inscription contract: ${state.contract.address}.${state.contract.contractName}`;
+      }
+    };
     let dropsQuote = null; // deposit quote from the relayer (ustx)
 
     const readDropDiagnostics = () => {
@@ -12450,7 +12473,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const loadRun = ++dropsState.loadRun;
       if (!dropsDom.listings) return;
       dropsState.loading = true;
-      if (dropsDom.badge) dropsDom.badge.textContent = state.contract.network;
+      syncDropsVersionHelpers();
       if (!background) void updateDropsDepositHint();
       const dropParam = params?.get?.('drop');
       if (dropParam && /^\d+$/.test(dropParam)) {

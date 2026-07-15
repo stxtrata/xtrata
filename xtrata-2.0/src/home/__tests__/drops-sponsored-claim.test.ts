@@ -13,7 +13,9 @@ describe('public Drops sponsored-claim surface', () => {
       'dropsDiagnosticsClear',
       'dropsDiagnosticsLog',
       'dropsHistory',
-      'dropsHistoryList'
+      'dropsHistoryList',
+      'dropsContractVersion',
+      'dropsProtocolVersion'
     ]) {
       expect(indexHtml).toContain(`id="${id}"`);
     }
@@ -21,6 +23,9 @@ describe('public Drops sponsored-claim surface', () => {
       'Raw signed transactions and private wallet data are never printed.'
     );
     expect(indexHtml).toContain('1 = one claim per wallet for this campaign');
+    expect(indexHtml).toContain('aria-label="Drops version information"');
+    expect(homeMain).toContain('syncDropsVersionHelpers();');
+    expect(homeMain).toContain('dropsContractVersionLabel');
   });
 
   it('keeps free claims on the validated sponsored path only', () => {
