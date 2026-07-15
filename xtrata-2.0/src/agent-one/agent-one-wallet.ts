@@ -36,7 +36,14 @@ const XtrataWallet = {
     return s.isConnected ? (s.address ?? null) : null;
   },
   async getActiveAddress(): Promise<string | null> {
-    const live = await readActiveWalletSession();
+    // A hung/failed live read must not force a fresh connect popup: fall back
+    // to the persisted session so the flow keeps the already-approved account.
+    let live: Awaited<ReturnType<typeof readActiveWalletSession>>;
+    try {
+      live = await readActiveWalletSession();
+    } catch {
+      live = null;
+    }
     if (live === null) {
       const cached = adapter.getSession();
       return cached.isConnected ? (cached.address ?? null) : null;

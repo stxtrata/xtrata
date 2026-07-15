@@ -803,12 +803,48 @@ const buildXverseConnectParams = () => ({
   message: XVERSE_MAINNET_CONNECT_PARAMS.message
 });
 
-const getXverseActiveAccount = async (provider: StacksProvider) =>
-  toWalletSession(
-    await requestWalletRpc(provider, 'wallet_getAccount', {
-      addresses: [...XVERSE_MAINNET_CONNECT_PARAMS.addresses]
-    })
-  );
+// Some Xverse builds answer wallet_getAccount once and leave every subsequent
+// call pending forever (no popup, no rejection). Every read therefore gets a
+// hard timeout, and a failed/hung wallet_getAccount falls back to
+// stx_getAccounts before giving up, so callers see a prompt error instead of
+// an indefinite hang.
+const XVERSE_ACCOUNT_READ_TIMEOUT_MS = 10_000;
+const withXverseTimeout = <T>(promise: Promise<T>, method: string) =>
+  Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            Object.assign(
+              new Error(`Xverse did not answer ${method} within 10s.`),
+              { code: 'XVERSE_ACCOUNT_READ_TIMEOUT' }
+            )
+          ),
+        XVERSE_ACCOUNT_READ_TIMEOUT_MS
+      )
+    )
+  ]);
+
+const getXverseActiveAccount = async (provider: StacksProvider) => {
+  try {
+    return toWalletSession(
+      await withXverseTimeout(
+        requestWalletRpc(provider, 'wallet_getAccount', {
+          addresses: [...XVERSE_MAINNET_CONNECT_PARAMS.addresses]
+        }),
+        'wallet_getAccount'
+      )
+    );
+  } catch (error) {
+    if (isUserCancelledError(error)) {
+      throw error;
+    }
+    return toWalletSession(
+      await withXverseTimeout(requestWalletRpc(provider, 'stx_getAccounts'), 'stx_getAccounts')
+    );
+  }
+};
 
 export const readActiveWalletSession = async (): Promise<WalletSession | null> => {
   const provider = getStacksProvider();

@@ -375,7 +375,7 @@ describe('wallet connect helpers', () => {
     const legacyProvider = { request: vi.fn() };
     const rpcProvider = {
       request: vi.fn(async (method: string) => {
-        expect(method).toBe('wallet_getAccount');
+        expect(['wallet_getAccount', 'stx_getAccounts']).toContain(method);
         throw Object.assign(new Error('Access denied'), { code: -32001 });
       })
     };
@@ -398,7 +398,54 @@ describe('wallet connect helpers', () => {
         stxAddress: ADDRESS
       })
     ).rejects.toMatchObject({ code: 'XVERSE_ACTIVE_ACCOUNT_UNAVAILABLE' });
-    expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual(['wallet_getAccount']);
+    expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual([
+      'wallet_getAccount',
+      'stx_getAccounts'
+    ]);
+    expect(legacyProvider.request).not.toHaveBeenCalled();
+  });
+
+  it('falls back to stx_getAccounts when wallet_getAccount fails, then completes the transfer', async () => {
+    const legacyProvider = { request: vi.fn() };
+    const rpcProvider = {
+      request: vi.fn(async (method: string) => {
+        if (method === 'wallet_getAccount') {
+          throw new Error('internal error');
+        }
+        if (method === 'stx_getAccounts') {
+          return {
+            status: 'success',
+            result: { addresses: [{ address: ADDRESS, purpose: 'stacks', network: 'Mainnet' }] }
+          };
+        }
+        expect(method).toBe('stx_transferStx');
+        return { status: 'success', result: { txid: '0xabc123' } };
+      })
+    };
+    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
+    (
+      window as typeof window & {
+        XverseProviders?: { StacksProvider: unknown; BitcoinProvider: unknown };
+      }
+    ).XverseProviders = {
+      StacksProvider: legacyProvider,
+      BitcoinProvider: rpcProvider
+    };
+
+    await expect(
+      __testing.requestStxTransfer(legacyProvider as never, {
+        recipient: ADDRESS,
+        amount: '2550000',
+        memo: 'Xtrata Agent One',
+        network: 'mainnet',
+        stxAddress: ADDRESS
+      })
+    ).resolves.toMatchObject({ txId: '0xabc123' });
+    expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual([
+      'wallet_getAccount',
+      'stx_getAccounts',
+      'stx_transferStx'
+    ]);
     expect(legacyProvider.request).not.toHaveBeenCalled();
   });
 
