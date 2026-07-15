@@ -11304,6 +11304,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // drops contract exposes market-shaped read-onlys, so reads look identical.
     const DROP_DIAGNOSTICS_KEY = 'xtrata:drops:diagnostics:v1';
     const DEFAULT_DROP_GROUP_ID = 1n;
+    const DROPS_DISPLAY_LIMIT = 25;
+    const DROPS_SCAN_MAX_IDS = DROPS_DISPLAY_LIMIT * 10;
     const dropsState = {
       run: 0,
       drops: [],
@@ -11453,10 +11455,13 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       });
       const lastId = BigInt(lastJson?.value?.value ?? 0);
       const results = [];
-      const floor = lastId > BigInt(MARKET_LISTINGS_PER_CONTRACT)
-        ? lastId - BigInt(MARKET_LISTINGS_PER_CONTRACT)
-        : 0n;
-      for (let id = lastId; id >= floor; id -= 1n) {
+      let scanned = 0;
+      for (
+        let id = lastId;
+        id >= 0n && results.length < DROPS_DISPLAY_LIMIT && scanned < DROPS_SCAN_MAX_IDS;
+        id -= 1n
+      ) {
+        scanned += 1;
         try {
           const json = await callReadOnlyJson({
             contractId,
@@ -11485,6 +11490,15 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           // sparse ids / settled drops: skip
         }
         if (id === 0n) break;
+      }
+      if (results.length < DROPS_DISPLAY_LIMIT && scanned >= DROPS_SCAN_MAX_IDS) {
+        debugLog('drops', 'stopped drop scan at safety cap', {
+          contractId,
+          lastId: lastId.toString(),
+          scanned,
+          found: results.length,
+          limit: DROPS_DISPLAY_LIMIT
+        }, 'warn');
       }
       return results;
     };
@@ -11800,7 +11814,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
     const renderDropsHistory = () => {
       if (!dropsDom.historyList) return;
-      const drops = dropsState.drops.slice(0, MARKET_LISTINGS_PER_CONTRACT);
+      const drops = dropsState.drops.slice(0, DROPS_DISPLAY_LIMIT);
       if (!drops.length) {
         dropsDom.historyList.replaceChildren(
           Object.assign(document.createElement('p'), {
