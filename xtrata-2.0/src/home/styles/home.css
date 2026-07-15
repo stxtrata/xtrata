@@ -2232,6 +2232,25 @@
       min-width: 68px;
     }
 
+    .transfer-recipient-resolution {
+      display: block;
+      min-height: 18px;
+      color: var(--blue);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11.5px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+
+    .transfer-recipient-resolution[data-status='resolving'] {
+      color: var(--amber);
+    }
+
+    .transfer-recipient-resolution[data-status='missing'],
+    .transfer-recipient-resolution[data-status='error'] {
+      color: var(--rose);
+    }
+
     .wallet-action-stack {
       position: relative;
       z-index: 30;

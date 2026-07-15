@@ -686,7 +686,7 @@
                 <label class="field">
                   <span class="label">Send selected inscription</span>
                   <div class="field-inline">
-                    <input class="input" id="transferRecipientInput" autocomplete="off" placeholder="ST..." />
+                    <input class="input" id="transferRecipientInput" autocomplete="off" placeholder="ST... or name.btc" aria-describedby="transferRecipientResolution transferStatus" />
                     <button class="btn" id="transferButton" type="button" disabled>Send</button>
                     <div class="wallet-action-stack">
                       <button class="btn" id="listForSaleButton" type="button" disabled>List for sale</button>
@@ -701,6 +701,7 @@
                       </div>
                     </div>
                   </div>
+                  <span class="transfer-recipient-resolution" id="transferRecipientResolution" aria-live="polite" hidden></span>
                 </label>
                 <span class="field-note" id="transferStatus">Select one of your inscriptions to send.</span>
               </div>

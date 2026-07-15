@@ -16,6 +16,7 @@ export type TransferValidationResult = {
 export const validateTransferRequest = (params: {
   senderAddress?: string | null;
   recipientAddress: string;
+  resolvedRecipientAddress?: string | null;
   tokenId?: bigint | null;
   networkMismatch?: boolean;
 }): TransferValidationResult => {
@@ -28,7 +29,7 @@ export const validateTransferRequest = (params: {
   if (params.tokenId === null || params.tokenId === undefined) {
     return { ok: false, reason: 'missing-token' };
   }
-  const trimmed = params.recipientAddress.trim();
+  const trimmed = (params.resolvedRecipientAddress ?? params.recipientAddress).trim();
   if (!trimmed) {
     return { ok: false, reason: 'missing-recipient' };
   }
@@ -61,7 +62,7 @@ export const getTransferValidationMessage = (
     case 'missing-recipient':
       return 'Enter a recipient address.';
     case 'invalid-recipient':
-      return 'Enter a valid Stacks address.';
+      return 'Enter a valid Stacks address or BNS name.';
     case 'self-recipient':
       return 'Recipient must be different from the sender.';
     default:

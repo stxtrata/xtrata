@@ -11,7 +11,8 @@
       principalCV,
       stringAsciiCV,
       uintCV,
-      contractPrincipalCV
+      contractPrincipalCV,
+      validateStacksAddress
     } from '@stacks/transactions';
     import { createStacksWalletAdapter } from '/src/lib/wallet/adapter.ts';
     import {
@@ -122,7 +123,8 @@
     } from '/src/lib/mint/attempt-cache.ts';
     import { bytesToHex } from '/src/lib/utils/encoding.ts';
     import { formatBytes, truncateMiddle } from '/src/lib/utils/format.ts';
-    import { resolveBnsNames } from '/src/lib/bns/resolver.ts';
+    import { resolveBnsAddress, resolveBnsNames } from '/src/lib/bns/resolver.ts';
+    import { normalizeBnsName } from '/src/lib/bns/helpers.ts';
     import {
       loadWalletHoldingsIndex,
       loadWalletHoldingsPage
@@ -364,6 +366,7 @@
       explorerHomeLink: $('explorerHomeLink'),
       explorerFilterInputs: [...document.querySelectorAll('[data-explorer-filter]')],
       transferRecipientInput: $('transferRecipientInput'),
+      transferRecipientResolution: $('transferRecipientResolution'),
       transferButton: $('transferButton'),
       transferStatus: $('transferStatus'),
       fullscreenViewer: $('fullscreenViewer'),
@@ -526,6 +529,13 @@
       walletLookupAbortController: null,
       walletViewRequestId: 0,
       transferPending: false,
+      transferRecipientLookupInput: '',
+      transferRecipientLookupName: null,
+      transferRecipientLookupAddress: null,
+      transferRecipientLookupStatus: 'idle',
+      transferRecipientLookupRequestId: 0,
+      transferRecipientLookupTimer: null,
+      transferRecipientLookupAbortController: null,
       adminStatus: null,
       selectedFile: null,
       prepared: null,
@@ -3464,6 +3474,13 @@
         return null;
       }
       if (
+        !state.walletViewAddress &&
+        state.connectedWalletName &&
+        addressesEqual(state.connectedWalletNameAddress, viewingAddress)
+      ) {
+        return state.connectedWalletName;
+      }
+      if (
         state.walletViewResolvedName &&
         addressesEqual(state.walletViewResolvedNameAddress, viewingAddress)
       ) {
@@ -3783,8 +3800,151 @@
       }
 
       dom.walletLookupStatus.textContent = viewingAddress
-        ? 'Using connected wallet.'
+        ? `Using connected wallet ${getConnectedWalletLabel() ?? truncateMiddle(viewingAddress, 8, 8)}.`
         : 'Using connected wallet when available.';
+    };
+
+    const transferRecipientLookupKey = (value) => value.trim().toLowerCase();
+
+    const getCurrentTransferRecipientLookup = () => {
+      const input = dom.transferRecipientInput.value.trim();
+      if (
+        !input ||
+        state.transferRecipientLookupInput !== transferRecipientLookupKey(input)
+      ) {
+        return null;
+      }
+      return {
+        input,
+        name: state.transferRecipientLookupName,
+        address: state.transferRecipientLookupAddress,
+        status: state.transferRecipientLookupStatus
+      };
+    };
+
+    const getResolvedTransferRecipientAddress = () => {
+      const lookup = getCurrentTransferRecipientLookup();
+      return lookup?.address ?? null;
+    };
+
+    const getTransferRecipientLabel = (address) => {
+      const lookup = getCurrentTransferRecipientLookup();
+      return lookup?.name && lookup.address
+        ? `${lookup.name} (${lookup.address})`
+        : address;
+    };
+
+    const renderTransferRecipientResolution = () => {
+      if (!dom.transferRecipientResolution) return;
+      const lookup = getCurrentTransferRecipientLookup();
+      const element = dom.transferRecipientResolution;
+      element.hidden = true;
+      element.textContent = '';
+      delete element.dataset.status;
+      if (!lookup) return;
+
+      if (lookup.status === 'resolving' && lookup.name) {
+        element.textContent = `Resolving ${lookup.name}…`;
+        element.dataset.status = 'resolving';
+      } else if (lookup.status === 'resolved' && lookup.name && lookup.address) {
+        element.textContent = `${lookup.name} → ${lookup.address}`;
+        element.dataset.status = 'resolved';
+      } else if (lookup.status === 'reverse-resolved' && lookup.name && lookup.address) {
+        element.textContent = `${lookup.name} → ${lookup.address}`;
+        element.dataset.status = 'resolved';
+      } else if (lookup.status === 'missing' && lookup.name) {
+        element.textContent = `No active Stacks address was found for ${lookup.name}.`;
+        element.dataset.status = 'missing';
+      } else if (lookup.status === 'error' && lookup.name) {
+        element.textContent = `Could not resolve ${lookup.name}. Check the name or paste a Stacks address.`;
+        element.dataset.status = 'error';
+      } else {
+        return;
+      }
+      element.hidden = false;
+    };
+
+    const queueTransferRecipientLookup = () => {
+      if (state.transferRecipientLookupTimer !== null) {
+        window.clearTimeout(state.transferRecipientLookupTimer);
+        state.transferRecipientLookupTimer = null;
+      }
+      state.transferRecipientLookupAbortController?.abort();
+      state.transferRecipientLookupAbortController = null;
+
+      const input = dom.transferRecipientInput.value.trim();
+      const lookupKey = transferRecipientLookupKey(input);
+      const bnsName = normalizeBnsName(input);
+      const directAddress = input && validateStacksAddress(input) ? input : null;
+      const requestId = ++state.transferRecipientLookupRequestId;
+      state.transferRecipientLookupInput = lookupKey;
+      state.transferRecipientLookupName = bnsName;
+      state.transferRecipientLookupAddress = directAddress;
+      state.transferRecipientLookupStatus = bnsName
+        ? 'resolving'
+        : directAddress
+          ? 'address'
+          : 'idle';
+      renderTransferRecipientResolution();
+      updateTransferControls();
+
+      if (!bnsName && !directAddress) return;
+      state.transferRecipientLookupTimer = window.setTimeout(async () => {
+        state.transferRecipientLookupTimer = null;
+        const controller = new AbortController();
+        state.transferRecipientLookupAbortController = controller;
+        try {
+          if (bnsName) {
+            const result = await resolveBnsAddress({
+              name: bnsName,
+              network: state.contract.network,
+              signal: controller.signal
+            });
+            if (
+              requestId !== state.transferRecipientLookupRequestId ||
+              state.transferRecipientLookupInput !== lookupKey
+            ) {
+              return;
+            }
+            state.transferRecipientLookupAddress = result.address;
+            state.transferRecipientLookupStatus = result.address ? 'resolved' : 'missing';
+          } else if (directAddress) {
+            const result = await resolveBnsNames({
+              address: directAddress,
+              network: state.contract.network,
+              signal: controller.signal
+            });
+            if (
+              requestId !== state.transferRecipientLookupRequestId ||
+              state.transferRecipientLookupInput !== lookupKey
+            ) {
+              return;
+            }
+            state.transferRecipientLookupName = result.primary;
+            state.transferRecipientLookupStatus = result.primary
+              ? 'reverse-resolved'
+              : 'address';
+          }
+        } catch (error) {
+          if (controller.signal.aborted || requestId !== state.transferRecipientLookupRequestId) {
+            return;
+          }
+          if (bnsName) {
+            state.transferRecipientLookupAddress = null;
+            state.transferRecipientLookupStatus = 'error';
+          }
+          debugLog('bns', 'transfer recipient lookup failed', {
+            recipient: bnsName ?? truncateMiddle(directAddress ?? '', 8, 8),
+            error: error instanceof Error ? error.message : String(error)
+          }, 'warn');
+        } finally {
+          if (requestId === state.transferRecipientLookupRequestId) {
+            state.transferRecipientLookupAbortController = null;
+            renderTransferRecipientResolution();
+            updateTransferControls();
+          }
+        }
+      }, 350);
     };
 
     const updateTransferControls = () => {
@@ -3795,6 +3955,7 @@
       const transferValidation = validateTransferRequest({
         senderAddress: walletOwnsToken ? walletAddress : null,
         recipientAddress: dom.transferRecipientInput.value,
+        resolvedRecipientAddress: getResolvedTransferRecipientAddress(),
         tokenId: selectedToken?.id ?? null,
         networkMismatch: !!getMismatch()
       });
@@ -3805,6 +3966,17 @@
         message = 'Connect the owner wallet to send this inscription.';
       } else if (!walletOwnsToken) {
         message = 'Only the connected owner can send this inscription.';
+      } else {
+        const recipientLookup = getCurrentTransferRecipientLookup();
+        if (recipientLookup?.status === 'resolving' && recipientLookup.name) {
+          message = `Resolving ${recipientLookup.name} to its current Stacks address…`;
+        } else if (recipientLookup?.status === 'missing' && recipientLookup.name) {
+          message = `No active Stacks address was found for ${recipientLookup.name}.`;
+        } else if (recipientLookup?.status === 'error' && recipientLookup.name) {
+          message = `BNS lookup failed for ${recipientLookup.name}. Check the name or paste a Stacks address.`;
+        } else if (transferValidation.ok && recipientLookup?.name && recipientLookup.address) {
+          message = `Ready to send to ${recipientLookup.name} at ${recipientLookup.address}.`;
+        }
       }
       const listBtn = $('listForSaleButton');
       if (listBtn) listBtn.disabled = state.selectedTokenId === null || !state.walletSession.isConnected;
@@ -7997,6 +8169,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const validation = validateTransferRequest({
         senderAddress: walletOwnsToken ? senderAddress : null,
         recipientAddress: dom.transferRecipientInput.value,
+        resolvedRecipientAddress: getResolvedTransferRecipientAddress(),
         tokenId: selectedToken?.id ?? null,
         networkMismatch: !!getMismatch()
       });
@@ -8010,6 +8183,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
 
       const recipient = validation.recipient ?? dom.transferRecipientInput.value.trim();
+      const recipientLabel = getTransferRecipientLabel(recipient);
       const network = state.walletSession.network ?? state.contract.network;
       const callOptions = buildTransferCall({
         contract: state.contract,
@@ -8030,9 +8204,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       });
 
       state.transferPending = true;
-      dom.transferStatus.textContent = 'Waiting for wallet confirmation...';
+      dom.transferStatus.textContent = `Waiting for wallet confirmation to send to ${recipientLabel}…`;
       updateControls();
-      appendLog(`Transferring ${formatTokenId(selectedToken.id)} to ${recipient}.`);
+      appendLog(`Transferring ${formatTokenId(selectedToken.id)} to ${recipientLabel}.`);
 
       try {
         showContractCall({
@@ -8040,8 +8214,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           stxAddress: senderAddress,
           onFinish: (payload) => {
             state.transferPending = false;
-            dom.transferStatus.textContent = `Transfer submitted: ${payload.txId}`;
-            appendLog(`Transfer submitted: ${payload.txId}`);
+            dom.transferStatus.textContent = `Transfer to ${recipientLabel} submitted: ${payload.txId}`;
+            appendLog(`Transfer to ${recipientLabel} submitted: ${payload.txId}`);
             updateControls();
             void loadWalletInscriptions();
           },
@@ -11425,7 +11599,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       } catch {
         // Diagnostics remain available for this page even if storage is unavailable.
       }
-      if (dropsDom.diagnostics) dropsDom.diagnostics.open = true;
       renderDropDiagnostics();
       debugLog('drops-claim', `${stage}: ${message}`, { round }, tone === 'error' ? 'error' : tone === 'warn' ? 'warn' : 'info');
     };
@@ -13016,7 +13189,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     });
     dom.addParentsButton.addEventListener('click', applyParentInput);
     dom.clearParentsButton.addEventListener('click', clearParentIds);
-    dom.transferRecipientInput.addEventListener('input', updateTransferControls);
+    dom.transferRecipientInput.addEventListener('input', queueTransferRecipientLookup);
     dom.transferButton.addEventListener('click', transferSelectedToken);
     // "List for sale" jumps to the Market page with the selected inscription
     // prefilled in the sell form (any currency, optional sponsorship).

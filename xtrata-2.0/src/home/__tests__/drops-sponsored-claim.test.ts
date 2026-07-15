@@ -24,6 +24,8 @@ describe('public Drops sponsored-claim surface', () => {
     );
     expect(indexHtml).toContain('1 = one claim per wallet for this campaign');
     expect(indexHtml).toContain('aria-label="Drops version information"');
+    expect(indexHtml).toContain('<details class="claim-diagnostics" id="dropsDiagnostics">');
+    expect(homeMain).not.toContain('dropsDom.diagnostics.open = true');
     expect(homeMain).toContain('syncDropsVersionHelpers();');
     expect(homeMain).toContain('dropsContractVersionLabel');
   });

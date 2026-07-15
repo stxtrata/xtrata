@@ -89,4 +89,17 @@ describe('transfer validation', () => {
     expect(result.reason).toBeNull();
     expect(result.recipient).toBe(RECIPIENT);
   });
+
+  it('accepts a BNS recipient after it has resolved to a Stacks address', () => {
+    const result = validateTransferRequest({
+      senderAddress: SENDER,
+      recipientAddress: 'alice.btc',
+      resolvedRecipientAddress: RECIPIENT,
+      tokenId: 5n
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.reason).toBeNull();
+    expect(result.recipient).toBe(RECIPIENT);
+  });
 });
