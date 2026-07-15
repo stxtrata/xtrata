@@ -11325,7 +11325,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       diagnosticsBadge: $('dropsDiagnosticsBadge'),
       diagnosticsLog: $('dropsDiagnosticsLog'),
       diagnosticsCopy: $('dropsDiagnosticsCopy'),
-      diagnosticsClear: $('dropsDiagnosticsClear')
+      diagnosticsClear: $('dropsDiagnosticsClear'),
+      history: $('dropsHistory'),
+      historyList: $('dropsHistoryList')
     };
     const dropsEntriesForNetwork = () =>
       DROPS_REGISTRY.filter((entry) => entry.network === state.contract.network);
@@ -11398,6 +11400,22 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     });
     renderDropDiagnostics();
 
+    const optionalPrincipalValue = (node) => {
+      const value = node?.value ?? null;
+      if (!value) return null;
+      if (typeof value === 'string') return value;
+      return typeof value.value === 'string' ? value.value : null;
+    };
+
+    const optionalUintValue = (node) => {
+      const value = node?.value ?? null;
+      if (value === null || value === undefined) return null;
+      const raw = typeof value === 'object' && value !== null && 'value' in value
+        ? value.value
+        : value;
+      return raw === null || raw === undefined ? null : BigInt(raw);
+    };
+
     const readDrops = async (entry) => {
       const contractId = `${entry.address}.${entry.contractName}`;
       const lastJson = await callReadOnlyJson({
@@ -11420,7 +11438,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           });
           const tuple = unwrapBindingTuple(json);
           if (!tuple) continue;
-          const claimedRaw = tuple['claimed-at']?.value ?? null;
           results.push({
             entry,
             contractId,
@@ -11433,7 +11450,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             groupId: BigInt(tuple['group-id'].value),
             feeBudget: tuple['fee-budget'] ? BigInt(tuple['fee-budget'].value) : null,
             budgetRemaining: tuple['budget-remaining'] ? BigInt(tuple['budget-remaining'].value) : null,
-            claimedAt: claimedRaw === null || claimedRaw === undefined ? null : BigInt(claimedRaw.value ?? claimedRaw)
+            claimer: optionalPrincipalValue(tuple.claimer),
+            claimedAt: optionalUintValue(tuple['claimed-at'])
           });
         } catch {
           // sparse ids / settled drops: skip
@@ -11731,6 +11749,73 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       });
     };
 
+    const renderDropsHistory = () => {
+      if (!dropsDom.historyList) return;
+      const drops = dropsState.drops.slice(0, MARKET_LISTINGS_PER_CONTRACT);
+      if (!drops.length) {
+        dropsDom.historyList.replaceChildren(
+          Object.assign(document.createElement('p'), {
+            className: 'field-hint',
+            textContent: 'No recent drop records are currently available.'
+          })
+        );
+        return;
+      }
+      dropsDom.historyList.replaceChildren(
+        ...drops.map((drop) => {
+          const row = document.createElement('article');
+          row.className = 'drops-history__row';
+          const claimed = drop.claimedAt !== null;
+          row.dataset.status = claimed ? 'claimed' : 'live';
+
+          const main = document.createElement('div');
+          main.className = 'drops-history__main';
+          const title = document.createElement('strong');
+          title.textContent = `Drop #${drop.dropId} · Inscription #${drop.tokenId}`;
+          const meta = document.createElement('span');
+          meta.textContent = 'Created by ';
+          const creator = document.createElement('span');
+          applyBnsName(creator, drop.creator);
+          meta.append(creator);
+          main.append(title, meta);
+
+          const claim = document.createElement('div');
+          claim.className = 'drops-history__claim';
+          if (claimed) {
+            const label = document.createElement('span');
+            label.textContent = `Claimed${drop.claimedAt ? ` at block ${drop.claimedAt}` : ''} by `;
+            claim.append(label);
+            if (drop.claimer) {
+              const claimer = document.createElement('span');
+              applyBnsName(claimer, drop.claimer);
+              claim.append(claimer);
+            } else {
+              claim.append('unknown wallet');
+            }
+          } else {
+            claim.textContent = 'Not claimed yet.';
+          }
+
+          const actions = document.createElement('div');
+          actions.className = 'drops-history__actions';
+          const viewLink = document.createElement('a');
+          viewLink.className = 'market-chip';
+          viewLink.href = `/xplorer?token=${drop.tokenId}`;
+          viewLink.target = '_self';
+          viewLink.textContent = 'View';
+          const dropLink = document.createElement('a');
+          dropLink.className = 'market-chip';
+          dropLink.href = `/drops?drop=${drop.tokenId}`;
+          dropLink.target = '_self';
+          dropLink.textContent = 'Open drop';
+          actions.append(viewLink, dropLink);
+
+          row.append(main, claim, actions);
+          return row;
+        })
+      );
+    };
+
     const renderDrops = () => {
       if (!dropsDom.listings) return;
       const run = dropsState.run;
@@ -11739,6 +11824,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         const claimKey = `${drop.contractId}:${drop.dropId}`;
         return drop.claimedAt === null || dropsState.recentlyClaimed.has(claimKey);
       });
+      renderDropsHistory();
       if (!visible.length) {
         dropsDom.listings.replaceChildren();
         dropsDom.status.innerHTML = '<span><strong>Drops</strong> no live drops right now — create one below, or check back soon.</span>';

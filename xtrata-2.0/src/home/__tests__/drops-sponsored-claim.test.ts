@@ -11,7 +11,9 @@ describe('public Drops sponsored-claim surface', () => {
       'dropsDiagnosticsBadge',
       'dropsDiagnosticsCopy',
       'dropsDiagnosticsClear',
-      'dropsDiagnosticsLog'
+      'dropsDiagnosticsLog',
+      'dropsHistory',
+      'dropsHistoryList'
     ]) {
       expect(indexHtml).toContain(`id="${id}"`);
     }
@@ -46,6 +48,10 @@ describe('public Drops sponsored-claim surface', () => {
     expect(homeMain).toContain("await switchToPage('drops', targetParams)");
     expect(homeMain).toContain('pollIntervalMs: 4000');
     expect(homeMain).toContain('confirmed and now live');
+    expect(homeMain).toContain('claimer: optionalPrincipalValue(tuple.claimer)');
+    expect(homeMain).toContain('renderDropsHistory();');
+    expect(homeMain).toContain("'drops-history__row'");
+    expect(homeMain).toContain('Claimed${drop.claimedAt ? ` at block ${drop.claimedAt}` : \'\'} by ');
     expect(homeMain).not.toContain('dropClaimSelfPaid');
     expect(homeMain).not.toContain('claiming self-paid instead');
   });
