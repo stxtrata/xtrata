@@ -11303,6 +11303,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // Reuses the market module's thumbnail/media caches and card styling; the
     // drops contract exposes market-shaped read-onlys, so reads look identical.
     const DROP_DIAGNOSTICS_KEY = 'xtrata:drops:diagnostics:v1';
+    const DEFAULT_DROP_GROUP_ID = 1n;
     const dropsState = {
       run: 0,
       drops: [],
@@ -11416,6 +11417,33 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       return raw === null || raw === undefined ? null : BigInt(raw);
     };
 
+    const unwrapReadOnlyNode = (node) => {
+      let current = node;
+      while (
+        current &&
+        typeof current.type === 'string' &&
+        (current.type.startsWith('(optional') || current.type.startsWith('(response'))
+      ) {
+        current = current.value ?? null;
+      }
+      return current;
+    };
+
+    const readBoolValue = (node) => {
+      const unwrapped = unwrapReadOnlyNode(node);
+      return unwrapped === true || (unwrapped?.type === 'bool' && unwrapped.value === true);
+    };
+
+    const hasClaimedDropGroup = async (drop, claimerAddress) => {
+      const json = await callReadOnlyJson({
+        contractId: drop.contractId,
+        functionName: 'has-claimed-in-group',
+        args: [principalCV(drop.creator), uintCV(drop.groupId), principalCV(claimerAddress)],
+        network: drop.entry.network
+      });
+      return readBoolValue(json);
+    };
+
     const readDrops = async (entry) => {
       const contractId = `${entry.address}.${entry.contractName}`;
       const lastJson = await callReadOnlyJson({
@@ -11489,6 +11517,27 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         dropsDom.status.innerHTML = '<span><strong>Drops</strong> connect a wallet to claim — new wallets work, no STX needed.</span>';
         recordDropDiagnostic(round, 'BLOCK', 'No connected Stacks wallet address.', 'error');
         return;
+      }
+      try {
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> checking whether this wallet has already claimed from this campaign…</span>';
+        const alreadyClaimedGroup = await hasClaimedDropGroup(drop, state.walletSession.address);
+        if (alreadyClaimedGroup) {
+          dropsDom.status.innerHTML = '<span><strong>Drops</strong> this wallet has already claimed a free drop from this campaign group.</span><span class="badge amber">one per wallet</span>';
+          recordDropDiagnostic(
+            round,
+            'GROUP_LIMIT',
+            `Wallet ${state.walletSession.address} already claimed campaign group ${drop.groupId} from ${drop.creator}.`,
+            'warn'
+          );
+          return;
+        }
+      } catch (error) {
+        recordDropDiagnostic(
+          round,
+          'GROUP_LIMIT_CHECK_UNAVAILABLE',
+          `Could not pre-check one-per-wallet policy; the contract will still enforce it. ${String(error?.message ?? error)}`,
+          'warn'
+        );
       }
       dropsState.claimsInFlight.add(claimKey);
       renderDrops();
@@ -11773,7 +11822,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           const title = document.createElement('strong');
           title.textContent = `Drop #${drop.dropId} · Inscription #${drop.tokenId}`;
           const meta = document.createElement('span');
-          meta.textContent = 'Created by ';
+          meta.textContent = `Group ${drop.groupId} · created by `;
           const creator = document.createElement('span');
           applyBnsName(creator, drop.creator);
           meta.append(creator);
@@ -11939,7 +11988,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         dropsQuote = 60_000n;
       }
       dropsDom.createDeposit.textContent =
-        `Sponsorship deposit: ${formatAssetAmount(dropsQuote, 6, 'STX')} — covers the claimer's network fee so they need zero STX; the unused part refunds to you after the claim or on cancel.`;
+        `Sponsorship deposit: ${formatAssetAmount(dropsQuote, 6, 'STX')} — covers the claimer's network fee so they need zero STX. Blank campaign group uses ${DEFAULT_DROP_GROUP_ID}, which lets each wallet claim once from this creator's campaign; unused deposit refunds after claim or cancel.`;
     };
 
     const watchCreatedDrop = async ({ txId, tokenId, creator, watchRun }) => {
@@ -12015,11 +12064,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const creator = state.walletSession.address;
       const tokenId = BigInt(tokenIdRaw);
       const groupRaw = dropsDom.createGroup?.value?.trim();
-      // A shared batch id limits claims to one per person per batch; leaving it
-      // blank gives the drop a unique id (no per-person limit).
+      // The drops contract enforces one claim per (creator, group id, claimer).
+      // Blank group id uses the default campaign group, so each wallet can only
+      // claim one free drop from that creator's default campaign.
       const groupId = /^\d+$/.test(groupRaw ?? '')
         ? BigInt(groupRaw)
-        : BigInt(Date.now()) * 1000n + BigInt(Math.floor(Math.random() * 1000));
+        : DEFAULT_DROP_GROUP_ID;
       const budget = dropsQuote ?? 60_000n;
 
       dropsDom.createStatus.textContent = 'Checking ownership...';

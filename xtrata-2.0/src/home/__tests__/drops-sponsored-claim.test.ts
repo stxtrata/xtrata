@@ -20,6 +20,7 @@ describe('public Drops sponsored-claim surface', () => {
     expect(indexHtml).toContain(
       'Raw signed transactions and private wallet data are never printed.'
     );
+    expect(indexHtml).toContain('1 = one claim per wallet for this campaign');
   });
 
   it('keeps free claims on the validated sponsored path only', () => {
@@ -52,6 +53,11 @@ describe('public Drops sponsored-claim surface', () => {
     expect(homeMain).toContain('renderDropsHistory();');
     expect(homeMain).toContain("'drops-history__row'");
     expect(homeMain).toContain('Claimed${drop.claimedAt ? ` at block ${drop.claimedAt}` : \'\'} by ');
+    expect(homeMain).toContain('const DEFAULT_DROP_GROUP_ID = 1n');
+    expect(homeMain).toContain("functionName: 'has-claimed-in-group'");
+    expect(homeMain).toContain("'GROUP_LIMIT'");
+    expect(homeMain).toContain('already claimed a free drop from this campaign group');
+    expect(homeMain).toContain(': DEFAULT_DROP_GROUP_ID');
     expect(homeMain).not.toContain('dropClaimSelfPaid');
     expect(homeMain).not.toContain('claiming self-paid instead');
   });
