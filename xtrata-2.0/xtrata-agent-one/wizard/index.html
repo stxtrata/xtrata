@@ -573,7 +573,7 @@
     </div>
     <div id="batchParentsCheck" style="font-size:12px;margin:2px 0 10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px" hidden></div>
     <div class="btnrow">
-      <button class="btn big" id="batchInscribeBtn" disabled>Inscribe batch</button>
+      <button class="btn big" id="batchInscribeBtn" disabled>Process batch</button>
       <button class="btn ghost" id="batchClearBtn">Clear batch</button>
     </div>
     <div class="muted" style="font-size:11.5px;margin-top:6px">⚡ Fast-track: pay once from your connected wallet — every inscription, the batch receipt, any parents, and all change return to it automatically.</div>
@@ -1144,7 +1144,14 @@ async function batchUnownedParents(){
   return missing;
 }
 $('#batchInscribeBtn').onclick=async()=>{
-  const err=$('#batchErr'); err.textContent='';
+  // Validation failures must be impossible to miss: any message scrolls into view,
+  // so a rejected batch never looks like a dead button.
+  const errEl=$('#batchErr');
+  const err={ get textContent(){ return errEl.textContent; },
+    set textContent(v){ errEl.textContent=v; if(v) errEl.scrollIntoView({behavior:'smooth',block:'center'}); } };
+  err.textContent='';
+  const btn=$('#batchInscribeBtn'); btn.textContent='Processing…';
+  try{
   let activeWallet=await syncActiveWallet();
   if(!activeWallet) activeWallet=await connectWallet();
   if(!activeWallet){ err.textContent='Connect the Xverse account that will fund this batch — everything returns to that same account.'; return; }
@@ -1167,7 +1174,7 @@ $('#batchInscribeBtn').onclick=async()=>{
       // Kick any rows still waiting for artwork (they build with their embedded art), then re-check.
       notReady.forEach(it=>{ if(it.player.status==='await') it.player.status='queued'; });
       renderBatch(); queueAudioBuilds();
-      err.textContent=`Building ${notReady.length} player${notReady.length>1?'s':''} — press Inscribe batch again once every row shows ✓.`;
+      err.textContent=`Building ${notReady.length} player${notReady.length>1?'s':''} — press Process batch again once every row shows ✓.`;
       return;
     }
   }
@@ -1175,7 +1182,7 @@ $('#batchInscribeBtn').onclick=async()=>{
   try{
     const unowned=await batchUnownedParents();
     if(unowned.length){
-      const go=confirm(`${unowned.length} parent inscription${unowned.length>1?'s':''} (#${unowned.join(', #')}) ${unowned.length>1?'are':'is'} not in your connected wallet.\n\nAny item that needs a missing parent will wait at “awaiting parent” and be auto-refunded if it never arrives at the deposit wallet.\n\nInscribe the batch anyway?`);
+      const go=confirm(`${unowned.length} parent inscription${unowned.length>1?'s':''} (#${unowned.join(', #')}) ${unowned.length>1?'are':'is'} not in your connected wallet.\n\nAny item that needs a missing parent will wait at “awaiting parent” and be auto-refunded if it never arrives at the deposit wallet.\n\nProcess the batch anyway?`);
       if(!go) return;
     }
   }catch{}
@@ -1193,6 +1200,7 @@ $('#batchInscribeBtn').onclick=async()=>{
     $('#activeJobDetail').scrollIntoView({behavior:'smooth',block:'start'});
   }catch(e){ err.textContent=e.message; }
   finally{ $('#batchInscribeBtn').disabled=false; }
+  }finally{ btn.textContent='Process batch'; }
 };
 
 function renderFileLines(){
