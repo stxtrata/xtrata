@@ -964,11 +964,11 @@ const requestSponsoredContractCall = async (
   return normalizeTxResult(response);
 };
 
-// Xverse exposes two injected request contexts. Account permission reads use
-// BitcoinProvider/Sats Connect, while the proven Stacks transaction popup uses
-// XverseProviders.StacksProvider. Keep those roles separate: crossing the STX
-// transfer onto BitcoinProvider can make Xverse compare it against a different
-// per-origin network login and reject it as a network mismatch.
+// Xverse exposes two injected request contexts: the legacy
+// XverseProviders.StacksProvider bridge and the Sats Connect BitcoinProvider.
+// Whichever bridge established the per-origin session (our connect flow uses
+// wallet_connect on BitcoinProvider) must also carry the transaction request;
+// splitting them makes Xverse reject the transfer as "Network mismatch".
 const requestStxTransfer = async (
   provider: StacksProvider,
   options: WalletStxTransferOptions
@@ -1020,11 +1020,22 @@ const requestStxTransfer = async (
       network: connection.network
     });
   }
-  // Production's working Xverse path uses StacksProvider for this request. The
-  // sender hint is intentionally omitted: Xverse signs with its active account,
-  // which was verified above against the job payer immediately beforehand.
+  // The transfer must ride the SAME Xverse provider that holds the session.
+  // Connect (wallet_connect) and wallet_getAccount go through
+  // getXverseRpcProvider() (Sats Connect / BitcoinProvider), so the origin's
+  // permission lives there. Sending stx_transferStx through the legacy
+  // StacksProvider bridge instead hits a bridge with no session for this
+  // origin, which Xverse rejects unwrapped as "Network mismatch". The sender
+  // hint is intentionally omitted for Xverse: it signs with its active
+  // account, verified above against the job payer immediately beforehand.
   const params = buildStxTransferParams(xverse ? { ...options, stxAddress: undefined } : options);
-  const response = await requestProvider(provider, 'stx_transferStx', params);
+  const response = xverse
+    ? await requestWalletRpc(provider, 'stx_transferStx', {
+        recipient: params.recipient,
+        amount: params.amount,
+        ...(params.memo ? { memo: params.memo } : {})
+      })
+    : await requestProvider(provider, 'stx_transferStx', params);
   return normalizeTxResult(response);
 };
 

@@ -287,29 +287,24 @@ describe('wallet connect helpers', () => {
     expect(rpcProvider.request).toHaveBeenCalledOnce();
   });
 
-  it('verifies Xverse on BitcoinProvider then opens the proven StacksProvider transfer', async () => {
-    const legacyProvider = {
-      request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
-        expect(method).toBe('stx_transferStx');
-        expect(params).toMatchObject({
-          recipient: ADDRESS,
-          amount: '2550000',
-          memo: 'Xtrata Agent One',
-          network: 'mainnet',
-          sponsored: false
-        });
-        expect(params?.address).toBeUndefined();
-        return { status: 'success', result: { txid: '0xabc123' } };
-      })
-    };
+  it('verifies Xverse then sends the transfer on the same session-holding BitcoinProvider', async () => {
+    const legacyProvider = { request: vi.fn() };
     const rpcProvider = {
       request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
-        expect(method).toBe('wallet_getAccount');
-        expect(params).toEqual({ addresses: ['stacks'] });
-        return {
-          status: 'success',
-          result: { addresses: [{ address: ADDRESS, purpose: 'stacks', network: 'Mainnet' }] }
-        };
+        if (method === 'wallet_getAccount') {
+          expect(params).toEqual({ addresses: ['stacks'] });
+          return {
+            status: 'success',
+            result: { addresses: [{ address: ADDRESS, purpose: 'stacks', network: 'Mainnet' }] }
+          };
+        }
+        expect(method).toBe('stx_transferStx');
+        expect(params).toEqual({
+          recipient: ADDRESS,
+          amount: '2550000',
+          memo: 'Xtrata Agent One'
+        });
+        return { status: 'success', result: { txid: '0xabc123' } };
       })
     };
     window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
@@ -332,10 +327,11 @@ describe('wallet connect helpers', () => {
       })
     ).resolves.toMatchObject({ txId: '0xabc123' });
 
-    expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual(['wallet_getAccount']);
-    expect(legacyProvider.request.mock.calls.map(([method]) => method)).toEqual([
+    expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual([
+      'wallet_getAccount',
       'stx_transferStx'
     ]);
+    expect(legacyProvider.request).not.toHaveBeenCalled();
   });
 
   it('blocks Xverse payment when its live active account differs from the job payer', async () => {
