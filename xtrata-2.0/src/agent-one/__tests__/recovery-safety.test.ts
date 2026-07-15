@@ -37,11 +37,14 @@ describe('Agent One browser recovery safety', () => {
   it('keeps the key until both NFT and STX recovery have been verified', () => {
     const finalInventoryIndex = recoverySource.indexOf('const finalHeld = await heldInscriptions');
     const deleteKeyIndex = recoverySource.lastIndexOf('delete job.ephemeralMnemonic');
+    const indexRefreshIndex = recoverySource.indexOf('await refreshIndexedOwners(returnedTokenIds)');
 
     expect(finalInventoryIndex).toBeGreaterThan(-1);
     expect(deleteKeyIndex).toBeGreaterThan(finalInventoryIndex);
+    expect(indexRefreshIndex).toBeGreaterThan(deleteKeyIndex);
     expect(recoverySource).toContain("new Set((job.nftReturns || []).filter");
     expect(recoverySource).toContain("job.status = 'CANCELLED'");
+    expect(recoverySource).toContain('must never turn a successful asset recovery back into NEEDS_RECOVERY');
     expect(agentSource).toContain("if (j.status === 'RECOVERING')");
     expect(agentSource).toContain("j.status = 'NEEDS_RECOVERY'");
   });
@@ -52,6 +55,7 @@ describe('Agent One browser recovery safety', () => {
     expect(wizardSource).toContain('This broadcasts transfers for ${minted} known inscribed token');
     expect(wizardSource).toContain('only after the wallet is confirmed NFT-empty');
     expect(wizardSource).toContain('Keep this tab open until recovery completes.');
+    expect(wizardSource).toContain('Xplorer will live-check the owner while the index catches up.');
     expect(wizardSource).not.toContain('svc/recover-all.mjs');
   });
 });

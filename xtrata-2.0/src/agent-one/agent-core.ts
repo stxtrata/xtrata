@@ -203,7 +203,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-14.1';
+export const AGENT_BUILD = '2026-07-14.3';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -460,6 +460,37 @@ async function returnAllHeldNfts(job: any, key: string, fromAddr: string, fallba
   return out;
 }
 
+// D1 summaries are deliberately cached for fast grids, but ownership changes
+// after a confirmed transfer. Refresh exactly the recovered ids so Xplorer does
+// not keep showing the one-shot wallet as owner. This is display/index repair
+// only: recovery success never depends on it once chain ownership is verified.
+async function refreshIndexedOwners(idsIn: string[]) {
+  const ids = [...new Set(idsIn.map(String).filter((id) => /^\d+$/.test(id)))];
+  if (!ids.length) return { ok: true, refreshed: 0, ids };
+  const contractId = `${CORE[0]}.${CORE[1]}`;
+  let lastError = 'index refresh failed';
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    try {
+      const response = await fetch(
+        `/index/${encodeURIComponent(contractId)}?id=${encodeURIComponent(ids.join(','))}`,
+        { method: 'POST', signal: controller.signal, headers: { accept: 'application/json' } }
+      );
+      let body: any = null;
+      try { body = await response.json(); } catch {}
+      if (!response.ok) throw new Error(`index refresh HTTP ${response.status}${body?.error ? `: ${body.error}` : ''}`);
+      return { ok: true, refreshed: Number(body?.refreshed ?? ids.length), ids };
+    } catch (e) {
+      lastError = errMsg(e);
+      if (attempt === 0) await sleep(1500);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  return { ok: false, refreshed: 0, ids, error: lastError };
+}
+
 // Job-scoped browser recovery. The ephemeral key exists only in this browser, so
 // the server-side svc/recover-*.mjs scripts cannot recover backendless jobs.
 // Inscriptions always move first. STX is swept only after a fresh holdings query
@@ -568,6 +599,19 @@ async function recoverJobAssets(jobIn: any) {
   delete job.ephemeralMnemonic; delete job.keepKey; delete job.keepKeyReason; delete job.error;
   writeJob(job);
   xaoLog(job.jobId, `RECOVERY complete · returned tokens ${returnedTokenIds.join(', ') || 'none'} · refund ${sweep.amount || '0'} uSTX`);
+
+  // The key is already wiped and chain recovery is complete before this
+  // best-effort index repair starts. A failed refresh is recorded for diagnosis
+  // but must never turn a successful asset recovery back into NEEDS_RECOVERY.
+  const indexRefresh = await refreshIndexedOwners(returnedTokenIds);
+  job = readJob(job.jobId);
+  job.recovery = { ...(job.recovery || {}), indexRefresh };
+  if (!indexRefresh.ok) job.recoveryWarning = `Ownership index refresh pending: ${indexRefresh.error}`;
+  else delete job.recoveryWarning;
+  writeJob(job);
+  xaoLog(job.jobId, indexRefresh.ok
+    ? `ownership index refreshed for ${indexRefresh.refreshed} token${indexRefresh.refreshed === 1 ? '' : 's'}`
+    : `ownership index refresh deferred · ${indexRefresh.error}`);
   return { recovered: true, ...job.recovery };
 }
 async function sendStxRetry(key: string, amount: bigint, to: string, fee: bigint, tries = 4) { let last: any; for (let i = 0; i < tries; i++) { try { return await sendStx(key, amount, to, fee); } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(8000); continue; } throw e; } } throw last; }

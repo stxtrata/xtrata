@@ -279,6 +279,49 @@ describe('wallet connect helpers', () => {
     expect(rpcProvider.request).toHaveBeenCalledOnce();
   });
 
+  it('routes Xverse STX payments through BitcoinProvider without touching legacy auth', async () => {
+    const legacyProvider = {
+      request: vi.fn(async () => {
+        throw new Error('legacy StacksProvider must not be used for Xverse payment');
+      })
+    };
+    const rpcProvider = {
+      request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
+        expect(method).toBe('stx_transferStx');
+        expect(params).toMatchObject({
+          recipient: ADDRESS,
+          amount: '2550000',
+          memo: 'Xtrata Agent One',
+          network: 'mainnet',
+          address: ADDRESS
+        });
+        return { status: 'success', result: { txid: '0xabc123' } };
+      })
+    };
+    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
+    (
+      window as typeof window & {
+        XverseProviders?: { StacksProvider: unknown; BitcoinProvider: unknown };
+      }
+    ).XverseProviders = {
+      StacksProvider: legacyProvider,
+      BitcoinProvider: rpcProvider
+    };
+
+    await expect(
+      __testing.requestStxTransfer(legacyProvider as never, {
+        recipient: ADDRESS,
+        amount: '2550000',
+        memo: 'Xtrata Agent One',
+        network: 'mainnet',
+        stxAddress: ADDRESS
+      })
+    ).resolves.toMatchObject({ txId: '0xabc123' });
+
+    expect(legacyProvider.request).not.toHaveBeenCalled();
+    expect(rpcProvider.request).toHaveBeenCalledOnce();
+  });
+
   it('builds a sponsored origin transaction and requests signing without broadcast', async () => {
     const privateKey = createStacksPrivateKey(
       'f9d7f5e0d0d81fdd90dcef4e0e2c1b9e3ea361776a5cd91b5c9a52b98b3e1cb601'

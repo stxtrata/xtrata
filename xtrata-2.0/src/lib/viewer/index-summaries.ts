@@ -62,9 +62,12 @@ const rowToSummary = (row: IndexRow, contractId: string): TokenSummary => ({
 const fetchContractRows = async (
   origin: string,
   contractId: string,
-  ids: bigint[]
+  ids: bigint[],
+  bypassCache = false
 ): Promise<IndexRow[]> => {
-  const url = `${origin}/index/${contractId}?ids=${ids.map((id) => id.toString()).join(',')}`;
+  const url =
+    `${origin}/index/${contractId}?ids=${ids.map((id) => id.toString()).join(',')}` +
+    (bypassCache ? '&fresh=1' : '');
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`index ${contractId} HTTP ${response.status}`);
@@ -83,12 +86,14 @@ const fetchCombined = async (
   origin: string,
   primaryContractId: string,
   lineageContractIds: string[],
-  ids: bigint[]
+  ids: bigint[],
+  bypassCache = false
 ): Promise<Map<string, TokenSummary>> => {
   const url =
     `${origin}/index/page?primary=${encodeURIComponent(primaryContractId)}` +
     `&lineage=${encodeURIComponent(lineageContractIds.join(','))}` +
-    `&ids=${ids.map((id) => id.toString()).join(',')}`;
+    `&ids=${ids.map((id) => id.toString()).join(',')}` +
+    (bypassCache ? '&fresh=1' : '');
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`index page HTTP ${response.status}`);
@@ -110,14 +115,15 @@ const fetchFanOut = async (
   origin: string,
   primaryContractId: string,
   lineageContractIds: string[],
-  ids: bigint[]
+  ids: bigint[],
+  bypassCache = false
 ): Promise<Map<string, TokenSummary>> => {
   const out = new Map<string, TokenSummary>();
   const contracts = [primaryContractId, ...lineageContractIds];
   const byContract = await Promise.all(
     contracts.map(async (contractId) => {
       try {
-        const rows = await fetchContractRows(origin, contractId, ids);
+        const rows = await fetchContractRows(origin, contractId, ids, bypassCache);
         const map = new Map<string, IndexRow>();
         for (const row of rows) map.set(row.id.toString(), row);
         return { contractId, map };
@@ -147,6 +153,7 @@ export const fetchIndexedSummaries = async (params: {
   lineageContractIds: string[];
   ids: bigint[];
   origin?: string;
+  bypassCache?: boolean;
 }): Promise<Map<string, TokenSummary>> => {
   const out = new Map<string, TokenSummary>();
   if (params.ids.length === 0) return out;
@@ -159,6 +166,10 @@ export const fetchIndexedSummaries = async (params: {
   const missing: bigint[] = [];
   await Promise.all(
     params.ids.map(async (id) => {
+      if (params.bypassCache) {
+        missing.push(id);
+        return;
+      }
       const cached = await loadTokenSummaryFromCache(
         params.primaryContractId,
         id,
@@ -180,14 +191,16 @@ export const fetchIndexedSummaries = async (params: {
       origin,
       params.primaryContractId,
       params.lineageContractIds,
-      missing
+      missing,
+      params.bypassCache === true
     );
   } catch {
     fetched = await fetchFanOut(
       origin,
       params.primaryContractId,
       params.lineageContractIds,
-      missing
+      missing,
+      params.bypassCache === true
     );
   }
 
