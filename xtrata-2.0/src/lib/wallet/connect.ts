@@ -51,8 +51,6 @@ const XVERSE_MAINNET_CONNECT_PARAMS = {
   network: 'Mainnet',
   message: 'Connect to Xtrata on Stacks mainnet.'
 } as const;
-const XVERSE_MAINNET_NETWORK_NAME = 'Mainnet';
-const XVERSE_STACKS_ACCOUNT_PARAMS = { addresses: ['stacks'] } as const;
 const PLACEHOLDER_COMPRESSED_PUBLIC_KEY = `02${'00'.repeat(32)}`;
 
 type WalletRpcProvider = {
@@ -820,53 +818,41 @@ const connectXverseMainnet = async (provider: StacksProvider) =>
     await requestWalletRpc(provider, 'wallet_connect', buildXverseConnectParams())
   );
 
-const getXverseStacksAccount = async (provider: StacksProvider) =>
-  toWalletSession(
-    await requestWalletRpc(provider, 'wallet_getAccount', {
-      addresses: [...XVERSE_STACKS_ACCOUNT_PARAMS.addresses]
-    })
+const resetXverseMainnetPaymentSession = async (provider: StacksProvider) => {
+  // Xverse binds an app's read permission to the account/network that granted
+  // it. A later wallet_connect can silently reuse that stale permission, so a
+  // Mainnet hint alone is not enough to repair the session. Explicitly clear
+  // the origin permission first, then reconnect with Mainnet pinned. Do not
+  // submit a transfer unless one of the documented reset methods succeeds.
+  // eslint-disable-next-line no-console
+  console.info('[wallet:stx-transfer]', { stage: 'XVERSE_PERMISSION_RESET' });
+  const resetErrors: Error[] = [];
+  for (const method of ['wallet_disconnect', 'wallet_renouncePermissions'] as const) {
+    try {
+      await requestWalletRpc(provider, method);
+      // eslint-disable-next-line no-console
+      console.info('[wallet:stx-transfer]', {
+        stage: 'XVERSE_PERMISSION_RESET_DONE',
+        method
+      });
+      // eslint-disable-next-line no-console
+      console.info('[wallet:stx-transfer]', { stage: 'XVERSE_MAINNET_RECONNECT' });
+      return connectXverseMainnet(provider);
+    } catch (error) {
+      if (isUserCancelledError(error)) {
+        throw error;
+      }
+      resetErrors.push(providerError(error));
+    }
+  }
+
+  const details = resetErrors.map((error) => error.message).filter(Boolean).join('; ');
+  throw Object.assign(
+    new Error(
+      `Xverse could not reset this app's cached wallet session${details ? `: ${details}` : '.'}`
+    ),
+    { code: 'XVERSE_SESSION_RESET_FAILED' }
   );
-
-const ensureXverseMainnetPaymentSession = async (provider: StacksProvider) => {
-  // Do not put wallet_getNetwork in front of a user-triggered payment. Some
-  // Xverse versions expose the signing bridge but leave the newer silent
-  // permission read pending, which prevents stx_transferStx from ever opening.
-  // wallet_changeNetwork is the explicit, user-facing network guard: it is a
-  // no-op on Mainnet and prompts for a switch otherwise.
-  // eslint-disable-next-line no-console
-  console.info('[wallet:stx-transfer]', { stage: 'XVERSE_MAINNET_ENSURE' });
-  try {
-    await requestWalletRpc(provider, 'wallet_changeNetwork', {
-      name: XVERSE_MAINNET_NETWORK_NAME
-    });
-  } catch (error) {
-    if (isUserCancelledError(error)) {
-      throw error;
-    }
-    // Older Xverse versions and stale permission sessions can reject the
-    // explicit switch. Reconnect with Mainnet pinned, which is the documented
-    // compatibility path and returns the active Stacks account in one request.
-    // eslint-disable-next-line no-console
-    console.info('[wallet:stx-transfer]', {
-      stage: 'XVERSE_MAINNET_RECONNECT',
-      message: error instanceof Error ? error.message : String(error)
-    });
-    return connectXverseMainnet(provider);
-  }
-
-  // eslint-disable-next-line no-console
-  console.info('[wallet:stx-transfer]', { stage: 'XVERSE_ACCOUNT_CHECK' });
-  try {
-    const session = await getXverseStacksAccount(provider);
-    return session.isConnected ? session : connectXverseMainnet(provider);
-  } catch (error) {
-    if (isUserCancelledError(error)) {
-      throw error;
-    }
-    // Switching networks can expose an account which has not yet granted this
-    // origin read access. Connect that active Mainnet account before paying.
-    return connectXverseMainnet(provider);
-  }
 };
 
 const requestLeatherContractCall = async (
@@ -1021,15 +1007,15 @@ const requestStxTransfer = async (
   const xverse = isSelectedXverseProvider(provider);
   if (xverse) {
     // Xverse binds dApp permissions to its active network. The site's cached SP
-    // address can remain valid after Xverse changes networks, so inspect/switch
-    // the live wallet context and then re-read the account before requesting a
-    // transfer. This avoids Xverse's "active network" transaction rejection.
+    // address can remain valid after Xverse changes networks, so rebuild that
+    // permission session before requesting a transfer. This avoids submitting
+    // through a stale per-origin network login.
     // eslint-disable-next-line no-console
     console.info('[wallet:stx-transfer]', {
       stage: 'XVERSE_MAINNET_PREFLIGHT',
       expectedAddress: options.stxAddress ?? null
     });
-    const connection = await ensureXverseMainnetPaymentSession(provider);
+    const connection = await resetXverseMainnetPaymentSession(provider);
     if (!connection.isConnected || !connection.address) {
       throw Object.assign(
         new Error('Xverse did not return a Stacks mainnet account. Reconnect Xverse on Mainnet.'),
@@ -1557,7 +1543,7 @@ export const __testing = {
   buildXverseStxTransferParams,
   buildUnsignedSponsoredContractCall,
   connectViaRequest,
-  ensureXverseMainnetPaymentSession,
+  resetXverseMainnetPaymentSession,
   extractStacksAddress,
   extractStacksPublicKey,
   extractSupportedMethods,

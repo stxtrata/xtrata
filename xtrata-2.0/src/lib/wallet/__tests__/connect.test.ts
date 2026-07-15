@@ -295,12 +295,16 @@ describe('wallet connect helpers', () => {
     };
     const rpcProvider = {
       request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
-        if (method === 'wallet_changeNetwork') {
-          expect(params).toEqual({ name: 'Mainnet' });
+        if (method === 'wallet_disconnect') {
+          expect(params).toBeUndefined();
           return { status: 'success', result: null };
         }
-        if (method === 'wallet_getAccount') {
-          expect(params).toEqual({ addresses: ['stacks'] });
+        if (method === 'wallet_connect') {
+          expect(params).toEqual({
+            addresses: ['stacks'],
+            network: 'Mainnet',
+            message: 'Connect to Xtrata on Stacks mainnet.'
+          });
           return {
             status: 'success',
             result: { addresses: [{ address: ADDRESS, purpose: 'stacks', network: 'Mainnet' }] }
@@ -340,18 +344,22 @@ describe('wallet connect helpers', () => {
 
     expect(legacyProvider.request).not.toHaveBeenCalled();
     expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual([
-      'wallet_changeNetwork',
-      'wallet_getAccount',
+      'wallet_disconnect',
+      'wallet_connect',
       'stx_transferStx'
     ]);
   });
 
-  it('reconnects Xverse on Mainnet when the cached app session has no read permission', async () => {
+  it('falls back to renouncing permissions before reconnecting Xverse on Mainnet', async () => {
     const legacyProvider = { request: vi.fn() };
     const rpcProvider = {
       request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
-        if (method === 'wallet_changeNetwork') {
-          throw Object.assign(new Error('Access denied'), { code: -32001 });
+        if (method === 'wallet_disconnect') {
+          throw Object.assign(new Error('Method not found'), { code: -32601 });
+        }
+        if (method === 'wallet_renouncePermissions') {
+          expect(params).toBeUndefined();
+          return { status: 'success', result: null };
         }
         if (method === 'wallet_connect') {
           expect(params).toEqual({
@@ -388,21 +396,22 @@ describe('wallet connect helpers', () => {
     ).resolves.toMatchObject({ txId: '0xabc123' });
 
     expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual([
-      'wallet_changeNetwork',
+      'wallet_disconnect',
+      'wallet_renouncePermissions',
       'wallet_connect',
       'stx_transferStx'
     ]);
   });
 
-  it('blocks Xverse payment when its refreshed account differs from the job owner', async () => {
+  it('blocks Xverse payment when its reconnected account differs from the job owner', async () => {
     const otherAddress = 'SP1QJJVMB6NQBGMZQVDR22PADW2E3BEP61R2Z8D7V';
     const legacyProvider = { request: vi.fn() };
     const rpcProvider = {
       request: vi.fn(async (method: string) => {
-        if (method === 'wallet_changeNetwork') {
+        if (method === 'wallet_disconnect') {
           return { status: 'success', result: null };
         }
-        expect(method).toBe('wallet_getAccount');
+        expect(method).toBe('wallet_connect');
         return {
           status: 'success',
           result: {
@@ -431,8 +440,45 @@ describe('wallet connect helpers', () => {
       })
     ).rejects.toMatchObject({ code: 'XVERSE_ACCOUNT_CHANGED' });
     expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual([
-      'wallet_changeNetwork',
-      'wallet_getAccount'
+      'wallet_disconnect',
+      'wallet_connect'
+    ]);
+  });
+
+  it('does not open an Xverse transfer when the stale permission session cannot be reset', async () => {
+    const legacyProvider = { request: vi.fn() };
+    const rpcProvider = {
+      request: vi.fn(async (method: string) => {
+        if (method === 'wallet_disconnect') {
+          throw Object.assign(new Error('Disconnect unavailable'), { code: -32601 });
+        }
+        if (method === 'wallet_renouncePermissions') {
+          throw Object.assign(new Error('Permission reset unavailable'), { code: -32601 });
+        }
+        throw new Error(`Unexpected method ${method}`);
+      })
+    };
+    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
+    (
+      window as typeof window & {
+        XverseProviders?: { StacksProvider: unknown; BitcoinProvider: unknown };
+      }
+    ).XverseProviders = {
+      StacksProvider: legacyProvider,
+      BitcoinProvider: rpcProvider
+    };
+
+    await expect(
+      __testing.requestStxTransfer(legacyProvider as never, {
+        recipient: ADDRESS,
+        amount: '2550000',
+        network: 'mainnet',
+        stxAddress: ADDRESS
+      })
+    ).rejects.toMatchObject({ code: 'XVERSE_SESSION_RESET_FAILED' });
+    expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual([
+      'wallet_disconnect',
+      'wallet_renouncePermissions'
     ]);
   });
 
