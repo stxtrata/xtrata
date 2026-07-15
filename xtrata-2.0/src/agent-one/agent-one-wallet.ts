@@ -6,7 +6,7 @@
 // Build:  npx vite build -c vite.agent-one-wallet.config.ts   (from the repo root)
 
 import { createStacksWalletAdapter } from '../lib/wallet/adapter';
-import { showStxTransfer, showContractCall } from '../lib/wallet/connect';
+import { readActiveWalletSession, showStxTransfer, showContractCall } from '../lib/wallet/connect';
 import { buildTransferCall } from '../lib/contract/client';
 import { buildTransferPostCondition } from '../lib/contract/post-conditions';
 import { validateTransferRequest, getTransferValidationMessage } from '../lib/wallet/transfer';
@@ -21,6 +21,10 @@ let activePayment: Promise<void> | null = null;
 
 const XtrataWallet = {
   async connect(): Promise<string | null> {
+    // A deliberate Connect click must not reuse a stale persisted address. Clear
+    // the origin permission so Xverse presents its account selector, then save
+    // the account the user actually chooses.
+    await adapter.disconnect();
     const session = await adapter.connect();
     return session.address ?? null;
   },
@@ -30,6 +34,14 @@ const XtrataWallet = {
   getAddress(): string | null {
     const s = adapter.getSession();
     return s.isConnected ? (s.address ?? null) : null;
+  },
+  async getActiveAddress(): Promise<string | null> {
+    const live = await readActiveWalletSession();
+    if (live === null) {
+      const cached = adapter.getSession();
+      return cached.isConnected ? (cached.address ?? null) : null;
+    }
+    return live.isConnected ? (live.address ?? null) : null;
   },
   // Opens the connected wallet to transfer an xtrata inscription NFT (e.g. an escrowed parent).
   // This is the SAME proven path as the site's "Send selected inscription" (ViewerScreen/MyWallet):
@@ -115,12 +127,12 @@ const XtrataWallet = {
   },
   // Opens the connected wallet to send STX. showStxTransfer already prefers the
   // modern stx_transferStx request that current Xverse expects (legacy popup fallback).
-  pay(opts: { recipient: string; amount: string | number; network?: string }): Promise<void> {
+  pay(opts: { recipient: string; amount: string | number; network?: string; expectedSender?: string }): Promise<void> {
     if (activePayment) {
       return activePayment;
     }
     const payment = new Promise<void>((resolve, reject) => {
-      const sender = adapter.getSession().address;
+      const sender = opts.expectedSender || adapter.getSession().address;
       showStxTransfer({
         recipient: opts.recipient,
         amount: String(opts.amount),

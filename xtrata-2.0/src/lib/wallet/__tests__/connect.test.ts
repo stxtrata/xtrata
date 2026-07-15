@@ -287,39 +287,29 @@ describe('wallet connect helpers', () => {
     expect(rpcProvider.request).toHaveBeenCalledOnce();
   });
 
-  it('routes Xverse STX payments through BitcoinProvider without touching legacy auth', async () => {
+  it('verifies Xverse on BitcoinProvider then opens the proven StacksProvider transfer', async () => {
     const legacyProvider = {
-      request: vi.fn(async () => {
-        throw new Error('legacy StacksProvider must not be used for Xverse payment');
-      })
-    };
-    const rpcProvider = {
       request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
-        if (method === 'wallet_disconnect') {
-          expect(params).toBeUndefined();
-          return { status: 'success', result: null };
-        }
-        if (method === 'wallet_connect') {
-          expect(params).toEqual({
-            addresses: ['stacks'],
-            network: 'Mainnet',
-            message: 'Connect to Xtrata on Stacks mainnet.'
-          });
-          return {
-            status: 'success',
-            result: { addresses: [{ address: ADDRESS, purpose: 'stacks', network: 'Mainnet' }] }
-          };
-        }
         expect(method).toBe('stx_transferStx');
         expect(params).toMatchObject({
           recipient: ADDRESS,
           amount: '2550000',
-          memo: 'Xtrata Agent One'
+          memo: 'Xtrata Agent One',
+          network: 'mainnet',
+          sponsored: false
         });
-        expect(params).not.toHaveProperty('network');
-        expect(params).not.toHaveProperty('address');
-        expect(params).not.toHaveProperty('sponsored');
+        expect(params?.address).toBeUndefined();
         return { status: 'success', result: { txid: '0xabc123' } };
+      })
+    };
+    const rpcProvider = {
+      request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
+        expect(method).toBe('wallet_getAccount');
+        expect(params).toEqual({ addresses: ['stacks'] });
+        return {
+          status: 'success',
+          result: { addresses: [{ address: ADDRESS, purpose: 'stacks', network: 'Mainnet' }] }
+        };
       })
     };
     window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
@@ -342,76 +332,18 @@ describe('wallet connect helpers', () => {
       })
     ).resolves.toMatchObject({ txId: '0xabc123' });
 
-    expect(legacyProvider.request).not.toHaveBeenCalled();
-    expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual([
-      'wallet_disconnect',
-      'wallet_connect',
+    expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual(['wallet_getAccount']);
+    expect(legacyProvider.request.mock.calls.map(([method]) => method)).toEqual([
       'stx_transferStx'
     ]);
   });
 
-  it('falls back to renouncing permissions before reconnecting Xverse on Mainnet', async () => {
-    const legacyProvider = { request: vi.fn() };
-    const rpcProvider = {
-      request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
-        if (method === 'wallet_disconnect') {
-          throw Object.assign(new Error('Method not found'), { code: -32601 });
-        }
-        if (method === 'wallet_renouncePermissions') {
-          expect(params).toBeUndefined();
-          return { status: 'success', result: null };
-        }
-        if (method === 'wallet_connect') {
-          expect(params).toEqual({
-            addresses: ['stacks'],
-            network: 'Mainnet',
-            message: 'Connect to Xtrata on Stacks mainnet.'
-          });
-          return {
-            status: 'success',
-            result: { addresses: [{ address: ADDRESS, purpose: 'stacks', network: 'Mainnet' }] }
-          };
-        }
-        expect(method).toBe('stx_transferStx');
-        return { status: 'success', result: { txid: '0xabc123' } };
-      })
-    };
-    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
-    (
-      window as typeof window & {
-        XverseProviders?: { StacksProvider: unknown; BitcoinProvider: unknown };
-      }
-    ).XverseProviders = {
-      StacksProvider: legacyProvider,
-      BitcoinProvider: rpcProvider
-    };
-
-    await expect(
-      __testing.requestStxTransfer(legacyProvider as never, {
-        recipient: ADDRESS,
-        amount: '2550000',
-        network: 'mainnet',
-        stxAddress: ADDRESS
-      })
-    ).resolves.toMatchObject({ txId: '0xabc123' });
-
-    expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual([
-      'wallet_disconnect',
-      'wallet_renouncePermissions',
-      'wallet_connect',
-      'stx_transferStx'
-    ]);
-  });
-
-  it('blocks Xverse payment when its reconnected account differs from the job owner', async () => {
+  it('blocks Xverse payment when its live active account differs from the job payer', async () => {
     const otherAddress = 'SP1QJJVMB6NQBGMZQVDR22PADW2E3BEP61R2Z8D7V';
     const legacyProvider = { request: vi.fn() };
     const rpcProvider = {
       request: vi.fn(async (method: string) => {
-        if (method === 'wallet_disconnect') {
-          return { status: 'success', result: null };
-        }
-        expect(method).toBe('wallet_connect');
+        expect(method).toBe('wallet_getAccount');
         return {
           status: 'success',
           result: {
@@ -439,23 +371,53 @@ describe('wallet connect helpers', () => {
         stxAddress: ADDRESS
       })
     ).rejects.toMatchObject({ code: 'XVERSE_ACCOUNT_CHANGED' });
-    expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual([
-      'wallet_disconnect',
-      'wallet_connect'
-    ]);
+    expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual(['wallet_getAccount']);
+    expect(legacyProvider.request).not.toHaveBeenCalled();
   });
 
-  it('does not open an Xverse transfer when the stale permission session cannot be reset', async () => {
+  it('does not open an Xverse transfer when its active account permission is unavailable', async () => {
     const legacyProvider = { request: vi.fn() };
     const rpcProvider = {
       request: vi.fn(async (method: string) => {
-        if (method === 'wallet_disconnect') {
-          throw Object.assign(new Error('Disconnect unavailable'), { code: -32601 });
-        }
-        if (method === 'wallet_renouncePermissions') {
-          throw Object.assign(new Error('Permission reset unavailable'), { code: -32601 });
-        }
-        throw new Error(`Unexpected method ${method}`);
+        expect(method).toBe('wallet_getAccount');
+        throw Object.assign(new Error('Access denied'), { code: -32001 });
+      })
+    };
+    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
+    (
+      window as typeof window & {
+        XverseProviders?: { StacksProvider: unknown; BitcoinProvider: unknown };
+      }
+    ).XverseProviders = {
+      StacksProvider: legacyProvider,
+      BitcoinProvider: rpcProvider
+    };
+
+    await expect(
+      __testing.requestStxTransfer(legacyProvider as never, {
+        recipient: ADDRESS,
+        amount: '2550000',
+        memo: 'Xtrata Agent One',
+        network: 'mainnet',
+        stxAddress: ADDRESS
+      })
+    ).rejects.toMatchObject({ code: 'XVERSE_ACTIVE_ACCOUNT_UNAVAILABLE' });
+    expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual(['wallet_getAccount']);
+    expect(legacyProvider.request).not.toHaveBeenCalled();
+  });
+
+  it('does not open an Xverse transfer when the active account is not on Mainnet', async () => {
+    const testnetAddress = 'ST10W2EEM757922QTVDZZ5CSEW55JEFNN33V2E7YA';
+    const legacyProvider = { request: vi.fn() };
+    const rpcProvider = {
+      request: vi.fn(async (method: string) => {
+        expect(method).toBe('wallet_getAccount');
+        return {
+          status: 'success',
+          result: {
+            addresses: [{ address: testnetAddress, purpose: 'stacks', network: 'Testnet' }]
+          }
+        };
       })
     };
     window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
@@ -475,11 +437,9 @@ describe('wallet connect helpers', () => {
         network: 'mainnet',
         stxAddress: ADDRESS
       })
-    ).rejects.toMatchObject({ code: 'XVERSE_SESSION_RESET_FAILED' });
-    expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual([
-      'wallet_disconnect',
-      'wallet_renouncePermissions'
-    ]);
+    ).rejects.toMatchObject({ code: 'XVERSE_MAINNET_SESSION_UNAVAILABLE' });
+    expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual(['wallet_getAccount']);
+    expect(legacyProvider.request).not.toHaveBeenCalled();
   });
 
   it('builds a sponsored origin transaction and requests signing without broadcast', async () => {

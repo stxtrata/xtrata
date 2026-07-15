@@ -797,62 +797,31 @@ const buildStxTransferParams = (options: WalletStxTransferOptions) => ({
   sponsored: options.sponsored ?? false
 });
 
-// Xverse's current Sats Connect stx_transferStx contract accepts only these
-// fields. Supplying generic Stacks `network`/`address` hints makes Xverse
-// compare differently encoded network values and reject a mainnet transfer as
-// "Network mismatch".
-const buildXverseStxTransferParams = (options: WalletStxTransferOptions) => ({
-  recipient: options.recipient,
-  amount: normalizeBigIntLike(options.amount) ?? '0',
-  ...(options.memo ? { memo: options.memo } : {})
-});
-
 const buildXverseConnectParams = () => ({
   addresses: [...XVERSE_MAINNET_CONNECT_PARAMS.addresses],
   network: XVERSE_MAINNET_CONNECT_PARAMS.network,
   message: XVERSE_MAINNET_CONNECT_PARAMS.message
 });
 
-const connectXverseMainnet = async (provider: StacksProvider) =>
+const getXverseActiveAccount = async (provider: StacksProvider) =>
   toWalletSession(
-    await requestWalletRpc(provider, 'wallet_connect', buildXverseConnectParams())
+    await requestWalletRpc(provider, 'wallet_getAccount', {
+      addresses: [...XVERSE_MAINNET_CONNECT_PARAMS.addresses]
+    })
   );
 
-const resetXverseMainnetPaymentSession = async (provider: StacksProvider) => {
-  // Xverse binds an app's read permission to the account/network that granted
-  // it. A later wallet_connect can silently reuse that stale permission, so a
-  // Mainnet hint alone is not enough to repair the session. Explicitly clear
-  // the origin permission first, then reconnect with Mainnet pinned. Do not
-  // submit a transfer unless one of the documented reset methods succeeds.
-  // eslint-disable-next-line no-console
-  console.info('[wallet:stx-transfer]', { stage: 'XVERSE_PERMISSION_RESET' });
-  const resetErrors: Error[] = [];
-  for (const method of ['wallet_disconnect', 'wallet_renouncePermissions'] as const) {
-    try {
-      await requestWalletRpc(provider, method);
-      // eslint-disable-next-line no-console
-      console.info('[wallet:stx-transfer]', {
-        stage: 'XVERSE_PERMISSION_RESET_DONE',
-        method
-      });
-      // eslint-disable-next-line no-console
-      console.info('[wallet:stx-transfer]', { stage: 'XVERSE_MAINNET_RECONNECT' });
-      return connectXverseMainnet(provider);
-    } catch (error) {
-      if (isUserCancelledError(error)) {
-        throw error;
-      }
-      resetErrors.push(providerError(error));
-    }
+export const readActiveWalletSession = async (): Promise<WalletSession | null> => {
+  const provider = getStacksProvider();
+  if (!provider) {
+    return disconnectedSession();
   }
-
-  const details = resetErrors.map((error) => error.message).filter(Boolean).join('; ');
-  throw Object.assign(
-    new Error(
-      `Xverse could not reset this app's cached wallet session${details ? `: ${details}` : '.'}`
-    ),
-    { code: 'XVERSE_SESSION_RESET_FAILED' }
-  );
+  // Other providers retain their existing adapter-backed restore behaviour.
+  // Xverse needs a live read because its active account can change while the
+  // site's persisted SP address remains unchanged.
+  if (!isSelectedXverseProvider(provider)) {
+    return null;
+  }
+  return getXverseActiveAccount(provider);
 };
 
 const requestLeatherContractCall = async (
@@ -995,30 +964,41 @@ const requestSponsoredContractCall = async (
   return normalizeTxResult(response);
 };
 
-// Keep Xverse on the same modern BitcoinProvider RPC bridge used for
-// wallet_connect. Calling stx_transferStx on XverseProviders.StacksProvider
-// falls back into the legacy @stacks/auth UserSession flow, where loadUserData()
-// necessarily fails because a modern wallet_connect does not create that
-// legacy session. Leather and other providers continue through requestProvider.
+// Xverse exposes two injected request contexts. Account permission reads use
+// BitcoinProvider/Sats Connect, while the proven Stacks transaction popup uses
+// XverseProviders.StacksProvider. Keep those roles separate: crossing the STX
+// transfer onto BitcoinProvider can make Xverse compare it against a different
+// per-origin network login and reject it as a network mismatch.
 const requestStxTransfer = async (
   provider: StacksProvider,
   options: WalletStxTransferOptions
 ) => {
   const xverse = isSelectedXverseProvider(provider);
   if (xverse) {
-    // Xverse binds dApp permissions to its active network. The site's cached SP
-    // address can remain valid after Xverse changes networks, so rebuild that
-    // permission session before requesting a transfer. This avoids submitting
-    // through a stale per-origin network login.
     // eslint-disable-next-line no-console
     console.info('[wallet:stx-transfer]', {
-      stage: 'XVERSE_MAINNET_PREFLIGHT',
+      stage: 'XVERSE_ACTIVE_ACCOUNT_CHECK',
       expectedAddress: options.stxAddress ?? null
     });
-    const connection = await resetXverseMainnetPaymentSession(provider);
+    let connection: WalletSession;
+    try {
+      connection = await getXverseActiveAccount(provider);
+    } catch (error) {
+      if (isUserCancelledError(error)) {
+        throw error;
+      }
+      throw Object.assign(
+        new Error(
+          'Xverse could not verify its active account. Reconnect the wallet and select the account locked to this job.'
+        ),
+        { code: 'XVERSE_ACTIVE_ACCOUNT_UNAVAILABLE', cause: providerError(error) }
+      );
+    }
     if (!connection.isConnected || !connection.address) {
       throw Object.assign(
-        new Error('Xverse did not return a Stacks mainnet account. Reconnect Xverse on Mainnet.'),
+        new Error(
+          'Xverse is not exposing an active Stacks Mainnet account. Reconnect and select the account locked to this job.'
+        ),
         { code: 'XVERSE_MAINNET_SESSION_UNAVAILABLE' }
       );
     }
@@ -1035,17 +1015,16 @@ const requestStxTransfer = async (
     }
     // eslint-disable-next-line no-console
     console.info('[wallet:stx-transfer]', {
-      stage: 'XVERSE_MAINNET_READY',
+      stage: 'XVERSE_ACTIVE_ACCOUNT_READY',
       address: connection.address,
       network: connection.network
     });
   }
-  const params = xverse ? buildXverseStxTransferParams(options) : buildStxTransferParams(options);
-  const response = await requestWalletRpc(
-    provider,
-    'stx_transferStx',
-    params
-  );
+  // Production's working Xverse path uses StacksProvider for this request. The
+  // sender hint is intentionally omitted: Xverse signs with its active account,
+  // which was verified above against the job payer immediately beforehand.
+  const params = buildStxTransferParams(xverse ? { ...options, stxAddress: undefined } : options);
+  const response = await requestProvider(provider, 'stx_transferStx', params);
   return normalizeTxResult(response);
 };
 
@@ -1540,10 +1519,9 @@ export const __testing = {
   buildContractDeployParams,
   buildStxTransferParams,
   buildXverseConnectParams,
-  buildXverseStxTransferParams,
   buildUnsignedSponsoredContractCall,
   connectViaRequest,
-  resetXverseMainnetPaymentSession,
+  getXverseActiveAccount,
   extractStacksAddress,
   extractStacksPublicKey,
   extractSupportedMethods,

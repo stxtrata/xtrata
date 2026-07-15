@@ -648,7 +648,7 @@
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=14"></script>
+<script src="agent-one.js?v=15"></script>
 <script src="optimize-audio.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script>
@@ -691,12 +691,17 @@ async function api(path, opts){
 function copyBtn(text){ return `<button class="copy" onclick="navigator.clipboard.writeText('${esc(text)}');this.textContent='copied'">copy</button>`; }
 function xtrataWallet(){ return window.XtrataWallet || null; }
 let WALLET_PAYMENT_PENDING=false;
-async function openWallet(addr, ustx){
+async function openWallet(addr, ustx, expectedSender){
   if(WALLET_PAYMENT_PENDING) return;
   const w=xtrataWallet();
   if(!w||!w.pay){ alert('Wallet bundle not loaded.\nCopy the address and amount shown and send manually.'); return; }
   WALLET_PAYMENT_PENDING=true;
-  try{ await w.pay({ recipient:addr, amount:String(ustx), network:(SERVER.net==='testnet'?'testnet':'mainnet') }); }
+  try{
+    let active=await syncActiveWallet();
+    if(expectedSender&&active!==expectedSender) active=await connectWallet();
+    if(expectedSender&&active!==expectedSender) throw new Error('This job is locked to '+expectedSender+', but Xverse is using '+(active||'no connected Mainnet account')+'. Select the locked account in Xverse before paying.');
+    await w.pay({ recipient:addr, amount:String(ustx), network:(SERVER.net==='testnet'?'testnet':'mainnet'), expectedSender:expectedSender||active||undefined });
+  }
   catch(e){ alert('Could not open the wallet to pay:\n'+((e&&e.message)||e)+'\n\nCopy the address and amount shown and send manually.'); }
   finally{ WALLET_PAYMENT_PENDING=false; }
 }
@@ -734,12 +739,17 @@ async function connectWallet(){
   catch(e){ alert('Connect failed:\n'+((e&&e.message)||e)); return null; }
 }
 async function disconnectWallet(){ try{ const w=xtrataWallet(); if(w&&w.disconnect) await w.disconnect(); }catch{} setWallet(null); }
+async function syncActiveWallet(){
+  const w=xtrataWallet();
+  if(!w||!w.getActiveAddress) return WALLET;
+  try{ const active=await w.getActiveAddress(); if(active!==WALLET) setWallet(active); return active||null; }
+  catch{ setWallet(null); return null; }
+}
 $('#connectBtn').onclick=()=>{ WALLET?disconnectWallet():connectWallet(); };
 $('#walletAddr').onclick=walletPillClick;
-// Restore a previously connected wallet. Deferred via queueMicrotask so it runs after
-// this whole script evaluates — setWallet() calls checkParents()/checkBatchParents(),
-// which reference BATCH / parentsCheckRun declared further down (TDZ ReferenceError otherwise).
-queueMicrotask(()=>{ try{ const w=xtrataWallet(); const a=w&&w.getAddress&&w.getAddress(); if(a) setWallet(a); }catch{} });
+// Restore from Xverse's live active account, never just the persisted app
+// address. Deferred so setWallet() runs after the batch/parent declarations.
+queueMicrotask(()=>{ syncActiveWallet().catch(()=>setWallet(null)); });
 
 // ---- category/type autodetect ----
 const catSel=$('#category'), ftSel=$('#ftype');
@@ -1135,7 +1145,9 @@ async function batchUnownedParents(){
 }
 $('#batchInscribeBtn').onclick=async()=>{
   const err=$('#batchErr'); err.textContent='';
-  if(!WALLET){ err.textContent='Connect your wallet (top-right) — the batch fast-tracks: everything returns to the wallet you pay from.'; connectWallet(); return; }
+  let activeWallet=await syncActiveWallet();
+  if(!activeWallet) activeWallet=await connectWallet();
+  if(!activeWallet){ err.textContent='Connect the Xverse account that will fund this batch — everything returns to that same account.'; return; }
   const shared=$('#batchParents').value.split(',').map(s=>s.trim()).filter(Boolean);
   if(!shared.every(d=>/^\d+$/.test(d))){ err.textContent='Shared parents must be token-id uints.'; return; }
   const batchRecipient=$('#batchRecipient').value.trim();
@@ -1357,7 +1369,9 @@ $('#inscribeBtn').onclick=async()=>{
   if(!deps.every(d=>/^\d+$/.test(d))){ err.textContent='Dependencies must be token-id uints.'; return; }
   if(!parents.every(d=>/^\d+$/.test(d))){ err.textContent='Parents must be token-id uints.'; return; }
   if(new Set(parents).size!==parents.length){ err.textContent='Duplicate parent token ids.'; return; }
-  if(!WALLET){ const a=await connectWallet(); if(!a){ err.textContent='Connect your wallet — you pay from it and your change returns to it.'; return; } }
+  let activeWallet=await syncActiveWallet();
+  if(!activeWallet) activeWallet=await connectWallet();
+  if(!activeWallet){ err.textContent='Connect the Xverse account that will pay — the job and every return are locked to that account.'; return; }
   if(differentAddr&&!ADDR_RE.test(recipientAddr)){ err.textContent='Inscription recipient must be a valid SP…/SM… principal (or untick “send to a different address”).'; return; }
   $('#inscribeBtn').disabled=true;
   try{
@@ -1370,7 +1384,7 @@ $('#inscribeBtn').onclick=async()=>{
     FLOW.jobId=job.jobId; FLOW.done=false;
     setStep('pay');
     startJobsPoll(); jobsTick();
-    if(!SERVER.mock){ openWallet(job.depositAddress, job.requiredUstx); }
+    if(!SERVER.mock){ openWallet(job.depositAddress, job.requiredUstx, job.expectedFunder||job.user); }
     setTimeout(()=>{ const el=$('#activeJobDetail'); if(el&&el.firstChild) el.scrollIntoView({behavior:'smooth',block:'start'}); },250);
   }catch(e){ err.textContent=e.message; $('#inscribeBtn').disabled=false; }
 };
@@ -1494,7 +1508,7 @@ async function renderJobDetail(jobId,out,isActive){
       ${batchPanel}
       ${showDeposit?`<div class="kv"><span>Deposit address ${copyBtn(job.depositAddress)}</span><span>${esc(job.depositAddress)}</span></div>
       <div class="kv"><span>Send exactly</span><span class="big-num" style="font-size:19px">${stx(status.requiredUstx)}</span></div>
-      ${!job.mock?`<div class="btnrow"><button class="btn" onclick="openWallet('${esc(job.depositAddress)}','${esc(status.requiredUstx)}')">Open wallet to pay ${stx(status.requiredUstx)}</button></div>`:''}
+      ${!job.mock?`<div class="btnrow"><button class="btn" onclick="openWallet('${esc(job.depositAddress)}','${esc(status.requiredUstx)}','${esc(job.expectedFunder||job.user||'')}')">Open wallet to pay ${stx(status.requiredUstx)}</button></div>`:''}
       ${job.fastTrack&&job.expectedFunder?`<div class="kv"><span>Pay from this wallet only ${copyBtn(job.expectedFunder)}</span><span class="mono" style="color:var(--ok)">${esc(job.expectedFunder)}</span></div>
       <div class="muted" style="font-size:12px;margin-top:6px;color:var(--warn)">⚠ Locked to the wallet above. A payment from any other wallet is automatically returned to the sender — nothing is inscribed.</div>`:''}
       <div class="muted" style="font-size:12px;margin-top:8px">↩︎ Guaranteed temporary — if not funded &amp; started in time, this auto-cancels and returns any funds${parents.length?' <b>and inscriptions</b>':''}. ${isActive?'<b id="expT"></b>':''}</div>`:''}
