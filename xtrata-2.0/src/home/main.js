@@ -67,6 +67,8 @@
       pollSponsorJob,
       submitSponsorClaimWithRetry
     } from '/src/lib/drops/sponsored-claim.ts';
+    import { getDropsCollectionLockForDrop } from '/src/lib/drops/collection-lock.ts';
+    import { loadDropsActivity } from '/src/lib/drops/history.ts';
     import {
       getMarketListingPublicBlockReason,
       isMarketListingPubliclyBuyable
@@ -11315,6 +11317,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const dropsState = {
       run: 0,
       drops: [],
+      historyEvents: [],
       claimRound: 0,
       claimsInFlight: new Set(),
       recentlyClaimed: new Set(),
@@ -11452,6 +11455,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       return readBoolValue(json);
     };
 
+    const hasClaimedAnyDropGroup = async (drop, claimerAddress, groupIds) => {
+      for (const groupId of groupIds) {
+        const claimed = await hasClaimedDropGroup({ ...drop, groupId }, claimerAddress);
+        if (claimed) return groupId;
+      }
+      return null;
+    };
+
     const readDrops = async (entry) => {
       const contractId = `${entry.address}.${entry.contractName}`;
       const lastJson = await callReadOnlyJson({
@@ -11540,13 +11551,22 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
       try {
         dropsDom.status.innerHTML = '<span><strong>Drops</strong> checking whether this wallet has already claimed from this campaign…</span>';
-        const alreadyClaimedGroup = await hasClaimedDropGroup(drop, state.walletSession.address);
-        if (alreadyClaimedGroup) {
-          dropsDom.status.innerHTML = '<span><strong>Drops</strong> this wallet has already claimed a free drop from this campaign group.</span><span class="badge amber">one per wallet</span>';
+        const collectionLock = getDropsCollectionLockForDrop({
+          contractId: drop.contractId,
+          creator: drop.creator,
+          dropId: drop.dropId,
+          groupId: drop.groupId
+        });
+        const claimedGroup = collectionLock
+          ? await hasClaimedAnyDropGroup(drop, state.walletSession.address, collectionLock.groupIds)
+          : (await hasClaimedDropGroup(drop, state.walletSession.address) ? drop.groupId : null);
+        if (claimedGroup !== null) {
+          const lockLabel = collectionLock?.label ?? 'this campaign group';
+          dropsDom.status.innerHTML = `<span><strong>Drops</strong> this wallet has already claimed a free drop from ${lockLabel}.</span><span class="badge amber">one per wallet</span>`;
           recordDropDiagnostic(
             round,
             'GROUP_LIMIT',
-            `Wallet ${state.walletSession.address} already claimed campaign group ${drop.groupId} from ${drop.creator}.`,
+            `Wallet ${state.walletSession.address} already claimed campaign group ${claimedGroup} from ${drop.creator}.`,
             'warn'
           );
           return;
@@ -11820,7 +11840,35 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
     const renderDropsHistory = () => {
       if (!dropsDom.historyList) return;
-      const drops = dropsState.drops.slice(0, DROPS_DISPLAY_LIMIT);
+      const dropEntries = dropsEntriesForNetwork();
+      const fallbackEntry = dropEntries[0] ?? null;
+      const byDropId = new Map();
+      for (const drop of dropsState.drops) {
+        byDropId.set(drop.dropId.toString(), { ...drop, historyType: 'active', txId: null });
+      }
+      const claimEvents = dropsState.historyEvents.filter((event) => event.type === 'claim');
+      for (const event of claimEvents) {
+        const key = event.dropId.toString();
+        const existing = byDropId.get(key);
+        byDropId.set(key, {
+          ...(existing ?? {}),
+          entry: existing?.entry ?? fallbackEntry,
+          contractId: existing?.contractId ?? (fallbackEntry ? getContractId(fallbackEntry) : ''),
+          dropId: event.dropId,
+          listingId: event.dropId,
+          creator: event.creator ?? existing?.creator ?? '',
+          nftContract: event.nftContract ?? existing?.nftContract ?? '',
+          tokenId: event.tokenId ?? existing?.tokenId ?? 0n,
+          groupId: event.groupId ?? existing?.groupId ?? 0n,
+          claimer: event.claimer ?? existing?.claimer ?? null,
+          claimedAt: event.blockHeight ? BigInt(event.blockHeight) : (existing?.claimedAt ?? null),
+          txId: event.txId ?? existing?.txId ?? null,
+          historyType: 'claim'
+        });
+      }
+      const drops = Array.from(byDropId.values())
+        .sort((a, b) => (b.dropId > a.dropId ? 1 : -1))
+        .slice(0, DROPS_DISPLAY_LIMIT * 2);
       if (!drops.length) {
         dropsDom.historyList.replaceChildren(
           Object.assign(document.createElement('p'), {
@@ -11834,7 +11882,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         ...drops.map((drop) => {
           const row = document.createElement('article');
           row.className = 'drops-history__row';
-          const claimed = drop.claimedAt !== null;
+          const claimed = drop.historyType === 'claim' || drop.claimedAt !== null;
           row.dataset.status = claimed ? 'claimed' : 'live';
 
           const main = document.createElement('div');
@@ -11874,9 +11922,16 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           viewLink.textContent = 'View';
           const dropLink = document.createElement('a');
           dropLink.className = 'market-chip';
-          dropLink.href = `/drops?drop=${drop.tokenId}`;
-          dropLink.target = '_self';
-          dropLink.textContent = 'Open drop';
+          if (claimed && drop.txId) {
+            dropLink.href = `https://explorer.hiro.so/txid/${encodeURIComponent(drop.txId)}?chain=${drop.entry?.network ?? state.contract.network}`;
+            dropLink.target = '_blank';
+            dropLink.rel = 'noopener noreferrer';
+            dropLink.textContent = 'Claim tx';
+          } else {
+            dropLink.href = `/drops?drop=${drop.tokenId}`;
+            dropLink.target = '_self';
+            dropLink.textContent = 'Open drop';
+          }
           actions.append(viewLink, dropLink);
 
           row.append(main, claim, actions);
@@ -12185,10 +12240,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       dropsDom.status.innerHTML = '<span><strong>Drops</strong> loading…</span>';
       try {
         const perContract = await Promise.all(
-          dropsEntriesForNetwork().map((entry) => readDrops(entry).catch(() => []))
+          dropsEntriesForNetwork().map(async (entry) => ({
+            drops: await readDrops(entry).catch(() => []),
+            history: await loadDropsActivity({ contract: entry }).catch(() => ({ events: [] }))
+          }))
         );
         if (run !== dropsState.run) return;
-        dropsState.drops = perContract.flat().sort((a, b) => (b.dropId > a.dropId ? 1 : -1));
+        dropsState.drops = perContract.flatMap((item) => item.drops).sort((a, b) => (b.dropId > a.dropId ? 1 : -1));
+        dropsState.historyEvents = perContract.flatMap((item) => item.history.events ?? []);
         renderDrops();
       } catch (error) {
         if (run !== dropsState.run) return;

@@ -188,6 +188,7 @@ let failBroadcast = false;
 let transactionKnown = true;
 let transactionStatus = 'success';
 let feeRate = 1;
+let collectionAlreadyClaimed = false;
 
 const stubFetch = () => {
   broadcasts.length = 0;
@@ -198,6 +199,7 @@ const stubFetch = () => {
   transactionKnown = true;
   transactionStatus = 'success';
   feeRate = 1;
+  collectionAlreadyClaimed = false;
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.includes('/v2/fees/transfer')) return new Response(String(feeRate), { status: 200 });
@@ -213,6 +215,9 @@ const stubFetch = () => {
     if (url.includes('/nonces')) return Response.json({ possible_next_nonce: 5 });
     if (url.includes('/get-listing')) {
       return Response.json({ okay: true, result: cvToHex(listingTuple()) });
+    }
+    if (url.includes('/has-claimed-in-group')) {
+      return Response.json({ okay: true, result: cvToHex(Cl.bool(collectionAlreadyClaimed)) });
     }
     if (url.includes('/extended/v1/tx/')) {
       return transactionKnown
@@ -370,6 +375,22 @@ describe('sponsor relayer Pages handler', () => {
       })
     );
     consoleWarn.mockRestore();
+  });
+
+  it('rejects a locked collection drop when the wallet already claimed another group in the batch', async () => {
+    collectionAlreadyClaimed = true;
+    const res = await submit(env, {
+      txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 32n, nonce: 0n }),
+      contractId: DROPS,
+      listingId: '32'
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      code: 'COLLECTION_LIMIT',
+      stage: 'COLLECTION_LOCK',
+      message: 'wallet already claimed from Dropped collection; one free drop per address'
+    });
+    expect(broadcasts).toHaveLength(0);
   });
 
   it('releases an unbroadcast reservation so the same Xverse payload can retry', async () => {

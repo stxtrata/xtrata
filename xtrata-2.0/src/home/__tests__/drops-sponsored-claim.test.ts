@@ -30,6 +30,8 @@ describe('public Drops sponsored-claim surface', () => {
     expect(homeMain).toContain('fetchAddressNonce(');
     expect(homeMain).toContain('inspectSponsoredClaimTransaction(payload');
     expect(homeMain).toContain('submitSponsorClaimWithRetry({');
+    expect(homeMain).toContain("import { getDropsCollectionLockForDrop } from '/src/lib/drops/collection-lock.ts'");
+    expect(homeMain).toContain("import { loadDropsActivity } from '/src/lib/drops/history.ts'");
     expect(homeMain).toContain("'RELAYER_RETRY'");
     expect(homeMain).toContain('sponsor relayer is temporarily slow');
     expect(homeMain).toContain('Your wallet signature is valid; retrying safely');
@@ -59,9 +61,13 @@ describe('public Drops sponsored-claim surface', () => {
     expect(homeMain).toContain('stopped drop scan at safety cap');
     expect(homeMain).toContain('wallet changed. This drop can only be cancelled by its creator');
     expect(homeMain).toContain('renderDrops();');
+    expect(homeMain).toContain('hasClaimedAnyDropGroup');
+    expect(homeMain).toContain('this wallet has already claimed a free drop from ${lockLabel}');
+    expect(homeMain).toContain('dropsState.historyEvents');
+    expect(homeMain).toContain('Claim tx');
     expect(homeMain).toContain("functionName: 'has-claimed-in-group'");
     expect(homeMain).toContain("'GROUP_LIMIT'");
-    expect(homeMain).toContain('already claimed a free drop from this campaign group');
+    expect(homeMain).toContain('already claimed a free drop from ${lockLabel}');
     expect(homeMain).toContain(': DEFAULT_DROP_GROUP_ID');
     expect(homeMain).not.toContain('dropClaimSelfPaid');
     expect(homeMain).not.toContain('claiming self-paid instead');
