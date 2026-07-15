@@ -57,6 +57,8 @@ describe('public Drops sponsored-claim surface', () => {
     expect(homeMain).toContain('const DROPS_DISPLAY_LIMIT = 25');
     expect(homeMain).toContain('results.length < DROPS_DISPLAY_LIMIT');
     expect(homeMain).toContain('stopped drop scan at safety cap');
+    expect(homeMain).toContain('wallet changed. This drop can only be cancelled by its creator');
+    expect(homeMain).toContain('renderDrops();');
     expect(homeMain).toContain("functionName: 'has-claimed-in-group'");
     expect(homeMain).toContain("'GROUP_LIMIT'");
     expect(homeMain).toContain('already claimed a free drop from this campaign group');

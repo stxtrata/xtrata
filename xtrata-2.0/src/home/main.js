@@ -9271,6 +9271,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         refreshConnectedWalletMatureMode();
         appendLog(state.walletSession.address ? `Wallet connected: ${truncateMiddle(state.walletSession.address)}` : 'Wallet connection cancelled.');
         updateWalletStatus();
+        if (PAGE_MODE === 'drops') {
+          renderDrops();
+        }
         await fetchAdminStatus();
         await refreshParentChecks();
         if (state.prepared) {
@@ -9330,6 +9333,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         state.uploadState = null;
         appendLog('Wallet disconnected.');
         updateWalletStatus();
+        if (PAGE_MODE === 'drops') {
+          renderDrops();
+        }
         await fetchAdminStatus();
         await refreshParentChecks();
         await loadWalletInscriptions();
@@ -11933,7 +11939,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
           const actions = document.createElement('div');
           actions.className = 'market-card__actions';
-          const isMine = state.walletSession.address === drop.creator;
+          const isMine = state.walletSession.address && addressesEqual(state.walletSession.address, drop.creator);
           if (claimed) {
             const claimedButton = document.createElement('button');
             claimedButton.type = 'button';
@@ -11948,6 +11954,16 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             cancelBtn.className = 'market-chip';
             cancelBtn.textContent = 'Cancel drop (reclaim)';
             cancelBtn.addEventListener('click', () => {
+              if (!state.walletSession.isConnected || !state.walletSession.address) {
+                dropsDom.status.innerHTML = '<span><strong>Drops</strong> connect the creator wallet to cancel this drop.</span>';
+                renderDrops();
+                return;
+              }
+              if (!addressesEqual(state.walletSession.address, drop.creator)) {
+                dropsDom.status.innerHTML = '<span><strong>Drops</strong> wallet changed. This drop can only be cancelled by its creator; refreshing actions now.</span><span class="badge amber">wallet changed</span>';
+                renderDrops();
+                return;
+              }
               const [nftAddress, nftName] = drop.nftContract.split('.');
               dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the cancel in your wallet…</span>';
               showContractCall({
