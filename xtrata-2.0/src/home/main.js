@@ -64,7 +64,8 @@
     import {
       isSponsorClaimConfirmedState,
       inspectSponsoredClaimTransaction,
-      pollSponsorJob
+      pollSponsorJob,
+      submitSponsorClaimWithRetry
     } from '/src/lib/drops/sponsored-claim.ts';
     import {
       getMarketListingPublicBlockReason,
@@ -11302,6 +11303,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // Reuses the market module's thumbnail/media caches and card styling; the
     // drops contract exposes market-shaped read-onlys, so reads look identical.
     const DROP_DIAGNOSTICS_KEY = 'xtrata:drops:diagnostics:v1';
+    const DEFAULT_DROP_GROUP_ID = 1n;
+    const DROPS_DISPLAY_LIMIT = 25;
+    const DROPS_SCAN_MAX_IDS = DROPS_DISPLAY_LIMIT * 10;
     const dropsState = {
       run: 0,
       drops: [],
@@ -11324,7 +11328,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       diagnosticsBadge: $('dropsDiagnosticsBadge'),
       diagnosticsLog: $('dropsDiagnosticsLog'),
       diagnosticsCopy: $('dropsDiagnosticsCopy'),
-      diagnosticsClear: $('dropsDiagnosticsClear')
+      diagnosticsClear: $('dropsDiagnosticsClear'),
+      history: $('dropsHistory'),
+      historyList: $('dropsHistoryList')
     };
     const dropsEntriesForNetwork = () =>
       DROPS_REGISTRY.filter((entry) => entry.network === state.contract.network);
@@ -11397,6 +11403,49 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     });
     renderDropDiagnostics();
 
+    const optionalPrincipalValue = (node) => {
+      const value = node?.value ?? null;
+      if (!value) return null;
+      if (typeof value === 'string') return value;
+      return typeof value.value === 'string' ? value.value : null;
+    };
+
+    const optionalUintValue = (node) => {
+      const value = node?.value ?? null;
+      if (value === null || value === undefined) return null;
+      const raw = typeof value === 'object' && value !== null && 'value' in value
+        ? value.value
+        : value;
+      return raw === null || raw === undefined ? null : BigInt(raw);
+    };
+
+    const unwrapReadOnlyNode = (node) => {
+      let current = node;
+      while (
+        current &&
+        typeof current.type === 'string' &&
+        (current.type.startsWith('(optional') || current.type.startsWith('(response'))
+      ) {
+        current = current.value ?? null;
+      }
+      return current;
+    };
+
+    const readBoolValue = (node) => {
+      const unwrapped = unwrapReadOnlyNode(node);
+      return unwrapped === true || (unwrapped?.type === 'bool' && unwrapped.value === true);
+    };
+
+    const hasClaimedDropGroup = async (drop, claimerAddress) => {
+      const json = await callReadOnlyJson({
+        contractId: drop.contractId,
+        functionName: 'has-claimed-in-group',
+        args: [principalCV(drop.creator), uintCV(drop.groupId), principalCV(claimerAddress)],
+        network: drop.entry.network
+      });
+      return readBoolValue(json);
+    };
+
     const readDrops = async (entry) => {
       const contractId = `${entry.address}.${entry.contractName}`;
       const lastJson = await callReadOnlyJson({
@@ -11406,10 +11455,13 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       });
       const lastId = BigInt(lastJson?.value?.value ?? 0);
       const results = [];
-      const floor = lastId > BigInt(MARKET_LISTINGS_PER_CONTRACT)
-        ? lastId - BigInt(MARKET_LISTINGS_PER_CONTRACT)
-        : 0n;
-      for (let id = lastId; id >= floor; id -= 1n) {
+      let scanned = 0;
+      for (
+        let id = lastId;
+        id >= 0n && results.length < DROPS_DISPLAY_LIMIT && scanned < DROPS_SCAN_MAX_IDS;
+        id -= 1n
+      ) {
+        scanned += 1;
         try {
           const json = await callReadOnlyJson({
             contractId,
@@ -11419,7 +11471,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           });
           const tuple = unwrapBindingTuple(json);
           if (!tuple) continue;
-          const claimedRaw = tuple['claimed-at']?.value ?? null;
           results.push({
             entry,
             contractId,
@@ -11432,12 +11483,22 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             groupId: BigInt(tuple['group-id'].value),
             feeBudget: tuple['fee-budget'] ? BigInt(tuple['fee-budget'].value) : null,
             budgetRemaining: tuple['budget-remaining'] ? BigInt(tuple['budget-remaining'].value) : null,
-            claimedAt: claimedRaw === null || claimedRaw === undefined ? null : BigInt(claimedRaw.value ?? claimedRaw)
+            claimer: optionalPrincipalValue(tuple.claimer),
+            claimedAt: optionalUintValue(tuple['claimed-at'])
           });
         } catch {
           // sparse ids / settled drops: skip
         }
         if (id === 0n) break;
+      }
+      if (results.length < DROPS_DISPLAY_LIMIT && scanned >= DROPS_SCAN_MAX_IDS) {
+        debugLog('drops', 'stopped drop scan at safety cap', {
+          contractId,
+          lastId: lastId.toString(),
+          scanned,
+          found: results.length,
+          limit: DROPS_DISPLAY_LIMIT
+        }, 'warn');
       }
       return results;
     };
@@ -11470,6 +11531,27 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         dropsDom.status.innerHTML = '<span><strong>Drops</strong> connect a wallet to claim — new wallets work, no STX needed.</span>';
         recordDropDiagnostic(round, 'BLOCK', 'No connected Stacks wallet address.', 'error');
         return;
+      }
+      try {
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> checking whether this wallet has already claimed from this campaign…</span>';
+        const alreadyClaimedGroup = await hasClaimedDropGroup(drop, state.walletSession.address);
+        if (alreadyClaimedGroup) {
+          dropsDom.status.innerHTML = '<span><strong>Drops</strong> this wallet has already claimed a free drop from this campaign group.</span><span class="badge amber">one per wallet</span>';
+          recordDropDiagnostic(
+            round,
+            'GROUP_LIMIT',
+            `Wallet ${state.walletSession.address} already claimed campaign group ${drop.groupId} from ${drop.creator}.`,
+            'warn'
+          );
+          return;
+        }
+      } catch (error) {
+        recordDropDiagnostic(
+          round,
+          'GROUP_LIMIT_CHECK_UNAVAILABLE',
+          `Could not pre-check one-per-wallet policy; the contract will still enforce it. ${String(error?.message ?? error)}`,
+          'warn'
+        );
       }
       dropsState.claimsInFlight.add(claimKey);
       renderDrops();
@@ -11542,34 +11624,50 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         dropsDom.status.innerHTML = '<span><strong>Drops</strong> signed claim validated — submitting to the sponsor relayer…</span>';
         const sponsorClient = createSponsorClient((drop.entry.sponsorApi ?? '/').replace(/\/+$/, ''));
         recordDropDiagnostic(round, 'RELAYER_SUBMIT', `Submitting signed claim for ${drop.contractId} drop #${drop.dropId}.`);
+        const describeSponsorClientError = (error) => {
+          const references = [
+            error.httpStatus ? `HTTP ${error.httpStatus}` : '',
+            error.stage ? `stage ${error.stage}` : '',
+            error.requestId ? `request ${error.requestId}` : '',
+            error.traceId ? `trace ${error.traceId}` : ''
+          ].filter(Boolean).join('; ');
+          return `${error.code}${references ? ` (${references})` : ''}: ${error.message}`;
+        };
+        let lastSubmitRetryError = null;
         let job;
         try {
-          job = await sponsorClient.submit({
+          job = await submitSponsorClaimWithRetry({
+            client: sponsorClient,
             txHex: inspection.txHex,
             contractId: drop.contractId,
-            listingId: drop.dropId
-          });
-        } catch (error) {
-          if (error instanceof SponsorClientError && error.existingJob) {
-            job = error.existingJob;
-            recordDropDiagnostic(round, 'RELAYER_RESUME', `${error.code}: resuming existing job ${job.id}.`, 'warn');
-          } else {
-            if (error instanceof SponsorClientError) {
-              const references = [
-                error.httpStatus ? `HTTP ${error.httpStatus}` : '',
-                error.stage ? `stage ${error.stage}` : '',
-                error.requestId ? `request ${error.requestId}` : '',
-                error.traceId ? `trace ${error.traceId}` : ''
-              ].filter(Boolean).join('; ');
+            listingId: drop.dropId,
+            onExistingJob: (error, existingJob) => {
+              recordDropDiagnostic(round, 'RELAYER_RESUME', `${error.code}: resuming existing job ${existingJob.id}.`, 'warn');
+            },
+            onRetry: (error, attempt, maxAttempts, delayMs) => {
+              lastSubmitRetryError = error;
+              dropsDom.status.innerHTML = `<span><strong>Drops</strong> sponsor relayer is temporarily slow. Your wallet signature is valid; retrying safely (${attempt + 1}/${maxAttempts})…</span><span class="badge amber">retrying</span>`;
               recordDropDiagnostic(
                 round,
-                'RELAYER_REJECTED',
-                `${error.code}${references ? ` (${references})` : ''}: ${error.message}`,
-                'error'
+                'RELAYER_RETRY',
+                `${describeSponsorClientError(error)}. Retrying sponsor submission in ${Math.round(delayMs / 1000)}s (${attempt + 1}/${maxAttempts}).`,
+                'warn'
               );
             }
-            throw error;
+          });
+        } catch (error) {
+          if (error instanceof SponsorClientError) {
+            const retryNote = lastSubmitRetryError
+              ? ' Automatic retries were exhausted; the wallet signature was valid, but the relayer could not complete sponsorship.'
+              : '';
+            recordDropDiagnostic(
+              round,
+              'RELAYER_REJECTED',
+              `${describeSponsorClientError(error)}.${retryNote}`,
+              'error'
+            );
           }
+          throw error;
         }
         const buyTx = job.txids?.buy ?? '';
         recordDropDiagnostic(round, 'RELAYER_ACCEPTED', `Job ${job.id} entered ${job.state}${buyTx ? `; claim tx ${buyTx}` : ''}.`, 'success');
@@ -11714,6 +11812,73 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       });
     };
 
+    const renderDropsHistory = () => {
+      if (!dropsDom.historyList) return;
+      const drops = dropsState.drops.slice(0, DROPS_DISPLAY_LIMIT);
+      if (!drops.length) {
+        dropsDom.historyList.replaceChildren(
+          Object.assign(document.createElement('p'), {
+            className: 'field-hint',
+            textContent: 'No recent drop records are currently available.'
+          })
+        );
+        return;
+      }
+      dropsDom.historyList.replaceChildren(
+        ...drops.map((drop) => {
+          const row = document.createElement('article');
+          row.className = 'drops-history__row';
+          const claimed = drop.claimedAt !== null;
+          row.dataset.status = claimed ? 'claimed' : 'live';
+
+          const main = document.createElement('div');
+          main.className = 'drops-history__main';
+          const title = document.createElement('strong');
+          title.textContent = `Drop #${drop.dropId} · Inscription #${drop.tokenId}`;
+          const meta = document.createElement('span');
+          meta.textContent = `Group ${drop.groupId} · created by `;
+          const creator = document.createElement('span');
+          applyBnsName(creator, drop.creator);
+          meta.append(creator);
+          main.append(title, meta);
+
+          const claim = document.createElement('div');
+          claim.className = 'drops-history__claim';
+          if (claimed) {
+            const label = document.createElement('span');
+            label.textContent = `Claimed${drop.claimedAt ? ` at block ${drop.claimedAt}` : ''} by `;
+            claim.append(label);
+            if (drop.claimer) {
+              const claimer = document.createElement('span');
+              applyBnsName(claimer, drop.claimer);
+              claim.append(claimer);
+            } else {
+              claim.append('unknown wallet');
+            }
+          } else {
+            claim.textContent = 'Not claimed yet.';
+          }
+
+          const actions = document.createElement('div');
+          actions.className = 'drops-history__actions';
+          const viewLink = document.createElement('a');
+          viewLink.className = 'market-chip';
+          viewLink.href = `/xplorer?token=${drop.tokenId}`;
+          viewLink.target = '_self';
+          viewLink.textContent = 'View';
+          const dropLink = document.createElement('a');
+          dropLink.className = 'market-chip';
+          dropLink.href = `/drops?drop=${drop.tokenId}`;
+          dropLink.target = '_self';
+          dropLink.textContent = 'Open drop';
+          actions.append(viewLink, dropLink);
+
+          row.append(main, claim, actions);
+          return row;
+        })
+      );
+    };
+
     const renderDrops = () => {
       if (!dropsDom.listings) return;
       const run = dropsState.run;
@@ -11722,6 +11887,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         const claimKey = `${drop.contractId}:${drop.dropId}`;
         return drop.claimedAt === null || dropsState.recentlyClaimed.has(claimKey);
       });
+      renderDropsHistory();
       if (!visible.length) {
         dropsDom.listings.replaceChildren();
         dropsDom.status.innerHTML = '<span><strong>Drops</strong> no live drops right now — create one below, or check back soon.</span>';
@@ -11836,7 +12002,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         dropsQuote = 60_000n;
       }
       dropsDom.createDeposit.textContent =
-        `Sponsorship deposit: ${formatAssetAmount(dropsQuote, 6, 'STX')} — covers the claimer's network fee so they need zero STX; the unused part refunds to you after the claim or on cancel.`;
+        `Sponsorship deposit: ${formatAssetAmount(dropsQuote, 6, 'STX')} — covers the claimer's network fee so they need zero STX. Blank campaign group uses ${DEFAULT_DROP_GROUP_ID}, which lets each wallet claim once from this creator's campaign; unused deposit refunds after claim or cancel.`;
     };
 
     const watchCreatedDrop = async ({ txId, tokenId, creator, watchRun }) => {
@@ -11891,23 +12057,33 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const dropsCreateDrop = async () => {
       const entry = dropsEntriesForNetwork()[0];
       if (!entry) return;
-      if (!state.walletSession.isConnected || !state.walletSession.address) {
-        dropsDom.createStatus.textContent = 'Connect a wallet to create a drop.';
-        return;
-      }
-      const creator = state.walletSession.address;
       const tokenIdRaw = dropsDom.createTokenId?.value?.trim();
       if (!/^\d+$/.test(tokenIdRaw ?? '')) {
         dropsDom.createStatus.textContent = 'Enter the inscription number you want to drop.';
         return;
       }
+      const params = new URLSearchParams(window.location.search);
+      if (window.location.pathname !== '/drops' || params.get('drop') !== tokenIdRaw) {
+        const targetParams = new URLSearchParams({ drop: tokenIdRaw });
+        window.history.pushState(null, '', `/drops?${targetParams.toString()}`);
+        dropsDom.createStatus.textContent =
+          `Inscription #${tokenIdRaw} selected. Loading its create-drop view...`;
+        await switchToPage('drops', targetParams);
+        return;
+      }
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        dropsDom.createStatus.textContent = 'Connect a wallet to create a drop.';
+        return;
+      }
+      const creator = state.walletSession.address;
       const tokenId = BigInt(tokenIdRaw);
       const groupRaw = dropsDom.createGroup?.value?.trim();
-      // A shared batch id limits claims to one per person per batch; leaving it
-      // blank gives the drop a unique id (no per-person limit).
+      // The drops contract enforces one claim per (creator, group id, claimer).
+      // Blank group id uses the default campaign group, so each wallet can only
+      // claim one free drop from that creator's default campaign.
       const groupId = /^\d+$/.test(groupRaw ?? '')
         ? BigInt(groupRaw)
-        : BigInt(Date.now()) * 1000n + BigInt(Math.floor(Math.random() * 1000));
+        : DEFAULT_DROP_GROUP_ID;
       const budget = dropsQuote ?? 60_000n;
 
       dropsDom.createStatus.textContent = 'Checking ownership...';

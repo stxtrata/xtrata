@@ -4366,6 +4366,51 @@
       opacity: 0.8;
     }
 
+    .drops-history {
+      margin-top: 14px;
+    }
+
+    .drops-history__list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .drops-history__row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      font-size: 12px;
+    }
+
+    .drops-history__row[data-status='claimed'] {
+      border-color: color-mix(in srgb, var(--success, #3f8f5d) 45%, var(--line));
+    }
+
+    .drops-history__main,
+    .drops-history__claim {
+      display: grid;
+      gap: 3px;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .drops-history__main > span,
+    .drops-history__claim {
+      color: var(--muted);
+    }
+
+    .drops-history__actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+
     .market-card {
       display: flex;
       flex-direction: column;
@@ -4450,6 +4495,14 @@
     }
 
     @media (max-width: 560px) {
+      .drops-history__row {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .drops-history__actions {
+        justify-content: flex-start;
+      }
+
       .wallet-market-listing__row {
         grid-template-columns: 72px minmax(0, 1fr);
       }
