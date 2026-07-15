@@ -46,6 +46,7 @@ import {
   hexToCV,
   makeContractCall,
   makeContractNonFungiblePostCondition,
+  principalCV,
   serializePostCondition,
   sponsorTransaction,
   uintCV
@@ -54,6 +55,7 @@ import { StacksMainnet } from '@stacks/network';
 import { jsonResponse } from '../lib/utils';
 import { run, queryAll, type Env } from '../lib/db';
 import { applyHiroApiKey, getHiroApiKeys, shouldRetryWithNextHiroKey } from '../lib/hiro-keys';
+import { getDropsCollectionLockForDrop } from '../../src/lib/drops/collection-lock';
 
 const DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const DEFAULT_MARKETS = [
@@ -267,11 +269,56 @@ const getListing = async (env: SponsorEnv, contractId: string, listingId: string
   if (!rec) return null;
   const soldRaw = (rec['sold-at'] as { value?: { value?: unknown } | null })?.value ?? null;
   return {
+    seller: String((rec.seller as { value: unknown }).value),
     budgetRemaining: BigInt(String((rec['budget-remaining'] as { value: unknown }).value)),
     nftContract: String((rec['nft-contract'] as { value: unknown }).value),
     tokenId: BigInt(String((rec['token-id'] as { value: unknown }).value)),
     soldAt: soldRaw === null || soldRaw === undefined ? null : String((soldRaw as { value?: unknown }).value ?? soldRaw)
   };
+};
+
+const hasClaimedInGroup = async (
+  env: SponsorEnv,
+  contractId: string,
+  creator: string,
+  groupId: bigint,
+  claimer: string
+) => {
+  const [address, name] = contractId.split('.');
+  const j = await hiroJson<{ okay?: boolean; result?: string }>(
+    env,
+    `/v2/contracts/call-read/${address}/${name}/has-claimed-in-group`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sender: address,
+        arguments: [
+          cvToHex(principalCV(creator)),
+          cvToHex(uintCV(groupId)),
+          cvToHex(principalCV(claimer))
+        ]
+      })
+    }
+  );
+  if (!j.okay || !j.result) return false;
+  const parsed = cvToJSON(hexToCV(j.result)) as { value?: { value?: boolean } | boolean };
+  return parsed.value === true || parsed.value?.value === true;
+};
+
+const getClaimedCollectionLockGroup = async (
+  env: SponsorEnv,
+  contractId: string,
+  creator: string,
+  groupIds: bigint[],
+  claimer: string
+) => {
+  for (const groupId of groupIds) {
+    if (await hasClaimedInGroup(env, contractId, creator, groupId, claimer)) {
+      return groupId;
+    }
+  }
+  return null;
 };
 
 const network = new StacksMainnet();
@@ -739,6 +786,30 @@ const handleRequest = async (
     }
     if (!hasExactDropClaimPostCondition(validated.tx, contractId, listing)) {
       return fail('VALIDATION', VALIDATION.WRONG_POST_CONDITIONS);
+    }
+    if (isDropsContract(contractId)) {
+      const lock = getDropsCollectionLockForDrop({
+        contractId,
+        creator: listing.seller,
+        dropId: listingId
+      });
+      if (lock) {
+        diagnostics.stage = 'COLLECTION_LOCK';
+        const claimedGroupId = await getClaimedCollectionLockGroup(
+          env,
+          contractId,
+          listing.seller,
+          lock.groupIds,
+          validated.buyer
+        );
+        if (claimedGroupId !== null) {
+          return fail(
+            'COLLECTION_LIMIT',
+            `wallet already claimed from ${lock.label}; one free drop per address`,
+            409
+          );
+        }
+      }
     }
     diagnostics.stage = 'FEE_ESTIMATE';
     const estimatedFee = await estimateBuyFee(env);
