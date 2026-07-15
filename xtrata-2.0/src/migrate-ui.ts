@@ -12,7 +12,7 @@ import {
   type MigrationSourceDefinition,
   type MigrationSourceError
 } from './lib/migration/quote';
-import { connectWallet, disconnectWallet, showContractCall } from './lib/wallet/connect';
+import { connectWallet, disconnectWallet, showContractCall } from './lib/wallet/coordinator';
 import type { WalletSession } from './lib/wallet/types';
 
 const DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';

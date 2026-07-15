@@ -25,10 +25,6 @@
   var HOST_BRIDGE_REQUEST_TYPE = 'xtrata:wallet:request';
   var HOST_BRIDGE_RESPONSE_TYPE = 'xtrata:wallet:response';
   var STORAGE_KEY = 'xtrata.runtime.wallet.session.v1';
-  var CONNECT_URLS = [
-    'https://esm.sh/@stacks/connect@7.10.2?bundle',
-    'https://esm.run/@stacks/connect@7.10.2'
-  ];
   var SHIM_METHODS = [
     'stx_getAddresses',
     'getAddresses',
@@ -57,8 +53,6 @@
     'deactivate'
   ];
 
-  var connectModulePromise = null;
-  var connectInFlight = null;
   var hostBridgePending = new Map();
   var hostBridgeListenerInstalled = false;
   var hostBridgeSeq = 0;
@@ -172,60 +166,6 @@
       return String(payload.testnet).trim();
     }
     return null;
-  }
-
-  function loadConnectModule() {
-    if (connectModulePromise) return connectModulePromise;
-
-    connectModulePromise = (async function () {
-      var lastError = null;
-      for (var i = 0; i < CONNECT_URLS.length; i += 1) {
-        var url = CONNECT_URLS[i];
-        try {
-          var mod = await import(url);
-          if (
-            mod &&
-            (typeof mod.showConnect === 'function' ||
-              typeof mod.authenticate === 'function')
-          ) {
-            debugLog('wallet sdk import succeeded', { url: url });
-            return mod;
-          }
-        } catch (error) {
-          lastError = error;
-          debugLog('wallet sdk import failed', {
-            url: url,
-            error: error && error.message ? error.message : String(error)
-          });
-        }
-      }
-      throw lastError || new Error('Failed to load wallet connect SDK.');
-    })().catch(function (error) {
-      connectModulePromise = null;
-      throw error;
-    });
-
-    return connectModulePromise;
-  }
-
-  function createUserSession(mod) {
-    if (!mod || typeof mod.AppConfig !== 'function' || typeof mod.UserSession !== 'function') {
-      return null;
-    }
-    try {
-      var appConfig = new mod.AppConfig(['store_write'], undefined, '', '/manifest.json');
-      return new mod.UserSession({ appConfig: appConfig });
-    } catch (error) {
-      return null;
-    }
-  }
-
-  function resolveRedirectPath() {
-    var path =
-      String(window.location.pathname || '/') +
-      String(window.location.search || '') +
-      String(window.location.hash || '');
-    return path || '/';
   }
 
   function buildSessionResponse(session) {
@@ -387,32 +327,6 @@
     );
   }
 
-  function isMethodUnsupportedError(error) {
-    var message = error && error.message ? String(error.message).toLowerCase() : '';
-    return (
-      message.indexOf('method not found') >= 0 ||
-      message.indexOf('unsupported') >= 0 ||
-      message.indexOf('not implemented') >= 0 ||
-      message.indexOf('request function is not implemented') >= 0
-    );
-  }
-
-  function isUserCancelledError(error) {
-    if (error && typeof error.code !== 'undefined') {
-      var numericCode = Number(error.code);
-      if (numericCode === 4001 || numericCode === -32000 || numericCode === -31001) {
-        return true;
-      }
-    }
-    var message = error && error.message ? String(error.message).toLowerCase() : '';
-    return (
-      message.indexOf('cancel') >= 0 ||
-      message.indexOf('reject') >= 0 ||
-      message.indexOf('denied') >= 0 ||
-      message.indexOf('closed') >= 0
-    );
-  }
-
   function parseRequestArgs(methodOrPayload, maybeParams) {
     if (typeof methodOrPayload === 'string') {
       return { method: methodOrPayload, params: maybeParams };
@@ -518,193 +432,6 @@
     return null;
   }
 
-  function connectViaProviderRequest(provider) {
-    if (!provider || typeof provider.request !== 'function') {
-      return Promise.reject(
-        createShimError('Wallet provider does not support request-based connect.', -32601)
-      );
-    }
-
-    var attempts = [
-      'stx_getAddresses',
-      'getAddresses',
-      'stx_getAccounts',
-      'getAccounts',
-      'wallet_getAccount',
-      'stx_requestAccounts',
-      'requestAccounts',
-      'stx_connect',
-      'connect',
-      'wallet_connect'
-    ];
-
-    var lastError = null;
-
-    function tryNext(index) {
-      if (index >= attempts.length) {
-        if (lastError) throw lastError;
-        return null;
-      }
-
-      var method = attempts[index];
-      return Promise.resolve()
-        .then(function () {
-          return provider.request(method);
-        })
-        .then(function (payload) {
-          var session = resolveSessionFromPayload(payload);
-          if (session) {
-            writeStoredSession(session);
-            return session;
-          }
-          return tryNext(index + 1);
-        })
-        .catch(function (error) {
-          lastError = error;
-          if (isUserCancelledError(error)) {
-            return null;
-          }
-          if (isMethodUnsupportedError(error)) {
-            return tryNext(index + 1);
-          }
-          throw error;
-        });
-    }
-
-    return tryNext(0);
-  }
-
-  function connectViaLegacySdk(provider) {
-    if (connectInFlight) return connectInFlight;
-
-    connectInFlight = loadConnectModule()
-      .then(function (mod) {
-        return new Promise(function (resolve, reject) {
-          var settled = false;
-          var userSession = createUserSession(mod);
-          var showConnectFn =
-            mod && typeof mod.showConnect === 'function' ? mod.showConnect : null;
-          var authenticateFn =
-            mod && typeof mod.authenticate === 'function' ? mod.authenticate : null;
-
-          if (!showConnectFn && !authenticateFn) {
-            reject(new Error('Wallet connect SDK missing showConnect/authenticate.'));
-            return;
-          }
-
-          var timeoutId = setTimeout(function () {
-            if (settled) return;
-            settled = true;
-            reject(new Error('Wallet authentication timed out.'));
-          }, 90000);
-
-          function finish(error, payload) {
-            if (settled) return;
-            settled = true;
-            clearTimeout(timeoutId);
-            if (error) {
-              reject(error);
-              return;
-            }
-
-            var address = extractStacksAddress(payload, 0);
-            var network = address
-              ? inferNetworkFromAddress(address) || TARGET_NETWORK
-              : TARGET_NETWORK;
-
-            if (
-              !address &&
-              payload &&
-              payload.userSession &&
-              typeof payload.userSession.loadUserData === 'function'
-            ) {
-              try {
-                var payloadUserData = payload.userSession.loadUserData();
-                address = extractStacksAddress(payloadUserData, 0) || address;
-                if (address) {
-                  network = inferNetworkFromAddress(address) || network;
-                }
-              } catch (innerError) {}
-            }
-
-            if (
-              !address &&
-              userSession &&
-              typeof userSession.isUserSignedIn === 'function' &&
-              userSession.isUserSignedIn()
-            ) {
-              try {
-                var signedData = userSession.loadUserData();
-                address = extractStacksAddress(signedData, 0) || address;
-                if (address) {
-                  network = inferNetworkFromAddress(address) || network;
-                }
-              } catch (innerError2) {}
-            }
-
-            if (address) {
-              writeStoredSession({ address: address, network: network });
-            }
-            resolve(readStoredSession());
-          }
-
-          var options = {
-            appDetails: {
-              name: 'Xtrata Runtime',
-              icon: window.location.origin + '/favicon.svg'
-            },
-            manifestPath: '/manifest.json',
-            redirectTo: resolveRedirectPath(),
-            onFinish: function (payload) {
-              finish(null, payload || null);
-            },
-            onCancel: function () {
-              finish(null, null);
-            }
-          };
-
-          if (userSession) {
-            options.userSession = userSession;
-          }
-
-          try {
-            var invocation;
-            if (showConnectFn) {
-              invocation = showConnectFn(options);
-            } else {
-              invocation = authenticateFn(options, provider || undefined);
-            }
-            Promise.resolve(invocation).catch(function (error) {
-              finish(error);
-            });
-          } catch (error) {
-            finish(error);
-          }
-        });
-      })
-      .finally(function () {
-        connectInFlight = null;
-      });
-
-    return connectInFlight;
-  }
-
-  function connectViaShim(provider) {
-    if (!provider) {
-      return connectViaLegacySdk(provider);
-    }
-
-    return connectViaProviderRequest(provider).catch(function (error) {
-      if (isUserCancelledError(error)) {
-        return null;
-      }
-      if (!isMethodUnsupportedError(error)) {
-        throw error;
-      }
-      return connectViaLegacySdk(provider);
-    });
-  }
-
   function shimRequest(method, provider, params) {
     var lower = String(method || '').trim();
 
@@ -733,50 +460,24 @@
     }
 
     if (isConnectMethod(lower)) {
-      var hostConnectAttempt = hasHostBridge()
-        ? requestHostBridge(lower, params).then(function (payload) {
-            return applySessionFromPayload(payload);
-          })
-        : Promise.reject(createShimError('Host wallet bridge unavailable.', -32001));
-
-      return hostConnectAttempt.catch(function (error) {
-        if (!isHostBridgeUnavailableError(error)) {
-          throw error;
-        }
-        return connectViaShim(provider).then(function (session) {
-          return buildSessionResponse(session);
-        });
+      if (!hasHostBridge()) {
+        return Promise.reject(
+          createShimError('Runtime wallet connection requires the Xtrata host coordinator.', -32001)
+        );
+      }
+      return requestHostBridge(lower, params).then(function (payload) {
+        return applySessionFromPayload(payload);
       });
     }
 
     if (isReadMethod(lower)) {
-      var hostReadAttempt = hasHostBridge()
-        ? requestHostBridge(lower, params).then(function (payload) {
-            return applySessionFromPayload(payload);
-          })
-        : Promise.reject(createShimError('Host wallet bridge unavailable.', -32001));
-
-      return hostReadAttempt.catch(function (error) {
-        if (!isHostBridgeUnavailableError(error)) {
-          throw error;
-        }
-        var session = readStoredSession();
-        if (!session && provider) {
-          var direct = null;
-          if (looksLikeStacksAddress(provider.selectedAddress)) {
-            direct = provider.selectedAddress;
-          } else if (looksLikeStacksAddress(provider.address)) {
-            direct = provider.address;
-          }
-          if (direct) {
-            session = {
-              address: String(direct).trim(),
-              network: inferNetworkFromAddress(String(direct).trim()) || TARGET_NETWORK
-            };
-            writeStoredSession(session);
-          }
-        }
-        return buildSessionResponse(session);
+      if (!hasHostBridge()) {
+        return Promise.reject(
+          createShimError('Runtime wallet reads require the Xtrata host coordinator.', -32001)
+        );
+      }
+      return requestHostBridge(lower, params).then(function (payload) {
+        return applySessionFromPayload(payload);
       });
     }
 

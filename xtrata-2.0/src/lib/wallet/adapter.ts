@@ -1,17 +1,18 @@
-import { createWalletSessionStore } from './session';
-import { connectWallet, disconnectWallet } from './connect';
-import type { WalletSession } from './types';
+import {
+  changeWalletAccount,
+  connectWallet,
+  disconnectWallet,
+  getWalletSession,
+  subscribeWalletSession
+} from './coordinator';
+import { walletSessionUtils } from './session';
+import type { WalletSession, WalletSessionChangeSource } from './types';
 
 export const createStacksWalletAdapter = (params: {
   appName: string;
   appIcon: string;
 }) => {
-  const sessionStore = createWalletSessionStore();
-  const clearSession = () => {
-    sessionStore.clear();
-  };
-
-  const getSession = (): WalletSession => sessionStore.load();
+  const getSession = (): WalletSession => getWalletSession();
 
   const connect = async (): Promise<WalletSession> => {
     const current = getSession();
@@ -23,18 +24,33 @@ export const createStacksWalletAdapter = (params: {
       appName: params.appName,
       appIcon: params.appIcon
     });
-    sessionStore.save(session);
+    return session;
+  };
+
+  const changeAccount = async (): Promise<WalletSession> => {
+    const session = await changeWalletAccount({
+      appName: params.appName,
+      appIcon: params.appIcon
+    });
     return session;
   };
 
   const disconnect = async () => {
     await disconnectWallet();
-    clearSession();
   };
+
+  const subscribe = (
+    listener: (session: WalletSession, source: WalletSessionChangeSource) => void
+  ) =>
+    subscribeWalletSession(({ record, source }) => {
+      listener(walletSessionUtils.recordToSession(record), source);
+    });
 
   return {
     connect,
+    changeAccount,
     disconnect,
-    getSession
+    getSession,
+    subscribe
   };
 };

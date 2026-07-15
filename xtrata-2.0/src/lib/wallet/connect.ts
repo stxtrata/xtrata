@@ -109,6 +109,8 @@ type WalletActionBase = {
   authOrigin?: ContractCallOptions['authOrigin'];
   userSession?: ContractCallOptions['userSession'];
   sponsored?: boolean;
+  /** Internal coordinator marker: one live account check already completed for this action. */
+  coordinatorVerified?: boolean;
   onFinish?: (payload: WalletTxResult) => void;
   onCancel?: () => void;
   onError?: (error: unknown) => void;
@@ -805,21 +807,12 @@ const buildXverseConnectParams = () => ({
 
 // Xverse's wallet_getAccount can take 12–15s to answer (and some builds never
 // answer). Do NOT fall back to stx_getAccounts: on current Xverse that opens a
-// "Mismatched Network" prompt and gets rejected. Instead: generous timeout,
-// share any in-flight read, and cache the last good answer briefly so the
-// pre-transfer check reuses the read that connect/sync just completed instead
-// of stacking a second 12s wait (or a popup) on the pay click.
+// "Mismatched Network" prompt and gets rejected. Share only the in-flight read;
+// completed results are never cached because a cache can conceal an account
+// switch made immediately after verification.
 const XVERSE_ACCOUNT_READ_TIMEOUT_MS = 30_000;
-const XVERSE_ACCOUNT_CACHE_MS = 45_000;
-let xverseAccountCache: { session: WalletSession; at: number } | null = null;
 let xverseAccountInFlight: Promise<WalletSession> | null = null;
-const rememberXverseAccount = (session: WalletSession) => {
-  if (session.isConnected) {
-    xverseAccountCache = { session, at: Date.now() };
-  }
-};
 const clearXverseAccountCache = () => {
-  xverseAccountCache = null;
   xverseAccountInFlight = null;
 };
 const withXverseTimeout = <T>(promise: Promise<T>, method: string) =>
@@ -840,19 +833,12 @@ const withXverseTimeout = <T>(promise: Promise<T>, method: string) =>
   ]);
 
 const getXverseActiveAccount = (provider: StacksProvider): Promise<WalletSession> => {
-  if (
-    xverseAccountCache &&
-    Date.now() - xverseAccountCache.at < XVERSE_ACCOUNT_CACHE_MS &&
-    xverseAccountCache.session.isConnected
-  ) {
-    return Promise.resolve(xverseAccountCache.session);
-  }
   if (xverseAccountInFlight) {
     return xverseAccountInFlight;
   }
   const read = (async () => {
     try {
-      const session = toWalletSession(
+      return toWalletSession(
         await withXverseTimeout(
           requestWalletRpc(provider, 'wallet_getAccount', {
             addresses: [...XVERSE_MAINNET_CONNECT_PARAMS.addresses]
@@ -860,8 +846,6 @@ const getXverseActiveAccount = (provider: StacksProvider): Promise<WalletSession
           'wallet_getAccount'
         )
       );
-      rememberXverseAccount(session);
-      return session;
     } finally {
       xverseAccountInFlight = null;
     }
@@ -924,7 +908,7 @@ const resolveWalletPublicKey = async (
 
   let lastError: unknown = null;
   const accountReadMethods = isSelectedXverseProvider(provider)
-    ? (['stx_getAccounts', 'wallet_getAccount', 'getAddresses'] as const)
+    ? (['wallet_getAccount'] as const)
     : WALLET_ACCOUNT_READ_METHODS;
   for (const method of accountReadMethods) {
     try {
@@ -1034,11 +1018,10 @@ const requestStxTransfer = async (
   options: WalletStxTransferOptions
 ) => {
   const xverse = isSelectedXverseProvider(provider);
-  if (xverse) {
+  if (xverse && !options.coordinatorVerified) {
     // eslint-disable-next-line no-console
     console.info('[wallet:stx-transfer]', {
-      stage: 'XVERSE_ACTIVE_ACCOUNT_CHECK',
-      expectedAddress: options.stxAddress ?? null
+      stage: 'XVERSE_ACTIVE_ACCOUNT_CHECK'
     });
     let connection: WalletSession;
     try {
@@ -1068,7 +1051,7 @@ const requestStxTransfer = async (
     ) {
       throw Object.assign(
         new Error(
-          `Xverse is using ${connection.address}, but this job is locked to ${options.stxAddress}. Switch back to the original account or create a new job.`
+          'The active Xverse account does not match the account locked to this job. Switch back to the original account or create a new job.'
         ),
         { code: 'XVERSE_ACCOUNT_CHANGED' }
       );
@@ -1076,7 +1059,6 @@ const requestStxTransfer = async (
     // eslint-disable-next-line no-console
     console.info('[wallet:stx-transfer]', {
       stage: 'XVERSE_ACTIVE_ACCOUNT_READY',
-      address: connection.address,
       network: connection.network
     });
   }
@@ -1148,7 +1130,9 @@ const GENERIC_CONNECT_METHODS = [
 const getConnectAttempts = async (provider: StacksProvider) => {
   const providerId = getSelectedProviderId();
   if (isSelectedXverseProvider(provider)) {
-    return ['wallet_connect', 'stx_getAccounts', 'wallet_getAccount'] as const;
+    // One explicit bridge and one interactive request. Never probe a second
+    // Xverse provider/method after cancellation or a capability failure.
+    return ['wallet_connect'] as const;
   }
   if (!isLeatherProviderId(providerId)) {
     return GENERIC_CONNECT_METHODS;
@@ -1171,14 +1155,13 @@ const getConnectAttempts = async (provider: StacksProvider) => {
     });
     const advertised = leatherMethods.filter((method) => supported.includes(method));
     return advertised.length > 0 ? advertised : leatherMethods;
-  } catch (error) {
+  } catch (_error) {
     // Capability discovery is advisory. Older Leather builds can still expose
     // the documented getAddresses method without exposing supportedMethods.
     // eslint-disable-next-line no-console
     console.info('[wallet:connect]', {
       stage: 'CAPABILITIES_UNAVAILABLE',
-      provider: 'leather',
-      message: error instanceof Error ? error.message : String(error)
+      provider: 'leather'
     });
     return leatherMethods;
   }
@@ -1200,9 +1183,6 @@ const connectViaRequest = async (provider: StacksProvider) => {
           : undefined
       );
       const session = toWalletSession(response);
-      if (session.isConnected && isSelectedXverseProvider(provider)) {
-        rememberXverseAccount(session);
-      }
       if (session.isConnected) {
         // eslint-disable-next-line no-console
         console.info('[wallet:connect]', {
@@ -1222,8 +1202,13 @@ const connectViaRequest = async (provider: StacksProvider) => {
       (unsupported ? console.info : console.warn)('[wallet:connect]', {
         stage: 'REQUEST_ERROR',
         method,
-        code: error && typeof error === 'object' && 'code' in error ? error.code : undefined,
-        message: error instanceof Error ? error.message : String(error)
+        code:
+          error &&
+          typeof error === 'object' &&
+          'code' in error &&
+          (typeof error.code === 'string' || typeof error.code === 'number')
+            ? error.code
+            : undefined
       });
       if (isUserCancelledError(error)) {
         return disconnectedSession();
@@ -1363,6 +1348,12 @@ export const getStacksProvider = (): StacksProvider | undefined => {
   }
 
   const selectedProviderId = getSelectedProviderId();
+  if (isXverseProviderId(selectedProviderId)) {
+    const rpcProvider = getXverseRpcProvider();
+    if (rpcProvider) {
+      return rpcProvider as StacksProvider;
+    }
+  }
   const selectedProvider = selectedProviderId
     ? (getProviderFromId(selectedProviderId) as StacksProvider | undefined)
     : undefined;
@@ -1471,7 +1462,7 @@ export const showContractCall = (options: WalletContractCallOptions, provider?: 
         return;
       }
       // eslint-disable-next-line no-console
-      console.error('[wallet] contract call request failed', error);
+      console.error('[wallet]', { stage: 'CONTRACT_CALL_FAILED' });
       if (isUserCancelledError(error)) {
         options.onCancel?.();
         return;
@@ -1508,7 +1499,7 @@ export const showSponsoredContractCall = (
     })
     .catch((error) => {
       // eslint-disable-next-line no-console
-      console.error('[wallet] sponsored contract signing failed', error);
+      console.error('[wallet]', { stage: 'SPONSORED_SIGN_FAILED' });
       if (isUserCancelledError(error)) {
         options.onCancel?.();
         return;
@@ -1543,7 +1534,7 @@ export const showContractDeploy = (
         return;
       }
       // eslint-disable-next-line no-console
-      console.error('[wallet] contract deploy request failed', error);
+      console.error('[wallet]', { stage: 'CONTRACT_DEPLOY_FAILED' });
       options.onCancel?.();
     });
 };
@@ -1576,7 +1567,7 @@ export const showStxTransfer = (options: WalletStxTransferOptions, provider?: St
         return;
       }
       // eslint-disable-next-line no-console
-      console.error('[wallet] STX transfer request failed', error);
+      console.error('[wallet]', { stage: 'STX_TRANSFER_FAILED' });
       if (isUserCancelledError(error)) {
         options.onCancel?.();
         return;

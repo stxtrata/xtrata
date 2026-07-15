@@ -4,7 +4,7 @@ import {
   getStacksProvider,
   showContractDeploy,
   type StacksProvider
-} from '../../lib/wallet/connect';
+} from '../../lib/wallet/coordinator';
 import { getContractId } from '../../lib/contract/config';
 import { getStacksExplorerContractUrl } from '../../lib/network/explorer';
 import {

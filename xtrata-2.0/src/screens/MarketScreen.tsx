@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { showContractCall } from '../lib/wallet/connect';
+import { showContractCall } from '../lib/wallet/coordinator';
 import {
   type ClarityValue,
   contractPrincipalCV,

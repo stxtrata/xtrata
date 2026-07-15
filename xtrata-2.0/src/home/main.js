@@ -42,7 +42,7 @@
       getSelectedWalletProviderId,
       showContractCall,
       showSponsoredContractCall
-    } from '/src/lib/wallet/connect.ts';
+    } from '/src/lib/wallet/coordinator.ts';
     import {
       CONTRACT_REGISTRY,
       getLegacyContract
@@ -12775,6 +12775,32 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       revokeTokenPreview();
       revokeFullscreenPreview();
       revokeGridThumbUrls();
+    });
+
+    walletAdapter.subscribe((session, source) => {
+      // Local connect/disconnect handlers already perform their richer data
+      // refresh. This path keeps a second tab's account state in sync without
+      // racing those workflows or opening another wallet prompt.
+      if (source === 'local') {
+        return;
+      }
+      const previous = state.walletSession;
+      if (
+        previous.isConnected === session.isConnected &&
+        previous.address === session.address &&
+        previous.publicKey === session.publicKey
+      ) {
+        return;
+      }
+      state.walletSession = session;
+      refreshConnectedWalletMatureMode();
+      updateWalletStatus();
+      updateControls();
+      void fetchAdminStatus();
+      void refreshParentChecks();
+      if (PAGE_MODE === 'my-wallet' || PAGE_MODE === 'market') {
+        void loadWalletInscriptions();
+      }
     });
 
     void initialize();

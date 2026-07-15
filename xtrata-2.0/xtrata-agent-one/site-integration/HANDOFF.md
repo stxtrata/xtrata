@@ -74,3 +74,8 @@ If you'd rather make it a first-class React screen instead of a static satellite
 reuse `createStacksWalletAdapter` for connect and port `wizard/index.html`'s markup
 + logic into a screen/route. More work; the shim route above is faster and reuses
 the wizard verbatim.
+# Wallet architecture
+
+Agent One uses the shared wallet coordinator; do not duplicate provider routing
+inside wizard pages. See [`docs/wallet-architecture.md`](../../docs/wallet-architecture.md)
+and [`docs/wallet-live-testing.md`](../../docs/wallet-live-testing.md).

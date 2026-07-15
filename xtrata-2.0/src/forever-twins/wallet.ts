@@ -8,7 +8,7 @@ import {
 } from '@stacks/transactions';
 import { StacksMainnet, StacksTestnet } from '@stacks/network';
 import { createStacksWalletAdapter } from '../lib/wallet/adapter';
-import { showContractCall } from '../lib/wallet/connect';
+import { showContractCall } from '../lib/wallet/coordinator';
 
 // This module is bundled for the standalone Forever Twins pages. Keeping the
 // adapter here makes those pages use the exact same provider selection,
@@ -32,6 +32,7 @@ export const connectForeverTwinsWallet = () => {
 export const disconnectForeverTwinsWallet = () => walletAdapter.disconnect();
 
 export const getForeverTwinsWalletSession = () => walletAdapter.getSession();
+export const subscribeForeverTwinsWalletSession = walletAdapter.subscribe;
 
 // The standalone pages previously imported a separate Stacks SDK from esm.sh.
 // Re-export the small compatibility surface they need from this bundle so all

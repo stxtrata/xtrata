@@ -5,6 +5,7 @@ This file captures the core development rules and app constraints for V16.
 ## Development Rules
 
 1) Before making any decision or code change, read `docs/app-reference.md`.
+   For any wallet change, also read `docs/wallet-architecture.md` first.
 2) Keep layout stable: avoid horizontal shifts when panels open/close; preserve scrollbar stability and responsive widths.
 3) Preserve square grid/preview behavior: 4x4 grids, square cells, square preview frame; metadata and actions stay outside the square; no scrolling needed to see the full asset inside the square.
 4) Avoid unnecessary network calls: prefer IndexedDB cache + React Query; reuse already-loaded grid content in previews.
@@ -18,6 +19,8 @@ This file captures the core development rules and app constraints for V16.
 10) After completing any change, write a summary and notes, then commit it.
     - The user handles all pushing. Do not push unless explicitly requested.
     - Commit all completed changes with summaries and notes where appropriate.
+11) Wallet changes must preserve the single-provider, single-session and
+    expected-sender invariants and pass `npm run smoke:wallet`.
 
 ## App Overview
 

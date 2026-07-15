@@ -6,7 +6,12 @@
 // Build:  npx vite build -c vite.agent-one-wallet.config.ts   (from the repo root)
 
 import { createStacksWalletAdapter } from '../lib/wallet/adapter';
-import { readActiveWalletSession, showStxTransfer, showContractCall } from '../lib/wallet/connect';
+import {
+  readActiveWalletSession,
+  showStxTransfer,
+  showContractCall,
+  subscribeWalletSession
+} from '../lib/wallet/coordinator';
 import { buildTransferCall } from '../lib/contract/client';
 import { buildTransferPostCondition } from '../lib/contract/post-conditions';
 import { validateTransferRequest, getTransferValidationMessage } from '../lib/wallet/transfer';
@@ -21,11 +26,11 @@ let activePayment: Promise<void> | null = null;
 
 const XtrataWallet = {
   async connect(): Promise<string | null> {
-    // A deliberate Connect click must not reuse a stale persisted address. Clear
-    // the origin permission so Xverse presents its account selector, then save
-    // the account the user actually chooses.
-    await adapter.disconnect();
-    const session = await adapter.connect();
+    // A deliberate account change keeps the established provider family and
+    // opens its account selector. It never disconnects the session first.
+    const session = adapter.getSession().isConnected && adapter.changeAccount
+      ? await adapter.changeAccount()
+      : await adapter.connect();
     return session.address ?? null;
   },
   async disconnect(): Promise<void> {
@@ -95,6 +100,12 @@ const XtrataWallet = {
   isConnected(): boolean {
     return adapter.getSession().isConnected === true;
   },
+  subscribe(listener: (address: string | null, status: string) => void): () => void {
+    return subscribeWalletSession(({ record }) => {
+      const address = record.status === 'CONNECTED' ? (record.address ?? null) : null;
+      listener(address, record.status);
+    });
+  },
   // Generic contract call over the site's PROVEN showContractCall path (the same
   // one inscribe/swap use on the core site). Args and post-conditions are passed
   // as serialized Clarity hex strings so a caller can build them with its own
@@ -149,7 +160,7 @@ const XtrataWallet = {
         appDetails: { name: 'Xtrata Agent One', icon: '/favicon.ico' },
         onFinish: () => resolve(),
         onCancel: () => reject(new Error('Payment cancelled or blocked in wallet. No STX was sent.')),
-        onError: (error) => reject(error instanceof Error ? error : new Error(String(error))),
+        onError: (error: unknown) => reject(error instanceof Error ? error : new Error(String(error))),
       } as unknown as Parameters<typeof showStxTransfer>[0]);
     });
     activePayment = payment;

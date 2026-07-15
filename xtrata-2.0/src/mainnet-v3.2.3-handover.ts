@@ -14,7 +14,7 @@ import {
   disconnectWallet,
   showContractCall,
   showContractDeploy
-} from './lib/wallet/connect';
+} from './lib/wallet/coordinator';
 import type { WalletSession } from './lib/wallet/types';
 
 type TryResult = { ok: boolean; value?: unknown; error?: string };

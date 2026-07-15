@@ -1,5 +1,10 @@
 # Live Test Checklist — main-staging → main (PR #212, 26 commits)
 
+Wallet release testing is now canonicalized in
+[`docs/wallet-live-testing.md`](../wallet-live-testing.md). Complete its full
+Xverse/Leather surface and transaction matrix in addition to the historical
+checks below.
+
 Verified against the shipped source (`src/home/main.js`, `xtrata-agent-one/wizard/*`), not just commit titles. Work top to bottom on the live site; each item says what to do and what "pass" looks like.
 
 ## 1. Inscribe panel — collapsed landing & mode switching

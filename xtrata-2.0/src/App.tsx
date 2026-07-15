@@ -11,7 +11,7 @@ import {
   showContractCall,
   showContractDeploy,
   showStxTransfer
-} from './lib/wallet/connect';
+} from './lib/wallet/coordinator';
 import { hexToBytes } from '@stacks/common';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -42,7 +42,7 @@ import type { NetworkType } from './lib/network/types';
 import { getViewerKey } from './lib/viewer/queries';
 import { isRuntimeWalletBridgeTokenValid } from './lib/viewer/runtime-open';
 import { createStacksWalletAdapter } from './lib/wallet/adapter';
-import { createWalletSessionStore } from './lib/wallet/session';
+import { getWalletSession } from './lib/wallet/coordinator';
 import { getWalletLookupState } from './lib/wallet/lookup';
 import type { WalletSession } from './lib/wallet/types';
 import {
@@ -123,8 +123,6 @@ const V323_CONTRACT = ACTIVE_CONTRACTS.find(
     entry.protocolVersion === '3.2.3' &&
     entry.contractName === 'xtrata-v3-2-3'
 );
-const walletSessionStore = createWalletSessionStore();
-
 const CONTRACT_NAME_PATTERN = /^[a-zA-Z][a-zA-Z0-9-_]{0,127}$/;
 const TEMPLATE_GUIDE_PATH = 'docs/artist-guides/collection-template-deploy-guide.md';
 type DeployMode = 'guided-template' | 'advanced-source';
@@ -687,7 +685,7 @@ export default function App() {
     contractSelectionStore.load()
   );
   const [walletSession, setWalletSession] = useState(() =>
-    walletSessionStore.load()
+    getWalletSession()
   );
   const [rateLimitWarning, setRateLimitWarning] = useState(false);
   const [deployMode, setDeployMode] = useState<DeployMode>('guided-template');
@@ -953,6 +951,7 @@ export default function App() {
 
   useEffect(() => {
     setWalletSession(walletAdapter.getSession());
+    return walletAdapter.subscribe(setWalletSession);
   }, [walletAdapter]);
 
   useEffect(() => {
@@ -1124,7 +1123,8 @@ export default function App() {
                     'Wallet transaction was cancelled by the user.',
                     4001
                   )
-                )
+                ),
+              onError: (error) => reject(error)
             });
           });
         }
@@ -1135,6 +1135,17 @@ export default function App() {
             fallbackNetwork
           );
 
+          let session = walletAdapter.getSession();
+          if (!session.isConnected) {
+            session = await walletAdapter.connect();
+            setWalletSession(session);
+          }
+          if (!session.isConnected || !session.address) {
+            throw createRuntimeWalletBridgeError(
+              'Wallet transaction was cancelled by the user.',
+              4001
+            );
+          }
           return await new Promise((resolve, reject) => {
             showStxTransfer(
               {
@@ -1142,6 +1153,7 @@ export default function App() {
                 amount: request.amount,
                 memo: request.memo,
                 network: request.network,
+                stxAddress: session.address,
                 appDetails: {
                   name: 'xtrata',
                   icon:
@@ -1154,7 +1166,8 @@ export default function App() {
                       'Wallet transaction was cancelled by the user.',
                       4001
                     )
-                  )
+                  ),
+                onError: (error) => reject(error)
               }
             );
           });

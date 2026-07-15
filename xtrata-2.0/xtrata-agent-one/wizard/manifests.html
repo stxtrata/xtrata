@@ -90,6 +90,7 @@
   <span id="health" class="pill">connecting…</span>
   <span id="walletAddr" class="pill" style="display:none;cursor:pointer;color:var(--ok);border-color:#1f5a45"></span>
   <button class="btn ghost" id="connectBtn">Connect wallet</button>
+  <button class="btn ghost" id="disconnectBtn" style="display:none">Disconnect</button>
 </header>
 
 <main>
@@ -213,7 +214,7 @@
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=18"></script>
+<script src="agent-one.js?v=19"></script>
 <script>
 const $=(s)=>document.querySelector(s);
 const $$=(s)=>Array.from(document.querySelectorAll(s));
@@ -254,13 +255,14 @@ function xa(){const A=window.XtrataAgent;if(!A)throw new Error('Agent bundle not
 const shortAddr=a=>a.slice(0,5)+'…'+a.slice(-4);
 async function bnsLookup(addr){try{const r=await fetch((window.XAO_CONFIG.hiro||'').replace(/\/(mainnet|testnet)\/?$/,'')+'/v1/addresses/stacks/'+addr);if(!r.ok)return null;const d=await r.json();return (d&&d.names&&d.names[0])||null}catch{return null}}
 function renderWallet(){const el=$('#walletAddr');if(!WALLET){el.style.display='none';return}el.style.display='';el.textContent='● '+(WALLET_NAME||shortAddr(WALLET));el.title=WALLET}
-function setWallet(a){WALLET=a||null;WALLET_NAME=null;$('#connectBtn').textContent=WALLET?'Disconnect':'Connect wallet';renderWallet();
+function setWallet(a){WALLET=a||null;WALLET_NAME=null;$('#connectBtn').textContent=WALLET?'Change account':'Connect wallet';$('#disconnectBtn').style.display=WALLET?'':'none';renderWallet();
   if(WALLET){bnsLookup(WALLET).then(n=>{if(n&&WALLET===a){WALLET_NAME=n;renderWallet();if(!$('#mBns').value)$('#mBns').value=n;}});}}
 $('#connectBtn').onclick=async()=>{const w=xw();
-  if(WALLET){try{w&&w.disconnect&&await w.disconnect()}catch{}setWallet(null);return}
   if(!w||!w.connect){alert('Wallet bundle not loaded — open this page from the Xtrata site.');return}
   try{const a=await w.connect();a&&setWallet(a)}catch(e){alert('Connect failed: '+((e&&e.message)||e))}};
+$('#disconnectBtn').onclick=async()=>{const w=xw();try{w&&w.disconnect&&await w.disconnect()}catch{}setWallet(null)};
 (function(){try{const w=xw();const a=w&&w.getAddress&&w.getAddress();if(a)setWallet(a)}catch{}})();
+try{const w=xw();if(w&&w.subscribe)w.subscribe((address)=>setWallet(address))}catch{}
 (async()=>{try{const h=await xa().health();SERVER.mock=!!h.mock;SERVER.net=h.net||'mainnet';
   $('#health').className='pill '+(h.mock?'mock':'live');$('#health').textContent=(h.mock?'MOCK':'LIVE')+' · '+SERVER.net;
 }catch{$('#health').textContent='agent not loaded';$('#health').style.color='var(--bad)'}})();

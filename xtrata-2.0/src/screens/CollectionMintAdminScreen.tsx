@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { showContractCall } from '../lib/wallet/connect';
+import { showContractCall } from '../lib/wallet/coordinator';
 import {
   bufferCV,
   boolCV,

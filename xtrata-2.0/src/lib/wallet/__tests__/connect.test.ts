@@ -403,7 +403,7 @@ describe('wallet connect helpers', () => {
     expect(legacyProvider.request).not.toHaveBeenCalled();
   });
 
-  it('reuses a fresh cached account read for the transfer instead of re-querying Xverse', async () => {
+  it('does not reuse a completed account read that could conceal an Xverse account switch', async () => {
     const legacyProvider = { request: vi.fn() };
     const rpcProvider = {
       request: vi.fn(async (method: string) => {
@@ -427,12 +427,12 @@ describe('wallet connect helpers', () => {
       BitcoinProvider: rpcProvider
     };
 
-    // First read populates the cache (as sync/connect does in the wizard)…
+    // A completed read is deliberately not reusable across actions.
     await expect(__testing.getXverseActiveAccount(legacyProvider as never)).resolves.toMatchObject({
       isConnected: true,
       address: ADDRESS
     });
-    // …then the transfer's account check reuses it: no second wallet_getAccount.
+    // The later transfer verifies again immediately before opening its popup.
     await expect(
       __testing.requestStxTransfer(legacyProvider as never, {
         recipient: ADDRESS,
@@ -443,6 +443,7 @@ describe('wallet connect helpers', () => {
       })
     ).resolves.toMatchObject({ txId: '0xabc123' });
     expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual([
+      'wallet_getAccount',
       'wallet_getAccount',
       'stx_transferStx'
     ]);
@@ -531,7 +532,7 @@ describe('wallet connect helpers', () => {
     const legacyProvider = { request: vi.fn() };
     const signingProvider = {
       request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
-        if (method === 'stx_getAccounts') {
+        if (method === 'wallet_getAccount') {
           return { status: 'success', result: { addresses: [{ address, publicKey }] } };
         }
         expect(method).toBe('stx_signTransaction');
@@ -573,7 +574,7 @@ describe('wallet connect helpers', () => {
 
     expect(legacyProvider.request).not.toHaveBeenCalled();
     expect(signingProvider.request.mock.calls.map(([method]) => method)).toEqual([
-      'stx_getAccounts',
+      'wallet_getAccount',
       'stx_signTransaction'
     ]);
     expect(result.txRaw).toMatch(/^[0-9a-f]+$/i);

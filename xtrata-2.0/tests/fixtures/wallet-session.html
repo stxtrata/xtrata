@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Wallet session browser harness</title>
+<script type="module">
+  import { createVersionedWalletSessionStore } from '/src/lib/wallet/session.ts';
+  const store = createVersionedWalletSessionStore();
+  window.walletHarness = {
+    load: () => store.load(),
+    connect: (address, providerId = 'LeatherProvider') => store.saveConnected({
+      session: { isConnected: true, address, network: 'mainnet' },
+      providerId,
+      transportId: providerId.includes('Xverse')
+        ? 'XverseProviders.BitcoinProvider'
+        : providerId,
+      walletType: providerId.includes('Xverse') ? 'xverse' : 'leather'
+    }),
+    accountChanged: () => store.markReconnectRequired(),
+    disconnect: () => store.clear()
+  };
+  document.documentElement.dataset.ready = 'true';
+</script>

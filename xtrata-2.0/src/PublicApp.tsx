@@ -35,7 +35,7 @@ import type { NetworkType } from './lib/network/types';
 import { isRateLimitError, isReadOnlyNetworkError } from './lib/contract/read-only';
 import { getViewerKey } from './lib/viewer/queries';
 import { createStacksWalletAdapter } from './lib/wallet/adapter';
-import { createWalletSessionStore } from './lib/wallet/session';
+import { getWalletSession } from './lib/wallet/coordinator';
 import { getWalletLookupState } from './lib/wallet/lookup';
 import {
   applyThemeToDocument,
@@ -53,8 +53,6 @@ import ViewerScreen, { type ViewerMode } from './screens/ViewerScreen';
 import WalletLookupScreen from './screens/WalletLookupScreen';
 import PublicCommerceScreen from './screens/PublicCommerceScreen';
 import PublicMarketScreen from './screens/PublicMarketScreen';
-
-const walletSessionStore = createWalletSessionStore();
 
 const SECTION_KEYS = [
   'wallet-lookup',
@@ -1452,7 +1450,7 @@ export default function PublicApp() {
     resolveInitialTheme()
   );
   const [walletSession, setWalletSession] = useState(() =>
-    walletSessionStore.load()
+    getWalletSession()
   );
   const [rateLimitWarning, setRateLimitWarning] = useState(false);
   const [walletPending, setWalletPending] = useState(false);
@@ -1915,6 +1913,7 @@ export default function PublicApp() {
 
   useEffect(() => {
     setWalletSession(walletAdapter.getSession());
+    return walletAdapter.subscribe(setWalletSession);
   }, [walletAdapter]);
 
   const handleConnectWallet = async () => {

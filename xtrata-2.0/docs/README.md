@@ -96,6 +96,8 @@ Release notes
 Product oversight
 	•	docs/product-contract-ui-reference.md
 	•	docs/xtrata-v3-migration-reference.md
+	•	docs/wallet-architecture.md — canonical wallet invariants and surface inventory
+	•	docs/wallet-live-testing.md — extension capability and release sign-off runbook
 
 Artist guides
 	•	docs/artist-guides/README.md

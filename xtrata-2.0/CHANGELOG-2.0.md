@@ -2,6 +2,15 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Shared wallet coordinator (2026-07-15)
+
+- Added a versioned wallet coordinator as the sole authored first-party entry point for provider selection, session state and all write types. Xverse records and resolves the BitcoinProvider transport for the complete session; UI and console imports no longer call the internal transport directly.
+- Added revision/generation session records with `BroadcastChannel` and storage-event propagation, stale-update rejection, immediate cross-tab disconnect, and `RECONNECT_REQUIRED` account-change semantics. Provider objects are resolved locally and never serialized.
+- Added expected-sender/mainnet write-boundary checks, a one-operation interactive lock, action-scoped Xverse verification, typed safe errors, and removal of the completed 45-second account cache. The 30-second timeout and no-`stx_getAccounts` recovery/deposit fix remain intact.
+- Agent One, SUNO and Manifest Studio now consume the shared global facade, subscribe to cross-tab state, expose explicit Change account and Disconnect controls, and no longer disconnect before account selection. Wizard recovery, expected-funder, deposit, refund and recipient behavior is unchanged.
+- Runtime wallet reads/connect/writes now require the authenticated host bridge, whose handler routes through the coordinator. Added generated Agent One bundle versioning, coordinator-only source verification, documentation contracts, wallet-specific unit/type/browser gates, and canonical architecture/live-test runbooks.
+- Live Xverse and Leather spending/capability sign-off remains intentionally manual in `docs/wallet-live-testing.md`; automated mocks are not treated as extension evidence.
+
 ## ESLint source gate repair (2026-07-14)
 
 - Replaced the incompatible flat-config React Refresh preset with its supported legacy `.eslintrc.cjs` rule equivalent, while preserving constant exports and React/Hook checks.

@@ -47,7 +47,7 @@ import {
 } from './lib/viewer/queries';
 import type { TokenSummary } from './lib/viewer/types';
 import { createStacksWalletAdapter } from './lib/wallet/adapter';
-import { createWalletSessionStore } from './lib/wallet/session';
+import { getWalletSession } from './lib/wallet/coordinator';
 import { getWalletLookupState } from './lib/wallet/lookup';
 import {
   normalizePublicWalletLookup,
@@ -72,8 +72,6 @@ import AddressLabel from './components/AddressLabel';
 import MintScreen from './screens/MintScreen';
 import PublicMarketScreen from './screens/PublicMarketScreen';
 import ViewerScreen, { type ViewerMode } from './screens/ViewerScreen';
-
-const walletSessionStore = createWalletSessionStore();
 
 const WORKSPACE_PATH = '/workspace';
 const OPUS_GENERATOR_PATH = '/opus-file-generator/';
@@ -742,7 +740,7 @@ export default function SimplePublicHome() {
     resolveInitialTheme()
   );
   const [walletSession, setWalletSession] = useState(() =>
-    walletSessionStore.load()
+    getWalletSession()
   );
   const [walletPending, setWalletPending] = useState(false);
   const [rateLimitWarning, setRateLimitWarning] = useState(false);
@@ -940,6 +938,7 @@ export default function SimplePublicHome() {
 
   useEffect(() => {
     setWalletSession(walletAdapter.getSession());
+    return walletAdapter.subscribe(setWalletSession);
   }, [walletAdapter]);
 
   useEffect(() => {

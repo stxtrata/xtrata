@@ -6,7 +6,7 @@ import {
   useState,
   type SyntheticEvent
 } from 'react';
-import { showContractCall } from './lib/wallet/connect';
+import { showContractCall } from './lib/wallet/coordinator';
 import { sha256 } from '@noble/hashes/sha256';
 import {
   bufferCV,
@@ -97,14 +97,13 @@ import { createObjectUrl } from './lib/utils/blob';
 import { bytesToHex } from './lib/utils/encoding';
 import { formatBytes } from './lib/utils/format';
 import { createStacksWalletAdapter } from './lib/wallet/adapter';
-import { createWalletSessionStore } from './lib/wallet/session';
+import { getWalletSession } from './lib/wallet/coordinator';
 import type { WalletSession } from './lib/wallet/types';
 import AddressLabel from './components/AddressLabel';
 import CollectionCoverImage from './components/CollectionCoverImage';
 import TokenCardMedia from './components/TokenCardMedia';
 import WalletTopBar from './components/WalletTopBar';
 
-const walletSessionStore = createWalletSessionStore();
 const CONTRACT_NAME_PATTERN = /^[a-zA-Z][a-zA-Z0-9-_]{0,127}$/;
 const HASH_HEX_PATTERN = /^[0-9a-f]{64}$/;
 const MINT_CHUNK_BATCH_SIZE = 30;
@@ -1045,7 +1044,7 @@ const isOptionalSome = (value: ClarityValue | null) => {
 export default function CollectionMintLivePage(props: CollectionMintLivePageProps) {
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => resolveInitialTheme());
   const [walletSession, setWalletSession] = useState<WalletSession>(() =>
-    walletSessionStore.load()
+    getWalletSession()
   );
   const [walletPending, setWalletPending] = useState(false);
   const usdPriceBook = useUsdPriceBook().data ?? null;
@@ -3119,6 +3118,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
 
   useEffect(() => {
     setWalletSession(walletAdapter.getSession());
+    return walletAdapter.subscribe(setWalletSession);
   }, [walletAdapter]);
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { showContractCall, showContractDeploy } from '../lib/wallet/connect';
+import { showContractCall, showContractDeploy } from '../lib/wallet/coordinator';
 import { useQuery } from '@tanstack/react-query';
 import {
   boolCV,

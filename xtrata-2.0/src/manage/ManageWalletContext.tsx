@@ -1,9 +1,6 @@
 import { createContext, useContext, useMemo, useState, useEffect, type ReactNode } from 'react';
 import { createStacksWalletAdapter } from '../lib/wallet/adapter';
-import { createWalletSessionStore } from '../lib/wallet/session';
 import type { WalletSession } from '../lib/wallet/types';
-
-const walletSessionStore = createWalletSessionStore();
 
 type ManageWalletContextValue = {
   walletAdapter: ReturnType<typeof createStacksWalletAdapter>;
@@ -36,24 +33,21 @@ export function ManageWalletProvider({ children }: ManageWalletProviderProps) {
       }),
     []
   );
-  const [walletSession, setWalletSession] = useState(walletSessionStore.load());
+  const [walletSession, setWalletSession] = useState(walletAdapter.getSession());
 
   useEffect(() => {
-    const session = walletAdapter.getSession();
-    setWalletSession(session);
-    walletSessionStore.save(session);
+    setWalletSession(walletAdapter.getSession());
+    return walletAdapter.subscribe(setWalletSession);
   }, [walletAdapter]);
 
   const connect = async () => {
     const session = await walletAdapter.connect();
-    walletSessionStore.save(session);
     setWalletSession(session);
   };
 
   const disconnect = async () => {
     await walletAdapter.disconnect();
     const session = walletAdapter.getSession();
-    walletSessionStore.save(session);
     setWalletSession(session);
   };
 

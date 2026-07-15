@@ -417,6 +417,7 @@
     <div class="badge" id="health"><span class="pill">connecting…</span></div>
     <span id="walletAddr" class="pill" style="display:none;cursor:pointer;color:var(--ok);border-color:#1f5a45" title="connected wallet — click to show & copy the address"></span>
     <button class="btn ghost" id="connectBtn" style="padding:7px 13px">Connect wallet</button>
+    <button class="btn ghost" id="disconnectBtn" style="padding:7px 13px;display:none">Disconnect</button>
   </div>
 </header>
 
@@ -659,7 +660,7 @@
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=18"></script>
+<script src="agent-one.js?v=19"></script>
 <script src="optimize-audio.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script>
@@ -760,9 +761,9 @@ async function walletPillClick(){ if(!WALLET) return;
   renderWalletPill();
   if(WALLET_REVEAL){ try{ await navigator.clipboard.writeText(WALLET); $('#walletAddr').textContent='✓ copied'; setTimeout(renderWalletPill,900); }catch{} } }
 function setWallet(addr){ WALLET=addr||null; WALLET_NAME=null; WALLET_REVEAL=false; const btn=$('#connectBtn');
-  if(WALLET){ btn.textContent='Disconnect'; if(!$('#user').value) $('#user').value=WALLET;
+  if(WALLET){ btn.textContent='Change account'; $('#disconnectBtn').style.display=''; if(!$('#user').value) $('#user').value=WALLET;
     renderWalletPill(); bnsLookup(WALLET).then(n=>{ if(n&&WALLET===addr){ WALLET_NAME=n; renderWalletPill(); } }); }
-  else { btn.textContent='Connect wallet'; renderWalletPill(); }
+  else { btn.textContent='Connect wallet'; $('#disconnectBtn').style.display='none'; renderWalletPill(); }
   try{ checkParents().catch(()=>{}); }catch{} try{ checkBatchParents().catch(()=>{}); }catch{} }   // re-verify declared parents (single + batch) against the (dis)connected wallet; both are async so swallow rejections too
 async function connectWallet(){
   const w=xtrataWallet();
@@ -781,8 +782,10 @@ async function syncActiveWallet(){
     if(active!==WALLET) setWallet(active); return active||null; }
   catch(e){ xlog('wallet','active account read FAILED',{message:(e&&e.message)||String(e),ms:Date.now()-t0}); setWallet(null); return null; }
 }
-$('#connectBtn').onclick=()=>{ WALLET?disconnectWallet():connectWallet(); };
+$('#connectBtn').onclick=()=>connectWallet();
+$('#disconnectBtn').onclick=()=>disconnectWallet();
 $('#walletAddr').onclick=walletPillClick;
+try{ const w=xtrataWallet(); if(w&&w.subscribe) w.subscribe((address)=>setWallet(address)); }catch{}
 // Restore from Xverse's live active account, never just the persisted app
 // address. Deferred so setWallet() runs after the batch/parent declarations.
 queueMicrotask(()=>{ syncActiveWallet().catch(()=>setWallet(null)); });

@@ -85,6 +85,11 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 
 ## Contracts, network, and wallet plumbing
 
+Wallet changes must begin with `docs/wallet-architecture.md` and finish with
+`npm run smoke:wallet`. `src/lib/wallet/coordinator.ts` is the sole first-party
+entry point for connection, state and writes. `connect.ts` is an internal
+one-release transport compatibility layer, not an application API.
+
 - `src/data/contract-registry.json` stores the named contract list used by the selector.
 - `src/data/market-registry.json` stores the app-side market contract list used by the selector, including optional payment-token metadata for STX, USDCx, and sBTC settlement-aware market flows.
 - `src/data/commerce-registry.json` stores the app-side commerce contract list used for USDCx listing/purchase helpers.
@@ -106,8 +111,19 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 - `functions/hiro/[network]/[[path]].ts` proxies Hiro API calls and injects API keys when present.
 - `functions/bnsv2/[network]/[[path]].ts` proxies BNSv2 API lookups used for address-to-name resolution.
 - `functions/explorer/[[path]].ts` proxies Explorer HTML pages used by BNS name/address scraping.
-- `src/lib/wallet/session.ts` and `src/lib/wallet/storage.ts` persist wallet sessions.
-- `src/lib/wallet/adapter.ts` centralizes wallet request calls and types.
+- `src/lib/wallet/session.ts` persists the revisioned v2 session and synchronizes
+  it with `BroadcastChannel` plus the `storage` fallback.
+- `src/lib/wallet/providers/{xverse,leather,generic}.ts` resolve one concrete
+  transport per connection. Xverse connection and writes remain on its selected
+  BitcoinProvider transport.
+- `src/lib/wallet/transactions.ts` enforces expected-sender and mainnet checks;
+  `src/lib/wallet/errors.ts` owns stable UI-safe error codes.
+- `src/lib/wallet/adapter.ts` is the React/static facade over the coordinator.
+- Production inventory: Home/Inscribe/Xplorer/My Xtrata/Market/Drops; Wizard,
+  SUNO and Manifest Studio; workspace/admin/manage; migration/deploy/sponsor
+  consoles; Forever Twins; and runtime/recursive apps through the host bridge.
+  Archived/versioned standalone HTML is classified separately in the canonical
+  architecture and must not be treated as a production wallet owner.
 
 ## Forever Twins (collection linking + escrow display)
 
@@ -292,8 +308,12 @@ Files: `src/App.tsx`, `src/lib/contract/client.ts`, `src/lib/network/stacks.ts`,
 Notes: deploy UI lives in App; transaction building lives in contract client.
 
 7) Wallet connect, disconnect, and session persistence changes.
-Files: `src/lib/wallet/session.ts`, `src/lib/wallet/storage.ts`, `src/lib/wallet/adapter.ts`, `src/App.tsx`.
-Notes: session persistence is separated from UI state and should stay that way.
+Files: `docs/wallet-architecture.md`, `src/lib/wallet/coordinator.ts`,
+`src/lib/wallet/providers/**`, `src/lib/wallet/session.ts`,
+`src/lib/wallet/transactions.ts`, `src/lib/wallet/errors.ts`,
+`src/lib/wallet/adapter.ts`, the affected surface, wallet tests and bundle gates.
+Notes: preserve the single-provider/single-session invariants, never poll from a
+page, and run `npm run smoke:wallet`.
 
 8) Mint flow changes (file validation, hashing, fee logic, transaction steps).
 Files: `index.html`, `src/screens/MintScreen.tsx`, `src/lib/chunking/hash.ts`, `src/lib/protocol/clarity.ts`, `src/lib/contract/client.ts`, `src/lib/wallet/adapter.ts`.

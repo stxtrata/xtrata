@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vite/client"]
+  },
+  "include": [
+    "src/lib/wallet/**/*.ts"
+  ],
+  "exclude": ["src/**/__tests__/**"]
+}

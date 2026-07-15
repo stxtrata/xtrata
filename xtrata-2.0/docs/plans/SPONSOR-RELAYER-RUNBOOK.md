@@ -1,5 +1,9 @@
 # Sponsor Relayer Runbook
 
+Provider/session rules are canonical in [`docs/wallet-architecture.md`](../wallet-architecture.md),
+and live extension sign-off is recorded in [`docs/wallet-live-testing.md`](../wallet-live-testing.md).
+This runbook only defines sponsor-specific transaction and relayer behavior.
+
 The relayer pays buyers' mining fees on the sponsored markets and reimburses itself from seller fee budgets. It holds a **hot wallet with a small STX float only** — treat it like a prepaid card, never a treasury.
 
 ## One-time setup

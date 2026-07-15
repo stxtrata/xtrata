@@ -76,6 +76,7 @@
   <span id="health" class="pill">connecting…</span>
   <span id="walletAddr" class="pill" style="display:none;cursor:pointer;color:var(--ok);border-color:#1f5a45" title="connected wallet — click to show & copy the address"></span>
   <button class="btn ghost" id="connectBtn">Connect wallet</button>
+  <button class="btn ghost" id="disconnectBtn" style="display:none">Disconnect</button>
 </header>
 
 <main>
@@ -178,7 +179,7 @@
 <script src="HTML_Template.js?v=6"></script>
 <script src="suno-build.js?v=7"></script>
 <script src="optimize-image.js?v=1"></script>
-<script src="agent-one.js?v=18"></script>
+<script src="agent-one.js?v=19"></script>
 <script>
 const SERVER = { mock:false, net:'mainnet' };
 // VERSION HANDSHAKE: this page requires AT LEAST the agent bundle build below. The site's deploy
@@ -253,13 +254,14 @@ async function walletPillClick(){ if(!WALLET) return;
   renderWalletPill();
   if(WALLET_REVEAL){ try{ await navigator.clipboard.writeText(WALLET); $('#walletAddr').textContent='✓ copied'; setTimeout(renderWalletPill,900); }catch{} } }
 function setWallet(a){ WALLET=a||null; WALLET_NAME=null; WALLET_REVEAL=false; const b=$('#connectBtn');
-  if(WALLET){ b.textContent='Disconnect'; renderWalletPill(); bnsLookup(WALLET).then(n=>{ if(n&&WALLET===a){ WALLET_NAME=n; renderWalletPill(); } }); }
-  else { b.textContent='Connect wallet'; renderWalletPill(); } updateGo(); }
+  if(WALLET){ b.textContent='Change account'; $('#disconnectBtn').style.display=''; renderWalletPill(); bnsLookup(WALLET).then(n=>{ if(n&&WALLET===a){ WALLET_NAME=n; renderWalletPill(); } }); }
+  else { b.textContent='Connect wallet'; $('#disconnectBtn').style.display='none'; renderWalletPill(); } updateGo(); }
 async function connectWallet(){ const w=xw();
   if(!w||!w.connect){ alert('Wallet bundle not loaded. Open this from the Xtrata site so agent-one.js (wallet) is present.'); return; }
   try{ const a=await w.connect(); a?setWallet(a):alert('Connected, but no Stacks address returned.'); }catch(e){ alert('Connect failed:\n'+((e&&e.message)||e)); } }
 async function disconnectWallet(){ try{ const w=xw(); if(w&&w.disconnect) await w.disconnect(); }catch{} setWallet(null); }
-$('#connectBtn').onclick=()=>{ WALLET?disconnectWallet():connectWallet(); };
+$('#connectBtn').onclick=()=>connectWallet();
+$('#disconnectBtn').onclick=()=>disconnectWallet();
 $('#walletAddr').onclick=walletPillClick;   // disconnect lives on the button; the pill reveals/copies
 async function payWallet(addr, ustx){ const w=xw();
   if(!w||!w.pay) throw new Error('wallet cannot pay — open inside the Xtrata site');
@@ -271,6 +273,7 @@ async function payWallet(addr, ustx){ const w=xw();
   checkAgentBuild();
 }catch(e){ $('#health').textContent='agent not loaded'; $('#health').style.color='var(--bad)'; } updateGo(); })();
 (function(){ try{ const w=xw(); const a=w&&w.getAddress&&w.getAddress(); if(a) setWallet(a); }catch{} })();
+try{ const w=xw(); if(w&&w.subscribe) w.subscribe((address)=>setWallet(address)); }catch{}
 
 // ---- file pick / drop → build the player in-browser, then quote on its exact size ----
 const drop=$('#drop'), picker=$('#picker');

@@ -16,7 +16,7 @@
  * The deployable registry mirrors scripts/mainnet-deploy-contract.mjs, and
  * the preflight applies the same rules in-browser.
  */
-import { connectWallet, disconnectWallet, showContractCall, showContractDeploy } from './lib/wallet/connect';
+import { connectWallet, disconnectWallet, showContractCall, showContractDeploy } from './lib/wallet/coordinator';
 import { standardPrincipalCV } from '@stacks/transactions';
 import { toStacksNetwork } from './lib/network/stacks';
 import type { WalletSession } from './lib/wallet/types';

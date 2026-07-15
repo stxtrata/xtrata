@@ -19,7 +19,7 @@ import {
   disconnectWallet,
   showContractCall,
   showStxTransfer
-} from './lib/wallet/connect';
+} from './lib/wallet/coordinator';
 import { toStacksNetwork } from './lib/network/stacks';
 import type { WalletSession } from './lib/wallet/types';
 import {

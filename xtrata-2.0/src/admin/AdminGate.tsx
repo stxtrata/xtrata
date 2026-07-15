@@ -10,7 +10,7 @@ import { getContractId } from '../lib/contract/config';
 import { createXtrataClient } from '../lib/contract/client';
 import { isAdminAddressAllowed, getAdminAllowlist } from '../lib/admin/access';
 import { createStacksWalletAdapter } from '../lib/wallet/adapter';
-import { createWalletSessionStore } from '../lib/wallet/session';
+import { getWalletSession } from '../lib/wallet/coordinator';
 import {
   applyThemeToDocument,
   coerceThemeMode,
@@ -25,14 +25,12 @@ type AdminGateProps = {
   children: ReactNode;
 };
 
-const walletSessionStore = createWalletSessionStore();
-
 export default function AdminGate({ children }: AdminGateProps) {
   const [themeMode, setThemeMode] = useState<ThemeMode>(() =>
     resolveInitialTheme()
   );
   const [walletSession, setWalletSession] = useState(() =>
-    walletSessionStore.load()
+    getWalletSession()
   );
   const [ownerAddress, setOwnerAddress] = useState<string | null>(null);
   const [ownerStatus, setOwnerStatus] = useState<string | null>(null);
@@ -58,6 +56,7 @@ export default function AdminGate({ children }: AdminGateProps) {
 
   useEffect(() => {
     setWalletSession(walletAdapter.getSession());
+    return walletAdapter.subscribe(setWalletSession);
   }, [walletAdapter]);
 
   useEffect(() => {

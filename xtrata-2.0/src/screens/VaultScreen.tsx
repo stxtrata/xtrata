@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { showContractCall } from '../lib/wallet/connect';
+import { showContractCall } from '../lib/wallet/coordinator';
 import { PostConditionMode, validateStacksAddress, type PostCondition } from '@stacks/transactions';
 import type { ContractCallOptions } from '@stacks/connect';
 import type { ContractRegistryEntry } from '../lib/contract/registry';
