@@ -22,6 +22,7 @@ const ADDRESS = 'SP2MF04VAGYHGAZWGTEDW5VYCPDWWSY08Z1QFNDSN';
 
 describe('wallet connect helpers', () => {
   afterEach(() => {
+    __testing.clearXverseAccountCache();
     window.localStorage.clear();
     delete (window as typeof window & { LeatherProvider?: unknown }).LeatherProvider;
     delete (window as typeof window & { XverseProviders?: unknown }).XverseProviders;
@@ -375,7 +376,7 @@ describe('wallet connect helpers', () => {
     const legacyProvider = { request: vi.fn() };
     const rpcProvider = {
       request: vi.fn(async (method: string) => {
-        expect(['wallet_getAccount', 'stx_getAccounts']).toContain(method);
+        expect(method).toBe('wallet_getAccount');
         throw Object.assign(new Error('Access denied'), { code: -32001 });
       })
     };
@@ -398,21 +399,15 @@ describe('wallet connect helpers', () => {
         stxAddress: ADDRESS
       })
     ).rejects.toMatchObject({ code: 'XVERSE_ACTIVE_ACCOUNT_UNAVAILABLE' });
-    expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual([
-      'wallet_getAccount',
-      'stx_getAccounts'
-    ]);
+    expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual(['wallet_getAccount']);
     expect(legacyProvider.request).not.toHaveBeenCalled();
   });
 
-  it('falls back to stx_getAccounts when wallet_getAccount fails, then completes the transfer', async () => {
+  it('reuses a fresh cached account read for the transfer instead of re-querying Xverse', async () => {
     const legacyProvider = { request: vi.fn() };
     const rpcProvider = {
       request: vi.fn(async (method: string) => {
         if (method === 'wallet_getAccount') {
-          throw new Error('internal error');
-        }
-        if (method === 'stx_getAccounts') {
           return {
             status: 'success',
             result: { addresses: [{ address: ADDRESS, purpose: 'stacks', network: 'Mainnet' }] }
@@ -432,6 +427,12 @@ describe('wallet connect helpers', () => {
       BitcoinProvider: rpcProvider
     };
 
+    // First read populates the cache (as sync/connect does in the wizard)…
+    await expect(__testing.getXverseActiveAccount(legacyProvider as never)).resolves.toMatchObject({
+      isConnected: true,
+      address: ADDRESS
+    });
+    // …then the transfer's account check reuses it: no second wallet_getAccount.
     await expect(
       __testing.requestStxTransfer(legacyProvider as never, {
         recipient: ADDRESS,
@@ -443,7 +444,6 @@ describe('wallet connect helpers', () => {
     ).resolves.toMatchObject({ txId: '0xabc123' });
     expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual([
       'wallet_getAccount',
-      'stx_getAccounts',
       'stx_transferStx'
     ]);
     expect(legacyProvider.request).not.toHaveBeenCalled();

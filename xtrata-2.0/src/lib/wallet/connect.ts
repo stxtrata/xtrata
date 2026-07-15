@@ -803,12 +803,25 @@ const buildXverseConnectParams = () => ({
   message: XVERSE_MAINNET_CONNECT_PARAMS.message
 });
 
-// Some Xverse builds answer wallet_getAccount once and leave every subsequent
-// call pending forever (no popup, no rejection). Every read therefore gets a
-// hard timeout, and a failed/hung wallet_getAccount falls back to
-// stx_getAccounts before giving up, so callers see a prompt error instead of
-// an indefinite hang.
-const XVERSE_ACCOUNT_READ_TIMEOUT_MS = 10_000;
+// Xverse's wallet_getAccount can take 12–15s to answer (and some builds never
+// answer). Do NOT fall back to stx_getAccounts: on current Xverse that opens a
+// "Mismatched Network" prompt and gets rejected. Instead: generous timeout,
+// share any in-flight read, and cache the last good answer briefly so the
+// pre-transfer check reuses the read that connect/sync just completed instead
+// of stacking a second 12s wait (or a popup) on the pay click.
+const XVERSE_ACCOUNT_READ_TIMEOUT_MS = 30_000;
+const XVERSE_ACCOUNT_CACHE_MS = 45_000;
+let xverseAccountCache: { session: WalletSession; at: number } | null = null;
+let xverseAccountInFlight: Promise<WalletSession> | null = null;
+const rememberXverseAccount = (session: WalletSession) => {
+  if (session.isConnected) {
+    xverseAccountCache = { session, at: Date.now() };
+  }
+};
+const clearXverseAccountCache = () => {
+  xverseAccountCache = null;
+  xverseAccountInFlight = null;
+};
 const withXverseTimeout = <T>(promise: Promise<T>, method: string) =>
   Promise.race([
     promise,
@@ -817,7 +830,7 @@ const withXverseTimeout = <T>(promise: Promise<T>, method: string) =>
         () =>
           reject(
             Object.assign(
-              new Error(`Xverse did not answer ${method} within 10s.`),
+              new Error(`Xverse did not answer ${method} within 30s.`),
               { code: 'XVERSE_ACCOUNT_READ_TIMEOUT' }
             )
           ),
@@ -826,24 +839,35 @@ const withXverseTimeout = <T>(promise: Promise<T>, method: string) =>
     )
   ]);
 
-const getXverseActiveAccount = async (provider: StacksProvider) => {
-  try {
-    return toWalletSession(
-      await withXverseTimeout(
-        requestWalletRpc(provider, 'wallet_getAccount', {
-          addresses: [...XVERSE_MAINNET_CONNECT_PARAMS.addresses]
-        }),
-        'wallet_getAccount'
-      )
-    );
-  } catch (error) {
-    if (isUserCancelledError(error)) {
-      throw error;
-    }
-    return toWalletSession(
-      await withXverseTimeout(requestWalletRpc(provider, 'stx_getAccounts'), 'stx_getAccounts')
-    );
+const getXverseActiveAccount = (provider: StacksProvider): Promise<WalletSession> => {
+  if (
+    xverseAccountCache &&
+    Date.now() - xverseAccountCache.at < XVERSE_ACCOUNT_CACHE_MS &&
+    xverseAccountCache.session.isConnected
+  ) {
+    return Promise.resolve(xverseAccountCache.session);
   }
+  if (xverseAccountInFlight) {
+    return xverseAccountInFlight;
+  }
+  const read = (async () => {
+    try {
+      const session = toWalletSession(
+        await withXverseTimeout(
+          requestWalletRpc(provider, 'wallet_getAccount', {
+            addresses: [...XVERSE_MAINNET_CONNECT_PARAMS.addresses]
+          }),
+          'wallet_getAccount'
+        )
+      );
+      rememberXverseAccount(session);
+      return session;
+    } finally {
+      xverseAccountInFlight = null;
+    }
+  })();
+  xverseAccountInFlight = read;
+  return read;
 };
 
 export const readActiveWalletSession = async (): Promise<WalletSession | null> => {
@@ -1176,6 +1200,9 @@ const connectViaRequest = async (provider: StacksProvider) => {
           : undefined
       );
       const session = toWalletSession(response);
+      if (session.isConnected && isSelectedXverseProvider(provider)) {
+        rememberXverseAccount(session);
+      }
       if (session.isConnected) {
         // eslint-disable-next-line no-console
         console.info('[wallet:connect]', {
@@ -1398,6 +1425,7 @@ export const connectWallet = async (params: {
 };
 
 export const disconnectWallet = async () => {
+  clearXverseAccountCache();
   const provider = getStacksProvider();
   const xverse = Boolean(provider && isSelectedXverseProvider(provider));
   if (provider && (xverse || isLeatherProviderId(getSelectedProviderId()))) {
@@ -1562,6 +1590,7 @@ export const showStxTransfer = (options: WalletStxTransferOptions, provider?: St
 };
 
 export const __testing = {
+  clearXverseAccountCache,
   buildContractCallParams,
   buildContractDeployParams,
   buildStxTransferParams,

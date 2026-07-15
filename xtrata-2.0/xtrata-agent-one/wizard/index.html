@@ -659,7 +659,7 @@
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=17"></script>
+<script src="agent-one.js?v=18"></script>
 <script src="optimize-audio.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script>
@@ -776,7 +776,7 @@ async function syncActiveWallet(){
   const w=xtrataWallet();
   if(!w||!w.getActiveAddress) return WALLET;
   const t0=Date.now();
-  try{ const active=await withTimeout(w.getActiveAddress(),15000,'Xverse active-account read (wallet_getAccount)');
+  try{ const active=await withTimeout(w.getActiveAddress(),35000,'Xverse active-account read (wallet_getAccount)');
     xlog('wallet','active account read',{address:active||null,ms:Date.now()-t0});
     if(active!==WALLET) setWallet(active); return active||null; }
   catch(e){ xlog('wallet','active account read FAILED',{message:(e&&e.message)||String(e),ms:Date.now()-t0}); setWallet(null); return null; }
