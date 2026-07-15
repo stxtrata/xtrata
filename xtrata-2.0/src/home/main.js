@@ -11327,6 +11327,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       historyEvents: [],
       claimRound: 0,
       claimsInFlight: new Set(),
+      claimProgress: new Map(),
       recentlyClaimed: new Set(),
       createWatchRun: 0
     };
@@ -11651,11 +11652,24 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       ];
     };
 
+    const setDropClaimProgress = (claimKey, buttonText, statusHtml) => {
+      dropsState.claimProgress.set(claimKey, buttonText);
+      dropsDom.listings?.querySelectorAll('[data-drop-claim]').forEach((button) => {
+        if (button.dataset.dropClaim !== claimKey) return;
+        button.disabled = true;
+        button.setAttribute('aria-busy', 'true');
+        button.textContent = buttonText;
+        button.title = buttonText;
+      });
+      if (statusHtml) dropsDom.status.innerHTML = statusHtml;
+    };
+
     const dropClaim = async (drop) => {
       const claimKey = `${drop.contractId}:${drop.dropId}`;
       const round = ++dropsState.claimRound;
       if (dropsState.claimsInFlight.has(claimKey)) {
         recordDropDiagnostic(round, 'BLOCK', `Drop #${drop.dropId} already has a claim round in progress.`, 'warn');
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> this claim is already in progress. Please wait for the current step to finish; a second transaction will not be created.</span><span class="badge amber">please wait</span>';
         return;
       }
       if (!state.walletSession.isConnected || !state.walletSession.address) {
@@ -11663,46 +11677,58 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         recordDropDiagnostic(round, 'BLOCK', 'No connected Stacks wallet address.', 'error');
         return;
       }
+      // Lock synchronously before the first await. This closes the double-click
+      // window while the one-per-wallet eligibility read is still running.
+      dropsState.claimsInFlight.add(claimKey);
+      dropsState.claimProgress.set(claimKey, 'Please wait — checking eligibility…');
+      renderDrops();
+      setDropClaimProgress(
+        claimKey,
+        'Please wait — checking eligibility…',
+        '<span><strong>Drops</strong> please wait — checking whether this wallet can claim. The claim button is disabled so a duplicate transaction cannot be created.</span><span class="badge amber">checking eligibility</span>'
+      );
       try {
-        dropsDom.status.innerHTML = '<span><strong>Drops</strong> checking whether this wallet has already claimed from this campaign…</span>';
-        const collectionLock = getDropsCollectionLockForDrop({
-          contractId: drop.contractId,
-          creator: drop.creator,
-          dropId: drop.dropId,
-          groupId: drop.groupId
-        });
-        const claimedGroup = collectionLock
-          ? await hasClaimedAnyDropGroup(drop, state.walletSession.address, collectionLock.groupIds)
-          : (await hasClaimedDropGroup(drop, state.walletSession.address) ? drop.groupId : null);
-        if (claimedGroup !== null) {
-          const lockLabel = collectionLock?.label ?? 'this campaign group';
-          dropsDom.status.innerHTML = `<span><strong>Drops</strong> this wallet has already claimed a free drop from ${lockLabel}.</span><span class="badge amber">one per wallet</span>`;
+        try {
+          const collectionLock = getDropsCollectionLockForDrop({
+            contractId: drop.contractId,
+            creator: drop.creator,
+            dropId: drop.dropId,
+            groupId: drop.groupId
+          });
+          const claimedGroup = collectionLock
+            ? await hasClaimedAnyDropGroup(drop, state.walletSession.address, collectionLock.groupIds)
+            : (await hasClaimedDropGroup(drop, state.walletSession.address) ? drop.groupId : null);
+          if (claimedGroup !== null) {
+            const lockLabel = collectionLock?.label ?? 'this campaign group';
+            dropsDom.status.innerHTML = `<span><strong>Drops</strong> this wallet has already claimed a free drop from ${lockLabel}.</span><span class="badge amber">one per wallet</span>`;
+            recordDropDiagnostic(
+              round,
+              'GROUP_LIMIT',
+              `Wallet ${state.walletSession.address} already claimed campaign group ${claimedGroup} from ${drop.creator}.`,
+              'warn'
+            );
+            return;
+          }
+        } catch (error) {
           recordDropDiagnostic(
             round,
-            'GROUP_LIMIT',
-            `Wallet ${state.walletSession.address} already claimed campaign group ${claimedGroup} from ${drop.creator}.`,
+            'GROUP_LIMIT_CHECK_UNAVAILABLE',
+            `Could not pre-check one-per-wallet policy; the contract will still enforce it. ${String(error?.message ?? error)}`,
             'warn'
           );
-          return;
         }
-      } catch (error) {
-        recordDropDiagnostic(
-          round,
-          'GROUP_LIMIT_CHECK_UNAVAILABLE',
-          `Could not pre-check one-per-wallet policy; the contract will still enforce it. ${String(error?.message ?? error)}`,
-          'warn'
+
+        const [nftAddress, nftName] = drop.nftContract.split('.');
+        const postConditions = dropClaimPostConditions(drop);
+        const providerId = getSelectedWalletProviderId() ?? 'injected provider';
+        recordDropDiagnostic(round, 'START', `Free claim for drop #${drop.dropId}, inscription #${drop.tokenId}.`);
+        recordDropDiagnostic(round, 'PREFLIGHT', `Wallet ${providerId}; ${drop.entry.network}; connected ${state.walletSession.address}.`);
+        recordDropDiagnostic(round, 'PLAN', `Build sponsored ${drop.contractId}::claim, then stx_signTransaction with broadcast=false; origin fee=0, deny mode, 1 NFT post-condition.`);
+        setDropClaimProgress(
+          claimKey,
+          'Please wait — creating claim transaction…',
+          '<span><strong>Drops</strong> please wait — creating the free claim transaction. Keep this page open; your wallet will ask for approval next.</span><span class="badge amber">preparing transaction</span>'
         );
-      }
-      dropsState.claimsInFlight.add(claimKey);
-      renderDrops();
-      const [nftAddress, nftName] = drop.nftContract.split('.');
-      const postConditions = dropClaimPostConditions(drop);
-      const providerId = getSelectedWalletProviderId() ?? 'injected provider';
-      recordDropDiagnostic(round, 'START', `Free claim for drop #${drop.dropId}, inscription #${drop.tokenId}.`);
-      recordDropDiagnostic(round, 'PREFLIGHT', `Wallet ${providerId}; ${drop.entry.network}; connected ${state.walletSession.address}.`);
-      recordDropDiagnostic(round, 'PLAN', `Build sponsored ${drop.contractId}::claim, then stx_signTransaction with broadcast=false; origin fee=0, deny mode, 1 NFT post-condition.`);
-      dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the free claim in your wallet (fee 0)…</span>';
-      try {
         recordDropDiagnostic(round, 'NONCE_REQUEST', 'Loading the connected address\'s next origin nonce from Hiro.');
         const originNonce = await fetchAddressNonce(
           state.walletSession.address,
@@ -11718,6 +11744,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           state.walletSession.publicKey ? 'success' : 'warn'
         );
         recordDropDiagnostic(round, 'WALLET_REQUEST', 'Requesting origin signature only; wallet broadcasting is disabled.');
+        setDropClaimProgress(
+          claimKey,
+          'Approve the claim in your wallet…',
+          '<span><strong>Drops</strong> the free claim transaction is ready. Please approve it in your wallet; the claim button remains disabled to prevent a duplicate request.</span><span class="badge amber">wallet approval</span>'
+        );
         const payload = await new Promise((resolve, reject) => {
           showSponsoredContractCall({
             contractAddress: drop.entry.address,
@@ -11743,6 +11774,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           ? Object.keys(payload).sort().join(', ') || 'none'
           : typeof payload;
         recordDropDiagnostic(round, 'WALLET_RESPONSE', `Approval returned. Normalized response keys: ${payloadKeys}.`);
+        setDropClaimProgress(
+          claimKey,
+          'Please wait — validating wallet approval…',
+          '<span><strong>Drops</strong> wallet approval received. Please wait while the signed claim is checked before submission.</span><span class="badge amber">validating</span>'
+        );
         const inspection = inspectSponsoredClaimTransaction(payload, {
           dropsContractId: drop.contractId,
           nftContractId: drop.nftContract,
@@ -11761,7 +11797,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         }
         recordDropDiagnostic(round, 'SIGNED_TX_READY', `Validated ${inspection.txHex.length / 2} bytes; tx ${inspection.txId ?? 'id unavailable'}.`, 'success');
 
-        dropsDom.status.innerHTML = '<span><strong>Drops</strong> signed claim validated — submitting to the sponsor relayer…</span>';
+        setDropClaimProgress(
+          claimKey,
+          'Please wait — submitting claim…',
+          '<span><strong>Drops</strong> signed claim validated. Please wait while it is submitted to the sponsor relayer.</span><span class="badge amber">submitting</span>'
+        );
         const sponsorClient = createSponsorClient((drop.entry.sponsorApi ?? '/').replace(/\/+$/, ''));
         recordDropDiagnostic(round, 'RELAYER_SUBMIT', `Submitting signed claim for ${drop.contractId} drop #${drop.dropId}.`);
         const describeSponsorClientError = (error) => {
@@ -11782,11 +11822,20 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             contractId: drop.contractId,
             listingId: drop.dropId,
             onExistingJob: (error, existingJob) => {
+              setDropClaimProgress(
+                claimKey,
+                'Please wait — resuming claim…',
+                '<span><strong>Drops</strong> this signed claim already reached the sponsor. Please wait while the existing claim job is resumed safely.</span><span class="badge amber">resuming</span>'
+              );
               recordDropDiagnostic(round, 'RELAYER_RESUME', `${error.code}: resuming existing job ${existingJob.id}.`, 'warn');
             },
             onRetry: (error, attempt, maxAttempts, delayMs) => {
               lastSubmitRetryError = error;
-              dropsDom.status.innerHTML = `<span><strong>Drops</strong> sponsor relayer is temporarily slow. Your wallet signature is valid; retrying safely (${attempt + 1}/${maxAttempts})…</span><span class="badge amber">retrying</span>`;
+              setDropClaimProgress(
+                claimKey,
+                `Please wait — sponsor retry ${attempt + 1}/${maxAttempts}…`,
+                `<span><strong>Drops</strong> sponsor relayer is temporarily slow. Your wallet signature is valid; retrying safely (${attempt + 1}/${maxAttempts}). Please wait while this completes.</span><span class="badge amber">retrying</span>`
+              );
               recordDropDiagnostic(
                 round,
                 'RELAYER_RETRY',
@@ -11811,7 +11860,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         }
         const buyTx = job.txids?.buy ?? '';
         recordDropDiagnostic(round, 'RELAYER_ACCEPTED', `Job ${job.id} entered ${job.state}${buyTx ? `; claim tx ${buyTx}` : ''}.`, 'success');
-        dropsDom.status.innerHTML = `<span><strong>Drops</strong> sponsored claim broadcast${buyTx ? ` — tx ${buyTx}` : ''}. Tracking confirmation and refund settlement…</span><span class="badge green">no STX needed</span>`;
+        setDropClaimProgress(
+          claimKey,
+          'Please wait — confirming on-chain…',
+          `<span><strong>Drops</strong> sponsored claim broadcast${buyTx ? ` — tx ${buyTx}` : ''}. Please wait while it confirms on-chain; the button stays disabled so the claim cannot be sent twice.</span><span class="badge green">no STX needed</span>`
+        );
 
         let claimConfirmed = false;
         const markClaimConfirmed = (confirmedJob) => {
@@ -11898,10 +11951,13 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           : `<span><strong>Drops</strong> sponsored claim blocked (${code}): ${message}. Open Claim diagnostics, fix the reported stage, then retry.</span>`;
       } finally {
         dropsState.claimsInFlight.delete(claimKey);
+        dropsState.claimProgress.delete(claimKey);
         dropsDom.listings?.querySelectorAll('[data-drop-claim]').forEach((button) => {
           if (button.dataset.dropClaim === claimKey) {
             const claimed = dropsState.recentlyClaimed.has(claimKey);
             button.disabled = claimed;
+            button.removeAttribute('aria-busy');
+            button.removeAttribute('title');
             button.textContent = claimed ? 'Claimed successfully' : 'Claim free — no STX needed';
           }
         });
@@ -12167,9 +12223,16 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             claimBtn.type = 'button';
             claimBtn.className = 'market-chip';
             const claimBusy = dropsState.claimsInFlight.has(claimKey);
+            const claimProgress = dropsState.claimProgress.get(claimKey);
             claimBtn.dataset.dropClaim = claimKey;
             claimBtn.disabled = claimBusy;
-            claimBtn.textContent = claimBusy ? 'Claim in progress…' : 'Claim free — no STX needed';
+            claimBtn.textContent = claimBusy
+              ? claimProgress ?? 'Please wait — claim in progress…'
+              : 'Claim free — no STX needed';
+            if (claimBusy) {
+              claimBtn.setAttribute('aria-busy', 'true');
+              claimBtn.title = claimBtn.textContent;
+            }
             claimBtn.addEventListener('click', () => { void dropClaim(drop); });
             actions.append(claimBtn);
           }
@@ -12441,6 +12504,15 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       if (PAGE_MODE === 'drops' && dropsState.claimsInFlight.size === 0) {
         void loadDropsPage(null, { background: true, refreshHistory: false });
       }
+    });
+
+    // localStorage events propagate to the user's other tabs. A claim in one
+    // tab therefore removes the same card in every open Drops page immediately,
+    // without waiting for the edge poll.
+    window.addEventListener('storage', (event) => {
+      if (event.key !== DROPS_BROWSER_CACHE_KEY || PAGE_MODE !== 'drops') return;
+      const cached = readDropsBrowserCache();
+      applyDropsSnapshot(cached);
     });
 
     const switchToPage = async (page, params = null) => {

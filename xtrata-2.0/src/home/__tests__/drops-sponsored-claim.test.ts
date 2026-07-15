@@ -46,7 +46,7 @@ describe('public Drops sponsored-claim surface', () => {
     expect(homeMain).toContain('Claimed successfully');
     expect(homeMain).toContain('isSponsorClaimConfirmedState');
     expect(homeMain).toContain('watchCreatedDrop({');
-    expect(homeMain).toContain("new URLSearchParams({ drop: tokenIdRaw })");
+    expect(homeMain).toContain('new URLSearchParams({ drop: tokenIdRaw })');
     expect(homeMain).toContain("window.history.pushState(null, '', `/drops?${targetParams.toString()}`)");
     expect(homeMain).toContain("await switchToPage('drops', targetParams)");
     expect(homeMain).toContain('pollIntervalMs: 4000');
@@ -57,6 +57,19 @@ describe('public Drops sponsored-claim surface', () => {
     expect(homeMain).toContain('Claimed${drop.claimedAt ? ` at block ${drop.claimedAt}` : \'\'} by ');
     expect(homeMain).toContain('const DEFAULT_DROP_GROUP_ID = 1n');
     expect(homeMain).toContain('const DROPS_DISPLAY_LIMIT = 25');
+    expect(homeMain).toContain('const DROPS_SCAN_BATCH_SIZE = 12');
+    expect(homeMain).toContain("const DROPS_BROWSER_CACHE_KEY = 'xtrata:drops:live:v2'");
+    expect(homeMain).toContain("fetch(`/drops/listings${fresh ? '?fresh=1' : ''}`");
+    expect(homeMain).toContain("cache: fresh ? 'no-store' : 'default'");
+    expect(homeMain).toContain('await Promise.all(ids.map(readDrop))');
+    expect(homeMain).toContain('void refreshDropsHistory();');
+    expect(homeMain).toContain(
+      'drop.claimedAt === null && !dropsState.recentlyClaimed.has(claimKey)'
+    );
+    expect(homeMain).toContain('DROPS_REFRESH_INTERVAL_MS');
+    expect(homeMain).toContain('event.key !== DROPS_BROWSER_CACHE_KEY');
+    expect(homeMain).toContain('background: true');
+    expect(homeMain).toContain('fresh: true');
     expect(homeMain).toContain('results.length < DROPS_DISPLAY_LIMIT');
     expect(homeMain).toContain('stopped drop scan at safety cap');
     expect(homeMain).toContain('wallet changed. This drop can only be cancelled by its creator');
@@ -71,5 +84,26 @@ describe('public Drops sponsored-claim surface', () => {
     expect(homeMain).toContain(': DEFAULT_DROP_GROUP_ID');
     expect(homeMain).not.toContain('dropClaimSelfPaid');
     expect(homeMain).not.toContain('claiming self-paid instead');
+  });
+
+  it('locks each claim before the first asynchronous check and explains every wait', () => {
+    const handlerStart = homeMain.indexOf('const dropClaim = async (drop) =>');
+    const handlerEnd = homeMain.indexOf('const hydrateDropThumbnails', handlerStart);
+    const claimHandler = homeMain.slice(handlerStart, handlerEnd);
+
+    expect(handlerStart).toBeGreaterThan(-1);
+    expect(claimHandler.indexOf('dropsState.claimsInFlight.add(claimKey)')).toBeLessThan(
+      claimHandler.indexOf('await hasClaimedAnyDropGroup')
+    );
+    expect(homeMain).toContain('claimProgress: new Map()');
+    expect(homeMain).toContain("button.setAttribute('aria-busy', 'true')");
+    expect(homeMain).toContain('a second transaction will not be created');
+    expect(homeMain).toContain('Please wait — checking eligibility…');
+    expect(homeMain).toContain('Please wait — creating claim transaction…');
+    expect(homeMain).toContain('Approve the claim in your wallet…');
+    expect(homeMain).toContain('Please wait — validating wallet approval…');
+    expect(homeMain).toContain('Please wait — submitting claim…');
+    expect(homeMain).toContain('Please wait — confirming on-chain…');
+    expect(indexHtml).toContain('id="dropsStatus" role="status" aria-live="polite"');
   });
 });
