@@ -11314,8 +11314,15 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const DEFAULT_DROP_GROUP_ID = 1n;
     const DROPS_DISPLAY_LIMIT = 25;
     const DROPS_SCAN_MAX_IDS = DROPS_DISPLAY_LIMIT * 10;
+    const DROPS_SCAN_BATCH_SIZE = 12;
+    const DROPS_BROWSER_CACHE_KEY = 'xtrata:drops:live:v2';
+    const DROPS_BROWSER_CACHE_MAX_AGE_MS = 5 * 60 * 1000;
+    const DROPS_REFRESH_INTERVAL_MS = 8 * 1000;
     const dropsState = {
       run: 0,
+      loadRun: 0,
+      historyRun: 0,
+      loading: false,
       drops: [],
       historyEvents: [],
       claimRound: 0,
@@ -11463,6 +11470,97 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       return null;
     };
 
+    const dropsEntryMap = () => new Map(
+      dropsEntriesForNetwork().map((entry) => [getContractId(entry), entry])
+    );
+
+    const hydrateDropRows = (rows) => {
+      const byContract = dropsEntryMap();
+      return (Array.isArray(rows) ? rows : []).map((row) => {
+        const entry = byContract.get(row.contractId);
+        if (!entry) return null;
+        return {
+          entry,
+          contractId: row.contractId,
+          dropId: BigInt(row.dropId),
+          listingId: BigInt(row.dropId),
+          creator: row.creator,
+          nftContract: row.nftContract,
+          tokenId: BigInt(row.tokenId),
+          groupId: BigInt(row.groupId),
+          feeBudget: row.feeBudget !== null && row.feeBudget !== undefined
+            ? BigInt(row.feeBudget)
+            : null,
+          budgetRemaining: row.budgetRemaining !== null && row.budgetRemaining !== undefined
+            ? BigInt(row.budgetRemaining)
+            : null,
+          claimer: row.claimer ?? null,
+          claimedAt: row.claimedAt !== null && row.claimedAt !== undefined
+            ? BigInt(row.claimedAt)
+            : null
+        };
+      }).filter(Boolean);
+    };
+
+    const serializeDropRows = (drops) => drops
+      .filter((drop) => {
+        const claimKey = `${drop.contractId}:${drop.dropId}`;
+        return drop.claimedAt === null && !dropsState.recentlyClaimed.has(claimKey);
+      })
+      .map((drop) => ({
+        contractId: drop.contractId,
+        dropId: drop.dropId.toString(),
+        creator: drop.creator,
+        nftContract: drop.nftContract,
+        tokenId: drop.tokenId.toString(),
+        groupId: drop.groupId.toString(),
+        feeBudget: drop.feeBudget?.toString() ?? null,
+        budgetRemaining: drop.budgetRemaining?.toString() ?? null,
+        claimer: drop.claimer ?? null,
+        claimedAt: null
+      }));
+
+    const writeDropsBrowserCache = (drops) => {
+      try {
+        localStorage.setItem(DROPS_BROWSER_CACHE_KEY, JSON.stringify({
+          network: state.contract.network,
+          updatedAt: Date.now(),
+          drops: serializeDropRows(drops)
+        }));
+      } catch {
+        // Edge/direct reads remain authoritative when storage is unavailable.
+      }
+    };
+
+    const readDropsBrowserCache = () => {
+      try {
+        const cached = JSON.parse(localStorage.getItem(DROPS_BROWSER_CACHE_KEY) ?? 'null');
+        if (
+          !cached ||
+          cached.network !== state.contract.network ||
+          !Number.isFinite(cached.updatedAt) ||
+          Date.now() - cached.updatedAt > DROPS_BROWSER_CACHE_MAX_AGE_MS
+        ) {
+          return [];
+        }
+        return hydrateDropRows(cached.drops);
+      } catch {
+        return [];
+      }
+    };
+
+    const loadDropsFromAggregate = async ({ fresh = false } = {}) => {
+      const response = await fetch(`/drops/listings${fresh ? '?fresh=1' : ''}`, {
+        cache: fresh ? 'no-store' : 'default'
+      });
+      if (!response.ok) throw new Error(`drops cache endpoint ${response.status}`);
+      const payload = await response.json();
+      if (payload.degraded === true || !Array.isArray(payload.drops)) {
+        throw new Error('drops cache endpoint is degraded');
+      }
+      return hydrateDropRows(payload.drops);
+    };
+
     const readDrops = async (entry) => {
       const contractId = `${entry.address}.${entry.contractName}`;
       const lastJson = await callReadOnlyJson({
@@ -11473,12 +11571,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const lastId = BigInt(lastJson?.value?.value ?? 0);
       const results = [];
       let scanned = 0;
-      for (
-        let id = lastId;
-        id >= 0n && results.length < DROPS_DISPLAY_LIMIT && scanned < DROPS_SCAN_MAX_IDS;
-        id -= 1n
-      ) {
-        scanned += 1;
+      let nextId = lastId;
+      const readDrop = async (id) => {
         try {
           const json = await callReadOnlyJson({
             contractId,
@@ -11487,8 +11581,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             network: entry.network
           });
           const tuple = unwrapBindingTuple(json);
-          if (!tuple) continue;
-          results.push({
+          if (!tuple) return null;
+          return {
             entry,
             contractId,
             dropId: id,
@@ -11502,11 +11596,31 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             budgetRemaining: tuple['budget-remaining'] ? BigInt(tuple['budget-remaining'].value) : null,
             claimer: optionalPrincipalValue(tuple.claimer),
             claimedAt: optionalUintValue(tuple['claimed-at'])
-          });
+          };
         } catch {
-          // sparse ids / settled drops: skip
+          return null;
         }
-        if (id === 0n) break;
+      };
+      while (
+        nextId >= 0n &&
+        results.length < DROPS_DISPLAY_LIMIT &&
+        scanned < DROPS_SCAN_MAX_IDS
+      ) {
+        const ids = [];
+        while (
+          nextId >= 0n &&
+          ids.length < DROPS_SCAN_BATCH_SIZE &&
+          scanned < DROPS_SCAN_MAX_IDS
+        ) {
+          ids.push(nextId);
+          nextId -= 1n;
+          scanned += 1;
+        }
+        const rows = await Promise.all(ids.map(readDrop));
+        for (const row of rows) {
+          if (row) results.push(row);
+          if (results.length >= DROPS_DISPLAY_LIMIT) break;
+        }
       }
       if (results.length < DROPS_DISPLAY_LIMIT && scanned >= DROPS_SCAN_MAX_IDS) {
         debugLog('drops', 'stopped drop scan at safety cap', {
@@ -11705,6 +11819,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           claimConfirmed = true;
           dropsState.recentlyClaimed.add(claimKey);
           drop.claimedAt = drop.claimedAt ?? 0n;
+          writeDropsBrowserCache(dropsState.drops);
           recordDropDiagnostic(
             round,
             'CLAIM_CONFIRMED',
@@ -11713,6 +11828,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           );
           renderDrops();
           dropsDom.status.innerHTML = '<span><strong>Drops</strong> inscription claimed successfully. Sponsor reimbursement is finishing in the background.</span><span class="badge green">claimed</span>';
+          // Confirmation is authoritative: remove the card immediately, then
+          // bypass the short edge cache so other visitors see it disappear on
+          // their next rapid refresh as soon as Hiro exposes the new state.
+          void loadDropsPage(null, {
+            fresh: true,
+            background: true,
+            refreshHistory: false
+          });
         };
         markClaimConfirmed(job);
         let previousState = '';
@@ -11749,7 +11872,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
               `Inscription is claimed; reimbursement job ${finalJob.id} remains ${finalJob.state} and can continue on later relayer traffic.`,
               'warn'
             );
-            await loadDropsPage();
+            await loadDropsPage(null, { fresh: true });
             dropsDom.status.innerHTML = '<span><strong>Drops</strong> inscription claimed successfully. Sponsor reimbursement remains pending.</span><span class="badge green">claimed</span>';
             return;
           }
@@ -11758,7 +11881,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           });
         }
         recordDropDiagnostic(round, 'COMPLETE', `Free claim settled. Claim ${finalJob.txids?.buy ?? 'n/a'}; reimbursement ${finalJob.txids?.claim ?? 'n/a'}; refund ${finalJob.txids?.refund ?? 'n/a'}.`, 'success');
-        await loadDropsPage();
+        await loadDropsPage(null, { fresh: true });
         dropsDom.status.innerHTML = '<span><strong>Drops</strong> free claim confirmed and sponsorship settled.</span><span class="badge green">complete</span>';
       } catch (error) {
         const code = error?.code ?? 'UNKNOWN_BLOCK';
@@ -11943,11 +12066,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const renderDrops = () => {
       if (!dropsDom.listings) return;
       const run = dropsState.run;
-      const live = dropsState.drops.filter((drop) => drop.claimedAt === null);
-      const visible = dropsState.drops.filter((drop) => {
+      const live = dropsState.drops.filter((drop) => {
         const claimKey = `${drop.contractId}:${drop.dropId}`;
-        return drop.claimedAt === null || dropsState.recentlyClaimed.has(claimKey);
+        return drop.claimedAt === null && !dropsState.recentlyClaimed.has(claimKey);
       });
+      const visible = live;
       renderDropsHistory();
       if (!visible.length) {
         dropsDom.listings.replaceChildren();
@@ -12228,33 +12351,97 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       dropsDom.create?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
-    const loadDropsPage = async (params = null) => {
-      const run = ++dropsState.run;
+    const dropsFingerprint = (drops) => drops
+      .map((drop) => `${drop.contractId}:${drop.dropId}:${drop.claimedAt ?? 'live'}`)
+      .join('|');
+
+    const refreshDropsHistory = async () => {
+      const historyRun = ++dropsState.historyRun;
+      const snapshots = await Promise.all(
+        dropsEntriesForNetwork().map((entry) =>
+          loadDropsActivity({ contract: entry }).catch(() => ({ events: [] }))
+        )
+      );
+      if (historyRun !== dropsState.historyRun || PAGE_MODE !== 'drops') return;
+      dropsState.historyEvents = snapshots.flatMap((item) => item.events ?? []);
+      renderDropsHistory();
+    };
+
+    const applyDropsSnapshot = (nextDrops, { force = false } = {}) => {
+      const sorted = nextDrops.sort((a, b) => (b.dropId > a.dropId ? 1 : -1));
+      const changed = force || dropsFingerprint(sorted) !== dropsFingerprint(dropsState.drops);
+      dropsState.drops = sorted;
+      writeDropsBrowserCache(sorted);
+      if (changed) {
+        dropsState.run += 1;
+        renderDrops();
+      }
+      return changed;
+    };
+
+    const loadDropsPage = async (
+      params = null,
+      { fresh = false, background = false, refreshHistory = !background } = {}
+    ) => {
+      if (background && dropsState.loading) return;
+      const loadRun = ++dropsState.loadRun;
       if (!dropsDom.listings) return;
+      dropsState.loading = true;
       if (dropsDom.badge) dropsDom.badge.textContent = state.contract.network;
-      void updateDropsDepositHint();
+      if (!background) void updateDropsDepositHint();
       const dropParam = params?.get?.('drop');
       if (dropParam && /^\d+$/.test(dropParam)) {
         openDropForToken(dropParam);
       }
-      dropsDom.status.innerHTML = '<span><strong>Drops</strong> loading…</span>';
+      if (!background && dropsState.drops.length === 0) {
+        const cached = readDropsBrowserCache();
+        if (cached.length > 0) {
+          applyDropsSnapshot(cached, { force: true });
+        } else {
+          dropsDom.status.innerHTML = '<span><strong>Drops</strong> loading…</span>';
+        }
+      }
       try {
-        const perContract = await Promise.all(
-          dropsEntriesForNetwork().map(async (entry) => ({
-            drops: await readDrops(entry).catch(() => []),
-            history: await loadDropsActivity({ contract: entry }).catch(() => ({ events: [] }))
-          }))
-        );
-        if (run !== dropsState.run) return;
-        dropsState.drops = perContract.flatMap((item) => item.drops).sort((a, b) => (b.dropId > a.dropId ? 1 : -1));
-        dropsState.historyEvents = perContract.flatMap((item) => item.history.events ?? []);
-        renderDrops();
+        let nextDrops;
+        try {
+          nextDrops = await loadDropsFromAggregate({ fresh });
+        } catch {
+          const perContract = await Promise.all(
+            dropsEntriesForNetwork().map((entry) => readDrops(entry).catch(() => []))
+          );
+          nextDrops = perContract.flat();
+        }
+        if (loadRun !== dropsState.loadRun) return;
+        applyDropsSnapshot(nextDrops);
+        if (refreshHistory) void refreshDropsHistory();
       } catch (error) {
-        if (run !== dropsState.run) return;
+        if (loadRun !== dropsState.loadRun) return;
         dropsDom.status.innerHTML = '<span><strong>Drops</strong> could not load drops.</span>';
         debugLog('drops', 'load failed', { error: String(error?.message ?? error) });
+      } finally {
+        if (loadRun === dropsState.loadRun) dropsState.loading = false;
       }
     };
+
+    // Mutable claim state is intentionally refreshed faster than ordinary
+    // gallery data. The edge feed has a five-second TTL; an eight-second poll
+    // means claims made in another tab or wallet disappear without a reload.
+    window.setInterval(() => {
+      if (
+        PAGE_MODE !== 'drops' ||
+        document.visibilityState !== 'visible' ||
+        dropsState.claimsInFlight.size > 0
+      ) {
+        return;
+      }
+      void loadDropsPage(null, { background: true, refreshHistory: false });
+    }, DROPS_REFRESH_INTERVAL_MS);
+
+    window.addEventListener('focus', () => {
+      if (PAGE_MODE === 'drops' && dropsState.claimsInFlight.size === 0) {
+        void loadDropsPage(null, { background: true, refreshHistory: false });
+      }
+    });
 
     const switchToPage = async (page, params = null) => {
       const run = ++pageSwitchRun;
