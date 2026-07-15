@@ -26,6 +26,10 @@ describe('public Drops sponsored-claim surface', () => {
     expect(homeMain).toContain('stx_signTransaction with broadcast=false');
     expect(homeMain).toContain('fetchAddressNonce(');
     expect(homeMain).toContain('inspectSponsoredClaimTransaction(payload');
+    expect(homeMain).toContain('submitSponsorClaimWithRetry({');
+    expect(homeMain).toContain("'RELAYER_RETRY'");
+    expect(homeMain).toContain('sponsor relayer is temporarily slow');
+    expect(homeMain).toContain('Your wallet signature is valid; retrying safely');
     expect(homeMain).toContain('pollSponsorJob({');
     expect(homeMain).toContain("'RELAYER_RESUME'");
     expect(homeMain).toContain("'RELAYER_REJECTED'");

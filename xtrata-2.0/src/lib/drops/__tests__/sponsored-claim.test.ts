@@ -10,13 +10,16 @@ import {
   uintCV
 } from '@stacks/transactions';
 import { buildContractTransferPostCondition } from '../../contract/post-conditions';
+import { SponsorClientError } from '../../market/sponsor-client';
 import {
   SPONSOR_JOB_MAX_ATTEMPTS,
   SPONSOR_JOB_POLL_INTERVAL_MS,
+  SPONSOR_SUBMIT_RETRY_DELAYS_MS,
   extractSponsoredTransactionHex,
   inspectSponsoredClaimTransaction,
   isSponsorClaimConfirmedState,
-  pollSponsorJob
+  pollSponsorJob,
+  submitSponsorClaimWithRetry
 } from '../sponsored-claim';
 
 const DROPS_ADDRESS = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
@@ -135,5 +138,51 @@ describe('sponsor job polling', () => {
     });
     expect(final.state).toBe('SETTLED');
     expect(seen).toEqual(['SPONSORED', 'CONFIRMED', 'CLAIMED', 'SETTLED']);
+  });
+});
+
+describe('sponsor claim submit retry', () => {
+  it('retries a transient sponsor-balance outage without requiring another signed transaction', async () => {
+    const wait = vi.fn().mockResolvedValue(undefined);
+    const retryError = new SponsorClientError(
+      'RELAYER_UNAVAILABLE',
+      'sponsor balance lookup unavailable; retry shortly',
+      undefined,
+      { httpStatus: 503, requestId: 'req-balance', stage: 'SPONSOR_BALANCE' }
+    );
+    const submit = vi
+      .fn()
+      .mockRejectedValueOnce(retryError)
+      .mockResolvedValueOnce({ id: 'sp-1', state: 'SPONSORED', txids: { buy: 'buy' } });
+    const onRetry = vi.fn();
+
+    const job = await submitSponsorClaimWithRetry({
+      client: { submit } as never,
+      txHex: 'signed-once',
+      contractId: DROPS,
+      listingId: 11n,
+      retryDelaysMs: [25],
+      wait,
+      onRetry
+    });
+
+    expect(job.state).toBe('SPONSORED');
+    expect(submit).toHaveBeenCalledTimes(2);
+    expect(submit).toHaveBeenNthCalledWith(1, {
+      txHex: 'signed-once',
+      contractId: DROPS,
+      listingId: 11n
+    });
+    expect(submit).toHaveBeenNthCalledWith(2, {
+      txHex: 'signed-once',
+      contractId: DROPS,
+      listingId: 11n
+    });
+    expect(wait).toHaveBeenCalledWith(25);
+    expect(onRetry).toHaveBeenCalledWith(retryError, 1, 2, 25);
+  });
+
+  it('keeps submit retry delays bounded for user-visible recovery', () => {
+    expect(SPONSOR_SUBMIT_RETRY_DELAYS_MS).toEqual([2_000, 5_000, 10_000, 20_000]);
   });
 });

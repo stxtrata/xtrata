@@ -64,7 +64,8 @@
     import {
       isSponsorClaimConfirmedState,
       inspectSponsoredClaimTransaction,
-      pollSponsorJob
+      pollSponsorJob,
+      submitSponsorClaimWithRetry
     } from '/src/lib/drops/sponsored-claim.ts';
     import {
       getMarketListingPublicBlockReason,
@@ -11542,34 +11543,50 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         dropsDom.status.innerHTML = '<span><strong>Drops</strong> signed claim validated — submitting to the sponsor relayer…</span>';
         const sponsorClient = createSponsorClient((drop.entry.sponsorApi ?? '/').replace(/\/+$/, ''));
         recordDropDiagnostic(round, 'RELAYER_SUBMIT', `Submitting signed claim for ${drop.contractId} drop #${drop.dropId}.`);
+        const describeSponsorClientError = (error) => {
+          const references = [
+            error.httpStatus ? `HTTP ${error.httpStatus}` : '',
+            error.stage ? `stage ${error.stage}` : '',
+            error.requestId ? `request ${error.requestId}` : '',
+            error.traceId ? `trace ${error.traceId}` : ''
+          ].filter(Boolean).join('; ');
+          return `${error.code}${references ? ` (${references})` : ''}: ${error.message}`;
+        };
+        let lastSubmitRetryError = null;
         let job;
         try {
-          job = await sponsorClient.submit({
+          job = await submitSponsorClaimWithRetry({
+            client: sponsorClient,
             txHex: inspection.txHex,
             contractId: drop.contractId,
-            listingId: drop.dropId
-          });
-        } catch (error) {
-          if (error instanceof SponsorClientError && error.existingJob) {
-            job = error.existingJob;
-            recordDropDiagnostic(round, 'RELAYER_RESUME', `${error.code}: resuming existing job ${job.id}.`, 'warn');
-          } else {
-            if (error instanceof SponsorClientError) {
-              const references = [
-                error.httpStatus ? `HTTP ${error.httpStatus}` : '',
-                error.stage ? `stage ${error.stage}` : '',
-                error.requestId ? `request ${error.requestId}` : '',
-                error.traceId ? `trace ${error.traceId}` : ''
-              ].filter(Boolean).join('; ');
+            listingId: drop.dropId,
+            onExistingJob: (error, existingJob) => {
+              recordDropDiagnostic(round, 'RELAYER_RESUME', `${error.code}: resuming existing job ${existingJob.id}.`, 'warn');
+            },
+            onRetry: (error, attempt, maxAttempts, delayMs) => {
+              lastSubmitRetryError = error;
+              dropsDom.status.innerHTML = `<span><strong>Drops</strong> sponsor relayer is temporarily slow. Your wallet signature is valid; retrying safely (${attempt + 1}/${maxAttempts})…</span><span class="badge amber">retrying</span>`;
               recordDropDiagnostic(
                 round,
-                'RELAYER_REJECTED',
-                `${error.code}${references ? ` (${references})` : ''}: ${error.message}`,
-                'error'
+                'RELAYER_RETRY',
+                `${describeSponsorClientError(error)}. Retrying sponsor submission in ${Math.round(delayMs / 1000)}s (${attempt + 1}/${maxAttempts}).`,
+                'warn'
               );
             }
-            throw error;
+          });
+        } catch (error) {
+          if (error instanceof SponsorClientError) {
+            const retryNote = lastSubmitRetryError
+              ? ' Automatic retries were exhausted; the wallet signature was valid, but the relayer could not complete sponsorship.'
+              : '';
+            recordDropDiagnostic(
+              round,
+              'RELAYER_REJECTED',
+              `${describeSponsorClientError(error)}.${retryNote}`,
+              'error'
+            );
           }
+          throw error;
         }
         const buyTx = job.txids?.buy ?? '';
         recordDropDiagnostic(round, 'RELAYER_ACCEPTED', `Job ${job.id} entered ${job.state}${buyTx ? `; claim tx ${buyTx}` : ''}.`, 'success');

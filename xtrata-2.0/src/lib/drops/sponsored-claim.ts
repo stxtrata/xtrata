@@ -12,7 +12,7 @@ import {
 import { buildContractTransferPostCondition } from '../contract/post-conditions';
 import type { NetworkType } from '../network/types';
 import { bytesToHex } from '../utils/encoding';
-import type { SponsorClient, SponsorJob, SponsorJobState } from '../market/sponsor-client';
+import { SponsorClientError, type SponsorClient, type SponsorJob, type SponsorJobState } from '../market/sponsor-client';
 
 export type SponsoredClaimCheck = {
   code: string;
@@ -191,6 +191,54 @@ export const isSponsorClaimConfirmedState = (state: SponsorJobState) =>
 
 export const SPONSOR_JOB_POLL_INTERVAL_MS = 4_000;
 export const SPONSOR_JOB_MAX_ATTEMPTS = 225;
+export const SPONSOR_SUBMIT_RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 20_000] as const;
+
+export const isRetryableSponsorSubmitError = (error: unknown) =>
+  error instanceof SponsorClientError &&
+  error.code === 'RELAYER_UNAVAILABLE' &&
+  (!error.stage || error.stage === 'SPONSOR_BALANCE' || error.stage === 'BROADCAST');
+
+export const submitSponsorClaimWithRetry = async (params: {
+  client: SponsorClient;
+  txHex: string;
+  contractId: string;
+  listingId: bigint;
+  retryDelaysMs?: readonly number[];
+  wait?: (ms: number) => Promise<void>;
+  onRetry?: (error: SponsorClientError, attempt: number, maxAttempts: number, delayMs: number) => void;
+  onExistingJob?: (error: SponsorClientError, job: SponsorJob) => void;
+}): Promise<SponsorJob> => {
+  const retryDelaysMs = params.retryDelaysMs ?? SPONSOR_SUBMIT_RETRY_DELAYS_MS;
+  const wait = params.wait ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
+  const maxAttempts = retryDelaysMs.length + 1;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await params.client.submit({
+        txHex: params.txHex,
+        contractId: params.contractId,
+        listingId: params.listingId
+      });
+    } catch (error) {
+      if (error instanceof SponsorClientError && error.existingJob) {
+        params.onExistingJob?.(error, error.existingJob);
+        return error.existingJob;
+      }
+      const delayMs = retryDelaysMs[attempt - 1];
+      if (
+        !(error instanceof SponsorClientError) ||
+        !isRetryableSponsorSubmitError(error) ||
+        typeof delayMs !== 'number'
+      ) {
+        throw error;
+      }
+      params.onRetry?.(error, attempt, maxAttempts, delayMs);
+      await wait(delayMs);
+    }
+  }
+
+  throw new SponsorClientError('RELAYER_UNAVAILABLE', 'sponsor relayer submission retry exhausted');
+};
 
 export const pollSponsorJob = async (params: {
   client: SponsorClient;
