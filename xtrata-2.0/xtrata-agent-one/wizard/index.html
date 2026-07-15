@@ -583,6 +583,17 @@
   <!-- STAGE 3/4 · ACTIVE JOB (deposit → escrow → progress → done) -->
   <div id="activeJobDetail"></div>
 
+  <!-- ACTIVITY LOG (debugging) -->
+  <details class="opts" id="activitySection">
+    <summary>Activity log — what the wizard is doing <span class="muted">(<span id="logCount">0</span> entries)</span>
+      <button class="btn ghost" id="logCopy" style="float:right;padding:4px 10px;margin-top:-3px" onclick="event.preventDefault();event.stopPropagation();navigator.clipboard.writeText(XLOG.join('\n'));this.textContent='copied'">Copy</button>
+      <button class="btn ghost" id="logClear" style="float:right;padding:4px 10px;margin:-3px 8px 0 0" onclick="event.preventDefault();event.stopPropagation();XLOG.length=0;document.getElementById('logBody').textContent='';document.getElementById('logCount').textContent='0';">Clear</button>
+    </summary>
+    <div class="opts-body">
+      <pre id="logBody" class="mono" style="font-size:11px;line-height:1.5;max-height:300px;overflow:auto;white-space:pre-wrap;margin:10px 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px"></pre>
+    </div>
+  </details>
+
   <!-- HISTORY -->
   <details class="opts" id="historySection">
     <summary>History — all jobs on this browser <button class="btn ghost" id="refreshJobs" style="float:right;padding:4px 10px;margin-top:-3px" onclick="event.preventDefault();event.stopPropagation();">Refresh</button></summary>
@@ -671,6 +682,24 @@ const $ = (s)=>document.querySelector(s);
 const stx = (u)=>(Number(u)/1e6).toFixed(6).replace(/0+$/,'').replace(/\.$/,'')+' STX';
 const mib = (b)=>(b/1048576).toFixed(3)+' MiB';
 const esc = (s)=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+// ---- activity log (expandable panel + console mirror) ----
+const XLOG=[];
+function xlog(tag,msg,data){
+  const t=new Date().toISOString().slice(11,23);
+  let extra=''; if(data!==undefined){ try{ extra=' '+JSON.stringify(data); }catch{ extra=' '+String(data); } }
+  const line=`[${t}] ${tag} · ${msg}${extra}`;
+  XLOG.push(line); if(XLOG.length>800) XLOG.shift();
+  const el=document.getElementById('logBody');
+  if(el){ el.textContent=XLOG.join('\n'); el.scrollTop=el.scrollHeight; }
+  const n=document.getElementById('logCount'); if(n) n.textContent=XLOG.length;
+  try{ console.info('[xao]',line); }catch{}
+}
+window.xlog=xlog;
+function withTimeout(promise,ms,label){
+  return Promise.race([promise,new Promise((_,rej)=>setTimeout(()=>rej(new Error(`${label} timed out after ${Math.round(ms/1000)}s — the wallet/API did not answer. Check the Xverse popup (it may be behind this window) and retry.`)),ms))]);
+}
+window.addEventListener('error',e=>xlog('window','uncaught error',{message:e.message,src:(e.filename||'').split('/').pop(),line:e.lineno}));
+window.addEventListener('unhandledrejection',e=>xlog('window','unhandled rejection',{message:(e.reason&&e.reason.message)||String(e.reason)}));
 // Backendless data layer: every former /api/* call routes to the in-browser agent (window.XtrataAgent).
 function xa(){ const A=window.XtrataAgent; if(!A) throw new Error('Agent bundle not loaded (agent-one.js).'); return A; }
 async function api(path, opts){
@@ -697,12 +726,15 @@ async function openWallet(addr, ustx, expectedSender){
   if(!w||!w.pay){ alert('Wallet bundle not loaded.\nCopy the address and amount shown and send manually.'); return; }
   WALLET_PAYMENT_PENDING=true;
   try{
+    xlog('pay','open wallet clicked',{recipient:addr,ustx:String(ustx),expectedSender:expectedSender||null});
     let active=await syncActiveWallet();
     if(expectedSender&&active!==expectedSender) active=await connectWallet();
     if(expectedSender&&active!==expectedSender) throw new Error('This job is locked to '+expectedSender+', but Xverse is using '+(active||'no connected Mainnet account')+'. Select the locked account in Xverse before paying.');
+    xlog('pay','requesting stx_transferStx…',{sender:expectedSender||active||null});
     await w.pay({ recipient:addr, amount:String(ustx), network:(SERVER.net==='testnet'?'testnet':'mainnet'), expectedSender:expectedSender||active||undefined });
+    xlog('pay','transfer submitted by wallet');
   }
-  catch(e){ alert('Could not open the wallet to pay:\n'+((e&&e.message)||e)+'\n\nCopy the address and amount shown and send manually.'); }
+  catch(e){ xlog('pay','FAILED',{message:(e&&e.message)||String(e)}); alert('Could not open the wallet to pay:\n'+((e&&e.message)||e)+'\n\nCopy the address and amount shown and send manually.'); }
   finally{ WALLET_PAYMENT_PENDING=false; }
 }
 window.openWallet=openWallet;
@@ -734,16 +766,20 @@ function setWallet(addr){ WALLET=addr||null; WALLET_NAME=null; WALLET_REVEAL=fal
   try{ checkParents().catch(()=>{}); }catch{} try{ checkBatchParents().catch(()=>{}); }catch{} }   // re-verify declared parents (single + batch) against the (dis)connected wallet; both are async so swallow rejections too
 async function connectWallet(){
   const w=xtrataWallet();
-  if(!w||!w.connect){ alert('Wallet bundle not loaded.\n\nThis wizard connects through the bundled wallet shim (window.XtrataWallet). Rebuild agent-one.js, or open the wizard from the Xtrata site.'); return null; }
-  try{ const addr=await w.connect(); if(addr){ setWallet(addr); return addr; } alert('Connected, but no Stacks address was returned.'); return null; }
-  catch(e){ alert('Connect failed:\n'+((e&&e.message)||e)); return null; }
+  if(!w||!w.connect){ xlog('connect','wallet bundle missing'); alert('Wallet bundle not loaded.\n\nThis wizard connects through the bundled wallet shim (window.XtrataWallet). Rebuild agent-one.js, or open the wizard from the Xtrata site.'); return null; }
+  xlog('connect','opening wallet connect (Xverse account picker)…');
+  try{ const addr=await w.connect(); xlog('connect','result',{address:addr||null}); if(addr){ setWallet(addr); return addr; } alert('Connected, but no Stacks address was returned.'); return null; }
+  catch(e){ xlog('connect','FAILED',{message:(e&&e.message)||String(e)}); alert('Connect failed:\n'+((e&&e.message)||e)); return null; }
 }
 async function disconnectWallet(){ try{ const w=xtrataWallet(); if(w&&w.disconnect) await w.disconnect(); }catch{} setWallet(null); }
 async function syncActiveWallet(){
   const w=xtrataWallet();
   if(!w||!w.getActiveAddress) return WALLET;
-  try{ const active=await w.getActiveAddress(); if(active!==WALLET) setWallet(active); return active||null; }
-  catch{ setWallet(null); return null; }
+  const t0=Date.now();
+  try{ const active=await withTimeout(w.getActiveAddress(),15000,'Xverse active-account read (wallet_getAccount)');
+    xlog('wallet','active account read',{address:active||null,ms:Date.now()-t0});
+    if(active!==WALLET) setWallet(active); return active||null; }
+  catch(e){ xlog('wallet','active account read FAILED',{message:(e&&e.message)||String(e),ms:Date.now()-t0}); setWallet(null); return null; }
 }
 $('#connectBtn').onclick=()=>{ WALLET?disconnectWallet():connectWallet(); };
 $('#walletAddr').onclick=walletPillClick;
@@ -1140,7 +1176,13 @@ $('#batchParents').addEventListener('input',()=>{ if(batchParentsCheckTimer)clea
 async function batchUnownedParents(){
   const A=window.XtrataAgent; if(SERVER.mock||!A||!A.ownerOf||!WALLET) return [];
   const ids=batchParentList().filter(d=>/^\d+$/.test(d)); const missing=[];
-  for(const id of ids){ let o=null; try{ o=await A.ownerOf(id); }catch{} if(!(o&&o===WALLET)) missing.push(id); }
+  xlog('parents','ownership check start',{ids});
+  for(const id of ids){ const t0=Date.now(); let o=null;
+    try{ o=await withTimeout(A.ownerOf(id),10000,`parent #${id} owner lookup`); }
+    catch(e){ xlog('parents',`#${id} owner lookup failed`,{message:(e&&e.message)||String(e),ms:Date.now()-t0}); }
+    xlog('parents',`#${id} owner`,{owner:o||null,inWallet:!!(o&&o===WALLET),ms:Date.now()-t0});
+    if(!(o&&o===WALLET)) missing.push(id); }
+  xlog('parents','ownership check done',{missing});
   return missing;
 }
 $('#batchInscribeBtn').onclick=async()=>{
@@ -1148,13 +1190,16 @@ $('#batchInscribeBtn').onclick=async()=>{
   // so a rejected batch never looks like a dead button.
   const errEl=$('#batchErr');
   const err={ get textContent(){ return errEl.textContent; },
-    set textContent(v){ errEl.textContent=v; if(v) errEl.scrollIntoView({behavior:'smooth',block:'center'}); } };
+    set textContent(v){ errEl.textContent=v; if(v){ xlog('batch','REJECTED',{reason:v}); errEl.scrollIntoView({behavior:'smooth',block:'center'}); } } };
   err.textContent='';
   const btn=$('#batchInscribeBtn'); btn.textContent='Processing…';
   try{
+  xlog('batch','process clicked',{items:BATCH.items.length,playerMode:!!BATCH.playerMode});
+  xlog('batch','step 1/4 — reading active wallet account…');
   let activeWallet=await syncActiveWallet();
-  if(!activeWallet) activeWallet=await connectWallet();
+  if(!activeWallet){ xlog('batch','no active account — opening connect'); activeWallet=await connectWallet(); }
   if(!activeWallet){ err.textContent='Connect the Xverse account that will fund this batch — everything returns to that same account.'; return; }
+  xlog('batch','step 2/4 — validating rows…',{wallet:activeWallet});
   const shared=$('#batchParents').value.split(',').map(s=>s.trim()).filter(Boolean);
   if(!shared.every(d=>/^\d+$/.test(d))){ err.textContent='Shared parents must be token-id uints.'; return; }
   const batchRecipient=$('#batchRecipient').value.trim();
@@ -1179,6 +1224,7 @@ $('#batchInscribeBtn').onclick=async()=>{
     }
   }
   // Confirm-first parent gate: warn before paying if any declared parent isn't in the connected wallet.
+  xlog('batch','step 3/4 — checking parent ownership…');
   try{
     const unowned=await batchUnownedParents();
     if(unowned.length){
@@ -1193,7 +1239,9 @@ $('#batchInscribeBtn').onclick=async()=>{
         deps:it.deps.split(',').map(s=>s.trim()).filter(Boolean), parents:it.parents.split(',').map(s=>s.trim()).filter(Boolean) }; }),
       parents:shared, marginUstx:$('#batchMargin').value||'0', strict:$('#batchStrict').checked,
       fastTrack:true, user:WALLET, expectedFunder:WALLET, recipient:batchRecipient||WALLET, receipt:RECEIPT };
+    xlog('batch','step 4/4 — creating job…',{items:payload.items.length,parents:payload.parents,receipt:payload.receipt});
     const {job}=await api('/api/jobs',{method:'POST',body:payload});
+    xlog('batch','job created',{jobId:job.jobId,required:job.requiredUstx,deposit:job.depositAddress});
     FLOW.jobId=job.jobId; FLOW.done=false;
     setStep('pay');
     startJobsPoll(); jobsTick();
