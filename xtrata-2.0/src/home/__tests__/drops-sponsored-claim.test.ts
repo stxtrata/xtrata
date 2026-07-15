@@ -41,6 +41,9 @@ describe('public Drops sponsored-claim surface', () => {
     expect(homeMain).toContain('Claimed successfully');
     expect(homeMain).toContain('isSponsorClaimConfirmedState');
     expect(homeMain).toContain('watchCreatedDrop({');
+    expect(homeMain).toContain("new URLSearchParams({ drop: tokenIdRaw })");
+    expect(homeMain).toContain("window.history.pushState(null, '', `/drops?${targetParams.toString()}`)");
+    expect(homeMain).toContain("await switchToPage('drops', targetParams)");
     expect(homeMain).toContain('pollIntervalMs: 4000');
     expect(homeMain).toContain('confirmed and now live');
     expect(homeMain).not.toContain('dropClaimSelfPaid');

@@ -11908,16 +11908,25 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const dropsCreateDrop = async () => {
       const entry = dropsEntriesForNetwork()[0];
       if (!entry) return;
-      if (!state.walletSession.isConnected || !state.walletSession.address) {
-        dropsDom.createStatus.textContent = 'Connect a wallet to create a drop.';
-        return;
-      }
-      const creator = state.walletSession.address;
       const tokenIdRaw = dropsDom.createTokenId?.value?.trim();
       if (!/^\d+$/.test(tokenIdRaw ?? '')) {
         dropsDom.createStatus.textContent = 'Enter the inscription number you want to drop.';
         return;
       }
+      const params = new URLSearchParams(window.location.search);
+      if (window.location.pathname !== '/drops' || params.get('drop') !== tokenIdRaw) {
+        const targetParams = new URLSearchParams({ drop: tokenIdRaw });
+        window.history.pushState(null, '', `/drops?${targetParams.toString()}`);
+        dropsDom.createStatus.textContent =
+          `Inscription #${tokenIdRaw} selected. Loading its create-drop view...`;
+        await switchToPage('drops', targetParams);
+        return;
+      }
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        dropsDom.createStatus.textContent = 'Connect a wallet to create a drop.';
+        return;
+      }
+      const creator = state.walletSession.address;
       const tokenId = BigInt(tokenIdRaw);
       const groupRaw = dropsDom.createGroup?.value?.trim();
       // A shared batch id limits claims to one per person per batch; leaving it
