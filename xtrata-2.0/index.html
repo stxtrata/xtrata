@@ -772,6 +772,21 @@
                 <span class="field__label">Campaign group id</span>
                 <input class="input" id="dropsCreateGroup" inputmode="numeric" placeholder="1 = one claim per wallet for this campaign" />
               </label>
+              <fieldset class="drop-rules" id="dropsCreateRules">
+                <legend>Claim rules</legend>
+                <label class="drop-rule">
+                  <input type="checkbox" id="dropsRuleOnePerWallet" checked />
+                  <span>One claim per wallet in this group</span>
+                </label>
+                <label class="drop-rule">
+                  <input type="checkbox" id="dropsRuleRequireBns" />
+                  <span>Require claimant to hold a BNS name</span>
+                </label>
+                <label class="drop-rule">
+                  <input type="checkbox" id="dropsRuleOnePerBns" />
+                  <span>One claim per BNS name</span>
+                </label>
+              </fieldset>
               <p class="field-hint" id="dropsCreateDeposit"></p>
               <button class="btn" id="dropsCreateButton" type="button">Create drop</button>
               <p class="field-hint" id="dropsCreateStatus"></p>

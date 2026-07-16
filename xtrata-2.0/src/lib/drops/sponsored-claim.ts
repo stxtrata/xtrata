@@ -203,6 +203,7 @@ export const submitSponsorClaimWithRetry = async (params: {
   txHex: string;
   contractId: string;
   listingId: bigint;
+  bnsName?: string | null;
   retryDelaysMs?: readonly number[];
   wait?: (ms: number) => Promise<void>;
   onRetry?: (error: SponsorClientError, attempt: number, maxAttempts: number, delayMs: number) => void;
@@ -217,7 +218,8 @@ export const submitSponsorClaimWithRetry = async (params: {
       return await params.client.submit({
         txHex: params.txHex,
         contractId: params.contractId,
-        listingId: params.listingId
+        listingId: params.listingId,
+        bnsName: params.bnsName
       });
     } catch (error) {
       if (error instanceof SponsorClientError && error.existingJob) {

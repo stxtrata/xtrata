@@ -13,7 +13,10 @@ describe('public Drops sponsored-claim surface', () => {
       'dropsDiagnosticsClear',
       'dropsDiagnosticsLog',
       'dropsHistory',
-      'dropsHistoryList'
+      'dropsHistoryList',
+      'dropsRuleOnePerWallet',
+      'dropsRuleRequireBns',
+      'dropsRuleOnePerBns'
     ]) {
       expect(indexHtml).toContain(`id="${id}"`);
     }
@@ -50,7 +53,11 @@ describe('public Drops sponsored-claim surface', () => {
     expect(homeMain).toContain("window.history.pushState(null, '', `/drops?${targetParams.toString()}`)");
     expect(homeMain).toContain("await switchToPage('drops', targetParams)");
     expect(homeMain).toContain('pollIntervalMs: 4000');
-    expect(homeMain).toContain('confirmed and now live');
+    expect(homeMain).toContain('confirmed, rules saved, and now live');
+    expect(homeMain).toContain('registerDropPolicy({');
+    expect(homeMain).toContain('chooseClaimBnsName(drop, policyRules, round)');
+    expect(homeMain).toContain('bnsName,');
+    expect(homeMain).toContain('generateUniqueDropGroupId');
     expect(homeMain).toContain('claimer: optionalPrincipalValue(tuple.claimer)');
     expect(homeMain).toContain('renderDropsHistory();');
     expect(homeMain).toContain("'drops-history__row'");
@@ -68,7 +75,8 @@ describe('public Drops sponsored-claim surface', () => {
     expect(homeMain).toContain("functionName: 'has-claimed-in-group'");
     expect(homeMain).toContain("'GROUP_LIMIT'");
     expect(homeMain).toContain('already claimed a free drop from ${lockLabel}');
-    expect(homeMain).toContain(': DEFAULT_DROP_GROUP_ID');
+    expect(homeMain).toContain(': policyRules.onePerWallet');
+    expect(homeMain).toContain('? DEFAULT_DROP_GROUP_ID');
     expect(homeMain).not.toContain('dropClaimSelfPaid');
     expect(homeMain).not.toContain('claiming self-paid instead');
   });

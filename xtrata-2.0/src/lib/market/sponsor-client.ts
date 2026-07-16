@@ -205,6 +205,7 @@ export const createSponsorClient = (
       txHex: string;
       contractId: string;
       listingId: bigint;
+      bnsName?: string | null;
     }): Promise<SponsorJob> {
       const body = (await request(fetchImpl, `${base}/sponsor/submit`, {
         method: 'POST',
@@ -212,7 +213,8 @@ export const createSponsorClient = (
         body: JSON.stringify({
           txHex: params.txHex,
           contractId: params.contractId,
-          listingId: params.listingId.toString()
+          listingId: params.listingId.toString(),
+          ...(params.bnsName ? { bnsName: params.bnsName } : {})
         })
       })) as SponsorJob;
       return body;
