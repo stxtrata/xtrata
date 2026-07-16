@@ -4267,7 +4267,9 @@
               title: state.selectedFile.name
             },
             ['Size', formatBytes(BigInt(state.selectedFile.size))],
-            ['Next step', 'Add parents, then click Prepare']
+            // Parents/dependencies are OPTIONAL — say so, and explain the
+            // transient locked state while the quote re-prepares.
+            ['Next step', 'Preparing quote - Start unlocks in a moment (parents/dependencies are optional)']
           ]);
         } else {
           clearElement(dom.payloadPreview, 'No payload');
@@ -13050,6 +13052,26 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // File card: the Dependencies input (existence-only references). Parses a
     // numeric list into the same handoff dependency slot the mint reads. Kept
     // separate from Parents so the two are never confused.
+    //
+    // Editing dependencies invalidates the prepared quote (markPreparedDirty),
+    // which disables Start. Previously nothing re-armed it — auto-prepare only
+    // ran on file drop — so adding dependencies silently deadlocked the flow.
+    // Now a debounced re-prepare runs once typing settles, mirroring the drop
+    // flow, and the status meta explains the transient locked state.
+    let dependencyReprepareTimer = null;
+    const scheduleDependencyReprepare = () => {
+      if (dependencyReprepareTimer) {
+        window.clearTimeout(dependencyReprepareTimer);
+        dependencyReprepareTimer = null;
+      }
+      if (!state.selectedFile) return;
+      dependencyReprepareTimer = window.setTimeout(() => {
+        dependencyReprepareTimer = null;
+        if (state.selectedFile && !state.busy && !state.prepared && autoPrepareHook) {
+          void autoPrepareHook();
+        }
+      }, 700);
+    };
     const syncDependencyInput = () => {
       const raw = (dom.dependencyIdsInput?.value || '').trim();
       const ids = raw.split(/[\s,]+/).filter(Boolean);
@@ -13063,6 +13085,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             : 'No dependencies added.';
       }
       markPreparedDirty();
+      scheduleDependencyReprepare();
     };
     // Text card: cost + inscribe button (label switches to "Inscribe reply" when replying).
     const syncTextCard = () => {

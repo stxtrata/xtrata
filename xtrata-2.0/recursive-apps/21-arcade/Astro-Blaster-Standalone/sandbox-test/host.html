@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Astro Blaster v3 - Fake srcdoc Sandbox Harness</title>
+  <style>
+    body { margin: 0; font-family: ui-sans-serif, system-ui, sans-serif; background: #10141f; color: #dfe8ff; }
+    #bar { padding: 8px 12px; background: #1a2233; font-size: 13px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+    #bar b { color: #8fd0ff; }
+    #frame-wrap { height: calc(100vh - 120px); }
+    iframe { width: 100%; height: 100%; border: 0; background: #000; }
+    #log { height: 78px; overflow: auto; font-size: 11px; font-family: ui-monospace, monospace; padding: 4px 12px; background: #0b0f19; color: #9ec6ff; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <div id="bar">
+    <b>Harness</b>
+    <label><input type="checkbox" id="grant-bridge" checked> answer hello (grant wallet bridge)</label>
+    <span id="status">booting...</span>
+  </div>
+  <div id="frame-wrap"><iframe id="game-frame" sandbox="allow-scripts" title="astro-blaster-sandbox"></iframe></div>
+  <pre id="log"></pre>
+
+  <script>
+    (async () => {
+      const logEl = document.getElementById('log');
+      const statusEl = document.getElementById('status');
+      const grantBridgeEl = document.getElementById('grant-bridge');
+      const params = new URLSearchParams(location.search);
+      if (params.get('grantBridge') === '0') grantBridgeEl.checked = false;
+
+      // Results object polled by the Playwright runner.
+      const R = (window.__HARNESS_RESULTS = {
+        parentFetched: false,
+        chunkRequests: [],
+        helloReceived: false,
+        helloAcked: false,
+        bridgeRequests: [],       // {method, params}
+        intents: [],              // {intent, payload}
+        errors: []
+      });
+
+      const log = (m) => {
+        logEl.textContent += m + '\n';
+        logEl.scrollTop = logEl.scrollHeight;
+      };
+      const setStatus = (m) => { statusEl.textContent = m; log('[status] ' + m); };
+
+      // ---- load parent template + module sources -------------------------
+      // Module ids are parsed from the parent template's CONFIG.moduleIds so
+      // the harness keeps working whenever ids change (e.g. contract
+      // migrations). Keys here are the CONFIG keys, not inscription ids.
+      const MODULE_PATHS = {
+        styles: '../modules/styles.css',
+        utils: '../modules/utils.js',
+        highscores: '../modules/highscores.js',
+        gameRuntime: '../modules/game01_astro_blaster-v2.37.js',
+        main: '../modules/main-v3.js'
+      };
+      const parseModuleIds = (html) => {
+        const out = {};
+        for (const key of Object.keys(MODULE_PATHS)) {
+          const m = html.match(new RegExp(key + ':\\s*(\\d+)'));
+          if (!m) throw new Error('moduleIds.' + key + ' not found in parent template');
+          out[m[1]] = { path: MODULE_PATHS[key] };
+        }
+        return out;
+      };
+
+      const fetchText = async (path) => {
+        const res = await fetch(path);
+        if (!res.ok) throw new Error('fetch failed ' + path + ' HTTP ' + res.status);
+        return res.text();
+      };
+
+      let parentHtml;
+      const moduleTexts = {};
+      try {
+        parentHtml = await fetchText('../parent/astro-blaster-parent-v3.template.html');
+        const moduleFiles = parseModuleIds(parentHtml);
+        for (const [id, def] of Object.entries(moduleFiles)) {
+          moduleTexts[id] = await fetchText(def.path);
+        }
+        R.parentFetched = true;
+      } catch (error) {
+        R.errors.push(String(error));
+        setStatus('FAILED loading sources: ' + error);
+        return;
+      }
+
+      // ---- build the in-frame fetch mock ---------------------------------
+      // Serves get-chunk reads exactly as the Hiro call-read endpoint would:
+      // {okay:true, result:'0x' + optional(buff(chunk))}. Everything else
+      // (get-top10 etc.) gets okay:false so reads degrade gracefully.
+      const CHUNK = 16384;
+      const toHex = (str) => {
+        const bytes = new TextEncoder().encode(str);
+        let hex = '';
+        for (const b of bytes) hex += b.toString(16).padStart(2, '0');
+        return { hex, length: bytes.length };
+      };
+      const moduleHex = {};
+      for (const [id, text] of Object.entries(moduleTexts)) {
+        moduleHex[id] = toHex(text);
+      }
+
+      const mockScript = `
+      <script>
+      (function(){
+        var MODULES = ${JSON.stringify(moduleHex)};
+        var CHUNK = ${CHUNK};
+        var realFetch = window.fetch ? window.fetch.bind(window) : null;
+        function cvUintFromHex(argHex){
+          return parseInt(String(argHex).replace(/^0x0?1/i, ''), 16);
+        }
+        window.fetch = function(input, init){
+          var url = typeof input === 'string' ? input : (input && input.url) || '';
+          if (url.indexOf('/v2/contracts/call-read/') < 0) {
+            return realFetch ? realFetch(input, init) : Promise.reject(new Error('no network in harness'));
+          }
+          var fn = url.split('/').pop();
+          var body = {};
+          try { body = JSON.parse(init && init.body || '{}'); } catch (e) {}
+          var args = body.arguments || [];
+          var payload;
+          if (fn === 'get-chunk') {
+            var moduleId = cvUintFromHex(args[0]);
+            var index = cvUintFromHex(args[1]);
+            var mod = MODULES[String(moduleId)];
+            try { parent.postMessage({ type: 'harness:chunk', moduleId: moduleId, index: index }, '*'); } catch (e) {}
+            if (!mod) {
+              payload = { okay: false, cause: 'unknown module ' + moduleId };
+            } else {
+              var startByte = index * CHUNK;
+              var hexStart = startByte * 2;
+              var hexEnd = Math.min(mod.hex.length, hexStart + CHUNK * 2);
+              if (hexStart >= mod.hex.length) {
+                payload = { okay: true, result: '0x09' }; // none
+              } else {
+                var chunkHex = mod.hex.slice(hexStart, hexEnd);
+                var lenBytes = chunkHex.length / 2;
+                var lenHex = lenBytes.toString(16).padStart(8, '0');
+                payload = { okay: true, result: '0x0a02' + lenHex + chunkHex };
+              }
+            }
+          } else if (fn === 'get-fee-unit') {
+            payload = { okay: true, result: '0x01' + (30000).toString(16).padStart(32, '0') };
+          } else if (fn === 'get-top10-entry') {
+            payload = { okay: true, result: '0x09' }; // none: empty slot
+          } else {
+            payload = { okay: false, cause: 'harness: function not mocked (' + fn + ')' };
+          }
+          return Promise.resolve(new Response(JSON.stringify(payload), {
+            status: 200, headers: { 'Content-Type': 'application/json' }
+          }));
+        };
+      })();
+      <\/script>`;
+
+      // Inject the mock BEFORE the parent's boot script.
+      const srcdoc = parentHtml.replace('<script>', mockScript + '\n<script>');
+
+      // ---- mock wallet-capable host --------------------------------------
+      const BRIDGE_TOKEN = 'harness-token-' + Math.random().toString(36).slice(2);
+      const FAKE_ADDRESS = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
+      let connected = false;
+
+      const sessionResponse = () => ({
+        address: connected ? FAKE_ADDRESS : null,
+        addresses: connected ? [FAKE_ADDRESS] : [],
+        accounts: connected ? [FAKE_ADDRESS] : [],
+        network: 'mainnet'
+      });
+
+      window.addEventListener('message', (event) => {
+        const data = event && event.data ? event.data : null;
+        if (!data || typeof data !== 'object') return;
+
+        if (data.type === 'harness:chunk') {
+          R.chunkRequests.push({ moduleId: data.moduleId, index: data.index });
+          return;
+        }
+
+        if (data.type === 'xtrata:wallet:hello') {
+          R.helloReceived = true;
+          log('[host] hello received (nonce ' + data.nonce + ')');
+          if (!grantBridgeEl.checked) { log('[host] bridge grant disabled; ignoring hello'); return; }
+          event.source.postMessage(
+            { type: 'xtrata:wallet:hello-ack', nonce: data.nonce, bridgeToken: BRIDGE_TOKEN },
+            '*'
+          );
+          R.helloAcked = true;
+          log('[host] hello-ack sent');
+          return;
+        }
+
+        if (data.type === 'xtrata:arcade:wallet-intent') {
+          R.intents.push({ intent: data.intent, payload: data.payload || null });
+          log('[host] intent: ' + data.intent);
+          return;
+        }
+
+        if (data.type === 'xtrata:wallet:request') {
+          if (data.bridgeToken !== BRIDGE_TOKEN) {
+            log('[host] request with BAD token: ' + data.method);
+            event.source.postMessage(
+              { type: 'xtrata:wallet:response', requestId: data.requestId, ok: false,
+                error: { message: 'bad token', code: -32600 } }, '*');
+            return;
+          }
+          R.bridgeRequests.push({ method: data.method, params: data.params || null });
+          log('[host] request: ' + data.method);
+          let result;
+          if (['stx_requestAccounts', 'requestAccounts', 'stx_connect', 'connect', 'wallet_connect'].includes(data.method)) {
+            connected = true;
+            result = sessionResponse();
+          } else if (['stx_getAddresses', 'getAddresses', 'stx_getAccounts', 'getAccounts', 'wallet_getAccount'].includes(data.method)) {
+            result = sessionResponse();
+          } else if (['stx_getNetwork', 'getNetwork'].includes(data.method)) {
+            result = { network: 'mainnet' };
+          } else if (['stx_callContract', 'stx_callContractV2'].includes(data.method)) {
+            result = { txId: '0x' + 'ab'.repeat(32) };
+          } else if (['stx_disconnect', 'wallet_disconnect', 'disconnect', 'deactivate'].includes(data.method)) {
+            connected = false;
+            result = { ok: true };
+          } else {
+            event.source.postMessage(
+              { type: 'xtrata:wallet:response', requestId: data.requestId, ok: false,
+                error: { message: 'unsupported: ' + data.method, code: -32601 } }, '*');
+            return;
+          }
+          event.source.postMessage(
+            { type: 'xtrata:wallet:response', requestId: data.requestId, ok: true, result },
+            '*'
+          );
+        }
+      });
+
+      document.getElementById('game-frame').srcdoc = srcdoc;
+      setStatus('parent booting in sandboxed srcdoc iframe (bridge grant: ' + (grantBridgeEl.checked ? 'ON' : 'OFF') + ')');
+    })();
+  </script>
+</body>
+</html>
