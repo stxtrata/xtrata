@@ -2,6 +2,16 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Arcade v3 — sandbox-native Astro Blaster + wallet bridge handshake (2026-07-16)
+
+- Diagnosed inscription #73 (Astro Blaster recursive parent): boots and reads the on-chain top-10 at top level, but wallet flow is structurally broken in sandboxed embeds (`sandbox="allow-scripts"` srcdoc iframes get no extension providers, no query string for `walletBridgeToken`, an opaque origin that breaks `postMessage(..., location.origin)`, unresolvable relative `/hiro/...` URLs, and silently ignored `alert()/confirm()`).
+- New `recursive-apps/21-arcade/Astro-Blaster-Standalone/modules/main-v3.js` (replaces main leaf #87): in-DOM notices instead of alert/confirm; never runs in-frame @stacks/connect auth when the provider is the host bridge shim; emits an `open-runtime` claim intent when no wallet is reachable; Xverse candidates now lead with `wallet_connect` on `BitcoinProvider` per the 2026-07-14 signing correction.
+- New `parent/astro-blaster-parent-v3.template.html` (replaces parent #73): `xtrata:wallet:hello`/`hello-ack` handshake grants the bridge token in sandboxed embeds (query param remains the /runtime fast path); origin-safe postMessage; absolute-first Hiro API bases (same-site `/hiro/<net>` when a real origin exists, literal `https://api.mainnet.hiro.so` otherwise so the embed rewrite proxies it); `window.ArcadeHostBridge` capability API; `parentTokenId`/`runtimeOrigin` config for the claim deep link. Leaves #69/#70/#80/#71 are reused unchanged.
+- Host side: `src/App.tsx` answers the hello handshake (mints + registers bridge tokens), accepts token-validated bridge requests from opaque-origin srcdoc frames, and opens `/runtime/` (rebuilt same-origin URL, whitelisted params, fresh token) on `open-runtime` intents; `src/home/main.js` gained an additive tail listener that handles the same intent on the public homepage (no token — top-level /runtime sees real providers).
+- `parent/fill-inscription-ids.mjs`: template field replacement scoped to the CONFIG block (the whole-document regex also matched runtime code and threw "found 7" for `network`); `--parent` now fills `parentTokenId` in v3 templates.
+- New `sandbox-test/` harness (host.html + run-harness.mjs, Playwright): boots the v3 parent inside a real `sandbox="allow-scripts"` srcdoc iframe with mocked `get-chunk` reads and a scripted wallet host. Verified 2026-07-16: all five modules inject; hello handshake grants the bridge; Connect drives the bridge and shows the connected address; `submit-score` rides the bridge to a txId; with a non-granting host the game still boots, notices in-DOM, and emits `open-runtime`. Both scenarios pass.
+- NOT yet verified: repo `vitest`/`vite build` for the App.tsx + home/main.js edits (run on Mac per usual gate); real-Xverse top-level connect; live inscription. Plan: `Astro-Blaster-Standalone/parent/INSCRIPTION-PLAN-V3.md` (2 new inscriptions: main-v3 leaf + v3 parent).
+
 ## ESLint source gate repair (2026-07-14)
 
 - Replaced the incompatible flat-config React Refresh preset with its supported legacy `.eslintrc.cjs` rule equivalent, while preserving constant exports and React/Hook checks.

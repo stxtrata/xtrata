@@ -70,6 +70,12 @@
     import { getDropsCollectionLockForDrop } from '/src/lib/drops/collection-lock.ts';
     import { loadDropsActivity } from '/src/lib/drops/history.ts';
     import {
+      DEFAULT_DROP_POLICY_RULES,
+      hasBnsPolicy,
+      normalizeDropBnsName,
+      normalizeDropPolicyRules
+    } from '/src/lib/drops/policies.ts';
+    import {
       getMarketListingPublicBlockReason,
       isMarketListingPubliclyBuyable
     } from '/src/lib/market/actions.ts';
@@ -4261,7 +4267,9 @@
               title: state.selectedFile.name
             },
             ['Size', formatBytes(BigInt(state.selectedFile.size))],
-            ['Next step', 'Add parents, then click Prepare']
+            // Parents/dependencies are OPTIONAL — say so, and explain the
+            // transient locked state while the quote re-prepares.
+            ['Next step', 'Preparing quote - Start unlocks in a moment (parents/dependencies are optional)']
           ]);
         } else {
           clearElement(dom.payloadPreview, 'No payload');
@@ -11330,6 +11338,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       create: $('dropsCreate'),
       createTokenId: $('dropsCreateTokenId'),
       createGroup: $('dropsCreateGroup'),
+      createRules: $('dropsCreateRules'),
+      ruleOnePerWallet: $('dropsRuleOnePerWallet'),
+      ruleRequireBns: $('dropsRuleRequireBns'),
+      ruleOnePerBns: $('dropsRuleOnePerBns'),
       createDeposit: $('dropsCreateDeposit'),
       createButton: $('dropsCreateButton'),
       createStatus: $('dropsCreateStatus'),
@@ -11463,6 +11475,98 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       return null;
     };
 
+    const dropsSponsorBase = (entry) => (entry?.sponsorApi ?? '/').replace(/\/+$/, '');
+
+    const getDropsCreatePolicyRules = () => normalizeDropPolicyRules({
+      onePerWallet: dropsDom.ruleOnePerWallet?.checked ?? DEFAULT_DROP_POLICY_RULES.onePerWallet,
+      requireBnsName: dropsDom.ruleRequireBns?.checked ?? DEFAULT_DROP_POLICY_RULES.requireBnsName,
+      onePerBnsName: dropsDom.ruleOnePerBns?.checked ?? DEFAULT_DROP_POLICY_RULES.onePerBnsName
+    });
+
+    const generateUniqueDropGroupId = () => {
+      const random = BigInt(Math.floor(Math.random() * 1000));
+      return BigInt(Date.now()) * 1000n + random;
+    };
+
+    const fetchDropPolicy = async (drop) => {
+      try {
+        const base = dropsSponsorBase(drop.entry);
+        const params = new URLSearchParams({
+          contractId: drop.contractId,
+          creator: drop.creator,
+          groupId: drop.groupId.toString()
+        });
+        const response = await fetch(`${base}/sponsor/drop-policy?${params.toString()}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const body = await response.json();
+        return normalizeDropPolicyRules(body.rules);
+      } catch (error) {
+        debugLog('drops-policy', 'policy read failed; using default rules', {
+          dropId: drop.dropId.toString(),
+          error: String(error?.message ?? error)
+        }, 'warn');
+        return DEFAULT_DROP_POLICY_RULES;
+      }
+    };
+
+    const registerDropPolicy = async ({ drop, rules, txId }) => {
+      const base = dropsSponsorBase(drop.entry);
+      const response = await fetch(`${base}/sponsor/drop-policy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contractId: drop.contractId,
+          dropId: drop.dropId.toString(),
+          creator: drop.creator,
+          groupId: drop.groupId.toString(),
+          rules,
+          txId: txId || null
+        })
+      });
+      if (!response.ok) {
+        let message = `HTTP ${response.status}`;
+        try {
+          const body = await response.json();
+          message = body.message ?? body.code ?? message;
+        } catch {
+          // Preserve HTTP status.
+        }
+        throw new Error(message);
+      }
+      return response.json();
+    };
+
+    const chooseClaimBnsName = async (drop, rules, round) => {
+      if (!hasBnsPolicy(rules)) return null;
+      recordDropDiagnostic(round, 'BNS_POLICY', 'Resolving BNS names held by the connected wallet.');
+      dropsDom.status.innerHTML = '<span><strong>Drops</strong> checking BNS eligibility for this claim…</span>';
+      const result = await resolveBnsNames({
+        address: state.walletSession.address,
+        network: drop.entry.network
+      });
+      const names = [...new Set((result.names ?? []).map(normalizeDropBnsName).filter(Boolean))];
+      if (!names.length) {
+        throw Object.assign(new Error('This drop requires the claiming wallet to hold a BNS name.'), {
+          code: 'BNS_REQUIRED'
+        });
+      }
+      let selected = normalizeDropBnsName(result.primary) ?? names[0];
+      if (names.length > 1 && rules.onePerBnsName) {
+        const answer = window.prompt(
+          `Choose the BNS name to use for this claim:\n\n${names.join('\n')}`,
+          selected
+        );
+        selected = normalizeDropBnsName(answer);
+        if (!selected || !names.includes(selected)) {
+          throw Object.assign(new Error('Choose one of the BNS names held by the connected wallet.'), {
+            code: 'BNS_SELECTION_INVALID'
+          });
+        }
+      }
+      recordDropDiagnostic(round, 'BNS_NAME', `Using ${selected} for BNS policy checks.`, 'success');
+      return selected;
+    };
+
     const readDrops = async (entry) => {
       const contractId = `${entry.address}.${entry.contractName}`;
       const lastJson = await callReadOnlyJson({
@@ -11549,6 +11653,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         recordDropDiagnostic(round, 'BLOCK', 'No connected Stacks wallet address.', 'error');
         return;
       }
+      let policyRules = DEFAULT_DROP_POLICY_RULES;
+      try {
+        policyRules = await fetchDropPolicy(drop);
+      } catch {
+        policyRules = DEFAULT_DROP_POLICY_RULES;
+      }
       try {
         dropsDom.status.innerHTML = '<span><strong>Drops</strong> checking whether this wallet has already claimed from this campaign…</span>';
         const collectionLock = getDropsCollectionLockForDrop({
@@ -11559,7 +11669,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         });
         const claimedGroup = collectionLock
           ? await hasClaimedAnyDropGroup(drop, state.walletSession.address, collectionLock.groupIds)
-          : (await hasClaimedDropGroup(drop, state.walletSession.address) ? drop.groupId : null);
+          : policyRules.onePerWallet
+            ? (await hasClaimedDropGroup(drop, state.walletSession.address) ? drop.groupId : null)
+            : null;
         if (claimedGroup !== null) {
           const lockLabel = collectionLock?.label ?? 'this campaign group';
           dropsDom.status.innerHTML = `<span><strong>Drops</strong> this wallet has already claimed a free drop from ${lockLabel}.</span><span class="badge amber">one per wallet</span>`;
@@ -11589,6 +11701,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       recordDropDiagnostic(round, 'PLAN', `Build sponsored ${drop.contractId}::claim, then stx_signTransaction with broadcast=false; origin fee=0, deny mode, 1 NFT post-condition.`);
       dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the free claim in your wallet (fee 0)…</span>';
       try {
+        const bnsName = await chooseClaimBnsName(drop, policyRules, round);
         recordDropDiagnostic(round, 'NONCE_REQUEST', 'Loading the connected address\'s next origin nonce from Hiro.');
         const originNonce = await fetchAddressNonce(
           state.walletSession.address,
@@ -11648,7 +11761,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         recordDropDiagnostic(round, 'SIGNED_TX_READY', `Validated ${inspection.txHex.length / 2} bytes; tx ${inspection.txId ?? 'id unavailable'}.`, 'success');
 
         dropsDom.status.innerHTML = '<span><strong>Drops</strong> signed claim validated — submitting to the sponsor relayer…</span>';
-        const sponsorClient = createSponsorClient((drop.entry.sponsorApi ?? '/').replace(/\/+$/, ''));
+        const sponsorClient = createSponsorClient(dropsSponsorBase(drop.entry));
         recordDropDiagnostic(round, 'RELAYER_SUBMIT', `Submitting signed claim for ${drop.contractId} drop #${drop.dropId}.`);
         const describeSponsorClientError = (error) => {
           const references = [
@@ -11667,6 +11780,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             txHex: inspection.txHex,
             contractId: drop.contractId,
             listingId: drop.dropId,
+            bnsName,
             onExistingJob: (error, existingJob) => {
               recordDropDiagnostic(round, 'RELAYER_RESUME', `${error.code}: resuming existing job ${existingJob.id}.`, 'warn');
             },
@@ -12072,11 +12186,18 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       } catch {
         dropsQuote = 60_000n;
       }
+      const rules = getDropsCreatePolicyRules();
+      const blankGroupHint = rules.onePerWallet
+        ? `Blank campaign group uses ${DEFAULT_DROP_GROUP_ID}, so each wallet can claim once from this creator's campaign.`
+        : 'Blank campaign group will generate a unique group id for this drop, so the contract default group does not force one-per-wallet.';
+      const bnsHint = rules.requireBnsName || rules.onePerBnsName
+        ? ' BNS rules are enforced by the sponsor relayer until they are hardened into the contract.'
+        : '';
       dropsDom.createDeposit.textContent =
-        `Sponsorship deposit: ${formatAssetAmount(dropsQuote, 6, 'STX')} — covers the claimer's network fee so they need zero STX. Blank campaign group uses ${DEFAULT_DROP_GROUP_ID}, which lets each wallet claim once from this creator's campaign; unused deposit refunds after claim or cancel.`;
+        `Sponsorship deposit: ${formatAssetAmount(dropsQuote, 6, 'STX')} — covers the claimer's network fee so they need zero STX. ${blankGroupHint}${bnsHint} Unused deposit refunds after claim or cancel.`;
     };
 
-    const watchCreatedDrop = async ({ txId, tokenId, creator, watchRun }) => {
+    const watchCreatedDrop = async ({ txId, tokenId, creator, rules, watchRun }) => {
       const hasTxId = typeof txId === 'string' && txId.length > 0;
       try {
         if (hasTxId) {
@@ -12099,7 +12220,18 @@ const openCuratedGallery = async (galleryId, options = {}) => {
               drop.claimedAt === null
           );
           if (createdDrop) {
-            dropsDom.createStatus.textContent = `Drop #${createdDrop.dropId} confirmed and now live.`;
+            try {
+              await registerDropPolicy({ drop: createdDrop, rules, txId });
+              dropsDom.createStatus.textContent = `Drop #${createdDrop.dropId} confirmed, rules saved, and now live.`;
+            } catch (policyError) {
+              dropsDom.createStatus.textContent =
+                `Drop #${createdDrop.dropId} is live, but rule registration failed: ${String(policyError?.message ?? policyError)}. Claims will fall back to default contract rules until this is saved.`;
+              debugLog('drops-policy', 'policy registration failed', {
+                dropId: createdDrop.dropId.toString(),
+                tokenId: tokenId.toString(),
+                error: String(policyError?.message ?? policyError)
+              }, 'warn');
+            }
             debugLog('drops-create', 'created drop is visible', {
               dropId: createdDrop.dropId.toString(),
               tokenId: tokenId.toString(),
@@ -12149,12 +12281,16 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const creator = state.walletSession.address;
       const tokenId = BigInt(tokenIdRaw);
       const groupRaw = dropsDom.createGroup?.value?.trim();
+      const policyRules = getDropsCreatePolicyRules();
       // The drops contract enforces one claim per (creator, group id, claimer).
-      // Blank group id uses the default campaign group, so each wallet can only
-      // claim one free drop from that creator's default campaign.
+      // When one-per-wallet is disabled and the creator leaves the group blank,
+      // generate a unique group id so the contract default group does not still
+      // impose the very rule the UI disabled.
       const groupId = /^\d+$/.test(groupRaw ?? '')
         ? BigInt(groupRaw)
-        : DEFAULT_DROP_GROUP_ID;
+        : policyRules.onePerWallet
+          ? DEFAULT_DROP_GROUP_ID
+          : generateUniqueDropGroupId();
       const budget = dropsQuote ?? 60_000n;
 
       dropsDom.createStatus.textContent = 'Checking ownership...';
@@ -12206,6 +12342,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             txId,
             tokenId,
             creator,
+            rules: policyRules,
             watchRun
           });
         },
@@ -12217,6 +12354,13 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     };
 
     dropsDom.createButton?.addEventListener('click', () => { void dropsCreateDrop(); });
+    [
+      dropsDom.ruleOnePerWallet,
+      dropsDom.ruleRequireBns,
+      dropsDom.ruleOnePerBns
+    ].forEach((input) => {
+      input?.addEventListener('change', () => { void updateDropsDepositHint(); });
+    });
 
     const openDropForToken = (tokenId) => {
       if (dropsDom.create) dropsDom.create.open = true;
@@ -12908,6 +13052,26 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // File card: the Dependencies input (existence-only references). Parses a
     // numeric list into the same handoff dependency slot the mint reads. Kept
     // separate from Parents so the two are never confused.
+    //
+    // Editing dependencies invalidates the prepared quote (markPreparedDirty),
+    // which disables Start. Previously nothing re-armed it — auto-prepare only
+    // ran on file drop — so adding dependencies silently deadlocked the flow.
+    // Now a debounced re-prepare runs once typing settles, mirroring the drop
+    // flow, and the status meta explains the transient locked state.
+    let dependencyReprepareTimer = null;
+    const scheduleDependencyReprepare = () => {
+      if (dependencyReprepareTimer) {
+        window.clearTimeout(dependencyReprepareTimer);
+        dependencyReprepareTimer = null;
+      }
+      if (!state.selectedFile) return;
+      dependencyReprepareTimer = window.setTimeout(() => {
+        dependencyReprepareTimer = null;
+        if (state.selectedFile && !state.busy && !state.prepared && autoPrepareHook) {
+          void autoPrepareHook();
+        }
+      }, 700);
+    };
     const syncDependencyInput = () => {
       const raw = (dom.dependencyIdsInput?.value || '').trim();
       const ids = raw.split(/[\s,]+/).filter(Boolean);
@@ -12921,6 +13085,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             : 'No dependencies added.';
       }
       markPreparedDirty();
+      scheduleDependencyReprepare();
     };
     // Text card: cost + inscribe button (label switches to "Inscribe reply" when replying).
     const syncTextCard = () => {

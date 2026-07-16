@@ -16,12 +16,15 @@ import {
   FungibleConditionCode,
   NonFungibleConditionCode,
   PostConditionMode,
+  TransactionVersion,
   contractPrincipalCV,
   createAssetInfo,
   cvToHex,
   makeContractCall,
   makeContractNonFungiblePostCondition,
   makeStandardSTXPostCondition,
+  getAddressFromPrivateKey,
+  hexToCV,
   uintCV
 } from '@stacks/transactions';
 import { StacksMainnet } from '@stacks/network';
@@ -34,15 +37,86 @@ const NFT = `${DEPLOYER}.xtrata-v3-2-3`;
 // throwaway keys, never used on-chain
 const BUYER_KEY = 'f9d7f5e0d0d81fdd90dcef4e0e2c1b9e3ea361776a5cd91b5c9a52b98b3e1cb601';
 const SPONSOR_KEY = 'a5c9a52b98b3e1cb6f9d7f5e0d0d81fdd90dcef4e0e2c1b9e3ea361776a5cd9101';
+const BUYER_ADDRESS = getAddressFromPrivateKey(BUYER_KEY, TransactionVersion.Mainnet);
 
 type Row = Record<string, unknown> & { id: string; state: string };
 
 const makeDb = () => {
   const jobs: Row[] = [];
+  const policies: Row[] = [];
+  const policyClaims: Row[] = [];
   const exec = (raw: string, binds: unknown[]) => {
     const q = raw.replace(/\s+/g, ' ').trim();
     if (q.startsWith('CREATE TABLE') || q.startsWith('CREATE INDEX')) {
       return { results: [], meta: { changes: 0 } };
+    }
+    if (q.startsWith('INSERT OR REPLACE INTO drop_policies')) {
+      const [
+        scope_key,
+        contract_id,
+        creator,
+        group_id,
+        one_per_wallet,
+        require_bns_name,
+        one_per_bns_name,
+        tx_id,
+        _scopeForCreatedAt,
+        created_at,
+        updated_at
+      ] = binds;
+      const existing = policies.find((row) => row.scope_key === scope_key);
+      const next = {
+        id: String(scope_key),
+        state: 'policy',
+        scope_key,
+        contract_id,
+        creator,
+        group_id,
+        one_per_wallet,
+        require_bns_name,
+        one_per_bns_name,
+        tx_id,
+        created_at: existing?.created_at ?? created_at,
+        updated_at
+      } as Row;
+      if (existing) Object.assign(existing, next);
+      else policies.push(next);
+      return { results: [], meta: { changes: 1 } };
+    }
+    if (q.startsWith('SELECT * FROM drop_policies WHERE scope_key=?')) {
+      return { results: policies.filter((row) => row.scope_key === binds[0]), meta: {} };
+    }
+    if (q.startsWith('INSERT INTO drop_policy_claims')) {
+      const [scope_key, claim_kind, claim_key, buyer, bns_name, job_id, created_at] = binds;
+      if (
+        policyClaims.some(
+          (row) =>
+            row.scope_key === scope_key &&
+            row.claim_kind === claim_kind &&
+            row.claim_key === claim_key
+        )
+      ) {
+        throw new Error('UNIQUE constraint failed: drop_policy_claims');
+      }
+      policyClaims.push({
+        id: `${scope_key}:${claim_kind}:${claim_key}`,
+        state: 'claim',
+        scope_key,
+        claim_kind,
+        claim_key,
+        buyer,
+        bns_name,
+        job_id,
+        created_at
+      });
+      return { results: [], meta: { changes: 1 } };
+    }
+    if (q.startsWith('DELETE FROM drop_policy_claims WHERE job_id=?')) {
+      const before = policyClaims.length;
+      for (let index = policyClaims.length - 1; index >= 0; index -= 1) {
+        if (policyClaims[index].job_id === binds[0]) policyClaims.splice(index, 1);
+      }
+      return { results: [], meta: { changes: before - policyClaims.length } };
     }
     if (q.startsWith('ALTER TABLE')) throw new Error('duplicate column');
     if (q.startsWith('UPDATE sponsor_jobs SET state=?')) {
@@ -106,7 +180,7 @@ const makeDb = () => {
       ).length;
       return { results: [{ n }], meta: {} };
     }
-    if (q.includes("state NOT IN ('SETTLED','ABANDONED')")) {
+    if (q.startsWith('SELECT COUNT(*) as n FROM sponsor_jobs WHERE state NOT IN')) {
       const n = jobs.filter((j) => !['SETTLED', 'ABANDONED'].includes(j.state)).length;
       return { results: [{ n }], meta: {} };
     }
@@ -154,6 +228,9 @@ const makeDb = () => {
     if (q.includes('WHERE id=?')) {
       return { results: jobs.filter((j) => j.id === binds[0]), meta: {} };
     }
+    if (q.startsWith('SELECT id FROM sponsor_jobs WHERE state=')) {
+      return { results: [], meta: {} };
+    }
     throw new Error(`unhandled query in test double: ${q}`);
   };
   const statement = (q: string, binds: unknown[] = []) => ({
@@ -161,7 +238,7 @@ const makeDb = () => {
     all: async () => exec(q, binds),
     run: async () => exec(q, binds)
   });
-  return { db: { prepare: (q: string) => statement(q) }, jobs };
+  return { db: { prepare: (q: string) => statement(q) }, jobs, policies, policyClaims };
 };
 
 const listingTuple = () =>
@@ -180,6 +257,20 @@ const listingTuple = () =>
     })
   );
 
+const dropTuple = (id = 3n) =>
+  Cl.some(
+    Cl.tuple({
+      creator: Cl.standardPrincipal('SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7'),
+      'nft-contract': Cl.contractPrincipal(DEPLOYER, 'xtrata-v3-2-3'),
+      'token-id': Cl.uint(2759),
+      'fee-budget': Cl.uint(100_000),
+      'budget-remaining': Cl.uint(100_000),
+      'group-id': Cl.uint(id === 32n || id === 31n ? 17481260230060069n : 1n),
+      claimer: Cl.none(),
+      'claimed-at': Cl.none()
+    })
+  );
+
 const broadcasts: string[] = [];
 const balanceApiKeys: Array<string | null> = [];
 let rejectAuthenticatedBalanceRequests = false;
@@ -189,6 +280,7 @@ let transactionKnown = true;
 let transactionStatus = 'success';
 let feeRate = 1;
 let collectionAlreadyClaimed = false;
+let bnsOwner = BUYER_ADDRESS;
 
 const stubFetch = () => {
   broadcasts.length = 0;
@@ -200,8 +292,12 @@ const stubFetch = () => {
   transactionStatus = 'success';
   feeRate = 1;
   collectionAlreadyClaimed = false;
+  bnsOwner = BUYER_ADDRESS;
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    if (url.includes('api.bnsv2.com/names/')) {
+      return Response.json({ status: 'active', data: { owner: bnsOwner, is_valid: true, revoked: false } });
+    }
     if (url.includes('/v2/fees/transfer')) return new Response(String(feeRate), { status: 200 });
     if (url.includes('/stx')) {
       const apiKey = new Headers(init?.headers).get('x-api-key');
@@ -215,6 +311,17 @@ const stubFetch = () => {
     if (url.includes('/nonces')) return Response.json({ possible_next_nonce: 5 });
     if (url.includes('/get-listing')) {
       return Response.json({ okay: true, result: cvToHex(listingTuple()) });
+    }
+    if (url.includes('/get-drop')) {
+      let id = 3n;
+      try {
+        const parsed = JSON.parse(String(init?.body ?? '{}')) as { arguments?: string[] };
+        const arg = parsed.arguments?.[0];
+        if (arg) id = BigInt(String((hexToCV(arg) as { value?: bigint }).value ?? 3n));
+      } catch {
+        // Test defaults to drop id 3.
+      }
+      return Response.json({ okay: true, result: cvToHex(dropTuple(id)) });
     }
     if (url.includes('/has-claimed-in-group')) {
       return Response.json({ okay: true, result: cvToHex(Cl.bool(collectionAlreadyClaimed)) });
@@ -283,6 +390,21 @@ const submit = (env: unknown, body: Record<string, unknown>) =>
     env
   } as never) as Promise<Response>;
 
+const savePolicy = (env: unknown, body: Record<string, unknown>) =>
+  onRequest({
+    request: new Request('https://x/sponsor/drop-policy', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    }),
+    env
+  } as never) as Promise<Response>;
+
+const readPolicy = (env: unknown, params: URLSearchParams) =>
+  onRequest({
+    request: new Request(`https://x/sponsor/drop-policy?${params.toString()}`, { method: 'GET' }),
+    env
+  } as never) as Promise<Response>;
+
 describe('sponsor relayer Pages handler', () => {
   let db: ReturnType<typeof makeDb>;
   let env: Record<string, unknown>;
@@ -310,6 +432,121 @@ describe('sponsor relayer Pages handler', () => {
       listingId: '3'
     });
     expect(res.status).toBe(200);
+  });
+
+  it('saves and reads toggleable drop policies for a creator group', async () => {
+    const saved = await savePolicy(env, {
+      contractId: DROPS,
+      dropId: '3',
+      creator: 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7',
+      groupId: '1',
+      rules: {
+        onePerWallet: false,
+        requireBnsName: true,
+        onePerBnsName: true
+      },
+      txId: 'abc'
+    });
+    expect(saved.status).toBe(200);
+    expect(await saved.json()).toMatchObject({
+      ok: true,
+      rules: {
+        onePerWallet: false,
+        requireBnsName: true,
+        onePerBnsName: true
+      }
+    });
+
+    const read = await readPolicy(env, new URLSearchParams({
+      contractId: DROPS,
+      creator: 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7',
+      groupId: '1'
+    }));
+    expect(read.status).toBe(200);
+    expect(await read.json()).toMatchObject({
+      rules: {
+        onePerWallet: false,
+        requireBnsName: true,
+        onePerBnsName: true
+      }
+    });
+  });
+
+  it('enforces require-BNS before sponsoring a drop claim', async () => {
+    await savePolicy(env, {
+      contractId: DROPS,
+      dropId: '3',
+      creator: 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7',
+      groupId: '1',
+      rules: { onePerWallet: false, requireBnsName: true, onePerBnsName: false }
+    });
+
+    const blocked = await submit(env, {
+      txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 3n, nonce: 0n }),
+      contractId: DROPS,
+      listingId: '3'
+    });
+    expect(blocked.status).toBe(403);
+    expect(await blocked.json()).toMatchObject({ code: 'BNS_REQUIRED', stage: 'BNS_POLICY' });
+    expect(broadcasts).toHaveLength(0);
+
+    const accepted = await submit(env, {
+      txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 3n, nonce: 1n }),
+      contractId: DROPS,
+      listingId: '3',
+      bnsName: 'alice.btc'
+    });
+    expect(accepted.status).toBe(200);
+  });
+
+  it('enforces one-per-BNS across different drops in the same policy group', async () => {
+    await savePolicy(env, {
+      contractId: DROPS,
+      dropId: '3',
+      creator: 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7',
+      groupId: '1',
+      rules: { onePerWallet: false, requireBnsName: true, onePerBnsName: true }
+    });
+    const first = await submit(env, {
+      txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 3n, nonce: 0n }),
+      contractId: DROPS,
+      listingId: '3',
+      bnsName: 'alice.btc'
+    });
+    expect(first.status).toBe(200);
+    const second = await submit(env, {
+      txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 4n, nonce: 1n }),
+      contractId: DROPS,
+      listingId: '4',
+      bnsName: 'alice.btc'
+    });
+    expect(second.status).toBe(409);
+    expect(await second.json()).toMatchObject({ code: 'POLICY_LIMIT', stage: 'POLICY_RESERVATION' });
+  });
+
+  it('crosses one-per-wallet and one-per-BNS when both toggles are selected', async () => {
+    await savePolicy(env, {
+      contractId: DROPS,
+      dropId: '3',
+      creator: 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7',
+      groupId: '1',
+      rules: { onePerWallet: true, requireBnsName: true, onePerBnsName: true }
+    });
+    const first = await submit(env, {
+      txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 3n, nonce: 0n }),
+      contractId: DROPS,
+      listingId: '3',
+      bnsName: 'alice.btc'
+    });
+    expect(first.status).toBe(200);
+    const sameWalletDifferentName = await submit(env, {
+      txHex: await fixture({ contract: DROPS, fn: 'claim', listingId: 4n, nonce: 1n }),
+      contractId: DROPS,
+      listingId: '4',
+      bnsName: 'bob.btc'
+    });
+    expect(sameWalletDifferentName.status).toBe(409);
+    expect(await sameWalletDifferentName.json()).toMatchObject({ code: 'POLICY_LIMIT' });
   });
 
   it('sanitizes a comma/newline Hiro key list before constructing request headers', async () => {

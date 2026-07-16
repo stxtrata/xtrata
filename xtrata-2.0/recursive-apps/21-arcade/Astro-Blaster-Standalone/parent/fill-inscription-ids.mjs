@@ -112,6 +112,28 @@ function replaceSingleObjectField(source, field, valueLiteral){
   return source.replace(regex, (_match, prefix, _currentValue, suffix) => `${prefix}${valueLiteral}${suffix}`);
 }
 
+// Fields like "network:"/"contractAddress:" also appear in the parent's
+// runtime code (bridge payloads, session objects), so replacements must be
+// scoped to the CONFIG object literal at the top of the boot script instead
+// of the whole document.
+function replaceConfigField(source, field, valueLiteral){
+  const start = source.indexOf('var CONFIG = {');
+  if(start < 0){
+    throw new Error('Parent template CONFIG block not found.');
+  }
+  // CONFIG ends at the first "};" at 6-space indent after its start.
+  const endMarker = /\n {6}\};/g;
+  endMarker.lastIndex = start;
+  const endMatch = endMarker.exec(source);
+  if(!endMatch){
+    throw new Error('Parent template CONFIG block end not found.');
+  }
+  const end = endMatch.index + endMatch[0].length;
+  const block = source.slice(start, end);
+  const nextBlock = replaceSingleObjectField(block, field, valueLiteral);
+  return source.slice(0, start) + nextBlock + source.slice(end);
+}
+
 function quoteJsString(value){
   return `'${String(value ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 }
@@ -300,45 +322,45 @@ function applyTemplateUpdates(templateText, manifest, leafIds){
   const scoreNetwork = scoreContract.network || contentContract.network || 'mainnet';
 
   let next = templateText;
-  next = replaceSingleObjectField(next, 'contentContractAddress', quoteJsString(contentContract.address || ''));
-  next = replaceSingleObjectField(next, 'contentContractName', quoteJsString(contentContract.name || ''));
-  next = replaceSingleObjectField(
+  next = replaceConfigField(next, 'contentContractAddress', quoteJsString(contentContract.address || ''));
+  next = replaceConfigField(next, 'contentContractName', quoteJsString(contentContract.name || ''));
+  next = replaceConfigField(
     next,
     'senderAddress',
     quoteJsString(contentContract.senderAddress || contentContract.address || '')
   );
-  next = replaceSingleObjectField(
+  next = replaceConfigField(
     next,
     'networkPriority',
     `[${quoteJsString(contentContract.network || 'mainnet')}]`
   );
 
-  next = replaceSingleObjectField(next, 'styles', leafIds.styles);
-  next = replaceSingleObjectField(next, 'utils', leafIds.utils);
-  next = replaceSingleObjectField(next, 'highscores', leafIds.highscores);
-  next = replaceSingleObjectField(next, 'gameRuntime', leafIds.gameRuntime);
-  next = replaceSingleObjectField(next, 'main', leafIds.main);
+  next = replaceConfigField(next, 'styles', leafIds.styles);
+  next = replaceConfigField(next, 'utils', leafIds.utils);
+  next = replaceConfigField(next, 'highscores', leafIds.highscores);
+  next = replaceConfigField(next, 'gameRuntime', leafIds.gameRuntime);
+  next = replaceConfigField(next, 'main', leafIds.main);
 
-  next = replaceSingleObjectField(next, 'network', quoteJsString(scoreNetwork));
-  next = replaceSingleObjectField(next, 'contractAddress', quoteJsString(scoreContract.address || ''));
-  next = replaceSingleObjectField(next, 'contractName', quoteJsString(scoreContract.name || ''));
-  next = replaceSingleObjectField(
+  next = replaceConfigField(next, 'network', quoteJsString(scoreNetwork));
+  next = replaceConfigField(next, 'contractAddress', quoteJsString(scoreContract.address || ''));
+  next = replaceConfigField(next, 'contractName', quoteJsString(scoreContract.name || ''));
+  next = replaceConfigField(
     next,
     'functionName',
     quoteJsString(scoreContract.functionName || 'submit-score')
   );
-  next = replaceSingleObjectField(
+  next = replaceConfigField(
     next,
     'leaderboardFunctionName',
     quoteJsString(scoreContract.leaderboardFunctionName || 'get-top10')
   );
-  next = replaceSingleObjectField(next, 'apiBaseUrl', quoteJsString(buildApiBaseUrl(scoreNetwork)));
-  next = replaceSingleObjectField(
+  next = replaceConfigField(next, 'apiBaseUrl', quoteJsString(buildApiBaseUrl(scoreNetwork)));
+  next = replaceConfigField(
     next,
     'apiFallbackBaseUrls',
     JSON.stringify(buildApiFallbackBaseUrls(scoreNetwork))
   );
-  next = replaceSingleObjectField(
+  next = replaceConfigField(
     next,
     'readSenderAddress',
     quoteJsString(scoreContract.readSenderAddress || '')
@@ -358,6 +380,16 @@ async function main(){
   if(options.hasLeafIds){
     const templateRaw = await fs.readFile(options.templatePath, 'utf8');
     nextTemplate = applyTemplateUpdates(templateRaw, nextManifest, options.leafIds);
+  }
+
+  // v3 templates carry a parentTokenId field (used for the claim-in-runtime
+  // deep link). Fill it when --parent is provided; older templates without
+  // the field are left untouched.
+  if(options.parentId){
+    const templateRaw = nextTemplate ?? await fs.readFile(options.templatePath, 'utf8');
+    if(/^\s*parentTokenId:/m.test(templateRaw)){
+      nextTemplate = replaceConfigField(templateRaw, 'parentTokenId', String(options.parentId));
+    }
   }
 
   const summary = {

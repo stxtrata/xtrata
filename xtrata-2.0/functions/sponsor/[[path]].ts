@@ -56,6 +56,13 @@ import { jsonResponse } from '../lib/utils';
 import { run, queryAll, type Env } from '../lib/db';
 import { applyHiroApiKey, getHiroApiKeys, shouldRetryWithNextHiroKey } from '../lib/hiro-keys';
 import { getDropsCollectionLockForDrop } from '../../src/lib/drops/collection-lock';
+import {
+  DEFAULT_DROP_POLICY_RULES,
+  hasBnsPolicy,
+  normalizeDropBnsName,
+  normalizeDropPolicyRules,
+  type DropPolicyRules
+} from '../../src/lib/drops/policies';
 
 const DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const DEFAULT_MARKETS = [
@@ -121,6 +128,7 @@ type RelayerDiagnostics = {
 };
 
 const HIRO = 'https://api.hiro.so';
+const BNS_V2 = 'https://api.bnsv2.com';
 
 const allowlist = (env: SponsorEnv) =>
   (env.SPONSOR_MARKETS?.split(',').map((s) => s.trim()).filter(Boolean) ?? DEFAULT_MARKETS);
@@ -275,6 +283,164 @@ const getListing = async (env: SponsorEnv, contractId: string, listingId: string
     tokenId: BigInt(String((rec['token-id'] as { value: unknown }).value)),
     soldAt: soldRaw === null || soldRaw === undefined ? null : String((soldRaw as { value?: unknown }).value ?? soldRaw)
   };
+};
+
+const getDrop = async (env: SponsorEnv, contractId: string, dropId: string) => {
+  const [address, name] = contractId.split('.');
+  const j = await hiroJson<{ okay?: boolean; result?: string }>(
+    env,
+    `/v2/contracts/call-read/${address}/${name}/get-drop`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sender: address, arguments: [cvToHex(uintCV(BigInt(dropId)))] })
+    }
+  );
+  if (!j.okay || !j.result) return null;
+  const parsed = cvToJSON(hexToCV(j.result)) as { value?: { value?: Record<string, { value: unknown }> } };
+  const rec = parsed?.value?.value;
+  if (!rec) return null;
+  const claimedRaw = (rec['claimed-at'] as { value?: { value?: unknown } | null })?.value ?? null;
+  return {
+    creator: String((rec.creator as { value: unknown }).value),
+    groupId: BigInt(String((rec['group-id'] as { value: unknown }).value)),
+    nftContract: String((rec['nft-contract'] as { value: unknown }).value),
+    tokenId: BigInt(String((rec['token-id'] as { value: unknown }).value)),
+    claimedAt: claimedRaw === null || claimedRaw === undefined ? null : String((claimedRaw as { value?: unknown }).value ?? claimedRaw)
+  };
+};
+
+const dropPolicyScopeKey = (contractId: string, creator: string, groupId: string | bigint) =>
+  `${contractId}:${creator}:${String(groupId)}`;
+
+type DropPolicyRow = {
+  scope_key: string;
+  contract_id: string;
+  creator: string;
+  group_id: string;
+  one_per_wallet: number;
+  require_bns_name: number;
+  one_per_bns_name: number;
+  tx_id?: string | null;
+};
+
+const rowToDropPolicy = (row?: DropPolicyRow | null): DropPolicyRules =>
+  normalizeDropPolicyRules(row
+    ? {
+        onePerWallet: row.one_per_wallet === 1,
+        requireBnsName: row.require_bns_name === 1,
+        onePerBnsName: row.one_per_bns_name === 1
+      }
+    : DEFAULT_DROP_POLICY_RULES);
+
+const getDropPolicy = async (
+  env: SponsorEnv,
+  contractId: string,
+  creator: string,
+  groupId: string | bigint
+): Promise<DropPolicyRules> => {
+  const found = await rows<DropPolicyRow>(
+    env,
+    `SELECT * FROM drop_policies WHERE scope_key=?`,
+    [dropPolicyScopeKey(contractId, creator, groupId)]
+  );
+  return rowToDropPolicy(found[0]);
+};
+
+const saveDropPolicy = async (
+  env: SponsorEnv,
+  params: {
+    contractId: string;
+    creator: string;
+    groupId: string | bigint;
+    rules: DropPolicyRules;
+    txId?: string | null;
+  }
+) => {
+  const rules = normalizeDropPolicyRules(params.rules);
+  const now = Date.now();
+  await run(
+    env,
+    `INSERT OR REPLACE INTO drop_policies (
+       scope_key, contract_id, creator, group_id,
+       one_per_wallet, require_bns_name, one_per_bns_name,
+       tx_id, created_at, updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM drop_policies WHERE scope_key=?), ?), ?)`,
+    [
+      dropPolicyScopeKey(params.contractId, params.creator, params.groupId),
+      params.contractId,
+      params.creator,
+      String(params.groupId),
+      rules.onePerWallet ? 1 : 0,
+      rules.requireBnsName ? 1 : 0,
+      rules.onePerBnsName ? 1 : 0,
+      params.txId ?? null,
+      dropPolicyScopeKey(params.contractId, params.creator, params.groupId),
+      now,
+      now
+    ]
+  );
+  return rules;
+};
+
+const releasePolicyClaimsForJob = async (env: SponsorEnv, id: string) => {
+  await run(env, `DELETE FROM drop_policy_claims WHERE job_id=?`, [id]).catch(() => undefined);
+};
+
+const reserveDropPolicyClaims = async (
+  env: SponsorEnv,
+  params: {
+    scopeKey: string;
+    rules: DropPolicyRules;
+    buyer: string;
+    bnsName: string | null;
+    jobId: string;
+  }
+) => {
+  const claims: Array<{ kind: string; key: string }> = [];
+  if (params.rules.onePerWallet) claims.push({ kind: 'wallet', key: params.buyer });
+  if (params.rules.onePerBnsName && params.bnsName) claims.push({ kind: 'bns', key: params.bnsName });
+  for (const claim of claims) {
+    try {
+      await run(
+        env,
+        `INSERT INTO drop_policy_claims (scope_key, claim_kind, claim_key, buyer, bns_name, job_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [params.scopeKey, claim.kind, claim.key, params.buyer, params.bnsName, params.jobId, Date.now()]
+      );
+    } catch {
+      throw Object.assign(new Error('drop policy claim already reserved'), { code: 'DROP_POLICY_CLAIM_CONFLICT' });
+    }
+  }
+};
+
+const getBnsOwner = async (env: SponsorEnv, name: string): Promise<string | null> => {
+  const normalized = normalizeDropBnsName(name);
+  if (!normalized) return null;
+  try {
+    const response = await fetch(`${BNS_V2}/names/${encodeURIComponent(normalized)}`);
+    if (response.ok) {
+      const body = (await response.json()) as {
+        status?: string;
+        data?: { owner?: unknown; is_valid?: unknown; revoked?: unknown };
+        owner?: unknown;
+      };
+      const owner = body.data?.owner ?? body.owner;
+      const isInvalid = body.status === 'inactive' || body.data?.is_valid === false || body.data?.revoked === true;
+      if (!isInvalid && typeof owner === 'string' && owner) return owner;
+    }
+  } catch {
+    // Fall through to Hiro's legacy names endpoint.
+  }
+  try {
+    const body = await hiroJson<{ address?: unknown; zonefile?: unknown }>(
+      env,
+      `/v1/names/${encodeURIComponent(normalized)}`
+    );
+    return typeof body.address === 'string' && body.address ? body.address : null;
+  } catch {
+    return null;
+  }
 };
 
 const hasClaimedInGroup = async (
@@ -482,6 +648,31 @@ const ensureTable = async (env: SponsorEnv) => {
   await run(env, `CREATE INDEX IF NOT EXISTS idx_sponsor_jobs_buyer ON sponsor_jobs (buyer, created_at)`).catch(
     () => undefined
   );
+  await run(env, `CREATE TABLE IF NOT EXISTS drop_policies (
+    scope_key TEXT PRIMARY KEY,
+    contract_id TEXT NOT NULL,
+    creator TEXT NOT NULL,
+    group_id TEXT NOT NULL,
+    one_per_wallet INTEGER NOT NULL DEFAULT 1,
+    require_bns_name INTEGER NOT NULL DEFAULT 0,
+    one_per_bns_name INTEGER NOT NULL DEFAULT 0,
+    tx_id TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`).catch(() => undefined);
+  await run(env, `CREATE TABLE IF NOT EXISTS drop_policy_claims (
+    scope_key TEXT NOT NULL,
+    claim_kind TEXT NOT NULL,
+    claim_key TEXT NOT NULL,
+    buyer TEXT NOT NULL,
+    bns_name TEXT,
+    job_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (scope_key, claim_kind, claim_key)
+  )`).catch(() => undefined);
+  await run(env, `CREATE INDEX IF NOT EXISTS idx_drop_policy_claims_job ON drop_policy_claims (job_id)`).catch(
+    () => undefined
+  );
 };
 
 // D1's .all() wraps rows in { results }; the raw cast was a latent bug.
@@ -504,7 +695,11 @@ const transition = async (
     `UPDATE sponsor_jobs SET state=?, updated_at=?, reservation_key=CASE WHEN ? IN ('SETTLED','ABANDONED') THEN NULL ELSE reservation_key END${extra.sets ? `, ${extra.sets}` : ''} WHERE id=? AND state=?`,
     [to, Date.now(), to, ...(extra.binds ?? []), id, from]
   )) as { meta?: { changes?: number } };
-  return (result.meta?.changes ?? 0) === 1;
+  const changed = (result.meta?.changes ?? 0) === 1;
+  if (changed && to === 'ABANDONED') {
+    await releasePolicyClaimsForJob(env, id);
+  }
+  return changed;
 };
 
 const abandonUnbroadcastJob = async (env: SponsorEnv, id: string, reason: string) => {
@@ -513,6 +708,7 @@ const abandonUnbroadcastJob = async (env: SponsorEnv, id: string, reason: string
     `UPDATE sponsor_jobs SET state='ABANDONED', reservation_key=NULL, payload_hash=NULL, error=?, updated_at=? WHERE id=? AND state='RECEIVED'`,
     [`broadcast: ${reason}`, Date.now(), id]
   );
+  await releasePolicyClaimsForJob(env, id);
 };
 
 type JobRow = {
@@ -553,11 +749,19 @@ const settleBatch = async (env: SponsorEnv, key: string) => {
     [Date.now(), staleBefore]
   ).catch(() => undefined);
   // RECEIVED = reserved but never broadcast (worker crashed pre-broadcast).
+  const staleReceived = await rows<{ id: string }>(
+    env,
+    `SELECT id FROM sponsor_jobs WHERE state='RECEIVED' AND COALESCE(updated_at, created_at) < ?`,
+    [receivedStaleBefore]
+  ).catch(() => []);
   await run(
     env,
     `UPDATE sponsor_jobs SET state='ABANDONED', reservation_key=NULL, payload_hash=NULL, error='never broadcast', updated_at=? WHERE state='RECEIVED' AND COALESCE(updated_at, created_at) < ?`,
     [Date.now(), receivedStaleBefore]
   ).catch(() => undefined);
+  for (const stale of staleReceived) {
+    await releasePolicyClaimsForJob(env, stale.id);
+  }
 
   // Repair jobs that were terminalized from a transient mempool drop before
   // the canonical transaction record became visible. The exact txid is the
@@ -705,12 +909,63 @@ const handleRequest = async (
     );
   }
 
+  if (path.endsWith('/sponsor/drop-policy') && request.method === 'GET') {
+    diagnostics.stage = 'DROP_POLICY_READ';
+    const contractId = url.searchParams.get('contractId') ?? '';
+    const creator = url.searchParams.get('creator') ?? '';
+    const groupId = url.searchParams.get('groupId') ?? '';
+    if (!contractId || !creator || !/^\d+$/.test(groupId)) {
+      return fail('BAD_REQUEST', 'contractId, creator, and numeric groupId required');
+    }
+    if (!allowlist(env).includes(contractId) || !isDropsContract(contractId)) {
+      return fail('CONTRACT_NOT_ALLOWED', 'drop contract not allowlisted');
+    }
+    const rules = await getDropPolicy(env, contractId, creator, groupId);
+    return jsonResponse({ contractId, creator, groupId, rules }, 200, CORS);
+  }
+
+  if (path.endsWith('/sponsor/drop-policy') && request.method === 'POST') {
+    diagnostics.stage = 'DROP_POLICY_SAVE';
+    const body = (await request.json().catch(() => ({}))) as {
+      contractId?: string;
+      dropId?: string | number;
+      creator?: string;
+      groupId?: string | number;
+      rules?: Partial<DropPolicyRules>;
+      txId?: string | null;
+    };
+    const contractId = String(body.contractId ?? '');
+    const dropId = String(body.dropId ?? '');
+    const creator = String(body.creator ?? '');
+    const groupId = String(body.groupId ?? '');
+    if (!contractId || !/^\d+$/.test(dropId) || !creator || !/^\d+$/.test(groupId)) {
+      return fail('BAD_REQUEST', 'contractId, dropId, creator, and numeric groupId required');
+    }
+    if (!allowlist(env).includes(contractId) || !isDropsContract(contractId)) {
+      return fail('CONTRACT_NOT_ALLOWED', 'drop contract not allowlisted');
+    }
+    const drop = await getDrop(env, contractId, dropId);
+    if (!drop) return fail('DROP_NOT_FOUND', 'drop unknown', 404);
+    if (drop.creator !== creator || drop.groupId !== BigInt(groupId)) {
+      return fail('VALIDATION', 'drop policy scope does not match on-chain drop');
+    }
+    const rules = await saveDropPolicy(env, {
+      contractId,
+      creator,
+      groupId,
+      rules: normalizeDropPolicyRules(body.rules),
+      txId: body.txId ?? null
+    });
+    return jsonResponse({ ok: true, contractId, dropId, creator, groupId, rules }, 200, CORS);
+  }
+
   if (path.endsWith('/sponsor/submit') && request.method === 'POST') {
     diagnostics.stage = 'SUBMIT_PARSE';
     const body = (await request.json().catch(() => ({}))) as {
       txHex?: string;
       contractId?: string;
       listingId?: string | number;
+      bnsName?: string | null;
     };
     if (!body.txHex || !body.contractId || body.listingId === undefined) {
       return fail('BAD_REQUEST', 'txHex, contractId, listingId required');
@@ -787,7 +1042,19 @@ const handleRequest = async (
     if (!hasExactDropClaimPostCondition(validated.tx, contractId, listing)) {
       return fail('VALIDATION', VALIDATION.WRONG_POST_CONDITIONS);
     }
+    let dropPolicy: DropPolicyRules | null = null;
+    let dropPolicyScope: string | null = null;
+    let verifiedBnsName: string | null = null;
     if (isDropsContract(contractId)) {
+      diagnostics.stage = 'DROP_POLICY';
+      const drop = await getDrop(env, contractId, listingId.toString());
+      if (drop) {
+        dropPolicy = await getDropPolicy(env, contractId, drop.creator, drop.groupId);
+        dropPolicyScope = dropPolicyScopeKey(contractId, drop.creator, drop.groupId);
+      } else {
+        dropPolicy = DEFAULT_DROP_POLICY_RULES;
+        dropPolicyScope = dropPolicyScopeKey(contractId, listing.seller, listingId);
+      }
       const lock = getDropsCollectionLockForDrop({
         contractId,
         creator: listing.seller,
@@ -808,6 +1075,17 @@ const handleRequest = async (
             `wallet already claimed from ${lock.label}; one free drop per address`,
             409
           );
+        }
+      }
+      if (dropPolicy && hasBnsPolicy(dropPolicy)) {
+        diagnostics.stage = 'BNS_POLICY';
+        verifiedBnsName = normalizeDropBnsName(body.bnsName);
+        if (!verifiedBnsName) {
+          return fail('BNS_REQUIRED', 'this drop requires a valid BNS name for the claiming wallet', 403);
+        }
+        const owner = await getBnsOwner(env, verifiedBnsName);
+        if (!owner || owner.toUpperCase() !== validated.buyer.toUpperCase()) {
+          return fail('BNS_NOT_OWNED', `${verifiedBnsName} is not currently owned by the claiming wallet`, 403);
         }
       }
     }
@@ -855,7 +1133,14 @@ const handleRequest = async (
          VALUES (?, 'RECEIVED', ?, ?, ?, ?, ?, ?, ?, ?)`,
         [id, contractId, listingId.toString(), validated.buyer, payloadHash, `${contractId}:${listingId}`, fee.toString(), Date.now(), Date.now()]
       );
-    } catch {
+    } catch (error) {
+      if ((error as { code?: string })?.code === 'DROP_POLICY_CLAIM_CONFLICT') {
+        return fail(
+          'POLICY_LIMIT',
+          'this drop group has already been claimed by that wallet or BNS name',
+          409
+        );
+      }
       const existing = await rows<JobRow>(env, `SELECT * FROM sponsor_jobs WHERE payload_hash=?`, [payloadHash]);
       if (existing.length) {
         return jsonResponse({ code: 'DUPLICATE', message: 'payload already sponsored', requestId: diagnostics.requestId, stage: diagnostics.stage, ...jobJson(existing[0]) }, 409, CORS);
@@ -869,6 +1154,28 @@ const handleRequest = async (
         return jsonResponse({ code: 'LISTING_BUSY', message: 'this drop or listing already has a sponsorship in progress', requestId: diagnostics.requestId, stage: diagnostics.stage, ...jobJson(reserved[0]) }, 409, CORS);
       }
       return fail('DUPLICATE', 'payload already sponsored', 409);
+    }
+    if (dropPolicy && dropPolicyScope) {
+      diagnostics.stage = 'POLICY_RESERVATION';
+      try {
+        await reserveDropPolicyClaims(env, {
+          scopeKey: dropPolicyScope,
+          rules: dropPolicy,
+          buyer: validated.buyer,
+          bnsName: verifiedBnsName,
+          jobId: id
+        });
+      } catch (error) {
+        await abandonUnbroadcastJob(env, id, 'policy limit');
+        if ((error as { code?: string })?.code === 'DROP_POLICY_CLAIM_CONFLICT') {
+          return fail(
+            'POLICY_LIMIT',
+            'this drop group has already been claimed by that wallet or BNS name',
+            409
+          );
+        }
+        throw error;
+      }
     }
 
     const transaction = deserializeTransaction(txHex);
