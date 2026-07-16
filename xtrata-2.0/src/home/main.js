@@ -4267,7 +4267,9 @@
               title: state.selectedFile.name
             },
             ['Size', formatBytes(BigInt(state.selectedFile.size))],
-            ['Next step', 'Add parents, then click Prepare']
+            // Parents/dependencies are OPTIONAL — say so, and explain the
+            // transient locked state while the quote re-prepares.
+            ['Next step', 'Preparing quote - Start unlocks in a moment (parents/dependencies are optional)']
           ]);
         } else {
           clearElement(dom.payloadPreview, 'No payload');
@@ -13050,6 +13052,26 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // File card: the Dependencies input (existence-only references). Parses a
     // numeric list into the same handoff dependency slot the mint reads. Kept
     // separate from Parents so the two are never confused.
+    //
+    // Editing dependencies invalidates the prepared quote (markPreparedDirty),
+    // which disables Start. Previously nothing re-armed it — auto-prepare only
+    // ran on file drop — so adding dependencies silently deadlocked the flow.
+    // Now a debounced re-prepare runs once typing settles, mirroring the drop
+    // flow, and the status meta explains the transient locked state.
+    let dependencyReprepareTimer = null;
+    const scheduleDependencyReprepare = () => {
+      if (dependencyReprepareTimer) {
+        window.clearTimeout(dependencyReprepareTimer);
+        dependencyReprepareTimer = null;
+      }
+      if (!state.selectedFile) return;
+      dependencyReprepareTimer = window.setTimeout(() => {
+        dependencyReprepareTimer = null;
+        if (state.selectedFile && !state.busy && !state.prepared && autoPrepareHook) {
+          void autoPrepareHook();
+        }
+      }, 700);
+    };
     const syncDependencyInput = () => {
       const raw = (dom.dependencyIdsInput?.value || '').trim();
       const ids = raw.split(/[\s,]+/).filter(Boolean);
@@ -13063,6 +13085,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             : 'No dependencies added.';
       }
       markPreparedDirty();
+      scheduleDependencyReprepare();
     };
     // Text card: cost + inscribe button (label switches to "Inscribe reply" when replying).
     const syncTextCard = () => {
@@ -13287,53 +13310,3 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       stationName: 'XTRATA FM',
       mount: document.getElementById('radioSlot')
     });
-
-// ---------------------------------------------------------------------------
-// Arcade open-runtime intent listener (additive, self-contained).
-// Inscribed HTML apps rendered in this page's sandboxed srcdoc iframes cannot
-// open windows themselves (sandbox="allow-scripts" only) and have no wallet
-// providers. When such an app asks to claim a score, it posts an
-// 'xtrata:arcade:wallet-intent' / 'open-runtime' message; we open OUR /runtime
-// page top-level, where wallet extensions inject real providers. The URL is
-// rebuilt from scratch on this origin with whitelisted params only, so an
-// embedded document can never make us open an arbitrary URL.
-(() => {
-  const INTENT_TYPE = 'xtrata:arcade:wallet-intent';
-  window.addEventListener('message', (event) => {
-    const data = event && event.data ? event.data : null;
-    if (!data || data.type !== INTENT_TYPE || data.intent !== 'open-runtime') {
-      return;
-    }
-    const opaqueOrigin = event.origin === 'null' || event.origin === '';
-    if (event.origin !== window.location.origin && !opaqueOrigin) {
-      return;
-    }
-    const detail =
-      data.payload && typeof data.payload === 'object' ? data.payload : {};
-    const requestedUrl =
-      typeof detail.runtimeUrl === 'string' ? detail.runtimeUrl : '';
-    let contractId = '';
-    let tokenId = '';
-    let network = '';
-    try {
-      const parsed = new URL(requestedUrl, window.location.origin);
-      contractId = parsed.searchParams.get('contractId') ?? '';
-      tokenId = parsed.searchParams.get('tokenId') ?? '';
-      network = parsed.searchParams.get('network') ?? '';
-    } catch (error) {
-      return;
-    }
-    if (!contractId) {
-      return;
-    }
-    const search = new URLSearchParams();
-    search.set('contractId', contractId);
-    if (tokenId) {
-      search.set('tokenId', tokenId);
-    }
-    search.set('network', network === 'testnet' ? 'testnet' : 'mainnet');
-    // No bridge token here: opened top-level, the runtime page sees real
-    // wallet extension providers directly and needs no opener bridge.
-    window.open(`${window.location.origin}/runtime/?${search.toString()}`, '_blank');
-  });
-})();

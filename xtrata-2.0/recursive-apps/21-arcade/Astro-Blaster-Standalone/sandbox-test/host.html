@@ -47,12 +47,24 @@
       const setStatus = (m) => { statusEl.textContent = m; log('[status] ' + m); };
 
       // ---- load parent template + module sources -------------------------
-      const MODULE_FILES = {
-        69: { path: '../modules/styles.css' },
-        70: { path: '../modules/utils.js' },
-        80: { path: '../modules/highscores.js' },
-        71: { path: '../modules/game01_astro_blaster-v2.37.js' },
-        87: { path: '../modules/main-v3.js' }
+      // Module ids are parsed from the parent template's CONFIG.moduleIds so
+      // the harness keeps working whenever ids change (e.g. contract
+      // migrations). Keys here are the CONFIG keys, not inscription ids.
+      const MODULE_PATHS = {
+        styles: '../modules/styles.css',
+        utils: '../modules/utils.js',
+        highscores: '../modules/highscores.js',
+        gameRuntime: '../modules/game01_astro_blaster-v2.37.js',
+        main: '../modules/main-v3.js'
+      };
+      const parseModuleIds = (html) => {
+        const out = {};
+        for (const key of Object.keys(MODULE_PATHS)) {
+          const m = html.match(new RegExp(key + ':\\s*(\\d+)'));
+          if (!m) throw new Error('moduleIds.' + key + ' not found in parent template');
+          out[m[1]] = { path: MODULE_PATHS[key] };
+        }
+        return out;
       };
 
       const fetchText = async (path) => {
@@ -65,7 +77,8 @@
       const moduleTexts = {};
       try {
         parentHtml = await fetchText('../parent/astro-blaster-parent-v3.template.html');
-        for (const [id, def] of Object.entries(MODULE_FILES)) {
+        const moduleFiles = parseModuleIds(parentHtml);
+        for (const [id, def] of Object.entries(moduleFiles)) {
           moduleTexts[id] = await fetchText(def.path);
         }
         R.parentFetched = true;

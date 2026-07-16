@@ -1,11 +1,11 @@
 {
   "schema": "xtrata-standalone-inscription-manifest@1",
   "appId": "astro_blaster_standalone",
-  "release": "v2.37-standalone",
+  "release": "v3-sandbox-native",
   "createdAt": "2026-02-21",
   "contentContract": {
     "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
-    "name": "xtrata-v2-1-0",
+    "name": "xtrata-v3-2-3",
     "network": "mainnet",
     "senderAddress": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
   },
@@ -24,7 +24,7 @@
       "sizeBytes": 15888,
       "sha256": "d8b3e8f89a257432222afd3785b49da0d03e2e297f526eb89270998fc1e220e3",
       "mintOrder": 1,
-      "mintedInscriptionId": 69
+      "mintedInscriptionId": null
     },
     {
       "key": "utils",
@@ -33,7 +33,7 @@
       "sizeBytes": 2261,
       "sha256": "16fb1f0d7a410ef200cfeded828160f1cb4619641cd0ae5ecc46b0b106e2a69f",
       "mintOrder": 2,
-      "mintedInscriptionId": 70
+      "mintedInscriptionId": null
     },
     {
       "key": "highscores",
@@ -42,7 +42,7 @@
       "sizeBytes": 129741,
       "sha256": "dd47cfbf1d3f3468076e7f2038dc82da1b5238c4e091018448bb51c75ab71603",
       "mintOrder": 3,
-      "mintedInscriptionId": 68
+      "mintedInscriptionId": null
     },
     {
       "key": "gameRuntime",
@@ -51,16 +51,14 @@
       "sizeBytes": 263260,
       "sha256": "dbadd0907f3951646c3768ea21052091e3d253cbe6f5a9d2a6622ff632479675",
       "mintOrder": 4,
-      "mintedInscriptionId": 71
+      "mintedInscriptionId": null
     },
     {
       "key": "main",
-      "path": "modules/main.js",
+      "path": "modules/main-v3.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 118415,
-      "sha256": "b057fa344a8757f2bc01c75a6bbc8f70d29e0ffb5dad7576ee1f92de295f3e3a",
       "mintOrder": 5,
-      "mintedInscriptionId": 72
+      "mintedInscriptionId": 2789
     }
   ],
   "parent": {
@@ -78,7 +76,7 @@
       "CONFIG.moduleIds.gameRuntime",
       "CONFIG.moduleIds.main"
     ],
-    "mintedInscriptionId": 0
+    "mintedInscriptionId": null
   },
   "recursiveSeal": {
     "method": "seal-recursive",
