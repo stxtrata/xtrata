@@ -40,7 +40,11 @@ import { getNetworkFromAddress, getNetworkMismatch } from './lib/network/guard';
 import { getStacksExplorerContractUrl } from './lib/network/explorer';
 import type { NetworkType } from './lib/network/types';
 import { getViewerKey } from './lib/viewer/queries';
-import { isRuntimeWalletBridgeTokenValid } from './lib/viewer/runtime-open';
+import {
+  createRuntimeWalletBridgeToken,
+  isRuntimeWalletBridgeTokenValid,
+  registerRuntimeWalletBridgeToken
+} from './lib/viewer/runtime-open';
 import { createStacksWalletAdapter } from './lib/wallet/adapter';
 import { createWalletSessionStore } from './lib/wallet/session';
 import { getWalletLookupState } from './lib/wallet/lookup';
@@ -249,6 +253,18 @@ const parseDeployContractName = (raw: string) => {
 
 const RUNTIME_WALLET_BRIDGE_REQUEST_TYPE = 'xtrata:wallet:request';
 const RUNTIME_WALLET_BRIDGE_RESPONSE_TYPE = 'xtrata:wallet:response';
+// Sandbox-native bridge handshake: inscribed HTML rendered in sandboxed
+// srcdoc iframes has no query string, so it cannot receive a walletBridgeToken
+// via URL. It broadcasts a hello; we mint+register a token and reply with an
+// ack. Authentication for subsequent requests rides on that token.
+const RUNTIME_WALLET_BRIDGE_HELLO_TYPE = 'xtrata:wallet:hello';
+const RUNTIME_WALLET_BRIDGE_HELLO_ACK_TYPE = 'xtrata:wallet:hello-ack';
+// Intent channel from inscribed apps (e.g. the arcade): open the secure
+// runtime page top-level so wallet extensions can inject real providers.
+const RUNTIME_WALLET_BRIDGE_INTENT_TYPE = 'xtrata:arcade:wallet-intent';
+
+const isOpaqueEmbeddedOrigin = (origin: string) =>
+  origin === 'null' || origin === '';
 
 const RUNTIME_WALLET_CONNECT_METHODS = new Set([
   'stx_requestAccounts',
@@ -960,6 +976,117 @@ export default function App() {
       return;
     }
 
+    // Answer the hello handshake from inscribed apps rendered in sandboxed
+    // iframes: mint + register a bridge token and hand it back. The token is
+    // what authenticates their subsequent xtrata:wallet:request messages.
+    const handleRuntimeWalletBridgeHello = (event: MessageEvent) => {
+      const payload = event.data as
+        | { type?: unknown; nonce?: unknown }
+        | null
+        | undefined;
+      if (
+        !payload ||
+        typeof payload !== 'object' ||
+        payload.type !== RUNTIME_WALLET_BRIDGE_HELLO_TYPE
+      ) {
+        return;
+      }
+      if (
+        event.origin !== window.location.origin &&
+        !isOpaqueEmbeddedOrigin(event.origin)
+      ) {
+        return;
+      }
+      const source = event.source;
+      if (!source || typeof (source as Window).postMessage !== 'function') {
+        return;
+      }
+      const nonce = typeof payload.nonce === 'string' ? payload.nonce : '';
+      if (!nonce) {
+        return;
+      }
+      const tokenStorage =
+        typeof window.sessionStorage === 'undefined'
+          ? null
+          : window.sessionStorage;
+      const bridgeToken = createRuntimeWalletBridgeToken();
+      registerRuntimeWalletBridgeToken(tokenStorage, bridgeToken);
+      const targetOrigin =
+        event.origin && event.origin !== 'null' ? event.origin : '*';
+      (source as Window).postMessage(
+        {
+          type: RUNTIME_WALLET_BRIDGE_HELLO_ACK_TYPE,
+          nonce,
+          bridgeToken
+        },
+        targetOrigin
+      );
+    };
+
+    // Handle open-runtime intents from inscribed apps: open OUR /runtime page
+    // top-level with a fresh bridge token. The URL is rebuilt from scratch on
+    // this origin — only whitelisted query params are carried over — so an
+    // embedded document can never make us open an arbitrary URL.
+    const handleRuntimeWalletBridgeIntent = (event: MessageEvent) => {
+      const payload = event.data as
+        | { type?: unknown; intent?: unknown; payload?: unknown }
+        | null
+        | undefined;
+      if (
+        !payload ||
+        typeof payload !== 'object' ||
+        payload.type !== RUNTIME_WALLET_BRIDGE_INTENT_TYPE ||
+        payload.intent !== 'open-runtime'
+      ) {
+        return;
+      }
+      if (
+        event.origin !== window.location.origin &&
+        !isOpaqueEmbeddedOrigin(event.origin)
+      ) {
+        return;
+      }
+      const detail =
+        payload.payload && typeof payload.payload === 'object'
+          ? (payload.payload as Record<string, unknown>)
+          : {};
+      const requestedUrl =
+        typeof detail.runtimeUrl === 'string' ? detail.runtimeUrl : '';
+      let contractId = '';
+      let tokenId = '';
+      let network = '';
+      try {
+        const parsed = new URL(requestedUrl, window.location.origin);
+        contractId = parsed.searchParams.get('contractId') ?? '';
+        tokenId = parsed.searchParams.get('tokenId') ?? '';
+        network = parsed.searchParams.get('network') ?? '';
+      } catch (error) {
+        return;
+      }
+      if (!contractId) {
+        return;
+      }
+      const search = new URLSearchParams();
+      search.set('contractId', contractId);
+      if (tokenId) {
+        search.set('tokenId', tokenId);
+      }
+      search.set('network', network === 'testnet' ? 'testnet' : 'mainnet');
+      const tokenStorage =
+        typeof window.sessionStorage === 'undefined'
+          ? null
+          : window.sessionStorage;
+      const bridgeToken = createRuntimeWalletBridgeToken();
+      registerRuntimeWalletBridgeToken(tokenStorage, bridgeToken);
+      search.set('walletBridgeToken', bridgeToken);
+      // Deliberately NOT noopener: the /runtime page uses window.opener to
+      // reach this page's wallet bridge (same-origin page under our control).
+      window.open(
+        `${window.location.origin}/runtime/?${search.toString()}`,
+        '_blank'
+      );
+    };
+
     const handleRuntimeWalletBridgeRequest = (
       event: MessageEvent<RuntimeWalletBridgeRequestMessage>
     ) => {
@@ -995,7 +1122,14 @@ export default function App() {
         return;
       }
 
-      if (event.origin !== window.location.origin) {
+      // Same-origin children (the /runtime page we opened) pass the origin
+      // check directly. Sandboxed srcdoc iframes we render report an opaque
+      // origin ('null'); for those the bridge token below is the sole gate.
+      // Any other real cross-origin sender is rejected outright.
+      if (
+        event.origin !== window.location.origin &&
+        !isOpaqueEmbeddedOrigin(event.origin)
+      ) {
         sendResponse({
           type: RUNTIME_WALLET_BRIDGE_RESPONSE_TYPE,
           requestId,
@@ -1195,8 +1329,12 @@ export default function App() {
         });
     };
 
+    window.addEventListener('message', handleRuntimeWalletBridgeHello);
+    window.addEventListener('message', handleRuntimeWalletBridgeIntent);
     window.addEventListener('message', handleRuntimeWalletBridgeRequest);
     return () => {
+      window.removeEventListener('message', handleRuntimeWalletBridgeHello);
+      window.removeEventListener('message', handleRuntimeWalletBridgeIntent);
       window.removeEventListener('message', handleRuntimeWalletBridgeRequest);
     };
   }, [walletAdapter, selectedContract.network]);

@@ -13287,3 +13287,53 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       stationName: 'XTRATA FM',
       mount: document.getElementById('radioSlot')
     });
+
+// ---------------------------------------------------------------------------
+// Arcade open-runtime intent listener (additive, self-contained).
+// Inscribed HTML apps rendered in this page's sandboxed srcdoc iframes cannot
+// open windows themselves (sandbox="allow-scripts" only) and have no wallet
+// providers. When such an app asks to claim a score, it posts an
+// 'xtrata:arcade:wallet-intent' / 'open-runtime' message; we open OUR /runtime
+// page top-level, where wallet extensions inject real providers. The URL is
+// rebuilt from scratch on this origin with whitelisted params only, so an
+// embedded document can never make us open an arbitrary URL.
+(() => {
+  const INTENT_TYPE = 'xtrata:arcade:wallet-intent';
+  window.addEventListener('message', (event) => {
+    const data = event && event.data ? event.data : null;
+    if (!data || data.type !== INTENT_TYPE || data.intent !== 'open-runtime') {
+      return;
+    }
+    const opaqueOrigin = event.origin === 'null' || event.origin === '';
+    if (event.origin !== window.location.origin && !opaqueOrigin) {
+      return;
+    }
+    const detail =
+      data.payload && typeof data.payload === 'object' ? data.payload : {};
+    const requestedUrl =
+      typeof detail.runtimeUrl === 'string' ? detail.runtimeUrl : '';
+    let contractId = '';
+    let tokenId = '';
+    let network = '';
+    try {
+      const parsed = new URL(requestedUrl, window.location.origin);
+      contractId = parsed.searchParams.get('contractId') ?? '';
+      tokenId = parsed.searchParams.get('tokenId') ?? '';
+      network = parsed.searchParams.get('network') ?? '';
+    } catch (error) {
+      return;
+    }
+    if (!contractId) {
+      return;
+    }
+    const search = new URLSearchParams();
+    search.set('contractId', contractId);
+    if (tokenId) {
+      search.set('tokenId', tokenId);
+    }
+    search.set('network', network === 'testnet' ? 'testnet' : 'mainnet');
+    // No bridge token here: opened top-level, the runtime page sees real
+    // wallet extension providers directly and needs no opener bridge.
+    window.open(`${window.location.origin}/runtime/?${search.toString()}`, '_blank');
+  });
+})();
