@@ -792,11 +792,18 @@ const buildStxTransferParams = (options: WalletStxTransferOptions) => ({
   sponsored: options.sponsored ?? false
 });
 
-const requestLeatherContractCall = async (
+// Keep Xverse contract calls on the same modern BitcoinProvider RPC bridge
+// used by wallet_connect. Xverse keeps account permission per injected
+// provider; sending the call through its legacy StacksProvider after connecting
+// on BitcoinProvider leaves the signer unset and mobile Xverse rejects it as
+// "Dapp is requesting signature from a different address. (undefined)".
+// requestWalletRpc preserves the existing direct provider path for Leather and
+// other wallets, while routing selected Xverse sessions to BitcoinProvider.
+const requestWalletContractCall = async (
   provider: StacksProvider,
   options: WalletContractCallOptions
 ) => {
-  const response = await requestProvider(
+  const response = await requestWalletRpc(
     provider,
     'stx_callContract',
     buildContractCallParams(options)
@@ -1295,7 +1302,7 @@ export const showContractCall = (options: WalletContractCallOptions, provider?: 
     return legacyShowContractCall(legacyOptions, provider);
   }
 
-  return void requestLeatherContractCall(activeProvider, options)
+  return void requestWalletContractCall(activeProvider, options)
     .then((payload) => {
       options.onFinish?.(payload);
     })
@@ -1441,6 +1448,7 @@ export const __testing = {
   normalizeTxResultForCallback,
   normalizeTxResultPayload,
   normalizeTxResult,
+  requestWalletContractCall,
   requestSponsoredContractCall,
   resolveProviderSelection,
   unwrapProviderResponse
