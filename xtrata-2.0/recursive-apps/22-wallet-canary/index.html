@@ -143,7 +143,7 @@
 (function () {
   'use strict';
 
-  var VERSION = 'xtrata-wallet-canary v0.1.0';
+  var VERSION = 'xtrata-wallet-canary v0.1.1';
   var QS = (function () {
     try { return new URLSearchParams(window.location.search || ''); } catch (e) { return { get: function () { return null; } }; }
   })();
@@ -476,9 +476,14 @@
     }, function (error) {
       settled = true; clearTimeout(watchdog);
       var ms = Date.now() - started;
+      var message = error && error.message ? error.message : String(error);
+      if (message === '[object Object]' || message === '[object Response]') {
+        message = jsonSafe(error);
+      }
       var detail = {
-        message: error && error.message ? error.message : String(error),
-        code: error && typeof error === 'object' && 'code' in error ? error.code : undefined
+        message: message,
+        code: error && typeof error === 'object' && 'code' in error ? error.code : undefined,
+        raw: error && typeof error === 'object' ? jsonSafe(error) : undefined
       };
       log('err', '#' + id + ' ' + name + ' → REJECTED in ' + ms + 'ms', detail);
       record(name, 'REJECTED(' + ms + 'ms)', jsonSafe(detail));
@@ -595,10 +600,11 @@
       functionName: CONFIG.functionName
     };
     if (shape === 'E') {
-      params.arguments = args;
+      params.arguments = args.slice();
     } else {
       params.functionArgs = args;
-      params.arguments = args;
+      // separate copy so the log doesn't collapse it to [circular]
+      params.arguments = args.slice();
     }
     if (pcMode === 'deny') {
       if (!addr) throw new Error('connect first — deny-mode PC needs the sender address');
@@ -651,6 +657,9 @@
       }
     }
     if (!stacksLike) return Promise.reject(new Error('no provider exposes transactionRequest()'));
+    if (/leather/i.test(stacksLike.id)) {
+      log('warn', 'note: Leather flags legacy transactionRequest as deprecated and may broadcast-fail on nonce conflicts — this button mainly targets Xverse mobile');
+    }
     return readFeeUnit().catch(function () { return CONFIG.feeCapFallback; }).then(function (feeCap) {
       var token = legacyToken(selPc.value === 'allow' ? 'allow' : 'deny', feeCap);
       log('info', 'legacy transactionRequest via ' + stacksLike.id + ' · token payload', JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))));
