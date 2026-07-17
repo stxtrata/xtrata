@@ -94,9 +94,15 @@ template.innerHTML = `
            beneath, then the vacated shell (exuvia) turns translucent amber. */
         #molt-reveal{opacity:0;pointer-events:none;transition:opacity .8s ease;}
         .is-molting #molt-reveal{opacity:1;}
-        .teneral-under{fill:url(#nymphTeneral);stroke:#1d3a2f;stroke-width:1.6;}
-        .teneral-ridge{fill:none;stroke:#24493b;stroke-width:2;stroke-linecap:round;opacity:.55;}
-        .teneral-eye{fill:#152a22;opacity:.85;}
+        /* The teneral colours preview the ACTUAL adult that will emerge: the
+           scene looks up that seed's shell / eye / accent traits and sets
+           these variables before the shell parts. Defaults are a neutral
+           pale green for standalone renders. */
+        .teneral-under{fill:url(#nymphTeneral);stroke:var(--teneral-edge,#1d3a2f);stroke-width:1.6;}
+        .teneral-ridge{fill:none;stroke:var(--teneral-ridge,#24493b);stroke-width:2;stroke-linecap:round;opacity:.55;}
+        .teneral-eye{fill:var(--teneral-eye,#152a22);opacity:.9;filter:drop-shadow(0 0 3px var(--teneral-eye,#152a22));}
+        .teneral-wingbud{fill:var(--teneral-mid,#7fbfa3);stroke:var(--teneral-glow,#9fe3c8);stroke-width:1;opacity:.8;}
+        .teneral-glowline{fill:none;stroke:var(--teneral-glow,#9fe3c8);stroke-width:1.4;stroke-linecap:round;opacity:.5;filter:drop-shadow(0 0 4px var(--teneral-glow,#9fe3c8));}
         .is-molting .teneral-under{animation:teneralBreathe 1.5s ease-in-out infinite alternate;transform-origin:200px 200px;}
         @keyframes teneralBreathe{from{transform:scale(1,1);}to{transform:scale(1.015,1.03);}}
         .shell-flap{fill:url(#nymphPlateGrad);stroke:var(--nymph-edge);stroke-width:1.8;stroke-linejoin:round;transform-origin:200px 120px;transition:transform 2s cubic-bezier(.35,0,.25,1);}
@@ -104,6 +110,47 @@ template.innerHTML = `
         .molt-open-1 .shell-flap-right{transform:rotate(6deg) translateX(2.5px);}
         .molt-open-2 .shell-flap-left{transform:rotate(-16deg) translateX(-8px) translateY(2px);}
         .molt-open-2 .shell-flap-right{transform:rotate(16deg) translateX(8px) translateY(2px);}
+        /* Emergence: the full-size teneral adult FORCES its way out of the
+           split head-first. The body is clipped to the zone above the shell's
+           head line, so whatever has not yet cleared the split stays genuinely
+           hidden inside the shell while the rest climbs into view. The shell
+           yields around it: thorax flaps over-bend to their widest exactly
+           while the bulky thorax passes, and the head capsule itself splits
+           into two hinged halves that swing apart. */
+        .head-half{transform-origin:152px 143px;transition:transform 2.2s cubic-bezier(.35,0,.25,1);}
+        .head-half-right{transform-origin:248px 143px;}
+        .head-half .head-fill{stroke-width:2;}
+        .emerge-1 .head-half-left{transform:rotate(-26deg) translateY(2px);}
+        .emerge-1 .head-half-right{transform:rotate(26deg) translateY(2px);}
+        .emerge-2 .head-half-left{transform:rotate(-46deg) translate(-6px,4px);}
+        .emerge-2 .head-half-right{transform:rotate(46deg) translate(6px,4px);}
+        .emerge-3 .head-half-left{transform:rotate(-36deg) translate(-4px,3px);}
+        .emerge-3 .head-half-right{transform:rotate(36deg) translate(4px,3px);}
+        /* The shell's own head is replaced by the two swinging halves. */
+        .emerge-1 #head{opacity:0;transition:opacity .8s ease;}
+        .emerge-1 .shell-flap-left{transform:rotate(-26deg) translateX(-11px) translateY(3px);}
+        .emerge-1 .shell-flap-right{transform:rotate(26deg) translateX(11px) translateY(3px);}
+        .emerge-2 .shell-flap-left{transform:rotate(-38deg) translateX(-17px) translateY(5px);}
+        .emerge-2 .shell-flap-right{transform:rotate(38deg) translateX(17px) translateY(5px);}
+        .emerge-3 .shell-flap-left{transform:rotate(-30deg) translateX(-13px) translateY(4px);}
+        .emerge-3 .shell-flap-right{transform:rotate(30deg) translateX(13px) translateY(4px);}
+        /* Once vacated, the empty shell relaxes to a narrower resting gape. */
+        .is-exuvia .shell-flap-left{transform:rotate(-22deg) translateX(-9px) translateY(3px);}
+        .is-exuvia .shell-flap-right{transform:rotate(22deg) translateX(9px) translateY(3px);}
+        .is-exuvia .head-half-left{transform:rotate(-30deg) translate(-3px,3px);}
+        .is-exuvia .head-half-right{transform:rotate(30deg) translate(3px,3px);}
+        #teneral-body{opacity:0;pointer-events:none;transform:translateY(0);transition:transform 3s cubic-bezier(.38,0,.3,1),opacity 1.6s ease;}
+        #teneral-inner{transform-origin:200px 280px;}
+        .emerge-1 #teneral-body{opacity:1;transform:translateY(-72px);}
+        .emerge-1 #teneral-inner,.emerge-2 #teneral-inner{animation:teneralStruggle 1.05s ease-in-out infinite alternate;}
+        @keyframes teneralStruggle{from{transform:rotate(-2deg) translateY(0);}55%{transform:rotate(.4deg) translateY(-4px);}to{transform:rotate(2deg) translateY(-1px);}}
+        .emerge-2 #teneral-body{opacity:1;transform:translateY(-196px);}
+        .emerge-3 #teneral-body{opacity:1;transform:translateY(-315px);}
+        .adult-out #teneral-body{opacity:0;}
+        /* Once vacated, the glimpse inside the shell empties out. */
+        .is-exuvia #molt-reveal > .teneral-under,.is-exuvia #molt-reveal > .teneral-ridge,
+        .is-exuvia #molt-reveal > .teneral-glowline,.is-exuvia #molt-reveal > .teneral-wingbud,
+        .is-exuvia #molt-reveal > .teneral-eye{opacity:.1;transition:opacity 2.4s ease;}
         .molt-split{opacity:0;pointer-events:none;}
         .molt-split .split-crack{fill:none;stroke:#170d06;stroke-width:3.6;stroke-linecap:round;}
         .molt-split .split-gleam{fill:none;stroke:#ffe9bd;stroke-width:1.6;stroke-linecap:round;filter:drop-shadow(0 0 4px rgba(255,222,150,.75));}
@@ -152,15 +199,18 @@ template.innerHTML = `
                         <stop offset="100%" stop-color="var(--nymph-dark)"/>
                     </radialGradient>
                     <linearGradient id="nymphTeneral" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stop-color="#cdeedd"/>
-                        <stop offset="45%" stop-color="#7fbfa3"/>
-                        <stop offset="100%" stop-color="#35604f"/>
+                        <stop offset="0%" stop-color="var(--teneral-light, #cdeedd)"/>
+                        <stop offset="45%" stop-color="var(--teneral-mid, #7fbfa3)"/>
+                        <stop offset="100%" stop-color="var(--teneral-dark, #35604f)"/>
                     </linearGradient>
                     <radialGradient id="nymphSheen" cx="42%" cy="20%" r="60%">
                         <stop offset="0%" stop-color="#fff3dd" stop-opacity="0.85"/>
                         <stop offset="55%" stop-color="#fff3dd" stop-opacity="0.12"/>
                         <stop offset="100%" stop-color="#fff3dd" stop-opacity="0"/>
                     </radialGradient>
+                    <clipPath id="teneralEmergeClip">
+                        <rect x="-100" y="-150" width="600" height="268"/>
+                    </clipPath>
                     <clipPath id="nymph-body-clip">
                         <path d="M128 158C118 202 132 247 154 272C126 312 135 391 200 438C265 391 274 312 246 272C268 247 282 202 272 158C252 129 225 118 200 120C175 118 148 129 128 158Z"/>
                     </clipPath>
@@ -259,12 +309,25 @@ template.innerHTML = `
                             </g>
 
                             <g id="molt-reveal">
-                                <path class="teneral-under" d="M200 118C166 156 164 242 200 296C236 242 234 156 200 118Z"/>
-                                <path class="teneral-ridge" d="M200 128C198 170 200 240 200 288"/>
-                                <ellipse class="teneral-eye" cx="185" cy="142" rx="5" ry="7"/>
-                                <ellipse class="teneral-eye" cx="215" cy="142" rx="5" ry="7"/>
+                                <path class="teneral-under" d="M200 116C154 150 152 244 200 300C248 244 246 150 200 116Z"/>
+                                <path class="teneral-wingbud" d="M176 168C162 202 164 244 178 268C186 242 184 198 176 168Z"/>
+                                <path class="teneral-wingbud" d="M224 168C238 202 236 244 222 268C214 242 216 198 224 168Z"/>
+                                <path class="teneral-ridge" d="M200 128C198 170 200 240 200 292"/>
+                                <path class="teneral-glowline" d="M200 134C199 172 200 236 200 286"/>
+                                <ellipse class="teneral-eye" cx="178" cy="142" rx="8" ry="10"/>
+                                <ellipse class="teneral-eye" cx="222" cy="142" rx="8" ry="10"/>
                                 <path class="shell-flap shell-flap-left" d="M200 116C197 150 202 196 198 238C196 258 201 272 200 290C166 250 165 160 200 116Z"/>
                                 <path class="shell-flap shell-flap-right" d="M200 116C203 150 198 196 202 238C204 258 199 272 200 290C234 250 235 160 200 116Z"/>
+                                <g class="head-half head-half-left">
+                                    <path class="head-fill" d="M200 106C172 106 150 119 150 145L200 148Z"/>
+                                    <ellipse class="base-eye nymph-eye" cx="157" cy="130" rx="13" ry="19" transform="rotate(-28 157 130)"/>
+                                    <ellipse class="eye-glint" cx="152" cy="117" rx="3.8" ry="5.8" transform="rotate(-28 152 117)"/>
+                                </g>
+                                <g class="head-half head-half-right">
+                                    <path class="head-fill" d="M200 106C228 106 250 119 250 145L200 148Z"/>
+                                    <ellipse class="base-eye nymph-eye" cx="243" cy="130" rx="13" ry="19" transform="rotate(28 243 130)"/>
+                                    <ellipse class="eye-glint" cx="248" cy="117" rx="3.8" ry="5.8" transform="rotate(28 248 117)"/>
+                                </g>
                             </g>
 
                             <g class="molt-split" id="molt-split">
@@ -275,6 +338,7 @@ template.innerHTML = `
                             <path id="head-hitbox" d="M126 102C126 72 150 48 200 48C250 48 274 72 274 102L274 154C274 184 248 198 200 198C152 198 126 184 126 154Z"/>
                         </g>
                     </g>
+
                 </g>
             </svg>
         </div>
@@ -562,11 +626,32 @@ export class CicadaNymphGenerator {
         this.shell.classList.add('is-molting');
     }
 
-    // Stages 2-3: the shell halves crack apart, progressively revealing the
-    // pale teneral adult beneath. stage 0 = closed, 1 = first gap, 2 = wide.
+    // Paint the teneral layer with the real palette of the adult that will
+    // emerge, so its colour and traits show through the cracked shell.
+    // Accepts { light, mid, dark, edge, ridge, eye, glow } CSS colours.
+    setTeneralColors(palette = {}) {
+        const map = {
+            '--teneral-light': palette.light, '--teneral-mid': palette.mid,
+            '--teneral-dark': palette.dark, '--teneral-edge': palette.edge,
+            '--teneral-ridge': palette.ridge, '--teneral-eye': palette.eye,
+            '--teneral-glow': palette.glow
+        };
+        for (const [prop, value] of Object.entries(map)) {
+            if (value) this.host.style.setProperty(prop, value);
+        }
+    }
+
+    // Staged ecdysis. 0 = closed; 1 = first gap; 2 = shell halves wide open;
+    // 3 = teneral head pushes out through the split; 4 = thorax and wing buds
+    // clear the shell (struggling); 5 = fully out, standing above the shell.
     setMoltStage(stage) {
-        this.shell.classList.toggle('molt-open-1', stage >= 1);
-        this.shell.classList.toggle('molt-open-2', stage >= 2);
+        const stages = [[1, 'molt-open-1'], [2, 'molt-open-2'], [3, 'emerge-1'], [4, 'emerge-2'], [5, 'emerge-3']];
+        for (const [n, cls] of stages) this.shell.classList.toggle(cls, stage >= n);
+    }
+
+    // Crossfade point: the real adult renders in the teneral's place.
+    setAdultOut() {
+        this.shell.classList.add('adult-out');
     }
 
     // Stage 2: the vacated shell becomes a translucent, motionless exuvia that

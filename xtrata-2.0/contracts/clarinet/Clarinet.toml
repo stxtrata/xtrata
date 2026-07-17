@@ -236,3 +236,23 @@ epoch = 'latest'
 path = 'contracts/xtrata-drops-v1.0.clar'
 clarity_version = 4
 epoch = 'latest'
+
+[contracts.mock-xtrata-core]
+path = 'contracts/mock-xtrata-core.clar'
+clarity_version = 3
+epoch = 'latest'
+
+[contracts.mock-twin-helper]
+path = 'contracts/mock-twin-helper.clar'
+clarity_version = 3
+epoch = 'latest'
+
+[contracts.xtrata-arcade-duels-v1]
+path = 'contracts/xtrata-arcade-duels-v1.clar'
+clarity_version = 3
+epoch = 'latest'
+
+[contracts.xtrata-duels-claims-v1]
+path = 'contracts/xtrata-duels-claims-v1.clar'
+clarity_version = 3
+epoch = 'latest'

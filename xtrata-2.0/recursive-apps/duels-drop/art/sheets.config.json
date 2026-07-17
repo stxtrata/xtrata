@@ -1,0 +1,62 @@
+{
+  "_comment": "Crop config for the Space Renegade sheets. region = grid area as fractions of the full image (x,y,w,h). labelCut trims the caption bar inside each cell (fraction of cell height). Run slice-sheets.mjs with --debug and inspect the *.overlay.png files, then nudge these numbers until every box hugs its sprite. Labels are in reading order, left-to-right then top-to-bottom.",
+  "sheets": [
+    {
+      "file": "FIGHTER-SHEET-MISSING.webp",
+      "role": "fighter",
+      "region": {
+        "x": 0.022,
+        "y": 0.155,
+        "w": 0.956,
+        "h": 0.7
+      },
+      "cols": 4,
+      "rows": 2,
+      "padX": 0.03,
+      "padY": 0.02,
+      "labelCut": 0.1,
+      "labels": [
+        "Space Renegade",
+        "Rocket Jim",
+        "Beard Barbarian",
+        "Tentacle Wrangler",
+        "Professor Renegade",
+        "Disco Voidwalker",
+        "Moon-Pirate Jim",
+        "Neon Noir Renegade"
+      ]
+    },
+    {
+      "file": "fighter-variants.webp",
+      "role": "weapon",
+      "region": {
+        "x": 0.02,
+        "y": 0.172,
+        "w": 0.96,
+        "h": 0.565
+      },
+      "cols": 7,
+      "rows": 2,
+      "padX": 0.05,
+      "padY": 0.03,
+      "labelCut": 0.46,
+      "_note": "labelCut is large here because each cell contains the stat bars + caption under the art; we keep only the weapon art. Tune with --debug.",
+      "labels": [
+        "Ray Gun",
+        "Rocket Pistol",
+        "Plasma Drill",
+        "Beard Axe",
+        "Tentacle Blaster",
+        "Alien Grappler",
+        "Holo Book",
+        "Quantum Confusion Ray",
+        "Disco Blaster",
+        "Moon Cutlass",
+        "Pirate Pistol",
+        "Neon Pistol",
+        "Chrono Device",
+        "Rocket Pack"
+      ]
+    }
+  ]
+}

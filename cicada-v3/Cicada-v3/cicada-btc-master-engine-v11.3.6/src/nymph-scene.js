@@ -1,16 +1,32 @@
-// Subterranean nymph scene. Renders a layered underground environment (soil
-// strata, tunnels, roots, stones, softly lit pathways) and populates it with a
-// colony of grounded cicada nymphs. Every nymph shares one character design
-// (CicadaNymphGenerator) but animates independently: each is given its own
-// seeded route, speed, timing and pauses. Near the end of a nymph's timed
-// progression it climbs toward the surface at the top boundary and transitions
-// cleanly into the adult cicada — the next visual state the engine already
-// supports — which then takes flight and leaves the scene.
-import { CicadaNymphGenerator } from './cicada-nymph-renderer.js?v=11.3.8-molt.1';
+// Subterranean nymph scene. The world is a solid square of layered earth —
+// soil strata, roots, stones — with trees rising from the surface. Nymphs DIG:
+// every tunnel on screen is a bore some nymph excavated, drawn behind it as
+// it goes. Stage 1: the nymph digs from root to root, feeding on sap at each
+// joint. Stage 2: it digs a rising shaft to its tree, breaks the surface,
+// climbs the bark to an exclusive perch, and moults in stages into the actual
+// adult its seed renders — which hardens, expands its wings, and flies off,
+// leaving the exuvia clinging to the bark.
+import { CicadaNymphGenerator } from './cicada-nymph-renderer.js?v=11.3.8-molt.10';
 import { mulberry32, clamp01, lerp } from './utils.js?v=11.3.5-nymph.2';
+import { SHELL_PRESETS, EYE_PRESETS, CICADA_COLOR_PRESETS } from './config.js?v=11.3.8-molt.10';
+import { getRenderInstructionsForSeed } from './cicada-traits.js?v=11.3.5-nymph.2';
+
+// Mix a #rrggbb colour toward a pale ivory — teneral (freshly moulted) insects
+// carry washed-out versions of their final colours until the cuticle hardens.
+function paleMix(hex, t) {
+    const n = parseInt(String(hex).replace('#', ''), 16);
+    if (Number.isNaN(n)) return hex;
+    const mix = (c, w) => Math.round(c + (w - c) * t);
+    const r = mix((n >> 16) & 255, 245), g = mix((n >> 8) & 255, 242), b = mix(n & 255, 232);
+    return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+}
 
 const SCENE_STYLE_ID = 'nymph-scene-style';
 const rand = (r, lo, hi) => lo + r() * (hi - lo);
+const normalizeAdultSeed = s => {
+    const n = Math.floor(Number(s) || 1);
+    return Math.max(1, Math.min(3301, n));
+};
 
 function injectSceneStyles() {
     if (document.getElementById(SCENE_STYLE_ID)) return;
@@ -19,9 +35,10 @@ function injectSceneStyles() {
     style.textContent = `
         .nymph-scene{position:absolute;inset:0;overflow:hidden;background:
             radial-gradient(120% 80% at 50% -10%, #3a2a17 0%, #26190d 26%, #180f07 55%, #0d0805 100%);}
-        .nymph-scene-env,.nymph-scene-disturb{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
+        .nymph-scene-env,.nymph-scene-disturb,.nymph-scene-carve{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
         .nymph-scene-env{z-index:0;}
-        .nymph-scene-disturb{z-index:1;}
+        .nymph-scene-carve{z-index:1;}
+        .nymph-scene-disturb{z-index:2;}
         .nymph-actor{position:absolute;overflow:visible;pointer-events:none;
             transition:transform 1.6s cubic-bezier(.4,0,.3,1), opacity 1.2s ease;will-change:transform,opacity;}
         .nymph-actor.is-emerging{transition:transform 3.4s cubic-bezier(.35,0,.2,1), opacity 2.4s ease;}
@@ -59,39 +76,16 @@ function buildEnvironmentSVG(seed) {
     }
     parts.push(`<g>${speck}</g>`);
 
-    // Tunnels — curved bores carved through the soil, each lined with a soft
-    // lit pathway so the colony reads as travelling along glowing channels.
-    // Each tunnel's curve is also sampled into a polyline the scene hands to
-    // its actors, so nymph routes genuinely follow the lit pathways.
-    const tunnelCount = 3 + Math.floor(r() * 2);
-    const tunnelPaths = [];
-    let tunnels = '', glow = '';
-    for (let i = 0; i < tunnelCount; i++) {
-        const startX = rand(r, 40, W - 40);
-        const topY = rand(r, 110, 240);
-        const c1x = startX + rand(r, -260, 260), c1y = rand(r, 320, 500);
-        const c2x = rand(r, 60, W - 60), c2y = rand(r, 560, 760);
-        const endX = rand(r, 60, W - 60), endY = rand(r, 820, 960);
-        const d = `M${startX.toFixed(0)} ${topY.toFixed(0)} C ${c1x.toFixed(0)} ${c1y.toFixed(0)}, ${c2x.toFixed(0)} ${c2y.toFixed(0)}, ${endX.toFixed(0)} ${endY.toFixed(0)}`;
-        glow += `<path d="${d}" fill="none" stroke="url(#tunnelGlow)" stroke-width="${rand(r, 46, 74).toFixed(0)}" stroke-linecap="round" opacity="${(0.16 + r() * 0.14).toFixed(2)}"/>`;
-        tunnels += `<path d="${d}" fill="none" stroke="#0c0704" stroke-width="${rand(r, 26, 40).toFixed(0)}" stroke-linecap="round" opacity="0.55"/>`;
-        tunnels += `<path d="${d}" fill="none" stroke="#3c2a16" stroke-width="${rand(r, 10, 18).toFixed(0)}" stroke-linecap="round" opacity="0.4"/>`;
-        // Sample the cubic bezier into a polyline (index 0 = top / surface end).
-        const pts = [];
-        for (let s = 0; s <= 24; s++) {
-            const t = s / 24, u = 1 - t;
-            pts.push({
-                x: u * u * u * startX + 3 * u * u * t * c1x + 3 * u * t * t * c2x + t * t * t * endX,
-                y: u * u * u * topY + 3 * u * u * t * c1y + 3 * u * t * t * c2y + t * t * t * endY
-            });
-        }
-        tunnelPaths.push(pts);
-    }
-    parts.push(`<g>${tunnels}</g>`);
+    // No pre-carved tunnels: the world is a solid block of earth. Nymphs dig
+    // their own bores as they travel, so every tunnel on screen is a trail
+    // some nymph actually excavated.
 
-    // Roots — branching descents from the surface, tapering as they go.
+    // Roots — branching descents from the surface, tapering as they go. Their
+    // sampled joints double as FOOD NODES: cicada nymphs feed on root xylem,
+    // and stage 1 of a nymph's life here is digging from root to root.
+    const foodNodes = [];
     let roots = '';
-    const rootCount = 4 + Math.floor(r() * 3);
+    const rootCount = 5 + Math.floor(r() * 3);
     for (let i = 0; i < rootCount; i++) {
         let px = rand(r, 30, W - 30), py = rand(r, 60, 120);
         let width = rand(r, 7, 13);
@@ -102,6 +96,8 @@ function buildEnvironmentSVG(seed) {
             const ny = py + rand(r, 90, 150);
             path += ` Q ${(px + rand(r, -40, 40)).toFixed(0)} ${((py + ny) / 2).toFixed(0)}, ${nx.toFixed(0)} ${ny.toFixed(0)}`;
             px = nx; py = ny;
+            // Joints deep enough to dig to become feeding spots.
+            if (ny > 380 && ny < 930 && nx > 60 && nx < W - 60) foodNodes.push({ x: nx, y: ny });
         }
         roots += `<path d="${path}" fill="none" stroke="#25160b" stroke-width="${width.toFixed(1)}" stroke-linecap="round" opacity="0.85"/>`;
         roots += `<path d="${path}" fill="none" stroke="#6b4a26" stroke-width="${(width * 0.4).toFixed(1)}" stroke-linecap="round" opacity="0.4"/>`;
@@ -113,16 +109,19 @@ function buildEnvironmentSVG(seed) {
     }
     parts.push(`<g>${roots}</g>`);
 
-    // Tree trunks — one rises from the surface at each tunnel's top end, giving
-    // emerging nymphs something to climb and moult on. Trunk anchor points are
-    // returned so the scene can route climbers onto the bark.
-    const trunkAnchors = [];
+    // Tree trunks rise from the surface, spread across the block, giving
+    // emerging nymphs something to dig up to, climb, and moult on. Each trunk
+    // is broad and tall enough to host several moulting spots, returned as
+    // slots at varying heights and lateral positions so climbers never share
+    // a perch.
+    const trunkSlots = [];
     let trunksMarkup = '';
-    for (const pts of tunnelPaths) {
-        const tx = Math.max(50, Math.min(W - 50, pts[0].x));
-        const half = rand(r, 26, 36);
+    const trunkCount = 2 + (r() < 0.5 ? 1 : 0);
+    for (let ti = 0; ti < trunkCount; ti++) {
+        const tx = Math.max(90, Math.min(W - 90, (ti + 0.5) * W / trunkCount + rand(r, -80, 80)));
+        const half = rand(r, 46, 62);
         const baseY = 96;   // just below the surface light band
-        const footY = rand(r, 168, 200);
+        const footY = rand(r, 215, 265);
         trunksMarkup += `<g>
             <path d="M${(tx - half).toFixed(0)} 0 L${(tx - half * 0.86).toFixed(0)} ${baseY} C${(tx - half * 1.5).toFixed(0)} ${footY}, ${(tx - half * 1.9).toFixed(0)} ${(footY + 16).toFixed(0)}, ${(tx - half * 2.3).toFixed(0)} ${(footY + 22).toFixed(0)} L${(tx + half * 2.3).toFixed(0)} ${(footY + 22).toFixed(0)} C${(tx + half * 1.9).toFixed(0)} ${(footY + 16).toFixed(0)}, ${(tx + half * 1.5).toFixed(0)} ${footY}, ${(tx + half * 0.86).toFixed(0)} ${baseY} L${(tx + half).toFixed(0)} 0 Z"
                 fill="url(#trunkGrad)" stroke="#160d06" stroke-width="2"/>
@@ -132,7 +131,17 @@ function buildEnvironmentSVG(seed) {
             <path d="M${tx.toFixed(0)} 6 C${(tx - half * 0.1).toFixed(0)} ${(footY * 0.5).toFixed(0)}, ${(tx + half * 0.08).toFixed(0)} ${(footY * 0.8).toFixed(0)}, ${tx.toFixed(0)} ${(footY + 6).toFixed(0)}"
                 fill="none" stroke="#6b4c2a" stroke-width="1.8" opacity="0.4"/>
         </g>`;
-        trunkAnchors.push({ x: tx, y: footY - 34 });
+        // Moulting slots stacked up the trunk face at clearly different
+        // heights, alternating sides, so several nymphs can emerge on one
+        // tree without ever touching (pairwise ~85+ scene units apart).
+        const slots = [];
+        for (let k = 0; k < 3; k++) {
+            slots.push({
+                x: tx + (k % 2 ? -1 : 1) * half * 0.5 + rand(r, -6, 6),
+                y: 66 + k * 68 + rand(r, -8, 8)
+            });
+        }
+        trunkSlots.push(slots);
     }
     parts.push(trunksMarkup);
 
@@ -150,9 +159,6 @@ function buildEnvironmentSVG(seed) {
         </g>`;
     }
     parts.push(`<g>${stones}</g>`);
-
-    // Soft light pools drawn last, over the pathways.
-    parts.push(`<g>${glow}</g>`);
 
     const markup = `
         <svg class="nymph-scene-env" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
@@ -177,11 +183,15 @@ function buildEnvironmentSVG(seed) {
             </defs>
             ${parts.join('\n')}
         </svg>`;
-    return { markup, tunnelPaths, trunkAnchors };
+    return { markup, trunkSlots, foodNodes };
 }
 
 export class NymphScene {
-    constructor({ mount, seed = 1, count = 5, renderCicada = null } = {}) {
+    constructor({ mount, seed = 1, count = 1, adultSeeds = null, renderCicada = null } = {}) {
+        // adultSeeds pins which adults emerge. A single-nymph scene defaults to
+        // the scene seed itself: you watch YOUR cicada come up.
+        this.adultSeeds = Array.isArray(adultSeeds) && adultSeeds.length ? adultSeeds
+            : (Math.max(1, Math.min(9, count)) === 1 ? [seed] : null);
         injectSceneStyles();
         this.mount = mount;
         this.seed = seed;
@@ -195,8 +205,18 @@ export class NymphScene {
         this.layer.className = 'nymph-scene';
         const env = buildEnvironmentSVG(seed);
         this.layer.innerHTML = env.markup;
-        this.tunnelPaths = env.tunnelPaths;
-        this.trunkAnchors = env.trunkAnchors;
+        this.foodNodes = env.foodNodes || [];
+        // Per-trunk moulting slots; owner tracking keeps one climber per slot.
+        this.trunkSlots = (env.trunkSlots || []).map(slots => slots.map(s => ({ ...s, owner: null })));
+
+        // Carve layer: the tunnels nymphs excavate as they dig. Each actor
+        // extends its own bore paths here; the network is the history of every
+        // dig the colony has made.
+        this.carve = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        this.carve.setAttribute('class', 'nymph-scene-carve');
+        this.carve.setAttribute('viewBox', '0 0 1000 1000');
+        this.carve.setAttribute('preserveAspectRatio', 'none');
+        this.layer.appendChild(this.carve);
 
         this.disturb = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         this.disturb.setAttribute('class', 'nymph-scene-disturb');
@@ -247,9 +267,139 @@ export class NymphScene {
     // Place an actor's host so its body centre sits on a tunnel point
     // (scene 0..1000 space maps directly to layer percentages).
     _placeActorAt(actor, point) {
-        actor.host.style.left = `${(point.x / 10).toFixed(1)}%`;
-        actor.host.style.top = `${(point.y / 10).toFixed(1)}%`;
+        actor.pos = { x: point.x, y: point.y };
+        // Sub-pixel precision: rebases must be visually seamless, and a 0.1%
+        // grid (~1.5px on a wide stage) reads as a micro-snap every chunk.
+        actor.host.style.left = `${(point.x / 10).toFixed(3)}%`;
+        actor.host.style.top = `${(point.y / 10).toFixed(3)}%`;
         actor.host.style.zIndex = String(3 + Math.max(0, Math.floor(point.y / 100)));
+    }
+
+    // Digging: extend the actor's excavated bore to a new point. Three strokes
+    // share one polyline — dark bore, lighter packed-earth lining, and a soft
+    // glow so dug pathways read like the old lit tunnels. Carving stops at the
+    // surface band (the trunk climb is above ground, not a dig).
+    _carveTo(actor, pt) {
+        if (pt.y < 235) return;
+        if (!actor.carve) {
+            const mk = (stroke, width, opacity) => {
+                const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                p.setAttribute('fill', 'none');
+                p.setAttribute('stroke', stroke);
+                p.setAttribute('stroke-width', width);
+                p.setAttribute('stroke-opacity', opacity);
+                p.setAttribute('stroke-linecap', 'round');
+                p.setAttribute('stroke-linejoin', 'round');
+                this.carve.appendChild(p);
+                return p;
+            };
+            actor.carve = {
+                d: `M${pt.x.toFixed(1)} ${pt.y.toFixed(1)}`,
+                els: [
+                    mk('url(#tunnelGlow)', rand(actor.rng, 48, 64).toFixed(0), '0.2'),
+                    mk('#0c0704', rand(actor.rng, 26, 34).toFixed(0), '0.55'),
+                    mk('#3c2a16', rand(actor.rng, 11, 15).toFixed(0), '0.4')
+                ]
+            };
+        }
+        actor.carve.d += ` L${pt.x.toFixed(1)} ${pt.y.toFixed(1)}`;
+        for (const el of actor.carve.els) el.setAttribute('d', actor.carve.d);
+    }
+
+    // Conversion factors: one scene unit (0..1000 space) expressed in the
+    // nymph's local viewBox units (its square shell fits the 900-tall box).
+    // The scene is stretched to the layer, so horizontal and vertical scene
+    // units differ in on-screen size — the conversion MUST be anisotropic, or
+    // the legs walk the wrong vertical distance and every rebase snaps the
+    // body back onto course.
+    _sceneToLocal(actor) {
+        const rect = this.layer.getBoundingClientRect();
+        const layerW = rect.width || 800;
+        const layerH = rect.height || layerW;
+        const sizePx = parseFloat(actor.host.style.width) || 190;
+        const pxPerLocal = (0.96 * sizePx) / 900;   // uniform: the shell is square
+        return {
+            kx: (layerW / 1000) / pxPerLocal,
+            ky: (layerH / 1000) / pxPerLocal
+        };
+    }
+
+    // Walk the actor's legs the ENTIRE way to a scene point. The journey is
+    // covered stride-chunk by stride-chunk inside the nymph's local space;
+    // between chunks the host is rebased by exactly the distance walked, in
+    // the same frame the local offset resets — visually seamless, so every
+    // bit of displacement on screen comes from the gait itself.
+    async _walkActorTo(actor, target, o = {}) {
+        const nymph = actor.nymph;
+        while (!this.destroyed && !actor.done) {
+            // Recomputed every chunk so a window resize mid-journey can never
+            // desynchronise the gait from the rebase.
+            const { kx, ky } = this._sceneToLocal(actor);
+            if (!Number.isFinite(kx) || !Number.isFinite(ky) || kx <= 0 || ky <= 0) break;
+            const cur = actor.pos;
+            const dx = target.x - cur.x, dy = target.y - cur.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < 2) break;
+            const chunkScene = Math.min(dist, 200 / Math.max(kx, ky));
+            const fx = dx / dist * chunkScene, fy = dy / dist * chunkScene;
+            const w = nymph.getWanderPos();
+            // The local leg target uses per-axis conversion, so the distance
+            // the legs cover on screen equals the rebase exactly on both axes.
+            await nymph.walkTo(w.x + fx * kx, w.y + fy * ky, o);
+            if (this.destroyed || actor.done) break;
+            const heading = nymph.getWanderPos().heading;
+            const next = { x: cur.x + fx, y: cur.y + fy };
+            this._placeActorAt(actor, next);
+            nymph.setWanderPos(0, 0, heading);
+            // Underground movement excavates: the bore extends behind the
+            // nymph as it digs, with loosened soil at the dig face.
+            this._carveTo(actor, next);
+            if (next.y >= 235 && actor.rng() < 0.5) {
+                this._disturbAt(next.x + rand(actor.rng, -12, 12), next.y + rand(actor.rng, -8, 8), rand(actor.rng, 0.7, 1.2));
+            }
+        }
+    }
+
+    // Personal-space steering: nudge a target point away from every other
+    // actor so the colony works around one another instead of overlapping.
+    _separate(actor, point, sep = 95) {
+        let x = point.x, y = point.y;
+        for (const other of this.actors) {
+            if (other === actor || !other.pos || other.done) continue;
+            const dx = x - other.pos.x, dy = y - other.pos.y;
+            const d = Math.hypot(dx, dy);
+            if (d >= sep) continue;
+            if (d < 0.001) { x += sep * 0.7; continue; }
+            const push = (sep - d) / d;
+            x += dx * push;
+            y += dy * push;
+        }
+        return { x: Math.max(30, Math.min(970, x)), y: Math.max(60, Math.min(950, y)) };
+    }
+
+    // Claim an exclusive moulting slot on the actor's trunk. Every climber gets
+    // its own spot/height; when the trunk is full a fresh perch is derived at a
+    // clearly different height so emergences never stack.
+    _claimTrunkSlot(actor) {
+        const slots = (this.trunkSlots || [])[actor.trunkIdx];
+        if (!slots || !slots.length) return null;
+        const free = slots.filter(s => !s.owner);
+        let slot = free.length ? free[Math.floor(actor.rng() * free.length)] : null;
+        if (!slot) {
+            const taken = slots.map(s => s.y);
+            let y = 70 + actor.rng() * 160;
+            for (let tries = 0; tries < 8 && taken.some(t => Math.abs(t - y) < 60); tries++) y = 60 + actor.rng() * 190;
+            slot = { x: slots[0].x + (actor.rng() - 0.5) * 44, y, owner: null };
+            slots.push(slot);
+        }
+        slot.owner = actor;
+        return slot;
+    }
+
+    _releaseTrunkSlot(actor) {
+        for (const slots of this.trunkSlots || []) {
+            for (const s of slots) if (s.owner === actor) s.owner = null;
+        }
     }
 
     _spawnActor(index) {
@@ -257,20 +407,20 @@ export class NymphScene {
         const r = mulberry32((this.seed * 2654435761 + index * 40503 + this._respawns(index)) >>> 0);
         const sizePx = rand(r, 150, 240);
 
-        // Route selection: each actor adopts one of the scene's tunnels and a
-        // starting depth along it. Spread actors across tunnels round-robin so
-        // every lit pathway carries traffic.
-        const tunnels = this.tunnelPaths || [];
-        const tunnelIdx = tunnels.length ? (index + Math.floor(r() * tunnels.length)) % tunnels.length : -1;
-        const path = tunnelIdx >= 0 ? tunnels[tunnelIdx] : null;
-        // Start deep in the tunnel; it will work upward. Depth is judged by the
-        // sampled point's actual y (curves are not monotonic), keeping spawns
-        // in the visible soil band below the surface.
-        let ti = 0;
-        if (path) {
-            const deep = path.map((p, i) => i).filter(i => i >= 4 && path[i].y >= 460 && path[i].y <= 940);
-            ti = deep.length ? deep[Math.floor(r() * deep.length)] : Math.floor(rand(r, path.length * 0.55, path.length - 1));
+        // Spawn deep in the earth block, clear of every other actor's personal
+        // space. There are no pre-made tunnels — this nymph will dig its own.
+        let spawn = { x: rand(r, 120, 880), y: rand(r, 500, 900) };
+        for (let tries = 0; tries < 12; tries++) {
+            const cand = { x: rand(r, 120, 880), y: rand(r, 480, 910) };
+            const clear = this.actors.every(a => !a.pos || Math.hypot(cand.x - a.pos.x, cand.y - a.pos.y) >= 95);
+            if (clear) { spawn = cand; break; }
         }
+        // Each actor is assigned the trunk nearest its spawn for its eventual
+        // dig to the surface (rebalanced by claim availability at emergence).
+        const trunkIdx = (this.trunkSlots || []).length
+            ? this.trunkSlots.reduce((best, slots, i) =>
+                Math.abs(slots[0].x - spawn.x) < Math.abs(this.trunkSlots[best][0].x - spawn.x) ? i : best, 0)
+            : -1;
 
         const host = document.createElement('div');
         host.className = 'nymph-actor';
@@ -292,9 +442,17 @@ export class NymphScene {
             instructions: { seed: nymphSeed, unit: '%', size: 96, idleWander: false, rarityTier: 'common' }
         });
 
-        const actor = { index, host, nymph, rng: r, done: false, emerging: false, path, ti, tunnelIdx };
+        // The adult this nymph will become is fixed at spawn, so the moult can
+        // preview its true colours through the shell cracks before it emerges.
+        // Pinned adult seeds (single-nymph and gallery views) take precedence.
+        const adultSeed = this.adultSeeds
+            ? normalizeAdultSeed(this.adultSeeds[index % this.adultSeeds.length])
+            : (this.seed + index * 271 + 7) % 3301 + 1;
+        const actor = { index, host, nymph, rng: r, done: false, emerging: false, trunkIdx, adultSeed };
         this.actors.push(actor);
-        this._placeActorAt(actor, path ? path[ti] : { x: rand(r, 100, 900), y: rand(r, 480, 720) });
+        this._placeActorAt(actor, spawn);
+        // The bore starts where the nymph hatched.
+        this._carveTo(actor, spawn);
 
         if (this._reduced) {
             // Static placement only; still fully legible.
@@ -313,10 +471,10 @@ export class NymphScene {
         return (this._respawnCounts[index] || 0) * 7919;
     }
 
-    // Walk an independent route along the actor's chosen tunnel: each leg
-    // advances a few samples along the pathway (mostly upward, with occasional
-    // backtracks), while the nymph's local gait supplies articulation, turning
-    // and pauses. After the timed budget it emerges at the tunnel's top end.
+    // STAGE 1 — foraging. The nymph digs through the solid earth from root to
+    // root, carving its tunnel as it goes, and pauses at each root joint to
+    // feed on the sap. When its timed underground life is spent, stage 2
+    // begins: the dig up to the tree.
     async _runRoute(actor) {
         if (this.destroyed || actor.done) return;
         const r = actor.rng;
@@ -324,36 +482,43 @@ export class NymphScene {
 
         const budgetMs = rand(r, 16000, 34000);
         const started = performance.now();
+        let lastFood = null;
 
         try {
             while (!this.destroyed && !actor.done) {
                 if (performance.now() - started > budgetMs) break;
-                const path = actor.path;
-                if (!path) break;
-                // Route step: usually climb 1-3 samples toward the surface,
-                // occasionally wander back down a sample.
-                const step = r() < 0.22 ? 1 : -(1 + Math.floor(r() * 3));
-                const nextTi = Math.max(2, Math.min(path.length - 1, actor.ti + step));
-                const from = path[actor.ti], to = path[nextTi];
-                actor.ti = nextTi;
-                this._placeActorAt(actor, to);
-                // Local gait leg in the direction of travel keeps legs, turning
-                // and body bob coherent with the host's glide along the tunnel.
-                const dx = to.x - from.x, dy = to.y - from.y;
-                const mag = Math.hypot(dx, dy) || 1;
-                await nymph.walkTo((dx / mag) * rand(r, 24, 44), (dy / mag) * rand(r, 18, 34), {
-                    speed: rand(r, 0.018, 0.04),
-                    tilt: rand(r, 1.6, 4.2),
-                    bob: rand(r, 1.1, 2.4),
-                    onStep: () => {
-                        if (r() < 0.06) {
-                            const p = this._actorScenePoint(actor);
-                            this._disturbAt(p.x, p.y, rand(r, 0.7, 1.3));
-                        }
+                // Pick the next feeding spot: sample a few root joints and take
+                // the nearest fresh one, so dig legs stay purposeful but varied.
+                const nodes = this.foodNodes;
+                let target;
+                if (nodes && nodes.length) {
+                    let best = null, bestD = Infinity;
+                    for (let s = 0; s < 4; s++) {
+                        const cand = nodes[Math.floor(r() * nodes.length)];
+                        if (cand === lastFood) continue;
+                        const d = Math.hypot(cand.x - actor.pos.x, cand.y - actor.pos.y);
+                        if (d > 40 && d < bestD) { best = cand; bestD = d; }
                     }
+                    target = best || nodes[Math.floor(r() * nodes.length)];
+                    lastFood = target;
+                } else {
+                    target = { x: rand(r, 120, 880), y: rand(r, 420, 900) };
+                }
+                // Steer around any nearby colony member, then DIG there —
+                // the bore extends behind the nymph the whole way.
+                const to = this._separate(actor, target);
+                await this._walkActorTo(actor, to, {
+                    speed: rand(r, 0.035, 0.06),
+                    tilt: rand(r, 1.6, 4.2),
+                    bob: rand(r, 1.1, 2.4)
                 });
                 if (this.destroyed || actor.done) return;
-                await nymph.holdPause(rand(r, 400, 2400)); // brief, varied pause
+                // Feed at the root: a longer, hungrier pause with soil settling
+                // around the feeding site.
+                for (let k = 0; k < 2 + Math.floor(r() * 3); k++) {
+                    this._disturbAt(actor.pos.x + rand(r, -16, 16), actor.pos.y + rand(r, -10, 10), rand(r, 0.6, 1.1));
+                }
+                await nymph.holdPause(rand(r, 1600, 3600));
             }
         } catch (_) { /* actor torn down mid-walk */ }
 
@@ -367,47 +532,45 @@ export class NymphScene {
         return id;
     }
 
-    // Staged ecdysis. The nymph climbs its tunnel to the surface, walks onto
-    // the tree trunk rising there, grips head-up, and moults: the dorsal
-    // cuticle splits, the adult pulls free of the shell stage by stage, its
-    // crumpled wings slowly expand and harden, and it flies off — leaving the
-    // translucent exuvia still clinging to the bark.
+    // STAGE 2 — the dig up, then ecdysis. The nymph excavates a rising shaft
+    // from wherever its foraging ended to the base of its tree, breaks the
+    // surface, climbs the bark to its claimed perch, grips head-up, and
+    // moults: the dorsal cuticle splits, the adult pulls free of the shell
+    // stage by stage, its crumpled wings slowly expand and harden, and it
+    // flies off — leaving the translucent exuvia still clinging to the bark.
     async _emerge(actor) {
         if (this.destroyed || actor.done || actor.emerging) return;
         actor.emerging = true;
         const r = actor.rng;
         const nymph = actor.nymph;
 
-        // 1. Flow the remaining tunnel legs up to the surface end — the nymph
-        // keeps walking its pathway the whole way, no positional jumps.
-        try {
-            while (!this.destroyed && !actor.done && actor.path && actor.ti > 3) {
-                const from = actor.path[actor.ti];
-                actor.ti = Math.max(3, actor.ti - 2);
-                const to = actor.path[actor.ti];
-                this._placeActorAt(actor, to);
-                const dx = to.x - from.x, dy = to.y - from.y, mag = Math.hypot(dx, dy) || 1;
-                await nymph.walkTo((dx / mag) * 30, (dy / mag) * 24, { speed: 0.045, tilt: 2, bob: 1.8 });
-                await nymph.holdPause(rand(r, 120, 420));
-            }
-        } catch (_) {}
-        if (this.destroyed || actor.done) return;
-
-        // 2. Up onto the bark: glide from the tunnel mouth onto the trunk while
-        // still stepping, then settle with a final short upward step so the
-        // walk ends exactly at local origin, facing up — the moult then happens
-        // precisely where the nymph stands.
         actor.host.classList.add('is-emerging');
-        const trunk = (this.trunkAnchors || [])[actor.tunnelIdx];
-        if (trunk) {
-            this._placeActorAt(actor, trunk);
-        } else if (actor.path) {
-            const top = actor.path[Math.min(4, actor.path.length - 1)];
-            this._placeActorAt(actor, { x: top.x, y: Math.max(90, top.y - rand(r, 0, 30)) });
-        }
+        const slot = this._claimTrunkSlot(actor);
         try {
-            await nymph.walkTo(0, 22, { speed: 0.02, tilt: 1.2, bob: 1.8, maxTurn: 160 });
-            await nymph.walkTo(0, 0, { speed: 0.014, tilt: 0.7, bob: 1.4 });
+            if (slot) {
+                // Dig a rising shaft in two slanting pulls: first angling
+                // toward the tree at mid depth, then straight up under the
+                // trunk to break the surface at its foot.
+                const mid = {
+                    x: actor.pos.x + (slot.x - actor.pos.x) * rand(r, 0.55, 0.75),
+                    y: Math.max(300, actor.pos.y * rand(r, 0.5, 0.65))
+                };
+                await this._walkActorTo(actor, this._separate(actor, mid), { speed: 0.04, tilt: 1.8, bob: 1.8 });
+                if (this.destroyed || actor.done) return;
+                await nymph.holdPause(rand(r, 300, 900));
+                await this._walkActorTo(actor, { x: slot.x, y: 250 }, { speed: 0.035, tilt: 1.2, bob: 1.8 });
+                if (this.destroyed || actor.done) return;
+                // Break out at the trunk base and climb the bark to the perch
+                // (above ground now — walking, not digging).
+                await this._walkActorTo(actor, { x: slot.x, y: slot.y + 70 }, { speed: 0.04, tilt: 1.2, bob: 1.6, maxTurn: 160 });
+                if (this.destroyed || actor.done) return;
+                await this._walkActorTo(actor, slot, { speed: 0.028, tilt: 0.8, bob: 1.4, maxTurn: 160 });
+            } else {
+                // No tree available: dig straight up and moult at the surface.
+                await this._walkActorTo(actor, { x: actor.pos.x, y: 250 }, { speed: 0.035, tilt: 1.2, bob: 1.8 });
+            }
+            // The final pull was straight up, so the gait ends at local origin
+            // already facing up — no settle snap needed.
         } catch (_) {}
         if (this.destroyed || actor.done) return;
 
@@ -416,6 +579,7 @@ export class NymphScene {
         // pale teneral adult beneath — before the adult pulls free.
         await nymph.holdPause(rand(r, 1100, 1900));
         if (this.destroyed || actor.done) return;
+        this._applyTeneralPalette(actor);
         nymph.beginMolt();                            // hairline crack
         await nymph.holdPause(rand(r, 1500, 2100));
         if (this.destroyed || actor.done) return;
@@ -425,23 +589,66 @@ export class NymphScene {
         nymph.setMoltStage(2);                        // wide open: dorsum exposed
         await nymph.holdPause(rand(r, 1400, 2000));
         if (this.destroyed || actor.done) return;
+        nymph.setMoltStage(3);                        // head pushes out of the split
+        await nymph.holdPause(rand(r, 2300, 3200));
+        if (this.destroyed || actor.done) return;
+        nymph.setMoltStage(4);                        // thorax + wing buds work free
+        await nymph.holdPause(rand(r, 2300, 3200));
+        if (this.destroyed || actor.done) return;
+        nymph.setMoltStage(5);                        // fully out, above the shell
+        await nymph.holdPause(rand(r, 1300, 1900));
+        if (this.destroyed || actor.done) return;
+        nymph.toExuvia();                             // the vacated shell empties
+        await nymph.holdPause(rand(r, 900, 1500));
+        if (this.destroyed || actor.done) return;
         this._moltReveal(actor);
     }
 
-    // 3-6. Pull-out, wing expansion, hardening, flight; the exuvia remains.
+    // Look up the real traits of the adult this actor will emerge as, and tint
+    // the teneral layer with washed-out versions of its true colours: shell
+    // preset for the body, eye preset for the eye spots, and the seed's neon
+    // accent as the glow lining the crack. The pale mix hardens into the full
+    // palette when the actual adult renders.
+    _applyTeneralPalette(actor) {
+        let inst = null;
+        try { inst = getRenderInstructionsForSeed(actor.adultSeed); } catch (_) { return; }
+        if (!inst) return;
+        const shell = SHELL_PRESETS[inst.shellColor] || SHELL_PRESETS.emerald;
+        const eye = EYE_PRESETS[inst.eyeColor] || EYE_PRESETS.crimson;
+        const glow = CICADA_COLOR_PRESETS[inst.color] || '#9fe3c8';
+        actor.nymph.setTeneralColors({
+            light: paleMix(shell.accent, 0.38),
+            mid: paleMix(shell.light, 0.2),
+            dark: paleMix(shell.dark, 0.08),
+            edge: shell.dark,
+            ridge: shell.accent,
+            eye: eye.fill,
+            glow
+        });
+    }
+
+    // Crossfade + hardening + flight. By the time this runs the teneral has
+    // already climbed fully out of the shell (moult stages 3-5); the real
+    // adult now materialises exactly where the teneral stands, above the
+    // vacated exuvia.
     _moltReveal(actor) {
         if (this.destroyed || actor.done) return;
         const r = actor.rng;
-        const adultSeed = (this.seed + actor.index * 271 + 7) % 3301 + 1;
+        const adultSeed = actor.adultSeed;
 
         let adult = null, adultMount = null;
         if (typeof this.renderCicada === 'function') {
             adultMount = document.createElement('div');
             // The adult rides its own wrapper so lift-off leaves the host (and
-            // the clinging exuvia) behind on the trunk.
+            // the clinging exuvia) behind on the trunk. It MORPHS from the
+            // teneral: same position, teneral size, washed-out colours — then
+            // slowly grows and darkens into its final form in place.
+            // Same position AND same size as the fully-emerged teneral — the
+            // handoff must be invisible; only the colours harden afterwards.
             adultMount.style.cssText = 'position:absolute;inset:0;opacity:0;' +
-                'transform:translateY(13%) scale(0.8);will-change:transform,opacity;' +
-                'transition:opacity 2.4s ease, transform 3.2s cubic-bezier(.32,0,.3,1);';
+                'transform:translateY(-23%) scale(0.94);' +
+                'filter:brightness(1.5) saturate(0.45);will-change:transform,opacity,filter;' +
+                'transition:opacity 1.4s ease;';
             actor.host.appendChild(adultMount);
             try {
                 adult = this.renderCicada({
@@ -470,16 +677,28 @@ export class NymphScene {
                 wings.push([el, base]);
             }
 
-            // Stage 3: the adult pulls free — rises out of the split shell while
-            // the vacated cuticle turns to a translucent exuvia beneath it.
+            // Morph, phase 1 — identity swap at matched size and paleness: the
+            // teneral fades out while the adult (teneral-sized, washed-out)
+            // fades in over the exact same spot. Nothing appears to change but
+            // the drawing hand.
             requestAnimationFrame(() => {
                 adultMount.style.opacity = '1';
-                adultMount.style.transform = 'translateY(-9%) scale(0.97)';
+                actor.nymph.setAdultOut();
             });
-            this._after(600, () => actor.nymph.toExuvia());
 
-            // Stage 4: wing expansion — slow unfurl to full span.
-            this._after(3200, () => {
+            // Morph, phase 2 — no growth: only the colours harden from
+            // teneral-pale into the seed's true palette, with the faintest
+            // hardening swell (0.94 -> 1.0), slowly, in place.
+            this._after(1600, () => {
+                if (actor.done) return;
+                adultMount.style.transition = 'transform 4.4s cubic-bezier(.3,0,.3,1), filter 4.4s ease, opacity 1.4s ease';
+                adultMount.style.transform = 'translateY(-23%) scale(1)';
+                adultMount.style.filter = '';
+            });
+
+            // Wing expansion — slow unfurl to full span once the body has
+            // mostly hardened.
+            this._after(5400, () => {
                 if (actor.done) return;
                 for (const [el, base] of wings) {
                     el.style.transition = 'transform 3.8s cubic-bezier(.3,0,.25,1), opacity 3.8s ease';
@@ -491,7 +710,7 @@ export class NymphScene {
 
         // Stage 5-6: harden, then take flight — the adult alone lifts out of the
         // scene while the exuvia stays gripping the trunk.
-        this._after(8600, () => {
+        this._after(11800, () => {
             if (actor.done) return;
             try { adult?.cicada?.setFlying?.(true); } catch (_) {}
             if (adultMount) {
@@ -503,12 +722,16 @@ export class NymphScene {
 
         // The exuvia lingers on the bark, then weathers away before the actor
         // recycles into a fresh nymph deep in the tunnels.
-        this._after(13500, () => {
+        this._after(16500, () => {
             actor.nymph.host.style.transition = 'opacity 4s ease';
             actor.nymph.host.style.opacity = '0';
         });
-        this._after(18000, () => {
+        this._after(21000, () => {
             actor.done = true;
+            this._releaseTrunkSlot(actor);
+            // Old bores stay as the colony's tunnel network, but cap the layer
+            // so it can't grow without bound over a long-running scene.
+            while (this.carve.childElementCount > 45) this.carve.firstElementChild?.remove();
             try { actor.adult?.destroy?.(); } catch (_) {}
             try { actor.nymph.destroy(); } catch (_) {}
             actor.host.remove();
