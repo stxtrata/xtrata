@@ -1,0 +1,748 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Xtrata Wallet Canary</title>
+<style>
+  :root {
+    --bg: #05060f;
+    --panel: #0b1023;
+    --line: #16305a;
+    --cyan: #34e0ff;
+    --dim: #7d93c8;
+    --ok: #45e08a;
+    --warn: #ffcf5c;
+    --err: #ff6472;
+    --mono: 'Courier New', ui-monospace, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: #d9e6ff;
+    font-family: var(--mono); font-size: 13px; padding: 10px;
+    -webkit-text-size-adjust: 100%;
+  }
+  h1 { color: var(--cyan); font-size: 17px; margin: 4px 0 2px; text-shadow: 0 0 12px rgba(52,224,255,.6); }
+  .sub { color: var(--dim); font-size: 11px; margin-bottom: 10px; }
+  .panel {
+    border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
+    padding: 8px; margin-bottom: 10px;
+  }
+  .panel h2 { font-size: 12px; color: var(--cyan); margin: 0 0 6px; letter-spacing: 1px; }
+  button {
+    font-family: var(--mono); font-size: 12px; color: #05131b;
+    background: var(--cyan); border: 0; border-radius: 5px;
+    padding: 8px 10px; margin: 3px 4px 3px 0; cursor: pointer; font-weight: bold;
+  }
+  button.secondary { background: #14335f; color: #bcd6ff; }
+  button.danger { background: #5f1430; color: #ffc9d6; }
+  button:disabled { opacity: .4; }
+  select, input {
+    font-family: var(--mono); font-size: 12px; background: #060b1a; color: #d9e6ff;
+    border: 1px solid var(--line); border-radius: 5px; padding: 6px; margin: 2px 4px 2px 0;
+    max-width: 100%;
+  }
+  label { color: var(--dim); font-size: 11px; }
+  #statusbar {
+    position: sticky; top: 0; z-index: 5; background: #081226; border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 8px; margin-bottom: 8px; font-size: 11px; color: var(--warn);
+    word-break: break-all;
+  }
+  #log {
+    white-space: pre-wrap; word-break: break-all; background: #04050c;
+    border: 1px solid var(--line); border-radius: 6px; padding: 8px;
+    height: 42vh; overflow-y: auto; font-size: 11px; line-height: 1.5;
+  }
+  .l-info { color: #9fb6e8; }
+  .l-ok { color: var(--ok); }
+  .l-warn { color: var(--warn); }
+  .l-err { color: var(--err); }
+  .l-tx { color: var(--cyan); }
+  .row { margin: 4px 0; }
+  .kv { color: var(--dim); }
+  .kv b { color: #d9e6ff; }
+</style>
+</head>
+<body>
+  <h1>XTRATA WALLET CANARY</h1>
+  <div class="sub" id="version">v0.1.0 — verbose wallet diagnosis for desktop + mobile, direct + /i/ bridge</div>
+  <div id="statusbar">booting…</div>
+
+  <div class="panel">
+    <h2>1 · ENVIRONMENT</h2>
+    <div id="env" class="kv">…</div>
+    <div class="row">
+      <button id="btn-detect">Re-detect providers</button>
+      <button id="btn-hello" class="secondary">Send bridge hello</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>2 · TARGET</h2>
+    <div class="row">
+      <label>Mode</label>
+      <select id="sel-mode">
+        <option value="direct">direct (injected provider)</option>
+        <option value="bridge">bridge (xtrata host)</option>
+      </select>
+      <label>Provider</label>
+      <select id="sel-provider"></select>
+    </div>
+    <div class="row kv" id="target-info"></div>
+  </div>
+
+  <div class="panel">
+    <h2>3 · CONNECT + READS</h2>
+    <button id="btn-connect">wallet_connect</button>
+    <button id="btn-getaccounts" class="secondary">stx_getAccounts</button>
+    <button id="btn-getaccount" class="secondary">wallet_getAccount</button>
+    <button id="btn-getaddresses" class="secondary">getAddresses</button>
+    <button id="btn-stxgetaddresses" class="secondary">stx_getAddresses</button>
+    <button id="btn-supported" class="secondary">supportedMethods</button>
+    <button id="btn-feeunit" class="secondary">read get-fee-unit</button>
+  </div>
+
+  <div class="panel">
+    <h2>4 · SIGNING TESTS <span class="kv">(reject in wallet to avoid cost — the sheet appearing IS the result)</span></h2>
+    <div class="row">
+      <label>call shape</label>
+      <select id="sel-shape">
+        <option value="A">A · spec-only (contract, functionName, functionArgs, PCs)</option>
+        <option value="B">B · spec + stxAddress</option>
+        <option value="C">C · spec + address</option>
+        <option value="D">D · full legacy params (+network,fee,nonce,sponsored)</option>
+        <option value="E">E · arguments-only (old sats-connect spelling)</option>
+      </select>
+      <label>post conditions</label>
+      <select id="sel-pc">
+        <option value="deny">deny + STX cap</option>
+        <option value="allow">allow, none</option>
+        <option value="omit">omit fields entirely</option>
+      </select>
+    </div>
+    <div class="row">
+      <button id="btn-call">stx_callContract (submit-score, gameId=canary)</button>
+    </div>
+    <div class="row">
+      <button id="btn-legacy" class="danger">LEGACY transactionRequest (JWT)</button>
+      <button id="btn-transfer" class="secondary">stx_transferStx 1 µSTX → self</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>5 · LOG</h2>
+    <div class="row">
+      <button id="btn-copy" class="secondary">Copy full log</button>
+      <button id="btn-report" class="secondary">Copy summary report</button>
+      <button id="btn-clear" class="secondary">Clear</button>
+    </div>
+    <div id="log"></div>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+
+  var VERSION = 'xtrata-wallet-canary v0.1.0';
+  var QS = (function () {
+    try { return new URLSearchParams(window.location.search || ''); } catch (e) { return { get: function () { return null; } }; }
+  })();
+
+  var CONFIG = {
+    network: QS.get('network') === 'testnet' ? 'testnet' : 'mainnet',
+    contractAddress: QS.get('contract') || 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+    contractName: QS.get('contractName') || 'xtrata-arcade-scores-v1-3',
+    functionName: 'submit-score',
+    gameId: QS.get('gameId') || 'canary',
+    playerName: 'CAN',
+    feeCapFallback: 30000,
+    watchdogMs: Number(QS.get('watchdog') || 30000)
+  };
+
+  // ---------- logging ----------
+  var logEl = document.getElementById('log');
+  var statusEl = document.getElementById('statusbar');
+  var t0 = Date.now();
+  var LOG_LINES = [];
+  var RESULTS = []; // for the summary report
+
+  function ts() { return ((Date.now() - t0) / 1000).toFixed(2) + 's'; }
+
+  function jsonSafe(value) {
+    var seen = [];
+    try {
+      var out = JSON.stringify(value, function (k, v) {
+        if (typeof v === 'bigint') return v.toString() + 'n';
+        if (typeof v === 'function') return '[fn]';
+        if (v && typeof v === 'object') {
+          if (seen.indexOf(v) >= 0) return '[circular]';
+          seen.push(v);
+        }
+        return v;
+      });
+      if (out && out.length > 4000) return out.slice(0, 4000) + '…[truncated]';
+      return out;
+    } catch (e) { return String(value); }
+  }
+
+  function log(level, msg, obj) {
+    var line = '[' + ts() + '] ' + msg + (typeof obj === 'undefined' ? '' : ' ' + jsonSafe(obj));
+    LOG_LINES.push(line);
+    var div = document.createElement('div');
+    div.className = 'l-' + level;
+    div.textContent = line;
+    logEl.appendChild(div);
+    logEl.scrollTop = logEl.scrollHeight;
+    try { console.log('[canary]', line); } catch (e) {}
+  }
+  function status(msg) { statusEl.textContent = msg; }
+  function record(name, outcome, detail) {
+    RESULTS.push({ name: name, outcome: outcome, detail: detail || '' });
+  }
+
+  window.onerror = function (m, src, ln, col, err) {
+    log('err', 'window.onerror: ' + m + ' @' + ln + ':' + col, err && err.stack ? String(err.stack).slice(0, 400) : undefined);
+  };
+  window.addEventListener('unhandledrejection', function (e) {
+    log('err', 'unhandledrejection', e && e.reason ? String(e.reason) : undefined);
+  });
+
+  function copyText(text, label) {
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); log('ok', label + ' copied (execCommand)'); }
+      catch (e) { log('err', 'copy failed — long-press the log to select manually'); }
+      document.body.removeChild(ta);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { log('ok', label + ' copied'); }, fallback);
+    } else { fallback(); }
+  }
+
+  // ---------- hex / c32 / clarity helpers ----------
+  function bytesToHex(bytes) {
+    var out = '';
+    for (var i = 0; i < bytes.length; i += 1) out += ('0' + bytes[i].toString(16)).slice(-2);
+    return out;
+  }
+  var C32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+  function c32AddressDecode(addr) {
+    // 'S' + versionChar + c32(hash160 + 4-byte checksum)
+    var up = String(addr || '').trim().toUpperCase();
+    if (up.charAt(0) !== 'S' || up.length < 8) throw new Error('not a stacks address: ' + addr);
+    var version = C32.indexOf(up.charAt(1));
+    if (version < 0) throw new Error('bad version char in ' + addr);
+    var body = up.slice(2);
+    var big = 0n;
+    for (var i = 0; i < body.length; i += 1) {
+      var v = C32.indexOf(body.charAt(i));
+      if (v < 0) throw new Error('bad c32 char ' + body.charAt(i));
+      big = big * 32n + BigInt(v);
+    }
+    var bytes = [];
+    while (big > 0n) { bytes.unshift(Number(big & 0xffn)); big >>= 8n; }
+    while (bytes.length < 24) bytes.unshift(0);
+    if (bytes.length > 24) bytes = bytes.slice(bytes.length - 24);
+    return { version: version, hash160: bytes.slice(0, 20) };
+  }
+  function uintCVHex(value) {
+    var n = BigInt(value);
+    var hex = n.toString(16);
+    while (hex.length < 32) hex = '0' + hex;
+    return '01' + hex;
+  }
+  function stringAsciiCVHex(text) {
+    var s = String(text);
+    var len = ('00000000' + s.length.toString(16)).slice(-8);
+    var body = '';
+    for (var i = 0; i < s.length; i += 1) body += ('0' + s.charCodeAt(i).toString(16)).slice(-2);
+    return '0d' + len + body;
+  }
+  function stxPostConditionHex(address, amountMicro, code) {
+    // 00 (STX) + 02 (standard principal) + version + hash160 + code + amount(8B BE)
+    var dec = c32AddressDecode(address);
+    var amt = BigInt(amountMicro);
+    var amtHex = amt.toString(16);
+    while (amtHex.length < 16) amtHex = '0' + amtHex;
+    return '00' + '02' + ('0' + dec.version.toString(16)).slice(-2) + bytesToHex(dec.hash160) +
+      ('0' + Number(code || 5).toString(16)).slice(-2) + amtHex;
+  }
+  function b64url(objOrStr) {
+    var raw = typeof objOrStr === 'string' ? objOrStr : JSON.stringify(objOrStr);
+    var b = btoa(unescape(encodeURIComponent(raw)));
+    return b.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  // ---------- environment / provider detection ----------
+  function isTopFrame() {
+    try { return window.top === window; } catch (e) { return false; }
+  }
+  function describeProviderObject(obj) {
+    if (!obj || typeof obj !== 'object') return null;
+    return {
+      hasRequest: typeof obj.request === 'function',
+      hasTransactionRequest: typeof obj.transactionRequest === 'function',
+      hasAuthenticationRequest: typeof obj.authenticationRequest === 'function',
+      keys: Object.keys(obj).slice(0, 15)
+    };
+  }
+  function detectProviders() {
+    var w = window;
+    var found = [];
+    function add(id, obj) {
+      var d = describeProviderObject(obj);
+      if (d) found.push({ id: id, obj: obj, info: d });
+    }
+    add('XverseProviders.BitcoinProvider', w.XverseProviders && w.XverseProviders.BitcoinProvider);
+    add('XverseProviders.StacksProvider', w.XverseProviders && w.XverseProviders.StacksProvider);
+    add('xverseProviders.BitcoinProvider', w.xverseProviders && w.xverseProviders.BitcoinProvider);
+    add('xverseProviders.StacksProvider', w.xverseProviders && w.xverseProviders.StacksProvider);
+    add('LeatherProvider', w.LeatherProvider);
+    add('window.StacksProvider', w.StacksProvider);
+    add('window.BitcoinProvider', w.BitcoinProvider);
+    if (Array.isArray(w.btc_providers)) {
+      for (var i = 0; i < w.btc_providers.length; i += 1) {
+        var p = w.btc_providers[i];
+        log('info', 'WBIP registry btc_providers[' + i + ']', { id: p && p.id, name: p && p.name });
+      }
+    }
+    return found;
+  }
+
+  var PROVIDERS = [];
+  var selProvider = document.getElementById('sel-provider');
+  var selMode = document.getElementById('sel-mode');
+  var selShape = document.getElementById('sel-shape');
+  var selPc = document.getElementById('sel-pc');
+
+  function refreshEnv() {
+    PROVIDERS = detectProviders();
+    var envEl = document.getElementById('env');
+    var lines = [];
+    lines.push('<b>UA:</b> ' + navigator.userAgent);
+    var origin = 'unknown';
+    try { origin = window.location.origin + window.location.pathname; } catch (e) {}
+    lines.push('<b>URL:</b> ' + origin);
+    lines.push('<b>topFrame:</b> ' + isTopFrame() + ' · <b>referrer:</b> ' + (document.referrer || 'none'));
+    lines.push('<b>providers:</b> ' + (PROVIDERS.length ? PROVIDERS.map(function (p) {
+      return p.id + (p.info.hasRequest ? '(request)' : '') + (p.info.hasTransactionRequest ? '(txReq)' : '');
+    }).join(', ') : 'NONE injected in this frame'));
+    envEl.innerHTML = lines.join('<br/>');
+
+    selProvider.innerHTML = '';
+    PROVIDERS.forEach(function (p, i) {
+      var o = document.createElement('option');
+      o.value = String(i); o.textContent = p.id;
+      selProvider.appendChild(o);
+    });
+    if (!PROVIDERS.length) {
+      var o = document.createElement('option');
+      o.value = '-1'; o.textContent = 'none — use bridge mode';
+      selProvider.appendChild(o);
+    }
+    // prefer Xverse BitcoinProvider by default
+    for (var i = 0; i < PROVIDERS.length; i += 1) {
+      if (/bitcoinprovider/i.test(PROVIDERS[i].id)) { selProvider.value = String(i); break; }
+    }
+    selMode.value = PROVIDERS.length ? 'direct' : (BRIDGE.token ? 'bridge' : selMode.value);
+    updateTargetInfo();
+    log('info', 'environment refreshed', {
+      topFrame: isTopFrame(),
+      providerCount: PROVIDERS.length,
+      providers: PROVIDERS.map(function (p) { return p.id; })
+    });
+  }
+
+  function currentProvider() {
+    var idx = Number(selProvider.value);
+    return idx >= 0 && PROVIDERS[idx] ? PROVIDERS[idx] : null;
+  }
+  function updateTargetInfo() {
+    var mode = selMode.value;
+    var p = currentProvider();
+    document.getElementById('target-info').innerHTML =
+      '<b>mode:</b> ' + mode +
+      (mode === 'direct'
+        ? ' · <b>provider:</b> ' + (p ? p.id : 'NONE')
+        : ' · <b>bridge token:</b> ' + (BRIDGE.token ? 'granted (' + (BRIDGE.hostOrigin || 'opaque host') + ')' : 'NOT granted'));
+  }
+  selMode.addEventListener('change', updateTargetInfo);
+  selProvider.addEventListener('change', updateTargetInfo);
+
+  // ---------- host wallet bridge (same protocol as astro parent v4) ----------
+  var BRIDGE = {
+    requestType: 'xtrata:wallet:request',
+    responseType: 'xtrata:wallet:response',
+    helloType: 'xtrata:wallet:hello',
+    helloAckType: 'xtrata:wallet:hello-ack',
+    token: '', hostOrigin: '', nonce: '', attempts: 0, pending: {}, seq: 0
+  };
+  (function initBridgeToken() {
+    var t = QS.get('walletBridgeToken');
+    if (t) { BRIDGE.token = String(t).trim(); log('ok', 'bridge token from query string'); }
+  })();
+  function bridgeTargets() {
+    var out = [];
+    try { if (window.opener && window.opener !== window) out.push(window.opener); } catch (e) {}
+    try { if (window.parent && window.parent !== window) out.push(window.parent); } catch (e) {}
+    try { if (window.top && window.top !== window && out.indexOf(window.top) < 0) out.push(window.top); } catch (e) {}
+    return out;
+  }
+  function postTargetOrigin() {
+    if (BRIDGE.hostOrigin) return BRIDGE.hostOrigin;
+    try {
+      if (window.location.origin && window.location.origin !== 'null' && /^https?:/.test(window.location.origin)) {
+        return window.location.origin;
+      }
+    } catch (e) {}
+    return '*';
+  }
+  function sendHello() {
+    var targets = bridgeTargets();
+    if (!targets.length) { log('warn', 'bridge hello: no parent/opener/top targets (standalone top frame)'); return; }
+    if (!BRIDGE.nonce) {
+      BRIDGE.nonce = 'canary-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+    }
+    BRIDGE.attempts += 1;
+    var msg = { type: BRIDGE.helloType, app: 'xtrata-wallet-canary', version: 'v1', nonce: BRIDGE.nonce, wants: ['wallet-bridge'] };
+    targets.forEach(function (t) { try { t.postMessage(msg, '*'); } catch (e) {} });
+    log('info', 'bridge hello sent (attempt ' + BRIDGE.attempts + ')');
+    if (!BRIDGE.token && BRIDGE.attempts < 5) setTimeout(sendHello, 700 * BRIDGE.attempts);
+  }
+  window.addEventListener('message', function (event) {
+    var data = event && event.data ? event.data : null;
+    if (!data || typeof data !== 'object') return;
+    if (data.type === BRIDGE.helloAckType) {
+      if (BRIDGE.token || data.nonce !== BRIDGE.nonce || typeof data.bridgeToken !== 'string') return;
+      BRIDGE.token = data.bridgeToken.trim();
+      BRIDGE.hostOrigin = event.origin && event.origin !== 'null' ? event.origin : '';
+      log('ok', 'bridge token granted via hello-ack', { hostOrigin: BRIDGE.hostOrigin || 'opaque' });
+      updateTargetInfo();
+      return;
+    }
+    if (data.type !== BRIDGE.responseType) return;
+    var id = typeof data.requestId === 'string' ? data.requestId : '';
+    var entry = id && BRIDGE.pending[id];
+    if (!entry) return;
+    delete BRIDGE.pending[id];
+    clearTimeout(entry.timer);
+    if (data.ok) entry.resolve(data.result);
+    else {
+      var detail = data.error || {};
+      var err = new Error(detail.message ? String(detail.message) : 'bridge rejected request');
+      if (typeof detail.code === 'number') err.code = detail.code;
+      entry.reject(err);
+    }
+  });
+  function bridgeRequest(method, params, timeoutMs) {
+    if (!BRIDGE.token) return Promise.reject(new Error('no bridge token — press "Send bridge hello" while embedded under the xtrata host'));
+    var targets = bridgeTargets();
+    if (!targets.length) return Promise.reject(new Error('no bridge target windows'));
+    return new Promise(function (resolve, reject) {
+      var id = 'canary-req-' + String(++BRIDGE.seq);
+      var timer = setTimeout(function () {
+        delete BRIDGE.pending[id];
+        reject(new Error('bridge request timed out for ' + method));
+      }, Math.max(3000, timeoutMs || 120000));
+      BRIDGE.pending[id] = { resolve: resolve, reject: reject, timer: timer };
+      var msg = { type: BRIDGE.requestType, requestId: id, bridgeToken: BRIDGE.token, method: method, params: typeof params === 'undefined' ? null : params };
+      var sent = false;
+      targets.forEach(function (t) { try { t.postMessage(msg, postTargetOrigin()); sent = true; } catch (e) {} });
+      if (!sent) { clearTimeout(timer); delete BRIDGE.pending[id]; reject(new Error('bridge postMessage failed')); }
+    });
+  }
+
+  // ---------- instrumented wallet request ----------
+  var testSeq = 0;
+  function runTest(name, sender) {
+    var id = ++testSeq;
+    var started = Date.now();
+    log('tx', '#' + id + ' ' + name + ' → START');
+    var settled = false;
+    var watchdog = setTimeout(function () {
+      if (!settled) {
+        log('warn', '#' + id + ' ' + name + ' → NO RESPONSE after ' + (CONFIG.watchdogMs / 1000) +
+          's. If the wallet showed a toast/sheet, note its exact wording. Still listening for a late answer…');
+        record(name, 'NO_RESPONSE', 'promise pending after ' + CONFIG.watchdogMs + 'ms');
+      }
+    }, CONFIG.watchdogMs);
+    return Promise.resolve().then(sender).then(function (result) {
+      settled = true; clearTimeout(watchdog);
+      var ms = Date.now() - started;
+      log('ok', '#' + id + ' ' + name + ' → RESOLVED in ' + ms + 'ms', result);
+      record(name, 'RESOLVED(' + ms + 'ms)', jsonSafe(result));
+      return result;
+    }, function (error) {
+      settled = true; clearTimeout(watchdog);
+      var ms = Date.now() - started;
+      var detail = {
+        message: error && error.message ? error.message : String(error),
+        code: error && typeof error === 'object' && 'code' in error ? error.code : undefined
+      };
+      log('err', '#' + id + ' ' + name + ' → REJECTED in ' + ms + 'ms', detail);
+      record(name, 'REJECTED(' + ms + 'ms)', jsonSafe(detail));
+      throw error;
+    });
+  }
+
+  function directRequest(method, params) {
+    var p = currentProvider();
+    if (!p) return Promise.reject(new Error('no injected provider available in this frame'));
+    if (!p.info.hasRequest) return Promise.reject(new Error(p.id + ' has no request()'));
+    log('info', 'direct request via ' + p.id + ' · method=' + method, params);
+    return Promise.resolve(p.obj.request(method, params)).then(function (response) {
+      if (response && typeof response === 'object') {
+        if (response.error) { var e1 = new Error(jsonSafe(response.error)); e1.code = response.error.code; throw e1; }
+        if (response.status === 'error') throw new Error(jsonSafe(response.result || response));
+      }
+      return response;
+    });
+  }
+  function walletRequest(method, params, timeoutMs) {
+    if (selMode.value === 'bridge') {
+      log('info', 'bridge request · method=' + method, params);
+      return bridgeRequest(method, params, timeoutMs);
+    }
+    return directRequest(method, params);
+  }
+
+  // ---------- session tracking ----------
+  var SESSION = { address: '', publicKey: '' };
+  function harvestStacksAddress(payload, depth) {
+    depth = depth || 0;
+    if (depth > 7 || payload === null || typeof payload === 'undefined') return null;
+    if (typeof payload === 'string') {
+      var t = payload.trim().toUpperCase();
+      return /^S[PM][0-9A-Z]{28,}$/.test(t) ? payload.trim() : null;
+    }
+    if (Array.isArray(payload)) {
+      for (var i = 0; i < payload.length; i += 1) {
+        var hit = harvestStacksAddress(payload[i], depth + 1);
+        if (hit) return hit;
+      }
+      return null;
+    }
+    if (typeof payload !== 'object') return null;
+    var keys = ['address', 'stxAddress', 'selectedAddress', 'addresses', 'accounts', 'result', 'mainnet'];
+    for (var k = 0; k < keys.length; k += 1) {
+      if (keys[k] in payload) {
+        var found = harvestStacksAddress(payload[keys[k]], depth + 1);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+  function noteSession(payload) {
+    var addr = harvestStacksAddress(payload, 0);
+    if (addr) {
+      SESSION.address = addr;
+      log('ok', 'session address captured: ' + addr);
+      status('connected: ' + addr);
+    }
+  }
+
+  // ---------- read-only fee lookup ----------
+  function apiBases() {
+    var abs = CONFIG.network === 'testnet' ? 'https://api.testnet.hiro.so' : 'https://api.mainnet.hiro.so';
+    var out = [];
+    try {
+      if (/^https?:/.test(window.location.origin || '')) out.push(window.location.origin + '/hiro/' + CONFIG.network);
+    } catch (e) {}
+    out.push(abs);
+    return out;
+  }
+  function readFeeUnit() {
+    var bases = apiBases();
+    var sender = SESSION.address || CONFIG.contractAddress;
+    var path = '/v2/contracts/call-read/' + CONFIG.contractAddress + '/' + CONFIG.contractName + '/get-fee-unit';
+    var attempt = function (i) {
+      if (i >= bases.length) return Promise.reject(new Error('all API bases failed for get-fee-unit'));
+      return fetch(bases[i] + path, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender: sender, arguments: [] })
+      }).then(function (r) { return r.json(); }).then(function (body) {
+        if (!body || !body.okay || !body.result) throw new Error('read failed: ' + jsonSafe(body));
+        var hex = String(body.result).replace(/^0x/, '');
+        // (ok uint) response envelope 07 + 01 + 16 bytes
+        var m = hex.match(/^07?01([0-9a-f]{32})$/) || hex.match(/^01([0-9a-f]{32})$/) || hex.match(/^0701([0-9a-f]{32})$/);
+        var amount = m ? Number(BigInt('0x' + m[1])) : NaN;
+        if (!isFinite(amount)) throw new Error('could not parse fee unit from ' + hex);
+        log('ok', 'get-fee-unit = ' + amount + ' µSTX (via ' + bases[i] + ')');
+        return amount;
+      }).catch(function (e) {
+        log('warn', 'fee read failed on ' + bases[i] + ': ' + e.message);
+        return attempt(i + 1);
+      });
+    };
+    return attempt(0);
+  }
+
+  // ---------- contract call shapes ----------
+  function buildFunctionArgs(score) {
+    return [
+      stringAsciiCVHex(CONFIG.gameId),
+      uintCVHex(0),
+      uintCVHex(score),
+      stringAsciiCVHex(CONFIG.playerName)
+    ];
+  }
+  function buildCallParams(shape, pcMode, feeCap) {
+    var addr = SESSION.address;
+    var args = buildFunctionArgs(1);
+    var params = {
+      contract: CONFIG.contractAddress + '.' + CONFIG.contractName,
+      functionName: CONFIG.functionName
+    };
+    if (shape === 'E') {
+      params.arguments = args;
+    } else {
+      params.functionArgs = args;
+      params.arguments = args;
+    }
+    if (pcMode === 'deny') {
+      if (!addr) throw new Error('connect first — deny-mode PC needs the sender address');
+      params.postConditionMode = 'deny';
+      params.postConditions = [stxPostConditionHex(addr, feeCap, 5)];
+    } else if (pcMode === 'allow') {
+      params.postConditionMode = 'allow';
+    }
+    if (shape === 'B') params.stxAddress = addr;
+    if (shape === 'C') params.address = addr;
+    if (shape === 'D') {
+      params.stxAddress = addr;
+      params.address = addr;
+      params.network = CONFIG.network;
+      params.sponsored = false;
+    }
+    return params;
+  }
+
+  // ---------- legacy JWT transactionRequest ----------
+  function legacyToken(pcMode, feeCap) {
+    var addr = SESSION.address;
+    var payload = {
+      txType: 'contract_call',
+      contractAddress: CONFIG.contractAddress,
+      contractName: CONFIG.contractName,
+      functionName: CONFIG.functionName,
+      functionArgs: buildFunctionArgs(1),
+      postConditionMode: pcMode === 'allow' ? 1 : 2,
+      postConditions: pcMode === 'deny' && addr ? [stxPostConditionHex(addr, feeCap, 5)] : [],
+      network: {
+        version: CONFIG.network === 'testnet' ? 128 : 22,
+        chainId: CONFIG.network === 'testnet' ? 2147483648 : 1,
+        coreApiUrl: CONFIG.network === 'testnet' ? 'https://api.testnet.hiro.so' : 'https://api.mainnet.hiro.so'
+      },
+      stxAddress: addr || undefined,
+      publicKey: '',
+      appDetails: { name: 'Xtrata Wallet Canary', icon: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22/%3E' }
+    };
+    // Unsigned JWT: wallets decode the payload without verifying the signature.
+    return b64url({ typ: 'JWT', alg: 'none' }) + '.' + b64url(payload) + '.' + b64url('canary');
+  }
+  function legacyTransactionRequest() {
+    var p = currentProvider();
+    if (!p) return Promise.reject(new Error('no injected provider in this frame (legacy path is direct-mode only)'));
+    var stacksLike = p.info.hasTransactionRequest ? p : null;
+    if (!stacksLike) {
+      for (var i = 0; i < PROVIDERS.length; i += 1) {
+        if (PROVIDERS[i].info.hasTransactionRequest) { stacksLike = PROVIDERS[i]; break; }
+      }
+    }
+    if (!stacksLike) return Promise.reject(new Error('no provider exposes transactionRequest()'));
+    return readFeeUnit().catch(function () { return CONFIG.feeCapFallback; }).then(function (feeCap) {
+      var token = legacyToken(selPc.value === 'allow' ? 'allow' : 'deny', feeCap);
+      log('info', 'legacy transactionRequest via ' + stacksLike.id + ' · token payload', JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))));
+      return Promise.resolve(stacksLike.obj.transactionRequest(token));
+    });
+  }
+
+  // ---------- buttons ----------
+  function bind(id, fn) {
+    document.getElementById(id).addEventListener('click', function () {
+      try { fn(); } catch (e) { log('err', 'handler threw: ' + e.message); }
+    });
+  }
+
+  bind('btn-detect', refreshEnv);
+  bind('btn-hello', function () { BRIDGE.attempts = 0; sendHello(); });
+
+  bind('btn-connect', function () {
+    runTest('wallet_connect [' + selMode.value + ']', function () {
+      return walletRequest(selMode.value === 'bridge' ? 'stx_requestAccounts' : 'wallet_connect', undefined, 120000);
+    }).then(noteSession).catch(function () {});
+  });
+  ['stx_getAccounts', 'wallet_getAccount', 'getAddresses', 'stx_getAddresses', 'supportedMethods'].forEach(function (method) {
+    var idMap = {
+      stx_getAccounts: 'btn-getaccounts', wallet_getAccount: 'btn-getaccount',
+      getAddresses: 'btn-getaddresses', stx_getAddresses: 'btn-stxgetaddresses',
+      supportedMethods: 'btn-supported'
+    };
+    bind(idMap[method], function () {
+      runTest(method + ' [' + selMode.value + ']', function () {
+        return walletRequest(method, undefined, 45000);
+      }).then(noteSession).catch(function () {});
+    });
+  });
+  bind('btn-feeunit', function () {
+    runTest('read-only get-fee-unit', readFeeUnit).catch(function () {});
+  });
+
+  bind('btn-call', function () {
+    var shape = selShape.value;
+    var pcMode = selPc.value;
+    var prep = pcMode === 'deny'
+      ? readFeeUnit().catch(function () { log('warn', 'using fallback fee cap ' + CONFIG.feeCapFallback); return CONFIG.feeCapFallback; })
+      : Promise.resolve(0);
+    prep.then(function (feeCap) {
+      var params;
+      try { params = buildCallParams(shape, pcMode, feeCap); }
+      catch (e) { log('err', e.message); return; }
+      runTest('stx_callContract shape=' + shape + ' pc=' + pcMode + ' [' + selMode.value + ']', function () {
+        return walletRequest('stx_callContract', params, 180000);
+      }).catch(function () {});
+    });
+  });
+
+  bind('btn-legacy', function () {
+    runTest('LEGACY transactionRequest [direct]', legacyTransactionRequest).catch(function () {});
+  });
+
+  bind('btn-transfer', function () {
+    if (!SESSION.address) { log('err', 'connect first — transfer sends 1 µSTX to your own address'); return; }
+    var params = {
+      recipient: SESSION.address,
+      amount: '1',
+      memo: 'canary'
+    };
+    runTest('stx_transferStx 1µSTX→self [' + selMode.value + ']', function () {
+      return walletRequest('stx_transferStx', params, 180000);
+    }).catch(function () {});
+  });
+
+  bind('btn-copy', function () { copyText(LOG_LINES.join('\n'), 'log'); });
+  bind('btn-clear', function () { LOG_LINES = []; logEl.innerHTML = ''; });
+  bind('btn-report', function () {
+    var lines = [VERSION, 'time: ' + new Date().toISOString(), 'ua: ' + navigator.userAgent,
+      'url: ' + (function () { try { return window.location.href; } catch (e) { return '?'; } })(),
+      'topFrame: ' + isTopFrame(), 'mode: ' + selMode.value,
+      'provider: ' + (currentProvider() ? currentProvider().id : 'none'),
+      'bridgeToken: ' + (BRIDGE.token ? 'granted' : 'none'),
+      'session: ' + (SESSION.address || 'not connected'), '--- results ---'];
+    RESULTS.forEach(function (r) { lines.push(r.name + ' => ' + r.outcome + (r.detail ? ' :: ' + r.detail : '')); });
+    copyText(lines.join('\n'), 'report');
+  });
+
+  // ---------- boot ----------
+  log('info', VERSION + ' booting');
+  log('info', 'config', CONFIG);
+  refreshEnv();
+  status(isTopFrame()
+    ? (PROVIDERS.length ? 'DIRECT mode ready — providers injected' : 'top frame but NO providers — open inside a wallet browser')
+    : 'embedded — sending bridge hello to host');
+  if (!isTopFrame()) sendHello();
+})();
+</script>
+</body>
+</html>
