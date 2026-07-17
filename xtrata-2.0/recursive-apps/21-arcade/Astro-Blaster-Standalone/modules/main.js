@@ -1704,8 +1704,11 @@
 
   function walletConnectImportUrls(){
     return [
-      'https://cdn.jsdelivr.net/npm/@stacks/connect@7.10.2/dist/index.mjs',
-      'https://unpkg.com/@stacks/connect@7.10.2/dist/index.mjs'
+      /* Bundling endpoints only: the raw dist/index.mjs build has bare imports
+         ("@stacks/auth") that browsers cannot resolve without a bundler, which
+         made this fallback fail with "Failed to resolve module specifier". */
+      'https://cdn.jsdelivr.net/npm/@stacks/connect@7.10.2/+esm',
+      'https://esm.sh/@stacks/connect@7.10.2?bundle'
     ];
   }
 
