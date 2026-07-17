@@ -761,6 +761,29 @@ const buildContractCallParams = (options: WalletContractCallOptions) => {
   };
 };
 
+// Xverse validates stx_callContract against the sats-connect schema, which
+// only knows contract, functionName, functionArgs/arguments, postConditions
+// and postConditionMode. Out-of-spec fields are not ignored everywhere:
+// Xverse mobile reads an explicit sender field as "sign as this address",
+// compares it with the STX account the dapp is connected as, and rejects the
+// request before any confirmation UI when they differ — including when its
+// own connection record is empty ("requesting signature from a different
+// address. (undefined)"). Sender correctness is enforced on our side by
+// ensureXverseSigningAccount before the call is sent.
+const buildXverseContractCallParams = (options: WalletContractCallOptions) => {
+  const params = buildContractCallParams(options);
+  return {
+    contract: params.contract,
+    functionName: params.functionName,
+    functionArgs: params.functionArgs,
+    // Older Xverse builds validate with a schema that only reads `arguments`
+    // and silently drop `functionArgs`; send both spellings.
+    arguments: params.functionArgs,
+    postConditionMode: params.postConditionMode,
+    postConditions: params.postConditions
+  };
+};
+
 const buildContractDeployParams = (options: WalletContractDeployOptions) => {
   const postConditions =
     options.postConditions && options.postConditions.length > 0
@@ -792,23 +815,156 @@ const buildStxTransferParams = (options: WalletStxTransferOptions) => ({
   sponsored: options.sponsored ?? false
 });
 
+// Xverse tracks the dapp connection per injected provider and per browsing
+// session. A session restored from our localStorage can therefore look
+// connected to the app while Xverse itself (especially the mobile in-app
+// browser, which starts a fresh dapp session each visit) has no active
+// wallet_connect for this origin — and a signing request in that state is
+// rejected before any confirmation UI. Before signing, read the active
+// account on the same BitcoinProvider that will receive the call; if nothing
+// is readable, re-run wallet_connect there. A different active account than
+// the one the post conditions were built for aborts the call instead of
+// silently re-targeting it.
+const XVERSE_ACCOUNT_MISMATCH_CODE = 'WALLET_ADDRESS_MISMATCH';
+
+// Kept below the parent bridge's 180s request timeout so the richer
+// diagnostic reaches the game modal before the generic bridge timeout fires.
+let xverseSigningWatchdogMs = 90_000;
+
+const ensureXverseSigningAccount = async (
+  rpcProvider: WalletRpcProvider,
+  expectedAddress?: string
+) => {
+  const assertExpected = (address: string, source: string) => {
+    if (expectedAddress && address !== expectedAddress) {
+      throw Object.assign(
+        new Error(
+          `Xverse active account ${address} (via ${source}) does not match the connected address ${expectedAddress}. Disconnect and reconnect the wallet, or switch back to the connected account.`
+        ),
+        { code: XVERSE_ACCOUNT_MISMATCH_CODE }
+      );
+    }
+    return address;
+  };
+
+  // wallet_getAccount answers silently on desktop Xverse; stx_getAccounts can
+  // raise a "requesting to get accounts" permission prompt there (canary run
+  // 2026-07-17), so it is only the fallback read.
+  for (const method of ['wallet_getAccount', 'stx_getAccounts'] as const) {
+    let address: string | null = null;
+    try {
+      const response = unwrapProviderResponse(await rpcProvider.request(method));
+      address = extractStacksAddress(response);
+    } catch (error) {
+      if (isUserCancelledError(error)) {
+        throw providerError(error);
+      }
+      // Access-denied and unsupported responses both mean this browsing
+      // session has no readable account yet; fall through to wallet_connect.
+    }
+    if (address) {
+      return assertExpected(address, method);
+    }
+  }
+
+  let response: unknown;
+  try {
+    response = unwrapProviderResponse(await rpcProvider.request('wallet_connect'));
+  } catch (error) {
+    throw providerError(error);
+  }
+  const address = extractStacksAddress(response);
+  if (!address) {
+    throw Object.assign(
+      new Error('Xverse did not return a Stacks account from wallet_connect.'),
+      { code: 'WALLET_ACCOUNT_UNAVAILABLE' }
+    );
+  }
+  return assertExpected(address, 'wallet_connect');
+};
+
 // Keep Xverse contract calls on the same modern BitcoinProvider RPC bridge
-// used by wallet_connect. Xverse keeps account permission per injected
-// provider; sending the call through its legacy StacksProvider after connecting
-// on BitcoinProvider leaves the signer unset and mobile Xverse rejects it as
-// "Dapp is requesting signature from a different address. (undefined)".
-// requestWalletRpc preserves the existing direct provider path for Leather and
-// other wallets, while routing selected Xverse sessions to BitcoinProvider.
+// used by wallet_connect: account permission lives on that provider object,
+// and its legacy StacksProvider has no session after a modern wallet_connect.
+// The direct provider path is preserved for Leather and other wallets.
 const requestWalletContractCall = async (
   provider: StacksProvider,
   options: WalletContractCallOptions
 ) => {
-  const response = await requestWalletRpc(
-    provider,
-    'stx_callContract',
-    buildContractCallParams(options)
-  );
-  return normalizeTxResult(response);
+  if (!isSelectedXverseProvider(provider)) {
+    const response = await requestProvider(
+      provider,
+      'stx_callContract',
+      buildContractCallParams(options)
+    );
+    return normalizeTxResult(response);
+  }
+
+  const rpcProvider = getXverseRpcProvider();
+  if (!rpcProvider) {
+    throw Object.assign(new Error('Xverse modern request provider is not available.'), {
+      code: 'XVERSE_RPC_UNAVAILABLE'
+    });
+  }
+
+  // Xverse mobile can reject a request with only an in-app toast and leave
+  // the RPC promise pending forever, so nothing would ever reach the caller.
+  // Track which request is in flight and fail with that diagnostic if the
+  // wallet neither resolves nor rejects within the watchdog window.
+  let stage = 'account-preflight';
+  let activeAddress: string | undefined;
+  const run = async () => {
+    activeAddress = await ensureXverseSigningAccount(rpcProvider, options.stxAddress);
+    stage = 'stx_callContract';
+    const params = buildXverseContractCallParams(options);
+    // eslint-disable-next-line no-console
+    console.info('[wallet:contract-call]', {
+      stage: 'XVERSE_SIGNING_REQUEST',
+      providerId: getSelectedProviderId(),
+      contract: params.contract,
+      functionName: params.functionName,
+      functionArgCount: params.functionArgs.length,
+      postConditionMode: params.postConditionMode,
+      postConditionCount: params.postConditions?.length ?? 0,
+      expectedAddress: options.stxAddress,
+      activeAddress
+    });
+    try {
+      const response = unwrapProviderResponse(
+        await rpcProvider.request('stx_callContract', params)
+      );
+      return normalizeTxResult(response);
+    } catch (error) {
+      throw providerError(error);
+    }
+  };
+
+  let watchdogTimer: ReturnType<typeof setTimeout> | undefined;
+  const watchdog = new Promise<never>((_, reject) => {
+    watchdogTimer = setTimeout(() => {
+      reject(
+        Object.assign(
+          new Error(
+            `Xverse did not answer the ${stage} request within ${Math.round(
+              xverseSigningWatchdogMs / 1000
+            )}s (provider=${getSelectedProviderId() ?? 'unknown'}, expected=${
+              options.stxAddress ?? 'none'
+            }, active=${activeAddress ?? 'unknown'}, call=${options.contractAddress}.${
+              options.contractName
+            }::${options.functionName}). If Xverse showed an error toast, note its exact text; if you approved a transaction, it may still broadcast.`
+          ),
+          { code: 'XVERSE_SIGNING_TIMEOUT', stage }
+        )
+      );
+    }, xverseSigningWatchdogMs);
+  });
+  try {
+    return await Promise.race([run(), watchdog]);
+  } finally {
+    if (watchdogTimer) {
+      clearTimeout(watchdogTimer);
+    }
+  }
 };
 
 const WALLET_ACCOUNT_READ_METHODS = [
@@ -1307,7 +1463,10 @@ export const showContractCall = (options: WalletContractCallOptions, provider?: 
       options.onFinish?.(payload);
     })
     .catch((error) => {
-      if (isMethodUnsupportedError(error)) {
+      // A modern Xverse connection has no legacy UserSession to fall back to;
+      // the legacy JWT popup is only for other providers that report the
+      // modern method unsupported.
+      if (isMethodUnsupportedError(error) && !isSelectedXverseProvider(activeProvider)) {
         legacyShowContractCall(legacyOptions, activeProvider);
         return;
       }
@@ -1432,6 +1591,11 @@ export const showStxTransfer = (options: WalletStxTransferOptions, provider?: St
 
 export const __testing = {
   buildContractCallParams,
+  buildXverseContractCallParams,
+  ensureXverseSigningAccount,
+  setXverseSigningWatchdogMs: (value: number) => {
+    xverseSigningWatchdogMs = value;
+  },
   buildContractDeployParams,
   buildStxTransferParams,
   buildUnsignedSponsoredContractCall,

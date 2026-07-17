@@ -1,0 +1,147 @@
+{
+  "source": "space-renegade-sheets",
+  "fighters": [],
+  "weapons": [
+    {
+      "name": "Ray Gun",
+      "file": "weapons/ray-gun.png",
+      "sheet": "fighter-variants.webp",
+      "bytes": 44296,
+      "sha256": "d2e4d08c669bad39491b3b5795bb389e2e8cb72af87b6dc285bb9c496594cad9",
+      "base": 88,
+      "weaponBonus": 48,
+      "style": 0
+    },
+    {
+      "name": "Rocket Pistol",
+      "file": "weapons/rocket-pistol.png",
+      "sheet": "fighter-variants.webp",
+      "bytes": 39648,
+      "sha256": "527909c3df5c6651aebf96dfc03698706e94ddb4f63cb22b095dbec08a032102",
+      "base": 13,
+      "weaponBonus": 53,
+      "style": 3
+    },
+    {
+      "name": "Plasma Drill",
+      "file": "weapons/plasma-drill.png",
+      "sheet": "fighter-variants.webp",
+      "bytes": 51337,
+      "sha256": "f60307e2011848708b21b4944f370b1aa7b66917d0e5268e394a3cb578fa4db9",
+      "base": 79,
+      "weaponBonus": 39,
+      "style": 2
+    },
+    {
+      "name": "Beard Axe",
+      "file": "weapons/beard-axe.png",
+      "sheet": "fighter-variants.webp",
+      "bytes": 42241,
+      "sha256": "4d8212224086e5957405b0f9070397f3f0cd826d286d5c1ddd95f0eaf5a3d3ba",
+      "base": 42,
+      "weaponBonus": 42,
+      "style": 2
+    },
+    {
+      "name": "Tentacle Blaster",
+      "file": "weapons/tentacle-blaster.png",
+      "sheet": "fighter-variants.webp",
+      "bytes": 47294,
+      "sha256": "969c6d76b0c6f219f1363b52d4bbe4460ed3d48f419b9f9d14364900add1e88c",
+      "base": 56,
+      "weaponBonus": 36,
+      "style": 2
+    },
+    {
+      "name": "Alien Grappler",
+      "file": "weapons/alien-grappler.png",
+      "sheet": "fighter-variants.webp",
+      "bytes": 46255,
+      "sha256": "194b66d5ea82ba3e0006451ca428dbbe86aaaf42341fe201640bd05ff3edd884",
+      "base": 75,
+      "weaponBonus": 55,
+      "style": 1
+    },
+    {
+      "name": "Holo Book",
+      "file": "weapons/holo-book.png",
+      "sheet": "fighter-variants.webp",
+      "bytes": 47933,
+      "sha256": "7c5fbe31d5bc2a5b11f79bdab0deb115b0c5cb4f959d13cfd80cf40795b79542",
+      "base": 39,
+      "weaponBonus": 39,
+      "style": 1
+    },
+    {
+      "name": "Quantum Confusion Ray",
+      "file": "weapons/quantum-confusion-ray.png",
+      "sheet": "fighter-variants.webp",
+      "bytes": 49880,
+      "sha256": "d270665896e0b7e7b19bd7cf23b6747309ae2c0f449296000a13e4dce1476f4c",
+      "base": 72,
+      "weaponBonus": 52,
+      "style": 0
+    },
+    {
+      "name": "Disco Blaster",
+      "file": "weapons/disco-blaster.png",
+      "sheet": "fighter-variants.webp",
+      "bytes": 48140,
+      "sha256": "3ffb592d915c190dd6fd75ec21aade071a9f912b06894de807dd64fd588589e8",
+      "base": 79,
+      "weaponBonus": 59,
+      "style": 1
+    },
+    {
+      "name": "Moon Cutlass",
+      "file": "weapons/moon-cutlass.png",
+      "sheet": "fighter-variants.webp",
+      "bytes": 36207,
+      "sha256": "5411113b1ccc196048f3b8f75d025a5bf062d5c72a295fd0a3f26f3326a84cb2",
+      "base": 21,
+      "weaponBonus": 41,
+      "style": 3
+    },
+    {
+      "name": "Pirate Pistol",
+      "file": "weapons/pirate-pistol.png",
+      "sheet": "fighter-variants.webp",
+      "bytes": 40131,
+      "sha256": "c41e20445cd77043451225c7f54c85cc55686d8797a7fe73379bc2287c2809cd",
+      "base": 6,
+      "weaponBonus": 46,
+      "style": 0
+    },
+    {
+      "name": "Neon Pistol",
+      "file": "weapons/neon-pistol.png",
+      "sheet": "fighter-variants.webp",
+      "bytes": 43459,
+      "sha256": "fbe1194a9b324b62ab5f4599133a30c8c6b93de4d10cbcaccd952cbe8d3f16d1",
+      "base": 81,
+      "weaponBonus": 41,
+      "style": 2
+    },
+    {
+      "name": "Chrono Device",
+      "file": "weapons/chrono-device.png",
+      "sheet": "fighter-variants.webp",
+      "bytes": 48621,
+      "sha256": "9e64ea6876816161ad021bc0068fe2142f0d56a6bddaf9b188acb7d25258762e",
+      "base": 48,
+      "weaponBonus": 48,
+      "style": 0
+    },
+    {
+      "name": "Rocket Pack",
+      "file": "weapons/rocket-pack.png",
+      "sheet": "fighter-variants.webp",
+      "bytes": 51255,
+      "sha256": "ba189a5ec12564cf97f1baac6a0d73ffca8eb1cc819d17132f216ddc302e75cd",
+      "base": 40,
+      "weaponBonus": 0,
+      "style": 2
+    }
+  ],
+  "items": []
+}

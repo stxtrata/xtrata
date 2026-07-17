@@ -1258,7 +1258,24 @@ export default function App() {
                     'Wallet transaction was cancelled by the user.',
                     4001
                   )
-                )
+                ),
+              // Preserve the wallet's real failure (address mismatch, schema
+              // rejection, provider missing) instead of reporting every
+              // non-success as a user cancellation.
+              onError: (error) => {
+                const code =
+                  error && typeof error === 'object' && 'code' in error
+                    ? (error as { code?: unknown }).code
+                    : undefined;
+                reject(
+                  createRuntimeWalletBridgeError(
+                    error instanceof Error
+                      ? error.message
+                      : String(error ?? 'Wallet contract call failed.'),
+                    typeof code === 'number' ? code : -32603
+                  )
+                );
+              }
             });
           });
         }

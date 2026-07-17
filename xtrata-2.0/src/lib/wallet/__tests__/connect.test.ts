@@ -16,7 +16,7 @@ import {
   stringAsciiCV,
   uintCV
 } from '@stacks/transactions';
-import { __testing, isLeatherProviderId, isXverseProviderId } from '../connect';
+import { __testing, isLeatherProviderId, isXverseProviderId, showContractCall } from '../connect';
 
 const ADDRESS = 'SP2MF04VAGYHGAZWGTEDW5VYCPDWWSY08Z1QFNDSN';
 
@@ -322,28 +322,20 @@ describe('wallet connect helpers', () => {
     expect(rpcProvider.request).toHaveBeenCalledOnce();
   });
 
-  it('routes Xverse contract calls through the session-holding BitcoinProvider', async () => {
-    const scoreTxId = `0x${'ab'.repeat(32)}`;
-    const legacyProvider = {
-      request: vi.fn(async () => {
-        throw new Error('legacy StacksProvider must not receive the Xverse contract call');
-      })
-    };
-    const rpcProvider = {
-      request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
-        expect(method).toBe('stx_callContract');
-        expect(params).toMatchObject({
-          contract: `${ADDRESS}.xtrata-arcade-scores-v1-3`,
-          functionName: 'submit-score',
-          network: 'mainnet',
-          address: ADDRESS,
-          postConditionMode: 'deny'
-        });
-        expect(params?.functionArgs).toHaveLength(4);
-        expect(params?.postConditions).toHaveLength(1);
-        return { status: 'success', result: { txid: scoreTxId } };
-      })
-    };
+  const scoreSubmitOptions = () => ({
+    contractAddress: ADDRESS,
+    contractName: 'xtrata-arcade-scores-v1-3',
+    functionName: 'submit-score',
+    functionArgs: [stringAsciiCV('astro-blaster'), uintCV(0), uintCV(883), stringAsciiCV('MOB')],
+    network: 'mainnet' as const,
+    stxAddress: ADDRESS,
+    postConditionMode: PostConditionMode.Deny,
+    postConditions: [
+      makeStandardSTXPostCondition(ADDRESS, FungibleConditionCode.LessEqual, 30000n)
+    ]
+  });
+
+  const installXverseProviders = (legacyProvider: unknown, rpcProvider: unknown) => {
     window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
     (
       window as typeof window & {
@@ -353,33 +345,210 @@ describe('wallet connect helpers', () => {
       StacksProvider: legacyProvider,
       BitcoinProvider: rpcProvider
     };
+  };
+
+  it('routes Xverse contract calls through the session-holding BitcoinProvider with spec-only params', async () => {
+    const scoreTxId = `0x${'ab'.repeat(32)}`;
+    const legacyProvider = {
+      request: vi.fn(async () => {
+        throw new Error('legacy StacksProvider must not receive the Xverse contract call');
+      })
+    };
+    const seenMethods: string[] = [];
+    const rpcProvider = {
+      request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
+        seenMethods.push(method);
+        if (method === 'wallet_getAccount') {
+          return { status: 'success', result: { addresses: [{ address: ADDRESS }] } };
+        }
+        expect(method).toBe('stx_callContract');
+        // Exactly the sats-connect schema fields (plus the legacy `arguments`
+        // alias) — the shape proven end-to-end on real Xverse mobile and
+        // desktop by the wallet canary. No sender/network/fee/nonce/sponsored.
+        expect(Object.keys(params ?? {}).sort()).toEqual([
+          'arguments',
+          'contract',
+          'functionArgs',
+          'functionName',
+          'postConditionMode',
+          'postConditions'
+        ]);
+        expect(params).toMatchObject({
+          contract: `${ADDRESS}.xtrata-arcade-scores-v1-3`,
+          functionName: 'submit-score',
+          postConditionMode: 'deny'
+        });
+        expect(params?.functionArgs).toHaveLength(4);
+        expect(params?.arguments).toEqual(params?.functionArgs);
+        expect(params?.postConditions).toHaveLength(1);
+        return { status: 'success', result: { txid: scoreTxId } };
+      })
+    };
+    installXverseProviders(legacyProvider, rpcProvider);
 
     await expect(
-      __testing.requestWalletContractCall(legacyProvider as never, {
-        contractAddress: ADDRESS,
-        contractName: 'xtrata-arcade-scores-v1-3',
-        functionName: 'submit-score',
-        functionArgs: [
-          stringAsciiCV('astro-blaster'),
-          uintCV(0),
-          uintCV(883),
-          stringAsciiCV('MOB')
-        ],
-        network: 'mainnet',
-        stxAddress: ADDRESS,
-        postConditionMode: PostConditionMode.Deny,
-        postConditions: [
-          makeStandardSTXPostCondition(
-            ADDRESS,
-            FungibleConditionCode.LessEqual,
-            30000n
-          )
-        ]
-      })
+      __testing.requestWalletContractCall(legacyProvider as never, scoreSubmitOptions())
     ).resolves.toMatchObject({ txId: scoreTxId });
 
     expect(legacyProvider.request).not.toHaveBeenCalled();
+    expect(seenMethods).toEqual(['wallet_getAccount', 'stx_callContract']);
+  });
+
+  it('re-runs wallet_connect on the same Xverse provider when the session has no readable account', async () => {
+    const scoreTxId = `0x${'cd'.repeat(32)}`;
+    const legacyProvider = { request: vi.fn() };
+    const seenMethods: string[] = [];
+    const rpcProvider = {
+      request: vi.fn(async (method: string) => {
+        seenMethods.push(method);
+        if (method === 'stx_getAccounts' || method === 'wallet_getAccount') {
+          throw Object.assign(new Error('Access denied.'), { code: -32002 });
+        }
+        if (method === 'wallet_connect') {
+          // Mobile-style wallet_connect result: BTC + STX purposes together.
+          return {
+            status: 'success',
+            result: {
+              addresses: [
+                { address: 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4', purpose: 'payment' },
+                { address: ADDRESS, purpose: 'stacks' }
+              ],
+              walletType: 'software'
+            }
+          };
+        }
+        expect(method).toBe('stx_callContract');
+        return { status: 'success', result: { txid: scoreTxId } };
+      })
+    };
+    installXverseProviders(legacyProvider, rpcProvider);
+
+    await expect(
+      __testing.requestWalletContractCall(legacyProvider as never, scoreSubmitOptions())
+    ).resolves.toMatchObject({ txId: scoreTxId });
+
+    expect(seenMethods).toEqual([
+      'wallet_getAccount',
+      'stx_getAccounts',
+      'wallet_connect',
+      'stx_callContract'
+    ]);
+    expect(legacyProvider.request).not.toHaveBeenCalled();
+  });
+
+  it('aborts the Xverse contract call when the active account differs from the connected address', async () => {
+    const otherAddress = 'SP15T1W26JTNS26VG17HM468KW7TQD3124KTYA9EJ';
+    const legacyProvider = { request: vi.fn() };
+    const rpcProvider = {
+      request: vi.fn(async (method: string) => {
+        if (method === 'wallet_getAccount') {
+          return { status: 'success', result: { addresses: [{ address: otherAddress }] } };
+        }
+        throw new Error(`stx_callContract must not be sent after an address mismatch (${method})`);
+      })
+    };
+    installXverseProviders(legacyProvider, rpcProvider);
+
+    await expect(
+      __testing.requestWalletContractCall(legacyProvider as never, scoreSubmitOptions())
+    ).rejects.toMatchObject({ code: 'WALLET_ADDRESS_MISMATCH' });
+
     expect(rpcProvider.request).toHaveBeenCalledOnce();
+  });
+
+  it('fails with a stage diagnostic when Xverse abandons the signing request', async () => {
+    const legacyProvider = { request: vi.fn() };
+    const rpcProvider = {
+      request: vi.fn(async (method: string) => {
+        if (method === 'wallet_getAccount') {
+          return { status: 'success', result: { addresses: [{ address: ADDRESS }] } };
+        }
+        // Xverse mobile can toast an error and leave the promise pending.
+        return new Promise(() => {});
+      })
+    };
+    installXverseProviders(legacyProvider, rpcProvider);
+
+    __testing.setXverseSigningWatchdogMs(50);
+    try {
+      await expect(
+        __testing.requestWalletContractCall(legacyProvider as never, scoreSubmitOptions())
+      ).rejects.toMatchObject({
+        code: 'XVERSE_SIGNING_TIMEOUT',
+        stage: 'stx_callContract',
+        message: expect.stringContaining('stx_callContract')
+      });
+    } finally {
+      __testing.setXverseSigningWatchdogMs(90_000);
+    }
+  });
+
+  it('surfaces real Xverse wallet errors through onError without a legacy fallback', async () => {
+    const legacyProvider = {
+      request: vi.fn(async () => {
+        throw new Error('legacy StacksProvider must not receive a fallback contract call');
+      }),
+      transactionRequest: vi.fn(async () => {
+        throw new Error('legacy transactionRequest must not be used for Xverse');
+      })
+    };
+    const rpcProvider = {
+      request: vi.fn(async (method: string) => {
+        if (method === 'wallet_getAccount') {
+          return { status: 'success', result: { addresses: [{ address: ADDRESS }] } };
+        }
+        throw Object.assign(new Error('Invalid parameters for stx_callContract.'), {
+          code: -32602
+        });
+      })
+    };
+    installXverseProviders(legacyProvider, rpcProvider);
+
+    const onFinish = vi.fn();
+    const onCancel = vi.fn();
+    const error = await new Promise<unknown>((resolve) => {
+      showContractCall(
+        {
+          ...scoreSubmitOptions(),
+          onFinish,
+          onCancel,
+          onError: resolve
+        },
+        legacyProvider as never
+      );
+    });
+
+    expect(error).toMatchObject({ message: 'Invalid parameters for stx_callContract.' });
+    expect(onFinish).not.toHaveBeenCalled();
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(legacyProvider.request).not.toHaveBeenCalled();
+    expect(legacyProvider.transactionRequest).not.toHaveBeenCalled();
+  });
+
+  it('keeps Leather contract calls on the selected provider with the full param shape', async () => {
+    const txId = `0x${'ef'.repeat(32)}`;
+    const seenMethods: string[] = [];
+    const leatherProvider = {
+      request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
+        seenMethods.push(method);
+        expect(method).toBe('stx_callContract');
+        expect(params).toMatchObject({
+          contract: `${ADDRESS}.xtrata-arcade-scores-v1-3`,
+          functionName: 'submit-score',
+          network: 'mainnet',
+          address: ADDRESS,
+          postConditionMode: 'deny'
+        });
+        return { status: 'success', result: { txid: txId } };
+      })
+    };
+    window.localStorage.setItem('STX_PROVIDER', 'LeatherProvider');
+
+    await expect(
+      __testing.requestWalletContractCall(leatherProvider as never, scoreSubmitOptions())
+    ).resolves.toMatchObject({ txId });
+
+    expect(seenMethods).toEqual(['stx_callContract']);
   });
 
   it('builds a sponsored origin transaction and requests signing without broadcast', async () => {

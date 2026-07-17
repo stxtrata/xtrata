@@ -2,6 +2,12 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## First Masterpiece bounty — /masterpiece landing page + homepage campaign card (2026-07-17)
+
+- Zero Authority DAO confirmed Option 1 of the sponsored-bounty proposals ("Inscribe Your First Masterpiece", 200 STX, 100/50/25/25 split). The existing `first-masterpiece/` static page is now wired into the site: new `/masterpiece` (and `/bounties/first-masterpiece`) 200 rewrites in `public/_redirects` serve `first-masterpiece/index.html`; the page was already in `scripts/copy-static-apps.mjs`.
+- Homepage: the previously empty `#campaignSlot` placeholder (its `.campaign-slot` CSS existed unused) now renders a static co-branded bounty card — 200 STX stat art panel, campaign copy, "Enter the bounty" → `/masterpiece` and "Start inscribing" → `/wizard/`. Supporting `.campaign-slot__stat*` styles appended to `src/home/styles/home.css`.
+- Campaign page drop panel upgraded from local-inspection-only to the real Create routing boundary: a module script imports `/create-routing.js` and uses `classifyCreateFiles`/`collectDroppedFiles`/`storeCreateHandoff`/`createHandoffUrl`, so a single file ≤ 512 KB routes to `/inscribe` (single-transaction mint, picked up by `importCreateHandoff` on boot) while larger files, multiple files, or folders hand off to `/wizard/` — same 512 KB gate as the homepage (`STANDARD_CREATE_MAX_BYTES`). Falls back to a plain Wizard link if the module or IndexedDB is unavailable. CONFIG placeholders (bounty URL, closing date) still need Grimaldo's confirmed details.
+
 ## Arcade v3 — sandbox-native Astro Blaster + wallet bridge handshake (2026-07-16)
 
 - Diagnosed inscription #73 (Astro Blaster recursive parent): boots and reads the on-chain top-10 at top level, but wallet flow is structurally broken in sandboxed embeds (`sandbox="allow-scripts"` srcdoc iframes get no extension providers, no query string for `walletBridgeToken`, an opaque origin that breaks `postMessage(..., location.origin)`, unresolvable relative `/hiro/...` URLs, and silently ignored `alert()/confirm()`).

@@ -42,3 +42,7 @@
 /inscription-wizard/ /wizard/ 301
 /inscription-wizard/* /wizard/:splat 301
 /manifests /wizard/manifests 200
+/masterpiece /first-masterpiece/ 200
+/masterpiece/ /first-masterpiece/ 200
+/bounties/first-masterpiece /first-masterpiece/ 200
+/bounties/first-masterpiece/ /first-masterpiece/ 200

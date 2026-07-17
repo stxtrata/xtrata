@@ -739,6 +739,26 @@
     return label.indexOf('bitcoinprovider') >= 0 && label.indexOf('stacksprovider') < 0;
   }
 
+  /* v3.1: Leather's getAddresses/stx_getAddresses open the wallet popup every
+     time they are called before the origin is approved. Any passive path
+     (status polling, background resolves) must never call them, or the popup
+     re-opens on every 5s poll. Detect Leather both by label and by identity —
+     Leather also injects itself as the deprecated window.StacksProvider alias,
+     which sorts to the top of the candidate list. */
+  function isLeatherInteractiveProvider(provider, label){
+    var text = String(label || (provider && provider.__arcadeWalletLabel) || '').toLowerCase();
+    if(text.indexOf('leather') >= 0) return true;
+    if(!provider || typeof provider !== 'object') return false;
+    if(provider.isLeather === true) return true;
+    try{
+      if(typeof window !== 'undefined' && window.LeatherProvider){
+        if(provider === window.LeatherProvider) return true;
+        if(window.StacksProvider && provider === window.StacksProvider) return true;
+      }
+    }catch(e){}
+    return false;
+  }
+
   function providerHasNestedStacksCandidate(provider){
     if(!provider || typeof provider !== 'object') return false;
     return !!(
@@ -1080,13 +1100,24 @@
       var context = providerContexts[contextIndex];
       var contextRoot = context.target;
       var prefix = context.label || 'window';
+      /* Named wallets (Leather, Xverse) also inject deprecated generic aliases
+         (StacksProvider, stacks, stacksProvider) pointing at the same
+         extension. Treating those as separate candidates double-prompts the
+         user during connect, so skip the generic names whenever a named
+         provider object exists in this context. */
+      var hasLeatherNamed = !!safeWindowRead(contextRoot, 'LeatherProvider');
+      var hasXverseNamed = !!(
+        safeWindowRead(contextRoot, 'XverseProviders') ||
+        safeWindowRead(contextRoot, 'xverseProviders')
+      );
+      var hasNamedWalletProvider = hasLeatherNamed || hasXverseNamed;
       var directCandidates = [
-        { label: prefix + '.StacksProvider', value: safeWindowRead(contextRoot, 'StacksProvider') },
-        { label: prefix + '.StacksProvider.StacksProvider', value: resolveProviderPathFromRoot('StacksProvider.StacksProvider', contextRoot) },
-        { label: prefix + '.StacksProvider.provider', value: resolveProviderPathFromRoot('StacksProvider.provider', contextRoot) },
-        { label: prefix + '.StacksProvider.stacksProvider', value: resolveProviderPathFromRoot('StacksProvider.stacksProvider', contextRoot) },
-        { label: prefix + '.StacksProvider.walletProvider', value: resolveProviderPathFromRoot('StacksProvider.walletProvider', contextRoot) },
-        { label: prefix + '.StacksProvider.wallet', value: resolveProviderPathFromRoot('StacksProvider.wallet', contextRoot) },
+        { label: prefix + '.StacksProvider', value: hasNamedWalletProvider ? null : safeWindowRead(contextRoot, 'StacksProvider') },
+        { label: prefix + '.StacksProvider.StacksProvider', value: hasNamedWalletProvider ? null : resolveProviderPathFromRoot('StacksProvider.StacksProvider', contextRoot) },
+        { label: prefix + '.StacksProvider.provider', value: hasNamedWalletProvider ? null : resolveProviderPathFromRoot('StacksProvider.provider', contextRoot) },
+        { label: prefix + '.StacksProvider.stacksProvider', value: hasNamedWalletProvider ? null : resolveProviderPathFromRoot('StacksProvider.stacksProvider', contextRoot) },
+        { label: prefix + '.StacksProvider.walletProvider', value: hasNamedWalletProvider ? null : resolveProviderPathFromRoot('StacksProvider.walletProvider', contextRoot) },
+        { label: prefix + '.StacksProvider.wallet', value: hasNamedWalletProvider ? null : resolveProviderPathFromRoot('StacksProvider.wallet', contextRoot) },
         { label: prefix + '.LeatherProvider', value: safeWindowRead(contextRoot, 'LeatherProvider') },
         { label: prefix + '.LeatherProvider.provider', value: resolveProviderPathFromRoot('LeatherProvider.provider', contextRoot) },
         { label: prefix + '.LeatherProvider.stacksProvider', value: resolveProviderPathFromRoot('LeatherProvider.stacksProvider', contextRoot) },
@@ -1099,10 +1130,13 @@
         { label: prefix + '.xverseProviders.StacksProvider', value: resolveProviderPathFromRoot('xverseProviders.StacksProvider', contextRoot) },
         { label: prefix + '.XverseProviders.BitcoinProvider', value: resolveProviderPathFromRoot('XverseProviders.BitcoinProvider', contextRoot) },
         { label: prefix + '.xverseProviders.BitcoinProvider', value: resolveProviderPathFromRoot('xverseProviders.BitcoinProvider', contextRoot) },
-        { label: prefix + '.stacksProvider', value: safeWindowRead(contextRoot, 'stacksProvider') },
-        { label: prefix + '.btc', value: safeWindowRead(contextRoot, 'btc') },
-        { label: prefix + '.stacks', value: safeWindowRead(contextRoot, 'stacks') },
-        { label: prefix + '.BitcoinProvider', value: safeWindowRead(contextRoot, 'BitcoinProvider') }
+        { label: prefix + '.stacksProvider', value: hasNamedWalletProvider ? null : safeWindowRead(contextRoot, 'stacksProvider') },
+        /* window.btc is Leather's btckit alias and window.BitcoinProvider is
+           Xverse's generic alias; calling either routes Leather submits into
+           the deprecated transactionRequest screen (disabled Confirm). */
+        { label: prefix + '.btc', value: hasLeatherNamed ? null : safeWindowRead(contextRoot, 'btc') },
+        { label: prefix + '.stacks', value: hasNamedWalletProvider ? null : safeWindowRead(contextRoot, 'stacks') },
+        { label: prefix + '.BitcoinProvider', value: hasXverseNamed ? null : safeWindowRead(contextRoot, 'BitcoinProvider') }
       ];
 
       var c;
@@ -1543,8 +1577,8 @@
 
   function readWalletConnectSessionStorage(){
     if(typeof window === 'undefined') return null;
-    if(!window.localStorage) return null;
     try{
+      if(!window.localStorage) return null;
       return window.localStorage.getItem(WALLET_CONNECT_SESSION_STORAGE_KEY);
     }catch(error){
       return null;
@@ -1553,12 +1587,16 @@
 
   function writeWalletConnectSessionStorage(value){
     if(typeof window === 'undefined') return;
-    if(!window.localStorage) return;
+    /* Sandboxed srcdoc iframes throw on the window.localStorage GETTER itself
+       (SecurityError), so even reading the property must sit inside try. */
+    var storage = null;
+    try{ storage = window.localStorage; }catch(error){ return; }
+    if(!storage) return;
     try{
       if(value){
-        window.localStorage.setItem(WALLET_CONNECT_SESSION_STORAGE_KEY, value);
+        storage.setItem(WALLET_CONNECT_SESSION_STORAGE_KEY, value);
       } else {
-        window.localStorage.removeItem(WALLET_CONNECT_SESSION_STORAGE_KEY);
+        storage.removeItem(WALLET_CONNECT_SESSION_STORAGE_KEY);
       }
     }catch(error){}
   }
@@ -1598,6 +1636,7 @@
     }
     walletConnectSession = null;
     writeWalletConnectSessionStorage('');
+    try{ window.ArcadeWalletSession = null; }catch(e){}
   }
 
   function setWalletConnectSession(address, network, providerLabel, source){
@@ -1616,6 +1655,17 @@
       source: walletConnectSession.source
     });
     writeWalletConnectSessionStorage(JSON.stringify(walletConnectSession));
+    /* v5.1: publish the session for sibling modules (highscores) so score
+       submits reuse the connected address instead of re-prompting the wallet.
+       Desktop Leather opens an approval popup on EVERY getAddresses call, so
+       any re-resolution after connect is a popup the player has to dismiss. */
+    try{
+      window.ArcadeWalletSession = {
+        address: walletConnectSession.address,
+        network: walletConnectSession.network,
+        provider: walletConnectSession.provider
+      };
+    }catch(e){}
     return true;
   }
 
@@ -1669,8 +1719,11 @@
 
   function walletConnectImportUrls(){
     return [
-      'https://cdn.jsdelivr.net/npm/@stacks/connect@7.10.2/dist/index.mjs',
-      'https://unpkg.com/@stacks/connect@7.10.2/dist/index.mjs'
+      /* Bundling endpoints only: the raw dist/index.mjs build has bare imports
+         ("@stacks/auth") that browsers cannot resolve without a bundler, which
+         made this fallback fail with "Failed to resolve module specifier". */
+      'https://cdn.jsdelivr.net/npm/@stacks/connect@7.10.2/+esm',
+      'https://esm.sh/@stacks/connect@7.10.2?bundle'
     ];
   }
 
@@ -2232,10 +2285,12 @@
     return [];
   }
 
-  async function resolveProviderAddress(provider, preferredNetwork){
+  async function resolveProviderAddress(provider, preferredNetwork, options){
     if(!provider) return null;
     var fallbackAddress = null;
     var providerLabel = getProviderLabel(provider);
+    var allowPrompt = !!(options && options.allowPrompt);
+    var isLeather = isLeatherInteractiveProvider(provider, providerLabel);
 
     if(typeof provider.selectedAddress === 'string' && looksLikeStacksAddress(provider.selectedAddress)){
       if(inferNetworkFromAddress(provider.selectedAddress) === preferredNetwork || !preferredNetwork){
@@ -2262,12 +2317,38 @@
       }
     }
 
+    /* v5.1: desktop Leather opens an approval popup on EVERY
+       getAddresses/stx_getAddresses call — not just the first — so once a
+       session exists the session IS the answer; never re-query Leather. */
+    if(isLeather && walletConnectSession && looksLikeStacksAddress(walletConnectSession.address)){
+      if(!preferredNetwork || inferNetworkFromAddress(walletConnectSession.address) === preferredNetwork){
+        return walletConnectSession.address;
+      }
+    }
+
+    /* v3.1: Leather's address methods are interactive popups until the origin
+       has been approved. Skip them entirely on passive paths (status polling)
+       when there is no established session yet — otherwise every poll re-opens
+       the Leather connect popup. Once a session exists (origin approved) the
+       same methods resolve silently and stay allowed. */
+    if(isLeather && !allowPrompt && !walletConnectSession){
+      walletDebug('info', 'Skipping interactive Leather address methods on passive path', {
+        provider: providerLabel,
+        preferredNetwork: preferredNetwork
+      });
+      return fallbackAddress;
+    }
+
     var methods = ['stx_getAddresses', 'getAddresses', 'stx_getAccounts', 'getAccounts', 'wallet_getAccount'];
+    /* Leather popup approval can take well over the default 3.5s request
+       timeout; timing out mid-approval spawned repeated popups. Give the
+       interactive Leather path a generous window instead. */
+    var requestOptions = (isLeather && allowPrompt) ? { timeoutMs: 120000 } : undefined;
     var i;
     for(i = 0; i < methods.length; i++){
       if(isKnownUnsupportedMethod(provider, methods[i])) continue;
       try{
-        var payload = await requestProvider(provider, methods[i]);
+        var payload = await requestProvider(provider, methods[i], undefined, requestOptions);
         var rpcError = extractRpcError(payload);
         if(rpcError) throw rpcError;
         var parsed = extractAddress(payload, preferredNetwork);
@@ -2292,6 +2373,9 @@
           method: methods[i],
           error: walletErrorForLog(e)
         });
+        /* A user rejection in the Leather popup must stop the method cascade;
+           each further method would re-open the popup. */
+        if(isLeather && isUserRejectedError(e)) break;
       }
     }
 
@@ -2350,6 +2434,7 @@
     var candidateProviders = getWalletAddressCandidates(providers);
     var splitCandidates = splitWalletAddressCandidates(candidateProviders);
     var targetNetwork = options && options.targetNetwork ? options.targetNetwork : null;
+    var allowPrompt = !!(options && options.allowPrompt);
     var resolveStartDetail = {
       targetNetwork: targetNetwork,
       providers: providers.map(function(entry){ return entry.label; }),
@@ -2385,7 +2470,7 @@
     for(g = 0; g < groups.length; g++){
       for(i = 0; i < groups[g].entries.length; i++){
         var entry = groups[g].entries[i];
-        var address = await resolveProviderAddress(entry.provider, targetNetwork);
+        var address = await resolveProviderAddress(entry.provider, targetNetwork, { allowPrompt: allowPrompt });
         if(address){
           var network = await resolveProviderNetwork(entry.provider, address);
           var candidateDetail = {
@@ -2660,7 +2745,10 @@
     setWalletBadge('is-loading', 'Wallet: connecting...');
 
     var connectMethods = ['stx_requestAccounts', 'requestAccounts', 'stx_connect', 'connect', 'wallet_connect'];
-    clearUnsupportedMethodsForProviders(providers, connectMethods);
+    /* v3.1: Leather connects through its documented address methods (they open
+       the approval popup on first call); mirror the main app's proven order. */
+    var leatherConnectMethods = ['getAddresses', 'stx_getAccounts', 'stx_getAddresses', 'stx_requestAccounts'];
+    clearUnsupportedMethodsForProviders(providers, connectMethods.concat(leatherConnectMethods));
     var connectProviders = getWalletAddressCandidates(providers);
     var fallbackAuthTried = false;
     walletConnectDebug('info', 'provider candidate list', {
@@ -2689,6 +2777,35 @@
       primaryAuthEntry.provider.__xtrataHostWalletBridgeShim
     ){
       walletConnectDebug('info', 'primary provider is host bridge shim; skipping in-frame stacks-connect auth', {
+        provider: primaryAuthEntry.label
+      });
+      primaryAuthEntry = null;
+    }
+
+    /* v3.1: for Leather, lead with its request() bridge (getAddresses opens the
+       account-approval popup) exactly like the main app; the @stacks/connect
+       legacy auth popup stays available as the per-entry fallback below. */
+    if(
+      primaryAuthEntry &&
+      isLeatherInteractiveProvider(primaryAuthEntry.provider, primaryAuthEntry.label)
+    ){
+      walletConnectDebug('info', 'primary provider is Leather; using request-bridge connect instead of stacks-connect auth', {
+        provider: primaryAuthEntry.label
+      });
+      primaryAuthEntry = null;
+    }
+
+    /* v3.2: every canary-proven wallet (Leather, Xverse, desktop + mobile)
+       connects through its request() bridge; the @stacks/connect legacy auth
+       popup is only for wallets without one. Running it for request-capable
+       providers double-prompts the user and its CDN connect-modal build can
+       crash mid-render ("$instanceValues$"). */
+    if(
+      primaryAuthEntry &&
+      primaryAuthEntry.provider &&
+      typeof primaryAuthEntry.provider.request === 'function'
+    ){
+      walletConnectDebug('info', 'primary provider has a request bridge; skipping stacks-connect auth', {
         provider: primaryAuthEntry.label
       });
       primaryAuthEntry = null;
@@ -2771,6 +2888,9 @@
       return ax - bx;
     });
     function connectMethodsForEntry(entry){
+      if(isLeatherInteractiveProvider(entry.provider, entry.label)){
+        return leatherConnectMethods;
+      }
       if(/xverse|bitcoinprovider/i.test(entry.label || '')){
         return ['wallet_connect'].concat(connectMethods.filter(function(mm){
           return mm !== 'wallet_connect';
@@ -2783,6 +2903,10 @@
       var entry = connectProviders[i];
       var provider = entry.provider;
       var entryConnectMethods = connectMethodsForEntry(entry);
+      var entryIsLeather = isLeatherInteractiveProvider(provider, entry.label);
+      /* Leather approval can easily exceed 15s; a timeout mid-approval used to
+         cascade into repeated popups. */
+      var entryConnectTimeoutMs = entryIsLeather ? 120000 : 15000;
       walletDebug('info', 'Trying provider candidate for connect', {
         provider: entry.label,
         index: i,
@@ -2824,12 +2948,12 @@
             provider: entry.label,
             method: entryConnectMethods[m]
           });
-          var payload = await requestProvider(provider, entryConnectMethods[m], undefined, { timeoutMs: 15000 });
+          var payload = await requestProvider(provider, entryConnectMethods[m], undefined, { timeoutMs: entryConnectTimeoutMs });
           var rpcError = extractRpcError(payload);
           if(rpcError) throw rpcError;
           var requestedAddress = extractAddress(payload, targetNetwork);
           if(!requestedAddress){
-            requestedAddress = await resolveProviderAddress(provider, targetNetwork);
+            requestedAddress = await resolveProviderAddress(provider, targetNetwork, { allowPrompt: true });
             if(!requestedAddress){
               walletConnectDebug('warn', 'non-event: method completed but no address resolved', {
                 provider: entry.label,
@@ -2916,8 +3040,10 @@
       if(
         !fallbackAuthTried &&
         !requireInteractiveReconnect &&
+        !walletConnectSession && /* v3.2: never re-auth once a session exists */
         !isLikelyBitcoinOnlyProvider(entry) &&
-        !(entry.provider && entry.provider.__xtrataHostWalletBridgeShim) /* v3: no in-frame auth for bridge shim */
+        !(entry.provider && entry.provider.__xtrataHostWalletBridgeShim) && /* v3: no in-frame auth for bridge shim */
+        typeof (entry.provider && entry.provider.request) !== 'function' /* v3.2: request-capable wallets never use legacy auth */
       ){
         fallbackAuthTried = true;
         try{
@@ -2995,7 +3121,7 @@
       } else {
         try{
           await maybeCallDirectProviderConnect(provider);
-          var directAddress = await resolveProviderAddress(provider, targetNetwork);
+          var directAddress = await resolveProviderAddress(provider, targetNetwork, { allowPrompt: true });
           if(directAddress){
             walletDebug('info', 'Direct provider connect resolved address', {
               provider: entry.label,

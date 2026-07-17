@@ -1,0 +1,127 @@
+{
+  "source": "space-renegade-sheets",
+  "fighters": [
+    {
+      "name": "Space Renegade",
+      "file": "fighters/space-renegade.png",
+      "sheet": "weapons-sheet.webp",
+      "bytes": 15775,
+      "sha256": "06e2e0f0e8fed6c1859b2736fbc78e60760efc052f77423e6643850975282689",
+      "base": 62,
+      "weaponBonus": 22,
+      "style": 0
+    },
+    {
+      "name": "Rocket Jim",
+      "file": "fighters/rocket-jim.png",
+      "sheet": "weapons-sheet.webp",
+      "bytes": 15854,
+      "sha256": "e8ae993cbe2ac88ab4a645dcb5d946f0c580e5a979d730d8ff312ffd80d3e3bc",
+      "base": 66,
+      "weaponBonus": 46,
+      "style": 0
+    },
+    {
+      "name": "Beard Barbarian",
+      "file": "fighters/beard-barbarian.png",
+      "sheet": "weapons-sheet.webp",
+      "bytes": 17123,
+      "sha256": "aec3b6d8dc3a4bda779355bfc81f18c29ab84806cb4973b756f16c2e894f73ab",
+      "base": 39,
+      "weaponBonus": 39,
+      "style": 0
+    },
+    {
+      "name": "Tentacle Wrangler",
+      "file": "fighters/tentacle-wrangler.png",
+      "sheet": "weapons-sheet.webp",
+      "bytes": 16912,
+      "sha256": "c3b9eaa0188836594b2245fe90c977b581ce376556396a081194e62ae58312d0",
+      "base": 5,
+      "weaponBonus": 5,
+      "style": 0
+    },
+    {
+      "name": "Professor Renegade",
+      "file": "fighters/professor-renegade.png",
+      "sheet": "weapons-sheet.webp",
+      "bytes": 18058,
+      "sha256": "dca94a2ca6aa1079b2c508c11164e18056c52ab1b9dcd13aa3dec867691af512",
+      "base": 89,
+      "weaponBonus": 29,
+      "style": 0
+    },
+    {
+      "name": "Disco Voidwalker",
+      "file": "fighters/disco-voidwalker.png",
+      "sheet": "weapons-sheet.webp",
+      "bytes": 16387,
+      "sha256": "c9f05010deb751b0ba2bf144168abd1df0247f11002e1242825ac723e1a63b95",
+      "base": 96,
+      "weaponBonus": 36,
+      "style": 0
+    },
+    {
+      "name": "Captain Catastrophe",
+      "file": "fighters/captain-catastrophe.png",
+      "sheet": "weapons-sheet.webp",
+      "bytes": 16853,
+      "sha256": "ce7bf3630b65a52374f5783f810049ef644a1fcf6f911ad1f21f81eb4c751bf8",
+      "base": 59,
+      "weaponBonus": 59,
+      "style": 3
+    },
+    {
+      "name": "The Last Roadie",
+      "file": "fighters/the-last-roadie.png",
+      "sheet": "weapons-sheet.webp",
+      "bytes": 16548,
+      "sha256": "568a7fca57dc229a6cc341e88645b2c363c8813bfd8f9fba081e99e31db213d9",
+      "base": 54,
+      "weaponBonus": 14,
+      "style": 2
+    },
+    {
+      "name": "Neon Noir Renegade",
+      "file": "fighters/neon-noir-renegade.png",
+      "sheet": "weapons-sheet.webp",
+      "bytes": 14844,
+      "sha256": "1eec7ea585e8d91e5d0abbb1a3736201680918efad20ef38f75d2f1c0c99ac55",
+      "base": 16,
+      "weaponBonus": 56,
+      "style": 1
+    },
+    {
+      "name": "Emperor of Absolutely Nothing",
+      "file": "fighters/emperor-of-absolutely-nothing.png",
+      "sheet": "weapons-sheet.webp",
+      "bytes": 16535,
+      "sha256": "cd052b82c684729568205513c80e24400040d82a243e2b5161a01d781fe67e9c",
+      "base": 85,
+      "weaponBonus": 45,
+      "style": 2
+    },
+    {
+      "name": "Moon-Pirate Jim",
+      "file": "fighters/moon-pirate-jim.png",
+      "sheet": "weapons-sheet.webp",
+      "bytes": 15981,
+      "sha256": "b3835d0b4d157a5ef63ffb4ec2f064ac51058ffae77e8405275496e504503159",
+      "base": 55,
+      "weaponBonus": 55,
+      "style": 3
+    },
+    {
+      "name": "Temporal Double",
+      "file": "fighters/temporal-double.png",
+      "sheet": "weapons-sheet.webp",
+      "bytes": 16193,
+      "sha256": "e57e4bf4c0f23f40155d9a76c96fe59f271f6487d7f4723fbdd6c645146016ce",
+      "base": 50,
+      "weaponBonus": 10,
+      "style": 0
+    }
+  ],
+  "weapons": [],
+  "items": []
+}

@@ -431,7 +431,7 @@
 
   <!-- STAGE 1 · DROP -->
   <div id="dropzone" class="drop" role="button" tabindex="0" aria-label="Drop a file to inscribe">
-    <input id="picker" type="file" hidden />
+    <input id="picker" type="file" multiple hidden />
     <div class="drop-main" id="dropMain">Drop a file to inscribe</div>
     <div class="drop-sub" id="dropSub">or click to browse — images, audio, video, documents, HTML, JSON, anything</div>
   </div>
@@ -1688,7 +1688,38 @@ function toWizard(id){ const n=nodeById(id); const deps=G.edges.filter(e=>e.f===
   window.scrollTo({top:0,behavior:'smooth'});
 }
 window.showNode=showNode; window.delNode=delNode; window.toWizard=toWizard;
+window.XtrataWizardImportFiles=(files)=>{
+  const fs=Array.from(files||[]);
+  if(fs.length>1||BATCH.items.length) enterBatch(fs);
+  else if(fs[0]) onFile(fs[0]);
+};
 drawGraph();
+</script>
+<script type="module" src="/create-routing.js"></script>
+<script type="module">
+const routing=globalThis.XtrataCreateRouting??await new Promise((resolve)=>{
+  globalThis.addEventListener('xtrata-create-routing-ready',()=>resolve(globalThis.XtrataCreateRouting),{once:true});
+});
+const {takeCreateHandoff}=routing;
+
+const params=new URLSearchParams(window.location.search);
+if(params.get('handoff')==='create-selection'&&params.get('handoffId')){
+  const dropSub=document.getElementById('dropSub');
+  try{
+    if(dropSub) dropSub.textContent='Loading your selection from Create…';
+    const handoff=await takeCreateHandoff(params.get('handoffId'));
+    if(!handoff) throw new Error('That file handoff expired. Drop the files again.');
+    window.XtrataWizardImportFiles(handoff.files);
+  }catch(error){
+    if(dropSub) dropSub.textContent=error instanceof Error?error.message:String(error);
+  }finally{
+    params.delete('handoff');
+    params.delete('handoffId');
+    params.delete('from');
+    const query=params.toString();
+    window.history.replaceState(null,'',`${window.location.pathname}${query?`?${query}`:''}`);
+  }
+}
 </script>
 <script src="/xtrata-radio.js" defer></script>
 </body>

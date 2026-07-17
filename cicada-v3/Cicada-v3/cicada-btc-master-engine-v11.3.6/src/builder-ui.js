@@ -3,7 +3,7 @@
 // control, deep-linkable seeds, an IntersectionObserver-gated gallery, and a
 // lazily-loaded export bundle so the heavy inscription module set is only
 // fetched when the user actually exports.
-import * as mod from './cicada-core.js?v=11.3.8-molt.1';
+import * as mod from './cicada-core.js?v=11.3.8-molt.10';
 import { initTraitLab } from './trait-lab-ui.js?v=11.3.5-nymph.2';
 import { buildInstructionOverrides } from './trait-registry.js?v=11.3.5-nymph.2';
 import { createZip, tinyHtml } from './zip-utils.js?v=11.3.5-nymph.2';
@@ -240,11 +240,11 @@ function showSeed(seed, { updateHash = true } = {}) {
             mount: stage,
             clearMount: true,
             pageStyles: false,
-            count: 5
+            count: 1
         });
         rarityBox.innerHTML = '';
         traitsList.innerHTML = '';
-        statusEl.textContent = `Nymph Mode: subterranean colony from seed ${seedNumber}. Nymphs travel the tunnels on independent routes and emerge into adults at the surface. Adult traits, rarity visuals, audio, and trait renderers are bypassed.`;
+        statusEl.textContent = `Nymph Mode: watching seed ${seedNumber}'s nymph in its own block of earth. It digs its tunnels root to root feeding on sap, then digs up to the tree and moults into this seed's adult. Adult traits, rarity visuals, audio, and trait renderers are bypassed.`;
         try { localStorage.setItem('cicada:lastSeed', String(seedNumber)); } catch (_) {}
         if (updateHash) {
             suppressHashUpdate = true;

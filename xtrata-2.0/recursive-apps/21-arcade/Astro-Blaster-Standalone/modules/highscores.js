@@ -978,8 +978,15 @@ var HighScores = (function(){
 
     _debugLog('info', 'Provider discovery started', _providerDebugSnapshot());
 
+    /* Named wallets (Leather, Xverse) also inject deprecated generic aliases
+       (window.StacksProvider, window.stacks) pointing at the same extension.
+       Enumerating those as separate candidates double-prompts the user, so
+       skip them whenever a named provider object is present. */
+    var hasNamedWalletProvider = !!(
+      window.LeatherProvider || window.XverseProviders || window.xverseProviders
+    );
     var directCandidates = [
-      { label: 'window.StacksProvider', value: window.StacksProvider },
+      { label: 'window.StacksProvider', value: hasNamedWalletProvider ? null : window.StacksProvider },
       { label: 'window.LeatherProvider', value: window.LeatherProvider },
       { label: 'window.XverseProviders', value: window.XverseProviders },
       { label: 'window.xverseProviders', value: window.xverseProviders },
@@ -999,9 +1006,15 @@ var HighScores = (function(){
         label: 'window.xverseProviders.BitcoinProvider',
         value: window.xverseProviders && window.xverseProviders.BitcoinProvider
       },
-      { label: 'window.btc', value: window.btc },
-      { label: 'window.stacks', value: window.stacks },
-      { label: 'window.BitcoinProvider', value: window.BitcoinProvider }
+      /* window.btc is Leather's btckit alias; using it routes submits into the
+         deprecated transactionRequest screen (disabled Confirm). Same for
+         Xverse's generic window.BitcoinProvider alias. */
+      { label: 'window.btc', value: window.LeatherProvider ? null : window.btc },
+      { label: 'window.stacks', value: hasNamedWalletProvider ? null : window.stacks },
+      {
+        label: 'window.BitcoinProvider',
+        value: (window.XverseProviders || window.xverseProviders) ? null : window.BitcoinProvider
+      }
     ];
     var out = [];
 
@@ -1233,6 +1246,9 @@ var HighScores = (function(){
         contract: fullContract,
         functionName: params.functionName,
         functionArgs: functionArgs,
+        // Older Xverse builds validate against a schema that only reads the
+        // deprecated `arguments` spelling; send both (canary-proven benign).
+        arguments: Array.isArray(functionArgs) ? functionArgs.slice() : functionArgs,
         network: params.network
       };
       if(typeof modeValue !== 'undefined'){
@@ -1281,6 +1297,16 @@ var HighScores = (function(){
       contractName: params.contractName,
       functionName: params.functionName
     };
+    /* Xverse mobile's legacy transaction-request handler reads the sender
+       from payload.stxAddress without a missing-value guard: omitting it
+       rejects the request before any confirmation UI with "The Dapp is
+       requesting signature from a different address. (undefined)". Desktop
+       wallets treat a present-and-matching stxAddress as a no-op, so always
+       carry the resolved sender when we have one. */
+    var senderAddress = String(params.senderAddress || '').trim();
+    if(senderAddress){
+      base.stxAddress = senderAddress;
+    }
     var network = params.network || 'mainnet';
     var postConditionMode = _normalizePostConditionMode(params.postConditionMode);
     var postConditionSpecs = _collectPostConditionSpecs(params);
@@ -1354,24 +1380,46 @@ var HighScores = (function(){
     });
   }
 
+  /* Wallet rejections often arrive as a JSON-RPC envelope
+     ({jsonrpc, id, error:{code,message}}); hoist the inner error so
+     user-rejected / unsupported classification and log messages see the real
+     code and text instead of "[object Object]". */
+  function _hoistRpcEnvelopeError(error){
+    if(
+      error && typeof error === 'object' && !(error instanceof Error) &&
+      error.error && typeof error.error === 'object' &&
+      (typeof error.error.code !== 'undefined' || error.error.message)
+    ){
+      var hoisted = new Error(String(error.error.message || 'Wallet RPC error.'));
+      hoisted.code = error.error.code;
+      hoisted.data = error.error.data;
+      return hoisted;
+    }
+    return error;
+  }
+
+  /* v5.1: always use the (method, params) call form — canary-proven against
+     Leather and Xverse on desktop and mobile. The old arity sniff
+     (provider.request.length >= 2) broke on modern providers that declare
+     request with rest/default parameters (arity 0/1): they received the
+     legacy object form, rejected it, and the submit cascade fell through to
+     deprecated aliases. */
   function _callProviderRequest(provider, method, params){
     if(!provider || typeof provider.request !== 'function'){
       throw new Error('Wallet provider request method is unavailable.');
     }
-    if(provider.request.length >= 2){
-      return provider.request(method, params);
-    }
-    return provider.request({ method: method, params: params });
+    return Promise.resolve(provider.request(method, params)).catch(function(error){
+      throw _hoistRpcEnvelopeError(error);
+    });
   }
 
   function _callProviderMethod(provider, method){
     if(!provider || typeof provider.request !== 'function'){
       throw new Error('Wallet provider request method is unavailable.');
     }
-    if(provider.request.length >= 2){
-      return provider.request(method);
-    }
-    return provider.request({ method: method });
+    return Promise.resolve(provider.request(method)).catch(function(error){
+      throw _hoistRpcEnvelopeError(error);
+    });
   }
 
   function _defaultProviderMethodParams(method, preferredNetwork){
@@ -1570,10 +1618,30 @@ var HighScores = (function(){
     return _pickPreferredStacksAddress(candidates, preferredNetwork || null);
   }
 
+  function _sharedWalletSessionAddress(preferredNetwork){
+    try{
+      var session = typeof window !== 'undefined' ? window.ArcadeWalletSession : null;
+      if(!session || !_looksLikeStacksAddress(session.address)) return null;
+      if(preferredNetwork && _networkFromAddress(session.address) !== preferredNetwork) return null;
+      return String(session.address).trim();
+    }catch(e){
+      return null;
+    }
+  }
+
   function _resolveProviderAddress(provider, preferredNetwork, options){
     if(!provider) return Promise.resolve(null);
     var fallbackAddress = null;
     var allowInteractive = !(options && options.allowInteractive === false);
+
+    /* v5.1: the launcher publishes the connected session as
+       window.ArcadeWalletSession. Reuse it instead of re-querying the wallet:
+       desktop Leather opens an approval popup on every address read, so each
+       redundant resolution here was a popup the player had to dismiss. */
+    var sessionAddress = _sharedWalletSessionAddress(preferredNetwork);
+    if(sessionAddress){
+      return Promise.resolve(sessionAddress);
+    }
 
     if(typeof provider.selectedAddress === 'string' && _looksLikeStacksAddress(provider.selectedAddress)){
       if(!preferredNetwork || _networkFromAddress(provider.selectedAddress) === preferredNetwork){
@@ -1800,11 +1868,14 @@ var HighScores = (function(){
 
   function _pickContractCallVariants(providerLabel, params){
     var variants = _buildContractCallParamVariants(params);
-    var lowerLabel = String(providerLabel || '').toLowerCase();
-    var preferMinimal =
-      lowerLabel.indexOf('bitcoinprovider') >= 0 ||
-      lowerLabel.indexOf('xverse') >= 0 ||
-      lowerLabel.indexOf('btc') >= 0;
+
+    /* v5.2: the combined-contract sats-connect form ({contract, functionName,
+       functionArgs, ...}) is canary-proven on Leather AND Xverse across
+       desktop and mobile, so it leads for EVERY provider. The legacy split
+       form (contractAddress + contractName) stays as a fallback only: Leather
+       mobile does not reject it — it silently never settles the promise, so
+       leading with it froze score submits forever. */
+    var preferMinimal = true;
 
     variants.sort(function(a, b){
       var scoreA = 0;
@@ -2461,7 +2532,8 @@ var HighScores = (function(){
               network: payload.network || 'mainnet',
               postConditionMode: POST_CONDITION_MODE_ALLOW,
               enableCallV2Fallback: false,
-              enableTransactionRequestFallback: false
+              enableTransactionRequestFallback: false,
+              senderAddress: playerAddress || null
             };
             _debugLog('info', 'Submitting score with compatible allow-mode transaction params', {
               providerLabel: candidate.label
@@ -2501,6 +2573,7 @@ var HighScores = (function(){
                     postConditionMode: POST_CONDITION_MODE_DENY,
                     enableCallV2Fallback: false,
                     enableTransactionRequestFallback: false,
+                    senderAddress: senderAddress,
                     postConditionVariants: _buildSubmitPostConditionVariants(senderAddress, feeCapMicroStx)
                   };
                   _debugLog('info', 'Prepared deny-mode post conditions for score submit', {

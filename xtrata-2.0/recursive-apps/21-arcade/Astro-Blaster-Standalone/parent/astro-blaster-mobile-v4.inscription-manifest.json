@@ -39,10 +39,10 @@
       "key": "highscores",
       "path": "modules/highscores.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 131963,
-      "sha256": "c3c10b142988e3fa3ba2d5fa42f0b32b65404e6503bd60d2ff178a91fed37dbe",
+      "sizeBytes": 132628,
+      "sha256": "213db4da24c4b8071bfabd057141934605f8bd74687745a270fabdbb2cb64bd5",
       "mintOrder": 3,
-      "mintedInscriptionId": 80
+      "mintedInscriptionId": 2797
     },
     {
       "key": "gameRuntime",
@@ -57,17 +57,17 @@
       "key": "main",
       "path": "modules/main-v3.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 162571,
-      "sha256": "007961d6f91a4fb9eabe2a8d84d3a0021bb0cb04f08a3f056f96f951840d0e0a",
+      "sizeBytes": 166549,
+      "sha256": "dbd492208d9bab46f84bb9fee2a2139846695968d1f77f40e570a87641fe700d",
       "mintOrder": 5,
-      "mintedInscriptionId": 2789
+      "mintedInscriptionId": 2798
     }
   ],
   "parent": {
     "path": "parent/astro-blaster-parent-v4-mobile.template.html",
     "mimeType": "text/html",
-    "sizeBytes": 65151,
-    "sha256": "199d02b8667dc829481472f8bacf160b85aa2913cf9dc75190f24e56d898db74",
+    "sizeBytes": 65153,
+    "sha256": "c6e79bdce8afc61b057d0b04017d5cf6e9e62c8db6303a8988d9d204ff27a4c5",
     "configFieldsToSetBeforeMint": [
       "CONFIG.contentContractAddress",
       "CONFIG.contentContractName",
@@ -92,9 +92,9 @@
     "dependencies": [
       69,
       70,
-      80,
+      2797,
       71,
-      2789
+      2798
     ],
     "tokenUri": "",
     "notes": "Parent-only mobile release; reuse all five minted v3 leaf inscriptions. Dependencies must match CONFIG.moduleIds exactly."

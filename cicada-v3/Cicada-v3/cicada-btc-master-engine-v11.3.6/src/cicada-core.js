@@ -1,7 +1,7 @@
 // Public browser API for rendering seeded cicadas.
 import { CicadaGenerator } from './cicada-renderer.js?v=11.3.5-nymph.2';
-import { CicadaNymphGenerator } from './cicada-nymph-renderer.js?v=11.3.8-molt.1';
-import { NymphScene } from './nymph-scene.js?v=11.3.8-molt.1';
+import { CicadaNymphGenerator } from './cicada-nymph-renderer.js?v=11.3.8-molt.10';
+import { NymphScene } from './nymph-scene.js?v=11.3.8-molt.10';
 import { CicadaSynth } from './cicada-audio.js?v=11.3.5-nymph.2';
 import { playSignatureCall, getSoundIdentity } from './motion-bridge.js?v=11.3.5-nymph.2';
 import { createGroupChorus, groupGenesForSeed } from './group-chorus.js?v=11.3.5-nymph.2';
@@ -52,7 +52,7 @@ export {
     getMetadataCSV
 } from './cicada-traits.js?v=11.3.5-nymph.2';
 export { CicadaGenerator } from './cicada-renderer.js?v=11.3.5-nymph.2';
-export { CicadaNymphGenerator } from './cicada-nymph-renderer.js?v=11.3.8-molt.1';
+export { CicadaNymphGenerator } from './cicada-nymph-renderer.js?v=11.3.8-molt.10';
 export { CicadaSynth } from './cicada-audio.js?v=11.3.5-nymph.2';
 
 // v11.3: exported ZIPs may include a base64-encoded bark asset map. Load it
@@ -438,17 +438,18 @@ function applyBasePageStyles() {
         };
     }
 
-    // Subterranean nymph scene: a colony of shared-design nymphs moving through
-    // a layered underground environment on independent routes, each emerging at
-    // the top boundary into the adult cicada (the next visual state the engine
-    // already renders).
+    // Subterranean nymph scene. Default: a single nymph — the seed's own — in
+    // its own private underground map, travelling its tunnels and emerging as
+    // that seed's adult cicada. Pass count > 1 for a colony view, or explicit
+    // adultSeeds to pin which adults emerge.
     export function renderNymphScene(options = {}) {
         const {
             seed = 1,
             mount,
             clearMount = true,
             pageStyles = true,
-            count = 5
+            count = 1,
+            adultSeeds = null
         } = options;
 
         if (pageStyles) applyBasePageStyles();
@@ -456,12 +457,13 @@ function applyBasePageStyles() {
         const target = resolveMount(mount);
         if (clearMount) target.replaceChildren();
 
-        const scene = new NymphScene({ mount: target, seed: seedNumber, count, renderCicada });
+        const scene = new NymphScene({ mount: target, seed: seedNumber, count, adultSeeds, renderCicada });
 
         if (target) {
             target.setAttribute('role', 'img');
-            target.setAttribute('aria-label',
-                `Subterranean scene: a colony of cicada nymphs from seed ${seedNumber} moving through tunnels and emerging into adults.`);
+            target.setAttribute('aria-label', count === 1
+                ? `Subterranean scene: the seed ${seedNumber} cicada nymph travelling its tunnels and emerging as its adult.`
+                : `Subterranean scene: a colony of cicada nymphs from seed ${seedNumber} moving through tunnels and emerging into adults.`);
         }
 
         return {
@@ -470,6 +472,70 @@ function applyBasePageStyles() {
             destroy() {
                 scene.destroy();
                 if (target) { target.removeAttribute('role'); target.removeAttribute('aria-label'); }
+            }
+        };
+    }
+
+    // Nymph gallery: one square tile per held seed, each a fully independent
+    // single-nymph scene — its own map, tunnels and tree — so a holder can
+    // watch every one of their cicadas come up at its own stage and pace.
+    export function renderNymphGallery(options = {}) {
+        const {
+            seeds = [1],
+            mount,
+            clearMount = true,
+            pageStyles = true,
+            showSeedLabels = true
+        } = options;
+
+        if (pageStyles) applyBasePageStyles();
+        const target = resolveMount(mount);
+        if (clearMount) target.replaceChildren();
+
+        if (!document.getElementById('nymph-gallery-style')) {
+            const style = document.createElement('style');
+            style.id = 'nymph-gallery-style';
+            style.textContent = `
+                .nymph-gallery{position:absolute;inset:0;overflow:auto;display:grid;
+                    grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;padding:12px;box-sizing:border-box;
+                    align-content:start;background:#0d0805;}
+                .nymph-gallery-tile{position:relative;aspect-ratio:1/1;overflow:hidden;border-radius:10px;
+                    border:1px solid rgba(255,255,255,.14);box-shadow:0 6px 18px rgba(0,0,0,.45);}
+                .nymph-gallery-label{position:absolute;left:8px;bottom:6px;z-index:20;pointer-events:none;
+                    color:rgba(255,241,199,.66);font:11px ui-monospace,Menlo,Consolas,monospace;
+                    letter-spacing:.08em;text-transform:uppercase;text-shadow:0 1px 3px rgba(0,0,0,.8);}
+            `;
+            document.head.appendChild(style);
+        }
+
+        const grid = document.createElement('div');
+        grid.className = 'nymph-gallery';
+        grid.setAttribute('role', 'list');
+        grid.setAttribute('aria-label', `Nymph gallery: ${seeds.length} cicadas emerging in separate scenes.`);
+        target.appendChild(grid);
+
+        const tiles = seeds.map(rawSeed => {
+            const seedNumber = normalizeSeed(rawSeed);
+            const tile = document.createElement('div');
+            tile.className = 'nymph-gallery-tile';
+            tile.setAttribute('role', 'listitem');
+            grid.appendChild(tile);
+            const scene = new NymphScene({ mount: tile, seed: seedNumber, count: 1, adultSeeds: [seedNumber], renderCicada });
+            if (showSeedLabels) {
+                const label = document.createElement('div');
+                label.className = 'nymph-gallery-label';
+                label.textContent = `Seed ${seedNumber}`;
+                tile.appendChild(label);
+            }
+            return { seed: seedNumber, tile, scene };
+        });
+
+        return {
+            seeds: tiles.map(t => t.seed),
+            tiles,
+            destroy() {
+                for (const t of tiles) { try { t.scene.destroy(); } catch (_) {} }
+                grid.remove();
             }
         };
     }

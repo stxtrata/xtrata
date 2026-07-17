@@ -377,6 +377,8 @@
       html { scroll-behavior: auto; }
       *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .001ms !important; }
     }
+    #dropContinue { margin-top: 12px; }
+    #dropContinue[hidden] { display: none !important; }
   </style>
 </head>
 
@@ -469,9 +471,9 @@
 
     <section class="section">
       <div class="file-step">
-        <div><span class="section-kicker">Your first move</span><h2>Drop something worth remembering.</h2><p>Choose a file here to confirm its type, then continue into the live Xtrata Wizard. This page only inspects the file locally; it does not upload it.</p><div class="format-list"><span>IMAGE</span><span>AUDIO</span><span>VIDEO</span><span>TEXT</span><span>HTML</span><span>SVG</span><span>JSON</span></div></div>
+        <div><span class="section-kicker">Your first move</span><h2>Drop something worth remembering.</h2><p>Choose your work here and we route it the right way: a single file up to 512&nbsp;KB mints in one quick transaction on the Create page, while larger files, multiple files, or folders continue in the guided Wizard. Nothing is uploaded until you confirm in your wallet.</p><div class="format-list"><span>IMAGE</span><span>AUDIO</span><span>VIDEO</span><span>TEXT</span><span>HTML</span><span>SVG</span><span>JSON</span></div></div>
         <div class="drop-ui" id="dropUi">
-          <div><div class="drop-mark" aria-hidden="true">↑</div><h3 id="dropTitle">Choose a file or drop it here</h3><p id="dropText">Preview the first step, then continue to Xtrata.</p><label class="btn" for="fileInput">Choose file</label><input id="fileInput" type="file" /><br><a class="drop-link" data-wizard-link href="https://xtrata.xyz/wizard/">Or open the Wizard directly ↗</a></div>
+          <div><div class="drop-mark" aria-hidden="true">↑</div><h3 id="dropTitle">Choose files or drop them here</h3><p id="dropText">Single file up to 512 KB mints in one transaction. Bigger or multiple continues in the Wizard.</p><label class="btn" for="fileInput">Choose files</label><input id="fileInput" type="file" multiple /><br><a class="btn" id="dropContinue" href="#" hidden>Continue</a><br><a class="drop-link" data-wizard-link href="https://xtrata.xyz/wizard/">Or open the Wizard directly ↗</a></div>
         </div>
       </div>
     </section>
@@ -611,20 +613,89 @@
     setInterval(updateCountdown, 60000);
 
     const dropUi = document.getElementById("dropUi");
+    ["dragenter", "dragover"].forEach((type) => dropUi.addEventListener(type, (event) => { event.preventDefault(); dropUi.classList.add("is-dragging"); }));
+    ["dragleave", "drop"].forEach((type) => dropUi.addEventListener(type, (event) => { event.preventDefault(); dropUi.classList.remove("is-dragging"); }));
+  </script>
+
+  <script type="module">
+    /* Route dropped work exactly like the homepage Create flow:
+       single file ≤ 512 KB → /inscribe single-transaction mint,
+       larger / multiple files / folders → guided Wizard (with IndexedDB handoff). */
+    const dropUi = document.getElementById("dropUi");
     const fileInput = document.getElementById("fileInput");
     const dropTitle = document.getElementById("dropTitle");
     const dropText = document.getElementById("dropText");
-    const inspectFile = (file) => {
-      if (!file) return;
-      const size = file.size < 1048576 ? `${Math.max(1, Math.round(file.size / 1024))} KB` : `${(file.size / 1048576).toFixed(1)} MB`;
-      dropTitle.textContent = file.name;
-      dropText.textContent = `${file.type || "Unknown file type"} · ${size} · ready for the Xtrata Wizard`;
-      showToast("File recognised locally. Nothing has been uploaded.");
+    const continueBtn = document.getElementById("dropContinue");
+    const toastEl = document.getElementById("toast");
+    const say = (message) => {
+      toastEl.textContent = message;
+      toastEl.classList.add("show");
+      clearTimeout(window.toastTimer);
+      window.toastTimer = setTimeout(() => toastEl.classList.remove("show"), 3200);
     };
-    fileInput.addEventListener("change", (event) => inspectFile(event.target.files[0]));
-    ["dragenter", "dragover"].forEach((type) => dropUi.addEventListener(type, (event) => { event.preventDefault(); dropUi.classList.add("is-dragging"); }));
-    ["dragleave", "drop"].forEach((type) => dropUi.addEventListener(type, (event) => { event.preventDefault(); dropUi.classList.remove("is-dragging"); }));
-    dropUi.addEventListener("drop", (event) => inspectFile(event.dataTransfer.files[0]));
+    const formatSize = (bytes) => bytes < 1048576 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1048576).toFixed(1)} MB`;
+
+    let routing = null;
+    try {
+      routing = await import("/create-routing.js");
+    } catch {
+      /* Standalone preview (file:// or missing asset): fall back to Wizard-only. */
+    }
+
+    let pending = null; // { files, containsDirectory, decision }
+
+    const describe = (files, containsDirectory) => {
+      if (!routing) {
+        return { label: "Continue in the Wizard ↗", text: "ready for the Xtrata Wizard", dest: "wizard", reason: "fallback" };
+      }
+      const decision = routing.classifyCreateFiles(files, { containsDirectory });
+      if (decision.destination === "create") {
+        return { label: "Mint it in one transaction →", text: "under 512 KB · single-transaction mint on the Create page", dest: "create", reason: decision.reason, decision };
+      }
+      const why = { large: "over 512 KB", multiple: `${files.length} files`, folder: "folder" }[decision.reason] || "this selection";
+      return { label: "Continue in the Wizard ↗", text: `${why} · continues in the guided Wizard`, dest: "wizard", reason: decision.reason, decision };
+    };
+
+    const present = (files, containsDirectory = false) => {
+      const list = Array.from(files || []);
+      if (!list.length) return;
+      const total = list.reduce((sum, file) => sum + file.size, 0);
+      const info = describe(list, containsDirectory);
+      pending = { files: list, containsDirectory, info };
+      dropTitle.textContent = list.length === 1 ? list[0].name : `${list.length} files selected`;
+      dropText.textContent = `${list.length === 1 ? (list[0].type || "Unknown type") : "Multiple files"} · ${formatSize(total)} · ${info.text}`;
+      continueBtn.textContent = info.label;
+      continueBtn.hidden = false;
+      say("Recognised locally. Nothing has been uploaded yet.");
+    };
+
+    continueBtn.addEventListener("click", async (event) => {
+      event.preventDefault();
+      if (!pending) return;
+      const { files, containsDirectory, info } = pending;
+      const path = info.dest === "create" ? "/inscribe" : "/wizard/";
+      if (!routing) { window.location.assign("/wizard/?from=masterpiece"); return; }
+      continueBtn.textContent = "Preparing…";
+      let target = `${path}?from=masterpiece&routingReason=${encodeURIComponent(info.reason)}`;
+      try {
+        const handoffId = await routing.storeCreateHandoff(files, { reason: info.reason, source: "masterpiece", containsDirectory });
+        target = routing.createHandoffUrl(path, handoffId, "masterpiece");
+      } catch {
+        /* Handoff storage unavailable — still honour the routing boundary. */
+      }
+      window.location.assign(target);
+    });
+
+    fileInput.addEventListener("change", (event) => present(event.target.files));
+    dropUi.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      if (routing) {
+        const { files, containsDirectory } = await routing.collectDroppedFiles(event.dataTransfer);
+        present(files, containsDirectory);
+      } else {
+        present(event.dataTransfer.files);
+      }
+    });
   </script>
 </body>
 </html>
