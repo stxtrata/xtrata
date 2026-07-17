@@ -780,7 +780,15 @@ const buildXverseContractCallParams = (options: WalletContractCallOptions) => {
     // and silently drop `functionArgs`; send both spellings.
     arguments: params.functionArgs,
     postConditionMode: params.postConditionMode,
-    postConditions: params.postConditions
+    postConditions: params.postConditions,
+    // Xverse mobile routes this request into its legacy transaction-request
+    // screen, which reads the sender as payload.stxAddress and rejects the
+    // request as "requesting signature from a different address. (undefined)"
+    // when it is missing. The extension validates against the sats-connect
+    // schema and strips unknown keys, so both sender aliases are safe there.
+    ...(options.stxAddress
+      ? { stxAddress: options.stxAddress, address: options.stxAddress }
+      : {})
   };
 };
 
@@ -826,6 +834,10 @@ const buildStxTransferParams = (options: WalletStxTransferOptions) => ({
 // the one the post conditions were built for aborts the call instead of
 // silently re-targeting it.
 const XVERSE_ACCOUNT_MISMATCH_CODE = 'WALLET_ADDRESS_MISMATCH';
+
+// Kept below the parent bridge's 180s request timeout so the richer
+// diagnostic reaches the game modal before the generic bridge timeout fires.
+let xverseSigningWatchdogMs = 90_000;
 
 const ensureXverseSigningAccount = async (
   rpcProvider: WalletRpcProvider,
@@ -899,27 +911,64 @@ const requestWalletContractCall = async (
       code: 'XVERSE_RPC_UNAVAILABLE'
     });
   }
-  const activeAddress = await ensureXverseSigningAccount(rpcProvider, options.stxAddress);
-  const params = buildXverseContractCallParams(options);
-  // eslint-disable-next-line no-console
-  console.info('[wallet:contract-call]', {
-    stage: 'XVERSE_SIGNING_REQUEST',
-    providerId: getSelectedProviderId(),
-    contract: params.contract,
-    functionName: params.functionName,
-    functionArgCount: params.functionArgs.length,
-    postConditionMode: params.postConditionMode,
-    postConditionCount: params.postConditions?.length ?? 0,
-    expectedAddress: options.stxAddress,
-    activeAddress
+
+  // Xverse mobile can reject a request with only an in-app toast and leave
+  // the RPC promise pending forever, so nothing would ever reach the caller.
+  // Track which request is in flight and fail with that diagnostic if the
+  // wallet neither resolves nor rejects within the watchdog window.
+  let stage = 'account-preflight';
+  let activeAddress: string | undefined;
+  const run = async () => {
+    activeAddress = await ensureXverseSigningAccount(rpcProvider, options.stxAddress);
+    stage = 'stx_callContract';
+    const params = buildXverseContractCallParams(options);
+    // eslint-disable-next-line no-console
+    console.info('[wallet:contract-call]', {
+      stage: 'XVERSE_SIGNING_REQUEST',
+      providerId: getSelectedProviderId(),
+      contract: params.contract,
+      functionName: params.functionName,
+      functionArgCount: params.functionArgs.length,
+      postConditionMode: params.postConditionMode,
+      postConditionCount: params.postConditions?.length ?? 0,
+      expectedAddress: options.stxAddress,
+      activeAddress
+    });
+    try {
+      const response = unwrapProviderResponse(
+        await rpcProvider.request('stx_callContract', params)
+      );
+      return normalizeTxResult(response);
+    } catch (error) {
+      throw providerError(error);
+    }
+  };
+
+  let watchdogTimer: ReturnType<typeof setTimeout> | undefined;
+  const watchdog = new Promise<never>((_, reject) => {
+    watchdogTimer = setTimeout(() => {
+      reject(
+        Object.assign(
+          new Error(
+            `Xverse did not answer the ${stage} request within ${Math.round(
+              xverseSigningWatchdogMs / 1000
+            )}s (provider=${getSelectedProviderId() ?? 'unknown'}, expected=${
+              options.stxAddress ?? 'none'
+            }, active=${activeAddress ?? 'unknown'}, call=${options.contractAddress}.${
+              options.contractName
+            }::${options.functionName}). If Xverse showed an error toast, note its exact text; if you approved a transaction, it may still broadcast.`
+          ),
+          { code: 'XVERSE_SIGNING_TIMEOUT', stage }
+        )
+      );
+    }, xverseSigningWatchdogMs);
   });
   try {
-    const response = unwrapProviderResponse(
-      await rpcProvider.request('stx_callContract', params)
-    );
-    return normalizeTxResult(response);
-  } catch (error) {
-    throw providerError(error);
+    return await Promise.race([run(), watchdog]);
+  } finally {
+    if (watchdogTimer) {
+      clearTimeout(watchdogTimer);
+    }
   }
 };
 
@@ -1549,6 +1598,9 @@ export const __testing = {
   buildContractCallParams,
   buildXverseContractCallParams,
   ensureXverseSigningAccount,
+  setXverseSigningWatchdogMs: (value: number) => {
+    xverseSigningWatchdogMs = value;
+  },
   buildContractDeployParams,
   buildStxTransferParams,
   buildUnsignedSponsoredContractCall,

@@ -362,20 +362,25 @@ describe('wallet connect helpers', () => {
           return { status: 'success', result: { addresses: [{ address: ADDRESS }] } };
         }
         expect(method).toBe('stx_callContract');
-        // Only the sats-connect schema fields may be sent: Xverse mobile
-        // rejects requests carrying an explicit sender field.
+        // sats-connect schema fields plus the sender aliases Xverse mobile's
+        // legacy transaction-request screen reads; nothing else (no network,
+        // fee, nonce or sponsored fields).
         expect(Object.keys(params ?? {}).sort()).toEqual([
+          'address',
           'arguments',
           'contract',
           'functionArgs',
           'functionName',
           'postConditionMode',
-          'postConditions'
+          'postConditions',
+          'stxAddress'
         ]);
         expect(params).toMatchObject({
           contract: `${ADDRESS}.xtrata-arcade-scores-v1-3`,
           functionName: 'submit-score',
-          postConditionMode: 'deny'
+          postConditionMode: 'deny',
+          stxAddress: ADDRESS,
+          address: ADDRESS
         });
         expect(params?.functionArgs).toHaveLength(4);
         expect(params?.arguments).toEqual(params?.functionArgs);
@@ -453,6 +458,33 @@ describe('wallet connect helpers', () => {
     ).rejects.toMatchObject({ code: 'WALLET_ADDRESS_MISMATCH' });
 
     expect(rpcProvider.request).toHaveBeenCalledOnce();
+  });
+
+  it('fails with a stage diagnostic when Xverse abandons the signing request', async () => {
+    const legacyProvider = { request: vi.fn() };
+    const rpcProvider = {
+      request: vi.fn(async (method: string) => {
+        if (method === 'stx_getAccounts') {
+          return { status: 'success', result: { addresses: [{ address: ADDRESS }] } };
+        }
+        // Xverse mobile can toast an error and leave the promise pending.
+        return new Promise(() => {});
+      })
+    };
+    installXverseProviders(legacyProvider, rpcProvider);
+
+    __testing.setXverseSigningWatchdogMs(50);
+    try {
+      await expect(
+        __testing.requestWalletContractCall(legacyProvider as never, scoreSubmitOptions())
+      ).rejects.toMatchObject({
+        code: 'XVERSE_SIGNING_TIMEOUT',
+        stage: 'stx_callContract',
+        message: expect.stringContaining('stx_callContract')
+      });
+    } finally {
+      __testing.setXverseSigningWatchdogMs(90_000);
+    }
   });
 
   it('surfaces real Xverse wallet errors through onError without a legacy fallback', async () => {
