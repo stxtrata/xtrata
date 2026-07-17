@@ -739,6 +739,26 @@
     return label.indexOf('bitcoinprovider') >= 0 && label.indexOf('stacksprovider') < 0;
   }
 
+  /* v3.1: Leather's getAddresses/stx_getAddresses open the wallet popup every
+     time they are called before the origin is approved. Any passive path
+     (status polling, background resolves) must never call them, or the popup
+     re-opens on every 5s poll. Detect Leather both by label and by identity —
+     Leather also injects itself as the deprecated window.StacksProvider alias,
+     which sorts to the top of the candidate list. */
+  function isLeatherInteractiveProvider(provider, label){
+    var text = String(label || (provider && provider.__arcadeWalletLabel) || '').toLowerCase();
+    if(text.indexOf('leather') >= 0) return true;
+    if(!provider || typeof provider !== 'object') return false;
+    if(provider.isLeather === true) return true;
+    try{
+      if(typeof window !== 'undefined' && window.LeatherProvider){
+        if(provider === window.LeatherProvider) return true;
+        if(window.StacksProvider && provider === window.StacksProvider) return true;
+      }
+    }catch(e){}
+    return false;
+  }
+
   function providerHasNestedStacksCandidate(provider){
     if(!provider || typeof provider !== 'object') return false;
     return !!(
@@ -2232,10 +2252,12 @@
     return [];
   }
 
-  async function resolveProviderAddress(provider, preferredNetwork){
+  async function resolveProviderAddress(provider, preferredNetwork, options){
     if(!provider) return null;
     var fallbackAddress = null;
     var providerLabel = getProviderLabel(provider);
+    var allowPrompt = !!(options && options.allowPrompt);
+    var isLeather = isLeatherInteractiveProvider(provider, providerLabel);
 
     if(typeof provider.selectedAddress === 'string' && looksLikeStacksAddress(provider.selectedAddress)){
       if(inferNetworkFromAddress(provider.selectedAddress) === preferredNetwork || !preferredNetwork){
@@ -2262,12 +2284,29 @@
       }
     }
 
+    /* v3.1: Leather's address methods are interactive popups until the origin
+       has been approved. Skip them entirely on passive paths (status polling)
+       when there is no established session yet — otherwise every poll re-opens
+       the Leather connect popup. Once a session exists (origin approved) the
+       same methods resolve silently and stay allowed. */
+    if(isLeather && !allowPrompt && !walletConnectSession){
+      walletDebug('info', 'Skipping interactive Leather address methods on passive path', {
+        provider: providerLabel,
+        preferredNetwork: preferredNetwork
+      });
+      return fallbackAddress;
+    }
+
     var methods = ['stx_getAddresses', 'getAddresses', 'stx_getAccounts', 'getAccounts', 'wallet_getAccount'];
+    /* Leather popup approval can take well over the default 3.5s request
+       timeout; timing out mid-approval spawned repeated popups. Give the
+       interactive Leather path a generous window instead. */
+    var requestOptions = (isLeather && allowPrompt) ? { timeoutMs: 120000 } : undefined;
     var i;
     for(i = 0; i < methods.length; i++){
       if(isKnownUnsupportedMethod(provider, methods[i])) continue;
       try{
-        var payload = await requestProvider(provider, methods[i]);
+        var payload = await requestProvider(provider, methods[i], undefined, requestOptions);
         var rpcError = extractRpcError(payload);
         if(rpcError) throw rpcError;
         var parsed = extractAddress(payload, preferredNetwork);
@@ -2292,6 +2331,9 @@
           method: methods[i],
           error: walletErrorForLog(e)
         });
+        /* A user rejection in the Leather popup must stop the method cascade;
+           each further method would re-open the popup. */
+        if(isLeather && isUserRejectedError(e)) break;
       }
     }
 
@@ -2350,6 +2392,7 @@
     var candidateProviders = getWalletAddressCandidates(providers);
     var splitCandidates = splitWalletAddressCandidates(candidateProviders);
     var targetNetwork = options && options.targetNetwork ? options.targetNetwork : null;
+    var allowPrompt = !!(options && options.allowPrompt);
     var resolveStartDetail = {
       targetNetwork: targetNetwork,
       providers: providers.map(function(entry){ return entry.label; }),
@@ -2385,7 +2428,7 @@
     for(g = 0; g < groups.length; g++){
       for(i = 0; i < groups[g].entries.length; i++){
         var entry = groups[g].entries[i];
-        var address = await resolveProviderAddress(entry.provider, targetNetwork);
+        var address = await resolveProviderAddress(entry.provider, targetNetwork, { allowPrompt: allowPrompt });
         if(address){
           var network = await resolveProviderNetwork(entry.provider, address);
           var candidateDetail = {
@@ -2660,7 +2703,10 @@
     setWalletBadge('is-loading', 'Wallet: connecting...');
 
     var connectMethods = ['stx_requestAccounts', 'requestAccounts', 'stx_connect', 'connect', 'wallet_connect'];
-    clearUnsupportedMethodsForProviders(providers, connectMethods);
+    /* v3.1: Leather connects through its documented address methods (they open
+       the approval popup on first call); mirror the main app's proven order. */
+    var leatherConnectMethods = ['getAddresses', 'stx_getAccounts', 'stx_getAddresses', 'stx_requestAccounts'];
+    clearUnsupportedMethodsForProviders(providers, connectMethods.concat(leatherConnectMethods));
     var connectProviders = getWalletAddressCandidates(providers);
     var fallbackAuthTried = false;
     walletConnectDebug('info', 'provider candidate list', {
@@ -2689,6 +2735,19 @@
       primaryAuthEntry.provider.__xtrataHostWalletBridgeShim
     ){
       walletConnectDebug('info', 'primary provider is host bridge shim; skipping in-frame stacks-connect auth', {
+        provider: primaryAuthEntry.label
+      });
+      primaryAuthEntry = null;
+    }
+
+    /* v3.1: for Leather, lead with its request() bridge (getAddresses opens the
+       account-approval popup) exactly like the main app; the @stacks/connect
+       legacy auth popup stays available as the per-entry fallback below. */
+    if(
+      primaryAuthEntry &&
+      isLeatherInteractiveProvider(primaryAuthEntry.provider, primaryAuthEntry.label)
+    ){
+      walletConnectDebug('info', 'primary provider is Leather; using request-bridge connect instead of stacks-connect auth', {
         provider: primaryAuthEntry.label
       });
       primaryAuthEntry = null;
@@ -2771,6 +2830,9 @@
       return ax - bx;
     });
     function connectMethodsForEntry(entry){
+      if(isLeatherInteractiveProvider(entry.provider, entry.label)){
+        return leatherConnectMethods;
+      }
       if(/xverse|bitcoinprovider/i.test(entry.label || '')){
         return ['wallet_connect'].concat(connectMethods.filter(function(mm){
           return mm !== 'wallet_connect';
@@ -2783,6 +2845,10 @@
       var entry = connectProviders[i];
       var provider = entry.provider;
       var entryConnectMethods = connectMethodsForEntry(entry);
+      var entryIsLeather = isLeatherInteractiveProvider(provider, entry.label);
+      /* Leather approval can easily exceed 15s; a timeout mid-approval used to
+         cascade into repeated popups. */
+      var entryConnectTimeoutMs = entryIsLeather ? 120000 : 15000;
       walletDebug('info', 'Trying provider candidate for connect', {
         provider: entry.label,
         index: i,
@@ -2824,12 +2890,12 @@
             provider: entry.label,
             method: entryConnectMethods[m]
           });
-          var payload = await requestProvider(provider, entryConnectMethods[m], undefined, { timeoutMs: 15000 });
+          var payload = await requestProvider(provider, entryConnectMethods[m], undefined, { timeoutMs: entryConnectTimeoutMs });
           var rpcError = extractRpcError(payload);
           if(rpcError) throw rpcError;
           var requestedAddress = extractAddress(payload, targetNetwork);
           if(!requestedAddress){
-            requestedAddress = await resolveProviderAddress(provider, targetNetwork);
+            requestedAddress = await resolveProviderAddress(provider, targetNetwork, { allowPrompt: true });
             if(!requestedAddress){
               walletConnectDebug('warn', 'non-event: method completed but no address resolved', {
                 provider: entry.label,
@@ -2995,7 +3061,7 @@
       } else {
         try{
           await maybeCallDirectProviderConnect(provider);
-          var directAddress = await resolveProviderAddress(provider, targetNetwork);
+          var directAddress = await resolveProviderAddress(provider, targetNetwork, { allowPrompt: true });
           if(directAddress){
             walletDebug('info', 'Direct provider connect resolved address', {
               provider: entry.label,
