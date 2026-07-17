@@ -66,8 +66,8 @@
   "parent": {
     "path": "parent/astro-blaster-parent-v5-mobile.template.html",
     "mimeType": "text/html",
-    "sizeBytes": 70242,
-    "sha256": "8400bcf3447b4cb57dba367c5877c50b40f4ae99306071b6f238f73494a57990",
+    "sizeBytes": 72286,
+    "sha256": "d94f660c09af0952ee866c021852a67670991daa5f85da02ea960cb1eedbefce",
     "configFieldsToSetBeforeMint": [
       "CONFIG.contentContractAddress",
       "CONFIG.contentContractName",

@@ -196,6 +196,55 @@
       if (window.__astroBlasterStandaloneParentStarted) return;
       window.__astroBlasterStandaloneParentStarted = true;
 
+      // v5.2: pace requestAnimationFrame to 60fps. The game module advances a
+      // fixed step per frame (no delta time), so on 120Hz displays (iPhone
+      // ProMotion — exactly what wallet in-app browsers run at) everything
+      // played at double speed. Installed before the modules load so the game
+      // loop inherits the paced clock; ?fps=native disables the shim.
+      (function installRafPacer() {
+        try {
+          var search = String(window.location && window.location.search || '');
+          if (/(?:^|[?&])fps=native(?:&|$)/.test(search)) return;
+        } catch (_) {}
+        if (typeof window.requestAnimationFrame !== 'function') return;
+        var TARGET_MS = 1000 / 60;
+        var nativeRaf = window.requestAnimationFrame.bind(window);
+        var nativeCancel = typeof window.cancelAnimationFrame === 'function'
+          ? window.cancelAnimationFrame.bind(window)
+          : function () {};
+        var lastTick = 0;
+        var lastFiredTs = -1;
+        var pending = {};
+        var nextId = 1;
+        window.requestAnimationFrame = function (callback) {
+          var id = nextId++;
+          function step(ts) {
+            // Every callback scheduled for an accepted frame fires on it —
+            // only whole frames are skipped, never individual consumers.
+            if (ts === lastFiredTs || ts - lastTick >= TARGET_MS - 1) {
+              if (ts !== lastFiredTs) {
+                lastTick += TARGET_MS;
+                if (ts - lastTick > TARGET_MS) lastTick = ts;
+                lastFiredTs = ts;
+              }
+              delete pending[id];
+              callback(ts);
+            } else {
+              pending[id] = nativeRaf(step);
+            }
+          }
+          pending[id] = nativeRaf(step);
+          return id;
+        };
+        window.cancelAnimationFrame = function (id) {
+          if (pending[id]) {
+            nativeCancel(pending[id]);
+            delete pending[id];
+          }
+        };
+        window.__astroRafPacer = { targetFps: 60 };
+      })();
+
       var CONFIG = {
         contentContractAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
         contentContractName: 'xtrata-v3-2-3',
