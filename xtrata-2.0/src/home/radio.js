@@ -40,7 +40,7 @@ const saveState = (state) => {
   try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* noop */ }
 };
 
-export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {}) => {
+export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
   if (!tokenIds.length || typeof document === 'undefined') {
     return null;
   }
@@ -58,27 +58,54 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   const root = document.createElement('div');
   root.className = 'xtrata-radio';
   root.innerHTML = [
-    '<button class="xtrata-radio__set xtrata-radio__toggle" type="button" aria-pressed="false" title="Xtrata Radio — random inscribed songs">',
-    '  <span class="xtrata-radio__grille" aria-hidden="true"></span>',
-    '  <span class="xtrata-radio__face" aria-hidden="true">',
-    '    <span class="xtrata-radio__screen">',
-    '      <span class="xtrata-radio__screen-text"></span>',
-    '    </span>',
-    '    <span class="xtrata-radio__meta">',
-    '      <span class="xtrata-radio__brandwrap"><img class="xtrata-radio__logo" src="/favicon.svg" alt="" /><span class="xtrata-radio__brand">XTRATA&nbsp;FM</span></span>',
-    '      <span class="xtrata-radio__vu"><i></i><i></i><i></i><i></i><i></i><i></i></span>',
-    '    </span>',
-    '  </span>',
-    '  <span class="xtrata-radio__side">',
-    '    <span class="xtrata-radio__knob" role="slider" aria-label="Volume" aria-valuemin="-1" aria-valuemax="10" title="Volume — scroll or drag; below 0 clicks off"><i></i></span>',
-    '    <span class="xtrata-radio__transport">',
-    '      <span class="xtrata-radio__tbtn" role="button" tabindex="0" data-dir="prev" title="Previous song">⏮</span>',
-    '      <span class="xtrata-radio__tbtn" role="button" tabindex="0" data-dir="next" title="Next song">⏭</span>',
-    '    </span>',
-    '  </span>',
-    '</button>'
+    // Hidden power element: the engine binds on/off to .xtrata-radio__toggle.
+    '<button class="xtrata-radio__toggle" type="button" aria-pressed="false" hidden></button>',
+    '<div class="xtrata-radio__stage">',
+    '  <div class="xtrata-radio__display" role="button" tabindex="0" title="Xtrata Radio">',
+    '    <div class="xtrata-radio__dmain">',
+    '      <div class="xtrata-radio__meta">',
+    '        <span class="xtrata-radio__brand">XTRATA FM</span>',
+    '      </div>',
+    '      <div class="xtrata-radio__screen"><span class="xtrata-radio__screen-text"></span></div>',
+    '    </div>',
+    '    <span class="xtrata-radio__vu"><i></i><i></i><i></i><i></i><i></i><i></i></span>',
+    '    <a class="xtrata-radio__art" target="_blank" rel="noopener" title="View the inscribed original">',
+    '      <img alt="" loading="lazy" />',
+    '    </a>',
+    '    <div class="xtrata-radio__pctl" aria-label="Radio controls">',
+    '      <button type="button" data-p="power" title="Power">\u23fb</button>',
+    '      <button type="button" data-p="prev" title="Previous song">\u23ee</button>',
+    '      <button type="button" data-p="pp" title="Play / pause">\u25b6</button>',
+    '      <button type="button" data-p="next" title="Next song">\u23ed</button>',
+    '    </div>',
+    '  </div>',
+    '  <button class="xtrata-radio__btn xtrata-radio__btn--playlist" type="button" title="Your station (liked band)"><span class="xtrata-radio__ring"></span></button>',
+    '  <button class="xtrata-radio__btn xtrata-radio__btn--shuffle" type="button" title="Discovery preset"><span class="xtrata-radio__lit"></span><span class="xtrata-radio__ring"></span></button>',
+    '  <button class="xtrata-radio__btn xtrata-radio__btn--heart" type="button" title="Like this song"><span class="xtrata-radio__lit"></span><span class="xtrata-radio__ring"></span></button>',
+    '  <button class="xtrata-radio__btn xtrata-radio__btn--repeat" type="button" title="Loop this song"><span class="xtrata-radio__lit"></span><span class="xtrata-radio__ring"></span></button>',
+    '  <button class="xtrata-radio__btn xtrata-radio__btn--prev xtrata-radio__tbtn" type="button" data-dir="prev" title="Previous song"><span class="xtrata-radio__ring"></span></button>',
+    '  <button class="xtrata-radio__btn xtrata-radio__btn--play" type="button" title="Play / pause"><span class="xtrata-radio__lit xtrata-radio__lit--play"></span><span class="xtrata-radio__lit xtrata-radio__lit--pause"></span><span class="xtrata-radio__ring"></span></button>',
+    '  <button class="xtrata-radio__btn xtrata-radio__btn--next xtrata-radio__tbtn" type="button" data-dir="next" title="Next song"><span class="xtrata-radio__ring"></span></button>',
+    '  <span class="xtrata-radio__pot xtrata-radio__pot--band" role="button" tabindex="0" title="Band: FM / Liked / Chain"><span class="xtrata-radio__potcore"></span></span>',
+    '  <span class="xtrata-radio__pot xtrata-radio__pot--preset" role="button" tabindex="0" title="Preset: All / Music"><span class="xtrata-radio__potcore"></span></span>',
+    '  <span class="xtrata-radio__pot xtrata-radio__pot--tone" aria-hidden="true"><span class="xtrata-radio__potcore"></span></span>',
+    '  <span class="xtrata-radio__pot xtrata-radio__pot--balance" aria-hidden="true"><span class="xtrata-radio__potcore"></span></span>',
+    '  <span class="xtrata-radio__pot xtrata-radio__pot--volume"><span class="xtrata-radio__knob" role="slider" aria-label="Volume" aria-valuemin="-1" aria-valuemax="10" title="Volume - scroll or drag; below 0 clicks off"></span></span>',
+    '  <button class="xtrata-radio__mini" type="button" title="Minimise radio"></button>',
+    '</div>',
+    '<button class="xtrata-radio__fs-close" type="button" title="Exit fullscreen (Esc)">✕</button>',
+    '<div class="xtrata-radio__rel" aria-label="Related inscriptions">',
+    '  <span class="xtrata-radio__rel-label">RELATED</span>',
+    '  <div class="xtrata-radio__rel-row"></div>',
+    '</div>',
+    '<div class="xtrata-radio__fs-hint">Click the <b>XTRATA&nbsp;FM</b> logo or press <b>Esc</b> to exit fullscreen — the music keeps playing</div>'
   ].join('');
-  document.body.appendChild(root);
+  // Optional header dock: pass `mount` and the radio lives there as a compact
+  // pill; clicking it opens the fullscreen receiver. No mount → the classic
+  // floating widget (bottom-left) used by the standalone pages.
+  const dockHost = mount && typeof mount.appendChild === 'function' ? mount : null;
+  if (dockHost) root.classList.add('is-docked');
+  (dockHost || document.body).appendChild(root);
 
   const toggleButton = root.querySelector('.xtrata-radio__toggle');
   const screenText = root.querySelector('.xtrata-radio__screen-text');
@@ -111,6 +138,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   let vuFrame = 0;
   let vuLevels = [0, 0, 0, 0, 0, 0];
   let silentSince = 0;
+  let silentClockStart = 0;
   const grille = root.querySelector('.xtrata-radio__grille');
   const vuBars = Array.from(root.querySelectorAll('.xtrata-radio__vu i'));
 
@@ -147,17 +175,35 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     analyser.getByteFrequencyData(bins);
     // Silence detector: a "playing" track with no signal for 8s has no usable
     // audio (e.g. a video-only mp4). Mark it a dud and retune.
+    // CRUCIAL mobile guard: a buffering stall also reads as zeros (element not
+    // paused, analyser silent) and a suspended AudioContext reads zeros while
+    // audio may still be audible. Both froze songs ~15-20s in and skipped them.
+    // Real silent audio ADVANCES the media clock while producing no signal, so
+    // require the clock to have consumed most of the window before skipping.
     const totalEnergy = bins.reduce((sum, v) => sum + v, 0);
+    const contextRunning = !audioContext || audioContext.state === 'running';
     if (totalEnergy > 40) {
       silentSince = 0;
+    } else if (!contextRunning || player.readyState < 3 || player.seeking) {
+      silentSince = 0; // suspended context or buffering — not evidence of silence
     } else if (player.currentTime > 0.5) {
-      if (!silentSince) silentSince = performance.now();
-      else if (performance.now() - silentSince > 8000 && on) {
-        radioLog(`silent track detected #${currentTokenId}`, 'no audio signal for 8s — skipping and marking dud', currentTokenId);
-        if (currentTokenId) trackCache.set(String(currentTokenId), null);
-        silentSince = 0;
-        player.pause();
-        void tuneToNextTrack();
+      if (!silentSince) {
+        silentSince = performance.now();
+        silentClockStart = player.currentTime;
+      } else if (performance.now() - silentSince > 8000 && on) {
+        const consumed = player.currentTime - silentClockStart;
+        if (consumed < 6) {
+          // clock barely moved: the network stalled mid-song — give it another
+          // window instead of skipping a perfectly good track
+          silentSince = 0;
+        } else {
+          radioLog(`silent track detected #${currentTokenId}`, 'decoder consumed 8s with no signal — skipping (session-only dud)', currentTokenId);
+          // session-only: a false positive must never permanently blacklist a song
+          if (currentTokenId) trackCache.set(String(currentTokenId), null);
+          silentSince = 0;
+          player.pause();
+          void tuneToNextTrack();
+        }
       }
     }
     // bass drive for the speaker pulse
@@ -314,11 +360,48 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   // --- track resolution ---------------------------------------------------
   // Hardcoded ignore list: inscriptions that resolve as media but must never
   // air (e.g. #1065 — a video-only mp4 with no decodable audio track).
-  const IGNORE_IDS = new Set(['1065']);
+  const IGNORE_IDS = new Set(['1065', '5', '319', '1090']);
+  // ids that failed transiently (502s, network errors) rest for 45s before the
+  // pickers may try them again — prevents tight resolve/warm-ping loops.
+  const transientFailAt = new Map();
+  const isCoolingDown = (id) => (Date.now() - (transientFailAt.get(String(id)) || 0)) < 45000;
   const trackCache = new Map(); // tokenId -> { src, title } | null
+  // Duds persist across visits so each page load doesn't burn tune attempts
+  // re-discovering the same dead ids (a big source of NO SIGNAL runs).
+  // v2: v1 could be mass-poisoned by misrouted content responses (the app
+  // shell answering /runtime/content marks EVERY probed id a dud) — discard it.
+  const DUDS_KEY = 'xtrata.radio.duds.v2';
+  try { window.localStorage.removeItem('xtrata.radio.duds.v1'); } catch { /* noop */ }
+  try {
+    JSON.parse(window.localStorage.getItem(DUDS_KEY) || '[]').forEach((id) => trackCache.set(String(id), null));
+  } catch { /* fresh cache */ }
+  // Share what this browser learned with every other listener (D1-backed).
+  const reportedVerdicts = new Set();
+  const reportVerdict = (tokenId, verdict, reason) => {
+    const key = String(tokenId) + ':' + verdict;
+    if (reportedVerdicts.has(key)) return;
+    reportedVerdicts.add(key);
+    try {
+      void fetch('/index/verdict', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ contract: PLAYABLE_CONTRACT, tokenId: Number(tokenId), verdict, reason: reason || '' })
+      }).catch(() => undefined);
+    } catch { /* advisory only */ }
+  };
+  const persistDud = (tokenId) => {
+    try {
+      const duds = JSON.parse(window.localStorage.getItem(DUDS_KEY) || '[]');
+      if (!duds.includes(String(tokenId))) {
+        duds.push(String(tokenId));
+        window.localStorage.setItem(DUDS_KEY, JSON.stringify(duds.slice(-2000)));
+      }
+    } catch { /* noop */ }
+  };
   const resolveTrack = async (tokenId) => {
     if (IGNORE_IDS.has(String(tokenId))) {
       radioLog(`ignored #${tokenId}`, 'on the hardcoded ignore list', tokenId);
+      trackCache.set(String(tokenId), null);   // cache as dud so pickers stop selecting it
       return null;
     }
     if (trackCache.has(tokenId)) {
@@ -334,6 +417,8 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     ];
     let resolved = null;
     let definitive = true; // network hiccups must stay retryable, not become duds
+    let shareable = true;  // only REAL content verdicts may persist/be reported
+    let dudReason = 'no-audio';
     try {
       let response = null;
       let mime = '';
@@ -352,26 +437,47 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
           src = url + '&m=1';
           break;
         }
-        if (!attempt.ok) definitive = false; // transient — retry later
+        // 404/410 mean the content genuinely isn't on this core — that is a
+        // definitive answer. Only server errors / rate limits are transient;
+        // treating 404s as transient made dead ids immortal and caused
+        // recurring NO SIGNAL runs.
+        if (!attempt.ok && attempt.status !== 404 && attempt.status !== 410) definitive = false;
         try { await attempt.body?.cancel(); } catch { /* noop */ }
       }
       if (!response) {
         radioLog(`verdict #${tokenId}`, definitive ? 'DUD (no playable content on any core)' : 'TRANSIENT (will retry; warm requested)', tokenId);
-        if (definitive) trackCache.set(tokenId, null); else trackCache.delete(tokenId);
+        if (definitive) { trackCache.set(tokenId, null); persistDud(tokenId); reportVerdict(tokenId, 'dud', 'no-content'); }
+        else trackCache.delete(tokenId);
         return null;
       }
-      if (response.ok && (mime.startsWith('audio/') || mime.startsWith('video/'))) {
-        // Plain audio inscriptions AND movies: the Audio element happily plays
-        // the soundtrack of video containers (webm/mp4), so films join the
-        // station as audio-only broadcasts.
+      if (response.ok && mime.startsWith('audio/')) {
+        // SONGS ONLY: plain audio inscriptions (mp3, opus, weba — including the
+        // films that were re-encoded webm -> weba). Raw video/* is rejected
+        // below: "film audio" mp4s were the main source of silent duds.
         await response.body?.cancel?.();
-        resolved = { src, title: `#${tokenId}${mime.startsWith('video/') ? ' (film audio)' : ''}`, tokenId };
+        resolved = { src, title: `#${tokenId}`, tokenId };
       } else if (response.ok && mime.includes('text/html')) {
         const html = await response.text();
         // Opus players embed their audio as a data: URI on a <source> element.
         // Opus players embed data:audio; some players/films embed data:video —
         // both are playable through the audio element.
-        const match = html.match(/<source[^>]+src="(data:(?:audio|video)\/[^"]+)"/i);
+        // players must embed data:audio — data:video is no longer accepted
+        const match = html.match(/<source[^>]+src="(data:audio\/[^"]+)"/i);
+        if (!match && /<script[^>]+src="\//i.test(html)) {
+          // An inscribed player is self-contained; a same-origin <script src="/…">
+          // means this is OUR APP SHELL misrouted onto the content route (vite
+          // dev without functions, SPA fallback). That's no verdict on the
+          // token — treating it as one poisoned entire dud stores.
+          definitive = false;
+          shareable = false;
+          radioLog(`resolve #${tokenId}`, 'app shell answered the content route — transient, no verdict', tokenId);
+        } else if (!match) {
+          // real inscribed html with no embedded audio: inscriptions are
+          // immutable, so this verdict is stable — persist and share it, or
+          // every session (and every listener) re-grinds the same non-player
+          // html at the head of the chain in order mode.
+          dudReason = 'html-no-audio';
+        }
         if (match) {
           const titleMatch = html.match(/<title>([^<]*)<\/title>/i);
           const artistMatch = html.match(/"artist":\s*"([^"]*)"/);
@@ -385,7 +491,15 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
           };
         }
       } else {
+        // A real response with a non-audio, non-html mime (video, image, …)
+        // is a definitive "not a song". This is AUTHORITATIVE content from the
+        // token's own core — it must override transient 502s from other cores,
+        // otherwise the id never gets cached and the picker loops on it forever.
         await response.body?.cancel?.();
+        definitive = true;
+        shareable = true;
+        dudReason = 'mime:' + mime.split(';')[0];
+        radioLog(`verdict #${tokenId}`, `not a song (${dudReason}) — dud`, tokenId);
       }
     } catch {
       resolved = null;
@@ -394,8 +508,10 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     radioLog(`verdict #${tokenId}`, resolved ? { playable: true, src: resolved.src.slice(0, 80), title: resolved.title } : (definitive ? 'DUD' : 'TRANSIENT'), tokenId);
     if (resolved || definitive) {
       trackCache.set(tokenId, resolved);
+      if (!resolved && shareable) { persistDud(tokenId); reportVerdict(tokenId, 'dud', dudReason); }
     } else {
       trackCache.delete(tokenId); // transient failure — eligible again next pass
+      transientFailAt.set(String(tokenId), Date.now());
       pingWarm(tokenId); // server reconstructs it into R2 for the retry
     }
     return resolved;
@@ -471,12 +587,36 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   let likes = loadLikes();                 // [{tokenId,title,artist,likedAt}]
   let band = 'fm';                         // 'fm' | 'liked' | 'chain'
   let preset = 'all';                      // within FM: 'music' | 'all'
+  // Shuffle is OFF by default: the dial plays in order (likes/curated/chain
+  // sequence per band). Neither shuffle nor loop persists across visits —
+  // the heart (likes) is the only remembered button.
+  let shuffleMode = false;
   const listeners = new Set();
   let nowPlaying = null;                   // {tokenId,title,artist,cover}
+  // One canonical snapshot everywhere (emit / getState / subscribe), including
+  // `playing` — the ACTUAL audio-element state — so UIs never have to guess
+  // play/pause from `on` (which only means "powered").
+  // Relatives of the playing song (parents/children/siblings from the edge
+  // index). Songs are clickable-to-play; images and other files are shown as
+  // display-only context.
+  let relatives = [];
+  let relativesFor = null;
+
+  const stateSnapshot = () => ({
+    on,
+    playing: on && !player.paused && !player.ended,
+    band, preset, nowPlaying, likes: likes.slice(), volumeStep,
+    shuffle: shuffleMode,
+    loop: player.loop,
+    relatives: relatives.slice()
+  });
   const emit = () => {
-    const snapshot = { on, band, preset, nowPlaying, likes: likes.slice(), volumeStep };
+    const snapshot = stateSnapshot();
     listeners.forEach((cb) => { try { cb(snapshot); } catch { /* listener error */ } });
   };
+  // Play/pause state changes must reach subscribers immediately, whatever
+  // triggered them (button, media keys, OS controls, stall, ended).
+  ['play', 'pause', 'playing', 'ended'].forEach((ev) => player.addEventListener(ev, emit));
   const isLiked = (id) => likes.some((l) => l.tokenId === String(id));
   const toggleLike = () => {
     if (!nowPlaying) return false;
@@ -493,6 +633,36 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     emit();
     return isLiked(nowPlaying.tokenId);
   };
+  const classifyRelative = (mime) => {
+    const m = String(mime || '').toLowerCase();
+    if (m.startsWith('audio/')) return 'audio';
+    if (m.includes('text/html')) return 'player';   // song candidate (opus player)
+    if (m.startsWith('image/')) return 'image';
+    return 'other';
+  };
+
+  const fetchRelatives = async (tokenId) => {
+    const id = String(tokenId);
+    relativesFor = id;
+    try {
+      const response = await fetch('/index/relations/' + PLAYABLE_CONTRACT + '?id=' + id);
+      if (!response.ok) return;
+      const data = await response.json();
+      if (relativesFor !== id) return;   // a different song landed meanwhile
+      const ids = [...new Set([...(data.parents || []), ...(data.children || []), ...(data.siblings || [])])]
+        .map(String)
+        .filter((rid) => rid !== id)
+        .slice(0, 16);
+      const mimes = data.mimes || {};
+      relatives = ids.map((rid) => {
+        const kind = classifyRelative(mimes[rid]);
+        const playable = (kind === 'audio' || kind === 'player') && trackCache.get(rid) !== null;
+        return { id: rid, kind, playable };
+      });
+      emit();
+    } catch { /* relatives are decorative — never disturb playback */ }
+  };
+
   const BANDS = ['fm', 'liked', 'chain'];
   const setBand = (next) => {
     if (!BANDS.includes(next)) return;
@@ -500,8 +670,9 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     persistExtras();
     if (on) {
       writeScreen(band === 'fm' ? 'BAND: FM — CURATED + CHAIN' : band === 'liked' ? (likes.length ? 'BAND: LIKED — YOUR STATION' : 'BAND: LIKED — NO SONGS SAVED YET (♥ TO ADD)') : 'BAND: CHAIN — FULL EXPLORATION');
-      player.pause();
-      void tuneToNextTrack();
+      sectionTimers.push(window.setTimeout(() => { if (currentTrackInfo) tickerStep(); }, 1600));
+      // The current song keeps playing — only what's CUED changes.
+      requeueForMode();
     }
     emit();
   };
@@ -512,7 +683,34 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     persistExtras();
     if (on) {
       writeScreen(preset === 'music' ? 'PRESET: MUSIC — CURATED ONLY' : 'PRESET: ALL — CURATED + DISCOVERY');
-      if (band === 'fm') { player.pause(); void tuneToNextTrack(); }
+      sectionTimers.push(window.setTimeout(() => { if (currentTrackInfo) tickerStep(); }, 1600));
+      requeueForMode(); // current song keeps playing; the queue re-cues
+    }
+    emit();
+  };
+
+  // Flush songs preloaded under the previous mode and cue fresh ones, WITHOUT
+  // touching the song that's currently on air.
+  function requeueForMode() {
+    preloadQueue.length = 0;
+    window.setTimeout(() => { void preloadNextTrack(); }, 150);
+  }
+
+  const setShuffle = (nextOn) => {
+    shuffleMode = Boolean(nextOn);
+    if (on) {
+      writeScreen(shuffleMode ? 'SHUFFLE: ON — RANDOM PICKS' : 'SHUFFLE: OFF — IN ORDER');
+      sectionTimers.push(window.setTimeout(() => { if (currentTrackInfo) tickerStep(); }, 1600));
+      requeueForMode();
+    }
+    emit();
+  };
+
+  const setLoop = (nextOn) => {
+    player.loop = Boolean(nextOn);
+    if (on) {
+      writeScreen(player.loop ? 'LOOP: THIS SONG' : 'LOOP: OFF');
+      sectionTimers.push(window.setTimeout(() => { if (currentTrackInfo) tickerStep(); }, 1600));
     }
     emit();
   };
@@ -532,9 +730,57 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   // live on legacy cores) join the seed rotation so they play regularly rather
   // than waiting on a lucky random pick.
   const EXTRA_SEEDS = ['8', '315', '1636', '1122'];
-  const playlist = [...new Set([...tokenIds.map((id) => id.toString()), ...EXTRA_SEEDS])];
+  // Curated seeds NEVER include ignored ids (e.g. #1065 is a curated gallery
+  // token but has no decodable audio) — otherwise the picker keeps selecting
+  // them, each one burns a tune attempt, and a run of them ends in NO SIGNAL.
+  const playlist = [...new Set([...tokenIds.map((id) => id.toString()), ...EXTRA_SEEDS])]
+    .filter((id) => !IGNORE_IDS.has(id));
   let maxTokenId = 0;
   const EXPLORE_RATIO = 0.5; // half the picks roam the full id range
+
+  // --- no-repeat memory ----------------------------------------------------
+  // Once a song has actually played, it won't play again until the dial has
+  // cycled through every other known playable song. Persists across visits;
+  // resets automatically when a cycle completes.
+  const PLAYED_KEY = 'xtrata.radio.played.v1';
+  let played = new Set();
+  try { played = new Set(JSON.parse(window.localStorage.getItem(PLAYED_KEY) || '[]')); } catch { /* fresh set */ }
+  const savePlayed = () => { try { window.localStorage.setItem(PLAYED_KEY, JSON.stringify([...played].slice(-5000))); } catch { /* noop */ } };
+  const markPlayed = (id) => { if (id) { played.add(String(id)); savePlayed(); } };
+  const clearPlayed = () => { played = new Set(); savePlayed(); radioLog('no-repeat cycle complete — every known song has aired, starting a fresh cycle'); };
+  // Fresh mints (ids that appear while the radio is on) jump the queue so new songs air fast.
+  const freshIds = [];
+
+  // --- known-song pool (D1-backed) ------------------------------------------
+  // /index/playable serves the FULL list of audio-capable tokens from the edge
+  // in one query (the D1 index syncs incrementally from the append-only
+  // minted-id list, so only new ids are ever scanned). With this pool the dial
+  // never wastes a spin on images/documents, "all known songs" is exact for the
+  // no-repeat cycle, and new mints arrive within a refresh.
+  const PLAYABLE_CONTRACT = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3';
+  let knownPool = [];                 // audio/video first, then html player candidates
+  const knownSet = new Set();
+  const fetchPlayable = async () => {
+    try {
+      const response = await fetch('/index/playable?contract=' + encodeURIComponent(PLAYABLE_CONTRACT));
+      if (!response.ok) return;
+      const data = await response.json();
+      // Pre-seed the dud cache with community-reported unplayables so this
+      // browser never wastes a tune attempt rediscovering them.
+      (data.duds || []).forEach((id) => trackCache.set(String(id), null));
+      const ids = [...(data.audio || []), ...(data.html || [])].map(String);
+      if (!ids.length) return;
+      const hadPool = knownSet.size > 0;
+      for (const id of ids) {
+        if (!knownSet.has(id)) {
+          knownSet.add(id);
+          if (hadPool) { freshIds.push(id); radioLog('new song indexed — queued for airplay', { tokenId: id }, id); }
+        }
+      }
+      knownPool = ids;
+      if (Number(data.mintedCount) > maxTokenId) maxTokenId = Number(data.mintedCount);
+    } catch { /* endpoint down — random exploration below still works */ }
+  };
 
   const discoverRange = async () => {
     try {
@@ -552,20 +798,110 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
       // (ok uint): 07 then 01 then 16 bytes big-endian
       if (data.okay && hex.startsWith('0701')) {
         const value = parseInt(hex.slice(2 + 2), 16);
-        if (Number.isFinite(value) && value > 0) maxTokenId = value;
+        if (Number.isFinite(value) && value > 0) {
+          if (maxTokenId > 0 && value > maxTokenId) {
+            for (let id = maxTokenId + 1; id <= value; id += 1) freshIds.push(String(id));
+            radioLog('new inscriptions on-chain — queued for airplay', { from: maxTokenId + 1, to: value });
+          }
+          maxTokenId = value;
+        }
       }
     } catch { /* stay curated-only */ }
   };
   void discoverRange();
+  void fetchPlayable();
+  // Keep the dial aware of new mints: an open tab re-reads the indexed song list
+  // (and the contract ceiling as fallback) every 5 minutes, so a freshly
+  // inscribed song becomes playable without a reload.
+  window.setInterval(() => { void fetchPlayable(); void discoverRange(); }, 5 * 60 * 1000);
+  // STUCK-WATCHDOG: if the radio is switched on but silent for >20 s with no
+  // tune in flight, no user pause, and a prior user gesture (autoplay policy),
+  // retune automatically — the dial recovers by itself instead of needing a
+  // page refresh or an off/on cycle.
+  window.setInterval(() => {
+    if (!on || manualPause || !hadGesture) return;
+    if (!player.paused || player.seeking) return;
+    if (Date.now() - lastTuneAt < 20000) return;   // a tune/backoff is still in progress
+    radioLog('watchdog: radio is on but silent — auto-retuning');
+    void tuneToNextTrack();
+  }, 15000);
   let on = false;
   let tuneToken = 0;
   let recent = [];
   let firstTune = true;
+  // Self-healing state: the radio must never stay silently stuck — see the
+  // NO SIGNAL retry (bottom of tuneToNextTrack) and the stuck-watchdog below.
+  let noSignalRetries = 0;
+  let manualPause = false;       // user pressed pause — the watchdog must respect it
+  let lastTuneAt = 0;
+  let hadGesture = false;        // autoplay policy: only auto-retry after a real user gesture
+  try {
+    if (navigator.userActivation && navigator.userActivation.hasBeenActive) hadGesture = true;
+    document.addEventListener('pointerdown', () => { hadGesture = true; }, { capture: true, passive: true });
+  } catch { /* conservative default: stays false until a click */ }
 
   let forcedNext = null;
+  // Ordered pool for shuffle-OFF playback: liked band follows your saved list;
+  // FM plays the curated order (then known chain songs ascending, preset ALL);
+  // CHAIN walks every known song by ascending id.
+  const sequentialPool = () => {
+    if (band === 'liked') return likes.map((l) => String(l.tokenId));
+    const known = knownPool.slice().sort((a, b) => Number(a) - Number(b));
+    if (band === 'chain') return known;
+    if (preset === 'music') return playlist.slice();
+    const curatedSet = new Set(playlist);
+    return [...playlist, ...known.filter((id) => !curatedSet.has(id))];
+  };
+
   const pickNext = () => {
     let choice;
     if (forcedNext) { choice = forcedNext; forcedNext = null; recent.push(choice); if (recent.length > 8) recent.shift(); return choice; }
+    if (!shuffleMode) {
+      // IN-ORDER MODE: walk the fixed running order onward from the current
+      // song, skipping known duds AND any song that has already aired in this
+      // cycle, so EVERY other available song plays before the current one comes
+      // round again. When the whole running order has aired, the cycle resets
+      // and the sequence starts over (the current song still held back to last).
+      const pool = sequentialPool();
+      if (pool.length) {
+        const cur = currentTokenId ? String(currentTokenId) : null;
+        // Fresh power-on (nothing playing): seed the running order at a RANDOM
+        // position. The head of the chain is dense with non-song inscriptions,
+        // so walking from index 0 burned every tune attempt on duds; starting
+        // anywhere keeps in-order behaviour (walk onward from the seed) while
+        // giving each session a different playlist.
+        const start = cur ? pool.indexOf(cur) : Math.floor(Math.random() * pool.length) - 1;
+        const playableCount = pool.reduce((n, id) => n + (trackCache.get(id) === null ? 0 : 1), 0);
+        const walk = (skipPlayed) => {
+          for (let step = 1; step <= pool.length; step += 1) {
+            const candidate = pool[(start + step) % pool.length];
+            if (trackCache.get(candidate) === null) continue;      // known dud
+            if (isCoolingDown(candidate)) continue;                 // resting after a transient failure
+            if (candidate === cur && playableCount > 1) continue;  // never the current song while others remain
+            if (skipPlayed && played.has(candidate)) continue;     // already aired this cycle
+            return candidate;
+          }
+          return null;
+        };
+        // Prefer the next song that has NOT yet aired this cycle.
+        choice = walk(true);
+        // Nothing left unaired → every other available song has played, so open
+        // a fresh cycle and resume the running order (current still held to last).
+        if (!choice && pool.some((id) => trackCache.get(id) !== null && played.has(id))) {
+          pool.forEach((id) => { if (trackCache.get(id) !== null) played.delete(id); });
+          savePlayed();
+          radioLog('no-repeat cycle complete (in-order) — every other song has aired, starting a fresh cycle');
+          choice = walk(false);
+        }
+      }
+      if (choice) {
+        recent.push(choice);
+        if (recent.length > 8) recent.shift();
+        return choice;
+      }
+      // nothing playable in order (e.g. empty liked list) — fall through to
+      // the random logic below rather than going silent
+    }
     // Band routing: LIKED = your station only; CHAIN = pure exploration;
     // FM = curated (+ discovery unless preset MUSIC).
     if (band === 'liked' && likes.length) {
@@ -576,19 +912,60 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
       return choice;
     }
     const exploreChance = band === 'chain' ? 1 : (band === 'fm' && preset === 'music' ? 0 : EXPLORE_RATIO);
-    if (maxTokenId > 0 && Math.random() < exploreChance) {
-      for (let attempt = 0; attempt < 10; attempt += 1) {
+    // FRESH-MINT PRIORITY: anything inscribed since load airs next (any band with
+    // discovery enabled) — a new song shouldn't have to win the random lottery.
+    if (exploreChance > 0) {
+      while (!choice && freshIds.length) {
+        const candidate = freshIds.shift();
+        if (recent.includes(candidate) || played.has(candidate) || trackCache.get(candidate) === null) continue;
+        choice = candidate;
+      }
+    }
+    // KNOWN-POOL EXPLORATION: with the D1 station list, pick only from tokens
+    // that can actually carry audio, and the no-repeat cycle is exact — a new
+    // cycle starts precisely when every known song has aired.
+    if (!choice && knownPool.length && Math.random() < exploreChance) {
+      let candidates = knownPool.filter((id) => !recent.includes(id) && !played.has(id) && trackCache.get(id) !== null && !isCoolingDown(id));
+      // Only declare the cycle complete if PLAYED songs were what emptied the pool
+      // (an all-duds/recent pool must not wipe the no-repeat memory).
+      if (!candidates.length && knownPool.some((id) => played.has(id))) {
+        clearPlayed();
+        candidates = knownPool.filter((id) => !recent.includes(id) && trackCache.get(id) !== null);
+      }
+      if (candidates.length) choice = candidates[Math.floor(Math.random() * candidates.length)];
+    }
+    // Fallback (station list unavailable): blind random ids across the range.
+    if (!choice && !knownPool.length && maxTokenId > 0 && Math.random() < exploreChance) {
+      let playedRejects = 0;
+      for (let attempt = 0; attempt < 25; attempt += 1) {
         const candidate = String(1 + Math.floor(Math.random() * maxTokenId));
         if (recent.includes(candidate)) continue;
         if (trackCache.get(candidate) === null) continue; // known dud
+        if (isCoolingDown(candidate)) continue;
+        if (played.has(candidate)) { playedRejects += 1; continue; }  // no repeats within a cycle
         choice = candidate;
         break;
       }
+      // Every sampled candidate had already aired → the cycle is (statistically)
+      // complete. Reset and pick again so the dial keeps spinning, never repeats early.
+      if (!choice && playedRejects >= 20) {
+        clearPlayed();
+        for (let attempt = 0; attempt < 10 && !choice; attempt += 1) {
+          const candidate = String(1 + Math.floor(Math.random() * maxTokenId));
+          if (!recent.includes(candidate) && trackCache.get(candidate) !== null) choice = candidate;
+        }
+      }
     }
     if (!choice) {
-      const candidates = playlist.filter((id) => !recent.includes(id));
-      const pool = candidates.length ? candidates : playlist;
-      choice = pool[Math.floor(Math.random() * pool.length)];
+      let candidates = playlist.filter((id) => !recent.includes(id) && !played.has(id) && trackCache.get(id) !== null && !isCoolingDown(id));
+      // Curated cycle complete (everything played or a known dud) → open a new cycle for these ids.
+      if (!candidates.length && playlist.every((id) => played.has(id) || trackCache.get(id) === null)) {
+        playlist.forEach((id) => played.delete(id)); savePlayed();
+        candidates = playlist.filter((id) => !recent.includes(id) && trackCache.get(id) !== null);
+      }
+      const pool = candidates.length ? candidates : playlist.filter((id) => !recent.includes(id));
+      const finalPool = pool.length ? pool : playlist;
+      choice = finalPool[Math.floor(Math.random() * finalPool.length)];
     }
     recent.push(choice);
     if (recent.length > 8) recent.shift();
@@ -623,6 +1000,24 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     } catch { /* best-effort */ }
   };
 
+  // Power-on readiness: keep working in the background (with backoff) until
+  // at least one resolved song sits cued in the queue, so the first press of
+  // the power switch always has something buffered and ready to play.
+  let readinessDelay = 3000;
+  let readinessTimer = 0;
+  const ensureCued = () => {
+    if (preloadQueue.length > 0) { readinessDelay = 3000; return; }
+    if (readinessTimer) return;
+    readinessTimer = window.setTimeout(() => {
+      readinessTimer = 0;
+      if (!preloadQueue.length) {
+        radioLog('readiness: nothing cued yet — retrying preload', { nextDelayMs: readinessDelay });
+        void preloadNextTrack();
+      }
+    }, readinessDelay);
+    readinessDelay = Math.min(60000, readinessDelay * 2);
+  };
+
   const preloadNextTrack = async () => {
     if (preloading) return;
     preloading = true;
@@ -645,6 +1040,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
       }
     } finally {
       preloading = false;
+      ensureCued();
     }
   };
 
@@ -653,7 +1049,9 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   // nothing downloads to this browser). Big films get warm before anyone tunes in.
   const pingWarm = (ids) => {
     radioLog('warm ping', ids || 'auto=2', ids);
-    try { void fetch(ids ? `/warm?ids=${ids}` : '/warm?auto=2'); } catch { /* noop */ }
+    try {
+      void fetch(ids ? `/warm?ids=${ids}` : '/warm?auto=2').catch(() => undefined);
+    } catch { /* best-effort */ }
   };
   // Start warming a few seconds after init, off the critical page-load path.
   const idle = window.requestIdleCallback || ((fn) => window.setTimeout(fn, 2500));
@@ -666,16 +1064,14 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   // Self-paced ticker: each section holds, scrolls fully to its end so it can
   // be read in full, then advances. No fixed timers cutting text off.
   const HOLD_MS = 2400;        // pause before scrolling starts
-  const HOLD_SHORT_MS = 5000;  // dwell time for text that fits without scrolling
-  const END_HOLD_MS = 1800;    // pause at the end of a scrolled section
   const SCROLL_PX_PER_S = 26;  // reading-speed scroll
   const FILLERS = [
     'ALL MUSIC 100% ON-CHAIN',
     'NO SERVERS · NO STREAMS · JUST STACKS',
     'EVERY SONG IS AN INSCRIPTION',
     'ANCHORED TO BITCOIN VIA STACKS',
-    'INSCRIBE YOUR OWN → /agent-one',
-    'SUNO TRACK? FAST-TRACK IT → /agent-one/suno',
+    'INSCRIBE YOUR OWN → /wizard',
+    'SUNO TRACK? FAST-TRACK IT → /wizard/suno',
     'BUILD A GALLERY → /manifests',
     'FIND ARTISTS AT /g/name.btc',
     'RECORD IT · REFERENCE IT · RETRIEVE IT',
@@ -762,6 +1158,8 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
   const history = [];
   const tuneToNextTrack = async (trackOverride) => {
     const token = ++tuneToken;
+    manualPause = false;
+    lastTuneAt = Date.now();
     stopTicker();
     setNow('~ TUNING ~', false);
     const startedTuning = performance.now();
@@ -775,6 +1173,13 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
         trackOverride = null;
       } else if (preloadQueue.length) {
         track = preloadQueue.shift();    // cued ahead of time — instant
+        // A track cued before the current song settled can be stale. In normal
+        // (non-loop) play, never let it be the song already on air — that would
+        // repeat the current track ahead of the rest of the running order.
+        if (track && !player.loop && currentTokenId && String(track.tokenId) === String(currentTokenId)) {
+          radioLog(`dropped stale preload #${track.tokenId}`, 'equals the current song — avoiding an early repeat', track.tokenId);
+          track = null;
+        }
       } else {
         const tokenId = pickNext();
         track = await resolveTrack(tokenId);
@@ -808,6 +1213,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
         ]);
         setNow('', true);
         startTicker(track);
+        void fetchRelatives(track.tokenId);
         startVu();
         currentTokenId = track.tokenId || null;
         nowPlaying = { tokenId: track.tokenId, title: track.title, artist: track.artist || '', cover: track.cover || '', href: `/inscription/${track.tokenId}` };
@@ -815,6 +1221,8 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
         persist();
         if (history[history.length - 1] !== track) history.push(track);
         if (history.length > 12) history.shift();
+        markPlayed(track.tokenId);   // no-repeat: this song sits out until the cycle completes
+        noSignalRetries = 0;
         window.setTimeout(() => { void preloadNextTrack(); }, 1500);
         return;
       } catch (error) {
@@ -826,7 +1234,16 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     }
     if (token === tuneToken && on) {
       stopTicker();
-      setNow('-- NO SIGNAL — TRY AGAIN --', false);
+      // SELF-HEALING: never park on a dead dial. Widen the pool (forget the
+      // recent list), back off, and retune automatically while switched on.
+      noSignalRetries += 1;
+      recent = [];
+      const delay = Math.min(30000, 5000 * noSignalRetries);
+      setNow(`-- NO SIGNAL — RETUNING IN ${Math.round(delay / 1000)}S --`, false);
+      radioLog('no signal — scheduling auto-retune', { retry: noSignalRetries, delayMs: delay });
+      window.setTimeout(() => {
+        if (on && token === tuneToken && player.paused && hadGesture) void tuneToNextTrack();
+      }, delay);
     }
   };
 
@@ -861,6 +1278,8 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
 
   const switchOff = () => {
     on = false;
+    relatives = [];
+    relativesFor = null;
     firstTune = true;
     tuneToken += 1;
     playTuning(-1, 'off');
@@ -949,6 +1368,7 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
         currentTokenId = track.tokenId || null;
         setNow('', true);
         startTicker(track);
+        void fetchRelatives(track.tokenId);
         startVu();
         if (history[history.length - 1] !== track) history.push(track);
         window.setTimeout(() => { void preloadNextTrack(); }, 2000);
@@ -970,26 +1390,252 @@ export const initXtrataRadio = ({ tokenIds = [], stationName = 'XTRATA FM' } = {
     void resume();
   }
 
-  if (saved && BANDS.includes(saved.band)) band = saved.band;
-  if (saved && PRESETS.includes(saved.preset)) preset = saved.preset;
+  // Band/preset/shuffle/loop deliberately reset every visit — the heart
+  // (your liked songs) is the only control that remembers.
 
   // Public API for the full-screen /radio page (and anything else).
   const api = {
     switchOn, switchOff,
     isOn: () => on,
-    playPause: () => { if (!on) { switchOn(); } else if (player.paused) { void player.play(); } else { player.pause(); } },
+    playPause: () => {
+      if (!on) { switchOn(); }
+      else if (player.paused) { manualPause = false; player.play().catch(() => { void tuneToNextTrack(); }); }
+      else { manualPause = true; player.pause(); }
+    },
     next: () => skip('next'),
     prev: () => skip('prev'),
     toggleLike,
     isLiked: () => (nowPlaying ? isLiked(nowPlaying.tokenId) : false),
     getLikes: () => likes.slice(),
     cycleBand, setBand, cyclePreset,
-    getState: () => ({ on, band, preset, nowPlaying, likes: likes.slice(), volumeStep }),
+    setShuffle, toggleShuffle: () => setShuffle(!shuffleMode),
+    setLoop, toggleLoop: () => setLoop(!player.loop),
+    getState: () => stateSnapshot(),
     unlike: (id) => { likes = likes.filter((l) => l.tokenId !== String(id)); saveLikes(likes); emit(); },
     playToken: (id) => { forcedNext = String(id); if (!on) { switchOn(); } else { player.pause(); void tuneToNextTrack(); } },
     nudgeVolume,
-    subscribe: (cb) => { listeners.add(cb); cb({ on, band, preset, nowPlaying, likes: likes.slice(), volumeStep }); return () => listeners.delete(cb); }
+    subscribe: (cb) => { listeners.add(cb); cb(stateSnapshot()); return () => listeners.delete(cb); }
   };
+  // --- receiver faceplate wiring -----------------------------------------
+  const UIMIN_KEY = 'xtrata.radio.ui.min';
+  const displayEl = root.querySelector('.xtrata-radio__display');
+  const faceBtn = (name) => root.querySelector('.xtrata-radio__btn--' + name);
+  const setMin = (min) => {
+    root.classList.toggle('is-min', Boolean(min));
+    if (!dockHost) {
+      try { window.localStorage.setItem(UIMIN_KEY, min ? '1' : '0'); } catch { /* noop */ }
+    }
+  };
+  let startMin = true; // default: unobtrusive pill
+  try { startMin = window.localStorage.getItem(UIMIN_KEY) !== '0'; } catch { /* keep default */ }
+  setMin(dockHost ? true : startMin); // docked radio always rests as the header pill
+
+  const onDisplayTap = () => {
+    if (dockHost && !root.classList.contains('is-full')) {
+      // Header pill tap = open the full receiver and get music going in one move.
+      setFull(true);
+      if (!on) switchOn();
+      return;
+    }
+    if (root.classList.contains('is-min')) {
+      setMin(false);
+      if (!on) switchOn();   // one tap: open the receiver AND tune in
+      return;
+    }
+    if (!on) switchOn();
+  };
+  displayEl.addEventListener('click', onDisplayTap);
+  displayEl.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onDisplayTap(); }
+  });
+  root.querySelector('.xtrata-radio__mini').addEventListener('click', (event) => {
+    event.stopPropagation();
+    setMin(true);
+  });
+
+  faceBtn('play').addEventListener('click', (event) => { event.stopPropagation(); api.playPause(); });
+  faceBtn('heart').addEventListener('click', (event) => { event.stopPropagation(); toggleLike(); });
+  faceBtn('playlist').addEventListener('click', (event) => { event.stopPropagation(); setBand(band === 'liked' ? 'fm' : 'liked'); });
+  faceBtn('shuffle').addEventListener('click', (event) => { event.stopPropagation(); setShuffle(!shuffleMode); });
+  faceBtn('repeat').addEventListener('click', (event) => { event.stopPropagation(); setLoop(!player.loop); });
+
+  // band / preset pots: discrete positions, click to cycle
+  const bandCore = root.querySelector('.xtrata-radio__pot--band .xtrata-radio__potcore');
+  const presetCore = root.querySelector('.xtrata-radio__pot--preset .xtrata-radio__potcore');
+  const renderPots = () => {
+    if (bandCore) bandCore.style.transform = 'rotate(' + ((BANDS.indexOf(band) - 1) * 45) + 'deg)';
+    if (presetCore) presetCore.style.transform = 'rotate(' + (preset === 'music' ? 45 : -45) + 'deg)';
+  };
+  root.querySelector('.xtrata-radio__pot--band').addEventListener('click', (event) => { event.stopPropagation(); cycleBand(); });
+  root.querySelector('.xtrata-radio__pot--preset').addEventListener('click', (event) => { event.stopPropagation(); cyclePreset(); });
+
+  // artwork thumb: cover of the playing song, linking to the inscribed original
+  const artEl = root.querySelector('.xtrata-radio__art');
+  const artImg = artEl.querySelector('img');
+  artEl.addEventListener('click', (event) => event.stopPropagation());
+  const renderArt = (snap) => {
+    const np = snap.nowPlaying;
+    const cover = np && np.cover;
+    if (cover) {
+      if (artImg.getAttribute('src') !== cover) artImg.src = cover;
+      artEl.href = '/i/' + np.tokenId;
+      artEl.classList.add('has-art');
+    } else {
+      artEl.classList.remove('has-art');
+      artImg.removeAttribute('src');
+      artEl.removeAttribute('href');
+    }
+  };
+
+  // relatives strip (fullscreen only, styled in CSS)
+  const relRow = root.querySelector('.xtrata-radio__rel-row');
+  const relWrap = root.querySelector('.xtrata-radio__rel');
+  let relSignature = '';
+  const renderRelatives = (snap) => {
+    const rels = snap.relatives || [];
+    const signature = rels.map((r) => r.id + r.kind + (r.playable ? '1' : '0')).join(',');
+    if (signature === relSignature) return;
+    relSignature = signature;
+    relRow.textContent = '';
+    relWrap.classList.toggle('has-rel', rels.length > 0);
+    rels.forEach((rel) => {
+      if (rel.playable) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'xtrata-radio__rtile is-song';
+        b.title = 'Play inscription #' + rel.id;
+        b.innerHTML = '<span>\u266a</span><i>#' + rel.id + '</i>';
+        b.addEventListener('click', (event) => { event.stopPropagation(); api.playToken(rel.id); });
+        relRow.appendChild(b);
+      } else if (rel.kind === 'image') {
+        const img = document.createElement('img');
+        img.className = 'xtrata-radio__rtile is-static';
+        img.loading = 'lazy';
+        img.alt = '';
+        img.title = 'Related inscription #' + rel.id;
+        img.src = '/i/' + rel.id;
+        img.addEventListener('error', () => img.remove());
+        relRow.appendChild(img);
+      } else {
+        const t = document.createElement('span');
+        t.className = 'xtrata-radio__rtile is-static is-doc';
+        t.title = 'Related inscription #' + rel.id;
+        t.innerHTML = '<span>\u25c7</span><i>#' + rel.id + '</i>';
+        relRow.appendChild(t);
+      }
+    });
+  };
+
+  // pill quick controls: power / prev / play-pause / next without expanding
+  const pctl = root.querySelector('.xtrata-radio__pctl');
+  const ppBtn = pctl.querySelector('[data-p="pp"]');
+  pctl.addEventListener('click', (event) => {
+    const btn = event.target.closest('button');
+    if (!btn) return;
+    event.stopPropagation();
+    if (btn.dataset.p === 'power') { on ? switchOff() : switchOn(); }
+    else if (btn.dataset.p === 'prev') skip('prev');
+    else if (btn.dataset.p === 'next') skip('next');
+    else if (btn.dataset.p === 'pp') api.playPause();
+  });
+  const renderPctl = (snap) => {
+    ppBtn.textContent = snap.playing ? '\u23f8' : '\u25b6';
+    pctl.querySelector('[data-p="power"]').classList.toggle('is-lit', Boolean(snap.on));
+  };
+
+
+  // engine state -> lit buttons / pot positions / playing class
+  const renderFace = (snap) => {
+    renderArt(snap);
+    renderRelatives(snap);
+    renderPctl(snap);
+    faceBtn('heart').classList.toggle('is-lit', Boolean(snap.nowPlaying && isLiked(snap.nowPlaying.tokenId)));
+    faceBtn('playlist').classList.toggle('is-lit', snap.band === 'liked');
+    faceBtn('shuffle').classList.toggle('is-lit', Boolean(snap.shuffle));
+    faceBtn('repeat').classList.toggle('is-lit', Boolean(snap.loop));
+    root.classList.toggle('is-playing', Boolean(snap.playing));
+    renderPots();
+  };
+  listeners.add(renderFace);
+  renderFace(stateSnapshot());
+
+  // --- fullscreen mode ----------------------------------------------------
+  // Click the XTRATA FM logo (or the docked header pill) to fill the screen;
+  // Esc, ✕, or the logo again exits. Pure CSS state on the same element, so
+  // playback is never interrupted entering or leaving fullscreen.
+  const brandEl = root.querySelector('.xtrata-radio__brand');
+  const setFull = (full) => {
+    const want = Boolean(full);
+    if (want && root.classList.contains('is-min')) setMin(false);
+    root.classList.toggle('is-full', want);
+    if (!want && dockHost) setMin(true); // docked radio returns to the header pill
+  };
+  const toggleFull = () => setFull(!root.classList.contains('is-full'));
+  brandEl.title = 'Click to toggle fullscreen radio';
+  brandEl.addEventListener('click', (event) => { event.stopPropagation(); toggleFull(); });
+  root.querySelector('.xtrata-radio__fs-close').addEventListener('click', (event) => {
+    event.stopPropagation();
+    setFull(false);
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && root.classList.contains('is-full')) setFull(false);
+  });
+  api.setFullscreen = setFull;
+  api.toggleFullscreen = toggleFull;
+  api.isFullscreen = () => root.classList.contains('is-full');
+
+  // Deep link for listeners: /?radio=fullscreen (also full/fs/1/on) opens the
+  // page with the receiver already fullscreen. Autoplay needs a gesture, so a
+  // fresh session shows a tap-to-start prompt; a resumed session just plays.
+  try {
+    const wantRadio = (new URLSearchParams(window.location.search).get('radio') || '').toLowerCase();
+    if (['fullscreen', 'full', 'fs', '1', 'on'].includes(wantRadio)) {
+      setFull(true);
+      if (!(saved && saved.on && saved.tokenId)) {
+        writeScreen('▶ TAP ANYWHERE TO START THE RADIO');
+        const onceStart = () => {
+          document.removeEventListener('pointerdown', onceStart, true);
+          if (!on) switchOn();
+        };
+        document.addEventListener('pointerdown', onceStart, true);
+      }
+    }
+  } catch { /* noop */ }
+
+  // --- attract mode: while off, invite the tap ----------------------------
+  // First-ever visitors get the full treatment (pulsing display + cycling
+  // messages); anyone who has tuned in before gets a calm single invitation.
+  const EVER_ON_KEY = 'xtrata.radio.everon';
+  const everOn = () => { try { return window.localStorage.getItem(EVER_ON_KEY) === '1'; } catch { return false; } };
+  const ATTRACT_MESSAGES = [
+    '\u25b6 TAP TO TUNE IN',
+    '\u266a MUSIC LIVE FROM THE CHAIN',
+    'EVERY SONG INSCRIBED FOREVER',
+    '100% ON-CHAIN RADIO'
+  ];
+  let attractSlot = 0;
+  const attractTick = () => {
+    if (on || !screenText) return;        // engine owns the screen while on
+    if (!everOn()) {
+      screenText.textContent = ATTRACT_MESSAGES[attractSlot % ATTRACT_MESSAGES.length];
+      attractSlot += 1;
+    } else if (!screenText.textContent) {
+      screenText.textContent = '\u25b6 TAP TO TUNE IN';
+    }
+  };
+  const applyAttract = () => {
+    const off = !on;
+    root.classList.toggle('is-attract', off);
+    root.classList.toggle('is-attract--strong', off && !everOn());
+    if (off) attractTick();
+  };
+  window.setInterval(() => { if (!on) attractTick(); }, 3600);
+  listeners.add((snap) => {
+    if (snap.on) { try { window.localStorage.setItem(EVER_ON_KEY, '1'); } catch { /* noop */ } }
+    applyAttract();
+  });
+  applyAttract();
+
   window.XtrataRadio = api;
   return api;
 };

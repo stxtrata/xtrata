@@ -19,7 +19,7 @@ const expectContractOk = (value: ClarityValue, context: string) => {
 
 const parseListingTuple = (value: ClarityValue, context: string): MarketListing => {
   const tuple = expectTuple(value, context);
-  return {
+  const listing: MarketListing = {
     seller: expectPrincipal(getTupleValue(tuple, 'seller', context), `${context}.seller`),
     nftContract: expectPrincipal(
       getTupleValue(tuple, 'nft-contract', context),
@@ -32,6 +32,27 @@ const parseListingTuple = (value: ClarityValue, context: string): MarketListing 
       `${context}.created-at`
     )
   };
+  // Sponsored markets (xtrata-market-sponsored-*) extend the tuple with the
+  // fee-budget escrow fields; plain v1.0 listings simply lack these keys.
+  if (tuple['fee-budget']) {
+    listing.feeBudget = expectUInt(tuple['fee-budget'], `${context}.fee-budget`);
+    listing.budgetRemaining = expectUInt(
+      getTupleValue(tuple, 'budget-remaining', context),
+      `${context}.budget-remaining`
+    );
+    listing.claimed = expectUInt(getTupleValue(tuple, 'claimed', context), `${context}.claimed`);
+    const buyerOpt = expectOptional(
+      getTupleValue(tuple, 'buyer', context),
+      `${context}.buyer`
+    );
+    listing.buyer = buyerOpt ? expectPrincipal(buyerOpt, `${context}.buyer`) : null;
+    const soldOpt = expectOptional(
+      getTupleValue(tuple, 'sold-at', context),
+      `${context}.sold-at`
+    );
+    listing.soldAt = soldOpt ? expectUInt(soldOpt, `${context}.sold-at`) : null;
+  }
+  return listing;
 };
 
 const parseOptionalListing = (value: ClarityValue, context: string) => {

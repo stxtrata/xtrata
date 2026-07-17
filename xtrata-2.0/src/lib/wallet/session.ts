@@ -29,7 +29,10 @@ const normalizeSession = (session: WalletSession): WalletSession => {
   return {
     isConnected: true,
     address: session.address,
-    network: REQUIRED_NETWORK
+    network: REQUIRED_NETWORK,
+    ...(typeof session.publicKey === 'string' && /^[0-9a-f]{66}$/i.test(session.publicKey)
+      ? { publicKey: session.publicKey }
+      : {})
   };
 };
 

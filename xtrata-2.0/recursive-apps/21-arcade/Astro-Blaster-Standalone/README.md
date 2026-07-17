@@ -14,6 +14,10 @@ Serve this folder over HTTP (not `file://`) and open:
 You can also test the parent-style loader:
 - `parent/astro-blaster-parent.local-test.html`
 
+For the current mobile parent and sandboxed wallet flow:
+- `sandbox-test/host.html`
+- see `parent/INSCRIPTION-PLAN-V4-MOBILE.md`
+
 ## Leaf modules to inscribe
 Inscribe these first:
 1. `modules/styles.css`
@@ -26,6 +30,9 @@ Inscribe these first:
 After the 5 leaf inscriptions are minted and IDs are known:
 - update IDs with `parent/fill-inscription-ids.mjs`
 - then inscribe `parent/astro-blaster-parent.template.html` as recursive parent
+
+The mobile test release reuses all current minted leaves and needs only a new
+parent inscription: `parent/astro-blaster-parent-v4-mobile.template.html`.
 
 ## Update IDs automatically
 From this folder:

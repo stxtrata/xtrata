@@ -54,6 +54,7 @@ const SESSION_BUDGET=BigInt(process.env.MINT_SESSION_BUDGET_USTX||process.env.RE
 const DRY_RUN=process.env.DRY_RUN!=='0';
 const REQUIRE_CONFIRM=process.env.REQUIRE_CONFIRM!=='0';
 const SELFTEST_HASH='d85faf0f9f48c46fdfc959def3e64ed9126ef62538fc5fd6c5f09e37ee25c64e';
+const isAscii=value=>Array.from(value).every(character=>character.codePointAt(0)<=0x7f);
 
 function deriveStacksWallet(m){const seed=mnemonicToSeedSync(m.trim().replace(/,\s*/g,' '));const c=HDKey.fromMasterSeed(seed).derive("m/44'/5757'/0'/0/0");if(!c.privateKey)throw new Error('derivation failed');const k=bytesToHex(c.privateKey)+'01';return {senderKey:k,address:getAddressFromPrivateKey(k,NET==='testnet'?TransactionVersion.Testnet:TransactionVersion.Mainnet)};}
 const MNEMONIC=process.env.WALLET_MNEMONIC||'';
@@ -80,7 +81,7 @@ async function main(){
   if(!fs.existsSync(FILE)){console.error('artifact not found: '+FILE);process.exit(2);}
   const bytes=new Uint8Array(fs.readFileSync(FILE));
   const chunks=chunkBytes(bytes); const h=incHash(chunks); const fh=hex(h);
-  if(URI.length===0||URI.length>256||!/^[\x00-\x7F]*$/.test(URI)){console.error('bad token-uri');process.exit(2);}
+  if(URI.length===0||URI.length>256||!isAscii(URI)){console.error('bad token-uri');process.exit(2);}
   if(MIME.length>64){console.error('mime > 64');process.exit(2);}
   log({event:'artifact-built',file:FILE,bytes:bytes.length,chunks:chunks.length,inscriptionFinalHash:fh,mime:MIME,tokenUri:URI,dependencies:DEPS.map(String),parents:PARENTS.map(String),ledgerKey:LEDGER_KEY});
   if(MNEMONIC&&process.env.XTRATA_SENDER_ADDRESS&&process.env.XTRATA_SENDER_ADDRESS!==SENDER){console.error(`Address mismatch ${SENDER}`);process.exit(2);}

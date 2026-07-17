@@ -73,6 +73,12 @@ describe('bns resolver', () => {
       if (url.includes(`/v1/addresses/stacks/${address}`)) {
         return jsonResponse(404, null);
       }
+      if (url.includes('/bnsv2/') && url.includes('/names/alice.btc')) {
+        return jsonResponse(200, {
+          status: 'active',
+          data: { full_name: 'alice.btc', owner: address, is_valid: true, revoked: false }
+        });
+      }
       return htmlResponse(
         200,
         `<html><head><title>alice.btc (${address}) | Stacks Explorer</title></head></html>`
@@ -99,6 +105,12 @@ describe('bns resolver', () => {
       }
       if (url.includes(`/v1/addresses/stacks/${address}`)) {
         return jsonResponse(404, null);
+      }
+      if (url.includes('/bnsv2/') && url.includes('/names/dyle.btc')) {
+        return jsonResponse(200, {
+          status: 'active',
+          data: { full_name: 'dyle.btc', owner: address, is_valid: true, revoked: false }
+        });
       }
       return htmlResponse(
         200,
@@ -127,6 +139,12 @@ describe('bns resolver', () => {
       if (url.includes(`/v1/addresses/stacks/${address}`)) {
         return jsonResponse(404, null);
       }
+      if (url.includes('/bnsv2/') && url.includes('/names/dyle.btc')) {
+        return jsonResponse(200, {
+          status: 'active',
+          data: { full_name: 'dyle.btc', owner: address, is_valid: true, revoked: false }
+        });
+      }
       return htmlResponse(
         200,
         `<html><body><script>self.__next_f.push([1,"5:{\\"initialAddressBNSNamesData\\":{\\"names\\":[\\"dyle.btc\\"]},\\"principal\\":\\"${address}\\"}"])</script></body></html>`
@@ -142,6 +160,42 @@ describe('bns resolver', () => {
     expect(result.primary).toBe('dyle.btc');
     expect(result.names).toEqual(['dyle.btc']);
     expect(result.source).toBe('explorer-html');
+  });
+
+  it('drops a scraped explorer name that does not resolve back to the queried address', async () => {
+    const address = 'SPXGFH9JTKPF2TQZJ2AH7NSMMMXJ72VMGH8PR654';
+    const otherOwner = 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7';
+    const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes(`/names/address/${address}/valid`)) {
+        return jsonResponse(404, null);
+      }
+      if (url.includes(`/v1/addresses/stacks/${address}`)) {
+        return jsonResponse(404, null);
+      }
+      // The scraped name is really a sender/inscriber on the page; it belongs to a
+      // DIFFERENT wallet, so verification must reject it.
+      if (url.includes('/bnsv2/') && url.includes('/names/jim.btc')) {
+        return jsonResponse(200, {
+          status: 'active',
+          data: { full_name: 'jim.btc', owner: otherOwner, is_valid: true, revoked: false }
+        });
+      }
+      if (url.includes('/v1/names/jim.btc')) {
+        return jsonResponse(200, { address: otherOwner, blockchain: 'stacks' });
+      }
+      return htmlResponse(
+        200,
+        `<html><head><title>jim.btc (${address}) | Stacks Explorer</title></head></html>`
+      );
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await resolveBnsNames({ address, network: 'mainnet' });
+
+    expect(result.names).toEqual([]);
+    expect(result.primary).toBeNull();
+    expect(result.source).toBeNull();
   });
 
   it('resolves BNSv2 names from the public BNSv2 API before legacy lookups', async () => {

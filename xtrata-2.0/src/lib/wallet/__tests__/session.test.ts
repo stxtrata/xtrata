@@ -19,6 +19,20 @@ describe('wallet session store', () => {
     expect(loaded.network).toBe('mainnet');
   });
 
+  it('preserves a valid Stacks public key for sponsored transaction construction', () => {
+    const storage = createMemoryStorage();
+    const store = createWalletSessionStore(storage);
+    const publicKey = `02${'ab'.repeat(32)}`;
+    store.save({
+      isConnected: true,
+      address: 'SP2JXKMSH007NPYAQHKJPQMAQYAD90NQGTVJVQ02B',
+      network: 'mainnet',
+      publicKey
+    });
+
+    expect(store.load().publicKey).toBe(publicKey);
+  });
+
   it('clears sessions', () => {
     const storage = createMemoryStorage();
     const store = createWalletSessionStore(storage);

@@ -13,7 +13,9 @@
  *   3. base64 the Opus (.weba) produced by opus-convert.mjs + base64 the cover
  *   4. feed an { mode:'embedded', audioBase64, imageBase64, metadata } config to the
  *      vendored template (svc/vendor/HTML_Template.js, byte-identical to the tool)
- *      run in a Node `vm` shim, yielding the same `xtrata-opus-player-v4` player.
+ *      run in a Node `vm` shim, yielding the same `xtrata-opus-player-v6` player
+ *      (eye → Controls tab, hover waveform transport over the artwork, and a
+ *      2 s cursor-idle fade of all layered overlays so the artwork shows clean).
  *
  * The vendored template's `buildXtrataAudioPlayerHtml` is pure string-building, so
  * running it under a minimal `{ window }` context reproduces the browser tool's
@@ -126,13 +128,19 @@ export function isSunoSource(meta = {}, filePath = '') {
  * Returns { ok, path, bytes, mime:'text/html', title, artist, hasCover, ... } | { ok:false, reason }.
  */
 export async function buildSunoPlayer(opts = {}) {
-  const { audioWebaPath, sourcePath, outDir, titleFallback = 'Untitled', ffmpeg } = opts;
+  // `coverPath` (batch mode: per-track artwork) overrides any cover embedded in the source file.
+  const { audioWebaPath, sourcePath, coverPath, outDir, titleFallback = 'Untitled', ffmpeg } = opts;
   try {
     if (!audioWebaPath || !fs.existsSync(audioWebaPath)) return { ok: false, reason: 'audio (weba) not found' };
     const ff = ffmpeg || await resolveFfmpeg();
     const metaSrc = (sourcePath && fs.existsSync(sourcePath)) ? sourcePath : audioWebaPath;
     const meta = ff ? await extractMetadata(metaSrc, ff) : { title: '', artist: '', album: '' };
-    const cover = ff ? await extractCover(metaSrc, ff) : null;
+    let cover = ff ? await extractCover(metaSrc, ff) : null;
+    if (coverPath && fs.existsSync(coverPath)) {
+      const buf = fs.readFileSync(coverPath);
+      const mime = sniffImageMime(buf);
+      if (mime) cover = { base64: buf.toString('base64'), mime, bytes: buf.length };
+    }
     const audioBase64 = fs.readFileSync(audioWebaPath).toString('base64');
 
     const title = (meta.title || '').trim() || titleFallback;

@@ -6,10 +6,12 @@
       hexToCV,
       listCV,
       makeStandardSTXPostCondition,
+      makeContractSTXPostCondition,
       PostConditionMode,
       principalCV,
       stringAsciiCV,
-      uintCV
+      uintCV,
+      contractPrincipalCV
     } from '@stacks/transactions';
     import { createStacksWalletAdapter } from '/src/lib/wallet/adapter.ts';
     import {
@@ -33,16 +35,51 @@
       GRID_MIME_LABELS,
       EXPLORER_CODE_MIME_TYPES,
       EXPLORER_FILTER_LABELS,
-      TWIN_HOLDER_LABELS,
       PEPE_ESCROW_RESOLVERS
     } from '/src/home/config.js';
     import { initXtrataRadio } from '/src/home/radio.js';
-    import { showContractCall } from '/src/lib/wallet/connect.ts';
+    import {
+      getSelectedWalletProviderId,
+      showContractCall,
+      showSponsoredContractCall
+    } from '/src/lib/wallet/connect.ts';
     import {
       CONTRACT_REGISTRY,
       getLegacyContract
     } from '/src/lib/contract/registry.ts';
     import { getContractId } from '/src/lib/contract/config.ts';
+    import { MARKET_REGISTRY, getMarketContractId } from '/src/lib/market/registry.ts';
+    import DROPS_REGISTRY from '/src/data/drops-registry.json';
+    import {
+      getMarketSettlementAsset,
+      getMarketSettlementLabel,
+      buildMarketBuyPostConditions,
+      formatMarketPriceWithUsd
+    } from '/src/lib/market/settlement.ts';
+    import { isSponsoredMarket } from '/src/lib/market/sponsored.ts';
+    import {
+      SponsorClientError,
+      createSponsorClient
+    } from '/src/lib/market/sponsor-client.ts';
+    import {
+      isSponsorClaimConfirmedState,
+      inspectSponsoredClaimTransaction,
+      pollSponsorJob,
+      submitSponsorClaimWithRetry
+    } from '/src/lib/drops/sponsored-claim.ts';
+    import { getDropsCollectionLockForDrop } from '/src/lib/drops/collection-lock.ts';
+    import { loadDropsActivity } from '/src/lib/drops/history.ts';
+    import {
+      DEFAULT_DROP_POLICY_RULES,
+      hasBnsPolicy,
+      normalizeDropBnsName,
+      normalizeDropPolicyRules
+    } from '/src/lib/drops/policies.ts';
+    import {
+      getMarketListingPublicBlockReason,
+      isMarketListingPubliclyBuyable
+    } from '/src/lib/market/actions.ts';
+    import { loadMarketActivity } from '/src/lib/market/indexer.ts';
     import {
       buildTransferCall,
       createXtrataClient
@@ -50,7 +87,6 @@
     import { fetchContractAdminStatus } from '/src/lib/contract/admin-status.ts';
     import {
       estimateContractFees,
-      formatMicroStx,
       getFeeSchedule
     } from '/src/lib/contract/fees.ts';
     import {
@@ -59,7 +95,10 @@
     } from '/src/lib/pricing/format.ts';
     import { fetchUsdPriceBook } from '/src/lib/pricing/hooks.ts';
     import { resolveContractCapabilities } from '/src/lib/contract/capabilities.ts';
-    import { buildTransferPostCondition } from '/src/lib/contract/post-conditions.ts';
+    import {
+      buildTransferPostCondition,
+      buildContractTransferPostCondition
+    } from '/src/lib/contract/post-conditions.ts';
     import { getNetworkMismatch } from '/src/lib/network/guard.ts';
     import { getApiBaseUrls } from '/src/lib/network/config.ts';
     import { toStacksNetwork } from '/src/lib/network/stacks.ts';
@@ -101,7 +140,8 @@
     import { getWalletLookupState } from '/src/lib/wallet/lookup.ts';
     import {
       loadInscriptionThumbnailFromCache,
-      saveInscriptionThumbnailToCache
+      saveInscriptionThumbnailToCache,
+      saveTokenSummaryToCache
     } from '/src/lib/viewer/cache.ts';
     import {
       injectGridThumbnailHtml,
@@ -138,7 +178,7 @@
       recordChildParents,
       syncChildIndex
     } from '/src/lib/viewer/parent-child-index.ts';
-    import { fetchLineage } from '/src/lib/viewer/relations-api.ts';
+    import { fetchLineage, fetchDependents } from '/src/lib/viewer/relations-api.ts';
     import {
       decodeTokenUriToImage,
       fetchTokenImageFromUri,
@@ -204,6 +244,26 @@
 
     const $ = (id) => document.getElementById(id);
 
+    // Page mode classified pre-paint by the router script in index.html <head>.
+    // 'home' | 'inscribe' | 'xplorer' | 'my-wallet' — controls which panels are
+    // visible (CSS) and which data loads run (see initialize/switchToPage).
+    // Mutable: nav clicks switch pages CLIENT-SIDE (SPA-style tabs) so the
+    // radio and wallet session are never torn down between site pages.
+    let PAGE_MODE = document.documentElement.dataset.page || 'home';
+
+    const PAGE_TITLES = {
+      home: 'Xtrata — Create something the internet cannot forget',
+      inscribe: 'Inscribe — Xtrata',
+      xplorer: 'Xtrata Xplorer',
+      'my-wallet': 'My Wallet — Xtrata',
+      market: 'Market — Xtrata',
+      drops: 'Drops — Claim free inscriptions — Xtrata'
+    };
+
+    // Set once the prepare handler exists; lets setSelectedFile auto-prepare a
+    // freshly dropped file so the default flow is drop → (prepared) → inscribe.
+    let autoPrepareHook = null;
+
     const dom = {
       themeSelect: $('themeSelect'),
       refreshWalletButton: $('refreshWalletButton'),
@@ -226,6 +286,20 @@
       dropzone: $('dropzone'),
       dropzoneText: $('dropzoneText'),
       textPayload: $('textPayload'),
+      textStats: $('textStats'),
+      tabFile: $('tabFile'),
+      tabText: $('tabText'),
+      inscribePanelBody: $('inscribePanelBody'),
+      textCost: $('textCost'),
+      inscribeTextButton: $('inscribeTextButton'),
+      inscribeChange: $('inscribeChange'),
+      threadReplyTo: $('threadReplyTo'),
+      threadReplyNote: $('threadReplyNote'),
+      activityLog: $('activityLog'),
+      textAdvancedDetails: $('textAdvancedDetails'),
+      textAdvancedLogSlot: $('textAdvancedLogSlot'),
+      largeFileNotice: $('largeFileNotice'),
+      largeFileNoticeText: $('largeFileNoticeText'),
       parentRelationshipPanel: $('parentRelationshipPanel'),
       parentRelationshipBadge: $('parentRelationshipBadge'),
       parentIdsInput: $('parentIdsInput'),
@@ -233,6 +307,8 @@
       clearParentsButton: $('clearParentsButton'),
       parentChipList: $('parentChipList'),
       parentStatusList: $('parentStatusList'),
+      dependencyIdsInput: $('dependencyIdsInput'),
+      dependencyStatusList: $('dependencyStatusList'),
       payloadPreview: $('payloadPreview'),
       payloadPreviewExpandButton: $('payloadPreviewExpandButton'),
       preparedMeta: $('preparedMeta'),
@@ -247,6 +323,7 @@
       inscribeButton: $('inscribeButton'),
       resetInscriberButton: $('resetInscriberButton'),
       clearInscriberButton: $('clearInscriberButton'),
+      processingNotice: $('processingNotice'),
       stepBegin: $('stepBegin'),
       stepUpload: $('stepUpload'),
       stepSeal: $('stepSeal'),
@@ -263,11 +340,16 @@
       walletLookupButton: $('walletLookupButton'),
       walletLookupStatus: $('walletLookupStatus'),
       walletGridStatus: $('walletGridStatus'),
+      walletMarketListings: $('walletMarketListings'),
+      walletMarketListingsSummary: $('walletMarketListingsSummary'),
+      walletMarketListingsBody: $('walletMarketListingsBody'),
+      walletMarketListingsStatus: $('walletMarketListingsStatus'),
       tokenGrid: $('tokenGrid'),
       tokenPreviewPanel: $('tokenPreviewPanel'),
       tokenPreviewMedia: $('tokenPreviewMedia'),
       tokenPreviewMeta: $('tokenPreviewMeta'),
       selectedRelationships: $('selectedRelationships'),
+      selectedThread: $('selectedThread'),
       previewExpandButton: $('previewExpandButton'),
       fullscreenButton: $('fullscreenButton'),
       explorerLink: $('explorerLink'),
@@ -278,7 +360,10 @@
       explorerPageInput: $('explorerPageInput'),
       explorerTokenInput: $('explorerTokenInput'),
       explorerJumpButton: $('explorerJumpButton'),
+      explorerRandomButton: $('explorerRandomButton'),
       explorerLatestButton: $('explorerLatestButton'),
+      explorerPrevPageButton: $('explorerPrevPageButton'),
+      explorerNextPageButton: $('explorerNextPageButton'),
       explorerFilterGroup: $('explorerFilterGroup'),
       explorerFilterToggle: $('explorerFilterToggle'),
       explorerClearFiltersButton: $('explorerClearFiltersButton'),
@@ -297,6 +382,7 @@
       fullscreenCloseButton: $('fullscreenCloseButton'),
       introConnectButton: $('introConnectButton'),
       introPrepareButton: $('introPrepareButton'),
+      introMyWalletLink: $('introMyWalletLink'),
       registryModeBadge: $('registryModeBadge'),
       registryIntroLead: $('registryIntroLead'),
       introNetworkValue: $('introNetworkValue'),
@@ -478,6 +564,7 @@
       selectedEscrowHolder: null,
       selectedParentsRequestId: 0,
       selectedChildrenRequestId: 0,
+      selectedThreadRequestId: 0,
       childScanRunning: false,
       childScanCancel: false,
       childScanTokenId: null,
@@ -503,6 +590,7 @@
       // the original Pepe/Leo; the Xtrata twin is in the helper contract). These
       // are injected onto page 0 of the wallet grid, marked with the padlock.
       escrowTwinInjection: { address: null, ids: [], requestId: 0 },
+      walletMarketListings: { address: null, listings: [], requestId: 0 },
       walletTokenCache: new Map(),
       walletTokens: [],
       walletPageIndex: 0,
@@ -541,7 +629,8 @@
         });
       });
 
-    const isAscii = (value) => /^[\x00-\x7F]*$/.test(value);
+    const isAscii = (value) =>
+      Array.from(value).every((character) => character.codePointAt(0) <= 0x7f);
 
     const nowLabel = () =>
       new Intl.DateTimeFormat(undefined, {
@@ -1965,6 +2054,28 @@
       return await response.json();
     };
 
+    const fetchAddressNonce = async (address, network = 'mainnet') => {
+      const response = await fetchHiroJson(
+        `/extended/v1/address/${encodeURIComponent(address)}/nonces`,
+        network
+      );
+      const value = response?.possible_next_nonce;
+      if (typeof value !== 'number' && typeof value !== 'string') {
+        throw Object.assign(new Error('Hiro nonce response omitted possible_next_nonce.'), {
+          code: 'ORIGIN_NONCE_UNAVAILABLE'
+        });
+      }
+      try {
+        const nonce = BigInt(value);
+        if (nonce < 0n) throw new Error('negative nonce');
+        return nonce;
+      } catch {
+        throw Object.assign(new Error(`Hiro returned an invalid origin nonce (${String(value)}).`), {
+          code: 'ORIGIN_NONCE_INVALID'
+        });
+      }
+    };
+
     const parseUintRepr = (value) => {
       const match = String(value ?? '').trim().match(/^u(\d+)$/);
       return match ? BigInt(match[1]) : null;
@@ -2073,6 +2184,11 @@
       state.selectedEscrowHolderRequestId += 1;
       state.selectedEscrowHolder = null;
       clearSelectedInscriptionRelationships();
+      state.selectedThreadRequestId += 1;
+      if (dom.selectedThread) {
+        dom.selectedThread.replaceChildren();
+        dom.selectedThread.hidden = true;
+      }
       renderMeta(dom.tokenPreviewMeta, [['Status', 'None selected']]);
     };
 
@@ -2161,6 +2277,7 @@
         void resolveSelectedEscrowHolder(token);
       }
       void renderSelectedInscriptionRelationships(token);
+      void renderSelectedInscriptionThread(token);
     };
 
     const clearSelectedInscriptionRelationships = () => {
@@ -2170,6 +2287,61 @@
         dom.selectedRelationships.replaceChildren();
         dom.selectedRelationships.hidden = true;
       }
+    };
+
+    // Thread view: an inscription's dependencies are its "in reply to" links (existence-only
+    // references). Read them live from the contract so a reply shows its thread parent
+    // immediately, and make each one clickable to walk up the thread. (Reverse — a message's
+    // replies — needs a dependency index and is a separate step.)
+    const renderSelectedInscriptionThread = async (token) => {
+      const el = dom.selectedThread;
+      if (!el) return;
+      state.selectedThreadRequestId += 1;
+      const requestId = state.selectedThreadRequestId;
+      el.replaceChildren();
+      el.hidden = true;
+      if (!token || !state.client) return;
+      const contractId = getTokenCacheContractId(token);
+      // Forward (what this replies to) is a live contract read; reverse (its replies) comes
+      // from the dependents edge index. Fetch both together.
+      const [deps, dependents] = await Promise.all([
+        state.client.getDependencies(token.id, getReadOnlySenderAddress()).catch(() => []),
+        fetchDependents({ contractId, id: token.id }).catch(() => null)
+      ]);
+      if (requestId !== state.selectedThreadRequestId || state.selectedTokenId !== token.id) return;
+      const replies = dependents?.dependents ?? [];
+      if ((!deps || deps.length === 0) && replies.length === 0) return;
+
+      const makeLink = (id) => {
+        const link = document.createElement('button');
+        link.type = 'button';
+        link.className = 'selected-thread__id';
+        link.textContent = formatTokenId(id);
+        link.title = `Open ${formatTokenId(id)}`;
+        link.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          void selectToken(id, { scrollToPreview: true });
+        });
+        return link;
+      };
+      const appendGroup = (label, ids, role = 'dep') => {
+        const head = document.createElement('div');
+        head.className = `selected-thread__head selected-thread__head--${role}`;
+        head.textContent = label;
+        const row = document.createElement('div');
+        row.className = 'selected-thread__ids';
+        for (const id of ids) row.append(makeLink(id));
+        el.append(head, row);
+      };
+
+      if (deps && deps.length > 0) {
+        appendGroup(`🔗 Dependencies (${deps.length})`, deps, 'dep');
+      }
+      if (replies.length > 0) {
+        appendGroup(`🔗 Dependents (${replies.length}${dependents?.hasMore ? '+' : ''})`, replies, 'dep');
+      }
+      el.hidden = false;
     };
 
     const getCachedRelationshipSummary = (id) =>
@@ -2608,6 +2780,9 @@
 
     // Upward navigation: full ancestor lineage (Parents, Grandparents, …) read
     // live from the chain, depth-grouped.
+    // Retained for the static-host fallback path, which can be re-enabled
+    // independently of the combined relationship renderer.
+    // eslint-disable-next-line no-unused-vars
     const renderAncestorsSection = async (token, contractId, section) => {
       const requestId = ++state.selectedParentsRequestId;
       const heading = document.createElement('div');
@@ -2659,6 +2834,7 @@
     // round-trip: children, grandchildren, …, ancestors above direct parents,
     // and half-siblings). Degrades to the local IndexedDB child index + scan
     // button when the endpoint is unavailable (e.g. local/static hosting).
+    // eslint-disable-next-line no-unused-vars
     const renderLineageSection = async (token, contractId, section) => {
       const requestId = ++state.selectedChildrenRequestId;
       const status = document.createElement('div');
@@ -3273,6 +3449,9 @@
       dom.disconnectButton.disabled = busy;
       dom.themeSelect.disabled = busy;
       dom.prepareButton.disabled = busy;
+      if (dom.processingNotice) {
+        dom.processingNotice.hidden = !busy;
+      }
       updateControls();
     };
 
@@ -3357,8 +3536,8 @@
       if (!dom.connectedReadout || !dom.connectedReadoutValue || !dom.connectedReadoutAddress) {
         return;
       }
-      dom.connectedReadout.hidden = !connected || state.explorerMode;
-      if (!connected || state.explorerMode) {
+      dom.connectedReadout.hidden = !connected;
+      if (!connected) {
         dom.connectedReadoutValue.textContent = '';
         dom.connectedReadoutAddress.textContent = '';
         return;
@@ -3438,18 +3617,26 @@
       !addressesEqual(state.walletViewAddress, state.walletSession.address);
 
     const shouldClearWalletLookupOnSubmit = () => {
-      if (state.curatedGalleryId || state.walletViewAddress || state.walletViewName) {
-        return true;
-      }
-      if (!isViewingExternalConnectedWallet()) {
+      const hasActiveView =
+        !!state.curatedGalleryId ||
+        !!state.walletViewAddress ||
+        !!state.walletViewName ||
+        isViewingExternalConnectedWallet();
+      if (!hasActiveView) {
         return false;
       }
+      // Only treat the submit as "clear" (back to the default view) when the box
+      // is empty or still shows the wallet currently on screen. A NEW, different
+      // address/name means the user wants to jump straight to that wallet, so we
+      // must NOT clear first. Previously this returned true for ANY active view,
+      // which swallowed the second lookup — you had to clear, then retype the
+      // target before it would load.
       const inputValue = normalizeWalletLookupInputValue(dom.walletLookupInput.value);
       const displayValue = getWalletLookupDisplayValue();
       return (
         !inputValue ||
         inputValue === displayValue ||
-        addressesEqual(inputValue, state.walletViewAddress)
+        (!!state.walletViewAddress && addressesEqual(inputValue, state.walletViewAddress))
       );
     };
 
@@ -3625,6 +3812,10 @@
       } else if (!walletOwnsToken) {
         message = 'Only the connected owner can send this inscription.';
       }
+      const listBtn = $('listForSaleButton');
+      if (listBtn) listBtn.disabled = state.selectedTokenId === null || !state.walletSession.isConnected;
+      const dropBtn = $('dropItButton');
+      if (dropBtn) dropBtn.disabled = state.busy || !walletOwnsToken;
       dom.transferButton.disabled =
         state.busy ||
         state.transferPending ||
@@ -3678,6 +3869,13 @@
       document.body.classList.toggle('has-ledger', hasLedger);
       document.body.classList.toggle('has-public-ledger', hasPublicLedger);
       document.body.classList.toggle('explorer-mode', state.explorerMode);
+      // Viewing a specific wallet inside Xplorer: hide the global-feed controls
+      // (page/token jump + type filters) to avoid confusion — they don't apply
+      // to a single wallet's holdings.
+      document.body.classList.toggle(
+        'explorer-wallet-view',
+        state.explorerMode && !!state.walletViewAddress
+      );
       document.body.classList.toggle('intro-mode', !hasLedger && !state.explorerMode);
       if (dom.walletTitle) {
         if (state.explorerMode) {
@@ -3697,22 +3895,30 @@
         dom.introContractValue.textContent = getContractId(state.contract);
       }
       if (dom.registryModeBadge) {
-        dom.registryModeBadge.textContent = hasLedger ? 'Live registry view' : 'Permanent media records';
+        dom.registryModeBadge.textContent =
+          PAGE_MODE === 'home'
+            ? 'A living world of permanent digital objects'
+            : hasLedger
+              ? 'Live registry view'
+              : 'Permanent media records';
       }
       if (dom.registryIntroLead) {
-        dom.registryIntroLead.textContent = state.curatedGalleryTitle
-          ? `${state.curatedGalleryTitle} is open below in Wallet Inscriptions.`
-          : state.homeLatestView
-          ? 'The latest Xtrata inscriptions are open below in Wallet Inscriptions.'
-          : !viewingAddress
-          ? 'Create and hold durable records for songs, masters, artwork, credits, documents, apps, and collaboration history, anchored to Bitcoin through Stacks.'
-          : !connected && count === 0
-            ? 'Public wallet lookup is active, but this contract has no inscriptions for that address yet.'
-            : connected && count === 0
-              ? 'Your wallet is connected, but this contract has no inscriptions for it yet. Start with a simple record, then the page will open into the full registry ledger view.'
-              : connected
-                ? `Wallet connected with ${count} inscription${count === 1 ? '' : 's'}. Switching into the fuller registry view.`
-                : `Public ledger view loaded with ${count} inscription${count === 1 ? '' : 's'} available for this address.`;
+        dom.registryIntroLead.textContent =
+          PAGE_MODE === 'home'
+            ? 'Make, collect, trade, connect and build with songs, art, apps, games and ideas that live fully on-chain.'
+            : state.curatedGalleryTitle
+              ? `${state.curatedGalleryTitle} is open below in Wallet Inscriptions.`
+              : state.homeLatestView
+                ? 'The latest Xtrata inscriptions are open below in Wallet Inscriptions.'
+                : !viewingAddress
+                  ? 'Create and hold durable records for songs, masters, artwork, credits, documents, apps, and collaboration history, anchored to Bitcoin through Stacks.'
+                  : !connected && count === 0
+                    ? 'Public wallet lookup is active, but this contract has no inscriptions for that address yet.'
+                    : connected && count === 0
+                      ? 'Your wallet is connected, but this contract has no inscriptions for it yet. Start with a simple record, then the page will open into the full registry ledger view.'
+                      : connected
+                        ? `Wallet connected with ${count} inscription${count === 1 ? '' : 's'}. Switching into the fuller registry view.`
+                        : `Public ledger view loaded with ${count} inscription${count === 1 ? '' : 's'} available for this address.`;
       }
       if (dom.introStateValue) {
         dom.introStateValue.textContent = state.curatedGalleryTitle
@@ -3727,6 +3933,9 @@
       }
       if (dom.introConnectButton) {
         dom.introConnectButton.hidden = connected;
+      }
+      if (dom.introMyWalletLink) {
+        dom.introMyWalletLink.hidden = !connected;
       }
     };
 
@@ -3744,9 +3953,9 @@
         connected && document.body.classList.contains('has-ledger') && visibleWalletCount > 0;
       const hasGridBackTarget =
         (hasConnectedInscriptionView || state.explorerMode) && state.selectedTokenId !== null;
-      dom.connectButton.hidden = connected || state.explorerMode;
-      dom.disconnectButton.hidden = !connected || state.explorerMode;
-      dom.viewInscriptionsButton.hidden = !hasConnectedInscriptionView || state.explorerMode;
+      dom.connectButton.hidden = connected;
+      dom.disconnectButton.hidden = !connected;
+      dom.viewInscriptionsButton.hidden = !hasConnectedInscriptionView;
       dom.viewInscriptionsButton.disabled = state.busy;
       dom.backToGridButton.hidden = !hasGridBackTarget;
       dom.inscribeButton.disabled =
@@ -3864,6 +4073,8 @@
         dom.walletPageReadout.textContent = 'Latest matches';
         dom.walletPrevButton.disabled = true;
         dom.walletNextButton.disabled = true;
+        if (dom.explorerPrevPageButton) dom.explorerPrevPageButton.disabled = true;
+        if (dom.explorerNextPageButton) dom.explorerNextPageButton.disabled = true;
         return;
       }
       const pageCount = getWalletPageCount();
@@ -3882,6 +4093,8 @@
         state.walletLoadingPage ||
         !hasPages ||
         state.walletPageIndex >= pageCount - 1;
+      if (dom.explorerPrevPageButton) dom.explorerPrevPageButton.disabled = dom.walletPrevButton.disabled;
+      if (dom.explorerNextPageButton) dom.explorerNextPageButton.disabled = dom.walletNextButton.disabled;
     };
 
     const syncExplorerFilterControls = () => {
@@ -4054,7 +4267,9 @@
               title: state.selectedFile.name
             },
             ['Size', formatBytes(BigInt(state.selectedFile.size))],
-            ['Next step', 'Add parents, then click Prepare']
+            // Parents/dependencies are OPTIONAL — say so, and explain the
+            // transient locked state while the quote re-prepares.
+            ['Next step', 'Preparing quote - Start unlocks in a moment (parents/dependencies are optional)']
           ]);
         } else {
           clearElement(dom.payloadPreview, 'No payload');
@@ -4062,6 +4277,8 @@
         }
         dom.duplicateWarning.classList.remove('on');
         renderResumeNotice();
+        if (dom.inscribeTextButton) dom.inscribeTextButton.disabled = true;
+        if (dom.largeFileNotice) dom.largeFileNotice.hidden = true;
         updateControls();
         return;
       }
@@ -4231,6 +4448,21 @@
         dom.duplicateWarning.classList.remove('on');
       }
       renderResumeNotice();
+      // Streamlined text card: cost is the flat rate (shown by syncTextCard); just keep the
+      // inscribe button in sync once the background prepare is ready.
+      if (dom.inscribeTextButton) {
+        const textCardBytes = new TextEncoder().encode(dom.textPayload.value).length;
+        dom.inscribeTextButton.disabled = !(state.prepared && textCardBytes > 0 && textCardBytes <= 16384 && !state.busy);
+      }
+      // Large-file nudge: over the single-tx limit (> 512 KB) → suggest the Wizard (non-blocking).
+      if (dom.largeFileNotice) {
+        const staged = !!state.prepared && transactionCount > 1;
+        dom.largeFileNotice.hidden = !staged;
+        if (staged && dom.largeFileNoticeText) {
+          dom.largeFileNoticeText.textContent =
+            `At ${formatBytes(BigInt(state.prepared.bytes))} it's over the 512 KB single-transaction limit, so inscribing it here takes ${transactionCount} wallet signatures. It's completely safe — the Wizard just does the whole thing in one click and one payment.`;
+        }
+      }
       updateControls();
     };
 
@@ -4387,6 +4619,7 @@
         dependencyIds,
         parentIds
       };
+      const prepared = state.prepared; // capture: fee writes below target THIS object, even if a concurrent edit nulls state.prepared
       const mintAttempt = {
         contractId: getContractId(state.contract),
         expectedHashHex,
@@ -4416,11 +4649,15 @@
         state.duplicateId = null;
       }
 
+      // If a keystroke or clear replaced/nulled state.prepared during the hash check above,
+      // this prepare is stale — stop before touching it (a late quote must never crash).
+      if (state.prepared !== prepared) return;
+
       // Quote the exact fees the core will charge so the user is told the real
       // cost and each transaction's post-condition caps at the right amount.
       // Single-tx: one flat fee. Staged: begin-fee on begin, seal-fee on seal.
-      state.prepared.singleTxFeeMicroStx = null;
-      state.prepared.stagedFee = null;
+      prepared.singleTxFeeMicroStx = null;
+      prepared.stagedFee = null;
       const capabilities = resolveContractCapabilities(state.contract);
       if (capabilities.supportsNativeSingleTx === true && chunks.length > 0) {
         if (chunks.length <= SMALL_MINT_HELPER_MAX_CHUNKS) {
@@ -4430,9 +4667,9 @@
               BigInt(chunks.length),
               sender
             );
-            state.prepared.singleTxFeeMicroStx = Number(quoted);
+            prepared.singleTxFeeMicroStx = Number(quoted);
           } catch (error) {
-            state.prepared.singleTxFeeMicroStx = null;
+            prepared.singleTxFeeMicroStx = null;
           }
         }
         try {
@@ -4441,13 +4678,13 @@
             BigInt(chunks.length),
             sender
           );
-          state.prepared.stagedFee = {
+          prepared.stagedFee = {
             beginMicroStx: Number(staged.beginFee),
             sealMicroStx: Number(staged.sealFee),
             totalMicroStx: Number(staged.totalFee)
           };
         } catch (error) {
-          state.prepared.stagedFee = null;
+          prepared.stagedFee = null;
         }
       }
 
@@ -4492,11 +4729,14 @@
       });
     };
 
-    const waitForTransactionConfirmation = async (txId, label) => {
+    const waitForTransactionConfirmation = async (
+      txId,
+      label,
+      { pollIntervalMs = 8000, timeoutMs = 45 * 60 * 1000 } = {}
+    ) => {
       const normalizedTxId = normalizeTxId({ txId });
       const apiBases = getApiBaseUrls(state.contract.network);
       const startedAt = Date.now();
-      const timeoutMs = 45 * 60 * 1000;
       appendLog(
         `${label} submitted. Waiting for on-chain confirmation before continuing.`,
         'waiting'
@@ -4508,7 +4748,7 @@
           'wait',
           'amber'
         );
-        await sleep(8000);
+        await sleep(pollIntervalMs);
         for (const apiBase of apiBases) {
           try {
             const response = await fetch(
@@ -4693,6 +4933,19 @@
     };
 
     const runInscription = async () => {
+      // Not an error — inscribing just needs a connected wallet. Prompt gently (amber) and
+      // open the connect flow instead of failing; no busy lock is taken on this path.
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        setStatus(
+          dom.walletStatus,
+          '<strong>Connect your wallet</strong> to inscribe — it only takes a moment.',
+          'connect wallet',
+          'amber'
+        );
+        appendLog('Connect your wallet to inscribe.', 'support');
+        try { await connectWallet(); } catch (_) {}
+        return;
+      }
       setBusy(true);
       resetSteps();
       let flowStarted = false;
@@ -5046,6 +5299,133 @@
 
     const getTokenCacheContractId = (token) =>
       token.sourceContractId ?? getContractId(getTokenClient(token).contract);
+
+    const requestIndexedOwnerRefresh = async (tokens) => {
+      const byContract = new Map();
+      for (const token of tokens) {
+        const contractId = getTokenCacheContractId(token);
+        const ids = byContract.get(contractId) ?? new Set();
+        ids.add(token.id.toString());
+        byContract.set(contractId, ids);
+      }
+      for (const [contractId, ids] of byContract.entries()) {
+        try {
+          const response = await fetch(
+            `/index/${encodeURIComponent(contractId)}?id=${encodeURIComponent([...ids].join(','))}`,
+            { method: 'POST', headers: { accept: 'application/json' } }
+          );
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          debugLog('readonly', 'ownership index repair requested', {
+            contractId,
+            tokenIds: [...ids]
+          });
+        } catch (error) {
+          debugLog('readonly', 'ownership index repair request failed', {
+            contractId,
+            tokenIds: [...ids],
+            error: error instanceof Error ? error.message : String(error)
+          }, 'warn');
+        }
+      }
+    };
+
+    // Content summaries are aggressively cached, but ownership is mutable.
+    // Whenever a live get-owner read or Hiro holdings page gives us a newer
+    // owner, repair every in-memory summary view and the short-lived IndexedDB
+    // summary so stale mint-time ownership cannot leak back into Xplorer.
+    const updateCachedTokenOwner = (token, owner) => {
+      const normalizedOwner = owner?.trim() ?? '';
+      if (!token || !normalizedOwner) {
+        return token;
+      }
+      const metaOwner = token.meta?.owner ?? null;
+      const ownerChanged = !addressesEqual(token.owner, normalizedOwner);
+      const metaOwnerChanged = token.meta && !addressesEqual(metaOwner, normalizedOwner);
+      if (!ownerChanged && !metaOwnerChanged) {
+        return token;
+      }
+      const updated = {
+        ...token,
+        owner: normalizedOwner,
+        meta: token.meta ? { ...token.meta, owner: normalizedOwner } : token.meta
+      };
+      const key = token.id.toString();
+      state.walletTokenCache.set(key, updated);
+      state.walletTokens = state.walletTokens.map((entry) =>
+        entry.id === token.id ? updated : entry
+      );
+      for (const cache of state.summaryCacheScopes.values()) {
+        if (cache.has(key)) {
+          cache.set(key, updated);
+        }
+      }
+      void saveTokenSummaryToCache(
+        getTokenCacheContractId(updated),
+        updated.id,
+        updated,
+        { maxAgeMs: 5 * 60 * 1000 }
+      );
+      return updated;
+    };
+
+    // IDs returned by Hiro's wallet-holdings endpoint are authoritative direct
+    // holdings. Do not apply this shortcut to injected Forever Twins, whose
+    // Xtrata owner is intentionally an escrow helper contract.
+    const applyKnownWalletOwner = (ids, walletAddress) => {
+      const injected = new Set(getInjectedEscrowTwinIds().map((id) => id.toString()));
+      const corrected = [];
+      for (const id of ids) {
+        if (injected.has(id.toString())) {
+          continue;
+        }
+        const token = state.walletTokenCache.get(id.toString()) ?? null;
+        if (token) {
+          const ownerWasStale = !addressesEqual(token.owner, walletAddress);
+          const updated = updateCachedTokenOwner(token, walletAddress);
+          if (ownerWasStale) corrected.push(updated);
+        }
+      }
+      if (corrected.length) void requestIndexedOwnerRefresh(corrected);
+    };
+
+    const refreshSelectedTokenOwner = async (token, requestId) => {
+      try {
+        const sourceClient = token.sourceContractId
+          ? getGalleryReadClient(token.sourceContractId)
+          : null;
+        const client = sourceClient ?? getTokenClient(token);
+        const liveOwner = await client.getOwner(token.id, getReadOnlySenderAddress());
+        if (
+          !liveOwner ||
+          requestId !== state.tokenPreviewRequestId ||
+          state.selectedTokenId !== token.id
+        ) {
+          return;
+        }
+        const current = getSelectedToken() ?? token;
+        const previousOwner = current.owner ?? null;
+        const updated = updateCachedTokenOwner(current, liveOwner);
+        if (!addressesEqual(previousOwner, liveOwner)) {
+          state.selectedOwnerNameRequestId += 1;
+          state.selectedEscrowHolder = null;
+          debugLog('readonly', 'selected owner corrected from live chain state', {
+            tokenId: token.id.toString(),
+            indexedOwner: previousOwner ? truncateMiddle(previousOwner, 8, 8) : null,
+            liveOwner: truncateMiddle(liveOwner, 8, 8)
+          });
+          renderSelectedInscriptionMeta(updated);
+          updateTransferControls();
+          void requestIndexedOwnerRefresh([updated]);
+        }
+      } catch (error) {
+        debugLog('readonly', 'selected live owner check failed', {
+          tokenId: token.id.toString(),
+          error: error instanceof Error ? error.message : String(error)
+        }, 'warn');
+      }
+    };
 
     const getThumbnailKey = (token) =>
       `${getTokenCacheContractId(token)}:${token.id.toString()}`;
@@ -6792,12 +7172,12 @@
           card.classList.add('token-card--escrowed');
           const lock = document.createElement('span');
           lock.className = 'token-escrow-badge';
-          lock.textContent = '🔒';
-          lock.setAttribute('aria-hidden', 'false');
+          lock.innerHTML =
+            '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" focusable="false"><path fill="currentColor" d="M18.6 6.62c-1.44 0-2.8.56-3.77 1.53L12 10.66 10.48 12h.01L7.8 14.39c-.64.64-1.49.99-2.4.99-1.87 0-3.39-1.51-3.39-3.38S3.53 8.62 5.4 8.62c.91 0 1.76.35 2.44 1.03l1.13 1 1.51-1.34L9.22 8.2C8.2 7.18 6.84 6.62 5.4 6.62 2.42 6.62 0 9.04 0 12s2.42 5.38 5.4 5.38c1.44 0 2.8-.56 3.77-1.53l2.83-2.5.01.01L14.2 9.61c.64-.64 1.49-.99 2.4-.99 1.87 0 3.39 1.51 3.39 3.38s-1.52 3.38-3.39 3.38c-.9 0-1.76-.35-2.44-1.03l-1.14-1.01-1.51 1.34 1.27 1.12c1.02 1.02 2.37 1.57 3.82 1.57 2.98 0 5.4-2.42 5.4-5.38s-2.42-5.37-5.4-5.37z"/></svg>';
           lock.setAttribute('role', 'img');
-          lock.setAttribute('aria-label', 'Escrowed Forever Twin');
+          lock.setAttribute('aria-label', 'Forever Twin');
           lock.title =
-            'Escrowed Forever Twin — the Xtrata twin is locked in the Forever Twin contract while the holder keeps the original collection NFT.';
+            'Forever Twin — this Xtrata inscription is bound to an original collection NFT through the Forever Twin contract.';
           card.append(lock);
         }
         const thumb = document.createElement('div');
@@ -7078,6 +7458,7 @@
 
       clearElement(dom.tokenPreviewMedia, 'Loading');
       renderSelectedInscriptionMeta(token);
+      void refreshSelectedTokenOwner(token, requestId);
       if (options.scrollToPreview && isMatureMobileWalletView()) {
         window.requestAnimationFrame(scrollToSelectedPreview);
       }
@@ -7198,6 +7579,30 @@
       state.walletLookupPending = false;
     };
 
+    // Keep the address bar in step with the wallet actually on screen, so the
+    // URL is correct/shareable and a refresh reopens the same wallet. Uses
+    // replaceState (no history spam) — a .btc name is preferred for readability,
+    // otherwise the raw address.
+    const applyWalletViewUrl = (nameOrAddress) => {
+      const value = (nameOrAddress ?? '').toString().replace(/\.btc$/i, '').trim();
+      try {
+        if (!value) {
+          clearWalletViewUrl();
+          return;
+        }
+        window.history.replaceState(null, '', `/?wallet=${encodeURIComponent(value)}`);
+      } catch (_) {
+        // history API unavailable — non-fatal
+      }
+    };
+    const clearWalletViewUrl = () => {
+      try {
+        window.history.replaceState(null, '', state.explorerMode ? '/xplorer' : '/my-wallet');
+      } catch (_) {
+        // non-fatal
+      }
+    };
+
     const clearWalletLookupToConnectedWallet = async () => {
       state.walletViewRequestId += 1;
       cancelWalletLookup();
@@ -7216,8 +7621,13 @@
       dom.walletLookupInput.value = '';
       updateWalletLookupInputMode();
 
-      appendLog('Returned to connected wallet view.');
+      appendLog(
+        state.explorerMode
+          ? 'Cleared wallet view — showing the latest inscriptions.'
+          : 'Returned to connected wallet view.'
+      );
 
+      clearWalletViewUrl();
       updateWalletStatus();
       await loadWalletInscriptions();
       updateControls();
@@ -7245,10 +7655,18 @@
       state.curatedGalleryTitle = null;
       state.homeLatestView = false;
       clearExampleDescription();
+      // Drop the previous wallet's selected inscription so the preview panel
+      // never shows a stale token from the wallet we just left.
+      clearSelectedTokenPreview();
 
       if (dom.walletLookupInput) {
         dom.walletLookupInput.value = isConnectedAddress ? '' : normalized;
         updateWalletLookupInputMode();
+      }
+      if (isConnectedAddress) {
+        clearWalletViewUrl();
+      } else {
+        applyWalletViewUrl(normalized);
       }
       appendLog(`Viewing wallet: ${truncateMiddle(normalized, 8, 8)}.`);
       updateWalletStatus();
@@ -7308,9 +7726,15 @@
         state.curatedGalleryTitle = null;
         state.homeLatestView = false;
         clearExampleDescription();
+        clearSelectedTokenPreview();
 
         dom.walletLookupInput.value = isConnectedAddress ? '' : baseLookupState.lookupAddress;
         updateWalletLookupInputMode();
+        if (isConnectedAddress) {
+          clearWalletViewUrl();
+        } else {
+          applyWalletViewUrl(baseLookupState.lookupAddress);
+        }
         appendLog(`Viewing wallet: ${truncateMiddle(baseLookupState.lookupAddress, 8, 8)}.`);
         updateWalletStatus();
         await loadWalletInscriptions(options);
@@ -7360,8 +7784,14 @@
         state.curatedGalleryId = null;
         state.curatedGalleryTitle = null;
         state.homeLatestView = false;
+        clearSelectedTokenPreview();
         dom.walletLookupInput.value = isConnectedAddress ? '' : toBtcLookupLabel(lookupName);
         updateWalletLookupInputMode();
+        if (isConnectedAddress) {
+          clearWalletViewUrl();
+        } else {
+          applyWalletViewUrl(lookupName);
+        }
         state.walletLookupNotice = null;
         appendLog(
           `Resolved ${lookupName} to ${truncateMiddle(resolvedLookupState.resolvedAddress, 8, 8)}.`
@@ -7684,6 +8114,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
     // Fetch (cached per primary contract) the set of primary-minted token ids
     // that fall within the legacy id range, so reads can be routed in one shot.
+    // Retained with the legacy routing cache while older-contract reads remain
+    // supported; the active bulk path no longer calls it directly.
+    // eslint-disable-next-line no-unused-vars
     const getPrimaryMintedIdSet = async (sender, legacyMaxId) => {
       if (!state.client || legacyMaxId === null) {
         return null;
@@ -7893,7 +8326,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           indexedSummaries = await fetchIndexedSummaries({
             primaryContractId: summaryContext.primaryContractId,
             lineageContractIds: summaryContext.lineageContractIds,
-            ids: idsToResolve
+            ids: idsToResolve,
+            bypassCache: options.force === true
           });
         } catch (error) {
           indexedSummaries = null;
@@ -8223,6 +8657,78 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         `Latest inscription #${latest.toString()}. Page ${state.walletPageIndex + 1} of ${pageCount}.`;
     };
 
+    const syncExplorerPageUrl = () => {
+      // Keep the address bar shareable: token selections write /x/<id> (see
+      // selectToken); plain grid pages write /xplorer?p=<n> so copied links and
+      // reload/back restore the position.
+      if (!state.explorerMode || state.selectedTokenId !== null) {
+        return;
+      }
+      try {
+        const url = new URL(window.location.href);
+        url.pathname = '/xplorer';
+        url.search = state.walletPageIndex > 0 ? `?p=${state.walletPageIndex + 1}` : '';
+        url.hash = '';
+        window.history.replaceState(null, '', url.toString());
+      } catch {
+        // Leave the URL untouched if history access fails.
+      }
+    };
+
+    const prefetchAdjacentExplorerPages = () => {
+      // Warm the summary cache for the neighbouring pages while the browser is
+      // idle so Prev/Next feel instant. Unfiltered explorer only — filtered id
+      // sets already live in memory once indexed.
+      if (!state.explorerMode || hasActiveExplorerFilters()) {
+        return;
+      }
+      const latest = state.explorerLatestTokenId;
+      if (!latest || latest <= 0n) {
+        return;
+      }
+      const idle = window.requestIdleCallback || ((fn) => window.setTimeout(fn, 1200));
+      idle(() => {
+        if (!state.explorerMode || state.walletLoadingPage) {
+          return;
+        }
+        const pageCount = getWalletPageCount();
+        const ids = [];
+        for (const pageIndex of [state.walletPageIndex + 1, state.walletPageIndex - 1]) {
+          if (pageIndex < 0 || pageIndex >= pageCount) {
+            continue;
+          }
+          const start = BigInt(pageIndex * WALLET_PAGE_SIZE) + 1n;
+          if (start > latest) {
+            continue;
+          }
+          const end =
+            start + BigInt(WALLET_PAGE_SIZE - 1) > latest
+              ? latest
+              : start + BigInt(WALLET_PAGE_SIZE - 1);
+          for (let id = start; id <= end; id += 1n) {
+            if (!state.walletTokenCache.has(id.toString())) {
+              ids.push(id);
+            }
+          }
+        }
+        if (ids.length === 0) {
+          return;
+        }
+        void fetchWalletTokenSummaries(ids)
+          .then((summaries) => {
+            for (const token of summaries) {
+              state.walletTokenCache.set(token.id.toString(), token);
+            }
+            debugLog('grid', 'adjacent explorer pages prefetched', {
+              prefetched: summaries.length
+            });
+          })
+          .catch(() => {
+            // Prefetch is best-effort; the normal load path handles errors.
+          });
+      });
+    };
+
     const loadExplorerPage = async (options = {}) => {
       const startedAt = performance.now();
       const homeLatest = !!options.homeLatest;
@@ -8298,6 +8804,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       updateFullscreenControls();
       updateExplorerStatus();
 
+      // Everything below runs under one try/finally: a thrown error anywhere
+      // in the page load must never strand walletLoadingPage=true, which used
+      // to grey out Prev/Next (and the jump controls) until a full reload.
+      let pageIds = [];
+      try {
       if (state.walletPageIds.length === 0) {
         state.walletTokens = [];
         state.selectedTokenId = null;
@@ -8314,11 +8825,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           'amber'
         );
         renderTokenGrid();
-        state.walletLoadingPage = false;
-        updateControls();
-        updateWalletPagerControls();
-        updateFullscreenControls();
-        updateExplorerStatus();
         debugLog('grid', 'explorer page load finished empty', {
           ...getGridDebugContext(state.walletPageIds),
           options: formatDebugOptions(options),
@@ -8338,7 +8844,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         'blue'
       );
 
-      const pageIds = getWalletPageIds();
+      pageIds = getWalletPageIds();
       const primedSummaries = primeWalletTokenCacheFromSummaryCache(pageIds, {
         force: !!options.force
       });
@@ -8357,7 +8863,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       });
       renderTokenGrid();
 
-      try {
         if (missingIds.length > 0 || options.force) {
           const idsToFetch = options.force ? pageIds : missingIds;
           const summaries = await fetchWalletTokenSummaries(idsToFetch, {
@@ -8419,6 +8924,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           options: formatDebugOptions(options),
           ms: Math.round(performance.now() - startedAt)
         });
+        if (state.explorerMode && !options.homeLatest) {
+          syncExplorerPageUrl();
+          prefetchAdjacentExplorerPages();
+        }
       }
     };
 
@@ -8447,6 +8956,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       state.walletLoadingPage = true;
       updateWalletPagerControls();
       updateFullscreenControls();
+      // One try/finally for the whole load — see loadExplorerPage: an error must
+      // never strand walletLoadingPage=true (stuck greyed-out pager buttons).
+      let pageIds = [];
+      try {
       if (state.walletUsesPagedHoldings && !options.pageAlreadyLoaded) {
         try {
           const contractId = getContractId(state.contract);
@@ -8466,9 +8979,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             sourceBase: summarizeApiBase(page.sourceBase)
           });
         } catch (error) {
-          state.walletLoadingPage = false;
-          updateWalletPagerControls();
-          updateFullscreenControls();
           debugLog('grid', 'wallet page holdings request failed', {
             options: formatDebugOptions(options),
             wallet: truncateMiddle(viewingAddress, 8, 8),
@@ -8479,7 +8989,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         }
       }
 
-      const pageIds = getWalletPageIds();
+      pageIds = getWalletPageIds();
       debugLog('grid', 'wallet page ids resolved', {
         ...getGridDebugContext(pageIds),
         options: formatDebugOptions(options)
@@ -8490,9 +9000,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         void closeFullscreenViewer();
         void updateWalletTokenUriHeadPreview(null);
         renderTokenGrid();
-        state.walletLoadingPage = false;
-        updateWalletPagerControls();
-        updateFullscreenControls();
         debugLog('grid', 'wallet page load finished empty', {
           ...getGridDebugContext(pageIds),
           options: formatDebugOptions(options),
@@ -8519,7 +9026,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       });
       renderTokenGrid({ deferHydration: !!options.deferHydration });
 
-      try {
         if (missingIds.length > 0 || options.force) {
           const idsToFetch = options.force ? pageIds : missingIds;
           const summaries = await fetchWalletTokenSummaries(idsToFetch, {
@@ -8539,6 +9045,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             summaryCacheSize: state.walletTokenCache.size
           });
         }
+        applyKnownWalletOwner(pageIds, viewingAddress);
         state.walletTokens = pageIds
           .map((id) => state.walletTokenCache.get(id.toString()) ?? null)
           .filter((token) => !!token);
@@ -8564,12 +9071,24 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     };
 
     const loadWalletInscriptions = async (options = {}) => {
-      if (state.explorerMode) {
+      // In Xplorer (explorer mode) the grid defaults to the global latest feed —
+      // BUT an explicit wallet lookup must take precedence, otherwise submitting a
+      // name/address in the "View wallet" box just reloaded the latest feed and the
+      // requested wallet never appeared (it only worked once explorer mode had been
+      // left). When a wallet is being viewed, fall through and load its holdings;
+      // clearing the lookup (walletViewAddress → null) returns to the default feed.
+      if (state.explorerMode && !state.walletViewAddress) {
         await loadExplorerPage({ refreshLatest: true, force: true });
         return;
       }
       const viewingAddress = getViewingWalletAddress();
       if (!viewingAddress) {
+        state.walletMarketListings = {
+          address: null,
+          listings: [],
+          requestId: (state.walletMarketListings.requestId ?? 0) + 1
+        };
+        renderWalletMarketListings();
         state.walletTokenIds = [];
         state.walletPageIds = [];
         state.walletTotalCount = 0;
@@ -8595,6 +9114,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         updateTransferControls();
         return;
       }
+
+      // Market escrow is still seller-controlled ownership. Load it alongside
+      // direct NFT holdings so a listed inscription never disappears from the
+      // seller's My Wallet view.
+      void refreshWalletMarketListings(viewingAddress);
 
       setStatus(dom.walletGridStatus, '<strong>Grid</strong> loading wallet holdings', 'loading', 'blue');
       renderTokenGridPlaceholders('...');
@@ -8757,6 +9281,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         refreshConnectedWalletMatureMode();
         appendLog(state.walletSession.address ? `Wallet connected: ${truncateMiddle(state.walletSession.address)}` : 'Wallet connection cancelled.');
         updateWalletStatus();
+        if (PAGE_MODE === 'drops') {
+          renderDrops();
+        }
         await fetchAdminStatus();
         await refreshParentChecks();
         if (state.prepared) {
@@ -8764,6 +9291,24 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           renderPreparedState();
         }
         await loadWalletInscriptions();
+        if (PAGE_MODE === 'market') {
+          renderMarketListings();
+          renderSellerDashboard();
+        }
+        if (PAGE_MODE === 'home' && state.walletSession.isConnected && state.walletSession.address) {
+          // A wallet that connects on the landing page and holds inscriptions
+          // goes straight to its ledger on the My Wallet page.
+          const holdingCount =
+            (state.walletUsesPagedHoldings
+              ? state.walletTotalCount
+              : state.walletTokenIds.length) + getInjectedEscrowTwinIds().length;
+          if (holdingCount > 0) {
+            appendLog('Opening My Wallet with your inscriptions…');
+            window.history.pushState(null, '', '/my-wallet');
+            void switchToPage('my-wallet');
+            return;
+          }
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         appendLog(`Wallet connect failed: ${message}`);
@@ -8771,6 +9316,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       } finally {
         setBusy(false);
         updateControls();
+        // The text inscribe button isn't covered by updateControls — re-enable it on connect.
+        if (dom.inscribeTextButton && dom.inscribePanelBody?.dataset.mode === 'text') {
+          const b = new TextEncoder().encode(dom.textPayload?.value || '').length;
+          dom.inscribeTextButton.disabled = !(b > 0 && b <= 16384 && !state.busy);
+        }
       }
     };
 
@@ -8793,9 +9343,16 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         state.uploadState = null;
         appendLog('Wallet disconnected.');
         updateWalletStatus();
+        if (PAGE_MODE === 'drops') {
+          renderDrops();
+        }
         await fetchAdminStatus();
         await refreshParentChecks();
         await loadWalletInscriptions();
+        if (PAGE_MODE === 'market') {
+          renderMarketListings();
+          renderSellerDashboard();
+        }
         renderPreparedState();
       } finally {
         setBusy(false);
@@ -8843,7 +9400,16 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             );
           }
         } else {
-          state.walletPageIndex = getExplorerLatestPageIndex();
+          // Shareable page position: /xplorer?p=12 opens straight onto page 12.
+          const requestedPage = Number.parseInt(
+            new URLSearchParams(window.location.search).get('p') ?? '',
+            10
+          );
+          const pageCount = getWalletPageCount();
+          state.walletPageIndex =
+            Number.isSafeInteger(requestedPage) && requestedPage >= 1 && pageCount > 0
+              ? Math.min(requestedPage - 1, pageCount - 1)
+              : getExplorerLatestPageIndex();
         }
         await loadExplorerPage({
           selectTokenId: initialSelectTokenId,
@@ -8940,11 +9506,63 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       if (!state.explorerMode) {
         return;
       }
+      // Smart field: "512" / "#512" → inscription id, "p12" / "page 12" → page.
+      const raw = dom.explorerTokenInput.value.trim();
+      // A Stacks address or a dotted BNS name (e.g. darthdude.btc) is
+      // unambiguously a wallet lookup — token/page inputs are always numeric,
+      // #id or p12. Route it to the shared /?wallet=<addr|name> deep-link, which
+      // resolves BNS names and opens that wallet's holdings (same path the
+      // homepage uses), instead of falling through to a failed page jump.
+      const looksLikeWalletAddress = /^S[PTMN][0-9A-Z]{20,}$/i.test(raw);
+      const looksLikeBnsName = /^[a-z0-9][a-z0-9-]*\.[a-z0-9-]{2,}$/i.test(raw);
+      if (raw && (looksLikeWalletAddress || looksLikeBnsName)) {
+        window.location.href = `/?wallet=${encodeURIComponent(raw)}`;
+        return;
+      }
+      const pageMatch = raw.match(/^p(?:age)?\s*(\d+)$/i);
+      if (pageMatch) {
+        dom.explorerPageInput.value = pageMatch[1];
+        dom.explorerTokenInput.value = '';
+        await jumpToExplorerPage();
+        return;
+      }
+      if (raw.startsWith('#')) {
+        dom.explorerTokenInput.value = raw.slice(1).trim();
+      }
       if (dom.explorerTokenInput.value.trim()) {
         await jumpToExplorerToken();
         return;
       }
       await jumpToExplorerPage();
+    };
+
+    const jumpToRandomInscription = async () => {
+      if (!state.explorerMode || state.walletLoadingPage) {
+        return;
+      }
+      if (!state.explorerLatestTokenId) {
+        await refreshExplorerLatestTokenId();
+      }
+      const latest = state.explorerLatestTokenId;
+      if (!latest || latest <= 0n) {
+        return;
+      }
+      // With filters active and indexed, roll within the matching set so the
+      // jump always lands on something visible.
+      if (
+        hasActiveExplorerFilters() &&
+        state.explorerFilterIndexComplete &&
+        state.explorerFilteredTokenIds.length > 0
+      ) {
+        const pick =
+          state.explorerFilteredTokenIds[
+            Math.floor(Math.random() * state.explorerFilteredTokenIds.length)
+          ];
+        dom.explorerTokenInput.value = pick.toString();
+      } else {
+        dom.explorerTokenInput.value = String(1 + Math.floor(Math.random() * Number(latest)));
+      }
+      await jumpToExplorerToken();
     };
 
     const showLatestExplorerPage = async () => {
@@ -9030,6 +9648,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       state.handoffDependencyIds = [];
       dom.fileInput.value = '';
       if (file) {
+        dom.inscribePanelBody?.classList.add('has-payload'); // reveal details + inscribe button
         dom.dropzoneText.innerHTML = '';
         const chip = document.createElement('span');
         chip.className = 'file-chip';
@@ -9042,9 +9661,19 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           dom.payloadType.value = file.type;
         }
       } else {
+        dom.inscribePanelBody?.classList.remove('has-payload'); // back to just the dropzone
         dom.dropzoneText.textContent = 'Choose file or drop it here';
       }
       renderPreparedState();
+      if (file && autoPrepareHook && !state.busy) {
+        // Railroad the default flow: a dropped file is prepared immediately,
+        // so the only remaining decision is "Start inscription".
+        window.setTimeout(() => {
+          if (state.selectedFile === file && !state.busy && !state.prepared) {
+            void autoPrepareHook();
+          }
+        }, 0);
+      }
     };
 
     // Manual recovery. If a wallet transaction is cancelled or fails — in
@@ -9066,6 +9695,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // Clear the inscription panel back to an empty state for a fresh file: drops
     // the selected file, prepared payload, parents, and form fields.
     const clearInscriberPanel = () => {
+      if (
+        (state.busy || state.lastMintAttempt) &&
+        !window.confirm(
+          'Clear this inscription?\n\nThere is an inscription in progress. Its on-chain progress is saved and would resume on its own if you left it — clearing removes that local record. Clear anyway?'
+        )
+      ) {
+        return;
+      }
       if (state.payloadPreviewUrl) {
         URL.revokeObjectURL(state.payloadPreviewUrl);
         state.payloadPreviewUrl = null;
@@ -9077,6 +9714,16 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       if (dom.textPayload) {
         dom.textPayload.value = '';
       }
+      if (dom.threadReplyTo) {
+        dom.threadReplyTo.value = '';
+      }
+      if (dom.dependencyIdsInput) {
+        dom.dependencyIdsInput.value = '';
+      }
+      if (dom.dependencyStatusList) {
+        dom.dependencyStatusList.textContent = 'No dependencies added.';
+      }
+      state.handoffDependencyIds = [];
       if (dom.payloadType) {
         dom.payloadType.selectedIndex = 0;
       }
@@ -9120,6 +9767,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           'support'
         );
         await preparePayload();
+        // Resume safety: if this inscription already has on-chain progress (a begin session /
+        // uploaded chunks), surface the file view so the user can finish it. A partially
+        // committed inscription must never be buried behind the collapsed landing.
+        if (state.uploadState) {
+          applyInscribeMode('file');
+        }
         void refreshParentChecks();
         return true;
       }
@@ -9298,9 +9951,2548 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       renderPreparedState();
     };
 
+    // Public views shared by boot deep-links and SPA tab switches:
+    //   ?gallery=<id>, ?wallet=/?showcase=<addr|name> (+ &sel=<tokenId>).
+    const openPublicViewFromParams = async (params) => {
+      const requestedGallery = params.get('gallery')?.trim() || null;
+      const requestedPublicWallet =
+        params.get('wallet')?.trim() || params.get('showcase')?.trim() || null;
+      if (requestedGallery) {
+        await openCuratedGallery(requestedGallery, { scroll: false });
+        return true;
+      }
+      if (!requestedPublicWallet) {
+        return false;
+      }
+      if (/^S[PM][0-9A-Z]+$/i.test(requestedPublicWallet)) {
+        await viewWalletByAddress(requestedPublicWallet);
+      } else {
+        dom.walletLookupInput.value = requestedPublicWallet.replace(/\.btc$/i, '');
+        updateWalletLookupInputMode();
+        await viewWalletFromInput();
+      }
+      const requestedSel = parsePositiveBigInt(params.get('sel') ?? '');
+      if (requestedSel !== null) {
+        try {
+          await focusWalletTokenById(requestedSel);
+        } catch (error) {
+          debugLog('grid', 'deep-link token focus failed', {
+            sel: requestedSel.toString(),
+            error: error instanceof Error ? error.message : String(error)
+          }, 'warn');
+        }
+      }
+      return true;
+    };
+
+    // Default My Wallet view: a connected wallet WITH inscriptions opens its
+    // own latest page; otherwise Music by Various, so there's always content.
+    const openMyWalletDefaultView = async () => {
+      let openedOwnWallet = false;
+      if (state.walletSession.isConnected && state.walletSession.address) {
+        await loadWalletInscriptions();
+        const ownedCount = state.walletUsesPagedHoldings
+          ? state.walletTotalCount
+          : state.walletTokenIds.length;
+        openedOwnWallet = ownedCount > 0;
+        if (!openedOwnWallet) {
+          appendLog('Connected wallet has no inscriptions yet — showing Music by Various.');
+        }
+      }
+      if (!openedOwnWallet) {
+        await openCuratedGallery('jim-music', { scroll: false });
+      }
+    };
+
+    // SPA tab switching: the four site pages share this shell, so nav clicks
+    // just swap the page mode and run that page's loads — no reload, and the
+    // radio, wallet session and caches all survive the switch.
+    let pageSwitchRun = 0;
+
+    // ------------------------------------------------------------------
+    // Market page: multi-asset inscription marketplace (homepage-native).
+    // Listings render as media thumbnails with an expandable details section
+    // (metadata, relationships, price, creation + trading history). All logic
+    // reuses src/lib: market registry/settlement/sponsored, viewer summaries
+    // and content loaders, and the market activity indexer.
+    // ------------------------------------------------------------------
+    const MARKET_LISTINGS_PER_CONTRACT = 24;
+    const MARKET_THUMB_HYDRATION_CONCURRENCY = 4;
+    const marketState = {
+      filter: 'all',
+      run: 0,
+      listings: [],
+      liveFrames: 0, // sandboxed iframes currently mounted (shares the grid's cap)
+      summaries: new Map(), // `${nftContract}:${tokenId}` -> TokenSummary|null
+      media: new Map(), // same key -> { url, kind } | null
+      activity: new Map(), // market contractId -> MarketIndexSnapshot events
+      clients: new Map() // nftContract principal -> XtrataClient
+    };
+    const marketDom = {
+      toolbar: $('marketToolbar'),
+      status: $('marketStatus'),
+      listings: $('marketListings'),
+      badge: $('marketNetworkBadge')
+    };
+
+    const marketEntriesForNetwork = () =>
+      MARKET_REGISTRY.filter((entry) => entry.network === state.contract.network);
+
+    const formatAssetAmount = (amount, decimals, symbol) => {
+      const base = 10n ** BigInt(decimals);
+      const whole = amount / base;
+      const frac = (amount % base).toString().padStart(decimals, '0').replace(/0+$/, '');
+      return `${whole.toString()}${frac ? '.' + frac : ''} ${symbol}`;
+    };
+
+    const formatByteSize = (size) => {
+      const n = Number(size);
+      if (!Number.isFinite(n)) return `${size} B`;
+      if (n < 1024) return `${n} B`;
+      if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+      return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+    };
+
+    const shortPrincipal = (value) =>
+      value && value.length > 14 ? `${value.slice(0, 8)}…${value.slice(-4)}` : String(value ?? '');
+
+    // BNS display names for market/drops cards — same resolver the Xplorer
+    // uses, cached per address so each seller is looked up at most once.
+    const marketBnsCache = new Map(); // address -> Promise<string|null>
+    const marketBnsNameFor = (address) => {
+      if (!address) return Promise.resolve(null);
+      let pending = marketBnsCache.get(address);
+      if (!pending) {
+        pending = resolveBnsNames({ address, network: state.contract.network })
+          .then((result) => result.primary ?? null)
+          .catch(() => null);
+        marketBnsCache.set(address, pending);
+      }
+      return pending;
+    };
+    // Renders "name.btc" into the span once resolved; keeps the short
+    // principal until then (and permanently when the address has no name).
+    const applyBnsName = (span, address) => {
+      span.textContent = shortPrincipal(address);
+      span.title = address;
+      void marketBnsNameFor(address).then((name) => {
+        if (name && span.isConnected) span.textContent = name;
+      });
+    };
+    const bnsNameSpan = (address) => {
+      const span = document.createElement('span');
+      applyBnsName(span, address);
+      return span;
+    };
+
+    const marketTokenKey = (listing) => `${listing.nftContract}:${listing.tokenId}`;
+
+    const marketClientFor = (nftContract, network) => {
+      let client = marketState.clients.get(nftContract);
+      if (!client) {
+        const [address, contractName] = nftContract.split('.');
+        client = createXtrataClient({ contract: { address, contractName, network } });
+        marketState.clients.set(nftContract, client);
+      }
+      return client;
+    };
+
+    const readMarketListings = async (entry) => {
+      const contractId = getMarketContractId(entry);
+      const settlement = getMarketSettlementAsset(entry.paymentTokenContractId ?? null);
+      const lastJson = await callReadOnlyJson({
+        contractId,
+        functionName: 'get-last-listing-id',
+        network: entry.network
+      });
+      const lastId = BigInt(lastJson?.value?.value ?? 0);
+      const results = [];
+      const from = lastId;
+      const floor = lastId > BigInt(MARKET_LISTINGS_PER_CONTRACT) ? lastId - BigInt(MARKET_LISTINGS_PER_CONTRACT) : 0n;
+      for (let id = from; id >= floor; id -= 1n) {
+        try {
+          const json = await callReadOnlyJson({
+            contractId,
+            functionName: 'get-listing',
+            args: [uintCV(id)],
+            network: entry.network
+          });
+          const tuple = unwrapBindingTuple(json);
+          if (!tuple) continue;
+          const soldRaw = tuple['sold-at']?.value ?? null;
+          results.push({
+            entry,
+            contractId,
+            settlement,
+            listingId: id,
+            seller: String(tuple.seller.value),
+            nftContract: String(tuple['nft-contract'].value),
+            tokenId: BigInt(tuple['token-id'].value),
+            price: BigInt(tuple.price.value),
+            createdAt: tuple['created-at'] ? BigInt(tuple['created-at'].value) : null,
+            feeBudget: tuple['fee-budget'] ? BigInt(tuple['fee-budget'].value) : null,
+            claimed: tuple.claimed ? BigInt(tuple.claimed.value) : null,
+            budgetRemaining: tuple['budget-remaining'] ? BigInt(tuple['budget-remaining'].value) : null,
+            // sold sponsored listings stay visible to their seller for reclaim
+            soldAt: soldRaw === null || soldRaw === undefined ? null : BigInt(soldRaw.value ?? soldRaw)
+          });
+        } catch {
+          // sparse ids / deleted listings: skip
+        }
+        if (id === 0n) break;
+      }
+      return results;
+    };
+
+    const getListingPublicBlockReason = (listing) =>
+      getMarketListingPublicBlockReason({
+        nftContract: listing.nftContract,
+        marketContractId: listing.contractId
+      });
+
+    const isListingPubliclyBuyable = (listing) =>
+      isMarketListingPubliclyBuyable({
+        nftContract: listing.nftContract,
+        marketContractId: listing.contractId
+      });
+
+    // Deny-mode post-conditions for contract-side payouts (cancel / reclaim /
+    // claim): the exact NFT and STX escrow outflows, so the wallet shows
+    // precisely what moves instead of the Allow-mode "this app may transfer
+    // any of your assets" warning.
+    const marketEscrowPostConditions = (listing, { includeNft = true } = {}) => {
+      const pcs = [];
+      if (includeNft) {
+        const [nftAddress, nftName] = listing.nftContract.split('.');
+        pcs.push(
+          buildContractTransferPostCondition({
+            nftContract: { address: nftAddress, contractName: nftName, network: listing.entry.network },
+            senderContract: {
+              address: listing.entry.address,
+              contractName: listing.entry.contractName,
+              network: listing.entry.network
+            },
+            tokenId: listing.tokenId
+          })
+        );
+      }
+      if (listing.budgetRemaining !== null && listing.budgetRemaining !== undefined) {
+        pcs.push(
+          makeContractSTXPostCondition(
+            listing.entry.address,
+            listing.entry.contractName,
+            FungibleConditionCode.Equal,
+            listing.budgetRemaining
+          )
+        );
+      }
+      return pcs;
+    };
+
+    const setMarketActionStatus = (target, html) => {
+      if (!target) return;
+      target.hidden = false;
+      target.innerHTML = html;
+    };
+
+    const marketCancel = async (listing, statusTarget = marketDom.status) => {
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        setMarketActionStatus(
+          statusTarget,
+          '<span><strong>Market</strong> connect the seller wallet to cancel.</span>'
+        );
+        return;
+      }
+      if (!addressesEqual(state.walletSession.address, listing.seller)) {
+        setMarketActionStatus(
+          statusTarget,
+          '<span><strong>Market</strong> only the listing seller can cancel.</span>'
+        );
+        return;
+      }
+      const [nftAddress, nftName] = listing.nftContract.split('.');
+      setMarketActionStatus(
+        statusTarget,
+        '<span><strong>Market</strong> confirm the unlist in your wallet…</span>'
+      );
+      showContractCall({
+        contractAddress: listing.entry.address,
+        contractName: listing.entry.contractName,
+        functionName: 'cancel',
+        functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(listing.listingId)],
+        network: listing.entry.network,
+        stxAddress: state.walletSession.address,
+        postConditionMode: PostConditionMode.Deny,
+        postConditions: marketEscrowPostConditions(listing),
+        onFinish: (payload) => {
+          const txId = payload?.txId ?? payload?.txid ?? '';
+          setMarketActionStatus(
+            statusTarget,
+            `<span><strong>Market</strong> unlist submitted${txId ? ` — tx ${txId}` : ''}. Once it confirms, the inscription returns to your wallet and you can relist it at the new price.</span>`
+          );
+        },
+        onCancel: () => {
+          setMarketActionStatus(
+            statusTarget,
+            '<span><strong>Market</strong> unlist cancelled.</span>'
+          );
+        }
+      });
+    };
+
+    const marketBuy = async (listing) => {
+      const publicBlockReason = getListingPublicBlockReason(listing);
+      if (publicBlockReason) {
+        marketDom.status.innerHTML = publicBlockReason === 'legacy-nft'
+          ? '<span><strong>Market</strong> this legacy inscription is not for sale — the seller must cancel, migrate to v3, and relist.</span>'
+          : '<span><strong>Market</strong> this legacy market cannot complete purchases — the seller must cancel and relist on a supported market.</span>';
+        return;
+      }
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        marketDom.status.innerHTML = '<span><strong>Market</strong> connect a wallet to buy.</span>';
+        return;
+      }
+      const [nftAddress, nftName] = listing.nftContract.split('.');
+      const postConditions = buildMarketBuyPostConditions({
+        settlement: listing.settlement,
+        buyerAddress: state.walletSession.address,
+        amount: listing.price,
+        nftContract: { address: nftAddress, contractName: nftName, network: listing.entry.network },
+        senderContract: {
+          address: listing.entry.address,
+          contractName: listing.entry.contractName,
+          network: listing.entry.network
+        },
+        tokenId: listing.tokenId
+      });
+      if (!postConditions) {
+        marketDom.status.innerHTML = '<span><strong>Market</strong> unsupported payment token for this listing.</span>';
+        return;
+      }
+      marketDom.status.innerHTML = '<span><strong>Market</strong> confirm the purchase in your wallet…</span>';
+      showContractCall({
+        contractAddress: listing.entry.address,
+        contractName: listing.entry.contractName,
+        functionName: 'buy',
+        functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(listing.listingId)],
+        network: listing.entry.network,
+        stxAddress: state.walletSession.address,
+        postConditionMode: PostConditionMode.Deny,
+        postConditions,
+        onFinish: (payload) => {
+          const txId = payload?.txId ?? payload?.txid ?? '';
+          marketDom.status.innerHTML = `<span><strong>Market</strong> purchase submitted${txId ? ` — tx ${txId}` : ''}.</span><span class="badge green">sent</span>`;
+        },
+        onCancel: () => {
+          marketDom.status.innerHTML = '<span><strong>Market</strong> purchase cancelled.</span>';
+        }
+      });
+    };
+
+    // --- thumbnails -------------------------------------------------------
+    const MARKET_KIND_ICONS = {
+      image: '🖼', audio: '🎵', video: '🎞', html: '🧩', text: '📄',
+      json: '{ }', code: '⌨', unknown: '◼'
+    };
+
+    const marketSummaryFor = async (listing) => {
+      const key = marketTokenKey(listing);
+      if (marketState.summaries.has(key)) return marketState.summaries.get(key);
+      let summary = null;
+      try {
+        summary = await fetchTokenSummary({
+          client: marketClientFor(listing.nftContract, listing.entry.network),
+          id: listing.tokenId,
+          senderAddress: listing.entry.address
+        });
+      } catch {
+        summary = null;
+      }
+      marketState.summaries.set(key, summary);
+      return summary;
+    };
+
+    const MARKET_MEDIA_MAX_BYTES = 512n * 1024n;
+    const MARKET_REMOTE_THUMBNAIL_MAX_BYTES = 5 * 1024 * 1024;
+
+    const marketFetchContent = async (listing, meta) => {
+      const bytes = await fetchOnChainContent({
+        client: marketClientFor(listing.nftContract, listing.entry.network),
+        id: listing.tokenId,
+        senderAddress: listing.entry.address,
+        totalSize: meta.totalSize,
+        mimeType: meta.mimeType
+      });
+      return bytes;
+    };
+
+    const marketCachedThumbnailFor = async (listing) => {
+      const key = marketTokenKey(listing);
+      const memoryHit = state.thumbnailCache.has(key);
+      let thumbnail = state.thumbnailCache.get(key);
+      if (thumbnail === undefined) {
+        thumbnail = await loadInscriptionThumbnailFromCache(
+          listing.nftContract,
+          listing.tokenId
+        );
+        state.thumbnailCache.set(key, thumbnail);
+      }
+      if (!thumbnail?.data) return null;
+      debugLog('cache', 'market thumbnail cache hit', {
+        tokenId: listing.tokenId.toString(),
+        contractId: listing.nftContract,
+        source: memoryHit ? 'memory' : 'indexeddb',
+        bytes: thumbnail.data.length
+      });
+      return {
+        kind: 'image',
+        url: URL.createObjectURL(
+          new Blob([thumbnail.data], {
+            type: thumbnail.mimeType ?? 'image/webp'
+          })
+        )
+      };
+    };
+
+    const warmMarketThumbnailCache = async (listing, bytes, mimeType) => {
+      try {
+        const thumbnail = await createImageThumbnail({ bytes, mimeType });
+        if (!thumbnail?.data) return null;
+        await saveInscriptionThumbnailToCache(
+          listing.nftContract,
+          listing.tokenId,
+          thumbnail.data,
+          {
+            mimeType: thumbnail.mimeType,
+            width: thumbnail.width,
+            height: thumbnail.height
+          }
+        );
+        state.thumbnailCache.set(marketTokenKey(listing), thumbnail);
+        debugLog('cache', 'market thumbnail cache warmed', {
+          tokenId: listing.tokenId.toString(),
+          contractId: listing.nftContract,
+          bytes: thumbnail.data.length,
+          mimeType: thumbnail.mimeType
+        });
+        return thumbnail;
+      } catch (error) {
+        debugLog('cache', 'market thumbnail cache warm failed', {
+          tokenId: listing.tokenId.toString(),
+          contractId: listing.nftContract,
+          error: error instanceof Error ? error.message : String(error)
+        }, 'warn');
+        return null;
+      }
+    };
+
+    const cacheMarketRemoteImage = async (listing, url) => {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) return;
+        const declaredSize = Number(response.headers.get('content-length') ?? 0);
+        if (declaredSize > MARKET_REMOTE_THUMBNAIL_MAX_BYTES) return;
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        if (!bytes.length || bytes.length > MARKET_REMOTE_THUMBNAIL_MAX_BYTES) return;
+        const declaredMime = response.headers.get('content-type')?.split(';')[0]?.trim() ?? '';
+        const mimeType = getMediaKind(declaredMime) === 'image'
+          ? declaredMime
+          : 'image/png';
+        await warmMarketThumbnailCache(listing, bytes, mimeType);
+      } catch {
+        // Cross-origin or transient image fetch failures only skip caching; the
+        // browser can still render the already-resolved source URL directly.
+      }
+    };
+
+    // Resolve a listing's thumbnail media. Kinds:
+    //   image      → <img> (covers static + SMIL/CSS-animated SVG)
+    //   html-live  → sandboxed <iframe srcdoc> (HTML inscriptions and
+    //                script-driven SVG animations, per the wallet-grid pattern)
+    //   video      → muted looping <video>
+    const marketMediaFor = async (listing) => {
+      const key = marketTokenKey(listing);
+      if (marketState.media.has(key)) return marketState.media.get(key);
+      let media = null;
+      try {
+        media = await marketCachedThumbnailFor(listing);
+        if (media) {
+          marketState.media.set(key, media);
+          return media;
+        }
+        const summary = await marketSummaryFor(listing);
+        const meta = summary?.meta ?? null;
+        const mime = (meta?.mimeType ?? '').toLowerCase();
+        const kind = getMediaKind(mime);
+        const fetchable =
+          meta && meta.totalSize > 0n && meta.totalSize <= MARKET_MEDIA_MAX_BYTES;
+
+        if (kind === 'image' && fetchable && mime.includes('svg')) {
+          // On-chain SVG: script-driven animations need a real document.
+          const bytes = await marketFetchContent(listing, meta);
+          const text = new TextDecoder().decode(bytes);
+          if (/<script[\s>]/i.test(text)) {
+            media = { kind: 'html-live', html: text };
+          } else {
+            await warmMarketThumbnailCache(listing, bytes, 'image/svg+xml');
+            media = {
+              kind: 'image',
+              url: URL.createObjectURL(new Blob([bytes], { type: 'image/svg+xml' }))
+            };
+          }
+        } else if (kind === 'image' && fetchable) {
+          const bytes = await marketFetchContent(listing, meta);
+          await warmMarketThumbnailCache(listing, bytes, meta.mimeType);
+          media = {
+            kind: 'image',
+            url: URL.createObjectURL(new Blob([bytes], { type: meta.mimeType }))
+          };
+        } else if (kind === 'html' && fetchable) {
+          const bytes = await marketFetchContent(listing, meta);
+          media = { kind: 'html-live', html: new TextDecoder().decode(bytes) };
+        } else if (kind === 'video' && fetchable) {
+          const bytes = await marketFetchContent(listing, meta);
+          media = {
+            kind: 'video',
+            url: URL.createObjectURL(new Blob([bytes], { type: meta.mimeType }))
+          };
+        } else if ((kind === 'text' || kind === 'json' || kind === 'code') && fetchable) {
+          // Text-like inscriptions: show the actual words, not a logo.
+          const bytes = await marketFetchContent(listing, meta);
+          const text = new TextDecoder().decode(bytes).trim().slice(0, 400);
+          if (text) media = { kind: 'text', text };
+        }
+
+        // Fallbacks: inline SVG data URI from the summary, then token-URI image.
+        if (!media && summary?.svgDataUri) {
+          media = { kind: 'image', url: summary.svgDataUri };
+        }
+        if (!media && summary?.tokenUri) {
+          const uriImage = await fetchTokenImageFromUri(summary.tokenUri);
+          if (uriImage) {
+            void cacheMarketRemoteImage(listing, uriImage);
+            media = { kind: 'image', url: uriImage };
+          }
+        }
+      } catch {
+        media = null;
+      }
+      marketState.media.set(key, media);
+      return media;
+    };
+
+    const hydrateMarketThumbnails = async (run, listings, root = marketDom.listings) => {
+      await runLimited(listings, MARKET_THUMB_HYDRATION_CONCURRENCY, async (listing) => {
+        if (run !== marketState.run) return;
+        const media = await marketMediaFor(listing);
+        if (run !== marketState.run) return;
+        const slot = root?.querySelector(
+          `[data-market-thumb="${listing.contractId}:${listing.listingId}"]`
+        );
+        if (!slot) return;
+        if (media?.kind === 'html-live' && marketState.liveFrames < MAX_LIVE_HTML_FRAMES) {
+          marketState.liveFrames += 1;
+          const frame = document.createElement('iframe');
+          frame.className = 'market-thumb__frame';
+          frame.title = `Inscription #${listing.tokenId} preview`;
+          frame.sandbox = 'allow-scripts';
+          frame.referrerPolicy = 'no-referrer';
+          frame.loading = 'lazy';
+          frame.setAttribute('scrolling', 'no');
+          frame.srcdoc = media.html;
+          slot.replaceChildren(frame);
+          slot.classList.add('market-thumb--media');
+        } else if (media?.kind === 'video' && media.url) {
+          const video = document.createElement('video');
+          video.src = media.url;
+          video.muted = true;
+          video.loop = true;
+          video.autoplay = true;
+          video.playsInline = true;
+          slot.replaceChildren(video);
+          slot.classList.add('market-thumb--media');
+        } else if (media?.kind === 'text') {
+          const pre = document.createElement('div');
+          pre.className = 'market-thumb__snippet';
+          pre.textContent = media.text;
+          slot.replaceChildren(pre);
+          slot.classList.add('market-thumb--media');
+        } else if (media?.url) {
+          const img = document.createElement('img');
+          img.src = media.url;
+          img.alt = `Inscription #${listing.tokenId}`;
+          img.loading = 'lazy';
+          slot.replaceChildren(img);
+          slot.classList.add('market-thumb--media');
+        } else {
+          const summary = marketState.summaries.get(marketTokenKey(listing));
+          const kind = getMediaKind(summary?.meta?.mimeType);
+          slot.replaceChildren(
+            Object.assign(document.createElement('span'), {
+              className: 'market-thumb__icon',
+              textContent: MARKET_KIND_ICONS[kind] ?? MARKET_KIND_ICONS.unknown
+            }),
+            Object.assign(document.createElement('span'), {
+              className: 'market-thumb__label',
+              textContent: summary?.meta?.mimeType ?? 'no preview'
+            })
+          );
+        }
+      });
+    };
+
+    // --- expandable details ----------------------------------------------
+    const marketActivityFor = async (listing) => {
+      const contractId = listing.contractId;
+      if (!marketState.activity.has(contractId)) {
+        try {
+          const snapshot = await loadMarketActivity({
+            contract: {
+              address: listing.entry.address,
+              contractName: listing.entry.contractName,
+              network: listing.entry.network
+            }
+          });
+          marketState.activity.set(contractId, snapshot?.events ?? []);
+        } catch {
+          marketState.activity.set(contractId, []);
+        }
+      }
+      return marketState.activity
+        .get(contractId)
+        .filter((event) => event.tokenId === listing.tokenId);
+    };
+
+    const detailRow = (label, value) => {
+      const row = document.createElement('div');
+      row.className = 'market-detail__row';
+      const dt = document.createElement('span');
+      dt.className = 'market-detail__label';
+      dt.textContent = label;
+      const dd = document.createElement('span');
+      dd.className = 'market-detail__value';
+      if (value instanceof HTMLElement) dd.append(value);
+      else dd.textContent = String(value);
+      row.append(dt, dd);
+      return row;
+    };
+
+    const xplorerTokenLink = (tokenId, label = null) => {
+      const link = document.createElement('a');
+      link.href = `/xplorer?token=${tokenId}`;
+      link.target = '_self';
+      link.textContent = label ?? `#${tokenId}`;
+      return link;
+    };
+
+    const loadMarketDetails = async (listing, body) => {
+      body.replaceChildren(
+        Object.assign(document.createElement('p'), { className: 'muted', textContent: 'Loading details…' })
+      );
+      const client = marketClientFor(listing.nftContract, listing.entry.network);
+      const sender = listing.entry.address;
+      const [summary, parents, deps, events] = await Promise.all([
+        marketSummaryFor(listing),
+        client.getParents(listing.tokenId, sender).catch(() => []),
+        client.getDependencies(listing.tokenId, sender).catch(() => []),
+        marketActivityFor(listing)
+      ]);
+
+      const frag = document.createDocumentFragment();
+
+      // metadata
+      const metaBlock = document.createElement('div');
+      metaBlock.className = 'market-detail__section';
+      metaBlock.append(Object.assign(document.createElement('strong'), { textContent: 'Metadata' }));
+      if (summary?.meta) {
+        metaBlock.append(
+          detailRow('Type', summary.meta.mimeType),
+          detailRow('Size', formatByteSize(summary.meta.totalSize)),
+          detailRow('Creator', bnsNameSpan(summary.meta.creator ?? summary.meta.owner)),
+          detailRow('Owner', summary.owner ? bnsNameSpan(summary.owner) : '—')
+        );
+      } else {
+        metaBlock.append(detailRow('Metadata', 'unavailable'));
+      }
+      if (summary?.tokenUri) {
+        const uriLink = document.createElement('a');
+        if (isHttpUrl(summary.tokenUri)) {
+          uriLink.href = summary.tokenUri;
+          uriLink.target = '_blank';
+          uriLink.rel = 'noreferrer';
+        }
+        uriLink.textContent =
+          summary.tokenUri.length > 48 ? `${summary.tokenUri.slice(0, 48)}…` : summary.tokenUri;
+        metaBlock.append(detailRow('Token URI', uriLink));
+      }
+      frag.append(metaBlock);
+
+      // relationships
+      const relBlock = document.createElement('div');
+      relBlock.className = 'market-detail__section';
+      relBlock.append(Object.assign(document.createElement('strong'), { textContent: 'Relationships' }));
+      const relValue = (ids) => {
+        if (!ids?.length) return '—';
+        const wrap = document.createElement('span');
+        ids.slice(0, 8).forEach((id, index) => {
+          if (index) wrap.append(', ');
+          wrap.append(xplorerTokenLink(id));
+        });
+        if (ids.length > 8) wrap.append(` +${ids.length - 8} more`);
+        return wrap;
+      };
+      relBlock.append(
+        detailRow(`Parents (${parents?.length ?? 0})`, relValue(parents)),
+        detailRow(`Dependencies (${deps?.length ?? 0})`, relValue(deps))
+      );
+      frag.append(relBlock);
+
+      // price + listing
+      const priceBlock = document.createElement('div');
+      priceBlock.className = 'market-detail__section';
+      priceBlock.append(Object.assign(document.createElement('strong'), { textContent: 'Listing' }));
+      const symbol = getMarketSettlementLabel(listing.settlement);
+      priceBlock.append(
+        detailRow('Price', formatMarketPriceWithUsd(listing.price, listing.settlement, state.usdPriceBook)),
+        detailRow('Listing', `#${listing.listingId} on ${listing.entry.label}`),
+        detailRow('Seller', bnsNameSpan(listing.seller))
+      );
+      if (listing.createdAt !== null) {
+        priceBlock.append(detailRow('Listed at block', listing.createdAt.toString()));
+      }
+      if (isSponsoredMarket(listing.entry) && listing.budgetRemaining !== null) {
+        priceBlock.append(
+          detailRow('Sponsorship', `no STX needed — fee budget ${formatAssetAmount(listing.budgetRemaining, 6, 'STX')} remaining`)
+        );
+      }
+      frag.append(priceBlock);
+
+      // trading history
+      const historyBlock = document.createElement('div');
+      historyBlock.className = 'market-detail__section';
+      historyBlock.append(Object.assign(document.createElement('strong'), { textContent: 'Trading history' }));
+      if (events.length) {
+        events
+          .slice(0, 12)
+          .forEach((event) => {
+            const what =
+              event.type === 'buy'
+                ? `Sold${event.price !== undefined ? ` for ${formatAssetAmount(event.price, listing.settlement.decimals ?? 6, symbol)}` : ''}`
+                : event.type === 'list'
+                  ? `Listed${event.price !== undefined ? ` at ${formatAssetAmount(event.price, listing.settlement.decimals ?? 6, symbol)}` : ''}`
+                  : event.type === 'cancel'
+                    ? 'Listing cancelled'
+                    : event.type;
+            const when = event.timestamp
+              ? new Date(event.timestamp).toLocaleDateString()
+              : event.blockHeight
+                ? `block ${event.blockHeight}`
+                : '';
+            historyBlock.append(detailRow(when || '—', what));
+          });
+      } else {
+        historyBlock.append(detailRow('History', 'No prior market activity for this inscription.'));
+      }
+      frag.append(historyBlock);
+
+      body.replaceChildren(frag);
+    };
+
+
+    // --- Sell an inscription (any currency, optional sponsorship) ----------
+    const sellDom = {
+      details: $('marketSell'),
+      tokenId: $('marketSellTokenId'),
+      market: $('marketSellMarket'),
+      price: $('marketSellPrice'),
+      priceLabel: $('marketSellPriceLabel'),
+      deposit: $('marketSellDeposit'),
+      button: $('marketSellButton'),
+      status: $('marketSellStatus')
+    };
+    const sellState = { quote: null, quoteRun: 0 };
+
+    // Legacy markets stay in the registry so old listings remain readable,
+    // but new listings must not go to them — exclude from the sell selector.
+    const sellEntries = () =>
+      marketEntriesForNetwork().filter((entry) => !/legacy/i.test(entry.label ?? ''));
+
+    const sellSelectedEntry = () => {
+      const id = sellDom.market?.value;
+      return sellEntries().find((entry) => getMarketContractId(entry) === id) ?? null;
+    };
+
+    const populateSellMarkets = () => {
+      if (!sellDom.market) return;
+      const current = sellDom.market.value;
+      const orderedEntries = [...sellEntries()].sort((a, b) =>
+        Number(isSponsoredMarket(a)) - Number(isSponsoredMarket(b))
+      );
+      sellDom.market.replaceChildren(
+        ...orderedEntries.map((entry) => {
+          const settlement = getMarketSettlementAsset(entry.paymentTokenContractId ?? null);
+          const symbol = getMarketSettlementLabel(settlement);
+          const option = document.createElement('option');
+          option.value = getMarketContractId(entry);
+          option.textContent = isSponsoredMarket(entry)
+            ? `${symbol} - sponsored (buyer pays no fee)`
+            : `${symbol} - standard`;
+          return option;
+        })
+      );
+      if (current) sellDom.market.value = current;
+      updateSellUi();
+    };
+
+    const parseSellPrice = (raw, decimals) => {
+      const trimmed = String(raw ?? '').trim();
+      if (!/^\d+(\.\d+)?$/.test(trimmed)) return null;
+      const [w, f = ''] = trimmed.split('.');
+      if (f.length > decimals) return null;
+      const amount = BigInt(w) * 10n ** BigInt(decimals) + BigInt((f || '0').padEnd(decimals, '0'));
+      return amount > 0n ? amount : null;
+    };
+
+    const updateSellUi = async () => {
+      const entry = sellSelectedEntry();
+      if (!entry || !sellDom.priceLabel) return;
+      const settlement = getMarketSettlementAsset(entry.paymentTokenContractId ?? null);
+      const symbol = getMarketSettlementLabel(settlement);
+      sellDom.priceLabel.textContent = `Price (${symbol})`;
+      if (isSponsoredMarket(entry) && entry.sponsorApi) {
+        const run = ++sellState.quoteRun;
+        sellDom.deposit.textContent = 'Fetching sponsorship deposit quote...';
+        try {
+          const base = entry.sponsorApi.replace(/\/+$/, '');
+          const r = await fetch(`${base}/sponsor/quote`, { method: 'POST' });
+          if (run !== sellState.quoteRun) return;
+          if (!r.ok) throw new Error('quote unavailable');
+          const q = await r.json();
+          sellState.quote = BigInt(q.budgetUstx ?? 60000);
+          sellDom.deposit.textContent =
+            `Sponsorship deposit: ${formatAssetAmount(sellState.quote, 6, 'STX')} - covers the buyer's network fee so they need no extra STX; the unused part is refunded to you when it sells or you cancel.`;
+        } catch {
+          if (run !== sellState.quoteRun) return;
+          sellState.quote = 60_000n;
+          sellDom.deposit.textContent =
+            'Sponsorship deposit: 0.06 STX (default - live quote unavailable). Unused portion refunds to you.';
+        }
+      } else {
+        sellState.quote = null;
+        sellDom.deposit.textContent = 'Standard listing: the buyer pays their own network fee.';
+      }
+    };
+
+    const marketList = async () => {
+      const entry = sellSelectedEntry();
+      if (!entry) return;
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        sellDom.status.textContent = 'Connect a wallet to list.';
+        return;
+      }
+      const tokenIdRaw = sellDom.tokenId?.value?.trim();
+      if (!/^\d+$/.test(tokenIdRaw ?? '')) {
+        sellDom.status.textContent = 'Enter the inscription number you want to sell.';
+        return;
+      }
+      const tokenId = BigInt(tokenIdRaw);
+      const settlement = getMarketSettlementAsset(entry.paymentTokenContractId ?? null);
+      const decimals = settlement.decimals ?? 6;
+      const priceAmount = parseSellPrice(sellDom.price?.value, decimals);
+      if (priceAmount === null) {
+        sellDom.status.textContent = `Enter a valid price (up to ${decimals} decimals).`;
+        return;
+      }
+      const sponsored = isSponsoredMarket(entry);
+      const budget = sponsored ? (sellState.quote ?? 60_000n) : null;
+
+      // ownership check before the wallet opens
+      sellDom.status.textContent = 'Checking ownership...';
+      try {
+        const owner = await state.client.getOwner(tokenId, state.walletSession.address);
+        if (!owner || owner !== state.walletSession.address) {
+          sellDom.status.textContent = owner
+            ? `Inscription #${tokenId} is owned by ${owner.slice(0, 8)}..., not your wallet.`
+            : `Inscription #${tokenId} not found.`;
+          return;
+        }
+      } catch {
+        sellDom.status.textContent = 'Could not verify ownership - try again.';
+        return;
+      }
+
+      const postConditions = [
+        buildTransferPostCondition({
+          contract: state.contract,
+          senderAddress: state.walletSession.address,
+          tokenId
+        })
+      ];
+      const functionArgs = [
+        contractPrincipalCV(state.contract.address, state.contract.contractName),
+        uintCV(tokenId),
+        uintCV(priceAmount)
+      ];
+      if (sponsored && budget !== null) {
+        functionArgs.push(uintCV(budget));
+        postConditions.push(
+          makeStandardSTXPostCondition(
+            state.walletSession.address,
+            FungibleConditionCode.Equal,
+            budget
+          )
+        );
+      }
+      sellDom.status.textContent = 'Confirm the listing in your wallet...';
+      showContractCall({
+        contractAddress: entry.address,
+        contractName: entry.contractName,
+        functionName: 'list-token',
+        functionArgs,
+        network: entry.network,
+        stxAddress: state.walletSession.address,
+        postConditionMode: PostConditionMode.Deny,
+        postConditions,
+        onFinish: (payload) => {
+          const txId = payload?.txId ?? payload?.txid ?? '';
+          sellDom.status.textContent = `Listing submitted${txId ? ` - tx ${txId}` : ''}. It appears here once confirmed.`;
+        },
+        onCancel: () => {
+          sellDom.status.textContent = 'Listing cancelled.';
+        }
+      });
+    };
+
+    sellDom.market?.addEventListener('change', () => { void updateSellUi(); });
+    sellDom.button?.addEventListener('click', () => { void marketList(); });
+
+    const openSellForToken = (tokenId) => {
+      if (sellDom.details) sellDom.details.open = true;
+      if (sellDom.tokenId) sellDom.tokenId.value = tokenId;
+      populateSellMarkets();
+      void updateSellUi();
+      sellDom.details?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    const renderMarketToolbar = () => {
+      if (!marketDom.toolbar) return;
+      const symbols = ['all', ...new Set(marketEntriesForNetwork().map((entry) =>
+        getMarketSettlementLabel(getMarketSettlementAsset(entry.paymentTokenContractId ?? null))
+      ))];
+      marketDom.toolbar.replaceChildren(
+        ...symbols.map((symbol) => {
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'market-chip';
+          chip.setAttribute('role', 'tab');
+          chip.setAttribute('aria-selected', String(marketState.filter === symbol));
+          chip.textContent = symbol === 'all' ? 'All assets' : symbol;
+          chip.addEventListener('click', () => {
+            marketState.filter = symbol;
+            renderMarketToolbar();
+            renderMarketListings();
+          });
+          return chip;
+        })
+      );
+    };
+
+    const renderMarketListings = () => {
+      if (!marketDom.listings) return;
+      const run = marketState.run;
+      const visible = marketState.listings.filter((listing) =>
+        listing.soldAt === null &&
+        isListingPubliclyBuyable(listing) &&
+        (marketState.filter === 'all' ||
+          getMarketSettlementLabel(listing.settlement) === marketState.filter)
+      );
+      if (!visible.length) {
+        marketDom.listings.replaceChildren();
+        marketDom.status.innerHTML = '<span><strong>Market</strong> no live listings right now — list one from My Wallet.</span>';
+        return;
+      }
+      marketDom.status.innerHTML = `<span><strong>Market</strong> ${visible.length} live listing${visible.length === 1 ? '' : 's'}.</span>`;
+      marketState.liveFrames = 0; // cards re-render from scratch; recount frames
+      marketDom.listings.replaceChildren(
+        ...visible.map((listing) => {
+          const card = document.createElement('article');
+          card.className = 'market-card';
+          const symbol = getMarketSettlementLabel(listing.settlement);
+          const sponsored = isSponsoredMarket(listing.entry);
+          const isOwnListing = !!state.walletSession.address &&
+            addressesEqual(listing.seller, state.walletSession.address);
+
+          const thumb = document.createElement('a');
+          thumb.className = 'market-thumb';
+          thumb.href = `/xplorer?token=${listing.tokenId}`;
+          thumb.target = '_self';
+          thumb.dataset.marketThumb = `${listing.contractId}:${listing.listingId}`;
+          thumb.setAttribute('aria-label', `View inscription #${listing.tokenId}`);
+          thumb.append(
+            Object.assign(document.createElement('span'), {
+              className: 'market-thumb__label',
+              textContent: 'Loading…'
+            })
+          );
+
+          const badges = document.createElement('div');
+          badges.className = 'market-card__badge-row';
+          badges.innerHTML = `<span class="badge">${symbol}</span>${
+            sponsored ? '<span class="badge green">No STX needed</span>' : ''
+          }${isOwnListing ? '<span class="badge blue">Your listing</span>' : ''}`;
+
+          const price = document.createElement('div');
+          price.className = 'market-card__price';
+          // Always show the USD equivalent next to the asset price (live
+          // Coinbase spot rates; falls back to asset-only while loading).
+          price.textContent = formatMarketPriceWithUsd(
+            listing.price,
+            listing.settlement,
+            state.usdPriceBook
+          );
+
+          const meta = document.createElement('div');
+          meta.className = 'market-card__meta';
+          meta.textContent = `Inscription #${listing.tokenId} · listing #${listing.listingId} · seller `;
+          const sellerSpan = document.createElement('span');
+          applyBnsName(sellerSpan, listing.seller);
+          meta.append(sellerSpan);
+
+          const details = document.createElement('details');
+          details.className = 'market-card__details';
+          const summaryEl = document.createElement('summary');
+          summaryEl.textContent = 'Details';
+          const body = document.createElement('div');
+          body.className = 'market-detail';
+          details.append(summaryEl, body);
+          details.addEventListener('toggle', () => {
+            if (details.open && !details.dataset.loaded) {
+              details.dataset.loaded = '1';
+              void loadMarketDetails(listing, body).catch(() => {
+                body.replaceChildren(
+                  Object.assign(document.createElement('p'), {
+                    className: 'muted',
+                    textContent: 'Details unavailable right now.'
+                  })
+                );
+              });
+            }
+          });
+
+          const actions = document.createElement('div');
+          actions.className = 'market-card__actions';
+          if (isOwnListing) {
+            const cancelBtn = document.createElement('button');
+            cancelBtn.type = 'button';
+            cancelBtn.className = 'market-chip';
+            cancelBtn.textContent = 'Cancel / change price';
+            cancelBtn.title = 'Unlist this inscription; once confirmed, relist it at the new price.';
+            cancelBtn.addEventListener('click', () => { void marketCancel(listing); });
+            actions.append(cancelBtn);
+          } else {
+            const buy = document.createElement('button');
+            buy.type = 'button';
+            buy.className = 'market-chip';
+            buy.textContent = sponsored ? 'Buy — no STX needed' : 'Buy';
+            buy.addEventListener('click', () => { void marketBuy(listing); });
+            actions.append(buy);
+          }
+
+          card.append(thumb, badges, price, meta, details, actions);
+          return card;
+        })
+      );
+      void hydrateMarketThumbnails(run, visible);
+    };
+
+    // --- Seller dashboard: my listings across all markets -----------------
+    const marketReclaim = async (listing) => {
+      if (!state.walletSession.isConnected || !state.walletSession.address) return;
+      marketDom.status.innerHTML = '<span><strong>Market</strong> confirm the reclaim in your wallet…</span>';
+      showContractCall({
+        contractAddress: listing.entry.address,
+        contractName: listing.entry.contractName,
+        functionName: 'settle-refund',
+        functionArgs: [uintCV(listing.listingId)],
+        network: listing.entry.network,
+        stxAddress: state.walletSession.address,
+        postConditionMode: PostConditionMode.Deny,
+        postConditions: marketEscrowPostConditions(listing, { includeNft: false }),
+        onFinish: (payload) => {
+          const txId = payload?.txId ?? payload?.txid ?? '';
+          marketDom.status.innerHTML = `<span><strong>Market</strong> reclaim submitted${txId ? ` — tx ${txId}` : ''}. Your unused deposit returns when it confirms.</span>`;
+        },
+        onCancel: () => {
+          marketDom.status.innerHTML = '<span><strong>Market</strong> reclaim cancelled.</span>';
+        }
+      });
+    };
+
+    const renderSellerDashboard = () => {
+      let host = document.getElementById('marketMine');
+      if (!host) {
+        host = document.createElement('details');
+        host.id = 'marketMine';
+        host.className = 'inscribe-details market-sell';
+        marketDom.listings?.parentElement?.insertBefore(host, marketDom.listings);
+      }
+      const mine = state.walletSession.address
+        ? marketState.listings.filter((listing) =>
+            addressesEqual(listing.seller, state.walletSession.address)
+          )
+        : [];
+      if (!mine.length) {
+        host.hidden = true;
+        return;
+      }
+      host.hidden = false;
+      host.replaceChildren();
+      const summary = document.createElement('summary');
+      summary.textContent = `My listings (${mine.length})`;
+      host.append(summary);
+      const body = document.createElement('div');
+      body.className = 'market-mine';
+      for (const listing of mine) {
+        const row = document.createElement('div');
+        row.className = 'market-mine__row';
+        const sponsored = isSponsoredMarket(listing.entry);
+        const publicBlockReason = getListingPublicBlockReason(listing);
+        const info = document.createElement('div');
+        info.className = 'market-card__meta';
+        const priceText = formatMarketPriceWithUsd(listing.price, listing.settlement, state.usdPriceBook);
+        const budgetText = sponsored && listing.budgetRemaining !== null
+          ? ` · deposit ${formatAssetAmount(listing.feeBudget ?? listing.budgetRemaining, 6, 'STX')}, ${formatAssetAmount(listing.budgetRemaining, 6, 'STX')} remaining`
+          : '';
+        const listingStatus = publicBlockReason === 'legacy-nft'
+          ? 'not shown to buyers — cancel, migrate to v3, then relist'
+          : publicBlockReason === 'broken-market'
+            ? 'not shown to buyers — cancel and relist on a supported market'
+            : listing.soldAt !== null
+              ? 'SOLD — settlement pending'
+              : 'live';
+        info.textContent = `#${listing.tokenId} · ${priceText} · ${listingStatus}${budgetText}`;
+        const actions = document.createElement('div');
+        actions.className = 'market-card__actions';
+        if (listing.soldAt === null) {
+          const cancelBtn = document.createElement('button');
+          cancelBtn.type = 'button';
+          cancelBtn.className = 'market-chip';
+          cancelBtn.textContent = publicBlockReason
+            ? 'Cancel listing (return NFT)'
+            : 'Cancel (return NFT + deposit)';
+          cancelBtn.addEventListener('click', () => { void marketCancel(listing); });
+          actions.append(cancelBtn);
+          if (publicBlockReason === 'legacy-nft') {
+            const migrate = document.createElement('a');
+            migrate.className = 'market-chip';
+            migrate.href = '/web/migrate.html';
+            migrate.target = '_self';
+            migrate.textContent = 'Migration guide';
+            actions.append(migrate);
+          }
+        } else if (sponsored && (listing.budgetRemaining ?? 0n) > 0n) {
+          const reclaimBtn = document.createElement('button');
+          reclaimBtn.type = 'button';
+          reclaimBtn.className = 'market-chip';
+          reclaimBtn.textContent = 'Reclaim deposit';
+          reclaimBtn.addEventListener('click', () => { void marketReclaim(listing); });
+          actions.append(reclaimBtn);
+          const note = document.createElement('span');
+          note.className = 'market-card__meta';
+          note.textContent = 'Usually automatic; self-reclaim unlocks ~24h after the sale if the relayer has not settled.';
+          actions.append(note);
+        }
+        row.append(info, actions);
+        body.append(row);
+      }
+      host.append(body);
+    };
+
+    // Fast path: the edge-cached aggregate endpoint (functions/market/listings)
+    // turns ~1+N Hiro reads per market into ONE cached request. Falls back to
+    // direct reads when unavailable (local dev without wrangler).
+    const loadListingsFromCache = async ({ seller = null, allowEmpty = false } = {}) => {
+      const query = seller ? `?seller=${encodeURIComponent(seller)}` : '';
+      const response = await fetch(`/market/listings${query}`);
+      if (!response.ok) throw new Error(`cache endpoint ${response.status}`);
+      const payload = await response.json();
+      // Never trust an empty or degraded cache answer: a transient upstream
+      // failure server-side must not render as "no listings" when listings
+      // exist on-chain. Throwing here falls back to direct reads.
+      if (payload.degraded === true || (!allowEmpty && !(payload.listings ?? []).length)) {
+        throw new Error('cache empty or degraded - verifying with direct reads');
+      }
+      const byId = new Map(
+        marketEntriesForNetwork().map((entry) => [getMarketContractId(entry), entry])
+      );
+      return (payload.listings ?? [])
+        .map((row) => {
+          const entry = byId.get(row.contractId);
+          if (!entry) return null;
+          return {
+            entry,
+            contractId: row.contractId,
+            settlement: getMarketSettlementAsset(entry.paymentTokenContractId ?? null),
+            listingId: BigInt(row.listingId),
+            seller: row.seller,
+            nftContract: row.nftContract,
+            tokenId: BigInt(row.tokenId),
+            price: BigInt(row.price),
+            createdAt: row.createdAt !== null ? BigInt(row.createdAt) : null,
+            feeBudget: row.feeBudget !== null ? BigInt(row.feeBudget) : null,
+            claimed: row.claimed !== null ? BigInt(row.claimed) : null,
+            budgetRemaining: row.budgetRemaining !== null ? BigInt(row.budgetRemaining) : null,
+            soldAt: row.soldAt !== null && row.soldAt !== undefined ? BigInt(row.soldAt) : null
+          };
+        })
+        .filter(Boolean);
+    };
+
+    const renderWalletMarketListings = () => {
+      const host = dom.walletMarketListings;
+      const body = dom.walletMarketListingsBody;
+      if (!host || !body) return;
+      const viewingAddress = getViewingWalletAddress();
+      const listingState = state.walletMarketListings;
+      const listings = viewingAddress && addressesEqual(listingState.address, viewingAddress)
+        ? listingState.listings.filter((listing) => {
+            if (listing.soldAt !== null) return false;
+            if (isListingPubliclyBuyable(listing)) return true;
+            return !!state.walletSession.address &&
+              addressesEqual(state.walletSession.address, listing.seller);
+          })
+        : [];
+      if (listings.length === 0) {
+        host.hidden = true;
+        body.replaceChildren();
+        return;
+      }
+      host.hidden = false;
+      host.open = true;
+      if (dom.walletMarketListingsSummary) {
+        dom.walletMarketListingsSummary.textContent = `Listed / escrowed (${listings.length})`;
+      }
+      body.replaceChildren(
+        ...listings.map((listing) => {
+          const publicBlockReason = getListingPublicBlockReason(listing);
+          const row = document.createElement('div');
+          row.className = 'market-mine__row wallet-market-listing__row';
+          const thumb = document.createElement('a');
+          thumb.className = 'market-thumb wallet-market-listing__thumb';
+          thumb.href = `/xplorer?token=${listing.tokenId}`;
+          thumb.target = '_self';
+          thumb.dataset.marketThumb = `${listing.contractId}:${listing.listingId}`;
+          thumb.setAttribute('aria-label', `View inscription #${listing.tokenId}`);
+          thumb.append(
+            Object.assign(document.createElement('span'), {
+              className: 'market-thumb__label',
+              textContent: 'Loading…'
+            })
+          );
+          const content = document.createElement('div');
+          content.className = 'wallet-market-listing__content';
+          const info = document.createElement('div');
+          info.className = 'market-card__meta';
+          const availabilityText = publicBlockReason === 'legacy-nft'
+            ? 'not shown to buyers — cancel, migrate to v3, then relist'
+            : publicBlockReason === 'broken-market'
+              ? 'not shown to buyers — cancel and relist on a supported market'
+              : 'held safely in market escrow';
+          info.textContent = `#${listing.tokenId} · ${formatMarketPriceWithUsd(
+            listing.price,
+            listing.settlement,
+            state.usdPriceBook
+          )} · ${availabilityText} · seller: ${getViewingWalletLabel()}`;
+          const actions = document.createElement('div');
+          actions.className = 'market-card__actions';
+          if (!publicBlockReason) {
+            const view = document.createElement('a');
+            view.className = 'market-chip';
+            view.href = '/market';
+            view.target = '_self';
+            view.textContent = 'View market';
+            actions.append(view);
+          }
+          if (
+            state.walletSession.address &&
+            addressesEqual(state.walletSession.address, listing.seller)
+          ) {
+            const cancel = document.createElement('button');
+            cancel.type = 'button';
+            cancel.className = 'market-chip';
+            cancel.textContent = publicBlockReason
+              ? 'Cancel listing (return NFT)'
+              : 'Unlist / change price';
+            cancel.title = 'The market contract requires cancel and relist to change price.';
+            cancel.addEventListener('click', () => {
+              void marketCancel(listing, dom.walletMarketListingsStatus);
+            });
+            actions.append(cancel);
+            if (publicBlockReason === 'legacy-nft') {
+              const migrate = document.createElement('a');
+              migrate.className = 'market-chip';
+              migrate.href = '/web/migrate.html';
+              migrate.target = '_self';
+              migrate.textContent = 'Migration guide';
+              actions.append(migrate);
+            }
+          }
+          content.append(info, actions);
+          row.append(thumb, content);
+          return row;
+        })
+      );
+      void hydrateMarketThumbnails(marketState.run, listings, body);
+    };
+
+    const refreshWalletMarketListings = async (walletAddress) => {
+      if (!walletAddress || state.explorerMode) return;
+      const requestId = (state.walletMarketListings.requestId ?? 0) + 1;
+      state.walletMarketListings = { address: walletAddress, listings: [], requestId };
+      renderWalletMarketListings();
+      let listings = [];
+      try {
+        listings = await loadListingsFromCache({ seller: walletAddress, allowEmpty: true });
+      } catch {
+        const perContract = await Promise.all(
+          marketEntriesForNetwork().map((entry) => readMarketListings(entry).catch(() => []))
+        );
+        listings = perContract.flat();
+      }
+      if (
+        requestId !== state.walletMarketListings.requestId ||
+        !addressesEqual(walletAddress, getViewingWalletAddress())
+      ) {
+        return;
+      }
+      state.walletMarketListings = {
+        address: walletAddress,
+        listings: listings.filter((listing) => addressesEqual(listing.seller, walletAddress)),
+        requestId
+      };
+      renderWalletMarketListings();
+    };
+
+    const loadMarketPage = async (params = null) => {
+      const run = ++marketState.run;
+      if (!marketDom.listings) return;
+      if (marketDom.badge) marketDom.badge.textContent = state.contract.network;
+      // USD conversion: fetch spot rates in the background and re-render the
+      // cards once available (asset-only prices show in the meantime).
+      void loadUsdPriceBook().then(() => {
+        if (run === marketState.run && state.usdPriceBook) {
+          renderMarketListings();
+          renderSellerDashboard();
+        }
+      });
+      renderMarketToolbar();
+      populateSellMarkets();
+      const listParam = params?.get?.('list');
+      if (listParam && /^\d+$/.test(listParam)) {
+        openSellForToken(listParam);
+      }
+      marketDom.status.innerHTML = '<span><strong>Market</strong> loading listings…</span>';
+      try {
+        let listings;
+        try {
+          listings = await loadListingsFromCache();
+          debugLog('market', 'listings served from edge cache', { count: listings.length });
+        } catch {
+          const perContract = await Promise.all(
+            marketEntriesForNetwork().map((entry) => readMarketListings(entry).catch(() => []))
+          );
+          listings = perContract.flat();
+        }
+        if (run !== marketState.run) return;
+        marketState.listings = listings.sort((a, b) => (b.listingId > a.listingId ? 1 : -1));
+        renderMarketListings();
+        renderSellerDashboard();
+      } catch (error) {
+        if (run !== marketState.run) return;
+        marketDom.status.innerHTML = '<span><strong>Market</strong> could not load listings.</span>';
+        debugLog('market', 'load failed', { error: String(error?.message ?? error) });
+      }
+    };
+
+
+    // --- Drops: sponsored free claims (data-page 'drops') -------------------
+    // Reuses the market module's thumbnail/media caches and card styling; the
+    // drops contract exposes market-shaped read-onlys, so reads look identical.
+    const DROP_DIAGNOSTICS_KEY = 'xtrata:drops:diagnostics:v1';
+    const DEFAULT_DROP_GROUP_ID = 1n;
+    const DROPS_DISPLAY_LIMIT = 25;
+    const DROPS_SCAN_MAX_IDS = DROPS_DISPLAY_LIMIT * 10;
+    const dropsState = {
+      run: 0,
+      drops: [],
+      historyEvents: [],
+      claimRound: 0,
+      claimsInFlight: new Set(),
+      recentlyClaimed: new Set(),
+      createWatchRun: 0
+    };
+    const dropsDom = {
+      status: $('dropsStatus'),
+      listings: $('dropsListings'),
+      badge: $('dropsNetworkBadge'),
+      create: $('dropsCreate'),
+      createTokenId: $('dropsCreateTokenId'),
+      createGroup: $('dropsCreateGroup'),
+      createRules: $('dropsCreateRules'),
+      ruleOnePerWallet: $('dropsRuleOnePerWallet'),
+      ruleRequireBns: $('dropsRuleRequireBns'),
+      ruleOnePerBns: $('dropsRuleOnePerBns'),
+      createDeposit: $('dropsCreateDeposit'),
+      createButton: $('dropsCreateButton'),
+      createStatus: $('dropsCreateStatus'),
+      diagnostics: $('dropsDiagnostics'),
+      diagnosticsBadge: $('dropsDiagnosticsBadge'),
+      diagnosticsLog: $('dropsDiagnosticsLog'),
+      diagnosticsCopy: $('dropsDiagnosticsCopy'),
+      diagnosticsClear: $('dropsDiagnosticsClear'),
+      history: $('dropsHistory'),
+      historyList: $('dropsHistoryList')
+    };
+    const dropsEntriesForNetwork = () =>
+      DROPS_REGISTRY.filter((entry) => entry.network === state.contract.network);
+    let dropsQuote = null; // deposit quote from the relayer (ustx)
+
+    const readDropDiagnostics = () => {
+      try {
+        const parsed = JSON.parse(sessionStorage.getItem(DROP_DIAGNOSTICS_KEY) ?? '[]');
+        return Array.isArray(parsed) ? parsed.slice(-100) : [];
+      } catch {
+        return [];
+      }
+    };
+    let dropDiagnostics = readDropDiagnostics();
+
+    const renderDropDiagnostics = () => {
+      if (!dropsDom.diagnosticsLog) return;
+      dropsDom.diagnosticsLog.replaceChildren(
+        ...dropDiagnostics.map((entry) => {
+          const item = document.createElement('li');
+          item.className = 'claim-diagnostics__entry';
+          item.dataset.tone = entry.tone ?? '';
+          const time = document.createElement('time');
+          time.className = 'claim-diagnostics__time';
+          time.textContent = entry.time;
+          const body = document.createElement('span');
+          body.textContent = `[round ${entry.round} · ${entry.stage}] ${entry.message}`;
+          item.append(time, body);
+          return item;
+        })
+      );
+      const last = dropDiagnostics.at(-1);
+      if (dropsDom.diagnosticsBadge) {
+        dropsDom.diagnosticsBadge.textContent = last?.stage === 'COMPLETE'
+          ? 'passed'
+          : last?.tone === 'error'
+          ? 'blocked'
+          : last?.stage === 'CANCELLED'
+            ? 'cancelled'
+            : dropDiagnostics.length
+              ? 'running'
+              : 'ready';
+      }
+      dropsDom.diagnosticsLog.scrollTop = dropsDom.diagnosticsLog.scrollHeight;
+    };
+
+    const recordDropDiagnostic = (round, stage, message, tone = '') => {
+      const entry = { round, stage, message, tone, time: nowLabel() };
+      dropDiagnostics = [...dropDiagnostics, entry].slice(-100);
+      try {
+        sessionStorage.setItem(DROP_DIAGNOSTICS_KEY, JSON.stringify(dropDiagnostics));
+      } catch {
+        // Diagnostics remain available for this page even if storage is unavailable.
+      }
+      if (dropsDom.diagnostics) dropsDom.diagnostics.open = true;
+      renderDropDiagnostics();
+      debugLog('drops-claim', `${stage}: ${message}`, { round }, tone === 'error' ? 'error' : tone === 'warn' ? 'warn' : 'info');
+    };
+
+    dropsDom.diagnosticsCopy?.addEventListener('click', () => {
+      const text = dropDiagnostics
+        .map((entry) => `${entry.time} [round ${entry.round} · ${entry.stage}] ${entry.message}`)
+        .join('\n');
+      void navigator.clipboard.writeText(text);
+    });
+    dropsDom.diagnosticsClear?.addEventListener('click', () => {
+      dropDiagnostics = [];
+      sessionStorage.removeItem(DROP_DIAGNOSTICS_KEY);
+      renderDropDiagnostics();
+    });
+    renderDropDiagnostics();
+
+    const optionalPrincipalValue = (node) => {
+      const value = node?.value ?? null;
+      if (!value) return null;
+      if (typeof value === 'string') return value;
+      return typeof value.value === 'string' ? value.value : null;
+    };
+
+    const optionalUintValue = (node) => {
+      const value = node?.value ?? null;
+      if (value === null || value === undefined) return null;
+      const raw = typeof value === 'object' && value !== null && 'value' in value
+        ? value.value
+        : value;
+      return raw === null || raw === undefined ? null : BigInt(raw);
+    };
+
+    const unwrapReadOnlyNode = (node) => {
+      let current = node;
+      while (
+        current &&
+        typeof current.type === 'string' &&
+        (current.type.startsWith('(optional') || current.type.startsWith('(response'))
+      ) {
+        current = current.value ?? null;
+      }
+      return current;
+    };
+
+    const readBoolValue = (node) => {
+      const unwrapped = unwrapReadOnlyNode(node);
+      return unwrapped === true || (unwrapped?.type === 'bool' && unwrapped.value === true);
+    };
+
+    const hasClaimedDropGroup = async (drop, claimerAddress) => {
+      const json = await callReadOnlyJson({
+        contractId: drop.contractId,
+        functionName: 'has-claimed-in-group',
+        args: [principalCV(drop.creator), uintCV(drop.groupId), principalCV(claimerAddress)],
+        network: drop.entry.network
+      });
+      return readBoolValue(json);
+    };
+
+    const hasClaimedAnyDropGroup = async (drop, claimerAddress, groupIds) => {
+      for (const groupId of groupIds) {
+        const claimed = await hasClaimedDropGroup({ ...drop, groupId }, claimerAddress);
+        if (claimed) return groupId;
+      }
+      return null;
+    };
+
+    const dropsSponsorBase = (entry) => (entry?.sponsorApi ?? '/').replace(/\/+$/, '');
+
+    const getDropsCreatePolicyRules = () => normalizeDropPolicyRules({
+      onePerWallet: dropsDom.ruleOnePerWallet?.checked ?? DEFAULT_DROP_POLICY_RULES.onePerWallet,
+      requireBnsName: dropsDom.ruleRequireBns?.checked ?? DEFAULT_DROP_POLICY_RULES.requireBnsName,
+      onePerBnsName: dropsDom.ruleOnePerBns?.checked ?? DEFAULT_DROP_POLICY_RULES.onePerBnsName
+    });
+
+    const generateUniqueDropGroupId = () => {
+      const random = BigInt(Math.floor(Math.random() * 1000));
+      return BigInt(Date.now()) * 1000n + random;
+    };
+
+    const fetchDropPolicy = async (drop) => {
+      try {
+        const base = dropsSponsorBase(drop.entry);
+        const params = new URLSearchParams({
+          contractId: drop.contractId,
+          creator: drop.creator,
+          groupId: drop.groupId.toString()
+        });
+        const response = await fetch(`${base}/sponsor/drop-policy?${params.toString()}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const body = await response.json();
+        return normalizeDropPolicyRules(body.rules);
+      } catch (error) {
+        debugLog('drops-policy', 'policy read failed; using default rules', {
+          dropId: drop.dropId.toString(),
+          error: String(error?.message ?? error)
+        }, 'warn');
+        return DEFAULT_DROP_POLICY_RULES;
+      }
+    };
+
+    const registerDropPolicy = async ({ drop, rules, txId }) => {
+      const base = dropsSponsorBase(drop.entry);
+      const response = await fetch(`${base}/sponsor/drop-policy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contractId: drop.contractId,
+          dropId: drop.dropId.toString(),
+          creator: drop.creator,
+          groupId: drop.groupId.toString(),
+          rules,
+          txId: txId || null
+        })
+      });
+      if (!response.ok) {
+        let message = `HTTP ${response.status}`;
+        try {
+          const body = await response.json();
+          message = body.message ?? body.code ?? message;
+        } catch {
+          // Preserve HTTP status.
+        }
+        throw new Error(message);
+      }
+      return response.json();
+    };
+
+    const chooseClaimBnsName = async (drop, rules, round) => {
+      if (!hasBnsPolicy(rules)) return null;
+      recordDropDiagnostic(round, 'BNS_POLICY', 'Resolving BNS names held by the connected wallet.');
+      dropsDom.status.innerHTML = '<span><strong>Drops</strong> checking BNS eligibility for this claim…</span>';
+      const result = await resolveBnsNames({
+        address: state.walletSession.address,
+        network: drop.entry.network
+      });
+      const names = [...new Set((result.names ?? []).map(normalizeDropBnsName).filter(Boolean))];
+      if (!names.length) {
+        throw Object.assign(new Error('This drop requires the claiming wallet to hold a BNS name.'), {
+          code: 'BNS_REQUIRED'
+        });
+      }
+      let selected = normalizeDropBnsName(result.primary) ?? names[0];
+      if (names.length > 1 && rules.onePerBnsName) {
+        const answer = window.prompt(
+          `Choose the BNS name to use for this claim:\n\n${names.join('\n')}`,
+          selected
+        );
+        selected = normalizeDropBnsName(answer);
+        if (!selected || !names.includes(selected)) {
+          throw Object.assign(new Error('Choose one of the BNS names held by the connected wallet.'), {
+            code: 'BNS_SELECTION_INVALID'
+          });
+        }
+      }
+      recordDropDiagnostic(round, 'BNS_NAME', `Using ${selected} for BNS policy checks.`, 'success');
+      return selected;
+    };
+
+    const readDrops = async (entry) => {
+      const contractId = `${entry.address}.${entry.contractName}`;
+      const lastJson = await callReadOnlyJson({
+        contractId,
+        functionName: 'get-last-drop-id',
+        network: entry.network
+      });
+      const lastId = BigInt(lastJson?.value?.value ?? 0);
+      const results = [];
+      let scanned = 0;
+      for (
+        let id = lastId;
+        id >= 0n && results.length < DROPS_DISPLAY_LIMIT && scanned < DROPS_SCAN_MAX_IDS;
+        id -= 1n
+      ) {
+        scanned += 1;
+        try {
+          const json = await callReadOnlyJson({
+            contractId,
+            functionName: 'get-drop',
+            args: [uintCV(id)],
+            network: entry.network
+          });
+          const tuple = unwrapBindingTuple(json);
+          if (!tuple) continue;
+          results.push({
+            entry,
+            contractId,
+            dropId: id,
+            // market-compatible keys so marketMediaFor/thumbnail caches work
+            listingId: id,
+            creator: String(tuple.creator.value),
+            nftContract: String(tuple['nft-contract'].value),
+            tokenId: BigInt(tuple['token-id'].value),
+            groupId: BigInt(tuple['group-id'].value),
+            feeBudget: tuple['fee-budget'] ? BigInt(tuple['fee-budget'].value) : null,
+            budgetRemaining: tuple['budget-remaining'] ? BigInt(tuple['budget-remaining'].value) : null,
+            claimer: optionalPrincipalValue(tuple.claimer),
+            claimedAt: optionalUintValue(tuple['claimed-at'])
+          });
+        } catch {
+          // sparse ids / settled drops: skip
+        }
+        if (id === 0n) break;
+      }
+      if (results.length < DROPS_DISPLAY_LIMIT && scanned >= DROPS_SCAN_MAX_IDS) {
+        debugLog('drops', 'stopped drop scan at safety cap', {
+          contractId,
+          lastId: lastId.toString(),
+          scanned,
+          found: results.length,
+          limit: DROPS_DISPLAY_LIMIT
+        }, 'warn');
+      }
+      return results;
+    };
+
+    // Claims cost the claimer nothing, so the only post-condition is the NFT
+    // leaving escrow — a "send exactly 0 STX" condition just confuses wallets.
+    const dropClaimPostConditions = (drop) => {
+      const [nftAddress, nftName] = drop.nftContract.split('.');
+      return [
+        buildContractTransferPostCondition({
+          nftContract: { address: nftAddress, contractName: nftName, network: drop.entry.network },
+          senderContract: {
+            address: drop.entry.address,
+            contractName: drop.entry.contractName,
+            network: drop.entry.network
+          },
+          tokenId: drop.tokenId
+        })
+      ];
+    };
+
+    const dropClaim = async (drop) => {
+      const claimKey = `${drop.contractId}:${drop.dropId}`;
+      const round = ++dropsState.claimRound;
+      if (dropsState.claimsInFlight.has(claimKey)) {
+        recordDropDiagnostic(round, 'BLOCK', `Drop #${drop.dropId} already has a claim round in progress.`, 'warn');
+        return;
+      }
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> connect a wallet to claim — new wallets work, no STX needed.</span>';
+        recordDropDiagnostic(round, 'BLOCK', 'No connected Stacks wallet address.', 'error');
+        return;
+      }
+      let policyRules = DEFAULT_DROP_POLICY_RULES;
+      try {
+        policyRules = await fetchDropPolicy(drop);
+      } catch {
+        policyRules = DEFAULT_DROP_POLICY_RULES;
+      }
+      try {
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> checking whether this wallet has already claimed from this campaign…</span>';
+        const collectionLock = getDropsCollectionLockForDrop({
+          contractId: drop.contractId,
+          creator: drop.creator,
+          dropId: drop.dropId,
+          groupId: drop.groupId
+        });
+        const claimedGroup = collectionLock
+          ? await hasClaimedAnyDropGroup(drop, state.walletSession.address, collectionLock.groupIds)
+          : policyRules.onePerWallet
+            ? (await hasClaimedDropGroup(drop, state.walletSession.address) ? drop.groupId : null)
+            : null;
+        if (claimedGroup !== null) {
+          const lockLabel = collectionLock?.label ?? 'this campaign group';
+          dropsDom.status.innerHTML = `<span><strong>Drops</strong> this wallet has already claimed a free drop from ${lockLabel}.</span><span class="badge amber">one per wallet</span>`;
+          recordDropDiagnostic(
+            round,
+            'GROUP_LIMIT',
+            `Wallet ${state.walletSession.address} already claimed campaign group ${claimedGroup} from ${drop.creator}.`,
+            'warn'
+          );
+          return;
+        }
+      } catch (error) {
+        recordDropDiagnostic(
+          round,
+          'GROUP_LIMIT_CHECK_UNAVAILABLE',
+          `Could not pre-check one-per-wallet policy; the contract will still enforce it. ${String(error?.message ?? error)}`,
+          'warn'
+        );
+      }
+      dropsState.claimsInFlight.add(claimKey);
+      renderDrops();
+      const [nftAddress, nftName] = drop.nftContract.split('.');
+      const postConditions = dropClaimPostConditions(drop);
+      const providerId = getSelectedWalletProviderId() ?? 'injected provider';
+      recordDropDiagnostic(round, 'START', `Free claim for drop #${drop.dropId}, inscription #${drop.tokenId}.`);
+      recordDropDiagnostic(round, 'PREFLIGHT', `Wallet ${providerId}; ${drop.entry.network}; connected ${state.walletSession.address}.`);
+      recordDropDiagnostic(round, 'PLAN', `Build sponsored ${drop.contractId}::claim, then stx_signTransaction with broadcast=false; origin fee=0, deny mode, 1 NFT post-condition.`);
+      dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the free claim in your wallet (fee 0)…</span>';
+      try {
+        const bnsName = await chooseClaimBnsName(drop, policyRules, round);
+        recordDropDiagnostic(round, 'NONCE_REQUEST', 'Loading the connected address\'s next origin nonce from Hiro.');
+        const originNonce = await fetchAddressNonce(
+          state.walletSession.address,
+          drop.entry.network
+        );
+        recordDropDiagnostic(round, 'ORIGIN_NONCE', `Using public origin nonce ${originNonce}.`, 'success');
+        recordDropDiagnostic(
+          round,
+          'SIGNING_INPUT',
+          state.walletSession.publicKey
+            ? 'Connected session includes a Stacks public key.'
+            : 'No cached public key; the adapter will request account data, then bind the unsigned origin to the connected address if the wallet omits its STX public key.',
+          state.walletSession.publicKey ? 'success' : 'warn'
+        );
+        recordDropDiagnostic(round, 'WALLET_REQUEST', 'Requesting origin signature only; wallet broadcasting is disabled.');
+        const payload = await new Promise((resolve, reject) => {
+          showSponsoredContractCall({
+            contractAddress: drop.entry.address,
+            contractName: drop.entry.contractName,
+            functionName: 'claim',
+            functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(drop.dropId)],
+            network: drop.entry.network,
+            stxAddress: state.walletSession.address,
+            publicKey: state.walletSession.publicKey,
+            nonce: originNonce,
+            postConditionMode: PostConditionMode.Deny,
+            postConditions,
+            sponsored: true,
+            onFinish: resolve,
+            onCancel: () => reject(Object.assign(new Error('Wallet request cancelled.'), { code: 'WALLET_CANCELLED' })),
+            onError: (error) => reject(Object.assign(
+              error instanceof Error ? error : new Error(String(error)),
+              { code: error?.code ?? 'WALLET_REQUEST_FAILED' }
+            ))
+          });
+        });
+        const payloadKeys = payload && typeof payload === 'object'
+          ? Object.keys(payload).sort().join(', ') || 'none'
+          : typeof payload;
+        recordDropDiagnostic(round, 'WALLET_RESPONSE', `Approval returned. Normalized response keys: ${payloadKeys}.`);
+        const inspection = inspectSponsoredClaimTransaction(payload, {
+          dropsContractId: drop.contractId,
+          nftContractId: drop.nftContract,
+          dropId: drop.dropId,
+          tokenId: drop.tokenId,
+          network: drop.entry.network,
+          claimerAddress: state.walletSession.address
+        });
+        for (const check of inspection.checks) {
+          recordDropDiagnostic(round, `CHECK_${check.code}`, check.message, check.ok ? 'success' : 'error');
+        }
+        if (!inspection.ok || !inspection.txHex) {
+          throw Object.assign(new Error('Wallet-signed transaction failed local safety checks.'), {
+            code: 'SIGNED_TX_VALIDATION_FAILED'
+          });
+        }
+        recordDropDiagnostic(round, 'SIGNED_TX_READY', `Validated ${inspection.txHex.length / 2} bytes; tx ${inspection.txId ?? 'id unavailable'}.`, 'success');
+
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> signed claim validated — submitting to the sponsor relayer…</span>';
+        const sponsorClient = createSponsorClient(dropsSponsorBase(drop.entry));
+        recordDropDiagnostic(round, 'RELAYER_SUBMIT', `Submitting signed claim for ${drop.contractId} drop #${drop.dropId}.`);
+        const describeSponsorClientError = (error) => {
+          const references = [
+            error.httpStatus ? `HTTP ${error.httpStatus}` : '',
+            error.stage ? `stage ${error.stage}` : '',
+            error.requestId ? `request ${error.requestId}` : '',
+            error.traceId ? `trace ${error.traceId}` : ''
+          ].filter(Boolean).join('; ');
+          return `${error.code}${references ? ` (${references})` : ''}: ${error.message}`;
+        };
+        let lastSubmitRetryError = null;
+        let job;
+        try {
+          job = await submitSponsorClaimWithRetry({
+            client: sponsorClient,
+            txHex: inspection.txHex,
+            contractId: drop.contractId,
+            listingId: drop.dropId,
+            bnsName,
+            onExistingJob: (error, existingJob) => {
+              recordDropDiagnostic(round, 'RELAYER_RESUME', `${error.code}: resuming existing job ${existingJob.id}.`, 'warn');
+            },
+            onRetry: (error, attempt, maxAttempts, delayMs) => {
+              lastSubmitRetryError = error;
+              dropsDom.status.innerHTML = `<span><strong>Drops</strong> sponsor relayer is temporarily slow. Your wallet signature is valid; retrying safely (${attempt + 1}/${maxAttempts})…</span><span class="badge amber">retrying</span>`;
+              recordDropDiagnostic(
+                round,
+                'RELAYER_RETRY',
+                `${describeSponsorClientError(error)}. Retrying sponsor submission in ${Math.round(delayMs / 1000)}s (${attempt + 1}/${maxAttempts}).`,
+                'warn'
+              );
+            }
+          });
+        } catch (error) {
+          if (error instanceof SponsorClientError) {
+            const retryNote = lastSubmitRetryError
+              ? ' Automatic retries were exhausted; the wallet signature was valid, but the relayer could not complete sponsorship.'
+              : '';
+            recordDropDiagnostic(
+              round,
+              'RELAYER_REJECTED',
+              `${describeSponsorClientError(error)}.${retryNote}`,
+              'error'
+            );
+          }
+          throw error;
+        }
+        const buyTx = job.txids?.buy ?? '';
+        recordDropDiagnostic(round, 'RELAYER_ACCEPTED', `Job ${job.id} entered ${job.state}${buyTx ? `; claim tx ${buyTx}` : ''}.`, 'success');
+        dropsDom.status.innerHTML = `<span><strong>Drops</strong> sponsored claim broadcast${buyTx ? ` — tx ${buyTx}` : ''}. Tracking confirmation and refund settlement…</span><span class="badge green">no STX needed</span>`;
+
+        let claimConfirmed = false;
+        const markClaimConfirmed = (confirmedJob) => {
+          if (claimConfirmed || !isSponsorClaimConfirmedState(confirmedJob.state)) return;
+          claimConfirmed = true;
+          dropsState.recentlyClaimed.add(claimKey);
+          drop.claimedAt = drop.claimedAt ?? 0n;
+          recordDropDiagnostic(
+            round,
+            'CLAIM_CONFIRMED',
+            `Inscription #${drop.tokenId} is claimed. Sponsor reimbursement continues in job ${confirmedJob.id}.`,
+            'success'
+          );
+          renderDrops();
+          dropsDom.status.innerHTML = '<span><strong>Drops</strong> inscription claimed successfully. Sponsor reimbursement is finishing in the background.</span><span class="badge green">claimed</span>';
+        };
+        markClaimConfirmed(job);
+        let previousState = '';
+        const finalJob = await pollSponsorJob({
+          client: sponsorClient,
+          job,
+          onStatus: (nextJob, attempt) => {
+            markClaimConfirmed(nextJob);
+            if (nextJob.state !== previousState || attempt % 5 === 0) {
+              recordDropDiagnostic(
+                round,
+                'SETTLEMENT',
+                `Job ${nextJob.id}: ${nextJob.state} (poll ${attempt}).`,
+                nextJob.state === 'ABANDONED'
+                  ? 'error'
+                  : isSponsorClaimConfirmedState(nextJob.state)
+                    ? 'success'
+                    : ''
+              );
+              previousState = nextJob.state;
+            }
+          }
+        });
+        if (finalJob.state === 'ABANDONED') {
+          throw Object.assign(new Error(finalJob.error ?? 'Relayer abandoned the sponsored claim.'), {
+            code: 'RELAYER_ABANDONED'
+          });
+        }
+        if (finalJob.state !== 'SETTLED') {
+          if (claimConfirmed) {
+            recordDropDiagnostic(
+              round,
+              'SETTLEMENT_PENDING',
+              `Inscription is claimed; reimbursement job ${finalJob.id} remains ${finalJob.state} and can continue on later relayer traffic.`,
+              'warn'
+            );
+            await loadDropsPage();
+            dropsDom.status.innerHTML = '<span><strong>Drops</strong> inscription claimed successfully. Sponsor reimbursement remains pending.</span><span class="badge green">claimed</span>';
+            return;
+          }
+          throw Object.assign(new Error(`Settlement polling ended in ${finalJob.state}; the on-chain job may still continue.`), {
+            code: 'SETTLEMENT_TIMEOUT'
+          });
+        }
+        recordDropDiagnostic(round, 'COMPLETE', `Free claim settled. Claim ${finalJob.txids?.buy ?? 'n/a'}; reimbursement ${finalJob.txids?.claim ?? 'n/a'}; refund ${finalJob.txids?.refund ?? 'n/a'}.`, 'success');
+        await loadDropsPage();
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> free claim confirmed and sponsorship settled.</span><span class="badge green">complete</span>';
+      } catch (error) {
+        const code = error?.code ?? 'UNKNOWN_BLOCK';
+        const message = String(error?.message ?? error);
+        const cancelled = code === 'WALLET_CANCELLED';
+        const stage = cancelled
+          ? 'CANCELLED'
+          : String(code).startsWith('WALLET_')
+            ? 'WALLET_ERROR'
+            : 'BLOCK';
+        recordDropDiagnostic(round, stage, `${code}: ${message}`, cancelled ? 'warn' : 'error');
+        dropsDom.status.innerHTML = cancelled
+          ? '<span><strong>Drops</strong> claim cancelled in the wallet. No transaction was submitted.</span>'
+          : `<span><strong>Drops</strong> sponsored claim blocked (${code}): ${message}. Open Claim diagnostics, fix the reported stage, then retry.</span>`;
+      } finally {
+        dropsState.claimsInFlight.delete(claimKey);
+        dropsDom.listings?.querySelectorAll('[data-drop-claim]').forEach((button) => {
+          if (button.dataset.dropClaim === claimKey) {
+            const claimed = dropsState.recentlyClaimed.has(claimKey);
+            button.disabled = claimed;
+            button.textContent = claimed ? 'Claimed successfully' : 'Claim free — no STX needed';
+          }
+        });
+      }
+    };
+
+    const hydrateDropThumbnails = async (run, drops) => {
+      await runLimited(drops, MARKET_THUMB_HYDRATION_CONCURRENCY, async (drop) => {
+        if (run !== dropsState.run) return;
+        const media = await marketMediaFor(drop);
+        if (run !== dropsState.run) return;
+        const slot = dropsDom.listings?.querySelector(
+          `[data-drop-thumb="${drop.contractId}:${drop.dropId}"]`
+        );
+        if (!slot) return;
+        if (media?.kind === 'html-live') {
+          const frame = document.createElement('iframe');
+          frame.className = 'market-thumb__frame';
+          frame.title = `Inscription #${drop.tokenId} preview`;
+          frame.sandbox = 'allow-scripts';
+          frame.referrerPolicy = 'no-referrer';
+          frame.loading = 'lazy';
+          frame.setAttribute('scrolling', 'no');
+          frame.srcdoc = media.html;
+          slot.replaceChildren(frame);
+          slot.classList.add('market-thumb--media');
+        } else if (media?.kind === 'text') {
+          const pre = document.createElement('div');
+          pre.className = 'market-thumb__snippet';
+          pre.textContent = media.text;
+          slot.replaceChildren(pre);
+          slot.classList.add('market-thumb--media');
+        } else if (media?.kind === 'video' && media.url) {
+          const video = document.createElement('video');
+          video.src = media.url;
+          video.muted = true;
+          video.loop = true;
+          video.autoplay = true;
+          video.playsInline = true;
+          slot.replaceChildren(video);
+          slot.classList.add('market-thumb--media');
+        } else if (media?.url && media.kind !== 'html-live') {
+          const img = document.createElement('img');
+          img.src = media.url;
+          img.alt = `Inscription #${drop.tokenId}`;
+          img.loading = 'lazy';
+          slot.replaceChildren(img);
+          slot.classList.add('market-thumb--media');
+        } else {
+          slot.replaceChildren(
+            Object.assign(document.createElement('span'), {
+              className: 'market-thumb__label',
+              textContent: `#${drop.tokenId}`
+            })
+          );
+        }
+      });
+    };
+
+    const renderDropsHistory = () => {
+      if (!dropsDom.historyList) return;
+      const dropEntries = dropsEntriesForNetwork();
+      const fallbackEntry = dropEntries[0] ?? null;
+      const byDropId = new Map();
+      for (const drop of dropsState.drops) {
+        byDropId.set(drop.dropId.toString(), { ...drop, historyType: 'active', txId: null });
+      }
+      const claimEvents = dropsState.historyEvents.filter((event) => event.type === 'claim');
+      for (const event of claimEvents) {
+        const key = event.dropId.toString();
+        const existing = byDropId.get(key);
+        byDropId.set(key, {
+          ...(existing ?? {}),
+          entry: existing?.entry ?? fallbackEntry,
+          contractId: existing?.contractId ?? (fallbackEntry ? getContractId(fallbackEntry) : ''),
+          dropId: event.dropId,
+          listingId: event.dropId,
+          creator: event.creator ?? existing?.creator ?? '',
+          nftContract: event.nftContract ?? existing?.nftContract ?? '',
+          tokenId: event.tokenId ?? existing?.tokenId ?? 0n,
+          groupId: event.groupId ?? existing?.groupId ?? 0n,
+          claimer: event.claimer ?? existing?.claimer ?? null,
+          claimedAt: event.blockHeight ? BigInt(event.blockHeight) : (existing?.claimedAt ?? null),
+          txId: event.txId ?? existing?.txId ?? null,
+          historyType: 'claim'
+        });
+      }
+      const drops = Array.from(byDropId.values())
+        .sort((a, b) => (b.dropId > a.dropId ? 1 : -1))
+        .slice(0, DROPS_DISPLAY_LIMIT * 2);
+      if (!drops.length) {
+        dropsDom.historyList.replaceChildren(
+          Object.assign(document.createElement('p'), {
+            className: 'field-hint',
+            textContent: 'No recent drop records are currently available.'
+          })
+        );
+        return;
+      }
+      dropsDom.historyList.replaceChildren(
+        ...drops.map((drop) => {
+          const row = document.createElement('article');
+          row.className = 'drops-history__row';
+          const claimed = drop.historyType === 'claim' || drop.claimedAt !== null;
+          row.dataset.status = claimed ? 'claimed' : 'live';
+
+          const main = document.createElement('div');
+          main.className = 'drops-history__main';
+          const title = document.createElement('strong');
+          title.textContent = `Drop #${drop.dropId} · Inscription #${drop.tokenId}`;
+          const meta = document.createElement('span');
+          meta.textContent = `Group ${drop.groupId} · created by `;
+          const creator = document.createElement('span');
+          applyBnsName(creator, drop.creator);
+          meta.append(creator);
+          main.append(title, meta);
+
+          const claim = document.createElement('div');
+          claim.className = 'drops-history__claim';
+          if (claimed) {
+            const label = document.createElement('span');
+            label.textContent = `Claimed${drop.claimedAt ? ` at block ${drop.claimedAt}` : ''} by `;
+            claim.append(label);
+            if (drop.claimer) {
+              const claimer = document.createElement('span');
+              applyBnsName(claimer, drop.claimer);
+              claim.append(claimer);
+            } else {
+              claim.append('unknown wallet');
+            }
+          } else {
+            claim.textContent = 'Not claimed yet.';
+          }
+
+          const actions = document.createElement('div');
+          actions.className = 'drops-history__actions';
+          const viewLink = document.createElement('a');
+          viewLink.className = 'market-chip';
+          viewLink.href = `/xplorer?token=${drop.tokenId}`;
+          viewLink.target = '_self';
+          viewLink.textContent = 'View';
+          const dropLink = document.createElement('a');
+          dropLink.className = 'market-chip';
+          if (claimed && drop.txId) {
+            dropLink.href = `https://explorer.hiro.so/txid/${encodeURIComponent(drop.txId)}?chain=${drop.entry?.network ?? state.contract.network}`;
+            dropLink.target = '_blank';
+            dropLink.rel = 'noopener noreferrer';
+            dropLink.textContent = 'Claim tx';
+          } else {
+            dropLink.href = `/drops?drop=${drop.tokenId}`;
+            dropLink.target = '_self';
+            dropLink.textContent = 'Open drop';
+          }
+          actions.append(viewLink, dropLink);
+
+          row.append(main, claim, actions);
+          return row;
+        })
+      );
+    };
+
+    const renderDrops = () => {
+      if (!dropsDom.listings) return;
+      const run = dropsState.run;
+      const live = dropsState.drops.filter((drop) => drop.claimedAt === null);
+      const visible = dropsState.drops.filter((drop) => {
+        const claimKey = `${drop.contractId}:${drop.dropId}`;
+        return drop.claimedAt === null || dropsState.recentlyClaimed.has(claimKey);
+      });
+      renderDropsHistory();
+      if (!visible.length) {
+        dropsDom.listings.replaceChildren();
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> no live drops right now — create one below, or check back soon.</span>';
+        return;
+      }
+      dropsDom.status.innerHTML = `<span><strong>Drops</strong> ${live.length} free claim${live.length === 1 ? '' : 's'} available.</span>`;
+      dropsDom.listings.replaceChildren(
+        ...visible.map((drop) => {
+          const claimKey = `${drop.contractId}:${drop.dropId}`;
+          const claimed = drop.claimedAt !== null || dropsState.recentlyClaimed.has(claimKey);
+          const card = document.createElement('article');
+          card.className = 'market-card';
+
+          const thumb = document.createElement('a');
+          thumb.className = 'market-thumb';
+          thumb.href = `/xplorer?token=${drop.tokenId}`;
+          thumb.target = '_self';
+          thumb.dataset.dropThumb = `${drop.contractId}:${drop.dropId}`;
+          thumb.setAttribute('aria-label', `View inscription #${drop.tokenId}`);
+          thumb.append(
+            Object.assign(document.createElement('span'), {
+              className: 'market-thumb__label',
+              textContent: 'Loading…'
+            })
+          );
+
+          const badges = document.createElement('div');
+          badges.className = 'market-card__badge-row';
+          badges.innerHTML = claimed
+            ? '<span class="badge green">Claimed</span><span class="badge">No STX spent</span>'
+            : '<span class="badge green">Free claim</span><span class="badge">No STX needed</span>';
+
+          const price = document.createElement('div');
+          price.className = 'market-card__price';
+          price.textContent = claimed ? 'Claimed' : 'Free';
+
+          const meta = document.createElement('div');
+          meta.className = 'market-card__meta';
+          meta.textContent = `Inscription #${drop.tokenId} · drop #${drop.dropId} · from `;
+          const creatorSpan = document.createElement('span');
+          applyBnsName(creatorSpan, drop.creator);
+          meta.append(creatorSpan);
+
+          const actions = document.createElement('div');
+          actions.className = 'market-card__actions';
+          const isMine = state.walletSession.address && addressesEqual(state.walletSession.address, drop.creator);
+          if (claimed) {
+            const claimedButton = document.createElement('button');
+            claimedButton.type = 'button';
+            claimedButton.className = 'market-chip';
+            claimedButton.disabled = true;
+            claimedButton.dataset.dropClaim = claimKey;
+            claimedButton.textContent = 'Claimed successfully';
+            actions.append(claimedButton);
+          } else if (isMine) {
+            const cancelBtn = document.createElement('button');
+            cancelBtn.type = 'button';
+            cancelBtn.className = 'market-chip';
+            cancelBtn.textContent = 'Cancel drop (reclaim)';
+            cancelBtn.addEventListener('click', () => {
+              if (!state.walletSession.isConnected || !state.walletSession.address) {
+                dropsDom.status.innerHTML = '<span><strong>Drops</strong> connect the creator wallet to cancel this drop.</span>';
+                renderDrops();
+                return;
+              }
+              if (!addressesEqual(state.walletSession.address, drop.creator)) {
+                dropsDom.status.innerHTML = '<span><strong>Drops</strong> wallet changed. This drop can only be cancelled by its creator; refreshing actions now.</span><span class="badge amber">wallet changed</span>';
+                renderDrops();
+                return;
+              }
+              const [nftAddress, nftName] = drop.nftContract.split('.');
+              dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the cancel in your wallet…</span>';
+              showContractCall({
+                contractAddress: drop.entry.address,
+                contractName: drop.entry.contractName,
+                functionName: 'cancel',
+                functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(drop.dropId)],
+                network: drop.entry.network,
+                stxAddress: state.walletSession.address,
+                postConditionMode: PostConditionMode.Deny,
+                postConditions: marketEscrowPostConditions(drop),
+                onFinish: () => {
+                  dropsDom.status.innerHTML = '<span><strong>Drops</strong> cancel submitted — NFT and deposit return when it confirms.</span>';
+                },
+                onCancel: () => {
+                  dropsDom.status.innerHTML = '<span><strong>Drops</strong> cancel aborted.</span>';
+                }
+              });
+            });
+            actions.append(cancelBtn);
+          } else {
+            const claimBtn = document.createElement('button');
+            claimBtn.type = 'button';
+            claimBtn.className = 'market-chip';
+            const claimBusy = dropsState.claimsInFlight.has(claimKey);
+            claimBtn.dataset.dropClaim = claimKey;
+            claimBtn.disabled = claimBusy;
+            claimBtn.textContent = claimBusy ? 'Claim in progress…' : 'Claim free — no STX needed';
+            claimBtn.addEventListener('click', () => { void dropClaim(drop); });
+            actions.append(claimBtn);
+          }
+
+          card.append(thumb, badges, price, meta, actions);
+          return card;
+        })
+      );
+      void hydrateDropThumbnails(run, visible);
+    };
+
+    const updateDropsDepositHint = async () => {
+      if (!dropsDom.createDeposit) return;
+      const entry = dropsEntriesForNetwork()[0];
+      if (!entry) return;
+      dropsDom.createDeposit.textContent = 'Fetching sponsorship deposit quote...';
+      try {
+        const base = (entry.sponsorApi ?? '/').replace(/\/+$/, '');
+        const r = await fetch(`${base}/sponsor/quote`, { method: 'POST' });
+        if (!r.ok) throw new Error(String(r.status));
+        const body = await r.json();
+        dropsQuote = BigInt(body.budgetUstx ?? '60000');
+      } catch {
+        dropsQuote = 60_000n;
+      }
+      const rules = getDropsCreatePolicyRules();
+      const blankGroupHint = rules.onePerWallet
+        ? `Blank campaign group uses ${DEFAULT_DROP_GROUP_ID}, so each wallet can claim once from this creator's campaign.`
+        : 'Blank campaign group will generate a unique group id for this drop, so the contract default group does not force one-per-wallet.';
+      const bnsHint = rules.requireBnsName || rules.onePerBnsName
+        ? ' BNS rules are enforced by the sponsor relayer until they are hardened into the contract.'
+        : '';
+      dropsDom.createDeposit.textContent =
+        `Sponsorship deposit: ${formatAssetAmount(dropsQuote, 6, 'STX')} — covers the claimer's network fee so they need zero STX. ${blankGroupHint}${bnsHint} Unused deposit refunds after claim or cancel.`;
+    };
+
+    const watchCreatedDrop = async ({ txId, tokenId, creator, rules, watchRun }) => {
+      const hasTxId = typeof txId === 'string' && txId.length > 0;
+      try {
+        if (hasTxId) {
+          dropsDom.createStatus.textContent = `Drop submitted - waiting for confirmation (${truncateMiddle(txId, 8, 8)})...`;
+          await waitForTransactionConfirmation(txId, 'Drop creation', {
+            pollIntervalMs: 4000,
+            timeoutMs: 15 * 60 * 1000
+          });
+        }
+        for (let attempt = 0; attempt < 75; attempt += 1) {
+          if (watchRun !== dropsState.createWatchRun) return;
+          dropsDom.createStatus.textContent = hasTxId
+            ? 'Drop confirmed - refreshing the live claims list...'
+            : 'Drop submitted - checking for on-chain confirmation...';
+          await loadDropsPage();
+          const createdDrop = dropsState.drops.find(
+            (drop) =>
+              drop.tokenId === tokenId &&
+              addressesEqual(drop.creator, creator) &&
+              drop.claimedAt === null
+          );
+          if (createdDrop) {
+            try {
+              await registerDropPolicy({ drop: createdDrop, rules, txId });
+              dropsDom.createStatus.textContent = `Drop #${createdDrop.dropId} confirmed, rules saved, and now live.`;
+            } catch (policyError) {
+              dropsDom.createStatus.textContent =
+                `Drop #${createdDrop.dropId} is live, but rule registration failed: ${String(policyError?.message ?? policyError)}. Claims will fall back to default contract rules until this is saved.`;
+              debugLog('drops-policy', 'policy registration failed', {
+                dropId: createdDrop.dropId.toString(),
+                tokenId: tokenId.toString(),
+                error: String(policyError?.message ?? policyError)
+              }, 'warn');
+            }
+            debugLog('drops-create', 'created drop is visible', {
+              dropId: createdDrop.dropId.toString(),
+              tokenId: tokenId.toString(),
+              txId: txId || null
+            });
+            return;
+          }
+          await sleep(4000);
+        }
+        throw new Error('Drop confirmed but did not appear in the live list within five minutes.');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        dropsDom.createStatus.textContent = `${message} Refresh the page to check its latest on-chain state.`;
+        debugLog('drops-create', 'automatic refresh stopped', {
+          tokenId: tokenId.toString(),
+          txId: txId || null,
+          error: message
+        }, 'warn');
+      } finally {
+        if (watchRun === dropsState.createWatchRun && dropsDom.createButton) {
+          dropsDom.createButton.disabled = false;
+        }
+      }
+    };
+
+    const dropsCreateDrop = async () => {
+      const entry = dropsEntriesForNetwork()[0];
+      if (!entry) return;
+      const tokenIdRaw = dropsDom.createTokenId?.value?.trim();
+      if (!/^\d+$/.test(tokenIdRaw ?? '')) {
+        dropsDom.createStatus.textContent = 'Enter the inscription number you want to drop.';
+        return;
+      }
+      const params = new URLSearchParams(window.location.search);
+      if (window.location.pathname !== '/drops' || params.get('drop') !== tokenIdRaw) {
+        const targetParams = new URLSearchParams({ drop: tokenIdRaw });
+        window.history.pushState(null, '', `/drops?${targetParams.toString()}`);
+        dropsDom.createStatus.textContent =
+          `Inscription #${tokenIdRaw} selected. Loading its create-drop view...`;
+        await switchToPage('drops', targetParams);
+        return;
+      }
+      if (!state.walletSession.isConnected || !state.walletSession.address) {
+        dropsDom.createStatus.textContent = 'Connect a wallet to create a drop.';
+        return;
+      }
+      const creator = state.walletSession.address;
+      const tokenId = BigInt(tokenIdRaw);
+      const groupRaw = dropsDom.createGroup?.value?.trim();
+      const policyRules = getDropsCreatePolicyRules();
+      // The drops contract enforces one claim per (creator, group id, claimer).
+      // When one-per-wallet is disabled and the creator leaves the group blank,
+      // generate a unique group id so the contract default group does not still
+      // impose the very rule the UI disabled.
+      const groupId = /^\d+$/.test(groupRaw ?? '')
+        ? BigInt(groupRaw)
+        : policyRules.onePerWallet
+          ? DEFAULT_DROP_GROUP_ID
+          : generateUniqueDropGroupId();
+      const budget = dropsQuote ?? 60_000n;
+
+      dropsDom.createStatus.textContent = 'Checking ownership...';
+      try {
+        const owner = await state.client.getOwner(tokenId, state.walletSession.address);
+        if (!owner || owner !== state.walletSession.address) {
+          dropsDom.createStatus.textContent = owner
+            ? `Inscription #${tokenId} is owned by ${owner.slice(0, 8)}..., not your wallet.`
+            : `Inscription #${tokenId} not found.`;
+          return;
+        }
+      } catch {
+        dropsDom.createStatus.textContent = 'Could not verify ownership - try again.';
+        return;
+      }
+
+      const postConditions = [
+        buildTransferPostCondition({
+          contract: state.contract,
+          senderAddress: state.walletSession.address,
+          tokenId
+        }),
+        makeStandardSTXPostCondition(
+          state.walletSession.address,
+          FungibleConditionCode.Equal,
+          budget
+        )
+      ];
+      dropsDom.createStatus.textContent = 'Confirm the drop in your wallet...';
+      if (dropsDom.createButton) dropsDom.createButton.disabled = true;
+      showContractCall({
+        contractAddress: entry.address,
+        contractName: entry.contractName,
+        functionName: 'create-drop',
+        functionArgs: [
+          contractPrincipalCV(state.contract.address, state.contract.contractName),
+          uintCV(tokenId),
+          uintCV(budget),
+          uintCV(groupId)
+        ],
+        network: entry.network,
+        stxAddress: state.walletSession.address,
+        postConditionMode: PostConditionMode.Deny,
+        postConditions,
+        onFinish: (payload) => {
+          const txId = payload?.txId ?? payload?.txid ?? '';
+          const watchRun = ++dropsState.createWatchRun;
+          void watchCreatedDrop({
+            txId,
+            tokenId,
+            creator,
+            rules: policyRules,
+            watchRun
+          });
+        },
+        onCancel: () => {
+          dropsDom.createStatus.textContent = 'Drop cancelled.';
+          if (dropsDom.createButton) dropsDom.createButton.disabled = false;
+        }
+      });
+    };
+
+    dropsDom.createButton?.addEventListener('click', () => { void dropsCreateDrop(); });
+    [
+      dropsDom.ruleOnePerWallet,
+      dropsDom.ruleRequireBns,
+      dropsDom.ruleOnePerBns
+    ].forEach((input) => {
+      input?.addEventListener('change', () => { void updateDropsDepositHint(); });
+    });
+
+    const openDropForToken = (tokenId) => {
+      if (dropsDom.create) dropsDom.create.open = true;
+      if (dropsDom.createTokenId) dropsDom.createTokenId.value = tokenId;
+      if (dropsDom.createStatus) {
+        dropsDom.createStatus.textContent =
+          `Inscription #${tokenId} selected. Review the refundable sponsorship deposit, then create the free giveaway.`;
+      }
+      dropsDom.create?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    const loadDropsPage = async (params = null) => {
+      const run = ++dropsState.run;
+      if (!dropsDom.listings) return;
+      if (dropsDom.badge) dropsDom.badge.textContent = state.contract.network;
+      void updateDropsDepositHint();
+      const dropParam = params?.get?.('drop');
+      if (dropParam && /^\d+$/.test(dropParam)) {
+        openDropForToken(dropParam);
+      }
+      dropsDom.status.innerHTML = '<span><strong>Drops</strong> loading…</span>';
+      try {
+        const perContract = await Promise.all(
+          dropsEntriesForNetwork().map(async (entry) => ({
+            drops: await readDrops(entry).catch(() => []),
+            history: await loadDropsActivity({ contract: entry }).catch(() => ({ events: [] }))
+          }))
+        );
+        if (run !== dropsState.run) return;
+        dropsState.drops = perContract.flatMap((item) => item.drops).sort((a, b) => (b.dropId > a.dropId ? 1 : -1));
+        dropsState.historyEvents = perContract.flatMap((item) => item.history.events ?? []);
+        renderDrops();
+      } catch (error) {
+        if (run !== dropsState.run) return;
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> could not load drops.</span>';
+        debugLog('drops', 'load failed', { error: String(error?.message ?? error) });
+      }
+    };
+
+    const switchToPage = async (page, params = null) => {
+      const run = ++pageSwitchRun;
+      PAGE_MODE = page;
+      document.documentElement.dataset.page = page;
+      document.title = PAGE_TITLES[page] ?? PAGE_TITLES.home;
+      window.scrollTo({ top: 0 });
+      if (page === 'xplorer') {
+        if (params && (await openPublicViewFromParams(params))) {
+          if (run === pageSwitchRun) {
+            updateControls();
+          }
+          return;
+        }
+        setExplorerModeFromRequest();
+        state.explorerMode = true;
+        await loadExplorerMode();
+        if (run === pageSwitchRun) {
+          updateControls();
+        }
+        return;
+      }
+      // Leaving the explorer: drop its state so explorer-mode CSS stops
+      // suppressing the other pages' panels.
+      state.explorerMode = false;
+      state.explorerInitialTokenId = null;
+      if (page === 'home' || page === 'inscribe') {
+        state.curatedGalleryId = null;
+        state.curatedGalleryTitle = null;
+        state.homeLatestView = false;
+        clearExampleDescription();
+      }
+      if (page === 'my-wallet') {
+        await openMyWalletDefaultView();
+      }
+      if (page === 'market') {
+        await loadMarketPage(params);
+      }
+      if (page === 'drops') {
+        await loadDropsPage(params);
+      }
+      if (run === pageSwitchRun) {
+        updateControls();
+      }
+    };
+
+    const classifyPath = (pathname, params) => {
+      const seg = (pathname.split('/').filter(Boolean)[0] || '').toLowerCase();
+      if (seg === 'inscribe' || params.has('handoff') || params.has('handoffId')) {
+        return 'inscribe';
+      }
+      if (seg === 'my-wallet' || seg === 'wallet') {
+        return 'my-wallet';
+      }
+      if (seg === 'market') {
+        return 'market';
+      }
+      if (seg === 'drops') {
+        return 'drops';
+      }
+      if (
+        seg === 'xplorer' ||
+        seg === 'x' ||
+        params.get('view') === 'explorer' ||
+        params.has('explorer') ||
+        params.has('token') ||
+        params.has('inscription') ||
+        params.has('wallet') ||
+        params.has('showcase') ||
+        params.has('gallery')
+      ) {
+        return 'xplorer';
+      }
+      return 'home';
+    };
+
     const initialize = async () => {
       applyTheme(loadTheme());
       setExplorerModeFromRequest();
+      const pageParams = new URLSearchParams(window.location.search);
+      const requestedGallery = pageParams.get('gallery')?.trim() || null;
+      const requestedPublicWallet =
+        pageParams.get('wallet')?.trim() || pageParams.get('showcase')?.trim() || null;
+      if (
+        !state.explorerMode &&
+        PAGE_MODE === 'xplorer' &&
+        !requestedGallery &&
+        !requestedPublicWallet
+      ) {
+        // /xplorer always lands in the explorer, even when the URL carried no
+        // usable token id (e.g. /x/not-a-number falls back to the latest page).
+        // Gallery/wallet params instead open that public view on this page.
+        state.explorerMode = true;
+      }
       dom.tokenUriInput.value = DEFAULT_TOKEN_URI;
       void updateTokenUriHeadPreview();
       dom.walletLookupInput.value = '';
@@ -9318,17 +12510,25 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         await loadExplorerMode();
       } else {
         await fetchAdminStatus();
-        // Deep link: /?wallet=<address> opens straight into that wallet's grid
-        // (used by the Xplorer owner click, which routes back to the homepage).
-        const requestedWallet = new URLSearchParams(window.location.search)
-          .get('wallet')
-          ?.trim();
-        if (requestedWallet) {
-          await viewWalletByAddress(requestedWallet);
-        } else if (walletViewRequestId === state.walletViewRequestId && !consumedHandoff) {
-          // Default homepage view: open the music gallery (HTML players first)
-          // instead of the generic "latest" grid, so there's music to play on load.
-          await openCuratedGallery('jim-music', { scroll: false });
+        // Deep links (rendered on the Xplorer page):
+        //   ?gallery=<id>          → curated example gallery
+        //   ?wallet= / ?showcase=  → any wallet's public ledger (address or .btc
+        //                            name), optional &sel=<tokenId> to focus one.
+        const openedPublicView = await openPublicViewFromParams(pageParams);
+        if (openedPublicView) {
+          // handled above
+        } else if (PAGE_MODE === 'market') {
+          await loadMarketPage(pageParams);
+        } else if (PAGE_MODE === 'drops') {
+          await loadDropsPage(pageParams);
+        } else if (
+          PAGE_MODE === 'my-wallet' &&
+          walletViewRequestId === state.walletViewRequestId &&
+          !consumedHandoff
+        ) {
+          // Home and inscribe skip the grid preload — their pages hide the
+          // wallet panel entirely.
+          await openMyWalletDefaultView();
         }
       }
       updateControls();
@@ -9337,18 +12537,88 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     dom.connectButton.addEventListener('click', connectWallet);
     dom.introConnectButton?.addEventListener('click', connectWallet);
     dom.introPrepareButton?.addEventListener('click', () => {
+      if (PAGE_MODE !== 'inscribe') {
+        window.history.pushState(null, '', '/inscribe');
+        void switchToPage('inscribe');
+        return;
+      }
       document.getElementById('inscribeTitle')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       dom.nameInput?.focus();
     });
     dom.disconnectButton.addEventListener('click', disconnectWallet);
-    dom.viewInscriptionsButton.addEventListener('click', scrollToWalletGrid);
+    dom.viewInscriptionsButton.addEventListener('click', () => {
+      if (PAGE_MODE === 'home' || PAGE_MODE === 'inscribe') {
+        // The wallet grid lives on its own tab now.
+        window.history.pushState(null, '', '/my-wallet');
+        void switchToPage('my-wallet');
+        return;
+      }
+      scrollToWalletGrid();
+    });
     dom.backToGridButton.addEventListener('click', scrollToWalletGrid);
     dom.refreshWalletButton.addEventListener('click', loadWalletInscriptions);
     dom.explorerJumpButton?.addEventListener('click', () => {
       void handleExplorerJump();
     });
+    dom.explorerRandomButton?.addEventListener('click', () => {
+      void jumpToRandomInscription();
+    });
+
+    // Grid keyboard navigation (Xplorer + My Wallet): ←/→ turn pages, ↑/↓ move
+    // the selection. Skipped while typing, while the fullscreen viewer is open
+    // (it has its own arrow handling), or with modifier keys held.
+    document.addEventListener('keydown', (event) => {
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+        return;
+      }
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (state.fullscreenOpen) {
+        return;
+      }
+      if ((PAGE_MODE !== 'xplorer' && PAGE_MODE !== 'my-wallet') || state.walletTokens.length === 0) {
+        return;
+      }
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        dom.walletPrevButton?.click();
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        dom.walletNextButton?.click();
+      } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        event.preventDefault();
+        const direction = event.key === 'ArrowDown' ? 1 : -1;
+        const currentIndex = state.walletTokens.findIndex(
+          (token) => token.id === state.selectedTokenId
+        );
+        const nextIndex =
+          currentIndex === -1
+            ? 0
+            : Math.min(state.walletTokens.length - 1, Math.max(0, currentIndex + direction));
+        const nextToken = state.walletTokens[nextIndex];
+        if (nextToken && nextToken.id !== state.selectedTokenId) {
+          void selectToken(nextToken.id);
+        }
+      }
+    });
     dom.explorerLatestButton?.addEventListener('click', () => {
       void showLatestExplorerPage();
+    });
+    // Explorer page arrows: proxy to the existing Prev/Next buttons so they reuse
+    // the exact same paging logic, guards and enabled/disabled state.
+    dom.explorerPrevPageButton?.addEventListener('click', () => {
+      dom.walletPrevButton?.click();
+    });
+    dom.explorerNextPageButton?.addEventListener('click', () => {
+      dom.walletNextButton?.click();
     });
     dom.explorerPageInput?.addEventListener('input', () => {
       if (document.activeElement === dom.explorerPageInput && dom.explorerTokenInput) {
@@ -9377,7 +12647,23 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     });
     dom.walletLookupForm.addEventListener('submit', async (event) => {
       event.preventDefault();
-      await viewWalletFromInput();
+      // "Clear" (empty box or the wallet already on screen) keeps the in-place
+      // reset that returns to the default feed / connected wallet.
+      if (shouldClearWalletLookupOnSubmit()) {
+        await viewWalletFromInput();
+        return;
+      }
+      const raw = normalizeWalletLookupInputValue(dom.walletLookupInput.value).trim();
+      if (!raw) {
+        await viewWalletFromInput();
+        return;
+      }
+      // "View" → navigate to the wallet's own URL, exactly like clicking an
+      // owner/holder link. This loads the wallet through the same clean boot
+      // path a shared link uses, so the address bar shows ?wallet=<name|address>
+      // and the correct wallet always loads (no stale grid, preview, or URL).
+      const walletParam = raw.replace(/\.btc$/i, '');
+      window.location.assign(`/?wallet=${encodeURIComponent(walletParam)}`);
     });
 
 
@@ -9539,7 +12825,13 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         pageCount: getWalletPageCount()
       });
       state.walletPageIndex -= 1;
-      await loadWalletPage();
+      try {
+        await loadWalletPage();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setStatus(dom.walletGridStatus, `<strong>Grid</strong> ${message}`, 'error', 'rose');
+        appendLog(`Page load failed: ${message}`);
+      }
     });
     dom.walletNextButton.addEventListener('click', async () => {
       const pageCount = getWalletPageCount();
@@ -9553,9 +12845,15 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         pageCount
       });
       state.walletPageIndex += 1;
-      await loadWalletPage();
+      try {
+        await loadWalletPage();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setStatus(dom.walletGridStatus, `<strong>Grid</strong> ${message}`, 'error', 'rose');
+        appendLog(`Page load failed: ${message}`);
+      }
     });
-    dom.prepareButton.addEventListener('click', async () => {
+    const runPrepare = async () => {
       setBusy(true);
       try {
         await preparePayload();
@@ -9566,7 +12864,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       } finally {
         setBusy(false);
       }
-    });
+    };
+    autoPrepareHook = runPrepare;
+    dom.prepareButton.addEventListener('click', runPrepare);
     dom.inscribeButton.addEventListener('click', runInscription);
     dom.resetInscriberButton.addEventListener('click', resetInscriberFlow);
     dom.clearInscriberButton.addEventListener('click', clearInscriberPanel);
@@ -9580,6 +12880,26 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     dom.clearParentsButton.addEventListener('click', clearParentIds);
     dom.transferRecipientInput.addEventListener('input', updateTransferControls);
     dom.transferButton.addEventListener('click', transferSelectedToken);
+    // "List for sale" jumps to the Market page with the selected inscription
+    // prefilled in the sell form (any currency, optional sponsorship).
+    const listForSaleButton = $('listForSaleButton');
+    listForSaleButton?.addEventListener('click', () => {
+      if (state.selectedTokenId === null || state.selectedTokenId === undefined) return;
+      const target = `/market?list=${state.selectedTokenId.toString()}`;
+      window.history.pushState(null, '', target);
+      void switchToPage('market', new URLSearchParams({ list: state.selectedTokenId.toString() }));
+    });
+    // "Drop It" mirrors the market shortcut, opening Drops with the selected
+    // inscription prefilled. Creation still requires an explicit wallet
+    // confirmation because the owner funds the refundable sponsorship deposit.
+    const dropItButton = $('dropItButton');
+    dropItButton?.addEventListener('click', () => {
+      if (state.selectedTokenId === null || state.selectedTokenId === undefined) return;
+      const tokenId = state.selectedTokenId.toString();
+      const target = `/drops?drop=${tokenId}`;
+      window.history.pushState(null, '', target);
+      void switchToPage('drops', new URLSearchParams({ drop: tokenId }));
+    });
     dom.payloadPreviewExpandButton?.addEventListener('click', openPreparedPayloadFullscreen);
     dom.fullscreenButton?.addEventListener('click', openFullscreenViewer);
     dom.previewExpandButton.addEventListener('click', openFullscreenViewer);
@@ -9644,20 +12964,226 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         setSelectedFile(file);
       }
     });
+    // ---- File vs Text tabs: mode toggle, live byte stats, instant text cost ----
+    const TEXT_MAX_BYTES = 16384; // product cap: text stays <= 16 KB = one chunk = one transaction
+    const textByteEncoder = new TextEncoder();
+    const textBytes = () => textByteEncoder.encode(dom.textPayload.value).length;
+    // Text is always one chunk, so the Xtrata protocol fee is flat — quote it ONCE and reuse it.
+    // The network (miner) fee is the only size-dependent part, so we LADDER it by size band:
+    // <=100 B, <=500 B, <=1 KB, then every 1 KB up to 16 KB. Each band is charged at its ceiling
+    // (a slight over-estimate, never an under-quote), so tiny inscriptions read cheap and the cost
+    // only steps up as the text grows. Computed locally — no per-keystroke quoting.
+    let textXtrataFeeMicroStx = null; // flat Xtrata fee for one chunk (quoted once)
+    const textFeeTier = (bytes) => {
+      if (bytes <= 100) return 100;
+      if (bytes <= 500) return 500;
+      if (bytes <= 1024) return 1024;
+      return Math.min(TEXT_MAX_BYTES, Math.ceil(bytes / 1024) * 1024); // every 1 KB up to 16 KB
+    };
+    const textFeeLabel = () => {
+      const bytes = textBytes();
+      if (bytes === 0 || textXtrataFeeMicroStx == null) return null;
+      const total = BigInt(Math.round(textXtrataFeeMicroStx)) + walletMinerFeeMicroStx(textFeeTier(bytes));
+      return `about ${formatMicroStxWithUsd(total, state.usdPriceBook).combined}`;
+    };
+    const paintTextFee = () => {
+      if (!dom.textCost || dom.inscribePanelBody?.dataset.mode !== 'text') return;
+      const bytes = textBytes();
+      if (bytes > 0 && bytes <= TEXT_MAX_BYTES) {
+        dom.textCost.textContent = textFeeLabel() || 'about … STX';
+      }
+    };
+    const ensureTextXtrataFee = async () => {
+      if (textXtrataFeeMicroStx != null) { paintTextFee(); return; }
+      try {
+        const q = await state.client.quoteSingleTxFee(BigInt(TEXT_MAX_BYTES), BigInt(1), getReadOnlySenderAddress());
+        textXtrataFeeMicroStx = Number(q);
+      } catch (_) { /* leave the placeholder; retried on next text-mode entry */ }
+      paintTextFee();
+    };
+    const updateTextStats = () => {
+      if (!dom.textStats) return;
+      const s = dom.textPayload.value;
+      const bytes = textByteEncoder.encode(s).length;
+      dom.textStats.textContent =
+        `${s.length.toLocaleString()} character${s.length === 1 ? '' : 's'} · ${bytes.toLocaleString()} byte${bytes === 1 ? '' : 's'}`;
+    };
+    // Reveal the chosen path. Hoisted (function decl) so setSelectedFile / boot-restore can
+    // call it before the const helpers below are initialised.
+    // The activity log is shared by both modes. In text mode it lives inside the
+    // single "Advanced" disclosure (so the text panel reads as just type + inscribe);
+    // in file/none mode it returns to its own top-level spot. Re-parenting keeps one
+    // log node (and its listeners) rather than duplicating it.
+    const activityLogHome = dom.activityLog
+      ? { parent: dom.activityLog.parentNode, next: dom.activityLog.nextSibling }
+      : null;
+    const placeActivityLog = (mode) => {
+      if (!dom.activityLog) return;
+      if (mode === 'text') {
+        if (dom.textAdvancedLogSlot && dom.activityLog.parentNode !== dom.textAdvancedLogSlot) {
+          dom.textAdvancedLogSlot.appendChild(dom.activityLog);
+        }
+      } else if (activityLogHome && dom.activityLog.parentNode !== activityLogHome.parent) {
+        activityLogHome.parent.insertBefore(dom.activityLog, activityLogHome.next);
+      }
+    };
+    function applyInscribeMode(mode) {
+      if (dom.inscribePanelBody) dom.inscribePanelBody.dataset.mode = mode;
+      dom.tabFile?.classList.toggle('is-active', mode === 'file');
+      dom.tabText?.classList.toggle('is-active', mode === 'text');
+      dom.tabFile?.setAttribute('aria-selected', mode === 'file' ? 'true' : 'false');
+      dom.tabText?.setAttribute('aria-selected', mode === 'text' ? 'true' : 'false');
+      placeActivityLog(mode);
+    }
+    // Threads: a "reply to" inscription id becomes a dependency (existence-only reference), so the
+    // text is minted as an on-chain reply via mint-single-tx-recursive. Anyone can reply to any
+    // inscription — no ownership needed. The reply-to input is the source of truth.
+    const syncThreadDep = () => {
+      const raw = (dom.threadReplyTo?.value || '').trim();
+      const valid = /^\d+$/.test(raw);
+      state.handoffDependencyIds = valid ? [BigInt(raw)] : [];
+      if (dom.threadReplyNote) {
+        dom.threadReplyNote.textContent = valid
+          ? `↳ Your text will be inscribed as a reply to #${raw}`
+          : raw ? "Enter a numeric inscription id (the message you're replying to)."
+          : 'Optional — turns your text into an on-chain reply. Anyone can reply to any inscription.';
+      }
+    };
+    // File card: the Dependencies input (existence-only references). Parses a
+    // numeric list into the same handoff dependency slot the mint reads. Kept
+    // separate from Parents so the two are never confused.
+    //
+    // Editing dependencies invalidates the prepared quote (markPreparedDirty),
+    // which disables Start. Previously nothing re-armed it — auto-prepare only
+    // ran on file drop — so adding dependencies silently deadlocked the flow.
+    // Now a debounced re-prepare runs once typing settles, mirroring the drop
+    // flow, and the status meta explains the transient locked state.
+    let dependencyReprepareTimer = null;
+    const scheduleDependencyReprepare = () => {
+      if (dependencyReprepareTimer) {
+        window.clearTimeout(dependencyReprepareTimer);
+        dependencyReprepareTimer = null;
+      }
+      if (!state.selectedFile) return;
+      dependencyReprepareTimer = window.setTimeout(() => {
+        dependencyReprepareTimer = null;
+        if (state.selectedFile && !state.busy && !state.prepared && autoPrepareHook) {
+          void autoPrepareHook();
+        }
+      }, 700);
+    };
+    const syncDependencyInput = () => {
+      const raw = (dom.dependencyIdsInput?.value || '').trim();
+      const ids = raw.split(/[\s,]+/).filter(Boolean);
+      const valid = ids.length > 0 && ids.every((s) => /^\d+$/.test(s));
+      state.handoffDependencyIds = valid ? ids.map((s) => BigInt(s)) : [];
+      if (dom.dependencyStatusList) {
+        dom.dependencyStatusList.textContent = valid
+          ? `Referencing ${ids.length} inscription${ids.length === 1 ? '' : 's'}: #${ids.join(', #')}`
+          : raw
+            ? 'Enter numeric inscription IDs only (e.g. 134, 90).'
+            : 'No dependencies added.';
+      }
+      markPreparedDirty();
+      scheduleDependencyReprepare();
+    };
+    // Text card: cost + inscribe button (label switches to "Inscribe reply" when replying).
+    const syncTextCard = () => {
+      if (!dom.inscribeTextButton) return;
+      const bytes = textBytes();
+      const over = bytes > TEXT_MAX_BYTES;
+      const replying = (state.handoffDependencyIds?.length ?? 0) > 0;
+      if (dom.textCost) {
+        dom.textCost.textContent =
+          bytes === 0 ? 'Enter text to see the cost'
+          : over ? `Over the 16 KB limit by ${(bytes - TEXT_MAX_BYTES).toLocaleString()} byte${bytes - TEXT_MAX_BYTES === 1 ? '' : 's'} — trim it`
+          : (textFeeLabel() || 'about … STX');
+      }
+      dom.inscribeTextButton.textContent = replying ? 'Inscribe reply' : 'Inscribe text';
+      // Enabled on valid text alone — the click handler connects the wallet if needed and
+      // prepares on the fly (runInscription → validateMintReadiness), so we never gate on
+      // state.prepared here (that left the button stuck when the background prepare didn't run).
+      dom.inscribeTextButton.disabled = !(bytes > 0 && !over && !state.busy);
+    };
+    const setInscribeMode = (mode) => {
+      applyInscribeMode(mode);
+      if (mode === 'text') {
+        if (state.selectedFile) setSelectedFile(null); // text drops any selected file (also clears deps)
+        updateTextStats();
+        void ensureTextXtrataFee(); // quote the flat Xtrata rate once, on entering text mode
+        syncThreadDep(); // re-apply any reply-to (e.g. a deep link) after the clear above
+        syncTextCard();
+        dom.textPayload?.focus();
+      } else if (mode === 'file') {
+        if (dom.textPayload?.value) { dom.textPayload.value = ''; updateTextStats(); markPreparedDirty(); }
+        if (dom.threadReplyTo) dom.threadReplyTo.value = '';
+        syncDependencyInput(); // file mode owns dependencies via the Dependencies input
+      } else { // none — back to the landing; clear both sources
+        if (state.selectedFile) setSelectedFile(null);
+        if (dom.textPayload?.value) { dom.textPayload.value = ''; updateTextStats(); }
+        if (dom.threadReplyTo) dom.threadReplyTo.value = '';
+        if (dom.dependencyIdsInput) dom.dependencyIdsInput.value = '';
+        state.handoffDependencyIds = [];
+        markPreparedDirty();
+      }
+    };
+    dom.tabFile?.addEventListener('click', () => setInscribeMode('file'));
+    dom.tabText?.addEventListener('click', () => setInscribeMode('text'));
+    dom.inscribeChange?.addEventListener('click', () => setInscribeMode('none'));
+    dom.inscribeTextButton?.addEventListener('click', () => {
+      const bytes = textBytes();
+      if (bytes === 0 || bytes > TEXT_MAX_BYTES) return; // hard guard — never inscribe > 16 KB of text
+      runInscription();
+    });
+    // Hero "Galleries" button expands the (collapsed-by-default) galleries list as it scrolls to it.
+    document.querySelector('a[href="#homeExamples"]')?.addEventListener('click', () => {
+      const galleries = document.getElementById('homeExamples');
+      if (galleries) galleries.open = true;
+    });
+    // Thread deep link: /inscribe?reply=<tokenId> opens the text tab pre-filled as a reply.
+    if (document.documentElement.dataset.page === 'inscribe' && dom.threadReplyTo) {
+      const replyTo = (new URLSearchParams(window.location.search).get('reply') || '').trim();
+      if (/^\d+$/.test(replyTo)) {
+        dom.threadReplyTo.value = replyTo;
+        const td = document.getElementById('textAdvancedDetails');
+        if (td) td.open = true;
+        setInscribeMode('text'); // switches to text + re-applies the reply-to dependency
+      }
+    }
+
     dom.textPayload.addEventListener('input', () => {
       if (dom.textPayload.value.length > 0 && state.selectedFile) {
         setSelectedFile(null);
       }
+      updateTextStats();
+      markPreparedDirty(); // clear any prior prepare; runInscription re-prepares on click
+      syncTextCard();      // cost is the cached flat rate; button enables on valid text
+    });
+    dom.threadReplyTo?.addEventListener('input', () => {
+      syncThreadDep();     // reply-to id → dependency (an on-chain reply, minted recursively)
       markPreparedDirty();
+      syncTextCard();
     });
     dom.nameInput.addEventListener('input', markPreparedDirty);
+    dom.dependencyIdsInput?.addEventListener('input', syncDependencyInput);
     dom.payloadType.addEventListener('change', markPreparedDirty);
     dom.tokenUriInput.addEventListener('input', () => {
       markPreparedDirty();
       queueTokenUriHeadPreviewUpdate();
     });
 
-    window.addEventListener('beforeunload', () => {
+    window.addEventListener('beforeunload', (event) => {
+      // Warn before leaving mid-inscription: a transaction may be signing or
+      // broadcasting. Progress is saved locally and resumes on reopen, but the
+      // native prompt stops an accidental close from interrupting the current tx.
+      if (state.busy) {
+        event.preventDefault();
+        event.returnValue = '';
+        return '';
+      }
+    });
+
+    window.addEventListener('pagehide', () => {
       if (state.tokenUriPreviewTimer !== null) {
         window.clearTimeout(state.tokenUriPreviewTimer);
       }
@@ -9668,6 +13194,103 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     });
 
     void initialize();
+
+    // SPA tab navigation: same-tab site links (nav, cards, example chips)
+    // switch pages client-side — the radio and wallet session never restart.
+    // Links outside the four page modes (/wizard, /g/…, static apps) navigate
+    // normally, as do modified-clicks (new tab/window).
+    document.addEventListener('click', (event) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+      const origin = event.target instanceof Element ? event.target : null;
+      const link = origin?.closest('a[target="_self"][href^="/"]');
+      if (!link) {
+        return;
+      }
+      const url = new URL(link.getAttribute('href') ?? '/', window.location.origin);
+      const page = classifyPath(url.pathname, url.searchParams);
+      const seg = (url.pathname.split('/').filter(Boolean)[0] || '').toLowerCase();
+      const isSitePagePath =
+        url.pathname === '/' ||
+        ['inscribe', 'my-wallet', 'wallet', 'xplorer', 'x', 'drops', 'market'].includes(seg);
+      if (!isSitePagePath) {
+        return; // /wizard, /g/…, docs, static apps → real navigation
+      }
+      event.preventDefault();
+      window.history.pushState(null, '', url.pathname + url.search + url.hash);
+      void switchToPage(page, url.searchParams);
+    });
+
+    window.addEventListener('popstate', () => {
+      const params = new URLSearchParams(window.location.search);
+      void switchToPage(classifyPath(window.location.pathname, params), params);
+    });
+
+    // Sticky header: condense after a little scroll so the nav, connected
+    // wallet and docked radio stay visible without eating vertical space.
+    //
+    // Oscillation protection (two layers):
+    // 1. The header's LAYOUT height is locked to its expanded size, so
+    //    condensing only shrinks the visible bar inside a constant-height box.
+    //    Document height therefore never changes with the toggle, which makes
+    //    the feedback loop (shrink → scrollY drops → expand → scrollY rises…)
+    //    physically impossible. The box itself is transparent and click-through
+    //    (see CSS), so the reserved space never hides or blocks content.
+    // 2. A hysteresis band (condense above 64px, expand only below 8px) so
+    //    trackpad jitter around a single threshold can't flutter the state.
+    const siteHeader = document.getElementById('siteHeader');
+    if (siteHeader) {
+      let headerCondensed = false;
+      const lockHeaderHeight = () => {
+        // Measure the EXPANDED height (class briefly removed inside one frame
+        // — no paint happens in between) and freeze the box at that size.
+        const wasCondensed = siteHeader.classList.contains('is-condensed');
+        siteHeader.classList.remove('is-condensed');
+        siteHeader.style.height = 'auto';
+        const expandedHeight = siteHeader.offsetHeight;
+        const lockedHeight = `${expandedHeight}px`;
+        if (siteHeader.style.height !== lockedHeight) {
+          siteHeader.style.height = lockedHeight;
+        }
+        siteHeader.classList.toggle('is-condensed', wasCondensed);
+      };
+      const syncHeader = () => {
+        const y = window.scrollY;
+        const next = headerCondensed ? y > 8 : y > 64;
+        if (next !== headerCondensed) {
+          headerCondensed = next;
+          siteHeader.classList.toggle('is-condensed', next);
+        }
+      };
+      let headerResizeTimer = null;
+      const queueHeaderRelock = () => {
+        if (headerResizeTimer !== null) {
+          window.clearTimeout(headerResizeTimer);
+        }
+        headerResizeTimer = window.setTimeout(lockHeaderHeight, 150);
+      };
+      window.addEventListener('resize', queueHeaderRelock);
+      // Re-lock when the header's CONTENT genuinely changes size (connected
+      // readout appearing, nav wrapping). lockHeaderHeight's class flip is
+      // synchronous within one frame, so it never retriggers the observer.
+      if (typeof ResizeObserver === 'function') {
+        const headerObserver = new ResizeObserver(queueHeaderRelock);
+        siteHeader.querySelectorAll('.topbar, .site-nav').forEach((el) => {
+          headerObserver.observe(el);
+        });
+      }
+      lockHeaderHeight();
+      window.addEventListener('scroll', syncHeader, { passive: true });
+      syncHeader();
+    }
 
     // Keep the station playing: internal links to other pages open in new
     // tabs so the homepage (and its radio) is never torn down mid-song.
@@ -9680,8 +13303,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       link.rel = link.rel ? link.rel + ' noopener' : 'noopener';
     });
 
-    // Xtrata Radio: homepage soundtrack from the curated music gallery.
+    // Xtrata Radio: site soundtrack, docked in the sticky header (falls back
+    // to the classic floating widget if the slot is missing).
     initXtrataRadio({
       tokenIds: (CURATED_GALLERIES.find((gallery) => gallery.id === 'jim-music')?.tokenIds ?? []),
-      stationName: 'XTRATA FM'
+      stationName: 'XTRATA FM',
+      mount: document.getElementById('radioSlot')
     });

@@ -230,6 +230,8 @@
   .hero-cta{display:flex;gap:12px;justify-content:flex-start;flex-wrap:wrap}
   .trust{margin-top:22px;font-family:var(--mono);font-size:12.5px;color:var(--muted)}
   .trust b{color:var(--ink)}
+  .hero-migration{display:inline-flex;align-items:center;gap:8px;margin-top:12px;padding:7px 11px;border:1px solid var(--line-strong);border-radius:999px;background:var(--panel);font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .hero-migration strong{color:var(--green)}
   .satellite-panel{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow);padding:22px}
   .satellite-panel h2{margin:0 0 8px;font-size:22px}
   .satellite-panel p{margin:0;color:var(--muted);font-size:14.5px}
@@ -269,6 +271,9 @@
   .col-badge{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.5px}
   .col-badge.live{background:var(--green-soft);color:var(--green)}
   .col-badge.soon{background:var(--amber-soft);color:var(--amber)}
+  .forevered-stamp{display:none;margin-left:8px;padding:4px 7px;border:2px solid var(--green);border-radius:4px;color:var(--green);background:var(--green-soft);font-family:var(--mono);font-size:10px;font-weight:900;letter-spacing:1px;text-transform:uppercase;transform:rotate(-3deg);vertical-align:middle}
+  .col-card.is-forevered .forevered-stamp{display:inline-block}
+  .col-card.is-forevered{border-color:var(--green)}
   .col-card h3{margin:10px 0 4px;font-size:21px;font-weight:900;letter-spacing:0}
   .col-card .chain{font-family:var(--mono);font-size:12px;color:var(--muted)}
   .col-body{padding:14px 22px 0;color:var(--muted);font-size:14.5px;flex:1}
@@ -344,61 +349,62 @@
     <h1>Make any NFT collection <span class="ink-gold">permanent.</span></h1>
     <p class="lede">A <strong>Forever Twin</strong> is a permanent, on-chain counterpart for an existing NFT, bound 1:1 to the original. No re-mint. No migration. Three collections are live now.</p>
     <div class="trust">First public collection: <b>Bitcoin Pepes</b> · <span id="trust-count">live on Stacks</span></div>
+    <div class="hero-migration">Live migration: <strong id="hero-migration-summary">Loading on-chain counts…</strong></div>
   </section>
 
   <section id="collections" style="padding-top:26px">
     <div class="collections">
 
       <!-- ACTIVE: Bitcoin Pepes -->
-      <a class="col-card col-card--hero active" href="./bitcoin-pepes/index.html" style="color:inherit">
+      <a id="c-card" class="col-card col-card--hero active" href="./bitcoin-pepes/index.html" style="color:inherit">
         <img class="col-banner" src="./assets/bitcoin-pepe-maxi.png" alt="Bitcoin Pepes" />
         <div class="col-top">
           <div class="col-head">
-            <span class="col-badge live">● Live</span>
+            <span class="col-badge live">● Live</span><span id="c-stamp" class="forevered-stamp">Forevered</span>
             <h3>Bitcoin Pepes</h3>
             <div class="chain">Stacks · bitcoin-pepe → pepe-4ever-fakfun</div>
           </div>
         </div>
         <div class="col-body">The first public Forever Twins collection. Holders give their Pepe a permanent on-chain twin, claimable on Fak.fun.</div>
         <div class="col-metrics">
-          <div class="col-metric"><div class="v live" id="c-inscribed">—</div><div class="k">Twins inscribed</div></div>
-          <div class="col-metric"><div class="v" id="c-status">—</div><div class="k">Canonical record</div></div>
+          <div class="col-metric"><div class="v live" id="c-inscribed">— / —</div><div class="k">Twins migrated</div></div>
+          <div class="col-metric"><div class="v" id="c-status">—</div><div class="k">Migration status</div></div>
         </div>
         <div class="col-foot"><span class="btn sm">View Bitcoin Pepes →</span></div>
       </a>
 
       <!-- ACTIVE: LEO Cats -->
-      <a class="col-card col-card--hero active" href="./leo-cats/index.html" style="color:inherit">
+      <a id="l-card" class="col-card col-card--hero active" href="./leo-cats/index.html" style="color:inherit">
         <img class="col-banner" src="./assets/leo-cat-forever-twin-logo-1.jpg" alt="LEO Cats Forever Twins" />
         <div class="col-top">
           <div class="col-head">
-            <span class="col-badge live">● Live</span>
+            <span class="col-badge live">● Live</span><span id="l-stamp" class="forevered-stamp">Forevered</span>
             <h3>LEO Cats</h3>
             <div class="chain">Stacks · leo-cats → leo-cats-forever-twins</div>
           </div>
         </div>
         <div class="col-body">LEO Cats holders can create a permanent on-chain counterpart backed by Xtrata, with tools for inscription, lookup, and gallery verification.</div>
         <div class="col-metrics">
-          <div class="col-metric"><div class="v live" id="l-inscribed">—</div><div class="k">Twins inscribed</div></div>
-          <div class="col-metric"><div class="v" id="l-status">—</div><div class="k">Canonical record</div></div>
+          <div class="col-metric"><div class="v live" id="l-inscribed">— / —</div><div class="k">Twins migrated</div></div>
+          <div class="col-metric"><div class="v" id="l-status">—</div><div class="k">Migration status</div></div>
         </div>
         <div class="col-foot"><span class="btn sm">View LEO Cats →</span></div>
       </a>
 
       <!-- ACTIVE: Miami Degens -->
-      <a class="col-card col-card--hero active" href="./miami-degens/index.html" style="color:inherit">
+      <a id="m-card" class="col-card col-card--hero active" href="./miami-degens/index.html" style="color:inherit">
         <img class="col-banner" src="./assets/miami-degens-forever-twin-logo.jpg" alt="Miami Degens Forever Twins" />
         <div class="col-top">
           <div class="col-head">
-            <span class="col-badge live">● Live</span>
+            <span class="col-badge live">● Live</span><span id="m-stamp" class="forevered-stamp">Forevered</span>
             <h3>Miami Degens</h3>
             <div class="chain">Stacks · miami-degens → miami-degens-fakfun-xtrata</div>
           </div>
         </div>
         <div class="col-body">Miami Degens holders can create a permanent Xtrata twin, then swap which side stays liquid: the original NFT or the inscription.</div>
         <div class="col-metrics">
-          <div class="col-metric"><div class="v live" id="m-inscribed">—</div><div class="k">Twins inscribed</div></div>
-          <div class="col-metric"><div class="v" id="m-status">—</div><div class="k">Canonical record</div></div>
+          <div class="col-metric"><div class="v live" id="m-inscribed">— / —</div><div class="k">Twins migrated</div></div>
+          <div class="col-metric"><div class="v" id="m-status">—</div><div class="k">Migration status</div></div>
         </div>
         <div class="col-foot"><span class="btn sm">View Miami Degens →</span></div>
       </a>
@@ -498,34 +504,46 @@
               page reads its final inscription data from CORE.
    REGISTRY = a collection's Forever Twins helper contract: a MAPPING layer only
               (local ID -> Xtrata ID + per-collection seed/fee/count).
-   The cards below show a per-collection twin COUNT, which is inherently a
-   registry stat, so each entry points at that collection's REGISTRY contract.
+   The cards below show live migration progress: the helper supplies the
+   inscribed count and the source NFT contract supplies its last token ID.
    This is decoration only — it is NOT the source of canonical inscription
    content. To add a collection: copy a card, give its metrics unique IDs, and
    add a { registry, countEl, statusEl } entry here. No core/indexer change. */
 const XTRATA_CORE_CONTRACT = "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3"; // canonical inscription layer (reference)
 const COLLECTIONS = [
   {
-    // REGISTRY (mapping layer) for Bitcoin Pepes — used here only for its twin count.
+    // Registry count + source collection total for Bitcoin Pepes.
     addr: "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22",
     name: "pepe-4ever-fakfun",
+    sourceAddr: "SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ",
+    sourceName: "bitcoin-pepe",
     countEl: "c-inscribed",
     statusEl: "c-status",
+    cardEl: "c-card",
+    stampEl: "c-stamp",
     trustEl: "trust-count"
   },
   {
-    // REGISTRY (mapping layer) for LEO Cats — used here only for its twin count.
+    // Registry count + source collection total for LEO Cats.
     addr: "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22",
     name: "leo-fakfun-xtrata",
+    sourceAddr: "SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC",
+    sourceName: "leo-cats",
     countEl: "l-inscribed",
-    statusEl: "l-status"
+    statusEl: "l-status",
+    cardEl: "l-card",
+    stampEl: "l-stamp"
   },
   {
-    // REGISTRY (mapping layer) for Miami Degens — used here only for its twin count.
+    // Registry count + source collection total for Miami Degens.
     addr: "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22",
     name: "miami-degens-fakfun-xtrata",
+    sourceAddr: "SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ",
+    sourceName: "miami-degens",
     countEl: "m-inscribed",
-    statusEl: "m-status"
+    statusEl: "m-status",
+    cardEl: "m-card",
+    stampEl: "m-stamp"
   }
 ];
 const API = "https://api.hiro.so";
@@ -557,21 +575,36 @@ async function callRead(addr, name, fn){
 }
 async function loadCollection(c){
   try{
-    const [count, finalized] = await Promise.all([
+    const [count, finalized, total] = await Promise.all([
       callRead(c.addr, c.name, "get-inscribed-count"),
-      callRead(c.addr, c.name, "is-finalized")
+      callRead(c.addr, c.name, "is-finalized"),
+      callRead(c.sourceAddr, c.sourceName, "get-last-token-id")
     ]);
     const n = Number(count);
+    const sourceTotal = Number(total);
+    const complete = sourceTotal > 0 && n >= sourceTotal;
     const elC = document.getElementById(c.countEl);
-    if(elC) elC.textContent = n.toLocaleString();
+    if(elC) elC.textContent = `${n.toLocaleString()} / ${sourceTotal.toLocaleString()}`;
     const elS = document.getElementById(c.statusEl);
     if(elS){
-      elS.textContent = finalized ? "🔒 Final" : "Seeding";
-      elS.style.color = finalized ? "var(--green)" : "var(--gold-2)";
+      elS.textContent = complete ? "FOREVERED" : `${Math.min(100, Math.floor((n / sourceTotal) * 100))}%`;
+      elS.style.color = complete || finalized ? "var(--green)" : "var(--gold-2)";
       elS.style.fontSize = "18px";
     }
+    const card = document.getElementById(c.cardEl);
+    if(card) card.classList.toggle("is-forevered", complete);
+    const stamp = document.getElementById(c.stampEl);
+    if(stamp) stamp.hidden = !complete;
     const elT = document.getElementById(c.trustEl);
-    if(elT) elT.innerHTML = `<b>${n.toLocaleString()}</b> Pepes already made permanent`;
+    if(elT) elT.innerHTML = complete
+      ? `<b>${n.toLocaleString()} / ${sourceTotal.toLocaleString()}</b> Bitcoin Pepes — <b>Forevered</b>`
+      : `<b>${n.toLocaleString()} / ${sourceTotal.toLocaleString()}</b> Bitcoin Pepes made permanent`;
+    if(c.trustEl){
+      const summary = document.getElementById("hero-migration-summary");
+      if(summary) summary.textContent = complete
+        ? `${n.toLocaleString()} / ${sourceTotal.toLocaleString()} Bitcoin Pepes · Forevered`
+        : `${n.toLocaleString()} / ${sourceTotal.toLocaleString()} Bitcoin Pepes`;
+    }
   }catch(e){
     console.warn("collection load failed", c.name, e);
     const elC = document.getElementById(c.countEl);

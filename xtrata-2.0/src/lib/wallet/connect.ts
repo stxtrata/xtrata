@@ -16,11 +16,16 @@ import {
   getInstalledProviders,
   getProviderFromId,
   getSelectedProviderId,
+  setSelectedProviderId,
   type WebBTCProvider
 } from '@stacks/connect-ui';
 import { defineCustomElements } from '@stacks/connect-ui/loader';
 import {
+  AnchorMode,
+  createAddress,
   deserializeTransaction,
+  getAddressFromPublicKey,
+  makeUnsignedContractCall,
   PostConditionMode,
   serializeCV,
   serializePostCondition,
@@ -35,13 +40,23 @@ export type { ContractCallOptions, ContractDeployOptions, StacksProvider };
 
 const DEFAULT_SCOPES = ['store_write'];
 const MANIFEST_PATH = '/manifest.json';
-const USER_CANCEL_ERROR_CODES = new Set([4001, -32000, -31001]);
+const USER_CANCEL_ERROR_CODES = new Set([4001, -31001]);
+const XVERSE_SIGNING_PROVIDER_IDS = [
+  'XverseProviders.BitcoinProvider',
+  'xverseProviders.BitcoinProvider',
+  'BitcoinProvider'
+] as const;
+const PLACEHOLDER_COMPRESSED_PUBLIC_KEY = `02${'00'.repeat(32)}`;
+
+type WalletRpcProvider = {
+  request: (method: string, params?: Record<string, unknown>) => Promise<unknown>;
+};
 
 type ConnectModalElement = HTMLElement & {
   defaultProviders: WebBTCProvider[];
   installedProviders: WebBTCProvider[];
   persistSelection: boolean;
-  callback?: (provider: StacksProvider) => void;
+  callback?: (selection: string | StacksProvider) => void;
   cancelCallback?: () => void;
 };
 
@@ -60,12 +75,20 @@ type SerializablePostCondition = Parameters<typeof serializePostCondition>[0];
 const TX_RESULT_NESTED_KEYS = ['result', 'data', 'payload', 'response', 'params'] as const;
 const TX_RESULT_RAW_KEYS = [
   'txRaw',
+  'txHex',
   'rawTx',
   'rawTransaction',
   'transaction',
+  'signedTransaction',
   'hex',
   'serializedTx'
 ] as const;
+
+export const isLeatherProviderId = (providerId: string | null | undefined) =>
+  typeof providerId === 'string' && providerId.toLowerCase().includes('leather');
+
+export const isXverseProviderId = (providerId: string | null | undefined) =>
+  typeof providerId === 'string' && providerId.toLowerCase().includes('xverse');
 
 type WalletActionBase = {
   appDetails?: ContractCallOptions['appDetails'];
@@ -83,6 +106,7 @@ type WalletActionBase = {
   sponsored?: boolean;
   onFinish?: (payload: WalletTxResult) => void;
   onCancel?: () => void;
+  onError?: (error: unknown) => void;
 };
 
 type WalletContractCallOptions = WalletActionBase & {
@@ -90,6 +114,12 @@ type WalletContractCallOptions = WalletActionBase & {
   contractName: string;
   functionName: string;
   functionArgs: ContractCallOptions['functionArgs'];
+};
+
+type SponsoredWalletContractCallOptions = WalletContractCallOptions & {
+  nonce: ContractCallOptions['nonce'] | string | bigint;
+  stxAddress: string;
+  publicKey?: string;
 };
 
 type WalletContractDeployOptions = WalletActionBase & {
@@ -105,6 +135,49 @@ type WalletStxTransferOptions = WalletActionBase & {
 };
 
 const disconnectedSession = (): WalletSession => ({ isConnected: false });
+
+// Self-heal: @stacks/auth's SessionData.fromJSON() throws
+// "JSON data version undefined not supported by SessionData" when localStorage
+// holds a session written in an incompatible format (a different @stacks/connect
+// major used elsewhere on this origin, or a very old session). After that,
+// UserSession.isUserSignedIn()/loadUserData() throw during connect and the
+// wallet never opens. Drop any stored session that isn't a valid, versioned
+// SessionData so connect always starts from a clean state.
+const STACKS_SESSION_STORAGE_KEYS = ['blockstack-session', 'blockstack'];
+const sanitizeStoredWalletSession = () => {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return;
+  }
+  for (const key of STACKS_SESSION_STORAGE_KEYS) {
+    let raw: string | null = null;
+    try {
+      raw = window.localStorage.getItem(key);
+    } catch {
+      continue;
+    }
+    if (!raw) {
+      continue;
+    }
+    let versionOk = false;
+    try {
+      const parsed = JSON.parse(raw) as { version?: unknown };
+      versionOk = typeof parsed?.version === 'string' && parsed.version.length > 0;
+    } catch {
+      versionOk = false;
+    }
+    if (!versionOk) {
+      try {
+        window.localStorage.removeItem(key);
+      } catch {
+        // ignore storage errors
+      }
+    }
+  }
+};
+
+// Run once at module load so any UserSession use (including inside
+// @stacks/connect's showConnect) starts from a clean, parseable session.
+sanitizeStoredWalletSession();
 
 const stripHexPrefix = (value: string) =>
   value.startsWith('0x') || value.startsWith('0X') ? value.slice(2) : value;
@@ -135,20 +208,13 @@ const normalizeRawTxHex = (value: unknown) => {
     return null;
   }
   const normalized = stripHexPrefix(text);
-  if (
-    normalized.length < 128 ||
-    normalized.length % 2 !== 0 ||
-    !/^[0-9a-f]+$/i.test(normalized)
-  ) {
+  if (normalized.length < 128 || normalized.length % 2 !== 0 || !/^[0-9a-f]+$/i.test(normalized)) {
     return null;
   }
   return normalized;
 };
 
-const normalizeNetwork = (
-  value: unknown,
-  fallback: NetworkType = 'mainnet'
-): NetworkType => {
+const normalizeNetwork = (value: unknown, fallback: NetworkType = 'mainnet'): NetworkType => {
   if (typeof value === 'string') {
     const lower = value.toLowerCase();
     if (lower.includes('testnet') || lower === 'test') {
@@ -198,7 +264,7 @@ const normalizePostCondition = (value: WalletContractPostCondition) =>
     ? stripHexPrefix(value)
     : bytesToHex(serializePostCondition(value as SerializablePostCondition));
 
-const normalizePostConditionMode = (value?: PostConditionMode) =>
+const normalizePostConditionMode = (value?: number) =>
   value === PostConditionMode.Allow ? 'allow' : 'deny';
 
 const extractStacksAddress = (payload: unknown, depth = 0): string | null => {
@@ -259,6 +325,74 @@ const extractStacksAddress = (payload: unknown, depth = 0): string | null => {
   return null;
 };
 
+const normalizePublicKey = (value: unknown) => {
+  const text = toNonEmptyText(value);
+  if (!text) {
+    return null;
+  }
+  const normalized = stripHexPrefix(text);
+  return /^[0-9a-f]{66}$/i.test(normalized) ? normalized : null;
+};
+
+const extractStacksPublicKey = (
+  payload: unknown,
+  expectedAddress?: string,
+  depth = 0
+): string | null => {
+  if (depth > 8 || !payload) {
+    return null;
+  }
+  if (Array.isArray(payload)) {
+    for (const entry of payload) {
+      const nested = extractStacksPublicKey(entry, expectedAddress, depth + 1);
+      if (nested) {
+        return nested;
+      }
+    }
+    return null;
+  }
+  if (typeof payload !== 'object') {
+    return expectedAddress ? null : normalizePublicKey(payload);
+  }
+
+  const candidate = payload as Record<string, unknown>;
+  const directAddress = [candidate.address, candidate.stxAddress, candidate.selectedAddress]
+    .map((value) => toNonEmptyText(value))
+    .find((value) => value && validateStacksAddress(value));
+  const directPublicKey = [candidate.publicKey, candidate.public_key, candidate.stxPublicKey]
+    .map((value) => normalizePublicKey(value))
+    .find(Boolean);
+
+  if (
+    directPublicKey &&
+    (!expectedAddress || (directAddress && directAddress === expectedAddress))
+  ) {
+    return directPublicKey;
+  }
+
+  for (const key of [
+    'addresses',
+    'accounts',
+    'result',
+    'data',
+    'payload',
+    'response',
+    'params',
+    'profile',
+    'userData'
+  ]) {
+    if (!(key in candidate)) {
+      continue;
+    }
+    const nested = extractStacksPublicKey(candidate[key], expectedAddress, depth + 1);
+    if (nested) {
+      return nested;
+    }
+  }
+
+  return null;
+};
+
 const deriveWalletSession = (userData: UserData): WalletSession => {
   const profile = (userData.profile ?? {}) as {
     stxAddress?:
@@ -310,19 +444,28 @@ const toWalletSession = (
   if (network !== 'mainnet') {
     return disconnectedSession();
   }
+  const publicKey = extractStacksPublicKey(payload, address);
   return {
     isConnected: true,
     address,
-    network
+    network,
+    ...(publicKey ? { publicKey } : {})
   };
 };
 
 const isMethodUnsupportedError = (error: unknown) => {
+  const code =
+    error && typeof error === 'object' && 'code' in error
+      ? (error as { code?: unknown }).code
+      : undefined;
   const message = error instanceof Error ? error.message : String(error ?? '');
   const lower = message.toLowerCase();
   return (
+    code === -32601 ||
     lower.includes('method not found') ||
+    lower.includes('not supported') ||
     lower.includes('unsupported') ||
+    lower.includes('not available') ||
     lower.includes('not implemented') ||
     lower.includes('request function is not implemented')
   );
@@ -336,13 +479,48 @@ const isUserCancelledError = (error: unknown) => {
     }
   }
   const message = error instanceof Error ? error.message : String(error ?? '');
-  const lower = message.toLowerCase();
+  const lower = message.trim().toLowerCase();
   return (
-    lower.includes('cancel') ||
-    lower.includes('reject') ||
-    lower.includes('denied') ||
-    lower.includes('closed')
+    /\buser (?:cancelled|canceled|rejected|denied|closed)\b/.test(lower) ||
+    /\b(?:cancelled|canceled|rejected|denied) by (?:the )?user\b/.test(lower) ||
+    /\b(?:wallet )?request (?:cancelled|canceled|rejected|denied)\b/.test(lower) ||
+    lower === 'cancelled' ||
+    lower === 'canceled'
   );
+};
+
+const providerError = (value: unknown) => {
+  if (value instanceof Error) {
+    return value;
+  }
+  const candidate = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  const nested =
+    candidate.error && typeof candidate.error === 'object'
+      ? (candidate.error as Record<string, unknown>)
+      : null;
+  const message =
+    toNonEmptyText(nested?.message) ??
+    toNonEmptyText(candidate.message) ??
+    toNonEmptyText(candidate.error) ??
+    toNonEmptyText(value) ??
+    'Wallet provider request failed.';
+  const error = new Error(message) as Error & { code?: unknown; data?: unknown };
+  error.code = nested?.code ?? candidate.code;
+  error.data = nested?.data ?? candidate.data;
+  return error;
+};
+
+const unwrapProviderResponse = (response: unknown) => {
+  if (response && typeof response === 'object') {
+    const candidate = response as Record<string, unknown>;
+    if (candidate.error) {
+      throw providerError(candidate);
+    }
+    if (candidate.status === 'error') {
+      throw providerError(candidate.result ?? candidate);
+    }
+  }
+  return response;
 };
 
 const requestProvider = async (
@@ -353,7 +531,75 @@ const requestProvider = async (
   if (typeof provider.request !== 'function') {
     throw new Error(`Wallet provider does not support request("${method}").`);
   }
-  return provider.request(method, params as unknown as any[]);
+  try {
+    const response = await provider.request(method as never, params as never);
+    return unwrapProviderResponse(response);
+  } catch (error) {
+    throw providerError(error);
+  }
+};
+
+const getXverseRpcProvider = (): WalletRpcProvider | undefined => {
+  if (typeof window === 'undefined') {
+    return undefined;
+  }
+  const walletWindow = window as typeof window & {
+    XverseProviders?: { BitcoinProvider?: WalletRpcProvider };
+    xverseProviders?: { BitcoinProvider?: WalletRpcProvider };
+    BitcoinProvider?: WalletRpcProvider;
+  };
+  const injected =
+    walletWindow.XverseProviders?.BitcoinProvider ??
+    walletWindow.xverseProviders?.BitcoinProvider ??
+    walletWindow.BitcoinProvider;
+  if (typeof injected?.request === 'function') {
+    return injected;
+  }
+  for (const providerId of XVERSE_SIGNING_PROVIDER_IDS) {
+    const provider = getProviderFromId(providerId) as WalletRpcProvider | undefined;
+    if (typeof provider?.request === 'function') {
+      return provider;
+    }
+  }
+  return undefined;
+};
+
+const isSelectedXverseProvider = (provider: StacksProvider) => {
+  if (isXverseProviderId(getSelectedProviderId())) {
+    return true;
+  }
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  const walletWindow = window as typeof window & {
+    XverseProviders?: { StacksProvider?: StacksProvider };
+    xverseProviders?: { StacksProvider?: StacksProvider };
+  };
+  return (
+    provider === walletWindow.XverseProviders?.StacksProvider ||
+    provider === walletWindow.xverseProviders?.StacksProvider
+  );
+};
+
+const requestWalletRpc = async (
+  provider: StacksProvider,
+  method: string,
+  params?: Record<string, unknown>
+) => {
+  if (!isSelectedXverseProvider(provider)) {
+    return requestProvider(provider, method, params);
+  }
+  const rpcProvider = getXverseRpcProvider();
+  if (!rpcProvider) {
+    throw Object.assign(new Error('Xverse modern request provider is not available.'), {
+      code: 'XVERSE_RPC_UNAVAILABLE'
+    });
+  }
+  try {
+    return unwrapProviderResponse(await rpcProvider.request(method, params));
+  } catch (error) {
+    throw providerError(error);
+  }
 };
 
 const deriveTxIdFromRawPayload = (value: unknown) => {
@@ -369,20 +615,18 @@ const deriveTxIdFromRawPayload = (value: unknown) => {
   }
 };
 
-const normalizeTxResultPayload = (
-  payload: unknown,
-  depth = 0
-): WalletTxResult | null => {
+const normalizeTxResultPayload = (payload: unknown, depth = 0): WalletTxResult | null => {
   if (depth > 6 || typeof payload === 'undefined' || payload === null) {
     return null;
   }
 
-  const standaloneTxId =
-    normalizeStandaloneTxId(payload) ?? deriveTxIdFromRawPayload(payload);
+  const standaloneRawTxId = deriveTxIdFromRawPayload(payload);
+  const standaloneTxId = normalizeStandaloneTxId(payload) ?? standaloneRawTxId;
   if (standaloneTxId) {
     return {
       txId: standaloneTxId,
-      txid: standaloneTxId
+      txid: standaloneTxId,
+      txRaw: standaloneRawTxId ? (toNonEmptyText(payload) ?? undefined) : undefined
     };
   }
 
@@ -401,6 +645,13 @@ const normalizeTxResultPayload = (
   }
 
   const candidate = payload as Record<string, unknown>;
+  let canonicalRawTx: string | null = null;
+  for (const key of TX_RESULT_RAW_KEYS) {
+    if (deriveTxIdFromRawPayload(candidate[key])) {
+      canonicalRawTx = toNonEmptyText(candidate[key]);
+      break;
+    }
+  }
   const explicitTxId =
     toNonEmptyText(candidate.txId) ||
     toNonEmptyText(candidate.txid) ||
@@ -409,7 +660,8 @@ const normalizeTxResultPayload = (
     return {
       ...candidate,
       txId: explicitTxId,
-      txid: explicitTxId
+      txid: explicitTxId,
+      txRaw: canonicalRawTx ?? toNonEmptyText(candidate.txRaw) ?? undefined
     };
   }
 
@@ -463,9 +715,7 @@ const normalizeTxResultForCallback = (payload: unknown): WalletTxResult => {
   return { result: payload };
 };
 
-const toLegacyContractCallOptions = (
-  options: WalletContractCallOptions
-): ContractCallOptions =>
+const toLegacyContractCallOptions = (options: WalletContractCallOptions): ContractCallOptions =>
   ({
     ...options,
     fee: normalizeBigIntLike(options.fee),
@@ -483,9 +733,7 @@ const toLegacyContractDeployOptions = (
     sponsored: options.sponsored === true
   }) as ContractDeployOptions;
 
-const toLegacyStxTransferOptions = (
-  options: WalletStxTransferOptions
-): STXTransferOptions =>
+const toLegacyStxTransferOptions = (options: WalletStxTransferOptions): STXTransferOptions =>
   ({
     ...options,
     fee: normalizeBigIntLike(options.fee),
@@ -496,9 +744,7 @@ const toLegacyStxTransferOptions = (
 const buildContractCallParams = (options: WalletContractCallOptions) => {
   const postConditions =
     options.postConditions && options.postConditions.length > 0
-      ? options.postConditions.map((entry) =>
-          normalizePostCondition(entry)
-        )
+      ? options.postConditions.map((entry) => normalizePostCondition(entry))
       : undefined;
 
   return {
@@ -518,9 +764,7 @@ const buildContractCallParams = (options: WalletContractCallOptions) => {
 const buildContractDeployParams = (options: WalletContractDeployOptions) => {
   const postConditions =
     options.postConditions && options.postConditions.length > 0
-      ? options.postConditions.map((entry) =>
-          normalizePostCondition(entry)
-        )
+      ? options.postConditions.map((entry) => normalizePostCondition(entry))
       : undefined;
 
   return {
@@ -548,11 +792,18 @@ const buildStxTransferParams = (options: WalletStxTransferOptions) => ({
   sponsored: options.sponsored ?? false
 });
 
-const requestLeatherContractCall = async (
+// Keep Xverse contract calls on the same modern BitcoinProvider RPC bridge
+// used by wallet_connect. Xverse keeps account permission per injected
+// provider; sending the call through its legacy StacksProvider after connecting
+// on BitcoinProvider leaves the signer unset and mobile Xverse rejects it as
+// "Dapp is requesting signature from a different address. (undefined)".
+// requestWalletRpc preserves the existing direct provider path for Leather and
+// other wallets, while routing selected Xverse sessions to BitcoinProvider.
+const requestWalletContractCall = async (
   provider: StacksProvider,
   options: WalletContractCallOptions
 ) => {
-  const response = await requestProvider(
+  const response = await requestWalletRpc(
     provider,
     'stx_callContract',
     buildContractCallParams(options)
@@ -560,11 +811,144 @@ const requestLeatherContractCall = async (
   return normalizeTxResult(response);
 };
 
-const requestLeatherStxTransfer = async (
+const WALLET_ACCOUNT_READ_METHODS = [
+  'getAddresses',
+  'stx_getAddresses',
+  'stx_getAccounts',
+  'getAccounts',
+  'wallet_getAccount'
+] as const;
+
+const publicKeyMatchesAddress = (publicKey: string, address: string) => {
+  try {
+    return getAddressFromPublicKey(publicKey) === address;
+  } catch {
+    return false;
+  }
+};
+
+const resolveWalletPublicKey = async (
+  provider: StacksProvider,
+  address: string,
+  preferredPublicKey?: string
+) => {
+  const preferred = normalizePublicKey(preferredPublicKey);
+  if (preferred && publicKeyMatchesAddress(preferred, address)) {
+    return preferred;
+  }
+
+  let lastError: unknown = null;
+  const accountReadMethods = isSelectedXverseProvider(provider)
+    ? (['stx_getAccounts', 'wallet_getAccount', 'getAddresses'] as const)
+    : WALLET_ACCOUNT_READ_METHODS;
+  for (const method of accountReadMethods) {
+    try {
+      const response = await requestWalletRpc(provider, method);
+      const publicKey = extractStacksPublicKey(response, address);
+      if (publicKey && publicKeyMatchesAddress(publicKey, address)) {
+        return publicKey;
+      }
+    } catch (error) {
+      lastError = error;
+      if (!isMethodUnsupportedError(error)) {
+        break;
+      }
+    }
+  }
+
+  throw Object.assign(
+    new Error(
+      lastError instanceof Error
+        ? `Wallet did not expose the public key for ${address}: ${lastError.message}`
+        : `Wallet did not expose the public key for ${address}. Reconnect the wallet and retry.`
+    ),
+    { code: 'WALLET_PUBLIC_KEY_UNAVAILABLE' }
+  );
+};
+
+const buildUnsignedSponsoredContractCall = async (
+  options: SponsoredWalletContractCallOptions,
+  publicKey?: string | null
+) => {
+  const transaction = await makeUnsignedContractCall({
+    contractAddress: options.contractAddress,
+    contractName: options.contractName,
+    functionName: options.functionName,
+    functionArgs: options.functionArgs,
+    publicKey: publicKey ?? PLACEHOLDER_COMPRESSED_PUBLIC_KEY,
+    network: normalizeNetwork(options.network),
+    fee: 0n,
+    nonce: options.nonce,
+    anchorMode: AnchorMode.Any,
+    postConditionMode: options.postConditionMode ?? PostConditionMode.Deny,
+    postConditions: options.postConditions ?? [],
+    sponsored: true
+  } as Parameters<typeof makeUnsignedContractCall>[0]);
+  // Leather's documented getAddresses response includes the STX address but
+  // may omit its public key. A single-sig spending condition commits to the
+  // address hash, so bind that signer directly to the already-validated,
+  // connected address. The wallet still supplies the only private-key
+  // signature and the page/relayer independently verify the origin address.
+  transaction.auth.spendingCondition.signer = createAddress(options.stxAddress).hash160;
+  return bytesToHex(transaction.serialize());
+};
+
+const requestSponsoredContractCall = async (
+  provider: StacksProvider,
+  options: SponsoredWalletContractCallOptions
+) => {
+  const providerId = getSelectedProviderId();
+  const leather = isLeatherProviderId(providerId);
+  const preferredPublicKey = normalizePublicKey(options.publicKey);
+  let publicKey =
+    preferredPublicKey && publicKeyMatchesAddress(preferredPublicKey, options.stxAddress)
+      ? preferredPublicKey
+      : null;
+  if (!publicKey && !leather) {
+    try {
+      publicKey = await resolveWalletPublicKey(provider, options.stxAddress);
+    } catch (error) {
+      if (
+        !error ||
+        typeof error !== 'object' ||
+        !('code' in error) ||
+        error.code !== 'WALLET_PUBLIC_KEY_UNAVAILABLE'
+      ) {
+        throw error;
+      }
+    }
+  }
+  const unsignedTransaction = await buildUnsignedSponsoredContractCall(options, publicKey);
+  // eslint-disable-next-line no-console
+  console.info('[wallet:sponsored-sign]', {
+    stage: 'SIGNING_REQUEST',
+    provider: leather ? 'leather' : isSelectedXverseProvider(provider) ? 'xverse' : 'generic',
+    originBinding: publicKey ? 'wallet-public-key' : 'connected-address-hash',
+    broadcast: false
+  });
+  const response = leather
+    ? await requestProvider(provider, 'stx_signTransaction', {
+        txHex: unsignedTransaction,
+        stxAddress: options.stxAddress,
+        network: normalizeNetwork(options.network)
+      })
+    : await requestWalletRpc(provider, 'stx_signTransaction', {
+        transaction: unsignedTransaction,
+        broadcast: false
+      });
+  return normalizeTxResult(response);
+};
+
+// Keep Xverse on the same modern BitcoinProvider RPC bridge used for
+// wallet_connect. Calling stx_transferStx on XverseProviders.StacksProvider
+// falls back into the legacy @stacks/auth UserSession flow, where loadUserData()
+// necessarily fails because a modern wallet_connect does not create that
+// legacy session. Leather and other providers continue through requestProvider.
+const requestStxTransfer = async (
   provider: StacksProvider,
   options: WalletStxTransferOptions
 ) => {
-  const response = await requestProvider(
+  const response = await requestWalletRpc(
     provider,
     'stx_transferStx',
     buildStxTransferParams(options)
@@ -584,34 +968,115 @@ const requestLeatherContractDeploy = async (
   return normalizeTxResult(response);
 };
 
-const connectViaRequest = async (provider: StacksProvider) => {
-  const attempts = [
-    'stx_getAddresses',
+const extractSupportedMethods = (payload: unknown, depth = 0): string[] => {
+  if (depth > 5 || payload === null || typeof payload === 'undefined') {
+    return [];
+  }
+  if (Array.isArray(payload)) {
+    return [...new Set(payload.filter((value): value is string => typeof value === 'string'))];
+  }
+  if (typeof payload !== 'object') {
+    return [];
+  }
+  const candidate = payload as Record<string, unknown>;
+  for (const key of ['supportedMethods', 'methods', 'result', 'data']) {
+    if (key in candidate) {
+      const methods = extractSupportedMethods(candidate[key], depth + 1);
+      if (methods.length > 0) {
+        return methods;
+      }
+    }
+  }
+  return [];
+};
+
+const GENERIC_CONNECT_METHODS = [
+  'wallet_connect',
+  'stx_requestAccounts',
+  'connect',
+  'getAddresses',
+  'stx_getAddresses',
+  'stx_getAccounts',
+  'getAccounts',
+  'wallet_getAccount',
+  'requestAccounts'
+] as const;
+
+const getConnectAttempts = async (provider: StacksProvider) => {
+  const providerId = getSelectedProviderId();
+  if (isSelectedXverseProvider(provider)) {
+    return ['wallet_connect', 'stx_getAccounts', 'wallet_getAccount'] as const;
+  }
+  if (!isLeatherProviderId(providerId)) {
+    return GENERIC_CONNECT_METHODS;
+  }
+
+  const leatherMethods = [
     'getAddresses',
     'stx_getAccounts',
-    'getAccounts',
-    'wallet_getAccount',
-    'wallet_connect',
+    'stx_getAddresses',
     'stx_requestAccounts',
-    'requestAccounts',
-    'connect',
     'wallet_connect'
-  ];
+  ] as const;
+  try {
+    const supported = extractSupportedMethods(await requestProvider(provider, 'supportedMethods'));
+    // eslint-disable-next-line no-console
+    console.info('[wallet:connect]', {
+      stage: 'CAPABILITIES',
+      provider: 'leather',
+      supportedMethods: supported
+    });
+    const advertised = leatherMethods.filter((method) => supported.includes(method));
+    return advertised.length > 0 ? advertised : leatherMethods;
+  } catch (error) {
+    // Capability discovery is advisory. Older Leather builds can still expose
+    // the documented getAddresses method without exposing supportedMethods.
+    // eslint-disable-next-line no-console
+    console.info('[wallet:connect]', {
+      stage: 'CAPABILITIES_UNAVAILABLE',
+      provider: 'leather',
+      message: error instanceof Error ? error.message : String(error)
+    });
+    return leatherMethods;
+  }
+};
+
+const connectViaRequest = async (provider: StacksProvider) => {
+  const attempts = await getConnectAttempts(provider);
 
   let lastError: unknown = null;
   for (const method of attempts) {
     try {
-      const response = await requestProvider(provider, method);
+      // eslint-disable-next-line no-console
+      console.info('[wallet:connect]', { stage: 'REQUEST', method });
+      const response = await requestWalletRpc(provider, method);
       const session = toWalletSession(response);
       if (session.isConnected) {
+        // eslint-disable-next-line no-console
+        console.info('[wallet:connect]', {
+          stage: 'CONNECTED',
+          method,
+          hasPublicKey: Boolean(session.publicKey)
+        });
         return session;
       }
+      // eslint-disable-next-line no-console
+      console.info('[wallet:connect]', { stage: 'EMPTY_RESPONSE', method });
     } catch (error) {
       lastError = error;
+      const unsupported = isMethodUnsupportedError(error);
+      // Expected capability misses are recorded without warning stack noise.
+      // eslint-disable-next-line no-console
+      (unsupported ? console.info : console.warn)('[wallet:connect]', {
+        stage: 'REQUEST_ERROR',
+        method,
+        code: error && typeof error === 'object' && 'code' in error ? error.code : undefined,
+        message: error instanceof Error ? error.message : String(error)
+      });
       if (isUserCancelledError(error)) {
         return disconnectedSession();
       }
-      if (isMethodUnsupportedError(error)) {
+      if (unsupported) {
         continue;
       }
       throw error;
@@ -655,10 +1120,24 @@ const connectViaLegacyAuth = async (
   });
 };
 
-const selectProvider = (options?: {
-  forceWalletSelect?: boolean;
-  persistSelection?: boolean;
-}) => {
+const resolveProviderSelection = (
+  selection: string | StacksProvider,
+  persistSelection = true
+): StacksProvider | null => {
+  if (typeof selection !== 'string') {
+    return selection;
+  }
+  const provider = getProviderFromId(selection) as StacksProvider | undefined;
+  if (!provider) {
+    return null;
+  }
+  if (persistSelection) {
+    setSelectedProviderId(selection);
+  }
+  return provider;
+};
+
+const selectProvider = (options?: { forceWalletSelect?: boolean; persistSelection?: boolean }) => {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     return Promise.resolve<StacksProvider | null>(null);
   }
@@ -698,7 +1177,18 @@ const selectProvider = (options?: {
     modal.defaultProviders = defaultProviders;
     modal.installedProviders = installedProviders;
     modal.persistSelection = persistSelection;
-    modal.callback = (provider) => {
+    modal.callback = (selection) => {
+      const provider = resolveProviderSelection(selection, persistSelection);
+      // eslint-disable-next-line no-console
+      console.info('[wallet:connect]', {
+        stage: 'PROVIDER_SELECTED',
+        providerId:
+          typeof selection === 'string'
+            ? selection
+            : (getSelectedProviderId() ?? 'provider-object'),
+        resolved: Boolean(provider),
+        requestBridge: typeof provider?.request === 'function'
+      });
       cleanup();
       resolve(provider);
     };
@@ -712,9 +1202,6 @@ const selectProvider = (options?: {
     document.body.appendChild(modal);
   });
 };
-
-export const isLeatherProviderId = (providerId: string | null | undefined) =>
-  typeof providerId === 'string' && providerId.toLowerCase().includes('leather');
 
 export const getSelectedWalletProviderId = () => getSelectedProviderId();
 
@@ -735,6 +1222,7 @@ export const getStacksProvider = (): StacksProvider | undefined => {
   const walletWindow = window as typeof window & {
     LeatherProvider?: StacksProvider;
     XverseProviders?: { StacksProvider?: StacksProvider };
+    xverseProviders?: { StacksProvider?: StacksProvider };
     BlockstackProvider?: StacksProvider;
     StacksProvider?: StacksProvider;
   };
@@ -742,6 +1230,7 @@ export const getStacksProvider = (): StacksProvider | undefined => {
   return (
     walletWindow.LeatherProvider ??
     walletWindow.XverseProviders?.StacksProvider ??
+    walletWindow.xverseProviders?.StacksProvider ??
     walletWindow.StacksProvider ??
     walletWindow.BlockstackProvider
   );
@@ -751,20 +1240,30 @@ export const connectWallet = async (params: {
   appName: string;
   appIcon: string;
 }): Promise<WalletSession> => {
+  // Re-sanitize right before connecting: a forever-twins page (or another tab)
+  // may have written an incompatible session after this module first loaded.
+  sanitizeStoredWalletSession();
   const provider = await selectProvider({ forceWalletSelect: true });
   if (!provider) {
     return disconnectedSession();
   }
 
-  const providerId = getSelectedProviderId();
-  if (isLeatherProviderId(providerId)) {
+  // Prefer the wallet's interactive connect (unlock + account selection) for any
+  // provider that exposes a request() bridge — both Leather and current Xverse do.
+  // This restores the account picker that the silent stx_getAddresses read skipped.
+  // The legacy auth popup is only a fallback when request() is unavailable or every
+  // interactive method is reported unsupported.
+  if (typeof provider.request === 'function') {
     try {
-      return await connectViaRequest(provider);
+      const session = await connectViaRequest(provider);
+      if (session.isConnected) {
+        return session;
+      }
     } catch (error) {
+      if (isUserCancelledError(error)) {
+        return disconnectedSession();
+      }
       if (!isMethodUnsupportedError(error)) {
-        if (isUserCancelledError(error)) {
-          return disconnectedSession();
-        }
         throw error;
       }
     }
@@ -776,12 +1275,7 @@ export const connectWallet = async (params: {
 export const disconnectWallet = async () => {
   const provider = getStacksProvider();
   if (provider && isLeatherProviderId(getSelectedProviderId())) {
-    for (const method of [
-      'stx_disconnect',
-      'wallet_disconnect',
-      'disconnect',
-      'deactivate'
-    ]) {
+    for (const method of ['stx_disconnect', 'wallet_disconnect', 'disconnect', 'deactivate']) {
       try {
         await requestProvider(provider, method);
         break;
@@ -797,10 +1291,7 @@ export const disconnectWallet = async () => {
   clearSelectedProviderId();
 };
 
-export const showContractCall = (
-  options: WalletContractCallOptions,
-  provider?: StacksProvider
-) => {
+export const showContractCall = (options: WalletContractCallOptions, provider?: StacksProvider) => {
   const activeProvider = provider ?? getStacksProvider();
   const legacyOptions = toLegacyContractCallOptions(options);
 
@@ -811,7 +1302,7 @@ export const showContractCall = (
     return legacyShowContractCall(legacyOptions, provider);
   }
 
-  return void requestLeatherContractCall(activeProvider, options)
+  return void requestWalletContractCall(activeProvider, options)
     .then((payload) => {
       options.onFinish?.(payload);
     })
@@ -822,7 +1313,48 @@ export const showContractCall = (
       }
       // eslint-disable-next-line no-console
       console.error('[wallet] contract call request failed', error);
+      if (isUserCancelledError(error)) {
+        options.onCancel?.();
+        return;
+      }
+      if (options.onError) {
+        options.onError(error);
+        return;
+      }
       options.onCancel?.();
+    });
+};
+
+// Sponsored claims must stop after the origin signature. stx_callContract
+// broadcasts immediately, before the relayer can attach the sponsor signature,
+// which current Xverse reports as SignatureValidation.
+export const showSponsoredContractCall = (
+  options: SponsoredWalletContractCallOptions,
+  provider?: StacksProvider
+) => {
+  const activeProvider = provider ?? getStacksProvider();
+  if (!activeProvider || typeof activeProvider.request !== 'function') {
+    options.onError?.(
+      Object.assign(
+        new Error('Selected wallet does not support origin-only transaction signing.'),
+        { code: 'WALLET_SIGNING_UNSUPPORTED' }
+      )
+    );
+    return;
+  }
+
+  return void requestSponsoredContractCall(activeProvider, options)
+    .then((payload) => {
+      options.onFinish?.(payload);
+    })
+    .catch((error) => {
+      // eslint-disable-next-line no-console
+      console.error('[wallet] sponsored contract signing failed', error);
+      if (isUserCancelledError(error)) {
+        options.onCancel?.();
+        return;
+      }
+      options.onError?.(error);
     });
 };
 
@@ -857,10 +1389,7 @@ export const showContractDeploy = (
     });
 };
 
-export const showStxTransfer = (
-  options: WalletStxTransferOptions,
-  provider?: StacksProvider
-) => {
+export const showStxTransfer = (options: WalletStxTransferOptions, provider?: StacksProvider) => {
   const activeProvider = provider ?? getStacksProvider();
   const legacyOptions = toLegacyStxTransferOptions({
     ...options,
@@ -875,17 +1404,28 @@ export const showStxTransfer = (
     return legacyShowSTXTransfer(legacyOptions, provider);
   }
 
-  return void requestLeatherStxTransfer(activeProvider, options)
+  return void requestStxTransfer(activeProvider, options)
     .then((payload) => {
       options.onFinish?.(payload);
     })
     .catch((error) => {
-      if (isMethodUnsupportedError(error)) {
+      // A modern Xverse connection has no legacy UserSession to fall back to.
+      // Keep unsupported/error responses on the modern bridge and surface them
+      // to the caller instead of triggering loadUserData() in @stacks/connect.
+      if (isMethodUnsupportedError(error) && !isSelectedXverseProvider(activeProvider)) {
         legacyShowSTXTransfer(legacyOptions, activeProvider);
         return;
       }
       // eslint-disable-next-line no-console
       console.error('[wallet] STX transfer request failed', error);
+      if (isUserCancelledError(error)) {
+        options.onCancel?.();
+        return;
+      }
+      if (options.onError) {
+        options.onError(error);
+        return;
+      }
       options.onCancel?.();
     });
 };
@@ -894,12 +1434,22 @@ export const __testing = {
   buildContractCallParams,
   buildContractDeployParams,
   buildStxTransferParams,
+  buildUnsignedSponsoredContractCall,
+  connectViaRequest,
   extractStacksAddress,
+  extractStacksPublicKey,
+  extractSupportedMethods,
+  getConnectAttempts,
   isMethodUnsupportedError,
   isUserCancelledError,
   normalizeNetwork,
+  requestStxTransfer,
   toLegacyContractCallOptions,
   normalizeTxResultForCallback,
   normalizeTxResultPayload,
-  normalizeTxResult
+  normalizeTxResult,
+  requestWalletContractCall,
+  requestSponsoredContractCall,
+  resolveProviderSelection,
+  unwrapProviderResponse
 };

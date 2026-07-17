@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as core from '../svc/core.mjs';
+import { createSponsorService, makeLiveChain, DEFAULT_MARKET_ALLOWLIST } from '../svc/sponsor-service.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.XAO_PORT || 8787);
@@ -38,11 +39,28 @@ const send = (res, code, obj) => { const b = JSON.stringify(obj); res.writeHead(
 const body = (req) => new Promise((resolve) => { let s = ''; req.on('data', (d) => (s += d)); req.on('end', () => { try { resolve(s ? JSON.parse(s) : {}); } catch { resolve({}); } }); });
 
 const PROCESSING = new Set();
+
+// ---- sponsor relayer (STX-free marketplace buys). Opt-in: set SPONSOR_KEY. ----
+// Allowlist entries come from SPONSOR_MARKETS ("contractId,contractId") or the module default.
+let sponsorSvc = null, sponsorChain = null;
+if (process.env.SPONSOR_KEY) {
+  const allowlist = process.env.SPONSOR_MARKETS
+    // Drops contracts sponsor `claim`; markets sponsor `buy`.
+    ? Object.fromEntries(process.env.SPONSOR_MARKETS.split(',').map((id) => [
+        id.trim(),
+        { buyFunction: /\.xtrata-drops-/.test(id.trim()) ? 'claim' : 'buy' }
+      ]))
+    : DEFAULT_MARKET_ALLOWLIST;
+  sponsorChain = makeLiveChain({ network: NET, sponsorKey: process.env.SPONSOR_KEY, hiroKey: HIRO_KEY });
+  sponsorSvc = createSponsorService({ chain: sponsorChain, allowlist, log: (...a) => console.log('[sponsor]', ...a) });
+  setInterval(() => sponsorSvc.settleAll().catch(() => {}), 15_000);
+  console.log(`  sponsor relayer enabled: ${sponsorChain.sponsorAddress} markets=${Object.keys(allowlist).length}`);
+}
 // AUTO-RESUME: transient failures (network, timeout, estimator, rate limit) park the job back at
 // FUNDED/INSCRIBED for the watcher to resume where it left off — resume is safe because the protocol is
 // idempotent end-to-end (begin-or-get, on-chain upload index, hash-checked mint pre-check). Only
 // deterministic failures or exhausted retries (4) fall through to the refund failsafe.
-const FATAL_ERR = /TX abort|not funded|locked to|unrecoverable|file bytes|empty file|exceeds single-tx|could not determine/i;
+const FATAL_ERR = /TX abort|not funded|locked to|unrecoverable|file bytes|empty file|exceeds single-tx|could not determine|wrong inscription received|no items inscribed/i;
 const MAX_RETRIES = Number(process.env.AGENT_MAX_RETRIES || '4');
 function startBackground(id, phase, fn) {
   PROCESSING.add(id);
@@ -50,7 +68,7 @@ function startBackground(id, phase, fn) {
   const job = core.readJob(JOB_DIR, id);
   Promise.resolve().then(() => fn(job))
     .then(() => {
-      try { const j = core.readJob(JOB_DIR, id); if (j.retryCount && j.status === 'COMPLETE') { delete j.retryCount; core.writeJob(JOB_DIR, j); } } catch {}
+      try { const j = core.readJob(JOB_DIR, id); if (j.retryCount && (j.status === 'COMPLETE' || j.status === 'COMPLETE_WITH_SKIPS')) { delete j.retryCount; core.writeJob(JOB_DIR, j); } } catch {}
       PROCESSING.delete(id);
     })
     .catch(async (e) => {
@@ -77,7 +95,7 @@ async function reapTick() {
   const now = Date.now();
   for (const j of jobs) {
     if (PROCESSING.has(j.jobId)) continue;
-    if (['COMPLETE', 'CANCELLED', 'NEEDS_RECOVERY'].includes(j.status)) continue;
+    if (['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED', 'NEEDS_RECOVERY'].includes(j.status)) continue;
     // EXPIRED = never-funded job parked with its key kept (see refundAndClose's never-strand guard).
     // Long-grace pass: after EXPIRE_GRACE_MS, one final close — sweeps any late-arriving funds back to
     // the payer, or (confirmed empty + no mempool inbound) finally discards the key.
@@ -110,7 +128,10 @@ async function reapTick() {
       continue;
     }
     const last = Date.parse(j.progressAt || j.createdAt || '') || 0;
-    if (!last || (now - last) < core.JOB_WINDOW_MS) continue;
+    // Parented jobs need time for TWO user sends (STX + the parent inscription) — give the deposit
+    // phase the parent window on top of the normal one before auto-returning.
+    const win = (j.status === 'AWAITING_DEPOSIT' && (j.parents || []).length) ? core.JOB_WINDOW_MS + core.PARENT_WINDOW_MS : core.JOB_WINDOW_MS;
+    if (!last || (now - last) < win) continue;
     PROCESSING.add(j.jobId);
     console.log(`reaper: ${j.jobId} (${j.status}) past window → return funds + close`);
     core.refundAndClose({ job: j, hiroKey: HIRO_KEY, jobDir: JOB_DIR, receiptsDir: RECEIPTS_DIR, reason: 'expired — no progress within window' })
@@ -131,7 +152,11 @@ async function fastTrackTick() {
       startBackground(j.jobId, 'DELIVERING', (job) => core.deliverJob({ job, hiroKey: HIRO_KEY, jobDir: JOB_DIR, receiptsDir: RECEIPTS_DIR }));
       continue;
     }
-    if (j.status !== 'AWAITING_DEPOSIT' && j.status !== 'FUNDED') continue;   // also resume jobs stuck at FUNDED (e.g. after a restart)
+    // AWAITING_PARENT = funded, waiting for the parent inscription to arrive at the deposit wallet.
+    // Poll it gently (~20 s) — autoRunJob re-checks the gate and either proceeds, keeps waiting, or
+    // (window over / wrong inscription) returns everything to the sender.
+    if (j.status === 'AWAITING_PARENT' && Date.now() - (Date.parse(j.progressAt || '') || 0) < 20000) continue;
+    if (!['AWAITING_DEPOSIT', 'FUNDED', 'AWAITING_PARENT'].includes(j.status)) continue;   // also resume jobs stuck at FUNDED (e.g. after a restart)
     // A job that was funded once counts as funded — mid-flight resumes have already spent part of the deposit.
     let funded = !!j.depositReceivedUstx;
     if (!funded) { try { funded = (await core.statusJob({ job: j, hiroKey: HIRO_KEY })).funded; } catch { continue; } }
@@ -159,7 +184,7 @@ const server = http.createServer(async (req, res) => {
 
     if (!p.startsWith('/api/')) return serveStatic(req, res);
 
-    if (p === '/api/health') return send(res, 200, { ok: true, core: CORE, net: NET, mock: MOCK, startedAt: STARTED_AT, windowMs: core.JOB_WINDOW_MS, jobDir: JOB_DIR });
+    if (p === '/api/health') return send(res, 200, { ok: true, core: CORE, net: NET, mock: MOCK, startedAt: STARTED_AT, windowMs: core.JOB_WINDOW_MS, parentWindowMs: core.PARENT_WINDOW_MS, jobDir: JOB_DIR });
 
     if (p === '/api/estimate' && req.method === 'POST') {
       const b = await body(req);
@@ -170,7 +195,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p === '/api/upload' && req.method === 'POST') {
-      const name = (url.searchParams.get('name') || 'upload.bin').replace(/[^\w.\-]+/g, '_').slice(-120);
+      const name = (url.searchParams.get('name') || 'upload.bin').replace(/[^\w.-]+/g, '_').slice(-120);
       fs.mkdirSync(UPLOAD_DIR, { recursive: true });
       const dest = path.join(UPLOAD_DIR, Date.now() + '-' + name);
       const len = Number(req.headers['content-length'] || 0);
@@ -194,8 +219,14 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/jobs' && req.method === 'POST') {
       const b = await body(req);
+      // BATCH: items[] → one deposit, N inscriptions, one receipt.
+      if (Array.isArray(b.items) && b.items.length) {
+        for (const it of b.items) if (!it.file || !fs.existsSync(it.file)) return send(res, 400, { error: 'item file not found on server: ' + (it.file || '(none)') });
+        const job = await core.createBatchJob({ coreName: CORE, net: NET, items: b.items, parents: b.parents || [], user: b.user, expectedFunder: b.expectedFunder || null, marginUstx: b.marginUstx || '0', jobDir: JOB_DIR, mock: MOCK, fastTrack: !!b.fastTrack, strict: !!b.strict });
+        return send(res, 200, { job: core.publicJob(job) });
+      }
       if (!b.file || !fs.existsSync(b.file)) return send(res, 400, { error: 'file not found on server: ' + (b.file || '(none)') });
-      const job = await core.createJob({ coreName: CORE, net: NET, file: b.file, uri: b.uri, mime: b.mime || 'application/octet-stream', deps: b.deps || [], user: b.user, expectedFunder: b.expectedFunder || null, marginUstx: b.marginUstx || '0', jobDir: JOB_DIR, mock: MOCK, fastTrack: !!b.fastTrack, suno: !!b.suno });
+      const job = await core.createJob({ coreName: CORE, net: NET, file: b.file, uri: b.uri, mime: b.mime || 'application/octet-stream', deps: b.deps || [], parents: b.parents || [], user: b.user, expectedFunder: b.expectedFunder || null, marginUstx: b.marginUstx || '0', jobDir: JOB_DIR, mock: MOCK, fastTrack: !!b.fastTrack, suno: !!b.suno });
       return send(res, 200, { job: core.publicJob(job) });
     }
 
@@ -215,6 +246,12 @@ const server = http.createServer(async (req, res) => {
         if (job.tokenId) return send(res, 400, { error: 'already inscribed' });
         const s = await core.statusJob({ job, hiroKey: HIRO_KEY });
         if (!s.funded) return send(res, 400, { error: 'not funded yet' });
+        // Parent gate (manual run): wrong inscription → return everything now; missing → tell the user what to send.
+        if (s.parents && s.parents.unexpected && s.parents.unexpected.length) {
+          startBackground(id, 'CANCELLED', (j) => core.refundAndClose({ job: j, hiroKey: HIRO_KEY, jobDir: JOB_DIR, receiptsDir: RECEIPTS_DIR, reason: `wrong inscription received (token #${s.parents.unexpected.join(', #')}) — all inscriptions and funds returned to sender` }));
+          return send(res, 400, { error: `wrong inscription received (token #${s.parents.unexpected.join(', #')}) — returning everything to the sender` });
+        }
+        if (s.parents && s.parents.missing.length) return send(res, 400, { error: `awaiting parent inscription #${s.parents.missing.join(', #')} — transfer it to ${job.depositAddress} first (it will be returned with your new inscription)` });
         startBackground(id, 'INSCRIBING', (j) => core.runJob({ job: j, enginePath: ENGINE, hiroKey: HIRO_KEY, jobDir: JOB_DIR }));
         return send(res, 200, { started: true });
       }
@@ -228,6 +265,29 @@ const server = http.createServer(async (req, res) => {
         if (PROCESSING.has(id)) return send(res, 409, { error: 'job is processing — try again once it settles' });
         try { return send(res, 200, core.deleteJob({ jobDir: JOB_DIR, id, receiptsDir: RECEIPTS_DIR })); }
         catch (e) { return send(res, 400, { error: String((e && e.message) || e) }); }
+      }
+    }
+
+    // ---- sponsor relayer routes ----
+    if (p.startsWith('/api/sponsor/')) {
+      if (!sponsorSvc) return send(res, 503, { code: 'RELAYER_DISABLED', message: 'sponsor relayer not configured (set SPONSOR_KEY)' });
+      try {
+        if (p === '/api/sponsor/quote' && req.method === 'POST') return send(res, 200, await sponsorSvc.quote());
+        if (p === '/api/sponsor/submit' && req.method === 'POST') {
+          const b = await body(req);
+          if (!b.txHex || !b.contractId || b.listingId === undefined) return send(res, 400, { code: 'BAD_REQUEST', message: 'txHex, contractId, listingId required' });
+          const listing = await sponsorChain.getListing(b.contractId, b.listingId);
+          const job = await sponsorSvc.submit({ txHex: b.txHex, contractId: b.contractId, listingId: b.listingId, listing });
+          return send(res, 200, { id: job.id, state: job.state, txids: job.txids });
+        }
+        const sm = p.match(/^\/api\/sponsor\/status\/([^/]+)$/);
+        if (sm && req.method === 'GET') {
+          const job = sponsorSvc.status(sm[1]);
+          if (!job) return send(res, 404, { code: 'NOT_FOUND', message: 'job unknown' });
+          return send(res, 200, { id: job.id, state: job.state, txids: job.txids, error: job.error });
+        }
+      } catch (e) {
+        return send(res, e.code === 'RATE_LIMITED' ? 429 : 400, { code: e.code || 'UNKNOWN', message: String((e && e.message) || e) });
       }
     }
 

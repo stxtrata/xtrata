@@ -958,12 +958,53 @@ const resolveAddressNamesFromExplorer = async (params: {
       }
 
       const extracted = extractAddressNamesFromExplorerHtml(response.html);
+      // The Explorer address page also lists OTHER principals (senders,
+      // inscribers, recipients in the tx history), so a raw scrape can surface a
+      // name that merely appears on the page but is NOT owned by this address —
+      // e.g. showing an inscription's inscriber (jim.btc) as the current owner.
+      // Verify every scraped name actually forward-resolves back to this exact
+      // address before trusting it; drop anything that doesn't round-trip.
+      const verifiedNames: string[] = [];
+      for (const candidate of extracted.names) {
+        try {
+          const forward =
+            (await resolveNameAddressFromBnsV2({
+              name: candidate,
+              network: params.network,
+              signal: params.signal
+            })) ??
+            (await resolveNameAddressFromApi({
+              name: candidate,
+              network: params.network,
+              signal: params.signal
+            }));
+          if (
+            forward?.address &&
+            forward.address.toUpperCase() === params.address.toUpperCase()
+          ) {
+            verifiedNames.push(candidate);
+          } else {
+            logDebug('bns', 'Discarded unverified scraped BNS name', {
+              address: params.address,
+              scrapedName: candidate,
+              resolvedTo: forward?.address ?? null
+            });
+          }
+        } catch (verifyError) {
+          logDebug('bns', 'Could not verify scraped BNS name; dropping it', {
+            address: params.address,
+            scrapedName: candidate,
+            error: getErrorMessage(verifyError)
+          });
+        }
+      }
+      const names = sortBnsNames(verifiedNames);
       return {
         result: {
           address: params.address,
-          names: extracted.names,
-          primary: extracted.primary,
-          source: extracted.names.length > 0 ? EXPLORER_PROVIDER_ID : null
+          names,
+          primary: pickPrimaryBnsName(names, names[0] ?? null),
+          source: names.length > 0 ? EXPLORER_PROVIDER_ID : null
         },
         cacheable: true
       };

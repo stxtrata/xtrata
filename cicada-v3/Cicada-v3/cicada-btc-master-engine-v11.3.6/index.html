@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cicada.btc Master Engine v11.3.4</title>
+    <link rel="stylesheet" href="./styles/builder.css?v=11.3.5-nymph.2">
+</head>
+<body>
+    <a href="#builder-panel" class="skip-link">Skip to controls</a>
+    <div id="stage" aria-label="Seeded cicada preview"></div>
+
+    <section id="builder-panel" aria-label="Cicada collection builder controls">
+        <h1>Cicada.btc Master Engine v11.3.4</h1>
+        <p class="subcopy">Jump to any seed from 1 to 3,301. v11.3.4 keeps the photographic tree-bark treatment and refines the live gallery: calls now queue instead of resetting singers, delayed cascades can spread like wildfire, and flight followers stay airborne until the clicked source lands.</p>
+
+        <div class="row controls-row" role="group" aria-label="Display preferences">
+            <button id="motion-toggle" type="button" aria-label="Motion preference: Auto">Motion: Auto</button>
+            <button id="nymph-toggle" type="button" aria-label="Nymph mode: Off" aria-pressed="false">Nymph: Off</button>
+        </div>
+
+        <label for="seed-input">Preview Seed</label>
+        <div class="row">
+            <input id="seed-input" type="number" min="1" max="3301" step="1" value="1" inputmode="numeric" aria-label="Seed number, 1 to 3301">
+            <button id="jump-button">Jump</button>
+        </div>
+        <div class="row">
+            <button id="prev-button">Prev</button>
+            <button id="next-button">Next</button>
+            <button id="random-button">Random</button>
+            <button id="gallery-button">Gallery Grid</button>
+        </div>
+
+        <section id="find-panel" aria-label="Find a piece">
+            <div class="rarity-title">Find a Piece</div>
+            <div class="row">
+                <input id="rank-input" type="number" min="1" max="3301" step="1" inputmode="numeric" placeholder="Rank #" aria-label="Rarity rank, 1 to 3301">
+                <button id="rank-go-button">Go to Rank</button>
+            </div>
+            <div class="row find-filters">
+                <label class="mini-select"><span>Tier</span><select id="find-tier"></select></label>
+                <label class="mini-select"><span>Trait</span><select id="find-trait"></select></label>
+                <label class="mini-select"><span>Value</span><select id="find-value"></select></label>
+            </div>
+            <div id="find-results" aria-live="polite"></div>
+        </section>
+
+        <div class="row" role="group" aria-label="Export options">
+            <label class="inline-check"><input id="inline-bark-toggle" type="checkbox" checked> <span>Inline bark images for self-contained export</span></label>
+        </div>
+        <button id="export-button" class="primary">Export Seed HTMLs + Module</button>
+        <div id="export-estimate" class="hint-line"></div>
+        <div id="progress-wrap">
+            <div id="progress-bar"><div id="progress-fill"></div></div>
+        </div>
+        <div id="status" role="status" aria-live="polite"></div>
+        <div id="download-slot" class="row"></div>
+        <div id="rarity-box"></div>
+        <div id="sound-identity-panel"></div>
+        <ul id="traits-list"></ul>
+    </section>
+
+    <aside id="trait-lab-panel" aria-label="Trait Lab controls"></aside>
+
+    <div id="touch-controls" role="group" aria-label="Cicada interaction">
+        <button id="touch-fly" type="button">Fly / Land</button>
+        <button id="touch-call" type="button">Signature Call</button>
+    </div>
+
+    <div id="hint">Preview: landed by default.<br>Click body (or press F) to fly + start sound.<br>Click head (or press C) for the fingerprinted signature call.</div>
+
+    <div id="gallery-overlay" role="dialog" aria-modal="true" aria-label="Cicada gallery">
+        <div id="gallery-header">
+            <div class="gallery-header-top">
+                <h2 id="gallery-title">Gallery Preview</h2>
+                <button id="close-gallery-button">Close Gallery</button>
+            </div>
+            <div id="gallery-filters">
+                <div id="gallery-group-buttons" class="row filter-row" role="group" aria-label="Gallery grouping"></div>
+                <div id="gallery-value-buttons" class="row filter-row" role="group" aria-label="Gallery filter"></div>
+            </div>
+        </div>
+        <div id="gallery-grid"></div>
+    </div>
+
+    <script type="module" src="./src/builder-ui.js?v=11.3.5-nymph.2"></script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Planted Foot Gait Smoke</title>
+<style>body{margin:0;background:#0b110e;color:#dfffea;font:13px ui-monospace,monospace}#stage{height:100vh}pre{position:fixed;top:8px;left:8px;background:#000a;padding:8px}</style>
+<div id="stage"></div><pre id="report">Running gait check…</pre>
+<script type="module">
+import { CicadaGenerator } from '../src/cicada-renderer.js?v=11.3.6-planted-feet';
+
+const cicada = new CicadaGenerator({ mount: '#stage', instructions: { seed: 42, size: 80, idleWander: false } });
+const root = cicada.root;
+const body = { x: 12, y: -4, sway: 0 };
+const planted = ['front-leg-right', 'middle-leg-left', 'hind-leg-right'];
+const originalFeet = Object.fromEntries(planted.map(id => {
+    const pad = root.getElementById(id).querySelector('.leg-pad');
+    return [id, { x: Number(pad.getAttribute('cx')), y: Number(pad.getAttribute('cy')) }];
+}));
+cicada.gait.begin({ x: 0, y: 0, sway: 0 });
+cicada.gait.update(body, 100, { x: 1, y: 0 });
+const checks = {
+    controller: Boolean(cicada.gait?.active),
+    sixLegs: root.querySelectorAll('#legs-layer .leg-unit').length === 6,
+    plantedFeetStayPut: planted.every(id => {
+        const pad = root.getElementById(id).querySelector('.leg-pad');
+        return Math.abs(Number(pad.getAttribute('cx')) + body.x - originalFeet[id].x) < .01
+            && Math.abs(Number(pad.getAttribute('cy')) + body.y - originalFeet[id].y) < .01;
+    }),
+    swingFootLifts: Number(root.getElementById('front-leg-left').querySelector('.leg-pad').getAttribute('cy')) < 125
+};
+checks.pass = Object.values(checks).every(Boolean);
+document.body.dataset.pass = String(checks.pass);
+document.getElementById('report').textContent = JSON.stringify(checks, null, 2);
+if (!checks.pass) throw new Error(`Gait smoke failed: ${JSON.stringify(checks)}`);
+cicada.destroy();
+</script>

@@ -2,8 +2,7 @@
 // Extracted verbatim from the former index.html inline script.
 import { FOREVER_TWIN_COLLECTIONS } from '/src/lib/twins/registry.ts';
 
-export const XTRATA_BRAND_MARK_URL =
-  'https://nxhyvj3lifp2q34nklffzxslfje426oxeruo3lkuj56srwgctdlq.arweave.net/bc-Kp2tBX6hvjVLKXN5LKknNedckaO2tVE99KNjCmNc';
+export const XTRATA_BRAND_MARK_URL = '/favicon.svg';
 
 export const THEME_STORAGE_KEY = 'xtrata.simple-homepage.theme';
 

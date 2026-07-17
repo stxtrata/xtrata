@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>SUNO More — do more with your Suno music · Xtrata Agent One</title>
+<title>SUNO More — do more with your Suno music · Xtrata Inscription Wizard</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="apple-touch-icon" href="/favicons/xtrata-apple-touch-icon.png" />
 <style>
@@ -71,7 +71,7 @@
 <body>
 <header>
   <img src="favicon.svg" alt="Xtrata" style="width:28px;height:28px;border-radius:7px;flex:none" />
-  <div class="logo"><b>XTRATA</b> <i>Agent One</i> · SUNO More</div>
+  <div class="logo"><b>XTRATA</b> <i>Inscription Wizard</i> · SUNO More</div>
   <div class="spacer"></div>
   <span id="health" class="pill">connecting…</span>
   <span id="walletAddr" class="pill" style="display:none;cursor:pointer;color:var(--ok);border-color:#1f5a45" title="connected wallet — click to show & copy the address"></span>
@@ -84,10 +84,10 @@
     <h1 class="suno-logo"><img src="/suno-more/assets/suno-more-logo.webp" alt="SUNO More — one song, infinite possibilities" /></h1>
     <p class="lead">You made the song — now do more with it. Drop a Suno MP3 and pay once: your browser optimises the audio to Opus, pulls in the cover art, title, artist &amp; lyrics, and builds a self-contained player. The agent inscribes the master and returns the token + receipt to your wallet, change refunded. Nothing leaves your browser until you pay.</p>
 
-    <input id="picker" type="file" accept="audio/mpeg,.mp3" hidden />
+    <input id="picker" type="file" accept="audio/mpeg,.mp3" multiple hidden />
     <div id="drop" class="drop">
-      <div class="drop-main">Drop your Suno MP3 here</div>
-      <div class="drop-sub">or <u>browse</u> — embedded MP3s only (cover art + title + artist)</div>
+      <div class="drop-main">Drop your Suno MP3s here</div>
+      <div class="drop-sub">or <u>browse</u> — one song, or several for a batch (embedded cover art + title)</div>
     </div>
 
     <div id="quote" class="quote">
@@ -100,6 +100,21 @@
     <div id="preview" style="display:none;margin-top:16px">
       <div class="muted" style="font-size:12px;margin-bottom:8px">▶ Preview — play it before you inscribe:</div>
       <iframe id="previewFrame" title="Player preview" style="width:100%;aspect-ratio:1/1;border:1px solid var(--line);border-radius:12px;background:#10120f;display:block"></iframe>
+    </div>
+
+    <!-- BATCH mode: several Suno MP3s → one payment, N players, one receipt (fast isolated core). -->
+    <div id="sunoBatch" style="display:none;margin-top:16px">
+      <div id="sbHead" class="muted" style="font-size:12.5px;margin-bottom:10px"></div>
+      <div id="sbList"></div>
+      <div id="sbDropped" class="muted" style="font-size:11.5px;margin-top:2px"></div>
+      <input id="sbArtPick" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+      <div id="sbQuoteBox" class="quote" style="margin-top:14px">
+        <div class="kv"><span>Players ready</span><span id="sbCount">—</span></div>
+        <div class="kv tot"><span>Pay once — every player, one receipt</span><span id="sbPay">—</span></div>
+        <div class="muted" style="font-size:11px;margin-top:6px">Quoted on the finished players' exact sizes. Over-collected for fees; unused remainder refunded on delivery.</div>
+      </div>
+      <button id="sbGo" class="btn" disabled>Inscribe players</button>
+      <div id="sbHint" class="hint"></div>
     </div>
 
     <!-- Optional edit panel: fast track stays untouched; this expands only on demand. -->
@@ -160,22 +175,26 @@
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
-<script src="HTML_Template.js?v=4"></script>
-<script src="suno-build.js?v=4"></script>
-<script src="agent-one.js?v=5"></script>
+<script src="HTML_Template.js?v=6"></script>
+<script src="suno-build.js?v=7"></script>
+<script src="optimize-image.js?v=1"></script>
+<script src="agent-one.js?v=9"></script>
 <script>
 const SERVER = { mock:false, net:'mainnet' };
-// VERSION HANDSHAKE: this page requires the agent bundle build below. The site's deploy pipeline
-// rebuilds agent-one.js from src/agent-one/*.ts — if that source hasn't been updated, the stale agent
-// is detected here and live inscriptions are blocked (a stale agent burns real miner fees on refund loops).
-const XAO_EXPECTED_BUILD='2026-07-01.5';
+// VERSION HANDSHAKE: this page requires AT LEAST the agent bundle build below. The site's deploy
+// pipeline rebuilds agent-one.js from src/agent-one/*.ts — if that source hasn't been updated, the
+// stale agent is detected here and live inscriptions are blocked (a stale agent burns real miner
+// fees on refund loops). Builds are date-stamped (YYYY-MM-DD.N) so a string compare orders them;
+// a NEWER deployed bundle must pass — requiring an exact match wrongly locked the page out
+// whenever the agent shipped ahead of the page.
+const XAO_MIN_AGENT_BUILD='2026-07-01.5';
 let AGENT_STALE=false;
 function checkAgentBuild(){
   const b=window.XAO_AGENT_BUILD||null;
-  if(b===XAO_EXPECTED_BUILD) return;
+  if(b&&b>=XAO_MIN_AGENT_BUILD) return;
   AGENT_STALE=true;
-  $('#hint').innerHTML='<span class="err">⚠ Outdated agent bundle deployed (build '+esc(b||'pre-versioning')+', page expects '+XAO_EXPECTED_BUILD+'). Live inscriptions are disabled — the deployed agent-one.js is missing the fee-spike + auto-resume fixes. Rebuild/redeploy it, then reload.</span>';
-  console.error('[xao] agent bundle build mismatch:',b,'expected',XAO_EXPECTED_BUILD);
+  $('#hint').innerHTML='<span class="err">⚠ Outdated agent bundle deployed (build '+esc(b||'pre-versioning')+', page needs '+XAO_MIN_AGENT_BUILD+' or newer). Live inscriptions are disabled — the deployed agent-one.js is missing the fee-spike + auto-resume fixes. Rebuild/redeploy it, then reload.</span>';
+  console.error('[xao] agent bundle build too old:',b,'minimum',XAO_MIN_AGENT_BUILD);
 }
 let WALLET=null, FILE=null, PLAYER=null, META=null, EST=null, JOB=null, poll=null, building=false;
 
@@ -185,7 +204,7 @@ const esc = (s)=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
 function slug(s){ return String(s||'').toLowerCase().replace(/\.[^.]+$/,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,48)||'track'; }
 // SUNO is for Suno MP3 exports ONLY (embedded cover art + title + artist). Everything else
 // (WAV, art-less MP3, etc.) is sent to the modular main wizard.
-const DROP_HTML='<div class="drop-main">Drop your Suno MP3 here</div><div class="drop-sub">or <u>browse</u> — embedded MP3s only (cover art + title + artist)</div>';
+const DROP_HTML='<div class="drop-main">Drop your Suno MP3s here</div><div class="drop-sub">or <u>browse</u> — one song, or several for a batch (embedded cover art + title)</div>';
 const MP3_MAX_MB=32;
 function validateSuno(f){
   if(!f) return 'No file selected.';
@@ -256,10 +275,13 @@ async function payWallet(addr, ustx){ const w=xw();
 // ---- file pick / drop → build the player in-browser, then quote on its exact size ----
 const drop=$('#drop'), picker=$('#picker');
 drop.onclick=()=>picker.click();
-picker.onchange=()=>{ if(picker.files[0]) pickFile(picker.files[0]); };
+// One file → the single-song fast track (unchanged). Several → batch mode. A single file
+// dropped while a batch is open is added to that batch.
+function routeDrop(fs){ fs=(fs||[]).filter(Boolean); if(!fs.length) return; if(fs.length===1&&!(typeof SB!=='undefined'&&SB.active)) pickFile(fs[0]); else enterSunoBatch(fs); }
+picker.onchange=()=>{ routeDrop(Array.from(picker.files||[])); picker.value=''; };
 ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag');}));
 ['dragleave','dragend','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag');}));
-drop.addEventListener('drop',e=>{ const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) pickFile(f); });
+drop.addEventListener('drop',e=>{ routeDrop(Array.from((e.dataTransfer&&e.dataTransfer.files)||[])); });
 
 async function pickFile(f){
   const verr=validateSuno(f);
@@ -347,6 +369,7 @@ $('#applyEdits').onclick=async()=>{
 };
 
 function updateGo(){
+  if(typeof SB!=='undefined'&&SB.active){ sbUpdateGo(); return; }   // batch mode drives its own button
   const b=$('#go');
   if(building){ b.disabled=true; b.textContent='Building player…'; return; }
   if(AGENT_STALE&&!SERVER.mock){ b.disabled=true; b.textContent='Agent bundle outdated — redeploy required'; return; }
@@ -418,7 +441,7 @@ async function refresh(){
       setProg(funded?'Payment confirmed — starting…':(pending?'Payment seen — confirming (usually under 30 s)…':'Waiting for payment to land…'),
         funded?['pay']:[], funded?18:(pending?10:4)); }
     else if(PHASE[st]){ setPhase(st, job); }
-    if(st==='COMPLETE'){ clearInterval(poll); poll=null; setBar(100); setTimeout(()=>{ stopWaitExtras(); done(job); },600); }
+    if(st==='COMPLETE'||st==='COMPLETE_WITH_SKIPS'){ clearInterval(poll); poll=null; setBar(100); setTimeout(()=>{ stopWaitExtras(); (job.items?sbDone:done)(job); },600); }
     else if(st==='CANCELLED'){ clearInterval(poll); poll=null; stopWaitExtras(); $('#prog').className='prog';
       $('#hint').innerHTML='<span class="muted">↩︎ Cancelled — funds returned'+(job.cancelReason?(' ('+esc(job.cancelReason)+')'):'')+'. <a href="#" onclick="showJobLog(\''+esc(job.jobId)+'\');return false">View agent log</a></span>'; $('#go').disabled=false; }
     else if(st==='ERROR'||st==='NEEDS_RECOVERY'){ clearInterval(poll); poll=null; stopWaitExtras(); $('#prog').className='prog';
@@ -468,6 +491,208 @@ function done(job){
 function resetAll(){ FILE=null;PLAYER=null;META=null;EST=null;JOB=null; if(poll){clearInterval(poll);poll=null;} stopWaitExtras();
   picker.value=''; drop.classList.remove('has'); drop.innerHTML=DROP_HTML;
   $('#quote').className='quote'; $('#prog').className='prog'; $('#result').className='result'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc'); $('#editWrap').style.display='none'; $('#hint').textContent=''; updateGo(); }
+
+// =================== BATCH: several Suno MP3s → one payment, N players ===================
+// Reuses the isolated page's FAST multi-threaded ffmpeg core (via XtrataSuno.build) and the
+// agent's batch job API (A.estimateBatch + A.createJob({items})). Songs are probed + built
+// SEQUENTIALLY (the shared core runs one command at a time). Songs with no embedded cover art
+// are auto-dropped (this page's promise is "embedded artwork"); the rest each get a preview and
+// an optional artwork swap, then inscribe together for one payment + one receipt.
+const SB={ items:[], dropped:[], active:false, busy:false, quoteRun:0, EST:null, stxUsd:null, droppedNote:'' };
+let sbArtTarget=-1;
+const sbReadB64=(file)=>new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]||null); r.onerror=()=>rej(r.error); r.readAsDataURL(file); });
+const sbMib=(n)=>(n/1048576).toFixed(2);
+const sbCostLabel=(ustx)=>stx(ustx)+(SB.stxUsd!=null?(' · ~$'+(Number(ustx)/1e6*Number(SB.stxUsd)).toFixed(2)):'');
+function sbEnterUI(){ SB.active=true;
+  $('#quote').className='quote'; $('#preview').style.display='none'; $('#editWrap').style.display='none';
+  $('#go').style.display='none'; $('#hint').textContent=''; $('#result').className='result'; $('#prog').className='prog';
+  $('#sunoBatch').style.display='block'; }
+function sbResetUI(){ SB.items.forEach(it=>{ if(it.previewUrl){ try{URL.revokeObjectURL(it.previewUrl);}catch(_e){} } });
+  SB.items=[]; SB.dropped=[]; SB.active=false; SB.busy=false; SB.EST=null; SB.droppedNote=''; JOB=null; if(poll){clearInterval(poll);poll=null;} stopWaitExtras();
+  $('#sunoBatch').style.display='none'; $('#go').style.display='';
+  drop.classList.remove('has'); drop.innerHTML=DROP_HTML;
+  $('#prog').className='prog'; $('#result').className='result'; $('#sbHint').textContent=''; updateGo(); }
+function enterSunoBatch(files){
+  const key=f=>f.name+'|'+f.size; const have=new Set(SB.items.map(it=>key(it.file)));
+  let bad=0, added=0;
+  for(const f of files){ if(SB.items.length>=40) break;
+    if(validateSuno(f)){ bad++; continue; }
+    if(have.has(key(f))) continue; have.add(key(f));
+    SB.items.push({ file:f, status:'queued', player:null, info:null, previewUrl:null, show:false, err:null }); added++; }
+  if(!SB.items.length){ rejectToWizard('None of those are Suno MP3 exports (embedded artwork, MP3, ≤'+MP3_MAX_MB+' MiB). Use the main wizard to set artwork yourself.'); return; }
+  sbEnterUI();
+  SB.droppedNote = bad? (bad+' file'+(bad>1?'s':'')+' skipped — not an MP3, or over '+MP3_MAX_MB+' MiB.') : '';
+  drop.classList.add('has');
+  drop.innerHTML='<div class="fname">🎵 Batch · '+SB.items.length+' song'+(SB.items.length>1?'s':'')+'</div><div class="fmeta">drop more Suno MP3s to add · click to browse</div>';
+  sbRender(); sbProcess();
+}
+let sbEngineWarned=false;
+async function sbProcess(){
+  if(SB.busy) return; SB.busy=true;
+  try{
+    if(!window.XtrataSuno||!window.buildXtrataAudioPlayerHtml){ if(!sbEngineWarned){ sbEngineWarned=true; $('#sbHint').innerHTML='<span class="err">Player engine still loading — retrying…</span>'; } }
+    for(;;){
+      const it=SB.items.find(x=>x.status==='queued');
+      if(!it) break;
+      it.status='probing'; sbRender();
+      try{
+        const p=await window.XtrataSuno.probe(it.file,()=>{});
+        if(!p.hasCover){ // auto-drop: this page guarantees embedded artwork
+          SB.dropped.push(it.file.name); SB.items=SB.items.filter(x=>x!==it); sbRender(); sbQuote(); continue; }
+        it.status='building'; sbRender();
+        const r=await window.XtrataSuno.build(it.file,()=>{});
+        if(it.previewUrl){ try{URL.revokeObjectURL(it.previewUrl);}catch(_e){} it.previewUrl=null; }
+        it.player=r.playerFile; it.info=r; it.status='ready'; it.err=null;
+      }catch(e){ it.status='error'; it.err=(e&&e.message)||String(e); }
+      sbRender(); sbQuote();
+    }
+  } finally { SB.busy=false; sbRender(); sbQuote(); }
+}
+function sbPreviewUrl(it){ if(!it.player) return ''; if(!it.previewUrl){ try{ it.previewUrl=URL.createObjectURL(it.player); }catch(_e){ it.previewUrl=''; } } return it.previewUrl; }
+function sbRow(it,i){
+  const title = it.info? (esc(it.info.title||it.file.name)+(it.info.artist?(' — '+esc(it.info.artist)):'')) : esc(it.file.name);
+  const artSrc = it.info&&it.info.coverB64 ? ('data:'+(it.info.coverMime||'image/jpeg')+';base64,'+it.info.coverB64) : '';
+  let status;
+  if(it.status==='ready') status='<span class="ok">'+sbMib(it.player.size)+' MiB · Opus'+(it.info&&it.info.hasCover?' + cover':'')+(it.info&&it.info.hasLyrics?' + lyrics':'')+'</span>'+(it.costUstx?(' · <span style="color:var(--acc);font-weight:700">'+sbCostLabel(it.costUstx)+'</span>'):'');
+  else if(it.status==='building') status='<span style="color:var(--acc2)"><span class="spin"></span>building player…</span>';
+  else if(it.status==='probing') status='<span class="muted"><span class="spin"></span>checking artwork…</span>';
+  else if(it.status==='error') status='<span class="err">✗ '+esc(it.err||'failed')+'</span> <a href="#" onclick="sbRetry('+i+');return false" style="margin-left:4px">retry</a>';
+  else status='<span class="muted">queued…</span>';
+  const btn=(fn,label,title)=>'<button class="btn ghost" style="width:auto;margin:0;padding:4px 9px;font-size:11px" onclick="'+fn+'('+i+')" title="'+title+'">'+label+'</button>';
+  return '<div class="sbrow" style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px">'
+    +'<div style="display:flex;gap:10px;align-items:center">'
+      +'<img alt="" src="'+artSrc+'" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#10120f;flex:none"/>'
+      +'<div style="flex:1;min-width:0"><div class="fname" style="font-size:14px;word-break:break-word">'+title+'</div><div class="fmeta">'+status+'</div></div>'
+      +(it.status==='ready'?btn('sbToggle',(it.show?'▾ hide':'▸ preview'),'Preview this player'):'')
+      +btn('sbArt','🖼','Change this player’s artwork')
+      +btn('sbRemove','✕','Remove from batch')
+    +'</div>'
+    +((it.status==='ready'&&it.show)?('<iframe src="'+sbPreviewUrl(it)+'" title="preview" loading="lazy" sandbox="allow-scripts allow-same-origin allow-popups" style="width:100%;aspect-ratio:1/1;border:1px solid var(--line);border-radius:10px;background:#10120f;display:block;margin-top:10px"></iframe>'):'')
+    +'</div>';
+}
+function sbRender(){
+  const ready=SB.items.filter(it=>it.status==='ready');
+  const total=SB.items.length;
+  const busy=SB.items.some(it=>['queued','probing','building'].includes(it.status));
+  $('#sbHead').innerHTML = busy
+    ? '<span class="spin"></span>Building on the fast core — '+ready.length+'/'+total+' player'+(total>1?'s':'')+' ready…'
+    : (total? '✓ '+ready.length+' player'+(ready.length>1?'s':'')+' ready — preview each, swap artwork if you like, then inscribe.' : 'No songs yet.');
+  $('#sbList').innerHTML = SB.items.map((it,i)=>sbRow(it,i)).join('');
+  $('#sbDropped').textContent = SB.dropped.length
+    ? ('⚠ '+SB.dropped.length+' auto-removed (no embedded artwork): '+SB.dropped.join(', ')+' — add art in the main wizard or single-song editor.')
+    : (SB.droppedNote||'');
+  const bytes=ready.reduce((s,it)=>s+it.player.size,0);
+  $('#sbCount').textContent = ready.length+' / '+total+(ready.length?(' · '+sbMib(bytes)+' MiB total'):'');
+  sbUpdateGo();
+}
+async function sbQuote(){
+  const run=++SB.quoteRun; const A=window.XtrataAgent;
+  const ready=SB.items.filter(it=>it.status==='ready');
+  if(!ready.length||!A||!A.estimateBatch){ SB.EST=null; SB.stxUsd=null; ready.forEach(it=>{ it.costUstx=null; }); $('#sbPay').textContent='—'; sbUpdateGo(); return; }
+  try{
+    const est=await A.estimateBatch({ itemsBytes:ready.map(it=>it.player.size), parentCount:0, marginUstx:'0' });
+    if(run!==SB.quoteRun) return;
+    SB.EST=est; SB.stxUsd=(est.stxUsd!=null?est.stxUsd:null);
+    // Split the single batch payment across songs in proportion to each one's on-chain
+    // footprint (protocol fee + miner reserve), so the per-song costs sum EXACTLY to the total.
+    try{
+      const req=BigInt(est.requiredUstx);
+      const direct=(est.items||[]).map(x=>BigInt(x.protocolFee||'0')+BigInt(x.minerReserve||'0'));
+      const dsum=direct.reduce((a,b)=>a+b,0n);
+      let allocated=0n;
+      for(let i=0;i<ready.length;i++){
+        let share;
+        if(i===ready.length-1) share=req-allocated;              // last song takes the remainder → exact total
+        else if(dsum>0n) share=req*(direct[i]||0n)/dsum;
+        else share=req/BigInt(ready.length);
+        allocated+=share; ready[i].costUstx=share.toString();
+      }
+    }catch(_e){ ready.forEach(it=>{ it.costUstx=null; }); }
+    const pending=SB.items.some(it=>['queued','probing','building'].includes(it.status));
+    $('#sbPay').textContent=stx(est.requiredUstx)+(est.stxUsd?(' · ~$'+(Number(est.requiredUstx)/1e6*est.stxUsd).toFixed(2)):'')+(pending?' (updating…)':'');
+    sbRender();
+  }catch(e){ if(run===SB.quoteRun){ $('#sbPay').textContent='—'; SB.EST=null; SB.stxUsd=null; sbUpdateGo(); } }
+}
+function sbUpdateGo(){
+  const b=$('#sbGo'); if(!b) return;
+  const ready=SB.items.filter(it=>it.status==='ready').length;
+  const busy=SB.items.some(it=>['queued','probing','building'].includes(it.status));
+  if(AGENT_STALE&&!SERVER.mock){ b.disabled=true; b.textContent='Agent bundle outdated — redeploy required'; return; }
+  if(busy){ b.disabled=true; b.textContent='Building players…'; return; }
+  if(!ready){ b.disabled=true; b.textContent='No players ready'; return; }
+  if(!SERVER.mock&&!WALLET){ b.disabled=true; b.textContent='Connect your wallet to inscribe'; return; }
+  b.disabled=!SB.EST; b.textContent = SB.EST? ('Inscribe '+ready+' player'+(ready>1?'s':'')+'  ·  pay '+stx(SB.EST.requiredUstx)) : ('Inscribe '+ready+' player'+(ready>1?'s':''));
+}
+window.sbToggle=(i)=>{ const it=SB.items[i]; if(it){ it.show=!it.show; sbRender(); } };
+window.sbRemove=(i)=>{ const it=SB.items[i]; if(!it) return; if(it.previewUrl){ try{URL.revokeObjectURL(it.previewUrl);}catch(_e){} }
+  SB.items.splice(i,1); if(!SB.items.length){ sbResetUI(); return; } sbRender(); sbQuote(); };
+window.sbRetry=(i)=>{ const it=SB.items[i]; if(it){ it.status='queued'; it.err=null; sbRender(); sbProcess(); } };
+window.sbArt=(i)=>{ sbArtTarget=i; $('#sbArtPick').click(); };
+$('#sbArtPick').onchange=async()=>{
+  const f=$('#sbArtPick').files[0]; $('#sbArtPick').value=''; const it=SB.items[sbArtTarget]; if(!f||!it) return;
+  if(!/^image\/(png|jpeg|webp)$/.test(f.type)){ $('#sbHint').innerHTML='<span class="err">Artwork must be PNG, JPEG or WebP.</span>'; return; }
+  if(f.size>4*1048576){ $('#sbHint').innerHTML='<span class="err">Artwork over 4 MiB would bloat the inscription — use a smaller image.</span>'; return; }
+  const prev=it.status; it.status='building'; sbRender();
+  try{
+    let cover=f; try{ if(window.XtrataImageOptimizer){ const cr=await window.XtrataImageOptimizer.optimize(f,()=>{}); if(cr.optimizedBytes) cover=cr.file; } }catch(_e){}
+    const b64=await sbReadB64(cover);
+    const r=await window.XtrataSuno.build(it.file,()=>{},{ coverB64:b64, coverMime:cover.type||'image/png' });
+    if(it.previewUrl){ try{URL.revokeObjectURL(it.previewUrl);}catch(_e){} it.previewUrl=null; }
+    it.player=r.playerFile; it.info=r; it.status='ready'; it.err=null; it.show=true;
+    $('#sbHint').innerHTML='<span class="ok">✓ Artwork updated — preview refreshed.</span>';
+  }catch(e){ it.status=prev==='ready'?'ready':'error'; it.err=(e&&e.message)||String(e); $('#sbHint').innerHTML='<span class="err">Artwork rebuild failed: '+esc(it.err)+'</span>'; }
+  sbRender(); sbQuote();
+};
+$('#sbGo').onclick=async()=>{
+  const ready=SB.items.filter(it=>it.status==='ready'); if(!ready.length) return;
+  if(!SERVER.mock&&!WALLET){ connectWallet(); return; }
+  const b=$('#sbGo'); b.disabled=true; $('#sbHint').textContent='';
+  try{
+    const items=ready.map(it=>({ file:it.player, uri:'xtrata:song/'+((it.info&&it.info.title)?slug(it.info.title):slug(it.file.name)), mime:'text/html' }));
+    const payload={ items, parents:[], marginUstx:'0', strict:false, fastTrack:true, suno:true, user:WALLET||undefined, expectedFunder:WALLET||undefined };
+    setProg('Creating your one-shot deposit…', []);
+    const { job }=await api('/api/jobs',{method:'POST',body:payload});
+    JOB=job;
+    if(SERVER.mock){ setProg('MOCK — simulating batch inscription…',['pay']); }
+    else{
+      setProg('Opening your wallet to pay '+stx(job.requiredUstx)+'…', []);
+      try{ await payWallet(job.depositAddress, job.requiredUstx); }
+      catch(e){ $('#sbHint').innerHTML='<span class="err">'+esc(e.message)+'</span><br><span class="muted">Send '+stx(job.requiredUstx)+' to '+esc(job.depositAddress)+' to continue.</span>'; }
+      setProg('Waiting for payment to land…', []);
+    }
+    startPoll();
+  }catch(e){ $('#prog').className='prog'; $('#sbHint').innerHTML='<span class="err">'+esc(e.message)+'</span>'; sbUpdateGo(); }
+};
+function sbDone(job){
+  $('#prog').className='prog'; $('#sunoBatch').style.display='none';
+  const items=job.items||[]; const okItems=items.filter(i=>i.tokenId); const net=job.net||SERVER.net;
+  const R=job.receipt||{};
+  const usdRate=(R.stxUsd!=null)?Number(R.stxUsd):(SB.EST&&SB.EST.stxUsd?Number(SB.EST.stxUsd):null);
+  const usd=u=>usdRate!=null?('$'+(Number(u)/1e6*usdRate).toFixed(2)):null;
+  const both=u=>stx(u)+(usd(u)?(' · '+usd(u)):'');
+  let paidU=R.totalPaid!=null?R.totalPaid:null;
+  if(paidU==null&&R.depositReceived!=null&&job.refundedUstx!=null){ try{ paidU=String(BigInt(R.depositReceived)-BigInt(job.refundedUstx||'0')); }catch(_e){} }
+  const rows=items.map(i=>{
+    const nm=esc((i.uri||'').replace(/^xtrata:(song|audio)\//,'')||'song');
+    const tok=i.tokenId?('<span class="ok">#'+esc(i.tokenId)+'</span>'):('<span class="muted">'+esc((i.status||'—').toLowerCase())+'</span>');
+    const link=(net==='mainnet'&&i.tokenId)?(' · <a href="https://xtrata.xyz/inscription/'+esc(i.tokenId)+'" target="_blank" rel="noopener">open</a>'):'';
+    return '<div class="kv"><span>'+nm+'</span><span>'+tok+link+'</span></div>';
+  }).join('');
+  const settle='<div style="background:linear-gradient(180deg,#0f1f17,#0c1812);border:1px solid #1f5a45;border-radius:12px;padding:14px 16px;margin:14px 0">'
+    +(R.depositReceived!=null?'<div class="kv"><span>Deposit you paid</span><span>'+both(R.depositReceived)+'</span></div>':'')
+    +(job.refundedUstx!=null?'<div class="kv"><span>Unused funds refunded</span><span class="ok">'+both(job.refundedUstx||'0')+'</span></div>':'')
+    +(paidU!=null?('<div class="kv" style="border-top:1px solid #1f5a45;padding-top:10px"><span style="font-weight:700;color:var(--ink)">Total to immortalise '+okItems.length+' song'+(okItems.length>1?'s':'')+'</span><span style="text-align:right"><span style="display:block;font-weight:800;font-size:19px;color:var(--acc)">'+(usd(paidU)||stx(paidU))+'</span>'+(usd(paidU)?('<span class="muted" style="font-size:12px">'+stx(paidU)+'</span>'):'')+'</span></div>'):'')
+    +'<div class="muted" style="font-size:11px;margin-top:8px">On-chain forever — no renewals, no hosting. Full breakdown on your receipt.</div></div>';
+  $('#result').className='result show';
+  $('#result').innerHTML=
+    '<div class="ok" style="font-weight:800;font-size:16px;margin-bottom:8px">✓ Batch inscribed — '+okItems.length+' / '+items.length+' player'+(items.length>1?'s':'')+(job.receiptTokenId?' + receipt':'')+'</div>'
+    +rows
+    +(job.receiptTokenId?'<div class="kv" style="border-top:1px solid var(--line);margin-top:4px;padding-top:8px"><span>Batch receipt</span><span class="ok">#'+esc(job.receiptTokenId)+'</span></div>':'')
+    +settle
+    +'<button class="btn ghost" style="display:block;width:100%;text-align:center" onclick="viewReceipt(\''+esc(job.jobId)+'\')">View receipt</button>'
+    +'<div class="hint" style="margin-top:12px"><a href="#" id="sbAgain">Inscribe more songs</a></div>';
+  const ag=$('#sbAgain'); if(ag) ag.onclick=(e)=>{ e.preventDefault(); sbResetUI(); };
+}
 </script>
 <script src="/xtrata-radio.js" defer></script>
 </body>

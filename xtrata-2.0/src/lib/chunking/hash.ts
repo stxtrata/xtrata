@@ -5,21 +5,18 @@ export const MAX_BATCH_SIZE = 50;
 export const MAX_UPLOAD_BATCH_SIZE = 30;
 export const EMPTY_HASH = new Uint8Array(32);
 
-const concatBytes = (left: Uint8Array, right: Uint8Array) => {
-  const combined = new Uint8Array(left.length + right.length);
-  combined.set(left, 0);
-  combined.set(right, left.length);
-  return combined;
-};
-
 export const chunkBytes = (data: Uint8Array, chunkSize = CHUNK_SIZE) => {
   if (chunkSize <= 0) {
     throw new Error('chunkSize must be greater than zero');
   }
 
+  // Zero-copy: return subarray() views over the original buffer instead of
+  // slice() copies. Chunks are consumed read-only (hashing, hex encoding, tx
+  // payloads), so sharing the backing buffer is safe and avoids O(n) copies on
+  // large files.
   const chunks: Uint8Array[] = [];
   for (let offset = 0; offset < data.length; offset += chunkSize) {
-    chunks.push(data.slice(offset, offset + chunkSize));
+    chunks.push(data.subarray(offset, offset + chunkSize));
   }
   return chunks;
 };
@@ -38,9 +35,13 @@ export const batchChunks = (chunks: Uint8Array[], batchSize = MAX_UPLOAD_BATCH_S
 };
 
 export const computeExpectedHash = (chunks: Uint8Array[]) => {
-  let runningHash = EMPTY_HASH;
+  // Protocol running hash: for each chunk, hash (previousHash || chunk).
+  // Incremental hashing feeds the two operands via successive update() calls,
+  // which is byte-for-byte identical to hashing their concatenation but avoids
+  // allocating a combined buffer per chunk.
+  let runningHash: Uint8Array = EMPTY_HASH;
   for (const chunk of chunks) {
-    runningHash = sha256(concatBytes(runningHash, chunk));
+    runningHash = sha256.create().update(runningHash).update(chunk).digest();
   }
   return runningHash;
 };

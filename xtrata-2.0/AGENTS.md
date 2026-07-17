@@ -1,6 +1,6 @@
 # AGENTS
 
-This file captures the core development rules and app constraints for V16.
+This file captures the core development rules and app constraints for V16. 
 
 ## Development Rules
 

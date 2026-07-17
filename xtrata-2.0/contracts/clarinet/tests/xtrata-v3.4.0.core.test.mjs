@@ -20,7 +20,6 @@ const buf=(n,fill)=>Buffer.alloc(n, fill & 0xff);
 const sha=b=>createHash("sha256").update(b).digest();
 const roll=cs=>{let h=Buffer.alloc(32,0); for(const c of cs) h=sha(Buffer.concat([h,c])); return h;};
 const clBuffs=cs=>Cl.list(cs.map(c=>Cl.buffer(c)));
-const idOf=r=>Number(r.result.value.value);
 const ro=(fn,args=[],who=deployer)=>simnet.callReadOnlyFn(C,fn,args,who);
 const pub=(fn,args,who)=>simnet.callPublicFn(C,fn,args,who);
 const stxBal=who=>{const m=simnet.getAssetsMap().get("STX"); return m?BigInt(m.get(who)??0n):0n;};

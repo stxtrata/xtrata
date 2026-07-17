@@ -3,55 +3,346 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Xtrata Agent One — Inscription Wizard</title>
+<title>Xtrata — Inscription Wizard</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="apple-touch-icon" href="/favicons/xtrata-apple-touch-icon.png" />
 <style>
-  :root{
-    --bg:#0b0e14; --panel:#121723; --panel2:#0e131d; --line:#243044; --line2:#1a2230;
-    --ink:#e6edf6; --mut:#8b9bb4; --acc:#3ea6ff; --acc2:#7c5cff; --ok:#3ddc97; --warn:#ffb454; --bad:#ff6b6b;
-    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  :root {
+    color-scheme: dark;
+    --bg: #050505;
+    --panel: #111111;
+    --ink: #f7f7f7;
+    --muted: #c9c9c9;
+    --line: #303030;
+    --line-strong: #d8d8d8;
+    --green: #ffffff;
+    --green-soft: #1d1d1d;
+    --blue: #e7e7e7;
+    --blue-soft: #181818;
+    --rose: #ffffff;
+    --rose-soft: #1f1f1f;
+    --amber: #d4d4d4;
+    --amber-soft: #202020;
+    --shadow: 0 24px 70px rgba(0,0,0,0.62);
+    --radius: 8px;
+    --control: #0b0b0b;
+    --surface-soft: #151515;
+    --thumb: #0d0d0d;
+    --button-hover: #d8d8d8;
+    --ghost-hover: rgba(255,255,255,0.08);
+    --focus-ring: rgba(255,255,255,0.18);
+    --topbar-accent: rgba(255,255,255,0.20);
+    --button-bg: #f7f7f7;
+    --button-ink: #050505;
+    --button-border: #f7f7f7;
+    --secondary-bg: transparent;
+    --secondary-ink: #f7f7f7;
+  }
+  /* wizard-only token names aliased onto the site's theme tokens */
+  :root {
+    --panel2: var(--surface-soft);
+    --mut: var(--muted);
+    --line2: var(--line-strong);
+    --acc: var(--green);
+    --acc2: var(--blue);
+    --ok: var(--green);
+    --warn: var(--amber);
+    --bad: var(--rose);
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  body[data-theme="classic"] {
+    --bg: #f6f8f5;
+    --panel: #ffffff;
+    --ink: #151a17;
+    --muted: #617067;
+    --line: #d2ddd6;
+    --line-strong: #9caf9f;
+    --green: #245f45;
+    --green-soft: #e6f1ea;
+    --blue: #214f73;
+    --blue-soft: #e5eef5;
+    --rose: #a43f58;
+    --rose-soft: #f7e6eb;
+    --amber: #84601b;
+    --amber-soft: #f7edd7;
+    --shadow: 0 18px 50px rgba(19, 31, 25, 0.08);
+    --control: #ffffff;
+    --surface-soft: #fbfdfb;
+    --thumb: #f1f5f2;
+    --button-hover: #27302b;
+    --ghost-hover: rgba(21, 26, 23, 0.06);
+    --focus-ring: rgba(36, 95, 69, 0.12);
+    --topbar-accent: transparent;
+  }
+  body[data-theme="terminal"] {
+    color-scheme: dark;
+    --bg: #0d120f;
+    --panel: #101813;
+    --ink: #e7f5ec;
+    --muted: #8fa498;
+    --line: #26362d;
+    --line-strong: #4a715a;
+    --green: #70d18d;
+    --green-soft: #14281c;
+    --blue: #8fc7ff;
+    --blue-soft: #122235;
+    --rose: #ff8da8;
+    --rose-soft: #351823;
+    --amber: #f0be63;
+    --amber-soft: #302411;
+    --shadow: 0 20px 58px rgba(0, 0, 0, 0.42);
+    --control: #0c1510;
+    --surface-soft: #0c1510;
+    --thumb: #0a100d;
+    --button-hover: #c8ead4;
+    --ghost-hover: rgba(112, 209, 141, 0.10);
+    --focus-ring: rgba(112, 209, 141, 0.18);
+    --topbar-accent: rgba(112, 209, 141, 0.16);
+  }
+  body[data-theme="midnight"] {
+    color-scheme: dark;
+    --bg: #101521;
+    --panel: #161d2b;
+    --ink: #f3f7ff;
+    --muted: #9ba8bb;
+    --line: #2b3649;
+    --line-strong: #556a8c;
+    --green: #76d6c2;
+    --green-soft: #12302d;
+    --blue: #9fc3ff;
+    --blue-soft: #172945;
+    --rose: #ff9ab0;
+    --rose-soft: #3a1d2a;
+    --amber: #ffd27a;
+    --amber-soft: #332713;
+    --shadow: 0 20px 62px rgba(0, 0, 0, 0.36);
+    --control: #101827;
+    --surface-soft: #111a29;
+    --thumb: #0f1724;
+    --button-hover: #d8e6ff;
+    --ghost-hover: rgba(159, 195, 255, 0.10);
+    --focus-ring: rgba(159, 195, 255, 0.18);
+    --topbar-accent: rgba(159, 195, 255, 0.16);
+  }
+  body[data-theme="neon"] {
+    color-scheme: dark;
+    --bg: #05020b;
+    --panel: #0c0715;
+    --ink: #f8f4ff;
+    --muted: #b79fd2;
+    --line: #3b1859;
+    --line-strong: #ff36d7;
+    --green: #00ff9c;
+    --green-soft: #06251c;
+    --blue: #00d9ff;
+    --blue-soft: #051c2a;
+    --rose: #ff36d7;
+    --rose-soft: #2a0724;
+    --amber: #ffe66d;
+    --amber-soft: #251f05;
+    --shadow: 0 0 34px rgba(255, 54, 215, 0.20), 0 0 68px rgba(0, 217, 255, 0.12);
+    --control: #10071b;
+    --surface-soft: #0a0611;
+    --thumb: #09040f;
+    --button-hover: #d9b8ff;
+    --ghost-hover: rgba(0, 217, 255, 0.13);
+    --focus-ring: rgba(255, 54, 215, 0.28);
+    --topbar-accent: rgba(0, 255, 156, 0.28);
+  }
+  body[data-theme="monochrome"] {
+    color-scheme: dark;
+    --bg: #050505;
+    --panel: #111111;
+    --ink: #f7f7f7;
+    --muted: #c9c9c9;
+    --line: #303030;
+    --line-strong: #d8d8d8;
+    --green: #ffffff;
+    --green-soft: #1d1d1d;
+    --blue: #e7e7e7;
+    --blue-soft: #181818;
+    --rose: #ffffff;
+    --rose-soft: #1f1f1f;
+    --amber: #d4d4d4;
+    --amber-soft: #202020;
+    --shadow: 0 24px 70px rgba(0, 0, 0, 0.62), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    --control: #0b0b0b;
+    --surface-soft: #151515;
+    --thumb: #0d0d0d;
+    --button-hover: #d8d8d8;
+    --ghost-hover: rgba(255, 255, 255, 0.08);
+    --focus-ring: rgba(255, 255, 255, 0.18);
+    --topbar-accent: rgba(255, 255, 255, 0.20);
+    --button-bg: #f7f7f7;
+    --button-ink: #050505;
+    --button-border: #f7f7f7;
+    --secondary-bg: transparent;
+    --secondary-ink: #f7f7f7;
+  }
+  body[data-theme="obsidian"] {
+    color-scheme: dark;
+    --bg: #070b10;
+    --panel: #0e141b;
+    --ink: #eef6ff;
+    --muted: #8fa2b6;
+    --line: #253241;
+    --line-strong: #50677d;
+    --green: #7ee2c7;
+    --green-soft: #102a27;
+    --blue: #86b7ff;
+    --blue-soft: #111f32;
+    --rose: #ff8fb3;
+    --rose-soft: #311522;
+    --amber: #ffcc78;
+    --amber-soft: #2a2010;
+    --shadow: 0 26px 76px rgba(0, 0, 0, 0.54);
+    --control: #0a1118;
+    --surface-soft: #0b1219;
+    --thumb: #060b10;
+    --button-hover: #d6e9ff;
+    --ghost-hover: rgba(134, 183, 255, 0.10);
+    --focus-ring: rgba(126, 226, 199, 0.20);
+    --topbar-accent: rgba(126, 226, 199, 0.16);
+  }
+  body[data-theme="ember"] {
+    color-scheme: dark;
+    --bg: #130905;
+    --panel: #1b0f0a;
+    --ink: #fff5ee;
+    --muted: #c09b85;
+    --line: #3b2116;
+    --line-strong: #a64f26;
+    --green: #f0a35b;
+    --green-soft: #331a0d;
+    --blue: #ffc36f;
+    --blue-soft: #2b1d0e;
+    --rose: #ff6d4d;
+    --rose-soft: #35120c;
+    --amber: #ffd27f;
+    --amber-soft: #30200d;
+    --shadow: 0 24px 68px rgba(0, 0, 0, 0.50), 0 0 42px rgba(255, 109, 77, 0.10);
+    --control: #170b07;
+    --surface-soft: #160c08;
+    --thumb: #110704;
+    --button-hover: #ffd3b0;
+    --ghost-hover: rgba(255, 195, 111, 0.10);
+    --focus-ring: rgba(255, 109, 77, 0.20);
+    --topbar-accent: rgba(255, 109, 77, 0.18);
+  }
+  body[data-theme="ultraviolet"] {
+    color-scheme: dark;
+    --bg: #10071f;
+    --panel: #170d2a;
+    --ink: #fbf7ff;
+    --muted: #b5a2d2;
+    --line: #33204e;
+    --line-strong: #8257d6;
+    --green: #c7ff7a;
+    --green-soft: #1f2b10;
+    --blue: #b08cff;
+    --blue-soft: #211338;
+    --rose: #ff91d6;
+    --rose-soft: #35142d;
+    --amber: #f4d27c;
+    --amber-soft: #2d230d;
+    --shadow: 0 24px 72px rgba(0, 0, 0, 0.46), 0 0 46px rgba(130, 87, 214, 0.16);
+    --control: #120820;
+    --surface-soft: #130a22;
+    --thumb: #0e0619;
+    --button-hover: #dac7ff;
+    --ghost-hover: rgba(176, 140, 255, 0.12);
+    --focus-ring: rgba(176, 140, 255, 0.20);
+    --topbar-accent: rgba(199, 255, 122, 0.18);
+  }
+  body[data-theme="arctic"] {
+    color-scheme: dark;
+    --bg: #061018;
+    --panel: #0c1a25;
+    --ink: #f0fbff;
+    --muted: #91aec0;
+    --line: #213a4a;
+    --line-strong: #63c6e8;
+    --green: #9df7ff;
+    --green-soft: #0c2b32;
+    --blue: #72b7ff;
+    --blue-soft: #0d2438;
+    --rose: #ff9fc8;
+    --rose-soft: #321827;
+    --amber: #f4dc95;
+    --amber-soft: #2a2412;
+    --shadow: 0 24px 72px rgba(0, 0, 0, 0.48), 0 0 38px rgba(114, 183, 255, 0.12);
+    --control: #07131d;
+    --surface-soft: #081722;
+    --thumb: #05101a;
+    --button-hover: #c6f4ff;
+    --ghost-hover: rgba(157, 247, 255, 0.12);
+    --focus-ring: rgba(157, 247, 255, 0.20);
+    --topbar-accent: rgba(99, 198, 232, 0.18);
+  }
+  body[data-theme="ruby"] {
+    color-scheme: dark;
+    --bg: #120611;
+    --panel: #1d0b1a;
+    --ink: #fff3fb;
+    --muted: #c39ab9;
+    --line: #3e1c37;
+    --line-strong: #b84d94;
+    --green: #ffb3df;
+    --green-soft: #331429;
+    --blue: #d9a8ff;
+    --blue-soft: #271633;
+    --rose: #ff6fbd;
+    --rose-soft: #3a1130;
+    --amber: #ffd18d;
+    --amber-soft: #2d2110;
+    --shadow: 0 24px 72px rgba(0, 0, 0, 0.50), 0 0 42px rgba(255, 111, 189, 0.14);
+    --control: #150713;
+    --surface-soft: #160914;
+    --thumb: #10050f;
+    --button-hover: #ffd0ef;
+    --ghost-hover: rgba(255, 111, 189, 0.11);
+    --focus-ring: rgba(255, 111, 189, 0.22);
+    --topbar-accent: rgba(255, 179, 223, 0.18);
   }
   *{box-sizing:border-box}
-  body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#15203200,#0b0e14),var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-  header{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#101622,#0b0e14)}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans)}
+  header{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--line);background:var(--panel)}
   .logo{font-weight:800;letter-spacing:.5px;font-size:18px}
   .logo b{color:var(--acc)} .logo i{color:var(--acc2);font-style:normal}
   .sub{color:var(--mut);font-size:12px}
-  .badge{margin-left:auto;display:flex;gap:8px;align-items:center;font-size:12px}
+  .badge{display:flex;gap:8px;align-items:center;font-size:12px;flex-wrap:wrap;justify-content:flex-end}
   .pill{padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--mut)}
   .pill.live{color:var(--ok);border-color:#1f5a45} .pill.mock{color:var(--warn);border-color:#5a4620}
-  nav{display:flex;gap:6px;padding:12px 22px 0}
-  nav button{background:transparent;border:1px solid transparent;color:var(--mut);padding:9px 16px;border-radius:9px 9px 0 0;cursor:pointer;font-size:13px;font-weight:600}
-  nav button.active{color:var(--ink);background:var(--panel);border-color:var(--line);border-bottom-color:var(--panel)}
-  main{padding:18px 22px 60px}
-  .wrap{max-width:1080px;margin:0 auto}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  @media(max-width:840px){.grid{grid-template-columns:1fr}}
+  main{padding:22px 22px 80px}
+  .wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
-  .card h3{margin:0 0 4px;font-size:15px} .card .hint{color:var(--mut);font-size:12px;margin-bottom:14px}
+  .card h3{margin:0 0 4px;font-size:15px} .card .hint{color:var(--mut);font-size:12px;margin-bottom:10px}
   label{display:block;font-size:12px;color:var(--mut);margin:12px 0 5px}
-  input,select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;color:var(--ink);padding:10px 11px;font-size:13px;font-family:inherit}
+  input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;color:var(--ink);padding:10px 11px;font-size:13px;font-family:inherit}
   input.mono{font-family:var(--mono)}
   input:focus,select:focus{outline:none;border-color:var(--acc)}
   .row{display:flex;gap:10px} .row>*{flex:1}
-  .btn{background:linear-gradient(180deg,#2b8fe6,#2378d6);border:0;color:#fff;padding:11px 16px;border-radius:10px;font-weight:700;cursor:pointer;font-size:13px}
+  .btn{background:var(--button-bg);border:1px solid var(--button-border);color:var(--button-ink);padding:11px 16px;border-radius:10px;font-weight:700;cursor:pointer;font-size:13px}
   .btn:disabled{opacity:.45;cursor:not-allowed}
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
   .btn.alt{background:linear-gradient(180deg,#8b6cff,#6f4cf0)}
   .btn.good{background:linear-gradient(180deg,#37cf8e,#23b277)}
   .btn.warn{background:linear-gradient(180deg,#ffb454,#e89a2e);color:#201400}
+  .btn.big{width:100%;padding:15px 16px;font-size:15px;border-radius:12px}
   .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-  .kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed var(--line)}
-  .kv:last-child{border-bottom:0} .kv span:first-child{color:var(--mut)} .kv span:last-child{font-family:var(--mono)}
-  .big{font-size:26px;font-weight:800;color:var(--acc)}
+  .kv{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px dashed var(--line)}
+  .kv:last-child{border-bottom:0} .kv span:first-child{color:var(--mut)} .kv span:last-child{font-family:var(--mono);text-align:right;word-break:break-all}
+  .big-num{font-size:26px;font-weight:800;color:var(--acc)}
   .mono{font-family:var(--mono)} .muted{color:var(--mut)}
   .status{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid var(--line)}
   .s-AWAITING_DEPOSIT{color:var(--warn);border-color:#5a4620}
+  .s-AWAITING_PARENT{color:var(--warn);border-color:#5a4620}
   .s-FUNDED{color:var(--ok);border-color:#1f5a45}
   .s-INSCRIBED{color:var(--acc);border-color:#234a6e}
   .s-COMPLETE{color:var(--ok);border-color:#1f5a45}
-  .s-INSCRIBING,.s-DELIVERING{color:var(--acc);border-color:#234a6e}
+  .s-INSCRIBING,.s-DELIVERING,.s-RECOVERING{color:var(--acc);border-color:#234a6e}
   .s-ERROR{color:var(--bad);border-color:#5a2222}
   .s-CANCELLED{color:var(--mut);border-color:var(--line)}
   .s-NEEDS_RECOVERY{color:var(--bad);border-color:#5a2222}
@@ -66,141 +357,290 @@
   .copy{cursor:pointer;border:1px solid var(--line);background:var(--panel2);border-radius:7px;padding:2px 8px;font-size:11px;color:var(--mut)}
   .err{color:var(--bad);font-size:12px;margin-top:8px;min-height:16px}
   .ok{color:var(--ok)}
-  .drop{border:1.5px dashed var(--line);border-radius:12px;padding:22px 16px;text-align:center;margin-top:12px;transition:border-color .15s,background .15s}
+
+  /* ---- railroad stages ---- */
+  .drop{border:1.5px dashed var(--line);border-radius:16px;padding:56px 20px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s,padding .2s;background:var(--panel)}
   .drop.drag{border-color:var(--acc);background:#0e1b2b}
-  .drop-main{font-weight:600} .drop-sub{margin-top:6px}
-  .srvpath{margin-top:10px} .srvpath summary{cursor:pointer;color:var(--mut);font-size:12px}
-  #fileInfo{margin-top:10px;font-family:var(--mono);font-size:12px;color:var(--ink)}
-  svg{width:100%;height:440px;background:var(--panel2);border:1px solid var(--line);border-radius:12px}
+  .drop .drop-main{font-weight:800;font-size:19px}
+  .drop .drop-sub{margin-top:8px;color:var(--mut);font-size:13px}
+  .drop.compact{padding:14px 16px;display:flex;align-items:center;gap:12px;text-align:left}
+  .drop.compact .drop-main{font-size:13.5px;flex:1;font-weight:600}
+  .drop.compact .drop-sub{margin:0;font-size:12px;white-space:nowrap}
+  .filechip{font-family:var(--mono);font-size:12.5px;color:var(--ink);word-break:break-all}
+  .stepper{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 2px}
+  .stepper .step{padding:3px 10px;border:1px solid var(--line);border-radius:999px;font-size:11px;color:var(--mut)}
+  .stepper .step.on{color:var(--acc2);border-color:#3a2f7a}
+  .stepper .step.done{color:var(--ok);border-color:#1f5a45}
+  details.opts{border:1px solid var(--line);border-radius:10px;background:var(--panel2);margin-top:12px}
+  details.opts>summary{cursor:pointer;padding:10px 13px;font-size:12.5px;font-weight:600;color:var(--mut);list-style:none;user-select:none}
+  details.opts>summary::-webkit-details-marker{display:none}
+  details.opts>summary:before{content:'▸';display:inline-block;margin-right:8px;transition:transform .15s}
+  details.opts[open]>summary:before{transform:rotate(90deg)}
+  details.opts[open]>summary{color:var(--ink);border-bottom:1px solid var(--line2)}
+  details.opts>.opts-body{padding:2px 13px 13px}
+  .optrow{display:flex;align-items:center;gap:10px;margin-top:12px;padding:10px 13px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);font-size:12.5px}
+  .optrow .grow{flex:1}
+  .optrow .savings{color:var(--ok);font-weight:700;font-family:var(--mono)}
+  .checkline{display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--ink);font-size:12.5px}
+  .checkline input{width:auto}
+  .preview-block{margin-top:14px}
+  .preview-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;font-size:12px;color:var(--mut);margin-bottom:7px}
+  .preview-body{border:1px solid var(--line);border-radius:12px;background:var(--panel2);overflow:hidden;display:flex;justify-content:center;align-items:center;min-height:56px}
+  .preview-body img{max-width:100%;max-height:340px;display:block}
+  .preview-body.is-image{background:#000}
+  .preview-body video{max-width:100%;max-height:340px;display:block;background:#000}
+  .preview-body audio{width:100%;margin:14px 12px}
+  .preview-body iframe{width:100%;height:360px;border:0;background:#fff}
+  .preview-body pre{width:100%;max-height:280px;overflow:auto;margin:0;padding:12px 14px;font:12px/1.5 var(--mono);color:var(--ink);white-space:pre-wrap;word-break:break-word}
+  .quote-summary{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:14px}
+  .quote-summary .lbl{color:var(--mut);font-size:12px}
+  footer{border-top:1px solid var(--line);margin-top:26px;padding:16px 22px;color:var(--mut);font-size:12.5px;display:flex;gap:18px;flex-wrap:wrap}
+  footer a{color:var(--acc);text-decoration:none;font-weight:600}
+  svg.graph{width:100%;height:440px;background:var(--panel2);border:1px solid var(--line);border-radius:12px}
   .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
   .chip{background:#10203a;border:1px solid #234a6e;color:var(--acc);border-radius:999px;padding:2px 9px;font-size:11px;font-family:var(--mono)}
-  .chip.x{cursor:pointer}
   .legend{display:flex;gap:14px;font-size:11px;color:var(--mut);margin-top:8px}
   .dot{display:inline-block;width:9px;height:9px;border-radius:3px;vertical-align:middle;margin-right:5px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:840px){.grid2{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
+<script>try{var _t=(localStorage.getItem('xtrata.theme.mode')||'').trim().toLowerCase();var _ok=["classic", "terminal", "midnight", "neon", "monochrome", "obsidian", "ember", "ultraviolet", "arctic", "ruby"];document.body.dataset.theme=_ok.indexOf(_t)>=0?_t:'monochrome';}catch(e){document.body.dataset.theme='monochrome';}</script>
 <header>
   <a href="/" title="Xtrata home" style="flex:none;display:block"><img src="favicon.svg" alt="Xtrata" style="width:30px;height:30px;border-radius:8px;display:block" /></a>
   <div>
-    <div class="logo"><b>XTRATA</b> <i>Agent One</i> · Inscription Wizard</div>
-    <div class="sub">Large files &amp; recursive dependency graphs → Stacks, via the deposit-wallet service</div>
+    <div class="logo"><b>XTRATA</b> <i>Inscription Wizard</i></div>
+    <div class="sub">Drop a file → pay once → it comes back inscribed. Anchored to Bitcoin via Stacks.</div>
   </div>
   <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
-    <div class="badge" id="health" style="margin-left:0"><span class="pill">connecting…</span></div>
+    <div class="badge" id="health"><span class="pill">connecting…</span></div>
     <span id="walletAddr" class="pill" style="display:none;cursor:pointer;color:var(--ok);border-color:#1f5a45" title="connected wallet — click to show & copy the address"></span>
     <button class="btn ghost" id="connectBtn" style="padding:7px 13px">Connect wallet</button>
   </div>
 </header>
-<nav>
-  <button data-tab="new" class="active">New inscription</button>
-  <button data-tab="graph">Dependency graph</button>
-  <button data-tab="jobs">Jobs</button>
-  <a href="./manifests.html" style="margin-left:auto;align-self:center;color:var(--acc);font-size:13px;font-weight:700;text-decoration:none;padding:0 14px">Manifest Studio →</a>
-</nav>
+
 <main><div class="wrap">
 
-  <!-- NEW -->
-  <section id="tab-new">
-    <div class="grid">
-      <div class="card">
-        <h3>1 · Describe &amp; quote</h3>
-        <div class="hint">Constrained choices keep every job inside the deterministic path.</div>
-        <div class="row">
-          <div><label>What are you inscribing?</label>
-            <select id="category"></select></div>
-          <div><label>File type</label>
-            <select id="ftype"></select></div>
-        </div>
-        <label>File</label>
-        <div id="dropzone" class="drop">
-          <input id="picker" type="file" hidden />
-          <div class="drop-main">Drag &amp; drop a file here</div>
-          <div class="drop-sub">or <button class="btn ghost" id="pickBtn" type="button">Open local folder…</button></div>
-          <div id="fileInfo"></div>
-        </div>
-        <details class="srvpath"><summary>Or use a file already on the server (paste a path)</summary>
-          <input id="file" class="mono" placeholder="/Users/you/media/clip.mp4" style="margin-top:8px" />
-        </details>
-        <div class="btnrow"><button class="btn ghost" id="estimateBtn">Estimate cost</button></div>
-        <div id="estimate"></div>
-      </div>
+  <div class="stepper" id="stepper" aria-label="Progress">
+    <span class="step on" data-step="drop">1 · Drop</span>
+    <span class="step" data-step="review">2 · Review</span>
+    <span class="step" data-step="pay">3 · Pay</span>
+    <span class="step" data-step="done">4 · Inscribed</span>
+  </div>
 
-      <div class="card">
-        <h3>2 · Delivery &amp; links</h3>
-        <div class="hint">Dependencies are existence-only links (recursive references). Parent links aren't used in the deposit model.</div>
-        <label style="display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--ink)">
-          <input type="checkbox" id="fastTrack" style="width:auto" checked />
-          <span><b style="color:var(--acc2)">⚡ Fast-track (auto)</b> — pay once and it inscribes &amp; returns the token + change to the wallet you pay from. No address needed.</span>
-        </label>
-        <div id="userWrap">
-          <label>Delivery address <span class="muted">(gets the inscription + any refund)</span></label>
-          <input id="user" class="mono" placeholder="SP… or SM…" />
+  <!-- STAGE 1 · DROP -->
+  <div id="dropzone" class="drop" role="button" tabindex="0" aria-label="Drop a file to inscribe">
+    <input id="picker" type="file" hidden />
+    <div class="drop-main" id="dropMain">Drop a file to inscribe</div>
+    <div class="drop-sub" id="dropSub">or click to browse — images, audio, video, documents, HTML, JSON, anything</div>
+  </div>
+  <div class="muted" id="resumeNotice" style="font-size:12.5px" hidden></div>
+
+  <!-- STAGE 2 · REVIEW -->
+  <section class="card" id="reviewCard" hidden>
+    <h3>Review &amp; inscribe</h3>
+    <div class="hint">Everything below is pre-set for the best result — expand only what you want to change.</div>
+    <div class="kv"><span>File</span><span class="filechip" id="fileLine"></span></div>
+    <div class="kv"><span>Type</span><span id="typeLine" class="mono"></span></div>
+
+    <div class="preview-block" id="previewBlock" hidden>
+      <div class="preview-head">
+        <span>Preview — this exact file goes on-chain, test it before you commit</span>
+        <span class="muted mono" id="previewNote"></span>
+      </div>
+      <div id="previewBody" class="preview-body"></div>
+      <div class="muted" id="previewFootnote" style="font-size:11px;margin-top:6px" hidden></div>
+    </div>
+
+    <div class="optrow" id="optRow" hidden>
+      <span id="optSpin" class="spin" hidden></span>
+      <span class="grow" id="optText"></span>
+      <span class="savings" id="optSavings" hidden></span>
+      <button class="btn ghost" id="optSkipBtn" style="padding:5px 11px" hidden>Skip — use original</button>
+      <label class="checkline" id="optRevertWrap" hidden>
+        <input type="checkbox" id="optRevert" />
+        <span>Use the original file instead</span>
+      </label>
+    </div>
+    <div class="muted" id="sunoHint" style="font-size:12px;margin-top:8px" hidden>
+      🎵 MP3 with embedded cover art? The <a href="./suno.html" style="color:var(--acc2)">SUNO fast-track</a> builds a full on-chain player (Opus + art + lyrics) in one payment.
+    </div>
+
+    <details class="opts" id="optionsDetails">
+      <summary>Options — URI, delivery, margin</summary>
+      <div class="opts-body">
+        <div class="row">
+          <div><label>Category</label><select id="category"></select></div>
+          <div><label>File type</label><select id="ftype"></select></div>
         </div>
-        <label>Dependencies <span class="muted">(token ids, comma-separated — or build them in the Graph tab)</span></label>
-        <input id="deps" class="mono" placeholder="134, 90" />
         <label>Content URI</label>
         <input id="uri" class="mono" placeholder="xtrata:video/my-clip" />
+        <label class="checkline" style="margin-top:12px">
+          <input type="checkbox" id="manualMode" />
+          <span>Send the inscription to a different address <span class="muted">(you still pay from your connected wallet; your change comes back to you)</span></span>
+        </label>
+        <div id="userWrap" style="display:none">
+          <label>Inscription recipient <span class="muted">(gets the inscription + receipt; your change returns to your wallet)</span></label>
+          <input id="user" class="mono" placeholder="SP… or SM…" />
+        </div>
         <label>Service margin (µSTX, 0 = none)</label>
         <input id="margin" class="mono" value="0" />
-        <div class="btnrow">
-          <button class="btn" id="createBtn">Create deposit job</button>
-          <button class="btn ghost" id="clearBtn">Clear</button>
-        </div>
-        <div class="err" id="newErr"></div>
-        <div id="deposit"></div>
       </div>
+    </details>
+
+    <details class="opts" id="relDetails">
+      <summary>Relationships — dependencies &amp; parents (optional)</summary>
+      <div class="opts-body">
+        <label>Dependencies <span class="muted">(existing token ids this inscription references, comma-separated)</span></label>
+        <input id="deps" class="mono" placeholder="134, 90" />
+        <label>Parent inscriptions <span class="muted">(token ids you own — escrowed for the mint, returned with the child)</span></label>
+        <input id="parents" class="mono" placeholder="134" />
+        <div id="parentsCheck" style="margin-top:8px;font-size:12.5px;display:flex;flex-direction:column;gap:4px"></div>
+        <div class="muted" style="font-size:11.5px;margin-top:8px">
+          Dependencies are existence-only links (recursive references). Parents are ownership links:
+          you send the parent to the deposit wallet with your payment; the child mints linked to it,
+          then parent + child + change all come back to you.
+          · <a href="#" id="openGraphLink" style="color:var(--acc)">Compose a dependency graph →</a>
+        </div>
+      </div>
+    </details>
+
+    <label class="checkline" id="receiptWrap" style="margin:12px 0 4px">
+      <input type="checkbox" id="receiptToggle" />
+      <span>Also inscribe an on-chain receipt <span class="muted">— a separate permanent receipt token (~0.1 STX extra). A viewable receipt is always saved either way, so this is off by default.</span></span>
+    </label>
+
+    <div class="quote-summary">
+      <span class="lbl">All-in deposit <span class="muted">(over-collected — unused remainder auto-refunded)</span></span>
+      <span class="big-num" id="quoteTotal">—</span>
     </div>
+    <details class="opts" id="quoteDetails">
+      <summary>Cost breakdown</summary>
+      <div class="opts-body" id="quoteBody"><div class="muted">Waiting for a file…</div></div>
+    </details>
+
+    <div class="btnrow">
+      <button class="btn big" id="inscribeBtn" disabled>Inscribe</button>
+    </div>
+    <div class="muted" style="font-size:11.5px;margin-top:6px" id="payHint">
+      ⚡ Fast-track: pay from your connected wallet and the inscription + change return to it automatically.
+    </div>
+    <div class="err" id="newErr"></div>
   </section>
 
-  <!-- GRAPH -->
-  <section id="tab-graph" hidden>
-    <div class="grid">
-      <div class="card">
-        <h3>Compose a recursive dependency graph</h3>
-        <div class="hint">Add nodes for existing inscriptions (by token id) and the new file you want to inscribe, then link dependencies. Send any new node to the wizard with its deps resolved.</div>
-        <label>Node label</label>
-        <input id="nLabel" placeholder="e.g. Smiley master, or Twin #042" />
-        <div class="row">
-          <div><label>Kind</label>
-            <select id="nKind"><option value="new">new (to inscribe)</option><option value="existing">existing (on-chain)</option></select></div>
-          <div id="nIdWrap"><label>Token id (existing)</label><input id="nTokenId" class="mono" placeholder="134" /></div>
-        </div>
-        <div id="nFileWrap"><label>File path (new)</label><input id="nFile" class="mono" placeholder="/Users/you/media/twin-042.png" /></div>
-        <div class="btnrow"><button class="btn alt" id="addNode">Add node</button></div>
-        <hr style="border:0;border-top:1px solid var(--line);margin:16px 0" />
-        <label>Add dependency edge</label>
-        <div class="row">
-          <div><select id="edgeFrom"></select></div>
-          <div class="muted" style="flex:0 0 auto;align-self:center">depends on →</div>
-          <div><select id="edgeTo"></select></div>
-        </div>
-        <div class="btnrow"><button class="btn ghost" id="addEdge">Link</button>
-          <button class="btn ghost" id="clearGraph">Clear graph</button></div>
-        <div class="err" id="graphErr"></div>
-      </div>
-      <div class="card">
-        <h3>Graph</h3>
-        <div class="hint">Layered left→right; arrows point from a node to the inscriptions it depends on.</div>
-        <svg id="svg" viewBox="0 0 760 440" preserveAspectRatio="xMidYMid meet"></svg>
-        <div class="legend"><span><span class="dot" style="background:#7c5cff"></span>new</span><span><span class="dot" style="background:#3ea6ff"></span>existing</span></div>
-        <div id="nodeDetail"></div>
-      </div>
+  <!-- STAGE 2b · BATCH REVIEW (drop MULTIPLE files → one payment, N inscriptions, one receipt) -->
+  <section class="card" id="batchCard" hidden>
+    <h3>Batch — one payment, <span id="batchCount">0</span> inscriptions, one receipt</h3>
+    <div class="hint">Every file below inscribes from a single deposit. Parents (yours, escrowed &amp; returned) can link to every item; deps can reference earlier rows as <span class="mono">@0, @1…</span> A single on-chain receipt records the whole batch.</div>
+    <div id="batchAudioMode" hidden style="margin:6px 0 10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px">
+      <div style="font-weight:700;font-size:13px;margin-bottom:6px">🎵 Audio files detected — how should they go on-chain?</div>
+      <label class="checkline"><input type="radio" name="bAudioMode" value="raw" checked><span>Inscribe the audio files as they are</span></label>
+      <label class="checkline"><input type="radio" name="bAudioMode" value="player"><span><b>Build an on-chain player for each song</b> — Opus-optimised audio + title/artist/lyrics + its own artwork (the opus-tool player, per track)</span></label>
+      <div class="muted" id="batchPlayerHint" hidden style="font-size:11.5px;margin-top:6px">Give each song artwork below: attach an image file (embedded in the player) <b>or</b> enter an image inscription id (recursive artwork — zero extra bytes). Songs with embedded cover art use it automatically.</div>
     </div>
+    <div id="batchPairInfo" class="ok" style="font-size:12px;margin:2px 0 8px" hidden></div>
+    <div id="batchOptSummary" class="ok" style="font-size:12px;margin:2px 0 8px" hidden></div>
+    <div id="batchTableWrap"></div>
+    <input id="batchArtPicker" type="file" accept="image/*" hidden />
+    <div class="btnrow" style="margin-top:8px">
+      <button class="btn ghost" id="batchAddBtn" style="padding:6px 12px">+ Add files</button>
+      <span class="muted" style="font-size:11.5px;align-self:center">max 40 items · audio is inscribed as dropped (use the SUNO page to pre-build players)</span>
+    </div>
+    <details class="opts" style="margin-top:10px">
+      <summary>Shared settings — parents for ALL items, margin, failure policy</summary>
+      <div class="opts-body">
+        <label>Parents for every item <span class="muted">(token ids you own — escrowed once, linked to each inscription, returned after the batch)</span></label>
+        <input id="batchParents" class="mono" placeholder="134" />
+        <label>Service margin (µSTX, 0 = none)</label>
+        <input id="batchMargin" class="mono" value="0" />
+        <label>Send all inscriptions to a different address <span class="muted">(optional — blank keeps everything in your wallet; your change always returns to you)</span></label>
+        <input id="batchRecipient" class="mono" placeholder="SP… or SM… (optional)" />
+        <label class="checkline" style="margin-top:10px">
+          <input type="checkbox" id="batchStrict" />
+          <span>Strict — if any item fails, skip the rest (default: continue and deliver what succeeded)</span>
+        </label>
+      </div>
+    </details>
+    <label class="checkline" id="batchReceiptWrap" style="margin:12px 0 4px">
+      <input type="checkbox" id="batchReceiptToggle" />
+      <span>Also inscribe an on-chain batch receipt <span class="muted">— a separate permanent receipt token (~0.1 STX extra). A viewable receipt is always saved either way, so this is off by default.</span></span>
+    </label>
+
+    <div class="quote-summary">
+      <span class="lbl">All-in deposit for the batch <span class="muted">(over-collected — unused remainder auto-refunded)</span></span>
+      <span class="big-num" id="batchQuoteTotal">—</span>
+    </div>
+    <div id="batchParentsCheck" style="font-size:12px;margin:2px 0 10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px" hidden></div>
+    <div class="btnrow">
+      <button class="btn big" id="batchInscribeBtn" disabled>Inscribe batch</button>
+      <button class="btn ghost" id="batchClearBtn">Clear batch</button>
+    </div>
+    <div class="muted" style="font-size:11.5px;margin-top:6px">⚡ Fast-track: pay once from your connected wallet — every inscription, the batch receipt, any parents, and all change return to it automatically.</div>
+    <div class="err" id="batchErr"></div>
   </section>
 
-  <!-- JOBS -->
-  <section id="tab-jobs" hidden>
-    <div class="card">
-      <h3>Jobs <button class="btn ghost" id="refreshJobs" style="float:right;padding:6px 12px">Refresh</button></h3>
-      <div class="hint">Click a job to manage its lifecycle: deposit → run → deliver.</div>
+  <!-- STAGE 3/4 · ACTIVE JOB (deposit → escrow → progress → done) -->
+  <div id="activeJobDetail"></div>
+
+  <!-- HISTORY -->
+  <details class="opts" id="historySection">
+    <summary>History — all jobs on this browser <button class="btn ghost" id="refreshJobs" style="float:right;padding:4px 10px;margin-top:-3px" onclick="event.preventDefault();event.stopPropagation();">Refresh</button></summary>
+    <div class="opts-body">
       <table><thead><tr><th>Job</th><th>URI</th><th>Size</th><th>Required</th><th>Status</th><th>Token</th></tr></thead>
         <tbody id="jobsBody"><tr><td colspan="6" class="muted">No jobs yet.</td></tr></tbody></table>
+      <div id="jobDetail"></div>
     </div>
-    <div id="jobDetail"></div>
-  </section>
+  </details>
+
+  <!-- ADVANCED · DEPENDENCY GRAPH (opened from Relationships) -->
+  <details class="opts" id="graphSection">
+    <summary>Advanced — dependency graph composer</summary>
+    <div class="opts-body">
+      <div class="grid2" style="margin-top:10px">
+        <div class="card">
+          <h3>Compose a recursive dependency graph</h3>
+          <div class="hint">Add nodes for existing inscriptions (by token id) and new files, link dependencies, then send a new node's resolved deps to the wizard.</div>
+          <label>Node label</label>
+          <input id="nLabel" placeholder="e.g. Smiley master, or Twin #042" />
+          <div class="row">
+            <div><label>Kind</label>
+              <select id="nKind"><option value="new">new (to inscribe)</option><option value="existing">existing (on-chain)</option></select></div>
+            <div id="nIdWrap"><label>Token id (existing)</label><input id="nTokenId" class="mono" placeholder="134" /></div>
+          </div>
+          <div id="nFileWrap"><label>File name (new — drop the actual file in step 1)</label><input id="nFile" class="mono" placeholder="twin-042.png" /></div>
+          <div class="btnrow"><button class="btn alt" id="addNode">Add node</button></div>
+          <hr style="border:0;border-top:1px solid var(--line);margin:16px 0" />
+          <label>Add dependency edge</label>
+          <div class="row">
+            <div><select id="edgeFrom"></select></div>
+            <div class="muted" style="flex:0 0 auto;align-self:center">depends on →</div>
+            <div><select id="edgeTo"></select></div>
+          </div>
+          <div class="btnrow"><button class="btn ghost" id="addEdge">Link</button>
+            <button class="btn ghost" id="clearGraph">Clear graph</button></div>
+          <div class="err" id="graphErr"></div>
+        </div>
+        <div class="card">
+          <h3>Graph</h3>
+          <div class="hint">Layered left→right; arrows point from a node to the inscriptions it depends on.</div>
+          <svg id="svg" class="graph" viewBox="0 0 760 440" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="legend"><span><span class="dot" style="background:#7c5cff"></span>new</span><span><span class="dot" style="background:#3ea6ff"></span>existing</span></div>
+          <div id="nodeDetail"></div>
+        </div>
+      </div>
+    </div>
+  </details>
 
 </div></main>
+
+<footer>
+  <a href="./suno.html">SUNO fast-track</a>
+  <a href="./manifests.html">Manifest Studio</a>
+  <a href="/inscribe" target="_self">Simple on-site inscriber</a>
+  <a href="/xplorer" target="_self">Xtrata Xplorer</a>
+  <span class="muted" style="margin-left:auto">Backendless — everything runs in this browser. Add <span class="mono">?mock=1</span> to rehearse offline.</span>
+</footer>
 
 <script>
   // Backendless config. ?mock=1 in the URL runs the whole flow offline (no chain).
@@ -208,9 +648,15 @@
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=5"></script>
+<script src="agent-one.js?v=9"></script>
+<script src="optimize-audio.js?v=3"></script>
+<script src="optimize-image.js?v=1"></script>
 <script>
 const API = '';   // backendless — all data flows through window.XtrataAgent (no HTTP API)
+// On-chain receipt: OFF by default. The receipt HTML is always saved + viewable; this
+// only controls whether a separate receipt token is also inscribed (and paid for).
+const RECEIPT_KEY = 'xao-onchain-receipt';
+let RECEIPT = localStorage.getItem(RECEIPT_KEY) === '1';
 const SERVER = { mock:false };
 let WALLET=null;
 const CONTENT = {
@@ -223,6 +669,7 @@ const CONTENT = {
 const ADDR_RE = /^S[PM][0-9A-HJKMNP-Z]{37,41}$/;
 const $ = (s)=>document.querySelector(s);
 const stx = (u)=>(Number(u)/1e6).toFixed(6).replace(/0+$/,'').replace(/\.$/,'')+' STX';
+const mib = (b)=>(b/1048576).toFixed(3)+' MiB';
 const esc = (s)=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 // Backendless data layer: every former /api/* call routes to the in-browser agent (window.XtrataAgent).
 function xa(){ const A=window.XtrataAgent; if(!A) throw new Error('Agent bundle not loaded (agent-one.js).'); return A; }
@@ -236,6 +683,7 @@ async function api(path, opts){
   let mm;
   if((mm=path.match(/^\/api\/jobs\/([^/]+)\/run$/))) return A.runJob(mm[1]);
   if((mm=path.match(/^\/api\/jobs\/([^/]+)\/deliver$/))) return A.deliverJob(mm[1]);
+  if((mm=path.match(/^\/api\/jobs\/([^/]+)\/recover$/))) return A.recoverJob(mm[1]);
   if((mm=path.match(/^\/api\/jobs\/([^/]+)\/delete$/))) return A.deleteJob(mm[1]);
   if((mm=path.match(/^\/api\/jobs\/([^/]+)$/))) return A.getJob(mm[1]);
   throw new Error('no route: '+path);
@@ -244,29 +692,18 @@ function copyBtn(text){ return `<button class="copy" onclick="navigator.clipboar
 function xtrataWallet(){ return window.XtrataWallet || null; }
 async function openWallet(addr, ustx){
   const w=xtrataWallet();
-  if(!w||!w.pay){ alert('Wallet bundle not loaded.\nCopy the address and amount shown and send manually — or run the wizard inside the Xtrata site (see site-integration/HANDOFF.md).'); return; }
+  if(!w||!w.pay){ alert('Wallet bundle not loaded.\nCopy the address and amount shown and send manually.'); return; }
   try{ await w.pay({ recipient:addr, amount:String(ustx), network:(SERVER.net==='testnet'?'testnet':'mainnet') }); }
   catch(e){ alert('Could not open the wallet to pay:\n'+((e&&e.message)||e)+'\n\nCopy the address and amount shown and send manually.'); }
 }
 window.openWallet=openWallet;
 
-// ---- tabs ----
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
-  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x===b));
-  ['new','graph','jobs'].forEach(t=>$('#tab-'+t).hidden = (t!==b.dataset.tab));
-  if(b.dataset.tab==='jobs'){ loadJobs(); startJobsPoll(); } else { stopJobsPoll(); }
-  if(b.dataset.tab==='graph') drawGraph();
-});
-
 // ---- health ----
-(async()=>{ try{ const h=await api('/api/health'); SERVER.mock=!!h.mock; SERVER.net=h.net; SERVER.windowMs=h.windowMs||300000; $('#health').innerHTML =
-  `<span class="pill ${h.mock?'mock':'live'}">${h.mock?'MOCK':'LIVE'}</span><span class="pill">${esc(h.core)}</span><span class="pill">${esc(h.net)}</span><span class="pill" title="server started — restart it if this predates your last change">⟳ ${h.startedAt?new Date(h.startedAt).toLocaleTimeString():''}</span><span class="pill" title="agent bundle build">${esc(h.build||window.XAO_AGENT_BUILD||'agent pre-v')}</span>`;
-  if(window.XtrataAgent&&window.XAO_AGENT_BUILD!=='2026-07-01.5'){ $('#health').innerHTML+='<span class="pill" style="color:var(--bad);border-color:#5a2222" title="the deployed agent-one.js is older than this page — rebuild/redeploy it">⚠ stale agent bundle</span>'; }
-}catch(e){ $('#health').innerHTML = `<span class="pill" style="color:var(--bad);border-color:#5a2222">server offline</span>`; } })();
+(async()=>{ try{ const h=await api('/api/health'); SERVER.mock=!!h.mock; SERVER.net=h.net; SERVER.windowMs=h.windowMs||300000; SERVER.parentWindowMs=h.parentWindowMs||900000; $('#health').innerHTML =
+  `<span class="pill ${h.mock?'mock':'live'}">${h.mock?'MOCK':'LIVE'}</span><span class="pill">${esc(h.core)}</span><span class="pill">${esc(h.net)}</span><span class="pill" title="agent bundle build">${esc(h.build||window.XAO_AGENT_BUILD||'agent pre-v')}</span>`;
+}catch(e){ $('#health').innerHTML = `<span class="pill" style="color:var(--bad);border-color:#5a2222">agent offline</span>`; } })();
 
-// ---- wallet connect (delegates to the Xtrata site's bundled wallet shim: window.XtrataWallet) ----
-// BNS: show the .btc name instead of the address when one exists; the address stays hidden until
-// the pill is clicked (click = reveal + copy to clipboard; click again = back to the name).
+// ---- wallet connect (delegates to the bundled wallet shim: window.XtrataWallet) ----
 let WALLET_NAME=null, WALLET_REVEAL=false;
 const shortAddr=a=>a.slice(0,5)+'…'+a.slice(-4);
 async function bnsLookup(addr){ try{
@@ -278,111 +715,915 @@ function renderWalletPill(){ const el=$('#walletAddr'); if(!WALLET){ el.style.di
   if(WALLET_NAME&&!WALLET_REVEAL){ el.textContent='● '+WALLET_NAME; el.title='connected as '+WALLET_NAME+' — click to show & copy the address'; }
   else { el.textContent='● '+shortAddr(WALLET); el.title=WALLET+(WALLET_NAME?' — click to show '+WALLET_NAME:' — click to copy'); } }
 async function walletPillClick(){ if(!WALLET) return;
-  WALLET_REVEAL=!WALLET_NAME||!WALLET_REVEAL;      // no name → always "revealed"
+  WALLET_REVEAL=!WALLET_NAME||!WALLET_REVEAL;
   renderWalletPill();
   if(WALLET_REVEAL){ try{ await navigator.clipboard.writeText(WALLET); $('#walletAddr').textContent='✓ copied'; setTimeout(renderWalletPill,900); }catch{} } }
 function setWallet(addr){ WALLET=addr||null; WALLET_NAME=null; WALLET_REVEAL=false; const btn=$('#connectBtn');
   if(WALLET){ btn.textContent='Disconnect'; if(!$('#user').value) $('#user').value=WALLET;
     renderWalletPill(); bnsLookup(WALLET).then(n=>{ if(n&&WALLET===addr){ WALLET_NAME=n; renderWalletPill(); } }); }
-  else { btn.textContent='Connect wallet'; renderWalletPill(); } }
+  else { btn.textContent='Connect wallet'; renderWalletPill(); }
+  try{ checkParents().catch(()=>{}); }catch{} try{ checkBatchParents().catch(()=>{}); }catch{} }   // re-verify declared parents (single + batch) against the (dis)connected wallet; both are async so swallow rejections too
 async function connectWallet(){
   const w=xtrataWallet();
-  if(!w||!w.connect){ alert('Wallet bundle not loaded.\n\nThis wizard connects through the Xtrata site’s bundled wallet (window.XtrataWallet). Build site-integration/agent-one-wallet and load it next to this page, or open the wizard inside the Xtrata site. See site-integration/HANDOFF.md.'); return; }
-  try{ const addr=await w.connect(); if(addr) setWallet(addr); else alert('Connected, but no Stacks address was returned.'); }
-  catch(e){ alert('Connect failed:\n'+((e&&e.message)||e)); }
+  if(!w||!w.connect){ alert('Wallet bundle not loaded.\n\nThis wizard connects through the bundled wallet shim (window.XtrataWallet). Rebuild agent-one.js, or open the wizard from the Xtrata site.'); return null; }
+  try{ const addr=await w.connect(); if(addr){ setWallet(addr); return addr; } alert('Connected, but no Stacks address was returned.'); return null; }
+  catch(e){ alert('Connect failed:\n'+((e&&e.message)||e)); return null; }
 }
 async function disconnectWallet(){ try{ const w=xtrataWallet(); if(w&&w.disconnect) await w.disconnect(); }catch{} setWallet(null); }
 $('#connectBtn').onclick=()=>{ WALLET?disconnectWallet():connectWallet(); };
-$('#walletAddr').onclick=walletPillClick;   // disconnect lives on the button; the pill reveals/copies
-(function(){ try{ const w=xtrataWallet(); const a=w&&w.getAddress&&w.getAddress(); if(a) setWallet(a); }catch{} })();
+$('#walletAddr').onclick=walletPillClick;
+// Restore a previously connected wallet. Deferred via queueMicrotask so it runs after
+// this whole script evaluates — setWallet() calls checkParents()/checkBatchParents(),
+// which reference BATCH / parentsCheckRun declared further down (TDZ ReferenceError otherwise).
+queueMicrotask(()=>{ try{ const w=xtrataWallet(); const a=w&&w.getAddress&&w.getAddress(); if(a) setWallet(a); }catch{} });
 
-// ---- New: category/type ----
+// ---- category/type autodetect ----
 const catSel=$('#category'), ftSel=$('#ftype');
 Object.keys(CONTENT).forEach(c=>catSel.add(new Option(c,c)));
 function fillTypes(){ ftSel.innerHTML=''; Object.keys(CONTENT[catSel.value]).forEach(t=>ftSel.add(new Option(t+' ('+CONTENT[catSel.value][t]+')',t))); }
-catSel.onchange=fillTypes; fillTypes();
+catSel.onchange=()=>{ fillTypes(); renderFileLines(); renderPreview(); };
+ftSel.onchange=()=>{ renderFileLines(); renderPreview(); };
+fillTypes();
 function slug(s){ return (s.toLowerCase().replace(/\.[^.]+$/,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,48))||'asset'; }
-// extension → [category,type]; .weba/.opus resolve to AUDIO so Opus-in-WebM is never tagged video
 const EXT={ weba:['audio','weba'],opus:['audio','opus'],mp3:['audio','mp3'],wav:['audio','wav'],ogg:['audio','ogg'],oga:['audio','ogg'],
   mp4:['video','mp4'],m4v:['video','mp4'],webm:['video','webm'],mov:['video','mov'],
   png:['image','png'],jpg:['image','jpeg'],jpeg:['image','jpeg'],gif:['image','gif'],svg:['image','svg'],webp:['image','webp'],
   pdf:['document','pdf'],html:['document','html'],htm:['document','html'],md:['document','md'],txt:['document','txt'],
   json:['data','json'],bin:['data','bin'] };
-let selectedFile=null;
 function detectFromName(name){ const ext=(name.match(/\.([a-z0-9]+)$/i)||[])[1]; const hit=ext&&EXT[ext.toLowerCase()];
   if(hit){ catSel.value=hit[0]; fillTypes(); ftSel.value=hit[1]; }
   if(!$('#uri').value){ $('#uri').value=`xtrata:${catSel.value}/${slug(name)}`; } }
-$('#file').addEventListener('input',()=>{ if($('#file').value.trim()){ selectedFile=null; $('#picker').value=''; $('#fileInfo').innerHTML=''; } });
-$('#file').addEventListener('blur',()=>{ const v=$('#file').value.trim(); if(v){ detectFromName(v.split(/[\\/]/).pop()); $('#estimateBtn').click(); } });
+
+// ============================================================================
+// THE RAILROAD — drop → review (auto-optimise + auto-quote) → pay → inscribed.
+// ============================================================================
+const FLOW = {
+  original:null,     // File as dropped
+  optimized:null,    // { file, originalBytes, optimizedBytes } when conversion won
+  useOriginal:false, // revert toggle
+  optRun:0,          // cancels stale optimisation passes
+  quote:null,        // last estimate for the ACTIVE bytes
+  quoteRun:0,
+  jobId:null,        // active job once created
+  done:false,
+};
+FLOW.activeFile = () => (FLOW.optimized && !FLOW.useOriginal) ? FLOW.optimized.file : FLOW.original;
+
+function setStep(step){
+  const order=['drop','review','pay','done'];
+  const idx=order.indexOf(step);
+  document.querySelectorAll('#stepper .step').forEach((el)=>{
+    const i=order.indexOf(el.dataset.step);
+    el.classList.toggle('done', i<idx);
+    el.classList.toggle('on', i===idx);
+  });
+}
+
 const dz=$('#dropzone'), picker=$('#picker');
-$('#pickBtn').onclick=()=>picker.click();
-picker.onchange=()=>{ if(picker.files[0]) setFile(picker.files[0]); };
+picker.multiple=true;   // drop/browse SEVERAL files → batch mode (one payment, N inscriptions)
+dz.onclick=()=>picker.click();
+dz.onkeydown=(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); picker.click(); } };
+picker.onchange=()=>{ const fs=Array.from(picker.files||[]); if(fs.length>1||BATCH.items.length) enterBatch(fs); else if(fs[0]) onFile(fs[0]); };
 ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));
 ['dragleave','dragend'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag');}));
-dz.addEventListener('drop',e=>{ e.preventDefault(); dz.classList.remove('drag'); const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) setFile(f); });
-function setFile(f){ selectedFile=f; $('#file').value=''; detectFromName(f.name); $('#fileInfo').innerHTML=`<b>${esc(f.name)}</b> · ${(f.size/1048576).toFixed(3)} MiB`
-  + ((/\.mp3$/i.test(f.name)||/audio\/mpeg/i.test(f.type||''))
-      ? `<div style="margin-top:6px;color:var(--mut)">🎵 Suno MP3 with embedded art? The <a href="./suno.html">SUNO fast-track</a> auto-builds a full player (Opus + cover + lyrics) in one payment.</div>`
-      : ''); $('#estimateBtn').click(); }
+dz.addEventListener('drop',e=>{ e.preventDefault(); dz.classList.remove('drag'); const fs=Array.from((e.dataTransfer&&e.dataTransfer.files)||[]); if(fs.length>1||BATCH.items.length) enterBatch(fs); else if(fs[0]) onFile(fs[0]); });
 
-$('#estimateBtn').onclick=async()=>{
-  const el=$('#estimate'); const margin=$('#margin').value||'0';
-  let payload; if(selectedFile){ payload={bytes:selectedFile.size,marginUstx:margin}; } else { const file=$('#file').value.trim(); if(!file){ el.innerHTML='<div class="err">Drop a file, open one, or paste a server path.</div>'; return; } payload={file,marginUstx:margin}; }
-  el.innerHTML='<div class="muted">Estimating…</div>';
-  try{ const e=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
+// ================= BATCH MODE (multi-file drop) =================
+const BATCH={ items:[], quoteRun:0 };
+function mimeFor(name){ const ext=(name.split('.').pop()||'').toLowerCase();
+  for(const cat of Object.keys(CONTENT)) for(const t of Object.keys(CONTENT[cat])) if(t===ext) return CONTENT[cat][t];
+  return ({jpg:'image/jpeg',htm:'text/html',mpeg:'audio/mpeg',weba:'audio/webm; codecs=opus'})[ext]||'application/octet-stream'; }
+function catFor(name){ const ext=(name.split('.').pop()||'').toLowerCase();
+  for(const cat of Object.keys(CONTENT)) if(Object.keys(CONTENT[cat]).includes(ext)) return cat; return 'data'; }
+function makeItem(f){
+  const mime=mimeFor(f.name);
+  const isAudio=mime.startsWith('audio/');
+  const isImage=!!(window.XtrataImageOptimizer&&window.XtrataImageOptimizer.isCandidate(f.name,f.size));
+  return { file:f, uri:`xtrata:${catFor(f.name)}/${slug(f.name)}`, mime, deps:'', parents:'',
+    isAudio, isImage, art:{file:null,tokenId:''}, player:{status:(BATCH.playerMode&&isAudio)?'await':'raw',file:null,info:null,err:null},
+    opt:{status:'pending',file:null,originalBytes:f.size,optimizedBytes:null,mime:null,note:''}, useOptimized:true, showPreview:true };
+}
+// Same-named audio+image auto-pairing. If EVERY art-less song in the batch has an image
+// sharing its base name (case/extension-insensitive), the drop is taken as "make players":
+// each image becomes that song's embedded artwork (and stops being a standalone inscription),
+// the batch flips to player mode, and the caller builds them. ALL-OR-NOTHING — one art-less
+// song with no match and we bail, leaving a perfectly normal mixed batch. Idempotent (songs
+// that already have art are skipped, so re-running / extra drops don't double-pair).
+function tryAutoPairPlayers(){
+  const base=(n)=>String(n||'').replace(/\.[^.]+$/,'').trim().toLowerCase();
+  const isImg=(it)=>!!(it.mime&&it.mime.startsWith('image/'));
+  const audio=BATCH.items.filter(it=>it.isAudio);
+  const images=BATCH.items.filter(isImg);
+  if(audio.length<1||images.length<1) return 0;
+  const used=new Set(); const plan=[];
+  for(const a of audio){
+    if(a.art.file||a.art.tokenId) continue;         // already has artwork → doesn't need pairing
+    const img=images.find(im=>!used.has(im)&&base(im.file.name)===base(a.file.name));
+    if(!img) return 0;                              // an art-less song with no same-named image → not a player drop
+    used.add(img); plan.push([a,img]);
+  }
+  if(!plan.length) return 0;                        // nothing to pair
+  for(const [a,img] of plan){ a.art.file=img.file; a.art.autoPaired=true; img._pairRemove=true; }
+  BATCH.items=BATCH.items.filter(x=>!x._pairRemove);
+  if(!BATCH.playerMode){
+    BATCH.playerMode=true;
+    const r=document.querySelector('input[name="bAudioMode"][value="player"]'); if(r) r.checked=true;
+    $('#batchPlayerHint').hidden=false;
+  }
+  BATCH.items.forEach(it=>{ if(it.isAudio){ const hasArt=!!(it.art.file||it.art.tokenId); const wasReady=it.player&&it.player.status==='ready';
+    it.player={status:wasReady?'ready':(hasArt?'queued':'await'), file:it.player&&it.player.file, info:it.player&&it.player.info, err:null}; } });
+  return plan.length;
+}
+function enterBatch(files){
+  for(const f of files){ if(BATCH.items.length>=40) break; BATCH.items.push(makeItem(f)); }
+  // batch replaces the single-file flow on screen
+  FLOW.original=null; FLOW.optimized=null; FLOW.jobId=null; FLOW.done=false;
+  $('#reviewCard').hidden=true; $('#activeJobDetail').innerHTML=''; picker.value='';
+  dz.classList.add('compact');
+  $('#dropMain').innerHTML=`<span class="filechip">Batch · ${BATCH.items.length} files</span>`;
+  $('#dropSub').textContent='drop more files to add them to the batch';
+  const paired=tryAutoPairPlayers();   // same-named audio+image (every song matched) → auto player mode + art
+  $('#batchAudioMode').hidden=!BATCH.items.some(it=>it.isAudio);
+  renderBatch(); setStep('review'); queueBatchOptimise();
+  if(paired) queueAudioBuilds();       // auto-build the matched players so the user just previews + inscribes
+  $('#batchCard').hidden=false; $('#batchCard').scrollIntoView({behavior:'smooth',block:'start'});
+}
+const artChip=(it,i)=>{
+  const p=it.player;
+  const state=p.status==='ready'?`<span class="ok" title="${esc((p.info&&p.info.title)||'')}">✓ player ${mib(p.file.size)}${p.info&&p.info.hasCover?' · art':''}</span>`
+    :p.status==='building'?'<span style="color:var(--acc)"><span class="spin"></span> building…</span>'
+    :p.status==='error'?`<span style="color:var(--bad)" title="${esc(p.err||'')}">✗ ${esc(String(p.err||'build failed').slice(0,40))}</span> <button class="btn ghost" style="padding:3px 8px;font-size:11px" onclick="batchBuildRow(${i})">Retry</button>`
+    :p.status==='queued'?'<span class="muted">queued…</span>'
+    :`<button class="btn ghost" style="padding:3px 8px;font-size:11px" onclick="batchBuildRow(${i})" title="No artwork chosen — the song's embedded cover art (if any) is used">Build${(it.art.file||it.art.tokenId)?'':' (embedded art)'}</button>`;
+  const art=it.art.file?`🖼 ${esc(it.art.file.name.length>14?it.art.file.name.slice(0,11)+'…':it.art.file.name)}`
+    :it.art.tokenId?`🖼 #${esc(it.art.tokenId)}`:'';
+  return `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+    <button class="btn ghost" style="padding:3px 8px;font-size:11px" onclick="batchArtPick(${i})">${art||'attach image'}</button>
+    <input class="mono" placeholder="or img #id" value="${esc(it.art.tokenId)}" data-arti="${i}" style="width:76px;padding:4px 6px;font-size:11px"/>
+    ${state}${it.player.status==='ready'?`<button class="btn ghost" style="padding:3px 8px;font-size:11px" onclick="batchTogglePreview(${i})">${it.showPreview?'▾ hide preview':'▸ preview'}</button>`:''}</div>`;
+};
+// Manually (re)build one row — also the retry path after a failure.
+window.batchBuildRow=(i)=>{ const it=BATCH.items[i]; if(!it||!it.isAudio) return;
+  it.player={status:'queued',file:null,info:null,err:null}; renderBatch(); queueAudioBuilds(); };
+// Per-row size readout: original → optimised (−%), with a revert toggle. Audio in
+// player mode is reported by the Artwork/player column instead, so it's skipped here.
+function optCellHtml(it,i){
+  if(BATCH.playerMode&&it.isAudio) return '';
+  const o=it.opt; if(!o) return '';
+  if(o.status==='optimising') return `<div class="muted" style="font-size:11px;margin-top:3px"><span class="spin"></span> optimising…</div>`;
+  if(o.status==='done'&&o.file){
+    const pct=Math.round((1-o.optimizedBytes/o.originalBytes)*100);
+    const act=it.useOptimized;
+    return `<div style="font-size:11px;margin-top:3px">`
+      +`<span class="${act?'savings':'muted'}">${mib(o.originalBytes)} → ${mib(o.optimizedBytes)} (−${pct}%)${o.label?' · '+esc(o.label):''}</span>`
+      +` <a href="#" data-revert="${i}" style="margin-left:4px">${act?'use original':'use optimised'}</a></div>`;
+  }
+  if(o.status==='skipped'&&o.note) return `<div class="muted" style="font-size:11px;margin-top:3px">${esc(o.note)}</div>`;
+  return '';
+}
+function batchOptSummary(){
+  const el=$('#batchOptSummary'); if(!el) return;
+  let orig=0, now=0, n=0;
+  for(const it of BATCH.items){ const o=it.opt; if(o&&o.status==='done'&&it.useOptimized&&o.file){ orig+=o.originalBytes; now+=o.optimizedBytes; n++; } }
+  if(!n){ el.hidden=true; el.textContent=''; return; }
+  const pct=Math.round((1-now/orig)*100);
+  el.hidden=false; el.textContent=`🗜 Optimised ${n} file${n>1?'s':''}: ${mib(orig)} → ${mib(now)} (−${pct}%) — the deposit below is quoted on the smaller sizes.`;
+}
+function batchPairInfo(){
+  const el=$('#batchPairInfo'); if(!el) return;
+  const n=BATCH.items.filter(it=>it.isAudio&&it.art&&it.art.autoPaired&&it.art.file).length;
+  if(n&&BATCH.playerMode){ el.hidden=false; el.textContent=`🎨 Auto-matched ${n} song${n>1?'s':''} to same-named artwork — switched to player mode; preview each below, then Inscribe.`; }
+  else { el.hidden=true; el.textContent=''; }
+}
+// Live preview of a built player. The player File is self-contained HTML (Opus audio +
+// art + UI), so a blob URL renders it exactly as it will inscribe. One URL per player
+// File, cached (a rebuild yields a new File → new URL); the old one is dropped on unload.
+const _previewUrls=new WeakMap();
+function playerPreviewUrl(it){
+  const f=it.player&&it.player.file; if(!f) return '';
+  let u=_previewUrls.get(f);
+  if(!u){ try{ u=URL.createObjectURL(f); _previewUrls.set(f,u); }catch(_e){ u=''; } }
+  return u;
+}
+function previewRowHtml(it){
+  if(!(BATCH.playerMode&&it.isAudio&&it.player&&it.player.status==='ready'&&it.showPreview)) return '';
+  const url=playerPreviewUrl(it); if(!url) return '';
+  return `<tr class="prevrow"><td colspan="7" style="padding:0 6px 12px 6px">`
+    +`<div class="muted" style="font-size:11px;margin:2px 0 5px">▾ Player preview — exactly what gets inscribed; press play to check it works</div>`
+    +`<iframe src="${url}" title="player preview" loading="lazy" sandbox="allow-scripts allow-same-origin allow-popups" style="width:100%;height:230px;border:1px solid var(--line);border-radius:10px;background:#0b0b0f"></iframe>`
+    +`</td></tr>`;
+}
+window.batchTogglePreview=(i)=>{ const it=BATCH.items[i]; if(it){ it.showPreview=!it.showPreview; renderBatch(); } };
+function renderBatch(){
+  $('#batchCount').textContent=String(BATCH.items.length);
+  const pm=BATCH.playerMode;
+  $('#batchTableWrap').innerHTML=`<table style="width:100%"><thead><tr><th style="width:26px">#</th><th>File</th><th style="width:${pm?'20%':'26%'}">URI</th>${pm?'<th style="width:24%">Artwork / player</th>':''}<th style="width:12%">Deps</th><th style="width:11%">Parents</th><th style="width:30px"></th></tr></thead>
+    <tbody>${BATCH.items.map((it,i)=>`<tr>
+    <td class="mono">${i}</td>
+    <td><span class="filechip" title="${esc(it.file.name)}">${esc(it.file.name.length>22?it.file.name.slice(0,19)+'…':it.file.name)}</span> <span class="muted">${mib(it.file.size)}</span>${optCellHtml(it,i)}</td>
+    <td><input class="mono" data-bi="${i}" data-bf="uri" value="${esc(it.uri)}" style="padding:6px 8px;font-size:12px"/></td>
+    ${pm?`<td>${it.isAudio?artChip(it,i):'<span class="muted">—</span>'}</td>`:''}
+    <td><input class="mono" data-bi="${i}" data-bf="deps" value="${esc(it.deps)}" placeholder="90, @0" style="padding:6px 8px;font-size:12px"/></td>
+    <td><input class="mono" data-bi="${i}" data-bf="parents" value="${esc(it.parents)}" placeholder="134" style="padding:6px 8px;font-size:12px"/></td>
+    <td><button class="btn ghost" style="padding:3px 8px" onclick="batchRemove(${i})">✕</button></td>
+  </tr>${previewRowHtml(it)}`).join('')}</tbody></table>`;
+  document.querySelectorAll('#batchTableWrap input[data-bf]').forEach(inp=>{ inp.oninput=()=>{ BATCH.items[Number(inp.dataset.bi)][inp.dataset.bf]=inp.value; if(inp.dataset.bf==='parents'){ if(batchParentsCheckTimer)clearTimeout(batchParentsCheckTimer); batchParentsCheckTimer=setTimeout(checkBatchParents,500); } }; });
+  document.querySelectorAll('#batchTableWrap input[data-arti]').forEach(inp=>{ inp.onchange=()=>{ const it=BATCH.items[Number(inp.dataset.arti)]; const v=inp.value.trim();
+    if(v&&!/^\d+$/.test(v)){ $('#batchErr').textContent='Artwork inscription id must be a token-id uint.'; return; }
+    $('#batchErr').textContent=''; it.art.tokenId=v; if(v) it.art.file=null;
+    if(BATCH.playerMode&&it.isAudio){ it.player={status:'queued',file:null,info:null,err:null}; queueAudioBuilds(); } renderBatch(); }; });
+  document.querySelectorAll('#batchTableWrap a[data-revert]').forEach(a=>{ a.onclick=(e)=>{ e.preventDefault(); const it=BATCH.items[Number(a.dataset.revert)]; if(it){ it.useOptimized=!it.useOptimized; renderBatch(); batchQuote(); } }; });
+  batchPairInfo();
+  batchOptSummary();
+  batchQuote();
+}
+
+// --- Auto size-optimisation (Opus for audio, smallest-format for images) ----
+// Every still image, and every audio file in "inscribe as-is" mode, is optimised
+// the moment it enters the batch — the same "best quality, smallest size" the
+// single-file flow applies. Non-destructive: it.file stays the original, it.opt.file
+// holds the smaller version, and each row can revert. In "build player" mode the
+// audio is Opus-encoded inside the player instead, so it's skipped here.
+const OPT_NOTES={ 'already-opus':'already Opus — nothing to squeeze', 'already-efficient':'already efficient — original kept', 'engine-unavailable':'optimiser unavailable — original kept', 'failed':'optimisation failed safely — original kept' };
+const optNote=(reason)=>OPT_NOTES[reason]||'';
+const optApplies=(it)=>it.isImage||(it.isAudio&&!BATCH.playerMode);
+async function optimiseItem(it){
+  try{
+    if(it.isAudio&&window.XtrataAudioOptimizer){
+      const r=await window.XtrataAudioOptimizer.optimize(it.file,(m)=>{ it.opt.note=m; });
+      it.opt = r.optimizedBytes
+        ? {status:'done',file:r.file,originalBytes:r.originalBytes,optimizedBytes:r.optimizedBytes,mime:r.file.type||'audio/webm; codecs=opus',label:'Opus HQ',note:''}
+        : {status:'skipped',file:null,originalBytes:it.file.size,optimizedBytes:null,mime:null,note:optNote(r.skipped)};
+    } else if(it.isImage&&window.XtrataImageOptimizer){
+      const r=await window.XtrataImageOptimizer.optimize(it.file,(m)=>{ it.opt.note=m; });
+      it.opt = r.optimizedBytes
+        ? {status:'done',file:r.file,originalBytes:r.originalBytes,optimizedBytes:r.optimizedBytes,mime:r.file.type,label:(r.format||'').toUpperCase(),note:''}
+        : {status:'skipped',file:null,originalBytes:it.file.size,optimizedBytes:null,mime:null,note:optNote(r.skipped)};
+    } else {
+      it.opt={status:'skipped',file:null,originalBytes:it.file.size,optimizedBytes:null,mime:null,note:''};
+    }
+  }catch(e){ it.opt={status:'skipped',file:null,originalBytes:it.file.size,optimizedBytes:null,mime:null,note:'optimisation failed safely — original kept'}; }
+  if(it.opt.status==='done') it.useOptimized=true;
+}
+let optBusy=false;
+async function queueBatchOptimise(){
+  if(optBusy) return; optBusy=true;
+  try{
+    for(;;){
+      const it=BATCH.items.find(x=>x.opt&&x.opt.status==='pending'&&optApplies(x));
+      if(!it){ // settle files that can never be optimised (video/docs); leave audio pending so a mode switch re-triggers it
+        BATCH.items.forEach(x=>{ if(x.opt&&x.opt.status==='pending'&&!x.isImage&&!x.isAudio) x.opt.status='skipped'; });
+        break;
+      }
+      it.opt.status='optimising'; renderBatch();
+      await optimiseItem(it);
+      renderBatch(); batchQuote();
+    }
+  } finally { optBusy=false; }
+}
+
+// --- Audio → on-chain player pipeline (the opus tool, per batch row) --------
+// Lazily loads ffmpeg.wasm + the v6 player template + suno-build.js, then builds
+// each queued song sequentially: Opus 96k + tags/lyrics + artwork (attached image,
+// image inscription id, or the song's own embedded cover).
+let sunoStack=null;
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('failed to load '+src)); document.head.appendChild(s); }); }
+async function ensureSunoStack(){
+  if(window.XtrataSuno&&window.buildXtrataAudioPlayerHtml) return;
+  if(!sunoStack) sunoStack=(async()=>{
+    if(!window.FFmpeg) await loadScript('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js');
+    if(!window.buildXtrataAudioPlayerHtml) await loadScript('HTML_Template.js?v=6');
+    if(!window.XtrataSuno) await loadScript('suno-build.js?v=7');
+  })();
+  return sunoStack;
+}
+const readB64=(file)=>new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]||null); r.onerror=()=>rej(r.error); r.readAsDataURL(file); });
+let buildBusy=false;
+async function queueAudioBuilds(){
+  if(buildBusy) return; buildBusy=true;
+  try{
+    await ensureSunoStack();
+    for(;;){
+      const it=BATCH.items.find(x=>BATCH.playerMode&&x.isAudio&&x.player.status==='queued');
+      if(!it) break;
+      it.player.status='building'; renderBatch();
+      try{
+        const overrides={};
+        if(it.art.tokenId) overrides.coverTokenId=it.art.tokenId;
+        else if(it.art.file){ let cover=it.art.file;   // reformat the cover to a smaller filetype before embedding → smallest player
+          try{ if(window.XtrataImageOptimizer){ const cr=await window.XtrataImageOptimizer.optimize(cover,()=>{}); if(cr.optimizedBytes) cover=cr.file; } }catch(_e){}
+          overrides.coverB64=await readB64(cover); overrides.coverMime=cover.type||'image/png'; }
+        const r=await window.XtrataSuno.build(it.file,()=>{},overrides);
+        it.player={status:'ready',file:r.playerFile,info:r,err:null};
+        it.uri=it.uri.replace(/^xtrata:audio\//,'xtrata:song/');
+      }catch(e){ it.player={status:'error',file:null,info:null,err:(e&&e.message)||String(e)}; }
+      renderBatch();
+    }
+  }catch(e){
+    // Engine (ffmpeg/template) failed to load — a RETRYABLE condition, not a per-song
+    // failure: park the rows back at "Build" and surface the reason once.
+    $('#batchErr').textContent='Player engine failed to load: '+((e&&e.message)||e)+' — check the connection and press Build again, or switch back to “inscribe as audio”.';
+    BATCH.items.forEach(it=>{ if(it.player.status==='queued'||it.player.status==='building') it.player={status:'await',file:null,info:null,err:null}; }); renderBatch(); }
+  finally{ buildBusy=false; }
+}
+document.querySelectorAll('input[name="bAudioMode"]').forEach(r=>{ r.onchange=()=>{
+  BATCH.playerMode=(document.querySelector('input[name="bAudioMode"]:checked')||{}).value==='player';
+  $('#batchPlayerHint').hidden=!BATCH.playerMode;
+  if(!BATCH.playerMode){ // leaving player mode → restore auto-matched artwork as its own items so nothing is lost
+    const restore=[];
+    BATCH.items.forEach(it=>{ if(it.isAudio&&it.art&&it.art.autoPaired&&it.art.file){ restore.push(it.art.file); it.art={file:null,tokenId:''}; } });
+    restore.forEach(f=>{ if(BATCH.items.length<40) BATCH.items.push(makeItem(f)); });
+  }
+  // Selecting player mode does NOT start building — each song waits for its artwork
+  // (or an explicit Build click); builds auto-start the moment artwork is assigned.
+  BATCH.items.forEach(it=>{ if(it.isAudio) it.player=BATCH.playerMode?{status:it.player.status==='ready'?'ready':'await',file:it.player.file,info:it.player.info,err:null}:{status:'raw',file:null,info:null,err:null}; });
+  renderBatch(); queueBatchOptimise(); // raw mode → Opus-optimise the audio; player mode leaves it to the player build
+};});
+// The bytes that will ACTUALLY inscribe for a row (player when built, else the raw file).
+const batchActiveFile=(it)=>{
+  if(BATCH.playerMode&&it.isAudio&&it.player.status==='ready'&&it.player.file) return it.player.file;
+  if(it.opt&&it.opt.status==='done'&&it.useOptimized&&it.opt.file) return it.opt.file;
+  return it.file;
+};
+// mime that will ACTUALLY inscribe (player → html, optimised image → its new type, else original).
+const batchActiveMime=(it)=>{
+  if(BATCH.playerMode&&it.isAudio&&it.player.status==='ready'&&it.player.file) return 'text/html';
+  if(it.opt&&it.opt.status==='done'&&it.useOptimized&&it.opt.file) return it.opt.file.type||it.mime;
+  return it.mime;
+};
+window.batchArtPick=(i)=>{ BATCH.artTarget=i; $('#batchArtPicker').click(); };
+$('#batchArtPicker').onchange=()=>{ const f=$('#batchArtPicker').files[0]; $('#batchArtPicker').value='';
+  const it=BATCH.items[BATCH.artTarget]; if(!f||!it) return;
+  it.art.file=f; it.art.tokenId='';
+  if(BATCH.playerMode&&it.isAudio){ it.player={status:'queued',file:null,info:null,err:null}; queueAudioBuilds(); }
+  renderBatch(); };
+function batchRemove(i){ BATCH.items.splice(i,1); if(!BATCH.items.length){ batchClear(); return; } renderBatch(); }
+function batchClear(){ BATCH.items=[]; $('#batchCard').hidden=true; $('#batchQuoteTotal').textContent='—'; $('#batchErr').textContent='';
+  dz.classList.remove('compact'); $('#dropMain').textContent='Drop a file to inscribe'; $('#dropSub').textContent='or click to browse — images, audio, video, documents, HTML, JSON, anything'; setStep('drop'); }
+window.batchRemove=batchRemove;
+$('#batchClearBtn').onclick=batchClear;
+$('#batchAddBtn').onclick=()=>picker.click();
+async function batchQuote(){
+  const run=++BATCH.quoteRun; const A=window.XtrataAgent;
+  $('#batchInscribeBtn').disabled=true;
+  if(!BATCH.items.length||!A){ $('#batchQuoteTotal').textContent='—'; return; }
+  if(!A.estimateBatch){ $('#batchQuoteTotal').textContent='agent bundle too old'; return; }
+  try{
+    const shared=$('#batchParents').value.split(',').map(s=>s.trim()).filter(Boolean);
+    const est=await A.estimateBatch({ itemsBytes:BATCH.items.map(it=>batchActiveFile(it).size), parentCount:new Set([...shared,...BATCH.items.flatMap(it=>it.parents.split(',').map(s=>s.trim()).filter(Boolean))]).size, marginUstx:$('#batchMargin').value||'0', receipt:RECEIPT });
+    if(run!==BATCH.quoteRun) return;
+    const pendingPlayers=BATCH.playerMode&&BATCH.items.some(it=>it.isAudio&&it.player.status!=='ready');
+    $('#batchQuoteTotal').textContent=stx(est.requiredUstx)+(est.stxUsd?` · ~$${(Number(est.requiredUstx)/1e6*est.stxUsd).toFixed(2)}`:'')+(pendingPlayers?' (finalising after player builds)':'');
+    $('#batchInscribeBtn').disabled=false;
+  }catch(e){ if(run===BATCH.quoteRun){ $('#batchQuoteTotal').textContent='—'; $('#batchErr').textContent=e.message; } }
+}
+['batchParents','batchMargin'].forEach(id=>{ $('#'+id).addEventListener('change',batchQuote); });
+
+// ---- batch parent-ownership check: green (in wallet) / orange (elsewhere) / red (no owner) ----
+// Covers the SHARED parents and EVERY row's parents, so nothing is missed. Mirrors the single
+// track's checkParents(); re-runs live as you edit and whenever the wallet connects/disconnects.
+let batchParentsCheckRun=0, batchParentsCheckTimer=null;
+function batchParentList(){
+  const set=new Map();
+  const add=(v)=>String(v||'').split(',').map(s=>s.trim()).filter(Boolean).forEach(id=>set.set(id,true));
+  add($('#batchParents').value); BATCH.items.forEach(it=>add(it.parents));
+  return [...set.keys()];
+}
+async function checkBatchParents(){
+  const box=$('#batchParentsCheck'); if(!box) return;
+  const ids=batchParentList(); const run=++batchParentsCheckRun;
+  if(!ids.length){ box.hidden=true; box.innerHTML=''; return; }
+  box.hidden=false;
+  const bad=ids.filter(d=>!/^\d+$/.test(d));
+  if(bad.length){ box.innerHTML=`<span style="color:var(--bad)">Parents must be numeric token ids (fix: ${esc(bad.join(', '))}).</span>`; return; }
+  if(SERVER.mock){ box.innerHTML='<span class="muted">MOCK mode — parent ownership not checked.</span>'; return; }
+  const A=window.XtrataAgent;
+  if(!A||!A.ownerOf){ box.innerHTML='<span class="muted">Ownership check unavailable (old agent bundle).</span>'; return; }
+  box.innerHTML=`<div style="font-weight:600;margin-bottom:5px">Parent ownership <span class="muted" style="font-weight:400">— escrowed for the mint, returned with your inscriptions</span></div>`
+    +ids.map(id=>`<div class="muted" data-bpid="${esc(id)}" style="margin:2px 0">⏳ #${esc(id)} — checking current owner…</div>`).join('')
+    +`<div id="batchParentsSummary" style="margin-top:5px"></div>`;
+  const owners={};
+  for(const id of ids){
+    let owner=null; try{ owner=await A.ownerOf(id); }catch{ owner=null; }
+    if(run!==batchParentsCheckRun) return;   // input changed mid-flight
+    owners[id]=owner;
+    const el=box.querySelector(`[data-bpid="${id}"]`); if(!el) continue;
+    if(owner&&WALLET&&owner===WALLET) el.innerHTML=`<span class="ok">✓ #${esc(id)} — in your connected wallet</span>`;
+    else if(!owner) el.innerHTML=`<span style="color:var(--bad)">✗ #${esc(id)} — no owner found (wrong id?)</span>`;
+    else if(!WALLET) el.innerHTML=`<span style="color:var(--warn)">⚠ #${esc(id)} — owned by ${esc(shortAddr(owner))}. Connect your wallet to confirm it's yours.</span>`;
+    else el.innerHTML=`<span style="color:var(--warn)">⚠ #${esc(id)} — owned by ${esc(shortAddr(owner))}, not your connected wallet.</span>`;
+  }
+  if(run!==batchParentsCheckRun) return;
+  BATCH.parentOwners=owners;
+  const missing=ids.filter(id=>!(owners[id]&&WALLET&&owners[id]===WALLET));
+  const sum=$('#batchParentsSummary');
+  if(sum) sum.innerHTML=!missing.length
+    ? `<span class="ok">✓ All ${ids.length} parent${ids.length>1?'s':''} are in your connected wallet.</span>`
+    : `<span style="color:var(--warn)">⚠ ${missing.length} of ${ids.length} not in your wallet — you'll be asked to confirm before inscribing (affected items auto-refund if their parent never arrives).</span>`;
+}
+$('#batchParents').addEventListener('input',()=>{ if(batchParentsCheckTimer)clearTimeout(batchParentsCheckTimer); batchParentsCheckTimer=setTimeout(checkBatchParents,500); });
+// Fresh re-check that GATES inscribe (confirm-first): the declared parents NOT in the connected wallet.
+async function batchUnownedParents(){
+  const A=window.XtrataAgent; if(SERVER.mock||!A||!A.ownerOf||!WALLET) return [];
+  const ids=batchParentList().filter(d=>/^\d+$/.test(d)); const missing=[];
+  for(const id of ids){ let o=null; try{ o=await A.ownerOf(id); }catch{} if(!(o&&o===WALLET)) missing.push(id); }
+  return missing;
+}
+$('#batchInscribeBtn').onclick=async()=>{
+  const err=$('#batchErr'); err.textContent='';
+  if(!WALLET){ err.textContent='Connect your wallet (top-right) — the batch fast-tracks: everything returns to the wallet you pay from.'; connectWallet(); return; }
+  const shared=$('#batchParents').value.split(',').map(s=>s.trim()).filter(Boolean);
+  if(!shared.every(d=>/^\d+$/.test(d))){ err.textContent='Shared parents must be token-id uints.'; return; }
+  const batchRecipient=$('#batchRecipient').value.trim();
+  if(batchRecipient&&!ADDR_RE.test(batchRecipient)){ err.textContent='Recipient must be a valid SP…/SM… principal (or clear it to keep everything in your wallet).'; return; }
+  for(const [i,it] of BATCH.items.entries()){
+    if(!it.uri.trim()){ err.textContent=`Item ${i}: URI required.`; return; }
+    const deps=it.deps.split(',').map(s=>s.trim()).filter(Boolean);
+    if(!deps.every(d=>/^\d+$/.test(d)||/^@\d+$/.test(d))){ err.textContent=`Item ${i}: deps must be token ids or @row refs.`; return; }
+    const pars=it.parents.split(',').map(s=>s.trim()).filter(Boolean);
+    if(!pars.every(d=>/^\d+$/.test(d))){ err.textContent=`Item ${i}: parents must be token-id uints.`; return; }
+  }
+  if(BATCH.playerMode){
+    const notReady=BATCH.items.filter(it=>it.isAudio&&it.player.status!=='ready');
+    if(notReady.length){
+      const failed=notReady.filter(it=>it.player.status==='error');
+      if(failed.length){ err.textContent=`Player build failed for ${failed.map(it=>it.file.name).join(', ')} — press Retry on the row, change its artwork, remove it, or switch back to “inscribe as audio”.`; return; }
+      // Kick any rows still waiting for artwork (they build with their embedded art), then re-check.
+      notReady.forEach(it=>{ if(it.player.status==='await') it.player.status='queued'; });
+      renderBatch(); queueAudioBuilds();
+      err.textContent=`Building ${notReady.length} player${notReady.length>1?'s':''} — press Inscribe batch again once every row shows ✓.`;
+      return;
+    }
+  }
+  // Confirm-first parent gate: warn before paying if any declared parent isn't in the connected wallet.
+  try{
+    const unowned=await batchUnownedParents();
+    if(unowned.length){
+      const go=confirm(`${unowned.length} parent inscription${unowned.length>1?'s':''} (#${unowned.join(', #')}) ${unowned.length>1?'are':'is'} not in your connected wallet.\n\nAny item that needs a missing parent will wait at “awaiting parent” and be auto-refunded if it never arrives at the deposit wallet.\n\nInscribe the batch anyway?`);
+      if(!go) return;
+    }
+  }catch{}
+  $('#batchInscribeBtn').disabled=true;
+  try{
+    const payload={ items:BATCH.items.map(it=>{ const f=batchActiveFile(it); const asPlayer=BATCH.playerMode&&it.isAudio&&it.player.status==='ready'&&f===it.player.file;
+        return { file:f, uri:it.uri.trim(), mime:asPlayer?'text/html':batchActiveMime(it),
+        deps:it.deps.split(',').map(s=>s.trim()).filter(Boolean), parents:it.parents.split(',').map(s=>s.trim()).filter(Boolean) }; }),
+      parents:shared, marginUstx:$('#batchMargin').value||'0', strict:$('#batchStrict').checked,
+      fastTrack:true, user:WALLET, expectedFunder:WALLET, recipient:batchRecipient||WALLET, receipt:RECEIPT };
+    const {job}=await api('/api/jobs',{method:'POST',body:payload});
+    FLOW.jobId=job.jobId; FLOW.done=false;
+    setStep('pay');
+    startJobsPoll(); jobsTick();
+    $('#activeJobDetail').scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(e){ err.textContent=e.message; }
+  finally{ $('#batchInscribeBtn').disabled=false; }
+};
+
+function renderFileLines(){
+  const f=FLOW.activeFile(); if(!f) return;
+  $('#fileLine').textContent=`${f.name} · ${mib(f.size)}`;
+  $('#typeLine').textContent=CONTENT[catSel.value][ftSel.value]||f.type||'—';
+}
+
+// ---- live preview: exactly the bytes that will go on-chain ----
+let previewUrl=null, previewRun=0;
+function clearPreview(){ if(previewUrl){ try{URL.revokeObjectURL(previewUrl);}catch{} previewUrl=null; }
+  $('#previewBody').innerHTML=''; $('#previewBody').classList.remove('is-image'); $('#previewBlock').hidden=true; $('#previewFootnote').hidden=true; }
+async function renderPreview(){
+  const f=FLOW.activeFile(); const run=++previewRun;
+  clearPreview(); if(!f) return;
+  const body=$('#previewBody'), note=$('#previewNote'), foot=$('#previewFootnote');
+  const mime=(CONTENT[catSel.value]&&CONTENT[catSel.value][ftSel.value])||f.type||'';
+  $('#previewBlock').hidden=false; note.textContent=mime||'unknown type';
+  const url=()=>{ previewUrl=URL.createObjectURL(f); return previewUrl; };
+  if(mime.startsWith('image/')){ body.innerHTML=`<img alt="Preview of ${esc(f.name)}">`; body.firstChild.src=url(); body.classList.add('is-image'); }
+  else if(mime.startsWith('audio/')){ body.innerHTML=`<audio controls></audio>`; body.firstChild.src=url();
+    if(FLOW.optimized) { foot.hidden=false; foot.textContent='You are hearing the '+(FLOW.useOriginal?'ORIGINAL file.':'OPTIMISED Opus file — toggle “Use the original file instead” below to compare.'); } }
+  else if(mime.startsWith('video/')){ body.innerHTML=`<video controls></video>`; body.firstChild.src=url(); }
+  else if(mime==='text/html'){ body.innerHTML=`<iframe sandbox="allow-scripts" title="HTML preview"></iframe>`; body.firstChild.src=url();
+    foot.hidden=false; foot.textContent='Runs sandboxed. On-chain references (e.g. /inscription/…) only resolve once inscribed, so recursive parts may not load in this local preview.'; }
+  else if(mime==='application/pdf'){ body.innerHTML=`<iframe title="PDF preview"></iframe>`; body.firstChild.src=url(); }
+  else if(mime.startsWith('text/')||mime==='application/json'){
+    const CAP=20000; const txt=await f.slice(0,CAP).text(); if(run!==previewRun) return;
+    body.innerHTML='<pre></pre>';
+    body.firstChild.textContent=txt+(f.size>CAP?`\n… (${(f.size-CAP).toLocaleString()} more bytes not shown)`:'');
+  }
+  else { body.innerHTML=`<div class="muted" style="padding:14px;text-align:center">No inline preview for “${esc(mime||'unknown')}” — the file is inscribed byte-for-byte regardless.</div>`; }
+}
+
+async function onFile(file){
+  FLOW.original=file; FLOW.optimized=null; FLOW.useOriginal=false; FLOW.quote=null;
+  FLOW.jobId=null; FLOW.done=false; $('#activeJobDetail').innerHTML='';
+  picker.value='';
+  dz.classList.add('compact');
+  $('#dropMain').innerHTML=`<span class="filechip">${esc(file.name)} · ${mib(file.size)}</span>`;
+  $('#dropSub').textContent='drop another file to replace';
+  $('#reviewCard').hidden=false;
+  $('#newErr').textContent='';
+  detectFromName(file.name);
+  $('#uri').value=`xtrata:${catSel.value}/${slug(file.name)}`;
+  renderFileLines(); renderPreview();
+  $('#sunoHint').hidden=!/\.mp3$/i.test(file.name);
+  setStep('review');
+  $('#reviewCard').scrollIntoView({behavior:'smooth',block:'start'});
+
+  // Auto-optimise audio, then quote on whatever wins. Skip resolves INSTANTLY
+  // (the encoder result is ignored when it lands late) so the railroad is
+  // never held hostage by the audio engine.
+  const opt=window.XtrataAudioOptimizer;
+  const run=++FLOW.optRun;
+  const row=$('#optRow');
+  if(opt&&opt.isCandidate(file.name,file.size)){
+    row.hidden=false; $('#optSpin').hidden=false; $('#optSkipBtn').hidden=false;
+    $('#optSavings').hidden=true; $('#optRevertWrap').hidden=true;
+    $('#optText').textContent='Audio optimisation: converting to Opus HQ (smaller file, same listening quality)…';
+    const signal={aborted:false};
+    let skipNow; const skipPromise=new Promise((r)=>{ skipNow=r; });
+    $('#optSkipBtn').onclick=()=>{ signal.aborted=true; skipNow({file, originalBytes:file.size, skipped:'skipped-by-user'}); };
+    quote(); // provisional quote on the original while the encoder works
+    const res=await Promise.race([
+      opt.optimize(file,(m)=>{ if(run===FLOW.optRun) $('#optText').textContent='Audio optimisation: '+m; },{signal}),
+      skipPromise
+    ]);
+    if(run!==FLOW.optRun) return; // a newer file replaced this one mid-encode
+    $('#optSpin').hidden=true; $('#optSkipBtn').hidden=true;
+    if(res.optimizedBytes){
+      FLOW.optimized=res;
+      const pct=Math.round((1-res.optimizedBytes/res.originalBytes)*100);
+      $('#optText').textContent='Audio optimised to Opus HQ — same listening quality, cheaper to inscribe';
+      $('#optSavings').hidden=false;
+      $('#optSavings').textContent=`${mib(res.originalBytes)} → ${mib(res.optimizedBytes)} (−${pct}%)`;
+      $('#optRevertWrap').hidden=false; $('#optRevert').checked=false;
+      detectFromName(res.file.name); $('#uri').value=`xtrata:audio/${slug(file.name)}`;
+      renderFileLines(); renderPreview(); quote();
+    } else {
+      row.hidden=(res.skipped==='not-audio'||res.skipped==='too-small');
+      $('#optText').textContent={
+        'already-opus':'Audio optimisation: already Opus — nothing to squeeze.',
+        'already-efficient':'Audio optimisation: already efficient — keeping the original.',
+        'engine-unavailable':'Audio optimisation unavailable right now — inscribing the original as-is.',
+        'failed':'Audio optimisation failed safely — inscribing the original as-is.',
+        'skipped-by-user':'Audio optimisation skipped — inscribing the original as-is.',
+      }[res.skipped]||'Keeping the original file.';
+    }
+  } else { row.hidden=true; quote(); }
+}
+
+$('#optRevert').onchange=()=>{
+  FLOW.useOriginal=$('#optRevert').checked;
+  const f=FLOW.activeFile();
+  detectFromName(f.name);
+  $('#uri').value=`xtrata:${catSel.value}/${slug(FLOW.original.name)}`;
+  renderFileLines(); renderPreview(); quote();
+};
+
+// ---- quote (auto) ----
+function parentList(){ return $('#parents').value.split(',').map(s=>s.trim()).filter(Boolean); }
+function depsList(){ return $('#deps').value.split(',').map(s=>s.trim()).filter(Boolean); }
+
+// ---- live parent-ownership check: instant green/red per id as you type ----
+let parentsCheckRun=0, parentsCheckTimer=null;
+async function checkParents(){
+  const box=$('#parentsCheck'); if(!box) return;
+  const ids=parentList(); const run=++parentsCheckRun;
+  if(!ids.length){ box.innerHTML=''; return; }
+  if(!ids.every(d=>/^\d+$/.test(d))){ box.innerHTML='<span style="color:var(--bad)">Parents must be numeric token ids.</span>'; return; }
+  if(new Set(ids).size!==ids.length){ box.innerHTML='<span style="color:var(--bad)">Duplicate parent token ids.</span>'; return; }
+  if(SERVER.mock){ box.innerHTML='<span class="muted">MOCK mode — ownership not checked.</span>'; return; }
+  const A=window.XtrataAgent;
+  if(!A||!A.ownerOf){ box.innerHTML='<span class="muted">Ownership check unavailable (old agent bundle).</span>'; return; }
+  box.innerHTML=ids.map(id=>`<span class="muted" data-pid="${esc(id)}">⏳ #${esc(id)} — checking current owner…</span>`).join('');
+  for(const id of ids){
+    let owner=null; try{ owner=await A.ownerOf(id); }catch{ owner=null; }
+    if(run!==parentsCheckRun) return; // input changed mid-flight
+    const el=box.querySelector(`[data-pid="${id}"]`); if(!el) continue;
+    if(owner&&WALLET&&owner===WALLET){ el.innerHTML=`<span class="ok">✓ #${esc(id)} — owned by your connected wallet</span>`; }
+    else if(!owner){ el.innerHTML=`<span style="color:var(--bad)">✗ #${esc(id)} — no owner found (wrong id?)</span>`; }
+    else if(!WALLET){ el.innerHTML=`<span style="color:var(--warn)">#${esc(id)} — owned by ${esc(shortAddr(owner))}. Connect your wallet to confirm it's yours.</span>`; }
+    else { el.innerHTML=`<span style="color:var(--bad)">✗ #${esc(id)} — owned by ${esc(shortAddr(owner))}, not your connected wallet. Escrow would auto-refund.</span>`; }
+  }
+}
+$('#parents').addEventListener('input',()=>{ if(parentsCheckTimer)clearTimeout(parentsCheckTimer); parentsCheckTimer=setTimeout(checkParents,500); });
+async function quote(){
+  const f=FLOW.activeFile(); if(!f) return;
+  const run=++FLOW.quoteRun;
+  $('#quoteTotal').textContent='…';
+  $('#inscribeBtn').disabled=true;
+  try{
+    const e=await api('/api/estimate',{method:'POST',body:{bytes:f.size,marginUstx:$('#margin').value||'0',parentCount:parentList().length,receipt:RECEIPT}});
+    if(run!==FLOW.quoteRun) return;
+    FLOW.quote=e;
     const usd=(u)=> e.stxUsd ? ' · ~$'+(Number(u)/1e6*e.stxUsd).toFixed(2) : '';
-    el.innerHTML = `<div class="deposit">
-      <div class="kv"><span>Size</span><span>${(e.bytes/1048576).toFixed(3)} MiB · ${e.bytes.toLocaleString()} bytes</span></div>
+    $('#quoteTotal').textContent=stx(e.requiredUstx)+(e.stxUsd?` (~$${(Number(e.requiredUstx)/1e6*e.stxUsd).toFixed(2)})`:'');
+    $('#quoteBody').innerHTML=`
+      <div class="kv"><span>Size</span><span>${mib(e.bytes)} · ${e.bytes.toLocaleString()} bytes</span></div>
       <div class="kv"><span>Chunks</span><span>${e.chunks} · ${e.single?'single-tx':'staged ('+e.batches+' batches)'}</span></div>
       <div class="kv"><span>Xtrata protocol fee</span><span>${stx(e.protocolFee)}${usd(e.protocolFee)}</span></div>
-      <div class="kv"><span>Receipt inscription</span><span>${stx(e.receiptProtocol||'0')}${usd(e.receiptProtocol||'0')}</span></div>
+      ${BigInt(e.receiptProtocol||'0')>0n?`<div class="kv"><span>Receipt inscription</span><span>${stx(e.receiptProtocol)}${usd(e.receiptProtocol)}</span></div>`:'<div class="kv"><span>On-chain receipt</span><span class="muted">off — receipt saved locally, not inscribed</span></div>'}
       <div class="kv"><span>Network (miner) reserve</span><span>${stx((BigInt(e.minerReserve)+BigInt(e.receiptMiner||'0')).toString())}${usd((BigInt(e.minerReserve)+BigInt(e.receiptMiner||'0')).toString())}</span></div>
       <div class="kv"><span>Agent fee (${e.agentFeePct}%)</span><span style="color:var(--acc2)">${stx(e.agentFeeUstx||'0')}${usd(e.agentFeeUstx||'0')}</span></div>
-      <div class="kv"><span><b>Required deposit</b></span><span class="big">${stx(e.requiredUstx)}${usd(e.requiredUstx)}</span></div>
-      <div class="muted" style="font-size:11px;margin-top:8px">Includes a 2nd inscription (the receipt) and the ${e.agentFeePct}% agent fee. Over-collected; unused remainder refunded on delivery.</div>
-    </div>`;
-  }catch(err){ el.innerHTML='<div class="err">'+esc(err.message)+'</div>'; }
+      <div class="kv"><span><b>Required deposit</b></span><span><b>${stx(e.requiredUstx)}${usd(e.requiredUstx)}</b></span></div>
+      <div class="muted" style="font-size:11px;margin-top:8px">Over-collected on purpose; the unused remainder is refunded on delivery.</div>`;
+    $('#inscribeBtn').disabled=false;
+    $('#inscribeBtn').textContent=`Inscribe — pay ${stx(e.requiredUstx)}`;
+  }catch(err){ if(run===FLOW.quoteRun){ $('#quoteTotal').textContent='—'; $('#quoteBody').innerHTML='<div class="err">'+esc(err.message)+'</div>'; } }
+}
+$('#margin').addEventListener('change',quote);
+$('#parents').addEventListener('change',quote);
+
+// ---- options wiring ----
+$('#manualMode').onchange=()=>{ const diff=$('#manualMode').checked;
+  $('#userWrap').style.display=diff?'':'none';
+  $('#payHint').innerHTML=diff
+    ?'⚡ Auto: pay from your connected wallet — the inscription + receipt go to the address above; your change (and any parents) return to your wallet automatically.'
+    :'⚡ Fast-track: pay from your connected wallet and the inscription + change return to it automatically.';
 };
+$('#openGraphLink').onclick=(e)=>{ e.preventDefault(); const g=$('#graphSection'); g.open=true; g.scrollIntoView({behavior:'smooth',block:'start'}); drawGraph(); };
 
-$('#clearBtn').onclick=()=>{ selectedFile=null; ['file','user','deps','uri'].forEach(id=>$('#'+id).value=''); $('#margin').value='0'; $('#picker').value=''; $('#fileInfo').innerHTML=''; $('#estimate').innerHTML=''; $('#deposit').innerHTML=''; $('#newErr').textContent=''; };
-$('#fastTrack').onchange=()=>{ $('#userWrap').style.display=$('#fastTrack').checked?'none':''; };
-$('#fastTrack').onchange();   // apply default (fast-track on) at load
-
-$('#createBtn').onclick=async()=>{
+// ---- create the job & railroad to payment ----
+$('#inscribeBtn').onclick=async()=>{
   const err=$('#newErr'); err.textContent='';
-  const fast=$('#fastTrack').checked;
-  const user=$('#user').value.trim();
-  const deps=$('#deps').value.split(',').map(s=>s.trim()).filter(Boolean);
-  const srcName=selectedFile?selectedFile.name:(($('#file').value.trim().split(/[\\/]/).pop())||'asset');
-  const uri=$('#uri').value.trim()||`xtrata:${catSel.value}/${slug(srcName)}`;
-  if(!selectedFile && !$('#file').value.trim()){ err.textContent='Drop a file, open one, or paste a server path.'; return; }
-  if(fast && !WALLET){ err.textContent='Connect your wallet (top-right) to use Fast-track — that address receives the inscription + change.'; connectWallet(); return; }
-  if(!fast && !ADDR_RE.test(user)){ err.textContent='Delivery address must be a valid SP…/SM… principal (or enable Fast-track).'; return; }
+  const file=FLOW.activeFile();
+  if(!file){ err.textContent='Drop a file first.'; return; }
+  const differentAddr=$('#manualMode').checked;
+  const recipientAddr=$('#user').value.trim();
+  const deps=depsList();
+  const parents=parentList();
+  const uri=$('#uri').value.trim()||`xtrata:${catSel.value}/${slug(file.name)}`;
   if(!deps.every(d=>/^\d+$/.test(d))){ err.textContent='Dependencies must be token-id uints.'; return; }
-  $('#createBtn').disabled=true;
+  if(!parents.every(d=>/^\d+$/.test(d))){ err.textContent='Parents must be token-id uints.'; return; }
+  if(new Set(parents).size!==parents.length){ err.textContent='Duplicate parent token ids.'; return; }
+  if(!WALLET){ const a=await connectWallet(); if(!a){ err.textContent='Connect your wallet — you pay from it and your change returns to it.'; return; } }
+  if(differentAddr&&!ADDR_RE.test(recipientAddr)){ err.textContent='Inscription recipient must be a valid SP…/SM… principal (or untick “send to a different address”).'; return; }
+  $('#inscribeBtn').disabled=true;
   try{
-    if(!selectedFile){ err.textContent='Drop a file or open one — backendless mode inscribes the file straight from your browser (no server paths).'; $('#createBtn').disabled=false; return; }
-    const payload={ file:selectedFile, uri, mime:CONTENT[catSel.value][ftSel.value], deps, marginUstx:$('#margin').value||'0', fastTrack:fast };
-    payload.user = fast ? WALLET : user;
-    if(fast) payload.expectedFunder = WALLET;   // railroad: ONLY this wallet may fund; any other payer is auto-refunded, nothing inscribed
-    const {job}=await api('/api/jobs',{method:'POST',body:payload});   // the File goes straight into XtrataAgent.createJob — no upload
-    $('#deposit').innerHTML = SERVER.mock ? `<div class="deposit" style="border-color:#5a4620;background:linear-gradient(180deg,#1c160a,#140f08)">
-      <div class="kv"><span>Job</span><span>${esc(job.jobId)}</span></div>
-      <div class="kv"><span><b>MOCK mode</b></span><span class="big" style="color:var(--warn)">no real STX</span></div>
-      <div class="muted" style="font-size:12px;margin-top:8px">${fast?'⚡ Fast-track auto-runs this simulated job — opening <b>Jobs</b> to watch.':'Dry run — <b style="color:var(--warn)">do not send STX</b>. Open <b>Jobs</b>, select this job, click <b>Run</b>.'}</div>
-    </div>` : `<div class="deposit">
-      <div class="kv"><span>Job</span><span>${esc(job.jobId)}</span></div>
-      <div class="kv"><span>Deposit address ${copyBtn(job.depositAddress)}</span><span>${esc(job.depositAddress)}</span></div>
-      <div class="kv"><span><b>Send exactly</b></span><span class="big">${stx(job.requiredUstx)}</span></div>
-      <div class="btnrow"><button class="btn" onclick="openWallet('${esc(job.depositAddress)}','${esc(job.requiredUstx)}')">Open wallet to pay ${stx(job.requiredUstx)}</button></div>
-      <div class="muted" style="font-size:11px;margin-top:8px">${fast?'⚡ Fast-track: as soon as this lands, it inscribes and returns the token + change to the wallet you pay from. Tracking in <b>Jobs</b>…':'One-shot address — fund once for this job only. Then open <b>Jobs</b> to run &amp; deliver.'}</div>
-    </div>`;
-    err.innerHTML='<span class="ok">Job created.</span>';
-    if(fast){ document.querySelector('nav button[data-tab="jobs"]').click(); selectJob(job.jobId); }
-  }catch(e){ err.textContent=e.message; } finally{ $('#createBtn').disabled=false; }
+    const payload={ file, uri, mime:CONTENT[catSel.value][ftSel.value]||file.type||'application/octet-stream',
+      deps, parents, marginUstx:$('#margin').value||'0', fastTrack:true, receipt:RECEIPT };
+    payload.user = WALLET;                        // payer = change/refund destination (always the connected wallet)
+    payload.recipient = differentAddr ? recipientAddr : WALLET;   // inscription + receipt destination
+    payload.expectedFunder = WALLET;              // railroad: ONLY this wallet may fund; any other payer is auto-refunded
+    const {job}=await api('/api/jobs',{method:'POST',body:payload});
+    FLOW.jobId=job.jobId; FLOW.done=false;
+    setStep('pay');
+    startJobsPoll(); jobsTick();
+    if(!SERVER.mock){ openWallet(job.depositAddress, job.requiredUstx); }
+    setTimeout(()=>{ const el=$('#activeJobDetail'); if(el&&el.firstChild) el.scrollIntoView({behavior:'smooth',block:'start'}); },250);
+  }catch(e){ err.textContent=e.message; $('#inscribeBtn').disabled=false; }
 };
 
-// ---- Graph ----
+function resetFlow(){
+  if((FLOW.jobId&&LIVE.has(FLOW.jobId))||SIG_PENDING){
+    if(!confirm('This inscription is still running. Starting again clears it from view — the job keeps going and stays in History, but you\'ll lose the live card here. Start again anyway?')) return;
+  }
+  FLOW.original=null; FLOW.optimized=null; FLOW.useOriginal=false; FLOW.quote=null;
+  FLOW.jobId=null; FLOW.done=false; FLOW.optRun++; FLOW.quoteRun++;
+  $('#activeJobDetail').innerHTML='';
+  $('#reviewCard').hidden=true;
+  dz.classList.remove('compact');
+  $('#dropMain').textContent='Drop a file to inscribe';
+  $('#dropSub').textContent='or click to browse — images, audio, video, documents, HTML, JSON, anything';
+  ['uri','deps','parents','user'].forEach(id=>$('#'+id).value='');
+  $('#margin').value='0'; $('#optRevert').checked=false; $('#optRow').hidden=true; $('#sunoHint').hidden=true;
+  $('#parentsCheck').innerHTML=''; parentsCheckRun++;
+  clearPreview();
+  $('#newErr').textContent='';
+  setStep('drop');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+window.resetFlow=resetFlow;
+
+// ============================================================================
+// Jobs — one steady poll drives the active card, the table and any open
+// history detail. Rendering logic preserved from the tabbed wizard.
+// ============================================================================
+let selJob=null, pollTimer=null;
+let lastProgAt=0, expiryAt=0;   // active-flow countdowns only
+const LIVE=new Set();           // jobIds mid-inscription (funded → delivering)
+let SIG_PENDING=false;          // a wallet signature is awaiting confirmation
+// Guard against an accidental tab close / refresh that would pause a running job.
+window.addEventListener('beforeunload',(e)=>{
+  if(LIVE.size||SIG_PENDING){ e.preventDefault(); e.returnValue=''; return ''; }
+});
+async function loadJobs(){
+  try{ const {jobs}=await api('/api/jobs'); const b=$('#jobsBody');
+    if(!jobs.length){ b.innerHTML='<tr><td colspan="6" class="muted">No jobs yet.</td></tr>'; return jobs; }
+    b.innerHTML=jobs.map(j=>{ const ds=(j.status==='AWAITING_DEPOSIT'&&j.funded)?'FUNDED':j.status; return `<tr onclick="selectJob('${j.jobId}')" class="${selJob===j.jobId?'sel':''}">
+      <td class="mono">${esc(j.jobId.replace('job-',''))}</td><td>${esc(j.uri||(j.items?('📦 batch · '+j.items.length+' items'):''))}</td>
+      <td>${(j.bytes/1048576).toFixed(2)}M</td><td class="mono">${stx(j.requiredUstx)}</td>
+      <td><span class="status s-${ds}">${ds.replace(/_/g,' ')}</span></td><td class="mono">${j.items?(j.items.filter(i=>i.tokenId).length+'/'+j.items.length):(j.tokenId||'—')}</td></tr>`; }).join('');
+    return jobs;
+  }catch(e){ $('#jobsBody').innerHTML=`<tr><td colspan="6" class="err">${esc(e.message)}</td></tr>`; return []; }
+}
+$('#refreshJobs').onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); loadJobs(); };
+async function jobsTick(){ try{ await Promise.all([
+  ($('#historySection').open||FLOW.jobId)?loadJobs():Promise.resolve(),
+  FLOW.jobId?renderJobDetail(FLOW.jobId,$('#activeJobDetail'),true):Promise.resolve(),
+  (selJob&&selJob!==FLOW.jobId)?renderJobDetail(selJob,$('#jobDetail'),false):Promise.resolve(),
+]); }catch(e){} }
+function startJobsPoll(){ if(pollTimer)clearInterval(pollTimer); pollTimer=setInterval(jobsTick,3000); }
+function stopJobsPoll(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
+async function selectJob(id){ selJob=id; if(id===FLOW.jobId){ $('#jobDetail').innerHTML='<div class="muted" style="margin-top:10px">That job is live in the card above.</div>'; loadJobs(); return; } loadJobs(); renderJobDetail(id,$('#jobDetail'),false); startJobsPoll(); }
+$('#historySection').addEventListener('toggle',()=>{ if($('#historySection').open){ loadJobs(); startJobsPoll(); } else if(!FLOW.jobId){ stopJobsPoll(); } });
+
+async function renderJobDetail(jobId,out,isActive){
+  if(!jobId||!out)return;
+  try{ const {job,status}=await api('/api/jobs/'+jobId);
+    const funded=status.funded, st=job.status;
+    const active=(st==='FUNDED'||st==='INSCRIBING'||st==='DELIVERING'||st==='RECOVERING'||(st==='INSCRIBED'&&job.fastTrack));
+    if(active) LIVE.add(jobId); else LIVE.delete(jobId);
+    if(isActive){ if(active){ if(!lastProgAt) lastProgAt=Date.now(); } else lastProgAt=0; }
+    const ds=(st==='AWAITING_DEPOSIT'&&funded)?'FUNDED':st;
+    const phaseMsg={FUNDED:'Payment detected — starting…',INSCRIBING:'Inscribing on-chain…',INSCRIBED:'Inscribed — delivering…',DELIVERING:'Delivering inscription + refunding change…',RECOVERING:'Recovery running — returning inscriptions before sweeping STX…'}[st];
+    const showDeposit=(st==='AWAITING_DEPOSIT');
+    if(isActive){
+      expiryAt = (showDeposit && job.createdAt && SERVER.windowMs) ? (Date.parse(job.createdAt) + SERVER.windowMs*12)
+        : (st==='AWAITING_PARENT' && job.fundedAt && SERVER.parentWindowMs) ? (Date.parse(job.fundedAt) + SERVER.parentWindowMs) : 0;
+      if((st==='COMPLETE'||st==='COMPLETE_WITH_SKIPS')&&!FLOW.done){ FLOW.done=true; setStep('done'); }
+      else if(st!=='COMPLETE'&&st!=='COMPLETE_WITH_SKIPS'&&funded&&FLOW.done===false){ /* keep pay step lit until done */ }
+    }
+    // ---- Batch board: one row per item, live ticks as the batch mints ----
+    let batchPanel='';
+    if(status.batch&&status.batch.items&&status.batch.items.length){
+      const bi=status.batch;
+      const chip=(it)=>it.tokenId?`<span class="ok">✓ #${esc(it.tokenId)}</span>`
+        :it.status==='INSCRIBING'?'<span style="color:var(--acc)"><span class="spin"></span> inscribing…</span>'
+        :it.status==='FAILED'?`<span style="color:var(--bad)" title="${esc(it.error||'')}">✗ failed</span>`
+        :it.status==='SKIPPED'?'<span class="muted">− skipped</span>'
+        :'<span class="muted">queued</span>';
+      batchPanel=`<div style="margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px">
+        <div style="font-weight:700;margin-bottom:6px">Batch — ${bi.items.filter(i=>i.tokenId).length}/${bi.total} inscribed <span class="muted" style="font-weight:400">· one payment · one receipt covers all items</span></div>
+        ${bi.items.map(it=>`<div class="kv"><span>${it.idx+1} · ${esc(it.uri)}</span><span>${chip(it)}</span></div>`).join('')}
+      </div>`;
+    }
+    // ---- Parent escrow checklist (jobs with declared parents) ----
+    let parentPanel='';
+    const parents=(job.parents||[]).map(String);
+    if(parents.length && ['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING'].includes(st)){
+      const ps=status.parents||{held:[],missing:parents,unexpected:[]};
+      if(!(ps.missing||[]).length) delete PARENT_MSG[job.jobId];
+      const pi=PARENT_INFO[job.jobId]||{};
+      const stxDone=funded||!!job.depositReceivedUstx;
+      parentPanel=`<div style="margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px">
+        <div style="font-weight:700;margin-bottom:6px">Escrow checklist <span class="muted" style="font-weight:400">— two sends, any order; parent + child + change all return to you</span></div>
+        <div class="kv"><span>Deposit address ${copyBtn(job.depositAddress)}</span><span class="mono">${esc(job.depositAddress)}</span></div>
+        <div class="kv"><span>1 · STX deposit (${stx(status.requiredUstx)})</span><span>${stxDone?'<span class="ok">✓ arrived</span>':(status.pending?'<span style="color:var(--warn)">⏳ seen in mempool — confirming…</span>':'<span class="muted">awaiting</span>')}</span></div>
+        ${parents.map((p,i)=>{
+          const held=(ps.held||[]).map(String).includes(p);
+          const own=pi[p];
+          let right;
+          if(held) right='<span class="ok">✓ arrived at deposit wallet</span>';
+          else if(own&&WALLET&&own===WALLET) right=`<span class="ok">✓ in your connected wallet</span> <button class="btn" style="padding:4px 10px;margin-left:8px" onclick="sendParent('${esc(job.jobId)}','${esc(p)}')">Send #${esc(p)} to deposit now</button>`;
+          else if(own&&own===job.depositAddress) right='<span class="ok">✓ arrived at deposit wallet</span>';
+          else if(own) right=`<span style="color:var(--warn)">held by ${esc(own.slice(0,5)+'…'+own.slice(-4))} — connect that wallet, or transfer #${esc(p)} to the deposit address from it</span>`;
+          else right='<span class="muted">checking current owner…</span>';
+          return `<div class="kv"><span>${i+2} · Parent inscription #${esc(p)}</span><span>${right}</span></div>`;}).join('')}
+        ${PARENT_MSG[job.jobId]?`<div style="margin-top:6px;font-size:12px;${PARENT_MSG[job.jobId].err?'color:var(--bad)':'color:var(--ok)'}">${PARENT_MSG[job.jobId].text}</div>`:''}
+        ${(ps.unexpected&&ps.unexpected.length)?`<div class="err" style="margin-top:6px">⚠ Unexpected inscription #${ps.unexpected.map(esc).join(', #')} arrived — it is not a declared parent. Everything will be returned to the sender automatically.</div>`:''}
+        <div class="muted" style="font-size:11px;margin-top:6px">The parent is only borrowed for the mint — it comes straight back with your new inscription.${(st==='AWAITING_PARENT'&&isActive)?' <b id="expT"></b>':''}</div>
+      </div>`;
+      maybeCheckParents(job.jobId);
+    }
+    out.innerHTML=`<div class="card"><h3>${isActive?'Your inscription':esc(job.jobId)} <span class="status s-${ds}">${ds.replace(/_/g,' ')}</span>${job.fastTrack?' <span class="status" style="color:var(--acc2);border-color:#3a2f7a">⚡ fast-track</span>':''}</h3>
+      ${isActive?`<div class="muted" style="font-size:12px;margin:-2px 0 8px">job ${esc(job.jobId)}</div>`:''}
+      ${job.mock?'<div class="muted" style="margin:-2px 0 8px;color:var(--warn)">MOCK job — simulated, no real funds.</div>':''}
+      <div class="kv"><span>Inscription${job.items?'s':''}</span><span>${job.items?esc(job.items.length+' items · batch'):esc(job.uri)}</span></div>
+      ${batchPanel}
+      ${showDeposit?`<div class="kv"><span>Deposit address ${copyBtn(job.depositAddress)}</span><span>${esc(job.depositAddress)}</span></div>
+      <div class="kv"><span>Send exactly</span><span class="big-num" style="font-size:19px">${stx(status.requiredUstx)}</span></div>
+      ${!job.mock?`<div class="btnrow"><button class="btn" onclick="openWallet('${esc(job.depositAddress)}','${esc(status.requiredUstx)}')">Open wallet to pay ${stx(status.requiredUstx)}</button></div>`:''}
+      ${job.fastTrack&&job.expectedFunder?`<div class="kv"><span>Pay from this wallet only ${copyBtn(job.expectedFunder)}</span><span class="mono" style="color:var(--ok)">${esc(job.expectedFunder)}</span></div>
+      <div class="muted" style="font-size:12px;margin-top:6px;color:var(--warn)">⚠ Locked to the wallet above. A payment from any other wallet is automatically returned to the sender — nothing is inscribed.</div>`:''}
+      <div class="muted" style="font-size:12px;margin-top:8px">↩︎ Guaranteed temporary — if not funded &amp; started in time, this auto-cancels and returns any funds${parents.length?' <b>and inscriptions</b>':''}. ${isActive?'<b id="expT"></b>':''}</div>`:''}
+      ${st==='AWAITING_PARENT'?`<div class="progress"><span class="spin"></span>Deposit received ✓ — waiting for the parent inscription to arrive at the deposit wallet…</div>`:''}
+      ${parentPanel}
+      ${job.parentReturnTxs&&job.parentReturnTxs.length?`<div class="kv"><span>Parent${job.parentReturnTxs.length>1?'s':''} returned</span><span class="ok">✓ #${job.parentReturnTxs.map(x=>esc(x.id)).join(', #')} sent home</span></div>`:''}
+      ${(job.recipient&&job.user&&job.recipient!==job.user)?`<div class="kv"><span>Inscription${job.items?'s':''} + receipt →</span><span class="mono">${esc(job.recipient)}</span></div><div class="kv"><span>Change${(job.parents&&job.parents.length)?' + parents':''} → your wallet</span><span class="mono">${esc(job.user)}</span></div>`:(job.user?`<div class="kv"><span>${job.fastTrack?'Returns to your wallet':'Delivery address'}</span><span class="mono">${esc(job.user)}</span></div>`:(job.fastTrack?`<div class="kv"><span>Returns to</span><span class="muted">the wallet you pay from (auto-detected)</span></div>`:''))}
+      ${(job.tokenId&&!job.items)?`<div class="kv"><span>Inscription token</span><span class="ok">#${esc(job.tokenId)}</span></div>`:''}
+      ${job.receiptTokenId?`<div class="kv"><span>Receipt token</span><span class="ok">#${esc(job.receiptTokenId)}</span></div>`:''}
+      ${job.agentFeeUstx?`<div class="kv"><span>Agent fee (${job.agentFeePct||10}%)</span><span style="color:var(--acc2)">${stx(job.agentFeeUstx)}</span></div>`:''}
+      ${(job.refundedUstx!=null)?`<div class="kv"><span>Change refunded</span><span>${stx(job.refundedUstx||'0')}</span></div>`:''}
+      ${active?`<div class="progress"><span class="spin"></span>${esc(phaseMsg||'Working…')}${job.progress?(' · '+esc(job.progress)):''} ${isActive?'<span id="progT" class="muted"></span>':''}</div>`:''}
+      ${active?`<div class="muted" style="margin-top:6px;font-size:12px;color:var(--ok)">🔒 Keep this tab open while the browser-held one-shot wallet is working. If it is interrupted, reopen this page in the same browser profile; the saved recovery key remains available. Don't send another payment.</div>`:''}
+      ${showDeposit&&!funded?`<div class="muted" style="margin-top:10px;font-size:12px">${job.fastTrack?'Pay from your connected wallet (shown above) — it receives the inscription and any change, and processing starts automatically on arrival. Payments from any other wallet are returned to the sender.':'Waiting for your deposit — the status flips to FUNDED once it lands.'}</div>`:''}
+      ${job.error?`<div class="err" style="margin-top:8px">Error: ${esc(job.error)}${!job.fastTrack?` <button class="btn ghost" onclick="act('run','${esc(job.jobId)}')" style="margin-left:8px;padding:5px 10px">Retry</button>`:''}</div>`:''}
+      ${(!job.fastTrack&&(st==='AWAITING_DEPOSIT'||st==='INSCRIBED'))?`<div class="btnrow">
+        <button class="btn good" onclick="act('run','${esc(job.jobId)}')" ${(funded&&st==='AWAITING_DEPOSIT')?'':'disabled'}>Run inscription</button>
+        <button class="btn warn" onclick="act('deliver','${esc(job.jobId)}')" ${st==='INSCRIBED'?'':'disabled'}>Deliver + refund + wipe key</button>
+      </div><div class="err" id="jobErr"></div>`:''}
+      ${(st==='COMPLETE'||st==='COMPLETE_WITH_SKIPS')?`<div class="ok" style="margin-top:12px">✓ ${job.items?`Batch complete — ${job.items.filter(i=>i.tokenId).length}/${job.items.length} inscriptions${job.receipt===false?'':' + the batch receipt'} delivered${job.fastTrack?' to your wallet':''}${st==='COMPLETE_WITH_SKIPS'?` (${job.items.filter(i=>i.status==='FAILED').length} failed / ${job.items.filter(i=>i.status==='SKIPPED').length} skipped — their cost came back as change)`:''}`:`Complete — inscription${job.receipt===false?'':' + receipt'} delivered${job.fastTrack?' to your wallet':''}`}${(job.parents&&job.parents.length)?`, parent${job.parents.length>1?'s':''} #${job.parents.map(esc).join(', #')} returned to your wallet`:''}, change refunded, deposit key wiped.</div>
+      <div class="btnrow"><button class="btn" onclick="viewReceipt('${esc(job.jobId)}')">View receipt</button>
+        ${job.tokenId?`<a class="btn ghost" style="text-decoration:none;display:inline-block" href="/x/${esc(job.tokenId)}" target="_blank" rel="noopener">View on Xplorer</a>`:''}
+        ${isActive?`<button class="btn alt" onclick="resetFlow()">Inscribe another file</button>`:`<button class="btn ghost" onclick="act('delete','${esc(job.jobId)}')">Delete job</button>`}</div>`:''}
+      ${st==='CANCELLED'?`<div class="muted" style="margin-top:12px">${job.recoveryCompletedAt?`✓ Recovery complete — ${(job.recovery&&job.recovery.returnedTokenIds||[]).length} inscription${(job.recovery&&job.recovery.returnedTokenIds||[]).length===1?'':'s'} and remaining STX returned to ${esc((job.recovery&&job.recovery.destination)||job.funder||job.user||'your wallet')}. ${(job.recovery&&job.recovery.remainingItems||[]).length} uninscribed batch item${(job.recovery&&job.recovery.remainingItems||[]).length===1?' remains':'s remain'} available in this job record for the next batch.`:`↩︎ Cancelled — ${(job.parents&&job.parents.length)?'all inscriptions (including parents) and funds':'funds'} returned to your wallet and the deposit key discarded.${job.cancelReason?(' ('+esc(job.cancelReason)+')'):''}`}</div>
+      ${job.recoveryWarning?`<div class="muted" style="margin-top:8px;font-size:12px;color:var(--warn)">${esc(job.recoveryWarning)} Chain ownership is already final; Xplorer will live-check the owner while the index catches up.</div>`:''}
+      <div class="btnrow">${isActive?`<button class="btn alt" onclick="resetFlow()">Start again</button>`:''}<button class="btn ghost" onclick="act('delete','${esc(job.jobId)}')">Delete job</button></div>`:''}
+      ${st==='NEEDS_RECOVERY'?`<div class="err" style="margin-top:12px">The browser still controls this one-shot wallet.${job.keepKeyReason?(' '+esc(job.keepKeyReason)):''}</div>
+      <div class="kv"><span>Recovery wallet ${copyBtn(job.depositAddress)}</span><span class="mono">${esc(job.depositAddress)}</span></div>
+      <div class="muted" style="margin-top:8px;font-size:12px">Recovery returns every inscription first, verifies the escrow wallet is NFT-empty, then refunds the remaining STX to the recorded payer. No receipt or new inscription is created.</div>
+      ${/NotEnoughFunds|insufficient funds/i.test(job.error||'')?`<div class="muted" style="margin-top:8px;font-size:12px;color:var(--warn)">The recovery wallet needs a small STX top-up to pay the NFT transfer fee. Copy the address above, top it up, then run recovery again.</div>`:''}
+      <div class="btnrow"><button class="btn good" onclick="act('recover','${esc(job.jobId)}')">Recover inscriptions + STX now</button></div><div class="err" id="jobErr"></div>`:''}
+    </div>`;
+  }catch(e){ /* transient read (job file mid-write) — keep polling */ }
+}
+// ---- parent escrow: ownership checker + one-click wallet send (aligned to THIS job's deposit only) ----
+const PARENT_INFO={};          // jobId -> { __core:'ADDR.name', <tokenId>: ownerAddress }
+const PARENT_MSG={};           // jobId -> { text, err } — send-status line, survives re-renders
+const parentChkAt={};
+async function maybeCheckParents(jobId){
+  if(Date.now()-(parentChkAt[jobId]||0)<10000) return;   // gentle: re-check owners every ~10 s
+  parentChkAt[jobId]=Date.now();
+  try{ const A=window.XtrataAgent; if(!A||!A.parentInfo) return;
+    const r=await A.parentInfo(jobId); const m={__core:r.core};
+    for(const p of (r.parents||[])) m[String(p.id)]=p.owner||null;
+    PARENT_INFO[jobId]=m;
+  }catch{}
+}
+async function sendParent(jobId,pid){
+  // Same proven path as the site's "Send selected inscription" (ported into the wallet bundle),
+  // except the recipient is HARD-CODED to the active job's deposit address — not editable, so the
+  // parent can never be sent to the wrong place.
+  const w=xtrataWallet();
+  if(!w||!w.sendInscription){ PARENT_MSG[jobId]={err:1,text:'Wallet bundle too old for one-click send — rebuild agent-one.js, or transfer #'+esc(pid)+' to the deposit address manually.'}; jobsTick(); return; }
+  if(!WALLET){ connectWallet(); return; }
+  PARENT_MSG[jobId]={text:'Waiting for wallet confirmation…'}; SIG_PENDING=true; jobsTick();
+  try{
+    const {job}=await api('/api/jobs/'+jobId);
+    const core=String((PARENT_INFO[jobId]&&PARENT_INFO[jobId].__core)||'').split('.');
+    const r=await w.sendInscription({ contractAddress:core[0]||'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', contractName:core[1]||'xtrata-v3-2-3',
+      tokenId:pid, sender:WALLET, recipient:job.depositAddress, network:SERVER.net||'mainnet' });   // recipient is ALWAYS this job's deposit wallet
+    PARENT_MSG[jobId]={text:'✓ Parent #'+esc(pid)+' transfer submitted'+(r&&r.txId?(' · '+esc(String(r.txId).slice(0,10))+'…'):'')+' — it will show as “arrived” once confirmed.'};
+  }catch(e){ PARENT_MSG[jobId]={err:1,text:'Parent send did not go through: '+esc((e&&e.message)||String(e))+' — you can retry, or send #'+esc(pid)+' to the deposit address from your wallet manually.'}; }
+  parentChkAt[jobId]=0; SIG_PENDING=false; lastProgAt=Date.now(); jobsTick();
+}
+window.sendParent=sendParent;
+
+async function act(which,jobId){
+  const id=jobId||selJob; if(!id) return;
+  if(which==='deliver' && !confirm('Deliver the inscription, refund the remainder, and permanently wipe the deposit key?')) return;
+  if(which==='recover'){
+    let j=null; try{ const r=await api('/api/jobs/'+id); j=r.job; }catch(e){ alert('Could not load the recovery details: '+((e&&e.message)||e)); return; }
+    const mintedIds=[...(j.items||[]).map(i=>i.tokenId),j.tokenId,j.receiptTokenId].filter(Boolean).map(String);
+    const minted=mintedIds.length;
+    const dest=j.funder||j.expectedFunder||j.user||'the verified payer';
+    if(!confirm(`Start on-chain recovery now?\n\nThis broadcasts transfers for ${minted} known inscribed token${minted===1?'':'s'}${mintedIds.length?' (#'+mintedIds.join(', #')+')':''} to ${dest}, then sweeps the remaining STX only after the wallet is confirmed NFT-empty. The uninscribed batch items will not be minted or charged.\n\nKeep this tab open until recovery completes.`)) return;
+  }
+  if(which==='delete'){
+    if(!confirm('Delete this job from the list?\nThe inscription stays on-chain — this only removes the local record + receipt.')) return;
+    try{ await api('/api/jobs/'+id+'/delete',{method:'POST'}); if(selJob===id){ selJob=null; $('#jobDetail').innerHTML=''; } if(FLOW.jobId===id){ FLOW.jobId=null; $('#activeJobDetail').innerHTML=''; } loadJobs(); }
+    catch(e){ const errEl=$('#jobErr'); if(errEl){errEl.textContent=e.message;} else alert(e.message); }
+    return;
+  }
+  try{ await api('/api/jobs/'+id+'/'+which,{method:'POST'}); lastProgAt=Date.now(); jobsTick(); startJobsPoll(); }
+  catch(e){ const errEl=$('#jobErr'); if(errEl)errEl.textContent=e.message; }
+}
+function viewReceipt(id){ try{ const A=window.XtrataAgent; const html=A&&A.getReceiptHtml&&A.getReceiptHtml(id); if(!html){ alert('Receipt not generated yet.'); return; } const w=window.open('','_blank'); if(w){ w.document.open(); w.document.write(html); w.document.close(); } else { const b=new Blob([html],{type:'text/html'}); window.open(URL.createObjectURL(b),'_blank'); } }catch(e){ alert('Could not open receipt: '+((e&&e.message)||e)); } }
+window.selectJob=selectJob; window.act=act; window.viewReceipt=viewReceipt;
+setInterval(()=>{ const t=$('#progT'); if(t&&lastProgAt){ const s=Math.round((Date.now()-lastProgAt)/1000); let x=''; if(s>=90)x=' · slower than usual — Stacks may be congested, still working'; else if(s>=30)x=' · confirming on-chain'; t.textContent='('+s+'s'+x+')'; }
+  const et=$('#expT'); if(et&&expiryAt){ const r=expiryAt-Date.now(); et.textContent = r>0 ? ('Auto-returns in '+Math.floor(r/60000)+':'+String(Math.floor(r/1000)%60).padStart(2,'0')) : 'Returning funds…'; } },1000);
+
+// On-chain receipt toggles (single + batch stay in sync; choice persists; re-quotes live).
+(function initReceiptToggles(){
+  const boxes=[$('#receiptToggle'),$('#batchReceiptToggle')].filter(Boolean);
+  boxes.forEach(b=>{
+    b.checked=RECEIPT;
+    b.addEventListener('change',()=>{
+      RECEIPT=b.checked; localStorage.setItem(RECEIPT_KEY, RECEIPT?'1':'0');
+      boxes.forEach(o=>{ if(o!==b) o.checked=RECEIPT; });
+      try{ if(!$('#reviewCard').hidden) quote(); }catch(e){}
+      try{ if(!$('#batchCard').hidden) batchQuote(); }catch(e){}
+    });
+  });
+})();
+
+// Unfinished business from a previous visit? Point at History instead of interrupting the railroad.
+(async()=>{ try{ const jobs=await loadJobs();
+  const open=(jobs||[]).filter(j=>!['COMPLETE','CANCELLED'].includes(j.status));
+  // A job that's actively minting (funded → delivering) or any fast-track job in
+  // flight reattaches straight to the live card, so a mid-process refresh/close
+  // drops the user right back on the running inscription.
+  const live=open.find(j=>['FUNDED','INSCRIBING','INSCRIBED','DELIVERING'].includes(j.status)&&(j.funded||j.fastTrack));
+  if(live&&!FLOW.jobId){
+    FLOW.jobId=live.jobId; FLOW.done=false; setStep('pay');
+    renderJobDetail(live.jobId,$('#activeJobDetail'),true);
+    $('#activeJobDetail').scrollIntoView({behavior:'smooth',block:'start'});
+    startJobsPoll();
+  } else if(open.length){ const n=$('#resumeNotice'); n.hidden=false;
+    n.innerHTML=`↻ ${open.length} unfinished job${open.length>1?'s':''} from a previous session — open <a href="#" style="color:var(--acc)" onclick="document.getElementById('historySection').open=true;document.getElementById('historySection').scrollIntoView({behavior:'smooth'});return false;">History</a> to resume.`;
+    startJobsPoll(); }
+}catch(e){} })();
+
+// Background tabs throttle the 3s poll, which can stall a live job. When the tab
+// comes back to the foreground, tick immediately and make sure the poll is running.
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&(FLOW.jobId||selJob||$('#historySection').open)){
+    jobsTick(); if(!pollTimer) startJobsPoll();
+  }
+});
+window.addEventListener('focus',()=>{ if(FLOW.jobId||selJob){ jobsTick(); if(!pollTimer) startJobsPoll(); } });
+
+// ============================================================================
+// Dependency graph composer (advanced) — logic unchanged from the tabbed wizard.
+// ============================================================================
 let G = load('xao-graph',{nodes:[],edges:[]}); let nid = G.nodes.reduce((m,n)=>Math.max(m,n.id),0)+1;
 function load(k,d){ try{return JSON.parse(localStorage.getItem(k))||d}catch{return d} }
 function saveG(){ localStorage.setItem('xao-graph',JSON.stringify(G)); }
@@ -431,7 +1672,7 @@ function showNode(id){ const n=nodeById(id); const out=$('#nodeDetail'); if(!n)r
   if(n.kind==='existing') h+=`<div class="kv"><span>Token id</span><span>#${esc(n.tokenId)}</span></div>`;
   if(n.file) h+=`<div class="kv"><span>File</span><span>${esc(n.file)}</span></div>`;
   h+=`<label>Dependencies</label><div class="chips">${deps.length?deps.map((d,i)=>`<span class="chip">${esc(d.label)}${resolved[i]?(' #'+resolved[i]):' (unresolved)'}</span>`).join(''):'<span class="muted">none</span>'}</div>`;
-  if(n.kind==='new'){ h+=`<div class="btnrow"><button class="btn" onclick="toWizard(${id})" ${unresolved.length?'disabled':''}>Send to wizard${unresolved.length?' (resolve deps first)':''}</button>
+  if(n.kind==='new'){ h+=`<div class="btnrow"><button class="btn" onclick="toWizard(${id})" ${unresolved.length?'disabled':''}>Use in the wizard${unresolved.length?' (resolve deps first)':''}</button>
     <button class="btn ghost" onclick="delNode(${id})">Delete node</button></div>`;
     if(unresolved.length) h+=`<div class="err">Unresolved deps must be existing token ids (inscribe those nodes first).</div>`;
   } else h+=`<div class="btnrow"><button class="btn ghost" onclick="delNode(${id})">Delete node</button></div>`;
@@ -439,84 +1680,14 @@ function showNode(id){ const n=nodeById(id); const out=$('#nodeDetail'); if(!n)r
 }
 function delNode(id){ G.nodes=G.nodes.filter(n=>n.id!==id); G.edges=G.edges.filter(e=>e.f!==id&&e.t!==id); saveG(); drawGraph(); $('#nodeDetail').innerHTML=''; }
 function toWizard(id){ const n=nodeById(id); const deps=G.edges.filter(e=>e.f===id).map(e=>nodeById(e.t)).map(d=>d.kind==='existing'?d.tokenId:d.inscribedTokenId).filter(Boolean);
-  if(n.file){ selectedFile=null; $('#picker').value=''; $('#fileInfo').innerHTML=''; $('#file').value=n.file; } $('#deps').value=deps.join(', '); if(!$('#uri').value&&n.file) $('#uri').value=`xtrata:asset/${slug(n.file.split(/[\\/]/).pop())}`;
-  document.querySelector('nav button[data-tab="new"]').click(); $('#newErr').innerHTML='<span class="ok">Loaded “'+esc(n.label)+'” from the graph.</span>';
+  $('#deps').value=deps.join(', ');
+  $('#relDetails').open=true;
+  if(FLOW.activeFile()){ quote(); }
+  const msg=n.file?` — now drop “${esc(n.file)}” in step 1`:'';
+  $('#newErr').innerHTML='<span class="ok">Loaded deps from “'+esc(n.label)+'”'+msg+'.</span>';
+  window.scrollTo({top:0,behavior:'smooth'});
 }
-
-// ---- Jobs ----
-let selJob=null, pollTimer=null;
-async function loadJobs(){
-  try{ const {jobs}=await api('/api/jobs'); const b=$('#jobsBody');
-    if(!jobs.length){ b.innerHTML='<tr><td colspan="6" class="muted">No jobs yet.</td></tr>'; return; }
-    b.innerHTML=jobs.map(j=>{ const ds=(j.status==='AWAITING_DEPOSIT'&&j.funded)?'FUNDED':j.status; return `<tr onclick="selectJob('${j.jobId}')" class="${selJob===j.jobId?'sel':''}">
-      <td class="mono">${esc(j.jobId.replace('job-',''))}</td><td>${esc(j.uri||'')}</td>
-      <td>${(j.bytes/1048576).toFixed(2)}M</td><td class="mono">${stx(j.requiredUstx)}</td>
-      <td><span class="status s-${ds}">${ds.replace('_',' ')}</span></td><td class="mono">${j.tokenId||'—'}</td></tr>`; }).join('');
-  }catch(e){ $('#jobsBody').innerHTML=`<tr><td colspan="6" class="err">${esc(e.message)}</td></tr>`; }
-}
-$('#refreshJobs').onclick=loadJobs;
-let lastProgAt=0, expiryAt=0;
-// One steady poll drives BOTH the table and the open detail, so the top row never lags the panel.
-async function jobsTick(){ try{ await Promise.all([ loadJobs(), selJob?renderJob():Promise.resolve() ]); }catch(e){} }
-function startJobsPoll(){ if(pollTimer)clearInterval(pollTimer); pollTimer=setInterval(jobsTick,3000); }
-function stopJobsPoll(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
-async function selectJob(id){ selJob=id; lastProgAt=0; loadJobs(); renderJob(); startJobsPoll(); }
-async function renderJob(){
-  if(!selJob)return; const out=$('#jobDetail');
-  try{ const {job,status}=await api('/api/jobs/'+selJob);
-    const funded=status.funded, st=job.status;
-    const active=(st==='FUNDED'||st==='INSCRIBING'||st==='DELIVERING'||(st==='INSCRIBED'&&job.fastTrack));
-    if(active){ if(!lastProgAt) lastProgAt=Date.now(); } else lastProgAt=0;
-    const ds=(st==='AWAITING_DEPOSIT'&&funded)?'FUNDED':st;
-    const phaseMsg={FUNDED:'Payment detected — starting…',INSCRIBING:'Inscribing on-chain…',INSCRIBED:'Inscribed — delivering…',DELIVERING:'Delivering inscription + refunding change…'}[st];
-    const showDeposit=(st==='AWAITING_DEPOSIT');
-    expiryAt = (showDeposit && job.createdAt && SERVER.windowMs) ? (Date.parse(job.createdAt) + SERVER.windowMs) : 0;
-    out.innerHTML=`<div class="card" style="margin-top:16px"><h3>${esc(job.jobId)} <span class="status s-${ds}">${ds.replace(/_/g,' ')}</span>${job.fastTrack?' <span class="status" style="color:var(--acc2);border-color:#3a2f7a">⚡ fast-track</span>':''}</h3>
-      ${job.mock?'<div class="muted" style="margin:-2px 0 8px;color:var(--warn)">MOCK job — simulated, no real funds.</div>':''}
-      <div class="kv"><span>Inscription</span><span>${esc(job.uri)}</span></div>
-      ${showDeposit?`<div class="kv"><span>Deposit address ${copyBtn(job.depositAddress)}</span><span>${esc(job.depositAddress)}</span></div>
-      <div class="kv"><span>Send exactly</span><span class="big" style="font-size:19px">${stx(status.requiredUstx)}</span></div>
-      ${!job.mock?`<div class="btnrow"><button class="btn" onclick="openWallet('${esc(job.depositAddress)}','${esc(status.requiredUstx)}')">Open wallet to pay ${stx(status.requiredUstx)}</button></div>`:''}
-      ${job.fastTrack&&job.expectedFunder?`<div class="kv"><span>Pay from this wallet only ${copyBtn(job.expectedFunder)}</span><span class="mono" style="color:var(--ok)">${esc(job.expectedFunder)}</span></div>
-      <div class="muted" style="font-size:12px;margin-top:6px;color:var(--warn)">⚠ Locked to the wallet above. A payment from any other wallet is automatically returned to the sender — nothing is inscribed.</div>`:''}
-      <div class="muted" style="font-size:12px;margin-top:8px">↩︎ Guaranteed temporary — if not funded &amp; started in time, this auto-cancels and returns any funds. <b id="expT"></b></div>`:''}
-      ${job.user?`<div class="kv"><span>${job.fastTrack?'Returns to your wallet':'Delivery address'}</span><span class="mono">${esc(job.user)}</span></div>`:(job.fastTrack?`<div class="kv"><span>Returns to</span><span class="muted">the wallet you pay from (auto-detected)</span></div>`:'')}
-      ${job.tokenId?`<div class="kv"><span>Inscription token</span><span class="ok">#${esc(job.tokenId)}</span></div>`:''}
-      ${job.receiptTokenId?`<div class="kv"><span>Receipt token</span><span class="ok">#${esc(job.receiptTokenId)}</span></div>`:''}
-      ${job.agentFeeUstx?`<div class="kv"><span>Agent fee (${job.agentFeePct||10}%)</span><span style="color:var(--acc2)">${stx(job.agentFeeUstx)}</span></div>`:''}
-      ${(job.refundedUstx!=null)?`<div class="kv"><span>Change refunded</span><span>${stx(job.refundedUstx||'0')}</span></div>`:''}
-      ${active?`<div class="progress"><span class="spin"></span>${esc(phaseMsg||'Working…')}${job.progress?(' · '+esc(job.progress)):''} <span id="progT" class="muted"></span></div>`:''}
-      ${showDeposit&&!funded?`<div class="muted" style="margin-top:10px;font-size:12px">${job.fastTrack?'Pay from your connected wallet (shown above) — it receives the inscription and any change, and processing starts automatically on arrival. Payments from any other wallet are returned to the sender.':'Waiting for your deposit — the Jobs list flips to FUNDED once it lands.'}</div>`:''}
-      ${job.error?`<div class="err" style="margin-top:8px">Error: ${esc(job.error)}${!job.fastTrack?` <button class="btn ghost" onclick="act('run')" style="margin-left:8px;padding:5px 10px">Retry</button>`:''}</div>`:''}
-      ${(!job.fastTrack&&(st==='AWAITING_DEPOSIT'||st==='INSCRIBED'))?`<div class="btnrow">
-        <button class="btn good" onclick="act('run')" ${(funded&&st==='AWAITING_DEPOSIT')?'':'disabled'}>Run inscription</button>
-        <button class="btn warn" onclick="act('deliver')" ${st==='INSCRIBED'?'':'disabled'}>Deliver + refund + wipe key</button>
-      </div><div class="err" id="jobErr"></div>`:''}
-      ${st==='COMPLETE'?`<div class="ok" style="margin-top:12px">✓ Complete — inscription + receipt delivered${job.fastTrack?' to your wallet':''}, change refunded, deposit key wiped.</div>
-      <div class="btnrow"><button class="btn" onclick="viewReceipt('${esc(job.jobId)}')">View receipt</button>
-        <button class="btn ghost" onclick="act('delete')">Delete job</button></div>`:''}
-      ${st==='CANCELLED'?`<div class="muted" style="margin-top:12px">↩︎ Cancelled — funds returned to your wallet and the deposit key discarded.${job.cancelReason?(' ('+esc(job.cancelReason)+')'):''}</div>
-      <div class="btnrow"><button class="btn ghost" onclick="act('delete')">Delete job</button></div>`:''}
-      ${st==='NEEDS_RECOVERY'?`<div class="err" style="margin-top:12px">Auto-refund didn’t confirm — your funds are safe but need a manual sweep: run <b>svc/recover-all.mjs</b>.${job.keepKeyReason?(' '+esc(job.keepKeyReason)):''}</div>`:''}
-    </div>`;
-    if(st==='COMPLETE'||st==='ERROR'||st==='CANCELLED'||st==='NEEDS_RECOVERY'){ loadJobs(); }
-  }catch(e){ /* transient read (job file mid-write) — keep polling */ }
-}
-async function act(which){
-  if(which==='deliver' && !confirm('Deliver the inscription, refund the remainder, and permanently wipe the deposit key?')) return;
-  if(which==='delete'){
-    if(!confirm('Delete this job from the list?\nThe inscription stays on-chain — this only removes the local record + receipt.')) return;
-    try{ await api('/api/jobs/'+selJob+'/delete',{method:'POST'}); selJob=null; $('#jobDetail').innerHTML=''; loadJobs(); }
-    catch(e){ const errEl=$('#jobErr'); if(errEl){errEl.textContent=e.message;} else alert(e.message); }
-    return;
-  }
-  try{ await api('/api/jobs/'+selJob+'/'+which,{method:'POST'}); lastProgAt=Date.now(); renderJob(); startJobsPoll(); }
-  catch(e){ const errEl=$('#jobErr'); if(errEl)errEl.textContent=e.message; }
-}
-function viewReceipt(id){ try{ const A=window.XtrataAgent; const html=A&&A.getReceiptHtml&&A.getReceiptHtml(id); if(!html){ alert('Receipt not generated yet.'); return; } const w=window.open('','_blank'); if(w){ w.document.open(); w.document.write(html); w.document.close(); } else { const b=new Blob([html],{type:'text/html'}); window.open(URL.createObjectURL(b),'_blank'); } }catch(e){ alert('Could not open receipt: '+((e&&e.message)||e)); } }
-window.showNode=showNode; window.delNode=delNode; window.toWizard=toWizard; window.selectJob=selectJob; window.act=act; window.viewReceipt=viewReceipt;
-setInterval(()=>{ const t=$('#progT'); if(t&&lastProgAt){ const s=Math.round((Date.now()-lastProgAt)/1000); let x=''; if(s>=90)x=' · slower than usual — Stacks may be congested, still working'; else if(s>=30)x=' · confirming on-chain'; t.textContent='('+s+'s'+x+')'; }
-  const et=$('#expT'); if(et&&expiryAt){ const r=expiryAt-Date.now(); et.textContent = r>0 ? ('Auto-returns in '+Math.floor(r/60000)+':'+String(Math.floor(r/1000)%60).padStart(2,'0')) : 'Returning funds…'; } },1000);
+window.showNode=showNode; window.delNode=delNode; window.toWizard=toWizard;
 drawGraph();
 </script>
 <script src="/xtrata-radio.js" defer></script>

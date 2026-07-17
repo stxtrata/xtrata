@@ -37,6 +37,11 @@ export type ContractCapabilities = {
   // mints must use the core directly rather than the external small-mint helper
   // (which is bound to a specific older core).
   supportsNativeSingleTx: boolean;
+  // Whether the core accepts a non-STX SIP-010 asset (sBTC, USDCx, USDT, ...)
+  // as the protocol-fee payment. No shipped core version supports this yet, so
+  // the multi-asset payment picker stays hidden until a core exposes it. See
+  // contracts/MULTI-ASSET-PAYMENT-FOLLOWUP.md.
+  supportsMultiAssetPayment: boolean;
 };
 
 const CAPABILITIES_BY_VERSION: Record<ProtocolVersion, ContractCapabilities> = {
@@ -55,7 +60,8 @@ const CAPABILITIES_BY_VERSION: Record<ProtocolVersion, ContractCapabilities> = {
     supportsNextTokenId: true,
     supportsMintedIndex: false,
     supportsRelationships: false,
-    supportsNativeSingleTx: false
+    supportsNativeSingleTx: false,
+    supportsMultiAssetPayment: false
   },
   '2.1.0': {
     version: '2.1.0',
@@ -72,7 +78,8 @@ const CAPABILITIES_BY_VERSION: Record<ProtocolVersion, ContractCapabilities> = {
     supportsNextTokenId: true,
     supportsMintedIndex: true,
     supportsRelationships: false,
-    supportsNativeSingleTx: false
+    supportsNativeSingleTx: false,
+    supportsMultiAssetPayment: false
   },
   '2.1.1': {
     version: '2.1.1',
@@ -89,7 +96,8 @@ const CAPABILITIES_BY_VERSION: Record<ProtocolVersion, ContractCapabilities> = {
     supportsNextTokenId: true,
     supportsMintedIndex: true,
     supportsRelationships: false,
-    supportsNativeSingleTx: false
+    supportsNativeSingleTx: false,
+    supportsMultiAssetPayment: false
   },
   '3.0.0': {
     version: '3.0.0',
@@ -106,7 +114,8 @@ const CAPABILITIES_BY_VERSION: Record<ProtocolVersion, ContractCapabilities> = {
     supportsNextTokenId: true,
     supportsMintedIndex: true,
     supportsRelationships: true,
-    supportsNativeSingleTx: true
+    supportsNativeSingleTx: true,
+    supportsMultiAssetPayment: false
   },
   '3.2.3': {
     version: '3.2.3',
@@ -123,7 +132,8 @@ const CAPABILITIES_BY_VERSION: Record<ProtocolVersion, ContractCapabilities> = {
     supportsNextTokenId: true,
     supportsMintedIndex: true,
     supportsRelationships: true,
-    supportsNativeSingleTx: true
+    supportsNativeSingleTx: true,
+    supportsMultiAssetPayment: false
   },
   '3.4.0': {
     version: '3.4.0',
@@ -140,7 +150,8 @@ const CAPABILITIES_BY_VERSION: Record<ProtocolVersion, ContractCapabilities> = {
     supportsNextTokenId: true,
     supportsMintedIndex: true,
     supportsRelationships: true,
-    supportsNativeSingleTx: true
+    supportsNativeSingleTx: true,
+    supportsMultiAssetPayment: false
   }
 };
 

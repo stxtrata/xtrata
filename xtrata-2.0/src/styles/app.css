@@ -4044,6 +4044,73 @@ p {
   flex-wrap: wrap;
 }
 
+/* WS-2: Standard/Advanced mint layout */
+.mint-source-choice {
+  border: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.mint-source-choice__options,
+.token-uri-choice {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.mint-source-choice__option,
+.token-uri-choice__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.mint-text-input {
+  display: grid;
+  gap: 12px;
+}
+
+.mint-advanced,
+.mint-fees-disclosure {
+  margin: 12px 0;
+}
+
+.mint-advanced > .mint-advanced__summary,
+.mint-fees-disclosure > .mint-advanced__summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 8px 0;
+  user-select: none;
+}
+
+.mint-advanced[open] > .mint-advanced__summary,
+.mint-fees-disclosure[open] > .mint-advanced__summary {
+  margin-bottom: 8px;
+}
+
+/* WS-3: fiat currency toggle + payment-asset picker */
+.mint-cost-controls {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.currency-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.currency-toggle__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
 .token-uri-status {
   font-size: 0.85rem;
   color: var(--muted);
