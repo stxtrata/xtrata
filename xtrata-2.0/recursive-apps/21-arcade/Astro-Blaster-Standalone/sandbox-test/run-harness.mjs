@@ -368,9 +368,10 @@ async function runLeatherDesktopScenario() {
     totalReads === 1 &&
     finalCalls.transactionRequest === 0 &&
     finalCalls.deprecatedObjectCalls === 0 &&
+    (finalCalls.hungCalls || 0) === 0 &&
     finalCalls.callVia.every((via) => via === 'LeatherProvider')
   ) {
-    pass('scenario C: zero re-prompts after connect; no deprecated alias or transactionRequest use');
+    pass('scenario C: zero re-prompts, zero hung split-form calls, named provider only');
   } else {
     fail('scenario C: wallet interaction budget exceeded: ' + JSON.stringify(finalCalls));
   }

@@ -1246,6 +1246,9 @@ var HighScores = (function(){
         contract: fullContract,
         functionName: params.functionName,
         functionArgs: functionArgs,
+        // Older Xverse builds validate against a schema that only reads the
+        // deprecated `arguments` spelling; send both (canary-proven benign).
+        arguments: Array.isArray(functionArgs) ? functionArgs.slice() : functionArgs,
         network: params.network
       };
       if(typeof modeValue !== 'undefined'){
@@ -1865,11 +1868,14 @@ var HighScores = (function(){
 
   function _pickContractCallVariants(providerLabel, params){
     var variants = _buildContractCallParamVariants(params);
-    var lowerLabel = String(providerLabel || '').toLowerCase();
-    var preferMinimal =
-      lowerLabel.indexOf('bitcoinprovider') >= 0 ||
-      lowerLabel.indexOf('xverse') >= 0 ||
-      lowerLabel.indexOf('btc') >= 0;
+
+    /* v5.2: the combined-contract sats-connect form ({contract, functionName,
+       functionArgs, ...}) is canary-proven on Leather AND Xverse across
+       desktop and mobile, so it leads for EVERY provider. The legacy split
+       form (contractAddress + contractName) stays as a fallback only: Leather
+       mobile does not reject it — it silently never settles the promise, so
+       leading with it froze score submits forever. */
+    var preferMinimal = true;
 
     variants.sort(function(a, b){
       var scoreA = 0;

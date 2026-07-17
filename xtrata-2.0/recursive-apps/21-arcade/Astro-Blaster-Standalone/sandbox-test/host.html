@@ -195,6 +195,14 @@
                 ]}});
               }
               if (method === 'stx_callContract') {
+                var callParams = arguments[1];
+                // Real Leather (canary-proven) accepts the combined-contract
+                // form only; Leather MOBILE never settles the legacy split
+                // form — emulate that so a bad first variant hangs the test.
+                if (!callParams || typeof callParams.contract !== 'string') {
+                  C.hungCalls = (C.hungCalls || 0) + 1;
+                  return new Promise(function(){});
+                }
                 C.callContract += 1;
                 C.callVia.push(deprecated ? 'deprecated-alias' : 'LeatherProvider');
                 return Promise.resolve({ jsonrpc: '2.0', id: 'h', result: {

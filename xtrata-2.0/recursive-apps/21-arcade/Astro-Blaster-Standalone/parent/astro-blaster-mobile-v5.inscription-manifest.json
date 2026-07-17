@@ -39,8 +39,8 @@
       "key": "highscores",
       "path": "modules/highscores.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 135406,
-      "sha256": "eeac5369fc3962a15736d32598ea4266d8bc6ca00e8156e963b03b8eeae7653c",
+      "sizeBytes": 135898,
+      "sha256": "2a2f58e08d86ae15600230e47a681a41bfd65c100e9591b847ae8e8905863b08",
       "mintOrder": 3,
       "mintedInscriptionId": null
     },
