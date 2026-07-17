@@ -322,6 +322,66 @@ describe('wallet connect helpers', () => {
     expect(rpcProvider.request).toHaveBeenCalledOnce();
   });
 
+  it('routes Xverse contract calls through the session-holding BitcoinProvider', async () => {
+    const scoreTxId = `0x${'ab'.repeat(32)}`;
+    const legacyProvider = {
+      request: vi.fn(async () => {
+        throw new Error('legacy StacksProvider must not receive the Xverse contract call');
+      })
+    };
+    const rpcProvider = {
+      request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
+        expect(method).toBe('stx_callContract');
+        expect(params).toMatchObject({
+          contract: `${ADDRESS}.xtrata-arcade-scores-v1-3`,
+          functionName: 'submit-score',
+          network: 'mainnet',
+          address: ADDRESS,
+          postConditionMode: 'deny'
+        });
+        expect(params?.functionArgs).toHaveLength(4);
+        expect(params?.postConditions).toHaveLength(1);
+        return { status: 'success', result: { txid: scoreTxId } };
+      })
+    };
+    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
+    (
+      window as typeof window & {
+        XverseProviders?: { StacksProvider: unknown; BitcoinProvider: unknown };
+      }
+    ).XverseProviders = {
+      StacksProvider: legacyProvider,
+      BitcoinProvider: rpcProvider
+    };
+
+    await expect(
+      __testing.requestWalletContractCall(legacyProvider as never, {
+        contractAddress: ADDRESS,
+        contractName: 'xtrata-arcade-scores-v1-3',
+        functionName: 'submit-score',
+        functionArgs: [
+          stringAsciiCV('astro-blaster'),
+          uintCV(0),
+          uintCV(883),
+          stringAsciiCV('MOB')
+        ],
+        network: 'mainnet',
+        stxAddress: ADDRESS,
+        postConditionMode: PostConditionMode.Deny,
+        postConditions: [
+          makeStandardSTXPostCondition(
+            ADDRESS,
+            FungibleConditionCode.LessEqual,
+            30000n
+          )
+        ]
+      })
+    ).resolves.toMatchObject({ txId: scoreTxId });
+
+    expect(legacyProvider.request).not.toHaveBeenCalled();
+    expect(rpcProvider.request).toHaveBeenCalledOnce();
+  });
+
   it('builds a sponsored origin transaction and requests signing without broadcast', async () => {
     const privateKey = createStacksPrivateKey(
       'f9d7f5e0d0d81fdd90dcef4e0e2c1b9e3ea361776a5cd91b5c9a52b98b3e1cb601'
