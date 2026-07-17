@@ -1,17 +1,19 @@
 #!/usr/bin/env node
 /**
- * Astro Blaster v3 sandbox harness runner.
+ * Astro Blaster v4 mobile sandbox harness runner.
  *
  * Verifies, in a real Chromium sandboxed srcdoc iframe (mirroring the Xtrata
  * viewer's sandbox="allow-scripts"), that:
  *  Scenario A (wallet-capable host):
- *   1. the v3 parent boots and loads all five modules via mocked get-chunk
+ *   1. the v4 mobile parent boots and loads all five modules via mocked get-chunk
  *   2. the hello handshake grants a bridge token
  *   3. Connect drives the host bridge (stx_requestAccounts et al) and the
  *      badge reaches "connected" — with NO in-frame popups
+ *   4. touch controls appear after launch, fit a phone viewport, and drive
+ *      the existing keyboard game API
  *  Scenario B (host that ignores hello):
- *   4. the game still boots and stays playable
- *   5. Connect produces the open-runtime intent (claim-in-runtime path)
+ *   5. the game still boots and stays playable
+ *   6. Connect produces the open-runtime intent (claim-in-runtime path)
  *      instead of an alert or a hang
  *
  * Usage: node sandbox-test/run-harness.mjs   (from the Standalone folder)
@@ -57,7 +59,11 @@ const browser = await chromium.launch(
 );
 
 async function runScenario({ grantBridge }) {
-  const page = await browser.newPage();
+  const page = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true
+  });
   page.on('pageerror', (e) => console.log('[pageerror]', e.message));
   await page.goto(`http://127.0.0.1:${port}/sandbox-test/host.html?grantBridge=${grantBridge ? 1 : 0}`);
 
@@ -153,6 +159,75 @@ async function runScenario({ grantBridge }) {
     if (noticeText && noticeText.length > 10) pass('in-DOM notice shown (no alert): "' + noticeText.slice(0, 80) + '..."');
     else fail('no in-DOM notice found after failed connect');
   }
+
+  // Launch Astro Blaster and exercise the parent-only touch adapter. The
+  // Pause assertion proves a pointer tap reaches the live game input handler;
+  // key event capture covers directional movement, fire, and EMP mappings.
+  await frame.click('.game-start-btn');
+  await frame.waitForSelector('#game-container canvas', { timeout: 20000 });
+  await frame.waitForFunction(
+    () => window.AstroBlasterMobileControls && window.AstroBlasterMobileControls.isVisible(),
+    null,
+    { timeout: 10000 }
+  ).catch(() => fail('mobile controls did not appear after game launch'));
+
+  const mobileLayout = await frame.evaluate(() => {
+    const controls = document.getElementById('astro-mobile-controls');
+    const canvas = document.querySelector('#game-container canvas');
+    const controlRect = controls && controls.getBoundingClientRect();
+    const canvasRect = canvas && canvas.getBoundingClientRect();
+    window.__MOBILE_KEY_EVENTS = [];
+    document.addEventListener('keydown', (event) => {
+      window.__MOBILE_KEY_EVENTS.push({ type: 'down', key: event.key, code: event.code });
+    });
+    document.addEventListener('keyup', (event) => {
+      window.__MOBILE_KEY_EVENTS.push({ type: 'up', key: event.key, code: event.code });
+    });
+    return {
+      visible: Boolean(controls && !controls.hidden),
+      noHorizontalOverflow: document.documentElement.scrollWidth <= window.innerWidth,
+      canvasAboveControls: Boolean(canvasRect && controlRect && canvasRect.bottom <= controlRect.top + 1),
+      canvasWidth: canvasRect ? Math.round(canvasRect.width) : 0,
+      canvasHeight: canvasRect ? Math.round(canvasRect.height) : 0,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight
+    };
+  });
+
+  if (mobileLayout.visible && mobileLayout.noHorizontalOverflow && mobileLayout.canvasAboveControls) {
+    pass(`touch deck + canvas fit phone viewport (${mobileLayout.canvasWidth}x${mobileLayout.canvasHeight} in ${mobileLayout.viewportWidth}x${mobileLayout.viewportHeight})`);
+  } else {
+    fail('mobile layout invalid: ' + JSON.stringify(mobileLayout));
+  }
+
+  const tap = async (selector, pointerId) => {
+    await frame.dispatchEvent(selector, 'pointerdown', { pointerId, pointerType: 'touch', buttons: 1, isPrimary: true });
+    await frame.dispatchEvent(selector, 'pointerup', { pointerId, pointerType: 'touch', buttons: 0, isPrimary: true });
+  };
+
+  const pausedBefore = await frame.evaluate(() => Game01.getTestHooks().getState().paused);
+  await tap('[data-astro-key="p"]', 41);
+  const pausedAfter = await frame.evaluate(() => Game01.getTestHooks().getState().paused);
+  if (!pausedBefore && pausedAfter) pass('Pause touch button changed live game state');
+  else fail(`Pause touch button did not change game state (${pausedBefore} -> ${pausedAfter})`);
+
+  await tap('[data-astro-key="ArrowLeft"]', 42);
+  await tap('[data-astro-key="Space"]', 43);
+  await tap('[data-astro-key="x"]', 44);
+  const mobileEvents = await frame.evaluate(() => window.__MOBILE_KEY_EVENTS || []);
+  const sawPair = (key) => mobileEvents.some((event) => event.type === 'down' && event.key === key) &&
+    mobileEvents.some((event) => event.type === 'up' && event.key === key);
+  if (sawPair('ArrowLeft') && sawPair(' ') && sawPair('x')) {
+    pass('Move, Fire, and EMP touch buttons emitted complete keyboard input pairs');
+  } else {
+    fail('missing touch key events: ' + JSON.stringify(mobileEvents));
+  }
+
+  // Restore the running state so teardown never leaves a held/paused input.
+  await tap('[data-astro-key="p"]', 45);
+  const mobileState = await frame.evaluate(() => window.AstroBlasterMobileControls.getState());
+  if (mobileState.pressed.length === 0) pass('touch adapter releases all held inputs');
+  else fail('touch adapter left held inputs: ' + JSON.stringify(mobileState));
 
   await page.close();
 }

@@ -1,0 +1,116 @@
+{
+  "schema": "xtrata-standalone-inscription-manifest@1",
+  "appId": "astro_blaster_standalone_mobile",
+  "release": "v4-mobile-controls",
+  "createdAt": "2026-07-17",
+  "contentContract": {
+    "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+    "name": "xtrata-v3-2-3",
+    "network": "mainnet",
+    "senderAddress": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+  },
+  "scoreContract": {
+    "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+    "name": "xtrata-arcade-scores-v1-3",
+    "network": "mainnet",
+    "functionName": "submit-score",
+    "leaderboardFunctionName": "get-top10"
+  },
+  "leafModules": [
+    {
+      "key": "styles",
+      "path": "modules/styles.css",
+      "mimeType": "text/css",
+      "sizeBytes": 15888,
+      "sha256": "d8b3e8f89a257432222afd3785b49da0d03e2e297f526eb89270998fc1e220e3",
+      "mintOrder": 1,
+      "mintedInscriptionId": 69
+    },
+    {
+      "key": "utils",
+      "path": "modules/utils.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 2261,
+      "sha256": "16fb1f0d7a410ef200cfeded828160f1cb4619641cd0ae5ecc46b0b106e2a69f",
+      "mintOrder": 2,
+      "mintedInscriptionId": 70
+    },
+    {
+      "key": "highscores",
+      "path": "modules/highscores.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 131963,
+      "sha256": "c3c10b142988e3fa3ba2d5fa42f0b32b65404e6503bd60d2ff178a91fed37dbe",
+      "mintOrder": 3,
+      "mintedInscriptionId": 80
+    },
+    {
+      "key": "gameRuntime",
+      "path": "modules/game01_astro_blaster-v2.37.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 262880,
+      "sha256": "07f4ece0a6ab124f9ce7129dc9e5d67f3414378088c493bcd4690a1445fd39bf",
+      "mintOrder": 4,
+      "mintedInscriptionId": 71
+    },
+    {
+      "key": "main",
+      "path": "modules/main-v3.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 162571,
+      "sha256": "007961d6f91a4fb9eabe2a8d84d3a0021bb0cb04f08a3f056f96f951840d0e0a",
+      "mintOrder": 5,
+      "mintedInscriptionId": 2789
+    }
+  ],
+  "parent": {
+    "path": "parent/astro-blaster-parent-v4-mobile.template.html",
+    "mimeType": "text/html",
+    "sizeBytes": 65151,
+    "sha256": "199d02b8667dc829481472f8bacf160b85aa2913cf9dc75190f24e56d898db74",
+    "configFieldsToSetBeforeMint": [
+      "CONFIG.contentContractAddress",
+      "CONFIG.contentContractName",
+      "CONFIG.senderAddress",
+      "CONFIG.moduleIds.styles",
+      "CONFIG.moduleIds.utils",
+      "CONFIG.moduleIds.highscores",
+      "CONFIG.moduleIds.gameRuntime",
+      "CONFIG.moduleIds.main"
+    ],
+    "mintedInscriptionId": null
+  },
+  "recursiveSeal": {
+    "method": "seal-recursive",
+    "dependencyOrder": [
+      "styles",
+      "utils",
+      "highscores",
+      "gameRuntime",
+      "main"
+    ],
+    "dependencies": [
+      69,
+      70,
+      80,
+      71,
+      2789
+    ],
+    "tokenUri": "",
+    "notes": "Parent-only mobile release; reuse all five minted v3 leaf inscriptions. Dependencies must match CONFIG.moduleIds exactly."
+  },
+  "verification": {
+    "expectedGlobals": [
+      "ArcadeUtils",
+      "HighScores",
+      "Game01",
+      "ArcadeLauncher",
+      "ArcadeHostBridge",
+      "AstroBlasterMobileControls"
+    ],
+    "expectedBoot": "Top-10 start screen appears first; Start launches a scaled canvas and touch deck on coarse-pointer or narrow displays.",
+    "requiredReadOnlyFunctions": [
+      "get-chunk"
+    ]
+  }
+}
