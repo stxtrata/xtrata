@@ -1006,9 +1006,15 @@ var HighScores = (function(){
         label: 'window.xverseProviders.BitcoinProvider',
         value: window.xverseProviders && window.xverseProviders.BitcoinProvider
       },
-      { label: 'window.btc', value: window.btc },
+      /* window.btc is Leather's btckit alias; using it routes submits into the
+         deprecated transactionRequest screen (disabled Confirm). Same for
+         Xverse's generic window.BitcoinProvider alias. */
+      { label: 'window.btc', value: window.LeatherProvider ? null : window.btc },
       { label: 'window.stacks', value: hasNamedWalletProvider ? null : window.stacks },
-      { label: 'window.BitcoinProvider', value: window.BitcoinProvider }
+      {
+        label: 'window.BitcoinProvider',
+        value: (window.XverseProviders || window.xverseProviders) ? null : window.BitcoinProvider
+      }
     ];
     var out = [];
 
@@ -1371,24 +1377,46 @@ var HighScores = (function(){
     });
   }
 
+  /* Wallet rejections often arrive as a JSON-RPC envelope
+     ({jsonrpc, id, error:{code,message}}); hoist the inner error so
+     user-rejected / unsupported classification and log messages see the real
+     code and text instead of "[object Object]". */
+  function _hoistRpcEnvelopeError(error){
+    if(
+      error && typeof error === 'object' && !(error instanceof Error) &&
+      error.error && typeof error.error === 'object' &&
+      (typeof error.error.code !== 'undefined' || error.error.message)
+    ){
+      var hoisted = new Error(String(error.error.message || 'Wallet RPC error.'));
+      hoisted.code = error.error.code;
+      hoisted.data = error.error.data;
+      return hoisted;
+    }
+    return error;
+  }
+
+  /* v5.1: always use the (method, params) call form — canary-proven against
+     Leather and Xverse on desktop and mobile. The old arity sniff
+     (provider.request.length >= 2) broke on modern providers that declare
+     request with rest/default parameters (arity 0/1): they received the
+     legacy object form, rejected it, and the submit cascade fell through to
+     deprecated aliases. */
   function _callProviderRequest(provider, method, params){
     if(!provider || typeof provider.request !== 'function'){
       throw new Error('Wallet provider request method is unavailable.');
     }
-    if(provider.request.length >= 2){
-      return provider.request(method, params);
-    }
-    return provider.request({ method: method, params: params });
+    return Promise.resolve(provider.request(method, params)).catch(function(error){
+      throw _hoistRpcEnvelopeError(error);
+    });
   }
 
   function _callProviderMethod(provider, method){
     if(!provider || typeof provider.request !== 'function'){
       throw new Error('Wallet provider request method is unavailable.');
     }
-    if(provider.request.length >= 2){
-      return provider.request(method);
-    }
-    return provider.request({ method: method });
+    return Promise.resolve(provider.request(method)).catch(function(error){
+      throw _hoistRpcEnvelopeError(error);
+    });
   }
 
   function _defaultProviderMethodParams(method, preferredNetwork){
@@ -1587,10 +1615,30 @@ var HighScores = (function(){
     return _pickPreferredStacksAddress(candidates, preferredNetwork || null);
   }
 
+  function _sharedWalletSessionAddress(preferredNetwork){
+    try{
+      var session = typeof window !== 'undefined' ? window.ArcadeWalletSession : null;
+      if(!session || !_looksLikeStacksAddress(session.address)) return null;
+      if(preferredNetwork && _networkFromAddress(session.address) !== preferredNetwork) return null;
+      return String(session.address).trim();
+    }catch(e){
+      return null;
+    }
+  }
+
   function _resolveProviderAddress(provider, preferredNetwork, options){
     if(!provider) return Promise.resolve(null);
     var fallbackAddress = null;
     var allowInteractive = !(options && options.allowInteractive === false);
+
+    /* v5.1: the launcher publishes the connected session as
+       window.ArcadeWalletSession. Reuse it instead of re-querying the wallet:
+       desktop Leather opens an approval popup on every address read, so each
+       redundant resolution here was a popup the player had to dismiss. */
+    var sessionAddress = _sharedWalletSessionAddress(preferredNetwork);
+    if(sessionAddress){
+      return Promise.resolve(sessionAddress);
+    }
 
     if(typeof provider.selectedAddress === 'string' && _looksLikeStacksAddress(provider.selectedAddress)){
       if(!preferredNetwork || _networkFromAddress(provider.selectedAddress) === preferredNetwork){

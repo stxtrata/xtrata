@@ -39,8 +39,8 @@
       "key": "highscores",
       "path": "modules/highscores.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 133114,
-      "sha256": "ae16406a46df0ea14936c3f5e5be2e8f6db2e51169a0ad133f3a45f1c77f0560",
+      "sizeBytes": 135406,
+      "sha256": "eeac5369fc3962a15736d32598ea4266d8bc6ca00e8156e963b03b8eeae7653c",
       "mintOrder": 3,
       "mintedInscriptionId": null
     },
@@ -57,8 +57,8 @@
       "key": "main",
       "path": "modules/main-v3.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 168282,
-      "sha256": "bad8aff8f7524c43351cbb6fd959d6dc20155beab2d13beb716f8b35f79b7c4e",
+      "sizeBytes": 169919,
+      "sha256": "c7d17e627ba8aeeb055363aa3082bdde90da338070a92141a4656d4d630ef403",
       "mintOrder": 5,
       "mintedInscriptionId": null
     }
@@ -67,7 +67,7 @@
     "path": "parent/astro-blaster-parent-v5-mobile.template.html",
     "mimeType": "text/html",
     "sizeBytes": 70242,
-    "sha256": "8f35c9ba5e808f5033bdff6e64e515a82fa4313105e7db5448d202b378fb968c",
+    "sha256": "8400bcf3447b4cb57dba367c5877c50b40f4ae99306071b6f238f73494a57990",
     "configFieldsToSetBeforeMint": [
       "CONFIG.contentContractAddress",
       "CONFIG.contentContractName",

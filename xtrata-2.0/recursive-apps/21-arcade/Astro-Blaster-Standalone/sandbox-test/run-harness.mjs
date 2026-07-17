@@ -286,10 +286,103 @@ async function runScenario({ grantBridge }) {
   await page.close();
 }
 
+// Scenario C: standalone top-frame with a mock DESKTOP Leather injected into
+// the game frame. Desktop Leather opens an approval popup on EVERY address
+// read, so this scenario asserts the whole session lifecycle costs exactly one
+// interactive read: connect = 1 popup, score submit + 6s of status polling = 0
+// additional reads, the call goes via LeatherProvider (never a deprecated
+// alias), and the deprecated transactionRequest path is never used.
+async function runLeatherDesktopScenario() {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  page.on('pageerror', (e) => console.log('[pageerror]', e.message));
+  if (process.env.HARNESS_DEBUG) {
+    page.on('console', (msg) => {
+      const text = msg.text();
+      if (/wallet|leather|session|provider/i.test(text)) console.log('[frame]', text.slice(0, 300));
+    });
+  }
+  await page.goto(`http://127.0.0.1:${port}/sandbox-test/host.html?grantBridge=0&mockLeather=1`);
+
+  const frame = await (async () => {
+    for (let i = 0; i < 100; i += 1) {
+      const f = page.frames().find((fr) => fr !== page.mainFrame());
+      if (f) {
+        const booted = await f.evaluate(() => !!window.ArcadeLauncher).catch(() => false);
+        if (booted) return f;
+      }
+      await page.waitForTimeout(300);
+    }
+    return null;
+  })();
+  if (!frame) {
+    fail('scenario C: game did not boot with mock Leather injected');
+    await page.close();
+    return;
+  }
+  pass('scenario C: parent booted with mock desktop Leather in frame');
+
+  await frame.click('#wallet-connect-btn');
+  await frame.waitForFunction(
+    () => /Wallet:\s*S[PTMN]/.test(document.getElementById('wallet-status-badge').textContent || ''),
+    null,
+    { timeout: 20000 }
+  ).catch(() => fail('scenario C: badge never reported connected'));
+
+  const afterConnect = await frame.evaluate(() => ({
+    calls: JSON.parse(JSON.stringify(window.__LEATHER_CALLS)),
+    session: window.ArcadeWalletSession || null
+  }));
+  const connectReads = afterConnect.calls.getAddresses + afterConnect.calls.stx_getAddresses;
+  if (connectReads === 1 && afterConnect.calls.deprecatedObjectCalls === 0) {
+    pass('scenario C: connect cost exactly one interactive Leather read, named provider only');
+  } else {
+    fail('scenario C: connect reads=' + connectReads + ' deprecated=' + afterConnect.calls.deprecatedObjectCalls +
+      ' detail=' + JSON.stringify(afterConnect.calls));
+  }
+  if (afterConnect.session && /^SP/.test(afterConnect.session.address || '')) {
+    pass('scenario C: launcher published window.ArcadeWalletSession for sibling modules');
+  } else {
+    fail('scenario C: shared session missing: ' + JSON.stringify(afterConnect.session));
+  }
+
+  const submitResult = await frame.evaluate(async () => {
+    try {
+      const r = await window.HighScores.submitOnChainScore({
+        gameId: 'astro-blaster', mode: 0, score: 424242, playerName: 'LTH'
+      });
+      return { ok: true, r: JSON.stringify(r).slice(0, 160) };
+    } catch (error) {
+      return { ok: false, error: String(error && error.message ? error.message : error) };
+    }
+  });
+
+  await page.waitForTimeout(6000); // cover a full status-poll tick
+  const finalCalls = await frame.evaluate(() => JSON.parse(JSON.stringify(window.__LEATHER_CALLS)));
+  const totalReads = finalCalls.getAddresses + finalCalls.stx_getAddresses;
+  if (submitResult.ok && finalCalls.callContract >= 1) {
+    pass('scenario C: score submit resolved via stx_callContract: ' + submitResult.r);
+  } else {
+    fail('scenario C: submit failed: ' + JSON.stringify({ submitResult, finalCalls }));
+  }
+  if (
+    totalReads === 1 &&
+    finalCalls.transactionRequest === 0 &&
+    finalCalls.deprecatedObjectCalls === 0 &&
+    finalCalls.callVia.every((via) => via === 'LeatherProvider')
+  ) {
+    pass('scenario C: zero re-prompts after connect; no deprecated alias or transactionRequest use');
+  } else {
+    fail('scenario C: wallet interaction budget exceeded: ' + JSON.stringify(finalCalls));
+  }
+  await page.close();
+}
+
 console.log('--- Scenario A: wallet-capable host (hello granted) ---');
 await runScenario({ grantBridge: true });
 console.log('--- Scenario B: host ignores hello (claim-runtime path) ---');
 await runScenario({ grantBridge: false });
+console.log('--- Scenario C: standalone + mock desktop Leather ---');
+await runLeatherDesktopScenario();
 
 await browser.close();
 server.close();

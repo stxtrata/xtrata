@@ -1105,11 +1105,12 @@
          extension. Treating those as separate candidates double-prompts the
          user during connect, so skip the generic names whenever a named
          provider object exists in this context. */
-      var hasNamedWalletProvider = !!(
-        safeWindowRead(contextRoot, 'LeatherProvider') ||
+      var hasLeatherNamed = !!safeWindowRead(contextRoot, 'LeatherProvider');
+      var hasXverseNamed = !!(
         safeWindowRead(contextRoot, 'XverseProviders') ||
         safeWindowRead(contextRoot, 'xverseProviders')
       );
+      var hasNamedWalletProvider = hasLeatherNamed || hasXverseNamed;
       var directCandidates = [
         { label: prefix + '.StacksProvider', value: hasNamedWalletProvider ? null : safeWindowRead(contextRoot, 'StacksProvider') },
         { label: prefix + '.StacksProvider.StacksProvider', value: hasNamedWalletProvider ? null : resolveProviderPathFromRoot('StacksProvider.StacksProvider', contextRoot) },
@@ -1130,9 +1131,12 @@
         { label: prefix + '.XverseProviders.BitcoinProvider', value: resolveProviderPathFromRoot('XverseProviders.BitcoinProvider', contextRoot) },
         { label: prefix + '.xverseProviders.BitcoinProvider', value: resolveProviderPathFromRoot('xverseProviders.BitcoinProvider', contextRoot) },
         { label: prefix + '.stacksProvider', value: hasNamedWalletProvider ? null : safeWindowRead(contextRoot, 'stacksProvider') },
-        { label: prefix + '.btc', value: safeWindowRead(contextRoot, 'btc') },
+        /* window.btc is Leather's btckit alias and window.BitcoinProvider is
+           Xverse's generic alias; calling either routes Leather submits into
+           the deprecated transactionRequest screen (disabled Confirm). */
+        { label: prefix + '.btc', value: hasLeatherNamed ? null : safeWindowRead(contextRoot, 'btc') },
         { label: prefix + '.stacks', value: hasNamedWalletProvider ? null : safeWindowRead(contextRoot, 'stacks') },
-        { label: prefix + '.BitcoinProvider', value: safeWindowRead(contextRoot, 'BitcoinProvider') }
+        { label: prefix + '.BitcoinProvider', value: hasXverseNamed ? null : safeWindowRead(contextRoot, 'BitcoinProvider') }
       ];
 
       var c;
@@ -1573,8 +1577,8 @@
 
   function readWalletConnectSessionStorage(){
     if(typeof window === 'undefined') return null;
-    if(!window.localStorage) return null;
     try{
+      if(!window.localStorage) return null;
       return window.localStorage.getItem(WALLET_CONNECT_SESSION_STORAGE_KEY);
     }catch(error){
       return null;
@@ -1583,12 +1587,16 @@
 
   function writeWalletConnectSessionStorage(value){
     if(typeof window === 'undefined') return;
-    if(!window.localStorage) return;
+    /* Sandboxed srcdoc iframes throw on the window.localStorage GETTER itself
+       (SecurityError), so even reading the property must sit inside try. */
+    var storage = null;
+    try{ storage = window.localStorage; }catch(error){ return; }
+    if(!storage) return;
     try{
       if(value){
-        window.localStorage.setItem(WALLET_CONNECT_SESSION_STORAGE_KEY, value);
+        storage.setItem(WALLET_CONNECT_SESSION_STORAGE_KEY, value);
       } else {
-        window.localStorage.removeItem(WALLET_CONNECT_SESSION_STORAGE_KEY);
+        storage.removeItem(WALLET_CONNECT_SESSION_STORAGE_KEY);
       }
     }catch(error){}
   }
@@ -1628,6 +1636,7 @@
     }
     walletConnectSession = null;
     writeWalletConnectSessionStorage('');
+    try{ window.ArcadeWalletSession = null; }catch(e){}
   }
 
   function setWalletConnectSession(address, network, providerLabel, source){
@@ -1646,6 +1655,17 @@
       source: walletConnectSession.source
     });
     writeWalletConnectSessionStorage(JSON.stringify(walletConnectSession));
+    /* v5.1: publish the session for sibling modules (highscores) so score
+       submits reuse the connected address instead of re-prompting the wallet.
+       Desktop Leather opens an approval popup on EVERY getAddresses call, so
+       any re-resolution after connect is a popup the player has to dismiss. */
+    try{
+      window.ArcadeWalletSession = {
+        address: walletConnectSession.address,
+        network: walletConnectSession.network,
+        provider: walletConnectSession.provider
+      };
+    }catch(e){}
     return true;
   }
 
@@ -2294,6 +2314,15 @@
       }
       if(!fallbackAddress){
         fallbackAddress = provider.address;
+      }
+    }
+
+    /* v5.1: desktop Leather opens an approval popup on EVERY
+       getAddresses/stx_getAddresses call — not just the first — so once a
+       session exists the session IS the answer; never re-query Leather. */
+    if(isLeather && walletConnectSession && looksLikeStacksAddress(walletConnectSession.address)){
+      if(!preferredNetwork || inferNetworkFromAddress(walletConnectSession.address) === preferredNetwork){
+        return walletConnectSession.address;
       }
     }
 

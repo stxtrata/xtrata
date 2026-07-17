@@ -119,7 +119,7 @@
           if (url.indexOf('/v2/contracts/call-read/') < 0) {
             return realFetch ? realFetch(input, init) : Promise.reject(new Error('no network in harness'));
           }
-          var fn = url.split('/').pop();
+          var fn = url.split('?')[0].split('/').pop();
           var body = {};
           try { body = JSON.parse(init && init.body || '{}'); } catch (e) {}
           var args = body.arguments || [];
@@ -145,7 +145,8 @@
               }
             }
           } else if (fn === 'get-fee-unit') {
-            payload = { okay: true, result: '0x01' + (30000).toString(16).padStart(32, '0') };
+            // Real chain wraps the uint in a response-ok envelope (0x07 01 ...).
+            payload = { okay: true, result: '0x0701' + (30000).toString(16).padStart(32, '0') };
           } else if (fn === 'get-top10-entry') {
             payload = { okay: true, result: '0x09' }; // none: empty slot
           } else {
@@ -158,8 +159,68 @@
       })();
       <\/script>`;
 
-      // Inject the mock BEFORE the parent's boot script.
-      const srcdoc = parentHtml.replace('<script>', mockScript + '\n<script>');
+      // ---- optional mock desktop Leather (scenario C) --------------------
+      // Emulates the desktop extension's semantics: getAddresses/stx_getAddresses
+      // are interactive approvals EVERY time (150ms), the deprecated
+      // window.StacksProvider / window.stacks / window.btc aliases exist and
+      // count their usage, and transactionRequest rejects as deprecated.
+      const leatherMockScript = params.get('mockLeather') === '1' ? `
+      <script>
+      (function(){
+        window.ARCADE_ONCHAIN_CONFIG = { debug: true };
+        var C = window.__LEATHER_CALLS = {
+          getAddresses: 0, stx_getAddresses: 0, otherReads: 0,
+          transactionRequest: 0, deprecatedObjectCalls: 0,
+          callContract: 0, callVia: []
+        };
+        var STX = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
+        function makeLeather(deprecated){
+          return {
+            request: function(method){
+              if (deprecated) C.deprecatedObjectCalls += 1;
+              if (method === 'getAddresses' || method === 'stx_getAddresses') {
+                C[method] += 1;
+                return new Promise(function(res){
+                  setTimeout(function(){
+                    res({ jsonrpc: '2.0', id: 'h', result: { addresses: [
+                      { symbol: 'BTC', type: 'p2wpkh', address: 'bc1qharness' },
+                      { symbol: 'STX', kind: 'single-sig', address: STX, publicKey: '02' + 'ab'.repeat(32) }
+                    ]}});
+                  }, 150);
+                });
+              }
+              if (method === 'supportedMethods') {
+                return Promise.resolve({ jsonrpc: '2.0', id: 'h', result: { methods: [
+                  { name: 'getAddresses' }, { name: 'stxGetAddresses' }, { name: 'stxCallContract' }
+                ]}});
+              }
+              if (method === 'stx_callContract') {
+                C.callContract += 1;
+                C.callVia.push(deprecated ? 'deprecated-alias' : 'LeatherProvider');
+                return Promise.resolve({ jsonrpc: '2.0', id: 'h', result: {
+                  txid: 'cd'.repeat(32), transaction: '00'
+                }});
+              }
+              C.otherReads += 1;
+              return Promise.reject({ jsonrpc: '2.0', id: 'h', error: {
+                code: -32601, message: '"' + method + '" is not supported.'
+              }});
+            },
+            transactionRequest: function(){
+              C.transactionRequest += 1;
+              return Promise.reject(new Error('This function is deprecated'));
+            }
+          };
+        }
+        window.LeatherProvider = makeLeather(false);
+        window.StacksProvider = makeLeather(true);
+        window.stacks = window.StacksProvider;
+        window.btc = makeLeather(true);
+      })();
+      <\/script>` : '';
+
+      // Inject the mocks BEFORE the parent's boot script.
+      const srcdoc = parentHtml.replace('<script>', leatherMockScript + mockScript + '\n<script>');
 
       // ---- mock wallet-capable host --------------------------------------
       const BRIDGE_TOKEN = 'harness-token-' + Math.random().toString(36).slice(2);
