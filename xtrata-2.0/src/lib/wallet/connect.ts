@@ -780,15 +780,7 @@ const buildXverseContractCallParams = (options: WalletContractCallOptions) => {
     // and silently drop `functionArgs`; send both spellings.
     arguments: params.functionArgs,
     postConditionMode: params.postConditionMode,
-    postConditions: params.postConditions,
-    // Xverse mobile routes this request into its legacy transaction-request
-    // screen, which reads the sender as payload.stxAddress and rejects the
-    // request as "requesting signature from a different address. (undefined)"
-    // when it is missing. The extension validates against the sats-connect
-    // schema and strips unknown keys, so both sender aliases are safe there.
-    ...(options.stxAddress
-      ? { stxAddress: options.stxAddress, address: options.stxAddress }
-      : {})
+    postConditions: params.postConditions
   };
 };
 

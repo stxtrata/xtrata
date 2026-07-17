@@ -362,25 +362,21 @@ describe('wallet connect helpers', () => {
           return { status: 'success', result: { addresses: [{ address: ADDRESS }] } };
         }
         expect(method).toBe('stx_callContract');
-        // sats-connect schema fields plus the sender aliases Xverse mobile's
-        // legacy transaction-request screen reads; nothing else (no network,
-        // fee, nonce or sponsored fields).
+        // Exactly the sats-connect schema fields (plus the legacy `arguments`
+        // alias) — the shape proven end-to-end on real Xverse mobile and
+        // desktop by the wallet canary. No sender/network/fee/nonce/sponsored.
         expect(Object.keys(params ?? {}).sort()).toEqual([
-          'address',
           'arguments',
           'contract',
           'functionArgs',
           'functionName',
           'postConditionMode',
-          'postConditions',
-          'stxAddress'
+          'postConditions'
         ]);
         expect(params).toMatchObject({
           contract: `${ADDRESS}.xtrata-arcade-scores-v1-3`,
           functionName: 'submit-score',
-          postConditionMode: 'deny',
-          stxAddress: ADDRESS,
-          address: ADDRESS
+          postConditionMode: 'deny'
         });
         expect(params?.functionArgs).toHaveLength(4);
         expect(params?.arguments).toEqual(params?.functionArgs);
