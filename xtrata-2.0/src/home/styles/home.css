@@ -6228,3 +6228,34 @@
         transition: none;
       }
     }
+
+    /* First Masterpiece bounty card (campaignSlot) — appended so it wins ties. */
+    .campaign-slot {
+      margin-bottom: 12px;
+    }
+
+    .campaign-slot__stat {
+      z-index: 1;
+      display: grid;
+      justify-items: center;
+      gap: 6px;
+      text-align: center;
+    }
+
+    .campaign-slot__stat-number {
+      color: var(--ink, #eef3f8);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: clamp(72px, 9vw, 128px);
+      font-weight: 650;
+      letter-spacing: -0.04em;
+      line-height: 0.9;
+      text-shadow: 0 26px 50px rgba(0, 0, 0, 0.55);
+    }
+
+    .campaign-slot__stat-label {
+      color: rgba(238, 243, 249, 0.62);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }

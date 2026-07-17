@@ -171,7 +171,20 @@
         <span class="section-kicker">Flagship stories</span>
         <h2 id="storiesTitle">Three ways the idea becomes real.</h2>
       </div>
-      <div class="campaign-slot" id="campaignSlot" aria-live="polite"></div>
+      <div class="campaign-slot" id="campaignSlot" aria-live="polite">
+        <div class="campaign-slot__art" aria-hidden="true">
+          <div class="campaign-slot__stat"><span class="campaign-slot__stat-number">200</span><span class="campaign-slot__stat-label">STX · prize pool</span></div>
+        </div>
+        <div class="campaign-slot__body">
+          <span class="section-kicker">Live bounty · Xtrata × Zero Authority DAO</span>
+          <h3 class="campaign-slot__title">Inscribe your first masterpiece.</h3>
+          <p class="campaign-slot__copy">Create an original song, artwork, photograph, poem, animation or film. Put it fully on-chain through Xtrata and enter to win part of 200 STX. Four winners. No theme. Permanent by design.</p>
+          <div class="campaign-slot__actions">
+            <a class="btn" href="/masterpiece" target="_self" data-home-action="campaign:masterpiece">Enter the bounty</a>
+            <a class="btn secondary" href="/wizard/" data-home-action="campaign:wizard">Start inscribing</a>
+          </div>
+        </div>
+      </div>
       <div class="story-grid">
         <article class="story-card story-card--free">
           <span class="story-card__number">01 / Proof of Free</span>
@@ -267,11 +280,11 @@
             <div id="fileFields">
               <div class="field">
                 <span class="label">Payload</span>
-                <input id="fileInput" type="file" multiple hidden />
+                <input id="fileInput" type="file" hidden />
                 <div class="dropzone" id="dropzone" tabindex="0" role="button">
                   <span id="dropzoneText">Choose file or drop it here</span>
                 </div>
-                <span class="field-note">One file up to 512 KB is prepared here. Larger files, multiple files, and folders continue in the Wizard automatically.</span>
+                <span class="field-note">Drop a file and it's prepared automatically — name, type and cost appear instantly.</span>
               </div>
             </div>
 
@@ -365,10 +378,19 @@
             </details>
 
             <p class="support-note inscribe-wizard-note">
-              Standard Create accepts one file up to 512 KB. Drop anything larger, multiple
-              files, or a folder and it will open in the <a href="/wizard/" target="_self">Inscription Wizard</a>.
+              Large file, audio master, or a hands-off flow? The
+              <a href="/wizard/" target="_self">Inscription Wizard</a> optimises, inscribes and
+              delivers it for a single payment.
             </p>
           </form>
+
+          <div class="large-file-notice" id="largeFileNotice" hidden>
+            <div class="large-file-notice__body">
+              <strong>Large file — the Wizard is easier here.</strong>
+              <span id="largeFileNoticeText"></span>
+            </div>
+            <a class="btn" href="/wizard/" target="_self">Use the Inscription Wizard →</a>
+          </div>
 
           <div class="prepare-grid">
             <div class="payload-preview-stage">
