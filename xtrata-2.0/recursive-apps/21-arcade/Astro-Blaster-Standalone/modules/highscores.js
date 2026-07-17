@@ -1281,6 +1281,16 @@ var HighScores = (function(){
       contractName: params.contractName,
       functionName: params.functionName
     };
+    /* Xverse mobile's legacy transaction-request handler reads the sender
+       from payload.stxAddress without a missing-value guard: omitting it
+       rejects the request before any confirmation UI with "The Dapp is
+       requesting signature from a different address. (undefined)". Desktop
+       wallets treat a present-and-matching stxAddress as a no-op, so always
+       carry the resolved sender when we have one. */
+    var senderAddress = String(params.senderAddress || '').trim();
+    if(senderAddress){
+      base.stxAddress = senderAddress;
+    }
     var network = params.network || 'mainnet';
     var postConditionMode = _normalizePostConditionMode(params.postConditionMode);
     var postConditionSpecs = _collectPostConditionSpecs(params);
@@ -2461,7 +2471,8 @@ var HighScores = (function(){
               network: payload.network || 'mainnet',
               postConditionMode: POST_CONDITION_MODE_ALLOW,
               enableCallV2Fallback: false,
-              enableTransactionRequestFallback: false
+              enableTransactionRequestFallback: false,
+              senderAddress: playerAddress || null
             };
             _debugLog('info', 'Submitting score with compatible allow-mode transaction params', {
               providerLabel: candidate.label
@@ -2501,6 +2512,7 @@ var HighScores = (function(){
                     postConditionMode: POST_CONDITION_MODE_DENY,
                     enableCallV2Fallback: false,
                     enableTransactionRequestFallback: false,
+                    senderAddress: senderAddress,
                     postConditionVariants: _buildSubmitPostConditionVariants(senderAddress, feeCapMicroStx)
                   };
                   _debugLog('info', 'Prepared deny-mode post conditions for score submit', {
