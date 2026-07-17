@@ -49,6 +49,7 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 - The root `index.html` now carries the public homepage UI directly with inline styles and scripts, including homepage wallet connect, inscription preparation, transaction logs, viewer grid, token preview, examples, and explorer mode.
 - Treat `src/PublicApp.tsx`/`src/SimplePublicHome.tsx` as React public-app references or alternate surfaces, not the only homepage implementation. If a requested change affects public homepage behavior or wording, make the effective change in `index.html` and mirror it in React modules only when those modules still expose the same user-facing surface.
 - For inscription UX changes, keep the homepage inline mint flow aligned with `src/screens/MintScreen.tsx`: preserve begin -> batch/chunk -> seal order, keep resume/recovery messaging consistent, and do not hide errors.
+- `public/create-routing.js` owns the public Create/Wizard selection boundary and IndexedDB file handoff. Standard Create accepts exactly one file up to and including 512 KB; larger files, multiple files, and folder drops route to `/wizard/`. `src/lib/create-routing.js` re-exports the same helper for the bundled homepage, while `first-masterpiece/index.html` and `xtrata-agent-one/wizard/index.html` consume its public browser API.
 
 ## Screens and shared UI
 

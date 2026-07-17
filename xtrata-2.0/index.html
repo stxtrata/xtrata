@@ -267,11 +267,11 @@
             <div id="fileFields">
               <div class="field">
                 <span class="label">Payload</span>
-                <input id="fileInput" type="file" hidden />
+                <input id="fileInput" type="file" multiple hidden />
                 <div class="dropzone" id="dropzone" tabindex="0" role="button">
                   <span id="dropzoneText">Choose file or drop it here</span>
                 </div>
-                <span class="field-note">Drop a file and it's prepared automatically — name, type and cost appear instantly.</span>
+                <span class="field-note">One file up to 512 KB is prepared here. Larger files, multiple files, and folders continue in the Wizard automatically.</span>
               </div>
             </div>
 
@@ -365,19 +365,10 @@
             </details>
 
             <p class="support-note inscribe-wizard-note">
-              Large file, audio master, or a hands-off flow? The
-              <a href="/wizard/" target="_self">Inscription Wizard</a> optimises, inscribes and
-              delivers it for a single payment.
+              Standard Create accepts one file up to 512 KB. Drop anything larger, multiple
+              files, or a folder and it will open in the <a href="/wizard/" target="_self">Inscription Wizard</a>.
             </p>
           </form>
-
-          <div class="large-file-notice" id="largeFileNotice" hidden>
-            <div class="large-file-notice__body">
-              <strong>Large file — the Wizard is easier here.</strong>
-              <span id="largeFileNoticeText"></span>
-            </div>
-            <a class="btn" href="/wizard/" target="_self">Use the Inscription Wizard →</a>
-          </div>
 
           <div class="prepare-grid">
             <div class="payload-preview-stage">

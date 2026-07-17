@@ -13,6 +13,14 @@
       uintCV,
       contractPrincipalCV
     } from '@stacks/transactions';
+    import {
+      STANDARD_CREATE_MAX_BYTES,
+      classifyCreateFiles,
+      collectDroppedFiles,
+      createHandoffUrl,
+      storeCreateHandoff,
+      takeCreateHandoff
+    } from '/src/lib/create-routing.js';
     import { createStacksWalletAdapter } from '/src/lib/wallet/adapter.ts';
     import {
       THEME_STORAGE_KEY,
@@ -298,8 +306,6 @@
       activityLog: $('activityLog'),
       textAdvancedDetails: $('textAdvancedDetails'),
       textAdvancedLogSlot: $('textAdvancedLogSlot'),
-      largeFileNotice: $('largeFileNotice'),
-      largeFileNoticeText: $('largeFileNoticeText'),
       parentRelationshipPanel: $('parentRelationshipPanel'),
       parentRelationshipBadge: $('parentRelationshipBadge'),
       parentIdsInput: $('parentIdsInput'),
@@ -4278,7 +4284,6 @@
         dom.duplicateWarning.classList.remove('on');
         renderResumeNotice();
         if (dom.inscribeTextButton) dom.inscribeTextButton.disabled = true;
-        if (dom.largeFileNotice) dom.largeFileNotice.hidden = true;
         updateControls();
         return;
       }
@@ -4454,15 +4459,6 @@
         const textCardBytes = new TextEncoder().encode(dom.textPayload.value).length;
         dom.inscribeTextButton.disabled = !(state.prepared && textCardBytes > 0 && textCardBytes <= 16384 && !state.busy);
       }
-      // Large-file nudge: over the single-tx limit (> 512 KB) → suggest the Wizard (non-blocking).
-      if (dom.largeFileNotice) {
-        const staged = !!state.prepared && transactionCount > 1;
-        dom.largeFileNotice.hidden = !staged;
-        if (staged && dom.largeFileNoticeText) {
-          dom.largeFileNoticeText.textContent =
-            `At ${formatBytes(BigInt(state.prepared.bytes))} it's over the 512 KB single-transaction limit, so inscribing it here takes ${transactionCount} wallet signatures. It's completely safe — the Wizard just does the whole thing in one click and one payment.`;
-        }
-      }
       updateControls();
     };
 
@@ -4597,6 +4593,9 @@
 
     const preparePayload = async () => {
       const file = resolvePayloadFile();
+      if (file.size > STANDARD_CREATE_MAX_BYTES) {
+        throw new Error('Files over 512 KB must be inscribed with the Wizard.');
+      }
       const bytes = new Uint8Array(await file.arrayBuffer());
       const chunks = chunkBytes(bytes);
       const expectedHash = computeExpectedHash(chunks);
@@ -9676,6 +9675,72 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
     };
 
+    const routeCreateSelection = async (
+      files,
+      { containsDirectory = false, source = 'create' } = {}
+    ) => {
+      const decision = classifyCreateFiles(files, { containsDirectory });
+      if (!decision.destination) {
+        throw new Error('Choose at least one file to continue.');
+      }
+      if (decision.destination === 'create') {
+        applyInscribeMode('file');
+        setSelectedFile(decision.files[0]);
+        return;
+      }
+
+      const reasonLabel = {
+        large: 'Files over 512 KB',
+        multiple: 'Multiple files',
+        folder: 'Folders'
+      }[decision.reason] ?? 'This selection';
+      dom.dropzoneText.textContent = `${reasonLabel} use the Wizard — taking you there…`;
+      let target = `/wizard/?from=${encodeURIComponent(source)}&routingReason=${encodeURIComponent(decision.reason)}`;
+      try {
+        const handoffId = await storeCreateHandoff(decision.files, {
+          reason: decision.reason,
+          source,
+          containsDirectory
+        });
+        target = createHandoffUrl('/wizard/', handoffId, source);
+      } catch {
+        // Still honour the routing boundary if IndexedDB is unavailable or the
+        // browser cannot retain a particularly large selection between pages.
+      }
+      window.location.assign(target);
+    };
+
+    const importCreateHandoff = async () => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('handoff') !== 'create-selection') {
+        return;
+      }
+      const handoffId = params.get('handoffId');
+      if (!handoffId) {
+        return;
+      }
+      try {
+        const handoff = await takeCreateHandoff(handoffId);
+        if (!handoff) {
+          throw new Error('That file handoff expired. Choose the file again.');
+        }
+        await routeCreateSelection(handoff.files, {
+          containsDirectory: handoff.containsDirectory,
+          source: handoff.source || 'create'
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        dom.dropzoneText.textContent = message;
+        setStatus(dom.walletStatus, `<strong>File import</strong> ${message}`, 'error', 'rose');
+      } finally {
+        params.delete('handoff');
+        params.delete('handoffId');
+        params.delete('from');
+        const query = params.toString();
+        window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
+      }
+    };
+
     // Manual recovery. If a wallet transaction is cancelled or fails — in
     // particular if a wallet popup leaves the request pending so the flow's
     // finally never runs — the busy lock can persist and disable every control.
@@ -12937,10 +13002,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     });
 
     dom.fileInput.addEventListener('change', () => {
-      const file = dom.fileInput.files?.[0] ?? null;
-      if (file) {
-        setSelectedFile(file);
+      const files = Array.from(dom.fileInput.files ?? []);
+      if (!files.length) {
+        return;
       }
+      void routeCreateSelection(files).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        dom.dropzoneText.textContent = message;
+      });
     });
     dom.dropzone.addEventListener('click', () => dom.fileInput.click());
     dom.dropzone.addEventListener('keydown', (event) => {
@@ -12959,10 +13028,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     dom.dropzone.addEventListener('drop', (event) => {
       event.preventDefault();
       dom.dropzone.classList.remove('dragging');
-      const file = event.dataTransfer?.files?.[0] ?? null;
-      if (file) {
-        setSelectedFile(file);
-      }
+      void collectDroppedFiles(event.dataTransfer)
+        .then(({ files, containsDirectory }) =>
+          routeCreateSelection(files, { containsDirectory })
+        )
+        .catch((error) => {
+          const message = error instanceof Error ? error.message : String(error);
+          dom.dropzoneText.textContent = message;
+        });
     });
     // ---- File vs Text tabs: mode toggle, live byte stats, instant text cost ----
     const TEXT_MAX_BYTES = 16384; // product cap: text stays <= 16 KB = one chunk = one transaction
@@ -13193,7 +13266,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       revokeGridThumbUrls();
     });
 
-    void initialize();
+    const boot = async () => {
+      await initialize();
+      await importCreateHandoff();
+    };
+    void boot();
 
     // SPA tab navigation: same-tab site links (nav, cards, example chips)
     // switch pages client-side — the radio and wallet session never restart.

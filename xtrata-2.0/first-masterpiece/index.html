@@ -392,7 +392,7 @@
         </a>
         <div class="top-actions">
           <a class="btn secondary small" href="https://xtrata.xyz/xplorer">Explore Xtrata</a>
-          <a class="btn small" data-wizard-link href="https://xtrata.xyz/wizard/">Create yours</a>
+          <a class="btn small" data-create-link href="https://xtrata.xyz/inscribe">Create yours</a>
           <button class="menu-button" id="menuButton" type="button" aria-expanded="false" aria-controls="siteNav">Menu</button>
         </div>
       </div>
@@ -415,7 +415,7 @@
         <h1 id="heroTitle">Inscribe your <em>first masterpiece.</em></h1>
         <p class="hero-lead">Create an original song, artwork, photograph, poem, animation or short film. Put it fully on-chain through Xtrata and enter to win part of <strong>200 STX.</strong></p>
         <div class="hero-actions">
-          <a class="btn" data-wizard-link href="https://xtrata.xyz/wizard/">Create your inscription <span aria-hidden="true">↗</span></a>
+          <a class="btn" data-create-link href="https://xtrata.xyz/inscribe">Create your inscription <span aria-hidden="true">↗</span></a>
           <a class="btn secondary" data-bounty-link href="#official-bounty">View official bounty <span aria-hidden="true">↗</span></a>
         </div>
         <div class="hero-trust"><span>Four winners</span><span>No theme required</span><span>Fully on-chain</span><span>Anchored to Bitcoin</span></div>
@@ -459,7 +459,7 @@
       <div class="section-heading"><span class="section-kicker">Four simple steps</span><h2 id="howTitle">Create it. Inscribe it. Share it. Submit it.</h2></div>
       <div class="process">
         <article><span class="process-no">01 / CREATE</span><div><h3>Make something original</h3><p>Create a piece you are proud to place permanently on-chain.</p></div></article>
-        <article><span class="process-no">02 / INSCRIBE</span><div><h3>Use Xtrata</h3><p>Upload the work through the Xtrata Wizard and complete the guided process.</p></div></article>
+        <article><span class="process-no">02 / INSCRIBE</span><div><h3>Use Xtrata</h3><p>Start in Xtrata Create. Files over 512 KB, multiple files, and folders continue in the Wizard automatically.</p></div></article>
         <article><span class="process-no">03 / SHARE</span><div><h3>Tell its story</h3><p>Share the inscription publicly and explain what you made and why it matters.</p></div></article>
         <article><span class="process-no">04 / SUBMIT</span><div><h3>Enter the bounty</h3><p>Submit your inscription link and public post through the official Zero Authority bounty.</p></div></article>
       </div>
@@ -467,9 +467,9 @@
 
     <section class="section">
       <div class="file-step">
-        <div><span class="section-kicker">Your first move</span><h2>Drop something worth remembering.</h2><p>Choose a file here to confirm its type, then continue into the live Xtrata Wizard. This page only inspects the file locally; it does not upload it.</p><div class="format-list"><span>IMAGE</span><span>AUDIO</span><span>VIDEO</span><span>TEXT</span><span>HTML</span><span>SVG</span><span>JSON</span></div></div>
+        <div><span class="section-kicker">Your first move</span><h2>Drop something worth remembering.</h2><p>One file up to 512 KB continues in Xtrata Create. Larger files, multiple files, and folders continue in the Wizard. Your selection stays local until you choose to inscribe it.</p><div class="format-list"><span>IMAGE</span><span>AUDIO</span><span>VIDEO</span><span>TEXT</span><span>HTML</span><span>SVG</span><span>JSON</span></div></div>
         <div class="drop-ui" id="dropUi">
-          <div><div class="drop-mark" aria-hidden="true">↑</div><h3 id="dropTitle">Choose a file or drop it here</h3><p id="dropText">Preview the first step, then continue to Xtrata.</p><label class="btn" for="fileInput">Choose file</label><input id="fileInput" type="file" /><br><a class="drop-link" data-wizard-link href="https://xtrata.xyz/wizard/">Or open the Wizard directly ↗</a></div>
+          <div><div class="drop-mark" aria-hidden="true">↑</div><h3 id="dropTitle">Choose files or drop them here</h3><p id="dropText">We will open the right Xtrata creation flow automatically.</p><label class="btn" for="fileInput">Choose files</label><input id="fileInput" type="file" multiple /><br><a class="drop-link" data-create-link href="https://xtrata.xyz/inscribe">Or open Create directly ↗</a></div>
         </div>
       </div>
     </section>
@@ -519,7 +519,7 @@
 
     <section class="final-cta">
       <span class="section-kicker">Your turn</span><h2>Make something<br><em>worth recording.</em></h2><p>The network is ready. The space is permanent. The first move is yours.</p>
-      <div class="hero-actions"><a class="btn" data-wizard-link href="https://xtrata.xyz/wizard/">Inscribe your masterpiece ↗</a><a class="btn secondary" data-bounty-link href="#official-bounty">Submit through Zero Authority ↗</a></div>
+      <div class="hero-actions"><a class="btn" data-create-link href="https://xtrata.xyz/inscribe">Inscribe your masterpiece ↗</a><a class="btn secondary" data-bounty-link href="#official-bounty">Submit through Zero Authority ↗</a></div>
       <div class="deadline-note" id="bottomDeadline">Deadline to be announced.</div>
     </section>
   </main>
@@ -533,11 +533,24 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script>
+  <script type="module" src="/create-routing.js"></script>
+  <script type="module">
+    const routing = globalThis.XtrataCreateRouting ?? await new Promise((resolve) => {
+      globalThis.addEventListener("xtrata-create-routing-ready", () => {
+        resolve(globalThis.XtrataCreateRouting);
+      }, { once: true });
+    });
+    const {
+      classifyCreateFiles,
+      collectDroppedFiles,
+      createHandoffUrl,
+      storeCreateHandoff
+    } = routing;
+
     /* Replace these values when the official bounty details are confirmed. */
     const CONFIG = {
       bountyUrl: "#official-bounty",
-      wizardUrl: "https://xtrata.xyz/wizard/",
+      createUrl: "https://xtrata.xyz/inscribe",
       closingDate: "", // Example: "2026-08-07T23:59:00Z"
       deadlineLabel: "Deadline to be announced"
     };
@@ -563,10 +576,8 @@
       }
     });
 
-    document.querySelectorAll("[data-wizard-link]").forEach((link) => {
-      link.href = CONFIG.wizardUrl;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
+    document.querySelectorAll("[data-create-link]").forEach((link) => {
+      link.href = CONFIG.createUrl;
     });
 
     const menuButton = document.getElementById("menuButton");
@@ -612,17 +623,49 @@
     const fileInput = document.getElementById("fileInput");
     const dropTitle = document.getElementById("dropTitle");
     const dropText = document.getElementById("dropText");
-    const inspectFile = (file) => {
-      if (!file) return;
-      const size = file.size < 1048576 ? `${Math.max(1, Math.round(file.size / 1024))} KB` : `${(file.size / 1048576).toFixed(1)} MB`;
-      dropTitle.textContent = file.name;
-      dropText.textContent = `${file.type || "Unknown file type"} · ${size} · ready for the Xtrata Wizard`;
-      showToast("File recognised locally. Nothing has been uploaded.");
+    const continueWithSelection = async (files, { containsDirectory = false } = {}) => {
+      const decision = classifyCreateFiles(files, { containsDirectory });
+      if (!decision.destination) return;
+      const labels = {
+        standard: "Opening Xtrata Create…",
+        large: "Over 512 KB — opening the Wizard…",
+        multiple: "Multiple files — opening the Wizard…",
+        folder: "Folder detected — opening the Wizard…"
+      };
+      dropTitle.textContent = decision.files.length === 1
+        ? decision.files[0].name
+        : `${decision.files.length} files selected`;
+      dropText.textContent = labels[decision.reason];
+      const path = decision.destination === "create" ? "/inscribe" : "/wizard/";
+      let target = `${path}?from=first-masterpiece&routingReason=${encodeURIComponent(decision.reason)}`;
+      try {
+        const handoffId = await storeCreateHandoff(decision.files, {
+          reason: decision.reason,
+          source: "first-masterpiece",
+          containsDirectory
+        });
+        target = createHandoffUrl(path, handoffId, "first-masterpiece");
+      } catch {
+        showToast("Opening Xtrata — choose the selection again if it was not carried across.");
+      }
+      window.location.assign(target);
     };
-    fileInput.addEventListener("change", (event) => inspectFile(event.target.files[0]));
+    fileInput.addEventListener("change", (event) => {
+      void continueWithSelection(Array.from(event.target.files || []));
+    });
     ["dragenter", "dragover"].forEach((type) => dropUi.addEventListener(type, (event) => { event.preventDefault(); dropUi.classList.add("is-dragging"); }));
     ["dragleave", "drop"].forEach((type) => dropUi.addEventListener(type, (event) => { event.preventDefault(); dropUi.classList.remove("is-dragging"); }));
-    dropUi.addEventListener("drop", (event) => inspectFile(event.dataTransfer.files[0]));
+    dropUi.addEventListener("drop", (event) => {
+      void collectDroppedFiles(event.dataTransfer)
+        .then(({ files, containsDirectory }) =>
+          continueWithSelection(files, { containsDirectory })
+        )
+        .catch((error) => {
+          const message = error instanceof Error ? error.message : String(error);
+          dropText.textContent = message;
+          showToast(message);
+        });
+    });
   </script>
 </body>
 </html>
