@@ -358,7 +358,7 @@ describe('wallet connect helpers', () => {
     const rpcProvider = {
       request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
         seenMethods.push(method);
-        if (method === 'stx_getAccounts') {
+        if (method === 'wallet_getAccount') {
           return { status: 'success', result: { addresses: [{ address: ADDRESS }] } };
         }
         expect(method).toBe('stx_callContract');
@@ -391,7 +391,7 @@ describe('wallet connect helpers', () => {
     ).resolves.toMatchObject({ txId: scoreTxId });
 
     expect(legacyProvider.request).not.toHaveBeenCalled();
-    expect(seenMethods).toEqual(['stx_getAccounts', 'stx_callContract']);
+    expect(seenMethods).toEqual(['wallet_getAccount', 'stx_callContract']);
   });
 
   it('re-runs wallet_connect on the same Xverse provider when the session has no readable account', async () => {
@@ -428,8 +428,8 @@ describe('wallet connect helpers', () => {
     ).resolves.toMatchObject({ txId: scoreTxId });
 
     expect(seenMethods).toEqual([
-      'stx_getAccounts',
       'wallet_getAccount',
+      'stx_getAccounts',
       'wallet_connect',
       'stx_callContract'
     ]);
@@ -441,7 +441,7 @@ describe('wallet connect helpers', () => {
     const legacyProvider = { request: vi.fn() };
     const rpcProvider = {
       request: vi.fn(async (method: string) => {
-        if (method === 'stx_getAccounts') {
+        if (method === 'wallet_getAccount') {
           return { status: 'success', result: { addresses: [{ address: otherAddress }] } };
         }
         throw new Error(`stx_callContract must not be sent after an address mismatch (${method})`);
@@ -460,7 +460,7 @@ describe('wallet connect helpers', () => {
     const legacyProvider = { request: vi.fn() };
     const rpcProvider = {
       request: vi.fn(async (method: string) => {
-        if (method === 'stx_getAccounts') {
+        if (method === 'wallet_getAccount') {
           return { status: 'success', result: { addresses: [{ address: ADDRESS }] } };
         }
         // Xverse mobile can toast an error and leave the promise pending.
@@ -494,7 +494,7 @@ describe('wallet connect helpers', () => {
     };
     const rpcProvider = {
       request: vi.fn(async (method: string) => {
-        if (method === 'stx_getAccounts') {
+        if (method === 'wallet_getAccount') {
           return { status: 'success', result: { addresses: [{ address: ADDRESS }] } };
         }
         throw Object.assign(new Error('Invalid parameters for stx_callContract.'), {

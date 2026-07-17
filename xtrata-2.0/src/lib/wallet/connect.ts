@@ -847,7 +847,10 @@ const ensureXverseSigningAccount = async (
     return address;
   };
 
-  for (const method of ['stx_getAccounts', 'wallet_getAccount'] as const) {
+  // wallet_getAccount answers silently on desktop Xverse; stx_getAccounts can
+  // raise a "requesting to get accounts" permission prompt there (canary run
+  // 2026-07-17), so it is only the fallback read.
+  for (const method of ['wallet_getAccount', 'stx_getAccounts'] as const) {
     let address: string | null = null;
     try {
       const response = unwrapProviderResponse(await rpcProvider.request(method));
