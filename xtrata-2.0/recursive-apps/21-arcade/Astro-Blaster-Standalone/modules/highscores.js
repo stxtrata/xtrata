@@ -978,8 +978,15 @@ var HighScores = (function(){
 
     _debugLog('info', 'Provider discovery started', _providerDebugSnapshot());
 
+    /* Named wallets (Leather, Xverse) also inject deprecated generic aliases
+       (window.StacksProvider, window.stacks) pointing at the same extension.
+       Enumerating those as separate candidates double-prompts the user, so
+       skip them whenever a named provider object is present. */
+    var hasNamedWalletProvider = !!(
+      window.LeatherProvider || window.XverseProviders || window.xverseProviders
+    );
     var directCandidates = [
-      { label: 'window.StacksProvider', value: window.StacksProvider },
+      { label: 'window.StacksProvider', value: hasNamedWalletProvider ? null : window.StacksProvider },
       { label: 'window.LeatherProvider', value: window.LeatherProvider },
       { label: 'window.XverseProviders', value: window.XverseProviders },
       { label: 'window.xverseProviders', value: window.xverseProviders },
@@ -1000,7 +1007,7 @@ var HighScores = (function(){
         value: window.xverseProviders && window.xverseProviders.BitcoinProvider
       },
       { label: 'window.btc', value: window.btc },
-      { label: 'window.stacks', value: window.stacks },
+      { label: 'window.stacks', value: hasNamedWalletProvider ? null : window.stacks },
       { label: 'window.BitcoinProvider', value: window.BitcoinProvider }
     ];
     var out = [];

@@ -1100,13 +1100,23 @@
       var context = providerContexts[contextIndex];
       var contextRoot = context.target;
       var prefix = context.label || 'window';
+      /* Named wallets (Leather, Xverse) also inject deprecated generic aliases
+         (StacksProvider, stacks, stacksProvider) pointing at the same
+         extension. Treating those as separate candidates double-prompts the
+         user during connect, so skip the generic names whenever a named
+         provider object exists in this context. */
+      var hasNamedWalletProvider = !!(
+        safeWindowRead(contextRoot, 'LeatherProvider') ||
+        safeWindowRead(contextRoot, 'XverseProviders') ||
+        safeWindowRead(contextRoot, 'xverseProviders')
+      );
       var directCandidates = [
-        { label: prefix + '.StacksProvider', value: safeWindowRead(contextRoot, 'StacksProvider') },
-        { label: prefix + '.StacksProvider.StacksProvider', value: resolveProviderPathFromRoot('StacksProvider.StacksProvider', contextRoot) },
-        { label: prefix + '.StacksProvider.provider', value: resolveProviderPathFromRoot('StacksProvider.provider', contextRoot) },
-        { label: prefix + '.StacksProvider.stacksProvider', value: resolveProviderPathFromRoot('StacksProvider.stacksProvider', contextRoot) },
-        { label: prefix + '.StacksProvider.walletProvider', value: resolveProviderPathFromRoot('StacksProvider.walletProvider', contextRoot) },
-        { label: prefix + '.StacksProvider.wallet', value: resolveProviderPathFromRoot('StacksProvider.wallet', contextRoot) },
+        { label: prefix + '.StacksProvider', value: hasNamedWalletProvider ? null : safeWindowRead(contextRoot, 'StacksProvider') },
+        { label: prefix + '.StacksProvider.StacksProvider', value: hasNamedWalletProvider ? null : resolveProviderPathFromRoot('StacksProvider.StacksProvider', contextRoot) },
+        { label: prefix + '.StacksProvider.provider', value: hasNamedWalletProvider ? null : resolveProviderPathFromRoot('StacksProvider.provider', contextRoot) },
+        { label: prefix + '.StacksProvider.stacksProvider', value: hasNamedWalletProvider ? null : resolveProviderPathFromRoot('StacksProvider.stacksProvider', contextRoot) },
+        { label: prefix + '.StacksProvider.walletProvider', value: hasNamedWalletProvider ? null : resolveProviderPathFromRoot('StacksProvider.walletProvider', contextRoot) },
+        { label: prefix + '.StacksProvider.wallet', value: hasNamedWalletProvider ? null : resolveProviderPathFromRoot('StacksProvider.wallet', contextRoot) },
         { label: prefix + '.LeatherProvider', value: safeWindowRead(contextRoot, 'LeatherProvider') },
         { label: prefix + '.LeatherProvider.provider', value: resolveProviderPathFromRoot('LeatherProvider.provider', contextRoot) },
         { label: prefix + '.LeatherProvider.stacksProvider', value: resolveProviderPathFromRoot('LeatherProvider.stacksProvider', contextRoot) },
@@ -1119,9 +1129,9 @@
         { label: prefix + '.xverseProviders.StacksProvider', value: resolveProviderPathFromRoot('xverseProviders.StacksProvider', contextRoot) },
         { label: prefix + '.XverseProviders.BitcoinProvider', value: resolveProviderPathFromRoot('XverseProviders.BitcoinProvider', contextRoot) },
         { label: prefix + '.xverseProviders.BitcoinProvider', value: resolveProviderPathFromRoot('xverseProviders.BitcoinProvider', contextRoot) },
-        { label: prefix + '.stacksProvider', value: safeWindowRead(contextRoot, 'stacksProvider') },
+        { label: prefix + '.stacksProvider', value: hasNamedWalletProvider ? null : safeWindowRead(contextRoot, 'stacksProvider') },
         { label: prefix + '.btc', value: safeWindowRead(contextRoot, 'btc') },
-        { label: prefix + '.stacks', value: safeWindowRead(contextRoot, 'stacks') },
+        { label: prefix + '.stacks', value: hasNamedWalletProvider ? null : safeWindowRead(contextRoot, 'stacks') },
         { label: prefix + '.BitcoinProvider', value: safeWindowRead(contextRoot, 'BitcoinProvider') }
       ];
 
@@ -2756,6 +2766,22 @@
       primaryAuthEntry = null;
     }
 
+    /* v3.2: every canary-proven wallet (Leather, Xverse, desktop + mobile)
+       connects through its request() bridge; the @stacks/connect legacy auth
+       popup is only for wallets without one. Running it for request-capable
+       providers double-prompts the user and its CDN connect-modal build can
+       crash mid-render ("$instanceValues$"). */
+    if(
+      primaryAuthEntry &&
+      primaryAuthEntry.provider &&
+      typeof primaryAuthEntry.provider.request === 'function'
+    ){
+      walletConnectDebug('info', 'primary provider has a request bridge; skipping stacks-connect auth', {
+        provider: primaryAuthEntry.label
+      });
+      primaryAuthEntry = null;
+    }
+
     if(primaryAuthEntry){
       fallbackAuthTried = true;
       try{
@@ -2985,8 +3011,10 @@
       if(
         !fallbackAuthTried &&
         !requireInteractiveReconnect &&
+        !walletConnectSession && /* v3.2: never re-auth once a session exists */
         !isLikelyBitcoinOnlyProvider(entry) &&
-        !(entry.provider && entry.provider.__xtrataHostWalletBridgeShim) /* v3: no in-frame auth for bridge shim */
+        !(entry.provider && entry.provider.__xtrataHostWalletBridgeShim) && /* v3: no in-frame auth for bridge shim */
+        typeof (entry.provider && entry.provider.request) !== 'function' /* v3.2: request-capable wallets never use legacy auth */
       ){
         fallbackAuthTried = true;
         try{
