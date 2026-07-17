@@ -77,7 +77,7 @@
       let parentHtml;
       const moduleTexts = {};
       try {
-        parentHtml = await fetchText('../parent/astro-blaster-parent-v4-mobile.template.html');
+        parentHtml = await fetchText('../parent/astro-blaster-parent-v5-mobile.template.html');
         const moduleFiles = parseModuleIds(parentHtml);
         for (const [id, def] of Object.entries(moduleFiles)) {
           moduleTexts[id] = await fetchText(def.path);

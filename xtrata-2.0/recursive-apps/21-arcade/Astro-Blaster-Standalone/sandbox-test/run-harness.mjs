@@ -211,16 +211,70 @@ async function runScenario({ grantBridge }) {
   if (!pausedBefore && pausedAfter) pass('Pause touch button changed live game state');
   else fail(`Pause touch button did not change game state (${pausedBefore} -> ${pausedAfter})`);
 
-  await tap('[data-astro-key="ArrowLeft"]', 42);
+  // v5: movement is a floating-origin joystick — drag left past the press
+  // threshold, then further down for a diagonal, then release.
+  await frame.evaluate(() => {
+    const joy = document.getElementById('astro-joystick');
+    const rect = joy.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const fire = (type, x, y) => joy.dispatchEvent(new PointerEvent(type, {
+      pointerId: 42, pointerType: 'touch', isPrimary: true, bubbles: true,
+      clientX: x, clientY: y
+    }));
+    fire('pointerdown', cx, cy);
+    fire('pointermove', cx - 40, cy);
+    window.__JOY_LEFT_HELD = window.AstroBlasterMobileControls.getState().pressed.slice();
+    fire('pointermove', cx - 40, cy + 40);
+    window.__JOY_DIAGONAL_HELD = window.AstroBlasterMobileControls.getState().pressed.slice();
+    fire('pointerup', cx - 40, cy + 40);
+  });
+  const joyHeld = await frame.evaluate(() => ({
+    left: window.__JOY_LEFT_HELD,
+    diagonal: window.__JOY_DIAGONAL_HELD,
+    after: window.AstroBlasterMobileControls.getState().pressed
+  }));
+  if (
+    joyHeld.left.includes('ArrowLeft') && !joyHeld.left.includes('ArrowDown') &&
+    joyHeld.diagonal.includes('ArrowLeft') && joyHeld.diagonal.includes('ArrowDown') &&
+    joyHeld.after.length === 0
+  ) {
+    pass('joystick drag pressed left, held diagonal, and released cleanly');
+  } else {
+    fail('joystick state wrong: ' + JSON.stringify(joyHeld));
+  }
+
   await tap('[data-astro-key="Space"]', 43);
   await tap('[data-astro-key="x"]', 44);
   const mobileEvents = await frame.evaluate(() => window.__MOBILE_KEY_EVENTS || []);
   const sawPair = (key) => mobileEvents.some((event) => event.type === 'down' && event.key === key) &&
     mobileEvents.some((event) => event.type === 'up' && event.key === key);
   if (sawPair('ArrowLeft') && sawPair(' ') && sawPair('x')) {
-    pass('Move, Fire, and EMP touch buttons emitted complete keyboard input pairs');
+    pass('joystick, Fire, and EMP emitted complete keyboard input pairs');
   } else {
     fail('missing touch key events: ' + JSON.stringify(mobileEvents));
+  }
+
+  // v5: restart is in the top bar behind a two-tap confirm.
+  const restartFlow = await frame.evaluate(async () => {
+    const btn = document.getElementById('mobile-restart-btn');
+    const visible = btn && getComputedStyle(btn).display !== 'none';
+    const before = (window.__MOBILE_KEY_EVENTS || []).filter((e) => e.key === 'r').length;
+    btn.click();
+    const armed = btn.classList.contains('is-confirming') && btn.textContent === 'Sure?';
+    const afterOneTap = (window.__MOBILE_KEY_EVENTS || []).filter((e) => e.key === 'r').length;
+    btn.click();
+    const afterTwoTaps = (window.__MOBILE_KEY_EVENTS || []).filter((e) => e.key === 'r').length;
+    const disarmed = !btn.classList.contains('is-confirming');
+    return { visible, armed, firstTapDispatched: afterOneTap - before, secondTapDispatched: afterTwoTaps - afterOneTap, disarmed };
+  });
+  if (
+    restartFlow.visible && restartFlow.armed && restartFlow.firstTapDispatched === 0 &&
+    restartFlow.secondTapDispatched === 2 && restartFlow.disarmed
+  ) {
+    pass('top-bar restart requires a confirm tap before dispatching');
+  } else {
+    fail('restart confirm flow wrong: ' + JSON.stringify(restartFlow));
   }
 
   // Restore the running state so teardown never leaves a held/paused input.
