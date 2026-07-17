@@ -99,7 +99,9 @@
     <button id="btn-getaddresses" class="secondary">getAddresses</button>
     <button id="btn-stxgetaddresses" class="secondary">stx_getAddresses</button>
     <button id="btn-supported" class="secondary">supportedMethods</button>
+    <button id="btn-getinfo" class="secondary">getInfo</button>
     <button id="btn-feeunit" class="secondary">read get-fee-unit</button>
+    <button id="btn-listen" class="secondary">watch account/network events</button>
   </div>
 
   <div class="panel">
@@ -143,7 +145,7 @@
 (function () {
   'use strict';
 
-  var VERSION = 'xtrata-wallet-canary v0.1.1';
+  var VERSION = 'xtrata-wallet-canary v0.2.0';
   var QS = (function () {
     try { return new URLSearchParams(window.location.search || ''); } catch (e) { return { get: function () { return null; } }; }
   })();
@@ -696,6 +698,45 @@
   });
   bind('btn-feeunit', function () {
     runTest('read-only get-fee-unit', readFeeUnit).catch(function () {});
+  });
+  bind('btn-getinfo', function () {
+    runTest('getInfo [' + selMode.value + ']', function () {
+      return walletRequest('getInfo', undefined, 30000);
+    }).catch(function () {});
+  });
+
+  // Wallet-pushed events: sats-connect style addListener (Xverse) and
+  // provider .on/.addEventListener fallbacks. Logs every accountChange /
+  // networkChange / disconnect so account-switch behavior becomes observable.
+  var LISTENERS_INSTALLED = false;
+  bind('btn-listen', function () {
+    if (LISTENERS_INSTALLED) { log('warn', 'event listeners already installed'); return; }
+    var events = ['accountChange', 'networkChange', 'disconnect'];
+    var installed = 0;
+    PROVIDERS.forEach(function (p) {
+      events.forEach(function (evt) {
+        var handler = function (payload) {
+          log('tx', 'EVENT ' + evt + ' from ' + p.id, payload);
+          record('event:' + evt + ' (' + p.id + ')', 'FIRED', jsonSafe(payload));
+        };
+        try {
+          if (typeof p.obj.addListener === 'function') {
+            p.obj.addListener(evt, handler); installed += 1;
+            log('info', 'addListener(' + evt + ') installed on ' + p.id);
+            return;
+          }
+          if (typeof p.obj.on === 'function') {
+            p.obj.on(evt, handler); installed += 1;
+            log('info', 'on(' + evt + ') installed on ' + p.id);
+          }
+        } catch (e) {
+          log('warn', 'listener install failed on ' + p.id + ' for ' + evt + ': ' + e.message);
+        }
+      });
+    });
+    LISTENERS_INSTALLED = installed > 0;
+    log(installed ? 'ok' : 'warn', 'event watchers installed: ' + installed +
+      (installed ? ' — now switch accounts/networks INSIDE the wallet and watch this log' : ' (no provider exposes addListener/on)'));
   });
 
   bind('btn-call', function () {
