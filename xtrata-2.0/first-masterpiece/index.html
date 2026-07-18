@@ -392,7 +392,7 @@
         </a>
         <div class="top-actions">
           <a class="btn secondary small" href="https://xtrata.xyz/xplorer">Explore Xtrata</a>
-          <a class="btn small" data-wizard-link href="https://xtrata.xyz/wizard/">Create yours</a>
+          <a class="btn small" data-create-link href="/inscribe">Create yours</a>
           <button class="menu-button" id="menuButton" type="button" aria-expanded="false" aria-controls="siteNav">Menu</button>
         </div>
       </div>
@@ -415,7 +415,7 @@
         <h1 id="heroTitle">Inscribe your <em>first masterpiece.</em></h1>
         <p class="hero-lead">Create an original song, artwork, photograph, poem, animation or short film. Put it fully on-chain through Xtrata and be one of four creators to win <strong>50 STX.</strong></p>
         <div class="hero-actions">
-          <a class="btn" data-wizard-link href="https://xtrata.xyz/wizard/">Create your inscription <span aria-hidden="true">↗</span></a>
+          <a class="btn" data-create-link href="/inscribe">Create your inscription <span aria-hidden="true">→</span></a>
           <a class="btn secondary" data-bounty-link href="#official-bounty">View official bounty <span aria-hidden="true">↗</span></a>
         </div>
         <div class="hero-trust"><span>Four equal winners</span><span>No theme required</span><span>Fully on-chain</span><span>Anchored to Bitcoin</span></div>
@@ -469,7 +469,7 @@
       <div class="file-step">
         <div><span class="section-kicker">Your first move</span><h2>Drop something worth remembering.</h2><p>Choose your work here and we route it the right way: a single file up to 512&nbsp;KB mints in one quick transaction on the Create page, while larger files, multiple files, or folders continue in the guided Wizard. Nothing is uploaded until you confirm in your wallet.</p><div class="format-list"><span>IMAGE</span><span>AUDIO</span><span>VIDEO</span><span>TEXT</span><span>HTML</span><span>SVG</span><span>JSON</span></div></div>
         <div class="drop-ui" id="dropUi">
-          <div><div class="drop-mark" aria-hidden="true">↑</div><h3 id="dropTitle">Choose files or drop them here</h3><p id="dropText">Single file up to 512 KB mints in one transaction. Bigger or multiple continues in the Wizard.</p><label class="btn" for="fileInput">Choose files</label><input id="fileInput" type="file" multiple /><br><a class="btn" id="dropContinue" href="#" hidden>Continue</a><br><a class="drop-link" data-wizard-link href="https://xtrata.xyz/wizard/">Or open the Wizard directly ↗</a></div>
+          <div><div class="drop-mark" aria-hidden="true">↑</div><h3 id="dropTitle">Choose files or drop them here</h3><p id="dropText">Single file up to 512 KB mints in one transaction. Bigger or multiple continues in the Wizard.</p><label class="btn" for="fileInput">Choose files</label><input id="fileInput" type="file" multiple /><br><a class="btn" id="dropContinue" href="#" hidden>Continue</a><br><a class="drop-link" href="/wizard/">Or open the Wizard directly ↗</a></div>
         </div>
       </div>
     </section>
@@ -518,7 +518,7 @@
 
     <section class="final-cta">
       <span class="section-kicker">Your turn</span><h2>Make something<br><em>worth recording.</em></h2><p>The network is ready. The space is permanent. The first move is yours.</p>
-      <div class="hero-actions"><a class="btn" data-wizard-link href="https://xtrata.xyz/wizard/">Inscribe your masterpiece ↗</a><a class="btn secondary" data-bounty-link href="#official-bounty">Submit through Zero Authority ↗</a></div>
+      <div class="hero-actions"><a class="btn" data-create-link href="/inscribe">Inscribe your masterpiece →</a><a class="btn secondary" data-bounty-link href="#official-bounty">Submit through Zero Authority ↗</a></div>
       <div class="deadline-note" id="bottomDeadline">Deadline to be announced.</div>
     </section>
   </main>
@@ -536,7 +536,8 @@
     /* Replace these values when the official bounty details are confirmed. */
     const CONFIG = {
       bountyUrl: "#official-bounty",
-      wizardUrl: "https://xtrata.xyz/wizard/",
+      createUrl: "/inscribe",
+      wizardUrl: "/wizard/",
       closingDate: "", // Example: "2026-08-07T23:59:00Z"
       deadlineLabel: "Deadline to be announced"
     };
@@ -562,10 +563,8 @@
       }
     });
 
-    document.querySelectorAll("[data-wizard-link]").forEach((link) => {
-      link.href = CONFIG.wizardUrl;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
+    document.querySelectorAll("[data-create-link]").forEach((link) => {
+      link.href = CONFIG.createUrl;
     });
 
     const menuButton = document.getElementById("menuButton");
@@ -612,6 +611,7 @@
     ["dragleave", "drop"].forEach((type) => dropUi.addEventListener(type, (event) => { event.preventDefault(); dropUi.classList.remove("is-dragging"); }));
   </script>
 
+  <script type="module" src="/create-routing.js"></script>
   <script type="module">
     /* Route dropped work exactly like the homepage Create flow:
        single file ≤ 512 KB → /inscribe single-transaction mint,
@@ -630,11 +630,14 @@
     };
     const formatSize = (bytes) => bytes < 1048576 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1048576).toFixed(1)} MB`;
 
-    let routing = null;
-    try {
-      routing = await import("/create-routing.js");
-    } catch {
-      /* Standalone preview (file:// or missing asset): fall back to Wizard-only. */
+    let routing = globalThis.XtrataCreateRouting || null;
+    if (!routing) {
+      /* The shared router script tag dispatches this once it has registered. */
+      await new Promise((resolve) => {
+        addEventListener("xtrata-create-routing-ready", resolve, { once: true });
+        setTimeout(resolve, 3000);
+      });
+      routing = globalThis.XtrataCreateRouting || null;
     }
 
     let pending = null; // { files, containsDirectory, decision }
@@ -664,7 +667,7 @@
       say("Recognised locally. Nothing has been uploaded yet.");
     };
 
-    continueBtn.addEventListener("click", async (event) => {
+    const continueWithSelection = async (event) => {
       event.preventDefault();
       if (!pending) return;
       const { files, containsDirectory, info } = pending;
@@ -679,7 +682,8 @@
         /* Handoff storage unavailable — still honour the routing boundary. */
       }
       window.location.assign(target);
-    });
+    };
+    continueBtn.addEventListener("click", continueWithSelection);
 
     fileInput.addEventListener("change", (event) => present(event.target.files));
     dropUi.addEventListener("drop", async (event) => {
