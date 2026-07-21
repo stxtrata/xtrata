@@ -144,13 +144,18 @@ const getRegisteredProvidersOnWindow = (win: Window | undefined): WebBTCProvider
   }
   const registryWindow = win as ProviderRegistryWindow;
   const merged = [
-    ...(registryWindow.webbtc_stx_providers ?? []),
+    ...(registryWindow.btc_providers ?? []),
     ...(registryWindow.webbtc_providers ?? []),
-    ...(registryWindow.btc_providers ?? [])
+    ...(registryWindow.webbtc_stx_providers ?? [])
   ];
   return merged.filter(
     (entry, index) =>
-      Boolean(entry?.id) && merged.findIndex((candidate) => candidate.id === entry.id) === index
+      Boolean(entry?.id) &&
+      merged.findIndex(
+        (candidate) =>
+          candidate.id === entry.id ||
+          (candidate.name && entry.name && candidate.name.toLowerCase() === entry.name.toLowerCase())
+      ) === index
   );
 };
 

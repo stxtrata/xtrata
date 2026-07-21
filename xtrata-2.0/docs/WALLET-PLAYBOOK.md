@@ -11,32 +11,33 @@ Enforced by tests: `src/lib/wallet/__tests__/connect.test.ts`,
 `src/agent-one/__tests__/wallet-payment.test.ts`. If one of those fails, a rule
 below is being violated — fix the code, never weaken the test.
 
-## 1. Xverse has TWO provider bridges — STX payments use the selected StacksProvider
+## 1. Xverse has separate request and legacy transaction bridges
 
-Xverse injects `XverseProviders.StacksProvider` and a Sats Connect
-`XverseProviders.BitcoinProvider`. Account connection and contract calls use the
-BitcoinProvider, but field evidence establishes an important exception:
-`stx_transferStx` must be sent to the selected StacksProvider. The working
-`main-staging-sol` wizard does exactly this; routing the payment to
-BitcoinProvider produces **"Network mismatch"** before any popup, even after a
-successful `wallet_disconnect` → `wallet_connect` recovery and account check.
+Xverse exposes a Sats Connect/WBIP BitcoinProvider for account connection and
+contract calls. Its older Stacks bridge varies by frame: the standalone wizard
+gets `XverseProviders.StacksProvider`, while the embedded wizard can get only a
+generic `StacksProvider` whose `request()` is an intentional unimplemented stub
+but whose `transactionRequest()` still works.
 
-Rule: `requestWalletRpc` continues to put Xverse connection, reads, contract
-calls and sponsored signing on the BitcoinProvider. `requestStxTransfer` uses
-`requestProvider` directly on the selected provider, which is resolved from the
-host window for the embedded wizard (see §5). Do not route Xverse STX payments
-through `getXverseRpcProvider()` without a new real-wallet canary proving it.
+Rule: connection, reads, contract calls and sponsored signing stay on the real
+registered BitcoinProvider. STX payment prefers the exact dotted StacksProvider
+`request()` used by `main-staging-sol`; when embedding removes that object, use
+the generic legacy `transactionRequest()` bridge. Never call `request()` on the
+generic `StacksProvider`. BitcoinProvider transfer is a minimal-params last
+resort only when neither legacy bridge exists.
 
 ## 2. Request shape follows the provider bridge
 
 Out-of-spec contract-call fields are not ignored:
 
-- `stx_transferStx` on the selected StacksProvider uses the complete
+- `stx_transferStx` on the exact dotted StacksProvider uses the complete
   `buildStxTransferParams` shape: recipient, amount, memo, network, connected
   address, sponsored, fee and nonce. This is the request proven by the working
   `main-staging-sol` wizard. Do not substitute the minimal BitcoinProvider
   `{recipient, amount, memo}` request: that route caused the July 21 production
-  mismatch loop.
+  mismatch loop. The generic embedded `transactionRequest` path receives the
+  legacy signed token built by @stacks/connect. The BitcoinProvider fallback,
+  if no legacy transaction bridge exists, receives only those three spec fields.
 - `stx_callContract` on BitcoinProvider with an explicit `sender` field → Xverse **mobile** reads
   it as "sign as this address", compares with its own (sometimes empty)
   connection record and rejects before any UI ("requesting signature from a
@@ -45,8 +46,8 @@ Out-of-spec contract-call fields are not ignored:
   (`arguments` duplicates `functionArgs` because older builds only read the
   former.) Sender correctness is enforced on OUR side by the account preflight.
 
-The payment test asserts `toEqual` on the complete transfer params and also
-asserts that BitcoinProvider is never touched by the payment.
+Tests cover all three routes and, critically, assert that the embedded generic
+StacksProvider's unimplemented `request()` is never touched.
 
 ## 2b. Contract-call recovery remains bounded to the BitcoinProvider
 
@@ -55,16 +56,15 @@ network binding. A contract call can therefore be rejected even when
 `wallet_getAccount` still answers with the expected address. The original July
 21 assumption that this also explained STX payment failures was falsified by a
 field log in which disconnect/connect succeeded and the retried transfer failed
-identically. That transfer now uses the selected StacksProvider (§1).
+identically. That transfer now prefers the legacy Stacks transaction bridge (§1).
 
-Rule: Xverse BitcoinProvider contract calls go through `requestXverseSigning`, which
+Rule: Xverse BitcoinProvider contract calls and the no-legacy payment fallback go through `requestXverseSigning`, which
 on a network-mismatch rejection drops the session (`wallet_disconnect`),
 re-runs `wallet_connect` on the same BitcoinProvider, verifies the reconnected
 account matches the expected sender, and retries ONCE. User rejections are
 never retried (`isNetworkMismatchError` gates the recovery). Tests assert the
-exact contract-call sequence. STX payments are deliberately outside this
-wrapper because retrying the same BitcoinProvider transfer failed identically
-in production.
+exact contract-call sequence. The primary legacy STX payment routes are outside
+this wrapper; only the last-resort BitcoinProvider payment uses it.
 
 ## 3. Account preflight: cache → wallet_getAccount (30s cap) → wallet_connect. NEVER stx_getAccounts
 
@@ -111,10 +111,14 @@ iframe. Detecting on the iframe window therefore shows Asigna as "installed"
 and hides the real wallets (July 21 incident).
 
 Rule: `getWalletHostWindow()` returns the top same-origin window (cross-origin
-parents fall back to the local window). `getInstalledProvidersOnHost` (chooser
-modal) detects on the host window ONLY; `resolveProviderById`,
+parents fall back to the local window). `getInstalledProvidersOnHost` merges
+current `btc_providers`/`webbtc_providers` metadata with legacy
+`webbtc_stx_providers` on the host window ONLY; `resolveProviderById`,
 `getStacksProvider`, `getXverseRpcProvider` and `isSelectedXverseProvider` all
-resolve through it. Never call connect-ui's `getInstalledProviders` directly.
+resolve through it. The obsolete `XverseProviders.StacksProvider` chooser id is
+an alias for the registered request bridge if the dotted object is missing, and
+an `undefined` modal callback is recovered from the id connect-ui already
+persisted. Never call connect-ui's `getInstalledProviders` directly.
 
 ## 6. Mobile-specific behaviour
 
@@ -172,5 +176,5 @@ one in between). Without this the wallet simply never opens.
    changes no unit test could predict.
 
 Console logging: all wallet stages log under `[wallet:connect]`,
-`[wallet:xverse-preflight]`, `[wallet:contract-call]`, `[wallet:sponsored-sign]`
+`[wallet:xverse-preflight]`, `[wallet:stx-transfer]`, `[wallet:contract-call]`, `[wallet:sponsored-sign]`
 — ask users for these lines when reporting wallet issues.

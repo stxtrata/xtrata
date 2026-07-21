@@ -16,7 +16,13 @@ import {
   stringAsciiCV,
   uintCV
 } from '@stacks/transactions';
-import { __testing, isLeatherProviderId, isXverseProviderId, showContractCall } from '../connect';
+import {
+  __testing,
+  isLeatherProviderId,
+  isXverseProviderId,
+  showContractCall,
+  showStxTransfer
+} from '../connect';
 
 const ADDRESS = 'SP2MF04VAGYHGAZWGTEDW5VYCPDWWSY08Z1QFNDSN';
 
@@ -27,6 +33,11 @@ describe('wallet connect helpers', () => {
     delete (window as typeof window & { LeatherProvider?: unknown }).LeatherProvider;
     delete (window as typeof window & { XverseProviders?: unknown }).XverseProviders;
     delete (window as typeof window & { xverseProviders?: unknown }).xverseProviders;
+    delete (window as typeof window & { BitcoinProvider?: unknown }).BitcoinProvider;
+    delete (window as typeof window & { StacksProvider?: unknown }).StacksProvider;
+    delete (window as typeof window & { webbtc_stx_providers?: unknown }).webbtc_stx_providers;
+    delete (window as typeof window & { webbtc_providers?: unknown }).webbtc_providers;
+    delete (window as typeof window & { btc_providers?: unknown }).btc_providers;
   });
 
   it('detects Leather provider ids', () => {
@@ -176,6 +187,32 @@ describe('wallet connect helpers', () => {
 
     expect(__testing.resolveProviderSelection('LeatherProvider')).toBe(provider);
     expect(window.localStorage.getItem('STX_PROVIDER')).toBe('LeatherProvider');
+  });
+
+  it('recovers Xverse when connect-ui persists its legacy id but returns no iframe provider', () => {
+    const rpcProvider = { request: vi.fn() };
+    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
+    (
+      window as typeof window & {
+        XverseProviders?: { BitcoinProvider: unknown };
+      }
+    ).XverseProviders = { BitcoinProvider: rpcProvider };
+
+    expect(__testing.resolveProviderSelection(undefined)).toBe(rpcProvider);
+    expect(__testing.resolveProviderById('XverseProviders.StacksProvider')).toBe(rpcProvider);
+  });
+
+  it('resolves a current Xverse WBIP registry entry from its host provider id', () => {
+    const rpcProvider = { request: vi.fn() };
+    (window as typeof window & { BitcoinProvider?: unknown }).BitcoinProvider = rpcProvider;
+    (
+      window as typeof window & {
+        btc_providers?: Array<{ id: string; name: string }>;
+      }
+    ).btc_providers = [{ id: 'BitcoinProvider', name: 'Xverse Wallet' }];
+    window.localStorage.setItem('STX_PROVIDER', 'BitcoinProvider');
+
+    expect(__testing.resolveProviderSelection(undefined)).toBe(rpcProvider);
   });
 
   it('extracts the public key belonging to the connected Stacks address', () => {
@@ -335,6 +372,95 @@ describe('wallet connect helpers', () => {
 
     expect(legacyProvider.request).toHaveBeenCalledOnce();
     expect(rpcProvider.request).not.toHaveBeenCalled();
+  });
+
+  it('finds the embedded Xverse transaction bridge behind the generic StacksProvider stub', () => {
+    const transactionRequest = vi.fn();
+    const stubProvider = {
+      request: vi.fn(async () => {
+        throw new Error('`request` function is not implemented');
+      }),
+      transactionRequest
+    };
+    const rpcProvider = { request: vi.fn() };
+    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
+    (
+      window as typeof window & {
+        XverseProviders?: { BitcoinProvider: unknown };
+        StacksProvider?: unknown;
+      }
+    ).XverseProviders = { BitcoinProvider: rpcProvider };
+    (window as typeof window & { StacksProvider?: unknown }).StacksProvider = stubProvider;
+
+    expect(__testing.resolveProviderSelection(undefined)).toBe(rpcProvider);
+    expect(__testing.getLegacyXverseTransactionProvider()).toBe(stubProvider);
+  });
+
+  it('routes an embedded Xverse payment through transactionRequest instead of its request stub', async () => {
+    const transactionRequest = vi.fn(async () => {
+      throw Object.assign(new Error('test cancellation'), { code: 4001 });
+    });
+    const stubProvider = {
+      request: vi.fn(async () => {
+        throw new Error('`request` function is not implemented');
+      }),
+      transactionRequest
+    };
+    const rpcProvider = { request: vi.fn() };
+    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
+    (
+      window as typeof window & {
+        XverseProviders?: { BitcoinProvider: unknown };
+        StacksProvider?: unknown;
+      }
+    ).XverseProviders = { BitcoinProvider: rpcProvider };
+    (window as typeof window & { StacksProvider?: unknown }).StacksProvider = stubProvider;
+
+    showStxTransfer({
+      recipient: ADDRESS,
+      amount: '2550000',
+      memo: 'Xtrata Agent One',
+      network: 'mainnet',
+      stxAddress: ADDRESS
+    });
+
+    await vi.waitFor(() => expect(transactionRequest).toHaveBeenCalledOnce());
+    expect(stubProvider.request).not.toHaveBeenCalled();
+    expect(rpcProvider.request).not.toHaveBeenCalled();
+  });
+
+  it('uses minimal Sats Connect params when only Xverse BitcoinProvider is available', async () => {
+    const seenMethods: string[] = [];
+    const rpcProvider = {
+      request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
+        seenMethods.push(method);
+        expect(method).toBe('stx_transferStx');
+        expect(params).toEqual({
+          recipient: ADDRESS,
+          amount: '2550000',
+          memo: 'Xtrata Agent One'
+        });
+        return { status: 'success', result: { txid: '0xmodern' } };
+      })
+    };
+    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
+    (
+      window as typeof window & {
+        XverseProviders?: { BitcoinProvider: unknown };
+      }
+    ).XverseProviders = { BitcoinProvider: rpcProvider };
+    __testing.rememberXverseAccount(ADDRESS);
+
+    await expect(
+      __testing.requestStxTransfer(rpcProvider as never, {
+        recipient: ADDRESS,
+        amount: '2550000',
+        memo: 'Xtrata Agent One',
+        network: 'mainnet',
+        stxAddress: ADDRESS
+      })
+    ).resolves.toMatchObject({ txId: '0xmodern' });
+    expect(seenMethods).toEqual(['stx_transferStx']);
   });
 
   it('surfaces an Xverse STX payment rejection without rerouting or retrying it', async () => {

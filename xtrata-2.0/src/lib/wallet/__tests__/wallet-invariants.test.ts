@@ -82,6 +82,24 @@ describe('iframe host-window provider resolution', () => {
     expect(__testing.resolveProviderById('XverseProviders.StacksProvider')).toBe(xverseStacks);
   });
 
+  it('maps the obsolete Xverse Stacks id to the host WBIP provider', () => {
+    const xverseRpc = { request: () => Promise.resolve() };
+    const topWindow = makeWindow({
+      BitcoinProvider: xverseRpc,
+      btc_providers: [{ id: 'BitcoinProvider', name: 'Xverse Wallet' }]
+    });
+    const iframeWindow = makeWindow({});
+    iframeWindow.self = iframeWindow;
+    iframeWindow.top = topWindow;
+    topWindow.self = topWindow;
+    topWindow.top = topWindow;
+    globalWithWindow.window = iframeWindow;
+
+    expect(__testing.resolveProviderById('XverseProviders.StacksProvider')).toBe(xverseRpc);
+    const installed = __testing.getInstalledProvidersOnHost([]) as Array<{ id: string }>;
+    expect(installed.map((provider) => provider.id)).toEqual(['BitcoinProvider']);
+  });
+
   it('falls back to the local window when the parent is cross-origin', () => {
     const leather = { request: () => Promise.resolve() };
     const iframeWindow = makeWindow({ LeatherProvider: leather });

@@ -2,6 +2,13 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Embedded Xverse provider alias + legacy payment bridge (2026-07-21, follow-up 5)
+
+- Production v14 exposed the iframe-specific failure precisely: the chooser persisted `XverseProviders.StacksProvider`, but connect-ui resolved that id against the iframe and returned `undefined` (`resolved:false`). The later generic `window.StacksProvider` fallback exposed a `request()` stub that always throws ``request` function is not implemented``. This differs from the standalone staging wizard because moving the wizard into the homepage tabs changed which frame owns each injected bridge.
+- Provider discovery now merges Xverse's current `btc_providers`/`webbtc_providers` WBIP registries with the legacy `webbtc_stx_providers` registry on the top same-origin page, preferring current entries. If connect-ui returns `undefined`, `resolveProviderSelection` recovers the already-persisted id and maps the obsolete Xverse Stacks id to the real registered BitcoinProvider for connection and account reads.
+- STX payment routing remains aligned with the working staging wizard: an exact `XverseProviders.StacksProvider.request` is preferred when present; in the embedded layout, the generic legacy `StacksProvider.transactionRequest` carries the signed transfer token and its unimplemented `request()` is never called. Only when neither legacy bridge exists does the current BitcoinProvider receive a minimal `{recipient, amount, memo}` request.
+- Regression coverage now models the actual top-page WBIP provider + iframe legacy transaction bridge, asserts the chooser's `undefined` callback recovers, and exercises `showStxTransfer` far enough to prove `transactionRequest` is called while both request stubs remain untouched. Agent build bumped to `2026-07-21.5`; wizard cache bumped to `?v=15`.
+
 ## Xverse wizard payment bridge restoration (2026-07-21, follow-up 4)
 
 - The working `main-staging-sol` wizard (`agent-one.js?v=7`) and the failing production field log isolated the payment regression: staging sends `stx_transferStx` directly to the selected `XverseProviders.StacksProvider`, while production v13 rerouted it to `BitcoinProvider`. Production could read the correct account, but both the original transfer and the post-reconnect retry failed with `Network mismatch`, disproving the stale-session diagnosis for STX payments.
