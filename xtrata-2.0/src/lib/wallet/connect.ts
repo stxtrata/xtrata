@@ -1,3 +1,5 @@
+import { startJourney, event, setWallet } from '../telemetry/client';
+import { classify } from '../telemetry/classify';
 import { AppConfig, UserSession, type UserData } from '@stacks/auth';
 import {
   DEFAULT_PROVIDERS,
@@ -122,10 +124,8 @@ const resolveProviderOnWindow = (win: Window | undefined, id: string | null | un
   }
   return id
     .split('.')
-    .reduce<unknown>(
-      (acc, part) => (acc as Record<string, unknown> | undefined)?.[part],
-      win
-    ) as StacksProvider | undefined;
+    .reduce<unknown>((acc, part) => (acc as Record<string, unknown> | undefined)?.[part], win) as
+    StacksProvider | undefined;
 };
 
 type ProviderRegistryWindow = Window & {
@@ -154,7 +154,9 @@ const getRegisteredProvidersOnWindow = (win: Window | undefined): WebBTCProvider
       merged.findIndex(
         (candidate) =>
           candidate.id === entry.id ||
-          (candidate.name && entry.name && candidate.name.toLowerCase() === entry.name.toLowerCase())
+          (candidate.name &&
+            entry.name &&
+            candidate.name.toLowerCase() === entry.name.toLowerCase())
       ) === index
   );
 };
@@ -176,8 +178,7 @@ const resolveInjectedXverseRpcProvider = (): WalletRpcProvider | undefined => {
   }
   const host = getWalletHostWindow();
   const registered = getRegisteredProvidersOnWindow(host).filter(
-    (entry) =>
-      isXverseProviderId(entry.id) || entry.name?.toLowerCase().includes('xverse')
+    (entry) => isXverseProviderId(entry.id) || entry.name?.toLowerCase().includes('xverse')
   );
   for (const entry of registered) {
     const provider = resolveProviderOnWindow(host, entry.id) as WalletRpcProvider | undefined;
@@ -697,10 +698,7 @@ const getExactXverseStacksProvider = (): LegacyStacksProvider | undefined => {
     return undefined;
   }
   const host = getWalletHostWindow();
-  for (const providerId of [
-    'XverseProviders.StacksProvider',
-    'xverseProviders.StacksProvider'
-  ]) {
+  for (const providerId of ['XverseProviders.StacksProvider', 'xverseProviders.StacksProvider']) {
     const provider =
       (resolveProviderOnWindow(host, providerId) as LegacyStacksProvider | undefined) ??
       (host === window
@@ -1081,8 +1079,7 @@ const requestXverseSigning = async (
       // eslint-disable-next-line no-console
       console.info('[wallet:xverse-preflight]', {
         stage: 'RECOVERY_RECONNECT_FAILED',
-        message:
-          reconnectError instanceof Error ? reconnectError.message : String(reconnectError)
+        message: reconnectError instanceof Error ? reconnectError.message : String(reconnectError)
       });
       throw failure;
     }
@@ -1109,7 +1106,7 @@ const requestXverseSigning = async (
 // wallet_getAccount sometimes never answers on current Xverse; bound it so the
 // preflight falls through to wallet_connect instead of hanging the payment.
 let xverseAccountReadTimeoutMs = 30_000;
-const withXverseReadTimeout = <T,>(promise: Promise<T>, label: string): Promise<T> => {
+const withXverseReadTimeout = <T>(promise: Promise<T>, label: string): Promise<T> => {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
@@ -1159,10 +1156,7 @@ const ensureXverseSigningAccount = async (
   let address: string | null = null;
   try {
     const response = unwrapProviderResponse(
-      await withXverseReadTimeout(
-        rpcProvider.request('wallet_getAccount'),
-        'wallet_getAccount'
-      )
+      await withXverseReadTimeout(rpcProvider.request('wallet_getAccount'), 'wallet_getAccount')
     );
     address = extractStacksAddress(response);
     // eslint-disable-next-line no-console
@@ -1204,10 +1198,9 @@ const ensureXverseSigningAccount = async (
   // eslint-disable-next-line no-console
   console.info('[wallet:xverse-preflight]', { stage: 'WALLET_CONNECT_OK', address: connected });
   if (!connected) {
-    throw Object.assign(
-      new Error('Xverse did not return a Stacks account from wallet_connect.'),
-      { code: 'WALLET_ACCOUNT_UNAVAILABLE' }
-    );
+    throw Object.assign(new Error('Xverse did not return a Stacks account from wallet_connect.'), {
+      code: 'WALLET_ACCOUNT_UNAVAILABLE'
+    });
   }
   rememberXverseAccount(connected);
   return assertExpected(connected, 'wallet_connect');
@@ -1429,10 +1422,7 @@ const requestSponsoredContractCall = async (
 // provider can be absent, so selection resolves to the registered WBIP bridge;
 // keep a minimal-spec fallback there rather than sending legacy fields that
 // Xverse interprets as a conflicting network/account request.
-const requestStxTransfer = async (
-  provider: StacksProvider,
-  options: WalletStxTransferOptions
-) => {
+const requestStxTransfer = async (provider: StacksProvider, options: WalletStxTransferOptions) => {
   if (!isSelectedXverseProvider(provider)) {
     const response = await requestProvider(
       provider,
@@ -1746,9 +1736,7 @@ export const getStacksProvider = (): StacksProvider | undefined => {
   }
 
   const selectedProviderId = getSelectedProviderId();
-  const selectedProvider = selectedProviderId
-    ? resolveProviderById(selectedProviderId)
-    : undefined;
+  const selectedProvider = selectedProviderId ? resolveProviderById(selectedProviderId) : undefined;
 
   if (selectedProvider) {
     return selectedProvider;
@@ -1771,7 +1759,7 @@ export const getStacksProvider = (): StacksProvider | undefined => {
   );
 };
 
-export const connectWallet = async (params: {
+const connectWalletInner = async (params: {
   appName: string;
   appIcon: string;
 }): Promise<WalletSession> => {
@@ -1807,6 +1795,42 @@ export const connectWallet = async (params: {
   return connectViaLegacyAuth(params, provider);
 };
 
+const telemetryWalletKind = (): string | undefined => {
+  const id = getSelectedProviderId();
+  if (isLeatherProviderId(id)) return 'leather';
+  if (isXverseProviderId(id)) return 'xverse';
+  return id ? String(id) : undefined;
+};
+
+// Thin telemetry wrapper: records the connect journey and, on success, sets the
+// (hashed server-side) wallet context that rides along with every later event.
+export const connectWallet = async (params: {
+  appName: string;
+  appIcon: string;
+}): Promise<WalletSession> => {
+  const journey = startJourney('wallet_connect');
+  event({ journey, step: 'open', outcome: 'start' });
+  try {
+    const session = await connectWalletInner(params);
+    if (session.isConnected && session.address) {
+      setWallet(session.address, telemetryWalletKind());
+      event({ journey, step: 'authorize', outcome: 'success' });
+    } else {
+      event({ journey, step: 'authorize', outcome: 'abandon' });
+    }
+    return session;
+  } catch (error) {
+    event({
+      journey,
+      step: 'authorize',
+      outcome: 'error',
+      errorCode: classify(error, 'wallet_connect'),
+      error
+    });
+    throw error;
+  }
+};
+
 export const disconnectWallet = async () => {
   const provider = getStacksProvider();
   if (provider && isLeatherProviderId(getSelectedProviderId())) {
@@ -1825,6 +1849,8 @@ export const disconnectWallet = async () => {
   disconnectLegacyProvider();
   clearSelectedProviderId();
   clearXverseAccountCache();
+  setWallet(null);
+  event({ flow: 'wallet_connect', step: 'disconnect', outcome: 'info' });
 };
 
 export const showContractCall = (options: WalletContractCallOptions, provider?: StacksProvider) => {

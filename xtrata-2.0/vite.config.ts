@@ -24,11 +24,7 @@ const applyOpusGeneratorHeaders = (
 // Dev/preview only: serve the static wizard app at its production /wizard/
 // path (prod copies xtrata-agent-one/wizard → dist/wizard via
 // scripts/copy-static-apps.mjs; the dev server has no such mapping).
-const applyWizardDevAlias = (
-  req: { url?: string },
-  _res: unknown,
-  next: () => void
-) => {
+const applyWizardDevAlias = (req: { url?: string }, _res: unknown, next: () => void) => {
   const url = req.url ?? '';
   if (url === '/wizard' || url.startsWith('/wizard/') || url.startsWith('/wizard?')) {
     const [path, query = ''] = url.split('?');
@@ -59,25 +55,21 @@ const opusGeneratorHeadersPlugin = {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const hiroApiKey = env.HIRO_API_KEY || env.VITE_HIRO_API_KEY;
-  const proxyHeaders: Record<string, string> = hiroApiKey
-    ? { 'x-hiro-api-key': hiroApiKey }
-    : {};
+  const proxyHeaders: Record<string, string> = hiroApiKey ? { 'x-hiro-api-key': hiroApiKey } : {};
   const hasHiroApiKey = Boolean(hiroApiKey);
-  const bnsApiBase =
-    env.VITE_BNS_API_MAINNET || env.VITE_BNS_API_BASE || 'https://api.bns.xyz';
+  const bnsApiBase = env.VITE_BNS_API_MAINNET || env.VITE_BNS_API_BASE || 'https://api.bns.xyz';
   const bnsV2MainnetApiBase =
-    env.VITE_BNSV2_API_BASE_MAINNET ||
-    env.VITE_BNSV2_API_BASE ||
-    'https://api.bnsv2.com';
+    env.VITE_BNSV2_API_BASE_MAINNET || env.VITE_BNSV2_API_BASE || 'https://api.bnsv2.com';
   const bnsV2TestnetApiBase =
-    env.VITE_BNSV2_API_BASE_TESTNET ||
-    env.VITE_BNSV2_API_BASE ||
-    'https://api.bnsv2.com/testnet';
+    env.VITE_BNSV2_API_BASE_TESTNET || env.VITE_BNSV2_API_BASE || 'https://api.bnsv2.com/testnet';
 
   return {
     plugins: [react(), opusGeneratorHeadersPlugin, wizardDevAliasPlugin],
     define: {
-      __XSTRATA_HAS_HIRO_KEY__: JSON.stringify(hasHiroApiKey)
+      __XSTRATA_HAS_HIRO_KEY__: JSON.stringify(hasHiroApiKey),
+      __XTRATA_APP_VERSION__: JSON.stringify(
+        process.env.CF_PAGES_COMMIT_SHA?.slice(0, 8) || process.env.VITE_APP_VERSION || 'dev'
+      )
     },
     build: {
       rollupOptions: {

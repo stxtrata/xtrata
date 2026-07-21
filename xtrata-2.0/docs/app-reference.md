@@ -83,6 +83,7 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 - `functions/lib/fee-guidance.ts` owns chunk-based mining-fee assumptions and estimate generation for collection guidance responses.
 - `functions/lib/collection-deploy.ts` validates whether a draft has a confirmed on-chain deploy transaction before upload/publish operations.
 - `functions/collections/health.ts` provides the `/collections/health` check used by the diagnostics panel to confirm D1 connectivity, table counts, storage bindings, and runtime inscription cache budget warnings.
+- `src/lib/telemetry/*`, `functions/log.ts`, and `functions/migrations/009_telemetry.sql` provide privacy-scrubbed journey/error telemetry with bounded retention and idempotent D1 issue rollups. `functions/debug.ts` and `functions/debug/data.ts` expose the fail-closed, `DEBUG_VIEW_KEY`-protected health dashboard; `TELEMETRY-AND-ISSUE-LOGGING-PLAN.md` records its deployment prerequisites.
 
 ## Contracts, network, and wallet plumbing
 

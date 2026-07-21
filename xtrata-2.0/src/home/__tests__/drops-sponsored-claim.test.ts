@@ -27,6 +27,10 @@ describe('public Drops sponsored-claim surface', () => {
   });
 
   it('keeps free claims on the validated sponsored path only', () => {
+    expect(homeMain).toContain(
+      "import { installGlobalTelemetry } from '/src/lib/telemetry/global.ts';"
+    );
+    expect(homeMain).toContain('installGlobalTelemetry();');
     expect(homeMain).toContain('sponsored: true');
     expect(homeMain).toContain('showSponsoredContractCall({');
     expect(homeMain).toContain('stx_signTransaction with broadcast=false');

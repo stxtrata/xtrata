@@ -200,6 +200,9 @@
       isLikelyImageUrl,
       resolveMimeType
     } from '/src/lib/viewer/content.ts';
+    import { installGlobalTelemetry } from '/src/lib/telemetry/global.ts';
+
+    installGlobalTelemetry();
 
     const isCoreEntry = (entry) =>
       entry.protocolVersion === '2.1.0' ||
