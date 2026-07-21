@@ -2,6 +2,12 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Xverse wizard payment bridge restoration (2026-07-21, follow-up 4)
+
+- The working `main-staging-sol` wizard (`agent-one.js?v=7`) and the failing production field log isolated the payment regression: staging sends `stx_transferStx` directly to the selected `XverseProviders.StacksProvider`, while production v13 rerouted it to `BitcoinProvider`. Production could read the correct account, but both the original transfer and the post-reconnect retry failed with `Network mismatch`, disproving the stale-session diagnosis for STX payments.
+- `requestStxTransfer` now restores the canary-proven staging route: direct `requestProvider` on the selected/top-window StacksProvider with the complete `buildStxTransferParams` shape. Iframe provider discovery, wallet/account selection, BitcoinProvider contract calls and sponsored signing are unchanged.
+- Tests now require exactly one selected-StacksProvider payment request with the complete parameters and assert that BitcoinProvider is untouched. The artificial transfer recovery test was removed; recovery coverage now exercises the BitcoinProvider contract-call path where the wrapper remains active. Playbook corrected (§1–§3), agent build bumped to `2026-07-21.4`, and wizard cache bumped to `?v=14`.
+
 ## Xverse stale-session network mismatch auto-recovery (2026-07-21, follow-up 3)
 
 - Field logs (`[wallet:xverse-preflight]` READ_OK with the correct mainnet address, then `stx_transferStx` → "Network mismatch.") isolated the final cause: Xverse's STORED per-origin session can be bound to a different network setting than the wallet's active network ("mismatch between your active network and the network you're logged in with on the app"). The account read still succeeds — only signing requests expose it, so no preflight can prevent it.

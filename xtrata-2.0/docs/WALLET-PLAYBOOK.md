@@ -11,29 +11,33 @@ Enforced by tests: `src/lib/wallet/__tests__/connect.test.ts`,
 `src/agent-one/__tests__/wallet-payment.test.ts`. If one of those fails, a rule
 below is being violated — fix the code, never weaken the test.
 
-## 1. Xverse has TWO provider bridges — session and transaction must use the SAME one
+## 1. Xverse has TWO provider bridges — STX payments use the selected StacksProvider
 
-Xverse injects a legacy `XverseProviders.StacksProvider` and a Sats Connect
-`XverseProviders.BitcoinProvider`. The per-origin session (created by
-`wallet_connect`) lives on the BitcoinProvider object. Any signing request
-(`stx_callContract`, `stx_transferStx`, `stx_signTransaction`) sent on the
-*other* bridge is rejected as **"Network mismatch"** even with byte-identical
-params and the correct network.
+Xverse injects `XverseProviders.StacksProvider` and a Sats Connect
+`XverseProviders.BitcoinProvider`. Account connection and contract calls use the
+BitcoinProvider, but field evidence establishes an important exception:
+`stx_transferStx` must be sent to the selected StacksProvider. The working
+`main-staging-sol` wizard does exactly this; routing the payment to
+BitcoinProvider produces **"Network mismatch"** before any popup, even after a
+successful `wallet_disconnect` → `wallet_connect` recovery and account check.
 
-Rule: all Xverse RPC goes through `getXverseRpcProvider()` (the BitcoinProvider,
-resolved on the host window — see §5). `requestWalletRpc` enforces this for any
-provider that identifies as Xverse. The legacy StacksProvider is never used for
-Xverse after a modern `wallet_connect` (it has no session, and the legacy
-popup flows fail with "Unexpected error creating transaction").
+Rule: `requestWalletRpc` continues to put Xverse connection, reads, contract
+calls and sponsored signing on the BitcoinProvider. `requestStxTransfer` uses
+`requestProvider` directly on the selected provider, which is resolved from the
+host window for the embedded wizard (see §5). Do not route Xverse STX payments
+through `getXverseRpcProvider()` without a new real-wallet canary proving it.
 
-## 2. Xverse validates requests against the sats-connect schema — send spec params ONLY
+## 2. Request shape follows the provider bridge
 
-Out-of-spec fields are not ignored:
+Out-of-spec contract-call fields are not ignored:
 
-- `stx_transferStx` with `network` / `address` / `sponsored` / `fee` / `nonce`
-  → rejected as **"Network mismatch"** (July 21 incident; regression of the
-  July staging fix). Send only `{recipient, amount, memo}`.
-- `stx_callContract` with an explicit `sender` field → Xverse **mobile** reads
+- `stx_transferStx` on the selected StacksProvider uses the complete
+  `buildStxTransferParams` shape: recipient, amount, memo, network, connected
+  address, sponsored, fee and nonce. This is the request proven by the working
+  `main-staging-sol` wizard. Do not substitute the minimal BitcoinProvider
+  `{recipient, amount, memo}` request: that route caused the July 21 production
+  mismatch loop.
+- `stx_callContract` on BitcoinProvider with an explicit `sender` field → Xverse **mobile** reads
   it as "sign as this address", compares with its own (sometimes empty)
   connection record and rejects before any UI ("requesting signature from a
   different address. (undefined)"). Send only
@@ -41,29 +45,30 @@ Out-of-spec fields are not ignored:
   (`arguments` duplicates `functionArgs` because older builds only read the
   former.) Sender correctness is enforced on OUR side by the account preflight.
 
-The payment test asserts `toEqual` on the exact transfer params, so adding any
-field fails CI by design.
+The payment test asserts `toEqual` on the complete transfer params and also
+asserts that BitcoinProvider is never touched by the payment.
 
-## 2b. Stale per-origin sessions cause "Network mismatch" that NO preflight can prevent
+## 2b. Contract-call recovery remains bounded to the BitcoinProvider
 
-Xverse's stored per-origin session records the network it was created under. If
-the wallet's active network setting has changed since (or the session predates a
-wallet update), signing requests are rejected with "There's a mismatch between
-your active network and the network you're logged in with on the app" — while
-`wallet_getAccount` still answers with the correct address, so the account
-preflight passes (July 21 evening incident, diagnosed from the
-`[wallet:xverse-preflight]` READ_OK → transfer-rejected log pair).
+Xverse's stored per-origin BitcoinProvider session can retain an obsolete
+network binding. A contract call can therefore be rejected even when
+`wallet_getAccount` still answers with the expected address. The original July
+21 assumption that this also explained STX payment failures was falsified by a
+field log in which disconnect/connect succeeded and the retried transfer failed
+identically. That transfer now uses the selected StacksProvider (§1).
 
-Rule: every Xverse signing request goes through `requestXverseSigning`, which
+Rule: Xverse BitcoinProvider contract calls go through `requestXverseSigning`, which
 on a network-mismatch rejection drops the session (`wallet_disconnect`),
 re-runs `wallet_connect` on the same BitcoinProvider, verifies the reconnected
 account matches the expected sender, and retries ONCE. User rejections are
 never retried (`isNetworkMismatchError` gates the recovery). Tests assert the
-exact call sequence and the non-retry of rejections.
+exact contract-call sequence. STX payments are deliberately outside this
+wrapper because retrying the same BitcoinProvider transfer failed identically
+in production.
 
 ## 3. Account preflight: cache → wallet_getAccount (30s cap) → wallet_connect. NEVER stx_getAccounts
 
-Before any Xverse signing request, `ensureXverseSigningAccount` confirms the
+Before an Xverse BitcoinProvider contract call, `ensureXverseSigningAccount` confirms the
 active account **on the same BitcoinProvider**:
 
 1. A cached account confirmed within the last 45s is reused

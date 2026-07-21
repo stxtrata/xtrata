@@ -916,7 +916,7 @@ const readXverseAccountCache = () =>
     ? xverseAccountCache.address
     : null;
 
-// Xverse rejects signing requests with "Network mismatch." / "There's a
+// Xverse rejects BitcoinProvider signing requests with "Network mismatch." / "There's a
 // mismatch between your active network and the network you're logged in with
 // on the app." when its STORED per-origin session was created under a
 // different network setting than the wallet's active network — the preflight
@@ -1313,50 +1313,22 @@ const requestSponsoredContractCall = async (
   return normalizeTxResult(response);
 };
 
-// Keep Xverse on the same modern BitcoinProvider RPC bridge used for
-// wallet_connect. Calling stx_transferStx on XverseProviders.StacksProvider
-// falls back into the legacy @stacks/auth UserSession flow, where loadUserData()
-// necessarily fails because a modern wallet_connect does not create that
-// legacy session. Leather and other providers continue through requestProvider.
+// Xverse STX payments are the exception to the BitcoinProvider routing used by
+// wallet_connect and contract calls. The production Xverse extension accepts
+// this request on the selected XverseProviders.StacksProvider, including when
+// that provider was resolved from the top window for the embedded wizard. The
+// BitcoinProvider path can read the account but repeatedly rejects this signing
+// request as "Network mismatch" even after disconnect/connect recovery. Keep
+// this byte-for-byte aligned with the working main-staging-sol wizard: use the
+// selected provider and the complete Stacks transfer parameter shape.
 const requestStxTransfer = async (
   provider: StacksProvider,
   options: WalletStxTransferOptions
 ) => {
-  if (!isSelectedXverseProvider(provider)) {
-    const response = await requestWalletRpc(
-      provider,
-      'stx_transferStx',
-      buildStxTransferParams(options)
-    );
-    return normalizeTxResult(response);
-  }
-
-  const rpcProvider = getXverseRpcProvider();
-  if (!rpcProvider) {
-    throw Object.assign(new Error('Xverse modern request provider is not available.'), {
-      code: 'XVERSE_RPC_UNAVAILABLE'
-    });
-  }
-  // The per-origin session must live on the SAME BitcoinProvider that receives
-  // the transfer — a session created elsewhere (legacy bridge, older build,
-  // fresh browsing session) makes Xverse reject the request as a network
-  // mismatch. Same preflight as contract calls: read the active account on
-  // this bridge and re-run wallet_connect there if nothing is readable.
-  await ensureXverseSigningAccount(rpcProvider, options.stxAddress);
-  // Xverse validates stx_transferStx against the sats-connect schema. Extra
-  // fields (network/address/sponsored/fee/nonce) are NOT ignored — current
-  // builds reject the whole request with the "network mismatch" error even on
-  // the right network. Send ONLY the spec params.
-  const params: Record<string, unknown> = {
-    recipient: options.recipient,
-    amount: normalizeBigIntLike(options.amount) ?? '0',
-    ...(options.memo ? { memo: options.memo } : {})
-  };
-  const response = await requestXverseSigning(
-    rpcProvider,
+  const response = await requestProvider(
+    provider,
     'stx_transferStx',
-    params,
-    options.stxAddress
+    buildStxTransferParams(options)
   );
   return normalizeTxResult(response);
 };
