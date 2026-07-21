@@ -2,6 +2,12 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Xverse "network mismatch" on wizard pay + forced account chooser (2026-07-21, follow-up)
+
+- **Xverse STX transfer fix** (`src/lib/wallet/connect.ts` `requestStxTransfer`): current Xverse validates `stx_transferStx` against the sats-connect schema and rejects requests carrying out-of-spec fields (`network`/`address`/`sponsored`/`fee`/`nonce`) with "There's a mismatch between your active network…" even when the network is correct. Xverse transfers now send ONLY `{recipient, amount, memo}` and run the same `ensureXverseSigningAccount` preflight as contract calls, so the per-origin session is guaranteed to live on the SAME BitcoinProvider that receives the transfer (re-runs `wallet_connect` there if the browsing session has no readable account).
+- **Account chooser on every Xverse connect** (`connectViaRequest`): while a per-origin permission exists, Xverse silently reuses the previously-approved account and never shows its account picker. Connect now drops the stale permission first with a best-effort `wallet_disconnect` on the BitcoinProvider, so the wallet re-prompts with the full account choice each time (older Xverse builds without the method fall through unchanged).
+- Tests updated/locked: Xverse connect asserts `wallet_disconnect` → `wallet_connect` order; Xverse payment asserts spec-only transfer params and the same-bridge preflight. Wizard bundles rebuilt, cache bumped to `?v=11`. Wallet suites 56/56.
+
 ## Wallet chooser + wizard iframe providers + inscribe-panel re-prepare (2026-07-21)
 
 - **Wallet choice on every connect** (`src/lib/wallet/adapter.ts`): `connect()` no longer short-circuits on the persisted localStorage session. Every Connect click now runs `connectWallet` and its forced provider-select modal, so the user picks Xverse or Leather each time and can switch wallets; cancelling the chooser keeps the existing session instead of wiping it. Locked in by the new `src/lib/wallet/__tests__/adapter.test.ts` (4 tests).

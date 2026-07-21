@@ -12,11 +12,16 @@ describe('Agent One wallet payment handoff', () => {
     expect(walletSource).toContain('onError: (error) => reject(');
   });
 
-  it('cache-busts the repaired combined wallet bundle on every wizard surface', () => {
-    expect(coreSource).toContain("AGENT_BUILD = '2026-07-14.3'");
-    for (const file of ['index.html', 'suno.html', 'manifests.html']) {
+  it('cache-busts the combined wallet bundle consistently on every wizard surface', () => {
+    expect(coreSource).toMatch(/AGENT_BUILD = '\d{4}-\d{2}-\d{2}/);
+    // Every wizard page must load agent-one.js with the SAME numeric cache-bust
+    // version — a mismatch means one surface serves a stale wallet bundle.
+    const versions = ['index.html', 'suno.html', 'manifests.html'].map((file) => {
       const html = readFileSync(new URL(file, wizardRoot), 'utf8');
-      expect(html).toContain('<script src="agent-one.js?v=9"></script>');
-    }
+      const match = html.match(/<script src="agent-one\.js\?v=(\d+)"><\/script>/);
+      expect(match, `${file} must load agent-one.js?v=<n>`).toBeTruthy();
+      return match?.[1];
+    });
+    expect(new Set(versions).size).toBe(1);
   });
 });

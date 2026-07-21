@@ -1170,12 +1170,44 @@ const requestStxTransfer = async (
   provider: StacksProvider,
   options: WalletStxTransferOptions
 ) => {
-  const response = await requestWalletRpc(
-    provider,
-    'stx_transferStx',
-    buildStxTransferParams(options)
-  );
-  return normalizeTxResult(response);
+  if (!isSelectedXverseProvider(provider)) {
+    const response = await requestWalletRpc(
+      provider,
+      'stx_transferStx',
+      buildStxTransferParams(options)
+    );
+    return normalizeTxResult(response);
+  }
+
+  const rpcProvider = getXverseRpcProvider();
+  if (!rpcProvider) {
+    throw Object.assign(new Error('Xverse modern request provider is not available.'), {
+      code: 'XVERSE_RPC_UNAVAILABLE'
+    });
+  }
+  // The per-origin session must live on the SAME BitcoinProvider that receives
+  // the transfer — a session created elsewhere (legacy bridge, older build,
+  // fresh browsing session) makes Xverse reject the request as a network
+  // mismatch. Same preflight as contract calls: read the active account on
+  // this bridge and re-run wallet_connect there if nothing is readable.
+  await ensureXverseSigningAccount(rpcProvider, options.stxAddress);
+  // Xverse validates stx_transferStx against the sats-connect schema. Extra
+  // fields (network/address/sponsored/fee/nonce) are NOT ignored — current
+  // builds reject the whole request with the "network mismatch" error even on
+  // the right network. Send ONLY the spec params.
+  const params: Record<string, unknown> = {
+    recipient: options.recipient,
+    amount: normalizeBigIntLike(options.amount) ?? '0',
+    ...(options.memo ? { memo: options.memo } : {})
+  };
+  try {
+    const response = unwrapProviderResponse(
+      await rpcProvider.request('stx_transferStx', params)
+    );
+    return normalizeTxResult(response);
+  } catch (error) {
+    throw providerError(error);
+  }
 };
 
 const requestLeatherContractDeploy = async (
@@ -1264,6 +1296,18 @@ const getConnectAttempts = async (provider: StacksProvider) => {
 };
 
 const connectViaRequest = async (provider: StacksProvider) => {
+  // Xverse only shows its account chooser on a FRESH wallet_connect — while a
+  // per-origin permission exists it silently reuses the previously-approved
+  // account. Users must get the account choice on every connect, so drop the
+  // stale permission first (best-effort: older builds without
+  // wallet_disconnect just fall through and connect as before).
+  if (isSelectedXverseProvider(provider)) {
+    try {
+      await requestWalletRpc(provider, 'wallet_disconnect');
+    } catch {
+      // ignore — connect proceeds with the existing permission
+    }
+  }
   const attempts = await getConnectAttempts(provider);
 
   let lastError: unknown = null;
@@ -1681,5 +1725,8 @@ export const __testing = {
   requestWalletContractCall,
   requestSponsoredContractCall,
   resolveProviderSelection,
-  unwrapProviderResponse
+  unwrapProviderResponse,
+  getWalletHostWindow,
+  resolveProviderById,
+  getInstalledProvidersOnHost
 };

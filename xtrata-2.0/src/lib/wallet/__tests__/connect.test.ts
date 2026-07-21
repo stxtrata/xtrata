@@ -255,6 +255,11 @@ describe('wallet connect helpers', () => {
     const legacyProvider = { request: vi.fn() };
     const rpcProvider = {
       request: vi.fn(async (method: string) => {
+        // Stale per-origin permission is dropped first so Xverse re-shows its
+        // account chooser on every connect.
+        if (method === 'wallet_disconnect') {
+          return { status: 'success', result: null };
+        }
         expect(method).toBe('wallet_connect');
         return { status: 'success', result: { addresses: [{ address, publicKey }] } };
       })
@@ -276,7 +281,10 @@ describe('wallet connect helpers', () => {
       network: 'mainnet'
     });
     expect(legacyProvider.request).not.toHaveBeenCalled();
-    expect(rpcProvider.request).toHaveBeenCalledOnce();
+    expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual([
+      'wallet_disconnect',
+      'wallet_connect'
+    ]);
   });
 
   it('routes Xverse STX payments through BitcoinProvider without touching legacy auth', async () => {
@@ -287,13 +295,17 @@ describe('wallet connect helpers', () => {
     };
     const rpcProvider = {
       request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
+        // Session preflight rides the SAME BitcoinProvider as the transfer.
+        if (method === 'wallet_getAccount') {
+          return { status: 'success', result: { addresses: [{ address: ADDRESS }] } };
+        }
         expect(method).toBe('stx_transferStx');
-        expect(params).toMatchObject({
+        // sats-connect spec params ONLY — network/address/sponsored make
+        // current Xverse reject the request as a network mismatch.
+        expect(params).toEqual({
           recipient: ADDRESS,
           amount: '2550000',
-          memo: 'Xtrata Agent One',
-          network: 'mainnet',
-          address: ADDRESS
+          memo: 'Xtrata Agent One'
         });
         return { status: 'success', result: { txid: '0xabc123' } };
       })
@@ -319,7 +331,8 @@ describe('wallet connect helpers', () => {
     ).resolves.toMatchObject({ txId: '0xabc123' });
 
     expect(legacyProvider.request).not.toHaveBeenCalled();
-    expect(rpcProvider.request).toHaveBeenCalledOnce();
+    // account preflight + the transfer itself, both on the BitcoinProvider
+    expect(rpcProvider.request).toHaveBeenCalledTimes(2);
   });
 
   const scoreSubmitOptions = () => ({
