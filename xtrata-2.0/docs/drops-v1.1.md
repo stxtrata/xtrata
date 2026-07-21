@@ -120,3 +120,21 @@ never enter a private key. The card keeps the latest 100 preflight and wallet
 events in local browser storage and can copy them as a plain-text deployment
 log. A CLI fallback is registered under `xtrata-drops-v1-1` in
 `scripts/mainnet-deploy-contract.mjs`.
+
+## Restricted collection-drop console
+
+The standalone `/web/collection-drop.html` entry is the operator-facing v1.1
+pathway. It is deliberately separate from the public `/drops` route, which
+continues to use `xtrata-drops-v1-0` and its existing `create-drop` logic.
+
+The collection console fails closed until the connected mainnet signer is
+either the main Xtrata address or the current owner returned for `jim.btc` by
+BNS v2. Every write handler repeats the address check before opening the wallet.
+This browser gate protects the first-party operations surface; the Clarity
+contract remains the authority for campaign creator/operator permissions.
+
+The console can create and inspect a campaign, authorise a Wizard operator,
+pause or resume a campaign, and manually place an existing Xtrata v3.2.3
+inscription into campaign escrow with exact NFT/STX post-conditions. The manual
+escrow action is intended for the one-item canary. The later Wizard composition
+path should still inscribe and invoke `create-campaign-drop` atomically.
