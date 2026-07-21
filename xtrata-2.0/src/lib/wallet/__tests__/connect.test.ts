@@ -22,6 +22,7 @@ const ADDRESS = 'SP2MF04VAGYHGAZWGTEDW5VYCPDWWSY08Z1QFNDSN';
 
 describe('wallet connect helpers', () => {
   afterEach(() => {
+    __testing.clearXverseAccountCache();
     window.localStorage.clear();
     delete (window as typeof window & { LeatherProvider?: unknown }).LeatherProvider;
     delete (window as typeof window & { XverseProviders?: unknown }).XverseProviders;
@@ -335,6 +336,40 @@ describe('wallet connect helpers', () => {
     expect(rpcProvider.request).toHaveBeenCalledTimes(2);
   });
 
+  it('skips the slow account read when the Xverse session was confirmed moments ago', async () => {
+    const legacyProvider = { request: vi.fn() };
+    const seenMethods: string[] = [];
+    const rpcProvider = {
+      request: vi.fn(async (method: string) => {
+        seenMethods.push(method);
+        expect(method).toBe('stx_transferStx');
+        return { status: 'success', result: { txid: '0xdef456' } };
+      })
+    };
+    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
+    (
+      window as typeof window & {
+        XverseProviders?: { StacksProvider: unknown; BitcoinProvider: unknown };
+      }
+    ).XverseProviders = {
+      StacksProvider: legacyProvider,
+      BitcoinProvider: rpcProvider
+    };
+    __testing.rememberXverseAccount(ADDRESS);
+
+    await expect(
+      __testing.requestStxTransfer(legacyProvider as never, {
+        recipient: ADDRESS,
+        amount: '1000000',
+        memo: 'Xtrata Agent One',
+        network: 'mainnet',
+        stxAddress: ADDRESS
+      })
+    ).resolves.toMatchObject({ txId: '0xdef456' });
+    // Cached session → no wallet_getAccount, and NEVER stx_getAccounts.
+    expect(seenMethods).toEqual(['stx_transferStx']);
+  });
+
   const scoreSubmitOptions = () => ({
     contractAddress: ADDRESS,
     contractName: 'xtrata-arcade-scores-v1-3',
@@ -440,12 +475,9 @@ describe('wallet connect helpers', () => {
       __testing.requestWalletContractCall(legacyProvider as never, scoreSubmitOptions())
     ).resolves.toMatchObject({ txId: scoreTxId });
 
-    expect(seenMethods).toEqual([
-      'wallet_getAccount',
-      'stx_getAccounts',
-      'wallet_connect',
-      'stx_callContract'
-    ]);
+    // stx_getAccounts must NEVER appear here — on current Xverse it opens a
+    // "Mismatched Network" prompt that gets rejected ("Network mismatch").
+    expect(seenMethods).toEqual(['wallet_getAccount', 'wallet_connect', 'stx_callContract']);
     expect(legacyProvider.request).not.toHaveBeenCalled();
   });
 

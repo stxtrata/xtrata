@@ -897,6 +897,47 @@ const XVERSE_ACCOUNT_MISMATCH_CODE = 'WALLET_ADDRESS_MISMATCH';
 // diagnostic reaches the game modal before the generic bridge timeout fires.
 let xverseSigningWatchdogMs = 90_000;
 
+// Last account Xverse confirmed for this origin on the BitcoinProvider bridge.
+// Seeded by wallet_connect (connect + preflight) and successful reads; cleared
+// on disconnect. Lets the pre-transaction check skip the slow wallet_getAccount
+// read right after connecting.
+const XVERSE_ACCOUNT_CACHE_MS = 45_000;
+let xverseAccountCache: { address: string; at: number } | null = null;
+const rememberXverseAccount = (address: string | null | undefined) => {
+  if (address) {
+    xverseAccountCache = { address, at: Date.now() };
+  }
+};
+const clearXverseAccountCache = () => {
+  xverseAccountCache = null;
+};
+const readXverseAccountCache = () =>
+  xverseAccountCache && Date.now() - xverseAccountCache.at <= XVERSE_ACCOUNT_CACHE_MS
+    ? xverseAccountCache.address
+    : null;
+
+// wallet_getAccount sometimes never answers on current Xverse; bound it so the
+// preflight falls through to wallet_connect instead of hanging the payment.
+let xverseAccountReadTimeoutMs = 30_000;
+const withXverseReadTimeout = <T,>(promise: Promise<T>, label: string): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(
+        Object.assign(
+          new Error(`Xverse did not answer ${label} within ${xverseAccountReadTimeoutMs / 1000}s.`),
+          { code: 'XVERSE_ACCOUNT_READ_TIMEOUT' }
+        )
+      );
+    }, xverseAccountReadTimeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }) as Promise<T>;
+};
+
 const ensureXverseSigningAccount = async (
   rpcProvider: WalletRpcProvider,
   expectedAddress?: string
@@ -913,40 +954,73 @@ const ensureXverseSigningAccount = async (
     return address;
   };
 
-  // wallet_getAccount answers silently on desktop Xverse; stx_getAccounts can
-  // raise a "requesting to get accounts" permission prompt there (canary run
-  // 2026-07-17), so it is only the fallback read.
-  for (const method of ['wallet_getAccount', 'stx_getAccounts'] as const) {
-    let address: string | null = null;
-    try {
-      const response = unwrapProviderResponse(await rpcProvider.request(method));
-      address = extractStacksAddress(response);
-    } catch (error) {
-      if (isUserCancelledError(error)) {
-        throw providerError(error);
-      }
-      // Access-denied and unsupported responses both mean this browsing
-      // session has no readable account yet; fall through to wallet_connect.
+  // A recently confirmed account for this origin short-circuits the read:
+  // wallet_getAccount can take 12-15s (or never answer) on current Xverse, and
+  // stx_getAccounts must NEVER be used here — it opens a "Mismatched Network"
+  // prompt that gets rejected, surfacing as "Network mismatch" to the user
+  // (canary runs 2026-07-17 and 2026-07-21).
+  const cached = readXverseAccountCache();
+  if (cached) {
+    // eslint-disable-next-line no-console
+    console.info('[wallet:xverse-preflight]', { stage: 'CACHED_SESSION', address: cached });
+    return assertExpected(cached, 'cached-session');
+  }
+
+  let address: string | null = null;
+  try {
+    const response = unwrapProviderResponse(
+      await withXverseReadTimeout(
+        rpcProvider.request('wallet_getAccount'),
+        'wallet_getAccount'
+      )
+    );
+    address = extractStacksAddress(response);
+    // eslint-disable-next-line no-console
+    console.info('[wallet:xverse-preflight]', {
+      stage: address ? 'READ_OK' : 'READ_EMPTY',
+      method: 'wallet_getAccount',
+      address
+    });
+  } catch (error) {
+    if (isUserCancelledError(error)) {
+      throw providerError(error);
     }
-    if (address) {
-      return assertExpected(address, method);
-    }
+    // Access denied, unsupported and timeouts all mean this browsing session
+    // has no readable account yet; fall through to wallet_connect.
+    // eslint-disable-next-line no-console
+    console.info('[wallet:xverse-preflight]', {
+      stage: 'READ_FAILED',
+      method: 'wallet_getAccount',
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
+  if (address) {
+    rememberXverseAccount(address);
+    return assertExpected(address, 'wallet_getAccount');
   }
 
   let response: unknown;
   try {
     response = unwrapProviderResponse(await rpcProvider.request('wallet_connect'));
   } catch (error) {
+    // eslint-disable-next-line no-console
+    console.info('[wallet:xverse-preflight]', {
+      stage: 'WALLET_CONNECT_FAILED',
+      message: error instanceof Error ? error.message : String(error)
+    });
     throw providerError(error);
   }
-  const address = extractStacksAddress(response);
-  if (!address) {
+  const connected = extractStacksAddress(response);
+  // eslint-disable-next-line no-console
+  console.info('[wallet:xverse-preflight]', { stage: 'WALLET_CONNECT_OK', address: connected });
+  if (!connected) {
     throw Object.assign(
       new Error('Xverse did not return a Stacks account from wallet_connect.'),
       { code: 'WALLET_ACCOUNT_UNAVAILABLE' }
     );
   }
-  return assertExpected(address, 'wallet_connect');
+  rememberXverseAccount(connected);
+  return assertExpected(connected, 'wallet_connect');
 };
 
 // Keep Xverse contract calls on the same modern BitcoinProvider RPC bridge
@@ -1324,6 +1398,9 @@ const connectViaRequest = async (provider: StacksProvider) => {
           method,
           hasPublicKey: Boolean(session.publicKey)
         });
+        if (isSelectedXverseProvider(provider)) {
+          rememberXverseAccount(session.address);
+        }
         return session;
       }
       // eslint-disable-next-line no-console
@@ -1555,6 +1632,7 @@ export const disconnectWallet = async () => {
 
   disconnectLegacyProvider();
   clearSelectedProviderId();
+  clearXverseAccountCache();
 };
 
 export const showContractCall = (options: WalletContractCallOptions, provider?: StacksProvider) => {
@@ -1728,5 +1806,10 @@ export const __testing = {
   unwrapProviderResponse,
   getWalletHostWindow,
   resolveProviderById,
-  getInstalledProvidersOnHost
+  getInstalledProvidersOnHost,
+  clearXverseAccountCache,
+  rememberXverseAccount,
+  setXverseAccountReadTimeoutMs: (value: number) => {
+    xverseAccountReadTimeoutMs = value;
+  }
 };

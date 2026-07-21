@@ -2,6 +2,14 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Xverse preflight repair (no stx_getAccounts, cache + timeout) + wallet playbook (2026-07-21, follow-up 2)
+
+- The transfer preflight added earlier today reused `ensureXverseSigningAccount`, whose fallback chain still contained `stx_getAccounts` — on current Xverse that opens a "Mismatched Network" prompt which gets rejected, so the wizard pay button STILL surfaced "Network mismatch" after the params fix. The preflight is now: 45s cached account (seeded from wallet_connect at connect time and successful reads, cleared on disconnect) → `wallet_getAccount` bounded by a 30s timeout → `wallet_connect` on the same BitcoinProvider. `stx_getAccounts` is banned from the preflight and the fallback-order test asserts it never appears.
+- Stage-by-stage `[wallet:xverse-preflight]` console logging (CACHED_SESSION / READ_OK / READ_EMPTY / READ_FAILED / WALLET_CONNECT_OK / WALLET_CONNECT_FAILED) so any future wallet report can be diagnosed from the user's console.
+- New regression test: a freshly confirmed session pays with a single `stx_transferStx` call (no account read, never stx_getAccounts).
+- New `docs/WALLET-PLAYBOOK.md`: consolidates every June–July wallet rule (dual Xverse bridges, spec-only params, preflight design, forced wallet + account choosers, iframe host-window detection, mobile watchdog, Leather ordering, sponsored signing, session self-heal) with the enforcing test for each and the ship checklist. Read it before touching wallet code.
+- Wizard bundles rebuilt, cache bumped to `?v=12`. Wallet suites 57/57.
+
 ## Xverse "network mismatch" on wizard pay + forced account chooser (2026-07-21, follow-up)
 
 - **Xverse STX transfer fix** (`src/lib/wallet/connect.ts` `requestStxTransfer`): current Xverse validates `stx_transferStx` against the sats-connect schema and rejects requests carrying out-of-spec fields (`network`/`address`/`sponsored`/`fee`/`nonce`) with "There's a mismatch between your active network…" even when the network is correct. Xverse transfers now send ONLY `{recipient, amount, memo}` and run the same `ensureXverseSigningAccount` preflight as contract calls, so the per-origin session is guaranteed to live on the SAME BitcoinProvider that receives the transfer (re-runs `wallet_connect` there if the browsing session has no readable account).
