@@ -44,6 +44,23 @@ Out-of-spec fields are not ignored:
 The payment test asserts `toEqual` on the exact transfer params, so adding any
 field fails CI by design.
 
+## 2b. Stale per-origin sessions cause "Network mismatch" that NO preflight can prevent
+
+Xverse's stored per-origin session records the network it was created under. If
+the wallet's active network setting has changed since (or the session predates a
+wallet update), signing requests are rejected with "There's a mismatch between
+your active network and the network you're logged in with on the app" — while
+`wallet_getAccount` still answers with the correct address, so the account
+preflight passes (July 21 evening incident, diagnosed from the
+`[wallet:xverse-preflight]` READ_OK → transfer-rejected log pair).
+
+Rule: every Xverse signing request goes through `requestXverseSigning`, which
+on a network-mismatch rejection drops the session (`wallet_disconnect`),
+re-runs `wallet_connect` on the same BitcoinProvider, verifies the reconnected
+account matches the expected sender, and retries ONCE. User rejections are
+never retried (`isNetworkMismatchError` gates the recovery). Tests assert the
+exact call sequence and the non-retry of rejections.
+
 ## 3. Account preflight: cache → wallet_getAccount (30s cap) → wallet_connect. NEVER stx_getAccounts
 
 Before any Xverse signing request, `ensureXverseSigningAccount` confirms the

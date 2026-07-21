@@ -370,6 +370,95 @@ describe('wallet connect helpers', () => {
     expect(seenMethods).toEqual(['stx_transferStx']);
   });
 
+  it('recovers from a stale-session "Network mismatch." by reconnecting on the same bridge and retrying once', async () => {
+    const legacyProvider = { request: vi.fn() };
+    const seenMethods: string[] = [];
+    let transferAttempts = 0;
+    const rpcProvider = {
+      request: vi.fn(async (method: string) => {
+        seenMethods.push(method);
+        if (method === 'wallet_disconnect') {
+          return { status: 'success', result: null };
+        }
+        if (method === 'wallet_connect') {
+          return { status: 'success', result: { addresses: [{ address: ADDRESS }] } };
+        }
+        expect(method).toBe('stx_transferStx');
+        transferAttempts += 1;
+        if (transferAttempts === 1) {
+          // Xverse's stored per-origin session was created under a different
+          // network setting — the preflight read still succeeds, only the
+          // signing request exposes it.
+          throw new Error('Network mismatch.');
+        }
+        return { status: 'success', result: { txid: '0xfeed01' } };
+      })
+    };
+    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
+    (
+      window as typeof window & {
+        XverseProviders?: { StacksProvider: unknown; BitcoinProvider: unknown };
+      }
+    ).XverseProviders = {
+      StacksProvider: legacyProvider,
+      BitcoinProvider: rpcProvider
+    };
+    __testing.rememberXverseAccount(ADDRESS);
+
+    await expect(
+      __testing.requestStxTransfer(legacyProvider as never, {
+        recipient: ADDRESS,
+        amount: '1000000',
+        memo: 'Xtrata Agent One',
+        network: 'mainnet',
+        stxAddress: ADDRESS
+      })
+    ).resolves.toMatchObject({ txId: '0xfeed01' });
+    expect(seenMethods).toEqual([
+      'stx_transferStx',
+      'wallet_disconnect',
+      'wallet_connect',
+      'stx_transferStx'
+    ]);
+  });
+
+  it('does not retry a genuine user rejection as a network mismatch', async () => {
+    const legacyProvider = { request: vi.fn() };
+    const rpcProvider = {
+      request: vi.fn(async (method: string) => {
+        if (method === 'wallet_getAccount') {
+          return { status: 'success', result: { addresses: [{ address: ADDRESS }] } };
+        }
+        throw Object.assign(new Error('User rejected the Stacks transaction signing request'), {
+          code: 4001
+        });
+      })
+    };
+    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
+    (
+      window as typeof window & {
+        XverseProviders?: { StacksProvider: unknown; BitcoinProvider: unknown };
+      }
+    ).XverseProviders = {
+      StacksProvider: legacyProvider,
+      BitcoinProvider: rpcProvider
+    };
+
+    await expect(
+      __testing.requestStxTransfer(legacyProvider as never, {
+        recipient: ADDRESS,
+        amount: '1000000',
+        network: 'mainnet',
+        stxAddress: ADDRESS
+      })
+    ).rejects.toThrow(/User rejected/);
+    // preflight read + one transfer attempt — no reconnect loop on rejection
+    expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual([
+      'wallet_getAccount',
+      'stx_transferStx'
+    ]);
+  });
+
   const scoreSubmitOptions = () => ({
     contractAddress: ADDRESS,
     contractName: 'xtrata-arcade-scores-v1-3',

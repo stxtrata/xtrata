@@ -2,6 +2,12 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Xverse stale-session network mismatch auto-recovery (2026-07-21, follow-up 3)
+
+- Field logs (`[wallet:xverse-preflight]` READ_OK with the correct mainnet address, then `stx_transferStx` → "Network mismatch.") isolated the final cause: Xverse's STORED per-origin session can be bound to a different network setting than the wallet's active network ("mismatch between your active network and the network you're logged in with on the app"). The account read still succeeds — only signing requests expose it, so no preflight can prevent it.
+- `requestXverseSigning` wrapper (now used by both `stx_transferStx` and `stx_callContract`): on a network-mismatch rejection it drops the stale session (`wallet_disconnect`), re-runs `wallet_connect` on the same BitcoinProvider (re-binding the session to the active network), verifies the reconnected account matches the expected sender, and retries the request ONCE. Genuine user rejections are never retried. New stages logged: NETWORK_MISMATCH_RECOVERY / RECOVERY_RETRY / RECOVERY_RECONNECT_FAILED.
+- Tests: recovery sequence asserted call-by-call (`stx_transferStx → wallet_disconnect → wallet_connect → stx_transferStx`); user-rejection non-retry asserted. Wallet suites 59/59. Cache bumped to `?v=13`. Playbook updated (§2b).
+
 ## Xverse preflight repair (no stx_getAccounts, cache + timeout) + wallet playbook (2026-07-21, follow-up 2)
 
 - The transfer preflight added earlier today reused `ensureXverseSigningAccount`, whose fallback chain still contained `stx_getAccounts` — on current Xverse that opens a "Mismatched Network" prompt which gets rejected, so the wizard pay button STILL surfaced "Network mismatch" after the params fix. The preflight is now: 45s cached account (seeded from wallet_connect at connect time and successful reads, cleared on disconnect) → `wallet_getAccount` bounded by a 30s timeout → `wallet_connect` on the same BitcoinProvider. `stx_getAccounts` is banned from the preflight and the fallback-order test asserts it never appears.

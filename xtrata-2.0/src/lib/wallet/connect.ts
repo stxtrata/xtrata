@@ -916,6 +916,85 @@ const readXverseAccountCache = () =>
     ? xverseAccountCache.address
     : null;
 
+// Xverse rejects signing requests with "Network mismatch." / "There's a
+// mismatch between your active network and the network you're logged in with
+// on the app." when its STORED per-origin session was created under a
+// different network setting than the wallet's active network — the preflight
+// can still read the right account, so only the signing request exposes it.
+// Recovery: drop the stale session, re-run wallet_connect on the same bridge
+// (re-binds the session to the active network) and retry the request ONCE.
+const isNetworkMismatchError = (error: unknown) => {
+  const message = (error instanceof Error ? error.message : String(error ?? '')).toLowerCase();
+  return (
+    message.includes('network mismatch') ||
+    (message.includes('mismatch') && message.includes('network'))
+  );
+};
+
+const refreshXverseSession = async (rpcProvider: WalletRpcProvider) => {
+  clearXverseAccountCache();
+  try {
+    await rpcProvider.request('wallet_disconnect');
+  } catch {
+    // best-effort: older builds without wallet_disconnect still re-connect
+  }
+  const response = unwrapProviderResponse(await rpcProvider.request('wallet_connect'));
+  const address = extractStacksAddress(response);
+  rememberXverseAccount(address);
+  return address;
+};
+
+const requestXverseSigning = async (
+  rpcProvider: WalletRpcProvider,
+  method: string,
+  params: Record<string, unknown> | undefined,
+  expectedAddress?: string
+) => {
+  try {
+    return unwrapProviderResponse(await rpcProvider.request(method, params));
+  } catch (error) {
+    const failure = providerError(error);
+    if (!isNetworkMismatchError(failure)) {
+      throw failure;
+    }
+    // eslint-disable-next-line no-console
+    console.info('[wallet:xverse-preflight]', {
+      stage: 'NETWORK_MISMATCH_RECOVERY',
+      method,
+      message: failure.message
+    });
+    let address: string | null = null;
+    try {
+      address = await refreshXverseSession(rpcProvider);
+    } catch (reconnectError) {
+      // eslint-disable-next-line no-console
+      console.info('[wallet:xverse-preflight]', {
+        stage: 'RECOVERY_RECONNECT_FAILED',
+        message:
+          reconnectError instanceof Error ? reconnectError.message : String(reconnectError)
+      });
+      throw failure;
+    }
+    if (!address || (expectedAddress && address !== expectedAddress)) {
+      throw Object.assign(
+        new Error(
+          address
+            ? `Xverse reconnected as ${address}, not the expected ${expectedAddress}. Switch back to that account and retry.`
+            : failure.message
+        ),
+        { code: address ? XVERSE_ACCOUNT_MISMATCH_CODE : undefined }
+      );
+    }
+    // eslint-disable-next-line no-console
+    console.info('[wallet:xverse-preflight]', { stage: 'RECOVERY_RETRY', method, address });
+    try {
+      return unwrapProviderResponse(await rpcProvider.request(method, params));
+    } catch (retryError) {
+      throw providerError(retryError);
+    }
+  }
+};
+
 // wallet_getAccount sometimes never answers on current Xverse; bound it so the
 // preflight falls through to wallet_connect instead of hanging the payment.
 let xverseAccountReadTimeoutMs = 30_000;
@@ -1069,14 +1148,13 @@ const requestWalletContractCall = async (
       expectedAddress: options.stxAddress,
       activeAddress
     });
-    try {
-      const response = unwrapProviderResponse(
-        await rpcProvider.request('stx_callContract', params)
-      );
-      return normalizeTxResult(response);
-    } catch (error) {
-      throw providerError(error);
-    }
+    const response = await requestXverseSigning(
+      rpcProvider,
+      'stx_callContract',
+      params,
+      options.stxAddress ?? activeAddress
+    );
+    return normalizeTxResult(response);
   };
 
   let watchdogTimer: ReturnType<typeof setTimeout> | undefined;
@@ -1274,14 +1352,13 @@ const requestStxTransfer = async (
     amount: normalizeBigIntLike(options.amount) ?? '0',
     ...(options.memo ? { memo: options.memo } : {})
   };
-  try {
-    const response = unwrapProviderResponse(
-      await rpcProvider.request('stx_transferStx', params)
-    );
-    return normalizeTxResult(response);
-  } catch (error) {
-    throw providerError(error);
-  }
+  const response = await requestXverseSigning(
+    rpcProvider,
+    'stx_transferStx',
+    params,
+    options.stxAddress
+  );
+  return normalizeTxResult(response);
 };
 
 const requestLeatherContractDeploy = async (
@@ -1809,6 +1886,8 @@ export const __testing = {
   getInstalledProvidersOnHost,
   clearXverseAccountCache,
   rememberXverseAccount,
+  isNetworkMismatchError,
+  requestXverseSigning,
   setXverseAccountReadTimeoutMs: (value: number) => {
     xverseAccountReadTimeoutMs = value;
   }
