@@ -1,0 +1,79 @@
+{
+  "$schema": "../../schemas/xtrata-capabilities.schema.json",
+  "protocol": {
+    "name": "Xtrata",
+    "description": "Contract-native inscription protocol on Stacks (Bitcoin L2). Chunked on-chain storage sealed into SIP-009 NFTs, deduplicated by incremental SHA-256 hash chain.",
+    "version": "2.1.0",
+    "app": "https://xtrata.xyz",
+    "sdk": { "@xtrata/sdk": "0.2.0", "@xtrata/reconstruction": "0.2.0" }
+  },
+  "contracts": {
+    "mainnet": {
+      "core": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0",
+      "smallMintHelper": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-small-mint-v1-0",
+      "legacyCore": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1.1.1",
+      "collectionMintActiveTarget": "xtrata-collection-mint-v1.4",
+      "nftAssetName": "xtrata-inscription"
+    }
+  },
+  "limits": {
+    "chunkSizeBytes": 16384,
+    "uploadBatchCeilingChunks": 30,
+    "contractBatchListMax": 50,
+    "smallMintMaxChunks": 30,
+    "maxTotalChunks": 2048,
+    "maxTotalSizeBytes": 33554432,
+    "uploadExpiryBlocks": 4320
+  },
+  "fees": {
+    "protocolFeeAsset": "STX",
+    "feeMinMicroStx": 1000,
+    "feeMaxMicroStx": 1000000,
+    "feeBucketChunks": 50,
+    "note": "Protocol fee charged on begin and seal; chunk uploads carry no protocol fee. Fee math uses the contract's 50-chunk bucket even though app/SDK uploads cap at 30 chunks per tx."
+  },
+  "endpoints": {
+    "stacksApiMainnet": "https://stacks-node-api.mainnet.stacks.co",
+    "stacksApiFallback": "https://api.mainnet.hiro.so",
+    "workerApi": "https://xtrata.xyz",
+    "openapi": "docs/machine/openapi.yaml"
+  },
+  "payments": {
+    "assets": [
+      { "kind": "stx", "symbol": "STX", "decimals": 6, "status": "native" },
+      {
+        "kind": "sip10",
+        "symbol": "sBTC",
+        "contractId": "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token",
+        "assetName": "sbtc-token",
+        "decimals": 8,
+        "network": "mainnet",
+        "status": "supported"
+      },
+      { "kind": "sip10", "symbol": "USDCx", "status": "planned", "note": "Descriptor via sip10Asset() with a verified contract id; not blessed as a built-in yet." },
+      { "kind": "sip10", "symbol": "USDC", "status": "planned" },
+      { "kind": "sip10", "symbol": "USDT", "status": "planned" }
+    ],
+    "fiatQuotes": { "currencies": ["USD", "GBP"], "settlement": false, "note": "Display estimates only via quoteFiat(); no fiat settles on-chain." },
+    "sponsoredTransactions": {
+      "supported": true,
+      "flow": "Buyer signs market buy with sponsored:true and zero fee; relayer attaches and pays the mining fee, then settles the seller's fee-budget escrow.",
+      "sdkModule": "@xtrata/sdk/sponsor"
+    }
+  },
+  "workflows": {
+    "singleMintSmall": { "route": "smallMintHelper.mint-small-single-tx", "maxChunks": 30, "skill": "docs/ai-skills/skill-inscribe.md" },
+    "singleMintStaged": { "route": "core.begin-or-get -> add-chunk-batch* -> seal-inscription", "skill": "docs/ai-skills/skill-inscribe.md" },
+    "batchMint": { "route": "core.seal-inscription-batch / collection mint-seal-batch", "maxItems": 50, "skill": "docs/ai-skills/skill-batch-mint.md" },
+    "transfer": { "route": "core.transfer", "skill": "docs/ai-skills/skill-transfer.md" },
+    "query": { "route": "read-only calls + /index/* endpoints", "skill": "docs/ai-skills/skill-query.md" },
+    "sdkPlanners": [
+      "buildCoreMintWorkflowPlan",
+      "buildCollectionMintWorkflowPlan",
+      "buildMarketListWorkflowPlan",
+      "buildMarketBuyWorkflowPlan",
+      "buildMarketCancelWorkflowPlan",
+      "buildBackupMigrationWorkflowPlan"
+    ]
+  }
+}

@@ -265,7 +265,8 @@
       xplorer: 'Xtrata Xplorer',
       'my-wallet': 'My Wallet — Xtrata',
       market: 'Market — Xtrata',
-      drops: 'Drops — Claim free inscriptions — Xtrata'
+      drops: 'Drops — Claim free inscriptions — Xtrata',
+      wizard: 'Inscription Wizard — Xtrata'
     };
 
     // Set once the prepare handler exists; lets setSelectedFile auto-prepare a
@@ -12465,6 +12466,18 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
     };
 
+    // Wizard page: the standalone /wizard/ app in an iframe. The src is set
+    // lazily on first visit so other pages never download the wizard bundles.
+    const activateWizardFrame = () => {
+      const frame = document.getElementById('wizardFrame');
+      if (frame && !frame.getAttribute('src')) {
+        frame.setAttribute('src', frame.dataset.src || '/wizard/?embedded=1');
+      }
+    };
+    if (PAGE_MODE === 'wizard') {
+      activateWizardFrame();
+    }
+
     const switchToPage = async (page, params = null) => {
       const run = ++pageSwitchRun;
       PAGE_MODE = page;
@@ -12505,6 +12518,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       if (page === 'drops') {
         await loadDropsPage(params);
       }
+      if (page === 'wizard') {
+        activateWizardFrame();
+      }
       if (run === pageSwitchRun) {
         updateControls();
       }
@@ -12523,6 +12539,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
       if (seg === 'drops') {
         return 'drops';
+      }
+      if (seg === 'create-wizard') {
+        return 'wizard';
       }
       if (
         seg === 'xplorer' ||
@@ -13297,7 +13316,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const seg = (url.pathname.split('/').filter(Boolean)[0] || '').toLowerCase();
       const isSitePagePath =
         url.pathname === '/' ||
-        ['inscribe', 'my-wallet', 'wallet', 'xplorer', 'x', 'drops', 'market'].includes(seg);
+        ['inscribe', 'my-wallet', 'wallet', 'xplorer', 'x', 'drops', 'market', 'create-wizard'].includes(seg);
       if (!isSitePagePath) {
         return; // /wizard, /g/…, docs, static apps → real navigation
       }

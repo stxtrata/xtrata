@@ -31,4 +31,15 @@ describe('sdk public exports', () => {
     expect(typeof sdk.getContractId).toBe('function');
     expect(typeof sdk.buildRegisterBackupCall).toBe('function');
   });
+
+  it('exposes sponsor and payment helpers', () => {
+    expect(typeof sdk.createSponsorClient).toBe('function');
+    expect(typeof sdk.mapRelayerError).toBe('function');
+    expect(typeof sdk.SponsorClientError).toBe('function');
+    expect(typeof sdk.sip10Asset).toBe('function');
+    expect(typeof sdk.buildPaymentPostCondition).toBe('function');
+    expect(typeof sdk.quoteFiat).toBe('function');
+    expect(sdk.STX_ASSET.kind).toBe('stx');
+    expect(sdk.SBTC_MAINNET.kind).toBe('sip10');
+  });
 });

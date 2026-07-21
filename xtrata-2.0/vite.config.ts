@@ -21,6 +21,31 @@ const applyOpusGeneratorHeaders = (
   next();
 };
 
+// Dev/preview only: serve the static wizard app at its production /wizard/
+// path (prod copies xtrata-agent-one/wizard → dist/wizard via
+// scripts/copy-static-apps.mjs; the dev server has no such mapping).
+const applyWizardDevAlias = (
+  req: { url?: string },
+  _res: unknown,
+  next: () => void
+) => {
+  const url = req.url ?? '';
+  if (url === '/wizard' || url.startsWith('/wizard/') || url.startsWith('/wizard?')) {
+    const [path, query = ''] = url.split('?');
+    let rest = path.replace(/^\/wizard\/?/, '');
+    if (rest === '' || rest.endsWith('/')) rest += 'index.html';
+    req.url = `/xtrata-agent-one/wizard/${rest}${query ? `?${query}` : ''}`;
+  }
+  next();
+};
+
+const wizardDevAliasPlugin = {
+  name: 'wizard-dev-alias',
+  configureServer(server: { middlewares: { use: typeof applyWizardDevAlias } }) {
+    server.middlewares.use(applyWizardDevAlias);
+  }
+};
+
 const opusGeneratorHeadersPlugin = {
   name: 'opus-generator-cross-origin-isolation-headers',
   configureServer(server: { middlewares: { use: typeof applyOpusGeneratorHeaders } }) {
@@ -50,7 +75,7 @@ export default defineConfig(({ mode }) => {
     'https://api.bnsv2.com/testnet';
 
   return {
-    plugins: [react(), opusGeneratorHeadersPlugin],
+    plugins: [react(), opusGeneratorHeadersPlugin, wizardDevAliasPlugin],
     define: {
       __XSTRATA_HAS_HIRO_KEY__: JSON.stringify(hasHiroApiKey)
     },

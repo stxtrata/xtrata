@@ -11,6 +11,9 @@ SDK package for protocol-first integrations:
 - Mint helpers (fees, caps, post-conditions, dependencies)
 - Collection mint lifecycle helpers
 - Market helpers
+- Sponsored-transaction client (`sponsor`) for zero-STX buys via the relayer
+- Payment-asset helpers (`payments`): STX/sBTC/SIP-010 descriptors, deny-mode
+  spend-cap post conditions, fiat (USD/GBP) display quotes
 - Deploy helper primitives
 
 Current packaging mode:

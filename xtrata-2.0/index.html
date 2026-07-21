@@ -42,6 +42,8 @@
         page = 'market';
       } else if (seg === 'drops') {
         page = 'drops';
+      } else if (seg === 'create-wizard') {
+        page = 'wizard';
       }
       document.documentElement.dataset.page = page;
       const titles = {
@@ -49,7 +51,8 @@
         'my-wallet': 'My Wallet — Xtrata',
         xplorer: 'Xtrata Xplorer',
         market: 'Market — Xtrata',
-        drops: 'Drops — Claim free inscriptions — Xtrata'
+        drops: 'Drops — Claim free inscriptions — Xtrata',
+        wizard: 'Inscription Wizard — Xtrata'
       };
       if (titles[page]) {
         document.title = titles[page];
@@ -90,7 +93,7 @@
       <a href="/drops" data-nav="drops" target="_self">Claim</a>
       <a href="/market" data-nav="market" target="_self">Collect</a>
       <a href="/my-wallet" data-nav="my-wallet" target="_self">My Xtrata</a>
-      <a href="/wizard/" data-nav="wizard" target="_self">Wizard</a>
+      <a href="/create-wizard" data-nav="wizard" target="_self">Wizard</a>
       <a href="/#build" data-nav="build" target="_self">Build</a>
       <div class="radio-slot" id="radioSlot" aria-label="Xtrata FM radio"></div>
     </nav>
@@ -832,6 +835,17 @@
             creator's deposit covers the network fee, so claimers need zero STX.
           </p>
         </div>
+      </section>
+      <!-- Wizard page: the standalone inscription wizard embedded in the shell
+           (data-page router). The iframe src is set lazily on first visit so
+           other pages never pay for the wizard bundles. -->
+      <section class="panel panel-wizard" aria-label="Inscription Wizard">
+        <div class="panel-wizard__bar">
+          <a class="panel-wizard__standalone" href="/wizard/" target="_blank" rel="noopener">Open standalone ↗</a>
+        </div>
+        <iframe id="wizardFrame" title="XTRATA Inscription Wizard"
+                data-src="/wizard/?embedded=1" loading="lazy"
+                allow="clipboard-write"></iframe>
       </section>
     </main>
 

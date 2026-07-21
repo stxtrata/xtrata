@@ -10,8 +10,8 @@ enough to inscribe on-chain where practical.
 |------|-------------|
 | [`skill-inscribe.md`](skill-inscribe.md) | Single-item inscription skill. Covers helper-route single-tx minting for `<=30` chunks plus the standard staged flow, with cost estimation and user confirmation gate. |
 | [`skill-batch-mint.md`](skill-batch-mint.md) | Batch mint skill for coordinated drops of `1..50` non-recursive items. Covers core `seal-inscription-batch` and collection `mint-seal-batch`, with deterministic ordering, dedupe, staged uploads, and final batch seal. |
-| `skill-transfer.md` | Transfer inscriptions between wallets. *(planned)* |
-| `skill-query.md` | Query inscription state, metadata, and content. *(planned)* |
+| [`skill-transfer.md`](skill-transfer.md) | Transfer inscriptions between wallets with ownership checks, escrow/twin detection, deny-mode NFT post condition, and post-transfer verification. |
+| [`skill-query.md`](skill-query.md) | Read-only queries: metadata, ownership, content reconstruction, dependencies, and the relationship index. No wallet or fees. |
 
 ## Canonical Skill File
 

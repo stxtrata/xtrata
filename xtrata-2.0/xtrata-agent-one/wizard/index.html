@@ -403,10 +403,26 @@
   .dot{display:inline-block;width:9px;height:9px;border-radius:3px;vertical-align:middle;margin-right:5px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   @media(max-width:840px){.grid2{grid-template-columns:1fr}}
+  /* Embedded in the site shell: shell provides brand + nav + radio; keep our
+     wallet controls (independent session) but drop the duplicate chrome. */
+  :root[data-embedded='1'] body>header>a[title="Xtrata home"]{display:none!important}
+
+  :root[data-embedded='1'] body>header>div:nth-of-type(1),
+  :root[data-embedded='1'] body>footer{display:none}
 </style>
 </head>
 <body>
 <script>try{var _t=(localStorage.getItem('xtrata.theme.mode')||'').trim().toLowerCase();var _ok=["classic", "terminal", "midnight", "neon", "monochrome", "obsidian", "ember", "ultraviolet", "arctic", "ruby"];document.body.dataset.theme=_ok.indexOf(_t)>=0?_t:'monochrome';}catch(e){document.body.dataset.theme='monochrome';}</script>
+<script>
+// Embedded mode: when framed by the main site shell (/create-wizard tab) the
+// shell already shows the brand header, tab nav and radio, so hide our
+// duplicates. Cross-origin window.top access throws → treat as embedded.
+try{
+  if(window.self!==window.top||new URLSearchParams(window.location.search).has('embedded')){
+    document.documentElement.dataset.embedded='1';
+  }
+}catch(e){document.documentElement.dataset.embedded='1';}
+</script>
 <header>
   <a href="/" title="Xtrata home" style="flex:none;display:block"><img src="favicon.svg" alt="Xtrata" style="width:30px;height:30px;border-radius:8px;display:block" /></a>
   <div>
@@ -1721,6 +1737,11 @@ if(params.get('handoff')==='create-selection'&&params.get('handoffId')){
   }
 }
 </script>
-<script src="/xtrata-radio.js" defer></script>
+<script>
+// XTRATA FM: skip when embedded — the shell already docks the radio.
+if(document.documentElement.dataset.embedded!=='1'){
+  var _r=document.createElement('script');_r.src='/xtrata-radio.js';_r.defer=true;document.head.appendChild(_r);
+}
+</script>
 </body>
 </html>

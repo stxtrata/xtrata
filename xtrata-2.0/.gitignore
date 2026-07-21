@@ -21,3 +21,6 @@ forever-twins/assets/xtrata-forever-twins.js
 
 # Vite config bundling artifacts (auto-generated, safe to delete)
 *.timestamp-*.mjs
+
+# Cowork cloud-session recycle bin (bridge cannot delete files)
+_to_delete/
