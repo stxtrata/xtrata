@@ -23,6 +23,8 @@
 /market/ / 200
 /drops / 200
 /drops/ / 200
+/create-wizard / 200
+/create-wizard/ / 200
 /wallet /my-wallet 301
 /wallet/ /my-wallet 301
 /workspace/* /workspace 200
