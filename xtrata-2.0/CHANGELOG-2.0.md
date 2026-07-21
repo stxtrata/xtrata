@@ -2,6 +2,13 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Homepage campaign spotlight rail (2026-07-21)
+
+- Restored the compact campaign-promo pattern immediately below primary navigation and expanded it to three banners: Proof Zero leads with the live 200 STX First Masterpiece bounty, followed by Forever Twins and Suno More. The banners use existing campaign artwork, responsive compact layouts, keyboard focus states, reduced-motion handling, and homepage action tracking.
+- Updated the reusable flagship campaign card to Proof Zero so the detailed campaign story remains consistent with the new top-of-page promotion.
+- Repaired `/masterpiece` and legacy First Masterpiece rewrites after the campaign directory was renamed from `first-masterpiece/` to `proofzero/`; updated the shared Create-routing integration test and app-reference path.
+- Verified with the focused homepage/Create-routing suite (14 tests) and a complete production build. The repository-wide lint gate remains blocked by two pre-existing unused variables in `recursive-apps/duels-drop/build-demo-v3.mjs`.
+
 ## First Masterpiece bounty — /masterpiece landing page + homepage campaign card (2026-07-17)
 
 - Zero Authority DAO confirmed Option 1 of the sponsored-bounty proposals ("Inscribe Your First Masterpiece", 200 STX, 100/50/25/25 split). The existing `first-masterpiece/` static page is now wired into the site: new `/masterpiece` (and `/bounties/first-masterpiece`) 200 rewrites in `public/_redirects` serve `first-masterpiece/index.html`; the page was already in `scripts/copy-static-apps.mjs`.

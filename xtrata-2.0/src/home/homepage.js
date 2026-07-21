@@ -1,5 +1,6 @@
 import {
   HOMEPAGE_ACTIVITY_DOORS,
+  HOMEPAGE_CAMPAIGN_BANNERS,
   HOMEPAGE_CAMPAIGN,
   HOMEPAGE_INTENTS,
   HOMEPAGE_OBJECTS,
@@ -12,6 +13,7 @@ const HOME_MOUNT_IDS = [
   'possibilityGrid',
   'intentGrid',
   'homeActivityList',
+  'campaignBannerList',
   'campaignSlot'
 ];
 let actionTrackingInstalled = false;
@@ -157,6 +159,57 @@ const renderActivity = () => {
   });
 };
 
+const renderCampaignBanners = () => {
+  const mount = document.getElementById('campaignBannerList');
+  if (!mount) {
+    return;
+  }
+  mount.replaceChildren();
+  HOMEPAGE_CAMPAIGN_BANNERS.forEach((item) => {
+    const banner = actionLink(
+      item.href,
+      '',
+      `campaign-banner campaign-banner--${item.tone}`,
+      `campaign_banner:${item.id}`
+    );
+    banner.dataset.campaignId = item.id;
+    banner.dataset.campaignStatus = item.status;
+
+    if (item.artwork) {
+      const image = document.createElement('img');
+      image.className = 'campaign-banner__art';
+      image.src = item.artwork;
+      image.alt = `${item.title} campaign artwork`;
+      image.decoding = 'async';
+      banner.append(image);
+    } else {
+      const stat = element('span', 'campaign-banner__art campaign-banner__stat');
+      stat.append(
+        element('strong', '', item.stat),
+        element('small', '', item.statLabel)
+      );
+      banner.append(stat);
+    }
+
+    const body = element('span', 'campaign-banner__body');
+    const kicker = element('span', 'campaign-banner__kicker');
+    kicker.append(
+      element('span', 'campaign-banner__pulse'),
+      document.createTextNode(item.eyebrow)
+    );
+    body.append(
+      kicker,
+      element('strong', 'campaign-banner__title', item.title),
+      element('span', 'campaign-banner__copy', item.description)
+    );
+    banner.append(
+      body,
+      element('span', 'campaign-banner__cta', `${item.cta} →`)
+    );
+    mount.append(banner);
+  });
+};
+
 const renderCampaign = () => {
   const mount = document.getElementById('campaignSlot');
   if (!mount) {
@@ -167,11 +220,20 @@ const renderCampaign = () => {
   mount.dataset.campaignStatus = HOMEPAGE_CAMPAIGN.status;
 
   const art = element('div', 'campaign-slot__art');
-  const image = document.createElement('img');
-  image.src = HOMEPAGE_CAMPAIGN.artwork;
-  image.alt = `${HOMEPAGE_CAMPAIGN.title} campaign artwork`;
-  image.loading = 'lazy';
-  art.append(image);
+  if (HOMEPAGE_CAMPAIGN.artwork) {
+    const image = document.createElement('img');
+    image.src = HOMEPAGE_CAMPAIGN.artwork;
+    image.alt = `${HOMEPAGE_CAMPAIGN.title} campaign artwork`;
+    image.loading = 'lazy';
+    art.append(image);
+  } else {
+    const stat = element('div', 'campaign-slot__stat');
+    stat.append(
+      element('span', 'campaign-slot__stat-number', HOMEPAGE_CAMPAIGN.stat),
+      element('span', 'campaign-slot__stat-label', HOMEPAGE_CAMPAIGN.statLabel)
+    );
+    art.append(stat);
+  }
 
   const body = element('div', 'campaign-slot__body');
   const sponsor = HOMEPAGE_CAMPAIGN.sponsor
@@ -248,6 +310,7 @@ export const initHomepage = () => {
   renderObjects();
   renderIntents();
   renderActivity();
+  renderCampaignBanners();
   renderCampaign();
   installActionTracking();
 };
