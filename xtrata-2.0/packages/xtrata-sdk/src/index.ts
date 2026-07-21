@@ -16,3 +16,5 @@ export * from './simple.js';
 export * from './safe.js';
 export * from './workflows.js';
 export * from './backup-migration.js';
+export * from './sponsor.js';
+export * from './payments.js';

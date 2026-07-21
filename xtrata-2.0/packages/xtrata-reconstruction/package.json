@@ -1,11 +1,38 @@
 {
   "name": "@xtrata/reconstruction",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "description": "Strict byte reconstruction for Xtrata inscriptions: batch chunk reads, fallback sources, diagnostics, and incremental hash verification.",
+  "license": "MIT",
+  "author": "Xtrata",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stxtrata/xtrata.git",
+    "directory": "xtrata-2.0/packages/xtrata-reconstruction"
+  },
+  "homepage": "https://github.com/stxtrata/xtrata#readme",
+  "keywords": [
+    "stacks",
+    "bitcoin",
+    "inscriptions",
+    "nft",
+    "sip-009",
+    "sip-010",
+    "clarity",
+    "sbtc",
+    "xtrata"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "sideEffects": false,
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "main": "./dist/index.js",
   "module": "./dist/index.js",

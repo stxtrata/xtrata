@@ -1,11 +1,38 @@
 {
   "name": "@xtrata/sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "description": "TypeScript SDK for the Xtrata contract-native inscription protocol on Stacks: read clients, mint/collection/market workflow planners, safe spend caps, sponsored-transaction client, and multi-asset payment helpers.",
+  "license": "MIT",
+  "author": "Xtrata",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stxtrata/xtrata.git",
+    "directory": "xtrata-2.0/packages/xtrata-sdk"
+  },
+  "homepage": "https://github.com/stxtrata/xtrata#readme",
+  "keywords": [
+    "stacks",
+    "bitcoin",
+    "inscriptions",
+    "nft",
+    "sip-009",
+    "sip-010",
+    "clarity",
+    "sbtc",
+    "xtrata"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "sideEffects": false,
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -66,6 +93,14 @@
     "./errors": {
       "types": "./dist/errors.d.ts",
       "import": "./dist/errors.js"
+    },
+    "./sponsor": {
+      "types": "./dist/sponsor.d.ts",
+      "import": "./dist/sponsor.js"
+    },
+    "./payments": {
+      "types": "./dist/payments.d.ts",
+      "import": "./dist/payments.js"
     }
   },
   "scripts": {
