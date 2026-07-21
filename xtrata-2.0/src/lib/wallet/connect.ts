@@ -51,11 +51,15 @@ type WalletRpcProvider = {
   request: (method: string, params?: Record<string, unknown>) => Promise<unknown>;
 };
 
+type LegacyStacksProvider = StacksProvider & {
+  transactionRequest?: (payload: string) => Promise<unknown>;
+};
+
 type ConnectModalElement = HTMLElement & {
   defaultProviders: WebBTCProvider[];
   installedProviders: WebBTCProvider[];
   persistSelection: boolean;
-  callback?: (selection: string | StacksProvider) => void;
+  callback?: (selection?: string | StacksProvider) => void;
   cancelCallback?: () => void;
 };
 
@@ -124,6 +128,71 @@ const resolveProviderOnWindow = (win: Window | undefined, id: string | null | un
     ) as StacksProvider | undefined;
 };
 
+type ProviderRegistryWindow = Window & {
+  webbtc_stx_providers?: WebBTCProvider[];
+  webbtc_providers?: WebBTCProvider[];
+  btc_providers?: WebBTCProvider[];
+};
+
+// @stacks/connect 7.x reads the old webbtc_stx_providers registry, while
+// current Xverse builds register their WBIP provider in btc_providers (some
+// released builds used webbtc_providers). Merge all three so the embedded
+// chooser sees the provider that is actually injected into the host page.
+const getRegisteredProvidersOnWindow = (win: Window | undefined): WebBTCProvider[] => {
+  if (!win) {
+    return [];
+  }
+  const registryWindow = win as ProviderRegistryWindow;
+  const merged = [
+    ...(registryWindow.webbtc_stx_providers ?? []),
+    ...(registryWindow.webbtc_providers ?? []),
+    ...(registryWindow.btc_providers ?? [])
+  ];
+  return merged.filter(
+    (entry, index) =>
+      Boolean(entry?.id) && merged.findIndex((candidate) => candidate.id === entry.id) === index
+  );
+};
+
+const isRegisteredXverseProviderId = (id: string | null | undefined) => {
+  if (!id) {
+    return false;
+  }
+  return getRegisteredProvidersOnWindow(getWalletHostWindow()).some(
+    (entry) =>
+      entry.id === id &&
+      (isXverseProviderId(entry.id) || entry.name?.toLowerCase().includes('xverse'))
+  );
+};
+
+const resolveInjectedXverseRpcProvider = (): WalletRpcProvider | undefined => {
+  if (typeof window === 'undefined') {
+    return undefined;
+  }
+  const host = getWalletHostWindow();
+  const registered = getRegisteredProvidersOnWindow(host).filter(
+    (entry) =>
+      isXverseProviderId(entry.id) || entry.name?.toLowerCase().includes('xverse')
+  );
+  for (const entry of registered) {
+    const provider = resolveProviderOnWindow(host, entry.id) as WalletRpcProvider | undefined;
+    if (typeof provider?.request === 'function') {
+      return provider;
+    }
+  }
+  for (const providerId of XVERSE_SIGNING_PROVIDER_IDS) {
+    const provider =
+      (resolveProviderOnWindow(host, providerId) as WalletRpcProvider | undefined) ??
+      (host === window
+        ? undefined
+        : (resolveProviderOnWindow(window, providerId) as WalletRpcProvider | undefined));
+    if (typeof provider?.request === 'function') {
+      return provider;
+    }
+  }
+  return undefined;
+};
+
 // Resolution for an already-chosen provider id: prefer the host (top) window,
 // then this window (covers the Asigna iframe shim if the user explicitly
 // picked Asigna), then connect-ui's own registry.
@@ -132,11 +201,21 @@ const resolveProviderById = (id: string | null | undefined): StacksProvider | un
     return undefined;
   }
   const host = getWalletHostWindow();
-  return (
+  const exact =
     resolveProviderOnWindow(host, id) ??
     (host === window ? undefined : resolveProviderOnWindow(window, id)) ??
-    (getProviderFromId(id) as StacksProvider | undefined)
-  );
+    (getProviderFromId(id) as StacksProvider | undefined);
+  if (exact) {
+    return exact;
+  }
+  // The Stacks Connect chooser still persists XverseProviders.StacksProvider,
+  // but current Xverse versions may expose only BitcoinProvider. Treat the old
+  // chooser id as an alias for that real request bridge instead of returning
+  // undefined and later falling into window.StacksProvider's stub request().
+  if (isXverseProviderId(id) || isRegisteredXverseProviderId(id)) {
+    return resolveInjectedXverseRpcProvider() as StacksProvider | undefined;
+  }
+  return undefined;
 };
 
 // Detection for the wallet-chooser modal: host window ONLY, so the iframe
@@ -146,8 +225,7 @@ const getInstalledProvidersOnHost = (defaultProviders: WebBTCProvider[]): WebBTC
   if (!host) {
     return [];
   }
-  const registered = ((host as Window & { webbtc_stx_providers?: WebBTCProvider[] })
-    .webbtc_stx_providers ?? []) as WebBTCProvider[];
+  const registered = getRegisteredProvidersOnWindow(host);
   const additional = defaultProviders.filter(
     (candidate) =>
       !registered.find((entry) => entry.id === candidate.id) &&
@@ -606,24 +684,50 @@ const requestProvider = async (
 };
 
 const getXverseRpcProvider = (): WalletRpcProvider | undefined => {
+  return resolveInjectedXverseRpcProvider();
+};
+
+const getExactXverseStacksProvider = (): LegacyStacksProvider | undefined => {
   if (typeof window === 'undefined') {
     return undefined;
   }
-  const walletWindow = (getWalletHostWindow() ?? window) as typeof window & {
-    XverseProviders?: { BitcoinProvider?: WalletRpcProvider };
-    xverseProviders?: { BitcoinProvider?: WalletRpcProvider };
-    BitcoinProvider?: WalletRpcProvider;
-  };
-  const injected =
-    walletWindow.XverseProviders?.BitcoinProvider ??
-    walletWindow.xverseProviders?.BitcoinProvider ??
-    walletWindow.BitcoinProvider;
-  if (typeof injected?.request === 'function') {
-    return injected;
+  const host = getWalletHostWindow();
+  for (const providerId of [
+    'XverseProviders.StacksProvider',
+    'xverseProviders.StacksProvider'
+  ]) {
+    const provider =
+      (resolveProviderOnWindow(host, providerId) as LegacyStacksProvider | undefined) ??
+      (host === window
+        ? undefined
+        : (resolveProviderOnWindow(window, providerId) as LegacyStacksProvider | undefined));
+    if (provider) {
+      return provider;
+    }
   }
-  for (const providerId of XVERSE_SIGNING_PROVIDER_IDS) {
-    const provider = resolveProviderById(providerId) as WalletRpcProvider | undefined;
-    if (typeof provider?.request === 'function') {
+  return undefined;
+};
+
+// Embedded Xverse currently leaves its legacy transactionRequest bridge under
+// the generic StacksProvider name, while its request() method is a deliberate
+// "not implemented" stub. That bridge is still the same one used by the
+// working standalone wizard, so retain it specifically for the STX payment.
+const getLegacyXverseTransactionProvider = (): LegacyStacksProvider | undefined => {
+  if (typeof window === 'undefined') {
+    return undefined;
+  }
+  const exact = getExactXverseStacksProvider();
+  if (typeof exact?.transactionRequest === 'function') {
+    return exact;
+  }
+  const host = getWalletHostWindow();
+  for (const providerId of ['StacksProvider', 'BlockstackProvider']) {
+    const provider =
+      (resolveProviderOnWindow(host, providerId) as LegacyStacksProvider | undefined) ??
+      (host === window
+        ? undefined
+        : (resolveProviderOnWindow(window, providerId) as LegacyStacksProvider | undefined));
+    if (typeof provider?.transactionRequest === 'function') {
       return provider;
     }
   }
@@ -631,7 +735,8 @@ const getXverseRpcProvider = (): WalletRpcProvider | undefined => {
 };
 
 const isSelectedXverseProvider = (provider: StacksProvider) => {
-  if (isXverseProviderId(getSelectedProviderId())) {
+  const selectedId = getSelectedProviderId();
+  if (isXverseProviderId(selectedId) || isRegisteredXverseProviderId(selectedId)) {
     return true;
   }
   if (typeof window === 'undefined') {
@@ -643,7 +748,8 @@ const isSelectedXverseProvider = (provider: StacksProvider) => {
   };
   return (
     provider === walletWindow.XverseProviders?.StacksProvider ||
-    provider === walletWindow.xverseProviders?.StacksProvider
+    provider === walletWindow.xverseProviders?.StacksProvider ||
+    provider === getXverseRpcProvider()
   );
 };
 
@@ -1313,22 +1419,50 @@ const requestSponsoredContractCall = async (
   return normalizeTxResult(response);
 };
 
-// Xverse STX payments are the exception to the BitcoinProvider routing used by
-// wallet_connect and contract calls. The production Xverse extension accepts
-// this request on the selected XverseProviders.StacksProvider, including when
-// that provider was resolved from the top window for the embedded wizard. The
-// BitcoinProvider path can read the account but repeatedly rejects this signing
-// request as "Network mismatch" even after disconnect/connect recovery. Keep
-// this byte-for-byte aligned with the working main-staging-sol wizard: use the
-// selected provider and the complete Stacks transfer parameter shape.
+// Prefer Xverse's exact legacy StacksProvider when it exists: this is the path
+// used by the working standalone wizard. In the embedded layout that dotted
+// provider can be absent, so selection resolves to the registered WBIP bridge;
+// keep a minimal-spec fallback there rather than sending legacy fields that
+// Xverse interprets as a conflicting network/account request.
 const requestStxTransfer = async (
   provider: StacksProvider,
   options: WalletStxTransferOptions
 ) => {
-  const response = await requestProvider(
-    provider,
+  if (!isSelectedXverseProvider(provider)) {
+    const response = await requestProvider(
+      provider,
+      'stx_transferStx',
+      buildStxTransferParams(options)
+    );
+    return normalizeTxResult(response);
+  }
+
+  const exactStacksProvider = getExactXverseStacksProvider();
+  if (typeof exactStacksProvider?.request === 'function') {
+    const response = await requestProvider(
+      exactStacksProvider,
+      'stx_transferStx',
+      buildStxTransferParams(options)
+    );
+    return normalizeTxResult(response);
+  }
+
+  const rpcProvider = getXverseRpcProvider();
+  if (!rpcProvider) {
+    throw Object.assign(new Error('Xverse payment provider is not available.'), {
+      code: 'XVERSE_RPC_UNAVAILABLE'
+    });
+  }
+  await ensureXverseSigningAccount(rpcProvider, options.stxAddress);
+  const response = await requestXverseSigning(
+    rpcProvider,
     'stx_transferStx',
-    buildStxTransferParams(options)
+    {
+      recipient: options.recipient,
+      amount: normalizeBigIntLike(options.amount) ?? '0',
+      ...(options.memo ? { memo: options.memo } : {})
+    },
+    options.stxAddress
   );
   return normalizeTxResult(response);
 };
@@ -1513,18 +1647,22 @@ const connectViaLegacyAuth = async (
 };
 
 const resolveProviderSelection = (
-  selection: string | StacksProvider,
+  selection: string | StacksProvider | undefined,
   persistSelection = true
 ): StacksProvider | null => {
-  if (typeof selection !== 'string') {
+  if (selection && typeof selection !== 'string') {
     return selection;
   }
-  const provider = resolveProviderById(selection);
+  // connect-ui resolves the clicked id against the iframe's window before it
+  // invokes us. For a provider injected only into the top page that callback
+  // value is undefined, although connect-ui has already persisted the id.
+  const selectedId = typeof selection === 'string' ? selection : getSelectedProviderId();
+  const provider = resolveProviderById(selectedId);
   if (!provider) {
     return null;
   }
-  if (persistSelection) {
-    setSelectedProviderId(selection);
+  if (persistSelection && selectedId) {
+    setSelectedProviderId(selectedId);
   }
   return provider;
 };
@@ -1800,11 +1938,42 @@ export const showStxTransfer = (options: WalletStxTransferOptions, provider?: St
     return legacyShowSTXTransfer(legacyOptions, provider);
   }
 
+  // In the embedded tab Xverse's modern provider is available on the host,
+  // while the iframe's generic StacksProvider keeps only transactionRequest;
+  // its request() is a stub that throws "request function is not implemented".
+  // Send the payment token through that legacy transaction bridge, which is
+  // the route proven by the standalone main-staging-sol wizard.
+  if (isSelectedXverseProvider(activeProvider) && !getExactXverseStacksProvider()) {
+    const legacyTransactionProvider = getLegacyXverseTransactionProvider();
+    if (legacyTransactionProvider) {
+      // eslint-disable-next-line no-console
+      console.info('[wallet:stx-transfer]', {
+        stage: 'PROVIDER_ROUTE',
+        providerId: getSelectedProviderId(),
+        route: 'legacy-transaction-request'
+      });
+      return legacyShowSTXTransfer(legacyOptions, legacyTransactionProvider);
+    }
+  }
+
   return void requestStxTransfer(activeProvider, options)
     .then((payload) => {
       options.onFinish?.(payload);
     })
     .catch((error) => {
+      if (isMethodUnsupportedError(error) && isSelectedXverseProvider(activeProvider)) {
+        const legacyTransactionProvider = getLegacyXverseTransactionProvider();
+        if (legacyTransactionProvider) {
+          // eslint-disable-next-line no-console
+          console.info('[wallet:stx-transfer]', {
+            stage: 'PROVIDER_ROUTE_RECOVERY',
+            providerId: getSelectedProviderId(),
+            route: 'legacy-transaction-request'
+          });
+          legacyShowSTXTransfer(legacyOptions, legacyTransactionProvider);
+          return;
+        }
+      }
       // A modern Xverse connection has no legacy UserSession to fall back to.
       // Keep unsupported/error responses on the modern bridge and surface them
       // to the caller instead of triggering loadUserData() in @stacks/connect.
@@ -1855,7 +2024,10 @@ export const __testing = {
   unwrapProviderResponse,
   getWalletHostWindow,
   resolveProviderById,
+  getRegisteredProvidersOnWindow,
   getInstalledProvidersOnHost,
+  getExactXverseStacksProvider,
+  getLegacyXverseTransactionProvider,
   clearXverseAccountCache,
   rememberXverseAccount,
   isNetworkMismatchError,
