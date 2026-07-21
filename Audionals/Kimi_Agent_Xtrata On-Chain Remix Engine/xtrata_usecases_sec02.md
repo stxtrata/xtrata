@@ -1,0 +1,34 @@
+## 2. The Timing Window: Four Converging Waves
+
+The timing case for Xtrata rests on dates and dollar figures, not sentiment. Four external waves converged in the eighteen months to July 2026: every platform that promised music permanence has collapsed, deletion of public information has gone institutional, deepfake fraud has turned content authenticity into a balance-sheet problem, and AI agents have acquired money and identity with nowhere permanent to publish.
+
+| Wave | Trigger events | What died | What opens for Xtrata |
+|---|---|---|---|
+| 2.1 On-chain music graveyard | Sound.xyz offline Jan 16, 2026 [^1^]; Nina Protocol shuts Jul 22, 2026 | The "permanence" platforms — their media was never on-chain | Music objects that outlive any operator |
+| 2.2 The Great Deletion | 25% of 2013–23 web pages gone [^2^]; 8,000+ US government pages purged | The assumption that institutions preserve | An un-deletable public record |
+| 2.3 Provenance panic | $1.5B+ deepfake-fraud losses in nine months [^3^] | Metadata-based authenticity, stripped in transit | An immutable anchor of record |
+| 2.4 Agent commerce | HTTP-402 agent payments in sBTC; ERC-8004 identity live [^4^] | The excuse that agents lack rails | Immutable publication — the missing third leg |
+
+The pattern across all four rows is identical: the artifact dies, or the proof dies, the moment it depends on a revocable institution — a startup's servers, a government website, a social platform's transcoder. Each wave carries primary-source numbers, and each peaks inside the same eighteen-month window. That simultaneity is the strategy. The audiences primed to care — artists, archivists, newsrooms, standards bodies, agent builders — are all seeking permanence at once, and none of the incumbents they once trusted can supply it today.
+
+### 2.1 The On-Chain Music Platform Graveyard
+#### 2.1.1 Sound.xyz ($25M, a16z) offline 2026-01-16 with media never on-chain; Nina Protocol shutting down 2026-07-22; Catalog pinned media on IPFS — the exact failure Xtrata prevents, and the narrative vacuum is open now
+
+Sound.xyz raised some $25 million, including a $20 million Series A led by Andreessen Horowitz, having paid $5.5 million to its first 500 invited artists[^5^]. On January 16, 2026 it went offline; the farewell note insists "the music and metadata are stored in decentralized storage" — true of the tokens, false of the product, because the audio files and player were never on-chain[^1^]. Nina Protocol reached roughly 40,000 monthly users and 20,000 releases[^6^], announced a phased shutdown on May 28, 2026, and goes offline tomorrow, July 22[^7^] — founded explicitly to save music from moments like "MySpace's servers going down"[^8^]. Catalog's one-of-one records persist only while the company pays to pin them on IPFS (file hosting that survives only while someone keeps paying)[^9^]; Royal closed in late 2024 after raising ~$71 million[^10^]. Every flagship permanence play kept the music off-chain and died with its website — the exact failure Xtrata's architecture prevents — leaving the "permanent home for music" narrative unclaimed.
+
+### 2.2 The Great Deletion: Link Rot and Institutional Data Purges
+#### 2.2.1 Pew 2024: 25% of 2013–2023 pages gone; 2025 US gov purges (8,000+ pages, 2,000+ datasets, CDC/climate tools); YouTube's deletion of 120–150k Syrian war-crime evidence videos
+
+Pew Research found 25% of webpages existing between 2013 and 2023 already inaccessible — 38% for 2013 — and 21% of government pages carrying a broken link[^2^]. Then deletion turned deliberate: more than 8,000 pages vanished from over a dozen US federal websites in early 2025, spanning vaccines, veterans' care, hate crimes, and scientific research[^11^], while 2,000+ datasets disappeared from data.gov and federal climate portals went dark[^12^]. A federal judge vacated the removals as "arbitrary and capricious," yet restoration stayed partial[^13^]. YouTube's classifiers had already erased an estimated 120,000–150,000 Syrian war-crime evidence videos[^14^], and the Internet Archive, the web's supposed fallback, went offline and read-only in October 2024 after a 31-million-account breach[^15^]. Preservation outsourced to goodwill is preservation already lost.
+
+### 2.3 The Provenance Panic
+#### 2.3.1 Deepfake fraud ~$1.5B+ in 9 months of 2025; C2PA manifests structurally strippable in transit — demand for an immutable anchor of record
+
+Reported deepfake-fraud losses topped $1.5 billion in the first nine months of 2025 alone[^3^]; human detection of high-quality deepfakes runs at roughly 24.5% accuracy — worse than a coin flip[^16^]. The industry's answer is C2PA, a standard embedding a signed provenance manifest inside the media file; adoption is real: 6,000+ member organizations and camera/phone signing. But the manifest is metadata, and platforms strip metadata during upload and transcoding, C2PA included — the largest gap between signing infrastructure and verification reality in any major technical standard, per one 2026 analysis[^17^]. The EU AI Act's machine-readable marking rule takes effect August 2, 2026 — twelve days after this report[^18^]. Provenance that cannot survive a screenshot needs an anchor outside the file.
+
+### 2.4 The Agent Commerce Wave
+#### 2.4.1 aibtc live with HTTP-402 agent payments in sBTC; ERC-8004-on-Stacks registries mainnet-deployed; agents need identity, payment rails, and immutable publication — Stacks has the first two, Xtrata is the third
+
+On Stacks, the agent economy is already operational. aibtc runs a live network where AI agents hold self-custodial wallets and pay each other 100 satoshis of sBTC per message via HTTP-402, the web's dormant "payment required" code repurposed as a payment rail[^4^]. ERC-8004, the standard giving each agent an on-chain identity NFT and a reputation registry, launched on mainnet January 29, 2026, drawing roughly 83,000 registered agents across 18 networks within months[^19^]; its identity, reputation, and validation registries are mainnet-deployed on Stacks[^20^], and aibtc requires an on-chain agent identity for its trading competition[^21^]. The wider x402 ecosystem logged about 165 million agent transactions by April 2026, though genuine commerce remains small — roughly $28,000 per day[^22^]. Agents on Bitcoin's rails already have identity and money; the missing third leg is immutable publication, and Xtrata's agent skill file already teaches aibtc agents to inscribe autonomously[^23^].
+
+Chapter 3 maps each wave to use cases: un-deletable music objects and on-chain remix lineage (2.1), civic-data rescue and war-crime evidence preservation (2.2), on-chain manifests of record and verifiably human work (2.3), and permanent agent portfolios with machine-readable publication (2.4). The window is open because all four audiences are looking at once; it closes the moment someone ships first.
