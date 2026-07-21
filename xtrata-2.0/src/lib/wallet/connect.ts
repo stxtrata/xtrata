@@ -13,7 +13,6 @@ import {
 } from '@stacks/connect';
 import {
   clearSelectedProviderId,
-  getInstalledProviders,
   getProviderFromId,
   getSelectedProviderId,
   setSelectedProviderId,
@@ -89,6 +88,73 @@ export const isLeatherProviderId = (providerId: string | null | undefined) =>
 
 export const isXverseProviderId = (providerId: string | null | undefined) =>
   typeof providerId === 'string' && providerId.toLowerCase().includes('xverse');
+
+// The wizard runs inside a same-origin iframe (/wizard/?embedded=1 on the
+// homepage). Wallet extensions (Leather, Xverse) inject their providers into
+// the TOP window only, while @stacks/connect ships an Asigna shim that defines
+// window.AsignaProvider inside EVERY iframe. Detecting providers against the
+// iframe window therefore lists Asigna as "installed" and hides the real
+// wallets. All provider detection and resolution goes through the top
+// same-origin window when one exists; cross-origin embeds fall back to the
+// local window.
+const getWalletHostWindow = (): Window | undefined => {
+  if (typeof window === 'undefined') {
+    return undefined;
+  }
+  try {
+    const top = window.top;
+    if (top && top !== window.self && top.location.origin === window.location.origin) {
+      return top;
+    }
+  } catch {
+    // Cross-origin parent: its providers are unreachable, use this window.
+  }
+  return window;
+};
+
+const resolveProviderOnWindow = (win: Window | undefined, id: string | null | undefined) => {
+  if (!win || !id) {
+    return undefined;
+  }
+  return id
+    .split('.')
+    .reduce<unknown>(
+      (acc, part) => (acc as Record<string, unknown> | undefined)?.[part],
+      win
+    ) as StacksProvider | undefined;
+};
+
+// Resolution for an already-chosen provider id: prefer the host (top) window,
+// then this window (covers the Asigna iframe shim if the user explicitly
+// picked Asigna), then connect-ui's own registry.
+const resolveProviderById = (id: string | null | undefined): StacksProvider | undefined => {
+  if (typeof window === 'undefined' || !id) {
+    return undefined;
+  }
+  const host = getWalletHostWindow();
+  return (
+    resolveProviderOnWindow(host, id) ??
+    (host === window ? undefined : resolveProviderOnWindow(window, id)) ??
+    (getProviderFromId(id) as StacksProvider | undefined)
+  );
+};
+
+// Detection for the wallet-chooser modal: host window ONLY, so the iframe
+// Asigna shim never shows up as an installed wallet.
+const getInstalledProvidersOnHost = (defaultProviders: WebBTCProvider[]): WebBTCProvider[] => {
+  const host = getWalletHostWindow();
+  if (!host) {
+    return [];
+  }
+  const registered = ((host as Window & { webbtc_stx_providers?: WebBTCProvider[] })
+    .webbtc_stx_providers ?? []) as WebBTCProvider[];
+  const additional = defaultProviders.filter(
+    (candidate) =>
+      !registered.find((entry) => entry.id === candidate.id) &&
+      !!resolveProviderOnWindow(host, candidate.id)
+  );
+  return registered.concat(additional);
+};
 
 type WalletActionBase = {
   appDetails?: ContractCallOptions['appDetails'];
@@ -543,7 +609,7 @@ const getXverseRpcProvider = (): WalletRpcProvider | undefined => {
   if (typeof window === 'undefined') {
     return undefined;
   }
-  const walletWindow = window as typeof window & {
+  const walletWindow = (getWalletHostWindow() ?? window) as typeof window & {
     XverseProviders?: { BitcoinProvider?: WalletRpcProvider };
     xverseProviders?: { BitcoinProvider?: WalletRpcProvider };
     BitcoinProvider?: WalletRpcProvider;
@@ -556,7 +622,7 @@ const getXverseRpcProvider = (): WalletRpcProvider | undefined => {
     return injected;
   }
   for (const providerId of XVERSE_SIGNING_PROVIDER_IDS) {
-    const provider = getProviderFromId(providerId) as WalletRpcProvider | undefined;
+    const provider = resolveProviderById(providerId) as WalletRpcProvider | undefined;
     if (typeof provider?.request === 'function') {
       return provider;
     }
@@ -571,7 +637,7 @@ const isSelectedXverseProvider = (provider: StacksProvider) => {
   if (typeof window === 'undefined') {
     return false;
   }
-  const walletWindow = window as typeof window & {
+  const walletWindow = (getWalletHostWindow() ?? window) as typeof window & {
     XverseProviders?: { StacksProvider?: StacksProvider };
     xverseProviders?: { StacksProvider?: StacksProvider };
   };
@@ -1283,7 +1349,7 @@ const resolveProviderSelection = (
   if (typeof selection !== 'string') {
     return selection;
   }
-  const provider = getProviderFromId(selection) as StacksProvider | undefined;
+  const provider = resolveProviderById(selection);
   if (!provider) {
     return null;
   }
@@ -1313,7 +1379,7 @@ const selectProvider = (options?: { forceWalletSelect?: boolean; persistSelectio
   return new Promise<StacksProvider | null>((resolve) => {
     const modal = document.createElement('connect-modal') as unknown as ConnectModalElement;
     const defaultProviders = DEFAULT_PROVIDERS as WebBTCProvider[];
-    const installedProviders = getInstalledProviders(defaultProviders);
+    const installedProviders = getInstalledProvidersOnHost(defaultProviders);
     const previousOverflow = document.body.style.overflow;
 
     const cleanup = () => {
@@ -1368,14 +1434,14 @@ export const getStacksProvider = (): StacksProvider | undefined => {
 
   const selectedProviderId = getSelectedProviderId();
   const selectedProvider = selectedProviderId
-    ? (getProviderFromId(selectedProviderId) as StacksProvider | undefined)
+    ? resolveProviderById(selectedProviderId)
     : undefined;
 
   if (selectedProvider) {
     return selectedProvider;
   }
 
-  const walletWindow = window as typeof window & {
+  const walletWindow = (getWalletHostWindow() ?? window) as typeof window & {
     LeatherProvider?: StacksProvider;
     XverseProviders?: { StacksProvider?: StacksProvider };
     xverseProviders?: { StacksProvider?: StacksProvider };

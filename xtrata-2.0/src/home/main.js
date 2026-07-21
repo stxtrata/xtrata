@@ -890,12 +890,32 @@
       }
     };
 
+    // Editing parents invalidates the prepared quote, which disables Start.
+    // Auto re-prepare shortly after (mirroring the dependency-input fix) so
+    // adding or removing a parent never leaves the flow dead-locked with a
+    // permanently disabled inscribe button. Debounced so rapid add/remove
+    // clicks only prepare once.
+    let relationshipReprepareTimer = null;
+    const scheduleRelationshipReprepare = () => {
+      if (relationshipReprepareTimer) {
+        window.clearTimeout(relationshipReprepareTimer);
+        relationshipReprepareTimer = null;
+      }
+      if (!state.selectedFile) return;
+      relationshipReprepareTimer = window.setTimeout(() => {
+        relationshipReprepareTimer = null;
+        if (state.selectedFile && !state.busy && !state.prepared && autoPrepareHook) {
+          void autoPrepareHook();
+        }
+      }, 400);
+    };
     const markRelationshipPreparedDirty = () => {
       state.prepared = null;
       state.duplicateId = null;
       state.uploadState = null;
       resetSteps();
       renderPreparedState();
+      scheduleRelationshipReprepare();
     };
 
     const applyParentInput = () => {
@@ -13256,12 +13276,22 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       markPreparedDirty();
       syncTextCard();
     });
-    dom.nameInput.addEventListener('input', markPreparedDirty);
+    // Name/type/token-URI edits invalidate the quote; the debounced re-prepare
+    // re-arms Start (same fix as the dependency and parent inputs — without it
+    // any post-prepare edit left the inscribe button locked with no way out).
+    dom.nameInput.addEventListener('input', () => {
+      markPreparedDirty();
+      scheduleDependencyReprepare();
+    });
     dom.dependencyIdsInput?.addEventListener('input', syncDependencyInput);
-    dom.payloadType.addEventListener('change', markPreparedDirty);
+    dom.payloadType.addEventListener('change', () => {
+      markPreparedDirty();
+      scheduleDependencyReprepare();
+    });
     dom.tokenUriInput.addEventListener('input', () => {
       markPreparedDirty();
       queueTokenUriHeadPreviewUpdate();
+      scheduleDependencyReprepare();
     });
 
     window.addEventListener('beforeunload', (event) => {
