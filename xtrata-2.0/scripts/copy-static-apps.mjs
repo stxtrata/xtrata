@@ -34,10 +34,6 @@ const staticApps = [
     target: 'dist/umg'
   },
   {
-    source: 'first-masterpiece',
-    target: 'dist/first-masterpiece'
-  },
-  {
     // Public path renamed from /agent-one to /wizard (old links 301 in _redirects).
     source: 'xtrata-agent-one/wizard',
     target: 'dist/wizard'
