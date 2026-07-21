@@ -26,6 +26,10 @@ const staticApps = [
     target: 'dist/flowproof'
   },
   {
+    source: 'proofzero',
+    target: 'dist/proofzero'
+  },
+  {
     source: 'umg',
     target: 'dist/umg'
   },
