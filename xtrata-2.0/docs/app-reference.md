@@ -98,6 +98,7 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 - `src/lib/contract/fungible-assets.ts` maps known SIP-010 token contracts used by first-party commerce and vault flows to the asset metadata needed for wallet post-conditions.
 - `src/lib/commerce/registry.ts`, `src/lib/commerce/contract.ts`, `src/lib/commerce/client.ts`, `src/lib/commerce/parsers.ts`, and `src/lib/commerce/types.ts` provide registry loading, contract-id parsing, transaction builders, and read-only helpers for `xtrata-commerce`.
 - `src/lib/vault/registry.ts`, `src/lib/vault/contract.ts`, `src/lib/vault/client.ts`, `src/lib/vault/parsers.ts`, and `src/lib/vault/types.ts` provide registry loading, contract-id parsing, transaction builders, and read-only helpers for `xtrata-vault`.
+- `contracts/live/xtrata-drops-v1.1.clar` adds immutable multi-batch campaign policy, permanent creator/operator separation, sequential campaign editions, and claimant-bound BNS attestations while preserving the v1.0 legacy drop and relayer read surface. `docs/drops-v1.1.md` defines its integration and deployment requirements; it is not a configured public contract until those requirements are completed.
 - `src/lib/utils/amounts.ts` parses and formats fixed-decimal SIP-010 token amounts used by commerce and vault forms.
 - `src/lib/utils/tab-guard.ts` manages multi-tab activity so only one tab performs heavy reads.
 - `src/lib/network/config.ts` defines network defaults and endpoints.
