@@ -1,0 +1,3346 @@
+# Xtrata
+
+> Xtrata is a contract-native inscription protocol on Stacks (Bitcoin L2).
+> Files are split into 16,384-byte chunks, uploaded on-chain, and sealed into
+> SIP-009 NFTs, deduplicated by an incremental SHA-256 hash chain. The
+> TypeScript SDK (@xtrata/sdk + @xtrata/reconstruction) provides read clients,
+> mint/collection/market workflow planners with deny-mode spend caps, a
+> sponsored-transaction client (zero-STX buys via a relayer), multi-asset
+> payment helpers (STX, sBTC, SIP-010 tokens), and strict byte reconstruction.
+
+Key facts:
+- Core contract: SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0 (mainnet)
+- Small helper (single-tx mints <=30 chunks): SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-small-mint-v1-0
+- Chunk size 16,384 bytes; app/SDK upload ceiling 30 chunks/tx (ABI accepts 50); max 2,048 chunks / 32 MiB per inscription
+- Active collection-mint target: xtrata-collection-mint-v1.4
+- App: https://xtrata.xyz (Inscription Wizard at /create-wizard, market at /market)
+
+---
+
+
+<!-- ===== SOURCE: XTRATA_AGENT_SKILL.md ===== -->
+
+---
+name: xtrata-inscription
+description: >
+  Skill for autonomously creating, minting, transferring, and querying
+  inscriptions on the Stacks blockchain via the xtrata protocol (xtrata.xyz).
+  Use this skill whenever an agent needs to inscribe data on-chain via Stacks,
+  mint inscription-based tokens, transfer inscriptions, query inscription state,
+  or interact with the xtrata data layer in any way. This includes agents from
+  the aibtc platform that hold STX and want to create or trade inscriptions
+  autonomously.
+---
+
+# Xtrata Inscription Skill
+
+## Overview
+Xtrata is a contract-native inscription protocol on Stacks (Bitcoin L2). Data is split into fixed 16,384-byte chunks, uploaded on-chain, then sealed into a SIP-009 NFT. Content is deduplicated by a canonical hash, uploads are resumable, and sealed data is immutable.
+
+Current production contract:
+- Address: `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X`
+- Contract name: `xtrata-v2-1-0`
+- Full ID: `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0`
+
+Small-file helper (mainnet default):
+- Address: `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X`
+- Contract name: `xtrata-small-mint-v1-0`
+- Full ID: `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-small-mint-v1-0`
+
+Legacy (read compatibility for migrated chunk data):
+- `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1`
+
+## Prerequisites
+- Funded Stacks wallet with STX for protocol fees + network fees.
+- JavaScript runtime (Node.js 20+ recommended).
+- Stacks transaction signing access:
+  - Direct key path (server/headless): `@stacks/transactions`
+  - Wallet/MCP path (aibtc): wallet tool signs and broadcasts
+- Required packages (current repo versions):
+  - `@stacks/transactions@^6.11.0`
+  - `@stacks/network@^6.11.0`
+  - `@noble/hashes@^1.4.0`
+- Optional browser-wallet dependency: `@stacks/connect@^7.8.0`
+
+Install:
+
+```bash
+npm install @stacks/transactions @stacks/network @noble/hashes
+```
+
+## Core Concepts
+1. There are two valid mint routes:
+   - Small helper route: `mint-small-single-tx` or `mint-small-single-tx-recursive`
+   - Standard staged route: `begin-or-get` (or `begin-inscription`) -> one or more `add-chunk-batch` -> `seal-inscription` (or `seal-recursive` / `seal-inscription-batch`)
+2. Chunking is fixed at 16,384 bytes. Maximum file size is 32 MiB (2,048 chunks).
+3. Hashing is incremental SHA-256 chain hashing, not a single hash of full bytes.
+4. Dedupe is native: `HashToId` guarantees one canonical token per final hash.
+5. Default route selection for first-party-compatible agents:
+   - Use helper route only when helper deployment is available, chunk count is `1..30`, and there is no active upload session to resume.
+   - Use staged route for `>30` chunks, legacy core contracts, or whenever a partial upload already exists.
+6. Uploads on the staged route are resumable via `UploadState`; sessions expire after 4,320 blocks.
+7. Helper-route retries restart the entire single call; staged-route retries can resume from the next missing chunk.
+8. Always use `PostConditionMode.Deny` for fee-paying calls.
+9. Transfers and reads still work while writes are paused.
+
+## Contract and Network Reference
+
+### Network Endpoints
+- Mainnet primary: `https://stacks-node-api.mainnet.stacks.co`
+- Mainnet fallback: `https://api.mainnet.hiro.so`
+- Testnet primary: `https://stacks-node-api.testnet.stacks.co`
+- Testnet fallback: `https://api.testnet.hiro.so`
+
+### Contract IDs
+- Mainnet (active): `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0`
+- Mainnet (small helper): `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-small-mint-v1-0`
+- Mainnet (legacy): `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1`
+- Testnet: deploy from `contracts/live/xtrata-v2.1.0.clar` (no canonical shared testnet deployment is pinned in this repository).
+
+### Constants
+| Name | Value | Meaning |
+|---|---:|---|
+| `MAX-BATCH-SIZE` | `u50` | Max chunks per `add-chunk-batch` |
+| `MAX-SEAL-BATCH-SIZE` | `u50` | Max entries per `seal-inscription-batch` |
+| `CHUNK-SIZE` | `u16384` | Fixed chunk size |
+| `MAX-TOTAL-CHUNKS` | `u2048` | Max chunks per inscription |
+| `MAX-TOTAL-SIZE` | `u33554432` | Max bytes (32 MiB) |
+| `FEE-MIN` | `u1000` | 0.001 STX |
+| `FEE-MAX` | `u1000000` | 1.0 STX |
+| `UPLOAD-EXPIRY-BLOCKS` | `u4320` | ~30 days |
+
+### Error Codes
+| Code | Name | Meaning |
+|---:|---|---|
+| `u100` | `ERR-NOT-AUTHORIZED` | Caller is not authorized |
+| `u101` | `ERR-NOT-FOUND` | Token/session/resource missing |
+| `u102` | `ERR-INVALID-BATCH` | Invalid batch/chunk limits/sizes |
+| `u103` | `ERR-HASH-MISMATCH` | Final hash mismatch at seal |
+| `u107` | `ERR-INVALID-URI` | Token URI invalid/empty/too long |
+| `u109` | `ERR-PAUSED` | Writes paused |
+| `u110` | `ERR-INVALID-FEE` | Fee value outside allowed bounds |
+| `u111` | `ERR-DEPENDENCY-MISSING` | Recursive dependency missing |
+| `u112` | `ERR-EXPIRED` | Upload session expired |
+| `u113` | `ERR-NOT-EXPIRED` | Purge attempted before expiry |
+| `u114` | `ERR-DUPLICATE` | Hash already sealed |
+| `u115` | `ERR-ALREADY-SET` | One-time setter already used |
+
+## Data Model
+
+### Chunking
+```javascript
+const CHUNK_SIZE = 16_384;
+
+export function chunkBytes(data) {
+  const chunks = [];
+  for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+    chunks.push(data.slice(i, i + CHUNK_SIZE));
+  }
+  return chunks;
+}
+```
+
+### Upload Batching
+```javascript
+const MAX_BATCH_SIZE = 50;
+
+export function batchChunks(chunks) {
+  const batches = [];
+  for (let i = 0; i < chunks.length; i += MAX_BATCH_SIZE) {
+    batches.push(chunks.slice(i, i + MAX_BATCH_SIZE));
+  }
+  return batches;
+}
+```
+
+### Incremental Hashing (Required)
+
+The hash is computed as a chain: start with 32 zero bytes, then for each chunk
+concatenate the current running hash (32 bytes) with the raw chunk bytes and
+SHA-256 the result. The output replaces the running hash. The final value after
+all chunks is the `expected-hash` used in `begin-or-get` and `seal-inscription`.
+
+This MUST match the contract's `process-chunk` logic:
+`next-hash = sha256(concat(current-hash, data))`
+
+```javascript
+import { sha256 } from '@noble/hashes/sha256';
+
+export function computeExpectedHash(chunks) {
+  let runningHash = new Uint8Array(32); // 32 zero bytes
+  for (const chunk of chunks) {
+    const combined = new Uint8Array(runningHash.length + chunk.length);
+    combined.set(runningHash, 0);
+    combined.set(chunk, runningHash.length);
+    runningHash = sha256(combined);
+  }
+  return runningHash;
+}
+```
+
+Alternative using Node.js built-in crypto:
+```javascript
+const crypto = require('crypto');
+
+function computeExpectedHash(chunks) {
+  let running = Buffer.alloc(32, 0);
+  for (const chunk of chunks) {
+    running = crypto.createHash('sha256')
+      .update(Buffer.concat([running, chunk])).digest();
+  }
+  return running;
+}
+```
+
+### Deduplication
+- Read-only lookup: `get-id-by-hash(hash)` -> `(optional uint)`
+- Atomic begin+dedupe path: `begin-or-get(...)`
+  - `(ok (some id))` -> content already sealed
+  - `(ok none)` -> new/resumed upload session
+- Helper dedupe path: `mint-small-single-tx(...)` and `mint-small-single-tx-recursive(...)`
+  - `(ok { token-id: id, existed: true })` -> canonical token already existed
+  - `(ok { token-id: id, existed: false })` -> helper minted a new token through core
+
+### UploadState Lifecycle
+1. Create/resume: `begin-or-get` or `begin-inscription`
+2. Upload chunks: `add-chunk-batch`
+3. Seal: `seal-inscription` or `seal-recursive`
+4. Expire after inactivity (`UPLOAD-EXPIRY-BLOCKS`)
+5. **Last resort** early expire: `abandon-upload`
+6. Purge expired chunks: `purge-expired-chunk-batch`
+
+**Resume is the default recovery path.** If an inscription is interrupted:
+- `begin-or-get` is resume-safe: calling it again returns the existing session.
+- Check `get-upload-state` to see `current-index` (how many chunks uploaded).
+- Resume uploading from the next chunk index.
+- The contract validates hashes incrementally — re-uploading the same correct
+  data produces the same running hash.
+- Sessions persist for 4,320 blocks (~30 days).
+- Only use `abandon-upload` when the upload is truly irrecoverable (e.g., wrong
+  data was uploaded and the running hash cannot be corrected).
+
+## Complete Contract API (xtrata-v2-1-0)
+
+### Public Functions
+| Function | Parameters (exact types) | Returns | Notes |
+|---|---|---|---|
+| `transfer` | `id: uint, sender: principal, recipient: principal` | `(response bool uint)` | SIP-009 transfer; works while paused |
+| `set-royalty-recipient` | `recipient: principal` | `(response bool uint)` | Admin only |
+| `set-fee-unit` | `new-fee: uint` | `(response bool uint)` | Admin only; bounded by min/max and relative change |
+| `set-next-id` | `value: uint` | `(response bool uint)` | Admin only; one-time |
+| `set-allowed-caller` | `caller: principal, allowed: bool` | `(response bool uint)` | Admin only |
+| `set-paused` | `value: bool` | `(response bool uint)` | Admin only |
+| `transfer-contract-ownership` | `new-owner: principal` | `(response bool uint)` | Admin only |
+| `migrate-from-v1` | `token-id: uint` | `(response uint uint)` | Migrates v1 token into v2 |
+| `begin-or-get` | `expected-hash: (buff 32), mime: (string-ascii 64), total-size: uint, total-chunks: uint` | `(response (optional uint) uint)` | Recommended begin path |
+| `begin-inscription` | `expected-hash: (buff 32), mime: (string-ascii 64), total-size: uint, total-chunks: uint` | `(response bool uint)` | Resume-safe; rejects duplicates |
+| `abandon-upload` | `expected-hash: (buff 32)` | `(response bool uint)` | Marks session expired for purge |
+| `purge-expired-chunk-batch` | `hash: (buff 32), owner: principal, indexes: (list 50 uint)` | `(response bool uint)` | Permissionless expired cleanup |
+| `add-chunk-batch` | `hash: (buff 32), chunks: (list 50 (buff 16384))` | `(response bool uint)` | No protocol fee |
+| `seal-inscription` | `expected-hash: (buff 32), token-uri-string: (string-ascii 256)` | `(response uint uint)` | Mints token |
+| `seal-inscription-batch` | `items: (list 50 { hash: (buff 32), token-uri: (string-ascii 256) })` | `(response { start: uint, count: uint } uint)` | Batch seal |
+| `seal-recursive` | `expected-hash: (buff 32), token-uri-string: (string-ascii 256), dependencies: (list 50 uint)` | `(response uint uint)` | Seal with dependencies |
+
+### Read-Only Functions
+| Function | Parameters (exact types) | Returns |
+|---|---|---|
+| `get-last-token-id` | none | `(response uint uint)` |
+| `get-next-token-id` | none | `(response uint uint)` |
+| `get-minted-count` | none | `(response uint uint)` |
+| `get-minted-id` | `index: uint` | `(optional uint)` |
+| `get-token-uri` | `id: uint` | `(response (optional (string-ascii 256)) uint)` |
+| `get-token-uri-raw` | `id: uint` | `(optional (string-ascii 256))` |
+| `get-owner` | `id: uint` | `(response (optional principal) uint)` |
+| `get-svg` | `id: uint` | `(response (optional (string-ascii 512)) uint)` |
+| `get-svg-data-uri` | `id: uint` | `(response (optional (string-ascii 1024)) uint)` |
+| `get-id-by-hash` | `hash: (buff 32)` | `(optional uint)` |
+| `get-inscription-meta` | `id: uint` | `(optional { owner: principal, creator: principal, mime-type: (string-ascii 64), total-size: uint, total-chunks: uint, sealed: bool, final-hash: (buff 32) })` |
+| `inscription-exists` | `id: uint` | `(response bool uint)` |
+| `get-inscription-hash` | `id: uint` | `(optional (buff 32))` |
+| `get-inscription-creator` | `id: uint` | `(optional principal)` |
+| `get-inscription-size` | `id: uint` | `(optional uint)` |
+| `get-inscription-chunks` | `id: uint` | `(optional uint)` |
+| `is-inscription-sealed` | `id: uint` | `(optional bool)` |
+| `get-chunk` | `id: uint, index: uint` | `(optional (buff 16384))` |
+| `get-chunk-batch` | `id: uint, indexes: (list 50 uint)` | `(list 50 (optional (buff 16384)))` |
+| `get-dependencies` | `id: uint` | `(list 50 uint)` |
+| `get-upload-state` | `expected-hash: (buff 32), owner: principal` | `(optional { mime-type: (string-ascii 64), total-size: uint, total-chunks: uint, current-index: uint, running-hash: (buff 32), last-touched: uint, purge-index: uint })` |
+| `get-pending-chunk` | `hash: (buff 32), creator: principal, index: uint` | `(optional (buff 16384))` |
+| `get-admin` | none | `(response principal uint)` |
+| `is-allowed-caller` | `caller: principal` | `(response bool uint)` |
+| `get-royalty-recipient` | none | `(response principal uint)` |
+| `get-fee-unit` | none | `(response uint uint)` |
+| `is-paused` | none | `(response bool uint)` |
+
+## Small Helper Contract API (`xtrata-small-mint-v1-0`)
+
+Use this helper only for small uploads that fit within `30` chunks and do not
+need staged resume behavior.
+
+### Public Functions
+| Function | Parameters (exact types) | Returns | Notes |
+|---|---|---|---|
+| `mint-small-single-tx` | `xtrata-contract: <xtrata-trait>, expected-hash: (buff 32), mime: (string-ascii 64), total-size: uint, chunks: (list 50 (buff 16384)), token-uri-string: (string-ascii 256)` | `(response { token-id: uint, existed: bool } uint)` | Single-call begin + upload + seal |
+| `mint-small-single-tx-recursive` | `xtrata-contract: <xtrata-trait>, expected-hash: (buff 32), mime: (string-ascii 64), total-size: uint, chunks: (list 50 (buff 16384)), token-uri-string: (string-ascii 256), dependencies: (list 50 uint)` | `(response { token-id: uint, existed: bool } uint)` | Single-call recursive seal |
+| `set-paused` | `value: bool` | `(response bool uint)` | Admin only |
+| `set-core-contract` | `new-core: principal` | `(response bool uint)` | Admin only |
+| `transfer-contract-ownership` | `new-owner: principal` | `(response bool uint)` | Admin only |
+
+### Read-Only Functions
+| Function | Parameters (exact types) | Returns |
+|---|---|---|
+| `get-owner` | none | `(response principal uint)` |
+| `is-paused` | none | `(response bool uint)` |
+| `get-core-contract` | none | `(response principal uint)` |
+| `get-max-small-chunks` | none | `(response uint uint)` |
+
+## Forever Twin Helper Contracts (collection linking)
+
+Forever Twin helpers port an existing NFT collection into Xtrata and act as the
+on-chain twin index linking each original (local) token id to its minted Xtrata
+inscription id. Registered collections live in `src/lib/twins/registry.ts`
+(mirrored in `index.html`); the app uses them to display the local collection
+number, name, and an `Escrowed` state with the real owner.
+
+### Shared contract shape
+| Item | Definition |
+|---|---|
+| `Bindings` map | key `local-token-id: uint` → `{ xtrata-id: uint, content-hash: (buff 32), inscriber: principal, xtrata-escrowed: bool, at: uint }` |
+| `get-binding` | `(token-id uint)` → `(optional { … })` — local id to binding |
+| `inscribe` | mints the twin to the helper (escrowed) and inserts the binding |
+| `swap-pepe-for-xtrata` / `swap-xtrata-for-pepe` | release / re-escrow the twin, flipping `xtrata-escrowed` |
+| `get-inscribed-count` | `(response uint uint)` |
+| `inscribed` print event | `{ event: "inscribed", token-id, xtrata-id, … }` — used to build the xtrata-id → local-id reverse index |
+
+### Registered collections
+| Collection | Helper contract | Source contract / asset |
+|---|---|---|
+| Bitcoin Pepes | `SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun` | `SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe` / `bitcoin-pepe` |
+| LeoCats | `SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata` | `SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats` / `leo-cats` |
+
+A twin is escrowed when its on-chain owner is a registered helper contract; the
+real owner is then the current holder of the source NFT (`source get-owner`).
+To add a collection/contract, follow the checklist in
+`docs/forever-twins-linking.md` and `docs/app-reference.md`.
+
+## Transaction Construction
+
+### Imports
+```javascript
+import {
+  makeContractCall,
+  broadcastTransaction,
+  callReadOnlyFunction,
+  bufferCV,
+  uintCV,
+  listCV,
+  tupleCV,
+  principalCV,
+  stringAsciiCV,
+  makeStandardSTXPostCondition,
+  FungibleConditionCode,
+  PostConditionMode,
+  AnchorMode,
+  cvToJSON,
+  getNonce
+} from '@stacks/transactions';
+import { StacksMainnet, StacksTestnet } from '@stacks/network';
+```
+
+### Network Setup
+```javascript
+const network = new StacksMainnet();
+// or:
+// const network = new StacksTestnet();
+// const network = new StacksMainnet({ url: 'https://stacks-node-api.mainnet.stacks.co' });
+
+const CONTRACT_ADDRESS = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
+const CONTRACT_NAME = 'xtrata-v2-1-0';
+const TX_DELAY_MS = 5000;
+```
+
+### Fee Model
+- `begin_fee = fee-unit`
+- `seal_fee = fee-unit * (1 + ceil(total_chunks / 50))`
+- Default `fee-unit`: `100_000` microSTX (0.1 STX)
+
+```javascript
+export function estimateFees(totalChunks, feeUnitMicroStx = 100_000n) {
+  const batches = (totalChunks + 49n) / 50n;
+  const beginFee = feeUnitMicroStx;
+  const sealFee = feeUnitMicroStx * (1n + batches);
+  return { beginFee, sealFee, totalFee: beginFee + sealFee };
+}
+```
+
+### Begin Transaction (fee-paying, post-condition required)
+```javascript
+export async function buildBeginOrGetTx({
+  expectedHash,
+  mime,
+  totalSize,
+  totalChunks,
+  senderAddress,
+  senderKey,
+  feeUnitMicroStx,
+  network
+}) {
+  return makeContractCall({
+    contractAddress: CONTRACT_ADDRESS,
+    contractName: CONTRACT_NAME,
+    functionName: 'begin-or-get',
+    functionArgs: [
+      bufferCV(expectedHash),
+      stringAsciiCV(mime),
+      uintCV(totalSize),
+      uintCV(totalChunks)
+    ],
+    senderKey,
+    network,
+    postConditions: [
+      makeStandardSTXPostCondition(
+        senderAddress,
+        FungibleConditionCode.LessEqual,
+        feeUnitMicroStx
+      )
+    ],
+    postConditionMode: PostConditionMode.Deny,
+    anchorMode: AnchorMode.Any
+  });
+}
+```
+
+### Chunk Upload Transaction (no protocol fee)
+```javascript
+export async function buildAddChunkBatchTx({
+  expectedHash,
+  chunks,
+  senderKey,
+  network
+}) {
+  return makeContractCall({
+    contractAddress: CONTRACT_ADDRESS,
+    contractName: CONTRACT_NAME,
+    functionName: 'add-chunk-batch',
+    functionArgs: [bufferCV(expectedHash), listCV(chunks.map((c) => bufferCV(c)))],
+    senderKey,
+    network,
+    postConditions: [],
+    postConditionMode: PostConditionMode.Deny,
+    anchorMode: AnchorMode.Any
+  });
+}
+```
+
+### Seal Transaction (fee-paying, post-condition required)
+```javascript
+export async function buildSealInscriptionTx({
+  expectedHash,
+  tokenUri,
+  totalChunks,
+  senderAddress,
+  senderKey,
+  feeUnitMicroStx,
+  network
+}) {
+  const sealFee = feeUnitMicroStx * (1n + ((totalChunks + 49n) / 50n));
+
+  return makeContractCall({
+    contractAddress: CONTRACT_ADDRESS,
+    contractName: CONTRACT_NAME,
+    functionName: 'seal-inscription',
+    functionArgs: [bufferCV(expectedHash), stringAsciiCV(tokenUri)],
+    senderKey,
+    network,
+    postConditions: [
+      makeStandardSTXPostCondition(
+        senderAddress,
+        FungibleConditionCode.LessEqual,
+        sealFee
+      )
+    ],
+    postConditionMode: PostConditionMode.Deny,
+    anchorMode: AnchorMode.Any
+  });
+}
+```
+
+### Recursive Seal Transaction
+```javascript
+export async function buildSealRecursiveTx({
+  expectedHash,
+  tokenUri,
+  dependencies,
+  totalChunks,
+  senderAddress,
+  senderKey,
+  feeUnitMicroStx,
+  network
+}) {
+  const sealFee = feeUnitMicroStx * (1n + ((totalChunks + 49n) / 50n));
+
+  return makeContractCall({
+    contractAddress: CONTRACT_ADDRESS,
+    contractName: CONTRACT_NAME,
+    functionName: 'seal-recursive',
+    functionArgs: [
+      bufferCV(expectedHash),
+      stringAsciiCV(tokenUri),
+      listCV(dependencies.map((id) => uintCV(id)))
+    ],
+    senderKey,
+    network,
+    postConditions: [
+      makeStandardSTXPostCondition(
+        senderAddress,
+        FungibleConditionCode.LessEqual,
+        sealFee
+      )
+    ],
+    postConditionMode: PostConditionMode.Deny,
+    anchorMode: AnchorMode.Any
+  });
+}
+```
+
+### Transfer Transaction
+```javascript
+export async function buildTransferTx({ tokenId, sender, recipient, senderKey, network }) {
+  return makeContractCall({
+    contractAddress: CONTRACT_ADDRESS,
+    contractName: CONTRACT_NAME,
+    functionName: 'transfer',
+    functionArgs: [uintCV(tokenId), principalCV(sender), principalCV(recipient)],
+    senderKey,
+    network,
+    postConditions: [],
+    postConditionMode: PostConditionMode.Deny,
+    anchorMode: AnchorMode.Any
+  });
+}
+```
+
+### Batch Seal Transaction
+```javascript
+export async function buildSealBatchTx({ items, senderAddress, senderKey, feeUnitMicroStx, network }) {
+  let totalSealFee = 0n;
+  for (const item of items) {
+    totalSealFee += feeUnitMicroStx * (1n + ((item.totalChunks + 49n) / 50n));
+  }
+
+  return makeContractCall({
+    contractAddress: CONTRACT_ADDRESS,
+    contractName: CONTRACT_NAME,
+    functionName: 'seal-inscription-batch',
+    functionArgs: [
+      listCV(
+        items.map((item) =>
+          tupleCV({
+            hash: bufferCV(item.expectedHash),
+            'token-uri': stringAsciiCV(item.tokenUri)
+          })
+        )
+      )
+    ],
+    senderKey,
+    network,
+    postConditions: [
+      makeStandardSTXPostCondition(
+        senderAddress,
+        FungibleConditionCode.LessEqual,
+        totalSealFee
+      )
+    ],
+    postConditionMode: PostConditionMode.Deny,
+    anchorMode: AnchorMode.Any
+  });
+}
+```
+
+### Nonce Management
+```javascript
+const nonce = await getNonce(senderAddress, network);
+// first tx uses nonce
+// next txs use nonce + 1, nonce + 2, ...
+```
+
+When broadcasting multiple sequential writes, delay at least 5 seconds between tx broadcasts.
+
+### Broadcast Helper
+```javascript
+export async function broadcastTx(transaction, network) {
+  const result = await broadcastTransaction(transaction, network);
+  if (result.error) {
+    throw new Error(`Broadcast failed: ${result.error} - ${result.reason}`);
+  }
+  return result.txid || result;
+}
+```
+
+## Workflows
+
+### Workflow 1: Route Selection
+- Use the helper route when all of the following are true:
+  - helper deployment is available
+  - `chunks.length` is between `1` and `30`
+  - there is no existing staged upload to resume for `{ expected-hash, owner }`
+- Use the staged route for everything else.
+- If an agent is driving the first-party app or wallet flow instead of raw
+  contract calls, expect one wallet approval on the helper route and multiple
+  approvals (`begin`, upload batch txs, `seal`) on the staged route.
+
+### Workflow 1A: Small Mint via Helper (single transaction)
+```javascript
+import { sha256 } from '@noble/hashes/sha256';
+import {
+  makeContractCall,
+  broadcastTransaction,
+  callReadOnlyFunction,
+  bufferCV,
+  contractPrincipalCV,
+  principalCV,
+  uintCV,
+  stringAsciiCV,
+  listCV,
+  makeStandardSTXPostCondition,
+  FungibleConditionCode,
+  PostConditionMode,
+  AnchorMode,
+  cvToJSON
+} from '@stacks/transactions';
+import { StacksMainnet } from '@stacks/network';
+
+const network = new StacksMainnet();
+const CONTRACT_ADDRESS = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
+const CONTRACT_NAME = 'xtrata-v2-1-0';
+const HELPER_CONTRACT_ADDRESS = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
+const HELPER_CONTRACT_NAME = 'xtrata-small-mint-v1-0';
+const MAX_SMALL_MINT_CHUNKS = 30;
+const TX_DELAY_MS = 5000;
+
+function chunkBytes(data) {
+  const out = [];
+  for (let i = 0; i < data.length; i += 16384) out.push(data.slice(i, i + 16384));
+  return out;
+}
+
+function batchChunks(chunks) {
+  const out = [];
+  for (let i = 0; i < chunks.length; i += 50) out.push(chunks.slice(i, i + 50));
+  return out;
+}
+
+function computeExpectedHash(chunks) {
+  let runningHash = new Uint8Array(32);
+  for (const chunk of chunks) {
+    const combined = new Uint8Array(runningHash.length + chunk.length);
+    combined.set(runningHash, 0);
+    combined.set(chunk, runningHash.length);
+    runningHash = sha256(combined);
+  }
+  return runningHash;
+}
+
+async function callReadOnly(functionName, functionArgs, senderAddress) {
+  return callReadOnlyFunction({
+    contractAddress: CONTRACT_ADDRESS,
+    contractName: CONTRACT_NAME,
+    functionName,
+    functionArgs,
+    senderAddress,
+    network
+  });
+}
+
+async function getFeeUnit(senderAddress) {
+  const r = await callReadOnly('get-fee-unit', [], senderAddress);
+  return BigInt(cvToJSON(r).value.value);
+}
+
+async function getIdByHash(expectedHash, senderAddress) {
+  const r = await callReadOnly('get-id-by-hash', [bufferCV(expectedHash)], senderAddress);
+  const json = cvToJSON(r);
+  return json.value ? BigInt(json.value.value) : null;
+}
+
+async function getUploadState(expectedHash, owner, senderAddress) {
+  const r = await callReadOnly(
+    'get-upload-state',
+    [bufferCV(expectedHash), principalCV(owner)],
+    senderAddress
+  );
+  return cvToJSON(r);
+}
+
+async function waitForConfirmation(txid) {
+  const url = `${network.coreApiUrl}/extended/v1/tx/${txid}`;
+  for (let i = 0; i < 60; i++) {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.tx_status === 'success') return data;
+    if (data.tx_status === 'abort_by_response' || data.tx_status === 'abort_by_post_condition') {
+      throw new Error(`TX failed: ${data.tx_status}`);
+    }
+    await new Promise((r) => setTimeout(r, 10000));
+  }
+  throw new Error(`TX not confirmed in time: ${txid}`);
+}
+
+export async function inscribeFile({ fileData, mimeType, tokenUri, dependencies = [], senderAddress, senderKey }) {
+  const chunks = chunkBytes(fileData);
+  const expectedHash = computeExpectedHash(chunks);
+  const totalChunks = BigInt(chunks.length);
+  const totalSize = BigInt(fileData.length);
+
+  const existing = await getIdByHash(expectedHash, senderAddress);
+  if (existing !== null) return { tokenId: existing, alreadyExisted: true };
+
+  const feeUnit = await getFeeUnit(senderAddress);
+  const uploadState = await getUploadState(expectedHash, senderAddress, senderAddress);
+  const canUseHelper =
+    chunks.length > 0 &&
+    chunks.length <= MAX_SMALL_MINT_CHUNKS &&
+    !uploadState.value;
+
+  if (!canUseHelper) {
+    return inscribeFileStaged({
+      chunks,
+      expectedHash,
+      fileData,
+      mimeType,
+      tokenUri,
+      dependencies,
+      senderAddress,
+      senderKey,
+      feeUnit
+    });
+  }
+
+  const sealFee = feeUnit * (1n + ((totalChunks + 49n) / 50n));
+  const spendCap = feeUnit + sealFee;
+  const helperTx = await makeContractCall({
+    contractAddress: HELPER_CONTRACT_ADDRESS,
+    contractName: HELPER_CONTRACT_NAME,
+    functionName:
+      dependencies.length > 0
+        ? 'mint-small-single-tx-recursive'
+        : 'mint-small-single-tx',
+    functionArgs:
+      dependencies.length > 0
+        ? [
+            contractPrincipalCV(CONTRACT_ADDRESS, CONTRACT_NAME),
+            bufferCV(expectedHash),
+            stringAsciiCV(mimeType),
+            uintCV(totalSize),
+            listCV(chunks.map((chunk) => bufferCV(chunk))),
+            stringAsciiCV(tokenUri),
+            listCV(dependencies.map((id) => uintCV(id)))
+          ]
+        : [
+            contractPrincipalCV(CONTRACT_ADDRESS, CONTRACT_NAME),
+            bufferCV(expectedHash),
+            stringAsciiCV(mimeType),
+            uintCV(totalSize),
+            listCV(chunks.map((chunk) => bufferCV(chunk))),
+            stringAsciiCV(tokenUri)
+          ],
+    senderKey,
+    network,
+    postConditions: [
+      makeStandardSTXPostCondition(
+        senderAddress,
+        FungibleConditionCode.LessEqual,
+        spendCap
+      )
+    ],
+    postConditionMode: PostConditionMode.Deny,
+    anchorMode: AnchorMode.Any
+  });
+
+  const helperResult = await broadcastTransaction(helperTx, network);
+  if (helperResult.error) throw new Error(`${helperResult.error}: ${helperResult.reason}`);
+  await waitForConfirmation(helperResult.txid || helperResult);
+
+  const tokenId = await getIdByHash(expectedHash, senderAddress);
+  return { tokenId, alreadyExisted: false, helperTxid: helperResult.txid, route: 'helper' };
+}
+```
+
+### Workflow 1B: Standard Staged Mint (begin -> upload -> seal)
+```javascript
+export async function inscribeFileStaged({
+  chunks,
+  expectedHash,
+  fileData,
+  mimeType,
+  tokenUri,
+  dependencies = [],
+  senderAddress,
+  senderKey,
+  feeUnit
+}) {
+  const batches = batchChunks(chunks);
+  const totalChunks = BigInt(chunks.length);
+  const totalSize = BigInt(fileData.length);
+
+  const beginTx = await makeContractCall({
+    contractAddress: CONTRACT_ADDRESS,
+    contractName: CONTRACT_NAME,
+    functionName: 'begin-or-get',
+    functionArgs: [
+      bufferCV(expectedHash),
+      stringAsciiCV(mimeType),
+      uintCV(totalSize),
+      uintCV(totalChunks)
+    ],
+    senderKey,
+    network,
+    postConditions: [
+      makeStandardSTXPostCondition(senderAddress, FungibleConditionCode.LessEqual, feeUnit)
+    ],
+    postConditionMode: PostConditionMode.Deny,
+    anchorMode: AnchorMode.Any
+  });
+
+  const beginResult = await broadcastTransaction(beginTx, network);
+  if (beginResult.error) throw new Error(`${beginResult.error}: ${beginResult.reason}`);
+  await waitForConfirmation(beginResult.txid || beginResult);
+
+  for (let i = 0; i < batches.length; i++) {
+    const chunkTx = await makeContractCall({
+      contractAddress: CONTRACT_ADDRESS,
+      contractName: CONTRACT_NAME,
+      functionName: 'add-chunk-batch',
+      functionArgs: [
+        bufferCV(expectedHash),
+        listCV(batches[i].map((chunk) => bufferCV(chunk)))
+      ],
+      senderKey,
+      network,
+      postConditions: [],
+      postConditionMode: PostConditionMode.Deny,
+      anchorMode: AnchorMode.Any
+    });
+
+    const chunkResult = await broadcastTransaction(chunkTx, network);
+    if (chunkResult.error) throw new Error(`${chunkResult.error}: ${chunkResult.reason}`);
+    await waitForConfirmation(chunkResult.txid || chunkResult);
+    if (i < batches.length - 1) {
+      await new Promise((r) => setTimeout(r, TX_DELAY_MS));
+    }
+  }
+
+  const sealFee = feeUnit * (1n + ((totalChunks + 49n) / 50n));
+  const sealTx = await makeContractCall({
+    contractAddress: CONTRACT_ADDRESS,
+    contractName: CONTRACT_NAME,
+    functionName: dependencies.length > 0 ? 'seal-recursive' : 'seal-inscription',
+    functionArgs:
+      dependencies.length > 0
+        ? [
+            bufferCV(expectedHash),
+            stringAsciiCV(tokenUri),
+            listCV(dependencies.map((id) => uintCV(id)))
+          ]
+        : [bufferCV(expectedHash), stringAsciiCV(tokenUri)],
+    senderKey,
+    network,
+    postConditions: [
+      makeStandardSTXPostCondition(senderAddress, FungibleConditionCode.LessEqual, sealFee)
+    ],
+    postConditionMode: PostConditionMode.Deny,
+    anchorMode: AnchorMode.Any
+  });
+
+  const sealResult = await broadcastTransaction(sealTx, network);
+  if (sealResult.error) throw new Error(`${sealResult.error}: ${sealResult.reason}`);
+  await waitForConfirmation(sealResult.txid || sealResult);
+
+  const tokenId = await getIdByHash(expectedHash, senderAddress);
+  return {
+    tokenId,
+    alreadyExisted: false,
+    beginTxid: beginResult.txid,
+    sealTxid: sealResult.txid,
+    route: 'staged'
+  };
+}
+```
+
+### Workflow 2: Transfer
+```javascript
+export async function transferInscription({ tokenId, sender, recipient, senderKey, network }) {
+  const tx = await makeContractCall({
+    contractAddress: CONTRACT_ADDRESS,
+    contractName: CONTRACT_NAME,
+    functionName: 'transfer',
+    functionArgs: [uintCV(tokenId), principalCV(sender), principalCV(recipient)],
+    senderKey,
+    network,
+    postConditions: [],
+    postConditionMode: PostConditionMode.Deny,
+    anchorMode: AnchorMode.Any
+  });
+  return broadcastTx(tx, network);
+}
+```
+
+### Workflow 3: Query Metadata + Content
+```javascript
+export async function getInscriptionMeta(tokenId, senderAddress, network) {
+  const result = await callReadOnlyFunction({
+    contractAddress: CONTRACT_ADDRESS,
+    contractName: CONTRACT_NAME,
+    functionName: 'get-inscription-meta',
+    functionArgs: [uintCV(tokenId)],
+    senderAddress,
+    network
+  });
+  return cvToJSON(result);
+}
+
+export async function readInscriptionContent(tokenId, senderAddress, network) {
+  const meta = cvToJSON(await callReadOnlyFunction({
+    contractAddress: CONTRACT_ADDRESS,
+    contractName: CONTRACT_NAME,
+    functionName: 'get-inscription-meta',
+    functionArgs: [uintCV(tokenId)],
+    senderAddress,
+    network
+  }));
+
+  if (!meta.value) throw new Error('Not found');
+  const totalChunks = Number(meta.value.value['total-chunks'].value);
+  const chunks = [];
+
+  for (let start = 0; start < totalChunks; start += 50) {
+    const indexes = [];
+    for (let i = start; i < Math.min(start + 50, totalChunks); i++) {
+      indexes.push(uintCV(BigInt(i)));
+    }
+    const batch = cvToJSON(await callReadOnlyFunction({
+      contractAddress: CONTRACT_ADDRESS,
+      contractName: CONTRACT_NAME,
+      functionName: 'get-chunk-batch',
+      functionArgs: [uintCV(tokenId), listCV(indexes)],
+      senderAddress,
+      network
+    }));
+
+    for (const entry of batch.value) {
+      if (entry.value) {
+        const hex = entry.value.value.startsWith('0x') ? entry.value.value.slice(2) : entry.value.value;
+        chunks.push(Buffer.from(hex, 'hex'));
+      }
+    }
+  }
+
+  return Buffer.concat(chunks);
+}
+```
+
+### Workflow 4: Recursive Seal
+- Helper route: `mint-small-single-tx-recursive(...)` when `chunks <= 30` and
+  no staged upload exists yet.
+- Staged route: execute the same begin + upload steps as standard mint, then
+  call `seal-recursive(expected-hash, token-uri, dependencies)`.
+- Validate dependencies first with `inscription-exists(id)`.
+
+### Workflow 5: Resume Interrupted Upload
+```javascript
+export async function getUploadState(expectedHash, owner, senderAddress, network) {
+  const result = await callReadOnlyFunction({
+    contractAddress: CONTRACT_ADDRESS,
+    contractName: CONTRACT_NAME,
+    functionName: 'get-upload-state',
+    functionArgs: [bufferCV(expectedHash), principalCV(owner)],
+    senderAddress,
+    network
+  });
+  return cvToJSON(result);
+}
+
+export async function resumeUpload({ expectedHash, allChunks, senderAddress, senderKey, network }) {
+  const state = await getUploadState(expectedHash, senderAddress, senderAddress, network);
+  if (!state.value) return { resumed: false };
+
+  const uploaded = Number(state.value.value['current-index'].value);
+  const remaining = allChunks.slice(uploaded);
+  const batches = batchChunks(remaining);
+
+  for (let i = 0; i < batches.length; i++) {
+    const tx = await buildAddChunkBatchTx({ expectedHash, chunks: batches[i], senderKey, network });
+    await broadcastTx(tx, network);
+    if (i < batches.length - 1) await new Promise((r) => setTimeout(r, 5000));
+  }
+
+  return { resumed: true, uploadedBeforeResume: uploaded };
+}
+```
+
+Resume applies to the staged route only. If `get-upload-state` returns an active
+session, do not switch that mint attempt onto the helper contract.
+
+## aibtc Integration
+
+### MCP Tool Mapping (aibtc)
+| Xtrata need | aibtc MCP tool |
+|---|---|
+| Get wallet address | `get_wallet_info` |
+| Check STX balance | `get_stx_balance` |
+| Read-only calls | `call_read_only_function` |
+| Write contract call | `call_contract` |
+| Broadcast signed tx | `broadcast_transaction` |
+| Poll tx status | `get_transaction_status` |
+
+### aibtc Routing Notes
+- If the first-party app auto-selects the helper route, expect a single wallet
+  approval and a single submitted tx, not separate begin/upload/seal prompts.
+- If the first-party app does not select the helper route, expect the staged
+  sequence and wait for each tx to confirm before watching for the next prompt.
+- Direct MCP `call_contract` remains unsafe for any call that carries chunk data
+  in `list(buff)` arguments. That includes:
+  - `add-chunk-batch`
+  - `mint-small-single-tx`
+  - `mint-small-single-tx-recursive`
+- For aibtc agents, use MCP for read-only checks and balance/status polling, but
+  use a direct `@stacks/transactions` signing path for chunk-bearing writes.
+
+### Autonomous 10-Step Loop
+1. Receive instruction to inscribe content.
+2. Query wallet balance and enforce minimum requirement.
+3. Convert content to bytes, detect MIME, chunk to 16,384-byte pieces.
+4. Compute incremental expected hash.
+5. Dedupe check with `get-id-by-hash`, then query `get-upload-state(expected-hash, owner)`.
+6. If helper deployment is available, chunk count is `1..30`, and no upload state exists, send one helper tx with a combined begin+seal spend cap.
+7. Otherwise send staged begin tx and wait for confirmation.
+8. On staged flow, upload chunk batches (<=50 per tx), wait for each batch to confirm before proceeding, then seal with the strict spend cap.
+9. Verify `get-inscription-meta` and final canonical ID.
+10. Return `{ tokenId, txids, hash, mimeType, totalSize, route }` or structured error.
+
+## Error Handling
+
+### Contract Errors and Resolutions
+| Error | Cause | Resolution |
+|---|---|---|
+| `u100 ERR-NOT-AUTHORIZED` | Wrong sender/admin/owner | Verify owner/admin and signer |
+| `u101 ERR-NOT-FOUND` | Missing token or upload | Re-check IDs; restart begin if session missing |
+| `u102 ERR-INVALID-BATCH` | Invalid chunk counts/sizes | Enforce batch <= 50, chunks <= 2048, size <= 32 MiB |
+| `u103 ERR-HASH-MISMATCH` | Local hash differs from on-chain running hash | Recompute and reupload from clean begin |
+| `u107 ERR-INVALID-URI` | Token URI invalid | Use non-empty URI <= 256 chars |
+| `u109 ERR-PAUSED` | Writes paused | Retry later or use allowlisted caller |
+| `u110 ERR-INVALID-FEE` | Admin fee set invalid | Admin-only path |
+| `u111 ERR-DEPENDENCY-MISSING` | Recursive dependency absent | Validate dependency IDs before sealing |
+| `u112 ERR-EXPIRED` | Session expired | Restart begin and reupload |
+| `u113 ERR-NOT-EXPIRED` | Purge too early | Wait until expiry or use abandon flow |
+| `u114 ERR-DUPLICATE` | Content already sealed | Query `get-id-by-hash` and reuse canonical token |
+| `u115 ERR-ALREADY-SET` | One-time admin setter used | Admin-only path |
+
+### Transaction-Level Failures
+- `abort_by_post_condition`: refresh fee-unit and rebuild post-condition caps.
+- `ConflictingNonceInMempool`: fetch latest nonce, sequence txs strictly.
+- `NotEnoughFunds`: top up STX or reduce operation size.
+- HTTP `429`: back off with 15s -> 30s -> 60s -> 120s.
+
+### Exponential Retry Helper
+```javascript
+export async function withRetry(fn, { maxRetries = 4, baseDelayMs = 1000 } = {}) {
+  let lastErr;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastErr = error;
+      if (attempt < maxRetries) {
+        const delay = baseDelayMs * 2 ** attempt;
+        const jitter = Math.floor(delay * (Math.random() * 0.5 - 0.25));
+        await new Promise((r) => setTimeout(r, delay + jitter));
+      }
+    }
+  }
+  throw lastErr;
+}
+```
+
+## API Endpoints
+
+### Account
+- `GET /v2/accounts/{address}`
+- Returns balance + nonce
+
+### Read-only call
+- `POST /v2/contracts/call-read/{contract_address}/{contract_name}/{function_name}`
+- Body:
+```json
+{
+  "sender": "SP1...",
+  "arguments": ["0x..."]
+}
+```
+
+### Broadcast
+- `POST /v2/transactions`
+- Body: serialized tx bytes (`application/octet-stream`)
+
+### Transaction status
+- `GET /extended/v1/tx/{txid}`
+
+### Clarity Value Constructors
+- `uint` -> `uintCV(...)`
+- `principal` -> `principalCV(...)`
+- `buff` -> `bufferCV(...)`
+- `string-ascii` -> `stringAsciiCV(...)`
+- `list` -> `listCV(...)`
+- `tuple` -> `tupleCV(...)`
+- parse responses with `cvToJSON(...)`
+
+### Inscription Index & Relationships
+The D1-backed inscription index serves token summaries and relationship graphs
+without per-token chain reads, and **stays current automatically** (new mints
+with parents are indexed during normal sync — no agent action required).
+
+- `GET /index/<contract>?ids=…` (or `?from=&limit=&order=`) — token summaries.
+- `GET /index/page?primary=&lineage=&ids=…` — lineage summaries in one query.
+- `GET /index/relations/<contract>?id=<id>` — derived parents/ancestors,
+  children/descendants, and siblings.
+
+Maintenance (occasional, manual): `POST /index/<contract>?parents=backfill&from=&limit=`
+repopulates parent edges for rows that predate the edge table. `limit` is capped
+at 100; paginate via `nextFromTokenId` until `complete`. When the
+`INDEX_ADMIN_TOKEN` env var is set, the backfill requires a matching
+`x-admin-token` header (else `401`); normal sync/refresh is never gated. Full
+runbook: [`docs/inscription-relationship-index.md`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/docs/inscription-relationship-index.md).
+
+## Security Notes
+- Never log private keys or seed phrases.
+- Always use `PostConditionMode.Deny` on writes.
+- Always set STX spend caps on fee-paying operations.
+- Run testnet rehearsals before mainnet for new agent logic.
+- Log txids and major state transitions for auditability.
+- Bound retries and use fallback endpoints under rate limits.
+
+## Companion Scripts
+This repository includes runnable references:
+- [`scripts/xtrata-mint-example.js`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/scripts/xtrata-mint-example.js)
+- [`scripts/xtrata-transfer-example.js`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/scripts/xtrata-transfer-example.js)
+- [`scripts/xtrata-query-example.js`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/scripts/xtrata-query-example.js)
+
+These scripts require minimal config (key, network, inputs) and implement this skill file's flow directly.
+
+---
+
+
+<!-- ===== SOURCE: docs/ai-skills/README.md ===== -->
+
+# AI Skills
+
+Self-contained skill documents for teaching AI agents to use Xtrata. Each skill
+doc follows the `skill-<name>.md` naming convention and is designed to be small
+enough to inscribe on-chain where practical.
+
+## Skills
+
+| File | Description |
+|------|-------------|
+| [`skill-inscribe.md`](skill-inscribe.md) | Single-item inscription skill. Covers helper-route single-tx minting for `<=30` chunks plus the standard staged flow, with cost estimation and user confirmation gate. |
+| [`skill-batch-mint.md`](skill-batch-mint.md) | Batch mint skill for coordinated drops of `1..50` non-recursive items. Covers core `seal-inscription-batch` and collection `mint-seal-batch`, with deterministic ordering, dedupe, staged uploads, and final batch seal. |
+| [`skill-transfer.md`](skill-transfer.md) | Transfer inscriptions between wallets with ownership checks, escrow/twin detection, deny-mode NFT post condition, and post-transfer verification. |
+| [`skill-query.md`](skill-query.md) | Read-only queries: metadata, ownership, content reconstruction, dependencies, and the relationship index. No wallet or fees. |
+
+## Canonical Skill File
+
+The comprehensive reference covering all Xtrata operations (inscribe, transfer,
+query, batch seal, full API tables) remains at:
+
+- [`XTRATA_AGENT_SKILL.md`](../../XTRATA_AGENT_SKILL.md)
+
+Individual `skill-*.md` files are lean subsets optimised for single-purpose
+agent training and on-chain inscription.
+
+## Index & Relationship Maintenance
+
+Reading and displaying inscription relationships (parents/children/descendants)
+is backed by the D1 inscription index, which **stays current automatically** —
+new mints with parents are indexed during normal sync, with no agent action
+required. Agents that read relationships should use:
+
+- `GET /index/relations/<contract>?id=<id>` — derived relationship graph.
+- `GET /index/page?primary=&lineage=&ids=…` — lineage summaries in one query.
+
+The one manual maintenance action is the **parent-edge backfill**
+(`POST /index/<contract>?parents=backfill`), needed only after the edge table is
+introduced or old rows are imported. When `INDEX_ADMIN_TOKEN` is configured it
+requires a matching `x-admin-token` header (else `401`). Full procedure, auth,
+pagination, and troubleshooting:
+[`../inscription-relationship-index.md`](../inscription-relationship-index.md).
+
+## Training Tracks
+
+- **aibtc track**: [`aibtc-agent-training.md`](aibtc-agent-training.md) — For
+  agents using MCP wallet tools and Hiro endpoints through aibtc flows.
+- **Generic agent track**: [`generic-agent-training.md`](generic-agent-training.md) —
+  For non-aibtc agents (custom frameworks, direct SDK/library integrations).
+
+## Suggested Order
+
+1. Read the relevant `skill-*.md` for your use case:
+   - [`skill-inscribe.md`](skill-inscribe.md) for one-item mints.
+   - [`skill-batch-mint.md`](skill-batch-mint.md) for coordinated drops of `2..50` items.
+2. Choose a training track (`aibtc` or `generic`) for environment-specific setup.
+3. Rehearse all supported routes separately before production use:
+   - helper-route single-item
+   - staged single-item
+   - staged batch seal
+4. Promote to mainnet only after successful dry runs, confirmation gating, and post-condition checks.
+
+## Safety Baseline
+
+- Always use `PostConditionMode.Deny` on fee-paying writes.
+- Check `get-fee-unit` before building spend caps.
+- Present costs to the user and get confirmation before any transaction.
+- Keep retry logic bounded and back off on `429` / `5xx` responses.
+- Log tx IDs and hash/token mappings for auditability.
+- Treat ordered manifests as authoritative for batch jobs so token-to-file mapping remains deterministic.
+- Batch seal is currently non-recursive only. If dependencies are required, mint items individually.
+- There is no current multi-file helper path. `mint-small-single-tx` remains single-item only.
+
+## Canonical GitHub References
+
+- [`XTRATA_AGENT_SKILL.md`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/XTRATA_AGENT_SKILL.md)
+- [`scripts/xtrata-mint-example.js`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/scripts/xtrata-mint-example.js)
+- [`scripts/xtrata-transfer-example.js`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/scripts/xtrata-transfer-example.js)
+- [`scripts/xtrata-query-example.js`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/scripts/xtrata-query-example.js)
+
+---
+
+
+<!-- ===== SOURCE: docs/ai-skills/skill-inscribe.md ===== -->
+
+---
+name: xtrata-inscribe
+description: >
+  Teach any AI agent to inscribe one item on Stacks (Bitcoin L2) via the Xtrata
+  protocol. Covers both the small helper single-tx route and the staged
+  begin/upload/seal flow. Includes cost estimation and user confirmation gate.
+  Multi-item batch jobs are handled by `skill-batch-mint.md`.
+version: "1.2"
+contract: SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0
+---
+
+# Xtrata Inscription Skill
+
+## 1. Scope
+
+This skill is for one-item minting.
+
+Use it when the request is a single file that should become one inscription.
+If the request is a coordinated drop of multiple files, hand off to
+[`skill-batch-mint.md`](skill-batch-mint.md).
+
+## 2. Protocol Overview
+
+Xtrata is a contract-native inscription protocol on Stacks (Bitcoin L2). Data is
+split into fixed 16,384-byte chunks, uploaded on-chain, then sealed into a
+SIP-009 NFT. Content is deduplicated by hash — identical data always resolves to
+one canonical token.
+
+## 3. Contract Reference
+
+| Key | Value |
+|-----|-------|
+| Contract | `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0` |
+| Small helper | `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-small-mint-v1-0` |
+| CHUNK-SIZE | 16,384 bytes |
+| MAX-UPLOAD-BATCH-SIZE | 30 chunks per first-party app/SDK `add-chunk-batch` call |
+| CONTRACT-BATCH-LIST-MAX | 50 chunks accepted by the deployed Clarity ABI |
+| MAX-SMALL-MINT-CHUNKS | 30 chunks per helper call |
+| MAX-TOTAL-CHUNKS | 2,048 |
+| MAX-TOTAL-SIZE | 32 MiB |
+| FEE-MIN | 0.001 STX |
+| FEE-MAX | 1.0 STX |
+| UPLOAD-EXPIRY | 4,320 blocks (~30 days) |
+
+Network endpoints:
+- Mainnet: `https://stacks-node-api.mainnet.stacks.co`
+- Fallback: `https://api.mainnet.hiro.so`
+
+## 4. Incremental Hashing
+
+Xtrata uses an incremental SHA-256 chain — not a single hash of the full file.
+Start with 32 zero bytes. For each chunk, concatenate the running hash with the
+raw chunk bytes and SHA-256 the result.
+
+```js
+const crypto = require('crypto');
+
+function computeHash(chunks) {
+  let running = Buffer.alloc(32, 0);
+  for (const chunk of chunks) {
+    running = crypto.createHash('sha256')
+      .update(Buffer.concat([running, chunk]))
+      .digest();
+  }
+  return running;
+}
+```
+
+This must match what the contract computes in `process-chunk`. Get it wrong and
+you will hit error `u103 HASH-MISMATCH`.
+
+## 5. Fee Model
+
+Protocol fees are denominated in microSTX. Fetch the current rate on-chain:
+
+```js
+const feeResult = await callReadOnlyFunction({
+  contractAddress: CONTRACT_ADDRESS,
+  contractName: CONTRACT_NAME,
+  functionName: 'get-fee-unit',
+  functionArgs: [],
+  senderAddress,
+  network
+});
+const feeUnit = BigInt(cvToJSON(feeResult).value.value);
+```
+
+Fee formulas:
+- begin fee = `feeUnit` microSTX
+- seal fee = `feeUnit * (1 + ceil(totalChunks / 50))` microSTX
+- helper spend cap = `begin fee + seal fee` in one deny-mode post-condition
+- network fees are separate and vary with mempool conditions
+
+## 6. Pre-Inscription Planning and User Confirmation
+
+Before sending any transaction, the agent must present the plan and get explicit
+user confirmation.
+
+1. Read the file.
+2. Compute size, chunk count, MIME type, and incremental hash.
+3. Fetch live `fee-unit`.
+4. Decide route:
+   - helper single-tx when one item, `1..30` chunks, helper exists, and there is no resumable staged upload
+   - staged flow otherwise
+5. Present route, cost estimate, and hash to the user.
+6. Proceed only after explicit confirmation.
+
+If the user cancels, stop immediately.
+
+## 7. Deduplication Check
+
+Before beginning, check whether the content already exists on-chain:
+
+```js
+const result = await callReadOnlyFunction({
+  contractAddress: CONTRACT_ADDRESS,
+  contractName: CONTRACT_NAME,
+  functionName: 'get-id-by-hash',
+  functionArgs: [bufferCV(hash)],
+  senderAddress,
+  network
+});
+```
+
+If the hash already resolves to a token ID, skip the mint and return the
+canonical existing token.
+
+## 8. Mint Route Selection
+
+Use the helper route only when all of the following are true:
+- helper deployment is available
+- there is exactly one item to mint
+- chunk count is `1..30`
+- there is no active upload state to resume for `{hash, owner}`
+
+Otherwise use the staged route.
+
+If the user asks to mint multiple files together, do not improvise a loop here.
+Hand the request to [`skill-batch-mint.md`](skill-batch-mint.md).
+
+## 9. Helper Route
+
+The helper route compresses begin, upload, and seal into one transaction for a
+single qualifying item.
+
+Execution rules:
+- fetch upload state first
+- do not use helper if a staged upload already exists
+- set one deny-mode STX post-condition with `begin fee + seal fee`
+- build principal arguments explicitly when a flow needs the caller identity, for example `principalCV(senderAddress)`
+- wait for confirmation before reporting success
+
+Recursive variant:
+- use `mint-small-single-tx-recursive` only for one-item recursive mints
+- do not project recursive support onto batch jobs
+
+## 10. Staged Route
+
+The staged route remains the default for larger one-item uploads and for any
+single-item job that must be resumed.
+
+Execution order:
+1. `begin-or-get`
+2. one or more `add-chunk-batch` calls
+3. `seal-inscription` or `seal-recursive`
+
+Rules:
+- confirm every tx before the next dependent tx
+- resume from `get-upload-state` when possible
+- use `seal-recursive` only when explicit dependencies are required
+
+## 11. Resume Rules
+
+Xtrata staged uploads are resume-safe.
+
+1. Call `get-upload-state(expected-hash, owner)`.
+2. Read `current-index`.
+3. Restart upload from the next missing chunk.
+4. Seal only after all chunks are confirmed on-chain.
+5. Do not switch an active staged upload onto the helper route mid-attempt.
+
+## 12. Operational Notes
+
+- Use `PostConditionMode.Deny` on fee-paying writes.
+- Keep retries bounded and back off on `429` / `5xx` responses.
+- Log tx IDs, expected hash, token ID, route, and total fees.
+- If the task becomes multi-item, switch skills rather than stretching this one.
+
+---
+
+
+<!-- ===== SOURCE: docs/ai-skills/skill-batch-mint.md ===== -->
+
+---
+name: xtrata-batch-mint
+description: >
+  Teach an AI agent to batch mint coordinated multi-file drops on Stacks via
+  Xtrata. Covers the core staged upload plus `seal-inscription-batch` flow and
+  the collection staged upload plus `mint-seal-batch` flow. Excludes recursive
+  batch minting because the current contracts do not support it.
+version: "1.0"
+contract: SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0
+---
+
+# Xtrata Batch Mint Skill
+
+## 1. Scope
+
+Use this skill when the job is a coordinated drop of multiple files that should
+mint in one final batch seal transaction.
+
+Supported:
+- Core path: staged uploads into Xtrata core, then `seal-inscription-batch`.
+- Collection path: staged uploads into a collection mint contract, then `mint-seal-batch`.
+
+Not supported:
+- Recursive batch minting. `seal-inscription-batch` does not accept dependencies.
+- Multi-file helper minting. `mint-small-single-tx` is still single-item only.
+
+## 2. Contract Facts
+
+| Key | Value |
+|-----|-------|
+| Core contract | `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0` |
+| Batch seal function | `seal-inscription-batch` |
+| Collection batch function | `mint-seal-batch` |
+| Upload batch size | max `30` chunks per first-party app/SDK `add-chunk-batch` / `mint-add-chunk-batch` |
+| Contract list ABI | deployed contracts accept up to `50` chunks in the list argument |
+| Final batch size | max `50` items per `seal-inscription-batch` / `mint-seal-batch` |
+| Small helper | `mint-small-single-tx` / `mint-small-single-tx-recursive` are single-item only |
+| Recursive limit | batch flow is non-recursive only |
+
+A batch job may contain small files, large files, or a mix. The critical rule is
+that the final seal list is limited to `50` items and every item must be fully
+uploaded before the final seal transaction is sent.
+
+## 3. Ordered Manifest Discipline
+
+Batch minting must start from a stable ordered manifest. The item order is not
+cosmetic. It becomes the canonical mapping from request order to minted token IDs.
+
+Recommended manifest shape:
+
+```json
+{
+  "route": "core-batch-seal",
+  "items": [
+    { "path": "./assets/map-01.png", "mime": "image/png", "tokenUri": "ipfs://placeholder-map-01" },
+    { "path": "./assets/key-01.json", "mime": "application/json", "tokenUri": "ipfs://placeholder-key-01" }
+  ]
+}
+```
+
+Rules:
+- Keep request order stable.
+- Deduplicate identical hashes before staging.
+- Do not include recursive dependencies in a batch manifest.
+- Do not exceed `50` items after dedupe.
+
+## 4. Preflight and User Confirmation
+
+Before any write:
+
+1. Read every file.
+2. Chunk each file into `16,384` byte slices.
+3. Compute the incremental Xtrata hash for each file.
+4. Run `get-id-by-hash` for each file and remove already-minted duplicates.
+5. Fetch `get-fee-unit` from the core contract.
+6. Build a deterministic execution plan.
+7. Present the cost and route summary to the user.
+8. Proceed only after explicit confirmation.
+
+Example planning output:
+
+```text
+Batch Mint Plan
+---------------
+Route: core batch seal
+Requested items: 12
+New unique items: 10
+Skipped duplicates: 2
+Final seal tx count: 1
+Upload tx count: 18
+
+Protocol fees
+-------------
+Begin: per item, fee-unit each
+Seal: per item, fee-unit * (1 + ceil(chunks/50))
+Collection mint price: n/a
+Network fees: estimated per staged tx plus one final batch seal tx
+```
+
+## 5. Route Selection
+
+Use the core path when the batch is minting directly into Xtrata core.
+
+Use the collection path when the batch must mint through a collection contract
+that exposes:
+- `mint-begin`
+- `mint-add-chunk-batch`
+- `mint-seal-batch`
+
+Do not use a helper route for multi-file jobs. Even if every file is tiny, the
+current helper contracts only compress one item into one transaction.
+
+## 6. Core Batch Flow
+
+For each item in manifest order:
+
+1. Check duplicate state with `get-id-by-hash`.
+2. Check resumable upload state with `get-upload-state(hash, owner)`.
+3. If no active upload exists, call `begin-or-get` with a spend cap equal to `fee-unit`.
+4. Upload all missing chunk batches with `add-chunk-batch`.
+5. Wait for each upload transaction to confirm before sending the next one.
+
+After every remaining item is fully staged:
+
+6. Build the ordered list of `{ hash, token-uri }` items.
+7. Call `seal-inscription-batch` once.
+8. Verify the returned `{ start, count }` and map token IDs deterministically:
+   - first manifest item -> token ID `start`
+   - second manifest item -> token ID `start + 1`
+   - and so on for `count` items
+
+## 7. Collection Batch Flow
+
+Collection batch minting adds phase accounting and mint pricing.
+
+For each item in manifest order:
+
+1. Check duplicate state on the core contract.
+2. Ensure the collection phase allows the item to reserve a mint session.
+3. Call `mint-begin` for items that do not already have an active session.
+4. Resume any existing session rather than creating a parallel path.
+5. Upload chunks with `mint-add-chunk-batch` until the item is complete.
+6. Wait for every upload transaction to confirm.
+
+Before the final seal:
+
+7. Confirm `default-dependencies` is empty. `mint-seal-batch` rejects batch jobs when default dependencies are configured.
+8. Sum all session `mint-price` values and include them in the economic plan.
+9. Call `mint-seal-batch` once with the ordered `{ hash, token-uri }` list.
+10. Verify the returned `{ start, count }` token range.
+
+Operational warning:
+- If a duplicate race is detected after collection reservations exist, stop before
+  `mint-seal-batch`. Session cleanup is collection-admin controlled in many deployments,
+  so silent retries can strand reservations.
+
+## 8. Fee Model
+
+Each item still pays the same core protocol economics as an individual mint:
+- begin fee = `fee-unit`
+- seal fee = `fee-unit * (1 + ceil(totalChunks / 50))`
+
+Batching reduces the number of final seal transactions, but it does not erase the
+per-item protocol fee math.
+
+Additional collection path cost:
+- total collection mint price = sum of all staged session `mint-price` values
+
+Always separate:
+- protocol fees
+- collection mint price, if any
+- estimated network fees
+
+## 9. Verification and Recovery
+
+Verification checklist:
+- every staged transaction confirmed successfully
+- every staged item has complete upload state before final seal
+- final seal returned the expected `count`
+- `get-id-by-hash` resolves each new hash to the expected token ID
+
+Recovery rules:
+- Duplicate before staging: skip the item and keep its canonical existing token ID.
+- Active upload state: resume from the next missing chunk index.
+- Expired or broken upload state: restart the item from `begin-or-get`.
+- Duplicate race detected just before final seal: rebuild the remaining batch against fresh chain state.
+- Recursive requirement discovered mid-plan: abort the batch and switch those items to individual recursive mints.
+
+## 10. Game and Drop Patterns
+
+This skill is useful for agents that need to place many artifacts on-chain in one
+coordinated release, for example:
+- hidden loot for map exploration games
+- preloaded claimable NFTs
+- staged item packs for puzzle unlocks
+- world state assets that should mint together
+
+The discipline is simple: ordered manifest, deterministic hashes, staged uploads,
+one final batch seal, and no recursive assumptions.
+
+---
+
+
+<!-- ===== SOURCE: docs/ai-skills/skill-transfer.md ===== -->
+
+---
+name: xtrata-transfer
+description: >
+  Teach any AI agent to transfer Xtrata inscriptions (SIP-009 NFTs) between
+  Stacks wallets, including ownership verification, escrowed Forever Twin
+  detection, and post-transfer confirmation. Single-item minting is
+  `skill-inscribe.md`; reading state is `skill-query.md`.
+version: "1.0"
+contract: SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0
+---
+
+# Xtrata Transfer Skill
+
+## 1. Scope
+
+This skill moves an existing, sealed inscription from one wallet to another.
+It does not mint (see [`skill-inscribe.md`](skill-inscribe.md)) and does not
+cover market listings — a listed token is escrowed by the market contract and
+must be cancelled or bought, not transferred.
+
+## 2. Contract Reference
+
+| Key | Value |
+|-----|-------|
+| Contract | `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0` |
+| Function | `transfer (id uint) (sender principal) (recipient principal)` |
+| Returns | `(response bool uint)` |
+| Fee | No protocol fee; only the miner fee |
+| Paused behaviour | `transfer` keeps working while the contract is paused |
+
+Network endpoints:
+- Mainnet: `https://stacks-node-api.mainnet.stacks.co`
+- Fallback: `https://api.mainnet.hiro.so`
+
+## 3. Preconditions (check ALL before signing)
+
+1. **Token exists and is sealed** — `inscription-exists(id)` and
+   `is-inscription-sealed(id)` must both be true.
+2. **Sender owns the token** — `get-owner(id)` must equal the sender
+   principal. `tx-sender` must be the sender; you cannot transfer on
+   someone else's behalf.
+3. **Not escrowed** — if `get-owner(id)` is a *contract* principal (market
+   escrow, or a Forever Twin helper such as
+   `SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun`), the token
+   cannot be transferred by the apparent holder. For twins, the real owner is
+   the holder of the source NFT; the twin must be released via the helper's
+   swap function first.
+4. **Valid recipient** — a standard Stacks address on the same network.
+   Warn the user before sending to a contract principal.
+
+## 4. Transaction Construction
+
+```javascript
+import {
+  AnchorMode, PostConditionMode, makeContractCall,
+  uintCV, principalCV,
+  makeStandardNonFungiblePostCondition, NonFungibleConditionCode,
+  createAssetInfo, tupleCV
+} from '@stacks/transactions';
+
+async function buildTransferTx({ tokenId, sender, recipient, senderKey, network }) {
+  return makeContractCall({
+    contractAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+    contractName: 'xtrata-v2-1-0',
+    functionName: 'transfer',
+    functionArgs: [uintCV(tokenId), principalCV(sender), principalCV(recipient)],
+    senderKey,
+    network,
+    postConditions: [
+      makeStandardNonFungiblePostCondition(
+        sender,
+        NonFungibleConditionCode.Sends,
+        createAssetInfo(
+          'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+          'xtrata-v2-1-0',
+          'xtrata-inscription'
+        ),
+        uintCV(tokenId)
+      )
+    ],
+    postConditionMode: PostConditionMode.Deny,
+    anchorMode: AnchorMode.Any
+  });
+}
+```
+
+Deny mode + the NFT `Sends` post condition guarantees exactly this token
+leaves the sender's wallet and nothing else.
+
+## 5. Confirmation Gate
+
+Before broadcasting, show the user and require explicit confirmation:
+
+```
+Transfer inscription #<id> (<mime>, <size> bytes)
+From:  <sender>
+To:    <recipient>
+Network fee: ~<fee> STX (no protocol fee)
+```
+
+## 6. Post-Transfer Verification
+
+Poll the tx until `success`, then re-read `get-owner(id)` and confirm it now
+returns the recipient. Report the txid and the explorer link.
+
+## 7. Common Errors
+
+| Error | Meaning | Action |
+|---|---|---|
+| `u100 ERR_NOT_AUTHORIZED` | `tx-sender` is not the owner/sender | Re-check `get-owner`; token may be escrowed |
+| `u101 ERR_NOT_FOUND` | Token id does not exist | Verify the id with `get-last-token-id` |
+| Post-condition failure | Wallet blocked an unexpected asset move | Rebuild with the exact token id and sender |
+
+---
+
+
+<!-- ===== SOURCE: docs/ai-skills/skill-query.md ===== -->
+
+---
+name: xtrata-query
+description: >
+  Teach any AI agent to query Xtrata inscription state, metadata, ownership,
+  content chunks, dependencies, and relationships — all read-only, no wallet
+  or fees required. Minting is `skill-inscribe.md`; moving tokens is
+  `skill-transfer.md`.
+version: "1.0"
+contract: SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0
+---
+
+# Xtrata Query Skill
+
+## 1. Scope
+
+Read-only access to everything the protocol knows: token metadata, ownership,
+raw content, upload sessions, dependencies, and the relationship index. No
+transactions are signed and nothing costs STX.
+
+## 2. Endpoints
+
+| Purpose | Endpoint |
+|---|---|
+| Read-only contract calls | `POST {api}/v2/contracts/call-read/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v2-1-0/{function}` |
+| Mainnet API | `https://stacks-node-api.mainnet.stacks.co` (fallback `https://api.mainnet.hiro.so`) |
+| Relationship graph | `GET /index/relations/<contract>?id=<id>` (D1 inscription index) |
+| Lineage summaries | `GET /index/page?primary=&lineage=&ids=…` |
+
+With the SDK, prefer `createXtrataReadClient` / `createSimpleSdk` from
+`@xtrata/sdk/simple` — they bind the contract once and expose typed snapshot
+helpers (`getTokenSnapshot`, `getSnapshot`) over these same functions.
+
+## 3. Core Read Functions
+
+| Question | Function(s) |
+|---|---|
+| How many tokens exist? | `get-last-token-id`, `get-minted-count` |
+| Who owns #id? | `get-owner (id uint)` |
+| What is #id? | `get-inscription-meta (id uint)` → owner, creator, mime-type, total-size, total-chunks, sealed, final-hash |
+| Token URI | `get-token-uri (id uint)` / `get-token-uri-raw` |
+| Does this content already exist? | `get-id-by-hash (hash (buff 32))` — dedupe lookup by incremental hash |
+| Is it sealed? | `is-inscription-sealed (id uint)` |
+| Raw content | `get-chunk (id, index)` / `get-chunk-batch (id, indexes (list 50 uint))` |
+| Recursive dependencies | `get-dependencies (id uint)` → up to 50 parent ids |
+| In-flight upload | `get-upload-state (hash, owner)` → current-index, running-hash, last-touched |
+| Protocol config | `get-fee-unit`, `is-paused`, `get-admin`, `get-royalty-recipient` |
+
+Preview helpers: `get-svg (id)` and `get-svg-data-uri (id)` return small
+on-chain SVG previews where available.
+
+## 4. Reconstructing Full Content
+
+Content is stored as 16,384-byte chunks under an incremental SHA-256 chain
+(see `skill-inscribe.md` §4 for the hash algorithm). To rebuild a file:
+
+1. `get-inscription-meta(id)` → `total-chunks`, `final-hash`, `mime-type`.
+2. Read chunks in order with `get-chunk-batch` — cap batches at 30 indexes
+   per call for cold-cache friendliness (the ABI accepts 50).
+3. Concatenate bytes, recompute the incremental hash, and verify it equals
+   `final-hash` before presenting the content as authentic.
+
+With the SDK, `@xtrata/reconstruction` does all of this: batch reads,
+fallback sources, diagnostics, and hash verification
+(`createXtrataReconstructionSources` in `@xtrata/sdk/simple` wires it up).
+
+## 5. Relationships (parents / children / descendants)
+
+The D1 inscription index derives the relationship graph from `seal-recursive`
+dependencies and stays current automatically during sync:
+
+- `GET /index/relations/<contract>?id=<id>` — parents and children of a token.
+- `GET /index/page?primary=&lineage=&ids=…` — lineage summaries in one query.
+
+Do not attempt to rebuild the graph by scanning every token on-chain; use the
+index endpoints.
+
+## 6. Read Etiquette
+
+- Batch reads where the ABI allows lists; never poll faster than once per
+  second per endpoint.
+- On HTTP 429, back off (the SDK's read client does this automatically and
+  raises `ReadOnlyBackoffError` with `retryAfterMs`).
+- Cache immutable facts (sealed content, hashes, creators) — they never
+  change; only ownership and protocol config are mutable.
+
+## 7. Common Pitfalls
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `(optional none)` for an id you expect | Token not minted or wrong contract version | Check `get-last-token-id`; legacy content may live on `xtrata-v1.1.1` |
+| Hash mismatch after reconstruction | Chunks read from a stale/partial upload | Only reconstruct sealed tokens; verify with `is-inscription-sealed` |
+| Owner is a contract principal | Escrow (market listing or Forever Twin helper) | Resolve the real owner via the market listing or the twin's source NFT |
+
+---
+
+
+<!-- ===== SOURCE: docs/sdk/README.md ===== -->
+
+# Xtrata SDK
+
+Status: production-ready and actively maintained.
+
+As of 2026-07-21 these docs are maintained in the xtrata-2.0 repo alongside
+`packages/xtrata-sdk` and `packages/xtrata-reconstruction`. The 2.0 platform
+additions (sponsored Clarity 4 market contracts, Inscription Wizard entry
+points, multi-asset payment plans) are tracked in
+`docs/plans/SDK-COMPLETION-AND-LLMS-DOCS-PLAN.md`; SDK-level sponsor/payment
+modules land in 0.2.0.
+
+The SDK is now implemented through release automation. The primary focus is stable usage, release discipline, and incremental improvements for third-party builders.
+
+Current production upload policy: app and SDK mint planners use a hard
+30-chunk ceiling for each upload transaction. The deployed Clarity ABI still
+accepts 50-item chunk lists, and protocol fee math remains based on the
+contract's 50-chunk fee bucket.
+
+## Start here
+
+1. `docs/sdk/quickstart-first-30-minutes.md`
+2. `docs/sdk/quickstart-simple-mode.md`
+3. `docs/sdk/quickstart-reconstruction.md`
+4. `docs/sdk/quickstart-workflows.md`
+5. `docs/xtrata-backup-migration-service.md`
+6. `docs/sdk/troubleshooting.md`
+7. `docs/sdk/migration-guide.md`
+
+## Core reference docs
+
+- `docs/sdk/api-overview.md`
+- `docs/reconstruction-spec.md`
+- `docs/sdk/compatibility-matrix.md`
+- `docs/standards/xtrata-manifest-templates/README.md`
+- `docs/standards/xtrata-manifest-templates/00-manifest-index.json`
+- `docs/sdk/test-gates.md`
+- `docs/sdk/changelog.md`
+- `docs/sdk/release-notes-template.md`
+
+## Release and validation commands
+
+Run from repo root:
+
+1. `npm run sdk:docs:validate`
+2. `npm run sdk:typecheck`
+3. `npm run sdk:build`
+4. `npm run sdk:test`
+5. `npm run sdk:version:check`
+6. `npm run sdk:pack:smoke`
+7. `npm run sdk:examples:smoke`
+8. `npm run sdk:examples:tarball:smoke`
+9. `npm run sdk:changelog:generate`
+10. `npm run sdk:release:dry-run`
+
+## Packages
+
+- `@xtrata/sdk` in `packages/xtrata-sdk`
+- `@xtrata/reconstruction` in `packages/xtrata-reconstruction`
+
+## Archived planning docs
+
+Historical planning and phase tracking docs are now archived under `docs/sdk/archive/`.
+
+- `docs/sdk/archive/implementation-plan.md`
+- `docs/sdk/archive/roadmap.md`
+- `docs/sdk/archive/js-package-plan.md`
+- `docs/sdk/archive/reconstruction-library-plan.md`
+- `docs/sdk/archive/example-repos-plan.md`
+
+---
+
+
+<!-- ===== SOURCE: docs/sdk/api-overview.md ===== -->
+
+# SDK API Overview
+
+This is the fastest way to choose the right API surface.
+
+If you are brand new, start with `docs/sdk/quickstart-first-30-minutes.md`.
+If you need to rebuild inscription bytes from public chain data, use
+`docs/sdk/quickstart-reconstruction.md`.
+
+## Default path (recommended)
+
+Use `simple` when you want minimal setup and clear read helpers.
+
+- `createXtrataReadClient`
+- `createXtrataReconstructionSources`
+- `createCollectionReadClient`
+- `createMarketReadClient`
+- `createSimpleSdk`
+- `@xtrata/reconstruction` for strict byte reconstruction, fallback sources,
+  batch reads, diagnostics, and hash verification
+
+These clients:
+
+- bind sender once
+- hide repetitive call plumbing
+- expose convenience snapshots (`getTokenSnapshot`, `getSnapshot`)
+
+For write transactions, use `workflows` to prebuild deny-mode call payloads:
+
+- `buildCoreMintWorkflowPlan`
+- `buildCollectionMintWorkflowPlan`
+- `buildMarketListWorkflowPlan`
+- `buildMarketBuyWorkflowPlan`
+- `buildMarketCancelWorkflowPlan`
+- `buildBackupMigrationWorkflowPlan` from `backup-migration` for holder-side
+  source-token escrow into a migrated collection
+
+Workflow guardrails:
+
+- malformed inputs now fail fast with `SdkValidationError`
+- network-mismatched contracts are rejected before call payload generation
+- deterministic spend-cap prerequisites are enforced (known mint price + fee unit)
+
+Collection-mint note:
+
+- Active SDK support target is `xtrata-collection-mint-v1.4`.
+- Legacy collection-mint `v1.0` and `v1.1` are archived for new SDK work.
+
+## Advanced path
+
+Use low-level modules only when needed:
+
+- `client` for explicit read/call builders
+- `mint` for chunking, hashing, fee, and post-condition primitives
+- `safe` for deterministic spend caps + guided mint flow statuses
+- `safe` for deterministic spend caps + guided recovery helpers (`buildMintRecoveryGuide`)
+- `workflows` for high-level write transaction plans
+- `backup-migration` for Xtrata backup registry and migrated-collection call
+  builders
+- `deploy` for template injection and contract naming
+- `collections` and `market` for standalone helper logic
+
+## Suggested progression
+
+1. Start with `simple`.
+2. Add `workflows` for write transaction plans.
+3. Add `mint` helpers for custom fee/cap tuning.
+4. Use `client` builders only for fully custom transaction orchestration.
+
+## API stability notes (current)
+
+- Public export availability is now enforced by package tests:
+  - `packages/xtrata-sdk/src/__tests__/exports.test.ts`
+  - `packages/xtrata-reconstruction/src/__tests__/exports.test.ts`
+- Capability and error-code API contracts are now enforced by:
+  - `packages/xtrata-sdk/src/__tests__/capabilities.test.ts`
+  - `packages/xtrata-sdk/src/__tests__/errors.test.ts`
+- Packaging smoke verifies package + subpath imports from packed artifacts:
+  - `@xtrata/sdk`
+  - `@xtrata/sdk/simple`
+  - `@xtrata/sdk/workflows`
+  - `@xtrata/sdk/backup-migration`
+  - `@xtrata/reconstruction`
+
+---
+
+
+<!-- ===== SOURCE: docs/sdk/quickstart-first-30-minutes.md ===== -->
+
+# SDK Quickstart: First 30 Minutes
+
+Audience: first-time integrators who want a reliable path from zero setup to a valid Xtrata workflow plan.
+
+Goal after 30 minutes:
+- read live protocol state
+- generate a safe write workflow plan
+- understand how to recover from common wallet failures
+
+## 0) Prerequisites (2 minutes)
+
+You need:
+- Node.js 20+
+- npm 10+
+- a project folder
+
+Create a project:
+
+```bash
+mkdir xtrata-sdk-demo
+cd xtrata-sdk-demo
+npm init -y
+npm install @xtrata/sdk @xtrata/reconstruction
+```
+
+## 1) Confirm SDK install (2 minutes)
+
+Create `check-sdk.mjs`:
+
+```js
+import { createSimpleSdk } from '@xtrata/sdk/simple';
+
+const sdk = createSimpleSdk({
+  senderAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+  xtrataContractId: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-1'
+});
+
+console.log(Boolean(sdk.xtrata));
+```
+
+Run:
+
+```bash
+node check-sdk.mjs
+```
+
+Expected output:
+- `true`
+
+## 2) Read live protocol state (8 minutes)
+
+Create `read-only.mjs`:
+
+```js
+import { createXtrataReadClient } from '@xtrata/sdk/simple';
+
+const client = createXtrataReadClient({
+  contractId: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-1',
+  senderAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X'
+});
+
+const [nextTokenId, feeUnit, paused] = await Promise.all([
+  client.getNextTokenId(),
+  client.getFeeUnit(),
+  client.isPaused()
+]);
+
+console.log({
+  nextTokenId: nextTokenId.toString(),
+  feeUnitMicroStx: feeUnit.toString(),
+  paused
+});
+```
+
+Run:
+
+```bash
+node read-only.mjs
+```
+
+If this fails due to network/rate limits, configure your API routing as shown in `docs/sdk/quickstart-read-only.md`.
+
+## 3) Build a safe mint workflow plan (10 minutes)
+
+Create `workflow.mjs`:
+
+```js
+import { chunkBytes, computeExpectedHash } from '@xtrata/sdk/mint';
+import { buildCoreMintWorkflowPlan } from '@xtrata/sdk/workflows';
+
+const payloadBytes = new TextEncoder().encode('xtrata-sdk-demo');
+const expectedHash = computeExpectedHash(chunkBytes(payloadBytes));
+
+const plan = buildCoreMintWorkflowPlan({
+  contract: {
+    address: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+    contractName: 'xtrata-v2-1-1',
+    network: 'mainnet'
+  },
+  senderAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+  payloadBytes,
+  expectedHash,
+  mimeType: 'text/plain',
+  tokenUri: 'ipfs://xtrata-sdk-demo',
+  mintPrice: 1_000_000n,
+  protocolFeeMicroStx: 100_000n
+});
+
+console.log({
+  nextAction: plan.flow.nextAction,
+  beginFunction: plan.beginCall.functionName,
+  chunkBatchCalls: plan.addChunkBatchCalls.length,
+  sealFunction: plan.sealCall.functionName,
+  safetySummary: plan.safety.summaryLines
+});
+```
+
+Run:
+
+```bash
+node workflow.mjs
+```
+
+Expected:
+- `begin-inscription` plan
+- one or more chunk batch calls
+- `seal-inscription` plan
+- deterministic max-spend summary lines
+
+## 4) Add wallet-failure recovery guidance (5 minutes)
+
+Create `recovery.mjs`:
+
+```js
+import { buildMintRecoveryGuide } from '@xtrata/sdk/safe';
+
+const guide = buildMintRecoveryGuide({
+  errorMessage: 'Bad nonce supplied for transaction',
+  attemptedStep: 'seal',
+  beginConfirmed: true,
+  uploadedChunkBatches: 3,
+  totalChunkBatches: 3,
+  sealConfirmed: false
+});
+
+console.log(guide);
+```
+
+Run:
+
+```bash
+node recovery.mjs
+```
+
+Use `recommendedAction` directly in your UI for human-readable recovery instructions.
+
+## 5) What to do next
+
+1. Use `docs/sdk/quickstart-simple-mode.md` for broader read-only coverage.
+2. Use `docs/sdk/quickstart-workflows.md` for collection + market workflows.
+3. Use `docs/sdk/troubleshooting.md` when integration errors appear.
+4. Use `docs/sdk/migration-guide.md` when upgrading SDK versions or moving to collection-mint v1.2 policy.
+
+---
+
+
+<!-- ===== SOURCE: docs/sdk/quickstart-simple-mode.md ===== -->
+
+# SDK Quickstart: Simple Mode (Recommended)
+
+Simple Mode is the easiest way to integrate Xtrata.
+
+You pass a contract ID once, bind a sender once, and call clear methods without repeating network/sender plumbing.
+
+Import note:
+- Use published package entrypoints: `@xtrata/sdk/*`
+
+## 1) Core Xtrata read-only in minutes
+
+```ts
+import { createXtrataReadClient } from '@xtrata/sdk/simple';
+
+const core = createXtrataReadClient({
+  contractId: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-1',
+  senderAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X'
+});
+
+const nextTokenId = await core.getNextTokenId();
+const paused = await core.isPaused();
+const token = await core.getTokenSnapshot(58n);
+
+console.log({ nextTokenId, paused, token });
+```
+
+## 2) Collection mint status in one call
+
+```ts
+import { createCollectionReadClient } from '@xtrata/sdk/simple';
+
+const collection = createCollectionReadClient({
+  contractId: 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7.xtrata-collection-ahv0-34f95221',
+  senderAddress: 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7'
+});
+
+const snapshot = await collection.getSnapshot();
+
+console.log({
+  live: snapshot.live,
+  minted: snapshot.mintedCount,
+  remaining: snapshot.remaining,
+  effectiveMintPrice: snapshot.effectiveMintPrice
+});
+```
+
+## 3) Market reads with the same pattern
+
+```ts
+import { createMarketReadClient } from '@xtrata/sdk/simple';
+
+const market = createMarketReadClient({
+  contractId: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-stx-v1-0',
+  senderAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X'
+});
+
+const lastListingId = await market.getLastListingId();
+const listing = await market.getListing(lastListingId);
+
+console.log({ lastListingId, listing });
+```
+
+## 4) One-suite setup (optional)
+
+```ts
+import { createSimpleSdk } from '@xtrata/sdk/simple';
+
+const sdk = createSimpleSdk({
+  senderAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+  xtrataContractId: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-1',
+  collectionContractId:
+    'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7.xtrata-collection-ahv0-34f95221'
+});
+
+const [nextTokenId, collectionSnapshot] = await Promise.all([
+  sdk.xtrata?.getNextTokenId(),
+  sdk.collection?.getSnapshot()
+]);
+```
+
+## When to use advanced modules
+
+Use `client`, `mint`, `deploy`, and lower-level helpers when you need:
+- custom transaction payload orchestration
+- custom infra routing and explicit retry control
+- specialized lifecycle or deployment workflows
+
+---
+
+
+<!-- ===== SOURCE: docs/sdk/quickstart-mint.md ===== -->
+
+# SDK Quickstart: Mint Flow
+
+Use call builders and post-condition helpers for deterministic mint transaction construction.
+
+```ts
+import {
+  buildBeginInscriptionCall,
+  buildAddChunkBatchCall,
+  buildSealInscriptionCall,
+  buildMintBeginStxPostConditions,
+  buildSealStxPostConditions,
+  chunkBytes,
+  computeExpectedHash,
+  toStacksNetwork
+} from '@xtrata/sdk';
+
+const contract = {
+  address: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+  contractName: 'xtrata-v2-1-1',
+  network: 'mainnet' as const
+};
+
+const network = toStacksNetwork(contract.network);
+const bytes = new TextEncoder().encode('hello');
+const chunks = chunkBytes(bytes);
+const expectedHash = computeExpectedHash(chunks);
+
+const beginCall = buildBeginInscriptionCall({
+  contract,
+  network,
+  expectedHash,
+  mime: 'text/plain',
+  totalSize: BigInt(bytes.length),
+  totalChunks: BigInt(chunks.length)
+});
+
+const beginPostConditions = buildMintBeginStxPostConditions({
+  sender: 'SP...WALLET',
+  mintPrice: 1_000_000n
+});
+
+const chunkCall = buildAddChunkBatchCall({
+  contract,
+  network,
+  expectedHash,
+  chunks
+});
+
+const sealCall = buildSealInscriptionCall({
+  contract,
+  network,
+  expectedHash,
+  tokenUri: 'ipfs://...'
+});
+
+const sealPostConditions = buildSealStxPostConditions({
+  sender: 'SP...WALLET',
+  protocolFeeMicroStx: 100_000n,
+  totalChunks: chunks.length
+});
+```
+
+Flow order remains:
+1. `begin`
+2. `add-chunk-batch` (one or more)
+3. `seal`
+
+---
+
+
+<!-- ===== SOURCE: docs/sdk/quickstart-collection-mint.md ===== -->
+
+# SDK Quickstart: Collection Mint Status + Lifecycle
+
+Use the collection client + lifecycle helpers to derive live/public state.
+
+Policy:
+- Active SDK support target is `xtrata-collection-mint-v1.4`.
+- Legacy `v1.0` and `v1.1` collection-mint contracts are archived for new SDK work.
+
+```ts
+import {
+  createCollectionMintClient,
+  createCollectionMintSnapshot,
+  shouldShowLiveMintPage,
+  parseContractId
+} from '@xtrata/sdk';
+
+const parsed = parseContractId(
+  'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7.xtrata-collection-ahv0-34f95221'
+);
+if (!parsed.config) {
+  throw new Error(parsed.error ?? 'Invalid collection contract id');
+}
+
+const client = createCollectionMintClient({ contract: parsed.config });
+const sender = parsed.config.address;
+
+const status = await client.getStatus(sender);
+const snapshot = createCollectionMintSnapshot(status);
+
+const showLivePage = shouldShowLiveMintPage({
+  state: 'published',
+  status
+});
+
+console.log({
+  minted: snapshot.mintedCount,
+  remaining: snapshot.remaining,
+  live: snapshot.live,
+  showLivePage
+});
+```
+
+Guidance:
+- Use `published` state + on-chain status together to decide public visibility.
+- Use `snapshot.remaining` for sold-out handling and UI state stamping.
+
+---
+
+
+<!-- ===== SOURCE: docs/sdk/quickstart-workflows.md ===== -->
+
+# SDK Quickstart: Write Workflows (Mint + Market)
+
+Use `@xtrata/sdk/workflows` when you want prebuilt write transaction plans with:
+- deny-mode post-condition defaults
+- deterministic spend caps
+- guided mint flow state
+
+## 1) Core mint workflow plan
+
+```ts
+import { chunkBytes, computeExpectedHash } from '@xtrata/sdk/mint';
+import { buildCoreMintWorkflowPlan } from '@xtrata/sdk/workflows';
+
+const contract = {
+  address: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+  contractName: 'xtrata-v2-1-1',
+  network: 'mainnet' as const
+};
+
+const payloadBytes = new TextEncoder().encode('hello xtrata');
+const expectedHash = computeExpectedHash(chunkBytes(payloadBytes));
+
+const plan = buildCoreMintWorkflowPlan({
+  contract,
+  senderAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+  payloadBytes,
+  expectedHash,
+  mimeType: 'text/plain',
+  tokenUri: 'ipfs://example',
+  mintPrice: 1_000_000n,
+  protocolFeeMicroStx: 100_000n
+});
+
+// Wallet transaction payloads:
+const beginCall = plan.beginCall;
+const chunkCalls = plan.addChunkBatchCalls.map((entry) => entry.call);
+const sealCall = plan.sealCall;
+
+// UX helpers:
+console.log(plan.safety.summaryLines);
+console.log(plan.flow.nextAction);
+```
+
+## 2) Collection mint workflow plan
+
+```ts
+import { buildCollectionMintWorkflowPlan } from '@xtrata/sdk/workflows';
+
+const plan = buildCollectionMintWorkflowPlan({
+  contract: {
+    address: 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7',
+    contractName: 'xtrata-collection-ahv0-34f95221',
+    network: 'mainnet'
+  },
+  xtrataContract: {
+    address: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+    contractName: 'xtrata-v2-1-1',
+    network: 'mainnet'
+  },
+  senderAddress: 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7',
+  payloadBytes: new Uint8Array([1, 2, 3]),
+  expectedHash: new Uint8Array(32),
+  mimeType: 'image/png',
+  tokenUri: 'ipfs://example',
+  mintPrice: 1_000_000n,
+  protocolFeeMicroStx: 100_000n
+});
+```
+
+## 3) Small-file single-tx helper plan (<= 30 chunks)
+
+```ts
+import { buildSmallMintSingleTxWorkflowPlan } from '@xtrata/sdk/workflows';
+
+const plan = buildSmallMintSingleTxWorkflowPlan({
+  helperContract: {
+    address: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+    contractName: 'xtrata-small-mint-v1-0',
+    network: 'mainnet'
+  },
+  xtrataContract: {
+    address: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+    contractName: 'xtrata-v2-1-1',
+    network: 'mainnet'
+  },
+  senderAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+  payloadBytes: new TextEncoder().encode('small payload'),
+  expectedHash: new Uint8Array(32),
+  mimeType: 'text/plain',
+  tokenUri: 'ipfs://example',
+  protocolFeeMicroStx: 100_000n
+});
+
+// Single wallet call, deny-mode spend cap included
+const singleTxCall = plan.call;
+```
+
+## 4) Market list / buy / cancel plans
+
+```ts
+import {
+  buildMarketBuyWorkflowPlan,
+  buildMarketCancelWorkflowPlan,
+  buildMarketListWorkflowPlan
+} from '@xtrata/sdk/workflows';
+
+const marketContract = {
+  address: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+  contractName: 'xtrata-market-stx-v1-0',
+  network: 'mainnet' as const
+};
+const nftContract = {
+  address: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+  contractName: 'xtrata-v2-1-1',
+  network: 'mainnet' as const
+};
+
+const listPlan = buildMarketListWorkflowPlan({
+  marketContract,
+  nftContract,
+  senderAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+  tokenId: 58n,
+  priceMicroStx: 2_500_000n
+});
+
+const buyPlan = buildMarketBuyWorkflowPlan({
+  marketContract,
+  nftContract,
+  buyerAddress: 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7',
+  listingId: 101n,
+  tokenId: 58n,
+  listingPriceMicroStx: 2_500_000n
+});
+
+const cancelPlan = buildMarketCancelWorkflowPlan({
+  marketContract,
+  nftContract,
+  listingId: 101n,
+  tokenId: 58n
+});
+
+console.log(listPlan.summaryLines);
+console.log(buyPlan.summaryLines);
+console.log(cancelPlan.summaryLines);
+```
+
+These workflow plans are designed so integrators can call `openContractCall` directly with consistent, deny-mode defaults.
+
+Validation note:
+- Workflow planners fail fast with `SdkValidationError` when critical inputs are malformed (missing sender, invalid hash length, oversized URI, zero/negative spend values, network mismatches).
+
+---
+
+
+<!-- ===== SOURCE: docs/sdk/quickstart-safe-transactions.md ===== -->
+
+# SDK Quickstart: Safe Transactions
+
+Use `@xtrata/sdk/safe` to generate deterministic spend caps, post-conditions, and guided flow status.
+
+## Core mint safety bundle
+
+```ts
+import { createCoreMintSafetyBundle } from '@xtrata/sdk/safe';
+
+const safety = createCoreMintSafetyBundle({
+  sender: 'SP...WALLET',
+  mintPrice: 1_000_000n,
+  protocolFeeMicroStx: 100_000n,
+  totalChunks: 120
+});
+
+console.log(safety.summaryLines);
+// Begin max spend: ...
+// Seal max spend: ...
+// Max combined spend: ...
+
+// Use these in wallet transaction requests:
+const beginPostConditions = safety.beginPostConditions;
+const sealPostConditions = safety.sealPostConditions;
+```
+
+## Collection mint safety bundle
+
+```ts
+import { createCollectionMintSafetyBundle } from '@xtrata/sdk/safe';
+
+const safety = createCollectionMintSafetyBundle({
+  sender: 'SP...WALLET',
+  mintPrice: 1_000_000n,
+  protocolFeeMicroStx: 100_000n,
+  totalChunks: 120
+});
+
+// begin cap includes collection mint price + deterministic protocol fee
+console.log(safety.beginCapMicroStx, safety.sealCapMicroStx);
+```
+
+## Guided flow states (traffic-light ready)
+
+```ts
+import { buildGuidedMintFlow } from '@xtrata/sdk/safe';
+
+const flow = buildGuidedMintFlow({
+  beginConfirmed: true,
+  uploadedChunkBatches: 2,
+  totalChunkBatches: 5,
+  sealConfirmed: false
+});
+
+console.log(flow.steps);
+console.log(flow.nextAction); // "Continue chunk uploads."
+console.log(flow.progressPercent);
+```
+
+This helper is designed for clear UX messaging and resume-friendly interfaces.
+
+## Recovery guidance for failed wallet steps
+
+```ts
+import { buildMintRecoveryGuide } from '@xtrata/sdk/safe';
+
+const recovery = buildMintRecoveryGuide({
+  errorMessage: 'Bad nonce supplied for transaction',
+  attemptedStep: 'seal',
+  beginConfirmed: true,
+  uploadedChunkBatches: 3,
+  totalChunkBatches: 3,
+  sealConfirmed: false
+});
+
+console.log(recovery.failedStep); // "seal"
+console.log(recovery.failureType); // "bad-nonce"
+console.log(recovery.recommendedAction);
+```
+
+---
+
+
+<!-- ===== SOURCE: docs/sdk/quickstart-read-only.md ===== -->
+
+# SDK Quickstart: Read-only
+
+Use `@xtrata/sdk` clients to read core protocol state with retry + fallback behavior.
+
+If you are new, use `docs/sdk/quickstart-first-30-minutes.md` first.
+If you want the easiest setup for production usage, use `docs/sdk/quickstart-simple-mode.md`.
+
+```ts
+import {
+  createXtrataClient,
+  parseContractId
+} from '@xtrata/sdk';
+
+const parsed = parseContractId(
+  'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-1'
+);
+if (!parsed.config) {
+  throw new Error(parsed.error ?? 'Invalid contract id');
+}
+
+const client = createXtrataClient({ contract: parsed.config });
+const sender = parsed.config.address;
+
+const [nextTokenId, paused, feeUnit] = await Promise.all([
+  client.getNextTokenId(sender),
+  client.isPaused(sender),
+  client.getFeeUnit(sender)
+]);
+
+console.log({ nextTokenId, paused, feeUnit });
+```
+
+Notes:
+- Use `apiBaseUrl`/`apiBaseUrls` in client options to control infrastructure routing.
+- Read-only retries/backoff are enabled by default.
+
+---
+
+
+<!-- ===== SOURCE: docs/sdk/quickstart-reconstruction.md ===== -->
+
+# SDK Quickstart: Independent Reconstruction
+
+Use this when you want to rebuild inscription bytes from public chain data
+without trusting `xtrata.xyz`.
+
+Canonical public mainnet target:
+
+`SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-1`
+
+Fallback source chain:
+
+1. `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0`
+2. `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1`
+
+## 20-line example
+
+```ts
+import { createXtrataReadClient, createXtrataReconstructionSources } from '@xtrata/sdk/simple';
+import { reconstructXtrataInscription } from '@xtrata/reconstruction';
+
+const contractId = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-1';
+const senderAddress = contractId.split('.')[0];
+const core = createXtrataReadClient({ contractId, senderAddress });
+const legacy = createXtrataReadClient({
+  contractId: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0',
+  senderAddress
+});
+
+const result = await reconstructXtrataInscription({
+  tokenId: 287n,
+  sources: createXtrataReconstructionSources(core, [legacy]),
+  strict: true,
+  maxNodes: 64
+});
+
+console.log({
+  tokenId: result.tokenId.toString(),
+  mimeType: result.mimeType,
+  bytes: result.bytes.length,
+  tokenUri: result.tokenUri,
+  rollingChunkHash: result.verification.expectedHashHex,
+  chunkSource: result.diagnostics.chunkSourceId,
+  dependencies: result.dependencies.nodes.map(String)
+});
+```
+
+This example uses public Stacks read-only calls through the SDK defaults. To
+avoid public rate limits, pass `apiBaseUrls` into `createXtrataReadClient`.
+Platform adapters can also pass `isTerminalReadError` into
+`reconstructXtrataInscription` so quota exhaustion stops immediately instead
+of triggering fallback reads.
+
+The first-party Cloudflare runtime uses the same reconstruction engine and
+clamps cold-cache `get-chunk-batch` reads to 30 chunks. Production smoke checks
+should confirm the response headers expose `X-Xtrata-Runtime-Cache: MISS` on a
+purged token, `X-Xtrata-Runtime-Read-Batch-Size: 30`, low fallback/single-read
+counts, and `X-Xtrata-Runtime-Cache: HIT` on the repeat request.
+
+For the full reconstruction rules, see
+[`docs/reconstruction-spec.md`](../reconstruction-spec.md).
+
+Hash note: Xtrata verification uses the protocol rolling chunk hash
+`sha256(previousHash || chunkBytes)`, starting from 32 zero bytes. For v3.1.1
+summaries this value is named `rolling-chunk-hash`; older contracts expose the
+same value as `final-hash`. It is not necessarily the normal
+`sha256(reconstructedBytes)`.
+
+## CLI proof
+
+From the repo root:
+
+```sh
+npm run reconstruct -- 287 /tmp/xtrata-287.html
+```
+
+The CLI prints the requested contract, metadata source, chunk source, fallback
+status, read mode, byte count, MIME type, token URI, dependency count, and
+verified hash.
+
+---
+
+
+<!-- ===== SOURCE: docs/sdk/compatibility-matrix.md ===== -->
+
+# SDK Compatibility Matrix
+
+Purpose: provide a single compatibility reference for protocol versions, template contracts, and SDK support level.
+
+Status legend:
+- `supported`: validated by SDK tests and active docs.
+- `baseline`: supported path exists; broader integration coverage still expanding.
+- `planned`: targeted but not yet validated through SDK gates.
+- `archived`: legacy compatibility only; no new SDK features/tests are added.
+
+## Core protocol contracts
+
+| Contract family | Version / target | SDK support | Notes |
+| --- | --- | --- | --- |
+| Xtrata core | `xtrata-v1.1.1` | baseline | Legacy chunk source for older migrated content. |
+| Xtrata core | `xtrata-v2.1.0` | supported | Legacy fallback source for `xtrata-v2.1.1` migrated/continued IDs. |
+| Xtrata core | `xtrata-v2.1.1` | supported | Current public mainnet default in `src/data/contract-registry.json`. |
+| Xtrata core | `xtrata-v3.0.0` | baseline | Source and SDK capability detection exist; not public default until registry/docs promote it. |
+| Xtrata core | `xtrata-v3.1.1` | planned | Comparison contract source only. SDK/app support must add chunk profiles, profile-specific single-tx functions, and rolling-hash summary parsing before promotion. |
+
+Current public reconstruction fallback chain:
+
+1. `xtrata-v2.1.1`
+2. `xtrata-v2.1.0`
+3. `xtrata-v1.1.1`
+
+## Collection and sale templates
+
+| Contract family | Version / target | SDK support | Notes |
+| --- | --- | --- | --- |
+| Collection mint | `xtrata-collection-mint-v1.0` | archived | Legacy only. New SDK development does not target this version. |
+| Collection mint | `xtrata-collection-mint-v1.1` | archived | Legacy only. New SDK development does not target this version. |
+| Collection mint | `xtrata-collection-mint-v1.4` | supported | **Only active collection-mint SDK target moving forward.** |
+| Preinscribed sale | `xtrata-preinscribed-collection-sale-v1.0` | baseline | Market/sale support available through market + workflow helpers. |
+
+## SDK module-level support
+
+| SDK module | Stability | Compatibility notes |
+| --- | --- | --- |
+| `simple` | baseline | Primary read-only entrypoint; tested in package export and example smoke flows. |
+| `client` | baseline | Typed low-level read/call builders for custom integrations. |
+| `mint` | baseline | Chunking/hash/fee utilities for core and collection workflows. |
+| `collections` | baseline | Collection snapshot helpers and lifecycle convenience logic. |
+| `market` | baseline | Listing and market helper support with workflow planners. |
+| `safe` | baseline | Deterministic spend caps and guided flow primitives. |
+| `workflows` | supported | Covered by workflow tests and pack smoke subpath import checks. |
+| `deploy` | baseline | Template naming/injection support; deployment orchestration still evolving. |
+| `@xtrata/reconstruction` | supported | Deterministic chunk assembly/hash verification, batch reads, fallback sources, diagnostics, and dependency traversal. |
+
+## Error compatibility contract
+
+The SDK normalizes the following known core error codes:
+
+`u100`, `u101`, `u102`, `u103`, `u104`, `u105`, `u106`, `u107`, `u109`, `u110`, `u111`, `u112`, `u113`, `u114`.
+
+Validation source:
+- `packages/xtrata-sdk/src/__tests__/errors.test.ts`
+
+## Collection-mint policy (active)
+
+- SDK roadmap scope is now v1.4-first for collection mint support.
+- `v1.0` and `v1.1` are archived for SDK development efficiency.
+- No new SDK features/tests should be added specifically for `v1.0` or `v1.1` unless policy is explicitly changed.
+
+## Validation gates for this matrix
+
+- Update this matrix whenever:
+  - new protocol or template contract versions are added,
+  - capability inference behavior changes,
+  - error code mapping changes.
+- Required gate commands after matrix-impacting changes:
+  1. `npm run sdk:typecheck`
+  2. `npm run sdk:test`
+  3. `npm run sdk:pack:smoke`
+  4. `npm run sdk:examples:smoke`
+
+---
+
+
+<!-- ===== SOURCE: docs/sdk/troubleshooting.md ===== -->
+
+# SDK Troubleshooting
+
+Use this page for the most common integration failures and fastest fixes.
+
+## 1) `SdkValidationError: ... is required`
+
+What it means:
+- Required workflow input is missing or malformed.
+
+Common causes:
+- empty `senderAddress`
+- `expectedHash` not exactly 32 bytes
+- empty or too-long `tokenUri`
+- non-positive price/fee input
+
+Fix:
+- validate inputs before calling `build*WorkflowPlan`.
+- keep token URI <= 256 chars and mime <= 64 chars.
+
+## 2) `SdkValidationError: Contract networks do not match`
+
+What it means:
+- You mixed `mainnet` and `testnet` contracts in one workflow.
+
+Fix:
+- ensure `contract.network`, `xtrataContract.network`, and market/NFT networks are identical.
+
+## 3) Wallet warns about unsafe post-condition mode
+
+What it means:
+- You are likely bypassing SDK workflow output and building custom wallet calls.
+
+Fix:
+- use `@xtrata/sdk/workflows` outputs directly.
+- confirm each call includes `postConditionMode: Deny`.
+
+## 4) Post-condition check failure (`SentLe`, `Equal`, etc.)
+
+What it means:
+- actual transfer exceeded your deterministic cap or mismatched expected values.
+
+Fix:
+- refresh live pricing/fee inputs and rebuild workflow plan immediately before submission.
+- verify collection active phase price vs base price.
+
+## 5) Bad nonce / conflicting nonce
+
+What it means:
+- another pending transaction consumed the nonce.
+
+Fix:
+1. wait for pending transactions to confirm or expire.
+2. refresh wallet state.
+3. regenerate and retry only the failed step.
+4. use `buildMintRecoveryGuide` for step-aware UI messaging.
+
+## 6) Read-only call failures or rate limiting
+
+What it means:
+- endpoint issue, temporary infra failure, or rate-limit backoff.
+
+Fix:
+- configure `apiBaseUrl`/`apiBaseUrls`.
+- keep retries bounded and avoid aggressive polling.
+- use cached results where possible.
+
+## 7) `npm run sdk:pack:smoke` fails in restricted environments
+
+What it means:
+- local npm cache or network restrictions can break naive pack/install flows.
+
+Fix:
+- use the included scripts:
+  - `npm run sdk:pack:smoke`
+  - `npm run sdk:examples:tarball:smoke`
+- these scripts already isolate npm cache and validate tarballs via local extraction.
+
+## 8) How to gather useful debug output
+
+Collect:
+- full thrown error message and stack trace
+- workflow input payload (without secrets)
+- contract IDs and network values
+- exact failed step (`begin`, `chunks`, or `seal`)
+- whether wallet call used deny mode + post-conditions
+
+Then reproduce with:
+
+```bash
+npm run sdk:typecheck
+npm run sdk:test
+npm run sdk:docs:validate
+```
+
+---
+
+
+<!-- ===== SOURCE: docs/sdk/migration-guide.md ===== -->
+
+# SDK Migration Guide
+
+This guide tracks safe upgrade steps for SDK consumers.
+
+## Scope
+
+- `@xtrata/sdk`
+- `@xtrata/reconstruction`
+- collection-mint support policy updates
+
+## Current support policy
+
+- Active collection-mint target: `xtrata-collection-mint-v1.4`
+- Archived for new SDK work: `v1.0`, `v1.1`
+
+If your app still depends on v1.0/v1.1 contract-specific behavior, keep those integrations in legacy codepaths and avoid adding new SDK feature assumptions there.
+
+## Migration checklist (any SDK upgrade)
+
+1. Upgrade packages in a feature branch.
+2. Re-run your read-only smoke checks.
+3. Rebuild workflow plans and verify deny-mode post-conditions.
+4. Re-run app-level mint/list/buy integration tests.
+5. Update your internal runbooks and user-facing recovery copy.
+
+## From low-level calls to `simple` + `workflows` (recommended)
+
+Before:
+- custom contract ID parsing
+- custom network selection
+- manual post-condition assembly
+
+After:
+- `createSimpleSdk` or `create*ReadClient` for read-only paths
+- `build*WorkflowPlan` for write planning
+- `buildMintRecoveryGuide` for wallet failure UX
+
+Benefits:
+- deterministic safety defaults
+- less wiring duplication
+- consistent resume behavior and error messaging
+
+## Validate migration in one command set
+
+Run from repo root:
+
+```bash
+npm run sdk:docs:validate
+npm run sdk:typecheck
+npm run sdk:build
+npm run sdk:test
+npm run sdk:pack:smoke
+npm run sdk:examples:smoke
+npm run sdk:examples:tarball:smoke
+```
+
+## Breaking-change response template
+
+When a future SDK release introduces breaking behavior:
+
+1. Capture impacted modules (`simple`, `workflows`, etc.).
+2. Add a migration subsection with before/after code.
+3. Add or update a compatibility-matrix row.
+4. Add regression tests reproducing previous behavior where compatibility is expected.
+
+## Notes for release maintainers
+
+- Keep this file updated whenever public exports or workflow validation rules change.
+- Link each migration section to the release note/changelog entry once release automation is active.
+
+---
+
+
+<!-- ===== SOURCE: docs/reconstruction-spec.md ===== -->
+
+# Xtrata Independent Reconstruction Spec
+
+Purpose: define the public rules required to rebuild a Xtrata inscription
+without using `xtrata.xyz` as a trust anchor.
+
+## Canonical Public Contract
+
+Current public mainnet target:
+
+`SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-1`
+
+Fallback source chain for historical and migrated content:
+
+1. `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0`
+2. `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1`
+
+`xtrata-v3.0.0` exists in contract sources and SDK capability detection, but it
+is not the public default until the contract registry and public docs explicitly
+promote it. `xtrata-v3.1.1` exists as a comparison contract source and still
+requires SDK/app capability updates before promotion.
+
+## Required Public Inputs
+
+A reconstructor needs:
+
+- network: `mainnet` or `testnet`
+- contract ID: `{address}.{contractName}`
+- token ID
+- Stacks read-only access through a public API, RPC, or self-hosted node
+- optional fallback contract IDs for migrated tokens
+
+No privileged Xtrata API is required.
+
+## Required Read-Only Calls
+
+For the active contract:
+
+- `get-inscription-meta(id)`
+- `get-token-uri(id)`
+- `get-dependencies(id)`
+- `get-chunk-batch(id, indexes)` when available
+- `get-chunk(id, index)` as fallback
+
+`get-inscription-meta` returns the authoritative reconstruction metadata:
+
+- `mime-type`
+- `total-size`
+- `total-chunks`
+- `sealed`
+- `final-hash`
+- `creator`
+
+## Chunk Ordering
+
+Chunks are ordered by zero-based index.
+
+Reconstruction order is:
+
+1. Build indexes `0..total-chunks-1`.
+2. Read each chunk by index.
+3. Concatenate chunks in ascending index order.
+4. Trim the result to `total-size` bytes.
+
+Missing chunks are fatal in strict reconstruction.
+
+## Hash Verification
+
+Xtrata uses an incremental SHA-256 chain hash, not a plain SHA-256 hash of the
+full file. In v3.1.1 this is named `rolling-chunk-hash` in summaries/events;
+older metadata still exposes the same value as `final-hash`.
+
+Algorithm:
+
+1. Start with 32 zero bytes.
+2. For each ordered raw chunk, compute `sha256(previousHash || chunkBytes)`.
+3. The final running hash must equal `rolling-chunk-hash` / `final-hash`.
+
+Strict reconstruction must fail when the computed hash differs from
+`rolling-chunk-hash` / `final-hash`. A normal `sha256(reconstructedBytes)`
+may be computed as an additional marketplace or preservation proof, but it is
+not the contract-verified Xtrata hash unless it is separately declared and
+verified.
+
+## Migration Fallback
+
+For migrated tokens, ownership and metadata can live in a newer contract while
+chunk bytes still live in an older source contract.
+
+Recommended fallback behavior:
+
+1. Read metadata from the requested contract.
+2. Try chunk `0` on the requested contract.
+3. If chunk `0` is missing, try fallback contracts in order.
+4. Once a source contract is selected, read all chunks from that source.
+5. Verify the rebuilt bytes against the metadata `final-hash`.
+
+If primary metadata is missing, repeat metadata lookup through fallback
+contracts.
+
+## Recursive Dependencies
+
+Recursive inscriptions declare direct dependencies on-chain through
+`get-dependencies(id)`.
+
+Clients should:
+
+- resolve dependency IDs from the same contract context unless explicit content
+  rules say otherwise;
+- bound traversal to avoid untrusted graph expansion;
+- treat the dependency list as an authoritative index, not a complete rendering
+  script for arbitrary HTML apps.
+
+## Strict Result Contract
+
+A strict reconstructor should return bytes only after all of these pass:
+
+- metadata exists;
+- `sealed` is true when the contract exposes that flag;
+- every declared chunk exists;
+- reconstructed byte length is at least `total-size`;
+- computed hash equals `final-hash`.
+
+The `@xtrata/reconstruction` package exposes `verifyPayload`,
+`assertVerified`, `reconstructInscription(..., { strict: true })`, and
+`reconstructXtrataInscription({ sources, strict: true })` for this boundary.
+When a source exposes `getChunkBatch`, the package reads batches first, falls
+back to per-chunk reads for failed or missing batch entries, and records read
+diagnostics in the reconstruction result. Production callers can provide
+`isTerminalReadError` when platform quota errors must stop reconstruction
+without per-chunk fallback amplification.
+
+The first-party `/runtime/content` route now consumes the same public
+reconstruction engine. Runtime responses expose reconstruction proof/debug
+headers such as `X-Xtrata-Runtime-Reconstruction-Read-Mode`,
+`X-Xtrata-Runtime-Reconstruction-Batch-Reads`, and
+`X-Xtrata-Runtime-Reconstruction-Errors`. The runtime also exposes
+`X-Xtrata-Runtime-Upstream-Requests`, which counts actual outbound Stacks API
+attempts including retries and alternate API-base attempts. Set
+`RUNTIME_CONTENT_DEBUG=1` in the runtime environment to emit opt-in
+reconstruction logs during testing.
+
+The Cloudflare Pages runtime sets `[limits] cpu_ms = 30000` and
+`subrequests = 2_000` in `wrangler.toml`. The deployed contract read ABI can
+accept up to 50 indexes, but the first-party cold-cache runtime clamps
+`get-chunk-batch` reads to 30 chunks for production stability. The
+`@xtrata/reconstruction` package applies the same 30-chunk clamp when callers
+provide a larger `batchSize`. If a batch still triggers `CostBalanceExceeded`,
+the runtime splits that read; Cloudflare subrequest quota exhaustion is terminal
+and must not fan out into individual chunk reads.
+
+For large v3.2.1 reconstructions, resolvers should prefer direct node map-entry
+reads for stored data when available:
+
+- `InscriptionMeta`
+- `TokenURIs`
+- `MigrationSource`
+- `Chunks`
+
+The final v3.2.1 testnet rehearsal verified a 33-chunk / 540,672-byte token by
+following these map entries directly. Heavy read-only calls such as
+`get-inscription-summary` or large `get-chunk-batch` requests can exceed public
+node `read_length` budgets even when the underlying data is valid. SDK and
+runtime callers must treat read-only helpers as convenience APIs, not as a
+guaranteed whole-token reconstruction surface for large files.
+
+Production readiness checks after a runtime deployment should include:
+
+- purge the target token from runtime cache using the protected
+  `/runtime/cache-purge` route;
+- request `/runtime/content` and confirm `X-Xtrata-Runtime-Cache: MISS`;
+- confirm `X-Xtrata-Runtime-Read-Batch-Size: 30`;
+- confirm batch fallback and single-read counts stay low;
+- request the same URL again and confirm `X-Xtrata-Runtime-Cache: HIT`;
+- verify `/inscription/:id`, `/i/:id`, and `Range: bytes=0-1023` responses.
+
+The optional `RUNTIME_CONTENT_READ_BATCH_SIZE` environment variable may reduce
+the read batch size below 30 for diagnostics, but values above 30 are clamped.
+
+## Chunk Size Compatibility
+
+Existing Xtrata core contracts use fixed 16,384-byte chunks. This is a contract
+format rule, not only an SDK default:
+
+- contract storage maps store `(buff 16384)` values;
+- upload calls accept `(buff 16384)` chunk values;
+- `get-chunk-batch` returns `(list 50 (optional (buff 16384)))`;
+- current metadata stores `total-size` and `total-chunks`, but not a per-token
+  chunk-size field.
+
+The reconstruction package therefore keeps `CHUNK_SIZE = 16_384` for existing
+contracts and for the legacy `total-chunks: 0` derivation path.
+
+`xtrata-v3.1.1` adds explicit chunk profiles:
+
+- `u1` small: 16,384-byte chunks, max `2048` chunks = 32 MiB.
+- `u2` standard: 65,536-byte chunks, max `2048` chunks = 128 MiB.
+- `u3` maximum: 131,072-byte chunks, max `2048` chunks = 256 MiB.
+
+For v3.1.1 and later profile-aware contracts, resolvers should prefer
+`get-inscription-summary(id)` when present and read:
+
+- `chunk-profile`
+- `chunk-size`
+- `rolling-chunk-hash`
+- `hash-algorithm`
+- `chunk-count`
+
+If summary is unavailable, fall back to `get-inscription-meta(id)`,
+`get-chunk-profile(id)`, and `get-chunk-size(id)`. Do not infer profile from
+file size alone.
+
+The v3.1.1 `get-chunk-batch` read-only helper intentionally remains capped at
+4 indexes because chunks are stored in a `(buff 131072)` map and larger optional
+read lists are not practical as a static Clarity response shape. Small and
+standard profile resolvers may still use repeated 4-index batch reads or
+per-chunk `get-chunk` fallback.
+
+Existing v1, v2.1, and v3.0 contract sources must continue reconstructing with
+16,384-byte chunks.
+
+## Public Proof Standard
+
+A third-party proof should record:
+
+- network;
+- requested contract ID;
+- chunk source contract ID;
+- token ID;
+- token URI;
+- MIME type;
+- total size;
+- total chunks;
+- rolling chunk hash / final hash;
+- actual reconstructed rolling hash;
+- optional normal file SHA-256 if the resolver computes one separately;
+- dependency IDs;
+- whether fallback was used.
+- read mode (`batch`, `single`, or `mixed`) and any read fallback errors.
+
+This is enough for another client to repeat the reconstruction independently.
+
+---
+
+
+<!-- ===== SOURCE: packages/xtrata-sdk/README.md ===== -->
+
+# @xtrata/sdk (workspace)
+
+SDK package for protocol-first integrations:
+- Core contract helpers (config/network/client)
+- Simple Mode wrappers (`simple`) for easiest onboarding
+- Safe transaction helpers (`safe`) for deterministic caps + guided flow states
+- Wallet failure recovery helper (`buildMintRecoveryGuide`) for resume-safe UX
+- Workflow planners (`workflows`) for mint and market write transactions
+- Backup migration helpers (`backup-migration`) for registry and holder
+  migration call planning
+- Mint helpers (fees, caps, post-conditions, dependencies)
+- Collection mint lifecycle helpers
+- Market helpers
+- Sponsored-transaction client (`sponsor`) for zero-STX buys via the relayer
+- Payment-asset helpers (`payments`): STX/sBTC/SIP-010 descriptors, deny-mode
+  spend-cap post conditions, fiat (USD/GBP) display quotes
+- Deploy helper primitives
+
+Current packaging mode:
+- Source of truth: `src/`
+- Build output: `dist/`
+- Package entrypoints resolve from `dist/*`
+- Tarball smoke validation is available via `npm run sdk:pack:smoke` from repo root.
+- Example tarball smoke validation is available via `npm run sdk:examples:tarball:smoke` from repo root.
+
+Mint workflow planners cap first-party upload calls at 30 chunks per
+`add-chunk-batch` / `mint-add-chunk-batch`, while retaining the deployed
+contract ABI constant of 50 for protocol fee math and list compatibility.
+
+Quick start:
+
+```ts
+import { createXtrataReadClient } from '@xtrata/sdk/simple';
+```
+
+---
+
+
+<!-- ===== SOURCE: packages/xtrata-reconstruction/README.md ===== -->
+
+# @xtrata/reconstruction
+
+Deterministic reconstruction helpers for rebuilding Xtrata inscription bytes
+from public chain data.
+
+Core helpers:
+
+- Chunk assembly
+- Incremental hash verification
+- Strict verification assertions
+- Batch-first chunk reads with per-chunk fallback
+- Ordered fallback source reconstruction for migrated content
+- Provenance and read diagnostics
+- Dependency graph resolution
+- End-to-end reconstruction primitive
+
+Current packaging mode:
+
+- Source of truth: `src/`
+- Build output: `dist/`
+- Package entrypoint resolves from `dist/index.js`
+
+## Strict reconstruction
+
+```ts
+import { createXtrataReadClient, createXtrataReconstructionSources } from '@xtrata/sdk/simple';
+import { reconstructXtrataInscription } from '@xtrata/reconstruction';
+
+const core = createXtrataReadClient({
+  contractId: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-1',
+  senderAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X'
+});
+const legacy = createXtrataReadClient({
+  contractId: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0',
+  senderAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X'
+});
+
+const result = await reconstructXtrataInscription({
+  tokenId: 287n,
+  sources: createXtrataReconstructionSources(core, [legacy]),
+  strict: true,
+  batchSize: 8,
+  concurrency: 4
+});
+
+console.log(result.mimeType, result.bytes.length, result.diagnostics.chunkSourceId);
+```
+
+`strict: true` throws `ReconstructionVerificationError` if the rebuilt payload
+does not match the on-chain `final-hash`. It also rejects unsealed metadata
+when that flag is exposed.
+
+`batchSize` and `concurrency` are optional. `batchSize` is clamped to the
+production ceiling of 30 chunks per read batch. These settings let production
+callers keep read-only reconstruction fast while preserving deterministic chunk
+order and strict hash verification. Platform adapters can also provide
+`isTerminalReadError` to stop immediately when retry or per-chunk fallback
+would only amplify an exhausted upstream quota.
+
+Full rules: `docs/reconstruction-spec.md` in the main repository.
+
+---

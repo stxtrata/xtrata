@@ -1,0 +1,151 @@
+openapi: "3.1.0"
+info:
+  title: Xtrata Worker API
+  version: "1.0.0"
+  description: >
+    HTTP endpoints served by the Xtrata Cloudflare Pages functions at
+    https://xtrata.xyz. Covers the sponsor relayer (zero-STX sponsored buys),
+    market listings, the D1 inscription/relationship index, inscription
+    content, and price quotes. On-chain reads/writes happen directly against
+    the Stacks API, not here.
+servers:
+  - url: https://xtrata.xyz
+paths:
+  /sponsor/quote:
+    post:
+      summary: Budget quote for the sponsored list flow ("sponsorship deposit")
+      operationId: sponsorQuote
+      responses:
+        "200":
+          description: Current fee estimate and required budget
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  estimatedFeeUstx: { type: string, description: micro-STX as string }
+                  budgetUstx: { type: string }
+                  minBudgetUstx: { type: string }
+                  expiresAt: { type: integer, description: unix ms }
+        "503": { $ref: "#/components/responses/RelayerError" }
+  /sponsor/submit:
+    post:
+      summary: Submit a buyer-signed sponsored transaction
+      operationId: sponsorSubmit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [txHex, contractId, listingId]
+              properties:
+                txHex: { type: string, description: hex-encoded signed sponsored tx (fee 0) }
+                contractId: { type: string, example: SP….xtrata-market-v1 }
+                listingId: { type: string, description: uint as string }
+                bnsName: { type: string }
+      responses:
+        "200":
+          description: Relayer job accepted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SponsorJob" }
+        "400": { $ref: "#/components/responses/RelayerError" }
+        "409": { $ref: "#/components/responses/RelayerError" }
+        "503": { $ref: "#/components/responses/RelayerError" }
+  /sponsor/status/{jobId}:
+    get:
+      summary: Poll a sponsor job
+      operationId: sponsorStatus
+      parameters:
+        - { name: jobId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Current job state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SponsorJob" }
+        "404": { $ref: "#/components/responses/RelayerError" }
+  /sponsor/drop-policy:
+    get:
+      summary: Current sponsored-drop claim policy
+      operationId: sponsorDropPolicy
+      responses:
+        "200": { description: Policy document (shape may evolve) }
+  /market/listings:
+    get:
+      summary: Market listings with pricing
+      operationId: marketListings
+      parameters:
+        - { name: contract, in: query, schema: { type: string } }
+      responses:
+        "200": { description: Listings array (see functions/market/listings.ts) }
+  /index/relations/{contract}:
+    get:
+      summary: Derived relationship graph (parents/children) for a token
+      operationId: indexRelations
+      parameters:
+        - { name: contract, in: path, required: true, schema: { type: string } }
+        - { name: id, in: query, required: true, schema: { type: integer } }
+      responses:
+        "200": { description: Relationship graph for the token }
+  /index/page:
+    get:
+      summary: Lineage summaries in one query
+      operationId: indexPage
+      parameters:
+        - { name: primary, in: query, schema: { type: string } }
+        - { name: lineage, in: query, schema: { type: string } }
+        - { name: ids, in: query, schema: { type: string }, description: comma-separated token ids }
+      responses:
+        "200": { description: Page of lineage summaries }
+  /inscription/{tokenId}:
+    get:
+      summary: Inscription content by token id (reconstructed, cached)
+      operationId: inscriptionContent
+      parameters:
+        - { name: tokenId, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200": { description: Raw inscription bytes with original MIME type }
+        "404": { description: Unknown or unsealed token }
+  /prices/spot:
+    get:
+      summary: Spot prices used for multi-asset display quotes
+      operationId: pricesSpot
+      responses:
+        "200": { description: Spot price map (STX/sBTC/stable assets vs USD) }
+components:
+  schemas:
+    SponsorJob:
+      type: object
+      properties:
+        id: { type: string }
+        state:
+          type: string
+          enum: [RECEIVED, SPONSORED, CONFIRMED, CLAIMING, CLAIMED, REFUNDING, SETTLED, ABANDONED]
+        txids:
+          type: object
+          properties:
+            buy: { type: string }
+            claim: { type: string }
+            refund: { type: string }
+        error: { type: string }
+    RelayerError:
+      type: object
+      properties:
+        code:
+          type: string
+          description: >
+            Relayer error code (RELAYER_UNAVAILABLE, AT_CAPACITY, LOW_BALANCE,
+            RATE_LIMITED, DUPLICATE, LISTING_BUSY, BUDGET_TOO_SMALL,
+            LISTING_SOLD, VALIDATION family, RELAYER_INTERNAL,
+            RELAYER_KEY_INVALID, BROADCAST)
+        message: { type: string }
+        requestId: { type: string }
+        stage: { type: string }
+  responses:
+    RelayerError:
+      description: Relayer error envelope (may include an existing job)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/RelayerError" }

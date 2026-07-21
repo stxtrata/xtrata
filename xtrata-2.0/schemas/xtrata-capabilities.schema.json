@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xtrata.xyz/schemas/xtrata-capabilities.schema.json",
+  "title": "Xtrata capability manifest",
+  "type": "object",
+  "required": ["protocol", "contracts", "limits", "fees", "endpoints", "payments", "workflows"],
+  "properties": {
+    "protocol": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "Xtrata" },
+        "description": { "type": "string" },
+        "version": { "type": "string" },
+        "app": { "type": "string", "format": "uri" },
+        "sdk": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "contracts": {
+      "type": "object",
+      "additionalProperties": { "type": "object", "additionalProperties": { "type": "string" } }
+    },
+    "limits": {
+      "type": "object",
+      "required": ["chunkSizeBytes", "uploadBatchCeilingChunks", "contractBatchListMax", "maxTotalChunks", "maxTotalSizeBytes"],
+      "additionalProperties": { "type": ["number", "string"] }
+    },
+    "fees": { "type": "object" },
+    "endpoints": { "type": "object", "additionalProperties": { "type": "string" } },
+    "payments": {
+      "type": "object",
+      "required": ["assets"],
+      "properties": {
+        "assets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind", "symbol", "status"],
+            "properties": {
+              "kind": { "enum": ["stx", "sip10"] },
+              "symbol": { "type": "string" },
+              "status": { "enum": ["native", "supported", "planned"] }
+            }
+          }
+        }
+      }
+    },
+    "workflows": { "type": "object" }
+  }
+}

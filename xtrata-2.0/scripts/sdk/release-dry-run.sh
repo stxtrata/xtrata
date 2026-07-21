@@ -17,6 +17,9 @@ npm --prefix "$ROOT_DIR" run sdk:changelog:generate
 
 echo "[sdk:release:dry-run] Running release gates"
 npm --prefix "$ROOT_DIR" run sdk:docs:validate
+npm --prefix "$ROOT_DIR" run sdk:api:extract
+npm --prefix "$ROOT_DIR" run sdk:llms:generate
+npm --prefix "$ROOT_DIR" run sdk:machine:validate
 npm --prefix "$ROOT_DIR" run sdk:typecheck
 npm --prefix "$ROOT_DIR" run sdk:build
 npm --prefix "$ROOT_DIR" run sdk:test

@@ -1,0 +1,49 @@
+# Xtrata
+
+> Xtrata is a contract-native inscription protocol on Stacks (Bitcoin L2).
+> Files are split into 16,384-byte chunks, uploaded on-chain, and sealed into
+> SIP-009 NFTs, deduplicated by an incremental SHA-256 hash chain. The
+> TypeScript SDK (@xtrata/sdk + @xtrata/reconstruction) provides read clients,
+> mint/collection/market workflow planners with deny-mode spend caps, a
+> sponsored-transaction client (zero-STX buys via a relayer), multi-asset
+> payment helpers (STX, sBTC, SIP-010 tokens), and strict byte reconstruction.
+
+Key facts:
+- Core contract: SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0 (mainnet)
+- Small helper (single-tx mints <=30 chunks): SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-small-mint-v1-0
+- Chunk size 16,384 bytes; app/SDK upload ceiling 30 chunks/tx (ABI accepts 50); max 2,048 chunks / 32 MiB per inscription
+- Active collection-mint target: xtrata-collection-mint-v1.4
+- App: https://xtrata.xyz (Inscription Wizard at /create-wizard, market at /market)
+
+## Agent skills (start here for AI agents)
+
+- [Canonical agent skill (all operations)](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/XTRATA_AGENT_SKILL.md)
+- [Inscribe one item](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/ai-skills/skill-inscribe.md)
+- [Batch mint 1..50 items](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/ai-skills/skill-batch-mint.md)
+- [Transfer inscriptions](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/ai-skills/skill-transfer.md)
+- [Query state, content and relationships](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/ai-skills/skill-query.md)
+- [AI skills index and training tracks](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/ai-skills/README.md)
+
+## SDK documentation
+
+- [SDK overview and release gates](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/sdk/README.md)
+- [API overview (choose your surface)](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/sdk/api-overview.md)
+- [First 30 minutes quickstart](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/sdk/quickstart-first-30-minutes.md)
+- [Simple mode quickstart](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/sdk/quickstart-simple-mode.md)
+- [Workflow planners quickstart](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/sdk/quickstart-workflows.md)
+- [Byte reconstruction quickstart](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/sdk/quickstart-reconstruction.md)
+- [Compatibility matrix](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/sdk/compatibility-matrix.md)
+- [Troubleshooting](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/sdk/troubleshooting.md)
+
+## Machine-readable references
+
+- [SDK API surface (JSON)](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/machine/sdk-api.json)
+- [Protocol capability manifest (JSON)](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/machine/xtrata-capabilities.json)
+- [Worker HTTP API (OpenAPI 3.1)](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/machine/openapi.yaml)
+- [Collection manifest JSON Schema](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/schemas/xtrata-collection-manifest.schema.json)
+
+## Optional
+
+- [Reconstruction spec](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/reconstruction-spec.md)
+- [Contract inventory](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/contract-inventory.md)
+- [App reference](https://github.com/stxtrata/xtrata/blob/main/xtrata-2.0/docs/app-reference.md)
