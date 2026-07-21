@@ -4,11 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#07090d" />
-  <meta name="description" content="Inscribe Your First Masterpiece — create original work, preserve it through Xtrata, and enter a Zero Authority DAO bounty with four equal 50 STX awards." />
-  <meta property="og:title" content="Inscribe Your First Masterpiece | Xtrata × Zero Authority DAO" />
-  <meta property="og:description" content="Create something original, inscribe it through Xtrata, share its story, and submit it to Zero Authority DAO. Four winners receive 50 STX each." />
+  <meta name="description" content="Proof of Creation — create original work, preserve it through Xtrata, and enter a Zero Authority DAO bounty with four equal 50 STX awards." />
+  <meta property="og:title" content="Proof of Creation | Xtrata × Zero Authority DAO" />
+  <meta property="og:description" content="Proof of Creation invites you to create something original, inscribe it through Xtrata, share its story, and compete for one of four equal 50 STX awards." />
   <meta property="og:type" content="website" />
-  <title>Inscribe Your First Masterpiece | Xtrata × Zero Authority DAO</title>
+  <meta property="og:url" content="https://xtrata.xyz/proof-of-creation" />
+  <link rel="canonical" href="https://xtrata.xyz/proof-of-creation" />
+  <title>Proof of Creation | Xtrata × Zero Authority DAO</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
   <style>
@@ -413,7 +415,7 @@
 
 <body>
   <div class="announcement">
-    <div class="shell"><span class="pulse" aria-hidden="true"></span><strong>Xtrata creative campaign · Zero Authority DAO bounty · 200 STX</strong><span aria-hidden="true">·</span><span id="topDeadline">Deadline to be announced</span></div>
+    <div class="shell"><span class="pulse" aria-hidden="true"></span><strong>Proof of Creation · Xtrata creative campaign · 200 STX</strong><span aria-hidden="true">·</span><span id="topDeadline">Deadline to be announced</span></div>
   </div>
 
   <header class="site-header">
@@ -431,7 +433,7 @@
       </div>
       <nav class="site-nav" id="siteNav" aria-label="Campaign navigation">
         <a href="https://xtrata.xyz/">Home</a>
-        <a href="#enter" aria-current="page">First Masterpiece</a>
+        <a href="#enter" aria-current="page">Proof of Creation</a>
         <a href="#how">Scope of Work</a>
         <a href="#submit">Submission</a>
         <a href="#prizes">Prizes</a>
@@ -446,7 +448,7 @@
   <main class="shell">
     <section class="hero" aria-labelledby="heroTitle">
       <div class="hero-copy">
-        <span class="section-kicker">Xtrata × Zero Authority DAO</span>
+        <span class="section-kicker">Proof of Creation · Xtrata × Zero Authority DAO</span>
         <h1 id="heroTitle">Inscribe your <em>first masterpiece.</em></h1>
         <p class="hero-lead">Create an original song, artwork, photograph, poem, animation or short film. Put it fully on-chain through Xtrata and be one of four creators to win <strong>50 STX.</strong></p>
         <div class="hero-actions">
@@ -778,12 +780,12 @@
       if (!pending) return;
       const { files, containsDirectory, info } = pending;
       const path = info.dest === "create" ? "/inscribe" : "/wizard/";
-      if (!routing) { window.location.assign("/wizard/?from=masterpiece"); return; }
+      if (!routing) { window.location.assign("/wizard/?from=proof-of-creation"); return; }
       continueBtn.textContent = "Preparing…";
-      let target = `${path}?from=masterpiece&routingReason=${encodeURIComponent(info.reason)}`;
+      let target = `${path}?from=proof-of-creation&routingReason=${encodeURIComponent(info.reason)}`;
       try {
-        const handoffId = await routing.storeCreateHandoff(files, { reason: info.reason, source: "masterpiece", containsDirectory });
-        target = routing.createHandoffUrl(path, handoffId, "masterpiece");
+        const handoffId = await routing.storeCreateHandoff(files, { reason: info.reason, source: "proof-of-creation", containsDirectory });
+        target = routing.createHandoffUrl(path, handoffId, "proof-of-creation");
       } catch {
         /* Handoff storage unavailable — still honour the routing boundary. */
       }
