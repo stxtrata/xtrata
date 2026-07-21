@@ -1,11 +1,11 @@
 # SDK Changelog
 
-Generated: 2026-05-30T22:22:40.289Z
+Generated: 2026-07-21T16:22:33.683Z
 
 ## Package versions
 
-- @xtrata/sdk: `0.1.0`
-- @xtrata/reconstruction: `0.1.0`
+- @xtrata/sdk: `0.2.0`
+- @xtrata/reconstruction: `0.2.0`
 
 ## Iteration history
 
