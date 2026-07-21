@@ -104,3 +104,19 @@ Do not deploy v1.1 for public use until all of the following are complete:
 
 The Clarity contract and its tests do not deploy or mutate v1.0 state. v1.1 is a
 new contract deployment with independent storage.
+
+## Deployment console
+
+The browser deployment workflow is available at `/web/deploy-console.html`.
+Its Drops v1.1 card bundles `contracts/live/xtrata-drops-v1.1.clar`, verifies
+the mainnet trait and Xtrata v3.2.3 principal, hashes the exact source, checks
+whether the contract name is already deployed, and unlocks the Clarity 4 wallet
+publish only for the production deployer.
+
+After confirmation, run the card's chain check again. The post-deploy buttons
+then submit `set-sponsor` and `set-bns-attestor-pubkey-hash` as separate wallet
+transactions. The attestor field accepts only a 20-byte hash160 in hexadecimal;
+never enter a private key. The card keeps the latest 100 preflight and wallet
+events in local browser storage and can copy them as a plain-text deployment
+log. A CLI fallback is registered under `xtrata-drops-v1-1` in
+`scripts/mainnet-deploy-contract.mjs`.
