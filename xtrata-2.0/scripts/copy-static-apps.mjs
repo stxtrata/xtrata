@@ -26,12 +26,12 @@ const staticApps = [
     target: 'dist/flowproof'
   },
   {
-    source: 'umg',
-    target: 'dist/umg'
+    source: 'proofzero',
+    target: 'dist/proofzero'
   },
   {
-    source: 'first-masterpiece',
-    target: 'dist/first-masterpiece'
+    source: 'umg',
+    target: 'dist/umg'
   },
   {
     // Public path renamed from /agent-one to /wizard (old links 301 in _redirects).
