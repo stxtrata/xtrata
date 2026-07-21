@@ -170,7 +170,7 @@ kbd{font-family:var(--mono);font-size:9.5px;background:var(--bg3);border:1px sol
       <button class="tbtn primary" id="playbtn" title="Play / Stop (Space)" disabled>▶</button>
       <div class="playhead-pill" id="playpos">1.1</div>
       <div class="pill"><b id="bpmval">122</b>&nbsp;BPM</div>
-      <div class="pill"><b>64</b>&nbsp;bars</div>
+      <div class="pill"><b id="barsval">16</b>&nbsp;bars</div>
     </div>
     <div class="now">
       <div class="t" id="nowtitle">Block Height Anthem</div>
@@ -190,7 +190,7 @@ kbd{font-family:var(--mono);font-size:9.5px;background:var(--bg3);border:1px sol
     <!-- CENTER -->
     <div id="center">
       <div id="treewrap">
-        <div class="treehud"><div class="panelhead"><span class="dot" style="background:var(--acc2)"></span>Arrangement — 64 bars</div></div>
+        <div class="treehud"><div class="panelhead"><span class="dot" style="background:var(--acc2)"></span><span id="arrtitle">Arrangement</span></div></div>
         <svg id="treesvg"></svg>
         <div id="arrange"></div>
         <div class="treehint"><kbd>space</kbd> play · every green cell is real inscribed audio · purple is deterministic synthesis</div>
@@ -481,139 +481,197 @@ const yCh=(name,midi,synth,preset,fx=[],gain=0.8,arr=[])=>ch(name,{type:'synth',
 const SONGS=[];
 function song(def){ SONGS.push(def); return def; }
 
-/* ---- candidate 1 · HOUSE ---- */
-song({
-  insc:1, name:'Block Height Anthem', genre:'House · 122', creator:'jimdotbtc', parents:[], license:'open',
-  kind:'remix', tempo:122, seed:9, key:'A minor', lenBars:64, date:'2026-07-21',
-  desc:'Candidate 1 — peak-time house. Eleven real Ordinals inscriptions — the OB1 kit, the melophonic loop, the moon landing, the protocol\'s own name — arranged with six deterministic synth voices.',
-  channels:[
-    /* --- rhythm section: real OB1 audio --- */
-    sCh('Kick',11,{mode:'grid',grid:'kick4',swaps:{9:'kickBuild',17:'kick4',41:'kickHeavy',57:'kick4'},fx:[],gain:1.0,arr:[[9,56],[57,60]]}),
-    sCh('Snare',12,{mode:'grid',grid:'snareBack',swaps:{49:'snareEnd'},fx:[],gain:0.8,arr:[[17,32],[41,56]]}),
-    sCh('Clap',14,{mode:'grid',grid:'clap',fx:[],gain:0.62,arr:[[13,32],[41,56]]}),
-    sCh('Hats',13,{mode:'grid',grid:'hatOff',swaps:{17:'hat16',33:'hatOff',41:'hat16'},fx:[],gain:0.55,arr:[[5,56],[57,62]]}),
-    sCh('Click Perc',17,{mode:'grid',grid:'click',fx:[1518],gain:0.5,arr:[[17,32],[41,56]]}),
-    sCh('Cowbell',20,{mode:'grid',grid:'cowbell',fx:[],gain:0.32,arr:[[45,56]]}),
-    sCh('Crash',15,{mode:'hits',hits:[{bar:9},{bar:17},{bar:33,gain:.7},{bar:41},{bar:57,gain:.7}],fx:[],gain:0.6,arr:[[9,57]]}),
-    sCh('Scratch FX',18,{mode:'hits',hits:[{bar:16,beat:3},{bar:32,beat:3},{bar:40,beat:3.5},{bar:56,beat:3},{bar:48,beat:3.5,rate:1.4,gain:.6}],fx:[],gain:0.7,arr:[[16,56]]}),
-    /* --- melodic / long-form on-chain audio --- */
-    sCh('Glock Motif',19,{mode:'keys',midi:846,ref:81,fx:[1502],gain:0.6,arr:[[1,16],[33,40],[57,64]]}),
-    sCh('OB1 Bass',16,{mode:'keys',midi:848,ref:45,fx:[1220],gain:0.85,arr:[[17,32]]}),
-    sCh('Melo Loop',22,{mode:'loop',every:2,rate:122/125,fx:[],gain:0.8,arr:[[1,8],[57,64]]}),
-    sCh('Bass Drop',21,{mode:'hits',hits:[{bar:33},{bar:41,rate:0.8,gain:.8}],fx:[],gain:0.85,arr:[[33,41]]}),
-    sCh('Moon Landing',23,{mode:'hits',hits:[{bar:34}],fx:[1503],gain:0.9,arr:[[33,40]]}),
-    sCh('Audional Tag',24,{mode:'hits',hits:[{bar:41},{bar:49,rate:1.19,gain:.7},{bar:63,rate:.5,gain:.8}],fx:[1518],gain:0.9,arr:[[41,64]]}),
-    /* --- synth section: v5 deterministic voices --- */
-    yCh('Sub Bass',830,1201,931,[],0.85,[[9,16],[33,40],[41,56]]),
-    yCh('Acid',832,1201,932,[1518],0.55,[[25,32],[49,56]]),
-    yCh('Pads',820,407,922,[1502],0.8,[[1,16],[57,64]]),
-    yCh('Break Pads',821,407,922,[1503],0.85,[[33,40]]),
-    yCh('Stabs',822,407,923,[1518],0.42,[[17,32],[41,56]]),
-    yCh('Bells',840,1307,941,[1518,1502],0.5,[[9,16],[33,40]]),
-    yCh('Chip Hook',847,1410,1421,[1518],0.52,[[41,56]]),
-    yCh('Super Arp',840,407,923,[1603,1518],0.32,[[49,64]]),
-    yCh('Voice',845,1350,955,[1503],0.62,[[33,40],[49,56]]),
-    yCh('Texture',843,409,942,[1503],0.45,[[1,8],[57,64]]),
-  ],
-});
+/* ================================================================
+   DRUM LAB — 28 drum styles, 16 bars each, OB1 kit only.
+   D()  = grid drum channel (grid arrays inline, velocities 0..1)
+   CR() = crash one-shots. rate re-pitches a sample (kick→tom/log).
+   ================================================================ */
+const D=(name,aud,grid,o={})=>sCh(name,aud,{mode:'grid',grid,fx:o.fx||[],
+  gain:o.gain!=null?o.gain:0.8,rate:o.rate,gridB:o.gridB,swaps:o.swaps,arr:o.arr||[[1,16]]});
+const CR=(bars,o={})=>sCh('Crash',15,{mode:'hits',
+  hits:bars.map(b=>({bar:b,rate:o.rate||1,gain:o.gain!=null?o.gain:0.5})),fx:o.fx||[],gain:0.55,arr:[[1,16]]});
+let SN=0;
+const style=(name,genre,tempo,seed,desc,channels)=>song({insc:++SN,name,genre,creator:'jimdotbtc',
+  parents:[],license:'open',kind:'remix',tempo,seed,key:'—',lenBars:16,date:'2026-07-21',desc,channels});
 
-/* ---- candidate 2 · HALFTIME / TRAP ---- */
-song({
-  insc:2, name:'Halving Time', genre:'Halftime · 140', creator:'jimdotbtc', parents:[], license:'open',
-  kind:'remix', tempo:140, seed:21, key:'A minor', lenBars:64, date:'2026-07-21',
-  desc:'Candidate 2 — dark halftime. The OB1 kit at 140 with the snare on the three, long 808 subs under the descent chords, hat rolls, and the moon landing hanging over the break.',
-  channels:[
-    sCh('Kick',11,{mode:'grid',grid:'kickTrap',swaps:{33:'kickTrap',41:'kickTrapB'},fx:[],gain:1.0,arr:[[9,32],[41,60]]}),
-    sCh('Snare',12,{mode:'grid',grid:'snareHalf',swaps:{49:'snareHalfG'},fx:[],gain:0.85,arr:[[9,32],[41,60]]}),
-    sCh('Hats',13,{mode:'grid',grid:'hatTrap',swaps:{25:'hatRoll',33:'hatTrap',49:'hatRoll'},fx:[],gain:0.5,arr:[[5,60]]}),
-    sCh('Click Perc',17,{mode:'grid',grid:'clickTrap',fx:[1518],gain:0.5,arr:[[17,32],[41,56]]}),
-    sCh('Crash',15,{mode:'hits',hits:[{bar:9},{bar:25,gain:.6},{bar:33,gain:.7},{bar:41},{bar:57,gain:.6}],fx:[],gain:0.55,arr:[[9,57]]}),
-    sCh('Scratch FX',18,{mode:'hits',hits:[{bar:32,beat:3,rate:.8},{bar:40,beat:3.5},{bar:56,beat:3,rate:.8}],fx:[],gain:0.6,arr:[[32,56]]}),
-    sCh('Glock Rain',19,{mode:'keys',midi:838,ref:81,fx:[1503],gain:0.55,arr:[[1,8],[33,40],[57,64]]}),
-    sCh('Bass Drop',21,{mode:'hits',hits:[{bar:9,rate:.9},{bar:33},{bar:41,rate:.7,gain:.85}],fx:[],gain:0.9,arr:[[9,41]]}),
-    sCh('Moon Landing',23,{mode:'hits',hits:[{bar:34}],fx:[1503],gain:0.95,arr:[[33,40]]}),
-    sCh('Audional Tag',24,{mode:'hits',hits:[{bar:41,rate:.84},{bar:57,rate:.5,gain:.8}],fx:[1518],gain:0.85,arr:[[41,64]]}),
-    yCh('808 Sub',834,1201,931,[],0.95,[[9,32],[41,56]]),
-    yCh('Dark Pads',821,407,922,[1503],0.8,[[1,16],[33,48],[57,64]]),
-    yCh('Stabs',822,407,923,[1518,1603],0.32,[[17,32],[49,56]]),
-    yCh('Bells',840,1307,941,[1518,1503],0.4,[[25,40]]),
-    yCh('Voice',845,1350,955,[1503],0.6,[[33,40],[49,56]]),
-    yCh('Texture',843,409,942,[1503],0.5,[[1,8],[33,40],[57,64]]),
-  ],
-});
+/* ---------------- CLUB ---------------- */
+style('Four Floor','House · 124',124,1,'Straight house: four on the floor, claps on 2 & 4, offbeat hats.',[
+  D('Kick',11,g16({0:1,4:1,8:1,12:1}),{gain:1}),
+  D('Clap',14,g16({4:.9,12:.9}),{gain:.7}),
+  D('Hats',13,g16({2:.75,6:.75,10:.75,14:.8}),{gain:.55}),
+  D('Click',17,g16({7:.4,15:.45}),{gain:.45}),
+  CR([1,9]),
+]);
+style('Warehouse','Techno · 132',132,2,'Deep techno: relentless floor, sparse clap, 16th click percolation.',[
+  D('Kick',11,g16({0:1,4:1,8:1,12:1}),{gain:1.05}),
+  D('Clap',14,g16({12:.6}),{gain:.55}),
+  D('Hats',13,g16({2:.6,6:.6,10:.6,14:.6}),{gain:.5}),
+  D('Click',17,g16({0:.3,1:.2,2:.4,3:.2,4:.3,5:.2,6:.4,7:.2,8:.3,9:.2,10:.4,11:.2,12:.3,13:.2,14:.4,15:.3}),{gain:.5}),
+]);
+style('Piston','Hard Techno · 148',148,3,'Hard kick doing the talking; snare+clap slam together on 2 & 4.',[
+  D('Kick',11,g16({0:1,4:1,8:1,12:1,14:.5}),{gain:1.1}),
+  D('Snare',12,g16({4:.9,12:.9}),{gain:.8}),
+  D('Clap',14,g16({4:.8,12:.8}),{gain:.6}),
+  D('Hats',13,g16({0:.4,1:.25,2:.6,3:.25,4:.4,5:.25,6:.6,7:.25,8:.4,9:.25,10:.6,11:.25,12:.4,13:.25,14:.6,15:.4}),{gain:.45}),
+  CR([1]),
+]);
+style('Donk Row','Hard House · 150',150,4,'Pumping hard house: doubled kick into the turnaround, cowbell offbeats.',[
+  D('Kick',11,g16({0:1,4:1,8:1,12:1,15:.6}),{gain:1.05}),
+  D('Clap',14,g16({4:.9,12:.9}),{gain:.7}),
+  D('Hats',13,g16({2:.8,6:.8,10:.8,14:.8}),{gain:.55}),
+  D('Cowbell',20,g16({2:.4,10:.4}),{gain:.4}),
+  CR([1,9]),
+]);
+style('Mainframe','Electro · 128',128,5,'Electro break: kick on the one and the and-of-two, snare backbeat, machine hats.',[
+  D('Kick',11,g16({0:1,10:.95}),{gain:1}),
+  D('Snare',12,g16({4:.9,12:.9}),{gain:.8}),
+  D('Clap',14,g16({4:.5,12:.5}),{gain:.5}),
+  D('Hats',13,g16({0:.5,1:.3,2:.7,3:.3,4:.5,5:.3,6:.7,7:.3,8:.5,9:.3,10:.7,11:.3,12:.5,13:.3,14:.7,15:.5}),{gain:.5}),
+]);
+style('Two Step','UK Garage · 132',132,6,'2-step: the missing third kick, shuffled hat clusters, clipped snares.',[
+  D('Kick',11,g16({0:1,10:.9}),{gain:.95}),
+  D('Snare',12,g16({4:.85,12:.9}),{gain:.75}),
+  D('Hats',13,g16({2:.7,5:.4,6:.7,10:.7,13:.45,14:.7}),{gain:.55}),
+  D('Click',17,g16({7:.5,15:.4}),{gain:.5}),
+]);
+style('Juke Work','Footwork · 160',160,7,'Footwork: kick triplets against the grid, clap holding the 4.',[
+  D('Kick',11,g16({0:1,3:.85,6:.9,8:.7,11:.85,14:.9}),{gain:1,gridB:g16({0:1,3:.85,6:.9,10:.85,13:.9})}),
+  D('Clap',14,g16({12:.9}),{gain:.7}),
+  D('Snare',12,g16({4:.4}),{gain:.6}),
+  D('Hats',13,g16({2:.4,6:.4,10:.4,14:.4}),{gain:.4}),
+]);
+style('Amyl Break','Big Beat · 136',136,8,'Big beat swagger: heavy break feel, cowbell jabs, crash every eight.',[
+  D('Kick',11,g16({0:1,8:.85,10:.9}),{gain:1}),
+  D('Snare',12,g16({4:.95,12:.95}),{gain:.85}),
+  D('Hats',13,g16({0:.5,2:.6,4:.5,6:.6,8:.5,10:.6,12:.5,14:.7}),{gain:.5}),
+  D('Cowbell',20,g16({2:.45,10:.4}),{gain:.4}),
+  CR([1,9]),
+]);
 
-/* ---- candidate 3 · DUB STEPPERS ---- */
-song({
-  insc:3, name:'Steppers Doctrine', genre:'Dub · 84', creator:'jimdotbtc', parents:[], license:'open',
-  kind:'remix', tempo:84, seed:76, key:'A minor', lenBars:64, date:'2026-07-21',
-  desc:'Candidate 3 — dub science. A steppers pulse from the OB1 kit, two bass notes a bar, offbeat skanks drowned in tape-length delay, and the protocol\'s own name as a dub siren.',
-  channels:[
-    sCh('Kick',11,{mode:'grid',grid:'kickDub',fx:[],gain:1.0,arr:[[9,56],[57,60]]}),
-    sCh('Rim',12,{mode:'grid',grid:'rimDub',fx:[1518],gain:0.55,arr:[[9,56]]}),
-    sCh('Hats',13,{mode:'grid',grid:'hatDub',fx:[],gain:0.5,arr:[[13,56],[57,62]]}),
-    sCh('Click Echo',17,{mode:'grid',grid:'clickDub',fx:[1518,1502],gain:0.55,arr:[[17,32],[41,56]]}),
-    sCh('Crash',15,{mode:'hits',hits:[{bar:17,rate:.8},{bar:41,rate:.8},{bar:33,gain:.5,rate:.7}],fx:[1502],gain:0.5,arr:[[17,41]]}),
-    sCh('Scratch Dub',18,{mode:'hits',hits:[{bar:24,beat:2,rate:.7},{bar:40,beat:2,rate:.7},{bar:56,beat:2,rate:.6}],fx:[1518],gain:0.6,arr:[[24,56]]}),
-    sCh('Glock Drops',19,{mode:'keys',midi:838,ref:81,fx:[1518,1502],gain:0.55,arr:[[17,32],[41,56]]}),
-    sCh('Melo Loop',22,{mode:'loop',every:2,rate:84/125,fx:[1220],gain:0.7,arr:[[1,8],[57,64]]}),
-    sCh('Audional Siren',24,{mode:'hits',hits:[{bar:17},{bar:25,rate:1.19,gain:.6},{bar:41,rate:.89},{bar:49,rate:1.19,gain:.6},{bar:63,rate:.5}],fx:[1518,1502],gain:0.8,arr:[[17,64]]}),
-    yCh('Dub Bass',833,1201,931,[],1.0,[[9,56],[57,64]]),
-    yCh('Skank Stabs',822,407,923,[1518,1502],0.4,[[9,56]]),
-    yCh('Ghost Pads',821,407,922,[1603,1503],0.55,[[25,40],[57,64]]),
-    yCh('Bells',840,1307,941,[1518,1503],0.32,[[33,48]]),
-    yCh('Voice',845,1350,955,[1503],0.5,[[41,56]]),
-    yCh('Texture',843,409,942,[1503],0.45,[[1,8],[33,40],[57,64]]),
-  ],
-});
+/* ---------------- BASS MUSIC ---------------- */
+style('Roller','Drum & Bass · 174',174,9,'DnB rollers: two-step kick/snare with ghost snares tucked in the gaps.',[
+  D('Kick',11,g16({0:1,10:.95}),{gain:1}),
+  D('Snare',12,g16({4:.95,7:.3,12:.95,15:.25}),{gain:.8}),
+  D('Hats',13,g16({0:.4,1:.25,2:.5,3:.25,4:.4,5:.25,6:.5,7:.25,8:.4,9:.25,10:.5,11:.25,12:.4,13:.25,14:.5,15:.35}),{gain:.45}),
+  D('Click',17,g16({6:.35,14:.4}),{gain:.45}),
+]);
+style('Ruffneck','Jungle · 168',168,10,'Jungle chop: displaced snares that flip every other bar, hat chatter.',[
+  D('Kick',11,g16({0:1,10:.9,13:.55}),{gain:.95}),
+  D('Snare',12,g16({4:.9,7:.45,9:.3,12:.9}),{gain:.8,gridB:g16({4:.9,6:.4,12:.9,14:.5})}),
+  D('Hats',13,g16({0:.45,2:.55,3:.3,4:.45,6:.55,8:.45,10:.55,11:.3,12:.45,14:.6,15:.35}),{gain:.5}),
+  D('Click',17,g16({3:.4,11:.45}),{gain:.45}),
+]);
+style('Half Ton','Halftime · 170',170,11,'Halftime 170: one kick, snare on the three, everything else is space.',[
+  D('Kick',11,g16({0:1,11:.4}),{gain:1}),
+  D('Snare',12,g16({8:.95}),{gain:.85}),
+  D('Hats',13,g16({4:.4,12:.45,13:.3,14:.5,15:.35}),{gain:.45}),
+  D('Click',17,g16({6:.4}),{gain:.45}),
+]);
+style('Eight Oh Eight','Trap · 140',140,12,'Trap: syncopated kicks, snare on the three, hat rolls into the turn.',[
+  D('Kick',11,g16({0:1,7:.75,10:.9}),{gain:1}),
+  D('Snare',12,g16({8:.95}),{gain:.85}),
+  D('Hats',13,g16({0:.6,2:.4,4:.6,6:.4,8:.6,10:.4,12:.7,13:.5,14:.8,15:.6}),{gain:.5}),
+  D('Click',17,g16({3:.45,11:.5}),{gain:.45}),
+]);
+style('Wobble Room','Dubstep · 140',140,13,'Dubstep skeleton: kick on the one, snare on the three, cavernous gaps.',[
+  D('Kick',11,g16({0:1,13:.4}),{gain:1.05}),
+  D('Snare',12,g16({8:1}),{gain:.9}),
+  D('Hats',13,g16({2:.4,6:.45,10:.4,14:.45}),{gain:.45}),
+  D('Click',17,g16({5:.4,11:.35}),{gain:.45}),
+  CR([1,9],{gain:.4}),
+]);
 
-/* ---- candidate 4 · ARCADE ELECTRO ---- */
-song({
-  insc:4, name:'Arcade Epoch', genre:'Electro · 128', creator:'jimdotbtc', parents:[], license:'open',
-  kind:'remix', tempo:128, seed:88, key:'A minor', lenBars:64, date:'2026-07-21',
-  desc:'Candidate 4 — chip electro. Busy OB1 drums under square-wave cascades from the Bit Engine, the OB1 Synth Bass as the low end, acid in the second drop, cowbell everywhere it should be.',
-  channels:[
-    sCh('Kick',11,{mode:'grid',grid:'kick4',swaps:{17:'kickElec',33:'kick4',41:'kickElec'},fx:[],gain:1.0,arr:[[9,56],[57,60]]}),
-    sCh('Snare',12,{mode:'grid',grid:'snareBack',swaps:{41:'snareElec'},fx:[],gain:0.75,arr:[[17,32],[41,56]]}),
-    sCh('Clap',14,{mode:'grid',grid:'clap',fx:[1601],gain:0.6,arr:[[13,32],[41,56]]}),
-    sCh('Hats',13,{mode:'grid',grid:'hatOff',swaps:{17:'hatElec'},fx:[],gain:0.5,arr:[[5,60]]}),
-    sCh('Click Perc',17,{mode:'grid',grid:'click',fx:[],gain:0.5,arr:[[17,32],[41,56]]}),
-    sCh('Cowbell',20,{mode:'grid',grid:'cowbell',fx:[],gain:0.4,arr:[[17,32],[41,56]]}),
-    sCh('Crash',15,{mode:'hits',hits:[{bar:9},{bar:17},{bar:33,gain:.6},{bar:41},{bar:57,gain:.6}],fx:[],gain:0.55,arr:[[9,57]]}),
-    sCh('Scratch FX',18,{mode:'hits',hits:[{bar:16,beat:3},{bar:32,beat:3,rate:1.3},{bar:40,beat:3.5},{bar:56,beat:3,rate:1.3}],fx:[],gain:0.65,arr:[[16,56]]}),
-    sCh('OB1 Bass',16,{mode:'keys',midi:848,ref:45,fx:[],gain:0.9,arr:[[9,32],[41,56]]}),
-    sCh('Glock Motif',19,{mode:'keys',midi:846,ref:81,fx:[1502],gain:0.55,arr:[[33,40],[57,64]]}),
-    sCh('Audional Tag',24,{mode:'hits',hits:[{bar:17},{bar:33,rate:1.19,gain:.7},{bar:41},{bar:49,rate:1.33,gain:.6}],fx:[1518],gain:0.85,arr:[[17,64]]}),
-    yCh('Chip Cascade',835,1410,1421,[1518],0.5,[[17,32],[41,64]]),
-    yCh('Chip Hook',847,1410,1421,[1518],0.55,[[41,56]]),
-    yCh('Acid',832,1201,932,[1518],0.5,[[49,56]]),
-    yCh('Stabs',822,407,923,[1601,1518],0.35,[[17,32],[41,56]]),
-    yCh('Pads',820,407,922,[1502],0.7,[[1,16],[33,40],[57,64]]),
-    yCh('Bells',840,1307,941,[1601,1502],0.35,[[9,16],[33,40]]),
-  ],
-});
+/* ---------------- CHILL ---------------- */
+style('Dusty Crates','Boom Bap · 92',92,14,'Boom bap: lazy kick pickup, cracking backbeat, swung 8th hats.',[
+  D('Kick',11,g16({0:1,7:.55,10:.85}),{gain:.95}),
+  D('Snare',12,g16({4:.9,12:.9}),{gain:.8}),
+  D('Hats',13,g16({0:.55,2:.4,4:.55,6:.4,8:.55,10:.4,12:.55,14:.45}),{gain:.5}),
+]);
+style('Smoked Glass','Trip-Hop · 78',78,15,'Trip-hop: dragged halftime, snare slightly under pitch, barely-there hats.',[
+  D('Kick',11,g16({0:.95,9:.7}),{gain:.9}),
+  D('Snare',12,g16({8:.9}),{gain:.8,rate:.92}),
+  D('Hats',13,g16({0:.4,4:.3,8:.4,12:.3,14:.25}),{gain:.4}),
+  D('Click',17,g16({6:.3,15:.3}),{gain:.4}),
+]);
+style('Tape Hiss','Lo-Fi · 70',70,16,'Lo-fi chill: soft thump, brushy snare, offbeat hats under the noise floor.',[
+  D('Kick',11,g16({0:.9,7:.5}),{gain:.85}),
+  D('Snare',12,g16({8:.7}),{gain:.7,rate:.95}),
+  D('Hats',13,g16({2:.35,6:.35,10:.35,14:.35}),{gain:.4}),
+  D('Click',17,g16({15:.3}),{gain:.35}),
+]);
+style('Lounge Orbit','Downtempo · 96',96,17,'Downtempo: kick and soft clap conversation, hats only on 2 & 4.',[
+  D('Kick',11,g16({0:.95,10:.6}),{gain:.9}),
+  D('Clap',14,g16({8:.6}),{gain:.55}),
+  D('Hats',13,g16({4:.45,12:.45}),{gain:.45}),
+  D('Click',17,g16({6:.4,14:.4}),{gain:.4}),
+]);
 
-/* ---- candidate 5 · AMBIENT BREAKS ---- */
-song({
-  insc:5, name:'Ordinal Drift', genre:'Ambient · 96', creator:'jimdotbtc', parents:[], license:'open',
-  kind:'remix', tempo:96, seed:44, key:'A minor', lenBars:64, date:'2026-07-21',
-  desc:'Candidate 5 — ambient breaks. Two-bar chord tides, grain weather, choir formants and glockenspiel rain over a soft half-time kit; the moon landing is the centrepiece, not an ornament.',
-  channels:[
-    sCh('Kick',11,{mode:'grid',grid:'kickAmb',fx:[1220],gain:0.8,arr:[[17,32],[41,56]]}),
-    sCh('Snare',12,{mode:'grid',grid:'snareAmb',fx:[1502],gain:0.6,arr:[[17,32],[41,56]]}),
-    sCh('Hats',13,{mode:'grid',grid:'hatAmb',fx:[],gain:0.4,arr:[[13,56]]}),
-    sCh('Click Perc',17,{mode:'grid',grid:'clickDub',fx:[1518,1503],gain:0.45,arr:[[25,56]]}),
-    sCh('Crash',15,{mode:'hits',hits:[{bar:17,rate:.7,gain:.4},{bar:41,rate:.7,gain:.45}],fx:[1503],gain:0.5,arr:[[17,41]]}),
-    sCh('Glock Rain',19,{mode:'keys',midi:838,ref:81,fx:[1518,1503],gain:0.6,arr:[[9,40],[49,64]]}),
-    sCh('Melo Ghost',22,{mode:'loop',every:4,rate:0.5,fx:[1220,1503],gain:0.5,arr:[[33,40]]}),
-    sCh('Moon Landing',23,{mode:'hits',hits:[{bar:18},{bar:42,rate:.9,gain:.7}],fx:[1503],gain:0.95,arr:[[17,48]]}),
-    sCh('Audional Whisper',24,{mode:'hits',hits:[{bar:57,rate:.5,gain:.6},{bar:61,rate:.4,gain:.5}],fx:[1518,1503],gain:0.7,arr:[[57,64]]}),
-    yCh('Sub Bass',833,1201,931,[],0.8,[[17,32],[41,56]]),
-    yCh('Tide Pads',837,407,922,[1503],0.9,[[1,64]]),
-    yCh('Bells',840,1307,941,[1518,1503],0.35,[[25,40],[49,56]]),
-    yCh('Voice',845,1350,955,[1503],0.7,[[17,32],[41,56]]),
-    yCh('Texture',843,409,942,[1503],0.55,[[1,16],[33,40],[57,64]]),
-  ],
-});
+/* ---------------- REGGAE / CARIBBEAN ---------------- */
+style('One Drop','Reggae · 74',74,18,'One drop: nothing on the one — kick and rim land together on the three.',[
+  D('Kick',11,g16({8:1}),{gain:.95}),
+  D('Rim',17,g16({8:.8}),{gain:.6}),
+  D('Hats',13,g16({0:.4,2:.55,4:.4,6:.55,8:.4,10:.55,12:.4,14:.6}),{gain:.5}),
+  D('Skank',14,g16({4:.35,12:.35}),{gain:.4}),
+]);
+style('Steppers','Reggae · 78',78,19,'Steppers: four-to-the-floor reggae march, rim answering on the three.',[
+  D('Kick',11,g16({0:.95,4:.95,8:.95,12:.95}),{gain:.95}),
+  D('Rim',17,g16({8:.75}),{gain:.6}),
+  D('Hats',13,g16({2:.55,6:.55,10:.55,14:.6}),{gain:.5}),
+]);
+style('Rockers','Reggae · 76',76,20,'Rockers: the one AND the three, militant but relaxed.',[
+  D('Kick',11,g16({0:.95,8:.95}),{gain:.95}),
+  D('Rim',17,g16({8:.7,3:.35}),{gain:.6}),
+  D('Hats',13,g16({0:.5,2:.55,4:.5,6:.55,8:.5,10:.55,12:.5,14:.6}),{gain:.5}),
+]);
+style('Yard Riddim','Dancehall · 100',100,21,'Dancehall: boom on the one, snares riding the 3-e and the and-of-4.',[
+  D('Kick',11,g16({0:1,8:.9}),{gain:1}),
+  D('Snare',12,g16({5:.85,13:.85}),{gain:.8}),
+  D('Hats',13,g16({2:.5,6:.5,10:.5,14:.5}),{gain:.45}),
+  D('Click',17,g16({11:.45}),{gain:.45}),
+]);
+style('Dembow','Reggaeton · 95',95,22,'Dembow: four-floor kick with the boom-ch-boom-chick snare cell.',[
+  D('Kick',11,g16({0:1,4:.95,8:1,12:.95}),{gain:.95}),
+  D('Snare',12,g16({3:.85,6:.8,11:.85,14:.8}),{gain:.75}),
+  D('Hats',13,g16({2:.4,6:.4,10:.4,14:.4}),{gain:.4}),
+]);
+style('King Tubby','Dub · 70',70,23,'Dub: rockers pulse with the rim shot living inside a tempo-synced delay.',[
+  D('Kick',11,g16({0:.95,10:.85}),{gain:.95}),
+  D('Rim',17,g16({4:.7,12:.75}),{fx:[1518],gain:.6}),
+  D('Hats',13,g16({2:.4,6:.5,10:.4,14:.5}),{gain:.45}),
+  sCh('Scratch Echo',18,{mode:'hits',hits:[{bar:8,beat:2,rate:.7},{bar:16,beat:2,rate:.6}],fx:[1518],gain:.5,arr:[[1,16]]}),
+]);
+
+/* ---------------- WORLD ---------------- */
+style('Lagos Traffic','Afrobeat · 110',110,24,'Afrobeat: broken kick, clave bell on the cowbell, chattering rim.',[
+  D('Kick',11,g16({0:1,6:.8,10:.85}),{gain:.95}),
+  D('Rim',17,g16({2:.55,5:.5,8:.55,11:.5,14:.55}),{gain:.55}),
+  D('Bell',20,g16({0:.5,3:.45,7:.5,10:.45,12:.5}),{gain:.45}),
+  D('Hats',13,g16({0:.4,2:.45,4:.4,6:.45,8:.4,10:.45,12:.4,14:.5}),{gain:.45}),
+]);
+style('Log Drum','Amapiano · 112',112,25,'Amapiano: sparse kick, pitched-down kick as the log drum, wide shaker.',[
+  D('Kick',11,g16({0:.9,11:.6}),{gain:.9}),
+  D('Log Drum',11,g16({3:.9,8:.8,14:.85}),{gain:.95,rate:.55}),
+  D('Shaker',13,g16({0:.3,1:.2,2:.35,3:.2,4:.3,5:.2,6:.35,7:.2,8:.3,9:.2,10:.35,11:.2,12:.3,13:.2,14:.35,15:.25}),{gain:.45}),
+  D('Rim',17,g16({4:.5,12:.5}),{gain:.5}),
+]);
+style('Sambadrome','Samba · 104',104,26,'Samba batucada: surdo on 2 & 4, tamborim clave, agogo from the cowbell.',[
+  D('Surdo',11,g16({4:1,12:1}),{gain:1}),
+  D('Surdo Hi',11,g16({0:.5,8:.5}),{gain:.7,rate:1.4}),
+  D('Tamborim',17,g16({0:.55,2:.4,3:.5,5:.4,8:.55,10:.4,11:.5,13:.45}),{gain:.5}),
+  D('Shaker',13,g16({0:.3,1:.25,2:.35,3:.25,4:.3,5:.25,6:.35,7:.25,8:.3,9:.25,10:.35,11:.25,12:.3,13:.25,14:.35,15:.3}),{gain:.4}),
+  D('Agogo',20,g16({0:.45,3:.4,6:.45,9:.4,12:.45}),{gain:.4}),
+]);
+style('Ipanema Walk','Bossa · 132',132,27,'Bossa: soft surdo pulse, the 3-2 clave split across alternating bars.',[
+  D('Kick',11,g16({0:.8,3:.45,8:.8,11:.45}),{gain:.8}),
+  D('Clave',17,g16({0:.6,3:.55,6:.6}),{gain:.55,gridB:g16({2:.55,8:.6,12:.5})}),
+  D('Hats',13,g16({0:.3,2:.35,4:.3,6:.35,8:.3,10:.35,12:.3,14:.35}),{gain:.4}),
+]);
+style('Rio Grande','Cumbia · 90',90,28,'Cumbia: kick on the one and three, guiro scrape from the click, bell on 2 & 4.',[
+  D('Kick',11,g16({0:.95,8:.95}),{gain:.9}),
+  D('Guiro',17,g16({2:.5,4:.6,6:.5,10:.5,12:.6,14:.5}),{gain:.55}),
+  D('Bell',20,g16({4:.5,12:.5}),{gain:.45}),
+  D('Hats',13,g16({0:.35,2:.4,4:.35,6:.4,8:.35,10:.4,12:.35,14:.4}),{gain:.4}),
+]);
 
 let SONG=SONGS[0];
 const inArr=(chn,bar)=>chn.arr.some(([a,b])=>bar>=a&&bar<=b);
@@ -824,9 +882,11 @@ function sessionEvents(song){
         });
       } else if(chn.mode==='grid'){
         let gname=chn.grid;
+        if(chn.gridB&&(bar-1)%2===1) gname=chn.gridB;
         if(chn.swaps) for(const [swBar,swG] of Object.entries(chn.swaps)) if(bar>=+swBar) gname=swG;
-        GRIDS[gname].forEach((v,s)=>{ if(v>0){
-          evs.push({beat:b0+s*0.25,jit:(r()*2-1)*0.003,chid:chn.chid,kind:'smpHit',vel:v*(0.92+r()*0.08)});
+        const garr=typeof gname==='string'?GRIDS[gname]:gname;
+        garr.forEach((v,s)=>{ if(v>0){
+          evs.push({beat:b0+s*0.25,jit:(r()*2-1)*0.003,chid:chn.chid,kind:'smpHit',rate:chn.rate||1,vel:v*(0.92+r()*0.08)*(chn.gain!=null?1:1)});
         }});
       } else if(chn.mode==='loop'){
         if((bar-chn.arr.find(([a,b])=>bar>=a&&bar<=b)[0])%chn.every===0)
@@ -1040,12 +1100,14 @@ function audition(id,btn){
 /* ----- arrangement strip + tree node ----- */
 function renderArrange(){
   const el=$('#arrange');
+  const LB=SONG.lenBars;
   el.innerHTML=SONG.channels.map(c=>{
     const cells=[];
-    for(let bar=1;bar<=64;bar++)
+    for(let bar=1;bar<=LB;bar++)
       cells.push(`<div class="arr-c ${inArr(c,bar)||c.mode==='hits'&&c.hits.some(h=>h.bar===bar)?'on':''} ${c.type==='synth'?'syn':''}" data-bar="${bar}"></div>`);
-    return `<div class="arr-row"><div class="arr-name">${c.name}</div><div class="arr-cells">${cells.join('')}</div></div>`;
+    return `<div class="arr-row"><div class="arr-name">${c.name}</div><div class="arr-cells" style="grid-template-columns:repeat(${LB},1fr)">${cells.join('')}</div></div>`;
   }).join('');
+  $('#arrtitle').textContent=`Arrangement — ${LB} bars`;
 }
 function renderTreeNode(){
   const svg=$('#treesvg'), w=svg.clientWidth||600;
@@ -1164,7 +1226,7 @@ function selectSong(i){
   SONG=SONGS[i];
   $('#nowtitle').textContent=SONG.name;
   $('#nowsub').textContent=`inscription #${SONG.insc} · candidate ${i+1}/${SONGS.length} · ${SONG.genre}`;
-  $('#bpmval').textContent=SONG.tempo;
+  $('#bpmval').textContent=SONG.tempo; $('#barsval').textContent=SONG.lenBars;
   $('#ws-tempo').textContent=SONG.tempo; $('#ws-seed').textContent=SONG.seed; $('#ws-key').textContent=SONG.key;
   $('#playpos').textContent='1.1';
   renderArrange(); renderTreeNode(); renderChannels(); renderInspector();
