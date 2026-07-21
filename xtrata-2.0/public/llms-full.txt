@@ -14,6 +14,7 @@ Key facts:
 - Chunk size 16,384 bytes; app/SDK upload ceiling 30 chunks/tx (ABI accepts 50); max 2,048 chunks / 32 MiB per inscription
 - Active collection-mint target: xtrata-collection-mint-v1.4
 - App: https://xtrata.xyz (Inscription Wizard at /create-wizard, market at /market)
+- Install: npm install @xtrata/sdk @xtrata/reconstruction (published on npm, MIT)
 
 ---
 
@@ -1841,6 +1842,9 @@ points, multi-asset payment plans) are tracked in
 `docs/plans/SDK-COMPLETION-AND-LLMS-DOCS-PLAN.md`; SDK-level sponsor/payment
 modules land in 0.2.0.
 
+Both packages are published on npm as of 2026-07-21:
+`npm install @xtrata/sdk @xtrata/reconstruction` (0.2.0, MIT).
+
 The SDK is now implemented through release automation. The primary focus is stable usage, release discipline, and incremental improvements for third-party builders.
 
 Current production upload policy: app and SDK mint planners use a hard
@@ -3242,7 +3246,7 @@ This is enough for another client to repeat the reconstruction independently.
 
 <!-- ===== SOURCE: packages/xtrata-sdk/README.md ===== -->
 
-# @xtrata/sdk (workspace)
+# @xtrata/sdk
 
 SDK package for protocol-first integrations:
 - Core contract helpers (config/network/client)
@@ -3272,6 +3276,10 @@ Mint workflow planners cap first-party upload calls at 30 chunks per
 contract ABI constant of 50 for protocol fee math and list compatibility.
 
 Quick start:
+
+```sh
+npm install @xtrata/sdk
+```
 
 ```ts
 import { createXtrataReadClient } from '@xtrata/sdk/simple';

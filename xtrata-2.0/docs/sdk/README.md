@@ -9,6 +9,9 @@ points, multi-asset payment plans) are tracked in
 `docs/plans/SDK-COMPLETION-AND-LLMS-DOCS-PLAN.md`; SDK-level sponsor/payment
 modules land in 0.2.0.
 
+Both packages are published on npm as of 2026-07-21:
+`npm install @xtrata/sdk @xtrata/reconstruction` (0.2.0, MIT).
+
 The SDK is now implemented through release automation. The primary focus is stable usage, release discipline, and incremental improvements for third-party builders.
 
 Current production upload policy: app and SDK mint planners use a hard

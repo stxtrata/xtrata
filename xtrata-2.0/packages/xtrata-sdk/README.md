@@ -1,4 +1,4 @@
-# @xtrata/sdk (workspace)
+# @xtrata/sdk
 
 SDK package for protocol-first integrations:
 - Core contract helpers (config/network/client)
@@ -28,6 +28,10 @@ Mint workflow planners cap first-party upload calls at 30 chunks per
 contract ABI constant of 50 for protocol fee math and list compatibility.
 
 Quick start:
+
+```sh
+npm install @xtrata/sdk
+```
 
 ```ts
 import { createXtrataReadClient } from '@xtrata/sdk/simple';

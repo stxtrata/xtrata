@@ -14,6 +14,7 @@ Key facts:
 - Chunk size 16,384 bytes; app/SDK upload ceiling 30 chunks/tx (ABI accepts 50); max 2,048 chunks / 32 MiB per inscription
 - Active collection-mint target: xtrata-collection-mint-v1.4
 - App: https://xtrata.xyz (Inscription Wizard at /create-wizard, market at /market)
+- Install: npm install @xtrata/sdk @xtrata/reconstruction (published on npm, MIT)
 
 ## Agent skills (start here for AI agents)
 
