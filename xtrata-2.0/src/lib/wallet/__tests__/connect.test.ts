@@ -16,16 +16,28 @@ import {
   stringAsciiCV,
   uintCV
 } from '@stacks/transactions';
-import { __testing, isLeatherProviderId, isXverseProviderId, showContractCall } from '../connect';
+import {
+  __testing,
+  isLeatherProviderId,
+  isXverseProviderId,
+  showContractCall,
+  showStxTransfer
+} from '../connect';
 
 const ADDRESS = 'SP2MF04VAGYHGAZWGTEDW5VYCPDWWSY08Z1QFNDSN';
 
 describe('wallet connect helpers', () => {
   afterEach(() => {
+    __testing.clearXverseAccountCache();
     window.localStorage.clear();
     delete (window as typeof window & { LeatherProvider?: unknown }).LeatherProvider;
     delete (window as typeof window & { XverseProviders?: unknown }).XverseProviders;
     delete (window as typeof window & { xverseProviders?: unknown }).xverseProviders;
+    delete (window as typeof window & { BitcoinProvider?: unknown }).BitcoinProvider;
+    delete (window as typeof window & { StacksProvider?: unknown }).StacksProvider;
+    delete (window as typeof window & { webbtc_stx_providers?: unknown }).webbtc_stx_providers;
+    delete (window as typeof window & { webbtc_providers?: unknown }).webbtc_providers;
+    delete (window as typeof window & { btc_providers?: unknown }).btc_providers;
   });
 
   it('detects Leather provider ids', () => {
@@ -177,6 +189,32 @@ describe('wallet connect helpers', () => {
     expect(window.localStorage.getItem('STX_PROVIDER')).toBe('LeatherProvider');
   });
 
+  it('recovers Xverse when connect-ui persists its legacy id but returns no iframe provider', () => {
+    const rpcProvider = { request: vi.fn() };
+    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
+    (
+      window as typeof window & {
+        XverseProviders?: { BitcoinProvider: unknown };
+      }
+    ).XverseProviders = { BitcoinProvider: rpcProvider };
+
+    expect(__testing.resolveProviderSelection(undefined)).toBe(rpcProvider);
+    expect(__testing.resolveProviderById('XverseProviders.StacksProvider')).toBe(rpcProvider);
+  });
+
+  it('resolves a current Xverse WBIP registry entry from its host provider id', () => {
+    const rpcProvider = { request: vi.fn() };
+    (window as typeof window & { BitcoinProvider?: unknown }).BitcoinProvider = rpcProvider;
+    (
+      window as typeof window & {
+        btc_providers?: Array<{ id: string; name: string }>;
+      }
+    ).btc_providers = [{ id: 'BitcoinProvider', name: 'Xverse Wallet' }];
+    window.localStorage.setItem('STX_PROVIDER', 'BitcoinProvider');
+
+    expect(__testing.resolveProviderSelection(undefined)).toBe(rpcProvider);
+  });
+
   it('extracts the public key belonging to the connected Stacks address', () => {
     const publicKey = `02${'ab'.repeat(32)}`;
     expect(
@@ -255,6 +293,11 @@ describe('wallet connect helpers', () => {
     const legacyProvider = { request: vi.fn() };
     const rpcProvider = {
       request: vi.fn(async (method: string) => {
+        // Stale per-origin permission is dropped first so Xverse re-shows its
+        // account chooser on every connect.
+        if (method === 'wallet_disconnect') {
+          return { status: 'success', result: null };
+        }
         expect(method).toBe('wallet_connect');
         return { status: 'success', result: { addresses: [{ address, publicKey }] } };
       })
@@ -276,26 +319,35 @@ describe('wallet connect helpers', () => {
       network: 'mainnet'
     });
     expect(legacyProvider.request).not.toHaveBeenCalled();
-    expect(rpcProvider.request).toHaveBeenCalledOnce();
+    expect(rpcProvider.request.mock.calls.map(([method]) => method)).toEqual([
+      'wallet_disconnect',
+      'wallet_connect'
+    ]);
   });
 
-  it('routes Xverse STX payments through BitcoinProvider without touching legacy auth', async () => {
+  it('routes Xverse STX payments through the selected StacksProvider', async () => {
     const legacyProvider = {
-      request: vi.fn(async () => {
-        throw new Error('legacy StacksProvider must not be used for Xverse payment');
-      })
-    };
-    const rpcProvider = {
       request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
         expect(method).toBe('stx_transferStx');
-        expect(params).toMatchObject({
+        // This is the exact request shape used by the working
+        // main-staging-sol wizard. In particular, the selected address and
+        // mainnet are carried to the provider that opens the payment popup.
+        expect(params).toEqual({
           recipient: ADDRESS,
           amount: '2550000',
           memo: 'Xtrata Agent One',
           network: 'mainnet',
-          address: ADDRESS
+          address: ADDRESS,
+          fee: undefined,
+          nonce: undefined,
+          sponsored: false
         });
         return { status: 'success', result: { txid: '0xabc123' } };
+      })
+    };
+    const rpcProvider = {
+      request: vi.fn(async () => {
+        throw new Error('BitcoinProvider must not receive the Xverse STX payment');
       })
     };
     window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
@@ -318,8 +370,128 @@ describe('wallet connect helpers', () => {
       })
     ).resolves.toMatchObject({ txId: '0xabc123' });
 
-    expect(legacyProvider.request).not.toHaveBeenCalled();
-    expect(rpcProvider.request).toHaveBeenCalledOnce();
+    expect(legacyProvider.request).toHaveBeenCalledOnce();
+    expect(rpcProvider.request).not.toHaveBeenCalled();
+  });
+
+  it('finds the embedded Xverse transaction bridge behind the generic StacksProvider stub', () => {
+    const transactionRequest = vi.fn();
+    const stubProvider = {
+      request: vi.fn(async () => {
+        throw new Error('`request` function is not implemented');
+      }),
+      transactionRequest
+    };
+    const rpcProvider = { request: vi.fn() };
+    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
+    (
+      window as typeof window & {
+        XverseProviders?: { BitcoinProvider: unknown };
+        StacksProvider?: unknown;
+      }
+    ).XverseProviders = { BitcoinProvider: rpcProvider };
+    (window as typeof window & { StacksProvider?: unknown }).StacksProvider = stubProvider;
+
+    expect(__testing.resolveProviderSelection(undefined)).toBe(rpcProvider);
+    expect(__testing.getLegacyXverseTransactionProvider()).toBe(stubProvider);
+  });
+
+  it('routes an embedded Xverse payment through transactionRequest instead of its request stub', async () => {
+    const transactionRequest = vi.fn(async () => {
+      throw Object.assign(new Error('test cancellation'), { code: 4001 });
+    });
+    const stubProvider = {
+      request: vi.fn(async () => {
+        throw new Error('`request` function is not implemented');
+      }),
+      transactionRequest
+    };
+    const rpcProvider = { request: vi.fn() };
+    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
+    (
+      window as typeof window & {
+        XverseProviders?: { BitcoinProvider: unknown };
+        StacksProvider?: unknown;
+      }
+    ).XverseProviders = { BitcoinProvider: rpcProvider };
+    (window as typeof window & { StacksProvider?: unknown }).StacksProvider = stubProvider;
+
+    showStxTransfer({
+      recipient: ADDRESS,
+      amount: '2550000',
+      memo: 'Xtrata Agent One',
+      network: 'mainnet',
+      stxAddress: ADDRESS
+    });
+
+    await vi.waitFor(() => expect(transactionRequest).toHaveBeenCalledOnce());
+    expect(stubProvider.request).not.toHaveBeenCalled();
+    expect(rpcProvider.request).not.toHaveBeenCalled();
+  });
+
+  it('uses minimal Sats Connect params when only Xverse BitcoinProvider is available', async () => {
+    const seenMethods: string[] = [];
+    const rpcProvider = {
+      request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
+        seenMethods.push(method);
+        expect(method).toBe('stx_transferStx');
+        expect(params).toEqual({
+          recipient: ADDRESS,
+          amount: '2550000',
+          memo: 'Xtrata Agent One'
+        });
+        return { status: 'success', result: { txid: '0xmodern' } };
+      })
+    };
+    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
+    (
+      window as typeof window & {
+        XverseProviders?: { BitcoinProvider: unknown };
+      }
+    ).XverseProviders = { BitcoinProvider: rpcProvider };
+    __testing.rememberXverseAccount(ADDRESS);
+
+    await expect(
+      __testing.requestStxTransfer(rpcProvider as never, {
+        recipient: ADDRESS,
+        amount: '2550000',
+        memo: 'Xtrata Agent One',
+        network: 'mainnet',
+        stxAddress: ADDRESS
+      })
+    ).resolves.toMatchObject({ txId: '0xmodern' });
+    expect(seenMethods).toEqual(['stx_transferStx']);
+  });
+
+  it('surfaces an Xverse STX payment rejection without rerouting or retrying it', async () => {
+    const legacyProvider = {
+      request: vi.fn(async () => {
+        throw Object.assign(new Error('User rejected the Stacks transaction signing request'), {
+          code: 4001
+        });
+      })
+    };
+    const rpcProvider = { request: vi.fn() };
+    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
+    (
+      window as typeof window & {
+        XverseProviders?: { StacksProvider: unknown; BitcoinProvider: unknown };
+      }
+    ).XverseProviders = {
+      StacksProvider: legacyProvider,
+      BitcoinProvider: rpcProvider
+    };
+
+    await expect(
+      __testing.requestStxTransfer(legacyProvider as never, {
+        recipient: ADDRESS,
+        amount: '1000000',
+        network: 'mainnet',
+        stxAddress: ADDRESS
+      })
+    ).rejects.toThrow(/User rejected/);
+    expect(legacyProvider.request).toHaveBeenCalledOnce();
+    expect(rpcProvider.request).not.toHaveBeenCalled();
   });
 
   const scoreSubmitOptions = () => ({
@@ -394,6 +566,71 @@ describe('wallet connect helpers', () => {
     expect(seenMethods).toEqual(['wallet_getAccount', 'stx_callContract']);
   });
 
+  it('recovers a BitcoinProvider contract call from a stale-session network mismatch once', async () => {
+    const scoreTxId = `0x${'ef'.repeat(32)}`;
+    const legacyProvider = { request: vi.fn() };
+    const seenMethods: string[] = [];
+    let callAttempts = 0;
+    const rpcProvider = {
+      request: vi.fn(async (method: string) => {
+        seenMethods.push(method);
+        if (method === 'wallet_getAccount') {
+          return { status: 'success', result: { addresses: [{ address: ADDRESS }] } };
+        }
+        if (method === 'wallet_disconnect') {
+          return { status: 'success', result: null };
+        }
+        if (method === 'wallet_connect') {
+          return { status: 'success', result: { addresses: [{ address: ADDRESS }] } };
+        }
+        expect(method).toBe('stx_callContract');
+        callAttempts += 1;
+        if (callAttempts === 1) {
+          throw new Error('Network mismatch.');
+        }
+        return { status: 'success', result: { txid: scoreTxId } };
+      })
+    };
+    installXverseProviders(legacyProvider, rpcProvider);
+
+    await expect(
+      __testing.requestWalletContractCall(legacyProvider as never, scoreSubmitOptions())
+    ).resolves.toMatchObject({ txId: scoreTxId });
+
+    expect(seenMethods).toEqual([
+      'wallet_getAccount',
+      'stx_callContract',
+      'wallet_disconnect',
+      'wallet_connect',
+      'stx_callContract'
+    ]);
+    expect(legacyProvider.request).not.toHaveBeenCalled();
+  });
+
+  it('does not retry a genuine Xverse contract-call rejection', async () => {
+    const legacyProvider = { request: vi.fn() };
+    const seenMethods: string[] = [];
+    const rpcProvider = {
+      request: vi.fn(async (method: string) => {
+        seenMethods.push(method);
+        if (method === 'wallet_getAccount') {
+          return { status: 'success', result: { addresses: [{ address: ADDRESS }] } };
+        }
+        throw Object.assign(new Error('User rejected the Stacks transaction signing request'), {
+          code: 4001
+        });
+      })
+    };
+    installXverseProviders(legacyProvider, rpcProvider);
+
+    await expect(
+      __testing.requestWalletContractCall(legacyProvider as never, scoreSubmitOptions())
+    ).rejects.toThrow(/User rejected/);
+
+    expect(seenMethods).toEqual(['wallet_getAccount', 'stx_callContract']);
+    expect(legacyProvider.request).not.toHaveBeenCalled();
+  });
+
   it('re-runs wallet_connect on the same Xverse provider when the session has no readable account', async () => {
     const scoreTxId = `0x${'cd'.repeat(32)}`;
     const legacyProvider = { request: vi.fn() };
@@ -427,12 +664,9 @@ describe('wallet connect helpers', () => {
       __testing.requestWalletContractCall(legacyProvider as never, scoreSubmitOptions())
     ).resolves.toMatchObject({ txId: scoreTxId });
 
-    expect(seenMethods).toEqual([
-      'wallet_getAccount',
-      'stx_getAccounts',
-      'wallet_connect',
-      'stx_callContract'
-    ]);
+    // stx_getAccounts must NEVER appear here — on current Xverse it opens a
+    // "Mismatched Network" prompt that gets rejected ("Network mismatch").
+    expect(seenMethods).toEqual(['wallet_getAccount', 'wallet_connect', 'stx_callContract']);
     expect(legacyProvider.request).not.toHaveBeenCalled();
   });
 

@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 // Generalised mainnet deploy helper (successor to mainnet-v3.2.3-deploy.mjs).
 //
-// Deploys a registered contract from contracts/live/ with ClarityVersion
-// pinned to Clarity 3 (wallet popup flows publish at the network's latest
-// Clarity version, where `as-contract` no longer resolves — see the v3.2.3
-// script header for the history).
+// Deploys a registered contract from contracts/live/ with its registry-pinned
+// Clarity version. Older contracts remain on Clarity 3; newer sponsored-market
+// and Drops contracts publish as Clarity 4.
 //
 // Every deploy runs a PREFLIGHT over the live source first:
 //   - no `.mock-` principals (local clarinet stand-ins)
@@ -85,6 +84,13 @@ const DEPLOYABLE = {
     sponsoredMarket: true,
     clarityVersion: 4,
     notes: 'Sponsored free-claim drops: creators escrow NFT + fee budget, claimers need zero STX.'
+  },
+  'xtrata-drops-v1-1': {
+    source: 'contracts/live/xtrata-drops-v1.1.clar',
+    sponsoredMarket: true,
+    dropsV11: true,
+    clarityVersion: 4,
+    notes: 'Campaign-aware sponsored drops with immutable wallet and BNS claim policy.'
   }
 };
 
@@ -174,6 +180,15 @@ const printSponsoredGoLive = (name) => {
   console.log('  5. Smoke: list with a small deposit, sponsored buy from an STX-empty wallet, verify claim-fee + settle-refund on the explorer.');
 };
 
+const printDropsV11GoLive = (name) => {
+  console.log('\nDrops v1.1 go-live checklist (after the deploy confirms):');
+  console.log(`  1. Call ${EXPECTED_DEPLOYER}.${name} set-sponsor with the relayer hot-wallet principal.`);
+  console.log('  2. Call set-bns-attestor-pubkey-hash with (some 0x<20-byte compressed-public-key hash160>).');
+  console.log('  3. Add the contract id to the sponsor-service and frontend allowlists.');
+  console.log('  4. Complete the testnet rehearsal in docs/drops-v1.1.md before public mainnet use.');
+  console.log('  5. Authorise the Wizard operator only after configuration is confirmed on-chain.');
+};
+
 const main = async () => {
   const args = process.argv.slice(2).filter((a) => a !== '--broadcast');
   const broadcast = process.argv.includes('--broadcast');
@@ -231,7 +246,8 @@ const main = async () => {
 
   if (!broadcast) {
     console.log('\nDry run complete. Re-run with --broadcast to publish.');
-    if (entry.sponsoredMarket) printSponsoredGoLive(name);
+    if (entry.dropsV11) printDropsV11GoLive(name);
+    else if (entry.sponsoredMarket) printSponsoredGoLive(name);
     return;
   }
 
@@ -244,7 +260,8 @@ const main = async () => {
   const txid = result.txid || result;
   console.log('\nBroadcast OK. txid:', txid);
   console.log(`Explorer: https://explorer.hiro.so/txid/0x${String(txid).replace(/^0x/, '')}?chain=mainnet`);
-  if (entry.sponsoredMarket) printSponsoredGoLive(name);
+  if (entry.dropsV11) printDropsV11GoLive(name);
+  else if (entry.sponsoredMarket) printSponsoredGoLive(name);
 };
 
 main().catch((error) => {

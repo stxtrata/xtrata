@@ -4,11 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#07090d" />
-  <meta name="description" content="Inscribe Your First Masterpiece — a 200 STX creative bounty presented by Xtrata and sponsored by Zero Authority DAO." />
-  <meta property="og:title" content="Inscribe Your First Masterpiece | Xtrata × Zero Authority DAO" />
-  <meta property="og:description" content="Create something original. Put it fully on-chain through Xtrata. Enter to win part of 200 STX." />
+  <meta name="description" content="Proof of Creation — create original work, preserve it through Xtrata, and enter a Zero Authority DAO bounty with five equal 60 STX awards." />
+  <meta property="og:title" content="Proof of Creation | Xtrata × Zero Authority DAO" />
+  <meta property="og:description" content="Proof of Creation invites you to create something original, inscribe it through Xtrata, share its story, and compete for one of five equal 60 STX awards." />
   <meta property="og:type" content="website" />
-  <title>Inscribe Your First Masterpiece | Xtrata × Zero Authority DAO</title>
+  <meta property="og:url" content="https://xtrata.xyz/proofzero/" />
+  <link rel="canonical" href="https://xtrata.xyz/proofzero/" />
+  <title>Proof of Creation | Xtrata × Zero Authority DAO</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
   <style>
@@ -267,6 +269,34 @@
     .process h3 { margin: 0 0 10px; font-size: clamp(25px,2.6vw,36px); letter-spacing: -.045em; line-height: 1; }
     .process p { margin: 0; color: var(--muted); font-size: 13px; }
 
+    .submission-map { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); align-items: stretch; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+    .submission-map article { position: relative; min-height: 180px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--panel); padding: 24px; }
+    .submission-map article:not(:last-child)::after { position: absolute; top: 50%; right: -12px; z-index: 2; display: grid; width: 24px; height: 24px; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: var(--bg); color: var(--acid); content: "→"; font-size: 12px; transform: translateY(-50%); }
+    .submission-map span { color: var(--acid); font: 850 9px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; text-transform: uppercase; }
+    .submission-map h3 { margin: 46px 0 8px; font-size: 24px; letter-spacing: -.035em; }
+    .submission-map p { margin: 0; color: var(--muted); font-size: 13px; }
+    .deliverable-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; margin-top: 12px; }
+    .deliverable { min-height: 220px; border: 1px solid rgba(255,255,255,.11); border-radius: 16px; background: radial-gradient(circle at 90% 0%, rgba(185,239,119,.12), transparent 38%), var(--dark-panel); padding: 25px; }
+    .deliverable-mark { display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid rgba(185,239,119,.36); border-radius: 50%; color: var(--acid); font: 850 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .deliverable h3 { margin: 48px 0 8px; font-size: 24px; letter-spacing: -.035em; }
+    .deliverable p { margin: 0; color: var(--muted); font-size: 13px; }
+    .requirements { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+    .requirement { min-height: 150px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--panel); padding: 22px; }
+    .requirement::before { display: grid; width: 25px; height: 25px; place-items: center; margin-bottom: 30px; border: 1px solid rgba(185,239,119,.44); border-radius: 50%; color: var(--acid); content: "✓"; font-size: 12px; }
+    .requirement strong { display: block; font-size: 14px; line-height: 1.25; }
+    .criterion ul { margin: 0; padding-left: 18px; color: rgba(247,250,252,.56); font-size: 13px; }
+    .criterion li + li { margin-top: 7px; }
+    .support-grid { display: grid; grid-template-columns: minmax(0,1.15fr) minmax(340px,.85fr); gap: 12px; }
+    .checklist-panel, .resource-panel { border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: var(--shadow); padding: clamp(26px,4vw,44px); }
+    .checklist-panel h3, .resource-panel h3 { margin: 10px 0 0; font-size: clamp(30px,4vw,48px); letter-spacing: -.05em; line-height: .95; }
+    .checklist { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin-top: 28px; }
+    .checklist-item { display: flex; align-items: flex-start; gap: 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 14px; color: var(--muted); font-size: 13px; }
+    .checklist-item::before { display: grid; width: 21px; height: 21px; flex: 0 0 21px; place-items: center; border: 1px solid rgba(185,239,119,.45); border-radius: 50%; color: var(--acid); content: "✓"; font-size: 10px; }
+    .resource-links { display: grid; gap: 9px; margin-top: 28px; }
+    .resource-link { display: flex; min-height: 58px; align-items: center; justify-content: space-between; gap: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 14px 16px; font-size: 13px; font-weight: 800; transition: border-color .18s ease, transform .18s ease; }
+    .resource-link:hover { border-color: var(--acid); color: var(--acid); transform: translateY(-1px); }
+    .resource-link span { color: var(--muted); font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .06em; text-transform: uppercase; }
+
     .file-step { display: grid; grid-template-columns: minmax(0,1fr) minmax(330px,.8fr); gap: clamp(26px,5vw,64px); align-items: center; overflow: hidden; border: 1px solid rgba(255,255,255,.11); border-radius: 22px; background: radial-gradient(circle at 10% 110%, rgba(108,73,255,.3), transparent 36%), var(--dark); color: #f7fafc; padding: clamp(30px,5vw,64px); }
     .file-step h2 { margin: 14px 0 0; font-size: clamp(40px,5vw,68px); letter-spacing: -.06em; line-height: .93; }
     .file-step p { max-width: 590px; color: rgba(247,250,252,.62); }
@@ -281,11 +311,9 @@
     .drop-ui input { display: none; }
     .drop-link { display: inline-block; margin-top: 13px; color: rgba(247,250,252,.58); font-size: 11px; text-decoration: underline; text-underline-offset: 3px; }
 
-    .prize-grid { display: grid; grid-template-columns: 1.45fr 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 12px; }
-    .prize-card { display: grid; min-height: 180px; align-content: space-between; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); box-shadow: var(--shadow); padding: 25px; }
-    .prize-card:first-child { grid-row: span 2; min-height: 372px; background: radial-gradient(circle at 85% 5%, rgba(185,239,119,.3), transparent 34%), var(--panel); }
+    .prize-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+    .prize-card { display: grid; min-height: 210px; align-content: space-between; border: 1px solid var(--line); border-radius: 16px; background: radial-gradient(circle at 90% 0%, rgba(185,239,119,.16), transparent 38%), var(--panel); box-shadow: var(--shadow); padding: 25px; }
     .amount { font-size: clamp(50px,7vw,84px); font-weight: 900; letter-spacing: -.07em; line-height: .8; }
-    .prize-card:first-child .amount { font-size: clamp(86px,13vw,160px); }
     .award { margin-top: 12px; font-size: 12px; font-weight: 850; }
     .prize-card p { margin: 28px 0 0; color: var(--muted); font-size: 12px; }
 
@@ -340,10 +368,13 @@
       .hero-copy { max-width: 780px; }
       .object-stage { width: min(100%,620px); margin: 0 auto; }
       .tile-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
-      .process { grid-template-columns: repeat(2,minmax(0,1fr)); }
+      .process, .submission-map { grid-template-columns: repeat(2,minmax(0,1fr)); }
+      .submission-map article:nth-child(2)::after { display: none; }
+      .deliverable-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+      .requirements { grid-template-columns: repeat(3,minmax(0,1fr)); }
+      .support-grid { grid-template-columns: 1fr; }
       .file-step { grid-template-columns: 1fr; }
       .prize-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
-      .prize-card:first-child { grid-column: span 2; grid-row: auto; min-height: 300px; }
     }
     @media (max-width: 720px) {
       .shell { width: min(var(--max),calc(100vw - 24px)); }
@@ -364,11 +395,11 @@
       .metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
       .manifesto { grid-template-columns: 1fr; }
       .manifesto blockquote { font-size: clamp(50px,15vw,78px); }
-      .tile-grid, .process, .criteria, .gallery { grid-template-columns: 1fr; }
+      .tile-grid, .process, .submission-map, .deliverable-grid, .requirements, .criteria, .gallery, .checklist { grid-template-columns: 1fr; }
+      .submission-map article::after { display: none !important; }
       .tile { min-height: 210px; }
       .process article { min-height: 230px; }
       .prize-grid { grid-template-columns: 1fr; }
-      .prize-card:first-child { grid-column: auto; }
       .final-cta { padding: 52px 20px; }
       .final-cta .btn { width: 100%; }
       .footer-grid { align-items: flex-start; flex-direction: column; }
@@ -384,7 +415,7 @@
 
 <body>
   <div class="announcement">
-    <div class="shell"><span class="pulse" aria-hidden="true"></span><strong>200 STX creative bounty</strong><span aria-hidden="true">·</span><span id="topDeadline">Deadline to be announced</span></div>
+    <div class="shell"><span class="pulse" aria-hidden="true"></span><strong>Proof of Creation · Xtrata creative campaign · 300 STX</strong><span aria-hidden="true">·</span><span id="topDeadline">Deadline to be announced</span></div>
   </div>
 
   <header class="site-header">
@@ -396,16 +427,18 @@
         </a>
         <div class="top-actions">
           <a class="btn secondary small" href="https://xtrata.xyz/xplorer">Explore Xtrata</a>
-          <a class="btn small" data-wizard-link href="https://xtrata.xyz/wizard/">Create yours</a>
+          <a class="btn small" data-create-link href="/inscribe">Create yours</a>
           <button class="menu-button" id="menuButton" type="button" aria-expanded="false" aria-controls="siteNav">Menu</button>
         </div>
       </div>
       <nav class="site-nav" id="siteNav" aria-label="Campaign navigation">
         <a href="https://xtrata.xyz/">Home</a>
-        <a href="#enter" aria-current="page">First Masterpiece</a>
-        <a href="#how">How it works</a>
+        <a href="#enter" aria-current="page">Proof of Creation</a>
+        <a href="#how">Scope of Work</a>
+        <a href="#submit">Submission</a>
         <a href="#prizes">Prizes</a>
         <a href="#gallery">Entries</a>
+        <a href="#resources">Resources</a>
         <a href="#rules">Rules</a>
         <a class="campaign-nav" data-bounty-link href="#official-bounty">Official bounty ↗</a>
       </nav>
@@ -415,19 +448,19 @@
   <main class="shell">
     <section class="hero" aria-labelledby="heroTitle">
       <div class="hero-copy">
-        <span class="section-kicker">Xtrata × Zero Authority DAO</span>
+        <span class="section-kicker">Proof of Creation · Xtrata × Zero Authority DAO</span>
         <h1 id="heroTitle">Inscribe your <em>first masterpiece.</em></h1>
-        <p class="hero-lead">Create an original song, artwork, photograph, poem, animation or short film. Put it fully on-chain through Xtrata and enter to win part of <strong>200 STX.</strong></p>
+        <p class="hero-lead">Create an original song, artwork, photograph, poem, animation or short film. Put it fully on-chain through Xtrata and be one of five creators to win <strong>60 STX.</strong></p>
         <div class="hero-actions">
-          <a class="btn" data-wizard-link href="https://xtrata.xyz/wizard/">Create your inscription <span aria-hidden="true">↗</span></a>
+          <a class="btn" data-create-link href="/inscribe">Create your inscription <span aria-hidden="true">→</span></a>
           <a class="btn secondary" data-bounty-link href="#official-bounty">View official bounty <span aria-hidden="true">↗</span></a>
         </div>
-        <div class="hero-trust"><span>Four winners</span><span>No theme required</span><span>Fully on-chain</span><span>Anchored to Bitcoin</span></div>
-        <div class="partners">Presented by <strong>XTRATA</strong> &nbsp;·&nbsp; Sponsored by <strong>ZERO AUTHORITY DAO</strong></div>
+        <div class="hero-trust"><span>Five equal winners</span><span>No theme required</span><span>Fully on-chain</span><span>Anchored to Bitcoin</span></div>
+        <div class="partners">Creative campaign by <strong>XTRATA</strong> &nbsp;·&nbsp; Bounty hosted and rewarded through <strong>ZERO AUTHORITY DAO</strong></div>
       </div>
 
       <div class="object-stage" aria-label="Examples of creative objects that can live on Xtrata">
-        <div class="prize-orbit"><div><span class="prize-number">200</span><span class="prize-label">STX · PRIZE POOL</span></div></div>
+        <div class="prize-orbit"><div><span class="prize-number">300</span><span class="prize-label">STX · PRIZE POOL</span></div></div>
         <article class="object-card"><div class="object-art art"></div><div class="object-meta"><strong>Original artwork</strong><span>Image · confirmed</span></div></article>
         <article class="object-card"><div class="object-art audio"></div><div class="object-meta"><strong>Sound on-chain</strong><span>Audio · inscribed</span></div></article>
         <article class="object-card"><div class="object-art words">WORDS<br>THAT<br>LAST</div><div class="object-meta"><strong>Written work</strong><span>Text · sealed</span></div></article>
@@ -436,15 +469,15 @@
     </section>
 
     <div class="metrics" aria-label="Campaign facts">
-      <div class="metric"><span>Prize pool</span><strong>200 STX</strong></div>
-      <div class="metric"><span>Winners</span><strong>4</strong></div>
+      <div class="metric"><span>Prize pool</span><strong>300 STX</strong></div>
+      <div class="metric"><span>Equal awards</span><strong>5 × 60 STX</strong></div>
       <div class="metric"><span>Network</span><strong>Stacks</strong></div>
       <div class="metric"><span>Time remaining</span><strong class="countdown" id="countdown">TBA</strong></div>
     </div>
 
     <section class="manifesto">
-      <div><span class="section-kicker">The submission is the object</span><p>Every valid entry becomes a permanent Xtrata object. Your inscription link is the deliverable, the provenance, and the proof that the work exists on-chain.</p></div>
-      <blockquote>The work is not merely submitted. The work <em>is</em> the submission.</blockquote>
+      <div><span class="section-kicker">No pitches. Just proof.</span><p>Every valid entry becomes more than an application. It becomes a permanent, verifiable Xtrata object anchored to Bitcoin. Whether it wins or not, it joins the creative record.</p></div>
+      <blockquote>Don’t just propose the work. <em>Build the proof.</em></blockquote>
     </section>
 
     <section class="section" id="enter" aria-labelledby="enterTitle">
@@ -460,12 +493,38 @@
     </section>
 
     <section class="section" id="how" aria-labelledby="howTitle">
-      <div class="section-heading"><span class="section-kicker">Four simple steps</span><h2 id="howTitle">Create it. Inscribe it. Share it. Submit it.</h2></div>
+      <div class="section-heading"><span class="section-kicker">Scope of Work</span><h2 id="howTitle">Create it. Inscribe it. Share it. Submit it.</h2><p>Complete all four steps to produce a valid bounty entry.</p></div>
       <div class="process">
-        <article><span class="process-no">01 / CREATE</span><div><h3>Make something original</h3><p>Create a piece you are proud to place permanently on-chain.</p></div></article>
-        <article><span class="process-no">02 / INSCRIBE</span><div><h3>Use Xtrata</h3><p>Upload the work through the Xtrata Wizard and complete the guided process.</p></div></article>
-        <article><span class="process-no">03 / SHARE</span><div><h3>Tell its story</h3><p>Share the inscription publicly and explain what you made and why it matters.</p></div></article>
-        <article><span class="process-no">04 / SUBMIT</span><div><h3>Enter the bounty</h3><p>Submit your inscription link and public post through the official Zero Authority bounty.</p></div></article>
+        <article><span class="process-no">01 / CREATE</span><div><h3>Make something original</h3><p>Create an original piece of artwork, photography, music, writing, moving image, code, or another creative digital experience.</p></div></article>
+        <article><span class="process-no">02 / INSCRIBE</span><div><h3>Preserve it with Xtrata</h3><p>Upload and inscribe the work through Xtrata. Small files use Create; larger files, multiple files, and folders continue through the guided Wizard.</p></div></article>
+        <article><span class="process-no">03 / SHARE</span><div><h3>Tell its story publicly</h3><p>Share the inscription on X or another public platform. Explain what you created, why you made it, and why it matters.</p></div></article>
+        <article><span class="process-no">04 / SUBMIT</span><div><h3>Enter through Zero Authority</h3><p>Submit your Xtrata inscription link, public post link, and a short description through the official Zero Authority DAO bounty.</p></div></article>
+      </div>
+    </section>
+
+    <section class="section" id="submit" aria-labelledby="submitTitle">
+      <div class="section-heading"><span class="section-kicker">Required Deliverables</span><h2 id="submitTitle">What you submit to Zero Authority.</h2><p>Your creative work becomes the inscription. Your bounty submission contains three clear links or pieces of information.</p></div>
+      <div class="submission-map" aria-label="Submission journey">
+        <article><span>01 / CREATE</span><h3>Your original work</h3><p>The artwork, music, writing, film, code, or digital experience you made.</p></article>
+        <article><span>02 / INSCRIBE</span><h3>Xtrata object</h3><p>The permanent on-chain version of your work and its public inscription page.</p></article>
+        <article><span>03 / SHARE</span><h3>Public story</h3><p>A public post explaining what you created and why.</p></article>
+        <article><span>04 / SUBMIT</span><h3>DAO entry</h3><p>Your complete entry submitted through the official Zero Authority bounty.</p></article>
+      </div>
+      <div class="deliverable-grid">
+        <article class="deliverable"><div class="deliverable-mark">01</div><h3>Xtrata inscription link</h3><p>Paste the public link to the successfully inscribed Xtrata object.</p></article>
+        <article class="deliverable"><div class="deliverable-mark">02</div><h3>Public post link</h3><p>Link to your post on X or another public platform introducing the work.</p></article>
+        <article class="deliverable"><div class="deliverable-mark">03</div><h3>Short description</h3><p>Briefly explain what the work is, what inspired it, and why you chose to preserve it.</p></article>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="requirementsTitle">
+      <div class="section-heading"><span class="section-kicker">Submission Requirements</span><h2 id="requirementsTitle">Five things every entry needs.</h2></div>
+      <div class="requirements">
+        <div class="requirement"><strong>Original work only</strong></div>
+        <div class="requirement"><strong>Successfully inscribed using Xtrata</strong></div>
+        <div class="requirement"><strong>Publicly shared before submission</strong></div>
+        <div class="requirement"><strong>Xtrata inscription link included</strong></div>
+        <div class="requirement"><strong>Public post link included</strong></div>
       </div>
     </section>
 
@@ -473,28 +532,27 @@
       <div class="file-step">
         <div><span class="section-kicker">Your first move</span><h2>Drop something worth remembering.</h2><p>Choose your work here and we route it the right way: a single file up to 512&nbsp;KB mints in one quick transaction on the Create page, while larger files, multiple files, or folders continue in the guided Wizard. Nothing is uploaded until you confirm in your wallet.</p><div class="format-list"><span>IMAGE</span><span>AUDIO</span><span>VIDEO</span><span>TEXT</span><span>HTML</span><span>SVG</span><span>JSON</span></div></div>
         <div class="drop-ui" id="dropUi">
-          <div><div class="drop-mark" aria-hidden="true">↑</div><h3 id="dropTitle">Choose files or drop them here</h3><p id="dropText">Single file up to 512 KB mints in one transaction. Bigger or multiple continues in the Wizard.</p><label class="btn" for="fileInput">Choose files</label><input id="fileInput" type="file" multiple /><br><a class="btn" id="dropContinue" href="#" hidden>Continue</a><br><a class="drop-link" data-wizard-link href="https://xtrata.xyz/wizard/">Or open the Wizard directly ↗</a></div>
+          <div><div class="drop-mark" aria-hidden="true">↑</div><h3 id="dropTitle">Choose files or drop them here</h3><p id="dropText">Single file up to 512 KB mints in one transaction. Bigger or multiple continues in the Wizard.</p><label class="btn" for="fileInput">Choose files</label><input id="fileInput" type="file" multiple /><br><a class="btn" id="dropContinue" href="#" hidden>Continue</a><br><a class="drop-link" href="/wizard/">Or open the Wizard directly ↗</a></div>
         </div>
       </div>
     </section>
 
     <section class="section" id="prizes" aria-labelledby="prizesTitle">
-      <div class="section-heading"><span class="section-kicker">The distribution</span><h2 id="prizesTitle">200 STX will be awarded.</h2><p>Judged on the strength of the work, how well it lives as an Xtrata object, and how clearly the creator introduces it.</p></div>
+      <div class="section-heading"><span class="section-kicker">The distribution</span><h2 id="prizesTitle">Five winners. One equal split.</h2><p>The 300 STX pool is divided equally: five winning inscriptions receive 60 STX each. There is no first place or runner-up.</p></div>
       <div class="prize-grid">
-        <article class="prize-card"><div><div class="amount">100</div><div class="award">STX · Best overall inscription</div></div><p>The strongest combination of originality, execution, and on-chain presentation.</p></article>
-        <article class="prize-card"><div><div class="amount">50</div><div class="award">STX · Runner-up</div></div><p>An exceptional second-place entry.</p></article>
-        <article class="prize-card"><div><div class="amount">25</div><div class="award">STX · Community selection</div></div><p>A standout chosen with community input.</p></article>
-        <article class="prize-card"><div><div class="amount">25</div><div class="award">STX · Xtrata selection</div></div><p>A work that explores the medium brilliantly.</p></article>
-        <article class="prize-card"><div><div class="amount">∞</div><div class="award">Permanent · Every valid entry</div></div><p>The inscription remains part of the living on-chain archive.</p></article>
+        <article class="prize-card"><div><div class="amount">5</div><div class="award">WINNING INSCRIPTIONS</div></div><p>Five works are selected using the same published judging criteria.</p></article>
+        <article class="prize-card"><div><div class="amount">60</div><div class="award">STX · EACH WINNER</div></div><p>Every winner receives exactly the same award.</p></article>
+        <article class="prize-card"><div><div class="amount">300</div><div class="award">STX · TOTAL POOL</div></div><p>The complete bounty pool is distributed across the five winners.</p></article>
+        <article class="prize-card"><div><div class="amount">=</div><div class="award">EQUAL SPLIT · NO RANKING</div></div><p>No first place, runner-up, or differently weighted payout.</p></article>
       </div>
     </section>
 
     <section class="section" aria-labelledby="criteriaTitle">
-      <div class="section-heading"><span class="section-kicker">How work is assessed</span><h2 id="criteriaTitle">Clear judging. No popularity contest.</h2></div>
+      <div class="section-heading"><span class="section-kicker">Judging Criteria</span><h2 id="criteriaTitle">Clear judging. No popularity contest.</h2><p>Entries are assessed on the work itself, its presentation through Xtrata, and the story shared alongside it.</p></div>
       <div class="criteria">
-        <article class="criterion"><strong>50%</strong><h3>The work</h3><p>Originality, creativity, craft, and overall quality.</p></article>
-        <article class="criterion"><strong>30%</strong><h3>The inscription</h3><p>How successfully the work is presented as a permanent Xtrata object.</p></article>
-        <article class="criterion"><strong>20%</strong><h3>The story</h3><p>How clearly and engagingly the public post introduces the work.</p></article>
+        <article class="criterion"><strong>50%</strong><h3>Creativity &amp; Originality</h3><ul><li>Quality of the work</li><li>Originality and creative thinking</li><li>Overall presentation</li></ul></article>
+        <article class="criterion"><strong>30%</strong><h3>Use of Xtrata</h3><ul><li>Successfully inscribed through Xtrata</li><li>Proper presentation of the inscription</li><li>How well the work lives as an on-chain object</li></ul></article>
+        <article class="criterion"><strong>20%</strong><h3>Storytelling</h3><ul><li>Quality and clarity of the public post</li><li>Explanation of what you created</li><li>Explanation of why you created it</li></ul></article>
       </div>
     </section>
 
@@ -507,23 +565,52 @@
       </div>
     </section>
 
+    <section class="section" id="resources" aria-labelledby="resourcesTitle">
+      <div class="section-heading"><span class="section-kicker">Before You Submit</span><h2 id="resourcesTitle">Check the entry. Find the help.</h2><p>Use this final check before opening the official bounty submission.</p></div>
+      <div class="support-grid">
+        <div class="checklist-panel">
+          <span class="section-kicker">Final checklist</span>
+          <h3>Have you completed every step?</h3>
+          <div class="checklist">
+            <div class="checklist-item">Created original work you have the right to submit</div>
+            <div class="checklist-item">Successfully inscribed the work through Xtrata</div>
+            <div class="checklist-item">Opened and checked the public inscription page</div>
+            <div class="checklist-item">Shared the inscription publicly</div>
+            <div class="checklist-item">Copied the inscription and public post links</div>
+            <div class="checklist-item">Written a short description of the work</div>
+          </div>
+        </div>
+        <div class="resource-panel">
+          <span class="section-kicker">Helpful resources</span>
+          <h3>Everything you need to get started.</h3>
+          <div class="resource-links">
+            <a class="resource-link" href="/wizard/"><div>Xtrata Inscription Wizard<br><span>Guided inscription flow</span></div><b aria-hidden="true">↗</b></a>
+            <a class="resource-link" data-guide-link href="#beginner-guide"><div>Beginner Guide<br><span>Coming soon</span></div><b aria-hidden="true">↗</b></a>
+            <a class="resource-link" href="https://t.me/+CCH5BtGV78g1Mjhk" target="_blank" rel="noopener noreferrer"><div>Join the Xtrata Telegram<br><span>Community help and discussion</span></div><b aria-hidden="true">↗</b></a>
+            <a class="resource-link" href="https://xtrata.xyz/"><div>Xtrata Homepage<br><span>Explore the platform</span></div><b aria-hidden="true">↗</b></a>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="section" id="rules" aria-labelledby="rulesTitle">
       <div class="section-heading"><span class="section-kicker">Rules and answers</span><h2 id="rulesTitle">Everything you need to know.</h2></div>
       <div class="accordion">
         <details open><summary>Who can enter?</summary><div class="answer">Anyone able to use a compatible Stacks wallet and meet the requirements shown on the official Zero Authority bounty page.</div></details>
-        <details><summary>What makes an entry valid?</summary><div class="answer"><ul><li>The work must be original and you must control the necessary rights.</li><li>It must be successfully inscribed through Xtrata during the bounty period.</li><li>You must provide a publicly accessible inscription link and public post.</li><li>The complete entry must be submitted through Zero Authority before the deadline.</li></ul></div></details>
+        <details><summary>What do I submit through Zero Authority?</summary><div class="answer">Submit three things: your public Xtrata inscription link, a link to the public post introducing the work, and a short description of what you created and why.</div></details>
+        <details><summary>What makes an entry valid?</summary><div class="answer"><ul><li>The work must be original and you must control the necessary rights.</li><li>It must be successfully inscribed through Xtrata during the bounty period.</li><li>It must be shared publicly before submission.</li><li>You must include the Xtrata inscription link, public post link, and a short description.</li><li>The complete entry must be submitted through Zero Authority before the deadline.</li></ul></div></details>
         <details><summary>Can I enter something I made previously?</summary><div class="answer">Yes, provided it is your original work and the Xtrata inscription itself is created during the campaign period.</div></details>
-        <details><summary>Can I submit more than one piece?</summary><div class="answer">You may create and inscribe more than one work, but only one official competition entry per wallet is recommended unless the official bounty rules state otherwise.</div></details>
+        <details><summary>Can I submit more than one piece?</summary><div class="answer">Check the official Zero Authority bounty page for any entry or wallet limits. Each submission should contain one complete set of required deliverables.</div></details>
         <details><summary>Does social engagement determine the winner?</summary><div class="answer">No. Likes, followers, and repost counts do not determine the result. The public share is judged for clarity and storytelling, not popularity.</div></details>
         <details><summary>Can collaborative work be entered?</summary><div class="answer">Yes. One wallet must be nominated to receive any reward, and collaborators are responsible for agreeing how a prize would be divided.</div></details>
-        <details><summary>How are rewards paid?</summary><div class="answer">Rewards are distributed through the official Zero Authority bounty process to the nominated Stacks wallet.</div></details>
+        <details><summary>How are rewards paid?</summary><div class="answer">The 300 STX pool is split equally among five winners. Each winner receives 60 STX through the official Zero Authority bounty process, paid to the nominated Stacks wallet.</div></details>
         <details><summary>Is there an entry fee?</summary><div class="answer">There is no separate competition entry fee. Any inscription cost or sponsored inscription arrangement should be confirmed in the official bounty details before launch.</div></details>
       </div>
     </section>
 
     <section class="final-cta">
-      <span class="section-kicker">Your turn</span><h2>Make something<br><em>worth recording.</em></h2><p>The network is ready. The space is permanent. The first move is yours.</p>
-      <div class="hero-actions"><a class="btn" data-wizard-link href="https://xtrata.xyz/wizard/">Inscribe your masterpiece ↗</a><a class="btn secondary" data-bounty-link href="#official-bounty">Submit through Zero Authority ↗</a></div>
+      <span class="section-kicker">Ready to enter?</span><h2>Create it.<br>Inscribe it.<br><em>Submit it.</em></h2><p>Every valid entry becomes a permanent Xtrata object. Five creators will each receive 60 STX through the Zero Authority DAO bounty.</p>
+      <div class="hero-actions"><a class="btn" data-create-link href="/inscribe">Create your inscription →</a><a class="btn secondary" data-bounty-link href="#official-bounty">Submit through Zero Authority ↗</a></div>
       <div class="deadline-note" id="bottomDeadline">Deadline to be announced.</div>
     </section>
   </main>
@@ -531,7 +618,7 @@
   <footer>
     <div class="shell footer-grid">
       <div><a class="footer-brand" href="https://xtrata.xyz/"><img src="/favicon.svg" alt="" /><span>XTRATA</span></a><div>Sponsored by Zero Authority DAO · Built on Stacks · Anchored to Bitcoin</div></div>
-      <nav class="footer-links" aria-label="Footer"><a href="https://xtrata.xyz/">Xtrata</a><a href="https://xtrata.xyz/xplorer">Explore</a><a href="https://xtrata.xyz/#build">Build</a><a data-bounty-link href="#official-bounty">Official bounty</a></nav>
+      <nav class="footer-links" aria-label="Footer"><a href="https://xtrata.xyz/">Xtrata</a><a href="https://xtrata.xyz/xplorer">Explore</a><a href="#resources">Resources</a><a href="https://t.me/+CCH5BtGV78g1Mjhk" target="_blank" rel="noopener noreferrer">Telegram</a><a data-bounty-link href="#official-bounty">Official bounty</a></nav>
     </div>
   </footer>
 
@@ -541,9 +628,11 @@
     /* Replace these values when the official bounty details are confirmed. */
     const CONFIG = {
       bountyUrl: "#official-bounty",
-      wizardUrl: "https://xtrata.xyz/wizard/",
-      closingDate: "", // Example: "2026-08-07T23:59:00Z"
-      deadlineLabel: "Deadline to be announced"
+      createUrl: "/inscribe",
+      wizardUrl: "/wizard/",
+      guideUrl: "", // Add the beginner guide URL when available.
+      closingDate: "2026-07-31T23:59:00+01:00",
+      deadlineLabel: "Entries close 31 July 2026 at 23:59 BST"
     };
 
     const toast = document.getElementById("toast");
@@ -567,10 +656,23 @@
       }
     });
 
-    document.querySelectorAll("[data-wizard-link]").forEach((link) => {
-      link.href = CONFIG.wizardUrl;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
+    document.querySelectorAll("[data-create-link]").forEach((link) => {
+      link.href = CONFIG.createUrl;
+    });
+
+    document.querySelectorAll("[data-guide-link]").forEach((link) => {
+      if (CONFIG.guideUrl) {
+        link.href = CONFIG.guideUrl;
+        if (CONFIG.guideUrl.startsWith("http")) {
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+        }
+      } else {
+        link.addEventListener("click", (event) => {
+          event.preventDefault();
+          showToast("The beginner guide is coming soon.");
+        });
+      }
     });
 
     const menuButton = document.getElementById("menuButton");
@@ -617,6 +719,7 @@
     ["dragleave", "drop"].forEach((type) => dropUi.addEventListener(type, (event) => { event.preventDefault(); dropUi.classList.remove("is-dragging"); }));
   </script>
 
+  <script type="module" src="/create-routing.js"></script>
   <script type="module">
     /* Route dropped work exactly like the homepage Create flow:
        single file ≤ 512 KB → /inscribe single-transaction mint,
@@ -635,11 +738,14 @@
     };
     const formatSize = (bytes) => bytes < 1048576 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1048576).toFixed(1)} MB`;
 
-    let routing = null;
-    try {
-      routing = await import("/create-routing.js");
-    } catch {
-      /* Standalone preview (file:// or missing asset): fall back to Wizard-only. */
+    let routing = globalThis.XtrataCreateRouting || null;
+    if (!routing) {
+      /* The shared router script tag dispatches this once it has registered. */
+      await new Promise((resolve) => {
+        addEventListener("xtrata-create-routing-ready", resolve, { once: true });
+        setTimeout(resolve, 3000);
+      });
+      routing = globalThis.XtrataCreateRouting || null;
     }
 
     let pending = null; // { files, containsDirectory, decision }
@@ -669,22 +775,23 @@
       say("Recognised locally. Nothing has been uploaded yet.");
     };
 
-    continueBtn.addEventListener("click", async (event) => {
+    const continueWithSelection = async (event) => {
       event.preventDefault();
       if (!pending) return;
       const { files, containsDirectory, info } = pending;
       const path = info.dest === "create" ? "/inscribe" : "/wizard/";
-      if (!routing) { window.location.assign("/wizard/?from=masterpiece"); return; }
+      if (!routing) { window.location.assign("/wizard/?from=proof-of-creation"); return; }
       continueBtn.textContent = "Preparing…";
-      let target = `${path}?from=masterpiece&routingReason=${encodeURIComponent(info.reason)}`;
+      let target = `${path}?from=proof-of-creation&routingReason=${encodeURIComponent(info.reason)}`;
       try {
-        const handoffId = await routing.storeCreateHandoff(files, { reason: info.reason, source: "masterpiece", containsDirectory });
-        target = routing.createHandoffUrl(path, handoffId, "masterpiece");
+        const handoffId = await routing.storeCreateHandoff(files, { reason: info.reason, source: "proof-of-creation", containsDirectory });
+        target = routing.createHandoffUrl(path, handoffId, "proof-of-creation");
       } catch {
         /* Handoff storage unavailable — still honour the routing boundary. */
       }
       window.location.assign(target);
-    });
+    };
+    continueBtn.addEventListener("click", continueWithSelection);
 
     fileInput.addEventListener("change", (event) => present(event.target.files));
     dropUi.addEventListener("drop", async (event) => {

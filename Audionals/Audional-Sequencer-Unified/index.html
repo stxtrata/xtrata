@@ -1,0 +1,1577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audional Sequencer — Unified Edition</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  AUDIONAL SEQUENCER — UNIFIED EDITION
+  ════════════════════════════════════════════════════════════════════════
+  A single-file, build-free, on-chain music sequencer for Bitcoin Ordinals.
+  Consolidates the lineage: audional-sequencer.html (2023) → 16-Channel
+  Beta → New Audional Sequencer → BETA_XI → B64x → BOP → Audionaut V2.3.
+
+  MODULE MAP (all inline, ES module script at end of body):
+    [utils]      helpers, dB/gain math, DOM shorthand
+    [loader]     universal on-chain sample loader (OB1 direct audio,
+                 Audional base64 JSON `audioData`, HTML-embedded audio,
+                 data: URIs, video-with-audio fallback) + registry/cache
+    [state]      projectState (persisted) / runtimeState (transient) split
+    [engine]     AudioContext, master bus, per-channel strips, AudioWorklet
+                 module (clock + gate + bitcrusher processors)
+    [effects]    per-channel insert chain: gate→EQ→comp→crush→chorus→
+                 phaser→delay→reverb (each bypassable)
+    [synth]      polyphonic instrument voice + live keyboard + clip record
+    [playback]   sampler trigger (region, fades, rate, reverse, overlap,
+                 loop tempo-sync) and instrument clip trigger
+    [transport]  sample-accurate scheduler host driven by AudioWorklet
+                 clock ticks; lookahead scheduling at exact ctx times
+    [ui]         channel grid render, step matrix, playhead, modals
+                 (FX rack, waveform/trim editor, synth), status bar
+    [saveload]   project JSON save/download, file load, load-from-ordinal
+
+  LOADER FORMAT SUPPORT MATRIX (loadSample):
+    application/json  → JSON.audioData base64 (± data: prefix) → decode
+    audio/*           → arrayBuffer → decodeAudioData
+    video/*           → decode attempt → MediaRecorder audio extraction
+    text/html (other) → first <audio src> or data:audio src → recurse
+    data: URI         → passed through untouched
+    bare ordinal id / ordinals.com URL / trailing #? → normalized
+
+  AUDIO ENGINE CHOICE: vanilla Web Audio API (no Tone.js). Rationale:
+  zero runtime dependencies of ANY kind — nothing to fetch before boot,
+  smallest possible inscription footprint, and the AudioWorklet scheduler
+  gives sample-accurate timing natively. This is a superset of the
+  "on-chain Tone.js" requirement: there is no library to load at all.
+
+  RUNTIME NETWORK POLICY: the only network calls this app ever makes are
+  content fetches to https://ordinals.com/content/<id> (or data: URIs).
+  No CDN, no fonts, no analytics, no server.
+
+  Author lineage: jim.btc / Audionals. Unified build 2026.
+  ════════════════════════════════════════════════════════════════════════
+-->
+<style>
+:root{
+  --bg:#0d0e12; --panel:#15171d; --panel2:#1b1e26; --line:#262a35;
+  --txt:#d6d9e0; --dim:#7b8090; --acc:#f7931a; --acc2:#ffb04d;
+  --green:#39d98a; --red:#ff5d5d; --blue:#4da3ff;
+  --step:#232733; --step-on:var(--acc);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--txt);
+  font:13px/1.45 "Share Tech Mono","SF Mono",Menlo,Consolas,monospace;
+  display:flex; flex-direction:column; min-height:100vh;
+}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer;background:var(--panel2);border:1px solid var(--line);
+  border-radius:4px;padding:4px 9px;transition:background .12s,border-color .12s}
+button:hover{background:#242835;border-color:#3a4052}
+button.acc{background:var(--acc);border-color:var(--acc);color:#141414;font-weight:700}
+button.acc:hover{background:var(--acc2)}
+button.small{padding:2px 6px;font-size:11px}
+button.toggled{background:var(--acc);border-color:var(--acc);color:#141414}
+input[type=text],input[type=number]{background:#0b0c10;border:1px solid var(--line);
+  border-radius:4px;padding:4px 6px}
+input[type=range]{accent-color:var(--acc)}
+select{background:#0b0c10;border:1px solid var(--line);border-radius:4px;padding:3px 4px;max-width:100%}
+
+/* ── header ─────────────────────────────────────────── */
+#topbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+#logo{display:flex;align-items:center;gap:9px;user-select:none}
+#logo svg{display:block}
+#logo .t1{font-size:17px;font-weight:700;color:var(--acc);letter-spacing:.5px}
+#logo .t2{font-size:10px;color:var(--dim);letter-spacing:2px}
+.tgroup{display:flex;align-items:center;gap:6px;background:var(--panel2);
+  border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+.tgroup label{color:var(--dim);font-size:11px}
+#bpm{width:62px;text-align:center}
+#play{min-width:64px}
+#seq-label{min-width:70px;text-align:center;color:var(--acc)}
+#master-vol{width:90px}
+#status{margin-left:auto;font-size:11px;color:var(--dim);max-width:420px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#status.err{color:var(--red)}
+#status.ok{color:var(--green)}
+
+/* ── channels ───────────────────────────────────────── */
+#channels{flex:1;overflow:auto;padding:10px 14px 30px}
+.chan{display:flex;align-items:stretch;gap:8px;margin-bottom:6px;
+  background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+.chan.muted-vis{opacity:.55}
+.chan-side{display:flex;flex-direction:column;gap:4px;width:218px;flex:none}
+.chan-row1{display:flex;align-items:center;gap:4px}
+.chan-num{width:20px;text-align:right;color:var(--dim);font-size:11px;flex:none}
+.chan-err{width:8px;height:8px;border-radius:50%;flex:none;background:transparent}
+.chan-err.on{background:var(--red)}
+.chan-select{flex:1;min-width:0;font-size:11px}
+.chan-row2{display:flex;align-items:center;gap:4px}
+.chan-row2 input[type=range]{flex:1;min-width:30px}
+.chan-row2 .pan{max-width:56px}
+.mini{font-size:10px;padding:2px 5px}
+.mute.toggled{background:var(--red);border-color:var(--red);color:#141414}
+.solo.toggled{background:var(--blue);border-color:var(--blue);color:#141414}
+.steps{display:grid;grid-template-columns:repeat(64,16px);gap:2px;align-content:center;
+  overflow-x:auto;padding:2px}
+.step{width:16px;height:34px;border-radius:3px;background:var(--step);
+  border:1px solid transparent;cursor:pointer;padding:0}
+.step:nth-child(8n+1),.step:nth-child(8n+2),.step:nth-child(8n+3),.step:nth-child(8n+4){background:#282d3c}
+.step:nth-child(16n+1){border-left:2px solid #3a4052}
+.step.on{background:var(--step-on)}
+.step.play{box-shadow:0 0 0 1px #fff inset;filter:brightness(1.45)}
+.step:hover{border-color:var(--acc)}
+
+/* ── modal ──────────────────────────────────────────── */
+#backdrop{position:fixed;inset:0;background:rgba(5,6,9,.72);display:none;
+  align-items:flex-start;justify-content:center;z-index:50;overflow:auto;padding:40px 16px}
+#backdrop.open{display:flex}
+#modal{background:var(--panel);border:1px solid #343a4a;border-radius:8px;
+  min-width:480px;max-width:820px;box-shadow:0 18px 60px rgba(0,0,0,.6)}
+#modal-head{display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;border-bottom:1px solid var(--line)}
+#modal-title{color:var(--acc);font-weight:700}
+#modal-body{padding:14px}
+.fx-unit{border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin-bottom:8px;
+  background:var(--panel2)}
+.fx-unit h4{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:6px}
+.fx-unit h4 span{color:var(--dim);font-weight:400;font-size:10px}
+.fx-params{display:flex;gap:14px;flex-wrap:wrap}
+.fx-p{display:flex;flex-direction:column;gap:2px;font-size:10px;color:var(--dim)}
+.fx-p input[type=range]{width:110px}
+.fx-p b{color:var(--txt);font-weight:400}
+.wave-wrap{position:relative}
+#wave-canvas{width:100%;height:150px;background:#0b0c10;border:1px solid var(--line);
+  border-radius:4px;display:block}
+.wv-grid{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px}
+.wv-grid .fx-p input[type=range]{width:140px}
+.keys{display:flex;margin:10px 0;user-select:none}
+.key{width:34px;height:110px;border:1px solid #000;background:#e8e8ee;border-radius:0 0 4px 4px;
+  position:relative;color:#333;font-size:9px;display:flex;align-items:flex-end;justify-content:center;
+  padding-bottom:4px;cursor:pointer}
+.key.black{background:#111;color:#bbb;width:22px;height:68px;margin:0 -11px;z-index:2}
+.key.held{background:var(--acc)!important;color:#141414}
+.synth-row{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.rec.toggled{background:var(--red);border-color:var(--red);color:#fff}
+#footer{padding:6px 14px;border-top:1px solid var(--line);color:var(--dim);
+  font-size:10px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+a{color:var(--acc)}
+::-webkit-scrollbar{height:8px;width:8px}
+::-webkit-scrollbar-thumb{background:#2b303e;border-radius:4px}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div id="logo" title="Audional Sequencer — Unified Edition">
+    <svg width="30" height="30" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#f7931a"/><path d="M11 22V10h6.2c2 0 3.3 1.1 3.3 2.9 0 1.2-.7 2.1-1.7 2.5 1.3.3 2.2 1.4 2.2 2.9 0 2-1.5 3.2-3.6 3.2H11zm2.6-7.2h3c.9 0 1.5-.5 1.5-1.4 0-.8-.6-1.3-1.5-1.3h-3v2.7zm0 5h3.3c1 0 1.6-.6 1.6-1.5s-.6-1.4-1.6-1.4h-3.3v2.9z" fill="#141414"/></svg>
+    <div><div class="t1">AUDIONAL SEQUENCER</div><div class="t2">UNIFIED · ON-CHAIN · ₿</div></div>
+  </div>
+
+  <div class="tgroup">
+    <button id="play" class="acc">▶ PLAY</button>
+    <button id="stop">■</button>
+    <label>BPM</label><input id="bpm" type="number" min="30" max="300" step="1" value="120">
+  </div>
+
+  <div class="tgroup">
+    <button id="seq-prev" class="small">‹</button>
+    <span id="seq-label">SEQ 1/1</span>
+    <button id="seq-next" class="small">›</button>
+    <button id="seq-add" class="small" title="Add a new blank sequence">+ SEQ</button>
+    <button id="seq-dup" class="small" title="Duplicate current sequence">DUP</button>
+    <button id="seq-cont" class="small toggled" title="Chain sequences during playback">CHAIN</button>
+    <button id="seq-clear" class="small" title="Clear all steps in this sequence">CLR</button>
+  </div>
+
+  <div class="tgroup">
+    <button id="save" class="small">SAVE ⭳</button>
+    <button id="load" class="small">LOAD ⭱</button>
+    <button id="load-ord" class="small" title="Load a project/preset JSON from an Ordinal inscription">LOAD ORD ₿</button>
+    <input id="file-in" type="file" accept=".json,application/json" style="display:none">
+  </div>
+
+  <div class="tgroup">
+    <label>MASTER</label><input id="master-vol" type="range" min="0" max="1" step="0.01" value="0.9">
+  </div>
+
+  <div id="status">ready — click PLAY to start the audio engine</div>
+</div>
+
+<div id="channels"></div>
+
+<div id="backdrop"><div id="modal">
+  <div id="modal-head"><span id="modal-title"></span><button id="modal-close" class="small">✕ CLOSE</button></div>
+  <div id="modal-body"></div>
+</div></div>
+
+<div id="footer">
+  <span>All audio loads from Bitcoin Ordinal inscriptions (ordinals.com/content). No server. No off-chain libraries.</span>
+  <span>OB1 · Audional base64 · recursive HTML audio — all supported</span>
+</div>
+
+<script type="module">
+'use strict';
+/* ═══════════════════════ [utils] ═══════════════════════ */
+const qs  = s => document.querySelector(s);
+const qsa = s => [...document.querySelectorAll(s)];
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') n.className = v;
+    else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+    else if (k === 'text') n.textContent = v;
+    else n.setAttribute(k, v);
+  }
+  for (const k of kids) if (k != null) n.append(k);
+  return n;
+};
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const num = (v, d) => (Number.isFinite(+v) ? +v : d);
+const deepClone = o => JSON.parse(JSON.stringify(o));
+let statusTimer = 0;
+function statusMsg(txt, kind = '') {
+  const s = qs('#status');
+  s.textContent = txt; s.className = kind;
+  clearTimeout(statusTimer);
+  if (kind !== 'err') statusTimer = setTimeout(() => { s.textContent = ''; s.className = ''; }, 6000);
+}
+/* ═══════════════════════ [loader] ═══════════════════════
+   Universal on-chain sample loader — faithful to the proven Audionaut
+   V2.3 contract (sequencer-sample-loader.js). This is the ONLY path by
+   which audio enters the app. Handles:
+     • OB1 direct-audio inscriptions (incl. trailing # / ? on URLs)
+     • Original Audional base64 JSON inscriptions ({"audioData": ...})
+     • HTML inscriptions with embedded <audio>/data:audio sources
+     • data: URIs, and video inscriptions (audio track extraction)
+*/
+
+// Curated OG on-chain library: the OB1 kit + classic Audional inscriptions.
+// { value: inscription URL, text: name, duration s, bpm|null, isLoop }
+const ogSampleUrls = [
+  { value: 'https://ordinals.com/content/e7d344ef3098d0889856978c4d2e81ccf2358f7f8b66feecc71e03036c59ad48i0#', text:'OB1 #1 - 808 Kick', duration: 1.116, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/ef5707e6ecf4d5b6edb4c3a371ca1c57b5d1057c6505ccb5f8bdc8918b0c4d94i0', text: 'OB1 #2 - 808 Snare', duration: 0.137, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/d030eb3d8bcd68b0ed02b0c67fdb981342eea40b0383814f179a48e76927db93i0', text: 'OB1 #3 - Closed Hat', duration: 0.066, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/3b7482a832c4f27c32fc1da7cc4249bbbac1cbdfbdb8673079cad0c33486d233i0', text: 'OB1 #4 - 808 Clap',  duration: 0.241, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/5a42d7b2e2fe01e4f31cbad5dd671997f87339d970faaab37f6355c4a2f3be5ai0', text: 'OB1 #5 - Crash', duration: 2.038, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/ddc1838c1a6a3c45b2c6e19ff278c3b51b0797c3f1339c533370442d23687a68i0', text: 'OB1 #6 - Synth Bass 1', duration: 0.162, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/91f52a4ca00bb27383ae149f24b605d75ea99df033a6cbb6de2389455233bf51i0', text: 'OB1 #7 - Synth Bass 2', duration: 0.174, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/1e3c2571e96729153e4b63e2b561d85aec7bc5ba372d293af469a525dfa3ed59i0', text: 'OB1 #8 - Synth Bass 3', duration: 0.333, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/437868aecce108d49f9b29c2f477987cb5834ffdf639a650335af7f0fdd5e55bi0', text: 'OB1 #9 - Hard Kick', duration: 0.462, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/3be1f8e37b718f5b9874aecad792504c5822dc8dfc727ad4928594f7725db987i0', text: 'OB1 #10 - Hard Snare', duration: 0.308, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/1bda678460ef08fb64435b57c9b69fd78fd4556822ccd8e9839b4eb71b3621edi0', text: 'OB1 #11 - Small Click', duration: 0.001, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/228947e9fc52e44d3a22e84aed7bbaeff08d60c5f925aa6be7e265d210425c28i0', text: 'OB1 #12 - DJ Scratch', duration: 3.658, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/578aa9d3b29ceceafc659ecee22cb7ef1a063ba5b71474db8fe84949746cdeefi0', text: 'OB1 #13 - Glockenspiel', duration: 3.153, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/3e5fe7bc10e37a145a75f7ddd71debd9079b05568c5b9c5e6b4de3d959a4c46bi0', text: 'OB1 #14 - Cowbell', duration: 0.122, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/b77fb3b299477ca55ab2626dbbc12c0d5fa9d4cf51ae00850caae6e36baef745i0', text: 'OB1 #16 - Bass Drop', duration: 5.039, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/752bd66406185690c6f14311060785170df91a887b42740e1dde27e5fbf351cbi0#', text: 'MS10 Woop.mp3', duration: 0.470, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/6d962189218b836cf33e2dc1adbc981e90242aa395f0868178773065f76f144ei0', text: 'audinalSample#1', duration: 0.549, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/0b8eff3f39f4095d0f129bb8dd75f29159f8725c7e66046bf41f70ebb9f60d93i0', text: 'melophonicSynthBassSample1', duration: 0.313, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/6d8be8186e63b4557e51edd66184a567bc6f5f9f5ba4bb34ba8c67e652c1934ei0', text: 'Step for man.mp3', duration: 2.560, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/6c01b1214fc4d4016d683380d066849e6bc645276b102604c098bd35fd77f791i0', text: 'melophonic_Snare_1.mp3', duration: 0.313, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/43efcebb84113c6df56bf5b8a455685c043492de9f5635d4108c4211c1f6841fi0', text: 'PumpIt_COLOR.mp3', duration: 0.601, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/3364803cb3032ce95f4138a214c15a9b36dcb70f574a477f27615d448e1cdeb8i0', text: 'Drums 8 bit beat - 2.429 - Bitcoin Step - Longstreet.btc.mp3', duration: 2.429, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/fef956676f3cbd6019a03d75c1a4a295c25b33653644b8f6ebde387971f9a677i0', text: 'wobble-bass.mp3', duration: 0.470, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/8fa54ad2d9e297c79b225eff67a481ebc8682dacf4fe9dbf5b692a60b237c163i0', text: 'Entertainment - Quiet Loop (2) (1).mp3', duration: 1.019, bpm: 125, isLoop: true },
+  { value: 'https://ordinals.com/content/695368ae1092c0633ef959dc795ddb90691648e43f560240d96da0e2753a0a08i0', text: 'Melody O  - 1.254 - Bitcoin Step - Longstreet.btc.mp3', duration: 1.254, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/d4ce1d1e80e90378d8fc49fd7e0e24e7f2310b2f5eb95d0c2318c47b6c9cd645i0', text: 'Melody K - 1.254 - Bitcoin Step - Longstreet.btc.mp3', duration: 1.254, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/e4cb3caff3b4a5192adf0f2ab5cd9da378bacfbafce56c3d4fb678a313607970i0', text: 'Melody I - 1.254 - Bitcoin Step - Longstreet.btc.mp3', duration: 1.254, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/898cba6dc32faab5be09f13092b7500b13eb22f1e7b3d604c8e6e47b0becd139i0', text: 'Melody C-MP3 - 1.254 - Bitcoin Step - Longstreet.btc.mp3', duration: 1.254, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/ed13d5389ae6273839342698b6d5bd3342c51eb472f32b8306e60f8e1e903ce8i0', text: 'Mel Fill 3 - 2.429 - Bitcoin Step - Longstreet.btc.mp3', duration: 2.429, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/c41587924f9d93d01cb71ca925fd664d6e50f1ac8e3c975d5e1e1f1bb0ff11b3i0', text: 'Audional-Jim.mp3', duration: 0.679, bpm: null, isLoop: false },
+  { value: 'https://ordinals.com/content/b0fb7f9eb0fe6c368a8d140b1117234431da0cd8725e9f78e6573bb7f0f61dadi0', text: 'Melody N  - 1.254 - Bitcoin Step - Longstreet.btc.mp3', duration: 1.254, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/0e38f29c76b29e471f5f0022a5e98f9ae64b5b1d8f25673f85e02851daf22526i0', text: 'Mel Fill 4 - 2.429 - Bitcoin Step - Longstreet.btc.mp3', duration: 2.429, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/244c785d6df173f8425d654cfc6d2b006c7bb47a605c7de576ed87022e42c7dfi0', text: 'Melody D - 1.254 - Bitcoin Step - Longstreet.btc.mp3', duration: 1.254, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/a72adee5a07200a623c40831ae5979bc7562b542788c3ded35d9e81e39c6014fi0', text: 'Melody B-MP3 - 1.254 - Bitcoin Step - Longstreet.btc.mp3', duration: 1.254, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/6a84401579707b76d9b9a77cc461e767f7ea8f08cc0e46dee0d21e5023cdde33i0', text: 'Melody J - 1.254 - Bitcoin Step - Longstreet.btc.mp3', duration: 1.254, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/c6decce29948ea64df9a24e689340c5907b6da207d74d13973fc5ca4dd3bd80ai0', text: 'Melody G - 1.254 - Bitcoin Step - Longstreet.btc.mp3', duration: 1.254, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/83174080310b0ab71c7a725461f3bd9e486bb62727b73134ee2c67f191d9d586i0', text: 'Mel Fill 5 - 2.429 - Bitcoin Step - Longstreet.btc.mp3', duration: 2.429, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/4f9bed6449d99ef3cbb0fabefac6890c20ef17db2bfe7c07f1386cb43277f220i0', text: 'Melody H - 1.254 - Bitcoin Step - Longstreet.btc.mp3', duration: 1.254, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/e9885c35376ae95dd291bb02075b0763fb3e655d51dc981984130b8366a6d3c8i0', text: 'Mel Fill 2 - 2.429 - Bitcoin Step - Longstreet.btc.mp3', duration: 2.429, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/34e73ef718034a3c0fdeba53899a2af8ee7771f252c419ab63cd13b0a39f6b10i0', text: 'Mel Fill 1 - 2.429 - Bitcoin Step - Longstreet.btc.mp3', duration: 2.429, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/435c5c22eaf0c1791e09cb46d56ce942eb312372376abf5b5420200b1424ff7fi0', text: 'Melody E - 1.254 - Bitcoin Step - Longstreet.btc.mp3', duration: 1.254, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/ccf99852fb85d63b5f65124fe506b08c11eb400a7b1da75cd3e0c9538fc49977i0', text: 'Drums Beat - 1.254 - Bitcoin Step - Longstreet.btc.mp3', duration: 1.254, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/ef8fdd599beee731e06aba4a9ed02d9c7bfe62147b27f6b6deaf22c8c067ab11i0', text: 'Melody A-MP3 - 1.254 - Bitcoin Step - Longstreet.btc.mp3', duration: 1.254, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/187a8c18ebfe07c18aea0e86cd99b3100474c1c53f56f02ee096723f1a35ce70i0', text: 'Drums Crash  - 1.254 - Bitcoin Step - Longstreet.btc.mp3', duration: 1.254, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/2b6b23199eae0760ee26650a0cc02c49b94fc8fd1f519a95417f0f8478246610i0', text: 'Melody M  - 1.254 - Bitcoin Step - Longstreet.btc.mp3', duration: 1.254, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/474f2b0aab9020757826b168ce58725871fd2abb26c6ca805de4b07e314416d1i0', text: 'Outro Fill 1 - 1.254 - Bitcoin Step - Longstreet.btc.mp3', duration: 1.254, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/1aa69c9d3b451ab3b584dba57ba6d6fedc6e9cb3df6830b9da270e84e51ea72di0', text: 'Melody L - 1.254 - Bitcoin Step - Longstreet.btc.mp3', duration: 1.254, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/81f9e6afc38b8c647d4ea258c29f13b81f6c1a2d40afd9c0a385d03126b4d11di0', text: 'Melody F - 1.254 - Bitcoin Step - Longstreet.btc.mp3', duration: 1.254, bpm: 105, isLoop: true },
+  { value: 'https://ordinals.com/content/4c40da69e783cfa96d2900bd15622c1ea60ad31e8ce9459cec13d155f39c463fi0', text: 'Intro Fill 1 - 1.254 - Bitcoin Step - Longstreet.btc.mp3', duration: 1.254, bpm: 105, isLoop: true }
+];
+
+// Shared decoding contexts — never one per sample.
+const AC  = window.AudioContext || window.webkitAudioContext || null;
+const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext || null;
+let _offlineDecodeCtx = null, _rtDecodeCtx = null;
+async function getDecodingContext() {
+  if (OAC) {
+    if (!_offlineDecodeCtx) {
+      try { _offlineDecodeCtx = new OAC(2, 44100, 44100); }
+      catch (e) { console.warn('[Loader] OfflineAudioContext unavailable, falling back.', e); _offlineDecodeCtx = null; }
+    }
+    if (_offlineDecodeCtx) return _offlineDecodeCtx;
+  }
+  if (!AC) throw new Error('Web Audio API unavailable; cannot decode samples.');
+  if (!_rtDecodeCtx) _rtDecodeCtx = new AC();
+  if (_rtDecodeCtx.state === 'suspended' && _rtDecodeCtx.resume) { try { await _rtDecodeCtx.resume(); } catch {} }
+  return _rtDecodeCtx;
+}
+
+function extractOrdinalId(url) {
+  if (!url || typeof url !== 'string') return null;
+  const m = url.match(/([a-f0-9]{64}i\d+)/i);
+  return m ? m[1].toLowerCase() : null;
+}
+
+/** Normalize any inscription reference to a canonical fetchable URL.
+ *  Preserves the OB1-critical behaviours: trailing #/? stripped, bare
+ *  64-hex ids accepted, everything lowercased, data: passed through. */
+function normalizeOrdUrl(input) {
+  if (!input || typeof input !== 'string') throw new Error('Missing Ordinal ID or URL');
+  const raw = input.trim();
+  if (!raw) throw new Error('Missing Ordinal ID or URL');
+  if (raw.startsWith('data:')) return raw;
+  const idMatch = raw.match(/([a-f0-9]{64}i\d+)/i);
+  if (idMatch) return `https://ordinals.com/content/${idMatch[1].toLowerCase()}`;
+  if (!/^https?:/i.test(raw)) throw new Error('Invalid Ordinal ID or URL');
+  const url = new URL(raw, 'https://ordinals.com');
+  const pathMatch = url.pathname.match(/\/content\/([a-f0-9]{64}i\d+)/i);
+  if (pathMatch) return `https://ordinals.com/content/${pathMatch[1].toLowerCase()}`;
+  return raw;
+}
+
+/** Fetch + decode any supported on-chain audio reference → AudioBuffer. */
+async function loadSample(src) {
+  const url = normalizeOrdUrl(src);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
+  const type = res.headers.get('Content-Type') || '';
+
+  // 1) Original Audional base64 JSON inscription
+  if (type.includes('application/json')) {
+    const { audioData } = await res.json();
+    if (!audioData) throw new Error("No 'audioData' in JSON");
+    const b64 = audioData.includes(',') ? audioData.split(',')[1] : audioData;
+    const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
+    const ctx = await getDecodingContext();
+    return await ctx.decodeAudioData(bin);
+  }
+
+  // 2) Direct audio (OB1 kit et al.) / video with an audio track
+  if (type.startsWith('audio/') || type.startsWith('video/')) {
+    const arrayBuffer = await res.arrayBuffer();
+    try {
+      const ctx = await getDecodingContext();
+      return await ctx.decodeAudioData(arrayBuffer.slice(0));
+    } catch (err) {
+      if (!type.startsWith('video/')) throw err;
+      return await extractAudioFromVideo(arrayBuffer, type);
+    }
+  }
+
+  // 3) HTML inscription with embedded audio — recurse into its source
+  const html = await res.text();
+  const m = html.match(/<audio[^>]+src=["']([^"']+)["']/i) || html.match(/src=["'](data:audio\/[^"']+)["']/i);
+  if (m) return loadSample(m[1].startsWith('http') || m[1].startsWith('data:') ? m[1] : new URL(m[1], url).href);
+
+  throw new Error(`Unsupported format: ${type || 'unknown'}`);
+}
+
+/** Capture the audio track of a video inscription via MediaRecorder. */
+async function extractAudioFromVideo(arrayBuffer, mimeType) {
+  if (typeof MediaRecorder !== 'function') throw new Error('MediaRecorder unavailable; cannot extract video audio.');
+  const blob = new Blob([arrayBuffer], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const video = document.createElement('video');
+  try {
+    video.src = url; video.crossOrigin = 'anonymous'; video.muted = true; video.playsInline = true;
+    await new Promise((res, rej) => { video.onloadedmetadata = res; video.onerror = () => rej(new Error('Failed to load video metadata')); });
+    const ctx = AC ? new AC() : null;
+    if (!ctx) throw new Error('Web Audio unavailable');
+    const dest = ctx.createMediaStreamDestination();
+    const srcNode = ctx.createMediaElementSource(video);
+    srcNode.connect(dest);
+    const chunks = [];
+    const rec = new MediaRecorder(dest.stream);
+    rec.ondataavailable = e => { if (e.data?.size) chunks.push(e.data); };
+    const done = new Promise((res, rej) => { rec.onstop = res; rec.onerror = ev => rej(ev.error || new Error('MediaRecorder error')); });
+    rec.start();
+    await video.play();
+    await new Promise(res => { video.onended = res; });
+    rec.stop(); await done; srcNode.disconnect();
+    const buf = await new Blob(chunks, { type: rec.mimeType || 'audio/webm' }).arrayBuffer();
+    return await ctx.decodeAudioData(buf);
+  } finally {
+    video.pause(); video.removeAttribute('src'); video.load(); video.remove();
+    URL.revokeObjectURL(url);
+  }
+}
+
+/** Registry: base library + runtime-added dynamic samples, with
+ *  ordinal-id and URL indexes so nothing is fetched or decoded twice. */
+const SampleRegistry = (() => {
+  const bufferCache = new Map();          // normalizedUrl -> Promise<AudioBuffer>
+  const dynamic = [];                     // descriptors appended after base list
+  const urlToIndex = new Map();           // normalizedUrl -> global index
+  const ordToIndex = new Map();           // ordinalId -> global index
+  ogSampleUrls.forEach((item, i) => {
+    try {
+      const nu = normalizeOrdUrl(item.value);
+      urlToIndex.set(nu, i);
+      const oid = extractOrdinalId(item.value);
+      if (oid) ordToIndex.set(oid, i);
+    } catch {}
+  });
+  const get = index => (index < ogSampleUrls.length ? ogSampleUrls[index] : dynamic[index - ogSampleUrls.length]) || null;
+  return {
+    get,
+    count: () => ogSampleUrls.length + dynamic.length,
+    baseCount: () => ogSampleUrls.length,
+    dynamicList: () => dynamic.slice(),
+    list() {
+      const out = [];
+      for (let i = 0; i < this.count(); i++) out.push({ index: i, ...get(i) });
+      return out;
+    },
+    findIndex(ref) {                      // by ordinal id or url
+      try {
+        const nu = normalizeOrdUrl(ref);
+        if (urlToIndex.has(nu)) return urlToIndex.get(nu);
+        const oid = extractOrdinalId(nu);
+        if (oid && ordToIndex.has(oid)) return ordToIndex.get(oid);
+      } catch {}
+      return -1;
+    },
+    registerDynamic({ url, name, bpm = null, isLoop = false }) {
+      const nu = normalizeOrdUrl(url);
+      const existing = this.findIndex(nu);
+      if (existing >= 0) {
+        const d = get(existing);
+        if (name && d && name !== d.text) d.text = name;
+        if (typeof bpm === 'number') d.bpm = bpm;
+        if (typeof isLoop === 'boolean' && isLoop !== undefined) d.isLoop = isLoop;
+        return existing;
+      }
+      const idx = this.count();
+      dynamic.push({ value: nu, text: name || (extractOrdinalId(nu) || nu).slice(0, 16) + '…', duration: null, bpm, isLoop });
+      urlToIndex.set(nu, idx);
+      const oid = extractOrdinalId(nu);
+      if (oid) ordToIndex.set(oid, idx);
+      return idx;
+    },
+    getBuffer(index) {
+      const d = get(index);
+      if (!d) return Promise.reject(new Error(`No sample at index ${index}`));
+      const key = d.value.startsWith('data:') ? d.value : normalizeOrdUrl(d.value);
+      if (!bufferCache.has(key)) {
+        const p = loadSample(d.value).then(buf => { if (d.duration == null) d.duration = buf.duration; return buf; });
+        p.catch(() => bufferCache.delete(key));   // allow retry after failure
+        bufferCache.set(key, p);
+      }
+      return bufferCache.get(key);
+    },
+    cached(index) {
+      const d = get(index);
+      if (!d) return null;
+      try {
+        const key = d.value.startsWith('data:') ? d.value : normalizeOrdUrl(d.value);
+        return bufferCache.has(key) ? bufferCache.get(key) : null;
+      } catch { return null; }
+    }
+  };
+})();
+
+/* ═══════════════════════ [state] ═══════════════════════
+   Strict split: projectState is exactly what SAVE/LOAD serialises;
+   runtimeState holds decoded buffers, cursors, handles — never saved. */
+const NUM_CHANNELS = 16;
+const NUM_STEPS = 64;
+
+const DEFAULT_INSERTS = () => ({
+  gate:   { on: false, threshold: -50 },
+  eq:     { on: false, low: 0, mid: 0, high: 0 },
+  comp:   { on: false, threshold: -24, ratio: 4 },
+  crush:  { on: false, bits: 8, reduction: 4 },
+  chorus: { on: false, rate: 1.5, depth: 0.004, mix: 0.4 },
+  phaser: { on: false, rate: 0.6, depth: 700, mix: 0.5 },
+  delay:  { on: false, time: 0.28, feedback: 0.35, mix: 0.3 },
+  reverb: { on: false, decay: 1.8, mix: 0.3 },
+});
+
+function makeChannel(i) {
+  return {
+    type: 'sampler',                     // 'sampler' | 'instrument'
+    name: `CH ${i + 1}`,
+    sourceIndex: i < 15 ? i : null,      // default-map the OB1 kit onto ch 1–15
+    mute: false, solo: false, volume: 0.85, pan: 0,
+    sampleRegion: { start: 0, end: 1 },  // 0..1 fractions of the buffer
+    fadeIn: 0, fadeOut: 0,               // seconds
+    rate: 1, reverse: false, allowOverlap: true, loopSync: true,
+    inserts: DEFAULT_INSERTS(),
+    synth: { wave: 'sawtooth', cutoff: 2200, attack: 0.01, release: 0.35, volume: 0.7 },
+    instrumentClip: null,                // { notes:[{t,n,d}], length }
+  };
+}
+const makeSequence = () =>
+  ({ steps: Array.from({ length: NUM_CHANNELS }, () => Array(NUM_STEPS).fill(0)) });
+
+const projectState = {
+  fmt: 'audional-unified-v1',
+  name: 'New Audional Project',
+  bpm: 120,
+  continuous: true,
+  currentSeq: 0,
+  sequences: [makeSequence()],
+  channels: Array.from({ length: NUM_CHANNELS }, (_, i) => makeChannel(i)),
+};
+
+const runtimeState = {
+  buffers: new Array(NUM_CHANNELS).fill(null),          // AudioBuffer per channel
+  reversed: new Array(NUM_CHANNELS).fill(null),         // cached reversed buffers
+  lastSource: new Array(NUM_CHANNELS).fill(null),       // for allowOverlap:false
+  errors: new Array(NUM_CHANNELS).fill(null),
+  loadingChannels: new Set(),
+  copiedSteps: null,
+  playing: false,
+  playSeq: 0,
+  uiStep: -1,
+  recordArm: new Array(NUM_CHANNELS).fill(false),
+};
+
+function channelAudible(i) {
+  const anySolo = projectState.channels.some(c => c.solo);
+  const c = projectState.channels[i];
+  return !c.mute && (!anySolo || c.solo);
+}
+/* ═══════════════════════ [engine] ═══════════════════════
+   AudioContext, master bus, per-channel strips, and the inline
+   AudioWorklet module (clock + gate + bitcrusher processors).
+   The clock worklet is the transport's wake source — no setInterval
+   scheduling; audio events are placed at exact context times. */
+
+const WORKLET_CODE = `
+class AudClock extends AudioWorkletProcessor{
+  constructor(){super();this.run=false;this.last=0;
+    this.port.onmessage=e=>{if(e.data==='start')this.run=true;else if(e.data==='stop')this.run=false;};}
+  process(){if(this.run&&currentTime-this.last>0.045){this.last=currentTime;this.port.postMessage(currentTime);}return true;}
+}
+registerProcessor('aud-clock',AudClock);
+class AudGate extends AudioWorkletProcessor{
+  static get parameterDescriptors(){return[{name:'threshold',defaultValue:-50,minValue:-80,maxValue:0}];}
+  constructor(){super();this.env=0;this.g=0;}
+  process(inputs,outputs,params){
+    const inp=inputs[0],out=outputs[0];
+    if(!inp||!inp.length){return true;}
+    const th=Math.pow(10,params.threshold[0]/20);
+    const n=out[0].length;
+    for(let i=0;i<n;i++){
+      let a=0;for(let c=0;c<inp.length;c++){const s=inp[c][i]||0;const ab=s<0?-s:s;if(ab>a)a=ab;}
+      this.env=a>this.env?a:this.env*0.9995;
+      const target=this.env>th?1:0;
+      this.g+=(target-this.g)*(target>this.g?0.02:0.0008);
+      for(let c=0;c<out.length;c++)out[c][i]=(inp[c]?inp[c][i]:0)*this.g;
+    }
+    return true;
+  }
+}
+registerProcessor('aud-gate',AudGate);
+class AudCrush extends AudioWorkletProcessor{
+  static get parameterDescriptors(){return[
+    {name:'bits',defaultValue:8,minValue:1,maxValue:16},
+    {name:'reduction',defaultValue:4,minValue:1,maxValue:40}];}
+  constructor(){super();this.phase=0;this.hold=[0,0];}
+  process(inputs,outputs,params){
+    const inp=inputs[0],out=outputs[0];
+    if(!inp||!inp.length){return true;}
+    const levels=Math.pow(2,params.bits[0]);
+    const red=Math.max(1,Math.round(params.reduction[0]));
+    const n=out[0].length;
+    for(let i=0;i<n;i++){
+      if(this.phase%red===0){
+        for(let c=0;c<out.length;c++){
+          const v=inp[c]?inp[c][i]||0:0;
+          this.hold[c]=Math.round(v*levels)/levels;
+        }
+      }
+      this.phase++;
+      for(let c=0;c<out.length;c++)out[c][i]=this.hold[c]||0;
+    }
+    return true;
+  }
+}
+registerProcessor('aud-crush',AudCrush);
+`;
+
+const Engine = {
+  ctx: null, master: null, limiter: null, clock: null,
+  workletOK: false, ready: false, strips: [],
+  _impulseCache: new Map(),
+
+  async init() {
+    if (this.ready) { if (this.ctx.state === 'suspended') await this.ctx.resume().catch(() => {}); return; }
+    if (!AC) { statusMsg('Web Audio API not available in this browser', 'err'); throw new Error('no WebAudio'); }
+    this.ctx = new AC({ latencyHint: 'interactive' });
+    if (this.ctx.state === 'suspended') await this.ctx.resume().catch(() => {});
+
+    this.master = this.ctx.createGain();
+    this.master.gain.value = num(qs('#master-vol').value, 0.9);
+    this.limiter = this.ctx.createDynamicsCompressor();      // safety limiter
+    this.limiter.threshold.value = -3; this.limiter.ratio.value = 12;
+    this.limiter.attack.value = 0.002; this.limiter.release.value = 0.15;
+    this.master.connect(this.limiter).connect(this.ctx.destination);
+
+    try {
+      // data: URL first — works on file://, https://, and inside inscriptions;
+      // blob: URL as fallback for engines that reject long data: module URLs.
+      try {
+        await this.ctx.audioWorklet.addModule('data:application/javascript;base64,' + btoa(WORKLET_CODE));
+      } catch {
+        const url = URL.createObjectURL(new Blob([WORKLET_CODE], { type: 'application/javascript' }));
+        await this.ctx.audioWorklet.addModule(url);
+        URL.revokeObjectURL(url);
+      }
+      this.workletOK = true;
+      this.clock = new AudioWorkletNode(this.ctx, 'aud-clock');
+      const sink = this.ctx.createGain(); sink.gain.value = 0;   // keep processor alive
+      this.clock.connect(sink).connect(this.ctx.destination);
+      this.clock.port.onmessage = () => Transport.tick();
+    } catch (e) {
+      console.warn('[Engine] AudioWorklet unavailable — falling back to timer wake for the scheduler (events still land at exact ctx times).', e);
+      this.workletOK = false;
+      setInterval(() => Transport.tick(), 25);
+    }
+
+    for (let i = 0; i < NUM_CHANNELS; i++) this.strips.push(this._makeStrip(i));
+    this.ready = true;
+    for (let i = 0; i < NUM_CHANNELS; i++) { this.rebuildChain(i); this.applyMixer(i); }
+    statusMsg('audio engine running' + (this.workletOK ? ' (AudioWorklet clock)' : ' (fallback clock)'), 'ok');
+  },
+
+  _makeStrip(i) {
+    const c = this.ctx;
+    const input = c.createGain();
+    const vol = c.createGain();
+    const pan = c.createStereoPanner ? c.createStereoPanner() : c.createGain();
+    vol.connect(pan).connect(this.master);
+    return { input, vol, pan, chain: [], lfos: [], fxRefs: {} };
+  },
+
+  applyMixer(i) {
+    if (!this.ready) return;
+    const s = this.strips[i], c = projectState.channels[i];
+    const target = channelAudible(i) ? c.volume : 0;
+    s.vol.gain.setTargetAtTime(target, this.ctx.currentTime, 0.01);
+    if (s.pan.pan) s.pan.pan.setTargetAtTime(c.pan, this.ctx.currentTime, 0.01);
+  },
+
+  /* ═══════════ [effects] — per-channel insert chain ═══════════
+     Order: gate → EQ → comp → crush → chorus → phaser → delay → reverb.
+     Rebuilt on enable/disable; param moves update AudioParams in place. */
+  rebuildChain(i) {
+    if (!this.ready) return;
+    const s = this.strips[i], c = projectState.channels[i], x = this.ctx;
+    try { s.input.disconnect(); } catch {}
+    for (const n of s.chain) { try { n.disconnect(); } catch {} }
+    for (const o of s.lfos) { try { o.stop(); } catch {} try { o.disconnect(); } catch {} }
+    s.chain = []; s.lfos = []; s.fxRefs = {};
+
+    const units = [];
+    const ins = c.inserts;
+    const track = u => { s.chain.push(...u.nodes); s.lfos.push(...(u.lfos || [])); return u; };
+
+    if (ins.gate.on && this.workletOK) {
+      const g = new AudioWorkletNode(x, 'aud-gate');
+      g.parameters.get('threshold').value = ins.gate.threshold;
+      units.push(track({ in: g, out: g, nodes: [g] }));
+      s.fxRefs.gate = p => g.parameters.get('threshold').setValueAtTime(p.threshold, x.currentTime);
+    }
+    if (ins.eq.on) {
+      const lo = x.createBiquadFilter(); lo.type = 'lowshelf';  lo.frequency.value = 200;
+      const mi = x.createBiquadFilter(); mi.type = 'peaking';   mi.frequency.value = 1000; mi.Q.value = 0.9;
+      const hi = x.createBiquadFilter(); hi.type = 'highshelf'; hi.frequency.value = 4200;
+      lo.gain.value = ins.eq.low; mi.gain.value = ins.eq.mid; hi.gain.value = ins.eq.high;
+      lo.connect(mi).connect(hi);
+      units.push(track({ in: lo, out: hi, nodes: [lo, mi, hi] }));
+      s.fxRefs.eq = p => { lo.gain.value = p.low; mi.gain.value = p.mid; hi.gain.value = p.high; };
+    }
+    if (ins.comp.on) {
+      const cp = x.createDynamicsCompressor();
+      cp.threshold.value = ins.comp.threshold; cp.ratio.value = ins.comp.ratio;
+      cp.knee.value = 8; cp.attack.value = 0.004; cp.release.value = 0.18;
+      units.push(track({ in: cp, out: cp, nodes: [cp] }));
+      s.fxRefs.comp = p => { cp.threshold.value = p.threshold; cp.ratio.value = p.ratio; };
+    }
+    if (ins.crush.on && this.workletOK) {
+      const cr = new AudioWorkletNode(x, 'aud-crush');
+      cr.parameters.get('bits').value = ins.crush.bits;
+      cr.parameters.get('reduction').value = ins.crush.reduction;
+      units.push(track({ in: cr, out: cr, nodes: [cr] }));
+      s.fxRefs.crush = p => { cr.parameters.get('bits').value = p.bits; cr.parameters.get('reduction').value = p.reduction; };
+    }
+    if (ins.chorus.on) {
+      const inG = x.createGain(), out = x.createGain(), dry = x.createGain(), wet = x.createGain();
+      const dl = x.createDelay(0.1); dl.delayTime.value = 0.025;
+      const lfo = x.createOscillator(), lg = x.createGain();
+      lfo.frequency.value = ins.chorus.rate; lg.gain.value = ins.chorus.depth;
+      lfo.connect(lg).connect(dl.delayTime); lfo.start();
+      dry.gain.value = 1 - ins.chorus.mix; wet.gain.value = ins.chorus.mix;
+      inG.connect(dry).connect(out); inG.connect(dl).connect(wet).connect(out);
+      units.push(track({ in: inG, out, nodes: [inG, out, dry, wet, dl, lg], lfos: [lfo] }));
+      s.fxRefs.chorus = p => { lfo.frequency.value = p.rate; lg.gain.value = p.depth; dry.gain.value = 1 - p.mix; wet.gain.value = p.mix; };
+    }
+    if (ins.phaser.on) {
+      const inG = x.createGain(), out = x.createGain(), dry = x.createGain(), wet = x.createGain();
+      const aps = [];
+      let prev = inG;
+      for (let k = 0; k < 4; k++) {
+        const ap = x.createBiquadFilter(); ap.type = 'allpass'; ap.frequency.value = 400 + k * 350; ap.Q.value = 0.6;
+        prev.connect(ap); prev = ap; aps.push(ap);
+      }
+      const lfo = x.createOscillator(), lg = x.createGain();
+      lfo.frequency.value = ins.phaser.rate; lg.gain.value = ins.phaser.depth;
+      for (const ap of aps) lg.connect(ap.frequency);
+      lfo.connect(lg); lfo.start();
+      dry.gain.value = 1 - ins.phaser.mix; wet.gain.value = ins.phaser.mix;
+      inG.connect(dry).connect(out); prev.connect(wet).connect(out);
+      units.push(track({ in: inG, out, nodes: [inG, out, dry, wet, lg, ...aps], lfos: [lfo] }));
+      s.fxRefs.phaser = p => { lfo.frequency.value = p.rate; lg.gain.value = p.depth; dry.gain.value = 1 - p.mix; wet.gain.value = p.mix; };
+    }
+    if (ins.delay.on) {
+      const inG = x.createGain(), out = x.createGain(), dry = x.createGain(), wet = x.createGain();
+      const dl = x.createDelay(2); dl.delayTime.value = ins.delay.time;
+      const fb = x.createGain(); fb.gain.value = clamp(ins.delay.feedback, 0, 0.92);
+      dry.gain.value = 1 - ins.delay.mix; wet.gain.value = ins.delay.mix;
+      inG.connect(dry).connect(out);
+      inG.connect(dl); dl.connect(wet).connect(out); dl.connect(fb).connect(dl);
+      units.push(track({ in: inG, out, nodes: [inG, out, dry, wet, dl, fb] }));
+      s.fxRefs.delay = p => { dl.delayTime.value = p.time; fb.gain.value = clamp(p.feedback, 0, 0.92); dry.gain.value = 1 - p.mix; wet.gain.value = p.mix; };
+    }
+    if (ins.reverb.on) {
+      const inG = x.createGain(), out = x.createGain(), dry = x.createGain(), wet = x.createGain();
+      const cv = x.createConvolver(); cv.buffer = this._impulse(ins.reverb.decay);
+      dry.gain.value = 1 - ins.reverb.mix; wet.gain.value = ins.reverb.mix;
+      inG.connect(dry).connect(out); inG.connect(cv).connect(wet).connect(out);
+      units.push(track({ in: inG, out, nodes: [inG, out, dry, wet, cv] }));
+      s.fxRefs.reverb = p => { cv.buffer = this._impulse(p.decay); dry.gain.value = 1 - p.mix; wet.gain.value = p.mix; };
+    }
+
+    let prev = s.input;
+    for (const u of units) { prev.connect(u.in); prev = u.out; }
+    prev.connect(s.vol);
+  },
+
+  _impulse(decay) {
+    const key = Math.round(clamp(decay, 0.2, 6) * 10) / 10;
+    if (this._impulseCache.has(key)) return this._impulseCache.get(key);
+    const sr = this.ctx.sampleRate, len = Math.max(1, Math.floor(sr * key));
+    const buf = this.ctx.createBuffer(2, len, sr);
+    for (let c = 0; c < 2; c++) {
+      const d = buf.getChannelData(c);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6);
+    }
+    this._impulseCache.set(key, buf);
+    return buf;
+  },
+};
+
+/* ═══════════════════════ [synth] ═══════════════════════
+   Lean polyphonic instrument (2 detuned oscs → lowpass → ADSR gain),
+   hosted BY the sequencer as a clean instrument-channel component
+   (the BOP lesson: integrate, don't fuse). Routed through the channel
+   strip so inserts apply to synth channels too. */
+class SimpleSynth {
+  constructor(ctx, dest, settings) {
+    this.ctx = ctx; this.settings = settings;
+    this.out = ctx.createGain(); this.out.gain.value = 1;
+    this.out.connect(dest);
+    this.voices = new Map();
+  }
+  _mkVoice(n, t) {
+    const s = this.settings, x = this.ctx;
+    const f = 440 * Math.pow(2, (n - 69) / 12);
+    const o1 = x.createOscillator(); o1.type = s.wave; o1.frequency.value = f;
+    const o2 = x.createOscillator(); o2.type = s.wave; o2.frequency.value = f; o2.detune.value = 8;
+    const filt = x.createBiquadFilter(); filt.type = 'lowpass'; filt.frequency.value = s.cutoff; filt.Q.value = 0.8;
+    const g = x.createGain(); g.gain.value = 0;
+    o1.connect(filt); o2.connect(filt); filt.connect(g); g.connect(this.out);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(s.volume * 0.5, t + Math.max(0.003, s.attack));
+    o1.start(t); o2.start(t);
+    return { o1, o2, g };
+  }
+  noteOn(n, time = null, dur = null) {
+    const t = time ?? this.ctx.currentTime;
+    const s = this.settings;
+    const v = this._mkVoice(n, t);
+    if (dur != null) {
+      const te = t + Math.max(dur, 0.02);
+      v.g.gain.setValueAtTime(s.volume * 0.5, Math.max(te, t + s.attack + 0.001));
+      v.g.gain.linearRampToValueAtTime(0.0001, te + s.release);
+      v.o1.stop(te + s.release + 0.06); v.o2.stop(te + s.release + 0.06);
+    } else {
+      this.noteOff(n, null, true);           // retrigger safety
+      this.voices.set(n, v);
+    }
+  }
+  noteOff(n, time = null, silent = false) {
+    const v = this.voices.get(n);
+    if (!v) return;
+    this.voices.delete(n);
+    const s = this.settings, t = time ?? this.ctx.currentTime;
+    const rel = silent ? 0.01 : s.release;
+    try {
+      v.g.gain.cancelScheduledValues(t);
+      v.g.gain.setValueAtTime(Math.max(v.g.gain.value, 0.0001), t);
+      v.g.gain.linearRampToValueAtTime(0.0001, t + rel);
+      v.o1.stop(t + rel + 0.06); v.o2.stop(t + rel + 0.06);
+    } catch {}
+  }
+  allOff() { for (const n of [...this.voices.keys()]) this.noteOff(n); }
+}
+
+const liveSynths = new Array(NUM_CHANNELS).fill(null);
+function getSynth(i) {
+  if (!Engine.ready) return null;
+  if (!liveSynths[i]) liveSynths[i] = new SimpleSynth(Engine.ctx, Engine.strips[i].input, projectState.channels[i].synth);
+  liveSynths[i].settings = projectState.channels[i].synth;   // re-bind after project load
+  return liveSynths[i];
+}
+
+// Clip recording (per instrument channel)
+const recState = { chan: -1, start: 0, pending: new Map(), notes: [] };
+function startRecording(i) {
+  recState.chan = i; recState.start = Engine.ctx.currentTime;
+  recState.pending.clear(); recState.notes = [];
+  statusMsg(`recording clip on CH ${i + 1} — play the keys, then hit REC again to stop`);
+}
+function stopRecording() {
+  const i = recState.chan;
+  if (i < 0) return;
+  const now = Engine.ctx.currentTime;
+  for (const [n, t0] of recState.pending) recState.notes.push({ t: t0, n, d: Math.max(0.05, now - recState.start - t0) });
+  recState.pending.clear();
+  if (recState.notes.length) {
+    const end = Math.max(...recState.notes.map(x => x.t + x.d));
+    projectState.channels[i].instrumentClip = { notes: recState.notes.map(x => ({ t: +x.t.toFixed(4), n: x.n, d: +x.d.toFixed(4) })), length: +end.toFixed(4) };
+    statusMsg(`clip saved on CH ${i + 1}: ${recState.notes.length} notes — steps now retrigger it`, 'ok');
+  } else statusMsg('recording stopped — no notes captured');
+  recState.chan = -1;
+}
+function synthKeyDown(i, n) {
+  const sy = getSynth(i); if (!sy) return;
+  sy.noteOn(n);
+  if (recState.chan === i) recState.pending.set(n, Engine.ctx.currentTime - recState.start);
+}
+function synthKeyUp(i, n) {
+  const sy = getSynth(i); if (!sy) return;
+  sy.noteOff(n);
+  if (recState.chan === i && recState.pending.has(n)) {
+    const t0 = recState.pending.get(n); recState.pending.delete(n);
+    recState.notes.push({ t: t0, n, d: Math.max(0.05, Engine.ctx.currentTime - recState.start - t0) });
+  }
+}
+
+/* ═══════════════════════ [playback] ═══════════════════════ */
+function getReversed(i, buf) {
+  if (runtimeState.reversed[i]?.__src === buf) return runtimeState.reversed[i];
+  const r = Engine.ctx.createBuffer(buf.numberOfChannels, buf.length, buf.sampleRate);
+  for (let c = 0; c < buf.numberOfChannels; c++) {
+    const s = buf.getChannelData(c), d = r.getChannelData(c);
+    for (let k = 0, L = s.length; k < L; k++) d[k] = s[L - 1 - k];
+  }
+  r.__src = buf;
+  runtimeState.reversed[i] = r;
+  return r;
+}
+
+function loadChannelBuffer(i) {
+  const ch = projectState.channels[i];
+  if (ch.sourceIndex == null || runtimeState.loadingChannels.has(i)) return;
+  runtimeState.loadingChannels.add(i);
+  updateChanErr(i, 'loading');
+  SampleRegistry.getBuffer(ch.sourceIndex)
+    .then(buf => {
+      runtimeState.buffers[i] = buf; runtimeState.reversed[i] = null; runtimeState.errors[i] = null;
+      updateChanErr(i);
+      if (waveModal.chan === i) drawWave(i);
+    })
+    .catch(e => {
+      runtimeState.errors[i] = e.message || String(e);
+      updateChanErr(i);
+      statusMsg(`CH ${i + 1} sample failed: ${runtimeState.errors[i]}`, 'err');
+    })
+    .finally(() => runtimeState.loadingChannels.delete(i));
+}
+
+function triggerSampler(i, time) {
+  const ch = projectState.channels[i];
+  const buf0 = runtimeState.buffers[i];
+  if (!buf0) { loadChannelBuffer(i); return; }               // will sound once loaded
+  const buf = ch.reverse ? getReversed(i, buf0) : buf0;
+  const st = clamp(num(ch.sampleRegion.start, 0), 0, 1), en = clamp(num(ch.sampleRegion.end, 1), 0, 1);
+  const offset = st * buf.duration, dur = (en - st) * buf.duration;
+  if (dur <= 0.002) return;
+  let rate = clamp(num(ch.rate, 1), 0.1, 8);
+  const meta = SampleRegistry.get(ch.sourceIndex);
+  if (ch.loopSync && meta?.isLoop && meta.bpm) rate *= projectState.bpm / meta.bpm;
+
+  const x = Engine.ctx;
+  const src = x.createBufferSource(); src.buffer = buf; src.playbackRate.value = rate;
+  const g = x.createGain();
+  src.connect(g); g.connect(Engine.strips[i].input);
+
+  const playDur = dur / rate;
+  const fi = clamp(num(ch.fadeIn, 0), 0, playDur * 0.45);
+  const fo = clamp(num(ch.fadeOut, 0), 0, playDur * 0.45);
+  g.gain.setValueAtTime(fi > 0 ? 0.0001 : 1, time);
+  if (fi > 0) g.gain.linearRampToValueAtTime(1, time + fi);
+  if (fo > 0) { g.gain.setValueAtTime(1, time + playDur - fo); g.gain.linearRampToValueAtTime(0.0001, time + playDur); }
+
+  if (!ch.allowOverlap && runtimeState.lastSource[i]) { try { runtimeState.lastSource[i].stop(time); } catch {} }
+  runtimeState.lastSource[i] = src;
+  try { src.start(time, offset, dur); } catch (e) { console.warn('trigger failed', e); }
+}
+
+function triggerInstrument(i, time) {
+  const sy = getSynth(i); if (!sy) return;
+  const clip = projectState.channels[i].instrumentClip;
+  if (clip?.notes?.length) {
+    for (const nt of clip.notes) sy.noteOn(nt.n, time + nt.t, nt.d);
+  } else {
+    sy.noteOn(48 + (i % 12), time, Transport.stepDur() * 0.9);  // audible default before a clip exists
+  }
+}
+
+/* ═══════════════════════ [transport] ═══════════════════════
+   Lookahead scheduler woken by the AudioWorklet clock. Every trigger is
+   scheduled at an exact AudioContext time; changing BPM mid-play keeps
+   phase continuity (next boundary unchanged, subsequent steps respaced). */
+const uiQueue = [];
+const Transport = {
+  lookahead: 0.18,
+  nextTime: 0, step: 0,
+  stepDur() { return 60 / projectState.bpm / 4; },   // 16th notes
+  async start() {
+    await Engine.init();
+    if (runtimeState.playing) return;
+    runtimeState.playing = true;
+    runtimeState.playSeq = projectState.currentSeq;
+    this.step = 0;
+    this.nextTime = Engine.ctx.currentTime + 0.08;
+    preloadUsedChannels();
+    if (Engine.clock) Engine.clock.port.postMessage('start');
+    qs('#play').textContent = '▶ PLAYING';
+    this.tick();
+  },
+  stop() {
+    if (!Engine.ready) return;
+    runtimeState.playing = false;
+    if (Engine.clock) Engine.clock.port.postMessage('stop');
+    for (let i = 0; i < NUM_CHANNELS; i++) {
+      const s = runtimeState.lastSource[i];
+      if (s) { try { s.stop(); } catch {} runtimeState.lastSource[i] = null; }
+      if (liveSynths[i]) liveSynths[i].allOff();
+    }
+    uiQueue.length = 0;
+    setPlayhead(-1);
+    qs('#play').textContent = '▶ PLAY';
+  },
+  tick() {
+    if (!runtimeState.playing || !Engine.ready) return;
+    const now = Engine.ctx.currentTime;
+    while (this.nextTime < now + this.lookahead) {
+      this.scheduleStep(this.step, this.nextTime);
+      uiQueue.push({ step: this.step, time: this.nextTime, seq: runtimeState.playSeq });
+      this.step++;
+      if (this.step >= NUM_STEPS) {
+        this.step = 0;
+        if (projectState.continuous && projectState.sequences.length > 1)
+          runtimeState.playSeq = (runtimeState.playSeq + 1) % projectState.sequences.length;
+      }
+      this.nextTime += this.stepDur();
+    }
+  },
+  scheduleStep(step, time) {
+    const seq = projectState.sequences[runtimeState.playSeq];
+    if (!seq) return;
+    for (let i = 0; i < NUM_CHANNELS; i++) {
+      if (!seq.steps[i][step]) continue;
+      const ch = projectState.channels[i];
+      try {
+        if (ch.type === 'sampler') triggerSampler(i, time);
+        else triggerInstrument(i, time);
+      } catch (e) { console.warn(`CH ${i + 1} trigger error`, e); }
+    }
+  },
+};
+
+function preloadUsedChannels() {
+  for (let i = 0; i < NUM_CHANNELS; i++) {
+    const ch = projectState.channels[i];
+    if (ch.type === 'sampler' && ch.sourceIndex != null && !runtimeState.buffers[i]) loadChannelBuffer(i);
+  }
+}
+/* ═══════════════════════ [ui] ═══════════════════════ */
+const stepBtns = [];      // [chan][step] -> button
+const rowEls = [];        // channel row elements
+const errDots = [];
+const selHolders = [];    // per-channel source-select container
+
+function buildSampleOptions(sel, selectedIndex) {
+  sel.innerHTML = '';
+  sel.append(el('option', { value: '', text: '— no sample —' }));
+  for (const d of SampleRegistry.list())
+    sel.append(el('option', { value: String(d.index), text: d.text + (d.isLoop ? ' ⟳' : '') }));
+  sel.append(el('option', { value: '__add', text: '＋ Add from Ordinal…' }));
+  sel.value = selectedIndex == null ? '' : String(selectedIndex);
+}
+function refreshAllSelects() {
+  projectState.channels.forEach((c, i) => {
+    const sel = selHolders[i]?.querySelector('select');
+    if (sel) buildSampleOptions(sel, c.sourceIndex);
+  });
+}
+
+function updateChanErr(i, loading) {
+  const d = errDots[i]; if (!d) return;
+  const err = runtimeState.errors[i];
+  d.className = 'chan-err' + (err ? ' on' : '');
+  d.title = err ? `Load failed: ${err}` : (loading === 'loading' ? 'loading…' : '');
+  d.style.background = loading === 'loading' ? 'var(--acc)' : '';
+}
+
+function renderChannels() {
+  const host = qs('#channels');
+  host.innerHTML = '';
+  stepBtns.length = rowEls.length = errDots.length = selHolders.length = 0;
+
+  projectState.channels.forEach((c, i) => {
+    const row = el('div', { class: 'chan' });
+    rowEls.push(row);
+
+    // ── left panel
+    const side = el('div', { class: 'chan-side' });
+    const r1 = el('div', { class: 'chan-row1' });
+    r1.append(el('span', { class: 'chan-num', text: String(i + 1) }));
+    const dot = el('span', { class: 'chan-err' }); errDots.push(dot); r1.append(dot);
+    r1.append(el('button', {
+      class: 'mini', title: 'Toggle channel type: sampler ↔ instrument (synth)',
+      text: c.type === 'sampler' ? '📼' : '🎹',
+      onclick: async () => {
+        c.type = c.type === 'sampler' ? 'instrument' : 'sampler';
+        renderChannels();
+      },
+    }));
+    const selHold = el('span', { style: 'flex:1;min-width:0;display:flex' });
+    selHolders.push(selHold);
+    if (c.type === 'sampler') {
+      const sel = el('select', { class: 'chan-select', title: 'On-chain sample source' });
+      buildSampleOptions(sel, c.sourceIndex);
+      sel.addEventListener('change', () => {
+        if (sel.value === '__add') { addOrdinalSample(i, sel); return; }
+        c.sourceIndex = sel.value === '' ? null : +sel.value;
+        runtimeState.buffers[i] = null; runtimeState.reversed[i] = null; runtimeState.errors[i] = null;
+        updateChanErr(i);
+        if (c.sourceIndex != null && Engine.ready) loadChannelBuffer(i);
+      });
+      selHold.append(sel);
+    } else {
+      selHold.append(el('button', {
+        class: 'mini', style: 'flex:1', text: `🎹 ${c.instrumentClip ? 'SYNTH · clip ✓' : 'OPEN SYNTH'}`,
+        onclick: async () => { await Engine.init(); openSynth(i); },
+      }));
+    }
+    r1.append(selHold);
+    side.append(r1);
+
+    const r2 = el('div', { class: 'chan-row2' });
+    r2.append(el('button', {
+      class: 'mini mute' + (c.mute ? ' toggled' : ''), text: 'M', title: 'Mute',
+      onclick: e => { c.mute = !c.mute; e.target.classList.toggle('toggled', c.mute);
+        for (let k = 0; k < NUM_CHANNELS; k++) Engine.applyMixer(k); },
+    }));
+    r2.append(el('button', {
+      class: 'mini solo' + (c.solo ? ' toggled' : ''), text: 'S', title: 'Solo',
+      onclick: e => { c.solo = !c.solo; e.target.classList.toggle('toggled', c.solo);
+        for (let k = 0; k < NUM_CHANNELS; k++) Engine.applyMixer(k); },
+    }));
+    const vol = el('input', { type: 'range', min: 0, max: 1, step: 0.01, title: 'Volume' });
+    vol.value = c.volume;
+    vol.addEventListener('input', () => { c.volume = +vol.value; Engine.applyMixer(i); });
+    r2.append(vol);
+    const pan = el('input', { type: 'range', class: 'pan', min: -1, max: 1, step: 0.02, title: 'Pan' });
+    pan.value = c.pan;
+    pan.addEventListener('input', () => { c.pan = +pan.value; Engine.applyMixer(i); });
+    pan.addEventListener('dblclick', () => { c.pan = 0; pan.value = 0; Engine.applyMixer(i); });
+    r2.append(pan);
+    if (c.type === 'sampler')
+      r2.append(el('button', { class: 'mini', text: 'WAVE', title: 'Waveform / trim / fades / rate',
+        onclick: async () => { await Engine.init(); openWave(i); } }));
+    r2.append(el('button', { class: 'mini', text: 'FX', title: 'Insert effects rack',
+      onclick: async () => { await Engine.init(); openFx(i); } }));
+    r2.append(el('button', { class: 'mini', text: '⧉', title: 'Copy this channel’s steps (current sequence)',
+      onclick: () => { runtimeState.copiedSteps = projectState.sequences[projectState.currentSeq].steps[i].slice(); statusMsg(`copied CH ${i + 1} pattern`); } }));
+    r2.append(el('button', { class: 'mini', text: '⇩', title: 'Paste copied steps into this channel',
+      onclick: () => { if (!runtimeState.copiedSteps) return statusMsg('nothing copied yet');
+        projectState.sequences[projectState.currentSeq].steps[i] = runtimeState.copiedSteps.slice();
+        refreshStepStates(); statusMsg(`pasted pattern into CH ${i + 1}`); } }));
+    side.append(r2);
+    row.append(side);
+
+    // ── step grid
+    const grid = el('div', { class: 'steps' });
+    const btns = [];
+    for (let sIdx = 0; sIdx < NUM_STEPS; sIdx++) {
+      const b = el('button', { class: 'step', title: `CH ${i + 1} · step ${sIdx + 1}` });
+      const cap = sIdx;
+      b.addEventListener('click', () => {
+        const seq = projectState.sequences[projectState.currentSeq];
+        seq.steps[i][cap] = seq.steps[i][cap] ? 0 : 1;
+        b.classList.toggle('on', !!seq.steps[i][cap]);
+      });
+      btns.push(b); grid.append(b);
+    }
+    stepBtns.push(btns);
+    row.append(grid);
+    host.append(row);
+  });
+  refreshStepStates();
+}
+
+function refreshStepStates() {
+  const seq = projectState.sequences[projectState.currentSeq];
+  for (let i = 0; i < NUM_CHANNELS; i++)
+    for (let s = 0; s < NUM_STEPS; s++)
+      stepBtns[i]?.[s]?.classList.toggle('on', !!seq.steps[i][s]);
+  qs('#seq-label').textContent = `SEQ ${projectState.currentSeq + 1}/${projectState.sequences.length}`;
+}
+
+let lastPlayCol = -1;
+function setPlayhead(step, seq = null) {
+  if (seq != null && seq !== projectState.currentSeq) {
+    projectState.currentSeq = seq;
+    refreshStepStates();
+  }
+  if (lastPlayCol >= 0)
+    for (let i = 0; i < NUM_CHANNELS; i++) stepBtns[i]?.[lastPlayCol]?.classList.remove('play');
+  lastPlayCol = step;
+  if (step >= 0)
+    for (let i = 0; i < NUM_CHANNELS; i++) stepBtns[i]?.[step]?.classList.add('play');
+}
+function uiLoop() {
+  if (Engine.ready) {
+    const now = Engine.ctx.currentTime;
+    while (uiQueue.length && uiQueue[0].time <= now + 0.02) {
+      const ev = uiQueue.shift();
+      setPlayhead(ev.step, ev.seq);
+    }
+  }
+  requestAnimationFrame(uiLoop);
+}
+
+function addOrdinalSample(i, sel) {
+  const c = projectState.channels[i];
+  try {
+    const ref = prompt('Ordinal ID or URL of the on-chain audio\n(OB1, Audional base64 JSON, HTML-embedded and data: URIs all work):');
+    if (!ref) { buildSampleOptions(sel, c.sourceIndex); return; }
+    const name = prompt('Name for this sample (optional):') || '';
+    const bpmS = prompt('BPM if this is a tempo-synced loop (leave blank for one-shot):') || '';
+    const bpm = bpmS.trim() === '' ? null : num(bpmS, null);
+    const idx = SampleRegistry.registerDynamic({ url: ref, name: name.trim() || undefined, bpm, isLoop: bpm != null });
+    c.sourceIndex = idx;
+    runtimeState.buffers[i] = null; runtimeState.reversed[i] = null; runtimeState.errors[i] = null;
+    refreshAllSelects();
+    if (Engine.ready) loadChannelBuffer(i);
+    statusMsg(`registered on-chain sample → CH ${i + 1}`, 'ok');
+  } catch (e) {
+    statusMsg(`could not add sample: ${e.message}`, 'err');
+    buildSampleOptions(sel, c.sourceIndex);
+  }
+}
+
+/* ── modal framework ── */
+const waveModal = { chan: -1 };
+let synthModalChan = -1;
+function openModal(title, build) {
+  qs('#modal-title').textContent = title;
+  const body = qs('#modal-body');
+  body.innerHTML = '';
+  build(body);
+  qs('#backdrop').classList.add('open');
+}
+function closeModal() {
+  qs('#backdrop').classList.remove('open');
+  waveModal.chan = -1;
+  if (synthModalChan >= 0 && recState.chan === synthModalChan) stopRecording();
+  synthModalChan = -1;
+}
+qs('#modal-close').addEventListener('click', closeModal);
+qs('#backdrop').addEventListener('click', e => { if (e.target === qs('#backdrop')) closeModal(); });
+
+/* ── FX rack modal ── */
+const FX_DEFS = [
+  ['gate',   'GATE',        'worklet noise gate',        [['threshold', -80, 0, 1, 'dB']]],
+  ['eq',     'EQ 3-BAND',   '200 / 1k / 4.2k',           [['low', -15, 15, .5, 'dB'], ['mid', -15, 15, .5, 'dB'], ['high', -15, 15, .5, 'dB']]],
+  ['comp',   'COMPRESSOR',  '',                          [['threshold', -60, 0, 1, 'dB'], ['ratio', 1, 20, .5, ':1']]],
+  ['crush',  'BITCRUSHER',  'worklet',                   [['bits', 1, 16, 1, 'bit'], ['reduction', 1, 40, 1, '÷sr']]],
+  ['chorus', 'CHORUS',      '',                          [['rate', .05, 8, .05, 'Hz'], ['depth', 0, .02, .0005, 's'], ['mix', 0, 1, .01, '']]],
+  ['phaser', 'PHASER',      '4-stage allpass',           [['rate', .05, 8, .05, 'Hz'], ['depth', 0, 1500, 10, 'Hz'], ['mix', 0, 1, .01, '']]],
+  ['delay',  'DELAY',       'feedback echo',             [['time', .02, 1.5, .01, 's'], ['feedback', 0, .92, .01, ''], ['mix', 0, 1, .01, '']]],
+  ['reverb', 'REVERB',      'convolution (generated IR)',[['decay', .2, 6, .1, 's'], ['mix', 0, 1, .01, '']]],
+];
+function openFx(i) {
+  const c = projectState.channels[i];
+  openModal(`CH ${i + 1} — INSERT EFFECTS`, body => {
+    for (const [key, label, note, params] of FX_DEFS) {
+      const st = c.inserts[key];
+      const unit = el('div', { class: 'fx-unit' });
+      const cb = el('input', { type: 'checkbox' });
+      cb.checked = st.on;
+      cb.addEventListener('change', () => { st.on = cb.checked; Engine.rebuildChain(i); });
+      const h = el('h4'); h.append(cb, document.createTextNode(' ' + label + ' '), el('span', { text: note }));
+      unit.append(h);
+      const pWrap = el('div', { class: 'fx-params' });
+      for (const [pk, mn, mx, stp, unitLbl] of params) {
+        const p = el('div', { class: 'fx-p' });
+        const val = el('b', { text: `${st[pk]}${unitLbl}` });
+        const r = el('input', { type: 'range', min: mn, max: mx, step: stp });
+        r.value = st[pk];
+        r.addEventListener('input', () => {
+          st[pk] = +r.value;
+          val.textContent = `${st[pk]}${unitLbl}`;
+          if (st.on) Engine.strips[i]?.fxRefs[key]?.(st);
+        });
+        p.append(el('span', { text: pk.toUpperCase() }), r, val);
+        pWrap.append(p);
+      }
+      unit.append(pWrap);
+      body.append(unit);
+    }
+  });
+}
+
+/* ── waveform / trim modal ── */
+function drawWave(i) {
+  const cv = qs('#wave-canvas'); if (!cv) return;
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = cv.clientWidth * dpr; cv.height = cv.clientHeight * dpr;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#0b0c10'; g.fillRect(0, 0, cv.width, cv.height);
+  const c = projectState.channels[i];
+  const buf0 = runtimeState.buffers[i];
+  if (!buf0) {
+    g.fillStyle = '#7b8090'; g.font = `${12 * dpr}px monospace`;
+    g.fillText(runtimeState.errors[i] ? 'load failed — ' + runtimeState.errors[i] : 'sample not loaded yet…', 10 * dpr, cv.height / 2);
+    return;
+  }
+  const buf = c.reverse ? getReversed(i, buf0) : buf0;
+  const data = buf.getChannelData(0);
+  const W = cv.width, H = cv.height, mid = H / 2;
+  g.strokeStyle = '#f7931a'; g.lineWidth = dpr; g.beginPath();
+  const chunk = Math.max(1, Math.floor(data.length / W));
+  for (let px = 0; px < W; px++) {
+    let mn = 1, mx = -1;
+    const base = px * chunk;
+    for (let k = 0; k < chunk; k += Math.max(1, chunk >> 4)) {
+      const v = data[base + k] || 0;
+      if (v < mn) mn = v; if (v > mx) mx = v;
+    }
+    g.moveTo(px, mid + mn * mid * 0.92);
+    g.lineTo(px, mid + mx * mid * 0.92 + 1);
+  }
+  g.stroke();
+  // region shading
+  const st = clamp(c.sampleRegion.start, 0, 1) * W, en = clamp(c.sampleRegion.end, 0, 1) * W;
+  g.fillStyle = 'rgba(0,0,0,0.62)';
+  g.fillRect(0, 0, st, H); g.fillRect(en, 0, W - en, H);
+  g.strokeStyle = '#4da3ff'; g.lineWidth = 2 * dpr;
+  g.beginPath(); g.moveTo(st, 0); g.lineTo(st, H); g.moveTo(en, 0); g.lineTo(en, H); g.stroke();
+}
+function openWave(i) {
+  const c = projectState.channels[i];
+  waveModal.chan = i;
+  if (c.sourceIndex != null && !runtimeState.buffers[i]) loadChannelBuffer(i);
+  openModal(`CH ${i + 1} — SAMPLE EDIT (${SampleRegistry.get(c.sourceIndex ?? -1)?.text || 'no sample'})`, body => {
+    const wrap = el('div', { class: 'wave-wrap' });
+    wrap.append(el('canvas', { id: 'wave-canvas' }));
+    body.append(wrap);
+    const grid = el('div', { class: 'wv-grid' });
+    const mk = (label, min, max, step, get, set, fmt = v => v) => {
+      const p = el('div', { class: 'fx-p' });
+      const val = el('b', { text: fmt(get()) });
+      const r = el('input', { type: 'range', min, max, step });
+      r.value = get();
+      r.addEventListener('input', () => { set(+r.value); val.textContent = fmt(get()); drawWave(i); });
+      p.append(el('span', { text: label }), r, val);
+      grid.append(p);
+      return r;
+    };
+    mk('REGION START', 0, 1, 0.001, () => c.sampleRegion.start,
+      v => { c.sampleRegion.start = Math.min(v, c.sampleRegion.end - 0.001); }, v => (v * 100).toFixed(1) + '%');
+    mk('REGION END', 0, 1, 0.001, () => c.sampleRegion.end,
+      v => { c.sampleRegion.end = Math.max(v, c.sampleRegion.start + 0.001); }, v => (v * 100).toFixed(1) + '%');
+    mk('FADE IN', 0, 2, 0.005, () => c.fadeIn, v => { c.fadeIn = v; }, v => v.toFixed(3) + 's');
+    mk('FADE OUT', 0, 2, 0.005, () => c.fadeOut, v => { c.fadeOut = v; }, v => v.toFixed(3) + 's');
+    mk('RATE / PITCH', 0.25, 4, 0.01, () => c.rate, v => { c.rate = v; }, v => '×' + v.toFixed(2));
+    body.append(grid);
+
+    const opts = el('div', { class: 'synth-row', style: 'margin-top:10px' });
+    const mkCb = (label, get, set, title = '') => {
+      const l = el('label', { style: 'display:flex;gap:5px;align-items:center;font-size:11px', title });
+      const cb = el('input', { type: 'checkbox' });
+      cb.checked = get();
+      cb.addEventListener('change', () => { set(cb.checked); drawWave(i); });
+      l.append(cb, document.createTextNode(label));
+      opts.append(l);
+    };
+    mkCb('REVERSE', () => c.reverse, v => { c.reverse = v; });
+    mkCb('ALLOW OVERLAP', () => c.allowOverlap, v => { c.allowOverlap = v; }, 'off = retrigger chokes the previous hit');
+    mkCb('LOOP TEMPO-SYNC', () => c.loopSync, v => { c.loopSync = v; }, 'stretch loops with known BPM to the project BPM');
+    opts.append(el('button', {
+      class: 'acc small', text: '► AUDITION',
+      onclick: async () => { await Engine.init(); triggerSampler(i, Engine.ctx.currentTime + 0.03); },
+    }));
+    body.append(opts);
+    requestAnimationFrame(() => drawWave(i));
+  });
+}
+
+/* ── synth modal ── */
+const KEYMAP = { z:48,s:49,x:50,d:51,c:52,v:53,g:54,b:55,h:56,n:57,j:58,m:59,
+                 q:60,'2':61,w:62,'3':63,e:64,r:65,'5':66,t:67,'6':68,y:69,'7':70,u:71,i:72 };
+const heldKeys = new Set();
+function onSynthKeydown(e) {
+  if (synthModalChan < 0 || e.repeat) return;
+  const n = KEYMAP[e.key.toLowerCase()];
+  if (n == null || heldKeys.has(n)) return;
+  heldKeys.add(n);
+  synthKeyDown(synthModalChan, n);
+  qs(`[data-note="${n}"]`)?.classList.add('held');
+}
+function onSynthKeyup(e) {
+  if (synthModalChan < 0) return;
+  const n = KEYMAP[e.key.toLowerCase()];
+  if (n == null) return;
+  heldKeys.delete(n);
+  synthKeyUp(synthModalChan, n);
+  qs(`[data-note="${n}"]`)?.classList.remove('held');
+}
+document.addEventListener('keydown', onSynthKeydown);
+document.addEventListener('keyup', onSynthKeyup);
+
+function openSynth(i) {
+  const c = projectState.channels[i];
+  synthModalChan = i;
+  openModal(`CH ${i + 1} — INSTRUMENT (recordable synth)`, body => {
+    const row1 = el('div', { class: 'synth-row' });
+    const wsel = el('select');
+    for (const w of ['sawtooth', 'square', 'triangle', 'sine'])
+      wsel.append(el('option', { value: w, text: w.toUpperCase() }));
+    wsel.value = c.synth.wave;
+    wsel.addEventListener('change', () => { c.synth.wave = wsel.value; });
+    row1.append(el('span', { text: 'WAVE', style: 'color:var(--dim);font-size:10px' }), wsel);
+    const mkS = (label, min, max, step, key, fmt) => {
+      const p = el('div', { class: 'fx-p' });
+      const val = el('b', { text: fmt(c.synth[key]) });
+      const r = el('input', { type: 'range', min, max, step });
+      r.value = c.synth[key];
+      r.addEventListener('input', () => { c.synth[key] = +r.value; val.textContent = fmt(c.synth[key]); });
+      p.append(el('span', { text: label }), r, val);
+      row1.append(p);
+    };
+    mkS('CUTOFF', 80, 12000, 10, 'cutoff', v => v + 'Hz');
+    mkS('ATTACK', 0.001, 1, 0.001, 'attack', v => v.toFixed(3) + 's');
+    mkS('RELEASE', 0.02, 3, 0.01, 'release', v => v.toFixed(2) + 's');
+    mkS('LEVEL', 0, 1, 0.01, 'volume', v => v.toFixed(2));
+    body.append(row1);
+
+    const row2 = el('div', { class: 'synth-row' });
+    const recBtn = el('button', {
+      class: 'rec' + (recState.chan === i ? ' toggled' : ''), text: recState.chan === i ? '● RECORDING…' : '● REC CLIP',
+      title: 'Record what you play into a clip; sequencer steps then retrigger the clip',
+      onclick: () => {
+        if (recState.chan === i) { stopRecording(); recBtn.classList.remove('toggled'); recBtn.textContent = '● REC CLIP'; info.textContent = clipInfo(); }
+        else { startRecording(i); recBtn.classList.add('toggled'); recBtn.textContent = '● RECORDING…'; }
+      },
+    });
+    const info = el('span', { style: 'color:var(--dim);font-size:11px', text: '' });
+    const clipInfo = () => c.instrumentClip
+      ? `clip: ${c.instrumentClip.notes.length} notes / ${c.instrumentClip.length.toFixed(2)}s`
+      : 'no clip yet — steps play a fallback note until you record one';
+    info.textContent = clipInfo();
+    row2.append(recBtn,
+      el('button', { class: 'small', text: 'CLEAR CLIP', onclick: () => { c.instrumentClip = null; info.textContent = clipInfo(); } }),
+      info);
+    body.append(row2);
+
+    // 2-octave keyboard C3–C5 (mouse + computer keys z-row / q-row)
+    const keys = el('div', { class: 'keys' });
+    const isBlack = n => [1, 3, 6, 8, 10].includes(n % 12);
+    const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    for (let n = 48; n <= 72; n++) {
+      const k = el('div', { class: 'key' + (isBlack(n) ? ' black' : ''), 'data-note': String(n),
+        text: isBlack(n) ? '' : names[n % 12] + (Math.floor(n / 12) - 1) });
+      const down = ev => { ev.preventDefault(); k.classList.add('held'); synthKeyDown(i, n); };
+      const up = () => { k.classList.remove('held'); synthKeyUp(i, n); };
+      k.addEventListener('pointerdown', down);
+      k.addEventListener('pointerup', up);
+      k.addEventListener('pointerleave', up);
+      keys.append(k);
+    }
+    body.append(keys);
+    body.append(el('div', { style: 'color:var(--dim);font-size:10px',
+      text: 'computer keys: Z-row = C3 octave, Q-row = C4 octave · recorded clips are saved in the project file' }));
+  });
+}
+
+/* ═══════════════════════ [saveload] ═══════════════════════ */
+function saveProjectObj() {
+  const o = deepClone(projectState);
+  o.channels.forEach((c, i) => {
+    c.sourceUrl = c.sourceIndex != null ? (SampleRegistry.get(c.sourceIndex)?.value ?? null) : null;
+    const meta = c.sourceIndex != null ? SampleRegistry.get(c.sourceIndex) : null;
+    c.sourceMeta = meta ? { name: meta.text, bpm: meta.bpm, isLoop: meta.isLoop } : null;
+  });
+  return o;
+}
+function saveProject() {
+  const blob = new Blob([JSON.stringify(saveProjectObj(), null, 1)], { type: 'application/json' });
+  const a = el('a', { href: URL.createObjectURL(blob), download: (projectState.name || 'audional-project').replace(/[^\w-]+/g, '_') + '.json' });
+  document.body.append(a); a.click(); a.remove();
+  statusMsg('project saved (JSON downloaded) — inscribe it to put the song on-chain', 'ok');
+}
+function loadProjectFromObj(obj) {
+  if (!obj || typeof obj !== 'object' || !Array.isArray(obj.channels)) throw new Error('not a recognisable Audional project');
+  Transport.stop();
+  projectState.name = typeof obj.name === 'string' ? obj.name : 'Loaded Project';
+  projectState.bpm = clamp(num(obj.bpm, 120), 30, 300);
+  projectState.continuous = obj.continuous !== false;
+  // sequences
+  const seqs = Array.isArray(obj.sequences) && obj.sequences.length ? obj.sequences : [makeSequence()];
+  projectState.sequences = seqs.map(sq => {
+    const out = makeSequence();
+    if (sq && Array.isArray(sq.steps))
+      for (let i = 0; i < NUM_CHANNELS; i++)
+        for (let s = 0; s < NUM_STEPS; s++)
+          out.steps[i][s] = sq.steps[i]?.[s] ? 1 : 0;
+    return out;
+  });
+  projectState.currentSeq = clamp(num(obj.currentSeq, 0), 0, projectState.sequences.length - 1);
+  // channels (merge onto defaults so old/partial saves stay loadable)
+  projectState.channels = Array.from({ length: NUM_CHANNELS }, (_, i) => {
+    const d = makeChannel(i); d.sourceIndex = null;
+    const c = obj.channels[i];
+    if (!c) return d;
+    d.type = c.type === 'instrument' ? 'instrument' : 'sampler';
+    d.name = typeof c.name === 'string' ? c.name : d.name;
+    d.mute = !!c.mute; d.solo = !!c.solo;
+    d.volume = clamp(num(c.volume, 0.85), 0, 1); d.pan = clamp(num(c.pan, 0), -1, 1);
+    if (c.sampleRegion) d.sampleRegion = { start: clamp(num(c.sampleRegion.start, 0), 0, 1), end: clamp(num(c.sampleRegion.end, 1), 0, 1) };
+    d.fadeIn = clamp(num(c.fadeIn, 0), 0, 5); d.fadeOut = clamp(num(c.fadeOut, 0), 0, 5);
+    d.rate = clamp(num(c.rate, 1), 0.1, 8);
+    d.reverse = !!c.reverse; d.allowOverlap = c.allowOverlap !== false; d.loopSync = c.loopSync !== false;
+    if (c.inserts) for (const k of Object.keys(d.inserts)) if (c.inserts[k]) Object.assign(d.inserts[k], c.inserts[k]);
+    if (c.synth) Object.assign(d.synth, c.synth);
+    if (c.instrumentClip?.notes) d.instrumentClip = c.instrumentClip;
+    // resolve sample reference: URL first (robust across library versions), then raw index
+    if (c.sourceUrl) {
+      try {
+        let idx = SampleRegistry.findIndex(c.sourceUrl);
+        if (idx < 0) idx = SampleRegistry.registerDynamic({ url: c.sourceUrl, name: c.sourceMeta?.name, bpm: c.sourceMeta?.bpm ?? null, isLoop: !!c.sourceMeta?.isLoop });
+        d.sourceIndex = idx;
+      } catch { d.sourceIndex = null; }
+    } else if (Number.isInteger(c.sourceIndex) && c.sourceIndex >= 0 && c.sourceIndex < SampleRegistry.count()) {
+      d.sourceIndex = c.sourceIndex;
+    }
+    return d;
+  });
+  // reset runtime
+  runtimeState.buffers.fill(null); runtimeState.reversed.fill(null);
+  runtimeState.lastSource.fill(null); runtimeState.errors.fill(null);
+  runtimeState.loadingChannels.clear();
+  liveSynths.fill(null);
+  qs('#bpm').value = projectState.bpm;
+  qs('#seq-cont').classList.toggle('toggled', projectState.continuous);
+  if (Engine.ready) for (let i = 0; i < NUM_CHANNELS; i++) { Engine.rebuildChain(i); Engine.applyMixer(i); }
+  renderChannels();
+  statusMsg(`project "${projectState.name}" loaded`, 'ok');
+}
+async function loadFromOrdinal() {
+  const ref = prompt('Ordinal ID or URL of an inscribed Audional project/preset JSON:');
+  if (!ref) return;
+  try {
+    statusMsg('fetching project from the chain…');
+    const res = await fetch(normalizeOrdUrl(ref));
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    loadProjectFromObj(JSON.parse(text));
+  } catch (e) { statusMsg(`load-from-ordinal failed: ${e.message}`, 'err'); }
+}
+
+/* ═══════════════════════ [wiring + boot] ═══════════════════════ */
+qs('#play').addEventListener('click', () => Transport.start().catch(e => statusMsg(String(e.message || e), 'err')));
+qs('#stop').addEventListener('click', () => Transport.stop());
+qs('#bpm').addEventListener('change', () => {
+  projectState.bpm = clamp(num(qs('#bpm').value, 120), 30, 300);
+  qs('#bpm').value = projectState.bpm;
+});
+qs('#master-vol').addEventListener('input', () => {
+  if (Engine.ready) Engine.master.gain.setTargetAtTime(+qs('#master-vol').value, Engine.ctx.currentTime, 0.02);
+});
+function gotoSeq(n) {
+  projectState.currentSeq = (n + projectState.sequences.length) % projectState.sequences.length;
+  if (!runtimeState.playing) runtimeState.playSeq = projectState.currentSeq;
+  refreshStepStates();
+}
+qs('#seq-prev').addEventListener('click', () => gotoSeq(projectState.currentSeq - 1));
+qs('#seq-next').addEventListener('click', () => gotoSeq(projectState.currentSeq + 1));
+qs('#seq-add').addEventListener('click', () => { projectState.sequences.push(makeSequence()); gotoSeq(projectState.sequences.length - 1); });
+qs('#seq-dup').addEventListener('click', () => {
+  projectState.sequences.push(deepClone(projectState.sequences[projectState.currentSeq]));
+  gotoSeq(projectState.sequences.length - 1);
+  statusMsg('sequence duplicated');
+});
+qs('#seq-cont').addEventListener('click', e => {
+  projectState.continuous = !projectState.continuous;
+  e.target.classList.toggle('toggled', projectState.continuous);
+});
+qs('#seq-clear').addEventListener('click', () => {
+  const seq = projectState.sequences[projectState.currentSeq];
+  for (const row of seq.steps) row.fill(0);
+  refreshStepStates();
+});
+qs('#save').addEventListener('click', saveProject);
+qs('#load').addEventListener('click', () => qs('#file-in').click());
+qs('#file-in').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { loadProjectFromObj(JSON.parse(await f.text())); }
+  catch (err) { statusMsg(`could not load file: ${err.message}`, 'err'); }
+  e.target.value = '';
+});
+qs('#load-ord').addEventListener('click', loadFromOrdinal);
+
+// a tiny starter groove so PLAY makes sound immediately (OB1 kick/snare/hat)
+(() => {
+  const s = projectState.sequences[0].steps;
+  for (let k = 0; k < NUM_STEPS; k += 8) s[0][k] = 1;            // 808 kick
+  for (let k = 4; k < NUM_STEPS; k += 8) s[1][k] = 1;            // 808 snare
+  for (let k = 2; k < NUM_STEPS; k += 4) s[2][k] = 1;            // closed hat
+})();
+
+renderChannels();
+uiLoop();
+
+// Debug / test API (also handy in the console)
+window.AUD = { projectState, runtimeState, SampleRegistry, loadSample, normalizeOrdUrl, extractOrdinalId,
+  Engine, Transport, loadProjectFromObj, saveProjectObj, triggerSampler, getSynth };
+
+console.log('%cAUDIONAL SEQUENCER — UNIFIED EDITION', 'color:#f7931a;font-weight:bold',
+  '\nOn-chain formats: OB1 direct audio · Audional base64 JSON · HTML-embedded · data: URIs',
+  '\nDebug API: window.AUD');
+</script>
+</body>
+</html>

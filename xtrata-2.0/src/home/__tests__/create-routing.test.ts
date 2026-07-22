@@ -39,7 +39,7 @@ describe('create routing', () => {
 describe('create routing integration', () => {
   it('sends bounty calls to action to Create and shares the automatic drop router', () => {
     const html = readFileSync(
-      new URL('../../../first-masterpiece/index.html', import.meta.url),
+      new URL('../../../proofzero/index.html', import.meta.url),
       'utf8'
     );
     expect(html).toContain('data-create-link');

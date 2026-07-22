@@ -53,6 +53,35 @@ describe('createSponsorClient', () => {
     expect(job.state).toBe('SPONSORED');
   });
 
+  it('requests a claimant-bound campaign attestation', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({
+      contractId: 'SP0.drops',
+      listingId: '7',
+      campaignId: '0',
+      bnsName: 'alice.btc',
+      bnsKey: '11'.repeat(32),
+      expiresAt: '1000',
+      signature: '22'.repeat(65),
+      rules: { onePerWallet: true, requireBnsName: true, onePerBnsName: true }
+    }));
+    const client = createSponsorClient('https://relayer.example', fetchImpl);
+    const attestation = await client.attestCampaign({
+      contractId: 'SP0.drops',
+      listingId: 7n,
+      claimer: 'SP123',
+      bnsName: 'alice.btc'
+    });
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe('https://relayer.example/sponsor/attest-campaign');
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+      contractId: 'SP0.drops',
+      listingId: '7',
+      claimer: 'SP123',
+      bnsName: 'alice.btc'
+    });
+    expect(attestation.signature).toHaveLength(130);
+  });
+
   it('network failure maps to RELAYER_UNAVAILABLE with self-paid fallback', async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new TypeError('fetch failed'));
     const client = createSponsorClient('https://relayer.example', fetchImpl);
@@ -196,6 +225,7 @@ describe('mapRelayerError', () => {
   it('passes through operational codes and defaults to UNKNOWN', () => {
     expect(mapRelayerError('RATE_LIMITED', 'x').code).toBe('RATE_LIMITED');
     expect(mapRelayerError('DUPLICATE', 'x').code).toBe('DUPLICATE');
+    expect(mapRelayerError('BNS_NOT_OWNED', 'x').code).toBe('BNS_NOT_OWNED');
     expect(mapRelayerError('SOMETHING_ELSE', 'x').code).toBe('UNKNOWN');
     expect(mapRelayerError(undefined, 'x').code).toBe('UNKNOWN');
   });
@@ -204,6 +234,7 @@ describe('mapRelayerError', () => {
     expect(new SponsorClientError('DUPLICATE', 'x').fallbackToSelfPaid).toBe(false);
     expect(new SponsorClientError('LISTING_BUSY', 'x').fallbackToSelfPaid).toBe(false);
     expect(new SponsorClientError('LISTING_SOLD', 'x').fallbackToSelfPaid).toBe(false);
+    expect(new SponsorClientError('ATTESTOR_DISABLED', 'x').fallbackToSelfPaid).toBe(false);
     expect(new SponsorClientError('AT_CAPACITY', 'x').fallbackToSelfPaid).toBe(true);
   });
 });

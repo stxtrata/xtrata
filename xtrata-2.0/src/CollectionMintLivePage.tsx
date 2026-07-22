@@ -1,11 +1,6 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type SyntheticEvent
-} from 'react';
+import { startJourney, event } from './lib/telemetry/client';
+import { classify } from './lib/telemetry/classify';
+import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
 import { showContractCall } from './lib/wallet/connect';
 import { sha256 } from '@noble/hashes/sha256';
 import {
@@ -208,15 +203,9 @@ type TimedCacheEntry<T> = {
   value: T;
 };
 
-const collectionSnapshotCache = new Map<
-  string,
-  TimedCacheEntry<CollectionSnapshot>
->();
+const collectionSnapshotCache = new Map<string, TimedCacheEntry<CollectionSnapshot>>();
 const collectionSnapshotInFlight = new Map<string, Promise<CollectionSnapshot>>();
-const collectionAssetBytesCache = new Map<
-  string,
-  TimedCacheEntry<Uint8Array>
->();
+const collectionAssetBytesCache = new Map<string, TimedCacheEntry<Uint8Array>>();
 const collectionAssetBytesInFlight = new Map<string, Promise<Uint8Array>>();
 
 const readTimedCache = <T,>(
@@ -235,11 +224,7 @@ const readTimedCache = <T,>(
   return record.value;
 };
 
-const writeTimedCache = <T,>(
-  cache: Map<string, TimedCacheEntry<T>>,
-  key: string,
-  value: T
-) => {
+const writeTimedCache = <T,>(cache: Map<string, TimedCacheEntry<T>>, key: string, value: T) => {
   cache.set(key, {
     updatedAt: Date.now(),
     value
@@ -249,7 +234,9 @@ const writeTimedCache = <T,>(
 const cloneBytes = (value: Uint8Array) => new Uint8Array(value);
 
 const isActiveCollectionAssetState = (value: unknown) => {
-  const state = String(value ?? '').trim().toLowerCase();
+  const state = String(value ?? '')
+    .trim()
+    .toLowerCase();
   return state !== 'expired' && state !== 'sold-out';
 };
 
@@ -307,9 +294,7 @@ const CollectionLivePreviewImage = ({
         mimeType,
         isSvgSource
       });
-      setPixelatePreview((previous) =>
-        previous === nextPixelate ? previous : nextPixelate
-      );
+      setPixelatePreview((previous) => (previous === nextPixelate ? previous : nextPixelate));
     },
     [mimeType, isSvgSource]
   );
@@ -367,9 +352,7 @@ const CollectionLiveGalleryMedia = ({
     );
   }
   return (
-    <span className="collection-live-page__gallery-fallback">
-      {asset.mime_type || 'binary'}
-    </span>
+    <span className="collection-live-page__gallery-fallback">{asset.mime_type || 'binary'}</span>
   );
 };
 
@@ -412,10 +395,7 @@ const CollectionLiveCachedImageMedia = ({
     if (!thumbnail?.data || thumbnail.data.length === 0) {
       return null;
     }
-    return createObjectUrl(
-      thumbnail.data,
-      thumbnail.mimeType ?? 'image/webp'
-    );
+    return createObjectUrl(thumbnail.data, thumbnail.mimeType ?? 'image/webp');
   }, [thumbnailQuery.data]);
 
   useEffect(() => {
@@ -464,16 +444,11 @@ const CollectionLiveCachedImageMedia = ({
         if (!thumbnail || thumbnail.data.length === 0 || cancelled) {
           return;
         }
-        await saveInscriptionThumbnailToCache(
-          contractId,
-          tokenId,
-          thumbnail.data,
-          {
-            mimeType: thumbnail.mimeType,
-            width: thumbnail.width,
-            height: thumbnail.height
-          }
-        );
+        await saveInscriptionThumbnailToCache(contractId, tokenId, thumbnail.data, {
+          mimeType: thumbnail.mimeType,
+          width: thumbnail.width,
+          height: thumbnail.height
+        });
         if (cancelled) {
           return;
         }
@@ -491,14 +466,7 @@ const CollectionLiveCachedImageMedia = ({
     return () => {
       cancelled = true;
     };
-  }, [
-    asset.mime_type,
-    contractId,
-    previewUrl,
-    queryClient,
-    thumbnailQuery.data,
-    tokenId
-  ]);
+  }, [asset.mime_type, contractId, previewUrl, queryClient, thumbnailQuery.data, tokenId]);
 
   if (thumbnailUrl) {
     return (
@@ -540,12 +508,7 @@ const CollectionLiveCachedDetailMedia = ({
   const queryClient = useQueryClient();
   const contentSeededRef = useRef(false);
   const cachedContentKey = useMemo(
-    () => [
-      'collection-live',
-      'detail-content',
-      contractId,
-      tokenId?.toString() ?? 'none'
-    ],
+    () => ['collection-live', 'detail-content', contractId, tokenId?.toString() ?? 'none'],
     [contractId, tokenId]
   );
   const cachedContentQuery = useQuery({
@@ -607,8 +570,7 @@ const CollectionLiveCachedDetailMedia = ({
         if (bytes.length === 0) {
           return;
         }
-        const resolvedMimeType =
-          response.headers.get('content-type')?.trim() || asset.mime_type;
+        const resolvedMimeType = response.headers.get('content-type')?.trim() || asset.mime_type;
         await saveInscriptionToCache(contractId, tokenId, bytes, resolvedMimeType);
         if (
           getMediaKind(resolvedMimeType) === 'image' ||
@@ -620,16 +582,11 @@ const CollectionLiveCachedDetailMedia = ({
             size: THUMBNAIL_SIZE
           });
           if (thumbnail && thumbnail.data.length > 0) {
-            await saveInscriptionThumbnailToCache(
-              contractId,
-              tokenId,
-              thumbnail.data,
-              {
-                mimeType: thumbnail.mimeType,
-                width: thumbnail.width,
-                height: thumbnail.height
-              }
-            );
+            await saveInscriptionThumbnailToCache(contractId, tokenId, thumbnail.data, {
+              mimeType: thumbnail.mimeType,
+              width: thumbnail.width,
+              height: thumbnail.height
+            });
             if (!cancelled) {
               queryClient.setQueryData(getTokenThumbnailKey(contractId, tokenId), {
                 data: thumbnail.data,
@@ -722,10 +679,7 @@ const CollectionLiveGalleryCardMedia = ({
       contractId,
       tokenId?.toString() ?? 'none'
     ],
-    enabled:
-      tokenId !== null &&
-      mediaKind !== 'image' &&
-      mediaKind !== 'svg',
+    enabled: tokenId !== null && mediaKind !== 'image' && mediaKind !== 'svg',
     staleTime: Infinity,
     refetchOnWindowFocus: false,
     queryFn: async () => {
@@ -791,9 +745,7 @@ const CollectionLiveGalleryCardMedia = ({
       <span className="collection-live-page__gallery-poster-title">
         {asset.filename ?? asset.path}
       </span>
-      <span className="collection-live-page__gallery-poster-note">
-        Preview on selection
-      </span>
+      <span className="collection-live-page__gallery-poster-note">Preview on selection</span>
     </div>
   );
 };
@@ -811,7 +763,9 @@ const parseJsonResponse = async <T,>(response: Response, label: string) => {
   }
   if (!response.ok) {
     const message =
-      payload && typeof payload === 'object' && typeof (payload as { error?: unknown }).error === 'string'
+      payload &&
+      typeof payload === 'object' &&
+      typeof (payload as { error?: unknown }).error === 'string'
         ? ((payload as { error: string }).error ?? '').trim()
         : '';
     throw new Error(message || `${label} request failed (${response.status}).`);
@@ -850,11 +804,7 @@ const parseUintCv = (value: ClarityValue) => {
     }
     return BigInt(Math.floor(parsed));
   }
-  if (
-    parsed &&
-    typeof parsed === 'object' &&
-    'value' in (parsed as Record<string, unknown>)
-  ) {
+  if (parsed && typeof parsed === 'object' && 'value' in (parsed as Record<string, unknown>)) {
     const raw = (parsed as { value?: unknown }).value;
     if (typeof raw === 'bigint') {
       return raw;
@@ -907,8 +857,7 @@ const hashHexToBytes = (hashHex: string) => {
   return bytes;
 };
 
-const inferNetworkFromContract = (value: string) =>
-  getNetworkFromAddress(value) ?? 'mainnet';
+const inferNetworkFromContract = (value: string) => getNetworkFromAddress(value) ?? 'mainnet';
 
 const parseContractId = (value: string): CollectionContractTarget | null => {
   const trimmed = value.trim();
@@ -1051,9 +1000,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   const usdPriceBook = useUsdPriceBook().data ?? null;
   const [collection, setCollection] = useState<CollectionRecord | null>(null);
   const [assets, setAssets] = useState<CollectionAsset[]>([]);
-  const [feeGuidance, setFeeGuidance] = useState<CollectionMiningFeeGuidance | null>(
-    null
-  );
+  const [feeGuidance, setFeeGuidance] = useState<CollectionMiningFeeGuidance | null>(null);
   const [collectionLoading, setCollectionLoading] = useState(false);
   const [collectionMessage, setCollectionMessage] = useState<string | null>(null);
   const [contractStatus, setContractStatus] = useState<ContractStatus | null>(null);
@@ -1069,9 +1016,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   >({});
   const [collectionIndexCount, setCollectionIndexCount] = useState(0);
   const [collectionIndexSyncPending, setCollectionIndexSyncPending] = useState(false);
-  const [collectionIndexSyncMessage, setCollectionIndexSyncMessage] = useState<string | null>(
-    null
-  );
+  const [collectionIndexSyncMessage, setCollectionIndexSyncMessage] = useState<string | null>(null);
   const galleryDetailRef = useRef<HTMLDivElement | null>(null);
   const previousSelectedGalleryAssetIdRef = useRef<string | null>(null);
   const resumableLookupCacheRef = useRef<ResumableLookupCacheEntry | null>(null);
@@ -1094,10 +1039,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   const [txDelaySeconds, setTxDelaySeconds] = useState<number | null>(null);
   const [txDelayLabel, setTxDelayLabel] = useState<string | null>(null);
 
-  const normalizedCollectionKey = useMemo(
-    () => props.collectionKey.trim(),
-    [props.collectionKey]
-  );
+  const normalizedCollectionKey = useMemo(() => props.collectionKey.trim(), [props.collectionKey]);
 
   const walletAdapter = useMemo(
     () =>
@@ -1110,14 +1052,8 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   );
 
   const metadata = useMemo(() => toRecord(collection?.metadata) ?? null, [collection]);
-  const deployPricingLock = useMemo(
-    () => parseDeployPricingLockSnapshot(metadata),
-    [metadata]
-  );
-  const templateVersion = useMemo(
-    () => toText(metadata?.templateVersion),
-    [metadata]
-  );
+  const deployPricingLock = useMemo(() => parseDeployPricingLockSnapshot(metadata), [metadata]);
+  const templateVersion = useMemo(() => toText(metadata?.templateVersion), [metadata]);
   const collectionMintPaymentModel = useMemo(
     () => resolveCollectionMintPaymentModel(templateVersion),
     [templateVersion]
@@ -1129,10 +1065,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   // Keep legacy v1.1 compatibility (mint price charged at begin) while allowing
   // v1.2 collections to charge only protocol fee at begin and settle price at seal.
   const chargeMintPriceAtBegin = collectionMintPaymentModel !== 'seal';
-  const metadataCollection = useMemo(
-    () => toRecord(metadata?.collection) ?? null,
-    [metadata]
-  );
+  const metadataCollection = useMemo(() => toRecord(metadata?.collection) ?? null, [metadata]);
   const metadataCollectionPage = useMemo(
     () => toRecord(metadata?.collectionPage) ?? null,
     [metadata]
@@ -1141,14 +1074,8 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     () => toRecord(metadataCollectionPage?.coverImage) ?? null,
     [metadataCollectionPage]
   );
-  const resolvedCollectionId = useMemo(
-    () => toText(collection?.id),
-    [collection]
-  );
-  const resolvedCollectionSlug = useMemo(
-    () => toText(collection?.slug),
-    [collection]
-  );
+  const resolvedCollectionId = useMemo(() => toText(collection?.id), [collection]);
+  const resolvedCollectionSlug = useMemo(() => toText(collection?.slug), [collection]);
   const resumeStorageKey = useMemo(
     () => toResumeStorageKey(resolvedCollectionId, walletSession.address ?? null),
     [resolvedCollectionId, walletSession.address]
@@ -1377,12 +1304,12 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   const selectedGalleryCreatorAddress = selectedGalleryMeta?.creator ?? null;
   const selectedGalleryMimeType =
     selectedGalleryMeta?.mimeType ?? selectedGalleryAsset?.mime_type ?? 'Unknown';
-  const selectedGalleryTotalSize = selectedGalleryMeta?.totalSize ?? (
-    selectedGalleryAsset ? BigInt(toPositiveInteger(selectedGalleryAsset.total_bytes)) : null
-  );
-  const selectedGalleryTotalChunks = selectedGalleryMeta?.totalChunks ?? (
-    selectedGalleryAsset ? BigInt(resolveAssetChunkCount(selectedGalleryAsset)) : null
-  );
+  const selectedGalleryTotalSize =
+    selectedGalleryMeta?.totalSize ??
+    (selectedGalleryAsset ? BigInt(toPositiveInteger(selectedGalleryAsset.total_bytes)) : null);
+  const selectedGalleryTotalChunks =
+    selectedGalleryMeta?.totalChunks ??
+    (selectedGalleryAsset ? BigInt(resolveAssetChunkCount(selectedGalleryAsset)) : null);
   const selectedGallerySealed = selectedGalleryMeta?.sealed ?? null;
   const selectedGalleryFinalHash = selectedGalleryMeta?.finalHash
     ? bytesToHex(selectedGalleryMeta.finalHash)
@@ -1584,16 +1511,14 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     contractStatus?.activePhaseMintPrice === null &&
     collectionMintPricingConfig.mode === 'price-includes-seal-fee' &&
     collectionMintPricingConfig.onChainMintPriceMicroStx !== null &&
-    collectionMintPricingConfig.onChainMintPriceMicroStx ===
-      (contractStatus?.mintPrice ?? null) &&
+    collectionMintPricingConfig.onChainMintPriceMicroStx === (contractStatus?.mintPrice ?? null) &&
     collectionMintPricingConfig.mintPriceMicroStx !== null;
   const useMintPriceTotalCap =
     collectionMintPaymentModel === 'seal' &&
     contractStatus?.activePhaseMintPrice === null &&
     collectionMintPricingConfig.mode === 'price-includes-total-fees' &&
     collectionMintPricingConfig.onChainMintPriceMicroStx !== null &&
-    collectionMintPricingConfig.onChainMintPriceMicroStx ===
-      (contractStatus?.mintPrice ?? null) &&
+    collectionMintPricingConfig.onChainMintPriceMicroStx === (contractStatus?.mintPrice ?? null) &&
     collectionMintPricingConfig.mintPriceMicroStx !== null;
 
   const resolveBeginSpendCapForMintPriceTotal = useCallback(() => {
@@ -1650,10 +1575,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       }
       if (useMintPriceTotalCap) {
         const beginCap = resolveBeginSpendCapForMintPriceTotal();
-        if (
-          beginCap === null ||
-          collectionMintPricingConfig.mintPriceMicroStx === null
-        ) {
+        if (beginCap === null || collectionMintPricingConfig.mintPriceMicroStx === null) {
           return null;
         }
         const sealCap = collectionMintPricingConfig.mintPriceMicroStx - beginCap;
@@ -1699,10 +1621,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     }
     if (useMintPriceTotalCap) {
       const beginCap = resolveBeginSpendCapForMintPriceTotal();
-      if (
-        beginCap === null ||
-        collectionMintPricingConfig.mintPriceMicroStx === null
-      ) {
+      if (beginCap === null || collectionMintPricingConfig.mintPriceMicroStx === null) {
         return null;
       }
       const sealCap = collectionMintPricingConfig.mintPriceMicroStx - beginCap;
@@ -1728,8 +1647,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
         protocolFeeMicroStx: contractStatus?.coreFeeUnitMicroStx ?? null,
         totalChunks,
         chargeMintPriceAtBegin,
-        sealSpendCapMicroStx:
-          sealSpendCapOverride === undefined ? null : sealSpendCapOverride
+        sealSpendCapMicroStx: sealSpendCapOverride === undefined ? null : sealSpendCapOverride
       });
     },
     [
@@ -1757,8 +1675,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
         protocolFeeMicroStx: contractStatus?.coreFeeUnitMicroStx ?? null,
         totalChunks,
         chargeMintPriceAtBegin,
-        sealSpendCapMicroStx:
-          sealSpendCapOverride === undefined ? null : sealSpendCapOverride
+        sealSpendCapMicroStx: sealSpendCapOverride === undefined ? null : sealSpendCapOverride
       });
     },
     [
@@ -1799,10 +1716,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
           { cache: 'default' }
         );
         if (!response.ok) {
-          const text = (await response.text())
-            .slice(0, 180)
-            .replace(/\s+/g, ' ')
-            .trim();
+          const text = (await response.text()).slice(0, 180).replace(/\s+/g, ' ').trim();
           throw new Error(
             `Unable to load asset bytes (${response.status})${text ? `: ${text}` : ''}.`
           );
@@ -1864,14 +1778,9 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
               fetch(`/collections/${encodeURIComponent(loadedCollectionId)}/assets`, {
                 cache: 'default'
               }),
-              fetch(
-                `/collections/${encodeURIComponent(
-                  loadedCollectionId
-                )}/fee-guidance`,
-                {
-                  cache: 'default'
-                }
-              )
+              fetch(`/collections/${encodeURIComponent(loadedCollectionId)}/fee-guidance`, {
+                cache: 'default'
+              })
             ]);
             const loadedAssets = await parseJsonResponse<CollectionAsset[]>(
               assetsResponse,
@@ -1879,11 +1788,10 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
             );
             let loadedFeeGuidance: CollectionMiningFeeGuidance | null = null;
             try {
-              loadedFeeGuidance =
-                await parseJsonResponse<CollectionMiningFeeGuidance>(
-                  feeGuidanceResponse,
-                  'Collection fee guidance'
-                );
+              loadedFeeGuidance = await parseJsonResponse<CollectionMiningFeeGuidance>(
+                feeGuidanceResponse,
+                'Collection fee guidance'
+              );
             } catch {
               loadedFeeGuidance = null;
             }
@@ -1892,11 +1800,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
               assets: loadedAssets,
               feeGuidance: loadedFeeGuidance
             } satisfies CollectionSnapshot;
-            writeTimedCache(
-              collectionSnapshotCache,
-              normalizedCollectionKey,
-              nextSnapshot
-            );
+            writeTimedCache(collectionSnapshotCache, normalizedCollectionKey, nextSnapshot);
             return nextSnapshot;
           })();
           collectionSnapshotInFlight.set(normalizedCollectionKey, loadPromise);
@@ -1921,91 +1825,94 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     }
   }, [normalizedCollectionKey]);
 
-  const loadContractStatus = useCallback(async (options?: { silent?: boolean }) => {
-    if (!collectionContract) {
-      setContractStatus(null);
-      setStatusLastUpdatedAt(null);
-      return null;
-    }
-    const silent = options?.silent ?? false;
-    if (!silent) {
-      setStatusLoading(true);
-      setStatusMessage(null);
-    }
-    try {
-      const network = toStacksNetwork(collectionContract.network);
-      const senderAddress = walletSession.address ?? collectionContract.address;
-      const readOnly = async (functionName: string) => {
-        const value = await callReadOnlyFunction({
-          contractAddress: collectionContract.address,
-          contractName: collectionContract.contractName,
-          functionName,
-          functionArgs: [],
-          senderAddress,
-          network
-        });
-        return unwrapReadOnly(value);
-      };
+  const loadContractStatus = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!collectionContract) {
+        setContractStatus(null);
+        setStatusLastUpdatedAt(null);
+        return null;
+      }
+      const silent = options?.silent ?? false;
+      if (!silent) {
+        setStatusLoading(true);
+        setStatusMessage(null);
+      }
+      try {
+        const network = toStacksNetwork(collectionContract.network);
+        const senderAddress = walletSession.address ?? collectionContract.address;
+        const readOnly = async (functionName: string) => {
+          const value = await callReadOnlyFunction({
+            contractAddress: collectionContract.address,
+            contractName: collectionContract.contractName,
+            functionName,
+            functionArgs: [],
+            senderAddress,
+            network
+          });
+          return unwrapReadOnly(value);
+        };
 
-      const [pausedCv, finalizedCv, mintPriceCv, maxSupplyCv, mintedCountCv, reservedCountCv] =
-        await Promise.all([
-          readOnly('is-paused'),
-          readOnly('get-finalized'),
-          readOnly('get-mint-price'),
-          readOnly('get-max-supply'),
-          readOnly('get-minted-count'),
-          readOnly('get-reserved-count')
-        ]);
-      const coreFeeUnitMicroStx = await coreClient.getFeeUnit(senderAddress).catch(() => null);
-      const activePhaseCv = await readOnly('get-active-phase');
-      const activePhaseId = parseUintCv(activePhaseCv);
-      let activePhaseMintPrice: bigint | null = null;
-      if (activePhaseId !== null && activePhaseId > 0n) {
-        const phaseCv = await callReadOnlyFunction({
-          contractAddress: collectionContract.address,
-          contractName: collectionContract.contractName,
-          functionName: 'get-phase',
-          functionArgs: [uintCV(activePhaseId)],
-          senderAddress,
-          network
-        });
-        const phaseValue = unwrapReadOnly(phaseCv);
-        if (phaseValue.type === ClarityType.OptionalSome) {
-          const tuple = phaseValue.value;
-          if (tuple.type === ClarityType.Tuple) {
-            const phasePriceCv = tuple.data['mint-price'];
-            if (phasePriceCv) {
-              activePhaseMintPrice = parseUintCv(phasePriceCv);
+        const [pausedCv, finalizedCv, mintPriceCv, maxSupplyCv, mintedCountCv, reservedCountCv] =
+          await Promise.all([
+            readOnly('is-paused'),
+            readOnly('get-finalized'),
+            readOnly('get-mint-price'),
+            readOnly('get-max-supply'),
+            readOnly('get-minted-count'),
+            readOnly('get-reserved-count')
+          ]);
+        const coreFeeUnitMicroStx = await coreClient.getFeeUnit(senderAddress).catch(() => null);
+        const activePhaseCv = await readOnly('get-active-phase');
+        const activePhaseId = parseUintCv(activePhaseCv);
+        let activePhaseMintPrice: bigint | null = null;
+        if (activePhaseId !== null && activePhaseId > 0n) {
+          const phaseCv = await callReadOnlyFunction({
+            contractAddress: collectionContract.address,
+            contractName: collectionContract.contractName,
+            functionName: 'get-phase',
+            functionArgs: [uintCV(activePhaseId)],
+            senderAddress,
+            network
+          });
+          const phaseValue = unwrapReadOnly(phaseCv);
+          if (phaseValue.type === ClarityType.OptionalSome) {
+            const tuple = phaseValue.value;
+            if (tuple.type === ClarityType.Tuple) {
+              const phasePriceCv = tuple.data['mint-price'];
+              if (phasePriceCv) {
+                activePhaseMintPrice = parseUintCv(phasePriceCv);
+              }
             }
           }
         }
-      }
 
-      const nextStatus = {
-        paused: Boolean(cvToValue(pausedCv)),
-        finalized: Boolean(cvToValue(finalizedCv)),
-        mintPrice: parseUintCv(mintPriceCv),
-        coreFeeUnitMicroStx,
-        activePhaseId,
-        activePhaseMintPrice,
-        maxSupply: parseUintCv(maxSupplyCv),
-        mintedCount: parseUintCv(mintedCountCv),
-        reservedCount: parseUintCv(reservedCountCv)
-      } satisfies ContractStatus;
-      setContractStatus(nextStatus);
-      setStatusMessage(null);
-      setStatusLastUpdatedAt(Date.now());
-      return nextStatus;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setStatusMessage(`Unable to refresh contract status: ${message}`);
-      return null;
-    } finally {
-      if (!silent) {
-        setStatusLoading(false);
+        const nextStatus = {
+          paused: Boolean(cvToValue(pausedCv)),
+          finalized: Boolean(cvToValue(finalizedCv)),
+          mintPrice: parseUintCv(mintPriceCv),
+          coreFeeUnitMicroStx,
+          activePhaseId,
+          activePhaseMintPrice,
+          maxSupply: parseUintCv(maxSupplyCv),
+          mintedCount: parseUintCv(mintedCountCv),
+          reservedCount: parseUintCv(reservedCountCv)
+        } satisfies ContractStatus;
+        setContractStatus(nextStatus);
+        setStatusMessage(null);
+        setStatusLastUpdatedAt(Date.now());
+        return nextStatus;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setStatusMessage(`Unable to refresh contract status: ${message}`);
+        return null;
+      } finally {
+        if (!silent) {
+          setStatusLoading(false);
+        }
       }
-    }
-  }, [collectionContract, coreClient, walletSession.address]);
+    },
+    [collectionContract, coreClient, walletSession.address]
+  );
 
   const syncCollectionTokenNumbers = useCallback(
     async (options?: { forceFull?: boolean; mintedCount?: bigint | null }) => {
@@ -2240,8 +2147,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
             icon: XTRATA_APP_ICON_DATA_URI
           },
           onFinish: (payload) => resolve(payload as TxPayload),
-          onCancel: () =>
-            reject(new Error('Wallet cancelled or failed to broadcast transaction.'))
+          onCancel: () => reject(new Error('Wallet cancelled or failed to broadcast transaction.'))
         });
       });
     },
@@ -2249,19 +2155,14 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   );
 
   const getMintProgress = useCallback(
-    async (
-      expectedHashBytes: Uint8Array,
-      session: WalletSession
-    ): Promise<MintProgress> => {
+    async (expectedHashBytes: Uint8Array, session: WalletSession): Promise<MintProgress> => {
       if (!collectionContract || !session.address) {
         throw new Error('Connect a wallet before minting.');
       }
       const senderAddress = session.address;
       const network = toStacksNetwork(collectionContract.network);
       const [tokenId, uploadStateResult, reservationCv] = await Promise.all([
-        coreClient
-          .getIdByHash(expectedHashBytes, senderAddress)
-          .catch(() => null),
+        coreClient.getIdByHash(expectedHashBytes, senderAddress).catch(() => null),
         coreClient
           .getUploadState(expectedHashBytes, senderAddress, senderAddress)
           .catch(() => null),
@@ -2326,8 +2227,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       const scanPromise = (async (): Promise<string | null> => {
         const candidates = mintableAssets.filter(
           (asset) =>
-            !pendingMintAssetIds.includes(asset.asset_id) &&
-            !mintedTokenIds[asset.asset_id]
+            !pendingMintAssetIds.includes(asset.asset_id) && !mintedTokenIds[asset.asset_id]
         );
         if (candidates.length === 0) {
           return null;
@@ -2451,9 +2351,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
         if (predicate(progress)) {
           return progress;
         }
-        setMintMessage(
-          `${statusLabel} (${attempt}/${CHAIN_SYNC_MAX_ATTEMPTS})...`
-        );
+        setMintMessage(`${statusLabel} (${attempt}/${CHAIN_SYNC_MAX_ATTEMPTS})...`);
         await pause(CHAIN_SYNC_INTERVAL_MS);
       }
       throw new Error(
@@ -2483,9 +2381,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
 
         if (knownHashHex && knownHashHex !== computedHex) {
           if (knownHashHex === rawShaHex) {
-            appendMintLog(
-              'Legacy hash format detected for a collection item. Auto-correcting.'
-            );
+            appendMintLog('Legacy hash format detected for a collection item. Auto-correcting.');
           } else {
             throw new Error(
               'Asset hash metadata does not match uploaded bytes. Re-upload this asset to continue.'
@@ -2546,9 +2442,9 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
               ? `Single-tx safety cap <= ${toMicroStxLabel(singleTxSpendCap)} (begin fee + seal protocol fee; mint price settled at begin).`
               : useMintPriceTotalCap
                 ? `Single-tx safety cap <= ${toMicroStxLabel(singleTxSpendCap)} (displayed mint price includes begin + seal protocol fees).`
-              : useMintPriceSealCap
-                ? `Single-tx safety cap <= ${toMicroStxLabel(singleTxSpendCap)} (displayed mint price + begin anti-spam fee).`
-                : `Single-tx safety cap <= ${toMicroStxLabel(singleTxSpendCap)} (mint price + begin anti-spam + seal protocol fee).`
+                : useMintPriceSealCap
+                  ? `Single-tx safety cap <= ${toMicroStxLabel(singleTxSpendCap)} (displayed mint price + begin anti-spam fee).`
+                  : `Single-tx safety cap <= ${toMicroStxLabel(singleTxSpendCap)} (mint price + begin anti-spam + seal protocol fee).`
           );
 
           const singleTxPostConditions = resolveSmallSingleTxPostConditions(
@@ -2745,14 +2641,9 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
         }
 
         activeStage = 'seal';
-        const sealPostConditions = resolveSealPostConditions(
-          senderAddress,
-          chunks.length
-        );
+        const sealPostConditions = resolveSealPostConditions(senderAddress, chunks.length);
         if (!sealPostConditions) {
-          throw new Error(
-            'Seal fee safety cap is unavailable. Refresh contract status and retry.'
-          );
+          throw new Error('Seal fee safety cap is unavailable. Refresh contract status and retry.');
         }
         const sealSpendCap =
           collectionMintPaymentModel === 'begin'
@@ -2763,32 +2654,29 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
             : useMintPriceTotalCap
               ? (() => {
                   const beginCap = resolveBeginSpendCapForMintPriceTotal();
-                  if (
-                    beginCap === null ||
-                    collectionMintPricingConfig.mintPriceMicroStx === null
-                  ) {
+                  if (beginCap === null || collectionMintPricingConfig.mintPriceMicroStx === null) {
                     return null;
                   }
                   const cap = collectionMintPricingConfig.mintPriceMicroStx - beginCap;
                   return cap >= 0n ? cap : null;
                 })()
-            : useMintPriceSealCap
-              ? collectionMintPricingConfig.mintPriceMicroStx
-              : resolveCollectionSealSpendCapMicroStx({
-                  mintPrice: contractStatus?.mintPrice ?? null,
-                  activePhaseMintPrice: contractStatus?.activePhaseMintPrice ?? null,
-                  protocolFeeMicroStx: contractStatus?.coreFeeUnitMicroStx ?? null,
-                  totalChunks: chunks.length
-                });
+              : useMintPriceSealCap
+                ? collectionMintPricingConfig.mintPriceMicroStx
+                : resolveCollectionSealSpendCapMicroStx({
+                    mintPrice: contractStatus?.mintPrice ?? null,
+                    activePhaseMintPrice: contractStatus?.activePhaseMintPrice ?? null,
+                    protocolFeeMicroStx: contractStatus?.coreFeeUnitMicroStx ?? null,
+                    totalChunks: chunks.length
+                  });
         if (sealSpendCap !== null) {
           appendMintLog(
             collectionMintPaymentModel === 'begin'
               ? `Seal safety cap <= ${toMicroStxLabel(sealSpendCap)} for ${chunks.length} chunk(s) (protocol seal fee only; mint price was charged at begin).`
               : useMintPriceTotalCap
                 ? `Seal safety cap <= ${toMicroStxLabel(sealSpendCap)} for ${chunks.length} chunk(s) (displayed mint price includes begin + seal protocol fees).`
-              : useMintPriceSealCap
-                ? `Seal safety cap <= ${toMicroStxLabel(sealSpendCap)} for ${chunks.length} chunk(s) (displayed mint price includes worst-case seal fee).`
-                : `Seal safety cap <= ${toMicroStxLabel(sealSpendCap)} for ${chunks.length} chunk(s) (mint price + protocol seal fee).`
+                : useMintPriceSealCap
+                  ? `Seal safety cap <= ${toMicroStxLabel(sealSpendCap)} for ${chunks.length} chunk(s) (displayed mint price includes worst-case seal fee).`
+                  : `Seal safety cap <= ${toMicroStxLabel(sealSpendCap)} for ${chunks.length} chunk(s) (mint price + protocol seal fee).`
           );
         }
         setSealState('pending');
@@ -2882,6 +2770,8 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     setMintMessage(null);
     setMintLog([]);
     let selectedAssetId: string | null = null;
+    const mintJourney = startJourney('mint');
+    event({ journey: mintJourney, step: 'begin', outcome: 'start' });
     try {
       const session = await ensureConnectedWallet();
       if (!session.address || !session.network) {
@@ -2918,9 +2808,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
         if (reservable) {
           target = reservable;
           setResumeAssetId(reservable.asset_id);
-          appendMintLog(
-            'Active reservation detected for this wallet. Resuming that item.'
-          );
+          appendMintLog('Active reservation detected for this wallet. Resuming that item.');
           setMintMessage('Active reservation found. Opening wallet for the next mint step.');
         } else if (remaining !== null && remaining <= 0n) {
           throw new Error(
@@ -2977,6 +2865,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       );
       setMintMessage('Preparing next collection item...');
       const tokenId = await mintAsset(target, session);
+      event({ journey: mintJourney, step: 'confirm', outcome: 'success', target: target.asset_id });
       const refreshedStatus = await loadContractStatus();
       const syncedIds = await syncCollectionTokenNumbers({
         forceFull: true,
@@ -2996,6 +2885,14 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       }, 8_000);
     } catch (error) {
       const message = normalizeMintError(error);
+      event({
+        journey: mintJourney,
+        step: 'mint',
+        outcome: 'error',
+        errorCode: classify(error, 'mint'),
+        error,
+        context: { assetId: selectedAssetId }
+      });
       setMintMessage(message);
       appendMintLog(`Mint failed: ${message}`);
       if (selectedAssetId) {
@@ -3003,9 +2900,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       }
     } finally {
       if (selectedAssetId) {
-        setPendingMintAssetIds((current) =>
-          current.filter((value) => value !== selectedAssetId)
-        );
+        setPendingMintAssetIds((current) => current.filter((value) => value !== selectedAssetId));
       }
       setMintPending(false);
     }
@@ -3375,10 +3270,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     ? collectionMintPricingConfig.mintPriceMicroStx
     : effectiveOnChainMintPrice;
   const mintPriceLabel = toMicroStxLabel(displayedMintPriceMicroStx);
-  const mintPriceDisplay = formatMicroStxWithUsd(
-    displayedMintPriceMicroStx,
-    usdPriceBook
-  );
+  const mintPriceDisplay = formatMicroStxWithUsd(displayedMintPriceMicroStx, usdPriceBook);
   const freeMint = isDisplayedCollectionMintFree({
     activePhaseMintPriceMicroStx: contractStatus?.activePhaseMintPrice ?? null,
     paymentModel: collectionMintPaymentModel,
@@ -3403,11 +3295,10 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
         : published
           ? 'live'
           : 'unknown';
-  const mintPriceTone =
-    resolveCollectionMintPriceTone({
-      displayedMintPriceMicroStx,
-      freeMint
-    });
+  const mintPriceTone = resolveCollectionMintPriceTone({
+    displayedMintPriceMicroStx,
+    freeMint
+  });
   const mintPriceToneClass = `collection-live-page__hero-price-card--${mintPriceTone}`;
   const heroStatusLabel = soldOut ? 'Sold out' : freeMint ? 'Free mint' : null;
   const mintBeginSpendCap = resolveCollectionBeginSpendCapMicroStx({
@@ -3426,9 +3317,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       ? null
       : Math.max(1, Math.ceil(collectionMaxChunkCount / MINT_CHUNK_BATCH_SIZE));
   const estimatedWalletApprovals =
-    estimatedUploadTransactionCount === null
-      ? null
-      : 2 + estimatedUploadTransactionCount;
+    estimatedUploadTransactionCount === null ? null : 2 + estimatedUploadTransactionCount;
   const supportsSingleTxRoute = supportsCollectionSmallSingleTx(templateVersion);
   const hasSingleTxEligibleAssets =
     supportsSingleTxRoute &&
@@ -3458,9 +3347,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     sealMinProtocolFee === null ? null : 5_000_000n + sealMinProtocolFee;
   const uploadExpiryDays = Math.round(COLLECTION_UPLOAD_EXPIRY_BLOCKS / APPROX_BLOCKS_PER_DAY);
   const collectionMaxSizeLabel =
-    collectionMaxBytes && collectionMaxBytes > 0
-      ? formatBytes(BigInt(collectionMaxBytes))
-      : null;
+    collectionMaxBytes && collectionMaxBytes > 0 ? formatBytes(BigInt(collectionMaxBytes)) : null;
   const protocolFeeRangeLabel =
     minimumProtocolFeeTotal && estimatedMaxProtocolFeeTotal
       ? minimumProtocolFeeTotal === estimatedMaxProtocolFeeTotal
@@ -3481,17 +3368,11 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     feeGuidance?.available && feeGuidance.totals.walletDefaultMicroStx > 0
       ? `${formatMiningFeeMicroStx(
           feeGuidance.totals.recommendedMicroStx
-        )} vs wallet-default ${formatMiningFeeMicroStx(
-          feeGuidance.totals.walletDefaultMicroStx
-        )}`
+        )} vs wallet-default ${formatMiningFeeMicroStx(feeGuidance.totals.walletDefaultMicroStx)}`
       : null;
   const pausedStatus = contractStatus?.paused;
   const pausedLabel =
-    pausedStatus === null || pausedStatus === undefined
-      ? 'Unknown'
-      : pausedStatus
-        ? 'Yes'
-        : 'No';
+    pausedStatus === null || pausedStatus === undefined ? 'Unknown' : pausedStatus ? 'Yes' : 'No';
   const finalizedStatus = contractStatus?.finalized;
   const finalizedLabel =
     finalizedStatus === null || finalizedStatus === undefined
@@ -3502,7 +3383,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   const resumeTargetAsset = useMemo(
     () =>
       resumeAssetId
-        ? mintableAssets.find((asset) => asset.asset_id === resumeAssetId) ?? null
+        ? (mintableAssets.find((asset) => asset.asset_id === resumeAssetId) ?? null)
         : null,
     [mintableAssets, resumeAssetId]
   );
@@ -3693,8 +3574,8 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                   <li className="collection-live-page__mint-guide-item">
                     <strong>Begin transaction</strong>
                     <span>
-                      Starts your mint session and anti-spam protection. This includes one
-                      protocol fee unit ({protocolFeeUnitLabel}).
+                      Starts your mint session and anti-spam protection. This includes one protocol
+                      fee unit ({protocolFeeUnitLabel}).
                     </span>
                   </li>
                   <li className="collection-live-page__mint-guide-item">
@@ -3736,8 +3617,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                     ? ` (begin ${protocolFeeUnitLabel} + seal ${toMicroStxLabel(sealMinProtocolFee)} for <=50 chunks).`
                     : '.'}
                 </p>
-                {estimatedMaxProtocolFeeTotal !== null &&
-                  collectionMaxChunkCount !== null && (
+                {estimatedMaxProtocolFeeTotal !== null && collectionMaxChunkCount !== null && (
                   <p className="collection-live-page__mint-guide-note">
                     Estimated protocol fee for a max-size mint in this collection:{' '}
                     {toMicroStxLabel(estimatedMaxProtocolFeeTotal)} total.
@@ -3767,9 +3647,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                             <tr key={row.step}>
                               <td>{row.label}</td>
                               <td>{row.txCount.toLocaleString()}</td>
-                              <td>
-                                {row.chunkCount > 0 ? row.chunkCount.toLocaleString() : '—'}
-                              </td>
+                              <td>{row.chunkCount > 0 ? row.chunkCount.toLocaleString() : '—'}</td>
                               <td>
                                 {formatMiningFeeMicroStx(row.recommendedTotalMicroStx)}
                                 {row.recommendedPerTxMicroStx !== null
@@ -3794,8 +3672,8 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                     </div>
                     {miningFeeDefaultComparisonLabel && (
                       <p className="collection-live-page__mint-guide-note">
-                        Suggested mining total vs wallet defaults:{' '}
-                        {miningFeeDefaultComparisonLabel}.
+                        Suggested mining total vs wallet defaults: {miningFeeDefaultComparisonLabel}
+                        .
                       </p>
                     )}
                     {feeGuidance.uploadBatches.length > 0 && (
@@ -3825,11 +3703,11 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                     ? 'Single-tx wallet cap is locked to the displayed mint price for this collection mode (begin + seal protocol fees absorbed).'
                     : useMintPriceSealCap
                       ? 'Wallet seal cap is set to the displayed mint price for this collection mode.'
-                    : `If mint price is 5 STX, wallet may currently show ${
-                        exampleSealTotalForFiveStx
-                          ? `${toMicroStxLabel(exampleSealTotalForFiveStx)}`
-                          : '5 STX + completion fee'
-                      } at seal because completion fees are added at seal.`}
+                      : `If mint price is 5 STX, wallet may currently show ${
+                          exampleSealTotalForFiveStx
+                            ? `${toMicroStxLabel(exampleSealTotalForFiveStx)}`
+                            : '5 STX + completion fee'
+                        } at seal because completion fees are added at seal.`}
                 </p>
                 <p className="collection-live-page__mint-guide-note">
                   Unfinished sessions can be resumed for about {uploadExpiryDays} days (
@@ -3839,9 +3717,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
               </div>
             )}
             {heroMintStatusMessage && (
-              <div className="alert collection-live-page__hero-alert">
-                {heroMintStatusMessage}
-              </div>
+              <div className="alert collection-live-page__hero-alert">{heroMintStatusMessage}</div>
             )}
           </div>
         </section>
@@ -3897,9 +3773,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
           </div>
           <div className="panel__body">
             {mintedGallery.length === 0 ? (
-              <p className="meta-value">
-                {mintedGalleryEmptyMessage}
-              </p>
+              <p className="meta-value">{mintedGalleryEmptyMessage}</p>
             ) : (
               <div className="collection-live-page__gallery-stack">
                 <div className="collection-live-page__gallery-grid">
@@ -3962,10 +3836,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                   })}
                 </div>
                 {selectedGalleryAsset && selectedGalleryPreviewUrl && (
-                  <div
-                    ref={galleryDetailRef}
-                    className="collection-live-page__gallery-detail"
-                  >
+                  <div ref={galleryDetailRef} className="collection-live-page__gallery-detail">
                     <div className="collection-live-page__gallery-detail-header">
                       <div>
                         <h3>Selected inscription</h3>
@@ -4152,9 +4023,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                   className="theme-select__control"
                   value={themeMode}
                   onChange={(event) => setThemeMode(coerceThemeMode(event.target.value))}
-                  onInput={(event) =>
-                    setThemeMode(coerceThemeMode(event.currentTarget.value))
-                  }
+                  onInput={(event) => setThemeMode(coerceThemeMode(event.currentTarget.value))}
                 >
                   {THEME_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -4210,12 +4079,12 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                               mintBeginSpendCap
                             )}. Upload enforces zero STX transfer. Single-tx cap <= displayed mint price (begin + seal protocol fees absorbed into display pricing).`
                           : useMintPriceSealCap
-                          ? `Deny mode caps: begin anti-spam <= ${toMicroStxLabel(
-                              mintBeginSpendCap
-                            )}. Upload enforces zero STX transfer. Seal <= displayed mint price (worst-case seal fee absorbed into display pricing).`
-                          : `Deny mode caps: begin anti-spam <= ${toMicroStxLabel(
-                              mintBeginSpendCap
-                            )}. Upload enforces zero STX transfer. Seal <= mint price + fee-unit x (1 + ceil(chunks/50)).`
+                            ? `Deny mode caps: begin anti-spam <= ${toMicroStxLabel(
+                                mintBeginSpendCap
+                              )}. Upload enforces zero STX transfer. Seal <= displayed mint price (worst-case seal fee absorbed into display pricing).`
+                            : `Deny mode caps: begin anti-spam <= ${toMicroStxLabel(
+                                mintBeginSpendCap
+                              )}. Upload enforces zero STX transfer. Seal <= mint price + fee-unit x (1 + ceil(chunks/50)).`
                         : `Compatibility mode caps: begin anti-spam <= ${toMicroStxLabel(
                             mintBeginSpendCap
                           )}. Upload enforces zero STX transfer. Seal <= mint price + fee-unit x (1 + ceil(chunks/50)).`}
@@ -4241,12 +4110,12 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
             {collectionIndexSyncPending && (
               <p className="meta-value">Syncing collection numbering...</p>
             )}
-            {mintedScanPending && (
-              <p className="meta-value">Refreshing minted gallery...</p>
-            )}
+            {mintedScanPending && <p className="meta-value">Refreshing minted gallery...</p>}
             {collectionMessage && <div className="alert">{collectionMessage}</div>}
             {statusMessage && <div className="alert">{statusMessage}</div>}
-            {collectionIndexSyncMessage && <div className="alert">{collectionIndexSyncMessage}</div>}
+            {collectionIndexSyncMessage && (
+              <div className="alert">{collectionIndexSyncMessage}</div>
+            )}
           </div>
         </section>
 

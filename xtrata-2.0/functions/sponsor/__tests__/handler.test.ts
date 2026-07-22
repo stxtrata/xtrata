@@ -17,26 +17,34 @@ import {
   NonFungibleConditionCode,
   PostConditionMode,
   TransactionVersion,
+  bufferCV,
   contractPrincipalCV,
   createAssetInfo,
   cvToHex,
   makeContractCall,
   makeContractNonFungiblePostCondition,
   makeStandardSTXPostCondition,
+  someCV,
   getAddressFromPrivateKey,
   hexToCV,
   uintCV
 } from '@stacks/transactions';
 import { StacksMainnet } from '@stacks/network';
 import { onRequest } from '../[[path]]';
+import {
+  attestorPubkeyHash,
+  campaignHexToBytes
+} from '../../../src/lib/drops/campaign-attestation';
 
 const DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const MARKET = `${DEPLOYER}.xtrata-market-sponsored-stx-v1-1`;
 const DROPS = `${DEPLOYER}.xtrata-drops-v1-0`;
+const DROPS_V11 = `${DEPLOYER}.xtrata-drops-v1-1`;
 const NFT = `${DEPLOYER}.xtrata-v3-2-3`;
 // throwaway keys, never used on-chain
 const BUYER_KEY = 'f9d7f5e0d0d81fdd90dcef4e0e2c1b9e3ea361776a5cd91b5c9a52b98b3e1cb601';
 const SPONSOR_KEY = 'a5c9a52b98b3e1cb6f9d7f5e0d0d81fdd90dcef4e0e2c1b9e3ea361776a5cd9101';
+const ATTESTOR_KEY = '2ae156d224f73bfee9d1d52e0210012b4ae4e85df2705f4f25b7ac62db45aa3b01';
 const BUYER_ADDRESS = getAddressFromPrivateKey(BUYER_KEY, TransactionVersion.Mainnet);
 
 type Row = Record<string, unknown> & { id: string; state: string };
@@ -257,7 +265,7 @@ const listingTuple = () =>
     })
   );
 
-const dropTuple = (id = 3n) =>
+const dropTuple = (id = 3n, campaign = false) =>
   Cl.some(
     Cl.tuple({
       creator: Cl.standardPrincipal('SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7'),
@@ -266,10 +274,25 @@ const dropTuple = (id = 3n) =>
       'fee-budget': Cl.uint(100_000),
       'budget-remaining': Cl.uint(100_000),
       'group-id': Cl.uint(id === 32n || id === 31n ? 17481260230060069n : 1n),
+      'campaign-id': campaign ? Cl.some(Cl.uint(0)) : Cl.none(),
+      edition: campaign ? Cl.some(Cl.uint(id)) : Cl.none(),
       claimer: Cl.none(),
       'claimed-at': Cl.none()
     })
   );
+
+const campaignTuple = () =>
+  Cl.some(Cl.tuple({
+    creator: Cl.standardPrincipal('SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7'),
+    'engine-id': Cl.uint(99),
+    'max-supply': Cl.uint(1024),
+    'drops-created': Cl.uint(1),
+    'one-per-wallet': Cl.bool(true),
+    'require-bns': Cl.bool(true),
+    'one-per-bns': Cl.bool(true),
+    active: Cl.bool(true),
+    'created-at': Cl.uint(1)
+  }));
 
 const broadcasts: string[] = [];
 const balanceApiKeys: Array<string | null> = [];
@@ -309,6 +332,7 @@ const stubFetch = () => {
       return Response.json({ balance: '100000000' });
     }
     if (url.includes('/nonces')) return Response.json({ possible_next_nonce: 5 });
+    if (url.endsWith('/v2/info')) return Response.json({ stacks_tip_height: 900 });
     if (url.includes('/get-listing')) {
       return Response.json({ okay: true, result: cvToHex(listingTuple()) });
     }
@@ -321,7 +345,16 @@ const stubFetch = () => {
       } catch {
         // Test defaults to drop id 3.
       }
-      return Response.json({ okay: true, result: cvToHex(dropTuple(id)) });
+      return Response.json({ okay: true, result: cvToHex(dropTuple(id, url.includes('xtrata-drops-v1-1'))) });
+    }
+    if (url.includes('/get-campaign')) {
+      return Response.json({ okay: true, result: cvToHex(campaignTuple()) });
+    }
+    if (url.includes('/get-bns-attestor-pubkey-hash')) {
+      return Response.json({
+        okay: true,
+        result: cvToHex(Cl.ok(Cl.some(Cl.buffer(campaignHexToBytes(attestorPubkeyHash(ATTESTOR_KEY))))))
+      });
     }
     if (url.includes('/has-claimed-in-group')) {
       return Response.json({ okay: true, result: cvToHex(Cl.bool(collectionAlreadyClaimed)) });
@@ -348,6 +381,7 @@ const fixture = async (params: {
   sponsored?: boolean;
   nonce?: bigint;
   postConditions?: ReturnType<typeof makeStandardSTXPostCondition>[];
+  functionArgs?: Parameters<typeof makeContractCall>[0]['functionArgs'];
 } = {}) => {
   const contract = params.contract ?? MARKET;
   const [addr, name] = contract.split('.');
@@ -356,7 +390,7 @@ const fixture = async (params: {
     contractAddress: addr,
     contractName: name,
     functionName: params.fn ?? 'buy',
-    functionArgs: [contractPrincipalCV(nftAddr, nftName), uintCV(params.listingId ?? 7n)],
+    functionArgs: params.functionArgs ?? [contractPrincipalCV(nftAddr, nftName), uintCV(params.listingId ?? 7n)],
     senderKey: BUYER_KEY,
     network: new StacksMainnet(),
     fee: 0n,
@@ -364,10 +398,10 @@ const fixture = async (params: {
     sponsored: params.sponsored ?? true,
     anchorMode: AnchorMode.Any,
     postConditionMode: PostConditionMode.Deny,
-    postConditions: params.postConditions ?? (contract === DROPS
+    postConditions: params.postConditions ?? (contract === DROPS || contract === DROPS_V11
       ? [makeContractNonFungiblePostCondition(
           DEPLOYER,
-          'xtrata-drops-v1-0',
+          contract === DROPS_V11 ? 'xtrata-drops-v1-1' : 'xtrata-drops-v1-0',
           NonFungibleConditionCode.Sends,
           createAssetInfo(DEPLOYER, 'xtrata-v3-2-3', 'xtrata-inscription'),
           uintCV(2759n)
@@ -399,6 +433,15 @@ const savePolicy = (env: unknown, body: Record<string, unknown>) =>
     env
   } as never) as Promise<Response>;
 
+const attestCampaign = (env: unknown, body: Record<string, unknown>) =>
+  onRequest({
+    request: new Request('https://x/sponsor/attest-campaign', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    }),
+    env
+  } as never) as Promise<Response>;
+
 const readPolicy = (env: unknown, params: URLSearchParams) =>
   onRequest({
     request: new Request(`https://x/sponsor/drop-policy?${params.toString()}`, { method: 'GET' }),
@@ -411,7 +454,7 @@ describe('sponsor relayer Pages handler', () => {
 
   beforeEach(() => {
     db = makeDb();
-    env = { SPONSOR_KEY: SPONSOR_KEY, DB: db.db };
+    env = { SPONSOR_KEY: SPONSOR_KEY, BNS_ATTESTOR_KEY: ATTESTOR_KEY, DB: db.db };
     stubFetch();
   });
   afterEach(() => vi.unstubAllGlobals());
@@ -432,6 +475,80 @@ describe('sponsor relayer Pages handler', () => {
       listingId: '3'
     });
     expect(res.status).toBe(200);
+  });
+
+  it('attests, validates, and sponsors a complete v1.1 campaign claim', async () => {
+    const attested = await attestCampaign(env, {
+      contractId: DROPS_V11,
+      listingId: '3',
+      claimer: BUYER_ADDRESS,
+      bnsName: 'alice.btc'
+    });
+    expect(attested.status).toBe(200);
+    const permit = await attested.json() as {
+      bnsKey: string;
+      expiresAt: string;
+      signature: string;
+      campaignId: string;
+    };
+    expect(permit).toMatchObject({ campaignId: '0', expiresAt: '920' });
+
+    const txHex = await fixture({
+      contract: DROPS_V11,
+      fn: 'claim-campaign',
+      listingId: 3n,
+      functionArgs: [
+        contractPrincipalCV(DEPLOYER, 'xtrata-v3-2-3'),
+        uintCV(3n),
+        someCV(bufferCV(campaignHexToBytes(permit.bnsKey, 32))),
+        uintCV(BigInt(permit.expiresAt)),
+        bufferCV(campaignHexToBytes(permit.signature, 65))
+      ]
+    });
+    const sponsored = await submit(env, {
+      txHex,
+      contractId: DROPS_V11,
+      listingId: '3',
+      bnsName: 'alice.btc'
+    });
+    expect(sponsored.status).toBe(200);
+    expect(await sponsored.json()).toMatchObject({ state: 'SPONSORED' });
+  });
+
+  it('refuses to spend sponsor fees on a forged v1.1 attestation', async () => {
+    const attested = await attestCampaign(env, {
+      contractId: DROPS_V11,
+      listingId: '3',
+      claimer: BUYER_ADDRESS,
+      bnsName: 'alice.btc'
+    });
+    const permit = await attested.json() as { bnsKey: string; expiresAt: string; signature: string };
+    const forged = `${permit.signature.slice(0, -2)}${permit.signature.endsWith('00') ? '01' : '00'}`;
+    const txHex = await fixture({
+      contract: DROPS_V11,
+      fn: 'claim-campaign',
+      listingId: 3n,
+      functionArgs: [
+        contractPrincipalCV(DEPLOYER, 'xtrata-v3-2-3'),
+        uintCV(3n),
+        someCV(bufferCV(campaignHexToBytes(permit.bnsKey, 32))),
+        uintCV(BigInt(permit.expiresAt)),
+        bufferCV(campaignHexToBytes(forged, 65))
+      ]
+    });
+    const blocked = await submit(env, {
+      txHex,
+      contractId: DROPS_V11,
+      listingId: '3',
+      bnsName: 'alice.btc'
+    });
+    expect(blocked.status).toBe(400);
+    expect(await blocked.json()).toMatchObject({
+      code: 'VALIDATION',
+      stage: 'CAMPAIGN_ATTESTATION',
+      message: 'campaign attestation signature is invalid'
+    });
+    expect(broadcasts).toHaveLength(0);
   });
 
   it('saves and reads toggleable drop policies for a creator group', async () => {

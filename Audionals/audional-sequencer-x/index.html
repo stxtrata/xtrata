@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audional Sequencer X</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <header id="top-bar">
+    <div class="brand">
+      <span class="logo">◉</span>
+      <h1>AUDIONAL <span>SEQUENCER&nbsp;X</span></h1>
+    </div>
+    <div class="project-meta">
+      <input id="project-name" type="text" placeholder="Project name" spellcheck="false">
+      <input id="artist-name" type="text" placeholder="Artist" spellcheck="false">
+    </div>
+    <div class="transport">
+      <button id="btn-play" class="transport-btn" title="Play / Pause (Space)">▶</button>
+      <button id="btn-stop" class="transport-btn" title="Stop">■</button>
+      <div class="lcd">
+        <div class="lcd-row">
+          <label>BPM</label>
+          <input id="bpm" type="number" min="20" max="420" step="0.5" value="120">
+        </div>
+        <div class="lcd-row">
+          <label>SWING</label>
+          <input id="swing" type="range" min="0" max="60" value="0">
+          <span id="swing-val">0%</span>
+        </div>
+      </div>
+      <div class="lcd">
+        <div class="lcd-row"><label>SEQ</label><span id="lcd-seq">01</span></div>
+        <div class="lcd-row"><label>POS</label><span id="lcd-pos">1.1</span></div>
+      </div>
+      <div class="master-vol">
+        <label>MASTER</label>
+        <input id="master-volume" type="range" min="0" max="1.5" step="0.01" value="0.9">
+      </div>
+    </div>
+    <div class="file-ops">
+      <button id="btn-undo" title="Undo (⌘/Ctrl+Z)" disabled>↶</button>
+      <button id="btn-redo" title="Redo (⌘/Ctrl+Shift+Z)" disabled>↷</button>
+      <button id="btn-beats" title="Load a pre-programmed beat (genre presets)">Beats</button>
+      <button id="btn-save" title="Export project JSON">Save</button>
+      <button id="btn-load" title="Load project JSON (new or legacy Audional format)">Load</button>
+      <button id="btn-new" title="New project">New</button>
+      <button id="btn-settings" title="Settings">⚙</button>
+      <input id="file-input" type="file" accept=".json,application/json" hidden>
+    </div>
+  </header>
+
+  <nav id="sequence-bar">
+    <button id="seq-prev" title="Previous sequence (←)">‹</button>
+    <div id="seq-slots"></div>
+    <button id="seq-next" title="Next sequence (→)">›</button>
+    <div class="seq-tools">
+      <button id="btn-view" title="Toggle between step-sequencer and arrange (waveform) view">Arrange</button>
+      <label class="chk" title="New trigger cuts off the previous sample on the same channel"><input id="chk-choke" type="checkbox"> Choke</label>
+      <label class="chk" title="Crossfade length when choking (ms)">Fade <input id="fade-ms" type="number" min="1" max="500" value="15" class="fade-input">ms</label>
+      <label class="chk"><input id="chk-continuous" type="checkbox" checked> Chain</label>
+      <button id="btn-copy-seq" title="Copy current sequence">Copy</button>
+      <button id="btn-paste-seq" title="Paste into current sequence">Paste</button>
+      <button id="btn-clear-seq" title="Clear current sequence">Clear</button>
+    </div>
+  </nav>
+
+  <main id="channels"></main>
+
+  <section id="instruments-wrap">
+    <h3 class="section-label">INSTRUMENTS <span class="dim-note">— synth channels with MIDI rolls</span></h3>
+    <div id="instruments"></div>
+  </section>
+
+  <footer id="status-bar"><span id="status-text">Ready — load samples via the ⊕ button on each channel.</span></footer>
+</div>
+
+<!-- Sample loader modal -->
+<div id="modal-loader" class="modal hidden">
+  <div class="modal-box">
+    <h2>Load Sample <span id="loader-channel-label"></span></h2>
+    <div class="tabs">
+      <button class="tab active" data-tab="library">Library</button>
+      <button class="tab" data-tab="ordinal">Ordinals ID</button>
+      <button class="tab" data-tab="xtrata">Stacks / Xtrata</button>
+      <button class="tab" data-tab="url">URL</button>
+      <button class="tab" data-tab="file">File</button>
+    </div>
+    <div class="tab-pane" data-pane="library">
+      <p>Curated on-chain samples &amp; songs (OB1s, OG Audionals, Bitcoin Step, landmarks).</p>
+      <select id="library-category" class="lib-select"></select>
+      <select id="library-sample" class="lib-select" size="8"></select>
+      <div class="lib-actions">
+        <button id="library-audition" title="Fetch, decode and play the selected sample">▶ Audition</button>
+        <button id="library-stop" title="Stop audition">■</button>
+        <button id="library-test" title="Fetch &amp; decode every sample in this category and report pass/fail">Test category</button>
+      </div>
+      <div id="library-status" class="lib-status"></div>
+    </div>
+    <div class="tab-pane hidden" data-pane="ordinal">
+      <p>Bitcoin Ordinals inscription ID (audio, audional JSON, or HTML-embedded audio).</p>
+      <input id="input-ordinal" type="text" placeholder="e.g. 83407a1c…21ba1i3" spellcheck="false">
+    </div>
+    <div class="tab-pane hidden" data-pane="xtrata">
+      <p>Stacks / Xtrata inscription ID. Gateway template is configurable in Settings.</p>
+      <input id="input-xtrata" type="text" placeholder="Xtrata inscription ID" spellcheck="false">
+    </div>
+    <div class="tab-pane hidden" data-pane="url">
+      <p>Direct URL to an audio file or audional JSON.</p>
+      <input id="input-url" type="text" placeholder="https://…" spellcheck="false">
+    </div>
+    <div class="tab-pane hidden" data-pane="file">
+      <p>Load a local audio file (WAV, MP3, OGG, FLAC…). Also supports drag &amp; drop onto a channel.</p>
+      <input id="input-file" type="file" accept="audio/*">
+    </div>
+    <div class="modal-actions">
+      <button id="loader-cancel">Cancel</button>
+      <button id="loader-load" class="primary">Load</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sample / step editor modal (trim + transport + per-step overrides) -->
+<div id="modal-trim" class="modal hidden">
+  <div class="modal-box wide">
+    <h2 id="trim-title">Sample Editor <span id="trim-channel-label"></span></h2>
+    <canvas id="trim-canvas" width="760" height="180"></canvas>
+    <div class="trim-controls">
+      <button id="trim-play" class="transport-btn small" title="Play trimmed region">▶</button>
+      <button id="trim-stop" class="transport-btn small" title="Stop">■</button>
+      <label>Start <input id="trim-start" type="range" min="0" max="1000" value="0"></label>
+      <label>End <input id="trim-end" type="range" min="0" max="1000" value="1000"></label>
+    </div>
+    <div class="trim-controls">
+      <label class="chk"><input id="trim-reverse" type="checkbox"> Reverse</label>
+      <label>Pitch <input id="trim-pitch" type="number" min="0.1" max="4" step="0.05" value="1" class="ch-pitch"></label>
+      <label id="trim-xfade-wrap">Crossfade in <input id="trim-xfade" type="number" min="0" max="2000" step="5" value="0" class="fade-input"> ms</label>
+      <span id="trim-scope" class="dim-note"></span>
+      <button id="trim-reset-step" title="Remove per-step overrides (revert to channel settings)">Reset to channel</button>
+    </div>
+    <div class="modal-actions">
+      <button id="trim-close" class="primary">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Piano roll / synth editor modal -->
+<div id="modal-roll" class="modal hidden">
+  <div class="modal-box xwide">
+    <h2 id="roll-title">MIDI Roll</h2>
+    <div class="roll-toolbar">
+      <select id="roll-synth-select" title="Synth engine"></select>
+      <select id="roll-lines" title="Pre-programmed lines for this synth"></select>
+      <label class="roll-dur-label">Note
+        <select id="roll-dur">
+          <option value="1">1/16</option>
+          <option value="2" selected>1/8</option>
+          <option value="4">1/4</option>
+          <option value="8">1/2</option>
+          <option value="16">1 bar</option>
+        </select>
+      </label>
+      <button id="roll-copy" title="Copy selected notes (⌘/Ctrl+C)">Copy</button>
+      <button id="roll-paste" title="Paste notes (⌘/Ctrl+V)">Paste</button>
+      <button id="roll-rec" title="Arm recording — play keys A–L while the sequencer runs">● REC</button>
+      <button id="roll-clear" title="Clear all notes in this sequence">Clear</button>
+      <button id="roll-close" class="primary">Done</button>
+    </div>
+    <div id="roll-synth-panel"></div>
+    <div class="roll-scroll">
+      <canvas id="roll-canvas"></canvas>
+    </div>
+    <div id="roll-status" class="lib-status"></div>
+  </div>
+</div>
+
+<!-- Beat presets modal -->
+<div id="modal-beats" class="modal hidden">
+  <div class="modal-box wide">
+    <h2>Beat Presets <span class="dim-note">— loads kit + pattern into the current sequence</span></h2>
+    <div class="beats-filter">
+      <select id="beats-genre"><option value="">All genres</option></select>
+    </div>
+    <div id="beats-list"></div>
+    <div class="modal-actions">
+      <button id="beats-close" class="primary">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Channel FX modal -->
+<div id="modal-fx" class="modal hidden">
+  <div class="modal-box">
+    <h2>Channel FX <span id="fx-channel-label"></span></h2>
+    <label class="fx-field">Filter
+      <select id="fx-filter">
+        <option value="off">Off</option>
+        <option value="lp">Low-pass</option>
+        <option value="hp">High-pass</option>
+      </select>
+      <input id="fx-cutoff" type="range" min="40" max="12000" step="10" value="8000">
+      <span id="fx-cutoff-val">8000 Hz</span>
+    </label>
+    <label class="fx-field">Drive
+      <input id="fx-drive" type="range" min="0" max="1" step="0.01" value="0">
+    </label>
+    <label class="fx-field">Delay send <span class="dim-note">(BPM-synced dotted 8th)</span>
+      <input id="fx-delay" type="range" min="0" max="1" step="0.01" value="0">
+    </label>
+    <label class="fx-field">Reverb send
+      <input id="fx-reverb" type="range" min="0" max="1" step="0.01" value="0">
+    </label>
+    <div class="modal-actions">
+      <button id="fx-preview">Preview hit</button>
+      <button id="fx-reset">Reset</button>
+      <button id="fx-close" class="primary">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Insert plugins modal -->
+<div id="modal-inserts" class="modal hidden">
+  <div class="modal-box wide">
+    <h2>Insert Plugins <span id="inserts-channel-label"></span></h2>
+    <p class="dim-note">Serial chain after channel FX: slot 1 → 2 → 3 → 4 → output. Set a slot to "— empty —" to remove.</p>
+    <div id="inserts-slots"></div>
+    <div class="modal-actions">
+      <button id="inserts-close" class="primary">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings modal -->
+<div id="modal-settings" class="modal hidden">
+  <div class="modal-box">
+    <h2>Settings</h2>
+    <label class="settings-field">Ordinals gateway
+      <input id="set-ordinals-gateway" type="text" spellcheck="false">
+    </label>
+    <label class="settings-field">Xtrata / Stacks gateway (<code>{id}</code> = inscription ID)
+      <input id="set-xtrata-gateway" type="text" spellcheck="false">
+    </label>
+    <label class="chk"><input id="set-autosave" type="checkbox" checked> Autosave to browser storage</label>
+    <div class="modal-actions">
+      <button id="settings-close" class="primary">Done</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

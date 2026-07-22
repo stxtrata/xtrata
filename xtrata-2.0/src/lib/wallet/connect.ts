@@ -1,3 +1,5 @@
+import { startJourney, event, setNetwork, setWallet } from '../telemetry/client';
+import { classify } from '../telemetry/classify';
 import { AppConfig, UserSession, type UserData } from '@stacks/auth';
 import {
   DEFAULT_PROVIDERS,
@@ -13,7 +15,6 @@ import {
 } from '@stacks/connect';
 import {
   clearSelectedProviderId,
-  getInstalledProviders,
   getProviderFromId,
   getSelectedProviderId,
   setSelectedProviderId,
@@ -52,11 +53,15 @@ type WalletRpcProvider = {
   request: (method: string, params?: Record<string, unknown>) => Promise<unknown>;
 };
 
+type LegacyStacksProvider = StacksProvider & {
+  transactionRequest?: (payload: string) => Promise<unknown>;
+};
+
 type ConnectModalElement = HTMLElement & {
   defaultProviders: WebBTCProvider[];
   installedProviders: WebBTCProvider[];
   persistSelection: boolean;
-  callback?: (selection: string | StacksProvider) => void;
+  callback?: (selection?: string | StacksProvider) => void;
   cancelCallback?: () => void;
 };
 
@@ -89,6 +94,151 @@ export const isLeatherProviderId = (providerId: string | null | undefined) =>
 
 export const isXverseProviderId = (providerId: string | null | undefined) =>
   typeof providerId === 'string' && providerId.toLowerCase().includes('xverse');
+
+// The wizard runs inside a same-origin iframe (/wizard/?embedded=1 on the
+// homepage). Wallet extensions (Leather, Xverse) inject their providers into
+// the TOP window only, while @stacks/connect ships an Asigna shim that defines
+// window.AsignaProvider inside EVERY iframe. Detecting providers against the
+// iframe window therefore lists Asigna as "installed" and hides the real
+// wallets. All provider detection and resolution goes through the top
+// same-origin window when one exists; cross-origin embeds fall back to the
+// local window.
+const getWalletHostWindow = (): Window | undefined => {
+  if (typeof window === 'undefined') {
+    return undefined;
+  }
+  try {
+    const top = window.top;
+    if (top && top !== window.self && top.location.origin === window.location.origin) {
+      return top;
+    }
+  } catch {
+    // Cross-origin parent: its providers are unreachable, use this window.
+  }
+  return window;
+};
+
+const resolveProviderOnWindow = (win: Window | undefined, id: string | null | undefined) => {
+  if (!win || !id) {
+    return undefined;
+  }
+  return id
+    .split('.')
+    .reduce<unknown>((acc, part) => (acc as Record<string, unknown> | undefined)?.[part], win) as
+    StacksProvider | undefined;
+};
+
+type ProviderRegistryWindow = Window & {
+  webbtc_stx_providers?: WebBTCProvider[];
+  webbtc_providers?: WebBTCProvider[];
+  btc_providers?: WebBTCProvider[];
+};
+
+// @stacks/connect 7.x reads the old webbtc_stx_providers registry, while
+// current Xverse builds register their WBIP provider in btc_providers (some
+// released builds used webbtc_providers). Merge all three so the embedded
+// chooser sees the provider that is actually injected into the host page.
+const getRegisteredProvidersOnWindow = (win: Window | undefined): WebBTCProvider[] => {
+  if (!win) {
+    return [];
+  }
+  const registryWindow = win as ProviderRegistryWindow;
+  const merged = [
+    ...(registryWindow.btc_providers ?? []),
+    ...(registryWindow.webbtc_providers ?? []),
+    ...(registryWindow.webbtc_stx_providers ?? [])
+  ];
+  return merged.filter(
+    (entry, index) =>
+      Boolean(entry?.id) &&
+      merged.findIndex(
+        (candidate) =>
+          candidate.id === entry.id ||
+          (candidate.name &&
+            entry.name &&
+            candidate.name.toLowerCase() === entry.name.toLowerCase())
+      ) === index
+  );
+};
+
+const isRegisteredXverseProviderId = (id: string | null | undefined) => {
+  if (!id) {
+    return false;
+  }
+  return getRegisteredProvidersOnWindow(getWalletHostWindow()).some(
+    (entry) =>
+      entry.id === id &&
+      (isXverseProviderId(entry.id) || entry.name?.toLowerCase().includes('xverse'))
+  );
+};
+
+const resolveInjectedXverseRpcProvider = (): WalletRpcProvider | undefined => {
+  if (typeof window === 'undefined') {
+    return undefined;
+  }
+  const host = getWalletHostWindow();
+  const registered = getRegisteredProvidersOnWindow(host).filter(
+    (entry) => isXverseProviderId(entry.id) || entry.name?.toLowerCase().includes('xverse')
+  );
+  for (const entry of registered) {
+    const provider = resolveProviderOnWindow(host, entry.id) as WalletRpcProvider | undefined;
+    if (typeof provider?.request === 'function') {
+      return provider;
+    }
+  }
+  for (const providerId of XVERSE_SIGNING_PROVIDER_IDS) {
+    const provider =
+      (resolveProviderOnWindow(host, providerId) as WalletRpcProvider | undefined) ??
+      (host === window
+        ? undefined
+        : (resolveProviderOnWindow(window, providerId) as WalletRpcProvider | undefined));
+    if (typeof provider?.request === 'function') {
+      return provider;
+    }
+  }
+  return undefined;
+};
+
+// Resolution for an already-chosen provider id: prefer the host (top) window,
+// then this window (covers the Asigna iframe shim if the user explicitly
+// picked Asigna), then connect-ui's own registry.
+const resolveProviderById = (id: string | null | undefined): StacksProvider | undefined => {
+  if (typeof window === 'undefined' || !id) {
+    return undefined;
+  }
+  const host = getWalletHostWindow();
+  const exact =
+    resolveProviderOnWindow(host, id) ??
+    (host === window ? undefined : resolveProviderOnWindow(window, id)) ??
+    (getProviderFromId(id) as StacksProvider | undefined);
+  if (exact) {
+    return exact;
+  }
+  // The Stacks Connect chooser still persists XverseProviders.StacksProvider,
+  // but current Xverse versions may expose only BitcoinProvider. Treat the old
+  // chooser id as an alias for that real request bridge instead of returning
+  // undefined and later falling into window.StacksProvider's stub request().
+  if (isXverseProviderId(id) || isRegisteredXverseProviderId(id)) {
+    return resolveInjectedXverseRpcProvider() as StacksProvider | undefined;
+  }
+  return undefined;
+};
+
+// Detection for the wallet-chooser modal: host window ONLY, so the iframe
+// Asigna shim never shows up as an installed wallet.
+const getInstalledProvidersOnHost = (defaultProviders: WebBTCProvider[]): WebBTCProvider[] => {
+  const host = getWalletHostWindow();
+  if (!host) {
+    return [];
+  }
+  const registered = getRegisteredProvidersOnWindow(host);
+  const additional = defaultProviders.filter(
+    (candidate) =>
+      !registered.find((entry) => entry.id === candidate.id) &&
+      !!resolveProviderOnWindow(host, candidate.id)
+  );
+  return registered.concat(additional);
+};
 
 type WalletActionBase = {
   appDetails?: ContractCallOptions['appDetails'];
@@ -540,24 +690,47 @@ const requestProvider = async (
 };
 
 const getXverseRpcProvider = (): WalletRpcProvider | undefined => {
+  return resolveInjectedXverseRpcProvider();
+};
+
+const getExactXverseStacksProvider = (): LegacyStacksProvider | undefined => {
   if (typeof window === 'undefined') {
     return undefined;
   }
-  const walletWindow = window as typeof window & {
-    XverseProviders?: { BitcoinProvider?: WalletRpcProvider };
-    xverseProviders?: { BitcoinProvider?: WalletRpcProvider };
-    BitcoinProvider?: WalletRpcProvider;
-  };
-  const injected =
-    walletWindow.XverseProviders?.BitcoinProvider ??
-    walletWindow.xverseProviders?.BitcoinProvider ??
-    walletWindow.BitcoinProvider;
-  if (typeof injected?.request === 'function') {
-    return injected;
+  const host = getWalletHostWindow();
+  for (const providerId of ['XverseProviders.StacksProvider', 'xverseProviders.StacksProvider']) {
+    const provider =
+      (resolveProviderOnWindow(host, providerId) as LegacyStacksProvider | undefined) ??
+      (host === window
+        ? undefined
+        : (resolveProviderOnWindow(window, providerId) as LegacyStacksProvider | undefined));
+    if (provider) {
+      return provider;
+    }
   }
-  for (const providerId of XVERSE_SIGNING_PROVIDER_IDS) {
-    const provider = getProviderFromId(providerId) as WalletRpcProvider | undefined;
-    if (typeof provider?.request === 'function') {
+  return undefined;
+};
+
+// Embedded Xverse currently leaves its legacy transactionRequest bridge under
+// the generic StacksProvider name, while its request() method is a deliberate
+// "not implemented" stub. That bridge is still the same one used by the
+// working standalone wizard, so retain it specifically for the STX payment.
+const getLegacyXverseTransactionProvider = (): LegacyStacksProvider | undefined => {
+  if (typeof window === 'undefined') {
+    return undefined;
+  }
+  const exact = getExactXverseStacksProvider();
+  if (typeof exact?.transactionRequest === 'function') {
+    return exact;
+  }
+  const host = getWalletHostWindow();
+  for (const providerId of ['StacksProvider', 'BlockstackProvider']) {
+    const provider =
+      (resolveProviderOnWindow(host, providerId) as LegacyStacksProvider | undefined) ??
+      (host === window
+        ? undefined
+        : (resolveProviderOnWindow(window, providerId) as LegacyStacksProvider | undefined));
+    if (typeof provider?.transactionRequest === 'function') {
       return provider;
     }
   }
@@ -565,19 +738,21 @@ const getXverseRpcProvider = (): WalletRpcProvider | undefined => {
 };
 
 const isSelectedXverseProvider = (provider: StacksProvider) => {
-  if (isXverseProviderId(getSelectedProviderId())) {
+  const selectedId = getSelectedProviderId();
+  if (isXverseProviderId(selectedId) || isRegisteredXverseProviderId(selectedId)) {
     return true;
   }
   if (typeof window === 'undefined') {
     return false;
   }
-  const walletWindow = window as typeof window & {
+  const walletWindow = (getWalletHostWindow() ?? window) as typeof window & {
     XverseProviders?: { StacksProvider?: StacksProvider };
     xverseProviders?: { StacksProvider?: StacksProvider };
   };
   return (
     provider === walletWindow.XverseProviders?.StacksProvider ||
-    provider === walletWindow.xverseProviders?.StacksProvider
+    provider === walletWindow.xverseProviders?.StacksProvider ||
+    provider === getXverseRpcProvider()
   );
 };
 
@@ -831,6 +1006,125 @@ const XVERSE_ACCOUNT_MISMATCH_CODE = 'WALLET_ADDRESS_MISMATCH';
 // diagnostic reaches the game modal before the generic bridge timeout fires.
 let xverseSigningWatchdogMs = 90_000;
 
+// Last account Xverse confirmed for this origin on the BitcoinProvider bridge.
+// Seeded by wallet_connect (connect + preflight) and successful reads; cleared
+// on disconnect. Lets the pre-transaction check skip the slow wallet_getAccount
+// read right after connecting.
+const XVERSE_ACCOUNT_CACHE_MS = 45_000;
+let xverseAccountCache: { address: string; at: number } | null = null;
+const rememberXverseAccount = (address: string | null | undefined) => {
+  if (address) {
+    xverseAccountCache = { address, at: Date.now() };
+  }
+};
+const clearXverseAccountCache = () => {
+  xverseAccountCache = null;
+};
+const readXverseAccountCache = () =>
+  xverseAccountCache && Date.now() - xverseAccountCache.at <= XVERSE_ACCOUNT_CACHE_MS
+    ? xverseAccountCache.address
+    : null;
+
+// Xverse rejects BitcoinProvider signing requests with "Network mismatch." / "There's a
+// mismatch between your active network and the network you're logged in with
+// on the app." when its STORED per-origin session was created under a
+// different network setting than the wallet's active network — the preflight
+// can still read the right account, so only the signing request exposes it.
+// Recovery: drop the stale session, re-run wallet_connect on the same bridge
+// (re-binds the session to the active network) and retry the request ONCE.
+const isNetworkMismatchError = (error: unknown) => {
+  const message = (error instanceof Error ? error.message : String(error ?? '')).toLowerCase();
+  return (
+    message.includes('network mismatch') ||
+    (message.includes('mismatch') && message.includes('network'))
+  );
+};
+
+const refreshXverseSession = async (rpcProvider: WalletRpcProvider) => {
+  clearXverseAccountCache();
+  try {
+    await rpcProvider.request('wallet_disconnect');
+  } catch {
+    // best-effort: older builds without wallet_disconnect still re-connect
+  }
+  const response = unwrapProviderResponse(await rpcProvider.request('wallet_connect'));
+  const address = extractStacksAddress(response);
+  rememberXverseAccount(address);
+  return address;
+};
+
+const requestXverseSigning = async (
+  rpcProvider: WalletRpcProvider,
+  method: string,
+  params: Record<string, unknown> | undefined,
+  expectedAddress?: string
+) => {
+  try {
+    return unwrapProviderResponse(await rpcProvider.request(method, params));
+  } catch (error) {
+    const failure = providerError(error);
+    if (!isNetworkMismatchError(failure)) {
+      throw failure;
+    }
+    // eslint-disable-next-line no-console
+    console.info('[wallet:xverse-preflight]', {
+      stage: 'NETWORK_MISMATCH_RECOVERY',
+      method,
+      message: failure.message
+    });
+    let address: string | null = null;
+    try {
+      address = await refreshXverseSession(rpcProvider);
+    } catch (reconnectError) {
+      // eslint-disable-next-line no-console
+      console.info('[wallet:xverse-preflight]', {
+        stage: 'RECOVERY_RECONNECT_FAILED',
+        message: reconnectError instanceof Error ? reconnectError.message : String(reconnectError)
+      });
+      throw failure;
+    }
+    if (!address || (expectedAddress && address !== expectedAddress)) {
+      throw Object.assign(
+        new Error(
+          address
+            ? `Xverse reconnected as ${address}, not the expected ${expectedAddress}. Switch back to that account and retry.`
+            : failure.message
+        ),
+        { code: address ? XVERSE_ACCOUNT_MISMATCH_CODE : undefined }
+      );
+    }
+    // eslint-disable-next-line no-console
+    console.info('[wallet:xverse-preflight]', { stage: 'RECOVERY_RETRY', method, address });
+    try {
+      return unwrapProviderResponse(await rpcProvider.request(method, params));
+    } catch (retryError) {
+      throw providerError(retryError);
+    }
+  }
+};
+
+// wallet_getAccount sometimes never answers on current Xverse; bound it so the
+// preflight falls through to wallet_connect instead of hanging the payment.
+let xverseAccountReadTimeoutMs = 30_000;
+const withXverseReadTimeout = <T>(promise: Promise<T>, label: string): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(
+        Object.assign(
+          new Error(`Xverse did not answer ${label} within ${xverseAccountReadTimeoutMs / 1000}s.`),
+          { code: 'XVERSE_ACCOUNT_READ_TIMEOUT' }
+        )
+      );
+    }, xverseAccountReadTimeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }) as Promise<T>;
+};
+
 const ensureXverseSigningAccount = async (
   rpcProvider: WalletRpcProvider,
   expectedAddress?: string
@@ -847,40 +1141,69 @@ const ensureXverseSigningAccount = async (
     return address;
   };
 
-  // wallet_getAccount answers silently on desktop Xverse; stx_getAccounts can
-  // raise a "requesting to get accounts" permission prompt there (canary run
-  // 2026-07-17), so it is only the fallback read.
-  for (const method of ['wallet_getAccount', 'stx_getAccounts'] as const) {
-    let address: string | null = null;
-    try {
-      const response = unwrapProviderResponse(await rpcProvider.request(method));
-      address = extractStacksAddress(response);
-    } catch (error) {
-      if (isUserCancelledError(error)) {
-        throw providerError(error);
-      }
-      // Access-denied and unsupported responses both mean this browsing
-      // session has no readable account yet; fall through to wallet_connect.
+  // A recently confirmed account for this origin short-circuits the read:
+  // wallet_getAccount can take 12-15s (or never answer) on current Xverse, and
+  // stx_getAccounts must NEVER be used here — it opens a "Mismatched Network"
+  // prompt that gets rejected, surfacing as "Network mismatch" to the user
+  // (canary runs 2026-07-17 and 2026-07-21).
+  const cached = readXverseAccountCache();
+  if (cached) {
+    // eslint-disable-next-line no-console
+    console.info('[wallet:xverse-preflight]', { stage: 'CACHED_SESSION', address: cached });
+    return assertExpected(cached, 'cached-session');
+  }
+
+  let address: string | null = null;
+  try {
+    const response = unwrapProviderResponse(
+      await withXverseReadTimeout(rpcProvider.request('wallet_getAccount'), 'wallet_getAccount')
+    );
+    address = extractStacksAddress(response);
+    // eslint-disable-next-line no-console
+    console.info('[wallet:xverse-preflight]', {
+      stage: address ? 'READ_OK' : 'READ_EMPTY',
+      method: 'wallet_getAccount',
+      address
+    });
+  } catch (error) {
+    if (isUserCancelledError(error)) {
+      throw providerError(error);
     }
-    if (address) {
-      return assertExpected(address, method);
-    }
+    // Access denied, unsupported and timeouts all mean this browsing session
+    // has no readable account yet; fall through to wallet_connect.
+    // eslint-disable-next-line no-console
+    console.info('[wallet:xverse-preflight]', {
+      stage: 'READ_FAILED',
+      method: 'wallet_getAccount',
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
+  if (address) {
+    rememberXverseAccount(address);
+    return assertExpected(address, 'wallet_getAccount');
   }
 
   let response: unknown;
   try {
     response = unwrapProviderResponse(await rpcProvider.request('wallet_connect'));
   } catch (error) {
+    // eslint-disable-next-line no-console
+    console.info('[wallet:xverse-preflight]', {
+      stage: 'WALLET_CONNECT_FAILED',
+      message: error instanceof Error ? error.message : String(error)
+    });
     throw providerError(error);
   }
-  const address = extractStacksAddress(response);
-  if (!address) {
-    throw Object.assign(
-      new Error('Xverse did not return a Stacks account from wallet_connect.'),
-      { code: 'WALLET_ACCOUNT_UNAVAILABLE' }
-    );
+  const connected = extractStacksAddress(response);
+  // eslint-disable-next-line no-console
+  console.info('[wallet:xverse-preflight]', { stage: 'WALLET_CONNECT_OK', address: connected });
+  if (!connected) {
+    throw Object.assign(new Error('Xverse did not return a Stacks account from wallet_connect.'), {
+      code: 'WALLET_ACCOUNT_UNAVAILABLE'
+    });
   }
-  return assertExpected(address, 'wallet_connect');
+  rememberXverseAccount(connected);
+  return assertExpected(connected, 'wallet_connect');
 };
 
 // Keep Xverse contract calls on the same modern BitcoinProvider RPC bridge
@@ -929,14 +1252,13 @@ const requestWalletContractCall = async (
       expectedAddress: options.stxAddress,
       activeAddress
     });
-    try {
-      const response = unwrapProviderResponse(
-        await rpcProvider.request('stx_callContract', params)
-      );
-      return normalizeTxResult(response);
-    } catch (error) {
-      throw providerError(error);
-    }
+    const response = await requestXverseSigning(
+      rpcProvider,
+      'stx_callContract',
+      params,
+      options.stxAddress ?? activeAddress
+    );
+    return normalizeTxResult(response);
   };
 
   let watchdogTimer: ReturnType<typeof setTimeout> | undefined;
@@ -1095,19 +1417,47 @@ const requestSponsoredContractCall = async (
   return normalizeTxResult(response);
 };
 
-// Keep Xverse on the same modern BitcoinProvider RPC bridge used for
-// wallet_connect. Calling stx_transferStx on XverseProviders.StacksProvider
-// falls back into the legacy @stacks/auth UserSession flow, where loadUserData()
-// necessarily fails because a modern wallet_connect does not create that
-// legacy session. Leather and other providers continue through requestProvider.
-const requestStxTransfer = async (
-  provider: StacksProvider,
-  options: WalletStxTransferOptions
-) => {
-  const response = await requestWalletRpc(
-    provider,
+// Prefer Xverse's exact legacy StacksProvider when it exists: this is the path
+// used by the working standalone wizard. In the embedded layout that dotted
+// provider can be absent, so selection resolves to the registered WBIP bridge;
+// keep a minimal-spec fallback there rather than sending legacy fields that
+// Xverse interprets as a conflicting network/account request.
+const requestStxTransfer = async (provider: StacksProvider, options: WalletStxTransferOptions) => {
+  if (!isSelectedXverseProvider(provider)) {
+    const response = await requestProvider(
+      provider,
+      'stx_transferStx',
+      buildStxTransferParams(options)
+    );
+    return normalizeTxResult(response);
+  }
+
+  const exactStacksProvider = getExactXverseStacksProvider();
+  if (typeof exactStacksProvider?.request === 'function') {
+    const response = await requestProvider(
+      exactStacksProvider,
+      'stx_transferStx',
+      buildStxTransferParams(options)
+    );
+    return normalizeTxResult(response);
+  }
+
+  const rpcProvider = getXverseRpcProvider();
+  if (!rpcProvider) {
+    throw Object.assign(new Error('Xverse payment provider is not available.'), {
+      code: 'XVERSE_RPC_UNAVAILABLE'
+    });
+  }
+  await ensureXverseSigningAccount(rpcProvider, options.stxAddress);
+  const response = await requestXverseSigning(
+    rpcProvider,
     'stx_transferStx',
-    buildStxTransferParams(options)
+    {
+      recipient: options.recipient,
+      amount: normalizeBigIntLike(options.amount) ?? '0',
+      ...(options.memo ? { memo: options.memo } : {})
+    },
+    options.stxAddress
   );
   return normalizeTxResult(response);
 };
@@ -1198,6 +1548,18 @@ const getConnectAttempts = async (provider: StacksProvider) => {
 };
 
 const connectViaRequest = async (provider: StacksProvider) => {
+  // Xverse only shows its account chooser on a FRESH wallet_connect — while a
+  // per-origin permission exists it silently reuses the previously-approved
+  // account. Users must get the account choice on every connect, so drop the
+  // stale permission first (best-effort: older builds without
+  // wallet_disconnect just fall through and connect as before).
+  if (isSelectedXverseProvider(provider)) {
+    try {
+      await requestWalletRpc(provider, 'wallet_disconnect');
+    } catch {
+      // ignore — connect proceeds with the existing permission
+    }
+  }
   const attempts = await getConnectAttempts(provider);
 
   let lastError: unknown = null;
@@ -1214,6 +1576,9 @@ const connectViaRequest = async (provider: StacksProvider) => {
           method,
           hasPublicKey: Boolean(session.publicKey)
         });
+        if (isSelectedXverseProvider(provider)) {
+          rememberXverseAccount(session.address);
+        }
         return session;
       }
       // eslint-disable-next-line no-console
@@ -1277,18 +1642,22 @@ const connectViaLegacyAuth = async (
 };
 
 const resolveProviderSelection = (
-  selection: string | StacksProvider,
+  selection: string | StacksProvider | undefined,
   persistSelection = true
 ): StacksProvider | null => {
-  if (typeof selection !== 'string') {
+  if (selection && typeof selection !== 'string') {
     return selection;
   }
-  const provider = getProviderFromId(selection) as StacksProvider | undefined;
+  // connect-ui resolves the clicked id against the iframe's window before it
+  // invokes us. For a provider injected only into the top page that callback
+  // value is undefined, although connect-ui has already persisted the id.
+  const selectedId = typeof selection === 'string' ? selection : getSelectedProviderId();
+  const provider = resolveProviderById(selectedId);
   if (!provider) {
     return null;
   }
-  if (persistSelection) {
-    setSelectedProviderId(selection);
+  if (persistSelection && selectedId) {
+    setSelectedProviderId(selectedId);
   }
   return provider;
 };
@@ -1313,7 +1682,7 @@ const selectProvider = (options?: { forceWalletSelect?: boolean; persistSelectio
   return new Promise<StacksProvider | null>((resolve) => {
     const modal = document.createElement('connect-modal') as unknown as ConnectModalElement;
     const defaultProviders = DEFAULT_PROVIDERS as WebBTCProvider[];
-    const installedProviders = getInstalledProviders(defaultProviders);
+    const installedProviders = getInstalledProvidersOnHost(defaultProviders);
     const previousOverflow = document.body.style.overflow;
 
     const cleanup = () => {
@@ -1367,15 +1736,13 @@ export const getStacksProvider = (): StacksProvider | undefined => {
   }
 
   const selectedProviderId = getSelectedProviderId();
-  const selectedProvider = selectedProviderId
-    ? (getProviderFromId(selectedProviderId) as StacksProvider | undefined)
-    : undefined;
+  const selectedProvider = selectedProviderId ? resolveProviderById(selectedProviderId) : undefined;
 
   if (selectedProvider) {
     return selectedProvider;
   }
 
-  const walletWindow = window as typeof window & {
+  const walletWindow = (getWalletHostWindow() ?? window) as typeof window & {
     LeatherProvider?: StacksProvider;
     XverseProviders?: { StacksProvider?: StacksProvider };
     xverseProviders?: { StacksProvider?: StacksProvider };
@@ -1392,7 +1759,7 @@ export const getStacksProvider = (): StacksProvider | undefined => {
   );
 };
 
-export const connectWallet = async (params: {
+const connectWalletInner = async (params: {
   appName: string;
   appIcon: string;
 }): Promise<WalletSession> => {
@@ -1428,6 +1795,43 @@ export const connectWallet = async (params: {
   return connectViaLegacyAuth(params, provider);
 };
 
+const telemetryWalletKind = (): string | undefined => {
+  const id = getSelectedProviderId();
+  if (isLeatherProviderId(id)) return 'leather';
+  if (isXverseProviderId(id)) return 'xverse';
+  return id ? String(id) : undefined;
+};
+
+// Thin telemetry wrapper: records the connect journey and, on success, sets the
+// (hashed server-side) wallet context that rides along with every later event.
+export const connectWallet = async (params: {
+  appName: string;
+  appIcon: string;
+}): Promise<WalletSession> => {
+  const journey = startJourney('wallet_connect');
+  event({ journey, step: 'open', outcome: 'start' });
+  try {
+    const session = await connectWalletInner(params);
+    if (session.isConnected && session.address) {
+      setWallet(session.address, telemetryWalletKind());
+      setNetwork(session.network);
+      event({ journey, step: 'authorize', outcome: 'success' });
+    } else {
+      event({ journey, step: 'authorize', outcome: 'abandon' });
+    }
+    return session;
+  } catch (error) {
+    event({
+      journey,
+      step: 'authorize',
+      outcome: 'error',
+      errorCode: classify(error, 'wallet_connect'),
+      error
+    });
+    throw error;
+  }
+};
+
 export const disconnectWallet = async () => {
   const provider = getStacksProvider();
   if (provider && isLeatherProviderId(getSelectedProviderId())) {
@@ -1445,6 +1849,10 @@ export const disconnectWallet = async () => {
 
   disconnectLegacyProvider();
   clearSelectedProviderId();
+  clearXverseAccountCache();
+  setWallet(null);
+  setNetwork(null);
+  event({ flow: 'wallet_connect', step: 'disconnect', outcome: 'info' });
 };
 
 export const showContractCall = (options: WalletContractCallOptions, provider?: StacksProvider) => {
@@ -1563,11 +1971,42 @@ export const showStxTransfer = (options: WalletStxTransferOptions, provider?: St
     return legacyShowSTXTransfer(legacyOptions, provider);
   }
 
+  // In the embedded tab Xverse's modern provider is available on the host,
+  // while the iframe's generic StacksProvider keeps only transactionRequest;
+  // its request() is a stub that throws "request function is not implemented".
+  // Send the payment token through that legacy transaction bridge, which is
+  // the route proven by the standalone main-staging-sol wizard.
+  if (isSelectedXverseProvider(activeProvider) && !getExactXverseStacksProvider()) {
+    const legacyTransactionProvider = getLegacyXverseTransactionProvider();
+    if (legacyTransactionProvider) {
+      // eslint-disable-next-line no-console
+      console.info('[wallet:stx-transfer]', {
+        stage: 'PROVIDER_ROUTE',
+        providerId: getSelectedProviderId(),
+        route: 'legacy-transaction-request'
+      });
+      return legacyShowSTXTransfer(legacyOptions, legacyTransactionProvider);
+    }
+  }
+
   return void requestStxTransfer(activeProvider, options)
     .then((payload) => {
       options.onFinish?.(payload);
     })
     .catch((error) => {
+      if (isMethodUnsupportedError(error) && isSelectedXverseProvider(activeProvider)) {
+        const legacyTransactionProvider = getLegacyXverseTransactionProvider();
+        if (legacyTransactionProvider) {
+          // eslint-disable-next-line no-console
+          console.info('[wallet:stx-transfer]', {
+            stage: 'PROVIDER_ROUTE_RECOVERY',
+            providerId: getSelectedProviderId(),
+            route: 'legacy-transaction-request'
+          });
+          legacyShowSTXTransfer(legacyOptions, legacyTransactionProvider);
+          return;
+        }
+      }
       // A modern Xverse connection has no legacy UserSession to fall back to.
       // Keep unsupported/error responses on the modern bridge and surface them
       // to the caller instead of triggering loadUserData() in @stacks/connect.
@@ -1615,5 +2054,18 @@ export const __testing = {
   requestWalletContractCall,
   requestSponsoredContractCall,
   resolveProviderSelection,
-  unwrapProviderResponse
+  unwrapProviderResponse,
+  getWalletHostWindow,
+  resolveProviderById,
+  getRegisteredProvidersOnWindow,
+  getInstalledProvidersOnHost,
+  getExactXverseStacksProvider,
+  getLegacyXverseTransactionProvider,
+  clearXverseAccountCache,
+  rememberXverseAccount,
+  isNetworkMismatchError,
+  requestXverseSigning,
+  setXverseAccountReadTimeoutMs: (value: number) => {
+    xverseAccountReadTimeoutMs = value;
+  }
 };

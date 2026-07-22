@@ -1,3 +1,5 @@
+import { startJourney, event } from '../telemetry/client';
+import { classify } from '../telemetry/classify';
 import {
   AddressVersion,
   AuthType,
@@ -12,7 +14,13 @@ import {
 import { buildContractTransferPostCondition } from '../contract/post-conditions';
 import type { NetworkType } from '../network/types';
 import { bytesToHex } from '../utils/encoding';
-import { SponsorClientError, type SponsorClient, type SponsorJob, type SponsorJobState } from '../market/sponsor-client';
+import { campaignBytesToHex } from './campaign-attestation';
+import {
+  SponsorClientError,
+  type SponsorClient,
+  type SponsorJob,
+  type SponsorJobState
+} from '../market/sponsor-client';
 
 export type SponsoredClaimCheck = {
   code: string;
@@ -27,6 +35,11 @@ export type SponsoredClaimExpectation = {
   tokenId: bigint;
   network: NetworkType;
   claimerAddress?: string;
+  campaignAttestation?: {
+    bnsKeyHex: string | null;
+    expiresAt: bigint;
+    signatureHex: string;
+  };
 };
 
 export type SponsoredClaimInspection = {
@@ -107,7 +120,12 @@ export const inspectSponsoredClaimTransaction = (
   const add = (code: string, ok: boolean, pass: string, fail: string) =>
     checks.push({ code, ok, message: ok ? pass : fail });
   const txHex = extractSponsoredTransactionHex(payload);
-  add('SIGNED_TX_PRESENT', !!txHex, 'Wallet returned a signed transaction.', 'Wallet response contained no usable signed transaction.');
+  add(
+    'SIGNED_TX_PRESENT',
+    !!txHex,
+    'Wallet returned a signed transaction.',
+    'Wallet response contained no usable signed transaction.'
+  );
   if (!txHex) return { ok: false, txHex: null, txId: null, checks };
 
   let tx: ReturnType<typeof deserializeTransaction>;
@@ -119,13 +137,32 @@ export const inspectSponsoredClaimTransaction = (
     return { ok: false, txHex, txId: null, checks };
   }
 
-  const expectedVersion = expected.network === 'mainnet'
-    ? TransactionVersion.Mainnet
-    : TransactionVersion.Testnet;
-  add('NETWORK', tx.version === expectedVersion, `Transaction targets ${expected.network}.`, `Transaction does not target ${expected.network}.`);
-  add('SPONSORED_AUTH', tx.auth.authType === AuthType.Sponsored, 'Sponsored authorization is present.', 'Transaction is not sponsored-auth.');
-  add('ORIGIN_FEE_ZERO', BigInt(tx.auth.spendingCondition.fee ?? 0n) === 0n, 'Claimer origin fee is 0.', 'Claimer origin fee is not 0.');
-  add('CONTRACT_CALL', tx.payload.payloadType === PayloadType.ContractCall, 'Payload is a contract call.', 'Payload is not a contract call.');
+  const expectedVersion =
+    expected.network === 'mainnet' ? TransactionVersion.Mainnet : TransactionVersion.Testnet;
+  add(
+    'NETWORK',
+    tx.version === expectedVersion,
+    `Transaction targets ${expected.network}.`,
+    `Transaction does not target ${expected.network}.`
+  );
+  add(
+    'SPONSORED_AUTH',
+    tx.auth.authType === AuthType.Sponsored,
+    'Sponsored authorization is present.',
+    'Transaction is not sponsored-auth.'
+  );
+  add(
+    'ORIGIN_FEE_ZERO',
+    BigInt(tx.auth.spendingCondition.fee ?? 0n) === 0n,
+    'Claimer origin fee is 0.',
+    'Claimer origin fee is not 0.'
+  );
+  add(
+    'CONTRACT_CALL',
+    tx.payload.payloadType === PayloadType.ContractCall,
+    'Payload is a contract call.',
+    'Payload is not a contract call.'
+  );
 
   if (tx.payload.payloadType === PayloadType.ContractCall) {
     const payloadValue = tx.payload as typeof tx.payload & {
@@ -135,21 +172,84 @@ export const inspectSponsoredClaimTransaction = (
       functionName: { content: string };
     };
     const contractId = `${addressToString(payloadValue.contractAddress)}.${payloadValue.contractName.content}`;
-    add('TARGET_CONTRACT', contractId === expected.dropsContractId, 'Drops contract matches.', `Expected ${expected.dropsContractId}; wallet signed ${contractId}.`);
-    add('TARGET_FUNCTION', payloadValue.functionName.content === 'claim', 'Function is claim.', `Wallet signed ${payloadValue.functionName.content}, not claim.`);
+    add(
+      'TARGET_CONTRACT',
+      contractId === expected.dropsContractId,
+      'Drops contract matches.',
+      `Expected ${expected.dropsContractId}; wallet signed ${contractId}.`
+    );
+    const expectedFunction = expected.campaignAttestation ? 'claim-campaign' : 'claim';
+    add(
+      'TARGET_FUNCTION',
+      payloadValue.functionName.content === expectedFunction,
+      `Function is ${expectedFunction}.`,
+      `Wallet signed ${payloadValue.functionName.content}, not ${expectedFunction}.`
+    );
     const args = payloadValue.functionArgs ?? [];
-    const nftArg = args[0] as { type?: ClarityType; address?: Parameters<typeof addressToString>[0]; contractName?: { content: string } } | undefined;
+    const nftArg = args[0] as
+      | {
+          type?: ClarityType;
+          address?: Parameters<typeof addressToString>[0];
+          contractName?: { content: string };
+        }
+      | undefined;
     const idArg = args[1] as { type?: ClarityType; value?: bigint } | undefined;
-    const signedNft = nftArg?.type === ClarityType.PrincipalContract && nftArg.address && nftArg.contractName
-      ? `${addressToString(nftArg.address)}.${nftArg.contractName.content}`
-      : null;
-    add('CLAIM_ARGUMENTS', args.length === 2 && signedNft === expected.nftContractId && idArg?.type === ClarityType.UInt && idArg.value === expected.dropId, 'Claim arguments match the NFT contract and drop id.', 'Claim arguments do not match the selected drop.');
+    const signedNft =
+      nftArg?.type === ClarityType.PrincipalContract && nftArg.address && nftArg.contractName
+        ? `${addressToString(nftArg.address)}.${nftArg.contractName.content}`
+        : null;
+    let argumentsMatch =
+      signedNft === expected.nftContractId &&
+      idArg?.type === ClarityType.UInt &&
+      idArg.value === expected.dropId;
+    if (expected.campaignAttestation) {
+      const bnsArg = args[2] as {
+        type?: ClarityType;
+        value?: { type?: ClarityType; buffer?: Uint8Array };
+      } | undefined;
+      const expiresArg = args[3] as { type?: ClarityType; value?: bigint } | undefined;
+      const signatureArg = args[4] as { type?: ClarityType; buffer?: Uint8Array } | undefined;
+      const signedBnsKey = bnsArg?.type === ClarityType.OptionalNone
+        ? null
+        : bnsArg?.type === ClarityType.OptionalSome &&
+            bnsArg.value?.type === ClarityType.Buffer &&
+            bnsArg.value.buffer instanceof Uint8Array
+          ? campaignBytesToHex(bnsArg.value.buffer)
+          : undefined;
+      const signedSignature = signatureArg?.type === ClarityType.Buffer &&
+        signatureArg.buffer instanceof Uint8Array
+        ? campaignBytesToHex(signatureArg.buffer)
+        : null;
+      argumentsMatch =
+        argumentsMatch &&
+        args.length === 5 &&
+        signedBnsKey === expected.campaignAttestation.bnsKeyHex &&
+        expiresArg?.type === ClarityType.UInt &&
+        expiresArg.value === expected.campaignAttestation.expiresAt &&
+        signedSignature === expected.campaignAttestation.signatureHex;
+    } else {
+      argumentsMatch = argumentsMatch && args.length === 2;
+    }
+    add(
+      'CLAIM_ARGUMENTS',
+      argumentsMatch,
+      expected.campaignAttestation
+        ? 'Campaign claim arguments match the drop and BNS attestation.'
+        : 'Claim arguments match the NFT contract and drop id.',
+      'Claim arguments do not match the selected drop.'
+    );
   }
 
-  add('POST_CONDITION_MODE', tx.postConditionMode === PostConditionMode.Deny, 'Post-condition mode is deny.', 'Post-condition mode is not deny.');
+  add(
+    'POST_CONDITION_MODE',
+    tx.postConditionMode === PostConditionMode.Deny,
+    'Post-condition mode is deny.',
+    'Post-condition mode is not deny.'
+  );
   const drops = splitContractId(expected.dropsContractId);
   const nft = splitContractId(expected.nftContractId);
-  const actualPostConditions = (tx as unknown as { postConditions?: { values?: unknown[] } }).postConditions?.values ?? [];
+  const actualPostConditions =
+    (tx as unknown as { postConditions?: { values?: unknown[] } }).postConditions?.values ?? [];
   let postConditionMatches = false;
   if (drops && nft && actualPostConditions.length === 1) {
     const expectedPostCondition = buildContractTransferPostCondition({
@@ -157,12 +257,21 @@ export const inspectSponsoredClaimTransaction = (
       senderContract: { ...drops, network: expected.network },
       tokenId: expected.tokenId
     });
-    postConditionMatches = postConditionHex(actualPostConditions[0]) === postConditionHex(expectedPostCondition);
+    postConditionMatches =
+      postConditionHex(actualPostConditions[0]) === postConditionHex(expectedPostCondition);
   }
-  add('NFT_POST_CONDITION', postConditionMatches, 'Exact escrow NFT transfer post-condition is present.', 'Expected exactly one escrow NFT transfer post-condition for the selected token.');
+  add(
+    'NFT_POST_CONDITION',
+    postConditionMatches,
+    'Exact escrow NFT transfer post-condition is present.',
+    'Expected exactly one escrow NFT transfer post-condition for the selected token.'
+  );
 
   if (expected.claimerAddress) {
-    const version = expected.network === 'mainnet' ? AddressVersion.MainnetSingleSig : AddressVersion.TestnetSingleSig;
+    const version =
+      expected.network === 'mainnet'
+        ? AddressVersion.MainnetSingleSig
+        : AddressVersion.TestnetSingleSig;
     let origin = '';
     try {
       origin = addressToString({
@@ -173,7 +282,12 @@ export const inspectSponsoredClaimTransaction = (
     } catch {
       origin = '';
     }
-    add('CLAIMER_ORIGIN', origin.toUpperCase() === expected.claimerAddress.toUpperCase(), 'Transaction origin matches the connected wallet.', `Transaction origin ${origin || 'unknown'} does not match the connected wallet.`);
+    add(
+      'CLAIMER_ORIGIN',
+      origin.toUpperCase() === expected.claimerAddress.toUpperCase(),
+      'Transaction origin matches the connected wallet.',
+      `Transaction origin ${origin || 'unknown'} does not match the connected wallet.`
+    );
   }
 
   return { ok: checks.every((check) => check.ok), txHex, txId: tx.txid(), checks };
@@ -206,24 +320,40 @@ export const submitSponsorClaimWithRetry = async (params: {
   bnsName?: string | null;
   retryDelaysMs?: readonly number[];
   wait?: (ms: number) => Promise<void>;
-  onRetry?: (error: SponsorClientError, attempt: number, maxAttempts: number, delayMs: number) => void;
+  onRetry?: (
+    error: SponsorClientError,
+    attempt: number,
+    maxAttempts: number,
+    delayMs: number
+  ) => void;
   onExistingJob?: (error: SponsorClientError, job: SponsorJob) => void;
 }): Promise<SponsorJob> => {
   const retryDelaysMs = params.retryDelaysMs ?? SPONSOR_SUBMIT_RETRY_DELAYS_MS;
   const wait = params.wait ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   const maxAttempts = retryDelaysMs.length + 1;
+  const journey = startJourney('drop_claim', params.contractId);
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    event({ journey, attempt, step: 'submit', outcome: 'start' });
     try {
-      return await params.client.submit({
+      const job = await params.client.submit({
         txHex: params.txHex,
         contractId: params.contractId,
         listingId: params.listingId,
         bnsName: params.bnsName
       });
+      event({ journey, attempt, step: 'submit', outcome: 'success' });
+      return job;
     } catch (error) {
       if (error instanceof SponsorClientError && error.existingJob) {
         params.onExistingJob?.(error, error.existingJob);
+        event({
+          journey,
+          attempt,
+          step: 'submit',
+          outcome: 'success',
+          context: { existingJob: true }
+        });
         return error.existingJob;
       }
       const delayMs = retryDelaysMs[attempt - 1];
@@ -232,6 +362,14 @@ export const submitSponsorClaimWithRetry = async (params: {
         !isRetryableSponsorSubmitError(error) ||
         typeof delayMs !== 'number'
       ) {
+        event({
+          journey,
+          attempt,
+          step: 'submit',
+          outcome: 'error',
+          errorCode: classify(error, 'drop_claim'),
+          error
+        });
         throw error;
       }
       params.onRetry?.(error, attempt, maxAttempts, delayMs);
@@ -239,6 +377,14 @@ export const submitSponsorClaimWithRetry = async (params: {
     }
   }
 
+  event({
+    journey,
+    attempt: maxAttempts,
+    step: 'submit',
+    outcome: 'error',
+    errorCode: 'SPONSOR_REJECTED',
+    error: 'sponsor relayer submission retry exhausted'
+  });
   throw new SponsorClientError('RELAYER_UNAVAILABLE', 'sponsor relayer submission retry exhausted');
 };
 
@@ -255,7 +401,11 @@ export const pollSponsorJob = async (params: {
   const wait = params.wait ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   let job = params.job;
   params.onStatus?.(job, 0);
-  for (let attempt = 1; attempt <= maxAttempts && !isTerminalSponsorJobState(job.state); attempt += 1) {
+  for (
+    let attempt = 1;
+    attempt <= maxAttempts && !isTerminalSponsorJobState(job.state);
+    attempt += 1
+  ) {
     await wait(intervalMs);
     job = await params.client.status(job.id);
     params.onStatus?.(job, attempt);

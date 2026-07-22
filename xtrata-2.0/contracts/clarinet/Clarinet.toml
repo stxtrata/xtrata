@@ -237,6 +237,11 @@ path = 'contracts/xtrata-drops-v1.0.clar'
 clarity_version = 4
 epoch = 'latest'
 
+[contracts.xtrata-drops-v1-1]
+path = 'contracts/xtrata-drops-v1.1.clar'
+clarity_version = 4
+epoch = 'latest'
+
 [contracts.mock-xtrata-core]
 path = 'contracts/mock-xtrata-core.clar'
 clarity_version = 3

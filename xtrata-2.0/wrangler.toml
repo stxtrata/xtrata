@@ -20,7 +20,8 @@ bucket_name = "xtrata-manage-assets"
 
 # Preview deployments (branch builds) mirror production bindings exactly, so
 # every branch URL runs against the same D1 and R2 as the live site. Secrets
-# (SPONSOR_KEY, HIRO_API_KEY) are NOT in this file — set them for BOTH the
+# (SPONSOR_KEY, HIRO_API_KEY, TELEMETRY_SALT, DEBUG_VIEW_KEY) are NOT in this
+# file — set them for BOTH the
 # Production and Preview environments in the dashboard:
 # Workers & Pages -> xtrata -> Settings -> Variables and Secrets.
 [env.preview]

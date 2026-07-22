@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audionals — 100-Year Remix Cycle</title>
+<style>
+  :root {
+    --bg: #0b0e14; --panel: #121722; --panel2: #1a2130; --line: #263042;
+    --txt: #dce6f5; --dim: #7d8ca3; --acc: #f7931a; --acc2: #22d3ee;
+    --good: #2edb84; --warn: #feca57;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--txt); font: 14px/1.5 "SF Mono", ui-monospace, Menlo, monospace; padding: 24px; }
+  h1 { font-size: 22px; letter-spacing: 1px; }
+  h1 span { color: var(--acc); }
+  .sub { color: var(--dim); margin: 4px 0 18px; max-width: 900px; }
+  .top { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
+  button {
+    background: var(--panel2); color: var(--txt); border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px 18px; font: inherit; cursor: pointer;
+  }
+  button:hover { border-color: var(--acc); }
+  button.primary { background: var(--acc); color: #14100a; font-weight: 700; border-color: var(--acc); }
+  button:disabled { opacity: .4; cursor: default; }
+  .status { color: var(--dim); }
+  .status b { color: var(--acc2); }
+  .layout { display: grid; grid-template-columns: 340px 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  .panel h2 { font-size: 13px; color: var(--dim); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; }
+  .gen {
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px;
+    cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .gen:hover { border-color: var(--acc2); }
+  .gen.active { border-color: var(--acc); background: #1c1508; }
+  .gen .yr { color: var(--acc); font-weight: 700; }
+  .gen .nm { font-weight: 700; }
+  .gen .ds { color: var(--dim); font-size: 12px; margin-top: 2px; }
+  .gen .tags { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .tag { font-size: 10px; border: 1px solid var(--line); border-radius: 20px; padding: 1px 8px; color: var(--acc2); }
+  .tag.synth { color: #c084fc; } .tag.fx { color: var(--warn); }
+  #graph { width: 100%; }
+  .credits table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .credits td, .credits th { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); }
+  .credits th { color: var(--dim); font-weight: 400; }
+  .credits td.pct { color: var(--good); text-align: right; }
+  .credits td.id { color: var(--dim); font-size: 10px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .note { color: var(--dim); font-size: 12px; margin-top: 10px; border-left: 3px solid var(--acc); padding-left: 10px; }
+  #log { font-size: 11px; color: var(--dim); max-height: 120px; overflow-y: auto; margin-top: 8px; }
+  .meter { height: 6px; background: var(--panel2); border-radius: 3px; overflow: hidden; margin-top: 10px; }
+  .meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--acc2), var(--acc)); transition: width .1s linear; }
+</style>
+</head>
+<body>
+
+<h1>AUDIONALS <span>// 100-YEAR REMIX CYCLE</span></h1>
+<p class="sub">
+  Every sound below is either fetched live from a Bitcoin Ordinals inscription (OB1 &amp; OG Audionals — raw audio,
+  base64-JSON and HTML-embedded forms all handled) or synthesised in the browser and attributed as a new node.
+  Each generation remixes the previous one. Attribution is computed <b>recursively from the reference graph</b> —
+  nobody tracks usage, nobody audits plays. The credits are simply a property of the data.
+</p>
+
+<div class="top">
+  <button id="load" class="primary">⛓ Load on-chain samples</button>
+  <button id="play" disabled>▶ Play cycle</button>
+  <button id="stop" disabled>■ Stop</button>
+  <span class="status" id="status">idle — samples load straight from ordinals.com/content/</span>
+</div>
+
+<div class="layout">
+  <div>
+    <div class="panel">
+      <h2>Generations — 2025 → 2125</h2>
+      <div id="gens"></div>
+      <div class="meter"><i id="meter"></i></div>
+      <div id="log"></div>
+    </div>
+  </div>
+  <div>
+    <div class="panel">
+      <h2>Recursive attribution graph</h2>
+      <svg id="graph" viewBox="0 0 900 430"></svg>
+    </div>
+    <div class="panel credits" style="margin-top:16px">
+      <h2>Structural credits — <span id="credgen"></span></h2>
+      <table id="credits"></table>
+      <p class="note">
+        Splits are derived by walking the remix graph: each generation passes half its weight to its parent
+        chain, the rest to the sources it introduces. Change the graph and the credits change with it —
+        a 2125 play still pays the 2025 kick, with zero detection infrastructure.
+      </p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+/* ---------------- on-chain sample registry (real inscription IDs) ---------------- */
+const GATEWAY = 'https://ordinals.com/content/';
+const SAMPLES = {
+  kick:    { id: 'e7d344ef3098d0889856978c4d2e81ccf2358f7f8b66feecc71e03036c59ad48i0', label: 'OB1 #1 — 808 Kick' },
+  snare:   { id: 'ef5707e6ecf4d5b6edb4c3a371ca1c57b5d1057c6505ccb5f8bdc8918b0c4d94i0', label: 'OB1 #2 — 808 Snare' },
+  hat:     { id: 'd030eb3d8bcd68b0ed02b0c67fdb981342eea40b0383814f179a48e76927db93i0', label: 'OB1 #3 — Closed Hat' },
+  clap:    { id: '3b7482a832c4f27c32fc1da7cc4249bbbac1cbdfbdb8673079cad0c33486d233i0', label: 'OB1 #4 — 808 Clap' },
+  crash:   { id: '5a42d7b2e2fe01e4f31cbad5dd671997f87339d970faaab37f6355c4a2f3be5ai0', label: 'OB1 #5 — Crash' },
+  bass:    { id: 'ddc1838c1a6a3c45b2c6e19ff278c3b51b0797c3f1339c533370442d23687a68i0', label: 'OB1 #6 — Synth Bass 1' },
+  glock:   { id: '578aa9d3b29ceceafc659ecee22cb7ef1a063ba5b71474db8fe84949746cdeefi0', label: 'OB1 #13 — Glockenspiel' },
+  scratch: { id: '228947e9fc52e44d3a22e84aed7bbaeff08d60c5f925aa6be7e265d210425c28i0', label: 'OB1 #12 — DJ Scratch' },
+  melobass:{ id: '0b8eff3f39f4095d0f129bb8dd75f29159f8725c7e66046bf41f70ebb9f60d93i0', label: 'Melophonic Bass+Kick (JSON b64)' },
+  step:    { id: '6d8be8186e63b4557e51edd66184a567bc6f5f9f5ba4bb34ba8c67e652c1934ei0', label: '"One small step for man…" (JSON b64)' },
+  audional:{ id: 'c41587924f9d93d01cb71ca925fd664d6e50f1ac8e3c975d5e1e1f1bb0ff11b3i0', label: '"Audional" — Jim (JSON b64)' },
+};
+
+/* synth voices are first-class attribution nodes too */
+const SYNTHS = {
+  jims10:  { label: 'jiMS10 mono lead (synth)' },
+  acid:    { label: 'Acid 303 bass (synth)' },
+  fm:      { label: 'FM bell (synth)' },
+  saw:     { label: 'Supersaw pad (synth)' },
+};
+
+/* ---------------- generations: the remix lineage ---------------- */
+const GENERATIONS = [
+  { key: 'g2025', year: 2025, name: 'Genesis', parent: null,
+    desc: 'The raw OB1 kit, played dry — exactly as inscribed.',
+    uses: ['kick','snare','hat','clap'], synths: [], fx: [] },
+  { key: 'g2050', year: 2050, name: 'First Recursion', parent: 'g2025',
+    desc: 'Someone reuses Genesis, layers on-chain bass and adds a filter-delay chain.',
+    uses: ['bass','melobass'], synths: [], fx: ['delay','filter'] },
+  { key: 'g2075', year: 2075, name: 'Synth Era', parent: 'g2050',
+    desc: 'A live acid line and FM bells join the inherited groove; drums get bit-crushed.',
+    uses: ['glock'], synths: ['acid','fm'], fx: ['crush','phaser'] },
+  { key: 'g2100', year: 2100, name: 'Halftime Rework', parent: 'g2075',
+    desc: 'Tempo felt in half; the moon-landing audional drifts through a reverb wash.',
+    uses: ['step','scratch'], synths: ['saw'], fx: ['reverb','dist'] },
+  { key: 'g2125', year: 2125, name: 'Century Remix', parent: 'g2100',
+    desc: 'Everything at once. Four generations deep, every source still credited automatically.',
+    uses: ['crash','audional'], synths: ['jims10'], fx: ['delay','reverb','phaser'] },
+];
+
+/* ---------------- loader: raw audio / base64 JSON / HTML-embedded (OB1) ---------------- */
+const b64buf = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
+
+async function fetchInscription(id) {
+  const r = await fetch(GATEWAY + id);
+  if (!r.ok) throw new Error(`fetch ${r.status}`);
+  const ct = (r.headers.get('content-type') || '').toLowerCase();
+  if (ct.includes('application/json')) {
+    const j = await r.json();
+    const b64 = j.audioData || j.audioData_base64 || '';
+    if (!b64) throw new Error('JSON has no audioData');
+    return b64buf(b64.includes(',') ? b64.split(',')[1] : b64);
+  }
+  if (ct.includes('text/html')) {
+    const html = await r.text();
+    const m = html.match(/data:audio\/[a-z0-9.+-]+;base64,([A-Za-z0-9+/=]+)/i);
+    if (m) return b64buf(m[1]);
+    throw new Error('HTML page contains no embedded audio');
+  }
+  return r.arrayBuffer();
+}
+
+/* ---------------- audio engine ---------------- */
+let ctx, master, buffers = {}, playing = false, timer = null;
+const BPM = 105, STEP = 60 / BPM / 4, BAR = STEP * 16, BARS_PER_GEN = 4;
+
+function ensureCtx() {
+  if (ctx) return;
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  master = ctx.createGain(); master.gain.value = 0.9;
+  const lim = ctx.createDynamicsCompressor();
+  lim.threshold.value = -6; lim.ratio.value = 20; lim.knee.value = 0; lim.attack.value = 0.002;
+  master.connect(lim).connect(ctx.destination);
+}
+
+/* impulse for reverb, generated (deterministic-ish, seeded noise fine here) */
+function makeImpulse(sec = 2.2, decay = 3) {
+  const len = ctx.sampleRate * sec, ir = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let c = 0; c < 2; c++) {
+    const d = ir.getChannelData(c);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+  }
+  return ir;
+}
+
+/* FX chain builders — real Web Audio plugin units */
+const FX = {
+  filter(from) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1800; f.Q.value = 4; from.connect(f); return f; },
+  delay(from) {
+    const d = ctx.createDelay(1); d.delayTime.value = STEP * 3; // dotted 8th
+    const fb = ctx.createGain(); fb.gain.value = 0.35;
+    const mix = ctx.createGain(); mix.gain.value = 0.35;
+    d.connect(fb).connect(d); from.connect(d); d.connect(mix);
+    const out = ctx.createGain(); from.connect(out); mix.connect(out); return out;
+  },
+  crush(from) {
+    const ws = ctx.createWaveShaper(); const n = 33, c = new Float32Array(1025);
+    for (let i = 0; i < 1025; i++) c[i] = Math.round((i / 512 - 1) * n) / n;
+    ws.curve = c; from.connect(ws); return ws;
+  },
+  dist(from) {
+    const ws = ctx.createWaveShaper(); const c = new Float32Array(1025);
+    for (let i = 0; i < 1025; i++) { const x = i / 512 - 1; c[i] = Math.tanh(x * 9) / Math.tanh(9); }
+    ws.curve = c; const g = ctx.createGain(); g.gain.value = 0.8; from.connect(ws).connect(g); return g;
+  },
+  phaser(from) {
+    let node = from; const stages = [];
+    for (let i = 0; i < 4; i++) { const ap = ctx.createBiquadFilter(); ap.type = 'allpass'; ap.frequency.value = 600; node.connect(ap); node = ap; stages.push(ap); }
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.4;
+    const lg = ctx.createGain(); lg.gain.value = 500;
+    lfo.connect(lg); stages.forEach(s => lg.connect(s.frequency)); lfo.start();
+    const out = ctx.createGain(); from.connect(out); node.connect(out); out.gain.value = 0.6; return out;
+  },
+  reverb(from) {
+    const cv = ctx.createConvolver(); cv.buffer = makeImpulse();
+    const wet = ctx.createGain(); wet.gain.value = 0.45;
+    const out = ctx.createGain(); from.connect(out); from.connect(cv).connect(wet).connect(out); return out;
+  },
+};
+
+function buildChain(fxList) {
+  const input = ctx.createGain(); let node = input;
+  for (const f of fxList) node = FX[f](node);
+  node.connect(master);
+  return input;
+}
+
+function playSample(key, t, dest, { rate = 1, gain = 1 } = {}) {
+  const b = buffers[key]; if (!b) return;
+  const s = ctx.createBufferSource(); s.buffer = b; s.playbackRate.value = rate;
+  const g = ctx.createGain(); g.gain.value = gain;
+  s.connect(g).connect(dest); s.start(t);
+}
+
+/* synth voices */
+function synthNote(kind, t, freq, dur, dest, vel = 1) {
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.25 * vel, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  if (kind === 'acid') {
+    const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = freq;
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 12;
+    f.frequency.setValueAtTime(freq * 8, t);
+    f.frequency.exponentialRampToValueAtTime(freq * 1.5, t + dur);
+    o.connect(f).connect(g); o.start(t); o.stop(t + dur + 0.05);
+  } else if (kind === 'fm') {
+    const car = ctx.createOscillator(); car.frequency.value = freq;
+    const mod = ctx.createOscillator(); mod.frequency.value = freq * 3.01;
+    const mg = ctx.createGain(); mg.gain.setValueAtTime(freq * 2, t);
+    mg.gain.exponentialRampToValueAtTime(1, t + dur);
+    mod.connect(mg).connect(car.frequency); car.connect(g);
+    car.start(t); mod.start(t); car.stop(t + dur + 0.05); mod.stop(t + dur + 0.05);
+  } else if (kind === 'saw') {
+    for (const det of [-7, 0, 7]) {
+      const o = ctx.createOscillator(); o.type = 'sawtooth';
+      o.frequency.value = freq; o.detune.value = det;
+      const og = ctx.createGain(); og.gain.value = 0.33;
+      o.connect(og).connect(g); o.start(t); o.stop(t + dur + 0.05);
+    }
+  } else { // jims10: square mono lead + glide feel
+    const o = ctx.createOscillator(); o.type = 'square'; o.frequency.setValueAtTime(freq, t);
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 2200;
+    o.connect(f).connect(g); o.start(t); o.stop(t + dur + 0.05);
+  }
+  g.connect(dest);
+}
+
+const N = m => 440 * Math.pow(2, (m - 69) / 12); // MIDI → Hz
+const ACID = [33, 33, 45, 33, 36, 33, 45, 40];   // A1 riff
+const BELLS = [69, 76, 81, 76];
+const LEAD = [57, 60, 64, 67, 64, 60];
+
+/* schedule one generation's bars starting at time t0. Returns end time. */
+function scheduleGeneration(gen, t0) {
+  const chain = buildChain(gen.fx.filter(f => FX[f]));
+  const dry = ctx.createGain(); dry.connect(master);
+  const half = gen.year >= 2100;
+  const cum = lineage(gen); // every ancestor's sample set is inherited
+
+  const drums = new Set(), melodics = new Set();
+  for (const g of cum) for (const u of g.uses)
+    (['kick','snare','hat','clap','crash'].includes(u) ? drums : melodics).add(u);
+
+  for (let bar = 0; bar < BARS_PER_GEN; bar++) {
+    const bt = t0 + bar * BAR;
+    for (let s = 0; s < 16; s++) {
+      const t = bt + s * STEP;
+      const stepIn2 = s % (half ? 32 : 16);
+      // drums (inherited from Genesis onward)
+      if (drums.has('kick') && (half ? s % 8 === 0 : (s % 4 === 0 || s === 14))) playSample('kick', t, chain);
+      if (drums.has('snare') && (half ? s === 8 : s % 8 === 4)) playSample('snare', t, chain);
+      if (drums.has('hat') && s % 2 === 0) playSample('hat', t, chain, { gain: s % 4 ? 0.5 : 0.8 });
+      if (drums.has('clap') && s % 8 === 4 && gen.year >= 2050) playSample('clap', t, chain, { gain: 0.7 });
+      if (drums.has('crash') && bar === 0 && s === 0) playSample('crash', t, dry, { gain: 0.6 });
+      // melodic on-chain samples
+      if (melodics.has('bass') && s % 4 === 2) playSample('bass', t, chain, { rate: 1, gain: 0.8 });
+      if (melodics.has('glock') && s % 16 === 6) playSample('glock', t, chain, { rate: [1, 1.5, 0.75][bar % 3], gain: 0.5 });
+      if (melodics.has('scratch') && bar === 2 && s === 12) playSample('scratch', t, dry, { gain: 0.7 });
+      // synths
+      if (gen.synths.includes('acid')) synthNote('acid', t, N(ACID[s % 8]) , STEP * 0.9, chain, s % 4 === 0 ? 1 : 0.7);
+      if (gen.synths.includes('fm') && s % 4 === 3) synthNote('fm', t, N(BELLS[(bar + s) % 4] ), STEP * 3, chain, 0.6);
+      if (gen.synths.includes('saw') && s === 0) synthNote('saw', t, N(45), BAR * 0.95, chain, 0.5);
+      if (gen.synths.includes('jims10') && s % 2 === 0) synthNote('jims10', t, N(LEAD[(bar * 8 + s / 2) % 6] + 12), STEP * 1.8, chain, 0.55);
+    }
+    // long-form audionals ride the bar
+    if (melodics.has('melobass') && bar % 2 === 0) playSample('melobass', bt, chain, { gain: 0.75 });
+    if (melodics.has('step') && bar === 1) playSample('step', bt, chain, { gain: 0.9 });
+    if (melodics.has('audional') && bar === 3) playSample('audional', bt, dry, { gain: 0.9 });
+  }
+  return t0 + BARS_PER_GEN * BAR;
+}
+
+function lineage(gen) { // [genesis … gen]
+  const out = []; let g = gen;
+  while (g) { out.unshift(g); g = GENERATIONS.find(x => x.key === g.parent); }
+  return out;
+}
+
+/* ---------------- attribution: pure function of the graph ---------------- */
+function credits(gen) {
+  const acc = {};
+  let weight = 1;
+  const chain = lineage(gen).reverse(); // gen first, genesis last
+  for (let i = 0; i < chain.length; i++) {
+    const g = chain[i];
+    const last = i === chain.length - 1;
+    const own = last ? weight : weight * 0.5;      // half flows up the parent chain
+    const srcs = [...g.uses.map(u => SAMPLES[u].label + '|' + SAMPLES[u].id),
+                  ...g.synths.map(s => SYNTHS[s].label + '|synth:' + s)];
+    for (const s of srcs) acc[s] = (acc[s] || 0) + own / srcs.length;
+    weight -= own;
+  }
+  return Object.entries(acc)
+    .map(([k, v]) => { const [label, id] = k.split('|'); return { label, id, pct: v * 100 }; })
+    .sort((a, b) => b.pct - a.pct);
+}
+
+/* ---------------- UI ---------------- */
+const $ = s => document.querySelector(s);
+const log = m => { const el = $('#log'); el.innerHTML = `<div>› ${m}</div>` + el.innerHTML; };
+
+function renderGens() {
+  $('#gens').innerHTML = GENERATIONS.map(g => `
+    <div class="gen" id="gen-${g.key}">
+      <span class="yr">${g.year}</span> <span class="nm">${g.name}</span>
+      <div class="ds">${g.desc}</div>
+      <div class="tags">
+        ${g.uses.map(u => `<span class="tag">⛓ ${SAMPLES[u].label.split('—').pop().trim()}</span>`).join('')}
+        ${g.synths.map(s => `<span class="tag synth">〜 ${SYNTHS[s].label.split('(')[0].trim()}</span>`).join('')}
+        ${g.fx.map(f => `<span class="tag fx">☰ ${f}</span>`).join('')}
+      </div>
+    </div>`).join('');
+  GENERATIONS.forEach(g => $(`#gen-${g.key}`).addEventListener('click', () => selectGen(g)));
+}
+
+function renderCredits(gen) {
+  $('#credgen').textContent = `${gen.year} ${gen.name}`;
+  $('#credits').innerHTML =
+    '<tr><th>source</th><th>inscription / origin</th><th style="text-align:right">split</th></tr>' +
+    credits(gen).map(c =>
+      `<tr><td>${c.label}</td><td class="id">${c.id}</td><td class="pct">${c.pct.toFixed(2)}%</td></tr>`).join('');
+}
+
+function renderGraph(activeKey) {
+  const W = 900, colW = W / GENERATIONS.length;
+  let svg = '';
+  GENERATIONS.forEach((g, i) => {
+    const x = colW * i + colW / 2, y = 50;
+    if (g.parent) svg += `<line x1="${x - colW}" y1="${y}" x2="${x}" y2="${y}" stroke="#f7931a" stroke-width="2" stroke-dasharray="6 4"/>`;
+    const on = g.key === activeKey;
+    svg += `<circle cx="${x}" cy="${y}" r="16" fill="${on ? '#f7931a' : '#1a2130'}" stroke="${on ? '#f7931a' : '#263042'}" stroke-width="2"/>`;
+    svg += `<text x="${x}" y="${y + 4}" text-anchor="middle" fill="${on ? '#14100a' : '#7d8ca3'}" font-size="10" font-family="monospace">${g.year}</text>`;
+    const srcs = [...g.uses.map(u => ({ t: 'chain', l: SAMPLES[u].label.split('—').pop().trim() })),
+                  ...g.synths.map(s => ({ t: 'synth', l: SYNTHS[s].label.split('(')[0].trim() }))];
+    srcs.forEach((s, j) => {
+      const sy = 110 + j * 42;
+      svg += `<line x1="${x}" y1="${y + 16}" x2="${x}" y2="${sy - 12}" stroke="#263042"/>`;
+      svg += `<rect x="${x - colW / 2 + 8}" y="${sy - 12}" width="${colW - 16}" height="26" rx="6" fill="#121722" stroke="${s.t === 'synth' ? '#c084fc' : '#22d3ee'}"/>`;
+      svg += `<text x="${x}" y="${sy + 5}" text-anchor="middle" fill="#dce6f5" font-size="9.5" font-family="monospace">${s.t === 'synth' ? '〜' : '⛓'} ${s.l.slice(0, 22)}</text>`;
+    });
+  });
+  $('#graph').innerHTML = svg;
+}
+
+function selectGen(gen) {
+  document.querySelectorAll('.gen').forEach(e => e.classList.remove('active'));
+  $(`#gen-${gen.key}`)?.classList.add('active');
+  renderCredits(gen); renderGraph(gen.key);
+}
+
+/* ---------------- transport ---------------- */
+const rawBytes = {}; // inscription id → ArrayBuffer, survives context recreation
+async function fetchCached(id) {
+  if (!rawBytes[id]) rawBytes[id] = await fetchInscription(id);
+  return rawBytes[id].slice(0);
+}
+
+async function loadAll() {
+  ensureCtx();
+  $('#load').disabled = true;
+  const keys = Object.keys(SAMPLES);
+  let ok = 0;
+  for (const k of keys) {
+    const s = SAMPLES[k];
+    $('#status').innerHTML = `loading <b>${s.label}</b> …`;
+    try {
+      buffers[k] = await ctx.decodeAudioData(await fetchCached(s.id));
+      ok++; log(`✓ ${s.label}`);
+    } catch (e) { log(`✗ ${s.label}: ${e.message}`); }
+  }
+  $('#status').innerHTML = `<b>${ok}/${keys.length}</b> on-chain samples decoded — ready`;
+  $('#play').disabled = ok === 0;
+}
+
+function playCycle() {
+  ensureCtx(); ctx.resume();
+  playing = true; $('#play').disabled = true; $('#stop').disabled = false;
+  let t = ctx.currentTime + 0.15;
+  const marks = [];
+  for (const g of GENERATIONS) { marks.push({ g, at: t }); t = scheduleGeneration(g, t); }
+  const end = t;
+  const t0 = marks[0].at;
+  timer = setInterval(() => {
+    const now = ctx.currentTime;
+    if (now >= end) { stopCycle(); return; }
+    const cur = [...marks].reverse().find(m => now >= m.at);
+    if (cur && !cur.done) { cur.done = true; selectGen(cur.g); $('#status').innerHTML = `playing <b>${cur.g.year} — ${cur.g.name}</b>`; }
+    $('#meter').style.width = `${((now - t0) / (end - t0)) * 100}%`;
+  }, 80);
+}
+
+async function stopCycle() {
+  playing = false; clearInterval(timer);
+  $('#play').disabled = false; $('#stop').disabled = true;
+  $('#meter').style.width = '0';
+  $('#status').textContent = 'stopped';
+  if (ctx) {
+    await ctx.close(); ctx = null; buffers = {};
+    // re-decode from cached raw bytes into a fresh context so Play works again immediately
+    ensureCtx();
+    for (const k of Object.keys(SAMPLES)) {
+      if (rawBytes[SAMPLES[k].id]) {
+        try { buffers[k] = await ctx.decodeAudioData(rawBytes[SAMPLES[k].id].slice(0)); } catch {}
+      }
+    }
+  }
+}
+
+/* wire up */
+$('#load').addEventListener('click', loadAll);
+$('#play').addEventListener('click', playCycle);
+$('#stop').addEventListener('click', stopCycle);
+
+renderGens();
+selectGen(GENERATIONS[GENERATIONS.length - 1]);
+</script>
+</body>
+</html>

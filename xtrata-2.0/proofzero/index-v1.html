@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#07090d" />
+  <meta name="description" content="Inscribe Your First Masterpiece — a 200 STX creative bounty presented by Xtrata and sponsored by Zero Authority DAO." />
+  <meta property="og:title" content="Inscribe Your First Masterpiece | Xtrata × Zero Authority DAO" />
+  <meta property="og:description" content="Create something original. Put it fully on-chain through Xtrata. Enter to win part of 200 STX." />
+  <meta property="og:type" content="website" />
+  <title>Inscribe Your First Masterpiece | Xtrata × Zero Authority DAO</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #050505;
+      --panel: #111111;
+      --surface: #151515;
+      --ink: #f7f7f7;
+      --muted: #aeb5b0;
+      --line: #303030;
+      --line-strong: #5b5b5b;
+      --green: #b9ef77;
+      --green-soft: #14200f;
+      --acid: #b9ef77;
+      --teal: #7de6d1;
+      --violet: #6c49ff;
+      --coral: #ff664d;
+      --dark: #070707;
+      --dark-panel: #0d0d0d;
+      --shadow: 0 22px 60px rgba(0, 0, 0, 0.42);
+      --max: 1240px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      min-width: 320px;
+      margin: 0;
+      background:
+        radial-gradient(circle at 14% 4%, rgba(108, 73, 255, .055), transparent 28rem),
+        var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+    a { color: inherit; text-decoration: none; }
+    button, input { font: inherit; }
+    button { color: inherit; }
+    img, svg { display: block; max-width: 100%; }
+    .shell { width: min(var(--max), calc(100vw - 32px)); margin: 0 auto; }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .section { padding: clamp(76px, 10vw, 132px) 0 0; }
+    .section-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--green);
+      font: 850 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+    .section-kicker::before { width: 22px; height: 1px; background: currentColor; content: ""; }
+    .section-heading { max-width: 790px; margin-bottom: 34px; }
+    .section-heading h2 {
+      margin: 12px 0 0;
+      font-size: clamp(38px, 5.7vw, 76px);
+      letter-spacing: -.055em;
+      line-height: .94;
+    }
+    .section-heading p { max-width: 650px; margin: 18px 0 0; color: var(--muted); font-size: 16px; }
+    .btn {
+      display: inline-flex;
+      min-height: 46px;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      border: 1px solid var(--ink);
+      border-radius: 8px;
+      background: var(--ink);
+      color: var(--bg);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 850;
+      padding: 11px 17px;
+      transition: transform .18s ease, background .18s ease, border-color .18s ease;
+    }
+    .btn:hover { border-color: var(--acid); background: var(--acid); color: #090b10; }
+    .btn.secondary { background: transparent; color: var(--ink); }
+    .btn.secondary:hover { border-color: var(--acid); background: rgba(185, 239, 119, .08); color: var(--acid); }
+    .btn.small { min-height: 38px; padding: 8px 13px; font-size: 12px; }
+
+    .announcement { border-bottom: 1px solid var(--line); background: #0b1009; }
+    .announcement .shell {
+      display: flex;
+      min-height: 38px;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      color: var(--acid);
+      font-size: 12px;
+      text-align: center;
+    }
+    .pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--acid); box-shadow: 0 0 0 5px rgba(185, 239, 119, .08); }
+
+    .site-header { background: rgba(5, 5, 5, .94); backdrop-filter: blur(18px); }
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      min-height: 112px;
+      align-items: center;
+      gap: 24px;
+      border-bottom: 1px solid var(--line-strong);
+    }
+    .brand { display: inline-flex; align-items: center; gap: 16px; min-width: 0; }
+    .brand-logo { width: 86px; height: 86px; flex: 0 0 86px; object-fit: contain; }
+    .brand-name { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+    .brand-wordmark { font-size: 25px; font-weight: 900; letter-spacing: .02em; line-height: 1; }
+    .brand-tagline { max-width: 32ch; color: var(--muted); font-size: 12px; font-weight: 500; }
+    .top-actions { display: flex; align-items: center; gap: 9px; }
+    .site-nav {
+      display: flex;
+      min-height: 50px;
+      align-items: center;
+      gap: 5px;
+      border-bottom: 1px solid var(--line);
+    }
+    .site-nav a {
+      border-radius: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      padding: 8px 11px;
+    }
+    .site-nav a:hover, .site-nav a[aria-current="page"] { background: var(--green-soft); color: var(--acid); }
+    .campaign-nav { margin-left: auto; }
+    .menu-button { display: none; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 9px 12px; }
+
+    .hero {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, .95fr) minmax(460px, 1.05fr);
+      min-height: min(720px, calc(100vh - 180px));
+      gap: clamp(28px, 5vw, 70px);
+      align-items: center;
+      margin-top: 18px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, .12);
+      border-radius: 24px;
+      background:
+        radial-gradient(circle at 8% 4%, rgba(108, 73, 255, .27), transparent 32%),
+        radial-gradient(circle at 96% 12%, rgba(33, 205, 187, .17), transparent 26%),
+        radial-gradient(circle at 66% 105%, rgba(255, 102, 77, .14), transparent 28%),
+        var(--dark);
+      box-shadow: 0 36px 100px rgba(0, 0, 0, .28);
+      color: #f8fafc;
+      padding: clamp(38px, 6vw, 76px);
+    }
+    .hero::before {
+      position: absolute;
+      inset: 0;
+      background-image: linear-gradient(rgba(255,255,255,.026) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.026) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: linear-gradient(120deg, #000, transparent 72%);
+      content: "";
+      pointer-events: none;
+    }
+    .hero-copy { position: relative; z-index: 1; }
+    .hero .section-kicker { color: #dfe7ef; }
+    .hero h1 {
+      max-width: 720px;
+      margin: 18px 0 0;
+      font-size: clamp(54px, 7vw, 96px);
+      font-weight: 900;
+      letter-spacing: -.068em;
+      line-height: .87;
+    }
+    .hero h1 em {
+      display: block;
+      color: var(--acid);
+      font-family: Georgia, "Times New Roman", serif;
+      font-weight: 500;
+      letter-spacing: -.055em;
+    }
+    .hero-lead { max-width: 620px; margin: 24px 0 0; color: rgba(238, 243, 249, .73); font-size: clamp(17px, 1.6vw, 21px); }
+    .hero-lead strong { color: #fff; }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+    .hero .btn { border-color: #eef3f8; background: #eef3f8; color: #090b10; }
+    .hero .btn:hover { border-color: var(--acid); background: var(--acid); }
+    .hero .btn.secondary { border-color: rgba(255,255,255,.28); background: rgba(255,255,255,.04); color: #f8fafc; }
+    .hero .btn.secondary:hover { border-color: rgba(255,255,255,.6); background: rgba(255,255,255,.1); }
+    .hero-trust { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 22px; color: rgba(238,243,249,.54); font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; text-transform: uppercase; }
+    .hero-trust span { display: inline-flex; align-items: center; gap: 7px; }
+    .hero-trust span::before { width: 3px; height: 3px; border-radius: 50%; background: var(--teal); content: ""; }
+    .partners { margin-top: 28px; color: rgba(238,243,249,.48); font-size: 11px; }
+    .partners strong { color: rgba(255,255,255,.88); font-weight: 850; }
+
+    .object-stage { position: relative; z-index: 1; min-height: 510px; perspective: 1100px; }
+    .prize-orbit {
+      position: absolute;
+      inset: 50% auto auto 50%;
+      display: grid;
+      width: 220px;
+      aspect-ratio: 1;
+      place-items: center;
+      border: 1px solid rgba(185,239,119,.46);
+      border-radius: 50%;
+      background: rgba(185,239,119,.06);
+      box-shadow: 0 0 0 30px rgba(185,239,119,.018), 0 0 80px rgba(185,239,119,.1);
+      text-align: center;
+      transform: translate(-50%, -50%);
+    }
+    .prize-orbit::before, .prize-orbit::after { position: absolute; inset: -42px; border: 1px dashed rgba(255,255,255,.12); border-radius: 50%; content: ""; }
+    .prize-orbit::after { inset: -92px; }
+    .prize-number { display: block; color: var(--acid); font-size: 68px; font-weight: 900; letter-spacing: -.07em; line-height: .8; }
+    .prize-label { display: block; margin-top: 12px; color: #f8fafc; font: 800 10px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .12em; }
+    .object-card {
+      position: absolute;
+      width: 154px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: 14px;
+      background: rgba(13,17,23,.94);
+      box-shadow: 0 24px 50px rgba(0,0,0,.32);
+      padding: 9px;
+    }
+    .object-card:nth-child(2) { top: 2%; left: 2%; transform: rotate(-4deg); }
+    .object-card:nth-child(3) { top: 8%; right: 0; transform: rotate(4deg); }
+    .object-card:nth-child(4) { bottom: 1%; left: 8%; transform: rotate(3deg); }
+    .object-card:nth-child(5) { right: 4%; bottom: 3%; transform: rotate(-3deg); }
+    .object-art { position: relative; aspect-ratio: 1; overflow: hidden; border-radius: 9px; }
+    .object-art.art { background: radial-gradient(circle at 34% 28%, #f7efad 0 4%, transparent 5%), linear-gradient(145deg,#272038,#6c49ff 55%,#7de6d1); }
+    .object-art.audio { background: #b9ef77; }
+    .object-art.audio::after { position: absolute; inset: 22% 13%; background: repeating-linear-gradient(90deg,#172018 0 3px,transparent 3px 9px); clip-path: polygon(0 40%,8% 22%,16% 70%,24% 8%,32% 82%,40% 34%,48% 64%,56% 15%,64% 76%,72% 42%,80% 62%,88% 26%,100% 48%,100% 58%,88% 38%,80% 74%,72% 54%,64% 88%,56% 28%,48% 76%,40% 46%,32% 94%,24% 20%,16% 82%,8% 34%,0 58%); content: ""; }
+    .object-art.words { display: grid; place-items: center; background: #f7fafc; color: #11161a; font: 900 18px/.88 Inter, sans-serif; letter-spacing: -.06em; text-align: center; }
+    .object-art.code { background: conic-gradient(from 160deg at 50% 50%,#7de6d1,#6c49ff,#0b0e14,#ff664d,#7de6d1); }
+    .object-meta { padding: 9px 3px 3px; }
+    .object-meta strong { display: block; font-size: 11px; }
+    .object-meta span { display: block; margin-top: 3px; color: rgba(238,243,249,.46); font: 8px ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; }
+
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); margin-top: 12px; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+    .metric { min-height: 115px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--panel); padding: 22px; }
+    .metric span { color: var(--muted); font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; text-transform: uppercase; }
+    .metric strong { display: block; margin-top: 16px; font-size: clamp(23px,3vw,38px); letter-spacing: -.04em; line-height: 1; }
+    .metric .countdown { color: var(--green); font-variant-numeric: tabular-nums; }
+
+    .manifesto { display: grid; grid-template-columns: minmax(0,.68fr) minmax(0,1.32fr); gap: clamp(36px,7vw,96px); align-items: end; padding: clamp(92px,12vw,160px) 0; border-bottom: 1px solid var(--line); }
+    .manifesto p { margin: 0; color: var(--muted); font-size: 15px; }
+    .manifesto blockquote { margin: 0; font-size: clamp(46px,7vw,100px); font-weight: 900; letter-spacing: -.07em; line-height: .84; }
+    .manifesto blockquote em { color: var(--green); font-family: Georgia, "Times New Roman", serif; font-weight: 500; }
+
+    .tile-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+    .tile { position: relative; min-height: 230px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--panel); padding: 24px; }
+    .tile-no { color: var(--muted); font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .tile-glyph { position: absolute; top: 20px; right: 22px; color: var(--green); font-size: 24px; }
+    .tile h3 { margin: 78px 0 8px; font-size: 25px; letter-spacing: -.035em; }
+    .tile p { max-width: 34ch; margin: 0; color: var(--muted); font-size: 13px; }
+
+    .process { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+    .process article { display: grid; min-height: 300px; align-content: space-between; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--panel); padding: 25px; }
+    .process-no { color: var(--green); font: 850 10px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; }
+    .process h3 { margin: 0 0 10px; font-size: clamp(25px,2.6vw,36px); letter-spacing: -.045em; line-height: 1; }
+    .process p { margin: 0; color: var(--muted); font-size: 13px; }
+
+    .file-step { display: grid; grid-template-columns: minmax(0,1fr) minmax(330px,.8fr); gap: clamp(26px,5vw,64px); align-items: center; overflow: hidden; border: 1px solid rgba(255,255,255,.11); border-radius: 22px; background: radial-gradient(circle at 10% 110%, rgba(108,73,255,.3), transparent 36%), var(--dark); color: #f7fafc; padding: clamp(30px,5vw,64px); }
+    .file-step h2 { margin: 14px 0 0; font-size: clamp(40px,5vw,68px); letter-spacing: -.06em; line-height: .93; }
+    .file-step p { max-width: 590px; color: rgba(247,250,252,.62); }
+    .format-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 22px; }
+    .format-list span { border: 1px solid rgba(255,255,255,.16); border-radius: 999px; color: rgba(247,250,252,.7); font: 8px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 7px 10px; }
+    .drop-ui { display: grid; min-height: 330px; place-items: center; border: 1px dashed rgba(185,239,119,.5); border-radius: 16px; background: rgba(255,255,255,.035); padding: 28px; text-align: center; transition: background .18s ease, border-color .18s ease; }
+    .drop-ui.is-dragging { border-color: var(--acid); background: rgba(185,239,119,.08); }
+    .drop-mark { display: grid; width: 58px; height: 58px; place-items: center; margin: 0 auto 18px; border: 1px solid rgba(255,255,255,.2); border-radius: 50%; font-size: 24px; }
+    .drop-ui h3 { margin: 0; font-size: 21px; }
+    .drop-ui p { margin: 8px 0 18px; color: rgba(247,250,252,.55); font-size: 12px; overflow-wrap: anywhere; }
+    .drop-ui .btn { border-color: #eef3f8; background: #eef3f8; color: #090b10; }
+    .drop-ui input { display: none; }
+    .drop-link { display: inline-block; margin-top: 13px; color: rgba(247,250,252,.58); font-size: 11px; text-decoration: underline; text-underline-offset: 3px; }
+
+    .prize-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+    .prize-card { display: grid; min-height: 210px; align-content: space-between; border: 1px solid var(--line); border-radius: 16px; background: radial-gradient(circle at 90% 0%, rgba(185,239,119,.16), transparent 38%), var(--panel); box-shadow: var(--shadow); padding: 25px; }
+    .amount { font-size: clamp(50px,7vw,84px); font-weight: 900; letter-spacing: -.07em; line-height: .8; }
+    .award { margin-top: 12px; font-size: 12px; font-weight: 850; }
+    .prize-card p { margin: 28px 0 0; color: var(--muted); font-size: 12px; }
+
+    .criteria { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+    .criterion { min-height: 250px; border: 1px solid rgba(255,255,255,.11); border-radius: 16px; background: var(--dark-panel); color: #f7fafc; padding: 25px; }
+    .criterion strong { color: var(--acid); font-size: 54px; letter-spacing: -.06em; }
+    .criterion h3 { margin: 48px 0 7px; font-size: 23px; }
+    .criterion p { margin: 0; color: rgba(247,250,252,.56); font-size: 13px; }
+
+    .gallery { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+    .entry { overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); box-shadow: var(--shadow); }
+    .entry-art { position: relative; aspect-ratio: 1.28; border-bottom: 1px solid var(--line); }
+    .entry-art.one { background: radial-gradient(circle at 32% 30%,#f7efad 0 3%,transparent 4%),linear-gradient(145deg,#181425,#6c49ff 55%,#7de6d1); }
+    .entry-art.two { background: repeating-radial-gradient(circle at 50% 50%,#10131a 0 8px,#245f45 9px 13px,#b9ef77 14px 18px); }
+    .entry-art.three { display: grid; place-items: center; background: #e7ebe7; color: #11161a; font-size: clamp(26px,4vw,50px); font-weight: 900; letter-spacing: -.07em; line-height: .82; text-align: center; }
+    .entry-body { padding: 19px; }
+    .entry-body span { color: var(--green); font: 8px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .09em; }
+    .entry-body h3 { margin: 10px 0 4px; font-size: 19px; }
+    .entry-body p { margin: 0; color: var(--muted); font-size: 12px; }
+
+    .accordion { border-top: 1px solid var(--line-strong); }
+    details { border-bottom: 1px solid var(--line); }
+    summary { display: flex; align-items: center; justify-content: space-between; gap: 24px; cursor: pointer; font-size: 15px; font-weight: 850; list-style: none; padding: 22px 2px; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { color: var(--green); content: "+"; font: 24px/1 ui-monospace, monospace; }
+    details[open] summary::after { content: "−"; }
+    .answer { max-width: 810px; padding: 0 2px 24px; color: var(--muted); font-size: 14px; }
+    .answer ul { margin: 0; padding-left: 20px; }
+
+    .final-cta { margin-top: clamp(76px,10vw,132px); overflow: hidden; border: 1px solid rgba(255,255,255,.12); border-radius: 22px; background: radial-gradient(circle at 92% 8%, rgba(125,230,209,.2), transparent 32%), radial-gradient(circle at 10% 105%, rgba(108,73,255,.25), transparent 38%), var(--dark); color: #f7fafc; padding: clamp(42px,8vw,94px); text-align: center; }
+    .final-cta .section-kicker { color: #dfe7ef; }
+    .final-cta h2 { margin: 16px 0 0; font-size: clamp(54px,8vw,104px); letter-spacing: -.07em; line-height: .85; }
+    .final-cta h2 em { color: var(--acid); font-family: Georgia,"Times New Roman",serif; font-weight: 500; }
+    .final-cta p { max-width: 620px; margin: 24px auto 0; color: rgba(247,250,252,.6); }
+    .final-cta .hero-actions { justify-content: center; }
+    .final-cta .btn { border-color: #eef3f8; background: #eef3f8; color: #090b10; }
+    .final-cta .btn:hover { border-color: var(--acid); background: var(--acid); }
+    .final-cta .btn.secondary { border-color: rgba(255,255,255,.3); background: transparent; color: #fff; }
+    .deadline-note { margin-top: 17px; color: rgba(247,250,252,.44); font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .07em; text-transform: uppercase; }
+
+    footer { padding: 42px 0 54px; }
+    .footer-grid { display: flex; align-items: flex-end; justify-content: space-between; gap: 28px; color: var(--muted); font-size: 11px; }
+    .footer-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; color: var(--ink); font-size: 16px; font-weight: 900; }
+    .footer-brand img { width: 42px; height: 42px; }
+    .footer-links { display: flex; flex-wrap: wrap; gap: 18px; font-weight: 750; }
+    .footer-links a:hover { color: var(--green); }
+    .toast { position: fixed; left: 50%; bottom: 24px; z-index: 50; max-width: min(440px,calc(100vw - 32px)); border: 1px solid rgba(255,255,255,.15); border-radius: 10px; background: var(--dark); color: #f7fafc; box-shadow: 0 18px 50px rgba(0,0,0,.25); font-size: 12px; font-weight: 750; padding: 12px 15px; transform: translate(-50%,120px); transition: transform .22s ease; }
+    .toast.show { transform: translate(-50%,0); }
+
+    @media (max-width: 1000px) {
+      .hero { grid-template-columns: 1fr; min-height: 0; }
+      .hero-copy { max-width: 780px; }
+      .object-stage { width: min(100%,620px); margin: 0 auto; }
+      .tile-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+      .process { grid-template-columns: repeat(2,minmax(0,1fr)); }
+      .file-step { grid-template-columns: 1fr; }
+      .prize-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    }
+    @media (max-width: 720px) {
+      .shell { width: min(var(--max),calc(100vw - 24px)); }
+      .topbar { min-height: 88px; }
+      .brand-logo { width: 64px; height: 64px; flex-basis: 64px; }
+      .brand-wordmark { font-size: 20px; }
+      .brand-tagline { display: none; }
+      .top-actions .btn { display: none; }
+      .menu-button { display: inline-flex; }
+      .site-nav { display: none; align-items: stretch; flex-direction: column; padding: 10px 0; }
+      .site-nav.open { display: flex; }
+      .site-nav a { padding: 11px; }
+      .campaign-nav { margin-left: 0; }
+      .hero { margin-top: 12px; border-radius: 18px; padding: 34px 20px 28px; }
+      .hero h1 { font-size: clamp(49px,16vw,72px); }
+      .hero-actions .btn { width: 100%; }
+      .object-stage { min-height: 420px; transform: scale(.9); transform-origin: center; }
+      .metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
+      .manifesto { grid-template-columns: 1fr; }
+      .manifesto blockquote { font-size: clamp(50px,15vw,78px); }
+      .tile-grid, .process, .criteria, .gallery { grid-template-columns: 1fr; }
+      .tile { min-height: 210px; }
+      .process article { min-height: 230px; }
+      .prize-grid { grid-template-columns: 1fr; }
+      .final-cta { padding: 52px 20px; }
+      .final-cta .btn { width: 100%; }
+      .footer-grid { align-items: flex-start; flex-direction: column; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .001ms !important; }
+    }
+    #dropContinue { margin-top: 12px; }
+    #dropContinue[hidden] { display: none !important; }
+  </style>
+</head>
+
+<body>
+  <div class="announcement">
+    <div class="shell"><span class="pulse" aria-hidden="true"></span><strong>200 STX creative bounty</strong><span aria-hidden="true">·</span><span id="topDeadline">Deadline to be announced</span></div>
+  </div>
+
+  <header class="site-header">
+    <div class="shell">
+      <div class="topbar">
+        <a class="brand" href="https://xtrata.xyz/" aria-label="Xtrata home">
+          <img class="brand-logo" src="/favicon.svg" alt="" />
+          <span class="brand-name"><span class="brand-wordmark">XTRATA</span><span class="brand-tagline">Living on-chain objects, anchored to Bitcoin</span></span>
+        </a>
+        <div class="top-actions">
+          <a class="btn secondary small" href="https://xtrata.xyz/xplorer">Explore Xtrata</a>
+          <a class="btn small" data-create-link href="/inscribe">Create yours</a>
+          <button class="menu-button" id="menuButton" type="button" aria-expanded="false" aria-controls="siteNav">Menu</button>
+        </div>
+      </div>
+      <nav class="site-nav" id="siteNav" aria-label="Campaign navigation">
+        <a href="https://xtrata.xyz/">Home</a>
+        <a href="#enter" aria-current="page">First Masterpiece</a>
+        <a href="#how">How it works</a>
+        <a href="#prizes">Prizes</a>
+        <a href="#gallery">Entries</a>
+        <a href="#rules">Rules</a>
+        <a class="campaign-nav" data-bounty-link href="#official-bounty">Official bounty ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="hero" aria-labelledby="heroTitle">
+      <div class="hero-copy">
+        <span class="section-kicker">Xtrata × Zero Authority DAO</span>
+        <h1 id="heroTitle">Inscribe your <em>first masterpiece.</em></h1>
+        <p class="hero-lead">Create an original song, artwork, photograph, poem, animation or short film. Put it fully on-chain through Xtrata and be one of four creators to win <strong>50 STX.</strong></p>
+        <div class="hero-actions">
+          <a class="btn" data-create-link href="/inscribe">Create your inscription <span aria-hidden="true">→</span></a>
+          <a class="btn secondary" data-bounty-link href="#official-bounty">View official bounty <span aria-hidden="true">↗</span></a>
+        </div>
+        <div class="hero-trust"><span>Four equal winners</span><span>No theme required</span><span>Fully on-chain</span><span>Anchored to Bitcoin</span></div>
+        <div class="partners">Presented by <strong>XTRATA</strong> &nbsp;·&nbsp; Sponsored by <strong>ZERO AUTHORITY DAO</strong></div>
+      </div>
+
+      <div class="object-stage" aria-label="Examples of creative objects that can live on Xtrata">
+        <div class="prize-orbit"><div><span class="prize-number">200</span><span class="prize-label">STX · PRIZE POOL</span></div></div>
+        <article class="object-card"><div class="object-art art"></div><div class="object-meta"><strong>Original artwork</strong><span>Image · confirmed</span></div></article>
+        <article class="object-card"><div class="object-art audio"></div><div class="object-meta"><strong>Sound on-chain</strong><span>Audio · inscribed</span></div></article>
+        <article class="object-card"><div class="object-art words">WORDS<br>THAT<br>LAST</div><div class="object-meta"><strong>Written work</strong><span>Text · sealed</span></div></article>
+        <article class="object-card"><div class="object-art code"></div><div class="object-meta"><strong>Unexpected object</strong><span>HTML · alive</span></div></article>
+      </div>
+    </section>
+
+    <div class="metrics" aria-label="Campaign facts">
+      <div class="metric"><span>Prize pool</span><strong>200 STX</strong></div>
+      <div class="metric"><span>Equal awards</span><strong>4 × 50 STX</strong></div>
+      <div class="metric"><span>Network</span><strong>Stacks</strong></div>
+      <div class="metric"><span>Time remaining</span><strong class="countdown" id="countdown">TBA</strong></div>
+    </div>
+
+    <section class="manifesto">
+      <div><span class="section-kicker">The submission is the object</span><p>Every valid entry becomes a permanent Xtrata object. Your inscription link is the deliverable, the provenance, and the proof that the work exists on-chain.</p></div>
+      <blockquote>The work is not merely submitted. The work <em>is</em> the submission.</blockquote>
+    </section>
+
+    <section class="section" id="enter" aria-labelledby="enterTitle">
+      <div class="section-heading"><span class="section-kicker">Open creative category</span><h2 id="enterTitle">What can you enter?</h2><p>Anything original that deserves to outlive a feed, a platform, or a hard drive.</p></div>
+      <div class="tile-grid">
+        <article class="tile"><span class="tile-no">01 / IMAGE</span><span class="tile-glyph">◩</span><h3>Artwork</h3><p>Illustration, digital art, collage, or a generative work.</p></article>
+        <article class="tile"><span class="tile-no">02 / AUDIO</span><span class="tile-glyph">◒</span><h3>Music</h3><p>A song, beat, soundscape, spoken piece, or experimental recording.</p></article>
+        <article class="tile"><span class="tile-no">03 / TEXT</span><span class="tile-glyph">¶</span><h3>Writing</h3><p>A poem, micro-story, manifesto, essay, or another original text.</p></article>
+        <article class="tile"><span class="tile-no">04 / IMAGE</span><span class="tile-glyph">◉</span><h3>Photography</h3><p>One strong photograph or a carefully presented visual record.</p></article>
+        <article class="tile"><span class="tile-no">05 / VIDEO</span><span class="tile-glyph">▷</span><h3>Moving image</h3><p>A short film, animation, loop, or audiovisual piece.</p></article>
+        <article class="tile"><span class="tile-no">06 / CODE</span><span class="tile-glyph">⌘</span><h3>Something unexpected</h3><p>Interactive HTML, code, a strange format, or something entirely new.</p></article>
+      </div>
+    </section>
+
+    <section class="section" id="how" aria-labelledby="howTitle">
+      <div class="section-heading"><span class="section-kicker">Four simple steps</span><h2 id="howTitle">Create it. Inscribe it. Share it. Submit it.</h2></div>
+      <div class="process">
+        <article><span class="process-no">01 / CREATE</span><div><h3>Make something original</h3><p>Create a piece you are proud to place permanently on-chain.</p></div></article>
+        <article><span class="process-no">02 / INSCRIBE</span><div><h3>Use Xtrata</h3><p>Upload the work through the Xtrata Wizard and complete the guided process.</p></div></article>
+        <article><span class="process-no">03 / SHARE</span><div><h3>Tell its story</h3><p>Share the inscription publicly and explain what you made and why it matters.</p></div></article>
+        <article><span class="process-no">04 / SUBMIT</span><div><h3>Enter the bounty</h3><p>Submit your inscription link and public post through the official Zero Authority bounty.</p></div></article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="file-step">
+        <div><span class="section-kicker">Your first move</span><h2>Drop something worth remembering.</h2><p>Choose your work here and we route it the right way: a single file up to 512&nbsp;KB mints in one quick transaction on the Create page, while larger files, multiple files, or folders continue in the guided Wizard. Nothing is uploaded until you confirm in your wallet.</p><div class="format-list"><span>IMAGE</span><span>AUDIO</span><span>VIDEO</span><span>TEXT</span><span>HTML</span><span>SVG</span><span>JSON</span></div></div>
+        <div class="drop-ui" id="dropUi">
+          <div><div class="drop-mark" aria-hidden="true">↑</div><h3 id="dropTitle">Choose files or drop them here</h3><p id="dropText">Single file up to 512 KB mints in one transaction. Bigger or multiple continues in the Wizard.</p><label class="btn" for="fileInput">Choose files</label><input id="fileInput" type="file" multiple /><br><a class="btn" id="dropContinue" href="#" hidden>Continue</a><br><a class="drop-link" href="/wizard/">Or open the Wizard directly ↗</a></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="prizes" aria-labelledby="prizesTitle">
+      <div class="section-heading"><span class="section-kicker">The distribution</span><h2 id="prizesTitle">Four winners. One equal split.</h2><p>The 200 STX pool is divided equally: four winning inscriptions receive 50 STX each. There is no first place or runner-up.</p></div>
+      <div class="prize-grid">
+        <article class="prize-card"><div><div class="amount">4</div><div class="award">WINNING INSCRIPTIONS</div></div><p>Four works are selected using the same published judging criteria.</p></article>
+        <article class="prize-card"><div><div class="amount">50</div><div class="award">STX · EACH WINNER</div></div><p>Every winner receives exactly the same award.</p></article>
+        <article class="prize-card"><div><div class="amount">200</div><div class="award">STX · TOTAL POOL</div></div><p>The complete bounty pool is distributed across the four winners.</p></article>
+        <article class="prize-card"><div><div class="amount">=</div><div class="award">EQUAL SPLIT · NO RANKING</div></div><p>No first place, runner-up, or differently weighted payout.</p></article>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="criteriaTitle">
+      <div class="section-heading"><span class="section-kicker">How work is assessed</span><h2 id="criteriaTitle">Clear judging. No popularity contest.</h2></div>
+      <div class="criteria">
+        <article class="criterion"><strong>50%</strong><h3>The work</h3><p>Originality, creativity, craft, and overall quality.</p></article>
+        <article class="criterion"><strong>30%</strong><h3>The inscription</h3><p>How successfully the work is presented as a permanent Xtrata object.</p></article>
+        <article class="criterion"><strong>20%</strong><h3>The story</h3><p>How clearly and engagingly the public post introduces the work.</p></article>
+      </div>
+    </section>
+
+    <section class="section" id="gallery" aria-labelledby="galleryTitle">
+      <div class="section-heading"><span class="section-kicker">Campaign gallery</span><h2 id="galleryTitle">The first masterpieces.</h2><p>This area is ready for approved live entries once the campaign begins.</p></div>
+      <div class="gallery">
+        <article class="entry"><div class="entry-art one"></div><div class="entry-body"><span>ENTRY / 001</span><h3>Waiting for the first work</h3><p>The first confirmed inscription will live here.</p></div></article>
+        <article class="entry"><div class="entry-art two"></div><div class="entry-body"><span>ENTRY / 002</span><h3>Every format is welcome</h3><p>Images, music, words, code, or something new.</p></div></article>
+        <article class="entry"><div class="entry-art three">YOUR WORK<br>COULD LIVE<br>HERE</div><div class="entry-body"><span>ENTRY / NEXT</span><h3>Make the archive yours</h3><p>Inscribe through Xtrata, then submit through Zero Authority.</p></div></article>
+      </div>
+    </section>
+
+    <section class="section" id="rules" aria-labelledby="rulesTitle">
+      <div class="section-heading"><span class="section-kicker">Rules and answers</span><h2 id="rulesTitle">Everything you need to know.</h2></div>
+      <div class="accordion">
+        <details open><summary>Who can enter?</summary><div class="answer">Anyone able to use a compatible Stacks wallet and meet the requirements shown on the official Zero Authority bounty page.</div></details>
+        <details><summary>What makes an entry valid?</summary><div class="answer"><ul><li>The work must be original and you must control the necessary rights.</li><li>It must be successfully inscribed through Xtrata during the bounty period.</li><li>You must provide a publicly accessible inscription link and public post.</li><li>The complete entry must be submitted through Zero Authority before the deadline.</li></ul></div></details>
+        <details><summary>Can I enter something I made previously?</summary><div class="answer">Yes, provided it is your original work and the Xtrata inscription itself is created during the campaign period.</div></details>
+        <details><summary>Can I submit more than one piece?</summary><div class="answer">You may create and inscribe more than one work, but only one official competition entry per wallet is recommended unless the official bounty rules state otherwise.</div></details>
+        <details><summary>Does social engagement determine the winner?</summary><div class="answer">No. Likes, followers, and repost counts do not determine the result. The public share is judged for clarity and storytelling, not popularity.</div></details>
+        <details><summary>Can collaborative work be entered?</summary><div class="answer">Yes. One wallet must be nominated to receive any reward, and collaborators are responsible for agreeing how a prize would be divided.</div></details>
+        <details><summary>How are rewards paid?</summary><div class="answer">The 200 STX pool is split equally among four winners. Each winner receives 50 STX through the official Zero Authority bounty process, paid to the nominated Stacks wallet.</div></details>
+        <details><summary>Is there an entry fee?</summary><div class="answer">There is no separate competition entry fee. Any inscription cost or sponsored inscription arrangement should be confirmed in the official bounty details before launch.</div></details>
+      </div>
+    </section>
+
+    <section class="final-cta">
+      <span class="section-kicker">Your turn</span><h2>Make something<br><em>worth recording.</em></h2><p>The network is ready. The space is permanent. The first move is yours.</p>
+      <div class="hero-actions"><a class="btn" data-create-link href="/inscribe">Inscribe your masterpiece →</a><a class="btn secondary" data-bounty-link href="#official-bounty">Submit through Zero Authority ↗</a></div>
+      <div class="deadline-note" id="bottomDeadline">Deadline to be announced.</div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="shell footer-grid">
+      <div><a class="footer-brand" href="https://xtrata.xyz/"><img src="/favicon.svg" alt="" /><span>XTRATA</span></a><div>Sponsored by Zero Authority DAO · Built on Stacks · Anchored to Bitcoin</div></div>
+      <nav class="footer-links" aria-label="Footer"><a href="https://xtrata.xyz/">Xtrata</a><a href="https://xtrata.xyz/xplorer">Explore</a><a href="https://xtrata.xyz/#build">Build</a><a data-bounty-link href="#official-bounty">Official bounty</a></nav>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    /* Replace these values when the official bounty details are confirmed. */
+    const CONFIG = {
+      bountyUrl: "#official-bounty",
+      createUrl: "/inscribe",
+      wizardUrl: "/wizard/",
+      closingDate: "", // Example: "2026-08-07T23:59:00Z"
+      deadlineLabel: "Deadline to be announced"
+    };
+
+    const toast = document.getElementById("toast");
+    const showToast = (message) => {
+      toast.textContent = message;
+      toast.classList.add("show");
+      clearTimeout(window.toastTimer);
+      window.toastTimer = setTimeout(() => toast.classList.remove("show"), 3200);
+    };
+
+    document.querySelectorAll("[data-bounty-link]").forEach((link) => {
+      link.href = CONFIG.bountyUrl;
+      if (CONFIG.bountyUrl.startsWith("http")) {
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+      } else {
+        link.addEventListener("click", (event) => {
+          event.preventDefault();
+          showToast("Add the official Zero Authority bounty URL in CONFIG before launch.");
+        });
+      }
+    });
+
+    document.querySelectorAll("[data-create-link]").forEach((link) => {
+      link.href = CONFIG.createUrl;
+    });
+
+    const menuButton = document.getElementById("menuButton");
+    const siteNav = document.getElementById("siteNav");
+    menuButton.addEventListener("click", () => {
+      const open = siteNav.classList.toggle("open");
+      menuButton.setAttribute("aria-expanded", String(open));
+    });
+    siteNav.querySelectorAll("a").forEach((link) => link.addEventListener("click", () => {
+      siteNav.classList.remove("open");
+      menuButton.setAttribute("aria-expanded", "false");
+    }));
+
+    const countdown = document.getElementById("countdown");
+    const topDeadline = document.getElementById("topDeadline");
+    const bottomDeadline = document.getElementById("bottomDeadline");
+    const updateCountdown = () => {
+      if (!CONFIG.closingDate) {
+        countdown.textContent = "TBA";
+        topDeadline.textContent = CONFIG.deadlineLabel;
+        bottomDeadline.textContent = `${CONFIG.deadlineLabel}.`;
+        return;
+      }
+      const end = new Date(CONFIG.closingDate);
+      const remaining = end.getTime() - Date.now();
+      const formatted = end.toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short" });
+      topDeadline.textContent = `Entries close ${formatted}`;
+      bottomDeadline.textContent = `Entries close ${formatted}.`;
+      if (remaining <= 0) {
+        countdown.textContent = "CLOSED";
+        document.querySelector(".announcement strong").textContent = "Entries closed · judging in progress";
+        return;
+      }
+      const days = Math.floor(remaining / 86400000);
+      const hours = Math.floor((remaining % 86400000) / 3600000);
+      const minutes = Math.floor((remaining % 3600000) / 60000);
+      countdown.textContent = `${days}d ${hours}h ${minutes}m`;
+    };
+    updateCountdown();
+    setInterval(updateCountdown, 60000);
+
+    const dropUi = document.getElementById("dropUi");
+    ["dragenter", "dragover"].forEach((type) => dropUi.addEventListener(type, (event) => { event.preventDefault(); dropUi.classList.add("is-dragging"); }));
+    ["dragleave", "drop"].forEach((type) => dropUi.addEventListener(type, (event) => { event.preventDefault(); dropUi.classList.remove("is-dragging"); }));
+  </script>
+
+  <script type="module" src="/create-routing.js"></script>
+  <script type="module">
+    /* Route dropped work exactly like the homepage Create flow:
+       single file ≤ 512 KB → /inscribe single-transaction mint,
+       larger / multiple files / folders → guided Wizard (with IndexedDB handoff). */
+    const dropUi = document.getElementById("dropUi");
+    const fileInput = document.getElementById("fileInput");
+    const dropTitle = document.getElementById("dropTitle");
+    const dropText = document.getElementById("dropText");
+    const continueBtn = document.getElementById("dropContinue");
+    const toastEl = document.getElementById("toast");
+    const say = (message) => {
+      toastEl.textContent = message;
+      toastEl.classList.add("show");
+      clearTimeout(window.toastTimer);
+      window.toastTimer = setTimeout(() => toastEl.classList.remove("show"), 3200);
+    };
+    const formatSize = (bytes) => bytes < 1048576 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1048576).toFixed(1)} MB`;
+
+    let routing = globalThis.XtrataCreateRouting || null;
+    if (!routing) {
+      /* The shared router script tag dispatches this once it has registered. */
+      await new Promise((resolve) => {
+        addEventListener("xtrata-create-routing-ready", resolve, { once: true });
+        setTimeout(resolve, 3000);
+      });
+      routing = globalThis.XtrataCreateRouting || null;
+    }
+
+    let pending = null; // { files, containsDirectory, decision }
+
+    const describe = (files, containsDirectory) => {
+      if (!routing) {
+        return { label: "Continue in the Wizard ↗", text: "ready for the Xtrata Wizard", dest: "wizard", reason: "fallback" };
+      }
+      const decision = routing.classifyCreateFiles(files, { containsDirectory });
+      if (decision.destination === "create") {
+        return { label: "Mint it in one transaction →", text: "under 512 KB · single-transaction mint on the Create page", dest: "create", reason: decision.reason, decision };
+      }
+      const why = { large: "over 512 KB", multiple: `${files.length} files`, folder: "folder" }[decision.reason] || "this selection";
+      return { label: "Continue in the Wizard ↗", text: `${why} · continues in the guided Wizard`, dest: "wizard", reason: decision.reason, decision };
+    };
+
+    const present = (files, containsDirectory = false) => {
+      const list = Array.from(files || []);
+      if (!list.length) return;
+      const total = list.reduce((sum, file) => sum + file.size, 0);
+      const info = describe(list, containsDirectory);
+      pending = { files: list, containsDirectory, info };
+      dropTitle.textContent = list.length === 1 ? list[0].name : `${list.length} files selected`;
+      dropText.textContent = `${list.length === 1 ? (list[0].type || "Unknown type") : "Multiple files"} · ${formatSize(total)} · ${info.text}`;
+      continueBtn.textContent = info.label;
+      continueBtn.hidden = false;
+      say("Recognised locally. Nothing has been uploaded yet.");
+    };
+
+    const continueWithSelection = async (event) => {
+      event.preventDefault();
+      if (!pending) return;
+      const { files, containsDirectory, info } = pending;
+      const path = info.dest === "create" ? "/inscribe" : "/wizard/";
+      if (!routing) { window.location.assign("/wizard/?from=masterpiece"); return; }
+      continueBtn.textContent = "Preparing…";
+      let target = `${path}?from=masterpiece&routingReason=${encodeURIComponent(info.reason)}`;
+      try {
+        const handoffId = await routing.storeCreateHandoff(files, { reason: info.reason, source: "masterpiece", containsDirectory });
+        target = routing.createHandoffUrl(path, handoffId, "masterpiece");
+      } catch {
+        /* Handoff storage unavailable — still honour the routing boundary. */
+      }
+      window.location.assign(target);
+    };
+    continueBtn.addEventListener("click", continueWithSelection);
+
+    fileInput.addEventListener("change", (event) => present(event.target.files));
+    dropUi.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      if (routing) {
+        const { files, containsDirectory } = await routing.collectDroppedFiles(event.dataTransfer);
+        present(files, containsDirectory);
+      } else {
+        present(event.dataTransfer.files);
+      }
+    });
+  </script>
+</body>
+</html>

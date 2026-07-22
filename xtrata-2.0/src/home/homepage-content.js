@@ -1,3 +1,40 @@
+export const HOMEPAGE_CAMPAIGN_BANNERS = Object.freeze([
+  Object.freeze({
+    id: 'proof-zero',
+    status: 'live',
+    eyebrow: 'Live bounty · 200 STX prize pool',
+    title: 'Inscribe your first masterpiece',
+    description: 'Create original work, put it fully on-chain, and enter to become one of four winners.',
+    stat: '200',
+    statLabel: 'STX',
+    href: '/masterpiece',
+    cta: 'Enter the bounty',
+    tone: 'proof-zero'
+  }),
+  Object.freeze({
+    id: 'forever-twins',
+    status: 'live',
+    eyebrow: 'On-chain legacy',
+    title: 'Forever Twins',
+    description: 'Give an existing collectible a permanent, self-contained on-chain counterpart.',
+    artwork: '/forever-twins/assets/forever-twins-logo.webp',
+    href: '/forever-twins/',
+    cta: 'Preserve yours',
+    tone: 'twins'
+  }),
+  Object.freeze({
+    id: 'suno-more',
+    status: 'live',
+    eyebrow: 'AI music permanence',
+    title: 'Suno More',
+    description: 'Inscribe the master, preserve attribution, and connect editions and remixes.',
+    artwork: '/suno-more/assets/suno-more-logo.webp',
+    href: '/wizard/suno',
+    cta: 'Inscribe a song',
+    tone: 'suno'
+  })
+]);
+
 export const HOMEPAGE_OBJECTS = Object.freeze([
   {
     id: 'music-history',
@@ -175,25 +212,26 @@ export const HOMEPAGE_ACTIVITY_DOORS = Object.freeze([
 ]);
 
 export const HOMEPAGE_CAMPAIGN = Object.freeze({
-  id: 'forever-twins-2026',
+  id: 'proof-zero-2026',
   status: 'live',
-  eyebrow: 'Featured campaign',
-  title: 'Forever Twins',
+  eyebrow: 'Live bounty · Xtrata × Zero Authority DAO',
+  title: 'Inscribe your first masterpiece.',
   description:
-    'Bitcoin Pepes have migrated fully on-chain. Leo Cats and Miami Degens are now joining them through a holder-first preservation flow built with Fak.Fun.',
-  artwork: '/forever-twins/assets/forever-twins-logo.webp',
+    'Create an original song, artwork, photograph, poem, animation or film. Put it fully on-chain through Xtrata and enter to win part of 200 STX. Four winners. No theme. Permanent by design.',
+  stat: '200',
+  statLabel: 'STX · prize pool',
   primaryAction: {
-    label: 'Activate a Forever Twin',
-    href: '/forever-twins/'
+    label: 'Enter the bounty',
+    href: '/masterpiece'
   },
   secondaryAction: {
-    label: 'See how preservation works',
-    href: '/forever-twins/'
+    label: 'Start inscribing',
+    href: '/wizard/'
   },
   startDate: null,
   endDate: null,
   featuredInscriptions: [],
-  sponsor: 'Fak.Fun'
+  sponsor: null
 });
 
 const hasUniqueIds = (items) => {
@@ -206,6 +244,9 @@ const isNavigableHref = (href) =>
 
 export const validateHomepageContent = () => {
   const errors = [];
+  if (!hasUniqueIds(HOMEPAGE_CAMPAIGN_BANNERS)) {
+    errors.push('Homepage campaign banner ids must be unique.');
+  }
   if (!hasUniqueIds(HOMEPAGE_OBJECTS)) {
     errors.push('Homepage object ids must be unique.');
   }
@@ -215,6 +256,16 @@ export const validateHomepageContent = () => {
   if (!hasUniqueIds(HOMEPAGE_ACTIVITY_DOORS)) {
     errors.push('Homepage activity ids must be unique.');
   }
+  HOMEPAGE_CAMPAIGN_BANNERS.forEach((item) => {
+    if (
+      !item.title ||
+      !item.description ||
+      (!item.artwork && !item.stat) ||
+      !isNavigableHref(item.href)
+    ) {
+      errors.push(`Homepage campaign banner ${item.id} is missing required content.`);
+    }
+  });
   HOMEPAGE_OBJECTS.forEach((item) => {
     if (!item.title || !item.description || !isNavigableHref(item.href)) {
       errors.push(`Homepage object ${item.id} is missing required content.`);

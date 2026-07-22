@@ -13,15 +13,10 @@ import CollectionManagerApp from './manage/CollectionManagerApp';
 import { ADMIN_PATH } from './config/admin';
 import { MANAGE_PATH } from './config/manage';
 import { ReadOnlyBackoffError } from './lib/contract/read-only';
-import {
-  hydrateQueryCache,
-  setupQueryCachePersistence
-} from './lib/cache/query-persist';
-import {
-  applyThemeToDocument,
-  resolveInitialTheme
-} from './lib/theme/preferences';
+import { hydrateQueryCache, setupQueryCachePersistence } from './lib/cache/query-persist';
+import { applyThemeToDocument, resolveInitialTheme } from './lib/theme/preferences';
 import './styles/app.css';
+import { installGlobalTelemetry, TelemetryBoundary } from './lib/telemetry';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -53,6 +48,9 @@ if (!root) {
 
 applyThemeToDocument(resolveInitialTheme());
 
+// Capture uncaught errors + flush on tab hide, site-wide.
+installGlobalTelemetry();
+
 const COLLECTION_LIVE_PATH_PREFIX = '/collection/';
 const WORKSPACE_PATH_PREFIX = '/workspace';
 const LAB_PATH_PREFIX = '/lab';
@@ -60,8 +58,7 @@ const LAB_EVOLUTION_PATH_PREFIX = '/lab/evolution';
 const pathname = window.location.pathname;
 const isLabPath = pathname === LAB_PATH_PREFIX || pathname.startsWith(`${LAB_PATH_PREFIX}/`);
 const isLabEvolutionPath =
-  pathname === LAB_EVOLUTION_PATH_PREFIX ||
-  pathname.startsWith(`${LAB_EVOLUTION_PATH_PREFIX}/`);
+  pathname === LAB_EVOLUTION_PATH_PREFIX || pathname.startsWith(`${LAB_EVOLUTION_PATH_PREFIX}/`);
 const collectionPathMatch = pathname.startsWith(COLLECTION_LIVE_PATH_PREFIX)
   ? pathname.slice(COLLECTION_LIVE_PATH_PREFIX.length)
   : '';
@@ -73,32 +70,32 @@ const decodePathSegment = (value: string) => {
   }
 };
 const collectionIdFromPath =
-  collectionPathMatch.length > 0
-    ? decodePathSegment(collectionPathMatch.split('/')[0] ?? '')
-    : '';
+  collectionPathMatch.length > 0 ? decodePathSegment(collectionPathMatch.split('/')[0] ?? '') : '';
 
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      {collectionIdFromPath ? (
-        <CollectionMintLivePage collectionKey={collectionIdFromPath} />
-      ) : pathname.startsWith(ADMIN_PATH) ? (
-        <AdminGate>
-          <App />
-        </AdminGate>
-      ) : pathname.startsWith(MANAGE_PATH) ? (
-        <ArtistManagerGate>
-          <CollectionManagerApp />
-        </ArtistManagerGate>
-      ) : isLabEvolutionPath ? (
-        <LabEvolutionPage />
-      ) : isLabPath ? (
-        <LabLandingPage />
-      ) : pathname.startsWith(WORKSPACE_PATH_PREFIX) ? (
-        <PublicApp />
-      ) : (
-        <SimplePublicHome />
-      )}
-    </QueryClientProvider>
+    <TelemetryBoundary>
+      <QueryClientProvider client={queryClient}>
+        {collectionIdFromPath ? (
+          <CollectionMintLivePage collectionKey={collectionIdFromPath} />
+        ) : pathname.startsWith(ADMIN_PATH) ? (
+          <AdminGate>
+            <App />
+          </AdminGate>
+        ) : pathname.startsWith(MANAGE_PATH) ? (
+          <ArtistManagerGate>
+            <CollectionManagerApp />
+          </ArtistManagerGate>
+        ) : isLabEvolutionPath ? (
+          <LabEvolutionPage />
+        ) : isLabPath ? (
+          <LabLandingPage />
+        ) : pathname.startsWith(WORKSPACE_PATH_PREFIX) ? (
+          <PublicApp />
+        ) : (
+          <SimplePublicHome />
+        )}
+      </QueryClientProvider>
+    </TelemetryBoundary>
   </React.StrictMode>
 );

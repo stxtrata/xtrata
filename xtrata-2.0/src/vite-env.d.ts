@@ -16,3 +16,4 @@ interface ImportMeta {
 }
 
 declare const __XSTRATA_HAS_HIRO_KEY__: boolean;
+declare const __XTRATA_APP_VERSION__: string;

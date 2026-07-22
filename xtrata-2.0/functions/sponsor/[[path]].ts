@@ -18,9 +18,10 @@
  *
  * Job state lives in the existing D1 database (table auto-created).
  *
- * Setup (once): wrangler pages secret put SPONSOR_KEY   (the hot-wallet key
- * from the Sponsor Ops page). Optional: SPONSOR_MARKETS to override the
- * allowlist, HIRO_API_KEY for rate limits.
+ * Setup (once): set SPONSOR_KEY to the fee hot-wallet key. Drops v1.1 also
+ * requires BNS_ATTESTOR_KEY, whose compressed public-key hash160 must match
+ * get-bns-attestor-pubkey-hash on-chain. Optional: SPONSOR_MARKETS to override
+ * the allowlist, HIRO_API_KEY for rate limits.
  *
  * NOTE: the validation rules here parallel svc/sponsor-service.mjs (the Node
  * local-dev adapter) but are implemented independently; direct tests for THIS
@@ -38,6 +39,7 @@ import {
   TransactionVersion,
   addressToString,
   AddressVersion,
+  bufferCV,
   cvToJSON,
   cvToHex,
   createAssetInfo,
@@ -49,7 +51,8 @@ import {
   principalCV,
   serializePostCondition,
   sponsorTransaction,
-  uintCV
+  uintCV,
+  validateStacksAddress
 } from '@stacks/transactions';
 import { StacksMainnet } from '@stacks/network';
 import { jsonResponse } from '../lib/utils';
@@ -63,20 +66,36 @@ import {
   normalizeDropPolicyRules,
   type DropPolicyRules
 } from '../../src/lib/drops/policies';
+import {
+  CAMPAIGN_ATTESTATION_TTL_BLOCKS,
+  DROPS_V11_MAINNET_CONTRACT_ID,
+  attestorPubkeyHash,
+  bnsNameKey,
+  campaignBytesToHex,
+  signCampaignAttestation,
+  verifyCampaignAttestation
+} from '../../src/lib/drops/campaign-attestation';
 
 const DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const DEFAULT_MARKETS = [
   `${DEPLOYER}.xtrata-market-sponsored-stx-v1-1`,
   `${DEPLOYER}.xtrata-market-sponsored-sbtc-v1-1`,
   `${DEPLOYER}.xtrata-market-sponsored-usdcx-v1-1`,
-  `${DEPLOYER}.xtrata-drops-v1-0`
+  `${DEPLOYER}.xtrata-drops-v1-0`,
+  DROPS_V11_MAINNET_CONTRACT_ID
 ];
 
 // Buyer-facing function the relayer will sponsor per contract type.
 // Drops contracts expose `claim` (free claim); markets expose `buy`.
 const isDropsContract = (contractId: string) => /\.xtrata-drops-/.test(contractId);
+const isCampaignDropsContract = (contractId: string) =>
+  contractId === DROPS_V11_MAINNET_CONTRACT_ID;
 const sponsoredFunction = (contractId: string) =>
-  isDropsContract(contractId) ? 'claim' : 'buy';
+  isCampaignDropsContract(contractId)
+    ? 'claim-campaign'
+    : isDropsContract(contractId)
+      ? 'claim'
+      : 'buy';
 const FEE_MULTIPLIER = 3n;
 const MIN_BUDGET_USTX = 50_000n;
 const MAX_FEE_USTX = 2_000_000n;
@@ -115,6 +134,7 @@ const CORS = {
 
 type SponsorEnv = Env & {
   SPONSOR_KEY?: string;
+  BNS_ATTESTOR_KEY?: string;
   SPONSOR_MARKETS?: string;
   HIRO_API_KEYS?: string;
   HIRO_API_KEY?: string;
@@ -260,6 +280,67 @@ const getTxStatus = async (env: SponsorEnv, txid: string): Promise<string> => {
   return j.tx_status ?? 'pending';
 };
 
+const getStacksTipHeight = async (env: SponsorEnv): Promise<bigint> => {
+  const body = await hiroJson<{ stacks_tip_height?: unknown }>(env, '/v2/info');
+  const value = Number(body.stacks_tip_height);
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error('Hiro returned an invalid Stacks tip height');
+  }
+  return BigInt(value);
+};
+
+const callReadOnlyJson = async (
+  env: SponsorEnv,
+  contractId: string,
+  functionName: string,
+  args: string[] = []
+) => {
+  const [address, name] = contractId.split('.');
+  const result = await hiroJson<{ okay?: boolean; result?: string }>(
+    env,
+    `/v2/contracts/call-read/${address}/${name}/${functionName}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sender: address, arguments: args })
+    }
+  );
+  if (!result.okay || !result.result) return null;
+  return cvToJSON(hexToCV(result.result)) as { type?: string; value?: unknown };
+};
+
+const unwrapJsonNode = (node: unknown): unknown => {
+  let current = node;
+  while (
+    current &&
+    typeof current === 'object' &&
+    typeof (current as { type?: unknown }).type === 'string' &&
+    ((current as { type: string }).type.startsWith('(optional') ||
+      (current as { type: string }).type.startsWith('(response'))
+  ) {
+    current = (current as { value?: unknown }).value ?? null;
+  }
+  return current;
+};
+
+const tupleRecord = (node: unknown) => {
+  const unwrapped = unwrapJsonNode(node) as { type?: unknown; value?: unknown } | null;
+  return unwrapped &&
+    typeof unwrapped.type === 'string' &&
+    unwrapped.type.startsWith('(tuple') &&
+    unwrapped.value &&
+    typeof unwrapped.value === 'object'
+    ? (unwrapped.value as Record<string, { type?: string; value?: unknown }>)
+    : null;
+};
+
+const optionalUintJson = (node: { value?: unknown } | undefined): bigint | null => {
+  const unwrapped = unwrapJsonNode(node) as { type?: unknown; value?: unknown } | null;
+  return unwrapped?.type === 'uint' && typeof unwrapped.value === 'string'
+    ? BigInt(unwrapped.value)
+    : null;
+};
+
 const getListing = async (env: SponsorEnv, contractId: string, listingId: string) => {
   const [address, name] = contractId.split('.');
   const j = await hiroJson<{ okay?: boolean; result?: string }>(
@@ -306,8 +387,38 @@ const getDrop = async (env: SponsorEnv, contractId: string, dropId: string) => {
     groupId: BigInt(String((rec['group-id'] as { value: unknown }).value)),
     nftContract: String((rec['nft-contract'] as { value: unknown }).value),
     tokenId: BigInt(String((rec['token-id'] as { value: unknown }).value)),
-    claimedAt: claimedRaw === null || claimedRaw === undefined ? null : String((claimedRaw as { value?: unknown }).value ?? claimedRaw)
+    claimedAt:
+      claimedRaw === null || claimedRaw === undefined
+        ? null
+        : String((claimedRaw as { value?: unknown }).value ?? claimedRaw),
+    campaignId: optionalUintJson(rec['campaign-id']),
+    edition: optionalUintJson(rec.edition)
   };
+};
+
+const getCampaign = async (env: SponsorEnv, contractId: string, campaignId: bigint) => {
+  const tuple = tupleRecord(
+    await callReadOnlyJson(env, contractId, 'get-campaign', [cvToHex(uintCV(campaignId))])
+  );
+  if (!tuple) return null;
+  const readBool = (key: string) => tuple[key]?.type === 'bool' && tuple[key]?.value === true;
+  return {
+    creator: String(tuple.creator?.value ?? ''),
+    active: readBool('active'),
+    onePerWallet: readBool('one-per-wallet'),
+    requireBnsName: readBool('require-bns'),
+    onePerBnsName: readBool('one-per-bns'),
+    maxSupply: BigInt(String(tuple['max-supply']?.value ?? 0)),
+    dropsCreated: BigInt(String(tuple['drops-created']?.value ?? 0))
+  };
+};
+
+const getConfiguredAttestorHash = async (env: SponsorEnv, contractId: string) => {
+  const json = await callReadOnlyJson(env, contractId, 'get-bns-attestor-pubkey-hash');
+  const value = unwrapJsonNode(json) as { type?: unknown; value?: unknown } | null;
+  return value?.type === '(buff 20)' && typeof value.value === 'string'
+    ? value.value.replace(/^0x/i, '').toLowerCase()
+    : null;
 };
 
 const dropPolicyScopeKey = (contractId: string, creator: string, groupId: string | bigint) =>
@@ -526,8 +637,8 @@ const VALIDATION = {
   NONZERO_FEE: 'origin fee must be 0',
   NOT_CONTRACT_CALL: 'payload must be a contract call',
   CONTRACT_NOT_ALLOWED: 'contract not allowlisted',
-  FUNCTION_NOT_ALLOWED: 'function must be buy (markets) or claim (drops)',
-  BAD_ARGS: 'call arguments must be (nft-contract <trait>, listing-id uint)',
+  FUNCTION_NOT_ALLOWED: 'function must be buy, claim, or claim-campaign for its allowlisted contract',
+  BAD_ARGS: 'call arguments do not match the allowlisted contract function',
   WRONG_NETWORK: 'transaction is not a mainnet transaction',
   NO_POST_CONDITIONS: 'buyer post-conditions required',
   PC_MODE: 'post-condition mode must be deny',
@@ -586,9 +697,9 @@ const validatePayload = (txHex: string, markets: string[]) => {
   if ((tx as unknown as { version: TransactionVersion }).version !== TransactionVersion.Mainnet) {
     return { error: 'WRONG_NETWORK' as const };
   }
-  // SIGNED-ARG BINDING: both `buy` and `claim` take (nft-contract <trait>,
-  // id uint). Decode them from the signed transaction — these, not the
-  // request body, are the authoritative facts the relayer acts on.
+  // SIGNED-ARG BINDING: buy/claim take two arguments and claim-campaign adds
+  // the BNS key, expiry and attestor signature. The signed call, never request
+  // metadata, is the authoritative source for every relayer decision.
   const args = (payload as unknown as { functionArgs?: unknown[] }).functionArgs ?? [];
   const nftArg = args[0] as
     | {
@@ -598,8 +709,9 @@ const validatePayload = (txHex: string, markets: string[]) => {
       }
     | undefined;
   const idArg = args[1] as { type?: ClarityType; value?: bigint } | undefined;
+  const campaignCall = isCampaignDropsContract(contractId);
   if (
-    args.length !== 2 ||
+    args.length !== (campaignCall ? 5 : 2) ||
     nftArg?.type !== ClarityType.PrincipalContract ||
     !nftArg.address ||
     !nftArg.contractName ||
@@ -610,6 +722,36 @@ const validatePayload = (txHex: string, markets: string[]) => {
   }
   const nftContractId = `${addressToString(nftArg.address)}.${nftArg.contractName.content}`;
   const listingId = idArg.value;
+  let bnsKeyHex: string | null = null;
+  let expiresAt: bigint | null = null;
+  let signatureHex: string | null = null;
+  if (campaignCall) {
+    const bnsArg = args[2] as {
+      type?: ClarityType;
+      value?: { type?: ClarityType; buffer?: Uint8Array };
+    } | undefined;
+    const expiryArg = args[3] as { type?: ClarityType; value?: bigint } | undefined;
+    const signatureArg = args[4] as { type?: ClarityType; buffer?: Uint8Array } | undefined;
+    const noBns = bnsArg?.type === ClarityType.OptionalNone;
+    const someBns =
+      bnsArg?.type === ClarityType.OptionalSome &&
+      bnsArg.value?.type === ClarityType.Buffer &&
+      bnsArg.value.buffer instanceof Uint8Array &&
+      bnsArg.value.buffer.length === 32;
+    if (
+      (!noBns && !someBns) ||
+      expiryArg?.type !== ClarityType.UInt ||
+      typeof expiryArg.value !== 'bigint' ||
+      signatureArg?.type !== ClarityType.Buffer ||
+      !(signatureArg.buffer instanceof Uint8Array) ||
+      signatureArg.buffer.length !== 65
+    ) {
+      return { error: 'BAD_ARGS' as const };
+    }
+    bnsKeyHex = someBns ? campaignBytesToHex(bnsArg.value!.buffer!) : null;
+    expiresAt = expiryArg.value;
+    signatureHex = campaignBytesToHex(signatureArg.buffer);
+  }
   const pcs = (tx as unknown as { postConditions?: { values?: unknown[] } }).postConditions;
   if (!pcs?.values?.length) return { error: 'NO_POST_CONDITIONS' as const };
   if ((tx as unknown as { postConditionMode: PostConditionMode }).postConditionMode !== PostConditionMode.Deny) {
@@ -620,7 +762,7 @@ const validatePayload = (txHex: string, markets: string[]) => {
     hash160: (tx.auth.spendingCondition as { signer: string }).signer,
     type: 0
   } as Parameters<typeof addressToString>[0]);
-  return { tx, contractId, buyer, listingId, nftContractId };
+  return { tx, contractId, buyer, listingId, nftContractId, bnsKeyHex, expiresAt, signatureHex };
 };
 
 // ---------------------------------------------------------------- job store (D1)
@@ -909,6 +1051,101 @@ const handleRequest = async (
     );
   }
 
+  if (path.endsWith('/sponsor/attest-campaign') && request.method === 'POST') {
+    diagnostics.stage = 'ATTESTATION_PARSE';
+    const body = (await request.json().catch(() => ({}))) as {
+      contractId?: string;
+      listingId?: string | number;
+      claimer?: string;
+      bnsName?: string | null;
+    };
+    const contractId = String(body.contractId ?? '');
+    const listingId = String(body.listingId ?? '');
+    const claimer = String(body.claimer ?? '').trim();
+    if (
+      contractId !== DROPS_V11_MAINNET_CONTRACT_ID ||
+      !allowlist(env).includes(contractId) ||
+      !/^\d+$/.test(listingId) ||
+      !claimer.startsWith('SP') ||
+      !validateStacksAddress(claimer)
+    ) {
+      return fail(
+        'VALIDATION',
+        'allowlisted v1.1 contract, numeric listingId, and mainnet claimer required'
+      );
+    }
+
+    diagnostics.stage = 'ATTESTATION_STATE';
+    const drop = await getDrop(env, contractId, listingId);
+    if (!drop || drop.campaignId === null) {
+      return fail('DROP_NOT_FOUND', 'campaign drop unknown', 404);
+    }
+    if (drop.claimedAt !== null) return fail('LISTING_SOLD', 'campaign drop already claimed', 409);
+    const campaign = await getCampaign(env, contractId, drop.campaignId);
+    if (!campaign) return fail('CAMPAIGN_NOT_FOUND', 'campaign unknown', 404);
+    if (!campaign.active) return fail('CAMPAIGN_INACTIVE', 'campaign is paused', 409);
+
+    diagnostics.stage = 'ATTESTATION_BNS';
+    const normalizedBns = normalizeDropBnsName(body.bnsName);
+    if (campaign.requireBnsName && !normalizedBns) {
+      return fail('BNS_REQUIRED', 'this campaign requires a valid BNS name for the claiming wallet', 403);
+    }
+    if (normalizedBns) {
+      const owner = await getBnsOwner(env, normalizedBns);
+      if (!owner || owner.toUpperCase() !== claimer.toUpperCase()) {
+        return fail('BNS_NOT_OWNED', `${normalizedBns} is not currently owned by the claiming wallet`, 403);
+      }
+    }
+
+    diagnostics.stage = 'ATTESTATION_KEY';
+    const rawAttestorKey = env.BNS_ATTESTOR_KEY?.trim().replace(/^0x/i, '');
+    if (!rawAttestorKey || !/^[0-9a-f]{64}(?:01)?$/i.test(rawAttestorKey)) {
+      return fail('ATTESTOR_DISABLED', 'BNS attestor is not configured', 503);
+    }
+    const configuredHash = await getConfiguredAttestorHash(env, contractId);
+    if (!configuredHash || attestorPubkeyHash(rawAttestorKey) !== configuredHash) {
+      return fail(
+        'ATTESTOR_KEY_MISMATCH',
+        'BNS attestor key does not match the on-chain configuration',
+        503
+      );
+    }
+
+    diagnostics.stage = 'ATTESTATION_SIGN';
+    const tip = await getStacksTipHeight(env);
+    const expiresAt = tip + CAMPAIGN_ATTESTATION_TTL_BLOCKS;
+    const bnsKeyHex = normalizedBns ? await bnsNameKey(normalizedBns) : null;
+    const signature = await signCampaignAttestation(
+      {
+        contractId,
+        campaignId: drop.campaignId,
+        dropId: BigInt(listingId),
+        claimer,
+        bnsKeyHex,
+        expiresAt
+      },
+      rawAttestorKey
+    );
+    return jsonResponse(
+      {
+        contractId,
+        listingId,
+        campaignId: drop.campaignId.toString(),
+        bnsName: normalizedBns,
+        bnsKey: bnsKeyHex,
+        expiresAt: expiresAt.toString(),
+        signature,
+        rules: {
+          onePerWallet: campaign.onePerWallet,
+          requireBnsName: campaign.requireBnsName,
+          onePerBnsName: campaign.onePerBnsName
+        }
+      },
+      200,
+      CORS
+    );
+  }
+
   if (path.endsWith('/sponsor/drop-policy') && request.method === 'GET') {
     diagnostics.stage = 'DROP_POLICY_READ';
     const contractId = url.searchParams.get('contractId') ?? '';
@@ -1048,7 +1285,65 @@ const handleRequest = async (
     if (isDropsContract(contractId)) {
       diagnostics.stage = 'DROP_POLICY';
       const drop = await getDrop(env, contractId, listingId.toString());
-      if (drop) {
+      if (isCampaignDropsContract(contractId)) {
+        if (!drop || drop.campaignId === null) {
+          return fail('VALIDATION', 'selected drop is not a v1.1 campaign drop');
+        }
+        const campaign = await getCampaign(env, contractId, drop.campaignId);
+        if (!campaign) return fail('CAMPAIGN_NOT_FOUND', 'campaign unknown', 404);
+        if (!campaign.active) return fail('CAMPAIGN_INACTIVE', 'campaign is paused', 409);
+        dropPolicy = {
+          onePerWallet: campaign.onePerWallet,
+          requireBnsName: campaign.requireBnsName,
+          onePerBnsName: campaign.onePerBnsName
+        };
+        dropPolicyScope = dropPolicyScopeKey(contractId, drop.creator, drop.campaignId);
+
+        diagnostics.stage = 'CAMPAIGN_ATTESTATION';
+        if (validated.expiresAt === null || !validated.signatureHex) {
+          return fail('VALIDATION', 'campaign claim is missing its signed attestation');
+        }
+        const tip = await getStacksTipHeight(env);
+        if (validated.expiresAt < tip) {
+          return fail('ATTESTATION_EXPIRED', 'campaign attestation has expired', 409);
+        }
+        if (validated.expiresAt > tip + CAMPAIGN_ATTESTATION_TTL_BLOCKS) {
+          return fail('VALIDATION', 'campaign attestation expiry exceeds the relayer window');
+        }
+        const configuredHash = await getConfiguredAttestorHash(env, contractId);
+        if (!configuredHash) {
+          return fail('ATTESTOR_DISABLED', 'campaign attestor is not configured on-chain', 503);
+        }
+        const signatureValid = await verifyCampaignAttestation(
+          {
+            contractId,
+            campaignId: drop.campaignId,
+            dropId: listingId,
+            claimer: validated.buyer,
+            bnsKeyHex: validated.bnsKeyHex,
+            expiresAt: validated.expiresAt
+          },
+          validated.signatureHex,
+          configuredHash
+        );
+        if (!signatureValid) return fail('VALIDATION', 'campaign attestation signature is invalid');
+        if (dropPolicy.requireBnsName && !validated.bnsKeyHex) {
+          return fail('BNS_REQUIRED', 'this campaign requires a BNS attestation', 403);
+        }
+        if (validated.bnsKeyHex) {
+          verifiedBnsName = normalizeDropBnsName(body.bnsName);
+          if (
+            !verifiedBnsName ||
+            (await bnsNameKey(verifiedBnsName)) !== validated.bnsKeyHex
+          ) {
+            return fail('VALIDATION', 'BNS name does not match the signed campaign key');
+          }
+          const owner = await getBnsOwner(env, verifiedBnsName);
+          if (!owner || owner.toUpperCase() !== validated.buyer.toUpperCase()) {
+            return fail('BNS_NOT_OWNED', `${verifiedBnsName} is not currently owned by the claiming wallet`, 403);
+          }
+        }
+      } else if (drop) {
         dropPolicy = await getDropPolicy(env, contractId, drop.creator, drop.groupId);
         dropPolicyScope = dropPolicyScopeKey(contractId, drop.creator, drop.groupId);
       } else {
@@ -1077,7 +1372,7 @@ const handleRequest = async (
           );
         }
       }
-      if (dropPolicy && hasBnsPolicy(dropPolicy)) {
+      if (!isCampaignDropsContract(contractId) && dropPolicy && hasBnsPolicy(dropPolicy)) {
         diagnostics.stage = 'BNS_POLICY';
         verifiedBnsName = normalizeDropBnsName(body.bnsName);
         if (!verifiedBnsName) {
