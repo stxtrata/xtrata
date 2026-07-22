@@ -13,6 +13,21 @@ export type SponsorQuote = {
   expiresAt: number;
 };
 
+export type CampaignClaimAttestation = {
+  contractId: string;
+  listingId: string;
+  campaignId: string;
+  bnsName: string | null;
+  bnsKey: string | null;
+  expiresAt: string;
+  signature: string;
+  rules: {
+    onePerWallet: boolean;
+    requireBnsName: boolean;
+    onePerBnsName: boolean;
+  };
+};
+
 export type SponsorJobState =
   | 'RECEIVED'
   | 'SPONSORED'
@@ -42,6 +57,12 @@ export type SponsorErrorCode =
   | 'VALIDATION'
   | 'RELAYER_INTERNAL'
   | 'RELAYER_KEY_INVALID'
+  | 'BNS_REQUIRED'
+  | 'BNS_NOT_OWNED'
+  | 'CAMPAIGN_INACTIVE'
+  | 'ATTESTATION_EXPIRED'
+  | 'ATTESTOR_DISABLED'
+  | 'ATTESTOR_KEY_MISMATCH'
   | 'BROADCAST'
   | 'UNKNOWN';
 
@@ -77,7 +98,17 @@ export class SponsorClientError extends Error {
     this.stage = details.stage;
     this.traceId = details.traceId;
     this.relayerCode = details.relayerCode;
-    this.fallbackToSelfPaid = code !== 'LISTING_SOLD' && code !== 'DUPLICATE' && code !== 'LISTING_BUSY';
+    this.fallbackToSelfPaid = ![
+      'LISTING_SOLD',
+      'DUPLICATE',
+      'LISTING_BUSY',
+      'BNS_REQUIRED',
+      'BNS_NOT_OWNED',
+      'CAMPAIGN_INACTIVE',
+      'ATTESTATION_EXPIRED',
+      'ATTESTOR_DISABLED',
+      'ATTESTOR_KEY_MISMATCH'
+    ].includes(code);
   }
 }
 
@@ -118,6 +149,12 @@ export const mapRelayerError = (
     'LISTING_SOLD',
     'RELAYER_INTERNAL',
     'RELAYER_KEY_INVALID',
+    'BNS_REQUIRED',
+    'BNS_NOT_OWNED',
+    'CAMPAIGN_INACTIVE',
+    'ATTESTATION_EXPIRED',
+    'ATTESTOR_DISABLED',
+    'ATTESTOR_KEY_MISMATCH',
     'BROADCAST'
   ];
   return new SponsorClientError(
@@ -218,6 +255,25 @@ export const createSponsorClient = (
         })
       })) as SponsorJob;
       return body;
+    },
+
+    /** Obtain a claimant-bound, short-lived BNS permit for Drops v1.1. */
+    async attestCampaign(params: {
+      contractId: string;
+      listingId: bigint;
+      claimer: string;
+      bnsName?: string | null;
+    }): Promise<CampaignClaimAttestation> {
+      return (await request(fetchImpl, `${base}/sponsor/attest-campaign`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          contractId: params.contractId,
+          listingId: params.listingId.toString(),
+          claimer: params.claimer,
+          ...(params.bnsName ? { bnsName: params.bnsName } : {})
+        })
+      })) as CampaignClaimAttestation;
     },
 
     async status(jobId: string): Promise<SponsorJob> {

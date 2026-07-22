@@ -4,9 +4,11 @@ import {
   AnchorMode,
   PostConditionMode,
   TransactionVersion,
+  bufferCV,
   contractPrincipalCV,
   getAddressFromPrivateKey,
   makeContractCall,
+  someCV,
   uintCV
 } from '@stacks/transactions';
 import { buildContractTransferPostCondition } from '../../contract/post-conditions';
@@ -90,6 +92,48 @@ describe('sponsored drop claim inspection', () => {
     });
     expect(result.ok).toBe(false);
     expect(result.checks.find((check) => check.code === 'NFT_POST_CONDITION')).toMatchObject({ ok: false });
+  });
+
+  it('proves all five signed v1.1 campaign claim arguments', async () => {
+    const bnsKey = '11'.repeat(32);
+    const signature = '22'.repeat(65);
+    const postConditions = [
+      buildContractTransferPostCondition({
+        nftContract: { address: DROPS_ADDRESS, contractName: 'xtrata-v3-2-3', network: 'mainnet' },
+        senderContract: { address: DROPS_ADDRESS, contractName: 'xtrata-drops-v1-1', network: 'mainnet' },
+        tokenId: 2759n
+      })
+    ];
+    const tx = await makeContractCall({
+      contractAddress: DROPS_ADDRESS,
+      contractName: 'xtrata-drops-v1-1',
+      functionName: 'claim-campaign',
+      functionArgs: [
+        contractPrincipalCV(DROPS_ADDRESS, 'xtrata-v3-2-3'),
+        uintCV(7n),
+        someCV(bufferCV(Buffer.from(bnsKey, 'hex'))),
+        uintCV(1_000n),
+        bufferCV(Buffer.from(signature, 'hex'))
+      ],
+      senderKey: BUYER_KEY,
+      network: new StacksMainnet(),
+      fee: 0n,
+      nonce: 0n,
+      sponsored: true,
+      anchorMode: AnchorMode.Any,
+      postConditionMode: PostConditionMode.Deny,
+      postConditions
+    });
+    const result = inspectSponsoredClaimTransaction(Buffer.from(tx.serialize()).toString('hex'), {
+      dropsContractId: `${DROPS_ADDRESS}.xtrata-drops-v1-1`,
+      nftContractId: NFT,
+      dropId: 7n,
+      tokenId: 2759n,
+      network: 'mainnet',
+      claimerAddress: BUYER_ADDRESS,
+      campaignAttestation: { bnsKeyHex: bnsKey, expiresAt: 1_000n, signatureHex: signature }
+    });
+    expect(result.ok).toBe(true);
   });
 });
 

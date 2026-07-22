@@ -14,6 +14,7 @@ import {
 import { buildContractTransferPostCondition } from '../contract/post-conditions';
 import type { NetworkType } from '../network/types';
 import { bytesToHex } from '../utils/encoding';
+import { campaignBytesToHex } from './campaign-attestation';
 import {
   SponsorClientError,
   type SponsorClient,
@@ -34,6 +35,11 @@ export type SponsoredClaimExpectation = {
   tokenId: bigint;
   network: NetworkType;
   claimerAddress?: string;
+  campaignAttestation?: {
+    bnsKeyHex: string | null;
+    expiresAt: bigint;
+    signatureHex: string;
+  };
 };
 
 export type SponsoredClaimInspection = {
@@ -172,11 +178,12 @@ export const inspectSponsoredClaimTransaction = (
       'Drops contract matches.',
       `Expected ${expected.dropsContractId}; wallet signed ${contractId}.`
     );
+    const expectedFunction = expected.campaignAttestation ? 'claim-campaign' : 'claim';
     add(
       'TARGET_FUNCTION',
-      payloadValue.functionName.content === 'claim',
-      'Function is claim.',
-      `Wallet signed ${payloadValue.functionName.content}, not claim.`
+      payloadValue.functionName.content === expectedFunction,
+      `Function is ${expectedFunction}.`,
+      `Wallet signed ${payloadValue.functionName.content}, not ${expectedFunction}.`
     );
     const args = payloadValue.functionArgs ?? [];
     const nftArg = args[0] as
@@ -191,13 +198,44 @@ export const inspectSponsoredClaimTransaction = (
       nftArg?.type === ClarityType.PrincipalContract && nftArg.address && nftArg.contractName
         ? `${addressToString(nftArg.address)}.${nftArg.contractName.content}`
         : null;
+    let argumentsMatch =
+      signedNft === expected.nftContractId &&
+      idArg?.type === ClarityType.UInt &&
+      idArg.value === expected.dropId;
+    if (expected.campaignAttestation) {
+      const bnsArg = args[2] as {
+        type?: ClarityType;
+        value?: { type?: ClarityType; buffer?: Uint8Array };
+      } | undefined;
+      const expiresArg = args[3] as { type?: ClarityType; value?: bigint } | undefined;
+      const signatureArg = args[4] as { type?: ClarityType; buffer?: Uint8Array } | undefined;
+      const signedBnsKey = bnsArg?.type === ClarityType.OptionalNone
+        ? null
+        : bnsArg?.type === ClarityType.OptionalSome &&
+            bnsArg.value?.type === ClarityType.Buffer &&
+            bnsArg.value.buffer instanceof Uint8Array
+          ? campaignBytesToHex(bnsArg.value.buffer)
+          : undefined;
+      const signedSignature = signatureArg?.type === ClarityType.Buffer &&
+        signatureArg.buffer instanceof Uint8Array
+        ? campaignBytesToHex(signatureArg.buffer)
+        : null;
+      argumentsMatch =
+        argumentsMatch &&
+        args.length === 5 &&
+        signedBnsKey === expected.campaignAttestation.bnsKeyHex &&
+        expiresArg?.type === ClarityType.UInt &&
+        expiresArg.value === expected.campaignAttestation.expiresAt &&
+        signedSignature === expected.campaignAttestation.signatureHex;
+    } else {
+      argumentsMatch = argumentsMatch && args.length === 2;
+    }
     add(
       'CLAIM_ARGUMENTS',
-      args.length === 2 &&
-        signedNft === expected.nftContractId &&
-        idArg?.type === ClarityType.UInt &&
-        idArg.value === expected.dropId,
-      'Claim arguments match the NFT contract and drop id.',
+      argumentsMatch,
+      expected.campaignAttestation
+        ? 'Campaign claim arguments match the drop and BNS attestation.'
+        : 'Claim arguments match the NFT contract and drop id.',
       'Claim arguments do not match the selected drop.'
     );
   }

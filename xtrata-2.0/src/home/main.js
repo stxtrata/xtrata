@@ -9,6 +9,8 @@
       makeContractSTXPostCondition,
       PostConditionMode,
       principalCV,
+      noneCV,
+      someCV,
       stringAsciiCV,
       uintCV,
       contractPrincipalCV
@@ -75,6 +77,7 @@
       pollSponsorJob,
       submitSponsorClaimWithRetry
     } from '/src/lib/drops/sponsored-claim.ts';
+    import { campaignHexToBytes } from '/src/lib/drops/campaign-attestation.ts';
     import { getDropsCollectionLockForDrop } from '/src/lib/drops/collection-lock.ts';
     import { loadDropsActivity } from '/src/lib/drops/history.ts';
     import {
@@ -11656,6 +11659,21 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     };
 
     const fetchDropPolicy = async (drop) => {
+      if (drop.campaignId !== null) {
+        const json = await callReadOnlyJson({
+          contractId: drop.contractId,
+          functionName: 'get-campaign',
+          args: [uintCV(drop.campaignId)],
+          network: drop.entry.network
+        });
+        const tuple = unwrapBindingTuple(json);
+        if (!tuple) throw new Error(`Campaign ${drop.campaignId} is unavailable.`);
+        return normalizeDropPolicyRules({
+          onePerWallet: tuple['one-per-wallet']?.value === true,
+          requireBnsName: tuple['require-bns']?.value === true,
+          onePerBnsName: tuple['one-per-bns']?.value === true
+        });
+      }
       try {
         const base = dropsSponsorBase(drop.entry);
         const params = new URLSearchParams({
@@ -11769,6 +11787,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             nftContract: String(tuple['nft-contract'].value),
             tokenId: BigInt(tuple['token-id'].value),
             groupId: BigInt(tuple['group-id'].value),
+            campaignId: optionalUintValue(tuple['campaign-id']),
+            edition: optionalUintValue(tuple.edition),
             feeBudget: tuple['fee-budget'] ? BigInt(tuple['fee-budget'].value) : null,
             budgetRemaining: tuple['budget-remaining'] ? BigInt(tuple['budget-remaining'].value) : null,
             claimer: optionalPrincipalValue(tuple.claimer),
@@ -11863,12 +11883,39 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const [nftAddress, nftName] = drop.nftContract.split('.');
       const postConditions = dropClaimPostConditions(drop);
       const providerId = getSelectedWalletProviderId() ?? 'injected provider';
+      const isCampaignClaim = drop.campaignId !== null;
       recordDropDiagnostic(round, 'START', `Free claim for drop #${drop.dropId}, inscription #${drop.tokenId}.`);
       recordDropDiagnostic(round, 'PREFLIGHT', `Wallet ${providerId}; ${drop.entry.network}; connected ${state.walletSession.address}.`);
-      recordDropDiagnostic(round, 'PLAN', `Build sponsored ${drop.contractId}::claim, then stx_signTransaction with broadcast=false; origin fee=0, deny mode, 1 NFT post-condition.`);
+      recordDropDiagnostic(round, 'PLAN', `Build sponsored ${drop.contractId}::${isCampaignClaim ? 'claim-campaign' : 'claim'}, then stx_signTransaction with broadcast=false; origin fee=0, deny mode, 1 NFT post-condition.`);
       dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the free claim in your wallet (fee 0)…</span>';
       try {
         const bnsName = await chooseClaimBnsName(drop, policyRules, round);
+        const sponsorClient = createSponsorClient(dropsSponsorBase(drop.entry));
+        let campaignAttestation = null;
+        if (isCampaignClaim) {
+          recordDropDiagnostic(round, 'ATTESTATION_REQUEST', 'Requesting a short-lived claimant-bound BNS attestation.');
+          const attestation = await sponsorClient.attestCampaign({
+            contractId: drop.contractId,
+            listingId: drop.dropId,
+            claimer: state.walletSession.address,
+            bnsName
+          });
+          if (
+            attestation.contractId !== drop.contractId ||
+            BigInt(attestation.listingId) !== drop.dropId ||
+            BigInt(attestation.campaignId) !== drop.campaignId
+          ) {
+            throw Object.assign(new Error('Sponsor returned an attestation for a different campaign drop.'), {
+              code: 'ATTESTATION_MISMATCH'
+            });
+          }
+          campaignAttestation = {
+            bnsKeyHex: attestation.bnsKey,
+            expiresAt: BigInt(attestation.expiresAt),
+            signatureHex: attestation.signature
+          };
+          recordDropDiagnostic(round, 'ATTESTATION_READY', `BNS permit issued through Stacks block ${attestation.expiresAt}.`, 'success');
+        }
         recordDropDiagnostic(round, 'NONCE_REQUEST', 'Loading the connected address\'s next origin nonce from Hiro.');
         const originNonce = await fetchAddressNonce(
           state.walletSession.address,
@@ -11888,8 +11935,18 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           showSponsoredContractCall({
             contractAddress: drop.entry.address,
             contractName: drop.entry.contractName,
-            functionName: 'claim',
-            functionArgs: [contractPrincipalCV(nftAddress, nftName), uintCV(drop.dropId)],
+            functionName: isCampaignClaim ? 'claim-campaign' : 'claim',
+            functionArgs: campaignAttestation
+              ? [
+                  contractPrincipalCV(nftAddress, nftName),
+                  uintCV(drop.dropId),
+                  campaignAttestation.bnsKeyHex
+                    ? someCV(bufferCV(campaignHexToBytes(campaignAttestation.bnsKeyHex, 32)))
+                    : noneCV(),
+                  uintCV(campaignAttestation.expiresAt),
+                  bufferCV(campaignHexToBytes(campaignAttestation.signatureHex, 65))
+                ]
+              : [contractPrincipalCV(nftAddress, nftName), uintCV(drop.dropId)],
             network: drop.entry.network,
             stxAddress: state.walletSession.address,
             publicKey: state.walletSession.publicKey,
@@ -11915,7 +11972,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           dropId: drop.dropId,
           tokenId: drop.tokenId,
           network: drop.entry.network,
-          claimerAddress: state.walletSession.address
+          claimerAddress: state.walletSession.address,
+          campaignAttestation
         });
         for (const check of inspection.checks) {
           recordDropDiagnostic(round, `CHECK_${check.code}`, check.message, check.ok ? 'success' : 'error');
@@ -11928,7 +11986,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         recordDropDiagnostic(round, 'SIGNED_TX_READY', `Validated ${inspection.txHex.length / 2} bytes; tx ${inspection.txId ?? 'id unavailable'}.`, 'success');
 
         dropsDom.status.innerHTML = '<span><strong>Drops</strong> signed claim validated — submitting to the sponsor relayer…</span>';
-        const sponsorClient = createSponsorClient(dropsSponsorBase(drop.entry));
         recordDropDiagnostic(round, 'RELAYER_SUBMIT', `Submitting signed claim for ${drop.contractId} drop #${drop.dropId}.`);
         const describeSponsorClientError = (error) => {
           const references = [

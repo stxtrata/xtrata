@@ -60,6 +60,10 @@ describe('public Drops sponsored-claim surface', () => {
     expect(homeMain).toContain('confirmed, rules saved, and now live');
     expect(homeMain).toContain('registerDropPolicy({');
     expect(homeMain).toContain('chooseClaimBnsName(drop, policyRules, round)');
+    expect(homeMain).toContain('sponsorClient.attestCampaign({');
+    expect(homeMain).toContain("functionName: isCampaignClaim ? 'claim-campaign' : 'claim'");
+    expect(homeMain).toContain('campaignAttestation.bnsKeyHex');
+    expect(homeMain).toContain('campaignAttestation.signatureHex');
     expect(homeMain).toContain('bnsName,');
     expect(homeMain).toContain('generateUniqueDropGroupId');
     expect(homeMain).toContain('claimer: optionalPrincipalValue(tuple.claimer)');

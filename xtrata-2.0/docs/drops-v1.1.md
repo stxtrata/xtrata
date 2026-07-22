@@ -85,22 +85,34 @@ Before each 32-item job, the Wizard should read `get-campaign` and require exact
 matches for contract id, campaign id, creator, engine id, supply, all rule flags,
 active state, and expected `drops-created` edition.
 
-## Deployment prerequisites
+## Deployment and runtime prerequisites
 
 Do not deploy v1.1 for public use until all of the following are complete:
 
 - deploy from the intended immutable source and confirm the mainnet SIP-009 and
   Xtrata v3.2.3 principals;
 - set the fee sponsor and BNS attestor public-key hash;
-- add the v1.1 contract id to the web and sponsor-service allowlists;
-- add the BNS attestation endpoint and teach the sponsor validator to accept the
-  new `claim-campaign` argument shape;
+- add the v1.1 contract id to the web and sponsor-service allowlists (implemented
+  by the Pages relayer and public Drops registry);
+- add the BNS attestation endpoint and teach the sponsor validator to accept and
+  verify the new `claim-campaign` argument shape (implemented at
+  `/sponsor/attest-campaign` and `/sponsor/submit`);
 - update Drops reads to recognise campaign metadata while preserving the
-  existing market-shaped `get-listing` path;
+  existing market-shaped `get-listing` path (implemented by the public reader);
 - update the Wizard to create/read campaigns, authorise its operator, and call
   `create-campaign-drop` through the atomic inscription composition contract;
 - run a testnet rehearsal covering create campaign, a 32-item boundary, claim,
   fee reimbursement, refund, pause, cancellation, and recovery.
+
+The Pages deployment needs two distinct secrets. `SPONSOR_KEY` pays transaction
+fees; `BNS_ATTESTOR_KEY` signs claimant-bound permits and must derive to the
+20-byte value returned by `get-bns-attestor-pubkey-hash`. The attestation route
+fails closed when the secret is missing or mismatched. Set it without printing
+or committing the key:
+
+```sh
+npx wrangler pages secret put BNS_ATTESTOR_KEY --project-name xtrata
+```
 
 The Clarity contract and its tests do not deploy or mutate v1.0 state. v1.1 is a
 new contract deployment with independent storage.
