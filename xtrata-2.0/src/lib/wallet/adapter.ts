@@ -1,5 +1,6 @@
 import { createWalletSessionStore } from './session';
 import { connectWallet, disconnectWallet } from './connect';
+import { setNetwork, setWallet } from '../telemetry/client';
 import type { WalletSession } from './types';
 
 export const createStacksWalletAdapter = (params: {
@@ -11,7 +12,14 @@ export const createStacksWalletAdapter = (params: {
     sessionStore.clear();
   };
 
-  const getSession = (): WalletSession => sessionStore.load();
+  const getSession = (): WalletSession => {
+    const session = sessionStore.load();
+    if (session.isConnected && session.address) {
+      setWallet(session.address);
+      setNetwork(session.network);
+    }
+    return session;
+  };
 
   // Connecting ALWAYS opens the wallet chooser (connectWallet forces the
   // provider-select modal), even when a previous session is persisted in

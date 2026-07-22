@@ -6,12 +6,13 @@
  *   const j = telemetry.startJourney('market_buy', listingId);
  *   telemetry.event({ journey: j, attempt: j.attempt(), step: 'sign', outcome: 'start' });
  */
-import { breadcrumb, event, flush, setWallet, startJourney } from './client';
+import { breadcrumb, event, flush, setNetwork, setWallet, startJourney } from './client';
 
 export {
   Journey,
   sessionId,
   setWallet,
+  setNetwork,
   breadcrumb,
   event,
   flush,
@@ -24,4 +25,4 @@ export { classify } from './classify';
 export { fingerprint, normaliseMessage } from './fingerprint';
 export type { Flow, Outcome, Severity, TelemetryInput, JourneyHandle } from './types';
 
-export const telemetry = { event, flush, setWallet, breadcrumb, startJourney };
+export const telemetry = { event, flush, setWallet, setNetwork, breadcrumb, startJourney };

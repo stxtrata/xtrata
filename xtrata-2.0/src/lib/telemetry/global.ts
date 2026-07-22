@@ -13,6 +13,11 @@ export function installGlobalTelemetry(): void {
   installed = true;
   setTelemetryEnabled(true);
 
+  // A lightweight boot event is the dashboard's positive heartbeat. Without
+  // it, a healthy visit that never enters a wallet/mint flow is
+  // indistinguishable from a broken telemetry client.
+  event({ flow: 'app', step: 'boot', outcome: 'info' });
+
   window.addEventListener('error', (e: ErrorEvent) => {
     event({
       flow: 'app',

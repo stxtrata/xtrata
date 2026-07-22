@@ -54,6 +54,7 @@ let wallet: { address: string | null; kind: string | null } = {
   address: null,
   kind: null
 };
+let network: string | null = null;
 export function setWallet(address: string | null, kind?: string): void {
   if (!address) {
     wallet = { address: null, kind: kind ?? wallet.kind };
@@ -61,6 +62,9 @@ export function setWallet(address: string | null, kind?: string): void {
   }
   const a = address.trim();
   wallet = { address: a, kind: kind ?? wallet.kind };
+}
+export function setNetwork(value: string | null | undefined): void {
+  network = typeof value === 'string' && value.length > 0 ? value : null;
 }
 
 // ---- breadcrumbs (in-memory ring; only ride along with error events) ----
@@ -186,7 +190,7 @@ export function event(input: TelemetryInput): void {
       route: input.route ?? (typeof location !== 'undefined' ? location.pathname : ''),
       walletAddress: wallet.address,
       walletKind: wallet.kind,
-      network: null,
+      network,
       context: Object.keys(ctx).length ? ctx : undefined
     };
     enqueue(wire);

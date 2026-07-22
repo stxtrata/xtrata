@@ -1,4 +1,4 @@
-import { startJourney, event, setWallet } from '../telemetry/client';
+import { startJourney, event, setNetwork, setWallet } from '../telemetry/client';
 import { classify } from '../telemetry/classify';
 import { AppConfig, UserSession, type UserData } from '@stacks/auth';
 import {
@@ -1814,6 +1814,7 @@ export const connectWallet = async (params: {
     const session = await connectWalletInner(params);
     if (session.isConnected && session.address) {
       setWallet(session.address, telemetryWalletKind());
+      setNetwork(session.network);
       event({ journey, step: 'authorize', outcome: 'success' });
     } else {
       event({ journey, step: 'authorize', outcome: 'abandon' });
@@ -1850,6 +1851,7 @@ export const disconnectWallet = async () => {
   clearSelectedProviderId();
   clearXverseAccountCache();
   setWallet(null);
+  setNetwork(null);
   event({ flow: 'wallet_connect', step: 'disconnect', outcome: 'info' });
 };
 

@@ -122,5 +122,6 @@ describe('/debug/data route', () => {
     const body = (await res.json()) as { ready: boolean };
     expect(body.ready).toBe(true);
     expect(queries.some((sql) => sql.includes('last_success > last_error'))).toBe(true);
+    expect(queries.some((sql) => sql.includes('ORDER BY received_at DESC LIMIT 30'))).toBe(true);
   });
 });

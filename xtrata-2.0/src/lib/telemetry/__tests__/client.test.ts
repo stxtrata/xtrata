@@ -60,6 +60,26 @@ describe('telemetry client queue + delivery', () => {
     expect(init.keepalive).toBe(true);
   });
 
+  it('includes the active wallet and network context on later events', async () => {
+    const beacon = vi.fn(() => true);
+    vi.stubGlobal('navigator', { sendBeacon: beacon, onLine: true, userAgent: 'test' });
+    vi.resetModules();
+    const mod = await import('../index');
+    mod.setTelemetryEnabled(true);
+    mod.setWallet('SP000000000000000000002Q6VF78', 'xverse');
+    mod.setNetwork('mainnet');
+
+    mod.event({ flow: 'mint', step: 'readiness', outcome: 'error', error: 'test' });
+
+    const [, blob] = beacon.mock.calls[0];
+    const payload = JSON.parse(await (blob as Blob).text());
+    expect(payload.events[0]).toMatchObject({
+      walletAddress: 'SP000000000000000000002Q6VF78',
+      walletKind: 'xverse',
+      network: 'mainnet'
+    });
+  });
+
   it('stays inert (no network) until enabled', async () => {
     const beacon = vi.fn(() => true);
     vi.stubGlobal('navigator', { sendBeacon: beacon, onLine: true, userAgent: 'test' });
@@ -74,5 +94,25 @@ describe('telemetry client queue + delivery', () => {
     vi.stubGlobal('fetch', undefined);
     const telemetry = await freshTelemetry();
     expect(() => telemetry.event({ flow: 'app', outcome: 'error', error: 'x' })).not.toThrow();
+  });
+
+  it('sends a boot heartbeat when global telemetry is installed', async () => {
+    const beacon = vi.fn(() => true);
+    vi.stubGlobal('navigator', { sendBeacon: beacon, onLine: true, userAgent: 'test' });
+    vi.stubGlobal('window', { addEventListener: vi.fn() });
+    vi.resetModules();
+    const mod = await import('../index');
+
+    mod.installGlobalTelemetry();
+    mod.flush('test');
+
+    expect(beacon).toHaveBeenCalledTimes(1);
+    const [, blob] = beacon.mock.calls[0];
+    const payload = JSON.parse(await (blob as Blob).text());
+    expect(payload.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ flow: 'app', step: 'boot', outcome: 'info' })
+      ])
+    );
   });
 });

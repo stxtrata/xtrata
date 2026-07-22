@@ -46,7 +46,7 @@ export const onRequest: PagesFunction = async ({ request, env }) => {
   const since = Date.now() - hours * 3_600_000;
 
   try {
-    const [totals, kpiErr, recovery, topIssues, byFlow, funnelRows, trend, recent] =
+    const [totals, kpiErr, recovery, topIssues, byFlow, funnelRows, trend, recent, recentActivity] =
       await Promise.all([
         queryAll(
           e,
@@ -120,6 +120,14 @@ export const onRequest: PagesFunction = async ({ request, env }) => {
          FROM telemetry_events WHERE outcome='error' AND received_at > ?
          ORDER BY received_at DESC LIMIT 20`,
           [since]
+        ),
+        queryAll(
+          e,
+          `SELECT received_at AS ts, flow, step, outcome, severity,
+                wallet_kind AS walletKind, country, device, ua_browser AS browser
+         FROM telemetry_events WHERE received_at > ?
+         ORDER BY received_at DESC LIMIT 30`,
+          [since]
         )
       ]);
 
@@ -158,6 +166,7 @@ export const onRequest: PagesFunction = async ({ request, env }) => {
         byFlow: rows(byFlow),
         funnels,
         trend: rows(trend),
+        recentActivity: rows(recentActivity),
         recentErrors: rows(recent)
       },
       200,

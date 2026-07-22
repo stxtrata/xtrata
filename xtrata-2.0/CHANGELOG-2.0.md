@@ -2,6 +2,14 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Live telemetry visibility + public-flow coverage (2026-07-22)
+
+- **Finding:** the production sender, `/log` route, D1 migration, and private `/debug/data` route were healthy; the live D1 already contained the wallet connect/disconnect records from the field check. The dashboard looked empty because it only visualised failures, while those records were successful/info outcomes. The production homepage mint and standard market-buy handlers also bypassed the React-only instrumentation.
+- **Dashboard:** `/debug` now leads with recorded activity, shows total events/errors per flow, has a newest-first activity feed, and explicitly reports when logging is active with zero crash-outs. The read endpoint returns the corresponding bounded, privacy-safe recent activity rows.
+- **Capture:** every page load emits a small `app / boot` heartbeat so a working client is distinguishable from a silent deployment. The real public homepage now records mint readiness, submission, confirmation, staged begin/upload/seal, completion, retry attempts, and classified errors; standard marketplace purchases record submit start/success/abandon/error. Wallet, sponsored drop, and React flow instrumentation remains unchanged.
+- **Privacy/behaviour:** no new free-form user data is captured. Wallet addresses still only reach the ingest for salted hashing and are never stored raw. Telemetry remains fire-and-forget and cannot block a page, wallet, mint, market, or drop action.
+- **Verified:** the full application suite passes **968 tests across 173 files** and the production build succeeds. The repository lint command still stops on the two pre-existing unused variables in `recursive-apps/duels-drop/build-demo-v3.mjs` already documented below.
+
 ## Backend issue & journey telemetry + `/debug` health dashboard (2026-07-21, follow-up 6)
 
 - **Why:** there was no persisted logging of user failures (only 11 scattered `console.error`s, no error boundary, no global handler), so no way to see who "crashes out", why, whether they retried, or whether they recovered. This adds an end-to-end, privacy-preserving telemetry pipeline and a plain-language dashboard on the existing Cloudflare + D1 stack.
@@ -224,6 +232,7 @@ Both Clarity 4 sponsored market contracts signed in the admin wallet via the dep
 ## Post-deploy verification (2026-07-10)
 
 Both sponsored markets CONFIRMED on mainnet and verified end-to-end:
+
 - sBTC: tx 0xada656…a09c, block 8522301, canonical, **Clarity 4**, epoch 3.4.
 - USDCx: tx 0xa86a83…f1e4, block 8522307, canonical, **Clarity 4**, epoch 3.4.
 - Source integrity: on-chain `source_code` matches the repo live variants; local sha256 (401dbeb9…/d0f4cea5…) identical to the hashes shown in the deploy console before signing — repo bytes = signed bytes = chain bytes.

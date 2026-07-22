@@ -200,7 +200,12 @@
       isLikelyImageUrl,
       resolveMimeType
     } from '/src/lib/viewer/content.ts';
-    import { installGlobalTelemetry } from '/src/lib/telemetry/global.ts';
+    import {
+      classify as classifyTelemetryError,
+      event as telemetryEvent,
+      installGlobalTelemetry,
+      startJourney
+    } from '/src/lib/telemetry/index.ts';
 
     installGlobalTelemetry();
 
@@ -4747,7 +4752,8 @@
           // wallet estimate (fine for the tiny begin/seal transactions).
           ...(options.feeMicroStx != null ? { fee: options.feeMicroStx } : {}),
           onFinish: (payload) => resolve(payload),
-          onCancel: () => reject(new Error('Wallet cancelled or failed to broadcast.'))
+          onCancel: () => reject(new Error('Wallet request cancelled.')),
+          onError: (error) => reject(error)
         });
       });
     };
@@ -4955,6 +4961,8 @@
       return [bufferCV(prepared.expectedHash), stringAsciiCV(prepared.tokenUriValue)];
     };
 
+    let publicMintJourney = null;
+
     const runInscription = async () => {
       // Not an error — inscribing just needs a connected wallet. Prompt gently (amber) and
       // open the connect flow instead of failing; no busy lock is taken on this path.
@@ -4972,6 +4980,11 @@
       setBusy(true);
       resetSteps();
       let flowStarted = false;
+      const mintJourney = publicMintJourney ?? startJourney('mint', getContractId(state.contract));
+      publicMintJourney = mintJourney;
+      const mintAttempt = mintJourney.attempt();
+      let telemetryStep = 'readiness';
+      telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'start' });
       try {
         await validateMintReadiness();
         const prepared = state.prepared;
@@ -4979,6 +4992,7 @@
         const parentIds = prepared.parentIds ?? [];
         await checkPreparedRelationships(prepared);
         await refreshUploadState(prepared.expectedHash);
+        telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'success' });
         flowStarted = true;
         const feeEstimate = getFeeEstimate(prepared.chunks.length);
         const hasUploadState = !!state.uploadState;
@@ -5008,6 +5022,8 @@
             typeof prepared.singleTxFeeMicroStx === 'number'
               ? prepared.singleTxFeeMicroStx
               : feeEstimate.totalMicroStx;
+          telemetryStep = 'submit';
+          telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'start' });
           const singleTx = await requestContractCall({
             functionName:
               parentIds.length > 0
@@ -5027,12 +5043,16 @@
             feeMicroStx: walletMinerFeeMicroStx(prepared.bytes.length)
           });
           const singleTxId = normalizeTxId(singleTx);
+          telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'success' });
           state.lastSubmittedTxId = singleTxId;
           appendLog(`Single-tx mint sent: ${singleTxId}`, 'action');
           setStep('begin', 'pending', 'Confirming');
           setStep('upload', 'pending', 'Confirming');
           setStep('seal', 'pending', 'Confirming');
+          telemetryStep = 'confirm';
+          telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'start' });
           await waitForTransactionConfirmation(singleTxId, 'Single-transaction mint');
+          telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'success' });
           setStep('begin', 'done', 'Confirmed');
           setStep('upload', 'done', 'Confirmed');
           setStep('seal', 'done', 'Confirmed');
@@ -5044,6 +5064,8 @@
             'ready',
             'green'
           );
+          telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: 'complete', outcome: 'success' });
+          publicMintJourney = null;
           await loadWalletInscriptions();
           return;
         }
@@ -5061,6 +5083,8 @@
               dependencyIds.length > 0 ? ` with ${dependencyIds.length} recursive dependency${dependencyIds.length === 1 ? '' : 'ies'}` : ''
             }.`
           );
+          telemetryStep = 'submit';
+          telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'start' });
           const singleTx = await requestContractCall({
             contract: smallMintHelperContract,
             functionName:
@@ -5090,12 +5114,16 @@
             feeMicroStx: walletMinerFeeMicroStx(prepared.bytes.length)
           });
           const singleTxId = normalizeTxId(singleTx);
+          telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'success' });
           state.lastSubmittedTxId = singleTxId;
           appendLog(`Single-tx mint sent: ${singleTxId}`, 'action');
           setStep('begin', 'pending', 'Confirming');
           setStep('upload', 'pending', 'Confirming');
           setStep('seal', 'pending', 'Confirming');
+          telemetryStep = 'confirm';
+          telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'start' });
           await waitForTransactionConfirmation(singleTxId, 'Single-transaction mint');
+          telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'success' });
           setStep('begin', 'done', 'Confirmed');
           setStep('upload', 'done', 'Confirmed');
           setStep('seal', 'done', 'Confirmed');
@@ -5107,11 +5135,15 @@
             'ready',
             'green'
           );
+          telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: 'complete', outcome: 'success' });
+          publicMintJourney = null;
           await loadWalletInscriptions();
           return;
         }
 
         if (!hasUploadState) {
+          telemetryStep = 'begin';
+          telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'start' });
           setStep('begin', 'pending', 'Wallet prompt');
           appendLog('Step 1: begin-inscription');
           const beginTx = await requestContractCall({
@@ -5137,6 +5169,7 @@
             );
           }
           setStep('begin', 'done', 'Confirmed');
+          telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'success' });
         } else {
           setStep('begin', 'done', 'Already started');
           appendLog(
@@ -5166,6 +5199,8 @@
         );
 
         if (remainingBatches.length > 0) {
+          telemetryStep = 'upload';
+          telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'start' });
           setStep(
             'upload',
             'pending',
@@ -5217,10 +5252,13 @@
             );
           }
           setStep('upload', 'done', `${totalBatches}/${totalBatches} confirmed`);
+          telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'success' });
         } else {
           setStep('upload', 'done', 'Already uploaded');
         }
 
+        telemetryStep = 'seal';
+        telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'start' });
         setStep('seal', 'pending', 'Wallet prompt');
         appendLog(
           getSealLogLabel(dependencyIds, parentIds)
@@ -5238,6 +5276,7 @@
         appendLog(`Seal transaction sent: ${sealTxId}`, 'action');
         setStep('seal', 'pending', 'Confirming');
         await waitForTransactionConfirmation(sealTxId, 'Seal transaction');
+        telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'success' });
         setStep('seal', 'done', 'Confirmed');
         state.lastMintAttempt = null;
         void clearMintAttempt(getContractId(state.contract));
@@ -5247,9 +5286,24 @@
           'ready',
           'green'
         );
+        telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: 'complete', outcome: 'success' });
+        publicMintJourney = null;
         await loadWalletInscriptions();
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        const wasCancelled = message === 'Wallet request cancelled.';
+        telemetryEvent(
+          wasCancelled
+            ? { journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'abandon' }
+            : {
+                journey: mintJourney,
+                attempt: mintAttempt,
+                step: telemetryStep,
+                outcome: 'error',
+                errorCode: classifyTelemetryError(error, 'mint'),
+                error
+              }
+        );
         appendLog(`Mint failed: ${message}`);
         if (flowStarted && state.prepared?.expectedHash) {
           await refreshUploadState(state.prepared.expectedHash);
@@ -10329,6 +10383,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       });
     };
 
+    const marketBuyJourneys = new Map();
+
     const marketBuy = async (listing) => {
       const publicBlockReason = getListingPublicBlockReason(listing);
       if (publicBlockReason) {
@@ -10358,6 +10414,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         marketDom.status.innerHTML = '<span><strong>Market</strong> unsupported payment token for this listing.</span>';
         return;
       }
+      const marketTarget = `${listing.contractId}::${listing.listingId.toString()}`;
+      const marketJourney =
+        marketBuyJourneys.get(marketTarget) ?? startJourney('market_buy', marketTarget);
+      marketBuyJourneys.set(marketTarget, marketJourney);
+      const marketAttempt = marketJourney.attempt();
+      telemetryEvent({ journey: marketJourney, attempt: marketAttempt, step: 'submit', outcome: 'start' });
       marketDom.status.innerHTML = '<span><strong>Market</strong> confirm the purchase in your wallet…</span>';
       showContractCall({
         contractAddress: listing.entry.address,
@@ -10369,11 +10431,27 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         postConditionMode: PostConditionMode.Deny,
         postConditions,
         onFinish: (payload) => {
+          telemetryEvent({ journey: marketJourney, attempt: marketAttempt, step: 'submit', outcome: 'success' });
           const txId = payload?.txId ?? payload?.txid ?? '';
+          marketBuyJourneys.delete(marketTarget);
           marketDom.status.innerHTML = `<span><strong>Market</strong> purchase submitted${txId ? ` — tx ${txId}` : ''}.</span><span class="badge green">sent</span>`;
         },
         onCancel: () => {
+          telemetryEvent({ journey: marketJourney, attempt: marketAttempt, step: 'submit', outcome: 'abandon' });
+          marketBuyJourneys.delete(marketTarget);
           marketDom.status.innerHTML = '<span><strong>Market</strong> purchase cancelled.</span>';
+        },
+        onError: (error) => {
+          telemetryEvent({
+            journey: marketJourney,
+            attempt: marketAttempt,
+            step: 'submit',
+            outcome: 'error',
+            errorCode: classifyTelemetryError(error, 'market_buy'),
+            error
+          });
+          const message = error instanceof Error ? error.message : String(error);
+          marketDom.status.textContent = `Market purchase failed: ${message}`;
         }
       });
     };
