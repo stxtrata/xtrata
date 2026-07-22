@@ -20,7 +20,7 @@
 
 1. Retrieve the private attestor key that corresponds to the already configured
    on-chain hash `0x0a58ec2d974c832a3e81347865103babe4fd226e`.
-2. Set it as the Cloudflare Pages secret `BNS_ATTESTOR_KEY`. Do not reuse the
+2. Use the existing Cloudflare Pages secret `BNS_ATTESTATION_PRIVATE_KEY`. Do not reuse the
    sponsor hot-wallet key and do not place either key in the repository.
 3. Deploy the current site build. No `SPONSOR_MARKETS` override is needed when
    using the default allowlist; if an override is present, it must explicitly

@@ -19,7 +19,7 @@
  * Job state lives in the existing D1 database (table auto-created).
  *
  * Setup (once): set SPONSOR_KEY to the fee hot-wallet key. Drops v1.1 also
- * requires BNS_ATTESTOR_KEY, whose compressed public-key hash160 must match
+ * requires BNS_ATTESTATION_PRIVATE_KEY, whose compressed public-key hash160 must match
  * get-bns-attestor-pubkey-hash on-chain. Optional: SPONSOR_MARKETS to override
  * the allowlist, HIRO_API_KEY for rate limits.
  *
@@ -134,7 +134,7 @@ const CORS = {
 
 type SponsorEnv = Env & {
   SPONSOR_KEY?: string;
-  BNS_ATTESTOR_KEY?: string;
+  BNS_ATTESTATION_PRIVATE_KEY?: string;
   SPONSOR_MARKETS?: string;
   HIRO_API_KEYS?: string;
   HIRO_API_KEY?: string;
@@ -1098,7 +1098,7 @@ const handleRequest = async (
     }
 
     diagnostics.stage = 'ATTESTATION_KEY';
-    const rawAttestorKey = env.BNS_ATTESTOR_KEY?.trim().replace(/^0x/i, '');
+    const rawAttestorKey = env.BNS_ATTESTATION_PRIVATE_KEY?.trim().replace(/^0x/i, '');
     if (!rawAttestorKey || !/^[0-9a-f]{64}(?:01)?$/i.test(rawAttestorKey)) {
       return fail('ATTESTOR_DISABLED', 'BNS attestor is not configured', 503);
     }

@@ -454,7 +454,11 @@ describe('sponsor relayer Pages handler', () => {
 
   beforeEach(() => {
     db = makeDb();
-    env = { SPONSOR_KEY: SPONSOR_KEY, BNS_ATTESTOR_KEY: ATTESTOR_KEY, DB: db.db };
+    env = {
+      SPONSOR_KEY,
+      BNS_ATTESTATION_PRIVATE_KEY: ATTESTOR_KEY,
+      DB: db.db
+    };
     stubFetch();
   });
   afterEach(() => vi.unstubAllGlobals());
