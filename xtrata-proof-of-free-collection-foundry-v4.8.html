@@ -498,7 +498,7 @@ R → regenerate the animation's deterministic state</div>
             <div style="margin-top:10px"><label for="masterContentUrl">Master inscription content URL</label><input id="masterContentUrl" type="text" placeholder="Paste after inscribing the master — blank uses __XTRATA_MASTER_URL__"></div>
             <div class="hint">Each tiny child contains only its edition number and a full-screen recursive iframe pointing to this master URL with <code>?edition=N</code>.</div>
             <div class="grid2" style="margin-top:10px">
-              <div><label for="claimRegistryUrl">Live claim registry JSON URL</label><input id="claimRegistryUrl" type="text" placeholder="Optional CORS-enabled endpoint"></div>
+              <div><label for="claimRegistryUrl">Live claim registry JSON URL</label><input id="claimRegistryUrl" type="text" value="https://xtrata.xyz/collection-drop/registry?campaign=0" placeholder="CORS-enabled endpoint"></div>
               <div><label for="registryRefreshSeconds">Registry refresh interval</label><input id="registryRefreshSeconds" type="number" min="0" max="3600" value="60"></div>
             </div>
             <div class="grid2" style="margin-top:10px">
@@ -511,6 +511,7 @@ R → regenerate the animation's deterministic state</div>
               <textarea id="embeddedClaimRegistry" class="code" style="min-height:120px">{}</textarea>
               <div class="hint">Accepted forms include an array, an object keyed by edition, or <code>{"items":[...]}</code>. Each item may contain: edition, claimed, inscription, contentUrl, owner, ownerName and tx.</div>
             </div>
+            <label class="checkbox" style="margin-top:10px"><input type="checkbox" checked disabled> Claim-gated mosaic: only claimed editions are visible and playable</label>
             <div class="actions">
               <button class="btn" id="downloadMasterBtn">Download master HTML</button>
               <button class="btn orange" id="downloadMasterBundleBtn">Generate 1,025 inscription files</button>
@@ -767,7 +768,7 @@ function readConfig(){
     includeCsv:checked("includeCsv"),
     includeReadme:checked("includeReadme"),
     masterContentUrl:values("masterContentUrl").trim(),
-    claimRegistryUrl:values("claimRegistryUrl").trim(),
+    claimRegistryUrl:values("claimRegistryUrl").trim()||"https://xtrata.xyz/collection-drop/registry?campaign=0",
     registryRefreshSeconds:clamp(parseInt(values("registryRefreshSeconds"))||0,0,3600),
     itemExplorerTemplate:values("itemExplorerTemplate").trim(),
     ownerExplorerTemplate:values("ownerExplorerTemplate").trim(),
@@ -962,7 +963,7 @@ function deriveMusicMeta(edition,cfg){
   };
 }
 function createMosaicMusicEngine(opts){
-  const cfg=opts.cfg,maxActive=opts.maxActive||32;
+  const cfg=opts.cfg,maxActive=opts.maxActive||32,allow=opts.allow||null;
   let ac=null,master=null,limiter=null,timer=0,playing=false,musicMode=false;
   let bpm=96,root=2,scaleName="minorPentatonic",quant="bar",step=0,nextTime=0;
   const active=new Map(),pending=new Map(),lastGesture=new Map(),recordedLoops=new Map(),recorders=new Map(),listeners=new Set();
@@ -1041,7 +1042,8 @@ function createMosaicMusicEngine(opts){
       if(on){if(active.size<maxActive)active.set(ed,deriveMusicMeta(ed,cfg))}
       else active.delete(ed)
     }
-    pending.clear()
+    pending.clear();
+    if(!active.size&&!recorders.size){playing=false;clearInterval(timer);timer=0}
   }
   function updateRecorders(globalStep){
     for(const [ed,r] of [...recorders]){
@@ -1094,6 +1096,7 @@ function createMosaicMusicEngine(opts){
   function setEditionEnabled(ed,on){
     ed=Number(ed);if(!(ed>=1&&ed<=cfg.count))return;
     on=!!on;
+    if(on&&allow&&!allow(ed))return;
     if(playing)pending.set(ed,on);
     else{if(on){if(active.size>=maxActive&&!active.has(ed))return;active.set(ed,deriveMusicMeta(ed,cfg))}else active.delete(ed)}
     if(on&&!playing)start();notify()
@@ -1105,6 +1108,7 @@ function createMosaicMusicEngine(opts){
   function armRecord(ed,loopBars=1){
     ed=Number(ed);loopBars=[1,2,4,8].includes(Number(loopBars))?Number(loopBars):1;
     if(!(ed>=1&&ed<=cfg.count))return;
+    if(allow&&!allow(ed))return;
     const A=init();if(!A)return;if(A.state==="suspended")A.resume();if(!playing)start();
     const pos=Math.max(step,Math.ceil(transportPosition())),startStep=(Math.floor(pos/64)+1)*64,lengthSteps=loopBars*64;
     recorders.set(ed,{edition:ed,state:"armed",loopBars,lengthSteps,startStep,endStep:startStep+lengthSteps,events:[]});
@@ -1116,6 +1120,7 @@ function createMosaicMusicEngine(opts){
   }
   function gesture(ed,x,y,isDrag=false){
     ed=Number(ed);x=Math.max(0,Math.min(1,x));y=Math.max(0,Math.min(1,y));
+    if(allow&&!allow(ed))return null;
     const A=init();if(!A)return null;if(A.state==="suspended")A.resume();if(!playing)start();
     const now=A.currentTime,last=lastGesture.get(ed)||0,minGap=isDrag?Math.max(.055,stepDuration()/2):.02;
     if(now-last<minGap)return null;lastGesture.set(ed,now);
@@ -1149,10 +1154,10 @@ function createMosaicMusicEngine(opts){
     setBpm(scene.bpm||96);setRoot(scene.rootIndex??MUSIC_ROOTS.indexOf(scene.root));setScale(scene.scale||"minorPentatonic");setQuant(scene.quantisation||"bar");
     for(const loop of scene.recordedLoops||[]){
       const ed=Number(loop.edition),bars=[1,2,4,8].includes(Number(loop.loopBars))?Number(loop.loopBars):1;
-      if(ed>=1&&ed<=cfg.count&&Array.isArray(loop.events))recordedLoops.set(ed,{edition:ed,loopBars:bars,lengthSteps:bars*64,events:loop.events.map(e=>({offset:Number(e.offset)||0,x:Math.max(0,Math.min(1,Number(e.x)||0)),y:Math.max(0,Math.min(1,Number(e.y)||0)),velocity:Number(e.velocity)||1}))})
+      if(ed>=1&&ed<=cfg.count&&(!allow||allow(ed))&&Array.isArray(loop.events))recordedLoops.set(ed,{edition:ed,loopBars:bars,lengthSteps:bars*64,events:loop.events.map(e=>({offset:Number(e.offset)||0,x:Math.max(0,Math.min(1,Number(e.x)||0)),y:Math.max(0,Math.min(1,Number(e.y)||0)),velocity:Number(e.velocity)||1}))})
     }
     for(const item of scene.items||[]){
-      const ed=Number(item.edition);if(ed>=1&&ed<=cfg.count&&active.size<maxActive){const m=deriveMusicMeta(ed,cfg);if(Number.isFinite(item.ratio))m.ratio=item.ratio;if(Number.isFinite(item.loopBars))m.loopBars=item.loopBars;if(Number.isFinite(item.gain))m.gain=item.gain;if(Number.isFinite(item.pan))m.pan=item.pan;active.set(ed,m)}
+      const ed=Number(item.edition);if(ed>=1&&ed<=cfg.count&&(!allow||allow(ed))&&active.size<maxActive){const m=deriveMusicMeta(ed,cfg);if(Number.isFinite(item.ratio))m.ratio=item.ratio;if(Number.isFinite(item.loopBars))m.loopBars=item.loopBars;if(Number.isFinite(item.gain))m.gain=item.gain;if(Number.isFinite(item.pan))m.pan=item.pan;active.set(ed,m)}
     }
     notify()
   }
@@ -1955,16 +1960,22 @@ function bootCollectionMaster(){
   const canvas=byId("mosaic"),ctx=canvas.getContext("2d"),tile=canvas.width/K;
   const stage=byId("stage"),world=byId("world"),selection=byId("selection"),musicOverlay=byId("musicOverlay");
   const cells=Array.from({length:CFG.count},(_,i)=>deriveMeta(i+1,CFG));
-  let registry=new Map(),selected=1,locked=false,scale=1,fit=.1,tx=0,ty=0;
-  let drag=false,moved=false,sx=0,sy=0,stx=0,sty=0,refreshTimer=0,clickTimer=0;
-  const music=createMosaicMusicEngine({cfg:CFG,maxActive:32,onState:s=>{
+  let registry=new Map(),selected=0,scale=1,fit=.1,tx=0,ty=0;
+  let drag=false,moved=false,sx=0,sy=0,stx=0,sty=0,refreshTimer=0;
+  // The public master is always claim-gated. ?reveal=1 is an explicit,
+  // pre-inscription test view and never changes claim state.
+  const GATED=QUERY.get("reveal")!=="1";
+  function isClaimed(ed){const c=registry.get(ed);return !!(c&&c.claimed)}
+  function isRevealed(ed){return !GATED||isClaimed(ed)}
+  const music=createMosaicMusicEngine({cfg:CFG,maxActive:32,allow:isRevealed,onState:s=>{
     renderMusicMarkers(musicOverlay,s,ed=>({row:cells[ed-1].gridRow,col:cells[ed-1].gridCol}),tile);
-    setIconControl(byId("musicMode"),s.musicMode?"♫":"▦",s.musicMode?"Switch to browse mode":"Switch to music mode",s.musicMode);setIconControl(byId("musicPlay"),s.playing?"■":"▶",s.playing?"Stop master":"Play master",s.playing);byId("musicPlay").classList.toggle("transport-playing",s.playing);setVisualState(byId("musicActive"),"●"+s.active.size,s.active.size+" active loops");
-    byId("musicBpm").value=s.bpm;byId("musicBpm").title="Tempo "+s.bpm+" BPM";setIconControl(byId("musicRoot"),ROOT_GLYPHS[s.root],"Root "+MUSIC_ROOTS[s.root]);setIconControl(byId("musicScale"),SCALE_GLYPHS[s.scaleName]||"⌁","Scale "+s.scaleName);setIconControl(byId("musicQuant"),QUANT_GLYPHS[s.quant]||"┃","Quantise "+s.quant);
-    const beat=Math.floor((s.step%64)/16)+1,sub=Math.floor((s.step%16)/4)+1;setVisualState(byId("musicBeat"),"▮"+(Math.floor(s.step/64)+1)+"·"+beat+"."+sub,"Bar "+(Math.floor(s.step/64)+1)+", beat "+beat+"."+sub);stage.classList.toggle("music-mode",s.musicMode)
+    byId("activeCount").textContent=s.active.size;
+    byId("playStatus").textContent=s.active.size?(s.playing?"PLAYING":"PAUSED"):"CLICK A CLAIMED SQUARE";
+    stage.classList.toggle("music-mode",s.active.size>0)
   }});
-  function openPerformance(ed){return createKaossPerformanceView({edition:ed,cfg:CFG,music,host:document.body})}
-
+  // Start the recursive master as an instrument so a single cell click queues
+  // that edition's loop without requiring a separate mode-switch interaction.
+  music.setMode(true);
   function normaliseRegistry(input){
     const map=new Map();
     let list=input;
@@ -2019,61 +2030,65 @@ function bootCollectionMaster(){
     ctx.fillStyle="#050607";ctx.fillRect(0,0,canvas.width,canvas.height);
     for(const m of cells){
       const x=m.gridCol*tile,y=m.gridRow*tile;
-      drawNftThumbnail(ctx,m,x,y,tile,tile);
       const claim=registry.get(m.edition);
-      if(claim&&claim.claimed){
-        ctx.save();
-        ctx.fillStyle="#61d095";ctx.strokeStyle="#06150d";ctx.lineWidth=Math.max(2,tile*.025);
-        ctx.beginPath();ctx.arc(x+tile*.86,y+tile*.14,tile*.055,0,Math.PI*2);ctx.fill();ctx.stroke();
-        ctx.restore();
+      if(GATED&&!(claim&&claim.claimed)){
+        ctx.fillStyle="#08090a";ctx.fillRect(x,y,tile,tile);
+        ctx.strokeStyle="rgba(255,255,255,.045)";ctx.lineWidth=1;ctx.strokeRect(x+.5,y+.5,tile-1,tile-1);
+        continue;
       }
+      drawNftThumbnail(ctx,m,x,y,tile,tile);
+      ctx.strokeStyle="rgba(255,255,255,.72)";ctx.lineWidth=Math.max(2,tile*.028);
+      ctx.strokeRect(x+1,y+1,tile-2,tile-2);
     }
     byId("claimCount").textContent=claimedCount().toLocaleString();
-    byId("registryCount").textContent=registry.size.toLocaleString();
   }
 
   function bounds(){return stage.getBoundingClientRect()}
   function calculateFit(){const r=bounds();fit=Math.min(r.width/canvas.width,r.height/canvas.height)*.965}
-  function apply(){world.style.transform=\`translate(\${tx}px,\${ty}px) scale(\${scale})\`;byId("zoomRead").textContent=(scale/fit).toFixed(1)+"×";highlight(selected)}
+  function apply(){world.style.transform=\`translate(\${tx}px,\${ty}px) scale(\${scale})\`;highlight(selected)}
   function fitAll(){calculateFit();scale=fit;const r=bounds();tx=(r.width-canvas.width*scale)/2;ty=(r.height-canvas.height*scale)/2;apply()}
   function zoom(factor,cx,cy){const r=bounds(),px=(cx??r.left+r.width/2)-r.left,py=(cy??r.top+r.height/2)-r.top,wx=(px-tx)/scale,wy=(py-ty)/scale;calculateFit();const next=Math.max(fit*.8,Math.min(Math.max(6,fit*24),scale*factor));tx=px-wx*next;ty=py-wy*next;scale=next;apply()}
   function editionAt(clientX,clientY){const r=bounds(),x=(clientX-r.left-tx)/scale,y=(clientY-r.top-ty)/scale;if(x<0||y<0||x>=canvas.width||y>=canvas.height)return 0;return Math.floor(y/tile)*K+Math.floor(x/tile)+1}
-  function highlight(ed){const m=cells[ed-1];selection.style.left=(m.gridCol*tile)+"px";selection.style.top=(m.gridRow*tile)+"px";selection.style.width=tile+"px";selection.style.height=tile+"px"}
+  function highlight(ed){
+    if(!ed||!isRevealed(ed)){selection.hidden=true;return}
+    const m=cells[ed-1];selection.hidden=false;selection.style.left=(m.gridCol*tile)+"px";selection.style.top=(m.gridRow*tile)+"px";selection.style.width=tile+"px";selection.style.height=tile+"px"
+  }
 
   function setLink(id,url,enabled=true){
     const a=byId(id);a.href=url||"#";a.classList.toggle("disabled",!url||!enabled);a.setAttribute("aria-disabled",(!url||!enabled)?"true":"false")
   }
   function show(ed){
-    if(!ed)return;selected=ed;highlight(ed);
+    if(!ed||!isRevealed(ed))return;selected=ed;highlight(ed);
     const m=cells[ed-1],claim=registry.get(ed)||null;
     byId("editionLabel").textContent=m.name;
     byId("traitLabel").textContent=\`\${m.engine} · \${m.paletteName} · \${m.signal}\`;
-    byId("statusLabel").textContent=claim&&claim.claimed?"CLAIMED":"UNCLAIMED";
-    byId("statusLabel").className=claim&&claim.claimed?"claimed":"unclaimed";
-    byId("inscriptionLabel").textContent=claim&&claim.inscription?claim.inscription:"Not recorded";
-    const ownerText=claim?(claim.ownerName||short(claim.owner)||"Not recorded"):"Not recorded";
+    const ownerText=claim?(claim.ownerName||short(claim.owner)||"Owner pending"):"Owner pending";
     const ownerA=byId("ownerLink");ownerA.textContent=ownerText;
     const ownUrl=ownerUrl(claim,ed);ownerA.href=ownUrl||"#";ownerA.classList.toggle("disabled",!ownUrl);
-    byId("walletLabel").textContent=claim&&claim.owner?claim.owner:"";
-    setLink("viewArtwork",artworkUrl(ed),true);
-    setLink("viewInscription",inscriptionUrl(claim,ed),!!(claim&&(claim.contentUrl||claim.inscription)));
-    setLink("viewTx",txUrl(claim,ed),!!(claim&&claim.tx));
-    byId("selectedPosition").textContent=\`ROW \${m.gridRow+1} · COLUMN \${m.gridCol+1}\`;
+    setLink("viewInscription",inscriptionUrl(claim,ed)||artworkUrl(ed),true);
+    byId("selectedInfo").hidden=false;
+  }
+
+  function showFirstClaimed(){
+    if(selected&&isRevealed(selected)){show(selected);return}
+    const first=cells.find(m=>isRevealed(m.edition));
+    selected=first?first.edition:0;highlight(selected);
+    byId("selectedInfo").hidden=!selected
   }
 
   async function loadRegistry(manual=false){
-    const url=CFG.claimRegistryUrl;
-    if(!url){byId("registryStatus").textContent="EMBEDDED SNAPSHOT";draw();show(selected);return}
+    const url=QUERY.get("registry")==="off"?"":CFG.claimRegistryUrl;
+    if(!url){byId("registryStatus").textContent="SNAPSHOT";draw();showFirstClaimed();return}
     byId("registryStatus").textContent="REFRESHING…";
     try{
       const res=await fetch(url,{cache:"no-store",headers:{accept:"application/json"}});
       if(!res.ok)throw new Error("HTTP "+res.status);
-      const json=await res.json();registry=normaliseRegistry(json);draw();show(selected);
+      const json=await res.json();registry=normaliseRegistry(json);draw();showFirstClaimed();
       byId("registryStatus").textContent="LIVE · "+new Date().toLocaleTimeString();
     }catch(err){
       byId("registryStatus").textContent="REGISTRY ERROR · USING SNAPSHOT";
       if(manual)console.error(err);
-      draw();show(selected);
+      draw();showFirstClaimed();
     }
     clearTimeout(refreshTimer);
     if(CFG.registryRefreshSeconds>0)refreshTimer=setTimeout(()=>loadRegistry(false),CFG.registryRefreshSeconds*1000);
@@ -2081,28 +2096,18 @@ function bootCollectionMaster(){
 
   stage.addEventListener("wheel",e=>{e.preventDefault();zoom(Math.exp(-e.deltaY*.00135),e.clientX,e.clientY)},{passive:false});
   stage.addEventListener("pointerdown",e=>{if(e.target.closest("button,a"))return;drag=true;moved=false;sx=e.clientX;sy=e.clientY;stx=tx;sty=ty;stage.setPointerCapture(e.pointerId);stage.classList.add("drag")});
-  stage.addEventListener("pointermove",e=>{if(drag){const dx=e.clientX-sx,dy=e.clientY-sy;if(Math.hypot(dx,dy)>4)moved=true;tx=stx+dx;ty=sty+dy;apply()}else if(!locked)show(editionAt(e.clientX,e.clientY))});
-  stage.addEventListener("pointerup",e=>{drag=false;stage.classList.remove("drag");if(!moved){const ed=editionAt(e.clientX,e.clientY);if(ed){locked=true;show(ed)}}});
+  stage.addEventListener("pointermove",e=>{if(drag){const dx=e.clientX-sx,dy=e.clientY-sy;if(Math.hypot(dx,dy)>4)moved=true;tx=stx+dx;ty=sty+dy;apply()}});
+  stage.addEventListener("pointerup",()=>{drag=false;stage.classList.remove("drag")});
   stage.addEventListener("click",e=>{
-    if(moved||e.target.closest("button,a,input,select"))return;
-    const ed=editionAt(e.clientX,e.clientY);if(!ed)return;clearTimeout(clickTimer);
-    clickTimer=setTimeout(()=>{locked=true;show(ed);if(music.isMusicMode())music.toggle(ed)},300)
+    if(moved||e.target.closest("button,a"))return;
+    const ed=editionAt(e.clientX,e.clientY);if(!ed||!isRevealed(ed))return;
+    show(ed);music.toggle(ed)
   });
-  stage.addEventListener("dblclick",e=>{
-    if(e.target.closest("button,a,input,select"))return;e.preventDefault();clearTimeout(clickTimer);
-    const ed=editionAt(e.clientX,e.clientY);if(ed)openPerformance(ed)
-  });
-  byId("zoomIn").onclick=()=>zoom(1.35);byId("zoomOut").onclick=()=>zoom(1/1.35);byId("fitAll").onclick=fitAll;
-  byId("unlock").onclick=()=>{locked=false};
+  byId("fitAll").onclick=fitAll;
   byId("refreshRegistry").onclick=()=>loadRegistry(true);
-  byId("musicMode").onclick=()=>music.setMode(!music.isMusicMode());byId("musicPlay").onclick=()=>{const s=music.getState();s.playing?music.stop():music.start()};byId("musicClear").onclick=()=>music.clear();
-  byId("musicBpm").oninput=e=>music.setBpm(e.target.value);byId("musicRoot").onclick=()=>{const s=music.getState();music.setRoot((s.root+1)%MUSIC_ROOTS.length)};byId("musicScale").onclick=()=>{const order=Object.keys(MUSIC_SCALES),s=music.getState();music.setScale(order[(order.indexOf(s.scaleName)+1)%order.length])};byId("musicQuant").onclick=()=>{const order=["beat","bar","2bars","4bars"],s=music.getState();music.setQuant(order[(order.indexOf(s.quant)+1)%order.length])};
-  byId("sceneExport").onclick=()=>{const b=new Blob([JSON.stringify(music.exportScene(),null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="proof-of-free-scene.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1200)};
-  byId("sceneImport").onclick=()=>byId("sceneFile").click();byId("sceneFile").onchange=async e=>{const f=e.target.files&&e.target.files[0];if(!f)return;try{music.importScene(JSON.parse(await f.text()))}catch(err){alert(err.message)}e.target.value=""};
-  byId("editionSearch").addEventListener("change",e=>{const v=String(e.target.value).trim();let ed=Number(v);if(!Number.isFinite(ed)){for(const [n,c] of registry){if((c.ownerName||"").toLowerCase().includes(v.toLowerCase())||(c.owner||"").toLowerCase().includes(v.toLowerCase())){ed=n;break}}}if(ed>=1&&ed<=CFG.count){locked=true;show(ed);const m=cells[ed-1],r=bounds();scale=Math.max(fit*5,1);tx=r.width/2-(m.gridCol+.5)*tile*scale;ty=r.height/2-(m.gridRow+.5)*tile*scale;apply()}});
-  for(const id of ["viewArtwork","viewInscription","viewTx","ownerLink"])byId(id).addEventListener("click",e=>{if(e.currentTarget.classList.contains("disabled"))e.preventDefault()});
+  for(const id of ["viewInscription","ownerLink"])byId(id).addEventListener("click",e=>{if(e.currentTarget.classList.contains("disabled"))e.preventDefault()});
   const ro=typeof ResizeObserver!=="undefined"?new ResizeObserver(fitAll):null;if(ro)ro.observe(stage);
-  draw();selected=Math.floor(K/2)*K+Math.floor(K/2)+1;show(selected);requestAnimationFrame(fitAll);loadRegistry(false);
+  draw();showFirstClaimed();requestAnimationFrame(fitAll);loadRegistry(false);
 }
 `;
   const title=String(cfg.collectionTitle).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2113,44 +2118,29 @@ function bootCollectionMaster(){
 <title>${title} · Collection Master</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#050607;color:#f3f5f6;font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-a{color:inherit}.app{height:100%;display:grid;grid-template-rows:auto auto 1fr;background:radial-gradient(circle at 20% 0%,#15202a 0,transparent 32%),#050607}
-header{display:flex;align-items:center;gap:18px;padding:13px 16px;border-bottom:1px solid #343c42;background:#090c0e}
-header h1{font:900 clamp(15px,2.2vw,25px)/1 system-ui,sans-serif;margin:0 0 5px}header p{margin:0;color:#9ca7ae}
+a{color:inherit}.app{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr) auto;background:#050607}
+header{display:flex;align-items:center;gap:18px;padding:11px 14px;border-bottom:1px solid #252d32;background:#090c0e}
+header h1{font:900 clamp(15px,2.2vw,23px)/1 system-ui,sans-serif;margin:0 0 4px}header p{margin:0;color:#8d989f;font-size:11px}
 .stats{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}.stat{border:1px solid #374148;background:#11161a;border-radius:999px;padding:7px 10px;font-weight:900}.stat span{color:#61d095}
 .musicbar{display:flex;gap:7px;align-items:center;flex-wrap:wrap;padding:9px 14px;border-bottom:1px solid #343c42;background:#080b0d}.musicbar label{display:flex;gap:5px;align-items:center;color:#9ca7ae;font-size:10px}.musicbar input,.musicbar select{background:#11171a;color:#fff;border:1px solid #3c474e;border-radius:7px;padding:7px}.musicbar input{width:92px}.musicbar .spacer{flex:1}
 .music-overlay{position:absolute;inset:0;pointer-events:none;z-index:2}.music-marker{position:absolute;border:8px solid #61d095;box-shadow:inset 0 0 0 5px #06150d,0 0 24px rgba(97,208,149,.7);animation:mp .7s ease-in-out infinite alternate}.music-marker.pending{border-color:#ffd166}.music-marker.stopping{border-color:#ef8732}@keyframes mp{to{opacity:.48;transform:scale(.94)}}.stage.music-mode{box-shadow:inset 0 0 0 2px #61d095}
 .kaoss-view{position:fixed;z-index:1000;inset:0;background:rgba(2,3,4,.97);display:grid;grid-template-rows:auto minmax(0,1fr) auto;padding:14px;gap:10px}.kaoss-top,.kaoss-bottom{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.kaoss-title{font-weight:950;font-size:16px}.kaoss-muted{color:#94a0a7;font-size:11px}.kaoss-spacer{flex:1}.kaoss-stage{position:relative;min-height:0;display:grid;place-items:center;overflow:hidden;border:1px solid #465159;border-radius:13px;background:#000}.kaoss-frame{position:relative;height:min(76vh,820px);max-width:100%;aspect-ratio:1;background:#000}.kaoss-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}.kaoss-pad{position:absolute;z-index:5;inset:0;touch-action:none;cursor:crosshair}.kaoss-pad:before,.kaoss-pad:after{content:"";position:absolute;background:rgba(255,255,255,.12)}.kaoss-pad:before{left:50%;top:0;bottom:0;width:1px}.kaoss-pad:after{top:50%;left:0;right:0;height:1px}.kaoss-cursor{position:absolute;z-index:6;width:24px;height:24px;margin:-12px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 3px #000,0 0 22px #54b8e7;pointer-events:none;display:none}.kaoss-read{border:1px solid #3c474e;background:#101518;border-radius:8px;padding:8px 10px;font-size:11px;font-weight:900}.kaoss-help{color:#89949b;font-size:18px;letter-spacing:.16em}
 .transport-playing{background:#1e7a4c!important;border-color:#61d095!important;color:#fff!important;box-shadow:0 0 22px rgba(97,208,149,.32)}.record-button{background:#331014!important;border-color:#8d3842!important}.record-button.armed{background:#5f3610!important;border-color:#ffd166!important}.record-button.recording{background:#a81321!important;border-color:#ff5a67!important;box-shadow:0 0 28px rgba(255,45,62,.5);animation:recordPulse .55s ease-in-out infinite alternate}@keyframes recordPulse{to{filter:brightness(1.35);transform:scale(1.025)}}.loop-enabled{background:#165f3c!important;border-color:#61d095!important}.kaoss-status{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.kaoss-status .kaoss-read{min-width:48px;text-align:center;font-size:16px}.kaoss-progress{height:8px;min-width:180px;flex:1;border:1px solid #3b454b;border-radius:99px;background:#090c0e;overflow:hidden}.kaoss-progress i{display:block;height:100%;width:0;background:#ff4251;transition:width .08s linear}
-main{min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 330px}
-.stage{position:relative;overflow:hidden;min-width:0;min-height:0;background:repeating-conic-gradient(#090c0e 0 25%,#0d1113 0 50%) 50%/24px 24px;touch-action:none;cursor:grab}.stage.drag{cursor:grabbing}
+main{min-height:0;position:relative}
+.stage{position:relative;width:100%;height:100%;overflow:hidden;min-width:0;min-height:0;background:repeating-conic-gradient(#090c0e 0 25%,#0d1113 0 50%) 50%/24px 24px;touch-action:none;cursor:grab}.stage.drag{cursor:grabbing}
 .world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}.world canvas{display:block;width:auto;height:auto;background:#050607}
-.selection{position:absolute;pointer-events:none;border:4px solid #fff;box-shadow:0 0 0 2px #000,0 0 24px #54b8e7}
-.hud{position:absolute;right:12px;top:12px;z-index:4;display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.selection{position:absolute;pointer-events:none;border:4px solid #fff;box-shadow:0 0 0 2px #000,0 0 24px #54b8e7}.selection[hidden]{display:none}
+.hud{position:absolute;right:10px;top:10px;z-index:4;display:flex;gap:7px}
 button,.hud input{border:1px solid #465159;background:rgba(7,10,12,.94);color:#fff;border-radius:9px;padding:9px 11px;font:inherit;font-weight:900}.hud input{width:145px}button{cursor:pointer}.icon-btn{width:42px;height:42px;min-width:42px;padding:0!important;display:inline-grid;place-items:center;font-size:19px;line-height:1;overflow:hidden}.icon-btn.wide{width:58px;min-width:58px}.icon-btn[aria-pressed="true"]{border-color:#61d095;background:#123d2a}.icon-option{display:flex!important;align-items:center;gap:6px;margin:0!important;padding:4px 6px!important}.icon-option>span{width:24px;text-align:center;font-size:17px}.icon-option select{width:64px!important;min-width:64px!important;border:0!important;background:#090c0e!important;padding:5px!important;text-align:center}.icon-range{display:flex!important;align-items:center;gap:7px;margin:0!important;padding:5px 8px;border:1px solid #3c474e;border-radius:8px;background:#101518}.icon-range>span{font-size:18px}.icon-range input{width:92px!important;padding:0!important;accent-color:#54b8e7}.visual-state{min-width:42px!important;width:auto;padding:8px 10px!important;font-size:16px!important;letter-spacing:.08em}
-.side{border-left:1px solid #343c42;background:#0b0f11;padding:17px;overflow:auto}
-.side h2{font-size:22px;line-height:1.05;margin:0 0 6px}.traits{color:#9ea9b0;margin-bottom:16px}.statusrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 0;border-top:1px solid #252d32}
-.claimed{color:#61d095;font-weight:950}.unclaimed{color:#89939a;font-weight:950}
-.k{color:#77838b;font-size:10px;letter-spacing:.11em}.v{overflow-wrap:anywhere;text-align:right}.owner{font-weight:900;text-decoration:none}.owner:hover{text-decoration:underline}.wallet{font-size:10px;color:#6e7980;overflow-wrap:anywhere;margin-top:4px}
-.links{display:flex;gap:8px;margin-top:16px;align-items:center}.links a{display:block;text-align:center;text-decoration:none;border:1px solid #465159;background:#151b1f;border-radius:9px;padding:10px;font-weight:950}.links a.icon-btn{display:grid;padding:0}.links a.primary{background:#1e72a7;border-color:#55aee2}.links a.disabled{opacity:.35;pointer-events:none}
-.note{font-size:11px;color:#89949b;margin-top:16px;padding-top:14px;border-top:1px solid #252d32}
-@media(max-width:850px){main{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto}.side{border-left:0;border-top:1px solid #343c42;max-height:38vh}.stats{display:none}.hud{left:8px;right:8px;justify-content:center}}
+.footerbar{min-height:48px;display:flex;align-items:center;gap:12px;padding:9px 14px;border-top:1px solid #252d32;background:#090c0e;color:#8f9aa1}.footerbar strong{color:#fff}.footerbar .traits{font-size:11px}.footerbar .spacer{flex:1}.footerbar a{text-decoration:none;font-weight:900}.footerbar a:hover{text-decoration:underline}.footerbar a.disabled{opacity:.4;pointer-events:none}.footerbar .help{font-size:10px;text-align:right}.selected{display:flex;align-items:center;gap:11px}.selected[hidden]{display:none}
+@media(max-width:720px){header p,.footerbar .traits,.footerbar .help{display:none}.stats .stat:nth-child(3){display:none}.footerbar{min-height:44px}.selected{min-width:0}.selected strong{white-space:nowrap}.owner{max-width:110px;overflow:hidden;text-overflow:ellipsis}.hud{right:6px;top:6px}}
 </style></head>
 <body><div class="app">
-<header><div><h1>${title} · COLLECTION MASTER</h1><p>1 master renderer · ${cfg.count.toLocaleString()} deterministic recursive children · synchronised musical mosaic</p></div><div class="stats"><div class="stat"><span id="claimCount">0</span> CLAIMED</div><div class="stat"><span id="registryCount">0</span> RECORDS</div><div class="stat" id="registryStatus">LOADING REGISTRY</div></div></header>
-<div class="musicbar"><button class="icon-btn" id="musicMode" aria-label="Switch to music mode" title="Switch to music mode" aria-pressed="false">▦</button><button class="icon-btn" id="musicPlay" aria-label="Play master" title="Play master" aria-pressed="false">▶</button><label class="icon-range" aria-label="Tempo" title="Tempo"><span aria-hidden="true">♩</span><input id="musicBpm" type="range" min="60" max="160" value="96" aria-label="Tempo"></label><button class="icon-btn" id="musicRoot" aria-label="Root D" title="Root D">🕑</button><button class="icon-btn" id="musicScale" aria-label="Minor pentatonic scale" title="Minor pentatonic scale">⋰</button><button class="icon-btn wide" id="musicQuant" aria-label="Quantise to bar" title="Quantise to bar">┃</button><div class="stat visual-state" id="musicActive" aria-label="Zero active loops" title="Zero active loops">●0</div><div class="stat visual-state" id="musicBeat" aria-label="Bar one, beat one" title="Bar one, beat one">▮1·1.1</div><div class="spacer"></div><button class="icon-btn" id="musicClear" aria-label="Clear all loops" title="Clear all loops">⌫</button><button class="icon-btn" id="sceneExport" aria-label="Export scene" title="Export scene">⇩</button><button class="icon-btn" id="sceneImport" aria-label="Import scene" title="Import scene">⇧</button><input id="sceneFile" type="file" accept=".json,application/json" hidden></div>
+<header><div><h1>${title}</h1><p>Claimed editions reveal here. Click a square once to play its loop; click again to stop it.</p></div><div class="stats"><div class="stat"><span id="claimCount">0</span> / ${cfg.count.toLocaleString()} CLAIMED</div><div class="stat"><span id="activeCount">0</span> PLAYING</div><div class="stat" id="registryStatus">LOADING</div></div></header>
 <main>
-<section class="stage" id="stage"><div class="world" id="world"><canvas id="mosaic" width="2048" height="2048"></canvas><div class="music-overlay" id="musicOverlay"></div><div class="selection" id="selection"></div></div>
-<div class="hud"><button class="icon-btn" id="zoomOut" aria-label="Zoom out" title="Zoom out">−</button><div class="stat" id="zoomRead">1.0×</div><button class="icon-btn" id="zoomIn" aria-label="Zoom in" title="Zoom in">+</button><button class="icon-btn" id="fitAll" aria-label="Fit full mosaic" title="Fit full mosaic">⊡</button><button class="icon-btn" id="unlock" aria-label="Follow hover" title="Follow hover">⌁</button><input id="editionSearch" aria-label="Edition or owner" title="Edition or owner" placeholder="⌕"></div></section>
-<aside class="side">
-<div class="k">SELECTED NFT</div><h2 id="editionLabel">Edition</h2><div class="traits" id="traitLabel"></div>
-<div class="statusrow"><span class="k">STATUS</span><span id="statusLabel" class="unclaimed">UNCLAIMED</span></div>
-<div class="statusrow"><span class="k">POSITION</span><span class="v" id="selectedPosition"></span></div>
-<div class="statusrow"><span class="k">INSCRIPTION</span><span class="v" id="inscriptionLabel">Not recorded</span></div>
-<div class="statusrow"><span class="k">OWNER</span><span class="v"><a id="ownerLink" class="owner disabled" href="#">Not recorded</a><div class="wallet" id="walletLabel"></div></span></div>
-<div class="links"><a id="viewArtwork" class="primary icon-btn" target="_blank" rel="noopener" aria-label="View artwork" title="View artwork">◉</a><a id="viewInscription" class="icon-btn" target="_blank" rel="noopener" aria-label="View inscription" title="View inscription">◇</a><a id="viewTx" class="icon-btn" target="_blank" rel="noopener" aria-label="View claim transaction" title="View claim transaction">⛓</a><button class="icon-btn" id="refreshRegistry" aria-label="Refresh registry" title="Refresh registry">↻</button></div>
-<div class="note">Browse Mode: single-click selects. Music Mode: single-click queues or removes a synchronised loop. Double-click opens the same-tab Kaoss performance view. Claimed editions show a green marker. Owner names link directly to the configured wallet explorer.</div>
-</aside>
-</main></div>
+<section class="stage" id="stage"><div class="world" id="world"><canvas id="mosaic" width="2048" height="2048"></canvas><div class="music-overlay" id="musicOverlay"></div><div class="selection" id="selection" hidden></div></div><div class="hud"><button class="icon-btn" id="fitAll" aria-label="Fit full mosaic" title="Fit full mosaic">⊡</button><button class="icon-btn" id="refreshRegistry" aria-label="Refresh claims" title="Refresh claims">↻</button></div></section>
+</main>
+<footer class="footerbar"><div class="selected" id="selectedInfo" hidden><strong id="editionLabel">Edition</strong><span class="traits" id="traitLabel"></span><a id="ownerLink" class="owner disabled" href="#">Owner pending</a><a id="viewInscription" target="_blank" rel="noopener">VIEW NFT ↗</a></div><div class="spacer"></div><span id="playStatus">CLICK A CLAIMED SQUARE</span><span class="help">Drag to pan · wheel to zoom</span></footer></div>
 <script>${runtime}<\/script></body></html>`;
 }
 
@@ -2166,7 +2156,7 @@ The inscriptions/ directory contains exactly ${cfg.count+1} files:
 MASTER
 ------
 The master is both:
-- the full ${Math.round(Math.sqrt(cfg.count))} × ${Math.round(Math.sqrt(cfg.count))} collection mosaic and ownership explorer
+- the claimed-only ${Math.round(Math.sqrt(cfg.count))} × ${Math.round(Math.sqrt(cfg.count))} musical mosaic
 - the renderer for every individual artwork via ?edition=N
 
 CHILDREN
@@ -2183,7 +2173,7 @@ WORKFLOW
 4. Generate this bundle again.
 5. Confirm no child contains the placeholder __XTRATA_MASTER_URL__.
 6. Inscribe all ${cfg.count} children.
-7. Point the claim registry endpoint at live edition / inscription / owner data.
+7. Confirm the claim registry returns the new campaign before distributing the master URL.
 
 Current child master source:
 ${masterSrc||"__XTRATA_MASTER_URL__"}
@@ -2208,6 +2198,16 @@ Accepted JSON:
 
 The endpoint must permit browser CORS access. The master falls back to its
 embedded snapshot if the live endpoint is unavailable.
+
+CLAIM-GATED MOSAIC
+------------------
+- all ${cfg.count} edition positions are tracked, but only claimed artwork is drawn
+- unclaimed cells cannot be selected, played or opened
+- one click on a claimed cell starts its deterministic loop
+- the next click queues that loop to stop on the shared bar boundary
+- the header reports claimed and active-loop counts
+- append ?reveal=1 only for a full pre-inscription visual test
+- append ?registry=off to exercise the embedded snapshot without a network read
 
 LINK TEMPLATES
 --------------
@@ -2640,6 +2640,9 @@ function renderMosaicPreview(){
       setVisualState(musicbar.querySelector('[data-m="active"]'),`●${s.active.size}`,`${s.active.size} active loops`);const beat=Math.floor((s.step%64)/16)+1,sub=Math.floor((s.step%16)/4)+1;
       setVisualState(musicbar.querySelector('[data-m="beat"]'),`▮${Math.floor(s.step/64)+1}·${beat}.${sub}`,`Bar ${Math.floor(s.step/64)+1}, beat ${beat}.${sub}`);stage.classList.toggle("music-mode",s.musicMode)
     }});
+    // Open the mosaic as an instrument: a single click selects the cell and
+    // queues its loop on or off at the next shared transport boundary.
+    music.setMode(true);
     const openPerformance=ed=>createKaossPerformanceView({edition:ed,cfg,music,host:document.body});
     musicbar.querySelector('[data-m="mode"]').onclick=()=>music.setMode(!music.isMusicMode());musicbar.querySelector('[data-m="play"]').onclick=()=>{const s=music.getState();s.playing?music.stop():music.start()};
     musicbar.querySelector('[data-m="clear"]').onclick=()=>music.clear();musicbar.querySelector('[data-m="bpm"]').oninput=e=>music.setBpm(e.target.value);musicbar.querySelector('[data-m="root"]').onclick=()=>{const s=music.getState();music.setRoot((s.root+1)%MUSIC_ROOTS.length)};

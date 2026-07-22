@@ -138,3 +138,41 @@ pause or resume a campaign, and manually place an existing Xtrata v3.2.3
 inscription into campaign escrow with exact NFT/STX post-conditions. The manual
 escrow action is intended for the one-item canary. The later Wizard composition
 path should still inscribe and invoke `create-campaign-drop` atomically.
+
+## Recursive master claim registry
+
+`GET /collection-drop/registry?campaign=<id>` is the public read model for a
+claim-gated recursive collection master. The endpoint scans the indexed print
+events for the fixed mainnet `xtrata-drops-v1-1` contract, returns only
+`claim-campaign` editions, and edge-caches the complete result for 60 seconds.
+It emits 1-based `edition` values even though Drops stores campaign editions
+from zero, so campaign edition `u0` reveals master cell `1` and `u1023` reveals
+cell `1024`.
+
+The response includes campaign metadata plus an `items` array accepted directly
+by the Proof of Free master:
+
+```json
+{
+  "campaignId": 0,
+  "maxSupply": 1024,
+  "dropsCreated": 1,
+  "claimedCount": 1,
+  "items": [
+    {
+      "edition": 1,
+      "claimed": true,
+      "inscription": "2743",
+      "contentUrl": "https://xtrata.xyz/inscription/2743",
+      "owner": "SP...",
+      "tx": "0x..."
+    }
+  ]
+}
+```
+
+The master inscription remains immutable. It tracks claims by refreshing this
+on-chain-derived read model and falls back to its embedded snapshot when the
+endpoint is unavailable. Before inscribing the master, confirm its configured
+campaign id matches `get-next-campaign-id`; for the initial Proof of Free launch
+the expected id is `0`.

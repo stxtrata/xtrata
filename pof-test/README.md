@@ -26,7 +26,7 @@ here.
 - Generator: `4.8.0`
 - Master seed: `xtrata-proof-of-free-genesis-2026`
 - Master SHA-256:
-  `32bf7223783b2fa51c3da6721c29f4f5ab205a7fe13f21df3e280a1842b75009`
+  `158141bcc5dbdd8f0655be54006c9eb993c98386f423e4f469aa3c70926cccf5`
 
 The hash identifies this exact test master. Any foundry setting change produces
 different bytes and requires a new hash and another review.
@@ -45,16 +45,26 @@ Then open:
 http://127.0.0.1:8765/pof-test/
 ```
 
-The full collection master is available at
-`/pof-test/proof-of-free-master.html`. A deterministic edition can be opened
+The claim-gated offline fixture is available at
+`/pof-test/proof-of-free-master.html?registry=off`; this explicit test switch
+uses the embedded mock claims without making a network request. A deterministic edition can be opened
 directly with `?edition=N`, for example `?edition=512`.
 
 ## Verification performed
 
-The master loaded in collection mode and rendered its mosaic. The seven child
+The master loaded in collection mode and rendered its claim-gated mosaic. Its
+embedded offline fixture marks editions 1, 512, and 1024 claimed; all other
+edition positions remain blank and inert. The seven child
 wrappers loaded the same master with their assigned edition and returned the
 expected collection name, master seed, chapter, visual engine, palette, sound,
 and proof code.
+
+The generated collection master is always in its musical interaction mode. A
+single click on claimed edition 1 started its loop; a second single click marked
+the loop as stopping and removed it at the next shared bar boundary. Clicking
+unclaimed edition 2 did not change the selection or audio state. The simplified
+master exposes only claim/playing status, selected NFT information, fit/refresh,
+and the clickable mosaic.
 
 Representative proof codes observed:
 
@@ -76,6 +86,10 @@ Representative proof codes observed:
 2. The generated test master leaves Drop ID, Drops contract, and parent
    inscription metadata blank. Decide whether those values should be embedded
    before generating the production bytes.
+3. The production foundry defaults to
+   `https://xtrata.xyz/collection-drop/registry?campaign=0`. Immediately before
+   inscription, refresh Drops state and confirm the next campaign id is still
+   `0`; the campaign id is part of the immutable master configuration.
 
 ## Production order
 
@@ -89,3 +103,5 @@ Representative proof codes observed:
    enabled.
 7. Generate production child wrappers using the master's permanent content URL
    and verify their hashes before inscription.
+8. Verify `/collection-drop/registry?campaign=0` reports the canary claim and
+   reveals exactly the corresponding 1-based mosaic cell.
