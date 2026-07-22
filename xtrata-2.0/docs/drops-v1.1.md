@@ -105,13 +105,13 @@ Do not deploy v1.1 for public use until all of the following are complete:
   fee reimbursement, refund, pause, cancellation, and recovery.
 
 The Pages deployment needs two distinct secrets. `SPONSOR_KEY` pays transaction
-fees; `BNS_ATTESTOR_KEY` signs claimant-bound permits and must derive to the
+fees; `BNS_ATTESTATION_PRIVATE_KEY` signs claimant-bound permits and must derive to the
 20-byte value returned by `get-bns-attestor-pubkey-hash`. The attestation route
 fails closed when the secret is missing or mismatched. Set it without printing
 or committing the key:
 
 ```sh
-npx wrangler pages secret put BNS_ATTESTOR_KEY --project-name xtrata
+npx wrangler pages secret put BNS_ATTESTATION_PRIVATE_KEY --project-name xtrata
 ```
 
 The Clarity contract and its tests do not deploy or mutate v1.0 state. v1.1 is a
