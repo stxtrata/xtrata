@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#09090b" />
+    <title>Proof of Free — Living Synth</title>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Proof of Free / contract instrument</p>
+          <h1>Living Synth</h1>
+        </div>
+        <div class="status-cluster">
+          <span id="chain-status" class="chain-status">Contract not configured</span>
+          <button id="connect" class="button ghost">Connect wallet</button>
+        </div>
+      </header>
+
+      <section class="mosaic-wrap" aria-label="1,024 NFT synth voices">
+        <div id="mosaic" class="mosaic"></div>
+      </section>
+
+      <aside id="instrument" class="instrument" aria-live="polite">
+        <div class="instrument-head">
+          <div>
+            <p id="edition-label" class="eyebrow">Select a cell</p>
+            <h2 id="voice-label">Seed voice</h2>
+          </div>
+          <button id="close" class="icon-button" aria-label="Close instrument">×</button>
+        </div>
+
+        <div id="pad" class="kaoss-pad" tabindex="0" role="application" aria-label="Playable XY synth pad">
+          <div id="cursor" class="pad-cursor"></div>
+          <span class="axis x-axis">pitch →</span>
+          <span class="axis y-axis">filter ↑</span>
+        </div>
+
+        <div class="transport">
+          <button id="record" class="button record">Record loop</button>
+          <button id="stop" class="button">Stop</button>
+          <button id="play" class="button">Play loop</button>
+          <button id="save" class="button ghost" disabled>Save JSON</button>
+        </div>
+
+        <div class="recording-register">
+          <p>After inscribing the saved JSON with this NFT as its Xtrata parent, enter the new inscription ID.</p>
+          <p id="recording-fee" class="recording-fee">Child registration fee: loading…</p>
+          <div class="inline-form">
+            <input id="recording-id" inputmode="numeric" placeholder="Recording inscription ID" />
+            <button id="register" class="button" disabled>Register child</button>
+          </div>
+          <div id="recording-history" class="recording-history"></div>
+        </div>
+
+        <output id="message" class="message"></output>
+      </aside>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
