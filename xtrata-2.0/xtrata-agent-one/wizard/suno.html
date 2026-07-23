@@ -178,7 +178,7 @@
 <script src="HTML_Template.js?v=6"></script>
 <script src="suno-build.js?v=7"></script>
 <script src="optimize-image.js?v=1"></script>
-<script src="agent-one.js?v=15"></script>
+<script src="agent-one.js?v=16"></script>
 <script>
 const SERVER = { mock:false, net:'mainnet' };
 // VERSION HANDSHAKE: this page requires AT LEAST the agent bundle build below. The site's deploy
@@ -412,8 +412,21 @@ const TIPS=[
   'The final step mints an on-chain HTML receipt and sends both tokens to your wallet.',
 ];
 let tipIdx=0, tipTimer=null, progT0=null, elapsedTimer=null;
-function setBar(pct){ const b=$('#bar'); if(pct==null){ b.className='bar indet'; b.firstElementChild.style.width='28%'; }
-  else { b.className='bar'; b.firstElementChild.style.width=Math.max(2,Math.min(100,pct))+'%'; } }
+const BAR={pct:0,floor:0,ceil:0,at:0,indet:false};
+function setBar(pct){ const b=$('#bar'); if(!b) return;
+  if(pct==null){ BAR.indet=true; b.className='bar indet'; b.firstElementChild.style.width='28%'; return; }
+  BAR.indet=false; b.className='bar';
+  const f=Math.max(2,Math.min(100,pct));
+  if(f>BAR.floor||f<BAR.floor-8) BAR.at=Date.now();   // new phase (or reset) -> restart the in-band creep clock
+  BAR.floor=f; BAR.ceil=Math.min(100, f>=100?100:f+(f<85?10:6));
+  if(BAR.pct<f) BAR.pct=f; }
+// steady creep so a slow confirmation never looks frozen; eases toward a crept target within the phase band
+setInterval(()=>{ const b=$('#bar'); if(!b||BAR.indet) return; const el=b.firstElementChild; if(!el) return;
+  const span=Math.max(0,BAR.ceil-BAR.floor); const t=Math.min(1,(Date.now()-BAR.at)/40000);
+  let target=BAR.floor+span*(1-Math.pow(1-t,2))*0.9; if(BAR.ceil>=100) target=100;
+  BAR.pct+=(Math.max(target,BAR.floor)-BAR.pct)*0.15;
+  if(BAR.pct>99.6&&BAR.ceil>=100) BAR.pct=100;
+  el.style.width=BAR.pct.toFixed(1)+'%'; },80);
 function startWaitExtras(){
   if(!tipTimer){ const rot=()=>{ const t=$('#tip'); t.style.opacity=0; setTimeout(()=>{ t.textContent=TIPS[tipIdx++%TIPS.length]; t.style.opacity=1; },400); }; rot(); tipTimer=setInterval(rot,9000); }
   if(!elapsedTimer){ progT0=progT0||Date.now(); elapsedTimer=setInterval(()=>{ const s=((Date.now()-progT0)/1000)|0; $('#elapsed').textContent=(s>=60?((s/60)|0)+'m ':'')+ (s%60)+'s'; },1000); }
@@ -429,6 +442,7 @@ function setPhase(st, job){ const p=PHASE[st]; if(!p) return;
   const m=/(\d+)\s*\/\s*(\d+)\s*chunks/.exec((job&&job.progress)||'');
   if(st==='INSCRIBING'&&m){ const a=+m[1], b=+m[2]||1; pct=30+Math.round(52*a/b); msg='Uploading on-chain · '+a+' / '+b+' chunks ('+Math.round(100*a/b)+'%)'; }
   else if(st==='INSCRIBING'&&job&&job.progress){ msg=job.progress.charAt(0).toUpperCase()+job.progress.slice(1); }
+  else if((st==='DELIVERING'||st==='INSCRIBED')&&job&&job.progress){ msg=job.progress.charAt(0).toUpperCase()+job.progress.slice(1); }
   $('#progMsg').textContent=msg; setBar(pct); startWaitExtras();
   document.querySelectorAll('.step').forEach(s=>{ s.className='step'+(p.on.includes(s.dataset.s)?' done':''); }); }
 

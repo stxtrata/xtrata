@@ -60,6 +60,7 @@ async function ro(fn: string, args: any[] = []) {
   return cvToJSON(await callReadOnlyFunction({ contractAddress: CORE[0], contractName: CORE[1], functionName: fn, functionArgs: args, senderAddress: DEPLOYER, network } as any));
 }
 async function balance(addr: string): Promise<bigint> { const d = await (await hfetch(`/extended/v1/address/${addr}/stx`)).json(); return BigInt(d.balance || '0'); }
+async function safeNonce(addr: string): Promise<bigint | undefined> { if (MOCK) return undefined; try { const d: any = await (await hfetch(`/extended/v1/address/${addr}/nonces`)).json(); const n = d && d.possible_next_nonce; return n == null ? undefined : BigInt(n); } catch { return undefined; } }
 async function quoteFee(sizeBytes: number, chunks: number) {
   if (MOCK) return { single: chunks <= SINGLE_MAX, protocolFee: 100000n + BigInt(chunks) * 2000n, batches: Math.max(1, Math.ceil(chunks / SINGLE_MAX)) };
   const single = chunks <= SINGLE_MAX;
@@ -85,15 +86,20 @@ const lastGoodFee = new Map<string, bigint>();
 async function send(key: string, from: string, fn: string, args: any[], spendCap: bigint | null, onFeeWait?: (m: string) => void) {
   const post = spendCap != null ? [makeStandardSTXPostCondition(from, FungibleConditionCode.LessEqual, spendCap)] : [];
   const opts: any = { contractAddress: CORE[0], contractName: CORE[1], functionName: fn, functionArgs: args, senderKey: key, network, postConditionMode: PostConditionMode.Deny, postConditions: post, anchorMode: AnchorMode.Any };
+  try { opts.nonce = await safeNonce(from); } catch {}
+  // Never broadcast a fee the deposit can't afford: cap at the lesser of MINT_CAP and the
+  // balance minus what later delivery+refund still need. Turns NotEnoughFunds into a wait.
+  let effCap = MINT_CAP; try { const _bal = await balance(from); const _head = _bal > (DELIVERY_RESERVE + REFUND_TX_FEE) ? _bal - (DELIVERY_RESERVE + REFUND_TX_FEE) : 0n; if (_head < effCap) effCap = _head; } catch {}
   let tx: any, fee: bigint;
   for (let attempt = 0; ; attempt++) {
     tx = await makeContractCall(opts);
     fee = BigInt(tx.auth.spendingCondition.fee.toString());
-    xaoLog(null, `${fn}: fee estimate ${fee} µSTX (cap ${MINT_CAP}, try ${attempt + 1})`);
-    if (fee <= MINT_CAP) break;
+    xaoLog(null, `${fn}: fee estimate ${fee} µSTX (cap ${effCap}, try ${attempt + 1})`);
+    if (fee <= effCap) break;
+    if (fee <= (effCap * 5n) / 4n) { tx = await makeContractCall({ ...opts, fee: effCap }); fee = effCap; break; }  // marginal overage: clamp to cap, don't burn retries
     if (attempt < 3) { xaoLog(null, `${fn}: estimator spike — retrying (${attempt + 1}/3)`); await sleep(6000); continue; }
     if (attempt < 15) { const m = `network fees are high — waiting for them to settle (${attempt - 2}/12)`; xaoLog(null, `${fn}: ${m}`); if (onFeeWait) try { onFeeWait(m); } catch {} await sleep(20000); continue; }
-    const fb = lastGoodFee.get(fn); const useFee = fb && fb * 2n <= MINT_CAP ? fb * 2n : MINT_CAP;
+    const fb = lastGoodFee.get(fn); const useFee = fb && fb * 2n <= effCap ? fb * 2n : effCap;
     xaoLog(null, `${fn}: fees still elevated after waiting — using bounded fallback fee ${useFee}`);
     tx = await makeContractCall({ ...opts, fee: useFee }); fee = useFee; break;
   }
@@ -107,12 +113,14 @@ async function send(key: string, from: string, fn: string, args: any[], spendCap
   return { txid, d };
 }
 async function sendNft(key: string, from: string, id: string, to: string) {
-  const tx: any = await makeContractCall({ contractAddress: CORE[0], contractName: CORE[1], functionName: 'transfer', functionArgs: [uintCV(BigInt(id)), standardPrincipalCV(from), standardPrincipalCV(to)], senderKey: key, network, postConditionMode: PostConditionMode.Allow, anchorMode: AnchorMode.Any } as any);
-  const res: any = await broadcastTransaction(tx, network); if (res.error) throw new Error('nft: ' + res.error); const txid = res.txid || res; await waitTx(txid); return txid;
+  let nonce: bigint | undefined; try { nonce = await safeNonce(from); } catch {}
+  const tx: any = await makeContractCall({ contractAddress: CORE[0], contractName: CORE[1], functionName: 'transfer', functionArgs: [uintCV(BigInt(id)), standardPrincipalCV(from), standardPrincipalCV(to)], senderKey: key, network, postConditionMode: PostConditionMode.Allow, anchorMode: AnchorMode.Any, nonce } as any);
+  const res: any = await broadcastTransaction(tx, network); if (res.error) throw new Error('nft: ' + res.error + (res.reason ? ' ' + res.reason : '')); const txid = res.txid || res; await waitTx(txid); return txid;
 }
 async function sendStx(key: string, amount: bigint, to: string, fee: bigint) {
-  const tx: any = await makeSTXTokenTransfer({ recipient: to, amount, senderKey: key, network, fee, anchorMode: AnchorMode.Any } as any);
-  const res: any = await broadcastTransaction(tx, network); if (res.error) throw new Error('stx: ' + res.error); const txid = res.txid || res; await waitTx(txid); return txid;
+  let nonce: bigint | undefined; try { nonce = await safeNonce(getAddressFromPrivateKey(key, TransactionVersion.Mainnet)); } catch {}
+  const tx: any = await makeSTXTokenTransfer({ recipient: to, amount, senderKey: key, network, fee, anchorMode: AnchorMode.Any, nonce } as any);
+  const res: any = await broadcastTransaction(tx, network); if (res.error) throw new Error('stx: ' + res.error + (res.reason ? ' ' + res.reason : '')); const txid = res.txid || res; await waitTx(txid); return txid;
 }
 const tidFrom = (d: any) => { const r = d?.tx_result?.repr || ''; const m = /token-id u(\d+)/.exec(r) || /\(ok u(\d+)\)/.exec(r); return m ? m[1] : null; };
 
@@ -203,7 +211,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-21.5';
+export const AGENT_BUILD = '2026-07-23.1';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -220,7 +228,10 @@ async function estimate(opts: any) {
   const chunks = Math.ceil(Number(bytes) / CHUNK) || 1;
   const q = await quoteFee(Number(bytes), chunks);
   const minerTxs = q.single ? 1n : BigInt(q.batches + 2);
-  const minerReserve = minerTxs * PERTX_MINER + (BigInt(Math.ceil(Number(bytes))) * 3n) / 2n;
+  // Single-tx flows budget the mint at the full fee cap so a spike can never underfund it
+  // (unused escrow auto-refunds as change). Staged flows keep the per-batch reserve and
+  // lean on the balance-coupled ceiling in send().
+  const minerReserve = q.single ? MINT_CAP : (minerTxs * PERTX_MINER + (BigInt(Math.ceil(Number(bytes))) * 3n) / 2n);
   // On-chain receipt is optional: when off, its protocol+miner cost is left out of
   // the deposit (the HTML receipt is still generated locally at delivery time).
   const rq = await quoteFee(RECEIPT_EST, 1);                 // quoteFee handles MOCK internally
@@ -432,7 +443,7 @@ async function returnAllHeldNfts(job: any, key: string, fromAddr: string, fallba
       const sender = await detectNftSender(fromAddr, String(id));
       const to = isDeclared ? (fallbackTo || sender) : (sender || fallbackTo);
       if (!to) continue;
-      const tx = await sendNft(key, fromAddr, String(id), to);
+      const tx = await sendNftRetry(key, fromAddr, String(id), to);
       out.push({ id: String(id), to, tx });
       xaoLog(job.jobId, `inscription #${id} returned to ${to}`);
       try {
@@ -615,6 +626,7 @@ async function recoverJobAssets(jobIn: any) {
   return { recovered: true, ...job.recovery };
 }
 async function sendStxRetry(key: string, amount: bigint, to: string, fee: bigint, tries = 4) { let last: any; for (let i = 0; i < tries; i++) { try { return await sendStx(key, amount, to, fee); } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(8000); continue; } throw e; } } throw last; }
+async function sendNftRetry(key: string, from: string, id: string, to: string, tries = 5) { let last: any; for (let i = 0; i < tries; i++) { try { return await sendNft(key, from, id, to); } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(Math.min(30000, 8000 * (i + 1))); continue; } throw e; } } throw last; }
 async function sweepStxTo(key: string, fromAddr: string, to: string, tries = 5): Promise<any> { let last: any; for (let i = 0; i < tries; i++) { let bal = 0n; try { bal = await balance(fromAddr); } catch (e) { last = e; await sleep(5000); continue; } if (bal <= REFUND_TX_FEE) return { sent: false, amount: '0', balance: bal.toString() }; const amount = bal - REFUND_TX_FEE; try { const tx = await sendStx(key, amount, to, REFUND_TX_FEE); return { sent: true, tx, amount: amount.toString() }; } catch (e) { last = e; if (i < tries - 1 && TRANSIENT_TX.test(errMsg(e))) { await sleep(8000); continue; } throw e; } } throw last || new Error('sweep failed'); }
 async function inscribeReceipt(key: string, from: string, html: string, uri: string, deps: string[]) { const data = enc.encode(html); const q = await quoteFee(data.length, chunkBytes(data).length); const tokenId = await mintSingle(key, from, data, 'text/html', uri, deps, q.protocolFee); return { tokenId }; }
 
@@ -798,7 +810,11 @@ async function runInscribe(job: any) {
   }
   // Funding gate — skipped on RESUME (a mid-flight job has already spent part of its deposit).
   if (!job.depositReceivedUstx) {
-    const bal = await balance(job.depositAddress);
+    // Hiro's API is load-balanced across nodes at different chain tips, so a single read can
+    // lag behind a just-landed deposit. Take the best of a few reads before concluding a job
+    // is unfunded, so a stale zero never triggers a spurious refund.
+    let bal = 0n;
+    for (let i = 0; i < 3; i++) { try { const b = await balance(job.depositAddress); if (b > bal) bal = b; } catch {} if (bal >= BigInt(job.requiredUstx)) break; if (i < 2) await sleep(6000); }
     if (bal < BigInt(job.requiredUstx)) throw new Error(`not funded: need ${job.requiredUstx}, have ${bal}`);
     job.depositReceivedUstx = bal.toString();
   }
@@ -923,10 +939,12 @@ async function deliverBatch(job: any, received: bigint, agentFee: bigint, stxUsd
     const r = await inscribeReceipt(dep.key, dep.address, buildBatchReceiptHtml(prelim), `xtrata:receipt/${job.jobId}`, receiptDeps);
     receiptTokenId = r.tokenId;
   }
+  const prog = (m: string) => { job.progress = m; job.progressAt = new Date().toISOString(); writeJob(job); xaoLog(job.jobId, m); };
   const deliverTxs: any[] = []; const notes: string[] = [];
   for (const item of minted) {
     try {
-      const tx = await sendNft(dep.key, dep.address, String(item.tokenId), job.recipient || job.user);
+      prog(`delivering item ${deliverTxs.length + 1} of ${minted.length} to your wallet`);
+      const tx = await sendNftRetry(dep.key, dep.address, String(item.tokenId), job.recipient || job.user);
       deliverTxs.push({ id: item.tokenId, tx }); item.deliverTx = tx;
       if (!job.inscriptionDelivered) { job.deliverTx = tx; job.inscriptionDelivered = true; writeJob(job); }
     } catch (e) {
@@ -936,13 +954,14 @@ async function deliverBatch(job: any, received: bigint, agentFee: bigint, stxUsd
   }
   const parentReturnTxs: any[] = [];
   for (const pid of (job.parents || [])) {
-    try { if ((await ownerOf(String(pid))) === dep.address) { const ptx = await sendNft(dep.key, dep.address, String(pid), refundTo); parentReturnTxs.push({ id: String(pid), tx: ptx }); xaoLog(job.jobId, `parent #${pid} returned home → ${refundTo}`); } }
+    try { if ((await ownerOf(String(pid))) === dep.address) { const ptx = await sendNftRetry(dep.key, dep.address, String(pid), refundTo); parentReturnTxs.push({ id: String(pid), tx: ptx }); xaoLog(job.jobId, `parent #${pid} returned home → ${refundTo}`); } }
     catch (e) { notes.push(`parent #${pid} return pending (` + errMsg(e) + ')'); job.keepKey = true; }
   }
   if (parentReturnTxs.length) { job.parentReturnTxs = parentReturnTxs; writeJob(job); }
   let receiptDeliverTx: any = null, agentFeeTx: any = null, refundTx: any = null, refundedUstx = '0';
-  if (receiptTokenId) { try { receiptDeliverTx = await sendNft(dep.key, dep.address, receiptTokenId, job.recipient || job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
+  if (receiptTokenId) { try { prog('sending your on-chain receipt'); receiptDeliverTx = await sendNftRetry(dep.key, dep.address, receiptTokenId, job.recipient || job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
   try { if (agentFee > 0n) agentFeeTx = await sendStxRetry(dep.key, agentFee, job.agentFeeAddress || AGENT_FEE_ADDRESS, REFUND_TX_FEE); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
+  prog('returning your change');
   try { const sw = await sweepStxTo(dep.key, dep.address, refundTo); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } } catch (e) { notes.push('change return pending (' + errMsg(e) + ')'); }
   const note = notes.length ? notes.join('; ') : null;
   const finalD = batchReceiptData(job, { received, agentFee, receiptTokenId, change: BigInt(refundedUstx), stxUsd, note });
@@ -966,6 +985,7 @@ async function deliver(job: any) {
   const agentFee = pct > 0n ? (received * pct) / 100n : 0n;
   const stxUsd = await stxUsdPrice();
   if (job.items) return deliverBatch(job, received, agentFee, stxUsd);
+  const prog = (m: string) => { job.progress = m; job.progressAt = new Date().toISOString(); writeJob(job); xaoLog(job.jobId, m); };
   if (job.mock) {
     // On-chain receipt optional: when off, no receipt token — but the HTML is still built + saved.
     const receiptTokenId = job.receipt === false ? null : String(Math.floor(1000 + Math.random() * 9000));
@@ -994,10 +1014,12 @@ async function deliver(job: any) {
   // protocol+miner cost, which then returns as change) but still build+save the HTML below.
   let receiptTokenId: string | null = null;
   if (job.receipt !== false) {
+    prog('building your on-chain receipt');
     const r = await inscribeReceipt(dep.key, dep.address, buildReceiptHtml(prelim), `xtrata:receipt/${job.jobId}`, receiptDeps);
     receiptTokenId = r.tokenId;
   }
-  const deliverTx = await sendNft(dep.key, dep.address, String(job.tokenId), job.recipient || job.user);   // inscription → recipient (defaults to payer); CRITICAL: if this fails the job failed → throw
+  prog('sending your inscription to your wallet');
+  const deliverTx = await sendNftRetry(dep.key, dep.address, String(job.tokenId), job.recipient || job.user);   // inscription → recipient (defaults to payer); CRITICAL: if this fails the job failed → throw
   job.deliverTx = deliverTx; job.inscriptionDelivered = true; writeJob(job);              // SUCCESS commit point
   let receiptDeliverTx: any = null, agentFeeTx: any = null, refundTx: any = null, refundedUstx = '0'; const notes: string[] = [];
   // Parent(s) go home FIRST — the user's own inscription(s) are the most valuable thing in this wallet.
@@ -1005,15 +1027,17 @@ async function deliver(job: any) {
   for (const pid of (job.parents || [])) {
     try {
       if ((await ownerOf(String(pid))) === dep.address) {
-        const ptx = await sendNft(dep.key, dep.address, String(pid), refundTo);
+        prog(`returning parent #${pid} to your wallet`);
+        const ptx = await sendNftRetry(dep.key, dep.address, String(pid), refundTo);
         parentReturnTxs.push({ id: String(pid), tx: ptx });
         xaoLog(job.jobId, `parent #${pid} returned home → ${refundTo}`);
       }
     } catch (e) { notes.push(`parent #${pid} return pending — recovery will send it home (` + errMsg(e) + ')'); job.keepKey = true; }
   }
   if (parentReturnTxs.length) { job.parentReturnTxs = parentReturnTxs; writeJob(job); }
-  if (receiptTokenId) { try { receiptDeliverTx = await sendNft(dep.key, dep.address, receiptTokenId, job.recipient || job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
+  if (receiptTokenId) { try { prog('sending your on-chain receipt'); receiptDeliverTx = await sendNftRetry(dep.key, dep.address, receiptTokenId, job.recipient || job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
   try { if (agentFee > 0n) agentFeeTx = await sendStxRetry(dep.key, agentFee, job.agentFeeAddress || AGENT_FEE_ADDRESS, REFUND_TX_FEE); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
+  prog('returning your change');
   try { const sw = await sweepStxTo(dep.key, dep.address, refundTo); if (sw.sent) { refundTx = sw.tx; refundedUstx = sw.amount; } } catch (e) { notes.push('change return pending — recover-all will sweep it (' + errMsg(e) + ')'); }
   const note = notes.length ? notes.join('; ') : null;
   const finalD = receiptData(job, { received, agentFee, receiptTokenId, change: BigInt(refundedUstx), mainMinerFee: mainMinerForReceipt.toString(), stxUsd, note });
@@ -1068,7 +1092,7 @@ async function refundAndClose(job: any, reasonIn = 'cancelled') {
       if (b0 > need + 50000n) {
         const d = receiptData(job, { received: BigInt(job.depositReceivedUstx || job.requiredUstx), agentFee: 0n, change: b0 - need, receiptTokenId: null, recipient: returnTo, outcome: 'refunded', note: reason });
         const r = await inscribeReceipt(dep.key, dep.address, buildReceiptHtml(d), `xtrata:receipt/${job.jobId}`, job.tokenId ? [String(job.tokenId)] : []);
-        if (r.tokenId) { try { await sendNft(dep.key, dep.address, r.tokenId, returnTo); } catch {} job.receiptTokenId = r.tokenId; out.receiptTokenId = r.tokenId; job.receiptHtml = buildReceiptHtml(d); }
+        if (r.tokenId) { try { await sendNftRetry(dep.key, dep.address, r.tokenId, returnTo); } catch {} job.receiptTokenId = r.tokenId; out.receiptTokenId = r.tokenId; job.receiptHtml = buildReceiptHtml(d); }
       }
     } catch (e) { out.receiptError = errMsg(e); }
   }
@@ -1134,7 +1158,7 @@ const PROCESSING = new Set<string>();
 // FUNDED/INSCRIBED and the watcher resumes exactly where it left off. Resume is safe end-to-end: staged
 // uploads continue from the on-chain index, single-tx mints are idempotent (get-id-by-hash pre-check).
 // Only deterministic failures or exhausted retries (4, with 15 s × attempt backoff) hit the refund failsafe.
-const FATAL_ERR = /TX abort|not funded|locked to|unrecoverable|file bytes|empty file|could not determine|wrong inscription received/i;
+const FATAL_ERR = /TX abort|locked to|unrecoverable|file bytes|empty file|could not determine|wrong inscription received/i;
 const MAX_RETRIES = 4;
 function background(id: string, fn: () => Promise<any>) {
   PROCESSING.add(id);
@@ -1150,6 +1174,15 @@ function background(id: string, fn: () => Promise<any>) {
         j.progress = `recovered from a hiccup — resuming where it left off (attempt ${j.retryCount}/${MAX_RETRIES})`;
         j.progressAt = new Date().toISOString(); writeJob(j);
         xaoLog(id, `TRANSIENT error — auto-resume scheduled from ${j.status} (${j.retryCount}/${MAX_RETRIES}): ${msg}`);
+        PROCESSING.delete(id); return;
+      }
+      // An already-minted token can't be un-minted, so never route it to a refund it can't honour.
+      // Its delivery just needs recovery — park with the key retained instead of thrashing.
+      if (j.tokenId && !FATAL_ERR.test(msg)) {
+        j.status = 'NEEDS_RECOVERY'; j.keepKey = true;
+        j.keepKeyReason = 'inscription minted but delivery did not finish — continue recovery to send it home';
+        j.progress = j.keepKeyReason; j.progressAt = new Date().toISOString(); writeJob(j);
+        xaoLog(id, `delivery incomplete for token #${j.tokenId} — parked as NEEDS_RECOVERY (not refunded): ${msg}`);
         PROCESSING.delete(id); return;
       }
       writeJob(j);
