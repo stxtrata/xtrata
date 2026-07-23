@@ -140,6 +140,65 @@
         color: #cfc8bc;
         line-height: 1.6;
       }
+      .eyebrow {
+        margin: 0 0 6px;
+        color: #f7d36b;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      .living-deploy {
+        border-color: #cf4f86;
+        box-shadow: 0 0 0 1px rgba(207, 79, 134, 0.16);
+      }
+      .gate-step {
+        margin-top: 14px;
+        padding: 14px;
+        border: 1px solid #35312f;
+        border-radius: 9px;
+        background: #11100f;
+      }
+      .gate-step > p:last-child {
+        margin-bottom: 0;
+      }
+      .gate-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+      }
+      .gate-heading h2 {
+        margin: 0;
+      }
+      .gate-badge {
+        flex: 0 0 auto;
+        padding: 3px 7px;
+        border: 1px solid currentColor;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+      }
+      .manifest-input {
+        width: 100%;
+        min-height: 110px;
+        resize: vertical;
+        padding: 10px;
+        border: 1px solid #3a3733;
+        border-radius: 8px;
+        color: #f4f1ea;
+        background: #0c0c0b;
+      }
+      @media (max-width: 640px) {
+        .gate-heading {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        dl {
+          grid-template-columns: 120px 1fr;
+        }
+      }
     </style>
   </head>
   <body>
