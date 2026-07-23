@@ -7,6 +7,7 @@ import SimplePublicHome from './SimplePublicHome';
 import CollectionMintLivePage from './CollectionMintLivePage';
 import LabLandingPage from './LabLandingPage';
 import LabEvolutionPage from './LabEvolutionPage';
+import ContractStudioPage from './contract-studio/ContractStudioPage';
 import AdminGate from './admin/AdminGate';
 import ArtistManagerGate from './manage/ArtistManagerGate';
 import CollectionManagerApp from './manage/CollectionManagerApp';
@@ -55,6 +56,7 @@ const COLLECTION_LIVE_PATH_PREFIX = '/collection/';
 const WORKSPACE_PATH_PREFIX = '/workspace';
 const LAB_PATH_PREFIX = '/lab';
 const LAB_EVOLUTION_PATH_PREFIX = '/lab/evolution';
+const CONTRACT_STUDIO_PATH_PREFIX = '/contract-studio';
 const pathname = window.location.pathname;
 const isLabPath = pathname === LAB_PATH_PREFIX || pathname.startsWith(`${LAB_PATH_PREFIX}/`);
 const isLabEvolutionPath =
@@ -78,6 +80,8 @@ ReactDOM.createRoot(root).render(
       <QueryClientProvider client={queryClient}>
         {collectionIdFromPath ? (
           <CollectionMintLivePage collectionKey={collectionIdFromPath} />
+        ) : pathname.startsWith(CONTRACT_STUDIO_PATH_PREFIX) ? (
+          <ContractStudioPage />
         ) : pathname.startsWith(ADMIN_PATH) ? (
           <AdminGate>
             <App />

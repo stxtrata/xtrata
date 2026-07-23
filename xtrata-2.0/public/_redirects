@@ -28,6 +28,8 @@
 /wallet /my-wallet 301
 /wallet/ /my-wallet 301
 /workspace/* /workspace 200
+/contract-studio /workspace 200
+/contract-studio/* /workspace 200
 /admin /workspace 200
 /admin/* /workspace 200
 /manage /workspace 200

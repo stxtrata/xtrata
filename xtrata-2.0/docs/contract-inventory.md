@@ -375,6 +375,40 @@ Source: `contracts/live/xtrata-arcade-scores-v1.0.clar`
 - `get-top10-entry(game-id, mode, rank)`
 - `get-owner()`
 
+## xtrata-studio-leaderboard-v1 (Clarinet fixture)
+
+Source: `contracts/clarinet/contracts/xtrata-studio-leaderboard-v1.clar`
+
+### Purpose
+
+- Deterministic default fixture for Contract Studio template
+  `xtrata-leaderboard/1.0.0`.
+- Pins an exact Xtrata core principal, inscription id, and sealed content hash.
+- Verifies the pinned inscription with a direct static `contract-call?`.
+- Stores one ranked wallet record per season with score bounds, duplicate
+  rejection, personal-best policy, fixed top-N state, and administrator seasons.
+- Transfers and holds no assets (Tier 1).
+
+### Test-only dependency
+
+- `contracts/clarinet/contracts/mock-xtrata-studio-core.clar` provides token
+  `u42` with the expected sealed hash under the fixture’s pinned Simnet
+  principal. It is not a deployment target.
+
+### Public functions
+
+- `verify-asset()`
+- `submit-score(score, alias)`
+- `start-next-season()`
+
+### Read-only functions
+
+- `get-asset-reference()`
+- `get-current-season()`
+- `get-player-score(season, player)`
+- `get-leaderboard-entry(season, rank)`
+- `get-configuration()`
+
 ## xtrata-arcade-scores-v1.1
 
 Source: `contracts/live/xtrata-arcade-scores-v1.1.clar`
