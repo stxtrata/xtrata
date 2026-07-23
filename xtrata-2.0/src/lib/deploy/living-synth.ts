@@ -3,6 +3,9 @@ export const LIVING_SYNTH_REGISTRY_NAME = 'proof-of-free-living-synth-v1';
 export const LIVING_SYNTH_XTRATA_NAME = 'xtrata-v3-2-3';
 export const LIVING_SYNTH_COLLECTION_SIZE = 1024;
 export const LIVING_SYNTH_PAGE_COUNT = 32;
+export const LIVING_SYNTH_MIN_RECORDING_FEE = 1_000n;
+export const LIVING_SYNTH_MAX_RECORDING_FEE = 1_000_000n;
+export const LIVING_SYNTH_DEFAULT_RECORDING_FEE = 100_000n;
 
 export type LivingSynthSystemState = {
   coreContract: string | null;
@@ -10,6 +13,8 @@ export type LivingSynthSystemState = {
   paused: boolean;
   registeredEditions: bigint;
   globalRevision: bigint;
+  recordingFee: bigint;
+  feeRecipient: string;
 };
 
 export type LivingSynthEditionEntry = {
@@ -69,14 +74,30 @@ export const inspectLivingSynthRegistrySource = (source: string): string[] => {
     'recordings must be locked to application/json',
     problems
   );
+  for (const [name, value] of [
+    ['MIN-RECORDING-FEE', 'u1000'],
+    ['MAX-RECORDING-FEE', 'u1000000'],
+    ['DEFAULT-RECORDING-FEE', 'u100000']
+  ]) {
+    sourceHas(
+      active,
+      `(define-constant ${name} ${value})`,
+      `${name} must be locked to ${value}`,
+      problems
+    );
+  }
   for (const fn of [
     'lock-core-contract',
     'set-engine',
     'register-edition',
     'register-recording',
-    'select-recording',
-    'select-seed',
+    'set-recording-fee',
+    'set-fee-recipient',
     'get-system-state',
+    'get-recording-fee',
+    'get-fee-recipient',
+    'get-recording-count',
+    'get-recording-id',
     'get-mosaic-page'
   ]) {
     if (!active.includes(`(${fn}`)) problems.push(`registry function ${fn} is missing`);
@@ -126,10 +147,14 @@ export const parseLivingSynthSystemState = (
   const paused = unwrap(data.paused)?.value;
   const registeredEditions = optionalBigint(data['registered-editions']);
   const globalRevision = optionalBigint(data['global-revision']);
+  const recordingFee = optionalBigint(data['recording-fee']);
+  const feeRecipient = optionalString(data['fee-recipient']);
   if (
     typeof paused !== 'boolean' ||
     registeredEditions === null ||
-    globalRevision === null
+    globalRevision === null ||
+    recordingFee === null ||
+    feeRecipient === null
   ) {
     return null;
   }
@@ -138,8 +163,25 @@ export const parseLivingSynthSystemState = (
     engineId: optionalBigint(data['engine-id']),
     paused,
     registeredEditions,
-    globalRevision
+    globalRevision,
+    recordingFee,
+    feeRecipient
   };
+};
+
+export const parseRecordingFeeStx = (
+  input: string
+): { ok: true; microStx: bigint } | { ok: false; error: string } => {
+  const value = input.trim();
+  if (!/^\d+(?:\.\d{1,6})?$/.test(value)) {
+    return { ok: false, error: 'Fee must be an STX amount with no more than 6 decimal places.' };
+  }
+  const [whole, decimals = ''] = value.split('.');
+  const microStx = BigInt(whole) * 1_000_000n + BigInt(decimals.padEnd(6, '0'));
+  if (microStx < LIVING_SYNTH_MIN_RECORDING_FEE || microStx > LIVING_SYNTH_MAX_RECORDING_FEE) {
+    return { ok: false, error: 'Fee must be between 0.001 and 1 STX.' };
+  }
+  return { ok: true, microStx };
 };
 
 export const parseInscriptionMime = (value: CvJson | null | undefined): string | null => {
@@ -238,6 +280,12 @@ export type LivingSynthGateInput = {
 export const deriveLivingSynthGates = (input: LivingSynthGateInput) => {
   const coreLocked = input.systemState?.coreContract === input.expectedGatewayId;
   const engineSet = input.systemState?.engineId !== null && input.systemState?.engineId !== undefined;
+  const feeReady = Boolean(
+    input.systemState &&
+    input.systemState.recordingFee >= LIVING_SYNTH_MIN_RECORDING_FEE &&
+    input.systemState.recordingFee <= LIVING_SYNTH_MAX_RECORDING_FEE &&
+    input.systemState.feeRecipient
+  );
   const mappingComplete =
     input.manifestEntries === LIVING_SYNTH_COLLECTION_SIZE &&
     input.systemState?.registeredEditions === BigInt(input.manifestEntries);
@@ -248,16 +296,19 @@ export const deriveLivingSynthGates = (input: LivingSynthGateInput) => {
     testPristineRegistry: input.gatewayDeployed && input.registryDeployed,
     lockGateway: input.registryDeployed && input.systemState !== null && !input.systemState.coreContract,
     setEngine: coreLocked && input.engineValidated && !engineSet,
-    registerEditions: coreLocked && engineSet,
-    auditMosaic: coreLocked && engineSet && mappingComplete,
+    configureFees: input.registryDeployed && input.systemState !== null,
+    registerEditions: coreLocked && engineSet && feeReady,
+    auditMosaic: coreLocked && engineSet && feeReady && mappingComplete,
     goLive:
       coreLocked &&
       engineSet &&
+      feeReady &&
       mappingComplete &&
       input.mosaicAuditPassed &&
       input.systemState?.paused === true,
     coreLocked,
     engineSet,
+    feeReady,
     mappingComplete
   };
 };

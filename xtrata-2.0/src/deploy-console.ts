@@ -58,6 +58,7 @@ import {
   parseLivingSynthEdition,
   parseLivingSynthMosaicPage,
   parseOptionalPrincipal,
+  parseRecordingFeeStx,
   parseLivingSynthSystemState,
   validateLivingSynthEditionManifest,
   type LivingSynthEditionEntry,
@@ -205,6 +206,8 @@ type LivingSynthConsoleState = {
   engineInput: string;
   engineValidatedId: number | null;
   engineMime: string | null;
+  feeInput: string;
+  feeRecipientInput: string;
   manifestInput: string;
   manifest: LivingSynthEditionEntry[];
   mappingIndex: number;
@@ -222,6 +225,8 @@ const livingSynth: LivingSynthConsoleState = {
   engineInput: '',
   engineValidatedId: null,
   engineMime: null,
+  feeInput: '0.1',
+  feeRecipientInput: EXPECTED_DEPLOYER,
   manifestInput: '',
   manifest: [],
   mappingIndex: 0,
@@ -547,6 +552,12 @@ const setBnsAttestor = (name: string, hashInput: string) => {
 
 const livingGatewayId = `${EXPECTED_DEPLOYER}.${LIVING_SYNTH_GATEWAY_NAME}`;
 
+const formatMicroStx = (microStx: bigint) => {
+  const whole = microStx / 1_000_000n;
+  const fraction = (microStx % 1_000_000n).toString().padStart(6, '0').replace(/0+$/, '');
+  return fraction ? `${whole}.${fraction} STX` : `${whole} STX`;
+};
+
 const callReadJson = async (
   contractAddress: string,
   contractName: string,
@@ -587,11 +598,13 @@ const refreshLivingSynthState = async () => {
     livingSynth.systemState = parsed;
     livingSynth.systemStateTested = true;
     livingSynth.mosaicAuditPassed = false;
+    livingSynth.feeInput = (Number(parsed.recordingFee) / 1_000_000).toString();
+    livingSynth.feeRecipientInput = parsed.feeRecipient;
     addLog(
       states.get(LIVING_SYNTH_REGISTRY_NAME)!,
       'state-test',
       'success',
-      `core ${parsed.coreContract ?? 'unlocked'}; engine ${parsed.engineId?.toString() ?? 'unset'}; ${parsed.registeredEditions.toString()} editions; ${parsed.paused ? 'paused' : 'live'}.`
+      `core ${parsed.coreContract ?? 'unlocked'}; engine ${parsed.engineId?.toString() ?? 'unset'}; fee ${formatMicroStx(parsed.recordingFee)} to ${parsed.feeRecipient}; ${parsed.registeredEditions.toString()} editions; ${parsed.paused ? 'paused' : 'live'}.`
     );
   } catch (error) {
     livingSynth.systemState = null;
@@ -601,6 +614,30 @@ const refreshLivingSynthState = async () => {
     livingSynth.busy = false;
     render();
   }
+};
+
+const setLivingSynthRecordingFee = () => {
+  const parsed = parseRecordingFeeStx(livingSynth.feeInput);
+  if (!parsed.ok) {
+    livingSynth.error = parsed.error;
+    render();
+    return;
+  }
+  submitLivingSynthCall('set-recording-fee', 'set-recording-fee', [uintCV(parsed.microStx)]);
+};
+
+const setLivingSynthFeeRecipient = () => {
+  const recipient = livingSynth.feeRecipientInput.trim();
+  if (!recipient.startsWith('SP') || !validateStacksAddress(recipient)) {
+    livingSynth.error = 'Enter a valid mainnet STX address for the fee recipient.';
+    render();
+    return;
+  }
+  submitLivingSynthCall(
+    'set-fee-recipient',
+    'set-fee-recipient',
+    [standardPrincipalCV(recipient)]
+  );
 };
 
 const submitLivingSynthCall = (
@@ -1051,6 +1088,8 @@ const renderLivingSynthDeployment = () => {
     summary.append(
       el('dt', {}, 'Gateway'), el('dd', { className: gates.coreLocked ? 'ok' : 'warn' }, state.coreContract ?? 'not locked'),
       el('dt', {}, 'Engine'), el('dd', {}, state.engineId?.toString() ?? 'not set'),
+      el('dt', {}, 'Recording fee'), el('dd', { className: gates.feeReady ? 'ok' : 'fail' }, formatMicroStx(state.recordingFee)),
+      el('dt', {}, 'Fee recipient'), el('dd', {}, state.feeRecipient),
       el('dt', {}, 'Editions'), el('dd', {}, state.registeredEditions.toString()),
       el('dt', {}, 'Mode'), el('dd', { className: state.paused ? 'warn' : 'ok' }, state.paused ? 'paused / safe' : 'LIVE')
     );
@@ -1131,9 +1170,45 @@ const renderLivingSynthDeployment = () => {
     engineStep.append(el('p', { className: 'ok' }, `Test passed: Xtrata #${livingSynth.engineValidatedId}, ${livingSynth.engineMime}.`));
   }
 
+  const feeStep = el('div', { className: 'gate-step' });
+  feeStep.append(
+    el('div', { className: 'gate-heading' }, el('h2', {}, '6. Verify + configure recording fee'), gateBadge(gates.feeReady, 'VALID ON-CHAIN')),
+    el('p', {}, 'Every registered child pays this amount. The contract enforces 0.001–1 STX; its deployment default is 0.1 STX paid to the deployer. Either value can be updated later by the deployer wallet.')
+  );
+  if (gates.configureFees) {
+    const feeInput = el('input', {
+      className: 'admin-input mono-input',
+      inputMode: 'decimal',
+      value: livingSynth.feeInput,
+      placeholder: 'Fee in STX (0.001–1)'
+    }) as HTMLInputElement;
+    feeInput.oninput = () => { livingSynth.feeInput = feeInput.value; };
+    const recipientInput = el('input', {
+      className: 'admin-input mono-input',
+      value: livingSynth.feeRecipientInput,
+      placeholder: 'Fee recipient SP…'
+    }) as HTMLInputElement;
+    recipientInput.oninput = () => { livingSynth.feeRecipientInput = recipientInput.value; };
+    feeStep.append(
+      el(
+        'div',
+        { className: 'row' },
+        feeInput,
+        el('button', { disabled: livingSynth.busy || !signerReady, onclick: setLivingSynthRecordingFee }, 'Set fee (wallet)')
+      ),
+      el(
+        'div',
+        { className: 'row' },
+        recipientInput,
+        el('button', { disabled: livingSynth.busy || !signerReady, onclick: setLivingSynthFeeRecipient }, 'Set recipient (wallet)')
+      ),
+      el('p', { className: 'muted' }, 'After either transaction confirms, run “Read + test system state” again. Edition registration remains gated on a valid on-chain fee and recipient.')
+    );
+  }
+
   const mappingStep = el('div', { className: 'gate-step' });
   mappingStep.append(
-    el('div', { className: 'gate-heading' }, el('h2', {}, '6. Validate + register edition mappings'), gateBadge(gates.mappingComplete, 'MANIFEST MATCHED')),
+    el('div', { className: 'gate-heading' }, el('h2', {}, '7. Validate + register edition mappings'), gateBadge(gates.mappingComplete, 'MANIFEST MATCHED')),
     el('p', {}, 'Paste [{"edition":1,"nftId":123}, …]. The console rejects duplicates and tests NFT existence plus the current edition slot before each wallet call. All 1,024 entries must match on-chain before go-live unlocks.')
   );
   if (gates.registerEditions) {
@@ -1186,7 +1261,7 @@ const renderLivingSynthDeployment = () => {
 
   const liveStep = el('div', { className: 'gate-step' });
   liveStep.append(
-    el('div', { className: 'gate-heading' }, el('h2', {}, '7. Audit mosaic + go live'), gateBadge(state?.paused === false, 'LIVE')),
+    el('div', { className: 'gate-heading' }, el('h2', {}, '8. Audit mosaic + go live'), gateBadge(state?.paused === false, 'LIVE')),
     el(
       'div',
       { className: 'row' },
@@ -1225,7 +1300,7 @@ const renderLivingSynthDeployment = () => {
     );
   }
   if (livingSynth.error) section.append(el('p', { className: 'fail' }, livingSynth.error));
-  section.append(sourceStep, registryStep, stateStep, lockStep, engineStep, mappingStep, liveStep);
+  section.append(sourceStep, registryStep, stateStep, lockStep, engineStep, feeStep, mappingStep, liveStep);
   const combinedLogs = [...gatewayState.logs, ...registryState.logs].sort((a, b) =>
     a.at.localeCompare(b.at)
   );

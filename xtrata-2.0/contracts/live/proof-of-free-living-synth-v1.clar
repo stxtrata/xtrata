@@ -9,6 +9,9 @@
 (define-constant MAX-EDITIONS u1024)
 (define-constant PAGE-SIZE u32)
 (define-constant RECORDING-MIME "application/json")
+(define-constant MIN-RECORDING-FEE u1000)
+(define-constant MAX-RECORDING-FEE u1000000)
+(define-constant DEFAULT-RECORDING-FEE u100000)
 
 (define-constant ERR-NOT-AUTHORIZED (err u100))
 (define-constant ERR-INVALID-EDITION (err u101))
@@ -20,11 +23,11 @@
 (define-constant ERR-NOT-CHILD (err u107))
 (define-constant ERR-INVALID-MIME (err u108))
 (define-constant ERR-RECORDING-EXISTS (err u109))
-(define-constant ERR-NOT-RECOGNIZED (err u110))
 (define-constant ERR-INVALID-CORE (err u111))
 (define-constant ERR-PAUSED (err u112))
 (define-constant ERR-CORE-LOCKED (err u113))
 (define-constant ERR-INVALID-PAGE (err u114))
+(define-constant ERR-INVALID-FEE (err u115))
 
 (define-trait xtrata-core-trait
   (
@@ -49,6 +52,8 @@
 (define-data-var engine-id (optional uint) none)
 (define-data-var registered-editions uint u0)
 (define-data-var global-revision uint u0)
+(define-data-var recording-fee uint DEFAULT-RECORDING-FEE)
+(define-data-var fee-recipient principal CONTRACT-OWNER)
 
 (define-map EditionToNft uint uint)
 (define-map NftToEdition uint uint)
@@ -195,6 +200,28 @@
   )
 )
 
+(define-public (set-recording-fee (value uint))
+  (begin
+    (try! (assert-owner))
+    (asserts!
+      (and (>= value MIN-RECORDING-FEE) (<= value MAX-RECORDING-FEE))
+      ERR-INVALID-FEE
+    )
+    (var-set recording-fee value)
+    (print { event: "recording-fee-updated", recording-fee: value })
+    (ok value)
+  )
+)
+
+(define-public (set-fee-recipient (recipient principal))
+  (begin
+    (try! (assert-owner))
+    (var-set fee-recipient recipient)
+    (print { event: "fee-recipient-updated", fee-recipient: recipient })
+    (ok recipient)
+  )
+)
+
 (define-public (set-engine (core <xtrata-core-trait>) (inscription-id uint))
   (begin
     (try! (assert-owner))
@@ -238,7 +265,8 @@
 
 ;; The recording must be owned by the caller and must carry the collection NFT
 ;; in its immutable Xtrata parent list. A newly registered recording becomes the
-;; default sound immediately; the owner can select any earlier child afterward.
+;; default sound immediately. Earlier children remain indexed and playable, but
+;; cannot replace the newest child as the mosaic default.
 (define-public (register-recording
   (core <xtrata-core-trait>)
   (nft-id uint)
@@ -259,6 +287,10 @@
       ERR-NOT-CHILD
     )
     (asserts! (is-none (map-get? RecordingInfo recording-id)) ERR-RECORDING-EXISTS)
+    (if (is-eq tx-sender (var-get fee-recipient))
+      true
+      (try! (stx-transfer? (var-get recording-fee) tx-sender (var-get fee-recipient)))
+    )
     (map-set Recordings { nft-id: nft-id, sequence: sequence } recording-id)
     (map-set RecordingCounts nft-id sequence)
     (map-set RecordingInfo recording-id {
@@ -279,54 +311,12 @@
         sequence: sequence,
         creator: tx-sender,
         revision: revision,
-        content-hash: (get final-hash meta)
+        content-hash: (get final-hash meta),
+        recording-fee: (var-get recording-fee),
+        fee-recipient: (var-get fee-recipient)
       })
     )
     (ok recording-id)
-  )
-)
-
-(define-public (select-recording
-  (core <xtrata-core-trait>)
-  (nft-id uint)
-  (recording-id uint)
-)
-  (let ((info (unwrap! (map-get? RecordingInfo recording-id) ERR-NOT-RECOGNIZED)))
-    (try! (assert-live))
-    (try! (assert-core core))
-    (try! (assert-current-nft-owner core nft-id))
-    (asserts! (is-eq (get nft-id info) nft-id) ERR-NOT-RECOGNIZED)
-    (map-set ActiveRecordings nft-id recording-id)
-    (let ((revision (bump-revision nft-id)))
-      (print {
-        event: "active-recording-selected",
-        nft-id: nft-id,
-        edition: (get edition info),
-        recording-id: recording-id,
-        selected-by: tx-sender,
-        revision: revision
-      })
-    )
-    (ok recording-id)
-  )
-)
-
-(define-public (select-seed (core <xtrata-core-trait>) (nft-id uint))
-  (let ((edition (unwrap! (map-get? NftToEdition nft-id) ERR-NOT-FOUND)))
-    (try! (assert-live))
-    (try! (assert-core core))
-    (try! (assert-current-nft-owner core nft-id))
-    (map-delete ActiveRecordings nft-id)
-    (let ((revision (bump-revision nft-id)))
-      (print {
-        event: "seed-selected",
-        nft-id: nft-id,
-        edition: edition,
-        selected-by: tx-sender,
-        revision: revision
-      })
-    )
-    (ok true)
   )
 )
 
@@ -336,8 +326,18 @@
     engine-id: (var-get engine-id),
     paused: (var-get paused),
     registered-editions: (var-get registered-editions),
-    global-revision: (var-get global-revision)
+    global-revision: (var-get global-revision),
+    recording-fee: (var-get recording-fee),
+    fee-recipient: (var-get fee-recipient)
   }
+)
+
+(define-read-only (get-recording-fee)
+  (var-get recording-fee)
+)
+
+(define-read-only (get-fee-recipient)
+  (var-get fee-recipient)
 )
 
 (define-read-only (get-edition (edition uint))

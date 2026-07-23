@@ -5,6 +5,7 @@ import {
   deriveLivingSynthGates,
   inspectLivingSynthGatewaySource,
   inspectLivingSynthRegistrySource,
+  parseRecordingFeeStx,
   parseInscriptionMime,
   parseLivingSynthEdition,
   parseLivingSynthMosaicPage,
@@ -20,14 +21,18 @@ const systemCv = ({
   core = GATEWAY,
   engine = '77',
   paused = true,
-  count = '2'
-}: { core?: string | null; engine?: string | null; paused?: boolean; count?: string } = {}) =>
+  count = '2',
+  fee = '100000',
+  recipient = DEPLOYER
+}: { core?: string | null; engine?: string | null; paused?: boolean; count?: string; fee?: string; recipient?: string } = {}) =>
   cv('(tuple ...)', {
     'core-contract': cv('(optional principal)', core ? cv('principal', core) : null),
     'engine-id': cv('(optional uint)', engine ? cv('uint', engine) : null),
     paused: cv('bool', paused),
     'registered-editions': cv('uint', count),
-    'global-revision': cv('uint', '4')
+    'global-revision': cv('uint', '4'),
+    'recording-fee': cv('uint', fee),
+    'fee-recipient': cv('principal', recipient)
   });
 
 describe('Living Synth deploy gates', () => {
@@ -44,9 +49,12 @@ describe('Living Synth deploy gates', () => {
 
     const functions = [
       'lock-core-contract', 'set-engine', 'register-edition', 'register-recording',
-      'select-recording', 'select-seed', 'get-system-state', 'get-mosaic-page'
+      'set-recording-fee', 'set-fee-recipient', 'get-system-state',
+      'get-recording-fee', 'get-fee-recipient', 'get-recording-count',
+      'get-recording-id', 'get-mosaic-page'
     ].map((name) => `(${name}`).join('\n');
-    const registry = `(define-constant MAX-EDITIONS u1024)\n(define-constant RECORDING-MIME "application/json")\n${functions}`;
+    const fees = `(define-constant MIN-RECORDING-FEE u1000)\n(define-constant MAX-RECORDING-FEE u1000000)\n(define-constant DEFAULT-RECORDING-FEE u100000)`;
+    const registry = `(define-constant MAX-EDITIONS u1024)\n(define-constant RECORDING-MIME "application/json")\n${fees}\n${functions}`;
     expect(inspectLivingSynthRegistrySource(registry)).toEqual([]);
     expect(inspectLivingSynthRegistrySource(registry.replace('u1024', 'u1000')))
       .toContain('MAX-EDITIONS must be locked to u1024');
@@ -58,7 +66,9 @@ describe('Living Synth deploy gates', () => {
       engineId: 77n,
       paused: true,
       registeredEditions: 2n,
-      globalRevision: 4n
+      globalRevision: 4n,
+      recordingFee: 100000n,
+      feeRecipient: DEPLOYER
     });
     expect(parseLivingSynthSystemState(cv('bool', true))).toBeNull();
     expect(parseInscriptionMime(cv('(optional tuple)', cv('(tuple ...)', {
@@ -78,6 +88,15 @@ describe('Living Synth deploy gates', () => {
       edition: cv('uint', '7'),
       'nft-id': cv('(optional uint)', cv('uint', '707'))
     })))).toEqual({ edition: 7, nftId: 707 });
+  });
+
+  it('parses exact STX fee amounts and enforces the contract range', () => {
+    expect(parseRecordingFeeStx('0.001')).toEqual({ ok: true, microStx: 1000n });
+    expect(parseRecordingFeeStx('0.1')).toEqual({ ok: true, microStx: 100000n });
+    expect(parseRecordingFeeStx('1')).toEqual({ ok: true, microStx: 1000000n });
+    expect(parseRecordingFeeStx('0.000999')).toEqual({ ok: false, error: 'Fee must be between 0.001 and 1 STX.' });
+    expect(parseRecordingFeeStx('1.000001')).toEqual({ ok: false, error: 'Fee must be between 0.001 and 1 STX.' });
+    expect(parseRecordingFeeStx('0.1000001').ok).toBe(false);
   });
 
   it('validates mapping manifests and rejects duplicate editions or NFT ids', () => {
@@ -112,6 +131,7 @@ describe('Living Synth deploy gates', () => {
     expect(deriveLivingSynthGates(base).goLive).toBe(true);
     expect(deriveLivingSynthGates({ ...base, mosaicAuditPassed: false }).goLive).toBe(false);
     expect(deriveLivingSynthGates({ ...base, systemState: parseLivingSynthSystemState(systemCv({ core: null })) }).setEngine).toBe(false);
+    expect(deriveLivingSynthGates({ ...base, systemState: parseLivingSynthSystemState(systemCv({ fee: '999' })) }).goLive).toBe(false);
     expect(deriveLivingSynthGates({ ...base, manifestEntries: 1023 }).auditMosaic).toBe(false);
   });
 });
