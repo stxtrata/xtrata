@@ -420,6 +420,12 @@ export default function TokenCardMedia(props: TokenCardMediaProps) {
     resolvedMimeType === 'text/html' ||
     resolvedMimeType === 'application/xhtml+xml';
   const isPdf = resolvedMimeType === 'application/pdf';
+  const pdfRuntimeUrl = isPdf
+    ? buildRuntimeInscriptionContentUrl({
+        coreContractId: props.token.sourceContractId ?? props.contractId,
+        tokenId: props.token.id
+      })
+    : null;
 
   const jsonImagePreview = useMemo(() => {
     if (!contentQuery.data || resolvedMimeType !== 'application/json') {
@@ -987,10 +993,9 @@ export default function TokenCardMedia(props: TokenCardMediaProps) {
     mediaElement = (
       <iframe
         title={`inscription-${props.token.id.toString()}`}
-        sandbox=""
         referrerPolicy="no-referrer"
         loading="lazy"
-        src={contentUrl}
+        src={pdfRuntimeUrl ?? contentUrl}
       />
     );
   } else if (resolvedKind === 'video' && contentUrl) {
