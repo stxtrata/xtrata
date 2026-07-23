@@ -9,13 +9,13 @@
 )
 
 (define-read-only (get-owner (id uint))
-  (contract-call? XTRATA-CORE get-owner id)
+  (contract-call? 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 get-owner id)
 )
 
 (define-read-only (get-parents (id uint))
-  (ok (contract-call? XTRATA-CORE get-parents id))
+  (ok (contract-call? 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 get-parents id))
 )
 
 (define-read-only (get-inscription-meta (id uint))
-  (ok (contract-call? XTRATA-CORE get-inscription-meta id))
+  (ok (contract-call? 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 get-inscription-meta id))
 )

@@ -28,7 +28,9 @@ import {
   cvToHex,
   cvToJSON,
   hexToCV,
+  listCV,
   standardPrincipalCV,
+  tupleCV,
   uintCV,
   validateStacksAddress
 } from '@stacks/transactions';
@@ -54,7 +56,7 @@ import {
   deriveLivingSynthGates,
   inspectLivingSynthGatewaySource,
   inspectLivingSynthRegistrySource,
-  parseInscriptionMime,
+  parseLivingSynthInscriptionMeta,
   parseLivingSynthEdition,
   parseLivingSynthMosaicPage,
   parseOptionalPrincipal,
@@ -206,12 +208,15 @@ type LivingSynthConsoleState = {
   engineInput: string;
   engineValidatedId: number | null;
   engineMime: string | null;
+  engineHash: string | null;
+  engineSize: bigint | null;
   feeInput: string;
   feeRecipientInput: string;
   manifestInput: string;
   manifest: LivingSynthEditionEntry[];
   mappingIndex: number;
-  mappingReady: boolean;
+  mappingReadyEntries: LivingSynthEditionEntry[];
+  newOwnerInput: string;
   mosaicAuditPassed: boolean;
   lockConfirmation: string;
   liveConfirmation: string;
@@ -225,12 +230,15 @@ const livingSynth: LivingSynthConsoleState = {
   engineInput: '',
   engineValidatedId: null,
   engineMime: null,
+  engineHash: null,
+  engineSize: null,
   feeInput: '0.1',
   feeRecipientInput: EXPECTED_DEPLOYER,
   manifestInput: '',
   manifest: [],
   mappingIndex: 0,
-  mappingReady: false,
+  mappingReadyEntries: [],
+  newOwnerInput: '',
   mosaicAuditPassed: false,
   lockConfirmation: '',
   liveConfirmation: '',
@@ -604,7 +612,7 @@ const refreshLivingSynthState = async () => {
       states.get(LIVING_SYNTH_REGISTRY_NAME)!,
       'state-test',
       'success',
-      `core ${parsed.coreContract ?? 'unlocked'}; engine ${parsed.engineId?.toString() ?? 'unset'}; fee ${formatMicroStx(parsed.recordingFee)} to ${parsed.feeRecipient}; ${parsed.registeredEditions.toString()} editions; ${parsed.paused ? 'paused' : 'live'}.`
+      `owner ${parsed.contractOwner}; core ${parsed.coreContract ?? 'unlocked'}; engine ${parsed.engineId?.toString() ?? 'unset'} (${parsed.engineHash ?? 'unhashed'}); fee ${formatMicroStx(parsed.recordingFee)} to ${parsed.feeRecipient}; ${parsed.registeredEditions.toString()} editions; ${parsed.paused ? 'paused' : 'live'}.`
     );
   } catch (error) {
     livingSynth.systemState = null;
@@ -643,11 +651,12 @@ const setLivingSynthFeeRecipient = () => {
 const submitLivingSynthCall = (
   action: string,
   functionName: string,
-  functionArgs: Parameters<typeof showContractCall>[0]['functionArgs']
+  functionArgs: Parameters<typeof showContractCall>[0]['functionArgs'],
+  requiredSigner = livingSynth.systemState?.contractOwner ?? EXPECTED_DEPLOYER
 ) => {
   const registryState = states.get(LIVING_SYNTH_REGISTRY_NAME)!;
-  if (!session.isConnected || session.address !== EXPECTED_DEPLOYER) {
-    livingSynth.error = `connect the deployer wallet (${EXPECTED_DEPLOYER}) first`;
+  if (!session.isConnected || session.address !== requiredSigner) {
+    livingSynth.error = `connect the required admin wallet (${requiredSigner}) first`;
     render();
     return;
   }
@@ -669,6 +678,7 @@ const submitLivingSynthCall = (
       livingSynth.busy = false;
       livingSynth.systemStateTested = false;
       livingSynth.mosaicAuditPassed = false;
+      livingSynth.mappingReadyEntries = [];
       if (txId) {
         addLog(
           registryState,
@@ -696,6 +706,8 @@ const testLivingSynthEngine = async () => {
   const engineId = Number(livingSynth.engineInput);
   livingSynth.engineValidatedId = null;
   livingSynth.engineMime = null;
+  livingSynth.engineHash = null;
+  livingSynth.engineSize = null;
   if (!Number.isSafeInteger(engineId) || engineId < 0) {
     livingSynth.error = 'Enter a valid Xtrata engine inscription ID.';
     render();
@@ -711,18 +723,20 @@ const testLivingSynthEngine = async () => {
       'get-inscription-meta',
       [uintCV(engineId)]
     );
-    const mime = parseInscriptionMime(decoded);
-    const allowed = new Set(['application/javascript', 'text/javascript', 'text/html']);
-    if (!mime || !allowed.has(mime)) {
-      throw new Error(`Engine #${engineId} has unsupported MIME ${mime ?? 'none'}.`);
-    }
+    const meta = parseLivingSynthInscriptionMeta(decoded);
+    if (!meta) throw new Error(`Engine #${engineId} returned incomplete metadata.`);
+    if (meta.mimeType !== 'text/javascript') throw new Error(`Engine #${engineId} has unsupported MIME ${meta.mimeType}.`);
+    if (!meta.sealed) throw new Error(`Engine #${engineId} is not sealed.`);
+    if (meta.totalSize < 1n || meta.totalSize > 131_072n) throw new Error(`Engine #${engineId} must be 1–131072 bytes.`);
     livingSynth.engineValidatedId = engineId;
-    livingSynth.engineMime = mime;
+    livingSynth.engineMime = meta.mimeType;
+    livingSynth.engineHash = meta.finalHash;
+    livingSynth.engineSize = meta.totalSize;
     addLog(
       states.get(LIVING_SYNTH_REGISTRY_NAME)!,
       'engine-test',
       'success',
-      `Xtrata engine #${engineId} exists with MIME ${mime}.`
+      `Xtrata engine #${engineId} is sealed ${meta.mimeType}, ${meta.totalSize.toString()} bytes, SHA-256 ${meta.finalHash}.`
     );
   } catch (error) {
     livingSynth.error = error instanceof Error ? error.message : String(error);
@@ -734,7 +748,7 @@ const testLivingSynthEngine = async () => {
 
 const validateLivingSynthManifest = () => {
   const result = validateLivingSynthEditionManifest(livingSynth.manifestInput);
-  livingSynth.mappingReady = false;
+  livingSynth.mappingReadyEntries = [];
   livingSynth.mosaicAuditPassed = false;
   if (!result.ok) {
     livingSynth.manifest = [];
@@ -749,41 +763,39 @@ const validateLivingSynthManifest = () => {
 };
 
 const testNextLivingSynthMapping = async () => {
-  const entry = livingSynth.manifest[livingSynth.mappingIndex];
-  if (!entry) return;
+  const candidates = livingSynth.manifest.slice(livingSynth.mappingIndex, livingSynth.mappingIndex + 25);
+  if (candidates.length === 0) return;
   livingSynth.busy = true;
-  livingSynth.mappingReady = false;
+  livingSynth.mappingReadyEntries = [];
   livingSynth.error = null;
   render();
   try {
-    const [ownerResult, editionResult] = await Promise.all([
-      callReadJson(EXPECTED_DEPLOYER, LIVING_SYNTH_XTRATA_NAME, 'get-owner', [uintCV(entry.nftId)]),
-      callReadJson(EXPECTED_DEPLOYER, LIVING_SYNTH_REGISTRY_NAME, 'get-edition', [uintCV(entry.edition)])
-    ]);
-    if (!parseOptionalPrincipal(ownerResult)) {
-      throw new Error(`Xtrata NFT #${entry.nftId} does not exist.`);
-    }
-    const current = parseLivingSynthEdition(editionResult);
-    if (!current) throw new Error(`Edition ${entry.edition} returned an invalid state.`);
-    if (current.nftId === entry.nftId) {
+    const checked = await Promise.all(candidates.map(async (entry) => {
+      const [ownerResult, editionResult] = await Promise.all([
+        callReadJson(EXPECTED_DEPLOYER, LIVING_SYNTH_XTRATA_NAME, 'get-owner', [uintCV(entry.nftId)]),
+        callReadJson(EXPECTED_DEPLOYER, LIVING_SYNTH_REGISTRY_NAME, 'get-edition', [uintCV(entry.edition)])
+      ]);
+      if (!parseOptionalPrincipal(ownerResult)) throw new Error(`Xtrata NFT #${entry.nftId} does not exist.`);
+      const current = parseLivingSynthEdition(editionResult);
+      if (!current) throw new Error(`Edition ${entry.edition} returned an invalid state.`);
+      if (current.nftId !== null && current.nftId !== entry.nftId) {
+        throw new Error(`Edition ${entry.edition} is already mapped to Xtrata #${current.nftId}.`);
+      }
+      return { entry, registered: current.nftId === entry.nftId };
+    }));
+    while (checked[0]?.registered) {
       livingSynth.mappingIndex += 1;
-      addLog(
-        states.get(LIVING_SYNTH_REGISTRY_NAME)!,
-        'mapping-test',
-        'success',
-        `Edition ${entry.edition} is confirmed on-chain as Xtrata #${entry.nftId}.`
-      );
-    } else if (current.nftId !== null) {
-      throw new Error(`Edition ${entry.edition} is already mapped to Xtrata #${current.nftId}.`);
-    } else {
-      livingSynth.mappingReady = true;
-      addLog(
-        states.get(LIVING_SYNTH_REGISTRY_NAME)!,
-        'mapping-test',
-        'success',
-        `Edition ${entry.edition} is empty and Xtrata #${entry.nftId} exists; registration unlocked.`
-      );
+      checked.shift();
     }
+    livingSynth.mappingReadyEntries = checked.filter(item => !item.registered).map(item => item.entry);
+    addLog(
+      states.get(LIVING_SYNTH_REGISTRY_NAME)!,
+      'mapping-test',
+      'success',
+      livingSynth.mappingReadyEntries.length > 0
+        ? `${livingSynth.mappingReadyEntries.length} empty mappings passed NFT and slot checks; atomic batch registration unlocked.`
+        : `${candidates.length} mappings are already confirmed on-chain.`
+    );
   } catch (error) {
     livingSynth.error = error instanceof Error ? error.message : String(error);
   } finally {
@@ -983,6 +995,8 @@ const renderLivingSynthDeployment = () => {
     mosaicAuditPassed: livingSynth.mosaicAuditPassed
   });
   const signerReady = session.isConnected && session.address === EXPECTED_DEPLOYER;
+  const adminSigner = livingSynth.systemState?.contractOwner ?? EXPECTED_DEPLOYER;
+  const adminSignerReady = session.isConnected && session.address === adminSigner;
   const section = el('section', { className: 'card featured living-deploy' });
   section.append(
     el('p', { className: 'eyebrow' }, 'Special gated deployment'),
@@ -1087,7 +1101,9 @@ const renderLivingSynthDeployment = () => {
     const summary = el('dl');
     summary.append(
       el('dt', {}, 'Gateway'), el('dd', { className: gates.coreLocked ? 'ok' : 'warn' }, state.coreContract ?? 'not locked'),
-      el('dt', {}, 'Engine'), el('dd', {}, state.engineId?.toString() ?? 'not set'),
+      el('dt', {}, 'Contract owner'), el('dd', {}, state.contractOwner),
+      el('dt', {}, 'Pending owner'), el('dd', {}, state.pendingOwner ?? 'none'),
+      el('dt', {}, 'Engine'), el('dd', {}, state.engineId === null ? 'not set' : `#${state.engineId.toString()} / ${state.engineHash ?? 'hash missing'}`),
       el('dt', {}, 'Recording fee'), el('dd', { className: gates.feeReady ? 'ok' : 'fail' }, formatMicroStx(state.recordingFee)),
       el('dt', {}, 'Fee recipient'), el('dd', {}, state.feeRecipient),
       el('dt', {}, 'Editions'), el('dd', {}, state.registeredEditions.toString()),
@@ -1110,7 +1126,7 @@ const renderLivingSynthDeployment = () => {
     const lockButton = el(
       'button',
       {
-        disabled: livingSynth.lockConfirmation !== 'LOCK GATEWAY' || !signerReady,
+        disabled: livingSynth.lockConfirmation !== 'LOCK GATEWAY' || !adminSignerReady,
         onclick: () => submitLivingSynthCall(
           'lock-gateway',
           'lock-core-contract',
@@ -1121,7 +1137,7 @@ const renderLivingSynthDeployment = () => {
     ) as HTMLButtonElement;
     confirm.oninput = () => {
       livingSynth.lockConfirmation = confirm.value;
-      lockButton.disabled = confirm.value !== 'LOCK GATEWAY' || !signerReady;
+      lockButton.disabled = confirm.value !== 'LOCK GATEWAY' || !adminSignerReady;
     };
     lockStep.append(el('div', { className: 'row' }, confirm, lockButton));
   }
@@ -1141,6 +1157,8 @@ const renderLivingSynthDeployment = () => {
       livingSynth.engineInput = engineInput.value;
       livingSynth.engineValidatedId = null;
       livingSynth.engineMime = null;
+      livingSynth.engineHash = null;
+      livingSynth.engineSize = null;
     };
     engineStep.append(
       el(
@@ -1151,7 +1169,7 @@ const renderLivingSynthDeployment = () => {
         el(
           'button',
           {
-            disabled: !gates.setEngine || !signerReady,
+            disabled: !gates.setEngine || !adminSignerReady,
             onclick: () => submitLivingSynthCall(
               'set-engine',
               'set-engine',
@@ -1167,7 +1185,7 @@ const renderLivingSynthDeployment = () => {
     );
   }
   if (livingSynth.engineValidatedId !== null) {
-    engineStep.append(el('p', { className: 'ok' }, `Test passed: Xtrata #${livingSynth.engineValidatedId}, ${livingSynth.engineMime}.`));
+    engineStep.append(el('p', { className: 'ok' }, `Test passed: Xtrata #${livingSynth.engineValidatedId}, sealed ${livingSynth.engineMime}, ${livingSynth.engineSize?.toString()} bytes, SHA-256 ${livingSynth.engineHash}.`));
   }
 
   const feeStep = el('div', { className: 'gate-step' });
@@ -1194,22 +1212,85 @@ const renderLivingSynthDeployment = () => {
         'div',
         { className: 'row' },
         feeInput,
-        el('button', { disabled: livingSynth.busy || !signerReady, onclick: setLivingSynthRecordingFee }, 'Set fee (wallet)')
+        el('button', { disabled: livingSynth.busy || !adminSignerReady, onclick: setLivingSynthRecordingFee }, 'Set fee (wallet)')
       ),
       el(
         'div',
         { className: 'row' },
         recipientInput,
-        el('button', { disabled: livingSynth.busy || !signerReady, onclick: setLivingSynthFeeRecipient }, 'Set recipient (wallet)')
+        el('button', { disabled: livingSynth.busy || !adminSignerReady, onclick: setLivingSynthFeeRecipient }, 'Set recipient (wallet)')
       ),
       el('p', { className: 'muted' }, 'After either transaction confirms, run “Read + test system state” again. Edition registration remains gated on a valid on-chain fee and recipient.')
     );
   }
 
+  const ownershipStep = el('div', { className: 'gate-step' });
+  ownershipStep.append(
+    el('div', { className: 'gate-heading' }, el('h2', {}, '7. Optional two-step admin handover'), gateBadge(Boolean(state?.pendingOwner), 'PENDING')),
+    el('p', {}, 'Ownership cannot move in one transaction. The current owner nominates an address; only that exact address can accept. The current owner can cancel while the handover is pending.')
+  );
+  if (state) {
+    const newOwnerInput = el('input', {
+      className: 'admin-input mono-input',
+      value: livingSynth.newOwnerInput,
+      placeholder: 'New owner SP…'
+    }) as HTMLInputElement;
+    const proposed = livingSynth.newOwnerInput.trim();
+    const proposedValid = proposed.startsWith('SP') && validateStacksAddress(proposed);
+    const nominateButton = el('button', {
+      disabled: livingSynth.busy || !adminSignerReady || !proposedValid,
+      onclick: () => {
+        const candidate = livingSynth.newOwnerInput.trim();
+        if (!candidate.startsWith('SP') || !validateStacksAddress(candidate)) return;
+        submitLivingSynthCall(
+          'initiate-owner-transfer',
+          'initiate-contract-ownership-transfer',
+          [standardPrincipalCV(candidate)]
+        );
+      }
+    }, 'Nominate owner (wallet)') as HTMLButtonElement;
+    newOwnerInput.oninput = () => {
+      livingSynth.newOwnerInput = newOwnerInput.value;
+      const candidate = newOwnerInput.value.trim();
+      nominateButton.disabled = livingSynth.busy || !adminSignerReady || !candidate.startsWith('SP') || !validateStacksAddress(candidate);
+    };
+    ownershipStep.append(
+      el(
+        'div',
+        { className: 'row' },
+        newOwnerInput,
+        nominateButton
+      )
+    );
+    if (state.pendingOwner) {
+      ownershipStep.append(
+        el('p', { className: 'warn' }, `Pending owner: ${state.pendingOwner}`),
+        el(
+          'div',
+          { className: 'row' },
+          el('button', {
+            className: 'ghost',
+            disabled: livingSynth.busy || !adminSignerReady,
+            onclick: () => submitLivingSynthCall('cancel-owner-transfer', 'cancel-contract-ownership-transfer', [])
+          }, 'Cancel handover'),
+          el('button', {
+            disabled: livingSynth.busy || session.address !== state.pendingOwner,
+            onclick: () => submitLivingSynthCall(
+              'accept-owner-transfer',
+              'accept-contract-ownership',
+              [],
+              state.pendingOwner!
+            )
+          }, 'Accept as pending owner')
+        )
+      );
+    }
+  }
+
   const mappingStep = el('div', { className: 'gate-step' });
   mappingStep.append(
-    el('div', { className: 'gate-heading' }, el('h2', {}, '7. Validate + register edition mappings'), gateBadge(gates.mappingComplete, 'MANIFEST MATCHED')),
-    el('p', {}, 'Paste [{"edition":1,"nftId":123}, …]. The console rejects duplicates and tests NFT existence plus the current edition slot before each wallet call. All 1,024 entries must match on-chain before go-live unlocks.')
+    el('div', { className: 'gate-heading' }, el('h2', {}, '8. Validate + register edition mappings'), gateBadge(gates.mappingComplete, 'MANIFEST MATCHED')),
+    el('p', {}, 'Paste [{"edition":1,"nftId":123}, …]. The console rejects duplicates and tests NFT existence plus the current edition slot in groups of up to 25, then registers each tested group atomically. A partial claimed-edition manifest is valid when every supplied mapping matches on-chain.')
   );
   if (gates.registerEditions) {
     const manifestInput = el('textarea', {
@@ -1226,7 +1307,7 @@ const renderLivingSynthDeployment = () => {
   if (livingSynth.manifest.length > 0) {
     const entry = livingSynth.manifest[livingSynth.mappingIndex];
     mappingStep.append(
-      el('p', { className: 'ok' }, `Manifest valid: ${livingSynth.manifest.length} unique mappings. Confirmed this session: ${livingSynth.mappingIndex}.`)
+      el('p', { className: 'ok' }, `Manifest valid: ${livingSynth.manifest.length} unique mappings. Leading on-chain confirmations: ${livingSynth.mappingIndex}.`)
     );
     if (entry) {
       mappingStep.append(
@@ -1234,25 +1315,27 @@ const renderLivingSynthDeployment = () => {
         el(
           'div',
           { className: 'row' },
-          el('button', { className: 'ghost', disabled: livingSynth.busy, onclick: () => void testNextLivingSynthMapping() }, 'Test next mapping'),
+          el('button', { className: 'ghost', disabled: livingSynth.busy, onclick: () => void testNextLivingSynthMapping() }, 'Test next batch (max 25)'),
           el(
             'button',
             {
-              disabled: !livingSynth.mappingReady || !signerReady,
+              disabled: livingSynth.mappingReadyEntries.length === 0 || !adminSignerReady,
               onclick: () => {
-                livingSynth.mappingReady = false;
+                const entries = livingSynth.mappingReadyEntries;
+                livingSynth.mappingReadyEntries = [];
                 submitLivingSynthCall(
-                  'register-edition',
-                  'register-edition',
+                  'register-edition-batch',
+                  'register-edition-batch',
                   [
-                    contractPrincipalCV(EXPECTED_DEPLOYER, LIVING_SYNTH_GATEWAY_NAME),
-                    uintCV(entry.edition),
-                    uintCV(entry.nftId)
+                    listCV(entries.map(item => tupleCV({
+                      edition: uintCV(item.edition),
+                      'nft-id': uintCV(item.nftId)
+                    })))
                   ]
                 );
               }
             },
-            'Register tested mapping (wallet)'
+            `Register tested batch (${livingSynth.mappingReadyEntries.length})`
           )
         )
       );
@@ -1261,7 +1344,7 @@ const renderLivingSynthDeployment = () => {
 
   const liveStep = el('div', { className: 'gate-step' });
   liveStep.append(
-    el('div', { className: 'gate-heading' }, el('h2', {}, '8. Audit mosaic + go live'), gateBadge(state?.paused === false, 'LIVE')),
+    el('div', { className: 'gate-heading' }, el('h2', {}, '9. Audit mosaic + go live'), gateBadge(state?.paused === false, 'LIVE')),
     el(
       'div',
       { className: 'row' },
@@ -1285,14 +1368,14 @@ const renderLivingSynthDeployment = () => {
     const liveButton = el(
       'button',
       {
-        disabled: livingSynth.liveConfirmation !== 'GO LIVE' || !gates.goLive || !signerReady,
+        disabled: livingSynth.liveConfirmation !== 'GO LIVE' || !gates.goLive || !adminSignerReady,
         onclick: () => submitLivingSynthCall('go-live', 'set-paused', [boolCV(false)])
       },
       'Unpause Living Synth (wallet)'
     ) as HTMLButtonElement;
     liveInput.oninput = () => {
       livingSynth.liveConfirmation = liveInput.value;
-      liveButton.disabled = liveInput.value !== 'GO LIVE' || !gates.goLive || !signerReady;
+      liveButton.disabled = liveInput.value !== 'GO LIVE' || !gates.goLive || !adminSignerReady;
     };
     liveStep.append(
       el('p', { className: 'warn' }, 'The sources, gateway, engine, mapping count, and all mosaic pages have passed. Type GO LIVE to expose owner recording writes.'),
@@ -1300,7 +1383,7 @@ const renderLivingSynthDeployment = () => {
     );
   }
   if (livingSynth.error) section.append(el('p', { className: 'fail' }, livingSynth.error));
-  section.append(sourceStep, registryStep, stateStep, lockStep, engineStep, feeStep, mappingStep, liveStep);
+  section.append(sourceStep, registryStep, stateStep, lockStep, engineStep, feeStep, ownershipStep, mappingStep, liveStep);
   const combinedLogs = [...gatewayState.logs, ...registryState.logs].sort((a, b) =>
     a.at.localeCompare(b.at)
   );

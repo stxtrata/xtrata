@@ -10,6 +10,9 @@ export const LIVING_SYNTH_DEFAULT_RECORDING_FEE = 100_000n;
 export type LivingSynthSystemState = {
   coreContract: string | null;
   engineId: bigint | null;
+  engineHash: string | null;
+  contractOwner: string;
+  pendingOwner: string | null;
   paused: boolean;
   registeredEditions: bigint;
   globalRevision: bigint;
@@ -54,6 +57,15 @@ export const inspectLivingSynthGatewaySource = (source: string, deployer: string
       `gateway reader ${reader} is missing`,
       problems
     );
+    sourceHas(
+      active,
+      `(contract-call? '${deployer}.${LIVING_SYNTH_XTRATA_NAME} ${reader}`,
+      `gateway reader ${reader} must call the literal production Xtrata contract`,
+      problems
+    );
+  }
+  if (active.includes('(contract-call? XTRATA-CORE')) {
+    problems.push('gateway readers cannot dynamically call XTRATA-CORE');
   }
   if (active.includes('.mock-')) problems.push('gateway source contains an active mock contract');
   return problems;
@@ -68,6 +80,12 @@ export const inspectLivingSynthRegistrySource = (source: string): string[] => {
     'MAX-EDITIONS must be locked to u1024',
     problems
   );
+  for (const [fragment, message] of [
+    ['(define-constant ENGINE-MIME "text/javascript")', 'engine MIME must be locked to text/javascript'],
+    ['(define-constant MAX-RECORDING-BYTES u262144)', 'recordings must be capped at 262144 bytes'],
+    ['(define-constant MAX-ENGINE-BYTES u131072)', 'engine must be capped at 131072 bytes'],
+    ['(define-constant MAX-EDITION-BATCH u25)', 'edition batches must be capped at 25']
+  ]) sourceHas(active, fragment, message, problems);
   sourceHas(
     active,
     '(define-constant RECORDING-MIME "application/json")',
@@ -90,7 +108,11 @@ export const inspectLivingSynthRegistrySource = (source: string): string[] => {
     'lock-core-contract',
     'set-engine',
     'register-edition',
+    'register-edition-batch',
     'register-recording',
+    'initiate-contract-ownership-transfer',
+    'cancel-contract-ownership-transfer',
+    'accept-contract-ownership',
     'set-recording-fee',
     'set-fee-recipient',
     'get-system-state',
@@ -101,6 +123,10 @@ export const inspectLivingSynthRegistrySource = (source: string): string[] => {
     'get-mosaic-page'
   ]) {
     if (!active.includes(`(${fn}`)) problems.push(`registry function ${fn} is missing`);
+  }
+  sourceHas(active, '(define-data-var engine-hash (optional (buff 32)) none)', 'registry must pin the engine content hash', problems);
+  if (!/\(define-public \(register-recording[\s\S]*?\(expected-fee uint\)/.test(active)) {
+    problems.push('register-recording must require the caller-tested expected fee');
   }
   if (active.includes('.mock-')) problems.push('registry source contains an active mock contract');
   return problems;
@@ -139,6 +165,13 @@ const optionalBigint = (node: CvJson | undefined): bigint | null => {
   }
 };
 
+const optionalHex = (node: CvJson | undefined): string | null => {
+  const current = unwrap(node);
+  if (typeof current?.value !== 'string') return null;
+  const normalized = current.value.replace(/^0x/, '').toLowerCase();
+  return /^[0-9a-f]{64}$/.test(normalized) ? normalized : null;
+};
+
 export const parseLivingSynthSystemState = (
   value: CvJson | null | undefined
 ): LivingSynthSystemState | null => {
@@ -149,18 +182,23 @@ export const parseLivingSynthSystemState = (
   const globalRevision = optionalBigint(data['global-revision']);
   const recordingFee = optionalBigint(data['recording-fee']);
   const feeRecipient = optionalString(data['fee-recipient']);
+  const contractOwner = optionalString(data['contract-owner']);
   if (
     typeof paused !== 'boolean' ||
     registeredEditions === null ||
     globalRevision === null ||
     recordingFee === null ||
-    feeRecipient === null
+    feeRecipient === null ||
+    contractOwner === null
   ) {
     return null;
   }
   return {
     coreContract: optionalString(data['core-contract']),
     engineId: optionalBigint(data['engine-id']),
+    engineHash: optionalHex(data['engine-hash']),
+    contractOwner,
+    pendingOwner: optionalString(data['pending-owner']),
     paused,
     registeredEditions,
     globalRevision,
@@ -187,6 +225,19 @@ export const parseRecordingFeeStx = (
 export const parseInscriptionMime = (value: CvJson | null | undefined): string | null => {
   const data = tuple(value);
   return data ? optionalString(data['mime-type']) : null;
+};
+
+export const parseLivingSynthInscriptionMeta = (
+  value: CvJson | null | undefined
+): { mimeType: string; totalSize: bigint; sealed: boolean; finalHash: string } | null => {
+  const data = tuple(value);
+  if (!data) return null;
+  const mimeType = optionalString(data['mime-type']);
+  const totalSize = optionalBigint(data['total-size']);
+  const sealed = unwrap(data.sealed)?.value;
+  const finalHash = optionalHex(data['final-hash']);
+  if (!mimeType || totalSize === null || typeof sealed !== 'boolean' || !finalHash) return null;
+  return { mimeType, totalSize, sealed, finalHash };
 };
 
 export const parseOptionalPrincipal = (value: CvJson | null | undefined): string | null =>
@@ -279,7 +330,10 @@ export type LivingSynthGateInput = {
 
 export const deriveLivingSynthGates = (input: LivingSynthGateInput) => {
   const coreLocked = input.systemState?.coreContract === input.expectedGatewayId;
-  const engineSet = input.systemState?.engineId !== null && input.systemState?.engineId !== undefined;
+  const engineSet =
+    input.systemState?.engineId !== null &&
+    input.systemState?.engineId !== undefined &&
+    Boolean(input.systemState?.engineHash);
   const feeReady = Boolean(
     input.systemState &&
     input.systemState.recordingFee >= LIVING_SYNTH_MIN_RECORDING_FEE &&
@@ -287,7 +341,7 @@ export const deriveLivingSynthGates = (input: LivingSynthGateInput) => {
     input.systemState.feeRecipient
   );
   const mappingComplete =
-    input.manifestEntries === LIVING_SYNTH_COLLECTION_SIZE &&
+    input.manifestEntries > 0 &&
     input.systemState?.registeredEditions === BigInt(input.manifestEntries);
   return {
     deployGateway: input.gatewaySourceReady && !input.gatewayDeployed,

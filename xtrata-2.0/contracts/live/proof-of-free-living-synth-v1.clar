@@ -5,10 +5,14 @@
 ;; contract only accepts immutable Xtrata children registered by the current
 ;; owner of the parent NFT.
 
-(define-constant CONTRACT-OWNER tx-sender)
+(define-constant CONTRACT-DEPLOYER tx-sender)
 (define-constant MAX-EDITIONS u1024)
 (define-constant PAGE-SIZE u32)
 (define-constant RECORDING-MIME "application/json")
+(define-constant ENGINE-MIME "text/javascript")
+(define-constant MAX-RECORDING-BYTES u262144)
+(define-constant MAX-ENGINE-BYTES u131072)
+(define-constant MAX-EDITION-BATCH u25)
 (define-constant MIN-RECORDING-FEE u1000)
 (define-constant MAX-RECORDING-FEE u1000000)
 (define-constant DEFAULT-RECORDING-FEE u100000)
@@ -23,11 +27,16 @@
 (define-constant ERR-NOT-CHILD (err u107))
 (define-constant ERR-INVALID-MIME (err u108))
 (define-constant ERR-RECORDING-EXISTS (err u109))
+(define-constant ERR-INVALID-ENGINE (err u110))
 (define-constant ERR-INVALID-CORE (err u111))
 (define-constant ERR-PAUSED (err u112))
 (define-constant ERR-CORE-LOCKED (err u113))
 (define-constant ERR-INVALID-PAGE (err u114))
 (define-constant ERR-INVALID-FEE (err u115))
+(define-constant ERR-FEE-CHANGED (err u116))
+(define-constant ERR-INVALID-RECORDING (err u117))
+(define-constant ERR-INVALID-BATCH (err u118))
+(define-constant ERR-NO-PENDING-OWNER (err u119))
 
 (define-trait xtrata-core-trait
   (
@@ -48,12 +57,15 @@
 )
 
 (define-data-var core-contract (optional principal) none)
+(define-data-var contract-owner principal CONTRACT-DEPLOYER)
+(define-data-var pending-owner (optional principal) none)
 (define-data-var paused bool true)
 (define-data-var engine-id (optional uint) none)
+(define-data-var engine-hash (optional (buff 32)) none)
 (define-data-var registered-editions uint u0)
 (define-data-var global-revision uint u0)
 (define-data-var recording-fee uint DEFAULT-RECORDING-FEE)
-(define-data-var fee-recipient principal CONTRACT-OWNER)
+(define-data-var fee-recipient principal CONTRACT-DEPLOYER)
 
 (define-map EditionToNft uint uint)
 (define-map NftToEdition uint uint)
@@ -83,8 +95,61 @@
 
 (define-private (assert-owner)
   (begin
-    (asserts! (is-eq tx-sender CONTRACT-OWNER) ERR-NOT-AUTHORIZED)
+    (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-NOT-AUTHORIZED)
     (ok true)
+  )
+)
+
+(define-private (write-edition (entry { edition: uint, nft-id: uint }))
+  (let (
+    (edition (get edition entry))
+    (nft-id (get nft-id entry))
+  )
+    (asserts! (and (> edition u0) (<= edition MAX-EDITIONS)) ERR-INVALID-EDITION)
+    (asserts! (is-none (map-get? EditionToNft edition)) ERR-EDITION-EXISTS)
+    (asserts! (is-none (map-get? NftToEdition nft-id)) ERR-NFT-EXISTS)
+    (map-set EditionToNft edition nft-id)
+    (map-set NftToEdition nft-id edition)
+    (map-set RecordingCounts nft-id u0)
+    (map-set NftRevisions nft-id u1)
+    (var-set registered-editions (+ (var-get registered-editions) u1))
+    (var-set global-revision (+ (var-get global-revision) u1))
+    (print { event: "edition-registered", edition: edition, nft-id: nft-id })
+    (ok nft-id)
+  )
+)
+
+(define-private (write-edition-step
+  (entry { edition: uint, nft-id: uint })
+  (state (response uint uint))
+)
+  (let ((count (try! state)))
+    (try! (write-edition entry))
+    (ok (+ count u1))
+  )
+)
+
+(define-private (validate-edition-step
+  (entry { edition: uint, nft-id: uint })
+  (state (response {
+    editions: (list 25 uint),
+    nft-ids: (list 25 uint)
+  } uint))
+)
+  (let (
+    (seen (try! state))
+    (edition (get edition entry))
+    (nft-id (get nft-id entry))
+  )
+    (asserts! (and (> edition u0) (<= edition MAX-EDITIONS)) ERR-INVALID-EDITION)
+    (asserts! (is-none (map-get? EditionToNft edition)) ERR-EDITION-EXISTS)
+    (asserts! (is-none (map-get? NftToEdition nft-id)) ERR-NFT-EXISTS)
+    (asserts! (is-none (index-of (get editions seen) edition)) ERR-EDITION-EXISTS)
+    (asserts! (is-none (index-of (get nft-ids seen) nft-id)) ERR-NFT-EXISTS)
+    (ok {
+      editions: (unwrap-panic (as-max-len? (append (get editions seen) edition) u25)),
+      nft-ids: (unwrap-panic (as-max-len? (append (get nft-ids seen) nft-id) u25))
+    })
   )
 )
 
@@ -200,6 +265,38 @@
   )
 )
 
+(define-public (initiate-contract-ownership-transfer (new-owner principal))
+  (begin
+    (try! (assert-owner))
+    (asserts! (not (is-eq new-owner (var-get contract-owner))) ERR-NOT-AUTHORIZED)
+    (var-set pending-owner (some new-owner))
+    (print { event: "ownership-transfer-initiated", pending-owner: new-owner })
+    (ok new-owner)
+  )
+)
+
+(define-public (cancel-contract-ownership-transfer)
+  (begin
+    (try! (assert-owner))
+    (var-set pending-owner none)
+    (print { event: "ownership-transfer-cancelled" })
+    (ok true)
+  )
+)
+
+(define-public (accept-contract-ownership)
+  (match (var-get pending-owner)
+    pending (begin
+      (asserts! (is-eq tx-sender pending) ERR-NOT-AUTHORIZED)
+      (var-set contract-owner pending)
+      (var-set pending-owner none)
+      (print { event: "ownership-transferred", contract-owner: pending })
+      (ok pending)
+    )
+    ERR-NO-PENDING-OWNER
+  )
+)
+
 (define-public (set-recording-fee (value uint))
   (begin
     (try! (assert-owner))
@@ -226,11 +323,26 @@
   (begin
     (try! (assert-owner))
     (try! (assert-core core))
-    (asserts! (is-some (try! (contract-call? core get-inscription-meta inscription-id))) ERR-NOT-FOUND)
-    (var-set engine-id (some inscription-id))
-    (var-set global-revision (+ (var-get global-revision) u1))
-    (print { event: "engine-updated", engine-id: inscription-id })
-    (ok inscription-id)
+    (let ((meta (unwrap! (try! (contract-call? core get-inscription-meta inscription-id)) ERR-NOT-FOUND)))
+      (asserts!
+        (and
+          (get sealed meta)
+          (> (get total-size meta) u0)
+          (<= (get total-size meta) MAX-ENGINE-BYTES)
+          (is-eq (get mime-type meta) ENGINE-MIME)
+        )
+        ERR-INVALID-ENGINE
+      )
+      (var-set engine-id (some inscription-id))
+      (var-set engine-hash (some (get final-hash meta)))
+      (var-set global-revision (+ (var-get global-revision) u1))
+      (print {
+        event: "engine-updated",
+        engine-id: inscription-id,
+        content-hash: (get final-hash meta)
+      })
+      (ok inscription-id)
+    )
   )
 )
 
@@ -244,22 +356,25 @@
   (begin
     (try! (assert-owner))
     (try! (assert-core core))
-    (asserts! (and (> edition u0) (<= edition MAX-EDITIONS)) ERR-INVALID-EDITION)
-    (asserts! (is-none (map-get? EditionToNft edition)) ERR-EDITION-EXISTS)
-    (asserts! (is-none (map-get? NftToEdition nft-id)) ERR-NFT-EXISTS)
     (asserts! (is-some (try! (read-owner core nft-id))) ERR-NOT-FOUND)
-    (map-set EditionToNft edition nft-id)
-    (map-set NftToEdition nft-id edition)
-    (map-set RecordingCounts nft-id u0)
-    (map-set NftRevisions nft-id u1)
-    (var-set registered-editions (+ (var-get registered-editions) u1))
-    (var-set global-revision (+ (var-get global-revision) u1))
-    (print {
-      event: "edition-registered",
-      edition: edition,
-      nft-id: nft-id
-    })
-    (ok nft-id)
+    (write-edition { edition: edition, nft-id: nft-id })
+  )
+)
+
+;; Batch registration is deliberately owner-attested: the deploy console first
+;; resolves every Xtrata owner and empty edition slot. Map constraints still make
+;; the entire transaction fail atomically on invalid or duplicate entries.
+(define-public (register-edition-batch
+  (entries (list 25 { edition: uint, nft-id: uint }))
+)
+  (begin
+    (try! (assert-owner))
+    (asserts! (and (> (len entries) u0) (<= (len entries) MAX-EDITION-BATCH)) ERR-INVALID-BATCH)
+    (try! (fold validate-edition-step entries (ok { editions: (list), nft-ids: (list) })))
+    (let ((registered (try! (fold write-edition-step entries (ok u0)))))
+      (print { event: "edition-batch-registered", count: registered })
+      (ok registered)
+    )
   )
 )
 
@@ -271,65 +386,84 @@
   (core <xtrata-core-trait>)
   (nft-id uint)
   (recording-id uint)
+  (expected-fee uint)
 )
-  (let (
-    (edition (unwrap! (map-get? NftToEdition nft-id) ERR-NOT-FOUND))
-    (meta (unwrap! (try! (contract-call? core get-inscription-meta recording-id)) ERR-NOT-FOUND))
-    (sequence (+ (default-to u0 (map-get? RecordingCounts nft-id)) u1))
-  )
+  (begin
     (try! (assert-live))
     (try! (assert-core core))
     (try! (assert-current-nft-owner core nft-id))
-    (asserts! (is-eq (try! (read-owner core recording-id)) (some tx-sender)) ERR-NOT-RECORDING-OWNER)
-    (asserts! (is-eq (get mime-type meta) RECORDING-MIME) ERR-INVALID-MIME)
-    (asserts!
-      (is-some (index-of (try! (contract-call? core get-parents recording-id)) nft-id))
-      ERR-NOT-CHILD
+    (let (
+      (edition (unwrap! (map-get? NftToEdition nft-id) ERR-NOT-FOUND))
+      (meta (unwrap! (try! (contract-call? core get-inscription-meta recording-id)) ERR-NOT-FOUND))
+      (sequence (+ (default-to u0 (map-get? RecordingCounts nft-id)) u1))
     )
-    (asserts! (is-none (map-get? RecordingInfo recording-id)) ERR-RECORDING-EXISTS)
-    (if (is-eq tx-sender (var-get fee-recipient))
-      true
-      (try! (stx-transfer? (var-get recording-fee) tx-sender (var-get fee-recipient)))
-    )
-    (map-set Recordings { nft-id: nft-id, sequence: sequence } recording-id)
-    (map-set RecordingCounts nft-id sequence)
-    (map-set RecordingInfo recording-id {
-      nft-id: nft-id,
-      edition: edition,
-      creator: tx-sender,
-      sequence: sequence,
-      registered-at: stacks-block-height,
-      content-hash: (get final-hash meta)
-    })
-    (map-set ActiveRecordings nft-id recording-id)
-    (let ((revision (bump-revision nft-id)))
-      (print {
-        event: "recording-registered",
+      (asserts! (is-eq (try! (read-owner core recording-id)) (some tx-sender)) ERR-NOT-RECORDING-OWNER)
+      (asserts! (is-eq expected-fee (var-get recording-fee)) ERR-FEE-CHANGED)
+      (asserts! (is-eq (get mime-type meta) RECORDING-MIME) ERR-INVALID-MIME)
+      (asserts!
+        (and
+          (get sealed meta)
+          (> (get total-size meta) u0)
+          (<= (get total-size meta) MAX-RECORDING-BYTES)
+        )
+        ERR-INVALID-RECORDING
+      )
+      (asserts!
+        (is-some (index-of (try! (contract-call? core get-parents recording-id)) nft-id))
+        ERR-NOT-CHILD
+      )
+      (asserts! (is-none (map-get? RecordingInfo recording-id)) ERR-RECORDING-EXISTS)
+      (if (is-eq tx-sender (var-get fee-recipient))
+        true
+        (try! (stx-transfer? expected-fee tx-sender (var-get fee-recipient)))
+      )
+      (map-set Recordings { nft-id: nft-id, sequence: sequence } recording-id)
+      (map-set RecordingCounts nft-id sequence)
+      (map-set RecordingInfo recording-id {
         nft-id: nft-id,
         edition: edition,
-        recording-id: recording-id,
-        sequence: sequence,
         creator: tx-sender,
-        revision: revision,
-        content-hash: (get final-hash meta),
-        recording-fee: (var-get recording-fee),
-        fee-recipient: (var-get fee-recipient)
+        sequence: sequence,
+        registered-at: stacks-block-height,
+        content-hash: (get final-hash meta)
       })
+      (map-set ActiveRecordings nft-id recording-id)
+      (let ((revision (bump-revision nft-id)))
+        (print {
+          event: "recording-registered",
+          nft-id: nft-id,
+          edition: edition,
+          recording-id: recording-id,
+          sequence: sequence,
+          creator: tx-sender,
+          revision: revision,
+          content-hash: (get final-hash meta),
+          recording-fee: expected-fee,
+          fee-recipient: (var-get fee-recipient)
+        })
+      )
+      (ok recording-id)
     )
-    (ok recording-id)
   )
 )
 
 (define-read-only (get-system-state)
   {
     core-contract: (var-get core-contract),
+    contract-owner: (var-get contract-owner),
+    pending-owner: (var-get pending-owner),
     engine-id: (var-get engine-id),
+    engine-hash: (var-get engine-hash),
     paused: (var-get paused),
     registered-editions: (var-get registered-editions),
     global-revision: (var-get global-revision),
     recording-fee: (var-get recording-fee),
     fee-recipient: (var-get fee-recipient)
   }
+)
+
+(define-read-only (get-contract-version)
+  "proof-of-free-living-synth/1.0.0"
 )
 
 (define-read-only (get-recording-fee)

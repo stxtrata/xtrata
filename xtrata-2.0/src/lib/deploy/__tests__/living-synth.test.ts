@@ -7,6 +7,7 @@ import {
   inspectLivingSynthRegistrySource,
   parseRecordingFeeStx,
   parseInscriptionMime,
+  parseLivingSynthInscriptionMeta,
   parseLivingSynthEdition,
   parseLivingSynthMosaicPage,
   parseLivingSynthSystemState,
@@ -23,11 +24,15 @@ const systemCv = ({
   paused = true,
   count = '2',
   fee = '100000',
-  recipient = DEPLOYER
-}: { core?: string | null; engine?: string | null; paused?: boolean; count?: string; fee?: string; recipient?: string } = {}) =>
+  recipient = DEPLOYER,
+  engineHash = '11'.repeat(32)
+}: { core?: string | null; engine?: string | null; paused?: boolean; count?: string; fee?: string; recipient?: string; engineHash?: string | null } = {}) =>
   cv('(tuple ...)', {
     'core-contract': cv('(optional principal)', core ? cv('principal', core) : null),
     'engine-id': cv('(optional uint)', engine ? cv('uint', engine) : null),
+    'engine-hash': cv('(optional (buff 32))', engineHash ? cv('(buff 32)', `0x${engineHash}`) : null),
+    'contract-owner': cv('principal', DEPLOYER),
+    'pending-owner': cv('(optional principal)', null),
     paused: cv('bool', paused),
     'registered-editions': cv('uint', count),
     'global-revision': cv('uint', '4'),
@@ -42,19 +47,21 @@ describe('Living Synth deploy gates', () => {
   });
 
   it('checks the gateway and registry invariants used before signing', () => {
-    const gateway = `(define-constant XTRATA-CORE\n  '${DEPLOYER}.xtrata-v3-2-3\n)\n(define-read-only (get-owner (id uint)) id)\n(define-read-only (get-parents (id uint)) id)\n(define-read-only (get-inscription-meta (id uint)) id)`;
+    const gateway = `(define-constant XTRATA-CORE\n  '${DEPLOYER}.xtrata-v3-2-3\n)\n(define-read-only (get-owner (id uint)) (contract-call? '${DEPLOYER}.xtrata-v3-2-3 get-owner id))\n(define-read-only (get-parents (id uint)) (contract-call? '${DEPLOYER}.xtrata-v3-2-3 get-parents id))\n(define-read-only (get-inscription-meta (id uint)) (contract-call? '${DEPLOYER}.xtrata-v3-2-3 get-inscription-meta id))`;
     expect(inspectLivingSynthGatewaySource(gateway, DEPLOYER)).toEqual([]);
     expect(inspectLivingSynthGatewaySource(gateway.replace('xtrata-v3-2-3', 'mock-core'), DEPLOYER))
       .toContain(`XTRATA-CORE must target '${DEPLOYER}.xtrata-v3-2-3'`);
 
     const functions = [
-      'lock-core-contract', 'set-engine', 'register-edition', 'register-recording',
+      'lock-core-contract', 'set-engine', 'register-edition', 'register-edition-batch', 'register-recording',
+      'initiate-contract-ownership-transfer', 'cancel-contract-ownership-transfer', 'accept-contract-ownership',
       'set-recording-fee', 'set-fee-recipient', 'get-system-state',
       'get-recording-fee', 'get-fee-recipient', 'get-recording-count',
       'get-recording-id', 'get-mosaic-page'
     ].map((name) => `(${name}`).join('\n');
     const fees = `(define-constant MIN-RECORDING-FEE u1000)\n(define-constant MAX-RECORDING-FEE u1000000)\n(define-constant DEFAULT-RECORDING-FEE u100000)`;
-    const registry = `(define-constant MAX-EDITIONS u1024)\n(define-constant RECORDING-MIME "application/json")\n${fees}\n${functions}`;
+    const limits = `(define-constant ENGINE-MIME "text/javascript")\n(define-constant MAX-RECORDING-BYTES u262144)\n(define-constant MAX-ENGINE-BYTES u131072)\n(define-constant MAX-EDITION-BATCH u25)`;
+    const registry = `(define-constant MAX-EDITIONS u1024)\n(define-constant RECORDING-MIME "application/json")\n${limits}\n${fees}\n(define-data-var engine-hash (optional (buff 32)) none)\n${functions}\n(define-public (register-recording (core principal) (nft-id uint) (recording-id uint) (expected-fee uint)) (ok true))`;
     expect(inspectLivingSynthRegistrySource(registry)).toEqual([]);
     expect(inspectLivingSynthRegistrySource(registry.replace('u1024', 'u1000')))
       .toContain('MAX-EDITIONS must be locked to u1024');
@@ -64,6 +71,9 @@ describe('Living Synth deploy gates', () => {
     expect(parseLivingSynthSystemState(systemCv())).toEqual({
       coreContract: GATEWAY,
       engineId: 77n,
+      engineHash: '11'.repeat(32),
+      contractOwner: DEPLOYER,
+      pendingOwner: null,
       paused: true,
       registeredEditions: 2n,
       globalRevision: 4n,
@@ -74,6 +84,17 @@ describe('Living Synth deploy gates', () => {
     expect(parseInscriptionMime(cv('(optional tuple)', cv('(tuple ...)', {
       'mime-type': cv('(string-ascii 64)', 'application/javascript')
     })))).toBe('application/javascript');
+    expect(parseLivingSynthInscriptionMeta(cv('(optional tuple)', cv('(tuple ...)', {
+      'mime-type': cv('(string-ascii 64)', 'text/javascript'),
+      'total-size': cv('uint', '20667'),
+      sealed: cv('bool', true),
+      'final-hash': cv('(buff 32)', `0x${'22'.repeat(32)}`)
+    })))).toEqual({
+      mimeType: 'text/javascript',
+      totalSize: 20667n,
+      sealed: true,
+      finalHash: '22'.repeat(32)
+    });
     expect(parseLivingSynthMosaicPage(cv('(response (list ...))', cv('(list ...)', [
       cv('(tuple ...)', {
         edition: cv('uint', '1'),
@@ -132,6 +153,7 @@ describe('Living Synth deploy gates', () => {
     expect(deriveLivingSynthGates({ ...base, mosaicAuditPassed: false }).goLive).toBe(false);
     expect(deriveLivingSynthGates({ ...base, systemState: parseLivingSynthSystemState(systemCv({ core: null })) }).setEngine).toBe(false);
     expect(deriveLivingSynthGates({ ...base, systemState: parseLivingSynthSystemState(systemCv({ fee: '999' })) }).goLive).toBe(false);
-    expect(deriveLivingSynthGates({ ...base, manifestEntries: 1023 }).auditMosaic).toBe(false);
+    expect(deriveLivingSynthGates({ ...base, systemState: parseLivingSynthSystemState(systemCv({ engineHash: null })) }).engineSet).toBe(false);
+    expect(deriveLivingSynthGates({ ...base, systemState: parseLivingSynthSystemState(systemCv({ count: '2' })), manifestEntries: 2 }).auditMosaic).toBe(true);
   });
 });
