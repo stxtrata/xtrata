@@ -155,6 +155,7 @@ export const PEPE_ESCROW_RESOLVERS = new Map(
 );
 
 export const GRID_MIME_LABELS = new Map([
+  ['application/pdf', 'PDF'],
   ['text/plain', 'PLAIN TEXT'],
   ['text/javascript', 'JAVASCRIPT'],
   ['application/javascript', 'JAVASCRIPT'],

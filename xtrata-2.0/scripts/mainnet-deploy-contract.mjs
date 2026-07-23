@@ -55,6 +55,16 @@ const FEE_USTX = BigInt(process.env.XTRATA_MAINNET_FEE_USTX ?? '750000');
 // Add new mainnet contracts HERE (live variant in contracts/live/ first).
 // ---------------------------------------------------------------------------
 const DEPLOYABLE = {
+  'xtrata-v3-2-3-gateway': {
+    source: 'contracts/live/xtrata-v3-2-3-gateway.clar',
+    clarityVersion: 4,
+    notes: 'Proof of Free Living Synth read-only gateway for Xtrata v3.2.3.'
+  },
+  'proof-of-free-living-synth-v1': {
+    source: 'contracts/live/proof-of-free-living-synth-v1.clar',
+    clarityVersion: 4,
+    notes: 'Proof of Free ownership-gated recording child registry and mosaic state.'
+  },
   'xtrata-v3-2-3': {
     source: 'contracts/live/xtrata-v3.2.3.clar',
     notes: 'Core inscription contract (see mainnet-v3.2.3-handover.mjs for post-deploy).'

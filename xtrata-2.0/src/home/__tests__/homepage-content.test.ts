@@ -15,6 +15,14 @@ const homeMainSource = readFileSync(new URL('../main.js', import.meta.url), 'utf
 const radioSource = readFileSync(new URL('../radio.js', import.meta.url), 'utf8');
 const configSource = readFileSync(new URL('../config.js', import.meta.url), 'utf8');
 const homeStyles = readFileSync(new URL('../styles/home.css', import.meta.url), 'utf8');
+const tokenCardMediaSource = readFileSync(
+  new URL('../../components/TokenCardMedia.tsx', import.meta.url),
+  'utf8'
+);
+const tokenContentPreviewSource = readFileSync(
+  new URL('../../components/TokenContentPreview.tsx', import.meta.url),
+  'utf8'
+);
 
 describe('homepage content configuration', () => {
   it('passes the homepage content contract', () => {
@@ -69,6 +77,19 @@ describe('homepage content configuration', () => {
     expect(homeMainSource).toContain(
       "['inscribe', 'my-wallet', 'wallet', 'xplorer', 'x', 'drops', 'market', 'create-wizard'].includes(seg)"
     );
+  });
+
+  it('renders PDFs from immutable runtime URLs without sandboxing the browser PDF viewer', () => {
+    expect(configSource).toContain("['application/pdf', 'PDF']");
+    expect(homeMainSource).toContain('pdfSourceUrl:');
+    expect(homeMainSource).toContain(
+      'getTokenRuntimeContentUrl(token) ?? inscriptionEndpointUrl(token.id)'
+    );
+    expect(homeMainSource).not.toContain("frame.sandbox = '';");
+    expect(tokenCardMediaSource).toContain('src={pdfRuntimeUrl ?? contentUrl}');
+    expect(tokenContentPreviewSource).toContain('src={pdfRuntimeUrl ?? contentUrl}');
+    expect(tokenCardMediaSource).not.toContain('sandbox=""');
+    expect(tokenContentPreviewSource).not.toContain('sandbox=""');
   });
 
   it('hands a selected My Xtrata inscription directly to the free drop form', () => {

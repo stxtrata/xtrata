@@ -75,6 +75,7 @@ import { createObjectUrl } from '../lib/utils/blob';
 import { formatBytes, truncateMiddle } from '../lib/utils/format';
 import { bytesToHex } from '../lib/utils/encoding';
 import { logDebug, logInfo, logWarn, shouldLog } from '../lib/utils/logger';
+import { buildRuntimeInscriptionContentUrl } from '../lib/collections/cover-image';
 import AddressLabel from './AddressLabel';
 
 type TokenContentPreviewProps = {
@@ -369,6 +370,12 @@ export default function TokenContentPreview(props: TokenContentPreviewProps) {
     displayMimeType === 'text/html' ||
     displayMimeType === 'application/xhtml+xml';
   const isPdf = displayMimeType === 'application/pdf';
+  const pdfRuntimeUrl = isPdf
+    ? buildRuntimeInscriptionContentUrl({
+        coreContractId: props.token.sourceContractId ?? props.contractId,
+        tokenId: props.token.id
+      })
+    : null;
   const hasContent = !!contentQuery.data && contentQuery.data.length > 0;
   const contentBytes = contentQuery.data ? contentQuery.data.length : null;
   const sniffedMimeType = useMemo(
@@ -2155,10 +2162,9 @@ export default function TokenContentPreview(props: TokenContentPreviewProps) {
                           contentUrl ? (
                             <iframe
                               title={`inscription-${props.token.id.toString()}`}
-                              sandbox=""
                               referrerPolicy="no-referrer"
                               loading="lazy"
-                              src={contentUrl}
+                              src={pdfRuntimeUrl ?? contentUrl}
                             />
                           ) : (
                             <p>PDF preview unavailable.</p>

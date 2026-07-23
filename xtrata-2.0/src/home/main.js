@@ -3454,15 +3454,20 @@
         frame.title = 'inscription-preview';
         frame.referrerPolicy = 'no-referrer';
         frame.loading = 'lazy';
-        frame.sandbox = previewMimeType?.trim().toLowerCase() === 'application/pdf'
-          ? ''
-          : 'allow-scripts';
-        if (options.htmlDoc && previewMimeType?.trim().toLowerCase() !== 'application/pdf') {
+        const isPdf =
+          previewMimeType?.trim().toLowerCase() === 'application/pdf';
+        if (!isPdf) {
+          frame.sandbox = 'allow-scripts';
+        }
+        if (options.htmlDoc && !isPdf) {
           frame.srcdoc = options.interactiveHtml
             ? injectInteractivePreviewHtml(options.htmlDoc)
             : injectGridThumbnailHtml(options.htmlDoc);
         } else {
-          frame.src = getObjectUrl();
+          frame.src =
+            isPdf && options.pdfSourceUrl
+              ? options.pdfSourceUrl
+              : getObjectUrl();
         }
         target.append(frame);
         return;
@@ -5868,13 +5873,16 @@
         frame.title = 'inscription-preview';
         frame.referrerPolicy = 'no-referrer';
         frame.loading = 'lazy';
-        frame.sandbox = mimeType?.trim().toLowerCase() === 'application/pdf'
-          ? ''
-          : 'allow-scripts';
-        if (htmlDoc && mimeType?.trim().toLowerCase() !== 'application/pdf') {
+        const isPdf = fullscreenMimeType === 'application/pdf';
+        if (!isPdf) {
+          frame.sandbox = 'allow-scripts';
+        }
+        if (htmlDoc && !isPdf) {
           frame.srcdoc = htmlDoc;
         } else {
-          frame.src = url;
+          frame.src = isPdf
+            ? getTokenRuntimeContentUrl(token) ?? inscriptionEndpointUrl(token.id)
+            : url;
         }
         dom.fullscreenStage.append(frame);
         return;
@@ -6820,17 +6828,12 @@
       }
 
       if (media.kind === 'pdf') {
-        const blob = new Blob([media.bytes], {
-          type: media.mimeType ?? 'application/pdf'
-        });
-        const url = URL.createObjectURL(blob);
-        state.tokenThumbUrls.set(cacheKey, url);
         const frame = document.createElement('iframe');
         frame.title = 'inscription-preview';
-        frame.sandbox = '';
         frame.referrerPolicy = 'no-referrer';
         frame.loading = 'lazy';
-        frame.src = url;
+        frame.src =
+          getTokenRuntimeContentUrl(token) ?? inscriptionEndpointUrl(token.id);
         thumbElement.append(frame);
         return true;
       }
@@ -7383,7 +7386,13 @@
       renderSelectedInscriptionMeta(token, null, mimeType);
       renderBytesPreview(dom.tokenPreviewMedia, bytes, mimeType, (url) => {
         state.tokenPreviewUrl = url;
-      }, { truthfulImageSizing: true, htmlDoc, interactiveHtml: true });
+      }, {
+        truthfulImageSizing: true,
+        htmlDoc,
+        interactiveHtml: true,
+        pdfSourceUrl:
+          getTokenRuntimeContentUrl(token) ?? inscriptionEndpointUrl(token.id)
+      });
       void warmThumbnailCacheFromBytes(token, bytes, mimeType);
       debugLog('preview', 'selected inscription preview rendered', {
         tokenId: token.id.toString(),
