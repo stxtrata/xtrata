@@ -349,6 +349,9 @@
   .spin{display:inline-block;width:12px;height:12px;border:2px solid var(--line);border-top-color:var(--acc);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:7px}
   @keyframes spin{to{transform:rotate(360deg)}}
   .progress{font-size:13px;color:var(--ink);margin-top:12px;background:#0e1726;border:1px solid var(--line);border-radius:10px;padding:11px 13px}
+  .pbar{margin-top:9px;height:6px;border-radius:6px;background:#0b1220;border:1px solid var(--line);overflow:hidden}
+  .pbar>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--acc),var(--acc2,#6a5acd));border-radius:6px;transition:width .2s linear}
+  .substep{margin-top:7px;font-size:12px;color:var(--mut)}
   table{width:100%;border-collapse:collapse;font-size:12.5px}
   th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line)}
   th{color:var(--mut);font-weight:600} tbody tr{cursor:pointer} tbody tr:hover{background:#0e1622}
@@ -664,7 +667,7 @@ try{
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=15"></script>
+<script src="agent-one.js?v=16"></script>
 <script src="optimize-audio.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script>
@@ -1448,8 +1451,9 @@ async function renderJobDetail(jobId,out,isActive){
     const active=(st==='FUNDED'||st==='INSCRIBING'||st==='DELIVERING'||st==='RECOVERING'||(st==='INSCRIBED'&&job.fastTrack));
     if(active) LIVE.add(jobId); else LIVE.delete(jobId);
     if(isActive){ if(active){ if(!lastProgAt) lastProgAt=Date.now(); } else lastProgAt=0; }
+    if(isActive){ if(active) barSync(st,job); else if(st==='COMPLETE'||st==='COMPLETE_WITH_SKIPS') BAR.target=100; else if(st==='AWAITING_DEPOSIT'||st==='AWAITING_PARENT'){ BAR.pct=0; BAR.target=0; BAR.floor=0; BAR.ceil=0; } }
     const ds=(st==='AWAITING_DEPOSIT'&&funded)?'FUNDED':st;
-    const phaseMsg={FUNDED:'Payment detected — starting…',INSCRIBING:'Inscribing on-chain…',INSCRIBED:'Inscribed — delivering…',DELIVERING:'Delivering inscription + refunding change…',RECOVERING:'Recovery running — returning inscriptions before sweeping STX…'}[st];
+    const phaseMsg={FUNDED:'Payment detected — starting…',INSCRIBING:'Inscribing on-chain…',INSCRIBED:'Inscribed — delivering…',DELIVERING:'Delivering on-chain — a few separate transactions…',RECOVERING:'Recovery running — returning inscriptions before sweeping STX…'}[st];
     const showDeposit=(st==='AWAITING_DEPOSIT');
     if(isActive){
       expiryAt = (showDeposit && job.createdAt && SERVER.windowMs) ? (Date.parse(job.createdAt) + SERVER.windowMs*12)
@@ -1518,7 +1522,7 @@ async function renderJobDetail(jobId,out,isActive){
       ${job.receiptTokenId?`<div class="kv"><span>Receipt token</span><span class="ok">#${esc(job.receiptTokenId)}</span></div>`:''}
       ${job.agentFeeUstx?`<div class="kv"><span>Agent fee (${job.agentFeePct||10}%)</span><span style="color:var(--acc2)">${stx(job.agentFeeUstx)}</span></div>`:''}
       ${(job.refundedUstx!=null)?`<div class="kv"><span>Change refunded</span><span>${stx(job.refundedUstx||'0')}</span></div>`:''}
-      ${active?`<div class="progress"><span class="spin"></span>${esc(phaseMsg||'Working…')}${job.progress?(' · '+esc(job.progress)):''} ${isActive?'<span id="progT" class="muted"></span>':''}</div>`:''}
+      ${active?`<div class="progress"><span class="spin"></span>${esc(phaseMsg||'Working…')} ${isActive?'<span id="progT" class="muted"></span>':''}${isActive?`<div class="pbar"><i id="pbarFill" style="width:${(BAR.pct||0).toFixed(1)}%"></i></div>`:''}${job.progress?`<div class="substep">${esc(job.progress)}</div>`:''}</div>`:''}
       ${active?`<div class="muted" style="margin-top:6px;font-size:12px;color:var(--ok)">🔒 Keep this tab open while the browser-held one-shot wallet is working. If it is interrupted, reopen this page in the same browser profile; the saved recovery key remains available. Don't send another payment.</div>`:''}
       ${showDeposit&&!funded?`<div class="muted" style="margin-top:10px;font-size:12px">${job.fastTrack?'Pay from your connected wallet (shown above) — it receives the inscription and any change, and processing starts automatically on arrival. Payments from any other wallet are returned to the sender.':'Waiting for your deposit — the status flips to FUNDED once it lands.'}</div>`:''}
       ${job.error?`<div class="err" style="margin-top:8px">Error: ${esc(job.error)}${!job.fastTrack?` <button class="btn ghost" onclick="act('run','${esc(job.jobId)}')" style="margin-left:8px;padding:5px 10px">Retry</button>`:''}</div>`:''}
@@ -1596,6 +1600,28 @@ function viewReceipt(id){ try{ const A=window.XtrataAgent; const html=A&&A.getRe
 window.selectJob=selectJob; window.act=act; window.viewReceipt=viewReceipt;
 setInterval(()=>{ const t=$('#progT'); if(t&&lastProgAt){ const s=Math.round((Date.now()-lastProgAt)/1000); let x=''; if(s>=90)x=' · slower than usual — Stacks may be congested, still working'; else if(s>=30)x=' · confirming on-chain'; t.textContent='('+s+'s'+x+')'; }
   const et=$('#expT'); if(et&&expiryAt){ const r=expiryAt-Date.now(); et.textContent = r>0 ? ('Auto-returns in '+Math.floor(r/60000)+':'+String(Math.floor(r/1000)%60).padStart(2,'0')) : 'Returning funds…'; } },1000);
+// ---- determinate progress bar: a steady creep so a slow confirmation never looks frozen ----
+const BAR={pct:0,target:0,floor:0,ceil:0,at:0};
+function barBand(st,job){
+  const p=(job&&job.progress)||''; const m=/(\d+)\s*\/\s*(\d+)/.exec(p);
+  if(st==='FUNDED') return [6,14];
+  if(st==='INSCRIBING'){ if(m){ const f=Math.max(0,Math.min(1,(+m[1])/((+m[2])||1))); const lo=16+52*f; return [lo,Math.min(70,lo+6)]; } return [16,70]; }
+  if(st==='INSCRIBED') return [70,76];
+  if(st==='DELIVERING') return [76,97];
+  if(st==='RECOVERING') return [55,95];
+  if(st==='COMPLETE'||st==='COMPLETE_WITH_SKIPS') return [100,100];
+  return [BAR.floor,BAR.ceil];
+}
+function barSync(st,job){ const b=barBand(st,job); if(b[0]>BAR.floor||b[1]!==BAR.ceil) BAR.at=Date.now(); BAR.floor=b[0]; BAR.ceil=b[1]; if(BAR.pct<b[0]) BAR.pct=b[0]; BAR.target=Math.max(BAR.target,b[0]); }
+setInterval(()=>{ const el=document.getElementById('pbarFill'); if(!el) return;
+  const span=Math.max(0,BAR.ceil-BAR.floor); const t=Math.min(1,(Date.now()-BAR.at)/40000);
+  const crept=BAR.floor+span*(1-Math.pow(1-t,2))*0.92;
+  BAR.target=Math.max(BAR.target,Math.min(BAR.ceil-0.5,crept),BAR.floor);
+  if(BAR.ceil>=100) BAR.target=100;
+  BAR.pct+=(BAR.target-BAR.pct)*0.15;
+  if(BAR.pct>99.6&&BAR.ceil>=100) BAR.pct=100;
+  el.style.width=BAR.pct.toFixed(1)+'%';
+},80);
 
 // On-chain receipt toggles (single + batch stay in sync; choice persists; re-quotes live).
 (function initReceiptToggles(){

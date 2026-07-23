@@ -35,10 +35,34 @@ const applyWizardDevAlias = (req: { url?: string }, _res: unknown, next: () => v
   next();
 };
 
+const applyContractStudioDevAlias = (
+  req: { url?: string },
+  _res: unknown,
+  next: () => void
+) => {
+  const url = req.url ?? '';
+  if (
+    url === '/contract-studio' ||
+    url.startsWith('/contract-studio/') ||
+    url.startsWith('/contract-studio?')
+  ) {
+    const query = url.includes('?') ? `?${url.split('?')[1]}` : '';
+    req.url = `/workspace.html${query}`;
+  }
+  next();
+};
+
 const wizardDevAliasPlugin = {
   name: 'wizard-dev-alias',
   configureServer(server: { middlewares: { use: typeof applyWizardDevAlias } }) {
     server.middlewares.use(applyWizardDevAlias);
+  }
+};
+
+const contractStudioDevAliasPlugin = {
+  name: 'contract-studio-dev-alias',
+  configureServer(server: { middlewares: { use: typeof applyContractStudioDevAlias } }) {
+    server.middlewares.use(applyContractStudioDevAlias);
   }
 };
 
@@ -64,7 +88,12 @@ export default defineConfig(({ mode }) => {
     env.VITE_BNSV2_API_BASE_TESTNET || env.VITE_BNSV2_API_BASE || 'https://api.bnsv2.com/testnet';
 
   return {
-    plugins: [react(), opusGeneratorHeadersPlugin, wizardDevAliasPlugin],
+    plugins: [
+      react(),
+      opusGeneratorHeadersPlugin,
+      wizardDevAliasPlugin,
+      contractStudioDevAliasPlugin
+    ],
     define: {
       __XSTRATA_HAS_HIRO_KEY__: JSON.stringify(hasHiroApiKey),
       __XTRATA_APP_VERSION__: JSON.stringify(

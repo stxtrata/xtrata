@@ -196,6 +196,16 @@ path = 'contracts/xtrata-arcade-scores-v1.3.clar'
 clarity_version = 3
 epoch = 'latest'
 
+[contracts.mock-xtrata-studio-core]
+path = 'contracts/mock-xtrata-studio-core.clar'
+clarity_version = 3
+epoch = 'latest'
+
+[contracts.xtrata-studio-leaderboard-v1]
+path = 'contracts/xtrata-studio-leaderboard-v1.clar'
+clarity_version = 3
+epoch = 'latest'
+
 
 [repl.analysis]
 passes = [
