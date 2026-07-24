@@ -51,7 +51,7 @@
         'my-wallet': 'My Wallet — Xtrata',
         xplorer: 'Xtrata Xplorer',
         market: 'Market — Xtrata',
-        drops: 'Drops — Claim free inscriptions — Xtrata',
+        drops: 'Drops — Sponsored claims, zero network fees — Xtrata',
         wizard: 'Inscription Wizard — Xtrata'
       };
       if (titles[page]) {
@@ -109,7 +109,7 @@
         <div class="living-hero__actions">
           <a class="btn hero-btn" href="/xplorer" target="_self" data-home-action="hero:explore">Explore what's alive</a>
           <button class="btn secondary hero-btn" id="introPrepareButton" type="button" data-home-action="hero:create">Create yours</button>
-          <a class="btn secondary hero-btn" href="/drops" target="_self" data-home-action="hero:claim">Claim free</a>
+          <a class="btn secondary hero-btn" href="/drops" target="_self" data-home-action="hero:claim">Claim drops</a>
         </div>
         <div class="living-hero__trust">
           <span>Fully on-chain</span>
@@ -192,10 +192,10 @@
       </div>
       <div class="story-grid">
         <article class="story-card story-card--free">
-          <span class="story-card__number">01 / Proof of Free</span>
-          <h3>Nothing to buy. Nothing to fund. Just claim it.</h3>
-          <p>Sponsored transactions turn an on-chain object into a genuine free distribution experience.</p>
-          <a class="text-link" href="/drops" target="_self" data-home-action="story:proof-of-free">See free drops →</a>
+          <span class="story-card__number">01 / Zero-fee claims</span>
+          <h3>Zero fees. Zero friction. Just claim it.</h3>
+          <p>Sponsored transactions cover the network fee, so claiming an on-chain object costs nothing in gas.</p>
+          <a class="text-link" href="/drops" target="_self" data-home-action="story:drops">See live drops →</a>
         </article>
         <article class="story-card story-card--music">
           <span class="story-card__number">02 / Living credits</span>
@@ -247,10 +247,10 @@
     <section class="final-invitation home-only" aria-labelledby="finalInvitationTitle">
       <span class="section-kicker">Your turn</span>
       <h2 id="finalInvitationTitle">What will you put on-chain?</h2>
-      <p>Make an object, launch a free drop, explore the living archive, or build an experience around it.</p>
+      <p>Make an object, launch a sponsored drop, explore the living archive, or build an experience around it.</p>
       <div class="final-invitation__actions">
         <a class="btn" href="/inscribe" target="_self" data-home-action="final:create">Create something</a>
-        <a class="btn secondary" href="/drops" target="_self" data-home-action="final:drop">Launch a free drop</a>
+        <a class="btn secondary" href="/drops" target="_self" data-home-action="final:drop">Launch a sponsored drop</a>
         <a class="btn secondary" href="/xplorer" target="_self" data-home-action="final:explore">Explore Xtrata</a>
         <a class="btn secondary" href="/#build" target="_self" data-home-action="final:build">Build with the SDK</a>
       </div>
@@ -774,7 +774,7 @@
             <div class="panel-title-row">
               <h1 class="panel-title" id="dropsTitle">Drops</h1>
             </div>
-            <p class="panel-subtitle">Claim free inscriptions — no STX needed. The creator has prepaid the network fee.</p>
+            <p class="panel-subtitle">Sponsored claims with zero network fees — the creator has prepaid the transaction.</p>
           </div>
           <span class="badge" id="dropsNetworkBadge">mainnet</span>
         </div>

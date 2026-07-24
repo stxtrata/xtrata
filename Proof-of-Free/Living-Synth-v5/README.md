@@ -102,7 +102,7 @@ parent-child inscriptions. The one bespoke contract, **`recording-fees`**, charg
   (connect → inscribe engine → deploy `recording-fees` → inscribe mosaic → inscribe
   editions → distribute), each step verified.
 
-Architecture: [`docs/onchain-reveal-plan.md`](docs/onchain-reveal-plan.md) · contract: [`contract/`](contract).
+Architecture: [`docs/onchain-reveal-plan.md`](docs/onchain-reveal-plan.md) · deploy: [`docs/deploy-runbook.md`](docs/deploy-runbook.md) · contract: [`contract/`](contract).
 
 ## Layout
 

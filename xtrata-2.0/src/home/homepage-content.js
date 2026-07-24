@@ -87,7 +87,7 @@ export const HOMEPAGE_OBJECTS = Object.freeze([
   {
     id: 'free-drops',
     eyebrow: 'Claim',
-    title: 'Free drops anyone can claim',
+    title: 'Sponsored drops anyone can claim',
     description:
       'Creators prepay the network fee. A collector only needs a Stacks wallet—no STX is required for sponsored claims.',
     href: '/drops',
@@ -96,7 +96,7 @@ export const HOMEPAGE_OBJECTS = Object.freeze([
     preview: {
       type: 'claim',
       title: 'Sponsored Xtrata claim receipt',
-      label: 'Proof of Free · sponsored claim'
+      label: 'Xtrata Drops · sponsored claim'
     }
   },
   {
@@ -156,7 +156,7 @@ export const HOMEPAGE_INTENTS = Object.freeze([
     title: 'Claim',
     description: 'Collect a sponsored drop without needing STX for the transaction.',
     href: '/drops',
-    cta: 'Claim something free'
+    cta: 'Claim a sponsored drop'
   },
   {
     id: 'collect',
@@ -193,7 +193,7 @@ export const HOMEPAGE_ACTIVITY_DOORS = Object.freeze([
   },
   {
     id: 'claiming',
-    verb: 'Free claims',
+    verb: 'Sponsored claims',
     description: 'Creator-funded drops with zero-STX claim support',
     href: '/drops'
   },

@@ -276,7 +276,7 @@
       xplorer: 'Xtrata Xplorer',
       'my-wallet': 'My Wallet — Xtrata',
       market: 'Market — Xtrata',
-      drops: 'Drops — Claim free inscriptions — Xtrata',
+      drops: 'Drops — Sponsored claims, zero network fees — Xtrata',
       wizard: 'Inscription Wizard — Xtrata'
     };
 
@@ -11870,7 +11870,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             : null;
         if (claimedGroup !== null) {
           const lockLabel = collectionLock?.label ?? 'this campaign group';
-          dropsDom.status.innerHTML = `<span><strong>Drops</strong> this wallet has already claimed a free drop from ${lockLabel}.</span><span class="badge amber">one per wallet</span>`;
+          dropsDom.status.innerHTML = `<span><strong>Drops</strong> this wallet has already claimed a drop from ${lockLabel}.</span><span class="badge amber">one per wallet</span>`;
           recordDropDiagnostic(
             round,
             'GROUP_LIMIT',
@@ -11893,10 +11893,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const postConditions = dropClaimPostConditions(drop);
       const providerId = getSelectedWalletProviderId() ?? 'injected provider';
       const isCampaignClaim = drop.campaignId !== null;
-      recordDropDiagnostic(round, 'START', `Free claim for drop #${drop.dropId}, inscription #${drop.tokenId}.`);
+      recordDropDiagnostic(round, 'START', `Sponsored claim for drop #${drop.dropId}, inscription #${drop.tokenId}.`);
       recordDropDiagnostic(round, 'PREFLIGHT', `Wallet ${providerId}; ${drop.entry.network}; connected ${state.walletSession.address}.`);
       recordDropDiagnostic(round, 'PLAN', `Build sponsored ${drop.contractId}::${isCampaignClaim ? 'claim-campaign' : 'claim'}, then stx_signTransaction with broadcast=false; origin fee=0, deny mode, 1 NFT post-condition.`);
-      dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the free claim in your wallet (fee 0)…</span>';
+      dropsDom.status.innerHTML = '<span><strong>Drops</strong> confirm the sponsored claim in your wallet (fee 0)…</span>';
       try {
         const bnsName = await chooseClaimBnsName(drop, policyRules, round);
         const sponsorClient = createSponsorClient(dropsSponsorBase(drop.entry));
@@ -12104,9 +12104,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             code: 'SETTLEMENT_TIMEOUT'
           });
         }
-        recordDropDiagnostic(round, 'COMPLETE', `Free claim settled. Claim ${finalJob.txids?.buy ?? 'n/a'}; reimbursement ${finalJob.txids?.claim ?? 'n/a'}; refund ${finalJob.txids?.refund ?? 'n/a'}.`, 'success');
+        recordDropDiagnostic(round, 'COMPLETE', `Sponsored claim settled. Claim ${finalJob.txids?.buy ?? 'n/a'}; reimbursement ${finalJob.txids?.claim ?? 'n/a'}; refund ${finalJob.txids?.refund ?? 'n/a'}.`, 'success');
         await loadDropsPage();
-        dropsDom.status.innerHTML = '<span><strong>Drops</strong> free claim confirmed and sponsorship settled.</span><span class="badge green">complete</span>';
+        dropsDom.status.innerHTML = '<span><strong>Drops</strong> sponsored claim confirmed and settled.</span><span class="badge green">complete</span>';
       } catch (error) {
         const code = error?.code ?? 'UNKNOWN_BLOCK';
         const message = String(error?.message ?? error);
@@ -12126,7 +12126,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           if (button.dataset.dropClaim === claimKey) {
             const claimed = dropsState.recentlyClaimed.has(claimKey);
             button.disabled = claimed;
-            button.textContent = claimed ? 'Claimed successfully' : 'Claim free — no STX needed';
+            button.textContent = claimed ? 'Claimed successfully' : 'Claim — zero network fee';
           }
         });
       }
@@ -12301,7 +12301,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         dropsDom.status.innerHTML = '<span><strong>Drops</strong> no live drops right now — create one below, or check back soon.</span>';
         return;
       }
-      dropsDom.status.innerHTML = `<span><strong>Drops</strong> ${live.length} free claim${live.length === 1 ? '' : 's'} available.</span>`;
+      dropsDom.status.innerHTML = `<span><strong>Drops</strong> ${live.length} sponsored claim${live.length === 1 ? '' : 's'} available.</span>`;
       dropsDom.listings.replaceChildren(
         ...visible.map((drop) => {
           const claimKey = `${drop.contractId}:${drop.dropId}`;
@@ -12326,11 +12326,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           badges.className = 'market-card__badge-row';
           badges.innerHTML = claimed
             ? '<span class="badge green">Claimed</span><span class="badge">No STX spent</span>'
-            : '<span class="badge green">Free claim</span><span class="badge">No STX needed</span>';
+            : '<span class="badge green">Sponsored claim</span><span class="badge">Zero network fee</span>';
 
           const price = document.createElement('div');
           price.className = 'market-card__price';
-          price.textContent = claimed ? 'Claimed' : 'Free';
+          price.textContent = claimed ? 'Claimed' : 'Sponsored';
 
           const meta = document.createElement('div');
           meta.className = 'market-card__meta';
@@ -12393,7 +12393,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             const claimBusy = dropsState.claimsInFlight.has(claimKey);
             claimBtn.dataset.dropClaim = claimKey;
             claimBtn.disabled = claimBusy;
-            claimBtn.textContent = claimBusy ? 'Claim in progress…' : 'Claim free — no STX needed';
+            claimBtn.textContent = claimBusy ? 'Claim in progress…' : 'Claim — zero network fee';
             claimBtn.addEventListener('click', () => { void dropClaim(drop); });
             actions.append(claimBtn);
           }
@@ -12600,7 +12600,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       if (dropsDom.createTokenId) dropsDom.createTokenId.value = tokenId;
       if (dropsDom.createStatus) {
         dropsDom.createStatus.textContent =
-          `Inscription #${tokenId} selected. Review the refundable sponsorship deposit, then create the free giveaway.`;
+          `Inscription #${tokenId} selected. Review the refundable sponsorship deposit, then create the sponsored drop.`;
       }
       dropsDom.create?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };

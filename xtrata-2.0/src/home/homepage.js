@@ -69,7 +69,7 @@ const createPreview = (preview, options = {}) => {
       element('span', 'claim-object__status', 'Sponsored claim'),
       element('strong', 'claim-object__price', '0 STX'),
       element('span', 'claim-object__note', 'Network fee sponsored'),
-      element('span', 'claim-object__button', 'Claim free →')
+      element('span', 'claim-object__button', 'Claim →')
     );
     frame.append(claim);
   }
