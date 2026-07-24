@@ -48,6 +48,16 @@ import {
   type DeployLogLevel
 } from './lib/deploy/drops-v1-1';
 import {
+  PROOF_OF_FREE_COLLECTION_SIZE,
+  PROOF_OF_FREE_CONTRACT_NAME,
+  PROOF_OF_FREE_ENGINE_CANDIDATE_SHA256,
+  generateProofOfFreeContract,
+  inspectProofOfFreeSource,
+  normalizeProofOfFreeEngine,
+  parseProofOfFreeCampaign,
+  parseProofOfFreeConfig
+} from './lib/deploy/proof-of-free-v1';
+import {
   LIVING_SYNTH_COLLECTION_SIZE,
   LIVING_SYNTH_GATEWAY_NAME,
   LIVING_SYNTH_PAGE_COUNT,
@@ -88,6 +98,7 @@ type Deployable = {
   notes: string;
   sponsoredMarket?: boolean;
   dropsV11?: boolean;
+  proofOfFree?: boolean;
   livingSynthRole?: 'gateway' | 'registry';
   paymentToken?: string;
 };
@@ -115,6 +126,16 @@ const DEPLOYABLE: Deployable[] = [
     dropsV11: true,
     notes:
       'Campaign-aware sponsored drops: immutable collection rules, one-per-wallet/BNS enforcement, and shared identity across every Wizard batch.'
+  },
+  {
+    name: PROOF_OF_FREE_CONTRACT_NAME,
+    source: 'generated after the engine inscription is verified',
+    code: dropsV11Source,
+    sponsoredMarket: true,
+    dropsV11: true,
+    proofOfFree: true,
+    notes:
+      'Dedicated Living Synth v3 claim controller. Generated in-browser with the verified engine inscription ID/SHA-256; campaign 0 is fixed to 1,024 with BNS, wallet and BNS-name limits.'
   },
   {
     name: 'xtrata-market-sponsored-stx-v1-1',
@@ -246,6 +267,30 @@ const livingSynth: LivingSynthConsoleState = {
   error: null
 };
 
+type ProofOfFreeConsoleState = {
+  engineInput: string;
+  expectedHashInput: string;
+  engineValidatedId: number | null;
+  engineHash: string | null;
+  engineSize: bigint | null;
+  engineMime: string | null;
+  deploymentVerified: boolean;
+  error: string | null;
+  busy: boolean;
+};
+
+const proofOfFree: ProofOfFreeConsoleState = {
+  engineInput: '',
+  expectedHashInput: PROOF_OF_FREE_ENGINE_CANDIDATE_SHA256,
+  engineValidatedId: null,
+  engineHash: null,
+  engineSize: null,
+  engineMime: null,
+  deploymentVerified: false,
+  error: null,
+  busy: false
+};
+
 const addLog = (
   stateEntry: ContractState,
   action: string,
@@ -310,6 +355,20 @@ const runPreflight = async (entry: Deployable, code: string): Promise<PreflightR
   if (entry.dropsV11) {
     problems.push(...inspectDropsV11Source(code, EXPECTED_DEPLOYER));
   }
+  if (entry.proofOfFree) {
+    if (proofOfFree.engineValidatedId === null || !proofOfFree.engineHash) {
+      problems.push('Proof of Free engine inscription has not passed the on-chain verification gate');
+    } else {
+      problems.push(
+        ...inspectProofOfFreeSource(
+          code,
+          EXPECTED_DEPLOYER,
+          proofOfFree.engineValidatedId,
+          proofOfFree.engineHash
+        )
+      );
+    }
+  }
   if (entry.livingSynthRole === 'gateway') {
     problems.push(...inspectLivingSynthGatewaySource(code, EXPECTED_DEPLOYER));
   }
@@ -355,7 +414,18 @@ const loadContract = async (name: string) => {
   );
   render();
   try {
-    const code = stateEntry.entry.code;
+    const code = stateEntry.entry.proofOfFree
+      ? (() => {
+          if (proofOfFree.engineValidatedId === null || !proofOfFree.engineHash) {
+            throw new Error('Verify the inscribed engine ID and SHA-256 before generating the contract.');
+          }
+          return generateProofOfFreeContract(
+            stateEntry.entry.code,
+            proofOfFree.engineValidatedId,
+            proofOfFree.engineHash
+          );
+        })()
+      : stateEntry.entry.code;
     if (!code || code.trimStart().startsWith('<')) {
       throw new Error('bundled contract source is missing or invalid');
     }
@@ -589,6 +659,201 @@ const callReadJson = async (
     throw new Error(`${functionName} read failed: ${payload.cause ?? 'missing result'}`);
   }
   return cvToJSON(hexToCV(payload.result));
+};
+
+const testProofOfFreeEngine = async () => {
+  const normalized = normalizeProofOfFreeEngine(
+    proofOfFree.engineInput,
+    proofOfFree.expectedHashInput
+  );
+  proofOfFree.engineValidatedId = null;
+  proofOfFree.engineHash = null;
+  proofOfFree.engineSize = null;
+  proofOfFree.engineMime = null;
+  proofOfFree.deploymentVerified = false;
+  if (!normalized.ok) {
+    proofOfFree.error = normalized.error;
+    render();
+    return;
+  }
+  proofOfFree.busy = true;
+  proofOfFree.error = null;
+  render();
+  try {
+    const decoded = await callReadJson(
+      EXPECTED_DEPLOYER,
+      LIVING_SYNTH_XTRATA_NAME,
+      'get-inscription-meta',
+      [uintCV(normalized.engineId)]
+    );
+    const meta = parseLivingSynthInscriptionMeta(decoded);
+    if (!meta) throw new Error(`Engine #${normalized.engineId} returned incomplete metadata.`);
+    if (!meta.sealed) throw new Error(`Engine #${normalized.engineId} is not sealed.`);
+    if (meta.mimeType !== 'text/javascript') {
+      throw new Error(`Engine #${normalized.engineId} has unsupported MIME ${meta.mimeType}.`);
+    }
+    if (meta.totalSize < 1n || meta.totalSize > 131_072n) {
+      throw new Error(`Engine #${normalized.engineId} must be 1–131072 bytes.`);
+    }
+    const chainHash = meta.finalHash.replace(/^0x/i, '').toLowerCase();
+    if (chainHash !== normalized.engineSha256) {
+      throw new Error(
+        `Engine hash mismatch: Xtrata reports ${chainHash}, expected ${normalized.engineSha256}.`
+      );
+    }
+    proofOfFree.engineValidatedId = normalized.engineId;
+    proofOfFree.engineHash = chainHash;
+    proofOfFree.engineSize = meta.totalSize;
+    proofOfFree.engineMime = meta.mimeType;
+    const stateEntry = states.get(PROOF_OF_FREE_CONTRACT_NAME)!;
+    stateEntry.source = null;
+    stateEntry.preflight = null;
+    addLog(
+      stateEntry,
+      'engine-test',
+      'success',
+      `Xtrata engine #${normalized.engineId} is sealed ${meta.mimeType}, ${meta.totalSize.toString()} bytes, SHA-256 ${chainHash}. Contract generation unlocked.`
+    );
+  } catch (error) {
+    proofOfFree.error = error instanceof Error ? error.message : String(error);
+  } finally {
+    proofOfFree.busy = false;
+    render();
+  }
+};
+
+const createProofOfFreeCampaign = () => {
+  const stateEntry = states.get(PROOF_OF_FREE_CONTRACT_NAME)!;
+  if (proofOfFree.engineValidatedId === null || !proofOfFree.engineHash) {
+    proofOfFree.error = 'Verify the engine inscription again before creating campaign 0.';
+    render();
+    return;
+  }
+  if (!session.isConnected || session.address !== EXPECTED_DEPLOYER) {
+    proofOfFree.error = `connect the deployer wallet (${EXPECTED_DEPLOYER}) first`;
+    render();
+    return;
+  }
+  stateEntry.busy = true;
+  proofOfFree.error = null;
+  addLog(
+    stateEntry,
+    'create-campaign',
+    'info',
+    `Opening wallet for immutable campaign 0: engine ${proofOfFree.engineValidatedId}, supply ${PROOF_OF_FREE_COLLECTION_SIZE}, one wallet, BNS required, one BNS.`
+  );
+  render();
+  showContractCall({
+    contractAddress: EXPECTED_DEPLOYER,
+    contractName: PROOF_OF_FREE_CONTRACT_NAME,
+    functionName: 'create-campaign',
+    functionArgs: [
+      uintCV(proofOfFree.engineValidatedId),
+      uintCV(PROOF_OF_FREE_COLLECTION_SIZE),
+      boolCV(true),
+      boolCV(true),
+      boolCV(true)
+    ],
+    appDetails,
+    network: toStacksNetwork('mainnet'),
+    stxAddress: session.address,
+    onFinish: (payload) => {
+      const txId = extractWalletTxId(payload);
+      stateEntry.txId = txId;
+      stateEntry.busy = false;
+      if (txId) {
+        addLog(
+          stateEntry,
+          'create-campaign',
+          'success',
+          'Campaign initialization submitted. It will be campaign 0 and starts inactive.',
+          txId
+        );
+      } else {
+        proofOfFree.error = 'wallet response did not include a transaction id';
+        addLog(stateEntry, 'create-campaign', 'error', proofOfFree.error);
+      }
+      render();
+    },
+    onCancel: () => {
+      stateEntry.busy = false;
+      proofOfFree.error = 'create-campaign cancelled in wallet';
+      addLog(stateEntry, 'create-campaign', 'warning', proofOfFree.error);
+      render();
+    }
+  });
+};
+
+const testProofOfFreeDeployment = async () => {
+  if (proofOfFree.engineValidatedId === null || !proofOfFree.engineHash) {
+    proofOfFree.error = 'Verify the engine inscription before testing the deployed controller.';
+    render();
+    return;
+  }
+  const stateEntry = states.get(PROOF_OF_FREE_CONTRACT_NAME)!;
+  proofOfFree.busy = true;
+  proofOfFree.error = null;
+  proofOfFree.deploymentVerified = false;
+  render();
+  try {
+    const [configValue, campaignValue] = await Promise.all([
+      callReadJson(EXPECTED_DEPLOYER, PROOF_OF_FREE_CONTRACT_NAME, 'get-collection-config'),
+      callReadJson(EXPECTED_DEPLOYER, PROOF_OF_FREE_CONTRACT_NAME, 'get-campaign', [uintCV(0)])
+    ]);
+    const config = parseProofOfFreeConfig(configValue);
+    const campaign = parseProofOfFreeCampaign(campaignValue);
+    if (!config) throw new Error('get-collection-config returned an unexpected shape.');
+    if (!campaign) throw new Error('Campaign 0 does not exist or returned an unexpected shape.');
+    const expectedId = BigInt(proofOfFree.engineValidatedId);
+    if (
+      config.engineId !== expectedId ||
+      config.engineSha256 !== proofOfFree.engineHash ||
+      config.campaignId !== 0n ||
+      config.maxSupply !== BigInt(PROOF_OF_FREE_COLLECTION_SIZE) ||
+      !config.onePerWallet ||
+      !config.requireBns ||
+      !config.onePerBns
+    ) {
+      throw new Error('Immutable controller configuration does not match the verified release.');
+    }
+    if (
+      campaign.engineId !== expectedId ||
+      campaign.maxSupply !== BigInt(PROOF_OF_FREE_COLLECTION_SIZE) ||
+      campaign.dropsCreated !== 0n ||
+      !campaign.onePerWallet ||
+      !campaign.requireBns ||
+      !campaign.onePerBns ||
+      campaign.active
+    ) {
+      throw new Error('Campaign 0 is not the expected empty, inactive, strict launch campaign.');
+    }
+    proofOfFree.deploymentVerified = true;
+    addLog(
+      stateEntry,
+      'controller-test',
+      'success',
+      `On-chain config and campaign 0 verified: engine ${config.engineId}, supply ${config.maxSupply}, 0 drops, inactive, BNS/wallet rules locked.`
+    );
+  } catch (error) {
+    proofOfFree.error = error instanceof Error ? error.message : String(error);
+    addLog(stateEntry, 'controller-test', 'error', proofOfFree.error);
+  } finally {
+    proofOfFree.busy = false;
+    render();
+  }
+};
+
+const downloadGeneratedContract = (name: string) => {
+  const stateEntry = states.get(name);
+  if (!stateEntry?.source) return;
+  const blob = new Blob([stateEntry.source], { type: 'text/plain;charset=utf-8' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `${name}.clar`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+  addLog(stateEntry, 'source-download', 'success', `Downloaded ${name}.clar for the release evidence bundle.`);
+  render();
 };
 
 const refreshLivingSynthState = async () => {
@@ -966,6 +1231,31 @@ const dropsV11GoLiveChecklist = () =>
       'li',
       {},
       'Only then authorise the Wizard operator and create the production campaign with its immutable supply and BNS rules.'
+    )
+  );
+
+const proofOfFreeGoLiveChecklist = () =>
+  el(
+    'ol',
+    {},
+    el('li', {}, 'Engine inscription reconstructed with exact MIME, byte count and SHA-256.'),
+    el('li', {}, 'Generated proof-of-free-v1 source downloaded and deployment confirmed.'),
+    el('li', {}, 'Sponsor and BNS attestor configured and confirmed on-chain.'),
+    el('li', {}, 'Campaign creation returns campaign 0 and get-campaign reports inactive with all rules true.'),
+    el(
+      'li',
+      {},
+      'Add the exact contract ID to POF_CONTRACT_ID and SPONSOR_MARKETS, then deploy the Xtrata site.'
+    ),
+    el(
+      'li',
+      {},
+      'Build/inscribe the 1,024 seeds and escrow them in edition order while campaign 0 remains closed.'
+    ),
+    el(
+      'li',
+      {},
+      'The contract will reject opening until drops-created is exactly 1,024. Audit registry/master before set-campaign-active.'
     )
   );
 
@@ -1445,12 +1735,75 @@ const render = () => {
       el(
         'h2',
         {},
-        entry.dropsV11
+        entry.proofOfFree
+          ? 'Proof of Free v1 — Living Synth v3 controller'
+          : entry.dropsV11
           ? 'Drops v1.1 — campaign deployment'
           : `${EXPECTED_DEPLOYER.slice(0, 8)}….${entry.name}`
       ),
       el('p', {}, entry.notes)
     );
+
+    if (entry.proofOfFree) {
+      const engineInput = el('input', {
+        className: 'admin-input mono-input',
+        placeholder: 'Confirmed engine inscription ID',
+        value: proofOfFree.engineInput
+      }) as HTMLInputElement;
+      const hashInput = el('input', {
+        className: 'admin-input mono-input',
+        placeholder: 'Expected engine SHA-256',
+        value: proofOfFree.expectedHashInput
+      }) as HTMLInputElement;
+      const invalidateEngineGate = () => {
+        proofOfFree.engineInput = engineInput.value;
+        proofOfFree.expectedHashInput = hashInput.value;
+        proofOfFree.engineValidatedId = null;
+        proofOfFree.engineHash = null;
+        proofOfFree.deploymentVerified = false;
+        stateEntry.source = null;
+        stateEntry.preflight = null;
+      };
+      engineInput.oninput = invalidateEngineGate;
+      hashInput.oninput = invalidateEngineGate;
+      card.append(
+        el(
+          'p',
+          { className: 'warn' },
+          'Engine first: inscribe the exact v3 JavaScript artifact, then enter its Xtrata ID. The expected candidate hash is prefilled; the console reads sealed metadata from Xtrata and will reject any mismatch.'
+        ),
+        el(
+          'p',
+          { className: 'muted' },
+          'Local artifact: Proof-of-Free/Living-Synth-v3/artifacts/proof-of-free-engine-v3.js'
+        ),
+        el(
+          'div',
+          { className: 'row' },
+          engineInput,
+          hashInput,
+          el(
+            'button',
+            {
+              className: 'ghost',
+              disabled: proofOfFree.busy,
+              onclick: () => void testProofOfFreeEngine()
+            },
+            proofOfFree.busy ? 'Checking engine…' : '0. Verify inscribed engine'
+          )
+        )
+      );
+      if (proofOfFree.engineValidatedId !== null) {
+        card.append(
+          el(
+            'p',
+            { className: 'ok' },
+            `Verified Xtrata #${proofOfFree.engineValidatedId}: ${proofOfFree.engineMime}, ${proofOfFree.engineSize?.toString()} bytes, SHA-256 ${proofOfFree.engineHash}.`
+          )
+        );
+      }
+      if (proofOfFree.error) card.append(el('p', { className: 'fail' }, proofOfFree.error));
+    }
 
     const dl = el('dl');
     dl.append(
@@ -1502,10 +1855,25 @@ const render = () => {
     row.append(
       el(
         'button',
-        { className: 'ghost', disabled: busy, onclick: () => void loadContract(entry.name) },
+        {
+          className: 'ghost',
+          disabled:
+            busy ||
+            (entry.proofOfFree && proofOfFree.engineValidatedId === null),
+          onclick: () => void loadContract(entry.name)
+        },
         preflight ? '1. Re-run preflight / chain check' : '1. Load + preflight'
       )
     );
+    if (entry.proofOfFree && stateEntry.source && preflight?.ok) {
+      row.append(
+        el(
+          'button',
+          { className: 'ghost', onclick: () => downloadGeneratedContract(entry.name) },
+          'Download generated .clar'
+        )
+      );
+    }
     card.append(row);
 
     // Deploy: wallet-signed. The contracts are Clarity 4, which is exactly
@@ -1527,9 +1895,11 @@ const render = () => {
         el(
           'p',
           {},
-          'Contract is Clarity 4 — matches what the wallet publishes, verified by the clarinet suite. CLI fallback:'
+          entry.proofOfFree
+            ? 'Contract is generated from the audited Drops v1.1 base and the verified engine binding. Download the generated source before signing so it is retained in the release evidence bundle.'
+            : 'Contract is Clarity 4 — matches what the wallet publishes, verified by the clarinet suite. CLI fallback:'
         ),
-        el('pre', {}, cliCommand(entry)),
+        ...(entry.proofOfFree ? [] : [el('pre', {}, cliCommand(entry))]),
         el(
           'p',
           {},
@@ -1588,9 +1958,56 @@ const render = () => {
           )
         );
       }
+      if (entry.proofOfFree) {
+        card.append(
+          el(
+            'p',
+            { className: 'warn' },
+            'Create the campaign only after sponsor and BNS-attestor transactions are confirmed. The contract accepts exactly campaign 0 with engine ID above, supply 1,024, and all three rules true; it starts inactive.'
+          ),
+          el(
+            'div',
+            { className: 'row' },
+            el(
+              'button',
+              {
+                disabled:
+                  busy ||
+                  proofOfFree.engineValidatedId === null ||
+                  !session.isConnected ||
+                  session.address !== EXPECTED_DEPLOYER,
+                onclick: () => createProofOfFreeCampaign()
+              },
+              busy ? 'Working…' : '5. Create locked campaign 0'
+            )
+          ),
+          el(
+            'div',
+            { className: 'row' },
+            el(
+              'button',
+              {
+                className: 'ghost',
+                disabled:
+                  proofOfFree.busy ||
+                  proofOfFree.engineValidatedId === null,
+                onclick: () => void testProofOfFreeDeployment()
+              },
+              proofOfFree.busy ? 'Testing…' : '6. Verify contract + campaign 0'
+            ),
+            proofOfFree.deploymentVerified
+              ? el('span', { className: 'ok' }, 'On-chain controller and closed campaign verified')
+              : el('span', { className: 'muted' }, 'Run after campaign transaction confirms')
+          )
+        );
+      }
       card.append(
         el('h2', {}, 'Go-live checklist'),
-        entry.dropsV11 ? dropsV11GoLiveChecklist() : goLiveChecklist()
+        entry.proofOfFree
+          ? proofOfFreeGoLiveChecklist()
+          : entry.dropsV11
+            ? dropsV11GoLiveChecklist()
+            : goLiveChecklist()
       );
     }
 

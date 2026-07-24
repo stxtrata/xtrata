@@ -1,0 +1,26 @@
+{
+  "name": "proof-of-free-living-synth-v1",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "check:contract": "clarinet check",
+    "test": "vitest run --exclude tests/mint-simulation.test.ts",
+    "simulate:mints": "node scripts/run-mint-simulation.mjs"
+  },
+  "dependencies": {
+    "@stacks/connect": "^7.8.0",
+    "@stacks/network": "^6.11.0",
+    "@stacks/transactions": "^7.2.0"
+  },
+  "devDependencies": {
+    "@stacks/clarinet-sdk": "^3.9.0",
+    "@types/node": "^24.4.0",
+    "typescript": "^5.9.2",
+    "vite": "^7.0.0",
+    "vitest": "^4.0.7",
+    "vitest-environment-clarinet": "^3.0.0"
+  }
+}

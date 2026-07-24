@@ -87,9 +87,15 @@ const DEFAULT_MARKETS = [
 
 // Buyer-facing function the relayer will sponsor per contract type.
 // Drops contracts expose `claim` (free claim); markets expose `buy`.
-const isDropsContract = (contractId: string) => /\.xtrata-drops-/.test(contractId);
+// Contract IDs still require an exact entry in SPONSOR_MARKETS. Recognising
+// the dedicated PoF ABI here only selects the correct parser/function after
+// that allowlist gate; it does not grant sponsorship by contract name.
+const isProofOfFreeContract = (contractId: string) =>
+  /\.proof-of-free-v1$/.test(contractId);
+const isDropsContract = (contractId: string) =>
+  /\.xtrata-drops-/.test(contractId) || isProofOfFreeContract(contractId);
 const isCampaignDropsContract = (contractId: string) =>
-  contractId === DROPS_V11_MAINNET_CONTRACT_ID;
+  contractId === DROPS_V11_MAINNET_CONTRACT_ID || isProofOfFreeContract(contractId);
 const sponsoredFunction = (contractId: string) =>
   isCampaignDropsContract(contractId)
     ? 'claim-campaign'
@@ -1063,7 +1069,7 @@ const handleRequest = async (
     const listingId = String(body.listingId ?? '');
     const claimer = String(body.claimer ?? '').trim();
     if (
-      contractId !== DROPS_V11_MAINNET_CONTRACT_ID ||
+      !isCampaignDropsContract(contractId) ||
       !allowlist(env).includes(contractId) ||
       !/^\d+$/.test(listingId) ||
       !claimer.startsWith('SP') ||
@@ -1071,7 +1077,7 @@ const handleRequest = async (
     ) {
       return fail(
         'VALIDATION',
-        'allowlisted v1.1 contract, numeric listingId, and mainnet claimer required'
+        'allowlisted campaign contract, numeric listingId, and mainnet claimer required'
       );
     }
 

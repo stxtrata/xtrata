@@ -40,6 +40,7 @@ const DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const MARKET = `${DEPLOYER}.xtrata-market-sponsored-stx-v1-1`;
 const DROPS = `${DEPLOYER}.xtrata-drops-v1-0`;
 const DROPS_V11 = `${DEPLOYER}.xtrata-drops-v1-1`;
+const POF = `${DEPLOYER}.proof-of-free-v1`;
 const NFT = `${DEPLOYER}.xtrata-v3-2-3`;
 // throwaway keys, never used on-chain
 const BUYER_KEY = 'f9d7f5e0d0d81fdd90dcef4e0e2c1b9e3ea361776a5cd91b5c9a52b98b3e1cb601';
@@ -345,7 +346,10 @@ const stubFetch = () => {
       } catch {
         // Test defaults to drop id 3.
       }
-      return Response.json({ okay: true, result: cvToHex(dropTuple(id, url.includes('xtrata-drops-v1-1'))) });
+      return Response.json({
+        okay: true,
+        result: cvToHex(dropTuple(id, url.includes('xtrata-drops-v1-1') || url.includes('proof-of-free-v1')))
+      });
     }
     if (url.includes('/get-campaign')) {
       return Response.json({ okay: true, result: cvToHex(campaignTuple()) });
@@ -398,10 +402,14 @@ const fixture = async (params: {
     sponsored: params.sponsored ?? true,
     anchorMode: AnchorMode.Any,
     postConditionMode: PostConditionMode.Deny,
-    postConditions: params.postConditions ?? (contract === DROPS || contract === DROPS_V11
+    postConditions: params.postConditions ?? (contract === DROPS || contract === DROPS_V11 || contract === POF
       ? [makeContractNonFungiblePostCondition(
           DEPLOYER,
-          contract === DROPS_V11 ? 'xtrata-drops-v1-1' : 'xtrata-drops-v1-0',
+          contract === DROPS_V11
+            ? 'xtrata-drops-v1-1'
+            : contract === POF
+              ? 'proof-of-free-v1'
+              : 'xtrata-drops-v1-0',
           NonFungibleConditionCode.Sends,
           createAssetInfo(DEPLOYER, 'xtrata-v3-2-3', 'xtrata-inscription'),
           uintCV(2759n)
@@ -517,6 +525,42 @@ describe('sponsor relayer Pages handler', () => {
     });
     expect(sponsored.status).toBe(200);
     expect(await sponsored.json()).toMatchObject({ state: 'SPONSORED' });
+  });
+
+  it('uses the campaign claim path for an explicitly allowlisted PoF controller', async () => {
+    env.SPONSOR_MARKETS = `${MARKET},${DROPS},${DROPS_V11},${POF}`;
+    const attested = await attestCampaign(env, {
+      contractId: POF,
+      listingId: '3',
+      claimer: BUYER_ADDRESS,
+      bnsName: 'alice.btc'
+    });
+    expect(attested.status).toBe(200);
+    const permit = await attested.json() as {
+      bnsKey: string;
+      expiresAt: string;
+      signature: string;
+    };
+    const txHex = await fixture({
+      contract: POF,
+      fn: 'claim-campaign',
+      listingId: 3n,
+      functionArgs: [
+        contractPrincipalCV(DEPLOYER, 'xtrata-v3-2-3'),
+        uintCV(3n),
+        someCV(bufferCV(campaignHexToBytes(permit.bnsKey, 32))),
+        uintCV(BigInt(permit.expiresAt)),
+        bufferCV(campaignHexToBytes(permit.signature, 65))
+      ]
+    });
+    const response = await submit(env, {
+      txHex,
+      contractId: POF,
+      listingId: '3',
+      bnsName: 'alice.btc'
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ state: 'SPONSORED' });
   });
 
   it('refuses to spend sponsor fees on a forged v1.1 attestation', async () => {

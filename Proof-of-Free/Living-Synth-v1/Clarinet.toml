@@ -1,0 +1,28 @@
+[project]
+name = "proof-of-free-living-synth-v1"
+description = "Ownership-gated Xtrata recording registry for the Proof of Free synth"
+authors = ["Proof of Free"]
+telemetry = false
+cache_dir = ".cache"
+requirements = []
+
+[contracts.mock-xtrata-core]
+path = "contracts/mock-xtrata-core.clar"
+clarity_version = 4
+epoch = "latest"
+
+[contracts.test-xtrata-gateway]
+path = "contracts/test-xtrata-gateway.clar"
+clarity_version = 4
+epoch = "latest"
+depends_on = ["mock-xtrata-core"]
+
+[contracts.proof-of-free-living-synth-v1]
+path = "contracts/proof-of-free-living-synth-v1.clar"
+clarity_version = 4
+epoch = "latest"
+depends_on = ["test-xtrata-gateway"]
+
+[repl.analysis]
+passes = ["check_checker"]
+check_checker = { trusted_sender = false, trusted_caller = false, callee_filter = false }
