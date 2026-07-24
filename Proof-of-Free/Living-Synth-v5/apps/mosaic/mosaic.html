@@ -10,6 +10,13 @@
   html, body { height: 100%; margin: 0; }
   body { background: radial-gradient(circle at 50% 0, #0d151a 0, #060709 46%, #040406 100%); color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; display: flex; flex-direction: column; align-items: center; padding: 12px; gap: 8px; }
   .title { font-size: 12px; letter-spacing: .14em; opacity: .8; }
+  #simBar { display: none; flex-wrap: wrap; align-items: center; gap: 8px; width: min(94vmin, 860px);
+            box-sizing: border-box; padding: 8px 12px; border: 1px solid #244a5c; background: #08141c; border-radius: 10px; }
+  #simBar .simTag { font-size: 10px; letter-spacing: .1em; color: #79d7ff; font-weight: 700; }
+  #simBar label { font-size: 10px; opacity: .8; display: flex; gap: 4px; align-items: center; }
+  #simBar input { background: #0a1620; border: 1px solid #26424f; color: #dff; border-radius: 6px; padding: 5px 7px; width: 128px; font: inherit; font-size: 11px; }
+  #simBar button { padding: 6px 9px; font-size: 10px; }
+  #simBar #simInfo { font-size: 10px; opacity: .9; margin-left: auto; white-space: nowrap; color: #a8e6ff; }
   button, select { font: inherit; font-size: 11px; }
   button { background: #131318; color: #fff; border: 1px solid #2c2c36; border-radius: 8px; padding: 7px 10px; cursor: pointer; transition: border-color .12s, background .12s; }
   button:hover { border-color: #6f6f88; }
@@ -82,6 +89,17 @@
 </head>
 <body>
   <div class="title">PROOF OF FREE · LIVING SYNTH v5</div>
+  <div id="simBar">
+    <span class="simTag">SIM · ON-CHAIN REVEAL</span>
+    <label>seed <input id="simSeed" spellcheck="false"></label>
+    <button id="simReroll" title="new random distribution">⚄ reroll</button>
+    <button id="simPrev" title="hide the last batch">◀</button>
+    <button id="simNext" title="inscribe the next random 32">▶ inscribe 32</button>
+    <button id="simAll" title="reveal all 1024">⏭ all</button>
+    <button id="simReset" title="back to the first batch">↺ reset</button>
+    <button id="simAuto" title="auto-advance the batches">▶ auto</button>
+    <span id="simInfo"></span>
+  </div>
   <div class="stage" id="stage">
     <div class="topbar">
       <span class="live" id="liveState">idle</span>
@@ -229,10 +247,13 @@
   let lastSession = null;                    // last recorded / loaded session
   let sessionPlay = null;                    // { timer } while a song plays
   let playingSession = false;                // input-lock flag during playback
+  let mint = null;                           // MintProvider (on-chain gating); null = all 1024 playable
+  function isPlayable(ed) { return !mint || mint.isMinted(ed); }
   /* Inert inspection hook — only attached when the URL carries ?debug. */
   const DEBUG = (() => { try { return location.search.includes("debug"); } catch { return false; } })();
   if (DEBUG) window.__pof = { previews, soloSet, manualMute, volumes, get current() { return current; }, get sessionRec() { return sessionRec; }, get lastSession() { return lastSession; }, get playingSession() { return playingSession; },
-    startRec: () => startSessionRec(), stopRec: () => stopSessionRec(false), playSong: () => playSession(), stopSong: () => stopSessionPlay(false) };
+    startRec: () => startSessionRec(), stopRec: () => stopSessionRec(false), playSong: () => playSession(), stopSong: () => stopSessionPlay(false),
+    get mint() { return mint; }, isPlayable };
 
   /* Append an event to the running session log, timed to the shared transport.
    * Higher-level actions (groups, scenes, arrows, randomise, scan, voice-cap
@@ -252,6 +273,7 @@
     recSession("off", { ed: edition });
   }
   function startPreview(edition, at) {
+    if (!isPlayable(edition)) return null;             // not inscribed on-chain — cannot play
     if (previews.has(edition)) return previews.get(edition);
     const div = document.createElement("div"); div.style.cssText = "position:fixed;left:-9999px;width:80px;height:80px"; document.body.appendChild(div);
     const inst = PF.mount(div, { edition, mode: "preview", onStateChange: syncLive });
@@ -318,6 +340,7 @@
     onSelectionChange(g) { tip.textContent = tipFor(g); }
   });
   function tileVerb(edition, ev) {
+    if (!isPlayable(edition)) return;                 // not inscribed on-chain — inert
     mosaic.select(edition);
     if (ev.shiftKey) return toggleSolo(edition);
     if (ev.altKey) return assignGroup(edition, activeGroup);
@@ -334,6 +357,7 @@
   let dragging = false, dragEd = -1, dragStartY = 0, dragStartVol = 1;
   canvas.addEventListener("pointerdown", ev => {
     const ed = mosaic.editionAt(ev);
+    if (playingSession || !isPlayable(ed)) { downXY = null; dragEd = -1; return; }  // locked / not inscribed
     downXY = { x: ev.clientX, y: ev.clientY }; longFired = false; dragging = false; dragEd = ed;
     clearTimeout(longTimer); longTimer = setTimeout(() => { longFired = true; openInstrument(ed); }, 460);
   });
@@ -414,13 +438,13 @@
   $("playRegion").addEventListener("click", () => {
     if (scanTimer) { clearInterval(scanTimer); scanTimer = null; $("playRegion").classList.remove("active"); return; }
     $("playRegion").classList.add("active"); col = 0;
-    scanTimer = setInterval(() => { const picks = []; for (let row = 0; row < G.GRID; row++) { const g = mosaic.genomes[row * G.GRID + col]; if (g.mosaic.brightness > 0.22 && picks.length < 3) picks.push(g.edition); } launchSet(picks); col = (col + 1) % G.GRID; }, (60 / PF.music.bpm) * 2000);
+    scanTimer = setInterval(() => { const picks = []; for (let row = 0; row < G.GRID; row++) { const g = mosaic.genomes[row * G.GRID + col]; if (g.mosaic.brightness > 0.22 && isPlayable(g.edition) && picks.length < 3) picks.push(g.edition); } launchSet(picks); col = (col + 1) % G.GRID; }, (60 / PF.music.bpm) * 2000);
   });
   $("stopAll").addEventListener("click", () => { if (scanTimer) { clearInterval(scanTimer); scanTimer = null; $("playRegion").classList.remove("active"); } [...previews.keys()].forEach(stopPreviewMusical); });
   $("killAll").addEventListener("click", () => { if (scanTimer) { clearInterval(scanTimer); scanTimer = null; $("playRegion").classList.remove("active"); } [...previews.keys()].forEach(removePreview); soloSet.clear(); manualMute.clear(); soloedGroup = null; applyMix(); msg.textContent = "killed all"; });
 
   /* ---- randomiser ---- */
-  function pickRole(roles, n) { const pool = mosaic.genomes.filter(g => roles.includes(g.mosaic.role)).map(g => g.edition); const out = []; for (let i = 0; i < n && pool.length; i++) out.push(pool.splice((Math.random() * pool.length) | 0, 1)[0]); return out; }
+  function pickRole(roles, n) { const pool = mosaic.genomes.filter(g => roles.includes(g.mosaic.role) && isPlayable(g.edition)).map(g => g.edition); const out = []; for (let i = 0; i < n && pool.length; i++) out.push(pool.splice((Math.random() * pool.length) | 0, 1)[0]); return out; }
   $("randomise").addEventListener("click", () => { [...previews.keys()].forEach(removePreview); soloSet.clear(); manualMute.clear(); const jam = [...pickRole(["drum"], 2), ...pickRole(["bass", "subBass"], 1), ...pickRole(["lead"], 2), ...pickRole(["pluck", "bell"], 1), ...pickRole(["pad", "drone"], 1)]; launchSet(jam); msg.textContent = `random jam · ${jam.length}`; });
 
   /* ---- scenes + groups persistence ---- */
@@ -555,6 +579,66 @@
   });
   setSessionUI();
 
+  /* ================= ON-CHAIN MINT GATING + REVEAL SIMULATION =================
+   * On mainnet a MintProvider reads the Stacks contract's minted bitmap and the
+   * mosaic shows only inscribed tiles. SimMint is the local test double: a seeded
+   * shuffle of 1..1024 revealed 32 at a time, so we can preview the random batched
+   * reveal before deploying. See docs/onchain-reveal-plan.md. */
+  const BATCH = 32, TOTAL = G.COLLECTION_SIZE, MAXBATCH = Math.ceil(TOTAL / BATCH);
+  function strToU32(s) { let h = 2166136261 >>> 0; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+  function shuffleOrder(seedU32) {                 // deterministic Fisher–Yates of [1..TOTAL]
+    const arr = Array.from({ length: TOTAL }, (_, i) => i + 1);
+    const rnd = G.splitmix32((seedU32 >>> 0) || 1);
+    for (let i = TOTAL - 1; i > 0; i--) { const j = (rnd() * (i + 1)) | 0; const t = arr[i]; arr[i] = arr[j]; arr[j] = t; }
+    return arr;
+  }
+  function SimMint(seedStr) {
+    let seed = seedStr || "xtrata-genesis", order = shuffleOrder(strToU32(seed)), batches = 1, cache = new Set();
+    const rebuild = () => { cache = new Set(order.slice(0, Math.min(TOTAL, batches * BATCH))); };
+    rebuild();
+    return {
+      enforced: true, get seed() { return seed; }, get batches() { return batches; }, MAXBATCH,
+      isMinted: ed => cache.has(ed), mintedSet: () => cache, count: () => cache.size,
+      setSeed(s) { seed = (s || seed).trim() || seed; order = shuffleOrder(strToU32(seed)); rebuild(); },
+      next() { if (batches < MAXBATCH) batches++; rebuild(); return batches; },
+      prev() { if (batches > 0) batches--; rebuild(); return batches; },
+      all() { batches = MAXBATCH; rebuild(); }, reset() { batches = 1; rebuild(); }
+    };
+  }
+  function refreshMint() { mosaic.setMinted(mint ? [...mint.mintedSet()] : null); applyMix(); }
+  /* LiveMint (mainnet) reads the Stacks contract bitmap — stubbed here; see the plan.
+     function LiveMint(cfg) { /* poll call-read get-minted → decode buff(128) → Set *\/ } */
+
+  const SIM = (() => { try { return new URLSearchParams(location.search).get("sim") === "1"; } catch { return false; } })();
+  const simBar = $("simBar");
+  function updateSimReadout() {
+    if (!mint) return;
+    $("simSeed").value = mint.seed;
+    $("simInfo").textContent = `batch ${mint.batches}/${mint.MAXBATCH} · ${mint.count()}/${TOTAL} inscribed`;
+    $("simNext").disabled = mint.batches >= mint.MAXBATCH;
+    $("simPrev").disabled = mint.batches <= 0;
+  }
+  function simStep(fn) { if (!mint) return; fn(); refreshMint(); updateSimReadout(); }
+  let simAuto = null;
+  function simToggleAuto() {
+    if (simAuto) { clearInterval(simAuto); simAuto = null; $("simAuto").classList.remove("rec"); $("simAuto").textContent = "▶ auto"; return; }
+    $("simAuto").classList.add("rec"); $("simAuto").textContent = "⏸ auto";
+    simAuto = setInterval(() => { if (mint.batches >= mint.MAXBATCH) { simToggleAuto(); return; } simStep(() => mint.next()); }, 900);
+  }
+  if (SIM) {
+    const seed = (() => { try { return new URLSearchParams(location.search).get("seed") || undefined; } catch { return undefined; } })();
+    mint = SimMint(seed);
+    simBar.style.display = "flex";
+    $("simSeed").addEventListener("change", () => simStep(() => mint.setSeed($("simSeed").value)));
+    $("simReroll").addEventListener("click", () => simStep(() => mint.setSeed("seed-" + Math.floor(Math.random() * 1e9))));
+    $("simPrev").addEventListener("click", () => simStep(() => mint.prev()));
+    $("simNext").addEventListener("click", () => simStep(() => mint.next()));
+    $("simAll").addEventListener("click", () => simStep(() => mint.all()));
+    $("simReset").addEventListener("click", () => simStep(() => mint.reset()));
+    $("simAuto").addEventListener("click", simToggleAuto);
+    refreshMint(); updateSimReadout();
+  }
+
   /* ================= SYNTH VIEW (swaps into the square) ================= */
   const seqPanel = $("seqPanel"), seqBox = $("sequencer");
   function renderSequencer() {
@@ -596,6 +680,7 @@
   childSel.addEventListener("change", () => switchToRevision(+childSel.value));
 
   function openInstrument(edition) {
+    if (!isPlayable(edition)) { msg.textContent = "that tile isn't inscribed yet"; return; }
     reopenAfterClose = previews.has(edition) ? edition : null; // was it part of the live session?
     suppressSessionRec = true;                                 // opening a synth is not a song event
     if (previews.has(edition)) removePreview(edition);         // hand the voice to the detailed view (no double-voice)

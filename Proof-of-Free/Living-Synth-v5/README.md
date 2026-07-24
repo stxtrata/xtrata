@@ -86,18 +86,29 @@ inscribe later. **▶ song** replays it hands-off: input locks, a stop button
 floats over the mosaic, and the artwork performs itself — the same engine,
 non-interactive. **⇪ load** plays back any saved session JSON.
 
+## On-chain reveal (mint gating + simulation)
+
+The mosaic only shows editions that exist on-chain: on mainnet a MintProvider reads
+the Stacks contract's minted bitmap; unminted tiles render as dark "not yet inscribed"
+slots and can't be played. Editions reveal in **random batches of 32** (a seeded
+shuffle of 1‥1024). A local **simulation** ships so you can preview the reveal now —
+open `living-synth-v5-demo.html?sim=1` for a SIM bar: **seed / reroll**, **◀ / ▶
+inscribe 32 / ⏭ all / ↺ reset**, and **▶ auto** to watch the mark resolve. Full
+architecture and open decisions: [`docs/onchain-reveal-plan.md`](docs/onchain-reveal-plan.md).
+
 ## Layout
 
 ```
 packages/genome/               XTRATA_MAP · roles · synth-arch trait · drums · drift
 packages/performance-codec/    xtrata-performance v1 (+ pattern + tone) · xtrata-session v1 (song)
-engine/engine-core.js          pluggable cores · per-instrument mute bus ·
+engine/engine-core.js          pluggable cores · per-instrument mute bus · mint gating ·
                                phase-locked launch · MIDI/keyboard · drum kit · mosaic
 artifacts/proof-of-free-engine-v5.js   built inscription artifact
 scripts/build-collection.mjs   builder + invariants + manifest
 scripts/sample-logo.mjs        regenerate XTRATA_MAP from a PNG
 manifests/collection-v5.json   hashes · roles · archs · loops · map
-apps/mosaic/mosaic.html        square shell · view-swap · live controls · MIDI
+apps/mosaic/mosaic.html        square shell · view-swap · live controls · MIDI · reveal sim
+docs/onchain-reveal-plan.md    plan: contract-read mint gating + random batched reveal
 living-synth-v5-demo.html      self-contained single-file demo
 ```
 
@@ -106,7 +117,8 @@ living-synth-v5-demo.html      self-contained single-file demo
 ```sh
 node scripts/build-collection.mjs
 node scripts/build-collection.mjs --seeds --engine-id 12345
-open living-synth-v5-demo.html
+open living-synth-v5-demo.html          # the instrument
+open living-synth-v5-demo.html?sim=1    # + the random batched-reveal simulation
 ```
 
 Invariants: byte-identical rebuilds · 1,024 unique genome hashes · loop trait

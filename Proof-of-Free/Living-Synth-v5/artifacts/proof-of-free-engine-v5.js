@@ -993,6 +993,8 @@
     let mutedSet = new Set(), soloActive = false, soloedSet = new Set(), groupOf = new Map(), groupColors = {}, volumes = new Map();
     let getInstrument = opts.getInstrument || null;
     let selection = Math.min(G.COLLECTION_SIZE, Math.max(1, opts.initialSelection || 1));
+    let minted = null;                 // null = show all (no on-chain gating); else a Set of minted editions
+    const mintedAt = new Map();        // edition → reveal timestamp, for the bloom-in
     const MIN_FRAME_MS = 32; // ~30fps is plenty for 1,024 dormant tiles
     /* Base HSL comes straight from the brand genome (fixed hue per family). */
     for (const g of genomes) g.mosaic._hsl = { h: g.mosaic.hue, s: g.mosaic.sat, l: g.mosaic.light };
@@ -1019,6 +1021,11 @@
       for (const g of genomes) {
         const m = g.mosaic, an = g.animation, dr = an.drift;
         const px = m.gridX * T, py = m.gridY * T, s = Math.max(1, T - 1);
+        if (minted && !minted.has(g.edition)) {           // not yet inscribed on-chain → dark slot
+          c.globalAlpha = 1; c.fillStyle = "#070709"; c.fillRect(px, py, s, s);
+          c.strokeStyle = "#13161d"; c.lineWidth = 1; c.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
+          continue;
+        }
         const isLive = live.has(g.edition), isDraining = draining.has(g.edition);
         const pulse = 0.5 + 0.5 * Math.sin(time * an.speed + (an.seed & 255) / 40);
         /* Living colour: FIXED brand hue, fading between the colour and black
@@ -1077,6 +1084,19 @@
             c.fillStyle = "#0a0a0f"; c.globalAlpha = 0.55; c.fillRect(px + 1.5, py + 1.5, 3, s - 3);
             c.fillStyle = isSoloed ? "#8affd0" : "#3ad29f"; c.globalAlpha = 0.95;
             c.fillRect(px + 1.5, py + s - 1.5 - (s - 3) * vol, 3, (s - 3) * vol);
+            c.globalAlpha = 1;
+          }
+        }
+        // freshly-inscribed bloom: a bright ring + flash that fades over ~1.6s
+        const revAt = mintedAt.get(g.edition);
+        if (revAt != null) {
+          const age = (now - revAt) / 1000;
+          if (age >= 1.6) mintedAt.delete(g.edition);
+          else {
+            const k = 1 - age / 1.6;
+            c.globalAlpha = 0.28 * k; c.fillStyle = "#eafff5"; c.fillRect(px, py, s, s);
+            c.globalAlpha = 0.9 * k; c.strokeStyle = "#eafff5"; c.lineWidth = 1 + 2.4 * k;
+            c.strokeRect(px + 1, py + 1, Math.max(1, s - 2), Math.max(1, s - 2));
             c.globalAlpha = 1;
           }
         }
@@ -1304,6 +1324,18 @@
         if ("volumes" in o) volumes = o.volumes instanceof Map ? o.volumes : new Map(Object.entries(o.volumes).map(([k, v]) => [+k, v]));
       },
       setInstrumentLookup(fn) { getInstrument = fn; },
+      /* On-chain gating: pass a list/Set of minted editions to show only those
+       * (unminted → dark slots); pass null to show all. Newly-added editions
+       * bloom in. */
+      setMinted(ids) {
+        if (ids == null) { minted = null; mintedAt.clear(); return; }
+        const next = ids instanceof Set ? ids : new Set(ids);
+        const stamp = (typeof performance !== "undefined" ? performance.now() : 0);
+        if (minted) for (const ed of next) if (!minted.has(ed)) mintedAt.set(ed, stamp);
+        minted = next;
+      },
+      mintedCount: () => (minted ? minted.size : G.COLLECTION_SIZE),
+      isMintGated: () => minted != null,
       getSelection: () => selection,
       selectedGenome: () => genomes[selection - 1],
       select: edition => setSelection(edition),
