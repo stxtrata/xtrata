@@ -17,14 +17,50 @@ export function errorStack(error: unknown): string | undefined {
   return error instanceof Error ? (error.stack ?? undefined) : undefined;
 }
 
+const safeDiagnosticValue = (value: unknown): string | number | boolean | undefined => {
+  if (typeof value === 'number' || typeof value === 'boolean') return value;
+  if (typeof value === 'string' && value.length > 0) return value.slice(0, 300);
+  return undefined;
+};
+
+/**
+ * Extract a small allowlist of provider diagnostics. Arbitrary wallet `data`
+ * is deliberately not copied: provider payloads are not a stable API and may
+ * contain transaction material or other values that do not belong in logs.
+ */
+export function errorDiagnosticContext(error: unknown): Record<string, unknown> | undefined {
+  if (!error || typeof error !== 'object') return undefined;
+  const candidate = error as Record<string, unknown>;
+  const details: Record<string, unknown> = {};
+  for (const key of ['code', 'stage', 'method', 'providerId', 'name']) {
+    const value = safeDiagnosticValue(candidate[key]);
+    if (value !== undefined) details[key] = value;
+  }
+  const data = candidate.data;
+  if (data && typeof data === 'object') {
+    const safeData: Record<string, unknown> = {};
+    for (const key of ['code', 'message', 'reason']) {
+      const value = safeDiagnosticValue((data as Record<string, unknown>)[key]);
+      if (value !== undefined) safeData[key] = value;
+    }
+    if (Object.keys(safeData).length > 0) details.data = safeData;
+  } else {
+    const safeData = safeDiagnosticValue(data);
+    if (safeData !== undefined) details.data = safeData;
+  }
+  return Object.keys(details).length > 0 ? details : undefined;
+}
+
 /**
  * Map an error to a stable, human-meaningful code. Unknown errors fall through
  * to UNCAUGHT but are still fingerprinted by their (normalised) message.
  */
 export function classify(error: unknown, _flow?: Flow): string {
   const name = (error as { name?: string } | null)?.name ?? '';
+  const code = (error as { code?: unknown } | null)?.code;
   const msg = errorMessage(error).toLowerCase();
 
+  if (code === -32603 || msg.trim() === 'internal error.') return 'WALLET_RPC_INTERNAL';
   if (name === 'ReadOnlyBackoffError' || (msg.includes('read-only') && msg.includes('backoff'))) {
     return 'READ_ONLY_BACKOFF';
   }

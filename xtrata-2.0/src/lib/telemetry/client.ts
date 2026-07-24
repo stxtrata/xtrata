@@ -6,7 +6,7 @@
  */
 import type { Flow, JourneyHandle, TelemetryInput, WireEvent } from './types';
 import { fingerprint } from './fingerprint';
-import { errorMessage, errorStack } from './classify';
+import { errorDiagnosticContext, errorMessage, errorStack } from './classify';
 
 // Injected at build time (vite.config.ts define). typeof-guarded so tests and
 // non-build contexts don't throw.
@@ -167,7 +167,11 @@ export function event(input: TelemetryInput): void {
     const stack = input.error != null ? errorStack(input.error) : undefined;
     const fp = isError ? fingerprint(flow, input.step, input.errorCode, message ?? '') : undefined;
 
-    const ctx: Record<string, unknown> = { ...(input.context ?? {}) };
+    const diagnostic = isError ? errorDiagnosticContext(input.error) : undefined;
+    const ctx: Record<string, unknown> = {
+      ...(diagnostic ? { error: diagnostic } : {}),
+      ...(input.context ?? {})
+    };
     if (isError && crumbs.length) ctx.breadcrumbs = crumbs.slice(-BREADCRUMB_MAX);
 
     const wire: WireEvent = {

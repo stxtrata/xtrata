@@ -4742,10 +4742,30 @@
       renderPreparedState();
     };
 
+    let lastWalletRequestContext = null;
     const requestContractCall = (options) => {
       const walletAddress = state.walletSession.address;
       const network = state.walletSession.network ?? state.contract.network;
       const contract = options.contract ?? state.contract;
+      let functionArgBytes = null;
+      try {
+        functionArgBytes = options.functionArgs.reduce(
+          (total, arg) => total + Math.ceil(cvToHex(arg).length / 2),
+          0
+        );
+      } catch {
+        // Diagnostics must never interfere with opening the wallet.
+      }
+      lastWalletRequestContext = {
+        method: 'stx_callContract',
+        providerId: getSelectedWalletProviderId() ?? 'unknown',
+        contract: `${contract.address}.${contract.contractName}`,
+        functionName: options.functionName,
+        functionArgCount: options.functionArgs.length,
+        functionArgBytes,
+        postConditionCount: options.postConditions?.length ?? 0,
+        network
+      };
       return new Promise((resolve, reject) => {
         showContractCall({
           contractAddress: contract.address,
@@ -4972,6 +4992,7 @@
     let publicMintJourney = null;
 
     const runInscription = async () => {
+      lastWalletRequestContext = null;
       // Not an error — inscribing just needs a connected wallet. Prompt gently (amber) and
       // open the connect flow instead of failing; no busy lock is taken on this path.
       if (!state.walletSession.isConnected || !state.walletSession.address) {
@@ -5309,7 +5330,10 @@
                 step: telemetryStep,
                 outcome: 'error',
                 errorCode: classifyTelemetryError(error, 'mint'),
-                error
+                error,
+                context: lastWalletRequestContext
+                  ? { walletRequest: lastWalletRequestContext }
+                  : undefined
               }
         );
         appendLog(`Mint failed: ${message}`);
@@ -11562,7 +11586,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           return item;
         })
       );
-      const last = dropDiagnostics.at(-1);
+      // Avoid Array.prototype.at here: this renderer runs during every page
+      // load, including on older wallet in-app browsers that do not provide it.
+      const last = dropDiagnostics[dropDiagnostics.length - 1];
       if (dropsDom.diagnosticsBadge) {
         dropsDom.diagnosticsBadge.textContent = last?.stage === 'COMPLETE'
           ? 'passed'

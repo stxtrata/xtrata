@@ -80,6 +80,34 @@ describe('telemetry client queue + delivery', () => {
     });
   });
 
+  it('records only allowlisted structured provider error diagnostics', async () => {
+    const beacon = vi.fn(() => true);
+    vi.stubGlobal('navigator', { sendBeacon: beacon, onLine: true, userAgent: 'test' });
+    const telemetry = await freshTelemetry();
+    const error = Object.assign(new Error('Internal error.'), {
+      code: -32603,
+      stage: 'stx_callContract',
+      data: {
+        reason: 'transaction construction failed',
+        signature: 'must-not-be-recorded',
+        txHex: 'must-not-be-recorded'
+      }
+    });
+
+    telemetry.event({ flow: 'mint', step: 'submit', outcome: 'error', error });
+
+    const [, blob] = beacon.mock.calls[0];
+    const payload = JSON.parse(await (blob as Blob).text());
+    expect(payload.events[0].context.error).toEqual({
+      code: -32603,
+      stage: 'stx_callContract',
+      name: 'Error',
+      data: { reason: 'transaction construction failed' }
+    });
+    expect(JSON.stringify(payload.events[0].context)).not.toContain('signature');
+    expect(JSON.stringify(payload.events[0].context)).not.toContain('txHex');
+  });
+
   it('stays inert (no network) until enabled', async () => {
     const beacon = vi.fn(() => true);
     vi.stubGlobal('navigator', { sendBeacon: beacon, onLine: true, userAgent: 'test' });
