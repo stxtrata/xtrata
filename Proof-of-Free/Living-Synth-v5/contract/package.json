@@ -1,0 +1,15 @@
+{
+  "name": "proof-of-free-contract",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@hirosystems/clarinet-sdk": "^2.11.0",
+    "@stacks/transactions": "^6.13.0",
+    "vitest": "^1.6.0",
+    "vitest-environment-clarinet": "^2.6.0"
+  }
+}

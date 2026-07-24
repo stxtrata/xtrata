@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Drops v1.2 Deployment Canary · Xtrata</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #070807;
+        color: #f4f2ea;
+        --panel: #111310;
+        --line: #2b3028;
+        --muted: #a7aa9d;
+        --green: #b9ef77;
+        --amber: #f2c66d;
+        --red: #ff8c7a;
+        --blue: #73cde5;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-width: 300px; background:
+        radial-gradient(circle at 80% 0%, rgba(185, 239, 119, .08), transparent 32rem),
+        #070807; }
+      main { width: min(1060px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 64px; }
+      header { display: grid; grid-template-columns: 1fr auto; gap: 22px; align-items: start; margin-bottom: 24px; }
+      .eyebrow { margin: 0 0 8px; color: var(--green); font-size: 11px; font-weight: 850; letter-spacing: .15em; text-transform: uppercase; }
+      h1 { margin: 0; max-width: 760px; font-size: clamp(28px, 5vw, 50px); line-height: 1.02; letter-spacing: -.045em; }
+      h2 { margin: 0; font-size: 19px; }
+      h3 { margin: 0 0 8px; font-size: 14px; }
+      p, li { color: #cbcfc0; line-height: 1.55; }
+      code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      code { color: var(--amber); overflow-wrap: anywhere; }
+      .contract-chip { border: 1px solid var(--line); border-radius: 999px; padding: 7px 10px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+      .notice { border: 1px solid #5d4a22; background: rgba(242, 198, 109, .07); border-radius: 10px; padding: 12px 14px; color: #e7d5ae; }
+      .steps { display: grid; gap: 14px; }
+      .step { border: 1px solid var(--line); border-radius: 14px; background: rgba(17, 19, 16, .92); overflow: hidden; }
+      .step__head { display: grid; grid-template-columns: 38px 1fr auto; gap: 12px; align-items: center; padding: 15px 16px; border-bottom: 1px solid var(--line); }
+      .step__number { width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid #3c4338; border-radius: 50%; color: var(--green); font: 750 12px ui-monospace, monospace; }
+      .step__body { padding: 16px; }
+      .badge { display: inline-flex; align-items: center; min-height: 24px; padding: 3px 8px; border: 1px solid currentColor; border-radius: 999px; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+      .badge[data-tone="success"] { color: var(--green); }
+      .badge[data-tone="warning"] { color: var(--amber); }
+      .badge[data-tone="error"] { color: var(--red); }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      .wide { grid-column: 1 / -1; }
+      label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
+      input, textarea { width: 100%; border: 1px solid #394035; border-radius: 9px; background: #090a09; color: #f4f2ea; padding: 10px 11px; font: inherit; }
+      input.mono, textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+      input:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+      button { border: 0; border-radius: 9px; padding: 10px 14px; background: var(--green); color: #0b0d09; font: 800 13px inherit; cursor: pointer; }
+      button.secondary { background: transparent; color: #eef0e6; border: 1px solid #42483e; }
+      button.danger { background: transparent; color: var(--red); border: 1px solid #704038; }
+      button:disabled { opacity: .38; cursor: not-allowed; }
+      .actions { display: flex; gap: 9px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+      dl { display: grid; grid-template-columns: 190px 1fr; gap: 7px 14px; margin: 0; font-size: 12px; }
+      dt { color: var(--muted); }
+      dd { margin: 0; overflow-wrap: anywhere; }
+      .checks { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+      .checks li::before { content: "○"; display: inline-block; width: 20px; color: var(--muted); }
+      .checks li[data-status="success"]::before { content: "✓"; color: var(--green); }
+      .checks li[data-status="error"]::before { content: "×"; color: var(--red); }
+      .status { min-height: 22px; margin: 12px 0 0; color: var(--muted); font-size: 12px; }
+      .status[data-tone="success"] { color: var(--green); }
+      .status[data-tone="warning"] { color: var(--amber); }
+      .status[data-tone="error"] { color: var(--red); }
+      details { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 14px; }
+      summary { cursor: pointer; color: var(--blue); font-size: 12px; font-weight: 750; }
+      pre { max-height: 320px; overflow: auto; white-space: pre-wrap; word-break: break-word; border: 1px solid var(--line); border-radius: 9px; background: #080908; padding: 11px; color: #cbd0c2; font-size: 11px; }
+      .footer-note { margin: 18px 0 0; color: #7f8578; font-size: 11px; }
+      @media (max-width: 720px) {
+        header, .grid { grid-template-columns: 1fr; }
+        .contract-chip { justify-self: start; white-space: normal; }
+        .step__head { grid-template-columns: 34px 1fr; }
+        .step__head .badge { grid-column: 2; justify-self: start; }
+        dl { grid-template-columns: 1fr; gap: 3px; }
+        dd { margin-bottom: 8px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <p class="eyebrow">Mainnet operations · fail closed</p>
+          <h1>Drops v1.2 deployment canary</h1>
+          <p>
+            Deploy and validate the immutable bulk-campaign contract in a fixed order. This page
+            never receives a seed phrase or private key; every write is reviewed and signed in the
+            connected web wallet.
+          </p>
+        </div>
+        <div class="contract-chip">xtrata-drops-v1-2 · Clarity 4</div>
+      </header>
+      <p class="notice">
+        Do not use this page from an unreviewed build. Compare the displayed source hash with the
+        reviewed release record before signing. A failed or unknown chain check keeps later steps locked.
+      </p>
+      <div id="app"></div>
+      <p class="footer-note">Local audit state contains public transaction IDs and checks only. No keys or signatures are stored.</p>
+    </main>
+    <script type="module" src="/src/drops-v1-2-canary.ts"></script>
+  </body>
+</html>

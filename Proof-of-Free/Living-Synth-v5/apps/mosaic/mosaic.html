@@ -579,11 +579,12 @@
   });
   setSessionUI();
 
-  /* ================= ON-CHAIN MINT GATING + REVEAL SIMULATION =================
-   * On mainnet a MintProvider reads the Stacks contract's minted bitmap and the
-   * mosaic shows only inscribed tiles. SimMint is the local test double: a seeded
-   * shuffle of 1..1024 revealed 32 at a time, so we can preview the random batched
-   * reveal before deploying. See docs/onchain-reveal-plan.md. */
+  /* ================= ON-CHAIN REVEAL (Xtrata ownership) + SIMULATION =========
+   * Live: a MintProvider reveals editions whose Xtrata token has left the
+   * treasury (owner != treasury) — read through a pluggable source, selected by
+   * a `pof-chain` config block (script tag or URL params). SimMint is the local
+   * test double: a seeded shuffle revealed 32 at a time, to preview the scatter
+   * before anything is distributed. See docs/onchain-reveal-plan.md. */
   const BATCH = 32, TOTAL = G.COLLECTION_SIZE, MAXBATCH = Math.ceil(TOTAL / BATCH);
   function strToU32(s) { let h = 2166136261 >>> 0; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
   function shuffleOrder(seedU32) {                 // deterministic Fisher–Yates of [1..TOTAL]
@@ -605,9 +606,57 @@
       all() { batches = MAXBATCH; rebuild(); }, reset() { batches = 1; rebuild(); }
     };
   }
-  function refreshMint() { mosaic.setMinted(mint ? [...mint.mintedSet()] : null); applyMix(); }
-  /* LiveMint (mainnet) reads the Stacks contract bitmap — stubbed here; see the plan.
-     function LiveMint(cfg) { /* poll call-read get-minted → decode buff(128) → Set *\/ } */
+  function refreshMint() { mosaic.setMinted(mint ? [...mint.mintedSet()] : null); applyMix(); syncLive(); }
+
+  /* Config: a `<script id="pof-chain" type="application/json">` block (baked in
+   * at inscription) or URL params. Fields: network, collection (contract),
+   * treasury (address), holdersUrl (JSON endpoint), childrenUrl, pollMs. */
+  function readChainConfig() {
+    let cfg = {};
+    try { const el = document.getElementById("pof-chain"); if (el) cfg = JSON.parse(el.textContent || "{}"); } catch { /* ignore */ }
+    try {
+      const q = new URLSearchParams(location.search);
+      if (q.get("live")) cfg.live = true;
+      for (const k of ["network", "collection", "treasury", "holdersUrl", "childrenUrl"]) if (q.get(k)) cfg[k] = q.get(k);
+      if (q.get("pollMs")) cfg.pollMs = +q.get("pollMs");
+    } catch { /* ignore */ }
+    return cfg;
+  }
+  /* Turn a holders payload into the revealed-edition list (owner != treasury).
+   * Accepts { revealed:[ids] }, an array of {edition,owner}, or an {ed:owner} map. */
+  function revealedFromHolders(data, treasury) {
+    const t = String(treasury || "").toLowerCase();
+    if (Array.isArray(data?.revealed)) return data.revealed.map(Number).filter(n => n >= 1 && n <= TOTAL);
+    const rows = Array.isArray(data) ? data.map(x => [x.edition ?? x.id, x.owner ?? x.holder])
+      : (data && typeof data === "object") ? Object.entries(data) : [];
+    const out = [];
+    for (const [ed, owner] of rows) {
+      const e = Number(ed);
+      if (e >= 1 && e <= TOTAL && owner && String(owner).toLowerCase() !== t) out.push(e);
+    }
+    return out;
+  }
+  function defaultRevealedSource(cfg) {
+    return async () => {
+      if (!cfg.holdersUrl) return [];                       // unconfigured → mosaic stays empty
+      const res = await fetch(cfg.holdersUrl, { headers: { accept: "application/json" } });
+      if (!res.ok) throw new Error("holders " + res.status);
+      return revealedFromHolders(await res.json(), cfg.treasury);
+    };
+  }
+  /* LiveMint — reveals editions out of the treasury, polling a pluggable source. */
+  function LiveMint(cfg) {
+    let cache = new Set();
+    const source = cfg.revealedSource || defaultRevealedSource(cfg);
+    async function refresh() {
+      try { const r = await source(); if (r) { cache = new Set(r.map(Number)); refreshMint(); } }
+      catch (e) { /* keep last-known set */ }
+    }
+    const timer = setInterval(refresh, Math.max(4000, cfg.pollMs || 15000));
+    refresh();
+    return { enforced: true, isLive: true, isMinted: ed => cache.has(ed), mintedSet: () => cache, count: () => cache.size, refresh, stop() { clearInterval(timer); } };
+  }
+  if (DEBUG) Object.assign(window.__pof || (window.__pof = {}), { revealedFromHolders, LiveMint, SimMint: (s) => SimMint(s), setMint: p => { mint = p; refreshMint(); } });
 
   const SIM = (() => { try { return new URLSearchParams(location.search).get("sim") === "1"; } catch { return false; } })();
   const simBar = $("simBar");
@@ -637,6 +686,11 @@
     $("simReset").addEventListener("click", () => simStep(() => mint.reset()));
     $("simAuto").addEventListener("click", simToggleAuto);
     refreshMint(); updateSimReadout();
+  } else {
+    /* Live reveal: if a pof-chain config is present, read Xtrata ownership;
+     * otherwise leave the mosaic ungated (all editions playable — full demo). */
+    const CHAIN = readChainConfig();
+    if (CHAIN.live || CHAIN.holdersUrl || CHAIN.collection) { mint = LiveMint(CHAIN); }
   }
 
   /* ================= SYNTH VIEW (swaps into the square) ================= */

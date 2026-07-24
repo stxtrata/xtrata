@@ -86,29 +86,38 @@ inscribe later. **▶ song** replays it hands-off: input locks, a stop button
 floats over the mosaic, and the artwork performs itself — the same engine,
 non-interactive. **⇪ load** plays back any saved session JSON.
 
-## On-chain reveal (mint gating + simulation)
+## On-chain (Xtrata) reveal, fees & deploy
 
-The mosaic only shows editions that exist on-chain: on mainnet a MintProvider reads
-the Stacks contract's minted bitmap; unminted tiles render as dark "not yet inscribed"
-slots and can't be played. Editions reveal in **random batches of 32** (a seeded
-shuffle of 1‥1024). A local **simulation** ships so you can preview the reveal now —
-open `living-synth-v5-demo.html?sim=1` for a SIM bar: **seed / reroll**, **◀ / ▶
-inscribe 32 / ⏭ all / ↺ reset**, and **▶ auto** to watch the mark resolve. Full
-architecture and open decisions: [`docs/onchain-reveal-plan.md`](docs/onchain-reveal-plan.md).
+The editions are **Xtrata inscriptions** (natively SIP-009), so ownership, transfers
+and marketplaces are Xtrata's. The mosaic starts empty and reveals a tile once its
+edition has **left the treasury wallet** (gifted or sold) — read live from Xtrata
+ownership through a `pof-chain` config block; unrevealed tiles render as dark "not yet
+inscribed" slots and can't be played. Child recordings that evolve a synth are Xtrata
+parent-child inscriptions. The one bespoke contract, **`recording-fees`**, charges
+0.1 STX / 1 STX (owner-updatable) to inscribe a child / live-set recording.
+
+- **Preview the reveal now:** `living-synth-v5-demo.html?sim=1` — seed / reroll / step 32 / auto.
+- **Point at real state:** `?live&holdersUrl=…&treasury=…`, or bake a `pof-chain` block in.
+- **Deploy it:** open `apps/canary/canary.html` — a one-wallet, step-through console
+  (connect → inscribe engine → deploy `recording-fees` → inscribe mosaic → inscribe
+  editions → distribute), each step verified.
+
+Architecture: [`docs/onchain-reveal-plan.md`](docs/onchain-reveal-plan.md) · deploy: [`docs/deploy-runbook.md`](docs/deploy-runbook.md) · contract: [`contract/`](contract).
 
 ## Layout
 
 ```
 packages/genome/               XTRATA_MAP · roles · synth-arch trait · drums · drift
 packages/performance-codec/    xtrata-performance v1 (+ pattern + tone) · xtrata-session v1 (song)
-engine/engine-core.js          pluggable cores · per-instrument mute bus · mint gating ·
+engine/engine-core.js          pluggable cores · per-instrument mute bus · reveal gating ·
                                phase-locked launch · MIDI/keyboard · drum kit · mosaic
 artifacts/proof-of-free-engine-v5.js   built inscription artifact
 scripts/build-collection.mjs   builder + invariants + manifest
-scripts/sample-logo.mjs        regenerate XTRATA_MAP from a PNG
 manifests/collection-v5.json   hashes · roles · archs · loops · map
-apps/mosaic/mosaic.html        square shell · view-swap · live controls · MIDI · reveal sim
-docs/onchain-reveal-plan.md    plan: contract-read mint gating + random batched reveal
+apps/mosaic/mosaic.html        square shell · view-swap · live controls · MIDI · reveal (sim + live)
+apps/canary/canary.html        one-wallet deploy console (Xtrata + Stacks)
+contract/                      recording-fees.clar (fees) + Clarinet tests
+docs/onchain-reveal-plan.md    on-chain architecture (Xtrata-native)
 living-synth-v5-demo.html      self-contained single-file demo
 ```
 

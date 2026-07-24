@@ -1,0 +1,15 @@
+[project]
+name = "proof-of-free-contract"
+description = "Proof of Free - recording-fee contract (companion to Xtrata inscriptions)"
+authors = []
+telemetry = false
+cache_dir = "./.cache"
+requirements = []
+
+[contracts.recording-fees]
+path = "contracts/recording-fees.clar"
+clarity_version = 2
+epoch = 2.5
+
+[repl.analysis]
+passes = ["check_checker"]

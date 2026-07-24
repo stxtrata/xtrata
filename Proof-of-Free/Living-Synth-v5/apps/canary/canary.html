@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Proof of Free — Canary</title>
+<style>
+  :root { --mint:#3ad29f; --orange:#f7931a; --blue:#5546ff; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: radial-gradient(circle at 50% 0, #0d151a, #060709 46%, #040406); color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  body { max-width: 860px; margin: 0 auto; padding: 18px; }
+  h1 { font-size: 15px; letter-spacing: .14em; font-weight: 700; margin: 0; }
+  .sub { font-size: 11px; opacity: .6; margin: 4px 0 16px; }
+  .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .bar .grow { flex: 1; }
+  button, select, input { background: #131318; color: #fff; border: 1px solid #2c2c36; border-radius: 8px; padding: 8px 11px; font: inherit; font-size: 12px; }
+  button { cursor: pointer; transition: border-color .12s, background .12s; }
+  button:hover:not(:disabled) { border-color: var(--mint); }
+  button:disabled { opacity: .4; cursor: default; }
+  button.primary { border-color: var(--mint); color: #051; background: var(--mint); font-weight: 700; }
+  button.link { border-color: #3a3a70; color: #b9b6ff; }
+  input { width: 100%; }
+  .addr { font-size: 11px; opacity: .8; }
+  .net { display: flex; gap: 0; border: 1px solid #2c2c36; border-radius: 8px; overflow: hidden; }
+  .net button { border: none; border-radius: 0; padding: 8px 12px; }
+  .net button.on { background: #0d2b23; color: #9dffd9; }
+  .step { border: 1px solid #23232c; border-radius: 12px; padding: 14px; margin-bottom: 10px; background: #0b0b10; }
+  .step.done { border-color: #1d5a45; }
+  .step.locked { opacity: .5; }
+  .step h2 { font-size: 13px; margin: 0 0 2px; display: flex; align-items: center; gap: 8px; }
+  .num { display: inline-flex; width: 20px; height: 20px; border-radius: 50%; border: 1px solid #3a3a44; align-items: center; justify-content: center; font-size: 10px; }
+  .step.done .num { background: var(--mint); color: #051; border-color: var(--mint); }
+  .badge { margin-left: auto; font-size: 9px; letter-spacing: .1em; padding: 3px 7px; border-radius: 20px; border: 1px solid #3a3a44; opacity: .8; }
+  .step.done .badge { color: #9dffd9; border-color: #1d5a45; }
+  .desc { font-size: 11px; opacity: .75; line-height: 1.5; margin: 6px 0 10px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+  .row .lbl { font-size: 10px; opacity: .55; min-width: 72px; }
+  .val { font-size: 11px; color: #a8e6ff; word-break: break-all; }
+  .verify { font-size: 11px; margin-top: 8px; opacity: .9; }
+  .ok { color: var(--mint); } .err { color: #ff8f83; }
+  pre { background: #07141c; border: 1px solid #204050; border-radius: 8px; padding: 10px; font-size: 10px; overflow: auto; color: #cfe; }
+  .panel { border: 1px solid #23232c; border-radius: 12px; padding: 14px; margin-top: 16px; background: #0b0b10; }
+  .panel h3 { font-size: 11px; letter-spacing: .12em; opacity: .6; margin: 0 0 8px; }
+  #log { font-size: 10px; opacity: .7; white-space: pre-wrap; max-height: 160px; overflow: auto; margin-top: 8px; }
+  a { color: #b9b6ff; }
+</style>
+</head>
+<body>
+  <h1>PROOF OF FREE · CANARY</h1>
+  <div class="sub">Step-through deploy for Xtrata — one Stacks wallet drives it all. Inscribing hands off to Xtrata; the contract + verification sign in-browser.</div>
+
+  <div class="bar">
+    <div class="net" id="net">
+      <button data-net="testnet" class="on">testnet</button>
+      <button data-net="mainnet">mainnet</button>
+    </div>
+    <div class="grow"></div>
+    <span class="addr" id="who">not connected</span>
+    <button id="connect">connect wallet</button>
+  </div>
+
+  <div id="steps"></div>
+
+  <div class="panel">
+    <h3>STATE · <span id="stateNet">testnet</span></h3>
+    <div id="stateView" class="val"></div>
+    <div class="row">
+      <button id="copyCfg" class="link">copy pof-chain config</button>
+      <button id="exportState">export</button>
+      <button id="resetState">reset this network</button>
+    </div>
+    <pre id="cfgOut" style="display:none"></pre>
+  </div>
+
+  <div class="panel"><h3>LOG</h3><div id="log"></div></div>
+
+<script type="module">
+// Chain libs load on demand — the page renders offline; the wallet only loads when you act.
+let _sdk = null;
+async function sdk(){
+  if (!_sdk) {
+    const [c, t] = await Promise.all([
+      import('https://esm.sh/@stacks/connect@8'),
+      import('https://esm.sh/@stacks/transactions@7'),
+    ]);
+    _sdk = { ...c, Cl: t.Cl, fetchCallReadOnlyFunction: t.fetchCallReadOnlyFunction, cvToJSON: t.cvToJSON };
+  }
+  return _sdk;
+}
+
+const CONTRACT_SRC = ";; Proof of Free - recording fees\n;; ---------------------------------------------------------------------------\n;; Everything else lives natively on Xtrata: the editions are Xtrata inscriptions\n;; (SIP-009 tokens), ownership and transfers are Xtrata's, child recordings that\n;; evolve a synth are inscribed as Xtrata parent-child links, and a tile is\n;; revealed in the mosaic by its ownership (out of the treasury wallet).\n;;\n;; This contract does ONE thing: collect the fee to inscribe a derivative\n;; recording to the treasury, with an on-chain receipt. Fees are owner-updatable.\n;;   kind u0 = child performance (xtrata-performance JSON) -> 0.1 STX\n;;   kind u1 = live set        (xtrata-session JSON)      -> 1 STX\n;; ---------------------------------------------------------------------------\n\n(define-constant ERR-OWNER-ONLY (err u100))\n(define-constant ERR-BAD-KIND (err u101))\n\n(define-data-var contract-owner principal tx-sender)\n(define-data-var treasury principal tx-sender)          ;; the Xtrata wallet\n(define-data-var child-fee uint u100000)                ;; 0.1 STX (micro-STX)\n(define-data-var live-set-fee uint u1000000)            ;; 1 STX\n(define-data-var receipts-count uint u0)\n\n;; a receipt ties a fee payment to the recording it inscribes\n(define-map receipts uint { payer: principal, kind: uint, parent: uint, ref: (string-ascii 80), height: uint })\n\n(define-private (is-owner) (is-eq tx-sender (var-get contract-owner)))\n\n;; Pay to inscribe a recording. `parent` = the edition being evolved (u0 for a\n;; live set); `ref` = the recording's Xtrata inscription id or content hash.\n(define-public (pay-inscription-fee (kind uint) (parent uint) (ref (string-ascii 80)))\n  (let ((fee (if (is-eq kind u1) (var-get live-set-fee) (var-get child-fee)))\n        (rid (+ (var-get receipts-count) u1)))\n    (asserts! (or (is-eq kind u0) (is-eq kind u1)) ERR-BAD-KIND)\n    (try! (stx-transfer? fee tx-sender (var-get treasury)))\n    (map-set receipts rid { payer: tx-sender, kind: kind, parent: parent, ref: ref, height: burn-block-height })\n    (var-set receipts-count rid)\n    (print { event: \"recording-fee\", id: rid, kind: kind, parent: parent, ref: ref, payer: tx-sender, fee: fee })\n    (ok rid)))\n\n;; ---- owner admin ----\n(define-public (set-child-fee (n uint))\n  (begin (asserts! (is-owner) ERR-OWNER-ONLY) (var-set child-fee n) (ok true)))\n(define-public (set-live-set-fee (n uint))\n  (begin (asserts! (is-owner) ERR-OWNER-ONLY) (var-set live-set-fee n) (ok true)))\n(define-public (set-treasury (who principal))\n  (begin (asserts! (is-owner) ERR-OWNER-ONLY) (var-set treasury who) (ok true)))\n(define-public (transfer-ownership (who principal))\n  (begin (asserts! (is-owner) ERR-OWNER-ONLY) (var-set contract-owner who) (ok true)))\n\n;; ---- read-only ----\n(define-read-only (get-fees) { child: (var-get child-fee), liveSet: (var-get live-set-fee) })\n(define-read-only (get-receipt (rid uint)) (map-get? receipts rid))\n(define-read-only (get-receipts-count) (var-get receipts-count))\n(define-read-only (get-treasury) (var-get treasury))\n(define-read-only (get-owner) (var-get contract-owner))\n";
+const CONTRACT_NAME = 'recording-fees';
+const XTRATA = 'https://xtrata.xyz';
+const $ = id => document.getElementById(id);
+const log = m => { const el = $('log'); el.textContent = `[${new Date().toISOString().slice(11,19)}] ${m}\n` + el.textContent; };
+
+let net = 'testnet';
+let me = null;
+let state = load();
+
+function keyFor(n){ return `pof-canary-${n}`; }
+function load(){ try { return JSON.parse(localStorage.getItem(keyFor(net)) || '{}'); } catch { return {}; } }
+function save(){ try { localStorage.setItem(keyFor(net), JSON.stringify(state)); } catch {} render(); }
+
+/* ---- step definitions ---- */
+const STEPS = [
+  {
+    id:'connect', title:'Connect wallet',
+    done:()=>!!me,
+    desc:()=>'Connect Leather or Xverse and pick the network above. The connected wallet becomes the collection owner + treasury when you deploy the contract.',
+    render(el){
+      el.innerHTML += `<div class="row"><button id="s-connect" class="primary">${me?'reconnect':'connect'}</button>
+        <span class="val">${me?me:'—'}</span></div>`;
+      el.querySelector('#s-connect').onclick = doConnect;
+    }
+  },
+  {
+    id:'engine', title:'Inscribe the engine on Xtrata',
+    done:()=>!!state.engineId,
+    desc:()=>'Inscribe <code>artifacts/proof-of-free-engine-v5.js</code> as an Xtrata inscription. Copy its inscription id back here — the mosaic and every edition recurse into it.',
+    render(el){
+      el.innerHTML += `<div class="row"><a class="link" href="${XTRATA}" target="_blank"><button class="link">open Xtrata ↗</button></a>
+        <input id="s-engine" placeholder="engine inscription id" value="${state.engineId||''}">
+        <button id="s-engine-save">save</button></div>`;
+      el.querySelector('#s-engine-save').onclick = ()=>{ state.engineId = $('s-engine').value.trim(); log('engine id saved'); save(); };
+    }
+  },
+  {
+    id:'contract', title:`Deploy the ${CONTRACT_NAME} contract`, gate:()=>!!me,
+    done:()=>!!state.contractId,
+    desc:()=>'Deploys the recording-fee contract from your wallet (owner + treasury = you). Sign the deploy, then verify the fees read back as 0.1 / 1 STX.',
+    render(el){
+      el.innerHTML += `<div class="row"><button id="s-deploy" class="primary" ${me?'':'disabled'}>deploy contract</button>
+        <button id="s-verify" ${state.contractId?'':'disabled'}>verify fees</button></div>
+        ${state.contractId?`<div class="row"><span class="lbl">contract</span><span class="val">${state.contractId}</span></div>`:''}
+        ${state.deployTx?`<div class="row"><span class="lbl">deploy tx</span><span class="val">${state.deployTx}</span></div>`:''}
+        <div class="verify" id="s-cverify"></div>`;
+      el.querySelector('#s-deploy').onclick = doDeploy;
+      el.querySelector('#s-verify').onclick = doVerifyContract;
+    }
+  },
+  {
+    id:'mosaic', title:'Inscribe the mosaic on Xtrata', gate:()=>!!state.contractId,
+    done:()=>!!state.mosaicId,
+    desc:()=>'Inscribe <code>living-synth-v5-demo.html</code> (referencing the engine id). Bake in the pof-chain config below so it reads live reveal state. Paste its inscription id back.',
+    render(el){
+      el.innerHTML += `<div class="row"><button id="s-cfg" class="link">show pof-chain config</button>
+        <a class="link" href="${XTRATA}" target="_blank"><button class="link">open Xtrata ↗</button></a></div>
+        <pre id="s-cfgout" style="display:none"></pre>
+        <div class="row"><input id="s-mosaic" placeholder="mosaic inscription id" value="${state.mosaicId||''}">
+        <button id="s-mosaic-save">save</button></div>`;
+      el.querySelector('#s-cfg').onclick = ()=>{ const p=$('s-cfgout'); p.style.display='block'; p.textContent = cfgBlock(); };
+      el.querySelector('#s-mosaic-save').onclick = ()=>{ state.mosaicId = $('s-mosaic').value.trim(); log('mosaic id saved'); save(); };
+    }
+  },
+  {
+    id:'editions', title:'Inscribe the edition seeds', gate:()=>!!state.mosaicId,
+    done:()=>(state.editionsDone|0)>0,
+    desc:()=>'Inscribe each edition seed on Xtrata (each references the engine id) into the treasury wallet. Track how many are inscribed so far — do it in batches at your own pace.',
+    render(el){
+      el.innerHTML += `<div class="row"><span class="lbl">inscribed</span>
+        <input id="s-ed" type="number" min="0" max="1024" value="${state.editionsDone||0}" style="width:90px">
+        <span class="val">/ 1024</span><button id="s-ed-save">save</button></div>`;
+      el.querySelector('#s-ed-save').onclick = ()=>{ state.editionsDone = Math.max(0,Math.min(1024, +$('s-ed').value||0)); log(`editions inscribed: ${state.editionsDone}`); save(); };
+    }
+  },
+  {
+    id:'live', title:'Distribute & go live', gate:()=>(state.editionsDone|0)>0,
+    done:()=>!!state.live,
+    desc:()=>'Distribute editions out of the treasury (gift, sponsored free-claim, or sale) — each first exit reveals its tile in the mosaic. Optionally fire a test recording-fee to confirm the contract end-to-end.',
+    render(el){
+      el.innerHTML += `<div class="row"><button id="s-testfee" ${state.contractId&&me?'':'disabled'}>test: pay child fee (0.1 STX)</button>
+        <button id="s-golive" class="primary">mark live</button></div><div class="verify" id="s-liveverify"></div>`;
+      el.querySelector('#s-testfee').onclick = doTestFee;
+      el.querySelector('#s-golive').onclick = ()=>{ state.live = true; log('marked live'); save(); };
+    }
+  },
+];
+
+/* ---- actions ---- */
+async function doConnect(){
+  try {
+    const { connect, getLocalStorage } = await sdk();
+    const r = await connect();
+    me = r?.addresses?.stx?.[0]?.address || r?.addresses?.[0]?.address || getLocalStorage()?.addresses?.stx?.[0]?.address || null;
+    if (!me) throw new Error('no STX address returned');
+    if (!state.treasury) state.treasury = me;
+    log(`connected ${me}`); save();
+  } catch(e){ log('connect failed: ' + (e.message||e)); }
+}
+async function doDeploy(){
+  try {
+    const { request } = await sdk();
+    log('requesting contract deploy…');
+    const r = await request('stx_deployContract', { name: CONTRACT_NAME, clarityCode: CONTRACT_SRC, network: net });
+    const txid = r?.txid || r?.result?.txid;
+    state.contractId = `${me}.${CONTRACT_NAME}`;
+    state.deployTx = txid; state.treasury = me;
+    log('deploy submitted' + (txid?` · ${txid}`:'')); save();
+  } catch(e){ log('deploy failed: ' + (e.message||e)); }
+}
+async function readOnly(fn, args=[]){
+  const { fetchCallReadOnlyFunction, cvToJSON } = await sdk();
+  const [addr, name] = state.contractId.split('.');
+  const cv = await fetchCallReadOnlyFunction({ contractAddress: addr, contractName: name, functionName: fn, functionArgs: args, senderAddress: me || addr, network: net });
+  return cvToJSON(cv);
+}
+async function doVerifyContract(){
+  const v = $('s-cverify');
+  v.innerHTML = 'reading…';
+  try {
+    const j = await readOnly('get-fees');
+    const child = j?.value?.child?.value, live = j?.value?.liveSet?.value;
+    const ok = String(child)==='100000' && String(live)==='1000000';
+    v.innerHTML = `<span class="${ok?'ok':'err'}">get-fees → child ${child} µSTX · liveSet ${live} µSTX ${ok?'✓':'(unexpected)'}</span>`;
+    log('verify get-fees: ' + JSON.stringify({child, live}));
+  } catch(e){ v.innerHTML = `<span class="err">read failed: ${e.message||e}</span> (is the deploy confirmed yet?)`; }
+}
+async function doTestFee(){
+  const v = $('s-liveverify'); v.innerHTML = 'requesting…';
+  try {
+    const { request, Cl } = await sdk();
+    const [addr, name] = state.contractId.split('.');
+    const r = await request('stx_callContract', { contract: `${addr}.${name}`, functionName: 'pay-inscription-fee',
+      functionArgs: [Cl.uint(0), Cl.uint(1), Cl.stringAscii('canary-test')], network: net, postConditionMode: 'allow' });
+    const txid = r?.txid || r?.result?.txid;
+    v.innerHTML = `<span class="ok">fee submitted ${txid||''}</span>`;
+    log('test fee submitted ' + (txid||''));
+  } catch(e){ v.innerHTML = `<span class="err">fee failed: ${e.message||e}</span>`; }
+}
+
+/* ---- config block to bake into the mosaic inscription ---- */
+function cfgBlock(){
+  const cfg = { network: net, treasury: state.treasury || me || '', collection: '<your Xtrata collection id>', holdersUrl: '<your Xtrata holders JSON endpoint>' };
+  return `<script id="pof-chain" type="application/json">\n${JSON.stringify(cfg, null, 2)}\n<\/script>`;
+}
+
+/* ---- render ---- */
+function render(){
+  $('who').textContent = me ? me.slice(0,8)+'…'+me.slice(-4) : 'not connected';
+  $('connect').textContent = me ? 'reconnect' : 'connect wallet';
+  $('stateNet').textContent = net; $('stateView').textContent = JSON.stringify(state);
+  [...document.querySelectorAll('#net button')].forEach(b=>b.classList.toggle('on', b.dataset.net===net));
+  const box = $('steps'); box.innerHTML = '';
+  let prevDone = true;
+  STEPS.forEach((s, i)=>{
+    const done = s.done();
+    const locked = s.gate ? !s.gate() : !prevDone && !done;
+    const el = document.createElement('div');
+    el.className = 'step' + (done?' done':'') + (locked?' locked':'');
+    el.innerHTML = `<h2><span class="num">${done?'✓':i+1}</span>${s.title}<span class="badge">${done?'DONE':locked?'LOCKED':'TODO'}</span></h2>
+      <div class="desc">${s.desc()}</div>`;
+    if (!locked) s.render(el);
+    box.appendChild(el);
+    prevDone = done;
+  });
+}
+
+/* ---- wiring ---- */
+$('connect').onclick = doConnect;
+[...document.querySelectorAll('#net button')].forEach(b=> b.onclick = ()=>{ net=b.dataset.net; state=load(); render(); });
+$('copyCfg').onclick = ()=>{ const p=$('cfgOut'); p.style.display='block'; p.textContent = cfgBlock(); navigator.clipboard?.writeText(cfgBlock()).then(()=>log('config copied')).catch(()=>{}); };
+$('exportState').onclick = ()=>{ const p=$('cfgOut'); p.style.display='block'; p.textContent = JSON.stringify(state, null, 2); };
+$('resetState').onclick = ()=>{ if(confirm('Reset saved state for '+net+'?')){ state={}; save(); } };
+render();
+(async()=>{ try { const s = await sdk(); if (s.isConnected()) { me = s.getLocalStorage()?.addresses?.stx?.[0]?.address || null; render(); } } catch { /* offline / no wallet libs */ } })();
+window.__canary = { get state(){return state;}, get me(){return me;}, cfgBlock, STEPS,
+  setState: s=>{ state={...state,...s}; save(); }, setMe: a=>{ me=a; render(); } };
+log('canary ready');
+</script>
+</body>
+</html>
