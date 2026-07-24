@@ -66,6 +66,18 @@ Inscribe exactly `artifacts/proof-of-free-engine-v3.js` through canonical
 Xtrata core and wait for transaction success. Reconstruct `/i/<ENGINE_ID>` and
 compare its bytes and SHA-256 with the frozen artifact.
 
+The deploy-console workflow is:
+
+1. open `/web/deploy-console.html`;
+2. find **Proof of Free v1 — Living Synth v3 controller**;
+3. enter the new Xtrata engine inscription ID;
+4. leave the prefilled candidate hash unchanged unless the frozen artifact was
+   deliberately rebuilt and re-audited;
+5. click **0. Verify inscribed engine**.
+
+The contract preflight button remains disabled until Xtrata reports a sealed
+`text/javascript` inscription whose final hash exactly matches the input.
+
 Gate: route content, MIME, byte count, and SHA-256 all match. A mismatch stops
 the launch; never put an unverified ID in the controller.
 
@@ -85,6 +97,20 @@ node scripts/build-contract.mjs \
 
 clarinet check release/contracts/proof-of-free-v1.clarinet.clar
 ```
+
+Alternatively, after the engine gate passes in `/web/deploy-console.html`:
+
+1. click **1. Load + preflight**;
+2. confirm the source byte count/SHA-256 and that the contract name is free;
+3. click **Download generated .clar** and retain it with the release evidence;
+4. connect the `SP3JN…743X` deployer wallet;
+5. click **2. Deploy** and confirm the Clarity 4 publish;
+6. after confirmation, re-run preflight so the card enters post-deploy mode;
+7. set sponsor, set the BNS attestor hash, then create locked campaign `0`;
+8. after each transaction confirms, click **6. Verify contract + campaign 0**.
+
+The downloaded console source and `build-contract.mjs` output are covered by a
+byte-for-byte parity test.
 
 Audit the generated diff against `xtrata-drops-v1.1`, then deploy the mainnet
 variant as `proof-of-free-v1`. Read and verify:

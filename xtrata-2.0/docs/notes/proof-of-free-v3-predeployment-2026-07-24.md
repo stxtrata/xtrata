@@ -27,9 +27,25 @@ Evidence run on 2026-07-24:
   input warnings inherited from Drops v1.1).
 - Focused registry and production sponsor handler tests: 36 passed, including
   direct on-chain controller fingerprint/policy reads.
-- Full Xtrata application suite: 993 passed; full Clarinet suite: 322 passed,
+- Full Xtrata application suite: 1,000 passed; full Clarinet suite: 322 passed,
   35 skipped; production build passed.
 
 No mainnet artifact has been generated with a fake ID. The real deployment
 continues from the engine inscription gate in
 `Proof-of-Free/Living-Synth-v3/DEPLOYMENT.md`.
+
+## Deployment-console continuation
+
+The main deploy console now includes a `proof-of-free-v1` card. It preloads the
+frozen engine candidate hash, verifies the user-entered inscription ID against
+canonical Xtrata metadata, generates and preflights the engine-bound contract,
+offers the exact generated `.clar` as a download, submits the wallet-signed
+deployment and post-deploy sponsor/BNS/campaign calls, and verifies
+`get-collection-config` plus inactive campaign `0`.
+
+The console generator is tested byte-for-byte against the command-line release
+generator. A headless Chrome smoke verified that preflight is locked before the
+engine check, the expected hash is prefilled, matching on-chain metadata
+unlocks generation, and the generated source passes browser preflight.
+The deployment helper tests passed 14 focused checks, including six dedicated
+Proof of Free generation, invariant, parity, and read-only parsing checks.
