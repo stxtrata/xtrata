@@ -10,7 +10,8 @@
     "release:verify": "node scripts/verify-release.mjs",
     "check:contract": "clarinet check",
     "test": "vitest run --exclude tests/mint-simulation.test.ts",
-    "simulate:mints": "node scripts/run-mint-simulation.mjs"
+    "simulate:mints": "node scripts/run-mint-simulation.mjs",
+    "preview:mints": "npm run simulate:mints && npm run release:build -- --engine-id 1 && vite --host 127.0.0.1 --open /mint-preview.html"
   },
   "dependencies": {
     "@stacks/connect": "^7.8.0",

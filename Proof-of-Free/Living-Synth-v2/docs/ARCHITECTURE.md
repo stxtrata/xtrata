@@ -39,11 +39,28 @@ Each canonical seed contains one JSON payload:
   "protocol": "proof-of-free/seed",
   "version": 2,
   "edition": 1,
-  "engineId": 12345
+  "engineId": 12345,
+  "traits": {
+    "profile": 422,
+    "hue": 148.007813,
+    "palette": "Aqua",
+    "rootNote": "A2",
+    "rootMidi": 45,
+    "waveform": "triangle"
+  }
 }
 ```
 
 and one script reference: `/i/12345`.
+
+## Collision-free traits
+
+Edition numbers are deterministically permuted across all 1,024 ten-bit values.
+Those values decompose into 16 palettes, 16 root notes, and four waveforms, so
+the full categorical trait tuple occurs exactly once. The 1,024 visual hue
+values are unique as well. Traits are embedded in each seed, recomputed by the
+engine and browser, and included in the canonical manifest. Building or
+verifying a release fails if any full trait profile repeats.
 
 The release manifest has no timestamp or machine-specific fields. Given the
 same canonical engine and engine ID, a rebuild produces byte-identical seeds

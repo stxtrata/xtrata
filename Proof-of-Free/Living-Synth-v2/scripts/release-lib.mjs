@@ -7,6 +7,17 @@ export const SEED_PROTOCOL = "proof-of-free/seed";
 export const SEED_VERSION = 2;
 export const ENGINE_MIME = "text/javascript";
 export const SEED_MIME = "text/html";
+export const WAVEFORMS = ["sine", "triangle", "sawtooth", "square"];
+export const PALETTES = [
+  "Infrared", "Ember", "Amber", "Solar",
+  "Lime", "Verdant", "Aqua", "Cyan",
+  "Azure", "Cobalt", "Violet", "Ultraviolet",
+  "Magenta", "Rose", "Silver", "Lunar"
+];
+export const ROOT_NOTES = [
+  "C2", "C#2", "D2", "D#2", "E2", "F2", "F#2", "G2",
+  "G#2", "A2", "A#2", "B2", "C3", "C#3", "D3", "D#3"
+];
 export const ENGINE_PATH = fileURLToPath(
   new URL("../artifacts/proof-of-free-engine.js", import.meta.url)
 );
@@ -29,6 +40,26 @@ export function canonicalEngineSrc(engineId) {
   return `/i/${validateEngineId(engineId)}`;
 }
 
+export function deriveTraits(edition) {
+  if (!Number.isInteger(edition) || edition < 1 || edition > COLLECTION_SIZE) {
+    throw new Error(`Edition must be between 1 and ${COLLECTION_SIZE}.`);
+  }
+  const slot = (((edition - 1) * 733) + 421) & 1_023;
+  const rootIndex = (slot >>> 2) & 15;
+  return {
+    profile: slot + 1,
+    hue: Number(((slot * 360) / COLLECTION_SIZE).toFixed(6)),
+    palette: PALETTES[(slot >>> 6) & 15],
+    rootNote: ROOT_NOTES[rootIndex],
+    rootMidi: 36 + rootIndex,
+    waveform: WAVEFORMS[slot & 3]
+  };
+}
+
+export function traitProfileKey(traits) {
+  return `${traits.palette}|${traits.rootNote}|${traits.waveform}`;
+}
+
 export function seedPayload(edition, engineId) {
   if (!Number.isInteger(edition) || edition < 1 || edition > COLLECTION_SIZE) {
     throw new Error(`Edition must be between 1 and ${COLLECTION_SIZE}.`);
@@ -37,7 +68,8 @@ export function seedPayload(edition, engineId) {
     protocol: SEED_PROTOCOL,
     version: SEED_VERSION,
     edition,
-    engineId: Number(validateEngineId(engineId))
+    engineId: Number(validateEngineId(engineId)),
+    traits: deriveTraits(edition)
   };
 }
 
@@ -95,6 +127,7 @@ export async function buildReleaseModel(engineId) {
       bytes,
       byteLength: bytes.length,
       sha256: sha256(bytes),
+      traits: deriveTraits(edition),
       dependencies: [normalizedId.toString()],
       parents: []
     };

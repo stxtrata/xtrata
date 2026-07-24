@@ -1,6 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import { buildReleaseModel, sha256, validateSeedHtml } from "./release-lib.mjs";
+import { buildReleaseModel, sha256, traitProfileKey, validateSeedHtml } from "./release-lib.mjs";
 
 const outputIndex = process.argv.indexOf("--output");
 const output = resolve(process.cwd(), outputIndex >= 0 ? process.argv[outputIndex + 1] : "release");
@@ -14,6 +14,8 @@ const engine = await readFile(resolve(output, manifest.engine.file));
 if (sha256(engine) !== manifest.engine.sha256) throw new Error("Engine hash mismatch.");
 const files = await readdir(resolve(output, "seeds"));
 if (files.length !== expected.children.length) throw new Error("Seed file count mismatch.");
+const uniqueTraitProfiles = new Set(expected.children.map(child => traitProfileKey(child.traits))).size;
+if (uniqueTraitProfiles !== expected.children.length) throw new Error("Release contains duplicate trait profiles.");
 
 for (const child of expected.children) {
   const bytes = await readFile(resolve(output, child.file));
@@ -25,5 +27,6 @@ console.log(JSON.stringify({
   verified: true,
   engineId: manifest.engine.id,
   seeds: expected.children.length,
-  uniqueSeedHashes: new Set(expected.children.map(child => child.sha256)).size
+  uniqueSeedHashes: new Set(expected.children.map(child => child.sha256)).size,
+  uniqueTraitProfiles
 }));

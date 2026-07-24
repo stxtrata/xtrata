@@ -1,6 +1,6 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { buildReleaseModel } from "./release-lib.mjs";
+import { buildReleaseModel, traitProfileKey } from "./release-lib.mjs";
 
 const engineIdIndex = process.argv.indexOf("--engine-id");
 if (engineIdIndex < 0 || !process.argv[engineIdIndex + 1]) {
@@ -10,6 +10,10 @@ if (engineIdIndex < 0 || !process.argv[engineIdIndex + 1]) {
 const outputIndex = process.argv.indexOf("--output");
 const output = resolve(process.cwd(), outputIndex >= 0 ? process.argv[outputIndex + 1] : "release");
 const model = await buildReleaseModel(process.argv[engineIdIndex + 1]);
+const uniqueTraitProfiles = new Set(model.children.map(child => traitProfileKey(child.traits))).size;
+if (uniqueTraitProfiles !== model.children.length) {
+  throw new Error(`Trait collision: expected ${model.children.length} unique profiles, found ${uniqueTraitProfiles}.`);
+}
 
 await rm(output, { recursive: true, force: true });
 await mkdir(resolve(output, "engine"), { recursive: true });
@@ -23,5 +27,6 @@ console.log(JSON.stringify({
   engineId: model.manifest.engine.id,
   engineSha256: model.manifest.engine.sha256,
   seeds: model.children.length,
-  uniqueSeedHashes: new Set(model.children.map(child => child.sha256)).size
+  uniqueSeedHashes: new Set(model.children.map(child => child.sha256)).size,
+  uniqueTraitProfiles
 }));

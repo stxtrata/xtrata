@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { recordingPostConditions } from "../src/contract-client";
 import { sandboxDocument } from "../src/engine-sandbox";
 import { validateSeedHtml } from "../src/seed";
+import { deriveTraits } from "../src/traits";
 import {
   MAX_GESTURE_POINTS,
   isLivingRecording,
@@ -66,7 +67,14 @@ describe("Living Synth frontend hardening", () => {
   });
 
   it("reconstructs inscriptions inside a script-only, network-denied sandbox", () => {
-    const seed = '<!doctype html><html><head></head><body><script id="pof-seed" type="application/json">{"protocol":"proof-of-free/seed","version":2,"edition":1,"engineId":77}</script><script src="/i/77"></script></body></html>';
+    const payload = JSON.stringify({
+      protocol: "proof-of-free/seed",
+      version: 2,
+      edition: 1,
+      engineId: 77,
+      traits: deriveTraits(1)
+    });
+    const seed = `<!doctype html><html><head></head><body><script id="pof-seed" type="application/json">${payload}</script><script src="/i/77"></script></body></html>`;
     const document = sandboxDocument(
       seed,
       'globalThis.ProofOfFree={protocol:"proof-of-free/engine-api-v2",edition:1,engineId:77,gesture(){},stop(){}};document.body.insertAdjacentHTML("afterbegin","<div id=\\"kaoss-pad\\"></div>");',
@@ -82,12 +90,23 @@ describe("Living Synth frontend hardening", () => {
   });
 
   it("rejects seeds that lie about edition, engine, or recursive route", () => {
-    const seed = '<!doctype html><html><head></head><body><script id="pof-seed" type="application/json">{"protocol":"proof-of-free/seed","version":2,"edition":512,"engineId":77}</script><script src="/i/77"></script></body></html>';
+    const payload = JSON.stringify({
+      protocol: "proof-of-free/seed",
+      version: 2,
+      edition: 512,
+      engineId: 77,
+      traits: deriveTraits(512)
+    });
+    const seed = `<!doctype html><html><head></head><body><script id="pof-seed" type="application/json">${payload}</script><script src="/i/77"></script></body></html>`;
     expect(validateSeedHtml(seed, { edition: 512, engineId: 77 })).toMatchObject({
       edition: 512,
       engineId: 77
     });
     expect(() => validateSeedHtml(seed, { edition: 511, engineId: 77 })).toThrow(/selected edition/);
+    expect(() => validateSeedHtml(seed.replace('"profile":', '"profile":999,"ignored":'), {
+      edition: 512,
+      engineId: 77
+    })).toThrow(/traits/);
     expect(() => validateSeedHtml(seed.replace("/i/77", "https://example.com/engine.js"), {
       edition: 512,
       engineId: 77

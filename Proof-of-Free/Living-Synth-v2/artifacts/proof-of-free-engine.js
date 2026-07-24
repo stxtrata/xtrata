@@ -5,16 +5,31 @@
   "use strict";
 
   const PROTOCOL = "proof-of-free/engine-api-v2";
-  const MASTER_SEED = "proof-of-free/living-synth/v2";
+  const WAVEFORMS = ["sine", "triangle", "sawtooth", "square"];
+  const PALETTES = [
+    "Infrared", "Ember", "Amber", "Solar",
+    "Lime", "Verdant", "Aqua", "Cyan",
+    "Azure", "Cobalt", "Violet", "Ultraviolet",
+    "Magenta", "Rose", "Silver", "Lunar"
+  ];
+  const ROOT_NOTES = [
+    "C2", "C#2", "D2", "D#2", "E2", "F2", "F#2", "G2",
+    "G#2", "A2", "A#2", "B2", "C3", "C#3", "D3", "D#3"
+  ];
   const clamp = value => Math.max(0, Math.min(1, Number(value) || 0));
-  const hash32 = text => {
-    let hash = 2166136261;
-    for (let index = 0; index < text.length; index += 1) {
-      hash ^= text.charCodeAt(index);
-      hash = Math.imul(hash, 16777619);
-    }
-    return hash >>> 0;
-  };
+
+  function deriveTraits(edition) {
+    const slot = (((edition - 1) * 733) + 421) & 1023;
+    const rootIndex = (slot >>> 2) & 15;
+    return {
+      profile: slot + 1,
+      hue: Number(((slot * 360) / 1024).toFixed(6)),
+      palette: PALETTES[(slot >>> 6) & 15],
+      rootNote: ROOT_NOTES[rootIndex],
+      rootMidi: 36 + rootIndex,
+      waveform: WAVEFORMS[slot & 3]
+    };
+  }
 
   function readSeed() {
     const node = document.getElementById("pof-seed");
@@ -27,7 +42,8 @@
       seed.edition < 1 ||
       seed.edition > 1024 ||
       !Number.isSafeInteger(seed.engineId) ||
-      seed.engineId < 0
+      seed.engineId < 0 ||
+      JSON.stringify(seed.traits) !== JSON.stringify(deriveTraits(seed.edition))
     ) {
       throw new Error("Invalid Proof of Free seed");
     }
@@ -35,11 +51,11 @@
   }
 
   const seed = readSeed();
-  const identity = hash32(`${MASTER_SEED}|${seed.edition}`);
-  const hue = identity % 360;
+  const traits = Object.freeze(seed.traits);
+  const hue = traits.hue;
   const accent = (hue + 137) % 360;
-  const root = 36 + (identity % 24);
-  const waveform = ["sine", "triangle", "sawtooth", "square"][(identity >>> 8) % 4];
+  const root = 440 * 2 ** ((traits.rootMidi - 69) / 12);
+  const waveform = traits.waveform;
 
   document.documentElement.style.cssText = "height:100%;background:#050507";
   document.body.style.cssText = "height:100%;margin:0;overflow:hidden;background:#050507;color:#fff;font-family:ui-monospace,monospace";
@@ -54,7 +70,7 @@
         <canvas id="pof-canvas" style="position:absolute;inset:0;width:100%;height:100%"></canvas>
         <div id="pof-cursor" style="position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 24px hsl(${accent} 90% 70%);pointer-events:none;opacity:.45"></div>
       </div>
-      <footer style="display:flex;justify-content:space-between;gap:12px;font-size:11px;opacity:.7"><span>DRAG: PITCH × FILTER</span><span>${waveform.toUpperCase()} · ROOT ${root}Hz</span></footer>
+      <footer style="display:flex;justify-content:space-between;gap:12px;font-size:11px;opacity:.7"><span>PROFILE ${traits.profile.toString().padStart(4, "0")} · ${traits.palette.toUpperCase()}</span><span>${waveform.toUpperCase()} · ROOT ${traits.rootNote}</span></footer>
     </main>
   `);
 
@@ -71,6 +87,7 @@
   rootElement.dataset.protocol = PROTOCOL;
   rootElement.dataset.edition = String(seed.edition);
   rootElement.dataset.engineId = String(seed.engineId);
+  rootElement.dataset.traitProfile = String(traits.profile);
   pad.dataset.engineReady = "true";
 
   function resize() {
@@ -165,10 +182,11 @@
     protocol: PROTOCOL,
     edition: seed.edition,
     engineId: seed.engineId,
+    traits,
     gesture,
     stop
   });
   dispatchEvent(new CustomEvent("proof-of-free:ready", {
-    detail: { protocol: PROTOCOL, edition: seed.edition, engineId: seed.engineId }
+    detail: { protocol: PROTOCOL, edition: seed.edition, engineId: seed.engineId, traits }
   }));
 })();

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#050507" />
+    <title>Proof of Free — Simulated Mint Gallery</title>
+  </head>
+  <body>
+    <main class="preview-shell">
+      <header class="preview-header">
+        <div>
+          <p class="kicker">Proof of Free / simnet collection</p>
+          <h1>1,024 playable mints</h1>
+          <p class="intro">Every cell is a canonical recursive seed backed by the shared simulated engine inscription.</p>
+        </div>
+        <div class="simulation-proof">
+          <strong>1,024 / 1,024</strong>
+          <span>unique profiles verified</span>
+        </div>
+      </header>
+
+      <section class="preview-layout">
+        <div class="collection-panel">
+          <div class="collection-tools">
+            <label for="edition-picker">Edition</label>
+            <input id="edition-picker" type="number" min="1" max="1024" value="1" />
+            <button id="previous" type="button">Previous</button>
+            <button id="next" type="button">Next</button>
+          </div>
+          <div id="mint-mosaic" class="mint-mosaic" aria-label="1,024 simulated NFT mints"></div>
+        </div>
+
+        <article class="player-panel">
+          <div class="player-heading">
+            <div>
+              <p id="mint-number" class="kicker">Simulated mint #0001</p>
+              <h2 id="trait-title">Loading profile…</h2>
+            </div>
+            <span class="verified">Canonical seed</span>
+          </div>
+          <iframe id="mint-player" title="Playable simulated Proof of Free synth"></iframe>
+          <dl id="trait-list" class="trait-list"></dl>
+          <p class="hint">Drag inside the instrument to play pitch and filter. Select any mosaic cell to load another mint.</p>
+        </article>
+      </section>
+    </main>
+    <script type="module" src="/src/mint-preview.ts"></script>
+  </body>
+</html>

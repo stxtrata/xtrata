@@ -67,6 +67,7 @@ For every confirmed seed, verify:
 - dependencies equal `[ENGINE_ID]`;
 - parents are empty;
 - IDs and editions are unique.
+- all 1,024 manifest trait profiles and hue values are unique.
 
 Stop on the first mismatch. Never shift later editions to compensate for a
 failed or duplicate mint.

@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Proof of Free — Living Synth v3 prototype</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { height: 100%; }
+  body { margin: 0; background: #050507; color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .wrap { display: grid; grid-template-columns: minmax(300px, 46vh) 1fr; gap: 18px; padding: 18px; box-sizing: border-box; height: 100%; }
+  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; height: auto; } }
+  h1 { font-size: 15px; margin: 0 0 2px; letter-spacing: .08em; }
+  small { opacity: .6; }
+  #mosaic { width: 100%; aspect-ratio: 1; image-rendering: pixelated; border: 1px solid #26262e; border-radius: 12px; cursor: crosshair; touch-action: none; }
+  #tip { font-size: 11px; min-height: 2.4em; opacity: .8; margin-top: 8px; white-space: pre-line; }
+  #instrument { min-height: 380px; display: grid; grid-template-rows: 1fr auto; gap: 12px; }
+  #host { min-height: 320px; }
+  #controls { display: flex; flex-wrap: wrap; gap: 8px; }
+  button { background: #131318; color: #fff; border: 1px solid #2c2c36; border-radius: 8px; padding: 8px 12px; font: inherit; font-size: 11px; cursor: pointer; }
+  button:hover { border-color: #5b5b70; }
+  button.rec { border-color: #c0392b; }
+  #registry { font-size: 11px; line-height: 1.7; opacity: .85; border-top: 1px solid #1d1d24; padding-top: 8px; max-height: 130px; overflow: auto; }
+  #registry b { color: #9ecfff; }
+  textarea { width: 100%; box-sizing: border-box; background: #0c0c10; color: #cfe; border: 1px solid #2c2c36; border-radius: 8px; font-size: 10px; height: 64px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section>
+    <h1>PROOF OF FREE · LIVING SYNTH v3</h1>
+    <small>1,024-tile mosaic · one engine · D dorian · 132 BPM<br>hover to inspect · click to preview loop · dbl-click to open</small>
+    <canvas id="mosaic" width="512" height="512" aria-label="32 by 32 collection mosaic"></canvas>
+    <div id="tip">hover a tile…</div>
+    <div id="controls">
+      <button id="playRegion">▶ play the mosaic (scan)</button>
+      <button id="stopAll">■ stop all</button>
+    </div>
+  </section>
+  <section id="instrument">
+    <div id="host"><small>double-click a tile to open its instrument…</small></div>
+    <div>
+      <div id="controls2" class="" style="display:flex;flex-wrap:wrap;gap:8px">
+        <button id="genesis">▶ genesis melody</button>
+        <button id="record">● record</button>
+        <button id="replay">↻ replay performance</button>
+        <button id="stop">■ stop</button>
+        <button id="export">⇩ export JSON</button>
+        <button id="propose">⛓ propose as default</button>
+      </div>
+      <p style="font-size:11px;opacity:.7;margin:8px 0 4px">Load a performance JSON (validated against edition, genome hash and engine version — bad payloads fall back to genesis):</p>
+      <textarea id="perfIn" spellcheck="false" placeholder='{"format":"xtrata-performance", ...}'></textarea>
+      <div style="display:flex;gap:8px;margin-top:6px"><button id="load">⇪ load</button><span id="msg" style="font-size:11px;opacity:.8;align-self:center"></span></div>
+      <div id="registry"><b>DEFAULT REGISTRY (simulated Clarity contract)</b><br>Revision 0 — genesis composition</div>
+    </div>
+  </section>
+</div>
+<script src="../../artifacts/proof-of-free-engine-v3.js"></script>
+<script>
+(() => {
+  const PF = globalThis.ProofOfFree, G = PF.genome;
+  const N = G.GRID, SIZE = 512, T = SIZE / N;
+  const canvas = document.getElementById("mosaic");
+  const ctx = canvas.getContext("2d");
+  const tip = document.getElementById("tip");
+  const host = document.getElementById("host");
+  const msg = document.getElementById("msg");
+  const registryEl = document.getElementById("registry");
+  const genomes = [];
+  for (let e = 1; e <= G.COLLECTION_SIZE; e++) genomes.push(G.deriveGenome(e));
+
+  /* Dormant state: one canvas, zero audio graphs. */
+  let current = null;      // the opened full instrument
+  let pulse = 0;
+  const previews = new Map(); // edition -> instrument (preview mode, hidden host)
+  const removePreview = edition => {
+    const preview = previews.get(edition);
+    if (!preview) return;
+    const node = preview.container;
+    preview.destroy();
+    node.remove();
+    previews.delete(edition);
+  };
+  function drawMosaic() {
+    pulse += 0.02;
+    for (const g of genomes) {
+      const m = g.mosaic;
+      const live = previews.has(g.edition) || current?.edition === g.edition;
+      const b = m.brightness * (28 + 12 * Math.sin(pulse + g.seedSlot)) + (live ? 26 : 0);
+      ctx.fillStyle = `hsl(${m.hue} ${live ? 95 : 70}% ${Math.max(6, b)}%)`;
+      ctx.fillRect(m.gridX * T, m.gridY * T, T - 1, T - 1);
+    }
+    requestAnimationFrame(drawMosaic);
+  }
+  drawMosaic();
+
+  const editionAt = ev => {
+    const box = canvas.getBoundingClientRect();
+    const gx = Math.min(N - 1, Math.max(0, ((ev.clientX - box.left) / box.width * N) | 0));
+    const gy = Math.min(N - 1, Math.max(0, ((ev.clientY - box.top) / box.height * N) | 0));
+    return gy * N + gx + 1;
+  };
+  canvas.addEventListener("pointermove", ev => {
+    const g = genomes[editionAt(ev) - 1];
+    tip.textContent = `#${String(g.edition).padStart(4, "0")}  ${g.mosaic.role} · ${g.mosaic.palette} · ${g.oscillator.typeA}+${g.oscillator.typeB}\nroot ${g.rootNote} · cutoff ${g.filter.cutoff} Hz · genome ${G.genomeHash(g)}`;
+  });
+
+  /* Preview state: temporary voice playing the genesis loop, voice-stolen. */
+  canvas.addEventListener("click", ev => {
+    const edition = editionAt(ev);
+    if (previews.has(edition)) { removePreview(edition); return; }
+    const div = document.createElement("div"); // offscreen preview shell
+    div.style.cssText = "position:fixed;left:-9999px;width:80px;height:60px";
+    document.body.appendChild(div);
+    const inst = PF.mount(div, { edition, mode: "preview" });
+    previews.set(edition, inst);
+    void inst.playMelody();
+    if (previews.size > 6) { const [firstKey] = previews.keys(); removePreview(firstKey); }
+  });
+
+  /* Instrument state: the full chaos pad. */
+  const registry = [{ revision: 0, label: "genesis composition", perf: null }];
+  function openInstrument(edition) {
+    current?.destroy();
+    host.replaceChildren();
+    current = PF.mount(host, { edition, engineId: 0, mode: "instrument" });
+    registry.length = 1;
+    renderRegistry();
+    msg.textContent = `edition ${edition} mounted — play the pad`;
+  }
+  canvas.addEventListener("dblclick", ev => openInstrument(editionAt(ev)));
+  openInstrument(417);
+
+  function renderRegistry() {
+    registryEl.innerHTML = "<b>DEFAULT REGISTRY (simulated Clarity contract)</b><br>" +
+      registry.map(r => `Revision ${r.revision} — ${r.label}`).join("<br>");
+  }
+
+  /* Play the Mosaic: left→right column scan across the logo. */
+  let scanTimer = null;
+  document.getElementById("playRegion").addEventListener("click", () => {
+    clearInterval(scanTimer);
+    let col = 0;
+    scanTimer = setInterval(() => {
+      [...previews.keys()].forEach(removePreview);
+      const picks = [];
+      for (let row = 0; row < N; row++) {
+        const g = genomes[row * N + col];
+        if (g.mosaic.brightness > 0.75 && picks.length < 3) picks.push(g.edition);
+      }
+      for (const edition of picks) {
+        const div = document.createElement("div");
+        div.style.cssText = "position:fixed;left:-9999px;width:10px;height:10px";
+        document.body.appendChild(div);
+        const inst = PF.mount(div, { edition, mode: "preview" });
+        previews.set(edition, inst);
+        void inst.playMelody();
+      }
+      col = (col + 1) % N;
+    }, (60 / PF.music.bpm) * 2000); // half a bar per column
+  });
+  document.getElementById("stopAll").addEventListener("click", () => {
+    clearInterval(scanTimer); scanTimer = null;
+    [...previews.keys()].forEach(removePreview);
+    PF.stopAll();
+  });
+
+  /* Instrument controls. */
+  const recordBtn = document.getElementById("record");
+  document.getElementById("genesis").addEventListener("click", () => current && current.playMelody());
+  document.getElementById("stop").addEventListener("click", () => { current?.stopTransport(); current?.silence(); });
+  recordBtn.addEventListener("click", () => {
+    if (!current) return;
+    if (current.recording) {
+      const perf = current.stopRecording();
+      recordBtn.classList.remove("rec"); recordBtn.textContent = "● record";
+      msg.textContent = perf ? `captured ${perf.events.length} events over ${perf.durationTicks} ticks` : "nothing captured";
+    } else {
+      current.startRecording();
+      recordBtn.classList.add("rec"); recordBtn.textContent = "■ stop recording";
+      msg.textContent = "recording gestures — play the pad";
+    }
+  });
+  document.getElementById("replay").addEventListener("click", () => {
+    try { current?.playPerformance(); msg.textContent = "replaying"; }
+    catch (err) { msg.textContent = err.message; }
+  });
+  document.getElementById("export").addEventListener("click", () => {
+    try {
+      const json = current.exportPerformance();
+      document.getElementById("perfIn").value = json;
+      const blob = new Blob([json], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `xtrata-performance-${current.edition}.json`;
+      a.click(); URL.revokeObjectURL(a.href);
+      msg.textContent = `exported ${json.length} bytes`;
+    } catch (err) { msg.textContent = err.message; }
+  });
+  document.getElementById("load").addEventListener("click", () => {
+    try {
+      const perf = current.loadPerformance(document.getElementById("perfIn").value);
+      msg.textContent = `loaded: ${perf.events.length} events — press replay`;
+    } catch (err) {
+      current?.clearPerformance();
+      msg.textContent = `rejected: ${err.message} (genesis fallback selected)`;
+    }
+  });
+  document.getElementById("propose").addEventListener("click", () => {
+    if (!current?.performance) { msg.textContent = "record or load a performance first"; return; }
+    registry.push({
+      revision: registry.length,
+      label: `performance (${current.performance.events.length} events) selected by SP…MOCK · genome ${current.genomeHash}`,
+      perf: current.performance
+    });
+    renderRegistry();
+    msg.textContent = "default updated in simulated registry (on mainnet: child inscription + ownership-gated contract call)";
+  });
+})();
+</script>
+</body>
+</html>

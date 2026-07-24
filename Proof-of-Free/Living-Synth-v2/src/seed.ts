@@ -1,3 +1,5 @@
+import { deriveTraits, type ProofOfFreeTraits } from "./traits";
+
 export const SEED_PROTOCOL = "proof-of-free/seed" as const;
 export const SEED_VERSION = 2 as const;
 
@@ -6,6 +8,7 @@ export type ProofOfFreeSeed = {
   version: typeof SEED_VERSION;
   edition: number;
   engineId: number;
+  traits: ProofOfFreeTraits;
 };
 
 export function canonicalEngineSource(engineId: number) {
@@ -33,9 +36,10 @@ export function validateSeedHtml(
     seed.protocol !== SEED_PROTOCOL ||
     seed.version !== SEED_VERSION ||
     seed.edition !== expected.edition ||
-    seed.engineId !== expected.engineId
+    seed.engineId !== expected.engineId ||
+    JSON.stringify(seed.traits) !== JSON.stringify(deriveTraits(expected.edition))
   ) {
-    throw new Error("Seed inscription does not identify the selected edition and locked engine.");
+    throw new Error("Seed inscription does not identify the selected edition, traits, and locked engine.");
   }
   if (scripts[0][1] !== canonicalEngineSource(expected.engineId)) {
     throw new Error("Seed inscription does not use the canonical recursive engine route.");

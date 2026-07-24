@@ -1,6 +1,6 @@
 import { Cl } from "@stacks/transactions";
 import { describe, expect, it } from "vitest";
-import { buildReleaseModel } from "../scripts/release-lib.mjs";
+import { buildReleaseModel, traitProfileKey } from "../scripts/release-lib.mjs";
 
 const REGISTRY = "proof-of-free-living-synth-v2";
 const CORE = "mock-xtrata-core";
@@ -74,6 +74,11 @@ describe("full collection mint simulation", () => {
   it("mints, registers, records, transfers, and audits all 1,024 editions", { timeout: 120_000 }, async () => {
     const { deployer, ownerA, ownerB } = accounts();
     const release = await buildReleaseModel(ENGINE_ID);
+    const uniqueTraitProfiles = new Set(
+      release.children.map(child => traitProfileKey(child.traits))
+    ).size;
+    expect(uniqueTraitProfiles).toBe(COLLECTION_SIZE);
+    expect(new Set(release.children.map(child => child.traits.hue)).size).toBe(COLLECTION_SIZE);
     const ownerForEdition = (edition: number) => edition % 2 === 0 ? ownerB : ownerA;
     const nftForEdition = (edition: number) => FIRST_NFT_ID + edition - 1;
 
@@ -180,6 +185,8 @@ describe("full collection mint simulation", () => {
       seededHtmlMints: COLLECTION_SIZE,
       recursiveDependencyChecks: COLLECTION_SIZE,
       uniqueSeedHashes: new Set(release.children.map(child => child.sha256)).size,
+      uniqueTraitProfiles,
+      uniqueTraitHues: new Set(release.children.map(child => child.traits.hue)).size,
       deterministicManifest: release.manifest.protocol,
       engineMints: 1,
       recordingMints: 5,
