@@ -1,18 +1,13 @@
 [project]
 name = "proof-of-free-contract"
-description = "Proof of Free — reveal & recording-fee registry"
+description = "Proof of Free - recording-fee contract (companion to Xtrata inscriptions)"
 authors = []
 telemetry = false
 cache_dir = "./.cache"
 requirements = []
 
-[contracts.nft-trait]
-path = "contracts/nft-trait.clar"
-clarity_version = 2
-epoch = 2.5
-
-[contracts.proof-of-free-reveal]
-path = "contracts/proof-of-free-reveal.clar"
+[contracts.recording-fees]
+path = "contracts/recording-fees.clar"
 clarity_version = 2
 epoch = 2.5
 

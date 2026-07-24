@@ -1,131 +1,65 @@
-# Proof of Free — on-chain reveal & mint-gating
+# Proof of Free — on-chain architecture (Xtrata)
 
-**Goal.** The inscribed engine draws the whole 1,024-tile Xtrata mosaic, but only
-editions that exist on-chain **and are in circulation** appear and are playable. A
-tile reveals the first time its token **leaves the Xtrata treasury wallet** (gifted
-or sold). This document is the plan for wiring the mosaic to on-chain state, plus the
-local **simulation** (shipped now, behind `?sim=1`) that previews the random reveal
-before a single satoshi is spent. The contract that implements this ships and is
-tested in [`../contract/`](../contract) (`proof-of-free-reveal`, 18 passing tests).
+**Everything runs on Xtrata's native infrastructure**, on Stacks (which settles with
+Bitcoin finality). The only bespoke on-chain piece is a tiny **recording-fee contract**.
 
----
+## What Xtrata gives us (no contract needed)
 
-## 1 · Source of truth — a Stacks (Clarity) contract
+- **The editions are Xtrata inscriptions** and are natively **SIP-009 tokens** — so
+  ownership, transfers, and marketplaces are all Xtrata's.
+- **Recursion:** the engine is inscribed once; the mosaic and every edition seed
+  reference it by inscription id (a dependency), so there's no duplicated engine.
+- **Parent-child evolution:** a **child recording** (an `xtrata-performance` JSON) is
+  inscribed as a *child of the parent edition inscription*. The mosaic, when it plays
+  edition N, uses the latest child to **evolve that synth for public playback**.
+- **Reveal = ownership.** The mosaic starts empty and shows a tile once its edition is
+  **held by someone other than the treasury** — i.e. it's been gifted or sold. That's
+  read straight from Xtrata ownership; nothing to track in a contract. (Xtrata's
+  sponsored **free-claims** are a natural give-away path: the claim moves the token out
+  of treasury, which is the reveal.)
 
-The collection lives on Stacks, so a Clarity SIP-009 contract is the canonical
-registry of which editions are **inscribed** and which have been **released** (moved
-out of treasury).
+## The one contract — `recording-fees`
 
-- **Reveal = first exit from treasury.** Every edition mints into the Xtrata treasury
-  wallet; the SIP-009 `transfer` flips a per-token reveal bit the first time the
-  `sender` is the treasury. This lets the team gift some and sell some, and the mosaic
-  shows exactly what's in circulation.
-- **State: a 1,024-bit reveal map** stored as 32 × 32-bit chunks; `get-revealed-chunks`
-  returns `(list 32 uint)`, so the mosaic reads the whole set in one call.
-- **Read path:** the mosaic calls the contract's read-onlys via the Hiro Stacks API
-  (`POST /v2/contracts/call-read/{addr}/{name}/{fn}`) or `@stacks/transactions`
-  `fetchCallReadOnlyFunction`, decodes `get-revealed-chunks` → revealed token ids →
-  positions via the shuffle.
-- **One chain, one wallet.** Everything is Stacks: the art is inscribed on **Xtrata**
-  (STX inscriptions, not Bitcoin ordinals — Xtrata settles with Bitcoin finality and
-  supports recursion, so the mosaic and each seed reference the shared engine
-  inscription by id), and the reveal contract is a Stacks contract. The mosaic reads
-  ownership/reveal state from the contract — one authoritative, cheap read that the
-  distribution process updates in lockstep — rather than indexing inscriptions.
+Users pay to inscribe a derivative recording; the fee goes to the treasury with a
+receipt. Owner-updatable.
 
-## 2 · Verifiable random placement (pre-committed shuffle)
+- `pay-inscription-fee (kind parent ref)` — `kind u0` = child performance → **0.1 STX**,
+  `kind u1` = live set (`xtrata-session`) → **1 STX**.
+- `set-child-fee` / `set-live-set-fee` change the prices; `set-treasury`,
+  `transfer-ownership` for admin.
+- Ships and tested in [`../contract`](../contract) (8 passing Clarinet tests).
 
-Token `#k` maps to mosaic position `S[k-1]`, where **S is a seeded Fisher–Yates
-shuffle** of `[1…1024]` — so whichever tokens leave treasury, the revealed positions
-scatter across the mosaic and the mark emerges from noise. Distributing the first 32
-lights up 32 random positions; that's what the `?sim=1` batch preview shows.
+## How the mosaic reads state
 
-- **Determinism + fairness.** The seed is committed as a hash at deploy (`commit-seed`)
-  and revealed later (`reveal-seed-value`, verified `sha256(seed)==hash`). The
-  permutation is computed off-chain; anyone can recompute it from the revealed seed and
-  confirm placements. The contract never stores the permutation.
-- **Recording fees.** The same contract collects owner-updatable inscription fees to
-  the treasury — **0.1 STX** per parent/child recording, **1 STX** per live set — via
-  `pay-recording-fee` (`set-child-recording-fee` / `set-live-set-fee` to change them).
-- **Entropy / seed — two models:**
-  - **A — committed master shuffle:** one seed fixed at deploy (e.g. the deploy
-- **Entropy / seed — two models:**
-  - **A — committed master shuffle:** one seed fixed at deploy (e.g. the deploy
-    burn-block hash) drives the whole 1,024 order; batches are consecutive slices.
-    Simplest and fully verifiable; the order becomes knowable once the seed is public.
-  - **B — per-batch entropy:** batch *i*'s 32 IDs derive from
-    `hash(masterSeed, burnBlockHash_i)`, drawn from the remaining pool. Harder to
-    pre-compute; the contract records each batch's block hash.
-- The **simulation implements Model A** with a settable seed (so you can preview many
-  distributions). Model B is a drop-in: hash the seed with a per-batch value before the
-  shuffle.
+- **Which tiles to show:** read Xtrata ownership for the collection and reveal editions
+  whose owner isn't the treasury (via Xtrata's API/indexer, or the collection contract's
+  `get-owner`). Each edition sits at its fixed genome position, so a distributed set
+  scatters across the logo.
+- **What each tile plays:** genesis by default; if the edition has a child inscription,
+  play the latest child (Xtrata parent-child).
+- **Reveal simulation** (shipped, `living-synth-v5-demo.html?sim=1`): a local preview of
+  the reveal filling in — seed / reroll / step 32 / auto — so you can see how the scatter
+  reads before anything is distributed.
 
-## 3 · Rendering rule
+## Order of operations (all Stacks, one wallet)
 
-- **Minted** → the tile renders and plays exactly as today (brand colour, motif, audio,
-  full interaction).
-- **Unminted** → a dark **"not yet inscribed"** slot: near-black cell + faint grid
-  border, no motif, no animation, no audio, not selectable. The logo materialises as
-  batches land.
-- **Newly minted** tiles **bloom** (a bright ring + flash) for ~1.6 s, so each batch's
-  32 are visible as they arrive.
+1. **Inscribe the engine** on Xtrata → engine inscription id.
+2. **Deploy `recording-fees`** on Stacks (treasury = the Xtrata wallet).
+3. **Inscribe the mosaic** on Xtrata (references the engine id; carries the collection +
+   fee-contract config).
+4. **Inscribe the edition seeds** on Xtrata (each references the engine id) into the
+   treasury.
+5. **Distribute** — gift (incl. sponsored free-claims) or sell; each first move out of
+   treasury reveals that tile.
+6. **Live:** owners record child performances / live sets, `pay-inscription-fee`, then
+   inscribe them on Xtrata — children evolve their synth in the mosaic; live sets play
+   back as songs.
 
-## 4 · Interaction gating
+## The Canary page (next)
 
-Every tile action is gated on `isPlayable(edition)` — tap-to-play, open-synth,
-volume-drag, solo / mute / group, the arrows, the randomiser, the region scan, and
-session record / playback. Unminted tiles are inert; the randomiser and scan only draw
-from minted tiles; a loaded session skips `on` events for editions that aren't minted
-yet.
-
-## 5 · Client architecture — `MintProvider`
-
-A tiny interface isolates *where mint state comes from* from *how the mosaic uses it*:
-
-```
-MintProvider = { isMinted(ed), mintedSet(), count(), enforced }
-```
-
-- **`LiveMint(config)`** — production: polls the Stacks read-only bitmap (per block or
-  every N s), decodes it, and pushes changes into the mosaic. Degrades gracefully
-  (offline → last-known state).
-- **`SimMint(seed)`** — testing (shipped): the seeded shuffle, with
-  `next() / prev() / all() / reset() / setSeed()`.
-- **Default** (no contract configured, no `?sim`): all 1,024 are playable, so the file
-  is still a complete instrument/demo.
-- **Selection:** `?sim=1` (optionally `&seed=…`) activates `SimMint` and the SIM bar.
-  A real deployment injects the contract address/network via a small config block, not
-  hard-coded into the immutable engine.
-
-## 6 · Simulation module (ships now, behind `?sim=1`)
-
-Open `living-synth-v5-demo.html?sim=1`. A **SIM** bar appears with:
-
-- a **seed** field + **⚄ reroll** (each seed is a different random distribution),
-- **◀ back**, **▶ inscribe 32**, **⏭ reveal all**, **↺ reset**,
-- an **▶ auto** toggle that walks the whole 32-batch reveal so you can watch it fill,
-- a readout: **`batch k / 32 · N / 1024 inscribed`**.
-
-Start from a dark grid, drop the first random 32, and step batch by batch to see how the
-scatter reads against the logo — or hit auto and watch the mark resolve.
-
-## 7 · Inscription notes (Xtrata / Stacks)
-
-- The art inscribes on **Xtrata** via wallet-signed Stacks transactions (its
-  Inscription Wizard / SDK). Xtrata supports **recursion**, so the **engine is inscribed
-  once** and the mosaic + each seed reference it by inscription id (a dependency
-  reference) — no duplicated engine bytes.
-- The **engine + mosaic are inscribed once** (immutable). The **reveal map lives in the
-  mutable Clarity contract**; the mosaic reads it at runtime, so tiles appear as their
-  tokens leave treasury — no re-inscription of the art.
-- The sim/mock is **inert unless `?sim`** — it can stay in the inscribed file as a dev
-  tool, or be stripped for the final immutable build via a build flag.
-- Network / contract address are injected via config (a `<script id="pof-chain">` JSON
-  block or URL params), never baked into the immutable engine.
-
-## 8 · Open decisions (for you)
-
-- Entropy **Model A vs B** (committed shuffle vs per-batch block hash).
-- Unminted look — pure black vs the current faint dark slot with a grid border.
-- LiveMint **poll interval** vs a websocket/block subscription.
-- Whether the **sim stays in the production inscription** or is stripped.
+A single self-contained HTML mission-control that walks the sequence with **one Stacks
+wallet** (Leather/Xverse via `@stacks/connect`) — connect → inscribe engine → deploy fee
+contract → inscribe mosaic → inscribe editions → distribute — each step with a
+read-only **verify** and a status, later steps locked until earlier ones pass. Because
+Xtrata inscribes via wallet-signed Stacks transactions, the whole flow signs in-browser;
+the inscribe steps use Xtrata's Wizard/SDK and record the returned inscription ids.
