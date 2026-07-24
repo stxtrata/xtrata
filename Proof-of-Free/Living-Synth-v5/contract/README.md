@@ -39,7 +39,7 @@ Owners pay to inscribe a recording, collected to the treasury with an on-chain l
 
 `mint`, `mint-many` (owner → treasury) · `transfer` (SIP-009, reveals on treasury exit) ·
 `commit-seed`, `reveal-seed-value` · `pay-recording-fee` · `set-child-recording-fee`,
-`set-live-set-fee` · `set-inscription` (position → Bitcoin inscription id) ·
+`set-live-set-fee` · `set-inscription` (position → Xtrata inscription id) ·
 `set-treasury`, `set-base-uri`, `transfer-ownership`.
 
 ## Read-only (what the mosaic / verifiers call)
@@ -54,7 +54,7 @@ Owners pay to inscribe a recording, collected to the treasury with an on-chain l
 1. **Deploy** `nft-trait` then `proof-of-free-reveal` (treasury/owner default to the deployer).
 2. `commit-seed <sha256(seed)>` — commit the placement seed's hash.
 3. `reveal-seed-value <seed>` — reveal it (before distributing, so the mosaic can place tiles).
-4. `mint` / `mint-many` — mint each inscribed batch's editions into the treasury; `set-inscription` records each Bitcoin inscription id.
+4. `mint` / `mint-many` — mint each inscribed batch's editions into the treasury; `set-inscription` records each Xtrata inscription id.
 5. **Distribute** — `transfer` tokens out of treasury (gift or sale); each first exit reveals its tile.
 
 ## Tests

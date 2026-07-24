@@ -26,9 +26,12 @@ out of treasury).
   (`POST /v2/contracts/call-read/{addr}/{name}/{fn}`) or `@stacks/transactions`
   `fetchCallReadOnlyFunction`, decodes `get-revealed-chunks` → revealed token ids →
   positions via the shuffle.
-- **Why not read Bitcoin/ordinals directly:** ordinal indexing is heavier and less
-  uniform to query. The Stacks contract is one authoritative, cheap read that the
-  distribution process updates in lockstep.
+- **One chain, one wallet.** Everything is Stacks: the art is inscribed on **Xtrata**
+  (STX inscriptions, not Bitcoin ordinals — Xtrata settles with Bitcoin finality and
+  supports recursion, so the mosaic and each seed reference the shared engine
+  inscription by id), and the reveal contract is a Stacks contract. The mosaic reads
+  ownership/reveal state from the contract — one authoritative, cheap read that the
+  distribution process updates in lockstep — rather than indexing inscriptions.
 
 ## 2 · Verifiable random placement (pre-committed shuffle)
 
@@ -106,11 +109,15 @@ Open `living-synth-v5-demo.html?sim=1`. A **SIM** bar appears with:
 Start from a dark grid, drop the first random 32, and step batch by batch to see how the
 scatter reads against the logo — or hit auto and watch the mark resolve.
 
-## 7 · Inscription notes
+## 7 · Inscription notes (Xtrata / Stacks)
 
-- The **engine + mosaic are inscribed once** (immutable). The **mint bitmap lives in the
-  mutable Clarity contract**; the mosaic reads it at runtime, so new mints appear with no
-  re-inscription of the art.
+- The art inscribes on **Xtrata** via wallet-signed Stacks transactions (its
+  Inscription Wizard / SDK). Xtrata supports **recursion**, so the **engine is inscribed
+  once** and the mosaic + each seed reference it by inscription id (a dependency
+  reference) — no duplicated engine bytes.
+- The **engine + mosaic are inscribed once** (immutable). The **reveal map lives in the
+  mutable Clarity contract**; the mosaic reads it at runtime, so tiles appear as their
+  tokens leave treasury — no re-inscription of the art.
 - The sim/mock is **inert unless `?sim`** — it can stay in the inscribed file as a dev
   tool, or be stripped for the final immutable build via a build flag.
 - Network / contract address are injected via config (a `<script id="pof-chain">` JSON

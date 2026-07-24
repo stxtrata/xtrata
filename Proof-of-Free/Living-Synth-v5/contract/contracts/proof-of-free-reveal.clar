@@ -137,7 +137,7 @@
 (define-public (set-live-set-fee (n uint))
   (begin (asserts! (is-owner) ERR-OWNER-ONLY) (var-set live-set-fee n) (ok true)))
 
-;; ---- inscription registry (position/token -> Bitcoin inscription id) ----
+;; ---- inscription registry (position/token -> Xtrata (Stacks) inscription id) ----
 (define-public (set-inscription (id uint) (inscription-id (string-ascii 80)))
   (begin
     (asserts! (is-owner) ERR-OWNER-ONLY)
