@@ -406,6 +406,15 @@
   .dot{display:inline-block;width:9px;height:9px;border-radius:3px;vertical-align:middle;margin-right:5px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   @media(max-width:840px){.grid2{grid-template-columns:1fr}}
+  /* Song-details editor — one component, opened against the single flow or a batch row. */
+  .meta-overlay{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.6)}
+  .meta-panel{width:min(460px,100%);max-height:90vh;overflow-y:auto;padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:0 18px 44px rgba(0,0,0,.45)}
+  .meta-panel h4{margin:0 0 2px;font-size:15px}
+  .mfield{margin-bottom:10px;min-width:0}
+  .mfield label{display:block;font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+  .mfield input,.mfield textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:8px 10px;font:inherit;font-size:13px}
+  .mfield textarea{resize:vertical;line-height:1.5}
+  .meta-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:6px}
   /* Embedded in the site shell: shell provides brand + nav + radio; keep our
      wallet controls (independent session) but drop the duplicate chrome. */
   :root[data-embedded='1'] body>header>a[title="Xtrata home"]{display:none!important}
@@ -482,9 +491,22 @@ try{
         <span>Use the original file instead</span>
       </label>
     </div>
-    <div class="muted" id="sunoHint" style="font-size:12px;margin-top:8px" hidden>
-      🎵 MP3 with embedded cover art? The <a href="./suno.html" style="color:var(--acc2)">SUNO fast-track</a> builds a full on-chain player (Opus + art + lyrics) in one payment.
+    <!-- Single-file audio mode. Mirrors the batch card's bAudioMode radios so one
+         song and many songs offer the same choice; raw stays the default so the
+         existing railroad is untouched for anyone who does not opt in. -->
+    <div id="audioMode" hidden style="margin:8px 0 10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px">
+      <div style="font-weight:700;font-size:13px;margin-bottom:6px">🎵 Audio file — how should it go on-chain?</div>
+      <label class="checkline"><input type="radio" name="sAudioMode" value="raw" checked><span>Inscribe the audio file as it is</span></label>
+      <label class="checkline"><input type="radio" name="sAudioMode" value="player"><span><b>Build an on-chain player for this song</b> — Opus-optimised audio + title/artist/lyrics + artwork (the opus tool)</span></label>
+      <div class="muted" id="audioFound" style="font-size:11.5px;margin-top:7px" hidden></div>
+      <div id="playerRow" style="font-size:12px;margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap" hidden></div>
+      <div class="muted" id="playerHint" style="font-size:11.5px;margin-top:6px" hidden>
+        The audio engine runs in your browser. This page uses the single-threaded core, so a build takes
+        longer here than on the <a href="./suno.html" style="color:var(--acc2)">SUNO fast-track</a> —
+        in exchange it takes any audio file and any artwork, not just Suno exports.
+      </div>
     </div>
+    <input id="singleArtPicker" type="file" accept="image/*" hidden />
 
     <details class="opts" id="optionsDetails">
       <summary>Options — URI, delivery, margin</summary>
@@ -653,6 +675,44 @@ try{
 
 </div></main>
 
+<!-- Song details — shared by the single flow and every batch row. Prefilled from
+     whatever the file carried; every field maps to an override XtrataSuno.build()
+     already accepts, so editing here changes the inscribed player. -->
+<div id="metaOverlay" class="meta-overlay" hidden>
+  <div class="meta-panel" role="dialog" aria-modal="true" aria-labelledby="metaTitleHead">
+    <h4 id="metaTitleHead">Song details</h4>
+    <div class="muted" id="metaFound" style="font-size:11.5px;margin-bottom:10px"></div>
+    <div class="mfield">
+      <label>Artwork</label>
+      <div style="display:flex;gap:10px;align-items:center">
+        <img id="mCoverThumb" alt="" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:var(--bg);flex:none" />
+        <button class="btn ghost" id="mCoverBtn" type="button" style="flex:1;margin:0">Change artwork…</button>
+      </div>
+      <div class="mfield" style="margin:8px 0 0"><label>or an image inscription id <span class="muted" style="text-transform:none;letter-spacing:0">— recursive artwork, zero extra bytes</span></label><input id="mCoverTokenId" class="mono" placeholder="e.g. 2311" /></div>
+    </div>
+    <div class="mfield"><label for="mTitle">Song title</label><input id="mTitle" type="text" maxlength="120" /></div>
+    <div class="mfield"><label for="mArtist">Artist</label><input id="mArtist" type="text" maxlength="120" /></div>
+    <details class="opts" style="margin:2px 0 12px">
+      <summary>More metadata — album, BPM, licence, lyrics</summary>
+      <div class="opts-body">
+        <div class="mfield"><label for="mAlbum">Album</label><input id="mAlbum" type="text" maxlength="120" /></div>
+        <div class="row">
+          <div class="mfield"><label for="mBpm">BPM</label><input id="mBpm" type="text" inputmode="numeric" maxlength="6" /></div>
+          <div class="mfield"><label for="mNote">Note</label><input id="mNote" type="text" maxlength="120" /></div>
+        </div>
+        <div class="mfield"><label for="mLicense">Licence</label><input id="mLicense" type="text" maxlength="160" placeholder="e.g. All rights reserved · CC BY-NC 4.0" /></div>
+        <div class="mfield"><label for="mDescription">Description</label><input id="mDescription" type="text" maxlength="300" /></div>
+        <div class="mfield"><label for="mLyrics">Lyrics</label><textarea id="mLyrics" rows="6"></textarea></div>
+      </div>
+    </details>
+    <div id="metaErr" class="err" style="font-size:12px;margin-bottom:6px"></div>
+    <div class="meta-actions">
+      <button class="btn ghost" id="mCancel" type="button" style="width:auto;margin:0">Cancel</button>
+      <button class="btn" id="mApply" type="button" style="width:auto;margin:0">Apply &amp; rebuild</button>
+    </div>
+  </div>
+</div>
+
 <footer>
   <a href="./suno.html">SUNO fast-track</a>
   <a href="./manifests.html">Manifest Studio</a>
@@ -785,8 +845,20 @@ const FLOW = {
   quoteRun:0,
   jobId:null,        // active job once created
   done:false,
+  isAudio:false,     // the dropped file is audio → the player choice applies
+  playerMode:false,  // "build an on-chain player" instead of inscribing the audio as-is
+  player:{status:'raw',file:null,info:null,err:null},
+  probe:null,        // cheap tag/cover read, so the details panel can prefill before any encode
+  meta:{},           // user overrides passed to XtrataSuno.build()
+  art:{file:null,tokenId:''},
 };
-FLOW.activeFile = () => (FLOW.optimized && !FLOW.useOriginal) ? FLOW.optimized.file : FLOW.original;
+// The bytes that will ACTUALLY inscribe. A built player wins over the Opus-optimised
+// source, which wins over the original — same precedence as batchActiveFile().
+FLOW.activeFile = () => (FLOW.playerMode && FLOW.player.status==='ready' && FLOW.player.file) ? FLOW.player.file
+  : (FLOW.optimized && !FLOW.useOriginal) ? FLOW.optimized.file
+  : FLOW.original;
+FLOW.activeMime = () => (FLOW.playerMode && FLOW.player.status==='ready' && FLOW.player.file) ? 'text/html'
+  : (CONTENT[catSel.value] && CONTENT[catSel.value][ftSel.value]) || (FLOW.original && FLOW.original.type) || 'application/octet-stream';
 
 function setStep(step){
   const order=['drop','review','pay','done'];
@@ -819,7 +891,7 @@ function makeItem(f){
   const isAudio=mime.startsWith('audio/');
   const isImage=!!(window.XtrataImageOptimizer&&window.XtrataImageOptimizer.isCandidate(f.name,f.size));
   return { file:f, uri:`xtrata:${catFor(f.name)}/${slug(f.name)}`, mime, deps:'', parents:'',
-    isAudio, isImage, art:{file:null,tokenId:''}, player:{status:(BATCH.playerMode&&isAudio)?'await':'raw',file:null,info:null,err:null},
+    isAudio, isImage, art:{file:null,tokenId:''}, meta:{}, player:{status:(BATCH.playerMode&&isAudio)?'await':'raw',file:null,info:null,err:null},
     opt:{status:'pending',file:null,originalBytes:f.size,optimizedBytes:null,mime:null,note:''}, useOptimized:true, showPreview:true };
 }
 // Same-named audio+image auto-pairing. If EVERY art-less song in the batch has an image
@@ -879,11 +951,13 @@ const artChip=(it,i)=>{
   return `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
     <button class="btn ghost" style="padding:3px 8px;font-size:11px" onclick="batchArtPick(${i})">${art||'attach image'}</button>
     <input class="mono" placeholder="or img #id" value="${esc(it.art.tokenId)}" data-arti="${i}" style="width:76px;padding:4px 6px;font-size:11px"/>
+    <button class="btn ghost" style="padding:3px 8px;font-size:11px" onclick="batchEditMeta(${i})" title="Title, artist, lyrics and the rest — read from the file, yours to correct">✎ details</button>
     ${state}${it.player.status==='ready'?`<button class="btn ghost" style="padding:3px 8px;font-size:11px" onclick="batchTogglePreview(${i})">${it.showPreview?'▾ hide preview':'▸ preview'}</button>`:''}</div>`;
 };
 // Manually (re)build one row — also the retry path after a failure.
 window.batchBuildRow=(i)=>{ const it=BATCH.items[i]; if(!it||!it.isAudio) return;
   it.player={status:'queued',file:null,info:null,err:null}; renderBatch(); queueAudioBuilds(); };
+window.batchEditMeta=(i)=>{ const it=BATCH.items[i]; if(it&&it.isAudio) openMetaEditor(it); };
 // Per-row size readout: original → optimised (−%), with a revert toggle. Audio in
 // player mode is reported by the Artwork/player column instead, so it's skipped here.
 function optCellHtml(it,i){
@@ -1027,7 +1101,7 @@ async function queueAudioBuilds(){
       if(!it) break;
       it.player.status='building'; renderBatch();
       try{
-        const overrides={};
+        const overrides=Object.assign({},it.meta);
         if(it.art.tokenId) overrides.coverTokenId=it.art.tokenId;
         else if(it.art.file){ let cover=it.art.file;   // reformat the cover to a smaller filetype before embedding → smallest player
           try{ if(window.XtrataImageOptimizer){ const cr=await window.XtrataImageOptimizer.optimize(cover,()=>{}); if(cr.optimizedBytes) cover=cr.file; } }catch(_e){}
@@ -1070,6 +1144,140 @@ const batchActiveMime=(it)=>{
   if(it.opt&&it.opt.status==='done'&&it.useOptimized&&it.opt.file) return it.opt.file.type||it.mime;
   return it.mime;
 };
+// --- Single-file player mode ------------------------------------------------
+// Same engine as the batch path, one song. XtrataSuno.build() takes any audio
+// ffmpeg.wasm decodes (mp3, wav, flac, m4a…) and pulls title/artist/album/lyrics
+// + cover from whatever the file carries, so this is not Suno-only.
+const AUDIO_RE=/\.(mp3|wav|flac|m4a|aac|ogg|oga|opus|weba|aiff?|wma)$/i;
+const isAudioFile=(f)=>!!f&&(AUDIO_RE.test(f.name)||String(f.type||'').startsWith('audio/'));
+// "What we found in this file" — neutral facts. No art is not an error; the
+// player is perfectly good without it, and you can attach your own.
+function foundLine(info){
+  if(!info) return '';
+  const bits=[];
+  bits.push(info.hasCover?'cover art ✓':'no embedded cover art');
+  if(info.title) bits.push('title “'+esc(info.title)+'”');
+  if(info.artist) bits.push('artist “'+esc(info.artist)+'”');
+  if(info.album) bits.push('album “'+esc(info.album)+'”');
+  // The cheap probe reads tags + cover only; lyrics and album come out of the
+  // full extraction, so don't claim "no lyrics" when we simply haven't looked.
+  if(!info.partial) bits.push(info.hasLyrics?('lyrics ✓'+(info.lyrics?(' ('+String(info.lyrics).split('\n').filter(Boolean).length+' lines)'):'')):'no lyrics');
+  return 'Found in this file: '+bits.join(' · ')
+    +(info.isSuno?' <span class="ok">· made with Suno</span>':'')
+    +(info.partial?' <span class="muted">· lyrics and album are read when the player is built</span>':'');
+}
+// Tags + cover only, no Opus encode — fast enough to run on every audio drop.
+async function probeSingle(file){
+  try{
+    await ensureSunoStack();
+    if(FLOW.original!==file) return;                       // a newer drop won
+    const p=await window.XtrataSuno.probe(file,()=>{});
+    if(FLOW.original!==file) return;
+    FLOW.probe=Object.assign({partial:true},p);
+    $('#audioFound').innerHTML=foundLine(FLOW.probe);
+    $('#audioFound').hidden=false;
+  }catch(_e){ /* the readout is a nicety — never block the drop on it */ }
+}
+function renderSinglePlayer(){
+  const row=$('#playerRow'); if(!row) return;
+  if(!FLOW.playerMode){ row.hidden=true; row.innerHTML=''; return; }
+  row.hidden=false;
+  const p=FLOW.player;
+  const art=FLOW.art.file?('🖼 '+esc(FLOW.art.file.name)):FLOW.art.tokenId?('🖼 #'+esc(FLOW.art.tokenId)):'';
+  const state=p.status==='ready'
+    ? '<span class="ok">✓ player built · '+mib(p.file.size)+(p.info&&p.info.hasCover?' · art':'')+'</span>'
+    : p.status==='building' ? '<span style="color:var(--acc)"><span class="spin"></span> building the player…</span>'
+    : p.status==='error' ? '<span style="color:var(--bad)">✗ '+esc(String(p.err||'build failed'))+'</span>'
+    : '<span class="muted">not built yet</span>';
+  row.innerHTML=state
+    +' <button class="btn ghost" id="pBuildBtn" style="width:auto;margin:0;padding:4px 10px;font-size:12px">'+(p.status==='ready'?'Rebuild':'Build player')+'</button>'
+    +' <button class="btn ghost" id="pEditBtn" style="width:auto;margin:0;padding:4px 10px;font-size:12px">✎ Song details'+(art?(' · '+art):'')+'</button>';
+  $('#pBuildBtn').onclick=()=>buildSinglePlayer();
+  $('#pEditBtn').onclick=()=>openMetaEditor(null);
+}
+let singleBuildBusy=false;
+async function buildSinglePlayer(){
+  if(!FLOW.original||singleBuildBusy) return;
+  singleBuildBusy=true;
+  FLOW.player={status:'building',file:null,info:null,err:null}; renderSinglePlayer(); quote();
+  try{
+    await ensureSunoStack();
+    const overrides=Object.assign({},FLOW.meta);
+    if(FLOW.art.tokenId) overrides.coverTokenId=FLOW.art.tokenId;
+    else if(FLOW.art.file){ let cover=FLOW.art.file;
+      try{ if(window.XtrataImageOptimizer){ const cr=await window.XtrataImageOptimizer.optimize(cover,()=>{}); if(cr.optimizedBytes) cover=cr.file; } }catch(_e){}
+      overrides.coverB64=await readB64(cover); overrides.coverMime=cover.type||'image/png'; }
+    const r=await window.XtrataSuno.build(FLOW.original,(m)=>{ const row=$('#playerRow'); if(row&&!row.hidden) row.innerHTML='<span style="color:var(--acc)"><span class="spin"></span> '+esc(m)+'</span>'; },overrides);
+    FLOW.player={status:'ready',file:r.playerFile,info:r,err:null};
+    FLOW.probe=r;
+    $('#audioFound').innerHTML=foundLine(r)
+      +(r.sourceBytes&&r.opusBytes?('<br>'+mib(r.sourceBytes)+' → Opus 96k VBR '+mib(r.opusBytes)+' (−'+Math.round((1-r.opusBytes/r.sourceBytes)*100)+'%) → +⅓ base64 in the player'):'');
+    $('#audioFound').hidden=false;
+    // A player is HTML, not audio — move the URI to the song namespace like the batch path.
+    $('#uri').value=String($('#uri').value||'').replace(/^xtrata:audio\//,'xtrata:song/');
+  }catch(e){ FLOW.player={status:'error',file:null,info:null,err:(e&&e.message)||String(e)}; }
+  finally{ singleBuildBusy=false; renderSinglePlayer(); quote(); }
+}
+document.querySelectorAll('input[name="sAudioMode"]').forEach(r=>{ r.onchange=()=>{
+  FLOW.playerMode=(document.querySelector('input[name="sAudioMode"]:checked')||{}).value==='player';
+  $('#playerHint').hidden=!FLOW.playerMode;
+  // The Opus-optimisation row describes the raw-audio route; in player mode the
+  // build does its own encode and that row is no longer what inscribes.
+  const optRow=$('#optRow'); if(optRow&&!FLOW.playerMode&&FLOW.optimized) optRow.hidden=false; else if(optRow&&FLOW.playerMode) optRow.hidden=true;
+  if(FLOW.playerMode){
+    if(FLOW.player.status!=='ready') buildSinglePlayer();
+  } else {
+    // Back to raw: the URI returns to the audio namespace and the quote to the source bytes.
+    $('#uri').value=String($('#uri').value||'').replace(/^xtrata:song\//,'xtrata:audio/');
+  }
+  renderSinglePlayer(); quote();
+};});
+$('#singleArtPicker').onchange=()=>{ const f=$('#singleArtPicker').files[0]; $('#singleArtPicker').value='';
+  if(!f) return;
+  if(!/^image\//.test(f.type)){ $('#metaErr').textContent='Artwork must be an image file.'; return; }
+  FLOW.art.file=f; FLOW.art.tokenId=''; $('#mCoverTokenId').value='';
+  const rd=new FileReader(); rd.onload=()=>{ $('#mCoverThumb').src=String(rd.result); }; rd.readAsDataURL(f);
+  $('#metaErr').textContent=''; };
+
+// --- Song details editor (shared: single flow when target is null, else a batch row) ---
+let metaTarget=null;   // null = FLOW, otherwise the batch item
+const metaHost=()=>metaTarget||FLOW;
+function openMetaEditor(item){
+  metaTarget=item||null;
+  const host=metaHost();
+  const info=(host.player&&host.player.info)||host.probe||{};
+  const m=host.meta||{};
+  const val=(k,fallback)=>m[k]!==undefined?m[k]:(info[k]||'');
+  $('#mTitle').value=val('title'); $('#mArtist').value=val('artist'); $('#mAlbum').value=val('album');
+  $('#mLyrics').value=val('lyrics');
+  $('#mBpm').value=m.bpm||''; $('#mNote').value=m.note||''; $('#mLicense').value=m.license||''; $('#mDescription').value=m.description||'';
+  $('#mCoverTokenId').value=host.art.tokenId||'';
+  $('#mCoverThumb').src=info.coverB64?('data:'+(info.coverMime||'image/jpeg')+';base64,'+info.coverB64):'';
+  if(host.art.file){ const rd=new FileReader(); rd.onload=()=>{ $('#mCoverThumb').src=String(rd.result); }; rd.readAsDataURL(host.art.file); }
+  $('#metaFound').innerHTML=foundLine(info)||'Details are read from the file when the player is built.';
+  $('#metaErr').textContent='';
+  $('#metaOverlay').hidden=false;
+  $('#mTitle').focus();
+}
+function closeMetaEditor(){ $('#metaOverlay').hidden=true; metaTarget=null; }
+$('#mCancel').onclick=closeMetaEditor;
+$('#mCoverBtn').onclick=()=>{ (metaTarget?$('#batchArtPicker'):$('#singleArtPicker')).click(); if(metaTarget) BATCH.artTarget=BATCH.items.indexOf(metaTarget); };
+$('#metaOverlay').addEventListener('click',(e)=>{ if(e.target===$('#metaOverlay')) closeMetaEditor(); });
+document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'&&!$('#metaOverlay').hidden) closeMetaEditor(); });
+$('#mApply').onclick=()=>{
+  const host=metaHost();
+  const tok=$('#mCoverTokenId').value.trim();
+  if(tok&&!/^\d+$/.test(tok)){ $('#metaErr').textContent='Artwork inscription id must be a token-id uint.'; return; }
+  host.meta={ title:$('#mTitle').value, artist:$('#mArtist').value, album:$('#mAlbum').value, lyrics:$('#mLyrics').value,
+    bpm:$('#mBpm').value, note:$('#mNote').value, license:$('#mLicense').value, description:$('#mDescription').value };
+  if(tok){ host.art.tokenId=tok; host.art.file=null; }
+  else if(host.art.tokenId&&!tok){ host.art.tokenId=''; }
+  const item=metaTarget;
+  closeMetaEditor();
+  if(item){ item.player={status:'queued',file:null,info:null,err:null}; renderBatch(); queueAudioBuilds(); }
+  else { buildSinglePlayer(); }
+};
+
 window.batchArtPick=(i)=>{ BATCH.artTarget=i; $('#batchArtPicker').click(); };
 $('#batchArtPicker').onchange=()=>{ const f=$('#batchArtPicker').files[0]; $('#batchArtPicker').value='';
   const it=BATCH.items[BATCH.artTarget]; if(!f||!it) return;
@@ -1242,9 +1450,20 @@ async function onFile(file){
   detectFromName(file.name);
   $('#uri').value=`xtrata:${catSel.value}/${slug(file.name)}`;
   renderFileLines(); renderPreview();
-  $('#sunoHint').hidden=!/\.mp3$/i.test(file.name);
+  // Audio → offer the player. Reset every player-mode field first: a second drop
+  // must not inherit the previous song's artwork, overrides or built player.
+  FLOW.isAudio=isAudioFile(file);
+  FLOW.playerMode=false; FLOW.player={status:'raw',file:null,info:null,err:null};
+  FLOW.probe=null; FLOW.meta={}; FLOW.art={file:null,tokenId:''};
+  const rawRadio=document.querySelector('input[name="sAudioMode"][value="raw"]'); if(rawRadio) rawRadio.checked=true;
+  $('#audioMode').hidden=!FLOW.isAudio;
+  $('#playerHint').hidden=true; $('#audioFound').hidden=true; $('#audioFound').innerHTML='';
+  renderSinglePlayer();
   setStep('review');
   $('#reviewCard').scrollIntoView({behavior:'smooth',block:'start'});
+  // Cheap tag/cover read (no encode) so the readout and the details panel are
+  // populated long before anyone commits to a build.
+  if(FLOW.isAudio) void probeSingle(file);
 
   // Auto-optimise audio, then quote on whatever wins. Skip resolves INSTANTLY
   // (the encoder result is ignored when it lands late) so the railroad is
@@ -1273,7 +1492,9 @@ async function onFile(file){
       $('#optSavings').hidden=false;
       $('#optSavings').textContent=`${mib(res.originalBytes)} → ${mib(res.optimizedBytes)} (−${pct}%)`;
       $('#optRevertWrap').hidden=false; $('#optRevert').checked=false;
-      detectFromName(res.file.name); $('#uri').value=`xtrata:audio/${slug(file.name)}`;
+      // Player mode owns the URI (xtrata:song/…) and its own encode — don't let a
+      // late-landing raw optimisation stamp the audio namespace back over it.
+      if(!FLOW.playerMode){ detectFromName(res.file.name); $('#uri').value=`xtrata:audio/${slug(file.name)}`; }
       renderFileLines(); renderPreview(); quote();
     } else {
       row.hidden=(res.skipped==='not-audio'||res.skipped==='too-small');
@@ -1376,7 +1597,9 @@ $('#inscribeBtn').onclick=async()=>{
   if(differentAddr&&!ADDR_RE.test(recipientAddr)){ err.textContent='Inscription recipient must be a valid SP…/SM… principal (or untick “send to a different address”).'; return; }
   $('#inscribeBtn').disabled=true;
   try{
-    const payload={ file, uri, mime:CONTENT[catSel.value][ftSel.value]||file.type||'application/octet-stream',
+    // activeMime() reports text/html once a player is built — the bytes being sent
+    // are the player, not the song, and the mime has to say so.
+    const payload={ file, uri, mime:FLOW.activeMime()||file.type||'application/octet-stream',
       deps, parents, marginUstx:$('#margin').value||'0', fastTrack:true, receipt:RECEIPT };
     payload.user = WALLET;                        // payer = change/refund destination (always the connected wallet)
     payload.recipient = differentAddr ? recipientAddr : WALLET;   // inscription + receipt destination
@@ -1402,7 +1625,11 @@ function resetFlow(){
   $('#dropMain').textContent='Drop a file to inscribe';
   $('#dropSub').textContent='or click to browse — images, audio, video, documents, HTML, JSON, anything';
   ['uri','deps','parents','user'].forEach(id=>$('#'+id).value='');
-  $('#margin').value='0'; $('#optRevert').checked=false; $('#optRow').hidden=true; $('#sunoHint').hidden=true;
+  $('#margin').value='0'; $('#optRevert').checked=false; $('#optRow').hidden=true;
+  FLOW.isAudio=false; FLOW.playerMode=false; FLOW.player={status:'raw',file:null,info:null,err:null};
+  FLOW.probe=null; FLOW.meta={}; FLOW.art={file:null,tokenId:''};
+  const rawR=document.querySelector('input[name="sAudioMode"][value="raw"]'); if(rawR) rawR.checked=true;
+  $('#audioMode').hidden=true; $('#playerHint').hidden=true; $('#audioFound').hidden=true; renderSinglePlayer();
   $('#parentsCheck').innerHTML=''; parentsCheckRun++;
   clearPreview();
   $('#newErr').textContent='';
