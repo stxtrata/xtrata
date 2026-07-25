@@ -26,6 +26,78 @@ import {
 
 const ADDRESS = 'SP2MF04VAGYHGAZWGTEDW5VYCPDWWSY08Z1QFNDSN';
 
+describe('wallet provider chooser', () => {
+  afterEach(() => {
+    delete (window as typeof window & { XverseProviders?: unknown }).XverseProviders;
+    delete (window as typeof window & { btc_providers?: unknown }).btc_providers;
+    delete (window as typeof window & { LeatherProvider?: unknown }).LeatherProvider;
+  });
+
+  // Reproduces the Xverse in-app browser: Xverse injects its WBIP provider AND
+  // the legacy XverseProviders.StacksProvider stub that DEFAULT_PROVIDERS names.
+  // Same wallet, same display name, two different ids — which listed Xverse
+  // twice in the chooser (www.xverse.app and xverse.app).
+  const XVERSE_REGISTERED = {
+    id: 'XverseProviders.BitcoinProvider',
+    name: 'Xverse Wallet',
+    webUrl: 'https://www.xverse.app'
+  };
+  const XVERSE_DEFAULT = {
+    id: 'XverseProviders.StacksProvider',
+    name: 'Xverse Wallet',
+    webUrl: 'https://xverse.app'
+  };
+  const LEATHER_DEFAULT = {
+    id: 'LeatherProvider',
+    name: 'Leather',
+    webUrl: 'https://leather.io'
+  };
+
+  const installXverseMobile = () => {
+    const win = window as typeof window & {
+      XverseProviders?: Record<string, unknown>;
+      btc_providers?: unknown[];
+    };
+    win.XverseProviders = {
+      BitcoinProvider: { request: () => undefined },
+      StacksProvider: { request: () => undefined }
+    };
+    win.btc_providers = [XVERSE_REGISTERED];
+  };
+
+  it('lists a wallet once when its injected and default entries share a name', () => {
+    installXverseMobile();
+    const installed = __testing.getInstalledProvidersOnHost([XVERSE_DEFAULT, LEATHER_DEFAULT]);
+    const xverseRows = installed.filter((entry) => entry.name === 'Xverse Wallet');
+    expect(xverseRows).toHaveLength(1);
+    // The injected entry must be the survivor — it is the bridge that answers.
+    expect(xverseRows[0].id).toBe('XverseProviders.BitcoinProvider');
+  });
+
+  it('still lists a genuinely different installed wallet', () => {
+    installXverseMobile();
+    (window as typeof window & { LeatherProvider?: unknown }).LeatherProvider = {
+      request: () => undefined
+    };
+    const installed = __testing.getInstalledProvidersOnHost([XVERSE_DEFAULT, LEATHER_DEFAULT]);
+    expect(installed.map((entry) => entry.name).sort()).toEqual(['Leather', 'Xverse Wallet']);
+  });
+
+  it('does not list a default provider that is not injected at all', () => {
+    installXverseMobile();
+    const installed = __testing.getInstalledProvidersOnHost([XVERSE_DEFAULT, LEATHER_DEFAULT]);
+    expect(installed.some((entry) => entry.name === 'Leather')).toBe(false);
+  });
+
+  it('treats id and case-insensitive name as the same wallet', () => {
+    expect(__testing.isSameWalletProvider(XVERSE_REGISTERED, XVERSE_DEFAULT)).toBe(true);
+    expect(
+      __testing.isSameWalletProvider(XVERSE_REGISTERED, { ...XVERSE_DEFAULT, name: 'XVERSE WALLET' })
+    ).toBe(true);
+    expect(__testing.isSameWalletProvider(XVERSE_REGISTERED, LEATHER_DEFAULT)).toBe(false);
+  });
+});
+
 describe('wallet connect helpers', () => {
   afterEach(() => {
     __testing.clearXverseAccountCache();

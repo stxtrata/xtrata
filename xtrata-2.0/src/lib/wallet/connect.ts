@@ -138,6 +138,17 @@ type ProviderRegistryWindow = Window & {
 // current Xverse builds register their WBIP provider in btc_providers (some
 // released builds used webbtc_providers). Merge all three so the embedded
 // chooser sees the provider that is actually injected into the host page.
+// One identity rule for "these two entries are the same wallet", shared by the
+// registry dedup and the default-provider filter below. They used to disagree —
+// the dedup matched on id OR name while the filter matched on id alone — and in
+// the Xverse in-app browser that surfaced Xverse twice in the chooser: once from
+// its injected WBIP provider (XverseProviders.BitcoinProvider, www.xverse.app)
+// and once from the DEFAULT_PROVIDERS entry (XverseProviders.StacksProvider,
+// xverse.app), same name, different id. Keep this the only definition.
+const isSameWalletProvider = (a: WebBTCProvider, b: WebBTCProvider) =>
+  a.id === b.id ||
+  Boolean(a.name && b.name && a.name.toLowerCase() === b.name.toLowerCase());
+
 const getRegisteredProvidersOnWindow = (win: Window | undefined): WebBTCProvider[] => {
   if (!win) {
     return [];
@@ -151,13 +162,7 @@ const getRegisteredProvidersOnWindow = (win: Window | undefined): WebBTCProvider
   return merged.filter(
     (entry, index) =>
       Boolean(entry?.id) &&
-      merged.findIndex(
-        (candidate) =>
-          candidate.id === entry.id ||
-          (candidate.name &&
-            entry.name &&
-            candidate.name.toLowerCase() === entry.name.toLowerCase())
-      ) === index
+      merged.findIndex((candidate) => isSameWalletProvider(candidate, entry)) === index
   );
 };
 
@@ -232,9 +237,12 @@ const getInstalledProvidersOnHost = (defaultProviders: WebBTCProvider[]): WebBTC
     return [];
   }
   const registered = getRegisteredProvidersOnWindow(host);
+  // Registered entries win: they are what the wallet actually injected, and the
+  // legacy id a default entry carries is already aliased onto that same bridge
+  // by resolveProviderById. concat keeps them first, so filtering here is enough.
   const additional = defaultProviders.filter(
     (candidate) =>
-      !registered.find((entry) => entry.id === candidate.id) &&
+      !registered.some((entry) => isSameWalletProvider(entry, candidate)) &&
       !!resolveProviderOnWindow(host, candidate.id)
   );
   return registered.concat(additional);
@@ -2030,6 +2038,7 @@ export const showStxTransfer = (options: WalletStxTransferOptions, provider?: St
 
 export const __testing = {
   buildContractCallParams,
+  isSameWalletProvider,
   buildXverseContractCallParams,
   ensureXverseSigningAccount,
   setXverseSigningWatchdogMs: (value: number) => {

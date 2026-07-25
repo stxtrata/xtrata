@@ -199,8 +199,17 @@ function registeredProviders(win){
     ...(win.btc_providers ?? []), ...(win.wbip_providers ?? []),
     ...(win.webbtc_providers ?? []), ...(win.webbtc_stx_providers ?? [])
   ];
-  return merged.filter((entry, i) => Boolean(entry?.id) && merged.findIndex(c =>
-    c.id === entry.id || (c.name && entry.name && c.name.toLowerCase() === entry.name.toLowerCase())) === i);
+  return merged.filter((entry, i) => Boolean(entry?.id) &&
+    merged.findIndex(c => isSameWalletProvider(c, entry)) === i);
+}
+// One identity rule for "same wallet", used by the dedup above and the default
+// filter below. They used to disagree — id-or-name here, id-only there — and in
+// the Xverse in-app browser that listed Xverse twice: its injected WBIP provider
+// (XverseProviders.BitcoinProvider) plus the DEFAULT_PROVIDERS legacy stub
+// (XverseProviders.StacksProvider), same name, different id.
+function isSameWalletProvider(a, b){
+  return a.id === b.id
+    || Boolean(a.name && b.name && a.name.toLowerCase() === b.name.toLowerCase());
 }
 const isLeatherProviderId = id => typeof id === 'string' && id.toLowerCase().includes('leather');
 const isXverseProviderId = id => typeof id === 'string' && id.toLowerCase().includes('xverse');
@@ -237,8 +246,10 @@ async function resolveProviderById(id){
 function installedProvidersOnHost(defaults){
   const host = walletHostWindow();
   const registered = registeredProviders(host);
+  // Registered entries win: they are what the wallet actually injected, and the
+  // legacy id a default entry carries is already aliased onto that same bridge.
   return registered.concat(defaults.filter(d =>
-    !registered.find(e => e.id === d.id) && !!resolveProviderOnWindow(host, d.id)));
+    !registered.some(e => isSameWalletProvider(e, d)) && !!resolveProviderOnWindow(host, d.id)));
 }
 async function selectedProviderId(){ return (await sdk()).getSelectedProviderId(); }
 async function getStacksProvider(){
