@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Proof of Free — Campaign Runner</title>
+<style>
+  :root { --mint:#3ad29f; --orange:#ff6a00; --blue:#38a0ff; --jim:#ffb454; --xtrata:#7da8ff; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: radial-gradient(circle at 50% 0, #0d151a, #060709 46%, #040406); color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  body { max-width: 960px; margin: 0 auto; padding: 18px 18px 80px; }
+  h1 { font-size: 15px; letter-spacing: .14em; font-weight: 700; margin: 0; }
+  .sub { font-size: 11px; opacity: .6; margin: 4px 0 16px; line-height: 1.5; }
+  button, select, input { background: #131318; color: #fff; border: 1px solid #2c2c36; border-radius: 8px; padding: 8px 11px; font: inherit; font-size: 12px; }
+  button { cursor: pointer; transition: border-color .12s, background .12s; }
+  button:hover:not(:disabled) { border-color: var(--mint); }
+  button:disabled { opacity: .4; cursor: default; }
+  button.primary { border-color: var(--mint); color: #051; background: var(--mint); font-weight: 700; }
+  button.danger { border-color: #7a2f2f; color: #ffb4ac; }
+  button.link { border-color: #3a3a70; color: #b9b6ff; }
+  button.tiny { padding: 5px 9px; font-size: 10px; }
+  a { color: #b9b6ff; }
+
+  .statusbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border: 1px solid #23232c; border-radius: 12px; padding: 12px 14px; background: #0b0b10; margin-bottom: 12px; }
+  .stat { display: flex; flex-direction: column; gap: 2px; min-width: 84px; }
+  .stat b { font-size: 20px; font-weight: 400; color: var(--mint); line-height: 1; }
+  .stat span { font-size: 9px; letter-spacing: .12em; text-transform: uppercase; opacity: .5; }
+  .statusbar .grow { flex: 1; }
+
+  .opts { display: flex; gap: 16px; flex-wrap: wrap; border: 1px solid #23232c; border-radius: 12px; padding: 12px 14px; background: #0b0b10; margin-bottom: 18px; font-size: 11px; }
+  .opts label { display: flex; gap: 7px; align-items: center; cursor: pointer; opacity: .85; }
+
+  .phase { margin: 26px 0 10px; font-size: 11px; letter-spacing: .18em; text-transform: uppercase; opacity: .5; display: flex; align-items: center; gap: 10px; }
+  .phase::after { content: ''; flex: 1; height: 1px; background: #23232c; }
+  .phase.locked { opacity: .28; }
+
+  .post { border: 1px solid #23232c; border-left-width: 3px; border-radius: 10px; padding: 13px 15px; margin-bottom: 9px; background: #0b0b10; }
+  .post.jim { border-left-color: var(--jim); }
+  .post.xtrata { border-left-color: var(--xtrata); }
+  .post.done { opacity: .42; }
+  .post.done .copy { text-decoration: line-through; text-decoration-color: #3a3a44; }
+  .head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 9px; }
+  .who { font-size: 11px; font-weight: 700; }
+  .jim .who { color: var(--jim); } .xtrata .who { color: var(--xtrata); }
+  .act { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; border: 1px solid #3a3a44; border-radius: 20px; padding: 2px 8px; opacity: .7; }
+  .ref { font-size: 10px; opacity: .45; }
+  .head .grow { flex: 1; }
+  .copy { white-space: pre-wrap; font-size: 13px; line-height: 1.5; background: #07141c; border: 1px solid #1b3542; border-radius: 8px; padding: 12px 13px; color: #dff; }
+  .meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 9px; }
+  .chars { font-size: 10px; opacity: .45; }
+  .chars.over { color: #ff8f83; opacity: 1; }
+  .card { margin-top: 9px; display: flex; gap: 11px; align-items: center; }
+  .card img { width: 92px; height: 92px; object-fit: cover; border: 1px solid #23232c; border-radius: 6px; background: #000; }
+  .card .cname { font-size: 10px; opacity: .55; line-height: 1.5; }
+  .note { font-size: 10px; opacity: .55; margin-top: 8px; line-height: 1.45; }
+
+  .prog { height: 6px; border-radius: 4px; background: #1a1a22; overflow: hidden; margin: 10px 0 0; }
+  .prog i { display: block; height: 100%; background: var(--mint); transition: width .3s; }
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--mint); color: #051; font-weight: 700; font-size: 12px; padding: 9px 16px; border-radius: 20px; opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+  <h1>PROOF OF FREE · CAMPAIGN RUNNER</h1>
+  <div class="sub">
+    Two-account sequence for the drop. <b style="color:var(--jim)">@jimdotbtc</b> makes it,
+    <b style="color:var(--xtrata)">@XtrataLayers</b> notices it. Counts are read live from
+    <code>xtrata-drops-v1-1</code> campaign 0, so the counter posts always carry the real number.
+  </div>
+
+  <div class="statusbar">
+    <div class="stat"><b id="s-remain">–</b><span>remain</span></div>
+    <div class="stat"><b id="s-claimed">–</b><span>claimed</span></div>
+    <div class="stat"><b id="s-posted">0</b><span>posted</span></div>
+    <div class="grow"></div>
+    <span class="chars" id="s-when"></span>
+    <button id="refresh">refresh count</button>
+    <button id="reset" class="danger tiny">reset posted</button>
+  </div>
+
+  <div class="opts">
+    <label><input type="checkbox" id="opt-ghost"> include the ghost post (#2856)</label>
+    <label><input type="checkbox" id="opt-honest" checked> use real counts, not "33 names"</label>
+    <label><input type="checkbox" id="opt-hide"> hide posted</label>
+    <span class="grow"></span>
+    <span class="chars" id="s-link"></span>
+  </div>
+
+  <div class="prog"><i id="prog" style="width:0%"></i></div>
+
+  <div id="feed"></div>
+  <div class="toast" id="toast">copied</div>
+
+<script type="module">
+/* ---------------------------------------------------------------------------
+ * Read-only. This page never signs anything and never posts anything — it
+ * sequences copy and reads the claim count so the numbers in the posts are
+ * true at the moment you post them.
+ * ------------------------------------------------------------------------- */
+const XTRATA_ADDRESS = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
+const DROPS_NAME = 'xtrata-drops-v1-1';
+const SUPPLY = 33;
+const LAST_DROP_ID = 32;
+const CLAIM_URL = 'https://xtrata.xyz/drops';
+const HIRO = 'https://api.mainnet.hiro.so';
+const KEY = 'pof-campaign-runner-v1';
+
+const $ = id => document.getElementById(id);
+let state = load();
+let counts = { remain: null, claimed: null, at: null };
+
+function load(){
+  try { return { posted: {}, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; }
+  catch { return { posted: {} }; }
+}
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} render(); }
+
+/* ---- live count ---------------------------------------------------------
+ * get-drop returns (optional (tuple ...)). Two states mean "not claimable":
+ * the record is gone (claimed then settled, which deletes it), or the record
+ * is present with claimed-at set (claimed, not yet settled). Both have to be
+ * handled — counting only missing records would miss the in-between state.
+ * Decoded properly rather than pattern-matched: the hex carries a buffer
+ * header and field names, so substring tests give wrong answers.
+ */
+let _cv = null;
+async function cv(){
+  if (!_cv) {
+    const t = await import('https://esm.sh/@stacks/transactions@7.4.0');
+    _cv = { hexToCV: t.hexToCV, cvToJSON: t.cvToJSON, Cl: t.Cl };
+  }
+  return _cv;
+}
+async function getDropState(id){
+  const { hexToCV, cvToJSON, Cl } = await cv();
+  const res = await fetch(`${HIRO}/v2/contracts/call-read/${XTRATA_ADDRESS}/${DROPS_NAME}/get-drop`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sender: XTRATA_ADDRESS, arguments: [Cl.serialize(Cl.uint(id))] })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  if (!json.okay || typeof json.result !== 'string') throw new Error('read not okay');
+  const tuple = cvToJSON(hexToCV(json.result))?.value?.value ?? null;
+  if (!tuple || typeof tuple !== 'object') return 'settled';
+  const claimedAt = tuple['claimed-at']?.value;
+  return claimedAt === null || claimedAt === undefined ? 'open' : 'claimed';
+}
+async function refreshCounts(){
+  $('refresh').disabled = true;
+  let remain = 0, failed = 0;
+  for (let id = 0; id <= LAST_DROP_ID; id++) {
+    let ok = false;
+    for (let attempt = 0; attempt < 3 && !ok; attempt++) {
+      if (attempt) await new Promise(r => setTimeout(r, 500 * attempt));
+      try { if (await getDropState(id) === 'open') remain++; ok = true; }
+      catch { /* transient upstream — retry */ }
+    }
+    if (!ok) failed++;
+    $('s-when').textContent = `reading ${id + 1} / ${LAST_DROP_ID + 1}\u2026`;
+    await new Promise(r => setTimeout(r, 90));
+  }
+  counts = { remain, claimed: SUPPLY - remain, at: new Date(), failed };
+  $('s-remain').textContent = String(remain);
+  $('s-claimed').textContent = String(SUPPLY - remain);
+  $('s-when').textContent = `updated ${counts.at.toTimeString().slice(0,5)}`
+    + (failed ? ` \u00b7 ${failed} unread` : '');
+  $('refresh').disabled = false;
+  render();
+}
+
+/* ---- the sequence -------------------------------------------------------
+ * {{remain}} is substituted with the live count when the card renders, so a
+ * counter post is never stale by the time it is copied.
+ */
+const JIM = 'jim', XT = 'xtrata';
+const SEQUENCE = [
+  { phase: 'A · The whisper', note: 'Jim alone. Xtrata stays completely silent through this phase — the whisper has to be his.' },
+  { id:'A1', who:JIM, act:'post', card:'A1-zero',
+    text:`I made 33 things.\n\nI am not selling any of them.` },
+  { id:'A2', who:JIM, act:'reply to A1', card:null,
+    text:`Not free as in cheap.\n\nFree as in there is nothing to pay,\nnothing to approve,\nand nothing I can take back.` },
+  { id:'A3', who:JIM, act:'post', card:'A3-name',
+    text:`Every free drop I have seen gets farmed by one wallet with a hundred faces.\n\nSo this one asks for a name.` },
+
+  { phase: 'B · Xtrata notices', note: 'Every Xtrata post is a quote or reply to Jim. Xtrata never announces, only notices.' },
+  { id:'B1', who:XT, act:'quote A3', card:null,
+    text:`This is what the free drops tab was built for.\n\nOne name. One wallet. One proof.\n\nNo allowlist. No snapshot. No bots.` },
+  { id:'B2', who:JIM, act:'reply to B1', card:null,
+    text:`I didn't ask for this to be built.\n\nI just needed somewhere to put something that costs nothing.` },
+
+  { phase: 'C · Open', note: 'Claim must be verified working before this phase goes out.' },
+  { id:'C1', who:JIM, act:'post', card:'C1-pof',
+    text:`Proof of Free.\n\n33 editions.\n0 STX.\n0 gas.\n1 per .btc name.\n\nOpen now.\n${CLAIM_URL}` },
+  { id:'C2', who:XT, act:'quote C1', card:null,
+    text:`Live on the Xtrata free drops tab.\n\nFully sponsored. Bring an empty wallet.\n\n@xverse · @LeatherBTC` },
+  { id:'C3', who:XT, act:'post', card:'C1-rule',
+    text:`Nine days ago we asked what you would claim if it cost absolutely nothing.\n\n@jimdotbtc answered with 33.` },
+
+  { phase: 'D · Live', note: 'Alternate accounts; the other one straight-reposts. Counter cards regenerate from the live number.' },
+  { id:'D1', who:JIM, act:'post', card:'D-remain', counter:true,
+    text:`{{remain}} remain.` },
+  { id:'D2', who:XT, act:'post', card:'D-remain', counter:true,
+    text:`{{remain}} remain.\n\n0 STX moved.` },
+  { id:'D3', who:JIM, act:'post', card:'D-single',
+    text:`Single figures.\n\nOne name. One wallet. One proof.` },
+  { id:'D4', who:XT, act:'post', card:'D-remain', counter:true,
+    text:`{{remain}} left.` },
+
+  { phase: 'E · Sellout', gate:'soldout', note: 'Unlocks when the live count reaches 0. Post both within a few minutes.' },
+  { id:'E1', who:JIM, act:'post', card:'E1-gone',
+    text:`Gone.\n\n33 editions. {{names}}.\n\nNobody paid me anything. That was the point.` },
+  { id:'E2', who:XT, act:'quote E1', card:'E1-names33',
+    text:`33 claims.\n{{namecount}} distinct BNS names.\n0 STX spent by claimers.\n\nEnforced by contract, not by trust.` },
+
+  { phase: 'F · After', gate:'soldout', note: 'One a day, alternating. This is where the substance lands.' },
+  { id:'F1', who:JIM, act:'post', card:'F1-bytes',
+    text:`Each edition is 377 bytes.\n\nThe artwork isn't in the file.\nThe file knows where to look.` },
+  { id:'F2', who:XT, act:'quote F1', card:null,
+    text:`One engine, inscribed once.\nThirty-three pointers.\n\nThis is what recursion is for.` },
+  { id:'F3', who:JIM, act:'post', card:'F3-families',
+    text:`Thresholds. 01–11.\nSignals. 12–22.\nNames. 23–33.\n\nOne system. Three ways through.` },
+  { id:'F4', who:JIM, act:'post', card:null,
+    text:`First Light. Free Passage. No Toll. Clear Threshold. Open Circuit. Zero Barrier. Unlocked Field. Common Key. Public Door. The Bare Minimum. The Way Through.\n\nRead them in order.\n\nIt's one sentence.` },
+  { id:'F5', who:JIM, act:'post', card:'F5-discount',
+    text:`0 was never a discount.\n\n0 was the artwork.` },
+  { id:'F6', who:XT, act:'quote F5', card:null,
+    text:`Free claiming isn't a promotion.\n\nIt's an on-ramp that leaves people holding something permanent.` },
+  { id:'FX', who:JIM, act:'post', card:'FX-ghost', optional:'ghost',
+    text:`There are 34 inscriptions.\nThere are 33 editions.\n\nOne of them is a ghost. I left it there.` },
+  { id:'F7', who:JIM, act:'post', card:'F7-tail',
+    text:`The 33 are gone.\n\nThe engine is not.\n\n#34 already exists. It always has.\nNobody has looked at it yet.` },
+  { id:'F8', who:XT, act:'quote F7', card:null,
+    text:`The collection sold out and did not finish.\n\nOpen-ended, deterministic, on-chain.` }
+];
+
+const posts = () => SEQUENCE.filter(x => x.id);
+const visible = () => posts().filter(p => !p.optional || (p.optional === 'ghost' && $('opt-ghost').checked));
+
+function resolve(text){
+  const remain = counts.remain === null ? '__' : counts.remain;
+  const honest = $('opt-honest').checked;
+  const claimedNames = counts.claimed === null ? 33 : counts.claimed;
+  return text
+    .replace(/\{\{remain\}\}/g, remain)
+    .replace(/\{\{names\}\}/g, honest ? `${claimedNames} names` : '33 names')
+    .replace(/\{\{namecount\}\}/g, honest ? String(claimedNames) : '33');
+}
+const cardFile = p => p.counter && counts.remain !== null
+  ? `out/D-remain-${counts.remain}.png` : (p.card ? `out/${p.card}.png` : null);
+
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1200);
+}
+
+function render(){
+  const soldOut = counts.remain === 0;
+  const list = visible();
+  const done = list.filter(p => state.posted[p.id]).length;
+  $('s-posted').textContent = String(done);
+  $('prog').style.width = `${list.length ? (done / list.length * 100).toFixed(1) : 0}%`;
+
+  const feed = $('feed'); feed.innerHTML = '';
+  for (const item of SEQUENCE) {
+    if (item.phase) {
+      const locked = item.gate === 'soldout' && !soldOut;
+      const h = document.createElement('div');
+      h.className = 'phase' + (locked ? ' locked' : '');
+      h.innerHTML = `<span>${item.phase}${locked ? ' · locked until sold out' : ''}</span>`;
+      feed.appendChild(h);
+      if (item.note) {
+        const n = document.createElement('div');
+        n.className = 'note'; n.style.margin = '0 0 10px'; n.textContent = item.note;
+        feed.appendChild(n);
+      }
+      continue;
+    }
+    if (item.optional === 'ghost' && !$('opt-ghost').checked) continue;
+    if ($('opt-hide').checked && state.posted[item.id]) continue;
+
+    const body = resolve(item.text);
+    const over = body.length > 280;
+    const img = cardFile(item);
+    const el = document.createElement('div');
+    el.className = `post ${item.who === JIM ? 'jim' : 'xtrata'}${state.posted[item.id] ? ' done' : ''}`;
+    el.innerHTML = `
+      <div class="head">
+        <span class="who">${item.who === JIM ? '@jimdotbtc' : '@XtrataLayers'}</span>
+        <span class="act">${item.act}</span>
+        <span class="ref">${item.id}</span>
+        <span class="grow"></span>
+        <span class="chars ${over ? 'over' : ''}">${body.length}/280</span>
+      </div>
+      <div class="copy">${body.replace(/[&<>]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c]))}</div>
+      <div class="meta">
+        <button class="tiny" data-copy="${item.id}">copy text</button>
+        ${img ? `<button class="tiny link" data-open="${img}">open card</button>` : ''}
+        <button class="tiny ${state.posted[item.id] ? '' : 'primary'}" data-done="${item.id}">${state.posted[item.id] ? 'mark unposted' : 'mark posted'}</button>
+      </div>
+      ${img ? `<div class="card"><img src="${img}" alt="" onerror="this.style.display='none';this.nextElementSibling.textContent='${img} — not rendered yet, run: node scripts/render-cards.mjs'"><div class="cname">${img}</div></div>` : ''}
+    `;
+    feed.appendChild(el);
+  }
+
+  feed.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => {
+    const item = posts().find(p => p.id === b.dataset.copy);
+    navigator.clipboard.writeText(resolve(item.text)).then(() => toast(`copied ${item.id}`));
+  });
+  feed.querySelectorAll('[data-open]').forEach(b => b.onclick = () => window.open(b.dataset.open, '_blank'));
+  feed.querySelectorAll('[data-done]').forEach(b => b.onclick = () => {
+    const id = b.dataset.done;
+    if (state.posted[id]) delete state.posted[id]; else state.posted[id] = new Date().toISOString();
+    save();
+  });
+}
+
+$('refresh').onclick = refreshCounts;
+$('reset').onclick = () => { if (confirm('Clear which posts are marked as posted?')) { state = { posted: {} }; save(); } };
+['opt-ghost','opt-honest','opt-hide'].forEach(id => $(id).onchange = render);
+$('s-link').innerHTML = `cards: <code>apps/campaign/out/</code> · claim: <a href="${CLAIM_URL}" target="_blank" rel="noopener">${CLAIM_URL}</a>`;
+
+render();
+refreshCounts();
+setInterval(() => { if (counts.remain !== 0) refreshCounts(); }, 120000);
+
+window.__campaign = { get state(){return state;}, get counts(){return counts;}, SEQUENCE, refreshCounts, resolve };
+</script>
+</body>
+</html>

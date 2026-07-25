@@ -15,7 +15,8 @@ const APPS = [
   ['/apps/gallery/', 'Gallery', 'Review all 33 editions rendered by the engine'],
   ['/apps/canary/canary.html', 'Inscription canary', 'Inscribe the engine as a child of 2838, then the 33 editions'],
   ['/apps/drop-canary/', 'Free drop canary', 'Create the sponsored claim campaign and escrow all 33 editions'],
-  ['/apps/wrapper-generator/', 'Wrapper generator', 'Generate wrappers for editions 34 and beyond']
+  ['/apps/wrapper-generator/', 'Wrapper generator', 'Generate wrappers for editions 34 and beyond'],
+  ['/apps/campaign/runner.html', 'Campaign runner', 'Two-account post sequence with a live claim counter']
 ];
 const INDEX = `<!doctype html><meta charset=utf-8><title>Proof of Free V3</title>
 <style>html{background:#080808;color:#f5ede2;font:14px ui-monospace,SFMono-Regular,Menlo,monospace}
