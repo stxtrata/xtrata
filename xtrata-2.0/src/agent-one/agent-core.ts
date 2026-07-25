@@ -239,7 +239,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-25.2';
+export const AGENT_BUILD = '2026-07-25.3';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -1150,9 +1150,21 @@ async function refundAndClose(job: any, reasonIn = 'cancelled') {
     // NEVER-STRAND GUARD: a never-funded job keeps its key (EXPIRED) — a slow payment confirming after
     // cancellation must never land at a keyless address.
     if (job.depositReceivedUstx || leftover > 0n) { delete job.ephemeralMnemonic; job.status = 'CANCELLED'; }
+    // An explicit cancel must REST as cancelled. Landing on EXPIRED left the job
+    // re-runnable by the watcher and still offering its own Stop button, so the
+    // thing the user just stopped looked like it had not stopped at all. The key is
+    // still kept, so a payment confirming late never lands at a keyless address.
+    else if (job.cancelRequested) {
+      job.keepKey = true; job.status = 'CANCELLED';
+      job.keepKeyReason = 'cancelled before funding — key kept so a late payment is never stranded';
+    }
     else { job.keepKey = true; job.status = 'EXPIRED'; job.keepKeyReason = 'never funded — key kept so a late payment is never stranded'; }
   }
   else { job.keepKey = true; job.status = 'NEEDS_RECOVERY'; job.keepKeyReason = `refund unconfirmed; ~${leftover ?? '?'} uSTX may remain`; }
+  // Stamp progress on every exit. The fatal path never did, so the watcher's
+  // "15 s × attempt" backoff was measured against a timestamp from minutes ago and
+  // never held anything back — the job re-entered roughly every two seconds.
+  job.progressAt = new Date().toISOString();
   job.cancelReason = reason; job.cancelledAt = new Date().toISOString(); if (out.refundTx) job.refundTx = out.refundTx;
   if (job.status === 'CANCELLED') idbDeleteBytes(job.jobId);
   writeJob(job); return out;
@@ -1303,6 +1315,20 @@ async function watchTick() {
       j.progress = j.keepKeyReason;
       j.progressAt = new Date().toISOString();
       writeJob(j);
+      continue;
+    }
+    // Past the retry ceiling this job has ALREADY been through the fatal path and a
+    // refund attempt. Re-running it just increments retryCount and burns API calls —
+    // observed live climbing past attempt 18, two seconds apart. Park it where a
+    // human can act instead, with the key kept so nothing is stranded.
+    if ((j.retryCount || 0) > MAX_RETRIES && !['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED', 'NEEDS_RECOVERY'].includes(j.status)) {
+      j.status = 'NEEDS_RECOVERY';
+      j.keepKey = true;
+      j.keepKeyReason = `stopped after ${j.retryCount} attempts — ${j.error || 'the job could not make progress'}. Use Recover to return anything left.`;
+      j.progress = j.keepKeyReason;
+      j.progressAt = new Date().toISOString();
+      writeJob(j);
+      xaoLog(j.jobId, `retry ceiling reached (${j.retryCount}) — parked as NEEDS_RECOVERY instead of resuming again`);
       continue;
     }
     // Backoff between auto-resume attempts: 15 s × attempt number.

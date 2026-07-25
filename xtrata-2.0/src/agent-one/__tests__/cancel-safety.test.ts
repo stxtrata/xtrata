@@ -85,6 +85,34 @@ describe('Agent One cancel safety', () => {
     expect(agentSource).toContain("throw new Error('could not determine the paying address')");
   });
 
+  it('stops re-running a job that has exhausted its retries', () => {
+    // Observed live climbing to "attempt 28", two seconds apart. retryCount is
+    // incremented inside the retry CONDITION, so it keeps growing even on the way
+    // to the fatal path — and the fatal path never updated progressAt, so the
+    // "15 s × attempt" backoff was measured against a stale timestamp and never
+    // held anything back.
+    expect(agentSource).toContain("if ((j.retryCount || 0) > MAX_RETRIES &&");
+    expect(agentSource).toContain('parked as NEEDS_RECOVERY instead of resuming again');
+    // Search forward from the stamp comment: an earlier `job.cancelReason = reason;`
+    // exists in the mock branch, and slicing to that gave an empty string that
+    // "contained" nothing and passed vacuously.
+    const stampAt = agentSource.indexOf('// Stamp progress on every exit');
+    expect(stampAt).toBeGreaterThan(-1);
+    const refundEnd = agentSource.slice(
+      stampAt,
+      agentSource.indexOf('job.cancelReason = reason;', stampAt)
+    );
+    expect(refundEnd).toContain('job.progressAt = new Date().toISOString()');
+  });
+
+  it('lets an explicit cancel rest as cancelled, not expired', () => {
+    // EXPIRED is re-runnable by the watcher and still offers its own Stop button,
+    // so the job the user just stopped looked like it had not stopped at all.
+    expect(agentSource).toContain('else if (job.cancelRequested) {');
+    expect(agentSource).toContain("job.keepKey = true; job.status = 'CANCELLED';");
+    expect(agentSource).toContain('cancelled before funding — key kept');
+  });
+
   it('is reachable from both pages, and degrades honestly on an old bundle', () => {
     for (const page of [wizard, suno]) {
       expect(page).toContain('/cancel$/');
