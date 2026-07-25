@@ -64,6 +64,27 @@ describe('Agent One cancel safety', () => {
     expect(bundle).toContain('cancelled by request');
   });
 
+  it('never leaves a keyless job re-runnable', () => {
+    // Observed live: refundAndClose returned on noKey with the status untouched, so
+    // the job stayed FUNDED, the watcher re-ran it every few seconds, autoRun threw
+    // and the refund landed back here — an endless loop that hammered the API.
+    const noKey = agentSource.slice(
+      agentSource.indexOf('if (!job.ephemeralMnemonic) {'),
+      agentSource.indexOf('return { noKey: true };') + 30
+    );
+    expect(noKey).toContain("job.status = job.depositReceivedUstx ? 'CANCELLED' : 'EXPIRED'");
+    expect(noKey).toContain('writeJob(job)');
+  });
+
+  it('treats a funder-lookup failure as transient, not deterministic', () => {
+    // It is a Hiro hiccup or a rate limit far more often than a real dead end, and
+    // classing it fatal turned one failed lookup into a refund attempt every tick.
+    const fatal = /const FATAL_ERR = \/([^/]+)\//.exec(agentSource)?.[1] ?? '';
+    expect(fatal).not.toContain('could not determine');
+    expect(fatal).toContain('TX abort');
+    expect(agentSource).toContain("throw new Error('could not determine the paying address')");
+  });
+
   it('is reachable from both pages, and degrades honestly on an old bundle', () => {
     for (const page of [wizard, suno]) {
       expect(page).toContain('/cancel$/');

@@ -1108,7 +1108,19 @@ async function refundAndClose(job: any, reasonIn = 'cancelled') {
     }
     job.status = 'COMPLETE'; writeJob(job); return { alreadyDelivered: true };
   }
-  if (!job.ephemeralMnemonic) { writeJob(job); return { noKey: true }; }
+  if (!job.ephemeralMnemonic) {
+    // No key means nothing can be swept or returned from here — so this job must
+    // NOT be left re-runnable. Returning with the status untouched left it as
+    // FUNDED, the watcher picked it up every few seconds, autoRun threw, and the
+    // refund landed back here: an endless loop that hammered the API (and the
+    // rate-limiting that caused made the original failure worse).
+    job.status = job.depositReceivedUstx ? 'CANCELLED' : 'EXPIRED';
+    job.cancelReason = `${reason} · deposit key already discarded — nothing left to return from this job`;
+    job.cancelledAt = new Date().toISOString();
+    writeJob(job);
+    xaoLog(job.jobId, `closing without a key (${job.status}) — ${reason}`);
+    return { noKey: true };
+  }
   const dep = deriveFrom(job.ephemeralMnemonic);
   const returnTo = (await resolveFunder(job)) || job.user;
   const out: any = { reason, deliveredNfts: [], refundTx: null };
@@ -1209,7 +1221,12 @@ try {
 // FUNDED/INSCRIBED and the watcher resumes exactly where it left off. Resume is safe end-to-end: staged
 // uploads continue from the on-chain index, single-tx mints are idempotent (get-id-by-hash pre-check).
 // Only deterministic failures or exhausted retries (4, with 15 s × attempt backoff) hit the refund failsafe.
-const FATAL_ERR = /TX abort|locked to|unrecoverable|file bytes|empty file|could not determine|wrong inscription received/i;
+// "could not determine the paying address" was in here, which made a funder lookup
+// failure a DETERMINISTIC failure and sent the job straight to a refund. It is
+// almost always transient — a Hiro hiccup or a rate limit — so it now retries with
+// backoff and only refunds once the retries are exhausted. Classing it as fatal is
+// what turned one failed lookup into a refund attempt every few seconds.
+const FATAL_ERR = /TX abort|locked to|unrecoverable|file bytes|empty file|wrong inscription received/i;
 // ---------- cancellation ----------
 // A cancel is a PERSISTED flag, not an in-memory one: the loop doing the work may
 // be mid-tick in another call stack, and the request has to survive a reload. The
