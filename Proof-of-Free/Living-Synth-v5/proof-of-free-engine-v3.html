@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Proof of Free</title>
+<meta name="description" content="Proof of Free. One name. One wallet. One proof.">
+<style>
+:root{--bg:#0a0a0a;--bone:#f2eadf;--orange:#ff6a00;--blue:#38a0ff;--steel:#8b9299}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--bone);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+body{display:grid;place-items:center}
+main{position:relative;width:min(100vw,100vh);height:min(100vw,100vh);aspect-ratio:1;overflow:hidden;background:var(--bg);isolation:isolate}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.overlay{position:absolute;inset:0;pointer-events:none}
+.top,.bottom{position:absolute;left:4.5%;right:4.5%;display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;text-transform:uppercase;letter-spacing:.14em;font-size:clamp(9px,1.4vw,14px);line-height:1.35}
+.top{top:4.2%}
+.bottom{bottom:4.2%;align-items:flex-end}
+.title{max-width:65%;font-weight:700}
+.rule{opacity:.64;text-align:right}
+.badge{position:absolute;right:4.5%;top:50%;transform:translateY(-50%) rotate(90deg);transform-origin:center;font-size:clamp(8px,1vw,11px);letter-spacing:.2em;text-transform:uppercase;opacity:.35}
+.tap{position:absolute;left:50%;bottom:9.5%;transform:translateX(-50%);pointer-events:auto;appearance:none;border:0;background:none;color:inherit;font:inherit;cursor:pointer;font-size:clamp(8px,1.1vw,12px);letter-spacing:.16em;text-transform:uppercase;opacity:.42;transition:opacity .3s}
+.tap:hover,.tap:focus-visible{opacity:.85}
+main:hover .tap{opacity:.7}
+@media (prefers-reduced-motion:reduce){.tap{opacity:.6}}
+</style>
+</head>
+<body>
+<main id="art" role="img" aria-label="Proof of Free generative artwork.">
+<canvas id="c"></canvas>
+<div class="overlay" aria-hidden="true">
+  <div class="top"><div class="title" id="piece-title">Proof of Free</div><div class="rule">0 PRICE<br>1 NAME<br>1 WALLET</div></div>
+  <div class="badge" id="piece-badge"></div>
+  <div class="bottom"><div>ONE NAME. ONE WALLET.</div><div>ONE PROOF.</div></div>
+</div>
+<button class="tap" id="tap" type="button">tap for sound</button>
+</main>
+<script type="application/json" id="proof-metadata"></script>
+<script>
+(() => {
+'use strict';
+const TAU=Math.PI*2;
+const TITLES=["First Light","Free Passage","No Toll","Clear Threshold","Open Circuit","Zero Barrier","Unlocked Field","Common Key","Public Door","The Bare Minimum","The Way Through","Open Signal","Free Frequency","Unmetered","Clear Channel","No Interference","One Pulse","Public Wave","Silent Charge","Released Current","Zero Noise","Broadcast Free","One Name","Named Light","Public Key","Unbound Mark","Open Signature","Free State","Known Here","No Alias","Single Claim","Proof Held","Proof of Free"];
+const SLUGS=["first-light","free-passage","no-toll","clear-threshold","open-circuit","zero-barrier","unlocked-field","common-key","public-door","the-bare-minimum","the-way-through","open-signal","free-frequency","unmetered","clear-channel","no-interference","one-pulse","public-wave","silent-charge","released-current","zero-noise","broadcast-free","one-name","named-light","public-key","unbound-mark","open-signature","free-state","known-here","no-alias","single-claim","proof-held","proof-of-free"];
+const PALETTES=[["#0a0a0a","#f2eadf","#ff6a00","#38a0ff","#8b9299"],["#0d1117","#f7f0e6","#ff7a1a","#5bb8ff","#b0b6bc"],["#050505","#fff7eb","#f04d00","#2d8cff","#747b83"],["#111111","#eee6dc","#ff8a2a","#7dc9ff","#9fa6ad"],["#080808","#f5ede2","#ff5c00","#4ca6ff","#6e747b"]];
+const V=[[0.7237,0.7307,-0.3991,0.0116,-0.0002,0.0009,0.027,-0.3706,0.0281,0.00375],[1.0192,0.5842,0.4077,0.0037,0.0062,-0.0004,0.0226,0.3089,0.024,0.0008],[1.1722,0.7016,0.1389,0.0042,0.0029,-0.001,0.0303,-0.6917,0.0221,-0.00391],[0.8725,0.98,0.3658,0.0058,-0.0028,0.0042,0.0414,0.2463,0.0151,-0.00326],[1.2806,0.9557,-0.3759,0.0139,0.0102,-0.0012,0.0256,0.2078,0.0251,0.00134],[1.2645,0.0424,0.0851,-0.0083,0.0187,0.0032,0.0351,-0.6203,0.0121,-0.00084],[0.942,0.3073,-0.0962,0.0049,-0.0184,0.0035,0.0104,0.2739,0.0263,0.00057],[1.2341,0.4756,-0.1796,-0.003,0.0176,-0.0003,0.0367,0.4726,0.0339,0.00044],[0.9237,0.7843,0.0754,0.0021,-0.0059,-0.0044,0.0394,-0.4197,0.0291,-0.00366],[1.069,0.0792,0.1749,-0.0043,0.0024,0.0007,0.0153,-0.6561,0.0319,-0.00344],[0.7217,0.1713,0.2276,-0.0127,0.0111,-0.0019,0.0384,0.2065,0.0169,-0.00082],[1.0174,0.325,-0.0631,0.0138,-0.0187,-0.0021,0.034,0.108,0.0108,0.00313],[0.7205,0.1667,0.3323,0.0121,0.0046,0.0031,0.0382,0.3664,0.034,0.00078],[0.7577,0.1219,-0.3456,-0.0152,-0.0049,-0.0044,0.0382,-0.4138,0.0249,0.00029],[1.1684,0.4648,0.0236,0.0003,-0.0041,-0.0023,0.0407,-0.2021,0.0111,-0.0],[1.2087,0.0063,-0.2709,0.0097,-0.0026,-0.004,0.0421,-0.1501,0.0217,0.00118],[0.7689,0.0899,0.2847,0.0166,-0.0142,-0.0043,0.0351,0.2979,0.019,-0.00258],[0.7923,0.7693,0.0012,0.0152,-0.0035,-0.0019,0.0407,-0.572,0.0273,0.00396],[1.1495,0.343,0.0853,-0.0023,-0.0183,-0.0035,0.0398,0.5534,0.03,0.00166],[1.2814,0.4334,0.1369,-0.0009,0.0057,0.0007,0.0282,-0.2123,0.0377,0.00022],[0.8743,0.1071,0.1156,-0.0147,0.0192,-0.0028,0.0089,0.1275,0.0361,-0.00091],[0.9194,0.7125,0.0506,0.0164,0.0114,-0.0001,0.033,-0.3885,0.0338,-0.00099],[1.0166,0.4436,0.24,-0.0101,-0.0139,0.0032,0.0231,0.4711,0.0266,0.00211],[1.1975,0.1313,-0.0224,0.0084,-0.0176,-0.0031,0.0394,-0.5986,0.0155,0.00194],[0.7426,0.1444,-0.2729,-0.014,-0.017,-0.0027,0.0219,0.4507,0.0137,-0.00174],[1.0399,0.2432,-0.181,-0.0129,-0.003,0.0007,0.0398,0.6677,0.0105,-0.00264],[0.7996,0.7696,-0.1269,-0.0019,0.0166,-0.0007,0.0368,0.3914,0.0154,0.00362],[0.8206,0.5122,-0.132,-0.0151,0.0155,0.0039,0.0347,0.2238,0.0123,-0.00385],[1.0028,0.9323,-0.0579,0.0056,-0.0186,0.0015,0.0347,-0.1342,0.0379,0.00208],[1.0859,0.9784,0.2028,0.0099,0.0076,-0.0036,0.0116,0.2864,0.0159,-0.00256],[1.2558,0.1919,-0.0227,0.0013,-0.0001,-0.0008,0.0374,-0.4276,0.0152,0.00021],[0.9201,0.6152,-0.2483,-0.0015,0.0093,0.0034,0.0416,-0.5127,0.0265,0.0014],[1.2535,0.9453,-0.1647,-0.0004,-0.0189,-0.0023,0.0092,-0.4406,0.0146,-0.00356]];
+const PORTALS=[["ellipse",0.185,0.275,-0.035,0.025,0.0],["arch",0.18,0.29,0.018,-0.018,0.006],["rounded",0.195,0.265,-0.018,0.012,-0.004],["circle",0.205,0.205,0,0.0,0.0],["hex",0.195,0.275,0.025,-0.02,0.005],["tall-arch",0.175,0.305,-0.022,0.028,-0.005],["octagon",0.19,0.275,0.015,-0.012,0.003],["wide-arch",0.205,0.255,-0.012,0.018,0.0],["rect",0.195,0.27,0.008,0.0,0.004],["diamond",0.19,0.27,0.04,-0.018,-0.002],["gateway",0.205,0.285,-0.018,0.022,0.0]];
+const FILES=["01-proof-of-free-first-light.html","02-proof-of-free-free-passage.html","03-proof-of-free-no-toll.html","04-proof-of-free-clear-threshold.html","05-proof-of-free-open-circuit.html","06-proof-of-free-zero-barrier.html","07-proof-of-free-unlocked-field.html","08-proof-of-free-common-key.html","09-proof-of-free-public-door.html","10-proof-of-free-the-bare-minimum.html","11-proof-of-free-the-way-through.html","12-proof-of-free-open-signal.html","13-proof-of-free-free-frequency.html","14-proof-of-free-unmetered.html","15-proof-of-free-clear-channel.html","16-proof-of-free-no-interference.html","17-proof-of-free-one-pulse.html","18-proof-of-free-public-wave.html","19-proof-of-free-silent-charge.html","20-proof-of-free-released-current.html","21-proof-of-free-zero-noise.html","22-proof-of-free-broadcast-free.html","23-proof-of-free-one-name.html","24-proof-of-free-named-light.html","25-proof-of-free-public-key.html","26-proof-of-free-unbound-mark.html","27-proof-of-free-open-signature.html","28-proof-of-free-free-state.html","29-proof-of-free-known-here.html","30-proof-of-free-no-alias.html","31-proof-of-free-single-claim.html","32-proof-of-free-proof-held.html","33-proof-of-free-proof-of-free.html"];
+const RELEASED_SUPPLY=33;
+const MAX_EDITION=Number.MAX_SAFE_INTEGER;
+const PARENT_INSCRIPTION=2838;
+const ENGINE_VERSION=3;
+const FUTURE_A=["Open","Free","Clear","Public","Common","Unbound","Silent","Zero","Bright","Shared","Known","Living","Infinite","Direct","True","New"];
+const FUTURE_B=["Vector","Passage","Signal","Field","Key","Current","Portal","Circuit","Pulse","Threshold","Wave","State","Mark","Light","Proof","Path"];
+
+// Family is no longer three separate renderers. One aperture system is drawn for
+// every edition; family only weights the layers of that single system.
+const FAMILIES={
+  Thresholds:{rigid:1,rings:17,spread:1.00,blade:0.00,flow:0.60,ringW:1.00,tilt:0.40},
+  Signals:   {rigid:0,rings:13,spread:0.82,blade:1.00,flow:1.00,ringW:0.86,tilt:1.00},
+  Names:     {rigid:0,rings:9, spread:1.14,blade:0.38,flow:0.72,ringW:1.10,tilt:0.75}
+};
+
+function hash32(value){
+  const s=String(value);let h=2166136261;
+  for(let j=0;j<s.length;j++){h^=s.charCodeAt(j);h=Math.imul(h,16777619)}
+  h+=h<<13;h^=h>>>7;h+=h<<3;h^=h>>>17;h+=h<<5;
+  return h>>>0;
+}
+function mulberry32(a){
+  let s=a>>>0;
+  return()=>{let t=s+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296};
+}
+function futureConfig(number,seedOverride){
+  const seedLabel=seedOverride!==null?String(seedOverride):`pof-${number}`;
+  const numericSeed=hash32(seedLabel),r=mulberry32(numericSeed),slot=(number-1)%33;
+  const family=slot<11?'Thresholds':slot<22?'Signals':'Names';
+  const mode=slot<11?'portal':slot<22?'iris':'passage';
+  const title=`${FUTURE_A[Math.floor(r()*FUTURE_A.length)]} ${FUTURE_B[Math.floor(r()*FUTURE_B.length)]} #${String(number).padStart(4,'0')}`;
+  const slug=title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+  const cfg={
+    collection:'Proof of Free',number,releasedSupply:RELEASED_SUPPLY,engineCapacity:'open',title,slug,
+    filename:`${String(number).padStart(4,'0')}-proof-of-free-${slug}.html`,family,mode,
+    seed:seedLabel,numericSeed,
+    claim:{price:0,walletLimit:1,bnsRequired:true,rule:'One name. One wallet. One proof.'},
+    palette:PALETTES[(number-1)%PALETTES.length],accentIndex:number%3===0?3:2,
+    particleCount:28+Math.floor(r()*31),spokes:7+Math.floor(r()*18),
+    speed:.72+r()*.57,phaseOffset:r(),rotation:-.42+r()*.84,direction:number%2?-1:1,
+    rxBias:-.019+r()*.038,ryBias:-.019+r()*.038,strokeBias:-.0045+r()*.009,
+    wobble:.008+r()*.035,bend:-.7+r()*1.4,lobes:3+Math.floor(r()*7),ripple:.01+r()*.028,
+    blades:6+Math.floor(r()*7),rings:11+Math.floor(r()*12),
+    baseHz:+(110*Math.pow(2,(number%12)/12)).toFixed(3),interval:[1.25,1.3333,1.5,1.6,1.75][number%5],detune:-.004+r()*.008
+  };
+  if(mode==='portal')Object.assign(cfg,{
+    portalShape:['ellipse','arch','rounded','circle','hex','tall-arch','octagon','wide-arch','rect','diamond','gateway'][Math.floor(r()*11)],
+    portalWidth:.175+r()*.035,portalHeight:.205+r()*.105,portalTilt:-.04+r()*.08,
+    portalPerspective:-.028+r()*.056,portalYOffset:-.006+r()*.012
+  });
+  return cfg;
+}
+function coverConfig(){
+  return{
+    collection:'Proof of Free',number:0,releasedSupply:RELEASED_SUPPLY,engineCapacity:'open',
+    title:'Open Engine',slug:'open-engine',family:'Signals',mode:'iris',
+    seed:PARENT_INSCRIPTION,numericSeed:PARENT_INSCRIPTION,
+    claim:{price:0,walletLimit:1,bnsRequired:true,rule:'One name. One wallet. One proof.'},
+    palette:PALETTES[0],accentIndex:2,particleCount:56,spokes:12,
+    speed:.62,phaseOffset:.10,rotation:0,direction:1,
+    rxBias:.004,ryBias:-.002,strokeBias:-.004,wobble:.012,bend:.20,lobes:5,ripple:.016,
+    blades:9,rings:14,baseHz:110,interval:1.5,detune:.002
+  };
+}
+function traitsOf(m){
+  const t=[
+    {trait_type:'Family',value:m.family},
+    {trait_type:'Mode',value:m.mode},
+    {trait_type:'Release',value:m.number<=RELEASED_SUPPLY?'Original 33':'Open Engine'},
+    {trait_type:'Palette',value:'P'+(PALETTES.indexOf(m.palette)+1)},
+    {trait_type:'Accent',value:m.accentIndex===3?'Blue':'Orange'},
+    {trait_type:'Drift',value:m.direction<0?'Counter':'With'},
+    {trait_type:'Lobes',value:m.lobes},
+    {trait_type:'Blades',value:m.blades},
+    {trait_type:'Price',value:'0'}
+  ];
+  if(m.portalShape)t.push({trait_type:'Portal',value:m.portalShape});
+  return t;
+}
+
+/* ---- selector ---- */
+const params=new URLSearchParams(location.search);
+const seedParam=params.has('seed')?params.get('seed').trim():null;
+const rawSelector=(params.get('n')||params.get('number')||decodeURIComponent(location.hash.slice(1))||'').trim();
+const COVER=!rawSelector&&!seedParam;
+let number=0,META;
+if(COVER){
+  META=coverConfig();
+}else{
+  const requested=rawSelector.toLowerCase();
+  number=Number.parseInt(requested,10);
+  // Released editions may also be selected by their published seed value. The
+  // range is bounded so that genuine high-numbered editions cannot alias onto 1-33.
+  if(Number.isFinite(number)&&number>330000&&number<=330000+7919*RELEASED_SUPPLY&&(number-330000)%7919===0)number=(number-330000)/7919;
+  if(!(Number.isSafeInteger(number)&&number>=1))number=SLUGS.indexOf(requested)+1;
+  if(!(Number.isSafeInteger(number)&&number>=1))number=FILES.findIndex(x=>x.toLowerCase()===requested)+1;
+  if(!(Number.isSafeInteger(number)&&number>=1))number=TITLES.findIndex(x=>x.toLowerCase()===requested)+1;
+  if(!(Number.isSafeInteger(number)&&number>=1)&&seedParam)number=RELEASED_SUPPLY+1+(hash32(seedParam)%1000000000);
+  if(!(Number.isSafeInteger(number)&&number>=1&&number<=MAX_EDITION))number=1;
+  if(number<=RELEASED_SUPPLY){
+    const i=number-1;
+    const family=number<=11?'Thresholds':number<=22?'Signals':'Names',mode=number<=11?'portal':number<=22?'iris':'passage';
+    const [speed,phaseOffset,rotation,rxBias,ryBias,strokeBias,wobble,bend,ripple,detune]=V[i];
+    META={
+      collection:'Proof of Free',number,releasedSupply:RELEASED_SUPPLY,engineCapacity:'open',
+      title:TITLES[i],slug:SLUGS[i],filename:FILES[i],family,mode,
+      seed:330000+7919*number,numericSeed:330000+7919*number,
+      claim:{price:0,walletLimit:1,bnsRequired:true,rule:'One name. One wallet. One proof.'},
+      palette:PALETTES[i%5],accentIndex:number%3===0?3:2,
+      particleCount:28+(7*number)%31,spokes:7+(5*number)%18,
+      speed,phaseOffset,rotation,direction:number%2?-1:1,rxBias,ryBias,strokeBias,wobble,bend,
+      lobes:3+number%7,ripple,blades:6+number%7,rings:11+number%12,
+      baseHz:+(110*Math.pow(2,(number%12)/12)).toFixed(3),interval:[1.25,1.3333,1.5,1.6,1.75][number%5],detune
+    };
+    if(number<=11)Object.assign(META,Object.fromEntries(['portalShape','portalWidth','portalHeight','portalTilt','portalPerspective','portalYOffset'].map((k,j)=>[k,PORTALS[i][j]])));
+  }else META=futureConfig(number,seedParam);
+}
+META.traits=traitsOf(META);
+META.lineage={engine:'proof-of-free-engine',version:ENGINE_VERSION,parentInscription:PARENT_INSCRIPTION,relationship:'child',runtime:'self-contained'};
+
+/* ---- chrome ---- */
+const root=document.documentElement;
+[['--bg',0],['--bone',1],['--orange',2],['--blue',3],['--steel',4]].forEach(([k,j])=>root.style.setProperty(k,META.palette[j]));
+const art=document.getElementById('art');
+const editionLabel=number<=RELEASED_SUPPLY?String(number).padStart(2,'0'):String(number).padStart(4,'0');
+if(COVER){
+  document.title='Proof of Free';
+  document.querySelector('meta[name=description]').content='Proof of Free. Open-ended recursive engine with 33 initial artworks.';
+  art.setAttribute('aria-label','Proof of Free. Animated recursive collection title.');
+  document.getElementById('piece-title').innerHTML='&nbsp;';
+  document.getElementById('piece-badge').textContent='Open Engine';
+}else{
+  document.title=`Proof of Free #${editionLabel} — ${META.title}`;
+  document.querySelector('meta[name=description]').content=`Proof of Free #${editionLabel}: ${META.title}. One name. One wallet. One proof.`;
+  art.setAttribute('aria-label',`Proof of Free number ${number}: ${META.title}. Animated generative artwork.`);
+  document.getElementById('piece-title').innerHTML=`Proof of Free<br>${number<=RELEASED_SUPPLY?editionLabel+' / '+RELEASED_SUPPLY:'#'+editionLabel} · ${META.title}`;
+  document.getElementById('piece-badge').textContent=`${META.family} · ${META.mode}`;
+}
+document.getElementById('proof-metadata').textContent=JSON.stringify(COVER?{collection:'Proof of Free',releasedSupply:RELEASED_SUPPLY,engineCapacity:'open',type:'recursive-engine',defaultView:'collection-title',lineage:META.lineage,selectors:['#34','?n=333','?n=3333','?n=34&seed=custom-seed']}:META,null,2);
+window.PROOF_OF_FREE_META=META;
+
+/* ---- render ---- */
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d',{alpha:false});
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const DPR=Math.min(devicePixelRatio||1,2);
+// Released editions carry a numeric seed; future editions carry a string label plus
+// numericSeed. Everything numeric derives from RNG_SEED so neither path can leak a string.
+const RNG_SEED=(typeof META.seed==='number'?META.seed:META.numericSeed)>>>0;
+const rng=mulberry32(RNG_SEED);
+const P=META.palette;
+const ACC=META.accentIndex;
+const FAM=FAMILIES[META.family];
+let W=0,H=0,S=0,cx=0,cy=0,RX=0,RY=0,last=performance.now(),phase=0,impulse=0,audioCtx=null;
+
+const FLOW=Array.from({length:META.particleCount},()=>({
+  a:rng()*TAU,off:rng(),sp:.55+rng()*.9,w:.5+rng()*1.9,sw:(rng()-.5)*1.1,tone:rng()
+}));
+const SPOKES=Array.from({length:META.spokes},(_,i)=>({
+  a:(i/META.spokes)*TAU+(rng()-.5)*.22,d:rng()*.16+.05,l:rng()*.24+.1
+}));
+
+function resize(){
+  const r=art.getBoundingClientRect();
+  W=Math.max(1,Math.round(r.width*DPR));
+  H=Math.max(1,Math.round(r.height*DPR));
+  canvas.width=W;canvas.height=H;
+  S=Math.min(W,H);cx=W/2;cy=H/2;
+}
+addEventListener('resize',resize,{passive:true});
+resize();
+
+function hexToRgba(hex,a){
+  const n=parseInt(hex.slice(1),16);
+  return `rgba(${n>>16},${(n>>8)&255},${n&255},${a})`;
+}
+function ease(x){return x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2}
+// charge -> open -> release -> seal
+function cycle(t){
+  const q=(t*META.speed+META.phaseOffset)%1;
+  if(q<.14)return ease(q/.14);
+  if(q<.72)return 1;
+  return 1-ease((q-.72)/.28);
+}
+
+function tracePortal(shape,w,h){
+  ctx.beginPath();
+  if(shape==='ellipse'){ctx.ellipse(0,0,w,h,0,0,TAU)}
+  else if(shape==='circle'){ctx.arc(0,0,Math.min(w,h),0,TAU)}
+  else if(shape==='rounded'){
+    const r=Math.min(w,h)*.24;
+    ctx.moveTo(-w+r,-h);ctx.lineTo(w-r,-h);ctx.quadraticCurveTo(w,-h,w,-h+r);
+    ctx.lineTo(w,h-r);ctx.quadraticCurveTo(w,h,w-r,h);ctx.lineTo(-w+r,h);
+    ctx.quadraticCurveTo(-w,h,-w,h-r);ctx.lineTo(-w,-h+r);ctx.quadraticCurveTo(-w,-h,-w+r,-h);
+  }
+  else if(shape==='rect'){ctx.rect(-w,-h,w*2,h*2)}
+  else if(shape==='diamond'){ctx.moveTo(0,-h);ctx.lineTo(w,0);ctx.lineTo(0,h);ctx.lineTo(-w,0);ctx.closePath()}
+  else if(shape==='hex'){
+    ctx.moveTo(-w*.58,-h);ctx.lineTo(w*.58,-h);ctx.lineTo(w,-h*.36);
+    ctx.lineTo(w,h*.36);ctx.lineTo(w*.58,h);ctx.lineTo(-w*.58,h);
+    ctx.lineTo(-w,h*.36);ctx.lineTo(-w,-h*.36);ctx.closePath();
+  }
+  else if(shape==='octagon'){
+    const k=.34;
+    ctx.moveTo(-w*(1-k),-h);ctx.lineTo(w*(1-k),-h);ctx.lineTo(w,-h*(1-k));
+    ctx.lineTo(w,h*(1-k));ctx.lineTo(w*(1-k),h);ctx.lineTo(-w*(1-k),h);
+    ctx.lineTo(-w,h*(1-k));ctx.lineTo(-w,-h*(1-k));ctx.closePath();
+  }
+  else{
+    const wide=shape==='wide-arch'||shape==='gateway',tall=shape==='tall-arch';
+    const top=tall?-h*.98:-h*.82,shoulder=wide?-h*.22:-h*.05,ww=wide?w*1.08:w;
+    ctx.moveTo(-ww,h);ctx.lineTo(-ww,shoulder);
+    ctx.bezierCurveTo(-ww,top,ww,top,ww,shoulder);
+    ctx.lineTo(ww,h);
+    if(shape==='gateway'){
+      ctx.lineTo(w*.62,h);ctx.lineTo(w*.62,-h*.02);
+      ctx.bezierCurveTo(w*.62,-h*.56,-w*.62,-h*.56,-w*.62,-h*.02);
+      ctx.lineTo(-w*.62,h);
+    }
+    ctx.closePath();
+  }
+}
+
+// The single shared form. Every layer is this curve at a different depth.
+function aperture(scale,morph){
+  if(FAM.rigid){tracePortal(META.portalShape||'ellipse',RX*scale,RY*scale);return}
+  ctx.beginPath();
+  const steps=150;
+  for(let i=0;i<=steps;i++){
+    const th=i/steps*TAU;
+    const k=1+Math.sin(th*META.lobes+phase)*META.ripple*morph+Math.sin(th*2+phase*.55)*META.bend*.028;
+    const x=Math.cos(th)*RX*scale*k,y=Math.sin(th)*RY*scale*k;
+    i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+  }
+  ctx.closePath();
+}
+
+function field(open){
+  ctx.fillStyle=P[0];ctx.fillRect(0,0,W,H);
+  const g=ctx.createRadialGradient(cx,cy,S*.02,cx,cy,S*.62);
+  g.addColorStop(0,hexToRgba(P[ACC],.07+.07*open+.08*impulse));
+  g.addColorStop(.45,hexToRgba(P[3],.025));
+  g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle=hexToRgba(P[1],.032);
+  ctx.lineWidth=Math.max(1,DPR*.55);
+  const gap=S/16;
+  for(let x=(W%gap)/2;x<W;x+=gap){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+  for(let y=(H%gap)/2;y<H;y+=gap){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+}
+
+// Receding copies of the aperture: the passage.
+function depth(t,open){
+  const n=FAM.rings;
+  const travel=(t*.000055*META.speed*META.direction+META.phaseOffset)%1;
+  for(let i=n-1;i>=0;i--){
+    let z=((i/n)+travel)%1;if(z<0)z+=1;
+    const e=z*z*(3-2*z);
+    const scale=.1+e*.95*FAM.spread;
+    const y=S*(META.portalPerspective||0)*(1-scale);
+    ctx.save();ctx.translate(0,y);
+    aperture(scale,open*(1-z*.55));
+    ctx.strokeStyle=hexToRgba(i%4===0?P[ACC]:(i%3===0?P[3]:P[1]),(.03+z*.3)*(.55+.45*open));
+    ctx.lineWidth=Math.max(DPR*.7,S*(.0011+.0052*z));
+    ctx.stroke();ctx.restore();
+  }
+}
+
+// Iris blades: the gate that is never actually closed.
+function blades(open){
+  if(FAM.blade<=0)return;
+  const n=META.blades,inner=Math.min(RX,RY)*(.16+open*.7),outer=Math.max(RX,RY)*1.02;
+  ctx.globalCompositeOperation='screen';
+  for(let i=0;i<n;i++){
+    ctx.save();ctx.rotate(i/n*TAU+phase*.06*META.direction);
+    ctx.beginPath();
+    ctx.moveTo(inner,0);
+    ctx.quadraticCurveTo(outer*.66,-outer*.15,outer,0);
+    ctx.quadraticCurveTo(outer*.64,outer*.09,inner,0);
+    ctx.fillStyle=hexToRgba(i%2?P[3]:P[ACC],(.045+.05*(1-open))*FAM.blade);
+    ctx.fill();ctx.restore();
+  }
+  ctx.globalCompositeOperation='source-over';
+}
+
+// Release: light leaves through the aperture instead of orbiting it.
+function flow(t,open){
+  ctx.globalCompositeOperation='screen';
+  const maxR=Math.max(RX,RY)*1.55,squash=RY/RX;
+  for(let i=0;i<FLOW.length;i++){
+    const p=FLOW[i];
+    const u=(t*.00007*p.sp*META.speed+p.off)%1;
+    const life=Math.sin(u*Math.PI);
+    const al=life*life*(.09+.46*open)*FAM.flow;
+    if(al<=.004)continue;
+    const rr=Math.pow(u,1.3)*maxR;
+    const a=p.a+u*p.sw*1.6+phase*.02*META.direction;
+    ctx.fillStyle=hexToRgba(p.tone<.28?P[ACC]:(p.tone<.62?P[3]:P[1]),al);
+    ctx.beginPath();
+    ctx.arc(Math.cos(a)*rr,Math.sin(a)*rr*squash,p.w*DPR*(.7+1.1*life)*(1+impulse*.8),0,TAU);
+    ctx.fill();
+  }
+  ctx.globalCompositeOperation='source-over';
+}
+
+// The zero. The signature form, and the front frame for Thresholds.
+function ring(open){
+  aperture(1,open);
+  const g=ctx.createLinearGradient(-RX,-RY,RX,RY);
+  g.addColorStop(0,P[1]);g.addColorStop(.42,P[ACC]);g.addColorStop(1,P[4]);
+  ctx.strokeStyle=g;
+  ctx.lineJoin='round';ctx.lineCap='round';
+  ctx.lineWidth=S*(.0225+META.strokeBias)*FAM.ringW;
+  ctx.shadowBlur=S*(.02+.055*impulse+.018*open);
+  ctx.shadowColor=P[ACC];
+  ctx.stroke();
+  ctx.shadowBlur=0;
+}
+
+function mark(open){
+  ctx.strokeStyle=hexToRgba(P[ACC],.09+.15*open);
+  ctx.lineWidth=Math.max(1,S*.0022);
+  // Kept inside the frame: the burst reads against the ring, not past it.
+  for(let i=0;i<SPOKES.length;i++){
+    const sp=SPOKES[i],a=sp.a+Math.sin(phase*.3+i)*.04;
+    const r1=S*(.095+sp.d*.45*open),r2=r1+S*sp.l*.5*open;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a)*r1,Math.sin(a)*r1);
+    ctx.lineTo(Math.cos(a)*r2,Math.sin(a)*r2);
+    ctx.stroke();
+  }
+  ctx.font=`${Math.round(S*.032)}px ui-monospace,monospace`;
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillStyle=hexToRgba(P[1],.36+.3*open);
+  ctx.fillText(META.number.toString(36).toUpperCase().padStart(2,'0'),0,0);
+}
+
+// The proof: one expanding ring per claim.
+function sealFlash(){
+  if(impulse<=.012)return;
+  aperture(1+(1-impulse)*.85,1);
+  ctx.strokeStyle=hexToRgba(P[1],impulse*.45);
+  ctx.lineWidth=Math.max(1,S*.0045*impulse);
+  ctx.stroke();
+}
+
+/* ---- cover wordmark ---- */
+const CV='Proof of Free',CV_ANCHOR=[0,6,9];
+function wordmark(t){
+  const q=(t*.00014)%1;
+  const e=q<.18?0:q<.5?ease((q-.18)/.32):q<.86?1:1-ease((q-.86)/.14);
+  const bigF=S*.145,smF=S*.072,FF='Arial,Helvetica,sans-serif';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.font=`${smF}px ${FF}`;
+  const w=[...CV].map(ch=>ctx.measureText(ch).width);
+  const total=w.reduce((a,b)=>a+b,0);
+  let x=-total/2;
+  const smX=w.map(v=>{const p=x+v/2;x+=v;return p});
+  ctx.font=`${bigF}px ${FF}`;
+  const bw=CV_ANCHOR.map(i=>ctx.measureText(CV[i]).width);
+  const gap=bigF*.3,bt=bw.reduce((a,b)=>a+b,0)+gap*2;
+  let bx=-bt/2;
+  const bigX=bw.map(v=>{const p=bx+v/2;bx+=v+gap;return p});
+  ctx.shadowBlur=S*.02;ctx.shadowColor=hexToRgba(P[1],.4);
+  for(let i=0;i<CV.length;i++){
+    const ch=CV[i];if(ch===' ')continue;
+    const k=CV_ANCHOR.indexOf(i);
+    if(k>=0){
+      ctx.font=`${bigF+(smF-bigF)*e}px ${FF}`;
+      ctx.fillStyle=hexToRgba(P[1],.94);
+      ctx.fillText(ch,bigX[k]+(smX[i]-bigX[k])*e,0);
+    }else if(e>.02){
+      ctx.font=`${smF}px ${FF}`;
+      ctx.fillStyle=hexToRgba(P[1],.9*e);
+      ctx.fillText(ch,smX[i],0);
+    }
+  }
+  ctx.shadowBlur=0;
+}
+
+function frame(now){
+  const dt=Math.min(50,now-last);last=now;
+  phase+=dt*.0032*META.speed;
+  impulse*=Math.pow(.001,dt/1000);
+  const open=reduced?.8:Math.min(1,cycle(now*.001)+impulse*.3);
+  RX=S*(.172+META.rxBias);RY=S*(.262+META.ryBias);
+  field(open);
+  ctx.save();
+  ctx.translate(cx,cy+S*(META.portalYOffset||0));
+  ctx.rotate((META.rotation+Math.sin(now*.00025+RNG_SEED)*META.wobble)*FAM.tilt+(META.portalTilt||0));
+  if(FAM.rigid){aperture(.155,0);ctx.fillStyle=P[0];ctx.fill()}
+  depth(now,open);
+  blades(open);
+  flow(now,open);
+  ring(open);
+  if(META.family==='Names')mark(open);
+  sealFlash();
+  ctx.restore();
+  if(COVER){
+    ctx.fillStyle='rgba(0,0,0,.46)';ctx.fillRect(0,0,W,H);
+    ctx.save();ctx.translate(cx,cy);wordmark(now);ctx.restore();
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+function playTone(){
+  audioCtx||=new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended')audioCtx.resume();
+  const t=audioCtx.currentTime;
+  const gain=audioCtx.createGain();
+  gain.gain.setValueAtTime(.0001,t);
+  gain.gain.exponentialRampToValueAtTime(.11,t+.018);
+  gain.gain.exponentialRampToValueAtTime(.0001,t+.9);
+  gain.connect(audioCtx.destination);
+  const base=META.baseHz;
+  [1,META.interval].forEach((m,i)=>{
+    const o=audioCtx.createOscillator(),f=audioCtx.createBiquadFilter();
+    o.type=i?'triangle':'sine';
+    o.frequency.setValueAtTime(base*m,t);
+    o.frequency.exponentialRampToValueAtTime(base*m*(1.004+META.detune),t+.65);
+    f.type='lowpass';f.frequency.value=1600+META.number*24;
+    o.connect(f).connect(gain);o.start(t+i*.035);o.stop(t+.95);
+  });
+  impulse=1;
+}
+// A gallery that swaps only the fragment must still re-resolve the edition.
+addEventListener('hashchange',()=>location.reload());
+art.addEventListener('pointerdown',playTone);
+document.getElementById('tap').addEventListener('click',e=>{e.preventDefault()});
+})();
+</script>
+</body>
+</html>

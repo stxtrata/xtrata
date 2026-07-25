@@ -1,0 +1,26 @@
+{
+  "name": "@xtrata/collections-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Contract-independent core of the Xtrata Collections & Drops v3 client layer (hashing, manifest, ingest, planner, progress, reconcile, report).",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@noble/hashes": "^1.4.0",
+    "@stacks/network": "^7.5.0",
+    "@stacks/transactions": "^7.5.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "fast-check": "^3.19.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.1.0"
+  }
+}

@@ -1,0 +1,199 @@
+/*
+ * Canary-only styling.
+ *
+ * Scoped to this entry rather than added to the shared shell theme: the canary
+ * is the only page with gated stage cards, and keeping its rules here means the
+ * shell stylesheet stays the vocabulary every page shares.
+ */
+
+.canary-summary {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.canary-stage {
+  border-left: 4px solid var(--border, #d0d0d0);
+}
+
+.canary-stage--running {
+  border-left-color: #2f6feb;
+}
+
+.canary-stage--passed {
+  border-left-color: #1a7f37;
+}
+
+.canary-stage--failed {
+  border-left-color: #b42318;
+}
+
+.canary-stage--skipped {
+  border-left-color: #9a6700;
+}
+
+.canary-stage__head h2 {
+  margin: 0;
+}
+
+.canary-stage__summary {
+  margin: 0.5rem 0;
+}
+
+.canary-stage__verification {
+  margin: 0.25rem 0 0.75rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
+.canary-stage__verification--attested {
+  color: #9a6700;
+  opacity: 1;
+  font-weight: 600;
+}
+
+.canary-stage__gate {
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background: rgba(154, 103, 0, 0.12);
+  font-size: 0.9rem;
+}
+
+.canary-stage__error {
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background: rgba(180, 35, 24, 0.12);
+  color: #b42318;
+}
+
+.canary-stage__skip {
+  margin: 0.5rem 0;
+  font-style: italic;
+  opacity: 0.85;
+}
+
+.canary-stage__actions {
+  margin-top: 0.75rem;
+}
+
+.canary-commands {
+  margin: 0.5rem 0;
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  background: rgba(127, 127, 127, 0.12);
+  font-size: 0.85rem;
+  white-space: pre;
+}
+
+.canary-evidence {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0.75rem 0;
+  font-size: 0.9rem;
+}
+
+.canary-evidence > div {
+  display: contents;
+}
+
+.canary-evidence dt {
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.canary-evidence dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+}
+
+.tone--ok {
+  color: #1a7f37;
+}
+
+.tone--warn {
+  color: #9a6700;
+}
+
+.tone--bad {
+  color: #b42318;
+}
+
+.tone--muted {
+  opacity: 0.7;
+}
+
+.canary-confirm {
+  margin: 0.75rem 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border, #d0d0d0);
+  border-radius: 8px;
+}
+
+.canary-confirm--irreversible {
+  border-color: #b42318;
+  background: rgba(180, 35, 24, 0.06);
+}
+
+.canary-confirm__warning {
+  margin: 0.4rem 0;
+  color: #b42318;
+  font-weight: 600;
+}
+
+.canary-confirm__state {
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.canary-attest,
+.canary-approval,
+.canary-skip {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--border, #d0d0d0);
+}
+
+.canary-attest__note {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: #9a6700;
+}
+
+.canary-approval__ack {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.canary-approval__blocked {
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  color: #9a6700;
+}
+
+@media (max-width: 640px) {
+  .canary-evidence {
+    grid-template-columns: 1fr;
+  }
+
+  .canary-evidence > div {
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+
+  .canary-summary {
+    position: static;
+  }
+}

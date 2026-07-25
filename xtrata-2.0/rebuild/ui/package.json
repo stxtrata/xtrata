@@ -1,0 +1,40 @@
+{
+  "name": "@xtrata/collections-ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Xtrata Collections & Drops v3 browser app — Collection Studio, Drop Builder and Deployment Canary entries on one Vite MPA.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@stacks/auth": "^7.0.6",
+    "@stacks/connect": "^7.10.1",
+    "@stacks/connect-ui": "6.5.0",
+    "@stacks/network": "^7.5.0",
+    "@stacks/transactions": "^7.5.0",
+    "@stacks/transactions-v6": "npm:@stacks/transactions@^6.16.0",
+    "@xtrata/collections-client": "file:../client",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.5.0",
+    "@testing-library/react": "^16.0.1",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "jsdom": "^25.0.1",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.8",
+    "vitest": "^2.1.2"
+  }
+}
