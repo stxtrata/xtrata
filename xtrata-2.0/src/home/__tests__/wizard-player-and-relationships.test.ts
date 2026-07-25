@@ -94,4 +94,16 @@ describe('SUNO relationships', () => {
     expect(suno).toContain('SERVER.parentWindowMs');
     expect(suno).toContain('was not declared as a parent');
   });
+
+  it('sends the parent to the right contract, and reattaches a stranded job', () => {
+    // job.core is the contract NAME only; splitting it handed the name in as the
+    // address and the wallet rejected it ("Invalid c32 address: must start with S").
+    expect(suno).toContain('async function sendParentCoreId()');
+    expect(suno).toContain('A.parentInfo(JOB.jobId)');
+    expect(suno).not.toContain("const core=String(JOB.core||'').split('.')");
+    expect(suno).toContain('could not resolve the Xtrata contract address');
+    // A funded job still waiting for its parent is stranded with real STX on the
+    // burner — the resume path has to pick it up, not just AWAITING_DEPOSIT.
+    expect(suno).toContain("(jobs||[]).find(j=>j.status==='AWAITING_PARENT')");
+  });
 });

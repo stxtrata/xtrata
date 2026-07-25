@@ -303,7 +303,7 @@ async function payWallet(addr, ustx){ const w=xw();
   await w.pay({ recipient:addr, amount:String(ustx), network:(SERVER.net==='testnet'?'testnet':'mainnet') }); }
 
 // ---- health ----
-(async()=>{ try{ const h=await api('/api/health'); SERVER.mock=!!h.mock; SERVER.net=h.net||'mainnet'; SERVER.parentWindowMs=h.parentWindowMs||900000;
+(async()=>{ try{ const h=await api('/api/health'); SERVER.mock=!!h.mock; SERVER.net=h.net||'mainnet'; SERVER.parentWindowMs=h.parentWindowMs||900000; SERVER.deployer=h.deployer||null;
   $('#health').className='pill '+(h.mock?'mock':'live'); $('#health').textContent=(h.mock?'MOCK':'LIVE')+' · '+SERVER.net+' · agent '+(window.XAO_AGENT_BUILD||'pre-v');
   checkAgentBuild();
 }catch(e){ $('#health').textContent='agent not loaded'; $('#health').style.color='var(--bad)'; } updateGo(); })();
@@ -590,6 +590,17 @@ function renderEscrow(job, status){
     +((job.status==='AWAITING_PARENT'&&job.fundedAt&&SERVER.parentWindowMs)?(' If it has not arrived by '+new Date(Date.parse(job.fundedAt)+SERVER.parentWindowMs).toLocaleTimeString()+', the job cancels itself and returns your deposit.'):'')
     +'</div>';
 }
+// "ADDRESS.name" for the Xtrata core, in the order we can most trust it:
+// parentInfo() reports the deployer the job actually used, health is the same
+// agent's own config, and the literal is the mainnet deployer as a last resort.
+async function sendParentCoreId(){
+  try{
+    const A=window.XtrataAgent;
+    if(A&&A.parentInfo&&JOB){ const r=await A.parentInfo(JOB.jobId); if(r&&r.core&&r.core.includes('.')) return String(r.core); }
+  }catch(_e){}
+  if(SERVER.deployer&&JOB&&JOB.core) return SERVER.deployer+'.'+JOB.core;
+  return 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.'+((JOB&&JOB.core)||'xtrata-v3-2-3');
+}
 // Recipient is HARD-CODED to this job's deposit wallet — the parent can never be
 // sent somewhere it cannot be recovered from.
 async function sendParentNow(pid){
@@ -599,8 +610,12 @@ async function sendParentNow(pid){
   if(!JOB){ return; }
   PARENT_MSG={text:'Waiting for wallet confirmation…'};
   try{
-    const core=String(JOB.core||'').split('.');
-    const r=await w.sendInscription({ contractAddress:core[0]||'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', contractName:core[1]||'xtrata-v3-2-3',
+    // job.core is the contract NAME only ("xtrata-v3-2-3"). The fully-qualified
+    // "ADDRESS.name" comes from parentInfo() — splitting job.core handed the name
+    // in as the address, which the wallet rejected as an invalid c32 address.
+    const core=(await sendParentCoreId()).split('.');
+    if(!/^S[PTMN][0-9A-HJKMNP-Z]{37,41}$/.test(core[0]||'')) throw new Error('could not resolve the Xtrata contract address for this transfer');
+    const r=await w.sendInscription({ contractAddress:core[0], contractName:core[1]||'xtrata-v3-2-3',
       tokenId:pid, sender:WALLET, recipient:JOB.depositAddress, network:SERVER.net||'mainnet' });
     PARENT_MSG={text:'✓ Parent #'+esc(pid)+' transfer submitted'+(r&&r.txId?(' · '+esc(String(r.txId).slice(0,10))+'…'):'')+' — it will show as arrived once confirmed.'};
     delete PARENT_OWNER[pid];
@@ -653,6 +668,13 @@ window.sunoRecover=sunoRecover;
   const live=(jobs||[]).find(j=>j.fastTrack&&['FUNDED','INSCRIBING','INSCRIBED','DELIVERING'].includes(j.status));
   if(live){ JOB=live; $('#go').disabled=true;
     setProg('Resuming your inscription from where it stopped — no chunks are re-uploaded…', ['pay']);
+    startPoll(); return; }
+  // A job that is funded but still waiting for its parent is stranded in exactly
+  // the same way — the burner holds real STX. Reattach it so the escrow checklist
+  // comes back (send the parent, or watch the automatic refund land).
+  const parentWait=(jobs||[]).find(j=>j.status==='AWAITING_PARENT');
+  if(parentWait){ JOB=parentWait; $('#go').disabled=true;
+    setProg('Deposit received ✓ — this job is still waiting for its parent inscription.', ['pay']);
     startPoll(); return; }
   const rec=(jobs||[]).find(j=>j.status==='NEEDS_RECOVERY');
   if(rec){ $('#hint').innerHTML='<span class="err">↻ A previous run stopped ('+esc(rec.progress||rec.error||'interrupted')+') — your funds are safe on its one-shot wallet.</span> '
