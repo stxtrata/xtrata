@@ -72,8 +72,13 @@ async function ro(fn: string, args: any[] = []) {
 // fee cap of 0, so every estimate looked like a spike and the fallback broadcast a
 // 0 µSTX fee that the node rejected as FeeTooLow. Throw instead; callers already
 // treat a throw as transient and retry.
+// v2, deliberately. Hiro has DEPRECATED /extended/v1/address/:addr/stx and now
+// throttles it hard regardless of the API key — measured 10/10 429s on a burst
+// through our keyed proxy, each carrying "Please update to the v2 endpoint". The
+// key was never the problem; the endpoint was. Same response shape, so this is a
+// drop-in swap. /extended/v2/addresses/:addr/balances/stx returned 10/10 200.
 async function balance(addr: string): Promise<bigint> {
-  const r = await hfetch(`/extended/v1/address/${addr}/stx`);
+  const r = await hfetch(`/extended/v2/addresses/${addr}/balances/stx`);
   if (!r.ok) throw new Error(`balance lookup failed (HTTP ${r.status})`);
   const d: any = await r.json();
   if (d == null || d.balance == null) throw new Error('balance lookup returned no balance');
@@ -426,16 +431,25 @@ ${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
 // Deposit addresses are public — a 1 µSTX dust tx must never claim fast-track delivery + refunds.
 async function detectFunder(addr: string): Promise<string | null> {
   const top = (m: Map<string, bigint>) => { let best: string | null = null, bestAmt = -1n; for (const [k, v] of m) if (v > bestAmt) { best = k; bestAmt = v; } return best; };
+  // /transactions FIRST. stx_inbound is throttled alongside the deprecated balance
+  // endpoint (measured 10/10 429s on a burst through our keyed proxy), which is why
+  // "could not determine the paying address" kept firing on wallets whose payment was
+  // plainly on chain. /transactions measured 10/10 200s, so it leads now and
+  // stx_inbound is only the backstop.
   try {
-    const d: any = await (await hfetch(`/extended/v1/address/${addr}/stx_inbound?limit=50`)).json();
+    const r = await hfetch(`/extended/v1/address/${addr}/transactions?limit=50`);
+    if (!r.ok) throw new Error(`tx list ${r.status}`);
+    const d: any = await r.json();
     const totals = new Map<string, bigint>();
-    for (const r of (d.results || [])) { const a = BigInt(r.amount || '0'); if (r.sender && a > 0n) totals.set(r.sender, (totals.get(r.sender) || 0n) + a); }
+    for (const e of (d.results || [])) { const tx = e.tx || e; if (tx.token_transfer && tx.token_transfer.recipient_address === addr && tx.sender_address) { const a = BigInt(tx.token_transfer.amount || '0'); if (a > 0n) totals.set(tx.sender_address, (totals.get(tx.sender_address) || 0n) + a); } }
     if (totals.size) return top(totals);
   } catch {}
   try {
-    const d: any = await (await hfetch(`/extended/v1/address/${addr}/transactions?limit=50`)).json();
+    const r = await hfetch(`/extended/v1/address/${addr}/stx_inbound?limit=50`);
+    if (!r.ok) throw new Error(`stx_inbound ${r.status}`);
+    const d: any = await r.json();
     const totals = new Map<string, bigint>();
-    for (const r of (d.results || [])) { const tx = r.tx || r; if (tx.token_transfer && tx.token_transfer.recipient_address === addr && tx.sender_address) { const a = BigInt(tx.token_transfer.amount || '0'); if (a > 0n) totals.set(tx.sender_address, (totals.get(tx.sender_address) || 0n) + a); } }
+    for (const e of (d.results || [])) { const a = BigInt(e.amount || '0'); if (e.sender && a > 0n) totals.set(e.sender, (totals.get(e.sender) || 0n) + a); }
     if (totals.size) return top(totals);
   } catch {}
   return null;

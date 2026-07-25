@@ -295,7 +295,10 @@ const estimateBuyFee = async (env: SponsorEnv): Promise<bigint> => {
 };
 
 const getBalance = async (env: SponsorEnv, address: string): Promise<bigint> => {
-  const result = await hiroJson<{ balance?: unknown }>(env, `/extended/v1/address/${address}/stx`);
+  // v2: Hiro deprecated /extended/v1/address/:addr/stx and throttles it regardless
+  // of the API key, so the relayer's own balance check was liable to fail under load
+  // and block sponsored claims. Same response shape.
+  const result = await hiroJson<{ balance?: unknown }>(env, `/extended/v2/addresses/${address}/balances/stx`);
   if (typeof result.balance !== 'string' || !/^\d+$/.test(result.balance)) {
     throw new Error('Hiro balance response is missing a decimal balance');
   }

@@ -53,3 +53,29 @@ describe('a failed balance read never looks like an empty wallet', () => {
     expect(bundle).toContain('could not read the deposit balance');
   });
 });
+
+// Measured through our own keyed proxy (7 keys configured, key confirmed applied),
+// 10 concurrent requests per endpoint:
+//   /extended/v1/address/:addr/stx          → 10/10 429 "Please update to the v2 endpoint"
+//   /extended/v1/address/:addr/stx_inbound  → 10/10 429
+//   /extended/v2/addresses/:addr/balances/stx → 10/10 200
+//   nonces, transactions, mempool, nft/holdings → 10/10 200
+// The API key does not exempt a deprecated endpoint from throttling.
+describe('deprecated Hiro endpoints are not on the hot path', () => {
+  it('reads balances from v2', () => {
+    expect(agentSource).toContain('/extended/v2/addresses/${addr}/balances/stx');
+    expect(agentSource).not.toContain('/extended/v1/address/${addr}/stx`');
+  });
+
+  it('detects the funder via the endpoint that is not throttled', () => {
+    const detect = agentSource.slice(
+      agentSource.indexOf('async function detectFunder'),
+      agentSource.indexOf('async function resolveFunder')
+    );
+    // /transactions leads; stx_inbound is only the backstop.
+    expect(detect.indexOf('/transactions?limit=50')).toBeLessThan(detect.indexOf('/stx_inbound?limit=50'));
+    // Both now check r.ok, so a 429 is a failure rather than an empty result set.
+    expect(detect).toContain('if (!r.ok) throw new Error(`tx list ${r.status}`)');
+    expect(detect).toContain('if (!r.ok) throw new Error(`stx_inbound ${r.status}`)');
+  });
+});
