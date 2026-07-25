@@ -1,0 +1,1097 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Proof of Free V3 — Free Drop Canary</title>
+<style>
+  :root { --mint:#3ad29f; --orange:#ff6a00; --blue:#38a0ff; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: radial-gradient(circle at 50% 0, #0d151a, #060709 46%, #040406); color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  body { max-width: 900px; margin: 0 auto; padding: 18px; }
+  h1 { font-size: 15px; letter-spacing: .14em; font-weight: 700; margin: 0; }
+  .sub { font-size: 11px; opacity: .6; margin: 4px 0 16px; line-height: 1.5; }
+  .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .bar .grow { flex: 1; }
+  button, select, input { background: #131318; color: #fff; border: 1px solid #2c2c36; border-radius: 8px; padding: 8px 11px; font: inherit; font-size: 12px; }
+  button { cursor: pointer; transition: border-color .12s, background .12s; }
+  button:hover:not(:disabled) { border-color: var(--mint); }
+  button:disabled { opacity: .4; cursor: default; }
+  button.primary { border-color: var(--mint); color: #051; background: var(--mint); font-weight: 700; }
+  button.danger { border-color: #7a2f2f; color: #ffb4ac; }
+  button.link { border-color: #3a3a70; color: #b9b6ff; }
+  input { width: 100%; }
+  .note { font-size: 10px; opacity: .62; line-height: 1.45; margin-top: 7px; }
+  .addr { font-size: 11px; opacity: .8; }
+  .net { display: flex; border: 1px solid #2c2c36; border-radius: 8px; overflow: hidden; }
+  .net button { border: none; border-radius: 0; padding: 8px 12px; background: #0d2b23; color: #9dffd9; }
+  .step { border: 1px solid #23232c; border-radius: 12px; padding: 14px; margin-bottom: 10px; background: #0b0b10; }
+  .step.done { border-color: #1d5a45; }
+  .step.locked { opacity: .5; }
+  .step h2 { font-size: 13px; margin: 0 0 2px; display: flex; align-items: center; gap: 8px; }
+  .num { display: inline-flex; width: 20px; height: 20px; border-radius: 50%; border: 1px solid #3a3a44; align-items: center; justify-content: center; font-size: 10px; }
+  .step.done .num { background: var(--mint); color: #051; border-color: var(--mint); }
+  .badge { margin-left: auto; font-size: 9px; letter-spacing: .1em; padding: 3px 7px; border-radius: 20px; border: 1px solid #3a3a44; opacity: .8; }
+  .step.done .badge { color: #9dffd9; border-color: #1d5a45; }
+  .desc { font-size: 11px; opacity: .75; line-height: 1.5; margin: 6px 0 10px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+  .row .lbl { font-size: 10px; opacity: .55; min-width: 96px; }
+  .val { font-size: 11px; color: #a8e6ff; word-break: break-all; }
+  .verify { font-size: 11px; margin-top: 8px; opacity: .9; line-height: 1.5; }
+  .ok { color: var(--mint); } .err { color: #ff8f83; } .warn { color: #ffd479; }
+  pre { background: #07141c; border: 1px solid #204050; border-radius: 8px; padding: 10px; font-size: 10px; overflow: auto; color: #cfe; max-height: 260px; }
+  .panel { border: 1px solid #23232c; border-radius: 12px; padding: 14px; margin-top: 16px; background: #0b0b10; }
+  .panel h3 { font-size: 11px; letter-spacing: .12em; opacity: .6; margin: 0 0 8px; }
+  #log { font-size: 10px; opacity: .7; white-space: pre-wrap; max-height: 180px; overflow: auto; margin-top: 8px; }
+  a { color: #b9b6ff; }
+  .prog { height: 6px; border-radius: 4px; background: #1a1a22; overflow: hidden; margin: 8px 0; }
+  .prog i { display: block; height: 100%; background: var(--mint); }
+  table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 8px; }
+  td { padding: 3px 6px; border-bottom: 1px solid #1a1a22; }
+  td.n { color: #a8e6ff; width: 34px; }
+  td.s { text-align: right; opacity: .7; }
+  .rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 10px; }
+  .rule { border: 1px solid #23232c; border-radius: 8px; padding: 8px 10px; }
+  .rule b { display: block; font-size: 10px; letter-spacing: .1em; opacity: .55; }
+  .rule span { font-size: 12px; color: var(--mint); }
+</style>
+</head>
+<body>
+  <h1>PROOF OF FREE V3 · FREE DROP CANARY</h1>
+  <div class="sub">
+    Creates one sponsored free-claim campaign on <b>xtrata-drops-v1-1</b> and escrows all 33 editions into it.
+    Claims are free to the claimer, one per wallet, one per BNS name, BNS required.
+  </div>
+
+  <div class="bar">
+    <div class="net"><button>mainnet</button></div>
+    <div class="grow"></div>
+    <span class="addr" id="who">not connected</span>
+    <button id="connect">connect wallet</button>
+  </div>
+
+  <div id="steps"></div>
+
+  <div class="panel">
+    <h3>STATE</h3>
+    <div id="stateView" class="val"></div>
+    <div class="row">
+      <button id="exportState">export</button>
+      <button id="resetState" class="danger">reset progress</button>
+    </div>
+    <pre id="cfgOut" style="display:none"></pre>
+  </div>
+
+  <div class="panel"><h3>LOG</h3><div id="log"></div></div>
+
+<script type="module">
+
+/* ---- what this canary configures ---- */
+const NETWORK = 'mainnet';
+const XTRATA_ADDRESS = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
+const CORE_NAME = 'xtrata-v3-2-3';
+const DROPS_NAME = 'xtrata-drops-v1-1';
+const CORE_CONTRACT = `${XTRATA_ADDRESS}.${CORE_NAME}`;
+const DROPS_CONTRACT = `${XTRATA_ADDRESS}.${DROPS_NAME}`;
+
+const ENGINE_INSCRIPTION = 2839;      // the v3 recursive engine, parent of all 33
+const SUPPLY = 33;
+const FEE_BUDGET = 100000;            // 0.1 STX per drop; MIN-FEE-BUDGET is 50000
+const MIN_FEE_BUDGET = 50000;
+const CLAIM_CAP = 2000000;
+
+// The campaign rules you asked for. create-campaign asserts that one-per-bns
+// implies require-bns, so these three cannot be set inconsistently.
+const RULES = Object.freeze({ onePerWallet: true, requireBns: true, onePerBns: true });
+
+const TITLES = ["First Light","Free Passage","No Toll","Clear Threshold","Open Circuit","Zero Barrier","Unlocked Field","Common Key","Public Door","The Bare Minimum","The Way Through","Open Signal","Free Frequency","Unmetered","Clear Channel","No Interference","One Pulse","Public Wave","Silent Charge","Released Current","Zero Noise","Broadcast Free","One Name","Named Light","Public Key","Unbound Mark","Open Signature","Free State","Known Here","No Alias","Single Claim","Proof Held","Proof of Free"];
+const ENGINE_FILE = 'proof-of-free-recursive-engine-v3.html';
+const CHUNK_SIZE = 16384;
+const pad2 = n => String(n).padStart(2, '0');
+const EXPLORER = txid => `https://explorer.hiro.so/txid/${txid}?chain=mainnet`;
+const HIRO = 'https://api.mainnet.hiro.so';
+
+// Identical to scripts/build-collection.mjs and the inscription canary. Used to
+// derive each edition's content hash so its token id can be read from the chain.
+function wrapperHtml(n, engineUrl){
+  return '<!doctype html><meta name=viewport content="width=device-width,initial-scale=1">'
+    + '<style>*{margin:0}iframe{border:0;width:100vw;height:100vh;display:block}</style>'
+    + `<iframe id=i allow=autoplay title="Proof of Free #${pad2(n)} — ${TITLES[n-1]}"></iframe>`
+    + `<script>i.src=(location.protocol=="file:"?"../artifacts/${ENGINE_FILE}":${JSON.stringify(engineUrl)})+"#${n}"<\/script>`;
+}
+
+const $ = id => document.getElementById(id);
+const log = m => { const el = $('log'); el.textContent = `[${new Date().toISOString().slice(11,19)}] ${m}\n` + el.textContent; };
+
+/* ---- wallet layer (inlined) ----
+ * Ported verbatim from the inscription canary, which came from the Living Synth
+ * v5 canary and ultimately the main Xtrata app (src/lib/wallet/connect.ts).
+ * Inlined rather than imported so this page is standalone: it works served from
+ * any directory, or opened on its own. Do not "simplify" any of it — every
+ * branch is a real wallet quirk diagnosed against a shipping build.
+ */
+function isMainnetStacksAddress(address){
+  if (typeof address !== 'string' || !/^(SP|SM)[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26,39}$/.test(address)) return false;
+  return validateAddress ? validateAddress(address) : true;
+}
+// Chain libs load on demand — the page renders offline; the wallet only loads
+// when you act. Versions are pinned: the wallet layer below is written against
+// these exact APIs and an open range would silently change provider behaviour.
+const LIB = {
+  connect: 'https://esm.sh/@stacks/connect@8.2.6',
+  connectUi: 'https://esm.sh/@stacks/connect-ui@8.1.2',
+  connectUiLoader: 'https://esm.sh/@stacks/connect-ui@8.1.2/loader',
+  transactions: 'https://esm.sh/@stacks/transactions@7.4.0'
+};
+let _sdk = null;
+async function sdk(){
+  if (!_sdk) {
+    const [c, ui, loader, t] = await Promise.all([
+      import(LIB.connect), import(LIB.connectUi), import(LIB.connectUiLoader), import(LIB.transactions)
+    ]);
+    _sdk = {
+      DEFAULT_PROVIDERS: c.DEFAULT_PROVIDERS,
+      disconnect: c.disconnect,
+      clearLocalStorage: c.clearLocalStorage,
+      getLocalStorage: c.getLocalStorage,
+      getSelectedProviderId: ui.getSelectedProviderId,
+      setSelectedProviderId: ui.setSelectedProviderId,
+      clearSelectedProviderId: ui.clearSelectedProviderId,
+      getProviderFromId: ui.getProviderFromId,
+      defineCustomElements: loader.defineCustomElements,
+      Cl: t.Cl,
+      fetchCallReadOnlyFunction: t.fetchCallReadOnlyFunction,
+      cvToJSON: t.cvToJSON,
+      validateStacksAddress: t.validateStacksAddress
+    };
+    validateAddress = t.validateStacksAddress;
+  }
+  return _sdk;
+}
+// Upgraded to the real c32 checksum test as soon as @stacks/transactions loads.
+let validateAddress = null;
+
+/* ---- wallet layer, ported from the main Xtrata app (src/lib/wallet/connect.ts) ---- */
+
+// This page may be viewed inside an iframe. Wallet extensions inject their
+// providers into the TOP window only, while @stacks/connect ships an Asigna
+// shim that defines window.AsignaProvider inside EVERY iframe — so detecting
+// against the local window lists Asigna as the only "installed" wallet and
+// hides Leather/Xverse. All detection goes through the top same-origin window
+// when one exists; cross-origin embeds fall back to the local window.
+function walletHostWindow(){
+  try {
+    const top = window.top;
+    if (top && top !== window.self && top.location.origin === window.location.origin) return top;
+  } catch { /* cross-origin parent: its providers are unreachable */ }
+  return window;
+}
+function resolveProviderOnWindow(win, id){
+  if (!win || !id) return undefined;
+  return id.split('.').reduce((acc, part) => acc?.[part], win);
+}
+// connect-ui only reads webbtc_stx_providers / wbip_providers, while current
+// Xverse builds register their WBIP provider in btc_providers (some releases
+// used webbtc_providers). Merge all four so the chooser sees what is injected.
+function registeredProviders(win){
+  if (!win) return [];
+  const merged = [
+    ...(win.btc_providers ?? []), ...(win.wbip_providers ?? []),
+    ...(win.webbtc_providers ?? []), ...(win.webbtc_stx_providers ?? [])
+  ];
+  return merged.filter((entry, i) => Boolean(entry?.id) && merged.findIndex(c =>
+    c.id === entry.id || (c.name && entry.name && c.name.toLowerCase() === entry.name.toLowerCase())) === i);
+}
+const isLeatherProviderId = id => typeof id === 'string' && id.toLowerCase().includes('leather');
+const isXverseProviderId = id => typeof id === 'string' && id.toLowerCase().includes('xverse');
+function isRegisteredXverseProviderId(id){
+  return !!id && registeredProviders(walletHostWindow()).some(e =>
+    e.id === id && (isXverseProviderId(e.id) || e.name?.toLowerCase().includes('xverse')));
+}
+const XVERSE_RPC_IDS = ['XverseProviders.BitcoinProvider', 'xverseProviders.BitcoinProvider', 'BitcoinProvider'];
+function xverseRpcProvider(){
+  const host = walletHostWindow();
+  const ids = registeredProviders(host)
+    .filter(e => isXverseProviderId(e.id) || e.name?.toLowerCase().includes('xverse'))
+    .map(e => e.id)
+    .concat(XVERSE_RPC_IDS);
+  for (const id of ids) {
+    const p = resolveProviderOnWindow(host, id) ?? (host === window ? undefined : resolveProviderOnWindow(window, id));
+    if (typeof p?.request === 'function') return p;
+  }
+  return undefined;
+}
+// The chooser still persists XverseProviders.StacksProvider, but current Xverse
+// exposes only BitcoinProvider. Treat the old id as an alias for the real
+// request bridge instead of falling through to window.StacksProvider's stub.
+async function resolveProviderById(id){
+  if (!id) return undefined;
+  const { getProviderFromId } = await sdk();
+  const host = walletHostWindow();
+  const exact = resolveProviderOnWindow(host, id)
+    ?? (host === window ? undefined : resolveProviderOnWindow(window, id))
+    ?? getProviderFromId(id);
+  if (exact) return exact;
+  return (isXverseProviderId(id) || isRegisteredXverseProviderId(id)) ? xverseRpcProvider() : undefined;
+}
+function installedProvidersOnHost(defaults){
+  const host = walletHostWindow();
+  const registered = registeredProviders(host);
+  return registered.concat(defaults.filter(d =>
+    !registered.find(e => e.id === d.id) && !!resolveProviderOnWindow(host, d.id)));
+}
+async function selectedProviderId(){ return (await sdk()).getSelectedProviderId(); }
+async function getStacksProvider(){
+  const selected = await resolveProviderById(await selectedProviderId());
+  if (selected) return selected;
+  const w = walletHostWindow();
+  return w.LeatherProvider ?? w.XverseProviders?.StacksProvider ?? w.xverseProviders?.StacksProvider
+    ?? xverseRpcProvider() ?? w.StacksProvider ?? w.BlockstackProvider;
+}
+async function isSelectedXverse(provider){
+  const id = await selectedProviderId();
+  if (isXverseProviderId(id) || isRegisteredXverseProviderId(id)) return true;
+  const w = walletHostWindow();
+  return provider === w.XverseProviders?.StacksProvider || provider === w.xverseProviders?.StacksProvider
+    || provider === xverseRpcProvider();
+}
+
+// Drive connect-ui's chooser ourselves so installedProviders comes from the
+// host window rather than this frame.
+async function selectProvider(){
+  const { DEFAULT_PROVIDERS, defineCustomElements, setSelectedProviderId } = await sdk();
+  defineCustomElements(window);
+  const chosenId = await new Promise(resolve => {
+    const modal = document.createElement('connect-modal');
+    const overflow = document.body.style.overflow;
+    const cleanup = () => { document.body.style.overflow = overflow; document.removeEventListener('keydown', onKey); modal.remove(); };
+    const onKey = e => { if (e.key === 'Escape') { cleanup(); resolve(null); } };
+    modal.defaultProviders = DEFAULT_PROVIDERS;
+    modal.installedProviders = installedProvidersOnHost(DEFAULT_PROVIDERS);
+    modal.persistSelection = false; // persisted below, against the host-resolved provider
+    modal.callback = sel => { cleanup(); resolve(typeof sel === 'string' ? sel : null); };
+    modal.cancelCallback = () => { cleanup(); resolve(null); };
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(modal);
+  });
+  if (!chosenId) return null;
+  const provider = await resolveProviderById(chosenId);
+  if (provider) { try { setSelectedProviderId(chosenId); } catch {} }
+  log(`provider selected ${chosenId}${provider ? '' : ' (could not resolve — is the wallet unlocked?)'}`);
+  return provider ?? null;
+}
+
+/* ---- provider request plumbing ---- */
+function providerError(value){
+  if (value instanceof Error) return value;
+  const c = value && typeof value === 'object' ? value : {};
+  const nested = c.error && typeof c.error === 'object' ? c.error : null;
+  const err = new Error(String(nested?.message || c.message || c.error || value || 'wallet request failed'));
+  err.code = nested?.code ?? c.code;
+  return err;
+}
+function unwrapResponse(response){
+  if (response && typeof response === 'object') {
+    if (response.error) throw providerError(response);
+    if (response.status === 'error') throw providerError(response.result ?? response);
+  }
+  return response;
+}
+async function providerRequest(provider, method, params){
+  if (typeof provider?.request !== 'function') throw new Error(`wallet has no request("${method}") bridge`);
+  try { return unwrapResponse(await provider.request(method, params)); }
+  catch (e) { throw providerError(e); }
+}
+// Xverse account permission lives on the BitcoinProvider object that answered
+// wallet_connect — keep every later call on that same bridge.
+async function walletRpc(provider, method, params){
+  if (!(await isSelectedXverse(provider))) return providerRequest(provider, method, params);
+  const rpc = xverseRpcProvider();
+  if (!rpc) throw Object.assign(new Error('Xverse request provider is not available'), { code:'XVERSE_RPC_UNAVAILABLE' });
+  try { return unwrapResponse(await rpc.request(method, params)); }
+  catch (e) { throw providerError(e); }
+}
+function isMethodUnsupported(error){
+  const msg = String(error?.message ?? error ?? '').toLowerCase();
+  return error?.code === -32601 || ['method not found','not supported','unsupported','not available',
+    'not implemented','request function is not implemented'].some(s => msg.includes(s));
+}
+function isUserCancelled(error){
+  if (error?.code === 4001 || error?.code === -31001) return true;
+  const msg = String(error?.message ?? error ?? '').trim().toLowerCase();
+  return /\buser (?:cancelled|canceled|rejected|denied|closed)\b/.test(msg)
+    || /\b(?:cancelled|canceled|rejected|denied) by (?:the )?user\b/.test(msg)
+    || msg === 'cancelled' || msg === 'canceled';
+}
+// Connect responses differ per wallet and per method (getAddresses, wallet_connect,
+// stx_getAccounts, wallet_getAccount all nest the address differently), so walk
+// the payload instead of guessing one shape. Bitcoin addresses fail the c32 test.
+function collectStacksAddresses(payload, out = [], depth = 0){
+  if (depth > 8 || payload === null || typeof payload === 'undefined') return out;
+  if (typeof payload === 'string') {
+    const t = payload.trim();
+    if (isMainnetStacksAddress(t) && !out.includes(t)) out.push(t);
+    return out;
+  }
+  if (Array.isArray(payload)) { payload.forEach(e => collectStacksAddresses(e, out, depth + 1)); return out; }
+  if (typeof payload !== 'object') return out;
+  for (const key of ['address','stxAddress','selectedAddress','identityAddress','mainnet',
+    'addresses','accounts','result','data','payload','response','profile','userData']) {
+    if (key in payload) collectStacksAddresses(payload[key], out, depth + 1);
+  }
+  return out;
+}
+function extractSupportedMethods(payload, depth = 0){
+  if (depth > 5 || !payload) return [];
+  if (Array.isArray(payload)) return [...new Set(payload.filter(v => typeof v === 'string'))];
+  if (typeof payload !== 'object') return [];
+  for (const key of ['supportedMethods','methods','result','data']) {
+    if (key in payload) { const m = extractSupportedMethods(payload[key], depth + 1); if (m.length) return m; }
+  }
+  return [];
+}
+// Wallets disagree on the connect method: Xverse only answers wallet_connect /
+// stx_getAccounts / wallet_getAccount, Leather documents getAddresses. A single
+// hard-coded getAddresses fails outright on anything that doesn't advertise it.
+async function connectAttempts(provider){
+  if (await isSelectedXverse(provider)) return ['wallet_connect','stx_getAccounts','wallet_getAccount'];
+  const leatherMethods = ['getAddresses','stx_getAccounts','stx_getAddresses','stx_requestAccounts','wallet_connect'];
+  if (!isLeatherProviderId(await selectedProviderId())) {
+    return ['wallet_connect','stx_requestAccounts','connect','getAddresses','stx_getAddresses',
+      'stx_getAccounts','getAccounts','wallet_getAccount','requestAccounts'];
+  }
+  try {
+    const supported = extractSupportedMethods(await providerRequest(provider, 'supportedMethods'));
+    log(`leather advertises: ${supported.join(', ') || 'nothing'}`);
+    const advertised = leatherMethods.filter(m => supported.includes(m));
+    return advertised.length ? advertised : leatherMethods;
+  } catch { return leatherMethods; } // capability discovery is advisory
+}
+async function connectViaRequest(provider){
+  // Xverse only shows its account chooser on a FRESH wallet_connect — while a
+  // per-origin permission exists it silently reuses the approved account.
+  if (await isSelectedXverse(provider)) {
+    try { await walletRpc(provider, 'wallet_disconnect'); } catch { /* older builds */ }
+  }
+  let lastError = null;
+  for (const method of await connectAttempts(provider)) {
+    try {
+      const addresses = collectStacksAddresses(await walletRpc(provider, method));
+      if (addresses.length) { log(`connected via ${method}`); return addresses; }
+      log(`${method} returned no Stacks mainnet address`);
+    } catch (e) {
+      lastError = e;
+      if (isUserCancelled(e)) return [];
+      if (isMethodUnsupported(e)) { log(`${method} unsupported, trying next`); continue; }
+      throw e;
+    }
+  }
+  if (lastError) throw lastError;
+  return [];
+}
+
+/* ---- Xverse signing session ---- */
+// Xverse tracks the dapp connection per injected provider and per browsing
+// session, and its mobile in-app browser starts a fresh session each visit. A
+// signing request made without an active wallet_connect for this origin is
+// rejected before any confirmation UI.
+const XVERSE_ACCOUNT_CACHE_MS = 45_000;
+const XVERSE_READ_TIMEOUT_MS = 30_000;
+const XVERSE_SIGNING_WATCHDOG_MS = 120_000;
+let xverseAccount = null;
+const rememberXverseAccount = a => { if (a) xverseAccount = { address:a, at:Date.now() }; };
+const clearXverseAccountCache = () => { xverseAccount = null; };
+const readXverseAccountCache = () =>
+  xverseAccount && Date.now() - xverseAccount.at <= XVERSE_ACCOUNT_CACHE_MS ? xverseAccount.address : null;
+
+function withTimeout(promise, label, ms){
+  let timer;
+  return Promise.race([promise, new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Xverse did not answer ${label} within ${ms/1000}s`)), ms);
+  })]).finally(() => clearTimeout(timer));
+}
+// Xverse rejects with "Network mismatch" when its stored per-origin session was
+// created under a different network setting than the wallet's active network —
+// only the signing request exposes it. Drop the session, reconnect, retry once.
+const isNetworkMismatch = e => {
+  const m = String(e?.message ?? e ?? '').toLowerCase();
+  return m.includes('network mismatch') || (m.includes('mismatch') && m.includes('network'));
+};
+async function ensureXverseAccount(rpc, expected){
+  const assertExpected = (address, source) => {
+    if (expected && address !== expected) {
+      throw new Error(`Xverse active account ${address} (via ${source}) is not the connected ${expected}. Switch back to that account, or disconnect and reconnect.`);
+    }
+    return address;
+  };
+  const cached = readXverseAccountCache();
+  if (cached) return assertExpected(cached, 'cached-session');
+
+  let address = null;
+  try {
+    // Never probe with stx_getAccounts here: it opens a "Mismatched Network"
+    // prompt that gets rejected and surfaces to the user as "Network mismatch".
+    address = collectStacksAddresses(unwrapResponse(
+      await withTimeout(rpc.request('wallet_getAccount'), 'wallet_getAccount', XVERSE_READ_TIMEOUT_MS)))[0] || null;
+  } catch (e) {
+    if (isUserCancelled(e)) throw providerError(e);
+    log('xverse preflight: wallet_getAccount unavailable (' + (e.message||e) + ')');
+  }
+  if (address) { rememberXverseAccount(address); return assertExpected(address, 'wallet_getAccount'); }
+
+  const connected = collectStacksAddresses(unwrapResponse(await rpc.request('wallet_connect')))[0] || null;
+  if (!connected) throw new Error('Xverse did not return a Stacks account from wallet_connect');
+  rememberXverseAccount(connected);
+  return assertExpected(connected, 'wallet_connect');
+}
+async function requestXverseSigning(rpc, method, params, expected){
+  try { return unwrapResponse(await rpc.request(method, params)); }
+  catch (error) {
+    const failure = providerError(error);
+    if (!isNetworkMismatch(failure)) throw failure;
+    log('xverse network mismatch — refreshing the session and retrying once');
+    clearXverseAccountCache();
+    try { await rpc.request('wallet_disconnect'); } catch {}
+    const address = collectStacksAddresses(unwrapResponse(await rpc.request('wallet_connect')))[0] || null;
+    rememberXverseAccount(address);
+    if (!address || (expected && address !== expected)) {
+      throw new Error(address ? `Xverse reconnected as ${address}, not ${expected}` : failure.message);
+    }
+    return unwrapResponse(await rpc.request(method, params));
+  }
+}
+function extractTxid(payload, depth = 0){
+  if (depth > 6 || !payload) return null;
+  if (Array.isArray(payload)) { for (const e of payload) { const t = extractTxid(e, depth + 1); if (t) return t; } return null; }
+  if (typeof payload !== 'object') return null;
+  for (const key of ['txid','txId','transactionId']) {
+    if (typeof payload[key] === 'string' && payload[key].trim()) return payload[key].trim();
+  }
+  for (const key of ['result','data','payload','response','params']) {
+    if (key in payload) { const t = extractTxid(payload[key], depth + 1); if (t) return t; }
+  }
+  return null;
+}
+// Xverse validates stx_callContract against the sats-connect schema, which only
+// knows contract, functionName, functionArgs/arguments and the post conditions.
+// Out-of-spec fields are not ignored: an explicit network or sender is read as
+// "sign as this address/chain" and rejected before any confirmation UI. Sender
+// correctness is enforced by ensureXverseAccount instead.
+async function callContract(provider, { contractId, functionName, functionArgs, stxAddress }){
+  const { Cl } = await sdk();
+  const args = functionArgs.map(a => typeof a === 'string' ? a : Cl.serialize(a));
+  if (!(await isSelectedXverse(provider))) {
+    return extractTxid(await providerRequest(provider, 'stx_callContract', {
+      contract: contractId, functionName, functionArgs: args,
+      network: NETWORK, address: stxAddress, postConditionMode: 'allow'
+    }));
+  }
+  const rpc = xverseRpcProvider();
+  if (!rpc) throw Object.assign(new Error('Xverse request provider is not available'), { code:'XVERSE_RPC_UNAVAILABLE' });
+
+  // Xverse mobile can reject a request with only an in-app toast and leave the
+  // RPC promise pending forever. Track the stage so the timeout is diagnostic.
+  let stage = 'account-preflight';
+  const run = async () => {
+    const active = await ensureXverseAccount(rpc, stxAddress);
+    stage = 'stx_callContract';
+    return extractTxid(await requestXverseSigning(rpc, 'stx_callContract', {
+      contract: contractId, functionName, functionArgs: args,
+      // Older Xverse builds validate with a schema that reads only `arguments`
+      // and silently drop `functionArgs`; send both spellings.
+      arguments: args, postConditionMode: 'allow'
+    }, active));
+  };
+  return Promise.race([run(), new Promise((_, reject) => setTimeout(() => reject(new Error(
+    `Xverse did not answer the ${stage} request within ${XVERSE_SIGNING_WATCHDOG_MS/1000}s. If it showed an error toast, note the exact wording; if you approved, the transaction may still broadcast.`
+  )), XVERSE_SIGNING_WATCHDOG_MS))]);
+}
+
+
+// Full teardown so the next connect re-opens the chooser and Xverse re-prompts
+// for an account instead of silently reusing the approved one.
+async function clearWalletSession(){
+  const s = await sdk().catch(() => null);
+  if (!s) return;
+  const previousId = await selectedProviderId();
+  const provider = await resolveProviderById(previousId).catch(() => undefined);
+  if (provider && isLeatherProviderId(previousId)) {
+    for (const method of ['stx_disconnect','wallet_disconnect','disconnect','deactivate']) {
+      try { await providerRequest(provider, method); break; } catch { /* try the next */ }
+    }
+  }
+  try { s.disconnect(); } catch {}
+  try { s.clearLocalStorage(); } catch {}
+  try { s.clearSelectedProviderId(); } catch {}
+  clearXverseAccountCache();
+}
+
+let me = null;
+let walletAddresses = [];
+let campaignInfo = null;   // on-chain get-campaign result
+let sponsorInfo = null;
+let state = load();
+
+function keyFor(){ return 'pof-v3-drop-canary-mainnet'; }
+function blankState(){ return { campaign: null, campaignTx: null, tokens: {}, drops: {}, dropTx: {} }; }
+function load(){
+  try { return { ...blankState(), ...JSON.parse(localStorage.getItem(keyFor()) || '{}') }; }
+  catch { return blankState(); }
+}
+function save(){
+  try { localStorage.setItem(keyFor(), JSON.stringify(state)); } catch {}
+  render();
+}
+const engineUrl = () => `https://xtrata.xyz/i/${ENGINE_INSCRIPTION}`;
+const tokensKnown = () => Object.keys(state.tokens).length;
+const dropsDone = () => Object.keys(state.drops).length;
+// Same reservation rule as the inscription canary: an edition is off the table
+// once its drop is confirmed OR a transaction for it is in flight.
+const nextDrop = () => {
+  for (let n = 1; n <= SUPPLY; n++) {
+    if (!state.tokens[n]) continue;      // token id not resolved yet
+    if (state.drops[n] !== undefined) continue;
+    if (state.dropTx[n] !== undefined) continue;
+    return n;
+  }
+  return null;
+};
+const hasCampaign = () => Number.isInteger(state.campaign) && state.campaign >= 0;
+let inFlight = false;
+let autoRun = false;
+let autoMsg = '', syncMsg = '';
+function setAuto(msg, cls = ''){ autoMsg = cls ? `<span class="${cls}">${msg}</span>` : msg; render(); }
+function stopAuto(reason, cls = 'warn'){
+  if (!autoRun) return;
+  autoRun = false;
+  log('auto-run stopped: ' + reason);
+  setAuto('auto-run stopped — ' + reason, cls);
+}
+
+/* ---- hashing (to map editions -> inscription ids) ---- */
+const hex = u8 => [...u8].map(b => b.toString(16).padStart(2,'0')).join('');
+async function sha256(bytes){ return new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)); }
+async function chainHash(bytes){
+  let running = new Uint8Array(32);
+  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+    const c = bytes.subarray(i, i + CHUNK_SIZE);
+    const cat = new Uint8Array(running.length + c.length);
+    cat.set(running, 0); cat.set(c, running.length);
+    running = await sha256(cat);
+  }
+  return running;
+}
+
+/* ---- chain reads ---- */
+function unwrapUint(node, depth = 0){
+  if (depth > 8 || node === null || node === undefined) return null;
+  if (typeof node === 'number') return node;
+  if (typeof node === 'string') return /^\d+$/.test(node) ? Number(node) : null;
+  if (typeof node === 'object' && 'value' in node) return unwrapUint(node.value, depth + 1);
+  return null;
+}
+async function readOnly(contractName, fn, args = []){
+  const { fetchCallReadOnlyFunction, cvToJSON } = await sdk();
+  const cv = await fetchCallReadOnlyFunction({
+    contractAddress: XTRATA_ADDRESS, contractName,
+    functionName: fn, functionArgs: args,
+    senderAddress: XTRATA_ADDRESS, network: NETWORK
+  });
+  return cvToJSON(cv);
+}
+async function fetchTx(txid){
+  const res = await fetch(`${HIRO}/extended/v1/tx/${txid}`);
+  if (!res.ok) throw new Error(`tx lookup failed: HTTP ${res.status}`);
+  return res.json();
+}
+// A failed read must never read as "absent" — that is how a duplicate slips in.
+async function withRetry(label, fn, attempts = 4){
+  let last = null;
+  for (let i = 0; i < attempts; i++) {
+    if (i) await new Promise(r => setTimeout(r, 800 * i * i));
+    try { return await fn(); }
+    catch (e) { last = e; log(`${label} attempt ${i+1} failed: ${e.message||e}`); }
+  }
+  throw new Error(`${label} failed after ${attempts} attempts: ${last?.message || last}`);
+}
+async function tokenIdForEdition(n){
+  const { Cl } = await sdk();
+  const h = await chainHash(new TextEncoder().encode(wrapperHtml(n, engineUrl())));
+  return withRetry(`get-id-by-hash(${pad2(n)})`, async () =>
+    unwrapUint(await readOnly(CORE_NAME, 'get-id-by-hash', [Cl.buffer(h)])));
+}
+// get-drop-by-token returns (optional (tuple ...)) — the whole drop record, not
+// a drop id. Presence of the tuple is what says "already escrowed"; the record
+// carries no drop-id field at all, so never try to read one out of it.
+async function dropForToken(tokenId){
+  const { Cl } = await sdk();
+  const j = await withRetry(`get-drop-by-token(${tokenId})`, async () =>
+    readOnly(DROPS_NAME, 'get-drop-by-token',
+      [Cl.contractPrincipal(XTRATA_ADDRESS, CORE_NAME), Cl.uint(tokenId)]));
+  const t = j?.value?.value ?? null;
+  if (!t || typeof t !== 'object') return null;
+  const g = k => t[k]?.value;
+  return {
+    escrowed: true,
+    campaignId: unwrapUint(t['campaign-id']),
+    edition: unwrapUint(t['edition']),
+    feeBudget: unwrapUint(t['fee-budget']),
+    creator: g('creator')
+  };
+}
+
+/* ---- step 2: resolve the 33 token ids from chain ---- */
+async function doResolveTokens(){
+  syncMsg = 'reading the 33 inscription ids from mainnet…'; render();
+  // Resumable on purpose. 33 sequential reads against the public node can hit a
+  // rate limit part-way through; keep everything already resolved, report where
+  // it stopped, and let another press continue from there rather than losing the
+  // whole pass. Already-resolved editions are skipped, so repeats are cheap.
+  let stoppedAt = null;
+  for (let n = 1; n <= SUPPLY; n++) {
+    if (state.tokens[n]) continue;
+    try {
+      await new Promise(r => setTimeout(r, 250));
+      const id = await tokenIdForEdition(n);
+      if (id) state.tokens[n] = id;
+      syncMsg = `resolving ${pad2(n)} / ${SUPPLY}…`; render();
+    } catch(e){
+      stoppedAt = { n, message: e.message || String(e) };
+      log(`token resolve stopped at ${pad2(n)}: ${stoppedAt.message}`);
+      break;
+    }
+  }
+  save();
+  const found = Object.keys(state.tokens).length;
+  if (stoppedAt) {
+    syncMsg = `<span class="warn">resolved ${found}/${SUPPLY} — the node stopped answering at edition `
+      + `${pad2(stoppedAt.n)}. Press “resolve from chain” again to continue from there.</span>`;
+  } else {
+    const missing = SUPPLY - found;
+    syncMsg = missing
+      ? `<span class="warn">${found}/${SUPPLY} resolved — ${missing} edition(s) are not inscribed yet</span>`
+      : `<span class="ok">all ${SUPPLY} editions resolved to inscription ids</span>`;
+  }
+  log(`token resolve: ${found}/${SUPPLY}${stoppedAt ? ` (stopped at ${pad2(stoppedAt.n)})` : ''}`);
+  render();
+  return found;
+}
+
+/* ---- step 4: reconcile which drops already exist ---- */
+async function doSyncDrops(){
+  if (!tokensKnown()) return null;
+  syncMsg = 'checking which editions are already escrowed…'; render();
+  try {
+    let found = 0;
+    for (let n = 1; n <= SUPPLY; n++) {
+      const token = state.tokens[n];
+      if (!token) continue;
+      await new Promise(r => setTimeout(r, 150));
+      const rec = await dropForToken(token);
+      if (rec) { state.drops[n] = rec.edition ?? true; delete state.dropTx[n]; found++; }
+      else if (state.drops[n] !== undefined) delete state.drops[n];
+      syncMsg = `checking ${pad2(n)} / ${SUPPLY}…`; render();
+    }
+    save();
+    syncMsg = `<span class="ok">drop sync: ${found}/${SUPPLY} escrowed</span>`;
+    log(`drop sync: ${found}/${SUPPLY} escrowed`);
+    render();
+    return found;
+  } catch(e){
+    syncMsg = `<span class="err">drop sync failed: ${e.message||e}</span>`;
+    log('drop sync failed: ' + (e.message||e));
+    render();
+    return null;
+  }
+}
+
+/* ---- signing ---- */
+async function call(contractName, functionName, functionArgs, confirmText, skipConfirm){
+  const provider = await getStacksProvider();
+  if (!provider) throw new Error('no wallet provider — press “choose wallet/account” first');
+  if (!skipConfirm && !confirm(confirmText)) return null;
+  return callContract(provider, {
+    contractId: `${XTRATA_ADDRESS}.${contractName}`,
+    functionName, functionArgs, stxAddress: me
+  });
+}
+
+async function doCreateCampaign(){
+  const v = $('cc-tx');
+  try {
+    const { Cl } = await sdk();
+    const predicted = await withRetry('get-next-campaign-id', async () =>
+      unwrapUint(await readOnly(DROPS_NAME, 'get-next-campaign-id', [])));
+    const txid = await call(DROPS_NAME, 'create-campaign', [
+      Cl.uint(ENGINE_INSCRIPTION), Cl.uint(SUPPLY),
+      Cl.bool(RULES.onePerWallet), Cl.bool(RULES.requireBns), Cl.bool(RULES.onePerBns)
+    ], `Create the free-drop campaign on MAINNET?\n\n`
+      + `engine ${ENGINE_INSCRIPTION} · max supply ${SUPPLY}\n`
+      + `one per wallet: yes\nBNS required: yes\none per BNS: yes\n\n`
+      + `Predicted campaign id: ${predicted ?? '?'}\n\n`
+      + `NOTE: in v1.1 a campaign is ACTIVE from creation, so claiming opens as soon as the first edition is escrowed.\n\nThis is irreversible.`);
+    if (!txid) return;
+    state.campaignTx = txid; save();
+    v.innerHTML = `<span class="ok">broadcast</span> <a href="${EXPLORER(txid)}" target="_blank" rel="noopener">${txid}</a>`;
+    pollCampaignTx(txid, predicted);
+  } catch(e){
+    v.innerHTML = `<span class="err">${isUserCancelled(e) ? 'cancelled in the wallet' : (e.message||e)}</span>`;
+    log('create-campaign failed: ' + (e.message||e));
+  }
+}
+async function pollCampaignTx(txid, predicted){
+  for (let i = 0; i < 240; i++) {
+    await new Promise(r => setTimeout(r, 5000));
+    try {
+      const tx = await fetchTx(txid);
+      if (tx.tx_status === 'pending') continue;
+      if (tx.tx_status !== 'success') {
+        $('cc-tx').innerHTML = `<span class="err">campaign tx ${tx.tx_status}: ${tx.tx_result?.repr || ''}</span>`;
+        log(`create-campaign ${tx.tx_status}: ${tx.tx_result?.repr || ''}`);
+        return;
+      }
+      const m = (tx.tx_result?.repr || '').match(/\(ok\s+u(\d+)\)/);
+      const id = m ? Number(m[1]) : predicted;
+      state.campaign = id; save();
+      log(`campaign created as id ${id}`);
+      doReadCampaign();
+      return;
+    } catch(e){ log('poll: ' + (e.message||e)); }
+  }
+  log('campaign tx poll timed out — check the explorer and set the id manually');
+}
+async function doReadCampaign(){
+  if (!hasCampaign()) { campaignInfo = null; return; }
+  try {
+    const { Cl } = await sdk();
+    const j = await withRetry(`get-campaign(${state.campaign})`, async () =>
+      readOnly(DROPS_NAME, 'get-campaign', [Cl.uint(state.campaign)]));
+    const t = j?.value?.value ?? j?.value ?? null;
+    if (!t) { campaignInfo = null; log(`campaign ${state.campaign} not found on chain`); render(); return; }
+    const g = k => t[k]?.value;
+    campaignInfo = {
+      creator: g('creator'), engineId: Number(g('engine-id')), maxSupply: Number(g('max-supply')),
+      dropsCreated: Number(g('drops-created')), onePerWallet: g('one-per-wallet') === true,
+      requireBns: g('require-bns') === true, onePerBns: g('one-per-bns') === true,
+      active: g('active') === true
+    };
+    log(`campaign ${state.campaign}: ${campaignInfo.dropsCreated}/${campaignInfo.maxSupply} drops, active ${campaignInfo.active}`);
+    render();
+  } catch(e){ log('get-campaign failed: ' + (e.message||e)); }
+}
+
+async function doCreateDrop(auto = false){
+  if (inFlight) { log('ignored — a signature request is already in flight'); return; }
+  if (auto && !autoRun) return;
+  const v = $('d-tx');
+  // Never build a transaction from an unusable campaign id — Cl.uint(NaN) throws
+  // "Values of type 'number' must be an integer" only after the run has started.
+  if (!hasCampaign()) {
+    v.innerHTML = '<span class="err">no valid campaign id — create the campaign first</span>';
+    stopAuto('no valid campaign id', 'err');
+    return;
+  }
+  let n = null;
+  inFlight = true;
+  try {
+    // Ask the chain before every signature. create-campaign-drop enforces one
+    // drop per (contract, token-id) on chain, but checking first means a
+    // duplicate never costs a rejected transaction — or a second escrow.
+    n = nextDrop();
+    while (n !== null) {
+      const existing = await dropForToken(state.tokens[n]);
+      if (!existing) break;
+      log(`edition ${pad2(n)} (token ${state.tokens[n]}) is already escrowed (campaign edition ${existing.edition ?? '?'}) — skipping`);
+      state.drops[n] = existing.edition ?? true; save();
+      n = nextDrop();
+    }
+    if (n === null) {
+      v.innerHTML = '<span class="ok">nothing left to escrow</span>';
+      stopAuto('all editions escrowed', 'ok');
+      return;
+    }
+    const token = state.tokens[n];
+    if (auto) setAuto(`edition ${pad2(n)} → drop — approve in your wallet…`);
+    const { Cl } = await sdk();
+    const txid = await call(DROPS_NAME, 'create-campaign-drop', [
+      Cl.contractPrincipal(XTRATA_ADDRESS, CORE_NAME),
+      Cl.uint(token), Cl.uint(FEE_BUDGET), Cl.uint(state.campaign)
+    ], `Escrow edition ${pad2(n)}/33 — "${TITLES[n-1]}" — into campaign ${state.campaign}?\n\n`
+      + `inscription #${token}\nfee budget ${(FEE_BUDGET/1e6).toFixed(3)} STX\n\n`
+      + `This transfers the NFT and the budget into the drops contract. Recoverable via cancel or settle-refund.`,
+      auto);
+    if (!txid) { stopAuto(`edition ${pad2(n)} returned no txid`, 'err'); return; }
+    state.dropTx[n] = txid; save();
+    v.innerHTML = `<span class="ok">edition ${pad2(n)} escrow broadcast</span> <a href="${EXPLORER(txid)}" target="_blank" rel="noopener">${txid}</a>`;
+    if (auto) setAuto(`edition ${pad2(n)} signed — waiting for confirmation…`, 'ok');
+    pollDropTx(n, txid);
+  } catch(e){
+    const cancelled = isUserCancelled(e);
+    const at = n === null ? 'drop' : `edition ${pad2(n)}`;
+    v.innerHTML = `<span class="err">${cancelled ? 'cancelled in the wallet' : (e.message||e)}</span>`;
+    log(`${at} escrow failed: ` + (e.message||e));
+    stopAuto(cancelled ? `${at} declined in the wallet` : `${at}: ${e.message||e}`, cancelled ? 'warn' : 'err');
+  } finally {
+    inFlight = false;
+  }
+}
+async function pollDropTx(n, txid){
+  for (let i = 0; i < 240; i++) {
+    await new Promise(r => setTimeout(r, 5000));
+    try {
+      const tx = await fetchTx(txid);
+      if (tx.tx_status === 'pending') continue;
+      if (tx.tx_status !== 'success') {
+        delete state.dropTx[n];
+        const onChain = await dropForToken(state.tokens[n]).catch(() => null);
+        if (onChain) state.drops[n] = onChain.edition ?? true;
+        save();
+        log(`edition ${pad2(n)} escrow ${tx.tx_status}: ${tx.tx_result?.repr || ''}`);
+        $('d-tx').innerHTML = `<span class="err">edition ${pad2(n)} ${tx.tx_status}: ${tx.tx_result?.repr || ''}</span>`;
+        stopAuto(`edition ${pad2(n)} ${tx.tx_status} — nothing further was signed`, 'err');
+        return;
+      }
+      const m = (tx.tx_result?.repr || '').match(/edition\s+u(\d+)/);
+      delete state.dropTx[n];
+      state.drops[n] = m ? Number(m[1]) : true;
+      save();
+      log(`edition ${pad2(n)} escrowed as drop ${m ? m[1] : '?'}`);
+      doReadCampaign();
+      if (autoRun) {
+        const next = nextDrop();
+        if (next === null) { stopAuto('all editions escrowed', 'ok'); return; }
+        setAuto(`edition ${pad2(n)} confirmed — requesting ${pad2(next)}…`, 'ok');
+        setTimeout(() => doCreateDrop(true), 1500);
+      }
+      return;
+    } catch(e){ log('poll: ' + (e.message||e)); }
+  }
+  const onChain = await dropForToken(state.tokens[n]).catch(() => null);
+  if (onChain) { state.drops[n] = onChain.edition ?? true; delete state.dropTx[n]; save(); }
+  stopAuto(`edition ${pad2(n)} did not confirm within 20 minutes — run “sync drops” before resuming`, 'warn');
+}
+async function doStartAuto(){
+  if (!hasCampaign()) { setAuto('no valid campaign id — create the campaign first', 'err'); return; }
+  setAuto('syncing with the chain before starting…');
+  const found = await doSyncDrops();
+  if (found === null) { setAuto('drop sync failed — not starting', 'err'); return; }
+  const remaining = tokensKnown() - dropsDone();
+  const first = nextDrop();
+  if (first === null) { setAuto('every resolved edition is already escrowed', 'ok'); return; }
+  const ok = confirm(
+    `Escrow the remaining ${remaining} edition${remaining===1?'':'s'} into campaign ${state.campaign}?\n\n`
+    + `Starting at #${pad2(first)}. Your wallet pops up for each one, and the next fires once the previous confirms.\n\n`
+    + `Each transfers one NFT plus ${(FEE_BUDGET/1e6).toFixed(3)} STX into escrow — `
+    + `${(remaining * FEE_BUDGET / 1e6).toFixed(2)} STX total, refundable via settle-refund.\n\n`
+    + `You approve every signature. Declining one, or any failed transaction, stops the run.`
+  );
+  if (!ok) return;
+  autoRun = true;
+  log(`drop auto-run started at edition ${pad2(first)}, ${remaining} remaining`);
+  setAuto(`auto-run started — ${remaining} to go`, 'ok');
+  doCreateDrop(true);
+}
+
+async function doSetActive(active){
+  if (!hasCampaign()) return;
+  try {
+    const { Cl } = await sdk();
+    const txid = await call(DROPS_NAME, 'set-campaign-active', [Cl.uint(state.campaign), Cl.bool(active)],
+      `${active ? 'Open' : 'Close'} claiming for campaign ${state.campaign}?\n\n`
+      + (active ? '' : 'While closed, create-campaign-drop is also blocked — you cannot escrow more editions until you re-open it.'));
+    if (!txid) return;
+    log(`set-campaign-active(${active}) broadcast ${txid}`);
+    $('m-tx').innerHTML = `<span class="ok">broadcast</span> <a href="${EXPLORER(txid)}" target="_blank" rel="noopener">${txid}</a>`;
+  } catch(e){
+    $('m-tx').innerHTML = `<span class="err">${isUserCancelled(e) ? 'cancelled in the wallet' : (e.message||e)}</span>`;
+  }
+}
+
+/* ---- connect ---- */
+async function doConnect(){
+  try {
+    await clearWalletSession();
+    me = null; walletAddresses = []; render();
+    const provider = await selectProvider();
+    if (!provider) { log('no wallet selected'); render(); return; }
+    const addresses = await connectViaRequest(provider);
+    walletAddresses = addresses;
+    me = addresses[0] || null;
+    if (!me) throw new Error('the wallet returned no valid SP or SM Stacks mainnet address');
+    if (await isSelectedXverse(provider)) rememberXverseAccount(me);
+    log(`connected Stacks signer ${me}`);
+    save();
+  } catch(e){
+    log(isUserCancelled(e) ? 'connect cancelled in the wallet' : 'connect failed: ' + (e.message||e));
+    render();
+  }
+}
+async function doDisconnect(){
+  await clearWalletSession();
+  me = null; walletAddresses = []; log('wallet disconnected'); render();
+}
+
+/* ---- steps ---- */
+const STEPS = [
+  {
+    id:'connect', title:'Connect wallet', gate:()=>true,
+    done:()=>!!me,
+    desc:()=>'Connect the wallet that owns the 33 inscriptions. It becomes the campaign creator, and escrow transfers the NFTs out of it.',
+    render(el){
+      const picker = walletAddresses.length > 1
+        ? `<select id="s-account">${walletAddresses.map(a => `<option value="${a}" ${a===me?'selected':''}>${a}</option>`).join('')}</select>`
+        : `<span class="val">${me||'—'}</span>`;
+      el.innerHTML += `<div class="row"><button id="s-connect" class="primary">choose wallet/account</button>
+        ${picker}${me?'<button id="s-disconnect">disconnect</button>':''}</div>`;
+      el.querySelector('#s-connect').onclick = doConnect;
+      el.querySelector('#s-disconnect')?.addEventListener('click', doDisconnect);
+      el.querySelector('#s-account')?.addEventListener('change', e => { me=e.target.value; render(); });
+    }
+  },
+  {
+    id:'tokens', title:'Resolve the 33 inscription ids', gate:()=>true,
+    done:()=>tokensKnown() === SUPPLY,
+    desc:()=>'Derives each edition\'s content hash and reads its inscription id from <code>get-id-by-hash</code>. This is how the duplicate of edition 16 is excluded — the map returns the first-seen id, so #2856 is never picked up.',
+    render(el){
+      el.innerHTML += `<div class="row"><button id="t-resolve" class="primary">resolve from chain</button>
+        <span class="lbl">resolved</span><span class="val">${tokensKnown()} / ${SUPPLY}</span></div>
+        ${syncMsg ? `<div class="verify">${syncMsg}</div>` : ''}
+        ${tokensKnown() ? `<table>${Object.keys(state.tokens).sort((a,b)=>a-b).map(k =>
+          `<tr><td class="n">${pad2(k)}</td><td>${TITLES[k-1]}</td><td class="s">#${state.tokens[k]}</td></tr>`).join('')}</table>` : ''}`;
+      el.querySelector('#t-resolve').onclick = doResolveTokens;
+    }
+  },
+  {
+    id:'campaign', title:'Create the campaign',
+    gate:()=>!!me && tokensKnown() > 0,
+    done:()=>hasCampaign(),
+    desc:()=>`One <code>create-campaign</code> call on <code>${DROPS_NAME}</code>. The rules are fixed here so they cannot be set inconsistently — the contract also asserts that one-per-BNS implies BNS-required.`,
+    render(el){
+      el.innerHTML += `<div class="rules">
+          <div class="rule"><b>ENGINE</b><span>${ENGINE_INSCRIPTION}</span></div>
+          <div class="rule"><b>MAX SUPPLY</b><span>${SUPPLY}</span></div>
+          <div class="rule"><b>ONE PER WALLET</b><span>yes</span></div>
+          <div class="rule"><b>BNS REQUIRED</b><span>yes</span></div>
+          <div class="rule"><b>ONE PER BNS</b><span>yes</span></div>
+          <div class="rule"><b>FEE BUDGET / DROP</b><span>${(FEE_BUDGET/1e6).toFixed(3)} STX</span></div>
+        </div>
+        <div class="verify warn">v1.1 campaigns are <b>active from creation</b> — claiming opens as soon as the first edition is escrowed. There is no stock-privately state (that arrived in v1.2, which is not deployed).</div>
+        <div class="row"><button id="cc-sign" class="primary" ${me?'':'disabled'}>create campaign</button>
+          <input id="cc-manual" placeholder="or paste an existing campaign id" value="${hasCampaign() ? state.campaign : ''}" style="max-width:240px">
+          <button id="cc-save">save id</button></div>
+        <div class="verify" id="cc-tx">${state.campaignTx ? `<a href="${EXPLORER(state.campaignTx)}" target="_blank" rel="noopener">${state.campaignTx}</a>` : ''}</div>
+        ${campaignInfo ? `<div class="verify ok">campaign ${state.campaign}: ${campaignInfo.dropsCreated}/${campaignInfo.maxSupply} escrowed · active ${campaignInfo.active} · creator ${campaignInfo.creator}</div>` : ''}`;
+      el.querySelector('#cc-sign').onclick = doCreateCampaign;
+      el.querySelector('#cc-save').onclick = ()=>{
+        const raw = $('cc-manual').value.trim();
+        if (raw === '') { state.campaign = null; campaignInfo = null; log('campaign id cleared'); save(); return; }
+        const v = Number(raw);
+        if (!Number.isInteger(v) || v < 0) { $('cc-tx').innerHTML = `<span class="err">\u201c${raw}\u201d is not a valid campaign id</span>`; return; }
+        state.campaign = v; log('campaign id set to ' + v); save(); doReadCampaign();
+      };
+    }
+  },
+  {
+    id:'drops', title:'Escrow the 33 editions',
+    gate:()=>hasCampaign() && !!me && tokensKnown() > 0,
+    done:()=>dropsDone() >= SUPPLY,
+    desc:()=>`One <code>create-campaign-drop</code> per edition — v1.1 escrows one NFT per transaction (batch-of-25 only arrived in the undeployed v1.2). Each call moves the NFT plus ${(FEE_BUDGET/1e6).toFixed(3)} STX into the drops contract.`,
+    render(el){
+      const n = nextDrop();
+      const doneCount = dropsDone();
+      el.innerHTML += `<div class="prog"><i style="width:${(doneCount/SUPPLY*100).toFixed(1)}%"></i></div>
+        <div class="row"><span class="lbl">escrowed</span><span class="val">${doneCount} / ${SUPPLY}</span>
+          <span class="lbl">STX committed</span><span class="val">${(doneCount*FEE_BUDGET/1e6).toFixed(2)} of ${(SUPPLY*FEE_BUDGET/1e6).toFixed(2)}</span></div>
+        ${n ? `<div class="row">
+            <button id="d-sign" class="primary" ${autoRun?'disabled':''}>escrow #${pad2(n)} — ${TITLES[n-1]}</button>
+            ${autoRun ? '<button id="d-stop" class="danger">stop auto-run</button>'
+                      : `<button id="d-auto" class="link">auto-escrow all remaining (${tokensKnown()-doneCount})</button>`}
+            <button id="d-sync" class="link" ${autoRun?'disabled':''}>sync drops</button></div>
+          <div class="note">Auto-run escrows them back to back, same as the inscription canary: wallet pops up per edition,
+            next fires once the previous confirms, and any decline or failure stops the run.</div>`
+          : '<div class="verify ok">all editions escrowed</div>'}
+        ${autoMsg ? `<div class="verify">${autoMsg}</div>` : ''}
+        <div class="verify" id="d-tx"></div>
+        ${doneCount ? `<table>${Object.keys(state.drops).sort((a,b)=>a-b).map(k =>
+          `<tr><td class="n">${pad2(k)}</td><td>${TITLES[k-1]}</td><td class="s">token #${state.tokens[k]} → escrowed</td></tr>`).join('')}</table>` : ''}`;
+      el.querySelector('#d-sign')?.addEventListener('click', ()=>doCreateDrop(false));
+      el.querySelector('#d-auto')?.addEventListener('click', doStartAuto);
+      el.querySelector('#d-stop')?.addEventListener('click', ()=>stopAuto('stopped by you', 'warn'));
+      el.querySelector('#d-sync')?.addEventListener('click', doSyncDrops);
+    }
+  },
+  {
+    id:'manage', title:'Verify & manage',
+    gate:()=>hasCampaign(),
+    done:()=>!!(campaignInfo && campaignInfo.dropsCreated >= SUPPLY && campaignInfo.active),
+    desc:()=>'Read the live campaign back from chain and open or close claiming. Closing also blocks further escrow, so only close once every edition is in.',
+    render(el){
+      el.innerHTML += `<div class="row"><button id="m-read">read campaign</button>
+          <button id="m-open" class="primary" ${campaignInfo?'':'disabled'}>open claiming</button>
+          <button id="m-close" class="danger" ${campaignInfo?'':'disabled'}>close claiming</button></div>
+        ${campaignInfo ? `<div class="rules">
+          <div class="rule"><b>ESCROWED</b><span>${campaignInfo.dropsCreated} / ${campaignInfo.maxSupply}</span></div>
+          <div class="rule"><b>ACTIVE</b><span>${campaignInfo.active ? 'yes' : 'no'}</span></div>
+          <div class="rule"><b>ONE PER WALLET</b><span>${campaignInfo.onePerWallet ? 'yes' : 'no'}</span></div>
+          <div class="rule"><b>BNS REQUIRED</b><span>${campaignInfo.requireBns ? 'yes' : 'no'}</span></div>
+          <div class="rule"><b>ONE PER BNS</b><span>${campaignInfo.onePerBns ? 'yes' : 'no'}</span></div>
+          <div class="rule"><b>ENGINE</b><span>${campaignInfo.engineId}</span></div>
+        </div>` : ''}
+        <div class="verify" id="m-tx"></div>
+        <div class="note">Claimers call <code>claim-campaign</code> with a BNS attestation signed by the configured attestor,
+          and the sponsor relayer pays their fee and reimburses itself from each drop's budget via <code>claim-fee</code>
+          (capped at ${(CLAIM_CAP/1e6).toFixed(0)} STX). Unclaimed budget returns to you with <code>settle-refund</code>.</div>`;
+      el.querySelector('#m-read').onclick = doReadCampaign;
+      el.querySelector('#m-open').onclick = ()=>doSetActive(true);
+      el.querySelector('#m-close').onclick = ()=>doSetActive(false);
+    }
+  }
+];
+
+/* ---- render ---- */
+function render(){
+  $('who').textContent = me ? me.slice(0,8)+'…'+me.slice(-4) : 'not connected';
+  $('stateView').textContent = JSON.stringify({ campaign: hasCampaign() ? state.campaign : null, tokens: tokensKnown(), drops: dropsDone() });
+  const box = $('steps'); box.innerHTML = '';
+  STEPS.forEach((s, i)=>{
+    const done = s.done();
+    const locked = s.gate ? !s.gate() : false;
+    const el = document.createElement('div');
+    el.className = 'step' + (done?' done':'') + (locked?' locked':'');
+    el.innerHTML = `<h2><span class="num">${done?'✓':i+1}</span>${s.title}<span class="badge">${done?'DONE':locked?'LOCKED':'TODO'}</span></h2>
+      <div class="desc">${s.desc()}</div>`;
+    if (!locked) s.render(el);
+    box.appendChild(el);
+  });
+}
+
+addEventListener('beforeunload', e => { if (autoRun) { e.preventDefault(); e.returnValue = ''; } });
+$('connect').onclick = doConnect;
+$('exportState').onclick = ()=>{ const p=$('cfgOut'); p.style.display='block'; p.textContent = JSON.stringify(state, null, 2); };
+$('resetState').onclick = ()=>{ if(confirm('Reset saved local progress? On-chain campaign and drops are not affected.')){ state=blankState(); save(); } };
+render();
+(async()=>{
+  try {
+    const s = await sdk();
+    if (!(await selectedProviderId())) return;
+    const cached = (s.getLocalStorage?.()?.addresses?.stx ?? []).map(e => e?.address).filter(isMainnetStacksAddress);
+    if (!cached.length) return;
+    walletAddresses = [...new Set(cached)]; me = walletAddresses[0];
+    log(`restored cached signer ${me} — reconnect to confirm it with the wallet`);
+    render();
+  } catch { /* offline / no wallet libs */ }
+  if (hasCampaign()) doReadCampaign();
+})();
+window.__dropCanary = {
+  get state(){return state;}, get me(){return me;}, get campaignInfo(){return campaignInfo;},
+  get autoRun(){return autoRun;}, get inFlight(){return inFlight;},
+  resolveTokens: doResolveTokens, syncDrops: doSyncDrops, readCampaign: doReadCampaign,
+  tokenIdForEdition, dropForToken, nextDrop, wrapperHtml,
+  startAuto: doStartAuto, stopAuto: ()=>stopAuto('stopped by you'),
+  setState: s=>{ state={...state,...s}; save(); }, setMe: a=>{ me=a; render(); }
+};
+log('drop canary ready — mainnet');
+</script>
+</body>
+</html>

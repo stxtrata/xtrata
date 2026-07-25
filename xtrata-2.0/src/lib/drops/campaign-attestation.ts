@@ -96,10 +96,21 @@ export const campaignAttestationDigest = async (payload: CampaignAttestationPayl
 export const bnsNameKey = async (name: string) =>
   campaignBytesToHex(await sha256(new TextEncoder().encode(name.trim().toLowerCase())));
 
-export const attestorPubkeyHash = (privateKey: string) => {
+// createStacksPrivateKey infers compression from the key's length: 64 hex chars
+// yields an uncompressed 65-byte public key, 66 ending in "01" the compressed
+// 33-byte one — two different hash160s for the same key. The contract compares
+// against `(hash160 recovered-pubkey)` where secp256k1-recover? always returns
+// the compressed form, so only the compressed hash can ever match. Normalise,
+// or a correct key supplied in the bare form is rejected as a mismatch even
+// though the signatures it produces are valid and identical.
+const compressedKeyHex = (privateKey: string) => {
   const key = canonicalHex(privateKey);
   if (key.length !== 64 && key.length !== 66) throw new Error('Invalid attestor private key');
-  const publicKey = publicKeyToString(getPublicKey(createStacksPrivateKey(key)));
+  return key.length === 64 ? `${key}01` : key;
+};
+
+export const attestorPubkeyHash = (privateKey: string) => {
+  const publicKey = publicKeyToString(getPublicKey(createStacksPrivateKey(compressedKeyHex(privateKey))));
   return campaignBytesToHex(hash160(campaignHexToBytes(publicKey)));
 };
 
@@ -110,7 +121,7 @@ export const signCampaignAttestation = async (
   const digest = await campaignAttestationDigest(payload);
   return signMessageHashRsv({
     messageHash: campaignBytesToHex(digest),
-    privateKey: createStacksPrivateKey(canonicalHex(privateKey))
+    privateKey: createStacksPrivateKey(compressedKeyHex(privateKey))
   }).data;
 };
 

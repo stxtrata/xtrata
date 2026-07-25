@@ -47,6 +47,8 @@ describe('/debug dashboard route', () => {
     expect(html).toContain('Site Health');
     expect(html).toContain('Glossary');
     expect(html).toContain('/debug/data');
+    expect(html).toContain('WALLET_RPC_INTERNAL');
+    expect(html).toContain('Technical details (latest occurrence)');
   });
 });
 
@@ -123,5 +125,7 @@ describe('/debug/data route', () => {
     expect(body.ready).toBe(true);
     expect(queries.some((sql) => sql.includes('last_success > last_error'))).toBe(true);
     expect(queries.some((sql) => sql.includes('ORDER BY received_at DESC LIMIT 30'))).toBe(true);
+    expect(queries.some((sql) => sql.includes('ROW_NUMBER() OVER'))).toBe(true);
+    expect(queries.some((sql) => sql.includes('context_json END) AS context'))).toBe(true);
   });
 });

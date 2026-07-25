@@ -1,0 +1,1191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Proof of Free V3 — Inscription Canary</title>
+<style>
+  :root { --mint:#3ad29f; --orange:#ff6a00; --blue:#38a0ff; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: radial-gradient(circle at 50% 0, #0d151a, #060709 46%, #040406); color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  body { max-width: 900px; margin: 0 auto; padding: 18px; }
+  h1 { font-size: 15px; letter-spacing: .14em; font-weight: 700; margin: 0; }
+  .sub { font-size: 11px; opacity: .6; margin: 4px 0 16px; line-height: 1.5; }
+  .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .bar .grow { flex: 1; }
+  button, select, input { background: #131318; color: #fff; border: 1px solid #2c2c36; border-radius: 8px; padding: 8px 11px; font: inherit; font-size: 12px; }
+  button { cursor: pointer; transition: border-color .12s, background .12s; }
+  button:hover:not(:disabled) { border-color: var(--mint); }
+  button:disabled { opacity: .4; cursor: default; }
+  button.primary { border-color: var(--mint); color: #051; background: var(--mint); font-weight: 700; }
+  button.danger { border-color: #7a2f2f; color: #ffb4ac; }
+  button.link { border-color: #3a3a70; color: #b9b6ff; }
+  input { width: 100%; }
+  .note { font-size: 10px; opacity: .62; line-height: 1.45; margin-top: 7px; }
+  .addr { font-size: 11px; opacity: .8; }
+  .net { display: flex; border: 1px solid #2c2c36; border-radius: 8px; overflow: hidden; }
+  .net button { border: none; border-radius: 0; padding: 8px 12px; background: #0d2b23; color: #9dffd9; }
+  .step { border: 1px solid #23232c; border-radius: 12px; padding: 14px; margin-bottom: 10px; background: #0b0b10; }
+  .step.done { border-color: #1d5a45; }
+  .step.locked { opacity: .5; }
+  .step h2 { font-size: 13px; margin: 0 0 2px; display: flex; align-items: center; gap: 8px; }
+  .num { display: inline-flex; width: 20px; height: 20px; border-radius: 50%; border: 1px solid #3a3a44; align-items: center; justify-content: center; font-size: 10px; }
+  .step.done .num { background: var(--mint); color: #051; border-color: var(--mint); }
+  .badge { margin-left: auto; font-size: 9px; letter-spacing: .1em; padding: 3px 7px; border-radius: 20px; border: 1px solid #3a3a44; opacity: .8; }
+  .step.done .badge { color: #9dffd9; border-color: #1d5a45; }
+  .desc { font-size: 11px; opacity: .75; line-height: 1.5; margin: 6px 0 10px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+  .row .lbl { font-size: 10px; opacity: .55; min-width: 88px; }
+  .val { font-size: 11px; color: #a8e6ff; word-break: break-all; }
+  .verify { font-size: 11px; margin-top: 8px; opacity: .9; line-height: 1.5; }
+  .ok { color: var(--mint); } .err { color: #ff8f83; } .warn { color: #ffd479; }
+  pre { background: #07141c; border: 1px solid #204050; border-radius: 8px; padding: 10px; font-size: 10px; overflow: auto; color: #cfe; max-height: 260px; }
+  .panel { border: 1px solid #23232c; border-radius: 12px; padding: 14px; margin-top: 16px; background: #0b0b10; }
+  .panel h3 { font-size: 11px; letter-spacing: .12em; opacity: .6; margin: 0 0 8px; }
+  #log { font-size: 10px; opacity: .7; white-space: pre-wrap; max-height: 180px; overflow: auto; margin-top: 8px; }
+  a { color: #b9b6ff; }
+  .prog { height: 6px; border-radius: 4px; background: #1a1a22; overflow: hidden; margin: 8px 0; }
+  .prog i { display: block; height: 100%; background: var(--mint); }
+  table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 8px; }
+  td { padding: 3px 6px; border-bottom: 1px solid #1a1a22; }
+  td.n { color: #a8e6ff; width: 34px; }
+  td.s { text-align: right; opacity: .7; }
+</style>
+</head>
+<body>
+  <h1>PROOF OF FREE V3 · INSCRIPTION CANARY</h1>
+  <div class="sub">
+    Inscribes the recursive engine as a child of <b>2838</b>, then the 33 seed editions as children of the engine.
+    Every payload is hash-verified in this page before the wallet is ever asked to sign.
+  </div>
+
+  <div class="bar">
+    <div class="net"><button>mainnet</button></div>
+    <div class="grow"></div>
+    <span class="addr" id="who">not connected</span>
+    <button id="connect">connect wallet</button>
+  </div>
+
+  <div id="steps"></div>
+
+  <div class="panel">
+    <h3>STATE</h3>
+    <div id="stateView" class="val"></div>
+    <div class="row">
+      <button id="exportState">export</button>
+      <button id="resetState" class="danger">reset progress</button>
+    </div>
+    <pre id="cfgOut" style="display:none"></pre>
+  </div>
+
+  <div class="panel"><h3>LOG</h3><div id="log"></div></div>
+
+<script type="module">
+/* ============================================================================
+ * Proof of Free V3 inscription canary.
+ *
+ * The wallet layer below is ported verbatim from the Living Synth v5 canary,
+ * which itself came from the main Xtrata app (src/lib/wallet/connect.ts). Do
+ * not "simplify" it — every branch is a real wallet quirk that was diagnosed
+ * against a shipping Leather or Xverse build.
+ * ========================================================================== */
+
+// Chain libs load on demand — the page renders offline; the wallet only loads
+// when you act. Versions are pinned: the wallet layer below is written against
+// these exact APIs and an open range would silently change provider behaviour.
+const LIB = {
+  connect: 'https://esm.sh/@stacks/connect@8.2.6',
+  connectUi: 'https://esm.sh/@stacks/connect-ui@8.1.2',
+  connectUiLoader: 'https://esm.sh/@stacks/connect-ui@8.1.2/loader',
+  transactions: 'https://esm.sh/@stacks/transactions@7.4.0'
+};
+let _sdk = null;
+async function sdk(){
+  if (!_sdk) {
+    const [c, ui, loader, t] = await Promise.all([
+      import(LIB.connect), import(LIB.connectUi), import(LIB.connectUiLoader), import(LIB.transactions)
+    ]);
+    _sdk = {
+      DEFAULT_PROVIDERS: c.DEFAULT_PROVIDERS,
+      disconnect: c.disconnect,
+      clearLocalStorage: c.clearLocalStorage,
+      getLocalStorage: c.getLocalStorage,
+      getSelectedProviderId: ui.getSelectedProviderId,
+      setSelectedProviderId: ui.setSelectedProviderId,
+      clearSelectedProviderId: ui.clearSelectedProviderId,
+      getProviderFromId: ui.getProviderFromId,
+      defineCustomElements: loader.defineCustomElements,
+      Cl: t.Cl,
+      fetchCallReadOnlyFunction: t.fetchCallReadOnlyFunction,
+      cvToJSON: t.cvToJSON,
+      validateStacksAddress: t.validateStacksAddress
+    };
+    validateAddress = t.validateStacksAddress;
+  }
+  return _sdk;
+}
+// Upgraded to the real c32 checksum test as soon as @stacks/transactions loads.
+let validateAddress = null;
+
+/* ---- what this canary inscribes ---- */
+const NETWORK = 'mainnet';
+const XTRATA_ADDRESS = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
+const XTRATA_NAME = 'xtrata-v3-2-3';
+const XTRATA_CONTRACT = `${XTRATA_ADDRESS}.${XTRATA_NAME}`;
+const MINT_FN = 'mint-single-tx-with-relationships';
+
+const PARENT_INSCRIPTION = 2838;
+const TOKEN_URI = 'https://yfa7uhk4vmrr3jjwr57fnm6ccvwi2r2ycufcjs6nsmrpjmr25azq.ardrive.net/wUH6HVyrIx2lNo9-VrPCFWyNR1gVCiTLzZMi9LI66DM';
+const MIME = 'text/html';
+const CHUNK_SIZE = 16384;
+const MAX_SINGLE_TX_CHUNKS = 32;
+
+// Pinned from the verified build. The wallet is never asked to sign a payload
+// whose bytes and both hashes do not match these exactly.
+const ENGINE_FILE = 'proof-of-free-recursive-engine-v3.html';
+const ENGINE_PATH = '../../artifacts/' + ENGINE_FILE;
+const ENGINE_EXPECT = Object.freeze({
+  bytes: 27388,
+  sha256: '824d0b7f034857860f85a52d4d13c525799bd583da176ec586bb522501cfd1cf',
+  chain: 'e7a35c737e6b34137d2f81b318e56519e10d54b51fbbee9a1538ab33c033bae8'
+});
+
+const TITLES = ["First Light","Free Passage","No Toll","Clear Threshold","Open Circuit","Zero Barrier","Unlocked Field","Common Key","Public Door","The Bare Minimum","The Way Through","Open Signal","Free Frequency","Unmetered","Clear Channel","No Interference","One Pulse","Public Wave","Silent Charge","Released Current","Zero Noise","Broadcast Free","One Name","Named Light","Public Key","Unbound Mark","Open Signature","Free State","Known Here","No Alias","Single Claim","Proof Held","Proof of Free"];
+const SLUGS = ["first-light","free-passage","no-toll","clear-threshold","open-circuit","zero-barrier","unlocked-field","common-key","public-door","the-bare-minimum","the-way-through","open-signal","free-frequency","unmetered","clear-channel","no-interference","one-pulse","public-wave","silent-charge","released-current","zero-noise","broadcast-free","one-name","named-light","public-key","unbound-mark","open-signature","free-state","known-here","no-alias","single-claim","proof-held","proof-of-free"];
+const SUPPLY = 33;
+const pad2 = n => String(n).padStart(2, '0');
+
+// Byte-for-byte identical to scripts/build-collection.mjs. If you change one,
+// change the other — the manifest hashes are generated by the script.
+function wrapperHtml(n, engineUrl){
+  return '<!doctype html><meta name=viewport content="width=device-width,initial-scale=1">'
+    + '<style>*{margin:0}iframe{border:0;width:100vw;height:100vh;display:block}</style>'
+    + `<iframe id=i allow=autoplay title="Proof of Free #${pad2(n)} — ${TITLES[n-1]}"></iframe>`
+    + `<script>i.src=(location.protocol=="file:"?"../artifacts/${ENGINE_FILE}":${JSON.stringify(engineUrl)})+"#${n}"<\/script>`;
+}
+
+const EXPLORER = txid => `https://explorer.hiro.so/txid/${txid}?chain=mainnet`;
+const HIRO = 'https://api.mainnet.hiro.so';
+
+const $ = id => document.getElementById(id);
+const log = m => { const el = $('log'); el.textContent = `[${new Date().toISOString().slice(11,19)}] ${m}\n` + el.textContent; };
+
+let me = null;
+let walletAddresses = [];
+let enginePayload = null;   // { bytes, chunks, sha256, chain, ok }
+let parentInfo = null;      // { owner, sealed }
+let state = load();
+
+function keyFor(){ return 'pof-v3-canary-mainnet'; }
+function isMainnetStacksAddress(address){
+  if (typeof address !== 'string' || !/^(SP|SM)[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26,39}$/.test(address)) return false;
+  return validateAddress ? validateAddress(address) : true;
+}
+function useWalletAddresses(addresses, preferred){
+  walletAddresses = addresses;
+  me = addresses.find(a => a === preferred) || addresses[0] || null;
+}
+
+/* ---- wallet layer, ported from the main Xtrata app (src/lib/wallet/connect.ts) ---- */
+
+// This page may be viewed inside an iframe. Wallet extensions inject their
+// providers into the TOP window only, while @stacks/connect ships an Asigna
+// shim that defines window.AsignaProvider inside EVERY iframe — so detecting
+// against the local window lists Asigna as the only "installed" wallet and
+// hides Leather/Xverse. All detection goes through the top same-origin window
+// when one exists; cross-origin embeds fall back to the local window.
+function walletHostWindow(){
+  try {
+    const top = window.top;
+    if (top && top !== window.self && top.location.origin === window.location.origin) return top;
+  } catch { /* cross-origin parent: its providers are unreachable */ }
+  return window;
+}
+function resolveProviderOnWindow(win, id){
+  if (!win || !id) return undefined;
+  return id.split('.').reduce((acc, part) => acc?.[part], win);
+}
+// connect-ui only reads webbtc_stx_providers / wbip_providers, while current
+// Xverse builds register their WBIP provider in btc_providers (some releases
+// used webbtc_providers). Merge all four so the chooser sees what is injected.
+function registeredProviders(win){
+  if (!win) return [];
+  const merged = [
+    ...(win.btc_providers ?? []), ...(win.wbip_providers ?? []),
+    ...(win.webbtc_providers ?? []), ...(win.webbtc_stx_providers ?? [])
+  ];
+  return merged.filter((entry, i) => Boolean(entry?.id) && merged.findIndex(c =>
+    c.id === entry.id || (c.name && entry.name && c.name.toLowerCase() === entry.name.toLowerCase())) === i);
+}
+const isLeatherProviderId = id => typeof id === 'string' && id.toLowerCase().includes('leather');
+const isXverseProviderId = id => typeof id === 'string' && id.toLowerCase().includes('xverse');
+function isRegisteredXverseProviderId(id){
+  return !!id && registeredProviders(walletHostWindow()).some(e =>
+    e.id === id && (isXverseProviderId(e.id) || e.name?.toLowerCase().includes('xverse')));
+}
+const XVERSE_RPC_IDS = ['XverseProviders.BitcoinProvider', 'xverseProviders.BitcoinProvider', 'BitcoinProvider'];
+function xverseRpcProvider(){
+  const host = walletHostWindow();
+  const ids = registeredProviders(host)
+    .filter(e => isXverseProviderId(e.id) || e.name?.toLowerCase().includes('xverse'))
+    .map(e => e.id)
+    .concat(XVERSE_RPC_IDS);
+  for (const id of ids) {
+    const p = resolveProviderOnWindow(host, id) ?? (host === window ? undefined : resolveProviderOnWindow(window, id));
+    if (typeof p?.request === 'function') return p;
+  }
+  return undefined;
+}
+// The chooser still persists XverseProviders.StacksProvider, but current Xverse
+// exposes only BitcoinProvider. Treat the old id as an alias for the real
+// request bridge instead of falling through to window.StacksProvider's stub.
+async function resolveProviderById(id){
+  if (!id) return undefined;
+  const { getProviderFromId } = await sdk();
+  const host = walletHostWindow();
+  const exact = resolveProviderOnWindow(host, id)
+    ?? (host === window ? undefined : resolveProviderOnWindow(window, id))
+    ?? getProviderFromId(id);
+  if (exact) return exact;
+  return (isXverseProviderId(id) || isRegisteredXverseProviderId(id)) ? xverseRpcProvider() : undefined;
+}
+function installedProvidersOnHost(defaults){
+  const host = walletHostWindow();
+  const registered = registeredProviders(host);
+  return registered.concat(defaults.filter(d =>
+    !registered.find(e => e.id === d.id) && !!resolveProviderOnWindow(host, d.id)));
+}
+async function selectedProviderId(){ return (await sdk()).getSelectedProviderId(); }
+async function getStacksProvider(){
+  const selected = await resolveProviderById(await selectedProviderId());
+  if (selected) return selected;
+  const w = walletHostWindow();
+  return w.LeatherProvider ?? w.XverseProviders?.StacksProvider ?? w.xverseProviders?.StacksProvider
+    ?? xverseRpcProvider() ?? w.StacksProvider ?? w.BlockstackProvider;
+}
+async function isSelectedXverse(provider){
+  const id = await selectedProviderId();
+  if (isXverseProviderId(id) || isRegisteredXverseProviderId(id)) return true;
+  const w = walletHostWindow();
+  return provider === w.XverseProviders?.StacksProvider || provider === w.xverseProviders?.StacksProvider
+    || provider === xverseRpcProvider();
+}
+
+// Drive connect-ui's chooser ourselves so installedProviders comes from the
+// host window rather than this frame.
+async function selectProvider(){
+  const { DEFAULT_PROVIDERS, defineCustomElements, setSelectedProviderId } = await sdk();
+  defineCustomElements(window);
+  const chosenId = await new Promise(resolve => {
+    const modal = document.createElement('connect-modal');
+    const overflow = document.body.style.overflow;
+    const cleanup = () => { document.body.style.overflow = overflow; document.removeEventListener('keydown', onKey); modal.remove(); };
+    const onKey = e => { if (e.key === 'Escape') { cleanup(); resolve(null); } };
+    modal.defaultProviders = DEFAULT_PROVIDERS;
+    modal.installedProviders = installedProvidersOnHost(DEFAULT_PROVIDERS);
+    modal.persistSelection = false; // persisted below, against the host-resolved provider
+    modal.callback = sel => { cleanup(); resolve(typeof sel === 'string' ? sel : null); };
+    modal.cancelCallback = () => { cleanup(); resolve(null); };
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(modal);
+  });
+  if (!chosenId) return null;
+  const provider = await resolveProviderById(chosenId);
+  if (provider) { try { setSelectedProviderId(chosenId); } catch {} }
+  log(`provider selected ${chosenId}${provider ? '' : ' (could not resolve — is the wallet unlocked?)'}`);
+  return provider ?? null;
+}
+
+/* ---- provider request plumbing ---- */
+function providerError(value){
+  if (value instanceof Error) return value;
+  const c = value && typeof value === 'object' ? value : {};
+  const nested = c.error && typeof c.error === 'object' ? c.error : null;
+  const err = new Error(String(nested?.message || c.message || c.error || value || 'wallet request failed'));
+  err.code = nested?.code ?? c.code;
+  return err;
+}
+function unwrapResponse(response){
+  if (response && typeof response === 'object') {
+    if (response.error) throw providerError(response);
+    if (response.status === 'error') throw providerError(response.result ?? response);
+  }
+  return response;
+}
+async function providerRequest(provider, method, params){
+  if (typeof provider?.request !== 'function') throw new Error(`wallet has no request("${method}") bridge`);
+  try { return unwrapResponse(await provider.request(method, params)); }
+  catch (e) { throw providerError(e); }
+}
+// Xverse account permission lives on the BitcoinProvider object that answered
+// wallet_connect — keep every later call on that same bridge.
+async function walletRpc(provider, method, params){
+  if (!(await isSelectedXverse(provider))) return providerRequest(provider, method, params);
+  const rpc = xverseRpcProvider();
+  if (!rpc) throw Object.assign(new Error('Xverse request provider is not available'), { code:'XVERSE_RPC_UNAVAILABLE' });
+  try { return unwrapResponse(await rpc.request(method, params)); }
+  catch (e) { throw providerError(e); }
+}
+function isMethodUnsupported(error){
+  const msg = String(error?.message ?? error ?? '').toLowerCase();
+  return error?.code === -32601 || ['method not found','not supported','unsupported','not available',
+    'not implemented','request function is not implemented'].some(s => msg.includes(s));
+}
+function isUserCancelled(error){
+  if (error?.code === 4001 || error?.code === -31001) return true;
+  const msg = String(error?.message ?? error ?? '').trim().toLowerCase();
+  return /\buser (?:cancelled|canceled|rejected|denied|closed)\b/.test(msg)
+    || /\b(?:cancelled|canceled|rejected|denied) by (?:the )?user\b/.test(msg)
+    || msg === 'cancelled' || msg === 'canceled';
+}
+// Connect responses differ per wallet and per method (getAddresses, wallet_connect,
+// stx_getAccounts, wallet_getAccount all nest the address differently), so walk
+// the payload instead of guessing one shape. Bitcoin addresses fail the c32 test.
+function collectStacksAddresses(payload, out = [], depth = 0){
+  if (depth > 8 || payload === null || typeof payload === 'undefined') return out;
+  if (typeof payload === 'string') {
+    const t = payload.trim();
+    if (isMainnetStacksAddress(t) && !out.includes(t)) out.push(t);
+    return out;
+  }
+  if (Array.isArray(payload)) { payload.forEach(e => collectStacksAddresses(e, out, depth + 1)); return out; }
+  if (typeof payload !== 'object') return out;
+  for (const key of ['address','stxAddress','selectedAddress','identityAddress','mainnet',
+    'addresses','accounts','result','data','payload','response','profile','userData']) {
+    if (key in payload) collectStacksAddresses(payload[key], out, depth + 1);
+  }
+  return out;
+}
+function extractSupportedMethods(payload, depth = 0){
+  if (depth > 5 || !payload) return [];
+  if (Array.isArray(payload)) return [...new Set(payload.filter(v => typeof v === 'string'))];
+  if (typeof payload !== 'object') return [];
+  for (const key of ['supportedMethods','methods','result','data']) {
+    if (key in payload) { const m = extractSupportedMethods(payload[key], depth + 1); if (m.length) return m; }
+  }
+  return [];
+}
+// Wallets disagree on the connect method: Xverse only answers wallet_connect /
+// stx_getAccounts / wallet_getAccount, Leather documents getAddresses. A single
+// hard-coded getAddresses fails outright on anything that doesn't advertise it.
+async function connectAttempts(provider){
+  if (await isSelectedXverse(provider)) return ['wallet_connect','stx_getAccounts','wallet_getAccount'];
+  const leatherMethods = ['getAddresses','stx_getAccounts','stx_getAddresses','stx_requestAccounts','wallet_connect'];
+  if (!isLeatherProviderId(await selectedProviderId())) {
+    return ['wallet_connect','stx_requestAccounts','connect','getAddresses','stx_getAddresses',
+      'stx_getAccounts','getAccounts','wallet_getAccount','requestAccounts'];
+  }
+  try {
+    const supported = extractSupportedMethods(await providerRequest(provider, 'supportedMethods'));
+    log(`leather advertises: ${supported.join(', ') || 'nothing'}`);
+    const advertised = leatherMethods.filter(m => supported.includes(m));
+    return advertised.length ? advertised : leatherMethods;
+  } catch { return leatherMethods; } // capability discovery is advisory
+}
+async function connectViaRequest(provider){
+  // Xverse only shows its account chooser on a FRESH wallet_connect — while a
+  // per-origin permission exists it silently reuses the approved account.
+  if (await isSelectedXverse(provider)) {
+    try { await walletRpc(provider, 'wallet_disconnect'); } catch { /* older builds */ }
+  }
+  let lastError = null;
+  for (const method of await connectAttempts(provider)) {
+    try {
+      const addresses = collectStacksAddresses(await walletRpc(provider, method));
+      if (addresses.length) { log(`connected via ${method}`); return addresses; }
+      log(`${method} returned no Stacks mainnet address`);
+    } catch (e) {
+      lastError = e;
+      if (isUserCancelled(e)) return [];
+      if (isMethodUnsupported(e)) { log(`${method} unsupported, trying next`); continue; }
+      throw e;
+    }
+  }
+  if (lastError) throw lastError;
+  return [];
+}
+
+/* ---- Xverse signing session ---- */
+// Xverse tracks the dapp connection per injected provider and per browsing
+// session, and its mobile in-app browser starts a fresh session each visit. A
+// signing request made without an active wallet_connect for this origin is
+// rejected before any confirmation UI.
+const XVERSE_ACCOUNT_CACHE_MS = 45_000;
+const XVERSE_READ_TIMEOUT_MS = 30_000;
+const XVERSE_SIGNING_WATCHDOG_MS = 120_000;
+let xverseAccount = null;
+const rememberXverseAccount = a => { if (a) xverseAccount = { address:a, at:Date.now() }; };
+const clearXverseAccountCache = () => { xverseAccount = null; };
+const readXverseAccountCache = () =>
+  xverseAccount && Date.now() - xverseAccount.at <= XVERSE_ACCOUNT_CACHE_MS ? xverseAccount.address : null;
+
+function withTimeout(promise, label, ms){
+  let timer;
+  return Promise.race([promise, new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Xverse did not answer ${label} within ${ms/1000}s`)), ms);
+  })]).finally(() => clearTimeout(timer));
+}
+// Xverse rejects with "Network mismatch" when its stored per-origin session was
+// created under a different network setting than the wallet's active network —
+// only the signing request exposes it. Drop the session, reconnect, retry once.
+const isNetworkMismatch = e => {
+  const m = String(e?.message ?? e ?? '').toLowerCase();
+  return m.includes('network mismatch') || (m.includes('mismatch') && m.includes('network'));
+};
+async function ensureXverseAccount(rpc, expected){
+  const assertExpected = (address, source) => {
+    if (expected && address !== expected) {
+      throw new Error(`Xverse active account ${address} (via ${source}) is not the connected ${expected}. Switch back to that account, or disconnect and reconnect.`);
+    }
+    return address;
+  };
+  const cached = readXverseAccountCache();
+  if (cached) return assertExpected(cached, 'cached-session');
+
+  let address = null;
+  try {
+    // Never probe with stx_getAccounts here: it opens a "Mismatched Network"
+    // prompt that gets rejected and surfaces to the user as "Network mismatch".
+    address = collectStacksAddresses(unwrapResponse(
+      await withTimeout(rpc.request('wallet_getAccount'), 'wallet_getAccount', XVERSE_READ_TIMEOUT_MS)))[0] || null;
+  } catch (e) {
+    if (isUserCancelled(e)) throw providerError(e);
+    log('xverse preflight: wallet_getAccount unavailable (' + (e.message||e) + ')');
+  }
+  if (address) { rememberXverseAccount(address); return assertExpected(address, 'wallet_getAccount'); }
+
+  const connected = collectStacksAddresses(unwrapResponse(await rpc.request('wallet_connect')))[0] || null;
+  if (!connected) throw new Error('Xverse did not return a Stacks account from wallet_connect');
+  rememberXverseAccount(connected);
+  return assertExpected(connected, 'wallet_connect');
+}
+async function requestXverseSigning(rpc, method, params, expected){
+  try { return unwrapResponse(await rpc.request(method, params)); }
+  catch (error) {
+    const failure = providerError(error);
+    if (!isNetworkMismatch(failure)) throw failure;
+    log('xverse network mismatch — refreshing the session and retrying once');
+    clearXverseAccountCache();
+    try { await rpc.request('wallet_disconnect'); } catch {}
+    const address = collectStacksAddresses(unwrapResponse(await rpc.request('wallet_connect')))[0] || null;
+    rememberXverseAccount(address);
+    if (!address || (expected && address !== expected)) {
+      throw new Error(address ? `Xverse reconnected as ${address}, not ${expected}` : failure.message);
+    }
+    return unwrapResponse(await rpc.request(method, params));
+  }
+}
+function extractTxid(payload, depth = 0){
+  if (depth > 6 || !payload) return null;
+  if (Array.isArray(payload)) { for (const e of payload) { const t = extractTxid(e, depth + 1); if (t) return t; } return null; }
+  if (typeof payload !== 'object') return null;
+  for (const key of ['txid','txId','transactionId']) {
+    if (typeof payload[key] === 'string' && payload[key].trim()) return payload[key].trim();
+  }
+  for (const key of ['result','data','payload','response','params']) {
+    if (key in payload) { const t = extractTxid(payload[key], depth + 1); if (t) return t; }
+  }
+  return null;
+}
+// Xverse validates stx_callContract against the sats-connect schema, which only
+// knows contract, functionName, functionArgs/arguments and the post conditions.
+// Out-of-spec fields are not ignored: an explicit network or sender is read as
+// "sign as this address/chain" and rejected before any confirmation UI. Sender
+// correctness is enforced by ensureXverseAccount instead.
+async function callContract(provider, { contractId, functionName, functionArgs, stxAddress }){
+  const { Cl } = await sdk();
+  const args = functionArgs.map(a => typeof a === 'string' ? a : Cl.serialize(a));
+  if (!(await isSelectedXverse(provider))) {
+    return extractTxid(await providerRequest(provider, 'stx_callContract', {
+      contract: contractId, functionName, functionArgs: args,
+      network: NETWORK, address: stxAddress, postConditionMode: 'allow'
+    }));
+  }
+  const rpc = xverseRpcProvider();
+  if (!rpc) throw Object.assign(new Error('Xverse request provider is not available'), { code:'XVERSE_RPC_UNAVAILABLE' });
+
+  // Xverse mobile can reject a request with only an in-app toast and leave the
+  // RPC promise pending forever. Track the stage so the timeout is diagnostic.
+  let stage = 'account-preflight';
+  const run = async () => {
+    const active = await ensureXverseAccount(rpc, stxAddress);
+    stage = 'stx_callContract';
+    return extractTxid(await requestXverseSigning(rpc, 'stx_callContract', {
+      contract: contractId, functionName, functionArgs: args,
+      // Older Xverse builds validate with a schema that reads only `arguments`
+      // and silently drop `functionArgs`; send both spellings.
+      arguments: args, postConditionMode: 'allow'
+    }, active));
+  };
+  return Promise.race([run(), new Promise((_, reject) => setTimeout(() => reject(new Error(
+    `Xverse did not answer the ${stage} request within ${XVERSE_SIGNING_WATCHDOG_MS/1000}s. If it showed an error toast, note the exact wording; if you approved, the transaction may still broadcast.`
+  )), XVERSE_SIGNING_WATCHDOG_MS))]);
+}
+
+/* ---- hashing ---- */
+const hex = u8 => [...u8].map(b => b.toString(16).padStart(2,'0')).join('');
+async function sha256(bytes){ return new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)); }
+function chunksOf(bytes){
+  const out = [];
+  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) out.push(bytes.subarray(i, i + CHUNK_SIZE));
+  return out;
+}
+// The contract verifies an incremental chain, not a flat digest:
+// running = sha256(running || chunk), starting from 32 zero bytes.
+async function chainHash(bytes){
+  let running = new Uint8Array(32);
+  for (const c of chunksOf(bytes)) {
+    const cat = new Uint8Array(running.length + c.length);
+    cat.set(running, 0); cat.set(c, running.length);
+    running = await sha256(cat);
+  }
+  return running;
+}
+async function describePayload(bytes){
+  const chunks = chunksOf(bytes);
+  return {
+    bytes, chunks,
+    size: bytes.length,
+    sha256: hex(await sha256(bytes)),
+    chain: hex(await chainHash(bytes))
+  };
+}
+
+/* ---- state ---- */
+function blankState(){
+  return { engine: null, engineTx: null, editions: {}, editionTx: {} };
+}
+function load(){
+  try { return { ...blankState(), ...JSON.parse(localStorage.getItem(keyFor()) || '{}') }; }
+  catch { return blankState(); }
+}
+function save(){
+  try { localStorage.setItem(keyFor(), JSON.stringify(state)); } catch {}
+  render();
+}
+const engineUrl = () => state.engine ? `https://xtrata.xyz/i/${state.engine}` : null;
+const editionsDone = () => Object.keys(state.editions).length;
+// An edition is off the table once it is confirmed OR once a transaction for it
+// has been broadcast and not yet resolved. Local "confirmed" state alone is not
+// enough: a lost poll (reload, sleeping tab, failed fetch) used to leave an
+// edition looking un-inscribed while its transaction landed on chain, and the
+// next signature targeted it again. That is how edition 16 got inscribed twice.
+const nextEdition = () => {
+  for (let n = 1; n <= SUPPLY; n++) {
+    if (state.editions[n]) continue;
+    if (state.editionTx[n]) continue;
+    return n;
+  }
+  return null;
+};
+// Only one signature request may be in flight at a time.
+let inFlight = false;
+
+/* ---- chain reads ---- */
+async function readOnly(fn, args = []){
+  const { fetchCallReadOnlyFunction, cvToJSON } = await sdk();
+  const cv = await fetchCallReadOnlyFunction({
+    contractAddress: XTRATA_ADDRESS, contractName: XTRATA_NAME,
+    functionName: fn, functionArgs: args,
+    senderAddress: XTRATA_ADDRESS, network: NETWORK
+  });
+  return cvToJSON(cv);
+}
+// cvToJSON wraps every Clarity container in another {type, value}. Descend until
+// a primitive of the wanted kind appears rather than hard-coding the nesting.
+function unwrapUint(node, depth = 0){
+  if (depth > 6 || node === null || node === undefined) return null;
+  if (typeof node === 'number') return node;
+  if (typeof node === 'string') return /^\d+$/.test(node) ? Number(node) : null;
+  if (typeof node === 'object' && 'value' in node) return unwrapUint(node.value, depth + 1);
+  return null;
+}
+function unwrapBool(node, depth = 0){
+  if (depth > 6 || node === null || node === undefined) return null;
+  if (typeof node === 'boolean') return node;
+  if (typeof node === 'string') return node === 'true' ? true : node === 'false' ? false : null;
+  if (typeof node === 'object' && 'value' in node) return unwrapBool(node.value, depth + 1);
+  return null;
+}
+async function fetchTx(txid){
+  const res = await fetch(`${HIRO}/extended/v1/tx/${txid}`);
+  if (!res.ok) throw new Error(`tx lookup failed: HTTP ${res.status}`);
+  return res.json();
+}
+// mint-single-tx-with-relationships returns (ok { token-id: uN, existed: bool }).
+function inscriptionIdFromTx(tx){
+  const repr = tx?.tx_result?.repr || '';
+  const m = repr.match(/token-id\s+u(\d+)/) || repr.match(/\(ok\s+u(\d+)\)/);
+  return m ? Number(m[1]) : null;
+}
+
+/* ---- duplicate prevention ----
+ * The contract keeps a HashToId map and exposes get-id-by-hash, so the chain
+ * itself can answer "has this exact content already been inscribed?". That is
+ * the only source of truth worth trusting — local progress can always drift.
+ * Note the contract records first-seen but does NOT reject duplicates, so this
+ * check has to happen here, before signing. */
+// A failed read must never be mistaken for "not on chain" — that is precisely how
+// a duplicate would slip through. Retry with backoff, and let a final failure
+// throw so the caller stops instead of signing.
+async function onChainIdForEdition(n, attempts = 4){
+  const { Cl } = await sdk();
+  const bytes = new TextEncoder().encode(wrapperHtml(n, engineUrl()));
+  const h = await chainHash(bytes);
+  let lastError = null;
+  for (let i = 0; i < attempts; i++) {
+    if (i) await new Promise(r => setTimeout(r, 800 * i * i));
+    try { return unwrapUint(await readOnly('get-id-by-hash', [Cl.buffer(h)])); }
+    catch (e) { lastError = e; log(`get-id-by-hash(${pad2(n)}) attempt ${i+1} failed: ${e.message||e}`); }
+  }
+  throw new Error(`could not read get-id-by-hash for edition ${pad2(n)} after ${attempts} attempts: ${lastError?.message || lastError}`);
+}
+let syncMsg = '';
+let syncing = false;
+async function doSyncFromChain(){
+  if (!state.engine || syncing) return null;
+  syncing = true;
+  syncMsg = 'reading all 33 hashes from mainnet…'; render();
+  try {
+    let found = 0, added = 0, cleared = 0;
+    for (let n = 1; n <= SUPPLY; n++) {
+      if (n > 1) await new Promise(r => setTimeout(r, 150)); // ease off the public node
+      const id = await onChainIdForEdition(n);
+      if (id) {
+        found++;
+        if (state.editions[n] !== id) { state.editions[n] = id; added++; }
+        delete state.editionTx[n];      // resolved: the content is on chain
+      } else if (state.editions[n]) {
+        delete state.editions[n]; cleared++;   // local said done, chain disagrees
+      }
+      syncMsg = `checking ${pad2(n)} / ${SUPPLY}…`; render();
+    }
+    save();
+    syncMsg = `<span class="ok">chain sync: ${found}/${SUPPLY} inscribed`
+      + (added ? `, ${added} corrected` : '') + (cleared ? `, ${cleared} cleared` : '') + '</span>';
+    log(`chain sync: ${found} inscribed, ${added} corrected, ${cleared} cleared`);
+    render();
+    return found;
+  } catch(e){
+    syncMsg = `<span class="err">chain sync failed: ${e.message||e}</span>`;
+    log('chain sync failed: ' + (e.message||e));
+    render();
+    return null;
+  } finally {
+    syncing = false;
+    render();
+  }
+}
+
+/* ---- actions ---- */
+async function doConnect(){
+  try {
+    await clearWalletSession();
+    me = null; walletAddresses = []; render();
+    const provider = await selectProvider();
+    if (!provider) { log('no wallet selected'); render(); return; }
+    const addresses = await connectViaRequest(provider);
+    useWalletAddresses(addresses, parentInfo?.owner);
+    if (!me) throw new Error('the wallet returned no valid SP or SM Stacks mainnet address');
+    if (await isSelectedXverse(provider)) rememberXverseAccount(me);
+    log(`connected Stacks signer ${me}`);
+    save();
+  } catch(e){
+    log(isUserCancelled(e) ? 'connect cancelled in the wallet' : 'connect failed: ' + (e.message||e));
+    render();
+  }
+}
+// Full teardown so the next connect re-opens the chooser and Xverse re-prompts
+// for an account instead of silently reusing the approved one.
+async function clearWalletSession(){
+  const s = await sdk().catch(() => null);
+  if (!s) return;
+  const previousId = await selectedProviderId();
+  const provider = await resolveProviderById(previousId).catch(() => undefined);
+  if (provider && isLeatherProviderId(previousId)) {
+    for (const method of ['stx_disconnect','wallet_disconnect','disconnect','deactivate']) {
+      try { await providerRequest(provider, method); break; } catch { /* try the next */ }
+    }
+  }
+  try { s.disconnect(); } catch {}
+  try { s.clearLocalStorage(); } catch {}
+  try { s.clearSelectedProviderId(); } catch {}
+  clearXverseAccountCache();
+}
+async function doDisconnect(){
+  await clearWalletSession();
+  me = null; walletAddresses = []; log('wallet disconnected'); render();
+}
+
+// render() rebuilds every step's innerHTML, so verification output must live in
+// state and be re-emitted from there — writing it into the DOM once would vanish
+// on the next redraw.
+let engineVerifyMsg = 'not loaded';
+let parentVerifyMsg = '';
+
+/* ---- unattended run ----
+ * Deliberately in-memory only. Persisting this would mean a page reload could
+ * start firing wallet prompts before anyone is watching; starting a run must
+ * always be a fresh, explicit click. Every individual signature is still
+ * approved in the wallet — this only removes the extra in-page confirm and
+ * chains the next request once the previous transaction confirms. */
+let autoRun = false;
+let autoMsg = '';
+function setAuto(msg, cls = ''){ autoMsg = cls ? `<span class="${cls}">${msg}</span>` : msg; render(); }
+function stopAuto(reason, cls = 'warn'){
+  if (!autoRun) return;
+  autoRun = false;
+  log('auto-run stopped: ' + reason);
+  setAuto('auto-run stopped — ' + reason, cls);
+}
+
+function engineVerifyHtml(){
+  if (!enginePayload) return engineVerifyMsg;
+  const p = enginePayload;
+  const sizeOk = p.size === ENGINE_EXPECT.bytes;
+  const shaOk = p.sha256 === ENGINE_EXPECT.sha256;
+  const chainOk = p.chain === ENGINE_EXPECT.chain;
+  const fits = p.chunks.length <= MAX_SINGLE_TX_CHUNKS;
+  const line = (ok, label, got, want) =>
+    `<div class="${ok?'ok':'err'}">${ok?'✓':'✗'} ${label} ${got}${ok?'':` — expected ${want}`}</div>`;
+  return line(sizeOk, 'bytes', p.size, ENGINE_EXPECT.bytes)
+    + line(shaOk, 'sha256', p.sha256.slice(0,16)+'…', ENGINE_EXPECT.sha256.slice(0,16)+'…')
+    + line(chainOk, 'expected-hash', '0x'+p.chain.slice(0,16)+'…', '0x'+ENGINE_EXPECT.chain.slice(0,16)+'…')
+    + line(fits, 'chunks', `${p.chunks.length} (${p.chunks.map(c=>c.length).join(', ')})`, `&lt;= ${MAX_SINGLE_TX_CHUNKS}`)
+    + (p.ok ? '<div class="ok">payload matches the verified build — signing enabled</div>'
+            : '<div class="err">payload does NOT match — signing stays disabled</div>');
+}
+function parentVerifyHtml(){
+  if (!parentInfo) return parentVerifyMsg;
+  const match = me && me === parentInfo.owner;
+  return `<div class="${parentInfo.sealed?'ok':'err'}">${parentInfo.sealed?'✓':'✗'} inscription ${PARENT_INSCRIPTION} sealed</div>
+    <div class="val">owner ${parentInfo.owner}</div>
+    ${me ? (match
+      ? '<div class="ok">✓ connected wallet is the owner — parents:[u2838] will pass</div>'
+      : `<div class="err">✗ connected wallet is ${me}.<br>validate-parent compares against tx-sender, so this would revert with ERR-NOT-AUTHORIZED. Connect the owning account.</div>`)
+    : '<div class="warn">connect a wallet to compare</div>'}`;
+}
+
+async function loadEngineBytes(bytes, source){
+  try {
+    if (!crypto?.subtle) throw new Error('crypto.subtle unavailable — open this page over http(s), not file://');
+    const p = await describePayload(bytes);
+    p.ok = p.size === ENGINE_EXPECT.bytes && p.sha256 === ENGINE_EXPECT.sha256
+        && p.chain === ENGINE_EXPECT.chain && p.chunks.length <= MAX_SINGLE_TX_CHUNKS;
+    enginePayload = p;
+    log(`engine loaded from ${source}: ${p.size} bytes, ${p.ok?'verified':'MISMATCH'}`);
+  } catch(e){
+    enginePayload = null;
+    engineVerifyMsg = `<span class="err">${e.message||e}</span>`;
+    log('engine load failed: ' + (e.message||e));
+  }
+  render();
+}
+async function doFetchEngine(){
+  $('e-verify').innerHTML = 'fetching…';
+  try {
+    const res = await fetch(ENGINE_PATH, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status} for ${ENGINE_PATH}`);
+    await loadEngineBytes(new Uint8Array(await res.arrayBuffer()), ENGINE_PATH);
+  } catch(e){
+    enginePayload = null;
+    engineVerifyMsg = `<span class="err">${e.message||e}</span><div class="note">Serve the project folder (<code>npm run serve</code>) or pick the file manually.</div>`;
+    log('engine fetch failed: ' + (e.message||e));
+    render();
+  }
+}
+async function doPickEngine(file){
+  if (!file) return;
+  await loadEngineBytes(new Uint8Array(await file.arrayBuffer()), file.name);
+}
+async function doCheckParent(){
+  $('p-verify').innerHTML = 'reading mainnet…';
+  try {
+    const { Cl } = await sdk();
+    const owner = await readOnly('get-owner', [Cl.uint(PARENT_INSCRIPTION)]);
+    const sealed = await readOnly('is-inscription-sealed', [Cl.uint(PARENT_INSCRIPTION)]);
+    const ownerAddr = owner?.value?.value?.value ?? owner?.value?.value ?? null;
+    if (typeof ownerAddr !== 'string') throw new Error(`inscription ${PARENT_INSCRIPTION} has no owner on ${XTRATA_NAME}`);
+    // get-owner is (response (optional principal)) and is-inscription-sealed is
+    // (optional bool), so both nest their real value under two or three `value`
+    // hops. Walk down to the primitive instead of guessing the depth.
+    parentInfo = { owner: ownerAddr, sealed: unwrapBool(sealed) === true };
+    log(`parent ${PARENT_INSCRIPTION}: owner ${parentInfo.owner}, sealed ${parentInfo.sealed}`);
+  } catch(e){
+    parentInfo = null;
+    parentVerifyMsg = `<span class="err">${e.message||e}</span>`;
+    log('parent check failed: ' + (e.message||e));
+  }
+  render();
+}
+
+async function inscribe({ bytes, parents, label, confirmText, skipConfirm }){
+  const { Cl } = await sdk();
+  const provider = await getStacksProvider();
+  if (!provider) throw new Error('no wallet provider — press “choose wallet/account” first');
+  const p = await describePayload(bytes);
+  if (p.chunks.length > MAX_SINGLE_TX_CHUNKS) throw new Error(`${p.chunks.length} chunks exceeds the single-tx limit`);
+  // In an unattended run the whole batch was confirmed once up front; the wallet
+  // signature stays the real gate for every individual transaction.
+  if (!skipConfirm && !confirm(confirmText)) { log(`${label}: cancelled before signing`); return null; }
+  log(`${label}: requesting signature — ${p.size} bytes, ${p.chunks.length} chunk(s), parents [${parents.join(', ')}]`);
+  const txid = await callContract(provider, {
+    contractId: XTRATA_CONTRACT,
+    functionName: MINT_FN,
+    functionArgs: [
+      Cl.bufferFromHex(p.chain),
+      Cl.stringAscii(MIME),
+      Cl.uint(p.size),
+      Cl.list(p.chunks.map(c => Cl.buffer(c))),
+      Cl.stringAscii(TOKEN_URI),
+      Cl.list([]),
+      Cl.list(parents.map(n => Cl.uint(n)))
+    ],
+    stxAddress: me
+  });
+  log(`${label}: broadcast ${txid || '(no txid returned)'}`);
+  return txid;
+}
+
+async function doInscribeEngine(){
+  const v = $('e-tx');
+  if (!enginePayload?.ok) { v.innerHTML = '<span class="err">payload not verified</span>'; return; }
+  try {
+    const txid = await inscribe({
+      bytes: enginePayload.bytes,
+      parents: [PARENT_INSCRIPTION],
+      label: 'engine',
+      confirmText: `Inscribe the v3 engine on Stacks MAINNET as a child of ${PARENT_INSCRIPTION}?\n\n`
+        + `${enginePayload.size} bytes · ${enginePayload.chunks.length} chunks\n`
+        + `protocol fee ~${(10000 + enginePayload.chunks.length*1000)/1e6} STX\n\nThis is irreversible.`
+    });
+    if (!txid) return;
+    state.engineTx = txid; save();
+    v.innerHTML = `<span class="ok">broadcast</span> <a href="${EXPLORER(txid)}" target="_blank" rel="noopener">${txid}</a>
+      <div class="note">Waiting for confirmation, then the inscription id is read from the transaction result.</div>`;
+    pollEngineTx(txid);
+  } catch(e){
+    v.innerHTML = `<span class="err">${isUserCancelled(e) ? 'cancelled in the wallet' : (e.message||e)}</span>`;
+    log('engine inscription failed: ' + (e.message||e));
+  }
+}
+async function pollEngineTx(txid){
+  for (let i = 0; i < 120; i++) {
+    await new Promise(r => setTimeout(r, 5000));
+    try {
+      const tx = await fetchTx(txid);
+      if (tx.tx_status === 'pending') continue;
+      if (tx.tx_status !== 'success') {
+        $('e-tx').innerHTML = `<span class="err">transaction ${tx.tx_status}: ${tx.tx_result?.repr || ''}</span>`;
+        log(`engine tx ${tx.tx_status}: ${tx.tx_result?.repr || ''}`);
+        return;
+      }
+      const id = inscriptionIdFromTx(tx);
+      if (!id) { $('e-tx').innerHTML = `<span class="warn">confirmed but could not parse the inscription id from ${tx.tx_result?.repr}</span>`; return; }
+      state.engine = id; save();
+      log(`engine inscribed as #${id}`);
+      return;
+    } catch(e){ log('poll: ' + (e.message||e)); }
+  }
+  log('engine tx poll timed out — check the explorer and paste the id manually');
+}
+
+async function doInscribeEdition(auto = false){
+  if (inFlight) { log('ignored — a signature request is already in flight'); return; }
+  if (auto && !autoRun) return; // stopped between the confirmation and this call
+  const v = $('c-tx');
+  let n = null;
+  inFlight = true;
+  try {
+    // Ask the chain before every signature. Whatever local progress claims, if
+    // this exact content is already inscribed we record it and move on rather
+    // than signing a second copy.
+    n = nextEdition();
+    while (n !== null) {
+      const existing = await onChainIdForEdition(n);
+      if (!existing) break;
+      log(`edition ${pad2(n)} is already on chain as #${existing} — skipping`);
+      state.editions[n] = existing; save();
+      n = nextEdition();
+    }
+    if (n === null) {
+      $('c-tx').innerHTML = '<span class="ok">nothing left to inscribe</span>';
+      stopAuto('all 33 editions inscribed', 'ok');
+      return;
+    }
+    if (auto) setAuto(`edition ${pad2(n)} — approve in your wallet…`);
+    const bytes = new TextEncoder().encode(wrapperHtml(n, engineUrl()));
+    const txid = await inscribe({
+      bytes,
+      parents: [state.engine],
+      label: `edition ${pad2(n)}`,
+      skipConfirm: auto,
+      confirmText: `Inscribe edition ${pad2(n)}/33 — "${TITLES[n-1]}" — on MAINNET as a child of ${state.engine}?\n\n`
+        + `${bytes.length} bytes · 1 chunk\nprotocol fee ~0.011 STX\n\nThis is irreversible.`
+    });
+    if (!txid) { stopAuto(`edition ${pad2(n)} returned no txid`, 'err'); return; }
+    state.editionTx[n] = txid; save();
+    $('c-tx').innerHTML = `<span class="ok">edition ${pad2(n)} broadcast</span> <a href="${EXPLORER(txid)}" target="_blank" rel="noopener">${txid}</a>`;
+    if (auto) setAuto(`edition ${pad2(n)} signed — waiting for confirmation…`, 'ok');
+    pollEditionTx(n, txid);
+  } catch(e){
+    const cancelled = isUserCancelled(e);
+    const at = n === null ? 'edition' : `edition ${pad2(n)}`;
+    v.innerHTML = `<span class="err">${cancelled ? 'cancelled in the wallet' : (e.message||e)}</span>`;
+    log(`${at} failed: ` + (e.message||e));
+    stopAuto(cancelled ? `${at} declined in the wallet` : `${at}: ${e.message||e}`,
+             cancelled ? 'warn' : 'err');
+  } finally {
+    inFlight = false;
+  }
+}
+async function pollEditionTx(n, txid){
+  for (let i = 0; i < 240; i++) {
+    await new Promise(r => setTimeout(r, 5000));
+    try {
+      const tx = await fetchTx(txid);
+      if (tx.tx_status === 'pending') continue;
+      if (tx.tx_status !== 'success') {
+        // Release the reservation so the edition can be retried — but only after
+        // confirming the chain really does not have it.
+        delete state.editionTx[n];
+        const onChain = await onChainIdForEdition(n).catch(() => null);
+        if (onChain) { state.editions[n] = onChain; log(`edition ${pad2(n)} tx ${tx.tx_status} but content is on chain as #${onChain}`); }
+        save();
+        log(`edition ${pad2(n)} tx ${tx.tx_status}: ${tx.tx_result?.repr || ''}`);
+        $('c-tx').innerHTML = `<span class="err">edition ${pad2(n)} ${tx.tx_status}: ${tx.tx_result?.repr || ''}</span>`;
+        stopAuto(`edition ${pad2(n)} ${tx.tx_status} — nothing further was signed`, 'err');
+        return;
+      }
+      const id = inscriptionIdFromTx(tx);
+      delete state.editionTx[n];
+      state.editions[n] = id ?? true; save();
+      log(`edition ${pad2(n)} inscribed as #${id ?? '?'}`);
+      if (autoRun) {
+        const next = nextEdition();
+        if (next === null) { stopAuto('all 33 editions inscribed', 'ok'); return; }
+        setAuto(`edition ${pad2(n)} confirmed — requesting ${pad2(next)} “${TITLES[next-1]}”…`, 'ok');
+        setTimeout(() => doInscribeEdition(true), 1500);
+      }
+      return;
+    } catch(e){ log('poll: ' + (e.message||e)); }
+  }
+  // A lost poll is exactly what caused edition 16 to be inscribed twice. Resolve
+  // it against the chain rather than leaving the edition in limbo.
+  const onChain = await onChainIdForEdition(n).catch(() => null);
+  if (onChain) { state.editions[n] = onChain; delete state.editionTx[n]; save();
+    log(`edition ${pad2(n)} poll timed out but content is on chain as #${onChain}`); }
+  else log(`edition ${pad2(n)} poll timed out and is not on chain — its transaction may still be pending`);
+  stopAuto(`edition ${pad2(n)} did not confirm within 20 minutes — run “sync from chain” before resuming`, 'warn');
+}
+async function doStartAuto(){
+  // Never start a batch from stale local progress — reconcile with the chain first.
+  setAuto('syncing with the chain before starting…');
+  const found = await doSyncFromChain();
+  if (found === null) { setAuto('chain sync failed — not starting', 'err'); return; }
+  const remaining = SUPPLY - editionsDone();
+  const first = nextEdition();
+  if (first === null) { setAuto('all 33 editions are already inscribed', 'ok'); return; }
+  const ok = confirm(
+    `Auto-sign the remaining ${remaining} edition${remaining===1?'':'s'} on MAINNET?\n\n`
+    + `Starting at #${pad2(first)} "${TITLES[first-1]}". Your wallet pops up for each one in turn, `
+    + `and the next request fires automatically once the previous transaction confirms.\n\n`
+    + `You still approve every signature in the wallet — nothing is signed without you. Declining one, `
+    + `or any failed transaction, stops the run.\n\n`
+    + `Total protocol fees ~${(remaining * 0.011).toFixed(3)} STX. This is irreversible.`
+  );
+  if (!ok) return;
+  autoRun = true;
+  log(`auto-run started at edition ${pad2(first)}, ${remaining} remaining`);
+  setAuto(`auto-run started — ${remaining} to go`, 'ok');
+  doInscribeEdition(true);
+}
+
+/* ---- steps ---- */
+const STEPS = [
+  {
+    id:'connect', title:'Connect wallet',
+    done:()=>!!me,
+    desc:()=>'Connect Leather or Xverse on Stacks mainnet. Inscribing the engine with <code>parents:[u2838]</code> requires the account that owns 2838 — the next step checks that for you.',
+    render(el){
+      const picker = walletAddresses.length > 1
+        ? `<select id="s-account">${walletAddresses.map(a => `<option value="${a}" ${a===me?'selected':''}>${a}</option>`).join('')}</select>`
+        : `<span class="val">${me||'—'}</span>`;
+      el.innerHTML += `<div class="row"><button id="s-connect" class="primary">choose wallet/account</button>
+        ${picker}${me?'<button id="s-disconnect">disconnect</button>':''}</div>
+        <div class="note">For a different Xverse account, switch account inside Xverse first, then press “choose wallet/account”. The canary clears stale cached addresses before reconnecting.</div>`;
+      el.querySelector('#s-connect').onclick = doConnect;
+      el.querySelector('#s-disconnect')?.addEventListener('click', doDisconnect);
+      el.querySelector('#s-account')?.addEventListener('change', e => { me=e.target.value; log(`selected signer ${me}`); render(); });
+    }
+  },
+  {
+    // Never gated: reading the chain and hashing the payload need no wallet, and
+    // both should be checkable before anyone is asked to connect one.
+    id:'parent', title:`Verify parent ${PARENT_INSCRIPTION}`,
+    gate:()=>true,
+    done:()=>!!(parentInfo?.sealed && me && parentInfo.owner === me),
+    desc:()=>'Reads the owner of 2838 from mainnet and compares it with the connected wallet. <code>validate-parent</code> checks ownership against <code>tx-sender</code>, so a mismatch here means the inscription reverts.',
+    render(el){
+      el.innerHTML += `<div class="row"><button id="p-check">check on mainnet</button>
+        <span class="lbl">contract</span><span class="val">${XTRATA_CONTRACT}</span></div>
+        <div class="verify" id="p-verify">${parentVerifyHtml()}</div>`;
+      el.querySelector('#p-check').onclick = doCheckParent;
+    }
+  },
+  {
+    id:'payload', title:'Load & verify the engine payload',
+    gate:()=>true,
+    done:()=>!!enginePayload?.ok,
+    desc:()=>`Loads <code>${ENGINE_FILE}</code> and checks its size, sha256 and incremental chain hash against the verified build. The sign button below stays disabled until all three match.`,
+    render(el){
+      el.innerHTML += `<div class="row"><button id="e-fetch" class="primary">load from project</button>
+        <input type="file" id="e-file" accept=".html" style="width:auto"></div>
+        <div class="verify" id="e-verify">${engineVerifyHtml()}</div>
+        <div class="note">Expected: ${ENGINE_EXPECT.bytes} bytes · sha256 ${ENGINE_EXPECT.sha256.slice(0,24)}… · chain 0x${ENGINE_EXPECT.chain.slice(0,24)}…</div>`;
+      el.querySelector('#e-fetch').onclick = doFetchEngine;
+      el.querySelector('#e-file').onchange = e => doPickEngine(e.target.files?.[0]);
+    }
+  },
+  {
+    id:'engine', title:'Inscribe the engine as a child of 2838',
+    gate:()=>!!enginePayload?.ok && !!me,
+    done:()=>!!state.engine,
+    desc:()=>`One transaction via <code>${MINT_FN}</code>: dependencies <code>[]</code>, parents <code>[u${PARENT_INSCRIPTION}]</code>. The engine never fetches 2838 at runtime, so the lineage is genealogy, not a content dependency.`,
+    render(el){
+      const owned = parentInfo && me && parentInfo.owner === me;
+      el.innerHTML += `<div class="row"><span class="lbl">token-uri</span><span class="val">${TOKEN_URI}</span></div>
+        <div class="row"><span class="lbl">mime</span><span class="val">${MIME}</span></div>
+        <div class="row"><button id="e-sign" class="primary" ${owned?'':'disabled'}>sign &amp; inscribe engine</button>
+          <input id="e-manual" placeholder="or paste a known engine inscription id" value="${state.engine||''}" style="max-width:280px">
+          <button id="e-save">save id</button></div>
+        ${owned ? '' : '<div class="verify warn">Run the parent check first and connect the owning account — signing is disabled until the wallet matches the owner of 2838.</div>'}
+        <div class="verify" id="e-tx">${state.engineTx ? `<a href="${EXPLORER(state.engineTx)}" target="_blank" rel="noopener">${state.engineTx}</a>` : ''}</div>
+        ${state.engine ? `<div class="verify ok">engine inscribed as #${state.engine} → <a href="${engineUrl()}" target="_blank" rel="noopener">${engineUrl()}</a></div>` : ''}`;
+      el.querySelector('#e-sign').onclick = doInscribeEngine;
+      el.querySelector('#e-save').onclick = ()=>{ const v = $('e-manual').value.trim(); state.engine = v ? Number(v) : null; log('engine id set to ' + state.engine); save(); };
+    }
+  },
+  {
+    id:'children', title:'Inscribe the 33 editions',
+    gate:()=>!!state.engine && !!me,
+    done:()=>editionsDone() >= SUPPLY,
+    desc:()=>'Each edition is a ~370-byte wrapper generated here from the same template as <code>scripts/build-collection.mjs</code>, pointing at the engine URL above, inscribed with <code>parents:[engine]</code>. One wallet signature each.',
+    render(el){
+      const n = nextEdition();
+      const doneCount = editionsDone();
+      const preview = n ? wrapperHtml(n, engineUrl()) : '';
+      el.innerHTML += `<div class="prog"><i style="width:${(doneCount/SUPPLY*100).toFixed(1)}%"></i></div>
+        <div class="row"><span class="lbl">progress</span><span class="val">${doneCount} / ${SUPPLY}</span>
+          <span class="lbl">engine url</span><span class="val">${engineUrl()}</span></div>
+        ${n ? `<div class="row">
+            <button id="c-sign" class="primary" ${autoRun||syncing?'disabled':''}>${syncing
+              ? 'checking the chain…'
+              : `sign &amp; inscribe #${pad2(n)} — ${TITLES[n-1]}`}</button>
+            ${autoRun
+              ? '<button id="c-stop" class="danger">stop auto-run</button>'
+              : `<button id="c-auto" class="link" ${syncing?'disabled':''}>auto-sign all remaining (${SUPPLY - doneCount})</button>`}
+            <button id="c-sync" class="link" ${autoRun||syncing?'disabled':''}>sync from chain</button>
+            <button id="c-preview" class="link">preview bytes</button></div>
+          <div class="note">Auto-run signs them back to back: the wallet pops up for each edition and the next
+            request fires as soon as the previous transaction confirms. Every signature is still approved by you —
+            declining one, or any failed transaction, stops the run.</div>
+          <pre id="c-previewout" style="display:none"></pre>` : '<div class="verify ok">all 33 editions inscribed</div>'}
+        ${syncMsg ? `<div class="verify">${syncMsg}</div>` : ''}
+        ${autoMsg ? `<div class="verify">${autoMsg}</div>` : ''}
+        <div class="verify" id="c-tx"></div>
+        ${doneCount ? `<table>${Object.keys(state.editions).sort((a,b)=>a-b).map(k =>
+          `<tr><td class="n">${pad2(k)}</td><td>${TITLES[k-1]}</td><td class="s">#${state.editions[k]}</td></tr>`).join('')}</table>` : ''}`;
+      el.querySelector('#c-sign')?.addEventListener('click', ()=>doInscribeEdition(false));
+      el.querySelector('#c-auto')?.addEventListener('click', doStartAuto);
+      el.querySelector('#c-sync')?.addEventListener('click', doSyncFromChain);
+      el.querySelector('#c-stop')?.addEventListener('click', ()=>stopAuto('stopped by you', 'warn'));
+      el.querySelector('#c-preview')?.addEventListener('click', ()=>{
+        const p = $('c-previewout'); p.style.display='block';
+        p.textContent = `${preview.length} bytes\n\n${preview}`;
+      });
+    }
+  },
+  {
+    id:'finish', title:'Rebuild the local collection',
+    gate:()=>!!state.engine,
+    done:()=>editionsDone() >= SUPPLY,
+    desc:()=>'Point the repo at the inscribed engine so the wrappers, gallery and manifest on disk match what is on chain.',
+    render(el){
+      el.innerHTML += `<pre>node scripts/build-collection.mjs ${engineUrl()} --engine-id ${state.engine}</pre>
+        <div class="note">The builder refuses to run if the engine artifact and the genome have drifted apart, so this doubles as a final consistency check.</div>`;
+    }
+  }
+];
+
+/* ---- render ---- */
+function render(){
+  $('who').textContent = me ? me.slice(0,8)+'…'+me.slice(-4) : 'not connected';
+  $('connect').textContent = 'choose wallet/account';
+  $('stateView').textContent = JSON.stringify({ engine: state.engine, engineTx: state.engineTx, editions: editionsDone() });
+  const box = $('steps'); box.innerHTML = '';
+  let prevDone = true;
+  STEPS.forEach((s, i)=>{
+    const done = s.done();
+    const locked = s.gate ? !s.gate() : !prevDone && !done;
+    const el = document.createElement('div');
+    el.className = 'step' + (done?' done':'') + (locked?' locked':'');
+    el.innerHTML = `<h2><span class="num">${done?'✓':i+1}</span>${s.title}<span class="badge">${done?'DONE':locked?'LOCKED':'TODO'}</span></h2>
+      <div class="desc">${s.desc()}</div>`;
+    if (!locked) s.render(el);
+    box.appendChild(el);
+    prevDone = done;
+  });
+}
+
+/* ---- wiring ---- */
+$('connect').onclick = doConnect;
+$('exportState').onclick = ()=>{ const p=$('cfgOut'); p.style.display='block'; p.textContent = JSON.stringify(state, null, 2); };
+$('resetState').onclick = ()=>{ if(confirm('Reset saved inscription progress? On-chain inscriptions are not affected.')){ state=blankState(); save(); } };
+render();
+
+// Reconcile with the chain on load. Local progress only advances when a poll
+// completes, so a reload or a lost poll leaves the "next edition" label showing
+// something that is already inscribed. The pre-sign guard makes that harmless,
+// but the display should not lie — read the truth instead of waiting to be asked.
+(async()=>{
+  if (!state.engine) return;
+  try { await doSyncFromChain(); }
+  catch(e){ log('startup chain sync failed: ' + (e.message||e)); }
+})();
+
+// Restore the last signer from @stacks/connect's own cache so a reload doesn't
+// look disconnected. Only a fresh connect can prove the wallet still holds this
+// account, so pressing "choose wallet/account" always re-runs the full handshake.
+(async()=>{
+  try {
+    const s = await sdk();
+    if (!(await selectedProviderId())) return;
+    const cached = (s.getLocalStorage?.()?.addresses?.stx ?? []).map(e => e?.address).filter(isMainnetStacksAddress);
+    if (!cached.length) return;
+    useWalletAddresses([...new Set(cached)], null);
+    log(`restored cached signer ${me} — reconnect to confirm it with the wallet`);
+    render();
+  } catch { /* offline / no wallet libs */ }
+})();
+// Reloading mid-run drops the in-memory autoRun flag and the pending poll, so a
+// signed-but-unconfirmed edition would look unstarted. Progress is saved, so this
+// only costs a resume click, but warn anyway.
+addEventListener('beforeunload', e => { if (autoRun) { e.preventDefault(); e.returnValue = ''; } });
+
+window.__canary = {
+  get state(){return state;}, get me(){return me;}, get enginePayload(){return enginePayload;},
+  get autoRun(){return autoRun;}, get inFlight(){return inFlight;},
+  startAuto: doStartAuto, stopAuto: ()=>stopAuto('stopped by you'),
+  syncFromChain: doSyncFromChain, onChainIdForEdition, nextEdition,
+  get parentInfo(){return parentInfo;}, get walletAddresses(){return walletAddresses.slice();},
+  wrapperHtml, describePayload, chainHash, inscriptionIdFromTx, STEPS,
+  doConnect, doDisconnect, selectProvider, connectViaRequest, collectStacksAddresses,
+  installedProvidersOnHost, walletHostWindow,
+  setState: s=>{ state={...state,...s}; save(); }, setMe: a=>{ me=a; render(); }
+};
+log('Proof of Free V3 canary ready — mainnet');
+</script>
+</body>
+</html>

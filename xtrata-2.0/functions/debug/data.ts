@@ -79,13 +79,36 @@ export const onRequest: PagesFunction = async ({ request, env }) => {
         ),
         queryAll(
           e,
-          `SELECT error_fingerprint AS fingerprint, flow, step, error_code AS errorCode,
-                MIN(error_message) AS sample, COUNT(*) AS occurrences,
-                COUNT(DISTINCT session_id) AS sessions,
-                COUNT(DISTINCT wallet_hash) AS wallets, MAX(received_at) AS lastSeen
-         FROM telemetry_events
-         WHERE outcome='error' AND received_at > ?
-         GROUP BY error_fingerprint ORDER BY occurrences DESC LIMIT 25`,
+          `WITH ranked AS (
+             SELECT *,
+                    ROW_NUMBER() OVER (
+                      PARTITION BY error_fingerprint
+                      ORDER BY received_at DESC, id DESC
+                    ) AS occurrence_rank
+             FROM telemetry_events
+             WHERE outcome='error' AND received_at > ?
+           )
+           SELECT error_fingerprint AS fingerprint,
+                  MAX(CASE WHEN occurrence_rank=1 THEN flow END) AS flow,
+                  MAX(CASE WHEN occurrence_rank=1 THEN step END) AS step,
+                  MAX(CASE WHEN occurrence_rank=1 THEN error_code END) AS errorCode,
+                  MAX(CASE WHEN occurrence_rank=1 THEN error_message END) AS sample,
+                  COUNT(*) AS occurrences,
+                  COUNT(DISTINCT session_id) AS sessions,
+                  COUNT(DISTINCT wallet_hash) AS wallets,
+                  MAX(received_at) AS lastSeen,
+                  MAX(CASE WHEN occurrence_rank=1 THEN app_version END) AS appVersion,
+                  MAX(CASE WHEN occurrence_rank=1 THEN wallet_kind END) AS walletKind,
+                  MAX(CASE WHEN occurrence_rank=1 THEN ua_browser END) AS browser,
+                  MAX(CASE WHEN occurrence_rank=1 THEN ua_os END) AS os,
+                  MAX(CASE WHEN occurrence_rank=1 THEN device END) AS device,
+                  MAX(CASE WHEN occurrence_rank=1 THEN route END) AS route,
+                  MAX(CASE WHEN occurrence_rank=1 THEN error_stack END) AS stack,
+                  MAX(CASE WHEN occurrence_rank=1 THEN context_json END) AS context
+           FROM ranked
+           GROUP BY error_fingerprint
+           ORDER BY occurrences DESC
+           LIMIT 25`,
           [since]
         ),
         queryAll(

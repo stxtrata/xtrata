@@ -70,3 +70,10 @@ export const applyHiroApiKey = (headers: Headers, apiKey: string | null) => {
 };
 
 export const shouldRetryWithNextHiroKey = (status: number) => HIRO_RETRYABLE_STATUSES.has(status);
+
+// Statuses worth retrying with the SAME key after a pause, rather than rotating
+// to the next one: the upstream node is briefly unavailable or throttling, not
+// rejecting our credentials. Rotating keys does not help; waiting does.
+const HIRO_TRANSIENT_STATUSES = new Set([429, 500, 502, 503, 504]);
+
+export const isTransientHiroStatus = (status: number) => HIRO_TRANSIENT_STATUSES.has(status);

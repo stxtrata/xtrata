@@ -73,6 +73,11 @@ describe('homepage content configuration', () => {
     expect(radioSource).toContain("fetch(ids ? `/warm?ids=${ids}` : '/warm?auto=2').catch");
   });
 
+  it('does not require Array.prototype.at during global homepage initialisation', () => {
+    expect(homeMainSource).toContain('dropDiagnostics[dropDiagnostics.length - 1]');
+    expect(homeMainSource).not.toContain('dropDiagnostics.at(-1)');
+  });
+
   it('keeps Claim and Collect navigation inside the SPA', () => {
     expect(homeMainSource).toContain(
       "['inscribe', 'my-wallet', 'wallet', 'xplorer', 'x', 'drops', 'market', 'create-wizard'].includes(seg)"

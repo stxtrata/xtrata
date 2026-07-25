@@ -20,6 +20,8 @@
   button.primary { border-color: var(--mint); color: #051; background: var(--mint); font-weight: 700; }
   button.link { border-color: #3a3a70; color: #b9b6ff; }
   input { width: 100%; }
+  select { max-width: 100%; }
+  .note { font-size: 10px; opacity: .62; line-height: 1.45; margin-top: 7px; }
   .addr { font-size: 11px; opacity: .8; }
   .net { display: flex; gap: 0; border: 1px solid #2c2c36; border-radius: 8px; overflow: hidden; }
   .net button { border: none; border-radius: 0; padding: 8px 12px; }
@@ -47,12 +49,11 @@
 </head>
 <body>
   <h1>PROOF OF FREE · CANARY</h1>
-  <div class="sub">Step-through deploy for Xtrata — one Stacks wallet drives it all. Inscribing hands off to Xtrata; the contract + verification sign in-browser.</div>
+  <div class="sub">Mainnet canary for Xtrata — the confirmed contract owner is fixed separately from whichever Stacks wallet is currently connected.</div>
 
   <div class="bar">
     <div class="net" id="net">
-      <button data-net="testnet" class="on">testnet</button>
-      <button data-net="mainnet">mainnet</button>
+      <button data-net="mainnet" class="on">mainnet</button>
     </div>
     <div class="grow"></div>
     <span class="addr" id="who">not connected</span>
@@ -62,12 +63,12 @@
   <div id="steps"></div>
 
   <div class="panel">
-    <h3>STATE · <span id="stateNet">testnet</span></h3>
+    <h3>STATE · <span id="stateNet">mainnet</span></h3>
     <div id="stateView" class="val"></div>
     <div class="row">
       <button id="copyCfg" class="link">copy pof-chain config</button>
       <button id="exportState">export</button>
-      <button id="resetState">reset this network</button>
+      <button id="resetState">reset progress</button>
     </div>
     <pre id="cfgOut" style="display:none"></pre>
   </div>
@@ -75,43 +76,289 @@
   <div class="panel"><h3>LOG</h3><div id="log"></div></div>
 
 <script type="module">
-// Chain libs load on demand — the page renders offline; the wallet only loads when you act.
+// Chain libs load on demand — the page renders offline; the wallet only loads
+// when you act. Versions are pinned: the wallet layer below is written against
+// these exact APIs and an open range would silently change provider behaviour.
+const LIB = {
+  connect: 'https://esm.sh/@stacks/connect@8.2.6',
+  connectUi: 'https://esm.sh/@stacks/connect-ui@8.1.2',
+  connectUiLoader: 'https://esm.sh/@stacks/connect-ui@8.1.2/loader',
+  transactions: 'https://esm.sh/@stacks/transactions@7.4.0'
+};
 let _sdk = null;
 async function sdk(){
   if (!_sdk) {
-    const [c, t] = await Promise.all([
-      import('https://esm.sh/@stacks/connect@8'),
-      import('https://esm.sh/@stacks/transactions@7'),
+    const [c, ui, loader, t] = await Promise.all([
+      import(LIB.connect), import(LIB.connectUi), import(LIB.connectUiLoader), import(LIB.transactions)
     ]);
-    _sdk = { ...c, Cl: t.Cl, fetchCallReadOnlyFunction: t.fetchCallReadOnlyFunction, cvToJSON: t.cvToJSON };
+    _sdk = {
+      DEFAULT_PROVIDERS: c.DEFAULT_PROVIDERS,
+      disconnect: c.disconnect,
+      clearLocalStorage: c.clearLocalStorage,
+      getLocalStorage: c.getLocalStorage,
+      getSelectedProviderId: ui.getSelectedProviderId,
+      setSelectedProviderId: ui.setSelectedProviderId,
+      clearSelectedProviderId: ui.clearSelectedProviderId,
+      getProviderFromId: ui.getProviderFromId,
+      defineCustomElements: loader.defineCustomElements,
+      Cl: t.Cl,
+      fetchCallReadOnlyFunction: t.fetchCallReadOnlyFunction,
+      cvToJSON: t.cvToJSON,
+      validateStacksAddress: t.validateStacksAddress
+    };
+    validateAddress = t.validateStacksAddress;
   }
   return _sdk;
 }
+// Upgraded to the real c32 checksum test as soon as @stacks/transactions loads.
+let validateAddress = null;
 
-const CONTRACT_SRC = ";; Proof of Free - recording fees\n;; ---------------------------------------------------------------------------\n;; Everything else lives natively on Xtrata: the editions are Xtrata inscriptions\n;; (SIP-009 tokens), ownership and transfers are Xtrata's, child recordings that\n;; evolve a synth are inscribed as Xtrata parent-child links, and a tile is\n;; revealed in the mosaic by its ownership (out of the treasury wallet).\n;;\n;; This contract does ONE thing: collect the fee to inscribe a derivative\n;; recording to the treasury, with an on-chain receipt. Fees are owner-updatable.\n;;   kind u0 = child performance (xtrata-performance JSON) -> 0.1 STX\n;;   kind u1 = live set        (xtrata-session JSON)      -> 1 STX\n;; ---------------------------------------------------------------------------\n\n(define-constant ERR-OWNER-ONLY (err u100))\n(define-constant ERR-BAD-KIND (err u101))\n\n(define-data-var contract-owner principal tx-sender)\n(define-data-var treasury principal tx-sender)          ;; the Xtrata wallet\n(define-data-var child-fee uint u100000)                ;; 0.1 STX (micro-STX)\n(define-data-var live-set-fee uint u1000000)            ;; 1 STX\n(define-data-var receipts-count uint u0)\n\n;; a receipt ties a fee payment to the recording it inscribes\n(define-map receipts uint { payer: principal, kind: uint, parent: uint, ref: (string-ascii 80), height: uint })\n\n(define-private (is-owner) (is-eq tx-sender (var-get contract-owner)))\n\n;; Pay to inscribe a recording. `parent` = the edition being evolved (u0 for a\n;; live set); `ref` = the recording's Xtrata inscription id or content hash.\n(define-public (pay-inscription-fee (kind uint) (parent uint) (ref (string-ascii 80)))\n  (let ((fee (if (is-eq kind u1) (var-get live-set-fee) (var-get child-fee)))\n        (rid (+ (var-get receipts-count) u1)))\n    (asserts! (or (is-eq kind u0) (is-eq kind u1)) ERR-BAD-KIND)\n    (try! (stx-transfer? fee tx-sender (var-get treasury)))\n    (map-set receipts rid { payer: tx-sender, kind: kind, parent: parent, ref: ref, height: burn-block-height })\n    (var-set receipts-count rid)\n    (print { event: \"recording-fee\", id: rid, kind: kind, parent: parent, ref: ref, payer: tx-sender, fee: fee })\n    (ok rid)))\n\n;; ---- owner admin ----\n(define-public (set-child-fee (n uint))\n  (begin (asserts! (is-owner) ERR-OWNER-ONLY) (var-set child-fee n) (ok true)))\n(define-public (set-live-set-fee (n uint))\n  (begin (asserts! (is-owner) ERR-OWNER-ONLY) (var-set live-set-fee n) (ok true)))\n(define-public (set-treasury (who principal))\n  (begin (asserts! (is-owner) ERR-OWNER-ONLY) (var-set treasury who) (ok true)))\n(define-public (transfer-ownership (who principal))\n  (begin (asserts! (is-owner) ERR-OWNER-ONLY) (var-set contract-owner who) (ok true)))\n\n;; ---- read-only ----\n(define-read-only (get-fees) { child: (var-get child-fee), liveSet: (var-get live-set-fee) })\n(define-read-only (get-receipt (rid uint)) (map-get? receipts rid))\n(define-read-only (get-receipts-count) (var-get receipts-count))\n(define-read-only (get-treasury) (var-get treasury))\n(define-read-only (get-owner) (var-get contract-owner))\n";
+const NETWORK = 'mainnet';
 const CONTRACT_NAME = 'recording-fees';
+// Must match the deployer of DEPLOY_TX exactly. c32 carries a checksum, so a
+// single mistyped character makes the whole principal invalid — verified against
+// the on-chain sender of the deployment transaction.
+const MAINNET_TREASURY = 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7';
+const CONTRACT_ID = `${MAINNET_TREASURY}.${CONTRACT_NAME}`;
+const DEPLOY_TX = '0x704d780d94638c798764c46fb677c3b9de07a2e7a6ff07f5d259e98e83dbdb9a';
+const ENGINE_ID = '#2838';
 const XTRATA = 'https://xtrata.xyz';
+const EXPLORER_TX = `https://explorer.hiro.so/txid/${DEPLOY_TX}?chain=mainnet`;
+const EXPLORER_CONTRACT = `https://explorer.hiro.so/txid/${CONTRACT_ID}?chain=mainnet`;
+const DEPLOYMENT = Object.freeze({
+  treasury: MAINNET_TREASURY,
+  engineId: ENGINE_ID,
+  contractId: CONTRACT_ID,
+  deployTx: DEPLOY_TX,
+});
 const $ = id => document.getElementById(id);
 const log = m => { const el = $('log'); el.textContent = `[${new Date().toISOString().slice(11,19)}] ${m}\n` + el.textContent; };
 
-let net = 'testnet';
+const net = NETWORK;
 let me = null;
+let walletAddresses = [];
 let state = load();
 
-function keyFor(n){ return `pof-canary-${n}`; }
-function load(){ try { return JSON.parse(localStorage.getItem(keyFor(net)) || '{}'); } catch { return {}; } }
-function save(){ try { localStorage.setItem(keyFor(net), JSON.stringify(state)); } catch {} render(); }
+function keyFor(){ return `pof-canary-${NETWORK}`; }
+// Shape first (c32 deliberately excludes I, L, O and U), then the checksum once
+// the chain libs are loaded. The shape test alone accepts a mistyped character
+// that happens to be valid c32 — only the checksum rejects it.
+function isMainnetStacksAddress(address){
+  if (typeof address !== 'string' || !/^(SP|SM)[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26,39}$/.test(address)) return false;
+  return validateAddress ? validateAddress(address) : true;
+}
+function useWalletAddresses(addresses, preferred){
+  walletAddresses = addresses;
+  me = addresses.find(a => a === preferred) || addresses[0] || null;
+}
+
+/* ---- wallet layer, ported from the main Xtrata app (src/lib/wallet/connect.ts) ---- */
+
+// This page is inscribed and viewed inside an iframe (ordinals explorers, the
+// mosaic, the Xtrata viewer). Wallet extensions inject their providers into the
+// TOP window only, while @stacks/connect ships an Asigna shim that defines
+// window.AsignaProvider inside EVERY iframe — so detecting against the local
+// window lists Asigna as the only "installed" wallet and hides Leather/Xverse.
+// All detection and resolution goes through the top same-origin window when one
+// exists; cross-origin embeds fall back to the local window.
+function walletHostWindow(){
+  try {
+    const top = window.top;
+    if (top && top !== window.self && top.location.origin === window.location.origin) return top;
+  } catch { /* cross-origin parent: its providers are unreachable */ }
+  return window;
+}
+function resolveProviderOnWindow(win, id){
+  if (!win || !id) return undefined;
+  return id.split('.').reduce((acc, part) => acc?.[part], win);
+}
+// connect-ui only reads webbtc_stx_providers / wbip_providers, while current
+// Xverse builds register their WBIP provider in btc_providers (some releases
+// used webbtc_providers). Merge all four so the chooser sees what is injected.
+function registeredProviders(win){
+  if (!win) return [];
+  const merged = [
+    ...(win.btc_providers ?? []), ...(win.wbip_providers ?? []),
+    ...(win.webbtc_providers ?? []), ...(win.webbtc_stx_providers ?? [])
+  ];
+  return merged.filter((entry, i) => Boolean(entry?.id) && merged.findIndex(c =>
+    c.id === entry.id || (c.name && entry.name && c.name.toLowerCase() === entry.name.toLowerCase())) === i);
+}
+const isLeatherProviderId = id => typeof id === 'string' && id.toLowerCase().includes('leather');
+const isXverseProviderId = id => typeof id === 'string' && id.toLowerCase().includes('xverse');
+function isRegisteredXverseProviderId(id){
+  return !!id && registeredProviders(walletHostWindow()).some(e =>
+    e.id === id && (isXverseProviderId(e.id) || e.name?.toLowerCase().includes('xverse')));
+}
+const XVERSE_RPC_IDS = ['XverseProviders.BitcoinProvider', 'xverseProviders.BitcoinProvider', 'BitcoinProvider'];
+function xverseRpcProvider(){
+  const host = walletHostWindow();
+  const ids = registeredProviders(host)
+    .filter(e => isXverseProviderId(e.id) || e.name?.toLowerCase().includes('xverse'))
+    .map(e => e.id)
+    .concat(XVERSE_RPC_IDS);
+  for (const id of ids) {
+    const p = resolveProviderOnWindow(host, id) ?? (host === window ? undefined : resolveProviderOnWindow(window, id));
+    if (typeof p?.request === 'function') return p;
+  }
+  return undefined;
+}
+// The chooser still persists XverseProviders.StacksProvider, but current Xverse
+// exposes only BitcoinProvider. Treat the old id as an alias for the real
+// request bridge instead of falling through to window.StacksProvider's stub.
+async function resolveProviderById(id){
+  if (!id) return undefined;
+  const { getProviderFromId } = await sdk();
+  const host = walletHostWindow();
+  const exact = resolveProviderOnWindow(host, id)
+    ?? (host === window ? undefined : resolveProviderOnWindow(window, id))
+    ?? getProviderFromId(id);
+  if (exact) return exact;
+  return (isXverseProviderId(id) || isRegisteredXverseProviderId(id)) ? xverseRpcProvider() : undefined;
+}
+function installedProvidersOnHost(defaults){
+  const host = walletHostWindow();
+  const registered = registeredProviders(host);
+  return registered.concat(defaults.filter(d =>
+    !registered.find(e => e.id === d.id) && !!resolveProviderOnWindow(host, d.id)));
+}
+async function selectedProviderId(){ return (await sdk()).getSelectedProviderId(); }
+async function getStacksProvider(){
+  const selected = await resolveProviderById(await selectedProviderId());
+  if (selected) return selected;
+  const w = walletHostWindow();
+  return w.LeatherProvider ?? w.XverseProviders?.StacksProvider ?? w.xverseProviders?.StacksProvider
+    ?? xverseRpcProvider() ?? w.StacksProvider ?? w.BlockstackProvider;
+}
+async function isSelectedXverse(provider){
+  const id = await selectedProviderId();
+  if (isXverseProviderId(id) || isRegisteredXverseProviderId(id)) return true;
+  const w = walletHostWindow();
+  return provider === w.XverseProviders?.StacksProvider || provider === w.xverseProviders?.StacksProvider
+    || provider === xverseRpcProvider();
+}
+
+// Drive connect-ui's chooser ourselves so installedProviders comes from the
+// host window rather than this frame.
+async function selectProvider(){
+  const { DEFAULT_PROVIDERS, defineCustomElements, setSelectedProviderId } = await sdk();
+  defineCustomElements(window);
+  const chosenId = await new Promise(resolve => {
+    const modal = document.createElement('connect-modal');
+    const overflow = document.body.style.overflow;
+    const cleanup = () => { document.body.style.overflow = overflow; document.removeEventListener('keydown', onKey); modal.remove(); };
+    const onKey = e => { if (e.key === 'Escape') { cleanup(); resolve(null); } };
+    modal.defaultProviders = DEFAULT_PROVIDERS;
+    modal.installedProviders = installedProvidersOnHost(DEFAULT_PROVIDERS);
+    modal.persistSelection = false; // persisted below, against the host-resolved provider
+    modal.callback = sel => { cleanup(); resolve(typeof sel === 'string' ? sel : null); };
+    modal.cancelCallback = () => { cleanup(); resolve(null); };
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(modal);
+  });
+  if (!chosenId) return null;
+  const provider = await resolveProviderById(chosenId);
+  if (provider) { try { setSelectedProviderId(chosenId); } catch {} }
+  log(`provider selected ${chosenId}${provider ? '' : ' (could not resolve — is the wallet unlocked?)'}`);
+  return provider ?? null;
+}
+
+/* ---- provider request plumbing ---- */
+function providerError(value){
+  if (value instanceof Error) return value;
+  const c = value && typeof value === 'object' ? value : {};
+  const nested = c.error && typeof c.error === 'object' ? c.error : null;
+  const err = new Error(String(nested?.message || c.message || c.error || value || 'wallet request failed'));
+  err.code = nested?.code ?? c.code;
+  return err;
+}
+function unwrapResponse(response){
+  if (response && typeof response === 'object') {
+    if (response.error) throw providerError(response);
+    if (response.status === 'error') throw providerError(response.result ?? response);
+  }
+  return response;
+}
+async function providerRequest(provider, method, params){
+  if (typeof provider?.request !== 'function') throw new Error(`wallet has no request("${method}") bridge`);
+  try { return unwrapResponse(await provider.request(method, params)); }
+  catch (e) { throw providerError(e); }
+}
+// Xverse account permission lives on the BitcoinProvider object that answered
+// wallet_connect — keep every later call on that same bridge.
+async function walletRpc(provider, method, params){
+  if (!(await isSelectedXverse(provider))) return providerRequest(provider, method, params);
+  const rpc = xverseRpcProvider();
+  if (!rpc) throw Object.assign(new Error('Xverse request provider is not available'), { code:'XVERSE_RPC_UNAVAILABLE' });
+  try { return unwrapResponse(await rpc.request(method, params)); }
+  catch (e) { throw providerError(e); }
+}
+function isMethodUnsupported(error){
+  const msg = String(error?.message ?? error ?? '').toLowerCase();
+  return error?.code === -32601 || ['method not found','not supported','unsupported','not available',
+    'not implemented','request function is not implemented'].some(s => msg.includes(s));
+}
+function isUserCancelled(error){
+  if (error?.code === 4001 || error?.code === -31001) return true;
+  const msg = String(error?.message ?? error ?? '').trim().toLowerCase();
+  return /\buser (?:cancelled|canceled|rejected|denied|closed)\b/.test(msg)
+    || /\b(?:cancelled|canceled|rejected|denied) by (?:the )?user\b/.test(msg)
+    || msg === 'cancelled' || msg === 'canceled';
+}
+// Connect responses differ per wallet and per method (getAddresses, wallet_connect,
+// stx_getAccounts, wallet_getAccount all nest the address differently), so walk
+// the payload instead of guessing one shape. Bitcoin addresses fail the c32 test.
+function collectStacksAddresses(payload, out = [], depth = 0){
+  if (depth > 8 || payload === null || typeof payload === 'undefined') return out;
+  if (typeof payload === 'string') {
+    const t = payload.trim();
+    if (isMainnetStacksAddress(t) && !out.includes(t)) out.push(t);
+    return out;
+  }
+  if (Array.isArray(payload)) { payload.forEach(e => collectStacksAddresses(e, out, depth + 1)); return out; }
+  if (typeof payload !== 'object') return out;
+  for (const key of ['address','stxAddress','selectedAddress','identityAddress','mainnet',
+    'addresses','accounts','result','data','payload','response','profile','userData']) {
+    if (key in payload) collectStacksAddresses(payload[key], out, depth + 1);
+  }
+  return out;
+}
+function normaliseState(saved = {}){
+  const next = { ...DEPLOYMENT, ...saved };
+  next.treasury = MAINNET_TREASURY;
+  next.contractId = CONTRACT_ID;
+  next.deployTx = DEPLOY_TX;
+  next.engineId = next.engineId || ENGINE_ID;
+  return next;
+}
+function load(){
+  try { return normaliseState(JSON.parse(localStorage.getItem(keyFor()) || '{}')); }
+  catch { return normaliseState(); }
+}
+function save(){
+  state = normaliseState(state);
+  try { localStorage.setItem(keyFor(), JSON.stringify(state)); } catch {}
+  render();
+}
 
 /* ---- step definitions ---- */
 const STEPS = [
   {
     id:'connect', title:'Connect wallet',
     done:()=>!!me,
-    desc:()=>'Connect Leather or Xverse and pick the network above. The connected wallet becomes the collection owner + treasury when you deploy the contract.',
+    desc:()=>'Connect Leather or Xverse on Stacks mainnet. The connected signer may be different from the fixed contract owner. Bitcoin addresses are ignored.',
     render(el){
-      el.innerHTML += `<div class="row"><button id="s-connect" class="primary">${me?'reconnect':'connect'}</button>
-        <span class="val">${me?me:'—'}</span></div>`;
+      const ownerNote = me && me !== MAINNET_TREASURY
+        ? '<div class="verify">Connected signer differs from the deployed owner/treasury. This is allowed; it can still pay the optional recording fee.</div>'
+        : me ? '<div class="verify ok">Connected as the deployed owner/treasury.</div>' : '';
+      const picker = walletAddresses.length > 1 ? `<select id="s-account">${walletAddresses.map(a => `<option value="${a}" ${a===me?'selected':''}>${a}</option>`).join('')}</select>` : `<span class="val">${me||'—'}</span>`;
+      el.innerHTML += `<div class="row"><button id="s-connect" class="primary">choose wallet/account</button>
+        ${picker}${me?'<button id="s-disconnect">disconnect</button>':''}</div>
+        <div class="note">For a different Xverse account, switch account inside Xverse first, then press “choose wallet/account”. The canary clears stale cached addresses before reconnecting.</div>${ownerNote}`;
       el.querySelector('#s-connect').onclick = doConnect;
+      el.querySelector('#s-disconnect')?.addEventListener('click', doDisconnect);
+      el.querySelector('#s-account')?.addEventListener('change', e => { me=e.target.value; log(`selected signer ${me}`); render(); });
     }
   },
   {
@@ -126,16 +373,17 @@ const STEPS = [
     }
   },
   {
-    id:'contract', title:`Deploy the ${CONTRACT_NAME} contract`, gate:()=>!!me,
-    done:()=>!!state.contractId,
-    desc:()=>'Deploys the recording-fee contract from your wallet (owner + treasury = you). Sign the deploy, then verify the fees read back as 0.1 / 1 STX.',
+    id:'contract', title:`Use the deployed ${CONTRACT_NAME} contract`,
+    done:()=>state.contractId===CONTRACT_ID,
+    desc:()=>'The recording-fees contract is already confirmed on Stacks mainnet. Verify its live fee values before continuing.',
     render(el){
-      el.innerHTML += `<div class="row"><button id="s-deploy" class="primary" ${me?'':'disabled'}>deploy contract</button>
-        <button id="s-verify" ${state.contractId?'':'disabled'}>verify fees</button></div>
-        ${state.contractId?`<div class="row"><span class="lbl">contract</span><span class="val">${state.contractId}</span></div>`:''}
-        ${state.deployTx?`<div class="row"><span class="lbl">deploy tx</span><span class="val">${state.deployTx}</span></div>`:''}
+      el.innerHTML += `<div class="row"><a href="${EXPLORER_TX}" target="_blank" rel="noopener"><button class="link">open deployment ↗</button></a>
+        <a href="${EXPLORER_CONTRACT}" target="_blank" rel="noopener"><button class="link">open contract ↗</button></a>
+        <button id="s-verify">verify fees</button></div>
+        <div class="row"><span class="lbl">owner</span><span class="val">${MAINNET_TREASURY}</span></div>
+        <div class="row"><span class="lbl">contract</span><span class="val">${CONTRACT_ID}</span></div>
+        <div class="row"><span class="lbl">deploy tx</span><span class="val">${DEPLOY_TX}</span></div>
         <div class="verify" id="s-cverify"></div>`;
-      el.querySelector('#s-deploy').onclick = doDeploy;
       el.querySelector('#s-verify').onclick = doVerifyContract;
     }
   },
@@ -169,7 +417,7 @@ const STEPS = [
     done:()=>!!state.live,
     desc:()=>'Distribute editions out of the treasury (gift, sponsored free-claim, or sale) — each first exit reveals its tile in the mosaic. Optionally fire a test recording-fee to confirm the contract end-to-end.',
     render(el){
-      el.innerHTML += `<div class="row"><button id="s-testfee" ${state.contractId&&me?'':'disabled'}>test: pay child fee (0.1 STX)</button>
+      el.innerHTML += `<div class="row"><button id="s-testfee" ${state.contractId&&me?'':'disabled'}>pay mainnet child fee (0.1 STX)</button>
         <button id="s-golive" class="primary">mark live</button></div><div class="verify" id="s-liveverify"></div>`;
       el.querySelector('#s-testfee').onclick = doTestFee;
       el.querySelector('#s-golive').onclick = ()=>{ state.live = true; log('marked live'); save(); };
@@ -177,32 +425,110 @@ const STEPS = [
   },
 ];
 
+/* ---- connect ---- */
+function extractSupportedMethods(payload, depth = 0){
+  if (depth > 5 || !payload) return [];
+  if (Array.isArray(payload)) return [...new Set(payload.filter(v => typeof v === 'string'))];
+  if (typeof payload !== 'object') return [];
+  for (const key of ['supportedMethods','methods','result','data']) {
+    if (key in payload) { const m = extractSupportedMethods(payload[key], depth + 1); if (m.length) return m; }
+  }
+  return [];
+}
+// Wallets disagree on the connect method: Xverse only answers wallet_connect /
+// stx_getAccounts / wallet_getAccount, Leather documents getAddresses. A single
+// hard-coded getAddresses fails outright on anything that doesn't advertise it.
+async function connectAttempts(provider){
+  if (await isSelectedXverse(provider)) return ['wallet_connect','stx_getAccounts','wallet_getAccount'];
+  const leatherMethods = ['getAddresses','stx_getAccounts','stx_getAddresses','stx_requestAccounts','wallet_connect'];
+  if (!isLeatherProviderId(await selectedProviderId())) {
+    return ['wallet_connect','stx_requestAccounts','connect','getAddresses','stx_getAddresses',
+      'stx_getAccounts','getAccounts','wallet_getAccount','requestAccounts'];
+  }
+  try {
+    const supported = extractSupportedMethods(await providerRequest(provider, 'supportedMethods'));
+    log(`leather advertises: ${supported.join(', ') || 'nothing'}`);
+    const advertised = leatherMethods.filter(m => supported.includes(m));
+    return advertised.length ? advertised : leatherMethods;
+  } catch { return leatherMethods; } // capability discovery is advisory
+}
+async function connectViaRequest(provider){
+  // Xverse only shows its account chooser on a FRESH wallet_connect — while a
+  // per-origin permission exists it silently reuses the approved account.
+  if (await isSelectedXverse(provider)) {
+    try { await walletRpc(provider, 'wallet_disconnect'); } catch { /* older builds */ }
+  }
+  let lastError = null;
+  for (const method of await connectAttempts(provider)) {
+    try {
+      const addresses = collectStacksAddresses(await walletRpc(provider, method));
+      if (addresses.length) { log(`connected via ${method}`); return addresses; }
+      log(`${method} returned no Stacks mainnet address`);
+    } catch (e) {
+      lastError = e;
+      if (isUserCancelled(e)) return [];
+      if (isMethodUnsupported(e)) { log(`${method} unsupported, trying next`); continue; }
+      throw e;
+    }
+  }
+  if (lastError) throw lastError;
+  return [];
+}
+
 /* ---- actions ---- */
 async function doConnect(){
   try {
-    const { connect, getLocalStorage } = await sdk();
-    const r = await connect();
-    me = r?.addresses?.stx?.[0]?.address || r?.addresses?.[0]?.address || getLocalStorage()?.addresses?.stx?.[0]?.address || null;
-    if (!me) throw new Error('no STX address returned');
-    if (!state.treasury) state.treasury = me;
-    log(`connected ${me}`); save();
-  } catch(e){ log('connect failed: ' + (e.message||e)); }
+    await clearWalletSession();
+    me = null; walletAddresses = []; render();
+    const provider = await selectProvider();
+    if (!provider) { log('no wallet selected'); render(); return; }
+    const addresses = await connectViaRequest(provider);
+    useWalletAddresses(addresses, MAINNET_TREASURY);
+    if (!me) throw new Error('the wallet returned no valid SP or SM Stacks mainnet address');
+    if (await isSelectedXverse(provider)) rememberXverseAccount(me);
+    log(`connected Stacks signer ${me}${me===MAINNET_TREASURY?' (deployed owner)':''}`); save();
+  } catch(e){
+    log(isUserCancelled(e) ? 'connect cancelled in the wallet' : 'connect failed: ' + (e.message||e));
+    render();
+  }
 }
-async function doDeploy(){
-  try {
-    const { request } = await sdk();
-    log('requesting contract deploy…');
-    const r = await request('stx_deployContract', { name: CONTRACT_NAME, clarityCode: CONTRACT_SRC, network: net });
-    const txid = r?.txid || r?.result?.txid;
-    state.contractId = `${me}.${CONTRACT_NAME}`;
-    state.deployTx = txid; state.treasury = me;
-    log('deploy submitted' + (txid?` · ${txid}`:'')); save();
-  } catch(e){ log('deploy failed: ' + (e.message||e)); }
+// Full teardown so the next connect re-opens the chooser and Xverse re-prompts
+// for an account instead of silently reusing the approved one.
+async function clearWalletSession(){
+  const s = await sdk().catch(() => null);
+  if (!s) return;
+  // Strictly by the stored id: a stale id that no longer resolves must not fall
+  // back to whatever else is on the host window and get another wallet's
+  // disconnect sequence.
+  const previousId = await selectedProviderId();
+  const provider = await resolveProviderById(previousId).catch(() => undefined);
+  if (provider && isLeatherProviderId(previousId)) {
+    for (const method of ['stx_disconnect','wallet_disconnect','disconnect','deactivate']) {
+      try { await providerRequest(provider, method); break; } catch { /* try the next */ }
+    }
+  }
+  try { s.disconnect(); } catch {}
+  try { s.clearLocalStorage(); } catch {}
+  try { s.clearSelectedProviderId(); } catch {}
+  clearXverseAccountCache();
+}
+async function doDisconnect(){
+  await clearWalletSession();
+  me = null; walletAddresses = []; log('wallet disconnected'); render();
 }
 async function readOnly(fn, args=[]){
   const { fetchCallReadOnlyFunction, cvToJSON } = await sdk();
-  const [addr, name] = state.contractId.split('.');
-  const cv = await fetchCallReadOnlyFunction({ contractAddress: addr, contractName: name, functionName: fn, functionArgs: args, senderAddress: me || addr, network: net });
+  const [addr, name] = CONTRACT_ID.split('.');
+  if (!isMainnetStacksAddress(addr)) throw new Error(`invalid Stacks contract address: ${addr}`);
+  // Read-only calls do not need the connected signer. Use the known deployer as sender.
+  const cv = await fetchCallReadOnlyFunction({
+    contractAddress: addr,
+    contractName: name,
+    functionName: fn,
+    functionArgs: args,
+    senderAddress: MAINNET_TREASURY,
+    network: NETWORK
+  });
   return cvToJSON(cv);
 }
 async function doVerifyContract(){
@@ -214,33 +540,168 @@ async function doVerifyContract(){
     const ok = String(child)==='100000' && String(live)==='1000000';
     v.innerHTML = `<span class="${ok?'ok':'err'}">get-fees → child ${child} µSTX · liveSet ${live} µSTX ${ok?'✓':'(unexpected)'}</span>`;
     log('verify get-fees: ' + JSON.stringify({child, live}));
-  } catch(e){ v.innerHTML = `<span class="err">read failed: ${e.message||e}</span> (is the deploy confirmed yet?)`; }
+  } catch(e){ v.innerHTML = `<span class="err">mainnet read failed: ${e.message||e}</span><div class="note">The contract read uses the fixed deployed owner address and does not depend on the connected wallet.</div>`; }
 }
-async function doTestFee(){
-  const v = $('s-liveverify'); v.innerHTML = 'requesting…';
+/* ---- signing ---- */
+// Xverse tracks the dapp connection per injected provider and per browsing
+// session, and its mobile in-app browser starts a fresh session each visit. A
+// signing request made without an active wallet_connect for this origin is
+// rejected before any confirmation UI. Cache the account Xverse last confirmed
+// so the slow wallet_getAccount read can be skipped right after connecting.
+const XVERSE_ACCOUNT_CACHE_MS = 45_000;
+const XVERSE_READ_TIMEOUT_MS = 30_000;
+const XVERSE_SIGNING_WATCHDOG_MS = 90_000;
+let xverseAccount = null;
+const rememberXverseAccount = a => { if (a) xverseAccount = { address:a, at:Date.now() }; };
+const clearXverseAccountCache = () => { xverseAccount = null; };
+const readXverseAccountCache = () =>
+  xverseAccount && Date.now() - xverseAccount.at <= XVERSE_ACCOUNT_CACHE_MS ? xverseAccount.address : null;
+
+function withTimeout(promise, label, ms){
+  let timer;
+  return Promise.race([promise, new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Xverse did not answer ${label} within ${ms/1000}s`)), ms);
+  })]).finally(() => clearTimeout(timer));
+}
+// Xverse rejects with "Network mismatch" when its stored per-origin session was
+// created under a different network setting than the wallet's active network —
+// only the signing request exposes it. Drop the session, reconnect, retry once.
+const isNetworkMismatch = e => {
+  const m = String(e?.message ?? e ?? '').toLowerCase();
+  return m.includes('network mismatch') || (m.includes('mismatch') && m.includes('network'));
+};
+async function ensureXverseAccount(rpc, expected){
+  const assertExpected = (address, source) => {
+    if (expected && address !== expected) {
+      throw new Error(`Xverse active account ${address} (via ${source}) is not the connected ${expected}. Switch back to that account, or disconnect and reconnect.`);
+    }
+    return address;
+  };
+  const cached = readXverseAccountCache();
+  if (cached) return assertExpected(cached, 'cached-session');
+
+  let address = null;
   try {
-    const { request, Cl } = await sdk();
-    const [addr, name] = state.contractId.split('.');
-    const r = await request('stx_callContract', { contract: `${addr}.${name}`, functionName: 'pay-inscription-fee',
-      functionArgs: [Cl.uint(0), Cl.uint(1), Cl.stringAscii('canary-test')], network: net, postConditionMode: 'allow' });
-    const txid = r?.txid || r?.result?.txid;
+    // Never probe with stx_getAccounts here: it opens a "Mismatched Network"
+    // prompt that gets rejected and surfaces to the user as "Network mismatch".
+    address = collectStacksAddresses(unwrapResponse(
+      await withTimeout(rpc.request('wallet_getAccount'), 'wallet_getAccount', XVERSE_READ_TIMEOUT_MS)))[0] || null;
+  } catch (e) {
+    if (isUserCancelled(e)) throw providerError(e);
+    // Denied, unsupported and timeouts all mean this browsing session has no
+    // readable account yet — fall through to wallet_connect.
+    log('xverse preflight: wallet_getAccount unavailable (' + (e.message||e) + ')');
+  }
+  if (address) { rememberXverseAccount(address); return assertExpected(address, 'wallet_getAccount'); }
+
+  const connected = collectStacksAddresses(unwrapResponse(await rpc.request('wallet_connect')))[0] || null;
+  if (!connected) throw new Error('Xverse did not return a Stacks account from wallet_connect');
+  rememberXverseAccount(connected);
+  return assertExpected(connected, 'wallet_connect');
+}
+async function requestXverseSigning(rpc, method, params, expected){
+  try { return unwrapResponse(await rpc.request(method, params)); }
+  catch (error) {
+    const failure = providerError(error);
+    if (!isNetworkMismatch(failure)) throw failure;
+    log('xverse network mismatch — refreshing the session and retrying once');
+    clearXverseAccountCache();
+    try { await rpc.request('wallet_disconnect'); } catch {}
+    const address = collectStacksAddresses(unwrapResponse(await rpc.request('wallet_connect')))[0] || null;
+    rememberXverseAccount(address);
+    if (!address || (expected && address !== expected)) {
+      throw new Error(address ? `Xverse reconnected as ${address}, not ${expected}` : failure.message);
+    }
+    return unwrapResponse(await rpc.request(method, params));
+  }
+}
+function extractTxid(payload, depth = 0){
+  if (depth > 6 || !payload) return null;
+  if (Array.isArray(payload)) { for (const e of payload) { const t = extractTxid(e, depth + 1); if (t) return t; } return null; }
+  if (typeof payload !== 'object') return null;
+  for (const key of ['txid','txId','transactionId']) {
+    if (typeof payload[key] === 'string' && payload[key].trim()) return payload[key].trim();
+  }
+  for (const key of ['result','data','payload','response','params']) {
+    if (key in payload) { const t = extractTxid(payload[key], depth + 1); if (t) return t; }
+  }
+  return null;
+}
+// Xverse validates stx_callContract against the sats-connect schema, which only
+// knows contract, functionName, functionArgs/arguments and the post conditions.
+// Out-of-spec fields are not ignored: an explicit network or sender is read as
+// "sign as this address/chain" and rejected before any confirmation UI. Sender
+// correctness is enforced by ensureXverseAccount instead.
+async function callContract(provider, { contractId, functionName, functionArgs, stxAddress }){
+  const { Cl } = await sdk();
+  const args = functionArgs.map(a => typeof a === 'string' ? a : Cl.serialize(a));
+  if (!(await isSelectedXverse(provider))) {
+    return extractTxid(await providerRequest(provider, 'stx_callContract', {
+      contract: contractId, functionName, functionArgs: args,
+      network: NETWORK, address: stxAddress, postConditionMode: 'allow'
+    }));
+  }
+  const rpc = xverseRpcProvider();
+  if (!rpc) throw Object.assign(new Error('Xverse request provider is not available'), { code:'XVERSE_RPC_UNAVAILABLE' });
+
+  // Xverse mobile can reject a request with only an in-app toast and leave the
+  // RPC promise pending forever. Track the stage so the timeout is diagnostic.
+  let stage = 'account-preflight';
+  const run = async () => {
+    const active = await ensureXverseAccount(rpc, stxAddress);
+    stage = 'stx_callContract';
+    return extractTxid(await requestXverseSigning(rpc, 'stx_callContract', {
+      contract: contractId, functionName, functionArgs: args,
+      // Older Xverse builds validate with a schema that reads only `arguments`
+      // and silently drop `functionArgs`; send both spellings.
+      arguments: args, postConditionMode: 'allow'
+    }, active));
+  };
+  return Promise.race([run(), new Promise((_, reject) => setTimeout(() => reject(new Error(
+    `Xverse did not answer the ${stage} request within ${XVERSE_SIGNING_WATCHDOG_MS/1000}s. If it showed an error toast, note the exact wording; if you approved, the transaction may still broadcast.`
+  )), XVERSE_SIGNING_WATCHDOG_MS))]);
+}
+
+async function doTestFee(){
+  if (!confirm('This submits a real Stacks mainnet transaction and pays 0.1 STX to the recording-fees treasury. Continue?')) return;
+  const v = $('s-liveverify'); v.innerHTML = 'requesting mainnet transaction…';
+  try {
+    const { Cl } = await sdk();
+    const provider = await getStacksProvider();
+    if (!provider) throw new Error('no wallet provider — press “choose wallet/account” first');
+    const txid = await callContract(provider, {
+      contractId: state.contractId,
+      functionName: 'pay-inscription-fee',
+      functionArgs: [Cl.uint(0), Cl.uint(1), Cl.stringAscii('canary-test')],
+      stxAddress: me
+    });
     v.innerHTML = `<span class="ok">fee submitted ${txid||''}</span>`;
     log('test fee submitted ' + (txid||''));
-  } catch(e){ v.innerHTML = `<span class="err">fee failed: ${e.message||e}</span>`; }
+  } catch(e){
+    v.innerHTML = `<span class="err">fee failed: ${e.message||e}</span>`;
+    log('test fee failed: ' + (e.message||e));
+  }
 }
 
 /* ---- config block to bake into the mosaic inscription ---- */
 function cfgBlock(){
-  const cfg = { network: net, treasury: state.treasury || me || '', collection: '<your Xtrata collection id>', holdersUrl: '<your Xtrata holders JSON endpoint>' };
-  return `<script id="pof-chain" type="application/json">\n${JSON.stringify(cfg, null, 2)}\n<\/script>`;
+  const cfg = {
+    network: NETWORK,
+    treasury: MAINNET_TREASURY,
+    recordingFeesContract: CONTRACT_ID,
+    collection: '<your Xtrata collection id>',
+    holdersUrl: '<your Xtrata holders JSON endpoint>'
+  };
+  return `<script id="pof-chain" type="application/json">
+${JSON.stringify(cfg, null, 2)}
+<\/script>`;
 }
 
 /* ---- render ---- */
 function render(){
   $('who').textContent = me ? me.slice(0,8)+'…'+me.slice(-4) : 'not connected';
-  $('connect').textContent = me ? 'reconnect' : 'connect wallet';
+  $('connect').textContent = 'choose wallet/account';
   $('stateNet').textContent = net; $('stateView').textContent = JSON.stringify(state);
-  [...document.querySelectorAll('#net button')].forEach(b=>b.classList.toggle('on', b.dataset.net===net));
   const box = $('steps'); box.innerHTML = '';
   let prevDone = true;
   STEPS.forEach((s, i)=>{
@@ -258,15 +719,28 @@ function render(){
 
 /* ---- wiring ---- */
 $('connect').onclick = doConnect;
-[...document.querySelectorAll('#net button')].forEach(b=> b.onclick = ()=>{ net=b.dataset.net; state=load(); render(); });
 $('copyCfg').onclick = ()=>{ const p=$('cfgOut'); p.style.display='block'; p.textContent = cfgBlock(); navigator.clipboard?.writeText(cfgBlock()).then(()=>log('config copied')).catch(()=>{}); };
 $('exportState').onclick = ()=>{ const p=$('cfgOut'); p.style.display='block'; p.textContent = JSON.stringify(state, null, 2); };
-$('resetState').onclick = ()=>{ if(confirm('Reset saved state for '+net+'?')){ state={}; save(); } };
+$('resetState').onclick = ()=>{ if(confirm('Reset saved mainnet progress? The confirmed deployment details will be kept.')){ state=normaliseState(); save(); } };
 render();
-(async()=>{ try { const s = await sdk(); if (s.isConnected()) { me = s.getLocalStorage()?.addresses?.stx?.[0]?.address || null; render(); } } catch { /* offline / no wallet libs */ } })();
-window.__canary = { get state(){return state;}, get me(){return me;}, cfgBlock, STEPS,
+// Restore the last signer from @stacks/connect's own cache so a reload doesn't
+// look disconnected. Only a fresh connect can prove the wallet still holds this
+// account, so pressing "choose wallet/account" always re-runs the full handshake.
+(async()=>{
+  try {
+    const s = await sdk();
+    if (!(await selectedProviderId())) return;
+    const cached = (s.getLocalStorage?.()?.addresses?.stx ?? []).map(e => e?.address).filter(isMainnetStacksAddress);
+    if (!cached.length) return;
+    useWalletAddresses([...new Set(cached)], MAINNET_TREASURY);
+    log(`restored cached signer ${me} — reconnect to confirm it with the wallet`);
+    render();
+  } catch { /* offline / no wallet libs */ }
+})();
+window.__canary = { get state(){return state;}, get me(){return me;}, get walletAddresses(){return walletAddresses.slice();}, cfgBlock, STEPS,
+  doConnect, doDisconnect, selectProvider, connectViaRequest, collectStacksAddresses, installedProvidersOnHost, walletHostWindow,
   setState: s=>{ state={...state,...s}; save(); }, setMe: a=>{ me=a; render(); } };
-log('canary ready');
+log('mainnet canary ready');
 </script>
 </body>
 </html>
