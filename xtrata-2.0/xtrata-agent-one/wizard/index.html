@@ -763,6 +763,7 @@ async function api(path, opts){
   if((mm=path.match(/^\/api\/jobs\/([^/]+)\/run$/))) return A.runJob(mm[1]);
   if((mm=path.match(/^\/api\/jobs\/([^/]+)\/deliver$/))) return A.deliverJob(mm[1]);
   if((mm=path.match(/^\/api\/jobs\/([^/]+)\/recover$/))) return A.recoverJob(mm[1]);
+  if((mm=path.match(/^\/api\/jobs\/([^/]+)\/cancel$/))) { if(!A.cancelJob) throw new Error('this agent bundle has no cancel — redeploy agent-one.js'); return A.cancelJob(mm[1]); }
   if((mm=path.match(/^\/api\/jobs\/([^/]+)\/delete$/))) return A.deleteJob(mm[1]);
   if((mm=path.match(/^\/api\/jobs\/([^/]+)$/))) return A.getJob(mm[1]);
   throw new Error('no route: '+path);
@@ -1753,6 +1754,9 @@ async function renderJobDetail(jobId,out,isActive){
       ${active?`<div class="muted" style="margin-top:6px;font-size:12px;color:var(--ok)">🔒 Keep this tab open while the browser-held one-shot wallet is working. If it is interrupted, reopen this page in the same browser profile; the saved recovery key remains available. Don't send another payment.</div>`:''}
       ${showDeposit&&!funded?`<div class="muted" style="margin-top:10px;font-size:12px">${job.fastTrack?'Pay from your connected wallet (shown above) — it receives the inscription and any change, and processing starts automatically on arrival. Payments from any other wallet are returned to the sender.':'Waiting for your deposit — the status flips to FUNDED once it lands.'}</div>`:''}
       ${job.error?`<div class="err" style="margin-top:8px">Error: ${esc(job.error)}${!job.fastTrack?` <button class="btn ghost" onclick="act('run','${esc(job.jobId)}')" style="margin-left:8px;padding:5px 10px">Retry</button>`:''}</div>`:''}
+      ${(['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING','EXPIRED'].includes(st)&&!job.tokenId&&!(job.items||[]).some(i=>i.tokenId))?`<div class="btnrow">
+        <button class="btn warn" onclick="act('cancel','${esc(job.jobId)}')">Stop this job &amp; refund me</button>
+      </div><div class="muted" style="font-size:11.5px;margin-top:4px">Stops at the next safe point — nothing part-sent is left hanging. Chunks already uploaded stay on-chain unsealed and cost nothing further; everything left in the deposit wallet${(job.parents&&job.parents.length)?', including any parent inscription,':''} comes back to you.</div><div class="err" id="jobErr"></div>`:''}
       ${(!job.fastTrack&&(st==='AWAITING_DEPOSIT'||st==='INSCRIBED'))?`<div class="btnrow">
         <button class="btn good" onclick="act('run','${esc(job.jobId)}')" ${(funded&&st==='AWAITING_DEPOSIT')?'':'disabled'}>Run inscription</button>
         <button class="btn warn" onclick="act('deliver','${esc(job.jobId)}')" ${st==='INSCRIBED'?'':'disabled'}>Deliver + refund + wipe key</button>
@@ -1807,6 +1811,7 @@ window.sendParent=sendParent;
 async function act(which,jobId){
   const id=jobId||selJob; if(!id) return;
   if(which==='deliver' && !confirm('Deliver the inscription, refund the remainder, and permanently wipe the deposit key?')) return;
+  if(which==='cancel' && !confirm('Stop this job and return everything?\n\nAny upload in progress halts at the next safe point. Chunks already on-chain stay there unsealed (they cost nothing more and nothing is minted), and the whole remaining deposit — plus any escrowed parent — is sent back to the wallet that paid.\n\nKeep this tab open until you see "Cancelled".')) return;
   if(which==='recover'){
     let j=null; try{ const r=await api('/api/jobs/'+id); j=r.job; }catch(e){ alert('Could not load the recovery details: '+((e&&e.message)||e)); return; }
     const mintedIds=[...(j.items||[]).map(i=>i.tokenId),j.tokenId,j.receiptTokenId].filter(Boolean).map(String);

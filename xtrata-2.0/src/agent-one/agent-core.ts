@@ -158,6 +158,11 @@ async function stagedInscribe(job: any, key: string, from: string, data: Uint8Ar
   if (idx === null) { await send(key, from, 'begin-or-get', [bufferCV(h), stringAsciiCV(target.mime), uintCV(BigInt(data.length)), uintCV(BigInt(total))], beginFee, onProg, job.jobId); idx = 0; onProg(`upload started · 0/${total}`); }
   else if (idx > 0) { onProg(`resuming upload · ${idx}/${total} chunks already on-chain`); }
   while (idx < total) {
+    // Cancellation checkpoint. Only ever BETWEEN batches: the previous send() has
+    // settled and the next has not started, so nothing is in flight when we stop.
+    // Chunks already uploaded stay on-chain (harmless, unsealed); the deposit is
+    // swept home by the refund that follows.
+    assertNotCancelled(job.jobId);
     const batch = chunks.slice(idx, idx + BATCH);
     // Fee runway check (guide: ~1 STX/MB mining + 20% drift). If the balance can no
     // longer cover the projected remaining batches + seal + delivery, say so loudly —
@@ -172,6 +177,9 @@ async function stagedInscribe(job: any, key: string, from: string, data: Uint8Ar
     await send(key, from, 'add-chunk-batch', [bufferCV(h), listCV(batch.map((c) => bufferCV(c)))], null, onProg, job.jobId);
     const st: any = (await ro('get-upload-state', [bufferCV(h), standardPrincipalCV(from)])); const ni = st.value ? Number(st.value.value['current-index'].value) : null; if (ni === null || ni <= idx) throw new Error(`upload stalled at ${idx}`); idx = ni; onProg(`uploading · ${idx}/${total}`);
   }
+  // Last chance to stop: sealing is what MINTS. Past this point the token exists and
+  // a cancel can no longer be honoured as a refund — it becomes a recovery instead.
+  assertNotCancelled(job.jobId);
   const deps = ((target.resolvedDeps || target.deps) || []).map((d: string) => uintCV(BigInt(d)));
   const parents = ((target.mergedParents || target.parents) || []).map((p: string) => uintCV(BigInt(p)));
   // Parents: seal-with-relationships requires the sealer (deposit wallet) to OWN the parents.
@@ -231,7 +239,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-25.1';
+export const AGENT_BUILD = '2026-07-25.2';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -792,6 +800,8 @@ async function runBatchItems(job: any) {
     job.batchProgress = { current: i, total: job.items.length };
     if (item.status === 'INSCRIBED' && item.tokenId) { minted += 1; continue; }
     if (item.status === 'FAILED' || item.status === 'SKIPPED') { failed += 1; continue; }
+    // Between items: stop before starting the next one rather than mid-upload.
+    assertNotCancelled(job.jobId);
     try {
       const key = `${job.jobId}:${i}`;
       let data = BYTES.get(key);
@@ -1200,6 +1210,21 @@ try {
 // uploads continue from the on-chain index, single-tx mints are idempotent (get-id-by-hash pre-check).
 // Only deterministic failures or exhausted retries (4, with 15 s × attempt backoff) hit the refund failsafe.
 const FATAL_ERR = /TX abort|locked to|unrecoverable|file bytes|empty file|could not determine|wrong inscription received/i;
+// ---------- cancellation ----------
+// A cancel is a PERSISTED flag, not an in-memory one: the loop doing the work may
+// be mid-tick in another call stack, and the request has to survive a reload. The
+// running job aborts at its next checkpoint (between chunk batches) and the STX is
+// swept home. Anything already minted is never cancelled — it is returned instead.
+class JobCancelled extends Error {
+  constructor() { super('cancelled by request'); this.name = 'JobCancelled'; }
+}
+const isCancelRequested = (id: string) => {
+  try { return !!readJob(id).cancelRequested; } catch { return false; }
+};
+function assertNotCancelled(id: string) {
+  if (isCancelRequested(id)) throw new JobCancelled();
+}
+
 const MAX_RETRIES = 4;
 function background(id: string, fn: () => Promise<any>) {
   PROCESSING.add(id);
@@ -1209,6 +1234,13 @@ function background(id: string, fn: () => Promise<any>) {
     PROCESSING.delete(id);
   }).catch(async (e) => {
     const msg = errMsg(e);
+    // A cancel is not an error: no retry, no NEEDS_RECOVERY, straight to the refund.
+    if (e instanceof JobCancelled || isCancelRequested(id)) {
+      xaoLog(id, 'cancelled by request — returning everything to the payer');
+      try { await refundAndClose(readJob(id), 'cancelled by request — everything returned to the payer'); } catch {}
+      PROCESSING.delete(id);
+      return;
+    }
     try {
       const j = readJob(id); j.error = msg;
       if (!FATAL_ERR.test(msg) && !/no items inscribed/.test(msg) && j.status !== 'AWAITING_DEPOSIT' && (j.retryCount = (j.retryCount || 0) + 1) <= MAX_RETRIES) {
@@ -1238,6 +1270,12 @@ async function watchTick() {
   void syncWakeLock();
   for (const j of listJobsRaw()) {
     if (PROCESSING.has(j.jobId)) continue;
+    // A cancel requested while the tab was closed. Honour it before any resume
+    // logic below, or the watcher would happily restart the job we were asked to stop.
+    if (j.cancelRequested && !['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED'].includes(j.status)) {
+      background(j.jobId, () => refundAndClose(readJob(j.jobId), 'cancelled by request — everything returned to the payer'));
+      continue;
+    }
     // A page close/reload can interrupt the browser-held recovery between
     // transactions. Never strand the job in a non-actionable state: preserve
     // the key and require an explicit click to continue from a fresh inventory.
@@ -1320,6 +1358,30 @@ async function reapTick() {
   getJob: async (id: string) => { const job = readJob(id); return { job: publicJob(job), status: await statusJob(job) }; },
   runJob: async (id: string) => { if (PROCESSING.has(id)) return { started: true, already: true }; const job = readJob(id); if (job.tokenId) return { error: 'already inscribed' }; const s = await statusJob(job); if (!s.funded) return { error: 'not funded yet' }; background(id, async () => { const j = readJob(id); j.status = 'INSCRIBING'; writeJob(j); await runInscribe(j); }); return { started: true }; },
   deliverJob: async (id: string) => { if (PROCESSING.has(id)) return { started: true, already: true }; const job = readJob(id); if (!job.tokenId) return { error: 'nothing to deliver yet' }; background(id, async () => { const j = readJob(id); j.status = 'DELIVERING'; writeJob(j); await deliver(j); }); return { started: true }; },
+  /**
+   * Stop a job and return everything to the payer. Safe to call whether or not the
+   * job is currently running: the flag is persisted, a running upload aborts at its
+   * next between-batch checkpoint, and the refund follows. Refuses once a token has
+   * been minted — that cannot be un-minted, so recovery (which returns the token) is
+   * the correct route, not a refund the job cannot honour.
+   */
+  cancelJob: async (id: string) => {
+    const job = readJob(id);
+    if (['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED'].includes(job.status)) return { error: `job is already ${job.status}` };
+    if (job.tokenId || (job.items || []).some((i: any) => i.tokenId)) {
+      return { error: 'this job has already minted an inscription — use recovery, which returns the token and the remaining STX' };
+    }
+    job.cancelRequested = true;
+    job.progress = 'cancelling — returning everything to the payer';
+    job.progressAt = new Date().toISOString();
+    writeJob(job);
+    xaoLog(id, 'cancel requested');
+    // Already running: the loop aborts at its next checkpoint and background()'s
+    // handler does the refund. Idle: refund right now.
+    if (PROCESSING.has(id)) return { cancelling: true, jobId: id, wasRunning: true };
+    background(id, () => refundAndClose(readJob(id), 'cancelled by request — everything returned to the payer'));
+    return { cancelling: true, jobId: id, wasRunning: false };
+  },
   recoverJob: async (id: string) => {
     if (PROCESSING.has(id)) return { started: true, already: true };
     const job = readJob(id);

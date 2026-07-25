@@ -194,6 +194,10 @@
       <!-- Escrow checklist — only for jobs that declared a parent. Two sends, any
            order; parent, song and change all come back. -->
       <div id="escrow" style="display:none;margin-top:12px;padding:11px 13px;border:1px solid var(--line);border-radius:10px;font-size:12.5px"></div>
+      <div id="cancelRow" style="display:none;margin-top:12px;text-align:center">
+        <button id="cancelJobBtn" class="btn ghost" type="button" style="width:auto;margin:0;padding:6px 12px;font-size:12px">Stop this job &amp; refund me</button>
+        <div class="muted" style="font-size:11px;margin-top:5px">Stops at the next safe point. Anything already uploaded stays on-chain unsealed and costs nothing more; the rest of your deposit comes straight back.</div>
+      </div>
     </div>
 
     <div id="result" class="result"></div>
@@ -221,7 +225,7 @@ const SERVER = { mock:false, net:'mainnet' };
 // fees on refund loops). Builds are date-stamped (YYYY-MM-DD.N) so a string compare orders them;
 // a NEWER deployed bundle must pass — requiring an exact match wrongly locked the page out
 // whenever the agent shipped ahead of the page.
-const XAO_MIN_AGENT_BUILD='2026-07-25.1';
+const XAO_MIN_AGENT_BUILD='2026-07-25.2';
 let AGENT_STALE=false;
 function checkAgentBuild(){
   const b=window.XAO_AGENT_BUILD||null;
@@ -265,7 +269,9 @@ async function api(path, opts){
   if(path==='/api/health') return A.health();
   if(path==='/api/estimate') return A.estimate(body);
   if(path==='/api/jobs' && m==='POST') return { job: await A.createJob(body) };
-  let mm; if((mm=path.match(/^\/api\/jobs\/([^/]+)$/))) return A.getJob(mm[1]);
+  let mm;
+  if((mm=path.match(/^\/api\/jobs\/([^/]+)\/cancel$/))) { if(!A.cancelJob) throw new Error('this agent bundle has no cancel — redeploy agent-one.js'); return A.cancelJob(mm[1]); }
+  if((mm=path.match(/^\/api\/jobs\/([^/]+)$/))) return A.getJob(mm[1]);
   throw new Error('no route: '+path);
 }
 
@@ -623,6 +629,17 @@ async function sendParentNow(pid){
 }
 window.sendParentNow=sendParentNow;
 
+$('#cancelJobBtn').onclick=async()=>{
+  if(!JOB) return;
+  if(!confirm('Stop this job and return everything?\n\nAny upload in progress halts at the next safe point. Chunks already on-chain stay there unsealed — nothing is minted and they cost nothing more — and the whole remaining deposit is sent back to the wallet that paid.\n\nKeep this tab open until you see "Cancelled".')) return;
+  const b=$('#cancelJobBtn'); b.disabled=true; b.textContent='Cancelling…';
+  try{ const r=await api('/api/jobs/'+JOB.jobId+'/cancel',{method:'POST'});
+    if(r&&r.error) throw new Error(r.error);
+    $('#hint').innerHTML='<span class="muted">Cancelling — returning your deposit. Keep this tab open until it confirms.</span>';
+    if(!poll) startPoll();
+  }catch(e){ b.disabled=false; b.textContent='Stop this job & refund me';
+    $('#hint').innerHTML='<span class="err">Could not cancel: '+esc((e&&e.message)||String(e))+'</span>'; }
+};
 function startPoll(){ if(poll) clearInterval(poll); poll=setInterval(refresh,2000); refresh(); }
 async function refresh(){
   if(!JOB) return;
@@ -633,6 +650,9 @@ async function refresh(){
         funded?['pay']:[], funded?18:(pending?10:4)); }
     else if(PHASE[st]){ setPhase(st, job); }
     renderEscrow(job, status);
+    // Cancellable right up until something is minted.
+    const canCancel=['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING','EXPIRED'].includes(st)&&!job.tokenId&&!(job.items||[]).some(i=>i.tokenId);
+    $('#cancelRow').style.display=canCancel?'block':'none';
     if(st==='COMPLETE'||st==='COMPLETE_WITH_SKIPS'){ clearInterval(poll); poll=null; setBar(100); setTimeout(()=>{ stopWaitExtras(); (job.items?sbDone:done)(job); },600); }
     else if(st==='CANCELLED'){ clearInterval(poll); poll=null; stopWaitExtras(); $('#prog').className='prog';
       $('#hint').innerHTML='<span class="muted">↩︎ Cancelled — funds returned'+(job.cancelReason?(' ('+esc(job.cancelReason)+')'):'')+'. <a href="#" onclick="showJobLog(\''+esc(job.jobId)+'\');return false">View agent log</a></span>'; $('#go').disabled=false; }
