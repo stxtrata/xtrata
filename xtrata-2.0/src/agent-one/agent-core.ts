@@ -269,7 +269,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-25.4';
+export const AGENT_BUILD = '2026-07-25.5';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -484,16 +484,21 @@ async function parentsStatus(job: any) {
   const required: string[] = (job.parents || []).map(String);
   if (job.mock || MOCK) return { required, held: required, missing: [], unexpected: [], ok: true };
   const own = job.depositAddress;
+  // OWNERSHIP comes from the contract, never from the holdings index. The gate asks
+  // "does the deposit wallet own this parent at seal time", and get-owner answers that
+  // authoritatively; the NFT holdings index lags chain state by seconds to minutes.
+  // Gating on the index left the job insisting the parent had not arrived while a
+  // contract read showed the deposit wallet already owned it — the escrow checklist
+  // said "arrived" on one line and "now send the parent" on the next.
+  const held: string[] = [], missing: string[] = [];
+  for (const pid of required) (((await ownerOf(pid)) === own) ? held : missing).push(pid);
+  // The index is still the only way to SEE a stray nobody declared.
   let heldAll: string[] | null = null;
   try { heldAll = await heldInscriptions(own); } catch {}
-  if (heldAll == null) {   // holdings API down → per-parent owner checks (can't see strays)
-    const held: string[] = [], missing: string[] = [];
-    for (const pid of required) (((await ownerOf(pid)) === own) ? held : missing).push(pid);
+  if (heldAll == null) {
     return { required, held, missing, unexpected: [], ok: missing.length === 0, holdingsUnverified: true };
   }
   const mine = new Set([...required, job.tokenId, job.receiptTokenId, ...((job.items || []).map((i: any) => i.tokenId))].filter(Boolean).map(String));
-  const held = required.filter((p) => heldAll!.includes(p));
-  const missing = required.filter((p) => !heldAll!.includes(p));
   const unexpected = heldAll.filter((id) => !mine.has(String(id)));
   return { required, held, missing, unexpected, ok: missing.length === 0 && unexpected.length === 0 };
 }

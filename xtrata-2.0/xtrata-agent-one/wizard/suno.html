@@ -225,7 +225,7 @@ const SERVER = { mock:false, net:'mainnet' };
 // fees on refund loops). Builds are date-stamped (YYYY-MM-DD.N) so a string compare orders them;
 // a NEWER deployed bundle must pass — requiring an exact match wrongly locked the page out
 // whenever the agent shipped ahead of the page.
-const XAO_MIN_AGENT_BUILD='2026-07-25.4';
+const XAO_MIN_AGENT_BUILD='2026-07-25.5';
 let AGENT_STALE=false;
 function checkAgentBuild(){
   const b=window.XAO_AGENT_BUILD||null;
@@ -572,6 +572,9 @@ function renderEscrow(job, status){
   if(!parents.length||!ESCROW_STATES.includes(job.status)){ hideEscrow(); return; }
   const chip=document.querySelector('.step[data-s="parent"]'); if(chip) chip.hidden=false;
   const ps=(status&&status.parents)||{held:[],missing:parents,unexpected:[]};
+  // Once nothing is missing, the "transfer submitted — it will show as arrived once
+  // confirmed" note is stale and directly contradicts the row above it.
+  if(!(ps.missing||[]).length) PARENT_MSG=null;
   const paid=(status&&status.funded)||!!job.depositReceivedUstx;
   const rows=parents.map((p)=>{
     const held=(ps.held||[]).map(String).includes(p);
@@ -649,6 +652,12 @@ async function refresh(){
       setProg(funded?'Payment confirmed — starting…':(pending?'Payment seen — confirming (usually under 30 s)…':'Waiting for payment to land…'),
         funded?['pay']:[], funded?18:(pending?10:4)); }
     else if(PHASE[st]){ setPhase(st, job); }
+    // The status only flips off AWAITING_PARENT on the agent's next ~20 s poll, so for
+    // that window the header kept asking for a parent the checklist already showed as
+    // arrived. Say what is actually true while we wait for the gate to re-run.
+    if(st==='AWAITING_PARENT' && status && status.parents && !(status.parents.missing||[]).length){
+      setProg('Parent inscription received ✓ — starting the inscription…', ['pay','parent'], 16);
+    }
     renderEscrow(job, status);
     // Cancellable right up until something is minted.
     const canCancel=['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING','EXPIRED'].includes(st)&&!job.tokenId&&!(job.items||[]).some(i=>i.tokenId);

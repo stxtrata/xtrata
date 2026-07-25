@@ -79,3 +79,23 @@ describe('deprecated Hiro endpoints are not on the hot path', () => {
     expect(detect).toContain('if (!r.ok) throw new Error(`stx_inbound ${r.status}`)');
   });
 });
+
+describe('the parent gate reads chain state, not the holdings index', () => {
+  const parentsStatus = agentSource.slice(
+    agentSource.indexOf('async function parentsStatus'),
+    agentSource.indexOf('async function returnAllHeldNfts')
+  );
+
+  it('decides held/missing from get-owner', () => {
+    // The index lags chain state, so gating on it left the escrow checklist saying
+    // "arrived at the deposit wallet" on one line and "now send the parent" above it.
+    expect(parentsStatus).toContain('(((await ownerOf(pid)) === own) ? held : missing).push(pid)');
+    // ...and that ownership decision is NOT derived from the holdings list.
+    expect(parentsStatus).not.toContain('required.filter((p) => heldAll!.includes(p))');
+  });
+
+  it('still uses the holdings index for strays only', () => {
+    expect(parentsStatus).toContain('heldAll.filter((id) => !mine.has(String(id)))');
+    expect(parentsStatus).toContain('holdingsUnverified: true');
+  });
+});
