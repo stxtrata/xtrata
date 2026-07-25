@@ -47,16 +47,51 @@ async function onChainHash(){
   return typeof value === 'string' ? value.replace(/^0x/i, '').toLowerCase() : null;
 }
 
-const askHidden = () => new Promise(resolve => {
-  const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
-  process.stdout.write('attestor private key (hidden): ');
-  const onData = ch => { if (![ '\n', '\r', '' ].includes(ch.toString())) process.stdout.write(''); };
-  process.stdin.on('data', onData);
-  rl.question('', answer => { process.stdin.off('data', onData); rl.close(); process.stdout.write('\n'); resolve(answer); });
-  rl._writeToOutput = () => {};
+// Raw mode so nothing is echoed. A piped stdin has no setRawMode, so fall back
+// to reading one line — that path is for `echo ... | node scripts/...`, which
+// does put the key in shell history; the interactive prompt does not.
+const askHidden = () => new Promise((resolve, reject) => {
+  const stdin = process.stdin;
+  if (!stdin.isTTY || typeof stdin.setRawMode !== 'function') {
+    const rl = createInterface({ input: stdin });
+    let got = false;
+    rl.once('line', line => { got = true; rl.close(); resolve(line); });
+    rl.once('close', () => { if (!got) resolve(''); });
+    return;
+  }
+  process.stdout.write('attestor private key (input hidden): ');
+  const wasRaw = stdin.isRaw;
+  stdin.setRawMode(true);
+  stdin.resume();
+  stdin.setEncoding('utf8');
+  let buf = '';
+  const finish = (fn, arg) => {
+    stdin.off('data', onData);
+    stdin.setRawMode(wasRaw);
+    stdin.pause();
+    process.stdout.write('\n');
+    fn(arg);
+  };
+  const onData = chunk => {
+    // A paste arrives as a single chunk, so walk it character by character.
+    for (const ch of chunk) {
+      if (ch === '\r' || ch === '\n') return finish(resolve, buf);
+      if (ch === '\u0003') return finish(reject, new Error('cancelled'));
+      if (ch === '\u0004') return finish(resolve, buf);
+      if (ch === '\u007f' || ch === '\b') { buf = buf.slice(0, -1); continue; }
+      if (ch >= ' ') buf += ch;
+    }
+  };
+  stdin.on('data', onData);
 });
 
 const raw = (process.env.BNS_ATTESTATION_PRIVATE_KEY || await askHidden()).trim().replace(/^0x/i, '');
+if (!raw) {
+  console.error('\nNo key entered. Paste it at the prompt (input is hidden, so nothing appears as you type),');
+  console.error('or pass it via the environment:');
+  console.error('  BNS_ATTESTATION_PRIVATE_KEY=<key> node scripts/check-attestor-key.mjs');
+  process.exit(1);
+}
 if (!/^[0-9a-f]{64}(?:01)?$/i.test(raw)) {
   console.error(`\nNot a valid key: expected 64 hex chars, optionally + "01". Got ${raw.length} chars.`);
   process.exit(1);
