@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEPOSIT, FakeChain, OTHER, PAYER, loadAgent, unloadAgent } from './support/fake-chain';
 
 // These run agent-core for real against a chain we break on purpose. Every case here
@@ -137,5 +137,61 @@ describe('a failed holdings read is not "this wallet holds nothing"', () => {
     // spend from. Every caller already had a try/catch expecting a throw; none of
     // them could ever fire.
     await expect(agent.heldInscriptions(DEPOSIT)).rejects.toThrow(/holdings lookup failed/i);
+  });
+});
+
+describe('a degraded read is never reported as a fact about the chain', () => {
+  let logged: string[];
+  beforeEach(() => {
+    // waitTx sleeps between polls; run timers eagerly so the loop completes fast.
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation(((f: any) => { f(); return 0 as any; }) as any);
+    // xaoLog only persists to a job record that already exists, but it always writes
+    // the same line to the console — that is the observable we care about here.
+    logged = [];
+    vi.spyOn(console, 'info').mockImplementation(((m: any) => { logged.push(String(m)); }) as any);
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  const job = () => ({
+    jobId: 'j1', depositAddress: DEPOSIT, requiredUstx: String(REQUIRED),
+    status: 'AWAITING_DEPOSIT', parents: [], mock: false
+  });
+
+  it('does not call a throttled mempool "no payment in flight"', async () => {
+    // The status line flipped between "payment seen — confirming" and "waiting for
+    // payment to land" because a 429 here read as an empty mempool.
+    chain.balances.set(DEPOSIT, 0n);
+    chain.fail('/mempool', 429);
+    const s = await agent.statusJob(job());
+    expect(s.funded).toBe(false);
+    expect(s.pending).toBe(false);          // unknown, reported as not-pending
+    expect(logged.join('\n')).toMatch(/mempool check unavailable/i);
+  });
+
+  it('sees a real pending payment when the mempool is readable', async () => {
+    chain.balances.set(DEPOSIT, 0n);
+    const original = chain.handle.bind(chain);
+    chain.handle = (url: string) => url.includes('/mempool')
+      ? new Response(JSON.stringify({ results: [{ token_transfer: { recipient_address: DEPOSIT } }] }),
+          { status: 200, headers: { 'content-type': 'application/json' } })
+      : original(url);
+    const s = await agent.statusJob(job());
+    expect(s.pending).toBe(true);
+  });
+
+  it('distinguishes "the API was unreachable" from "the tx never confirmed"', async () => {
+    chain.fail('/extended/v1/tx/', 503);
+    await expect(agent.waitTx('0xdeadbeef')).rejects.toThrow(/could not reach the API/i);
+  });
+
+  it('still reports a genuine non-confirmation as such', async () => {
+    // Reachable, but the tx stays pending forever.
+    await expect(agent.waitTx('0xabc123')).rejects.toThrow(/not confirmed/i);
+  });
+
+  it('logs rather than hides a nonce lookup it could not make', async () => {
+    chain.fail('/nonces', 429);
+    await expect(agent.safeNonce(DEPOSIT, 'j1')).resolves.toBeUndefined();
+    expect(logged.join('\n')).toMatch(/nonce lookup failed/i);
   });
 });

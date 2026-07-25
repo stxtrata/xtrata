@@ -72,7 +72,7 @@ async function callReadOnly(fn,args){return callReadOnlyFunction({contractAddres
 async function quote(sz,nc){const t=cvToJSON(await callReadOnly('quote-single-tx-fee',[uintCV(sz),uintCV(nc)])).value.value;return {totalFee:BigInt(t['total-fee'].value),eligible:t['single-tx-eligible'].value===true};}
 async function isPaused(){const j=cvToJSON(await callReadOnly('is-paused',[]));return (j.value?.value??j.value)===true;}
 async function ownerOf(id){try{const j=cvToJSON(await callReadOnly('get-owner',[uintCV(id)]));const v=j.value?.value?.value??j.value?.value??null;return typeof v==='string'?v:(v?.value??null);}catch(e){return null;}}
-async function getBalance(){const d=await(await fetch(`${network.coreApiUrl}/extended/v1/address/${SENDER}/stx`)).json();return BigInt(d.balance||'0');}
+async function getBalance(){const r=await fetch(`${network.coreApiUrl}/extended/v2/addresses/${SENDER}/balances/stx`);if(!r.ok)throw new Error(`balance lookup failed (HTTP ${r.status})`);const d=await r.json();if(d?.balance==null)throw new Error('balance lookup returned no balance');return BigInt(d.balance);}
 async function waitForConfirmation(txid){const url=`${network.coreApiUrl}/extended/v1/tx/${txid}`;for(let i=0;i<90;i++){try{const d=await(await fetch(url)).json();if(d.tx_status==='success')return d;if(d.tx_status&&d.tx_status.startsWith('abort'))throw new Error(`TX ${d.tx_status}: ${d.tx_result?.repr||''}`);}catch(e){if(String(e).includes('TX abort'))throw e;}await sleep(10000);}throw new Error('not confirmed');}
 const tokenIdFromTx=d=>{const m=/token-id u(\d+)/.exec(d?.tx_result?.repr||'');return m?m[1]:null;};
 

@@ -156,7 +156,7 @@ export const runReadOnlyReleaseSmoke = async ({
   });
 
   await check('Sponsor wallet reserve', async () => {
-    const response = await fetchWithTimeout(fetchImpl, `${hiro}/extended/v1/address/${SPONSOR_ADDRESS}/stx`);
+    const response = await fetchWithTimeout(fetchImpl, `${hiro}/extended/v2/addresses/${SPONSOR_ADDRESS}/balances/stx`);
     const body = await readJson(response, 'sponsor balance');
     const balance = BigInt(body.balance ?? '-1');
     assert(balance >= MIN_SPONSOR_BALANCE_USTX, `sponsor balance ${balance} is below ${MIN_SPONSOR_BALANCE_USTX}`);

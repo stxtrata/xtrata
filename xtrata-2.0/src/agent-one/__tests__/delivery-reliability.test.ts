@@ -29,7 +29,7 @@ describe('NFT delivery is transient-aware', () => {
 describe('Deposit-wallet transactions are nonce-sequenced', () => {
   it('reads a mempool-aware nonce and threads it into each send', () => {
     expect(agentSource).toContain('possible_next_nonce');
-    expect(agentSource).toContain('opts.nonce = await safeNonce(from)');
+    expect(agentSource).toContain('opts.nonce = await safeNonce(from, logId)');
     expect(agentSource).toContain('nonce = await safeNonce(getAddressFromPrivateKey(key, TransactionVersion.Mainnet))');
   });
 });

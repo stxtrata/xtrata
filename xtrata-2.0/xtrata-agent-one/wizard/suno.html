@@ -225,7 +225,7 @@ const SERVER = { mock:false, net:'mainnet' };
 // fees on refund loops). Builds are date-stamped (YYYY-MM-DD.N) so a string compare orders them;
 // a NEWER deployed bundle must pass — requiring an exact match wrongly locked the page out
 // whenever the agent shipped ahead of the page.
-const XAO_MIN_AGENT_BUILD='2026-07-25.7';
+const XAO_MIN_AGENT_BUILD='2026-07-25.8';
 let AGENT_STALE=false;
 function checkAgentBuild(){
   const b=window.XAO_AGENT_BUILD||null;

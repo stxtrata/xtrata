@@ -84,7 +84,24 @@ async function balance(addr: string): Promise<bigint> {
   if (d == null || d.balance == null) throw new Error('balance lookup returned no balance');
   return BigInt(d.balance);
 }
-async function safeNonce(addr: string): Promise<bigint | undefined> { if (MOCK) return undefined; try { const d: any = await (await hfetch(`/extended/v1/address/${addr}/nonces`)).json(); const n = d && d.possible_next_nonce; return n == null ? undefined : BigInt(n); } catch { return undefined; } }
+// undefined = "let the tx builder pick its own nonce", which is a legitimate
+// fallback rather than a wrong answer. But it used to be completely silent, so a
+// nonce chosen from a different source — and the ConflictingNonceInMempool that
+// can follow under load — had no trace in the log to explain it.
+async function safeNonce(addr: string, logId: string | null = null): Promise<bigint | undefined> {
+  if (MOCK) return undefined;
+  try {
+    const r = await hfetch(`/extended/v1/address/${addr}/nonces`);
+    if (!r.ok) throw new Error(`nonce lookup ${r.status}`);
+    const d: any = await r.json();
+    const n = d && d.possible_next_nonce;
+    if (n == null) throw new Error('nonce lookup returned no possible_next_nonce');
+    return BigInt(n);
+  } catch (e) {
+    xaoLog(logId, `nonce lookup failed (${errMsg(e)}) — falling back to the wallet's own nonce`);
+    return undefined;
+  }
+}
 async function quoteFee(sizeBytes: number, chunks: number) {
   if (MOCK) return { single: chunks <= SINGLE_MAX, protocolFee: 100000n + BigInt(chunks) * 2000n, batches: Math.max(1, Math.ceil(chunks / SINGLE_MAX)) };
   const single = chunks <= SINGLE_MAX;
@@ -93,17 +110,28 @@ async function quoteFee(sizeBytes: number, chunks: number) {
 }
 // Nakamoto-aware: poll 2 s for the first ~90 s (most blocks land in seconds), then 6 s. ~16 min ceiling.
 async function waitTx(txid: string) {
+  // Track whether we ever actually reached the API. Swallowing every read error and
+  // then reporting "not confirmed" blames the transaction for what was an outage —
+  // and the caller treats those two very differently.
+  let reads = 0; let lastReadErr: unknown = null;
   for (let i = 0; i < 210; i++) {
     try {
-      const d = await (await hfetch(`/extended/v1/tx/${txid}`)).json();
+      const r = await hfetch(`/extended/v1/tx/${txid}`);
+      if (!r.ok) throw new Error(`tx lookup ${r.status}`);
+      const d = await r.json();
+      reads += 1;
       if (d.tx_status === 'success') return d;
       if (d.tx_status && String(d.tx_status).startsWith('abort')) throw new Error('TX ' + d.tx_status);
       // A dropped tx is never coming back — polling it for sixteen more minutes just
       // looks like a hang. Fail now, with the reason, so the retry can re-broadcast.
       if (d.tx_status && String(d.tx_status).startsWith('dropped')) throw new Error('TX ' + d.tx_status);
-    } catch (e: any) { if (String(e).includes('TX abort') || String(e).includes('TX dropped')) throw e; }
+    } catch (e: any) {
+      if (String(e).includes('TX abort') || String(e).includes('TX dropped')) throw e;
+      lastReadErr = e;
+    }
     await sleep(i < 45 ? 2000 : 6000);
   }
+  if (!reads) throw new Error(`could not reach the API to confirm ${txid} (${errMsg(lastReadErr)}) — the transaction may well have landed`);
   throw new Error('not confirmed: ' + txid);
 }
 async function getIdByHash(h: Uint8Array) { const j: any = await ro('get-id-by-hash', [bufferCV(h)]); return j.value ? String(j.value.value) : null; }
@@ -120,7 +148,7 @@ const lastGoodFee = new Map<string, bigint>();
 async function send(key: string, from: string, fn: string, args: any[], spendCap: bigint | null, onFeeWait?: (m: string) => void, logId: string | null = null) {
   const post = spendCap != null ? [makeStandardSTXPostCondition(from, FungibleConditionCode.LessEqual, spendCap)] : [];
   const opts: any = { contractAddress: CORE[0], contractName: CORE[1], functionName: fn, functionArgs: args, senderKey: key, network, postConditionMode: PostConditionMode.Deny, postConditions: post, anchorMode: AnchorMode.Any };
-  try { opts.nonce = await safeNonce(from); } catch {}
+  try { opts.nonce = await safeNonce(from, logId); } catch {}
   // Cap the fee at the lesser of MINT_CAP and the balance minus what delivery+refund
   // still need, so NotEnoughFunds becomes a wait instead of a failure. A LOOKUP
   // failure must not lower the cap — a cap of 0 makes every estimate look like a
@@ -301,7 +329,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-25.7';
+export const AGENT_BUILD = '2026-07-25.8';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -857,7 +885,19 @@ async function statusJob(job: any) {
   // "Payment seen" (mempool) — UI signal only; money decisions still gate on the confirmed balance.
   let pending = false;
   if (!funded && !MOCK && job.depositAddress && job.status === 'AWAITING_DEPOSIT') {
-    try { const d: any = await (await hfetch(`/extended/v1/address/${job.depositAddress}/mempool?limit=10`)).json(); pending = (d.results || []).some((tx: any) => tx.token_transfer && tx.token_transfer.recipient_address === job.depositAddress); } catch {}
+    // A throttled read here used to report "nothing pending", which is why the
+    // status line flipped between "payment seen — confirming" and "waiting for
+    // payment to land" while a deposit was in flight. Unknown is not the same as
+    // none: leave `pending` false but do not pretend the mempool was empty.
+    try {
+      const r = await hfetch(`/extended/v1/address/${job.depositAddress}/mempool?limit=10`);
+      if (!r.ok) throw new Error(`mempool ${r.status}`);
+      const d: any = await r.json();
+      if (!Array.isArray(d?.results)) throw new Error('mempool returned no results');
+      pending = d.results.some((tx: any) => tx.token_transfer && tx.token_transfer.recipient_address === job.depositAddress);
+    } catch (e) {
+      xaoLog(job.jobId, `mempool check unavailable (${errMsg(e)}) — cannot say whether a payment is in flight`);
+    }
   }
   // Parent escrow gate — a parented job is runnable only when funded AND all parents are held.
   let parents: any = null;
@@ -1540,4 +1580,4 @@ export { deriveFrom, newWallet, balance, quoteFee, mintSingle, stagedInscribe, g
 // Exported for the fault-injection harness. These two decide "who paid" and "has the
 // parent arrived" — the questions behind the failures that shipped, and both are only
 // meaningful when exercised against a degraded API rather than asserted on in source.
-export { detectFunder, parentsStatus, heldInscriptions };
+export { detectFunder, parentsStatus, heldInscriptions, waitTx, safeNonce, statusJob };

@@ -48,7 +48,7 @@ const main = async () => {
   console.log('Sweeping from :', from);
   console.log('To            :', recipient);
 
-  const balRes = await fetch(`https://api.hiro.so/extended/v1/address/${from}/stx`);
+  const balRes = await fetch(`https://api.hiro.so/extended/v2/addresses/${from}/balances/stx`);
   const bal = BigInt(((await balRes.json()).balance ?? '0'));
   console.log('Balance       :', (Number(bal) / 1e6).toFixed(6), 'STX');
   if (bal <= FEE) {

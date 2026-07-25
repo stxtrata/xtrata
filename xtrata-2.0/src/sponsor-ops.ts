@@ -90,9 +90,13 @@ const callRead = async (contractName: string, fn: string, args: string[] = []) =
 const refreshChainState = async () => {
   if (state.relayerAddress) {
     try {
-      const r = await fetch(`${HIRO_API}/extended/v1/address/${state.relayerAddress}/stx`);
+      // v2, and a missing field is unknown (null) rather than zero — showing the
+      // relayer at 0 STX because a read was throttled reads as an outage.
+      const r = await fetch(`${HIRO_API}/extended/v2/addresses/${state.relayerAddress}/balances/stx`);
+      if (!r.ok) throw new Error(`balance lookup failed (HTTP ${r.status})`);
       const j = (await r.json()) as { balance?: string };
-      state.balanceUstx = BigInt(j.balance ?? '0');
+      if (j?.balance == null) throw new Error('balance lookup returned no balance');
+      state.balanceUstx = BigInt(j.balance);
     } catch {
       state.balanceUstx = null;
     }

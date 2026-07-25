@@ -159,9 +159,13 @@ export function makeLiveChain({ network = 'mainnet', sponsorKey, hiroKey }) {
       } catch { return 30_000n; }
     },
     async getBalance(addr) {
-      const r = await h(`${api}/extended/v1/address/${addr}/stx`);
+      // v2 + throw: the deprecated v1 route is throttled regardless of API key, and
+      // a zero default turned that throttling into "the relayer is out of funds".
+      const r = await h(`${api}/extended/v2/addresses/${addr}/balances/stx`);
+      if (!r.ok) throw new Error(`balance lookup failed (HTTP ${r.status})`);
       const j = await r.json();
-      return BigInt(j.balance || '0');
+      if (j == null || j.balance == null) throw new Error('balance lookup returned no balance');
+      return BigInt(j.balance);
     },
     async getNonce(addr) {
       const r = await h(`${api}/extended/v1/address/${addr}/nonces`);
