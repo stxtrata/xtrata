@@ -551,12 +551,13 @@ const dropsDone = () => Object.keys(state.drops).length;
 const nextDrop = () => {
   for (let n = 1; n <= SUPPLY; n++) {
     if (!state.tokens[n]) continue;      // token id not resolved yet
-    if (state.drops[n]) continue;
-    if (state.dropTx[n]) continue;
+    if (state.drops[n] !== undefined) continue;
+    if (state.dropTx[n] !== undefined) continue;
     return n;
   }
   return null;
 };
+const hasCampaign = () => Number.isInteger(state.campaign) && state.campaign >= 0;
 let inFlight = false;
 let autoRun = false;
 let autoMsg = '', syncMsg = '';
@@ -620,11 +621,24 @@ async function tokenIdForEdition(n){
   return withRetry(`get-id-by-hash(${pad2(n)})`, async () =>
     unwrapUint(await readOnly(CORE_NAME, 'get-id-by-hash', [Cl.buffer(h)])));
 }
-async function dropIdForToken(tokenId){
+// get-drop-by-token returns (optional (tuple ...)) — the whole drop record, not
+// a drop id. Presence of the tuple is what says "already escrowed"; the record
+// carries no drop-id field at all, so never try to read one out of it.
+async function dropForToken(tokenId){
   const { Cl } = await sdk();
-  return withRetry(`get-drop-by-token(${tokenId})`, async () =>
-    unwrapUint(await readOnly(DROPS_NAME, 'get-drop-by-token',
-      [Cl.contractPrincipal(XTRATA_ADDRESS, CORE_NAME), Cl.uint(tokenId)])));
+  const j = await withRetry(`get-drop-by-token(${tokenId})`, async () =>
+    readOnly(DROPS_NAME, 'get-drop-by-token',
+      [Cl.contractPrincipal(XTRATA_ADDRESS, CORE_NAME), Cl.uint(tokenId)]));
+  const t = j?.value?.value ?? null;
+  if (!t || typeof t !== 'object') return null;
+  const g = k => t[k]?.value;
+  return {
+    escrowed: true,
+    campaignId: unwrapUint(t['campaign-id']),
+    edition: unwrapUint(t['edition']),
+    feeBudget: unwrapUint(t['fee-budget']),
+    creator: g('creator')
+  };
 }
 
 /* ---- step 2: resolve the 33 token ids from chain ---- */
@@ -674,9 +688,9 @@ async function doSyncDrops(){
       const token = state.tokens[n];
       if (!token) continue;
       await new Promise(r => setTimeout(r, 150));
-      const dropId = await dropIdForToken(token);
-      if (dropId !== null) { state.drops[n] = dropId; delete state.dropTx[n]; found++; }
-      else if (state.drops[n]) delete state.drops[n];
+      const rec = await dropForToken(token);
+      if (rec) { state.drops[n] = rec.edition ?? true; delete state.dropTx[n]; found++; }
+      else if (state.drops[n] !== undefined) delete state.drops[n];
       syncMsg = `checking ${pad2(n)} / ${SUPPLY}…`; render();
     }
     save();
@@ -707,7 +721,8 @@ async function doCreateCampaign(){
   const v = $('cc-tx');
   try {
     const { Cl } = await sdk();
-    const predicted = unwrapUint(await readOnly(DROPS_NAME, 'get-next-campaign-id', []));
+    const predicted = await withRetry('get-next-campaign-id', async () =>
+      unwrapUint(await readOnly(DROPS_NAME, 'get-next-campaign-id', [])));
     const txid = await call(DROPS_NAME, 'create-campaign', [
       Cl.uint(ENGINE_INSCRIPTION), Cl.uint(SUPPLY),
       Cl.bool(RULES.onePerWallet), Cl.bool(RULES.requireBns), Cl.bool(RULES.onePerBns)
@@ -747,10 +762,11 @@ async function pollCampaignTx(txid, predicted){
   log('campaign tx poll timed out — check the explorer and set the id manually');
 }
 async function doReadCampaign(){
-  if (state.campaign === null || state.campaign === undefined) return;
+  if (!hasCampaign()) { campaignInfo = null; return; }
   try {
     const { Cl } = await sdk();
-    const j = await readOnly(DROPS_NAME, 'get-campaign', [Cl.uint(state.campaign)]);
+    const j = await withRetry(`get-campaign(${state.campaign})`, async () =>
+      readOnly(DROPS_NAME, 'get-campaign', [Cl.uint(state.campaign)]));
     const t = j?.value?.value ?? j?.value ?? null;
     if (!t) { campaignInfo = null; log(`campaign ${state.campaign} not found on chain`); render(); return; }
     const g = k => t[k]?.value;
@@ -769,6 +785,13 @@ async function doCreateDrop(auto = false){
   if (inFlight) { log('ignored — a signature request is already in flight'); return; }
   if (auto && !autoRun) return;
   const v = $('d-tx');
+  // Never build a transaction from an unusable campaign id — Cl.uint(NaN) throws
+  // "Values of type 'number' must be an integer" only after the run has started.
+  if (!hasCampaign()) {
+    v.innerHTML = '<span class="err">no valid campaign id — create the campaign first</span>';
+    stopAuto('no valid campaign id', 'err');
+    return;
+  }
   let n = null;
   inFlight = true;
   try {
@@ -777,10 +800,10 @@ async function doCreateDrop(auto = false){
     // duplicate never costs a rejected transaction — or a second escrow.
     n = nextDrop();
     while (n !== null) {
-      const existing = await dropIdForToken(state.tokens[n]);
-      if (existing === null) break;
-      log(`edition ${pad2(n)} (token ${state.tokens[n]}) is already escrowed as drop ${existing} — skipping`);
-      state.drops[n] = existing; save();
+      const existing = await dropForToken(state.tokens[n]);
+      if (!existing) break;
+      log(`edition ${pad2(n)} (token ${state.tokens[n]}) is already escrowed (campaign edition ${existing.edition ?? '?'}) — skipping`);
+      state.drops[n] = existing.edition ?? true; save();
       n = nextDrop();
     }
     if (n === null) {
@@ -821,15 +844,15 @@ async function pollDropTx(n, txid){
       if (tx.tx_status === 'pending') continue;
       if (tx.tx_status !== 'success') {
         delete state.dropTx[n];
-        const onChain = await dropIdForToken(state.tokens[n]).catch(() => null);
-        if (onChain !== null) state.drops[n] = onChain;
+        const onChain = await dropForToken(state.tokens[n]).catch(() => null);
+        if (onChain) state.drops[n] = onChain.edition ?? true;
         save();
         log(`edition ${pad2(n)} escrow ${tx.tx_status}: ${tx.tx_result?.repr || ''}`);
         $('d-tx').innerHTML = `<span class="err">edition ${pad2(n)} ${tx.tx_status}: ${tx.tx_result?.repr || ''}</span>`;
         stopAuto(`edition ${pad2(n)} ${tx.tx_status} — nothing further was signed`, 'err');
         return;
       }
-      const m = (tx.tx_result?.repr || '').match(/drop-id\s+u(\d+)/);
+      const m = (tx.tx_result?.repr || '').match(/edition\s+u(\d+)/);
       delete state.dropTx[n];
       state.drops[n] = m ? Number(m[1]) : true;
       save();
@@ -844,11 +867,12 @@ async function pollDropTx(n, txid){
       return;
     } catch(e){ log('poll: ' + (e.message||e)); }
   }
-  const onChain = await dropIdForToken(state.tokens[n]).catch(() => null);
-  if (onChain !== null) { state.drops[n] = onChain; delete state.dropTx[n]; save(); }
+  const onChain = await dropForToken(state.tokens[n]).catch(() => null);
+  if (onChain) { state.drops[n] = onChain.edition ?? true; delete state.dropTx[n]; save(); }
   stopAuto(`edition ${pad2(n)} did not confirm within 20 minutes — run “sync drops” before resuming`, 'warn');
 }
 async function doStartAuto(){
+  if (!hasCampaign()) { setAuto('no valid campaign id — create the campaign first', 'err'); return; }
   setAuto('syncing with the chain before starting…');
   const found = await doSyncDrops();
   if (found === null) { setAuto('drop sync failed — not starting', 'err'); return; }
@@ -870,6 +894,7 @@ async function doStartAuto(){
 }
 
 async function doSetActive(active){
+  if (!hasCampaign()) return;
   try {
     const { Cl } = await sdk();
     const txid = await call(DROPS_NAME, 'set-campaign-active', [Cl.uint(state.campaign), Cl.bool(active)],
@@ -940,7 +965,7 @@ const STEPS = [
   {
     id:'campaign', title:'Create the campaign',
     gate:()=>!!me && tokensKnown() > 0,
-    done:()=>state.campaign !== null && state.campaign !== undefined,
+    done:()=>hasCampaign(),
     desc:()=>`One <code>create-campaign</code> call on <code>${DROPS_NAME}</code>. The rules are fixed here so they cannot be set inconsistently — the contract also asserts that one-per-BNS implies BNS-required.`,
     render(el){
       el.innerHTML += `<div class="rules">
@@ -953,17 +978,23 @@ const STEPS = [
         </div>
         <div class="verify warn">v1.1 campaigns are <b>active from creation</b> — claiming opens as soon as the first edition is escrowed. There is no stock-privately state (that arrived in v1.2, which is not deployed).</div>
         <div class="row"><button id="cc-sign" class="primary" ${me?'':'disabled'}>create campaign</button>
-          <input id="cc-manual" placeholder="or paste an existing campaign id" value="${state.campaign ?? ''}" style="max-width:240px">
+          <input id="cc-manual" placeholder="or paste an existing campaign id" value="${hasCampaign() ? state.campaign : ''}" style="max-width:240px">
           <button id="cc-save">save id</button></div>
         <div class="verify" id="cc-tx">${state.campaignTx ? `<a href="${EXPLORER(state.campaignTx)}" target="_blank" rel="noopener">${state.campaignTx}</a>` : ''}</div>
         ${campaignInfo ? `<div class="verify ok">campaign ${state.campaign}: ${campaignInfo.dropsCreated}/${campaignInfo.maxSupply} escrowed · active ${campaignInfo.active} · creator ${campaignInfo.creator}</div>` : ''}`;
       el.querySelector('#cc-sign').onclick = doCreateCampaign;
-      el.querySelector('#cc-save').onclick = ()=>{ const v=$('cc-manual').value.trim(); state.campaign = v===''?null:Number(v); save(); doReadCampaign(); };
+      el.querySelector('#cc-save').onclick = ()=>{
+        const raw = $('cc-manual').value.trim();
+        if (raw === '') { state.campaign = null; campaignInfo = null; log('campaign id cleared'); save(); return; }
+        const v = Number(raw);
+        if (!Number.isInteger(v) || v < 0) { $('cc-tx').innerHTML = `<span class="err">\u201c${raw}\u201d is not a valid campaign id</span>`; return; }
+        state.campaign = v; log('campaign id set to ' + v); save(); doReadCampaign();
+      };
     }
   },
   {
     id:'drops', title:'Escrow the 33 editions',
-    gate:()=>state.campaign !== null && state.campaign !== undefined && !!me && tokensKnown() > 0,
+    gate:()=>hasCampaign() && !!me && tokensKnown() > 0,
     done:()=>dropsDone() >= SUPPLY,
     desc:()=>`One <code>create-campaign-drop</code> per edition — v1.1 escrows one NFT per transaction (batch-of-25 only arrived in the undeployed v1.2). Each call moves the NFT plus ${(FEE_BUDGET/1e6).toFixed(3)} STX into the drops contract.`,
     render(el){
@@ -983,7 +1014,7 @@ const STEPS = [
         ${autoMsg ? `<div class="verify">${autoMsg}</div>` : ''}
         <div class="verify" id="d-tx"></div>
         ${doneCount ? `<table>${Object.keys(state.drops).sort((a,b)=>a-b).map(k =>
-          `<tr><td class="n">${pad2(k)}</td><td>${TITLES[k-1]}</td><td class="s">token #${state.tokens[k]} → drop ${state.drops[k]}</td></tr>`).join('')}</table>` : ''}`;
+          `<tr><td class="n">${pad2(k)}</td><td>${TITLES[k-1]}</td><td class="s">token #${state.tokens[k]} → escrowed</td></tr>`).join('')}</table>` : ''}`;
       el.querySelector('#d-sign')?.addEventListener('click', ()=>doCreateDrop(false));
       el.querySelector('#d-auto')?.addEventListener('click', doStartAuto);
       el.querySelector('#d-stop')?.addEventListener('click', ()=>stopAuto('stopped by you', 'warn'));
@@ -992,7 +1023,7 @@ const STEPS = [
   },
   {
     id:'manage', title:'Verify & manage',
-    gate:()=>state.campaign !== null && state.campaign !== undefined,
+    gate:()=>hasCampaign(),
     done:()=>!!(campaignInfo && campaignInfo.dropsCreated >= SUPPLY && campaignInfo.active),
     desc:()=>'Read the live campaign back from chain and open or close claiming. Closing also blocks further escrow, so only close once every edition is in.',
     render(el){
@@ -1021,7 +1052,7 @@ const STEPS = [
 /* ---- render ---- */
 function render(){
   $('who').textContent = me ? me.slice(0,8)+'…'+me.slice(-4) : 'not connected';
-  $('stateView').textContent = JSON.stringify({ campaign: state.campaign, tokens: tokensKnown(), drops: dropsDone() });
+  $('stateView').textContent = JSON.stringify({ campaign: hasCampaign() ? state.campaign : null, tokens: tokensKnown(), drops: dropsDone() });
   const box = $('steps'); box.innerHTML = '';
   STEPS.forEach((s, i)=>{
     const done = s.done();
@@ -1050,13 +1081,13 @@ render();
     log(`restored cached signer ${me} — reconnect to confirm it with the wallet`);
     render();
   } catch { /* offline / no wallet libs */ }
-  if (state.campaign !== null && state.campaign !== undefined) doReadCampaign();
+  if (hasCampaign()) doReadCampaign();
 })();
 window.__dropCanary = {
   get state(){return state;}, get me(){return me;}, get campaignInfo(){return campaignInfo;},
   get autoRun(){return autoRun;}, get inFlight(){return inFlight;},
   resolveTokens: doResolveTokens, syncDrops: doSyncDrops, readCampaign: doReadCampaign,
-  tokenIdForEdition, dropIdForToken, nextDrop, wrapperHtml,
+  tokenIdForEdition, dropForToken, nextDrop, wrapperHtml,
   startAuto: doStartAuto, stopAuto: ()=>stopAuto('stopped by you'),
   setState: s=>{ state={...state,...s}; save(); }, setMe: a=>{ me=a; render(); }
 };

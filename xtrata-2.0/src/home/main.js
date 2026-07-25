@@ -11523,7 +11523,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // drops contract exposes market-shaped read-onlys, so reads look identical.
     const DROP_DIAGNOSTICS_KEY = 'xtrata:drops:diagnostics:v1';
     const DEFAULT_DROP_GROUP_ID = 1n;
-    const DROPS_DISPLAY_LIMIT = 25;
+    // A v1.1 campaign escrows one drop per edition, so this ceiling has to clear
+    // a whole collection or the page silently shows a truncated set — a 33-edition
+    // campaign displayed only its newest 25 drops under the previous value of 25.
+    const DROPS_DISPLAY_LIMIT = 64;
     const DROPS_SCAN_MAX_IDS = DROPS_DISPLAY_LIMIT * 10;
     const dropsState = {
       run: 0,
@@ -11840,6 +11843,16 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           lastId: lastId.toString(),
           scanned,
           found: results.length,
+          limit: DROPS_DISPLAY_LIMIT
+        }, 'warn');
+      }
+      // Hitting the display limit is the other way this list can be incomplete,
+      // and it was previously silent: the page just showed fewer drops than exist.
+      if (results.length >= DROPS_DISPLAY_LIMIT && lastId >= BigInt(DROPS_DISPLAY_LIMIT)) {
+        debugLog('drops', 'drop list truncated at display limit', {
+          contractId,
+          lastId: lastId.toString(),
+          shown: results.length,
           limit: DROPS_DISPLAY_LIMIT
         }, 'warn');
       }
