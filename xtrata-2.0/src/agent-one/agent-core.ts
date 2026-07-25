@@ -93,7 +93,17 @@ async function quoteFee(sizeBytes: number, chunks: number) {
 }
 // Nakamoto-aware: poll 2 s for the first ~90 s (most blocks land in seconds), then 6 s. ~16 min ceiling.
 async function waitTx(txid: string) {
-  for (let i = 0; i < 210; i++) { try { const d = await (await hfetch(`/extended/v1/tx/${txid}`)).json(); if (d.tx_status === 'success') return d; if (d.tx_status && String(d.tx_status).startsWith('abort')) throw new Error('TX ' + d.tx_status); } catch (e: any) { if (String(e).includes('TX abort')) throw e; } await sleep(i < 45 ? 2000 : 6000); }
+  for (let i = 0; i < 210; i++) {
+    try {
+      const d = await (await hfetch(`/extended/v1/tx/${txid}`)).json();
+      if (d.tx_status === 'success') return d;
+      if (d.tx_status && String(d.tx_status).startsWith('abort')) throw new Error('TX ' + d.tx_status);
+      // A dropped tx is never coming back — polling it for sixteen more minutes just
+      // looks like a hang. Fail now, with the reason, so the retry can re-broadcast.
+      if (d.tx_status && String(d.tx_status).startsWith('dropped')) throw new Error('TX ' + d.tx_status);
+    } catch (e: any) { if (String(e).includes('TX abort') || String(e).includes('TX dropped')) throw e; }
+    await sleep(i < 45 ? 2000 : 6000);
+  }
   throw new Error('not confirmed: ' + txid);
 }
 async function getIdByHash(h: Uint8Array) { const j: any = await ro('get-id-by-hash', [bufferCV(h)]); return j.value ? String(j.value.value) : null; }
@@ -111,8 +121,6 @@ async function send(key: string, from: string, fn: string, args: any[], spendCap
   const post = spendCap != null ? [makeStandardSTXPostCondition(from, FungibleConditionCode.LessEqual, spendCap)] : [];
   const opts: any = { contractAddress: CORE[0], contractName: CORE[1], functionName: fn, functionArgs: args, senderKey: key, network, postConditionMode: PostConditionMode.Deny, postConditions: post, anchorMode: AnchorMode.Any };
   try { opts.nonce = await safeNonce(from); } catch {}
-  // Never broadcast a fee the deposit can't afford: cap at the lesser of MINT_CAP and the
-  // balance minus what later delivery+refund still need. Turns NotEnoughFunds into a wait.
   // Cap the fee at the lesser of MINT_CAP and the balance minus what delivery+refund
   // still need, so NotEnoughFunds becomes a wait instead of a failure. A LOOKUP
   // failure must not lower the cap — a cap of 0 makes every estimate look like a
@@ -127,21 +135,45 @@ async function send(key: string, from: string, fn: string, args: any[], spendCap
   if (headroom === 0n) throw new Error(`${fn}: deposit wallet has no headroom left for fees — nothing was broadcast`);
   if (headroom != null && headroom < effCap) effCap = headroom;
   let tx: any, fee: bigint;
+  // The cheapest quote seen this run is the closest thing we have to the node's real
+  // minimum. The fallback must never dip below it: a fee we KNOW will be rejected is
+  // not a fallback, it is a guaranteed FeeTooLow.
+  let cheapestQuote: bigint | null = null;
   for (let attempt = 0; ; attempt++) {
     tx = await makeContractCall(opts);
     fee = BigInt(tx.auth.spendingCondition.fee.toString());
+    if (cheapestQuote == null || fee < cheapestQuote) cheapestQuote = fee;
     xaoLog(logId, `${fn}: fee estimate ${fee} µSTX (cap ${effCap}, try ${attempt + 1})`);
     if (fee <= effCap) break;
     if (fee <= (effCap * 5n) / 4n) { tx = await makeContractCall({ ...opts, fee: effCap }); fee = effCap; break; }  // marginal overage: clamp to cap, don't burn retries
     if (attempt < 3) { xaoLog(logId, `${fn}: estimator spike — retrying (${attempt + 1}/3)`); await sleep(6000); continue; }
     if (attempt < 15) { const m = `network fees are high — waiting for them to settle (${attempt - 2}/12)`; xaoLog(logId, `${fn}: ${m}`); if (onFeeWait) try { onFeeWait(m); } catch {} await sleep(20000); continue; }
-    const fb = lastGoodFee.get(fn); const useFee = fb && fb * 2n <= effCap ? fb * 2n : effCap;
-    xaoLog(logId, `${fn}: fees still elevated after waiting — using bounded fallback fee ${useFee}`);
-    tx = await makeContractCall({ ...opts, fee: useFee }); fee = useFee; break;
+    // Out of patience. Reaching here means EVERY quote exceeded effCap * 5/4, so the
+    // cheapest quote is necessarily above what this wallet can afford. The old
+    // "bounded fallback" broadcast min(2 × last good fee, effCap) anyway — a fee
+    // already known to be below every quote the node gave us, which is how a run
+    // ended in "using bounded fallback fee 0" followed by FeeTooLow. There is no
+    // affordable fee to fall back to; say so, spend nothing, and let the caller
+    // retry later when either the fee market or the balance has moved.
+    const floor = cheapestQuote ?? 0n;
+    throw new Error(`${fn}: cannot afford the network fee — cheapest quote ${floor} µSTX, affordable ${effCap} µSTX. Nothing was broadcast.`);
   }
-  lastGoodFee.set(fn, fee);
-  const res: any = await broadcastTransaction(tx, network);
+  let res: any = await broadcastTransaction(tx, network);
+  // FeeTooLow is deterministic for a given fee — waiting cannot fix it, only a bigger
+  // fee can. It used to fall out to the caller's retry, which re-ran the whole
+  // estimate/wait cycle (up to four minutes) and arrived at the same rejected fee.
+  for (let bump = 1; bump <= 3 && res?.error && /FeeTooLow/i.test(`${res.error} ${res.reason || ''}`); bump += 1) {
+    const next = fee * 2n > effCap ? effCap : fee * 2n;
+    if (next <= fee) { xaoLog(logId, `${fn}: FeeTooLow at ${fee} µSTX and already at the affordable ceiling — cannot bump further`); break; }
+    xaoLog(logId, `${fn}: FeeTooLow at ${fee} µSTX — retrying at ${next} µSTX (bump ${bump}/3)`);
+    tx = await makeContractCall({ ...opts, fee: next }); fee = next;
+    res = await broadcastTransaction(tx, network);
+  }
   if (res.error) { xaoLog(logId, `${fn}: broadcast REJECTED — ${res.error} ${res.reason || ''}`); throw new Error(`${fn}: ${res.error} ${res.reason || ''}`); }
+  // Only a fee that ACTUALLY broadcast is "good". Recording it before the broadcast
+  // meant a rejected fee seeded the next fallback, so one bad estimate poisoned
+  // every later attempt for that function.
+  lastGoodFee.set(fn, fee);
   const txid = res.txid || res;
   xaoLog(logId, `${fn}: broadcast 0x${String(txid).replace(/^0x/, '')} · fee ${fee} µSTX — awaiting confirmation`);
   const t0 = Date.now(); const d = await waitTx(txid);
@@ -269,7 +301,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-25.6';
+export const AGENT_BUILD = '2026-07-25.7';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;

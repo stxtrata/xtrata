@@ -33,6 +33,24 @@ export class FakeChain {
   /** inbound STX transfers per address: {sender, amount}. */
   inbound = new Map<string, Array<{ sender: string; amount: bigint }>>();
 
+  // --- fee estimator + mempool ---
+  /** Fees the estimator quotes, consumed in order; the last value repeats. */
+  feeQuotes: bigint[] = [3000n];
+  /** Node minimum: a broadcast at or below this is rejected as FeeTooLow. */
+  minAcceptedFee = 0n;
+  /** Fees actually broadcast, in order — lets a test assert what reached the node. */
+  broadcasts: bigint[] = [];
+  /** tx id → status returned by the tx endpoint. */
+  txStatus = new Map<string, string>();
+  private feeIdx = 0;
+  private txSeq = 0;
+
+  nextFee(): bigint {
+    const q = this.feeQuotes[Math.min(this.feeIdx, this.feeQuotes.length - 1)] ?? 3000n;
+    this.feeIdx += 1;
+    return q;
+  }
+
   /** URL fragment → forced failure. */
   private faults: Array<{ match: string; fault: Fault }> = [];
   /** Every path requested, in order — lets a test assert what was NOT called. */
@@ -122,11 +140,40 @@ export class FakeChain {
 
     if (url.includes('/nonces')) return json({ possible_next_nonce: 1 });
 
+    // --- fee estimation ---
+    if (url.includes('/v2/fees/transaction')) {
+      const f = Number(this.nextFee());
+      return json({ estimated_cost_scalar: 1, estimations: [{ fee: f }, { fee: f }, { fee: f }] });
+    }
+    if (url.includes('/v2/fees/transfer')) return json(1);
+
+    // --- broadcast ---
+    if (url.includes('/v2/transactions')) {
+      const fee = this.lastBroadcastFee ?? 0n;
+      this.broadcasts.push(fee);
+      if (fee <= this.minAcceptedFee) {
+        return json({ error: 'transaction rejected', reason: 'FeeTooLow', reason_data: { expected: String(this.minAcceptedFee + 1n) } }, 400);
+      }
+      const txid = `0x${(++this.txSeq).toString(16).padStart(64, '0')}`;
+      this.txStatus.set(txid, 'success');
+      return json(txid.replace(/^0x/, ''));
+    }
+
+    // --- tx status ---
+    // Hiro returns the txid WITHOUT a 0x prefix from /v2/transactions but accepts
+    // either form on lookup, so normalise both ends here.
+    m = /\/extended\/v1\/tx\/(?:0x)?([0-9a-f]+)/.exec(url);
+    if (m) { const id = `0x${m[1]}`; return json({ tx_status: this.txStatus.get(id) ?? 'pending', tx_id: id }); }
+
+    if (url.includes('/v2/accounts/')) return json({ balance: '0x0', nonce: 1 });
+
     return json({ message: `unrouted: ${url}` }, 404);
   }
 
   /** Set by the fetch shim from the POST body of a read-only call. */
   lastReadArgTokenId: string | null = null;
+  /** Fee on the transaction currently being broadcast, decoded by the fetch shim. */
+  lastBroadcastFee: bigint | null = null;
 }
 
 // (some u<id>) / none, as Clarity hex — built with the real serializer at load time.
@@ -166,6 +213,7 @@ export async function loadAgent(chain: FakeChain, opts: { core?: string } = {}) 
   g.fetch = vi.fn(async (input: any, init?: any) => {
     const url = String(input);
     if (init?.body) {
+      // Read-only call: remember which token id was asked about.
       try {
         const body = JSON.parse(String(init.body));
         const arg = Array.isArray(body.arguments) ? body.arguments[0] : null;
@@ -174,6 +222,15 @@ export async function loadAgent(chain: FakeChain, opts: { core?: string } = {}) 
           chain.lastReadArgTokenId = cv?.value != null ? String(cv.value) : null;
         }
       } catch { /* not a read-only call */ }
+      // Broadcast: pull the real fee out of the serialized transaction, so the fake
+      // node judges the fee the agent actually signed rather than one we were told.
+      if (url.includes('/v2/transactions')) {
+        try {
+          const raw = init.body instanceof Uint8Array ? init.body : new Uint8Array(init.body);
+          const tx: any = stacks.deserializeTransaction(raw);
+          chain.lastBroadcastFee = BigInt(tx.auth.spendingCondition.fee.toString());
+        } catch { chain.lastBroadcastFee = null; }
+      }
     }
     return chain.handle(url);
   });
