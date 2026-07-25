@@ -57,7 +57,12 @@ import {
 import { StacksMainnet } from '@stacks/network';
 import { jsonResponse } from '../lib/utils';
 import { run, queryAll, type Env } from '../lib/db';
-import { applyHiroApiKey, getHiroApiKeys, shouldRetryWithNextHiroKey } from '../lib/hiro-keys';
+import {
+  applyHiroApiKey,
+  getHiroApiKeys,
+  isTransientHiroStatus,
+  shouldRetryWithNextHiroKey
+} from '../lib/hiro-keys';
 import { getDropsCollectionLockForDrop } from '../../src/lib/drops/collection-lock';
 import {
   DEFAULT_DROP_POLICY_RULES,
@@ -192,16 +197,39 @@ const hiroFetch = async (env: SponsorEnv, path: string, init: RequestInit = {}):
   throw lastError instanceof Error ? lastError : new Error('Hiro request failed');
 };
 
+// Reads only. hiroFetch rotates API keys for 401/403/429, but a 503 from the
+// node was not retried at all, so one blip anywhere in ATTESTATION_STATE failed
+// the whole claim as RELAYER_INTERNAL. Every caller of hiroJson is idempotent
+// (GETs plus call-read POSTs); broadcast uses hiroFetch directly and must stay
+// single-shot, so this retry cannot resubmit a transaction.
+const HIRO_READ_ATTEMPTS = 3;
+const HIRO_READ_BACKOFF_MS = 250;
+
 const hiroJson = async <T>(env: SponsorEnv, path: string, init: RequestInit = {}): Promise<T> => {
-  const response = await hiroFetch(env, path, init);
-  if (!response.ok) {
-    throw new Error(`Hiro request returned HTTP ${response.status}`);
+  let lastError: unknown;
+  for (let attempt = 0; attempt < HIRO_READ_ATTEMPTS; attempt += 1) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, HIRO_READ_BACKOFF_MS * attempt * attempt));
+    }
+    let response: Response;
+    try {
+      response = await hiroFetch(env, path, init);
+    } catch (error) {
+      lastError = error;
+      continue;
+    }
+    if (!response.ok) {
+      lastError = new Error(`Hiro request returned HTTP ${response.status}`);
+      if (isTransientHiroStatus(response.status)) continue;
+      throw lastError;
+    }
+    try {
+      return (await response.json()) as T;
+    } catch {
+      throw new Error('Hiro request returned invalid JSON');
+    }
   }
-  try {
-    return (await response.json()) as T;
-  } catch {
-    throw new Error('Hiro request returned invalid JSON');
-  }
+  throw lastError instanceof Error ? lastError : new Error('Hiro request failed');
 };
 
 type HiroBroadcastResult = { txid: string } | { error: string; reason?: string };

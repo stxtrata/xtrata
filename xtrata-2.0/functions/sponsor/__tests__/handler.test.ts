@@ -305,6 +305,7 @@ let transactionStatus = 'success';
 let feeRate = 1;
 let collectionAlreadyClaimed = false;
 let bnsOwner = BUYER_ADDRESS;
+let transientDropReadFailures = 0;
 
 const stubFetch = () => {
   broadcasts.length = 0;
@@ -317,6 +318,7 @@ const stubFetch = () => {
   feeRate = 1;
   collectionAlreadyClaimed = false;
   bnsOwner = BUYER_ADDRESS;
+  transientDropReadFailures = 0;
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.includes('api.bnsv2.com/names/')) {
@@ -338,6 +340,10 @@ const stubFetch = () => {
       return Response.json({ okay: true, result: cvToHex(listingTuple()) });
     }
     if (url.includes('/get-drop')) {
+      if (transientDropReadFailures > 0) {
+        transientDropReadFailures -= 1;
+        return new Response('upstream unavailable', { status: 503 });
+      }
       let id = 3n;
       try {
         const parsed = JSON.parse(String(init?.body ?? '{}')) as { arguments?: string[] };
@@ -525,6 +531,35 @@ describe('sponsor relayer Pages handler', () => {
     });
     expect(sponsored.status).toBe(200);
     expect(await sponsored.json()).toMatchObject({ state: 'SPONSORED' });
+  });
+
+  // A single 503 anywhere in ATTESTATION_STATE used to fail the whole claim as
+  // RELAYER_INTERNAL, because hiroFetch only rotated API keys for 401/403/429
+  // and never retried an unavailable node.
+  it('rides out a transient 503 on a campaign state read', async () => {
+    transientDropReadFailures = 2;
+    const attested = await attestCampaign(env, {
+      contractId: DROPS_V11,
+      listingId: '3',
+      claimer: BUYER_ADDRESS,
+      bnsName: 'alice.btc'
+    });
+    expect(attested.status).toBe(200);
+    expect(transientDropReadFailures).toBe(0);
+    await expect(attested.json()).resolves.toMatchObject({ campaignId: '0' });
+  });
+
+  it('still gives up when the node stays unavailable', async () => {
+    transientDropReadFailures = 99;
+    const attested = await attestCampaign(env, {
+      contractId: DROPS_V11,
+      listingId: '3',
+      claimer: BUYER_ADDRESS,
+      bnsName: 'alice.btc'
+    });
+    // Exhausted retries surface as RELAYER_INTERNAL, not a masked success.
+    expect(attested.status).toBe(500);
+    await expect(attested.json()).resolves.toMatchObject({ code: 'RELAYER_INTERNAL' });
   });
 
   it('uses the campaign claim path for an explicitly allowlisted PoF controller', async () => {
