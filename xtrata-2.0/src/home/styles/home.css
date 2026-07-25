@@ -984,10 +984,16 @@
     #inscribePanelBody[data-mode='file']:not(.has-payload) #resumeNotice,
     #inscribePanelBody[data-mode='file']:not(.has-payload) #batchGuide { display: none; }
 
-    /* Text path: strip to just the text card. */
+    /* Text path: strip to just the text card, plus Parents.
+       #parentsDetails stays visible: the text button runs the same
+       runInscription/prepare path as the file flow, which already reads
+       state.parentIds and mints via mint-single-tx-with-relationships, so
+       hiding the panel was the only thing preventing a parented text
+       inscription. #dependenciesDetails stays hidden on purpose — text mode
+       sources its dependency from "Reply to a thread", and exposing both would
+       give two competing inputs for the same contract argument. */
     #inscribePanelBody[data-mode='text'] #fileFields,
     #inscribePanelBody[data-mode='text'] #inscribeAdvancedDetails,
-    #inscribePanelBody[data-mode='text'] #parentsDetails,
     #inscribePanelBody[data-mode='text'] #dependenciesDetails,
     #inscribePanelBody[data-mode='text'] .inscribe-wizard-note,
     #inscribePanelBody[data-mode='text'] .prepare-grid,

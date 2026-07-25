@@ -304,7 +304,11 @@
                 <button class="btn" id="inscribeTextButton" type="button" disabled>Inscribe text</button>
               </div>
               <details class="inscribe-details" id="textAdvancedDetails">
-                <summary>Advanced — reply to a thread &amp; activity log</summary>
+                <summary>Advanced — parent, reply to a thread &amp; activity log</summary>
+                <!-- #parentsDetails is shared with the file flow, so it is moved
+                     in here at runtime by placeParentsPanel() rather than
+                     duplicated. Order: parent, then reply-to, then the log. -->
+                <div id="textAdvancedParentSlot"></div>
                 <label class="field">
                   <span class="label">💬 Reply to a thread <span style="color:var(--muted);font-weight:400">· optional</span></span>
                   <input class="input" id="threadReplyTo" inputmode="numeric" autocomplete="off" placeholder="token id — e.g. 2745" />

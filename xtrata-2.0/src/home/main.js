@@ -320,6 +320,8 @@
       textAdvancedLogSlot: $('textAdvancedLogSlot'),
       parentRelationshipPanel: $('parentRelationshipPanel'),
       parentRelationshipBadge: $('parentRelationshipBadge'),
+      textAdvancedParentSlot: $('textAdvancedParentSlot'),
+      parentsDetails: $('parentsDetails'),
       parentIdsInput: $('parentIdsInput'),
       addParentsButton: $('addParentsButton'),
       clearParentsButton: $('clearParentsButton'),
@@ -4297,6 +4299,20 @@
         : `Connected Wallet: ${getConnectedWalletLabel()}.`;
     };
 
+    // The text inscribe button had four writers with three different rules, so
+    // whichever ran last won. markRelationshipPreparedDirty nulls state.prepared
+    // and renders, which unconditionally disabled it — meaning adding or clearing
+    // a parent left the button dead until the text was edited again. One rule now:
+    // valid text and not busy. The click handler connects the wallet and prepares
+    // on the fly (runInscription -> validateMintReadiness), so there is nothing to
+    // wait for here.
+    const TEXT_INSCRIBE_MAX_BYTES = 16384;
+    const syncTextInscribeButton = () => {
+      if (!dom.inscribeTextButton) return;
+      const bytes = new TextEncoder().encode(dom.textPayload?.value || '').length;
+      dom.inscribeTextButton.disabled = !(bytes > 0 && bytes <= TEXT_INSCRIBE_MAX_BYTES && !state.busy);
+    };
+
     const renderPreparedState = () => {
       if (!state.prepared) {
         revokePayloadPreview();
@@ -4320,7 +4336,7 @@
         }
         dom.duplicateWarning.classList.remove('on');
         renderResumeNotice();
-        if (dom.inscribeTextButton) dom.inscribeTextButton.disabled = true;
+        syncTextInscribeButton();
         updateControls();
         return;
       }
@@ -4490,12 +4506,15 @@
         dom.duplicateWarning.classList.remove('on');
       }
       renderResumeNotice();
-      // Streamlined text card: cost is the flat rate (shown by syncTextCard); just keep the
-      // inscribe button in sync once the background prepare is ready.
-      if (dom.inscribeTextButton) {
-        const textCardBytes = new TextEncoder().encode(dom.textPayload.value).length;
-        dom.inscribeTextButton.disabled = !(state.prepared && textCardBytes > 0 && textCardBytes <= 16384 && !state.busy);
-      }
+      // Streamlined text card: cost is the flat rate (shown by syncTextCard).
+      // This must use the SAME rule as syncTextCard — valid text alone, never
+      // state.prepared. Both write this button, so a stricter rule here silently
+      // wins whenever renderPreparedState runs last: adding or clearing a parent
+      // calls markRelationshipPreparedDirty, which nulls state.prepared and lands
+      // here, leaving the button dead until the text was edited again. The click
+      // handler prepares on the fly (runInscription -> validateMintReadiness), so
+      // there is nothing to wait for.
+      syncTextInscribeButton();
       updateControls();
     };
 
@@ -9430,10 +9449,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         setBusy(false);
         updateControls();
         // The text inscribe button isn't covered by updateControls — re-enable it on connect.
-        if (dom.inscribeTextButton && dom.inscribePanelBody?.dataset.mode === 'text') {
-          const b = new TextEncoder().encode(dom.textPayload?.value || '').length;
-          dom.inscribeTextButton.disabled = !(b > 0 && b <= 16384 && !state.busy);
-        }
+        if (dom.inscribePanelBody?.dataset.mode === 'text') syncTextInscribeButton();
       }
     };
 
@@ -13543,6 +13559,23 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const activityLogHome = dom.activityLog
       ? { parent: dom.activityLog.parentNode, next: dom.activityLog.nextSibling }
       : null;
+    // The Parents panel is shared with the file flow, where it sits at the top
+    // level and reveals with .has-payload. Text mode wants everything under the
+    // one Advanced panel, so move the same node instead of duplicating it —
+    // duplicating would mean two inputs writing one state.parentIds.
+    const parentsPanelHome = dom.parentsDetails
+      ? { parent: dom.parentsDetails.parentNode, next: dom.parentsDetails.nextSibling }
+      : null;
+    const placeParentsPanel = (mode) => {
+      if (!dom.parentsDetails) return;
+      if (mode === 'text') {
+        if (dom.textAdvancedParentSlot && dom.parentsDetails.parentNode !== dom.textAdvancedParentSlot) {
+          dom.textAdvancedParentSlot.appendChild(dom.parentsDetails);
+        }
+      } else if (parentsPanelHome && dom.parentsDetails.parentNode !== parentsPanelHome.parent) {
+        parentsPanelHome.parent.insertBefore(dom.parentsDetails, parentsPanelHome.next);
+      }
+    };
     const placeActivityLog = (mode) => {
       if (!dom.activityLog) return;
       if (mode === 'text') {
@@ -13559,6 +13592,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       dom.tabText?.classList.toggle('is-active', mode === 'text');
       dom.tabFile?.setAttribute('aria-selected', mode === 'file' ? 'true' : 'false');
       dom.tabText?.setAttribute('aria-selected', mode === 'text' ? 'true' : 'false');
+      placeParentsPanel(mode);
       placeActivityLog(mode);
     }
     // Threads: a "reply to" inscription id becomes a dependency (existence-only reference), so the
@@ -13626,10 +13660,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           : (textFeeLabel() || 'about … STX');
       }
       dom.inscribeTextButton.textContent = replying ? 'Inscribe reply' : 'Inscribe text';
-      // Enabled on valid text alone — the click handler connects the wallet if needed and
-      // prepares on the fly (runInscription → validateMintReadiness), so we never gate on
-      // state.prepared here (that left the button stuck when the background prepare didn't run).
-      dom.inscribeTextButton.disabled = !(bytes > 0 && !over && !state.busy);
+      syncTextInscribeButton();
     };
     const setInscribeMode = (mode) => {
       applyInscribeMode(mode);
