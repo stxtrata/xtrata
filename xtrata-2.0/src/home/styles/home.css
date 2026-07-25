@@ -4359,10 +4359,17 @@
       gap: 14px;
     }
 
+    /* Recessed by default: this is a debugging aid, not something a collector
+       needs to read. Blocked claims raise .claim-notice instead. */
     .claim-diagnostics {
       margin: 0 0 14px;
-      border: 1px solid var(--line);
+      border: 1px solid transparent;
       border-radius: var(--radius);
+      background: none;
+    }
+
+    .claim-diagnostics[open] {
+      border-color: var(--line);
       background: var(--surface-soft);
     }
 
@@ -4371,10 +4378,77 @@
       align-items: center;
       justify-content: space-between;
       gap: 10px;
-      padding: 10px 12px;
+      padding: 6px 12px;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 12px;
+      font-weight: 500;
+      opacity: 0.55;
+    }
+
+    .claim-diagnostics > summary:hover,
+    .claim-diagnostics[open] > summary {
+      opacity: 1;
       font-weight: 700;
+    }
+
+    /* --- blocked-claim notice ------------------------------------------- */
+
+    .claim-notice {
+      max-width: min(440px, calc(100vw - 32px));
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: inherit;
+    }
+
+    .claim-notice::backdrop {
+      background: rgba(4, 8, 16, 0.62);
+      backdrop-filter: blur(2px);
+    }
+
+    .claim-notice__body {
+      display: grid;
+      gap: 10px;
+      padding: 22px 22px 18px;
+    }
+
+    .claim-notice__eyebrow {
+      margin: 0;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .claim-notice--soft .claim-notice__eyebrow {
+      color: var(--muted);
+    }
+
+    .claim-notice__title {
+      margin: 0;
+      font-size: 19px;
+      line-height: 1.25;
+    }
+
+    .claim-notice__text {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .claim-notice__detail {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .claim-notice__ok {
+      justify-self: end;
+      margin-top: 4px;
+      min-width: 116px;
     }
 
     .claim-diagnostics__body {

@@ -11551,6 +11551,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       createDeposit: $('dropsCreateDeposit'),
       createButton: $('dropsCreateButton'),
       createStatus: $('dropsCreateStatus'),
+      notice: $('dropsNotice'),
+      noticeEyebrow: $('dropsNoticeEyebrow'),
+      noticeTitle: $('dropsNoticeTitle'),
+      noticeText: $('dropsNoticeText'),
+      noticeDetail: $('dropsNoticeDetail'),
       diagnostics: $('dropsDiagnostics'),
       diagnosticsBadge: $('dropsDiagnosticsBadge'),
       diagnosticsLog: $('dropsDiagnosticsLog'),
@@ -11606,6 +11611,100 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       dropsDom.diagnosticsLog.scrollTop = dropsDom.diagnosticsLog.scrollHeight;
     };
 
+    // Why a claim stopped, in words a first-time collector can act on. Keyed by
+    // the code the sponsor relayer or the client-side pre-checks raise; contract
+    // aborts are matched on their error constant. Anything unmatched still gets
+    // a dialog, because silence is what made this look broken.
+    const DROP_NOTICES = {
+      BNS_REQUIRED: {
+        title: 'You need a .btc name to claim',
+        text: 'This drop is reserved for people who hold a BNS name (a .btc name). The wallet you have connected does not hold one yet.',
+        detail: 'You can register a name at btc.us or bns.xyz, then come back and claim.'
+      },
+      BNS_NOT_OWNED: {
+        title: 'That name is not in this wallet',
+        text: 'The BNS name chosen for this claim is not currently owned by the connected wallet. Names transfer, so this can happen if it moved recently.',
+        detail: 'Connect the wallet that holds the name, or pick a different name.'
+      },
+      BNS_SELECTION_INVALID: {
+        title: 'Pick one of your names',
+        text: 'This drop allows one claim per BNS name, so you need to choose which of your names to use.',
+        detail: 'Press claim again and select a name from the list.'
+      },
+      BNS_LIMIT: {
+        title: 'That name has already claimed',
+        text: 'This collection allows one claim per BNS name, and the name you are using has already claimed an edition.',
+        detail: 'A different name you own can still claim — each name gets one.'
+      },
+      GROUP_LIMIT: {
+        title: 'This wallet has already claimed',
+        text: 'The collection is one per wallet, and this wallet already holds an edition from it.',
+        detail: 'Every edition is free, so the rest are there for other collectors.'
+      },
+      CAMPAIGN_LIMIT: {
+        title: 'This wallet has already claimed',
+        text: 'The collection is one per wallet, and this wallet already holds an edition from it.',
+        detail: 'Every edition is free, so the rest are there for other collectors.'
+      },
+      LISTING_SOLD: {
+        title: 'Someone claimed this one first',
+        text: 'This edition was claimed moments ago. Claims are first come, first served.',
+        detail: 'Close this and pick another edition — the list refreshes as they go.'
+      },
+      CAMPAIGN_INACTIVE: {
+        title: 'Claiming is paused',
+        text: 'The creator has paused this drop for now. Nothing was submitted and nothing was spent.',
+        detail: 'Try again later.'
+      },
+      WALLET_CANCELLED: {
+        title: 'Claim cancelled',
+        text: 'You dismissed the request in your wallet, so nothing was submitted.',
+        detail: 'Press claim again whenever you are ready.'
+      }
+    };
+
+    const DROP_NOTICE_FALLBACK = {
+      title: 'Claim could not be completed',
+      text: 'Something stopped this claim before it went through. Nothing was submitted and no fees were spent.',
+      detail: 'Try again in a moment. If it keeps happening, open Claim diagnostics for the technical detail.'
+    };
+
+    // Contract aborts arrive as text, not codes, so map the error constants the
+    // claim path can raise onto the same copy.
+    const CONTRACT_ABORT_NOTICES = [
+      [/\bu113\b/, 'CAMPAIGN_LIMIT'],
+      [/\bu114\b/, 'BNS_REQUIRED'],
+      [/\bu115\b/, 'BNS_LIMIT'],
+      [/\bu106\b/, 'LISTING_SOLD'],
+      [/\bu117\b/, 'CAMPAIGN_INACTIVE']
+    ];
+
+    const resolveDropNotice = (code, message) => {
+      if (DROP_NOTICES[code]) return DROP_NOTICES[code];
+      const haystack = `${code ?? ''} ${message ?? ''}`;
+      const matched = CONTRACT_ABORT_NOTICES.find(([pattern]) => pattern.test(haystack));
+      return matched ? DROP_NOTICES[matched[1]] : DROP_NOTICE_FALLBACK;
+    };
+
+    const showDropNotice = (code, message, eyebrow = 'Claim not available') => {
+      const notice = resolveDropNotice(code, message);
+      const dialog = dropsDom.notice;
+      if (!dialog) return;
+      if (dropsDom.noticeEyebrow) dropsDom.noticeEyebrow.textContent = eyebrow;
+      if (dropsDom.noticeTitle) dropsDom.noticeTitle.textContent = notice.title;
+      if (dropsDom.noticeText) dropsDom.noticeText.textContent = notice.text;
+      if (dropsDom.noticeDetail) {
+        dropsDom.noticeDetail.textContent = notice.detail ?? '';
+        dropsDom.noticeDetail.hidden = !notice.detail;
+      }
+      dialog.classList.toggle('claim-notice--soft', code === 'WALLET_CANCELLED');
+      try {
+        if (!dialog.open) dialog.showModal();
+      } catch {
+        // A browser without <dialog> support still has the status line.
+      }
+    };
+
     const recordDropDiagnostic = (round, stage, message, tone = '') => {
       const entry = { round, stage, message, tone, time: nowLabel() };
       dropDiagnostics = [...dropDiagnostics, entry].slice(-100);
@@ -11614,7 +11713,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       } catch {
         // Diagnostics remain available for this page even if storage is unavailable.
       }
-      if (dropsDom.diagnostics) dropsDom.diagnostics.open = true;
+      // Deliberately does NOT force the panel open. Diagnostics are for
+      // debugging a stuck claim, not the primary channel — blocked claims raise
+      // the notice dialog instead, which most users act on without ever
+      // expanding this.
       renderDropDiagnostics();
       debugLog('drops-claim', `${stage}: ${message}`, { round }, tone === 'error' ? 'error' : tone === 'warn' ? 'warn' : 'info');
     };
@@ -11910,6 +12012,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         if (claimedGroup !== null) {
           const lockLabel = collectionLock?.label ?? 'this campaign group';
           dropsDom.status.innerHTML = `<span><strong>Drops</strong> this wallet has already claimed a drop from ${lockLabel}.</span><span class="badge amber">one per wallet</span>`;
+          // This path returns before the try/catch below, so raise the dialog here too.
+          showDropNotice('GROUP_LIMIT', `already claimed group ${claimedGroup}`);
           recordDropDiagnostic(
             round,
             'GROUP_LIMIT',
@@ -12159,6 +12263,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         dropsDom.status.innerHTML = cancelled
           ? '<span><strong>Drops</strong> claim cancelled in the wallet. No transaction was submitted.</span>'
           : `<span><strong>Drops</strong> sponsored claim blocked (${code}): ${message}. Open Claim diagnostics, fix the reported stage, then retry.</span>`;
+        showDropNotice(code, message, cancelled ? 'Claim cancelled' : 'Claim not available');
       } finally {
         dropsState.claimsInFlight.delete(claimKey);
         dropsDom.listings?.querySelectorAll('[data-drop-claim]').forEach((button) => {
