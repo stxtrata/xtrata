@@ -6,6 +6,14 @@ const DEFAULT_BNSV2_BASES: Record<NetworkType, string[]> = {
   testnet: ['https://api.bnsv2.com/testnet']
 };
 
+// The BNS-V2 registry, used for the authoritative primary-name read. Testnet
+// has no deployment we trust yet, so primary lookups are skipped there and the
+// name-list heuristics stand in.
+const DEFAULT_BNSV2_CONTRACTS: Record<NetworkType, string | null> = {
+  mainnet: 'SP2QEZ06AGJ3RKJPBV14SY1V5BBFNAW33D96YPGZF.BNS-V2',
+  testnet: null
+};
+
 const getEnvOverride = (network: NetworkType) => {
   const env = import.meta.env;
   if (network === 'testnet') {
@@ -44,6 +52,19 @@ export const getExplorerHtmlBaseUrls = (network: NetworkType) => {
     return [`${window.location.origin}${getExplorerProxyBase()}`];
   }
   return [DEFAULT_EXPLORER_BASE];
+};
+
+export const getBnsV2ContractId = (network: NetworkType) => {
+  const env = import.meta.env;
+  const override =
+    network === 'testnet'
+      ? env.VITE_BNSV2_CONTRACT_TESTNET
+      : env.VITE_BNSV2_CONTRACT_MAINNET;
+  const trimmed = typeof override === 'string' ? override.trim() : '';
+  if (trimmed) {
+    return trimmed.includes('.') ? trimmed : null;
+  }
+  return DEFAULT_BNSV2_CONTRACTS[network];
 };
 
 export const getBnsV2ApiBaseUrls = (network: NetworkType) => {

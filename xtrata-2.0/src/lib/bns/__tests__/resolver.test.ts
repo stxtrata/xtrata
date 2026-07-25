@@ -1,4 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  bufferCV,
+  cvToHex,
+  noneCV,
+  responseOkCV,
+  someCV,
+  tupleCV
+} from '@stacks/transactions';
 import { buildBnsCacheKey } from '../helpers';
 import {
   __resetBnsResolverStateForTests,
@@ -12,6 +20,26 @@ const jsonResponse = (status: number, json: unknown) => ({
   json: async () => json,
   text: async () => JSON.stringify(json)
 });
+
+// Every address lookup also reads BNS-V2 get-primary. These stand in for that
+// call: "none" = the wallet has set no primary, so the heuristics decide.
+const PRIMARY_NONE = cvToHex(responseOkCV(noneCV()));
+const primaryHex = (name: string, namespace: string) =>
+  cvToHex(
+    responseOkCV(
+      someCV(
+        tupleCV({
+          name: bufferCV(Uint8Array.from(name, (char) => char.charCodeAt(0))),
+          namespace: bufferCV(
+            Uint8Array.from(namespace, (char) => char.charCodeAt(0))
+          )
+        })
+      )
+    )
+  );
+const primaryResponse = (result: string) =>
+  jsonResponse(200, { okay: true, result });
+const isPrimaryLookup = (url: string) => url.includes('/get-primary');
 
 const htmlResponse = (status: number, html: string) => ({
   ok: status >= 200 && status < 300,
@@ -202,6 +230,9 @@ describe('bns resolver', () => {
     const address = 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7';
     const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (isPrimaryLookup(url)) {
+        return primaryResponse(PRIMARY_NONE);
+      }
       if (url.includes(`/names/address/${address}/valid`)) {
         return jsonResponse(200, {
           total: 1,
@@ -223,13 +254,90 @@ describe('bns resolver', () => {
       primary: 'jim.btc',
       source: 'bnsv2-api'
     });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses the on-chain primary instead of the first .btc name', async () => {
+    const address = 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7';
+    const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (isPrimaryLookup(url)) {
+        return primaryResponse(primaryHex('zed', 'btc'));
+      }
+      if (url.includes(`/names/address/${address}/valid`)) {
+        return jsonResponse(200, {
+          total: 2,
+          names: [
+            { full_name: 'aaa.btc', owner: address },
+            { full_name: 'zed.btc', owner: address }
+          ]
+        });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await resolveBnsNames({ address, network: 'mainnet' });
+
+    expect(result.primary).toBe('zed.btc');
+    expect(result.names).toEqual(['aaa.btc', 'zed.btc']);
+  });
+
+  it('keeps the alphabetical fallback when the registry read fails', async () => {
+    const address = 'SP2JXKMSH007NPYAQHKJPQMAQYAD90NQGTVJVQ02B';
+    const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (isPrimaryLookup(url)) {
+        throw new Error('Failed to fetch');
+      }
+      if (url.includes(`/names/address/${address}/valid`)) {
+        return jsonResponse(200, {
+          total: 2,
+          names: [
+            { full_name: 'aaa.btc', owner: address },
+            { full_name: 'zed.btc', owner: address }
+          ]
+        });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await resolveBnsNames({ address, network: 'mainnet' });
+
+    expect(result.primary).toBe('aaa.btc');
+  });
+
+  it('offers the on-chain primary even when the name list has not caught up', async () => {
+    const address = 'SP162D87CY84QVVCMJKNKGHC7GGXFGA0TAR9D0XJW';
+    const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (isPrimaryLookup(url)) {
+        return primaryResponse(primaryHex('jim', 'boom'));
+      }
+      if (url.includes(`/names/address/${address}/valid`)) {
+        return jsonResponse(200, {
+          total: 1,
+          names: [{ full_name: 'alice.btc', owner: address }]
+        });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await resolveBnsNames({ address, network: 'mainnet' });
+
+    expect(result.primary).toBe('jim.boom');
+    expect(result.names).toEqual(['alice.btc', 'jim.boom']);
   });
 
   it('falls back to the Hiro names API when the BNSv2 valid-name lookup misses', async () => {
     const address = 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7';
     const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (isPrimaryLookup(url)) {
+        return primaryResponse(PRIMARY_NONE);
+      }
       if (url.includes(`/names/address/${address}/valid`)) {
         return jsonResponse(404, null);
       }
@@ -251,13 +359,16 @@ describe('bns resolver', () => {
       primary: 'jim.btc',
       source: 'hiro-names-api'
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it('treats an empty BNSv2 address result as authoritative over stale Hiro names', async () => {
     const staleOwner = 'SP162D87CY84QVVCMJKNKGHC7GGXFGA0TAR9D0XJW';
     const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (isPrimaryLookup(url)) {
+        return primaryResponse(PRIMARY_NONE);
+      }
       if (url.includes(`/names/address/${staleOwner}/valid`)) {
         return jsonResponse(200, { total: 0, names: [] });
       }
@@ -279,7 +390,7 @@ describe('bns resolver', () => {
       primary: null,
       source: 'bnsv2-api'
     });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('applies short cooldown after transient address fallback to avoid repeat hammering', async () => {
@@ -500,6 +611,9 @@ describe('bns resolver', () => {
   it('caches successful address-name lookups', async () => {
     const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (isPrimaryLookup(url)) {
+        return primaryResponse(PRIMARY_NONE);
+      }
       if (url.includes('/names/address/SP2JXKMSH007NPYAQHKJPQMAQYAD90NQGTVJVQ02B/valid')) {
         return jsonResponse(404, null);
       }
@@ -525,6 +639,6 @@ describe('bns resolver', () => {
 
     expect(first.primary).toBe('alice.btc');
     expect(second.primary).toBe('alice.btc');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });

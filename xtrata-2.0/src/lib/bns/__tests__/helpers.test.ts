@@ -36,4 +36,23 @@ describe('bns helpers', () => {
     );
     expect(pickPrimaryBnsName([], 'carol.id')).toBe('carol.id');
   });
+
+  it('prefers the on-chain primary over the btc heuristic', () => {
+    expect(
+      pickPrimaryBnsName(['aaa.btc', 'zed.btc'], null, 'zed.btc')
+    ).toBe('zed.btc');
+  });
+
+  it('honours a non-btc on-chain primary', () => {
+    expect(
+      pickPrimaryBnsName(['alice.btc', 'jim.boom'], null, 'jim.boom')
+    ).toBe('jim.boom');
+  });
+
+  it('ignores an unusable on-chain primary', () => {
+    expect(pickPrimaryBnsName(['alice.btc'], null, 'not-a-name')).toBe(
+      'alice.btc'
+    );
+    expect(pickPrimaryBnsName(['alice.btc'], null, null)).toBe('alice.btc');
+  });
 });
