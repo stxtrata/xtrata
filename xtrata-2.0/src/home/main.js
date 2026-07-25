@@ -320,6 +320,8 @@
       textAdvancedLogSlot: $('textAdvancedLogSlot'),
       parentRelationshipPanel: $('parentRelationshipPanel'),
       parentRelationshipBadge: $('parentRelationshipBadge'),
+      textAdvancedParentSlot: $('textAdvancedParentSlot'),
+      parentsDetails: $('parentsDetails'),
       parentIdsInput: $('parentIdsInput'),
       addParentsButton: $('addParentsButton'),
       clearParentsButton: $('clearParentsButton'),
@@ -4297,6 +4299,20 @@
         : `Connected Wallet: ${getConnectedWalletLabel()}.`;
     };
 
+    // The text inscribe button had four writers with three different rules, so
+    // whichever ran last won. markRelationshipPreparedDirty nulls state.prepared
+    // and renders, which unconditionally disabled it — meaning adding or clearing
+    // a parent left the button dead until the text was edited again. One rule now:
+    // valid text and not busy. The click handler connects the wallet and prepares
+    // on the fly (runInscription -> validateMintReadiness), so there is nothing to
+    // wait for here.
+    const TEXT_INSCRIBE_MAX_BYTES = 16384;
+    const syncTextInscribeButton = () => {
+      if (!dom.inscribeTextButton) return;
+      const bytes = new TextEncoder().encode(dom.textPayload?.value || '').length;
+      dom.inscribeTextButton.disabled = !(bytes > 0 && bytes <= TEXT_INSCRIBE_MAX_BYTES && !state.busy);
+    };
+
     const renderPreparedState = () => {
       if (!state.prepared) {
         revokePayloadPreview();
@@ -4320,7 +4336,7 @@
         }
         dom.duplicateWarning.classList.remove('on');
         renderResumeNotice();
-        if (dom.inscribeTextButton) dom.inscribeTextButton.disabled = true;
+        syncTextInscribeButton();
         updateControls();
         return;
       }
@@ -4490,12 +4506,15 @@
         dom.duplicateWarning.classList.remove('on');
       }
       renderResumeNotice();
-      // Streamlined text card: cost is the flat rate (shown by syncTextCard); just keep the
-      // inscribe button in sync once the background prepare is ready.
-      if (dom.inscribeTextButton) {
-        const textCardBytes = new TextEncoder().encode(dom.textPayload.value).length;
-        dom.inscribeTextButton.disabled = !(state.prepared && textCardBytes > 0 && textCardBytes <= 16384 && !state.busy);
-      }
+      // Streamlined text card: cost is the flat rate (shown by syncTextCard).
+      // This must use the SAME rule as syncTextCard — valid text alone, never
+      // state.prepared. Both write this button, so a stricter rule here silently
+      // wins whenever renderPreparedState runs last: adding or clearing a parent
+      // calls markRelationshipPreparedDirty, which nulls state.prepared and lands
+      // here, leaving the button dead until the text was edited again. The click
+      // handler prepares on the fly (runInscription -> validateMintReadiness), so
+      // there is nothing to wait for.
+      syncTextInscribeButton();
       updateControls();
     };
 
@@ -9430,10 +9449,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         setBusy(false);
         updateControls();
         // The text inscribe button isn't covered by updateControls — re-enable it on connect.
-        if (dom.inscribeTextButton && dom.inscribePanelBody?.dataset.mode === 'text') {
-          const b = new TextEncoder().encode(dom.textPayload?.value || '').length;
-          dom.inscribeTextButton.disabled = !(b > 0 && b <= 16384 && !state.busy);
-        }
+        if (dom.inscribePanelBody?.dataset.mode === 'text') syncTextInscribeButton();
       }
     };
 
@@ -11528,8 +11544,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // campaign displayed only its newest 25 drops under the previous value of 25.
     const DROPS_DISPLAY_LIMIT = 64;
     const DROPS_SCAN_MAX_IDS = DROPS_DISPLAY_LIMIT * 10;
+    // Matches the 4 used by the other runReadOnlyLimited call sites; the proxy
+    // holds a paid Hiro key at 50 req/s, so this is nowhere near the ceiling.
+    const DROPS_READ_CONCURRENCY = 6;
     const dropsState = {
       run: 0,
+      // Blocked-claim messages, keyed by claim key so each card owns its own.
+      notices: new Map(),
+      noticeToReveal: null,
       drops: [],
       historyEvents: [],
       claimRound: 0,
@@ -11606,6 +11628,194 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       dropsDom.diagnosticsLog.scrollTop = dropsDom.diagnosticsLog.scrollHeight;
     };
 
+    // Why a claim stopped, in words a first-time collector can act on. Keyed by
+    // the code the sponsor relayer or the client-side pre-checks raise; contract
+    // aborts are matched on their error constant. Anything unmatched still gets
+    // a dialog, because silence is what made this look broken.
+    const DROP_NOTICES = {
+      BNS_REQUIRED: {
+        title: 'You need a .btc name to claim',
+        text: 'This drop is reserved for people who hold a BNS name (a .btc name). The wallet you have connected does not hold one yet.',
+        detail: 'You can register a name at btc.us or bns.xyz, then come back and claim.'
+      },
+      BNS_NOT_OWNED: {
+        title: 'That name is not in this wallet',
+        text: 'The BNS name chosen for this claim is not currently owned by the connected wallet. Names transfer, so this can happen if it moved recently.',
+        detail: 'Connect the wallet that holds the name, or pick a different name.'
+      },
+      BNS_SELECTION_INVALID: {
+        title: 'Pick one of your names',
+        text: 'This drop allows one claim per BNS name, so you need to choose which of your names to use.',
+        detail: 'Press claim again and select a name from the list.'
+      },
+      BNS_LIMIT: {
+        title: 'That name has already claimed',
+        text: 'This collection allows one claim per BNS name, and the name you are using has already claimed an edition.',
+        detail: 'A different name you own can still claim — each name gets one.'
+      },
+      GROUP_LIMIT: {
+        title: 'This wallet has already claimed',
+        text: 'The collection is one per wallet, and this wallet already holds an edition from it.',
+        detail: 'Every edition is free, so the rest are there for other collectors.'
+      },
+      CAMPAIGN_LIMIT: {
+        title: 'This wallet has already claimed',
+        text: 'The collection is one per wallet, and this wallet already holds an edition from it.',
+        detail: 'Every edition is free, so the rest are there for other collectors.'
+      },
+      LISTING_SOLD: {
+        title: 'Someone claimed this one first',
+        text: 'This edition was claimed moments ago. Claims are first come, first served.',
+        detail: 'Close this and pick another edition — the list refreshes as they go.'
+      },
+      CAMPAIGN_INACTIVE: {
+        title: 'Claiming is paused',
+        text: 'The creator has paused this drop for now. Nothing was submitted and nothing was spent.',
+        detail: 'Try again later.'
+      },
+      WALLET_NOT_CONNECTED: {
+        title: 'Connect a wallet first',
+        text: 'You need a Stacks wallet connected to claim. A brand new wallet is fine — the creator pays the network fee, so you do not need any STX.',
+        detail: 'Use the Connect wallet button at the top of the page, then press claim again.'
+      },
+      WALLET_CANCELLED: {
+        title: 'Claim cancelled',
+        text: 'You dismissed the request in your wallet, so nothing was submitted.',
+        detail: 'Press claim again whenever you are ready.'
+      }
+    };
+
+    const DROP_NOTICE_FALLBACK = {
+      title: 'Claim could not be completed',
+      text: 'Something stopped this claim before it went through. Nothing was submitted and no fees were spent.',
+      detail: 'Try again in a moment. If it keeps happening, open Claim diagnostics for the technical detail.'
+    };
+
+    // Contract aborts arrive as text, not codes, so map the error constants the
+    // claim path can raise onto the same copy.
+    const CONTRACT_ABORT_NOTICES = [
+      [/\bu113\b/, 'CAMPAIGN_LIMIT'],
+      [/\bu114\b/, 'BNS_REQUIRED'],
+      [/\bu115\b/, 'BNS_LIMIT'],
+      [/\bu106\b/, 'LISTING_SOLD'],
+      [/\bu117\b/, 'CAMPAIGN_INACTIVE']
+    ];
+
+    const resolveDropNotice = (code, message) => {
+      if (DROP_NOTICES[code]) return DROP_NOTICES[code];
+      const haystack = `${code ?? ''} ${message ?? ''}`;
+      const matched = CONTRACT_ABORT_NOTICES.find(([pattern]) => pattern.test(haystack));
+      return matched ? DROP_NOTICES[matched[1]] : DROP_NOTICE_FALLBACK;
+    };
+
+    // Attached to the card the collector actually pressed, rather than a global
+    // banner they may never scroll back up to. Held until dismissed so it can be
+    // re-read, and scrolled into view on the next render so it cannot be missed.
+    const showDropNotice = (claimKey, code, message, eyebrow = 'Claim not available') => {
+      if (!claimKey) return;
+      dropsState.notices.set(claimKey, {
+        ...resolveDropNotice(code, message),
+        eyebrow,
+        soft: code === 'WALLET_CANCELLED'
+      });
+      dropsState.noticeToReveal = claimKey;
+      renderDrops();
+    };
+
+    const dismissDropNotice = (claimKey) => {
+      if (dropNoticeAnchor?.key === claimKey) dropNoticeAnchor.stop();
+      dropsState.notices.delete(claimKey);
+      if (dropsState.noticeToReveal === claimKey) dropsState.noticeToReveal = null;
+      renderDrops();
+    };
+
+    let dropNoticeAnchor = null;
+    const anchorDropNotice = (claimKey) => {
+      dropNoticeAnchor?.stop();
+      const listings = dropsDom.listings;
+      if (!listings?.querySelector(`[data-drop-notice="${claimKey}"]`)) return;
+
+      let released = false;
+      let programmatic = false;
+      // Re-query every time: renderDrops rebuilds the grid with replaceChildren,
+      // so a captured node goes detached and reports a zero-sized rect, which
+      // reads as "already on screen" and silently cancels the scroll.
+      const find = () => listings.querySelector(`[data-drop-notice="${claimKey}"]`);
+      const bring = (smooth) => {
+        const target = find();
+        if (!target) return;
+        const box = target.getBoundingClientRect();
+        if (box.top >= 0 && box.bottom <= window.innerHeight) return;
+        programmatic = true;
+        // Smooth scrolling is a no-op while the document is hidden, and is not
+        // wanted at all under reduced-motion — fall back to an instant jump so
+        // the card still ends up on screen either way.
+        const gentle = smooth
+          && !document.hidden
+          && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        target.scrollIntoView({ behavior: gentle ? 'smooth' : 'auto', block: 'center' });
+        setTimeout(() => { programmatic = false; }, 400);
+      };
+      const stop = () => {
+        if (released) return;
+        released = true;
+        observer.disconnect();
+        window.removeEventListener('wheel', onUserScroll);
+        window.removeEventListener('touchmove', onUserScroll);
+        window.removeEventListener('keydown', onUserScroll);
+        clearTimeout(cap);
+        if (dropNoticeAnchor?.key === claimKey) dropNoticeAnchor = null;
+      };
+      const onUserScroll = () => { if (!programmatic) stop(); };
+      const observer = new ResizeObserver(() => bring(false));
+
+      observer.observe(listings);
+      window.addEventListener('wheel', onUserScroll, { passive: true });
+      window.addEventListener('touchmove', onUserScroll, { passive: true });
+      window.addEventListener('keydown', onUserScroll);
+      const cap = setTimeout(stop, 8000);
+
+      dropNoticeAnchor = { key: claimKey, stop };
+      bring(true);
+      find()?.querySelector('.card-notice__ok')?.focus({ preventScroll: true });
+    };
+
+    const buildDropNoticeEl = (claimKey, notice) => {
+      const box = document.createElement('div');
+      box.className = `card-notice${notice.soft ? ' card-notice--soft' : ''}`;
+      box.dataset.dropNotice = claimKey;
+      box.setAttribute('role', 'alert');
+
+      const eyebrow = document.createElement('p');
+      eyebrow.className = 'card-notice__eyebrow';
+      eyebrow.textContent = notice.eyebrow;
+
+      const title = document.createElement('p');
+      title.className = 'card-notice__title';
+      title.textContent = notice.title;
+
+      const text = document.createElement('p');
+      text.className = 'card-notice__text';
+      text.textContent = notice.text;
+
+      box.append(eyebrow, title, text);
+
+      if (notice.detail) {
+        const detail = document.createElement('p');
+        detail.className = 'card-notice__detail';
+        detail.textContent = notice.detail;
+        box.append(detail);
+      }
+
+      const ok = document.createElement('button');
+      ok.type = 'button';
+      ok.className = 'market-chip card-notice__ok';
+      ok.textContent = 'Got it';
+      ok.addEventListener('click', () => dismissDropNotice(claimKey));
+      box.append(ok);
+      return box;
+    };
+
     const recordDropDiagnostic = (round, stage, message, tone = '') => {
       const entry = { round, stage, message, tone, time: nowLabel() };
       dropDiagnostics = [...dropDiagnostics, entry].slice(-100);
@@ -11614,7 +11824,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       } catch {
         // Diagnostics remain available for this page even if storage is unavailable.
       }
-      if (dropsDom.diagnostics) dropsDom.diagnostics.open = true;
+      // Deliberately does NOT force the panel open. Diagnostics are for
+      // debugging a stuck claim, not the primary channel — blocked claims raise
+      // the notice dialog instead, which most users act on without ever
+      // expanding this.
       renderDropDiagnostics();
       debugLog('drops-claim', `${stage}: ${message}`, { round }, tone === 'error' ? 'error' : tone === 'warn' ? 'warn' : 'info');
     };
@@ -11798,14 +12011,22 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         network: entry.network
       });
       const lastId = BigInt(lastJson?.value?.value ?? 0);
-      const results = [];
-      let scanned = 0;
+
+      // Candidate ids first, then fetch them concurrently. Reading these one at
+      // a time cost ~140ms each, so a 33-drop campaign spent ~6.8s here before
+      // the grid could render; the same reads in parallel take ~1.5s.
+      const candidates = [];
       for (
         let id = lastId;
-        id >= 0n && results.length < DROPS_DISPLAY_LIMIT && scanned < DROPS_SCAN_MAX_IDS;
+        id >= 0n && candidates.length < DROPS_DISPLAY_LIMIT && candidates.length < DROPS_SCAN_MAX_IDS;
         id -= 1n
       ) {
-        scanned += 1;
+        candidates.push(id);
+        if (id === 0n) break;
+      }
+      const scanned = candidates.length;
+
+      const fetched = await runReadOnlyLimited(candidates, DROPS_READ_CONCURRENCY, async (id) => {
         try {
           const json = await callReadOnlyJson({
             contractId,
@@ -11813,9 +12034,17 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             args: [uintCV(id)],
             network: entry.network
           });
-          const tuple = unwrapBindingTuple(json);
-          if (!tuple) continue;
-          results.push({
+          return { id, tuple: unwrapBindingTuple(json) };
+        } catch {
+          return { id, tuple: null }; // sparse ids / settled drops: skip
+        }
+      });
+
+      const results = [];
+      for (const entryResult of fetched) {
+        const { id, tuple } = entryResult ?? {};
+        if (!tuple) continue;
+        results.push({
             entry,
             contractId,
             dropId: id,
@@ -11831,11 +12060,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             budgetRemaining: tuple['budget-remaining'] ? BigInt(tuple['budget-remaining'].value) : null,
             claimer: optionalPrincipalValue(tuple.claimer),
             claimedAt: optionalUintValue(tuple['claimed-at'])
-          });
-        } catch {
-          // sparse ids / settled drops: skip
-        }
-        if (id === 0n) break;
+        });
       }
       if (results.length < DROPS_DISPLAY_LIMIT && scanned >= DROPS_SCAN_MAX_IDS) {
         debugLog('drops', 'stopped drop scan at safety cap', {
@@ -11885,6 +12110,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
       if (!state.walletSession.isConnected || !state.walletSession.address) {
         dropsDom.status.innerHTML = '<span><strong>Drops</strong> connect a wallet to claim — new wallets work, no STX needed.</span>';
+        showDropNotice(claimKey, 'WALLET_NOT_CONNECTED', 'no connected address');
         recordDropDiagnostic(round, 'BLOCK', 'No connected Stacks wallet address.', 'error');
         return;
       }
@@ -11910,6 +12136,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         if (claimedGroup !== null) {
           const lockLabel = collectionLock?.label ?? 'this campaign group';
           dropsDom.status.innerHTML = `<span><strong>Drops</strong> this wallet has already claimed a drop from ${lockLabel}.</span><span class="badge amber">one per wallet</span>`;
+          // This path returns before the try/catch below, so raise the dialog here too.
+          showDropNotice(claimKey, 'GROUP_LIMIT', `already claimed group ${claimedGroup}`);
           recordDropDiagnostic(
             round,
             'GROUP_LIMIT',
@@ -11926,6 +12154,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           'warn'
         );
       }
+      dropsState.notices.delete(claimKey);
       dropsState.claimsInFlight.add(claimKey);
       renderDrops();
       const [nftAddress, nftName] = drop.nftContract.split('.');
@@ -12159,6 +12388,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         dropsDom.status.innerHTML = cancelled
           ? '<span><strong>Drops</strong> claim cancelled in the wallet. No transaction was submitted.</span>'
           : `<span><strong>Drops</strong> sponsored claim blocked (${code}): ${message}. Open Claim diagnostics, fix the reported stage, then retry.</span>`;
+        showDropNotice(claimKey, code, message, cancelled ? 'Claim cancelled' : 'Claim not available');
       } finally {
         dropsState.claimsInFlight.delete(claimKey);
         dropsDom.listings?.querySelectorAll('[data-drop-claim]').forEach((button) => {
@@ -12438,9 +12668,23 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           }
 
           card.append(thumb, badges, price, meta, actions);
+          const cardNotice = dropsState.notices.get(claimKey);
+          if (cardNotice) card.append(buildDropNoticeEl(claimKey, cardNotice));
           return card;
         })
       );
+      // A notice on a card far down the page is useless if it stays off-screen,
+      // and thumbnails hydrate asynchronously — each one that loads resizes its
+      // card and shoves the target hundreds of pixels away. Hold the card in
+      // view while the grid settles, and stop the moment the reader scrolls.
+      if (dropsState.noticeToReveal) {
+        const key = dropsState.noticeToReveal;
+        dropsState.noticeToReveal = null;
+        // Called directly rather than inside requestAnimationFrame: the grid is
+        // already committed by replaceChildren, and rAF never fires in a
+        // backgrounded tab, which silently disabled the reveal entirely.
+        anchorDropNotice(key);
+      }
       void hydrateDropThumbnails(run, visible);
     };
 
@@ -13315,6 +13559,23 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const activityLogHome = dom.activityLog
       ? { parent: dom.activityLog.parentNode, next: dom.activityLog.nextSibling }
       : null;
+    // The Parents panel is shared with the file flow, where it sits at the top
+    // level and reveals with .has-payload. Text mode wants everything under the
+    // one Advanced panel, so move the same node instead of duplicating it —
+    // duplicating would mean two inputs writing one state.parentIds.
+    const parentsPanelHome = dom.parentsDetails
+      ? { parent: dom.parentsDetails.parentNode, next: dom.parentsDetails.nextSibling }
+      : null;
+    const placeParentsPanel = (mode) => {
+      if (!dom.parentsDetails) return;
+      if (mode === 'text') {
+        if (dom.textAdvancedParentSlot && dom.parentsDetails.parentNode !== dom.textAdvancedParentSlot) {
+          dom.textAdvancedParentSlot.appendChild(dom.parentsDetails);
+        }
+      } else if (parentsPanelHome && dom.parentsDetails.parentNode !== parentsPanelHome.parent) {
+        parentsPanelHome.parent.insertBefore(dom.parentsDetails, parentsPanelHome.next);
+      }
+    };
     const placeActivityLog = (mode) => {
       if (!dom.activityLog) return;
       if (mode === 'text') {
@@ -13331,6 +13592,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       dom.tabText?.classList.toggle('is-active', mode === 'text');
       dom.tabFile?.setAttribute('aria-selected', mode === 'file' ? 'true' : 'false');
       dom.tabText?.setAttribute('aria-selected', mode === 'text' ? 'true' : 'false');
+      placeParentsPanel(mode);
       placeActivityLog(mode);
     }
     // Threads: a "reply to" inscription id becomes a dependency (existence-only reference), so the
@@ -13398,10 +13660,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           : (textFeeLabel() || 'about … STX');
       }
       dom.inscribeTextButton.textContent = replying ? 'Inscribe reply' : 'Inscribe text';
-      // Enabled on valid text alone — the click handler connects the wallet if needed and
-      // prepares on the fly (runInscription → validateMintReadiness), so we never gate on
-      // state.prepared here (that left the button stuck when the background prepare didn't run).
-      dom.inscribeTextButton.disabled = !(bytes > 0 && !over && !state.busy);
+      syncTextInscribeButton();
     };
     const setInscribeMode = (mode) => {
       applyInscribeMode(mode);

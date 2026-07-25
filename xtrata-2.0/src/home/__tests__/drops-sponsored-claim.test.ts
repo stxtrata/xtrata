@@ -71,18 +71,25 @@ describe('public Drops sponsored-claim surface', () => {
     expect(homeMain).toContain("'drops-history__row'");
     expect(homeMain).toContain('Claimed${drop.claimedAt ? ` at block ${drop.claimedAt}` : \'\'} by ');
     expect(homeMain).toContain('const DEFAULT_DROP_GROUP_ID = 1n');
-    expect(homeMain).toContain('const DROPS_DISPLAY_LIMIT = 25');
-    expect(homeMain).toContain('results.length < DROPS_DISPLAY_LIMIT');
+    // Asserted as a floor rather than a literal: the limit caps how many drops the
+    // page can show, and a value below a full campaign silently truncates the grid
+    // (33 editions rendered as 25 under the previous value). The scan is also
+    // bounded by candidate count now, not by results, because the reads run
+    // concurrently through runReadOnlyLimited instead of one at a time.
+    const displayLimit = Number(/const DROPS_DISPLAY_LIMIT = (\d+)/.exec(homeMain)?.[1]);
+    expect(displayLimit).toBeGreaterThanOrEqual(33);
+    expect(homeMain).toContain('candidates.length < DROPS_DISPLAY_LIMIT');
+    expect(homeMain).toContain('runReadOnlyLimited(candidates, DROPS_READ_CONCURRENCY');
     expect(homeMain).toContain('stopped drop scan at safety cap');
     expect(homeMain).toContain('wallet changed. This drop can only be cancelled by its creator');
     expect(homeMain).toContain('renderDrops();');
     expect(homeMain).toContain('hasClaimedAnyDropGroup');
-    expect(homeMain).toContain('this wallet has already claimed a free drop from ${lockLabel}');
+    expect(homeMain).toContain('this wallet has already claimed a drop from ${lockLabel}');
     expect(homeMain).toContain('dropsState.historyEvents');
     expect(homeMain).toContain('Claim tx');
     expect(homeMain).toContain("functionName: 'has-claimed-in-group'");
     expect(homeMain).toContain("'GROUP_LIMIT'");
-    expect(homeMain).toContain('already claimed a free drop from ${lockLabel}');
+    expect(homeMain).toContain('already claimed a drop from ${lockLabel}');
     expect(homeMain).toContain(': policyRules.onePerWallet');
     expect(homeMain).toContain('? DEFAULT_DROP_GROUP_ID');
     expect(homeMain).not.toContain('dropClaimSelfPaid');

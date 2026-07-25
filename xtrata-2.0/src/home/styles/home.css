@@ -984,10 +984,16 @@
     #inscribePanelBody[data-mode='file']:not(.has-payload) #resumeNotice,
     #inscribePanelBody[data-mode='file']:not(.has-payload) #batchGuide { display: none; }
 
-    /* Text path: strip to just the text card. */
+    /* Text path: strip to just the text card, plus Parents.
+       #parentsDetails stays visible: the text button runs the same
+       runInscription/prepare path as the file flow, which already reads
+       state.parentIds and mints via mint-single-tx-with-relationships, so
+       hiding the panel was the only thing preventing a parented text
+       inscription. #dependenciesDetails stays hidden on purpose — text mode
+       sources its dependency from "Reply to a thread", and exposing both would
+       give two competing inputs for the same contract argument. */
     #inscribePanelBody[data-mode='text'] #fileFields,
     #inscribePanelBody[data-mode='text'] #inscribeAdvancedDetails,
-    #inscribePanelBody[data-mode='text'] #parentsDetails,
     #inscribePanelBody[data-mode='text'] #dependenciesDetails,
     #inscribePanelBody[data-mode='text'] .inscribe-wizard-note,
     #inscribePanelBody[data-mode='text'] .prepare-grid,
@@ -4359,10 +4365,17 @@
       gap: 14px;
     }
 
+    /* Recessed by default: this is a debugging aid, not something a collector
+       needs to read. Blocked claims surface on the card itself instead. */
     .claim-diagnostics {
       margin: 0 0 14px;
-      border: 1px solid var(--line);
+      border: 1px solid transparent;
       border-radius: var(--radius);
+      background: none;
+    }
+
+    .claim-diagnostics[open] {
+      border-color: var(--line);
       background: var(--surface-soft);
     }
 
@@ -4371,10 +4384,85 @@
       align-items: center;
       justify-content: space-between;
       gap: 10px;
-      padding: 10px 12px;
+      padding: 6px 12px;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 12px;
+      font-weight: 500;
+      opacity: 0.55;
+    }
+
+    .claim-diagnostics > summary:hover,
+    .claim-diagnostics[open] > summary {
+      opacity: 1;
       font-weight: 700;
+    }
+
+    /* --- blocked-claim notice, attached to the card that was pressed ------ */
+
+    .card-notice {
+      display: grid;
+      gap: 6px;
+      margin-top: 10px;
+      padding: 12px 13px 13px;
+      /* --amber / --amber-soft are defined per theme in this stylesheet and are
+         what the existing "badge amber" uses; --accent lives in app.css and does
+         not resolve here, which left the notice transparent with a white border. */
+      border: 1px solid var(--amber);
+      border-radius: var(--radius);
+      background: var(--amber-soft);
+      animation: cardNoticeIn 180ms ease-out;
+    }
+
+    .card-notice--soft {
+      border-color: var(--line);
+      background: var(--surface-soft);
+    }
+
+    @keyframes cardNoticeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .card-notice { animation: none; }
+    }
+
+    .card-notice__eyebrow {
+      margin: 0;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--amber);
+    }
+
+    .card-notice--soft .card-notice__eyebrow {
+      color: var(--muted);
+    }
+
+    .card-notice__title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+
+    .card-notice__text {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .card-notice__detail {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+
+    .card-notice__ok {
+      justify-self: start;
+      margin-top: 4px;
     }
 
     .claim-diagnostics__body {
