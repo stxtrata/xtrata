@@ -45,7 +45,13 @@ network.coreApiUrl = location.origin + HIRO_BASE;   // routes read-only + broadc
 
 const enc = new TextEncoder();
 const hfetch = (p: string, init?: any) => fetch(location.origin + HIRO_BASE + p, init);
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// Throttle-resistant sleep: window timers are throttled to ~1/min (and eventually frozen)
+// in background tabs, which has stalled live uploads mid-run. Worker timers are exempt
+// from tab timer throttling, so confirmation polls keep firing while the tab is hidden.
+const sleepWorker: Worker | null = (() => { try { return new Worker(URL.createObjectURL(new Blob(['onmessage=(e)=>setTimeout(()=>postMessage(e.data.id),e.data.ms)'], { type: 'text/javascript' }))); } catch { return null; } })();
+let sleepSeq = 0; const sleepWaiters = new Map<number, () => void>();
+if (sleepWorker) sleepWorker.onmessage = (e: MessageEvent) => { const r = sleepWaiters.get(e.data); if (r) { sleepWaiters.delete(e.data); r(); } };
+const sleep = (ms: number) => new Promise<void>((r) => { if (sleepWorker) { const id = ++sleepSeq; sleepWaiters.set(id, r); sleepWorker.postMessage({ id, ms }); } else setTimeout(r, ms); });
 const chunkBytes = (d: Uint8Array) => { const o: Uint8Array[] = []; for (let i = 0; i < d.length; i += CHUNK) o.push(d.slice(i, i + CHUNK)); return o; };
 const incHash = (chunks: Uint8Array[]) => { let h: Uint8Array = new Uint8Array(32); for (const c of chunks) { const m = new Uint8Array(h.length + c.length); m.set(h, 0); m.set(c, h.length); h = sha256(m); } return h; };
 
@@ -83,7 +89,7 @@ async function ownerOf(id: string) { try { const o: any = await ro('get-owner', 
 //      "network fees are high — waiting", not look stuck (our own ~512 KB batches can drive fees up);
 //   3. bounded fallback — 2× the last successful fee for this fn, never above the cap.
 const lastGoodFee = new Map<string, bigint>();
-async function send(key: string, from: string, fn: string, args: any[], spendCap: bigint | null, onFeeWait?: (m: string) => void) {
+async function send(key: string, from: string, fn: string, args: any[], spendCap: bigint | null, onFeeWait?: (m: string) => void, logId: string | null = null) {
   const post = spendCap != null ? [makeStandardSTXPostCondition(from, FungibleConditionCode.LessEqual, spendCap)] : [];
   const opts: any = { contractAddress: CORE[0], contractName: CORE[1], functionName: fn, functionArgs: args, senderKey: key, network, postConditionMode: PostConditionMode.Deny, postConditions: post, anchorMode: AnchorMode.Any };
   try { opts.nonce = await safeNonce(from); } catch {}
@@ -94,22 +100,22 @@ async function send(key: string, from: string, fn: string, args: any[], spendCap
   for (let attempt = 0; ; attempt++) {
     tx = await makeContractCall(opts);
     fee = BigInt(tx.auth.spendingCondition.fee.toString());
-    xaoLog(null, `${fn}: fee estimate ${fee} µSTX (cap ${effCap}, try ${attempt + 1})`);
+    xaoLog(logId, `${fn}: fee estimate ${fee} µSTX (cap ${effCap}, try ${attempt + 1})`);
     if (fee <= effCap) break;
     if (fee <= (effCap * 5n) / 4n) { tx = await makeContractCall({ ...opts, fee: effCap }); fee = effCap; break; }  // marginal overage: clamp to cap, don't burn retries
-    if (attempt < 3) { xaoLog(null, `${fn}: estimator spike — retrying (${attempt + 1}/3)`); await sleep(6000); continue; }
-    if (attempt < 15) { const m = `network fees are high — waiting for them to settle (${attempt - 2}/12)`; xaoLog(null, `${fn}: ${m}`); if (onFeeWait) try { onFeeWait(m); } catch {} await sleep(20000); continue; }
+    if (attempt < 3) { xaoLog(logId, `${fn}: estimator spike — retrying (${attempt + 1}/3)`); await sleep(6000); continue; }
+    if (attempt < 15) { const m = `network fees are high — waiting for them to settle (${attempt - 2}/12)`; xaoLog(logId, `${fn}: ${m}`); if (onFeeWait) try { onFeeWait(m); } catch {} await sleep(20000); continue; }
     const fb = lastGoodFee.get(fn); const useFee = fb && fb * 2n <= effCap ? fb * 2n : effCap;
-    xaoLog(null, `${fn}: fees still elevated after waiting — using bounded fallback fee ${useFee}`);
+    xaoLog(logId, `${fn}: fees still elevated after waiting — using bounded fallback fee ${useFee}`);
     tx = await makeContractCall({ ...opts, fee: useFee }); fee = useFee; break;
   }
   lastGoodFee.set(fn, fee);
   const res: any = await broadcastTransaction(tx, network);
-  if (res.error) { xaoLog(null, `${fn}: broadcast REJECTED — ${res.error} ${res.reason || ''}`); throw new Error(`${fn}: ${res.error} ${res.reason || ''}`); }
+  if (res.error) { xaoLog(logId, `${fn}: broadcast REJECTED — ${res.error} ${res.reason || ''}`); throw new Error(`${fn}: ${res.error} ${res.reason || ''}`); }
   const txid = res.txid || res;
-  xaoLog(null, `${fn}: broadcast 0x${String(txid).replace(/^0x/, '')} · fee ${fee} µSTX — awaiting confirmation`);
+  xaoLog(logId, `${fn}: broadcast 0x${String(txid).replace(/^0x/, '')} · fee ${fee} µSTX — awaiting confirmation`);
   const t0 = Date.now(); const d = await waitTx(txid);
-  xaoLog(null, `${fn}: confirmed in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+  xaoLog(logId, `${fn}: confirmed in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
   return { txid, d };
 }
 async function sendNft(key: string, from: string, id: string, to: string) {
@@ -125,7 +131,7 @@ async function sendStx(key: string, amount: bigint, to: string, fee: bigint) {
 const tidFrom = (d: any) => { const r = d?.tx_result?.repr || ''; const m = /token-id u(\d+)/.exec(r) || /\(ok u(\d+)\)/.exec(r); return m ? m[1] : null; };
 
 // ---- mint paths ----
-async function mintSingle(key: string, from: string, data: Uint8Array, mime: string, uri: string, deps: string[], spendCap: bigint, parents: string[] = []) {
+async function mintSingle(key: string, from: string, data: Uint8Array, mime: string, uri: string, deps: string[], spendCap: bigint, parents: string[] = [], logId: string | null = null) {
   const chunks = chunkBytes(data); const h = incHash(chunks);
   const depCV = (deps || []).map((d) => uintCV(BigInt(d)));
   const parentCV = (parents || []).map((p) => uintCV(BigInt(p)));
@@ -137,7 +143,7 @@ async function mintSingle(key: string, from: string, data: Uint8Array, mime: str
   // IDEMPOTENT: if this exact hash is already inscribed (e.g. retry after a confirmation timeout),
   // return the existing token — a resume can never double-mint or double-spend.
   const pre = await getIdByHash(h); if (pre) return pre;
-  const { d } = await send(key, from, fn, args, spendCap);
+  const { d } = await send(key, from, fn, args, spendCap, undefined, logId);
   return tidFrom(d) || (await getIdByHash(h));
 }
 async function stagedInscribe(job: any, key: string, from: string, data: Uint8Array, onProg: (m: string) => void, target: any = job) {
@@ -149,16 +155,30 @@ async function stagedInscribe(job: any, key: string, from: string, data: Uint8Ar
   onProg(`planned · ${total} chunks`);
   let idx: number | null = null;
   try { const st: any = (await ro('get-upload-state', [bufferCV(h), standardPrincipalCV(from)])); idx = st.value ? Number(st.value.value['current-index'].value) : null; } catch { idx = null; }
-  if (idx === null) { await send(key, from, 'begin-or-get', [bufferCV(h), stringAsciiCV(target.mime), uintCV(BigInt(data.length)), uintCV(BigInt(total))], beginFee, onProg); idx = 0; onProg(`upload started · 0/${total}`); }
+  if (idx === null) { await send(key, from, 'begin-or-get', [bufferCV(h), stringAsciiCV(target.mime), uintCV(BigInt(data.length)), uintCV(BigInt(total))], beginFee, onProg, job.jobId); idx = 0; onProg(`upload started · 0/${total}`); }
   else if (idx > 0) { onProg(`resuming upload · ${idx}/${total} chunks already on-chain`); }
-  while (idx < total) { const batch = chunks.slice(idx, idx + BATCH); await send(key, from, 'add-chunk-batch', [bufferCV(h), listCV(batch.map((c) => bufferCV(c)))], null, onProg); const st: any = (await ro('get-upload-state', [bufferCV(h), standardPrincipalCV(from)])); const ni = st.value ? Number(st.value.value['current-index'].value) : null; if (ni === null || ni <= idx) throw new Error(`upload stalled at ${idx}`); idx = ni; onProg(`uploading · ${idx}/${total}`); }
+  while (idx < total) {
+    const batch = chunks.slice(idx, idx + BATCH);
+    // Fee runway check (guide: ~1 STX/MB mining + 20% drift). If the balance can no
+    // longer cover the projected remaining batches + seal + delivery, say so loudly —
+    // send() will still clamp/wait, but the user sees WHY the job is crawling.
+    try {
+      const remBatches = BigInt(Math.max(1, Math.ceil((total - idx) / BATCH)));
+      const perBatch = lastGoodFee.get('add-chunk-batch') ?? (BigInt(BATCH * CHUNK) * 6n) / 5n;
+      const runway = remBatches * perBatch + sealFee + DELIVERY_RESERVE + REFUND_TX_FEE;
+      const bal = await balance(from);
+      if (bal < runway) { const m = `fee runway low — ${bal} µSTX left vs ~${runway} projected for ${remBatches} remaining batch(es); fees will be clamped and may wait`; xaoLog(job.jobId, m); onProg(m); }
+    } catch {}
+    await send(key, from, 'add-chunk-batch', [bufferCV(h), listCV(batch.map((c) => bufferCV(c)))], null, onProg, job.jobId);
+    const st: any = (await ro('get-upload-state', [bufferCV(h), standardPrincipalCV(from)])); const ni = st.value ? Number(st.value.value['current-index'].value) : null; if (ni === null || ni <= idx) throw new Error(`upload stalled at ${idx}`); idx = ni; onProg(`uploading · ${idx}/${total}`);
+  }
   const deps = ((target.resolvedDeps || target.deps) || []).map((d: string) => uintCV(BigInt(d)));
   const parents = ((target.mergedParents || target.parents) || []).map((p: string) => uintCV(BigInt(p)));
   // Parents: seal-with-relationships requires the sealer (deposit wallet) to OWN the parents.
   const sealFn = parents.length ? 'seal-with-relationships' : (deps.length ? 'seal-recursive' : 'seal-inscription');
   const sealArgs: any[] = parents.length ? [bufferCV(h), stringAsciiCV(target.uri), listCV(deps), listCV(parents)]
     : deps.length ? [bufferCV(h), stringAsciiCV(target.uri), listCV(deps)] : [bufferCV(h), stringAsciiCV(target.uri)];
-  const { d } = await send(key, from, sealFn, sealArgs, sealFee, onProg); onProg('sealed'); return tidFrom(d) || (await getIdByHash(h));
+  const { d } = await send(key, from, sealFn, sealArgs, sealFee, onProg, job.jobId); onProg('sealed'); return tidFrom(d) || (await getIdByHash(h));
 }
 
 // ============================================================================
@@ -211,7 +231,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-23.1';
+export const AGENT_BUILD = '2026-07-25.1';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -231,7 +251,9 @@ async function estimate(opts: any) {
   // Single-tx flows budget the mint at the full fee cap so a spike can never underfund it
   // (unused escrow auto-refunds as change). Staged flows keep the per-batch reserve and
   // lean on the balance-coupled ceiling in send().
-  const minerReserve = q.single ? MINT_CAP : (minerTxs * PERTX_MINER + (BigInt(Math.ceil(Number(bytes))) * 3n) / 2n);
+  // Staged mining budget follows the operational guide: ~1 STX per MB observed on
+  // mainnet (0.52 STX per 512 KiB batch) + 20% drift headroom → 1.2 µSTX per byte.
+  const minerReserve = q.single ? MINT_CAP : (minerTxs * PERTX_MINER + (BigInt(Math.ceil(Number(bytes))) * 6n) / 5n);
   // On-chain receipt is optional: when off, its protocol+miner cost is left out of
   // the deposit (the HTML receipt is still generated locally at delivery time).
   const rq = await quoteFee(RECEIPT_EST, 1);                 // quoteFee handles MOCK internally
@@ -782,7 +804,7 @@ async function runBatchItems(job: any) {
         if (/mockfail/i.test(item.uri)) throw new Error('TX abort_by_response (mock forced failure)');
         item.tokenId = String(Math.floor(1000 + Math.random() * 9000));
       } else if (item.single) {
-        item.tokenId = await mintSingle(dep!.key, dep!.address, data!, item.mime, item.uri, item.resolvedDeps, BigInt(item.protocolFee), item.mergedParents);
+        item.tokenId = await mintSingle(dep!.key, dep!.address, data!, item.mime, item.uri, item.resolvedDeps, BigInt(item.protocolFee), item.mergedParents, job.jobId);
       } else {
         item.tokenId = await stagedInscribe(job, dep!.key, dep!.address, data!, prog, item);
       }
@@ -832,7 +854,7 @@ async function runInscribe(job: any) {
   const dep = deriveFrom(job.ephemeralMnemonic);
   let tokenId: string | null;
   const prog = (m: string) => { job.progress = m; job.progressAt = new Date().toISOString(); writeJob(job); xaoLog(job.jobId, m); };
-  if (job.single) { tokenId = await mintSingle(dep.key, dep.address, data, job.mime, job.uri, job.deps || [], BigInt(job.protocolFee), job.parents || []); }
+  if (job.single) { tokenId = await mintSingle(dep.key, dep.address, data, job.mime, job.uri, job.deps || [], BigInt(job.protocolFee), job.parents || [], job.jobId); }
   else { tokenId = await stagedInscribe(job, dep.key, dep.address, data, prog); }
   job.tokenId = tokenId; job.status = 'INSCRIBED'; writeJob(job); return tokenId;
 }
@@ -1154,6 +1176,25 @@ async function autoRun(job: any) {
 
 // ---------- watcher + reaper (mirror server.mjs; run only while the tab is open) ----------
 const PROCESSING = new Set<string>();
+// Keep the device awake while a job is actively processing — a screen lock suspends
+// the tab (and its Worker) even in the foreground. Best-effort: browsers without the
+// Wake Lock API just skip it; the lock is re-acquired whenever the tab is visible.
+let wakeLock: any = null;
+async function syncWakeLock() {
+  try {
+    if (PROCESSING.size > 0 && !wakeLock && document.visibilityState === 'visible' && (navigator as any).wakeLock) {
+      wakeLock = await (navigator as any).wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } else if (PROCESSING.size === 0 && wakeLock) { const wl = wakeLock; wakeLock = null; await wl.release(); }
+  } catch { wakeLock = null; }
+}
+// A tab returning to the foreground may have had its intervals frozen for hours:
+// tick the watcher immediately so a stalled job resumes the moment the user is back,
+// instead of waiting for the throttled interval to fire.
+try {
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { void syncWakeLock(); void watchTick(); } });
+  window.addEventListener('focus', () => { void syncWakeLock(); void watchTick(); });
+} catch {}
 // AUTO-RESUME: transient failures (network, timeouts, rate limits) do NOT refund — the job parks back at
 // FUNDED/INSCRIBED and the watcher resumes exactly where it left off. Resume is safe end-to-end: staged
 // uploads continue from the on-chain index, single-tx mints are idempotent (get-id-by-hash pre-check).
@@ -1162,6 +1203,7 @@ const FATAL_ERR = /TX abort|locked to|unrecoverable|file bytes|empty file|could 
 const MAX_RETRIES = 4;
 function background(id: string, fn: () => Promise<any>) {
   PROCESSING.add(id);
+  void syncWakeLock();
   Promise.resolve().then(fn).then(() => {
     try { const j = readJob(id); if (j.retryCount && (j.status === 'COMPLETE' || j.status === 'COMPLETE_WITH_SKIPS')) { delete j.retryCount; writeJob(j); } } catch {}
     PROCESSING.delete(id);
@@ -1193,6 +1235,7 @@ function background(id: string, fn: () => Promise<any>) {
   });
 }
 async function watchTick() {
+  void syncWakeLock();
   for (const j of listJobsRaw()) {
     if (PROCESSING.has(j.jobId)) continue;
     // A page close/reload can interrupt the browser-held recovery between
