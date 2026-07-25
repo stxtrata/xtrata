@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proof of Free — campaign cards</title>
+<style>
+  /* Matches the existing @XtrataLayers "PoF" cards: pure white on pure black,
+     Helvetica/Arial, one idea per card, nothing else on the canvas. */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: #000; }
+  body { display: grid; place-items: center; min-height: 100vh; }
+  .card {
+    width: 100vw; height: 100vh;
+    background: #000; color: #fff;
+    display: grid; place-items: center;
+    font-family: Arial, Helvetica, sans-serif;
+    text-align: center;
+    padding: 8vmin;
+  }
+  .huge   { font-size: 42vmin; font-weight: 400; line-height: .9; letter-spacing: -.02em; }
+  .big    { font-size: 22vmin; font-weight: 400; line-height: 1; letter-spacing: -.01em; }
+  .mid    { font-size: 9.5vmin; font-weight: 400; line-height: 1.28; }
+  .small  { font-size: 6.4vmin; font-weight: 400; line-height: 1.34; }
+  .stack  { display: flex; flex-direction: column; gap: .34em; }
+  .dim    { opacity: .42; }
+  .rule   { font-size: 7.4vmin; line-height: 1.42; }
+  .count  { display: flex; flex-direction: column; gap: .06em; align-items: center; }
+  .count b { font-size: 46vmin; font-weight: 400; line-height: .86; }
+  .count span { font-size: 8vmin; opacity: .55; letter-spacing: .12em; text-transform: uppercase; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+</style>
+</head>
+<body>
+<div class="card" id="card"></div>
+<script>
+const CARDS = {
+  // --- Phase A: the whisper -------------------------------------------------
+  zero:      `<div class="huge">0</div>`,
+  made33:    `<div class="stack mid"><div>I made 33 things.</div><div class="dim">I am not selling any of them.</div></div>`,
+  name:      `<div class="stack mid"><div>Every free drop gets farmed.</div><div class="dim">So this one asks for a name.</div></div>`,
+
+  // --- Phase C: open --------------------------------------------------------
+  pof:       `<div class="big">PoF</div>`,
+  rule:      `<div class="stack rule"><div>One name.</div><div>One wallet.</div><div>One proof.</div></div>`,
+  terms:     `<div class="stack small mono"><div>33 EDITIONS</div><div>0 STX</div><div>0 GAS</div><div>1 PER NAME</div></div>`,
+
+  // --- Phase D: counters (append ?n=NN to override the number) --------------
+  remain:    n => `<div class="count"><b>${n}</b><span>remain</span></div>`,
+  single:    `<div class="mid">Single figures.</div>`,
+
+  // --- Phase E: sellout -----------------------------------------------------
+  gone:      `<div class="big">GONE</div>`,
+  names33:   `<div class="stack mid"><div>33 editions.</div><div>33 names.</div><div class="dim">0 STX moved.</div></div>`,
+
+  // --- Phase F: after -------------------------------------------------------
+  bytes:     `<div class="stack mid"><div>377 bytes.</div><div class="dim">The artwork isn't in the file.<br>The file knows where to look.</div></div>`,
+  discount:  `<div class="stack mid"><div>0 was never a discount.</div><div class="dim">0 was the artwork.</div></div>`,
+  tail:      `<div class="big">#34</div>`,
+  tailtext:  `<div class="stack mid"><div>The 33 are gone.</div><div class="dim">The engine is not.</div></div>`,
+  ghost:     `<div class="stack mid"><div>34 inscriptions.</div><div>33 editions.</div><div class="dim">One of them is a ghost.</div></div>`
+};
+const params = new URLSearchParams(location.search);
+const key = (location.hash.slice(1) || 'zero');
+const entry = CARDS[key];
+document.getElementById('card').innerHTML =
+  typeof entry === 'function' ? entry(params.get('n') || '31') : (entry || CARDS.zero);
+document.title = 'card: ' + key;
+</script>
+</body>
+</html>
