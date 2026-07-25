@@ -14,7 +14,22 @@ const CALL_READ_FUNCTION_TTLS_MS: Record<string, number> = {
   'get-token-uri': 30_000,
   'get-svg-data-uri': 30_000,
   'get-svg': 30_000,
-  'get-max-supply': 15_000
+  'get-max-supply': 15_000,
+  // Drops reads. The drops grid issues one get-drop per edition, so a repeat
+  // visit within the TTL is served entirely from here instead of re-reading the
+  // chain N times. Kept short because a claim mutates get-drop: the client
+  // already marks locally-claimed drops itself, so a brief stale window only
+  // affects other viewers, and 15s is well under a block time.
+  'get-drop': 15_000,
+  'get-last-drop-id': 8_000,
+  'get-campaign': 15_000,
+  'get-drop-by-token': 15_000,
+  'get-listing': 15_000,
+  'get-last-listing-id': 8_000
+  // Deliberately NOT cached: has-claimed-in-group, has-claimed-campaign-wallet
+  // and has-claimed-campaign-bns gate eligibility, and a stale answer there
+  // would either block a valid claim or invite one that reverts. They are a
+  // single call per attempt, so there is nothing to win.
 };
 
 const CORS_HEADERS = {

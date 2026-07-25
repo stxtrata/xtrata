@@ -11528,6 +11528,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // campaign displayed only its newest 25 drops under the previous value of 25.
     const DROPS_DISPLAY_LIMIT = 64;
     const DROPS_SCAN_MAX_IDS = DROPS_DISPLAY_LIMIT * 10;
+    // Matches the 4 used by the other runReadOnlyLimited call sites; the proxy
+    // holds a paid Hiro key at 50 req/s, so this is nowhere near the ceiling.
+    const DROPS_READ_CONCURRENCY = 6;
     const dropsState = {
       run: 0,
       // Blocked-claim messages, keyed by claim key so each card owns its own.
@@ -11992,14 +11995,22 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         network: entry.network
       });
       const lastId = BigInt(lastJson?.value?.value ?? 0);
-      const results = [];
-      let scanned = 0;
+
+      // Candidate ids first, then fetch them concurrently. Reading these one at
+      // a time cost ~140ms each, so a 33-drop campaign spent ~6.8s here before
+      // the grid could render; the same reads in parallel take ~1.5s.
+      const candidates = [];
       for (
         let id = lastId;
-        id >= 0n && results.length < DROPS_DISPLAY_LIMIT && scanned < DROPS_SCAN_MAX_IDS;
+        id >= 0n && candidates.length < DROPS_DISPLAY_LIMIT && candidates.length < DROPS_SCAN_MAX_IDS;
         id -= 1n
       ) {
-        scanned += 1;
+        candidates.push(id);
+        if (id === 0n) break;
+      }
+      const scanned = candidates.length;
+
+      const fetched = await runReadOnlyLimited(candidates, DROPS_READ_CONCURRENCY, async (id) => {
         try {
           const json = await callReadOnlyJson({
             contractId,
@@ -12007,9 +12018,17 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             args: [uintCV(id)],
             network: entry.network
           });
-          const tuple = unwrapBindingTuple(json);
-          if (!tuple) continue;
-          results.push({
+          return { id, tuple: unwrapBindingTuple(json) };
+        } catch {
+          return { id, tuple: null }; // sparse ids / settled drops: skip
+        }
+      });
+
+      const results = [];
+      for (const entryResult of fetched) {
+        const { id, tuple } = entryResult ?? {};
+        if (!tuple) continue;
+        results.push({
             entry,
             contractId,
             dropId: id,
@@ -12025,11 +12044,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             budgetRemaining: tuple['budget-remaining'] ? BigInt(tuple['budget-remaining'].value) : null,
             claimer: optionalPrincipalValue(tuple.claimer),
             claimedAt: optionalUintValue(tuple['claimed-at'])
-          });
-        } catch {
-          // sparse ids / settled drops: skip
-        }
-        if (id === 0n) break;
+        });
       }
       if (results.length < DROPS_DISPLAY_LIMIT && scanned >= DROPS_SCAN_MAX_IDS) {
         debugLog('drops', 'stopped drop scan at safety cap', {
