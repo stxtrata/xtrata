@@ -115,3 +115,39 @@ describe('confirmation', () => {
     ).rejects.toThrow(/dropped/i);
   });
 });
+
+describe('one transaction cannot eat the budget for the rest', () => {
+  it('honours a caller-supplied fee ceiling below the global cap', async () => {
+    const addr = DEPOSIT;
+    chain.balances.set(addr, 5_000_000n);
+    // The estimator wants 1.5 STX — under MINT_CAP (2 STX), so the old code would
+    // simply pay it. With ten batches left and a 6.4 STX budget, three of those
+    // empty the wallet before anything is sealed.
+    chain.feeQuotes = [1_500_000n];
+    const ceiling = 400_000n;
+    // Refuses rather than paying it. (Asserting "every broadcast <= ceiling" would
+    // have passed vacuously on an empty list — the mistake this replaces.)
+    await expect(
+      agent.send(KEY, addr, 'add-chunk-batch', [], null, undefined, null, ceiling)
+    ).rejects.toThrow(/cannot afford the network fee/i);
+    expect(chain.broadcasts).toEqual([]);
+  });
+
+  it('still sends when the quote fits inside the ceiling', async () => {
+    const addr = DEPOSIT;
+    chain.balances.set(addr, 5_000_000n);
+    chain.feeQuotes = [300_000n];
+    const out = await agent.send(KEY, addr, 'add-chunk-batch', [], null, undefined, null, 400_000n);
+    expect(out.txid).toBeTruthy();
+    expect(chain.broadcasts).toEqual([300_000n]);
+  });
+
+  it('leaves the global cap in charge when no ceiling is given', async () => {
+    const addr = DEPOSIT;
+    chain.balances.set(addr, 5_000_000n);
+    chain.feeQuotes = [1_500_000n];
+    const out = await agent.send(KEY, addr, 'add-chunk-batch', [], null, undefined, null);
+    expect(out.txid).toBeTruthy();
+    expect(chain.broadcasts).toEqual([1_500_000n]);
+  });
+});

@@ -225,7 +225,7 @@ const SERVER = { mock:false, net:'mainnet' };
 // fees on refund loops). Builds are date-stamped (YYYY-MM-DD.N) so a string compare orders them;
 // a NEWER deployed bundle must pass — requiring an exact match wrongly locked the page out
 // whenever the agent shipped ahead of the page.
-const XAO_MIN_AGENT_BUILD='2026-07-25.8';
+const XAO_MIN_AGENT_BUILD='2026-07-25.9';
 let AGENT_STALE=false;
 function checkAgentBuild(){
   const b=window.XAO_AGENT_BUILD||null;
@@ -561,10 +561,14 @@ const ESCROW_STATES=['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING']
 let PARENT_MSG=null, PARENT_OWNER={};
 function hideEscrow(){ const e=$('#escrow'); if(e){ e.style.display='none'; e.innerHTML=''; }
   const chip=document.querySelector('.step[data-s="parent"]'); if(chip) chip.hidden=true; }
+// Re-checked, not cached forever. The first version resolved once and never looked
+// again, so a parent that had since moved to the deposit wallet was still described
+// as sitting in your wallet — complete with a Send button for a send already made.
+const PARENT_OWNER_AT={};
 async function noteParentOwner(id){
-  if(PARENT_OWNER[id]!==undefined) return;
-  PARENT_OWNER[id]=null;
-  try{ const A=window.XtrataAgent; if(A&&A.ownerOf) PARENT_OWNER[id]=await A.ownerOf(id); }catch{ PARENT_OWNER[id]=null; }
+  if(PARENT_OWNER_AT[id] && Date.now()-PARENT_OWNER_AT[id] < 15000) return;   // at most one lookup per 15 s
+  PARENT_OWNER_AT[id]=Date.now();
+  try{ const A=window.XtrataAgent; if(A&&A.ownerOf) PARENT_OWNER[id]=await A.ownerOf(id); }catch{ /* keep the last known owner */ }
 }
 function renderEscrow(job, status){
   const box=$('#escrow'); if(!box) return;
@@ -577,7 +581,10 @@ function renderEscrow(job, status){
   if(!(ps.missing||[]).length) PARENT_MSG=null;
   const paid=(status&&status.funded)||!!job.depositReceivedUstx;
   const rows=parents.map((p)=>{
-    const held=(ps.held||[]).map(String).includes(p);
+    // Past the gate the parent is definitionally held — the contract would not have
+    // let the mint start otherwise. Never ask for it again once we are inscribing.
+    const pastGate=['INSCRIBING','INSCRIBED','DELIVERING','COMPLETE','COMPLETE_WITH_SKIPS'].includes(job.status);
+    const held=pastGate||(ps.held||[]).map(String).includes(p);
     const owner=PARENT_OWNER[p];
     if(!held) void noteParentOwner(p);
     let right;

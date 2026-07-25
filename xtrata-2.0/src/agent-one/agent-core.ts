@@ -145,7 +145,7 @@ async function ownerOf(id: string) { try { const o: any = await ro('get-owner', 
 //      "network fees are high — waiting", not look stuck (our own ~512 KB batches can drive fees up);
 //   3. bounded fallback — 2× the last successful fee for this fn, never above the cap.
 const lastGoodFee = new Map<string, bigint>();
-async function send(key: string, from: string, fn: string, args: any[], spendCap: bigint | null, onFeeWait?: (m: string) => void, logId: string | null = null) {
+async function send(key: string, from: string, fn: string, args: any[], spendCap: bigint | null, onFeeWait?: (m: string) => void, logId: string | null = null, feeCeiling: bigint | null = null) {
   const post = spendCap != null ? [makeStandardSTXPostCondition(from, FungibleConditionCode.LessEqual, spendCap)] : [];
   const opts: any = { contractAddress: CORE[0], contractName: CORE[1], functionName: fn, functionArgs: args, senderKey: key, network, postConditionMode: PostConditionMode.Deny, postConditions: post, anchorMode: AnchorMode.Any };
   try { opts.nonce = await safeNonce(from, logId); } catch {}
@@ -162,6 +162,9 @@ async function send(key: string, from: string, fn: string, args: any[], spendCap
   // Genuinely no headroom: say so instead of broadcasting something unpayable.
   if (headroom === 0n) throw new Error(`${fn}: deposit wallet has no headroom left for fees — nothing was broadcast`);
   if (headroom != null && headroom < effCap) effCap = headroom;
+  // A caller that knows how much of the budget this one transaction may take (the
+  // staged loop, which knows how many batches are left) tightens the ceiling further.
+  if (feeCeiling != null && feeCeiling > 0n && feeCeiling < effCap) effCap = feeCeiling;
   let tx: any, fee: bigint;
   // The cheapest quote seen this run is the closest thing we have to the node's real
   // minimum. The fallback must never dip below it: a fee we KNOW will be rejected is
@@ -257,14 +260,25 @@ async function stagedInscribe(job: any, key: string, from: string, data: Uint8Ar
     // Fee runway check (guide: ~1 STX/MB mining + 20% drift). If the balance can no
     // longer cover the projected remaining batches + seal + delivery, say so loudly —
     // send() will still clamp/wait, but the user sees WHY the job is crawling.
+    // Fee ceiling for THIS batch, derived from what is actually left to spend.
+    // MINT_CAP alone is 2 STX per transaction — over three times what the quote
+    // budgets per batch — so a job could accept 1.5 STX batches against a 0.64 STX
+    // budget and spend its way into a dead end: deposit gone, nothing sealed. The
+    // runway was already computed here and only used to print a warning.
+    let batchFeeCap: bigint | null = null;
     try {
       const remBatches = BigInt(Math.max(1, Math.ceil((total - idx) / BATCH)));
       const perBatch = lastGoodFee.get('add-chunk-batch') ?? (BigInt(BATCH * CHUNK) * 6n) / 5n;
       const runway = remBatches * perBatch + sealFee + DELIVERY_RESERVE + REFUND_TX_FEE;
       const bal = await balance(from);
-      if (bal < runway) { const m = `fee runway low — ${bal} µSTX left vs ~${runway} projected for ${remBatches} remaining batch(es); fees will be clamped and may wait`; xaoLog(job.jobId, m); onProg(m); }
-    } catch {}
-    await send(key, from, 'add-chunk-batch', [bufferCV(h), listCV(batch.map((c) => bufferCV(c)))], null, onProg, job.jobId);
+      // Reserve what the tail still needs, then share the rest across the batches
+      // left. Never let one batch eat the budget for the others.
+      const tail = sealFee + DELIVERY_RESERVE + REFUND_TX_FEE;
+      const spendable = bal > tail ? bal - tail : 0n;
+      batchFeeCap = spendable / remBatches;
+      if (bal < runway) { const m = `fee runway low — ${bal} µSTX left vs ~${runway} projected for ${remBatches} remaining batch(es); this batch is capped at ${batchFeeCap} µSTX`; xaoLog(job.jobId, m); onProg(m); }
+    } catch { batchFeeCap = null; }
+    await send(key, from, 'add-chunk-batch', [bufferCV(h), listCV(batch.map((c) => bufferCV(c)))], null, onProg, job.jobId, batchFeeCap);
     const st: any = (await ro('get-upload-state', [bufferCV(h), standardPrincipalCV(from)])); const ni = st.value ? Number(st.value.value['current-index'].value) : null; if (ni === null || ni <= idx) throw new Error(`upload stalled at ${idx}`); idx = ni; onProg(`uploading · ${idx}/${total}`);
   }
   // Last chance to stop: sealing is what MINTS. Past this point the token exists and
@@ -329,7 +343,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-25.8';
+export const AGENT_BUILD = '2026-07-25.9';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -901,7 +915,11 @@ async function statusJob(job: any) {
   }
   // Parent escrow gate — a parented job is runnable only when funded AND all parents are held.
   let parents: any = null;
-  if ((job.parents || []).length && ['AWAITING_DEPOSIT', 'AWAITING_PARENT', 'FUNDED'].includes(job.status)) {
+  // INSCRIBING included deliberately: the escrow checklist stays on screen while the
+  // upload runs, and without live parent status it fell back to a stale owner lookup
+  // and told the user to send a parent the job had already accepted and was minting
+  // against. The gate has passed by then — the UI just needs to be told.
+  if ((job.parents || []).length && ['AWAITING_DEPOSIT', 'AWAITING_PARENT', 'FUNDED', 'INSCRIBING'].includes(job.status)) {
     try { parents = await parentsStatus(job); } catch {}
   }
   const batch = job.items ? { current: (job.batchProgress || {}).current || 0, total: job.items.length, items: job.items.map((i: any) => ({ idx: i.idx, uri: i.uri, status: i.status, tokenId: i.tokenId || null, error: i.error || null })) } : null;
