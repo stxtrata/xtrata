@@ -11530,6 +11530,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const DROPS_SCAN_MAX_IDS = DROPS_DISPLAY_LIMIT * 10;
     const dropsState = {
       run: 0,
+      // Blocked-claim messages, keyed by claim key so each card owns its own.
+      notices: new Map(),
+      noticeToReveal: null,
       drops: [],
       historyEvents: [],
       claimRound: 0,
@@ -11551,11 +11554,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       createDeposit: $('dropsCreateDeposit'),
       createButton: $('dropsCreateButton'),
       createStatus: $('dropsCreateStatus'),
-      notice: $('dropsNotice'),
-      noticeEyebrow: $('dropsNoticeEyebrow'),
-      noticeTitle: $('dropsNoticeTitle'),
-      noticeText: $('dropsNoticeText'),
-      noticeDetail: $('dropsNoticeDetail'),
       diagnostics: $('dropsDiagnostics'),
       diagnosticsBadge: $('dropsDiagnosticsBadge'),
       diagnosticsLog: $('dropsDiagnosticsLog'),
@@ -11656,6 +11654,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         text: 'The creator has paused this drop for now. Nothing was submitted and nothing was spent.',
         detail: 'Try again later.'
       },
+      WALLET_NOT_CONNECTED: {
+        title: 'Connect a wallet first',
+        text: 'You need a Stacks wallet connected to claim. A brand new wallet is fine — the creator pays the network fee, so you do not need any STX.',
+        detail: 'Use the Connect wallet button at the top of the page, then press claim again.'
+      },
       WALLET_CANCELLED: {
         title: 'Claim cancelled',
         text: 'You dismissed the request in your wallet, so nothing was submitted.',
@@ -11686,23 +11689,112 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       return matched ? DROP_NOTICES[matched[1]] : DROP_NOTICE_FALLBACK;
     };
 
-    const showDropNotice = (code, message, eyebrow = 'Claim not available') => {
-      const notice = resolveDropNotice(code, message);
-      const dialog = dropsDom.notice;
-      if (!dialog) return;
-      if (dropsDom.noticeEyebrow) dropsDom.noticeEyebrow.textContent = eyebrow;
-      if (dropsDom.noticeTitle) dropsDom.noticeTitle.textContent = notice.title;
-      if (dropsDom.noticeText) dropsDom.noticeText.textContent = notice.text;
-      if (dropsDom.noticeDetail) {
-        dropsDom.noticeDetail.textContent = notice.detail ?? '';
-        dropsDom.noticeDetail.hidden = !notice.detail;
+    // Attached to the card the collector actually pressed, rather than a global
+    // banner they may never scroll back up to. Held until dismissed so it can be
+    // re-read, and scrolled into view on the next render so it cannot be missed.
+    const showDropNotice = (claimKey, code, message, eyebrow = 'Claim not available') => {
+      if (!claimKey) return;
+      dropsState.notices.set(claimKey, {
+        ...resolveDropNotice(code, message),
+        eyebrow,
+        soft: code === 'WALLET_CANCELLED'
+      });
+      dropsState.noticeToReveal = claimKey;
+      renderDrops();
+    };
+
+    const dismissDropNotice = (claimKey) => {
+      if (dropNoticeAnchor?.key === claimKey) dropNoticeAnchor.stop();
+      dropsState.notices.delete(claimKey);
+      if (dropsState.noticeToReveal === claimKey) dropsState.noticeToReveal = null;
+      renderDrops();
+    };
+
+    let dropNoticeAnchor = null;
+    const anchorDropNotice = (claimKey) => {
+      dropNoticeAnchor?.stop();
+      const listings = dropsDom.listings;
+      if (!listings?.querySelector(`[data-drop-notice="${claimKey}"]`)) return;
+
+      let released = false;
+      let programmatic = false;
+      // Re-query every time: renderDrops rebuilds the grid with replaceChildren,
+      // so a captured node goes detached and reports a zero-sized rect, which
+      // reads as "already on screen" and silently cancels the scroll.
+      const find = () => listings.querySelector(`[data-drop-notice="${claimKey}"]`);
+      const bring = (smooth) => {
+        const target = find();
+        if (!target) return;
+        const box = target.getBoundingClientRect();
+        if (box.top >= 0 && box.bottom <= window.innerHeight) return;
+        programmatic = true;
+        // Smooth scrolling is a no-op while the document is hidden, and is not
+        // wanted at all under reduced-motion — fall back to an instant jump so
+        // the card still ends up on screen either way.
+        const gentle = smooth
+          && !document.hidden
+          && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        target.scrollIntoView({ behavior: gentle ? 'smooth' : 'auto', block: 'center' });
+        setTimeout(() => { programmatic = false; }, 400);
+      };
+      const stop = () => {
+        if (released) return;
+        released = true;
+        observer.disconnect();
+        window.removeEventListener('wheel', onUserScroll);
+        window.removeEventListener('touchmove', onUserScroll);
+        window.removeEventListener('keydown', onUserScroll);
+        clearTimeout(cap);
+        if (dropNoticeAnchor?.key === claimKey) dropNoticeAnchor = null;
+      };
+      const onUserScroll = () => { if (!programmatic) stop(); };
+      const observer = new ResizeObserver(() => bring(false));
+
+      observer.observe(listings);
+      window.addEventListener('wheel', onUserScroll, { passive: true });
+      window.addEventListener('touchmove', onUserScroll, { passive: true });
+      window.addEventListener('keydown', onUserScroll);
+      const cap = setTimeout(stop, 8000);
+
+      dropNoticeAnchor = { key: claimKey, stop };
+      bring(true);
+      find()?.querySelector('.card-notice__ok')?.focus({ preventScroll: true });
+    };
+
+    const buildDropNoticeEl = (claimKey, notice) => {
+      const box = document.createElement('div');
+      box.className = `card-notice${notice.soft ? ' card-notice--soft' : ''}`;
+      box.dataset.dropNotice = claimKey;
+      box.setAttribute('role', 'alert');
+
+      const eyebrow = document.createElement('p');
+      eyebrow.className = 'card-notice__eyebrow';
+      eyebrow.textContent = notice.eyebrow;
+
+      const title = document.createElement('p');
+      title.className = 'card-notice__title';
+      title.textContent = notice.title;
+
+      const text = document.createElement('p');
+      text.className = 'card-notice__text';
+      text.textContent = notice.text;
+
+      box.append(eyebrow, title, text);
+
+      if (notice.detail) {
+        const detail = document.createElement('p');
+        detail.className = 'card-notice__detail';
+        detail.textContent = notice.detail;
+        box.append(detail);
       }
-      dialog.classList.toggle('claim-notice--soft', code === 'WALLET_CANCELLED');
-      try {
-        if (!dialog.open) dialog.showModal();
-      } catch {
-        // A browser without <dialog> support still has the status line.
-      }
+
+      const ok = document.createElement('button');
+      ok.type = 'button';
+      ok.className = 'market-chip card-notice__ok';
+      ok.textContent = 'Got it';
+      ok.addEventListener('click', () => dismissDropNotice(claimKey));
+      box.append(ok);
+      return box;
     };
 
     const recordDropDiagnostic = (round, stage, message, tone = '') => {
@@ -11987,6 +12079,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
       if (!state.walletSession.isConnected || !state.walletSession.address) {
         dropsDom.status.innerHTML = '<span><strong>Drops</strong> connect a wallet to claim — new wallets work, no STX needed.</span>';
+        showDropNotice(claimKey, 'WALLET_NOT_CONNECTED', 'no connected address');
         recordDropDiagnostic(round, 'BLOCK', 'No connected Stacks wallet address.', 'error');
         return;
       }
@@ -12013,7 +12106,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           const lockLabel = collectionLock?.label ?? 'this campaign group';
           dropsDom.status.innerHTML = `<span><strong>Drops</strong> this wallet has already claimed a drop from ${lockLabel}.</span><span class="badge amber">one per wallet</span>`;
           // This path returns before the try/catch below, so raise the dialog here too.
-          showDropNotice('GROUP_LIMIT', `already claimed group ${claimedGroup}`);
+          showDropNotice(claimKey, 'GROUP_LIMIT', `already claimed group ${claimedGroup}`);
           recordDropDiagnostic(
             round,
             'GROUP_LIMIT',
@@ -12030,6 +12123,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           'warn'
         );
       }
+      dropsState.notices.delete(claimKey);
       dropsState.claimsInFlight.add(claimKey);
       renderDrops();
       const [nftAddress, nftName] = drop.nftContract.split('.');
@@ -12263,7 +12357,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         dropsDom.status.innerHTML = cancelled
           ? '<span><strong>Drops</strong> claim cancelled in the wallet. No transaction was submitted.</span>'
           : `<span><strong>Drops</strong> sponsored claim blocked (${code}): ${message}. Open Claim diagnostics, fix the reported stage, then retry.</span>`;
-        showDropNotice(code, message, cancelled ? 'Claim cancelled' : 'Claim not available');
+        showDropNotice(claimKey, code, message, cancelled ? 'Claim cancelled' : 'Claim not available');
       } finally {
         dropsState.claimsInFlight.delete(claimKey);
         dropsDom.listings?.querySelectorAll('[data-drop-claim]').forEach((button) => {
@@ -12543,9 +12637,23 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           }
 
           card.append(thumb, badges, price, meta, actions);
+          const cardNotice = dropsState.notices.get(claimKey);
+          if (cardNotice) card.append(buildDropNoticeEl(claimKey, cardNotice));
           return card;
         })
       );
+      // A notice on a card far down the page is useless if it stays off-screen,
+      // and thumbnails hydrate asynchronously — each one that loads resizes its
+      // card and shoves the target hundreds of pixels away. Hold the card in
+      // view while the grid settles, and stop the moment the reader scrolls.
+      if (dropsState.noticeToReveal) {
+        const key = dropsState.noticeToReveal;
+        dropsState.noticeToReveal = null;
+        // Called directly rather than inside requestAnimationFrame: the grid is
+        // already committed by replaceChildren, and rAF never fires in a
+        // backgrounded tab, which silently disabled the reveal entirely.
+        anchorDropNotice(key);
+      }
       void hydrateDropThumbnails(run, visible);
     };
 

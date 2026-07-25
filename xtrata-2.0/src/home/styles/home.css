@@ -4360,7 +4360,7 @@
     }
 
     /* Recessed by default: this is a debugging aid, not something a collector
-       needs to read. Blocked claims raise .claim-notice instead. */
+       needs to read. Blocked claims surface on the card itself instead. */
     .claim-diagnostics {
       margin: 0 0 14px;
       border: 1px solid transparent;
@@ -4391,64 +4391,72 @@
       font-weight: 700;
     }
 
-    /* --- blocked-claim notice ------------------------------------------- */
+    /* --- blocked-claim notice, attached to the card that was pressed ------ */
 
-    .claim-notice {
-      max-width: min(440px, calc(100vw - 32px));
-      padding: 0;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: var(--surface);
-      color: inherit;
-    }
-
-    .claim-notice::backdrop {
-      background: rgba(4, 8, 16, 0.62);
-      backdrop-filter: blur(2px);
-    }
-
-    .claim-notice__body {
+    .card-notice {
       display: grid;
-      gap: 10px;
-      padding: 22px 22px 18px;
+      gap: 6px;
+      margin-top: 10px;
+      padding: 12px 13px 13px;
+      /* --amber / --amber-soft are defined per theme in this stylesheet and are
+         what the existing "badge amber" uses; --accent lives in app.css and does
+         not resolve here, which left the notice transparent with a white border. */
+      border: 1px solid var(--amber);
+      border-radius: var(--radius);
+      background: var(--amber-soft);
+      animation: cardNoticeIn 180ms ease-out;
     }
 
-    .claim-notice__eyebrow {
+    .card-notice--soft {
+      border-color: var(--line);
+      background: var(--surface-soft);
+    }
+
+    @keyframes cardNoticeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .card-notice { animation: none; }
+    }
+
+    .card-notice__eyebrow {
       margin: 0;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
       letter-spacing: 0.14em;
       text-transform: uppercase;
-      color: var(--accent);
+      color: var(--amber);
     }
 
-    .claim-notice--soft .claim-notice__eyebrow {
+    .card-notice--soft .card-notice__eyebrow {
       color: var(--muted);
     }
 
-    .claim-notice__title {
+    .card-notice__title {
       margin: 0;
-      font-size: 19px;
-      line-height: 1.25;
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.3;
     }
 
-    .claim-notice__text {
-      margin: 0;
-      font-size: 14px;
-      line-height: 1.55;
-    }
-
-    .claim-notice__detail {
+    .card-notice__text {
       margin: 0;
       font-size: 13px;
       line-height: 1.5;
+    }
+
+    .card-notice__detail {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.45;
       color: var(--muted);
     }
 
-    .claim-notice__ok {
-      justify-self: end;
+    .card-notice__ok {
+      justify-self: start;
       margin-top: 4px;
-      min-width: 116px;
     }
 
     .claim-diagnostics__body {

@@ -811,20 +811,6 @@
             </div>
           </details>
           <div class="status" id="dropsStatus"><span>Loading drops…</span></div>
-          <!-- #dropsStatus sits above 33 cards, so a claim blocked from a card far
-               down the page rendered its explanation off-screen. Anything that
-               stops a claim also opens this dialog, which has to be dismissed. -->
-          <dialog class="claim-notice" id="dropsNotice" aria-labelledby="dropsNoticeTitle">
-            <form method="dialog" class="claim-notice__body">
-              <p class="claim-notice__eyebrow" id="dropsNoticeEyebrow">Claim not available</p>
-              <h3 class="claim-notice__title" id="dropsNoticeTitle"></h3>
-              <p class="claim-notice__text" id="dropsNoticeText"></p>
-              <p class="claim-notice__detail" id="dropsNoticeDetail" hidden></p>
-              <button class="btn claim-notice__ok" id="dropsNoticeOk" value="ok" type="submit" autofocus>
-                Got it
-              </button>
-            </form>
-          </dialog>
           <details class="claim-diagnostics" id="dropsDiagnostics">
             <summary>
               <span>Claim diagnostics</span>
