@@ -65,7 +65,20 @@ function newWallet() { const mnemonic = generateMnemonic(wordlist, 256); return 
 async function ro(fn: string, args: any[] = []) {
   return cvToJSON(await callReadOnlyFunction({ contractAddress: CORE[0], contractName: CORE[1], functionName: fn, functionArgs: args, senderAddress: DEPLOYER, network } as any));
 }
-async function balance(addr: string): Promise<bigint> { const d = await (await hfetch(`/extended/v1/address/${addr}/stx`)).json(); return BigInt(d.balance || '0'); }
+// A FAILED balance read must never look like an empty wallet. Defaulting the missing
+// field to zero returned 0 for a rate-limited or errored response, and 0 is indistinguishable from
+// "wallet is empty" — which broke two things at once on a wallet holding 11.66 STX:
+// processFunded reported "not funded: need 11660000, have 0", and send() computed a
+// fee cap of 0, so every estimate looked like a spike and the fallback broadcast a
+// 0 µSTX fee that the node rejected as FeeTooLow. Throw instead; callers already
+// treat a throw as transient and retry.
+async function balance(addr: string): Promise<bigint> {
+  const r = await hfetch(`/extended/v1/address/${addr}/stx`);
+  if (!r.ok) throw new Error(`balance lookup failed (HTTP ${r.status})`);
+  const d: any = await r.json();
+  if (d == null || d.balance == null) throw new Error('balance lookup returned no balance');
+  return BigInt(d.balance);
+}
 async function safeNonce(addr: string): Promise<bigint | undefined> { if (MOCK) return undefined; try { const d: any = await (await hfetch(`/extended/v1/address/${addr}/nonces`)).json(); const n = d && d.possible_next_nonce; return n == null ? undefined : BigInt(n); } catch { return undefined; } }
 async function quoteFee(sizeBytes: number, chunks: number) {
   if (MOCK) return { single: chunks <= SINGLE_MAX, protocolFee: 100000n + BigInt(chunks) * 2000n, batches: Math.max(1, Math.ceil(chunks / SINGLE_MAX)) };
@@ -95,7 +108,19 @@ async function send(key: string, from: string, fn: string, args: any[], spendCap
   try { opts.nonce = await safeNonce(from); } catch {}
   // Never broadcast a fee the deposit can't afford: cap at the lesser of MINT_CAP and the
   // balance minus what later delivery+refund still need. Turns NotEnoughFunds into a wait.
-  let effCap = MINT_CAP; try { const _bal = await balance(from); const _head = _bal > (DELIVERY_RESERVE + REFUND_TX_FEE) ? _bal - (DELIVERY_RESERVE + REFUND_TX_FEE) : 0n; if (_head < effCap) effCap = _head; } catch {}
+  // Cap the fee at the lesser of MINT_CAP and the balance minus what delivery+refund
+  // still need, so NotEnoughFunds becomes a wait instead of a failure. A LOOKUP
+  // failure must not lower the cap — a cap of 0 makes every estimate look like a
+  // spike and ends in a 0 µSTX broadcast the node rejects as FeeTooLow.
+  let effCap = MINT_CAP;
+  let headroom: bigint | null = null;
+  try {
+    const bal = await balance(from);
+    headroom = bal > (DELIVERY_RESERVE + REFUND_TX_FEE) ? bal - (DELIVERY_RESERVE + REFUND_TX_FEE) : 0n;
+  } catch { headroom = null; }        // unknown → keep the safe default cap
+  // Genuinely no headroom: say so instead of broadcasting something unpayable.
+  if (headroom === 0n) throw new Error(`${fn}: deposit wallet has no headroom left for fees — nothing was broadcast`);
+  if (headroom != null && headroom < effCap) effCap = headroom;
   let tx: any, fee: bigint;
   for (let attempt = 0; ; attempt++) {
     tx = await makeContractCall(opts);
@@ -239,7 +264,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-25.3';
+export const AGENT_BUILD = '2026-07-25.4';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -845,8 +870,16 @@ async function runInscribe(job: any) {
     // Hiro's API is load-balanced across nodes at different chain tips, so a single read can
     // lag behind a just-landed deposit. Take the best of a few reads before concluding a job
     // is unfunded, so a stale zero never triggers a spurious refund.
-    let bal = 0n;
-    for (let i = 0; i < 3; i++) { try { const b = await balance(job.depositAddress); if (b > bal) bal = b; } catch {} if (bal >= BigInt(job.requiredUstx)) break; if (i < 2) await sleep(6000); }
+    // Track whether ANY read actually succeeded. Swallowing the errors and reporting
+    // the resulting 0 as "not funded" is what made a rate-limited lookup look like an
+    // unpaid deposit on a wallet that held the full amount.
+    let bal = 0n; let reads = 0; let lastErr: unknown = null;
+    for (let i = 0; i < 3; i++) {
+      try { const b = await balance(job.depositAddress); reads += 1; if (b > bal) bal = b; } catch (e) { lastErr = e; }
+      if (reads && bal >= BigInt(job.requiredUstx)) break;
+      if (i < 2) await sleep(6000);
+    }
+    if (!reads) throw new Error(`could not read the deposit balance (${errMsg(lastErr)}) — nothing was spent, retrying`);
     if (bal < BigInt(job.requiredUstx)) throw new Error(`not funded: need ${job.requiredUstx}, have ${bal}`);
     job.depositReceivedUstx = bal.toString();
   }
