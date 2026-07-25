@@ -269,7 +269,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-25.5';
+export const AGENT_BUILD = '2026-07-25.6';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -464,8 +464,17 @@ async function heldInscriptions(addr: string): Promise<string[]> {
   const asset = `${CORE[0]}.${CORE[1]}::xtrata-inscription`;
   const ids: string[] = []; let offset = 0;
   for (;;) {
-    const d: any = await (await hfetch(`/extended/v1/tokens/nft/holdings?principal=${addr}&asset_identifiers=${encodeURIComponent(asset)}&limit=50&offset=${offset}`)).json();
-    const rs = d.results || [];
+    // Must THROW on a bad read. Returning [] made a failed lookup indistinguishable
+    // from "this wallet holds nothing" — and every caller below already wraps this in
+    // a try/catch written on the assumption that it throws, so those safety nets were
+    // dead code. The dangerous one is refundAndClose's never-strand guard: a failed
+    // read reported no inscription held and the deposit key was discarded, which would
+    // strand an escrowed parent at an address nobody can spend from again.
+    const r = await hfetch(`/extended/v1/tokens/nft/holdings?principal=${addr}&asset_identifiers=${encodeURIComponent(asset)}&limit=50&offset=${offset}`);
+    if (!r.ok) throw new Error(`holdings lookup failed (HTTP ${r.status})`);
+    const d: any = await r.json();
+    if (!Array.isArray(d?.results)) throw new Error('holdings lookup returned no results');
+    const rs = d.results;
     for (const r of rs) { const m = /u?(\d+)/.exec((r.value && r.value.repr) || ''); if (m) ids.push(m[1]); }
     offset += rs.length;
     if (rs.length < 50 || offset >= Number(d.total || 0)) break;
@@ -1496,3 +1505,7 @@ setInterval(watchTick, MOCK ? 2000 : 4000);
 setInterval(reapTick, 20000);
 // helpers already ported and available to the implementer/tester:
 export { deriveFrom, newWallet, balance, quoteFee, mintSingle, stagedInscribe, getIdByHash, ownerOf, send, sendNft, sendStx, network, MOCK, CORE, DEPLOYER, AGENT_FEE_PCT, AGENT_FEE_ADDRESS, CHUNK, SINGLE_MAX, PERTX_MINER, DELIVERY_RESERVE, REFUND_TX_FEE, RECEIPT_EST, incHash, chunkBytes };
+// Exported for the fault-injection harness. These two decide "who paid" and "has the
+// parent arrived" — the questions behind the failures that shipped, and both are only
+// meaningful when exercised against a degraded API rather than asserted on in source.
+export { detectFunder, parentsStatus, heldInscriptions };
