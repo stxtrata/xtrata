@@ -37,3 +37,23 @@ describe('Drops v1.1 campaign attestation', () => {
     ).toBe(false);
   });
 });
+
+describe('attestor key compression', () => {
+  // The contract compares against `(hash160 recovered-pubkey)` and
+  // secp256k1-recover? always returns the 33-byte compressed key, so the bare
+  // 64-char form of a correct key must not be reported as a mismatch.
+  const bare = ATTESTOR_KEY.slice(0, 64);
+
+  it('derives the same hash160 whatever form the key is supplied in', () => {
+    const expected = attestorPubkeyHash(ATTESTOR_KEY);
+    expect(attestorPubkeyHash(bare)).toBe(expected);
+    expect(attestorPubkeyHash(`0x${bare}`)).toBe(expected);
+    expect(attestorPubkeyHash(`0x${ATTESTOR_KEY}`)).toBe(expected);
+  });
+
+  it('signs identically from either form', async () => {
+    const withSuffix = await signCampaignAttestation(payload, ATTESTOR_KEY);
+    const withoutSuffix = await signCampaignAttestation(payload, bare);
+    expect(withoutSuffix).toBe(withSuffix);
+  });
+});
