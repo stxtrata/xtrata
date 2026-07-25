@@ -9,6 +9,7 @@ import {
   pickPrimaryBnsName,
   sortBnsNames
 } from './helpers';
+import { resolvePrimaryBnsName } from './primary';
 
 export type BnsNamesResult = {
   address: string;
@@ -287,6 +288,7 @@ type AddressResolution = {
 };
 
 const BNS_V2_PROVIDER_ID = 'bnsv2-api';
+const BNS_V2_CONTRACT_PROVIDER_ID = 'bnsv2-contract';
 const BNS_API_PROVIDER_ID = 'hiro-names-api';
 const EXPLORER_PROVIDER_ID = 'explorer-html';
 const HTML_TITLE_PATTERN = /<title[^>]*>([^<]+)<\/title>/i;
@@ -1296,6 +1298,15 @@ export const resolveBnsNames = async (params: {
     let bnsV2Error: unknown = null;
     let apiError: unknown = null;
 
+    // Runs alongside the name-list ladder: none of those providers report which
+    // name is primary, so the registry read is the only authoritative answer.
+    // It resolves to null rather than throwing, so it can never fail a lookup.
+    const onChainPrimaryPromise = resolvePrimaryBnsName({
+      address: trimmed,
+      network: params.network,
+      signal: params.signal
+    });
+
     try {
       resolution = await resolveAddressNamesFromBnsV2({
         address: trimmed,
@@ -1341,6 +1352,28 @@ export const resolveBnsNames = async (params: {
       throw (resolvedError instanceof Error
         ? resolvedError
         : new Error(getErrorMessage(resolvedError)));
+    }
+
+    const onChainPrimary = await onChainPrimaryPromise;
+    if (onChainPrimary) {
+      // A wallet can set a name as primary before our list provider catches up,
+      // so make sure the primary is always one of the names we offer.
+      const names = resolution.result.names.includes(onChainPrimary)
+        ? resolution.result.names
+        : sortBnsNames([...resolution.result.names, onChainPrimary]);
+      resolution = {
+        ...resolution,
+        result: {
+          ...resolution.result,
+          names,
+          primary: pickPrimaryBnsName(
+            names,
+            resolution.result.primary,
+            onChainPrimary
+          ),
+          source: resolution.result.source ?? BNS_V2_CONTRACT_PROVIDER_ID
+        }
+      };
     }
 
     if (resolution.cacheable) {

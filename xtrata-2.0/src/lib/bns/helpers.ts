@@ -49,10 +49,20 @@ export const sortBnsNames = (names: string[]) => {
   return unique;
 };
 
+/**
+ * `onChainPrimary` is the wallet's primary name as recorded by the BNS-V2
+ * registry and always wins — including when it is not a `.btc` name. The
+ * remaining rules are heuristics for when the chain has no answer.
+ */
 export const pickPrimaryBnsName = (
   names: string[],
-  preferred?: string | null
+  preferred?: string | null,
+  onChainPrimary?: string | null
 ) => {
+  const normalizedOnChain = normalizeBnsName(onChainPrimary);
+  if (normalizedOnChain) {
+    return normalizedOnChain;
+  }
   const normalizedPreferred = normalizeBnsName(preferred);
   if (normalizedPreferred && normalizedPreferred.endsWith('.btc')) {
     return normalizedPreferred;

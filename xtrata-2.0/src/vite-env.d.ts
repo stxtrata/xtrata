@@ -4,6 +4,8 @@ interface ImportMetaEnv {
   readonly VITE_BNSV2_API_BASE?: string;
   readonly VITE_BNSV2_API_BASE_MAINNET?: string;
   readonly VITE_BNSV2_API_BASE_TESTNET?: string;
+  readonly VITE_BNSV2_CONTRACT_MAINNET?: string;
+  readonly VITE_BNSV2_CONTRACT_TESTNET?: string;
   readonly VITE_STACKS_API_TESTNET?: string;
   readonly VITE_STACKS_API_MAINNET?: string;
   readonly VITE_STACKS_EXPLORER_BASE?: string;
