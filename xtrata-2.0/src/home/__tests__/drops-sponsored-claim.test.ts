@@ -11,6 +11,7 @@ describe('public Drops sponsored-claim surface', () => {
       'dropsDiagnosticsBadge',
       'dropsDiagnosticsCopy',
       'dropsDiagnosticsClear',
+      'dropsDiagnosticsForgetBns',
       'dropsDiagnosticsLog',
       'dropsHistory',
       'dropsHistoryList',
@@ -94,5 +95,24 @@ describe('public Drops sponsored-claim surface', () => {
     expect(homeMain).toContain('? DEFAULT_DROP_GROUP_ID');
     expect(homeMain).not.toContain('dropClaimSelfPaid');
     expect(homeMain).not.toContain('claiming self-paid instead');
+  });
+
+  it('chooses the claiming BNS name in-page rather than through window.prompt', () => {
+    // window.prompt() is raised after an await here, so it is outside a user
+    // gesture: browsers suppress it and an extension wallet taking focus
+    // dismisses it, which failed the claim outright.
+    expect(homeMain).not.toContain('window.prompt(');
+    expect(homeMain).toContain('const askForBnsName = ({ names, preselected, primary })');
+    expect(homeMain).toContain("overlay.className = 'bns-picker'");
+    expect(homeMain).toContain("panel.setAttribute('aria-modal', 'true')");
+    // Cancelling is a cancellation, not a failure.
+    expect(homeMain).toContain("code: 'BNS_SELECTION_CANCELLED'");
+    expect(homeMain).toContain("code === 'WALLET_CANCELLED' || code === 'BNS_SELECTION_CANCELLED'");
+    // Asked for every BNS-gated drop, not only one-per-name ones.
+    expect(homeMain).not.toContain('names.length > 1 && rules.onePerBnsName');
+    expect(homeMain).toContain('preselected: primary && names.includes(primary) ? primary : names[0]');
+    expect(homeMain).toContain('readRememberedBnsName(address)');
+    expect(homeMain).toContain('rememberBnsName(address, selected)');
+    expect(homeMain).toContain('renderDropBnsChoiceControl()');
   });
 });

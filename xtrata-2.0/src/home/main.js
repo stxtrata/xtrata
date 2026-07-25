@@ -11578,6 +11578,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       diagnosticsLog: $('dropsDiagnosticsLog'),
       diagnosticsCopy: $('dropsDiagnosticsCopy'),
       diagnosticsClear: $('dropsDiagnosticsClear'),
+      diagnosticsForgetBns: $('dropsDiagnosticsForgetBns'),
       history: $('dropsHistory'),
       historyList: $('dropsHistoryList')
     };
@@ -11647,6 +11648,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         title: 'Pick one of your names',
         text: 'This drop allows one claim per BNS name, so you need to choose which of your names to use.',
         detail: 'Press claim again and select a name from the list.'
+      },
+      BNS_SELECTION_CANCELLED: {
+        title: 'Claim cancelled',
+        text: 'You closed the name chooser, so nothing was submitted and no fees were spent.',
+        detail: 'Press claim again whenever you are ready.'
       },
       BNS_LIMIT: {
         title: 'That name has already claimed',
@@ -11845,6 +11851,180 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     });
     renderDropDiagnostics();
 
+    // --- remembered BNS choice -------------------------------------------
+    // Wallets holding several names would otherwise be asked on every claim.
+
+    const DROP_BNS_CHOICE_PREFIX = 'xtrata.drops.bnsChoice.';
+    const dropBnsChoiceKey = (address) =>
+      `${DROP_BNS_CHOICE_PREFIX}${String(address ?? '').trim().toUpperCase()}`;
+
+    const readRememberedBnsName = (address) => {
+      try {
+        return normalizeDropBnsName(localStorage.getItem(dropBnsChoiceKey(address)));
+      } catch {
+        return null;
+      }
+    };
+
+    const rememberBnsName = (address, name) => {
+      try {
+        localStorage.setItem(dropBnsChoiceKey(address), name);
+      } catch {
+        // A remembered choice is a convenience; claiming works without it.
+      }
+      renderDropBnsChoiceControl();
+    };
+
+    const forgetBnsName = (address) => {
+      try {
+        localStorage.removeItem(dropBnsChoiceKey(address));
+      } catch {
+        // Nothing to clean up if storage is unavailable.
+      }
+      renderDropBnsChoiceControl();
+    };
+
+    // Lives in the diagnostics actions row because that is the one part of the
+    // drops UI that stays put; the claim status line is overwritten constantly.
+    function renderDropBnsChoiceControl() {
+      const host = dropsDom.diagnosticsForgetBns;
+      if (!host) return;
+      const address = state.walletSession?.address ?? null;
+      const remembered = address ? readRememberedBnsName(address) : null;
+      host.hidden = !remembered;
+      if (remembered) {
+        host.textContent = `Forget saved name (${remembered})`;
+      }
+    }
+
+    dropsDom.diagnosticsForgetBns?.addEventListener('click', () => {
+      const address = state.walletSession?.address;
+      if (address) forgetBnsName(address);
+    });
+    renderDropBnsChoiceControl();
+
+    // --- BNS name chooser --------------------------------------------------
+    // This used to be a native browser prompt. It is raised after an await, so it is
+    // no longer inside a user gesture: browsers suppress it and an extension
+    // wallet taking focus dismisses it, which is why the chooser "appeared and
+    // vanished" and then failed the claim. An in-page dialog cannot be
+    // suppressed and lets us show which name the chain says is primary.
+    const askForBnsName = ({ names, preselected, primary }) =>
+      new Promise((resolve) => {
+        const previouslyFocused = document.activeElement;
+        const overlay = document.createElement('div');
+        overlay.className = 'bns-picker';
+
+        const panel = document.createElement('div');
+        panel.className = 'bns-picker__panel';
+        panel.setAttribute('role', 'dialog');
+        panel.setAttribute('aria-modal', 'true');
+        panel.setAttribute('aria-labelledby', 'bnsPickerTitle');
+
+        const eyebrow = document.createElement('p');
+        eyebrow.className = 'card-notice__eyebrow';
+        eyebrow.textContent = 'Choose a name';
+
+        const title = document.createElement('p');
+        title.className = 'card-notice__title';
+        title.id = 'bnsPickerTitle';
+        title.textContent = 'Which of your names should claim this?';
+
+        const text = document.createElement('p');
+        text.className = 'card-notice__text';
+        text.textContent =
+          'This drop is gated by BNS, so the claim is recorded against one of the names in this wallet.';
+
+        const list = document.createElement('div');
+        list.className = 'bns-picker__list';
+        const groupName = `bns-picker-${Date.now()}`;
+        names.forEach((name) => {
+          const option = document.createElement('label');
+          option.className = 'bns-picker__option';
+
+          const input = document.createElement('input');
+          input.type = 'radio';
+          input.name = groupName;
+          input.value = name;
+          input.checked = name === preselected;
+
+          const label = document.createElement('span');
+          label.className = 'bns-picker__name';
+          label.textContent = name;
+
+          option.append(input, label);
+          if (name === primary) {
+            const badge = document.createElement('span');
+            badge.className = 'badge green bns-picker__badge';
+            badge.textContent = 'primary';
+            option.append(badge);
+          }
+          list.append(option);
+        });
+
+        const remember = document.createElement('label');
+        remember.className = 'bns-picker__remember';
+        const rememberInput = document.createElement('input');
+        rememberInput.type = 'checkbox';
+        const rememberText = document.createElement('span');
+        rememberText.textContent =
+          'Use this name for my future claims (change it under Claim diagnostics)';
+        remember.append(rememberInput, rememberText);
+
+        const actions = document.createElement('div');
+        actions.className = 'bns-picker__actions';
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'market-chip';
+        cancel.textContent = 'Cancel';
+        const confirm = document.createElement('button');
+        confirm.type = 'button';
+        confirm.className = 'market-chip bns-picker__confirm';
+        confirm.textContent = 'Use this name';
+        actions.append(cancel, confirm);
+
+        panel.append(eyebrow, title, text, list, remember, actions);
+        overlay.append(panel);
+
+        let settled = false;
+        const close = (answer) => {
+          if (settled) return;
+          settled = true;
+          document.removeEventListener('keydown', onKeyDown, true);
+          overlay.remove();
+          if (previouslyFocused?.focus) {
+            previouslyFocused.focus({ preventScroll: true });
+          }
+          resolve(answer);
+        };
+
+        function onKeyDown(event) {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            close(null);
+          }
+        }
+
+        const accept = () => {
+          const chosen = list.querySelector('input:checked');
+          if (!chosen) return;
+          close({ name: chosen.value, remember: rememberInput.checked });
+        };
+
+        cancel.addEventListener('click', () => close(null));
+        confirm.addEventListener('click', accept);
+        // Double-clicking a name is the impatient path through this dialog.
+        list.addEventListener('dblclick', accept);
+        overlay.addEventListener('click', (event) => {
+          if (event.target === overlay) close(null);
+        });
+        document.addEventListener('keydown', onKeyDown, true);
+
+        document.body.append(overlay);
+        const checked = list.querySelector('input:checked') ?? list.querySelector('input');
+        checked?.focus({ preventScroll: true });
+      });
+
     const optionalPrincipalValue = (node) => {
       const value = node?.value ?? null;
       if (!value) return null;
@@ -11986,18 +12166,45 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           code: 'BNS_REQUIRED'
         });
       }
-      let selected = normalizeDropBnsName(result.primary) ?? names[0];
-      if (names.length > 1 && rules.onePerBnsName) {
-        const answer = window.prompt(
-          `Choose the BNS name to use for this claim:\n\n${names.join('\n')}`,
-          selected
+      const primary = normalizeDropBnsName(result.primary);
+      const address = state.walletSession.address;
+
+      if (names.length === 1) {
+        recordDropDiagnostic(round, 'BNS_NAME', `Using ${names[0]} for BNS policy checks.`, 'success');
+        return names[0];
+      }
+
+      const remembered = readRememberedBnsName(address);
+      if (remembered && names.includes(remembered)) {
+        recordDropDiagnostic(
+          round,
+          'BNS_NAME',
+          `Using ${remembered} for BNS policy checks (saved choice; clear it under Claim diagnostics).`,
+          'success'
         );
-        selected = normalizeDropBnsName(answer);
-        if (!selected || !names.includes(selected)) {
-          throw Object.assign(new Error('Choose one of the BNS names held by the connected wallet.'), {
-            code: 'BNS_SELECTION_INVALID'
-          });
-        }
+        return remembered;
+      }
+
+      // Ask for every BNS-gated drop, not just one-per-name ones: which name a
+      // claim is recorded against is the claimer's call either way.
+      const answer = await askForBnsName({
+        names,
+        preselected: primary && names.includes(primary) ? primary : names[0],
+        primary
+      });
+      if (!answer) {
+        throw Object.assign(new Error('No BNS name was chosen, so nothing was submitted.'), {
+          code: 'BNS_SELECTION_CANCELLED'
+        });
+      }
+      const selected = normalizeDropBnsName(answer.name);
+      if (!selected || !names.includes(selected)) {
+        throw Object.assign(new Error('Choose one of the BNS names held by the connected wallet.'), {
+          code: 'BNS_SELECTION_INVALID'
+        });
+      }
+      if (answer.remember) {
+        rememberBnsName(address, selected);
       }
       recordDropDiagnostic(round, 'BNS_NAME', `Using ${selected} for BNS policy checks.`, 'success');
       return selected;
@@ -12378,7 +12585,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       } catch (error) {
         const code = error?.code ?? 'UNKNOWN_BLOCK';
         const message = String(error?.message ?? error);
-        const cancelled = code === 'WALLET_CANCELLED';
+        const cancelled = code === 'WALLET_CANCELLED' || code === 'BNS_SELECTION_CANCELLED';
         const stage = cancelled
           ? 'CANCELLED'
           : String(code).startsWith('WALLET_')
@@ -12386,7 +12593,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             : 'BLOCK';
         recordDropDiagnostic(round, stage, `${code}: ${message}`, cancelled ? 'warn' : 'error');
         dropsDom.status.innerHTML = cancelled
-          ? '<span><strong>Drops</strong> claim cancelled in the wallet. No transaction was submitted.</span>'
+          ? code === 'BNS_SELECTION_CANCELLED'
+            ? '<span><strong>Drops</strong> claim cancelled — no name was chosen. No transaction was submitted.</span>'
+            : '<span><strong>Drops</strong> claim cancelled in the wallet. No transaction was submitted.</span>'
           : `<span><strong>Drops</strong> sponsored claim blocked (${code}): ${message}. Open Claim diagnostics, fix the reported stage, then retry.</span>`;
         showDropNotice(claimKey, code, message, cancelled ? 'Claim cancelled' : 'Claim not available');
       } finally {
@@ -12558,6 +12767,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
     const renderDrops = () => {
       if (!dropsDom.listings) return;
+      // Connecting or switching wallets changes whose saved name this is.
+      renderDropBnsChoiceControl();
       const run = dropsState.run;
       const live = dropsState.drops.filter((drop) => drop.claimedAt === null);
       const visible = dropsState.drops.filter((drop) => {

@@ -9,6 +9,8 @@ mainnet API probes, not in the transcript alone.
 
 ---
 
+**Status:** P0-a and P0-b are done. P0-c and the two P1s are still open.
+
 ## P0 — BNS claim selection is broken in two separate ways
 
 Reported by Darth Dude: with several BNS names in one wallet, the name chooser
@@ -17,7 +19,7 @@ alphanumeric name rather than the wallet's primary name.
 
 Those are two independent defects. Both live in the Proof of Free claim path.
 
-### P0-a — the chooser is a `window.prompt()`
+### P0-a — the chooser is a `window.prompt()` — DONE
 
 `src/home/main.js:11975` `chooseClaimBnsName()`:
 
@@ -54,12 +56,16 @@ dialog styling (same pattern as `showDropNotice`). Requirements:
 - Cancel resolves to "cancelled" → the claim aborts cleanly with a diagnostic,
   no scary error.
 - Remembers the choice per wallet in `localStorage`
-  (`xtrata.drops.bnsChoice.<address>`) so repeat claimers aren't asked again;
-  a "change" link on the drops status line clears it.
+  (`xtrata.drops.bnsChoice.<address>`) so repeat claimers aren't asked again.
 - `recordDropDiagnostic(round, 'BNS_NAME', …)` stays, so the debug panel still
   shows what was used.
 
-### P0-b — "primary" is guessed alphabetically, never read from chain
+Built as specified, with one change: the reset control went into the Claim
+diagnostics actions row rather than onto the drops status line. The status line
+is rewritten on every step of a claim, so a link there would have survived for
+about a second. The dialog's own copy points at where the setting lives.
+
+### P0-b — "primary" is guessed alphabetically, never read from chain — DONE
 
 `src/lib/bns/helpers.ts:52` `pickPrimaryBnsName()` prefers a `preferred` value
 if it ends in `.btc`, else takes the **first `.btc` name in sort order**. The
