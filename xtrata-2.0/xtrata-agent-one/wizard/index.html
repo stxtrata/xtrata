@@ -408,6 +408,13 @@
   @media(max-width:840px){.grid2{grid-template-columns:1fr}}
   /* Song-details editor — one component, opened against the single flow or a batch row. */
   .meta-overlay{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.6)}
+  /* MUST come after the rule above: any author `display` beats the UA's
+     [hidden]{display:none}, so without this the overlay is on screen at every
+     page load, covering the page with nothing that can dismiss it. */
+  .meta-overlay[hidden]{display:none}
+  /* Same trap: an inline display:flex here defeated [hidden] too. */
+  #playerRow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;margin-top:8px}
+  #playerRow[hidden]{display:none}
   .meta-panel{width:min(460px,100%);max-height:90vh;overflow-y:auto;padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:0 18px 44px rgba(0,0,0,.45)}
   .meta-panel h4{margin:0 0 2px;font-size:15px}
   .mfield{margin-bottom:10px;min-width:0}
@@ -499,7 +506,7 @@ try{
       <label class="checkline"><input type="radio" name="sAudioMode" value="raw" checked><span>Inscribe the audio file as it is</span></label>
       <label class="checkline"><input type="radio" name="sAudioMode" value="player"><span><b>Build an on-chain player for this song</b> — Opus-optimised audio + title/artist/lyrics + artwork (the opus tool)</span></label>
       <div class="muted" id="audioFound" style="font-size:11.5px;margin-top:7px" hidden></div>
-      <div id="playerRow" style="font-size:12px;margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap" hidden></div>
+      <div id="playerRow" hidden></div>
       <div class="muted" id="playerHint" style="font-size:11.5px;margin-top:6px" hidden>
         The audio engine runs in your browser. This page uses the single-threaded core, so a build takes
         longer here than on the <a href="./suno.html" style="color:var(--acc2)">SUNO fast-track</a> —
