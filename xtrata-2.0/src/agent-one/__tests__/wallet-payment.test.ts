@@ -14,12 +14,18 @@ describe('Agent One wallet payment handoff', () => {
 
   it('cache-busts the combined wallet bundle consistently on every wizard surface', () => {
     expect(coreSource).toMatch(/AGENT_BUILD = '\d{4}-\d{2}-\d{2}/);
-    // Every wizard page must load agent-one.js with the SAME numeric cache-bust
-    // version — a mismatch means one surface serves a stale wallet bundle.
+    // Every wizard page must load agent-one.js with the SAME cache-bust version — a
+    // mismatch means one surface serves a stale wallet bundle.
+    //
+    // This used to accept any bare number and only compare the pages to each other.
+    // That passes happily while all three sit on a version that has not moved in
+    // eleven bundle rebuilds, which is precisely what shipped: the browser ran an
+    // agent eleven versions old. The value is now the agent build itself, and
+    // deploy-freshness.test.ts is what enforces that.
     const versions = ['index.html', 'suno.html', 'manifests.html'].map((file) => {
       const html = readFileSync(new URL(file, wizardRoot), 'utf8');
-      const match = html.match(/<script src="agent-one\.js\?v=(\d+)"><\/script>/);
-      expect(match, `${file} must load agent-one.js?v=<n>`).toBeTruthy();
+      const match = html.match(/<script src="agent-one\.js\?v=([^"]+)"><\/script>/);
+      expect(match, `${file} must load agent-one.js?v=<build>`).toBeTruthy();
       return match?.[1];
     });
     expect(new Set(versions).size).toBe(1);

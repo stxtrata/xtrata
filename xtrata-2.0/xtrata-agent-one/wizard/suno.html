@@ -216,7 +216,7 @@
 <script src="HTML_Template.js?v=6"></script>
 <script src="suno-build.js?v=7"></script>
 <script src="optimize-image.js?v=1"></script>
-<script src="agent-one.js?v=16"></script>
+<script src="agent-one.js?v=2026-07-25.11"></script>
 <script>
 const SERVER = { mock:false, net:'mainnet' };
 // VERSION HANDSHAKE: this page requires AT LEAST the agent bundle build below. The site's deploy
@@ -296,7 +296,12 @@ function setWallet(a){ WALLET=a||null; WALLET_NAME=null; WALLET_REVEAL=false; co
   if(WALLET){ b.textContent='Disconnect'; renderWalletPill(); bnsLookup(WALLET).then(n=>{ if(n&&WALLET===a){ WALLET_NAME=n; renderWalletPill(); } }); }
   else { b.textContent='Connect wallet'; renderWalletPill(); }
   // Whether the parent is "yours" depends on which wallet is connected.
-  try{ checkParent(); }catch(_e){}
+  // DEFERRED on purpose: setWallet runs during initial script evaluation (the
+  // reconnect probe at the bottom of this file), and checkParent touches consts
+  // declared further down — a temporal dead zone. checkParent is also async, so the
+  // ReferenceError surfaced as an unhandled rejection that a plain try/catch here
+  // could never see. A timeout of 0 runs it once the whole script has evaluated.
+  try{ setTimeout(()=>{ Promise.resolve(checkParent()).catch(()=>{}); }, 0); }catch(_e){}
   updateGo(); }
 async function connectWallet(){ const w=xw();
   if(!w||!w.connect){ alert('Wallet bundle not loaded. Open this from the Xtrata site so agent-one.js (wallet) is present.'); return; }
