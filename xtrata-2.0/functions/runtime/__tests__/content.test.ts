@@ -2,6 +2,7 @@ import {
   boolCV,
   bufferCV,
   listCV,
+  noneCV,
   principalCV,
   responseOkCV,
   serializeCV,
@@ -642,5 +643,57 @@ describe('/runtime/content', () => {
     expect(response.headers.get('X-Xtrata-Runtime-Response-Mode')).toBe('range');
     expect(response.headers.get('X-Xtrata-Runtime-Reconstruction-Batch-Reads')).toBe('1');
     expect(Array.from(new Uint8Array(await response.arrayBuffer()))).toEqual([2, 3]);
+  });
+
+  // A token that has migrated keeps its id but leaves its bytes on the core it
+  // was written to, so "the newest core says no" is routine, not an error. This
+  // used to surface as a 502 — which Cloudflare replaces with its own bare
+  // error page, so the caller learnt nothing at all.
+  it('answers 404, naming the contracts searched, when no core holds the token', async () => {
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const endpoint = String(input);
+      if (!endpoint.endsWith('/get-inscription-meta')) {
+        throw new Error(`Unexpected endpoint ${endpoint}`);
+      }
+      return new Response(
+        JSON.stringify({ okay: true, result: cvHex(noneCV()) }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+    vi.stubGlobal('fetch', fetch);
+
+    const fallbackContractId = `${CONTRACT_ADDRESS}.xtrata-v1-1-1`;
+    const response = await onRequest({
+      request: new Request(
+        `https://xtrata.xyz/runtime/content?contractId=${CONTRACT_ID}&fallbackContractId=${fallbackContractId}&tokenId=8&network=mainnet`
+      ),
+      env: {}
+    });
+
+    expect(response.status).toBe(404);
+    const body = (await response.json()) as { error: string; detail: string };
+    expect(body.error).toBe('Inscription not found on this contract lineage.');
+    // The detail is the actionable part: which lineage was actually searched.
+    expect(body.detail).toContain('#8');
+    expect(body.detail).toContain(CONTRACT_ID);
+    expect(body.detail).toContain(fallbackContractId);
+  });
+
+  it('keeps a failed read as a server error rather than reporting it as missing', async () => {
+    // "We could not reach the chain" must never be reported as "this
+    // inscription does not exist" — that is a permanence claim we cannot make.
+    const fetch = vi.fn(async () => new Response('upstream exploded', { status: 500 }));
+    vi.stubGlobal('fetch', fetch);
+
+    const response = await onRequest({
+      request: new Request(
+        `https://xtrata.xyz/runtime/content?contractId=${CONTRACT_ID}&tokenId=8&network=mainnet`
+      ),
+      env: { RUNTIME_CONTENT_READ_RETRIES: '0' }
+    });
+
+    expect(response.status).toBe(502);
+    const body = (await response.json()) as { error: string };
+    expect(body.error).toBe('Failed to reconstruct runtime content.');
   });
 });

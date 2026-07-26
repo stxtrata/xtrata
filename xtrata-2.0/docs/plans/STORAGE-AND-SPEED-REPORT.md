@@ -80,14 +80,21 @@ We use two R2 buckets:
 - **`COLLECTION_ASSETS`** (`xtrata-manage-assets`) — artwork uploaded for
   collections before it goes on chain.
 
-⚠️ **One thing to check:** `RUNTIME_CONTENT_CACHE` does not appear in our
-`wrangler.toml` config file, even though the 5 GB budget setting for it does.
-The cache is definitely working (I measured `HIT` on every request), so the
-bucket must be connected via the Cloudflare dashboard rather than the config
-file. That's fine functionally, but it means **a fresh deployment or a new
-environment could silently come up without it**, and the site would quietly
-fall back to rebuilding everything from the blockchain. Worth confirming in the
-dashboard and writing it into the config file so it can't get lost.
+🔴 **`RUNTIME_CONTENT_CACHE` does not exist in production.** The live site's own
+health endpoint (`/collections/health`) reports it plainly:
+
+```json
+"runtimeCache": { "available": false, "binding": null,
+  "warningMessage": "Runtime inscription cache storage is not configured..." }
+```
+
+The same endpoint lists every setting the site can see. The 5 GB *budget*
+(`RUNTIME_CONTENT_CACHE_LIMIT_BYTES`) is there. The *bucket itself* is not.
+
+So the warehouse for assembled songs was designed, built in code, given a
+budget — and never actually created. Every `HIT` I measured is coming from the
+consolation prize: Cloudflare's edge cache, which is per-data-centre and
+evictable. See "The warehouse that was never built" below.
 
 ### 3. D1 — our notebook
 
@@ -303,9 +310,8 @@ Genuinely, and worth protecting:
     buffer the entire file to inject one line, so we can't start sending until
     it's all in memory. An 11 MB video is a tenth of the memory budget and a
     delayed start.
-11. **Broken tokens burn real time.** `/inscription/8` returns an error after
-    **4.7 seconds** of trying. Token 8 is on the radio's known-troublesome list;
-    it's still costing every attempt five seconds.
+11. **The public inscription URL can't reach content that has moved cores, and
+    crashes instead of saying so.** See "The two-hop problem" below.
 
 ---
 
@@ -374,21 +380,205 @@ them, which is worth more than the money it saves.
 
 ---
 
+## Part 5b — The two things that need a decision from you
+
+### The warehouse that was never built
+
+**What a "binding" is.** Our website code is not allowed to reach out and grab
+any storage it fancies. Cloudflare makes us declare, up front, "this site is
+allowed to use this specific bucket, and the code will refer to it by this
+name." That declaration is a *binding* — a labelled door between our code and
+one specific store. No binding, no door.
+
+Our code contains a complete, working warehouse system for assembled
+inscriptions. It has:
+
+- a name it expects the door to be called: `RUNTIME_CONTENT_CACHE`
+- a filing scheme (content hash as the label)
+- a 5 GB budget, which **is** configured in production
+- usage monitoring, warnings at 80% and 95%, and a purge endpoint
+
+Everything except the door. The bucket was never created and never bound.
+
+**How the code reacts.** Deliberately gracefully — which is exactly why nobody
+noticed. The relevant function reads: *if there's a bucket, use it; otherwise
+use the edge cache.* No error, no warning in normal use. It just quietly works
+less well, for a year, in a way that looks like "the blockchain is slow".
+
+**Why the difference matters.** Both layers store the same assembled bytes.
+They are not remotely equivalent:
+
+| | R2 warehouse (missing) | Edge cache (what we're using) |
+|---|---|---|
+| Where the copy lives | One copy, globally reachable | Separately in each data centre that served a request |
+| How long it lasts | Until we delete it | Until Cloudflare wants the space back — hours, maybe |
+| Reach | A visitor in Sydney benefits from a London visitor's assembly | Sydney gets nothing from London; it reassembles from scratch |
+| Guarantee | Durable storage | None. It's a convenience, and Cloudflare says so |
+| Our cost | ~7¢/month for 5 GB, free to read from | Free |
+
+**What that means in practice.** Cloudflare has roughly 300 data centres. Right
+now, the first person in each one to request a given song pays the full
+blockchain-reassembly cost — hundreds of chain reads, several seconds, and for
+the big files sometimes a crash. Then that copy quietly expires and the next
+person pays it again.
+
+This also explains something that was puzzling me. We built "crowd-warming" —
+every visitor asks the server to pre-assemble a couple of random inscriptions in
+the background, so nobody has to wait for a cold file. That's a genuinely smart
+idea, and **with no warehouse it barely helps**, because it warms one data
+centre's short-lived cache. The mechanism is fine; it's been pouring water into
+a bucket with no bottom.
+
+**The decision.** There are three options, and they're not close.
+
+1. **Create the bucket and bind it in `wrangler.toml`.** ~7¢/month. Reading from
+   R2 is free and sending data out of R2 is free. Assembled songs then persist
+   globally and permanently, crowd-warming starts working as designed, and the
+   worst-case "cold song" experience largely disappears.
+2. Create it in the Cloudflare dashboard only. Works, but it's an invisible
+   dependency — the next fresh environment or preview branch comes up without it
+   and silently degrades exactly like today. This is likely how it went missing
+   in the first place.
+3. Leave it. Keep paying for reassembly forever, in latency and in Hiro API
+   calls we don't control.
+
+**My recommendation: option 1.** Put it in the config file so it is part of the
+code and cannot get lost again. Of everything in this report, this is the
+cheapest fix with the largest effect — and unlike the others, it isn't an
+optimisation. It's finishing something that was already built.
+
+**And it's even cheaper than I thought.** I queried the index for the total size
+of every sealed inscription on the chain:
+
+| | |
+|---|---|
+| Sealed inscriptions | 3,152 |
+| Total size of all of them | **0.55 GB** |
+| Largest single file | 11.2 MB |
+| The 5 GB budget | 9× more than we need |
+
+The entire body of work Xtrata has ever inscribed fits in about half a gigabyte.
+At R2's storage rate that is **under one penny per month** — and reads and
+egress are free.
+
+So this isn't a cache in the usual sense of "keep the popular things and evict
+the rest". We can hold **a permanent, assembled copy of literally everything,
+forever, for less than a penny a month**, and never reconstruct anything from
+the chain twice. For a project whose entire promise is permanence, that is a
+rather better fit than a cache anyway.
+
+**Status: done.** Bucket `xtrata-runtime-content-cache` created and bound as
+`RUNTIME_CONTENT_CACHE` in `wrangler.toml`. Takes effect on the next deploy.
+
+One expectation to set: the warehouse starts **empty**. Nothing gets faster the
+moment it deploys. Each file is reconstructed once more, stored, and then is
+permanently fast for everyone everywhere. Crowd-warming — which until now has
+been filling a bucket with no bottom — will start actually accumulating, so
+coverage builds on its own over the first days.
+
+One caveat so this doesn't get oversold: the warehouse makes *repeat* requests
+fast and reliable. It does **not** remove the ~600 ms metadata toll (that's the
+separate fix in Part 6, item 3), and it doesn't reduce the ~10 MB of unrequested
+audio (item 1). Those three are independent, and you want all three.
+
+### The two-hop problem — why `/inscription/8` fails
+
+**What I actually found.** Token 8 is not broken. Its bytes are fine. I fetched
+them: a 1.87 MB video, 115 chunks, served in 1.2 seconds.
+
+The catch is *where* I had to ask:
+
+| Where I asked for token 8 | Result |
+|---|---|
+| `/inscription/8` — the normal public URL | **502 error after ~5 seconds** |
+| Directly from core v3-2-3 | 502 error |
+| Directly from core v2-1-0 | 502 error |
+| Directly from core v1-1-1 | ✅ works, 1.87 MB, 1.2 s |
+
+**Why.** Inscriptions can migrate to newer versions of the contract. When they
+do, they keep their number, but **the actual bytes stay on the contract they
+were originally written to.** Token 8 is from the very beginning, so its bytes
+live on v1-1-1, while its identity has moved up to v3.
+
+The public URL knows to look one step back: it tries v3, and if that misses it
+tries v2. It stops there. Token 8's bytes are two steps back, on v1, so the URL
+never finds them.
+
+Interestingly, **the radio gets this right** — it probes all three cores itself
+in order, which is why token 8 plays on the radio while its own public URL is
+broken. The correct logic already exists in our code; it just lives in the
+browser instead of on the server, where every other visitor and every embed and
+every external link would benefit from it.
+
+**The second, separate problem: it crashes rather than declining.** When the
+lookup fails, we don't return our own tidy "not found" message. The server
+itself falls over and Cloudflare substitutes a bare `error code: 502`. I
+confirmed this is general, not specific to token 8 — asking for token 999999,
+which has never existed, gives the same bare 502 after a second.
+
+Two consequences:
+
+- Anyone linking to an inscription that we can't resolve gets a blank Cloudflare
+  error page instead of "this inscription isn't available here". Bad for trust
+  on a permanence product.
+- A crash is invisible to our own error tracking, because our code never gets to
+  the line that would report it. We have a telemetry system that this class of
+  failure walks straight past.
+
+**The decision.** Two fixes, and they're independent — you can take either
+without the other:
+
+1. **Extend the server's search to the full lineage** (v3 → v2 → v1) instead of
+   stopping after one step. Low risk: it only adds attempts where we currently
+   fail outright, so nothing that works today can start failing. Cost is one
+   extra chain lookup on the rare tokens that need it. This makes every
+   early-era inscription reachable by its public URL.
+2. **Make a failed lookup return a proper error instead of crashing.** Purely
+   defensive, no behaviour change for anything that works. Turns a blank
+   Cloudflare page into a real message, and makes these failures show up in
+   telemetry so we find out about the next one without you noticing it by hand.
+
+**My recommendation: do both, and do #2 first** — it's smaller, it's pure
+safety, and it will immediately start telling us how many *other* inscriptions
+are quietly unreachable. Right now we genuinely don't know whether token 8 is
+one case or a hundred, because the failures have been invisible. #2 answers that
+question, and then #1 fixes what it finds.
+
+---
+
 ## Part 6 — What to do, in order
 
 Ordered by benefit-per-risk. The first three are the ones that make the site
 feel fast.
 
+### Tier 0 — finish what's already built ✅ DONE, awaiting deploy
+
+**0. Create the R2 bucket and bind it as `RUNTIME_CONTENT_CACHE`.** See Part 5b.
+Bucket created, bound in `wrangler.toml` for both production and preview. Under
+a penny a month — all 3,152 sealed inscriptions total 0.55 GB. No code changes:
+the warehouse code was already written and already tested, it was just taking
+the fallback branch every time.
+*Risk: essentially none. Takes effect on the next deploy.*
+
 ### Tier 1 — big wins, low risk
 
-**1. Stop downloading music nobody asked for.**
-Replace the homepage's four embedded live players with a static image plus a
-play button that loads the real thing on click. Don't let the radio preload
-until the visitor switches it on — or preload exactly one track, not three,
-and only after the page has finished loading everything else.
-*Expected: ~10 MB → under 1 MB per page load. This is the single biggest change
-available.*
-*Risk: low. The radio's first press gets slower; everything else gets faster.*
+**1. Stop downloading music nobody asked for.** ✅ **DONE**
+Both halves shipped:
+- Every iframe preview on the homepage is now a poster with a play button, and
+  the inscription mounts only when pressed. This also fixes the duplicate
+  fetches: the hero stage renders the first four objects and the grid below
+  renders all six, so items 1–4 were being loaded twice.
+- The radio no longer cues tracks while it is switched off — not on page load,
+  not after switching off, and not from the readiness retry loop. The `/warm`
+  ping stays, because that is server-side work that downloads nothing to the
+  visitor's browser and is how the shared cache fills for everyone.
+
+*Measured after the change: **zero** inscription bytes fetched on page load
+(was ~10 MB), and fetching begins the moment the radio is switched on.*
+*The one trade: the first press of the radio now tunes from cold. The tuning
+sweep that plays on power-on already covers that wait — it exists for exactly
+this reason. Someone who leaves the radio playing and navigates still gets it
+resumed, because that is a track they asked for.*
 
 **2. Let Cloudflare's network cache immutable content.**
 An inscription's bytes can never change. Configure the edge to keep them.
@@ -520,7 +710,7 @@ Two specific rules worth writing down:
 | **Right** | R2 with free egress; content-hash keys; the D1 index; range requests; graceful failure |
 | **Wrong** | ~10 MB of unrequested audio per page load; 600 ms toll before every cached file; no edge caching on immutable content; browser rebuilds 7× slower than they need to be |
 | **Cost risk** | Not R2 (pennies). D1 writes from telemetry and index refresh, both scaling with traffic rather than content. Bites at growth, quietly, as a bill. Hiro API dependency is the real one — outside our control |
-| **Do first** | Stop preloading music; cache immutable content at the edge; read the content hash from D1 instead of the chain |
+| **Do first** | Create the missing R2 bucket (~7¢/month, finishes work already built); stop preloading music; cache immutable content at the edge; read the content hash from D1 instead of the chain |
 | **Build first** | The measuring script and the budget file, so every change after that is evidenced rather than hoped for |
 
 The encouraging part: the expensive, hard, clever work — permanence, hash-keyed

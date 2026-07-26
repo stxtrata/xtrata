@@ -43,19 +43,52 @@ const actionLink = (href, label, className, action) => {
   return link;
 };
 
+// An iframe preview is a whole HTML inscription: it downloads megabytes and then
+// runs scripts. Six of them auto-loading (and the first four twice over, because
+// the hero stage and the grid below both render them) was the bulk of what a
+// first-time visitor waited for, before they had asked to see anything. So these
+// mount on demand: a poster until someone presses it.
+const mountPreviewFrame = (frame, preview) => {
+  const iframe = document.createElement('iframe');
+  iframe.src = preview.src;
+  iframe.title = preview.title;
+  iframe.sandbox = 'allow-scripts allow-pointer-lock allow-forms allow-popups';
+  iframe.allow = 'autoplay; fullscreen';
+  iframe.tabIndex = 0;
+  frame.prepend(iframe);
+  frame.dataset.loaded = 'true';
+  iframe.focus({ preventScroll: true });
+};
+
+const createPreviewPoster = (frame, preview) => {
+  const poster = document.createElement('button');
+  poster.type = 'button';
+  poster.className = 'object-preview__launch';
+  // The inscription is the point, so name it rather than showing a generic
+  // "play" — the label already carries the id and the medium.
+  poster.setAttribute('aria-label', `Load ${preview.title}`);
+  poster.append(
+    element('span', 'object-preview__launch-icon', '▶'),
+    element('span', 'object-preview__launch-text', 'Load interactive object')
+  );
+  poster.addEventListener(
+    'click',
+    () => {
+      poster.remove();
+      mountPreviewFrame(frame, preview);
+    },
+    { once: true }
+  );
+  return poster;
+};
+
 const createPreview = (preview, options = {}) => {
   const frame = element('div', `object-preview object-preview--${preview.type}`);
   const eager = options.eager === true;
 
   if (preview.type === 'iframe') {
-    const iframe = document.createElement('iframe');
-    iframe.src = preview.src;
-    iframe.title = preview.title;
-    iframe.loading = eager ? 'eager' : 'lazy';
-    iframe.sandbox = 'allow-scripts allow-pointer-lock allow-forms allow-popups';
-    iframe.allow = 'autoplay; fullscreen';
-    iframe.tabIndex = options.interactive === true ? 0 : -1;
-    frame.append(iframe);
+    frame.dataset.loaded = 'false';
+    frame.append(createPreviewPoster(frame, preview));
   } else if (preview.type === 'image') {
     const image = document.createElement('img');
     image.src = preview.src;

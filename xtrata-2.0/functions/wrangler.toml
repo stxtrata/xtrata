@@ -10,3 +10,9 @@ name = "xtrata"
   [[r2_buckets]]
   binding = "COLLECTION_ASSETS"
   bucket_name = "xtrata-manage-assets"
+
+  # Kept in step with the root wrangler.toml, which is the one Pages actually
+  # reads. See the comment there for why this binding name matters.
+  [[r2_buckets]]
+  binding = "RUNTIME_CONTENT_CACHE"
+  bucket_name = "xtrata-runtime-content-cache"

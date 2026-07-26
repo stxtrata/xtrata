@@ -120,4 +120,41 @@ describe('homepage content configuration', () => {
     expect(tooltipRule).not.toContain('background: var(--surface);');
     expect(tooltipRule).not.toContain('color: var(--text);');
   });
+
+  // A first-time visitor was downloading roughly 10 MB of audio before asking
+  // for any of it: six embedded HTML players (the first four rendered twice,
+  // once in the hero stage and again in the grid) plus three radio tracks cued
+  // while the radio was switched off. Both are easy to reintroduce by accident.
+  it('does not fetch inscription media before the visitor asks for it', () => {
+    // Iframe previews mount on press, never at render time.
+    expect(homepageSource).toContain('const mountPreviewFrame =');
+    expect(homepageSource).toContain('createPreviewPoster(frame, preview)');
+    expect(homepageSource).toContain("poster.className = 'object-preview__launch'");
+    expect(homeStyles).toContain('.object-preview__launch {');
+    // The only place an iframe src is assigned is inside the on-press mount.
+    const iframeSrcAssignments = homepageSource.match(/iframe\.src\s*=/g) ?? [];
+    expect(iframeSrcAssignments).toHaveLength(1);
+    const mountBody =
+      homepageSource.match(/const mountPreviewFrame = \([\s\S]*?\n\};/)?.[0] ?? '';
+    expect(mountBody).toContain('iframe.src = preview.src;');
+  });
+
+  it('keeps the radio silent on the wire until it is switched on', () => {
+    // Cueing a track downloads it, so every preload path is gated on `on`.
+    const preloadBody =
+      radioSource.match(/const preloadNextTrack = async \(\) => \{[\s\S]*?\n  \};/)?.[0] ?? '';
+    expect(preloadBody).toContain('if (!on) return;');
+    const ensureCuedBody =
+      radioSource.match(/const ensureCued = \(\) => \{[\s\S]*?\n  \};/)?.[0] ?? '';
+    expect(ensureCuedBody).toContain('if (!on) return;');
+    // Page load warms the shared server-side cache only — that downloads
+    // nothing to this browser — and must not cue a track.
+    expect(radioSource).toContain('idle(() => { pingWarm(); });');
+    expect(radioSource).not.toContain('idle(() => { void preloadNextTrack(); pingWarm(); });');
+    // Switching off releases the queue rather than re-cueing behind the user.
+    const switchOffBody =
+      radioSource.match(/const switchOff = \(\) => \{[\s\S]*?\n  \};/)?.[0] ?? '';
+    expect(switchOffBody).toContain('preloadQueue.length = 0;');
+    expect(switchOffBody).not.toContain('preloadNextTrack');
+  });
 });
