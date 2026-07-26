@@ -194,6 +194,20 @@
       <!-- Escrow checklist — only for jobs that declared a parent. Two sends, any
            order; parent, song and change all come back. -->
       <div id="escrow" style="display:none;margin-top:12px;padding:11px 13px;border:1px solid var(--line);border-radius:10px;font-size:12.5px"></div>
+      <!-- Always on screen while a job is live. The keep-open message used to be one
+           of the rotating tips, which is easy to miss and gone a second later. -->
+      <div id="keepOpen" style="display:none;margin-top:12px;padding:10px 12px;border:1px solid var(--acc2);border-radius:10px;background:rgba(124,92,255,.08);font-size:12.5px">
+        <div><b>🔒 Keep this tab open</b> — <span id="keepOpenSteps">the agent runs in this browser</span></div>
+        <div class="muted" style="font-size:11.5px;margin-top:4px">Your deposit sits in a one-shot wallet that only this tab can spend from. Closing pauses the job — you can resume it or take a refund when you come back.</div>
+        <div id="keepOpenWarn" class="err" style="font-size:11.5px;margin-top:6px;display:none"></div>
+        <!-- Finish without me. Hidden entirely unless a handoff endpoint is configured,
+             so a half-deployed feature is never offered. -->
+        <div id="handoffRow" style="display:none;margin-top:10px;padding-top:9px;border-top:1px solid var(--line)">
+          <button id="handoffBtn" class="btn ghost" type="button" style="width:auto;margin:0;padding:5px 11px;font-size:12px">Finish this without me →</button>
+          <div class="muted" style="font-size:11px;margin-top:5px">Hands this one job to Xtrata's server so it completes while you close the tab. You will be asked to agree first.</div>
+          <div id="handoffState" class="ok" style="font-size:11.5px;margin-top:6px;display:none"></div>
+        </div>
+      </div>
       <div id="cancelRow" style="display:none;margin-top:12px;text-align:center">
         <button id="cancelJobBtn" class="btn ghost" type="button" style="width:auto;margin:0;padding:6px 12px;font-size:12px">Stop this job &amp; refund me</button>
         <div class="muted" style="font-size:11px;margin-top:5px">Stops at the next safe point. Anything already uploaded stays on-chain unsealed and costs nothing more; the rest of your deposit comes straight back.</div>
@@ -216,7 +230,7 @@
 <script src="HTML_Template.js?v=6"></script>
 <script src="suno-build.js?v=7"></script>
 <script src="optimize-image.js?v=1"></script>
-<script src="agent-one.js?v=2026-07-25.12"></script>
+<script src="agent-one.js?v=2026-07-26.1"></script>
 <script>
 const SERVER = { mock:false, net:'mainnet' };
 // VERSION HANDSHAKE: this page requires AT LEAST the agent bundle build below. The site's deploy
@@ -225,7 +239,7 @@ const SERVER = { mock:false, net:'mainnet' };
 // fees on refund loops). Builds are date-stamped (YYYY-MM-DD.N) so a string compare orders them;
 // a NEWER deployed bundle must pass — requiring an exact match wrongly locked the page out
 // whenever the agent shipped ahead of the page.
-const XAO_MIN_AGENT_BUILD='2026-07-25.12';
+const XAO_MIN_AGENT_BUILD='2026-07-26.1';
 let AGENT_STALE=false;
 function checkAgentBuild(){
   const b=window.XAO_AGENT_BUILD||null;
@@ -644,6 +658,85 @@ async function sendParentNow(pid){
 }
 window.sendParentNow=sendParentNow;
 
+// A job is LIVE while the browser still has work to do for it. Used by the banner
+// and by the leave guard.
+let JOB_LIVE=false;
+const LIVE_STATES=['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING','INSCRIBED','DELIVERING'];
+function renderKeepOpen(job, st){
+  const box=$('#keepOpen'); if(!box) return;
+  JOB_LIVE=LIVE_STATES.includes(st);
+  box.style.display=JOB_LIVE?'block':'none';
+  if(!JOB_LIVE) return;
+  // Say where we are in concrete terms — a bar that stops moving is
+  // indistinguishable from a crash, but "4 of 16 done" is obviously alive.
+  const m=/(\d+)\s*\/\s*(\d+)\s*chunks/.exec((job&&job.progress)||'');
+  $('#keepOpenSteps').textContent = m
+    ? ('uploading — ' + m[1] + ' of ' + m[2] + ' chunks on-chain so far')
+    : (st==='AWAITING_DEPOSIT' ? 'waiting for your payment to confirm'
+    : st==='AWAITING_PARENT' ? 'waiting for the parent inscription'
+    : st==='DELIVERING' ? 'sending your inscription and change back'
+    : 'the agent is working in this browser');
+  // If the file could not be saved for resume, closing the tab is genuinely
+  // destructive rather than merely a pause — say so plainly.
+  const A=window.XtrataAgent;
+  const perr=(A&&A.getBytesPersistError&&A.getBytesPersistError())||null;
+  const warn=$('#keepOpenWarn');
+  const durability=job&&job.storageDurability;
+  if(perr){
+    warn.style.display='block';
+    warn.textContent='⚠ This browser would not save your file for resume ('+esc(perr)+'). If you close this tab the job cannot resume and will refund instead.';
+  } else if(durability==='refused'){
+    warn.style.display='block';
+    warn.textContent='⚠ This browser declined to mark its storage as permanent, so it may clear the deposit key if disk space runs low. Try to leave this tab open until the job finishes.';
+  } else { warn.style.display='none'; }
+}
+// --- finish without me -------------------------------------------------------
+// The deposit key never leaves this browser EXCEPT here, so the agreement is
+// explicit, per job, and spells out what changes rather than burying it.
+const HANDOFF_CONSENT='i-agree-xtrata-may-finish-this-job';
+function renderHandoff(job){
+  const row=$('#handoffRow'); if(!row) return;
+  const A=window.XtrataAgent;
+  const enabled=!!(A&&A.handoffAvailable&&A.handoffAvailable());
+  row.style.display=(enabled&&JOB_LIVE)?'block':'none';
+  const st=$('#handoffState');
+  if(job&&job.handedOffAt){
+    st.style.display='block';
+    st.textContent='✓ Handed to the server at '+new Date(job.handedOffAt).toLocaleTimeString()+' — you can close this tab. It will still finish here if you stay.';
+    $('#handoffBtn').disabled=true;
+  } else { st.style.display='none'; $('#handoffBtn').disabled=false; }
+}
+$('#handoffBtn').onclick=async()=>{
+  if(!JOB) return;
+  const ok=confirm(
+    'Let Xtrata finish this job without you?\n\n'+
+    'Right now the wallet holding your deposit can only be spent by this browser tab — nobody else, including Xtrata, can touch it.\n\n'+
+    'If you agree, the key for THIS ONE JOB is sent to Xtrata\'s server so it can finish the inscription while you close the tab. It affects only this job and only until it completes; the wallet is emptied and the key destroyed at the end. Your own wallet is never involved.\n\n'+
+    'Your inscription and change still go back to the same wallet either way.\n\n'+
+    'Agree and hand this job over?');
+  if(!ok) return;
+  const b=$('#handoffBtn'); b.disabled=true; b.textContent='Handing over…';
+  try{
+    const r=await window.XtrataAgent.handoffJob(JOB.jobId, HANDOFF_CONSENT);
+    $('#handoffState').style.display='block';
+    $('#handoffState').textContent = r&&r.alreadyHandedOff
+      ? '✓ Already handed over — you can close this tab.'
+      : '✓ Handed over — you can close this tab. It will still finish here if you stay.';
+  }catch(e){
+    b.disabled=false; b.textContent='Finish this without me →';
+    $('#handoffState').style.display='block';
+    $('#handoffState').className='err';
+    $('#handoffState').textContent='Could not hand it over: '+esc((e&&e.message)||String(e))+'. Nothing changed — this tab is still in charge.';
+  }
+};
+
+// The main wizard has had this guard for a while; SUNO did not. It can only trigger
+// the browser's own generic "Leave site?" prompt — the wording and buttons are not
+// ours to control — so the banner above is what actually does the explaining.
+window.addEventListener('beforeunload',(e)=>{
+  if(JOB_LIVE){ e.preventDefault(); e.returnValue=''; return ''; }
+});
+
 $('#cancelJobBtn').onclick=async()=>{
   if(!JOB) return;
   if(!confirm('Stop this job and return everything?\n\nAny upload in progress halts at the next safe point. Chunks already on-chain stay there unsealed — nothing is minted and they cost nothing more — and the whole remaining deposit is sent back to the wallet that paid.\n\nKeep this tab open until you see "Cancelled".')) return;
@@ -674,6 +767,8 @@ async function refresh(){
     // Cancellable right up until something is minted.
     const canCancel=['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING','EXPIRED'].includes(st)&&!job.tokenId&&!(job.items||[]).some(i=>i.tokenId);
     $('#cancelRow').style.display=canCancel?'block':'none';
+    renderKeepOpen(job, st);
+    renderHandoff(job);
     if(st==='COMPLETE'||st==='COMPLETE_WITH_SKIPS'){ clearInterval(poll); poll=null; setBar(100); setTimeout(()=>{ stopWaitExtras(); (job.items?sbDone:done)(job); },600); }
     else if(st==='CANCELLED'){ clearInterval(poll); poll=null; stopWaitExtras(); $('#prog').className='prog';
       $('#hint').innerHTML='<span class="muted">↩︎ Cancelled — funds returned'+(job.cancelReason?(' ('+esc(job.cancelReason)+')'):'')+'. <a href="#" onclick="showJobLog(\''+esc(job.jobId)+'\');return false">View agent log</a></span>'; $('#go').disabled=false; }
@@ -708,7 +803,7 @@ window.sunoRecover=sunoRecover;
   const jobs=await A.listJobs();
   const live=(jobs||[]).find(j=>j.fastTrack&&['FUNDED','INSCRIBING','INSCRIBED','DELIVERING'].includes(j.status));
   if(live){ JOB=live; $('#go').disabled=true;
-    setProg('Resuming your inscription from where it stopped — no chunks are re-uploaded…', ['pay']);
+    setProg('Picking up where you left off — nothing already uploaded is redone. You can stop and take a refund at any point below.', ['pay']);
     startPoll(); return; }
   // A job that is funded but still waiting for its parent is stranded in exactly
   // the same way — the burner holds real STX. Reattach it so the escrow checklist
