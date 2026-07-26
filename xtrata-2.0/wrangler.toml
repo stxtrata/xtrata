@@ -18,6 +18,17 @@ database_id = "7d7cf4b8-bc72-41b2-9eea-cc4af9aea54b"
 binding = "COLLECTION_ASSETS"
 bucket_name = "xtrata-manage-assets"
 
+# Assembled inscription bytes, keyed by content hash (functions/runtime/cache.ts).
+# The binding NAME is load-bearing: the code looks for exactly
+# RUNTIME_CONTENT_CACHE and silently falls back to the per-datacentre edge cache
+# when it is absent. That fallback is why this went unnoticed — the site keeps
+# working, it just re-reconstructs every file from the chain in every Cloudflare
+# location, repeatedly. Keep this in the config file rather than the dashboard so
+# a new environment cannot come up without it.
+[[r2_buckets]]
+binding = "RUNTIME_CONTENT_CACHE"
+bucket_name = "xtrata-runtime-content-cache"
+
 # Preview deployments (branch builds) mirror production bindings exactly, so
 # every branch URL runs against the same D1 and R2 as the live site. Secrets
 # (SPONSOR_KEY, HIRO_API_KEY, TELEMETRY_SALT, DEBUG_VIEW_KEY) are NOT in this
@@ -37,3 +48,7 @@ database_id = "7d7cf4b8-bc72-41b2-9eea-cc4af9aea54b"
 [[env.preview.r2_buckets]]
 binding = "COLLECTION_ASSETS"
 bucket_name = "xtrata-manage-assets"
+
+[[env.preview.r2_buckets]]
+binding = "RUNTIME_CONTENT_CACHE"
+bucket_name = "xtrata-runtime-content-cache"
