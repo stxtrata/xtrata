@@ -75,8 +75,14 @@ async function ownerOf(core, network, id) {
   try { const o = await ro(core, network, 'get-owner', [uintCV(BigInt(id))]); const v = o.value && o.value.value; return v ? (v.value ?? v) : null; } catch { return null; }
 }
 export async function balance(network, addr, hiroKey) {
-  const d = await (await hfetch(`${network.coreApiUrl}/extended/v1/address/${addr}/stx`, hiroKey)).json();
-  return BigInt(d.balance || '0');
+  // v2 + throw. Hiro deprecated /extended/v1/address/:addr/stx and throttles it
+  // regardless of API key; defaulting a missing field to zero then made a throttled
+  // read indistinguishable from an empty wallet. Same failure the browser agent hit.
+  const r = await hfetch(`${network.coreApiUrl}/extended/v2/addresses/${addr}/balances/stx`, hiroKey);
+  if (!r.ok) throw new Error(`balance lookup failed (HTTP ${r.status})`);
+  const d = await r.json();
+  if (d == null || d.balance == null) throw new Error('balance lookup returned no balance');
+  return BigInt(d.balance);
 }
 export async function quote(core, network, sizeBytes, chunks) {
   const single = chunks <= SINGLE_TX_MAX_CHUNKS;

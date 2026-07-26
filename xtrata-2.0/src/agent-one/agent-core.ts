@@ -18,6 +18,7 @@ import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
 import {
   makeContractCall, makeSTXTokenTransfer, broadcastTransaction, callReadOnlyFunction,
+  estimateTransaction, estimateTransactionByteLength,
   uintCV, standardPrincipalCV, bufferCV, stringAsciiCV, listCV,
   makeStandardSTXPostCondition, FungibleConditionCode, PostConditionMode, AnchorMode,
   cvToJSON, getAddressFromPrivateKey, TransactionVersion,
@@ -65,8 +66,43 @@ function newWallet() { const mnemonic = generateMnemonic(wordlist, 256); return 
 async function ro(fn: string, args: any[] = []) {
   return cvToJSON(await callReadOnlyFunction({ contractAddress: CORE[0], contractName: CORE[1], functionName: fn, functionArgs: args, senderAddress: DEPLOYER, network } as any));
 }
-async function balance(addr: string): Promise<bigint> { const d = await (await hfetch(`/extended/v1/address/${addr}/stx`)).json(); return BigInt(d.balance || '0'); }
-async function safeNonce(addr: string): Promise<bigint | undefined> { if (MOCK) return undefined; try { const d: any = await (await hfetch(`/extended/v1/address/${addr}/nonces`)).json(); const n = d && d.possible_next_nonce; return n == null ? undefined : BigInt(n); } catch { return undefined; } }
+// A FAILED balance read must never look like an empty wallet. Defaulting the missing
+// field to zero returned 0 for a rate-limited or errored response, and 0 is indistinguishable from
+// "wallet is empty" — which broke two things at once on a wallet holding 11.66 STX:
+// processFunded reported "not funded: need 11660000, have 0", and send() computed a
+// fee cap of 0, so every estimate looked like a spike and the fallback broadcast a
+// 0 µSTX fee that the node rejected as FeeTooLow. Throw instead; callers already
+// treat a throw as transient and retry.
+// v2, deliberately. Hiro has DEPRECATED /extended/v1/address/:addr/stx and now
+// throttles it hard regardless of the API key — measured 10/10 429s on a burst
+// through our keyed proxy, each carrying "Please update to the v2 endpoint". The
+// key was never the problem; the endpoint was. Same response shape, so this is a
+// drop-in swap. /extended/v2/addresses/:addr/balances/stx returned 10/10 200.
+async function balance(addr: string): Promise<bigint> {
+  const r = await hfetch(`/extended/v2/addresses/${addr}/balances/stx`);
+  if (!r.ok) throw new Error(`balance lookup failed (HTTP ${r.status})`);
+  const d: any = await r.json();
+  if (d == null || d.balance == null) throw new Error('balance lookup returned no balance');
+  return BigInt(d.balance);
+}
+// undefined = "let the tx builder pick its own nonce", which is a legitimate
+// fallback rather than a wrong answer. But it used to be completely silent, so a
+// nonce chosen from a different source — and the ConflictingNonceInMempool that
+// can follow under load — had no trace in the log to explain it.
+async function safeNonce(addr: string, logId: string | null = null): Promise<bigint | undefined> {
+  if (MOCK) return undefined;
+  try {
+    const r = await hfetch(`/extended/v1/address/${addr}/nonces`);
+    if (!r.ok) throw new Error(`nonce lookup ${r.status}`);
+    const d: any = await r.json();
+    const n = d && d.possible_next_nonce;
+    if (n == null) throw new Error('nonce lookup returned no possible_next_nonce');
+    return BigInt(n);
+  } catch (e) {
+    xaoLog(logId, `nonce lookup failed (${errMsg(e)}) — falling back to the wallet's own nonce`);
+    return undefined;
+  }
+}
 async function quoteFee(sizeBytes: number, chunks: number) {
   if (MOCK) return { single: chunks <= SINGLE_MAX, protocolFee: 100000n + BigInt(chunks) * 2000n, batches: Math.max(1, Math.ceil(chunks / SINGLE_MAX)) };
   const single = chunks <= SINGLE_MAX;
@@ -75,7 +111,28 @@ async function quoteFee(sizeBytes: number, chunks: number) {
 }
 // Nakamoto-aware: poll 2 s for the first ~90 s (most blocks land in seconds), then 6 s. ~16 min ceiling.
 async function waitTx(txid: string) {
-  for (let i = 0; i < 210; i++) { try { const d = await (await hfetch(`/extended/v1/tx/${txid}`)).json(); if (d.tx_status === 'success') return d; if (d.tx_status && String(d.tx_status).startsWith('abort')) throw new Error('TX ' + d.tx_status); } catch (e: any) { if (String(e).includes('TX abort')) throw e; } await sleep(i < 45 ? 2000 : 6000); }
+  // Track whether we ever actually reached the API. Swallowing every read error and
+  // then reporting "not confirmed" blames the transaction for what was an outage —
+  // and the caller treats those two very differently.
+  let reads = 0; let lastReadErr: unknown = null;
+  for (let i = 0; i < 210; i++) {
+    try {
+      const r = await hfetch(`/extended/v1/tx/${txid}`);
+      if (!r.ok) throw new Error(`tx lookup ${r.status}`);
+      const d = await r.json();
+      reads += 1;
+      if (d.tx_status === 'success') return d;
+      if (d.tx_status && String(d.tx_status).startsWith('abort')) throw new Error('TX ' + d.tx_status);
+      // A dropped tx is never coming back — polling it for sixteen more minutes just
+      // looks like a hang. Fail now, with the reason, so the retry can re-broadcast.
+      if (d.tx_status && String(d.tx_status).startsWith('dropped')) throw new Error('TX ' + d.tx_status);
+    } catch (e: any) {
+      if (String(e).includes('TX abort') || String(e).includes('TX dropped')) throw e;
+      lastReadErr = e;
+    }
+    await sleep(i < 45 ? 2000 : 6000);
+  }
+  if (!reads) throw new Error(`could not reach the API to confirm ${txid} (${errMsg(lastReadErr)}) — the transaction may well have landed`);
   throw new Error('not confirmed: ' + txid);
 }
 async function getIdByHash(h: Uint8Array) { const j: any = await ro('get-id-by-hash', [bufferCV(h)]); return j.value ? String(j.value.value) : null; }
@@ -89,29 +146,97 @@ async function ownerOf(id: string) { try { const o: any = await ro('get-owner', 
 //      "network fees are high — waiting", not look stuck (our own ~512 KB batches can drive fees up);
 //   3. bounded fallback — 2× the last successful fee for this fn, never above the cap.
 const lastGoodFee = new Map<string, bigint>();
-async function send(key: string, from: string, fn: string, args: any[], spendCap: bigint | null, onFeeWait?: (m: string) => void, logId: string | null = null) {
+
+/**
+ * Build the transaction at the node's LOW fee estimate rather than the middle one.
+ *
+ * @stacks/transactions defaults to `estimations[1]` — the middle of the node's
+ * low/middle/high triple. Measured against mainnet:
+ *
+ *   seal-inscription   227 bytes    low 0.000227  mid 0.001191 (5.2x)  high 0.007937
+ *   add-chunk-batch    524661 bytes low 0.524661  mid 0.524661         high 0.524661
+ *
+ * On small transactions the middle estimate is several times the low one, and the
+ * low one is simply the network's 1 uSTX/byte relay floor — which is exactly what a
+ * human picks by hand when they drop the wallet to its lowest setting. On a full
+ * chunk batch all three collapse onto that same floor, so nothing changes there:
+ * 512 KiB costs ~0.52 STX no matter what anyone chooses.
+ *
+ * Starting low is only safe because a rejection is now recoverable — the broadcast
+ * path bumps 2x on FeeTooLow, up to three times, which is the same thing a human
+ * does when the cheap fee bounces.
+ */
+async function quoteLowFee(opts: any) {
+  if (opts.fee != null) return makeContractCall(opts);
+  try {
+    // fee: 1 keeps this local — no estimate request is made while building.
+    const draft: any = await makeContractCall({ ...opts, fee: 1n });
+    const est: any = await estimateTransaction(draft.payload, estimateTransactionByteLength(draft), network);
+    const low = est && est[0] && est[0].fee != null ? BigInt(est[0].fee) : null;
+    if (low != null && low > 0n) return makeContractCall({ ...opts, fee: low });
+  } catch { /* estimator unavailable → fall back to the library's own default */ }
+  return makeContractCall(opts);
+}
+async function send(key: string, from: string, fn: string, args: any[], spendCap: bigint | null, onFeeWait?: (m: string) => void, logId: string | null = null, feeCeiling: bigint | null = null) {
   const post = spendCap != null ? [makeStandardSTXPostCondition(from, FungibleConditionCode.LessEqual, spendCap)] : [];
   const opts: any = { contractAddress: CORE[0], contractName: CORE[1], functionName: fn, functionArgs: args, senderKey: key, network, postConditionMode: PostConditionMode.Deny, postConditions: post, anchorMode: AnchorMode.Any };
-  try { opts.nonce = await safeNonce(from); } catch {}
-  // Never broadcast a fee the deposit can't afford: cap at the lesser of MINT_CAP and the
-  // balance minus what later delivery+refund still need. Turns NotEnoughFunds into a wait.
-  let effCap = MINT_CAP; try { const _bal = await balance(from); const _head = _bal > (DELIVERY_RESERVE + REFUND_TX_FEE) ? _bal - (DELIVERY_RESERVE + REFUND_TX_FEE) : 0n; if (_head < effCap) effCap = _head; } catch {}
+  try { opts.nonce = await safeNonce(from, logId); } catch {}
+  // Cap the fee at the lesser of MINT_CAP and the balance minus what delivery+refund
+  // still need, so NotEnoughFunds becomes a wait instead of a failure. A LOOKUP
+  // failure must not lower the cap — a cap of 0 makes every estimate look like a
+  // spike and ends in a 0 µSTX broadcast the node rejects as FeeTooLow.
+  let effCap = MINT_CAP;
+  let headroom: bigint | null = null;
+  try {
+    const bal = await balance(from);
+    headroom = bal > (DELIVERY_RESERVE + REFUND_TX_FEE) ? bal - (DELIVERY_RESERVE + REFUND_TX_FEE) : 0n;
+  } catch { headroom = null; }        // unknown → keep the safe default cap
+  // Genuinely no headroom: say so instead of broadcasting something unpayable.
+  if (headroom === 0n) throw new Error(`${fn}: deposit wallet has no headroom left for fees — nothing was broadcast`);
+  if (headroom != null && headroom < effCap) effCap = headroom;
+  // A caller that knows how much of the budget this one transaction may take (the
+  // staged loop, which knows how many batches are left) tightens the ceiling further.
+  if (feeCeiling != null && feeCeiling > 0n && feeCeiling < effCap) effCap = feeCeiling;
   let tx: any, fee: bigint;
+  // The cheapest quote seen this run is the closest thing we have to the node's real
+  // minimum. The fallback must never dip below it: a fee we KNOW will be rejected is
+  // not a fallback, it is a guaranteed FeeTooLow.
+  let cheapestQuote: bigint | null = null;
   for (let attempt = 0; ; attempt++) {
-    tx = await makeContractCall(opts);
+    tx = await quoteLowFee(opts);
     fee = BigInt(tx.auth.spendingCondition.fee.toString());
+    if (cheapestQuote == null || fee < cheapestQuote) cheapestQuote = fee;
     xaoLog(logId, `${fn}: fee estimate ${fee} µSTX (cap ${effCap}, try ${attempt + 1})`);
     if (fee <= effCap) break;
     if (fee <= (effCap * 5n) / 4n) { tx = await makeContractCall({ ...opts, fee: effCap }); fee = effCap; break; }  // marginal overage: clamp to cap, don't burn retries
     if (attempt < 3) { xaoLog(logId, `${fn}: estimator spike — retrying (${attempt + 1}/3)`); await sleep(6000); continue; }
     if (attempt < 15) { const m = `network fees are high — waiting for them to settle (${attempt - 2}/12)`; xaoLog(logId, `${fn}: ${m}`); if (onFeeWait) try { onFeeWait(m); } catch {} await sleep(20000); continue; }
-    const fb = lastGoodFee.get(fn); const useFee = fb && fb * 2n <= effCap ? fb * 2n : effCap;
-    xaoLog(logId, `${fn}: fees still elevated after waiting — using bounded fallback fee ${useFee}`);
-    tx = await makeContractCall({ ...opts, fee: useFee }); fee = useFee; break;
+    // Out of patience. Reaching here means EVERY quote exceeded effCap * 5/4, so the
+    // cheapest quote is necessarily above what this wallet can afford. The old
+    // "bounded fallback" broadcast min(2 × last good fee, effCap) anyway — a fee
+    // already known to be below every quote the node gave us, which is how a run
+    // ended in "using bounded fallback fee 0" followed by FeeTooLow. There is no
+    // affordable fee to fall back to; say so, spend nothing, and let the caller
+    // retry later when either the fee market or the balance has moved.
+    const floor = cheapestQuote ?? 0n;
+    throw new Error(`${fn}: cannot afford the network fee — cheapest quote ${floor} µSTX, affordable ${effCap} µSTX. Nothing was broadcast.`);
   }
-  lastGoodFee.set(fn, fee);
-  const res: any = await broadcastTransaction(tx, network);
+  let res: any = await broadcastTransaction(tx, network);
+  // FeeTooLow is deterministic for a given fee — waiting cannot fix it, only a bigger
+  // fee can. It used to fall out to the caller's retry, which re-ran the whole
+  // estimate/wait cycle (up to four minutes) and arrived at the same rejected fee.
+  for (let bump = 1; bump <= 3 && res?.error && /FeeTooLow/i.test(`${res.error} ${res.reason || ''}`); bump += 1) {
+    const next = fee * 2n > effCap ? effCap : fee * 2n;
+    if (next <= fee) { xaoLog(logId, `${fn}: FeeTooLow at ${fee} µSTX and already at the affordable ceiling — cannot bump further`); break; }
+    xaoLog(logId, `${fn}: FeeTooLow at ${fee} µSTX — retrying at ${next} µSTX (bump ${bump}/3)`);
+    tx = await makeContractCall({ ...opts, fee: next }); fee = next;
+    res = await broadcastTransaction(tx, network);
+  }
   if (res.error) { xaoLog(logId, `${fn}: broadcast REJECTED — ${res.error} ${res.reason || ''}`); throw new Error(`${fn}: ${res.error} ${res.reason || ''}`); }
+  // Only a fee that ACTUALLY broadcast is "good". Recording it before the broadcast
+  // meant a rejected fee seeded the next fallback, so one bad estimate poisoned
+  // every later attempt for that function.
+  lastGoodFee.set(fn, fee);
   const txid = res.txid || res;
   xaoLog(logId, `${fn}: broadcast 0x${String(txid).replace(/^0x/, '')} · fee ${fee} µSTX — awaiting confirmation`);
   const t0 = Date.now(); const d = await waitTx(txid);
@@ -158,20 +283,39 @@ async function stagedInscribe(job: any, key: string, from: string, data: Uint8Ar
   if (idx === null) { await send(key, from, 'begin-or-get', [bufferCV(h), stringAsciiCV(target.mime), uintCV(BigInt(data.length)), uintCV(BigInt(total))], beginFee, onProg, job.jobId); idx = 0; onProg(`upload started · 0/${total}`); }
   else if (idx > 0) { onProg(`resuming upload · ${idx}/${total} chunks already on-chain`); }
   while (idx < total) {
+    // Cancellation checkpoint. Only ever BETWEEN batches: the previous send() has
+    // settled and the next has not started, so nothing is in flight when we stop.
+    // Chunks already uploaded stay on-chain (harmless, unsealed); the deposit is
+    // swept home by the refund that follows.
+    assertNotCancelled(job.jobId);
     const batch = chunks.slice(idx, idx + BATCH);
     // Fee runway check (guide: ~1 STX/MB mining + 20% drift). If the balance can no
     // longer cover the projected remaining batches + seal + delivery, say so loudly —
     // send() will still clamp/wait, but the user sees WHY the job is crawling.
+    // Fee ceiling for THIS batch, derived from what is actually left to spend.
+    // MINT_CAP alone is 2 STX per transaction — over three times what the quote
+    // budgets per batch — so a job could accept 1.5 STX batches against a 0.64 STX
+    // budget and spend its way into a dead end: deposit gone, nothing sealed. The
+    // runway was already computed here and only used to print a warning.
+    let batchFeeCap: bigint | null = null;
     try {
       const remBatches = BigInt(Math.max(1, Math.ceil((total - idx) / BATCH)));
       const perBatch = lastGoodFee.get('add-chunk-batch') ?? (BigInt(BATCH * CHUNK) * 6n) / 5n;
       const runway = remBatches * perBatch + sealFee + DELIVERY_RESERVE + REFUND_TX_FEE;
       const bal = await balance(from);
-      if (bal < runway) { const m = `fee runway low — ${bal} µSTX left vs ~${runway} projected for ${remBatches} remaining batch(es); fees will be clamped and may wait`; xaoLog(job.jobId, m); onProg(m); }
-    } catch {}
-    await send(key, from, 'add-chunk-batch', [bufferCV(h), listCV(batch.map((c) => bufferCV(c)))], null, onProg, job.jobId);
+      // Reserve what the tail still needs, then share the rest across the batches
+      // left. Never let one batch eat the budget for the others.
+      const tail = sealFee + DELIVERY_RESERVE + REFUND_TX_FEE;
+      const spendable = bal > tail ? bal - tail : 0n;
+      batchFeeCap = spendable / remBatches;
+      if (bal < runway) { const m = `fee runway low — ${bal} µSTX left vs ~${runway} projected for ${remBatches} remaining batch(es); this batch is capped at ${batchFeeCap} µSTX`; xaoLog(job.jobId, m); onProg(m); }
+    } catch { batchFeeCap = null; }
+    await send(key, from, 'add-chunk-batch', [bufferCV(h), listCV(batch.map((c) => bufferCV(c)))], null, onProg, job.jobId, batchFeeCap);
     const st: any = (await ro('get-upload-state', [bufferCV(h), standardPrincipalCV(from)])); const ni = st.value ? Number(st.value.value['current-index'].value) : null; if (ni === null || ni <= idx) throw new Error(`upload stalled at ${idx}`); idx = ni; onProg(`uploading · ${idx}/${total}`);
   }
+  // Last chance to stop: sealing is what MINTS. Past this point the token exists and
+  // a cancel can no longer be honoured as a refund — it becomes a recovery instead.
+  assertNotCancelled(job.jobId);
   const deps = ((target.resolvedDeps || target.deps) || []).map((d: string) => uintCV(BigInt(d)));
   const parents = ((target.mergedParents || target.parents) || []).map((p: string) => uintCV(BigInt(p)));
   // Parents: seal-with-relationships requires the sealer (deposit wallet) to OWN the parents.
@@ -231,7 +375,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-25.1';
+export const AGENT_BUILD = '2026-07-25.10';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -393,16 +537,25 @@ ${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
 // Deposit addresses are public — a 1 µSTX dust tx must never claim fast-track delivery + refunds.
 async function detectFunder(addr: string): Promise<string | null> {
   const top = (m: Map<string, bigint>) => { let best: string | null = null, bestAmt = -1n; for (const [k, v] of m) if (v > bestAmt) { best = k; bestAmt = v; } return best; };
+  // /transactions FIRST. stx_inbound is throttled alongside the deprecated balance
+  // endpoint (measured 10/10 429s on a burst through our keyed proxy), which is why
+  // "could not determine the paying address" kept firing on wallets whose payment was
+  // plainly on chain. /transactions measured 10/10 200s, so it leads now and
+  // stx_inbound is only the backstop.
   try {
-    const d: any = await (await hfetch(`/extended/v1/address/${addr}/stx_inbound?limit=50`)).json();
+    const r = await hfetch(`/extended/v1/address/${addr}/transactions?limit=50`);
+    if (!r.ok) throw new Error(`tx list ${r.status}`);
+    const d: any = await r.json();
     const totals = new Map<string, bigint>();
-    for (const r of (d.results || [])) { const a = BigInt(r.amount || '0'); if (r.sender && a > 0n) totals.set(r.sender, (totals.get(r.sender) || 0n) + a); }
+    for (const e of (d.results || [])) { const tx = e.tx || e; if (tx.token_transfer && tx.token_transfer.recipient_address === addr && tx.sender_address) { const a = BigInt(tx.token_transfer.amount || '0'); if (a > 0n) totals.set(tx.sender_address, (totals.get(tx.sender_address) || 0n) + a); } }
     if (totals.size) return top(totals);
   } catch {}
   try {
-    const d: any = await (await hfetch(`/extended/v1/address/${addr}/transactions?limit=50`)).json();
+    const r = await hfetch(`/extended/v1/address/${addr}/stx_inbound?limit=50`);
+    if (!r.ok) throw new Error(`stx_inbound ${r.status}`);
+    const d: any = await r.json();
     const totals = new Map<string, bigint>();
-    for (const r of (d.results || [])) { const tx = r.tx || r; if (tx.token_transfer && tx.token_transfer.recipient_address === addr && tx.sender_address) { const a = BigInt(tx.token_transfer.amount || '0'); if (a > 0n) totals.set(tx.sender_address, (totals.get(tx.sender_address) || 0n) + a); } }
+    for (const e of (d.results || [])) { const a = BigInt(e.amount || '0'); if (e.sender && a > 0n) totals.set(e.sender, (totals.get(e.sender) || 0n) + a); }
     if (totals.size) return top(totals);
   } catch {}
   return null;
@@ -417,8 +570,17 @@ async function heldInscriptions(addr: string): Promise<string[]> {
   const asset = `${CORE[0]}.${CORE[1]}::xtrata-inscription`;
   const ids: string[] = []; let offset = 0;
   for (;;) {
-    const d: any = await (await hfetch(`/extended/v1/tokens/nft/holdings?principal=${addr}&asset_identifiers=${encodeURIComponent(asset)}&limit=50&offset=${offset}`)).json();
-    const rs = d.results || [];
+    // Must THROW on a bad read. Returning [] made a failed lookup indistinguishable
+    // from "this wallet holds nothing" — and every caller below already wraps this in
+    // a try/catch written on the assumption that it throws, so those safety nets were
+    // dead code. The dangerous one is refundAndClose's never-strand guard: a failed
+    // read reported no inscription held and the deposit key was discarded, which would
+    // strand an escrowed parent at an address nobody can spend from again.
+    const r = await hfetch(`/extended/v1/tokens/nft/holdings?principal=${addr}&asset_identifiers=${encodeURIComponent(asset)}&limit=50&offset=${offset}`);
+    if (!r.ok) throw new Error(`holdings lookup failed (HTTP ${r.status})`);
+    const d: any = await r.json();
+    if (!Array.isArray(d?.results)) throw new Error('holdings lookup returned no results');
+    const rs = d.results;
     for (const r of rs) { const m = /u?(\d+)/.exec((r.value && r.value.repr) || ''); if (m) ids.push(m[1]); }
     offset += rs.length;
     if (rs.length < 50 || offset >= Number(d.total || 0)) break;
@@ -437,16 +599,21 @@ async function parentsStatus(job: any) {
   const required: string[] = (job.parents || []).map(String);
   if (job.mock || MOCK) return { required, held: required, missing: [], unexpected: [], ok: true };
   const own = job.depositAddress;
+  // OWNERSHIP comes from the contract, never from the holdings index. The gate asks
+  // "does the deposit wallet own this parent at seal time", and get-owner answers that
+  // authoritatively; the NFT holdings index lags chain state by seconds to minutes.
+  // Gating on the index left the job insisting the parent had not arrived while a
+  // contract read showed the deposit wallet already owned it — the escrow checklist
+  // said "arrived" on one line and "now send the parent" on the next.
+  const held: string[] = [], missing: string[] = [];
+  for (const pid of required) (((await ownerOf(pid)) === own) ? held : missing).push(pid);
+  // The index is still the only way to SEE a stray nobody declared.
   let heldAll: string[] | null = null;
   try { heldAll = await heldInscriptions(own); } catch {}
-  if (heldAll == null) {   // holdings API down → per-parent owner checks (can't see strays)
-    const held: string[] = [], missing: string[] = [];
-    for (const pid of required) (((await ownerOf(pid)) === own) ? held : missing).push(pid);
+  if (heldAll == null) {
     return { required, held, missing, unexpected: [], ok: missing.length === 0, holdingsUnverified: true };
   }
   const mine = new Set([...required, job.tokenId, job.receiptTokenId, ...((job.items || []).map((i: any) => i.tokenId))].filter(Boolean).map(String));
-  const held = required.filter((p) => heldAll!.includes(p));
-  const missing = required.filter((p) => !heldAll!.includes(p));
   const unexpected = heldAll.filter((id) => !mine.has(String(id)));
   return { required, held, missing, unexpected, ok: missing.length === 0 && unexpected.length === 0 };
 }
@@ -764,11 +931,27 @@ async function statusJob(job: any) {
   // "Payment seen" (mempool) — UI signal only; money decisions still gate on the confirmed balance.
   let pending = false;
   if (!funded && !MOCK && job.depositAddress && job.status === 'AWAITING_DEPOSIT') {
-    try { const d: any = await (await hfetch(`/extended/v1/address/${job.depositAddress}/mempool?limit=10`)).json(); pending = (d.results || []).some((tx: any) => tx.token_transfer && tx.token_transfer.recipient_address === job.depositAddress); } catch {}
+    // A throttled read here used to report "nothing pending", which is why the
+    // status line flipped between "payment seen — confirming" and "waiting for
+    // payment to land" while a deposit was in flight. Unknown is not the same as
+    // none: leave `pending` false but do not pretend the mempool was empty.
+    try {
+      const r = await hfetch(`/extended/v1/address/${job.depositAddress}/mempool?limit=10`);
+      if (!r.ok) throw new Error(`mempool ${r.status}`);
+      const d: any = await r.json();
+      if (!Array.isArray(d?.results)) throw new Error('mempool returned no results');
+      pending = d.results.some((tx: any) => tx.token_transfer && tx.token_transfer.recipient_address === job.depositAddress);
+    } catch (e) {
+      xaoLog(job.jobId, `mempool check unavailable (${errMsg(e)}) — cannot say whether a payment is in flight`);
+    }
   }
   // Parent escrow gate — a parented job is runnable only when funded AND all parents are held.
   let parents: any = null;
-  if ((job.parents || []).length && ['AWAITING_DEPOSIT', 'AWAITING_PARENT', 'FUNDED'].includes(job.status)) {
+  // INSCRIBING included deliberately: the escrow checklist stays on screen while the
+  // upload runs, and without live parent status it fell back to a stale owner lookup
+  // and told the user to send a parent the job had already accepted and was minting
+  // against. The gate has passed by then — the UI just needs to be told.
+  if ((job.parents || []).length && ['AWAITING_DEPOSIT', 'AWAITING_PARENT', 'FUNDED', 'INSCRIBING'].includes(job.status)) {
     try { parents = await parentsStatus(job); } catch {}
   }
   const batch = job.items ? { current: (job.batchProgress || {}).current || 0, total: job.items.length, items: job.items.map((i: any) => ({ idx: i.idx, uri: i.uri, status: i.status, tokenId: i.tokenId || null, error: i.error || null })) } : null;
@@ -792,6 +975,8 @@ async function runBatchItems(job: any) {
     job.batchProgress = { current: i, total: job.items.length };
     if (item.status === 'INSCRIBED' && item.tokenId) { minted += 1; continue; }
     if (item.status === 'FAILED' || item.status === 'SKIPPED') { failed += 1; continue; }
+    // Between items: stop before starting the next one rather than mid-upload.
+    assertNotCancelled(job.jobId);
     try {
       const key = `${job.jobId}:${i}`;
       let data = BYTES.get(key);
@@ -835,8 +1020,16 @@ async function runInscribe(job: any) {
     // Hiro's API is load-balanced across nodes at different chain tips, so a single read can
     // lag behind a just-landed deposit. Take the best of a few reads before concluding a job
     // is unfunded, so a stale zero never triggers a spurious refund.
-    let bal = 0n;
-    for (let i = 0; i < 3; i++) { try { const b = await balance(job.depositAddress); if (b > bal) bal = b; } catch {} if (bal >= BigInt(job.requiredUstx)) break; if (i < 2) await sleep(6000); }
+    // Track whether ANY read actually succeeded. Swallowing the errors and reporting
+    // the resulting 0 as "not funded" is what made a rate-limited lookup look like an
+    // unpaid deposit on a wallet that held the full amount.
+    let bal = 0n; let reads = 0; let lastErr: unknown = null;
+    for (let i = 0; i < 3; i++) {
+      try { const b = await balance(job.depositAddress); reads += 1; if (b > bal) bal = b; } catch (e) { lastErr = e; }
+      if (reads && bal >= BigInt(job.requiredUstx)) break;
+      if (i < 2) await sleep(6000);
+    }
+    if (!reads) throw new Error(`could not read the deposit balance (${errMsg(lastErr)}) — nothing was spent, retrying`);
     if (bal < BigInt(job.requiredUstx)) throw new Error(`not funded: need ${job.requiredUstx}, have ${bal}`);
     job.depositReceivedUstx = bal.toString();
   }
@@ -1098,7 +1291,19 @@ async function refundAndClose(job: any, reasonIn = 'cancelled') {
     }
     job.status = 'COMPLETE'; writeJob(job); return { alreadyDelivered: true };
   }
-  if (!job.ephemeralMnemonic) { writeJob(job); return { noKey: true }; }
+  if (!job.ephemeralMnemonic) {
+    // No key means nothing can be swept or returned from here — so this job must
+    // NOT be left re-runnable. Returning with the status untouched left it as
+    // FUNDED, the watcher picked it up every few seconds, autoRun threw, and the
+    // refund landed back here: an endless loop that hammered the API (and the
+    // rate-limiting that caused made the original failure worse).
+    job.status = job.depositReceivedUstx ? 'CANCELLED' : 'EXPIRED';
+    job.cancelReason = `${reason} · deposit key already discarded — nothing left to return from this job`;
+    job.cancelledAt = new Date().toISOString();
+    writeJob(job);
+    xaoLog(job.jobId, `closing without a key (${job.status}) — ${reason}`);
+    return { noKey: true };
+  }
   const dep = deriveFrom(job.ephemeralMnemonic);
   const returnTo = (await resolveFunder(job)) || job.user;
   const out: any = { reason, deliveredNfts: [], refundTx: null };
@@ -1128,9 +1333,21 @@ async function refundAndClose(job: any, reasonIn = 'cancelled') {
     // NEVER-STRAND GUARD: a never-funded job keeps its key (EXPIRED) — a slow payment confirming after
     // cancellation must never land at a keyless address.
     if (job.depositReceivedUstx || leftover > 0n) { delete job.ephemeralMnemonic; job.status = 'CANCELLED'; }
+    // An explicit cancel must REST as cancelled. Landing on EXPIRED left the job
+    // re-runnable by the watcher and still offering its own Stop button, so the
+    // thing the user just stopped looked like it had not stopped at all. The key is
+    // still kept, so a payment confirming late never lands at a keyless address.
+    else if (job.cancelRequested) {
+      job.keepKey = true; job.status = 'CANCELLED';
+      job.keepKeyReason = 'cancelled before funding — key kept so a late payment is never stranded';
+    }
     else { job.keepKey = true; job.status = 'EXPIRED'; job.keepKeyReason = 'never funded — key kept so a late payment is never stranded'; }
   }
   else { job.keepKey = true; job.status = 'NEEDS_RECOVERY'; job.keepKeyReason = `refund unconfirmed; ~${leftover ?? '?'} uSTX may remain`; }
+  // Stamp progress on every exit. The fatal path never did, so the watcher's
+  // "15 s × attempt" backoff was measured against a timestamp from minutes ago and
+  // never held anything back — the job re-entered roughly every two seconds.
+  job.progressAt = new Date().toISOString();
   job.cancelReason = reason; job.cancelledAt = new Date().toISOString(); if (out.refundTx) job.refundTx = out.refundTx;
   if (job.status === 'CANCELLED') idbDeleteBytes(job.jobId);
   writeJob(job); return out;
@@ -1199,7 +1416,27 @@ try {
 // FUNDED/INSCRIBED and the watcher resumes exactly where it left off. Resume is safe end-to-end: staged
 // uploads continue from the on-chain index, single-tx mints are idempotent (get-id-by-hash pre-check).
 // Only deterministic failures or exhausted retries (4, with 15 s × attempt backoff) hit the refund failsafe.
-const FATAL_ERR = /TX abort|locked to|unrecoverable|file bytes|empty file|could not determine|wrong inscription received/i;
+// "could not determine the paying address" was in here, which made a funder lookup
+// failure a DETERMINISTIC failure and sent the job straight to a refund. It is
+// almost always transient — a Hiro hiccup or a rate limit — so it now retries with
+// backoff and only refunds once the retries are exhausted. Classing it as fatal is
+// what turned one failed lookup into a refund attempt every few seconds.
+const FATAL_ERR = /TX abort|locked to|unrecoverable|file bytes|empty file|wrong inscription received/i;
+// ---------- cancellation ----------
+// A cancel is a PERSISTED flag, not an in-memory one: the loop doing the work may
+// be mid-tick in another call stack, and the request has to survive a reload. The
+// running job aborts at its next checkpoint (between chunk batches) and the STX is
+// swept home. Anything already minted is never cancelled — it is returned instead.
+class JobCancelled extends Error {
+  constructor() { super('cancelled by request'); this.name = 'JobCancelled'; }
+}
+const isCancelRequested = (id: string) => {
+  try { return !!readJob(id).cancelRequested; } catch { return false; }
+};
+function assertNotCancelled(id: string) {
+  if (isCancelRequested(id)) throw new JobCancelled();
+}
+
 const MAX_RETRIES = 4;
 function background(id: string, fn: () => Promise<any>) {
   PROCESSING.add(id);
@@ -1209,6 +1446,13 @@ function background(id: string, fn: () => Promise<any>) {
     PROCESSING.delete(id);
   }).catch(async (e) => {
     const msg = errMsg(e);
+    // A cancel is not an error: no retry, no NEEDS_RECOVERY, straight to the refund.
+    if (e instanceof JobCancelled || isCancelRequested(id)) {
+      xaoLog(id, 'cancelled by request — returning everything to the payer');
+      try { await refundAndClose(readJob(id), 'cancelled by request — everything returned to the payer'); } catch {}
+      PROCESSING.delete(id);
+      return;
+    }
     try {
       const j = readJob(id); j.error = msg;
       if (!FATAL_ERR.test(msg) && !/no items inscribed/.test(msg) && j.status !== 'AWAITING_DEPOSIT' && (j.retryCount = (j.retryCount || 0) + 1) <= MAX_RETRIES) {
@@ -1238,6 +1482,12 @@ async function watchTick() {
   void syncWakeLock();
   for (const j of listJobsRaw()) {
     if (PROCESSING.has(j.jobId)) continue;
+    // A cancel requested while the tab was closed. Honour it before any resume
+    // logic below, or the watcher would happily restart the job we were asked to stop.
+    if (j.cancelRequested && !['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED'].includes(j.status)) {
+      background(j.jobId, () => refundAndClose(readJob(j.jobId), 'cancelled by request — everything returned to the payer'));
+      continue;
+    }
     // A page close/reload can interrupt the browser-held recovery between
     // transactions. Never strand the job in a non-actionable state: preserve
     // the key and require an explicit click to continue from a fresh inventory.
@@ -1248,6 +1498,20 @@ async function watchTick() {
       j.progress = j.keepKeyReason;
       j.progressAt = new Date().toISOString();
       writeJob(j);
+      continue;
+    }
+    // Past the retry ceiling this job has ALREADY been through the fatal path and a
+    // refund attempt. Re-running it just increments retryCount and burns API calls —
+    // observed live climbing past attempt 18, two seconds apart. Park it where a
+    // human can act instead, with the key kept so nothing is stranded.
+    if ((j.retryCount || 0) > MAX_RETRIES && !['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED', 'NEEDS_RECOVERY'].includes(j.status)) {
+      j.status = 'NEEDS_RECOVERY';
+      j.keepKey = true;
+      j.keepKeyReason = `stopped after ${j.retryCount} attempts — ${j.error || 'the job could not make progress'}. Use Recover to return anything left.`;
+      j.progress = j.keepKeyReason;
+      j.progressAt = new Date().toISOString();
+      writeJob(j);
+      xaoLog(j.jobId, `retry ceiling reached (${j.retryCount}) — parked as NEEDS_RECOVERY instead of resuming again`);
       continue;
     }
     // Backoff between auto-resume attempts: 15 s × attempt number.
@@ -1320,6 +1584,30 @@ async function reapTick() {
   getJob: async (id: string) => { const job = readJob(id); return { job: publicJob(job), status: await statusJob(job) }; },
   runJob: async (id: string) => { if (PROCESSING.has(id)) return { started: true, already: true }; const job = readJob(id); if (job.tokenId) return { error: 'already inscribed' }; const s = await statusJob(job); if (!s.funded) return { error: 'not funded yet' }; background(id, async () => { const j = readJob(id); j.status = 'INSCRIBING'; writeJob(j); await runInscribe(j); }); return { started: true }; },
   deliverJob: async (id: string) => { if (PROCESSING.has(id)) return { started: true, already: true }; const job = readJob(id); if (!job.tokenId) return { error: 'nothing to deliver yet' }; background(id, async () => { const j = readJob(id); j.status = 'DELIVERING'; writeJob(j); await deliver(j); }); return { started: true }; },
+  /**
+   * Stop a job and return everything to the payer. Safe to call whether or not the
+   * job is currently running: the flag is persisted, a running upload aborts at its
+   * next between-batch checkpoint, and the refund follows. Refuses once a token has
+   * been minted — that cannot be un-minted, so recovery (which returns the token) is
+   * the correct route, not a refund the job cannot honour.
+   */
+  cancelJob: async (id: string) => {
+    const job = readJob(id);
+    if (['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED'].includes(job.status)) return { error: `job is already ${job.status}` };
+    if (job.tokenId || (job.items || []).some((i: any) => i.tokenId)) {
+      return { error: 'this job has already minted an inscription — use recovery, which returns the token and the remaining STX' };
+    }
+    job.cancelRequested = true;
+    job.progress = 'cancelling — returning everything to the payer';
+    job.progressAt = new Date().toISOString();
+    writeJob(job);
+    xaoLog(id, 'cancel requested');
+    // Already running: the loop aborts at its next checkpoint and background()'s
+    // handler does the refund. Idle: refund right now.
+    if (PROCESSING.has(id)) return { cancelling: true, jobId: id, wasRunning: true };
+    background(id, () => refundAndClose(readJob(id), 'cancelled by request — everything returned to the payer'));
+    return { cancelling: true, jobId: id, wasRunning: false };
+  },
   recoverJob: async (id: string) => {
     if (PROCESSING.has(id)) return { started: true, already: true };
     const job = readJob(id);
@@ -1339,3 +1627,7 @@ setInterval(watchTick, MOCK ? 2000 : 4000);
 setInterval(reapTick, 20000);
 // helpers already ported and available to the implementer/tester:
 export { deriveFrom, newWallet, balance, quoteFee, mintSingle, stagedInscribe, getIdByHash, ownerOf, send, sendNft, sendStx, network, MOCK, CORE, DEPLOYER, AGENT_FEE_PCT, AGENT_FEE_ADDRESS, CHUNK, SINGLE_MAX, PERTX_MINER, DELIVERY_RESERVE, REFUND_TX_FEE, RECEIPT_EST, incHash, chunkBytes };
+// Exported for the fault-injection harness. These two decide "who paid" and "has the
+// parent arrived" — the questions behind the failures that shipped, and both are only
+// meaningful when exercised against a degraded API rather than asserted on in source.
+export { detectFunder, parentsStatus, heldInscriptions, waitTx, safeNonce, statusJob };

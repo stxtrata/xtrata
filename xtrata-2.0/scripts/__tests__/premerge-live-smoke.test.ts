@@ -51,7 +51,8 @@ const passingFetch = () => {
     if (url.endsWith('/get-sponsor') && method === 'POST') {
       return Response.json({ okay: true, result: sponsorResult });
     }
-    if (url.endsWith(`/${SPONSOR_ADDRESS}/stx`)) return Response.json({ balance: '40975001' });
+    // v2 balances route — the v1 one is deprecated upstream and throttled.
+    if (url.endsWith(`/addresses/${SPONSOR_ADDRESS}/balances/stx`)) return Response.json({ balance: '40975001' });
     const canary = WALLET_CANARIES.find((entry) => url.endsWith(`0x${entry.txid}`));
     if (canary) return Response.json(canaryBody(canary));
     throw new Error(`unexpected request ${method} ${url}`);

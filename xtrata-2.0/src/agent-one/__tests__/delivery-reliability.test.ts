@@ -29,14 +29,18 @@ describe('NFT delivery is transient-aware', () => {
 describe('Deposit-wallet transactions are nonce-sequenced', () => {
   it('reads a mempool-aware nonce and threads it into each send', () => {
     expect(agentSource).toContain('possible_next_nonce');
-    expect(agentSource).toContain('opts.nonce = await safeNonce(from)');
+    expect(agentSource).toContain('opts.nonce = await safeNonce(from, logId)');
     expect(agentSource).toContain('nonce = await safeNonce(getAddressFromPrivateKey(key, TransactionVersion.Mainnet))');
   });
 });
 
 describe('Funding gate is confirmation-consistent', () => {
   it('takes the best of several reads and never treats not-funded as fatal', () => {
-    expect(agentSource).toContain('for (let i = 0; i < 3; i++) { try { const b = await balance(job.depositAddress)');
+    // Still three reads, best-of, for the same reason (Hiro load-balances across
+    // nodes at different chain tips). The loop was reshaped so a FAILED read is no
+    // longer reported as a zero balance — see balance-honesty.test.ts.
+    expect(agentSource).toContain('const b = await balance(job.depositAddress); reads += 1; if (b > bal) bal = b;');
+    expect(agentSource).toContain('for (let i = 0; i < 3; i++) {');
     // A lagging node read must not trip the refund failsafe.
     expect(agentSource).toContain('const FATAL_ERR = /TX abort|locked to|');
     expect(agentSource).not.toContain('const FATAL_ERR = /TX abort|not funded|locked to|');
