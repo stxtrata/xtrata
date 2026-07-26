@@ -52,7 +52,13 @@ describe('Fee ceiling is coupled to the affordable balance', () => {
     expect(agentSource).toContain('let effCap = MINT_CAP;');
     expect(agentSource).toContain('if (fee <= effCap) break;');
     expect(agentSource).toContain('marginal overage: clamp to cap');
-    expect(agentSource).toContain('q.single ? MINT_CAP');
+    // Single-tx used to reserve the FULL cap regardless of size — a 64 KiB file was
+    // quoted 2 STX of mining to spend about 0.15. It is now sized from the byte floor
+    // and merely BOUNDED by the cap. Behaviour is covered for real in
+    // fee-and-broadcast.test.ts; this just guards the shape.
+    expect(agentSource).toContain('function minerBudget(');
+    expect(agentSource).toContain('return reserve < MINT_CAP ? reserve : MINT_CAP;');
+    expect(agentSource).not.toContain('q.single ? MINT_CAP');
   });
 });
 

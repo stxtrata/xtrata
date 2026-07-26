@@ -375,7 +375,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-25.10';
+export const AGENT_BUILD = '2026-07-25.11';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -387,17 +387,57 @@ function listJobsRaw(): any[] { const o: any[] = []; for (let i = 0; i < localSt
 const publicJob = (j: any) => { const { ephemeralMnemonic, ...pub } = j; return { ...pub, hasKey: !!ephemeralMnemonic }; };
 
 // ---------- estimate (mirror core.estimate) ----------
+/**
+ * How much STX to hold back for MINER fees. One definition, used by the single-file
+ * quote and the batch quote alike, so the two cannot drift apart.
+ *
+ * Anchored to the network's own floor of 1 µSTX per byte. Everything above that is
+ * congestion, and it is measurable: across one live 10-batch upload the per-batch fee
+ * ran at 1.00, 1.00, 1.24, 1.37, 1.56, 1.68, 1.51 and 2.89 times the floor — mean
+ * 1.53x, worst 2.89x.
+ *
+ * Staged (many transactions): 1.8x the floor. Clears the observed mean with room to
+ * spare, and a lone spike no longer has to be pre-funded because the staged loop caps
+ * each batch at its share of the remaining runway. The previous 1.2x sat BELOW the
+ * observed mean, which is how a job spent its whole deposit without ever sealing.
+ *
+ * Single-tx (one shot, no averaging, no second chance): 3x the floor, still bounded by
+ * MINT_CAP. This replaces a flat MINT_CAP reserve that charged every small inscription
+ * for 2 STX of mining — a 64 KiB file reserved 2 STX in order to spend about 0.15.
+ *
+ * Over-collecting is cheap for the user because the remainder is swept back as change,
+ * but it is not free: it is what they see quoted. Hence tight, not generous.
+ */
+function minerBudget(bytes: number | bigint, single: boolean, minerTxs: bigint): bigint {
+  const byteCount = BigInt(Math.ceil(Number(bytes)));
+  if (single) {
+    const reserve = PERTX_MINER + byteCount * 3n;
+    return reserve < MINT_CAP ? reserve : MINT_CAP;
+  }
+  return minerTxs * PERTX_MINER + (byteCount * 9n) / 5n;
+}
+
 async function estimate(opts: any) {
   const { bytes, marginUstx = '0', agentFeePct = AGENT_FEE_PCT, parentCount = 0, receipt = true } = opts;
   const chunks = Math.ceil(Number(bytes) / CHUNK) || 1;
   const q = await quoteFee(Number(bytes), chunks);
   const minerTxs = q.single ? 1n : BigInt(q.batches + 2);
-  // Single-tx flows budget the mint at the full fee cap so a spike can never underfund it
-  // (unused escrow auto-refunds as change). Staged flows keep the per-batch reserve and
-  // lean on the balance-coupled ceiling in send().
-  // Staged mining budget follows the operational guide: ~1 STX per MB observed on
-  // mainnet (0.52 STX per 512 KiB batch) + 20% drift headroom → 1.2 µSTX per byte.
-  const minerReserve = q.single ? MINT_CAP : (minerTxs * PERTX_MINER + (BigInt(Math.ceil(Number(bytes))) * 6n) / 5n);
+  // MINER RESERVE — anchored to the network's own floor, which is 1 µSTX per byte.
+  // Everything above that floor is congestion, and it is measurable: across one live
+  // 10-batch upload the per-batch fee ran at 1.00, 1.00, 1.24, 1.37, 1.56, 1.68, 1.51
+  // and 2.89 times the floor — mean 1.53x, worst 2.89x.
+  //
+  // Staged (many transactions): 1.8x the floor. That clears the observed mean with
+  // room to spare, and a single spike no longer has to be pre-funded because the
+  // staged loop now caps each batch at its share of the remaining runway. The old
+  // 1.2x sat below the observed mean, which is how a job spent its deposit before
+  // sealing. Unused reserve comes back as change either way.
+  //
+  // Single-tx (one shot, no averaging and no second chance): 3x the floor, still
+  // bounded by MINT_CAP. This REPLACES a flat MINT_CAP reserve that charged every
+  // small inscription for 2 STX of mining — a 64 KiB file reserved 2 STX to spend
+  // about 0.15. Tightening that is most of what "run a tight ship" means here.
+  const minerReserve = minerBudget(bytes, q.single, minerTxs);
   // On-chain receipt is optional: when off, its protocol+miner cost is left out of
   // the deposit (the HTML receipt is still generated locally at delivery time).
   const rq = await quoteFee(RECEIPT_EST, 1);                 // quoteFee handles MOCK internally
@@ -429,7 +469,7 @@ async function estimateBatch(opts: any) {
     const chunks = Math.ceil(Number(bytes) / CHUNK) || 1;
     const q = await quoteFee(Number(bytes), chunks);
     const minerTxs = q.single ? 1n : BigInt(q.batches + 2);
-    const minerReserve = minerTxs * PERTX_MINER + (BigInt(Math.ceil(Number(bytes))) * 3n) / 2n;
+    const minerReserve = minerBudget(bytes, q.single, minerTxs);
     items.push({ bytes: Number(bytes), chunks, single: q.single, batches: q.batches, protocolFee: q.protocolFee.toString(), minerReserve: minerReserve.toString() });
     sumProtocol += q.protocolFee; sumMiner += minerReserve;
   }

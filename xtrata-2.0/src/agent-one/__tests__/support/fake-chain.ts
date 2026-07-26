@@ -137,6 +137,13 @@ export class FakeChain {
         const owner = tokenId ? this.owners.get(tokenId) : undefined;
         return json({ okay: true, result: owner ? someOwnerHex(owner) : NONE_HEX });
       }
+      if (url.endsWith('/quote-inscription-fee')) {
+        // (ok (some {total-fee, upload-batches, begin-fee, seal-fee})) — the protocol
+        // fee, which is separate from the miner fee this suite is mostly about.
+        const chunks = this.lastQuoteChunks ?? 1;
+        const batches = Math.max(1, Math.ceil(chunks / 32));
+        return json({ okay: true, result: quoteHex(100000 + chunks * 2000, batches) });
+      }
       return json({ okay: true, result: NONE_HEX });
     }
 
@@ -180,20 +187,33 @@ export class FakeChain {
 
   /** Set by the fetch shim from the POST body of a read-only call. */
   lastReadArgTokenId: string | null = null;
+  /** Chunk count from the most recent quote-inscription-fee call. */
+  lastQuoteChunks: number | null = null;
   /** Fee on the transaction currently being broadcast, decoded by the fetch shim. */
   lastBroadcastFee: bigint | null = null;
 }
 
 // (some u<id>) / none, as Clarity hex — built with the real serializer at load time.
 let someOwnerHexImpl: (addr: string) => string;
+let quoteHexImpl: (totalFee: number, batches: number) => string;
 let NONE_HEX = '0x09';
 const someOwnerHex = (addr: string) => someOwnerHexImpl(addr);
+const quoteHex = (totalFee: number, batches: number) => quoteHexImpl(totalFee, batches);
 
 export async function loadAgent(chain: FakeChain, opts: { core?: string } = {}) {
   const stacks = await import('@stacks/transactions');
   someOwnerHexImpl = (addr: string) =>
     stacks.cvToHex(stacks.responseOkCV(stacks.someCV(stacks.standardPrincipalCV(addr))));
   NONE_HEX = stacks.cvToHex(stacks.responseOkCV(stacks.noneCV()));
+  quoteHexImpl = (totalFee: number, batches: number) =>
+    // (ok {…}) — the contract does NOT wrap this in an optional, and the agent walks
+    // .value.value straight onto the tuple fields.
+    stacks.cvToHex(stacks.responseOkCV(stacks.tupleCV({
+      'total-fee': stacks.uintCV(totalFee),
+      'upload-batches': stacks.uintCV(batches),
+      'begin-fee': stacks.uintCV(1000),
+      'seal-fee': stacks.uintCV(1000)
+    })));
 
   const store = new Map<string, string>();
   const localStorage = {
@@ -228,6 +248,10 @@ export async function loadAgent(chain: FakeChain, opts: { core?: string } = {}) 
         if (typeof arg === 'string') {
           const cv: any = stacks.hexToCV(arg);
           chain.lastReadArgTokenId = cv?.value != null ? String(cv.value) : null;
+        }
+        // quote-inscription-fee(sizeBytes, chunks, mode) — chunks is the 2nd arg.
+        if (String(url).endsWith('/quote-inscription-fee') && Array.isArray(body.arguments) && body.arguments[1]) {
+          try { chain.lastQuoteChunks = Number((stacks.hexToCV(body.arguments[1]) as any).value); } catch { /* leave as is */ }
         }
       } catch { /* not a read-only call */ }
       // Broadcast: pull the real fee out of the serialized transaction, so the fake

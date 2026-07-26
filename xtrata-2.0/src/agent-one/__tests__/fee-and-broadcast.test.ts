@@ -175,3 +175,42 @@ describe('which of the node\'s three estimates we take', () => {
     expect(chain.broadcasts).toEqual([1000n, 2000n]);
   });
 });
+
+describe('the miner reserve is tight but survives observed congestion', () => {
+  // The floor is 1 µSTX/byte; a live 10-batch run averaged 1.53x it and peaked at 2.89x.
+  const FLOOR = (bytes: number) => BigInt(bytes);
+
+  it('reserves comfortably above the mean for a staged upload', async () => {
+    const bytes = 4_997_120;                      // ~5 MB player, 10 batches
+    const est = await (globalThis as any).window.XtrataAgent.estimate({ bytes, receipt: false, agentFeePct: 0 });
+    const reserve = BigInt(est.minerReserve);
+    const floor = FLOOR(bytes);
+    const ratio = Number(reserve) / Number(floor);
+    expect(ratio).toBeGreaterThan(1.53);          // above the observed mean
+    expect(ratio).toBeLessThan(2.2);              // but not padded into a scary quote
+  });
+
+  it('no longer charges a small single-tx file for 2 STX of mining', async () => {
+    const est = await (globalThis as any).window.XtrataAgent.estimate({ bytes: 64 * 1024, receipt: false, agentFeePct: 0 });
+    const reserve = BigInt(est.minerReserve);
+    expect(est.single).toBe(true);
+    // Was a flat MINT_CAP (2 STX) regardless of size.
+    expect(reserve).toBeLessThan(300_000n);
+    // Still at least 3x the floor, because a single tx gets no second chance.
+    expect(reserve).toBeGreaterThanOrEqual(FLOOR(64 * 1024) * 3n);
+  });
+
+  it('never reserves more than the per-tx cap for a single tx', async () => {
+    const est = await (globalThis as any).window.XtrataAgent.estimate({ bytes: 512 * 1024, receipt: false, agentFeePct: 0 });
+    expect(BigInt(est.minerReserve)).toBeLessThanOrEqual(2_000_000n);
+  });
+
+  it('quotes a batch on the same model as a single file', async () => {
+    const bytes = 64 * 1024;
+    const one = await (globalThis as any).window.XtrataAgent.estimate({ bytes, receipt: false, agentFeePct: 0 });
+    const many = await (globalThis as any).window.XtrataAgent.estimateBatch({ itemsBytes: [bytes, bytes], receipt: false, agentFeePct: 0 });
+    // Two identical items must reserve exactly twice one item — the batch path used
+    // to carry its own multiplier and drift from the single-file quote.
+    expect(BigInt(many.sumMiner)).toBe(BigInt(one.minerReserve) * 2n);
+  });
+});
