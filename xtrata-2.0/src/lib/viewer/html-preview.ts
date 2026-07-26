@@ -3,6 +3,18 @@ const GRID_PREVIEW_SCRIPT_MARKER = 'data-xtrata-grid-fit-script';
 const INTERACTIVE_PREVIEW_MARKER = 'data-xtrata-interactive-preview';
 
 const buildGridPreviewStyle = () => `<style ${GRID_PREVIEW_MARKER}="true">
+/* A tiny HTML inscription that brings no styles of its own — "Library",
+   "Music", a title and nothing else — used to render on the browser's default
+   white canvas, so it sat in the grid as a white card among black ones.
+   color-scheme is the right tool rather than a background declaration: it moves
+   only the UA DEFAULT, so an inscription that paints its own background is
+   untouched. :where() keeps the specificity at zero, so any rule the
+   inscription itself declares wins regardless of source order — this can
+   never repaint someone's artwork. */
+:where(:root) {
+  color-scheme: dark;
+}
+
 html, body {
   margin: 0 !important;
   padding: 0 !important;
