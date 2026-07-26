@@ -447,6 +447,35 @@ code and cannot get lost again. Of everything in this report, this is the
 cheapest fix with the largest effect — and unlike the others, it isn't an
 optimisation. It's finishing something that was already built.
 
+**And it's even cheaper than I thought.** I queried the index for the total size
+of every sealed inscription on the chain:
+
+| | |
+|---|---|
+| Sealed inscriptions | 3,152 |
+| Total size of all of them | **0.55 GB** |
+| Largest single file | 11.2 MB |
+| The 5 GB budget | 9× more than we need |
+
+The entire body of work Xtrata has ever inscribed fits in about half a gigabyte.
+At R2's storage rate that is **under one penny per month** — and reads and
+egress are free.
+
+So this isn't a cache in the usual sense of "keep the popular things and evict
+the rest". We can hold **a permanent, assembled copy of literally everything,
+forever, for less than a penny a month**, and never reconstruct anything from
+the chain twice. For a project whose entire promise is permanence, that is a
+rather better fit than a cache anyway.
+
+**Status: done.** Bucket `xtrata-runtime-content-cache` created and bound as
+`RUNTIME_CONTENT_CACHE` in `wrangler.toml`. Takes effect on the next deploy.
+
+One expectation to set: the warehouse starts **empty**. Nothing gets faster the
+moment it deploys. Each file is reconstructed once more, stored, and then is
+permanently fast for everyone everywhere. Crowd-warming — which until now has
+been filling a bucket with no bottom — will start actually accumulating, so
+coverage builds on its own over the first days.
+
 One caveat so this doesn't get oversold: the warehouse makes *repeat* requests
 fast and reliable. It does **not** remove the ~600 ms metadata toll (that's the
 separate fix in Part 6, item 3), and it doesn't reduce the ~10 MB of unrequested
@@ -522,13 +551,14 @@ question, and then #1 fixes what it finds.
 Ordered by benefit-per-risk. The first three are the ones that make the site
 feel fast.
 
-### Tier 0 — finish what's already built (do this first)
+### Tier 0 — finish what's already built ✅ DONE, awaiting deploy
 
-**0. Create the R2 bucket and bind it as `RUNTIME_CONTENT_CACHE` in
-`wrangler.toml`.** See Part 5b. ~7¢/month, no code changes, makes the existing
-warehouse and crowd-warming actually work.
-*Risk: essentially none. The code path is already written and already tested; it
-is currently taking the fallback branch.*
+**0. Create the R2 bucket and bind it as `RUNTIME_CONTENT_CACHE`.** See Part 5b.
+Bucket created, bound in `wrangler.toml` for both production and preview. Under
+a penny a month — all 3,152 sealed inscriptions total 0.55 GB. No code changes:
+the warehouse code was already written and already tested, it was just taking
+the fallback branch every time.
+*Risk: essentially none. Takes effect on the next deploy.*
 
 ### Tier 1 — big wins, low risk
 
