@@ -16,5 +16,21 @@
 # The wizard ships its JS under stable filenames (agent-one.js, suno-build.js,
 # HTML_Template.js, optimize-audio.js). Force revalidation so a redeploy is
 # never served from a stale CDN/browser cache.
-/wizard/*.js
+#
+# EXACT PATHS, deliberately. `/wizard/*.js` silently did nothing: Cloudflare Pages
+# does not support a `*` in the middle of a path segment, so the rule never matched
+# and these files fell back to the Pages default of max-age=14400. A redeploy could
+# therefore be shadowed by a four-hour-old bundle — which is exactly what happened,
+# with the page refusing to run against an agent build eleven versions behind.
+/wizard/agent-one.js
+  Cache-Control: no-cache
+/wizard/agent-one-wallet.js
+  Cache-Control: no-cache
+/wizard/suno-build.js
+  Cache-Control: no-cache
+/wizard/HTML_Template.js
+  Cache-Control: no-cache
+/wizard/optimize-audio.js
+  Cache-Control: no-cache
+/wizard/optimize-image.js
   Cache-Control: no-cache

@@ -40,6 +40,11 @@ export class FakeChain {
   midMultiple = 5;
   /** Node minimum: a broadcast at or below this is rejected as FeeTooLow. */
   minAcceptedFee = 0n;
+  /** Accepted into the mempool but only MINED at or above this fee. Models the
+   *  floor-fee transaction that miners simply ignore — accepted, never confirmed. */
+  minFeeToConfirm = 0n;
+  /** Nonces broadcast, in order — a replacement must reuse the original's nonce. */
+  broadcastNonces: bigint[] = [];
   /** Fees actually broadcast, in order — lets a test assert what reached the node. */
   broadcasts: bigint[] = [];
   /** tx id → status returned by the tx endpoint. */
@@ -170,7 +175,18 @@ export class FakeChain {
         return json({ error: 'transaction rejected', reason: 'FeeTooLow', reason_data: { expected: String(this.minAcceptedFee + 1n) } }, 400);
       }
       const txid = `0x${(++this.txSeq).toString(16).padStart(64, '0')}`;
-      this.txStatus.set(txid, 'success');
+      this.txStatus.set(txid, fee >= this.minFeeToConfirm ? 'success' : 'pending');
+      if (fee >= this.minFeeToConfirm) {
+        // A confirmed replacement supersedes every earlier tx for the same nonce.
+        const n = this.lastBroadcastNonce;
+        this.broadcastNonces.forEach((bn, i) => {
+          const earlier = `0x${(i + 1).toString(16).padStart(64, '0')}`;
+          if (bn === n && earlier !== txid && this.txStatus.get(earlier) === 'pending') {
+            this.txStatus.set(earlier, 'dropped_replace_by_fee');
+          }
+        });
+      }
+      this.broadcastNonces.push(this.lastBroadcastNonce ?? -1n);
       return json(txid.replace(/^0x/, ''));
     }
 
@@ -191,6 +207,8 @@ export class FakeChain {
   lastQuoteChunks: number | null = null;
   /** Fee on the transaction currently being broadcast, decoded by the fetch shim. */
   lastBroadcastFee: bigint | null = null;
+  /** Nonce on the transaction currently being broadcast. */
+  lastBroadcastNonce: bigint | null = null;
 }
 
 // (some u<id>) / none, as Clarity hex — built with the real serializer at load time.
@@ -261,7 +279,8 @@ export async function loadAgent(chain: FakeChain, opts: { core?: string } = {}) 
           const raw = init.body instanceof Uint8Array ? init.body : new Uint8Array(init.body);
           const tx: any = stacks.deserializeTransaction(raw);
           chain.lastBroadcastFee = BigInt(tx.auth.spendingCondition.fee.toString());
-        } catch { chain.lastBroadcastFee = null; }
+          chain.lastBroadcastNonce = BigInt(tx.auth.spendingCondition.nonce.toString());
+        } catch { chain.lastBroadcastFee = null; chain.lastBroadcastNonce = null; }
       }
     }
     return chain.handle(url);
