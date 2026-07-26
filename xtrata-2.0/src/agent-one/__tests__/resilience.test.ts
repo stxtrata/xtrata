@@ -84,3 +84,46 @@ describe('finish without me', () => {
     expect(fn).not.toMatch(/walletSession|userMnemonic|seedPhrase/);
   });
 });
+
+// The custody promise is the strongest thing we can say, so it has to stay TRUE.
+// "Nothing leaves your computer" would be false — the file goes on-chain, and the
+// key can leave if the user hands the job over. The claim is deliberately narrower
+// and therefore checkable: the deposit wallet is browser-created and browser-only.
+describe('self-custody is stated where the doubt actually is', () => {
+  it('appears at the payment moment on both surfaces', () => {
+    // Someone about to send real money to an address they have never seen.
+    expect(wizard).toContain('This is your own wallet, not ours.');
+    expect(wizard).toContain('holds the only key');
+    expect(suno).toContain('Your browser created this wallet and holds the only key');
+  });
+
+  it('says it in the keep-open banner, where it explains the constraint too', () => {
+    expect(suno).toMatch(/your browser created and only it can spend from/i);
+    expect(suno).toMatch(/why nobody else can touch your funds/i);
+  });
+
+  it('sets the expectation in both heroes', () => {
+    expect(suno).toContain('Self-custody, start to finish.');
+    expect(wizard).toMatch(/one-shot wallet your own browser creates and controls/i);
+  });
+
+  it('does not overclaim that nothing leaves the machine', () => {
+    // The file DOES leave — that is the product. Conflating the two would be a
+    // promise we could not keep.
+    for (const html of [suno, wizard]) {
+      expect(html).not.toMatch(/nothing (ever )?leaves your (computer|machine)/i);
+    }
+    // The old line read as a custody claim but was about the preview; it is gone.
+    expect(suno).not.toContain('Nothing leaves your browser until you pay.');
+    expect(suno).toContain('Your song stays on your machine until you pay');
+  });
+
+  it('qualifies the promise only where the handoff is actually offered', () => {
+    // An unexplained caveat is worse than none, and an unqualified promise beside a
+    // button that breaks it is worse still.
+    expect(suno).toContain('function handoffOffered()');
+    expect(suno).toContain("(handoffOffered()?', unless you hand this job over below':'')");
+    // The wizard has no handoff button, so it carries no caveat.
+    expect(wizard).not.toContain('handoffOffered');
+  });
+});

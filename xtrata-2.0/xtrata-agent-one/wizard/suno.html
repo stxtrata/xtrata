@@ -82,7 +82,8 @@
   <div class="card">
     <span class="tag">⚡ one payment → full player on-chain</span>
     <h1 class="suno-logo"><img src="/suno-more/assets/suno-more-logo.webp" alt="SUNO More — one song, infinite possibilities" /></h1>
-    <p class="lead">You made the song — now do more with it. Drop a Suno MP3 and pay once: your browser optimises the audio to Opus, pulls in the cover art, title, artist &amp; lyrics, and builds a self-contained player. The agent inscribes the master and returns the token + receipt to your wallet, change refunded. Nothing leaves your browser until you pay.</p>
+    <p class="lead">You made the song — now do more with it. Drop a Suno MP3 and pay once: your browser optimises the audio to Opus, pulls in the cover art, title, artist &amp; lyrics, and builds a self-contained player. The agent inscribes the master and returns the token + receipt to your wallet, change refunded.</p>
+    <p class="lead" style="font-size:13.5px;opacity:.85">🔑 <b>Self-custody, start to finish.</b> Your song stays on your machine until you pay, and your deposit goes to a one-shot wallet <b>your own browser creates and controls</b> — never to us. It is emptied and its key destroyed the moment your inscription and change are back with you.</p>
 
     <input id="picker" type="file" accept="audio/mpeg,.mp3" multiple hidden />
     <div id="drop" class="drop">
@@ -198,7 +199,7 @@
            of the rotating tips, which is easy to miss and gone a second later. -->
       <div id="keepOpen" style="display:none;margin-top:12px;padding:10px 12px;border:1px solid var(--acc2);border-radius:10px;background:rgba(124,92,255,.08);font-size:12.5px">
         <div><b>🔒 Keep this tab open</b> — <span id="keepOpenSteps">the agent runs in this browser</span></div>
-        <div class="muted" style="font-size:11.5px;margin-top:4px">Your deposit sits in a one-shot wallet that only this tab can spend from. Closing pauses the job — you can resume it or take a refund when you come back.</div>
+        <div class="muted" style="font-size:11.5px;margin-top:4px">Your deposit sits in a one-shot wallet <b>your browser created and only it can spend from</b> — that is why this has to stay open, and also why nobody else can touch your funds. Closing pauses the job; you can resume it or take a refund when you come back.</div>
         <div id="keepOpenWarn" class="err" style="font-size:11.5px;margin-top:6px;display:none"></div>
         <!-- Finish without me. Hidden entirely unless a handoff endpoint is configured,
              so a half-deployed feature is never offered. -->
@@ -617,6 +618,7 @@ function renderEscrow(job, status){
   box.style.display='block';
   box.innerHTML='<div style="font-weight:700;margin-bottom:6px">Escrow checklist <span class="muted" style="font-weight:400">— two sends, any order; parent, song and change all come back to you</span></div>'
     +'<div class="kv"><span>Deposit address</span><span class="mono" style="word-break:break-all">'+esc(job.depositAddress)+'</span></div>'
+    +'<div class="muted" style="font-size:11px;margin:2px 0 8px">🔑 Your browser created this wallet and holds the only key — Xtrata cannot spend from it'+(handoffOffered()?', unless you hand this job over below':'')+'. Emptied and destroyed when your inscription and change come back.</div>'
     +'<div class="kv"><span>1 · STX deposit ('+stx(job.requiredUstx)+')</span><span>'+(paid?'<span class="ok">✓ arrived</span>':(status&&status.pending?'<span style="color:var(--warn)">⏳ seen — confirming…</span>':'<span class="muted">awaiting</span>'))+'</span></div>'
     +rows
     +(PARENT_MSG?('<div style="margin-top:6px;'+(PARENT_MSG.err?'color:var(--bad)':'color:var(--ok)')+'">'+PARENT_MSG.text+'</div>'):'')
@@ -694,6 +696,9 @@ function renderKeepOpen(job, st){
 // The deposit key never leaves this browser EXCEPT here, so the agreement is
 // explicit, per job, and spells out what changes rather than burying it.
 const HANDOFF_CONSENT='i-agree-xtrata-may-finish-this-job';
+// Only qualify the custody promise where the handoff is genuinely on offer —
+// an unexplained caveat is worse than none.
+function handoffOffered(){ try{ const A=window.XtrataAgent; return !!(A&&A.handoffAvailable&&A.handoffAvailable()); }catch{ return false; } }
 function renderHandoff(job){
   const row=$('#handoffRow'); if(!row) return;
   const A=window.XtrataAgent;
