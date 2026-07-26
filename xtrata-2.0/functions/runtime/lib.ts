@@ -61,6 +61,34 @@ const encodeUintListArg = (values: bigint[]) =>
 
 const asError = (value: unknown) => (value instanceof Error ? value : new Error(String(value)));
 
+/**
+ * Every contract we asked answered cleanly, and none of them holds this token.
+ * Distinct from "a read failed": this is a definitive absence, so it must be
+ * reported as 404 rather than as a server error. Migrated tokens keep their id
+ * but leave their bytes on the core they were written to, so `triedContracts`
+ * records the lineage we searched — that is the actionable part of the answer.
+ */
+export class RuntimeContentNotFoundError extends Error {
+  triedContracts: string[];
+
+  constructor(tokenId: bigint, triedContracts: string[]) {
+    super(
+      `Inscription #${tokenId.toString()} was not found on ${
+        triedContracts.length === 1
+          ? triedContracts[0]
+          : `any of: ${triedContracts.join(', ')}`
+      }.`
+    );
+    this.name = 'RuntimeContentNotFoundError';
+    this.triedContracts = triedContracts;
+  }
+}
+
+export const isRuntimeContentNotFoundError = (
+  error: unknown
+): error is RuntimeContentNotFoundError =>
+  error instanceof RuntimeContentNotFoundError;
+
 export type RuntimeUpstreamRequestTracker = {
   attempts: number;
 };
@@ -631,27 +659,42 @@ export const resolveRuntimeMeta = async (params: {
 
   let activeContract = params.primaryContract;
   let activeMeta = primaryMeta;
+  const triedContracts = [formatRuntimeContractId(params.primaryContract)];
+  let fallbackMetaError: Error | null = null;
 
   if (
     !activeMeta &&
     params.fallbackContract &&
     !isSameRuntimeContract(params.primaryContract, params.fallbackContract)
   ) {
-    const fallbackMeta = await read.fetchMeta({
-      env: params.env,
-      apiBases: params.apiBases,
-      contract: params.fallbackContract,
-      tokenId: params.tokenId,
-      upstreamTracker: params.upstreamTracker
-    });
-    if (fallbackMeta) {
-      activeContract = params.fallbackContract;
-      activeMeta = fallbackMeta;
+    triedContracts.push(formatRuntimeContractId(params.fallbackContract));
+    try {
+      const fallbackMeta = await read.fetchMeta({
+        env: params.env,
+        apiBases: params.apiBases,
+        contract: params.fallbackContract,
+        tokenId: params.tokenId,
+        upstreamTracker: params.upstreamTracker
+      });
+      if (fallbackMeta) {
+        activeContract = params.fallbackContract;
+        activeMeta = fallbackMeta;
+      }
+    } catch (error) {
+      fallbackMetaError = asError(error);
+      if (isCloudflareSubrequestQuotaError(error)) {
+        throw fallbackMetaError;
+      }
     }
   }
 
   if (!activeMeta) {
-    throw primaryMetaError || new Error('Inscription metadata not found.');
+    // A read that FAILED and a token that is genuinely ABSENT are different
+    // answers. Only the second is a 404; reporting a failed read as "not found"
+    // would tell the caller the inscription does not exist when we simply could
+    // not reach the chain.
+    const readError = primaryMetaError ?? fallbackMetaError;
+    throw readError ?? new RuntimeContentNotFoundError(params.tokenId, triedContracts);
   }
 
   return {

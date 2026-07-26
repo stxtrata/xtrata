@@ -18,6 +18,7 @@ import {
   getRuntimeReadConfig,
   getRuntimeApiBases,
   isCloudflareSubrequestQuotaError,
+  isRuntimeContentNotFoundError,
   parseRuntimeContractRef,
   parseRuntimeNetwork,
   parseRuntimeTokenId,
@@ -812,6 +813,7 @@ export const onRequest = async (context: {
     const detail = error instanceof Error ? error.message : String(error);
     const diagnostics = getErrorDiagnostics(error);
     const subrequestQuotaExhausted = isCloudflareSubrequestQuotaError(error);
+    const notFound = isRuntimeContentNotFoundError(error);
     logRuntimeContentDebug(env, 'reconstruction-error', {
       network,
       tokenId: tokenId?.toString(),
@@ -820,6 +822,42 @@ export const onRequest = async (context: {
       upstreamRequests: upstreamTracker.attempts,
       diagnostics: toRuntimeDiagnosticsSummary(diagnostics)
     });
+    // Always log a failed content request, not just in debug mode. These are
+    // invisible otherwise: client-side telemetry never sees them (the browser
+    // just gets a status code), and an unreachable inscription is exactly the
+    // kind of thing that should not be discovered by someone reporting it.
+    console.warn('[runtime/content] request failed', {
+      network,
+      tokenId: tokenId?.toString() ?? null,
+      requestedContractId: contractId ? getRuntimeContractId(contractId) : null,
+      fallbackContractId: fallbackContractId
+        ? getRuntimeContractId(fallbackContractId)
+        : null,
+      outcome: notFound
+        ? 'not-found'
+        : subrequestQuotaExhausted
+          ? 'upstream-quota'
+          : 'reconstruction-failed',
+      triedContracts: notFound ? error.triedContracts : undefined,
+      upstreamRequests: upstreamTracker.attempts,
+      detail
+    });
+
+    if (notFound) {
+      // 404, not 502, for two reasons. It is the honest status — every contract
+      // we asked answered, and none of them has this token. And Cloudflare
+      // replaces a 502 body with its own generic error page, so the caller was
+      // previously getting a bare "error code: 502" with no explanation of
+      // which contracts were searched.
+      return asJsonError(
+        404,
+        'Inscription not found on this contract lineage.',
+        detail,
+        diagnostics,
+        upstreamTracker.attempts
+      );
+    }
+
     return asJsonError(
       subrequestQuotaExhausted ? 503 : 502,
       subrequestQuotaExhausted
