@@ -580,23 +580,57 @@ sweep that plays on power-on already covers that wait — it exists for exactly
 this reason. Someone who leaves the radio playing and navigates still gets it
 resumed, because that is a track they asked for.*
 
-**2. Let Cloudflare's network cache immutable content.**
-An inscription's bytes can never change. Configure the edge to keep them.
-*Expected: repeat visitors served in tens of milliseconds from a nearby data
-centre, with our code never waking up. Cuts Worker cost and Hiro calls too.*
-*Risk: low — but this is the change where being careful matters most. Only
-sealed content with a content hash may be cached this way. Unsealed or
-in-progress inscriptions must keep their current short cache life, or someone
-could see a half-finished file forever. The code already distinguishes these
-cases; the rule just has to be enforced deliberately.*
+**3. Remember the content hash so we stop asking the chain for it.** ✅ **DONE**
+The index already holds the hash, and for a sealed inscription it can never
+change. `/runtime/content` now reads it from D1 and goes straight to the
+warehouse; the chain is only consulted when the index cannot answer or the
+warehouse misses.
 
-**3. Remember the content hash so we stop asking the chain for it.**
-The 600 ms toll exists only because the hash lives on-chain. We already have it
-in D1, and for sealed inscriptions it can never change. Read it from D1 (or a
-short edge-cached lookup) and fall back to the chain only when it's missing.
-*Expected: ~600 ms → ~50 ms before first byte. Removes five blockchain calls
-per media request.*
-*Risk: low, and it fails safe — no D1 row means we do exactly what we do today.*
+Deliberately one-way: the index is used only to FIND an assembled copy, never
+to reconstruct one. A stale or wrong row can therefore cost a wasted lookup but
+can never produce wrong bytes — the key simply fails to match and the normal
+chain path runs. Malformed hashes are rejected rather than turned into a cache
+key, and a missing D1 binding (a fresh preview environment) skips the fast path
+silently.
+
+*Expected: cache hits drop from ~600 ms and up to five upstream calls to a
+single indexed lookup. Tests assert a hit is served with **zero** chain calls.*
+
+**2. Let Cloudflare's network cache immutable content.** ⚠️ **Recommend a
+dashboard Cache Rule — deliberately not done in code**
+
+Worth explaining, because it is the one item I have chosen not to build.
+
+The finding stands: every response comes back `cf-cache-status: DYNAMIC`, so
+Cloudflare's network keeps no copy and every visitor reaches our code. The
+question is how to fix it, and the answer changed once items 0 and 3 landed.
+
+Doing it in code would mean caching whole responses in `caches.default`, keyed
+by request URL. That has three problems:
+- It is **per-data-centre**, so it adds little over R2, which is already global.
+- The existing purge endpoint keys on the content hash and could not clear it.
+  A URL-keyed cache would need every URL permutation purged by hand
+  (`/inscription/8`, `/i/8`, `/runtime/content?...`), which is not a purge story
+  anyone should rely on.
+- It duplicates, less well, what the platform does natively.
+
+A **Cache Rule** in the Cloudflare dashboard — cache `/inscription/*` and
+`/i/*`, honouring the origin `Cache-Control` we already send — gets the same
+result with Cloudflare's own purge tooling behind it, and is reversible with a
+toggle.
+
+My recommendation: deploy items 0, 1 and 3 first and measure. A cache hit now
+costs a D1 lookup plus an R2 read rather than a chain round trip, which may
+well be enough. If it is not, add the Cache Rule then — as configuration, with
+a working purge path, rather than as a bespoke cache in our code.
+
+*Whichever way it is done, one rule must hold: only sealed content with a
+content hash may be cached this way. Unsealed or in-progress inscriptions have
+to keep their current short cache life, or someone could see a half-finished
+file forever. The code already sends the two different `Cache-Control` values,
+so a rule that honours the origin header gets this right for free — which is a
+further argument for the Cache Rule over hand-rolled caching.*
+
 
 ### Tier 2 — solid wins, slightly more care
 
