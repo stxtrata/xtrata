@@ -36,6 +36,29 @@ describe('html grid preview injection', () => {
     expect(result).toContain(": 'auto'");
   });
 
+  // A bare HTML inscription carrying no styles of its own rendered on the
+  // browser's default white canvas, so it appeared as a white card in an
+  // otherwise black grid.
+  it('defaults an unstyled inscription to the dark grid canvas', () => {
+    const html = '<html><head><title>Library</title></head><body>Library</body></html>';
+    const result = injectGridThumbnailHtml(html);
+    expect(result).toContain('color-scheme: dark;');
+  });
+
+  // The guard on the above: this must never repaint an inscription that chose
+  // its own appearance. Zero specificity via :where() means any rule the
+  // inscription declares beats it, whatever the source order.
+  it('cannot override an appearance the inscription chose for itself', () => {
+    const result = injectGridThumbnailHtml(
+      '<html><head></head><body></body></html>'
+    );
+    const colorSchemeRule =
+      result.match(/(:\S+)\s*\{\s*\n?\s*color-scheme: dark;/)?.[1] ?? '';
+    expect(colorSchemeRule).toBe(':where(:root)');
+    // No background is declared at all, so a painted background is untouched.
+    expect(result).not.toMatch(/background(-color)?:/);
+  });
+
   it('avoids duplicate injection', () => {
     const html =
       '<html><head><style data-xtrata-grid-preview="true"></style></head><body></body></html>';
