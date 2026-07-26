@@ -89,7 +89,12 @@ describe('the parent gate reads chain state, not the holdings index', () => {
   it('decides held/missing from get-owner', () => {
     // The index lags chain state, so gating on it left the escrow checklist saying
     // "arrived at the deposit wallet" on one line and "now send the parent" above it.
-    expect(parentsStatus).toContain('(((await ownerOf(pid)) === own) ? held : missing).push(pid)');
+    // Still get-owner, but the loop was reshaped so a FAILED read lands in `unknown`
+    // rather than `missing` — reporting a read error as "not arrived" is what made the
+    // checklist flicker. See degraded-api.test.ts for the behaviour.
+    expect(parentsStatus).toContain('const r = await ownerOfChecked(pid);');
+    expect(parentsStatus).toContain('else if (r.owner === own) held.push(pid);');
+    expect(parentsStatus).toContain('if (!r.ok) unknown.push(pid);');
     // ...and that ownership decision is NOT derived from the holdings list.
     expect(parentsStatus).not.toContain('required.filter((p) => heldAll!.includes(p))');
   });

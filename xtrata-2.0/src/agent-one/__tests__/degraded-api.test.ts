@@ -195,3 +195,33 @@ describe('a degraded read is never reported as a fact about the chain', () => {
     expect(logged.join('\n')).toMatch(/nonce lookup failed/i);
   });
 });
+
+describe('a parent that has arrived stays arrived', () => {
+  const job = (parents: string[]) => ({ jobId: 'j1', depositAddress: DEPOSIT, parents, mock: false, fundedAt: new Date().toISOString() });
+
+  it('does not report a parent missing when the ownership read simply failed', async () => {
+    chain.owners.set('2878', DEPOSIT);          // it IS at the deposit wallet
+    chain.fail('/get-owner', 500);              // ...but the read does not answer
+    const s = await agent.parentsStatus(job(['2878']));
+    // The flicker: ownerOf() returns null on any error, so a transient RPC failure
+    // was bucketed as "missing" and the checklist flipped green → not arrived → green.
+    expect(s.missing).toEqual([]);
+    expect(s.unknown).toEqual(['2878']);
+    expect(s.ok).toBe(false);                   // unknown still blocks the mint
+  });
+
+  it('still reports a genuinely absent parent as missing', async () => {
+    chain.owners.set('2878', PAYER);
+    const s = await agent.parentsStatus(job(['2878']));
+    expect(s.missing).toEqual(['2878']);
+    expect(s.unknown).toEqual([]);
+  });
+
+  it('reports it held when the read answers and the deposit owns it', async () => {
+    chain.owners.set('2878', DEPOSIT);
+    const s = await agent.parentsStatus(job(['2878']));
+    expect(s.held).toEqual(['2878']);
+    expect(s.unknown).toEqual([]);
+    expect(s.ok).toBe(true);
+  });
+});
