@@ -494,7 +494,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-26.1';
+export const AGENT_BUILD = '2026-07-26.2';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -611,6 +611,17 @@ async function estimateBatch(opts: any) {
 }
 
 // ---------- receipt (copied from core: success + refunded) ----------
+/**
+ * The name the USER saw, for receipts. "Agent One" is the internal engine name and
+ * should never appear on something a buyer keeps — the SUNO page never says it, so a
+ * receipt that does looks like it came from somewhere else entirely.
+ */
+const ORIGIN_BRAND: Record<string, string> = {
+  wizard: 'Inscription Wizard',
+  suno: 'SUNO More',
+};
+const brandFor = (origin: any) => ORIGIN_BRAND[String(origin || 'wizard')] || ORIGIN_BRAND.wizard;
+
 function receiptData(job: any, x: any) {
   const received = BigInt(x.received);
   const mainMiner = x.mainMinerFee != null ? BigInt(x.mainMinerFee) : (job.mainMinerFee ? BigInt(job.mainMinerFee) : BigInt(job.minerReserve));
@@ -628,7 +639,7 @@ function receiptData(job: any, x: any) {
   return {
     jobId: job.jobId, core: job.core, date: new Date().toISOString(),
     uri: job.uri, mime: job.mime, bytes: job.bytes, chunks: job.chunks, single: job.single,
-    tokenId: job.tokenId, receiptTokenId: x.receiptTokenId || null, recipient: x.recipient || job.recipient || job.user, agentIdentityId: job.agentIdentityId || null,
+    tokenId: job.tokenId, receiptTokenId: x.receiptTokenId || null, recipient: x.recipient || job.recipient || job.user, agentIdentityId: job.agentIdentityId || null, origin: job.origin || 'wizard',
     parents: (job.parents || []).map(String),
     outcome: x.outcome || 'inscribed', note: x.note || null,
     depositReceived: received.toString(), xtrataProtocol: fileProtocol.toString(), receiptProtocol: receiptProtocol.toString(),
@@ -648,7 +659,7 @@ function buildReceiptHtml(d: any) {
   const usd = (u: any) => d.stxUsd ? ' · ~$' + (Number(u) / 1e6 * d.stxUsd).toFixed(2) : '';
   const short = (s: any) => s ? (s.length > 18 ? s.slice(0, 9) + '…' + s.slice(-6) : s) : '—';
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Xtrata Agent One — Receipt ${d.jobId}</title><style>
+<title>Xtrata ${brandFor(d.origin)} — Receipt ${d.jobId}</title><style>
 :root{--bg:#0b0e14;--pan:#121826;--line:#243044;--ink:#e9eff8;--mut:#8ea0bd;--acc:#3ea6ff;--acc2:#7c5cff;--ok:#3ddc97;--mono:ui-monospace,Menlo,Consolas,monospace}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(820px 420px at 80% -10%,rgba(124,92,255,.14),transparent),var(--bg);color:var(--ink);font:14px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 .wrap{max-width:560px;margin:0 auto;padding:34px 20px}.card{background:var(--pan);border:1px solid var(--line);border-radius:16px;padding:24px}
@@ -660,7 +671,7 @@ function buildReceiptHtml(d: any) {
 .tot{margin-top:10px;padding-top:12px;border-top:1px solid var(--line)}.tot .r span:last-child{color:var(--acc);font-size:15px}
 .fee span:last-child{color:var(--acc2)}.tok{color:var(--ok)}.foot{color:var(--mut);font-size:11px;margin-top:18px;text-align:center}
 </style></head><body><div class="wrap"><div class="card">
-<div class="h"><div class="logo"><b>XTRATA</b> <i>Agent One</i></div><span class="badge"${d.outcome !== 'inscribed' ? ' style="color:#ffb454;border-color:#5a4620"' : ''}>${d.outcome === 'inscribed' ? '✓ Inscribed' : '↩︎ Refunded'}</span></div>
+<div class="h"><div class="logo"><b>XTRATA</b> <i>${brandFor(d.origin)}</i></div><span class="badge"${d.outcome !== 'inscribed' ? ' style="color:#ffb454;border-color:#5a4620"' : ''}>${d.outcome === 'inscribed' ? '✓ Inscribed' : '↩︎ Refunded'}</span></div>
 <div class="sub">${d.outcome === 'inscribed' ? 'Inscription receipt' : 'Refund receipt'} · ${d.date.slice(0, 19).replace('T', ' ')} UTC</div>
 <h1>What was inscribed</h1>
 ${row('Content URI', escHtml(d.uri))}${row('Type', escHtml(d.mime))}
@@ -672,7 +683,7 @@ ${(d.parents && d.parents.length) ? row('Parent inscription' + (d.parents.length
 ${row('Inscription token', '<span class="tok">#' + (d.tokenId ?? '—') + '</span>' + ((d.parents && d.parents.length) ? ' · child of #' + d.parents.join(', #') : ''))}
 ${row('Receipt token', d.receiptTokenId ? ('<span class="tok">#' + d.receiptTokenId + '</span>') : 'this inscription')}
 ${row('Delivered to', short(d.recipient))}
-${d.agentIdentityId ? row('Issued by', 'Agent One · identity <span class="tok">#' + d.agentIdentityId + '</span>') : ''}
+${d.agentIdentityId ? row('Issued by', brandFor(d.origin) + ' · identity <span class="tok">#' + d.agentIdentityId + '</span>') : ''}
 ${d.outcome === 'inscribed' ? `<h1>Cost breakdown</h1>
 ${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
 ${row('Xtrata protocol fee', stxr(d.xtrataProtocol) + usd(d.xtrataProtocol))}
@@ -980,7 +991,7 @@ async function inscribeReceipt(key: string, from: string, html: string, uri: str
 
 // ---------- estimate→create→inscribe→deliver→refund (mirror core) ----------
 async function createJob(opts: any) {
-  const { file, uri, mime = 'application/octet-stream', deps = [], parents = [], user, recipient = null, expectedFunder = null, marginUstx = '0', fastTrack = false, agentFeePct = AGENT_FEE_PCT, receipt = true } = opts;
+  const { file, uri, mime = 'application/octet-stream', deps = [], parents = [], user, recipient = null, expectedFunder = null, marginUstx = '0', fastTrack = false, agentFeePct = AGENT_FEE_PCT, receipt = true, origin = 'wizard', sunoPlayer = null } = opts;
   if (!file || !uri) throw new Error('file, uri required');
   if (!fastTrack && !user) throw new Error('delivery address (user) required unless fastTrack');
   // PARENT LINKING (escrow): validate declared parents up-front, before payment is requested.
@@ -1014,7 +1025,7 @@ async function createJob(opts: any) {
     protocolFee: est.protocolFee, minerReserve: est.minerReserve, receiptProtocol: est.receiptProtocol, receiptMiner: est.receiptMiner,
     agentFeePct: est.agentFeePct, agentFeeAddress: AGENT_FEE_ADDRESS, agentFeeExpectedUstx: est.agentFeeUstx, agentIdentityId: cfg.agentIdentityId || null,
     margin: String(marginUstx), requiredUstx: est.requiredUstx, depositAddress: w.address, ephemeralMnemonic: w.mnemonic,
-    status: 'AWAITING_DEPOSIT', createdAt: new Date().toISOString(), storageDurability: durability,
+    status: 'AWAITING_DEPOSIT', createdAt: new Date().toISOString(), storageDurability: durability, origin, sunoPlayer,
   };
   writeJob(job); return publicJob(job);
 }
@@ -1027,7 +1038,7 @@ async function createJob(opts: any) {
  * items are inscribed exactly as provided.
  */
 async function createBatchJob(opts: any) {
-  const { items = [], parents = [], user, recipient = null, expectedFunder = null, marginUstx = '0', fastTrack = false, strict = false, agentFeePct = AGENT_FEE_PCT, receipt = true } = opts;
+  const { items = [], parents = [], user, recipient = null, expectedFunder = null, marginUstx = '0', fastTrack = false, strict = false, agentFeePct = AGENT_FEE_PCT, receipt = true, origin = 'wizard' } = opts;
   if (!Array.isArray(items) || !items.length) throw new Error('items required');
   if (items.length > MAX_BATCH_ITEMS) throw new Error(`batch too large: ${items.length} items (max ${MAX_BATCH_ITEMS})`);
   if (!fastTrack && !user) throw new Error('delivery address (user) required unless fastTrack');
@@ -1087,7 +1098,7 @@ async function createBatchJob(opts: any) {
     receiptProtocol: est.receiptProtocol, receiptMiner: est.receiptMiner,
     agentFeePct: est.agentFeePct, agentFeeAddress: AGENT_FEE_ADDRESS, agentFeeExpectedUstx: est.agentFeeUstx, agentIdentityId: cfg.agentIdentityId || null,
     margin: String(marginUstx), requiredUstx: est.requiredUstx, depositAddress: w.address, ephemeralMnemonic: w.mnemonic,
-    status: 'AWAITING_DEPOSIT', createdAt: new Date().toISOString(), storageDurability: durability,
+    status: 'AWAITING_DEPOSIT', createdAt: new Date().toISOString(), storageDurability: durability, origin,
   };
   writeJob(job); return publicJob(job);
 }
@@ -1253,7 +1264,7 @@ function buildBatchReceiptHtml(d: any) {
     return row(`${i.idx + 1} · ${escHtml(i.uri)}`, `${escHtml(i.mime)} · ${(i.bytes / 1048576).toFixed(2)} MiB · ${mark}`);
   };
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Xtrata Agent One — Batch receipt ${d.jobId}</title><style>
+<title>Xtrata ${brandFor(d.origin)} — Batch receipt ${d.jobId}</title><style>
 :root{--bg:#0b0e14;--pan:#121826;--line:#243044;--ink:#e9eff8;--mut:#8ea0bd;--acc:#3ea6ff;--acc2:#7c5cff;--ok:#3ddc97;--mono:ui-monospace,Menlo,Consolas,monospace}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(820px 420px at 80% -10%,rgba(124,92,255,.14),transparent),var(--bg);color:var(--ink);font:14px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 .wrap{max-width:640px;margin:0 auto;padding:34px 20px}.card{background:var(--pan);border:1px solid var(--line);border-radius:16px;padding:24px}
@@ -1265,7 +1276,7 @@ function buildBatchReceiptHtml(d: any) {
 .tot{margin-top:10px;padding-top:12px;border-top:1px solid var(--line)}.tot .r span:last-child{color:var(--acc);font-size:15px}
 .fee span:last-child{color:var(--acc2)}.tok{color:var(--ok)}.foot{color:var(--mut);font-size:11px;margin-top:18px;text-align:center}
 </style></head><body><div class="wrap"><div class="card">
-<div class="h"><div class="logo"><b>XTRATA</b> <i>Agent One</i></div><span class="badge"${!ok ? ' style="color:#ffb454;border-color:#5a4620"' : ''}>${ok ? `✓ Batch · ${d.counts.minted}/${d.counts.total} inscribed` : '↩︎ Refunded'}</span></div>
+<div class="h"><div class="logo"><b>XTRATA</b> <i>${brandFor(d.origin)}</i></div><span class="badge"${!ok ? ' style="color:#ffb454;border-color:#5a4620"' : ''}>${ok ? `✓ Batch · ${d.counts.minted}/${d.counts.total} inscribed` : '↩︎ Refunded'}</span></div>
 <div class="sub">Batch ${ok ? 'inscription' : 'refund'} receipt · ${d.counts.total} items · ${d.date.slice(0, 19).replace('T', ' ')} UTC</div>
 <h1>What was inscribed</h1>
 ${d.items.map(itemRow).join('')}
@@ -1273,7 +1284,7 @@ ${(d.parents && d.parents.length) ? `<h1>Parent inscription${d.parents.length > 
 ${row('Escrowed for the batch', d.parents.map((p: string) => '<span class="tok">#' + p + '</span>').join(' ') + ` · linked to every item · returned to ${ok ? 'you' : 'sender'}`)}` : ''}
 ${row('Receipt token', d.receiptTokenId ? ('<span class="tok">#' + d.receiptTokenId + '</span>') : 'this inscription')}
 ${row('Delivered to', escHtml(short(d.recipient)))}
-${d.agentIdentityId ? row('Issued by', 'Agent One · identity <span class="tok">#' + d.agentIdentityId + '</span>') : ''}
+${d.agentIdentityId ? row('Issued by', brandFor(d.origin) + ' · identity <span class="tok">#' + d.agentIdentityId + '</span>') : ''}
 <h1>${ok ? 'Cost breakdown' : 'Outcome'}</h1>
 ${ok ? '' : row('Status', 'Not completed — all funds and inscriptions returned to sender')}
 ${d.note ? row(ok ? 'Note' : 'Reason', escHtml(d.note)) : ''}
@@ -1892,3 +1903,5 @@ export { deriveFrom, newWallet, balance, quoteFee, mintSingle, stagedInscribe, g
 // parent arrived" — the questions behind the failures that shipped, and both are only
 // meaningful when exercised against a degraded API rather than asserted on in source.
 export { detectFunder, parentsStatus, heldInscriptions, waitTx, safeNonce, statusJob };
+// Exported so the branding can be verified by RENDERING a receipt, not by reading the template.
+export { buildReceiptHtml, buildBatchReceiptHtml, brandFor };

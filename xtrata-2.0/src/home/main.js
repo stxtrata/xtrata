@@ -9427,20 +9427,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           renderMarketListings();
           renderSellerDashboard();
         }
-        if (PAGE_MODE === 'home' && state.walletSession.isConnected && state.walletSession.address) {
-          // A wallet that connects on the landing page and holds inscriptions
-          // goes straight to its ledger on the My Wallet page.
-          const holdingCount =
-            (state.walletUsesPagedHoldings
-              ? state.walletTotalCount
-              : state.walletTokenIds.length) + getInjectedEscrowTwinIds().length;
-          if (holdingCount > 0) {
-            appendLog('Opening My Wallet with your inscriptions…');
-            window.history.pushState(null, '', '/my-wallet');
-            void switchToPage('my-wallet');
-            return;
-          }
-        }
+        // Connecting a wallet is not a request to go anywhere. This used to jump the
+        // user to My Xtrata — but only if they happened to hold inscriptions, so the
+        // same button behaved differently for different people, which is what made it
+        // feel unpredictable. loadWalletInscriptions() above still runs, so My Xtrata
+        // is ready whenever they choose to open it themselves.
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         appendLog(`Wallet connect failed: ${message}`);

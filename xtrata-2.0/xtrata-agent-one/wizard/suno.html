@@ -66,6 +66,13 @@
   .efield textarea{resize:vertical;font-size:13px;line-height:1.5}
   .efield input:focus,.efield textarea:focus{outline:none;border-color:var(--acc2)}
   footer{padding:14px 22px;color:var(--mut);font-size:12px;text-align:center}
+  .danger-confirm{position:fixed;inset:0;z-index:95;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.6)}
+  .danger-panel{width:min(440px,100%);max-height:90vh;overflow-y:auto;padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:0 18px 44px rgba(0,0,0,.45)}
+  .danger-title{font-weight:800;font-size:15.5px;margin-bottom:8px}
+  .danger-body{font-size:13px;line-height:1.55;color:var(--mut)}
+  .danger-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:14px}
+  .danger-actions .btn{width:auto;margin:0;padding:8px 14px;font-size:13px}
+  .danger-yes{background:linear-gradient(180deg,#e0603f,#c14a2c)}
 </style>
 </head>
 <body>
@@ -152,6 +159,12 @@
     <!-- Relationships. Parent is an OWNERSHIP link and changes the payment flow into
          two sends (STX + the parent itself), so it gets its own disclosure rather
          than sitting among the song metadata. -->
+    <div id="receiptWrap" style="display:none;margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px">
+      <label class="checkline" style="display:flex;align-items:flex-start;gap:9px;cursor:pointer">
+        <input type="checkbox" id="receiptToggle" />
+        <span style="font-size:12.5px">Also inscribe an on-chain receipt <span class="muted">— a second permanent token recording what you paid (~0.1 STX extra). A readable receipt is saved either way, so this is off unless you want the on-chain copy.</span></span>
+      </label>
+    </div>
     <div id="relWrap" style="display:none;margin-top:12px">
       <button id="relToggle" class="btn ghost" type="button" style="width:100%;text-align:center">🔗 Relationships — parent &amp; dependencies ▾</button>
       <div id="relPanel" style="display:none;margin-top:10px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px 16px">
@@ -219,7 +232,7 @@
   </div>
 </main>
 
-<footer>Runs entirely in your browser · need the full controls? Open the <a href="./">Inscription Wizard</a>.</footer>
+<footer>Runs entirely in your browser · need the full controls? Open the <a href="./" target="_blank" rel="noopener">Inscription Wizard</a>.</footer>
 
 <script>
   // Backendless config. ?mock=1 runs the whole flow offline (no chain).
@@ -231,7 +244,7 @@
 <script src="HTML_Template.js?v=6"></script>
 <script src="suno-build.js?v=7"></script>
 <script src="optimize-image.js?v=1"></script>
-<script src="agent-one.js?v=2026-07-26.1"></script>
+<script src="agent-one.js?v=2026-07-26.2"></script>
 <script>
 const SERVER = { mock:false, net:'mainnet' };
 // VERSION HANDSHAKE: this page requires AT LEAST the agent bundle build below. The site's deploy
@@ -240,7 +253,7 @@ const SERVER = { mock:false, net:'mainnet' };
 // fees on refund loops). Builds are date-stamped (YYYY-MM-DD.N) so a string compare orders them;
 // a NEWER deployed bundle must pass — requiring an exact match wrongly locked the page out
 // whenever the agent shipped ahead of the page.
-const XAO_MIN_AGENT_BUILD='2026-07-26.1';
+const XAO_MIN_AGENT_BUILD='2026-07-26.2';
 let AGENT_STALE=false;
 function checkAgentBuild(){
   const b=window.XAO_AGENT_BUILD||null;
@@ -272,8 +285,8 @@ function validateSuno(f){
 function rejectToWizard(msg){
   FILE=null;PLAYER=null;META=null;EST=null; if(poll){clearInterval(poll);poll=null;}
   drop.classList.remove('has'); drop.innerHTML=DROP_HTML;
-  $('#quote').className='quote'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc'); $('#result').className='result'; $('#editWrap').style.display='none'; $('#relWrap').style.display='none';
-  $('#hint').innerHTML='<span class="err">'+msg+'</span><br><a class="btn ghost" href="./" style="display:inline-block;width:auto;margin-top:10px">Build it in the main wizard →</a>';
+  $('#quote').className='quote'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc'); $('#result').className='result'; $('#editWrap').style.display='none'; $('#relWrap').style.display='none'; $('#receiptWrap').style.display='none';
+  $('#hint').innerHTML='<span class="err">'+msg+'</span><br><a class="btn ghost" href="./" target="_blank" rel="noopener" style="display:inline-block;width:auto;margin-top:10px">Build it in the main wizard →</a>';
   building=false; $('#go').disabled=true; $('#go').textContent='Drop a Suno MP3 to begin';
 }
 function xa(){ const A=window.XtrataAgent; if(!A) throw new Error('Agent bundle not loaded (agent-one.js).'); return A; }
@@ -364,7 +377,7 @@ async function pickFile(f){
     const r=await window.XtrataSuno.build(f, (msg)=>{ $('#hint').innerHTML='<span class="spin"></span>'+esc(msg); });
     PLAYER=r.playerFile; META=r;
     if(r.html){ $('#previewFrame').srcdoc=r.html; $('#preview').style.display='block'; }
-    EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size,parentCount:parentList().length})});
+    EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size,parentCount:parentList().length,receipt:wantReceipt()})});
     $('#qName').textContent=(r.title||f.name)+(r.artist?(' — '+r.artist):'');
     const mib=(n)=>(n/1048576).toFixed(2);
     $('#qPlayer').textContent=mib(PLAYER.size)+' MiB · Opus'+(r.hasCover?' + cover':'')+(r.hasLyrics?' + lyrics':'');
@@ -387,7 +400,7 @@ function prefillEdits(r){
   $('#eCoverThumb').src=r.coverB64?('data:'+(r.coverMime||'image/jpeg')+';base64,'+r.coverB64):'';
   $('#editHint').textContent='';
   $('#editWrap').style.display='block'; $('#editPanel').style.display='none'; $('#moreMetaPanel').style.display='none';
-  $('#relWrap').style.display='block'; $('#sRelBatchNote').style.display='none';
+  $('#relWrap').style.display='block'; $('#sRelBatchNote').style.display='none'; $('#receiptWrap').style.display='block';
   $('#editToggle').textContent='✎ Edit details — artwork · title · artist';
   $('#moreMetaToggle').textContent='More metadata ▾';
 }
@@ -422,7 +435,7 @@ $('#applyEdits').onclick=async()=>{
     const r=await window.XtrataSuno.build(FILE,(m)=>{ $('#editHint').innerHTML='<span class="spin"></span>'+esc(m); },collectEdits());
     PLAYER=r.playerFile; META=r;
     if(r.html){ $('#previewFrame').srcdoc=r.html; $('#preview').style.display='block'; }
-    EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size,parentCount:parentList().length})});
+    EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size,parentCount:parentList().length,receipt:wantReceipt()})});
     const mib=(n)=>(n/1048576).toFixed(2);
     $('#qName').textContent=(r.title||FILE.name)+(r.artist?(' — '+r.artist):'');
     $('#qPlayer').textContent=mib(PLAYER.size)+' MiB · Opus'+(r.hasCover?' + cover':'')+(r.hasLyrics?' + lyrics':'');
@@ -435,6 +448,9 @@ $('#applyEdits').onclick=async()=>{
 // ---- relationships: one parent (ownership, escrowed) + free dependencies ----
 // One parent only: SUNO players are always staged (>512 KiB), and the staged seal
 // path supports a single parent — the agent rejects more, so don't offer more.
+// Off by default, matching the main wizard. SUNO used to omit `receipt` entirely,
+// which the agent defaults to true — so every song quietly bought a receipt token.
+const wantReceipt=()=>!!($('#receiptToggle')&&$('#receiptToggle').checked);
 const parentId=()=>String($('#sParent').value||'').trim();
 const parentList=()=>parentId()?[parentId()]:[];
 const depsList=()=>String($('#sDeps').value||'').split(',').map(s=>s.trim()).filter(Boolean);
@@ -464,6 +480,7 @@ async function checkParent(){
   else { box.innerHTML='<span class="err">✗ #'+esc(id)+' — held by '+esc(shortAddr(owner))+', not your connected wallet. Escrow would auto-refund.</span>'; PARENT_OK='bad'; }
   updateGo();
 }
+if($('#receiptToggle')) $('#receiptToggle').addEventListener('change',()=>{ quoteRefresh(); });
 $('#sParent').addEventListener('input',()=>{ if(parentCheckTimer)clearTimeout(parentCheckTimer); parentCheckTimer=setTimeout(()=>{ checkParent(); quoteRefresh(); },500); });
 $('#sDeps').addEventListener('input',()=>{ /* deps are free and unowned — nothing to check or requote */ });
 // Why the inscribe button is held, in the same spirit as the Create page's
@@ -481,7 +498,7 @@ async function quoteRefresh(){
   if(typeof SB!=='undefined'&&SB.active){ sbQuote(); return; }
   if(!PLAYER) return;
   try{
-    EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size,parentCount:parentList().length})});
+    EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size,parentCount:parentList().length,receipt:wantReceipt()})});
     $('#qPay').textContent=stx(EST.requiredUstx)+(EST.stxUsd?(' · ~$'+(Number(EST.requiredUstx)/1e6*EST.stxUsd).toFixed(2)):'');
   }catch(_e){}
   updateGo();
@@ -510,7 +527,9 @@ $('#go').onclick=async()=>{
     const deps=depsList(), parents=parentList();
     if(!deps.every(d=>/^\d+$/.test(d))){ throw new Error('Dependencies must be token-id uints.'); }
     if(!parents.every(d=>/^\d+$/.test(d))){ throw new Error('Parent must be a token-id uint.'); }
-    const payload={ file:PLAYER, uri:'xtrata:audio/'+(META&&META.title?slug(META.title):slug(FILE.name)), mime:'text/html', deps, parents, fastTrack:true, suno:true, user:WALLET||undefined, expectedFunder:WALLET||undefined };
+    const payload={ file:PLAYER, uri:'xtrata:audio/'+(META&&META.title?slug(META.title):slug(FILE.name)), mime:'text/html', deps, parents, fastTrack:true, origin:'suno', receipt:wantReceipt(),
+      sunoPlayer: META ? { ok:true, title:META.title||'', artist:META.artist||'', hasCover:!!META.hasCover, playerBytes:PLAYER.size } : null,
+      user:WALLET||undefined, expectedFunder:WALLET||undefined };
     const { job }=await api('/api/jobs',{method:'POST',body:payload});
     JOB=job;
     if(SERVER.mock){ setProg('MOCK — simulating inscription…', ['pay']); }
@@ -742,9 +761,48 @@ window.addEventListener('beforeunload',(e)=>{
   if(JOB_LIVE){ e.preventDefault(); e.returnValue=''; return ''; }
 });
 
+// Suppression-proof confirmation for destructive actions. Resolves false on
+// cancel, on Escape, and on backdrop click — so an unanswered question NEVER
+// cancels a running job. window.confirm cannot promise that: a browser may
+// suppress it outright, and a suppressed dialog is indistinguishable from a click.
+function confirmDanger({ title, body, confirmLabel, cancelLabel }){
+  return new Promise((resolve)=>{
+    const prev=document.activeElement;
+    const wrap=document.createElement('div');
+    wrap.className='danger-confirm';
+    wrap.innerHTML='<div class="danger-panel" role="alertdialog" aria-modal="true">'
+      +'<div class="danger-title"></div><div class="danger-body"></div>'
+      +'<div class="danger-actions">'
+      +'<button type="button" class="btn ghost" data-x="no"></button>'
+      +'<button type="button" class="btn danger-yes" data-x="yes"></button>'
+      +'</div></div>';
+    wrap.querySelector('.danger-title').textContent=title;
+    wrap.querySelector('.danger-body').textContent=body;
+    wrap.querySelector('[data-x="no"]').textContent=cancelLabel||'Keep going';
+    wrap.querySelector('[data-x="yes"]').textContent=confirmLabel||'Yes, stop it';
+    let done=false;
+    const close=(v)=>{ if(done) return; done=true;
+      document.removeEventListener('keydown',onKey,true); wrap.remove();
+      if(prev&&prev.focus) prev.focus({preventScroll:true}); resolve(v); };
+    function onKey(e){ if(e.key==='Escape'){ e.preventDefault(); close(false); } }
+    wrap.querySelector('[data-x="no"]').onclick=()=>close(false);
+    wrap.querySelector('[data-x="yes"]').onclick=()=>close(true);
+    wrap.addEventListener('click',(e)=>{ if(e.target===wrap) close(false); });
+    document.addEventListener('keydown',onKey,true);
+    document.body.appendChild(wrap);
+    // Focus the SAFE option, so a stray Return keeps the job running.
+    wrap.querySelector('[data-x="no"]').focus({preventScroll:true});
+  });
+}
+
 $('#cancelJobBtn').onclick=async()=>{
   if(!JOB) return;
-  if(!confirm('Stop this job and return everything?\n\nAny upload in progress halts at the next safe point. Chunks already on-chain stay there unsealed — nothing is minted and they cost nothing more — and the whole remaining deposit is sent back to the wallet that paid.\n\nKeep this tab open until you see "Cancelled".')) return;
+  const sure = await confirmDanger({
+    title:'Stop this job and return everything?',
+    body:'Any upload in progress halts at the next safe point. Chunks already on-chain stay there unsealed — nothing is minted and they cost nothing more — and the whole remaining deposit is sent back to the wallet that paid. Keep this tab open until you see "Cancelled".',
+    confirmLabel:'Stop and refund me', cancelLabel:'Keep going'
+  });
+  if(!sure) return;
   const b=$('#cancelJobBtn'); b.disabled=true; b.textContent='Cancelling…';
   try{ const r=await api('/api/jobs/'+JOB.jobId+'/cancel',{method:'POST'});
     if(r&&r.error) throw new Error(r.error);
@@ -779,7 +837,7 @@ async function refresh(){
       $('#hint').innerHTML='<span class="muted">↩︎ Cancelled — funds returned'+(job.cancelReason?(' ('+esc(job.cancelReason)+')'):'')+'. <a href="#" onclick="showJobLog(\''+esc(job.jobId)+'\');return false">View agent log</a></span>'; $('#go').disabled=false; }
     else if(st==='ERROR'||st==='NEEDS_RECOVERY'){ clearInterval(poll); poll=null; stopWaitExtras(); $('#prog').className='prog';
       $('#hint').innerHTML='<span class="err">'+esc(job.error||'Something went wrong')+(st==='NEEDS_RECOVERY'?' — your funds are safe on the job’s one-shot wallet.':' — funds returned.')+'</span>'
-        +(st==='NEEDS_RECOVERY'?' <a href="#" onclick="sunoRecover(\''+esc(job.jobId)+'\');return false">Recover now</a> · <a href="/wizard/">open wizard History</a>':''); $('#go').disabled=false; }
+        +(st==='NEEDS_RECOVERY'?' <a href="#" onclick="sunoRecover(\''+esc(job.jobId)+'\');return false">Recover now</a> · <a href="/wizard/" target="_blank" rel="noopener">open wizard History</a>':''); $('#go').disabled=false; }
   }catch{ /* transient — keep polling */ }
 }
 function showJobLog(id){ try{ const A=window.XtrataAgent; const lines=(A&&A.getJobLog&&A.getJobLog(id))||[];
@@ -819,9 +877,9 @@ window.sunoRecover=sunoRecover;
     startPoll(); return; }
   const rec=(jobs||[]).find(j=>j.status==='NEEDS_RECOVERY');
   if(rec){ $('#hint').innerHTML='<span class="err">↻ A previous run stopped ('+esc(rec.progress||rec.error||'interrupted')+') — your funds are safe on its one-shot wallet.</span> '
-    +'<a href="#" onclick="sunoRecover(\''+esc(rec.jobId)+'\');return false">Recover now</a> · <a href="/wizard/">open wizard History</a>'; return; }
+    +'<a href="#" onclick="sunoRecover(\''+esc(rec.jobId)+'\');return false">Recover now</a> · <a href="/wizard/" target="_blank" rel="noopener">open wizard History</a>'; return; }
   const wait=(jobs||[]).find(j=>j.status==='AWAITING_DEPOSIT');
-  if(wait){ $('#hint').innerHTML='<span class="muted">↻ An unpaid job from a previous session is still open — <a href="/wizard/">open wizard History</a> to resume or cancel it.</span>'; }
+  if(wait){ $('#hint').innerHTML='<span class="muted">↻ An unpaid job from a previous session is still open — <a href="/wizard/" target="_blank" rel="noopener">open wizard History</a> to resume or cancel it.</span>'; }
 }catch(e){} })();
 // Frozen-tab catch-up: background tabs throttle timers; on return, refresh at once.
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&JOB){ refresh(); if(!poll) startPoll(); } });
@@ -883,7 +941,7 @@ function sbResetUI(){ SB.items.forEach(it=>{ if(it.previewUrl){ try{URL.revokeOb
   SB.items=[]; SB.dropped=[]; SB.active=false; SB.busy=false; SB.EST=null; SB.droppedNote=''; JOB=null; if(poll){clearInterval(poll);poll=null;} stopWaitExtras();
   $('#sunoBatch').style.display='none'; $('#go').style.display='';
   drop.classList.remove('has'); drop.innerHTML=DROP_HTML;
-  $('#prog').className='prog'; $('#result').className='result'; $('#sbHint').textContent=''; $('#relWrap').style.display='none'; hideEscrow(); updateGo(); }
+  $('#prog').className='prog'; $('#result').className='result'; $('#sbHint').textContent=''; $('#relWrap').style.display='none'; $('#receiptWrap').style.display='none'; hideEscrow(); updateGo(); }
 function enterSunoBatch(files){
   const key=f=>f.name+'|'+f.size; const have=new Set(SB.items.map(it=>key(it.file)));
   let bad=0, added=0;
@@ -945,7 +1003,7 @@ function sbRow(it,i){
 function sbRender(){
   const ready=SB.items.filter(it=>it.status==='ready');
   const total=SB.items.length;
-  $('#relWrap').style.display=total?'block':'none';
+  $('#relWrap').style.display=total?'block':'none'; $('#receiptWrap').style.display=total?'block':'none';
   $('#sRelBatchNote').style.display=total?'block':'none';
   const busy=SB.items.some(it=>['queued','probing','building'].includes(it.status));
   $('#sbHead').innerHTML = busy
@@ -964,7 +1022,7 @@ async function sbQuote(){
   const ready=SB.items.filter(it=>it.status==='ready');
   if(!ready.length||!A||!A.estimateBatch){ SB.EST=null; SB.stxUsd=null; ready.forEach(it=>{ it.costUstx=null; }); $('#sbPay').textContent='—'; sbUpdateGo(); return; }
   try{
-    const est=await A.estimateBatch({ itemsBytes:ready.map(it=>it.player.size), parentCount:parentList().length, marginUstx:'0' });
+    const est=await A.estimateBatch({ itemsBytes:ready.map(it=>it.player.size), parentCount:parentList().length, marginUstx:'0', receipt:wantReceipt() });
     if(run!==SB.quoteRun) return;
     SB.EST=est; SB.stxUsd=(est.stxUsd!=null?est.stxUsd:null);
     // Split the single batch payment across songs in proportion to each one's on-chain
@@ -1030,7 +1088,7 @@ $('#sbGo').onclick=async()=>{
     if(!parents.every(d=>/^\d+$/.test(d))) throw new Error('Parent must be a token-id uint.');
     // Job-level deps/parents apply to every item in the batch.
     if(deps.length) items.forEach(it=>{ it.deps=deps; });
-    const payload={ items, parents, marginUstx:'0', strict:false, fastTrack:true, suno:true, user:WALLET||undefined, expectedFunder:WALLET||undefined };
+    const payload={ items, parents, marginUstx:'0', strict:false, fastTrack:true, origin:'suno', receipt:wantReceipt(), user:WALLET||undefined, expectedFunder:WALLET||undefined };
     PARENT_MSG=null; PARENT_OWNER={};
     setProg('Creating your one-shot deposit…', []);
     const { job }=await api('/api/jobs',{method:'POST',body:payload});

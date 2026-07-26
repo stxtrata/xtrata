@@ -405,6 +405,14 @@
   .legend{display:flex;gap:14px;font-size:11px;color:var(--mut);margin-top:8px}
   .dot{display:inline-block;width:9px;height:9px;border-radius:3px;vertical-align:middle;margin-right:5px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .danger-confirm{position:fixed;inset:0;z-index:95;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.6)}
+  .danger-confirm[hidden]{display:none}
+  .danger-panel{width:min(440px,100%);max-height:90vh;overflow-y:auto;padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:0 18px 44px rgba(0,0,0,.45)}
+  .danger-title{font-weight:800;font-size:15.5px;margin-bottom:8px}
+  .danger-body{font-size:13px;line-height:1.55;color:var(--mut)}
+  .danger-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:14px}
+  .danger-actions .btn{width:auto;margin:0;padding:8px 14px;font-size:13px}
+  .danger-yes{background:linear-gradient(180deg,#e0603f,#c14a2c)}
   @media(max-width:840px){.grid2{grid-template-columns:1fr}}
   /* Song-details editor — one component, opened against the single flow or a batch row. */
   .meta-overlay{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.6)}
@@ -735,7 +743,7 @@ try{
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=2026-07-26.1"></script>
+<script src="agent-one.js?v=2026-07-26.2"></script>
 <script src="optimize-audio.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script>
@@ -1821,10 +1829,50 @@ async function sendParent(jobId,pid){
 }
 window.sendParent=sendParent;
 
+// Suppression-proof confirmation for destructive actions. Resolves false on cancel,
+// Escape and backdrop click, so an unanswered question never cancels a running job —
+// window.confirm cannot promise that, since a browser may suppress it outright and a
+// suppressed dialog is indistinguishable from a click. Same reason the BNS name
+// chooser stopped using window.prompt.
+function confirmDanger({ title, body, confirmLabel, cancelLabel }){
+  return new Promise((resolve)=>{
+    const prev=document.activeElement;
+    const wrap=document.createElement('div');
+    wrap.className='danger-confirm';
+    wrap.innerHTML='<div class="danger-panel" role="alertdialog" aria-modal="true">'
+      +'<div class="danger-title"></div><div class="danger-body"></div>'
+      +'<div class="danger-actions">'
+      +'<button type="button" class="btn ghost" data-x="no"></button>'
+      +'<button type="button" class="btn danger-yes" data-x="yes"></button>'
+      +'</div></div>';
+    wrap.querySelector('.danger-title').textContent=title;
+    wrap.querySelector('.danger-body').textContent=body;
+    wrap.querySelector('[data-x="no"]').textContent=cancelLabel||'Keep going';
+    wrap.querySelector('[data-x="yes"]').textContent=confirmLabel||'Yes, stop it';
+    let done=false;
+    const close=(v)=>{ if(done) return; done=true;
+      document.removeEventListener('keydown',onKey,true); wrap.remove();
+      if(prev&&prev.focus) prev.focus({preventScroll:true}); resolve(v); };
+    function onKey(e){ if(e.key==='Escape'){ e.preventDefault(); close(false); } }
+    wrap.querySelector('[data-x="no"]').onclick=()=>close(false);
+    wrap.querySelector('[data-x="yes"]').onclick=()=>close(true);
+    wrap.addEventListener('click',(e)=>{ if(e.target===wrap) close(false); });
+    document.addEventListener('keydown',onKey,true);
+    document.body.appendChild(wrap);
+    wrap.querySelector('[data-x="no"]').focus({preventScroll:true});   // safe option focused
+  });
+}
 async function act(which,jobId){
   const id=jobId||selJob; if(!id) return;
   if(which==='deliver' && !confirm('Deliver the inscription, refund the remainder, and permanently wipe the deposit key?')) return;
-  if(which==='cancel' && !confirm('Stop this job and return everything?\n\nAny upload in progress halts at the next safe point. Chunks already on-chain stay there unsealed (they cost nothing more and nothing is minted), and the whole remaining deposit — plus any escrowed parent — is sent back to the wallet that paid.\n\nKeep this tab open until you see "Cancelled".')) return;
+  if(which==='cancel'){
+    const sure = await confirmDanger({
+      title:'Stop this job and return everything?',
+      body:'Any upload in progress halts at the next safe point. Chunks already on-chain stay there unsealed (they cost nothing more and nothing is minted), and the whole remaining deposit — plus any escrowed parent — is sent back to the wallet that paid. Keep this tab open until you see "Cancelled".',
+      confirmLabel:'Stop and refund me', cancelLabel:'Keep going'
+    });
+    if(!sure) return;
+  }
   if(which==='recover'){
     let j=null; try{ const r=await api('/api/jobs/'+id); j=r.job; }catch(e){ alert('Could not load the recovery details: '+((e&&e.message)||e)); return; }
     const mintedIds=[...(j.items||[]).map(i=>i.tokenId),j.tokenId,j.receiptTokenId].filter(Boolean).map(String);
