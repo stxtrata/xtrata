@@ -743,7 +743,7 @@ try{
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=2026-07-26.2"></script>
+<script src="agent-one.js?v=2026-07-26.3"></script>
 <script src="optimize-audio.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script>
@@ -1732,7 +1732,9 @@ async function renderJobDetail(jobId,out,isActive){
         <div class="kv"><span>Deposit address ${copyBtn(job.depositAddress)}</span><span class="mono">${esc(job.depositAddress)}</span></div>
         <div class="kv"><span>1 · STX deposit (${stx(status.requiredUstx)})</span><span>${stxDone?'<span class="ok">✓ arrived</span>':(status.pending?'<span style="color:var(--warn)">⏳ seen in mempool — confirming…</span>':'<span class="muted">awaiting</span>')}</span></div>
         ${parents.map((p,i)=>{
-          const held=(ps.held||[]).map(String).includes(p);
+          const seen=PARENT_ARRIVED[job.jobId]||(PARENT_ARRIVED[job.jobId]={});
+          if((ps.held||[]).map(String).includes(p)) seen[p]=true;
+          const held=!!seen[p];
           const own=pi[p];
           let right;
           if(held) right='<span class="ok">✓ arrived at deposit wallet</span>';
@@ -1799,6 +1801,9 @@ async function renderJobDetail(jobId,out,isActive){
 }
 // ---- parent escrow: ownership checker + one-click wallet send (aligned to THIS job's deposit only) ----
 const PARENT_INFO={};          // jobId -> { __core:'ADDR.name', <tokenId>: ownerAddress }
+// jobId -> { tokenId: true } once seen at the deposit wallet. Arrival is one-way
+// before the mint, so a single unanswered lookup must not flip the light back off.
+const PARENT_ARRIVED={};
 const PARENT_MSG={};           // jobId -> { text, err } — send-status line, survives re-renders
 const parentChkAt={};
 async function maybeCheckParents(jobId){

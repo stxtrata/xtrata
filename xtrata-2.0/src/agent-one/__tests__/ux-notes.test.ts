@@ -119,3 +119,28 @@ describe('what the receipt actually renders', () => {
     expect(html).not.toContain('Agent One');
   });
 });
+
+describe('the parent indicator does not flicker', () => {
+  it('latches green once arrival has been seen, on both surfaces', () => {
+    // Arrival is one-way before the mint — the parent only leaves when the job
+    // returns it at the end — so a single unanswered lookup must not flip it back.
+    expect(suno).toContain('let PARENT_ARRIVED={}');
+    expect(suno).toContain('const held=!!PARENT_ARRIVED[p];');
+    expect(wizard).toContain('const PARENT_ARRIVED={}');
+    expect(wizard).toContain('const held=!!seen[p];');
+  });
+
+  it('clears the latch between jobs so it cannot carry across', () => {
+    expect(suno).toContain('PARENT_ARRIVED={};');
+    expect(wizard).toContain('PARENT_ARRIVED[job.jobId]||(PARENT_ARRIVED[job.jobId]={})');
+  });
+
+  it('never counts an unanswered check toward the refund clock', () => {
+    // Repeated read failures would otherwise walk a job with its parent sitting
+    // right there into the fifteen-minute auto-refund.
+    expect(core).toContain('if (ps.unknown && ps.unknown.length) {');
+    expect(core).toContain('retrying, not treating it as missing');
+    // ...and the mint gate refuses rather than proceeding unverified.
+    expect(core).toContain('could not verify parent token(s)');
+  });
+});

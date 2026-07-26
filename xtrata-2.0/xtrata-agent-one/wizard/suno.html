@@ -244,7 +244,7 @@
 <script src="HTML_Template.js?v=6"></script>
 <script src="suno-build.js?v=7"></script>
 <script src="optimize-image.js?v=1"></script>
-<script src="agent-one.js?v=2026-07-26.2"></script>
+<script src="agent-one.js?v=2026-07-26.3"></script>
 <script>
 const SERVER = { mock:false, net:'mainnet' };
 // VERSION HANDSHAKE: this page requires AT LEAST the agent bundle build below. The site's deploy
@@ -253,7 +253,7 @@ const SERVER = { mock:false, net:'mainnet' };
 // fees on refund loops). Builds are date-stamped (YYYY-MM-DD.N) so a string compare orders them;
 // a NEWER deployed bundle must pass — requiring an exact match wrongly locked the page out
 // whenever the agent shipped ahead of the page.
-const XAO_MIN_AGENT_BUILD='2026-07-26.2';
+const XAO_MIN_AGENT_BUILD='2026-07-26.3';
 let AGENT_STALE=false;
 function checkAgentBuild(){
   const b=window.XAO_AGENT_BUILD||null;
@@ -522,7 +522,7 @@ $('#go').onclick=async()=>{
   if(!SERVER.mock && !WALLET){ connectWallet(); return; }
   const b=$('#go'); b.disabled=true; $('#hint').textContent='';
   try{
-    PARENT_MSG=null; PARENT_OWNER={};
+    PARENT_MSG=null; PARENT_OWNER={}; PARENT_ARRIVED={};
     setProg('Creating your one-shot deposit…', []);
     const deps=depsList(), parents=parentList();
     if(!deps.every(d=>/^\d+$/.test(d))){ throw new Error('Dependencies must be token-id uints.'); }
@@ -598,6 +598,11 @@ function setPhase(st, job){ const p=PHASE[st]; if(!p) return;
 // ---- parent escrow: the second send, and where the job waits for it ----
 const ESCROW_STATES=['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING'];
 let PARENT_MSG=null, PARENT_OWNER={};
+// Arrival is one-way before the gate: a parent at the deposit wallet only leaves
+// when the job returns it at the very end, long after this checklist matters. So
+// once we have SEEN it there, latch it green — otherwise one unanswered lookup
+// makes the light flicker off and on, and the user cannot tell what is true.
+let PARENT_ARRIVED={};
 function hideEscrow(){ const e=$('#escrow'); if(e){ e.style.display='none'; e.innerHTML=''; }
   const chip=document.querySelector('.step[data-s="parent"]'); if(chip) chip.hidden=true; }
 // Re-checked, not cached forever. The first version resolved once and never looked
@@ -623,7 +628,8 @@ function renderEscrow(job, status){
     // Past the gate the parent is definitionally held — the contract would not have
     // let the mint start otherwise. Never ask for it again once we are inscribing.
     const pastGate=['INSCRIBING','INSCRIBED','DELIVERING','COMPLETE','COMPLETE_WITH_SKIPS'].includes(job.status);
-    const held=pastGate||(ps.held||[]).map(String).includes(p);
+    if(pastGate||(ps.held||[]).map(String).includes(p)) PARENT_ARRIVED[p]=true;
+    const held=!!PARENT_ARRIVED[p];
     const owner=PARENT_OWNER[p];
     if(!held) void noteParentOwner(p);
     let right;
@@ -1089,7 +1095,7 @@ $('#sbGo').onclick=async()=>{
     // Job-level deps/parents apply to every item in the batch.
     if(deps.length) items.forEach(it=>{ it.deps=deps; });
     const payload={ items, parents, marginUstx:'0', strict:false, fastTrack:true, origin:'suno', receipt:wantReceipt(), user:WALLET||undefined, expectedFunder:WALLET||undefined };
-    PARENT_MSG=null; PARENT_OWNER={};
+    PARENT_MSG=null; PARENT_OWNER={}; PARENT_ARRIVED={};
     setProg('Creating your one-shot deposit…', []);
     const { job }=await api('/api/jobs',{method:'POST',body:payload});
     JOB=job;

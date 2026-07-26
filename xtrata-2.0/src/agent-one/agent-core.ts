@@ -137,6 +137,17 @@ async function waitTx(txid: string) {
 }
 async function getIdByHash(h: Uint8Array) { const j: any = await ro('get-id-by-hash', [bufferCV(h)]); return j.value ? String(j.value.value) : null; }
 async function ownerOf(id: string) { try { const o: any = await ro('get-owner', [uintCV(BigInt(id))]); const v = o.value && o.value.value; return v ? (v.value ?? v) : null; } catch { return null; } }
+// ownerOf() collapses "nobody owns it" and "the read failed" into the same null,
+// which is fine for a display hint and wrong for a gate: a transient RPC error made
+// an escrowed parent look like it had left, so the checklist flickered green → not
+// arrived → green on successive polls. This reports which of the two happened.
+async function ownerOfChecked(id: string): Promise<{ owner: string | null; ok: boolean }> {
+  try {
+    const o: any = await ro('get-owner', [uintCV(BigInt(id))]);
+    const v = o.value && o.value.value;
+    return { owner: v ? (v.value ?? v) : null, ok: true };
+  } catch { return { owner: null, ok: false }; }
+}
 
 // ---- signed sends (browser) ----
 // FEE POLICY — never crash a job on a fee estimate. The node's estimator returns absurd one-off spikes
@@ -494,7 +505,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-26.2';
+export const AGENT_BUILD = '2026-07-26.3';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -767,7 +778,7 @@ async function detectNftSender(addr: string, tokenId: string): Promise<string | 
 }
 async function parentsStatus(job: any) {
   const required: string[] = (job.parents || []).map(String);
-  if (job.mock || MOCK) return { required, held: required, missing: [], unexpected: [], ok: true };
+  if (job.mock || MOCK) return { required, held: required, missing: [], unknown: [], unexpected: [], ok: true };
   const own = job.depositAddress;
   // OWNERSHIP comes from the contract, never from the holdings index. The gate asks
   // "does the deposit wallet own this parent at seal time", and get-owner answers that
@@ -775,17 +786,22 @@ async function parentsStatus(job: any) {
   // Gating on the index left the job insisting the parent had not arrived while a
   // contract read showed the deposit wallet already owned it — the escrow checklist
   // said "arrived" on one line and "now send the parent" on the next.
-  const held: string[] = [], missing: string[] = [];
-  for (const pid of required) (((await ownerOf(pid)) === own) ? held : missing).push(pid);
+  const held: string[] = [], missing: string[] = [], unknown: string[] = [];
+  for (const pid of required) {
+    const r = await ownerOfChecked(pid);
+    if (!r.ok) unknown.push(pid);              // read failed — says nothing either way
+    else if (r.owner === own) held.push(pid);
+    else missing.push(pid);
+  }
   // The index is still the only way to SEE a stray nobody declared.
   let heldAll: string[] | null = null;
   try { heldAll = await heldInscriptions(own); } catch {}
   if (heldAll == null) {
-    return { required, held, missing, unexpected: [], ok: missing.length === 0, holdingsUnverified: true };
+    return { required, held, missing, unknown, unexpected: [], ok: missing.length === 0 && unknown.length === 0, holdingsUnverified: true };
   }
   const mine = new Set([...required, job.tokenId, job.receiptTokenId, ...((job.items || []).map((i: any) => i.tokenId))].filter(Boolean).map(String));
   const unexpected = heldAll.filter((id) => !mine.has(String(id)));
-  return { required, held, missing, unexpected, ok: missing.length === 0 && unexpected.length === 0 };
+  return { required, held, missing, unknown, unexpected, ok: missing.length === 0 && unknown.length === 0 && unexpected.length === 0 };
 }
 // Return EVERY inscription the deposit wallet holds. Strays go back to whoever sent them; declared
 // parents / minted tokens go to `fallbackTo` (the payer). Never throws.
@@ -1216,6 +1232,7 @@ async function runInscribe(job: any) {
   if ((job.parents || []).length) {
     const ps = await parentsStatus(job);
     if (ps.unexpected && ps.unexpected.length) throw new Error(`wrong inscription received: deposit wallet holds unexpected token(s) #${ps.unexpected.join(', #')} — returning everything to sender`);
+    if (ps.unknown && ps.unknown.length) throw new Error(`could not verify parent token(s) #${ps.unknown.join(', #')} right now — retrying rather than assuming they are missing`);
     if (ps.missing.length) throw new Error(`parents not yet received: waiting for token(s) #${ps.missing.join(', #')} to arrive at ${job.depositAddress}`);
   }
   if (job.items) return runBatchItems(job);   // BATCH: N ordered mints from the one funded wallet
@@ -1548,6 +1565,16 @@ async function autoRun(job: any) {
     if (ps.unexpected && ps.unexpected.length) {
       await refundAndClose(job, `wrong inscription received (token #${ps.unexpected.join(', #')} is not a declared parent of this job) — all inscriptions and funds returned to sender`);
       return { rejected: true, unexpected: ps.unexpected };
+    }
+    // A read we could not make is not a parent that did not arrive. Falling through
+    // here would mint without knowing the deposit owns the parent (the contract would
+    // abort and burn the fee), and counting it as "missing" would advance the
+    // fifteen-minute refund clock on a job whose parent is sitting right there.
+    if (ps.unknown && ps.unknown.length) {
+      job.progress = `deposit received ✓ — re-checking parent inscription #${ps.unknown.join(', #')} (the last check did not answer)`;
+      job.progressAt = new Date().toISOString(); writeJob(job);
+      xaoLog(job.jobId, `parent check for #${ps.unknown.join(', #')} did not answer — retrying, not treating it as missing`);
+      return { awaitingParent: true, unknown: ps.unknown };
     }
     if (ps.missing.length) {
       const waited = Date.now() - (Date.parse(job.fundedAt) || Date.now());
