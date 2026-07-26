@@ -562,14 +562,23 @@ the fallback branch every time.
 
 ### Tier 1 — big wins, low risk
 
-**1. Stop downloading music nobody asked for.**
-Replace the homepage's four embedded live players with a static image plus a
-play button that loads the real thing on click. Don't let the radio preload
-until the visitor switches it on — or preload exactly one track, not three,
-and only after the page has finished loading everything else.
-*Expected: ~10 MB → under 1 MB per page load. This is the single biggest change
-available.*
-*Risk: low. The radio's first press gets slower; everything else gets faster.*
+**1. Stop downloading music nobody asked for.** ✅ **DONE**
+Both halves shipped:
+- Every iframe preview on the homepage is now a poster with a play button, and
+  the inscription mounts only when pressed. This also fixes the duplicate
+  fetches: the hero stage renders the first four objects and the grid below
+  renders all six, so items 1–4 were being loaded twice.
+- The radio no longer cues tracks while it is switched off — not on page load,
+  not after switching off, and not from the readiness retry loop. The `/warm`
+  ping stays, because that is server-side work that downloads nothing to the
+  visitor's browser and is how the shared cache fills for everyone.
+
+*Measured after the change: **zero** inscription bytes fetched on page load
+(was ~10 MB), and fetching begins the moment the radio is switched on.*
+*The one trade: the first press of the radio now tunes from cold. The tuning
+sweep that plays on power-on already covers that wait — it exists for exactly
+this reason. Someone who leaves the radio playing and navigates still gets it
+resumed, because that is a track they asked for.*
 
 **2. Let Cloudflare's network cache immutable content.**
 An inscription's bytes can never change. Configure the edge to keep them.

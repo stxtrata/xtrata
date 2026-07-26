@@ -1006,6 +1006,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
   let readinessDelay = 3000;
   let readinessTimer = 0;
   const ensureCued = () => {
+    if (!on) return;
     if (preloadQueue.length > 0) { readinessDelay = 3000; return; }
     if (readinessTimer) return;
     readinessTimer = window.setTimeout(() => {
@@ -1018,7 +1019,13 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
     readinessDelay = Math.min(60000, readinessDelay * 2);
   };
 
+  // Cueing a track DOWNLOADS it — an HTML player is fetched whole so its audio
+  // can be read out of it. Doing that on every page load, radio off, cost each
+  // visitor several megabytes and the bandwidth the rest of the page needed.
+  // The tuning sweep on power-on already covers the wait for a cold first
+  // track, so nothing is fetched until someone actually switches the radio on.
   const preloadNextTrack = async () => {
+    if (!on) return;
     if (preloading) return;
     preloading = true;
     try {
@@ -1053,9 +1060,11 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
       void fetch(ids ? `/warm?ids=${ids}` : '/warm?auto=2').catch(() => undefined);
     } catch { /* best-effort */ }
   };
-  // Start warming a few seconds after init, off the critical page-load path.
+  // Warming only — a /warm ping is server-side work that downloads nothing to
+  // this browser, and it is how the shared cache fills for everyone. Cueing a
+  // track is the opposite, so it no longer happens here; power-on does it.
   const idle = window.requestIdleCallback || ((fn) => window.setTimeout(fn, 2500));
-  idle(() => { void preloadNextTrack(); pingWarm(); });
+  idle(() => { pingWarm(); });
 
   // --- digital screen ticker ---------------------------------------------
   // While a song plays the screen cycles: NOW PLAYING info interleaved with a
@@ -1286,8 +1295,9 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
     player.pause();
     player.removeAttribute('src');
     try { player.load(); } catch { /* noop */ }
-    // Re-cue for the next switch-on.
-    window.setTimeout(() => { void preloadNextTrack(); }, 1200);
+    // Deliberately does NOT re-cue: switching off is a request to stop using
+    // bandwidth. The next switch-on tunes from cold, covered by the sweep.
+    preloadQueue.length = 0;
     toggleButton.setAttribute('aria-pressed', 'false');
     root.classList.remove('is-on');
     renderKnob();

@@ -5725,6 +5725,57 @@
       color-scheme: dark;
     }
 
+    /* Stands in for an unloaded iframe preview until it is pressed. Fills the
+       frame so the layout is identical before and after loading. */
+    .object-preview__launch {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      color: rgba(248, 250, 252, 0.9);
+      cursor: pointer;
+      font: inherit;
+      transition: background-color 0.16s ease;
+    }
+
+    .object-preview__launch:hover,
+    .object-preview__launch:focus-visible {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .object-preview__launch-icon {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      border-radius: 50%;
+      background: rgba(3, 5, 8, 0.55);
+      font-size: 15px;
+      padding-left: 3px;
+      backdrop-filter: blur(6px);
+    }
+
+    .object-preview__launch:hover .object-preview__launch-icon,
+    .object-preview__launch:focus-visible .object-preview__launch-icon {
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .object-preview__launch-text {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      opacity: 0.75;
+    }
+
     .object-preview__meta {
       position: absolute;
       right: 8px;
