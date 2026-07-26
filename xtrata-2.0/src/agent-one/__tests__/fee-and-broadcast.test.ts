@@ -151,3 +151,27 @@ describe('one transaction cannot eat the budget for the rest', () => {
     expect(chain.broadcasts).toEqual([1_500_000n]);
   });
 });
+
+describe('which of the node\'s three estimates we take', () => {
+  it('uses the LOW estimate, not the library default of middle', async () => {
+    const addr = DEPOSIT;
+    chain.balances.set(addr, 5_000_000n);
+    chain.feeQuotes = [1000n];      // low; middle is 5x, high 30x
+    chain.midMultiple = 5;
+    const out = await agent.send(KEY, addr, 'seal-inscription', [], null, undefined, null);
+    expect(out.txid).toBeTruthy();
+    // Measured on mainnet: a 227-byte seal quotes low 227, middle 1191 uSTX. Paying
+    // the middle is ~5x the network's own 1 uSTX/byte relay floor for no benefit.
+    expect(chain.broadcasts).toEqual([1000n]);
+  });
+
+  it('is safe to start low because a rejection bumps', async () => {
+    const addr = DEPOSIT;
+    chain.balances.set(addr, 5_000_000n);
+    chain.feeQuotes = [1000n];
+    chain.minAcceptedFee = 1500n;   // the node wants more than the low estimate
+    const out = await agent.send(KEY, addr, 'seal-inscription', [], null, undefined, null);
+    expect(out.txid).toBeTruthy();
+    expect(chain.broadcasts).toEqual([1000n, 2000n]);
+  });
+});

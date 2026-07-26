@@ -18,6 +18,7 @@ import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
 import {
   makeContractCall, makeSTXTokenTransfer, broadcastTransaction, callReadOnlyFunction,
+  estimateTransaction, estimateTransactionByteLength,
   uintCV, standardPrincipalCV, bufferCV, stringAsciiCV, listCV,
   makeStandardSTXPostCondition, FungibleConditionCode, PostConditionMode, AnchorMode,
   cvToJSON, getAddressFromPrivateKey, TransactionVersion,
@@ -145,6 +146,37 @@ async function ownerOf(id: string) { try { const o: any = await ro('get-owner', 
 //      "network fees are high — waiting", not look stuck (our own ~512 KB batches can drive fees up);
 //   3. bounded fallback — 2× the last successful fee for this fn, never above the cap.
 const lastGoodFee = new Map<string, bigint>();
+
+/**
+ * Build the transaction at the node's LOW fee estimate rather than the middle one.
+ *
+ * @stacks/transactions defaults to `estimations[1]` — the middle of the node's
+ * low/middle/high triple. Measured against mainnet:
+ *
+ *   seal-inscription   227 bytes    low 0.000227  mid 0.001191 (5.2x)  high 0.007937
+ *   add-chunk-batch    524661 bytes low 0.524661  mid 0.524661         high 0.524661
+ *
+ * On small transactions the middle estimate is several times the low one, and the
+ * low one is simply the network's 1 uSTX/byte relay floor — which is exactly what a
+ * human picks by hand when they drop the wallet to its lowest setting. On a full
+ * chunk batch all three collapse onto that same floor, so nothing changes there:
+ * 512 KiB costs ~0.52 STX no matter what anyone chooses.
+ *
+ * Starting low is only safe because a rejection is now recoverable — the broadcast
+ * path bumps 2x on FeeTooLow, up to three times, which is the same thing a human
+ * does when the cheap fee bounces.
+ */
+async function quoteLowFee(opts: any) {
+  if (opts.fee != null) return makeContractCall(opts);
+  try {
+    // fee: 1 keeps this local — no estimate request is made while building.
+    const draft: any = await makeContractCall({ ...opts, fee: 1n });
+    const est: any = await estimateTransaction(draft.payload, estimateTransactionByteLength(draft), network);
+    const low = est && est[0] && est[0].fee != null ? BigInt(est[0].fee) : null;
+    if (low != null && low > 0n) return makeContractCall({ ...opts, fee: low });
+  } catch { /* estimator unavailable → fall back to the library's own default */ }
+  return makeContractCall(opts);
+}
 async function send(key: string, from: string, fn: string, args: any[], spendCap: bigint | null, onFeeWait?: (m: string) => void, logId: string | null = null, feeCeiling: bigint | null = null) {
   const post = spendCap != null ? [makeStandardSTXPostCondition(from, FungibleConditionCode.LessEqual, spendCap)] : [];
   const opts: any = { contractAddress: CORE[0], contractName: CORE[1], functionName: fn, functionArgs: args, senderKey: key, network, postConditionMode: PostConditionMode.Deny, postConditions: post, anchorMode: AnchorMode.Any };
@@ -171,7 +203,7 @@ async function send(key: string, from: string, fn: string, args: any[], spendCap
   // not a fallback, it is a guaranteed FeeTooLow.
   let cheapestQuote: bigint | null = null;
   for (let attempt = 0; ; attempt++) {
-    tx = await makeContractCall(opts);
+    tx = await quoteLowFee(opts);
     fee = BigInt(tx.auth.spendingCondition.fee.toString());
     if (cheapestQuote == null || fee < cheapestQuote) cheapestQuote = fee;
     xaoLog(logId, `${fn}: fee estimate ${fee} µSTX (cap ${effCap}, try ${attempt + 1})`);
@@ -343,7 +375,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-25.9';
+export const AGENT_BUILD = '2026-07-25.10';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;

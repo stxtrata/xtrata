@@ -36,6 +36,8 @@ export class FakeChain {
   // --- fee estimator + mempool ---
   /** Fees the estimator quotes, consumed in order; the last value repeats. */
   feeQuotes: bigint[] = [3000n];
+  /** How much bigger the MIDDLE estimate is than the low one (mainnet: ~5x small txs). */
+  midMultiple = 5;
   /** Node minimum: a broadcast at or below this is rejected as FeeTooLow. */
   minAcceptedFee = 0n;
   /** Fees actually broadcast, in order — lets a test assert what reached the node. */
@@ -142,8 +144,14 @@ export class FakeChain {
 
     // --- fee estimation ---
     if (url.includes('/v2/fees/transaction')) {
-      const f = Number(this.nextFee());
-      return json({ estimated_cost_scalar: 1, estimations: [{ fee: f }, { fee: f }, { fee: f }] });
+      // low / middle / high, as the node really returns. feeQuotes is the LOW value;
+      // middle and high are multiples so a test can prove which one we take. The real
+      // spread on a small mainnet tx was low 227, middle 1191, high 7937 uSTX.
+      const lo = Number(this.nextFee());
+      return json({
+        estimated_cost_scalar: 1,
+        estimations: [{ fee: lo }, { fee: lo * this.midMultiple }, { fee: lo * this.midMultiple * 6 }]
+      });
     }
     if (url.includes('/v2/fees/transfer')) return json(1);
 
