@@ -442,11 +442,44 @@ const idbOpen = () => new Promise<IDBDatabase>((res, rej) => {
     r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
   } catch (e) { rej(e); }
 });
+/**
+ * Ask the browser to treat this site's storage as DURABLE.
+ *
+ * By default a browser may evict localStorage and IndexedDB whenever it feels
+ * short of disk — without warning and without asking. Both the deposit key and
+ * the file being inscribed live there, so eviction mid-job means the job cannot
+ * resume and gets refunded, losing the miner fees already spent. One call turns
+ * "probably fine" into an actual guarantee, and it is granted silently on a site
+ * the user has engaged with.
+ *
+ * Returns what happened so the UI can say so instead of assuming.
+ */
+export async function requestDurableStorage(): Promise<'granted' | 'refused' | 'unsupported'> {
+  try {
+    const s: any = (navigator as any)?.storage;
+    if (!s || typeof s.persist !== 'function') return 'unsupported';
+    if (typeof s.persisted === 'function' && await s.persisted()) return 'granted';
+    return (await s.persist()) ? 'granted' : 'refused';
+  } catch { return 'unsupported'; }
+}
+
+/** Set when a file could not be persisted, so the UI can warn instead of a console line. */
+let lastBytesPersistError: string | null = null;
+export const getBytesPersistError = () => lastBytesPersistError;
+
 async function idbSaveBytes(id: string, bytes: Uint8Array) {
-  try { const db = await idbOpen();
+  try {
+    const db = await idbOpen();
     await new Promise((res, rej) => { const tx = db.transaction('files', 'readwrite'); tx.objectStore('files').put(bytes, id); tx.oncomplete = res as any; tx.onerror = () => rej(tx.error); });
     db.close();
-  } catch (e) { console.warn('xao: could not persist file bytes (reload-resume disabled for this job):', e); }
+    lastBytesPersistError = null;
+  } catch (e) {
+    // This used to be a console.warn and nothing else: the job then looked healthy
+    // while having quietly lost the ability to resume, and the user only found out
+    // when reopening the tab produced a refund instead of their inscription.
+    lastBytesPersistError = errMsg(e);
+    xaoLog(id.split(':')[0] || null, `could not save the file for resume (${errMsg(e)}) — if this tab closes, the job refunds instead of resuming`);
+  }
 }
 async function idbLoadBytes(id: string): Promise<Uint8Array | null> {
   try { const db = await idbOpen();
@@ -461,7 +494,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-25.12';
+export const AGENT_BUILD = '2026-07-26.1';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -968,6 +1001,10 @@ async function createJob(opts: any) {
     }
   }
   const est = await estimate({ bytes: data.length, marginUstx, agentFeePct, parentCount: parentIds.length, receipt });
+  // Ask for durable storage BEFORE a key exists to lose. The deposit key and the
+  // file both live in browser storage that a browser may evict without asking; this
+  // is the difference between "probably survives" and "survives".
+  const durability = await requestDurableStorage();
   const w = newWallet(); const id = `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   BYTES.set(id, data); await idbSaveBytes(id, data);
   const job: any = {
@@ -977,7 +1014,7 @@ async function createJob(opts: any) {
     protocolFee: est.protocolFee, minerReserve: est.minerReserve, receiptProtocol: est.receiptProtocol, receiptMiner: est.receiptMiner,
     agentFeePct: est.agentFeePct, agentFeeAddress: AGENT_FEE_ADDRESS, agentFeeExpectedUstx: est.agentFeeUstx, agentIdentityId: cfg.agentIdentityId || null,
     margin: String(marginUstx), requiredUstx: est.requiredUstx, depositAddress: w.address, ephemeralMnemonic: w.mnemonic,
-    status: 'AWAITING_DEPOSIT', createdAt: new Date().toISOString(),
+    status: 'AWAITING_DEPOSIT', createdAt: new Date().toISOString(), storageDurability: durability,
   };
   writeJob(job); return publicJob(job);
 }
@@ -1033,6 +1070,10 @@ async function createBatchJob(opts: any) {
     const merged = [...new Set([...sharedParents, ...b.parents])];
     if (!b.single && merged.length > 1) throw new Error(`item ${b.idx}: large (staged) inscriptions support at most 1 parent`);
   }
+  // Ask for durable storage BEFORE a key exists to lose. The deposit key and the
+  // file both live in browser storage that a browser may evict without asking; this
+  // is the difference between "probably survives" and "survives".
+  const durability = await requestDurableStorage();
   const w = newWallet(); const id = `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   for (let i = 0; i < datas.length; i += 1) { BYTES.set(`${id}:${i}`, datas[i]); await idbSaveBytes(`${id}:${i}`, datas[i]); }
   const job: any = {
@@ -1046,7 +1087,7 @@ async function createBatchJob(opts: any) {
     receiptProtocol: est.receiptProtocol, receiptMiner: est.receiptMiner,
     agentFeePct: est.agentFeePct, agentFeeAddress: AGENT_FEE_ADDRESS, agentFeeExpectedUstx: est.agentFeeUstx, agentIdentityId: cfg.agentIdentityId || null,
     margin: String(marginUstx), requiredUstx: est.requiredUstx, depositAddress: w.address, ephemeralMnemonic: w.mnemonic,
-    status: 'AWAITING_DEPOSIT', createdAt: new Date().toISOString(),
+    status: 'AWAITING_DEPOSIT', createdAt: new Date().toISOString(), storageDurability: durability,
   };
   writeJob(job); return publicJob(job);
 }
@@ -1747,9 +1788,103 @@ async function reapTick() {
   deleteJob: async (id: string) => { const job = readJob(id); if (job.ephemeralMnemonic) throw new Error('refusing to delete: job still holds a deposit key — deliver or recover it first'); if (!['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED'].includes(job.status)) throw new Error(`refusing to delete: job is ${job.status}, not finished`); localStorage.removeItem(jobKey(id)); BYTES.delete(id); idbDeleteBytes(id); (job.items || []).forEach((_: any, i: number) => { BYTES.delete(`${id}:${i}`); idbDeleteBytes(`${id}:${i}`); }); return { deleted: true, jobId: id }; },
   getReceiptHtml: (id: string) => { try { return readJob(id).receiptHtml || null; } catch { return null; } },
   getJobLog: (id: string) => { try { return readJob(id).log || []; } catch { return []; } },
+  // Storage durability, so a page can warn rather than assume its job will survive.
+  requestDurableStorage,
+  getBytesPersistError,
+  handoffAvailable: () => !!HANDOFF_ENDPOINT,
+  handoffJob,
 };
+/**
+ * FINISH WITHOUT ME — hand one job to the server so it completes unattended.
+ *
+ * This is the only place the deposit key ever leaves the browser, and it is a real
+ * change in who can spend that wallet: until now nobody but this tab could. So it
+ * is gated three ways — the endpoint must be configured, the caller must pass an
+ * explicit consent token, and the job must still be in a state where handing it
+ * over means anything.
+ *
+ * What is sent is scoped to ONE job: its id, its ephemeral key, the deposit
+ * address, and enough state to resume. Not the user's wallet, not other jobs. The
+ * server is expected to run the same state machine (svc/core.mjs already does),
+ * deliver to the same recipient and refund to the same payer.
+ *
+ * The local copy is deliberately KEPT, not wiped. If the server never picks it up,
+ * the browser can still resume or refund exactly as before — a handoff that fails
+ * must not be a handoff that strands.
+ */
+const HANDOFF_ENDPOINT: string = cfg.handoffEndpoint || '';
+const HANDOFF_CONSENT = 'i-agree-xtrata-may-finish-this-job';
+
+async function handoffJob(id: string, consent: string) {
+  if (!HANDOFF_ENDPOINT) throw new Error('finishing without you is not enabled on this deployment');
+  if (consent !== HANDOFF_CONSENT) throw new Error('handoff requires explicit consent');
+  const job = readJob(id);
+  if (!job.ephemeralMnemonic) throw new Error('this job has no deposit key left to hand over');
+  if (['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED'].includes(job.status)) throw new Error(`job is already ${job.status}`);
+  if (job.handedOffAt) return { alreadyHandedOff: true, at: job.handedOffAt };
+
+  const body = {
+    jobId: job.jobId, core: job.core, net: job.net,
+    depositAddress: job.depositAddress, ephemeralMnemonic: job.ephemeralMnemonic,
+    uri: job.uri, mime: job.mime, deps: job.deps || [], parents: job.parents || [],
+    user: job.user, recipient: job.recipient, expectedFunder: job.expectedFunder,
+    requiredUstx: job.requiredUstx, depositReceivedUstx: job.depositReceivedUstx || null,
+    status: job.status, consent
+  };
+  const r = await fetch(HANDOFF_ENDPOINT, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error(`handoff refused (HTTP ${r.status})`);
+  const out: any = await r.json().catch(() => ({}));
+
+  job.handedOffAt = new Date().toISOString();
+  job.handedOffTo = out?.runner || HANDOFF_ENDPOINT;
+  writeJob(job);
+  xaoLog(id, `handed to the server to finish (${job.handedOffTo}) — the browser copy is kept so this tab can still resume or refund`);
+  return { handedOff: true, at: job.handedOffAt, runner: job.handedOffTo };
+}
+
+/**
+ * Do not count time when nobody was working.
+ *
+ * The reaper expires a job on wall-clock "no progress since", with a five-minute
+ * window mid-inscribe. But the agent only runs while the tab is open, so closing
+ * the tab for ten minutes could get a healthy job REFUNDED on reopen rather than
+ * resumed — punishing the pause rather than a stall. The parent-escrow window has
+ * the same problem: a fifteen-minute clock that runs while nobody can act on it.
+ *
+ * A heartbeat records when the agent was last alive. On load, any gap is credited
+ * back to every unfinished job by shifting its timestamps forward.
+ */
+const HEARTBEAT_KEY = 'xtrata.agent.lastSeen';
+const CLOSED_GAP_MS = 30000;   // longer than a normal tick: this was a real closure
+function noteAlive() { try { localStorage.setItem(HEARTBEAT_KEY, String(Date.now())); } catch {} }
+function creditClosedTime(): number {
+  let closed = 0;
+  try {
+    const last = Number(localStorage.getItem(HEARTBEAT_KEY) || 0);
+    noteAlive();
+    if (!last) return 0;
+    closed = Date.now() - last;
+    if (closed < CLOSED_GAP_MS) return 0;
+    const shift = (t: any) => (t ? new Date(Date.parse(t) + closed).toISOString() : t);
+    for (const j of listJobsRaw()) {
+      if (['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED'].includes(j.status)) continue;
+      j.progressAt = shift(j.progressAt);
+      j.createdAt = shift(j.createdAt);
+      if (j.fundedAt) j.fundedAt = shift(j.fundedAt);
+      j.closedForMs = (j.closedForMs || 0) + closed;
+      writeJob(j);
+      xaoLog(j.jobId, `tab was closed for ${Math.round(closed / 60000)} min — clocks credited, this job was paused rather than stalled`);
+    }
+  } catch { /* a missing heartbeat just means no credit */ }
+  return closed;
+}
+creditClosedTime();
+
 // In-browser watcher + reaper — auto-run funded fast-track jobs; refund stalls/expiries. Tab-open only.
 setInterval(watchTick, MOCK ? 2000 : 4000);
+setInterval(noteAlive, 10000);
 setInterval(reapTick, 20000);
 // helpers already ported and available to the implementer/tester:
 export { deriveFrom, newWallet, balance, quoteFee, mintSingle, stagedInscribe, getIdByHash, ownerOf, send, sendNft, sendStx, network, MOCK, CORE, DEPLOYER, AGENT_FEE_PCT, AGENT_FEE_ADDRESS, CHUNK, SINGLE_MAX, PERTX_MINER, DELIVERY_RESERVE, REFUND_TX_FEE, RECEIPT_EST, incHash, chunkBytes };

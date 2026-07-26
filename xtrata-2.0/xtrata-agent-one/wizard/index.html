@@ -446,7 +446,8 @@ try{
   <a href="/" title="Xtrata home" style="flex:none;display:block"><img src="favicon.svg" alt="Xtrata" style="width:30px;height:30px;border-radius:8px;display:block" /></a>
   <div>
     <div class="logo"><b>XTRATA</b> <i>Inscription Wizard</i></div>
-    <div class="sub">Drop a file → pay once → it comes back inscribed. Anchored to Bitcoin via Stacks.</div>
+    <div class="sub">Drop a file → pay once → it comes back inscribed. Anchored to Bitcoin via Stacks.<br>
+      <span style="opacity:.8">Your deposit goes to a one-shot wallet your own browser creates and controls — never to us.</span></div>
   </div>
   <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
     <div class="badge" id="health"><span class="pill">connecting…</span></div>
@@ -734,7 +735,7 @@ try{
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=2026-07-25.12"></script>
+<script src="agent-one.js?v=2026-07-26.1"></script>
 <script src="optimize-audio.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script>
@@ -1745,6 +1746,11 @@ async function renderJobDetail(jobId,out,isActive){
       ${batchPanel}
       ${showDeposit?`<div class="kv"><span>Deposit address ${copyBtn(job.depositAddress)}</span><span>${esc(job.depositAddress)}</span></div>
       <div class="kv"><span>Send exactly</span><span class="big-num" style="font-size:19px">${stx(status.requiredUstx)}</span></div>
+      <div class="muted" style="font-size:12px;margin-top:8px;padding:9px 11px;border:1px solid var(--line);border-radius:9px">
+        🔑 <b>This is your own wallet, not ours.</b> Your browser created it moments ago and holds the only key,
+        so Xtrata cannot spend from it. It is emptied and the key destroyed once your inscription and change are
+        back with you.
+      </div>
       ${!job.mock?`<div class="btnrow"><button class="btn" onclick="openWallet('${esc(job.depositAddress)}','${esc(status.requiredUstx)}')">Open wallet to pay ${stx(status.requiredUstx)}</button></div>`:''}
       ${job.fastTrack&&job.expectedFunder?`<div class="kv"><span>Pay from this wallet only ${copyBtn(job.expectedFunder)}</span><span class="mono" style="color:var(--ok)">${esc(job.expectedFunder)}</span></div>
       <div class="muted" style="font-size:12px;margin-top:6px;color:var(--warn)">⚠ Locked to the wallet above. A payment from any other wallet is automatically returned to the sender — nothing is inscribed.</div>`:''}
