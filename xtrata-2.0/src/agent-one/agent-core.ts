@@ -239,9 +239,95 @@ async function send(key: string, from: string, fn: string, args: any[], spendCap
   lastGoodFee.set(fn, fee);
   const txid = res.txid || res;
   xaoLog(logId, `${fn}: broadcast 0x${String(txid).replace(/^0x/, '')} · fee ${fee} µSTX — awaiting confirmation`);
-  const t0 = Date.now(); const d = await waitTx(txid);
+  const t0 = Date.now();
+  // The nonce the transaction was ACTUALLY signed with. A replacement has to reuse
+  // it exactly or it is a new transaction rather than a replacement.
+  const usedNonce = BigInt(tx.auth.spendingCondition.nonce.toString());
+  const out = await confirmOrEscalate({ txid, opts, usedNonce, fee, effCap, fn, logId });
   xaoLog(logId, `${fn}: confirmed in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
-  return { txid, d };
+  return { txid: out.txid, d: out.d };
+}
+
+const RBF_AFTER_MS = 90000;   // give the cheap fee a fair run before paying more
+const RBF_MAX = 3;
+
+/**
+ * Wait for confirmation, and escalate the fee if the transaction is simply not being
+ * mined.
+ *
+ * Paying the node's LOW estimate gets the 1 µSTX/byte floor, which is the cheapest
+ * fee available and also the lowest priority in the mempool. The FeeTooLow bump only
+ * fires on REJECTION; a transaction accepted at the floor and then ignored by miners
+ * is not rejected, it just sits — and because Stacks confirms nonces in order, every
+ * later transaction in the job sits behind it. Observed live: a chunk batch pending
+ * seven minutes at the floor with the next transaction queued behind it.
+ *
+ * So: re-broadcast the SAME nonce at double the fee, which is what replace-by-fee
+ * means on Stacks (the superseded entry ends up dropped_replace_by_fee). Bounded by
+ * the affordable ceiling and by RBF_MAX.
+ *
+ * Every txid broadcast for this nonce is watched, not just the newest. If the
+ * original is mined while a replacement is in flight, that is a win, not a race to
+ * lose — whichever lands first ends the wait.
+ */
+async function confirmOrEscalate(p: {
+  txid: string; opts: any; usedNonce: bigint; fee: bigint; effCap: bigint; fn: string; logId: string | null;
+}) {
+  const txids: string[] = [p.txid];
+  let fee = p.fee, bumps = 0, lastEscalate = Date.now();
+  let reads = 0, lastErr: unknown = null;
+
+  for (let i = 0; i < 210; i++) {
+    for (const id of txids) {
+      try {
+        const r = await hfetch(`/extended/v1/tx/${id}`);
+        if (!r.ok) throw new Error(`tx lookup ${r.status}`);
+        const d: any = await r.json();
+        reads += 1;
+        if (d.tx_status === 'success') return { txid: id, d };
+        if (d.tx_status && String(d.tx_status).startsWith('abort')) throw new Error('TX ' + d.tx_status);
+        // Dropped is terminal only when it is the ONLY transaction we have for this
+        // nonce. Once a replacement exists, the original being dropped is the
+        // mechanism working, not a failure.
+        if (d.tx_status && String(d.tx_status).startsWith('dropped') && txids.length === 1) {
+          throw new Error('TX ' + d.tx_status);
+        }
+      } catch (e: any) {
+        if (String(e).includes('TX abort') || String(e).includes('TX dropped')) throw e;
+        lastErr = e;
+      }
+    }
+
+    if (bumps < RBF_MAX && Date.now() - lastEscalate >= RBF_AFTER_MS) {
+      const next = fee * 2n > p.effCap ? p.effCap : fee * 2n;
+      if (next > fee) {
+        lastEscalate = Date.now();
+        try {
+          const rtx = await makeContractCall({ ...p.opts, fee: next, nonce: p.usedNonce });
+          const rres: any = await broadcastTransaction(rtx, network);
+          if (rres?.error) {
+            xaoLog(p.logId, `${p.fn}: fee escalation rejected (${rres.error} ${rres.reason || ''}) — still waiting on ${fee} µSTX`);
+          } else {
+            bumps += 1; fee = next;
+            const rid = rres.txid || rres;
+            txids.push(rid);
+            lastGoodFee.set(p.fn, fee);
+            xaoLog(p.logId, `${p.fn}: not mined after ${Math.round(RBF_AFTER_MS / 1000)}s — replaced nonce ${p.usedNonce} at ${fee} µSTX (escalation ${bumps}/${RBF_MAX})`);
+          }
+        } catch (e) {
+          xaoLog(p.logId, `${p.fn}: could not build a replacement (${errMsg(e)}) — still waiting`);
+        }
+      } else if (bumps === 0) {
+        // Nothing left to pay with; say so once rather than silently waiting out the clock.
+        xaoLog(p.logId, `${p.fn}: pending at ${fee} µSTX and already at the affordable ceiling — cannot escalate, waiting`);
+        lastEscalate = Date.now();
+      }
+    }
+
+    await sleep(i < 45 ? 2000 : 6000);
+  }
+  if (!reads) throw new Error(`could not reach the API to confirm ${txids[0]} (${errMsg(lastErr)}) — the transaction may well have landed`);
+  throw new Error('not confirmed: ' + txids.join(', '));
 }
 async function sendNft(key: string, from: string, id: string, to: string) {
   let nonce: bigint | undefined; try { nonce = await safeNonce(from); } catch {}
@@ -375,7 +461,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-25.11';
+export const AGENT_BUILD = '2026-07-25.12';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;

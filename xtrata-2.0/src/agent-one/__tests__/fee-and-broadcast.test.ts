@@ -214,3 +214,63 @@ describe('the miner reserve is tight but survives observed congestion', () => {
     expect(BigInt(many.sumMiner)).toBe(BigInt(one.minerReserve) * 2n);
   });
 });
+
+describe('replace-by-fee when a transaction is accepted but never mined', () => {
+  // Virtual clock: the escalation threshold is wall-clock, so sleeps must advance
+  // time or the 90 s window never arrives and the test would pass for the wrong reason.
+  let now: number;
+  const useVirtualClock = () => {
+    now = 1_700_000_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation(((f: any, ms = 0) => {
+      now += Number(ms) || 0; f(); return 0 as any;
+    }) as any);
+  };
+
+  it('re-broadcasts the SAME nonce at a higher fee, and confirms', async () => {
+    const addr = DEPOSIT;
+    chain.balances.set(addr, 20_000_000n);
+    chain.feeQuotes = [524_661n];        // the 1 uSTX/byte floor
+    chain.minFeeToConfirm = 900_000n;    // miners ignore the floor; 2x clears it
+    useVirtualClock();
+
+    const out = await agent.send(KEY, addr, 'add-chunk-batch', [], null, undefined, null);
+    expect(out.txid).toBeTruthy();
+
+    // Floor first, then one doubling. Observed live: a batch sat seven minutes at the
+    // floor with the next transaction stuck behind it, because the FeeTooLow bump only
+    // fires on rejection and an ignored transaction is never rejected.
+    expect(chain.broadcasts).toEqual([524_661n, 1_049_322n]);
+    // Same nonce both times — otherwise it is a second transaction, not a replacement.
+    expect(new Set(chain.broadcastNonces.map(String)).size).toBe(1);
+  });
+
+  it('does not escalate a transaction that confirms promptly', async () => {
+    const addr = DEPOSIT;
+    chain.balances.set(addr, 20_000_000n);
+    chain.feeQuotes = [524_661n];
+    chain.minFeeToConfirm = 0n;          // mined straight away
+    useVirtualClock();
+
+    await agent.send(KEY, addr, 'add-chunk-batch', [], null, undefined, null);
+    expect(chain.broadcasts).toEqual([524_661n]);   // paid the floor, nothing more
+  });
+
+  it('stops escalating at the affordable ceiling instead of overspending', async () => {
+    const addr = DEPOSIT;
+    chain.balances.set(addr, 20_000_000n);
+    chain.feeQuotes = [500_000n];
+    chain.minFeeToConfirm = 99_000_000n;   // never mineable
+    useVirtualClock();
+
+    await expect(
+      agent.send(KEY, addr, 'add-chunk-batch', [], null, undefined, null)
+    ).rejects.toThrow(/not confirmed/i);
+    // It DID try to escalate (a `<= 4` assertion alone is satisfied by a single
+    // broadcast, so it would pass against the old passive wait too)...
+    expect(chain.broadcasts.length).toBeGreaterThan(1);
+    // ...and stopped: bounded by RBF_MAX and by the cap, never a fee spiral.
+    expect(chain.broadcasts.length).toBeLessThanOrEqual(4);
+    for (const f of chain.broadcasts) expect(f).toBeLessThanOrEqual(2_000_000n);
+  });
+});
