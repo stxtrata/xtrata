@@ -631,6 +631,8 @@ try{
 
   <!-- STAGE 3/4 · ACTIVE JOB (deposit → escrow → progress → done) -->
   <div id="activeJobDetail"></div>
+  <!-- keep-open banner + leave guard: shared panel (src/agent-one/ui-panels.ts) -->
+  <div id="keepOpenSlot"></div>
 
   <!-- HISTORY -->
   <details class="opts" id="historySection">
@@ -938,7 +940,7 @@ function enterBatch(files){
   for(const f of files){ if(BATCH.items.length>=40) break; BATCH.items.push(makeItem(f)); }
   // batch replaces the single-file flow on screen
   FLOW.original=null; FLOW.optimized=null; FLOW.jobId=null; FLOW.done=false;
-  $('#reviewCard').hidden=true; $('#activeJobDetail').innerHTML=''; picker.value='';
+  $('#reviewCard').hidden=true; $('#activeJobDetail').innerHTML=''; clearKeepOpen(); picker.value='';
   dz.classList.add('compact');
   $('#dropMain').innerHTML=`<span class="filechip">Batch · ${BATCH.items.length} files</span>`;
   $('#dropSub').textContent='drop more files to add them to the batch';
@@ -1449,7 +1451,7 @@ async function renderPreview(){
 
 async function onFile(file){
   FLOW.original=file; FLOW.optimized=null; FLOW.useOriginal=false; FLOW.quote=null;
-  FLOW.jobId=null; FLOW.done=false; $('#activeJobDetail').innerHTML='';
+  FLOW.jobId=null; FLOW.done=false; $('#activeJobDetail').innerHTML=''; clearKeepOpen();
   picker.value='';
   dz.classList.add('compact');
   $('#dropMain').innerHTML=`<span class="filechip">${esc(file.name)} · ${mib(file.size)}</span>`;
@@ -1628,7 +1630,7 @@ function resetFlow(){
   }
   FLOW.original=null; FLOW.optimized=null; FLOW.useOriginal=false; FLOW.quote=null;
   FLOW.jobId=null; FLOW.done=false; FLOW.optRun++; FLOW.quoteRun++;
-  $('#activeJobDetail').innerHTML='';
+  $('#activeJobDetail').innerHTML=''; clearKeepOpen();
   $('#reviewCard').hidden=true;
   dz.classList.remove('compact');
   $('#dropMain').textContent='Drop a file to inscribe';
@@ -1680,6 +1682,8 @@ function stopJobsPoll(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null
 async function selectJob(id){ selJob=id; if(id===FLOW.jobId){ $('#jobDetail').innerHTML='<div class="muted" style="margin-top:10px">That job is live in the card above.</div>'; loadJobs(); return; } loadJobs(); renderJobDetail(id,$('#jobDetail'),false); startJobsPoll(); }
 $('#historySection').addEventListener('toggle',()=>{ if($('#historySection').open){ loadJobs(); startJobsPoll(); } else if(!FLOW.jobId){ stopJobsPoll(); } });
 
+// Stand the banner down: goes through the panel so the leave guard is disarmed too.
+function clearKeepOpen(){ try{ window.XtrataUI.keepOpenBanner({ job:null, status:'', mount:$('#keepOpenSlot') }); }catch(e){} }
 async function renderJobDetail(jobId,out,isActive){
   if(!jobId||!out)return;
   try{ const {job,status}=await api('/api/jobs/'+jobId);
@@ -1694,6 +1698,9 @@ async function renderJobDetail(jobId,out,isActive){
     if(isActive){
       expiryAt = (showDeposit && job.createdAt && SERVER.windowMs) ? (Date.parse(job.createdAt) + SERVER.windowMs*12)
         : (st==='AWAITING_PARENT' && job.fundedAt && SERVER.parentWindowMs) ? (Date.parse(job.fundedAt) + SERVER.parentWindowMs) : 0;
+      // The agent IS this tab: while a job is live, closing it stops the work
+      // mid-upload with the deposit still on a wallet only this browser can open.
+      window.XtrataUI.keepOpenBanner({ job, status: st, mount: $('#keepOpenSlot') });
       if((st==='COMPLETE'||st==='COMPLETE_WITH_SKIPS')&&!FLOW.done){ FLOW.done=true; setStep('done'); }
       else if(st!=='COMPLETE'&&st!=='COMPLETE_WITH_SKIPS'&&funded&&FLOW.done===false){ /* keep pay step lit until done */ }
     }
@@ -1854,7 +1861,7 @@ async function act(which,jobId){
   }
   if(which==='delete'){
     if(!confirm('Delete this job from the list?\nThe inscription stays on-chain — this only removes the local record + receipt.')) return;
-    try{ await api('/api/jobs/'+id+'/delete',{method:'POST'}); if(selJob===id){ selJob=null; $('#jobDetail').innerHTML=''; } if(FLOW.jobId===id){ FLOW.jobId=null; $('#activeJobDetail').innerHTML=''; } loadJobs(); }
+    try{ await api('/api/jobs/'+id+'/delete',{method:'POST'}); if(selJob===id){ selJob=null; $('#jobDetail').innerHTML=''; } if(FLOW.jobId===id){ FLOW.jobId=null; $('#activeJobDetail').innerHTML=''; clearKeepOpen(); } loadJobs(); }
     catch(e){ const errEl=$('#jobErr'); if(errEl){errEl.textContent=e.message;} else alert(e.message); }
     return;
   }

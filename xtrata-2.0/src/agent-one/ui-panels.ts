@@ -74,6 +74,94 @@ export function confirmDanger(opts: {
   });
 }
 
+// ---------- keep-this-tab-open banner ----------
+// The agent IS the tab. While a job is live, closing it does not cancel anything —
+// the work simply stops, mid-upload, with the deposit still on a wallet only this
+// browser can open. The banner exists to make that visible before it happens, and to
+// keep saying something concrete: a progress bar that stops moving is indistinguishable
+// from a crash, while "4 of 16 chunks on-chain" is obviously alive.
+
+// A job is live while this browser still has work to do for it.
+const LIVE_STATES = ['AWAITING_DEPOSIT', 'AWAITING_PARENT', 'FUNDED', 'INSCRIBING', 'INSCRIBED', 'DELIVERING'];
+let jobIsLive = false;
+let guardInstalled = false;
+
+function installLeaveGuard() {
+  if (guardInstalled || typeof window === 'undefined') return;
+  guardInstalled = true;
+  window.addEventListener('beforeunload', (e: BeforeUnloadEvent) => {
+    if (!jobIsLive) return;
+    e.preventDefault();
+    e.returnValue = '';
+    return '';
+  });
+}
+
+/** What the browser is doing right now, in words rather than a bar. */
+function liveDetail(job: any, status: string): string {
+  const m = /(\d+)\s*\/\s*(\d+)\s*chunks/.exec((job && job.progress) || '');
+  if (m) return `uploading — ${m[1]} of ${m[2]} chunks on-chain so far`;
+  if (status === 'AWAITING_DEPOSIT') return 'waiting for your payment to confirm';
+  if (status === 'AWAITING_PARENT') return 'waiting for the parent inscription';
+  if (status === 'DELIVERING') return 'sending your inscription and change back';
+  return 'the agent is working in this browser';
+}
+
+/**
+ * Renders (or hides) the keep-open banner inside `mount`, and arms the leave guard.
+ * Returns whether the job is live. Call it on every status refresh.
+ */
+export function keepOpenBanner(opts: { job: any; status: string; mount: HTMLElement | null }) {
+  installLeaveGuard();
+  const mount = opts.mount;
+  if (!mount) return { live: false };
+
+  jobIsLive = LIVE_STATES.includes(opts.status);
+  let box = mount.querySelector('.xao-keepopen') as HTMLElement | null;
+  if (!jobIsLive) { box?.remove(); return { live: false }; }
+
+  styleOnce('keepopen', `
+  .xao-keepopen{margin-top:12px;padding:10px 12px;border:1px solid var(--acc2,#7c5cff);border-radius:10px;background:rgba(124,92,255,.08);font-size:12.5px;line-height:1.5}
+  .xao-keepopen .xao-ko-custody{font-size:11.5px;margin-top:4px;color:var(--mut)}
+  .xao-keepopen .xao-ko-warn{font-size:11.5px;margin-top:6px;color:var(--bad,#e0603f)}`);
+
+  if (!box) {
+    box = document.createElement('div');
+    box.className = 'xao-keepopen';
+    box.setAttribute('role', 'status');
+    // The custody sentence belongs HERE rather than in a tips rotation: this is the
+    // moment the constraint bites, and the same fact that forces the tab to stay open
+    // is the reason nobody else can touch the money.
+    box.innerHTML = '<div><b>🔒 Keep this tab open</b> — <span class="xao-ko-steps"></span></div>'
+      + '<div class="xao-ko-custody">Your deposit sits in a one-shot wallet <b>your browser created and only it can spend from</b>'
+      + ' — that is why this has to stay open, and also why nobody else can touch your funds.'
+      + ' Closing pauses the job; you can resume it or take a refund when you come back.</div>'
+      + '<div class="xao-ko-warn" hidden></div>';
+    mount.appendChild(box);
+  }
+  (box.querySelector('.xao-ko-steps') as HTMLElement).textContent = liveDetail(opts.job, opts.status);
+
+  // If the file could not be saved for resume, closing the tab is genuinely
+  // destructive rather than merely a pause — say so plainly rather than leaving the
+  // generic "keep it open" to carry a warning it cannot convey.
+  const warn = box.querySelector('.xao-ko-warn') as HTMLElement;
+  const agent = (window as any).XtrataAgent;
+  let persistError: string | null = null;
+  try { persistError = (agent && agent.getBytesPersistError && agent.getBytesPersistError()) || null; } catch { /* older bundle */ }
+
+  if (persistError) {
+    warn.hidden = false;
+    warn.textContent = `⚠ This browser would not save your file for resume (${persistError}). If you close this tab the job cannot resume and will refund instead.`;
+  } else if (opts.job && opts.job.storageDurability === 'refused') {
+    warn.hidden = false;
+    warn.textContent = '⚠ This browser declined to mark its storage as permanent, so it may clear the deposit key if disk space runs low. Try to leave this tab open until the job finishes.';
+  } else {
+    warn.hidden = true;
+    warn.textContent = '';
+  }
+  return { live: true };
+}
+
 // ---------- unfinished-job reminder ----------
 // The agent lives in the tab, so an unfinished job vanishes from view the moment the
 // tab closes. If it was funded, its one-shot wallet is holding real money until
@@ -169,5 +257,5 @@ export function unfinishedBanner(opts: { skipJobId?: string | null; mount?: HTML
 // scripts and cannot import.
 if (typeof window !== 'undefined') {
   const w = window as any;
-  w.XtrataUI = Object.assign(w.XtrataUI || {}, { confirmDanger, unfinishedBanner, dismissUnfinished });
+  w.XtrataUI = Object.assign(w.XtrataUI || {}, { confirmDanger, unfinishedBanner, dismissUnfinished, keepOpenBanner });
 }

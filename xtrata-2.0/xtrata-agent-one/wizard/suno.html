@@ -203,17 +203,8 @@
       <div id="escrow" style="display:none;margin-top:12px;padding:11px 13px;border:1px solid var(--line);border-radius:10px;font-size:12.5px"></div>
       <!-- Always on screen while a job is live. The keep-open message used to be one
            of the rotating tips, which is easy to miss and gone a second later. -->
-      <div id="keepOpen" style="display:none;margin-top:12px;padding:10px 12px;border:1px solid var(--acc2);border-radius:10px;background:rgba(124,92,255,.08);font-size:12.5px">
-        <div><b>🔒 Keep this tab open</b> — <span id="keepOpenSteps">the agent runs in this browser</span></div>
-        <div class="muted" style="font-size:11.5px;margin-top:4px">Your deposit sits in a one-shot wallet <b>your browser created and only it can spend from</b> — that is why this has to stay open, and also why nobody else can touch your funds. Closing pauses the job; you can resume it or take a refund when you come back.</div>
-        <div id="keepOpenWarn" class="err" style="font-size:11.5px;margin-top:6px;display:none"></div>
-        <!-- Finish without me. Hidden entirely unless a handoff endpoint is configured,
-             so a half-deployed feature is never offered. -->
-        <div id="handoffRow" style="display:none;margin-top:10px;padding-top:9px;border-top:1px solid var(--line)">
-          <button id="handoffBtn" class="btn ghost" type="button" style="width:auto;margin:0;padding:5px 11px;font-size:12px">Finish this without me →</button>
-          <div class="muted" style="font-size:11px;margin-top:5px">Hands this one job to Xtrata's server so it completes while you close the tab. You will be asked to agree first.</div>
-          <div id="handoffState" class="ok" style="font-size:11.5px;margin-top:6px;display:none"></div>
-        </div>
+      <!-- keep-open banner: rendered by the shared panel (src/agent-one/ui-panels.ts) -->
+      <div id="keepOpenSlot"></div>
       </div>
       <div id="cancelRow" style="display:none;margin-top:12px;text-align:center">
         <button id="cancelJobBtn" class="btn ghost" type="button" style="width:auto;margin:0;padding:6px 12px;font-size:12px">Stop this job &amp; refund me</button>
@@ -678,37 +669,11 @@ async function sendParentNow(pid){
 }
 window.sendParentNow=sendParentNow;
 
-// A job is LIVE while the browser still has work to do for it. Used by the banner
-// and by the leave guard.
+// The keep-open banner and the leave guard both live in the shared panel
+// (src/agent-one/ui-panels.ts), so the wizard gets the identical behaviour.
 let JOB_LIVE=false;
-const LIVE_STATES=['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING','INSCRIBED','DELIVERING'];
 function renderKeepOpen(job, st){
-  const box=$('#keepOpen'); if(!box) return;
-  JOB_LIVE=LIVE_STATES.includes(st);
-  box.style.display=JOB_LIVE?'block':'none';
-  if(!JOB_LIVE) return;
-  // Say where we are in concrete terms — a bar that stops moving is
-  // indistinguishable from a crash, but "4 of 16 done" is obviously alive.
-  const m=/(\d+)\s*\/\s*(\d+)\s*chunks/.exec((job&&job.progress)||'');
-  $('#keepOpenSteps').textContent = m
-    ? ('uploading — ' + m[1] + ' of ' + m[2] + ' chunks on-chain so far')
-    : (st==='AWAITING_DEPOSIT' ? 'waiting for your payment to confirm'
-    : st==='AWAITING_PARENT' ? 'waiting for the parent inscription'
-    : st==='DELIVERING' ? 'sending your inscription and change back'
-    : 'the agent is working in this browser');
-  // If the file could not be saved for resume, closing the tab is genuinely
-  // destructive rather than merely a pause — say so plainly.
-  const A=window.XtrataAgent;
-  const perr=(A&&A.getBytesPersistError&&A.getBytesPersistError())||null;
-  const warn=$('#keepOpenWarn');
-  const durability=job&&job.storageDurability;
-  if(perr){
-    warn.style.display='block';
-    warn.textContent='⚠ This browser would not save your file for resume ('+esc(perr)+'). If you close this tab the job cannot resume and will refund instead.';
-  } else if(durability==='refused'){
-    warn.style.display='block';
-    warn.textContent='⚠ This browser declined to mark its storage as permanent, so it may clear the deposit key if disk space runs low. Try to leave this tab open until the job finishes.';
-  } else { warn.style.display='none'; }
+  JOB_LIVE = window.XtrataUI.keepOpenBanner({ job, status: st, mount: $('#keepOpenSlot') }).live;
 }
 // --- finish without me -------------------------------------------------------
 // The deposit key never leaves this browser EXCEPT here, so the agreement is
@@ -756,9 +721,6 @@ $('#handoffBtn').onclick=async()=>{
 // The main wizard has had this guard for a while; SUNO did not. It can only trigger
 // the browser's own generic "Leave site?" prompt — the wording and buttons are not
 // ours to control — so the banner above is what actually does the explaining.
-window.addEventListener('beforeunload',(e)=>{
-  if(JOB_LIVE){ e.preventDefault(); e.returnValue=''; return ''; }
-});
 
 // Suppression-proof confirmation for destructive actions. Resolves false on
 // cancel, on Escape, and on backdrop click — so an unanswered question NEVER
