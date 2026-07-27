@@ -154,6 +154,63 @@ changes how the wizard pays for things. Right answer eventually.
   the limit. Treat an over-cap balance as "return it immediately", never as
   "reject it" — `assertWithinCap()` exists for exactly this.
 
+## 5a. The wallet origin (isolation)
+
+An in-page key means any XSS anywhere on Xtrata becomes seed theft. Browsers
+isolate by **origin**, so the wallet runs on its own hostname in an iframe: the
+seed is unsealed, used and wiped inside that origin, and script on the main site
+cannot reach it. An injection on the main site can still ask the wallet to sign
+(the user sees the prompt and can refuse) but cannot take the key.
+
+### Three deployment rules
+
+1. **A genuinely different hostname.** `wallet.xtrata.xyz`, or a separate Pages
+   project. A path like `xtrata.xyz/wallet/` is the SAME origin and gives zero
+   isolation — it looks like a boundary and is not one. This is the single
+   easiest thing to get wrong here.
+2. **The embedding page must grant WebAuthn to the frame.** Cross-origin iframes
+   cannot use passkeys unless the parent opts in:
+   `<iframe allow="publickey-credentials-get *; publickey-credentials-create *">`.
+   Without it the wallet fails with `NotAllowedError` — which looks exactly like
+   the transient failure in §3.1, so check this first when debugging.
+3. **The passkey binds to the wallet origin,** not the embedding site. That is
+   the desired behaviour: one wallet across every Xtrata property. It also means
+   changing the wallet hostname orphans every wallet, so treat it as permanent.
+
+### CSP for the wallet origin
+
+The point of a separate origin is that nothing else runs there. Serve at minimum:
+
+```
+Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self';
+  connect-src 'self' https://api.hiro.so; img-src 'self' data:;
+  frame-ancestors https://xtrata.xyz https://main-staging.xtrata.pages.dev;
+  base-uri 'none'; form-action 'none'
+```
+
+`frame-ancestors` must list the embedding origins explicitly — it is the
+server-side twin of the host's allowlist. No CDN, no analytics, no fonts, no
+third-party anything on this origin, ever. Adding one script tag here undoes the
+whole design.
+
+### Protocol
+
+`src/lib/wallet/passkey/bridge/`. Both sides validate independently:
+
+- **Client** (main site) accepts a reply only if the origin matches exactly, the
+  source is our iframe's window, and the id matches a request we sent. Posts with
+  an explicit `targetOrigin`, never `'*'` — with `'*'` a redirect could hand our
+  request to whoever now occupies the frame.
+- **Host** (wallet origin) answers only allowlisted parent origins, and silently
+  ignores everything else so an unrecognised embedder learns nothing. Wildcards
+  are refused at construction: one forgotten subdomain is a stolen wallet.
+
+**The protocol cannot carry a secret.** There is no method that returns a seed or
+a private key, and the 24-word phrase is rendered *inside* the iframe — it never
+crosses the boundary. `assertNoSecrets` scans every outgoing response for
+key-shaped fields and raw bytes and fails closed. That backstop exists because a
+protocol that merely omits a dangerous field can grow one in a later change.
+
 ## 6. What exists now
 
 | File | What it does |
@@ -162,20 +219,28 @@ changes how the wizard pays for things. Right answer eventually.
 | `src/lib/wallet/passkey/envelope.ts` | PRF → HKDF → AES-GCM seal/open, `withSeed` wipe discipline |
 | `src/lib/wallet/passkey/seed.ts` | 24-word generation, validation, `m/44'/5757'/n'/0/0` derivation |
 | `src/lib/wallet/passkey/session-return.ts` | Pre-signed rolling return + cap and staleness guards |
+| `src/lib/wallet/passkey/bridge/protocol.ts` | Message shapes, method allowlist, `assertNoSecrets` |
+| `src/lib/wallet/passkey/bridge/client.ts` | Main-site side: origin/source/id validation, timeouts |
+| `src/lib/wallet/passkey/bridge/host.ts` | Wallet-origin side: parent allowlist, leak backstop |
 
-46 tests in `src/lib/wallet/passkey/__tests__/`. The derivation tests carry
+111 tests across `__tests__/` and `bridge/__tests__/`. The derivation tests carry
 known-answer address locks: if they change, existing wallets have been silently
 relocated to addresses their owners cannot reach. Fix the code, never the vector.
 
 ## 7. Not built yet
 
-1. Sandboxed wallet origin + postMessage bridge (**blocker for shipping**).
+1. **Deploy the wallet origin.** The bridge exists; the hostname does not. Needs
+   a separate Pages project or subdomain plus the §5a headers. Until then none of
+   this is reachable, which is the correct state.
 2. WebAuthn ceremony wrapper — the canary proves it, the app has no wrapper yet.
    Must enforce the §3.1 ordering: prove PRF on the credential *before* any seed
    is generated or sealed, and treat `NotAllowedError` as retryable.
-3. Ciphertext blob storage endpoint.
-4. Registration as a third provider behind the existing `connectWallet` seam.
-5. Wiring to the sponsor relay so a fresh, STX-empty passkey wallet can transact.
+3. The wallet iframe UI: the confirmation screen the user actually reads before
+   signing, and the in-frame 24-word reveal.
+4. Ciphertext blob storage endpoint.
+5. Registration as a third provider behind the existing `connectWallet` seam.
+6. Wiring to the sponsor relay so a fresh, STX-empty passkey wallet can transact.
    This is the combination worth having: Face ID, no app, no STX, and you can
    still inscribe.
-6. Fallback path for devices where PRF fails.
+7. Fallback path for devices where PRF fails.
+8. Android and desktop Safari canary runs (§3).
