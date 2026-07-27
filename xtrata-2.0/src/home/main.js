@@ -15,6 +15,7 @@
       uintCV,
       contractPrincipalCV
     } from '@stacks/transactions';
+    import { unfinishedBanner } from '../agent-one/ui-panels';
     import {
       STANDARD_CREATE_MAX_BYTES,
       classifyCreateFiles,
@@ -14083,3 +14084,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       stationName: 'XTRATA FM',
       mount: document.getElementById('radioSlot')
     });
+
+    // An inscription started in the wizard runs entirely in this browser, so once that
+    // tab is closed there is nothing anywhere to say it never finished. If it was paid
+    // for, its deposit is sitting on a one-shot wallet only this browser holds the key
+    // to. Remind them here, where they actually come back to.
+    try { unfinishedBanner(); } catch { /* never block the homepage over a reminder */ }

@@ -12,18 +12,16 @@ describe('cancel is confirmed by something a browser cannot suppress', () => {
     // native dialog, and a suppressed dialog is indistinguishable from a click.
     for (const [name, html] of [['suno', suno], ['wizard', wizard]] as const) {
       expect(html, `${name} still uses window.confirm to cancel`).not.toContain("confirm('Stop this job");
-      expect(html).toContain('function confirmDanger(');
       expect(html).toContain('confirmLabel:\'Stop and refund me\'');
     }
   });
 
-  it('fails safe — an unanswered question keeps the job running', () => {
-    for (const html of [suno, wizard]) {
-      // Escape and backdrop both resolve false, and the SAFE button takes focus so a
-      // stray Return does not cancel a job.
-      expect(html).toContain("if(e.key==='Escape'){ e.preventDefault(); close(false); }");
-      expect(html).toContain("if(e.target===wrap) close(false)");
-      expect(html).toMatch(/\[data-x="no"\]'\)\.focus\(\{preventScroll:true\}\)/);
+  it('both surfaces call the ONE shared dialog, not their own copy', () => {
+    // Two copies is how the two pages drifted apart in the first place. Behaviour is
+    // covered by driving the real thing in confirm-danger.test.ts.
+    for (const [name, html] of [['suno', suno], ['wizard', wizard]] as const) {
+      expect(html, `${name} has grown its own confirmDanger again`).not.toContain('function confirmDanger(');
+      expect(html).toContain('window.XtrataUI.confirmDanger(o)');
     }
   });
 });

@@ -34,6 +34,8 @@ const CHUNK = 16384, SINGLE_MAX = 32, BATCH = 32;
 const HIRO_BASE: string = cfg.hiro || '/hiro/mainnet';         // same-origin proxy — reuses the site's existing /hiro/<network> Pages Function
 const AGENT_FEE_PCT = BigInt(cfg.agentFeePct ?? 10);
 const AGENT_FEE_ADDRESS: string = cfg.agentFeeAddress || DEPLOYER;
+import { jobKey, listJobsRaw, unfinishedJobs } from './unfinished';
+
 export const WINDOW_MS: number = Number(cfg.windowMs || 300000); // commence/stall window
 export const PARENT_WINDOW_MS: number = Number(cfg.parentWindowMs || 900000); // 15 min after funding for parent NFT(s) to arrive, else full refund
 const PERTX_MINER = 30000n, DELIVERY_RESERVE = 200000n, REFUND_TX_FEE = 5000n, MINT_CAP = 2000000n, RECEIPT_EST = 9000;
@@ -442,9 +444,7 @@ async function stxUsdPrice(): Promise<number | null> {
 const balOf = async (job: any): Promise<bigint> => (MOCK ? BigInt(job.requiredUstx) : balance(job.depositAddress));
 
 // ---------- localStorage job-state + in-memory file bytes ----------
-const JOB_PREFIX = 'xao-job-';
 const BYTES = new Map<string, Uint8Array>();                 // jobId -> file bytes (hot copy; also persisted to IndexedDB below)
-const jobKey = (id: string) => JOB_PREFIX + id;
 
 // ---------- IndexedDB byte persistence (survives reloads — localStorage can't hold multi-MiB files) ----------
 const idbOpen = () => new Promise<IDBDatabase>((res, rej) => {
@@ -513,8 +513,8 @@ function xaoLog(id: string | null, msg: string) {
 }
 function writeJob(j: any) { try { localStorage.setItem(jobKey(j.jobId), JSON.stringify(j)); } catch {} return j; }
 function readJob(id: string): any { const s = localStorage.getItem(jobKey(id)); if (!s) throw new Error('job not found: ' + id); return JSON.parse(s); }
-function listJobsRaw(): any[] { const o: any[] = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(JOB_PREFIX)) { try { o.push(JSON.parse(localStorage.getItem(k) as string)); } catch {} } } return o; }
 const publicJob = (j: any) => { const { ephemeralMnemonic, ...pub } = j; return { ...pub, hasKey: !!ephemeralMnemonic }; };
+
 
 // ---------- estimate (mirror core.estimate) ----------
 /**
@@ -1837,6 +1837,8 @@ async function reapTick() {
   createJob: async (opts: any) => (Array.isArray(opts?.items) && opts.items.length ? createBatchJob(opts) : createJob(opts)),
   estimateBatch: async (opts: any) => estimateBatch({ ...opts, itemsBytes: opts.itemsBytes ?? (opts.items || []).map((it: any) => (it.file ? (it.file as File).size : it.bytes || 0)) }),
   listJobs: async () => Promise.all(listJobsRaw().sort((a, b) => (b.jobId > a.jobId ? 1 : -1)).map(async (j) => { let funded = false, balanceUstx = '0'; if (j.status === 'AWAITING_DEPOSIT') { try { const s = await statusJob(j); funded = s.funded; balanceUstx = s.balanceUstx; } catch {} } return { ...publicJob(j), funded, balanceUstx }; })),
+  // Synchronous and network-free, so any page can ask on load without waiting.
+  unfinishedJobs: () => unfinishedJobs(),
   getJob: async (id: string) => { const job = readJob(id); return { job: publicJob(job), status: await statusJob(job) }; },
   runJob: async (id: string) => { if (PROCESSING.has(id)) return { started: true, already: true }; const job = readJob(id); if (job.tokenId) return { error: 'already inscribed' }; const s = await statusJob(job); if (!s.funded) return { error: 'not funded yet' }; background(id, async () => { const j = readJob(id); j.status = 'INSCRIBING'; writeJob(j); await runInscribe(j); }); return { started: true }; },
   deliverJob: async (id: string) => { if (PROCESSING.has(id)) return { started: true, already: true }; const job = readJob(id); if (!job.tokenId) return { error: 'nothing to deliver yet' }; background(id, async () => { const j = readJob(id); j.status = 'DELIVERING'; writeJob(j); await deliver(j); }); return { started: true }; },

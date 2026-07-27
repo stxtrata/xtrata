@@ -405,14 +405,6 @@
   .legend{display:flex;gap:14px;font-size:11px;color:var(--mut);margin-top:8px}
   .dot{display:inline-block;width:9px;height:9px;border-radius:3px;vertical-align:middle;margin-right:5px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  .danger-confirm{position:fixed;inset:0;z-index:95;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.6)}
-  .danger-confirm[hidden]{display:none}
-  .danger-panel{width:min(440px,100%);max-height:90vh;overflow-y:auto;padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:0 18px 44px rgba(0,0,0,.45)}
-  .danger-title{font-weight:800;font-size:15.5px;margin-bottom:8px}
-  .danger-body{font-size:13px;line-height:1.55;color:var(--mut)}
-  .danger-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:14px}
-  .danger-actions .btn{width:auto;margin:0;padding:8px 14px;font-size:13px}
-  .danger-yes{background:linear-gradient(180deg,#e0603f,#c14a2c)}
   @media(max-width:840px){.grid2{grid-template-columns:1fr}}
   /* Song-details editor — one component, opened against the single flow or a batch row. */
   .meta-overlay{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.6)}
@@ -1839,34 +1831,9 @@ window.sendParent=sendParent;
 // window.confirm cannot promise that, since a browser may suppress it outright and a
 // suppressed dialog is indistinguishable from a click. Same reason the BNS name
 // chooser stopped using window.prompt.
-function confirmDanger({ title, body, confirmLabel, cancelLabel }){
-  return new Promise((resolve)=>{
-    const prev=document.activeElement;
-    const wrap=document.createElement('div');
-    wrap.className='danger-confirm';
-    wrap.innerHTML='<div class="danger-panel" role="alertdialog" aria-modal="true">'
-      +'<div class="danger-title"></div><div class="danger-body"></div>'
-      +'<div class="danger-actions">'
-      +'<button type="button" class="btn ghost" data-x="no"></button>'
-      +'<button type="button" class="btn danger-yes" data-x="yes"></button>'
-      +'</div></div>';
-    wrap.querySelector('.danger-title').textContent=title;
-    wrap.querySelector('.danger-body').textContent=body;
-    wrap.querySelector('[data-x="no"]').textContent=cancelLabel||'Keep going';
-    wrap.querySelector('[data-x="yes"]').textContent=confirmLabel||'Yes, stop it';
-    let done=false;
-    const close=(v)=>{ if(done) return; done=true;
-      document.removeEventListener('keydown',onKey,true); wrap.remove();
-      if(prev&&prev.focus) prev.focus({preventScroll:true}); resolve(v); };
-    function onKey(e){ if(e.key==='Escape'){ e.preventDefault(); close(false); } }
-    wrap.querySelector('[data-x="no"]').onclick=()=>close(false);
-    wrap.querySelector('[data-x="yes"]').onclick=()=>close(true);
-    wrap.addEventListener('click',(e)=>{ if(e.target===wrap) close(false); });
-    document.addEventListener('keydown',onKey,true);
-    document.body.appendChild(wrap);
-    wrap.querySelector('[data-x="no"]').focus({preventScroll:true});   // safe option focused
-  });
-}
+// confirmDanger lives in the shared bundle (src/agent-one/ui-panels.ts) so a fix
+// to it reaches both wizards at once. It injects its own styles.
+const confirmDanger = (o)=>window.XtrataUI.confirmDanger(o);
 async function act(which,jobId){
   const id=jobId||selJob; if(!id) return;
   if(which==='deliver' && !confirm('Deliver the inscription, refund the remainder, and permanently wipe the deposit key?')) return;
@@ -1948,7 +1915,14 @@ setInterval(()=>{ const el=document.getElementById('pbarFill'); if(!el) return;
     $('#activeJobDetail').scrollIntoView({behavior:'smooth',block:'start'});
     startJobsPoll();
   } else if(open.length){ const n=$('#resumeNotice'); n.hidden=false;
-    n.innerHTML=`↻ ${open.length} unfinished job${open.length>1?'s':''} from a previous session — open <a href="#" style="color:var(--acc)" onclick="document.getElementById('historySection').open=true;document.getElementById('historySection').scrollIntoView({behavior:'smooth'});return false;">History</a> to resume.`;
+    // A PAID job is not merely "unfinished" — its deposit is sitting on a one-shot
+    // wallet only this browser holds the key to, so nobody else can finish or refund
+    // it. Saying just "unfinished" gave no reason to come back.
+    const paid=open.filter(j=>j.funded||j.depositReceivedUstx||j.fundedAt||['FUNDED','INSCRIBING','INSCRIBED','DELIVERING','AWAITING_PARENT','NEEDS_RECOVERY'].includes(j.status)).length;
+    const hist=`<a href="#" style="color:var(--acc)" onclick="document.getElementById('historySection').open=true;document.getElementById('historySection').scrollIntoView({behavior:'smooth'});return false;">History</a>`;
+    n.innerHTML = paid
+      ? `↻ ${paid} paid job${paid>1?'s':''} from a previous session ${paid>1?'are':'is'} still unfinished — the deposit is on a one-shot wallet only this browser can open. Go to ${hist} to finish ${paid>1?'them':'it'} or take the refund.`
+      : `↻ ${open.length} unfinished job${open.length>1?'s':''} from a previous session — nothing was paid, so nothing is at stake. Open ${hist} to resume or clear ${open.length>1?'them':'it'}.`;
     startJobsPoll(); }
 }catch(e){} })();
 
