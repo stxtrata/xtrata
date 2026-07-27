@@ -92,7 +92,11 @@ describe('SUNO relationships', () => {
     // The recipient is hard-coded to this job's deposit wallet.
     expect(suno).toContain('recipient:JOB.depositAddress');
     expect(suno).toContain('SERVER.parentWindowMs');
-    expect(suno).toContain('was not declared as a parent');
+    // A stray is reported, but as a note — it no longer threatens the job, so the copy
+    // must not imply the user's deposit is being taken away.
+    expect(suno).toContain('is not a declared parent of this job');
+    expect(suno).toContain('your job carries on as normal');
+    expect(suno).not.toContain('everything will be returned to the sender automatically');
   });
 
   it('sends the parent to the right contract, and reattaches a stranded job', () => {

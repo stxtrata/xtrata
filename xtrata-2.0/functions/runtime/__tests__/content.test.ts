@@ -679,6 +679,165 @@ describe('/runtime/content', () => {
     expect(body.detail).toContain(fallbackContractId);
   });
 
+  // The cache is keyed by content hash, so we used to read the chain on EVERY
+  // request — cache hits included — purely to learn the hash. Measured against
+  // production that was ~600ms and up to five upstream calls before a single
+  // cached byte moved. For a sealed inscription the index already knows it.
+  describe('index fast path', () => {
+    const FINAL_HASH_HEX = 'ab'.repeat(32);
+    const indexedDb = (row: Record<string, unknown> | null) => ({
+      prepare: () => ({
+        bind: () => ({
+          all: async () => ({ results: row ? [row] : [] })
+        }),
+        all: async () => ({ results: row ? [row] : [] })
+      })
+    });
+    const indexRow = (overrides: Record<string, unknown> = {}) => ({
+      contract: CONTRACT_ID,
+      mime: 'image/gif',
+      total_size: 2,
+      total_chunks: 1,
+      final_hash: `0x${FINAL_HASH_HEX}`,
+      token_uri: 'xtrata:test',
+      ...overrides
+    });
+    const cacheBucket = (get: ReturnType<typeof vi.fn>) => ({
+      get,
+      put: vi.fn(),
+      delete: vi.fn(),
+      list: vi.fn(),
+      getUploadUrl: vi.fn()
+    });
+
+    it('serves a cache hit without touching the chain at all', async () => {
+      const get = vi.fn(async () => ({
+        body: streamFrom(new Uint8Array([9, 8])),
+        size: 2,
+        httpMetadata: { contentType: 'image/gif' },
+        customMetadata: { sourceContractId: CONTRACT_ID }
+      }));
+      const fetch = vi.fn();
+      vi.stubGlobal('fetch', fetch);
+
+      const response = await onRequest({
+        request: new Request(
+          `https://xtrata.xyz/runtime/content?contractId=${CONTRACT_ID}&tokenId=294&network=mainnet`
+        ),
+        env: {
+          DB: indexedDb(indexRow()),
+          RUNTIME_CONTENT_CACHE: cacheBucket(get)
+        } as unknown as RuntimeEnv
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('X-Xtrata-Runtime-Cache')).toBe('HIT');
+      expect(response.headers.get('Content-Type')).toBe('image/gif');
+      expect(response.headers.get('X-Xtrata-Runtime-Final-Hash')).toBe(FINAL_HASH_HEX);
+      // The whole point: no upstream calls were needed to serve this.
+      expect(fetch).not.toHaveBeenCalled();
+      expect(response.headers.get('X-Xtrata-Runtime-Upstream-Requests')).toBe('0');
+      // And the key it looked under is the indexed hash.
+      expect(String(get.mock.calls[0][0])).toContain(FINAL_HASH_HEX);
+    });
+
+    it('falls through to the chain when the index has no assembled copy', async () => {
+      // A cache miss on the fast path must not short-circuit anything: the
+      // normal path still has to run and reconstruct.
+      const get = vi.fn(async () => null);
+      const fetch = vi.fn(
+        async () =>
+          new Response(JSON.stringify({ okay: true, result: metaResult() }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          })
+      );
+      vi.stubGlobal('fetch', fetch);
+
+      const response = await onRequest({
+        request: new Request(
+          `https://xtrata.xyz/runtime/content?contractId=${CONTRACT_ID}&tokenId=294&network=mainnet`
+        ),
+        env: {
+          DB: indexedDb(indexRow()),
+          RUNTIME_CONTENT_CACHE: cacheBucket(get)
+        } as unknown as RuntimeEnv
+      });
+
+      expect(fetch).toHaveBeenCalled();
+      expect(response.headers.get('X-Xtrata-Runtime-Cache')).not.toBe('HIT');
+    });
+
+    it('ignores index rows it cannot trust rather than guessing', async () => {
+      // A malformed hash must never be turned into a cache key: that would
+      // look up a key that cannot exist, or worse, a key belonging to other
+      // content. Each of these has to leave the fast path untaken.
+      for (const badHash of ['', 'not-hex', '0xabcd', null]) {
+        // Call order is the tell: the fast path looks in the cache BEFORE
+        // touching the chain, so a chain read landing first proves it was
+        // skipped. (The normal path then does its own cache lookup, which is
+        // why counting lookups would not distinguish the two.)
+        const order: string[] = [];
+        const get = vi.fn(async () => {
+          order.push('cache');
+          return null;
+        });
+        const fetch = vi.fn(async () => {
+          order.push('chain');
+          return new Response(JSON.stringify({ okay: true, result: metaResult() }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        });
+        vi.stubGlobal('fetch', fetch);
+
+        await onRequest({
+          request: new Request(
+            `https://xtrata.xyz/runtime/content?contractId=${CONTRACT_ID}&tokenId=294&network=mainnet`
+          ),
+          env: {
+            DB: indexedDb(indexRow({ final_hash: badHash })),
+            RUNTIME_CONTENT_CACHE: cacheBucket(get)
+          } as unknown as RuntimeEnv
+        });
+
+        expect(order[0], `final_hash=${String(badHash)}`).toBe('chain');
+      }
+    });
+
+    it('survives an index that is missing entirely', async () => {
+      // No DB binding at all — the normal case for a fresh preview
+      // environment. The fast path must be skipped silently, not throw.
+      const get = vi.fn(async () => ({
+        body: streamFrom(new Uint8Array([9, 8])),
+        size: 2,
+        httpMetadata: { contentType: 'image/gif' },
+        customMetadata: { sourceContractId: CONTRACT_ID }
+      }));
+      const fetch = vi.fn(
+        async () =>
+          new Response(JSON.stringify({ okay: true, result: metaResult() }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          })
+      );
+      vi.stubGlobal('fetch', fetch);
+
+      const response = await onRequest({
+        request: new Request(
+          `https://xtrata.xyz/runtime/content?contractId=${CONTRACT_ID}&tokenId=294&network=mainnet`
+        ),
+        env: { RUNTIME_CONTENT_CACHE: cacheBucket(get) } as unknown as RuntimeEnv
+      });
+
+      // Served, but only after reading the chain for the hash — i.e. exactly
+      // the behaviour we had before the fast path existed.
+      expect(response.status).toBe(200);
+      expect(response.headers.get('X-Xtrata-Runtime-Cache')).toBe('HIT');
+      expect(fetch).toHaveBeenCalled();
+    });
+  });
+
   it('keeps a failed read as a server error rather than reporting it as missing', async () => {
     // "We could not reach the chain" must never be reported as "this
     // inscription does not exist" — that is a permanence claim we cannot make.

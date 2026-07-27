@@ -11,6 +11,13 @@ Enforced by tests: `src/lib/wallet/__tests__/connect.test.ts`,
 `src/agent-one/__tests__/wallet-payment.test.ts`. If one of those fails, a rule
 below is being violated — fix the code, never weaken the test.
 
+**Scope:** this file covers the Xverse and Leather extension/in-app-browser
+paths, which are the only live connect routes. A third route — a self-hosted
+passkey wallet needing no extension and no wallet app — is being spiked
+separately; see [PASSKEY-WALLET.md](PASSKEY-WALLET.md). None of the rules below
+apply to it, because it does not negotiate with a third-party provider. Nothing
+from that spike is wired into `connectWallet` yet.
+
 ## 1. Xverse has separate request and legacy transaction bridges
 
 Xverse exposes a Sats Connect/WBIP BitcoinProvider for account connection and
@@ -165,9 +172,16 @@ one in between). Without this the wallet simply never opens.
    — all suites green, no assertions weakened.
 2. Rebuild BOTH wizard bundles: `npx vite build -c vite.agent-one-wallet.config.ts`
    and `npx vite build -c vite.agent-one.config.ts`, then `npx vite build`.
-3. Bump `agent-one.js?v=<n>` in `xtrata-agent-one/wizard/{index,manifests,suno}.html`
-   (all three MUST match — the cache-bust test enforces it) and sync
-   `dist/wizard/`.
+3. Bump the build stamp. `AGENT_BUILD` in `src/agent-one/agent-core.ts` is the
+   source of truth (`YYYY-MM-DD.N`); `deploy-freshness.test.ts` requires every
+   `agent-one.js?v=` in `xtrata-agent-one/wizard/{index,manifests,suno}.html` to
+   equal it, and suno's `XAO_MIN_AGENT_BUILD` to be no newer than it. That is
+   **five** references across four files, not three. Then sync `dist/wizard/`.
+
+   Bump it whenever the bundle's behaviour or API surface changes, not only for
+   wallet work: a stale buster leaves the browser on an old bundle, which
+   presents as a feature reporting itself "unavailable (old agent bundle)"
+   rather than as an error.
 4. Update `CHANGELOG-2.0.md`.
 5. Manual canary after ANY Xverse/Leather extension update: connect (expect the
    wallet chooser, then Xverse's account picker), pay a small STX transfer from

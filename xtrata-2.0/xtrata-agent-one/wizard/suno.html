@@ -66,13 +66,6 @@
   .efield textarea{resize:vertical;font-size:13px;line-height:1.5}
   .efield input:focus,.efield textarea:focus{outline:none;border-color:var(--acc2)}
   footer{padding:14px 22px;color:var(--mut);font-size:12px;text-align:center}
-  .danger-confirm{position:fixed;inset:0;z-index:95;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.6)}
-  .danger-panel{width:min(440px,100%);max-height:90vh;overflow-y:auto;padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:0 18px 44px rgba(0,0,0,.45)}
-  .danger-title{font-weight:800;font-size:15.5px;margin-bottom:8px}
-  .danger-body{font-size:13px;line-height:1.55;color:var(--mut)}
-  .danger-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:14px}
-  .danger-actions .btn{width:auto;margin:0;padding:8px 14px;font-size:13px}
-  .danger-yes{background:linear-gradient(180deg,#e0603f,#c14a2c)}
 </style>
 </head>
 <body>
@@ -210,17 +203,15 @@
       <div id="escrow" style="display:none;margin-top:12px;padding:11px 13px;border:1px solid var(--line);border-radius:10px;font-size:12.5px"></div>
       <!-- Always on screen while a job is live. The keep-open message used to be one
            of the rotating tips, which is easy to miss and gone a second later. -->
-      <div id="keepOpen" style="display:none;margin-top:12px;padding:10px 12px;border:1px solid var(--acc2);border-radius:10px;background:rgba(124,92,255,.08);font-size:12.5px">
-        <div><b>🔒 Keep this tab open</b> — <span id="keepOpenSteps">the agent runs in this browser</span></div>
-        <div class="muted" style="font-size:11.5px;margin-top:4px">Your deposit sits in a one-shot wallet <b>your browser created and only it can spend from</b> — that is why this has to stay open, and also why nobody else can touch your funds. Closing pauses the job; you can resume it or take a refund when you come back.</div>
-        <div id="keepOpenWarn" class="err" style="font-size:11.5px;margin-top:6px;display:none"></div>
-        <!-- Finish without me. Hidden entirely unless a handoff endpoint is configured,
-             so a half-deployed feature is never offered. -->
-        <div id="handoffRow" style="display:none;margin-top:10px;padding-top:9px;border-top:1px solid var(--line)">
-          <button id="handoffBtn" class="btn ghost" type="button" style="width:auto;margin:0;padding:5px 11px;font-size:12px">Finish this without me →</button>
-          <div class="muted" style="font-size:11px;margin-top:5px">Hands this one job to Xtrata's server so it completes while you close the tab. You will be asked to agree first.</div>
-          <div id="handoffState" class="ok" style="font-size:11.5px;margin-top:6px;display:none"></div>
-        </div>
+      <!-- keep-open banner: rendered by the shared panel (src/agent-one/ui-panels.ts) -->
+      <div id="keepOpenSlot"></div>
+      <!-- Finish without me. Hidden entirely unless a handoff endpoint is configured,
+           so a half-deployed feature is never offered. Lived inside the old keep-open
+           box; it is a sibling of the slot now that the banner renders itself. -->
+      <div id="handoffRow" style="display:none;margin-top:10px;padding-top:9px;border-top:1px solid var(--line)">
+        <button id="handoffBtn" class="btn ghost" type="button" style="width:auto;margin:0;padding:5px 11px;font-size:12px">Finish this without me →</button>
+        <div class="muted" style="font-size:11px;margin-top:5px">Hands this one job to Xtrata's server so it completes while you close the tab. You will be asked to agree first.</div>
+        <div id="handoffState" class="ok" style="font-size:11.5px;margin-top:6px;display:none"></div>
       </div>
       <div id="cancelRow" style="display:none;margin-top:12px;text-align:center">
         <button id="cancelJobBtn" class="btn ghost" type="button" style="width:auto;margin:0;padding:6px 12px;font-size:12px">Stop this job &amp; refund me</button>
@@ -244,16 +235,22 @@
 <script src="HTML_Template.js?v=6"></script>
 <script src="suno-build.js?v=7"></script>
 <script src="optimize-image.js?v=1"></script>
-<script src="agent-one.js?v=2026-07-26.3"></script>
+<script src="agent-one.js?v=2026-07-27.4"></script>
 <script>
 const SERVER = { mock:false, net:'mainnet' };
+// Batch state, declared HERE rather than beside its helpers further down. routeDrop and
+// updateGo both read it during page load, and a `const` used before its declaration line
+// is in the temporal dead zone — where `typeof SB !== 'undefined'` does NOT save you: it
+// throws ReferenceError rather than returning 'undefined'. That is exactly what broke
+// this page on load and on the first dropped file.
+const SB={ items:[], dropped:[], active:false, busy:false, quoteRun:0, EST:null, stxUsd:null, droppedNote:'' };
 // VERSION HANDSHAKE: this page requires AT LEAST the agent bundle build below. The site's deploy
 // pipeline rebuilds agent-one.js from src/agent-one/*.ts — if that source hasn't been updated, the
 // stale agent is detected here and live inscriptions are blocked (a stale agent burns real miner
 // fees on refund loops). Builds are date-stamped (YYYY-MM-DD.N) so a string compare orders them;
 // a NEWER deployed bundle must pass — requiring an exact match wrongly locked the page out
 // whenever the agent shipped ahead of the page.
-const XAO_MIN_AGENT_BUILD='2026-07-26.3';
+const XAO_MIN_AGENT_BUILD='2026-07-27.4';
 let AGENT_STALE=false;
 function checkAgentBuild(){
   const b=window.XAO_AGENT_BUILD||null;
@@ -353,7 +350,7 @@ const drop=$('#drop'), picker=$('#picker');
 drop.onclick=()=>picker.click();
 // One file → the single-song fast track (unchanged). Several → batch mode. A single file
 // dropped while a batch is open is added to that batch.
-function routeDrop(fs){ fs=(fs||[]).filter(Boolean); if(!fs.length) return; if(fs.length===1&&!(typeof SB!=='undefined'&&SB.active)) pickFile(fs[0]); else enterSunoBatch(fs); }
+function routeDrop(fs){ fs=(fs||[]).filter(Boolean); if(!fs.length) return; if(fs.length===1&&!SB.active) pickFile(fs[0]); else enterSunoBatch(fs); }
 picker.onchange=()=>{ routeDrop(Array.from(picker.files||[])); picker.value=''; };
 ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag');}));
 ['dragleave','dragend','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag');}));
@@ -470,10 +467,14 @@ async function checkParent(){
   if(!/^\d+$/.test(id)){ box.innerHTML='<span class="err">A parent must be a numeric token id.</span>'; PARENT_OK='bad'; updateGo(); return; }
   if(SERVER.mock){ box.innerHTML='<span class="muted">MOCK mode — ownership not checked.</span>'; PARENT_OK='unverified'; updateGo(); return; }
   const A=window.XtrataAgent;
-  if(!A||!A.ownerOf){ box.innerHTML='<span class="muted">Ownership check unavailable here — the agent re-checks the parent before taking any payment.</span>'; PARENT_OK='unverified'; updateGo(); return; }
+  if(!A||!A.ownerOfChecked){ box.innerHTML='<span class="muted">Ownership check unavailable here — the agent re-checks the parent before taking any payment.</span>'; PARENT_OK='unverified'; updateGo(); return; }
   PARENT_OK='checking'; box.innerHTML='<span class="muted"><span class="spin"></span>#'+esc(id)+' — checking the current owner…</span>'; updateGo();
-  let owner=null; try{ owner=await A.ownerOf(id); }catch{ owner=null; }
+  // ownerOfChecked, not ownerOf: ownerOf answers null for BOTH "no such token" and
+  // "the read failed", so a flaky API used to tell people their token id was wrong.
+  let owner=null, ok=true;
+  try{ const r=await A.ownerOfChecked(id); ok=r.ok; owner=r.owner; }catch{ ok=false; }
   if(run!==parentCheckRun) return;                       // the field changed mid-flight
+  if(!ok){ box.innerHTML='<span class="muted">#'+esc(id)+' — could not check the owner right now. The agent re-checks the parent before taking any payment.</span>'; PARENT_OK='unverified'; updateGo(); return; }
   if(owner&&WALLET&&owner===WALLET){ box.innerHTML='<span class="ok">✓ #'+esc(id)+' — in your connected wallet</span>'; PARENT_OK='ok'; }
   else if(!owner){ box.innerHTML='<span class="err">✗ #'+esc(id)+' — no owner found. Check the token id.</span>'; PARENT_OK='bad'; }
   else if(!WALLET){ box.innerHTML='<span style="color:var(--warn)">#'+esc(id)+' — held by '+esc(shortAddr(owner))+'. Connect that wallet to confirm it is yours.</span>'; PARENT_OK='bad'; }
@@ -495,7 +496,7 @@ function parentBlockingMessage(){
 }
 // Re-quote after a parent change: each escrowed parent reserves a return-transfer fee.
 async function quoteRefresh(){
-  if(typeof SB!=='undefined'&&SB.active){ sbQuote(); return; }
+  if(SB.active){ sbQuote(); return; }
   if(!PLAYER) return;
   try{
     EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size,parentCount:parentList().length,receipt:wantReceipt()})});
@@ -505,7 +506,7 @@ async function quoteRefresh(){
 }
 
 function updateGo(){
-  if(typeof SB!=='undefined'&&SB.active){ sbUpdateGo(); return; }   // batch mode drives its own button
+  if(SB.active){ sbUpdateGo(); return; }   // batch mode drives its own button
   const b=$('#go');
   if(building){ b.disabled=true; b.textContent='Building player…'; return; }
   if(AGENT_STALE&&!SERVER.mock){ b.disabled=true; b.textContent='Agent bundle outdated — redeploy required'; return; }
@@ -647,7 +648,7 @@ function renderEscrow(job, status){
     +'<div class="kv"><span>1 · STX deposit ('+stx(job.requiredUstx)+')</span><span>'+(paid?'<span class="ok">✓ arrived</span>':(status&&status.pending?'<span style="color:var(--warn)">⏳ seen — confirming…</span>':'<span class="muted">awaiting</span>'))+'</span></div>'
     +rows
     +(PARENT_MSG?('<div style="margin-top:6px;'+(PARENT_MSG.err?'color:var(--bad)':'color:var(--ok)')+'">'+PARENT_MSG.text+'</div>'):'')
-    +((ps.unexpected&&ps.unexpected.length)?('<div class="err" style="margin-top:6px">⚠ Inscription #'+ps.unexpected.map(esc).join(', #')+' arrived but was not declared as a parent — everything will be returned to the sender automatically.</div>'):'')
+    +((ps.unexpected&&ps.unexpected.length)?('<div style="margin-top:6px;color:var(--mut);font-size:12px">Inscription #'+ps.unexpected.map(esc).join(', #')+' arrived but is not a declared parent of this job. It will be sent back to whoever sent it — <strong>your job carries on as normal</strong>.</div>'):'')
     +'<div class="muted" style="font-size:11px;margin-top:6px">The parent is only borrowed for the mint.'
     +((job.status==='AWAITING_PARENT'&&job.fundedAt&&SERVER.parentWindowMs)?(' If it has not arrived by '+new Date(Date.parse(job.fundedAt)+SERVER.parentWindowMs).toLocaleTimeString()+', the job cancels itself and returns your deposit.'):'')
     +'</div>';
@@ -685,37 +686,11 @@ async function sendParentNow(pid){
 }
 window.sendParentNow=sendParentNow;
 
-// A job is LIVE while the browser still has work to do for it. Used by the banner
-// and by the leave guard.
+// The keep-open banner and the leave guard both live in the shared panel
+// (src/agent-one/ui-panels.ts), so the wizard gets the identical behaviour.
 let JOB_LIVE=false;
-const LIVE_STATES=['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING','INSCRIBED','DELIVERING'];
 function renderKeepOpen(job, st){
-  const box=$('#keepOpen'); if(!box) return;
-  JOB_LIVE=LIVE_STATES.includes(st);
-  box.style.display=JOB_LIVE?'block':'none';
-  if(!JOB_LIVE) return;
-  // Say where we are in concrete terms — a bar that stops moving is
-  // indistinguishable from a crash, but "4 of 16 done" is obviously alive.
-  const m=/(\d+)\s*\/\s*(\d+)\s*chunks/.exec((job&&job.progress)||'');
-  $('#keepOpenSteps').textContent = m
-    ? ('uploading — ' + m[1] + ' of ' + m[2] + ' chunks on-chain so far')
-    : (st==='AWAITING_DEPOSIT' ? 'waiting for your payment to confirm'
-    : st==='AWAITING_PARENT' ? 'waiting for the parent inscription'
-    : st==='DELIVERING' ? 'sending your inscription and change back'
-    : 'the agent is working in this browser');
-  // If the file could not be saved for resume, closing the tab is genuinely
-  // destructive rather than merely a pause — say so plainly.
-  const A=window.XtrataAgent;
-  const perr=(A&&A.getBytesPersistError&&A.getBytesPersistError())||null;
-  const warn=$('#keepOpenWarn');
-  const durability=job&&job.storageDurability;
-  if(perr){
-    warn.style.display='block';
-    warn.textContent='⚠ This browser would not save your file for resume ('+esc(perr)+'). If you close this tab the job cannot resume and will refund instead.';
-  } else if(durability==='refused'){
-    warn.style.display='block';
-    warn.textContent='⚠ This browser declined to mark its storage as permanent, so it may clear the deposit key if disk space runs low. Try to leave this tab open until the job finishes.';
-  } else { warn.style.display='none'; }
+  JOB_LIVE = window.XtrataUI.keepOpenBanner({ job, status: st, mount: $('#keepOpenSlot') }).live;
 }
 // --- finish without me -------------------------------------------------------
 // The deposit key never leaves this browser EXCEPT here, so the agreement is
@@ -763,43 +738,14 @@ $('#handoffBtn').onclick=async()=>{
 // The main wizard has had this guard for a while; SUNO did not. It can only trigger
 // the browser's own generic "Leave site?" prompt — the wording and buttons are not
 // ours to control — so the banner above is what actually does the explaining.
-window.addEventListener('beforeunload',(e)=>{
-  if(JOB_LIVE){ e.preventDefault(); e.returnValue=''; return ''; }
-});
 
 // Suppression-proof confirmation for destructive actions. Resolves false on
 // cancel, on Escape, and on backdrop click — so an unanswered question NEVER
 // cancels a running job. window.confirm cannot promise that: a browser may
 // suppress it outright, and a suppressed dialog is indistinguishable from a click.
-function confirmDanger({ title, body, confirmLabel, cancelLabel }){
-  return new Promise((resolve)=>{
-    const prev=document.activeElement;
-    const wrap=document.createElement('div');
-    wrap.className='danger-confirm';
-    wrap.innerHTML='<div class="danger-panel" role="alertdialog" aria-modal="true">'
-      +'<div class="danger-title"></div><div class="danger-body"></div>'
-      +'<div class="danger-actions">'
-      +'<button type="button" class="btn ghost" data-x="no"></button>'
-      +'<button type="button" class="btn danger-yes" data-x="yes"></button>'
-      +'</div></div>';
-    wrap.querySelector('.danger-title').textContent=title;
-    wrap.querySelector('.danger-body').textContent=body;
-    wrap.querySelector('[data-x="no"]').textContent=cancelLabel||'Keep going';
-    wrap.querySelector('[data-x="yes"]').textContent=confirmLabel||'Yes, stop it';
-    let done=false;
-    const close=(v)=>{ if(done) return; done=true;
-      document.removeEventListener('keydown',onKey,true); wrap.remove();
-      if(prev&&prev.focus) prev.focus({preventScroll:true}); resolve(v); };
-    function onKey(e){ if(e.key==='Escape'){ e.preventDefault(); close(false); } }
-    wrap.querySelector('[data-x="no"]').onclick=()=>close(false);
-    wrap.querySelector('[data-x="yes"]').onclick=()=>close(true);
-    wrap.addEventListener('click',(e)=>{ if(e.target===wrap) close(false); });
-    document.addEventListener('keydown',onKey,true);
-    document.body.appendChild(wrap);
-    // Focus the SAFE option, so a stray Return keeps the job running.
-    wrap.querySelector('[data-x="no"]').focus({preventScroll:true});
-  });
-}
+// confirmDanger lives in the shared bundle (src/agent-one/ui-panels.ts) so a fix
+// to it reaches both wizards at once. It injects its own styles.
+const confirmDanger = (o)=>window.XtrataUI.confirmDanger(o);
 
 $('#cancelJobBtn').onclick=async()=>{
   if(!JOB) return;
@@ -886,6 +832,9 @@ window.sunoRecover=sunoRecover;
     +'<a href="#" onclick="sunoRecover(\''+esc(rec.jobId)+'\');return false">Recover now</a> · <a href="/wizard/" target="_blank" rel="noopener">open wizard History</a>'; return; }
   const wait=(jobs||[]).find(j=>j.status==='AWAITING_DEPOSIT');
   if(wait){ $('#hint').innerHTML='<span class="muted">↻ An unpaid job from a previous session is still open — <a href="/wizard/" target="_blank" rel="noopener">open wizard History</a> to resume or cancel it.</span>'; }
+  // Anything left unfinished on the OTHER wizard is invisible here otherwise, and if it
+  // was funded its one-shot wallet is still holding the deposit.
+  if(window.XtrataUI) window.XtrataUI.unfinishedBanner({ skipJobId: JOB&&JOB.jobId });
 }catch(e){} })();
 // Frozen-tab catch-up: background tabs throttle timers; on return, refresh at once.
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&JOB){ refresh(); if(!poll) startPoll(); } });
@@ -905,7 +854,7 @@ function done(job){
     '<div style="background:linear-gradient(180deg,#0f1f17,#0c1812);border:1px solid #1f5a45;border-radius:12px;padding:14px 16px;margin:14px 0">'+
       (R.depositReceived!=null?'<div class="kv"><span>Deposit you paid</span><span>'+both(R.depositReceived)+'</span></div>':'')+
       (job.refundedUstx!=null?'<div class="kv"><span>Unused funds refunded to you</span><span class="ok">'+both(job.refundedUstx||'0')+'</span></div>':'')+
-      '<div class="muted" style="font-size:11px;margin:4px 0 8px">The deposit is over-collected to guarantee fees; everything not spent on the inscription, receipt, network fees and the agent fee comes straight back to your wallet.</div>'+
+      '<div class="muted" style="font-size:11px;margin:4px 0 8px">The deposit is over-collected to guarantee fees; everything not spent on the inscription, receipt, network fees and the wizard fee comes straight back to your wallet.</div>'+
       (paidU!=null?('<div class="kv" style="border-top:1px solid #1f5a45;padding-top:10px"><span style="font-weight:700;color:var(--ink)">Final price to immortalise this song</span>'+
         '<span style="text-align:right"><span style="display:block;font-weight:800;font-size:19px;color:var(--acc)">'+(usd(paidU)||stx(paidU))+'</span>'+
         (usd(paidU)?('<span class="muted" style="font-size:12px">'+stx(paidU)+'</span>'):'')+'</span></div>'):'')+
@@ -934,7 +883,6 @@ function resetAll(){ FILE=null;PLAYER=null;META=null;EST=null;JOB=null; if(poll)
 // SEQUENTIALLY (the shared core runs one command at a time). Songs with no embedded cover art
 // are auto-dropped (this page's promise is "embedded artwork"); the rest each get a preview and
 // an optional artwork swap, then inscribe together for one payment + one receipt.
-const SB={ items:[], dropped:[], active:false, busy:false, quoteRun:0, EST:null, stxUsd:null, droppedNote:'' };
 let sbArtTarget=-1;
 const sbReadB64=(file)=>new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]||null); r.onerror=()=>rej(r.error); r.readAsDataURL(file); });
 const sbMib=(n)=>(n/1048576).toFixed(2);

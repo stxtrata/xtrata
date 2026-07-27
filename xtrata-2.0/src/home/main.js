@@ -15,6 +15,7 @@
       uintCV,
       contractPrincipalCV
     } from '@stacks/transactions';
+    import { unfinishedBanner } from '../agent-one/ui-panels';
     import {
       STANDARD_CREATE_MAX_BYTES,
       classifyCreateFiles,
@@ -6601,10 +6602,19 @@
 
       const activate = (record) => {
         if (record.active || !record.frame.isConnected) return;
-        record.frame.srcdoc = injectGridThumbnailHtml(record.html);
         record.active = true;
         record.activatedAt = now();
-        if (record.poster) record.poster.hidden = true;
+        // The poster stays up until the frame has LOADED, not merely until srcdoc was
+        // assigned. Many inscriptions are a tiny loader that pulls the real engine from
+        // /i/<id> over the network, and their document sets no background — so between
+        // assignment and first paint the browser shows its default white page. Dropping
+        // the poster on assignment is what made scrolling flash white boxes.
+        const reveal = () => { if (record.active && record.poster) record.poster.hidden = true; };
+        record.frame.addEventListener('load', reveal, { once: true });
+        record.frame.srcdoc = injectGridThumbnailHtml(record.html);
+        // Belt and braces: a frame that never fires load must not leave a poster stuck
+        // over working content.
+        setTimeout(reveal, 4000);
       };
 
       const deactivate = (record) => {
@@ -6758,6 +6768,19 @@
           requestActivation(record);
         }
       };
+
+      // A tab that was hidden while the grid rendered gets NO IntersectionObserver
+      // callbacks at all, so every tile stays on its poster with nothing to nudge it.
+      // Re-observing on the way back delivers fresh entries for whatever is on screen.
+      if (typeof document !== 'undefined' && document.addEventListener) {
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState !== 'visible' || !observer) return;
+          tiles.forEach((_record, element) => {
+            observer.unobserve(element);
+            observer.observe(element);
+          });
+        });
+      }
 
       const reset = () => {
         if (observer) {
@@ -11535,8 +11558,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // campaign displayed only its newest 25 drops under the previous value of 25.
     const DROPS_DISPLAY_LIMIT = 64;
     const DROPS_SCAN_MAX_IDS = DROPS_DISPLAY_LIMIT * 10;
-    // Matches the 4 used by the other runReadOnlyLimited call sites; the proxy
-    // holds a paid Hiro key at 50 req/s, so this is nowhere near the ceiling.
+    // The proxy holds a paid Hiro key at 50 req/s, so this is nowhere near the
+    // ceiling. At 6, a 33-drop campaign across two contract versions was 68 reads in
+    // eleven waves — roughly 3.1s before the grid could paint. Twelve halves that and
+    // still leaves plenty of headroom for the rest of the page's reads.
     const DROPS_READ_CONCURRENCY = 6;
     const dropsState = {
       run: 0,
@@ -12611,16 +12636,17 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         );
         if (!slot) return;
         if (media?.kind === 'html-live') {
-          const frame = document.createElement('iframe');
-          frame.className = 'market-thumb__frame';
-          frame.title = `Inscription #${drop.tokenId} preview`;
-          frame.sandbox = 'allow-scripts';
-          frame.referrerPolicy = 'no-referrer';
-          frame.loading = 'lazy';
-          frame.setAttribute('scrolling', 'no');
-          frame.srcdoc = media.html;
-          slot.replaceChildren(frame);
+          // Each of these is not a picture but a live app: the inscription is usually a
+          // small loader that pulls a full engine from /i/<id> and runs it. Building the
+          // iframe here by hand meant every visible drop ran one, uncapped, with nothing
+          // to show while it loaded — hence the white boxes when scrolling.
+          //
+          // liveHtmlFrameManager is the machinery that already solves this for the market
+          // grid: it gates execution to the viewport, caps concurrent frames at
+          // MAX_LIVE_HTML_FRAMES, and keeps a poster up until the frame has loaded.
+          slot.replaceChildren();
           slot.classList.add('market-thumb--media');
+          liveHtmlFrameManager.register(slot, media, { gated: false });
         } else if (media?.kind === 'text') {
           const pre = document.createElement('div');
           pre.className = 'market-thumb__snippet';
@@ -13101,16 +13127,47 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
       dropsDom.status.innerHTML = '<span><strong>Drops</strong> loading…</span>';
       try {
-        const perContract = await Promise.all(
-          dropsEntriesForNetwork().map(async (entry) => ({
-            drops: await readDrops(entry).catch(() => []),
-            history: await loadDropsActivity({ contract: entry }).catch(() => ({ events: [] }))
-          }))
-        );
+        // Drops paint the grid; history only fills the activity list beneath it, and
+        // neither needs the other. They used to be two awaits in one object literal,
+        // so history ran AFTER the drop scan on each contract and the grid stayed
+        // blank for its whole duration — about a second of avoidable dead time.
+        //
+        // They now run together, and each updates only its own part of the page:
+        // history calls renderDropsHistory rather than renderDrops, so a late history
+        // response cannot rebuild the cards (and their iframes) underneath the user.
+        const entries = dropsEntriesForNetwork();
+        // Each contract paints as it lands rather than the grid waiting for the
+        // slowest. This matters because the registry still carries the legacy v1-0
+        // contract: half of every page load's reads go to it, and on a measured load
+        // it returned no live drops at all while v1-1 returned all 24. Waiting for
+        // both meant the cards people can actually see were held up by a scan of a
+        // contract with nothing in it.
+        dropsState.drops = [];
+        const dropsReady = Promise.all(
+          entries.map((entry) =>
+            readDrops(entry)
+              .catch(() => [])
+              .then((drops) => {
+                if (run !== dropsState.run || !drops.length) return;
+                dropsState.drops = dropsState.drops
+                  .concat(drops)
+                  .sort((a, b) => (b.dropId > a.dropId ? 1 : -1));
+                renderDrops();
+              })
+          )
+        ).then(() => {
+          // One final render so an empty result still replaces "loading…".
+          if (run === dropsState.run && !dropsState.drops.length) renderDrops();
+        });
+        const historyReady = Promise.all(
+          entries.map((entry) => loadDropsActivity({ contract: entry }).catch(() => ({ events: [] })))
+        ).then((snapshots) => {
+          if (run !== dropsState.run) return;
+          dropsState.historyEvents = snapshots.flatMap((snapshot) => snapshot.events ?? []);
+          renderDropsHistory();
+        });
+        await Promise.all([dropsReady, historyReady]);
         if (run !== dropsState.run) return;
-        dropsState.drops = perContract.flatMap((item) => item.drops).sort((a, b) => (b.dropId > a.dropId ? 1 : -1));
-        dropsState.historyEvents = perContract.flatMap((item) => item.history.events ?? []);
-        renderDrops();
       } catch (error) {
         if (run !== dropsState.run) return;
         dropsDom.status.innerHTML = '<span><strong>Drops</strong> could not load drops.</span>';
@@ -14083,3 +14140,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       stationName: 'XTRATA FM',
       mount: document.getElementById('radioSlot')
     });
+
+    // An inscription started in the wizard runs entirely in this browser, so once that
+    // tab is closed there is nothing anywhere to say it never finished. If it was paid
+    // for, its deposit is sitting on a one-shot wallet only this browser holds the key
+    // to. Remind them here, where they actually come back to.
+    try { unfinishedBanner(); } catch { /* never block the homepage over a reminder */ }

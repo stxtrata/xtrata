@@ -113,7 +113,9 @@ describe('the parent gate when the holdings index lags the chain', () => {
     const status = await agent.parentsStatus(job(['2878']));
     expect(status.held).toEqual(['2878']);
     expect(status.unexpected).toEqual(['9999']);
-    expect(status.ok).toBe(false);
+    // ok answers "can this job mint?", and a stray does not stop it — only declared
+    // parents are passed to the mint. A stray used to abort a job at 416/459 chunks.
+    expect(status.ok).toBe(true);
   });
 
   it('degrades to holdingsUnverified when the index is down, without blocking', async () => {

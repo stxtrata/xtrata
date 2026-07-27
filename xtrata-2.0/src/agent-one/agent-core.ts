@@ -34,12 +34,16 @@ const CHUNK = 16384, SINGLE_MAX = 32, BATCH = 32;
 const HIRO_BASE: string = cfg.hiro || '/hiro/mainnet';         // same-origin proxy — reuses the site's existing /hiro/<network> Pages Function
 const AGENT_FEE_PCT = BigInt(cfg.agentFeePct ?? 10);
 const AGENT_FEE_ADDRESS: string = cfg.agentFeeAddress || DEPLOYER;
+import { jobKey, listJobsRaw, unfinishedJobs } from './unfinished';
+
 export const WINDOW_MS: number = Number(cfg.windowMs || 300000); // commence/stall window
 export const PARENT_WINDOW_MS: number = Number(cfg.parentWindowMs || 900000); // 15 min after funding for parent NFT(s) to arrive, else full refund
 const PERTX_MINER = 30000n, DELIVERY_RESERVE = 200000n, REFUND_TX_FEE = 5000n, MINT_CAP = 2000000n, RECEIPT_EST = 9000;
 const PARENT_RETURN_FEE = 30000n;                                // per-parent NFT return-transfer reserve
 const ITEM_DELIVERY_FEE = 30000n;                                // per extra batch-item delivery transfer reserve
 export const MAX_BATCH_ITEMS = 40;                               // receipt deps cap 50 − parents/identity headroom
+// Typed-out confirmation for throwing away a job whose chunks are already paid for.
+const DISCARD_CONSENT = 'i-accept-losing-the-unfinished-upload';
 
 const network: any = new StacksMainnet();
 network.coreApiUrl = location.origin + HIRO_BASE;   // routes read-only + broadcast through the proxy
@@ -54,6 +58,8 @@ let sleepSeq = 0; const sleepWaiters = new Map<number, () => void>();
 if (sleepWorker) sleepWorker.onmessage = (e: MessageEvent) => { const r = sleepWaiters.get(e.data); if (r) { sleepWaiters.delete(e.data); r(); } };
 const sleep = (ms: number) => new Promise<void>((r) => { if (sleepWorker) { const id = ++sleepSeq; sleepWaiters.set(id, r); sleepWorker.postMessage({ id, ms }); } else setTimeout(r, ms); });
 const chunkBytes = (d: Uint8Array) => { const o: Uint8Array[] = []; for (let i = 0; i < d.length; i += CHUNK) o.push(d.slice(i, i + CHUNK)); return o; };
+const toHex = (b: Uint8Array) => Array.from(b).map((x) => x.toString(16).padStart(2, '0')).join('');
+const fromHex = (h: string) => new Uint8Array((h.match(/../g) || []).map((x) => parseInt(x, 16)));
 const incHash = (chunks: Uint8Array[]) => { let h: Uint8Array = new Uint8Array(32); for (const c of chunks) { const m = new Uint8Array(h.length + c.length); m.set(h, 0); m.set(c, h.length); h = sha256(m); } return h; };
 
 function deriveFrom(mnemonic: string) {
@@ -377,6 +383,13 @@ async function stagedInscribe(job: any, key: string, from: string, data: Uint8Ar
   onProg(`planned · ${total} chunks`);
   let idx: number | null = null;
   try { const st: any = (await ro('get-upload-state', [bufferCV(h), standardPrincipalCV(from)])); idx = st.value ? Number(st.value.value['current-index'].value) : null; } catch { idx = null; }
+  // Remember the content hash on the JOB. An upload lives on-chain under
+  // (contentHash, minterPrincipal), so this is the only handle by which a
+  // half-finished upload can later be found — and the only thing standing between a
+  // stalled job and a key wipe that would strand chunks the user has already paid for.
+  target.uploadHash = toHex(h);
+  target.uploadTotal = total;
+  writeJob(job);
   if (idx === null) { await send(key, from, 'begin-or-get', [bufferCV(h), stringAsciiCV(target.mime), uintCV(BigInt(data.length)), uintCV(BigInt(total))], beginFee, onProg, job.jobId); idx = 0; onProg(`upload started · 0/${total}`); }
   else if (idx > 0) { onProg(`resuming upload · ${idx}/${total} chunks already on-chain`); }
   while (idx < total) {
@@ -442,9 +455,7 @@ async function stxUsdPrice(): Promise<number | null> {
 const balOf = async (job: any): Promise<bigint> => (MOCK ? BigInt(job.requiredUstx) : balance(job.depositAddress));
 
 // ---------- localStorage job-state + in-memory file bytes ----------
-const JOB_PREFIX = 'xao-job-';
 const BYTES = new Map<string, Uint8Array>();                 // jobId -> file bytes (hot copy; also persisted to IndexedDB below)
-const jobKey = (id: string) => JOB_PREFIX + id;
 
 // ---------- IndexedDB byte persistence (survives reloads — localStorage can't hold multi-MiB files) ----------
 const idbOpen = () => new Promise<IDBDatabase>((res, rej) => {
@@ -505,7 +516,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-26.3';
+export const AGENT_BUILD = '2026-07-27.4';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -513,8 +524,8 @@ function xaoLog(id: string | null, msg: string) {
 }
 function writeJob(j: any) { try { localStorage.setItem(jobKey(j.jobId), JSON.stringify(j)); } catch {} return j; }
 function readJob(id: string): any { const s = localStorage.getItem(jobKey(id)); if (!s) throw new Error('job not found: ' + id); return JSON.parse(s); }
-function listJobsRaw(): any[] { const o: any[] = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(JOB_PREFIX)) { try { o.push(JSON.parse(localStorage.getItem(k) as string)); } catch {} } } return o; }
 const publicJob = (j: any) => { const { ephemeralMnemonic, ...pub } = j; return { ...pub, hasKey: !!ephemeralMnemonic }; };
+
 
 // ---------- estimate (mirror core.estimate) ----------
 /**
@@ -700,7 +711,7 @@ ${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
 ${row('Xtrata protocol fee', stxr(d.xtrataProtocol) + usd(d.xtrataProtocol))}
 ${row('Receipt inscription', stxr(d.receiptProtocol) + usd(d.receiptProtocol))}
 ${row('Network (miner) fee', stxr(d.networkFee) + usd(d.networkFee))}
-<div class="fee">${row('Agent fee (' + d.agentFeePct + '%)', stxr(d.agentFee) + usd(d.agentFee))}</div>
+<div class="fee">${row('Wizard fee (' + d.agentFeePct + '%)', stxr(d.agentFee) + usd(d.agentFee))}</div>
 ${row('Change returned to you', stxr(d.changeReturned) + usd(d.changeReturned))}
 ${d.note ? row('Note', escHtml(d.note)) : ''}
 <div class="tot">${row('Total paid', stxr(d.totalPaid) + usd(d.totalPaid))}</div>` : `<h1>Outcome</h1>
@@ -801,8 +812,83 @@ async function parentsStatus(job: any) {
   }
   const mine = new Set([...required, job.tokenId, job.receiptTokenId, ...((job.items || []).map((i: any) => i.tokenId))].filter(Boolean).map(String));
   const unexpected = heldAll.filter((id) => !mine.has(String(id)));
-  return { required, held, missing, unknown, unexpected, ok: missing.length === 0 && unknown.length === 0 && unexpected.length === 0 };
+  // A stray does NOT make the job un-runnable. Only declared parents feed the mint, so an
+  // extra inscription sitting in the deposit wallet cannot abort it. `ok` therefore asks
+  // "can we mint?", and strays are reported separately so they can be sent home.
+  return { required, held, missing, unknown, unexpected, ok: missing.length === 0 && unknown.length === 0 };
 }
+// Send strays home mid-job. Never throws and never blocks: a stray that cannot be returned
+// now is caught by the never-strand guard at the end and goes home via recovery.
+async function returnStrays(job: any, key: string, fromAddr: string, ids: string[]) {
+  const out: any[] = [];
+  for (const id of ids.map(String)) {
+    try {
+      // ownerOfChecked, not ownerOf: a read that FAILED returns null too, and treating that
+      // as "already moved on" would silently leave someone else's inscription behind.
+      const o = await ownerOfChecked(id);
+      if (!o.ok) throw new Error('could not confirm who owns it right now');
+      if (o.owner !== fromAddr) continue;                  // already moved on
+      const to = await detectNftSender(fromAddr, id);
+      if (!to) { xaoLog(job.jobId, `stray inscription #${id}: could not tell who sent it — it will be returned by recovery`); continue; }
+      const tx = await sendNftRetry(key, fromAddr, id, to);
+      out.push({ id, to, tx });
+      xaoLog(job.jobId, `stray inscription #${id} sent back to ${to} — your job is unaffected`);
+    } catch (e) {
+      out.push({ id, error: errMsg(e) });
+      xaoLog(job.jobId, `stray inscription #${id} could not be returned yet (${errMsg(e)}) — recovery will send it home`);
+    }
+  }
+  if (out.length) { job.strayReturns = [...(job.strayReturns || []), ...out]; writeJob(job); }
+  return out;
+}
+// Delivery tail: anything in this wallet that isn't the user's own goes back to its sender,
+// once their inscription is safely delivered. Deferred to here so the send never competes
+// with the mint for a deposit sized to the job.
+async function sweepStrays(job: any, key: string, addr: string, receiptTokenId: any, prog: (m: string) => void, notes: string[]) {
+  try {
+    const mine = new Set([...(job.parents || []), job.tokenId, receiptTokenId, ...((job.items || []).map((i: any) => i.tokenId))].filter(Boolean).map(String));
+    const strays = (await heldInscriptions(addr)).filter((id) => !mine.has(String(id)));
+    if (!strays.length) return;
+    prog(`returning inscription #${strays.join(', #')} to whoever sent it`);
+    await returnStrays(job, key, addr, strays);
+  } catch (e) {
+    notes.push('a stray inscription could not be returned yet — recovery will send it home (' + errMsg(e) + ')');
+    job.keepKey = true;
+  }
+}
+// Is there a half-finished upload sitting on this wallet?
+//
+// An upload lives on-chain under (contentHash, minterPrincipal), so ONLY this deposit
+// wallet can ever continue or seal it. Destroying the key therefore strands every chunk
+// already paid for — permanently, since no other principal can pick them up. This is the
+// same never-strand duty we already owe an escrowed NFT, extended to work in progress.
+//
+// Returns { partial, ok }: `ok` false means we could not find out, and an unanswered
+// question must never be treated as "nothing there".
+async function unsealedUploadFor(job: any, address: string): Promise<{ partial: any[]; ok: boolean }> {
+  if (job.mock || MOCK) return { partial: [], ok: true };
+  const targets = [job, ...(job.items || [])].filter((t: any) => t && t.uploadHash && !t.tokenId);
+  if (!targets.length) return { partial: [], ok: true };
+  const partial: any[] = [];
+  let ok = true;
+  for (const t of targets) {
+    let st: any;
+    // Only a failed READ counts as "could not find out". A response that parses to
+    // "no upload here" is a real answer, and treating it as unknown would keep the key
+    // for ever on every job that never started uploading.
+    try { st = await ro('get-upload-state', [bufferCV(fromHex(t.uploadHash)), standardPrincipalCV(address)]); }
+    catch { ok = false; continue; }
+    // (ok {current-index: uN}) — the same shape stagedInscribe reads. A response with
+    // no upload still yields a truthy `.value`, so walk to the field rather than
+    // trusting the wrapper to be falsy.
+    const tuple = st && st.value && st.value.value;
+    const cur = tuple && typeof tuple === 'object' ? tuple['current-index'] : null;
+    const idx = cur && cur.value != null ? Number(cur.value) : null;
+    if (idx != null && idx > 0) partial.push({ uri: t.uri, uploaded: idx, total: t.uploadTotal || null });
+  }
+  return { partial, ok };
+}
+
 // Return EVERY inscription the deposit wallet holds. Strays go back to whoever sent them; declared
 // parents / minted tokens go to `fallbackTo` (the payer). Never throws.
 async function returnAllHeldNfts(job: any, key: string, fromAddr: string, fallbackTo: string | null) {
@@ -1231,7 +1317,10 @@ async function runInscribe(job: any) {
   // declared parent, and a mid-mint abort still burns miner fees. Verify BEFORE spending.
   if ((job.parents || []).length) {
     const ps = await parentsStatus(job);
-    if (ps.unexpected && ps.unexpected.length) throw new Error(`wrong inscription received: deposit wallet holds unexpected token(s) #${ps.unexpected.join(', #')} — returning everything to sender`);
+    // A stray is not a threat to the mint — only `job.parents` is passed to it. It used to
+    // abort here, which destroyed a job at 416/459 chunks over a mistyped token id. Note it
+    // and carry on; the delivery tail sends it back to whoever sent it.
+    if (ps.unexpected && ps.unexpected.length) xaoLog(job.jobId, `inscription #${ps.unexpected.join(', #')} arrived but was not declared as a parent — it will be sent back to the sender; your job continues`);
     if (ps.unknown && ps.unknown.length) throw new Error(`could not verify parent token(s) #${ps.unknown.join(', #')} right now — retrying rather than assuming they are missing`);
     if (ps.missing.length) throw new Error(`parents not yet received: waiting for token(s) #${ps.missing.join(', #')} to arrive at ${job.depositAddress}`);
   }
@@ -1309,7 +1398,7 @@ ${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
 ${row('Xtrata protocol fees (' + d.counts.minted + ' mints)', stxr(d.xtrataProtocol) + usd(d.xtrataProtocol))}
 ${row('Receipt inscription', stxr(d.receiptProtocol) + usd(d.receiptProtocol))}
 ${row('Network (miner) fee', stxr(d.networkFee) + usd(d.networkFee))}
-<div class="fee">${row('Agent fee (' + d.agentFeePct + '%)', stxr(d.agentFee) + usd(d.agentFee))}</div>
+<div class="fee">${row('Wizard fee (' + d.agentFeePct + '%)', stxr(d.agentFee) + usd(d.agentFee))}</div>
 ${row('Change returned', stxr(d.changeReturned) + usd(d.changeReturned))}
 <div class="tot">${row(ok ? 'Total paid' : 'Returned to you', stxr(ok ? d.totalPaid : d.changeReturned) + usd(ok ? d.totalPaid : d.changeReturned))}</div>
 <div class="foot">Core ${d.core} · job ${d.jobId}${d.stxUsd ? ' · STX $' + d.stxUsd : ''} · one payment, ${d.counts.total} inscriptions · settled on Bitcoin via Stacks</div>
@@ -1368,6 +1457,7 @@ async function deliverBatch(job: any, received: bigint, agentFee: bigint, stxUsd
     catch (e) { notes.push(`parent #${pid} return pending (` + errMsg(e) + ')'); job.keepKey = true; }
   }
   if (parentReturnTxs.length) { job.parentReturnTxs = parentReturnTxs; writeJob(job); }
+  await sweepStrays(job, dep.key, dep.address, receiptTokenId, prog, notes);
   let receiptDeliverTx: any = null, agentFeeTx: any = null, refundTx: any = null, refundedUstx = '0';
   if (receiptTokenId) { try { prog('sending your on-chain receipt'); receiptDeliverTx = await sendNftRetry(dep.key, dep.address, receiptTokenId, job.recipient || job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
   try { if (agentFee > 0n) agentFeeTx = await sendStxRetry(dep.key, agentFee, job.agentFeeAddress || AGENT_FEE_ADDRESS, REFUND_TX_FEE); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
@@ -1445,6 +1535,7 @@ async function deliver(job: any) {
     } catch (e) { notes.push(`parent #${pid} return pending — recovery will send it home (` + errMsg(e) + ')'); job.keepKey = true; }
   }
   if (parentReturnTxs.length) { job.parentReturnTxs = parentReturnTxs; writeJob(job); }
+  await sweepStrays(job, dep.key, dep.address, receiptTokenId, prog, notes);
   if (receiptTokenId) { try { prog('sending your on-chain receipt'); receiptDeliverTx = await sendNftRetry(dep.key, dep.address, receiptTokenId, job.recipient || job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
   try { if (agentFee > 0n) agentFeeTx = await sendStxRetry(dep.key, agentFee, job.agentFeeAddress || AGENT_FEE_ADDRESS, REFUND_TX_FEE); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
   prog('returning your change');
@@ -1523,7 +1614,22 @@ async function refundAndClose(job: any, reasonIn = 'cancelled') {
   // NEVER-STRAND (NFT edition): never discard the key while the wallet still holds an inscription
   // (e.g. a parent that arrived without enough STX to send it back yet).
   let holdsNftAfter = false; try { holdsNftAfter = (await heldInscriptions(dep.address)).length > 0; } catch { holdsNftAfter = (job.parents || []).length > 0; }
-  if (holdsNftAfter) { job.keepKey = true; job.status = 'NEEDS_RECOVERY'; job.keepKeyReason = 'wallet still holds an inscription — return it via recovery'; }
+  // NEVER-STRAND (UPLOAD edition): chunks already on-chain can only ever be continued or
+  // sealed by THIS principal, so wiping the key throws away work the user has already
+  // paid for, permanently. Keep the key and say the job can be topped up and finished.
+  // An unanswered read counts as "there might be one" — the cost of being wrong that way
+  // is a key kept a little longer; the other way it is unrecoverable.
+  const upload = await unsealedUploadFor(job, dep.address);
+  const hasPartial = upload.partial.length > 0 || !upload.ok;
+  if (hasPartial) {
+    const where = upload.partial.map((p: any) => `${p.uploaded}${p.total ? '/' + p.total : ''} chunks`).join(', ');
+    job.keepKey = true; job.status = 'NEEDS_FUNDS';
+    job.partialUpload = upload.partial;
+    job.keepKeyReason = upload.ok
+      ? `${where} are already on-chain and paid for, and only this wallet can finish them — add funds to the deposit address and resume, or clear the job to give up on them`
+      : 'could not confirm whether an upload is half-finished, so the key is kept rather than risk stranding paid-for chunks';
+  }
+  else if (holdsNftAfter) { job.keepKey = true; job.status = 'NEEDS_RECOVERY'; job.keepKeyReason = 'wallet still holds an inscription — return it via recovery'; }
   else if (leftover != null && leftover <= REFUND_TX_FEE) {
     // NEVER-STRAND GUARD: a never-funded job keeps its key (EXPIRED) — a slow payment confirming after
     // cancellation must never land at a keyless address.
@@ -1557,14 +1663,16 @@ async function autoRun(job: any) {
     return { rejected: true, funder, expected: job.expectedFunder };
   }
   if (job.fastTrack || !job.user) { job.user = funder; writeJob(job); }
-  // PARENT ESCROW GATE: wrong inscription → return EVERYTHING; parents missing → park as
-  // AWAITING_PARENT (the watcher re-polls), bounded by PARENT_WINDOW_MS from funding.
+  // PARENT ESCROW GATE: parents missing → park as AWAITING_PARENT (the watcher re-polls),
+  // bounded by PARENT_WINDOW_MS from funding. A stray never gates anything.
   if ((job.parents || []).length) {
     if (!job.fundedAt) { job.fundedAt = new Date().toISOString(); writeJob(job); }
     const ps = await parentsStatus(job);
+    // STRAY: log it and keep going. Returning it here would spend from a deposit sized for
+    // the job, so the send is deferred to the delivery tail where change is being returned
+    // anyway. Only declared parents are ever passed to the mint, so a stray changes nothing.
     if (ps.unexpected && ps.unexpected.length) {
-      await refundAndClose(job, `wrong inscription received (token #${ps.unexpected.join(', #')} is not a declared parent of this job) — all inscriptions and funds returned to sender`);
-      return { rejected: true, unexpected: ps.unexpected };
+      xaoLog(job.jobId, `inscription #${ps.unexpected.join(', #')} arrived but was not declared as a parent — it will be sent back to the sender; your job continues`);
     }
     // A read we could not make is not a parent that did not arrive. Falling through
     // here would mint without knowing the deposit owns the parent (the contract would
@@ -1626,7 +1734,9 @@ try {
 // almost always transient — a Hiro hiccup or a rate limit — so it now retries with
 // backoff and only refunds once the retries are exhausted. Classing it as fatal is
 // what turned one failed lookup into a refund attempt every few seconds.
-const FATAL_ERR = /TX abort|locked to|unrecoverable|file bytes|empty file|wrong inscription received/i;
+// 'wrong inscription received' deliberately absent: a stray is returned to its sender and the
+// job carries on, so it must never route a nearly-complete upload to a refund.
+const FATAL_ERR = /TX abort|locked to|unrecoverable|file bytes|empty file/i;
 // ---------- cancellation ----------
 // A cancel is a PERSISTED flag, not an in-memory one: the loop doing the work may
 // be mid-tick in another call stack, and the request has to survive a reload. The
@@ -1760,7 +1870,10 @@ async function reapTick() {
   const now = Date.now();
   for (const j of listJobsRaw()) {
     if (PROCESSING.has(j.jobId)) continue;
-    if (['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED', 'NEEDS_RECOVERY', 'EXPIRED'].includes(j.status)) continue;
+    // NEEDS_FUNDS is paused ON PURPOSE and waiting for the user to top the wallet up.
+    // Reaping it would refund and wipe the key — the exact outcome that state exists
+    // to prevent — and strand chunks that are already paid for.
+    if (['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED', 'NEEDS_RECOVERY', 'EXPIRED', 'NEEDS_FUNDS'].includes(j.status)) continue;
     const last = Date.parse(j.progressAt || j.createdAt || '') || 0;
     // Payments can take many minutes to confirm — give AWAITING_DEPOSIT 12× the normal window.
     const win = j.status === 'AWAITING_DEPOSIT' ? WINDOW_MS * 12 : WINDOW_MS;
@@ -1776,6 +1889,10 @@ async function reapTick() {
   // Live owner lookup for the UI (pre-job parent validation): read-only get-owner
   // on the core contract. Returns the owner principal string or null.
   ownerOf: async (id: string) => ownerOf(String(id)),
+  // ownerOf collapses "nobody owns it" and "the read failed" into the same null, so
+  // any UI built on it tells the user their token id is wrong when the API was simply
+  // unreachable. This reports which of the two actually happened.
+  ownerOfChecked: async (id: string) => ownerOfChecked(String(id)),
   // Parent checker for the UI: who owns each declared parent right now? (connected wallet / deposit / other)
   parentInfo: async (id: string) => {
     const job = readJob(id); const out: any[] = [];
@@ -1786,6 +1903,8 @@ async function reapTick() {
   createJob: async (opts: any) => (Array.isArray(opts?.items) && opts.items.length ? createBatchJob(opts) : createJob(opts)),
   estimateBatch: async (opts: any) => estimateBatch({ ...opts, itemsBytes: opts.itemsBytes ?? (opts.items || []).map((it: any) => (it.file ? (it.file as File).size : it.bytes || 0)) }),
   listJobs: async () => Promise.all(listJobsRaw().sort((a, b) => (b.jobId > a.jobId ? 1 : -1)).map(async (j) => { let funded = false, balanceUstx = '0'; if (j.status === 'AWAITING_DEPOSIT') { try { const s = await statusJob(j); funded = s.funded; balanceUstx = s.balanceUstx; } catch {} } return { ...publicJob(j), funded, balanceUstx }; })),
+  // Synchronous and network-free, so any page can ask on load without waiting.
+  unfinishedJobs: () => unfinishedJobs(),
   getJob: async (id: string) => { const job = readJob(id); return { job: publicJob(job), status: await statusJob(job) }; },
   runJob: async (id: string) => { if (PROCESSING.has(id)) return { started: true, already: true }; const job = readJob(id); if (job.tokenId) return { error: 'already inscribed' }; const s = await statusJob(job); if (!s.funded) return { error: 'not funded yet' }; background(id, async () => { const j = readJob(id); j.status = 'INSCRIBING'; writeJob(j); await runInscribe(j); }); return { started: true }; },
   deliverJob: async (id: string) => { if (PROCESSING.has(id)) return { started: true, already: true }; const job = readJob(id); if (!job.tokenId) return { error: 'nothing to deliver yet' }; background(id, async () => { const j = readJob(id); j.status = 'DELIVERING'; writeJob(j); await deliver(j); }); return { started: true }; },
@@ -1824,6 +1943,56 @@ async function reapTick() {
     return { started: true, jobId: id };
   },
   deleteJob: async (id: string) => { const job = readJob(id); if (job.ephemeralMnemonic) throw new Error('refusing to delete: job still holds a deposit key — deliver or recover it first'); if (!['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED'].includes(job.status)) throw new Error(`refusing to delete: job is ${job.status}, not finished`); localStorage.removeItem(jobKey(id)); BYTES.delete(id); idbDeleteBytes(id); (job.items || []).forEach((_: any, i: number) => { BYTES.delete(`${id}:${i}`); idbDeleteBytes(`${id}:${i}`); }); return { deleted: true, jobId: id }; },
+  // Is this job safe to throw away, and if not, why not? Drives the confirm dialog so
+  // the user is told what would be lost rather than just refused.
+  discardCheck: async (id: string) => {
+    const job = readJob(id);
+    if (!job.ephemeralMnemonic) return { safe: true, reasons: [], leftoverUstx: '0', heldNfts: [], partial: [] };
+    const dep = deriveFrom(job.ephemeralMnemonic);
+    const reasons: string[] = [];
+    // Every check THROWS on a failed read rather than answering "nothing there": this
+    // decision destroys a key, so an unanswered question must block it.
+    let leftover: bigint;
+    try { leftover = await balance(dep.address); }
+    catch (e) { return { safe: false, unknown: true, reasons: [`could not check the wallet balance (${errMsg(e)})`], leftoverUstx: null, heldNfts: [], partial: [] }; }
+    let held: string[];
+    try { held = await heldInscriptions(dep.address); }
+    catch (e) { return { safe: false, unknown: true, reasons: [`could not check for inscriptions still in the wallet (${errMsg(e)})`], leftoverUstx: leftover.toString(), heldNfts: [], partial: [] }; }
+    const upload = await unsealedUploadFor(job, dep.address);
+    if (!upload.ok) return { safe: false, unknown: true, reasons: ['could not check whether an upload is half-finished'], leftoverUstx: leftover.toString(), heldNfts: held, partial: [] };
+
+    if (leftover > REFUND_TX_FEE) reasons.push(`${leftover} uSTX is still in the deposit wallet — recover it first`);
+    if (held.length) reasons.push(`inscription #${held.join(', #')} is still in the deposit wallet — recover it first`);
+    // A partial upload does NOT block: those chunks are unrecoverable either way, and
+    // giving up on them is the user's call to make. It is reported so the confirm
+    // dialog can say exactly what is being abandoned.
+    return {
+      safe: reasons.length === 0,
+      reasons,
+      leftoverUstx: leftover.toString(),
+      heldNfts: held,
+      partial: upload.partial
+    };
+  },
+  // Destroy the deposit key and forget the job. Refuses unless the wallet is verifiably
+  // empty of both STX and inscriptions — the point of the confirm dialog is to abandon
+  // half-finished UPLOAD work, never to abandon assets.
+  discardJob: async (id: string, consent: string) => {
+    if (consent !== DISCARD_CONSENT) throw new Error('discarding a job requires explicit confirmation');
+    const job = readJob(id);
+    if (job.ephemeralMnemonic) {
+      const dep = deriveFrom(job.ephemeralMnemonic);
+      const leftover = await balance(dep.address);            // throws on a failed read
+      if (leftover > REFUND_TX_FEE) throw new Error(`refusing to discard: ${leftover} uSTX is still in the deposit wallet`);
+      const held = await heldInscriptions(dep.address);       // throws on a failed read
+      if (held.length) throw new Error(`refusing to discard: the deposit wallet still holds inscription #${held.join(', #')}`);
+    }
+    xaoLog(id, 'job discarded by the user — deposit key destroyed, any unsealed chunks abandoned');
+    localStorage.removeItem(jobKey(id));
+    BYTES.delete(id); idbDeleteBytes(id);
+    (job.items || []).forEach((_: any, i: number) => { BYTES.delete(`${id}:${i}`); idbDeleteBytes(`${id}:${i}`); });
+    return { discarded: true, jobId: id };
+  },
   getReceiptHtml: (id: string) => { try { return readJob(id).receiptHtml || null; } catch { return null; } },
   getJobLog: (id: string) => { try { return readJob(id).log || []; } catch { return []; } },
   // Storage durability, so a page can warn rather than assume its job will survive.
@@ -1929,6 +2098,6 @@ export { deriveFrom, newWallet, balance, quoteFee, mintSingle, stagedInscribe, g
 // Exported for the fault-injection harness. These two decide "who paid" and "has the
 // parent arrived" — the questions behind the failures that shipped, and both are only
 // meaningful when exercised against a degraded API rather than asserted on in source.
-export { detectFunder, parentsStatus, heldInscriptions, waitTx, safeNonce, statusJob };
+export { detectFunder, parentsStatus, heldInscriptions, waitTx, safeNonce, statusJob, autoRun, returnStrays, unsealedUploadFor };
 // Exported so the branding can be verified by RENDERING a receipt, not by reading the template.
 export { buildReceiptHtml, buildBatchReceiptHtml, brandFor };

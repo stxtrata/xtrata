@@ -12,18 +12,16 @@ describe('cancel is confirmed by something a browser cannot suppress', () => {
     // native dialog, and a suppressed dialog is indistinguishable from a click.
     for (const [name, html] of [['suno', suno], ['wizard', wizard]] as const) {
       expect(html, `${name} still uses window.confirm to cancel`).not.toContain("confirm('Stop this job");
-      expect(html).toContain('function confirmDanger(');
       expect(html).toContain('confirmLabel:\'Stop and refund me\'');
     }
   });
 
-  it('fails safe — an unanswered question keeps the job running', () => {
-    for (const html of [suno, wizard]) {
-      // Escape and backdrop both resolve false, and the SAFE button takes focus so a
-      // stray Return does not cancel a job.
-      expect(html).toContain("if(e.key==='Escape'){ e.preventDefault(); close(false); }");
-      expect(html).toContain("if(e.target===wrap) close(false)");
-      expect(html).toMatch(/\[data-x="no"\]'\)\.focus\(\{preventScroll:true\}\)/);
+  it('both surfaces call the ONE shared dialog, not their own copy', () => {
+    // Two copies is how the two pages drifted apart in the first place. Behaviour is
+    // covered by driving the real thing in confirm-danger.test.ts.
+    for (const [name, html] of [['suno', suno], ['wizard', wizard]] as const) {
+      expect(html, `${name} has grown its own confirmDanger again`).not.toContain('function confirmDanger(');
+      expect(html).toContain('window.XtrataUI.confirmDanger(o)');
     }
   });
 });
@@ -110,6 +108,32 @@ describe('what the receipt actually renders', () => {
     expect(html).toContain('<b>XTRATA</b> <i>Inscription Wizard</i>');
     expect(html).toContain('Inscription Wizard · identity');
     expect(html).not.toContain('Agent One');
+  });
+
+  it('calls it the Wizard fee, and only in the wording', async () => {
+    // The label moved from "Agent fee" to "Wizard fee". The DATA KEYS behind it did
+    // not: agentFeePct / agentFeeUstx / agentFeeTx / agentFeeAddress are persisted on
+    // every job in localStorage and read back by receipts and recovery, so renaming
+    // them would strand jobs that were created before the change.
+    const html = await render(undefined);
+    expect(html).toContain('Wizard fee (');
+    expect(html).not.toContain('Agent fee');
+  });
+
+  it('still reads the fee from the unchanged agentFee* fields', async () => {
+    const { FakeChain, loadAgent, unloadAgent } = await import('./support/fake-chain');
+    const agent: any = await loadAgent(new FakeChain());
+    const html = agent.buildReceiptHtml({
+      jobId: 'job-1', core: 'xtrata-v3-2-3', date: new Date(0).toISOString(),
+      outcome: 'inscribed', uri: 'x', mime: 'text/html', bytes: 100, tokenId: '1',
+      depositReceived: '1000', xtrataProtocol: '1', receiptProtocol: '0',
+      networkFee: '1', changeReturned: '0', totalPaid: '1',
+      // the two fields the label is built from, exactly as jobs persist them
+      agentFeePct: 10, agentFee: '56000'
+    });
+    unloadAgent();
+    expect(html).toContain('Wizard fee (10%)');
+    expect(html).toContain('0.056');
   });
 
   it('says SUNO More when the job came from there', async () => {

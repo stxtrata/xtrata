@@ -2,14 +2,6 @@
   {
     "label": "Sponsored claims — zero fee",
     "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
-    "contractName": "xtrata-drops-v1-0",
-    "network": "mainnet",
-    "sponsored": true,
-    "sponsorApi": "/"
-  },
-  {
-    "label": "Xtrata Drops v1.1",
-    "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
     "contractName": "xtrata-drops-v1-1",
     "network": "mainnet",
     "sponsored": true,

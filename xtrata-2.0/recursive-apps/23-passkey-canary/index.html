@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Xtrata Passkey Canary</title>
+<style>
+  :root {
+    --bg: #05060f;
+    --panel: #0b1023;
+    --line: #16305a;
+    --cyan: #34e0ff;
+    --dim: #7d93c8;
+    --ok: #45e08a;
+    --warn: #ffcf5c;
+    --err: #ff6472;
+    --mono: 'Courier New', ui-monospace, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: #d9e6ff;
+    font-family: var(--mono); font-size: 13px; padding: 10px;
+    -webkit-text-size-adjust: 100%;
+  }
+  h1 { color: var(--cyan); font-size: 17px; margin: 4px 0 2px; text-shadow: 0 0 12px rgba(52,224,255,.6); }
+  .sub { color: var(--dim); font-size: 11px; margin-bottom: 10px; }
+  .panel {
+    border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
+    padding: 8px; margin-bottom: 10px;
+  }
+  .panel h2 { font-size: 12px; color: var(--cyan); margin: 0 0 6px; letter-spacing: 1px; }
+  button {
+    font-family: var(--mono); font-size: 12px; color: #05131b;
+    background: var(--cyan); border: 0; border-radius: 5px;
+    padding: 8px 10px; margin: 3px 4px 3px 0; cursor: pointer; font-weight: bold;
+  }
+  button.secondary { background: #14335f; color: #bcd6ff; }
+  button.danger { background: #5f1430; color: #ffc9d6; }
+  button:disabled { opacity: .4; }
+  #statusbar {
+    position: sticky; top: 0; z-index: 5; background: #081226; border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 8px; margin-bottom: 8px; font-size: 11px; color: var(--warn);
+    word-break: break-all;
+  }
+  #verdict { font-size: 13px; padding: 10px 8px; text-align: center; font-weight: bold; letter-spacing: 1px; }
+  #verdict.go { color: var(--ok); border-color: var(--ok); }
+  #verdict.nogo { color: var(--err); border-color: var(--err); }
+  #verdict.partial { color: var(--warn); border-color: var(--warn); }
+  #log {
+    white-space: pre-wrap; word-break: break-all; background: #04050c;
+    border: 1px solid var(--line); border-radius: 6px; padding: 8px;
+    height: 40vh; overflow-y: auto; font-size: 11px; line-height: 1.5;
+  }
+  .l-info { color: #9fb6e8; }
+  .l-ok { color: var(--ok); }
+  .l-warn { color: var(--warn); }
+  .l-err { color: var(--err); }
+  .l-step { color: var(--cyan); font-weight: bold; }
+  .kv { color: var(--dim); }
+  .kv b { color: #d9e6ff; }
+  ol { margin: 4px 0 0 16px; padding: 0; color: var(--dim); font-size: 11px; line-height: 1.7; }
+</style>
+</head>
+<body>
+  <h1>XTRATA PASSKEY CANARY</h1>
+  <div class="sub" id="version">v0.1.0 — does Face ID give us a stable secret we can lock a Stacks key with?</div>
+  <div id="statusbar">booting…</div>
+
+  <div class="panel" id="verdict">RUN THE TESTS</div>
+
+  <div class="panel">
+    <h2>WHAT THIS PROVES</h2>
+    <ol>
+      <li>Your device can make a passkey that supports <b>PRF</b>.</li>
+      <li>PRF hands back the <b>same 32-byte secret every time</b> — across taps, and across a page reload.</li>
+      <li>That secret can lock and unlock a wallet seed (encrypt → decrypt → identical).</li>
+    </ol>
+    <div class="sub" style="margin:8px 0 0">If all three pass on iPhone, iPad, Safari and Chrome, the self-hosted passkey wallet is viable. If test 2 fails anywhere, that device can never use it.</div>
+  </div>
+
+  <div class="panel">
+    <h2>TESTS</h2>
+    <button id="btn-caps">1. CHECK DEVICE</button>
+    <button id="btn-create">2. CREATE PASSKEY</button>
+    <button id="btn-prf">3. PRF + STABILITY</button>
+    <button id="btn-seal">4. LOCK/UNLOCK SEED</button>
+    <button id="btn-reload" class="secondary">5. AFTER-RELOAD CHECK</button>
+    <button id="btn-all">RUN 1-4</button>
+    <br />
+    <button id="btn-copy" class="secondary">COPY REPORT</button>
+    <button id="btn-reset" class="danger">RESET</button>
+  </div>
+
+  <div class="panel">
+    <h2>LOG</h2>
+    <div id="log"></div>
+  </div>
+
+<script>
+(() => {
+  'use strict';
+
+  // Fixed, app-specific salt. PRF returns a secret derived from (credential, salt),
+  // so this constant must never change or every existing wallet becomes unopenable.
+  const PRF_SALT = new TextEncoder().encode('xtrata.wallet.v1.seed-encryption');
+  const ALT_SALT = new TextEncoder().encode('xtrata.wallet.v1.different-salt');
+  const STORE = 'xtrata.passkey.canary.v1';
+
+  const logEl = document.getElementById('log');
+  const statusEl = document.getElementById('statusbar');
+  const verdictEl = document.getElementById('verdict');
+  const results = {};
+  const lines = [];
+
+  const log = (msg, cls = 'l-info') => {
+    const stamp = new Date().toISOString().slice(11, 19);
+    lines.push(`${stamp} ${msg}`);
+    const div = document.createElement('div');
+    div.className = cls;
+    div.textContent = `${stamp} ${msg}`;
+    logEl.appendChild(div);
+    logEl.scrollTop = logEl.scrollHeight;
+  };
+  const step = (m) => log(`── ${m}`, 'l-step');
+  const ok = (m) => log(`PASS  ${m}`, 'l-ok');
+  const bad = (m) => log(`FAIL  ${m}`, 'l-err');
+  const warn = (m) => log(`WARN  ${m}`, 'l-warn');
+  const status = (m) => { statusEl.textContent = m; };
+
+  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const sha256 = async (buf) => new Uint8Array(await crypto.subtle.digest('SHA-256', buf));
+  const eq = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+
+  const load = () => { try { return JSON.parse(localStorage.getItem(STORE) || '{}'); } catch { return {}; } };
+  const save = (patch) => localStorage.setItem(STORE, JSON.stringify({ ...load(), ...patch }));
+
+  // ---- 1. device capabilities -------------------------------------------
+  const checkCaps = async () => {
+    step('1. DEVICE CHECK');
+    log(`ua: ${navigator.userAgent}`);
+    log(`origin: ${location.origin}  secure: ${window.isSecureContext}`);
+
+    if (!window.isSecureContext) {
+      bad('not a secure context — passkeys need https (or localhost)');
+      // Easy trap: `python3 -m http.server` advertises itself as [::] or 0.0.0.0,
+      // and neither wildcard address is treated as trustworthy. Same server,
+      // wrong hostname — so say so rather than letting it read as a device failure.
+      if (/^\[::\]|^0\.0\.0\.0/.test(location.hostname) || location.hostname === '::') {
+        log(`→ you are on ${location.host}. That is the wildcard address, not a real host.`, 'l-warn');
+        log(`→ open http://localhost:${location.port || 80} instead — same server, and it will pass.`, 'l-warn');
+      } else if (location.protocol === 'file:') {
+        log('→ file:// has no domain for a passkey to bind to. Serve it over http on localhost.', 'l-warn');
+      } else if (location.protocol === 'http:') {
+        log(`→ http://${location.hostname} is not trusted. Use localhost, 127.0.0.1, or deploy over https.`, 'l-warn');
+        log('→ a LAN address like 192.168.x.x will NOT work — phones need a real https host.', 'l-warn');
+      }
+      results.caps = false;
+      return false;
+    }
+    if (!window.PublicKeyCredential) {
+      bad('WebAuthn not available — this browser cannot do passkeys at all');
+      results.caps = false;
+      return false;
+    }
+    ok('WebAuthn available');
+
+    const uvpa = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable?.().catch(() => false);
+    uvpa ? ok('platform authenticator present (Face ID / Touch ID / Windows Hello)')
+         : warn('no platform authenticator — user would need a security key');
+
+    const cond = await PublicKeyCredential.isConditionalMediationAvailable?.().catch(() => false);
+    log(`conditional mediation (autofill sign-in): ${cond ? 'yes' : 'no'}`);
+
+    if (!crypto?.subtle) { bad('WebCrypto subtle unavailable — cannot encrypt'); results.caps = false; return false; }
+    ok('WebCrypto available');
+
+    results.caps = true;
+    return true;
+  };
+
+  // ---- 2. create a PRF-capable passkey -----------------------------------
+  const createPasskey = async () => {
+    step('2. CREATE PASSKEY');
+    status('waiting for Face ID / Touch ID…');
+
+    const userId = crypto.getRandomValues(new Uint8Array(16));
+    const challenge = crypto.getRandomValues(new Uint8Array(32));
+
+    let cred;
+    try {
+      cred = await navigator.credentials.create({
+        publicKey: {
+          challenge,
+          rp: { name: 'Xtrata Passkey Canary' },
+          user: { id: userId, name: 'canary@xtrata', displayName: 'Xtrata Canary' },
+          // ES256 then RS256. Note: this key signs P-256, which is NOT a Stacks
+          // curve — we only ever use the PRF side-channel, never this signature.
+          pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+          authenticatorSelection: {
+            authenticatorAttachment: 'platform',
+            residentKey: 'required',      // discoverable: no username to type
+            userVerification: 'required'  // force the biometric every time
+          },
+          timeout: 60000,
+          extensions: { prf: {} }
+        }
+      });
+    } catch (err) {
+      bad(`create failed: ${err.name} — ${err.message}`);
+      status('passkey creation failed');
+      results.create = false;
+      return false;
+    }
+
+    const ext = cred.getClientExtensionResults?.() || {};
+    log(`credential id: ${cred.id.slice(0, 32)}…`);
+    save({ credentialId: b64(cred.rawId) });
+
+    if (ext.prf?.enabled === true) {
+      ok('authenticator reports PRF enabled at creation');
+    } else if (ext.prf?.enabled === false) {
+      bad('authenticator explicitly reports PRF NOT supported');
+      results.create = false;
+      return false;
+    } else {
+      // Legitimate and common: several platforms only report PRF on assertion.
+      warn('PRF not reported at creation — step 3 is the real test');
+    }
+
+    ok('passkey created');
+    status('passkey created — run step 3');
+    results.create = true;
+    return true;
+  };
+
+  // ---- PRF evaluation helper ---------------------------------------------
+  const evalPrf = async (salt) => {
+    const stored = load();
+    if (!stored.credentialId) throw new Error('no passkey yet — run step 2');
+
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        allowCredentials: [{ type: 'public-key', id: unb64(stored.credentialId) }],
+        userVerification: 'required',
+        timeout: 60000,
+        extensions: { prf: { eval: { first: salt } } }
+      }
+    });
+
+    const first = assertion.getClientExtensionResults?.()?.prf?.results?.first;
+    if (!first) throw new Error('assertion returned no PRF result');
+    return new Uint8Array(first);
+  };
+
+  // ---- 3. PRF works, and is stable ---------------------------------------
+  const checkPrf = async () => {
+    step('3. PRF + STABILITY');
+    status('Face ID — first of two taps…');
+
+    let a;
+    try {
+      a = await evalPrf(PRF_SALT);
+    } catch (err) {
+      bad(`PRF unavailable: ${err.name} — ${err.message}`);
+      // NotAllowedError is NOT a capability verdict. It covers a cancelled
+      // prompt, a timeout, and iOS Stolen Device Protection kicking in away
+      // from a familiar location — all transient. Observed on iPhone Edge
+      // 2026-07-27, where an identical retry passed every test.
+      if (err.name === 'NotAllowedError') {
+        log('→ transient, not a device verdict: cancelled prompt, timeout, or', 'l-warn');
+        log('  iOS Stolen Device Protection. Try again before concluding anything.', 'l-warn');
+        delete results.prf; // inconclusive — `in` must not see it, or verdict() reads NO-GO
+        status('PRF interrupted — retry');
+        return false;
+      }
+      log('This device cannot host a self-hosted passkey wallet.', 'l-err');
+      results.prf = false;
+      return false;
+    }
+    ok(`PRF returned ${a.length} bytes`);
+    if (a.length < 32) { bad(`expected >=32 bytes, got ${a.length}`); results.prf = false; return false; }
+
+    status('Face ID — second tap, checking the secret is identical…');
+    const b = await evalPrf(PRF_SALT);
+    if (!eq(a, b)) {
+      bad('PRF output CHANGED between two calls — unusable, the seed could never be decrypted twice');
+      results.prf = false;
+      return false;
+    }
+    ok('PRF stable across two separate calls');
+
+    // Sanity: a different salt must give a different secret, or `eval` is being ignored.
+    status('Face ID — third tap, salt sanity check…');
+    const c = await evalPrf(ALT_SALT);
+    eq(a, c) ? bad('different salt produced the SAME secret — eval is being ignored')
+             : ok('different salt gives a different secret (eval is honoured)');
+
+    const digest = await sha256(a);
+    save({ prfHash: b64(digest) });
+    log(`prf fingerprint: ${hex(digest).slice(0, 24)}…  (only the hash is stored, never the secret)`);
+
+    results.prf = eq(a, b) && !eq(a, c);
+    status(results.prf ? 'PRF works and is stable' : 'PRF check failed');
+    return results.prf;
+  };
+
+  // ---- 4. lock and unlock a seed -----------------------------------------
+  const sealSeed = async () => {
+    step('4. LOCK/UNLOCK SEED');
+
+    // Stand-in for a real BIP39 seed. Proving the envelope is what matters here;
+    // wordlist + m/44'/5757'/0'/0/0 derivation lands in the wallet module.
+    const seed = crypto.getRandomValues(new Uint8Array(32));
+    log(`seed fingerprint: ${hex(await sha256(seed)).slice(0, 24)}…`);
+
+    status('Face ID — locking the seed…');
+    let prf;
+    try { prf = await evalPrf(PRF_SALT); }
+    catch (err) { bad(`PRF failed: ${err.message}`); results.seal = false; return false; }
+
+    // HKDF the PRF output rather than using it as a key directly.
+    const derive = async (secret, info) => {
+      const base = await crypto.subtle.importKey('raw', secret, 'HKDF', false, ['deriveKey']);
+      return crypto.subtle.deriveKey(
+        { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32), info: new TextEncoder().encode(info) },
+        base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+      );
+    };
+
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await derive(prf, 'xtrata-seed-v1');
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, seed));
+    ok(`seed encrypted → ${ct.length} bytes of ciphertext`);
+    log('this ciphertext is what your server would hold — useless without the passkey');
+    save({ ciphertext: b64(ct), iv: b64(iv), seedHash: b64(await sha256(seed)) });
+
+    // Fresh Face ID tap, fresh PRF call — mirrors what a real unlock does.
+    status('Face ID — unlocking again from scratch…');
+    const prf2 = await evalPrf(PRF_SALT);
+    const key2 = await derive(prf2, 'xtrata-seed-v1');
+    let out;
+    try {
+      out = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key2, ct));
+    } catch (err) {
+      bad(`decrypt failed: ${err.message}`);
+      results.seal = false;
+      return false;
+    }
+
+    if (!eq(out, seed)) { bad('decrypted seed does not match the original'); results.seal = false; return false; }
+    ok('decrypted seed matches the original exactly');
+    log('→ a wallet locked behind Face ID is recoverable. This is the whole design.', 'l-ok');
+
+    out.fill(0);
+    seed.fill(0);
+    log('plaintext seed zeroed in memory');
+
+    results.seal = true;
+    status('lock/unlock roundtrip passed');
+    return true;
+  };
+
+  // ---- 5. survives a reload ----------------------------------------------
+  const afterReload = async () => {
+    step('5. AFTER-RELOAD CHECK');
+    const stored = load();
+    if (!stored.prfHash || !stored.ciphertext) {
+      warn('nothing stored yet — run 1-4, then reload the page and press this');
+      return false;
+    }
+    log('Run this AFTER a full page reload (ideally after closing the tab).');
+
+    status('Face ID — checking the secret survived…');
+    let prf;
+    try { prf = await evalPrf(PRF_SALT); }
+    catch (err) { bad(`PRF failed after reload: ${err.message}`); results.reload = false; return false; }
+
+    const digest = await sha256(prf);
+    if (!eq(digest, unb64(stored.prfHash))) {
+      bad('PRF secret DIFFERS from before the reload — wallets would be lost between sessions');
+      results.reload = false;
+      return false;
+    }
+    ok('PRF secret identical to before the reload');
+
+    const base = await crypto.subtle.importKey('raw', prf, 'HKDF', false, ['deriveKey']);
+    const key = await crypto.subtle.deriveKey(
+      { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32), info: new TextEncoder().encode('xtrata-seed-v1') },
+      base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+    );
+    try {
+      const out = new Uint8Array(await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: unb64(stored.iv) }, key, unb64(stored.ciphertext)
+      ));
+      const matches = eq(await sha256(out), unb64(stored.seedHash));
+      out.fill(0);
+      if (!matches) { bad('recovered seed does not match'); results.reload = false; return false; }
+      ok('seed from the previous session decrypted successfully');
+      log('→ a returning user gets their wallet back with one Face ID tap.', 'l-ok');
+      results.reload = true;
+      status('survives reload — this is the go signal');
+      return true;
+    } catch (err) {
+      bad(`decrypt after reload failed: ${err.message}`);
+      results.reload = false;
+      return false;
+    }
+  };
+
+  // ---- verdict ------------------------------------------------------------
+  const verdict = () => {
+    const core = ['caps', 'create', 'prf', 'seal'];
+    const done = core.filter((k) => k in results);
+    const passed = core.filter((k) => results[k] === true);
+
+    if (done.length < core.length) {
+      verdictEl.className = 'panel partial';
+      verdictEl.textContent = `${passed.length}/${core.length} PASSED — RUN THE REST`;
+      return;
+    }
+    if (passed.length === core.length) {
+      const tail = results.reload === true ? ' + SURVIVES RELOAD'
+                 : results.reload === false ? ' — BUT FAILED AFTER RELOAD' : '';
+      verdictEl.className = results.reload === false ? 'panel nogo' : 'panel go';
+      verdictEl.textContent = results.reload === false
+        ? `NO-GO ON THIS DEVICE${tail}`
+        : `GO ON THIS DEVICE${tail}`;
+    } else {
+      verdictEl.className = 'panel nogo';
+      verdictEl.textContent = `NO-GO ON THIS DEVICE — ${core.filter((k) => !results[k]).join(', ')} failed`;
+    }
+  };
+
+  const run = (fn) => async () => {
+    try { await fn(); }
+    catch (err) { bad(`unexpected: ${err.name} — ${err.message}`); }
+    finally { verdict(); }
+  };
+
+  document.getElementById('btn-caps').onclick = run(checkCaps);
+  document.getElementById('btn-create').onclick = run(createPasskey);
+  document.getElementById('btn-prf').onclick = run(checkPrf);
+  document.getElementById('btn-seal').onclick = run(sealSeed);
+  document.getElementById('btn-reload').onclick = run(afterReload);
+  document.getElementById('btn-all').onclick = run(async () => {
+    if (!await checkCaps()) return;
+    if (!await createPasskey()) return;
+    if (!await checkPrf()) return;
+    await sealSeed();
+    log('Now RELOAD the page and press "AFTER-RELOAD CHECK".', 'l-warn');
+  });
+
+  document.getElementById('btn-copy').onclick = async () => {
+    const report = [`Xtrata Passkey Canary — ${new Date().toISOString()}`, navigator.userAgent, '', ...lines].join('\n');
+    try { await navigator.clipboard.writeText(report); status('report copied to clipboard'); }
+    catch { status('clipboard blocked — select the log and copy manually'); }
+  };
+
+  document.getElementById('btn-reset').onclick = () => {
+    localStorage.removeItem(STORE);
+    for (const k of Object.keys(results)) delete results[k];
+    logEl.innerHTML = '';
+    verdictEl.className = 'panel';
+    verdictEl.textContent = 'RUN THE TESTS';
+    log('local state cleared — the passkey itself still exists in your device keychain', 'l-warn');
+    status('reset');
+  };
+
+  const stored = load();
+  status(stored.credentialId ? 'passkey already on file — press 5 to test reload survival, or RESET' : 'ready — press RUN 1-4');
+  log('Xtrata Passkey Canary ready.');
+  if (stored.credentialId) log('Found a passkey from a previous session. Press "AFTER-RELOAD CHECK".', 'l-warn');
+})();
+</script>
+</body>
+</html>

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 const core = readFileSync(new URL('../agent-core.ts', import.meta.url), 'utf8');
 const suno = readFileSync(new URL('../../../xtrata-agent-one/wizard/suno.html', import.meta.url), 'utf8');
 const wizard = readFileSync(new URL('../../../xtrata-agent-one/wizard/index.html', import.meta.url), 'utf8');
+const panels = readFileSync(new URL('../ui-panels.ts', import.meta.url), 'utf8');
 
 describe('storage durability', () => {
   it('asks the browser to keep the deposit key and file, and records the answer', () => {
@@ -19,22 +20,34 @@ describe('storage durability', () => {
     // silently lost the ability to resume.
     expect(core).toContain('lastBytesPersistError = errMsg(e)');
     expect(core).toContain('could not save the file for resume');
-    expect(suno).toContain('getBytesPersistError');
+    // The banner reads it and turns it into a plain warning — see keep-open.test.ts,
+    // which drives that path rather than grepping for the call.
+    expect(panels).toContain('getBytesPersistError');
   });
 });
 
 describe('the tab-open warning', () => {
   it('is a persistent banner, not one of the rotating tips', () => {
-    expect(suno).toContain('id="keepOpen"');
-    expect(suno).toContain('function renderKeepOpen(');
+    expect(panels).toContain('xao-keepopen');
     // Concrete progress: a bar that stops moving looks identical to a crash.
-    expect(suno).toContain('chunks on-chain so far');
+    expect(panels).toContain('chunks on-chain so far');
   });
 
-  it('guards an accidental close on BOTH wizard surfaces', () => {
+  it('is mounted on BOTH wizard surfaces, sharing one leave guard', () => {
+    // The guard now lives with the banner, so it can never be armed on a page whose
+    // banner logic has drifted. Behaviour is covered in keep-open.test.ts.
+    expect(panels).toContain("addEventListener('beforeunload'");
     for (const [name, html] of [['suno', suno], ['wizard', wizard]] as const) {
-      expect(html, `${name} has no beforeunload guard`).toContain("addEventListener('beforeunload'");
+      expect(html, `${name} does not mount the keep-open banner`).toContain('XtrataUI.keepOpenBanner(');
+      // A thin wrapper that forwards to the panel is fine; a second copy of the
+      // banner's own wording is not — that is what drifted before.
+      expect(html, `${name} still carries its own keep-open copy`).not.toContain('chunks on-chain so far');
     }
+    // SUNO has no guard of its own — the shared one is enough there. The wizard keeps
+    // its own because it guards MORE than one job's status: a wallet signature waiting
+    // to be confirmed, and every job live in History. Two listeners still prompt once.
+    expect(suno).not.toContain("addEventListener('beforeunload'");
+    expect(wizard).toContain('LIVE.size||SIG_PENDING');
   });
 });
 
@@ -98,8 +111,9 @@ describe('self-custody is stated where the doubt actually is', () => {
   });
 
   it('says it in the keep-open banner, where it explains the constraint too', () => {
-    expect(suno).toMatch(/your browser created and only it can spend from/i);
-    expect(suno).toMatch(/why nobody else can touch your funds/i);
+    // Shared, so it now reaches the main wizard too — which never had this line.
+    expect(panels).toMatch(/your browser created and only it can spend from/i);
+    expect(panels).toMatch(/why nobody else can touch your funds/i);
   });
 
   it('sets the expectation in both heroes', () => {

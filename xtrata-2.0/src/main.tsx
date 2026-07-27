@@ -2,8 +2,9 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
-import PublicApp from './PublicApp';
-import SimplePublicHome from './SimplePublicHome';
+// PublicApp and SimplePublicHome are intentionally no longer mounted — see the
+// isLegacyPublicPanelPath comment below. The files are kept so the fix can be
+// applied to src/screens/MintScreen.tsx and the routes restored.
 import CollectionMintLivePage from './CollectionMintLivePage';
 import LabLandingPage from './LabLandingPage';
 import LabEvolutionPage from './LabEvolutionPage';
@@ -53,7 +54,6 @@ applyThemeToDocument(resolveInitialTheme());
 installGlobalTelemetry();
 
 const COLLECTION_LIVE_PATH_PREFIX = '/collection/';
-const WORKSPACE_PATH_PREFIX = '/workspace';
 const LAB_PATH_PREFIX = '/lab';
 const LAB_EVOLUTION_PATH_PREFIX = '/lab/evolution';
 const CONTRACT_STUDIO_PATH_PREFIX = '/contract-studio';
@@ -74,32 +74,52 @@ const decodePathSegment = (value: string) => {
 const collectionIdFromPath =
   collectionPathMatch.length > 0 ? decodePathSegment(collectionPathMatch.split('/')[0] ?? '') : '';
 
-ReactDOM.createRoot(root).render(
-  <React.StrictMode>
-    <TelemetryBoundary>
-      <QueryClientProvider client={queryClient}>
-        {collectionIdFromPath ? (
-          <CollectionMintLivePage collectionKey={collectionIdFromPath} />
-        ) : pathname.startsWith(CONTRACT_STUDIO_PATH_PREFIX) ? (
-          <ContractStudioPage />
-        ) : pathname.startsWith(ADMIN_PATH) ? (
-          <AdminGate>
-            <App />
-          </AdminGate>
-        ) : pathname.startsWith(MANAGE_PATH) ? (
-          <ArtistManagerGate>
-            <CollectionManagerApp />
-          </ArtistManagerGate>
-        ) : isLabEvolutionPath ? (
-          <LabEvolutionPage />
-        ) : isLabPath ? (
-          <LabLandingPage />
-        ) : pathname.startsWith(WORKSPACE_PATH_PREFIX) ? (
-          <PublicApp />
-        ) : (
-          <SimplePublicHome />
-        )}
-      </QueryClientProvider>
-    </TelemetryBoundary>
-  </React.StrictMode>
-);
+// The legacy public panel (PublicApp at /workspace, SimplePublicHome as the
+// catch-all) duplicates the homepage, but its mint path pins an exact-match STX
+// post-condition against a stale three-stage fee estimate. On v3.2.3 that means
+// 300000 SentEq 11000: every inscription by a non-admin aborts and burns the
+// miner fee. It only ever worked for the fee recipient, which is why it survived
+// internal testing. See src/screens/MintScreen.tsx (resolveFeePostConditions).
+//
+// Until that is fixed, anything that would have landed on the legacy panel goes
+// to the homepage, which mints correctly. This deliberately also covers bare
+// /collection, which used to fall through to SimplePublicHome. The gated tools
+// are unaffected: public/_redirects rewrites them to this asset but preserves
+// their own pathname, so they still match their own branch below.
+const isLegacyPublicPanelPath =
+  !collectionIdFromPath &&
+  !pathname.startsWith(CONTRACT_STUDIO_PATH_PREFIX) &&
+  !pathname.startsWith(ADMIN_PATH) &&
+  !pathname.startsWith(MANAGE_PATH) &&
+  !isLabEvolutionPath &&
+  !isLabPath;
+
+if (isLegacyPublicPanelPath) {
+  window.location.replace('/');
+} else {
+  ReactDOM.createRoot(root).render(
+    <React.StrictMode>
+      <TelemetryBoundary>
+        <QueryClientProvider client={queryClient}>
+          {collectionIdFromPath ? (
+            <CollectionMintLivePage collectionKey={collectionIdFromPath} />
+          ) : pathname.startsWith(CONTRACT_STUDIO_PATH_PREFIX) ? (
+            <ContractStudioPage />
+          ) : pathname.startsWith(ADMIN_PATH) ? (
+            <AdminGate>
+              <App />
+            </AdminGate>
+          ) : pathname.startsWith(MANAGE_PATH) ? (
+            <ArtistManagerGate>
+              <CollectionManagerApp />
+            </ArtistManagerGate>
+          ) : isLabEvolutionPath ? (
+            <LabEvolutionPage />
+          ) : (
+            <LabLandingPage />
+          )}
+        </QueryClientProvider>
+      </TelemetryBoundary>
+    </React.StrictMode>
+  );
+}

@@ -10,8 +10,10 @@ import {
   runtimeBytesToHex,
   writeRuntimeContentCache,
   type RuntimeByteRange,
-  type RuntimeCacheStatus
+  type RuntimeCacheStatus,
+  type RuntimeContentCacheRecord
 } from './cache';
+import { lookupIndexedRuntimeMeta } from './index-meta';
 import {
   createRuntimeUpstreamRequestTracker,
   fetchRuntimeTokenUri,
@@ -25,7 +27,9 @@ import {
   resolveRuntimeContent,
   resolveRuntimeMeta,
   syncRuntimeUpstreamRequests,
+  type RuntimeContractRef,
   type RuntimeEnv,
+  type RuntimeNetworkType,
   type RuntimeReconstructionDiagnostics
 } from './lib';
 import {
@@ -364,6 +368,107 @@ const injectRuntimeModuleBaseInBytes = (params: {
   };
 };
 
+// Shared by both cache-hit paths: the one reached after a chain metadata read,
+// and the faster one reached straight from the index. Identical output either
+// way — the only difference is where the content hash came from.
+const buildCachedRuntimeResponse = async (params: {
+  cached: RuntimeContentCacheRecord;
+  request: Request;
+  url: URL;
+  network: RuntimeNetworkType;
+  tokenId: bigint;
+  contract: RuntimeContractRef;
+  mimeType: string;
+  totalSize: bigint;
+  totalChunks: bigint;
+  finalHash: string;
+  requestedRange: ParsedRange;
+  readConfig: { batchSize: number; concurrency: number; retries: number };
+  upstreamRequests: number;
+  startedAt: number;
+}) => {
+  const { cached, request, url, requestedRange } = params;
+  const isRangeResponse = requestedRange.status === 'valid';
+  const sourceContractId =
+    cached.customMetadata?.sourceContractId ?? getRuntimeContractId(params.contract);
+  const cachedModuleBaseHref =
+    cached.customMetadata?.moduleBaseHref ??
+    buildRuntimeModuleBaseHref({
+      network: params.network,
+      contractId: sourceContractId,
+      tokenUriPath: cached.customMetadata?.tokenUri,
+      entryTokenId: params.tokenId
+    });
+  const rangeContentLength = isRangeResponse ? requestedRange.range.length : null;
+  const cachedMimeType =
+    params.mimeType || cached.httpMetadata?.contentType || 'application/octet-stream';
+  let cachedResponseBody: BodyInit | null =
+    request.method === 'HEAD' ? null : cached.body;
+  let cachedContentLength = rangeContentLength ?? cached.size;
+  let cachedApiRewrite = false;
+  let cachedModuleBaseInjected = false;
+  if (
+    cachedResponseBody &&
+    shouldRewriteHiroBases({
+      requestUrl: url,
+      mimeType: cachedMimeType,
+      method: request.method,
+      isRangeResponse
+    })
+  ) {
+    const cachedBytes = new Uint8Array(
+      await new Response(cachedResponseBody as BodyInit).arrayBuffer()
+    );
+    const rewritten = rewriteHiroApiBasesInBytes(cachedBytes, url.origin);
+    cachedResponseBody = rewritten.bytes;
+    cachedContentLength = rewritten.bytes.length;
+    cachedApiRewrite = rewritten.changed;
+  }
+  if (cachedResponseBody && request.method === 'GET' && !isRangeResponse) {
+    const cachedBytes = new Uint8Array(
+      await new Response(cachedResponseBody as BodyInit).arrayBuffer()
+    );
+    const baseInjected = injectRuntimeModuleBaseInBytes({
+      bytes: cachedBytes,
+      mimeType: cachedMimeType,
+      moduleBaseHref: cachedModuleBaseHref,
+      requestUrl: url
+    });
+    cachedResponseBody = baseInjected.bytes;
+    cachedContentLength = baseInjected.bytes.length;
+    cachedModuleBaseInjected = baseInjected.changed;
+  }
+  const headers = buildRuntimeContentHeaders({
+    mimeType: cachedMimeType,
+    cacheStatus: 'HIT',
+    network: params.network,
+    contractId: getRuntimeContractId(params.contract),
+    sourceContractId,
+    tokenUri: cached.customMetadata?.tokenUri ?? '',
+    moduleBaseHref: cachedModuleBaseHref ?? '',
+    finalHash: params.finalHash,
+    totalSize: params.totalSize,
+    totalChunks: params.totalChunks,
+    contentLength: cachedContentLength,
+    contentRange: isRangeResponse ? requestedRange.contentRange : undefined,
+    responseMode:
+      request.method === 'HEAD' ? 'head' : isRangeResponse ? 'range' : 'cache',
+    apiRewrite: cachedApiRewrite,
+    readBatchSize: params.readConfig.batchSize,
+    readConcurrency: params.readConfig.concurrency,
+    readRetries: params.readConfig.retries,
+    upstreamRequests: params.upstreamRequests,
+    preparedMs: performance.now() - params.startedAt
+  });
+  if (cachedModuleBaseInjected) {
+    headers['X-Xtrata-Runtime-Module-Base-Injected'] = 'true';
+  }
+  return new Response(cachedResponseBody, {
+    status: isRangeResponse ? 206 : 200,
+    headers
+  });
+};
+
 export const onRequest = async (context: {
   request: Request;
   env: RuntimeEnv;
@@ -402,6 +507,68 @@ export const onRequest = async (context: {
   }
   const readConfig = getRuntimeReadConfig(env);
   const upstreamTracker = createRuntimeUpstreamRequestTracker();
+
+  // Fast path: the cache is keyed by content hash, and for a SEALED inscription
+  // the index already knows that hash. Reading it from D1 instead of the chain
+  // turns a cache hit from ~600ms and up to five upstream calls into a single
+  // indexed lookup. Strictly an optimisation — the index is only ever used to
+  // FIND an assembled copy, never to reconstruct one, so a stale or wrong row
+  // can cost a wasted lookup but can never produce wrong bytes. Any miss falls
+  // through to the unchanged chain path below.
+  if (hasRuntimeContentCache(env)) {
+    try {
+      const indexed = await lookupIndexedRuntimeMeta({
+        env,
+        candidates: [contractId, fallbackContractId],
+        tokenId
+      });
+      if (indexed) {
+        const indexedRange = shouldHonorRange(request, indexed.finalHashHex)
+          ? parseRuntimeRange(request.headers.get('Range'), indexed.totalSize)
+          : ({ status: 'none' } as const);
+        // An unsatisfiable range needs the 416 path below, which reports the
+        // chain's view of the token; let it fall through rather than answering
+        // an error from the index.
+        if (indexedRange.status !== 'unsatisfiable') {
+          const indexedCached = await readRuntimeContentCache(
+            env,
+            buildRuntimeContentCacheKey({
+              network,
+              contract: indexed.contract,
+              tokenId,
+              finalHash: indexed.finalHash
+            }),
+            indexedRange.status === 'valid' ? indexedRange.range : null
+          );
+          if (indexedCached) {
+            return await buildCachedRuntimeResponse({
+              cached: indexedCached,
+              request,
+              url,
+              network,
+              tokenId,
+              contract: indexed.contract,
+              mimeType: indexed.mimeType,
+              totalSize: indexed.totalSize,
+              totalChunks: indexed.totalChunks,
+              finalHash: indexed.finalHashHex,
+              requestedRange: indexedRange,
+              readConfig,
+              upstreamRequests: upstreamTracker.attempts,
+              startedAt
+            });
+          }
+        }
+      }
+    } catch (error) {
+      // The fast path must never be able to fail a request that the normal
+      // path could still serve.
+      logRuntimeContentDebug(env, 'index-fast-path-failed', {
+        tokenId: tokenId.toString(),
+        detail: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
 
   try {
     const resolvedMeta = await resolveRuntimeMeta({
@@ -457,94 +624,21 @@ export const onRequest = async (context: {
 
     const cached = await readRuntimeContentCache(env, cacheKey, range);
     if (cached) {
-      const sourceContractId =
-        cached.customMetadata?.sourceContractId ?? getRuntimeContractId(resolvedMeta.contract);
-      const cachedModuleBaseHref =
-        cached.customMetadata?.moduleBaseHref ??
-        buildRuntimeModuleBaseHref({
-          network,
-          contractId: sourceContractId,
-          tokenUriPath: cached.customMetadata?.tokenUri,
-          entryTokenId: tokenId
-        });
-      const rangeContentLength =
-        requestedRange.status === 'valid' ? requestedRange.range.length : null;
-      const cachedMimeType =
-        resolvedMeta.meta.mimeType ||
-        cached.httpMetadata?.contentType ||
-        'application/octet-stream';
-      let cachedResponseBody: BodyInit | null =
-        request.method === 'HEAD' ? null : cached.body;
-      let cachedContentLength = rangeContentLength ?? cached.size;
-      let cachedApiRewrite = false;
-      let cachedModuleBaseInjected = false;
-      if (
-        cachedResponseBody &&
-        shouldRewriteHiroBases({
-          requestUrl: url,
-          mimeType: cachedMimeType,
-          method: request.method,
-          isRangeResponse: requestedRange.status === 'valid'
-        })
-      ) {
-        const cachedBytes = new Uint8Array(
-          await new Response(cachedResponseBody as BodyInit).arrayBuffer()
-        );
-        const rewritten = rewriteHiroApiBasesInBytes(cachedBytes, url.origin);
-        cachedResponseBody = rewritten.bytes;
-        cachedContentLength = rewritten.bytes.length;
-        cachedApiRewrite = rewritten.changed;
-      }
-      if (
-        cachedResponseBody &&
-        request.method === 'GET' &&
-        requestedRange.status !== 'valid'
-      ) {
-        const cachedBytes = new Uint8Array(
-          await new Response(cachedResponseBody as BodyInit).arrayBuffer()
-        );
-        const baseInjected = injectRuntimeModuleBaseInBytes({
-          bytes: cachedBytes,
-          mimeType: cachedMimeType,
-          moduleBaseHref: cachedModuleBaseHref,
-          requestUrl: url
-        });
-        cachedResponseBody = baseInjected.bytes;
-        cachedContentLength = baseInjected.bytes.length;
-        cachedModuleBaseInjected = baseInjected.changed;
-      }
-      const headers = buildRuntimeContentHeaders({
-        mimeType: cachedMimeType,
-        cacheStatus: 'HIT',
+      return buildCachedRuntimeResponse({
+        cached,
+        request,
+        url,
         network,
-        contractId: getRuntimeContractId(resolvedMeta.contract),
-        sourceContractId,
-        tokenUri: cached.customMetadata?.tokenUri ?? '',
-        moduleBaseHref: cachedModuleBaseHref ?? '',
-        finalHash,
+        tokenId,
+        contract: resolvedMeta.contract,
+        mimeType: resolvedMeta.meta.mimeType,
         totalSize: resolvedMeta.meta.totalSize,
         totalChunks: resolvedMeta.meta.totalChunks,
-        contentLength: cachedContentLength,
-        contentRange: requestedRange.status === 'valid' ? requestedRange.contentRange : undefined,
-        responseMode:
-          request.method === 'HEAD'
-            ? 'head'
-            : requestedRange.status === 'valid'
-              ? 'range'
-              : 'cache',
-        apiRewrite: cachedApiRewrite,
-        readBatchSize: readConfig.batchSize,
-        readConcurrency: readConfig.concurrency,
-        readRetries: readConfig.retries,
+        finalHash,
+        requestedRange,
+        readConfig,
         upstreamRequests: upstreamTracker.attempts,
-        preparedMs: performance.now() - startedAt
-      });
-      if (cachedModuleBaseInjected) {
-        headers['X-Xtrata-Runtime-Module-Base-Injected'] = 'true';
-      }
-      return new Response(cachedResponseBody, {
-        status: requestedRange.status === 'valid' ? 206 : 200,
-        headers
+        startedAt
       });
     }
 

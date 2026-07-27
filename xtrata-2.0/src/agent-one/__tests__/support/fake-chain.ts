@@ -32,6 +32,11 @@ export class FakeChain {
   index = new Map<string, string[]>();
   /** inbound STX transfers per address: {sender, amount}. */
   inbound = new Map<string, Array<{ sender: string; amount: bigint }>>();
+  /** token id → transfer history, oldest first. Lets the agent work out who sent a stray. */
+  nftHistory = new Map<string, Array<{ sender: string; recipient: string }>>();
+  /** `${contentHashHex}:${minterPrincipal}` → chunks uploaded so far. An upload belongs
+   *  to ONE principal: any other wallet asking about the same hash gets nothing. */
+  uploads = new Map<string, number>();
 
   // --- fee estimator + mempool ---
   /** Fees the estimator quotes, consumed in order; the last value repeats. */
@@ -81,6 +86,7 @@ export class FakeChain {
   /** Move a token on-chain. `alsoIndex: false` simulates the index lagging behind. */
   transfer(tokenId: string, to: string, alsoIndex = true) {
     const from = this.owners.get(tokenId);
+    if (from) this.nftHistory.set(tokenId, [...(this.nftHistory.get(tokenId) ?? []), { sender: from, recipient: to }]);
     this.owners.set(tokenId, to);
     if (!alsoIndex) return;
     if (from) this.index.set(from, (this.index.get(from) ?? []).filter((id) => id !== tokenId));
@@ -134,6 +140,13 @@ export class FakeChain {
       return json({ total: ids.length, results: ids.map((id) => ({ value: { repr: `u${id}` } })) });
     }
 
+    // --- NFT transfer history (how a stray's sender is identified) ---
+    m = /\/tokens\/nft\/history\?.*[?&]value=([^&]+)/.exec(url);
+    if (m) {
+      const id = decodeURIComponent(m[1]).replace(/^u/, '');
+      return json({ results: this.nftHistory.get(id) ?? [] });
+    }
+
     // --- read-only contract calls ---
     if (url.includes('/v2/contracts/call-read/')) {
       if (url.endsWith('/get-owner')) {
@@ -141,6 +154,10 @@ export class FakeChain {
         const tokenId = this.lastReadArgTokenId;
         const owner = tokenId ? this.owners.get(tokenId) : undefined;
         return json({ okay: true, result: owner ? someOwnerHex(owner) : NONE_HEX });
+      }
+      if (url.endsWith('/get-upload-state')) {
+        const n = this.lastUploadKey ? this.uploads.get(this.lastUploadKey) : undefined;
+        return json({ okay: true, result: n == null ? NONE_HEX : uploadStateHex(n) });
       }
       if (url.endsWith('/quote-inscription-fee')) {
         // (ok (some {total-fee, upload-batches, begin-fee, seal-fee})) — the protocol
@@ -203,6 +220,8 @@ export class FakeChain {
 
   /** Set by the fetch shim from the POST body of a read-only call. */
   lastReadArgTokenId: string | null = null;
+  /** `${hash}:${principal}` from the most recent get-upload-state call. */
+  lastUploadKey: string | null = null;
   /** Chunk count from the most recent quote-inscription-fee call. */
   lastQuoteChunks: number | null = null;
   /** Fee on the transaction currently being broadcast, decoded by the fetch shim. */
@@ -214,15 +233,23 @@ export class FakeChain {
 // (some u<id>) / none, as Clarity hex — built with the real serializer at load time.
 let someOwnerHexImpl: (addr: string) => string;
 let quoteHexImpl: (totalFee: number, batches: number) => string;
+let uploadStateHexImpl: (currentIndex: number) => string;
 let NONE_HEX = '0x09';
 const someOwnerHex = (addr: string) => someOwnerHexImpl(addr);
 const quoteHex = (totalFee: number, batches: number) => quoteHexImpl(totalFee, batches);
+const uploadStateHex = (currentIndex: number) => uploadStateHexImpl(currentIndex);
 
 export async function loadAgent(chain: FakeChain, opts: { core?: string } = {}) {
   const stacks = await import('@stacks/transactions');
   someOwnerHexImpl = (addr: string) =>
     stacks.cvToHex(stacks.responseOkCV(stacks.someCV(stacks.standardPrincipalCV(addr))));
   NONE_HEX = stacks.cvToHex(stacks.responseOkCV(stacks.noneCV()));
+  // (ok {current-index: uN}) — NOT wrapped in an optional, same as
+  // quote-inscription-fee; the agent walks .value.value['current-index'].
+  uploadStateHexImpl = (currentIndex: number) =>
+    stacks.cvToHex(stacks.responseOkCV(stacks.tupleCV({
+      'current-index': stacks.uintCV(currentIndex)
+    })));
   quoteHexImpl = (totalFee: number, batches: number) =>
     // (ok {…}) — the contract does NOT wrap this in an optional, and the agent walks
     // .value.value straight onto the tuple fields.
@@ -266,6 +293,15 @@ export async function loadAgent(chain: FakeChain, opts: { core?: string } = {}) 
         if (typeof arg === 'string') {
           const cv: any = stacks.hexToCV(arg);
           chain.lastReadArgTokenId = cv?.value != null ? String(cv.value) : null;
+        }
+        // get-upload-state(contentHash, minter) — a buffer and a principal.
+        if (String(url).endsWith('/get-upload-state') && Array.isArray(body.arguments)) {
+          try {
+            const hashCv: any = stacks.hexToCV(body.arguments[0]);
+            const whoCv: any = stacks.hexToCV(body.arguments[1]);
+            const bytes: Uint8Array = hashCv.buffer ?? hashCv.value;
+            chain.lastUploadKey = `${Array.from(bytes).map((b: any) => b.toString(16).padStart(2, '0')).join('')}:${stacks.cvToString(whoCv)}`;
+          } catch { chain.lastUploadKey = null; }
         }
         // quote-inscription-fee(sizeBytes, chunks, mode) — chunks is the 2nd arg.
         if (String(url).endsWith('/quote-inscription-fee') && Array.isArray(body.arguments) && body.arguments[1]) {

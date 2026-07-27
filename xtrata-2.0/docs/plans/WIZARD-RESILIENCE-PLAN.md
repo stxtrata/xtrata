@@ -10,9 +10,20 @@ Status of the code this plan builds on: agent build `2026-07-25.12`.
 
 ---
 
-## P0 — a stray inscription must not void the job
+## P0 — a stray inscription must not void the job — ✅ DONE 2026-07-27
 
-**This is the one to do first.** Live tonight, at 416/459 chunks uploaded and
+Both abort paths are gone. A stray is now logged, the job carries on, and the
+delivery tail sends it back to whoever sent it (`returnStrays` / `sweepStrays`).
+`parentsStatus().ok` answers "can this job mint?", which a stray never changes,
+and `wrong inscription received` has been removed from `FATAL_ERR`. Covered by
+`src/agent-one/__tests__/stray-inscription.test.ts`, verified to fail against the
+pre-fix code.
+
+Original write-up below.
+
+---
+
+Live tonight, at 416/459 chunks uploaded and
 ~35 minutes in:
 
 ```
