@@ -32,6 +32,8 @@ export class FakeChain {
   index = new Map<string, string[]>();
   /** inbound STX transfers per address: {sender, amount}. */
   inbound = new Map<string, Array<{ sender: string; amount: bigint }>>();
+  /** token id → transfer history, oldest first. Lets the agent work out who sent a stray. */
+  nftHistory = new Map<string, Array<{ sender: string; recipient: string }>>();
 
   // --- fee estimator + mempool ---
   /** Fees the estimator quotes, consumed in order; the last value repeats. */
@@ -81,6 +83,7 @@ export class FakeChain {
   /** Move a token on-chain. `alsoIndex: false` simulates the index lagging behind. */
   transfer(tokenId: string, to: string, alsoIndex = true) {
     const from = this.owners.get(tokenId);
+    if (from) this.nftHistory.set(tokenId, [...(this.nftHistory.get(tokenId) ?? []), { sender: from, recipient: to }]);
     this.owners.set(tokenId, to);
     if (!alsoIndex) return;
     if (from) this.index.set(from, (this.index.get(from) ?? []).filter((id) => id !== tokenId));
@@ -132,6 +135,13 @@ export class FakeChain {
     if (m) {
       const ids = this.index.get(decodeURIComponent(m[1])) ?? [];
       return json({ total: ids.length, results: ids.map((id) => ({ value: { repr: `u${id}` } })) });
+    }
+
+    // --- NFT transfer history (how a stray's sender is identified) ---
+    m = /\/tokens\/nft\/history\?.*[?&]value=([^&]+)/.exec(url);
+    if (m) {
+      const id = decodeURIComponent(m[1]).replace(/^u/, '');
+      return json({ results: this.nftHistory.get(id) ?? [] });
     }
 
     // --- read-only contract calls ---

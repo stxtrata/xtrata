@@ -244,7 +244,7 @@
 <script src="HTML_Template.js?v=6"></script>
 <script src="suno-build.js?v=7"></script>
 <script src="optimize-image.js?v=1"></script>
-<script src="agent-one.js?v=2026-07-26.3"></script>
+<script src="agent-one.js?v=2026-07-27.1"></script>
 <script>
 const SERVER = { mock:false, net:'mainnet' };
 // VERSION HANDSHAKE: this page requires AT LEAST the agent bundle build below. The site's deploy
@@ -253,7 +253,7 @@ const SERVER = { mock:false, net:'mainnet' };
 // fees on refund loops). Builds are date-stamped (YYYY-MM-DD.N) so a string compare orders them;
 // a NEWER deployed bundle must pass — requiring an exact match wrongly locked the page out
 // whenever the agent shipped ahead of the page.
-const XAO_MIN_AGENT_BUILD='2026-07-26.3';
+const XAO_MIN_AGENT_BUILD='2026-07-27.1';
 let AGENT_STALE=false;
 function checkAgentBuild(){
   const b=window.XAO_AGENT_BUILD||null;
@@ -647,7 +647,7 @@ function renderEscrow(job, status){
     +'<div class="kv"><span>1 · STX deposit ('+stx(job.requiredUstx)+')</span><span>'+(paid?'<span class="ok">✓ arrived</span>':(status&&status.pending?'<span style="color:var(--warn)">⏳ seen — confirming…</span>':'<span class="muted">awaiting</span>'))+'</span></div>'
     +rows
     +(PARENT_MSG?('<div style="margin-top:6px;'+(PARENT_MSG.err?'color:var(--bad)':'color:var(--ok)')+'">'+PARENT_MSG.text+'</div>'):'')
-    +((ps.unexpected&&ps.unexpected.length)?('<div class="err" style="margin-top:6px">⚠ Inscription #'+ps.unexpected.map(esc).join(', #')+' arrived but was not declared as a parent — everything will be returned to the sender automatically.</div>'):'')
+    +((ps.unexpected&&ps.unexpected.length)?('<div style="margin-top:6px;color:var(--mut);font-size:12px">Inscription #'+ps.unexpected.map(esc).join(', #')+' arrived but is not a declared parent of this job. It will be sent back to whoever sent it — <strong>your job carries on as normal</strong>.</div>'):'')
     +'<div class="muted" style="font-size:11px;margin-top:6px">The parent is only borrowed for the mint.'
     +((job.status==='AWAITING_PARENT'&&job.fundedAt&&SERVER.parentWindowMs)?(' If it has not arrived by '+new Date(Date.parse(job.fundedAt)+SERVER.parentWindowMs).toLocaleTimeString()+', the job cancels itself and returns your deposit.'):'')
     +'</div>';

@@ -743,7 +743,7 @@ try{
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=2026-07-26.3"></script>
+<script src="agent-one.js?v=2026-07-27.1"></script>
 <script src="optimize-audio.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script>
@@ -1744,7 +1744,7 @@ async function renderJobDetail(jobId,out,isActive){
           else right='<span class="muted">checking current owner…</span>';
           return `<div class="kv"><span>${i+2} · Parent inscription #${esc(p)}</span><span>${right}</span></div>`;}).join('')}
         ${PARENT_MSG[job.jobId]?`<div style="margin-top:6px;font-size:12px;${PARENT_MSG[job.jobId].err?'color:var(--bad)':'color:var(--ok)'}">${PARENT_MSG[job.jobId].text}</div>`:''}
-        ${(ps.unexpected&&ps.unexpected.length)?`<div class="err" style="margin-top:6px">⚠ Unexpected inscription #${ps.unexpected.map(esc).join(', #')} arrived — it is not a declared parent. Everything will be returned to the sender automatically.</div>`:''}
+        ${(ps.unexpected&&ps.unexpected.length)?`<div style="margin-top:6px;color:var(--mut);font-size:12px">Inscription #${ps.unexpected.map(esc).join(', #')} arrived but is not a declared parent of this job. It will be sent back to whoever sent it — <strong>your job carries on as normal</strong>.</div>`:''}
         <div class="muted" style="font-size:11px;margin-top:6px">The parent is only borrowed for the mint — it comes straight back with your new inscription.${(st==='AWAITING_PARENT'&&isActive)?' <b id="expT"></b>':''}</div>
       </div>`;
       maybeCheckParents(job.jobId);

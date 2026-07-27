@@ -505,7 +505,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-26.3';
+export const AGENT_BUILD = '2026-07-27.1';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -801,7 +801,49 @@ async function parentsStatus(job: any) {
   }
   const mine = new Set([...required, job.tokenId, job.receiptTokenId, ...((job.items || []).map((i: any) => i.tokenId))].filter(Boolean).map(String));
   const unexpected = heldAll.filter((id) => !mine.has(String(id)));
-  return { required, held, missing, unknown, unexpected, ok: missing.length === 0 && unknown.length === 0 && unexpected.length === 0 };
+  // A stray does NOT make the job un-runnable. Only declared parents feed the mint, so an
+  // extra inscription sitting in the deposit wallet cannot abort it. `ok` therefore asks
+  // "can we mint?", and strays are reported separately so they can be sent home.
+  return { required, held, missing, unknown, unexpected, ok: missing.length === 0 && unknown.length === 0 };
+}
+// Send strays home mid-job. Never throws and never blocks: a stray that cannot be returned
+// now is caught by the never-strand guard at the end and goes home via recovery.
+async function returnStrays(job: any, key: string, fromAddr: string, ids: string[]) {
+  const out: any[] = [];
+  for (const id of ids.map(String)) {
+    try {
+      // ownerOfChecked, not ownerOf: a read that FAILED returns null too, and treating that
+      // as "already moved on" would silently leave someone else's inscription behind.
+      const o = await ownerOfChecked(id);
+      if (!o.ok) throw new Error('could not confirm who owns it right now');
+      if (o.owner !== fromAddr) continue;                  // already moved on
+      const to = await detectNftSender(fromAddr, id);
+      if (!to) { xaoLog(job.jobId, `stray inscription #${id}: could not tell who sent it — it will be returned by recovery`); continue; }
+      const tx = await sendNftRetry(key, fromAddr, id, to);
+      out.push({ id, to, tx });
+      xaoLog(job.jobId, `stray inscription #${id} sent back to ${to} — your job is unaffected`);
+    } catch (e) {
+      out.push({ id, error: errMsg(e) });
+      xaoLog(job.jobId, `stray inscription #${id} could not be returned yet (${errMsg(e)}) — recovery will send it home`);
+    }
+  }
+  if (out.length) { job.strayReturns = [...(job.strayReturns || []), ...out]; writeJob(job); }
+  return out;
+}
+// Delivery tail: anything in this wallet that isn't the user's own goes back to its sender,
+// once their inscription is safely delivered. Deferred to here so the send never competes
+// with the mint for a deposit sized to the job.
+async function sweepStrays(job: any, key: string, addr: string, receiptTokenId: any, prog: (m: string) => void, notes: string[]) {
+  try {
+    const mine = new Set([...(job.parents || []), job.tokenId, receiptTokenId, ...((job.items || []).map((i: any) => i.tokenId))].filter(Boolean).map(String));
+    const strays = (await heldInscriptions(addr)).filter((id) => !mine.has(String(id)));
+    if (!strays.length) return;
+    prog(`returning inscription #${strays.join(', #')} to whoever sent it`);
+    await returnStrays(job, key, addr, strays);
+  } catch (e) {
+    notes.push('a stray inscription could not be returned yet — recovery will send it home (' + errMsg(e) + ')');
+    job.keepKey = true;
+  }
 }
 // Return EVERY inscription the deposit wallet holds. Strays go back to whoever sent them; declared
 // parents / minted tokens go to `fallbackTo` (the payer). Never throws.
@@ -1231,7 +1273,10 @@ async function runInscribe(job: any) {
   // declared parent, and a mid-mint abort still burns miner fees. Verify BEFORE spending.
   if ((job.parents || []).length) {
     const ps = await parentsStatus(job);
-    if (ps.unexpected && ps.unexpected.length) throw new Error(`wrong inscription received: deposit wallet holds unexpected token(s) #${ps.unexpected.join(', #')} — returning everything to sender`);
+    // A stray is not a threat to the mint — only `job.parents` is passed to it. It used to
+    // abort here, which destroyed a job at 416/459 chunks over a mistyped token id. Note it
+    // and carry on; the delivery tail sends it back to whoever sent it.
+    if (ps.unexpected && ps.unexpected.length) xaoLog(job.jobId, `inscription #${ps.unexpected.join(', #')} arrived but was not declared as a parent — it will be sent back to the sender; your job continues`);
     if (ps.unknown && ps.unknown.length) throw new Error(`could not verify parent token(s) #${ps.unknown.join(', #')} right now — retrying rather than assuming they are missing`);
     if (ps.missing.length) throw new Error(`parents not yet received: waiting for token(s) #${ps.missing.join(', #')} to arrive at ${job.depositAddress}`);
   }
@@ -1368,6 +1413,7 @@ async function deliverBatch(job: any, received: bigint, agentFee: bigint, stxUsd
     catch (e) { notes.push(`parent #${pid} return pending (` + errMsg(e) + ')'); job.keepKey = true; }
   }
   if (parentReturnTxs.length) { job.parentReturnTxs = parentReturnTxs; writeJob(job); }
+  await sweepStrays(job, dep.key, dep.address, receiptTokenId, prog, notes);
   let receiptDeliverTx: any = null, agentFeeTx: any = null, refundTx: any = null, refundedUstx = '0';
   if (receiptTokenId) { try { prog('sending your on-chain receipt'); receiptDeliverTx = await sendNftRetry(dep.key, dep.address, receiptTokenId, job.recipient || job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
   try { if (agentFee > 0n) agentFeeTx = await sendStxRetry(dep.key, agentFee, job.agentFeeAddress || AGENT_FEE_ADDRESS, REFUND_TX_FEE); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
@@ -1445,6 +1491,7 @@ async function deliver(job: any) {
     } catch (e) { notes.push(`parent #${pid} return pending — recovery will send it home (` + errMsg(e) + ')'); job.keepKey = true; }
   }
   if (parentReturnTxs.length) { job.parentReturnTxs = parentReturnTxs; writeJob(job); }
+  await sweepStrays(job, dep.key, dep.address, receiptTokenId, prog, notes);
   if (receiptTokenId) { try { prog('sending your on-chain receipt'); receiptDeliverTx = await sendNftRetry(dep.key, dep.address, receiptTokenId, job.recipient || job.user); } catch (e) { notes.push('receipt delivery deferred (' + errMsg(e) + ')'); } }
   try { if (agentFee > 0n) agentFeeTx = await sendStxRetry(dep.key, agentFee, job.agentFeeAddress || AGENT_FEE_ADDRESS, REFUND_TX_FEE); } catch (e) { notes.push('agent fee deferred (' + errMsg(e) + ')'); }
   prog('returning your change');
@@ -1557,14 +1604,16 @@ async function autoRun(job: any) {
     return { rejected: true, funder, expected: job.expectedFunder };
   }
   if (job.fastTrack || !job.user) { job.user = funder; writeJob(job); }
-  // PARENT ESCROW GATE: wrong inscription → return EVERYTHING; parents missing → park as
-  // AWAITING_PARENT (the watcher re-polls), bounded by PARENT_WINDOW_MS from funding.
+  // PARENT ESCROW GATE: parents missing → park as AWAITING_PARENT (the watcher re-polls),
+  // bounded by PARENT_WINDOW_MS from funding. A stray never gates anything.
   if ((job.parents || []).length) {
     if (!job.fundedAt) { job.fundedAt = new Date().toISOString(); writeJob(job); }
     const ps = await parentsStatus(job);
+    // STRAY: log it and keep going. Returning it here would spend from a deposit sized for
+    // the job, so the send is deferred to the delivery tail where change is being returned
+    // anyway. Only declared parents are ever passed to the mint, so a stray changes nothing.
     if (ps.unexpected && ps.unexpected.length) {
-      await refundAndClose(job, `wrong inscription received (token #${ps.unexpected.join(', #')} is not a declared parent of this job) — all inscriptions and funds returned to sender`);
-      return { rejected: true, unexpected: ps.unexpected };
+      xaoLog(job.jobId, `inscription #${ps.unexpected.join(', #')} arrived but was not declared as a parent — it will be sent back to the sender; your job continues`);
     }
     // A read we could not make is not a parent that did not arrive. Falling through
     // here would mint without knowing the deposit owns the parent (the contract would
@@ -1626,7 +1675,9 @@ try {
 // almost always transient — a Hiro hiccup or a rate limit — so it now retries with
 // backoff and only refunds once the retries are exhausted. Classing it as fatal is
 // what turned one failed lookup into a refund attempt every few seconds.
-const FATAL_ERR = /TX abort|locked to|unrecoverable|file bytes|empty file|wrong inscription received/i;
+// 'wrong inscription received' deliberately absent: a stray is returned to its sender and the
+// job carries on, so it must never route a nearly-complete upload to a refund.
+const FATAL_ERR = /TX abort|locked to|unrecoverable|file bytes|empty file/i;
 // ---------- cancellation ----------
 // A cancel is a PERSISTED flag, not an in-memory one: the loop doing the work may
 // be mid-tick in another call stack, and the request has to survive a reload. The
@@ -1929,6 +1980,6 @@ export { deriveFrom, newWallet, balance, quoteFee, mintSingle, stagedInscribe, g
 // Exported for the fault-injection harness. These two decide "who paid" and "has the
 // parent arrived" — the questions behind the failures that shipped, and both are only
 // meaningful when exercised against a degraded API rather than asserted on in source.
-export { detectFunder, parentsStatus, heldInscriptions, waitTx, safeNonce, statusJob };
+export { detectFunder, parentsStatus, heldInscriptions, waitTx, safeNonce, statusJob, autoRun, returnStrays };
 // Exported so the branding can be verified by RENDERING a receipt, not by reading the template.
 export { buildReceiptHtml, buildBatchReceiptHtml, brandFor };
