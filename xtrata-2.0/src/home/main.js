@@ -14007,6 +14007,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // never unloads anything: the iframe stays mounted and CSS hides it, so a job keeps
     // running. Only closing the tab, going Back, or following a link off-site matters.
     const embeddedLiveJobs = new Map();
+    // Declared before the listener that reads it, not after: a `let` used above its
+    // declaration line is a temporal dead zone, and `typeof` does not save you from it.
+    let hostTitle = '';
     window.addEventListener('message', (event) => {
       if (event.origin !== window.location.origin) return;          // same-origin only
       const data = event && event.data;
@@ -14014,8 +14017,15 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       // Key by the frame that sent it, so two embedded surfaces cannot clear each other.
       const frame = [...document.querySelectorAll('iframe')].find((f) => f.contentWindow === event.source);
       if (!frame) return;
-      if (data.live) embeddedLiveJobs.set(frame, String(data.detail || 'an inscription is running'));
+      if (data.live) embeddedLiveJobs.set(frame, String(data.short || '⬤ inscribing'));
       else embeddedLiveJobs.delete(frame);
+      // The frame's own <title> is invisible while embedded — this page's is what shows
+      // in the tab strip, so a job running inside the iframe writes its progress here.
+      // That is the only signal a throttled background tab can give without being
+      // switched to, and it is what stops a running job being closed by accident.
+      if (!hostTitle) hostTitle = document.title;
+      const running = [...embeddedLiveJobs.values()];
+      document.title = running.length ? `${running[0]} · ${hostTitle}` : hostTitle;
     });
 
     window.addEventListener('beforeunload', (event) => {

@@ -52,13 +52,22 @@ describe('the frame reports live work to its host', () => {
     expect(posted.map((p) => p.msg.live)).toEqual([true, false]);
   });
 
-  it('reports only on CHANGE, not on every status refresh', () => {
-    // statusJob polls every few seconds for the life of a job; one message per poll
-    // would be noise the host has to dedupe.
+  it('stays quiet while nothing changes', () => {
+    // statusJob polls every few seconds for the life of a job; an identical message per
+    // poll would be noise the host has to dedupe.
     for (let i = 0; i < 5; i++) {
-      keepOpenBanner({ job: { progress: `${i}/459 chunks` }, status: 'INSCRIBING', mount: mount() });
+      keepOpenBanner({ job: { progress: '96/459 chunks' }, status: 'INSCRIBING', mount: mount() });
     }
     expect(posted).toHaveLength(1);
+  });
+
+  it('does report each time the progress actually moves', () => {
+    // The host writes these into the tab title, so real movement has to get through —
+    // that is the whole point of showing progress on a tab nobody is looking at.
+    for (const n of [96, 128, 160]) {
+      keepOpenBanner({ job: { progress: `${n}/459 chunks` }, status: 'INSCRIBING', mount: mount() });
+    }
+    expect(posted.map((p) => p.msg.short)).toEqual(['⬤ 96/459', '⬤ 128/459', '⬤ 160/459']);
   });
 
   it('pins the target origin rather than posting to *', () => {

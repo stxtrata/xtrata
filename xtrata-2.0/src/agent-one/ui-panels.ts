@@ -105,14 +105,91 @@ function installLeaveGuard() {
 // knows and the host decides what to do with it.
 //
 // Same-origin only: the target origin is pinned, and the host checks the sender.
-let lastReported: boolean | null = null;
-function reportLiveToHost(live: boolean, detail: string) {
-  if (typeof window === 'undefined' || window.parent === window) return;
-  if (live === lastReported) return;            // only on change
-  lastReported = live;
+const isEmbedded = () => typeof window !== 'undefined' && window.parent !== window;
+let lastReported: string | null = null;
+function reportLiveToHost(live: boolean, detail: string, short: string) {
+  if (!isEmbedded()) return;
+  const signature = `${live}|${short}`;
+  if (signature === lastReported) return;       // only on change
+  lastReported = signature;
   try {
-    window.parent.postMessage({ type: 'xtrata:job:live', live, detail }, window.location.origin);
+    window.parent.postMessage({ type: 'xtrata:job:live', live, detail, short }, window.location.origin);
   } catch { /* cross-origin host: nothing we can do, and nothing we should throw over */ }
+}
+
+// ---------- progress in the tab title ----------
+// A tab you are not looking at is throttled, not stopped — but from the outside it is
+// indistinguishable from a tab doing nothing, which is how a running job gets closed by
+// accident. The tab strip is the one piece of UI visible without switching to it.
+//
+// Embedded, the frame's own title is invisible (the host's is what shows), so the frame
+// hands its progress up and the host writes it. Same channel as the leave guard.
+let originalTitle: string | null = null;
+export function setTitleProgress(short: string | null) {
+  if (typeof document === 'undefined') return;
+  if (short) {
+    if (originalTitle === null) originalTitle = document.title;   // capture once per job
+    document.title = `${short} · ${originalTitle}`;
+  } else if (originalTitle !== null) {
+    document.title = originalTitle;
+    originalTitle = null;   // RELEASE, so a title set for any other reason later is not
+                            // overwritten by a stale capture from a job long finished.
+  }
+}
+
+// ---------- notify when it finishes ----------
+// Permission is asked for on a CLICK and never on load: an unprompted permission
+// dialog is usually dismissed (or auto-blocked), which burns the one chance to ask.
+// The offer only appears while a job is actually running, when it means something.
+const NOTIFY_KEY = 'xtrata.notify.onfinish';
+const notifyWanted = () => { try { return localStorage.getItem(NOTIFY_KEY) === '1'; } catch { return false; } };
+const N = () => (typeof window !== 'undefined' ? (window as any).Notification : undefined);
+
+export function notifyAvailable(): boolean {
+  const n = N();
+  return !!n && n.permission !== 'denied';
+}
+
+/** Returns true if notifications are now on. Must be called from a user gesture. */
+export async function enableFinishNotice(): Promise<boolean> {
+  const n = N();
+  if (!n) return false;
+  let perm = n.permission;
+  if (perm === 'default') { try { perm = await n.requestPermission(); } catch { return false; } }
+  if (perm !== 'granted') return false;
+  try { localStorage.setItem(NOTIFY_KEY, '1'); } catch { /* private mode: on for this session only */ }
+  return true;
+}
+
+// Fire once per transition into an end state, not on every poll that reports it.
+let lastNotifiedStatus: string | null = null;
+const FINISH_MESSAGE: Record<string, string> = {
+  COMPLETE: 'Your inscription is finished and back in your wallet.',
+  COMPLETE_WITH_SKIPS: 'Your batch finished — some items were skipped and refunded.',
+  CANCELLED: 'Your job was stopped and your deposit returned.',
+  NEEDS_FUNDS: 'Your job is paused and needs more STX to finish.',
+  NEEDS_RECOVERY: 'Your job needs you: something is still in the deposit wallet.'
+};
+function notifyOnFinish(status: string) {
+  const message = FINISH_MESSAGE[status];
+  if (!message) { if (LIVE_STATES.includes(status)) lastNotifiedStatus = null; return; }
+  if (status === lastNotifiedStatus) return;
+  lastNotifiedStatus = status;
+  const n = N();
+  if (!n || n.permission !== 'granted' || !notifyWanted()) return;
+  // Only worth interrupting for if they are not already looking at it.
+  if (typeof document !== 'undefined' && document.visibilityState === 'visible') return;
+  try { new n('Xtrata', { body: message, tag: 'xtrata-job', icon: '/favicon.svg' }); } catch { /* never break a job over a notification */ }
+}
+
+/** "96/459" or "paying" — short enough to survive a narrow tab. */
+function shortProgress(job: any, status: string): string {
+  const m = /(\d+)\s*\/\s*(\d+)\s*chunks/.exec((job && job.progress) || '');
+  if (m) return `⬤ ${m[1]}/${m[2]}`;
+  if (status === 'AWAITING_DEPOSIT') return '⬤ awaiting payment';
+  if (status === 'AWAITING_PARENT') return '⬤ awaiting parent';
+  if (status === 'DELIVERING') return '⬤ delivering';
+  return '⬤ inscribing';
 }
 
 /** What the browser is doing right now, in words rather than a bar. */
@@ -134,18 +211,27 @@ export function keepOpenBanner(opts: { job: any; status: string; mount: HTMLElem
   const mount = opts.mount;
   if (!mount) {
     jobIsLive = LIVE_STATES.includes(opts.status);
-    reportLiveToHost(jobIsLive, liveDetail(opts.job, opts.status));
+    const short = jobIsLive ? shortProgress(opts.job, opts.status) : null;
+    reportLiveToHost(jobIsLive, liveDetail(opts.job, opts.status), short || '');
+    if (!isEmbedded()) setTitleProgress(short);
+    notifyOnFinish(opts.status);
     return { live: false };
   }
 
   jobIsLive = LIVE_STATES.includes(opts.status);
-  reportLiveToHost(jobIsLive, liveDetail(opts.job, opts.status));
+  const short = jobIsLive ? shortProgress(opts.job, opts.status) : null;
+  reportLiveToHost(jobIsLive, liveDetail(opts.job, opts.status), short || '');
+  if (!isEmbedded()) setTitleProgress(short);
+  notifyOnFinish(opts.status);
   let box = mount.querySelector('.xao-keepopen') as HTMLElement | null;
   if (!jobIsLive) { box?.remove(); return { live: false }; }
 
   styleOnce('keepopen', `
   .xao-keepopen{margin-top:12px;padding:10px 12px;border:1px solid var(--acc2,#7c5cff);border-radius:10px;background:rgba(124,92,255,.08);font-size:12.5px;line-height:1.5}
   .xao-keepopen .xao-ko-custody{font-size:11.5px;margin-top:4px;color:var(--mut)}
+  .xao-keepopen .xao-ko-notify{margin-top:8px;padding:5px 11px;font:inherit;font-size:11.5px;border-radius:8px;cursor:pointer;
+    border:1px solid var(--line);background:transparent;color:var(--ink)}
+  .xao-keepopen .xao-ko-notify[hidden]{display:none}
   .xao-keepopen .xao-ko-warn{font-size:11.5px;margin-top:6px;color:var(--bad,#e0603f)}`);
 
   if (!box) {
@@ -156,6 +242,7 @@ export function keepOpenBanner(opts: { job: any; status: string; mount: HTMLElem
     // moment the constraint bites, and the same fact that forces the tab to stay open
     // is the reason nobody else can touch the money.
     box.innerHTML = '<div><b>🔒 Keep this tab open</b> — <span class="xao-ko-steps"></span></div>'
+      + '<button type="button" class="xao-ko-notify" hidden>🔔 Tell me when it is done</button>'
       + '<div class="xao-ko-custody">Your deposit sits in a one-shot wallet <b>your browser created and only it can spend from</b>'
       + ' — that is why this has to stay open, and also why nobody else can touch your funds.'
       + ' Closing pauses the job; you can resume it or take a refund when you come back.</div>'
@@ -163,6 +250,21 @@ export function keepOpenBanner(opts: { job: any; status: string; mount: HTMLElem
     mount.appendChild(box);
   }
   (box.querySelector('.xao-ko-steps') as HTMLElement).textContent = liveDetail(opts.job, opts.status);
+
+  // Offered only while something is actually running, and only if it can be granted.
+  const notifyBtn = box.querySelector('.xao-ko-notify') as HTMLButtonElement;
+  const showOffer = notifyAvailable() && !(N()?.permission === 'granted' && notifyWanted());
+  notifyBtn.hidden = !showOffer;
+  if (showOffer && !notifyBtn.dataset.wired) {
+    notifyBtn.dataset.wired = '1';
+    notifyBtn.onclick = async () => {
+      notifyBtn.disabled = true;
+      const on = await enableFinishNotice();
+      notifyBtn.textContent = on ? '🔔 You will be told when it is done' : '🔔 Notifications are blocked in this browser';
+      notifyBtn.disabled = false;
+      if (on) setTimeout(() => { notifyBtn.hidden = true; }, 2500);
+    };
+  }
 
   // If the file could not be saved for resume, closing the tab is genuinely
   // destructive rather than merely a pause — say so plainly rather than leaving the
@@ -280,5 +382,5 @@ export function unfinishedBanner(opts: { skipJobId?: string | null; mount?: HTML
 // scripts and cannot import.
 if (typeof window !== 'undefined') {
   const w = window as any;
-  w.XtrataUI = Object.assign(w.XtrataUI || {}, { confirmDanger, unfinishedBanner, dismissUnfinished, keepOpenBanner });
+  w.XtrataUI = Object.assign(w.XtrataUI || {}, { confirmDanger, unfinishedBanner, dismissUnfinished, keepOpenBanner, setTitleProgress, enableFinishNotice, notifyAvailable });
 }

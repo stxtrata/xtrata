@@ -516,7 +516,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-27.5';
+export const AGENT_BUILD = '2026-07-27.6';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -2019,6 +2019,22 @@ async function reapTick() {
  * the browser can still resume or refund exactly as before — a handoff that fails
  * must not be a handoff that strands.
  */
+// DORMANT BY DESIGN — do not wire this up without a product decision.
+//
+// The handoff sends this job's deposit key to a server so it can finish while the tab
+// is closed. It works, and it is deliberately switched OFF: an empty endpoint means
+// handoffAvailable() is false and the UI never offers it, so nothing is ever sent.
+//
+// The reason is custody. Everything else in Xtrata is self-custodial — the deposit
+// wallet is made in the user's browser and only that browser can spend from it. The
+// handoff is the single feature that breaks that promise, and from the user's side
+// "we hold your key for a bit" is custody however carefully it is scoped. Convenience
+// is not worth becoming a custodian by accident.
+//
+// Kept because the code is proven and the escrow/consent plumbing around it is the
+// hard part. If a good model appears (a signed, time-boxed, single-job delegation the
+// user can revoke), setting cfg.handoffEndpoint turns it back on. Until then it stays
+// unset, and the wizard's answer to "I want to close the tab" is that jobs resume.
 const HANDOFF_ENDPOINT: string = cfg.handoffEndpoint || '';
 const HANDOFF_CONSENT = 'i-agree-xtrata-may-finish-this-job';
 
