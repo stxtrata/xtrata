@@ -145,14 +145,14 @@
       <li class="step" data-id="P4" data-phase="P">
         <div class="head">
           <input type="checkbox" class="done" id="cb-P4" />
-          <label for="cb-P4"><span class="sid">P4</span> Decide the campaign-drops question</label>
+          <label for="cb-P4"><span class="sid">P4</span> Confirm the deployed satellite versions (do not trust the repo)</label>
           
           
         </div>
         <div class="body">
-          <p class="why"><strong>Why.</strong> This is the only decision that changes the size of the whole migration, so make it before anything touches a chain.</p>
-          <p><strong>Do.</strong> xtrata-drops-v1-2 has exactly one hardcoded call to the core, at line 574 inside create-campaign-drop. Standard drops, claims and cancels all take an &lt;nft-trait&gt; parameter and work with 3.2.4 after an allow-list call. Decide now whether campaign drops must support 3.2.4 tokens. If yes, drops needs a redeploy (step S4). If no, the migration is admin calls only.</p>
-          <p class="verify"><strong>Verify.</strong> Decision recorded in this file under decisions.campaignDrops.</p>
+          <p class="why"><strong>Why.</strong> contracts/live/ holds source for contracts that were never deployed. Planning against the repo instead of the chain produces admin calls to contracts that do not exist.</p>
+          <p><strong>Do.</strong> Fetch the contract interface for each satellite before planning any call against it. Verified 2026-07-27: drops v1-0 and v1-1 are DEPLOYED, drops v1-2 is NOT. The three sponsored markets, collection-mint-v1-4 and the non-sponsored markets are deployed. xtrata-v3-2-3-gateway and proof-of-free-living-synth-v1 are NOT deployed. Re-check before starting, since this can change.</p>
+          <p class="verify"><strong>Verify.</strong> Every contract named in phase S returns an interface from the API.</p>
           <p class="rb"><strong>Rollback.</strong> None.</p>
           <p class="auto none">No automatic check. Confirm by hand.</p>
         </div>
@@ -325,14 +325,14 @@
       <li class="step" data-id="S2" data-phase="S">
         <div class="head">
           <input type="checkbox" class="done" id="cb-S2" />
-          <label for="cb-S2"><span class="sid">S2</span> Allow-list 3.2.4 on drops</label>
+          <label for="cb-S2"><span class="sid">S2</span> Allow-list 3.2.4 on drops v1-1 (the deployed one)</label>
           
           
         </div>
         <div class="body">
-          <p class="why"><strong>Why.</strong> Enables standard drops for 3.2.4 tokens. create-drop, claim and cancel all take an &lt;nft-trait&gt; parameter, so they need no code change.</p>
-          <p><strong>Do.</strong> Call set-nft-allowed(&lt;3.2.4 principal&gt;, true) on xtrata-drops-v1-2.</p>
-          <p class="verify"><strong>Verify.</strong> A 3.2.4 token can be dropped and claimed end to end.</p>
+          <p class="why"><strong>Why.</strong> drops v1-1 is what is actually live. Its create-drop, claim, cancel AND create-campaign-drop all take an &lt;nft-trait&gt; parameter and guard on the allow-list. PRIMARY-NFT-CONTRACT is only read by the get-nft-contract getter, so nothing needs redeploying.</p>
+          <p><strong>Do.</strong> Call set-nft-allowed(&lt;3.2.4 principal&gt;, true) on xtrata-drops-v1-1. This covers standard drops and campaign drops together.</p>
+          <p class="verify"><strong>Verify.</strong> A 3.2.4 token can be dropped and claimed, and added to a campaign.</p>
           <p class="rb"><strong>Rollback.</strong> set-nft-allowed(..., false).</p>
           <p class="auto none">No automatic check. Confirm by hand.</p>
         </div>
@@ -352,33 +352,33 @@
           <p class="auto none">No automatic check. Confirm by hand.</p>
         </div>
       </li>
-      <li class="step" data-id="S4" data-phase="S" data-conditional="decisions.campaignDrops">
+      <li class="step" data-id="S4" data-phase="S">
         <div class="head">
           <input type="checkbox" class="done" id="cb-S4" />
-          <label for="cb-S4"><span class="sid">S4</span> Redeploy drops for campaign support (ONLY if P4 said yes)</label>
-          <span class="tag cond">conditional</span>
+          <label for="cb-S4"><span class="sid">S4</span> Drops redeploy: NOT REQUIRED</label>
+          
           
         </div>
         <div class="body">
-          <p class="why"><strong>Why.</strong> create-campaign-drop hardcodes the 3.2.3 principal at line 574 and Clarity is immutable, so campaign drops cannot be extended by an admin call.</p>
-          <p><strong>Do.</strong> Deploy xtrata-drops-v1-3 with the core reference updated, migrate the registry entry per the newest-contract-only rule, and leave v1-2 in place for existing campaigns.</p>
-          <p class="verify"><strong>Verify.</strong> A campaign drop can be created against a 3.2.4 token.</p>
-          <p class="rb"><strong>Rollback.</strong> Keep pointing the app at v1-2. The new contract sits unused.</p>
+          <p class="why"><strong>Why.</strong> This step existed because xtrata-drops-v1-2 hardcodes the core inside create-campaign-drop. v1-2 is not deployed, and the live v1-1 has no such hardcoding, so there is nothing to redeploy.</p>
+          <p><strong>Do.</strong> No action. Leave here as a record. If drops v1-2 is ever deployed, fix its hardcoded core call at line 574 FIRST, or it will ship the exact coupling this migration avoided.</p>
+          <p class="verify"><strong>Verify.</strong> Nothing to verify. Confirm v1-2 is still undeployed before skipping.</p>
+          <p class="rb"><strong>Rollback.</strong> None.</p>
           <p class="auto none">No automatic check. Confirm by hand.</p>
         </div>
       </li>
       <li class="step" data-id="S5" data-phase="S">
         <div class="head">
           <input type="checkbox" class="done" id="cb-S5" />
-          <label for="cb-S5"><span class="sid">S5</span> Redeploy the gateway</label>
+          <label for="cb-S5"><span class="sid">S5</span> Gateway: NOT REQUIRED</label>
           
           
         </div>
         <div class="body">
-          <p class="why"><strong>Why.</strong> xtrata-v3-2-3-gateway makes three hardcoded calls to the core and is named after it. It cannot be repointed.</p>
-          <p><strong>Do.</strong> Deploy xtrata-v3-2-4-gateway with the core reference updated. Check what actually consumes the gateway before assuming it is needed at all.</p>
-          <p class="verify"><strong>Verify.</strong> Whatever depends on the gateway still resolves.</p>
-          <p class="rb"><strong>Rollback.</strong> Leave the old gateway serving 3.2.3 tokens.</p>
+          <p class="why"><strong>Why.</strong> xtrata-v3-2-3-gateway is a read-only trait adapter, and it is not deployed. Nor is its only consumer, proof-of-free-living-synth-v1. It is a source template the deploy console validates and deploys as part of a Living Synth collection.</p>
+          <p><strong>Do.</strong> No migration action. Separately, add a 3.2.4 variant of the gateway template and point LIVING_SYNTH_GATEWAY_NAME in src/lib/deploy/living-synth.ts at it, so the next Living Synth deploy adapts the new core.</p>
+          <p class="verify"><strong>Verify.</strong> Nothing on-chain. The template edit is covered by the living-synth deploy tests.</p>
+          <p class="rb"><strong>Rollback.</strong> None.</p>
           <p class="auto none">No automatic check. Confirm by hand.</p>
         </div>
       </li>

@@ -89,17 +89,27 @@ staged path untouched keeps the diff small.
 Much less than a core swap usually does, because most of the ecosystem was built
 against traits rather than a hardcoded core.
 
-| Contract | Coupling to the core | Action |
-|---|---|---|
-| `xtrata-market-sponsored-stx-v1-1` | `PRIMARY-NFT-CONTRACT` read by a getter only, enforcement via allow-list | **Admin call** |
-| `xtrata-market-sponsored-sbtc-v1-1` | same | **Admin call** |
-| `xtrata-market-sponsored-usdcx-v1-1` | same | **Admin call** |
-| `xtrata-drops-v1-2` | trait-based, except `create-campaign-drop` | **Admin call**, redeploy only for campaigns |
-| `xtrata-market-stx-v1-0`, `usdc`, `sbtc` | `<nft-trait>` parameter | **Nothing** |
-| `xtrata-collection-mint-v1-4` | no core reference | **Nothing** |
-| `xtrata-preinscribed-collection-sale-v1-0` | no core reference | **Nothing** |
-| `xtrata-commerce`, `xtrata-vault` | no core reference | **Nothing** |
-| `xtrata-v3-2-3-gateway` | three hardcoded calls, named after the core | **Redeploy** |
+Deployment status checked against mainnet on 2026-07-27. **Check the chain, not
+`contracts/live/`**: that folder holds source for contracts that were never
+deployed, and planning against it produces admin calls to principals that do not
+exist.
+
+| Contract | Deployed | Coupling to the core | Action |
+|---|---|---|---|
+| `xtrata-market-sponsored-stx-v1-1` | yes | `PRIMARY-NFT-CONTRACT` read by a getter only, enforcement via allow-list | **Admin call** |
+| `xtrata-market-sponsored-sbtc-v1-1` | yes | same | **Admin call** |
+| `xtrata-market-sponsored-usdcx-v1-1` | yes | same | **Admin call** |
+| `xtrata-drops-v1-1` | yes | fully trait-based, campaign path included | **Admin call** |
+| `xtrata-drops-v1-0` | yes | historic drops only | **Nothing** |
+| `xtrata-market-stx-v1-0`, `usdc`, `sbtc` | yes | `<nft-trait>` parameter | **Nothing** |
+| `xtrata-collection-mint-v1-4` | yes | no core reference | **Nothing** |
+| `xtrata-preinscribed-collection-sale-v1-0` | yes | no core reference | **Nothing** |
+| `xtrata-commerce`, `xtrata-vault` | yes | no core reference | **Nothing** |
+| `xtrata-drops-v1-2` | **no** | hardcodes the core in `create-campaign-drop` | **Nothing.** Fix line 574 before it ever ships |
+| `xtrata-v3-2-3-gateway` | **no** | three hardcoded calls | **Nothing.** Source template, see `S5` |
+
+**No satellite contract needs redeploying.** The whole migration is a core deploy,
+five admin calls and the app pivot.
 
 Out of scope by decision: `xtrata-arcade-duels-v1`, `xtrata-duels-claims-v1`,
 `xtrata-arcade-scores-*`. These are experimental, they hardcode the core, and they
@@ -140,7 +150,7 @@ _Generated from `steps.json` by `build-canary.mjs`. Do not edit by hand._
 | `P1` | Register the candidate in the Clarinet project | clarinet check runs without a NoSuchContract error. | Yes |
 | `P2` | Swap the NFT trait to the local one for checking | clarinet check reports all contracts checked with no errors. | Yes |
 | `P3` | Run both contract test suites | Core suite 18 passed / 0 failed. Sponsored suite 11 passed / 0 failed. | Yes |
-| `P4` | Decide the campaign-drops question | Decision recorded in this file under decisions.campaignDrops. | Yes |
+| `P4` | Confirm the deployed satellite versions (do not trust the repo) | Every contract named in phase S returns an interface from the API. | Yes |
 
 ### T. Testnet rehearsal
 
@@ -172,10 +182,10 @@ _Generated from `steps.json` by `build-canary.mjs`. Do not edit by hand._
 | Step | What | Verify | Reversible |
 |---|---|---|---|
 | `S1` | Allow-list 3.2.4 on the three sponsored markets | is-nft-allowed returns true for 3.2.4 on each, and a 3.2.4 token can be listed and bought. | Yes |
-| `S2` | Allow-list 3.2.4 on drops | A 3.2.4 token can be dropped and claimed end to end. | Yes |
+| `S2` | Allow-list 3.2.4 on drops v1-1 (the deployed one) | A 3.2.4 token can be dropped and claimed, and added to a campaign. | Yes |
 | `S3` | Confirm the no-change contracts really need no change | Both succeed with no admin action taken. | Yes |
-| `S4` | Redeploy drops for campaign support (ONLY if P4 said yes) *(conditional)* | A campaign drop can be created against a 3.2.4 token. | Yes |
-| `S5` | Redeploy the gateway | Whatever depends on the gateway still resolves. | Yes |
+| `S4` | Drops redeploy: NOT REQUIRED | Nothing to verify. Confirm v1-2 is still undeployed before skipping. | Yes |
+| `S5` | Gateway: NOT REQUIRED | Nothing on-chain. The template edit is covered by the living-synth deploy tests. | Yes |
 
 ### A. App pivot
 
@@ -221,10 +231,24 @@ Each of these cost time already.
 - **Do not ship the pivot on the current fee model.** `src/lib/contract/fees.ts`
   still returns `300000` for a single-tx mint that costs `11000`. Step `A3`.
 
-## Open decisions
+## Resolved questions
 
-- `decisions.campaignDrops` in `steps.json` is unset. It gates step `S4` and is
-  the only thing that changes the size of this migration. Decide it in phase `P`.
-- Whether the gateway is still consumed by anything. If not, `S5` can be dropped.
-- Whether to bundle any other core change now, given the collection split above
-  makes a second core deploy expensive.
+Both open questions closed on 2026-07-27 by checking the chain rather than the
+repo. Recorded under `decisions` in `steps.json`.
+
+- **Do campaign drops force a drops redeploy? No.** The question came from
+  `xtrata-drops-v1-2`, which hardcodes the core inside `create-campaign-drop`.
+  That contract is not deployed. The live one is `xtrata-drops-v1-1`, whose
+  campaign path takes an `<nft-trait>` parameter and guards on the allow-list, so
+  one admin call covers standard and campaign drops together.
+- **Does the gateway need redeploying? No.** `xtrata-v3-2-3-gateway` is not
+  deployed, and neither is its only consumer, `proof-of-free-living-synth-v1`. It
+  is a source template the deploy console validates when someone deploys a Living
+  Synth collection. It needs a 3.2.4 variant eventually, but that is a source
+  edit, not a migration step.
+
+## Still open
+
+- Whether to bundle any other core change now. The collection split above makes a
+  second core deploy expensive, so this is the moment to land anything else worth
+  having.
