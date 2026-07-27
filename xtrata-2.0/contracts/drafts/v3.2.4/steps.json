@@ -1,0 +1,385 @@
+{
+  "$comment": "SINGLE SOURCE OF TRUTH for the v3.2.4 migration. Edit this file, then run `node build-canary.mjs` to regenerate canary.html AND the step table inside MIGRATION-PLAN.md. Do not hand-edit either of those two files.",
+  "title": "Xtrata v3.2.4 migration",
+  "core": {
+    "from": "xtrata-v3-2-3",
+    "to": "xtrata-v3-2-4",
+    "deployer": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+  },
+  "feeTargets": {
+    "single-tx-fee-unit": 10000,
+    "upload-chunk-fee-unit": 1000,
+    "begin-fee-unit": 100000,
+    "seal-fee-unit": 100000,
+    "upload-batch-fee-unit": 100000
+  },
+  "phases": [
+    {
+      "id": "P",
+      "title": "Prepare (local, no chain)"
+    },
+    {
+      "id": "T",
+      "title": "Testnet rehearsal"
+    },
+    {
+      "id": "M",
+      "title": "Mainnet core deploy"
+    },
+    {
+      "id": "C",
+      "title": "Cutover and continuity"
+    },
+    {
+      "id": "S",
+      "title": "Satellite contracts"
+    },
+    {
+      "id": "A",
+      "title": "App pivot"
+    },
+    {
+      "id": "V",
+      "title": "Verify and monitor"
+    }
+  ],
+  "steps": [
+    {
+      "id": "P1",
+      "phase": "P",
+      "title": "Register the candidate in the Clarinet project",
+      "why": "The candidate lives in contracts/drafts/v3.2.4/ and is not in the active plan. It must be registered to be checked or tested.",
+      "action": "Copy xtrata-v3.2.4-candidate.clar into contracts/clarinet/contracts/ and append a [contracts.xtrata-v3-2-4] entry with clarity_version = 3 and epoch = 'latest'. The epoch matters: epoch = 3.1 schedules it ahead of its own dependencies and clarinet fails with NoSuchContract.",
+      "verify": "clarinet check runs without a NoSuchContract error.",
+      "rollback": "Remove the entry and the copied file.",
+      "check": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "P2",
+      "phase": "P",
+      "title": "Swap the NFT trait to the local one for checking",
+      "why": "The deployable file references the MAINNET nft-trait principal. Clarinet cannot resolve it and reports 'use of unresolved contract'.",
+      "action": "In the Clarinet copy only, uncomment the [LOCAL / CLARINET] impl-trait and use-trait lines and comment out the [MAINNET] pair. Never commit this swap back into the deployable file.",
+      "verify": "clarinet check reports all contracts checked with no errors.",
+      "rollback": "Restore the mainnet trait lines.",
+      "check": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "P3",
+      "phase": "P",
+      "title": "Run both contract test suites",
+      "why": "Proves the recipient split works and that nothing in v3.2.3 behaviour changed.",
+      "action": "From contracts/clarinet: `node xtrata-v3.2.4-draft.core.test.mjs` and `node xtrata-v3.2.4-sponsored.test.mjs`. Both suites unpause the core first, since cores deploy paused and everything else returns ERR-PAUSED (u109).",
+      "verify": "Core suite 18 passed / 0 failed. Sponsored suite 11 passed / 0 failed.",
+      "rollback": "None. Do not proceed on any failure.",
+      "check": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "P4",
+      "phase": "P",
+      "title": "Decide the campaign-drops question",
+      "why": "This is the only decision that changes the size of the whole migration, so make it before anything touches a chain.",
+      "action": "xtrata-drops-v1-2 has exactly one hardcoded call to the core, at line 574 inside create-campaign-drop. Standard drops, claims and cancels all take an <nft-trait> parameter and work with 3.2.4 after an allow-list call. Decide now whether campaign drops must support 3.2.4 tokens. If yes, drops needs a redeploy (step S4). If no, the migration is admin calls only.",
+      "verify": "Decision recorded in this file under decisions.campaignDrops.",
+      "rollback": "None.",
+      "check": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "T1",
+      "phase": "T",
+      "title": "Deploy the core to testnet",
+      "why": "Rehearse the deploy shape before spending mainnet STX on a 1600-line contract.",
+      "action": "Activate the [TESTNET] trait pair in the deployable file. Deploy as xtrata-v3-2-4 with Clarity 3 via the SDK. Do not deploy from a wallet UI: the wallet forces Clarity 4, under which `as-contract` in the migration path does not resolve.",
+      "verify": "The contract interface is retrievable from the testnet API.",
+      "rollback": "Redeploy under a new name. Testnet deploys are cheap and non-destructive.",
+      "check": {
+        "kind": "contract-exists"
+      }
+    },
+    {
+      "id": "T2",
+      "phase": "T",
+      "title": "Set testnet fee units to the mainnet values",
+      "why": "Rehearsing against default fees would not exercise the real numbers, and the fee-change guards bound each move.",
+      "action": "Call set-single-tx-fee-unit, set-upload-chunk-fee-unit, set-begin-fee-unit, set-seal-fee-unit and set-upload-batch-fee-unit to the values in feeTargets. Each update is bounded: a new fee must be at most double and at least a tenth of the current one, so large moves need several calls.",
+      "verify": "quote-single-tx-fee(u16384, u1) returns single-tx-fee u11000.",
+      "rollback": "Set them back. Bounded either way.",
+      "check": {
+        "kind": "read-only",
+        "fn": "get-single-tx-fee-unit",
+        "args": [],
+        "expect": "u10000"
+      }
+    },
+    {
+      "id": "T3",
+      "phase": "T",
+      "title": "Unpause and run the mint flows on testnet",
+      "why": "End-to-end proof on a real chain rather than simnet.",
+      "action": "set-paused false, then run: a plain mint-single-tx, a sponsored mint-single-tx-to with a second wallet as recipient, and a staged begin / add-chunk-batch / seal cycle.",
+      "verify": "The sponsored mint leaves the recipient owning the token with a zero STX balance change, and the payer charged 11000 microSTX.",
+      "rollback": "set-paused true.",
+      "check": {
+        "kind": "read-only",
+        "fn": "is-paused",
+        "args": [],
+        "expect": "false"
+      }
+    },
+    {
+      "id": "T4",
+      "phase": "T",
+      "title": "Point a staging build at the testnet core and mint through the app",
+      "why": "The contract being right is not the same as the app driving it correctly. This is exactly what was missed when the fee post-condition regression shipped.",
+      "action": "Add a testnet registry entry, build, and inscribe through the real UI. Watch the post-conditions on the signing screen: they must be less-than-or-equal, and the capped amount must match quote-single-tx-fee.",
+      "verify": "A file inscribes from the UI, and the signing screen shows a LessEqual condition at the quoted fee, not an exact match.",
+      "rollback": "Remove the testnet registry entry.",
+      "check": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "M1",
+      "phase": "M",
+      "title": "Deploy the core to mainnet",
+      "why": "The point of the exercise.",
+      "action": "Activate the [MAINNET] trait pair. Deploy as xtrata-v3-2-4 from the deployer at m/44'/5757'/3'/0/0, pinned to Clarity 3 via the SDK. Budget roughly 0.5 STX. The contract deploys PAUSED, which is the safety property this plan depends on: it exists but cannot be used until step C3.",
+      "verify": "The contract interface is retrievable and is-paused returns true.",
+      "rollback": "None. A deployed contract is permanent. It stays paused and unused, and you deploy 3.2.5 instead.",
+      "check": {
+        "kind": "contract-exists"
+      },
+      "irreversible": true
+    },
+    {
+      "id": "M2",
+      "phase": "M",
+      "title": "Verify the deployed interface before touching anything else",
+      "why": "Catches a wrong-file or wrong-Clarity-version deploy while the contract is still paused and harmless.",
+      "action": "Fetch the contract interface and confirm mint-single-tx-to, mint-single-tx-recursive-to, mint-single-tx-with-relationships-to and migrate-from-v3-2-3 are all present, and that MAX-TOTAL-CHUNKS behaviour matches 128 MiB.",
+      "verify": "All four functions appear in the interface.",
+      "rollback": "Stop. Leave paused.",
+      "check": {
+        "kind": "has-function",
+        "fn": "mint-single-tx-to"
+      }
+    },
+    {
+      "id": "M3",
+      "phase": "M",
+      "title": "Set the mainnet fee units",
+      "why": "A new core starts on defaults, which are far above the live values. Minting at default fees would overcharge every user.",
+      "action": "Set the five fee units to the feeTargets values. Remember the doubling and tenth bounds, so stepping down from the u100000 default to u10000 takes two calls.",
+      "verify": "quote-single-tx-fee(u16384, u1) returns single-tx-fee u11000 and total-fee u11000.",
+      "rollback": "Adjust again. Bounded, so no single call can do damage.",
+      "check": {
+        "kind": "read-only",
+        "fn": "get-single-tx-fee-unit",
+        "args": [],
+        "expect": "u10000"
+      }
+    },
+    {
+      "id": "C1",
+      "phase": "C",
+      "title": "Read the current next-id from v3.2.3",
+      "why": "Token id continuity. Without this, 3.2.4 starts at zero and you get two different inscriptions sharing an id across the two contracts, which is unresolvable afterwards.",
+      "action": "Call get-next-token-id on xtrata-v3-2-3 and write the number down. Do this as close to the cutover as possible, because every mint on 3.2.3 moves it.",
+      "verify": "You have the number.",
+      "rollback": "None. Read-only.",
+      "check": {
+        "kind": "read-only",
+        "contract": "xtrata-v3-2-3",
+        "fn": "get-next-token-id",
+        "args": []
+      }
+    },
+    {
+      "id": "C2",
+      "phase": "C",
+      "title": "Pause v3.2.3",
+      "why": "Freezes next-id so the number from C1 cannot drift between reading it and setting it. Transfers are explicitly NOT paused, so the market, drops and migration all keep working.",
+      "action": "Call set-paused true on xtrata-v3-2-3.",
+      "verify": "is-paused on v3.2.3 returns true, and a transfer of an existing token still succeeds.",
+      "rollback": "set-paused false. Fully reversible.",
+      "check": {
+        "kind": "read-only",
+        "contract": "xtrata-v3-2-3",
+        "fn": "is-paused",
+        "args": [],
+        "expect": "true"
+      }
+    },
+    {
+      "id": "C3",
+      "phase": "C",
+      "title": "Set next-id on v3.2.4 and unpause it",
+      "why": "This is the actual cutover moment. Do the id first, then the unpause, never the other way around.",
+      "action": "Call set-next-id on xtrata-v3-2-4 with the value from C1, confirm it, then call set-paused false.",
+      "verify": "get-next-token-id on 3.2.4 matches C1, and a real mint produces the next id in sequence with no collision against 3.2.3.",
+      "rollback": "set-paused true on 3.2.4, set-paused false on 3.2.3. Reversible until the first 3.2.4 mint lands.",
+      "check": {
+        "kind": "read-only",
+        "fn": "is-paused",
+        "args": [],
+        "expect": "false"
+      }
+    },
+    {
+      "id": "S1",
+      "phase": "S",
+      "title": "Allow-list 3.2.4 on the three sponsored markets",
+      "why": "No redeploy needed. In all three sponsored markets PRIMARY-NFT-CONTRACT is only read by the get-nft-contract getter. Enforcement runs off the AllowedNftContracts map.",
+      "action": "Call set-nft-allowed(<3.2.4 principal>, true) on xtrata-market-sponsored-stx-v1-1, xtrata-market-sponsored-sbtc-v1-1 and xtrata-market-sponsored-usdcx-v1-1.",
+      "verify": "is-nft-allowed returns true for 3.2.4 on each, and a 3.2.4 token can be listed and bought.",
+      "rollback": "set-nft-allowed(..., false).",
+      "check": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "S2",
+      "phase": "S",
+      "title": "Allow-list 3.2.4 on drops",
+      "why": "Enables standard drops for 3.2.4 tokens. create-drop, claim and cancel all take an <nft-trait> parameter, so they need no code change.",
+      "action": "Call set-nft-allowed(<3.2.4 principal>, true) on xtrata-drops-v1-2.",
+      "verify": "A 3.2.4 token can be dropped and claimed end to end.",
+      "rollback": "set-nft-allowed(..., false).",
+      "check": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "S3",
+      "phase": "S",
+      "title": "Confirm the no-change contracts really need no change",
+      "why": "Cheap to verify, expensive to assume.",
+      "action": "The non-sponsored markets take an <nft-trait> parameter and never name the core. xtrata-collection-mint-v1-4, xtrata-preinscribed-collection-sale-v1-0, xtrata-commerce and xtrata-vault contain no reference to the core at all. Spot check one market listing and one collection mint against 3.2.4.",
+      "verify": "Both succeed with no admin action taken.",
+      "rollback": "None.",
+      "check": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "S4",
+      "phase": "S",
+      "title": "Redeploy drops for campaign support (ONLY if P4 said yes)",
+      "why": "create-campaign-drop hardcodes the 3.2.3 principal at line 574 and Clarity is immutable, so campaign drops cannot be extended by an admin call.",
+      "action": "Deploy xtrata-drops-v1-3 with the core reference updated, migrate the registry entry per the newest-contract-only rule, and leave v1-2 in place for existing campaigns.",
+      "verify": "A campaign drop can be created against a 3.2.4 token.",
+      "rollback": "Keep pointing the app at v1-2. The new contract sits unused.",
+      "check": {
+        "kind": "manual"
+      },
+      "conditional": "decisions.campaignDrops"
+    },
+    {
+      "id": "S5",
+      "phase": "S",
+      "title": "Redeploy the gateway",
+      "why": "xtrata-v3-2-3-gateway makes three hardcoded calls to the core and is named after it. It cannot be repointed.",
+      "action": "Deploy xtrata-v3-2-4-gateway with the core reference updated. Check what actually consumes the gateway before assuming it is needed at all.",
+      "verify": "Whatever depends on the gateway still resolves.",
+      "rollback": "Leave the old gateway serving 3.2.3 tokens.",
+      "check": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "A1",
+      "phase": "A",
+      "title": "Add the 3.2.4 capabilities entry",
+      "why": "src/lib/contract/capabilities.ts is keyed by version string. An unknown version has no capability record and the mint route cannot be resolved.",
+      "action": "Add a '3.2.4' entry copying '3.2.3', with supportsNativeSingleTx true. Add a supportsSponsoredMint flag set true for 3.2.4 and false everywhere else, so the UI can show the pay-for-someone-else option only where it exists.",
+      "verify": "The app resolves capabilities for 3.2.4 without falling through to a default.",
+      "rollback": "Revert the entry.",
+      "check": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "A2",
+      "phase": "A",
+      "title": "Swap the registry entry, do not append",
+      "why": "House rule: the app uses only the newest version of a contract. A registry listing two versions of the same contract is a bug, not a compatibility feature. The /drops page previously burned 34 wasted read-only calls per load this way.",
+      "action": "In src/config/public.ts, change PUBLIC_CONTRACT to xtrata-v3-2-4 and set legacyContractId to the 3.2.3 id so the viewer keeps resolving older inscriptions.",
+      "verify": "A 3.2.3 inscription still renders in the viewer, and new mints go to 3.2.4.",
+      "rollback": "Point the registry back at 3.2.3. The app is the only thing that moves.",
+      "check": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "A3",
+      "phase": "A",
+      "title": "Fix the fee model before shipping the pivot",
+      "why": "src/lib/contract/fees.ts still models a single fee-unit and returns 300000 for a single-tx mint that actually costs 11000. Shipping the pivot without this carries a known 27x over-estimate into the new core.",
+      "action": "Replace estimateContractFees for v3+ with the on-chain quote-single-tx-fee and quote-staged-fee calls that already exist on the client. Confirm no mint path emits FungibleConditionCode.Equal.",
+      "verify": "A mint's signing screen caps at the quoted fee with LessEqual.",
+      "rollback": "Revert.",
+      "check": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "A4",
+      "phase": "A",
+      "title": "Triage the remaining 3.2.3 references in source",
+      "why": "Roughly twenty files name 3.2.3. Most legitimately record where past on-chain activity happened and must NOT be rewritten, or the record becomes false.",
+      "action": "Leave historical records alone (src/lib/drops/collection-lock.ts, src/sponsor-ops.ts float tracking, the handover files). Update anything that resolves the CURRENT core. Retire historical references only when the underlying activity finishes.",
+      "verify": "Full app test suite passes.",
+      "rollback": "Revert per file.",
+      "check": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "V1",
+      "phase": "V",
+      "title": "Inscribe through the live app and check the fee actually charged",
+      "why": "The last regression was invisible in code review and obvious in a transaction.",
+      "action": "Inscribe a small file through the production UI. Read the resulting transaction: confirm one STX transfer of 11000 microSTX, a LessEqual post-condition, and tx_status success.",
+      "verify": "Transfer is 11000 microSTX and the post-condition is not an exact match.",
+      "rollback": "Point the registry back at 3.2.3.",
+      "check": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "V2",
+      "phase": "V",
+      "title": "Run one sponsored mint in anger",
+      "why": "The feature this whole deploy exists for.",
+      "action": "From a funded wallet, mint-single-tx-to a wallet holding zero STX. Confirm the recipient owns the token, is recorded as creator, and was charged nothing.",
+      "verify": "Recipient owns and is creator. Recipient STX balance unchanged.",
+      "rollback": "None needed.",
+      "check": {
+        "kind": "manual"
+      }
+    },
+    {
+      "id": "V3",
+      "phase": "V",
+      "title": "Watch for post-condition aborts for 48 hours",
+      "why": "abort_by_post_condition is the failure mode that costs users money while looking like nothing happened. It will not page anyone.",
+      "action": "Poll the 3.2.4 contract transaction list and alert on any abort_by_post_condition. Check for sent_equal_to conditions specifically, which should never appear.",
+      "verify": "Zero post-condition aborts.",
+      "rollback": "Pause 3.2.4 and repoint the app at 3.2.3.",
+      "check": {
+        "kind": "abort-scan"
+      }
+    }
+  ],
+  "decisions": {
+    "campaignDrops": null
+  }
+}

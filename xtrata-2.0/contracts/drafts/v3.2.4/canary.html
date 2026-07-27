@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Xtrata v3.2.4 migration canary</title>
+<!--
+  GENERATED FILE. Do not edit.
+  Source: contracts/drafts/v3.2.4/steps.json
+  Rebuild: node contracts/drafts/v3.2.4/build-canary.mjs
+-->
+<style>
+  :root { --bg:#fbfbfd; --fg:#16161a; --mut:#63636b; --line:#e3e3e8; --ok:#0a7d3f; --bad:#b3261e; --warn:#8a5a00; --accent:#3b3bd6; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#121216; --fg:#ececf1; --mut:#9a9aa4; --line:#2a2a32; --ok:#4ade80; --bad:#ff6b6b; --warn:#fbbf24; --accent:#8b8bff; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:2rem 1rem 6rem; background:var(--bg); color:var(--fg);
+         font:15px/1.55 ui-sans-serif,-apple-system,'Segoe UI',Roboto,sans-serif; }
+  .wrap { max-width:60rem; margin:0 auto; }
+  h1 { font-size:1.5rem; margin:0 0 .25rem; }
+  .sub { color:var(--mut); margin:0 0 1.5rem; }
+  fieldset { border:1px solid var(--line); border-radius:.6rem; padding:1rem; margin:0 0 1.5rem; }
+  legend { padding:0 .4rem; color:var(--mut); font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; }
+  .cfg { display:grid; grid-template-columns:repeat(auto-fit,minmax(13rem,1fr)); gap:.75rem; }
+  label.f { display:block; font-size:.8rem; color:var(--mut); margin-bottom:.2rem; }
+  /* :not([type=checkbox]) matters. A blanket width:100% here stretches every
+     step checkbox to the full row and collapses its label to a few characters. */
+  input:not([type=checkbox]),select { width:100%; padding:.45rem .55rem; border:1px solid var(--line);
+                 border-radius:.4rem; background:var(--bg); color:var(--fg); font:inherit; font-size:.9rem; }
+  input[type=checkbox] { flex:0 0 auto; width:1rem; height:1rem; margin:0; accent-color:var(--ok); }
+  .bar { position:sticky; top:0; z-index:5; background:var(--bg); border-bottom:1px solid var(--line);
+         padding:.6rem 0; margin-bottom:1rem; display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+  .pill { border:1px solid var(--line); background:transparent; color:var(--mut); border-radius:2rem;
+          padding:.25rem .7rem; font-size:.78rem; cursor:pointer; }
+  .pill.on { border-color:var(--accent); color:var(--accent); }
+  .prog { flex:1 1 8rem; height:.4rem; background:var(--line); border-radius:2rem; overflow:hidden; min-width:6rem; }
+  .prog i { display:block; height:100%; width:0; background:var(--ok); transition:width .2s; }
+  ol { list-style:none; padding:0; margin:0; }
+  .step { border:1px solid var(--line); border-radius:.6rem; margin-bottom:.6rem; overflow:hidden; }
+  .step.done-y { opacity:.55; }
+  .step.locked { opacity:.4; }
+  .step.locked .body, .step.locked .done { pointer-events:none; }
+  .head { display:flex; align-items:center; gap:.6rem; padding:.7rem .9rem; background:color-mix(in srgb, var(--line) 25%, transparent); }
+  .head label { cursor:pointer; font-weight:600; flex:1; }
+  .sid { display:inline-block; min-width:2.4rem; color:var(--accent); font-family:ui-monospace,monospace; font-size:.85rem; }
+  .tag { font-size:.65rem; text-transform:uppercase; letter-spacing:.06em; padding:.12rem .45rem; border-radius:.25rem; }
+  .tag.danger { background:var(--bad); color:#fff; }
+  .tag.cond { border:1px solid var(--warn); color:var(--warn); }
+  .body { padding:.3rem .9rem .9rem 3.9rem; }
+  .body p { margin:.45rem 0; }
+  .why, .rb { color:var(--mut); font-size:.9rem; }
+  .verify { border-left:2px solid var(--ok); padding-left:.6rem; }
+  .auto.none { color:var(--mut); font-size:.85rem; font-style:italic; }
+  button.run { border:1px solid var(--accent); color:var(--accent); background:transparent;
+               border-radius:.35rem; padding:.3rem .7rem; font:inherit; font-size:.85rem; cursor:pointer; }
+  .out { margin-left:.6rem; font-family:ui-monospace,monospace; font-size:.82rem; }
+  .out.ok { color:var(--ok); } .out.bad { color:var(--bad); } .out.wait { color:var(--mut); }
+  .reset { margin-left:auto; background:none; border:none; color:var(--mut); cursor:pointer; font-size:.8rem; text-decoration:underline; }
+  table.fees { border-collapse:collapse; font-size:.85rem; }
+  table.fees td { padding:.15rem .8rem .15rem 0; }
+  table.fees td:last-child { font-family:ui-monospace,monospace; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Xtrata v3.2.4 migration</h1>
+  <p class="sub">Deployment canary. Steps unlock in order. Progress is stored in this browser only.</p>
+
+  <fieldset>
+    <legend>Target</legend>
+    <div class="cfg">
+      <div><label class="f" for="net">Network</label>
+        <select id="net">
+          <option value="https://api.testnet.hiro.so">testnet</option>
+          <option value="https://api.hiro.so">mainnet</option>
+        </select></div>
+      <div><label class="f" for="dep">Deployer</label><input id="dep" value="SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X" spellcheck="false" /></div>
+      <div><label class="f" for="newc">New core</label><input id="newc" value="xtrata-v3-2-4" spellcheck="false" /></div>
+      <div><label class="f" for="oldc">Old core</label><input id="oldc" value="xtrata-v3-2-3" spellcheck="false" /></div>
+    </div>
+    <p class="sub" style="margin:.9rem 0 0">Target fee units:</p>
+    <table class="fees"><tr><td>single-tx-fee-unit</td><td>u10000</td></tr><tr><td>upload-chunk-fee-unit</td><td>u1000</td></tr><tr><td>begin-fee-unit</td><td>u100000</td></tr><tr><td>seal-fee-unit</td><td>u100000</td></tr><tr><td>upload-batch-fee-unit</td><td>u100000</td></tr></table>
+  </fieldset>
+
+  <div class="bar">
+        <button class="pill" data-phase="P">P. Prepare (local, no chain)</button>
+        <button class="pill" data-phase="T">T. Testnet rehearsal</button>
+        <button class="pill" data-phase="M">M. Mainnet core deploy</button>
+        <button class="pill" data-phase="C">C. Cutover and continuity</button>
+        <button class="pill" data-phase="S">S. Satellite contracts</button>
+        <button class="pill" data-phase="A">A. App pivot</button>
+        <button class="pill" data-phase="V">V. Verify and monitor</button>
+    <div class="prog"><i id="pbar"></i></div>
+    <span id="pcount" class="sub" style="margin:0;font-size:.8rem"></span>
+    <button class="reset" id="reset">reset</button>
+  </div>
+
+  <ol id="steps">
+      <li class="step" data-id="P1" data-phase="P">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-P1" />
+          <label for="cb-P1"><span class="sid">P1</span> Register the candidate in the Clarinet project</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> The candidate lives in contracts/drafts/v3.2.4/ and is not in the active plan. It must be registered to be checked or tested.</p>
+          <p><strong>Do.</strong> Copy xtrata-v3.2.4-candidate.clar into contracts/clarinet/contracts/ and append a [contracts.xtrata-v3-2-4] entry with clarity_version = 3 and epoch = 'latest'. The epoch matters: epoch = 3.1 schedules it ahead of its own dependencies and clarinet fails with NoSuchContract.</p>
+          <p class="verify"><strong>Verify.</strong> clarinet check runs without a NoSuchContract error.</p>
+          <p class="rb"><strong>Rollback.</strong> Remove the entry and the copied file.</p>
+          <p class="auto none">No automatic check. Confirm by hand.</p>
+        </div>
+      </li>
+      <li class="step" data-id="P2" data-phase="P">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-P2" />
+          <label for="cb-P2"><span class="sid">P2</span> Swap the NFT trait to the local one for checking</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> The deployable file references the MAINNET nft-trait principal. Clarinet cannot resolve it and reports 'use of unresolved contract'.</p>
+          <p><strong>Do.</strong> In the Clarinet copy only, uncomment the [LOCAL / CLARINET] impl-trait and use-trait lines and comment out the [MAINNET] pair. Never commit this swap back into the deployable file.</p>
+          <p class="verify"><strong>Verify.</strong> clarinet check reports all contracts checked with no errors.</p>
+          <p class="rb"><strong>Rollback.</strong> Restore the mainnet trait lines.</p>
+          <p class="auto none">No automatic check. Confirm by hand.</p>
+        </div>
+      </li>
+      <li class="step" data-id="P3" data-phase="P">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-P3" />
+          <label for="cb-P3"><span class="sid">P3</span> Run both contract test suites</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> Proves the recipient split works and that nothing in v3.2.3 behaviour changed.</p>
+          <p><strong>Do.</strong> From contracts/clarinet: `node xtrata-v3.2.4-draft.core.test.mjs` and `node xtrata-v3.2.4-sponsored.test.mjs`. Both suites unpause the core first, since cores deploy paused and everything else returns ERR-PAUSED (u109).</p>
+          <p class="verify"><strong>Verify.</strong> Core suite 18 passed / 0 failed. Sponsored suite 11 passed / 0 failed.</p>
+          <p class="rb"><strong>Rollback.</strong> None. Do not proceed on any failure.</p>
+          <p class="auto none">No automatic check. Confirm by hand.</p>
+        </div>
+      </li>
+      <li class="step" data-id="P4" data-phase="P">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-P4" />
+          <label for="cb-P4"><span class="sid">P4</span> Decide the campaign-drops question</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> This is the only decision that changes the size of the whole migration, so make it before anything touches a chain.</p>
+          <p><strong>Do.</strong> xtrata-drops-v1-2 has exactly one hardcoded call to the core, at line 574 inside create-campaign-drop. Standard drops, claims and cancels all take an &lt;nft-trait&gt; parameter and work with 3.2.4 after an allow-list call. Decide now whether campaign drops must support 3.2.4 tokens. If yes, drops needs a redeploy (step S4). If no, the migration is admin calls only.</p>
+          <p class="verify"><strong>Verify.</strong> Decision recorded in this file under decisions.campaignDrops.</p>
+          <p class="rb"><strong>Rollback.</strong> None.</p>
+          <p class="auto none">No automatic check. Confirm by hand.</p>
+        </div>
+      </li>
+      <li class="step" data-id="T1" data-phase="T">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-T1" />
+          <label for="cb-T1"><span class="sid">T1</span> Deploy the core to testnet</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> Rehearse the deploy shape before spending mainnet STX on a 1600-line contract.</p>
+          <p><strong>Do.</strong> Activate the [TESTNET] trait pair in the deployable file. Deploy as xtrata-v3-2-4 with Clarity 3 via the SDK. Do not deploy from a wallet UI: the wallet forces Clarity 4, under which `as-contract` in the migration path does not resolve.</p>
+          <p class="verify"><strong>Verify.</strong> The contract interface is retrievable from the testnet API.</p>
+          <p class="rb"><strong>Rollback.</strong> Redeploy under a new name. Testnet deploys are cheap and non-destructive.</p>
+          <p class="auto"><button class="run" data-check='{&quot;kind&quot;:&quot;contract-exists&quot;}'>Run check</button> <span class="out"></span></p>
+        </div>
+      </li>
+      <li class="step" data-id="T2" data-phase="T">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-T2" />
+          <label for="cb-T2"><span class="sid">T2</span> Set testnet fee units to the mainnet values</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> Rehearsing against default fees would not exercise the real numbers, and the fee-change guards bound each move.</p>
+          <p><strong>Do.</strong> Call set-single-tx-fee-unit, set-upload-chunk-fee-unit, set-begin-fee-unit, set-seal-fee-unit and set-upload-batch-fee-unit to the values in feeTargets. Each update is bounded: a new fee must be at most double and at least a tenth of the current one, so large moves need several calls.</p>
+          <p class="verify"><strong>Verify.</strong> quote-single-tx-fee(u16384, u1) returns single-tx-fee u11000.</p>
+          <p class="rb"><strong>Rollback.</strong> Set them back. Bounded either way.</p>
+          <p class="auto"><button class="run" data-check='{&quot;kind&quot;:&quot;read-only&quot;,&quot;fn&quot;:&quot;get-single-tx-fee-unit&quot;,&quot;args&quot;:[],&quot;expect&quot;:&quot;u10000&quot;}'>Run check</button> <span class="out"></span></p>
+        </div>
+      </li>
+      <li class="step" data-id="T3" data-phase="T">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-T3" />
+          <label for="cb-T3"><span class="sid">T3</span> Unpause and run the mint flows on testnet</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> End-to-end proof on a real chain rather than simnet.</p>
+          <p><strong>Do.</strong> set-paused false, then run: a plain mint-single-tx, a sponsored mint-single-tx-to with a second wallet as recipient, and a staged begin / add-chunk-batch / seal cycle.</p>
+          <p class="verify"><strong>Verify.</strong> The sponsored mint leaves the recipient owning the token with a zero STX balance change, and the payer charged 11000 microSTX.</p>
+          <p class="rb"><strong>Rollback.</strong> set-paused true.</p>
+          <p class="auto"><button class="run" data-check='{&quot;kind&quot;:&quot;read-only&quot;,&quot;fn&quot;:&quot;is-paused&quot;,&quot;args&quot;:[],&quot;expect&quot;:&quot;false&quot;}'>Run check</button> <span class="out"></span></p>
+        </div>
+      </li>
+      <li class="step" data-id="T4" data-phase="T">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-T4" />
+          <label for="cb-T4"><span class="sid">T4</span> Point a staging build at the testnet core and mint through the app</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> The contract being right is not the same as the app driving it correctly. This is exactly what was missed when the fee post-condition regression shipped.</p>
+          <p><strong>Do.</strong> Add a testnet registry entry, build, and inscribe through the real UI. Watch the post-conditions on the signing screen: they must be less-than-or-equal, and the capped amount must match quote-single-tx-fee.</p>
+          <p class="verify"><strong>Verify.</strong> A file inscribes from the UI, and the signing screen shows a LessEqual condition at the quoted fee, not an exact match.</p>
+          <p class="rb"><strong>Rollback.</strong> Remove the testnet registry entry.</p>
+          <p class="auto none">No automatic check. Confirm by hand.</p>
+        </div>
+      </li>
+      <li class="step" data-id="M1" data-phase="M">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-M1" />
+          <label for="cb-M1"><span class="sid">M1</span> Deploy the core to mainnet</label>
+          
+          <span class="tag danger">irreversible</span>
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> The point of the exercise.</p>
+          <p><strong>Do.</strong> Activate the [MAINNET] trait pair. Deploy as xtrata-v3-2-4 from the deployer at m/44'/5757'/3'/0/0, pinned to Clarity 3 via the SDK. Budget roughly 0.5 STX. The contract deploys PAUSED, which is the safety property this plan depends on: it exists but cannot be used until step C3.</p>
+          <p class="verify"><strong>Verify.</strong> The contract interface is retrievable and is-paused returns true.</p>
+          <p class="rb"><strong>Rollback.</strong> None. A deployed contract is permanent. It stays paused and unused, and you deploy 3.2.5 instead.</p>
+          <p class="auto"><button class="run" data-check='{&quot;kind&quot;:&quot;contract-exists&quot;}'>Run check</button> <span class="out"></span></p>
+        </div>
+      </li>
+      <li class="step" data-id="M2" data-phase="M">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-M2" />
+          <label for="cb-M2"><span class="sid">M2</span> Verify the deployed interface before touching anything else</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> Catches a wrong-file or wrong-Clarity-version deploy while the contract is still paused and harmless.</p>
+          <p><strong>Do.</strong> Fetch the contract interface and confirm mint-single-tx-to, mint-single-tx-recursive-to, mint-single-tx-with-relationships-to and migrate-from-v3-2-3 are all present, and that MAX-TOTAL-CHUNKS behaviour matches 128 MiB.</p>
+          <p class="verify"><strong>Verify.</strong> All four functions appear in the interface.</p>
+          <p class="rb"><strong>Rollback.</strong> Stop. Leave paused.</p>
+          <p class="auto"><button class="run" data-check='{&quot;kind&quot;:&quot;has-function&quot;,&quot;fn&quot;:&quot;mint-single-tx-to&quot;}'>Run check</button> <span class="out"></span></p>
+        </div>
+      </li>
+      <li class="step" data-id="M3" data-phase="M">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-M3" />
+          <label for="cb-M3"><span class="sid">M3</span> Set the mainnet fee units</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> A new core starts on defaults, which are far above the live values. Minting at default fees would overcharge every user.</p>
+          <p><strong>Do.</strong> Set the five fee units to the feeTargets values. Remember the doubling and tenth bounds, so stepping down from the u100000 default to u10000 takes two calls.</p>
+          <p class="verify"><strong>Verify.</strong> quote-single-tx-fee(u16384, u1) returns single-tx-fee u11000 and total-fee u11000.</p>
+          <p class="rb"><strong>Rollback.</strong> Adjust again. Bounded, so no single call can do damage.</p>
+          <p class="auto"><button class="run" data-check='{&quot;kind&quot;:&quot;read-only&quot;,&quot;fn&quot;:&quot;get-single-tx-fee-unit&quot;,&quot;args&quot;:[],&quot;expect&quot;:&quot;u10000&quot;}'>Run check</button> <span class="out"></span></p>
+        </div>
+      </li>
+      <li class="step" data-id="C1" data-phase="C">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-C1" />
+          <label for="cb-C1"><span class="sid">C1</span> Read the current next-id from v3.2.3</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> Token id continuity. Without this, 3.2.4 starts at zero and you get two different inscriptions sharing an id across the two contracts, which is unresolvable afterwards.</p>
+          <p><strong>Do.</strong> Call get-next-token-id on xtrata-v3-2-3 and write the number down. Do this as close to the cutover as possible, because every mint on 3.2.3 moves it.</p>
+          <p class="verify"><strong>Verify.</strong> You have the number.</p>
+          <p class="rb"><strong>Rollback.</strong> None. Read-only.</p>
+          <p class="auto"><button class="run" data-check='{&quot;kind&quot;:&quot;read-only&quot;,&quot;contract&quot;:&quot;xtrata-v3-2-3&quot;,&quot;fn&quot;:&quot;get-next-token-id&quot;,&quot;args&quot;:[]}'>Run check</button> <span class="out"></span></p>
+        </div>
+      </li>
+      <li class="step" data-id="C2" data-phase="C">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-C2" />
+          <label for="cb-C2"><span class="sid">C2</span> Pause v3.2.3</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> Freezes next-id so the number from C1 cannot drift between reading it and setting it. Transfers are explicitly NOT paused, so the market, drops and migration all keep working.</p>
+          <p><strong>Do.</strong> Call set-paused true on xtrata-v3-2-3.</p>
+          <p class="verify"><strong>Verify.</strong> is-paused on v3.2.3 returns true, and a transfer of an existing token still succeeds.</p>
+          <p class="rb"><strong>Rollback.</strong> set-paused false. Fully reversible.</p>
+          <p class="auto"><button class="run" data-check='{&quot;kind&quot;:&quot;read-only&quot;,&quot;contract&quot;:&quot;xtrata-v3-2-3&quot;,&quot;fn&quot;:&quot;is-paused&quot;,&quot;args&quot;:[],&quot;expect&quot;:&quot;true&quot;}'>Run check</button> <span class="out"></span></p>
+        </div>
+      </li>
+      <li class="step" data-id="C3" data-phase="C">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-C3" />
+          <label for="cb-C3"><span class="sid">C3</span> Set next-id on v3.2.4 and unpause it</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> This is the actual cutover moment. Do the id first, then the unpause, never the other way around.</p>
+          <p><strong>Do.</strong> Call set-next-id on xtrata-v3-2-4 with the value from C1, confirm it, then call set-paused false.</p>
+          <p class="verify"><strong>Verify.</strong> get-next-token-id on 3.2.4 matches C1, and a real mint produces the next id in sequence with no collision against 3.2.3.</p>
+          <p class="rb"><strong>Rollback.</strong> set-paused true on 3.2.4, set-paused false on 3.2.3. Reversible until the first 3.2.4 mint lands.</p>
+          <p class="auto"><button class="run" data-check='{&quot;kind&quot;:&quot;read-only&quot;,&quot;fn&quot;:&quot;is-paused&quot;,&quot;args&quot;:[],&quot;expect&quot;:&quot;false&quot;}'>Run check</button> <span class="out"></span></p>
+        </div>
+      </li>
+      <li class="step" data-id="S1" data-phase="S">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-S1" />
+          <label for="cb-S1"><span class="sid">S1</span> Allow-list 3.2.4 on the three sponsored markets</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> No redeploy needed. In all three sponsored markets PRIMARY-NFT-CONTRACT is only read by the get-nft-contract getter. Enforcement runs off the AllowedNftContracts map.</p>
+          <p><strong>Do.</strong> Call set-nft-allowed(&lt;3.2.4 principal&gt;, true) on xtrata-market-sponsored-stx-v1-1, xtrata-market-sponsored-sbtc-v1-1 and xtrata-market-sponsored-usdcx-v1-1.</p>
+          <p class="verify"><strong>Verify.</strong> is-nft-allowed returns true for 3.2.4 on each, and a 3.2.4 token can be listed and bought.</p>
+          <p class="rb"><strong>Rollback.</strong> set-nft-allowed(..., false).</p>
+          <p class="auto none">No automatic check. Confirm by hand.</p>
+        </div>
+      </li>
+      <li class="step" data-id="S2" data-phase="S">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-S2" />
+          <label for="cb-S2"><span class="sid">S2</span> Allow-list 3.2.4 on drops</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> Enables standard drops for 3.2.4 tokens. create-drop, claim and cancel all take an &lt;nft-trait&gt; parameter, so they need no code change.</p>
+          <p><strong>Do.</strong> Call set-nft-allowed(&lt;3.2.4 principal&gt;, true) on xtrata-drops-v1-2.</p>
+          <p class="verify"><strong>Verify.</strong> A 3.2.4 token can be dropped and claimed end to end.</p>
+          <p class="rb"><strong>Rollback.</strong> set-nft-allowed(..., false).</p>
+          <p class="auto none">No automatic check. Confirm by hand.</p>
+        </div>
+      </li>
+      <li class="step" data-id="S3" data-phase="S">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-S3" />
+          <label for="cb-S3"><span class="sid">S3</span> Confirm the no-change contracts really need no change</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> Cheap to verify, expensive to assume.</p>
+          <p><strong>Do.</strong> The non-sponsored markets take an &lt;nft-trait&gt; parameter and never name the core. xtrata-collection-mint-v1-4, xtrata-preinscribed-collection-sale-v1-0, xtrata-commerce and xtrata-vault contain no reference to the core at all. Spot check one market listing and one collection mint against 3.2.4.</p>
+          <p class="verify"><strong>Verify.</strong> Both succeed with no admin action taken.</p>
+          <p class="rb"><strong>Rollback.</strong> None.</p>
+          <p class="auto none">No automatic check. Confirm by hand.</p>
+        </div>
+      </li>
+      <li class="step" data-id="S4" data-phase="S" data-conditional="decisions.campaignDrops">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-S4" />
+          <label for="cb-S4"><span class="sid">S4</span> Redeploy drops for campaign support (ONLY if P4 said yes)</label>
+          <span class="tag cond">conditional</span>
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> create-campaign-drop hardcodes the 3.2.3 principal at line 574 and Clarity is immutable, so campaign drops cannot be extended by an admin call.</p>
+          <p><strong>Do.</strong> Deploy xtrata-drops-v1-3 with the core reference updated, migrate the registry entry per the newest-contract-only rule, and leave v1-2 in place for existing campaigns.</p>
+          <p class="verify"><strong>Verify.</strong> A campaign drop can be created against a 3.2.4 token.</p>
+          <p class="rb"><strong>Rollback.</strong> Keep pointing the app at v1-2. The new contract sits unused.</p>
+          <p class="auto none">No automatic check. Confirm by hand.</p>
+        </div>
+      </li>
+      <li class="step" data-id="S5" data-phase="S">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-S5" />
+          <label for="cb-S5"><span class="sid">S5</span> Redeploy the gateway</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> xtrata-v3-2-3-gateway makes three hardcoded calls to the core and is named after it. It cannot be repointed.</p>
+          <p><strong>Do.</strong> Deploy xtrata-v3-2-4-gateway with the core reference updated. Check what actually consumes the gateway before assuming it is needed at all.</p>
+          <p class="verify"><strong>Verify.</strong> Whatever depends on the gateway still resolves.</p>
+          <p class="rb"><strong>Rollback.</strong> Leave the old gateway serving 3.2.3 tokens.</p>
+          <p class="auto none">No automatic check. Confirm by hand.</p>
+        </div>
+      </li>
+      <li class="step" data-id="A1" data-phase="A">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-A1" />
+          <label for="cb-A1"><span class="sid">A1</span> Add the 3.2.4 capabilities entry</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> src/lib/contract/capabilities.ts is keyed by version string. An unknown version has no capability record and the mint route cannot be resolved.</p>
+          <p><strong>Do.</strong> Add a '3.2.4' entry copying '3.2.3', with supportsNativeSingleTx true. Add a supportsSponsoredMint flag set true for 3.2.4 and false everywhere else, so the UI can show the pay-for-someone-else option only where it exists.</p>
+          <p class="verify"><strong>Verify.</strong> The app resolves capabilities for 3.2.4 without falling through to a default.</p>
+          <p class="rb"><strong>Rollback.</strong> Revert the entry.</p>
+          <p class="auto none">No automatic check. Confirm by hand.</p>
+        </div>
+      </li>
+      <li class="step" data-id="A2" data-phase="A">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-A2" />
+          <label for="cb-A2"><span class="sid">A2</span> Swap the registry entry, do not append</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> House rule: the app uses only the newest version of a contract. A registry listing two versions of the same contract is a bug, not a compatibility feature. The /drops page previously burned 34 wasted read-only calls per load this way.</p>
+          <p><strong>Do.</strong> In src/config/public.ts, change PUBLIC_CONTRACT to xtrata-v3-2-4 and set legacyContractId to the 3.2.3 id so the viewer keeps resolving older inscriptions.</p>
+          <p class="verify"><strong>Verify.</strong> A 3.2.3 inscription still renders in the viewer, and new mints go to 3.2.4.</p>
+          <p class="rb"><strong>Rollback.</strong> Point the registry back at 3.2.3. The app is the only thing that moves.</p>
+          <p class="auto none">No automatic check. Confirm by hand.</p>
+        </div>
+      </li>
+      <li class="step" data-id="A3" data-phase="A">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-A3" />
+          <label for="cb-A3"><span class="sid">A3</span> Fix the fee model before shipping the pivot</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> src/lib/contract/fees.ts still models a single fee-unit and returns 300000 for a single-tx mint that actually costs 11000. Shipping the pivot without this carries a known 27x over-estimate into the new core.</p>
+          <p><strong>Do.</strong> Replace estimateContractFees for v3+ with the on-chain quote-single-tx-fee and quote-staged-fee calls that already exist on the client. Confirm no mint path emits FungibleConditionCode.Equal.</p>
+          <p class="verify"><strong>Verify.</strong> A mint's signing screen caps at the quoted fee with LessEqual.</p>
+          <p class="rb"><strong>Rollback.</strong> Revert.</p>
+          <p class="auto none">No automatic check. Confirm by hand.</p>
+        </div>
+      </li>
+      <li class="step" data-id="A4" data-phase="A">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-A4" />
+          <label for="cb-A4"><span class="sid">A4</span> Triage the remaining 3.2.3 references in source</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> Roughly twenty files name 3.2.3. Most legitimately record where past on-chain activity happened and must NOT be rewritten, or the record becomes false.</p>
+          <p><strong>Do.</strong> Leave historical records alone (src/lib/drops/collection-lock.ts, src/sponsor-ops.ts float tracking, the handover files). Update anything that resolves the CURRENT core. Retire historical references only when the underlying activity finishes.</p>
+          <p class="verify"><strong>Verify.</strong> Full app test suite passes.</p>
+          <p class="rb"><strong>Rollback.</strong> Revert per file.</p>
+          <p class="auto none">No automatic check. Confirm by hand.</p>
+        </div>
+      </li>
+      <li class="step" data-id="V1" data-phase="V">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-V1" />
+          <label for="cb-V1"><span class="sid">V1</span> Inscribe through the live app and check the fee actually charged</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> The last regression was invisible in code review and obvious in a transaction.</p>
+          <p><strong>Do.</strong> Inscribe a small file through the production UI. Read the resulting transaction: confirm one STX transfer of 11000 microSTX, a LessEqual post-condition, and tx_status success.</p>
+          <p class="verify"><strong>Verify.</strong> Transfer is 11000 microSTX and the post-condition is not an exact match.</p>
+          <p class="rb"><strong>Rollback.</strong> Point the registry back at 3.2.3.</p>
+          <p class="auto none">No automatic check. Confirm by hand.</p>
+        </div>
+      </li>
+      <li class="step" data-id="V2" data-phase="V">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-V2" />
+          <label for="cb-V2"><span class="sid">V2</span> Run one sponsored mint in anger</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> The feature this whole deploy exists for.</p>
+          <p><strong>Do.</strong> From a funded wallet, mint-single-tx-to a wallet holding zero STX. Confirm the recipient owns the token, is recorded as creator, and was charged nothing.</p>
+          <p class="verify"><strong>Verify.</strong> Recipient owns and is creator. Recipient STX balance unchanged.</p>
+          <p class="rb"><strong>Rollback.</strong> None needed.</p>
+          <p class="auto none">No automatic check. Confirm by hand.</p>
+        </div>
+      </li>
+      <li class="step" data-id="V3" data-phase="V">
+        <div class="head">
+          <input type="checkbox" class="done" id="cb-V3" />
+          <label for="cb-V3"><span class="sid">V3</span> Watch for post-condition aborts for 48 hours</label>
+          
+          
+        </div>
+        <div class="body">
+          <p class="why"><strong>Why.</strong> abort_by_post_condition is the failure mode that costs users money while looking like nothing happened. It will not page anyone.</p>
+          <p><strong>Do.</strong> Poll the 3.2.4 contract transaction list and alert on any abort_by_post_condition. Check for sent_equal_to conditions specifically, which should never appear.</p>
+          <p class="verify"><strong>Verify.</strong> Zero post-condition aborts.</p>
+          <p class="rb"><strong>Rollback.</strong> Pause 3.2.4 and repoint the app at 3.2.3.</p>
+          <p class="auto"><button class="run" data-check='{&quot;kind&quot;:&quot;abort-scan&quot;}'>Run check</button> <span class="out"></span></p>
+        </div>
+      </li>
+  </ol>
+</div>
+<script>
+(function () {
+  var KEY = 'xtrata-v324-canary';
+  var state = {};
+  try { state = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { state = {}; }
+  var steps = Array.prototype.slice.call(document.querySelectorAll('.step'));
+  var cfg = { net: 'net', dep: 'dep', newc: 'newc', oldc: 'oldc' };
+  Object.keys(cfg).forEach(function (k) {
+    var el = document.getElementById(cfg[k]);
+    if (state['cfg_' + k]) el.value = state['cfg_' + k];
+    el.addEventListener('change', function () { state['cfg_' + k] = el.value; save(); });
+  });
+  function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
+  function api() { return document.getElementById('net').value; }
+  function principal(which) {
+    var dep = document.getElementById('dep').value.trim();
+    var name = document.getElementById(which === 'old' ? 'oldc' : 'newc').value.trim();
+    return { dep: dep, name: name, id: dep + '.' + name };
+  }
+  // Steps unlock strictly in order. The whole point is that you cannot
+  // accidentally unpause before setting next-id.
+  function refresh() {
+    var doneCount = 0, firstOpen = true;
+    steps.forEach(function (li) {
+      var id = li.dataset.id;
+      var cb = li.querySelector('.done');
+      cb.checked = !!state[id];
+      li.classList.toggle('done-y', !!state[id]);
+      if (state[id]) { doneCount++; li.classList.remove('locked'); }
+      else if (firstOpen) { li.classList.remove('locked'); firstOpen = false; }
+      else { li.classList.add('locked'); }
+    });
+    var pct = steps.length ? Math.round((doneCount / steps.length) * 100) : 0;
+    document.getElementById('pbar').style.width = pct + '%';
+    document.getElementById('pcount').textContent = doneCount + '/' + steps.length;
+  }
+  steps.forEach(function (li) {
+    li.querySelector('.done').addEventListener('change', function (e) {
+      state[li.dataset.id] = e.target.checked;
+      if (!e.target.checked) {
+        // Unchecking a step relocks everything after it.
+        var seen = false;
+        steps.forEach(function (o) {
+          if (o === li) { seen = true; return; }
+          if (seen) state[o.dataset.id] = false;
+        });
+      }
+      save(); refresh();
+    });
+  });
+  document.getElementById('reset').addEventListener('click', function () {
+    if (!confirm('Clear all canary progress?')) return;
+    steps.forEach(function (li) { state[li.dataset.id] = false; });
+    save(); refresh();
+  });
+  document.querySelectorAll('.pill').forEach(function (p) {
+    p.addEventListener('click', function () {
+      var on = p.classList.toggle('on');
+      var ph = p.dataset.phase;
+      document.querySelectorAll('.pill').forEach(function (q) { if (q !== p) q.classList.remove('on'); });
+      steps.forEach(function (li) {
+        li.style.display = (!on || li.dataset.phase === ph) ? '' : 'none';
+      });
+    });
+  });
+
+  // Clarity read-only results arrive hex-encoded and are almost always wrapped
+  // in a response, so a bare bool is 0x0703/0x0704 rather than 0x03/0x04, and a
+  // uint is 0x0701 followed by a 16-byte big-endian value. Decode properly:
+  // substring matching gives false passes (u1000 "matches" inside u10000).
+  function decodeClarity(hex) {
+    var h = String(hex || '').replace(/^0x/, '');
+    if (h.slice(0, 2) === '07' || h.slice(0, 2) === '08') h = h.slice(2); // unwrap (ok/err)
+    var tag = h.slice(0, 2);
+    if (tag === '03') return { type: 'bool', value: true };
+    if (tag === '04') return { type: 'bool', value: false };
+    if (tag === '01') return { type: 'uint', value: BigInt('0x' + h.slice(2, 34)) };
+    return { type: 'raw', value: '0x' + h };
+  }
+  function matchesExpected(hex, want) {
+    var got = decodeClarity(hex);
+    var w = String(want).trim();
+    if (w === 'true' || w === 'false') return got.type === 'bool' && got.value === (w === 'true');
+    if (/^u?d+$/.test(w)) return got.type === 'uint' && got.value === BigInt(w.replace(/^u/, ''));
+    return false;
+  }
+  function describe(hex) {
+    var g = decodeClarity(hex);
+    return g.type === 'uint' ? 'u' + g.value : g.type === 'bool' ? String(g.value) : g.value;
+  }
+  async function readOnly(target, fn, args) {
+    var p = principal(target === 'xtrata-v3-2-3' ? 'old' : 'new');
+    var url = api() + '/v2/contracts/call-read/' + p.dep + '/' + p.name + '/' + fn;
+    var r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sender: p.dep, arguments: args || [] })
+    });
+    return r.json();
+  }
+  async function runCheck(spec, out) {
+    out.className = 'out wait'; out.textContent = 'checking...';
+    try {
+      if (spec.kind === 'contract-exists' || spec.kind === 'has-function') {
+        var p = principal('new');
+        var r = await fetch(api() + '/v2/contracts/interface/' + p.dep + '/' + p.name);
+        if (!r.ok) throw new Error('not deployed (' + r.status + ')');
+        var iface = await r.json();
+        if (spec.kind === 'has-function') {
+          var names = (iface.functions || []).map(function (f) { return f.name; });
+          if (names.indexOf(spec.fn) === -1) throw new Error('missing ' + spec.fn);
+          out.className = 'out ok'; out.textContent = 'PASS - ' + spec.fn + ' present';
+        } else {
+          out.className = 'out ok'; out.textContent = 'PASS - deployed';
+        }
+        return;
+      }
+      if (spec.kind === 'read-only') {
+        var res = await readOnly(spec.contract, spec.fn, spec.args);
+        if (!res.okay) throw new Error(res.cause || 'call failed');
+        var got = res.result;
+        if (spec.expect && !matchesExpected(got, spec.expect)) {
+          out.className = 'out bad';
+          out.textContent = 'MISMATCH - wanted ' + spec.expect + ', got ' + describe(got);
+          return;
+        }
+        out.className = 'out ok'; out.textContent = 'PASS - ' + describe(got);
+        return;
+      }
+      if (spec.kind === 'abort-scan') {
+        var p2 = principal('new');
+        var r2 = await fetch(api() + '/extended/v1/address/' + p2.id + '/transactions?limit=50');
+        var d = await r2.json();
+        var bad = (d.results || []).filter(function (t) { return t.tx_status === 'abort_by_post_condition'; });
+        if (bad.length) {
+          out.className = 'out bad';
+          out.textContent = bad.length + ' POST-CONDITION ABORT(S) - ' + bad[0].tx_id.slice(0, 12);
+        } else {
+          out.className = 'out ok';
+          out.textContent = 'PASS - no post-condition aborts in last 50 txs';
+        }
+        return;
+      }
+      out.className = 'out'; out.textContent = 'no check';
+    } catch (e) {
+      out.className = 'out bad'; out.textContent = 'FAIL - ' + (e && e.message ? e.message : e);
+    }
+  }
+  document.querySelectorAll('button.run').forEach(function (b) {
+    b.addEventListener('click', function () {
+      runCheck(JSON.parse(b.dataset.check), b.parentNode.querySelector('.out'));
+    });
+  });
+  refresh();
+})();
+</script>
+</body>
+</html>
