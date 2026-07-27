@@ -97,6 +97,24 @@ function installLeaveGuard() {
   });
 }
 
+// EMBEDDED: tell the page hosting us whether work is in flight.
+//
+// A beforeunload registered inside an iframe is not reliably honoured when the PARENT
+// is the page being closed — it depends on the browser and on that frame's own user
+// activation. The parent's own guard always is. So the frame reports the one fact it
+// knows and the host decides what to do with it.
+//
+// Same-origin only: the target origin is pinned, and the host checks the sender.
+let lastReported: boolean | null = null;
+function reportLiveToHost(live: boolean, detail: string) {
+  if (typeof window === 'undefined' || window.parent === window) return;
+  if (live === lastReported) return;            // only on change
+  lastReported = live;
+  try {
+    window.parent.postMessage({ type: 'xtrata:job:live', live, detail }, window.location.origin);
+  } catch { /* cross-origin host: nothing we can do, and nothing we should throw over */ }
+}
+
 /** What the browser is doing right now, in words rather than a bar. */
 function liveDetail(job: any, status: string): string {
   const m = /(\d+)\s*\/\s*(\d+)\s*chunks/.exec((job && job.progress) || '');
@@ -114,9 +132,14 @@ function liveDetail(job: any, status: string): string {
 export function keepOpenBanner(opts: { job: any; status: string; mount: HTMLElement | null }) {
   installLeaveGuard();
   const mount = opts.mount;
-  if (!mount) return { live: false };
+  if (!mount) {
+    jobIsLive = LIVE_STATES.includes(opts.status);
+    reportLiveToHost(jobIsLive, liveDetail(opts.job, opts.status));
+    return { live: false };
+  }
 
   jobIsLive = LIVE_STATES.includes(opts.status);
+  reportLiveToHost(jobIsLive, liveDetail(opts.job, opts.status));
   let box = mount.querySelector('.xao-keepopen') as HTMLElement | null;
   if (!jobIsLive) { box?.remove(); return { live: false }; }
 

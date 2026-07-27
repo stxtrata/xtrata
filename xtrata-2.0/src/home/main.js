@@ -13998,11 +13998,31 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       scheduleDependencyReprepare();
     });
 
+    // The embedded wizard runs its job inside an iframe, and a beforeunload registered
+    // in a frame is not reliably honoured when the PARENT is what is closing. So the
+    // frame reports whether work is in flight and this page — whose guard the browser
+    // always honours — speaks for it.
+    //
+    // Note this is only about LEAVING THE SITE. Switching between the site's own tabs
+    // never unloads anything: the iframe stays mounted and CSS hides it, so a job keeps
+    // running. Only closing the tab, going Back, or following a link off-site matters.
+    const embeddedLiveJobs = new Map();
+    window.addEventListener('message', (event) => {
+      if (event.origin !== window.location.origin) return;          // same-origin only
+      const data = event && event.data;
+      if (!data || data.type !== 'xtrata:job:live') return;
+      // Key by the frame that sent it, so two embedded surfaces cannot clear each other.
+      const frame = [...document.querySelectorAll('iframe')].find((f) => f.contentWindow === event.source);
+      if (!frame) return;
+      if (data.live) embeddedLiveJobs.set(frame, String(data.detail || 'an inscription is running'));
+      else embeddedLiveJobs.delete(frame);
+    });
+
     window.addEventListener('beforeunload', (event) => {
       // Warn before leaving mid-inscription: a transaction may be signing or
       // broadcasting. Progress is saved locally and resumes on reopen, but the
       // native prompt stops an accidental close from interrupting the current tx.
-      if (state.busy) {
+      if (state.busy || embeddedLiveJobs.size) {
         event.preventDefault();
         event.returnValue = '';
         return '';
