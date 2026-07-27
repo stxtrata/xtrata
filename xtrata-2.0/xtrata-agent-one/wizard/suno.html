@@ -228,7 +228,7 @@
 <script src="HTML_Template.js?v=6"></script>
 <script src="suno-build.js?v=7"></script>
 <script src="optimize-image.js?v=1"></script>
-<script src="agent-one.js?v=2026-07-27.1"></script>
+<script src="agent-one.js?v=2026-07-27.2"></script>
 <script>
 const SERVER = { mock:false, net:'mainnet' };
 // VERSION HANDSHAKE: this page requires AT LEAST the agent bundle build below. The site's deploy
@@ -237,7 +237,7 @@ const SERVER = { mock:false, net:'mainnet' };
 // fees on refund loops). Builds are date-stamped (YYYY-MM-DD.N) so a string compare orders them;
 // a NEWER deployed bundle must pass — requiring an exact match wrongly locked the page out
 // whenever the agent shipped ahead of the page.
-const XAO_MIN_AGENT_BUILD='2026-07-27.1';
+const XAO_MIN_AGENT_BUILD='2026-07-27.2';
 let AGENT_STALE=false;
 function checkAgentBuild(){
   const b=window.XAO_AGENT_BUILD||null;
@@ -454,10 +454,14 @@ async function checkParent(){
   if(!/^\d+$/.test(id)){ box.innerHTML='<span class="err">A parent must be a numeric token id.</span>'; PARENT_OK='bad'; updateGo(); return; }
   if(SERVER.mock){ box.innerHTML='<span class="muted">MOCK mode — ownership not checked.</span>'; PARENT_OK='unverified'; updateGo(); return; }
   const A=window.XtrataAgent;
-  if(!A||!A.ownerOf){ box.innerHTML='<span class="muted">Ownership check unavailable here — the agent re-checks the parent before taking any payment.</span>'; PARENT_OK='unverified'; updateGo(); return; }
+  if(!A||!A.ownerOfChecked){ box.innerHTML='<span class="muted">Ownership check unavailable here — the agent re-checks the parent before taking any payment.</span>'; PARENT_OK='unverified'; updateGo(); return; }
   PARENT_OK='checking'; box.innerHTML='<span class="muted"><span class="spin"></span>#'+esc(id)+' — checking the current owner…</span>'; updateGo();
-  let owner=null; try{ owner=await A.ownerOf(id); }catch{ owner=null; }
+  // ownerOfChecked, not ownerOf: ownerOf answers null for BOTH "no such token" and
+  // "the read failed", so a flaky API used to tell people their token id was wrong.
+  let owner=null, ok=true;
+  try{ const r=await A.ownerOfChecked(id); ok=r.ok; owner=r.owner; }catch{ ok=false; }
   if(run!==parentCheckRun) return;                       // the field changed mid-flight
+  if(!ok){ box.innerHTML='<span class="muted">#'+esc(id)+' — could not check the owner right now. The agent re-checks the parent before taking any payment.</span>'; PARENT_OK='unverified'; updateGo(); return; }
   if(owner&&WALLET&&owner===WALLET){ box.innerHTML='<span class="ok">✓ #'+esc(id)+' — in your connected wallet</span>'; PARENT_OK='ok'; }
   else if(!owner){ box.innerHTML='<span class="err">✗ #'+esc(id)+' — no owner found. Check the token id.</span>'; PARENT_OK='bad'; }
   else if(!WALLET){ box.innerHTML='<span style="color:var(--warn)">#'+esc(id)+' — held by '+esc(shortAddr(owner))+'. Connect that wallet to confirm it is yours.</span>'; PARENT_OK='bad'; }

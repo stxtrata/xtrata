@@ -415,6 +415,16 @@
   /* Same trap: an inline display:flex here defeated [hidden] too. */
   #playerRow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;margin-top:8px}
   #playerRow[hidden]{display:none}
+  .custody-note{margin:0 0 16px;padding:14px 16px;border:1px solid var(--acc2);border-radius:12px;background:rgba(124,92,255,.07)}
+  .custody-note h3{margin:0 0 7px;font-size:14.5px}
+  .custody-note p{margin:0 0 7px;font-size:13px;line-height:1.6;color:var(--ink)}
+  .custody-note p:last-child{margin-bottom:0}
+  .custody-note .custody-small{font-size:12px;color:var(--mut)}
+  /* Token ids are easy to transpose (#2887 for #2878 cost a live job), so every
+     referenced inscription is shown, not just named. */
+  .relrow{display:flex;align-items:center;gap:9px}
+  .relthumb{width:44px;height:44px;flex:0 0 44px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);overflow:hidden}
+  .relthumb iframe{width:100%;height:100%;border:0;display:block;pointer-events:none;background:#0e1726}
   .meta-panel{width:min(460px,100%);max-height:90vh;overflow-y:auto;padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:0 18px 44px rgba(0,0,0,.45)}
   .meta-panel h4{margin:0 0 2px;font-size:15px}
   .mfield{margin-bottom:10px;min-width:0}
@@ -465,6 +475,29 @@ try{
     <span class="step" data-step="done">4 · Inscribed</span>
   </div>
 
+  <!-- Self-custody, said once, plainly, before anything is asked of the user. The
+       header line was accurate but technical ("one-shot wallet your own browser
+       creates and controls"), and people who most need this reassurance are exactly
+       the ones that phrasing does not reach. -->
+  <section class="custody-note">
+    <h3>🔑 Your money never passes through us</h3>
+    <p>
+      When you inscribe, your browser makes a brand-new wallet — right here on this
+      device, just for this one job. You pay into that wallet, it does the work, and it
+      sends your inscription and your change straight back to you.
+    </p>
+    <p>
+      <b>Xtrata never holds your funds and cannot touch that wallet.</b> Nobody can, except
+      this browser. That is also why the tab needs to stay open while a job runs: your
+      browser is doing the work, not a server somewhere.
+    </p>
+    <p class="custody-small">
+      If you close the tab by accident, nothing is lost — come back and you can pick the
+      job up or ask for your money back. When the job is done the wallet is emptied and
+      its key destroyed.
+    </p>
+  </section>
+
   <!-- STAGE 1 · DROP -->
   <div id="dropzone" class="drop" role="button" tabindex="0" aria-label="Drop a file to inscribe">
     <input id="picker" type="file" multiple hidden />
@@ -508,10 +541,22 @@ try{
       <label class="checkline"><input type="radio" name="sAudioMode" value="player"><span><b>Build an on-chain player for this song</b> — Opus-optimised audio + title/artist/lyrics + artwork (the opus tool)</span></label>
       <div class="muted" id="audioFound" style="font-size:11.5px;margin-top:7px" hidden></div>
       <div id="playerRow" hidden></div>
+      <!-- The player is the thing being inscribed, so it should be playable BEFORE
+           paying for it: srcdoc means the preview is the exact bytes that go on-chain. -->
+      <div id="playerPreview" hidden style="margin-top:10px">
+        <div class="muted" style="font-size:11.5px;margin-bottom:6px">Preview — this is exactly what gets inscribed. Play it, check the artwork and lyrics, then rebuild if anything is off.</div>
+        <!-- Sandboxed, though the HTML is our own builder's output from the user's own
+             file: SUNO's equivalent frame has no sandbox at all, so this is the tighter
+             of the two. allow-same-origin stays because the player scripts expect a
+             normal document rather than an opaque origin. -->
+        <iframe id="playerPreviewFrame" title="Player preview" sandbox="allow-scripts allow-same-origin"
+                style="width:100%;aspect-ratio:1/1;border:1px solid var(--line);border-radius:12px;background:#10120f;display:block"></iframe>
+      </div>
       <div class="muted" id="playerHint" style="font-size:11.5px;margin-top:6px" hidden>
-        The audio engine runs in your browser. This page uses the single-threaded core, so a build takes
-        longer here than on the <a href="./suno.html" style="color:var(--acc2)">SUNO fast-track</a> —
-        in exchange it takes any audio file and any artwork, not just Suno exports.
+        The audio engine runs in your browser, so nothing is uploaded to build the player.
+        A build takes longer here than on the <a href="./suno.html" style="color:var(--acc2)">SUNO fast-track</a>,
+        which is allowed to use a faster multi-core version of the same engine. Both pages
+        accept any audio file and any artwork — the wait is the only difference.
       </div>
     </div>
     <input id="singleArtPicker" type="file" accept="image/*" hidden />
@@ -543,6 +588,7 @@ try{
       <div class="opts-body">
         <label>Dependencies <span class="muted">(existing token ids this inscription references, comma-separated)</span></label>
         <input id="deps" class="mono" placeholder="134, 90" />
+        <div id="depsCheck" style="margin-top:8px;font-size:12.5px;display:flex;flex-direction:column;gap:6px"></div>
         <label>Parent inscriptions <span class="muted">(token ids you own — escrowed for the mint, returned with the child)</span></label>
         <input id="parents" class="mono" placeholder="134" />
         <div id="parentsCheck" style="margin-top:8px;font-size:12.5px;display:flex;flex-direction:column;gap:4px"></div>
@@ -737,7 +783,7 @@ try{
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=2026-07-27.1"></script>
+<script src="agent-one.js?v=2026-07-27.2"></script>
 <script src="optimize-audio.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script>
@@ -1205,6 +1251,16 @@ function renderSinglePlayer(){
     +' <button class="btn ghost" id="pEditBtn" style="width:auto;margin:0;padding:4px 10px;font-size:12px">✎ Song details'+(art?(' · '+art):'')+'</button>';
   $('#pBuildBtn').onclick=()=>buildSinglePlayer();
   $('#pEditBtn').onclick=()=>openMetaEditor(null);
+  renderPlayerPreview();
+}
+// The built player, running. Only ever fed the HTML we are about to inscribe, so
+// what the user checks here and what lands on-chain cannot diverge.
+function renderPlayerPreview(){
+  const wrap=$('#playerPreview'), frame=$('#playerPreviewFrame'); if(!wrap||!frame) return;
+  const html=FLOW.playerMode&&FLOW.player&&FLOW.player.status==='ready'&&FLOW.player.info&&FLOW.player.info.html;
+  if(!html){ wrap.hidden=true; frame.removeAttribute('srcdoc'); return; }
+  if(frame.getAttribute('srcdoc')!==html) frame.srcdoc=html;   // don't restart playback on every re-render
+  wrap.hidden=false;
 }
 let singleBuildBusy=false;
 async function buildSinglePlayer(){
@@ -1336,17 +1392,21 @@ async function checkBatchParents(){
   if(bad.length){ box.innerHTML=`<span style="color:var(--bad)">Parents must be numeric token ids (fix: ${esc(bad.join(', '))}).</span>`; return; }
   if(SERVER.mock){ box.innerHTML='<span class="muted">MOCK mode — parent ownership not checked.</span>'; return; }
   const A=window.XtrataAgent;
-  if(!A||!A.ownerOf){ box.innerHTML='<span class="muted">Ownership check unavailable (old agent bundle).</span>'; return; }
+  if(!A||!A.ownerOfChecked){ box.innerHTML='<span class="muted">Ownership check unavailable (old agent bundle).</span>'; return; }
   box.innerHTML=`<div style="font-weight:600;margin-bottom:5px">Parent ownership <span class="muted" style="font-weight:400">— escrowed for the mint, returned with your inscriptions</span></div>`
     +ids.map(id=>`<div class="muted" data-bpid="${esc(id)}" style="margin:2px 0">⏳ #${esc(id)} — checking current owner…</div>`).join('')
     +`<div id="batchParentsSummary" style="margin-top:5px"></div>`;
   const owners={};
   for(const id of ids){
-    let owner=null; try{ owner=await A.ownerOf(id); }catch{ owner=null; }
+    let owner=null, ok=true;
+    // Same reason as the single-file check: a read that failed is not a token that
+    // does not exist, and only ownerOfChecked can tell the two apart.
+    try{ const r=await A.ownerOfChecked(id); ok=r.ok; owner=r.owner; }catch{ ok=false; }
     if(run!==batchParentsCheckRun) return;   // input changed mid-flight
     owners[id]=owner;
     const el=box.querySelector(`[data-bpid="${id}"]`); if(!el) continue;
-    if(owner&&WALLET&&owner===WALLET) el.innerHTML=`<span class="ok">✓ #${esc(id)} — in your connected wallet</span>`;
+    if(!ok) el.innerHTML=`<span class="muted">#${esc(id)} — could not check the owner right now; the agent re-checks before taking payment.</span>`;
+    else if(owner&&WALLET&&owner===WALLET) el.innerHTML=`<span class="ok">✓ #${esc(id)} — in your connected wallet</span>`;
     else if(!owner) el.innerHTML=`<span style="color:var(--bad)">✗ #${esc(id)} — no owner found (wrong id?)</span>`;
     else if(!WALLET) el.innerHTML=`<span style="color:var(--warn)">⚠ #${esc(id)} — owned by ${esc(shortAddr(owner))}. Connect your wallet to confirm it's yours.</span>`;
     else el.innerHTML=`<span style="color:var(--warn)">⚠ #${esc(id)} — owned by ${esc(shortAddr(owner))}, not your connected wallet.</span>`;
@@ -1533,6 +1593,45 @@ function parentList(){ return $('#parents').value.split(',').map(s=>s.trim()).fi
 function depsList(){ return $('#deps').value.split(',').map(s=>s.trim()).filter(Boolean); }
 
 // ---- live parent-ownership check: instant green/red per id as you type ----
+// A referenced inscription, shown rather than just named. /i/<id> is the same
+// content route the explorer uses, so this costs one cached request and no chain reads.
+function relThumb(id){
+  return '<span class="relthumb"><iframe src="/i/'+encodeURIComponent(id)+'" loading="lazy" title="Inscription #'+esc(id)+'" sandbox="allow-scripts" scrolling="no"></iframe></span>';
+}
+const relRow=(id,body)=>'<span class="relrow" data-rid="'+esc(id)+'">'+relThumb(id)+'<span>'+body+'</span></span>';
+
+// DEPENDENCIES are references, not escrow: nothing is held and nobody has to own
+// them. The only thing that can be wrong is the id itself — a token that does not
+// exist, or a digit typed wrong — which is exactly what a thumbnail catches.
+let depsCheckRun=0, depsCheckTimer=null;
+async function checkDeps(){
+  const box=$('#depsCheck'); if(!box) return;
+  const ids=String($('#deps').value||'').split(',').map(x=>x.trim()).filter(Boolean);
+  const run=++depsCheckRun;
+  if(!ids.length){ box.innerHTML=''; return; }
+  if(!ids.every(d=>/^\d+$/.test(d))){ box.innerHTML='<span style="color:var(--bad)">Dependencies must be numeric token ids.</span>'; return; }
+  if(new Set(ids).size!==ids.length){ box.innerHTML='<span style="color:var(--bad)">Duplicate dependency token ids.</span>'; return; }
+  if(SERVER.mock){ box.innerHTML='<span class="muted">MOCK mode — dependencies not checked.</span>'; return; }
+  const A=window.XtrataAgent;
+  if(!A||!A.ownerOfChecked){ box.innerHTML='<span class="muted">Dependency check unavailable (old agent bundle).</span>'; return; }
+  box.innerHTML=ids.map(id=>relRow(id,'<span class="muted">⏳ #'+esc(id)+' — checking it exists…</span>')).join('');
+  for(const id of ids){
+    let owner=null, ok=true;
+    // ownerOfChecked, not ownerOf: ownerOf returns null for BOTH "no such token" and
+    // "the read failed", and telling someone their id is wrong when the API was down
+    // sends them hunting for a typo that is not there.
+    try{ const r=await A.ownerOfChecked(id); ok=r.ok; owner=r.owner; }catch{ ok=false; }
+    if(run!==depsCheckRun) return;   // input changed mid-flight
+    const el=box.querySelector('[data-rid="'+id+'"] span:last-child'); if(!el) continue;
+    // A read that FAILED is not a token that does not exist — saying so would send
+    // someone hunting for a typo in a perfectly good id.
+    if(!ok) el.innerHTML='<span class="muted">#'+esc(id)+' — could not check right now; the mint will verify it.</span>';
+    else if(owner) el.innerHTML='<span class="ok">✓ #'+esc(id)+' — exists. Nothing is escrowed; you do not need to own it.</span>';
+    else el.innerHTML='<span style="color:var(--bad)">✗ #'+esc(id)+' — no such inscription. Check the token id.</span>';
+  }
+}
+$('#deps').addEventListener('input',()=>{ if(depsCheckTimer)clearTimeout(depsCheckTimer); depsCheckTimer=setTimeout(checkDeps,500); });
+
 let parentsCheckRun=0, parentsCheckTimer=null;
 async function checkParents(){
   const box=$('#parentsCheck'); if(!box) return;
@@ -1542,13 +1641,16 @@ async function checkParents(){
   if(new Set(ids).size!==ids.length){ box.innerHTML='<span style="color:var(--bad)">Duplicate parent token ids.</span>'; return; }
   if(SERVER.mock){ box.innerHTML='<span class="muted">MOCK mode — ownership not checked.</span>'; return; }
   const A=window.XtrataAgent;
-  if(!A||!A.ownerOf){ box.innerHTML='<span class="muted">Ownership check unavailable (old agent bundle).</span>'; return; }
-  box.innerHTML=ids.map(id=>`<span class="muted" data-pid="${esc(id)}">⏳ #${esc(id)} — checking current owner…</span>`).join('');
+  if(!A||!A.ownerOfChecked){ box.innerHTML='<span class="muted">Ownership check unavailable (old agent bundle).</span>'; return; }
+  box.innerHTML=ids.map(id=>relRow(id,`<span class="muted">⏳ #${esc(id)} — checking current owner…</span>`)).join('');
   for(const id of ids){
-    let owner=null; try{ owner=await A.ownerOf(id); }catch{ owner=null; }
+    let owner=null, ok=true;
+    try{ const r=await A.ownerOfChecked(id); ok=r.ok; owner=r.owner; }catch{ ok=false; }
     if(run!==parentsCheckRun) return; // input changed mid-flight
-    const el=box.querySelector(`[data-pid="${id}"]`); if(!el) continue;
-    if(owner&&WALLET&&owner===WALLET){ el.innerHTML=`<span class="ok">✓ #${esc(id)} — owned by your connected wallet</span>`; }
+    const el=box.querySelector(`[data-rid="${id}"] span:last-child`); if(!el) continue;
+    // Same rule as the escrow gate: a read we could not make says nothing either way.
+    if(!ok){ el.innerHTML=`<span class="muted">#${esc(id)} — could not check the owner right now; the agent re-checks before taking payment.</span>`; }
+    else if(owner&&WALLET&&owner===WALLET){ el.innerHTML=`<span class="ok">✓ #${esc(id)} — owned by your connected wallet</span>`; }
     else if(!owner){ el.innerHTML=`<span style="color:var(--bad)">✗ #${esc(id)} — no owner found (wrong id?)</span>`; }
     else if(!WALLET){ el.innerHTML=`<span style="color:var(--warn)">#${esc(id)} — owned by ${esc(shortAddr(owner))}. Connect your wallet to confirm it's yours.</span>`; }
     else { el.innerHTML=`<span style="color:var(--bad)">✗ #${esc(id)} — owned by ${esc(shortAddr(owner))}, not your connected wallet. Escrow would auto-refund.</span>`; }

@@ -505,7 +505,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-27.1';
+export const AGENT_BUILD = '2026-07-27.2';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -1827,6 +1827,10 @@ async function reapTick() {
   // Live owner lookup for the UI (pre-job parent validation): read-only get-owner
   // on the core contract. Returns the owner principal string or null.
   ownerOf: async (id: string) => ownerOf(String(id)),
+  // ownerOf collapses "nobody owns it" and "the read failed" into the same null, so
+  // any UI built on it tells the user their token id is wrong when the API was simply
+  // unreachable. This reports which of the two actually happened.
+  ownerOfChecked: async (id: string) => ownerOfChecked(String(id)),
   // Parent checker for the UI: who owns each declared parent right now? (connected wallet / deposit / other)
   parentInfo: async (id: string) => {
     const job = readJob(id); const out: any[] = [];
