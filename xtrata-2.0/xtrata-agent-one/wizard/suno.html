@@ -205,6 +205,13 @@
            of the rotating tips, which is easy to miss and gone a second later. -->
       <!-- keep-open banner: rendered by the shared panel (src/agent-one/ui-panels.ts) -->
       <div id="keepOpenSlot"></div>
+      <!-- Finish without me. Hidden entirely unless a handoff endpoint is configured,
+           so a half-deployed feature is never offered. Lived inside the old keep-open
+           box; it is a sibling of the slot now that the banner renders itself. -->
+      <div id="handoffRow" style="display:none;margin-top:10px;padding-top:9px;border-top:1px solid var(--line)">
+        <button id="handoffBtn" class="btn ghost" type="button" style="width:auto;margin:0;padding:5px 11px;font-size:12px">Finish this without me →</button>
+        <div class="muted" style="font-size:11px;margin-top:5px">Hands this one job to Xtrata's server so it completes while you close the tab. You will be asked to agree first.</div>
+        <div id="handoffState" class="ok" style="font-size:11.5px;margin-top:6px;display:none"></div>
       </div>
       <div id="cancelRow" style="display:none;margin-top:12px;text-align:center">
         <button id="cancelJobBtn" class="btn ghost" type="button" style="width:auto;margin:0;padding:6px 12px;font-size:12px">Stop this job &amp; refund me</button>
@@ -231,6 +238,12 @@
 <script src="agent-one.js?v=2026-07-27.4"></script>
 <script>
 const SERVER = { mock:false, net:'mainnet' };
+// Batch state, declared HERE rather than beside its helpers further down. routeDrop and
+// updateGo both read it during page load, and a `const` used before its declaration line
+// is in the temporal dead zone — where `typeof SB !== 'undefined'` does NOT save you: it
+// throws ReferenceError rather than returning 'undefined'. That is exactly what broke
+// this page on load and on the first dropped file.
+const SB={ items:[], dropped:[], active:false, busy:false, quoteRun:0, EST:null, stxUsd:null, droppedNote:'' };
 // VERSION HANDSHAKE: this page requires AT LEAST the agent bundle build below. The site's deploy
 // pipeline rebuilds agent-one.js from src/agent-one/*.ts — if that source hasn't been updated, the
 // stale agent is detected here and live inscriptions are blocked (a stale agent burns real miner
@@ -337,7 +350,7 @@ const drop=$('#drop'), picker=$('#picker');
 drop.onclick=()=>picker.click();
 // One file → the single-song fast track (unchanged). Several → batch mode. A single file
 // dropped while a batch is open is added to that batch.
-function routeDrop(fs){ fs=(fs||[]).filter(Boolean); if(!fs.length) return; if(fs.length===1&&!(typeof SB!=='undefined'&&SB.active)) pickFile(fs[0]); else enterSunoBatch(fs); }
+function routeDrop(fs){ fs=(fs||[]).filter(Boolean); if(!fs.length) return; if(fs.length===1&&!SB.active) pickFile(fs[0]); else enterSunoBatch(fs); }
 picker.onchange=()=>{ routeDrop(Array.from(picker.files||[])); picker.value=''; };
 ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag');}));
 ['dragleave','dragend','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag');}));
@@ -483,7 +496,7 @@ function parentBlockingMessage(){
 }
 // Re-quote after a parent change: each escrowed parent reserves a return-transfer fee.
 async function quoteRefresh(){
-  if(typeof SB!=='undefined'&&SB.active){ sbQuote(); return; }
+  ifSB.active{ sbQuote(); return; }
   if(!PLAYER) return;
   try{
     EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size,parentCount:parentList().length,receipt:wantReceipt()})});
@@ -493,7 +506,7 @@ async function quoteRefresh(){
 }
 
 function updateGo(){
-  if(typeof SB!=='undefined'&&SB.active){ sbUpdateGo(); return; }   // batch mode drives its own button
+  ifSB.active{ sbUpdateGo(); return; }   // batch mode drives its own button
   const b=$('#go');
   if(building){ b.disabled=true; b.textContent='Building player…'; return; }
   if(AGENT_STALE&&!SERVER.mock){ b.disabled=true; b.textContent='Agent bundle outdated — redeploy required'; return; }
@@ -870,7 +883,6 @@ function resetAll(){ FILE=null;PLAYER=null;META=null;EST=null;JOB=null; if(poll)
 // SEQUENTIALLY (the shared core runs one command at a time). Songs with no embedded cover art
 // are auto-dropped (this page's promise is "embedded artwork"); the rest each get a preview and
 // an optional artwork swap, then inscribe together for one payment + one receipt.
-const SB={ items:[], dropped:[], active:false, busy:false, quoteRun:0, EST:null, stxUsd:null, droppedNote:'' };
 let sbArtTarget=-1;
 const sbReadB64=(file)=>new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]||null); r.onerror=()=>rej(r.error); r.readAsDataURL(file); });
 const sbMib=(n)=>(n/1048576).toFixed(2);
