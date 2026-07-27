@@ -783,7 +783,7 @@ try{
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=2026-07-27.2"></script>
+<script src="agent-one.js?v=2026-07-27.3"></script>
 <script src="optimize-audio.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script>
@@ -1674,7 +1674,7 @@ async function quote(){
       <div class="kv"><span>Xtrata protocol fee</span><span>${stx(e.protocolFee)}${usd(e.protocolFee)}</span></div>
       ${BigInt(e.receiptProtocol||'0')>0n?`<div class="kv"><span>Receipt inscription</span><span>${stx(e.receiptProtocol)}${usd(e.receiptProtocol)}</span></div>`:'<div class="kv"><span>On-chain receipt</span><span class="muted">off — receipt saved locally, not inscribed</span></div>'}
       <div class="kv"><span>Network (miner) reserve</span><span>${stx((BigInt(e.minerReserve)+BigInt(e.receiptMiner||'0')).toString())}${usd((BigInt(e.minerReserve)+BigInt(e.receiptMiner||'0')).toString())}</span></div>
-      <div class="kv"><span>Agent fee (${e.agentFeePct}%)</span><span style="color:var(--acc2)">${stx(e.agentFeeUstx||'0')}${usd(e.agentFeeUstx||'0')}</span></div>
+      <div class="kv"><span>Wizard fee (${e.agentFeePct}%)</span><span style="color:var(--acc2)">${stx(e.agentFeeUstx||'0')}${usd(e.agentFeeUstx||'0')}</span></div>
       <div class="kv"><span><b>Required deposit</b></span><span><b>${stx(e.requiredUstx)}${usd(e.requiredUstx)}</b></span></div>
       <div class="muted" style="font-size:11px;margin-top:8px">Over-collected on purpose; the unused remainder is refunded on delivery.</div>`;
     $('#inscribeBtn').disabled=false;
@@ -1872,7 +1872,7 @@ async function renderJobDetail(jobId,out,isActive){
       ${(job.recipient&&job.user&&job.recipient!==job.user)?`<div class="kv"><span>Inscription${job.items?'s':''} + receipt →</span><span class="mono">${esc(job.recipient)}</span></div><div class="kv"><span>Change${(job.parents&&job.parents.length)?' + parents':''} → your wallet</span><span class="mono">${esc(job.user)}</span></div>`:(job.user?`<div class="kv"><span>${job.fastTrack?'Returns to your wallet':'Delivery address'}</span><span class="mono">${esc(job.user)}</span></div>`:(job.fastTrack?`<div class="kv"><span>Returns to</span><span class="muted">the wallet you pay from (auto-detected)</span></div>`:''))}
       ${(job.tokenId&&!job.items)?`<div class="kv"><span>Inscription token</span><span class="ok">#${esc(job.tokenId)}</span></div>`:''}
       ${job.receiptTokenId?`<div class="kv"><span>Receipt token</span><span class="ok">#${esc(job.receiptTokenId)}</span></div>`:''}
-      ${job.agentFeeUstx?`<div class="kv"><span>Agent fee (${job.agentFeePct||10}%)</span><span style="color:var(--acc2)">${stx(job.agentFeeUstx)}</span></div>`:''}
+      ${job.agentFeeUstx?`<div class="kv"><span>Wizard fee (${job.agentFeePct||10}%)</span><span style="color:var(--acc2)">${stx(job.agentFeeUstx)}</span></div>`:''}
       ${(job.refundedUstx!=null)?`<div class="kv"><span>Change refunded</span><span>${stx(job.refundedUstx||'0')}</span></div>`:''}
       ${active?`<div class="progress"><span class="spin"></span>${esc(phaseMsg||'Working…')} ${isActive?'<span id="progT" class="muted"></span>':''}${isActive?`<div class="pbar"><i id="pbarFill" style="width:${(BAR.pct||0).toFixed(1)}%"></i></div>`:''}${job.progress?`<div class="substep">${esc(job.progress)}</div>`:''}</div>`:''}
       ${active?`<div class="muted" style="margin-top:6px;font-size:12px;color:var(--ok)">🔒 Keep this tab open while the browser-held one-shot wallet is working. If it is interrupted, reopen this page in the same browser profile; the saved recovery key remains available. Don't send another payment.</div>`:''}

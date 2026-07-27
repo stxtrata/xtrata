@@ -228,7 +228,7 @@
 <script src="HTML_Template.js?v=6"></script>
 <script src="suno-build.js?v=7"></script>
 <script src="optimize-image.js?v=1"></script>
-<script src="agent-one.js?v=2026-07-27.2"></script>
+<script src="agent-one.js?v=2026-07-27.3"></script>
 <script>
 const SERVER = { mock:false, net:'mainnet' };
 // VERSION HANDSHAKE: this page requires AT LEAST the agent bundle build below. The site's deploy
@@ -237,7 +237,7 @@ const SERVER = { mock:false, net:'mainnet' };
 // fees on refund loops). Builds are date-stamped (YYYY-MM-DD.N) so a string compare orders them;
 // a NEWER deployed bundle must pass — requiring an exact match wrongly locked the page out
 // whenever the agent shipped ahead of the page.
-const XAO_MIN_AGENT_BUILD='2026-07-27.2';
+const XAO_MIN_AGENT_BUILD='2026-07-27.3';
 let AGENT_STALE=false;
 function checkAgentBuild(){
   const b=window.XAO_AGENT_BUILD||null;
@@ -841,7 +841,7 @@ function done(job){
     '<div style="background:linear-gradient(180deg,#0f1f17,#0c1812);border:1px solid #1f5a45;border-radius:12px;padding:14px 16px;margin:14px 0">'+
       (R.depositReceived!=null?'<div class="kv"><span>Deposit you paid</span><span>'+both(R.depositReceived)+'</span></div>':'')+
       (job.refundedUstx!=null?'<div class="kv"><span>Unused funds refunded to you</span><span class="ok">'+both(job.refundedUstx||'0')+'</span></div>':'')+
-      '<div class="muted" style="font-size:11px;margin:4px 0 8px">The deposit is over-collected to guarantee fees; everything not spent on the inscription, receipt, network fees and the agent fee comes straight back to your wallet.</div>'+
+      '<div class="muted" style="font-size:11px;margin:4px 0 8px">The deposit is over-collected to guarantee fees; everything not spent on the inscription, receipt, network fees and the wizard fee comes straight back to your wallet.</div>'+
       (paidU!=null?('<div class="kv" style="border-top:1px solid #1f5a45;padding-top:10px"><span style="font-weight:700;color:var(--ink)">Final price to immortalise this song</span>'+
         '<span style="text-align:right"><span style="display:block;font-weight:800;font-size:19px;color:var(--acc)">'+(usd(paidU)||stx(paidU))+'</span>'+
         (usd(paidU)?('<span class="muted" style="font-size:12px">'+stx(paidU)+'</span>'):'')+'</span></div>'):'')+

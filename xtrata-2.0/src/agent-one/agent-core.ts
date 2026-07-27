@@ -505,7 +505,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-27.2';
+export const AGENT_BUILD = '2026-07-27.3';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -700,7 +700,7 @@ ${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
 ${row('Xtrata protocol fee', stxr(d.xtrataProtocol) + usd(d.xtrataProtocol))}
 ${row('Receipt inscription', stxr(d.receiptProtocol) + usd(d.receiptProtocol))}
 ${row('Network (miner) fee', stxr(d.networkFee) + usd(d.networkFee))}
-<div class="fee">${row('Agent fee (' + d.agentFeePct + '%)', stxr(d.agentFee) + usd(d.agentFee))}</div>
+<div class="fee">${row('Wizard fee (' + d.agentFeePct + '%)', stxr(d.agentFee) + usd(d.agentFee))}</div>
 ${row('Change returned to you', stxr(d.changeReturned) + usd(d.changeReturned))}
 ${d.note ? row('Note', escHtml(d.note)) : ''}
 <div class="tot">${row('Total paid', stxr(d.totalPaid) + usd(d.totalPaid))}</div>` : `<h1>Outcome</h1>
@@ -1354,7 +1354,7 @@ ${row('Deposit received', stxr(d.depositReceived) + usd(d.depositReceived))}
 ${row('Xtrata protocol fees (' + d.counts.minted + ' mints)', stxr(d.xtrataProtocol) + usd(d.xtrataProtocol))}
 ${row('Receipt inscription', stxr(d.receiptProtocol) + usd(d.receiptProtocol))}
 ${row('Network (miner) fee', stxr(d.networkFee) + usd(d.networkFee))}
-<div class="fee">${row('Agent fee (' + d.agentFeePct + '%)', stxr(d.agentFee) + usd(d.agentFee))}</div>
+<div class="fee">${row('Wizard fee (' + d.agentFeePct + '%)', stxr(d.agentFee) + usd(d.agentFee))}</div>
 ${row('Change returned', stxr(d.changeReturned) + usd(d.changeReturned))}
 <div class="tot">${row(ok ? 'Total paid' : 'Returned to you', stxr(ok ? d.totalPaid : d.changeReturned) + usd(ok ? d.totalPaid : d.changeReturned))}</div>
 <div class="foot">Core ${d.core} · job ${d.jobId}${d.stxUsd ? ' · STX $' + d.stxUsd : ''} · one payment, ${d.counts.total} inscriptions · settled on Bitcoin via Stacks</div>

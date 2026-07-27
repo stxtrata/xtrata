@@ -110,6 +110,32 @@ describe('what the receipt actually renders', () => {
     expect(html).not.toContain('Agent One');
   });
 
+  it('calls it the Wizard fee, and only in the wording', async () => {
+    // The label moved from "Agent fee" to "Wizard fee". The DATA KEYS behind it did
+    // not: agentFeePct / agentFeeUstx / agentFeeTx / agentFeeAddress are persisted on
+    // every job in localStorage and read back by receipts and recovery, so renaming
+    // them would strand jobs that were created before the change.
+    const html = await render(undefined);
+    expect(html).toContain('Wizard fee (');
+    expect(html).not.toContain('Agent fee');
+  });
+
+  it('still reads the fee from the unchanged agentFee* fields', async () => {
+    const { FakeChain, loadAgent, unloadAgent } = await import('./support/fake-chain');
+    const agent: any = await loadAgent(new FakeChain());
+    const html = agent.buildReceiptHtml({
+      jobId: 'job-1', core: 'xtrata-v3-2-3', date: new Date(0).toISOString(),
+      outcome: 'inscribed', uri: 'x', mime: 'text/html', bytes: 100, tokenId: '1',
+      depositReceived: '1000', xtrataProtocol: '1', receiptProtocol: '0',
+      networkFee: '1', changeReturned: '0', totalPaid: '1',
+      // the two fields the label is built from, exactly as jobs persist them
+      agentFeePct: 10, agentFee: '56000'
+    });
+    unloadAgent();
+    expect(html).toContain('Wizard fee (10%)');
+    expect(html).toContain('0.056');
+  });
+
   it('says SUNO More when the job came from there', async () => {
     const html = await render('suno');
     expect(html).toContain('<title>Xtrata SUNO More — Receipt job-1</title>');

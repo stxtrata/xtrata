@@ -6602,10 +6602,19 @@
 
       const activate = (record) => {
         if (record.active || !record.frame.isConnected) return;
-        record.frame.srcdoc = injectGridThumbnailHtml(record.html);
         record.active = true;
         record.activatedAt = now();
-        if (record.poster) record.poster.hidden = true;
+        // The poster stays up until the frame has LOADED, not merely until srcdoc was
+        // assigned. Many inscriptions are a tiny loader that pulls the real engine from
+        // /i/<id> over the network, and their document sets no background — so between
+        // assignment and first paint the browser shows its default white page. Dropping
+        // the poster on assignment is what made scrolling flash white boxes.
+        const reveal = () => { if (record.active && record.poster) record.poster.hidden = true; };
+        record.frame.addEventListener('load', reveal, { once: true });
+        record.frame.srcdoc = injectGridThumbnailHtml(record.html);
+        // Belt and braces: a frame that never fires load must not leave a poster stuck
+        // over working content.
+        setTimeout(reveal, 4000);
       };
 
       const deactivate = (record) => {
@@ -6759,6 +6768,19 @@
           requestActivation(record);
         }
       };
+
+      // A tab that was hidden while the grid rendered gets NO IntersectionObserver
+      // callbacks at all, so every tile stays on its poster with nothing to nudge it.
+      // Re-observing on the way back delivers fresh entries for whatever is on screen.
+      if (typeof document !== 'undefined' && document.addEventListener) {
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState !== 'visible' || !observer) return;
+          tiles.forEach((_record, element) => {
+            observer.unobserve(element);
+            observer.observe(element);
+          });
+        });
+      }
 
       const reset = () => {
         if (observer) {
@@ -12614,16 +12636,17 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         );
         if (!slot) return;
         if (media?.kind === 'html-live') {
-          const frame = document.createElement('iframe');
-          frame.className = 'market-thumb__frame';
-          frame.title = `Inscription #${drop.tokenId} preview`;
-          frame.sandbox = 'allow-scripts';
-          frame.referrerPolicy = 'no-referrer';
-          frame.loading = 'lazy';
-          frame.setAttribute('scrolling', 'no');
-          frame.srcdoc = media.html;
-          slot.replaceChildren(frame);
+          // Each of these is not a picture but a live app: the inscription is usually a
+          // small loader that pulls a full engine from /i/<id> and runs it. Building the
+          // iframe here by hand meant every visible drop ran one, uncapped, with nothing
+          // to show while it loaded — hence the white boxes when scrolling.
+          //
+          // liveHtmlFrameManager is the machinery that already solves this for the market
+          // grid: it gates execution to the viewport, caps concurrent frames at
+          // MAX_LIVE_HTML_FRAMES, and keeps a poster up until the frame has loaded.
+          slot.replaceChildren();
           slot.classList.add('market-thumb--media');
+          liveHtmlFrameManager.register(slot, media, { gated: false });
         } else if (media?.kind === 'text') {
           const pre = document.createElement('div');
           pre.className = 'market-thumb__snippet';
