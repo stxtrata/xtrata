@@ -160,6 +160,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
   };
 
   const VU_BANDS = [[1, 3], [3, 6], [6, 12], [12, 24], [24, 48], [48, 96]];
+  let vuBins = null;   // scratch buffer for getByteFrequencyData, reused every frame
   const vuLoop = () => {
     vuFrame = 0;
     if (!analyser || player.paused || player.ended) {
@@ -171,7 +172,10 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
       if (vuLevels.some((v) => v > 0.02)) vuFrame = window.requestAnimationFrame(vuLoop);
       return;
     }
-    const bins = new Uint8Array(analyser.frequencyBinCount);
+    // Reused, not reallocated: this runs on every animation frame while music plays,
+    // so a fresh typed array here was ~60 allocations a second for no reason.
+    if (!vuBins || vuBins.length !== analyser.frequencyBinCount) vuBins = new Uint8Array(analyser.frequencyBinCount);
+    const bins = vuBins;
     analyser.getByteFrequencyData(bins);
     // Silence detector: a "playing" track with no signal for 8s has no usable
     // audio (e.g. a video-only mp4). Mark it a dud and retune.
@@ -808,12 +812,22 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
       }
     } catch { /* stay curated-only */ }
   };
-  void discoverRange();
-  void fetchPlayable();
+  // Deferred to idle rather than run at module load. The radio is docked in the header
+  // of every page, so these two requests were on the critical path of every page view —
+  // for a feature most visits never touch. Idle keeps the pool warm (so the first tap
+  // still starts fast) without competing with the page the user actually came for.
+  const primePools = () => { void discoverRange(); void fetchPlayable(); };
+  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(primePools, { timeout: 4000 });
+  else window.setTimeout(primePools, 1200);
   // Keep the dial aware of new mints: an open tab re-reads the indexed song list
   // (and the contract ceiling as fallback) every 5 minutes, so a freshly
   // inscribed song becomes playable without a reload.
-  window.setInterval(() => { void fetchPlayable(); void discoverRange(); }, 5 * 60 * 1000);
+  window.setInterval(() => {
+    // Nothing can be observed in a hidden tab, and the next tick after it comes back
+    // picks up anything new. Skipping keeps a backgrounded tab off the network.
+    if (typeof document !== 'undefined' && document.hidden) return;
+    void fetchPlayable(); void discoverRange();
+  }, 5 * 60 * 1000);
   // STUCK-WATCHDOG: if the radio is switched on but silent for >20 s with no
   // tune in flight, no user pause, and a prior user gesture (autoplay policy),
   // retune automatically — the dial recovers by itself instead of needing a
@@ -1180,7 +1194,11 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
       if (trackOverride) {
         track = trackOverride;
         trackOverride = null;
-      } else if (preloadQueue.length) {
+      } else if (preloadQueue.length && !forcedNext) {
+        // NOT when a specific song was asked for. Clicking a track in Your Station sets
+        // forcedNext, but the preload queue was consulted FIRST — so the cued track
+        // played and the clicked one only came round on the following change. From the
+        // outside that is simply "it jumps to the wrong song".
         track = preloadQueue.shift();    // cued ahead of time — instant
         // A track cued before the current song settled can be stale. In normal
         // (non-loop) play, never let it be the song already on air — that would
@@ -1422,7 +1440,14 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
     setLoop, toggleLoop: () => setLoop(!player.loop),
     getState: () => stateSnapshot(),
     unlike: (id) => { likes = likes.filter((l) => l.tokenId !== String(id)); saveLikes(likes); emit(); },
-    playToken: (id) => { forcedNext = String(id); if (!on) { switchOn(); } else { player.pause(); void tuneToNextTrack(); } },
+    playToken: (id) => {
+      forcedNext = String(id);
+      // Anything cued was chosen to follow the PREVIOUS song, so it is stale the moment
+      // the listener jumps somewhere else. Dropping it costs one preload, and keeps
+      // "what plays after this" honest rather than a leftover from the old sequence.
+      preloadQueue.length = 0;
+      if (!on) { switchOn(); } else { player.pause(); void tuneToNextTrack(); }
+    },
     nudgeVolume,
     subscribe: (cb) => { listeners.add(cb); cb(stateSnapshot()); return () => listeners.delete(cb); }
   };
