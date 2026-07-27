@@ -783,7 +783,7 @@ try{
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=2026-07-27.3"></script>
+<script src="agent-one.js?v=2026-07-27.4"></script>
 <script src="optimize-audio.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script>
@@ -1885,7 +1885,7 @@ async function renderJobDetail(jobId,out,isActive){
         <button class="btn good" onclick="act('run','${esc(job.jobId)}')" ${(funded&&st==='AWAITING_DEPOSIT')?'':'disabled'}>Run inscription</button>
         <button class="btn warn" onclick="act('deliver','${esc(job.jobId)}')" ${st==='INSCRIBED'?'':'disabled'}>Deliver + refund + wipe key</button>
       </div><div class="err" id="jobErr"></div>`:''}
-      ${(st==='COMPLETE'||st==='COMPLETE_WITH_SKIPS')?`<div class="ok" style="margin-top:12px">✓ ${job.items?`Batch complete — ${job.items.filter(i=>i.tokenId).length}/${job.items.length} inscriptions${job.receipt===false?'':' + the batch receipt'} delivered${job.fastTrack?' to your wallet':''}${st==='COMPLETE_WITH_SKIPS'?` (${job.items.filter(i=>i.status==='FAILED').length} failed / ${job.items.filter(i=>i.status==='SKIPPED').length} skipped — their cost came back as change)`:''}`:`Complete — inscription${job.receipt===false?'':' + receipt'} delivered${job.fastTrack?' to your wallet':''}`}${(job.parents&&job.parents.length)?`, parent${job.parents.length>1?'s':''} #${job.parents.map(esc).join(', #')} returned to your wallet`:''}, change refunded, deposit key wiped.</div>
+      ${(st==='COMPLETE'||st==='COMPLETE_WITH_SKIPS')?`<div class="ok" style="margin-top:12px">✓ ${job.items?`Batch complete — ${job.items.filter(i=>i.tokenId).length}/${job.items.length} inscriptions${job.receiptTokenId?' + the batch receipt':''} delivered${job.fastTrack?' to your wallet':''}${st==='COMPLETE_WITH_SKIPS'?` (${job.items.filter(i=>i.status==='FAILED').length} failed / ${job.items.filter(i=>i.status==='SKIPPED').length} skipped — their cost came back as change)`:''}`:`Complete — inscription${job.receiptTokenId?' + receipt':''} delivered${job.fastTrack?' to your wallet':''}`}${(job.parents&&job.parents.length)?`, parent${job.parents.length>1?'s':''} #${job.parents.map(esc).join(', #')} returned to your wallet`:''}, change refunded${job.keepKey?'':', deposit key wiped'}.${job.keepKey?`<div class="muted" style="margin-top:6px;font-size:12px">The deposit key is being kept — ${esc(job.keepKeyReason||'something still needs finishing')}.</div>`:''}</div>
       <div class="btnrow"><button class="btn" onclick="viewReceipt('${esc(job.jobId)}')">View receipt</button>
         ${job.tokenId?`<a class="btn ghost" style="text-decoration:none;display:inline-block" href="/x/${esc(job.tokenId)}" target="_blank" rel="noopener">View on Xplorer</a>`:''}
         ${isActive?`<button class="btn alt" onclick="resetFlow()">Inscribe another file</button>`:`<button class="btn ghost" onclick="act('delete','${esc(job.jobId)}')">Delete job</button>`}</div>`:''}
@@ -1897,6 +1897,16 @@ async function renderJobDetail(jobId,out,isActive){
       <div class="muted" style="margin-top:8px;font-size:12px">Recovery returns every inscription first, verifies the escrow wallet is NFT-empty, then refunds the remaining STX to the recorded payer. No receipt or new inscription is created.</div>
       ${/NotEnoughFunds|insufficient funds/i.test(job.error||'')?`<div class="muted" style="margin-top:8px;font-size:12px;color:var(--warn)">The recovery wallet needs a small STX top-up to pay the NFT transfer fee. Copy the address above, top it up, then run recovery again.</div>`:''}
       <div class="btnrow"><button class="btn good" onclick="act('recover','${esc(job.jobId)}')">Recover inscriptions + STX now</button></div><div class="err" id="jobErr"></div>`:''}
+      ${st==='NEEDS_FUNDS'?`<div style="margin-top:12px;padding:11px 13px;border:1px solid var(--warn);border-radius:10px;font-size:12.5px">
+        <b>Paused — this job needs more STX to finish.</b>
+        <div class="muted" style="margin-top:5px">${esc(job.keepKeyReason||'')}</div>
+        ${(job.partialUpload&&job.partialUpload.length)?`<div class="muted" style="margin-top:5px">Already uploaded: ${job.partialUpload.map(p=>esc(String(p.uploaded))+(p.total?('/'+esc(String(p.total))):'')+' chunks').join(', ')}. Those chunks are paid for and only this wallet can seal them.</div>`:''}
+        <div class="kv" style="margin-top:8px"><span>Top up this wallet ${copyBtn(job.depositAddress)}</span><span class="mono">${esc(job.depositAddress)}</span></div>
+        <div class="btnrow" style="margin-top:8px">
+          <button class="btn good" onclick="act('run','${esc(job.jobId)}')">I've topped it up — carry on</button>
+          <button class="btn ghost" onclick="act('discard','${esc(job.jobId)}')">Clear this job</button>
+        </div>
+        <div class="err" id="jobErr"></div></div>`:''}
     </div>`;
   }catch(e){ /* transient read (job file mid-write) — keep polling */ }
 }
@@ -1960,6 +1970,37 @@ async function act(which,jobId){
     const minted=mintedIds.length;
     const dest=j.funder||j.expectedFunder||j.user||'the verified payer';
     if(!confirm(`Start on-chain recovery now?\n\nThis broadcasts transfers for ${minted} known inscribed token${minted===1?'':'s'}${mintedIds.length?' (#'+mintedIds.join(', #')+')':''} to ${dest}, then sweeps the remaining STX only after the wallet is confirmed NFT-empty. The uninscribed batch items will not be minted or charged.\n\nKeep this tab open until recovery completes.`)) return;
+  }
+  if(which==='discard'){
+    // Destroying the key is the one action here that CANNOT be undone: the chunks
+    // already on-chain can only ever be sealed by this wallet. So the dialog names
+    // exactly what is being given up, and the agent independently refuses if any
+    // STX or inscription is still sitting there.
+    const A=window.XtrataAgent;
+    let chk=null;
+    try{ chk=await A.discardCheck(id); }
+    catch(e){ alert('Could not check the wallet before clearing: '+((e&&e.message)||e)); return; }
+    if(!chk.safe){
+      alert(chk.unknown
+        ? 'Cannot clear this job yet — '+chk.reasons.join('; ')+'.\n\nThe wallet has to be confirmed empty before its key is destroyed. Try again in a moment.'
+        : 'Cannot clear this job yet:\n\n• '+chk.reasons.join('\n• ')+'\n\nRun recovery first, then clear it.');
+      return;
+    }
+    const lost=(chk.partial||[]).map(p=>p.uploaded+(p.total?('/'+p.total):'')+' chunks'+(p.uri?(' of '+p.uri):'')).join(', ');
+    const sure=await confirmDanger({
+      title:'Clear this job for good?',
+      body:(lost?('You have already paid to put '+lost+' on-chain. Only this deposit wallet can ever finish them, so clearing the job abandons that work permanently — a new job would start from scratch and pay again. '):'')
+        +'Your wallet is empty: all change and inscriptions are already back with you. Clearing destroys the deposit key and removes this job from the list. This cannot be undone.',
+      confirmLabel:'Clear it and destroy the key', cancelLabel:'Keep the job'
+    });
+    if(!sure) return;
+    try{
+      await A.discardJob(id,'i-accept-losing-the-unfinished-upload');
+      if(selJob===id){ selJob=null; $('#jobDetail').innerHTML=''; }
+      if(FLOW.jobId===id){ FLOW.jobId=null; $('#activeJobDetail').innerHTML=''; clearKeepOpen(); }
+      loadJobs();
+    }catch(e){ const errEl=$('#jobErr'); if(errEl){errEl.textContent=e.message;} else alert(e.message); }
+    return;
   }
   if(which==='delete'){
     if(!confirm('Delete this job from the list?\nThe inscription stays on-chain — this only removes the local record + receipt.')) return;
