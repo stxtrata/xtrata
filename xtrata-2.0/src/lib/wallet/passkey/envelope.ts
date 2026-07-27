@@ -85,7 +85,16 @@ const deriveKey = async (prfOutput: Uint8Array): Promise<CryptoKey> => {
   );
 };
 
-/** Encrypt a seed under the passkey's PRF secret. */
+/**
+ * Encrypt a seed under the passkey's PRF secret.
+ *
+ * CALLER INVARIANT: only ever call this with a PRF output obtained from a live
+ * round-trip on the credential you are about to seal against. A passkey can be
+ * created successfully and still fail its first PRF call (observed on iPhone
+ * Edge, 2026-07-27 — iOS Stolen Device Protection). Sealing against an unproven
+ * credential risks a funded wallet that cannot be opened. See
+ * docs/PASSKEY-WALLET.md §3.1.
+ */
 export const sealSeed = async (seed: Uint8Array, prfOutput: Uint8Array): Promise<SealedSeed> => {
   const key = await deriveKey(prfOutput);
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));

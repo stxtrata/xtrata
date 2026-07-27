@@ -3,9 +3,10 @@
 Goal: let someone use Xtrata from ordinary Safari or Chrome on a phone, with
 Face ID, without installing Xverse or Leather and without their in-app browser.
 
-Status: **spike in progress.** Desktop Chrome passes end to end. iPhone Safari
-is the gate that decides whether the design ships. Nothing here is wired into
-the app yet — Xverse and Leather remain the only live connect paths.
+Status: **spike passed — GO.** Desktop Chrome and all four iPhone browsers pass
+end to end, including reload survival (§3). Nothing here is wired into the app
+yet — Xverse and Leather remain the only live connect paths, and must stay that
+way until the sandboxed wallet origin exists (§7.1).
 
 ## 1. A passkey cannot sign a Stacks transaction
 
@@ -58,14 +59,45 @@ ending in a GO/NO-GO verdict per device.
 | Device | Result | Date |
 | --- | --- | --- |
 | Desktop Chrome 150 (macOS) | **GO** — all 5 pass, including reload survival | 2026-07-27 |
-| iPhone Safari | not yet run — **this is the gate** | |
+| iPhone Safari 26.5.2 (iOS 18.7) | **GO** — all 5 pass | 2026-07-27 |
+| iPhone Chrome 150 | **GO** — all 5 pass | 2026-07-27 |
+| iPhone Firefox 153 | **GO** — all 5 pass | 2026-07-27 |
+| iPhone Edge 150 | **GO** on retry — see §3.1 | 2026-07-27 |
 | iPad Safari | not yet run | |
 | Desktop Safari | not yet run | |
 
-Desktop Chrome is the friendliest environment there is; a pass there is
-necessary, not sufficient. Note also that the recorded run did not capture
-**which authenticator** was chosen (iCloud Keychain vs Chrome's own profile
-store). Only an iCloud Keychain pass predicts iPhone behaviour.
+**Verdict: GO.** The design is viable — proceed with the self-hosted route.
+
+Read the iOS coverage honestly: Apple requires every iOS browser to use WebKit,
+so those four are four shells over one engine and one keychain. Strong for iOS,
+but one implementation, not four. Desktop Safari and Android remain unsampled.
+
+### 3.1 The Edge failure, and the invariant it bought
+
+iPhone Edge failed step 3 with `NotAllowedError`, immediately after step 2 had
+created the passkey successfully. An identical retry passed everything. The
+cause was **iOS Stolen Device Protection** — active away from a familiar
+location, it delays or blocks exactly this operation. Environmental and
+transient, not a browser limitation.
+
+But note the sequence: **credential created, PRF then failed.** Had we sealed a
+seed against that credential and the user funded it, the funds would have been
+behind a passkey that would not open, recoverable only from the 24 words.
+
+**Rule: never seal a seed against a credential whose PRF is unproven.**
+Create the passkey → run a live PRF round-trip → only then generate and seal the
+seed. If PRF fails, discard the credential and start over; nothing is lost,
+because no wallet exists yet. Enforce this in the WebAuthn wrapper (§7.2) — it
+is the ordering that makes the difference between a retry and a lost wallet.
+
+Corollary: `NotAllowedError` is **not** a capability verdict. It covers a
+cancelled prompt, a timeout and Stolen Device Protection alike. Treat it as
+retryable; never record it as "this device cannot do passkeys". The canary was
+wrong about this on the first run and now says "retry" instead.
+
+Second corollary: the 24 words are not optional, and this is the scenario that
+proves it. They must be shown and confirmed before any funds can reach the
+wallet.
 
 ### Gotchas found while testing
 
@@ -139,6 +171,8 @@ relocated to addresses their owners cannot reach. Fix the code, never the vector
 
 1. Sandboxed wallet origin + postMessage bridge (**blocker for shipping**).
 2. WebAuthn ceremony wrapper — the canary proves it, the app has no wrapper yet.
+   Must enforce the §3.1 ordering: prove PRF on the credential *before* any seed
+   is generated or sealed, and treat `NotAllowedError` as retryable.
 3. Ciphertext blob storage endpoint.
 4. Registration as a third provider behind the existing `connectWallet` seam.
 5. Wiring to the sponsor relay so a fresh, STX-empty passkey wallet can transact.

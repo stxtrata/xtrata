@@ -264,7 +264,18 @@
     try {
       a = await evalPrf(PRF_SALT);
     } catch (err) {
-      bad(`PRF unavailable: ${err.message}`);
+      bad(`PRF unavailable: ${err.name} — ${err.message}`);
+      // NotAllowedError is NOT a capability verdict. It covers a cancelled
+      // prompt, a timeout, and iOS Stolen Device Protection kicking in away
+      // from a familiar location — all transient. Observed on iPhone Edge
+      // 2026-07-27, where an identical retry passed every test.
+      if (err.name === 'NotAllowedError') {
+        log('→ transient, not a device verdict: cancelled prompt, timeout, or', 'l-warn');
+        log('  iOS Stolen Device Protection. Try again before concluding anything.', 'l-warn');
+        delete results.prf; // inconclusive — `in` must not see it, or verdict() reads NO-GO
+        status('PRF interrupted — retry');
+        return false;
+      }
       log('This device cannot host a self-hosted passkey wallet.', 'l-err');
       results.prf = false;
       return false;
