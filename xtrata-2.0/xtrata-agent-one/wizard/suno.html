@@ -496,7 +496,7 @@ function parentBlockingMessage(){
 }
 // Re-quote after a parent change: each escrowed parent reserves a return-transfer fee.
 async function quoteRefresh(){
-  ifSB.active{ sbQuote(); return; }
+  if(SB.active){ sbQuote(); return; }
   if(!PLAYER) return;
   try{
     EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size,parentCount:parentList().length,receipt:wantReceipt()})});
@@ -506,7 +506,7 @@ async function quoteRefresh(){
 }
 
 function updateGo(){
-  ifSB.active{ sbUpdateGo(); return; }   // batch mode drives its own button
+  if(SB.active){ sbUpdateGo(); return; }   // batch mode drives its own button
   const b=$('#go');
   if(building){ b.disabled=true; b.textContent='Building player…'; return; }
   if(AGENT_STALE&&!SERVER.mock){ b.disabled=true; b.textContent='Agent bundle outdated — redeploy required'; return; }
