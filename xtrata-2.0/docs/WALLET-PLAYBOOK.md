@@ -165,9 +165,16 @@ one in between). Without this the wallet simply never opens.
    — all suites green, no assertions weakened.
 2. Rebuild BOTH wizard bundles: `npx vite build -c vite.agent-one-wallet.config.ts`
    and `npx vite build -c vite.agent-one.config.ts`, then `npx vite build`.
-3. Bump `agent-one.js?v=<n>` in `xtrata-agent-one/wizard/{index,manifests,suno}.html`
-   (all three MUST match — the cache-bust test enforces it) and sync
-   `dist/wizard/`.
+3. Bump the build stamp. `AGENT_BUILD` in `src/agent-one/agent-core.ts` is the
+   source of truth (`YYYY-MM-DD.N`); `deploy-freshness.test.ts` requires every
+   `agent-one.js?v=` in `xtrata-agent-one/wizard/{index,manifests,suno}.html` to
+   equal it, and suno's `XAO_MIN_AGENT_BUILD` to be no newer than it. That is
+   **five** references across four files, not three. Then sync `dist/wizard/`.
+
+   Bump it whenever the bundle's behaviour or API surface changes, not only for
+   wallet work: a stale buster leaves the browser on an old bundle, which
+   presents as a feature reporting itself "unavailable (old agent bundle)"
+   rather than as an error.
 4. Update `CHANGELOG-2.0.md`.
 5. Manual canary after ANY Xverse/Leather extension update: connect (expect the
    wallet chooser, then Xverse's account picker), pay a small STX transfer from

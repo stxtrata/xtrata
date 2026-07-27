@@ -1,5 +1,39 @@
 # xtrata-2.0 — working notes
 
+## Before touching wallet code: read the playbook
+
+**`docs/WALLET-PLAYBOOK.md` is the single source of truth for wallet connect and
+signing.** Every rule in it was paid for with a production or staging incident, and
+most exist because the *obvious* implementation breaks in a way types and unit tests
+cannot catch. Do not "tidy" wallet code that looks redundant without reading it first.
+
+The short version of what is locked down, so it is recognisable when you meet it:
+
+- **Xverse has two bridges** and the request shape must follow the bridge. Sending
+  BitcoinProvider's minimal `{recipient, amount, memo}` shape down the StacksProvider
+  route caused the July 21 production mismatch loop.
+- **Never send `sender` on `stx_callContract`.** Xverse mobile reads it as "sign as
+  this address", compares against its own sometimes-empty record, and rejects before
+  any UI with "requesting signature from a different address. (undefined)".
+- **Never use `stx_getAccounts` in the Xverse preflight.** It opens a "Mismatched
+  Network" prompt that surfaces to users as a network mismatch. The order is
+  cache → `wallet_getAccount` (30s cap) → `wallet_connect`, and the fallback-order
+  test locks it.
+- **Detect providers on the TOP same-origin window.** The embedded wizard is an
+  iframe, extensions inject into the top window only, and @stacks/connect's Asigna
+  shim defines itself in every iframe — so detecting locally shows Asigna as the only
+  wallet and hides the real ones.
+- **The chooser opens on every connect**, and Xverse gets a best-effort
+  `wallet_disconnect` first, or it silently reuses the previous account.
+- **A confirmed account that disagrees with the post-conditions aborts the call.**
+  Never silently re-target a transaction.
+
+Enforced by `src/lib/wallet/__tests__/` and
+`src/agent-one/__tests__/wallet-payment.test.ts`. A failure there means a rule is
+being violated: fix the code, never weaken the test. The playbook's §10 is the ship
+checklist for any wallet change, including the manual desktop-and-mobile canary that
+§1–§3 all originated from.
+
 ## Contract versions: newest only
 
 **The app talks to exactly one version of each contract — the newest one. Older
