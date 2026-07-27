@@ -6602,19 +6602,10 @@
 
       const activate = (record) => {
         if (record.active || !record.frame.isConnected) return;
+        record.frame.srcdoc = injectGridThumbnailHtml(record.html);
         record.active = true;
         record.activatedAt = now();
-        // The poster stays up until the frame has LOADED, not merely until srcdoc was
-        // assigned. Many inscriptions are a tiny loader that pulls the real engine from
-        // /i/<id> over the network, and their document sets no background — so between
-        // assignment and first paint the browser shows its default white page. Dropping
-        // the poster on assignment is what made scrolling flash white boxes.
-        const reveal = () => { if (record.active && record.poster) record.poster.hidden = true; };
-        record.frame.addEventListener('load', reveal, { once: true });
-        record.frame.srcdoc = injectGridThumbnailHtml(record.html);
-        // Belt and braces: a frame that never fires load must not leave a poster stuck
-        // over working content.
-        setTimeout(reveal, 4000);
+        if (record.poster) record.poster.hidden = true;
       };
 
       const deactivate = (record) => {
@@ -12636,17 +12627,26 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         );
         if (!slot) return;
         if (media?.kind === 'html-live') {
-          // Each of these is not a picture but a live app: the inscription is usually a
-          // small loader that pulls a full engine from /i/<id> and runs it. Building the
-          // iframe here by hand meant every visible drop ran one, uncapped, with nothing
-          // to show while it loaded — hence the white boxes when scrolling.
+          // REVERTED to rendering the frame directly. Routing these through
+          // liveHtmlFrameManager was correct in principle — it caps concurrent live
+          // frames and shows a poster — but it gates execution on an
+          // IntersectionObserver, and on the live Claim page the tiles never
+          // activated: every card sat on "TAP TO LOAD" and the page looked empty.
           //
-          // liveHtmlFrameManager is the machinery that already solves this for the market
-          // grid: it gates execution to the viewport, caps concurrent frames at
-          // MAX_LIVE_HTML_FRAMES, and keeps a poster up until the frame has loaded.
-          slot.replaceChildren();
+          // Rendering unconditionally is what shipped for months and works. The white
+          // flash while a nested /i/<id> engine loads is a cosmetic problem and is NOT
+          // worth risking a blank page over. Any retry has to keep the frame rendering
+          // by default and only ADD a poster behind it, never gate on the observer.
+          const frame = document.createElement('iframe');
+          frame.className = 'market-thumb__frame';
+          frame.title = `Inscription #${drop.tokenId} preview`;
+          frame.sandbox = 'allow-scripts';
+          frame.referrerPolicy = 'no-referrer';
+          frame.loading = 'lazy';
+          frame.setAttribute('scrolling', 'no');
+          frame.srcdoc = media.html;
+          slot.replaceChildren(frame);
           slot.classList.add('market-thumb--media');
-          liveHtmlFrameManager.register(slot, media, { gated: false });
         } else if (media?.kind === 'text') {
           const pre = document.createElement('div');
           pre.className = 'market-thumb__snippet';
