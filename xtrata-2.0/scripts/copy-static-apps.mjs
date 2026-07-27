@@ -41,6 +41,10 @@ const staticApps = [
   {
     source: 'recursive-apps/22-wallet-canary',
     target: 'dist/wallet-canary'
+  },
+  {
+    source: 'recursive-apps/23-passkey-canary',
+    target: 'dist/passkey-canary'
   }
 ];
 

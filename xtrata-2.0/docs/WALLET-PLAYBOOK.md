@@ -11,6 +11,13 @@ Enforced by tests: `src/lib/wallet/__tests__/connect.test.ts`,
 `src/agent-one/__tests__/wallet-payment.test.ts`. If one of those fails, a rule
 below is being violated — fix the code, never weaken the test.
 
+**Scope:** this file covers the Xverse and Leather extension/in-app-browser
+paths, which are the only live connect routes. A third route — a self-hosted
+passkey wallet needing no extension and no wallet app — is being spiked
+separately; see [PASSKEY-WALLET.md](PASSKEY-WALLET.md). None of the rules below
+apply to it, because it does not negotiate with a third-party provider. Nothing
+from that spike is wired into `connectWallet` yet.
+
 ## 1. Xverse has separate request and legacy transaction bridges
 
 Xverse exposes a Sats Connect/WBIP BitcoinProvider for account connection and
