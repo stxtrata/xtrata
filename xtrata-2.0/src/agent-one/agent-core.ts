@@ -551,7 +551,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-27.7';
+export const AGENT_BUILD = '2026-07-27.8';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -924,7 +924,7 @@ async function pendingQueue(addr: string): Promise<Array<{ nonce: bigint; fee: b
  * afterwards at proper fees. Replacing rather than appending is the only thing that can
  * unblock a queue, because the front of it is what everything else is waiting on.
  */
-async function unstickQueue(key: string, addr: string, onProg: (m: string) => void) {
+async function unstickQueue(job: any, key: string, addr: string, onProg: (m: string) => void) {
   const queue = await pendingQueue(addr);           // throws rather than guess
   if (!queue.length) return { replaced: [], alreadyClear: true };
   const bal = await balance(addr);                  // throws rather than guess
@@ -943,7 +943,13 @@ async function unstickQueue(key: string, addr: string, onProg: (m: string) => vo
       const res: any = await broadcastTransaction(tx, network);
       if (res.error) throw new Error(res.error + (res.reason ? ' ' + res.reason : ''));
       replaced.push({ nonce: String(stuck.nonce), was: String(stuck.fee), now: String(fee), fee: String(fee), txid: res.txid || res });
+      xaoLog(job.jobId, `nonce ${stuck.nonce}: replacement broadcast at ${fee} uSTX`);
     } catch (e) {
+      // Log it, don't just return it. The panel that displays these rebuilds every few
+      // seconds, so a rejection reported only through the return value was wiped from
+      // the screen before anyone could read it — which is why an unstick that did
+      // nothing looked like an unstick that had worked.
+      xaoLog(job.jobId, `nonce ${stuck.nonce}: replacement REJECTED — ${errMsg(e)}`);
       replaced.push({ nonce: String(stuck.nonce), error: errMsg(e) });
     }
   }
@@ -2113,13 +2119,17 @@ async function reapTick() {
     if (!job.ephemeralMnemonic) throw new Error('this job no longer has a key — nothing to unstick');
     const dep = deriveFrom(job.ephemeralMnemonic);
     const prog = (m: string) => { const j = readJob(id); j.progress = m; j.progressAt = new Date().toISOString(); writeJob(j); xaoLog(id, m); };
-    const out = await unstickQueue(dep.key, dep.address, prog);
+    const out = await unstickQueue(job, dep.key, dep.address, prog);
     const j = readJob(id);
     j.unstick = [...(j.unstick || []), { at: new Date().toISOString(), ...out }];
     const ok = out.replaced.filter((r: any) => r.txid).length;
+    const failed = out.replaced.filter((r: any) => r.error);
+    j.unstickError = failed.length ? failed.map((r: any) => `nonce ${r.nonce}: ${r.error}`).join(' · ') : null;
     j.progress = out.alreadyClear
       ? 'nothing was stuck — the queue is already clear'
-      : `replaced ${ok} stuck transaction${ok === 1 ? '' : 's'} — once they confirm, run recovery again`;
+      : ok
+        ? `replaced ${ok} stuck transaction${ok === 1 ? '' : 's'} — once they confirm, run recovery again`
+        : `could not replace any stuck transaction — ${j.unstickError}`;
     j.progressAt = new Date().toISOString(); writeJob(j);
     return out;
   },
