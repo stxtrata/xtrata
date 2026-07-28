@@ -354,7 +354,9 @@ export function unfinishedBanner(opts: { skipJobId?: string | null; mount?: HTML
   const sub = document.createElement('div');
   sub.className = 'xao-sub';
   // "last seen" is the honest framing: this is local memory, not chain state.
-  sub.textContent = job.funded
+  sub.textContent = job.keepKeyReason
+    ? `${job.label} — ${job.keepKeyReason}. Only this browser holds that wallet's key, so it has to be done from here.`
+    : job.funded
     ? `${job.label} — last seen ${ago(job.lastSeenAt)}${job.needsRecovery ? ', and it stopped partway' : ''}. Your deposit is on a one-shot wallet only this browser holds the key to, so it needs you to come back and either finish it or take the refund.`
     : `${job.label} — started ${ago(job.createdAt)}. Nothing was paid, so there is nothing at stake; open it to carry on, or dismiss this.`;
 

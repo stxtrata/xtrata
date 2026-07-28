@@ -235,7 +235,7 @@
 <script src="HTML_Template.js?v=6"></script>
 <script src="suno-build.js?v=7"></script>
 <script src="optimize-image.js?v=1"></script>
-<script src="agent-one.js?v=2026-07-27.8"></script>
+<script src="agent-one.js?v=2026-07-27.9"></script>
 <script>
 const SERVER = { mock:false, net:'mainnet' };
 // Batch state, declared HERE rather than beside its helpers further down. routeDrop and
@@ -250,7 +250,7 @@ const SB={ items:[], dropped:[], active:false, busy:false, quoteRun:0, EST:null,
 // fees on refund loops). Builds are date-stamped (YYYY-MM-DD.N) so a string compare orders them;
 // a NEWER deployed bundle must pass — requiring an exact match wrongly locked the page out
 // whenever the agent shipped ahead of the page.
-const XAO_MIN_AGENT_BUILD='2026-07-27.8';
+const XAO_MIN_AGENT_BUILD='2026-07-27.9';
 let AGENT_STALE=false;
 function checkAgentBuild(){
   const b=window.XAO_AGENT_BUILD||null;

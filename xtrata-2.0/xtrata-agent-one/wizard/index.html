@@ -787,7 +787,7 @@ try{
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=2026-07-27.8"></script>
+<script src="agent-one.js?v=2026-07-27.9"></script>
 <script src="optimize-audio.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script>
@@ -1769,24 +1769,34 @@ window.addEventListener('beforeunload',(e)=>{
 });
 async function loadJobs(){
   try{ const {jobs}=await api('/api/jobs'); const b=$('#jobsBody');
-    if(!jobs.length){ b.innerHTML='<tr><td colspan="6" class="muted">No jobs yet.</td></tr>'; return jobs; }
+    if(!jobs.length){ b.dataset.sig=''; b.innerHTML='<tr><td colspan="6" class="muted">No jobs yet.</td></tr>'; return jobs; }
     // Each job carries its own expansion row. Opening a job used to render into a
     // single panel BELOW the table, so clicking a row near the top scrolled nothing
     // and the detail appeared off-screen — it read as "nothing happened".
-    b.innerHTML=jobs.map(j=>{ const ds=(j.status==='AWAITING_DEPOSIT'&&j.funded)?'FUNDED':j.status; const open=selJob===j.jobId; return `<tr onclick="selectJob('${j.jobId}')" class="${open?'sel':''}" title="${open?'Collapse':'Expand'} this job">
+    const html=jobs.map(j=>{ const ds=(j.status==='AWAITING_DEPOSIT'&&j.funded)?'FUNDED':j.status; const open=selJob===j.jobId; return `<tr onclick="selectJob('${j.jobId}')" class="${open?'sel':''}" title="${open?'Collapse':'Expand'} this job">
       <td class="mono">${open?'▾':'▸'} ${esc(j.jobId.replace('job-',''))}</td><td>${esc(j.uri||(j.items?('📦 batch · '+j.items.length+' items'):''))}</td>
       <td>${(j.bytes/1048576).toFixed(2)}M</td><td class="mono">${stx(j.requiredUstx)}</td>
       <td><span class="status s-${ds}">${ds.replace(/_/g,' ')}</span></td><td class="mono">${j.items?(j.items.filter(i=>i.tokenId).length+'/'+j.items.length):(j.tokenId||'—')}</td></tr>
       <tr class="jobrow-detail"${open?'':' hidden'}><td colspan="6" data-job-detail="${esc(j.jobId)}"></td></tr>`; }).join('');
+    // Only touch the DOM when the rows actually differ. A poll that changes nothing
+    // used to replace the whole table anyway, discarding the open job's rendered
+    // detail and forcing it to be rebuilt from scratch.
+    if(b.dataset.sig!==html){ b.dataset.sig=html; b.innerHTML=html; }
     return jobs;
-  }catch(e){ $('#jobsBody').innerHTML=`<tr><td colspan="6" class="err">${esc(e.message)}</td></tr>`; return []; }
+  }catch(e){ const b=$('#jobsBody'); b.dataset.sig=''; b.innerHTML=`<tr><td colspan="6" class="err">${esc(e.message)}</td></tr>`; return []; }
 }
 $('#refreshJobs').onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); loadJobs(); };
-async function jobsTick(){ try{ await Promise.all([
-  ($('#historySection').open||FLOW.jobId)?loadJobs():Promise.resolve(),
-  FLOW.jobId?renderJobDetail(FLOW.jobId,$('#activeJobDetail'),true):Promise.resolve(),
-  (selJob&&selJob!==FLOW.jobId)?renderJobDetail(selJob,jobDetailEl(selJob),false):Promise.resolve(),
-]); }catch(e){} }
+async function jobsTick(){ try{
+  // ORDER MATTERS. loadJobs() rebuilds the table body, which destroys the expansion
+  // cell holding an open job's detail. Running it alongside renderJobDetail meant the
+  // rebuild could finish last and wipe the freshly written detail — the open row
+  // looked like it collapsed on every poll. Table first, then fill it.
+  if($('#historySection').open||FLOW.jobId) await loadJobs();
+  await Promise.all([
+    FLOW.jobId?renderJobDetail(FLOW.jobId,$('#activeJobDetail'),true):Promise.resolve(),
+    (selJob&&selJob!==FLOW.jobId)?renderJobDetail(selJob,jobDetailEl(selJob),false):Promise.resolve(),
+  ]);
+}catch(e){} }
 function startJobsPoll(){ if(pollTimer)clearInterval(pollTimer); pollTimer=setInterval(jobsTick,3000); }
 function stopJobsPoll(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
 // The expansion cell for a job, or null when that job is not open.
