@@ -551,7 +551,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-28.2';
+export const AGENT_BUILD = '2026-07-28.3';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -2196,6 +2196,53 @@ async function reapTick() {
         : `could not replace any stuck transaction — ${j.unstickError}`;
     j.progressAt = new Date().toISOString(); writeJob(j);
     return out;
+  },
+  /**
+   * Job records for moving between origins (xtrata.xyz vs a pages.dev preview keep
+   * SEPARATE localStorage, so work done on one is invisible on the other).
+   *
+   * DEPOSIT KEYS ARE NEVER EXPORTED. A key is what makes "only this browser can spend
+   * that wallet" true; copying one to a second origin makes that false, and would let
+   * two tabs race each other's recovery on the same funds. Jobs that still hold a key
+   * are exported as a RECORD only, tagged with the origin that can actually finish
+   * them.
+   */
+  exportJobs: () => {
+    const jobs = listJobsRaw().map((j: any) => {
+      const { ephemeralMnemonic, ...rest } = j;
+      return ephemeralMnemonic
+        ? { ...rest, keyHeldOn: (typeof location !== 'undefined' ? location.origin : 'another browser') }
+        : rest;
+    });
+    return {
+      format: 'xtrata-jobs-v1',
+      exportedAt: new Date().toISOString(),
+      origin: typeof location !== 'undefined' ? location.origin : null,
+      jobs
+    };
+  },
+  /**
+   * Merge exported records in. Never overwrites a job this browser already has — the
+   * local copy is the one that has been running and is always the more current of the
+   * two — and strips any key that somehow made it into the file.
+   */
+  importJobs: (payload: any) => {
+    const data = typeof payload === 'string' ? JSON.parse(payload) : payload;
+    if (!data || data.format !== 'xtrata-jobs-v1' || !Array.isArray(data.jobs)) {
+      throw new Error('that does not look like an Xtrata job export');
+    }
+    let added = 0, skipped = 0, keysStripped = 0;
+    for (const incoming of data.jobs) {
+      if (!incoming || !incoming.jobId) { skipped += 1; continue; }
+      let existing = null;
+      try { existing = readJob(incoming.jobId); } catch { existing = null; }
+      if (existing) { skipped += 1; continue; }           // never clobber the live copy
+      const { ephemeralMnemonic, ...safe } = incoming;
+      if (ephemeralMnemonic) keysStripped += 1;
+      writeJob({ ...safe, importedFrom: data.origin || 'another browser', importedAt: new Date().toISOString() });
+      added += 1;
+    }
+    return { added, skipped, keysStripped, from: data.origin || null };
   },
   getReceiptHtml: (id: string) => { try { return readJob(id).receiptHtml || null; } catch { return null; } },
   getJobLog: (id: string) => { try { return readJob(id).log || []; } catch { return []; } },

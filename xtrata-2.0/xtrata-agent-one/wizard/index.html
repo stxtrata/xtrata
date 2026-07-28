@@ -688,6 +688,15 @@ try{
   <!-- HISTORY -->
   <details class="opts" id="historySection">
     <summary>History — all jobs on this browser <button class="btn ghost" id="refreshJobs" style="float:right;padding:4px 10px;margin-top:-3px" onclick="event.preventDefault();event.stopPropagation();">Refresh</button></summary>
+    <!-- Jobs live in localStorage, which is per-site: xtrata.xyz and a preview URL keep
+         entirely separate histories. This carries the RECORDS across. Deposit keys are
+         never included — see exportJobs. -->
+    <div class="opts-body" style="padding-bottom:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn ghost" id="exportJobs" style="width:auto;margin:0;padding:5px 11px;font-size:12px">Export history</button>
+      <button class="btn ghost" id="importJobs" style="width:auto;margin:0;padding:5px 11px;font-size:12px">Import history</button>
+      <input id="importJobsFile" type="file" accept="application/json,.json" hidden />
+      <span class="muted" style="font-size:11.5px">Moves receipts and job details between xtrata.xyz and a preview site. Deposit keys are never exported — a job still holding funds has to be finished on the site that created it.</span>
+    </div>
     <div class="opts-body">
       <table><thead><tr><th>Job</th><th>URI</th><th>Size</th><th>Required</th><th>Status</th><th>Token</th></tr></thead>
         <tbody id="jobsBody"><tr><td colspan="6" class="muted">No jobs yet.</td></tr></tbody></table>
@@ -787,7 +796,7 @@ try{
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=2026-07-28.2"></script>
+<script src="agent-one.js?v=2026-07-28.3"></script>
 <script src="optimize-audio.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script>
@@ -1786,6 +1795,30 @@ async function loadJobs(){
   }catch(e){ const b=$('#jobsBody'); b.dataset.sig=''; b.innerHTML=`<tr><td colspan="6" class="err">${esc(e.message)}</td></tr>`; return []; }
 }
 $('#refreshJobs').onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); loadJobs(); };
+$('#exportJobs').onclick=(e)=>{ e.preventDefault(); e.stopPropagation();
+  try{
+    const data=window.XtrataAgent.exportJobs();
+    const withKeys=data.jobs.filter(j=>j.keyHeldOn).length;
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='xtrata-jobs-'+new Date().toISOString().slice(0,10)+'.json';
+    a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+    if(withKeys) alert('Exported '+data.jobs.length+' jobs.\n\n'+withKeys+' of them still hold a deposit wallet. Their KEYS were not exported — those jobs have to be finished or refunded on this site. Everything else, including receipts, will import cleanly.');
+  }catch(err){ alert('Could not export: '+((err&&err.message)||err)); }
+};
+$('#importJobs').onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); $('#importJobsFile').click(); };
+$('#importJobsFile').onchange=async(e)=>{
+  const f=e.target.files&&e.target.files[0]; if(!f) return;
+  try{
+    const r=window.XtrataAgent.importJobs(await f.text());
+    await loadJobs();
+    alert('Added '+r.added+' job'+(r.added===1?'':'s')+' from '+(r.from||'the other site')+'.'
+      +(r.skipped?('\n\n'+r.skipped+' were already here and were left untouched — the copy on this browser is the one that has been running.'):'')
+      +(r.keysStripped?('\n\n'+r.keysStripped+' carried a deposit key, which was discarded. Those jobs must be finished on the site that created them.'):''));
+  }catch(err){ alert('Could not import: '+((err&&err.message)||err)); }
+  finally{ e.target.value=''; }
+};
 async function jobsTick(){ try{
   // ORDER MATTERS. loadJobs() rebuilds the table body, which destroys the expansion
   // cell holding an open job's detail. Running it alongside renderJobDetail meant the
