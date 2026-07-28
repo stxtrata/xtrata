@@ -185,7 +185,19 @@ export class FakeChain {
       return json({ okay: true, result: NONE_HEX });
     }
 
-    if (url.includes('/nonces')) return json({ possible_next_nonce: 1 });
+    if (url.includes('/nonces')) {
+      const nonces = this.pending.map((p) => p.nonce);
+      const next = nonces.length ? Math.max(...nonces) + 1 : this.lastExecutedNonce + 1;
+      const lowest = nonces.length ? Math.min(...nonces) : this.lastExecutedNonce + 1;
+      const missing: number[] = [];
+      for (let n = this.lastExecutedNonce + 1; n < lowest; n += 1) missing.push(n);
+      return json({
+        possible_next_nonce: next,
+        last_executed_tx_nonce: this.lastExecutedNonce,
+        detected_missing_nonces: missing.reverse(),
+        detected_mempool_nonces: nonces
+      });
+    }
 
     // --- fee estimation ---
     if (url.includes('/v2/fees/transaction')) {
@@ -262,6 +274,9 @@ export class FakeChain {
   pending: Array<{ nonce: number; fee: number; kind: string; sinceIso?: string }> = [];
   /** When set, every broadcast is refused with this reason. */
   rejectAllBroadcasts: string | null = null;
+  /** Highest nonce the chain has actually MINED. Everything above it waits its turn,
+   *  so a hole between this and the mempool strands every queued transaction. */
+  lastExecutedNonce = 0;
   /** Mainnet rejects a transfer to yourself. Modelling it means a test fails where the
    *  real node did: this exact rule silently defeated the whole unstick feature. */
   rejectSelfTransfer = true;

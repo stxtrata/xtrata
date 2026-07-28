@@ -29,6 +29,7 @@ const seedJammedJob = () => {
   const dep = agent.deriveFrom(mnemonic);
   chain.selfTransferAddress = dep.address;          // the node's self-transfer rule
   chain.fund(dep.address, 9_725_513n, PAYER);       // funded by PAYER, so refunds resolve
+  chain.lastExecutedNonce = 23;                     // no hole: 24 is genuinely next
   chain.pending = [
     { nonce: 24, fee: 604, kind: 'transfer', sinceIso: new Date(Date.now() - 23 * 3600_000).toISOString() },
     { nonce: 25, fee: 389, kind: 'transfer', sinceIso: new Date(Date.now() - 22 * 3600_000).toISOString() }
@@ -110,9 +111,39 @@ describe('clearing the jam', () => {
     await expect(api().unstickJob('jam')).rejects.toThrow(/nowhere safe to send/i);
   });
 
+  it('fills a nonce the chain is waiting for but nothing occupies', async () => {
+    // The mempool garbage-collects old transactions. When the ones holding the LOW
+    // nonces age out, everything above them is stranded for ever — correctly priced
+    // and unmineable, because nonces execute in order. Replacing the visible queue
+    // cannot fix it: the hole is beneath the queue.
+    seedJammedJob();
+    chain.lastExecutedNonce = 20;                   // chain wants 21; 21-23 have aged out
+    const st = await api().stuckStatus('jam');
+    expect(st.missingNonces).toEqual(['21', '22', '23']);
+
+    const out = await api().unstickJob('jam');
+    const filled = out.replaced.filter((r: any) => r.filledGap).map((r: any) => r.nonce);
+    expect(filled).toEqual(['21', '22', '23']);
+    // and the gap is filled BEFORE the queue is replaced, or the queue stays stuck
+    expect(chain.broadcastNonces.map(String)).toEqual(['21', '22', '23', '24', '25']);
+  });
+
+  it('does NOT invent a gap when the mempool is simply empty', async () => {
+    // last_executed 20 with nothing queued is a healthy wallet: the next transaction
+    // just takes nonce 21. A "gap" only matters when something is queued ABOVE it and
+    // therefore waiting on it.
+    seedJammedJob();
+    chain.pending = [];
+    chain.lastExecutedNonce = 20;
+    const st = await api().stuckStatus('jam');
+    expect(st.missingNonces).toEqual([]);
+    expect(st.stuck).toBe(false);
+  });
+
   it('says so plainly when nothing is stuck', async () => {
     seedJammedJob();
     chain.pending = [];
+    chain.lastExecutedNonce = 23;
     const out = await api().unstickJob('jam');
     expect(out.alreadyClear).toBe(true);
     expect(chain.broadcasts).toEqual([]);

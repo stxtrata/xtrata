@@ -787,7 +787,7 @@ try{
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=2026-07-28.1"></script>
+<script src="agent-one.js?v=2026-07-28.2"></script>
 <script src="optimize-audio.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script>
@@ -1832,7 +1832,11 @@ function stuckPanelHtml(jobId){
   if(!st||(!st.stuck&&!st.unknown)) return '';
   const body = st.unknown
     ? '<span class="muted">Could not check whether transactions are queued ('+esc(st.error||'')+').</span>'
-    : ('<b>⚠ '+st.pending.length+' transaction'+(st.pending.length===1?'':'s')+' stuck in the queue</b>'
+    : (((st.missingNonces&&st.missingNonces.length)
+        ? ('<b>⚠ The chain is waiting on nonce'+(st.missingNonces.length===1?' ':'s ')+esc(st.missingNonces.join(', '))+', which no longer exist</b>'
+          +'<div class="muted" style="margin-top:5px">Old transactions are eventually dropped from the queue. When the ones holding the LOW numbers are dropped, everything above them is frozen — correctly priced and still unmineable, because transactions confirm strictly in order. Clearing will put a placeholder in each missing slot first, then replace the rest.</div>')
+        : '')
+      +'<b>⚠ '+st.pending.length+' transaction'+(st.pending.length===1?'':'s')+' stuck in the queue</b>'
       +'<div class="muted" style="margin-top:5px">Transactions confirm in order, so the oldest one'
       +((st.oldestAgeMs!=null)?(' — waiting '+(Math.round(st.oldestAgeMs/60000)>=120?(Math.round(st.oldestAgeMs/3600000)+' hours'):(Math.round(st.oldestAgeMs/60000)+' minutes'))):'')
       +' — is blocking the rest. Nothing can move until it clears, which is why recovery keeps stopping.</div>'

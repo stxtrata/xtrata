@@ -551,7 +551,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-28.1';
+export const AGENT_BUILD = '2026-07-28.2';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -900,6 +900,30 @@ async function sweepStrays(job: any, key: string, addr: string, receiptTokenId: 
 //
 // THROWS on a failed read: "I could not see the mempool" must never be reported as
 // "nothing is stuck", or the UI hides the one thing blocking the user.
+/**
+ * Nonces the chain is WAITING FOR that no longer exist anywhere.
+ *
+ * The mempool garbage-collects transactions after a day or two. If the ones holding
+ * the low nonces age out, everything above them is stranded for ever: nonces execute
+ * in order, so a correctly-priced transaction at nonce 24 can never be mined while the
+ * account's next expected nonce is 21 and nothing occupies 21, 22 or 23. Replacing the
+ * visible queue does not help — the hole is BELOW it.
+ *
+ * Derived from last_executed_tx_nonce rather than the API's own detected_missing_nonces,
+ * so it does not depend on a field that may be absent or lag.
+ */
+async function nonceGap(addr: string, pending: Array<{ nonce: bigint }>): Promise<bigint[]> {
+  const r = await hfetch(`/extended/v1/address/${addr}/nonces`);
+  if (!r.ok) throw new Error(`nonce lookup failed (HTTP ${r.status})`);
+  const d: any = await r.json();
+  if (d == null || d.last_executed_tx_nonce == null) throw new Error('nonce lookup returned no last_executed_tx_nonce');
+  const nextExpected = BigInt(d.last_executed_tx_nonce) + 1n;
+  const lowestPending = pending.length ? pending[0].nonce : nextExpected;
+  const gap: bigint[] = [];
+  for (let n = nextExpected; n < lowestPending; n += 1n) gap.push(n);
+  return gap;
+}
+
 async function pendingQueue(addr: string): Promise<Array<{ nonce: bigint; fee: bigint; kind: string; sinceIso: string | null }>> {
   const r = await hfetch(`/extended/v1/address/${addr}/mempool?limit=50`);
   if (!r.ok) throw new Error(`mempool lookup failed (HTTP ${r.status})`);
@@ -926,9 +950,31 @@ async function pendingQueue(addr: string): Promise<Array<{ nonce: bigint; fee: b
  */
 async function unstickQueue(job: any, key: string, addr: string, to: string, onProg: (m: string) => void) {
   const queue = await pendingQueue(addr);           // throws rather than guess
-  if (!queue.length) return { replaced: [], alreadyClear: true };
+  const gap = await nonceGap(addr, queue);          // holes BELOW the queue
+  if (!queue.length && !gap.length) return { replaced: [], alreadyClear: true };
   const bal = await balance(addr);                  // throws rather than guess
   const replaced: any[] = [];
+
+  // FILL THE HOLE FIRST. A nonce the chain is waiting for, with nothing occupying it,
+  // blocks every transaction above it no matter how well those are priced — and the
+  // ones already queued cannot fix it, because the gap is beneath them.
+  for (const missing of gap) {
+    const fee = TRANSFER_FEE_FLOOR * 2n;
+    const spent = replaced.reduce((t: bigint, r: any) => t + (r.fee ? BigInt(r.fee) : 0n), 0n);
+    if (bal < spent + fee + 1n) { replaced.push({ nonce: String(missing), error: 'not enough STX left to fill this gap' }); break; }
+    onProg(`filling missing nonce ${missing} — nothing occupies it, so everything above it is stuck`);
+    try {
+      const tx: any = await makeSTXTokenTransfer({ recipient: to, amount: 1n, senderKey: key, network, fee, anchorMode: AnchorMode.Any, nonce: missing } as any);
+      const res: any = await broadcastTransaction(tx, network);
+      if (res.error) throw new Error(res.error + (res.reason ? ' ' + res.reason : ''));
+      replaced.push({ nonce: String(missing), filledGap: true, fee: String(fee), txid: res.txid || res });
+      xaoLog(job.jobId, `nonce ${missing}: gap filled at ${fee} uSTX`);
+    } catch (e) {
+      replaced.push({ nonce: String(missing), error: errMsg(e) });
+      xaoLog(job.jobId, `nonce ${missing}: could not fill the gap — ${errMsg(e)}`);
+    }
+  }
+
   for (const stuck of queue) {
     // Comfortably above both the stuck fee and the floor — a replacement that is only
     // marginally higher is just another stuck transaction.
@@ -2109,9 +2155,13 @@ async function reapTick() {
     const dep = deriveFrom(job.ephemeralMnemonic);
     try {
       const queue = await pendingQueue(dep.address);
+      const gap = await nonceGap(dep.address, queue);
       const oldest = queue[0];
       return {
-        stuck: queue.length > 0,
+        stuck: queue.length > 0 || gap.length > 0,
+        // Nonces the chain is waiting for that no longer exist. Everything queued above
+        // them is frozen until they are filled, however well priced it is.
+        missingNonces: gap.map(String),
         address: dep.address,
         pending: queue.map((q) => ({ nonce: String(q.nonce), fee: String(q.fee), kind: q.kind, since: q.sinceIso })),
         oldestAgeMs: oldest && oldest.sinceIso ? Date.now() - Date.parse(oldest.sinceIso) : null
