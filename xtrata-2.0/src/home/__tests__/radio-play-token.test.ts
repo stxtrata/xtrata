@@ -18,6 +18,25 @@ import { describe, expect, it } from 'vitest';
 
 const radio = readFileSync(new URL('../radio.js', import.meta.url), 'utf8');
 
+describe('the dial sweep is for power, not for skipping', () => {
+  it('only sweeps on the first tune after switching on', () => {
+    expect(radio).toContain("const tuningSeconds = firstTune ? playTuning(1, 'on') : 0;");
+    // switchOff resets firstTune, so EVERY power-on sweeps — not just the first of
+    // the session.
+    const off = radio.slice(radio.indexOf('const switchOff = ()'), radio.indexOf('const switchOff = ()') + 400);
+    expect(off).toContain('firstTune = true;');
+    expect(off).toContain("playTuning(-1, 'off')");
+  });
+
+  it('adds no delay between songs either', () => {
+    // The song is deliberately held back until the sweep finishes, so a zero-length
+    // sweep must also mean a zero-length wait — otherwise skipping stays sluggish
+    // while merely being silent.
+    expect(radio).toContain('if (elapsed < tuningSeconds) {');
+    expect(radio).not.toContain("playTuning(1, 'between')");
+  });
+});
+
 describe('a deliberate click is never overridden by the player itself', () => {
   it('ignores media errors raised while a tune is mid-swap', () => {
     // Assigning player.src ABORTS whatever the element was loading, and the browser

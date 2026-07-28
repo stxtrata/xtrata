@@ -1202,7 +1202,12 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
     stopTicker();
     setNow('~ TUNING ~', false);
     const startedTuning = performance.now();
-    const tuningSeconds = playTuning(1, firstTune ? 'on' : 'between');
+    // The dial sweep belongs to switching the radio ON, not to every track change.
+    // Between songs it was both a sound nobody asked for on each skip AND a delay,
+    // because the song is deliberately held back until the sweep finishes — so
+    // returning 0 here removes the pause as well as the noise. playTuning still
+    // supports 'between' if it is ever wanted back.
+    const tuningSeconds = firstTune ? playTuning(1, 'on') : 0;
     firstTune = false;
     // Try a few candidates in case some inscriptions have no extractable audio.
     for (let attempt = 0; attempt < 10; attempt += 1) {
