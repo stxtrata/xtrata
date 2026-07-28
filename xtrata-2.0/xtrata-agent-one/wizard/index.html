@@ -783,7 +783,7 @@ try{
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=2026-07-27.4"></script>
+<script src="agent-one.js?v=2026-07-27.7"></script>
 <script src="optimize-audio.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script>
@@ -1784,6 +1784,31 @@ function stopJobsPoll(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null
 async function selectJob(id){ selJob=id; if(id===FLOW.jobId){ $('#jobDetail').innerHTML='<div class="muted" style="margin-top:10px">That job is live in the card above.</div>'; loadJobs(); return; } loadJobs(); renderJobDetail(id,$('#jobDetail'),false); startJobsPoll(); }
 $('#historySection').addEventListener('toggle',()=>{ if($('#historySection').open){ loadJobs(); startJobsPoll(); } else if(!FLOW.jobId){ stopJobsPoll(); } });
 
+// Transactions execute in nonce order, so ONE the miners will not take freezes every
+// transaction behind it. Recovery then fails for a reason that looks nothing like the
+// cause ("wallet still holds an inscription"), and each retry queues another doomed
+// transaction. Ask the mempool, and only offer the fix when there is something to fix.
+let stuckRun=0;
+async function checkStuck(jobId){
+  const box=$('#stuckRow'); if(!box) return;
+  const run=++stuckRun;
+  const A=window.XtrataAgent; if(!A||!A.stuckStatus){ box.style.display='none'; return; }
+  let st=null; try{ st=await A.stuckStatus(jobId); }catch(e){ st=null; }
+  if(run!==stuckRun||!box.isConnected) return;
+  if(!st||(!st.stuck&&!st.unknown)){ box.style.display='none'; box.innerHTML=''; return; }
+  box.style.display='block';
+  if(st.unknown){ box.innerHTML='<span class="muted">Could not check whether transactions are queued (' + esc(st.error||'') + ').</span>'; return; }
+  const mins=st.oldestAgeMs?Math.round(st.oldestAgeMs/60000):null;
+  box.innerHTML='<b>⚠ '+st.pending.length+' transaction'+(st.pending.length===1?'':'s')+' stuck in the queue</b>'
+    +'<div class="muted" style="margin-top:5px">Transactions confirm in order, so the oldest one'
+    +(mins!=null?(' — waiting '+(mins>=120?(Math.round(mins/60)+' hours'):(mins+' minutes'))):'')
+    +' — is blocking the rest. Nothing can move until it clears, which is why recovery keeps stopping.</div>'
+    +'<div class="mono muted" style="margin-top:6px;font-size:11px">'
+    + st.pending.map(p=>'nonce '+esc(p.nonce)+' · '+esc(p.kind)+' · '+esc(p.fee)+' µSTX').join('<br>')
+    +'</div>'
+    +'<div class="btnrow" style="margin-top:8px"><button class="btn" onclick="act(\'unstick\',\''+esc(jobId)+'\')">Clear the stuck transactions</button></div>';
+}
+
 // Stand the banner down: goes through the panel so the leave guard is disarmed too.
 function clearKeepOpen(){ try{ window.XtrataUI.keepOpenBanner({ job:null, status:'', mount:$('#keepOpenSlot') }); }catch(e){} }
 async function renderJobDetail(jobId,out,isActive){
@@ -1896,7 +1921,11 @@ async function renderJobDetail(jobId,out,isActive){
       <div class="kv"><span>Recovery wallet ${copyBtn(job.depositAddress)}</span><span class="mono">${esc(job.depositAddress)}</span></div>
       <div class="muted" style="margin-top:8px;font-size:12px">Recovery returns every inscription first, verifies the escrow wallet is NFT-empty, then refunds the remaining STX to the recorded payer. No receipt or new inscription is created.</div>
       ${/NotEnoughFunds|insufficient funds/i.test(job.error||'')?`<div class="muted" style="margin-top:8px;font-size:12px;color:var(--warn)">The recovery wallet needs a small STX top-up to pay the NFT transfer fee. Copy the address above, top it up, then run recovery again.</div>`:''}
-      <div class="btnrow"><button class="btn good" onclick="act('recover','${esc(job.jobId)}')">Recover inscriptions + STX now</button></div><div class="err" id="jobErr"></div>`:''}
+      <div class="btnrow"><button class="btn good" onclick="act('recover','${esc(job.jobId)}')">Recover inscriptions + STX now</button></div>
+      <!-- Only rendered once a jam is actually confirmed (checkStuck below) — an
+           always-visible button invites people to spend fees clearing nothing. -->
+      <div id="stuckRow" style="display:none;margin-top:10px;padding:10px 12px;border:1px solid var(--warn);border-radius:10px;font-size:12.5px"></div>
+      <div class="err" id="jobErr"></div>`:''}
       ${st==='NEEDS_FUNDS'?`<div style="margin-top:12px;padding:11px 13px;border:1px solid var(--warn);border-radius:10px;font-size:12.5px">
         <b>Paused — this job needs more STX to finish.</b>
         <div class="muted" style="margin-top:5px">${esc(job.keepKeyReason||'')}</div>
@@ -1908,6 +1937,7 @@ async function renderJobDetail(jobId,out,isActive){
         </div>
         <div class="err" id="jobErr"></div></div>`:''}
     </div>`;
+    if(st==='NEEDS_RECOVERY') checkStuck(jobId);
   }catch(e){ /* transient read (job file mid-write) — keep polling */ }
 }
 // ---- parent escrow: ownership checker + one-click wallet send (aligned to THIS job's deposit only) ----
@@ -1970,6 +2000,27 @@ async function act(which,jobId){
     const minted=mintedIds.length;
     const dest=j.funder||j.expectedFunder||j.user||'the verified payer';
     if(!confirm(`Start on-chain recovery now?\n\nThis broadcasts transfers for ${minted} known inscribed token${minted===1?'':'s'}${mintedIds.length?' (#'+mintedIds.join(', #')+')':''} to ${dest}, then sweeps the remaining STX only after the wallet is confirmed NFT-empty. The uninscribed batch items will not be minted or charged.\n\nKeep this tab open until recovery completes.`)) return;
+  }
+  if(which==='unstick'){
+    const A=window.XtrataAgent;
+    const sure=await confirmDanger({
+      title:'Clear the stuck transactions?',
+      body:'Each stuck transaction is replaced with a tiny one at a fee that will actually confirm, which cancels whatever was queued at that position. That costs a small network fee per transaction, and it is the only way to unblock the queue — the ones behind cannot move until the front one clears. Recovery will re-send anything that mattered afterwards.',
+      confirmLabel:'Clear them', cancelLabel:'Leave it'
+    });
+    if(!sure) return;
+    const errEl=$('#jobErr'); if(errEl) errEl.textContent='';
+    try{
+      const r=await A.unstickJob(id);
+      const ok=(r.replaced||[]).filter(x=>x.txid).length;
+      const failed=(r.replaced||[]).filter(x=>x.error);
+      if(errEl&&failed.length) errEl.textContent=failed.map(f=>'nonce '+f.nonce+': '+f.error).join('; ');
+      alert(r.alreadyClear
+        ? 'Nothing was stuck — the queue is already clear.'
+        : 'Replaced '+ok+' stuck transaction'+(ok===1?'':'s')+'.\n\nThey take a few minutes to confirm. Once they do, press "Recover inscriptions + STX now" again.');
+      jobsTick();
+    }catch(e){ if(errEl) errEl.textContent=(e&&e.message)||String(e); else alert(e.message); }
+    return;
   }
   if(which==='discard'){
     // Destroying the key is the one action here that CANNOT be undone: the chunks

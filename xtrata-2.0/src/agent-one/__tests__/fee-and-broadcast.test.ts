@@ -32,7 +32,9 @@ describe('fee estimation', () => {
   it('after waiting, refuses rather than broadcasting a fee below every quote', async () => {
     const addr = DEPOSIT;
     // Headroom just above the reserves, so effCap is tiny and every quote "spikes".
-    chain.balances.set(addr, 205_000n + 800n);
+    // Derived from the constants, not typed as a number: this read 205_000 and silently
+    // became "below the reserve" (a different error) the day REFUND_TX_FEE changed.
+    chain.balances.set(addr, agent.DELIVERY_RESERVE + agent.REFUND_TX_FEE + 800n);
     chain.feeQuotes = [90_000n];
     chain.minAcceptedFee = 0n;   // the node would ACCEPT anything — the point is we don't send it
     await expect(
@@ -46,7 +48,7 @@ describe('fee estimation', () => {
 
   it('refuses when even the cheapest quote is beyond the wallet, instead of broadcasting', async () => {
     const addr = DEPOSIT;
-    chain.balances.set(addr, 205_100n);   // ~100 µSTX of headroom
+    chain.balances.set(addr, agent.DELIVERY_RESERVE + agent.REFUND_TX_FEE + 100n);   // ~100 µSTX of headroom
     chain.feeQuotes = [50_000n];
     await expect(
       agent.send(KEY, addr, 'begin-or-get', [], null, undefined, null)

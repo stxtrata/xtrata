@@ -38,7 +38,11 @@ import { jobKey, listJobsRaw, unfinishedJobs } from './unfinished';
 
 export const WINDOW_MS: number = Number(cfg.windowMs || 300000); // commence/stall window
 export const PARENT_WINDOW_MS: number = Number(cfg.parentWindowMs || 900000); // 15 min after funding for parent NFT(s) to arrive, else full refund
-const PERTX_MINER = 30000n, DELIVERY_RESERVE = 200000n, REFUND_TX_FEE = 5000n, MINT_CAP = 2000000n, RECEIPT_EST = 9000;
+// REFUND_TX_FEE is both the fee a refund/sweep PAYS and the amount every reserve holds
+// back for it, so the two can never disagree. Raised from 5,000: at that level sweeps
+// and NFT returns sat unmined for days, and an unmined transfer holds its nonce and
+// jams everything queued behind it.
+const PERTX_MINER = 30000n, DELIVERY_RESERVE = 200000n, REFUND_TX_FEE = 20000n, MINT_CAP = 2000000n, RECEIPT_EST = 9000;
 const PARENT_RETURN_FEE = 30000n;                                // per-parent NFT return-transfer reserve
 const ITEM_DELIVERY_FEE = 30000n;                                // per extra batch-item delivery transfer reserve
 export const MAX_BATCH_ITEMS = 40;                               // receipt deps cap 50 − parents/identity headroom
@@ -346,14 +350,45 @@ async function confirmOrEscalate(p: {
   if (!reads) throw new Error(`could not reach the API to confirm ${txids[0]} (${errMsg(lastErr)}) — the transaction may well have landed`);
   throw new Error('not confirmed: ' + txids.join(', '));
 }
+// A transfer that never gets mined is worse than one that fails: it holds its nonce, and
+// every transaction queued behind it is stuck too, for ever. This is not hypothetical —
+// a recovery wallet ended up with six transactions jammed behind a 5,000 uSTX transfer
+// that had been waiting forty hours, holding 9.7 STX and an inscription hostage, and
+// each retry appended another doomed transaction to the back of the queue.
+//
+// The mints on that same wallet confirmed fine because they pay a computed fee. These
+// paid the library default (389-863 uSTX). So transfers now use a floor AND escalate.
+const TRANSFER_FEE_FLOOR = REFUND_TX_FEE;   // one number: what we pay is what we reserved
+
 async function sendNft(key: string, from: string, id: string, to: string) {
   let nonce: bigint | undefined; try { nonce = await safeNonce(from); } catch {}
-  const tx: any = await makeContractCall({ contractAddress: CORE[0], contractName: CORE[1], functionName: 'transfer', functionArgs: [uintCV(BigInt(id)), standardPrincipalCV(from), standardPrincipalCV(to)], senderKey: key, network, postConditionMode: PostConditionMode.Allow, anchorMode: AnchorMode.Any, nonce } as any);
-  const res: any = await broadcastTransaction(tx, network); if (res.error) throw new Error('nft: ' + res.error + (res.reason ? ' ' + res.reason : '')); const txid = res.txid || res; await waitTx(txid); return txid;
+  const opts: any = { contractAddress: CORE[0], contractName: CORE[1], functionName: 'transfer', functionArgs: [uintCV(BigInt(id)), standardPrincipalCV(from), standardPrincipalCV(to)], senderKey: key, network, postConditionMode: PostConditionMode.Allow, anchorMode: AnchorMode.Any, nonce };
+  const fee = await transferFee(opts);
+  const tx: any = await makeContractCall({ ...opts, fee });
+  const res: any = await broadcastTransaction(tx, network); if (res.error) throw new Error('nft: ' + res.error + (res.reason ? ' ' + res.reason : '')); const txid = res.txid || res;
+  // Escalate rather than wait for ever: same nonce, higher fee, until it is mined.
+  const used = nonce != null ? nonce : (await safeNonce(from).catch(() => undefined));
+  if (used != null) { const r = await confirmOrEscalate({ txid, opts, usedNonce: used, fee, effCap: MINT_CAP, fn: 'transfer', logId: null }); return r.txid; }
+  await waitTx(txid); return txid;
+}
+
+/** The node's low estimate, floored — the estimate alone is what got these stuck. */
+async function transferFee(opts: any): Promise<bigint> {
+  try {
+    const draft: any = await makeContractCall({ ...opts, fee: 1n });
+    const est: any = await estimateTransaction(draft.payload, estimateTransactionByteLength(draft), network);
+    const low = est && est[0] && est[0].fee != null ? BigInt(est[0].fee) : 0n;
+    return low > TRANSFER_FEE_FLOOR ? low : TRANSFER_FEE_FLOOR;
+  } catch { return TRANSFER_FEE_FLOOR; }
 }
 async function sendStx(key: string, amount: bigint, to: string, fee: bigint) {
-  let nonce: bigint | undefined; try { nonce = await safeNonce(getAddressFromPrivateKey(key, TransactionVersion.Mainnet)); } catch {}
-  const tx: any = await makeSTXTokenTransfer({ recipient: to, amount, senderKey: key, network, fee, anchorMode: AnchorMode.Any, nonce } as any);
+  // Same lesson as sendNft: REFUND_TX_FEE (5,000 uSTX) is what a refund BUDGETS, not
+  // what the mempool will accept when it is busy. Two sweeps sat unmined for days at
+  // exactly that fee. Floor it, and let the caller's budget cover the difference.
+  const useFee = fee > TRANSFER_FEE_FLOOR ? fee : TRANSFER_FEE_FLOOR;
+  const from = getAddressFromPrivateKey(key, TransactionVersion.Mainnet);
+  let nonce: bigint | undefined; try { nonce = await safeNonce(from); } catch {}
+  const tx: any = await makeSTXTokenTransfer({ recipient: to, amount, senderKey: key, network, fee: useFee, anchorMode: AnchorMode.Any, nonce } as any);
   const res: any = await broadcastTransaction(tx, network); if (res.error) throw new Error('stx: ' + res.error + (res.reason ? ' ' + res.reason : '')); const txid = res.txid || res; await waitTx(txid); return txid;
 }
 const tidFrom = (d: any) => { const r = d?.tx_result?.repr || ''; const m = /token-id u(\d+)/.exec(r) || /\(ok u(\d+)\)/.exec(r); return m ? m[1] : null; };
@@ -516,7 +551,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-27.4';
+export const AGENT_BUILD = '2026-07-27.7';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -856,6 +891,65 @@ async function sweepStrays(job: any, key: string, addr: string, receiptTokenId: 
     job.keepKey = true;
   }
 }
+// ---------- stuck mempool queue ----------
+// Nonces execute IN ORDER. One transaction the miners will not take therefore freezes
+// every transaction queued behind it, for as long as it sits there — and each retry
+// appends another one to the back rather than fixing the front. A real wallet ended up
+// with six transactions jammed behind a 5,000 uSTX transfer that had waited forty
+// hours, holding 9.7 STX and an inscription that could not move.
+//
+// THROWS on a failed read: "I could not see the mempool" must never be reported as
+// "nothing is stuck", or the UI hides the one thing blocking the user.
+async function pendingQueue(addr: string): Promise<Array<{ nonce: bigint; fee: bigint; kind: string; sinceIso: string | null }>> {
+  const r = await hfetch(`/extended/v1/address/${addr}/mempool?limit=50`);
+  if (!r.ok) throw new Error(`mempool lookup failed (HTTP ${r.status})`);
+  const d: any = await r.json();
+  if (!Array.isArray(d?.results)) throw new Error('mempool lookup returned no results');
+  return d.results
+    .map((t: any) => ({
+      nonce: BigInt(t.nonce),
+      fee: BigInt(t.fee_rate || 0),
+      kind: t.contract_call ? `${t.contract_call.function_name}` : t.tx_type,
+      sinceIso: t.receipt_time_iso || null
+    }))
+    .sort((a: any, b: any) => (a.nonce < b.nonce ? -1 : a.nonce > b.nonce ? 1 : 0));
+}
+
+/**
+ * Replace-by-fee the whole stuck queue, oldest nonce first.
+ *
+ * Each stuck nonce is replaced with a 1 uSTX self-transfer at a fee that will actually
+ * be mined. That CANCELS whatever was queued at that nonce, which is the point: those
+ * transactions have been unmineable for hours, and recovery re-issues the useful ones
+ * afterwards at proper fees. Replacing rather than appending is the only thing that can
+ * unblock a queue, because the front of it is what everything else is waiting on.
+ */
+async function unstickQueue(key: string, addr: string, onProg: (m: string) => void) {
+  const queue = await pendingQueue(addr);           // throws rather than guess
+  if (!queue.length) return { replaced: [], alreadyClear: true };
+  const bal = await balance(addr);                  // throws rather than guess
+  const replaced: any[] = [];
+  for (const stuck of queue) {
+    // Comfortably above both the stuck fee and the floor — a replacement that is only
+    // marginally higher is just another stuck transaction.
+    let fee = stuck.fee * 3n;
+    if (fee < TRANSFER_FEE_FLOOR * 2n) fee = TRANSFER_FEE_FLOOR * 2n;
+    if (fee > MINT_CAP) fee = MINT_CAP;
+    const spent = replaced.reduce((t, r) => t + BigInt(r.fee), 0n);
+    if (bal < spent + fee + 1n) { replaced.push({ nonce: String(stuck.nonce), error: 'not enough STX left to replace this one' }); break; }
+    onProg(`clearing stuck transaction ${stuck.nonce} (${stuck.kind}) — replacing ${stuck.fee} with ${fee} uSTX`);
+    try {
+      const tx: any = await makeSTXTokenTransfer({ recipient: addr, amount: 1n, senderKey: key, network, fee, anchorMode: AnchorMode.Any, nonce: stuck.nonce } as any);
+      const res: any = await broadcastTransaction(tx, network);
+      if (res.error) throw new Error(res.error + (res.reason ? ' ' + res.reason : ''));
+      replaced.push({ nonce: String(stuck.nonce), was: String(stuck.fee), now: String(fee), fee: String(fee), txid: res.txid || res });
+    } catch (e) {
+      replaced.push({ nonce: String(stuck.nonce), error: errMsg(e) });
+    }
+  }
+  return { replaced, alreadyClear: false };
+}
+
 // Is there a half-finished upload sitting on this wallet?
 //
 // An upload lives on-chain under (contentHash, minterPrincipal), so ONLY this deposit
@@ -1993,6 +2087,42 @@ async function reapTick() {
     (job.items || []).forEach((_: any, i: number) => { BYTES.delete(`${id}:${i}`); idbDeleteBytes(`${id}:${i}`); });
     return { discarded: true, jobId: id };
   },
+  // Is this job's wallet jammed? Drives a button that only appears when it IS — an
+  // always-visible "unstick" invites people to spend fees on a queue that is fine.
+  stuckStatus: async (id: string) => {
+    const job = readJob(id);
+    if (!job.ephemeralMnemonic) return { stuck: false, pending: [] };
+    const dep = deriveFrom(job.ephemeralMnemonic);
+    try {
+      const queue = await pendingQueue(dep.address);
+      const oldest = queue[0];
+      return {
+        stuck: queue.length > 0,
+        address: dep.address,
+        pending: queue.map((q) => ({ nonce: String(q.nonce), fee: String(q.fee), kind: q.kind, since: q.sinceIso })),
+        oldestAgeMs: oldest && oldest.sinceIso ? Date.now() - Date.parse(oldest.sinceIso) : null
+      };
+    } catch (e) {
+      // Unknown is not "fine": say so rather than hiding a jam behind a failed read.
+      return { stuck: false, unknown: true, error: errMsg(e), pending: [] };
+    }
+  },
+  /** Replace every stuck transaction so the queue can move again. */
+  unstickJob: async (id: string) => {
+    const job = readJob(id);
+    if (!job.ephemeralMnemonic) throw new Error('this job no longer has a key — nothing to unstick');
+    const dep = deriveFrom(job.ephemeralMnemonic);
+    const prog = (m: string) => { const j = readJob(id); j.progress = m; j.progressAt = new Date().toISOString(); writeJob(j); xaoLog(id, m); };
+    const out = await unstickQueue(dep.key, dep.address, prog);
+    const j = readJob(id);
+    j.unstick = [...(j.unstick || []), { at: new Date().toISOString(), ...out }];
+    const ok = out.replaced.filter((r: any) => r.txid).length;
+    j.progress = out.alreadyClear
+      ? 'nothing was stuck — the queue is already clear'
+      : `replaced ${ok} stuck transaction${ok === 1 ? '' : 's'} — once they confirm, run recovery again`;
+    j.progressAt = new Date().toISOString(); writeJob(j);
+    return out;
+  },
   getReceiptHtml: (id: string) => { try { return readJob(id).receiptHtml || null; } catch { return null; } },
   getJobLog: (id: string) => { try { return readJob(id).log || []; } catch { return []; } },
   // Storage durability, so a page can warn rather than assume its job will survive.
@@ -2019,6 +2149,22 @@ async function reapTick() {
  * the browser can still resume or refund exactly as before — a handoff that fails
  * must not be a handoff that strands.
  */
+// DORMANT BY DESIGN — do not wire this up without a product decision.
+//
+// The handoff sends this job's deposit key to a server so it can finish while the tab
+// is closed. It works, and it is deliberately switched OFF: an empty endpoint means
+// handoffAvailable() is false and the UI never offers it, so nothing is ever sent.
+//
+// The reason is custody. Everything else in Xtrata is self-custodial — the deposit
+// wallet is made in the user's browser and only that browser can spend from it. The
+// handoff is the single feature that breaks that promise, and from the user's side
+// "we hold your key for a bit" is custody however carefully it is scoped. Convenience
+// is not worth becoming a custodian by accident.
+//
+// Kept because the code is proven and the escrow/consent plumbing around it is the
+// hard part. If a good model appears (a signed, time-boxed, single-job delegation the
+// user can revoke), setting cfg.handoffEndpoint turns it back on. Until then it stays
+// unset, and the wizard's answer to "I want to close the tab" is that jobs resume.
 const HANDOFF_ENDPOINT: string = cfg.handoffEndpoint || '';
 const HANDOFF_CONSENT = 'i-agree-xtrata-may-finish-this-job';
 

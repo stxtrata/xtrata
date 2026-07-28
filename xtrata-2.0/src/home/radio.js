@@ -841,6 +841,12 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
   }, 15000);
   let on = false;
   let tuneToken = 0;
+  // True while tuneToNextTrack is mid-swap. Assigning player.src ABORTS whatever the
+  // element was loading, and the browser reports that as an `error` on the media
+  // element — which the error handler used to answer by starting ANOTHER tune, with
+  // no requested id. That second tune took a higher tuneToken and therefore won, so a
+  // deliberate click landed on a song nobody chose. Hence the randomness.
+  let tuneInFlight = false;
   let recent = [];
   let firstTune = true;
   // Self-healing state: the radio must never stay silently stuck — see the
@@ -1181,12 +1187,27 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
   const history = [];
   const tuneToNextTrack = async (trackOverride) => {
     const token = ++tuneToken;
+    // What the listener actually ASKED for, captured before pickNext consumes it.
+    // Without this, a requested song that fails to resolve fell through to attempt 2
+    // with forcedNext already spent — so the retry picked a random track and the
+    // listener got a song they never chose, with nothing said about it.
+    const requestedId = forcedNext;
+    tuneInFlight = true;
+    // Only the CURRENT tune may lower the flag. A superseded tune returning early
+    // would otherwise clear it while the newer one is still swapping src — reopening
+    // the exact race this flag exists to close.
+    const endTune = () => { if (token === tuneToken) tuneInFlight = false; };
     manualPause = false;
     lastTuneAt = Date.now();
     stopTicker();
     setNow('~ TUNING ~', false);
     const startedTuning = performance.now();
-    const tuningSeconds = playTuning(1, firstTune ? 'on' : 'between');
+    // The dial sweep belongs to switching the radio ON, not to every track change.
+    // Between songs it was both a sound nobody asked for on each skip AND a delay,
+    // because the song is deliberately held back until the sweep finishes — so
+    // returning 0 here removes the pause as well as the noise. playTuning still
+    // supports 'between' if it is ever wanted back.
+    const tuningSeconds = firstTune ? playTuning(1, 'on') : 0;
     firstTune = false;
     // Try a few candidates in case some inscriptions have no extractable audio.
     for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -1213,14 +1234,24 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
       }
       // Keep the queue topped up in the background.
       window.setTimeout(() => { void preloadNextTrack(); }, 300);
-      if (token !== tuneToken || !on) return;
-      if (!track) continue;
+      if (token !== tuneToken || !on) { endTune(); return; }
+      if (!track) {
+        if (requestedId) {
+          // Be honest rather than substituting. Silently playing something else is
+          // exactly what made this feel random.
+          radioLog(`requested #${requestedId} has no playable audio`, 'staying put rather than substituting', requestedId);
+          setNow('-- THAT ONE HAS NO PLAYABLE AUDIO --', false);
+          endTune();
+          return;
+        }
+        continue;
+      }
       // Let the tuning sweep finish before the song lands — feels like a dial.
       const elapsed = (performance.now() - startedTuning) / 1000;
       if (elapsed < tuningSeconds) {
         await new Promise((resolve) => setTimeout(resolve, (tuningSeconds - elapsed) * 1000));
       }
-      if (token !== tuneToken || !on) return;
+      if (token !== tuneToken || !on) { endTune(); return; }
       if (player.src !== track.src) {
         player.src = track.src;
       }
@@ -1251,6 +1282,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
         markPlayed(track.tokenId);   // no-repeat: this song sits out until the cycle completes
         noSignalRetries = 0;
         window.setTimeout(() => { void preloadNextTrack(); }, 1500);
+        endTune();
         return;
       } catch (error) {
         radioLog(`play FAILED #${track.tokenId}`, { error: String(error), mediaError: player.error && player.error.code, ready: player.readyState, net: player.networkState }, track.tokenId);
@@ -1259,6 +1291,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
         // Autoplay refusal, decode failure, or stall — try another station.
       }
     }
+    endTune();
     if (token === tuneToken && on) {
       stopTicker();
       // SELF-HEALING: never park on a dead dial. Widen the pool (forget the
@@ -1275,7 +1308,9 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
   };
 
   player.addEventListener('ended', () => {
-    if (on) {
+    // Same guard: an `ended` raised while a tune is mid-swap belongs to the source
+    // being replaced, not to a song that finished playing.
+    if (on && !tuneInFlight) {
       void tuneToNextTrack();
     }
   });
@@ -1288,7 +1323,10 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
 
   player.addEventListener('error', () => {
     radioLog('player element error', { code: player.error && player.error.code, src: (player.currentSrc || '').slice(0, 80) }, currentTokenId);
-    if (on) {
+    // NOT while we are the ones changing the source. Swapping src aborts the previous
+    // load and surfaces as an error on the element; retuning here would discard the
+    // song the listener just asked for and replace it with an unrequested one.
+    if (on && !tuneInFlight) {
       void tuneToNextTrack();
     }
   });

@@ -18,6 +18,51 @@ import { describe, expect, it } from 'vitest';
 
 const radio = readFileSync(new URL('../radio.js', import.meta.url), 'utf8');
 
+describe('the dial sweep is for power, not for skipping', () => {
+  it('only sweeps on the first tune after switching on', () => {
+    expect(radio).toContain("const tuningSeconds = firstTune ? playTuning(1, 'on') : 0;");
+    // switchOff resets firstTune, so EVERY power-on sweeps — not just the first of
+    // the session.
+    const off = radio.slice(radio.indexOf('const switchOff = ()'), radio.indexOf('const switchOff = ()') + 400);
+    expect(off).toContain('firstTune = true;');
+    expect(off).toContain("playTuning(-1, 'off')");
+  });
+
+  it('adds no delay between songs either', () => {
+    // The song is deliberately held back until the sweep finishes, so a zero-length
+    // sweep must also mean a zero-length wait — otherwise skipping stays sluggish
+    // while merely being silent.
+    expect(radio).toContain('if (elapsed < tuningSeconds) {');
+    expect(radio).not.toContain("playTuning(1, 'between')");
+  });
+});
+
+describe('a deliberate click is never overridden by the player itself', () => {
+  it('ignores media errors raised while a tune is mid-swap', () => {
+    // Assigning player.src ABORTS whatever the element was loading, and the browser
+    // reports that as an `error`. The handler answered by starting ANOTHER tune with
+    // no requested id — and that one took a higher tuneToken, so it WON. A click
+    // therefore landed on a song nobody chose, intermittently, depending on whether
+    // the previous track was still loading. That is the "chaotic" part.
+    expect(radio).toContain('if (on && !tuneInFlight) {');
+    expect((radio.match(/if \(on && !tuneInFlight\) \{/g) || []).length).toBe(2);   // error AND ended
+  });
+
+  it('only the current tune may lower the in-flight flag', () => {
+    // A superseded tune returning early must not clear the flag out from under the
+    // newer one that is still swapping src.
+    expect(radio).toContain('const endTune = () => { if (token === tuneToken) tuneInFlight = false; };');
+    expect(radio).not.toMatch(/^\s*tuneInFlight = false;\s*$/m);   // no unguarded clears
+  });
+
+  it('says so rather than substituting when the requested song will not play', () => {
+    // forcedNext is consumed by the first pickNext, so a failed resolve used to fall
+    // through to attempt 2 unforced — quietly playing a song the listener never chose.
+    expect(radio).toContain('const requestedId = forcedNext;');
+    expect(radio).toContain('THAT ONE HAS NO PLAYABLE AUDIO');
+  });
+});
+
 describe('an explicit song request beats the preload queue', () => {
   it('skips the cued track when a specific song was asked for', () => {
     expect(radio).toContain('} else if (preloadQueue.length && !forcedNext) {');

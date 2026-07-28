@@ -30,7 +30,8 @@ describe('Deposit-wallet transactions are nonce-sequenced', () => {
   it('reads a mempool-aware nonce and threads it into each send', () => {
     expect(agentSource).toContain('possible_next_nonce');
     expect(agentSource).toContain('opts.nonce = await safeNonce(from, logId)');
-    expect(agentSource).toContain('nonce = await safeNonce(getAddressFromPrivateKey(key, TransactionVersion.Mainnet))');
+    // sendStx resolves its own address first, then threads a mempool-aware nonce.
+    expect(agentSource).toMatch(/const from = getAddressFromPrivateKey\(key, TransactionVersion\.Mainnet\);[\s\S]{0,160}safeNonce\(from\)/);
   });
 });
 
