@@ -133,6 +133,22 @@ export class FakeChain {
       return json({ results: rows });
     }
 
+    // --- mempool for an address: what is queued and unmined ---
+    m = /\/extended\/v1\/address\/([^/]+)\/mempool/.exec(url);
+    if (m) {
+      return json({
+        total: this.pending.length,
+        results: this.pending.map((p) => ({
+          nonce: p.nonce,
+          fee_rate: String(p.fee),
+          tx_type: p.kind === 'transfer' ? 'contract_call' : p.kind,
+          contract_call: p.kind === 'transfer' ? { function_name: 'transfer' } : undefined,
+          receipt_time_iso: p.sinceIso ?? null,
+          tx_id: `0xpending${p.nonce}`
+        }))
+      });
+    }
+
     // --- NFT holdings index ---
     m = /\/extended\/v1\/tokens\/nft\/holdings\?principal=([^&]+)/.exec(url);
     if (m) {
@@ -188,6 +204,13 @@ export class FakeChain {
     if (url.includes('/v2/transactions')) {
       const fee = this.lastBroadcastFee ?? 0n;
       this.broadcasts.push(fee);
+      if (this.lastBroadcastRecipient) this.transferRecipients.push(this.lastBroadcastRecipient);
+      if (this.rejectAllBroadcasts) {
+        return json({ error: 'transaction rejected', reason: this.rejectAllBroadcasts }, 400);
+      }
+      if (this.rejectSelfTransfer && this.lastBroadcastRecipient && this.lastBroadcastRecipient === this.selfTransferAddress) {
+        return json({ error: 'transaction rejected', reason: 'TransferRecipientCannotEqualSender' }, 400);
+      }
       if (fee <= this.minAcceptedFee) {
         return json({ error: 'transaction rejected', reason: 'FeeTooLow', reason_data: { expected: String(this.minAcceptedFee + 1n) } }, 400);
       }
@@ -228,6 +251,20 @@ export class FakeChain {
   lastBroadcastFee: bigint | null = null;
   /** Nonce on the transaction currently being broadcast. */
   lastBroadcastNonce: bigint | null = null;
+  /** Recipient of the transfer currently being broadcast, if it is one. */
+  lastBroadcastRecipient: string | null = null;
+  lastBroadcastSender: string | null = null;
+  /** Every transfer recipient seen, in order — lets a test assert where funds went. */
+  transferRecipients: string[] = [];
+  /** Set by a test to the sending wallet, so a self-transfer can be recognised. */
+  selfTransferAddress: string | null = null;
+  /** Transactions sitting in the mempool for the address under test. */
+  pending: Array<{ nonce: number; fee: number; kind: string; sinceIso?: string }> = [];
+  /** When set, every broadcast is refused with this reason. */
+  rejectAllBroadcasts: string | null = null;
+  /** Mainnet rejects a transfer to yourself. Modelling it means a test fails where the
+   *  real node did: this exact rule silently defeated the whole unstick feature. */
+  rejectSelfTransfer = true;
 }
 
 // (some u<id>) / none, as Clarity hex — built with the real serializer at load time.
@@ -316,6 +353,17 @@ export async function loadAgent(chain: FakeChain, opts: { core?: string } = {}) 
           const tx: any = stacks.deserializeTransaction(raw);
           chain.lastBroadcastFee = BigInt(tx.auth.spendingCondition.fee.toString());
           chain.lastBroadcastNonce = BigInt(tx.auth.spendingCondition.nonce.toString());
+          // Token transfers carry a recipient; remember it so a test can assert where
+          // the money went — and so the fake node can enforce the real rule below.
+          try {
+            const r = tx.payload && tx.payload.recipient;
+            chain.lastBroadcastRecipient = r ? stacks.cvToString(r) : null;
+          } catch { chain.lastBroadcastRecipient = null; }
+          try {
+            chain.lastBroadcastSender = stacks.getAddressFromPublicKey(
+              tx.auth.spendingCondition.signer ? tx.auth.spendingCondition.signer : '', undefined as any
+            );
+          } catch { chain.lastBroadcastSender = null; }
         } catch { chain.lastBroadcastFee = null; chain.lastBroadcastNonce = null; }
       }
     }

@@ -551,7 +551,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-27.9';
+export const AGENT_BUILD = '2026-07-28.1';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -918,13 +918,13 @@ async function pendingQueue(addr: string): Promise<Array<{ nonce: bigint; fee: b
 /**
  * Replace-by-fee the whole stuck queue, oldest nonce first.
  *
- * Each stuck nonce is replaced with a 1 uSTX self-transfer at a fee that will actually
- * be mined. That CANCELS whatever was queued at that nonce, which is the point: those
+ * Each stuck nonce is replaced with a 1 uSTX transfer TO THE PAYER at a fee that will
+ * actually be mined. That CANCELS whatever was queued at that nonce, which is the point: those
  * transactions have been unmineable for hours, and recovery re-issues the useful ones
  * afterwards at proper fees. Replacing rather than appending is the only thing that can
  * unblock a queue, because the front of it is what everything else is waiting on.
  */
-async function unstickQueue(job: any, key: string, addr: string, onProg: (m: string) => void) {
+async function unstickQueue(job: any, key: string, addr: string, to: string, onProg: (m: string) => void) {
   const queue = await pendingQueue(addr);           // throws rather than guess
   if (!queue.length) return { replaced: [], alreadyClear: true };
   const bal = await balance(addr);                  // throws rather than guess
@@ -935,11 +935,19 @@ async function unstickQueue(job: any, key: string, addr: string, onProg: (m: str
     let fee = stuck.fee * 3n;
     if (fee < TRANSFER_FEE_FLOOR * 2n) fee = TRANSFER_FEE_FLOOR * 2n;
     if (fee > MINT_CAP) fee = MINT_CAP;
-    const spent = replaced.reduce((t, r) => t + BigInt(r.fee), 0n);
+    // Only SUCCESSFUL replacements have spent anything. A failed one is {nonce, error}
+    // with no fee, and BigInt(undefined) threw — so the first rejection crashed the
+    // whole loop and every later nonce went unreported. That is why a run against a
+    // six-deep queue logged exactly one rejection and then went silent.
+    const spent = replaced.reduce((t: bigint, r: any) => t + (r.fee ? BigInt(r.fee) : 0n), 0n);
     if (bal < spent + fee + 1n) { replaced.push({ nonce: String(stuck.nonce), error: 'not enough STX left to replace this one' }); break; }
     onProg(`clearing stuck transaction ${stuck.nonce} (${stuck.kind}) — replacing ${stuck.fee} with ${fee} uSTX`);
     try {
-      const tx: any = await makeSTXTokenTransfer({ recipient: addr, amount: 1n, senderKey: key, network, fee, anchorMode: AnchorMode.Any, nonce: stuck.nonce } as any);
+      // NOT to itself. Stacks rejects a transfer whose recipient equals the sender
+      // (TransferRecipientCannotEqualSender), so the "harmless self-send" this used to
+      // build was refused by the node every time and nothing was ever replaced. One
+      // microSTX goes to the payer instead — the same address the refund targets.
+      const tx: any = await makeSTXTokenTransfer({ recipient: to, amount: 1n, senderKey: key, network, fee, anchorMode: AnchorMode.Any, nonce: stuck.nonce } as any);
       const res: any = await broadcastTransaction(tx, network);
       if (res.error) throw new Error(res.error + (res.reason ? ' ' + res.reason : ''));
       replaced.push({ nonce: String(stuck.nonce), was: String(stuck.fee), now: String(fee), fee: String(fee), txid: res.txid || res });
@@ -2119,7 +2127,13 @@ async function reapTick() {
     if (!job.ephemeralMnemonic) throw new Error('this job no longer has a key — nothing to unstick');
     const dep = deriveFrom(job.ephemeralMnemonic);
     const prog = (m: string) => { const j = readJob(id); j.progress = m; j.progressAt = new Date().toISOString(); writeJob(j); xaoLog(id, m); };
-    const out = await unstickQueue(job, dep.key, dep.address, prog);
+    // The replacement has to go somewhere that is not this wallet, so it goes where a
+    // refund would: the address that paid.
+    const to = (await resolveFunder(job)) || job.expectedFunder || job.user;
+    if (!to || !/^SP[0-9A-HJKMNP-Z]{37,41}$/.test(String(to))) {
+      throw new Error('cannot work out which wallet paid for this job, so there is nowhere safe to send the replacement');
+    }
+    const out = await unstickQueue(job, dep.key, dep.address, String(to), prog);
     const j = readJob(id);
     j.unstick = [...(j.unstick || []), { at: new Date().toISOString(), ...out }];
     const ok = out.replaced.filter((r: any) => r.txid).length;
