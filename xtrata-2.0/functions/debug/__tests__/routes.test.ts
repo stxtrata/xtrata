@@ -50,6 +50,35 @@ describe('/debug dashboard route', () => {
     expect(html).toContain('WALLET_RPC_INTERNAL');
     expect(html).toContain('Technical details (latest occurrence)');
   });
+
+  // The page markup is a TEMPLATE LITERAL, so any backslash escape in it is
+  // consumed at build time: a `\n` written inside an inline-script string is
+  // emitted as a real newline, which breaks the string across two lines and
+  // takes the whole dashboard down with "Uncaught SyntaxError: Invalid or
+  // unexpected token". That shipped once and the tests above did not notice,
+  // because serving valid-looking HTML says nothing about the script parsing.
+  it('serves an inline script that actually parses', async () => {
+    const login = await call(
+      debugPage,
+      new Request('https://x/debug', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ key: DEBUG_KEY })
+      }),
+      { DEBUG_VIEW_KEY: DEBUG_KEY }
+    );
+    const cookie = login.headers.get('set-cookie')?.split(';')[0] ?? '';
+    const res = await call(debugPage, new Request('https://x/debug', { headers: { cookie } }), {
+      DEBUG_VIEW_KEY: DEBUG_KEY
+    });
+    const html = await res.text();
+
+    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+    expect(scripts.length).toBeGreaterThan(0);
+    for (const [i, source] of scripts.entries()) {
+      expect(() => new Function(source), `inline script ${i} must parse`).not.toThrow();
+    }
+  });
 });
 
 describe('/debug/data route', () => {

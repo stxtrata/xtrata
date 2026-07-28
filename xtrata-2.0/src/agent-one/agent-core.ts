@@ -551,7 +551,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-28.2';
+export const AGENT_BUILD = '2026-07-28.3';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -1146,7 +1146,7 @@ async function recoverJobAssets(jobIn: any) {
     job.cancelReason = `recovery complete — ${knownTokenIds.length} inscription${knownTokenIds.length === 1 ? '' : 's'} and remaining STX returned`;
     job.progress = job.cancelReason;
     job.status = 'CANCELLED';
-    delete job.ephemeralMnemonic; delete job.keepKey; delete job.keepKeyReason; delete job.error;
+    delete job.ephemeralMnemonic; delete job.keepKey; delete job.keepKeyGrace; delete job.keepKeyReason; delete job.error;
     writeJob(job);
     return { recovered: true, ...job.recovery };
   }
@@ -1222,7 +1222,7 @@ async function recoverJobAssets(jobIn: any) {
   job.cancelReason = `recovery complete — ${returnedTokenIds.length} inscription${returnedTokenIds.length === 1 ? '' : 's'} and remaining STX returned`;
   job.progress = job.cancelReason;
   job.status = 'CANCELLED';
-  delete job.ephemeralMnemonic; delete job.keepKey; delete job.keepKeyReason; delete job.error;
+  delete job.ephemeralMnemonic; delete job.keepKey; delete job.keepKeyGrace; delete job.keepKeyReason; delete job.error;
   writeJob(job);
   xaoLog(job.jobId, `RECOVERY complete · returned tokens ${returnedTokenIds.join(', ') || 'none'} · refund ${sweep.amount || '0'} uSTX`);
 
@@ -1792,11 +1792,14 @@ async function refundAndClose(job: any, reasonIn = 'cancelled') {
     // re-runnable by the watcher and still offering its own Stop button, so the
     // thing the user just stopped looked like it had not stopped at all. The key is
     // still kept, so a payment confirming late never lands at a keyless address.
+    // keepKeyGrace marks the key as held for insurance, not because value is stranded.
+    // unfinished.ts uses it to keep these out of the reminder: nothing is at stake, and
+    // autoRunAll still polls them for a late deposit either way.
     else if (job.cancelRequested) {
-      job.keepKey = true; job.status = 'CANCELLED';
+      job.keepKey = true; job.keepKeyGrace = true; job.status = 'CANCELLED';
       job.keepKeyReason = 'cancelled before funding — key kept so a late payment is never stranded';
     }
-    else { job.keepKey = true; job.status = 'EXPIRED'; job.keepKeyReason = 'never funded — key kept so a late payment is never stranded'; }
+    else { job.keepKey = true; job.keepKeyGrace = true; job.status = 'EXPIRED'; job.keepKeyReason = 'never funded — key kept so a late payment is never stranded'; }
   }
   else { job.keepKey = true; job.status = 'NEEDS_RECOVERY'; job.keepKeyReason = `refund unconfirmed; ~${leftover ?? '?'} uSTX may remain`; }
   // Stamp progress on every exit. The fatal path never did, so the watcher's
@@ -2196,6 +2199,53 @@ async function reapTick() {
         : `could not replace any stuck transaction — ${j.unstickError}`;
     j.progressAt = new Date().toISOString(); writeJob(j);
     return out;
+  },
+  /**
+   * Job records for moving between origins (xtrata.xyz vs a pages.dev preview keep
+   * SEPARATE localStorage, so work done on one is invisible on the other).
+   *
+   * DEPOSIT KEYS ARE NEVER EXPORTED. A key is what makes "only this browser can spend
+   * that wallet" true; copying one to a second origin makes that false, and would let
+   * two tabs race each other's recovery on the same funds. Jobs that still hold a key
+   * are exported as a RECORD only, tagged with the origin that can actually finish
+   * them.
+   */
+  exportJobs: () => {
+    const jobs = listJobsRaw().map((j: any) => {
+      const { ephemeralMnemonic, ...rest } = j;
+      return ephemeralMnemonic
+        ? { ...rest, keyHeldOn: (typeof location !== 'undefined' ? location.origin : 'another browser') }
+        : rest;
+    });
+    return {
+      format: 'xtrata-jobs-v1',
+      exportedAt: new Date().toISOString(),
+      origin: typeof location !== 'undefined' ? location.origin : null,
+      jobs
+    };
+  },
+  /**
+   * Merge exported records in. Never overwrites a job this browser already has — the
+   * local copy is the one that has been running and is always the more current of the
+   * two — and strips any key that somehow made it into the file.
+   */
+  importJobs: (payload: any) => {
+    const data = typeof payload === 'string' ? JSON.parse(payload) : payload;
+    if (!data || data.format !== 'xtrata-jobs-v1' || !Array.isArray(data.jobs)) {
+      throw new Error('that does not look like an Xtrata job export');
+    }
+    let added = 0, skipped = 0, keysStripped = 0;
+    for (const incoming of data.jobs) {
+      if (!incoming || !incoming.jobId) { skipped += 1; continue; }
+      let existing = null;
+      try { existing = readJob(incoming.jobId); } catch { existing = null; }
+      if (existing) { skipped += 1; continue; }           // never clobber the live copy
+      const { ephemeralMnemonic, ...safe } = incoming;
+      if (ephemeralMnemonic) keysStripped += 1;
+      writeJob({ ...safe, importedFrom: data.origin || 'another browser', importedAt: new Date().toISOString() });
+      added += 1;
+    }
+    return { added, skipped, keysStripped, from: data.origin || null };
   },
   getReceiptHtml: (id: string) => { try { return readJob(id).receiptHtml || null; } catch { return null; } },
   getJobLog: (id: string) => { try { return readJob(id).log || []; } catch { return []; } },

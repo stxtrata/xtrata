@@ -109,8 +109,11 @@ describe('Agent One cancel safety', () => {
     // EXPIRED is re-runnable by the watcher and still offers its own Stop button,
     // so the job the user just stopped looked like it had not stopped at all.
     expect(agentSource).toContain('else if (job.cancelRequested) {');
-    expect(agentSource).toContain("job.keepKey = true; job.status = 'CANCELLED';");
+    expect(agentSource).toContain("job.status = 'CANCELLED';");
     expect(agentSource).toContain('cancelled before funding — key kept');
+    // The key is kept, but flagged as insurance rather than stranded value, so the
+    // reminder does not claim a never-funded job is still in progress.
+    expect(agentSource).toContain('job.keepKey = true; job.keepKeyGrace = true;');
   });
 
   it('is reachable from both pages, and degrades honestly on an old bundle', () => {
