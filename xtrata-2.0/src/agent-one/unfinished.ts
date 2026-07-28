@@ -21,7 +21,29 @@ export function listJobsRaw(): any[] {
   return o;
 }
 
-const FINISHED = ['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED', 'FAILED'];
+// EXPIRED belongs here: it means the deposit window closed WITHOUT a payment, so the
+// job is over. Leaving it out made every expired job unfinished forever.
+const FINISHED = ['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED', 'FAILED', 'EXPIRED'];
+
+/**
+ * True when the key is held purely as a late-payment precaution on a job that never
+ * received a penny (see the cancelRequested / EXPIRED branches in agent-core).
+ *
+ * Nothing is at stake in that case. The key is kept only so a deposit confirming after
+ * the window cannot land at a keyless address, and autoRunAll keeps polling those jobs
+ * for exactly that — so dropping them from the reminder cannot strand anything. If a
+ * late payment does land, the status moves into PAID_STATUS and the job legitimately
+ * comes back.
+ *
+ * Without this, `keepKey` alone marked the job funded, and the banner claimed an
+ * inscription was "still in progress" while its own subtitle said "never funded",
+ * with a "Not now" button that could never dismiss it for good.
+ *
+ * The regex is the migration path: jobs already in localStorage were written before
+ * keepKeyGrace existed, and both grace reasons end in this exact phrase.
+ */
+const graceKeyOnly = (j: any) =>
+  j.keepKeyGrace === true || /late payment is never stranded/.test(String(j.keepKeyReason || ''));
 // Statuses only reachable after payment. A job can also be funded without having moved
 // on yet, which `depositReceivedUstx`/`fundedAt` catch.
 const PAID_STATUS = ['FUNDED', 'INSCRIBING', 'INSCRIBED', 'DELIVERING', 'AWAITING_PARENT', 'NEEDS_RECOVERY', 'RECOVERING'];
@@ -49,7 +71,13 @@ export function unfinishedJobs(): UnfinishedJob[] {
     // or an inscription is still sitting in the deposit wallet, and those jobs were
     // being filtered straight out — so a COMPLETE job holding 6.2 STX reported
     // "nothing was paid, so nothing is at stake".
-    .filter((j) => j && j.jobId && (!FINISHED.includes(j.status) || j.keepKey || j.ephemeralMnemonic))
+    .filter(
+      (j) =>
+        j &&
+        j.jobId &&
+        (!FINISHED.includes(j.status) ||
+          ((j.keepKey || j.ephemeralMnemonic) && !graceKeyOnly(j)))
+    )
     .map((j) => ({
       jobId: String(j.jobId),
       status: String(j.status || 'UNKNOWN'),
@@ -58,7 +86,12 @@ export function unfinishedJobs(): UnfinishedJob[] {
       progress: j.progress || null,
       createdAt: j.createdAt || null,
       lastSeenAt: j.progressAt || j.fundedAt || j.createdAt || null,
-      funded: !!(j.depositReceivedUstx || j.fundedAt) || PAID_STATUS.includes(j.status) || !!j.keepKey,
+      // A kept key still implies money is at stake, EXCEPT when it is only being held
+      // against a late payment on a job that was never funded.
+      funded:
+        !!(j.depositReceivedUstx || j.fundedAt) ||
+        PAID_STATUS.includes(j.status) ||
+        (!!j.keepKey && !graceKeyOnly(j)),
       // Why the key is still held, so the reminder can say what is actually owed.
       keepKeyReason: j.keepKeyReason || null,
       hasKey: !!j.ephemeralMnemonic,

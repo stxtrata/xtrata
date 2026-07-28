@@ -1146,7 +1146,7 @@ async function recoverJobAssets(jobIn: any) {
     job.cancelReason = `recovery complete — ${knownTokenIds.length} inscription${knownTokenIds.length === 1 ? '' : 's'} and remaining STX returned`;
     job.progress = job.cancelReason;
     job.status = 'CANCELLED';
-    delete job.ephemeralMnemonic; delete job.keepKey; delete job.keepKeyReason; delete job.error;
+    delete job.ephemeralMnemonic; delete job.keepKey; delete job.keepKeyGrace; delete job.keepKeyReason; delete job.error;
     writeJob(job);
     return { recovered: true, ...job.recovery };
   }
@@ -1222,7 +1222,7 @@ async function recoverJobAssets(jobIn: any) {
   job.cancelReason = `recovery complete — ${returnedTokenIds.length} inscription${returnedTokenIds.length === 1 ? '' : 's'} and remaining STX returned`;
   job.progress = job.cancelReason;
   job.status = 'CANCELLED';
-  delete job.ephemeralMnemonic; delete job.keepKey; delete job.keepKeyReason; delete job.error;
+  delete job.ephemeralMnemonic; delete job.keepKey; delete job.keepKeyGrace; delete job.keepKeyReason; delete job.error;
   writeJob(job);
   xaoLog(job.jobId, `RECOVERY complete · returned tokens ${returnedTokenIds.join(', ') || 'none'} · refund ${sweep.amount || '0'} uSTX`);
 
@@ -1792,11 +1792,14 @@ async function refundAndClose(job: any, reasonIn = 'cancelled') {
     // re-runnable by the watcher and still offering its own Stop button, so the
     // thing the user just stopped looked like it had not stopped at all. The key is
     // still kept, so a payment confirming late never lands at a keyless address.
+    // keepKeyGrace marks the key as held for insurance, not because value is stranded.
+    // unfinished.ts uses it to keep these out of the reminder: nothing is at stake, and
+    // autoRunAll still polls them for a late deposit either way.
     else if (job.cancelRequested) {
-      job.keepKey = true; job.status = 'CANCELLED';
+      job.keepKey = true; job.keepKeyGrace = true; job.status = 'CANCELLED';
       job.keepKeyReason = 'cancelled before funding — key kept so a late payment is never stranded';
     }
-    else { job.keepKey = true; job.status = 'EXPIRED'; job.keepKeyReason = 'never funded — key kept so a late payment is never stranded'; }
+    else { job.keepKey = true; job.keepKeyGrace = true; job.status = 'EXPIRED'; job.keepKeyReason = 'never funded — key kept so a late payment is never stranded'; }
   }
   else { job.keepKey = true; job.status = 'NEEDS_RECOVERY'; job.keepKeyReason = `refund unconfirmed; ~${leftover ?? '?'} uSTX may remain`; }
   // Stamp progress on every exit. The fatal path never did, so the watcher's

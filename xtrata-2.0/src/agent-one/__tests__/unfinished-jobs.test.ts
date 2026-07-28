@@ -98,6 +98,67 @@ describe('a job that is "finished" but still holds money', () => {
   });
 });
 
+/**
+ * A key kept ONLY against a late payment is not money at stake.
+ *
+ * Reported from production: four EXPIRED jobs and a permanent banner reading "You have
+ * an inscription still in progress" whose own subtitle said "never funded". EXPIRED was
+ * missing from the finished list, and `keepKey` alone was enough to mark a job funded,
+ * so the reminder was both wrong and impossible to dismiss.
+ */
+describe('a key kept only against a late payment', () => {
+  const GRACE = 'never funded — key kept so a late payment is never stranded';
+
+  it('does not keep an expired, never-funded job alive forever', () => {
+    put({ jobId: 'expired-grace', status: 'EXPIRED', keepKey: true, keepKeyGrace: true,
+          keepKeyReason: GRACE, progressAt: iso(90) });
+    expect(unfinishedJobs()).toEqual([]);
+  });
+
+  it('does the same for a job cancelled before it was ever funded', () => {
+    put({ jobId: 'cancelled-grace', status: 'CANCELLED', keepKey: true, keepKeyGrace: true,
+          keepKeyReason: 'cancelled before funding — key kept so a late payment is never stranded',
+          progressAt: iso(90) });
+    expect(unfinishedJobs()).toEqual([]);
+  });
+
+  // Jobs already in localStorage predate the flag, so the reason string has to work too,
+  // or the fix would not clear the banner for anyone already seeing it.
+  it('recognises jobs stored before keepKeyGrace existed', () => {
+    put({ jobId: 'legacy-grace', status: 'EXPIRED', keepKey: true, keepKeyReason: GRACE, progressAt: iso(90) });
+    expect(unfinishedJobs()).toEqual([]);
+  });
+
+  it('still surfaces an expired job that DID take money', () => {
+    put({ jobId: 'expired-but-paid', status: 'EXPIRED', keepKey: true,
+          depositReceivedUstx: '6199461',
+          keepKeyReason: 'wallet still holds 6199461 uSTX — sweep with recover-all',
+          progressAt: iso(90) });
+    const [j] = unfinishedJobs();
+    expect(j.jobId).toBe('expired-but-paid');
+    expect(j.funded).toBe(true);
+  });
+
+  it('shows no banner at all for a grace-only job', () => {
+    put({ jobId: 'expired-grace', status: 'EXPIRED', keepKey: true, keepKeyGrace: true,
+          keepKeyReason: GRACE, label: 'xtrata:audio/where-every-note-remains', progressAt: iso(90) });
+    expect(unfinishedBanner()).toBeNull();
+    expect(document.querySelector('.xao-unfinished')).toBeNull();
+  });
+
+  it('never claims a never-funded job is in progress', () => {
+    // The contradiction users actually saw: the funded headline above the unfunded reason.
+    put({ jobId: 'grace-plus-real', status: 'EXPIRED', keepKey: true, keepKeyGrace: true,
+          keepKeyReason: GRACE, progressAt: iso(90) });
+    put({ jobId: 'genuinely-open', status: 'AWAITING_DEPOSIT', uri: 'xtrata:text/thing', createdAt: iso(30) });
+    const job = unfinishedBanner();
+    expect(job?.jobId).toBe('genuinely-open');
+    const text = document.querySelector('.xao-unfinished')?.textContent ?? '';
+    expect(text).not.toContain('still in progress');
+    expect(text).toContain('never paid for it');
+  });
+});
+
 describe('the reminder itself', () => {
   it('says nothing when there is nothing to say', () => {
     expect(unfinishedBanner()).toBeNull();
