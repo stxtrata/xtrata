@@ -44,7 +44,12 @@ export type UnfinishedJob = {
  */
 export function unfinishedJobs(): UnfinishedJob[] {
   return listJobsRaw()
-    .filter((j) => j && j.jobId && !FINISHED.includes(j.status))
+    // A KEPT KEY means the job is not done with the user, whatever its status says.
+    // COMPLETE only describes the inscription; never-strand keeps the key whenever STX
+    // or an inscription is still sitting in the deposit wallet, and those jobs were
+    // being filtered straight out — so a COMPLETE job holding 6.2 STX reported
+    // "nothing was paid, so nothing is at stake".
+    .filter((j) => j && j.jobId && (!FINISHED.includes(j.status) || j.keepKey || j.ephemeralMnemonic))
     .map((j) => ({
       jobId: String(j.jobId),
       status: String(j.status || 'UNKNOWN'),
@@ -53,7 +58,9 @@ export function unfinishedJobs(): UnfinishedJob[] {
       progress: j.progress || null,
       createdAt: j.createdAt || null,
       lastSeenAt: j.progressAt || j.fundedAt || j.createdAt || null,
-      funded: !!(j.depositReceivedUstx || j.fundedAt) || PAID_STATUS.includes(j.status),
+      funded: !!(j.depositReceivedUstx || j.fundedAt) || PAID_STATUS.includes(j.status) || !!j.keepKey,
+      // Why the key is still held, so the reminder can say what is actually owed.
+      keepKeyReason: j.keepKeyReason || null,
       hasKey: !!j.ephemeralMnemonic,
       needsRecovery: j.status === 'NEEDS_RECOVERY',
       href: (j.origin === 'suno' ? '/wizard/suno' : '/wizard/') + `?job=${encodeURIComponent(j.jobId)}`

@@ -356,6 +356,11 @@
   th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line)}
   th{color:var(--mut);font-weight:600} tbody tr{cursor:pointer} tbody tr:hover{background:#0e1622}
   tbody tr.sel{background:#10203a}
+  /* The expansion row is a panel, not a table cell: no cell padding fighting the
+     detail's own layout, and a left edge tying it to the row it belongs to. */
+  tbody tr.jobrow-detail[hidden]{display:none}
+  tbody tr.jobrow-detail>td{padding:0 0 12px 0;border-top:0;background:#0b1524;border-left:2px solid var(--acc)}
+  tbody tr.jobrow-detail>td>*{margin-left:12px;margin-right:12px}
   .deposit{background:linear-gradient(180deg,#0f1f17,#0c1812);border:1px solid #1f5a45;border-radius:12px;padding:16px;margin-top:14px}
   .copy{cursor:pointer;border:1px solid var(--line);background:var(--panel2);border-radius:7px;padding:2px 8px;font-size:11px;color:var(--mut)}
   .err{color:var(--bad);font-size:12px;margin-top:8px;min-height:16px}
@@ -686,7 +691,6 @@ try{
     <div class="opts-body">
       <table><thead><tr><th>Job</th><th>URI</th><th>Size</th><th>Required</th><th>Status</th><th>Token</th></tr></thead>
         <tbody id="jobsBody"><tr><td colspan="6" class="muted">No jobs yet.</td></tr></tbody></table>
-      <div id="jobDetail"></div>
     </div>
   </details>
 
@@ -783,7 +787,7 @@ try{
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
-<script src="agent-one.js?v=2026-07-27.7"></script>
+<script src="agent-one.js?v=2026-07-27.9"></script>
 <script src="optimize-audio.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script>
@@ -1765,48 +1769,93 @@ window.addEventListener('beforeunload',(e)=>{
 });
 async function loadJobs(){
   try{ const {jobs}=await api('/api/jobs'); const b=$('#jobsBody');
-    if(!jobs.length){ b.innerHTML='<tr><td colspan="6" class="muted">No jobs yet.</td></tr>'; return jobs; }
-    b.innerHTML=jobs.map(j=>{ const ds=(j.status==='AWAITING_DEPOSIT'&&j.funded)?'FUNDED':j.status; return `<tr onclick="selectJob('${j.jobId}')" class="${selJob===j.jobId?'sel':''}">
-      <td class="mono">${esc(j.jobId.replace('job-',''))}</td><td>${esc(j.uri||(j.items?('📦 batch · '+j.items.length+' items'):''))}</td>
+    if(!jobs.length){ b.dataset.sig=''; b.innerHTML='<tr><td colspan="6" class="muted">No jobs yet.</td></tr>'; return jobs; }
+    // Each job carries its own expansion row. Opening a job used to render into a
+    // single panel BELOW the table, so clicking a row near the top scrolled nothing
+    // and the detail appeared off-screen — it read as "nothing happened".
+    const html=jobs.map(j=>{ const ds=(j.status==='AWAITING_DEPOSIT'&&j.funded)?'FUNDED':j.status; const open=selJob===j.jobId; return `<tr onclick="selectJob('${j.jobId}')" class="${open?'sel':''}" title="${open?'Collapse':'Expand'} this job">
+      <td class="mono">${open?'▾':'▸'} ${esc(j.jobId.replace('job-',''))}</td><td>${esc(j.uri||(j.items?('📦 batch · '+j.items.length+' items'):''))}</td>
       <td>${(j.bytes/1048576).toFixed(2)}M</td><td class="mono">${stx(j.requiredUstx)}</td>
-      <td><span class="status s-${ds}">${ds.replace(/_/g,' ')}</span></td><td class="mono">${j.items?(j.items.filter(i=>i.tokenId).length+'/'+j.items.length):(j.tokenId||'—')}</td></tr>`; }).join('');
+      <td><span class="status s-${ds}">${ds.replace(/_/g,' ')}</span></td><td class="mono">${j.items?(j.items.filter(i=>i.tokenId).length+'/'+j.items.length):(j.tokenId||'—')}</td></tr>
+      <tr class="jobrow-detail"${open?'':' hidden'}><td colspan="6" data-job-detail="${esc(j.jobId)}"></td></tr>`; }).join('');
+    // Only touch the DOM when the rows actually differ. A poll that changes nothing
+    // used to replace the whole table anyway, discarding the open job's rendered
+    // detail and forcing it to be rebuilt from scratch.
+    if(b.dataset.sig!==html){ b.dataset.sig=html; b.innerHTML=html; }
     return jobs;
-  }catch(e){ $('#jobsBody').innerHTML=`<tr><td colspan="6" class="err">${esc(e.message)}</td></tr>`; return []; }
+  }catch(e){ const b=$('#jobsBody'); b.dataset.sig=''; b.innerHTML=`<tr><td colspan="6" class="err">${esc(e.message)}</td></tr>`; return []; }
 }
 $('#refreshJobs').onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); loadJobs(); };
-async function jobsTick(){ try{ await Promise.all([
-  ($('#historySection').open||FLOW.jobId)?loadJobs():Promise.resolve(),
-  FLOW.jobId?renderJobDetail(FLOW.jobId,$('#activeJobDetail'),true):Promise.resolve(),
-  (selJob&&selJob!==FLOW.jobId)?renderJobDetail(selJob,$('#jobDetail'),false):Promise.resolve(),
-]); }catch(e){} }
+async function jobsTick(){ try{
+  // ORDER MATTERS. loadJobs() rebuilds the table body, which destroys the expansion
+  // cell holding an open job's detail. Running it alongside renderJobDetail meant the
+  // rebuild could finish last and wipe the freshly written detail — the open row
+  // looked like it collapsed on every poll. Table first, then fill it.
+  if($('#historySection').open||FLOW.jobId) await loadJobs();
+  await Promise.all([
+    FLOW.jobId?renderJobDetail(FLOW.jobId,$('#activeJobDetail'),true):Promise.resolve(),
+    (selJob&&selJob!==FLOW.jobId)?renderJobDetail(selJob,jobDetailEl(selJob),false):Promise.resolve(),
+  ]);
+}catch(e){} }
 function startJobsPoll(){ if(pollTimer)clearInterval(pollTimer); pollTimer=setInterval(jobsTick,3000); }
 function stopJobsPoll(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
-async function selectJob(id){ selJob=id; if(id===FLOW.jobId){ $('#jobDetail').innerHTML='<div class="muted" style="margin-top:10px">That job is live in the card above.</div>'; loadJobs(); return; } loadJobs(); renderJobDetail(id,$('#jobDetail'),false); startJobsPoll(); }
+// The expansion cell for a job, or null when that job is not open.
+function jobDetailEl(id){ return document.querySelector('[data-job-detail="'+id+'"]'); }
+async function selectJob(id){
+  // Toggle: clicking the open job closes it, so the row is a real disclosure control
+  // rather than a one-way selection you cannot undo.
+  if(selJob===id){ selJob=null; await loadJobs(); return; }
+  selJob=id;
+  await loadJobs();                     // redraw so the expansion row for THIS job exists
+  if(id===FLOW.jobId){ const c=jobDetailEl(id); if(c) c.innerHTML='<div class="muted" style="margin:10px 0">That job is live in the card above.</div>'; return; }
+  renderJobDetail(id,jobDetailEl(id),false);
+  startJobsPoll();
+}
 $('#historySection').addEventListener('toggle',()=>{ if($('#historySection').open){ loadJobs(); startJobsPoll(); } else if(!FLOW.jobId){ stopJobsPoll(); } });
 
 // Transactions execute in nonce order, so ONE the miners will not take freezes every
 // transaction behind it. Recovery then fails for a reason that looks nothing like the
 // cause ("wallet still holds an inscription"), and each retry queues another doomed
 // transaction. Ask the mempool, and only offer the fix when there is something to fix.
+// The job panel rebuilds its whole innerHTML every 3s, so anything filled in
+// ASYNCHRONOUSLY afterwards vanishes on each rebuild and pops back when the fetch
+// lands — the page grew and shrank every few seconds. The status is cached and
+// rendered synchronously as part of that HTML instead, so the panel is complete the
+// instant it is drawn, and the mempool is only re-read occasionally.
+const STUCK={};                 // jobId -> { st, at }
+const STUCK_ERR={};             // jobId -> last rejection, kept across panel rebuilds
+const STUCK_MAX_AGE_MS=20000;   // a jammed queue does not change second to second
 let stuckRun=0;
+
+function stuckPanelHtml(jobId){
+  const c=STUCK[jobId]; const st=c&&c.st;
+  if(!st||(!st.stuck&&!st.unknown)) return '';
+  const body = st.unknown
+    ? '<span class="muted">Could not check whether transactions are queued ('+esc(st.error||'')+').</span>'
+    : ('<b>⚠ '+st.pending.length+' transaction'+(st.pending.length===1?'':'s')+' stuck in the queue</b>'
+      +'<div class="muted" style="margin-top:5px">Transactions confirm in order, so the oldest one'
+      +((st.oldestAgeMs!=null)?(' — waiting '+(Math.round(st.oldestAgeMs/60000)>=120?(Math.round(st.oldestAgeMs/3600000)+' hours'):(Math.round(st.oldestAgeMs/60000)+' minutes'))):'')
+      +' — is blocking the rest. Nothing can move until it clears, which is why recovery keeps stopping.</div>'
+      +'<div class="mono muted" style="margin-top:6px;font-size:11px">'
+      + st.pending.map(p=>'nonce '+esc(p.nonce)+' · '+esc(p.kind)+' · '+esc(p.fee)+' µSTX').join('<br>')
+      +'</div>'
+      +'<div class="btnrow" style="margin-top:8px"><button class="btn" onclick="act(\'unstick\',\''+esc(jobId)+'\')">Clear the stuck transactions</button></div>'
+      +(STUCK_ERR[jobId]?('<div class="err" style="margin-top:8px;font-size:11.5px">Last attempt was rejected — '+esc(STUCK_ERR[jobId])+'</div>'):''));
+  return '<div id="stuckRow" style="margin-top:10px;padding:10px 12px;border:1px solid var(--warn);border-radius:10px;font-size:12.5px">'+body+'</div>';
+}
+
+// Refresh the cache in the background. Only re-renders when the answer CHANGED, so a
+// steady state never redraws anything.
 async function checkStuck(jobId){
-  const box=$('#stuckRow'); if(!box) return;
+  const A=window.XtrataAgent; if(!A||!A.stuckStatus) return;
+  const c=STUCK[jobId];
+  if(c&&Date.now()-c.at<STUCK_MAX_AGE_MS) return;      // still fresh enough
   const run=++stuckRun;
-  const A=window.XtrataAgent; if(!A||!A.stuckStatus){ box.style.display='none'; return; }
-  let st=null; try{ st=await A.stuckStatus(jobId); }catch(e){ st=null; }
-  if(run!==stuckRun||!box.isConnected) return;
-  if(!st||(!st.stuck&&!st.unknown)){ box.style.display='none'; box.innerHTML=''; return; }
-  box.style.display='block';
-  if(st.unknown){ box.innerHTML='<span class="muted">Could not check whether transactions are queued (' + esc(st.error||'') + ').</span>'; return; }
-  const mins=st.oldestAgeMs?Math.round(st.oldestAgeMs/60000):null;
-  box.innerHTML='<b>⚠ '+st.pending.length+' transaction'+(st.pending.length===1?'':'s')+' stuck in the queue</b>'
-    +'<div class="muted" style="margin-top:5px">Transactions confirm in order, so the oldest one'
-    +(mins!=null?(' — waiting '+(mins>=120?(Math.round(mins/60)+' hours'):(mins+' minutes'))):'')
-    +' — is blocking the rest. Nothing can move until it clears, which is why recovery keeps stopping.</div>'
-    +'<div class="mono muted" style="margin-top:6px;font-size:11px">'
-    + st.pending.map(p=>'nonce '+esc(p.nonce)+' · '+esc(p.kind)+' · '+esc(p.fee)+' µSTX').join('<br>')
-    +'</div>'
-    +'<div class="btnrow" style="margin-top:8px"><button class="btn" onclick="act(\'unstick\',\''+esc(jobId)+'\')">Clear the stuck transactions</button></div>';
+  let st=null; try{ st=await A.stuckStatus(jobId); }catch(e){ return; }
+  if(run!==stuckRun) return;
+  const before=JSON.stringify(c&&c.st||null);
+  STUCK[jobId]={ st, at:Date.now() };
+  if(JSON.stringify(st)!==before&&selJob===jobId) renderJobDetail(jobId,jobDetailEl(jobId),false);
 }
 
 // Stand the banner down: goes through the panel so the leave guard is disarmed too.
@@ -1922,9 +1971,10 @@ async function renderJobDetail(jobId,out,isActive){
       <div class="muted" style="margin-top:8px;font-size:12px">Recovery returns every inscription first, verifies the escrow wallet is NFT-empty, then refunds the remaining STX to the recorded payer. No receipt or new inscription is created.</div>
       ${/NotEnoughFunds|insufficient funds/i.test(job.error||'')?`<div class="muted" style="margin-top:8px;font-size:12px;color:var(--warn)">The recovery wallet needs a small STX top-up to pay the NFT transfer fee. Copy the address above, top it up, then run recovery again.</div>`:''}
       <div class="btnrow"><button class="btn good" onclick="act('recover','${esc(job.jobId)}')">Recover inscriptions + STX now</button></div>
-      <!-- Only rendered once a jam is actually confirmed (checkStuck below) — an
-           always-visible button invites people to spend fees clearing nothing. -->
-      <div id="stuckRow" style="display:none;margin-top:10px;padding:10px 12px;border:1px solid var(--warn);border-radius:10px;font-size:12.5px"></div>
+      <!-- Rendered from cache, synchronously: filling this in after the fact made the
+           panel appear and disappear on every 3s rebuild. Empty until a jam is
+           confirmed — an always-visible button invites people to spend fees on nothing. -->
+      ${stuckPanelHtml(jobId)}
       <div class="err" id="jobErr"></div>`:''}
       ${st==='NEEDS_FUNDS'?`<div style="margin-top:12px;padding:11px 13px;border:1px solid var(--warn);border-radius:10px;font-size:12.5px">
         <b>Paused — this job needs more STX to finish.</b>
@@ -2014,10 +2064,13 @@ async function act(which,jobId){
       const r=await A.unstickJob(id);
       const ok=(r.replaced||[]).filter(x=>x.txid).length;
       const failed=(r.replaced||[]).filter(x=>x.error);
-      if(errEl&&failed.length) errEl.textContent=failed.map(f=>'nonce '+f.nonce+': '+f.error).join('; ');
-      alert(r.alreadyClear
-        ? 'Nothing was stuck — the queue is already clear.'
-        : 'Replaced '+ok+' stuck transaction'+(ok===1?'':'s')+'.\n\nThey take a few minutes to confirm. Once they do, press "Recover inscriptions + STX now" again.');
+      // Held outside the panel: #jobErr lives inside markup that is rebuilt every 3s,
+      // so a rejection written there was erased before it could be read.
+      STUCK_ERR[id]=failed.length?failed.map(f=>'nonce '+f.nonce+': '+f.error).join(' · '):null;
+      delete STUCK[id];                       // force a fresh mempool read
+      if(ok) alert('Replaced '+ok+' stuck transaction'+(ok===1?'':'s')+'.\n\nThey take a few minutes to confirm. Once they do, press "Recover inscriptions + STX now" again.');
+      else if(failed.length) alert('None of the replacements were accepted.\n\n'+failed.map(f=>'nonce '+f.nonce+': '+f.error).join('\n')+'\n\nThe exact reason is also in the job log.');
+      else if(r.alreadyClear) alert('Nothing was stuck — the queue is already clear.');
       jobsTick();
     }catch(e){ if(errEl) errEl.textContent=(e&&e.message)||String(e); else alert(e.message); }
     return;
@@ -2047,7 +2100,7 @@ async function act(which,jobId){
     if(!sure) return;
     try{
       await A.discardJob(id,'i-accept-losing-the-unfinished-upload');
-      if(selJob===id){ selJob=null; $('#jobDetail').innerHTML=''; }
+      if(selJob===id){ selJob=null; }
       if(FLOW.jobId===id){ FLOW.jobId=null; $('#activeJobDetail').innerHTML=''; clearKeepOpen(); }
       loadJobs();
     }catch(e){ const errEl=$('#jobErr'); if(errEl){errEl.textContent=e.message;} else alert(e.message); }
@@ -2055,7 +2108,7 @@ async function act(which,jobId){
   }
   if(which==='delete'){
     if(!confirm('Delete this job from the list?\nThe inscription stays on-chain — this only removes the local record + receipt.')) return;
-    try{ await api('/api/jobs/'+id+'/delete',{method:'POST'}); if(selJob===id){ selJob=null; $('#jobDetail').innerHTML=''; } if(FLOW.jobId===id){ FLOW.jobId=null; $('#activeJobDetail').innerHTML=''; clearKeepOpen(); } loadJobs(); }
+    try{ await api('/api/jobs/'+id+'/delete',{method:'POST'}); if(selJob===id){ selJob=null; } if(FLOW.jobId===id){ FLOW.jobId=null; $('#activeJobDetail').innerHTML=''; clearKeepOpen(); } loadJobs(); }
     catch(e){ const errEl=$('#jobErr'); if(errEl){errEl.textContent=e.message;} else alert(e.message); }
     return;
   }

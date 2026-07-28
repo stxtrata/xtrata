@@ -72,6 +72,32 @@ describe('which jobs count as unfinished', () => {
   });
 });
 
+describe('a job that is "finished" but still holds money', () => {
+  it('is still unfinished while the key is kept', () => {
+    // COMPLETE describes the INSCRIPTION, not the wallet. Never-strand keeps the key
+    // whenever STX or an inscription is still sitting there, and those jobs were being
+    // filtered out entirely — so a COMPLETE job holding 6.2 STX reported "nothing was
+    // paid, so nothing is at stake".
+    put({ jobId: 'done-but-holding', status: 'COMPLETE', keepKey: true,
+          keepKeyReason: 'wallet still holds 6199461 uSTX — sweep with recover-all',
+          progressAt: iso(5) });
+    const [j] = unfinishedJobs();
+    expect(j.jobId).toBe('done-but-holding');
+    expect(j.funded).toBe(true);                    // there is money in it right now
+    expect(j.keepKeyReason).toContain('6199461');
+  });
+
+  it('leaves a genuinely finished job alone', () => {
+    put({ jobId: 'really-done', status: 'COMPLETE', progressAt: iso(5) });
+    expect(unfinishedJobs()).toEqual([]);
+  });
+
+  it('counts a cancelled job that never released its key', () => {
+    put({ jobId: 'cancelled-holding', status: 'CANCELLED', ephemeralMnemonic: 'x', progressAt: iso(5) });
+    expect(unfinishedJobs().map((j) => j.jobId)).toEqual(['cancelled-holding']);
+  });
+});
+
 describe('the reminder itself', () => {
   it('says nothing when there is nothing to say', () => {
     expect(unfinishedBanner()).toBeNull();
