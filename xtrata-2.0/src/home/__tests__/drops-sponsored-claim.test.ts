@@ -39,7 +39,10 @@ describe('public Drops sponsored-claim surface', () => {
     expect(homeMain).toContain('inspectSponsoredClaimTransaction(payload');
     expect(homeMain).toContain('submitSponsorClaimWithRetry({');
     expect(homeMain).toContain("import { getDropsCollectionLockForDrop } from '/src/lib/drops/collection-lock.ts'");
-    expect(homeMain).toContain("import { loadDropsActivity } from '/src/lib/drops/history.ts'");
+    // The campaign fix widened this import: the page also needs the claim
+    // predicate, because campaign drops emit "claim-campaign", not "claim".
+    expect(homeMain).toContain("from '/src/lib/drops/history.ts'");
+    expect(homeMain).toContain('loadDropsActivity');
     expect(homeMain).toContain("'RELAYER_RETRY'");
     expect(homeMain).toContain('sponsor relayer is temporarily slow');
     expect(homeMain).toContain('Your wallet signature is valid; retrying safely');

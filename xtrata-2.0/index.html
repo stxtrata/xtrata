@@ -299,12 +299,18 @@
                 <textarea class="textarea" id="textPayload" spellcheck="false" placeholder="Paste or type text — up to 16 KB, inscribed in a single transaction."></textarea>
                 <span class="field-note" id="textStats">0 characters · 0 bytes</span>
               </label>
+              <!-- Attachments live inside the collapsed Advanced block, so a reply id
+                   or a parent could be set with nothing on screen to show it. The only
+                   hint was the word "reply" appearing in the button, which is far too
+                   quiet for a permanent, paid action. This strip is always visible
+                   whenever something is attached, and can clear it in one click. -->
+              <div class="text-rel-summary" id="textRelSummary" hidden></div>
               <div class="text-cost-row">
                 <span class="text-cost" id="textCost">Enter text to see the cost</span>
                 <button class="btn" id="inscribeTextButton" type="button" disabled>Inscribe text</button>
               </div>
               <details class="inscribe-details" id="textAdvancedDetails">
-                <summary>Advanced — parent, reply to a thread &amp; activity log</summary>
+                <summary id="textAdvancedSummary">Advanced — parent, reply to a thread &amp; activity log</summary>
                 <!-- #parentsDetails is shared with the file flow, so it is moved
                      in here at runtime by placeParentsPanel() rather than
                      duplicated. Order: parent, then reply-to, then the log. -->
@@ -783,6 +789,25 @@
           <span class="badge" id="dropsNetworkBadge">mainnet</span>
         </div>
         <div class="panel-body">
+          <!-- Historic drop gallery. A settled drop is DELETED from the
+               contract's Drops map, so this view is rebuilt from the drop print
+               events joined with live NFT ownership. Shown by the ?campaign= /
+               ?item= params on this page; hidden otherwise. -->
+          <section class="drops-gallery" id="dropsGallery" aria-labelledby="dropsGalleryTitle" hidden>
+            <div class="drops-gallery__head">
+              <div>
+                <span class="section-kicker">Historic gallery</span>
+                <h2 class="panel-title" id="dropsGalleryTitle">Past drops</h2>
+                <p class="panel-subtitle" id="dropsGallerySubtitle">
+                  Completed drops and the wallets that hold them.
+                </p>
+              </div>
+              <a class="market-chip" id="dropsGalleryBack" href="/drops">← Live drops</a>
+            </div>
+            <div class="drops-gallery__switch" id="dropsGallerySwitch"></div>
+            <div class="status" id="dropsGalleryStatus"><span>Loading the gallery…</span></div>
+            <div class="drops-gallery__grid" id="dropsGalleryGrid"></div>
+          </section>
           <details class="inscribe-details market-sell" id="dropsCreate">
             <summary>Create a drop</summary>
             <div class="market-sell__body">
@@ -833,6 +858,9 @@
             </div>
           </details>
           <div class="market-listings" id="dropsListings"></div>
+          <!-- Entry point into the historic gallery; the campaign links are
+               built from the drop events, so they survive settlement. -->
+          <div class="drops-gallery-entry" id="dropsGalleryEntry" aria-label="Past drop galleries"></div>
           <details class="inscribe-details drops-history" id="dropsHistory">
             <summary>Drop history</summary>
             <div class="drops-history__list" id="dropsHistoryList"></div>

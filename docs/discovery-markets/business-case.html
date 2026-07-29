@@ -1,0 +1,596 @@
+<title>Nobody in music can tell a hit from a budget</title>
+
+<style>
+  :root {
+    --paper:    #EDECE8;
+    --paper-2:  #E5E4DF;
+    --paper-3:  #DBDAD4;
+    --ink:      #1B1D24;
+    --ink-soft: #5A5D66;
+    --blue:     #0F5FA6;
+    --pink:     #E4457F;
+    --pink-txt: #B81D57;
+    --rule:     rgba(27, 29, 36, 0.15);
+    --rule-2:   rgba(27, 29, 36, 0.09);
+    --grain:    0.16;
+    --grain-blend: multiply;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #13151A; --paper-2: #191C22; --paper-3: #21242C;
+      --ink: #E8E6E0; --ink-soft: #9095A0;
+      --blue: #4FA3E3; --pink: #FF6BA0; --pink-txt: #FF8CB6;
+      --rule: rgba(232,230,224,0.17); --rule-2: rgba(232,230,224,0.10);
+      --grain: 0.10; --grain-blend: screen;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #13151A; --paper-2: #191C22; --paper-3: #21242C;
+    --ink: #E8E6E0; --ink-soft: #9095A0;
+    --blue: #4FA3E3; --pink: #FF6BA0; --pink-txt: #FF8CB6;
+    --rule: rgba(232,230,224,0.17); --rule-2: rgba(232,230,224,0.10);
+    --grain: 0.10; --grain-blend: screen;
+  }
+  :root[data-theme="light"] {
+    --paper: #EDECE8; --paper-2: #E5E4DF; --paper-3: #DBDAD4;
+    --ink: #1B1D24; --ink-soft: #5A5D66;
+    --blue: #0F5FA6; --pink: #E4457F; --pink-txt: #B81D57;
+    --rule: rgba(27,29,36,0.15); --rule-2: rgba(27,29,36,0.09);
+    --grain: 0.16; --grain-blend: multiply;
+  }
+
+  :root {
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, "Menlo", "Consolas",
+            "Liberation Mono", monospace;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua",
+             Georgia, serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: var(--serif); font-size: 17px; line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .grain {
+    position: fixed; inset: 0; z-index: 100; pointer-events: none;
+    opacity: var(--grain); mix-blend-mode: var(--grain-blend);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 26px; }
+
+  .row {
+    display: grid; grid-template-columns: 132px minmax(0, 66ch);
+    gap: 0 44px; align-items: start;
+  }
+  .margin { display: flex; flex-direction: column; gap: 14px; padding-top: 6px; }
+  .col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .wide { grid-column: 1 / -1; }
+
+  @media (max-width: 900px) {
+    .row { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+    .margin { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 12px 18px; padding-top: 0; }
+  }
+
+  h1, h2, h3, .eyebrow, .cut, .btn, .stamp, .fig, .th { font-family: var(--mono); }
+
+  h1 {
+    margin: 0; font-size: clamp(2.3rem, 6.4vw, 4.1rem); line-height: 0.98;
+    letter-spacing: -0.035em; font-weight: 700; text-wrap: balance;
+    text-shadow: 0.05em 0.042em 0 color-mix(in srgb, var(--pink) 40%, transparent);
+  }
+  h2 {
+    margin: 0; font-size: clamp(1.45rem, 3.2vw, 2.05rem); line-height: 1.1;
+    letter-spacing: -0.025em; font-weight: 700; text-wrap: balance;
+  }
+  h3 { margin: 0; font-size: 1rem; letter-spacing: -0.01em; font-weight: 700; text-wrap: balance; }
+
+  p { margin: 0; }
+  .lede { font-size: 1.18rem; line-height: 1.5; }
+
+  .eyebrow {
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.17em;
+    font-weight: 600; color: var(--ink-soft);
+  }
+  .cut {
+    font-size: 0.78rem; letter-spacing: 0.14em; font-weight: 700; color: var(--blue);
+    border-top: 2px solid var(--blue); padding-top: 7px; white-space: nowrap;
+  }
+  .note {
+    font-family: var(--serif); font-style: italic; font-size: 0.9rem; line-height: 1.45;
+    color: var(--pink-txt);
+    border-left: 2px solid color-mix(in srgb, var(--pink) 55%, transparent);
+    padding-left: 12px;
+  }
+  @media (max-width: 900px) { .note { flex: 1 1 100%; } }
+
+  strong { font-weight: 600; }
+  em { color: var(--pink-txt); font-style: italic; }
+
+  .pull {
+    font-family: var(--mono); font-size: clamp(1.12rem, 2.3vw, 1.45rem);
+    line-height: 1.24; letter-spacing: -0.02em; font-weight: 700;
+    border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink);
+    padding: 20px 0; text-wrap: balance;
+  }
+
+  header { padding: 64px 0 8px; }
+  .header-inner { display: flex; flex-direction: column; gap: 24px; }
+  .stamp-row { display: flex; flex-wrap: wrap; gap: 13px; align-items: center; }
+  .stamp {
+    font-size: 0.66rem; letter-spacing: 0.16em; font-weight: 700; text-transform: uppercase;
+    color: var(--pink-txt);
+    border: 2px solid color-mix(in srgb, var(--pink) 62%, transparent);
+    border-radius: 2px; padding: 6px 11px; transform: rotate(-2.2deg);
+  }
+  .stamp.b { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 55%, transparent); transform: rotate(1.4deg); }
+
+  /* ---- the evidence grid: four facts, one conclusion ---- */
+  .ev { display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+  .ev-cell { background: var(--paper); padding: 20px 18px; display: flex; flex-direction: column; gap: 8px; }
+  .fig {
+    font-size: 1.85rem; font-weight: 700; letter-spacing: -0.035em; line-height: 1;
+    font-variant-numeric: tabular-nums; color: var(--blue);
+  }
+  .ev-cell:nth-child(3) .fig { color: var(--pink-txt); }
+  .ev-what { font-size: 0.9rem; line-height: 1.4; }
+  .ev-src { font-family: var(--mono); font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.13em; color: var(--ink-soft); margin-top: auto; padding-top: 6px; }
+
+  /* ---- tables ---- */
+  .tw { overflow-x: auto; border: 1px solid var(--rule); }
+  table { border-collapse: collapse; width: 100%; min-width: 460px; font-size: 0.93rem; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--rule-2); vertical-align: top; }
+  th {
+    font-family: var(--mono); font-size: 0.62rem; text-transform: uppercase;
+    letter-spacing: 0.13em; color: var(--ink-soft); font-weight: 700;
+    background: var(--paper-2); border-bottom: 1px solid var(--rule);
+  }
+  tr:last-child td { border-bottom: 0; }
+  td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -0.02em; }
+  td.hl { color: var(--blue); }
+
+  .rooms { display: flex; flex-direction: column; gap: 20px; }
+  .room {
+    display: flex; flex-direction: column; gap: 7px;
+    border-left: 3px solid var(--rule); padding-left: 18px;
+  }
+  .room.now { border-left-color: var(--pink); }
+  .room .who { font-family: var(--mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-soft); }
+
+  .quote {
+    background: var(--paper-2); border-left: 3px solid var(--blue);
+    padding: 20px 22px; display: flex; flex-direction: column; gap: 13px;
+    font-size: 1.02rem; line-height: 1.55;
+  }
+
+  .side { background: var(--paper-2); border-top: 3px solid var(--blue); padding: 34px 0 40px; margin-top: 62px; }
+  .side.pink { border-top-color: var(--pink); }
+
+  .plain { display: flex; flex-direction: column; gap: 9px; border-left: 2px solid var(--rule); padding-left: 18px; }
+  .plain .h { font-family: var(--mono); font-weight: 700; font-size: 0.95rem; }
+
+  .srcs { display: flex; flex-direction: column; gap: 13px; }
+  .src { display: flex; flex-direction: column; gap: 2px; font-size: 0.88rem; line-height: 1.4; }
+  .src a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
+  .src a:hover { color: var(--pink-txt); }
+  .src a:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .src .what { color: var(--ink-soft); font-size: 0.82rem; }
+
+  .xlink {
+    display: inline-flex; align-items: center; gap: 9px;
+    font-family: var(--mono); font-size: 0.7rem; text-transform: uppercase;
+    letter-spacing: 0.13em; font-weight: 700;
+    color: var(--paper); background: var(--ink);
+    padding: 12px 18px; border-radius: 2px; text-decoration: none;
+    align-self: flex-start; transition: background 0.18s ease;
+  }
+  .xlink:hover { background: var(--blue); }
+  .xlink:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+
+  footer { padding: 56px 0 90px; margin-top: 62px; border-top: 1px solid var(--rule); }
+  section { scroll-margin-top: 20px; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="grain" aria-hidden="true"></div>
+
+<header>
+  <div class="wrap">
+    <div class="row">
+      <div class="margin"><div class="cut">XTR / THE CASE</div></div>
+      <div class="header-inner">
+        <div class="stamp-row">
+          <div class="stamp">Design stage</div>
+          <div class="stamp b">Nothing built</div>
+        </div>
+        <h1>Nobody in music can tell a hit from a budget</h1>
+        <p class="lede">
+          Streams can be botted. Playlists can be bought. Charts can be gamed. There
+          is no trustworthy measure anywhere in this industry of whether a record
+          actually connected with anybody. We think that single missing number is a
+          company.
+        </p>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+
+    <!-- ============ EVIDENCE ============ -->
+    <section class="row" style="margin-top:46px">
+      <div class="margin">
+        <div class="cut">01 &nbsp;&middot;&nbsp; Evidence</div>
+        <p class="note">Four facts, found separately, for four unrelated reasons.</p>
+      </div>
+      <div class="col">
+        <div class="ev">
+          <div class="ev-cell">
+            <div class="fig">1st &amp; 40th</div>
+            <div class="ev-what">The same record, in two copies of the same experiment running at once. The only difference was whether you could see what others had downloaded.</div>
+            <div class="ev-src">Science, 2006 &nbsp;&rarr;&nbsp; popularity is not quality</div>
+          </div>
+          <div class="ev-cell">
+            <div class="fig">88%</div>
+            <div class="ev-what">Of everything on streaming was played fewer than a thousand times last year, out of 253 million tracks, growing by 106,000 a day.</div>
+            <div class="ev-src">Luminate, 2025 &nbsp;&rarr;&nbsp; the filter is broken</div>
+          </div>
+          <div class="ev-cell">
+            <div class="fig">500,000</div>
+            <div class="ev-what">Streams removed by Spotify from a number one record last month, after a $3m Kalshi contract had already settled and paid out on the inflated figure.</div>
+            <div class="ev-src">June 2026 &nbsp;&rarr;&nbsp; streams cannot settle a contract</div>
+          </div>
+          <div class="ev-cell">
+            <div class="fig">$2bn</div>
+            <div class="ev-what">Committed by ICE, who own the New York Stock Exchange, into Polymarket. The reported thesis was distributing the data, not clipping the trades.</div>
+            <div class="ev-src">2025 &nbsp;&rarr;&nbsp; signal is worth real money</div>
+          </div>
+        </div>
+        <p>
+          Read separately they are four problems. Read together they are one problem
+          seen from four angles, and it is a measurement problem.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ THE IDEA ============ -->
+    <section class="row" style="margin-top:58px">
+      <div class="margin"><div class="cut">02 &nbsp;&middot;&nbsp; The idea</div></div>
+      <div class="col">
+        <h2>Run the measurement nobody runs</h2>
+        <p>
+          In 2006 Salganik, Dodds and Watts put 48 unknown songs in front of 14,341
+          people, split across eight identical copies of the same website running at
+          the same time. Crucially they also ran a control group who could not see
+          any download counts at all.
+        </p>
+        <p>
+          So every song was measured twice. Once with the crowd visible, and once
+          with the crowd hidden. The paper treats the second number, the one with no
+          social signal in it, as the song's actual quality.
+        </p>
+        <div class="pull">
+          Streaming only ever runs the first measurement. Nobody has ever run the
+          second one as a product.
+        </div>
+        <p>
+          That is what we are building. A record is played to a cohort of listeners
+          drawn at random, who never saw a price, never saw a forecast, do not follow
+          the artist, and are never told they are the ones being measured. What that
+          cohort does next is the number.
+        </p>
+        <p>
+          <strong>It is unreachable by design.</strong> To move it you would need to
+          control roughly a tenth of the entire listener base, and you would never
+          learn which tenth you needed, because the cohort is drawn after forecasting
+          closes and is never published. That is the difference between a number
+          anyone can buy and a number nobody can.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ WHY NOW ============ -->
+    <section class="row" style="margin-top:58px">
+      <div class="margin">
+        <div class="cut">03 &nbsp;&middot;&nbsp; Timing</div>
+        <p class="note">The demand arrived three weeks ago, in public, with a price tag.</p>
+      </div>
+      <div class="col">
+        <h2>Every prediction market wants music. None of them can settle it.</h2>
+        <p>
+          Kalshi and Polymarket are together worth around $37bn. Both already run
+          music and entertainment markets. Both settle them on chart and stream data,
+          which is the one thing in music that a determined trader can reach out and
+          change.
+        </p>
+        <p>
+          In June, Kalshi ran a contract on the most streamed song in the US that
+          month, with around $3m traded. Streams for one record jumped roughly 70% in
+          a day and it went to number one. Kalshi settled and paid out. Spotify then
+          removed over 500,000 streams it did not believe came from real listeners
+          and the track fell to fourth. There is no suggestion the artist or his team
+          was involved. A Kalshi trader is who flagged it.
+        </p>
+        <p>
+          That is not a scandal, it is a product gap. A market cannot settle on a
+          number its own traders can manufacture. We make the number they need.
+        </p>
+
+        <div class="tw" style="margin-top:4px">
+          <table>
+            <thead>
+              <tr><th>&nbsp;</th><th>Kalshi</th><th>Polymarket</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Valuation</td><td class="n">~$22bn</td><td class="n">~$15bn</td></tr>
+              <tr><td>June 2026 volume</td><td class="n">~$31.5bn</td><td class="n">~$10.8bn</td></tr>
+              <tr><td>2025 revenue</td><td class="n">~$260m</td><td class="n">~nil</td></tr>
+              <tr><td>Take rate</td><td class="n">~1.14%</td><td class="n hl">fees began Q1 2026</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="font-size:0.88rem; color:var(--ink-soft)">
+          Note the Polymarket column. It ran at roughly zero revenue until January
+          2026, on years of venture money, because in an order book liquidity is the
+          entire moat. That is the war we intend not to fight.
+        </p>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ WHO PAYS ============ -->
+  <section class="side">
+    <div class="wrap">
+      <div class="row">
+        <div class="margin"><div class="cut">04 &nbsp;&middot;&nbsp; Who pays</div></div>
+        <div class="col">
+          <h2>One measurement, four customers</h2>
+          <p>
+            The same held-out cohort number is the product in every case. Only the
+            wrapper changes.
+          </p>
+
+          <div class="rooms">
+            <div class="room now">
+              <div class="who">First revenue &nbsp;&middot;&nbsp; smallest build</div>
+              <h3>The prediction markets</h3>
+              <p>
+                Sell Kalshi and Polymarket the settlement data. They keep the
+                exchange, the licence and the liquidity. We supply the only music
+                number their traders cannot reach. This needs no consumer scale at
+                all to start being worth money, and it puts the regulated surface on
+                somebody who already has it.
+              </p>
+            </div>
+            <div class="room">
+              <div class="who">Near term</div>
+              <h3>Labels and A&amp;R</h3>
+              <p>
+                Early signal, which they already buy through flat paid panels like
+                SoundOut and HitPredictor. Ours is reputation-weighted rather than
+                flat, which is a narrow and testable claim: more signal per
+                listener-hour than a panel of strangers.
+              </p>
+            </div>
+            <div class="room">
+              <div class="who">The instrument</div>
+              <h3>Listeners</h3>
+              <p>
+                A discovery product where you hear records blind, back them before
+                anyone knows what they are, and build a permanent public record of
+                being early. This is what generates the measurement, so it is both
+                the product and the factory.
+              </p>
+            </div>
+            <div class="room">
+              <div class="who">Later</div>
+              <h3>Artists</h3>
+              <p>
+                Audience intelligence that is not a play count. Who stayed to the
+                end, who came back a week later unprompted, and which scene actually
+                responded, which is regularly not the one they thought they were in.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MONEY ============ -->
+  <section class="side pink">
+    <div class="wrap">
+      <div class="row">
+        <div class="margin">
+          <div class="cut" style="color:var(--pink-txt); border-color:var(--pink)">05 &nbsp;&middot;&nbsp; Money</div>
+        </div>
+        <div class="col">
+          <h2>Real stakes, without selling the chart</h2>
+          <p>
+            Money makes a forecast honest, and it is legal to do this properly in the
+            US, where Polymarket now operates as a CFTC-regulated exchange and event
+            contracts are treated as derivatives rather than as bets. A June 2026
+            CFTC proposal points further that way, explicitly excluding awards
+            contests from the gaming prohibition because they turn on external
+            judgment.
+          </p>
+          <p>
+            It is not legal here. Polymarket blocks the UK entirely, the Gambling
+            Commission treats prediction markets as betting intermediaries needing a
+            licence, and the FCA binary options ban is a separate obstacle a gambling
+            licence does not solve. So the UK edition runs on free credits and the
+            paid edition runs where it can.
+          </p>
+          <p>
+            There is a real design problem underneath that, and it matters more than
+            the regulation. <strong>Capital moves price.</strong> If the market ranks
+            the records, then whoever has the most money buys the chart, which is
+            pay-to-play wearing a better suit. So the two are separated permanently.
+          </p>
+
+          <div class="tw" style="margin-top:4px">
+            <table>
+              <thead>
+                <tr><th>&nbsp;</th><th>Weighted by</th><th>Who sees it</th></tr>
+              </thead>
+              <tbody>
+                <tr><td class="n">The market</td><td>Capital</td><td>Traders. A financial instrument</td></tr>
+                <tr><td class="n">The chart</td><td>Reputation</td><td>Listeners. Reputation is unbuyable</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            Both settle on the same cohort measurement. Money buys exposure to the
+            outcome. Money never buys a place in somebody's feed.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <!-- ============ RISKS ============ -->
+    <section class="row" style="margin-top:62px">
+      <div class="margin">
+        <div class="cut">06 &nbsp;&middot;&nbsp; Risks</div>
+        <p class="note">We would rather lose you here than at diligence.</p>
+      </div>
+      <div class="col">
+        <h2>What could kill it</h2>
+        <div class="rooms" style="gap:16px">
+          <div class="plain">
+            <div class="h">Nobody listens blind</div>
+            <p>
+              The whole thing rests on people voluntarily hearing unknown music all
+              the way through. That is work, and most people do not want work. This
+              is the top risk, ahead of manipulation, and it is the first thing we
+              test.
+            </p>
+          </div>
+          <div class="plain">
+            <div class="h">Good taste may not be a real thing</div>
+            <p>
+              Meaning it may be luck that looks like skill in hindsight rather than a
+              repeatable trait. If forecasting skill does not persist across a
+              split-half test, there are no tastemakers and the reputation layer is
+              fiction. Testable, and tested early.
+            </p>
+          </div>
+          <div class="plain">
+            <div class="h">The crowd may not beat the algorithm</div>
+            <p>
+              Every market opens at a machine prediction and humans only score by
+              beating it, so this resolves to one number. If it is not reliably
+              positive, there is no company, and we would like to be the ones who
+              find that out.
+            </p>
+          </div>
+          <div class="plain">
+            <div class="h">Thin markets</div>
+            <p>
+              Liquidity is the hard part of this sector and our questions have less
+              natural interest than an election. Markets have to be scarce and
+              earned rather than one per track, and that constrains how fast this
+              scales.
+            </p>
+          </div>
+          <div class="plain">
+            <div class="h">Whoever turns up defines the chart</div>
+            <p>
+              Early users will skew, and the output will reflect that while sounding
+              objective. Naming whose opinion a chart represents is the minimum.
+              Fixing it is slow, expensive recruitment and no mechanism does it for
+              us.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ FIRST MOVE ============ -->
+    <section class="row" style="margin-top:58px">
+      <div class="margin"><div class="cut">07 &nbsp;&middot;&nbsp; First move</div></div>
+      <div class="col">
+        <h2>The cheap question, before anything else</h2>
+        <p>
+          Not the market. Not the technology. A two week test of whether anyone will
+          sit and listen to unknown music properly, more than once. A page, a queue
+          of unreleased tracks, no scores and no predictions. We measure completion,
+          depth and seven day return.
+        </p>
+        <p>
+          If that fails, this goes in a drawer and it costs almost nothing to find
+          out. If it holds, the next build is the cohort mechanism, because
+          <strong>the cohort mechanism is the asset</strong>. It is what Kalshi
+          visibly lacked in June, and it is the only part of this that cannot be
+          bought with a bigger balance sheet.
+        </p>
+        <a class="xlink" href="https://claude.ai/code/artifact/e8a3eaea-2647-420a-afe2-ae96666f8c92">
+          Read the listener and artist version &rarr;
+        </a>
+      </div>
+    </section>
+
+    <!-- ============ SOURCES ============ -->
+    <section class="row" style="margin-top:58px">
+      <div class="margin"><div class="cut">Sources</div></div>
+      <div class="col">
+        <h2>Where the numbers come from</h2>
+        <p>Every figure is published and checkable. The only things we made up are the arguments.</p>
+        <div class="srcs">
+          <div class="src">
+            <a href="https://www.princeton.edu/~mjs3/salganik_dodds_watts06_full.pdf">Salganik, Dodds &amp; Watts, Science, 10 February 2006</a>
+            <span class="what">14,341 participants, 48 songs, eight parallel worlds, and the independent control condition treated as the measure of quality.</span>
+          </div>
+          <div class="src">
+            <a href="https://pages.stern.nyu.edu/~wgreene/entertainmentandmedia/JustinTimberlakeIdeaLab.pdf">Duncan Watts, New York Times Magazine</a>
+            <span class="what">Source for Lockdown by 52metro finishing first of 48 in one world and fortieth in another.</span>
+          </div>
+          <div class="src">
+            <a href="https://view.ceros.com/luminate-data/luminate-year-end-music-report-2025-1">Luminate 2025 Year-End Music Report</a>
+            <span class="what">106,000 uploads a day, 253 million tracks, 88% under a thousand plays.</span>
+          </div>
+          <div class="src">
+            <a href="https://www.musicbusinessworldwide.com/spotify-slashes-streams-hit-song-after-suspicious-activity-on-prediction-market-kalshi/">Music Business Worldwide on the Kalshi settlement, July 2026</a>
+            <span class="what">The June contract, the 500,000 removed streams, and the explicit note that there is no suggestion the artist or his team was involved.</span>
+          </div>
+          <div class="src">
+            <a href="https://www.prnewswire.com/news-releases/polymarket-acquires-cftc-licensed-exchange-and-clearinghouse-qcex-for-112-million-302509626.html">Polymarket acquires QCEX, $112m</a>
+            <span class="what">The CFTC-licensed exchange and clearinghouse behind the regulated US relaunch.</span>
+          </div>
+          <div class="src">
+            <a href="https://www.gtlaw.com/en/insights/2026/6/cftc-proposes-new-rules-for-events-contracts-on-prediction-markets">CFTC proposed rulemaking on event contracts, 10 June 2026</a>
+            <span class="what">The gaming definition, and the exclusion of awards contests decided by external evaluative judgment.</span>
+          </div>
+          <div class="src">
+            <a href="https://www.gamblingcommission.gov.uk/blog/post/prediction-markets-heres-what-you-need-to-know">UK Gambling Commission on prediction markets</a>
+            <span class="what">Why the paid version cannot launch in Britain.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="row">
+      <div class="margin"><div class="eyebrow">In one line</div></div>
+      <div class="col">
+        <div class="pull" style="border-color:var(--blue)">
+          Every chart in music measures who had the attention. We want to measure who
+          deserved it, using a number that cannot be bought.
+        </div>
+        <p class="eyebrow" style="margin-top:8px">
+          Design stage &nbsp;&middot;&nbsp; July 2026 &nbsp;&middot;&nbsp; Nothing here is built or funded
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>

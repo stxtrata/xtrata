@@ -1320,7 +1320,6 @@ const buildXtrataAudioPlayerHtml = (config) => {
       // Buffering gate: hold the "click to play" affordance until enough audio is
       // buffered that the first click starts cleanly at 0:00 with no clipped intro.
       let isAudioReady = false;
-      let playWhenReady = false;
       const BUFFER_TARGET_SECONDS = 8;
       let manifest = {};
       try {
@@ -1510,20 +1509,24 @@ const buildXtrataAudioPlayerHtml = (config) => {
           return;
         }
 
-        // Not buffered enough yet: queue the play so it fires the instant we're
-        // ready, from the true start, instead of starting mid-decode.
-        if (!isAudioReady) {
-          playWhenReady = true;
-          setStatus('Buffering audio… playback will start automatically.');
-          return;
-        }
-
+        // NEVER defer the play() call. A tap is the browser's permission to make
+        // sound, and it only counts while the handler is still running — calling
+        // play() later, from a buffering event, is blocked outright on mobile. This
+        // used to return here and wait for readiness, so the first tap was swallowed
+        // and the queued play was refused; only a tap that happened to land AFTER
+        // buffering finished ever worked, which is why it felt like a gate opening
+        // at random and rewarded frantic tapping.
+        //
+        // Calling play() on an element that is still loading is well-defined: it
+        // starts as soon as there is data, from currentTime 0, and keeps the gesture
+        // authorisation. The buffering state is still shown, it just no longer gates.
         if (audio.ended) {
           try {
             audio.currentTime = 0;
           } catch (_error) {}
         }
 
+        if (!isAudioReady) setStatus('Buffering audio… playback will start automatically.');
         const playResult = audio.play();
         if (playResult && typeof playResult.catch === 'function') {
           playResult
@@ -1552,7 +1555,9 @@ const buildXtrataAudioPlayerHtml = (config) => {
         }
         if (playToggleButton) {
           playToggleButton.textContent = isPlaying ? 'Pause' : 'Play';
-          playToggleButton.disabled = !isAudioReady && !isPlaying;
+          // Never disabled while buffering: that tap is the only thing that can
+          // authorise sound on mobile, and swallowing it is what broke playback.
+          playToggleButton.disabled = false;
         }
         if (clickHint) {
           clickHint.textContent = !isAudioReady
@@ -1599,17 +1604,45 @@ const buildXtrataAudioPlayerHtml = (config) => {
         if (player) player.dataset.transport = 'hidden';
       };
 
-      const showHoverTransport = () => {
+      // Auto-hiding controls is a MOUSE idea. It works because a mouse produces a
+      // continuous pointermove stream that keeps waking them, and because the cursor
+      // can rest over the artwork without touching anything.
+      //
+      // A finger does neither. It produces one pointerdown, then nothing, and
+      // pointerleave fires the instant it lifts. So on a phone every tap was followed
+      // immediately by the controls hiding again, and the next tap landed on something
+      // fading out from under it. That is why playing a track took twenty taps and the
+      // player looked like it was flashing.
+      //
+      // Gating on the '(hover: hover)' media query was not enough. That is a guess about
+      // the DEVICE, and it is true on iPadOS, on Android tablets in desktop mode, and on
+      // any phone with a trackpad or mouse paired — on all of which the controls went
+      // back to fading out from under a finger.
+      //
+      // The pointerType on the ACTUAL event is ground truth: a touch says 'touch'
+      // whatever the device claims it can do. Auto-hide is therefore armed only once a
+      // real mouse has been seen, and a single touch disarms it again.
+      let usingMouse = false;
+      const notePointerType = (event) => {
+        if (event && event.pointerType === 'touch') usingMouse = false;
+        else if (event && event.pointerType === 'mouse') usingMouse = true;
+      };
+
+      const showHoverTransport = (event) => {
+        notePointerType(event);
         if (player) player.dataset.transport = 'visible';
         if (hoverHideTimer) window.clearTimeout(hoverHideTimer);
-        hoverHideTimer = window.setTimeout(hideHoverTransport, HOVER_HIDE_DELAY_MS);
+        if (usingMouse) {
+          hoverHideTimer = window.setTimeout(hideHoverTransport, HOVER_HIDE_DELAY_MS);
+        }
         drawHoverWave();
       };
 
       if (cover) {
         cover.addEventListener('pointermove', showHoverTransport);
         cover.addEventListener('pointerdown', showHoverTransport);
-        cover.addEventListener('pointerleave', () => {
+        cover.addEventListener('pointerleave', (event) => {
+          if (!usingMouse || (event && event.pointerType === 'touch')) return;
           if (hoverHideTimer) window.clearTimeout(hoverHideTimer);
           hideHoverTransport();
         });
@@ -1621,17 +1654,23 @@ const buildXtrataAudioPlayerHtml = (config) => {
       const IDLE_HIDE_DELAY_MS = 2000;
       let idleTimer = 0;
       const goIdle = () => { if (player) player.dataset.idle = 'true'; };
-      const wakeOverlays = () => {
+      const wakeOverlays = (event) => {
+        notePointerType(event);
         if (player) player.dataset.idle = 'false';
         if (idleTimer) window.clearTimeout(idleTimer);
-        idleTimer = window.setTimeout(goIdle, IDLE_HIDE_DELAY_MS);
+        // Same reasoning as the transport above: a finger produces no movement to wake
+        // these again, so fading them only takes the controls away.
+        if (usingMouse) idleTimer = window.setTimeout(goIdle, IDLE_HIDE_DELAY_MS);
       };
       if (player) {
         ['pointermove', 'pointerdown', 'keydown'].forEach((eventName) => player.addEventListener(eventName, wakeOverlays));
-        player.addEventListener('pointerleave', () => {
-          if (idleTimer) window.clearTimeout(idleTimer);
-          goIdle();
-        });
+        {
+          player.addEventListener('pointerleave', (event) => {
+            if (!usingMouse || (event && event.pointerType === 'touch')) return;
+            if (idleTimer) window.clearTimeout(idleTimer);
+            goIdle();
+          });
+        }
         wakeOverlays();
       }
 
@@ -1675,17 +1714,30 @@ const buildXtrataAudioPlayerHtml = (config) => {
         Boolean(event.target.closest('button, input, a, [data-player-control]'));
 
       if (cover) {
+        // Act on the FIRST click, immediately. This used to wait 300ms on a timer to
+        // tell a single click from a double one — but a setTimeout callback carries no
+        // user gesture, so the play() it eventually made was refused by mobile every
+        // single time. Tapping the artwork, which is the obvious thing to do, could
+        // therefore never start playback at all.
+        //
+        // The double-click case is handled by UNDOING instead: a second click within
+        // the window rewinds to the start, which is what it did before. Acting first
+        // and correcting is the only ordering that keeps the gesture.
         cover.addEventListener('click', (event) => {
           if (isPlayerControlTarget(event)) return;
           event.preventDefault();
+          const isSecondClick = Boolean(coverClickTimer);
           clearCoverClickTimer();
-          coverClickTimer = window.setTimeout(toggleAudioPlayback, 300);
+          if (isSecondClick) { resetAudioToStart(); return; }
+          coverClickTimer = window.setTimeout(clearCoverClickTimer, 300);
+          toggleAudioPlayback();
         });
 
+        // dblclick still fires after the two clicks above; the second click has already
+        // reset, so this must not toggle playback again.
         cover.addEventListener('dblclick', (event) => {
           if (isPlayerControlTarget(event)) return;
           event.preventDefault();
-          resetAudioToStart();
         });
 
         cover.addEventListener('keydown', (event) => {
@@ -1754,12 +1806,10 @@ const buildXtrataAudioPlayerHtml = (config) => {
         // Ensure the first play begins exactly at the start (no clipped intro).
         try { if (audio.currentTime > 0 && audio.paused) audio.currentTime = 0; } catch (_error) {}
         updatePlaybackUi();
-        if (playWhenReady) {
-          playWhenReady = false;
-          toggleAudioPlayback();
-        } else {
-          setStatus('Ready to play.');
-        }
+        // Deliberately does NOT start playback. Reaching this point from a buffering
+        // event means there is no user gesture in scope, and mobile refuses a play()
+        // made there — the request is already in flight from the tap itself.
+        if (audio.paused) setStatus('Ready to play.');
       };
 
       // Consider playback safe once the whole track (short clips/loops) or at
@@ -1771,7 +1821,7 @@ const buildXtrataAudioPlayerHtml = (config) => {
         const target = duration ? Math.min(BUFFER_TARGET_SECONDS, duration - 0.1) : BUFFER_TARGET_SECONDS;
         if (buffered >= target && buffered > 0) {
           markAudioReady();
-        } else if (!playWhenReady) {
+        } else {
           const pct = duration ? Math.min(99, Math.round((buffered / duration) * 100)) : null;
           setStatus(pct !== null ? 'Buffering audio… ' + pct + '%' : 'Buffering audio…');
         }
@@ -1829,13 +1879,25 @@ const buildXtrataAudioPlayerHtml = (config) => {
       }
 
       wavePeaks = placeholderPeaks();
-      if (player) player.dataset.transport = 'hidden';
+      // Start VISIBLE. Hidden-at-init meant the transport — waveform, seek bar and the
+      // play button itself — was opacity:0 AND pointer-events:none until some pointer
+      // event revealed it. On a phone that left the artwork as the only thing you could
+      // tap, with no visible control to aim at. A mouse hides it again 2s after it
+      // starts moving; a finger never does.
+      if (player) player.dataset.transport = 'visible';
       renderWaveform();
       setPanel('closed');
       updatePlaybackUi();
       updateProgress();
       loadRealWaveform();
-      window.addEventListener('resize', drawHoverWave);
+      // iOS fires resize continuously while scrolling, as the URL bar hides and shows.
+      // Redrawing the canvas on every one of those made the controls flash and swallowed
+      // taps. Coalesce to one redraw per frame.
+      let hoverWaveFrame = 0;
+      window.addEventListener('resize', () => {
+        if (hoverWaveFrame) return;
+        hoverWaveFrame = requestAnimationFrame(() => { hoverWaveFrame = 0; drawHoverWave(); });
+      });
     })();
   <\/script>
 </body>

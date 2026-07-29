@@ -158,3 +158,91 @@ describe('homepage content configuration', () => {
     expect(switchOffBody).not.toContain('preloadNextTrack');
   });
 });
+
+/**
+ * Text attachments must never be invisible.
+ *
+ * Reported after a real mix-up: a reply id left in the collapsed Advanced block
+ * turned the next post into a reply to something unrelated. The only signal was
+ * the word "reply" in the button, and nothing on screen named the target — a
+ * permanent, paid action with a one-word warning.
+ */
+describe('what a text inscription is attached to', () => {
+  it('has a summary strip that lives OUTSIDE the collapsed Advanced block', () => {
+    const advancedAt = indexHtml.indexOf('id="textAdvancedDetails"');
+    const stripAt = indexHtml.indexOf('id="textRelSummary"');
+    expect(stripAt).toBeGreaterThan(-1);
+    expect(advancedAt).toBeGreaterThan(-1);
+    // Before, therefore not nested inside it.
+    expect(stripAt).toBeLessThan(advancedAt);
+  });
+
+  it('names the reply target and the parents, not just that something is set', () => {
+    const body =
+      homeMainSource.match(/const syncTextRelSummary = \(\) => \{[\s\S]*?\n    \};/)?.[0] ?? '';
+    expect(body).toContain('Replying to #');
+    expect(body).toContain('Child of ');
+    // Hidden only when there is genuinely nothing attached.
+    expect(body).toContain('hidden = parts.length === 0');
+  });
+
+  it('restates the attachment in the collapsed summary too', () => {
+    expect(homeMainSource).toContain('dom.textAdvancedSummary.textContent');
+    expect(indexHtml).toContain('id="textAdvancedSummary"');
+  });
+
+  it('offers a one-click way out of an attachment', () => {
+    const body =
+      homeMainSource.match(/const syncTextRelSummary = \(\) => \{[\s\S]*?\n    \};/)?.[0] ?? '';
+    expect(body).toContain('rel-sum-clear');
+    expect(body).toContain('clearParentIds()');
+    expect(body).toContain("dom.threadReplyTo.value = ''");
+  });
+
+  it('refreshes the strip when parents change inside the Advanced block', () => {
+    expect(homeMainSource).toContain('applyParentInput(); syncTextCard();');
+    expect(homeMainSource).toContain('clearParentIds(); syncTextCard();');
+  });
+});
+
+/**
+ * Media inside an inscription must be allowed to play.
+ *
+ * Inscriptions are sandboxed with allow-scripts and WITHOUT allow-same-origin, which
+ * gives them an opaque origin. The Permissions Policy default for `autoplay` is `self`,
+ * and an opaque origin is never `self`, so play() is rejected with NotAllowedError even
+ * directly inside a tap handler. Mobile enforces this strictly, so a tap on the player
+ * appeared to do nothing at all.
+ */
+describe('inscription iframe permissions', () => {
+  it('delegates autoplay to frames showing one chosen inscription', () => {
+    expect(homeMainSource).toContain("const INSCRIPTION_FRAME_ALLOW = 'autoplay; fullscreen; encrypted-media'");
+    // Every viewer frame that sandboxes also delegates, or media silently cannot start.
+    const grants = homeMainSource.match(/frame\.allow = INSCRIPTION_FRAME_ALLOW;/g) ?? [];
+    expect(grants.length).toBe(3);
+  });
+
+  it('never grants autoplay to grid or market thumbnails', () => {
+    // A wall of inscriptions each granting itself autoplay would all make noise at once,
+    // so only the frames the user deliberately opened may delegate the feature. Checked
+    // against the sandbox sites themselves: "inscription-preview" names both viewers and
+    // thumbnails, so it is far too ambiguous to assert on.
+    const sites = [...homeMainSource.matchAll(/frame\.sandbox = 'allow-scripts';/g)];
+    expect(sites.length).toBe(6);
+    const granting = sites.filter((m) =>
+      homeMainSource.slice(m.index ?? 0, (m.index ?? 0) + 120).includes('INSCRIPTION_FRAME_ALLOW')
+    );
+    expect(granting.length).toBe(3);
+    // The two market-thumbnail frames are named, so pin those explicitly as ungranted.
+    for (const m of [...homeMainSource.matchAll(/frame\.className = 'market-thumb__frame';/g)]) {
+      expect(homeMainSource.slice(m.index ?? 0, (m.index ?? 0) + 300)).not.toContain(
+        'INSCRIPTION_FRAME_ALLOW'
+      );
+    }
+  });
+
+  it('keeps the sandbox itself intact', () => {
+    // Delegating a feature must never turn into relaxing the origin boundary.
+    expect(homeMainSource).not.toContain("sandbox = 'allow-scripts allow-same-origin'");
+  });
+});

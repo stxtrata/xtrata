@@ -889,6 +889,35 @@
       color: var(--ink);
     }
 
+    /* Always-visible record of what this text will be attached to. Only rendered
+       when something IS attached, so it reads as a deliberate state, not chrome. */
+    .text-rel-summary {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--accent, #7c5cff);
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--accent, #7c5cff) 8%, transparent);
+      font-size: 12.5px;
+    }
+    .text-rel-summary[hidden] { display: none; }
+    .text-rel-summary .rel-sum-item { color: var(--ink); }
+    .text-rel-summary .rel-sum-clear {
+      margin-left: auto;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--muted);
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    .text-rel-summary .rel-sum-clear:hover { color: var(--ink); }
+
     .activity-log > summary { font-size: 12px; color: var(--muted); }
 
     .processing-notice {
@@ -4605,6 +4634,100 @@
       margin-right: 8px;
       color: var(--muted);
       opacity: 0.8;
+    }
+
+    /* Historic drop gallery: completed drops rebuilt from print events. When
+       it is open the live-claim furniture steps aside so the gallery reads as
+       its own page rather than a panel bolted onto the claim grid. */
+    .drops-gallery {
+      display: grid;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    :root[data-drops-view='gallery'] .panel-drops > .panel-body > .market-sell,
+    :root[data-drops-view='gallery'] .panel-drops > .panel-body > .claim-diagnostics,
+    :root[data-drops-view='gallery'] .panel-drops > .panel-body > .market-listings,
+    :root[data-drops-view='gallery'] .panel-drops > .panel-body > .status,
+    :root[data-drops-view='gallery'] .panel-drops > .panel-body > .drops-gallery-entry,
+    :root[data-drops-view='gallery'] .panel-drops > .panel-body > .drops-history,
+    :root[data-drops-view='gallery'] .panel-drops > .panel-body > #dropsFootnote {
+      display: none;
+    }
+
+    .drops-gallery__head {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .drops-gallery__head .panel-title {
+      margin: 2px 0 0;
+    }
+
+    .drops-gallery__head .panel-subtitle {
+      margin: 4px 0 0;
+    }
+
+    .drops-gallery__switch,
+    .drops-gallery-entry {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .drops-gallery-entry {
+      margin-top: 14px;
+    }
+
+    .drops-gallery-entry:empty {
+      display: none;
+    }
+
+    .drops-gallery__grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 14px;
+    }
+
+    .drops-gallery__card[data-status='cancelled'] {
+      opacity: 0.72;
+    }
+
+    .drops-gallery__caption {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .drops-gallery__wallets {
+      display: grid;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+
+    .drops-gallery__wallet-label {
+      color: var(--muted);
+      opacity: 0.75;
+      margin-right: 4px;
+    }
+
+    .drops-gallery__wallet-value {
+      color: var(--ink);
+    }
+
+    .drops-gallery__empty {
+      border: 1px dashed var(--line);
+      border-radius: var(--radius);
+      padding: 22px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
     }
 
     .drops-history {

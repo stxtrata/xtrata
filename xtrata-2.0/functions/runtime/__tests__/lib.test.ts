@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { chunkBytes, computeExpectedHash } from '../../../packages/xtrata-reconstruction/src/index';
+import {
+  CHUNK_SIZE,
+  MAX_READ_BATCH_SIZE,
+  MAX_READ_LENGTH,
+  chunkBytes,
+  computeExpectedHash
+} from '../../../packages/xtrata-reconstruction/src/index';
 import type { InscriptionMeta } from '../../../src/lib/protocol/types';
 import {
   resolveRuntimeContent,
@@ -48,12 +54,17 @@ const wait = (ms: number) =>
   });
 
 describe('runtime content reconstruction', () => {
-  it('clamps runtime read batches to 30 chunks', () => {
-    expect(
-      getRuntimeReadConfig({
-        RUNTIME_CONTENT_READ_BATCH_SIZE: '50'
-      }).batchSize
-    ).toBe(30);
+  // The ceiling exists because a read-only call may touch at most 500,000 bytes.
+  // Asserting the budget rather than the number keeps this honest if CHUNK_SIZE
+  // ever moves: the old test pinned 30, which was itself over the limit, so it
+  // passed happily while every batch on the live site was being rejected.
+  it('clamps runtime read batches to what the Clarity read_length budget allows', () => {
+    const batchSize = getRuntimeReadConfig({
+      RUNTIME_CONTENT_READ_BATCH_SIZE: '50'
+    }).batchSize;
+
+    expect(batchSize).toBe(MAX_READ_BATCH_SIZE);
+    expect(batchSize * CHUNK_SIZE).toBeLessThan(MAX_READ_LENGTH);
   });
 
   it('uses get-chunk-batch for remaining chunks and preserves byte order', async () => {
@@ -190,8 +201,11 @@ describe('runtime content reconstruction', () => {
         })
       ),
       fetchChunk: vi.fn(async ({ index }) => chunks.get(index.toString()) ?? null),
+      // Threshold is relative to the configured ceiling so this keeps exercising
+      // the reduction path. Pinned at a literal 25 it silently stopped doing so
+      // the moment the ceiling dropped below it.
       fetchChunkBatch: vi.fn(async ({ indexes }) => {
-        if (indexes.length > 25) {
+        if (indexes.length > MAX_READ_BATCH_SIZE / 2) {
           throw new Error('CostBalanceExceeded');
         }
         return indexes.map((index) => chunks.get(index.toString()) ?? null);
@@ -209,11 +223,15 @@ describe('runtime content reconstruction', () => {
       read: reader
     });
 
-    const batchCalls = vi.mocked(reader.fetchChunkBatch).mock.calls;
+    const batchSizes = vi
+      .mocked(reader.fetchChunkBatch)
+      .mock.calls.map(([params]) => params.indexes.length);
+
     expect(Array.from(resolved.bytes)).toEqual(Array.from(bytes));
-    expect(batchCalls.map(([params]) => params.indexes.length)).toEqual(
-      expect.arrayContaining([30, 15, 15])
-    );
+    // It should open at the ceiling, get refused, then come back with something
+    // small enough to succeed — and still return every byte.
+    expect(batchSizes[0]).toBe(MAX_READ_BATCH_SIZE);
+    expect(Math.min(...batchSizes)).toBeLessThanOrEqual(MAX_READ_BATCH_SIZE / 2);
     expect(reader.fetchChunk).toHaveBeenCalledTimes(1);
   });
 

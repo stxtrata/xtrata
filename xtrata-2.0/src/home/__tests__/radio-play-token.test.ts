@@ -95,3 +95,42 @@ describe('an explicit song request beats the preload queue', () => {
     expect(fn).toContain('if (!on) { switchOn(); } else { player.pause(); void tuneToNextTrack(); }');
   });
 });
+
+/**
+ * The station skipped every song on a phone, roughly every 8 seconds, while the audio
+ * was playing out loud the whole time.
+ *
+ * The silence detector reads the analyser and skips a track that produces no signal.
+ * Every guard it had was about the ELEMENT — buffering, seeking, a suspended context —
+ * and each one assumes that a healthy element implies a truthful analyser. On iOS that
+ * is false: createMediaElementSource frequently yields an analyser that reads a flat
+ * zero for the entire session while playback is perfectly audible and the media clock
+ * advances normally. So every guard passed, the clock cleared the "did it consume the
+ * window" check, and the detector skipped a good song, then the next one, and the next.
+ *
+ * A zero only means "no audio" if the analyser is known to be capable of reporting
+ * something else. Until it has done so once, it is not a witness.
+ */
+describe('a silent analyser is not evidence of a silent song', () => {
+  it('will not skip anything until the analyser has proven it can report signal', () => {
+    expect(radio).toContain('let analyserProven = false;');
+    // Proof is recorded only where real energy was actually seen.
+    const proof = radio.slice(radio.indexOf('if (totalEnergy > 40)'), radio.indexOf('if (totalEnergy > 40)') + 120);
+    expect(proof).toContain('analyserProven = true;');
+  });
+
+  it('checks that BEFORE the branch that decides to skip', () => {
+    const guard = radio.indexOf('} else if (!analyserProven) {');
+    const skip = radio.indexOf('} else if (player.currentTime > 0.5) {');
+    expect(guard, 'the analyserProven guard is missing').toBeGreaterThan(-1);
+    expect(skip).toBeGreaterThan(-1);
+    expect(guard, 'an unproven analyser can still reach the skip').toBeLessThan(skip);
+  });
+
+  it('treats an unproven analyser as no evidence rather than as silence', () => {
+    const branch = radio.slice(radio.indexOf('} else if (!analyserProven) {'));
+    const body = branch.slice(0, branch.indexOf('} else if (player.currentTime'));
+    expect(body).toContain('silentSince = 0;');
+    expect(body, 'an unproven analyser must never start the silence clock').not.toContain('performance.now()');
+  });
+});
