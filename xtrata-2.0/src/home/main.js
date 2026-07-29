@@ -331,6 +331,8 @@
       threadReplyNote: $('threadReplyNote'),
       activityLog: $('activityLog'),
       textAdvancedDetails: $('textAdvancedDetails'),
+      textAdvancedSummary: $('textAdvancedSummary'),
+      textRelSummary: $('textRelSummary'),
       textAdvancedLogSlot: $('textAdvancedLogSlot'),
       parentRelationshipPanel: $('parentRelationshipPanel'),
       parentRelationshipBadge: $('parentRelationshipBadge'),
@@ -14130,8 +14132,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       renderParentSelection();
       updateControls();
     });
-    dom.addParentsButton.addEventListener('click', applyParentInput);
-    dom.clearParentsButton.addEventListener('click', clearParentIds);
+    // syncTextCard refreshes the attachment strip, so parents added or cleared from
+    // inside the collapsed Advanced block still show up outside it.
+    dom.addParentsButton.addEventListener('click', () => { applyParentInput(); syncTextCard(); });
+    dom.clearParentsButton.addEventListener('click', () => { clearParentIds(); syncTextCard(); });
     dom.transferRecipientInput.addEventListener('input', updateTransferControls);
     dom.transferButton.addEventListener('click', transferSelectedToken);
     // "List for sale" jumps to the Market page with the selected inscription
@@ -14367,12 +14371,65 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       markPreparedDirty();
       scheduleDependencyReprepare();
     };
+    /**
+     * Shows what this text will be attached to, outside the Advanced block.
+     *
+     * Both attachment inputs (reply-to, parent IDs) live inside a collapsed
+     * <details>, so a value could be set with nothing on screen to show it. The
+     * only signal was the word "reply" appearing in the button, which someone
+     * inscribing a second post will not notice — and the result is a permanent,
+     * paid inscription attached to the wrong thing.
+     */
+    const syncTextRelSummary = () => {
+      if (!dom.textRelSummary) return;
+      const replyId = (dom.threadReplyTo?.value || '').trim();
+      const replying = /^\d+$/.test(replyId);
+      const parents = state.parentIds ?? [];
+
+      const parts = [];
+      if (replying) parts.push(`↳ Replying to #${replyId}`);
+      if (parents.length) {
+        parts.push(
+          `Child of ${parents.length} parent${parents.length === 1 ? '' : 's'} · #${parents.join(', #')}`
+        );
+      }
+
+      dom.textRelSummary.textContent = '';
+      dom.textRelSummary.hidden = parts.length === 0;
+
+      if (dom.textAdvancedSummary) {
+        // The summary states what is set, so the collapsed block can never hide it.
+        dom.textAdvancedSummary.textContent = parts.length
+          ? `Advanced — ${parts.join(' · ').replace('↳ ', '')}`
+          : 'Advanced — parent, reply to a thread & activity log';
+      }
+      if (!parts.length) return;
+
+      for (const part of parts) {
+        const span = document.createElement('span');
+        span.className = 'rel-sum-item';
+        span.textContent = part;
+        dom.textRelSummary.appendChild(span);
+      }
+      const clear = document.createElement('button');
+      clear.type = 'button';
+      clear.className = 'rel-sum-clear';
+      clear.textContent = 'Remove';
+      clear.addEventListener('click', () => {
+        if (dom.threadReplyTo) dom.threadReplyTo.value = '';
+        clearParentIds();
+        syncThreadDep();
+        syncTextCard();
+      });
+      dom.textRelSummary.appendChild(clear);
+    };
     // Text card: cost + inscribe button (label switches to "Inscribe reply" when replying).
     const syncTextCard = () => {
       if (!dom.inscribeTextButton) return;
       const bytes = textBytes();
       const over = bytes > TEXT_MAX_BYTES;
       const replying = (state.handoffDependencyIds?.length ?? 0) > 0;
+      syncTextRelSummary();
       if (dom.textCost) {
         dom.textCost.textContent =
           bytes === 0 ? 'Enter text to see the cost'

@@ -299,12 +299,18 @@
                 <textarea class="textarea" id="textPayload" spellcheck="false" placeholder="Paste or type text — up to 16 KB, inscribed in a single transaction."></textarea>
                 <span class="field-note" id="textStats">0 characters · 0 bytes</span>
               </label>
+              <!-- Attachments live inside the collapsed Advanced block, so a reply id
+                   or a parent could be set with nothing on screen to show it. The only
+                   hint was the word "reply" appearing in the button, which is far too
+                   quiet for a permanent, paid action. This strip is always visible
+                   whenever something is attached, and can clear it in one click. -->
+              <div class="text-rel-summary" id="textRelSummary" hidden></div>
               <div class="text-cost-row">
                 <span class="text-cost" id="textCost">Enter text to see the cost</span>
                 <button class="btn" id="inscribeTextButton" type="button" disabled>Inscribe text</button>
               </div>
               <details class="inscribe-details" id="textAdvancedDetails">
-                <summary>Advanced — parent, reply to a thread &amp; activity log</summary>
+                <summary id="textAdvancedSummary">Advanced — parent, reply to a thread &amp; activity log</summary>
                 <!-- #parentsDetails is shared with the file flow, so it is moved
                      in here at runtime by placeParentsPanel() rather than
                      duplicated. Order: parent, then reply-to, then the log. -->

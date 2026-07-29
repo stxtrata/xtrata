@@ -158,3 +158,49 @@ describe('homepage content configuration', () => {
     expect(switchOffBody).not.toContain('preloadNextTrack');
   });
 });
+
+/**
+ * Text attachments must never be invisible.
+ *
+ * Reported after a real mix-up: a reply id left in the collapsed Advanced block
+ * turned the next post into a reply to something unrelated. The only signal was
+ * the word "reply" in the button, and nothing on screen named the target — a
+ * permanent, paid action with a one-word warning.
+ */
+describe('what a text inscription is attached to', () => {
+  it('has a summary strip that lives OUTSIDE the collapsed Advanced block', () => {
+    const advancedAt = indexHtml.indexOf('id="textAdvancedDetails"');
+    const stripAt = indexHtml.indexOf('id="textRelSummary"');
+    expect(stripAt).toBeGreaterThan(-1);
+    expect(advancedAt).toBeGreaterThan(-1);
+    // Before, therefore not nested inside it.
+    expect(stripAt).toBeLessThan(advancedAt);
+  });
+
+  it('names the reply target and the parents, not just that something is set', () => {
+    const body =
+      homeMainSource.match(/const syncTextRelSummary = \(\) => \{[\s\S]*?\n    \};/)?.[0] ?? '';
+    expect(body).toContain('Replying to #');
+    expect(body).toContain('Child of ');
+    // Hidden only when there is genuinely nothing attached.
+    expect(body).toContain('hidden = parts.length === 0');
+  });
+
+  it('restates the attachment in the collapsed summary too', () => {
+    expect(homeMainSource).toContain('dom.textAdvancedSummary.textContent');
+    expect(indexHtml).toContain('id="textAdvancedSummary"');
+  });
+
+  it('offers a one-click way out of an attachment', () => {
+    const body =
+      homeMainSource.match(/const syncTextRelSummary = \(\) => \{[\s\S]*?\n    \};/)?.[0] ?? '';
+    expect(body).toContain('rel-sum-clear');
+    expect(body).toContain('clearParentIds()');
+    expect(body).toContain("dom.threadReplyTo.value = ''");
+  });
+
+  it('refreshes the strip when parents change inside the Advanced block', () => {
+    expect(homeMainSource).toContain('applyParentInput(); syncTextCard();');
+    expect(homeMainSource).toContain('clearParentIds(); syncTextCard();');
+  });
+});
