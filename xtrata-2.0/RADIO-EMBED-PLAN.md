@@ -107,20 +107,17 @@ cooldown, got retried, and failed again. The symptom was NO SIGNAL runs and
 songs that never came on, not a permanent write-off. The batch fix is therefore
 the whole fix, and those tokens should simply start playing.
 
-Still worth revisiting once this has been live for a while: how much of the dud
-caching, verdict reporting and `/warm` machinery in `src/home/radio.js` was
-built to work around slow-or-failing reconstruction rather than genuinely bad
-inscriptions.
-
 ### Unproven hypothesis, worth checking after the fix
 
 A lot of machinery in `src/home/radio.js` exists to work around reconstructions
 that fail for no visible reason: the persisted dud cache (`DUDS_KEY`), the
 D1-backed verdict reporting (`/index/verdict`), the transient-failure cooldown,
-and the `/warm` pings. Some of that may be compensating for this bug rather than
-for genuinely bad inscriptions. If so, the dud store will need clearing after
-the fix, because it has cached "not playable" verdicts for tokens that were only
-ever failing on batch size.
+and the `/warm` pings. Some of that may have been built to work around
+slow-or-failing reconstruction rather than genuinely bad inscriptions, in which
+case it can be simplified once this has been live for a while.
+
+Note this is about simplifying code, not about clearing data. Per the section
+above, no verdict was ever persisted as a result of this bug.
 
 ---
 
