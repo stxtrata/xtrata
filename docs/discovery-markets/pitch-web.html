@@ -1,0 +1,945 @@
+<title>The chart that has to be right</title>
+
+<style>
+  :root {
+    --paper:    #EDECE8;
+    --paper-2:  #E5E4DF;
+    --paper-3:  #DBDAD4;
+    --ink:      #1B1D24;
+    --ink-soft: #5A5D66;
+    --blue:     #0F5FA6;
+    --pink:     #E4457F;
+    --pink-txt: #B81D57;
+    --rule:     rgba(27, 29, 36, 0.15);
+    --grain:    0.16;
+    --grain-blend: multiply;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:    #13151A;
+      --paper-2:  #191C22;
+      --paper-3:  #21242C;
+      --ink:      #E8E6E0;
+      --ink-soft: #9095A0;
+      --blue:     #4FA3E3;
+      --pink:     #FF6BA0;
+      --pink-txt: #FF8CB6;
+      --rule:     rgba(232, 230, 224, 0.17);
+      --grain:    0.10;
+      --grain-blend: screen;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:    #13151A;
+    --paper-2:  #191C22;
+    --paper-3:  #21242C;
+    --ink:      #E8E6E0;
+    --ink-soft: #9095A0;
+    --blue:     #4FA3E3;
+    --pink:     #FF6BA0;
+    --pink-txt: #FF8CB6;
+    --rule:     rgba(232, 230, 224, 0.17);
+    --grain:    0.10;
+    --grain-blend: screen;
+  }
+
+  :root[data-theme="light"] {
+    --paper:    #EDECE8;
+    --paper-2:  #E5E4DF;
+    --paper-3:  #DBDAD4;
+    --ink:      #1B1D24;
+    --ink-soft: #5A5D66;
+    --blue:     #0F5FA6;
+    --pink:     #E4457F;
+    --pink-txt: #B81D57;
+    --rule:     rgba(27, 29, 36, 0.15);
+    --grain:    0.16;
+    --grain-blend: multiply;
+  }
+
+  :root {
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, "Menlo", "Consolas",
+            "Liberation Mono", monospace;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua",
+             Georgia, serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .grain {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    pointer-events: none;
+    opacity: var(--grain);
+    mix-blend-mode: var(--grain-blend);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 26px; }
+
+  /* ---- the two column sleeve grid: margin notes left, reading column right ---- */
+  .row {
+    display: grid;
+    grid-template-columns: 132px minmax(0, 64ch);
+    gap: 0 44px;
+    align-items: start;
+  }
+  .row + .row { margin-top: 46px; }
+  .margin { display: flex; flex-direction: column; gap: 14px; padding-top: 6px; }
+  .col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+
+  @media (max-width: 900px) {
+    .row { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+    .margin { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 12px 18px; padding-top: 0; }
+  }
+
+  /* ---- type ---- */
+  h1, h2, h3, .eyebrow, .cut, .num, .btn, .meta { font-family: var(--mono); }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(2.5rem, 7.2vw, 4.5rem);
+    line-height: 0.97;
+    letter-spacing: -0.035em;
+    font-weight: 700;
+    text-wrap: balance;
+    text-shadow: 0.05em 0.042em 0 color-mix(in srgb, var(--pink) 40%, transparent);
+  }
+
+  h2 {
+    margin: 0;
+    font-size: clamp(1.5rem, 3.3vw, 2.15rem);
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+    font-weight: 700;
+    text-wrap: balance;
+  }
+
+  h3 {
+    margin: 0;
+    font-size: 1.02rem;
+    letter-spacing: -0.01em;
+    font-weight: 700;
+    text-wrap: balance;
+  }
+
+  p { margin: 0; }
+  p + p { margin-top: -4px; }
+
+  .lede { font-size: 1.2rem; line-height: 1.55; }
+
+  .eyebrow {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.17em;
+    font-weight: 600;
+    color: var(--ink-soft);
+  }
+
+  /* side/track marker, e.g. A1 -- vinyl's own vernacular */
+  .cut {
+    font-size: 0.78rem;
+    letter-spacing: 0.14em;
+    font-weight: 700;
+    color: var(--blue);
+    border-top: 2px solid var(--blue);
+    padding-top: 7px;
+    white-space: nowrap;
+  }
+
+  .note {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 0.9rem;
+    line-height: 1.45;
+    color: var(--pink-txt);
+    border-left: 2px solid color-mix(in srgb, var(--pink) 55%, transparent);
+    padding-left: 12px;
+  }
+  @media (max-width: 900px) { .note { flex: 1 1 100%; } }
+
+  strong { font-weight: 600; color: var(--ink); }
+  em { color: var(--pink-txt); font-style: italic; }
+
+  .pull {
+    font-family: var(--mono);
+    font-size: clamp(1.15rem, 2.4vw, 1.5rem);
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    font-weight: 700;
+    border-top: 2px solid var(--ink);
+    border-bottom: 2px solid var(--ink);
+    padding: 20px 0;
+    text-wrap: balance;
+  }
+
+  hr.rule { border: 0; border-top: 1px solid var(--rule); margin: 0; }
+
+  /* ---- hero ---- */
+  header { padding: 68px 0 8px; }
+  .header-inner { display: flex; flex-direction: column; gap: 26px; }
+  .stamp-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+
+  .stamp {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.16em;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--pink-txt);
+    border: 2px solid color-mix(in srgb, var(--pink) 62%, transparent);
+    border-radius: 2px;
+    padding: 6px 11px;
+    transform: rotate(-2.4deg);
+  }
+  .stamp.b { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 55%, transparent); transform: rotate(1.6deg); }
+
+  /* ---- the demo: a white label you actually judge ---- */
+  .demo {
+    background: var(--paper-2);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 26px;
+    display: grid;
+    grid-template-columns: 108px minmax(0, 1fr);
+    gap: 26px;
+    align-items: center;
+  }
+  @media (max-width: 620px) { .demo { grid-template-columns: minmax(0, 1fr); gap: 20px; } }
+
+  .label {
+    width: 108px; height: 108px; border-radius: 50%;
+    background: var(--paper-3);
+    border: 1px solid var(--rule);
+    display: grid; place-items: center;
+    position: relative;
+    font-family: var(--mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.14em;
+    color: var(--ink-soft);
+    text-align: center;
+  }
+  .label::after {
+    content: ""; position: absolute;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+  }
+  .label span { position: relative; z-index: 1; transform: translateY(-26px); }
+
+  .demo-body { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+  .redact { display: flex; flex-direction: column; gap: 8px; }
+  .bar {
+    height: 17px; border-radius: 2px;
+    background: var(--ink);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .bar.w1 { width: 58%; }
+  .bar.w2 { width: 34%; }
+
+  .revealed { display: none; flex-direction: column; gap: 3px; }
+  .demo.done .redact { display: none; }
+  .demo.done .revealed { display: flex; }
+
+  .track-title { font-family: var(--mono); font-size: 1.12rem; font-weight: 700; letter-spacing: -0.02em; }
+  .track-artist { font-family: var(--mono); font-size: 0.76rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); }
+
+  .ask { display: flex; flex-direction: column; gap: 11px; }
+  .ask-q { font-size: 0.98rem; line-height: 1.4; }
+
+  .slider-row { display: flex; align-items: center; gap: 15px; }
+
+  input[type="range"] {
+    flex: 1; min-width: 0; -webkit-appearance: none; appearance: none;
+    height: 3px; background: var(--rule); border-radius: 3px; outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--pink); border: 2px solid var(--paper-2);
+    cursor: grab;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--pink); border: 2px solid var(--paper-2);
+    cursor: grab; border-style: solid;
+  }
+  input[type="range"]:focus-visible { outline: 2px solid var(--blue); outline-offset: 6px; }
+  input[type="range"]:disabled::-webkit-slider-thumb { background: var(--ink-soft); cursor: default; }
+  input[type="range"]:disabled::-moz-range-thumb { background: var(--ink-soft); cursor: default; }
+
+  .readout {
+    font-family: var(--mono); font-weight: 700;
+    font-size: 1.5rem; letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    min-width: 3.6ch; text-align: right;
+    color: var(--pink-txt);
+  }
+
+  .btn {
+    align-self: flex-start;
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.15em; font-weight: 700;
+    background: var(--ink); color: var(--paper);
+    border: 0; border-radius: 2px; padding: 11px 20px; cursor: pointer;
+    transition: background 0.18s ease;
+  }
+  .btn:hover { background: var(--blue); }
+  .btn:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+  .btn:disabled { opacity: 0.4; cursor: default; background: var(--ink); }
+
+  .verdict { display: none; flex-direction: column; gap: 12px; }
+  .demo.done .verdict { display: flex; }
+  .demo.done .ask { display: none; }
+
+  .scores { display: flex; flex-wrap: wrap; gap: 0; border-top: 1px solid var(--rule); }
+  .score {
+    flex: 1 1 33%; min-width: 90px;
+    padding: 12px 14px 12px 0;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .score-n {
+    font-family: var(--mono); font-weight: 700; font-size: 1.55rem;
+    letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1;
+  }
+  .score-l {
+    font-family: var(--mono); font-size: 0.6rem; text-transform: uppercase;
+    letter-spacing: 0.14em; color: var(--ink-soft);
+  }
+  .s-machine .score-n { color: var(--ink-soft); }
+  .s-you .score-n     { color: var(--pink-txt); }
+  .s-real .score-n    { color: var(--blue); }
+
+  .verdict-txt { font-size: 0.98rem; line-height: 1.5; }
+  .replay {
+    background: none; border: 0; padding: 0; cursor: pointer;
+    font-family: var(--mono); font-size: 0.66rem; text-transform: uppercase;
+    letter-spacing: 0.14em; color: var(--ink-soft); text-decoration: underline;
+    text-underline-offset: 3px; align-self: flex-start;
+  }
+  .replay:hover { color: var(--pink-txt); }
+  .replay:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+
+  /* ---- audience blocks ---- */
+  .side {
+    background: var(--paper-2);
+    border-top: 3px solid var(--blue);
+    padding: 34px 0 40px;
+    margin-top: 66px;
+  }
+  .side.pink { border-top-color: var(--pink); }
+
+  .points { display: flex; flex-direction: column; gap: 22px; }
+  .point { display: flex; flex-direction: column; gap: 7px; }
+
+  .plain {
+    display: flex; flex-direction: column; gap: 10px;
+    border-left: 2px solid var(--rule); padding-left: 18px;
+  }
+  .plain .h { font-family: var(--mono); font-weight: 700; font-size: 0.95rem; }
+
+  footer { padding: 60px 0 90px; margin-top: 66px; border-top: 1px solid var(--rule); }
+
+  section { scroll-margin-top: 20px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+
+<div class="grain" aria-hidden="true"></div>
+
+<header>
+  <div class="wrap">
+    <div class="row">
+      <div class="margin">
+        <div class="cut">XTR / WHITE LABEL</div>
+      </div>
+      <div class="header-inner">
+        <div class="stamp-row">
+          <div class="stamp">Promo &mdash; not for sale</div>
+          <div class="stamp b">Nothing built yet</div>
+        </div>
+        <h1>The chart that has to be right</h1>
+        <p class="lede">
+          A hundred thousand tracks land on streaming services every day and almost
+          all of them are heard by nobody. What decides which ones reach you is
+          invisible, unaccountable, and in most cases purchasable. This is an
+          attempt at something else.
+        </p>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+
+    <!-- ============ THE DEMO ============ -->
+    <div class="row" style="margin-top:44px">
+      <div class="margin">
+        <div class="eyebrow">Try it</div>
+        <p class="note">This is the entire product. It takes about ten seconds.</p>
+      </div>
+      <div class="col">
+        <div class="demo" id="demo">
+          <div class="label" aria-hidden="true"><span>XTR&#8202;001</span></div>
+
+          <div class="demo-body">
+            <div class="redact" aria-label="Track details hidden">
+              <div class="bar w1"></div>
+              <div class="bar w2"></div>
+            </div>
+
+            <div class="revealed">
+              <div class="track-title">Low Tide Function</div>
+              <div class="track-artist">Nine Mile Break</div>
+            </div>
+
+            <div class="ask">
+              <label class="ask-q" for="conviction">
+                You have heard it. You know nothing else about it. Of listeners who
+                have never heard this record, what share come back to it inside a week?
+              </label>
+              <div class="slider-row">
+                <input type="range" id="conviction" min="0" max="100" value="22"
+                       aria-describedby="readout" />
+                <div class="readout" id="readout">22%</div>
+              </div>
+              <button class="btn" id="commit">Commit</button>
+            </div>
+
+            <div class="verdict" aria-live="polite">
+              <div class="scores">
+                <div class="score s-machine">
+                  <div class="score-n">22%</div>
+                  <div class="score-l">Software said</div>
+                </div>
+                <div class="score s-you">
+                  <div class="score-n" id="you-n">&mdash;</div>
+                  <div class="score-l">You said</div>
+                </div>
+                <div class="score s-real">
+                  <div class="score-n">61%</div>
+                  <div class="score-l">It landed at</div>
+                </div>
+              </div>
+              <p class="verdict-txt" id="verdict-txt"></p>
+              <button class="replay" id="replay">Reset and try again</button>
+            </div>
+          </div>
+        </div>
+        <p class="note" style="border-color:var(--rule); color:var(--ink-soft)">
+          Illustration. The record and the numbers are invented.
+        </p>
+      </div>
+    </div>
+
+    <!-- ============ A1 ============ -->
+    <section class="row" style="margin-top:76px">
+      <div class="margin"><div class="cut">A1 &nbsp;&middot;&nbsp; The loop</div></div>
+      <div class="col">
+        <h2>Listen. Commit. Then find out.</h2>
+        <p>
+          You hear a song and you know nothing about it. No artist name, no artwork,
+          no play count, no label, no follower count. You listen properly, all the
+          way through.
+        </p>
+        <p>
+          Then you answer one question. Not a form, not a rating out of ten. One
+          question: how far do you think this travels with people who have never
+          heard it?
+        </p>
+        <p>
+          Then the screen opens up. Who made it, what everyone else thinks, who
+          backed it before you did, and where you sit among them. Weeks later, you
+          find out whether you were right.
+        </p>
+        <p>
+          That is the product. Everything else is machinery to make that last
+          sentence mean something.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ A2 ============ -->
+    <section class="row" style="margin-top:60px">
+      <div class="margin">
+        <div class="cut">A2 &nbsp;&middot;&nbsp; The mechanism</div>
+        <p class="note">The one idea that makes this different from every rate&#8209;this&#8209;song service ever built.</p>
+      </div>
+      <div class="col">
+        <h2>The software guesses first</h2>
+        <p>
+          Before any human hears a new track, our software makes its own prediction.
+          It is not clever software. It knows the genre, it knows what has done well
+          recently, it knows what people with similar habits have done before. It
+          makes a boring, sensible, slightly dull guess.
+        </p>
+        <p>That guess is the starting line. <strong>You only score by beating it.</strong></p>
+        <p>
+          Agree with the software and you earn nothing, because you have told us
+          nothing we did not already know. Back a record the software wrote off, and
+          turn out to be right, and you earn a great deal.
+        </p>
+        <div class="pull">
+          We are not paying attention to people for having opinions. We are paying
+          attention to people for having opinions our software could not have had.
+        </div>
+        <p>
+          It also means one thing happens on its own, with nobody having to police
+          it. <em>Piling on stops paying.</em> By the time a record is obviously
+          good, backing it is worth close to nothing. Being early is the only thing
+          here worth anything at all.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ A3 ============ -->
+    <section class="row" style="margin-top:60px">
+      <div class="margin"><div class="cut">A3 &nbsp;&middot;&nbsp; The blindfold</div></div>
+      <div class="col">
+        <h2>You never see the crowd before you commit</h2>
+        <p>
+          This looks like a small interface decision. It is the most important rule
+          we have.
+        </p>
+        <p>
+          Every chart ever made has the same disease. People see what is popular, so
+          they listen to what is popular, so it becomes more popular, and eventually
+          the chart is mostly measuring itself.
+        </p>
+        <p>
+          There is a well known experiment on exactly this. Around fourteen thousand
+          people were given a set of unknown songs. Some could see what everyone else
+          was downloading. Some could not. In the group that could see the numbers,
+          the hits got far bigger, the flops got far deader, and which songs became
+          hits turned out to be close to arbitrary. Genuinely good songs rarely
+          bombed and genuinely bad ones rarely soared, but everything in the middle,
+          which is where almost all music actually lives, became a coin flip
+          amplified by whoever happened to click first.
+        </p>
+        <p><strong>Show people the crowd, and the crowd stops telling you anything.</strong></p>
+        <p>So we do not show you. You listen, you decide, you commit, and then you see everything.</p>
+      </div>
+    </section>
+
+    <!-- ============ A4 ============ -->
+    <section class="row" style="margin-top:60px">
+      <div class="margin">
+        <div class="cut">A4 &nbsp;&middot;&nbsp; The honesty</div>
+        <p class="note">The part we would want to read first if somebody else were pitching this to us.</p>
+      </div>
+      <div class="col">
+        <h2>The rule that stops us cheating</h2>
+        <p>
+          If a market decides which songs get pushed, and being pushed is what makes
+          a song do well, then the market can simply cause its own answer. That is
+          not a forecast. That is a budget for making something happen. Prediction
+          markets on music have already run into exactly this, publicly, this year.
+        </p>
+        <p>Our answer is one sentence.</p>
+        <div class="pull">
+          The people who forecast do not count.<br />
+          The people who count do not forecast.
+        </div>
+        <p>
+          When it is time to settle whether a record actually did well, we hand it to
+          a completely separate group of listeners. They never forecast on it. They
+          do not follow the artist. They did not arrive through a shared link. They
+          were picked at random after the forecasting closed, and they are not told
+          they are the ones being measured. They just get handed a song, the way they
+          get handed songs every day.
+        </p>
+        <p>
+          <strong>What that costs an attacker.</strong> To rig one record you would
+          need to control something like a tenth of everybody on the platform. And
+          because the group is picked at random after the fact and never announced,
+          you would never know which tenth you needed.
+        </p>
+        <p>
+          There is a happy accident in this. The random, unbiased listening that lets
+          us measure honestly is the same thing as the random, unbiased listening
+          that gives unknown records a fair hearing. Fairness and honest measurement
+          turn out to be one cost, paid once.
+        </p>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ B1: ARTISTS ============ -->
+  <section class="side">
+    <div class="wrap">
+      <div class="row">
+        <div class="margin">
+          <div class="cut">B1 &nbsp;&middot;&nbsp; If you make records</div>
+        </div>
+        <div class="col">
+          <h2>Nobody hears your name</h2>
+          <p>
+            Not your label, not whether you have one, not your follower count, not
+            your artwork, not your city, not who you know. The first thing anyone
+            learns about your record is what it sounds like. For a lot of you that is
+            the first genuinely blind hearing your music will ever get.
+          </p>
+
+          <div class="points" style="margin-top:14px">
+            <div class="point">
+              <h3>We will not sell you placement. Not now, not quietly, not later.</h3>
+              <p>
+                You do not have to trust our ethics on this. You only have to trust
+                our self interest. The signal is the only thing we have. The moment
+                an artist can pay to be surfaced, the signal is worth nothing and we
+                have nothing left to sell to anybody. Pay to play would not be us
+                being greedy. It would be us setting fire to the only asset we own.
+              </p>
+            </div>
+            <div class="point">
+              <h3>We will tell you the truth about what happened</h3>
+              <p>
+                Not a play count. Play counts are the easiest number in music to fake
+                and the least informative one to receive. You find out how many people
+                stayed to the end, how many came back a week later without being
+                prompted, and, often most useful of all, which scene actually
+                responded. That is regularly not the scene the artist thought they
+                were in.
+              </p>
+            </div>
+            <div class="point">
+              <h3>Most records will not get a market</h3>
+              <p>
+                We would rather say that now than have you discover it. Forecasting
+                attention is limited, and a service that surfaces everything has
+                surfaced nothing. Records earn their way in. A slice is also promoted
+                completely at random, deliberately, so nobody can reverse engineer
+                the door.
+              </p>
+            </div>
+            <div class="point">
+              <h3>We publish who backed you. We do not publish who did not.</h3>
+              <p>
+                There is no flop list. No bottom of the chart. No public record of a
+                record that did not land. You see the full picture, privately, because
+                you should have it. Nobody else does. Putting a permanent public
+                verdict on a young artist's work is not a feature, and it cannot be
+                taken back once it is done.
+              </p>
+            </div>
+            <div class="point">
+              <h3>If it travels, it travels on something checkable</h3>
+              <p>
+                When a record starts moving here there is an actual answer to why it
+                is being pushed, and the answer has names and dates in it. Nobody has
+                to take our word for it, including you.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ B2: LISTENERS ============ -->
+  <section class="side pink">
+    <div class="wrap">
+      <div class="row">
+        <div class="margin">
+          <div class="cut" style="color:var(--pink-txt); border-color:var(--pink)">B2 &nbsp;&middot;&nbsp; If you listen</div>
+        </div>
+        <div class="col">
+          <h2>You have been doing this free for twenty years</h2>
+          <p>
+            You found the band before your friends did. You sent the album to six
+            people in 2019. You were right, there is no record anywhere that you were
+            right, and the platform that monetised your instinct did not so much as
+            thank you. Here, being early is the entire point, and it counts.
+          </p>
+
+          <div class="points" style="margin-top:14px">
+            <div class="point">
+              <h3>Your feed comes from people, not a black box</h3>
+              <p>
+                Not "listeners like you", which is a phrase that means nothing. Real,
+                specific people whose calls have lined up with yours in the past,
+                tracked and proven over time. Something more like:
+              </p>
+              <div class="pull" style="font-size:1.05rem; border-color:var(--pink); margin-top:6px">
+                These eleven people backed five records you later loved, before
+                almost anyone else did. Here is what they are backing now.
+              </div>
+              <p style="margin-top:14px">
+                No recommendation engine can currently say that sentence to you. It is
+                a better sentence than anything a black box produces, because you can
+                interrogate it.
+              </p>
+            </div>
+            <div class="point">
+              <h3>Being good at one thing does not make you an authority on everything</h3>
+              <p>
+                You might be excellent at spotting ambient records and hopeless at
+                pop. Most people are like this. Your standing is specific to the
+                scenes where you have actually demonstrated it, and it does not leak
+                into places you have not earned it.
+              </p>
+            </div>
+            <div class="point">
+              <h3>You earn it slowly, and that is deliberate</h3>
+              <p>
+                A hot streak of three does not make you a tastemaker, it makes you
+                lucky. Being right a few times moves almost nothing. Being right
+                repeatedly, over time, in a scene you know, moves a lot. Closer to a
+                chess rating than a follower count, and it cannot be bought at any
+                price.
+              </p>
+            </div>
+            <div class="point">
+              <h3>This is not gambling and structurally cannot become gambling</h3>
+              <p>
+                You cannot put money in. You cannot take money out. Credits are free,
+                they arrive on a schedule, you cannot buy more, and you cannot give
+                them to anyone else. If this service ever adds a button to buy more
+                credits, it will have become a different and much worse company, and
+                you should leave immediately. We are writing that down in public on
+                purpose.
+              </p>
+            </div>
+            <div class="point">
+              <h3>It does ask something of you</h3>
+              <p>
+                Sitting through a song you have never heard, all the way, not knowing
+                if it is any good, is more work than skipping. We are not going to
+                pretend otherwise. We think there are plenty of people who would
+                actively enjoy that, because they already do it for nothing.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <!-- ============ B3 ============ -->
+    <section class="row" style="margin-top:66px">
+      <div class="margin"><div class="cut">B3 &nbsp;&middot;&nbsp; What changes</div></div>
+      <div class="col">
+        <h2>Three doors, two of them for sale</h2>
+        <p>
+          Today there are three ways into a listener's ears. Playlist editors,
+          algorithms, and marketing spend. All three are opaque and two of them are
+          purchasable.
+        </p>
+
+        <div class="points" style="margin-top:10px">
+          <div class="point">
+            <h3>Discovery gets an audit trail</h3>
+            <p>
+              A position on this chart is not a number that appeared. It is a list of
+              people who said something before it was obvious, on a date, with a
+              record of what they said. Charts today are either counting, which
+              rewards whoever already had attention, or somebody's opinion, which
+              rewards whoever knows the right person.
+            </p>
+          </div>
+          <div class="point">
+            <h3>Being early becomes an asset that belongs to the person</h3>
+            <p>
+              Your record of good calls is stamped permanently and cannot be edited
+              afterwards, including by us. If we go under, or get bought by somebody
+              worse, it survives us. Your reputation is not our property, which is a
+              genuinely unusual thing to be able to say.
+            </p>
+          </div>
+          <div class="point">
+            <h3>Finding music early stops being a budget item</h3>
+            <p>
+              Right now, new music discovery at any scale requires a label's
+              resources. If a crowd genuinely does it better, then small labels,
+              promoters, venues, radio shows and blogs get the same instrument the
+              majors have, at roughly no cost. That is a bigger change to the industry
+              than anything happening on the streaming side.
+            </p>
+          </div>
+          <div class="point">
+            <h3>Artists get a route in that is not money</h3>
+            <p>
+              Not a better route than money. Not yet. A route that money cannot buy,
+              which is not currently on offer anywhere.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ B4 ============ -->
+    <section class="row" style="margin-top:60px">
+      <div class="margin">
+        <div class="cut">B4 &nbsp;&middot;&nbsp; The small print</div>
+        <p class="note">We would rather lose you here than later.</p>
+      </div>
+      <div class="col">
+        <h2>What we are not pretending</h2>
+
+        <div class="points" style="margin-top:6px">
+          <div class="plain">
+            <div class="h">We are not replacing Spotify</div>
+            <p>
+              Replacing a streaming service means winning a licensing war against
+              three major labels, and nobody wins that starting from nothing. We want
+              to be the thing that finds records first. If we are genuinely good at
+              that, the streaming services and the labels become customers rather
+              than competitors, and honestly that is the better business anyway.
+            </p>
+          </div>
+          <div class="plain">
+            <div class="h">Crowds are not automatically right</div>
+            <p>
+              A room full of people can be sincerely and unanimously wrong. That is
+              why we measure ourselves against dumb software forever, and why we will
+              publish the comparison. If the crowd cannot beat a boring algorithm,
+              this should not exist, and we would like to be the ones who find that
+              out.
+            </p>
+          </div>
+          <div class="plain">
+            <div class="h">Whoever turns up will define the chart</div>
+            <p>
+              Early on that will be a narrower group of people than we would like, and
+              the results will reflect their tastes while sounding objective. Being
+              honest about whose opinion a chart represents is the minimum. Fixing it
+              is slow, expensive recruitment work, and no clever mechanism does it for
+              us.
+            </p>
+          </div>
+          <div class="plain">
+            <div class="h">We do not yet know whether good taste is a real thing</div>
+            <p>
+              Meaning whether it is a repeatable skill some people have, or luck that
+              looks like skill in hindsight. That is not us being modest. It is a
+              genuinely open question, it is testable, and it is the first thing we
+              are testing, because if the answer is no then most of this page is
+              fiction.
+            </p>
+          </div>
+          <div class="plain">
+            <div class="h">None of this is built</div>
+            <p>This is a design and an argument. Nothing above is a product you can use today.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ B5 ============ -->
+    <section class="row" style="margin-top:60px">
+      <div class="margin"><div class="cut">B5 &nbsp;&middot;&nbsp; First move</div></div>
+      <div class="col">
+        <h2>It starts with the cheap question</h2>
+        <p>Not with markets. Not with technology. With a two week test of one thing.</p>
+        <div class="pull">Will anybody sit and listen to unknown music, properly, more than once?</div>
+        <p>
+          A page. A queue of unreleased tracks. No scores, no credits, no predictions,
+          no accounts beyond an email. We watch how many people finish the first song,
+          how many songs they get through, and how many come back a week later.
+        </p>
+        <p>
+          If the answer is no, we will say so, and this goes in a drawer. Everything
+          above depends on that one behaviour, and it costs almost nothing to find
+          out. We would rather ask the cheap question first.
+        </p>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="row">
+      <div class="margin"><div class="eyebrow">End of side B</div></div>
+      <div class="col">
+        <div class="pull" style="border-color:var(--blue)">
+          Every chart you have ever seen was made either by counting or by somebody's
+          opinion. Counting rewards whoever already had the attention. Opinion rewards
+          whoever knows the right person. We would like to try a chart made of people
+          who have to be right.
+        </div>
+        <p class="eyebrow" style="margin-top:8px">
+          Design exploration &nbsp;&middot;&nbsp; July 2026 &nbsp;&middot;&nbsp; Nothing here is a product
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var MACHINE = 22, TRUTH = 61;
+
+    var demo    = document.getElementById('demo');
+    var slider  = document.getElementById('conviction');
+    var readout = document.getElementById('readout');
+    var commit  = document.getElementById('commit');
+    var replay  = document.getElementById('replay');
+    var youN    = document.getElementById('you-n');
+    var vtxt    = document.getElementById('verdict-txt');
+
+    function sync() { readout.textContent = slider.value + '%'; }
+    slider.addEventListener('input', sync);
+
+    function verdict(you) {
+      var machineGap = Math.abs(TRUTH - MACHINE);
+      var youGap     = Math.abs(TRUTH - you);
+
+      if (you <= MACHINE) {
+        return 'You went the other way from the software, and the record travelled '
+             + 'further than either of you thought. That costs you credits, and it '
+             + 'should. Being wrong in a direction nobody else went is the expensive '
+             + 'kind of wrong.';
+      }
+      if (youGap < machineGap * 0.35) {
+        return 'That is the call this whole thing is built to reward. You saw '
+             + 'something the software could not see, you said so before anyone '
+             + 'else had, and you were close to right. In a scene where you did that '
+             + 'repeatedly, your voice would start moving what other people hear.';
+      }
+      if (youGap < machineGap) {
+        return 'You beat the software. Not by a mile, but the direction was right and '
+             + 'the direction is what gets paid. Do that consistently in one scene '
+             + 'and you become someone whose calls other people see.';
+      }
+      return 'You went past it. Over-confidence costs something here, which is the '
+           + 'point, because a system where enthusiasm is free is a system where '
+           + 'everything gets shouted about equally.';
+    }
+
+    commit.addEventListener('click', function () {
+      var you = parseInt(slider.value, 10);
+      youN.textContent = you + '%';
+      vtxt.textContent = verdict(you);
+      slider.disabled = true;
+      demo.classList.add('done');
+    });
+
+    replay.addEventListener('click', function () {
+      demo.classList.remove('done');
+      slider.disabled = false;
+      slider.value = MACHINE;
+      sync();
+      slider.focus();
+    });
+
+    sync();
+  })();
+</script>
