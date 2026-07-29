@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   CHUNK_SIZE,
+  MAX_READ_BATCH_SIZE,
+  MAX_READ_LENGTH,
   ReconstructionContentError,
   ReconstructionVerificationError,
   assertVerified,
@@ -109,7 +111,7 @@ describe('reconstruction sdk', () => {
     expect(result.diagnostics.singleReads).toBe(1);
   });
 
-  it('clamps reconstruction batch reads to 30 chunks', async () => {
+  it('clamps reconstruction batch reads to the Clarity read_length budget', async () => {
     const payload = new Uint8Array(CHUNK_SIZE * 65);
     const chunks = chunkBytes(payload);
     const expectedHash = computeExpectedHash(chunks);
@@ -136,7 +138,16 @@ describe('reconstruction sdk', () => {
     );
 
     expect(result.verification.ok).toBe(true);
-    expect(batchRequests.map((indexes) => indexes.length)).toEqual([30, 30, 4]);
+
+    // No batch may exceed the ceiling, and a batch at the ceiling must still fit
+    // inside the 500,000-byte read budget. Asserting the budget rather than a
+    // literal split is the point: the previous [30, 30, 4] expectation encoded a
+    // batch size the node rejects outright, so the suite stayed green while
+    // every real batch read was failing.
+    const sizes = batchRequests.map((indexes) => indexes.length);
+    expect(Math.max(...sizes)).toBe(MAX_READ_BATCH_SIZE);
+    expect(MAX_READ_BATCH_SIZE * CHUNK_SIZE).toBeLessThan(MAX_READ_LENGTH);
+    expect(sizes.reduce((total, size) => total + size, 0)).toBe(chunks.length - 1);
   });
 
   it('falls back to single chunk reads for missing batch entries', async () => {

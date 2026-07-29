@@ -1,11 +1,12 @@
 # Xtrata FM: embeddable radio, and the read-batch bug found on the way
 
-Status: design agreed, nothing built yet. One production bug found and not yet
-fixed (see part 1, which is independent of the embed work and more urgent).
+Status: part 1 is fixed and verified against mainnet. Part 2 is design only,
+nothing built, and the model has since moved from a self-hosted script tag to a
+hosted iframe with multi-tenant analytics — see the note at the top of part 2.
 
 ---
 
-## Part 1: the read-batch ceiling (production bug, unfixed)
+## Part 1: the read-batch ceiling (FIXED)
 
 ### What happens
 
@@ -45,11 +46,71 @@ overridable per-environment via `RUNTIME_CONTENT_READ_BATCH_SIZE`, but the
 default is above the ceiling, which means roughly 24x more Hiro calls than
 necessary and outright failure on large audio inscriptions.
 
-### Suggested fix
+### The fix that shipped
 
-Drop both the clamp ceiling and the default to 24. Worth deriving the number
-from the cost limit rather than hardcoding it, since a future chunk-size change
-would silently reintroduce this.
+The measured boundary is 27: 27 succeeds, 28 trips the limit. Rather than pin
+27, `MAX_READ_BATCH_SIZE` is now derived from the budget itself in
+`packages/xtrata-reconstruction/src/index.ts`:
+
+```
+floor(500_000 * 0.8 / CHUNK_SIZE) = 24
+```
+
+The 0.8 keeps roughly 12% headroom, because the cost accounting is a node
+implementation detail that can move under us and sitting on the edge buys
+nothing. 24 and 27 time identically (1.49s vs 1.52s on #1107).
+
+`functions/runtime/lib.ts` now imports that constant instead of declaring its
+own 30, so the two cannot drift apart again.
+
+Verified against mainnet after the change, passing batchSize 999 so the clamp
+is what does the work:
+
+| Token | Size | Before | After |
+|---|---|---|---|
+| 1101 | 3.8MB | fails after 36s | 3.2s |
+| 785 | 3.5MB | fails after 36s | 3.1s |
+| 1107 | 697KB | 19.1s | 1.5s |
+
+All hash-verified with `strict: true`.
+
+### Tests
+
+Three tests pinned the old ceiling as a literal and so stayed green while the
+live site was rejecting every batch. They now assert the budget rather than the
+number:
+
+- `packages/xtrata-reconstruction/src/__tests__/index.test.ts` - no batch may
+  exceed the ceiling, and a batch at the ceiling must fit inside the budget.
+- `functions/runtime/__tests__/lib.test.ts` - same, plus the halve-on-cost-error
+  test now derives its "too big" threshold from the ceiling. Pinned at a literal
+  25, it silently stopped exercising the reduction path the moment the ceiling
+  dropped below it.
+- `functions/runtime/__tests__/content.test.ts` - the response-header assertion.
+
+Full `functions/` and `packages/` suites pass: 283 tests, 40 files.
+
+### The dud stores are NOT affected (checked)
+
+An earlier draft of this document claimed `radio_verdicts` (D1) and the
+per-browser `xtrata.radio.duds.v2` key had been poisoned with false verdicts and
+needed clearing. That was wrong. Nothing needs clearing.
+
+A dud is only recorded on a definitive answer, which means a 404. A failed
+reconstruction returns 502 (`functions/runtime/content.ts:956`), and
+`src/home/radio.js:447` explicitly treats anything that is not 404 or 410 as
+transient: `definitive` stays false, no verdict is reported, no dud is
+persisted.
+
+So the affected tokens were never blacklisted. They failed, went into the 45s
+cooldown, got retried, and failed again. The symptom was NO SIGNAL runs and
+songs that never came on, not a permanent write-off. The batch fix is therefore
+the whole fix, and those tokens should simply start playing.
+
+Still worth revisiting once this has been live for a while: how much of the dud
+caching, verdict reporting and `/warm` machinery in `src/home/radio.js` was
+built to work around slow-or-failing reconstruction rather than genuinely bad
+inscriptions.
 
 ### Unproven hypothesis, worth checking after the fix
 
@@ -64,6 +125,28 @@ ever failing on batch size.
 ---
 
 ## Part 2: the embed
+
+> **Direction has changed since this was written.** The model is now a hosted
+> iframe on our own domain with per-partner accounts, player IDs and
+> multi-tenant listening analytics in D1, rather than a script tag partners host
+> themselves. Two things drove it: the analytics beacon from a hosted iframe is
+> same-origin, so it reuses the `isCrossSite` gate in
+> `functions/lib/telemetry-ingest.ts:77` instead of needing a hole punched in
+> it, and a runtime we control cannot be tampered with by a partner who has an
+> incentive to inflate their numbers.
+>
+> Hosting the iframe does NOT give back the bandwidth win: the shell and bundle
+> are small and cached, and the audio still reconstructs client-side against
+> Hiro on the listener's IP.
+>
+> What it costs: fullscreen is clipped to the frame box, and Safari blocks
+> third-party storage in iframes without the Storage Access API, so the
+> IndexedDB track cache may not work there at all. Needs an in-memory session
+> cache as a fallback.
+>
+> Everything below about reconstruction, the `resolveTrack` seam, the fixed
+> playlist and the cache still holds. The delivery and account sections need
+> rewriting. Open question: `xtrata.xyz` or `xtrata.io`.
 
 ### Goal
 
