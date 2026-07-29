@@ -22,10 +22,17 @@ should be enforced in the data model rather than in policy.
 Per track, the forecaster set and the resolver set are disjoint. Enforced at
 assignment, not checked afterwards.
 
-This is the direct answer to the failure the FT reported in July 2026, where
-traders held positions on a chart outcome that their own activity could plausibly
-move. The activity and the measurement were the same population. Separate them and
-the attack has nowhere to stand.
+This is the direct answer to the Kalshi failure of June 2026. Kalshi ran a contract
+on the most streamed song in the US that month, around $3m traded. Streams for
+Malcolm Todd's Earrings jumped roughly 70% in a day on 29 June, taking it to number
+one. Spotify subsequently removed over 500,000 streams it did not believe came from
+genuine listeners and the track dropped to fourth, by which point Kalshi had
+already settled and paid out on the inflated number. No suggestion the artist or
+his team was involved. A Kalshi trader flagged it.
+
+The structural fault is that the people holding positions and the people generating
+the settlement metric were the same population, with nothing between them. Separate
+them and the attack has nowhere to stand.
 
 ### I2. Randomised exposure
 
@@ -108,12 +115,22 @@ attack. Build for it first.
 
 ### 2. Herding and information cascades
 
-Salganik, Dodds and Watts, 2006, with 14,341 participants, found that showing
-people what others had chosen increased both inequality and unpredictability.
-Early noise became self-fulfilling. The most important detail is the middle: the
-very best songs rarely did badly and the very worst rarely did well, but everything
-in between was essentially arbitrary. That middle band is exactly where a discovery
-product operates.
+Salganik, Dodds and Watts, Science, February 2006. 48 songs by unknown bands, 14,341
+participants, eight parallel worlds plus an independent control condition. Showing
+people what others had chosen increased both inequality and unpredictability, and
+early noise became self-fulfilling.
+
+The most important detail is the middle. In the authors' words, "the best songs
+rarely did poorly, and the worst rarely did well", and everything in between was
+essentially arbitrary. That middle band is exactly where a discovery product
+operates. The concrete case: Lockdown by 52metro finished 1st of 48 in one world
+and 40th in another.
+
+Note also what the paper's design implies for us. It treats the independent
+condition, meaning the ranking with no social signal at all, as the measure of a
+song's actual quality. That is precisely the role the baseline model plays in
+[02-mechanism.md](02-mechanism.md), which means the central design choice here has
+a published precedent rather than being an invention.
 
 Handled structurally by sealed quotes in [02-mechanism.md](02-mechanism.md).
 Residual risk remains through side channels, which means no visible "trending"

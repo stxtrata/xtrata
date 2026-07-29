@@ -10,8 +10,9 @@ badly.
 
 ## The problem, from both ends
 
-Roughly a hundred thousand tracks are uploaded to streaming services every day.
-Almost all of them are heard by nobody.
+106,000 tracks a day were uploaded to streaming services last year. There are now
+253 million of them sitting there, and 88% were played fewer than a thousand times.
+120.5 million were played fewer than ten times.
 
 If you are an artist without a marketing budget or a contact who runs a playlist,
 that is the entire distribution story. You release a record, it lands in the same
@@ -85,13 +86,19 @@ Every chart ever made has the same disease. People see what is popular, so they
 listen to what is popular, so it becomes more popular, and eventually the chart is
 mostly measuring itself.
 
-There is a well known experiment on exactly this. Around fourteen thousand people
-were given a set of unknown songs. Some could see what everyone else was
-downloading. Some could not. In the group that could see the numbers, the hits got
-far bigger, the flops got far deader, and which songs became hits turned out to be
-close to arbitrary. Genuinely good songs rarely bombed and genuinely bad ones
-rarely soared, but everything in the middle, which is where almost all music
-actually lives, became a coin flip amplified by whoever happened to click first.
+There is a published experiment on exactly this. In 2006 Salganik, Dodds and Watts
+put 48 songs by unknown bands in front of 14,341 people, split across eight
+identical copies of the same site running at the same time, plus a control group
+who could not see download counts at all. Turning the counts on made the hits far
+bigger, the flops far deader, and which songs won substantially arbitrary. In their
+words, "the best songs rarely did poorly, and the worst rarely did well", and
+everything in between was up for grabs. That middle band is where almost all music
+actually lives.
+
+One record makes the point on its own. Lockdown, by a Milwaukee band called
+52metro, finished first out of 48 in one world and fortieth in another. Same song,
+same competition, indistinguishable audiences. The entire difference was whether
+you could see what the people before you had downloaded.
 
 Show people the crowd, and the crowd stops telling you anything.
 
@@ -107,8 +114,16 @@ us.
 
 If a market decides which songs get pushed, and being pushed is what makes a song
 do well, then the market can simply cause its own answer. That is not a forecast.
-That is a budget for making something happen. Prediction markets on music have
-already run into exactly this, publicly, this year.
+That is a budget for making something happen.
+
+This is not hypothetical and it is not old news. Last month Kalshi ran a contract
+on the most streamed song in the US in June, with around $3m traded on it. On 29
+June the streams for Malcolm Todd's Earrings jumped about 70% in a day and it went
+to number one. Spotify then removed over 500,000 streams it did not believe came
+from real listeners, and the track fell to fourth. Kalshi had already settled and
+paid out on the inflated figures. There is no suggestion that Todd or his team had
+anything to do with it. A Kalshi trader reading the streaming data is who flagged
+it.
 
 Our answer is one sentence:
 

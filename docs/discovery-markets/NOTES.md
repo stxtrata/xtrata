@@ -64,7 +64,25 @@ arguing to blind the company.
 
 - Xtrata fee figures in [05-xtrata-fit.md](05-xtrata-fit.md) are from memory notes,
   not a live mainnet estimate.
-- Precedents in [01-concept.md](01-concept.md), meaning HSX, Iowa, SoundOut,
-  HitPredictor, are from memory and the details matter if they get cited.
+- Precedents in [01-concept.md](01-concept.md), meaning HSX, Iowa, SoundOut and
+  HitPredictor, are still from memory. Everything else has now been checked.
 - Cost of inscribing full round records rather than just Merkle roots has not been
   estimated at all.
+
+## Verified 2026-07-29
+
+Checked against primary or named sources, and now safe to quote. Full list with
+links is in the Sources section of [pitch-web.html](pitch-web.html).
+
+- **Salganik, Dodds & Watts**, Science, 10 Feb 2006. 14,341 participants, 48 songs
+  by unknown bands, eight parallel worlds plus an independent control. Primary
+  source confirms the design and the quality-measure role of the control condition.
+- **Lockdown by 52metro**, 1st of 48 in one world, 40th in another. From Watts' own
+  NYT Magazine account, corroborated across secondary sources.
+- **Luminate 2025 Year-End**. 106,000 uploads a day, 253m tracks on streaming
+  services, 88% under a thousand plays, 120.5m under ten plays.
+- **Kalshi and Spotify, June 2026**. Contract on most streamed US song in June,
+  ~$3m traded. Earrings by Malcolm Todd rose ~70% in a day on 29 June to number
+  one, Spotify removed 500,000+ streams, track fell to fourth, Kalshi had already
+  paid out. **Carry the exculpatory clause every time this is used: there is no
+  suggestion the artist or his team was involved.**

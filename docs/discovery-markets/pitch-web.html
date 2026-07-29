@@ -242,18 +242,14 @@
 
   .demo-body { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
-  .redact { display: flex; flex-direction: column; gap: 8px; }
-  .bar {
-    height: 17px; border-radius: 2px;
-    background: var(--ink);
-    transition: opacity 0.5s ease, transform 0.5s ease;
-  }
-  .bar.w1 { width: 58%; }
-  .bar.w2 { width: 34%; }
+  .revealed { display: flex; flex-direction: column; gap: 3px; }
 
-  .revealed { display: none; flex-direction: column; gap: 3px; }
-  .demo.done .redact { display: none; }
-  .demo.done .revealed { display: flex; }
+  .srcs { display: flex; flex-direction: column; gap: 13px; }
+  .src { display: flex; flex-direction: column; gap: 2px; font-size: 0.9rem; line-height: 1.4; }
+  .src a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
+  .src a:hover { color: var(--pink-txt); }
+  .src a:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .src .what { color: var(--ink-soft); font-size: 0.84rem; }
 
   .track-title { font-family: var(--mono); font-size: 1.12rem; font-weight: 700; letter-spacing: -0.02em; }
   .track-artist { font-family: var(--mono); font-size: 0.76rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); }
@@ -375,10 +371,10 @@
         </div>
         <h1>The chart that has to be right</h1>
         <p class="lede">
-          A hundred thousand tracks land on streaming services every day and almost
-          all of them are heard by nobody. What decides which ones reach you is
-          invisible, unaccountable, and in most cases purchasable. This is an
-          attempt at something else.
+          106,000 tracks were uploaded to streaming services every day last year.
+          88% of everything on them was played fewer than a thousand times. What
+          decides which records escape that is invisible, unaccountable, and in most
+          cases purchasable. This is an attempt at something else.
         </p>
       </div>
     </div>
@@ -391,33 +387,31 @@
     <!-- ============ THE DEMO ============ -->
     <div class="row" style="margin-top:44px">
       <div class="margin">
-        <div class="eyebrow">Try it</div>
-        <p class="note">This is the entire product. It takes about ten seconds.</p>
+        <div class="eyebrow">A real record</div>
+        <p class="note">Every number below is from a published experiment. Nothing here is invented.</p>
       </div>
       <div class="col">
         <div class="demo" id="demo">
-          <div class="label" aria-hidden="true"><span>XTR&#8202;001</span></div>
+          <div class="label" aria-hidden="true"><span>SCIENCE&#8202;2006</span></div>
 
           <div class="demo-body">
-            <div class="redact" aria-label="Track details hidden">
-              <div class="bar w1"></div>
-              <div class="bar w2"></div>
-            </div>
-
-            <div class="revealed">
-              <div class="track-title">Low Tide Function</div>
-              <div class="track-artist">Nine Mile Break</div>
+            <div class="revealed" style="display:flex">
+              <div class="track-title">Lockdown</div>
+              <div class="track-artist">52metro &nbsp;&middot;&nbsp; Milwaukee</div>
             </div>
 
             <div class="ask">
               <label class="ask-q" for="conviction">
-                You have heard it. You know nothing else about it. Of listeners who
-                have never heard this record, what share come back to it inside a week?
+                In 2006 this song was put in front of 14,341 people across eight
+                separate copies of the same music site, each running at the same time
+                with the same 48 unknown tracks. In one copy it finished
+                <strong>first out of 48</strong>. Where do you think it finished in
+                another?
               </label>
               <div class="slider-row">
-                <input type="range" id="conviction" min="0" max="100" value="22"
+                <input type="range" id="conviction" min="1" max="48" value="5"
                        aria-describedby="readout" />
-                <div class="readout" id="readout">22%</div>
+                <div class="readout" id="readout">5th</div>
               </div>
               <button class="btn" id="commit">Commit</button>
             </div>
@@ -425,16 +419,16 @@
             <div class="verdict" aria-live="polite">
               <div class="scores">
                 <div class="score s-machine">
-                  <div class="score-n">22%</div>
-                  <div class="score-l">Software said</div>
+                  <div class="score-n">1st</div>
+                  <div class="score-l">Best world</div>
                 </div>
                 <div class="score s-you">
                   <div class="score-n" id="you-n">&mdash;</div>
                   <div class="score-l">You said</div>
                 </div>
                 <div class="score s-real">
-                  <div class="score-n">61%</div>
-                  <div class="score-l">It landed at</div>
+                  <div class="score-n">40th</div>
+                  <div class="score-l">Worst world</div>
                 </div>
               </div>
               <p class="verdict-txt" id="verdict-txt"></p>
@@ -443,7 +437,10 @@
           </div>
         </div>
         <p class="note" style="border-color:var(--rule); color:var(--ink-soft)">
-          Illustration. The record and the numbers are invented.
+          Salganik, Dodds and Watts, <em style="color:inherit">Science</em>, 10 February 2006.
+          Same song, same 48 competitors, indistinguishable audiences. The only
+          difference between the two worlds was whether people could see what
+          everyone before them had downloaded.
         </p>
       </div>
     </div>
@@ -505,6 +502,13 @@
           good, backing it is worth close to nothing. Being early is the only thing
           here worth anything at all.
         </p>
+        <p>
+          This is not a trick we invented. The 2006 experiment measured every song
+          twice, once with the crowd visible and once without, and treated the
+          crowd-free score as the song's actual worth. We are doing the same job with
+          software instead of a control group, and then paying people for the gap
+          between the two.
+        </p>
       </div>
     </section>
 
@@ -523,14 +527,20 @@
           the chart is mostly measuring itself.
         </p>
         <p>
-          There is a well known experiment on exactly this. Around fourteen thousand
-          people were given a set of unknown songs. Some could see what everyone else
-          was downloading. Some could not. In the group that could see the numbers,
-          the hits got far bigger, the flops got far deader, and which songs became
-          hits turned out to be close to arbitrary. Genuinely good songs rarely
-          bombed and genuinely bad ones rarely soared, but everything in the middle,
-          which is where almost all music actually lives, became a coin flip
-          amplified by whoever happened to click first.
+          The experiment at the top of this page is the proof. Salganik, Dodds and
+          Watts put 48 unknown songs in front of 14,341 people, split across eight
+          parallel copies of the same site plus a control group who could not see
+          download counts at all. Turning the counts on made the hits far bigger and
+          the flops far deader, and it made <em>which</em> songs won substantially
+          arbitrary. In their words:
+        </p>
+        <div class="pull" style="font-size:1.1rem">
+          "The best songs rarely did poorly, and the worst rarely did well."
+        </div>
+        <p>
+          Everything else was up for grabs. That middle band is where almost all
+          music actually lives, and it is the entire distance between first and
+          fortieth for the same record.
         </p>
         <p><strong>Show people the crowd, and the crowd stops telling you anything.</strong></p>
         <p>So we do not show you. You listen, you decide, you commit, and then you see everything.</p>
@@ -548,10 +558,23 @@
         <p>
           If a market decides which songs get pushed, and being pushed is what makes
           a song do well, then the market can simply cause its own answer. That is
-          not a forecast. That is a budget for making something happen. Prediction
-          markets on music have already run into exactly this, publicly, this year.
+          not a forecast. That is a budget for making something happen.
         </p>
-        <p>Our answer is one sentence.</p>
+        <p>
+          This is not hypothetical and it is not old news. Last month, Kalshi ran a
+          contract on the most streamed song in the US in June, with around
+          $3m traded on it. On 29 June the streams for Malcolm Todd's
+          <em>Earrings</em> jumped about 70% in a day and it went to number one.
+          Spotify then removed over 500,000 streams it did not believe came from
+          real listeners, and the track fell to fourth. Kalshi had already settled
+          and paid out on the inflated figures. There is no suggestion that Todd or
+          his team had anything to do with it. The suspicious activity was flagged
+          by a Kalshi trader reading the streaming data.
+        </p>
+        <p>
+          That is a market betting on a number that the bettors could reach out and
+          touch. Our answer to it is one sentence.
+        </p>
         <div class="pull">
           The people who forecast do not count.<br />
           The people who count do not forecast.
@@ -861,6 +884,43 @@
         </p>
       </div>
     </section>
+
+    <!-- ============ SOURCES ============ -->
+    <section class="row" style="margin-top:60px">
+      <div class="margin"><div class="cut">Sources</div></div>
+      <div class="col">
+        <h2>Where the numbers come from</h2>
+        <p>
+          Every figure on this page is published and checkable. The only things we
+          have made up are the arguments.
+        </p>
+        <div class="srcs">
+          <div class="src">
+            <a href="https://www.princeton.edu/~mjs3/salganik_dodds_watts06_full.pdf">
+              Salganik, Dodds &amp; Watts, "Experimental Study of Inequality and
+              Unpredictability in an Artificial Cultural Market", Science, 10 Feb 2006</a>
+            <span class="what">14,341 participants, 48 songs, eight parallel worlds, and the control group with no download counts.</span>
+          </div>
+          <div class="src">
+            <a href="https://pages.stern.nyu.edu/~wgreene/entertainmentandmedia/JustinTimberlakeIdeaLab.pdf">
+              Duncan Watts, "Is Justin Timberlake a Product of Cumulative
+              Advantage?", New York Times Magazine</a>
+            <span class="what">Watts' own account of the study, and the source for Lockdown by 52metro finishing first in one world and 40th of 48 in another.</span>
+          </div>
+          <div class="src">
+            <a href="https://view.ceros.com/luminate-data/luminate-year-end-music-report-2025-1">
+              Luminate 2025 Year-End Music Report</a>
+            <span class="what">106,000 uploads a day, 253 million tracks on streaming services, 88% played a thousand times or fewer, 120.5 million played ten times or fewer.</span>
+          </div>
+          <div class="src">
+            <a href="https://www.musicbusinessworldwide.com/spotify-slashes-streams-hit-song-after-suspicious-activity-on-prediction-market-kalshi/">
+              Music Business Worldwide, "Spotify slashes streams of hit song after
+              suspicious activity on prediction market Kalshi", July 2026</a>
+            <span class="what">The June 2026 Kalshi contract, the 500,000 removed streams, and the explicit note that there is no suggestion the artist or his team was involved.</span>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
 </main>
 
@@ -885,7 +945,7 @@
 
 <script>
   (function () {
-    var MACHINE = 22, TRUTH = 61;
+    var TRUTH = 40, DEFAULT = 5;
 
     var demo    = document.getElementById('demo');
     var slider  = document.getElementById('conviction');
@@ -895,38 +955,39 @@
     var youN    = document.getElementById('you-n');
     var vtxt    = document.getElementById('verdict-txt');
 
-    function sync() { readout.textContent = slider.value + '%'; }
+    function ord(n) {
+      var s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+      return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    }
+
+    function sync() { readout.textContent = ord(parseInt(slider.value, 10)); }
     slider.addEventListener('input', sync);
 
     function verdict(you) {
-      var machineGap = Math.abs(TRUTH - MACHINE);
-      var youGap     = Math.abs(TRUTH - you);
-
-      if (you <= MACHINE) {
-        return 'You went the other way from the software, and the record travelled '
-             + 'further than either of you thought. That costs you credits, and it '
-             + 'should. Being wrong in a direction nobody else went is the expensive '
-             + 'kind of wrong.';
+      if (you <= 10) {
+        return 'Almost everyone says something like that, and it is the reasonable '
+             + 'answer. It came 40th out of 48. Nothing about the record changed. '
+             + 'The only difference was that people in the second world could see '
+             + 'what everyone before them had downloaded.';
       }
-      if (youGap < machineGap * 0.35) {
-        return 'That is the call this whole thing is built to reward. You saw '
-             + 'something the software could not see, you said so before anyone '
-             + 'else had, and you were close to right. In a scene where you did that '
-             + 'repeatedly, your voice would start moving what other people hear.';
+      if (you <= 25) {
+        return 'You expected it to slip, which is more than most people allow for. '
+             + 'It slipped a great deal further than that, to 40th out of 48, on '
+             + 'nothing but whether the download counts were visible.';
       }
-      if (youGap < machineGap) {
-        return 'You beat the software. Not by a mile, but the direction was right and '
-             + 'the direction is what gets paid. Do that consistently in one scene '
-             + 'and you become someone whose calls other people see.';
+      if (you <= 44) {
+        return 'That is close, and closer than almost anyone guesses. It came 40th '
+             + 'out of 48. Same record, same competition, and the entire gap is '
+             + 'down to whether people could see the crowd before they chose.';
       }
-      return 'You went past it. Over-confidence costs something here, which is the '
-           + 'point, because a system where enthusiasm is free is a system where '
-           + 'everything gets shouted about equally.';
+      return 'You went further than it actually fell. It came 40th out of 48, which '
+           + 'is still a collapse from first place caused by nothing but visible '
+           + 'download counts.';
     }
 
     commit.addEventListener('click', function () {
       var you = parseInt(slider.value, 10);
-      youN.textContent = you + '%';
+      youN.textContent = ord(you);
       vtxt.textContent = verdict(you);
       slider.disabled = true;
       demo.classList.add('done');
@@ -935,7 +996,7 @@
     replay.addEventListener('click', function () {
       demo.classList.remove('done');
       slider.disabled = false;
-      slider.value = MACHINE;
+      slider.value = DEFAULT;
       sync();
       slider.focus();
     });

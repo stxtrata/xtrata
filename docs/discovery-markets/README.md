@@ -42,6 +42,8 @@ work below is about breaking that loop.
 | [06-open-questions.md](06-open-questions.md) | Regulation, revenue, and the things I cannot resolve |
 | [NOTES.md](NOTES.md) | What changed from the original brief, and next actions |
 | [PITCH.md](PITCH.md) | The same idea with no jargon, written for artists and listeners |
+| [30-SECOND-PITCH.md](30-SECOND-PITCH.md) | The spoken version, plus answers to the questions it provokes |
+| [pitch-web.html](pitch-web.html) | Web version of the pitch, sourced. Published as a private artifact |
 
 ---
 
