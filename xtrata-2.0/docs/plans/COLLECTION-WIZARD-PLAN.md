@@ -61,26 +61,56 @@ already exists and has been hardened this month:
 
 These are measured from the code, not assumed.
 
-### 3.1 The contract rejects duplicate content — and job creation throws on it
+### 3.1 Duplicate content is ALLOWED — the client is stricter than the chain
 
-`createJob` and `createBatchJob` both refuse if an item's hash already exists on-chain:
+An earlier draft of this plan claimed the contract rejects duplicate content globally and
+that one collision would make a collection uncompletable. **That is wrong.** Read against
+the deployed `xtrata-v3.2.3` source:
 
-> `This exact content is already inscribed on-chain as token #N — no payment was taken.`
+```clarity
+;; Advisory first-seen mapping: sealed content hash -> first token-id.
+(define-map HashToId (buff 32) uint)
+;; map-insert preserves the original token-id when duplicate content mints later.
+```
 
-Two consequences, and both matter enormously at 10k:
+`HashToId` is a **first-seen record, not a uniqueness constraint**. `map-insert` keeps the
+original id and later duplicates simply mint their own token. `get-id-by-hash` answers
+"who was first", not "is this taken". Exclusivity was deliberately removed.
 
-1. **Every item must be byte-unique.** Generative collections produce collisions more
-   often than people expect — two items with the same trait set, or the same stub with
-   whitespace differences only. A 10,000-item collection with a single duplicate pair
-   cannot be fully inscribed.
-2. **Resuming must not re-declare finished items.** Execution tolerates
-   already-inscribed content; *job creation* throws on it. So a resumed collection must
-   rebuild its work list from what is missing, not re-submit the original 10,000.
+There are exactly two real rules:
 
-**Therefore: a full duplicate audit before any payment** — internal (item vs item, by
-hash) and external (item vs chain, by `getIdByHash`). 10,000 hashes computed locally is
-fast; 10,000 chain reads is not, so it needs batching and caching, and it must be
-honest when a read fails rather than assuming "not inscribed".
+1. **Per wallet, per hash, one upload at a time.** `begin-inscription` asserts
+   `(is-none (map-get? UploadState { owner: tx-sender, hash: expected-hash }))`. You
+   cannot start a second upload of the same content from the same wallet while one is
+   already in progress. Different wallets are unaffected.
+2. **Within a single batch, item hashes must be distinct** —
+   `validate-batch-uniqueness` folds over the ≤50 item list. Twins in *different*
+   batches are fine.
+
+**The thing to fix, not design around:** `createJob` and `createBatchJob` throw on ANY
+pre-existing hash —
+
+> `This exact content is already inscribed on-chain as token #N. Inscribing an identical
+> hash is blocked by the contract — no payment was taken.`
+
+That message is inaccurate (the contract blocks no such thing) and the policy is stricter
+than the chain. For a single file it is arguably a courtesy — you probably did not mean
+to pay twice. For a collection it is actively harmful: it would refuse an item whose
+content happens to match something a stranger inscribed, and it complicates resume for
+no reason. The collection path needs a way past it — a `allowDuplicate` flag, or a
+create path that warns rather than throws.
+
+**So the audit changes purpose.** It is not a gate that prevents an impossible
+collection; it is advice plus batch planning:
+
+- **Twins are a warning, not an error.** Two identical pieces will both inscribe, as two
+  indistinguishable tokens. That is almost always a generator bug worth surfacing before
+  someone pays for it — but it is their call.
+- **Twins must not land in the same batch** (rule 2), so batch assembly has to separate
+  them deliberately.
+- **Already-inscribed-by-you content is skippable**, which is what makes resume cheap.
+- A failed chain read must still report "could not check" rather than "not inscribed" —
+  that part of the original plan stands.
 
 ### 3.2 One receipt cannot cover 10,000 items
 
@@ -157,9 +187,9 @@ much is ever at risk in one browser-held key.
    is present; otherwise infer.
 2. **Tell them what they have.** Item count, total bytes, detected shape, and — if
    Shape A looks convertible — *say so plainly*, with the cost difference.
-3. **Audit before money.** Byte-unique check across items; chain check for
-   already-inscribed hashes; name/URI collisions; per-item size ceilings. Refuse to
-   start on a duplicate rather than discovering it at item 6,000.
+3. **Audit before money.** Twin detection (reported, not fatal), name/URI collisions,
+   per-item size ceilings, and which items this wallet has already inscribed. Twins are
+   separated across batches automatically.
 4. **Price the stages.** Phase 1 exactly. Phase 3 as an estimate with a clear "priced
    properly once assets are inscribed" caveat, because 4 above.
 5. **Fund tranche 1**, then run: assets → bind → items, checkpointing every item.
@@ -183,13 +213,16 @@ registry, and enough speed to run 10,000 items.
 - Re-running a fully complete collection is a no-op and costs zero.
 - The plan never loses an item: for every input there is a token id or a recorded reason.
 
-**The duplicate constraint (3.1)**
-- Two byte-identical items are caught in the audit, before any payment.
-- An item already on-chain is detected and excluded, not re-declared.
-- A FAILED chain read during the audit reports "could not check" and blocks the start —
-  never "not inscribed". (This is the bug class that has cost most this month.)
-- Whitespace-only differences between stubs count as distinct — and are flagged as
-  probably-unintended.
+**Duplicates (3.1)**
+- Two byte-identical items are REPORTED as a likely generator bug, and the run may still
+  proceed — the chain allows it and it is the creator's call.
+- Twins are never placed in the same batch, because a batch requires distinct hashes.
+- A stranger having inscribed identical content does NOT block an item.
+- Content this wallet already inscribed is skipped, which is what makes resume cheap.
+- A FAILED chain read reports "could not check" and never "not inscribed". (This is the
+  bug class that has cost most this month.)
+- The create-time throw on a pre-existing hash is bypassable for collections, and its
+  message no longer claims the contract blocks it.
 
 **Phase 2 binding**
 - Item bytes contain the real asset token ids after binding.
