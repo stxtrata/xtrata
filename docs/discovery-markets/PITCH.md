@@ -233,14 +233,19 @@ right a few times moves almost nothing. Being right repeatedly, over time, in a
 scene you know, moves a lot. It is closer to a chess rating than a follower count,
 and it cannot be bought at any price.
 
-**This is not gambling, and it structurally cannot become gambling.**
+**You will never be able to buy your way into what people hear.**
 
-You cannot put money in. You cannot take money out. Credits are free, they arrive
-on a schedule, you cannot buy more, and you cannot give them to anyone else.
+Reputation is the only thing that moves what gets shown to other listeners, and
+reputation cannot be bought at any price. It is earned from calls that resolved,
+and from nothing else. No amount of money, from you, from a label, or from us,
+moves a record in front of somebody.
 
-If this service ever adds a "buy more credits" button, it will have become a
-different and much worse company, and you should leave immediately. We are writing
-that down in public on purpose.
+There may in time be a version where people can take a real financial position, in
+places where that is legal. If that happens it will be a separate thing sitting
+alongside this one, and it will buy exposure to the outcome rather than a place in
+anyone's feed. Those two are kept apart deliberately and permanently.
+
+We are writing that down in public because it is the promise worth holding us to.
 
 **It does ask something of you.**
 

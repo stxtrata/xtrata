@@ -46,8 +46,11 @@ everything on streaming got under a thousand plays.
 ## What they will ask, and the answer
 
 **"So it's gambling."**
-No money in, no money out. Credits are free and you cannot buy more. It is a
-rating, closer to Elo in chess than to a bet.
+Not in the UK version, because there is no money in it at all. In the US,
+Polymarket and Kalshi are CFTC regulated exchanges and their contracts are
+derivatives rather than bets, so there is a legal route there that does not exist
+here. Either way the thing that decides what listeners get shown is reputation, and
+reputation cannot be bought at any price.
 
 **"What does the artist get?"**
 A genuinely blind first listen, which most of them have never had. Then real
