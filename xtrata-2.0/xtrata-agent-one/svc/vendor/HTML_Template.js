@@ -1410,10 +1410,29 @@ const buildXtrataAudioPlayerHtml = (config) => {
       // Decode the actual audio into peaks for the real waveform. Works for
       // embedded base64 data URIs and remote recursive sources alike; on any
       // failure the seeded placeholder remains.
+      // Decoding the WHOLE track to raw PCM just to draw a waveform costs far more
+      // memory than the track itself: one minute of 48 kHz stereo float32 is ~23 MB,
+      // so a long piece runs to hundreds of MB. Desktop absorbs it. A phone does not,
+      // and when the decode blows the frame's memory budget the <audio> element next
+      // to it dies with it — the player sits at 0:00 saying "ready to play" and the
+      // tap does nothing. Older players had no waveform and were unaffected, which is
+      // exactly why only the newer ones broke on mobile.
+      //
+      // So: skip the decode on anything that looks memory-constrained or oversized,
+      // and keep the seeded placeholder waveform, which this code already treats as
+      // the normal failure path. Playback matters more than a pretty waveform.
+      const MAX_WAVEFORM_SRC_CHARS = 3000000; // ~2.2 MB of audio once base64-decoded
+      const waveformDecodeIsSafe = (src) => {
+        if (src.length > MAX_WAVEFORM_SRC_CHARS) return false;
+        const memory = navigator.deviceMemory;
+        if (typeof memory === 'number' && memory <= 4) return false;
+        return true;
+      };
       const loadRealWaveform = () => {
         const sourceNode = audio.querySelector('source');
         const src = sourceNode ? sourceNode.getAttribute('src') : '';
         if (!src || typeof window.fetch !== 'function') return;
+        if (!waveformDecodeIsSafe(src)) return;
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         if (!AudioContextClass) return;
         fetch(src)
@@ -1835,7 +1854,14 @@ const buildXtrataAudioPlayerHtml = (config) => {
       updatePlaybackUi();
       updateProgress();
       loadRealWaveform();
-      window.addEventListener('resize', drawHoverWave);
+      // iOS fires resize continuously while scrolling, as the URL bar hides and shows.
+      // Redrawing the canvas on every one of those made the controls flash and swallowed
+      // taps. Coalesce to one redraw per frame.
+      let hoverWaveFrame = 0;
+      window.addEventListener('resize', () => {
+        if (hoverWaveFrame) return;
+        hoverWaveFrame = requestAnimationFrame(() => { hoverWaveFrame = 0; drawHoverWave(); });
+      });
     })();
   <\/script>
 </body>
