@@ -235,7 +235,7 @@
 <script src="HTML_Template.js?v=6"></script>
 <script src="suno-build.js?v=7"></script>
 <script src="optimize-image.js?v=1"></script>
-<script src="agent-one.js?v=2026-07-28.6"></script>
+<script src="agent-one.js?v=2026-07-28.7"></script>
 <script>
 const SERVER = { mock:false, net:'mainnet' };
 // Batch state, declared HERE rather than beside its helpers further down. routeDrop and
@@ -250,7 +250,7 @@ const SB={ items:[], dropped:[], active:false, busy:false, quoteRun:0, EST:null,
 // fees on refund loops). Builds are date-stamped (YYYY-MM-DD.N) so a string compare orders them;
 // a NEWER deployed bundle must pass — requiring an exact match wrongly locked the page out
 // whenever the agent shipped ahead of the page.
-const XAO_MIN_AGENT_BUILD='2026-07-28.6';
+const XAO_MIN_AGENT_BUILD='2026-07-28.7';
 let AGENT_STALE=false;
 function checkAgentBuild(){
   const b=window.XAO_AGENT_BUILD||null;
@@ -443,9 +443,15 @@ $('#eCoverPick').onchange=()=>{
   const rd=new FileReader();
   rd.onload=()=>{ const s=String(rd.result); const b64=s.slice(s.indexOf(',')+1);
     COVER_OVERRIDE={ b64, mime:f.type };
-    $('#eCoverThumb').src=s; $('#editHint').textContent='New artwork staged — Apply changes to rebuild.'; };
+    $('#eCoverThumb').src=s; markEditsDirty();
+    $('#editHint').innerHTML='<span style="color:var(--warn)">New artwork staged — press <b>Apply changes</b> to put it in the player.</span>'; };
   rd.readAsDataURL(f);
 };
+// Any keystroke in the panel counts, including the ones that do not change the player's
+// size — a missing lyric sheet is as invisible on-chain as a missing title.
+['#eTitle','#eArtist','#eAlbum','#eLyrics','#eBpm','#eNote','#eLicense','#eDescription']
+  .forEach(sel=>{ const el=$(sel); if(el) el.addEventListener('input',markEditsDirty); });
+
 function collectEdits(){
   const v=(id)=>$(id).value;
   const o={ title:v('#eTitle'), artist:v('#eArtist'), album:v('#eAlbum'), lyrics:v('#eLyrics'),
@@ -466,6 +472,7 @@ $('#applyEdits').onclick=async()=>{
     $('#qName').textContent=(r.title||FILE.name)+(r.artist?(' — '+r.artist):'');
     $('#qPlayer').textContent=mib(PLAYER.size)+' MiB · Opus'+(r.hasCover?' + cover':'')+(r.hasLyrics?' + lyrics':'');
     $('#qPay').textContent=stx(EST.requiredUstx)+(EST.stxUsd?(' · ~$'+(Number(EST.requiredUstx)/1e6*EST.stxUsd).toFixed(2)):'');
+    clearEditsDirty();
     $('#editHint').innerHTML='<span class="ok">✓ Preview updated — quote refreshed on the new exact size.</span>';
   }catch(e){ $('#editHint').innerHTML='<span class="err">Rebuild failed: '+esc(e.message)+'</span>'; }
   building=false; updateGo();
@@ -537,6 +544,18 @@ async function quoteRefresh(){
 // What this track still needs before it can be inscribed. Empty for a Suno export.
 let NEEDS=[];
 let OVERSIZE=false;   // the built player exceeds what the contract can hold
+// Edits typed or artwork staged since the last rebuild. The player is built ONCE and
+// inscribed as-is, so anything not applied is simply absent from what goes on-chain —
+// and that is invisible unless we say so. A warning, not a block: it is their call.
+let EDITS_DIRTY=false;
+function markEditsDirty(){
+  if(EDITS_DIRTY) return;
+  EDITS_DIRTY=true;
+  const h=$('#editHint');
+  if(h) h.innerHTML='<span style="color:var(--warn)">Not applied yet — press <b>Apply changes</b> to put these in the player.</span>';
+  updateGo();
+}
+function clearEditsDirty(){ EDITS_DIRTY=false; updateGo(); }
 // "artwork, a title and an artist" — not "and ... and ...".
 const listOf=(a)=>a.length<2?(a[0]||''):a.slice(0,-1).join(', ')+' and '+a[a.length-1];
 // Re-derived from the BUILT player, not from the original probe: once artwork or a
@@ -575,13 +594,26 @@ function updateGo(){
   if(!SERVER.mock && !WALLET){ b.disabled=true; b.textContent='Connect your wallet to inscribe'; return; }
   const pb=parentBlockingMessage();
   if(pb){ b.disabled=true; b.textContent=pb; return; }
-  b.disabled=false; b.textContent = EST ? ('Inscribe my track  ·  pay '+stx(EST.requiredUstx)) : 'Inscribe my track';
+  b.disabled=false;
+  b.textContent = (EDITS_DIRTY?'Inscribe without your latest edits  ·  pay ':'Inscribe my track'+(EST?'  ·  pay ':''))
+    + (EST? stx(EST.requiredUstx) : '');
 }
 
 // ---- one combined action: create job (player File) + pay, then track ----
 $('#go').onclick=async()=>{
   if(!PLAYER) return;
   if(!SERVER.mock && !WALLET){ connectWallet(); return; }
+  // Ask, do not refuse. The player was built before these edits, so they are genuinely
+  // absent from what would be inscribed — but plenty of people will have typed
+  // something they do not care about, and this is permanent either way.
+  if(EDITS_DIRTY){
+    const sure=await confirmDanger({
+      title:'Inscribe without your latest edits?',
+      body:'You changed artwork or details but have not pressed "Apply changes", so the player about to be inscribed is the version from before those edits. Inscriptions are permanent — applying takes a second and rebuilds the preview so you can see exactly what goes on-chain.',
+      confirmLabel:'Inscribe as it is', cancelLabel:'Let me apply them'
+    });
+    if(!sure){ $('#editPanel').style.display='block'; $('#applyEdits').scrollIntoView({behavior:'smooth',block:'center'}); return; }
+  }
   const b=$('#go'); b.disabled=true; $('#hint').textContent='';
   try{
     PARENT_MSG=null; PARENT_OWNER={}; PARENT_ARRIVED={};
