@@ -226,6 +226,23 @@
 
     installGlobalTelemetry();
 
+    /**
+     * Permissions delegated to an iframe showing ONE inscription the user chose to open.
+     *
+     * We sandbox inscriptions with `allow-scripts` and deliberately without
+     * `allow-same-origin`, which puts them in an OPAQUE origin. The Permissions Policy
+     * default allowlist for `autoplay` is `self`, and an opaque origin is never `self`,
+     * so `media.play()` inside an inscription is rejected with NotAllowedError EVEN WHEN
+     * the user just tapped it. Desktop browsers are lenient about this; mobile is not,
+     * so on a phone the tap simply appears to do nothing. Delegating the feature
+     * explicitly is the documented fix and does not weaken the sandbox: the frame still
+     * has an opaque origin and no access to us.
+     *
+     * Deliberately NOT applied to grid or market thumbnails. A wall of inscriptions that
+     * had each granted itself autoplay would all start making noise at once.
+     */
+    const INSCRIPTION_FRAME_ALLOW = 'autoplay; fullscreen; encrypted-media';
+
     const isCoreEntry = (entry) =>
       entry.protocolVersion === '2.1.0' ||
       entry.protocolVersion === '2.1.1' ||
@@ -3476,6 +3493,7 @@
           previewMimeType?.trim().toLowerCase() === 'application/pdf';
         if (!isPdf) {
           frame.sandbox = 'allow-scripts';
+          frame.allow = INSCRIPTION_FRAME_ALLOW;
         }
         if (options.htmlDoc && !isPdf) {
           frame.srcdoc = options.interactiveHtml
@@ -5935,6 +5953,7 @@
         const isPdf = fullscreenMimeType === 'application/pdf';
         if (!isPdf) {
           frame.sandbox = 'allow-scripts';
+          frame.allow = INSCRIPTION_FRAME_ALLOW;
         }
         if (htmlDoc && !isPdf) {
           frame.srcdoc = htmlDoc;
@@ -6052,6 +6071,7 @@
         frame.referrerPolicy = 'no-referrer';
         frame.loading = 'lazy';
         frame.sandbox = 'allow-scripts';
+        frame.allow = INSCRIPTION_FRAME_ALLOW;
         frame.src = url;
         dom.fullscreenStage.append(frame);
         return;

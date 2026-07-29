@@ -204,3 +204,45 @@ describe('what a text inscription is attached to', () => {
     expect(homeMainSource).toContain('clearParentIds(); syncTextCard();');
   });
 });
+
+/**
+ * Media inside an inscription must be allowed to play.
+ *
+ * Inscriptions are sandboxed with allow-scripts and WITHOUT allow-same-origin, which
+ * gives them an opaque origin. The Permissions Policy default for `autoplay` is `self`,
+ * and an opaque origin is never `self`, so play() is rejected with NotAllowedError even
+ * directly inside a tap handler. Mobile enforces this strictly, so a tap on the player
+ * appeared to do nothing at all.
+ */
+describe('inscription iframe permissions', () => {
+  it('delegates autoplay to frames showing one chosen inscription', () => {
+    expect(homeMainSource).toContain("const INSCRIPTION_FRAME_ALLOW = 'autoplay; fullscreen; encrypted-media'");
+    // Every viewer frame that sandboxes also delegates, or media silently cannot start.
+    const grants = homeMainSource.match(/frame\.allow = INSCRIPTION_FRAME_ALLOW;/g) ?? [];
+    expect(grants.length).toBe(3);
+  });
+
+  it('never grants autoplay to grid or market thumbnails', () => {
+    // A wall of inscriptions each granting itself autoplay would all make noise at once,
+    // so only the frames the user deliberately opened may delegate the feature. Checked
+    // against the sandbox sites themselves: "inscription-preview" names both viewers and
+    // thumbnails, so it is far too ambiguous to assert on.
+    const sites = [...homeMainSource.matchAll(/frame\.sandbox = 'allow-scripts';/g)];
+    expect(sites.length).toBe(6);
+    const granting = sites.filter((m) =>
+      homeMainSource.slice(m.index ?? 0, (m.index ?? 0) + 120).includes('INSCRIPTION_FRAME_ALLOW')
+    );
+    expect(granting.length).toBe(3);
+    // The two market-thumbnail frames are named, so pin those explicitly as ungranted.
+    for (const m of [...homeMainSource.matchAll(/frame\.className = 'market-thumb__frame';/g)]) {
+      expect(homeMainSource.slice(m.index ?? 0, (m.index ?? 0) + 300)).not.toContain(
+        'INSCRIPTION_FRAME_ALLOW'
+      );
+    }
+  });
+
+  it('keeps the sandbox itself intact', () => {
+    // Delegating a feature must never turn into relaxing the origin boundary.
+    expect(homeMainSource).not.toContain("sandbox = 'allow-scripts allow-same-origin'");
+  });
+});
