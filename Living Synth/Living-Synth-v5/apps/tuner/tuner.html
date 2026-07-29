@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Living Synth v5 — mosaic legibility tuner</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #050507; color: #dfe4e8; font: 12px ui-monospace, Menlo, monospace; }
+  h1 { font-size: 13px; letter-spacing: .14em; font-weight: 600; margin: 0 0 2px; }
+  .sub { font-size: 11px; opacity: .55; margin: 0 0 16px; }
+  .wrap { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 22px; padding: 18px; align-items: start; }
+  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } }
+  .panel { border: 1px solid #1b1f26; border-radius: 12px; padding: 14px; background: #08090c; }
+  .row { display: grid; grid-template-columns: 1fr 52px; gap: 8px; align-items: center; margin-bottom: 11px; }
+  .row label { font-size: 11px; opacity: .8; }
+  .row .val { text-align: right; font-variant-numeric: tabular-nums; opacity: .95; }
+  input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: #3ad29f; margin: 0; }
+  .hint { font-size: 10px; opacity: .45; margin: -7px 0 12px; line-height: 1.4; }
+  button { font: inherit; color: #dfe4e8; background: #11141a; border: 1px solid #262c36; border-radius: 8px;
+           padding: 7px 10px; cursor: pointer; }
+  button:hover { border-color: #3ad29f; }
+  button.on { border-color: #3ad29f; color: #8affd0; }
+  .btns { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 14px; }
+  .stage { max-width: min(760px, 100%); }
+  canvas { width: 100%; aspect-ratio: 1/1; display: block; border: 1px solid #1b1f26; border-radius: 12px; background: #050507; }
+  pre { background: #0b0d11; border: 1px solid #1b1f26; border-radius: 8px; padding: 10px; font-size: 10.5px;
+        overflow-x: auto; margin: 12px 0 0; line-height: 1.5; }
+  .legend { font-size: 10px; opacity: .5; margin-top: 9px; line-height: 1.6; }
+  hr { border: 0; border-top: 1px solid #1b1f26; margin: 14px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="panel">
+    <h1>MOSAIC LEGIBILITY</h1>
+    <p class="sub">Dormant tiles only. Live tiles always draw at full strength.</p>
+
+    <div class="btns">
+      <button id="pShipped">shipped</button>
+      <button id="pQuiet">quiet</button>
+      <button id="pBase">base colours</button>
+    </div>
+    <div class="btns">
+      <button id="play">▶ play 8</button>
+      <button id="stop">■ stop</button>
+      <button id="hold">hold to A/B</button>
+    </div>
+
+    <hr>
+    <div id="sliders"></div>
+    <hr>
+    <div style="opacity:.6;font-size:10px;letter-spacing:.08em">PASTE INTO engine-core.js TUNING</div>
+    <pre id="out"></pre>
+    <div class="legend">
+      A/B: press and hold the button (or hold the <b>space</b> key) to flip back to the shipped
+      values, release to return to yours.
+    </div>
+  </div>
+
+  <div class="stage">
+    <canvas id="mosaic"></canvas>
+    <div class="legend" id="status">1,024 tiles revealed, all dormant.</div>
+  </div>
+</div>
+
+<script src="../../artifacts/proof-of-free-engine-v5.js"></script>
+<script>
+(() => {
+  const PF = globalThis.ProofOfFree, G = PF.genome, T = PF.tuning;
+  const $ = id => document.getElementById(id);
+
+  /* Every knob, with the range that is actually useful to look at. */
+  const KNOBS = [
+    { k: "idleDriftAmp",      min: 0,   max: 1,   step: 0.01, label: "drift amplitude",     hint: "How far a dormant tile fades toward white or black. This is the main thing washing the mark out." },
+    { k: "idleSatDrop",       min: 0,   max: 1,   step: 0.01, label: "saturation drop",     hint: "Colour lost at the top of the drift swing." },
+    { k: "idlePulseLight",    min: 0,   max: 8,   step: 0.1,  label: "lightness pulse",     hint: "Extra per-tile breathing, scaled by that tile's vibrancy." },
+    { k: "idleMotifAlpha",    min: 0,   max: 1,   step: 0.01, label: "motif alpha",         hint: "Opacity of the 0s, rings, bars and scopes on dormant melodic tiles." },
+    { k: "idleMotifVibrancy", min: 0,   max: 0.6, step: 0.01, label: "motif vibrancy add",  hint: "How much a vibrant tile brightens its own motif." },
+    { k: "idleDrumAlpha",     min: 0,   max: 1,   step: 0.01, label: "drum letter alpha",   hint: "357 tiles carry a K/S/H/O/T/C/P. At the shipped value they dominate the field." },
+    { k: "idleDrumPulse",     min: 0,   max: 0.5, step: 0.01, label: "drum letter pulse",   hint: "Beat-clock throb on the dormant drum letter." },
+    { k: "idleDrumRing",      min: 0,   max: 0.6, step: 0.01, label: "drum beat ring",      hint: "The expanding 0 behind each dormant drum letter." }
+  ];
+
+  const SHIPPED = Object.fromEntries(KNOBS.map(n => [n.k, T[n.k]]));
+  /* My starting suggestion: let the base colours carry the mark, and make
+   * playing a tile the only thing that lights it up. */
+  const QUIET = {
+    idleDriftAmp: 0.2, idleSatDrop: 0.12, idlePulseLight: 1,
+    idleMotifAlpha: 0.12, idleMotifVibrancy: 0.08,
+    idleDrumAlpha: 0.1, idleDrumPulse: 0.05, idleDrumRing: 0.04
+  };
+
+  const inputs = {};
+  const box = $("sliders");
+  for (const n of KNOBS) {
+    const wrap = document.createElement("div");
+    wrap.innerHTML = `<div class="row"><label for="s-${n.k}">${n.label}</label>
+      <span class="val" id="v-${n.k}"></span>
+      <input type="range" id="s-${n.k}" min="${n.min}" max="${n.max}" step="${n.step}"></div>
+      <div class="hint">${n.hint}</div>`;
+    box.appendChild(wrap);
+    const el = wrap.querySelector("input");
+    inputs[n.k] = el;
+    el.addEventListener("input", () => { T[n.k] = +el.value; paintReadout(); });
+  }
+
+  function paintReadout() {
+    for (const n of KNOBS) {
+      inputs[n.k].value = T[n.k];
+      $("v-" + n.k).textContent = (+T[n.k]).toFixed(n.step < 0.05 ? 2 : 1);
+    }
+    const body = KNOBS.map(n => `    ${n.k}: ${+(+T[n.k]).toFixed(3)},`).join("\n");
+    $("out").textContent = `const TUNING = {\n${body}\n    motifsOff: false\n  };`;
+  }
+  function apply(values) { Object.assign(T, values); T.motifsOff = false; paintReadout(); }
+
+  $("pShipped").onclick = () => apply(SHIPPED);
+  $("pQuiet").onclick = () => apply(QUIET);
+  $("pBase").onclick = () => { T.motifsOff = !T.motifsOff; $("pBase").classList.toggle("on", T.motifsOff); };
+
+  /* Hold to compare against the shipped values without losing your own. */
+  let held = null;
+  const holdOn = () => { if (held) return; held = Object.fromEntries(KNOBS.map(n => [n.k, T[n.k]])); Object.assign(T, SHIPPED); $("hold").classList.add("on"); };
+  const holdOff = () => { if (!held) return; Object.assign(T, held); held = null; $("hold").classList.remove("on"); paintReadout(); };
+  const hb = $("hold");
+  hb.addEventListener("pointerdown", holdOn);
+  addEventListener("pointerup", holdOff);
+  addEventListener("keydown", e => { if (e.code === "Space" && !e.repeat) { e.preventDefault(); holdOn(); } });
+  addEventListener("keyup", e => { if (e.code === "Space") { e.preventDefault(); holdOff(); } });
+
+  /* ---- the mosaic, fully revealed, so the judgement is the real thing ---- */
+  const live = new Map();
+  const mosaic = PF.createMosaic($("mosaic"), {
+    keyboard: false,
+    getInstrument: ed => live.get(ed) || null,
+    onSelect: ed => toggle(ed)
+  });
+  mosaic.setMinted(null);            // every tile revealed
+
+  function syncLive() {
+    const on = [], draining = [];
+    for (const [ed, inst] of live) (inst.state === "draining" ? draining : on).push(ed);
+    mosaic.setLive(on, draining);
+    $("status").textContent = on.length
+      ? `${on.length} live. Everything else dormant, which is what you are judging.`
+      : "1,024 tiles revealed, all dormant.";
+  }
+  function mount(ed) {
+    const div = document.createElement("div");
+    div.style.cssText = "position:fixed;left:-9999px;width:70px;height:70px";
+    document.body.appendChild(div);
+    const inst = PF.mount(div, { edition: ed, mode: "preview", onStateChange: syncLive });
+    live.set(ed, inst);
+    void inst.playMelody();
+    return inst;
+  }
+  function drop(ed) {
+    const inst = live.get(ed); if (!inst) return;
+    const node = inst.container; inst.destroy(); node.remove(); live.delete(ed);
+  }
+  function toggle(ed) { if (live.has(ed)) drop(ed); else mount(ed); syncLive(); }
+
+  $("play").onclick = async () => {
+    await PF.ensureAudio();
+    [...live.keys()].forEach(drop);
+    /* A deliberate spread: drums, bass, leads and highs, so the live tiles sit
+     * across the whole picture rather than clumping in one band. */
+    const want = { drum: 3, bass: 1, subBass: 1, lead: 2, bell: 1 };
+    const step = 7919;                                  // coprime with 1024, walks the grid
+    for (let i = 0, ed = 1; i < 1024 && Object.values(want).some(v => v > 0); i++) {
+      ed = (ed + step) % 1024 + 1;
+      const role = G.deriveGenome(ed).mosaic.role;
+      if (want[role] > 0) { want[role]--; mount(ed); }
+    }
+    syncLive();
+  };
+  $("stop").onclick = () => { [...live.keys()].forEach(drop); syncLive(); };
+
+  paintReadout();
+})();
+</script>
+</body>
+</html>

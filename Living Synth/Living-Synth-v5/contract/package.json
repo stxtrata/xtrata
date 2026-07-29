@@ -1,0 +1,17 @@
+{
+  "name": "proof-of-free-contract",
+  "version": "2.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "check": "clarinet check"
+  },
+  "devDependencies": {
+    "@stacks/clarinet-sdk": "^3.9.0",
+    "@stacks/transactions": "^7.4.0",
+    "typescript": "^5.9.2",
+    "vitest": "^4.0.7",
+    "vitest-environment-clarinet": "^3.0.0"
+  }
+}

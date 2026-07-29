@@ -1,0 +1,2771 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Proof of Free — Living Synth v5</title>
+<style>
+  :root { color-scheme: dark; --mint:#3ad29f; --line:#242430; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: radial-gradient(circle at 50% 0, #0d151a 0, #060709 46%, #040406 100%); color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; display: flex; flex-direction: column; align-items: center; padding: 12px; gap: 8px; }
+  .title { font-size: 12px; letter-spacing: .14em; opacity: .8; }
+  #simBar { display: none; flex-wrap: wrap; align-items: center; gap: 8px; width: min(94vmin, 860px);
+            box-sizing: border-box; padding: 8px 12px; border: 1px solid #244a5c; background: #08141c; border-radius: 10px; }
+  #simBar .simTag { font-size: 10px; letter-spacing: .1em; color: #79d7ff; font-weight: 700; }
+  #simBar label { font-size: 10px; opacity: .8; display: flex; gap: 4px; align-items: center; }
+  #simBar input { background: #0a1620; border: 1px solid #26424f; color: #dff; border-radius: 6px; padding: 5px 7px; width: 128px; font: inherit; font-size: 11px; }
+  #simBar button { padding: 6px 9px; font-size: 10px; }
+  #simBar #simInfo { font-size: 10px; opacity: .9; margin-left: auto; white-space: nowrap; color: #a8e6ff; }
+  button, select { font: inherit; font-size: 11px; }
+  button { background: #131318; color: #fff; border: 1px solid #2c2c36; border-radius: 8px; padding: 7px 10px; cursor: pointer; transition: border-color .12s, background .12s; }
+  button:hover { border-color: #6f6f88; }
+  button.active { border-color: var(--mint); color: #9dffd9; background: #0d2b23; }
+  button.kill { border-color: #b33; color: #ff9b8f; }
+  button.rec { border-color: #c0392b; color: #ff8f83; }
+  select { background: #0c0c10; color: #cfe; border: 1px solid #2c2c36; border-radius: 8px; padding: 6px 8px; }
+
+  /* The whole experience is ONE square (like the inscription frame). */
+  .stage { position: relative; width: min(94vmin, 860px); aspect-ratio: 1; display: grid;
+           grid-template-columns: 96px 1fr 96px; grid-template-rows: auto 1fr auto; gap: 6px;
+           padding: 8px; border: 1.5px solid #3ad29f55; border-radius: 16px;
+           box-shadow: 0 0 42px #3ad29f18, inset 0 0 70px #0007; background: #040406; }
+  .topbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; min-height: 30px; flex-wrap: wrap; }
+  .topbar .live { font-size: 10px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .modes { display: flex; gap: 3px; margin-left: auto; align-items: center; flex-wrap: wrap; }
+  .modes .modeLbl { font-size: 8px; letter-spacing: .12em; opacity: .5; margin-right: 3px; }
+  .modes button { padding: 6px 9px; font-size: 10px; letter-spacing: .03em; }
+  .modes button.active { box-shadow: 0 0 0 1px var(--mint) inset; }
+  .rail { display: flex; flex-direction: column; gap: 4px; overflow: auto; }
+  .rail.left { grid-column: 1; grid-row: 2; } .rail.right { grid-column: 3; grid-row: 2; }
+  .rail button, .rail select { width: 100%; padding: 6px 3px; font-size: 10px; }
+  .rail .lbl { font-size: 8px; letter-spacing: .1em; opacity: .45; margin: 4px 0 1px; }
+  .grp { font-weight: 700; }
+  .center { grid-column: 2; grid-row: 2; position: relative; display: flex; align-items: center; justify-content: center; }
+  #mosaic { width: 100%; height: 100%; aspect-ratio: 1; display: block; border-radius: 8px; cursor: crosshair; touch-action: none; }
+  .bottombar { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-height: 34px; }
+  .bottombar .dpad { display: grid; grid-template-columns: repeat(3, 26px); grid-template-rows: repeat(3, 26px); gap: 2px; }
+  .bottombar .dpad button { padding: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+  #tip { font-size: 10px; opacity: .8; flex: 1; min-width: 120px; white-space: pre-line; }
+
+  /* Synth view swaps INTO the square (double-tap a tile). */
+  .synthLayer { position: absolute; inset: 6px; background: #050507ee; backdrop-filter: blur(2px); border-radius: 12px;
+                display: none; grid-template-rows: auto 1fr auto; gap: 8px; padding: 10px; }
+  .stage.synth .synthLayer { display: grid; }
+  .stage.synth > .rail, .stage.synth > .bottombar, .stage.synth > .topbar .modes { visibility: hidden; }
+  button:disabled { opacity: .4; cursor: default; }
+  /* Session playback ("song"): hands-off. Lock the controls, keep the mosaic
+     bright to watch, and float a stop button over it. */
+  .stage.playing > .rail, .stage.playing > .bottombar, .stage.playing > .topbar .modes { pointer-events: none; opacity: .4; }
+  .stage.playing > .center { pointer-events: none; }
+  .songStop { position: absolute; left: 50%; bottom: 46px; transform: translateX(-50%); z-index: 40;
+              display: none; border-color: #c0392b; color: #ff8f83; background: #1a0f0eee; font-weight: 700; box-shadow: 0 4px 18px #000a; }
+  .stage.playing .songStop { display: inline-flex; }
+  .stage.synth .songStop { display: none !important; }
+  .synthTop { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .synthTop .x { border-color: #b33; color: #ffb3aa; font-weight: 700; }
+  #host { min-height: 0; overflow: auto; }
+  .synthBottom { display: flex; flex-direction: column; gap: 6px; }
+  .synthBottom .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  #seqPanel { border: 1px solid #26353d; background: #081014; border-radius: 8px; padding: 8px; }
+  #sequencer { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 3px; }
+  #registry { font-size: 10px; line-height: 1.6; opacity: .9; max-height: 84px; overflow: auto; }
+  #registry b { color: #9ecfff; }
+  #midiStatus { font-size: 10px; opacity: .75; }
+  #msg { font-size: 10px; opacity: .85; }
+  textarea { width: 100%; background: #0c0c10; color: #cfe; border: 1px solid #2c2c36; border-radius: 8px; font-size: 10px; height: 42px; }
+  .legend { display: flex; gap: 12px; font-size: 10px; opacity: .65; flex-wrap: wrap; justify-content: center; }
+  .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; vertical-align: middle; margin-right: 3px; }
+
+  @media (max-width: 680px) {
+    .stage { width: 100%; aspect-ratio: auto; grid-template-columns: 1fr; grid-template-rows: auto auto auto auto; }
+    .stage .center { grid-column: 1; grid-row: 2; aspect-ratio: 1; }
+    .rail { grid-column: 1 !important; flex-direction: row; flex-wrap: wrap; }
+    .rail.left { grid-row: 3; } .rail.right { grid-row: 4; }
+    .rail button, .rail select { width: auto; flex: 1 1 60px; }
+    .synthLayer { position: fixed; inset: 8px; }
+  }
+</style>
+</head>
+<body>
+  <div class="title">PROOF OF FREE · LIVING SYNTH v5</div>
+  <div id="simBar">
+    <span class="simTag">SIM · ON-CHAIN REVEAL</span>
+    <label>seed <input id="simSeed" spellcheck="false"></label>
+    <button id="simReroll" title="new random distribution">⚄ reroll</button>
+    <button id="simPrev" title="hide the last batch">◀</button>
+    <button id="simNext" title="inscribe the next random 32">▶ inscribe 32</button>
+    <button id="simAll" title="reveal all 1024">⏭ all</button>
+    <button id="simReset" title="back to the first batch">↺ reset</button>
+    <button id="simAuto" title="auto-advance the batches">▶ auto</button>
+    <span id="simInfo"></span>
+  </div>
+  <div class="stage" id="stage">
+    <div class="topbar">
+      <span class="live" id="liveState">idle</span>
+      <div class="modes" id="modes">
+        <span class="modeLbl">CURSOR&nbsp;MODE</span>
+        <button data-mode="play" class="active" title="tap a tile to start / stop its loop">▶ play</button>
+        <button data-mode="solo" title="tap a tile to solo it (desktop: shift-click)">◉ solo</button>
+        <button data-mode="group" title="tap a tile to add it to the active group (desktop: alt-click)">◥ group</button>
+        <button data-mode="mute" title="tap a live tile to mute it (desktop: ⌘/ctrl-click)">✕ mute</button>
+      </div>
+    </div>
+
+    <div class="rail left">
+      <div class="lbl">GROUPS</div>
+      <button class="grp" data-grp="A" style="border-color:#4bd0ff">A</button>
+      <button class="grp" data-grp="B" style="border-color:#ff6bd0">B</button>
+      <button class="grp" data-grp="C" style="border-color:#f0b55d">C</button>
+      <button class="grp" data-grp="D" style="border-color:#8affab">D</button>
+      <button id="grpLaunch">▶ launch</button>
+      <button id="grpStop">■ stop</button>
+      <button id="grpSolo">◉ solo</button>
+      <button id="grpClear">clear</button>
+    </div>
+
+    <div class="center"><canvas id="mosaic" tabindex="0" aria-label="Xtrata living mosaic"></canvas></div>
+
+    <div class="rail right">
+      <div class="lbl">LIVE</div>
+      <button id="voices">voices 8</button>
+      <button id="clearSolo">◉ unsolo</button>
+      <button id="clearMute">✕ unmute</button>
+      <button id="killAll" class="kill">✕ kill all</button>
+      <div class="lbl">JAM</div>
+      <button id="randomise">⚄ random</button>
+      <button id="sceneSave">◉ save</button>
+      <select id="sceneList" aria-label="recall scene"><option value="">recall…</option></select>
+      <button id="sceneClear" title="delete scenes">🗑</button>
+      <div class="lbl">SESSION</div>
+      <button id="recSession" title="record the whole live set as a song">● rec set</button>
+      <button id="playSession" title="play the recorded/loaded session, hands-off" disabled>▶ song</button>
+      <button id="saveSession" title="download the session JSON" disabled>⇩ save</button>
+      <button id="loadSession" title="load a session JSON to play">⇪ load</button>
+      <input id="sessionFile" type="file" accept="application/json,.json" style="display:none">
+    </div>
+
+    <button id="songStop" class="songStop" title="stop the song">■ stop song</button>
+
+    <div class="bottombar">
+      <div class="dpad">
+        <span></span><button id="up">▲</button><span></span>
+        <button id="left">◀</button><button id="open" style="font-size:8px">OPEN</button><button id="right">▶</button>
+        <span></span><button id="down">▼</button><span></span>
+      </div>
+      <button id="playRegion">▶ scan</button>
+      <button id="stopAll">■ stop (finish)</button>
+      <div id="tip">tap = launch/stop · double-tap = open synth · drag = volume</div>
+    </div>
+
+    <!-- Synth view: swaps into the square on double-tap -->
+    <div class="synthLayer" id="synthLayer">
+      <div class="synthTop">
+        <button class="x" id="closeSynth" title="back to mosaic">✕</button>
+        <strong id="synthTitle" style="font-size:12px">Edition</strong>
+        <select id="childSel" title="default / children"></select>
+        <span id="midiStatus">MIDI: —</span>
+      </div>
+      <div id="host"></div>
+      <div class="synthBottom">
+        <div class="row">
+          <button id="genesis">▶ play</button>
+          <button id="record">● record</button>
+          <button id="clearRec">↺ clear rec</button>
+          <button id="replay">↻ replay</button>
+          <button id="export">⇩ export</button>
+          <button id="propose">⛓ publish child</button>
+          <span id="msg"></span>
+        </div>
+        <div id="seqPanel" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <strong id="seqTitle" style="font-size:11px">DRUM PATTERN</strong>
+            <span style="font-size:9px;opacity:.6">tap grid on pad or here · shift = accent</span>
+          </div>
+          <div id="sequencer"></div>
+          <div class="row" style="margin-top:6px">
+            <button id="seqRandom">⚄ randomise</button>
+            <button id="seqClear">✕ clear</button>
+            <button id="seqRestore">↺ genesis</button>
+          </div>
+        </div>
+        <details><summary style="font-size:10px;opacity:.7;cursor:pointer">load JSON / history</summary>
+          <textarea id="perfIn" spellcheck="false" placeholder='{"format":"xtrata-performance", ...}'></textarea>
+          <div class="row"><button id="load">⇪ load</button></div>
+          <div id="registry"></div>
+        </details>
+        <div style="font-size:9px;opacity:.55">MIDI keyboard or computer keys Z–M play notes (locked to the scale)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span><i class="sw" style="background:#585859"></i>grey/white · highs</span>
+    <span><i class="sw" style="background:#2f5fa0"></i>blue · leads</span>
+    <span><i class="sw" style="background:#8a5a28"></i>orange · bass/sub</span>
+    <span><i class="sw" style="background:#0a0b0c;border:1px solid #333"></i>black · drums</span>
+    <span>green live · orange finishing · dashed muted</span>
+  </div>
+
+<script>
+/* Proof of Free — Living Synth v5 · deterministic genome module.
+ *
+ * v5:
+ *  - Colour comes from the ACTUAL Xtrata logo, embedded as a 32×32 hex map
+ *    (XTRATA_MAP, sampled from the source artwork) — the mosaic reproduces
+ *    the real composition pixel-for-pixel. Regenerate from a PNG with
+ *    scripts/sample-logo.mjs.
+ *  - Five families via colour classification: black / grey / white / blue /
+ *    orange. BLACK TILES ARE DRUM NFTS: each is a drum machine with a
+ *    deterministic preset step pattern (hats/claps/snares in the upper rows,
+ *    kicks/toms/sub toward the bottom) that owners can re-record or
+ *    re-sequence and inscribe as a child to change the beat or tone.
+ *  - Per-tile loop lengths (1–8 bars, polymetric against the shared
+ *    132 BPM / D-dorian transport).
+ *  - Themed animations (0 / ZERO / PROOF / FREE / …, bars, scope, orbit).
+ *
+ * ENGINE_VERSION is baked into every genome. A version-3 genome must sound
+ * and render identically under any future engine or be refused.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory();
+  else root.ProofOfFreeGenome = factory();
+})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  "use strict";
+
+  const ENGINE_VERSION = 3;
+  const COLLECTION_ID = "xtrata-living-synth-v5";
+  const COLLECTION_SIZE = 1024;
+  const GRID = 32;
+
+  /* One global musical framework shared by all 1,024 instruments. */
+  const MUSIC = Object.freeze({
+    root: "D",
+    rootMidi: 50,
+    scale: Object.freeze([0, 2, 3, 5, 7, 9, 10]),
+    bpm: 132,
+    barsPerLoop: 4,
+    stepsPerBar: 16,
+    ppq: 96,
+    tuningHz: 440
+  });
+  const STEPS_PER_BAR = MUSIC.stepsPerBar;                        // 16
+  const TICKS_PER_STEP = (MUSIC.ppq * 4) / MUSIC.stepsPerBar;     // 24
+  const TICKS_PER_BAR = STEPS_PER_BAR * TICKS_PER_STEP;           // 384
+  const STEPS_PER_LOOP = MUSIC.barsPerLoop * MUSIC.stepsPerBar;   // 64
+  const TICKS_PER_LOOP = STEPS_PER_LOOP * TICKS_PER_STEP;         // 1536
+  /* Loop-length TRAIT: every NFT (melodic or percussive) loops in exactly
+   * 1, 2 or 4 bars. Duplicates weight the draw. */
+  const LOOP_BARS = Object.freeze([1, 2, 2, 4, 4]);
+  const MAX_LOOP_TICKS = 4 * TICKS_PER_BAR;                       // 1536
+
+  const WAVEFORMS = Object.freeze(["sine", "triangle", "sawtooth", "square"]);
+  const WORDS = Object.freeze([
+    "0", "ZERO", "PROOF", "FREE", "NOTHING", "OPEN",
+    "BLOCK", "CLAIM", "SIGNAL", "WITNESS", "FOREVER", "X"
+  ]);
+  const ANIM_KINDS = Object.freeze(["glyph", "bars", "scope", "orbit", "zeroRing", "rain", "void", "pulse0", "binary", "radiate"]);
+  const ROLES = Object.freeze(["bell", "pluck", "lead", "pad", "bass", "subBass", "pulse", "drone", "atmos", "drum"]);
+  const FAMILIES = Object.freeze(["black", "grey", "white", "blue", "orange"]);
+  const DRUM_TYPES = Object.freeze(["kick", "snare", "closedHat", "openHat", "tom", "clap", "perc"]);
+
+  /* Brand palette — fixed hues, tiles fade between their colour and black/white.
+   * lo/hi = base-lightness band per family. Gold is the mythic overlay. */
+  const BRAND = Object.freeze({
+    orange: { h: 32,  s: 88, lo: 38, hi: 56 },   // Bitcoin Orange (#F7931A)
+    blue:   { h: 240, s: 88, lo: 38, hi: 60 },   // Stacks Blue (#5546FF)
+    grey:   { h: 220, s: 6,  lo: 34, hi: 64 },   // neutral
+    white:  { h: 220, s: 5,  lo: 70, hi: 90 },   // bright neutral
+    black:  { h: 225, s: 14, lo: 4,  hi: 12 }    // near-black ground
+  });
+  const GOLD = Object.freeze({ h: 45, s: 92 });
+
+  /* The actual Xtrata logo, 32×32, sampled from the source artwork.
+   * Each row is 32 × 6-char hex (no '#'). */
+  const XTRATA_MAP_ROWS = [
+    "090b0b090a0b090a0a090a0a090b0b0a0b0b080a0a0f10110a0b0c090a0a080a0a090a0a090a0a090a0a090a0b0a0b0c080a0a1415160a0b0c090b0b08090a080a0a090a0a08090a090b0b0a0b0c080a0a121314090a0b080a0a08090a090a0b",
+    "090a0b080909090a0a08090a0708090d0e0f0a0a0b07080907080908080908090907080908090a08090a07080910111209090a08080907080807080908080907080908090a08090a0708080f10100809090809090708080809090f121315191b",
+    "4647475a5b5b5758586364645e5e5e5556565252525556565858595454555555565c5c5c1415151011110a0a0b0809090708080808090708090708095656575b5b5c5858586d6d6e575858525353565656535454565757545455555656595b5d",
+    "4444457272732526261011111010111011111011121011111112121111121011125e5f5f595a5a1011120708090809090809090809090809095454555a5a5a1b1c1c1112121011110f10111011121011121011111112131112121415166c6c6d",
+    "52535461616257575771684b615e54555556595a5a5959595a5a5a7070715d5e5e5c5c5da9a9a9616162111112080909080909090a0a535454707070606161555556565656595a5a5657575656565353545a5b5b6060609f9f9f5b5c5c5c5c5d",
+    "4546465e5f5f1f202011110e1111111010110f10111616171112130f10104e4f4f5a5a5a5d5e5e5859595757581011120708085d5d5e5d5e5e5758585c5c5d5d5d5d1112120f10111010111112120f1011191a1a0f1011121213131314555656",
+    "4748496060605657575a5a5b5859596868685b5c5c5152525253535757581b1c1c5455555c5c5d6161615e5e5e6a6a6b5657575d5e5e5c5c5c5e5e5e5858591112125556565b5b5c525253696a6a5a5a5b525253555556515151555555585859",
+    "48494a3c495352575b6b6b6b6162625b5b5c5657575c5c5d56565661616159595a1718184e4e4f6b6b6b5757575a5b5b6f633c5a59565e5e5e5b5b5c0f10105051515b5b5c6d6d6d5556566060605757585a5a5a5c5c5d5758592d3e4b595a5a",
+    "0e0f102a3b483143522a3c4a1116190f10100f10110f0f101010115252535d5d5d9494941f20205253535758586363635e5d5b5858595d5d5d1516175454556a6b6b5b5b5c0f10100e0f0f0f10100f10100f10102a3c4a2b3d4c233644151617",
+    "1f2e39243746223545203343253847233543263847253746243745283d4e4f54575a5a5a5757581415154e4e4f5859595757576060601010115d5e5e6464645f5f5f2437452c3d4c2031401f32412336452538472034433247596c80911d2e3c",
+    "090c0e22313c2034440c13190a0c0e090c0e090b0d0f11130a0c0e22323e2437455154575757575a5a5a1718185757585757581f20205353545b5b5c5657572b3d4a243848090c0d090c0e0a0c0e090b0d1214160a0e10243847243645090b0d",
+    "080a0a080a0a1a2a37273a4a687c8c354b5c243949595638191811080a0b22323e2538475155585c5d5d1213131112120b0c0d0809095656575a5b5b293b4a1d3141213646090a0b2638462c43552336451f3342233645223544080a0a080809",
+    "090a0b080909080a0c243644273b4b1f32422538472437452436440a0e112938442437482133426265675c5c5d1112120708085050505758582c3d4a645c35263947080a0c2b41527488982134451e31411e3242283948080a0b090a0a08090a",
+    "08090a0d0e0f0b0c0c080a0b202f3c2538482135450d121621303d2235450b1015273a492437472436465254575455555757575b5c5c2537462538492133411215172235451c3040090a0c2236462437471c2f40090b0c090a0a070809111213",
+    "090a0b08080907080908080908090b212f3b2438472537460a10142336462335440a0e1122313e2437462436455457595858592d3d4b6d808f2c4153090b0d1c2e3c273a491d31411a2c3b1a2e3e213342090b0c070809111212070809080909",
+    "080a0a080809080809070809080909090a0b182835283e512437471a2d3e1f3242213343090e121c2e3c2337470e11140a0b0c334555213546090c0f192c3b2135451c30411f33431b2f3f1d3244080a0b0e0f10080909070809070808080909",
+    "090a0a07080908090a09090a0808090d0e0f090a0b182834213443090e121928351d30400b0f12090a0b1d2e3b263c4e1f3241213443080a0c0808091c2f3e223443090a0c213545203241101112080909070809070808080809070809070809",
+    "090a0b08090a0809090f1010090a0b0808091c2b372033431e31412032411a2e3f223646090d102436452336461f32432d3e4d2134451f3140080b0d1f3242223545213343374c5d6f82911f324107080808080908090a070809080909080a0a",
+    "080a0a0c0d0e0b0c0c0708090708091f2d3a2033431b2f3f0b101421313f2033431014171f2f3c2134442134444e382354392028354021344421354607090a25394a26394a08090a2133422034441d2f3e07080908090a090a0b080909101112",
+    "090a0b070809070809080a0b1525321a2d3c1f32420a0f141626322438480b11161d2d3a1f32412434414d3826563b2351351c563a2126323c2b40501f3242080b0d192b3a203241090b0d192c3c1d303f203242090a0c121313080809080909",
+    "08090a0708090809091b28331f3141223444192b3b2236481e3040090d10212f3a1b2d3c1f314094806f553921573b23573d265f3f24563a221e2c381a2c3c24354408090a2233436c7d8c1f32436c6237283b4c1f303e08080907080808090a",
+    "08090a08090b1827332032422032412336461f31401e2f3d080d1108090a1a293520313f48342352351d4c311a17151208090a4a3320573d275539221e2d3a182b3a090b0c090a0b2434422438491e303e1e2f3e1e2f3e1e303e080a0b080909",
+    "090b0b1b2833182a391c30410b101507090a07080908090a07090a1d2b361c2d3c4c3726533923604228130f0b0909090808080708094c34204e331c52372123313d20324012131408090a08090a07080907090a080b0d2132401d2e3c090a0b",
+    "1d2a34263a4a2032411d2e3d1a2b3a2031402232412131401a2c3b5a563919180f5338235238220f0c0a0909094a321f4c3019110d0a0809094e35215237216548302232401c2d3c1e2f3d2c3d4b1e2f3e2536442032416375841d2f3e2f404f",
+    "19252f535137323a36202e3b22303d202e3b19293722313d202e3c1417194530204b311c110d0a0b0a0946301e5136215035205337210e0c0a1011114e34204f35200b0a09273643202e3a21303d1e2d3a63727e202e3b2c3d4d20303f24313d",
+    "402e1f35373a4231254d311c50331d5337214d311c5e3f2751351e4e331e543b27110e0c09090949311f50351f5236214c321d6241285236200e0c0a0708084f36234f341e987d684a2d1852341c5036225b3d2650341f4a301c212e3a4f3724",
+    "3f2d1f8c715c573e2a4a301c4b321e5c422e4f3522472e1b4f37254c3421130e0a0b0a09432c1a533721513927181614090a0b412b1a4e331f5035200e0c0a0708094b321e4f3522452c1a5e412c49311e49301d4a321f452c184d311c4a311f",
+    "3f2c1e4b2e1817110c0d0e0e0a0a0b08080907080907080907080907080908090a47301f4d321e745b3115130d070809060708080809462e1d4e321e4d311d0c0b0b0708090e0f100809090809090708080808090708090909094d311d4e3421",
+    "3f2d2062422b1d140d0d0b0a0c0a090d0b0a0d0b0a0c0b090d0c0a0d0b0a0d0b0a5439264d34220f0c0907080808090908090908090908090a4831214f33201715120f0d0b0c0b090c0a090d0b0a0c0b090c0b090d0c0a0f0c0a492d185a3d27",
+    "382618472d1a49311f472e1b4b32204227154a311e4c3321452c1a583b264d342249301d100c09070809070808070809090a0a090a0a0808090f101149301d482f1d6e5c2b4a301e472f1d492f1c4b321f4d342148301e5e422d4a311e452e1d",
+    "08090a08090907080907080908090a0809090708090d0e0f090a0b07080907080808080908090907080908090a080909080809101112090a0b07080907080808080908090907080909090a08090a07080911121307080907080907080808090a",
+    "090a0b080909090a0a090a0a08090a0f10100a0b0c08090907080908090908090908090908090a090a0a0809090e1010090a0a08090907080908090908090a080909090a0a090a0b0808090f101108090a08090907080908090a08090a08090a"
+  ];
+  const XTRATA_MAP = XTRATA_MAP_ROWS.map(row => {
+    const cols = [];
+    for (let i = 0; i < GRID; i++) cols.push("#" + row.slice(i * 6, i * 6 + 6));
+    return cols;
+  });
+  if (XTRATA_MAP.length !== GRID || XTRATA_MAP.some(r => r.length !== GRID)) {
+    throw new Error("XTRATA_MAP must be exactly 32×32.");
+  }
+
+  function hexToRgb(hex) {
+    const v = parseInt(hex.slice(1), 16);
+    return { r: (v >> 16) & 255, g: (v >> 8) & 255, b: v & 255 };
+  }
+  /* Same classifier as the collection-builder reference. */
+  function classifyFamily(r, g, b) {
+    const lum = (r + g + b) / 3, sat = Math.max(r, g, b) - Math.min(r, g, b);
+    if (lum < 28 && sat < 24) return "black";
+    if (lum > 145 && sat < 38) return "white";
+    if (b > r * 1.08 && b > g * 1.02) return "blue";
+    if (r > b * 1.18 && r > g * 1.05 && lum > 35) return "orange";
+    if (lum > 45) return "grey";
+    return "black";
+  }
+  function logoColor(x, y) {
+    const hex = XTRATA_MAP[y][x];
+    const { r, g, b } = hexToRgb(hex);
+    return { hex, r, g, b, family: classifyFamily(r, g, b) };
+  }
+
+  /* Deterministic PRNG: splitmix32. No Math.random anywhere. */
+  function splitmix32(a) {
+    let s = a >>> 0;
+    return function () {
+      s = (s + 0x9e3779b9) >>> 0;
+      let t = s ^ (s >>> 16);
+      t = Math.imul(t, 0x21f0aaad);
+      t = t ^ (t >>> 15);
+      t = Math.imul(t, 0x735a2d97);
+      t = t ^ (t >>> 15);
+      return (t >>> 0) / 4294967296;
+    };
+  }
+  const q = (v, p) => Number(v.toFixed(p));
+  const pick = (rand, arr) => arr[(rand() * arr.length) | 0];
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const toHex = (r, g, b) => "#" + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
+  const lighten = (hex, f) => { const { r, g, b } = hexToRgb(hex); return toHex(r + (255 - r) * f, g + (255 - g) * f, b + (255 - b) * f); };
+  function hslToHex(h, s, l) {
+    h = ((h % 360) + 360) % 360; s = Math.max(0, Math.min(100, s)) / 100; l = Math.max(0, Math.min(100, l)) / 100;
+    const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - c / 2;
+    let r = 0, g = 0, b = 0;
+    if (h < 60) [r, g, b] = [c, x, 0]; else if (h < 120) [r, g, b] = [x, c, 0];
+    else if (h < 180) [r, g, b] = [0, c, x]; else if (h < 240) [r, g, b] = [0, x, c];
+    else if (h < 300) [r, g, b] = [x, 0, c]; else [r, g, b] = [c, 0, x];
+    return toHex((r + m) * 255, (g + m) * 255, (b + m) * 255);
+  }
+
+  /* Weighted role selection per family; black rows split hats-top / kicks-bottom
+   * exactly like the reference builder. */
+  function weighted(rand, weights) {
+    const entries = Object.entries(weights).filter(([, w]) => w > 0);
+    const total = entries.reduce((n, [, w]) => n + w, 0);
+    let v = rand() * total;
+    for (const [name, w] of entries) { v -= w; if (v <= 0) return name; }
+    return entries[entries.length - 1][0];
+  }
+  function drumTypeFor(gridY, rand) {
+    const v = gridY / (GRID - 1), top = 1 - v, bottom = v;
+    return weighted(rand, {
+      closedHat: 20 * top + 2, openHat: 10 * top + 1, clap: 12 * top + 2,
+      snare: 9 + 3 * top, perc: 12, kick: 3 + 24 * bottom, tom: 3 + 18 * bottom
+    });
+  }
+  /* Orchestration follows the logo as a mix hierarchy:
+   *   black  → drums (percussive frame)
+   *   orange → basslines, sub-bass weighted toward the bottom rows (low end)
+   *   blue   → the main leads (the body of the tune)
+   *   grey   → high-frequency, thin/bright presets (plucks + bells)
+   *   white  → the brightest highlights (bells / plucks) */
+  function roleFor(family, gridY, rand) {
+    if (family === "black") return rand() < 0.82 ? "drum" : (rand() < 0.6 ? "drone" : "atmos");
+    if (family === "grey") return weighted(rand, { pluck: 28, bell: 22, lead: 8 });
+    if (family === "white") return rand() < 0.5 ? "bell" : "pluck";
+    if (family === "blue") return weighted(rand, { lead: 32, pad: 9, pluck: 7, bass: 5 });
+    // orange: low end. Sub-bass grows the lower the tile sits in the logo.
+    const v = gridY / (GRID - 1);
+    return weighted(rand, { bass: 28, subBass: 6 + 46 * Math.max(0, (v - 0.5) / 0.5), pulse: 6, lead: 3 });
+  }
+  const ROLE_SPEC = {
+    bell:    { reg: 24,  waves: ["sine", "triangle"],     density: 0.42,  octaves: 2, atk: [0.002, 0.02],  rel: [0.6, 1.8],  cut: [4000, 11000], res: [2, 7],  drive: [0, 0.1],     sub: 0.0 },
+    pluck:   { reg: 12,  waves: ["triangle", "sawtooth"], density: 0.5, octaves: 2, atk: [0.001, 0.008], rel: [0.08, 0.4], cut: [2600, 9500], res: [2, 8],  drive: [0, 0.18],    sub: 0.0 },
+    lead:    { reg: 12,  waves: ["sawtooth", "triangle"], density: 0.55,  octaves: 2, atk: [0.004, 0.05],  rel: [0.3, 1.3],  cut: [2200, 7000], res: [3, 9],  drive: [0.06, 0.32], sub: 0.12 },
+    pad:     { reg: -5,  waves: ["sawtooth", "triangle"], density: 0.24, octaves: 1, atk: [0.15, 0.7],    rel: [1.4, 3.2],  cut: [900, 3600],  res: [1, 5],  drive: [0, 0.1],     sub: 0.15 },
+    bass:    { reg: -12, waves: ["sawtooth", "square"],   density: 0.42, octaves: 1, atk: [0.004, 0.03],  rel: [0.18, 0.6], cut: [420, 2000],  res: [3, 8],  drive: [0.1, 0.4],   sub: 0.5 },
+    subBass: { reg: -24, waves: ["sine", "triangle"],     density: 0.3, octaves: 1, atk: [0.006, 0.04],  rel: [0.25, 0.8], cut: [70, 340],    res: [1, 4],  drive: [0.04, 0.24], sub: 0.7 },
+    pulse:   { reg: 0,   waves: ["square", "sawtooth"],   density: 0.6, octaves: 1, atk: [0.002, 0.015], rel: [0.08, 0.4], cut: [1400, 6000], res: [4, 11], drive: [0.15, 0.55], sub: 0.2 },
+    drone:   { reg: -12, waves: ["sine", "sawtooth"],     density: 0.12, octaves: 1, atk: [0.4, 1.2],     rel: [2.5, 5],    cut: [400, 1800],  res: [1, 4],  drive: [0, 0.08],    sub: 0.4 },
+    atmos:   { reg: 0,   waves: ["triangle", "sine"],     density: 0.16,  octaves: 2, atk: [0.2, 0.9],     rel: [1.6, 4],    cut: [800, 4200],  res: [1, 6],  drive: [0, 0.12],    sub: 0.1 },
+    drum:    { reg: 0,   waves: ["sine", "triangle"],     density: 0.5,  octaves: 1, atk: [0.001, 0.01],  rel: [0.05, 0.3], cut: [800, 8000],  res: [1, 6],  drive: [0.1, 0.4],   sub: 0.0 }
+  };
+
+  function animationFor(family, role, rand) {
+    const r = rand();
+    let kind, word = null;
+    if (role === "drum") {
+      /* drum tiles render their animated LETTER; kind只 seeds the surround style */
+      kind = pick(rand, ["bars", "zeroRing", "radiate", "orbit"]);
+      word = null;
+    } else if (family === "black") {
+      // sparse, atmospheric ground — lots of 0 / void references
+      kind = r < 0.22 ? "void" : r < 0.4 ? "radiate" : r < 0.56 ? "binary" : r < 0.7 ? "orbit" : r < 0.85 ? "pulse0" : "glyph";
+      if (kind === "glyph") word = rand() < 0.7 ? "0" : pick(rand, ["ZERO", "NOTHING", "FOREVER", "X"]);
+    } else {
+      // bright families — heavy on 0 motifs with variety
+      if (r < 0.13) { kind = "glyph"; word = "0"; }
+      else if (r < 0.22) { kind = "glyph"; word = pick(rand, WORDS.slice(1)); }
+      else if (r < 0.37) kind = "pulse0";
+      else if (r < 0.5) kind = "zeroRing";
+      else if (r < 0.62) kind = "binary";
+      else if (r < 0.73) kind = "radiate";
+      else if (r < 0.82) kind = "bars";
+      else if (r < 0.9) kind = "scope";
+      else if (r < 0.96) kind = "rain";
+      else kind = "orbit";
+    }
+    /* Living colour: every tile drifts inside its family range. Some tiles
+     * are calm, some vibrant — vibrancy also scales the motif energy. */
+    const vibrancy = q(rand() * rand(), 3); // biased toward calm, few very alive
+    return {
+      kind, word,
+      speed: q(lerp(0.5, 1.8, rand()), 3),
+      seed: (rand() * 0xffffffff) >>> 0,
+      drift: {
+        hue: q(lerp(4, family === "black" ? 14 : 22, rand()) * (0.5 + vibrancy), 2),   // ± degrees
+        light: q(lerp(0.04, 0.18, rand()) * (0.5 + vibrancy), 3),                       // ± lightness
+        sat: q(lerp(0.02, 0.14, rand()) * (0.5 + vibrancy), 3),
+        rate: q(lerp(0.05, 0.5, rand()), 3),                                            // Hz
+        vibrancy
+      }
+    };
+  }
+
+  /* Distinct synth architectures (voice cores) so tiles in a family sound
+   * like different instruments, not one synth with effect tweaks. */
+  const ARCHS = Object.freeze(["dualosc", "supersaw", "fm", "pwm", "ring", "reese", "pluck", "wavetable"]);
+  const ARCH_BY_ROLE = {
+    lead:    ["supersaw", "fm", "pwm", "wavetable", "dualosc"],
+    pluck:   ["pluck", "fm", "wavetable", "pwm"],
+    bell:    ["fm", "wavetable", "pluck", "ring"],
+    bass:    ["reese", "fm", "supersaw", "dualosc"],
+    subBass: ["dualosc", "fm", "reese"],
+    pad:     ["supersaw", "wavetable", "pwm", "dualosc"],
+    pulse:   ["pwm", "ring", "supersaw", "fm"],
+    drone:   ["wavetable", "fm", "dualosc", "ring"],
+    atmos:   ["wavetable", "ring", "fm", "pwm"],
+    drum:    ["dualosc"]
+  };
+  function synthFor(role, rand) {
+    const arch = pick(rand, ARCH_BY_ROLE[role] || ["dualosc"]);
+    return {
+      arch,
+      fmRatio: pick(rand, [1, 2, 2, 3, 3.5, 4, 5, 7]),
+      fmIndex: q(lerp(0.4, role === "bell" ? 6 : 3.5, rand() * rand()), 2),
+      voices: 3 + ((rand() * 4) | 0),                // super/reese unison count
+      detuneSpread: q(lerp(6, role === "pad" ? 40 : 26, rand()), 1),
+      pwmDepth: q(lerp(0.2, 0.9, rand()), 2),
+      ringRatio: q(lerp(1.4, 3.3, rand()), 3),
+      waveSeed: (rand() * 0xffffffff) >>> 0
+    };
+  }
+
+  function deriveGenome(edition) {
+    if (!Number.isInteger(edition) || edition < 1 || edition > COLLECTION_SIZE) {
+      throw new Error(`Edition must be 1–${COLLECTION_SIZE}.`);
+    }
+    const rand = splitmix32(0x50f0f3ee ^ Math.imul(edition, 2654435761));
+    const gridX = (edition - 1) % GRID;
+    const gridY = ((edition - 1) / GRID) | 0;
+    const col = logoColor(gridX, gridY);
+    const family = col.family;
+    const role = roleFor(family, gridY, rand);
+    const spec = ROLE_SPEC[role];
+    const lum = (col.r + col.g + col.b) / (3 * 255);
+
+    const loopBars = pick(rand, LOOP_BARS);
+    const loopSteps = loopBars * STEPS_PER_BAR;
+    const rootNote = MUSIC.rootMidi + spec.reg + (rand() < 0.3 ? 12 : 0);
+    const patternSeed = (Math.imul(edition, 0x85ebca6b) ^ Math.imul(gridX * 32 + gridY + 1, 0xc2b2ae35)) >>> 0;
+
+    /* Brand palette: fixed hues (Bitcoin Orange / Stacks Blue / neutral greys),
+     * every tile fades between ITS colour and black or white — no rainbow.
+     * A rare gold tile is a MYTHIC: brighter, more alive, better in every way. */
+    const mythic = rand() < 0.012;                          // ~12 of 1,024
+    const band = BRAND[family];
+    const baseLight = q(lerp(band.lo, band.hi, rand()), 2);
+    const hue = mythic ? GOLD.h : band.h;
+    const sat = mythic ? GOLD.s : band.s;
+    const light = mythic ? q(lerp(52, 66, rand()), 2) : baseLight;
+    const fade = mythic ? "white" : (family === "white" ? "black" : rand() < 0.5 ? "white" : "black");
+    const fadeAmp = q((mythic ? 0.7 : 0.35) + rand() * (mythic ? 0.3 : 0.5), 3);
+
+    const genome = {
+      collectionId: COLLECTION_ID,
+      engineVersion: ENGINE_VERSION,
+      edition,
+      tokenId: edition,
+      mosaic: {
+        gridX, gridY, family, role, mythic,
+        hue, sat, light, fade, fadeAmp,
+        color: hslToHex(hue, sat, light),
+        accent: hslToHex(hue, Math.min(100, sat + (band.s < 20 ? 0 : 8)), Math.min(94, light + (mythic ? 24 : 30))),
+        brightness: q(Math.max(0.04, light / 100), 4)
+      },
+      animation: animationFor(family, role, rand),
+      rootNote,
+      loopBars,
+      oscillator: {
+        typeA: spec.waves[0],
+        typeB: pick(rand, spec.waves),
+        detune: q(lerp(3, 14, rand()), 2),
+        mix: q(lerp(0.3, 0.62, rand()), 3),
+        sub: q(spec.sub * lerp(0.6, 1.1, rand()), 3)
+      },
+      synth: synthFor(role, rand),
+      lfo: { rate: q(lerp(0.05, 6, rand() * rand()), 3), depth: q(lerp(0, 0.5, rand()), 3), target: pick(rand, ["cutoff", "pitch", "amp"]) },
+      filter: {
+        type: role === "bass" || role === "drone" ? "lowpass" : pick(rand, ["lowpass", "lowpass", "bandpass"]),
+        cutoff: Math.round(lerp(spec.cut[0], spec.cut[1], rand())),
+        resonance: q(lerp(spec.res[0], spec.res[1], rand()), 2)
+      },
+      envelope: {
+        attack: q(lerp(spec.atk[0], spec.atk[1], rand()), 4),
+        decay: q(lerp(0.05, 0.5, rand()), 4),
+        sustain: q(lerp(0.25, 0.75, rand()), 3),
+        release: q(lerp(spec.rel[0], spec.rel[1], rand()), 4)
+      },
+      effects: {
+        delaySteps: pick(rand, [2, 3, 4, 6, 8]),
+        feedback: q(lerp(0.15, 0.5, rand()), 3),
+        delayWet: q(lerp(0.08, 0.36, rand()), 3),
+        reverb: q(lerp(0.08, 0.5, rand()), 3),
+        distortion: q(lerp(spec.drive[0], spec.drive[1], rand()), 3),
+        pan: q(lerp(-0.6, 0.6, rand()), 3)
+      },
+      melody: {
+        patternSeed,
+        loopBars,
+        length: loopSteps,
+        density: q(Math.min(0.85, spec.density + (rand() - 0.5) * 0.18), 3),
+        octaveRange: spec.octaves,
+        swing: q(lerp(0, 0.18, rand()), 3)
+      },
+      padBehaviour: role === "drum"
+        ? { xAxis: "toneOrPitch", yAxis: "decay", pressureAxis: "drive" }
+        : { xAxis: "scaleDegree", yAxis: "filterCutoff", pressureAxis: "distortion" }
+    };
+
+    /* Drum NFT: dedicated drum machine genome. */
+    if (role === "drum") {
+      genome.drum = {
+        type: drumTypeFor(gridY, rand),
+        pitch: q(gridY > 20 ? lerp(30, 90, rand()) : lerp(60, 160, rand()), 2),
+        decay: q(lerp(0.06, 0.6, rand()), 3),
+        tone: q(rand(), 3),
+        snap: q(rand(), 3),
+        metal: q(rand(), 3),
+        gain: q(lerp(0.6, 0.95, rand()), 3)
+      };
+    }
+    return genome;
+  }
+
+  /* Deterministic melody (melodic tiles): same genome → same notes forever. */
+  /* Metric weight per 16th step: notes land on strong beats and leave space,
+   * so the genesis loops stay minimal and many tiles layer without turning to
+   * mush. Downbeat > half > quarter > eighth > sixteenth. */
+  function metricWeight(step) {
+    const b = step % 16;
+    if (b === 0) return 1;
+    if (b === 8) return 0.85;
+    if (b % 4 === 0) return 0.6;
+    if (b % 2 === 0) return 0.3;
+    return 0.12;
+  }
+  function deriveMelody(genome) {
+    const rand = splitmix32(genome.melody.patternSeed);
+    const degrees = MUSIC.scale.length;
+    const span = degrees * genome.melody.octaveRange;
+    const swingTicks = Math.round(genome.melody.swing * TICKS_PER_STEP);
+    const steps = [];
+    let degree = (rand() * span) | 0;
+    for (let i = 0; i < genome.melody.length; i++) {
+      const offbeat = i % 2 === 1;
+      if (rand() < genome.melody.density * metricWeight(i)) {
+        degree = Math.min(span - 1, Math.max(0, degree + (((rand() * 5) | 0) - 2)));
+        const midi = genome.rootNote + 12 * ((degree / degrees) | 0) + MUSIC.scale[degree % degrees];
+        steps.push({
+          step: i,
+          tick: i * TICKS_PER_STEP + (offbeat ? swingTicks : 0),
+          midi,
+          velocity: q(0.5 + rand() * 0.4 + (i % 16 === 0 ? 0.1 : 0), 3),
+          gateSteps: 1 + ((rand() * 3) | 0)
+        });
+      }
+    }
+    /* Guarantee a downbeat anchor so every tile has a clear pulse to lock to. */
+    if (steps.length === 0 || steps[0].step !== 0) {
+      steps.unshift({ step: 0, tick: 0, midi: genome.rootNote, velocity: 0.72, gateSteps: 2 });
+    }
+    return steps;
+  }
+
+  /* Deterministic preset drum pattern for a drum NFT (per drum type, over the
+   * tile's own loop length, with bar-to-bar variation). Steps are
+   * null | {vel, prob, pitch, accent} — same shape owners edit and inscribe. */
+  function deriveDrumPattern(genome) {
+    if (!genome.drum) return [];
+    const rand = splitmix32(genome.melody.patternSeed ^ 0x5eed);
+    const type = genome.drum.type;
+    const barOf = () => {
+      const a = Array.from({ length: 16 }, () => null);
+      const hit = (i, v = 0.75, p = 1, pitch = 0) => { a[i] = { vel: q(v, 3), prob: q(p, 3), pitch, accent: v > 0.88 }; };
+      if (type === "kick") { [0, 8].forEach(i => hit(i, 0.95)); if (rand() > 0.35) hit(10, 0.62, 0.85); if (rand() > 0.5) hit(14, 0.7, 0.8); }
+      else if (type === "snare" || type === "clap") { [4, 12].forEach(i => hit(i, 0.9)); if (rand() > 0.55) hit(15, 0.45, 0.65); }
+      else if (type === "closedHat") { for (let i = 0; i < 16; i += 2) hit(i, 0.45 + rand() * 0.25, 0.9); if (rand() > 0.5) for (let i = 1; i < 16; i += 4) hit(i, 0.35, 0.65); }
+      else if (type === "openHat") { [6, 14].forEach(i => hit(i, 0.55, 0.8)); }
+      else if (type === "tom") { [3, 7, 11, 15].forEach((i, n) => { if (rand() > 0.35) hit(i, 0.55 + rand() * 0.35, 0.85, n - 1); }); }
+      else { for (let i = 0; i < 16; i++) if (rand() < 0.2) hit(i, 0.35 + rand() * 0.5, 0.55 + rand() * 0.4, ((rand() * 5) | 0) - 2); }
+      return a;
+    };
+    const pattern = [];
+    for (let bar = 0; bar < genome.loopBars; bar++) {
+      const barPattern = barOf();
+      if (bar > 0) for (let i = 0; i < 16; i++) if (rand() < 0.12) {
+        barPattern[i] = barPattern[i] ? null : { vel: q(0.35 + rand() * 0.55, 3), prob: q(0.65 + rand() * 0.35, 3), pitch: ((rand() * 5) | 0) - 2, accent: rand() > 0.75 };
+      }
+      pattern.push(...barPattern);
+    }
+    if (!pattern.some(Boolean)) pattern[0] = { vel: 0.8, prob: 1, pitch: 0, accent: false };
+    return pattern;
+  }
+
+  const midiToHz = midi => MUSIC.tuningHz * 2 ** ((midi - 69) / 12);
+  function quantiseX(genome, x, octaves) {
+    const span = MUSIC.scale.length * (octaves || 2);
+    const degree = Math.min(span - 1, (Math.max(0, Math.min(1, x)) * span) | 0);
+    return genome.rootNote + 12 * ((degree / MUSIC.scale.length) | 0) + MUSIC.scale[degree % MUSIC.scale.length];
+  }
+
+  function stableStringify(value) {
+    if (Array.isArray(value)) return "[" + value.map(stableStringify).join(",") + "]";
+    if (value && typeof value === "object") {
+      return "{" + Object.keys(value).sort().map(k => JSON.stringify(k) + ":" + stableStringify(value[k])).join(",") + "}";
+    }
+    return JSON.stringify(value);
+  }
+  function genomeHash(genome) {
+    const text = stableStringify(genome);
+    let h = 0x811c9dc5;
+    for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+    return "0x" + (h >>> 0).toString(16).padStart(8, "0");
+  }
+
+  return Object.freeze({
+    ENGINE_VERSION, COLLECTION_ID, COLLECTION_SIZE, GRID,
+    MUSIC, WAVEFORMS, WORDS, ANIM_KINDS, ROLES, FAMILIES, DRUM_TYPES, LOOP_BARS,
+    XTRATA_MAP, classifyFamily, logoColor, hexToRgb,
+    TICKS_PER_STEP, TICKS_PER_BAR, STEPS_PER_BAR, STEPS_PER_LOOP, TICKS_PER_LOOP, MAX_LOOP_TICKS,
+    splitmix32, deriveGenome, deriveMelody, deriveDrumPattern, midiToHz, quantiseX,
+    stableStringify, genomeHash
+  });
+});
+
+/* Proof of Free — Living Synth v3 · performance codec.
+ * Gestures, not audio: a tick-based event stream is the canonical work.
+ * Merges v2's living-recording validation rigour with the v3 tick transport.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory();
+  else root.ProofOfFreePerformance = factory();
+})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  "use strict";
+
+  const FORMAT = "xtrata-performance";
+  const VERSION = 1;
+  const MAX_EVENTS = 4096;
+  const MAX_BYTES = 262144;
+  const MAX_DURATION_TICKS = 1536 * 64;      // 64 loops of the shared transport
+  const MAX_PATTERN_STEPS = 64;              // 4 bars × 16 steps (loop trait: 1/2/4)
+  const GATES = ["down", "move", "up"];
+
+  const clamp01 = v => Math.min(1, Math.max(0, Number(v) || 0));
+  const round3 = v => Math.round(v * 1000) / 1000;
+
+  /* opts.pattern (drum editions): step array — the child changes the BEAT.
+   * null entries are rests; hits are {vel, prob, pitch, accent}. */
+  function create(parent, events, durationTicks, opts) {
+    const perf = {
+      format: FORMAT,
+      version: VERSION,
+      parentEdition: parent.edition,
+      instrumentGenomeHash: parent.genomeHash,
+      engineVersion: parent.engineVersion,
+      bpm: parent.bpm,
+      durationTicks: Math.max(1, Math.round(durationTicks)),
+      events: events.map(e => ({
+        tick: Math.max(0, Math.round(e.tick)),
+        type: e.type,
+        ...(e.type !== "up" ? { x: round3(clamp01(e.x)), y: round3(clamp01(e.y)), pressure: round3(clamp01(e.pressure)) } : {})
+      }))
+    };
+    if (opts?.pattern) {
+      perf.pattern = opts.pattern.map(s => s ? {
+        vel: round3(clamp01(s.vel ?? 0.7)),
+        prob: round3(clamp01(s.prob ?? 1)),
+        pitch: Math.max(-12, Math.min(12, Math.round(s.pitch || 0))),
+        accent: !!s.accent
+      } : null);
+      if (opts.loopBars) perf.loopBars = Math.max(1, Math.min(4, Math.round(opts.loopBars)));
+    }
+    /* Persistent tone shaping (drum editions): the pad position the owner
+     * settled on — x → tone/pitch · y → decay/FX character. */
+    if (opts?.tone) perf.tone = { x: round3(clamp01(opts.tone.x)), y: round3(clamp01(opts.tone.y)) };
+    return perf;
+  }
+
+  function validatePattern(pattern, expectedLength) {
+    if (!Array.isArray(pattern) || pattern.length < 1 || pattern.length > MAX_PATTERN_STEPS) {
+      throw new Error(`Pattern must contain 1–${MAX_PATTERN_STEPS} steps.`);
+    }
+    if (pattern.length % 16 !== 0) throw new Error("Pattern length must be a whole number of 16-step bars.");
+    if (expectedLength && pattern.length !== expectedLength) {
+      throw new Error(`Pattern must be ${expectedLength} steps for this edition's loop.`);
+    }
+    for (const s of pattern) {
+      if (s === null) continue;
+      if (!s || typeof s !== "object") throw new Error("Pattern steps must be null or hit objects.");
+      if (![s.vel, s.prob].every(n => Number.isFinite(n) && n >= 0 && n <= 1)) throw new Error("Pattern velocity and probability must be between 0 and 1.");
+      if (!Number.isInteger(s.pitch) || s.pitch < -12 || s.pitch > 12) throw new Error("Pattern pitch offset must be an integer between -12 and 12.");
+      if (typeof s.accent !== "boolean") throw new Error("Pattern accent must be boolean.");
+    }
+    return pattern.map(s => s && { vel: s.vel, prob: s.prob, pitch: s.pitch, accent: s.accent });
+  }
+
+  /* Throws with a precise reason; dashboards fall back to the genesis melody. */
+  function validate(value, expected) {
+    if (!value || typeof value !== "object") throw new Error("Performance must be a JSON object.");
+    const p = value;
+    if (p.format !== FORMAT || p.version !== VERSION) throw new Error("Unsupported performance format or version.");
+    if (!Number.isInteger(p.parentEdition) || p.parentEdition < 1 || p.parentEdition > 1024) throw new Error("Parent edition is invalid.");
+    if (typeof p.instrumentGenomeHash !== "string" || !/^0x[0-9a-f]{8}$/.test(p.instrumentGenomeHash)) throw new Error("Genome hash is invalid.");
+    if (!Number.isInteger(p.engineVersion) || p.engineVersion < 1) throw new Error("Engine version is invalid.");
+    if (!Number.isInteger(p.durationTicks) || p.durationTicks < 1 || p.durationTicks > MAX_DURATION_TICKS) throw new Error("Duration is out of bounds.");
+    const hasPattern = p.pattern !== undefined && p.pattern !== null;
+    if (hasPattern) validatePattern(p.pattern, expected?.patternLength || undefined);
+    if (p.loopBars !== undefined && ![1, 2, 4].includes(p.loopBars)) throw new Error("Loop bars must be 1, 2 or 4.");
+    if (p.tone !== undefined) {
+      if (!p.tone || typeof p.tone !== "object" || ![p.tone.x, p.tone.y].every(n => Number.isFinite(n) && n >= 0 && n <= 1)) {
+        throw new Error("Tone shaping must be {x, y} between 0 and 1.");
+      }
+    }
+    const minEvents = hasPattern ? 0 : 1; // a beat-only child carries no gestures
+    if (!Array.isArray(p.events) || p.events.length < minEvents || p.events.length > MAX_EVENTS) throw new Error(`Performance must contain ${minEvents}–${MAX_EVENTS} events.`);
+    let last = -1;
+    for (const e of p.events) {
+      if (!Number.isInteger(e.tick) || e.tick < last || e.tick > p.durationTicks) throw new Error("Event ticks must be ordered inside the duration.");
+      if (!GATES.includes(e.type)) throw new Error("Event type is invalid.");
+      if (e.type !== "up" && ![e.x, e.y, e.pressure].every(n => Number.isFinite(n) && n >= 0 && n <= 1)) {
+        throw new Error("Event coordinates and pressure must be between 0 and 1.");
+      }
+      last = e.tick;
+    }
+    if (expected) {
+      if (p.parentEdition !== expected.edition) throw new Error("Performance targets a different edition.");
+      if (expected.genomeHash && p.instrumentGenomeHash !== expected.genomeHash) throw new Error("Performance genome hash does not match this instrument.");
+      if (expected.engineVersion && p.engineVersion !== expected.engineVersion) throw new Error("Performance engine version is unsupported.");
+    }
+    if (JSON.stringify(p).length > MAX_BYTES) throw new Error("Performance exceeds the inscription size bound.");
+    return p;
+  }
+
+  /* ============================================================
+   * Session recordings — a mosaic-level live performance.
+   * Where a `performance` is one instrument's gesture take, a `session`
+   * is the whole set: which tiles play and every mix move (solo · mute ·
+   * volume · voice-cap), tick-timed against the shared transport. It
+   * replays non-interactively as a "song" — the mosaic playing itself.
+   * ============================================================ */
+  const SESSION_FORMAT = "xtrata-session";
+  const SESSION_VERSION = 1;
+  const MAX_SESSION_EVENTS = 8192;
+  const MAX_SESSION_TICKS = 1536 * 512;   // generous live-set ceiling (~1h at 132bpm)
+  const MAX_SESSION_BYTES = 524288;       // 512 KiB
+  const SESSION_KINDS = ["on", "off", "vol", "solo", "mute", "clearSolo", "clearMute", "voices"];
+  const HAS_ED = ["on", "off", "vol", "solo", "mute"];
+  const edOK = e => Number.isInteger(e) && e >= 1 && e <= 1024;
+  const clampEd = e => Math.max(1, Math.min(1024, Math.round(e)));
+
+  /* meta: { collectionId, engineVersion, bpm, ppq, voices, name? } */
+  function createSession(meta, events, durationTicks) {
+    const out = {
+      format: SESSION_FORMAT,
+      version: SESSION_VERSION,
+      collectionId: meta.collectionId,
+      engineVersion: meta.engineVersion,
+      bpm: meta.bpm,
+      ppq: meta.ppq,
+      voices: meta.voices === 16 ? 16 : 8,
+      durationTicks: Math.max(1, Math.round(durationTicks)),
+      events: events.map(e => {
+        const o = { t: Math.max(0, Math.round(e.t)), k: e.k };
+        if (e.k === "on" || e.k === "off") o.ed = clampEd(e.ed);
+        else if (e.k === "vol") { o.ed = clampEd(e.ed); o.v = round3(clamp01(e.v)); }
+        else if (e.k === "solo" || e.k === "mute") { o.ed = clampEd(e.ed); o.on = !!e.on; }
+        else if (e.k === "voices") o.n = e.n === 16 ? 16 : 8;
+        return o;
+      })
+    };
+    if (meta.name) out.name = String(meta.name).slice(0, 80);
+    return out;
+  }
+
+  /* Throws with a precise reason; the player refuses to run a malformed song. */
+  function validateSession(value) {
+    const s = typeof value === "string" ? JSON.parse(value) : value;
+    if (!s || typeof s !== "object") throw new Error("Session must be a JSON object.");
+    if (s.format !== SESSION_FORMAT || s.version !== SESSION_VERSION) throw new Error("Unsupported session format or version.");
+    if (!Number.isInteger(s.engineVersion) || s.engineVersion < 1) throw new Error("Session engine version is invalid.");
+    if (![8, 16].includes(s.voices)) throw new Error("Session voice cap must be 8 or 16.");
+    if (!Number.isInteger(s.durationTicks) || s.durationTicks < 1 || s.durationTicks > MAX_SESSION_TICKS) throw new Error("Session duration is out of bounds.");
+    if (!Array.isArray(s.events) || s.events.length < 1 || s.events.length > MAX_SESSION_EVENTS) throw new Error(`Session must contain 1–${MAX_SESSION_EVENTS} events.`);
+    let last = -1;
+    for (const e of s.events) {
+      if (!e || typeof e !== "object") throw new Error("Session event must be an object.");
+      if (!SESSION_KINDS.includes(e.k)) throw new Error("Session event kind is invalid.");
+      if (!Number.isInteger(e.t) || e.t < last || e.t > s.durationTicks) throw new Error("Session event ticks must be ordered within the duration.");
+      if (HAS_ED.includes(e.k) && !edOK(e.ed)) throw new Error("Session event edition is invalid.");
+      if (e.k === "vol" && !(Number.isFinite(e.v) && e.v >= 0 && e.v <= 1)) throw new Error("Session volume must be between 0 and 1.");
+      if ((e.k === "solo" || e.k === "mute") && typeof e.on !== "boolean") throw new Error("Session solo/mute flag must be boolean.");
+      if (e.k === "voices" && ![8, 16].includes(e.n)) throw new Error("Session voice cap must be 8 or 16.");
+      last = e.t;
+    }
+    if (JSON.stringify(s).length > MAX_SESSION_BYTES) throw new Error("Session exceeds the inscription size bound.");
+    return s;
+  }
+
+  return Object.freeze({
+    FORMAT, VERSION, MAX_EVENTS, MAX_BYTES, MAX_DURATION_TICKS, MAX_PATTERN_STEPS, create, validate, validatePattern,
+    SESSION_FORMAT, SESSION_VERSION, MAX_SESSION_EVENTS, MAX_SESSION_TICKS, createSession, validateSession
+  });
+});
+
+/* Proof of Free — Living Synth v5 · universal engine core.
+ * One engine, 1,024 instruments. Requires ProofOfFreeGenome and
+ * ProofOfFreePerformance (concatenated ahead of this file in the artifact).
+ *
+ * v5:
+ *  - Higher-quality voice: dual osc + sub, waveshaper drive, resonant filter,
+ *    LFO, tempo-synced feedback delay, a shared convolver reverb bus, stereo
+ *    pan, soft-clip master limiter, and a per-voice analyser for visuals.
+ *  - Square Kaoss-pad instrument with high-resolution themed animation
+ *    (glyph 0/ZERO/PROOF/FREE/…, spectral bars from the FFT, oscilloscope
+ *    from the time-domain buffer, orbiting particles).
+ *  - A data-driven living-mosaic renderer: one shared canvas, a pre-rendered
+ *    glyph atlas, a lightweight animated draw per tile, zero audio graphs
+ *    while dormant; tiles promote to preview/instrument on demand.
+ */
+(() => {
+  "use strict";
+  const G = globalThis.ProofOfFreeGenome;
+  const P = globalThis.ProofOfFreePerformance;
+  const PROTOCOL = "proof-of-free/engine-api-v5";
+
+  const TICK_SECONDS = 60 / (G.MUSIC.bpm * G.MUSIC.ppq);
+  const BAR_SECONDS = G.TICKS_PER_BAR * TICK_SECONDS;
+  let maxActive = 8;                       // default 8 voices, 16 toggleable
+  let transportOrigin = null;              // shared musical zero → every tile aligns to it
+  const active = [];
+  function enforceVoiceCap() { while (active.length >= maxActive) active.shift().silence(); }
+  const clamp01 = v => Math.min(1, Math.max(0, Number(v) || 0));
+
+  /* ---------- mosaic legibility tuning ----------
+   * How loud a DORMANT tile is allowed to be. The base colours reproduce the
+   * Xtrata mark exactly, so everything here trades "alive" against "the mark
+   * reads". Live tiles are unaffected: they always draw at full strength, which
+   * is what makes playing a tile the reward. Values are read every frame, so a
+   * tuner page can drive them live; the numbers baked here are the defaults
+   * that ship. */
+  const TUNING = {
+    idleDriftAmp: 0.68,       // × fadeAmp — how far a dormant tile drifts to white/black
+    idleSatDrop: 0.32,        // saturation lost at full drift
+    idlePulseLight: 3,        // lightness pulse on a dormant tile
+    idleMotifAlpha: 0.44,     // dormant motif base alpha
+    idleMotifVibrancy: 0.2,   // vibrancy added to dormant motif alpha
+    idleDrumAlpha: 0.28,      // dormant drum letter base alpha
+    idleDrumPulse: 0.15,      // pulse added to dormant drum letter alpha
+    idleDrumRing: 0.13,       // dormant drum beat-ring alpha
+    motifsOff: false          // reference view: base colours only
+  };
+
+  /* ---------- shared audio graph ---------- */
+  let ctx = null, master = null, reverbBus = null, noiseBuffer = null;
+  function lcg(seed) { let s = seed >>> 0; return () => (s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296; }
+  function buildReverbImpulse(context) {
+    const rate = context.sampleRate, len = (rate * 2.6) | 0;
+    const buf = context.createBuffer(2, len, rate), rnd = lcg(0x9e3779b9);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) d[i] = (rnd() * 2 - 1) * Math.pow(1 - i / len, 2.6);
+    }
+    return buf;
+  }
+  function buildNoiseBuffer(context) {
+    const len = context.sampleRate, buf = context.createBuffer(1, len, context.sampleRate), rnd = lcg(0x1234abcd), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = rnd() * 2 - 1;
+    return buf;
+  }
+  async function audio() {
+    if (!ctx) {
+      ctx = new AudioContext();
+      master = ctx.createGain(); master.gain.value = 0.9;
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -6; limiter.knee.value = 24; limiter.ratio.value = 12;
+      limiter.attack.value = 0.003; limiter.release.value = 0.2;
+      const conv = ctx.createConvolver(); conv.buffer = buildReverbImpulse(ctx);
+      const revGain = ctx.createGain(); revGain.gain.value = 0.9;
+      conv.connect(revGain).connect(master);
+      reverbBus = conv;
+      noiseBuffer = buildNoiseBuffer(ctx);
+      master.connect(limiter).connect(ctx.destination);
+    }
+    if (ctx.state === "suspended") await ctx.resume();
+    if (transportOrigin === null) transportOrigin = ctx.currentTime + 0.08;   // musical zero
+    return ctx;
+  }
+
+  /* ---------- drum synthesis (one-shot nodes per hit) ----------
+   * Seven types with per-genome tone params and live x/y/pressure
+   * modulation (X → tone/pitch · Y → decay/FX · pressure → drive),
+   * mirroring the reference collection builder. */
+  class DrumVoice {
+    constructor(context, genome, dest) {
+      this.context = context;
+      this.genome = genome;
+      const out = dest || master;
+      this.spec = genome.drum || { type: "perc", pitch: 90, decay: 0.2, tone: 0.5, snap: 0.5, metal: 0.5, gain: 0.8 };
+      this.gain = context.createGain();
+      this.gain.gain.value = this.spec.gain * 0.9;
+      this.pan = context.createStereoPanner();
+      this.pan.pan.value = genome.mosaic ? genome.mosaic.gridX / 32 - 0.5 : 0;
+      this.send = context.createGain(); this.send.gain.value = 0.12 + (genome.effects?.reverb ?? 0.2) * 0.2;
+      this.analyser = context.createAnalyser();
+      this.analyser.fftSize = 512; this.analyser.smoothingTimeConstant = 0.7;
+      this.freq = new Uint8Array(this.analyser.frequencyBinCount);
+      this.wave = new Uint8Array(this.analyser.fftSize);
+      this.gain.connect(this.pan).connect(out);
+      this.gain.connect(this.send).connect(reverbBus);
+      this.gain.connect(this.analyser);
+    }
+    level() { this.analyser.getByteFrequencyData(this.freq); let s = 0; for (let i = 0; i < 24; i++) s += this.freq[i]; return s / (24 * 255); }
+    noise(t, duration) { const s = this.context.createBufferSource(); s.buffer = noiseBuffer; s.start(t); s.stop(t + duration); return s; }
+    /* mods: {x, y, pressure, pitch} — all optional. */
+    hit(type, velocity, when, mods = {}) {
+      const t = when ?? this.context.currentTime, v = Math.max(0.05, Math.min(1, velocity));
+      const D = this.spec, x = mods.x ?? 0.5, y = mods.y ?? 0.5, pitchOffset = mods.pitch || 0;
+      const decayMod = 0.4 + y * 1.2; // Y stretches/shortens decay
+      type = type || D.type;
+      if (type === "kick") {
+        const o = this.context.createOscillator(), g = this.context.createGain();
+        o.type = "sine";
+        o.frequency.setValueAtTime((D.pitch + 70 + pitchOffset * 5) * (0.7 + x * 0.8), t);
+        o.frequency.exponentialRampToValueAtTime(Math.max(28, 35 + D.pitch * 0.18), t + 0.035 + D.tone * 0.055);
+        g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + (0.16 + D.decay * 0.7) * decayMod);
+        o.connect(g).connect(this.gain); o.start(t); o.stop(t + 0.9);
+      } else if (type === "snare" || type === "clap") {
+        const bursts = type === "clap" ? 3 : 1;
+        for (let k = 0; k < bursts; k++) {
+          const ct = t + k * 0.012;
+          const n = this.noise(ct, 0.55), bp = this.context.createBiquadFilter(), ng = this.context.createGain();
+          bp.type = "bandpass"; bp.frequency.value = 900 + x * 3300; bp.Q.value = 0.7 + D.snap * 1.4;
+          ng.gain.setValueAtTime(v * (type === "clap" ? 0.5 : 0.8), ct);
+          ng.gain.exponentialRampToValueAtTime(0.001, ct + (0.09 + D.decay * 0.35) * decayMod);
+          n.connect(bp).connect(ng).connect(this.gain);
+        }
+        if (type === "snare") {
+          const o = this.context.createOscillator(), g = this.context.createGain();
+          o.type = "triangle"; o.frequency.setValueAtTime(150 + pitchOffset * 12, t);
+          g.gain.setValueAtTime(v * 0.35, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+          o.connect(g).connect(this.gain); o.start(t); o.stop(t + 0.14);
+        }
+      } else if (type === "closedHat" || type === "openHat" || type === "hat") {
+        const open = type === "openHat";
+        const n = this.noise(t, 0.9), hp = this.context.createBiquadFilter(), ng = this.context.createGain();
+        hp.type = "highpass"; hp.frequency.value = 4500 + x * 6500;
+        ng.gain.setValueAtTime(v * 0.5, t);
+        ng.gain.exponentialRampToValueAtTime(0.001, t + (open ? 0.28 + D.decay * 0.65 : 0.025 + D.decay * 0.09) * decayMod);
+        n.connect(hp).connect(ng).connect(this.gain);
+      } else if (type === "tom") {
+        const o = this.context.createOscillator(), g = this.context.createGain();
+        o.type = "sine";
+        const f = (75 + D.pitch * 0.9 + pitchOffset * 18) * (0.75 + x * 0.65);
+        o.frequency.setValueAtTime(f * 1.35, t); o.frequency.exponentialRampToValueAtTime(f, t + 0.04);
+        g.gain.setValueAtTime(v * 0.8, t); g.gain.exponentialRampToValueAtTime(0.001, t + (0.18 + D.decay * 0.65) * decayMod);
+        o.connect(g).connect(this.gain); o.start(t); o.stop(t + 0.85);
+      } else { // perc
+        const n = this.noise(t, 0.35), bp = this.context.createBiquadFilter(), ng = this.context.createGain();
+        bp.type = "bandpass"; bp.frequency.value = 300 + x * 7000; bp.Q.value = 1 + D.metal * 10;
+        ng.gain.setValueAtTime(v * 0.5, t);
+        ng.gain.exponentialRampToValueAtTime(0.001, t + (0.035 + D.decay * 0.28) * decayMod);
+        n.connect(bp).connect(ng).connect(this.gain);
+      }
+    }
+    dispose() { try { this.gain.disconnect(); this.pan.disconnect(); this.send.disconnect(); } catch { /* noop */ } }
+  }
+
+  /* Fraction of a drum edition's pad occupied by the on-NFT step sequencer. */
+  const DRUM_GRID_FRAC = 0.34;
+
+  function makeDriveCurve(amount) {
+    const k = amount * 80, curve = new Float32Array(1024);
+    for (let i = 0; i < 1024; i++) { const x = (i / 512) - 1; curve[i] = amount <= 0 ? x : ((1 + k) * x) / (1 + k * Math.abs(x)); }
+    return curve;
+  }
+
+  /* ---------- pluggable oscillator cores ----------
+   * Each core generates the raw tone and connects into `output` (the drive
+   * stage). The shared filter/envelope/effects tail is identical across
+   * architectures, so distinct cores still sit together in the mix. */
+  function buildCore(context, genome, output) {
+    const s = genome.synth || { arch: "dualosc" };
+    const g = genome.oscillator;
+    const oscs = [];                       // started/stopped together
+    const gain = v => { const n = context.createGain(); n.gain.value = v; return n; };
+    const mkOsc = type => { const o = context.createOscillator(); if (type) o.type = type; oscs.push(o); return o; };
+    const detuneParams = [];
+    let setFreq = () => {}, excite = null;
+
+    if (s.arch === "supersaw" || s.arch === "reese") {
+      const n = s.arch === "reese" ? 3 : Math.max(3, s.voices | 0);
+      const spread = s.detuneSpread * (s.arch === "reese" ? 1.6 : 1);
+      const mix = gain(0.85 / n); mix.connect(output);
+      const list = [];
+      for (let i = 0; i < n; i++) { const o = mkOsc("sawtooth"); o.detune.value = (n === 1 ? 0 : (i / (n - 1) - 0.5) * 2 * spread); o.connect(mix); list.push(o); detuneParams.push(o.detune); }
+      if (s.arch === "reese") { const sub = mkOsc("sine"); const sg = gain(0.5); sub.connect(sg).connect(output); list.subOsc = sub; }
+      setFreq = (hz, t, gl) => { list.forEach(o => o.frequency.setTargetAtTime(hz, t, gl)); if (list.subOsc) list.subOsc.frequency.setTargetAtTime(hz / 2, t, gl); };
+    } else if (s.arch === "fm") {
+      const car = mkOsc("sine"), mod = mkOsc("sine"), modGain = gain(0);
+      mod.connect(modGain).connect(car.frequency); car.connect(gain(0.9)).connect(output); detuneParams.push(car.detune);
+      setFreq = (hz, t, gl) => { car.frequency.setTargetAtTime(hz, t, gl); mod.frequency.setTargetAtTime(hz * s.fmRatio, t, gl); modGain.gain.setTargetAtTime(hz * s.fmIndex, t, gl); };
+    } else if (s.arch === "pwm") {
+      const o1 = mkOsc("sawtooth"), o2 = mkOsc("sawtooth"), dl = context.createDelay(0.02);
+      const lfo = mkOsc("sine"); lfo.frequency.value = 0.15 + s.pwmDepth * 0.9; const lfoG = gain(0.0015 * s.pwmDepth);
+      o1.connect(gain(0.85)).connect(output); o2.connect(gain(-0.85)).connect(dl).connect(output);
+      lfo.connect(lfoG).connect(dl.delayTime); detuneParams.push(o1.detune, o2.detune);
+      setFreq = (hz, t, gl) => { o1.frequency.setTargetAtTime(hz, t, gl); o2.frequency.setTargetAtTime(hz, t, gl); dl.delayTime.setTargetAtTime(Math.min(0.019, (0.5 / hz) * s.pwmDepth), t, gl); };
+    } else if (s.arch === "ring") {
+      const oa = mkOsc(g.typeA || "sine"), ob = mkOsc("sine"), rg = gain(0);
+      ob.connect(rg.gain); oa.connect(rg).connect(gain(0.95)).connect(output); detuneParams.push(oa.detune);
+      setFreq = (hz, t, gl) => { oa.frequency.setTargetAtTime(hz, t, gl); ob.frequency.setTargetAtTime(hz * s.ringRatio, t, gl); };
+    } else if (s.arch === "pluck") {
+      // Plucked-string character via a per-note filter zap + noise click,
+      // robust (no feedback-cycle latency issues), distinctly percussive.
+      const o1 = mkOsc("triangle"), o2 = mkOsc("sawtooth"); o2.detune.value = 8;
+      const bright = context.createBiquadFilter(); bright.type = "lowpass"; bright.Q.value = 2; bright.frequency.value = 6000;
+      const m = gain(0.6); o1.connect(m); o2.connect(m); m.connect(bright).connect(output);
+      detuneParams.push(o1.detune, o2.detune);
+      setFreq = (hz, t, gl) => { o1.frequency.setTargetAtTime(hz, t, gl); o2.frequency.setTargetAtTime(hz, t, gl); };
+      excite = when => {
+        bright.frequency.cancelScheduledValues(when);
+        bright.frequency.setValueAtTime(9500, when);
+        bright.frequency.exponentialRampToValueAtTime(800, when + 0.14);
+        const src = context.createBufferSource(); src.buffer = noiseBuffer;
+        const eg = gain(0), hp = context.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 2200;
+        eg.gain.setValueAtTime(0.5, when); eg.gain.exponentialRampToValueAtTime(0.001, when + 0.03);
+        src.connect(hp).connect(eg).connect(output); src.start(when); src.stop(when + 0.04);
+      };
+    } else if (s.arch === "wavetable") {
+      const n = 16, real = new Float32Array(n), imag = new Float32Array(n), rnd = G.splitmix32(s.waveSeed);
+      for (let i = 1; i < n; i++) imag[i] = (rnd() * 2 - 1) * Math.pow(1 - i / n, 1.4);
+      const wave = context.createPeriodicWave(real, imag);
+      const o1 = mkOsc(), o2 = mkOsc(); o1.setPeriodicWave(wave); o2.setPeriodicWave(wave); o2.detune.value = g.detune;
+      o1.connect(gain(0.5)).connect(output); o2.connect(gain(0.5)).connect(output); detuneParams.push(o1.detune, o2.detune);
+      setFreq = (hz, t, gl) => { o1.frequency.setTargetAtTime(hz, t, gl); o2.frequency.setTargetAtTime(hz, t, gl); };
+    } else { // dualosc (classic)
+      const oa = mkOsc(g.typeA), ob = mkOsc(g.typeB), sub = mkOsc("sine");
+      ob.detune.value = g.detune;
+      const ma = gain((1 - g.mix) * 0.9), mb = gain(g.mix * 0.9), sg = gain(g.sub);
+      oa.connect(ma).connect(output); ob.connect(mb).connect(output); sub.connect(sg).connect(output); detuneParams.push(oa.detune, ob.detune);
+      setFreq = (hz, t, gl) => { oa.frequency.setTargetAtTime(hz, t, gl); ob.frequency.setTargetAtTime(hz, t, gl); sub.frequency.setTargetAtTime(hz / 2, t, gl); };
+    }
+    return {
+      setFreq, excite, detuneParams,
+      start(t) { oscs.forEach(o => { try { o.start(t); } catch { /* started */ } }); },
+      stop(t) { oscs.forEach(o => { try { o.stop(t); } catch { /* stopped */ } }); }
+    };
+  }
+
+  class Voice {
+    constructor(context, genome, dest) {
+      this.context = context; this.genome = genome;
+      const out = dest || master;
+      const g = genome;
+      this.shaper = context.createWaveShaper();
+      this.filter = context.createBiquadFilter();
+      this.env = context.createGain();
+      this.panner = context.createStereoPanner();
+      this.out = context.createGain();
+      this.delay = context.createDelay(2);
+      this.feedback = context.createGain();
+      this.delayWet = context.createGain();
+      this.reverbSend = context.createGain();
+      this.lfo = context.createOscillator();
+      this.lfoGain = context.createGain();
+      this.analyser = context.createAnalyser();
+      this.analyser.fftSize = 512; this.analyser.smoothingTimeConstant = 0.75;
+      this.freq = new Uint8Array(this.analyser.frequencyBinCount);
+      this.wave = new Uint8Array(this.analyser.fftSize);
+
+      this.baseDrive = g.effects.distortion;
+      this.shaper.curve = makeDriveCurve(this.baseDrive);
+      this.filter.type = g.filter.type;
+      this.filter.frequency.value = g.filter.cutoff;
+      this.filter.Q.value = g.filter.resonance;
+      this.env.gain.value = 0;
+      this.panner.pan.value = g.effects.pan;
+      this.out.gain.value = 0.24;
+      this.delay.delayTime.value = g.effects.delaySteps * G.TICKS_PER_STEP * TICK_SECONDS;
+      this.feedback.gain.value = g.effects.feedback;
+      this.delayWet.gain.value = g.effects.delayWet;
+      this.reverbSend.gain.value = g.effects.reverb * 0.6;
+
+      this.core = buildCore(context, genome, this.shaper);
+      this.shaper.connect(this.filter).connect(this.env).connect(this.panner).connect(this.out);
+      this.out.connect(this.analyser);
+      this.out.connect(out);
+      this.out.connect(this.delay).connect(this.delayWet).connect(out);
+      this.delay.connect(this.feedback).connect(this.delay);
+      this.out.connect(this.reverbSend).connect(reverbBus);
+
+      // LFO modulation
+      const lfoTarget = g.lfo.target;
+      this.lfo.frequency.value = g.lfo.rate;
+      this.lfoGain.gain.value = lfoTarget === "cutoff" ? g.filter.cutoff * g.lfo.depth
+        : lfoTarget === "pitch" ? g.lfo.depth * 30 : g.lfo.depth * 0.12;
+      this.lfo.connect(this.lfoGain);
+      if (lfoTarget === "cutoff") this.lfoGain.connect(this.filter.frequency);
+      else if (lfoTarget === "amp") this.lfoGain.connect(this.out.gain);
+      else this.core.detuneParams.forEach(p => this.lfoGain.connect(p));
+
+      this.core.start(context.currentTime); this.lfo.start();
+    }
+    setPitch(midi, when, glide = 0.012) {
+      const hz = G.midiToHz(midi), t = when ?? this.context.currentTime;
+      this.core.setFreq(hz, t, glide);
+    }
+    noteOn(midi, velocity, when) {
+      const e = this.genome.envelope, t = when ?? this.context.currentTime;
+      this.setPitch(midi, t, 0.001);
+      this.core.excite?.(t);
+      const peak = 0.05 + 0.26 * clamp01(velocity);
+      this.env.gain.cancelScheduledValues(t);
+      this.env.gain.setTargetAtTime(peak, t, Math.max(0.003, e.attack / 3));
+      this.env.gain.setTargetAtTime(peak * e.sustain, t + e.attack, Math.max(0.01, e.decay / 3));
+    }
+    noteOff(when) {
+      const t = when ?? this.context.currentTime;
+      this.env.gain.cancelScheduledValues(t);
+      this.env.gain.setTargetAtTime(0, t, Math.max(0.02, this.genome.envelope.release / 3));
+    }
+    setCutoffNorm(y, t) { this.filter.frequency.setTargetAtTime(160 + (y * y) * 11500, t, 0.02); }
+    setDrive(pressure) { this.shaper.curve = makeDriveCurve(Math.min(1, this.baseDrive + pressure * 0.5)); }
+    level() { this.analyser.getByteFrequencyData(this.freq); let s = 0; for (let i = 0; i < 24; i++) s += this.freq[i]; return s / (24 * 255); }
+    dispose() { try { this.core.stop(this.context.currentTime); this.lfo.stop(); } catch { /* stopped */ } this.out.disconnect(); }
+  }
+
+  /* ---------- glyph atlas for the mosaic ---------- */
+  let atlas = null;
+  function buildAtlas() {
+    if (atlas) return atlas;
+    const cell = 64, cols = 4, rows = Math.ceil(G.WORDS.length / cols);
+    const cvs = (typeof OffscreenCanvas !== "undefined") ? new OffscreenCanvas(cell * cols, cell * rows) : Object.assign(document.createElement("canvas"), { width: cell * cols, height: cell * rows });
+    const c = cvs.getContext("2d");
+    c.textAlign = "center"; c.textBaseline = "middle"; c.fillStyle = "#fff";
+    const map = {};
+    G.WORDS.forEach((w, i) => {
+      const cx = (i % cols) * cell + cell / 2, cy = ((i / cols) | 0) * cell + cell / 2;
+      const fs = w.length <= 1 ? 44 : Math.max(11, Math.floor(58 / w.length));
+      c.font = `700 ${fs}px ui-monospace, Menlo, monospace`;
+      c.fillText(w, cx, cy);
+      map[w] = { sx: (i % cols) * cell, sy: ((i / cols) | 0) * cell, cell };
+    });
+    atlas = { canvas: cvs, map };
+    return atlas;
+  }
+
+  /* ---------- living mosaic renderer (data-driven, shared canvas) ---------- */
+  function createMosaic(canvas, opts = {}) {
+    const N = G.GRID;
+    const genomes = [];
+    for (let e = 1; e <= G.COLLECTION_SIZE; e++) genomes.push(G.deriveGenome(e));
+    const a = buildAtlas();
+    const c = canvas.getContext("2d");
+    let raf = 0, t0 = null, live = new Set(), draining = new Set(), running = true, lastDraw = 0;
+    let mutedSet = new Set(), soloActive = false, soloedSet = new Set(), groupOf = new Map(), groupColors = {}, volumes = new Map();
+    let getInstrument = opts.getInstrument || null;
+    let selection = Math.min(G.COLLECTION_SIZE, Math.max(1, opts.initialSelection || 1));
+    let minted = null;                 // null = show all (no on-chain gating); else a Set of minted editions
+    const mintedAt = new Map();        // edition → reveal timestamp, for the bloom-in
+    const MIN_FRAME_MS = 32; // ~30fps is plenty for 1,024 dormant tiles
+    /* Base HSL comes straight from the brand genome (fixed hue per family). */
+    for (const g of genomes) g.mosaic._hsl = { h: g.mosaic.hue, s: g.mosaic.sat, l: g.mosaic.light };
+
+    function resize() {
+      const ratio = Math.min(2, devicePixelRatio || 1);
+      const box = canvas.getBoundingClientRect();
+      canvas.width = Math.max(N, Math.round(box.width * ratio));
+      canvas.height = canvas.width;
+      c.setTransform(ratio, 0, 0, ratio, 0, 0);
+      c._cssW = canvas.width / ratio;
+    }
+    const ro = new ResizeObserver(resize); ro.observe(canvas); resize();
+
+    function frame(now) {
+      if (!running) return;
+      raf = requestAnimationFrame(frame);
+      if (now - lastDraw < MIN_FRAME_MS) return;
+      lastDraw = now;
+      t0 ??= now; const time = (now - t0) / 1000;
+      const W = c._cssW, T = W / N;
+      c.fillStyle = "#050507"; c.fillRect(0, 0, W, W);
+      if (T < 1.5) return;   // canvas not laid out yet — avoid sub-pixel/negative radii
+      for (const g of genomes) {
+        const m = g.mosaic, an = g.animation, dr = an.drift;
+        const px = m.gridX * T, py = m.gridY * T, s = Math.max(1, T - 1);
+        if (minted && !minted.has(g.edition)) {           // not yet inscribed on-chain → dark slot
+          c.globalAlpha = 1; c.fillStyle = "#070709"; c.fillRect(px, py, s, s);
+          c.strokeStyle = "#13161d"; c.lineWidth = 1; c.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
+          continue;
+        }
+        const isLive = live.has(g.edition), isDraining = draining.has(g.edition);
+        const pulse = 0.5 + 0.5 * Math.sin(time * an.speed + (an.seed & 255) / 40);
+        /* Living colour: FIXED brand hue, fading between the colour and black
+         * or white (per-tile). Vibrant tiles swing further/faster. */
+        const ph = time * dr.rate * 6.283 + (an.seed % 628) / 100;
+        const tt = 0.5 + 0.5 * Math.sin(ph);
+        const baseL = m.light, floorL = m.family === "black" ? 2 : 6;
+        // Idle tiles hold their brand colour so the Xtrata logo reads solidly;
+        // live/draining tiles still swing the full amount.
+        const amp = m.fadeAmp * (isLive || isDraining ? 1 : TUNING.idleDriftAmp);
+        let light = m.fade === "white" ? baseL + (96 - baseL) * tt * amp
+                                       : baseL - (baseL - floorL) * tt * amp;
+        light = Math.max(2, Math.min(97, light + (isLive || isDraining ? 8 : 0)
+          + pulse * (isLive || isDraining ? 3 : TUNING.idlePulseLight) * dr.vibrancy));
+        const sat = Math.max(0, m.sat * (1 - (isLive || isDraining ? 0.32 : TUNING.idleSatDrop) * tt * amp));
+        const isDrumTile = m.role === "drum";
+        c.globalAlpha = 1;
+        c.fillStyle = `hsl(${m.hue} ${sat.toFixed(1)}% ${light.toFixed(1)}%)`;
+        c.fillRect(px, py, s, s);
+        const isMuted = mutedSet.has(g.edition);
+        const isSoloed = soloedSet.has(g.edition);
+        const dimmed = soloActive && (isLive || isDraining) && !isSoloed; // muted-by-solo
+        const inst = (isLive || isDraining) && getInstrument ? getInstrument(g.edition) : null;
+        const motifsAllowed = !TUNING.motifsOff || isLive || isDraining;
+        if (isDrumTile) { if (motifsAllowed) drawDrumGlyph(c, g, px, py, s, time, pulse, isLive || isDraining, inst); }
+        else if (motifsAllowed && !(m.family === "black" && m.brightness < 0.09 && !isLive && !isDraining && dr.vibrancy < 0.32)) {
+          drawTileMotif(c, an, m, px, py, s, time,
+            isLive || isDraining ? 1 : TUNING.idleMotifAlpha + dr.vibrancy * TUNING.idleMotifVibrancy, inst);
+        }
+        // MYTHIC: a shimmering gold inner ring — the collection's rares
+        if (m.mythic) {
+          c.strokeStyle = "#ffd24a"; c.lineWidth = 1.4;
+          c.globalAlpha = 0.4 + 0.4 * Math.sin(time * 2.2 + (an.seed % 100) / 10);
+          c.strokeRect(px + 1.5, py + 1.5, Math.max(1, s - 3), Math.max(1, s - 3));
+          c.globalAlpha = 1;
+        }
+        // dim tiles silenced by an active solo, or explicitly muted
+        if ((dimmed || isMuted) && (isLive || isDraining)) {
+          c.globalAlpha = 0.55; c.fillStyle = "#05050a"; c.fillRect(px, py, s, s); c.globalAlpha = 1;
+        }
+        // group membership badge (corner triangle in the group colour)
+        if (groupOf.has(g.edition)) {
+          const gc = groupColors[groupOf.get(g.edition)] || "#fff";
+          c.fillStyle = gc; c.globalAlpha = 0.95;
+          c.beginPath(); c.moveTo(px + s, py); c.lineTo(px + s - s * 0.34, py); c.lineTo(px + s, py + s * 0.34); c.closePath(); c.fill();
+          c.globalAlpha = 1;
+        }
+        // state borders: green = live · orange = finishing loop · dashed = muted
+        if (isLive || isDraining) {
+          c.strokeStyle = isDraining ? "#ff9d3c" : isSoloed ? "#8affd0" : "#3ad29f";
+          c.lineWidth = isSoloed ? 2.6 : 1.8;
+          c.globalAlpha = (isMuted || dimmed) ? 0.5 : 0.95;
+          if (isMuted) c.setLineDash([3, 3]);
+          c.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
+          c.setLineDash([]); c.globalAlpha = 1;
+          // per-tile volume: a level bar up the left inner edge (click-drag)
+          const vol = volumes.has(g.edition) ? volumes.get(g.edition) : 1;
+          if (vol < 0.999) {
+            c.fillStyle = "#0a0a0f"; c.globalAlpha = 0.55; c.fillRect(px + 1.5, py + 1.5, 3, s - 3);
+            c.fillStyle = isSoloed ? "#8affd0" : "#3ad29f"; c.globalAlpha = 0.95;
+            c.fillRect(px + 1.5, py + s - 1.5 - (s - 3) * vol, 3, (s - 3) * vol);
+            c.globalAlpha = 1;
+          }
+        }
+        // freshly-inscribed bloom: a bright ring + flash that fades over ~1.6s
+        const revAt = mintedAt.get(g.edition);
+        if (revAt != null) {
+          const age = (now - revAt) / 1000;
+          if (age >= 1.6) mintedAt.delete(g.edition);
+          else {
+            const k = 1 - age / 1.6;
+            c.globalAlpha = 0.28 * k; c.fillStyle = "#eafff5"; c.fillRect(px, py, s, s);
+            c.globalAlpha = 0.9 * k; c.strokeStyle = "#eafff5"; c.lineWidth = 1 + 2.4 * k;
+            c.strokeRect(px + 1, py + 1, Math.max(1, s - 2), Math.max(1, s - 2));
+            c.globalAlpha = 1;
+          }
+        }
+      }
+      // selection cursor (arrow-key / step controls)
+      const sg = genomes[selection - 1].mosaic, sx = sg.gridX * T, sy = sg.gridY * T;
+      const blink = 0.55 + 0.45 * Math.sin(time * 6);
+      c.strokeStyle = "#eafff5"; c.lineWidth = 2.4; c.globalAlpha = blink;
+      c.strokeRect(sx - 1.5, sy - 1.5, T + 2, T + 2);
+      c.globalAlpha = blink * 0.7; c.strokeStyle = "#3ad29f"; c.lineWidth = 1;
+      c.strokeRect(sx + 1.5, sy + 1.5, T - 4, T - 4);
+      c.globalAlpha = 1;
+    }
+    /* Drum NFTs: glyph letter; live tiles pulse with their real output level
+     * and show a step ticker along the bottom edge. */
+    const DRUM_GLYPH = { kick: "K", snare: "S", closedHat: "H", openHat: "O", tom: "T", clap: "C", perc: "P" };
+    /* The drum LETTER is the animation: it pulses to a beat clock, wobbles,
+     * and (when live) is ringed by orbiting 0s. */
+    function drawDrumGlyph(c, g, px, py, s, time, pulse, isActive, inst) {
+      const an = g.animation, accent = g.mosaic.accent;
+      const lvl = inst?.drumVoice ? inst.drumVoice.level() : 0;
+      const cx = px + s / 2, cy = py + s / 2;
+      const beat = time * (G.MUSIC.bpm / 60) * 2 + (an.seed % 1000) / 1000;
+      const kick = Math.pow(1 - (beat % 1), 2.4);       // spike on each half-beat, decays
+      // beat ring behind the letter (a 0 that expands & fades)
+      c.strokeStyle = accent; c.lineWidth = Math.max(1, s * 0.04);
+      c.globalAlpha = (isActive ? 0.55 : TUNING.idleDrumRing) * (1 - kick * 0.7);
+      c.beginPath(); c.arc(cx, cy, s * (0.16 + (1 - kick) * 0.24), 0, 7); c.stroke();
+      // orbiting 0s (live only, keeps dormant cheap)
+      if (isActive) {
+        c.font = `${Math.max(6, s * 0.2)}px ui-monospace, monospace`; c.textAlign = "center"; c.textBaseline = "middle";
+        c.fillStyle = accent;
+        for (let i = 0; i < 3; i++) {
+          const ang = time * an.speed * 0.9 + i * 2.094 + (an.seed % 628) / 100;
+          c.globalAlpha = 0.85 * (0.5 + 0.5 * Math.sin(ang * 1.3));
+          c.fillText("0", cx + Math.cos(ang) * s * 0.34, cy + Math.sin(ang) * s * 0.34);
+        }
+      }
+      // the letter itself: pulse + wobble (letter IS the motion)
+      c.save(); c.translate(cx, cy);
+      c.rotate(Math.sin(time * an.speed * 0.7 + an.seed) * 0.13 + kick * 0.05);
+      const sc = 1 + kick * (0.22 + lvl * 0.6) + (isActive ? lvl * 0.2 : 0);
+      c.scale(sc, sc);
+      c.globalAlpha = isActive ? 0.85 + 0.15 * lvl : TUNING.idleDrumAlpha + TUNING.idleDrumPulse * pulse;
+      c.fillStyle = isActive ? accent : "#5c6b68";
+      c.font = `bold ${Math.max(7, s * 0.46)}px ui-monospace, monospace`;
+      c.textAlign = "center"; c.textBaseline = "middle";
+      c.fillText(DRUM_GLYPH[g.drum.type] || "P", 0, 0);
+      c.restore();
+      if (isActive) { // step ticker
+        const steps = 8, w = s / steps, cur = ((time * (G.MUSIC.bpm / 60) * 4) | 0) % steps;
+        c.fillStyle = accent; c.globalAlpha = 0.9; c.fillRect(px + cur * w, py + s - 2.5, w - 1, 2);
+      }
+      c.globalAlpha = 1;
+    }
+    function shade(hex, b) {
+      const n = parseInt(hex.slice(1), 16); let r = (n >> 16) & 255, gg = (n >> 8) & 255, bl = n & 255;
+      const f = Math.max(0.15, Math.min(1.35, b + 0.35));
+      r = Math.min(255, r * f) | 0; gg = Math.min(255, gg * f) | 0; bl = Math.min(255, bl * f) | 0;
+      return `rgb(${r},${gg},${bl})`;
+    }
+    function drawTileMotif(c, an, m, px, py, s, time, alpha, inst) {
+      const cx = px + s / 2, cy = py + s / 2;
+      const voice = inst?.voice || inst?.drumVoice || null;
+      const R = v => Math.max(0.5, v);           // never a negative radius
+      c.globalAlpha = alpha;
+      if (an.kind === "glyph") {
+        const sp = a.map[an.word] || a.map["0"];
+        const breathe = 0.86 + 0.14 * Math.sin(time * an.speed * 1.2 + an.seed);
+        const sz = R(s * 0.68 * breathe);
+        c.save(); c.translate(cx, cy); c.rotate(Math.sin(time * an.speed * 0.4 + an.seed) * 0.06);
+        c.globalAlpha = alpha * (0.55 + 0.45 * Math.abs(Math.sin(time * an.speed * 0.8 + an.seed)));
+        c.drawImage(a.canvas, sp.sx, sp.sy, sp.cell, sp.cell, -sz / 2, -sz / 2, sz, sz);
+        c.restore();
+      } else if (an.kind === "pulse0") {
+        // a breathing "0": ring scaling to a beat + counter inner ring
+        const beat = 0.5 + 0.5 * Math.sin(time * an.speed * 1.7 + an.seed);
+        c.strokeStyle = m.accent; c.lineWidth = R(s * (0.055 + 0.05 * beat));
+        c.globalAlpha = alpha * (0.6 + 0.4 * beat);
+        c.beginPath(); c.arc(cx, cy, R(s * (0.15 + 0.15 * beat)), 0, 7); c.stroke();
+        c.globalAlpha = alpha * 0.45; c.lineWidth = 1;
+        c.beginPath(); c.arc(cx, cy, R(s * 0.30 * (1 - beat * 0.4)), 0, 7); c.stroke();
+      } else if (an.kind === "radiate") {
+        // 0-rings radiating outward like sonar
+        c.strokeStyle = m.accent; c.lineWidth = 1.4;
+        for (let i = 0; i < 3; i++) {
+          const ph = (time * an.speed * 0.4 + i / 3) % 1;
+          c.globalAlpha = alpha * (1 - ph) * 0.8;
+          c.beginPath(); c.arc(cx, cy, R(s * 0.05 + ph * s * 0.42), 0, 7); c.stroke();
+        }
+      } else if (an.kind === "binary") {
+        // columns of 0/1 raining — proof of free, reduced to bits
+        c.textAlign = "center"; c.textBaseline = "middle"; c.fillStyle = m.accent;
+        const fs = Math.max(6, s * 0.2); c.font = `${fs}px ui-monospace, monospace`;
+        for (let cI = 0; cI < 2; cI++) {
+          const x = px + s * (0.33 + cI * 0.34), off = (time * an.speed * (0.5 + cI * 0.25)) % 1;
+          for (let rI = 0; rI < 4; rI++) {
+            const p = (rI / 4 + off) % 1, yy = py + s * p;
+            const bit = ((an.seed >> ((rI + cI * 4) % 28)) & 1) ^ ((Math.floor(time * (2 + cI)) + rI) & 1);
+            c.globalAlpha = alpha * (0.25 + 0.65 * Math.sin(p * Math.PI));
+            c.fillText(bit ? "1" : "0", x, yy);
+          }
+        }
+      } else if (an.kind === "bars") {
+        c.fillStyle = m.accent;
+        if (voice) { // live: the real spectrum
+          voice.analyser.getByteFrequencyData(voice.freq);
+          const n = 5, bw = s / (n * 1.5);
+          for (let i = 0; i < n; i++) {
+            const h = s * 0.15 + (voice.freq[i * 6] / 255) * s * 0.7;
+            c.fillRect(px + s * 0.1 + i * bw * 1.5, py + s - h - s * 0.1, bw, h);
+          }
+        } else {
+          const n = 4, bw = s / (n * 1.6);
+          for (let i = 0; i < n; i++) {
+            const h = s * (0.2 + 0.6 * Math.abs(Math.sin(time * an.speed + i * 0.7 + an.seed)));
+            c.fillRect(px + s * 0.14 + i * bw * 1.5, py + s - h - s * 0.12, bw, h);
+          }
+        }
+      } else if (an.kind === "scope") {
+        c.strokeStyle = m.accent; c.lineWidth = 1.4; c.beginPath();
+        if (voice) { // live: the literal output waveform
+          voice.analyser.getByteTimeDomainData(voice.wave);
+          const n = voice.wave.length;
+          for (let i = 0; i <= 12; i++) {
+            const xx = px + s * (0.08 + 0.84 * i / 12);
+            const yy = py + s * (voice.wave[((i / 12) * (n - 1)) | 0] / 255);
+            i ? c.lineTo(xx, yy) : c.moveTo(xx, yy);
+          }
+        } else {
+          for (let i = 0; i <= 10; i++) {
+            const xx = px + s * (0.1 + 0.8 * i / 10);
+            const yy = cy + Math.sin(time * an.speed * 2 + i * 0.9 + an.seed) * s * 0.22;
+            i ? c.lineTo(xx, yy) : c.moveTo(xx, yy);
+          }
+        }
+        c.stroke();
+      } else if (an.kind === "zeroRing") {
+        /* A spinning, breaking "0" — proof of free: the zero never closes. */
+        const r = R(s * (0.24 + 0.06 * Math.sin(time * an.speed + an.seed)));
+        const spin = time * an.speed * 1.4 + an.seed;
+        const gap = 0.9 + 0.7 * Math.sin(time * an.speed * 0.6);
+        c.strokeStyle = m.accent; c.lineWidth = Math.max(1.2, s * 0.07);
+        c.beginPath(); c.arc(cx, cy, r, spin + gap, spin + 6.283); c.stroke();
+        c.globalAlpha = alpha * 0.5;
+        c.beginPath(); c.arc(cx, cy, R(r * 0.55), -spin, -spin + 4.6); c.stroke();
+        const echo = (time * an.speed * 0.5) % 1;       // outward echo ring
+        c.globalAlpha = alpha * (1 - echo) * 0.4;
+        c.beginPath(); c.arc(cx, cy, R(r + echo * s * 0.24), 0, 7); c.stroke();
+      } else if (an.kind === "rain") {
+        /* Zeros falling through — everything returns to nothing. */
+        c.fillStyle = m.accent; c.textAlign = "center"; c.textBaseline = "middle";
+        for (let i = 0; i < 3; i++) {
+          const ph = (time * an.speed * 0.35 + i * 0.37 + ((an.seed >> (i * 5)) & 31) / 31) % 1;
+          const xx = px + s * (0.2 + 0.3 * i), yy = py + s * ph;
+          c.globalAlpha = alpha * Math.sin(ph * Math.PI) * 0.9;
+          c.font = `${Math.max(6, s * (0.2 + 0.1 * i))}px ui-monospace`;
+          c.fillText("0", xx, yy);
+        }
+      } else if (an.kind === "void") {
+        /* The void: a collapsing disc of nothing with a glowing rim. */
+        const r = R(s * (0.12 + 0.16 * Math.abs(Math.sin(time * an.speed * 0.5 + an.seed))));
+        c.fillStyle = "#000"; c.globalAlpha = alpha * 0.85;
+        c.beginPath(); c.arc(cx, cy, r, 0, 7); c.fill();
+        c.strokeStyle = m.accent; c.lineWidth = 1.2; c.globalAlpha = alpha * (0.4 + 0.4 * Math.sin(time * an.speed + an.seed));
+        c.beginPath(); c.arc(cx, cy, R(r + 1.5), 0, 7); c.stroke();
+      } else { // orbit — dots circling a faint 0
+        c.strokeStyle = m.accent; c.globalAlpha = alpha * 0.4; c.lineWidth = 1.4;
+        c.beginPath(); c.arc(cx, cy, R(s * 0.14), 0, 7); c.stroke();
+        c.fillStyle = m.accent;
+        for (let i = 0; i < 3; i++) {
+          const ang = time * an.speed * (i % 2 ? -1 : 1) + an.seed + i * 2.094;
+          const rad = R(s * (0.24 + (i % 2) * 0.06));
+          c.globalAlpha = alpha * (0.6 + 0.4 * Math.sin(ang));
+          c.beginPath(); c.arc(cx + Math.cos(ang) * rad, cy + Math.sin(ang) * rad, R(s * 0.055), 0, 7); c.fill();
+        }
+      }
+      c.globalAlpha = 1;
+    }
+
+    const editionAt = ev => {
+      const box = canvas.getBoundingClientRect();
+      const gx = Math.min(N - 1, Math.max(0, ((ev.clientX - box.left) / box.width * N) | 0));
+      const gy = Math.min(N - 1, Math.max(0, ((ev.clientY - box.top) / box.height * N) | 0));
+      return gy * N + gx + 1;
+    };
+    if (opts.onHover) canvas.addEventListener("pointermove", ev => opts.onHover(genomes[editionAt(ev) - 1], ev));
+    if (opts.onSelect) canvas.addEventListener("click", ev => { setSelection(editionAt(ev)); opts.onSelect(editionAt(ev)); });
+    if (opts.onOpen) canvas.addEventListener("dblclick", ev => { setSelection(editionAt(ev)); opts.onOpen(editionAt(ev)); });
+
+    function setSelection(edition, announce = true) {
+      selection = Math.min(G.COLLECTION_SIZE, Math.max(1, edition | 0));
+      if (announce) opts.onSelectionChange?.(genomes[selection - 1]);
+      return selection;
+    }
+    function step(dx, dy) {
+      const g = genomes[selection - 1].mosaic;
+      const gx = Math.min(N - 1, Math.max(0, g.gridX + dx));
+      const gy = Math.min(N - 1, Math.max(0, g.gridY + dy));
+      return setSelection(gy * N + gx + 1);
+    }
+    const keyHandler = ev => {
+      const k = ev.key;
+      if (k === "ArrowLeft") step(-1, 0);
+      else if (k === "ArrowRight") step(1, 0);
+      else if (k === "ArrowUp") step(0, -1);
+      else if (k === "ArrowDown") step(0, 1);
+      else if (k === "Enter") opts.onOpen?.(selection);
+      else if (k === " ") opts.onSelect?.(selection);
+      else return;
+      ev.preventDefault();
+    };
+    if (opts.keyboard !== false) addEventListener("keydown", keyHandler);
+
+    raf = requestAnimationFrame(frame);
+    return {
+      genomes,
+      setLive(liveEditions, drainingEditions) { live = new Set(liveEditions || []); draining = new Set(drainingEditions || []); },
+      setOverlays(o = {}) {   // partial merge — only provided fields change
+        if ("muted" in o) mutedSet = new Set(o.muted || []);
+        if ("soloActive" in o) soloActive = !!o.soloActive;
+        if ("soloed" in o) soloedSet = new Set(o.soloed || []);
+        if ("groupOf" in o) groupOf = o.groupOf instanceof Map ? o.groupOf : new Map(Object.entries(o.groupOf || {}).map(([k, v]) => [+k, v]));
+        if ("groupColors" in o) groupColors = o.groupColors || {};
+        if ("volumes" in o) volumes = o.volumes instanceof Map ? o.volumes : new Map(Object.entries(o.volumes).map(([k, v]) => [+k, v]));
+      },
+      setInstrumentLookup(fn) { getInstrument = fn; },
+      /* On-chain gating: pass a list/Set of minted editions to show only those
+       * (unminted → dark slots); pass null to show all. Newly-added editions
+       * bloom in. */
+      setMinted(ids) {
+        if (ids == null) { minted = null; mintedAt.clear(); return; }
+        const next = ids instanceof Set ? ids : new Set(ids);
+        const stamp = (typeof performance !== "undefined" ? performance.now() : 0);
+        if (minted) for (const ed of next) if (!minted.has(ed)) mintedAt.set(ed, stamp);
+        minted = next;
+      },
+      mintedCount: () => (minted ? minted.size : G.COLLECTION_SIZE),
+      isMintGated: () => minted != null,
+      getSelection: () => selection,
+      selectedGenome: () => genomes[selection - 1],
+      select: edition => setSelection(edition),
+      step,                                   // step(dx,dy) → arrow controls
+      openSelected() { opts.onOpen?.(selection); },
+      previewSelected() { opts.onSelect?.(selection); },
+      stop() { running = false; cancelAnimationFrame(raf); ro.disconnect(); removeEventListener("keydown", keyHandler); },
+      editionAt
+    };
+  }
+
+  /* ---------- instrument (square pad + rich animation) ---------- */
+  class Instrument {
+    constructor(container, options) {
+      const opts = options || {};
+      this.edition = opts.edition;
+      this.engineId = opts.engineId ?? 0;
+      this.mode = opts.mode || "instrument";
+      this.genome = G.deriveGenome(this.edition);
+      this.genomeHash = G.genomeHash(this.genome);
+      this.isDrum = this.genome.mosaic.role === "drum";
+      this.melody = this.isDrum ? [] : G.deriveMelody(this.genome);
+      this.genesisPattern = this.isDrum ? G.deriveDrumPattern(this.genome) : null;
+      this.pattern = this.genesisPattern ? this.genesisPattern.map(s => s && { ...s }) : null;
+      this.loopTicks = this.genome.melody.length * G.TICKS_PER_STEP;
+      this.container = container;
+      this.voice = null; this.drumVoice = null; this.timers = []; this.schedulerTimer = null;
+      this.recording = null; this.recordingTimer = null; this.performance = null; this.pointerDown = false;
+      this.randomiseCount = 0; this.lastPadHitMs = 0;
+      this.toneShape = { x: 0.5, y: 0.5 };            // persistent drum tone (saved in children)
+      this.toneShapeDirty = false;
+      this.state = "idle";                             // idle | live | draining
+      this.muted = false; this.volume = 1; this.bus = null;
+      this.drainTimer = null;
+      this.loopStartTime = 0; this.loopSeconds = 0;
+      this.onStateChange = opts.onStateChange || null;
+      this.pointer = { x: 0.5, y: 0.5, active: false };
+      this.renderShell();
+      if (this.mode === "instrument") this.bindPad();
+      this.animate = this.animate.bind(this);
+      this.raf = requestAnimationFrame(this.animate);
+    }
+    ensureBus(context) {
+      if (!this.bus) {
+        this.bus = context.createGain();
+        this.bus.gain.value = this.muted ? 0.0001 : this.volume;
+        this.bus.connect(master);
+      }
+      return this.bus;
+    }
+    applyBusGain() { if (this.bus) this.bus.gain.setTargetAtTime(this.muted ? 0.0001 : this.volume, this.bus.context.currentTime, 0.012); }
+    /* Per-tile live volume (click-drag on the mosaic). */
+    setVolume(v) { this.volume = Math.max(0, Math.min(1, v)); this.applyBusGain(); this.onStateChange?.(this, this.state); return this.volume; }
+    async ensureVoice() {
+      const context = await audio();
+      if (!this.voice) {
+        enforceVoiceCap();
+        this.voice = new Voice(context, this.genome, this.ensureBus(context));
+        active.push(this);
+      }
+      return this.voice;
+    }
+    async ensureDrums() {
+      const context = await audio();
+      if (!this.drumVoice) this.drumVoice = new DrumVoice(context, this.genome, this.ensureBus(context));
+      return this.drumVoice;
+    }
+    /* Mute/unmute WITHOUT stopping the transport — the loop keeps running
+     * silently, so unmuting drops back in on the beat (phase-locked). */
+    setMuted(on) {
+      this.muted = !!on;
+      this.applyBusGain();
+      this.onStateChange?.(this, this.state);
+      return this.muted;
+    }
+    /* Instant off — no loop-out. */
+    kill() { this.silence(); }
+    buildLoopEvents() {
+      if (this.isDrum) {
+        return (this.pattern || []).flatMap((s, i) => s
+          ? [{ tick: i * G.TICKS_PER_STEP, kind: "drum", hit: { velocity: s.vel ?? 0.7, prob: s.prob ?? 1, pitch: s.pitch || 0, accent: !!s.accent } }]
+          : []);
+      }
+      return this.melody.map(n => ({ tick: n.tick, kind: "note", note: n }));
+    }
+    /* ---------- drum pattern editing (beat re-authoring) ---------- */
+    setPattern(pattern) {
+      if (!this.isDrum) throw new Error("Only drum editions carry a step pattern.");
+      this.pattern = P.validatePattern(pattern, this.genome.loopBars * G.STEPS_PER_BAR);
+      if (this.playing) this.loopEvents = this.buildLoopEvents();
+      return this.pattern;
+    }
+    restorePattern() {
+      if (!this.isDrum) return null;
+      this.pattern = this.genesisPattern.map(s => s && { ...s });
+      if (this.playing) this.loopEvents = this.buildLoopEvents();
+      return this.pattern;
+    }
+    randomisePattern() {
+      if (!this.isDrum) return null;
+      this.randomiseCount++;
+      const rand = G.splitmix32((this.genome.melody.patternSeed ^ Math.imul(this.randomiseCount, 0x9e3779b9)) >>> 0);
+      const steps = this.genome.loopBars * G.STEPS_PER_BAR;
+      const density = 0.2 + rand() * 0.35;
+      const pattern = Array.from({ length: steps }, (_, i) => {
+        const strong = i % 4 === 0;
+        return rand() < density + (strong ? 0.25 : 0)
+          ? { vel: Math.round((0.35 + rand() * 0.6) * 1000) / 1000, prob: Math.round((0.7 + rand() * 0.3) * 1000) / 1000, pitch: ((rand() * 5) | 0) - 2, accent: rand() > 0.8 }
+          : null;
+      });
+      if (!pattern.some(Boolean)) pattern[0] = { vel: 0.8, prob: 1, pitch: 0, accent: false };
+      return this.setPattern(pattern);
+    }
+    setState(s) { if (this.state !== s) { this.state = s; this.onStateChange?.(this, s); } }
+    silence() {
+      clearTimeout(this.drainTimer); this.drainTimer = null;
+      this.stopTransport();
+      if (this.voice) { this.voice.noteOff(); const v = this.voice; setTimeout(() => v.dispose(), 800); this.voice = null; }
+      if (this.drumVoice) { const d = this.drumVoice; setTimeout(() => d.dispose(), 800); this.drumVoice = null; }
+      if (this.bus) { const bus = this.bus; setTimeout(() => { try { bus.disconnect(); } catch { /* noop */ } }, 900); this.bus = null; }
+      const i = active.indexOf(this); if (i >= 0) active.splice(i, 1);
+      this.setState("idle");
+      this.setStatus("idle");
+    }
+    /* Stop musically: keep playing to the end of the current loop (orange /
+     * "draining" state), then fall silent. */
+    stopAtLoopEnd() {
+      if (this.state !== "live" || !this.playing) { this.silence(); return 0; }
+      const context = this.voice?.context || this.drumVoice?.context;
+      if (!context || !this.loopSeconds) { this.silence(); return 0; }
+      const elapsed = context.currentTime - this.loopStartTime;
+      const phase = ((elapsed % this.loopSeconds) + this.loopSeconds) % this.loopSeconds;
+      const remaining = Math.max(0.02, this.loopSeconds - phase);
+      this.setState("draining");
+      this.setStatus("finishing loop…");
+      clearTimeout(this.drainTimer);
+      this.drainTimer = setTimeout(() => this.silence(), remaining * 1000 + 60);
+      return remaining;
+    }
+    destroy() {
+      cancelAnimationFrame(this.raf);
+      this.ro?.disconnect(); this.ro = null;
+      clearTimeout(this.recordingTimer); this.recordingTimer = null;
+      this.silence();
+      this.container.replaceChildren();
+    }
+
+    stopTransport() { this.timers.forEach(clearTimeout); this.timers = []; if (this.schedulerTimer) { clearInterval(this.schedulerTimer); this.schedulerTimer = null; } if (this.voice) this.voice.noteOff(); this.playing = null; }
+
+    async playMelody(opts = {}) {
+      const context = await audio();
+      if (this.isDrum) await this.ensureDrums(); else await this.ensureVoice();
+      if (!active.includes(this)) { enforceVoiceCap(); active.push(this); }
+      this.stopTransport(); this.playing = "melody";
+      const kit = this.isDrum ? ` · ${this.genome.drum.type}` : "";
+      this.setStatus(`genesis loop · ${this.genome.loopBars} bar${this.genome.loopBars > 1 ? "s" : ""}${kit}`);
+      const loopSeconds = this.loopTicks * TICK_SECONDS;
+      this.loopEvents = this.buildLoopEvents();
+      /* GLOBAL TRANSPORT SYNC: align this loop's origin to the shared musical
+       * zero (transportOrigin) so every tile — whenever it starts — locks to
+       * the same bar/beat grid. Loop lengths are whole bars, so 1/2/4-bar
+       * tiles always share downbeats. The tile phase-jumps in on the grid. */
+      const now = context.currentTime;
+      let loopStart = transportOrigin + Math.floor((now + 0.06 - transportOrigin) / loopSeconds) * loopSeconds;
+      let index = 0; const horizon = 0.15;
+      this.loopStartTime = loopStart; this.loopSeconds = loopSeconds;
+      this.setState("live");
+      const probRand = G.splitmix32(this.genome.melody.patternSeed ^ 0xbea7);
+      this.schedulerTimer = setInterval(() => {
+        if (!this.loopEvents.length) return;
+        const t = context.currentTime;
+        while (true) {
+          if (index >= this.loopEvents.length) { index = 0; loopStart += loopSeconds; }
+          const ev = this.loopEvents[index], when = loopStart + ev.tick * TICK_SECONDS;
+          if (when > t + horizon) break;
+          if (when >= t - 0.03) {                       // skip events already elapsed (grid phase-in)
+            if (ev.kind === "note") {
+              if (this.toneShapeDirty && !this.isDrum) this.voice?.setCutoffNorm(this.toneShape.y, when); // persisted kaos tone biases the loop
+              this.voice?.noteOn(ev.note.midi, ev.note.velocity, when);
+              this.voice?.noteOff(when + ev.note.gateSteps * G.TICKS_PER_STEP * TICK_SECONDS * 0.9);
+            } else if ((ev.hit.prob ?? 1) >= 1 || probRand() < ev.hit.prob) {
+              this.drumVoice?.hit(null, ev.hit.velocity * (ev.hit.accent ? 1.15 : 1), when,
+                { pitch: ev.hit.pitch, x: this.toneShape.x, y: this.toneShape.y });
+            }
+          }
+          index++;
+        }
+      }, 25);
+    }
+
+    async gesture(point) {
+      const type = ["down", "move", "up"].includes(point?.type) ? point.type : "move";
+      const x = clamp01(point?.x), y = clamp01(point?.y), pressure = clamp01(point?.pressure ?? 0.65);
+      if (this.recording) { this.recording.events.push({ tick: this.nowTick(), type, x, y, pressure }); if (this.recording.events.length >= P.MAX_EVENTS) this.stopRecording(); }
+      this.pointer = { x, y, active: type !== "up" };
+      if (this.isDrum) {
+        /* The pad IS the drum machine. Bottom strip = step sequencer
+         * (tap toggles a hit, shift-tap accents — you SEE and EDIT the
+         * timing). Everything above = chaos zone: X → tone/pitch,
+         * Y → decay/FX, pressure → velocity; the last position persists
+         * as the edition's tone shape and is saved into children. */
+        if (type === "up") return;
+        const gridTopNorm = 1 - DRUM_GRID_FRAC;
+        if (y >= gridTopNorm && this.mode === "instrument") {
+          if (type !== "down") return;                       // no drag-toggling
+          const steps = this.pattern.length, cols = 16, rows = steps / 16;
+          const col = Math.min(cols - 1, ((x * cols) | 0));
+          const row = Math.min(rows - 1, (((y - gridTopNorm) / DRUM_GRID_FRAC) * rows) | 0);
+          const i = row * cols + col;
+          const p = this.pattern.map(s => s && { ...s });
+          if (point.shiftKey) { if (p[i]) p[i].accent = !p[i].accent; else p[i] = { vel: 0.9, prob: 1, pitch: 0, accent: true }; }
+          else p[i] = p[i] ? null : { vel: 0.72, prob: 1, pitch: 0, accent: false };
+          this.setPattern(p);
+          this.onPatternEdit?.(this.pattern);
+          const drums = await this.ensureDrums();            // audible feedback
+          if (p[i]) drums.hit(null, p[i].vel, drums.context.currentTime + 0.005, { pitch: p[i].pitch, x: this.toneShape.x, y: this.toneShape.y });
+          return;
+        }
+        const now = performance.now();
+        if (type === "move" && now - this.lastPadHitMs < 85) return;
+        this.lastPadHitMs = now;
+        const chaosY = clamp01(y / gridTopNorm);             // normalise chaos zone
+        this.toneShape = { x, y: 1 - chaosY };               // persist the shaping
+        this.toneShapeDirty = true;
+        const drums = await this.ensureDrums();
+        if (!active.includes(this)) { enforceVoiceCap(); active.push(this); }
+        drums.hit(null, 0.35 + pressure * 0.6, drums.context.currentTime + 0.005, { x, y: 1 - chaosY });
+        return;
+      }
+      if (type === "up") { this.voice?.noteOff(); return; }
+      const voice = await this.ensureVoice(), t = voice.context.currentTime;
+      const midi = G.quantiseX(this.genome, x, 2);
+      if (type === "down") voice.noteOn(midi, 0.4 + pressure * 0.6, t); else voice.setPitch(midi, t);
+      voice.setCutoffNorm(1 - y, t); voice.setDrive(pressure);
+      // The kaos position persists (Y → tone brightness) so it survives into the
+      // looping default and is carried back to the mosaic tile.
+      this.toneShape = { x, y: 1 - y }; this.toneShapeDirty = true;
+    }
+
+    /* ---------- MIDI / computer-keyboard note input (mono, scale-locked) ---------- */
+    snapToScale(midiNote) {
+      const { scale, rootMidi } = G.MUSIC;
+      const pc = ((midiNote - rootMidi) % 12 + 12) % 12;
+      let best = scale[0], bd = 99;
+      for (const d of scale) { const diff = Math.min((pc - d + 12) % 12, (d - pc + 12) % 12); if (diff < bd) { bd = diff; best = d; } }
+      return rootMidi + best + Math.round((midiNote - (rootMidi + best)) / 12) * 12;
+    }
+    /* Map a snapped MIDI note back to the pad x that reproduces it, so MIDI /
+     * keyboard notes record & replay through the same gesture format. */
+    midiToX(midi) {
+      const span = G.MUSIC.scale.length * 2;
+      for (let d = 0; d < span; d++) if (G.quantiseX(this.genome, (d + 0.5) / span, 2) === midi) return (d + 0.5) / span;
+      return 0.5;
+    }
+    async playMidiNote(midiNote, velocity = 0.8) {
+      if (this.isDrum) {
+        const d = await this.ensureDrums();
+        if (!active.includes(this)) { enforceVoiceCap(); active.push(this); }
+        const x = this.toneShape.x, y = this.toneShape.y;
+        if (this.recording) this.recording.events.push({ tick: this.nowTick(), type: "down", x, y: 1 - y, pressure: velocity });
+        d.hit(null, velocity, d.context.currentTime + 0.002, { pitch: Math.max(-12, Math.min(12, midiNote - 60)), x, y });
+        return;
+      }
+      const v = await this.ensureVoice();
+      const snapped = this.snapToScale(midiNote);
+      const held = (this.heldNotes ||= new Set());
+      const x = this.midiToX(snapped);
+      this.pointer = { x, y: 0.5, active: true };
+      if (this.recording) this.recording.events.push({ tick: this.nowTick(), type: held.size ? "move" : "down", x, y: 0.5, pressure: velocity });
+      held.add(midiNote);
+      v.noteOn(snapped, velocity, v.context.currentTime);
+      this.setStatus(`note ${snapped}`);
+    }
+    releaseMidiNote(midiNote) {
+      if (this.isDrum) return;
+      this.heldNotes?.delete(midiNote);
+      if (!this.heldNotes || this.heldNotes.size === 0) {
+        this.voice?.noteOff(); this.pointer.active = false;
+        if (this.recording) this.recording.events.push({ tick: this.nowTick(), type: "up" });
+      }
+    }
+
+    nowTick() { return Math.round((performance.now() - this.recordStartMs) / 1000 / TICK_SECONDS); }
+    startRecording() {
+      // The default stops the moment recording begins so the take is clean;
+      // drum editions keep their beat looping under the tone gestures.
+      if (!this.isDrum) { this.stopTransport(); this.setState("idle"); }
+      this.recordStartMs = performance.now(); this.recording = { events: [] }; this.setStatus("recording");
+      clearTimeout(this.recordingTimer);
+      this.recordingTimer = setTimeout(() => this.stopRecording(), P.MAX_DURATION_TICKS * TICK_SECONDS * 1000);
+    }
+    patternDiffersFromGenesis() {
+      if (!this.isDrum) return false;
+      return JSON.stringify(this.pattern) !== JSON.stringify(this.genesisPattern);
+    }
+    stopRecording() {
+      if (!this.recording) return null;
+      clearTimeout(this.recordingTimer); this.recordingTimer = null;
+      const events = this.recording.events.slice(0, P.MAX_EVENTS); this.recording = null;
+      const editedPattern = this.patternDiffersFromGenesis() ? this.pattern : null;
+      if (events.length === 0 && !editedPattern) { this.setStatus("idle"); return null; }
+      if (events.length && events[events.length - 1].type !== "up") {
+        const up = { tick: Math.min(this.nowTick(), P.MAX_DURATION_TICKS), type: "up" };
+        if (events.length === P.MAX_EVENTS) events[events.length - 1] = up; else events.push(up);
+      }
+      const loop = this.loopTicks;
+      const lastTick = events.length ? events[events.length - 1].tick : loop;
+      const durationTicks = Math.min(P.MAX_DURATION_TICKS, Math.max(loop, Math.ceil(lastTick / loop) * loop));
+      const opts = {};
+      if (editedPattern) { opts.pattern = editedPattern; opts.loopBars = this.genome.loopBars; }
+      if (this.isDrum && this.toneShapeDirty) opts.tone = this.toneShape;
+      this.performance = P.validate(P.create(
+        { edition: this.edition, genomeHash: this.genomeHash, engineVersion: this.genome.engineVersion, bpm: G.MUSIC.bpm },
+        events, durationTicks,
+        Object.keys(opts).length ? opts : undefined
+      ));
+      this.setStatus(`captured ${events.length} events${editedPattern ? " + pattern" : ""}${opts.tone ? " + tone" : ""}`);
+      return this.performance;
+    }
+    /* Beat/tone-only child: inscribe the edited pattern + tone, no gestures. */
+    capturePattern() {
+      if (!this.isDrum) throw new Error("Only drum editions carry a step pattern.");
+      if (!this.patternDiffersFromGenesis() && !this.toneShapeDirty) throw new Error("Pattern and tone match genesis — edit them first.");
+      this.performance = P.validate(P.create(
+        { edition: this.edition, genomeHash: this.genomeHash, engineVersion: this.genome.engineVersion, bpm: G.MUSIC.bpm },
+        [], this.loopTicks,
+        { pattern: this.pattern, loopBars: this.genome.loopBars, ...(this.toneShapeDirty ? { tone: this.toneShape } : {}) }
+      ));
+      this.setStatus("pattern captured");
+      return this.performance;
+    }
+    clearPerformance() { this.performance = null; }
+    loadPerformance(json) {
+      this.performance = P.validate(typeof json === "string" ? JSON.parse(json) : json, {
+        edition: this.edition, genomeHash: this.genomeHash, engineVersion: this.genome.engineVersion,
+        patternLength: this.isDrum ? this.genome.loopBars * G.STEPS_PER_BAR : null
+      });
+      return this.performance;
+    }
+    exportPerformance() { if (!this.performance) throw new Error("No performance captured yet."); return JSON.stringify(this.performance); }
+    async playPerformance(perf) {
+      const target = perf ? this.loadPerformance(perf) : this.performance;
+      if (!target) throw new Error("No performance to play.");
+      if (this.isDrum && target.pattern) this.setPattern(target.pattern);      // child changes the beat
+      if (this.isDrum && target.tone) { this.toneShape = { ...target.tone }; this.toneShapeDirty = true; } // …and the tone
+      if (this.isDrum) { await this.ensureDrums(); await this.playMelody(); }  // pattern loops under the gestures
+      else await this.ensureVoice();
+      if (!this.isDrum) { this.stopTransport(); this.setState("live"); this.loopStartTime = (this.voice?.context.currentTime ?? 0); this.loopSeconds = target.durationTicks * TICK_SECONDS; }
+      this.playing = "performance"; this.setStatus("replaying performance");
+      const loopMs = target.durationTicks * TICK_SECONDS * 1000;
+      const schedule = () => { for (const e of target.events) this.timers.push(setTimeout(() => { void this.gesture(e); }, e.tick * TICK_SECONDS * 1000)); this.timers.push(setTimeout(schedule, loopMs)); };
+      if (target.events.length) schedule();
+    }
+
+    renderShell() {
+      const g = this.genome, m = g.mosaic, compact = this.mode === "preview";
+      this.container.innerHTML = `
+        <div class="pof-instrument" data-protocol="${PROTOCOL}" data-edition="${this.edition}" data-family="${m.family}"
+             style="height:100%;display:grid;grid-template-rows:${compact ? "1fr" : "auto 1fr auto"};gap:10px;color:#fff;font-family:ui-monospace,monospace">
+          ${compact ? "" : `
+          <header style="display:flex;justify-content:space-between;align-items:end">
+            <div><small style="opacity:.6;letter-spacing:.08em">PROOF OF FREE · LIVING SYNTH v5</small>
+              <h1 style="font-size:clamp(16px,3vw,26px);margin:2px 0 0">Edition ${String(this.edition).padStart(4, "0")}</h1></div>
+            <small style="opacity:.6;text-align:right">ENGINE #${this.engineId} · v${g.engineVersion}<br>${this.genomeHash}</small>
+          </header>`}
+          <div class="pof-pad" role="application" aria-label="Chaos pad, edition ${this.edition}"
+            style="position:relative;width:100%;aspect-ratio:1/1;max-height:${compact ? "100%" : "min(58vh,520px)"};margin:0 auto;overflow:hidden;border:1px solid ${m.accent}99;border-radius:14px;touch-action:none;cursor:crosshair;background:#060608">
+            <canvas style="position:absolute;inset:0;width:100%;height:100%"></canvas>
+          </div>
+          ${compact ? "" : `
+          <footer style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;font-size:11px;opacity:.75">
+            <span>${m.family.toUpperCase()} · ${this.isDrum ? `DRUM · ${g.drum.type.toUpperCase()}` : m.role.toUpperCase()} · ${g.loopBars}-BAR</span>
+            <span>${this.isDrum ? `X TONE/PITCH · Y DECAY · PRESSURE DRIVE` : `${g.oscillator.typeA.toUpperCase()}+${g.oscillator.typeB.toUpperCase()} · ROOT ${g.rootNote}`} · ${G.MUSIC.root} DORIAN ${G.MUSIC.bpm}BPM</span>
+            <span class="pof-status">idle</span>
+          </footer>`}
+        </div>`;
+      this.pad = this.container.querySelector(".pof-pad");
+      this.canvas = this.container.querySelector("canvas");
+      this.c = this.canvas.getContext("2d");
+      this.statusEl = this.container.querySelector(".pof-status");
+      this.ro = new ResizeObserver(() => this.resize()); this.ro.observe(this.canvas); this.resize();
+      buildAtlas();
+    }
+    resize() {
+      const ratio = Math.min(2, devicePixelRatio || 1), box = this.canvas.getBoundingClientRect();
+      this.canvas.width = Math.max(1, Math.round(box.width * ratio));
+      this.canvas.height = Math.max(1, Math.round(box.height * ratio));
+      this.c.setTransform(ratio, 0, 0, ratio, 0, 0);
+      this._w = this.canvas.width / ratio; this._h = this.canvas.height / ratio;
+    }
+    setStatus(t) { if (this.statusEl) this.statusEl.textContent = t; }
+
+    animate(now) {
+      this.raf = requestAnimationFrame(this.animate);
+      const c = this.c, W = this._w, H = this._h; if (!W) return;
+      const g = this.genome, m = g.mosaic, an = g.animation, time = now / 1000;
+      const v = this.voice, lvl = v ? v.level() : 0;
+      // background wash
+      const grd = c.createRadialGradient(W * (0.3 + m.gridX / 64), H * 0.4, 8, W / 2, H / 2, W * 0.8);
+      grd.addColorStop(0, mix(m.color, "#000000", 0.35 - lvl * 0.2));
+      grd.addColorStop(1, "#050507");
+      c.fillStyle = grd; c.fillRect(0, 0, W, H);
+      // trails
+      c.fillStyle = "rgba(5,5,7,0.18)"; c.fillRect(0, 0, W, H);
+
+      if (this.isDrum) {
+        this.drawDrumMachine(c, W, H, m, time);
+      } else if (v && (this.playing || this.pointer.active)) {
+        if (an.kind === "bars" || m.role === "bass" || m.role === "pad") this.drawSpectrum(c, W, H, v, m);
+        else if (an.kind === "scope" || m.role === "lead") this.drawScope(c, W, H, v, m);
+        else this.drawGlyphLive(c, W, H, m, an, time, lvl);
+      } else {
+        this.drawIdle(c, W, H, m, an, time);
+      }
+      // pointer cursor
+      if (this.pointer.active) {
+        c.strokeStyle = m.accent; c.lineWidth = 2; c.globalAlpha = 0.8;
+        c.beginPath(); c.arc(this.pointer.x * W, this.pointer.y * H, 12 + lvl * 30, 0, 7); c.stroke();
+        c.globalAlpha = 1;
+      }
+    }
+    /* Drum NFT pad: the pattern IS the interface. The bottom strip is the
+     * live step sequencer (tap = toggle, shift-tap = accent), the zone above
+     * is the tone chaos pad with a marker at the persistent tone shape. */
+    drawDrumMachine(c, W, H, m, time) {
+      const pattern = this.pattern || [], steps = pattern.length || 16;
+      const cols = 16, rows = Math.max(1, steps / 16);
+      const gridTop = H * (1 - DRUM_GRID_FRAC), gridH = H * DRUM_GRID_FRAC;
+      const cw = W / cols, rh = gridH / rows;
+      const d = this.drumVoice, lvl = d ? d.level() : 0;
+      // chaos zone: big glyph reacting to the real output level
+      c.globalAlpha = 0.1 + lvl * 0.45; c.fillStyle = m.accent;
+      c.font = `bold ${gridTop * 0.72}px ui-monospace, monospace`; c.textAlign = "center"; c.textBaseline = "middle";
+      c.fillText({ kick: "K", snare: "S", closedHat: "H", openHat: "O", tom: "T", clap: "C", perc: "P" }[this.genome.drum.type] || "P", W / 2, gridTop * 0.5);
+      // real waveform across the chaos zone
+      if (d && (this.playing || this.pointer.active)) {
+        d.analyser.getByteTimeDomainData(d.wave);
+        c.strokeStyle = m.accent; c.lineWidth = 1.6; c.globalAlpha = 0.8; c.beginPath();
+        for (let i = 0; i < d.wave.length; i += 4) { const px = i / d.wave.length * W, py = (d.wave[i] / 255) * gridTop; i ? c.lineTo(px, py) : c.moveTo(px, py); }
+        c.stroke();
+      }
+      // persistent tone marker
+      c.globalAlpha = 0.9; c.strokeStyle = "#fff"; c.lineWidth = 1.5;
+      const tx = this.toneShape.x * W, ty = (1 - this.toneShape.y) * gridTop;
+      c.beginPath(); c.arc(tx, ty, 8, 0, 7); c.stroke();
+      c.beginPath(); c.moveTo(tx - 13, ty); c.lineTo(tx + 13, ty); c.moveTo(tx, ty - 13); c.lineTo(tx, ty + 13); c.stroke();
+      // divider + hint
+      c.globalAlpha = 0.5; c.strokeStyle = "rgba(255,255,255,0.25)"; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(0, gridTop); c.lineTo(W, gridTop); c.stroke();
+      c.globalAlpha = 0.45; c.fillStyle = "#fff"; c.font = "9px ui-monospace, monospace"; c.textAlign = "left"; c.textBaseline = "bottom";
+      c.fillText("TONE PAD — X pitch · Y decay", 8, gridTop - 6);
+      // step grid (playhead synced to the actual transport clock)
+      let playStep = -1;
+      const context = d?.context;
+      if (this.playing && context && this.loopSeconds) {
+        const pos = ((context.currentTime - this.loopStartTime) % this.loopSeconds + this.loopSeconds) % this.loopSeconds;
+        playStep = Math.min(steps - 1, (pos / this.loopSeconds * steps) | 0);
+      }
+      c.textAlign = "center"; c.textBaseline = "middle";
+      for (let i = 0; i < steps; i++) {
+        const cx = (i % cols) * cw, cy = gridTop + ((i / cols) | 0) * rh;
+        const s = pattern[i];
+        c.fillStyle = s ? (s.accent ? m.accent : mix(m.color, m.accent, 0.55)) : "rgba(255,255,255,0.05)";
+        c.globalAlpha = s ? 0.45 + (s.vel ?? 0.7) * 0.55 : 1;
+        c.fillRect(cx + 1.5, cy + 1.5, cw - 3, rh - 3);
+        if (i % 4 === 0 && !s) { c.globalAlpha = 0.25; c.fillStyle = "#fff"; c.font = `${Math.max(7, rh * 0.28)}px ui-monospace`; c.fillText(String(i % 16 + 1), cx + cw / 2, cy + rh / 2); }
+        if (i === playStep) { c.globalAlpha = 0.95; c.strokeStyle = i === playStep && s ? "#fff" : "rgba(255,255,255,0.7)"; c.lineWidth = 2; c.strokeRect(cx + 1.5, cy + 1.5, cw - 3, rh - 3); }
+      }
+      c.globalAlpha = 1;
+    }
+    drawSpectrum(c, W, H, v, m) {
+      v.analyser.getByteFrequencyData(v.freq); const n = 40, bw = W / n;
+      for (let i = 0; i < n; i++) {
+        const val = v.freq[i] / 255, h = val * H * 0.9;
+        c.fillStyle = mix(m.color, m.accent, val);
+        c.fillRect(i * bw, H - h, bw - 1, h);
+      }
+    }
+    drawScope(c, W, H, v, m) {
+      v.analyser.getByteTimeDomainData(v.wave); c.strokeStyle = m.accent; c.lineWidth = 2; c.beginPath();
+      for (let i = 0; i < v.wave.length; i += 2) { const x = i / v.wave.length * W, y = (v.wave[i] / 255) * H; i ? c.lineTo(x, y) : c.moveTo(x, y); }
+      c.stroke();
+    }
+    drawGlyphLive(c, W, H, m, an, time, lvl) {
+      const a = buildAtlas(), sp = a.map[an.word] || a.map["0"], word = an.word || "0";
+      c.save(); c.translate(W / 2, H / 2);
+      const scale = 0.6 + lvl * 0.5 + 0.05 * Math.sin(time * 3);
+      c.globalAlpha = 0.9;
+      if (word === "0") {
+        c.rotate(time * 0.4);
+        c.strokeStyle = m.accent; c.lineWidth = 4 + lvl * 10;
+        c.beginPath(); c.arc(0, 0, Math.min(W, H) * 0.28 * (0.8 + lvl), 0, 7); c.stroke();
+        c.setLineDash([6, 10]); c.globalAlpha = 0.5;
+        c.beginPath(); c.arc(0, 0, Math.min(W, H) * 0.36, time, time + 5.6); c.stroke(); c.setLineDash([]);
+      } else {
+        const sz = Math.min(W, H) * 0.7 * scale;
+        c.globalAlpha = 0.85; c.drawImage(a.canvas, sp.sx, sp.sy, sp.cell, sp.cell, -sz / 2, -sz / 2, sz, sz);
+        c.globalAlpha = 0.25; c.fillStyle = m.accent; c.fillRect(-W / 2, (Math.sin(time * 2) * 0.4) * H, W, 2);
+      }
+      c.restore();
+    }
+    drawIdle(c, W, H, m, an, time) {
+      const a = buildAtlas();
+      if (an.kind === "glyph") {
+        const sp = a.map[an.word] || a.map["0"], sz = Math.min(W, H) * 0.62;
+        c.globalAlpha = 0.35 + 0.3 * Math.abs(Math.sin(time * an.speed));
+        c.drawImage(a.canvas, sp.sx, sp.sy, sp.cell, sp.cell, (W - sz) / 2, (H - sz) / 2, sz, sz);
+        c.globalAlpha = 1;
+      } else if (an.kind === "bars") {
+        const n = 12, bw = W / n; c.fillStyle = m.accent; c.globalAlpha = 0.7;
+        for (let i = 0; i < n; i++) { const h = H * (0.15 + 0.5 * Math.abs(Math.sin(time * an.speed + i * 0.5))); c.fillRect(i * bw + 2, H - h, bw - 4, h); }
+        c.globalAlpha = 1;
+      } else if (an.kind === "scope") {
+        c.strokeStyle = m.accent; c.lineWidth = 2; c.globalAlpha = 0.7; c.beginPath();
+        for (let i = 0; i <= 48; i++) { const x = i / 48 * W, y = H / 2 + Math.sin(time * an.speed * 2 + i * 0.3) * H * 0.24; i ? c.lineTo(x, y) : c.moveTo(x, y); }
+        c.stroke(); c.globalAlpha = 1;
+      } else {
+        c.fillStyle = m.accent;
+        for (let i = 0; i < 5; i++) { const ang = time * an.speed * (1 + i * 0.2) + i, r = Math.min(W, H) * (0.1 + i * 0.06); c.globalAlpha = 0.7 - i * 0.1; c.beginPath(); c.arc(W / 2 + Math.cos(ang) * r, H / 2 + Math.sin(ang) * r, 4, 0, 7); c.fill(); }
+        c.globalAlpha = 1;
+      }
+    }
+
+    bindPad() {
+      const pointOf = (e, type) => { const b = this.pad.getBoundingClientRect(); return { type, x: clamp01((e.clientX - b.left) / b.width), y: clamp01((e.clientY - b.top) / b.height), pressure: clamp01(e.pressure || 0.65), shiftKey: !!e.shiftKey }; };
+      this.pad.addEventListener("pointerdown", e => { this.pointerDown = true; this.pad.setPointerCapture?.(e.pointerId); void this.gesture(pointOf(e, "down")); });
+      this.pad.addEventListener("pointermove", e => { if (this.pointerDown) void this.gesture(pointOf(e, "move")); });
+      const up = e => { if (!this.pointerDown) return; this.pointerDown = false; void this.gesture(pointOf(e, "up")); };
+      this.pad.addEventListener("pointerup", up); this.pad.addEventListener("pointercancel", up);
+    }
+  }
+
+  function mix(a, b, t) {
+    t = Math.max(0, Math.min(1, t));
+    const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+    const r = Math.round(((pa >> 16 & 255) * (1 - t) + (pb >> 16 & 255) * t));
+    const g = Math.round(((pa >> 8 & 255) * (1 - t) + (pb >> 8 & 255) * t));
+    const bl = Math.round(((pa & 255) * (1 - t) + (pb & 255) * t));
+    return `rgb(${r},${g},${bl})`;
+  }
+
+  const api = Object.freeze({
+    protocol: PROTOCOL, engineVersion: G.ENGINE_VERSION, music: G.MUSIC, genome: G, performance: P,
+    tuning: TUNING,        // mosaic legibility knobs, read live every frame (see apps/tuner)
+    mount(container, options) { return new Instrument(container, options); },
+    createMosaic, buildAtlas,
+    activeCount() { return active.length; },
+    setMaxActive(n) { maxActive = n === 16 ? 16 : 8; enforceVoiceCap(); return maxActive; },
+    getMaxActive() { return maxActive; },
+    async ensureAudio() { return audio(); },
+    now(lead = 0) { return (ctx ? ctx.currentTime : 0) + lead; },   // shared clock for phase-locked launches
+    tickSeconds: TICK_SECONDS,                                       // one transport tick, in seconds
+    /* Current position on the shared transport, in ticks from musical zero.
+     * Session recordings timestamp live-set events against this clock. */
+    transportTick() { return (ctx && transportOrigin !== null) ? Math.max(0, Math.round((ctx.currentTime - transportOrigin) / TICK_SECONDS)) : 0; },
+    stopAll() { [...active].forEach(i => i.silence()); },           // instant kill-all
+    drainAll() { [...active].forEach(i => i.stopAtLoopEnd()); }     // finish-loops stop-all
+  });
+  globalThis.ProofOfFree = api;
+
+  /* Recursive-inscription auto-boot. */
+  const seedNode = document.getElementById("pof-seed");
+  if (seedNode) {
+    const seed = JSON.parse(seedNode.textContent || "{}");
+    const genome = G.deriveGenome(seed.edition);
+    if (seed.protocol !== "proof-of-free/seed" || seed.version !== 5 || !Number.isSafeInteger(seed.engineId) || seed.engineId < 0 || seed.engineVersion !== G.ENGINE_VERSION || seed.genomeHash !== G.genomeHash(genome)) {
+      throw new Error("Invalid Proof of Free v5 seed");
+    }
+    document.documentElement.style.cssText = "height:100%;background:#050507";
+    document.body.style.cssText = "height:100%;margin:0;padding:14px;box-sizing:border-box;overflow:hidden;background:#050507";
+    const rootEl = document.createElement("div"); rootEl.style.height = "100%"; document.body.appendChild(rootEl);
+    const instrument = api.mount(rootEl, { edition: seed.edition, engineId: seed.engineId });
+    dispatchEvent(new CustomEvent("proof-of-free:ready", { detail: { protocol: PROTOCOL, edition: seed.edition, engineId: seed.engineId, genomeHash: instrument.genomeHash } }));
+  }
+})();
+
+</script>
+<script>
+(() => {
+  const PF = globalThis.ProofOfFree, G = PF.genome;
+  const $ = id => document.getElementById(id);
+  const stage = $("stage"), host = $("host"), msg = $("msg"), tip = $("tip"), liveState = $("liveState");
+  const registryEl = $("registry"), childSel = $("childSel"), midiStatusEl = $("midiStatus");
+  let current = null, view = "mosaic", reopenAfterClose = null;
+  const previews = new Map();
+
+  /* ---- child registry (latest child = default; genesis + all children stay accessible) ---- */
+  const CHILD_KEY = "pof-v5-children";
+  let childStore; try { childStore = JSON.parse(localStorage.getItem(CHILD_KEY) || "{}"); } catch { childStore = {}; }
+  const childrenOf = e => childStore[e] || [];
+  const ownerSim = () => true;
+  function addChild(edition, perf) {
+    if (!ownerSim()) throw new Error("Only the owner can publish a child.");
+    const list = childrenOf(edition);
+    list.push({ revision: list.length + 1, perf, at: new Date().toISOString(), by: "SP…MOCK" });
+    childStore[edition] = list;
+    try { localStorage.setItem(CHILD_KEY, JSON.stringify(childStore)); } catch { /* full */ }
+    return list[list.length - 1];
+  }
+
+  const tipFor = g => g.mosaic.role === "drum"
+    ? `#${String(g.edition).padStart(4,"0")}  ${g.mosaic.family} · DRUM · ${g.drum.type} · ${g.loopBars}-bar`
+    : `#${String(g.edition).padStart(4,"0")}  ${g.mosaic.family} · ${g.mosaic.role} · ${g.synth.arch} · ${g.loopBars}-bar`;
+
+  /* ================= LIVE SESSION ================= */
+  const GROUP_COLORS = { A: "#4bd0ff", B: "#ff6bd0", C: "#f0b55d", D: "#8affab" };
+  let mode = "play", activeGroup = "A", soloedGroup = null;
+  const groups = { A: new Set(), B: new Set(), C: new Set(), D: new Set() };
+  const soloSet = new Set(), manualMute = new Set(), volumes = new Map();
+  /* Mosaic-level session recording (a "song": every tile on/off + mix move). */
+  const PS = PF.performance;                 // the shared codec (performance + session)
+  let sessionRec = null;                     // { startTick, events } while recording
+  let suppressSessionRec = false;            // don't log open/close preview churn
+  let lastSession = null;                    // last recorded / loaded session
+  let sessionPlay = null;                    // { timer } while a song plays
+  let playingSession = false;                // input-lock flag during playback
+  let mint = null;                           // MintProvider (on-chain gating); null = all 1024 playable
+  function isPlayable(ed) { return !mint || mint.isMinted(ed); }
+  /* Inert inspection hook — only attached when the URL carries ?debug. */
+  const DEBUG = (() => { try { return location.search.includes("debug"); } catch { return false; } })();
+  if (DEBUG) window.__pof = { previews, soloSet, manualMute, volumes, get current() { return current; }, get sessionRec() { return sessionRec; }, get lastSession() { return lastSession; }, get playingSession() { return playingSession; },
+    startRec: () => startSessionRec(), stopRec: () => stopSessionRec(false), playSong: () => playSession(), stopSong: () => stopSessionPlay(false),
+    get mint() { return mint; }, isPlayable };
+
+  /* Append an event to the running session log, timed to the shared transport.
+   * Higher-level actions (groups, scenes, arrows, randomise, scan, voice-cap
+   * eviction) all funnel through these primitives, so hooking them captures
+   * the whole performance. */
+  function recSession(k, extra) {
+    if (!sessionRec || suppressSessionRec) return;
+    const t = PF.transportTick() - sessionRec.startTick;
+    if (t < 0) return;
+    sessionRec.events.push(Object.assign({ t, k }, extra));
+    if (sessionRec.events.length >= PS.MAX_SESSION_EVENTS) stopSessionRec(true);
+  }
+  function removePreview(edition) {
+    const inst = previews.get(edition); if (!inst) return;
+    const node = inst.container; inst.destroy(); node.remove(); previews.delete(edition);
+    soloSet.delete(edition); manualMute.delete(edition); volumes.delete(edition);
+    recSession("off", { ed: edition });
+  }
+  function startPreview(edition, at) {
+    if (!isPlayable(edition)) return null;             // not inscribed on-chain — cannot play
+    if (previews.has(edition)) return previews.get(edition);
+    const div = document.createElement("div"); div.style.cssText = "position:fixed;left:-9999px;width:80px;height:80px"; document.body.appendChild(div);
+    const inst = PF.mount(div, { edition, mode: "preview", onStateChange: syncLive });
+    const list = childrenOf(edition);
+    previews.set(edition, inst);
+    if (list.length) { try { void inst.playPerformance(list[list.length - 1].perf); } catch { void inst.playMelody({ at }); } }
+    else void inst.playMelody({ at });
+    recSession("on", { ed: edition });
+    if (previews.size > PF.getMaxActive()) removePreview(previews.keys().next().value);
+    return inst;
+  }
+  function stopPreviewMusical(edition) {
+    const inst = previews.get(edition); if (!inst) return;
+    if (inst.state === "live") { inst.stopAtLoopEnd(); const t = setInterval(() => { if (!previews.has(edition) || inst.state === "idle") { clearInterval(t); removePreview(edition); applyMix(); } }, 120); }
+    else { removePreview(edition); applyMix(); }
+  }
+  function togglePreview(edition) { if (previews.has(edition)) stopPreviewMusical(edition); else { startPreview(edition); applyMix(); } }
+
+  function toggleSolo(edition) { if (!previews.has(edition)) startPreview(edition); if (soloSet.has(edition)) soloSet.delete(edition); else soloSet.add(edition); soloedGroup = null; recSession("solo", { ed: edition, on: soloSet.has(edition) }); applyMix(); }
+  function toggleMute(edition) { if (!previews.has(edition)) { startPreview(edition); applyMix(); return; } if (manualMute.has(edition)) manualMute.delete(edition); else manualMute.add(edition); recSession("mute", { ed: edition, on: manualMute.has(edition) }); applyMix(); }
+  function assignGroup(edition, g) { if (groups[g].has(edition)) groups[g].delete(edition); else { for (const k of Object.keys(groups)) groups[k].delete(edition); groups[g].add(edition); } persistGroups(); applyMix(); }
+  const groupOfMap = () => { const m = {}; for (const g of Object.keys(groups)) for (const ed of groups[g]) m[ed] = g; return m; };
+
+  function applyMix() {
+    const soloOn = soloSet.size > 0;
+    const effMuted = [];
+    for (const [ed, inst] of previews) { const muted = manualMute.has(ed) || (soloOn && !soloSet.has(ed)); inst.setMuted(muted); if (muted) effMuted.push(ed); }
+    mosaic.setOverlays({ muted: effMuted, soloActive: soloOn, soloed: [...soloSet], groupOf: groupOfMap(), groupColors: GROUP_COLORS, volumes });
+    syncLive();
+  }
+  async function launchSet(editions, { solo } = {}) {
+    await PF.ensureAudio(); const at = PF.now(0.15);
+    editions.forEach(ed => startPreview(ed, at));
+    if (solo) { soloSet.clear(); editions.forEach(ed => soloSet.add(ed)); }
+    applyMix();
+  }
+  function clearSolo() { soloSet.clear(); soloedGroup = null; recSession("clearSolo"); applyMix(); msg.textContent = "solo cleared"; }
+  function clearMute() { manualMute.clear(); recSession("clearMute"); applyMix(); }
+
+  function stateSets() {
+    const liveSet = [], drainSet = [];
+    for (const [ed, inst] of previews) (inst.state === "draining" ? drainSet : inst.state === "live" ? liveSet : []).push(ed);
+    if (current && view === "synth") (current.state === "draining" ? drainSet : current.state === "live" ? liveSet : []).push(current.edition);
+    return { liveSet, drainSet };
+  }
+  function syncLive() {
+    const { liveSet, drainSet } = stateSets();
+    mosaic.setLive(liveSet, drainSet);
+    const parts = [`▶ ${liveSet.length} live`];
+    if (drainSet.length) parts.push(`${drainSet.length} finishing`);
+    if (soloSet.size) parts.push(`◉ solo ${soloSet.size}`);
+    if (manualMute.size) parts.push(`✕ mute ${manualMute.size}`);
+    parts.push(`voices ${PF.getMaxActive()}`);
+    if (sessionRec) parts.unshift(`● REC ${sessionRec.events.length}`);
+    if (playingSession) parts.unshift("▶ SONG");
+    liveState.textContent = parts.join(" · ");
+  }
+
+  /* ---- mosaic gestures: tap = mode verb · double = off · long-press = open ---- */
+  const mosaic = PF.createMosaic($("mosaic"), {
+    initialSelection: 233, keyboard: false,
+    getInstrument: edition => previews.get(edition) || (current?.edition === edition ? current : null),
+    onHover(g) { tip.textContent = tipFor(g); },
+    onSelectionChange(g) { tip.textContent = tipFor(g); }
+  });
+  function tileVerb(edition, ev) {
+    if (!isPlayable(edition)) return;                 // not inscribed on-chain — inert
+    mosaic.select(edition);
+    if (ev.shiftKey) return toggleSolo(edition);
+    if (ev.altKey) return assignGroup(edition, activeGroup);
+    if (ev.metaKey || ev.ctrlKey) return toggleMute(edition);
+    if (mode === "solo") return toggleSolo(edition);
+    if (mode === "group") return assignGroup(edition, activeGroup);
+    if (mode === "mute") return toggleMute(edition);
+    return togglePreview(edition);
+  }
+  /* Gesture map: tap = mode verb · DOUBLE-tap/click = open synth ·
+   * long-press = open · vertical click-DRAG = that tile's volume. */
+  const canvas = $("mosaic");
+  let lastTapEd = -1, lastTapMs = 0, longTimer = null, longFired = false, downXY = null;
+  let dragging = false, dragEd = -1, dragStartY = 0, dragStartVol = 1;
+  canvas.addEventListener("pointerdown", ev => {
+    const ed = mosaic.editionAt(ev);
+    if (playingSession || !isPlayable(ed)) { downXY = null; dragEd = -1; return; }  // locked / not inscribed
+    downXY = { x: ev.clientX, y: ev.clientY }; longFired = false; dragging = false; dragEd = ed;
+    clearTimeout(longTimer); longTimer = setTimeout(() => { longFired = true; openInstrument(ed); }, 460);
+  });
+  canvas.addEventListener("pointermove", ev => {
+    if (!downXY) return;
+    const dist = Math.hypot(ev.clientX - downXY.x, ev.clientY - downXY.y);
+    if (dist > 10) clearTimeout(longTimer);
+    if (!dragging && dist > 14 && view === "mosaic") {          // begin volume drag
+      dragging = true;
+      let inst = previews.get(dragEd) || startPreview(dragEd);  // drag also fades a silent tile in
+      dragStartVol = inst?.volume ?? 1; dragStartY = ev.clientY;
+      applyMix();
+    }
+    if (dragging) {
+      const inst = previews.get(dragEd); if (!inst) return;
+      const box = canvas.getBoundingClientRect();
+      const v = inst.setVolume(dragStartVol + (dragStartY - ev.clientY) / (box.height * 0.5));
+      volumes.set(dragEd, v);
+      mosaic.setOverlays({ volumes });
+      tip.textContent = `#${String(dragEd).padStart(4, "0")} · volume ${Math.round(v * 100)}%`;
+    }
+  });
+  canvas.addEventListener("pointerup", ev => {
+    clearTimeout(longTimer); const wasDrag = dragging, wasLong = longFired; downXY = null; dragging = false;
+    if (wasLong) return;
+    if (wasDrag) { if (dragEd > 0 && volumes.has(dragEd)) recSession("vol", { ed: dragEd, v: volumes.get(dragEd) }); applyMix(); return; } // drag finished — capture final volume
+    const ed = mosaic.editionAt(ev), t = Date.now();
+    if (ed === lastTapEd && t - lastTapMs < 320) { lastTapEd = -1; lastTapMs = 0; openInstrument(ed); return; }  // DOUBLE → open synth
+    lastTapEd = ed; lastTapMs = t; tileVerb(ed, ev);
+  });
+  canvas.addEventListener("pointercancel", () => { clearTimeout(longTimer); downXY = null; dragging = false; });
+
+  /* ---- modes: the cursor over the mosaic shows which mode you're in ---- */
+  const modeBtns = [...document.querySelectorAll("#modes button")];
+  const svgCursor = (svg, hx = 14, hy = 14, fb = "pointer") => `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${hx} ${hy}, ${fb}`;
+  const C_PLAY = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><path d="M9 6 L21 14 L9 22 Z" fill="#3ad29f" stroke="#04120d" stroke-width="1.6"/></svg>`;
+  const C_SOLO = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><circle cx="14" cy="14" r="7.6" fill="none" stroke="#8affd0" stroke-width="2.6"/><circle cx="14" cy="14" r="2.6" fill="#8affd0"/></svg>`;
+  const C_MUTE = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><path d="M8 8 L20 20 M20 8 L8 20" stroke="#ff8f83" stroke-width="3.2" stroke-linecap="round"/></svg>`;
+  const cGroup = col => `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><path d="M6 6 L22 6 L22 22 Z" fill="${col}" stroke="#04120d" stroke-width="1.6"/></svg>`;  // corner triangle = the group badge
+  function cursorFor(m) { return svgCursor(m === "play" ? C_PLAY : m === "solo" ? C_SOLO : m === "mute" ? C_MUTE : cGroup(GROUP_COLORS[activeGroup])); }
+  function applyModeCursor() { if (!playingSession) canvas.style.cursor = cursorFor(mode); }
+  function setMode(m) { mode = m; modeBtns.forEach(b => b.classList.toggle("active", b.dataset.mode === m)); applyModeCursor(); tip.textContent = { play: "PLAY — tap launches/stops a loop", solo: "SOLO — tap isolates a tile", group: `GROUP — tap adds to group ${activeGroup}`, mute: "MUTE — tap mutes a live tile" }[m]; }
+  modeBtns.forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode)));
+  applyModeCursor();   // initial (play) cursor
+
+  /* ---- groups ---- */
+  const grpBtns = [...document.querySelectorAll("#groups button, .rail.left button[data-grp]")];
+  const grpEls = [...document.querySelectorAll("button[data-grp]")];
+  function refreshGroupBtns() { grpEls.forEach(b => { const on = b.dataset.grp === activeGroup; b.classList.toggle("active", on); b.style.background = on ? GROUP_COLORS[b.dataset.grp] : ""; b.style.color = on ? "#05050a" : ""; }); }
+  grpEls.forEach(b => b.addEventListener("click", () => { activeGroup = b.dataset.grp; refreshGroupBtns(); setMode("group"); }));
+  refreshGroupBtns();
+  $("grpLaunch").addEventListener("click", () => { const m = [...groups[activeGroup]]; if (!m.length) { msg.textContent = `group ${activeGroup} empty`; return; } launchSet(m); });
+  $("grpStop").addEventListener("click", () => { for (const ed of groups[activeGroup]) stopPreviewMusical(ed); });
+  $("grpSolo").addEventListener("click", () => {
+    const m = [...groups[activeGroup]]; if (!m.length) return;
+    if (soloedGroup === activeGroup) { clearSolo(); }                 // toggle off
+    else { launchSet(m, { solo: true }); soloedGroup = activeGroup; tip.textContent = `soloing group ${activeGroup} — press solo again to release`; }
+  });
+  $("grpClear").addEventListener("click", () => { groups[activeGroup].clear(); persistGroups(); applyMix(); });
+  $("clearSolo").addEventListener("click", clearSolo);
+  $("clearMute").addEventListener("click", clearMute);
+
+  /* ---- transport ---- */
+  function moveActivePattern(dx, dy) {
+    mosaic.step(dx, dy); if (!previews.size) return;
+    const N = G.GRID;
+    const shifted = [...previews.keys()].map(ed => { const x = ((ed - 1) % N + dx + N) % N, y = (((ed - 1) / N | 0) + dy + N) % N; return y * N + x + 1; });
+    [...previews.keys()].forEach(removePreview); launchSet(shifted);
+  }
+  $("up").addEventListener("click", () => moveActivePattern(0, -1));
+  $("down").addEventListener("click", () => moveActivePattern(0, 1));
+  $("left").addEventListener("click", () => moveActivePattern(-1, 0));
+  $("right").addEventListener("click", () => moveActivePattern(1, 0));
+  $("open").addEventListener("click", () => openInstrument(mosaic.getSelection()));
+  $("voices").addEventListener("click", () => { const n = PF.setMaxActive(PF.getMaxActive() === 8 ? 16 : 8); $("voices").textContent = `voices ${n}`; recSession("voices", { n }); syncLive(); });
+
+  let scanTimer = null, col = 0;
+  $("playRegion").addEventListener("click", () => {
+    if (scanTimer) { clearInterval(scanTimer); scanTimer = null; $("playRegion").classList.remove("active"); return; }
+    $("playRegion").classList.add("active"); col = 0;
+    scanTimer = setInterval(() => { const picks = []; for (let row = 0; row < G.GRID; row++) { const g = mosaic.genomes[row * G.GRID + col]; if (g.mosaic.brightness > 0.22 && isPlayable(g.edition) && picks.length < 3) picks.push(g.edition); } launchSet(picks); col = (col + 1) % G.GRID; }, (60 / PF.music.bpm) * 2000);
+  });
+  $("stopAll").addEventListener("click", () => { if (scanTimer) { clearInterval(scanTimer); scanTimer = null; $("playRegion").classList.remove("active"); } [...previews.keys()].forEach(stopPreviewMusical); });
+  $("killAll").addEventListener("click", () => { if (scanTimer) { clearInterval(scanTimer); scanTimer = null; $("playRegion").classList.remove("active"); } [...previews.keys()].forEach(removePreview); soloSet.clear(); manualMute.clear(); soloedGroup = null; applyMix(); msg.textContent = "killed all"; });
+
+  /* ---- randomiser ---- */
+  function pickRole(roles, n) { const pool = mosaic.genomes.filter(g => roles.includes(g.mosaic.role) && isPlayable(g.edition)).map(g => g.edition); const out = []; for (let i = 0; i < n && pool.length; i++) out.push(pool.splice((Math.random() * pool.length) | 0, 1)[0]); return out; }
+  $("randomise").addEventListener("click", () => { [...previews.keys()].forEach(removePreview); soloSet.clear(); manualMute.clear(); const jam = [...pickRole(["drum"], 2), ...pickRole(["bass", "subBass"], 1), ...pickRole(["lead"], 2), ...pickRole(["pluck", "bell"], 1), ...pickRole(["pad", "drone"], 1)]; launchSet(jam); msg.textContent = `random jam · ${jam.length}`; });
+
+  /* ---- scenes + groups persistence ---- */
+  const SCENE_KEY = "pof-v5-scenes", GROUP_KEY = "pof-v5-groups";
+  let scenes; try { scenes = JSON.parse(localStorage.getItem(SCENE_KEY) || "{}"); } catch { scenes = {}; }
+  function persistGroups() { try { localStorage.setItem(GROUP_KEY, JSON.stringify(Object.fromEntries(Object.entries(groups).map(([k, v]) => [k, [...v]])))); } catch { /* full */ } }
+  (function loadGroups() { try { const g = JSON.parse(localStorage.getItem(GROUP_KEY) || "{}"); for (const k of Object.keys(groups)) (g[k] || []).forEach(ed => groups[k].add(ed)); } catch { /* none */ } })();
+  const sceneList = $("sceneList");
+  function refreshScenes() { sceneList.innerHTML = '<option value="">recall…</option>' + Object.keys(scenes).map(n => `<option value="${n}">${n}</option>`).join(""); }
+  refreshScenes();
+  $("sceneSave").addEventListener("click", () => { const live = [...previews.keys()]; if (!live.length) { msg.textContent = "nothing to save"; return; } const name = "scene " + (Object.keys(scenes).length + 1); scenes[name] = { tiles: live, groups: Object.fromEntries(Object.entries(groups).map(([k, v]) => [k, [...v]])) }; try { localStorage.setItem(SCENE_KEY, JSON.stringify(scenes)); } catch { /* full */ } refreshScenes(); msg.textContent = `saved ${name}`; });
+  sceneList.addEventListener("change", () => { const s = scenes[sceneList.value]; if (!s) return; [...previews.keys()].forEach(removePreview); soloSet.clear(); manualMute.clear(); for (const k of Object.keys(groups)) { groups[k].clear(); (s.groups?.[k] || []).forEach(ed => groups[k].add(ed)); } persistGroups(); refreshGroupBtns(); launchSet(s.tiles); msg.textContent = `recalled ${sceneList.value}`; sceneList.value = ""; });
+  $("sceneClear").addEventListener("click", () => { scenes = {}; try { localStorage.removeItem(SCENE_KEY); } catch { /* noop */ } refreshScenes(); });
+
+  /* ================= SESSION RECORDER — record the whole live set as a song =================
+   * Hooks in the primitives above stream every tile on/off and mix move into
+   * `sessionRec.events`, tick-timed to the shared transport. Stop → validate →
+   * save JSON. ▶ song replays it non-interactively: the mosaic plays itself. */
+  function setVoicesLabel() { $("voices").textContent = `voices ${PF.getMaxActive()}`; }
+  function clearAllLive() {
+    suppressSessionRec = true;
+    [...previews.keys()].forEach(removePreview);
+    soloSet.clear(); manualMute.clear(); volumes.clear(); soloedGroup = null;
+    suppressSessionRec = false;
+    applyMix();
+  }
+  function setSessionUI() {
+    const rec = $("recSession"), play = $("playSession"), save = $("saveSession");
+    rec.textContent = sessionRec ? "■ stop set" : "● rec set";
+    rec.classList.toggle("rec", !!sessionRec);
+    rec.disabled = playingSession;
+    play.disabled = !lastSession || !!sessionRec || playingSession;
+    save.disabled = !lastSession || !!sessionRec;
+    $("loadSession").disabled = !!sessionRec || playingSession;
+  }
+  async function startSessionRec() {
+    if (sessionRec) return;
+    if (playingSession) stopSessionPlay(false);
+    await PF.ensureAudio();
+    const startTick = PF.transportTick(), events = [];
+    // Seed t=0 with the current live state so the song stands alone.
+    for (const ed of previews.keys()) {
+      events.push({ t: 0, k: "on", ed });
+      const v = volumes.has(ed) ? volumes.get(ed) : 1;
+      if (v < 0.999) events.push({ t: 0, k: "vol", ed, v });
+    }
+    for (const ed of soloSet) events.push({ t: 0, k: "solo", ed, on: true });
+    for (const ed of manualMute) events.push({ t: 0, k: "mute", ed, on: true });
+    if (PF.getMaxActive() === 16) events.push({ t: 0, k: "voices", n: 16 });
+    sessionRec = { startTick, events };
+    setSessionUI(); syncLive();
+    msg.textContent = "● recording the set — perform the mosaic, then ■ to stop & save";
+  }
+  function stopSessionRec(auto) {
+    if (!sessionRec) return null;
+    const rec = sessionRec; sessionRec = null;
+    const events = rec.events;
+    if (!events.length) { setSessionUI(); syncLive(); msg.textContent = "nothing recorded"; return null; }
+    const lastT = events[events.length - 1].t;
+    const durationTicks = Math.max(lastT + G.TICKS_PER_BAR, PF.transportTick() - rec.startTick);
+    try {
+      lastSession = PS.validateSession(PS.createSession(
+        { collectionId: G.COLLECTION_ID, engineVersion: G.ENGINE_VERSION, bpm: G.MUSIC.bpm, ppq: G.MUSIC.ppq, voices: PF.getMaxActive() },
+        events, durationTicks
+      ));
+      const bars = (durationTicks / G.TICKS_PER_BAR).toFixed(1);
+      msg.textContent = `${auto ? "session full — " : ""}captured ${events.length} moves · ${bars} bars — ⇩ save or ▶ song`;
+    } catch (e) { lastSession = null; msg.textContent = `session rejected: ${e.message}`; }
+    setSessionUI(); syncLive();
+    return lastSession;
+  }
+  function downloadSession() {
+    if (!lastSession) { msg.textContent = "record a session first"; return; }
+    const j = JSON.stringify(lastSession);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([j], { type: "application/json" }));
+    a.download = `xtrata-session-${lastSession.events.length}moves.json`;
+    a.click(); URL.revokeObjectURL(a.href);
+    msg.textContent = `saved session · ${j.length} bytes`;
+  }
+  function applySessionEvent(e) {
+    switch (e.k) {
+      case "on": startPreview(e.ed); break;
+      case "off": removePreview(e.ed); break;
+      case "vol": { const inst = previews.get(e.ed); if (inst) { inst.setVolume(e.v); volumes.set(e.ed, e.v); } break; }
+      case "solo": if (e.on) soloSet.add(e.ed); else soloSet.delete(e.ed); break;
+      case "mute": if (e.on) manualMute.add(e.ed); else manualMute.delete(e.ed); break;
+      case "clearSolo": soloSet.clear(); break;
+      case "clearMute": manualMute.clear(); break;
+      case "voices": PF.setMaxActive(e.n); setVoicesLabel(); break;
+    }
+    applyMix();
+  }
+  async function playSession() {
+    if (!lastSession || sessionRec || playingSession) return;
+    const song = lastSession;
+    await PF.ensureAudio();
+    clearAllLive();
+    PF.setMaxActive(song.voices); setVoicesLabel();
+    playingSession = true; stage.classList.add("playing"); canvas.style.cursor = "default"; setSessionUI(); syncLive();
+    const t0 = PF.transportTick(), events = song.events, dur = song.durationTicks;
+    let i = 0;
+    const timer = setInterval(() => {
+      const now = PF.transportTick() - t0;
+      while (i < events.length && events[i].t <= now) applySessionEvent(events[i++]);
+      tip.textContent = `▶ SONG · ${Math.min(100, Math.round(100 * now / Math.max(1, dur)))}%`;
+      if (i >= events.length && now >= dur) endSessionPlay();
+    }, 30);
+    sessionPlay = { timer };
+  }
+  function endSessionPlay() {                       // natural finish: let loops ring out
+    [...previews.keys()].forEach(stopPreviewMusical);
+    stopSessionPlay(true);
+    tip.textContent = "▶ SONG · finished"; msg.textContent = "song finished";
+  }
+  function stopSessionPlay(natural) {
+    if (sessionPlay) { clearInterval(sessionPlay.timer); sessionPlay = null; }
+    playingSession = false; stage.classList.remove("playing"); applyModeCursor();
+    if (!natural) { clearAllLive(); tip.textContent = "song stopped"; msg.textContent = "song stopped"; }
+    setSessionUI(); syncLive();
+  }
+  $("recSession").addEventListener("click", () => { if (sessionRec) stopSessionRec(false); else startSessionRec(); });
+  $("playSession").addEventListener("click", playSession);
+  $("saveSession").addEventListener("click", downloadSession);
+  $("songStop").addEventListener("click", () => stopSessionPlay(false));
+  $("loadSession").addEventListener("click", () => $("sessionFile").click());
+  $("sessionFile").addEventListener("change", ev => {
+    const f = ev.target.files?.[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => { try { lastSession = PS.validateSession(r.result); setSessionUI(); syncLive(); msg.textContent = `loaded session · ${lastSession.events.length} moves — ▶ song`; } catch (e) { msg.textContent = `rejected: ${e.message}`; } };
+    r.readAsText(f); ev.target.value = "";
+  });
+  setSessionUI();
+
+  /* ================= ON-CHAIN REVEAL (Xtrata ownership) + SIMULATION =========
+   * Live: a MintProvider reveals editions whose Xtrata token has left the
+   * treasury (owner != treasury) — read through a pluggable source, selected by
+   * a `pof-chain` config block (script tag or URL params). SimMint is the local
+   * test double: a seeded shuffle revealed 32 at a time, to preview the scatter
+   * before anything is distributed. See docs/onchain-reveal-plan.md. */
+  const BATCH = 32, TOTAL = G.COLLECTION_SIZE, MAXBATCH = Math.ceil(TOTAL / BATCH);
+  function strToU32(s) { let h = 2166136261 >>> 0; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+  function shuffleOrder(seedU32) {                 // deterministic Fisher–Yates of [1..TOTAL]
+    const arr = Array.from({ length: TOTAL }, (_, i) => i + 1);
+    const rnd = G.splitmix32((seedU32 >>> 0) || 1);
+    for (let i = TOTAL - 1; i > 0; i--) { const j = (rnd() * (i + 1)) | 0; const t = arr[i]; arr[i] = arr[j]; arr[j] = t; }
+    return arr;
+  }
+  function SimMint(seedStr) {
+    let seed = seedStr || "xtrata-genesis", order = shuffleOrder(strToU32(seed)), batches = 1, cache = new Set();
+    const rebuild = () => { cache = new Set(order.slice(0, Math.min(TOTAL, batches * BATCH))); };
+    rebuild();
+    return {
+      enforced: true, get seed() { return seed; }, get batches() { return batches; }, MAXBATCH,
+      isMinted: ed => cache.has(ed), mintedSet: () => cache, count: () => cache.size,
+      setSeed(s) { seed = (s || seed).trim() || seed; order = shuffleOrder(strToU32(seed)); rebuild(); },
+      next() { if (batches < MAXBATCH) batches++; rebuild(); return batches; },
+      prev() { if (batches > 0) batches--; rebuild(); return batches; },
+      all() { batches = MAXBATCH; rebuild(); }, reset() { batches = 1; rebuild(); }
+    };
+  }
+  function refreshMint() { mosaic.setMinted(mint ? [...mint.mintedSet()] : null); applyMix(); syncLive(); }
+
+  /* Config: a `<script id="pof-chain" type="application/json">` block (baked in
+   * at inscription) or URL params. Fields: network, collection (contract),
+   * treasury (address), holdersUrl (JSON endpoint), childrenUrl, pollMs. */
+  function readChainConfig() {
+    let cfg = {};
+    try { const el = document.getElementById("pof-chain"); if (el) cfg = JSON.parse(el.textContent || "{}"); } catch { /* ignore */ }
+    try {
+      const q = new URLSearchParams(location.search);
+      if (q.get("live")) cfg.live = true;
+      for (const k of ["network", "collection", "treasury", "holdersUrl", "childrenUrl"]) if (q.get(k)) cfg[k] = q.get(k);
+      if (q.get("pollMs")) cfg.pollMs = +q.get("pollMs");
+    } catch { /* ignore */ }
+    return cfg;
+  }
+  /* Turn a holders payload into the revealed-edition list (owner != treasury).
+   * Accepts { revealed:[ids] }, an array of {edition,owner}, or an {ed:owner} map. */
+  function revealedFromHolders(data, treasury) {
+    const t = String(treasury || "").toLowerCase();
+    if (Array.isArray(data?.revealed)) return data.revealed.map(Number).filter(n => n >= 1 && n <= TOTAL);
+    const rows = Array.isArray(data) ? data.map(x => [x.edition ?? x.id, x.owner ?? x.holder])
+      : (data && typeof data === "object") ? Object.entries(data) : [];
+    const out = [];
+    for (const [ed, owner] of rows) {
+      const e = Number(ed);
+      if (e >= 1 && e <= TOTAL && owner && String(owner).toLowerCase() !== t) out.push(e);
+    }
+    return out;
+  }
+  function defaultRevealedSource(cfg) {
+    return async () => {
+      if (!cfg.holdersUrl) return [];                       // unconfigured → mosaic stays empty
+      const res = await fetch(cfg.holdersUrl, { headers: { accept: "application/json" } });
+      if (!res.ok) throw new Error("holders " + res.status);
+      return revealedFromHolders(await res.json(), cfg.treasury);
+    };
+  }
+  /* LiveMint — reveals editions out of the treasury, polling a pluggable source. */
+  function LiveMint(cfg) {
+    let cache = new Set();
+    const source = cfg.revealedSource || defaultRevealedSource(cfg);
+    async function refresh() {
+      try { const r = await source(); if (r) { cache = new Set(r.map(Number)); refreshMint(); } }
+      catch (e) { /* keep last-known set */ }
+    }
+    const timer = setInterval(refresh, Math.max(4000, cfg.pollMs || 15000));
+    refresh();
+    return { enforced: true, isLive: true, isMinted: ed => cache.has(ed), mintedSet: () => cache, count: () => cache.size, refresh, stop() { clearInterval(timer); } };
+  }
+  if (DEBUG) Object.assign(window.__pof || (window.__pof = {}), { revealedFromHolders, LiveMint, SimMint: (s) => SimMint(s), setMint: p => { mint = p; refreshMint(); } });
+
+  const SIM = (() => { try { return new URLSearchParams(location.search).get("sim") === "1"; } catch { return false; } })();
+  const simBar = $("simBar");
+  function updateSimReadout() {
+    if (!mint) return;
+    $("simSeed").value = mint.seed;
+    $("simInfo").textContent = `batch ${mint.batches}/${mint.MAXBATCH} · ${mint.count()}/${TOTAL} inscribed`;
+    $("simNext").disabled = mint.batches >= mint.MAXBATCH;
+    $("simPrev").disabled = mint.batches <= 0;
+  }
+  function simStep(fn) { if (!mint) return; fn(); refreshMint(); updateSimReadout(); }
+  let simAuto = null;
+  function simToggleAuto() {
+    if (simAuto) { clearInterval(simAuto); simAuto = null; $("simAuto").classList.remove("rec"); $("simAuto").textContent = "▶ auto"; return; }
+    $("simAuto").classList.add("rec"); $("simAuto").textContent = "⏸ auto";
+    simAuto = setInterval(() => { if (mint.batches >= mint.MAXBATCH) { simToggleAuto(); return; } simStep(() => mint.next()); }, 900);
+  }
+  if (SIM) {
+    const seed = (() => { try { return new URLSearchParams(location.search).get("seed") || undefined; } catch { return undefined; } })();
+    mint = SimMint(seed);
+    simBar.style.display = "flex";
+    $("simSeed").addEventListener("change", () => simStep(() => mint.setSeed($("simSeed").value)));
+    $("simReroll").addEventListener("click", () => simStep(() => mint.setSeed("seed-" + Math.floor(Math.random() * 1e9))));
+    $("simPrev").addEventListener("click", () => simStep(() => mint.prev()));
+    $("simNext").addEventListener("click", () => simStep(() => mint.next()));
+    $("simAll").addEventListener("click", () => simStep(() => mint.all()));
+    $("simReset").addEventListener("click", () => simStep(() => mint.reset()));
+    $("simAuto").addEventListener("click", simToggleAuto);
+    refreshMint(); updateSimReadout();
+  } else {
+    /* Live reveal: if a pof-chain config is present, read Xtrata ownership;
+     * otherwise leave the mosaic ungated (all editions playable — full demo). */
+    const CHAIN = readChainConfig();
+    if (CHAIN.live || CHAIN.holdersUrl || CHAIN.collection) { mint = LiveMint(CHAIN); }
+  }
+
+  /* ================= SYNTH VIEW (swaps into the square) ================= */
+  const seqPanel = $("seqPanel"), seqBox = $("sequencer");
+  function renderSequencer() {
+    if (!current?.isDrum) { seqPanel.style.display = "none"; return; }
+    seqPanel.style.display = "block";
+    $("seqTitle").textContent = `DRUM · ${current.genome.drum.type.toUpperCase()} · ${current.genome.loopBars} BAR${current.genome.loopBars > 1 ? "S" : ""}`;
+    seqBox.innerHTML = "";
+    current.pattern.forEach((s, i) => {
+      const b = document.createElement("button");
+      b.style.cssText = `aspect-ratio:1;border-radius:3px;padding:0;font-size:8px;` + (s ? `background:${s.accent ? "#f0b55d" : "#1e6a54"};color:#d9fff2;border-color:#65e7bd;opacity:${0.5 + (s.vel ?? 0.7) * 0.5}` : `background:#0b1216;color:#6a8`);
+      b.textContent = (i % 16) + 1;
+      b.onclick = e => { const p = current.pattern.map(x => x && { ...x }); if (e.shiftKey) { if (p[i]) p[i].accent = !p[i].accent; else p[i] = { vel: .9, prob: 1, pitch: 0, accent: true }; } else p[i] = p[i] ? null : { vel: .72, prob: 1, pitch: 0, accent: false }; current.setPattern(p); renderSequencer(); };
+      seqBox.appendChild(b);
+    });
+  }
+  function populateChildSel(edition) {
+    const list = childrenOf(edition), latest = list.length;
+    childSel.innerHTML = `<option value="0">genesis${latest === 0 ? " (default)" : ""}</option>` + list.map(c => `<option value="${c.revision}">rev ${c.revision} · child${c.revision === latest ? " (default)" : ""}</option>`).join("");
+    childSel.value = String(latest);   // latest child is the default
+  }
+  function switchToRevision(rev) {
+    if (!current) return;
+    const list = childrenOf(current.edition);
+    current.stopTransport();
+    if (rev === 0 || !list.length) { current.restorePattern?.(); current.clearPerformance(); void current.playMelody(); msg.textContent = "genesis"; }
+    else { const c = list.find(x => x.revision === rev) || list[list.length - 1]; try { void current.playPerformance(c.perf); msg.textContent = `child rev ${c.revision}`; } catch (e) { current.clearPerformance(); void current.playMelody(); msg.textContent = `rejected: ${e.message}`; } }
+    renderSequencer(); syncLive();
+  }
+  /* Resume the effective default (latest child, else genesis) without disturbing
+   * the status hint — used on open, on clear, and when a take captures nothing. */
+  function playDefault() {
+    if (!current) return;
+    const list = childrenOf(current.edition);
+    current.stopTransport();
+    try { if (list.length) void current.playPerformance(list[list.length - 1].perf); else void current.playMelody(); }
+    catch { current.clearPerformance(); void current.playMelody(); }
+    renderSequencer(); syncLive();
+  }
+  childSel.addEventListener("change", () => switchToRevision(+childSel.value));
+
+  function openInstrument(edition) {
+    if (!isPlayable(edition)) { msg.textContent = "that tile isn't inscribed yet"; return; }
+    reopenAfterClose = previews.has(edition) ? edition : null; // was it part of the live session?
+    suppressSessionRec = true;                                 // opening a synth is not a song event
+    if (previews.has(edition)) removePreview(edition);         // hand the voice to the detailed view (no double-voice)
+    suppressSessionRec = false;
+    current?.destroy(); host.replaceChildren();
+    current = PF.mount(host, { edition, engineId: 0, mode: "instrument", onStateChange: syncLive });
+    current.onPatternEdit = () => renderSequencer();
+    const g = current.genome;
+    $("synthTitle").textContent = `#${String(edition).padStart(4, "0")} · ${g.mosaic.family} · ${g.mosaic.role === "drum" ? g.drum.type : g.synth.arch}`;
+    populateChildSel(edition);
+    renderSequencer();
+    view = "synth"; stage.classList.add("synth");
+    msg.textContent = current.isDrum ? "tap the pad grid to edit the beat · shape tone above" : "play the pad · MIDI/keys Z–M play notes";
+    initMidi();
+    // The default keeps playing while the synth is open (latest child, else genesis).
+    PF.ensureAudio().then(() => playDefault()).catch(() => {});
+    syncLive();
+  }
+  function closeSynth() {
+    const restore = reopenAfterClose; reopenAfterClose = null;
+    // carry the kaos/tone position set in the detail view back to the mosaic tile
+    const carryTone = (current && current.toneShapeDirty) ? { ...current.toneShape } : null;
+    current?.destroy(); current = null;
+    view = "mosaic"; stage.classList.remove("synth");
+    if (restore != null && !previews.has(restore)) {
+      suppressSessionRec = true;                          // restoring after a peek is not a song event
+      const inst = startPreview(restore);                 // keep it live in the session
+      suppressSessionRec = false;
+      if (inst && carryTone) { inst.toneShape = carryTone; inst.toneShapeDirty = true; }
+    }
+    applyMix();               // restore mosaic overlays (state remembered)
+  }
+  $("closeSynth").addEventListener("click", closeSynth);
+
+  /* synth transport / recording */
+  const recordBtn = $("record");
+  $("genesis").addEventListener("click", () => current && current.playMelody());
+  $("clearRec").addEventListener("click", () => { current?.clearPerformance(); if (current) switchToRevision(+childSel.value || 0); msg.textContent = "recording cleared"; });
+  recordBtn.addEventListener("click", () => {
+    if (!current) return;
+    if (current.recording) {
+      const p = current.stopRecording();
+      recordBtn.classList.remove("rec"); recordBtn.textContent = "● record";
+      if (p) { try { void current.playPerformance(); } catch { /* keep silent */ } msg.textContent = `captured ${p.events.length} events — your take is playing · publish to make it the child default`; }
+      else { playDefault(); msg.textContent = "nothing captured — back to default"; }
+    } else {
+      current.startRecording();   // the default stops; your take is captured until you clear it
+      recordBtn.classList.add("rec"); recordBtn.textContent = "■ stop";
+      msg.textContent = "recording — default stopped · play your take, then ■ to switch to it";
+    }
+  });
+  $("replay").addEventListener("click", () => { try { current?.playPerformance(); msg.textContent = "replaying"; } catch (e) { msg.textContent = e.message; } });
+  $("export").addEventListener("click", () => { try { const j = current.exportPerformance(); $("perfIn").value = j; const bl = new Blob([j], { type: "application/json" }); const a = document.createElement("a"); a.href = URL.createObjectURL(bl); a.download = `xtrata-performance-${current.edition}.json`; a.click(); URL.revokeObjectURL(a.href); msg.textContent = `exported ${j.length} bytes`; } catch (e) { msg.textContent = e.message; } });
+  $("load").addEventListener("click", () => { try { const p = current.loadPerformance($("perfIn").value); msg.textContent = `loaded ${p.events.length} events — replay`; } catch (e) { current?.clearPerformance(); msg.textContent = `rejected: ${e.message}`; } });
+  $("propose").addEventListener("click", () => { if (!current?.performance) { msg.textContent = "record or capture first"; return; } try { const c = addChild(current.edition, current.performance); populateChildSel(current.edition); msg.textContent = `published child rev ${c.revision} — now the default (owner-gated on mainnet)`; } catch (e) { msg.textContent = e.message; } });
+  $("seqRandom").addEventListener("click", () => { current?.randomisePattern(); renderSequencer(); });
+  $("seqClear").addEventListener("click", () => { if (current?.isDrum) { const p = current.pattern.map(() => null); p[0] = { vel: .8, prob: 1, pitch: 0, accent: false }; current.setPattern(p); renderSequencer(); } });
+  $("seqRestore").addEventListener("click", () => { current?.restorePattern(); renderSequencer(); });
+
+  /* ---- MIDI + computer keyboard (into the open synth) ---- */
+  let midiAccess = null;
+  const midiInputs = () => { let n = 0; midiAccess?.inputs.forEach(() => n++); return n; };
+  function setMidiStatus() { midiStatusEl.textContent = !navigator.requestMIDIAccess ? "MIDI: not supported here" : midiAccess ? `MIDI: ${midiInputs()} device(s)` : "MIDI: —"; }
+  async function initMidi() {
+    if (midiAccess || !navigator.requestMIDIAccess) { setMidiStatus(); return; }
+    try { midiAccess = await navigator.requestMIDIAccess(); const bind = () => midiAccess.inputs.forEach(i => (i.onmidimessage = onMidi)); bind(); midiAccess.onstatechange = () => { bind(); setMidiStatus(); }; setMidiStatus(); }
+    catch { midiStatusEl.textContent = "MIDI: blocked"; }
+  }
+  function onMidi(e) { const [st, d1, d2] = e.data, cmd = st & 0xf0; if (!current || view !== "synth") return; if (cmd === 0x90 && d2 > 0) current.playMidiNote(d1, d2 / 127); else if (cmd === 0x80 || (cmd === 0x90 && d2 === 0)) current.releaseMidiNote(d1); }
+  const KEY_DEG = { z: 0, x: 1, c: 2, v: 3, b: 4, n: 5, m: 6, a: 7, s: 8, d: 9, q: 0, w: 1, e: 2, r: 3, t: 4, y: 5, u: 6 };
+  const heldKeys = new Set();
+  function degToMidi(g, deg) { const sc = G.MUSIC.scale, oct = Math.floor(deg / sc.length); return g.rootNote + oct * 12 + sc[((deg % sc.length) + sc.length) % sc.length]; }
+  addEventListener("keydown", e => {
+    if (view !== "synth" || !current) return;
+    const tag = e.target?.tagName; if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+    const k = e.key.toLowerCase();
+    if (k in KEY_DEG && !heldKeys.has(k)) { heldKeys.add(k); const note = degToMidi(current.genome, KEY_DEG[k]); current.playMidiNote(note, 0.8); e.preventDefault(); }
+    else if (e.key === "Escape") closeSynth();
+  });
+  addEventListener("keyup", e => { const k = e.key.toLowerCase(); if (heldKeys.has(k)) { heldKeys.delete(k); current?.releaseMidiNote(degToMidi(current.genome, KEY_DEG[k])); } });
+
+  /* ---- global keys (mosaic view) ---- */
+  addEventListener("keydown", e => {
+    if (view === "synth") return;
+    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
+      e.preventDefault();
+      const move = previews.size ? moveActivePattern : mosaic.step;
+      if (e.key === "ArrowLeft") move(-1, 0); else if (e.key === "ArrowRight") move(1, 0); else if (e.key === "ArrowUp") move(0, -1); else move(0, 1);
+    } else if (e.key === "Enter") { e.preventDefault(); openInstrument(mosaic.getSelection()); }
+    else if (e.key === " ") { e.preventDefault(); togglePreview(mosaic.getSelection()); }
+  }, { capture: true });
+
+  syncLive();
+})();
+</script>
+</body>
+</html>
