@@ -35,6 +35,57 @@ const COPIES = [
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 const template = read(COPIES[0]);
 
+describe('inscribed audio player: the tap that asks for sound must make the sound', () => {
+  /**
+   * The SECOND mobile regression in this template, reported the same way as the first:
+   * "#1117 and #1122 play with one click, the new ones need frantic tapping, like a
+   * gate opens every now and then."
+   *
+   * A tap is the browser's permission to make sound, and it is only valid while the
+   * handler is still on the stack. Two places threw it away:
+   *
+   *   1. toggleAudioPlayback returned early when the audio was not buffered yet,
+   *      setting playWhenReady and letting a BUFFERING EVENT call play() later. No
+   *      gesture in scope, so mobile refused it.
+   *   2. Clicking the artwork deferred toggleAudioPlayback through a 300ms setTimeout
+   *      to tell single clicks from double ones. A timer callback carries no gesture
+   *      either, so tapping the cover — the obvious thing to do — could never work.
+   *
+   * The "gate" was isAudioReady: only a tap landing after buffering finished reached
+   * play() synchronously. Hence the tapping, and hence older players being fine.
+   */
+  it('calls play() on the tap even when the audio is still buffering', () => {
+    const fn = template.slice(template.indexOf('const toggleAudioPlayback'),
+                              template.indexOf('const seekBy'));
+    // No early return that skips the play() call.
+    expect(fn).not.toMatch(/if \(!isAudioReady\) \{[\s\S]{0,140}return;/);
+    expect(fn).toContain('audio.play()');
+  });
+
+  it('never starts playback from a buffering event', () => {
+    // markAudioReady runs from progress/canplay handlers. A play() there is refused on
+    // mobile AND races the one the tap already started.
+    const fn = template.slice(template.indexOf('const markAudioReady'),
+                              template.indexOf('const evaluateReadiness'));
+    expect(fn).not.toContain('toggleAudioPlayback()');
+  });
+
+  it('plays the artwork tap immediately rather than on a timer', () => {
+    expect(template).not.toContain('window.setTimeout(toggleAudioPlayback');
+    const handler = template.slice(template.indexOf("cover.addEventListener('click'"),
+                                   template.indexOf("cover.addEventListener('dblclick'"));
+    expect(handler).toContain('toggleAudioPlayback();');
+    // The double-click case is handled by undoing, not by delaying the first click.
+    expect(handler).toContain('resetAudioToStart();');
+  });
+
+  it('never disables the play button while buffering', () => {
+    // A disabled button cannot receive the tap that would authorise playback, so the
+    // only control that still worked was unreachable exactly when it was needed.
+    expect(template).not.toContain('playToggleButton.disabled = !isAudioReady');
+  });
+});
+
 describe('inscribed audio player: controls must survive a finger', () => {
   it('decides once whether the device can hover', () => {
     expect(template).toContain("window.matchMedia('(hover: hover)').matches");
