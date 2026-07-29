@@ -82,12 +82,12 @@
   <div class="card">
     <span class="tag">⚡ one payment → full player on-chain</span>
     <h1 class="suno-logo"><img src="/suno-more/assets/suno-more-logo.webp" alt="SUNO More — one song, infinite possibilities" /></h1>
-    <p class="lead">You made the song — now do more with it. Drop a Suno MP3 and pay once: your browser optimises the audio to Opus, pulls in the cover art, title, artist &amp; lyrics, and builds a self-contained player. The agent inscribes the master and returns the token + receipt to your wallet, change refunded.</p>
+    <p class="lead">You made the song — now do more with it. Drop any audio and pay once: your browser optimises it to Opus, pulls in whatever cover art, title, artist &amp; lyrics the file already carries, and builds a self-contained player. A Suno export arrives with all of that embedded and goes straight through; anything else just asks you for the missing pieces first. The agent inscribes the master and returns the token + receipt to your wallet, change refunded.</p>
     <p class="lead" style="font-size:13.5px;opacity:.85">🔑 <b>Self-custody, start to finish.</b> Your song stays on your machine until you pay, and your deposit goes to a one-shot wallet <b>your own browser creates and controls</b> — never to us. It is emptied and its key destroyed the moment your inscription and change are back with you.</p>
 
-    <input id="picker" type="file" accept="audio/mpeg,.mp3" multiple hidden />
+    <input id="picker" type="file" accept="audio/*,.mp3,.wav,.flac,.m4a,.aac,.ogg,.oga,.opus,.aiff,.aif" multiple hidden />
     <div id="drop" class="drop">
-      <div class="drop-main">Drop your Suno MP3s here</div>
+      <div class="drop-main">Drop your music here</div>
       <div class="drop-sub">or <u>browse</u> — one song, or several for a batch (embedded cover art + title)</div>
     </div>
 
@@ -103,7 +103,7 @@
       <iframe id="previewFrame" title="Player preview" style="width:100%;aspect-ratio:1/1;border:1px solid var(--line);border-radius:12px;background:#10120f;display:block"></iframe>
     </div>
 
-    <!-- BATCH mode: several Suno MP3s → one payment, N players, one receipt (fast isolated core). -->
+    <!-- BATCH mode: several tracks → one payment, N players, one receipt (fast isolated core). -->
     <div id="sunoBatch" style="display:none;margin-top:16px">
       <div id="sbHead" class="muted" style="font-size:12.5px;margin-bottom:10px"></div>
       <div id="sbList"></div>
@@ -235,7 +235,7 @@
 <script src="HTML_Template.js?v=6"></script>
 <script src="suno-build.js?v=7"></script>
 <script src="optimize-image.js?v=1"></script>
-<script src="agent-one.js?v=2026-07-28.3"></script>
+<script src="agent-one.js?v=2026-07-28.4"></script>
 <script>
 const SERVER = { mock:false, net:'mainnet' };
 // Batch state, declared HERE rather than beside its helpers further down. routeDrop and
@@ -250,7 +250,7 @@ const SB={ items:[], dropped:[], active:false, busy:false, quoteRun:0, EST:null,
 // fees on refund loops). Builds are date-stamped (YYYY-MM-DD.N) so a string compare orders them;
 // a NEWER deployed bundle must pass — requiring an exact match wrongly locked the page out
 // whenever the agent shipped ahead of the page.
-const XAO_MIN_AGENT_BUILD='2026-07-28.3';
+const XAO_MIN_AGENT_BUILD='2026-07-28.4';
 let AGENT_STALE=false;
 function checkAgentBuild(){
   const b=window.XAO_AGENT_BUILD||null;
@@ -265,26 +265,39 @@ const $ = (s)=>document.querySelector(s);
 const stx = (u)=>(Number(u)/1e6).toFixed(6).replace(/0+$/,'').replace(/\.$/,'')+' STX';
 const esc = (s)=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function slug(s){ return String(s||'').toLowerCase().replace(/\.[^.]+$/,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,48)||'track'; }
-// SUNO is for Suno MP3 exports ONLY (embedded cover art + title + artist). Everything else
-// (WAV, art-less MP3, etc.) is sent to the modular main wizard.
-const DROP_HTML='<div class="drop-main">Drop your Suno MP3s here</div><div class="drop-sub">or <u>browse</u> — one song, or several for a batch (embedded cover art + title)</div>';
-const MP3_MAX_MB=32;
-function validateSuno(f){
+// SUNO takes ANY audio. A Suno export already carries cover art, title and artist and
+// goes straight through; every other file is built the same way and simply asks for the
+// missing pieces before it can be inscribed.
+const DROP_HTML='<div class="drop-main">Drop your music here</div><div class="drop-sub">or <u>browse</u> — one song, or several for a batch. MP3, WAV, FLAC, M4A, OGG. Suno exports bring their own artwork; anything else, you add it here.</div>';
+// The constraint is BROWSER MEMORY during the encode, not the inscription: the file
+// that goes on-chain is the Opus player, which is a fraction of any of these. Lossless
+// sources are naturally much larger than an MP3, so one generous ceiling serves both.
+const AUDIO_MAX_MB=128;
+// Matches MAX_BATCH_ITEMS in agent-core: the receipt's dependency list is capped at 50
+// by the contract, and parents plus the identity link need the remaining headroom.
+const BATCH_MAX=40;
+const MP3_MAX_MB=AUDIO_MAX_MB;   // legacy name, still referenced in a few messages
+// Any audio the in-browser encoder can read. A Suno export already carries artwork,
+// title and artist and sails through; everything else is built the same way and simply
+// asks for what is missing before it can be inscribed.
+const AUDIO_EXT=['mp3','wav','flac','m4a','aac','ogg','oga','opus','weba','webm','aiff','aif','wma'];
+function validateAudio(f){
   if(!f) return 'No file selected.';
   const ext=((f.name.match(/\.([a-z0-9]+)$/i)||[])[1]||'').toLowerCase();
-  const isMp3 = ext==='mp3' || (f.type||'').toLowerCase()==='audio/mpeg';
-  if(!isMp3) return 'The SUNO page only takes Suno MP3 exports (embedded artwork, title &amp; artist). For WAV / other formats — or to choose artwork & metadata yourself — use the main wizard.';
+  const looksAudio = AUDIO_EXT.includes(ext) || (f.type||'').toLowerCase().startsWith('audio/');
+  if(!looksAudio) return 'That does not look like an audio file. Drop an MP3, WAV, FLAC, M4A or OGG — anything else belongs in the <a href="./" target="_blank" rel="noopener" style="color:var(--acc2)">main wizard</a>.';
   const mb=f.size/1048576;
-  if(mb>MP3_MAX_MB) return 'MP3s are capped at '+MP3_MAX_MB+' MiB here — yours is '+mb.toFixed(1)+' MiB.';
+  if(mb>AUDIO_MAX_MB) return 'Audio is capped at '+AUDIO_MAX_MB+' MiB here (the encode runs in your browser) — yours is '+mb.toFixed(1)+' MiB.';
   return null;
 }
+const validateSuno=validateAudio;   // old name, same check
 // Block + redirect: reset the page and offer the modular main wizard.
 function rejectToWizard(msg){
   FILE=null;PLAYER=null;META=null;EST=null; if(poll){clearInterval(poll);poll=null;}
   drop.classList.remove('has'); drop.innerHTML=DROP_HTML;
   $('#quote').className='quote'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc'); $('#result').className='result'; $('#editWrap').style.display='none'; $('#relWrap').style.display='none'; $('#receiptWrap').style.display='none';
   $('#hint').innerHTML='<span class="err">'+msg+'</span><br><a class="btn ghost" href="./" target="_blank" rel="noopener" style="display:inline-block;width:auto;margin-top:10px">Build it in the main wizard →</a>';
-  building=false; $('#go').disabled=true; $('#go').textContent='Drop a Suno MP3 to begin';
+  building=false; $('#go').disabled=true; $('#go').textContent='Drop a track to begin';
 }
 function xa(){ const A=window.XtrataAgent; if(!A) throw new Error('Agent bundle not loaded (agent-one.js).'); return A; }
 // Backendless data layer: former /api/* → window.XtrataAgent.
@@ -368,8 +381,12 @@ async function pickFile(f){
     // GATE: a Suno export must carry embedded cover art + title + artist. Probe before the heavy encode.
     $('#hint').innerHTML='<span class="spin"></span>Checking your track…';
     const p=await window.XtrataSuno.probe(f, (msg)=>{ $('#hint').innerHTML='<span class="spin"></span>'+esc(msg); });
-    const missing=[]; if(!p.hasCover) missing.push('cover art'); if(!p.hasTitle) missing.push('a title'); if(!p.hasArtist) missing.push('an artist');
-    if(missing.length){ rejectToWizard('This MP3 is missing '+missing.join(' / ')+'. The SUNO fast-track needs a Suno export with embedded artwork, title &amp; artist. The main wizard will still build you a full on-chain player — you just choose the artwork and details yourself.'); return; }
+    // ANY MP3 is welcome. A Suno export arrives with artwork, title and artist already
+    // embedded and sails through; anything else is built just the same and simply asks
+    // for the missing pieces before it can be inscribed. Sending someone to another
+    // page to type a title was a heavier bounce than the problem deserved.
+    NEEDS = [];
+    if(!p.hasCover) NEEDS.push('artwork'); if(!p.hasTitle) NEEDS.push('a title'); if(!p.hasArtist) NEEDS.push('an artist');
     $('#hint').innerHTML='<span class="spin"></span>Building your player in-browser…';
     const r=await window.XtrataSuno.build(f, (msg)=>{ $('#hint').innerHTML='<span class="spin"></span>'+esc(msg); });
     PLAYER=r.playerFile; META=r;
@@ -381,8 +398,9 @@ async function pickFile(f){
     // Conversion transparency: source → Opus (Music HQ 96k VBR) → base64-in-player.
     if(r.opusBytes&&r.sourceBytes){ $('#qPlayer').title='MP3 '+mib(r.sourceBytes)+' MiB → Opus 96k VBR '+mib(r.opusBytes)+' MiB (−'+Math.round((1-r.opusBytes/r.sourceBytes)*100)+'%) → +⅓ base64 embedding'; }
     $('#qPay').textContent=stx(EST.requiredUstx)+(EST.stxUsd?(' · ~$'+(Number(EST.requiredUstx)/1e6*EST.stxUsd).toFixed(2)):'');
-    $('#quote').className='quote show'; $('#hint').textContent='';
+    $('#quote').className='quote show';
     prefillEdits(r);
+    refreshNeeds(r);
   }catch(e){ $('#hint').innerHTML='<span class="err">Could not build the player: '+esc(e.message)+'</span>'; }
   building=false; updateGo();
 }
@@ -505,12 +523,33 @@ async function quoteRefresh(){
   updateGo();
 }
 
+// What this track still needs before it can be inscribed. Empty for a Suno export.
+let NEEDS=[];
+// "artwork, a title and an artist" — not "and ... and ...".
+const listOf=(a)=>a.length<2?(a[0]||''):a.slice(0,-1).join(', ')+' and '+a[a.length-1];
+// Re-derived from the BUILT player, not from the original probe: once artwork or a
+// title is supplied and the player rebuilt, the requirement is genuinely gone.
+function refreshNeeds(r){
+  NEEDS=[];
+  if(!(r&&(r.hasCover||r.coverB64))) NEEDS.push('artwork');
+  if(!(r&&r.title)) NEEDS.push('a title');
+  if(!(r&&r.artist)) NEEDS.push('an artist');
+  const hint=$('#hint');
+  if(NEEDS.length){
+    $('#editWrap').style.display='block';
+    $('#editPanel').style.display='block';          // open it — that is where the fix is
+    hint.innerHTML='<span style="color:var(--warn)">Almost there — this track still needs '
+      +esc(listOf(NEEDS))+'. Add '+(NEEDS.length>1?'them':'it')+' below, then Apply changes.</span>';
+  } else { hint.textContent=''; }
+  updateGo();
+}
 function updateGo(){
   if(SB.active){ sbUpdateGo(); return; }   // batch mode drives its own button
   const b=$('#go');
   if(building){ b.disabled=true; b.textContent='Building player…'; return; }
   if(AGENT_STALE&&!SERVER.mock){ b.disabled=true; b.textContent='Agent bundle outdated — redeploy required'; return; }
   if(!FILE||!PLAYER){ b.disabled=true; b.textContent='Drop a track to begin'; return; }
+  if(NEEDS.length){ b.disabled=true; b.textContent='Add '+listOf(NEEDS)+' to continue'; return; }
   if(!SERVER.mock && !WALLET){ b.disabled=true; b.textContent='Connect your wallet to inscribe'; return; }
   const pb=parentBlockingMessage();
   if(pb){ b.disabled=true; b.textContent=pb; return; }
@@ -877,7 +916,7 @@ function resetAll(){ FILE=null;PLAYER=null;META=null;EST=null;JOB=null; if(poll)
   picker.value=''; drop.classList.remove('has'); drop.innerHTML=DROP_HTML;
   $('#quote').className='quote'; $('#prog').className='prog'; $('#result').className='result'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc'); $('#editWrap').style.display='none'; $('#hint').textContent=''; updateGo(); }
 
-// =================== BATCH: several Suno MP3s → one payment, N players ===================
+// =================== BATCH: several tracks → one payment, N players ===================
 // Reuses the isolated page's FAST multi-threaded ffmpeg core (via XtrataSuno.build) and the
 // agent's batch job API (A.estimateBatch + A.createJob({items})). Songs are probed + built
 // SEQUENTIALLY (the shared core runs one command at a time). Songs with no embedded cover art
@@ -898,16 +937,23 @@ function sbResetUI(){ SB.items.forEach(it=>{ if(it.previewUrl){ try{URL.revokeOb
   $('#prog').className='prog'; $('#result').className='result'; $('#sbHint').textContent=''; $('#relWrap').style.display='none'; $('#receiptWrap').style.display='none'; hideEscrow(); updateGo(); }
 function enterSunoBatch(files){
   const key=f=>f.name+'|'+f.size; const have=new Set(SB.items.map(it=>key(it.file)));
-  let bad=0, added=0;
-  for(const f of files){ if(SB.items.length>=40) break;
-    if(validateSuno(f)){ bad++; continue; }
+  let bad=0, added=0, overflow=0;
+  // 40 is the ceiling: the receipt lists every minted token as a dependency and the
+  // contract caps those at 50, leaving headroom for parents and the identity link.
+  // Silently dropping the 41st was worse than refusing it — files simply vanished.
+  for(const f of files){
+    if(SB.items.length>=BATCH_MAX){ overflow++; continue; }
+    if(validateAudio(f)){ bad++; continue; }
     if(have.has(key(f))) continue; have.add(key(f));
     SB.items.push({ file:f, status:'queued', player:null, info:null, previewUrl:null, show:false, err:null }); added++; }
-  if(!SB.items.length){ rejectToWizard('None of those are Suno MP3 exports (embedded artwork, MP3, ≤'+MP3_MAX_MB+' MiB). Use the main wizard to set artwork yourself.'); return; }
+  if(!SB.items.length){ rejectToWizard('None of those look like audio files under '+AUDIO_MAX_MB+' MiB. MP3, WAV, FLAC, M4A and OGG all work here.'); return; }
   sbEnterUI();
-  SB.droppedNote = bad? (bad+' file'+(bad>1?'s':'')+' skipped — not an MP3, or over '+MP3_MAX_MB+' MiB.') : '';
+  const notes=[];
+  if(bad) notes.push(bad+' file'+(bad>1?'s':'')+' skipped — not audio, or over '+AUDIO_MAX_MB+' MiB.');
+  if(overflow) notes.push(overflow+' more did not fit — '+BATCH_MAX+' songs is the maximum per batch. Inscribe these, then start another.');
+  SB.droppedNote = notes.join(' ');
   drop.classList.add('has');
-  drop.innerHTML='<div class="fname">🎵 Batch · '+SB.items.length+' song'+(SB.items.length>1?'s':'')+'</div><div class="fmeta">drop more Suno MP3s to add · click to browse</div>';
+  drop.innerHTML='<div class="fname">🎵 Batch · '+SB.items.length+' song'+(SB.items.length>1?'s':'')+'</div><div class="fmeta">drop more tracks to add · click to browse</div>';
   sbRender(); sbProcess();
 }
 let sbEngineWarned=false;
@@ -920,13 +966,15 @@ async function sbProcess(){
       if(!it) break;
       it.status='probing'; sbRender();
       try{
-        const p=await window.XtrataSuno.probe(it.file,()=>{});
-        if(!p.hasCover){ // auto-drop: this page guarantees embedded artwork
-          SB.dropped.push(it.file.name); SB.items=SB.items.filter(x=>x!==it); sbRender(); sbQuote(); continue; }
+        await window.XtrataSuno.probe(it.file,()=>{});
+        // No longer dropped for missing artwork. Every row already has an artwork
+        // button and a details editor — removing the song told people to fix it
+        // somewhere else while deleting the row that could have fixed it here.
         it.status='building'; sbRender();
         const r=await window.XtrataSuno.build(it.file,()=>{});
         if(it.previewUrl){ try{URL.revokeObjectURL(it.previewUrl);}catch(_e){} it.previewUrl=null; }
         it.player=r.playerFile; it.info=r; it.status='ready'; it.err=null;
+        it.needs=sbNeeds(r);
       }catch(e){ it.status='error'; it.err=(e&&e.message)||String(e); }
       sbRender(); sbQuote();
     }
@@ -937,9 +985,10 @@ function sbRow(it,i){
   const title = it.info? (esc(it.info.title||it.file.name)+(it.info.artist?(' — '+esc(it.info.artist)):'')) : esc(it.file.name);
   const artSrc = it.info&&it.info.coverB64 ? ('data:'+(it.info.coverMime||'image/jpeg')+';base64,'+it.info.coverB64) : '';
   let status;
-  if(it.status==='ready') status='<span class="ok">'+sbMib(it.player.size)+' MiB · Opus'+(it.info&&it.info.hasCover?' + cover':'')+(it.info&&it.info.hasLyrics?' + lyrics':'')+'</span>'+(it.costUstx?(' · <span style="color:var(--acc);font-weight:700">'+sbCostLabel(it.costUstx)+'</span>'):'');
+  if(it.status==='ready'&&it.needs&&it.needs.length) status='<span style="color:var(--warn)">needs '+esc(listOf(it.needs))+' — use 🖼 to add artwork</span>';
+  else if(it.status==='ready') status='<span class="ok">'+sbMib(it.player.size)+' MiB · Opus'+(it.info&&it.info.hasCover?' + cover':'')+(it.info&&it.info.hasLyrics?' + lyrics':'')+'</span>'+(it.costUstx?(' · <span style="color:var(--acc);font-weight:700">'+sbCostLabel(it.costUstx)+'</span>'):'');
   else if(it.status==='building') status='<span style="color:var(--acc2)"><span class="spin"></span>building player…</span>';
-  else if(it.status==='probing') status='<span class="muted"><span class="spin"></span>checking artwork…</span>';
+  else if(it.status==='probing') status='<span class="muted"><span class="spin"></span>reading the track…</span>';
   else if(it.status==='error') status='<span class="err">✗ '+esc(it.err||'failed')+'</span> <a href="#" onclick="sbRetry('+i+');return false" style="margin-left:4px">retry</a>';
   else status='<span class="muted">queued…</span>';
   const btn=(fn,label,title)=>'<button class="btn ghost" style="width:auto;margin:0;padding:4px 9px;font-size:11px" onclick="'+fn+'('+i+')" title="'+title+'">'+label+'</button>';
@@ -964,8 +1013,9 @@ function sbRender(){
     ? '<span class="spin"></span>Building on the fast core — '+ready.length+'/'+total+' player'+(total>1?'s':'')+' ready…'
     : (total? '✓ '+ready.length+' player'+(ready.length>1?'s':'')+' ready — preview each, swap artwork if you like, then inscribe.' : 'No songs yet.');
   $('#sbList').innerHTML = SB.items.map((it,i)=>sbRow(it,i)).join('');
-  $('#sbDropped').textContent = SB.dropped.length
-    ? ('⚠ '+SB.dropped.length+' auto-removed (no embedded artwork): '+SB.dropped.join(', ')+' — add art in the main wizard or single-song editor.')
+  const needy=SB.items.filter(it=>it.status==='ready'&&it.needs&&it.needs.length).length;
+  $('#sbDropped').textContent = needy
+    ? (needy+' song'+(needy>1?'s':'')+' still need artwork or details — add them above and the button will unlock.')
     : (SB.droppedNote||'');
   const bytes=ready.reduce((s,it)=>s+it.player.size,0);
   $('#sbCount').textContent = ready.length+' / '+total+(ready.length?(' · '+sbMib(bytes)+' MiB total'):'');
@@ -999,6 +1049,14 @@ async function sbQuote(){
     sbRender();
   }catch(e){ if(run===SB.quoteRun){ $('#sbPay').textContent='—'; SB.EST=null; SB.stxUsd=null; sbUpdateGo(); } }
 }
+// What a built player still lacks. Same rule as the single flow.
+function sbNeeds(r){
+  const n=[];
+  if(!(r&&(r.hasCover||r.coverB64))) n.push('artwork');
+  if(!(r&&r.title)) n.push('a title');
+  if(!(r&&r.artist)) n.push('an artist');
+  return n;
+}
 function sbUpdateGo(){
   const b=$('#sbGo'); if(!b) return;
   const ready=SB.items.filter(it=>it.status==='ready').length;
@@ -1006,6 +1064,8 @@ function sbUpdateGo(){
   if(AGENT_STALE&&!SERVER.mock){ b.disabled=true; b.textContent='Agent bundle outdated — redeploy required'; return; }
   if(busy){ b.disabled=true; b.textContent='Building players…'; return; }
   if(!ready){ b.disabled=true; b.textContent='No players ready'; return; }
+  const incomplete=SB.items.filter(it=>it.status==='ready'&&it.needs&&it.needs.length);
+  if(incomplete.length){ b.disabled=true; b.textContent=incomplete.length+' song'+(incomplete.length>1?'s':'')+' still need artwork or details'; return; }
   if(!SERVER.mock&&!WALLET){ b.disabled=true; b.textContent='Connect your wallet to inscribe'; return; }
   const pb=parentBlockingMessage();
   if(pb){ b.disabled=true; b.textContent=pb; return; }
@@ -1027,6 +1087,7 @@ $('#sbArtPick').onchange=async()=>{
     const r=await window.XtrataSuno.build(it.file,()=>{},{ coverB64:b64, coverMime:cover.type||'image/png' });
     if(it.previewUrl){ try{URL.revokeObjectURL(it.previewUrl);}catch(_e){} it.previewUrl=null; }
     it.player=r.playerFile; it.info=r; it.status='ready'; it.err=null; it.show=true;
+    it.needs=sbNeeds(r);
     $('#sbHint').innerHTML='<span class="ok">✓ Artwork updated — preview refreshed.</span>';
   }catch(e){ it.status=prev==='ready'?'ready':'error'; it.err=(e&&e.message)||String(e); $('#sbHint').innerHTML='<span class="err">Artwork rebuild failed: '+esc(it.err)+'</span>'; }
   sbRender(); sbQuote();
