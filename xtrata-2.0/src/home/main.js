@@ -80,7 +80,20 @@
     } from '/src/lib/drops/sponsored-claim.ts';
     import { campaignHexToBytes } from '/src/lib/drops/campaign-attestation.ts';
     import { getDropsCollectionLockForDrop } from '/src/lib/drops/collection-lock.ts';
-    import { loadDropsActivity } from '/src/lib/drops/history.ts';
+    import { loadDropsActivity, isClaimActivity } from '/src/lib/drops/history.ts';
+    import {
+      applyDropGalleryOwners,
+      buildDropGalleryItems,
+      dropGalleryHref,
+      dropGalleryItemLabel,
+      dropGalleryMediaTarget,
+      dropGalleryOwnerKey,
+      groupDropGalleries,
+      parseDropGallerySelection,
+      selectDropGallery,
+      sortDropGalleryItems,
+      EMPTY_DROP_GALLERY_SELECTION
+    } from '/src/lib/drops/gallery.ts';
     import {
       DEFAULT_DROP_POLICY_RULES,
       hasBnsPolicy,
@@ -11561,6 +11574,20 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       noticeToReveal: null,
       drops: [],
       historyEvents: [],
+      // Per-contract event sources, so a gallery item's key stays bound to the
+      // contract it came from (v1-0 and v1-1 both mint drop ids from zero).
+      historySources: [],
+      // Historic gallery: which one the URL asked for, and the current-owner
+      // join, cached by `${nftContract}:${tokenId}` across re-renders.
+      gallery: {
+        run: 0,
+        loading: false,
+        // Signature of the last painted grid; re-renders that would rebuild the
+        // identical grid are skipped so live iframes are not torn down.
+        signature: '',
+        selection: EMPTY_DROP_GALLERY_SELECTION,
+        owners: new Map()
+      },
       claimRound: 0,
       claimsInFlight: new Set(),
       recentlyClaimed: new Set(),
@@ -11587,7 +11614,15 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       diagnosticsClear: $('dropsDiagnosticsClear'),
       diagnosticsForgetBns: $('dropsDiagnosticsForgetBns'),
       history: $('dropsHistory'),
-      historyList: $('dropsHistoryList')
+      historyList: $('dropsHistoryList'),
+      gallery: $('dropsGallery'),
+      galleryTitle: $('dropsGalleryTitle'),
+      gallerySubtitle: $('dropsGallerySubtitle'),
+      gallerySwitch: $('dropsGallerySwitch'),
+      galleryStatus: $('dropsGalleryStatus'),
+      galleryGrid: $('dropsGalleryGrid'),
+      galleryBack: $('dropsGalleryBack'),
+      galleryEntry: $('dropsGalleryEntry')
     };
     const dropsEntriesForNetwork = () =>
       DROPS_REGISTRY.filter((entry) => entry.network === state.contract.network);
@@ -12617,6 +12652,64 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
     };
 
+    // Paint one resolved media object into a thumbnail slot. Shared by the live
+    // claim grid and the historic gallery so both render an inscription the
+    // same way — and so a null/failed media only ever falls back to the label.
+    const paintDropThumbnail = (slot, media, tokenId) => {
+      if (!slot) return;
+      if (media?.kind === 'html-live') {
+        // REVERTED to rendering the frame directly. Routing these through
+        // liveHtmlFrameManager was correct in principle — it caps concurrent live
+        // frames and shows a poster — but it gates execution on an
+        // IntersectionObserver, and on the live Claim page the tiles never
+        // activated: every card sat on "TAP TO LOAD" and the page looked empty.
+        //
+        // Rendering unconditionally is what shipped for months and works. The white
+        // flash while a nested /i/<id> engine loads is a cosmetic problem and is NOT
+        // worth risking a blank page over. Any retry has to keep the frame rendering
+        // by default and only ADD a poster behind it, never gate on the observer.
+        const frame = document.createElement('iframe');
+        frame.className = 'market-thumb__frame';
+        frame.title = `Inscription #${tokenId} preview`;
+        frame.sandbox = 'allow-scripts';
+        frame.referrerPolicy = 'no-referrer';
+        frame.loading = 'lazy';
+        frame.setAttribute('scrolling', 'no');
+        frame.srcdoc = media.html;
+        slot.replaceChildren(frame);
+        slot.classList.add('market-thumb--media');
+      } else if (media?.kind === 'text') {
+        const pre = document.createElement('div');
+        pre.className = 'market-thumb__snippet';
+        pre.textContent = media.text;
+        slot.replaceChildren(pre);
+        slot.classList.add('market-thumb--media');
+      } else if (media?.kind === 'video' && media.url) {
+        const video = document.createElement('video');
+        video.src = media.url;
+        video.muted = true;
+        video.loop = true;
+        video.autoplay = true;
+        video.playsInline = true;
+        slot.replaceChildren(video);
+        slot.classList.add('market-thumb--media');
+      } else if (media?.url && media.kind !== 'html-live') {
+        const img = document.createElement('img');
+        img.src = media.url;
+        img.alt = `Inscription #${tokenId}`;
+        img.loading = 'lazy';
+        slot.replaceChildren(img);
+        slot.classList.add('market-thumb--media');
+      } else {
+        slot.replaceChildren(
+          Object.assign(document.createElement('span'), {
+            className: 'market-thumb__label',
+            textContent: tokenId === null || tokenId === undefined ? 'No preview' : `#${tokenId}`
+          })
+        );
+      }
+    };
+
     const hydrateDropThumbnails = async (run, drops) => {
       await runLimited(drops, MARKET_THUMB_HYDRATION_CONCURRENCY, async (drop) => {
         if (run !== dropsState.run) return;
@@ -12625,62 +12718,393 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         const slot = dropsDom.listings?.querySelector(
           `[data-drop-thumb="${drop.contractId}:${drop.dropId}"]`
         );
-        if (!slot) return;
-        if (media?.kind === 'html-live') {
-          // REVERTED to rendering the frame directly. Routing these through
-          // liveHtmlFrameManager was correct in principle — it caps concurrent live
-          // frames and shows a poster — but it gates execution on an
-          // IntersectionObserver, and on the live Claim page the tiles never
-          // activated: every card sat on "TAP TO LOAD" and the page looked empty.
-          //
-          // Rendering unconditionally is what shipped for months and works. The white
-          // flash while a nested /i/<id> engine loads is a cosmetic problem and is NOT
-          // worth risking a blank page over. Any retry has to keep the frame rendering
-          // by default and only ADD a poster behind it, never gate on the observer.
-          const frame = document.createElement('iframe');
-          frame.className = 'market-thumb__frame';
-          frame.title = `Inscription #${drop.tokenId} preview`;
-          frame.sandbox = 'allow-scripts';
-          frame.referrerPolicy = 'no-referrer';
-          frame.loading = 'lazy';
-          frame.setAttribute('scrolling', 'no');
-          frame.srcdoc = media.html;
-          slot.replaceChildren(frame);
-          slot.classList.add('market-thumb--media');
-        } else if (media?.kind === 'text') {
-          const pre = document.createElement('div');
-          pre.className = 'market-thumb__snippet';
-          pre.textContent = media.text;
-          slot.replaceChildren(pre);
-          slot.classList.add('market-thumb--media');
-        } else if (media?.kind === 'video' && media.url) {
-          const video = document.createElement('video');
-          video.src = media.url;
-          video.muted = true;
-          video.loop = true;
-          video.autoplay = true;
-          video.playsInline = true;
-          slot.replaceChildren(video);
-          slot.classList.add('market-thumb--media');
-        } else if (media?.url && media.kind !== 'html-live') {
-          const img = document.createElement('img');
-          img.src = media.url;
-          img.alt = `Inscription #${drop.tokenId}`;
-          img.loading = 'lazy';
-          slot.replaceChildren(img);
-          slot.classList.add('market-thumb--media');
-        } else {
-          slot.replaceChildren(
-            Object.assign(document.createElement('span'), {
-              className: 'market-thumb__label',
-              textContent: `#${drop.tokenId}`
-            })
-          );
-        }
+        paintDropThumbnail(slot, media, drop.tokenId);
       });
     };
 
+    // --- historic drop gallery --------------------------------------------
+    //
+    // settle-refund DELETES the contract's Drops map row, so a claimed drop
+    // stops existing in contract state the moment it settles: get-drop returns
+    // none and the drop, its edition and its holder vanish from the page. This
+    // gallery is therefore rebuilt from the durable print events and joined
+    // with live NFT ownership — it must never depend on get-drop.
+    const DROP_GALLERY_OWNER_CONCURRENCY = 4;
+
+    const dropsGalleryEntryFor = (contractId) => {
+      const entries = dropsEntriesForNetwork();
+      return entries.find((entry) => getContractId(entry) === contractId) ?? entries[0] ?? null;
+    };
+
+    // The full item set for the current network: every drop the event feed
+    // remembers, plus the drops still live in contract state.
+    const dropsGalleryItems = () => {
+      const entries = dropsEntriesForNetwork();
+      const fallbackContractId = entries[0] ? getContractId(entries[0]) : '';
+      const liveByContract = new Map();
+      for (const drop of dropsState.drops) {
+        const key = drop.contractId ?? fallbackContractId;
+        liveByContract.set(key, (liveByContract.get(key) ?? []).concat(drop));
+      }
+      const sources = dropsState.historySources.length
+        ? dropsState.historySources
+        : [{ contractId: fallbackContractId, events: dropsState.historyEvents }];
+      const covered = new Set();
+      const items = [];
+      for (const source of sources) {
+        covered.add(source.contractId);
+        items.push(
+          ...buildDropGalleryItems(source.events, {
+            contractId: source.contractId,
+            liveDrops: liveByContract.get(source.contractId) ?? []
+          })
+        );
+      }
+      // A contract whose event feed failed still has live drops worth showing.
+      for (const [contractId, drops] of liveByContract) {
+        if (covered.has(contractId)) continue;
+        items.push(...buildDropGalleryItems([], { contractId, liveDrops: drops }));
+      }
+      return applyDropGalleryOwners(sortDropGalleryItems(items), dropsState.gallery.owners);
+    };
+
+    const DROP_GALLERY_STATUS_BADGES = {
+      claimed: { className: 'badge green', text: 'Claimed' },
+      cancelled: { className: 'badge amber', text: 'Cancelled' },
+      live: { className: 'badge green', text: 'Live now' },
+      unknown: { className: 'badge', text: 'Recorded' }
+    };
+
+    const formatGalleryTimestamp = (iso) => {
+      if (!iso) return '';
+      const date = new Date(iso);
+      return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString();
+    };
+
+    // One "label: wallet" line. The value starts as a short principal and is
+    // upgraded to a BNS name if one resolves — a failed lookup leaves the
+    // address in place rather than blanking the row.
+    const galleryWalletRow = (label, address, { fallback = '—' } = {}) => {
+      const row = document.createElement('div');
+      const key = document.createElement('span');
+      key.className = 'drops-gallery__wallet-label';
+      key.textContent = `${label}:`;
+      const value = document.createElement('span');
+      value.className = 'drops-gallery__wallet-value';
+      if (address) {
+        applyBnsName(value, address);
+      } else {
+        value.textContent = fallback;
+      }
+      row.append(key, value);
+      return row;
+    };
+
+    const paintGalleryOwnerRow = (row, item) => {
+      if (!row) return;
+      row.replaceChildren();
+      if (!item.ownerKnown) {
+        // Unknown owner (still loading, or the read failed): say so quietly and
+        // keep the claiming holder above it as the durable record.
+        row.append(galleryWalletRow('Held by', null, { fallback: 'checking…' }));
+        return;
+      }
+      if (item.owner === item.contractId) {
+        row.append(galleryWalletRow('Held by', null, { fallback: 'drops contract (escrow)' }));
+        return;
+      }
+      const label = item.ownerDiverged ? 'Now held by' : 'Held by';
+      row.append(galleryWalletRow(label, item.owner));
+      if (item.ownerDiverged) {
+        const traded = document.createElement('span');
+        traded.className = 'badge amber';
+        traded.textContent = 'traded on';
+        row.append(traded);
+      }
+    };
+
+    const renderDropGalleryCard = (item, gallery) => {
+      const card = document.createElement('article');
+      card.className = 'market-card drops-gallery__card';
+      card.dataset.status = item.status;
+      card.dataset.galleryItem = item.key;
+
+      const hasToken = item.tokenId !== null && item.tokenId !== undefined;
+      const thumb = document.createElement(hasToken ? 'a' : 'div');
+      thumb.className = 'market-thumb';
+      thumb.dataset.galleryThumb = item.key;
+      if (hasToken) {
+        thumb.href = `/xplorer?token=${item.tokenId}`;
+        thumb.target = '_self';
+        thumb.setAttribute('aria-label', `View inscription #${item.tokenId}`);
+      }
+      thumb.append(
+        Object.assign(document.createElement('span'), {
+          className: 'market-thumb__label',
+          textContent: hasToken ? 'Loading…' : 'No preview'
+        })
+      );
+
+      const badges = document.createElement('div');
+      badges.className = 'market-card__badge-row';
+      const status = DROP_GALLERY_STATUS_BADGES[item.status] ?? DROP_GALLERY_STATUS_BADGES.unknown;
+      badges.append(
+        Object.assign(document.createElement('span'), {
+          className: status.className,
+          textContent: status.text
+        })
+      );
+      if (item.settled) {
+        badges.append(
+          Object.assign(document.createElement('span'), {
+            className: 'badge',
+            textContent: 'settled'
+          })
+        );
+      }
+
+      const caption = document.createElement('div');
+      caption.className = 'drops-gallery__caption';
+      // "of 33" is only true for a whole campaign; a single-drop view holds one
+      // item and would otherwise read "edition 33 of 1".
+      caption.textContent = dropGalleryItemLabel(
+        item,
+        gallery.scope === 'campaign' ? gallery.totals.total : undefined
+      );
+
+      const meta = document.createElement('div');
+      meta.className = 'market-card__meta';
+      const claimedOn = formatGalleryTimestamp(item.claimedAt);
+      meta.textContent = [
+        hasToken ? `Inscription #${item.tokenId}` : 'Inscription unknown',
+        `drop #${item.dropId}`,
+        item.claimBlockHeight ? `block ${item.claimBlockHeight}` : '',
+        claimedOn
+      ]
+        .filter(Boolean)
+        .join(' · ');
+
+      const wallets = document.createElement('div');
+      wallets.className = 'drops-gallery__wallets';
+      wallets.append(galleryWalletRow('Creator', item.creator, { fallback: 'unknown' }));
+      if (item.status === 'claimed') {
+        wallets.append(galleryWalletRow('Claimed by', item.holder, { fallback: 'unknown wallet' }));
+      }
+      const ownerRow = document.createElement('div');
+      ownerRow.dataset.galleryOwner = item.key;
+      paintGalleryOwnerRow(ownerRow, item);
+      wallets.append(ownerRow);
+
+      const actions = document.createElement('div');
+      actions.className = 'market-card__actions';
+      if (hasToken) {
+        const view = document.createElement('a');
+        view.className = 'market-chip';
+        view.href = `/xplorer?token=${item.tokenId}`;
+        view.target = '_self';
+        view.textContent = 'View';
+        actions.append(view);
+      }
+      if (item.claimTxId) {
+        const tx = document.createElement('a');
+        tx.className = 'market-chip';
+        tx.href = `https://explorer.hiro.so/txid/${encodeURIComponent(item.claimTxId)}?chain=${
+          dropsGalleryEntryFor(item.contractId)?.network ?? state.contract.network
+        }`;
+        tx.target = '_blank';
+        tx.rel = 'noopener noreferrer';
+        tx.textContent = 'Claim tx';
+        actions.append(tx);
+      }
+      const permalink = document.createElement('a');
+      permalink.className = 'market-chip';
+      permalink.href = dropGalleryHref({ campaignId: item.campaignId, dropId: item.dropId });
+      permalink.target = '_self';
+      permalink.textContent = 'Permalink';
+      actions.append(permalink);
+
+      card.append(thumb, badges, caption, meta, wallets, actions);
+      return card;
+    };
+
+    const hydrateDropGalleryThumbnails = async (run, items) => {
+      await runLimited(items, MARKET_THUMB_HYDRATION_CONCURRENCY, async (item) => {
+        if (run !== dropsState.gallery.run) return;
+        const target = dropGalleryMediaTarget(item, dropsGalleryEntryFor(item.contractId));
+        // No token id on record (truncated event window): the placeholder tile
+        // stays, and nothing else on the card is affected.
+        if (!target) return;
+        let media = null;
+        try {
+          media = await marketMediaFor(target);
+        } catch {
+          media = null;
+        }
+        if (run !== dropsState.gallery.run) return;
+        const slot = dropsDom.galleryGrid?.querySelector(`[data-gallery-thumb="${item.key}"]`);
+        paintDropThumbnail(slot, media, item.tokenId);
+      });
+    };
+
+    // Current ownership is the one thing the events cannot know: an inscription
+    // claimed months ago may have been traded since. Read it live, one read per
+    // NFT, and patch the owner row in place so thumbnails are never torn down.
+    const hydrateDropGalleryOwners = async (run, items) => {
+      const pending = items.filter((item) => {
+        const key = dropGalleryOwnerKey(item);
+        return key && !dropsState.gallery.owners.has(key);
+      });
+      await runReadOnlyLimited(pending, DROP_GALLERY_OWNER_CONCURRENCY, async (item) => {
+        if (run !== dropsState.gallery.run) return;
+        const key = dropGalleryOwnerKey(item);
+        const entry = dropsGalleryEntryFor(item.contractId);
+        let owner = null;
+        try {
+          owner = await marketClientFor(
+            item.nftContract,
+            entry?.network ?? state.contract.network
+          ).getOwner(item.tokenId, entry?.address ?? state.contract.address);
+        } catch {
+          owner = null; // a failed read must never blank the tile
+        }
+        if (run !== dropsState.gallery.run) return;
+        dropsState.gallery.owners.set(key, owner);
+        const [joined] = applyDropGalleryOwners([item], dropsState.gallery.owners);
+        paintGalleryOwnerRow(
+          dropsDom.galleryGrid?.querySelector(`[data-gallery-owner="${item.key}"]`),
+          joined
+        );
+      });
+    };
+
+    // Links into the gallery from the live Drops page: one chip per campaign,
+    // built from the events so they keep working after every drop has settled.
+    const renderDropGalleryEntryPoints = () => {
+      const host = dropsDom.galleryEntry;
+      if (!host) return;
+      const galleries = groupDropGalleries(dropsGalleryItems()).filter(
+        (gallery) => gallery.totals.total > 0
+      );
+      if (!galleries.length) {
+        host.replaceChildren();
+        return;
+      }
+      const label = document.createElement('span');
+      label.className = 'field-hint';
+      label.textContent = 'Past drops:';
+      const links = galleries.map((gallery) => {
+        const link = document.createElement('a');
+        link.className = 'market-chip';
+        link.target = '_self';
+        link.href = dropGalleryHref(
+          gallery.campaignId === null ? { standalone: true } : { campaignId: gallery.campaignId }
+        );
+        link.textContent = `${gallery.title} · ${gallery.totals.total} drop${
+          gallery.totals.total === 1 ? '' : 's'
+        }`;
+        return link;
+      });
+      const all = document.createElement('a');
+      all.className = 'market-chip';
+      all.target = '_self';
+      all.href = dropGalleryHref({ all: true });
+      all.textContent = 'View gallery — every drop';
+      host.replaceChildren(label, ...links, all);
+    };
+
+    const renderDropGallery = () => {
+      const selection = dropsState.gallery.selection;
+      const host = dropsDom.gallery;
+      if (!host) return;
+      const active = Boolean(selection?.active);
+      host.hidden = !active;
+      document.documentElement.dataset.dropsView = active ? 'gallery' : '';
+      if (!active) return;
+
+      const run = dropsState.gallery.run;
+      const items = dropsGalleryItems();
+      const gallery = selectDropGallery(items, selection);
+      const allGalleries = groupDropGalleries(items);
+
+      // Sibling galleries, so a visitor can move between campaigns without
+      // going back to the live page.
+      if (dropsDom.gallerySwitch) {
+        const chips = allGalleries.map((entry) => {
+          const link = document.createElement('a');
+          link.className = 'market-chip';
+          link.target = '_self';
+          link.href = dropGalleryHref(
+            entry.campaignId === null ? { standalone: true } : { campaignId: entry.campaignId }
+          );
+          link.textContent = `${entry.title} (${entry.totals.total})`;
+          if (gallery && entry.id === gallery.id) link.setAttribute('aria-selected', 'true');
+          return link;
+        });
+        const all = document.createElement('a');
+        all.className = 'market-chip';
+        all.target = '_self';
+        all.href = dropGalleryHref({ all: true });
+        all.textContent = 'Every drop';
+        if (gallery?.id === 'all') all.setAttribute('aria-selected', 'true');
+        dropsDom.gallerySwitch.replaceChildren(...chips, all);
+      }
+
+      if (!gallery) {
+        if (dropsDom.galleryTitle) dropsDom.galleryTitle.textContent = 'Past drops';
+        if (dropsDom.gallerySubtitle) {
+          dropsDom.gallerySubtitle.textContent =
+            'Completed drops are rebuilt from on-chain drop events, so they stay viewable after settlement.';
+        }
+        if (dropsDom.galleryStatus) {
+          dropsDom.galleryStatus.innerHTML = dropsState.gallery.loading
+            ? '<span><strong>Gallery</strong> reading drop events…</span>'
+            : '<span><strong>Gallery</strong> no drops match this link yet.</span>';
+        }
+        dropsDom.galleryGrid?.replaceChildren(
+          Object.assign(document.createElement('p'), {
+            className: 'drops-gallery__empty',
+            textContent: dropsState.gallery.loading
+              ? 'Loading drop history…'
+              : 'No completed drops have been recorded here yet. Once a drop is claimed it appears in this gallery permanently.'
+          })
+        );
+        return;
+      }
+
+      if (dropsDom.galleryTitle) dropsDom.galleryTitle.textContent = gallery.title;
+      if (dropsDom.gallerySubtitle) {
+        const holders = gallery.holders.length;
+        dropsDom.gallerySubtitle.textContent = `${gallery.totals.total} drop${
+          gallery.totals.total === 1 ? '' : 's'
+        } · ${gallery.totals.claimed} claimed by ${holders} wallet${
+          holders === 1 ? '' : 's'
+        }${gallery.totals.live ? ` · ${gallery.totals.live} still live` : ''}${
+          gallery.totals.cancelled ? ` · ${gallery.totals.cancelled} cancelled` : ''
+        }`;
+      }
+      if (dropsDom.galleryStatus) {
+        dropsDom.galleryStatus.innerHTML = dropsState.gallery.loading
+          ? '<span><strong>Gallery</strong> reading drop events…</span>'
+          : '<span><strong>Gallery</strong> rebuilt from on-chain drop events — these records survive settlement.</span>';
+      }
+      const signature = `${gallery.id}|${gallery.items
+        .map((item) => `${item.key}:${item.status}`)
+        .join(',')}`;
+      if (signature === dropsState.gallery.signature && dropsDom.galleryGrid?.childElementCount) {
+        return; // identical grid: keep the mounted previews alive
+      }
+      dropsState.gallery.signature = signature;
+      dropsDom.galleryGrid?.replaceChildren(
+        ...gallery.items.map((item) => renderDropGalleryCard(item, gallery))
+      );
+      void hydrateDropGalleryThumbnails(run, gallery.items);
+      void hydrateDropGalleryOwners(run, gallery.items);
+    };
+
     const renderDropsHistory = () => {
+      // The gallery links live outside the history list, so they are refreshed
+      // even when there is no history list to paint.
+      renderDropGalleryEntryPoints();
       if (!dropsDom.historyList) return;
       const dropEntries = dropsEntriesForNetwork();
       const fallbackEntry = dropEntries[0] ?? null;
@@ -12688,7 +13112,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       for (const drop of dropsState.drops) {
         byDropId.set(drop.dropId.toString(), { ...drop, historyType: 'active', txId: null });
       }
-      const claimEvents = dropsState.historyEvents.filter((event) => event.type === 'claim');
+      // Campaign drops emit "claim-campaign", not "claim". Matching only
+      // "claim" hid every settled campaign drop from the history — and since
+      // settle-refund deletes the on-chain Drops row, the events are the only
+      // record left, so the list rendered empty.
+      const claimEvents = dropsState.historyEvents.filter((event) => isClaimActivity(event.type));
       for (const event of claimEvents) {
         const key = event.dropId.toString();
         const existing = byDropId.get(key);
@@ -12705,6 +13133,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           claimer: event.claimer ?? existing?.claimer ?? null,
           claimedAt: event.blockHeight ? BigInt(event.blockHeight) : (existing?.claimedAt ?? null),
           txId: event.txId ?? existing?.txId ?? null,
+          // Carried so the row can link straight into its campaign gallery.
+          campaignId: event.campaignId ?? existing?.campaignId ?? null,
           historyType: 'claim'
         });
       }
@@ -12774,7 +13204,17 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             dropLink.target = '_self';
             dropLink.textContent = 'Open drop';
           }
-          actions.append(viewLink, dropLink);
+          // The gallery is the only place a settled drop can still be seen, so
+          // every row links into it — not just the claimed ones.
+          const galleryLink = document.createElement('a');
+          galleryLink.className = 'market-chip';
+          galleryLink.target = '_self';
+          galleryLink.href = dropGalleryHref({
+            campaignId: drop.campaignId ?? null,
+            dropId: drop.dropId
+          });
+          galleryLink.textContent = 'Gallery';
+          actions.append(viewLink, dropLink, galleryLink);
 
           row.append(main, claim, actions);
           return row;
@@ -13125,6 +13565,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       if (dropParam && /^\d+$/.test(dropParam)) {
         openDropForToken(dropParam);
       }
+      // ?campaign= / ?item= open the historic gallery on this same page. The
+      // selection is parsed before any read so the gallery can show its own
+      // loading state instead of the live-claim furniture.
+      dropsState.gallery.run += 1;
+      dropsState.gallery.loading = true;
+      dropsState.gallery.signature = '';
+      dropsState.gallery.selection = parseDropGallerySelection(params ?? null);
+      renderDropGallery();
       dropsDom.status.innerHTML = '<span><strong>Drops</strong> loading…</span>';
       try {
         // Drops paint the grid; history only fills the activity list beneath it, and
@@ -13163,13 +13611,26 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           entries.map((entry) => loadDropsActivity({ contract: entry }).catch(() => ({ events: [] })))
         ).then((snapshots) => {
           if (run !== dropsState.run) return;
+          // Keep each contract's events attached to that contract: v1-0 and
+          // v1-1 both number their drops from zero, so a flat list would let
+          // two different drops collide on one gallery tile.
+          dropsState.historySources = snapshots.map((snapshot, index) => ({
+            contractId: snapshot.contractId ?? (entries[index] ? getContractId(entries[index]) : ''),
+            events: snapshot.events ?? []
+          }));
           dropsState.historyEvents = snapshots.flatMap((snapshot) => snapshot.events ?? []);
+          dropsState.gallery.loading = false;
           renderDropsHistory();
+          renderDropGallery();
         });
         await Promise.all([dropsReady, historyReady]);
         if (run !== dropsState.run) return;
+        dropsState.gallery.loading = false;
+        renderDropGallery();
       } catch (error) {
         if (run !== dropsState.run) return;
+        dropsState.gallery.loading = false;
+        renderDropGallery();
         dropsDom.status.innerHTML = '<span><strong>Drops</strong> could not load drops.</span>';
         debugLog('drops', 'load failed', { error: String(error?.message ?? error) });
       }

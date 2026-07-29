@@ -1,4 +1,4 @@
-import { Cl, hexToCV } from '@stacks/transactions';
+import { Cl, ClarityType, hexToCV } from '@stacks/transactions';
 import { getContractId, type ContractConfig } from '../contract/config';
 import { getApiBaseUrls } from '../network/config';
 import {
@@ -9,12 +9,67 @@ import {
   getTupleValue
 } from '../protocol/clarity';
 
+/**
+ * Every drop event the contract emits that describes a drop's lifecycle.
+ *
+ * The campaign variants matter: once a drop is claimed and settled the contract
+ * DELETES its `Drops` row, so these print events are the only durable record of
+ * that drop and its holder. Campaign drops (the v1.1 path) emit
+ * `create-campaign-drop` / `claim-campaign` rather than `create-drop` / `claim`,
+ * and omitting them made every settled campaign drop invisible to the history.
+ */
 export type DropActivityType =
   | 'create-drop'
+  | 'create-campaign-drop'
+  | 'create-campaign'
   | 'claim'
+  | 'claim-campaign'
   | 'claim-fee'
   | 'settle-refund'
   | 'cancel-drop';
+
+const DROP_ACTIVITY_TYPES: readonly DropActivityType[] = [
+  'create-drop',
+  'create-campaign-drop',
+  'create-campaign',
+  'claim',
+  'claim-campaign',
+  'claim-fee',
+  'settle-refund',
+  'cancel-drop'
+];
+
+/** True for both the legacy and campaign claim events. */
+export const isClaimActivity = (type: DropActivityType): boolean =>
+  type === 'claim' || type === 'claim-campaign';
+
+/** True for both the legacy and campaign drop-creation events. */
+export const isCreateActivity = (type: DropActivityType): boolean =>
+  type === 'create-drop' || type === 'create-campaign-drop';
+
+/** Unwrap a uint that may be wrapped in an optional, tolerating either shape. */
+const optionalUInt = (value: unknown, context: string): bigint | undefined => {
+  const cv = value as any;
+  if (!cv) return undefined;
+  if (cv.type === ClarityType.OptionalNone) return undefined;
+  const inner = cv.type === ClarityType.OptionalSome ? cv.value : cv;
+  if (!inner || inner.type !== ClarityType.UInt) return undefined;
+  return expectUInt(inner, context);
+};
+
+/** Hex-encode a (buff 32) that may be wrapped in an optional. */
+const optionalBufferHex = (value: unknown): string | undefined => {
+  const cv = value as any;
+  if (!cv) return undefined;
+  if (cv.type === ClarityType.OptionalNone) return undefined;
+  const inner = cv.type === ClarityType.OptionalSome ? cv.value : cv;
+  if (!inner || inner.type !== ClarityType.Buffer) return undefined;
+  const bytes: Uint8Array = inner.buffer ?? inner.value;
+  if (!bytes) return undefined;
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+};
 
 export type DropActivityEvent = {
   id: string;
@@ -25,6 +80,14 @@ export type DropActivityEvent = {
   creator?: string;
   claimer?: string;
   nftContract?: string;
+  /** Campaign drops only: the campaign this drop belongs to. */
+  campaignId?: bigint;
+  /** Campaign drops only: 0-based position within the campaign. */
+  edition?: bigint;
+  /** Campaign claims only: the BNS key the claim was attested against. */
+  bnsKey?: string;
+  /** create-campaign-drop only: who funded the escrow. */
+  funder?: string;
   txId?: string;
   blockHeight?: number;
   eventIndex?: number;
@@ -101,13 +164,11 @@ const parseDropEventValue = (
     getTupleValue(tuple, 'event', 'drop.event'),
     'drop.event.event'
   ) as DropActivityType;
-  if (
-    type !== 'create-drop' &&
-    type !== 'claim' &&
-    type !== 'claim-fee' &&
-    type !== 'settle-refund' &&
-    type !== 'cancel-drop'
-  ) {
+  if (!DROP_ACTIVITY_TYPES.includes(type)) {
+    return null;
+  }
+  // create-campaign is campaign-scoped and carries no drop-id.
+  if (type === 'create-campaign') {
     return null;
   }
   const dropId = expectUInt(
@@ -121,6 +182,14 @@ const parseDropEventValue = (
   const nftContract = tuple['nft-contract']
     ? expectPrincipal(tuple['nft-contract'], 'drop.event.nft-contract')
     : undefined;
+  const funder = tuple.funder ? expectPrincipal(tuple.funder, 'drop.event.funder') : undefined;
+  // campaign-id and edition are (optional uint) on some events and a bare uint
+  // on others, so unwrap defensively rather than assuming one shape.
+  const campaignId = tuple['campaign-id']
+    ? optionalUInt(tuple['campaign-id'], 'drop.event.campaign-id')
+    : undefined;
+  const edition = tuple.edition ? optionalUInt(tuple.edition, 'drop.event.edition') : undefined;
+  const bnsKey = tuple['bns-key'] ? optionalBufferHex(tuple['bns-key']) : undefined;
   return {
     id: `${meta.txId ?? 'unknown'}:${meta.eventIndex ?? dropId.toString()}:${type}`,
     type,
@@ -130,6 +199,10 @@ const parseDropEventValue = (
     creator,
     claimer,
     nftContract,
+    campaignId,
+    edition,
+    bnsKey,
+    funder,
     txId: meta.txId,
     blockHeight: meta.blockHeight,
     eventIndex: meta.eventIndex,
@@ -154,6 +227,10 @@ const parseDropEvent = (event: HiroContractEvent): DropActivityEvent | null => {
     return null;
   }
 };
+
+/** Exposed for tests: parse one raw Hiro contract event. */
+export const parseDropEventForTest = (event: unknown): DropActivityEvent | null =>
+  parseDropEvent(event as HiroContractEvent);
 
 const fetchDropEventsPage = async (params: {
   baseUrl: string;

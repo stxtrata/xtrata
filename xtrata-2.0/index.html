@@ -783,6 +783,25 @@
           <span class="badge" id="dropsNetworkBadge">mainnet</span>
         </div>
         <div class="panel-body">
+          <!-- Historic drop gallery. A settled drop is DELETED from the
+               contract's Drops map, so this view is rebuilt from the drop print
+               events joined with live NFT ownership. Shown by the ?campaign= /
+               ?item= params on this page; hidden otherwise. -->
+          <section class="drops-gallery" id="dropsGallery" aria-labelledby="dropsGalleryTitle" hidden>
+            <div class="drops-gallery__head">
+              <div>
+                <span class="section-kicker">Historic gallery</span>
+                <h2 class="panel-title" id="dropsGalleryTitle">Past drops</h2>
+                <p class="panel-subtitle" id="dropsGallerySubtitle">
+                  Completed drops and the wallets that hold them.
+                </p>
+              </div>
+              <a class="market-chip" id="dropsGalleryBack" href="/drops">← Live drops</a>
+            </div>
+            <div class="drops-gallery__switch" id="dropsGallerySwitch"></div>
+            <div class="status" id="dropsGalleryStatus"><span>Loading the gallery…</span></div>
+            <div class="drops-gallery__grid" id="dropsGalleryGrid"></div>
+          </section>
           <details class="inscribe-details market-sell" id="dropsCreate">
             <summary>Create a drop</summary>
             <div class="market-sell__body">
@@ -833,6 +852,9 @@
             </div>
           </details>
           <div class="market-listings" id="dropsListings"></div>
+          <!-- Entry point into the historic gallery; the campaign links are
+               built from the drop events, so they survive settlement. -->
+          <div class="drops-gallery-entry" id="dropsGalleryEntry" aria-label="Past drop galleries"></div>
           <details class="inscribe-details drops-history" id="dropsHistory">
             <summary>Drop history</summary>
             <div class="drops-history__list" id="dropsHistoryList"></div>
