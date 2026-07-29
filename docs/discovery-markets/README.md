@@ -41,6 +41,7 @@ work below is about breaking that loop.
 | [05-xtrata-fit.md](05-xtrata-fit.md) | What genuinely belongs on chain, and what does not |
 | [06-open-questions.md](06-open-questions.md) | Regulation, revenue, and the things I cannot resolve |
 | [NOTES.md](NOTES.md) | What changed from the original brief, and next actions |
+| [PITCH.md](PITCH.md) | The same idea with no jargon, written for artists and listeners |
 
 ---
 
