@@ -1,5 +1,6 @@
 import { deserializeCV, listCV, serializeCV, uintCV } from '@stacks/transactions';
 import {
+  MAX_READ_BATCH_SIZE,
   reconstructXtrataInscription,
   type ReconstructionDiagnostics,
   type ReconstructionSource
@@ -26,7 +27,12 @@ export type RuntimeContractRef = {
 };
 
 const CHUNK_FALLBACK_SIZE = 16384n;
-const RUNTIME_MAX_READ_BATCH_SIZE = 30;
+// Keep in step with @xtrata/reconstruction's MAX_READ_BATCH_SIZE — batches above
+// it blow the Clarity read_length budget, so the node rejects every one and the
+// reader crawls through chunks singly (or gives up on large tokens). This was 30
+// and therefore always over the line. See the comment on MAX_READ_BATCH_SIZE in
+// packages/xtrata-reconstruction/src/index.ts for the measurements.
+const RUNTIME_MAX_READ_BATCH_SIZE = MAX_READ_BATCH_SIZE;
 const DEFAULT_RUNTIME_READ_BATCH_SIZE = RUNTIME_MAX_READ_BATCH_SIZE;
 const DEFAULT_RUNTIME_CHUNK_CONCURRENCY = 4;
 const DEFAULT_RUNTIME_CHUNK_RETRIES = 2;

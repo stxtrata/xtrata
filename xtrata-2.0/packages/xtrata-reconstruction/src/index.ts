@@ -352,14 +352,33 @@ const readSingleChunk = async (params: {
   }
 };
 
+// A read-only call may touch at most 500,000 bytes (the Clarity `read_length`
+// budget). Every chunk read costs its CHUNK_SIZE payload plus map-entry
+// overhead, so the batch ceiling is a function of the chunk size, not a number
+// to pick by hand.
+//
+// This used to be a flat 30, which is over the line: the node rejected EVERY
+// batch with CostBalanceExceeded (read_length 513703 against the 500000 limit)
+// and the reader silently fell back to fetching chunks one at a time. Measured
+// on mainnet, token #1107 took 19.1s at 30 and 1.9s at 24, and larger tokens
+// (#1101, #785) gave up altogether with `missing-chunk` after ~36s.
+//
+// Measured boundary is 27: 27 succeeds, 28 trips the limit. We take 24 to keep
+// roughly 12% headroom, because the cost accounting is a node implementation
+// detail that can shift under us and sitting on the edge buys nothing — 24 and
+// 27 time identically (1.49s vs 1.52s on #1107).
+export const MAX_READ_LENGTH = 500_000;
+const READ_LENGTH_SAFETY = 0.8;
+export const MAX_READ_BATCH_SIZE = Math.max(
+  1,
+  Math.floor((MAX_READ_LENGTH * READ_LENGTH_SAFETY) / CHUNK_SIZE)
+);
+
 const normalizeBatchSize = (batchSize: number | undefined) => {
-  if (batchSize === undefined) {
-    return 30;
+  if (batchSize === undefined || !Number.isFinite(batchSize)) {
+    return MAX_READ_BATCH_SIZE;
   }
-  if (!Number.isFinite(batchSize)) {
-    return 30;
-  }
-  return Math.max(1, Math.min(30, Math.floor(batchSize)));
+  return Math.max(1, Math.min(MAX_READ_BATCH_SIZE, Math.floor(batchSize)));
 };
 
 const normalizeConcurrency = (concurrency: number | undefined, total: number) => {

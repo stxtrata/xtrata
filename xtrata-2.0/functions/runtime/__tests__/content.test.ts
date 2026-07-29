@@ -12,7 +12,11 @@ import {
   uintCV
 } from '@stacks/transactions';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { chunkBytes, computeExpectedHash } from '../../../packages/xtrata-reconstruction/src/index';
+import {
+  MAX_READ_BATCH_SIZE,
+  chunkBytes,
+  computeExpectedHash
+} from '../../../packages/xtrata-reconstruction/src/index';
 import { onRequest } from '../content';
 import type { RuntimeEnv } from '../lib';
 
@@ -503,7 +507,9 @@ describe('/runtime/content', () => {
     expect(response.headers.get('X-Xtrata-Runtime-Cache')).toBe('BYPASS');
     expect(response.headers.get('X-Xtrata-Runtime-Reconstruction-Read-Mode')).toBe('mixed');
     expect(response.headers.get('X-Xtrata-Runtime-Reconstruction-Fallback')).toBe('false');
-    expect(response.headers.get('X-Xtrata-Runtime-Read-Batch-Size')).toBe('30');
+    expect(response.headers.get('X-Xtrata-Runtime-Read-Batch-Size')).toBe(
+      String(MAX_READ_BATCH_SIZE)
+    );
     expect(response.headers.get('X-Xtrata-Runtime-Upstream-Requests')).toBe('4');
     expect(response.headers.get('Content-Length')).toBe('3');
     expect(Array.from(new Uint8Array(await response.arrayBuffer()))).toEqual([1, 2, 3]);
