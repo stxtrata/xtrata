@@ -235,7 +235,7 @@
 <script src="HTML_Template.js?v=6"></script>
 <script src="suno-build.js?v=7"></script>
 <script src="optimize-image.js?v=1"></script>
-<script src="agent-one.js?v=2026-07-28.4"></script>
+<script src="agent-one.js?v=2026-07-28.6"></script>
 <script>
 const SERVER = { mock:false, net:'mainnet' };
 // Batch state, declared HERE rather than beside its helpers further down. routeDrop and
@@ -250,7 +250,7 @@ const SB={ items:[], dropped:[], active:false, busy:false, quoteRun:0, EST:null,
 // fees on refund loops). Builds are date-stamped (YYYY-MM-DD.N) so a string compare orders them;
 // a NEWER deployed bundle must pass — requiring an exact match wrongly locked the page out
 // whenever the agent shipped ahead of the page.
-const XAO_MIN_AGENT_BUILD='2026-07-28.4';
+const XAO_MIN_AGENT_BUILD='2026-07-28.6';
 let AGENT_STALE=false;
 function checkAgentBuild(){
   const b=window.XAO_AGENT_BUILD||null;
@@ -269,10 +269,21 @@ function slug(s){ return String(s||'').toLowerCase().replace(/\.[^.]+$/,'').repl
 // goes straight through; every other file is built the same way and simply asks for the
 // missing pieces before it can be inscribed.
 const DROP_HTML='<div class="drop-main">Drop your music here</div><div class="drop-sub">or <u>browse</u> — one song, or several for a batch. MP3, WAV, FLAC, M4A, OGG. Suno exports bring their own artwork; anything else, you add it here.</div>';
-// The constraint is BROWSER MEMORY during the encode, not the inscription: the file
-// that goes on-chain is the Opus player, which is a fraction of any of these. Lossless
-// sources are naturally much larger than an MP3, so one generous ceiling serves both.
+// TWO different limits, on two different files.
+//
+// 1. The SOURCE you drop in. Bounded only by what the in-browser encoder can chew
+//    through, because this file never goes on-chain — it is transcoded to Opus first.
+//    WAV is uncompressed at roughly 10 MiB per minute, so 128 MiB is about a
+//    12-minute lossless master.
 const AUDIO_MAX_MB=128;
+// 2. The PLAYER that actually gets inscribed. This one is the contract's own hard cap:
+//    xtrata-v3-2-3 defines MAX-TOTAL-CHUNKS u2048 * CHUNK-SIZE u16384 = 33,554,432
+//    bytes, and refuses anything larger. Opus at 96k VBR plus the base64 embedding
+//    runs near 1 MiB per minute, so this is roughly a 33-minute track — nowhere near
+//    it for a song, but reachable for a long mix, and worth catching HERE rather than
+//    at seal time when the deposit has already been spent.
+const CHAIN_MAX_BYTES=33554432;
+const CHAIN_MAX_MB=CHAIN_MAX_BYTES/1048576;
 // Matches MAX_BATCH_ITEMS in agent-core: the receipt's dependency list is capped at 50
 // by the contract, and parents plus the identity link need the remaining headroom.
 const BATCH_MAX=40;
@@ -525,12 +536,22 @@ async function quoteRefresh(){
 
 // What this track still needs before it can be inscribed. Empty for a Suno export.
 let NEEDS=[];
+let OVERSIZE=false;   // the built player exceeds what the contract can hold
 // "artwork, a title and an artist" — not "and ... and ...".
 const listOf=(a)=>a.length<2?(a[0]||''):a.slice(0,-1).join(', ')+' and '+a[a.length-1];
 // Re-derived from the BUILT player, not from the original probe: once artwork or a
 // title is supplied and the player rebuilt, the requirement is genuinely gone.
 function refreshNeeds(r){
   NEEDS=[];
+  // The contract will refuse an oversize inscription outright, so catch it before a
+  // deposit is quoted rather than after it has been spent.
+  if(PLAYER&&PLAYER.size>CHAIN_MAX_BYTES){
+    $('#hint').innerHTML='<span class="err">This player is '+(PLAYER.size/1048576).toFixed(1)
+      +' MiB once encoded, and the contract cannot hold more than '+CHAIN_MAX_MB
+      +' MiB in one inscription. That is roughly 33 minutes of audio — try a shorter track, or split it.</span>';
+    OVERSIZE=true; updateGo(); return;
+  }
+  OVERSIZE=false;
   if(!(r&&(r.hasCover||r.coverB64))) NEEDS.push('artwork');
   if(!(r&&r.title)) NEEDS.push('a title');
   if(!(r&&r.artist)) NEEDS.push('an artist');
@@ -549,6 +570,7 @@ function updateGo(){
   if(building){ b.disabled=true; b.textContent='Building player…'; return; }
   if(AGENT_STALE&&!SERVER.mock){ b.disabled=true; b.textContent='Agent bundle outdated — redeploy required'; return; }
   if(!FILE||!PLAYER){ b.disabled=true; b.textContent='Drop a track to begin'; return; }
+  if(OVERSIZE){ b.disabled=true; b.textContent='Too long for one inscription'; return; }
   if(NEEDS.length){ b.disabled=true; b.textContent='Add '+listOf(NEEDS)+' to continue'; return; }
   if(!SERVER.mock && !WALLET){ b.disabled=true; b.textContent='Connect your wallet to inscribe'; return; }
   const pb=parentBlockingMessage();
@@ -1052,6 +1074,9 @@ async function sbQuote(){
 // What a built player still lacks. Same rule as the single flow.
 function sbNeeds(r){
   const n=[];
+  // Each batch item is a SEPARATE inscription, so each player must fit the contract
+  // ceiling on its own — a batch does not pool the allowance.
+  if(r&&r.playerFile&&r.playerFile.size>CHAIN_MAX_BYTES) n.push('a shorter edit (over '+CHAIN_MAX_MB+' MiB inscribed)');
   if(!(r&&(r.hasCover||r.coverB64))) n.push('artwork');
   if(!(r&&r.title)) n.push('a title');
   if(!(r&&r.artist)) n.push('an artist');
