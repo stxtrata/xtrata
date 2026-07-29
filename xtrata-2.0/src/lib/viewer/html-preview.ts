@@ -127,61 +127,6 @@ export const injectGridThumbnailHtml = (html: string) => {
   return injectPreviewContent(html, GRID_PREVIEW_MARKER, style);
 };
 
-const PLAYBACK_SHIM_MARKER = 'data-xtrata-playback-shim';
-
-/**
- * Rescues already-inscribed audio players that cannot play on a phone.
- *
- * Players generated from 2026-07-03 onward decode the WHOLE track to raw PCM at load,
- * purely to draw a waveform. One minute of 48 kHz stereo float32 is ~23 MB, so a long
- * track runs to hundreds of megabytes. Desktop absorbs it; a phone does not, and when
- * the decode blows the frame's memory the <audio> element beside it dies too — the
- * player sits at 0:00 reading "ready to play" and the tap does nothing.
- *
- * The template is fixed going forward, but inscriptions are PERMANENT: every player
- * already on chain would stay broken on mobile forever. This is the one lever we have.
- *
- * Why it is safe rather than a rewrite of someone's artwork:
- *   - the inscribed bytes are untouched, and so is the content hash. This changes the
- *     runtime environment the player is given, exactly as a browser polyfill does, and
- *     the page already injects into <head> for preview styling.
- *   - the player's own decode chain ends in `.catch()`, whose documented behaviour is
- *     "on any failure the seeded placeholder remains". Failing the decode therefore
- *     takes a branch THE AUTHOR WROTE. We are not inventing a fallback.
- *   - it only engages on a memory-constrained device AND an oversized buffer, so
- *     desktop rendering is bit-for-bit what it was.
- *
- * Playback is the product. A waveform is decoration.
- */
-const buildPlaybackShim = () => `<script ${PLAYBACK_SHIM_MARKER}="true">
-(function () {
-  try {
-    var Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx || !Ctx.prototype || typeof Ctx.prototype.decodeAudioData !== 'function') return;
-    var memory = navigator.deviceMemory;
-    var constrained =
-      (typeof memory === 'number' && memory <= 4) ||
-      /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '');
-    if (!constrained) return;
-    var MAX_DECODE_BYTES = 3000000;
-    var original = Ctx.prototype.decodeAudioData;
-    Ctx.prototype.decodeAudioData = function (buffer) {
-      if (buffer && buffer.byteLength > MAX_DECODE_BYTES) {
-        return Promise.reject(
-          new Error('xtrata: waveform decode skipped so playback survives on this device')
-        );
-      }
-      return original.apply(this, arguments);
-    };
-  } catch (_error) {
-    /* a shim must never be the reason a player fails to start */
-  }
-})();
-<\/script>`;
-
-export const injectMobilePlaybackShim = (html: string) =>
-  injectPreviewContent(html, PLAYBACK_SHIM_MARKER, buildPlaybackShim());
-
 export const injectInteractivePreviewHtml = (html: string) =>
   injectPreviewContent(
     html,

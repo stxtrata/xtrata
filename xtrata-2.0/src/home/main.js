@@ -170,8 +170,7 @@
     } from '/src/lib/viewer/cache.ts';
     import {
       injectGridThumbnailHtml,
-      injectInteractivePreviewHtml,
-      injectMobilePlaybackShim
+      injectInteractivePreviewHtml
     } from '/src/lib/viewer/html-preview.ts';
     import {
       buildRuntimeModuleBaseHref,
@@ -3497,11 +3496,9 @@
           frame.allow = INSCRIPTION_FRAME_ALLOW;
         }
         if (options.htmlDoc && !isPdf) {
-          frame.srcdoc = injectMobilePlaybackShim(
-            options.interactiveHtml
-              ? injectInteractivePreviewHtml(options.htmlDoc)
-              : injectGridThumbnailHtml(options.htmlDoc)
-          );
+          frame.srcdoc = options.interactiveHtml
+            ? injectInteractivePreviewHtml(options.htmlDoc)
+            : injectGridThumbnailHtml(options.htmlDoc);
         } else {
           frame.src =
             isPdf && options.pdfSourceUrl
@@ -5959,7 +5956,7 @@
           frame.allow = INSCRIPTION_FRAME_ALLOW;
         }
         if (htmlDoc && !isPdf) {
-          frame.srcdoc = injectMobilePlaybackShim(htmlDoc);
+          frame.srcdoc = htmlDoc;
         } else {
           frame.src = isPdf
             ? getTokenRuntimeContentUrl(token) ?? inscriptionEndpointUrl(token.id)

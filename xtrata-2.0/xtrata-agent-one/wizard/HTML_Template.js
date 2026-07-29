@@ -1410,29 +1410,10 @@ const buildXtrataAudioPlayerHtml = (config) => {
       // Decode the actual audio into peaks for the real waveform. Works for
       // embedded base64 data URIs and remote recursive sources alike; on any
       // failure the seeded placeholder remains.
-      // Decoding the WHOLE track to raw PCM just to draw a waveform costs far more
-      // memory than the track itself: one minute of 48 kHz stereo float32 is ~23 MB,
-      // so a long piece runs to hundreds of MB. Desktop absorbs it. A phone does not,
-      // and when the decode blows the frame's memory budget the <audio> element next
-      // to it dies with it — the player sits at 0:00 saying "ready to play" and the
-      // tap does nothing. Older players had no waveform and were unaffected, which is
-      // exactly why only the newer ones broke on mobile.
-      //
-      // So: skip the decode on anything that looks memory-constrained or oversized,
-      // and keep the seeded placeholder waveform, which this code already treats as
-      // the normal failure path. Playback matters more than a pretty waveform.
-      const MAX_WAVEFORM_SRC_CHARS = 3000000; // ~2.2 MB of audio once base64-decoded
-      const waveformDecodeIsSafe = (src) => {
-        if (src.length > MAX_WAVEFORM_SRC_CHARS) return false;
-        const memory = navigator.deviceMemory;
-        if (typeof memory === 'number' && memory <= 4) return false;
-        return true;
-      };
       const loadRealWaveform = () => {
         const sourceNode = audio.querySelector('source');
         const src = sourceNode ? sourceNode.getAttribute('src') : '';
         if (!src || typeof window.fetch !== 'function') return;
-        if (!waveformDecodeIsSafe(src)) return;
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         if (!AudioContextClass) return;
         fetch(src)
@@ -1618,20 +1599,38 @@ const buildXtrataAudioPlayerHtml = (config) => {
         if (player) player.dataset.transport = 'hidden';
       };
 
+      // Auto-hiding controls is a MOUSE idea. It works because a mouse produces a
+      // continuous pointermove stream that keeps waking them, and because the cursor
+      // can rest over the artwork without touching anything.
+      //
+      // A finger does neither. It produces one pointerdown, then nothing, and
+      // pointerleave fires the instant it lifts. So on a phone every tap was followed
+      // immediately by the controls hiding again, and the next tap landed on something
+      // fading out from under it. That is why playing a track took twenty taps and the
+      // player looked like it was flashing.
+      //
+      // On a device that cannot hover, the controls simply stay put.
+      const CAN_HOVER =
+        typeof window.matchMedia === 'function' && window.matchMedia('(hover: hover)').matches;
+
       const showHoverTransport = () => {
         if (player) player.dataset.transport = 'visible';
         if (hoverHideTimer) window.clearTimeout(hoverHideTimer);
-        hoverHideTimer = window.setTimeout(hideHoverTransport, HOVER_HIDE_DELAY_MS);
+        if (CAN_HOVER) {
+          hoverHideTimer = window.setTimeout(hideHoverTransport, HOVER_HIDE_DELAY_MS);
+        }
         drawHoverWave();
       };
 
       if (cover) {
         cover.addEventListener('pointermove', showHoverTransport);
         cover.addEventListener('pointerdown', showHoverTransport);
-        cover.addEventListener('pointerleave', () => {
-          if (hoverHideTimer) window.clearTimeout(hoverHideTimer);
-          hideHoverTransport();
-        });
+        if (CAN_HOVER) {
+          cover.addEventListener('pointerleave', () => {
+            if (hoverHideTimer) window.clearTimeout(hoverHideTimer);
+            hideHoverTransport();
+          });
+        }
       }
 
       // --- Cursor-idle overlay fade ----------------------------------------
@@ -1643,14 +1642,18 @@ const buildXtrataAudioPlayerHtml = (config) => {
       const wakeOverlays = () => {
         if (player) player.dataset.idle = 'false';
         if (idleTimer) window.clearTimeout(idleTimer);
-        idleTimer = window.setTimeout(goIdle, IDLE_HIDE_DELAY_MS);
+        // Same reasoning as the transport above: without hover there is no movement to
+        // wake these again, so fading them out only takes the controls away.
+        if (CAN_HOVER) idleTimer = window.setTimeout(goIdle, IDLE_HIDE_DELAY_MS);
       };
       if (player) {
         ['pointermove', 'pointerdown', 'keydown'].forEach((eventName) => player.addEventListener(eventName, wakeOverlays));
-        player.addEventListener('pointerleave', () => {
-          if (idleTimer) window.clearTimeout(idleTimer);
-          goIdle();
-        });
+        if (CAN_HOVER) {
+          player.addEventListener('pointerleave', () => {
+            if (idleTimer) window.clearTimeout(idleTimer);
+            goIdle();
+          });
+        }
         wakeOverlays();
       }
 

@@ -1,18 +1,27 @@
 /**
  * Guards on the inscribed audio player template, so a future edit cannot ship a
- * player that plays fine on a laptop and not at all on a phone.
+ * player that behaves on a laptop and not on a phone.
  *
  * These matter more than most tests here because the template is INSCRIBED. Once a
- * player is on chain it is permanent, so a regression is not something we can patch
- * afterwards — every inscription made while it was broken stays broken forever.
+ * player is on chain it is permanent, so a regression cannot be patched afterwards —
+ * every inscription made while it was broken stays broken forever.
  *
- * The bug these exist to prevent, seen on inscription #2883:
- *   loadRealWaveform() decoded the entire track to raw PCM at load time, purely to
- *   draw a waveform. One minute of 48 kHz stereo float32 is ~23 MB, so a long track
- *   runs to hundreds of MB. Desktop absorbed it. iOS did not, and when the decode
- *   blew the frame's memory the <audio> element beside it died too: the player sat
- *   at 0:00 reading "ready to play" and the tap did nothing. Older players had no
- *   waveform, which is why only newer inscriptions broke.
+ * The bug they exist to prevent, shipped on 2026-07-03 in a6e49511 and found on
+ * inscription #2883:
+ *
+ *   The player auto-hid its controls two seconds after the last pointer event, and
+ *   hid them IMMEDIATELY on pointerleave. That is a mouse idea. It works because a
+ *   mouse emits a continuous pointermove stream that keeps waking the controls, and
+ *   because a cursor can rest over the artwork without touching it.
+ *
+ *   A finger does neither. It emits one pointerdown and then nothing, and pointerleave
+ *   fires the instant it lifts. So on a phone every tap was followed at once by the
+ *   controls hiding again, and the next tap landed on something fading out from under
+ *   it. Playing a track took roughly twenty taps and the player appeared to flash.
+ *
+ * Proof it was this and not file size or memory: #1117 is 7.64 MB and plays fine;
+ * #2883 is 6.82 MB and did not. The larger file works. The difference is that #1117
+ * predates the commit that added these timers.
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -26,42 +35,41 @@ const COPIES = [
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 const template = read(COPIES[0]);
 
-describe('inscribed audio player: mobile playability', () => {
-  it('never decodes a whole track to PCM without checking the cost first', () => {
-    expect(template).toContain('const waveformDecodeIsSafe = (src) =>');
-    // The guard must run BEFORE any AudioContext work, or the cost is already paid.
-    const fn = template.slice(
-      template.indexOf('const loadRealWaveform = () =>'),
-      template.indexOf('fetch(src)')
-    );
-    expect(fn).toContain('if (!waveformDecodeIsSafe(src)) return;');
-    expect(fn.indexOf('waveformDecodeIsSafe')).toBeLessThan(
-      fn.indexOf('AudioContextClass') === -1 ? Infinity : fn.indexOf('AudioContextClass')
-    );
+describe('inscribed audio player: controls must survive a finger', () => {
+  it('decides once whether the device can hover', () => {
+    expect(template).toContain("window.matchMedia('(hover: hover)').matches");
+    expect(template).toMatch(/const CAN_HOVER =/);
   });
 
-  it('caps the decode by payload size and by device memory', () => {
-    expect(template).toMatch(/MAX_WAVEFORM_SRC_CHARS = \d+/);
-    expect(template).toContain('src.length > MAX_WAVEFORM_SRC_CHARS');
-    expect(template).toContain('navigator.deviceMemory');
+  it('never starts an auto-hide timer on a device that cannot hover', () => {
+    // Both timers must be gated. Either one left ungated still takes the controls away.
+    expect(template).toContain('if (CAN_HOVER) {\n          hoverHideTimer = window.setTimeout(hideHoverTransport, HOVER_HIDE_DELAY_MS);');
+    expect(template).toContain('if (CAN_HOVER) idleTimer = window.setTimeout(goIdle, IDLE_HIDE_DELAY_MS);');
   });
 
-  it('treats a skipped waveform as normal, never as a failed player', () => {
-    // Playback is the product. The waveform is decoration and must degrade quietly.
-    const fn = template.slice(
-      template.indexOf('const loadRealWaveform = () =>'),
-      template.indexOf('fetch(src)')
-    );
-    expect(fn).not.toMatch(/throw |console\.error/);
+  it('never hides controls on pointerleave without hover', () => {
+    // pointerleave fires the moment a finger lifts, so an ungated handler here hides
+    // the controls on every single tap — the worst version of this bug.
+    for (const marker of ["cover.addEventListener('pointerleave'", "player.addEventListener('pointerleave'"]) {
+      const at = template.indexOf(marker);
+      expect(at, `${marker} not found`).toBeGreaterThan(-1);
+      // The nearest preceding gate must be a CAN_HOVER check.
+      const before = template.slice(Math.max(0, at - 200), at);
+      expect(before, `${marker} is not gated on CAN_HOVER`).toContain('if (CAN_HOVER)');
+    }
+  });
+
+  it('still auto-hides for a mouse, so the desktop design is unchanged', () => {
+    expect(template).toContain('HOVER_HIDE_DELAY_MS = 2000');
+    expect(template).toContain('IDLE_HIDE_DELAY_MS = 2000');
   });
 
   it('coalesces resize redraws to one per frame', () => {
     // iOS fires resize continuously while scrolling as the URL bar hides and shows.
-    // A raw handler here made the controls flash and swallowed taps.
+    // A raw handler here repainted the canvas throughout every scroll.
     expect(template).not.toContain("window.addEventListener('resize', drawHoverWave)");
-    expect(template).toContain('requestAnimationFrame');
     const at = template.indexOf("window.addEventListener('resize'");
-    expect(template.slice(at, at + 260)).toContain('hoverWaveFrame');
+    expect(template.slice(at, at + 260)).toContain('requestAnimationFrame');
   });
 
   it('keeps every copy of the template identical', () => {
