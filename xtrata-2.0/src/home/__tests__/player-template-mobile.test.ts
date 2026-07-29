@@ -87,27 +87,47 @@ describe('inscribed audio player: the tap that asks for sound must make the soun
 });
 
 describe('inscribed audio player: controls must survive a finger', () => {
-  it('decides once whether the device can hover', () => {
-    expect(template).toContain("window.matchMedia('(hover: hover)').matches");
-    expect(template).toMatch(/const CAN_HOVER =/);
+  /**
+   * Round two. Gating the auto-hide timers on '(hover: hover)' was not enough: that
+   * media query describes the DEVICE, and it reports true on iPadOS, on tablets in
+   * desktop mode, and on any phone with a mouse or trackpad paired. On all of those the
+   * controls went straight back to fading out from under a finger.
+   *
+   * pointerType on the actual event is ground truth — a touch says 'touch' whatever the
+   * device claims it is capable of.
+   */
+  it('decides from the pointer actually in use, not from the device', () => {
+    expect(template).not.toContain('CAN_HOVER');
+    expect(template).toContain("event.pointerType === 'mouse'");
+    expect(template).toContain("event.pointerType === 'touch'");
   });
 
-  it('never starts an auto-hide timer on a device that cannot hover', () => {
-    // Both timers must be gated. Either one left ungated still takes the controls away.
-    expect(template).toContain('if (CAN_HOVER) {\n          hoverHideTimer = window.setTimeout(hideHoverTransport, HOVER_HIDE_DELAY_MS);');
-    expect(template).toContain('if (CAN_HOVER) idleTimer = window.setTimeout(goIdle, IDLE_HIDE_DELAY_MS);');
+  it('arms the auto-hide only once a mouse has been seen', () => {
+    expect(template).toContain('if (usingMouse) {\n          hoverHideTimer = window.setTimeout(hideHoverTransport, HOVER_HIDE_DELAY_MS);');
+    expect(template).toContain('if (usingMouse) idleTimer = window.setTimeout(goIdle, IDLE_HIDE_DELAY_MS);');
   });
 
-  it('never hides controls on pointerleave without hover', () => {
-    // pointerleave fires the moment a finger lifts, so an ungated handler here hides
-    // the controls on every single tap — the worst version of this bug.
+  it('lets a touch disarm it again on a device that also has a mouse', () => {
+    // Pairing a trackpad must not permanently condemn the phone to fading controls.
+    expect(template).toContain("if (event && event.pointerType === 'touch') usingMouse = false;");
+  });
+
+  it('never hides on a pointerleave raised by a finger', () => {
+    // pointerleave fires the moment a finger lifts, so acting on it hides the controls
+    // on every single tap — the worst version of this bug.
     for (const marker of ["cover.addEventListener('pointerleave'", "player.addEventListener('pointerleave'"]) {
       const at = template.indexOf(marker);
       expect(at, `${marker} not found`).toBeGreaterThan(-1);
-      // The nearest preceding gate must be a CAN_HOVER check.
-      const before = template.slice(Math.max(0, at - 200), at);
-      expect(before, `${marker} is not gated on CAN_HOVER`).toContain('if (CAN_HOVER)');
+      const handler = template.slice(at, at + 260);
+      expect(handler, `${marker} acts on a touch pointerleave`).toContain("event.pointerType === 'touch'");
     }
+  });
+
+  it('starts with the transport VISIBLE, not hidden', () => {
+    // Hidden at init meant opacity:0 AND pointer-events:none — so on a phone there was
+    // no play button, seek bar or waveform to aim at, only the artwork.
+    expect(template).toContain("player.dataset.transport = 'visible';");
+    expect(template).not.toMatch(/dataset\.transport = 'hidden';\s*\n\s*renderWaveform/);
   });
 
   it('still auto-hides for a mouse, so the desktop design is unchanged', () => {

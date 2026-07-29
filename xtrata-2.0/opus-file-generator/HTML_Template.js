@@ -1614,14 +1614,25 @@ const buildXtrataAudioPlayerHtml = (config) => {
       // fading out from under it. That is why playing a track took twenty taps and the
       // player looked like it was flashing.
       //
-      // On a device that cannot hover, the controls simply stay put.
-      const CAN_HOVER =
-        typeof window.matchMedia === 'function' && window.matchMedia('(hover: hover)').matches;
+      // Gating on the '(hover: hover)' media query was not enough. That is a guess about
+      // the DEVICE, and it is true on iPadOS, on Android tablets in desktop mode, and on
+      // any phone with a trackpad or mouse paired — on all of which the controls went
+      // back to fading out from under a finger.
+      //
+      // The pointerType on the ACTUAL event is ground truth: a touch says 'touch'
+      // whatever the device claims it can do. Auto-hide is therefore armed only once a
+      // real mouse has been seen, and a single touch disarms it again.
+      let usingMouse = false;
+      const notePointerType = (event) => {
+        if (event && event.pointerType === 'touch') usingMouse = false;
+        else if (event && event.pointerType === 'mouse') usingMouse = true;
+      };
 
-      const showHoverTransport = () => {
+      const showHoverTransport = (event) => {
+        notePointerType(event);
         if (player) player.dataset.transport = 'visible';
         if (hoverHideTimer) window.clearTimeout(hoverHideTimer);
-        if (CAN_HOVER) {
+        if (usingMouse) {
           hoverHideTimer = window.setTimeout(hideHoverTransport, HOVER_HIDE_DELAY_MS);
         }
         drawHoverWave();
@@ -1630,12 +1641,11 @@ const buildXtrataAudioPlayerHtml = (config) => {
       if (cover) {
         cover.addEventListener('pointermove', showHoverTransport);
         cover.addEventListener('pointerdown', showHoverTransport);
-        if (CAN_HOVER) {
-          cover.addEventListener('pointerleave', () => {
-            if (hoverHideTimer) window.clearTimeout(hoverHideTimer);
-            hideHoverTransport();
-          });
-        }
+        cover.addEventListener('pointerleave', (event) => {
+          if (!usingMouse || (event && event.pointerType === 'touch')) return;
+          if (hoverHideTimer) window.clearTimeout(hoverHideTimer);
+          hideHoverTransport();
+        });
       }
 
       // --- Cursor-idle overlay fade ----------------------------------------
@@ -1644,17 +1654,19 @@ const buildXtrataAudioPlayerHtml = (config) => {
       const IDLE_HIDE_DELAY_MS = 2000;
       let idleTimer = 0;
       const goIdle = () => { if (player) player.dataset.idle = 'true'; };
-      const wakeOverlays = () => {
+      const wakeOverlays = (event) => {
+        notePointerType(event);
         if (player) player.dataset.idle = 'false';
         if (idleTimer) window.clearTimeout(idleTimer);
-        // Same reasoning as the transport above: without hover there is no movement to
-        // wake these again, so fading them out only takes the controls away.
-        if (CAN_HOVER) idleTimer = window.setTimeout(goIdle, IDLE_HIDE_DELAY_MS);
+        // Same reasoning as the transport above: a finger produces no movement to wake
+        // these again, so fading them only takes the controls away.
+        if (usingMouse) idleTimer = window.setTimeout(goIdle, IDLE_HIDE_DELAY_MS);
       };
       if (player) {
         ['pointermove', 'pointerdown', 'keydown'].forEach((eventName) => player.addEventListener(eventName, wakeOverlays));
-        if (CAN_HOVER) {
-          player.addEventListener('pointerleave', () => {
+        {
+          player.addEventListener('pointerleave', (event) => {
+            if (!usingMouse || (event && event.pointerType === 'touch')) return;
             if (idleTimer) window.clearTimeout(idleTimer);
             goIdle();
           });
@@ -1867,7 +1879,12 @@ const buildXtrataAudioPlayerHtml = (config) => {
       }
 
       wavePeaks = placeholderPeaks();
-      if (player) player.dataset.transport = 'hidden';
+      // Start VISIBLE. Hidden-at-init meant the transport — waveform, seek bar and the
+      // play button itself — was opacity:0 AND pointer-events:none until some pointer
+      // event revealed it. On a phone that left the artwork as the only thing you could
+      // tap, with no visible control to aim at. A mouse hides it again 2s after it
+      // starts moving; a finger never does.
+      if (player) player.dataset.transport = 'visible';
       renderWaveform();
       setPanel('closed');
       updatePlaybackUi();

@@ -139,6 +139,12 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
   let vuLevels = [0, 0, 0, 0, 0, 0];
   let silentSince = 0;
   let silentClockStart = 0;
+  // Has the analyser EVER reported signal? Until it has, a reading of zero is
+  // not evidence about the track — it is equally consistent with the analyser
+  // not working at all, which is the normal state of affairs on iOS. See the
+  // silence detector below.
+  let analyserProven = false;
+  let analyserMuteLogged = false;
   const grille = root.querySelector('.xtrata-radio__grille');
   const vuBars = Array.from(root.querySelectorAll('.xtrata-radio__vu i'));
 
@@ -188,8 +194,31 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
     const contextRunning = !audioContext || audioContext.state === 'running';
     if (totalEnergy > 40) {
       silentSince = 0;
+      analyserProven = true;
     } else if (!contextRunning || player.readyState < 3 || player.seeking) {
       silentSince = 0; // suspended context or buffering — not evidence of silence
+    } else if (!analyserProven) {
+      // THE MOBILE CASE. Every guard above is about the ELEMENT (buffering,
+      // seeking, suspended context) and assumes that when the element is
+      // healthy the analyser is telling the truth. On iOS that assumption is
+      // wrong: createMediaElementSource often yields an analyser that reads a
+      // flat zero for the whole session while the audio plays out loud and the
+      // media clock advances perfectly normally. Every check below then passes,
+      // and the detector skips a song that is audibly playing — one after
+      // another, roughly every 8s, which is the whole station unlistenable on a
+      // phone.
+      //
+      // A reading of zero only means "no audio" if we know the analyser can
+      // report anything else. Until it has done so once, it is not a witness.
+      silentSince = 0;
+      // Once per session, not per frame — this runs on every animation frame.
+      if (!analyserMuteLogged && player.currentTime > 3) {
+        analyserMuteLogged = true;
+        radioLog(
+          'analyser reads flat zero while the clock advances',
+          'silence detection disabled for this session (expected on iOS); the VU meter will not move either'
+        );
+      }
     } else if (player.currentTime > 0.5) {
       if (!silentSince) {
         silentSince = performance.now();
