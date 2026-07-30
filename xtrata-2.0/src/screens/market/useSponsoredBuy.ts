@@ -1,33 +1,30 @@
 import { startJourney, event } from '../../lib/telemetry/client';
 import { classify } from '../../lib/telemetry/classify';
 /**
- * State machine for an STX-free (sponsored) marketplace purchase.
+ * React binding for an STX-free (sponsored) marketplace purchase.
+ *
+ * The decisions this flow makes — how a signing error, a relayer refusal or a
+ * job state reading turn into a phase, and whether a self-paid fallback is safe
+ * to offer — all live in lib/market/sponsored-buy.ts, which the vanilla market
+ * page imports too. This hook owns only the React-shaped parts: state, the
+ * polling effect, and cancellation on unmount or restart.
+ *
  * Wallet signing and the relayer client are injected so the hook is fully
  * render-testable offline.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { SponsorClient } from '../../lib/market/sponsor-client';
 import {
-  SponsorClientError,
-  type SponsorClient,
-  type SponsorJobState
-} from '../../lib/market/sponsor-client';
+  isWalletCancellation,
+  sponsoredBuyFailureFromSignError,
+  sponsoredBuyFailureFromSubmitError,
+  sponsoredBuyPhaseFromJob,
+  type SignSponsoredBuy,
+  type SponsoredBuyPhase
+} from '../../lib/market/sponsored-buy';
+import { isTerminalSponsorJobState } from '../../lib/drops/sponsored-claim';
 
-export type SponsoredBuyPhase =
-  | { phase: 'idle' }
-  | { phase: 'signing' }
-  | { phase: 'submitting' }
-  | { phase: 'sponsoring'; jobId: string; jobState: SponsorJobState; buyTxId?: string }
-  | { phase: 'settled'; jobId: string; buyTxId?: string; refundTxId?: string }
-  | {
-      phase: 'failed';
-      message: string;
-      /** buyer can still complete the purchase paying their own fee */
-      fallbackToSelfPaid: boolean;
-    };
-
-export type SignSponsoredBuy = () => Promise<{ txHex: string } | null>;
-
-const TERMINAL: SponsorJobState[] = ['SETTLED', 'ABANDONED'];
+export type { SponsoredBuyPhase, SignSponsoredBuy };
 
 export const useSponsoredBuy = (params: {
   client: SponsorClient;
@@ -43,9 +40,6 @@ export const useSponsoredBuy = (params: {
   const runToken = useRef(0);
   const journeyRef = useRef<{ id: string } | null>(null);
 
-  const fail = (message: string, fallbackToSelfPaid: boolean) =>
-    setState({ phase: 'failed', message, fallbackToSelfPaid });
-
   const start = useCallback(async () => {
     const token = ++runToken.current;
     const live = () => runToken.current === token;
@@ -57,6 +51,11 @@ export const useSponsoredBuy = (params: {
     try {
       signed = await signSponsoredBuy();
     } catch (error) {
+      if (isWalletCancellation(error)) {
+        event({ journey, step: 'sign', outcome: 'abandon' });
+        if (live()) setState({ phase: 'idle' });
+        return;
+      }
       event({
         journey,
         step: 'sign',
@@ -64,7 +63,9 @@ export const useSponsoredBuy = (params: {
         errorCode: classify(error, 'market_buy'),
         error
       });
-      if (live()) fail(error instanceof Error ? error.message : 'wallet error', true);
+      if (live()) {
+        setState({ phase: 'failed', ...sponsoredBuyFailureFromSignError(error) });
+      }
       return;
     }
     if (!live()) return;
@@ -95,11 +96,7 @@ export const useSponsoredBuy = (params: {
         errorCode: classify(error, 'market_buy'),
         error
       });
-      if (error instanceof SponsorClientError) {
-        fail(error.message, error.fallbackToSelfPaid);
-      } else {
-        fail(error instanceof Error ? error.message : 'sponsor error', true);
-      }
+      setState({ phase: 'failed', ...sponsoredBuyFailureFromSubmitError(error) });
     }
   }, [client, contractId, listingId, signSponsoredBuy]);
 
@@ -108,38 +105,31 @@ export const useSponsoredBuy = (params: {
     if (state.phase !== 'sponsoring') {
       return;
     }
-    const { jobId } = state;
     let cancelled = false;
     const tick = async () => {
       try {
-        const job = await client.status(jobId);
+        const job = await client.status(state.jobId);
         if (cancelled) return;
-        if (job.state === 'SETTLED') {
+        const next = sponsoredBuyPhaseFromJob(job, state);
+        if (!next) return;
+        if (next.phase === 'settled') {
           event({
             flow: 'market_buy',
             journeyId: journeyRef.current?.id,
             step: 'settle',
             outcome: 'success'
           });
-          setState({
-            phase: 'settled',
-            jobId,
-            buyTxId: job.txids.buy,
-            refundTxId: job.txids.refund
-          });
-        } else if (job.state === 'ABANDONED') {
+        } else if (next.phase === 'failed') {
           event({
             flow: 'market_buy',
             journeyId: journeyRef.current?.id,
             step: 'settle',
             outcome: 'error',
             errorCode: 'SPONSOR_REJECTED',
-            error: job.error ?? 'sponsorship abandoned'
+            error: next.message
           });
-          fail(job.error ?? 'sponsorship abandoned', true);
-        } else if (job.state !== state.jobState) {
-          setState({ ...state, jobState: job.state, buyTxId: job.txids.buy });
         }
+        setState(next);
       } catch {
         // transient poll failure: keep waiting
       }
@@ -160,7 +150,5 @@ export const useSponsoredBuy = (params: {
   const busy =
     state.phase === 'signing' || state.phase === 'submitting' || state.phase === 'sponsoring';
 
-  const isTerminalJobState = (s: SponsorJobState) => TERMINAL.includes(s);
-
-  return { state, start, reset, busy, isTerminalJobState };
+  return { state, start, reset, busy, isTerminalJobState: isTerminalSponsorJobState };
 };

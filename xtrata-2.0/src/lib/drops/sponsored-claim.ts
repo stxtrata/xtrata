@@ -1,5 +1,6 @@
 import { startJourney, event } from '../telemetry/client';
 import { classify } from '../telemetry/classify';
+import type { Flow } from '../telemetry/types';
 import {
   AddressVersion,
   AuthType,
@@ -318,6 +319,12 @@ export const submitSponsorClaimWithRetry = async (params: {
   contractId: string;
   listingId: bigint;
   bnsName?: string | null;
+  /**
+   * Telemetry flow. Defaults to the drops claim this helper was written for;
+   * the sponsored market buy in ../market/sponsored-buy.ts passes 'market_buy'
+   * so the two flows stay distinguishable in the journey data.
+   */
+  flow?: Flow;
   retryDelaysMs?: readonly number[];
   wait?: (ms: number) => Promise<void>;
   onRetry?: (
@@ -331,7 +338,8 @@ export const submitSponsorClaimWithRetry = async (params: {
   const retryDelaysMs = params.retryDelaysMs ?? SPONSOR_SUBMIT_RETRY_DELAYS_MS;
   const wait = params.wait ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   const maxAttempts = retryDelaysMs.length + 1;
-  const journey = startJourney('drop_claim', params.contractId);
+  const flow: Flow = params.flow ?? 'drop_claim';
+  const journey = startJourney(flow, params.contractId);
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     event({ journey, attempt, step: 'submit', outcome: 'start' });
@@ -367,7 +375,7 @@ export const submitSponsorClaimWithRetry = async (params: {
           attempt,
           step: 'submit',
           outcome: 'error',
-          errorCode: classify(error, 'drop_claim'),
+          errorCode: classify(error, flow),
           error
         });
         throw error;

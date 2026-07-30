@@ -67,7 +67,15 @@
       buildMarketBuyPostConditions,
       formatMarketPriceWithUsd
     } from '/src/lib/market/settlement.ts';
-    import { isSponsoredMarket } from '/src/lib/market/sponsored.ts';
+    import {
+      getSponsoredBuyEligibility,
+      isSponsoredMarket
+    } from '/src/lib/market/sponsored.ts';
+    import {
+      runSponsoredBuy,
+      sponsoredBuyIneligibilityMessage,
+      sponsoredBuyProgressLabel
+    } from '/src/lib/market/sponsored-buy.ts';
     import {
       SponsorClientError,
       createSponsorClient
@@ -10252,6 +10260,19 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // and content loaders, and the market activity indexer.
     // ------------------------------------------------------------------
     const MARKET_LISTINGS_PER_CONTRACT = 24;
+
+    // Seller-side gate. Sponsored BUYING is wired as of Stage 2 (see
+    // marketSponsoredBuy below), so a seller's escrowed deposit is no longer
+    // dead money. What is still missing is Stage 4: the deposit UX that tells a
+    // seller, before they sign, exactly how much STX they are escrowing and that
+    // it is refundable — charged in STX even on an sBTC or USDCx listing.
+    //
+    // Listing without that disclosure is the part that takes money from someone
+    // who has not been shown the price, so the selector stays closed until the
+    // deposit field ships and the testnet rehearsal in the plan's §5 passes.
+    //
+    // docs/plans/SPONSORED-MARKET-BUY-PLAN.md.
+    const SPONSORED_CHECKOUT_ENABLED = false;
     const MARKET_THUMB_HYDRATION_CONCURRENCY = 4;
     const marketState = {
       filter: 'all',
@@ -10477,7 +10498,185 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
     const marketBuyJourneys = new Map();
 
-    const marketBuy = async (listing) => {
+    // --- sponsored (zero-STX) checkout ------------------------------------
+    // Stage 2 of docs/plans/SPONSORED-MARKET-BUY-PLAN.md. Every decision below
+    // comes from /src/lib/market/sponsored-buy.ts, which the React MarketScreen
+    // imports too, so the two surfaces cannot answer the same question
+    // differently. This page owns only the DOM.
+    //
+    // Deliberately quiet: nothing here advertises free checkout. Restoring that
+    // copy is Stage 3, gated on the testnet rehearsal in the plan's §5. A buyer
+    // who happens to get sponsored simply pays no fee.
+
+    // Relayer messages and txids reach the DOM through innerHTML templates, and
+    // they come from a remote service rather than this page. Escape them.
+    const escapeHtml = (value) => String(value ?? '').replace(
+      /[&<>"']/g,
+      (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+    );
+
+    const marketSponsorClients = new Map();
+    const marketSponsorClientFor = (entry) => {
+      const base = (entry?.sponsorApi ?? '').replace(/\/+$/, '');
+      if (!base) return null;
+      if (!marketSponsorClients.has(base)) {
+        marketSponsorClients.set(base, createSponsorClient(base));
+      }
+      return marketSponsorClients.get(base);
+    };
+
+    /**
+     * Ask the relayer what a sponsored buy would cost and whether it is up.
+     * A quote failure is not an error here: it means "not available", and the
+     * caller falls through to a normal self-paid purchase.
+     */
+    const marketSponsorReadiness = async (client) => {
+      try {
+        const quote = await client.quote();
+        return { available: true, estimatedFeeUstx: quote.estimatedFeeUstx };
+      } catch {
+        return { available: false, estimatedFeeUstx: 0n };
+      }
+    };
+
+    /**
+     * Render a terminal failure with, when it is safe, a button that retries the
+     * same purchase self-paid. `fallbackToSelfPaid` is false when a second
+     * attempt could cost the buyer a miner fee for nothing (listing already
+     * sold, or a sponsored buy that may still be confirming) — see
+     * sponsoredBuyTimeoutFailure in lib/market/sponsored-buy.ts.
+     */
+    const renderMarketSponsorFailure = (listing, phase) => {
+      marketDom.status.innerHTML =
+        `<span><strong>Market</strong> sponsored checkout failed: ${escapeHtml(phase.message)}</span>`;
+      if (!phase.fallbackToSelfPaid) return;
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'market-chip';
+      retry.textContent = 'Pay my own network fee instead';
+      retry.addEventListener('click', () => {
+        void marketBuy(listing, { forceSelfPaid: true });
+      });
+      marketDom.status.append(' ', retry);
+    };
+
+    /**
+     * Returns true when the sponsored path took ownership of this purchase
+     * (whether it succeeded or failed), false when the caller should carry on
+     * to the normal self-paid buy.
+     */
+    const marketSponsoredBuy = async (listing, ctx) => {
+      const client = marketSponsorClientFor(listing.entry);
+      if (!client) return false;
+
+      marketDom.status.innerHTML =
+        '<span><strong>Market</strong> checking sponsored checkout…</span>';
+      const readiness = await marketSponsorReadiness(client);
+      const eligibility = getSponsoredBuyEligibility({
+        market: listing.entry,
+        listing,
+        estimatedFeeUstx: readiness.estimatedFeeUstx,
+        relayerAvailable: readiness.available
+      });
+      if (!eligibility.ok) {
+        // A sold listing is the one refusal a self-paid retry cannot fix.
+        if (eligibility.reason === 'listing-sold') {
+          marketDom.status.innerHTML =
+            `<span><strong>Market</strong> ${escapeHtml(sponsoredBuyIneligibilityMessage(eligibility) ?? 'this listing is unavailable.')}</span>`;
+          return true;
+        }
+        return false;
+      }
+
+      const finalPhase = await runSponsoredBuy({
+        client,
+        contractId: listing.contractId,
+        listingId: listing.listingId,
+        signSponsoredBuy: async () => {
+          // The origin signs at fee 0 and does not broadcast; the relayer
+          // attaches the sponsor signature and pays. A public nonce read is
+          // required because the wallet never sees an unsigned sponsored tx it
+          // can nonce itself.
+          const originNonce = await fetchAddressNonce(
+            state.walletSession.address,
+            listing.entry.network
+          );
+          const payload = await new Promise((resolve, reject) => {
+            showSponsoredContractCall({
+              contractAddress: listing.entry.address,
+              contractName: listing.entry.contractName,
+              functionName: 'buy',
+              functionArgs: [
+                contractPrincipalCV(ctx.nftAddress, ctx.nftName),
+                uintCV(listing.listingId)
+              ],
+              network: listing.entry.network,
+              stxAddress: state.walletSession.address,
+              publicKey: state.walletSession.publicKey,
+              nonce: originNonce,
+              postConditionMode: PostConditionMode.Deny,
+              postConditions: ctx.postConditions,
+              sponsored: true,
+              onFinish: resolve,
+              onCancel: () => reject(Object.assign(
+                new Error('Wallet request cancelled.'),
+                { code: 'WALLET_CANCELLED' }
+              )),
+              onError: (error) => reject(Object.assign(
+                error instanceof Error ? error : new Error(String(error)),
+                { code: error?.code ?? 'WALLET_REQUEST_FAILED' }
+              ))
+            });
+          });
+          const txHex = payload?.txHex ?? payload?.transaction ?? payload?.tx ?? null;
+          if (typeof txHex !== 'string' || txHex.length === 0) {
+            throw new Error('Wallet did not return a signed transaction.');
+          }
+          return { txHex };
+        },
+        onSubmitRetry: (error, attempt, maxAttempts) => {
+          marketDom.status.innerHTML =
+            `<span><strong>Market</strong> sponsor is busy; your signature is still valid, retrying (${attempt + 1}/${maxAttempts})…</span>`;
+        },
+        onPhase: (phase) => {
+          if (phase.phase === 'idle' || phase.phase === 'failed' || phase.phase === 'settled') return;
+          marketDom.status.innerHTML =
+            `<span><strong>Market</strong> ${escapeHtml(sponsoredBuyProgressLabel(phase))}</span>`;
+        }
+      });
+
+      if (finalPhase.phase === 'settled') {
+        telemetryEvent({
+          journey: ctx.journey,
+          attempt: ctx.attempt,
+          step: 'settle',
+          outcome: 'success'
+        });
+        marketBuyJourneys.delete(ctx.target);
+        marketDom.status.innerHTML =
+          `<span><strong>Market</strong> purchase complete — you paid no network fee${finalPhase.buyTxId ? ` — tx ${escapeHtml(finalPhase.buyTxId)}` : ''}.</span><span class="badge green">settled</span>`;
+        return true;
+      }
+      if (finalPhase.phase === 'failed') {
+        telemetryEvent({
+          journey: ctx.journey,
+          attempt: ctx.attempt,
+          step: 'settle',
+          outcome: 'error',
+          errorCode: 'SPONSOR_REJECTED',
+          error: finalPhase.message
+        });
+        renderMarketSponsorFailure(listing, finalPhase);
+        return true;
+      }
+      // idle: the buyer dismissed the wallet. Say so and stop, rather than
+      // reopening it for a self-paid buy they did not ask for.
+      marketBuyJourneys.delete(ctx.target);
+      marketDom.status.innerHTML = '<span><strong>Market</strong> purchase cancelled.</span>';
+      return true;
+    };
+
+    const marketBuy = async (listing, options = {}) => {
       const publicBlockReason = getListingPublicBlockReason(listing);
       if (publicBlockReason) {
         marketDom.status.innerHTML = publicBlockReason === 'legacy-nft'
@@ -10511,6 +10710,23 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         marketBuyJourneys.get(marketTarget) ?? startJourney('market_buy', marketTarget);
       marketBuyJourneys.set(marketTarget, marketJourney);
       const marketAttempt = marketJourney.attempt();
+
+      // Sponsored branch. Anything short of "eligible and the relayer answered"
+      // returns false and drops through to the self-paid call below, so a buyer
+      // is never left without a way to purchase. `forceSelfPaid` is set by the
+      // fallback button rendered on a sponsored failure.
+      if (!options.forceSelfPaid && isSponsoredMarket(listing.entry)) {
+        const handled = await marketSponsoredBuy(listing, {
+          nftAddress,
+          nftName,
+          postConditions,
+          journey: marketJourney,
+          attempt: marketAttempt,
+          target: marketTarget
+        });
+        if (handled) return;
+      }
+
       telemetryEvent({ journey: marketJourney, attempt: marketAttempt, step: 'submit', outcome: 'start' });
       marketDom.status.innerHTML = '<span><strong>Market</strong> confirm the purchase in your wallet…</span>';
       showContractCall({
@@ -10920,8 +11136,13 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         priceBlock.append(detailRow('Listed at block', listing.createdAt.toString()));
       }
       if (isSponsoredMarket(listing.entry) && listing.budgetRemaining !== null) {
+        // Factual only: the budget is genuinely escrowed, but it is not yet
+        // spendable from this page, so do not describe the buy as free.
         priceBlock.append(
-          detailRow('Sponsorship', `no STX needed — fee budget ${formatAssetAmount(listing.budgetRemaining, 6, 'STX')} remaining`)
+          detailRow(
+            'Seller fee deposit',
+            `${formatAssetAmount(listing.budgetRemaining, 6, 'STX')} escrowed — refunds to the seller (sponsored checkout not yet enabled)`
+          )
         );
       }
       frag.append(priceBlock);
@@ -10974,7 +11195,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // Legacy markets stay in the registry so old listings remain readable,
     // but new listings must not go to them — exclude from the sell selector.
     const sellEntries = () =>
-      marketEntriesForNetwork().filter((entry) => !/legacy/i.test(entry.label ?? ''));
+      marketEntriesForNetwork().filter(
+        (entry) =>
+          !/legacy/i.test(entry.label ?? '') &&
+          (SPONSORED_CHECKOUT_ENABLED || !isSponsoredMarket(entry))
+      );
 
     const sellSelectedEntry = () => {
       const id = sellDom.market?.value;
@@ -11177,7 +11402,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           const card = document.createElement('article');
           card.className = 'market-card';
           const symbol = getMarketSettlementLabel(listing.settlement);
-          const sponsored = isSponsoredMarket(listing.entry);
+          // No `sponsored` flag here on purpose: the card must look identical on
+          // every market until Stage 3 restores the sponsorship copy. marketBuy
+          // decides sponsorship at click time from the live relayer state, which
+          // a badge rendered at list time could not honestly reflect anyway.
           const isOwnListing = !!state.walletSession.address &&
             addressesEqual(listing.seller, state.walletSession.address);
 
@@ -11196,9 +11424,15 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
           const badges = document.createElement('div');
           badges.className = 'market-card__badge-row';
+          // Sponsored checkout is NOT wired into this page: marketBuy always
+          // uses showContractCall, so the buyer pays their own network fee on
+          // every market. Until the sponsored buy flow is implemented here (see
+          // docs/plans/SPONSORED-MARKET-BUY-PLAN.md) this must not claim
+          // otherwise — the badge previously said "No STX needed", which sent
+          // zero-STX buyers into a transaction they could not pay for.
           badges.innerHTML = `<span class="badge">${symbol}</span>${
-            sponsored ? '<span class="badge green">No STX needed</span>' : ''
-          }${isOwnListing ? '<span class="badge blue">Your listing</span>' : ''}`;
+            isOwnListing ? '<span class="badge blue">Your listing</span>' : ''
+          }`;
 
           const price = document.createElement('div');
           price.className = 'market-card__price';
@@ -11252,7 +11486,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             const buy = document.createElement('button');
             buy.type = 'button';
             buy.className = 'market-chip';
-            buy.textContent = sponsored ? 'Buy — no STX needed' : 'Buy';
+            // See the badge comment above: every buy on this page is self-paid.
+            buy.textContent = 'Buy';
             buy.addEventListener('click', () => { void marketBuy(listing); });
             actions.append(buy);
           }

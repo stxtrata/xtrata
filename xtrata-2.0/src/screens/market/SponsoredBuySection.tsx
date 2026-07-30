@@ -5,20 +5,12 @@
  */
 import { useSponsoredBuy, type SignSponsoredBuy } from './useSponsoredBuy';
 import type { SponsorClient } from '../../lib/market/sponsor-client';
+import { getSponsoredBuyEligibility } from '../../lib/market/sponsored';
 import {
-  getSponsoredBuyEligibility,
-  type SponsoredBuyEligibility
-} from '../../lib/market/sponsored';
+  sponsoredBuyIneligibilityMessage,
+  sponsoredBuyProgressLabel
+} from '../../lib/market/sponsored-buy';
 import type { MarketRegistryEntry } from '../../lib/market/registry';
-
-const PROGRESS_LABELS: Record<string, string> = {
-  signing: 'Waiting for wallet…',
-  submitting: 'Sending to sponsor…',
-  RECEIVED: 'Sponsoring…',
-  SPONSORED: 'Broadcast — confirming…',
-  CONFIRMED: 'Confirmed — settling…',
-  CLAIMED: 'Settling…'
-};
 
 export type SponsoredBuySectionProps = {
   market: Pick<MarketRegistryEntry, 'sponsored'> | null;
@@ -33,21 +25,6 @@ export type SponsoredBuySectionProps = {
   /** invoked when the user opts for the normal self-paid purchase */
   onSelfPaidBuy: () => void;
   pollIntervalMs?: number;
-};
-
-const ineligibilityMessage = (
-  eligibility: Exclude<SponsoredBuyEligibility, { ok: true }>
-) => {
-  switch (eligibility.reason) {
-    case 'listing-sold':
-      return 'This listing has already been sold.';
-    case 'budget-exhausted':
-      return 'The sponsorship budget for this listing is used up.';
-    case 'relayer-unavailable':
-      return 'Sponsored checkout is temporarily unavailable.';
-    default:
-      return null;
-  }
 };
 
 const SponsoredBuySection = (props: SponsoredBuySectionProps) => {
@@ -102,19 +79,15 @@ const SponsoredBuySection = (props: SponsoredBuySectionProps) => {
   }
 
   if (busy) {
-    const label =
-      state.phase === 'sponsoring'
-        ? PROGRESS_LABELS[state.jobState] ?? 'Sponsoring…'
-        : PROGRESS_LABELS[state.phase] ?? 'Working…';
     return (
       <div className="sponsored-buy sponsored-buy--busy" role="status">
-        <p>{label}</p>
+        <p>{sponsoredBuyProgressLabel(state)}</p>
       </div>
     );
   }
 
   if (!eligibility.ok) {
-    const message = ineligibilityMessage(eligibility);
+    const message = sponsoredBuyIneligibilityMessage(eligibility);
     return (
       <div className="sponsored-buy">
         {message ? <p className="muted">{message}</p> : null}
