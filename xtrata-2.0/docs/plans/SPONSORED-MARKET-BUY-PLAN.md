@@ -1,12 +1,32 @@
 # Sponsored Market Buy — Safe Implementation Plan
 
-Status: **Stages 0–2 done (2026-07-30). Buying is wired; nothing advertises it yet.**
+Status: **Stages 0–2 and 4 done (2026-07-30). Buying is wired, selling is unblocked, nothing advertises free checkout yet.**
 
 - A buyer clicking Buy on a sponsored listing now goes through the relayer and pays no network fee. Every refusal falls through to the normal self-paid purchase, so no buyer is ever left without a way to buy.
 - No buyer-facing copy claims free checkout. That is Stage 3, and it is gated on the testnet rehearsal in §5 — restoring the promise before the flow has been run against a real relayer would repeat the original defect.
-- Sellers still cannot list on sponsored markets: `SPONSORED_CHECKOUT_ENABLED` stays `false` until the Stage 4 deposit disclosure ships.
+- `SPONSORED_CHECKOUT_ENABLED` is **gone**. It had to go: see §3.1. Sellers now choose from whatever markets can actually accept the active core, with the deposit disclosed before signing.
 
-Stages 3–5 remain. This document is the route through them.
+Stages 3 and 5 remain. This document is the route through them.
+
+## 3.1 Why the seller gate had to go — the v2-1-0 weld
+
+The blanket flag hid the sponsored markets from sellers on the reasoning that their escrow bought nothing while sponsored buying was dead. Stage 2 killed that reasoning, but the flag turned out to be doing far more damage than it was preventing.
+
+**Every pre-sponsored market welds its NFT contract in at deploy time.** Read off mainnet:
+
+| Market | Accepts | How |
+|---|---|---|
+| `xtrata-market-{stx,sbtc,usdc}-v1-0` | `xtrata-v2-1-0` **only** | `(define-constant ALLOWED-NFT-CONTRACT …)`, asserted in `list-token` |
+| `xtrata-market-v1-{0,1}` | `xtrata-v1-1-1` **only** | same |
+| `xtrata-market-sponsored-{stx,sbtc,usdcx}-v1-1` | anything allow-listed; v3-2-3 **is** | `set-nft-allowed`, admin-settable |
+
+There is no getter for the constant, so this is not discoverable at runtime. Listing a v3 inscription on a welded market aborts with `ERR-NOT-AUTHORIZED` before the wallet shows a confirmation, and Xverse reports that as `Internal error` — nothing a seller could act on.
+
+So with the flag on, **the sell selector offered only markets that reject every current inscription.** Worse, the buy path tells sellers of legacy listings to "migrate to v3 and relist", which moves their token out of the one core those markets accept. Following the app's own advice made listing impossible.
+
+The gate is now the contract-level fact: `lockedNftContract` in the market registry, applied by `marketAcceptsNftContract`. Locked markets stay fully readable, buyable and cancellable — the weld is on `list-token` alone, and hiding those listings would strand their sellers.
+
+**Consequence worth stating plainly:** a v3 inscription can only be listed on a sponsored market, and those require a mandatory deposit (`list-token` asserts `fee-budget >= MIN-FEE-BUDGET`, 0.05 STX). There is no zero-deposit market for v3 and cannot be one without deploying a new contract. Buyers on those markets can still pay their own fee, so both sale styles work — the deposit is the seller's cost of offering the sponsored option.
 
 ## 1. Why this is worth doing
 
@@ -73,10 +93,16 @@ Only then reintroduce buyer-facing sponsorship copy, worded to the truth: "Buyer
 
 *Tests:* update the copy guards to assert the new strings appear **only** when the sponsored branch exists; assert exhausted-budget and relayer-down listings do not advertise free checkout.
 
-### Stage 4 — Seller-side deposit UX
-Re-enable sponsored entries in the sell selector by flipping `SPONSORED_CHECKOUT_ENABLED`. Port `SponsorshipDepositField`'s behaviour: live quote, explicit "you are depositing X STX, refundable", validation against `MIN-FEE-BUDGET` and the 2 STX useful maximum. **Fix the inverted comparator** in `populateSellMarkets` (`Number(isSponsoredMarket(a)) - Number(isSponsoredMarket(b))` currently sorts standard first) so sponsored markets lead for sBTC/USDCx.
+### Stage 4 — Seller-side deposit UX (done, brought forward)
+Pulled ahead of Stage 3 because §3.1 made it urgent: with the flag on there was no sellable market at all for a v3 inscription.
 
-*Tests:* deposit below minimum rejected before the wallet opens; quote failure falls back to 0.06 STX with honest copy; option ordering asserted; STX post-condition equals the deposit exactly.
+`SPONSORED_CHECKOUT_ENABLED` is deleted. `sellEntries()` now calls `getSellableMarkets(activeCore, network)`, which filters on `lockedNftContract` and returns sponsored first — the inverted comparator in `populateSellMarkets` is gone with it. An empty result says so and disables the button rather than showing an empty dropdown.
+
+The deposit is disclosed before signing, including the detail a seller is most likely to be caught by: it is charged **in STX even on an sBTC or USDCx listing**. A remote quote is clamped to `[MIN_FEE_BUDGET_USTX, MAX_USEFUL_BUDGET_USTX]` and re-checked with `validateFeeBudget` before the wallet opens, so an out-of-range budget cannot abort a transaction the seller has already approved and paid a miner fee for. `marketList` re-checks `marketAcceptsNftContract` too, since a stale selection survives a contract switch.
+
+*Tests:* eight registry cases pinning every weld read off mainnet, that sponsored markets stay unlocked, that a v3 seller is offered exactly the three sponsored markets, that sponsored sort first, and that no locked market is ever offered to a core it cannot take. Four page guards covering the selector gate, the stale-selection re-check, the STX disclosure and the bounds validation.
+
+*Still open from the original Stage 4:* the STX post-condition is built from the same clamped budget passed as the function argument, but there is no test asserting the two cannot diverge.
 
 ### Stage 5 — Post-action refresh
 The market page never refreshes after a buy, cancel, or list — a sold listing keeps a live Buy button until manual reload. Sponsored settlement makes this worse because the flow is asynchronous. Re-read listings on terminal states.

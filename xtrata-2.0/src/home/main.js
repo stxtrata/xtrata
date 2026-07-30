@@ -59,7 +59,12 @@
       getLegacyContract
     } from '/src/lib/contract/registry.ts';
     import { getContractId } from '/src/lib/contract/config.ts';
-    import { MARKET_REGISTRY, getMarketContractId } from '/src/lib/market/registry.ts';
+    import {
+      MARKET_REGISTRY,
+      getMarketContractId,
+      getSellableMarkets,
+      marketAcceptsNftContract
+    } from '/src/lib/market/registry.ts';
     import DROPS_REGISTRY from '/src/data/drops-registry.json';
     import {
       getMarketSettlementAsset,
@@ -68,8 +73,11 @@
       formatMarketPriceWithUsd
     } from '/src/lib/market/settlement.ts';
     import {
+      MAX_USEFUL_BUDGET_USTX,
+      MIN_FEE_BUDGET_USTX,
       getSponsoredBuyEligibility,
-      isSponsoredMarket
+      isSponsoredMarket,
+      validateFeeBudget
     } from '/src/lib/market/sponsored.ts';
     import {
       resolveSponsorBase,
@@ -10262,18 +10270,6 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // ------------------------------------------------------------------
     const MARKET_LISTINGS_PER_CONTRACT = 24;
 
-    // Seller-side gate. Sponsored BUYING is wired as of Stage 2 (see
-    // marketSponsoredBuy below), so a seller's escrowed deposit is no longer
-    // dead money. What is still missing is Stage 4: the deposit UX that tells a
-    // seller, before they sign, exactly how much STX they are escrowing and that
-    // it is refundable — charged in STX even on an sBTC or USDCx listing.
-    //
-    // Listing without that disclosure is the part that takes money from someone
-    // who has not been shown the price, so the selector stays closed until the
-    // deposit field ships and the testnet rehearsal in the plan's §5 passes.
-    //
-    // docs/plans/SPONSORED-MARKET-BUY-PLAN.md.
-    const SPONSORED_CHECKOUT_ENABLED = false;
     const MARKET_THUMB_HYDRATION_CONCURRENCY = 4;
     const marketState = {
       filter: 'all',
@@ -11197,14 +11193,38 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     };
     const sellState = { quote: null, quoteRun: 0 };
 
-    // Legacy markets stay in the registry so old listings remain readable,
-    // but new listings must not go to them — exclude from the sell selector.
+    // Fallback when the relayer cannot be reached for a live quote. Above
+    // MIN-FEE-BUDGET so a listing still succeeds, and well under the claim cap
+    // so nothing extra is tied up.
+    const DEFAULT_FEE_BUDGET_USTX = 60_000n;
+
+    // A quote is a remote number and the contract rejects anything below
+    // MIN-FEE-BUDGET outright, which would abort the listing after the seller
+    // had already approved it. Anything above the claim cap is simply escrowed
+    // and never spendable, so it is the seller's money sitting idle.
+    const clampFeeBudget = (budget) => {
+      if (budget < MIN_FEE_BUDGET_USTX) return MIN_FEE_BUDGET_USTX;
+      if (budget > MAX_USEFUL_BUDGET_USTX) return MAX_USEFUL_BUDGET_USTX;
+      return budget;
+    };
+
+    // Which markets can take a NEW listing of the inscription core the app is
+    // currently pointed at.
+    //
+    // Every pre-sponsored market welds its NFT contract in at deploy time:
+    // xtrata-market-{stx,sbtc,usdc}-v1-0 accept only xtrata-v2-1-0, and
+    // xtrata-market-v1-{0,1} only xtrata-v1-1-1. Offering those for a v3
+    // inscription produced a transaction that aborted with ERR-NOT-AUTHORIZED
+    // before the wallet ever showed a confirmation, which Xverse reports as
+    // "Internal error" — no way for a seller to work out what was wrong. Worse,
+    // the buy path tells sellers of legacy listings to migrate to v3 and relist,
+    // which moved their token OUT of the only core those markets accept.
+    //
+    // marketAcceptsNftContract reads the recorded lock, so the selector now
+    // offers only what will actually work. Existing listings on locked markets
+    // stay readable, buyable and cancellable: the lock is on list-token alone.
     const sellEntries = () =>
-      marketEntriesForNetwork().filter(
-        (entry) =>
-          !/legacy/i.test(entry.label ?? '') &&
-          (SPONSORED_CHECKOUT_ENABLED || !isSponsoredMarket(entry))
-      );
+      getSellableMarkets(getContractId(state.contract), state.contract.network);
 
     const sellSelectedEntry = () => {
       const id = sellDom.market?.value;
@@ -11214,9 +11234,26 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const populateSellMarkets = () => {
       if (!sellDom.market) return;
       const current = sellDom.market.value;
-      const orderedEntries = [...sellEntries()].sort((a, b) =>
-        Number(isSponsoredMarket(a)) - Number(isSponsoredMarket(b))
-      );
+      // getSellableMarkets already returns sponsored first. The previous sort
+      // here read `Number(isSponsoredMarket(a)) - Number(isSponsoredMarket(b))`,
+      // which put them last — the opposite of what the sBTC and USDCx flows want,
+      // since sponsored is the only kind of market that can take a v3 listing.
+      const orderedEntries = sellEntries();
+      if (orderedEntries.length === 0) {
+        // Say so rather than presenting an empty dropdown. This is reachable:
+        // point the app at a core no deployed market accepts and there is
+        // genuinely nowhere to list until one is allow-listed.
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'No market accepts this inscription contract';
+        sellDom.market.replaceChildren(option);
+        sellDom.market.disabled = true;
+        if (sellDom.button) sellDom.button.disabled = true;
+        updateSellUi();
+        return;
+      }
+      sellDom.market.disabled = false;
+      if (sellDom.button) sellDom.button.disabled = false;
       sellDom.market.replaceChildren(
         ...orderedEntries.map((entry) => {
           const settlement = getMarketSettlementAsset(entry.paymentTokenContractId ?? null);
@@ -11224,12 +11261,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           const option = document.createElement('option');
           option.value = getMarketContractId(entry);
           option.textContent = isSponsoredMarket(entry)
-            ? `${symbol} - sponsored (buyer pays no fee)`
+            ? `${symbol} - buyer can pay no network fee`
             : `${symbol} - standard`;
           return option;
         })
       );
-      if (current) sellDom.market.value = current;
+      if (current && orderedEntries.some((entry) => getMarketContractId(entry) === current)) {
+        sellDom.market.value = current;
+      }
       updateSellUi();
     };
 
@@ -11248,24 +11287,43 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const settlement = getMarketSettlementAsset(entry.paymentTokenContractId ?? null);
       const symbol = getMarketSettlementLabel(settlement);
       sellDom.priceLabel.textContent = `Price (${symbol})`;
-      if (isSponsoredMarket(entry) && entry.sponsorApi) {
+      if (isSponsoredMarket(entry) && resolveSponsorBase(entry) !== null) {
         const run = ++sellState.quoteRun;
         sellDom.deposit.textContent = 'Fetching sponsorship deposit quote...';
+        // The deposit is charged in STX on EVERY sponsored market, including the
+        // sBTC and USDCx ones, and the contract requires it: list-token asserts
+        // fee-budget >= MIN-FEE-BUDGET. Say the amount and the currency before
+        // the wallet opens, because this is money leaving the seller's balance.
+        const describe = (budget, suffix) =>
+          `Sponsorship deposit: ${formatAssetAmount(budget, 6, 'STX')}${suffix}, ` +
+          'charged in STX even on an sBTC or USDCx listing. It covers the buyer\'s ' +
+          'network fee so they can buy holding no STX, and the unused part comes ' +
+          'back to you when the listing sells or you cancel.';
         try {
-          const base = entry.sponsorApi.replace(/\/+$/, '');
+          const base = resolveSponsorBase(entry);
           const r = await fetch(`${base}/sponsor/quote`, { method: 'POST' });
           if (run !== sellState.quoteRun) return;
           if (!r.ok) throw new Error('quote unavailable');
           const q = await r.json();
-          sellState.quote = BigInt(q.budgetUstx ?? 60000);
-          sellDom.deposit.textContent =
-            `Sponsorship deposit: ${formatAssetAmount(sellState.quote, 6, 'STX')} - covers the buyer's network fee so they need no extra STX; the unused part is refunded to you when it sells or you cancel.`;
+          sellState.quote = clampFeeBudget(BigInt(q.budgetUstx ?? DEFAULT_FEE_BUDGET_USTX));
+          sellDom.deposit.textContent = describe(sellState.quote, '');
         } catch {
           if (run !== sellState.quoteRun) return;
-          sellState.quote = 60_000n;
-          sellDom.deposit.textContent =
-            'Sponsorship deposit: 0.06 STX (default - live quote unavailable). Unused portion refunds to you.';
+          sellState.quote = DEFAULT_FEE_BUDGET_USTX;
+          sellDom.deposit.textContent = describe(
+            sellState.quote,
+            ' (default rate, live quote unavailable)'
+          );
         }
+      } else if (isSponsoredMarket(entry)) {
+        // Sponsored market with no relayer configured: the deposit is still
+        // mandatory on chain, so quote the contract minimum rather than
+        // implying the listing is free.
+        sellState.quote = DEFAULT_FEE_BUDGET_USTX;
+        sellDom.deposit.textContent =
+          `Sponsorship deposit: ${formatAssetAmount(sellState.quote, 6, 'STX')}, charged in STX. ` +
+          'No sponsor relayer is configured for this market, so buyers will pay their ' +
+          'own fee for now. The deposit is refunded when the listing sells or you cancel.';
       } else {
         sellState.quote = null;
         sellDom.deposit.textContent = 'Standard listing: the buyer pays their own network fee.';
@@ -11275,6 +11333,15 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const marketList = async () => {
       const entry = sellSelectedEntry();
       if (!entry) return;
+      // Belt and braces: the selector should never offer a market that cannot
+      // take this core, but a stale selection survives a contract switch, and
+      // the failure mode is an opaque wallet error rather than a useful message.
+      const activeNftContract = getContractId(state.contract);
+      if (!marketAcceptsNftContract(entry, activeNftContract)) {
+        sellDom.status.textContent =
+          `${entry.label} only accepts ${entry.lockedNftContract?.split('.')[1] ?? 'another'} inscriptions, not ${activeNftContract.split('.')[1]}. Pick a different market.`;
+        return;
+      }
       if (!state.walletSession.isConnected || !state.walletSession.address) {
         sellDom.status.textContent = 'Connect a wallet to list.';
         return;
@@ -11293,7 +11360,22 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         return;
       }
       const sponsored = isSponsoredMarket(entry);
-      const budget = sponsored ? (sellState.quote ?? 60_000n) : null;
+      const budget = sponsored
+        ? clampFeeBudget(sellState.quote ?? DEFAULT_FEE_BUDGET_USTX)
+        : null;
+      if (sponsored) {
+        // The contract asserts fee-budget >= MIN-FEE-BUDGET and would abort
+        // after the seller had already approved the transaction, paying a miner
+        // fee for nothing. Check here, where it costs them nothing.
+        const validation = validateFeeBudget(budget);
+        if (!validation.ok) {
+          sellDom.status.textContent =
+            validation.reason === 'above-useful-maximum'
+              ? `Sponsorship deposit cannot exceed ${formatAssetAmount(MAX_USEFUL_BUDGET_USTX, 6, 'STX')}.`
+              : `Sponsorship deposit must be at least ${formatAssetAmount(MIN_FEE_BUDGET_USTX, 6, 'STX')}.`;
+          return;
+        }
+      }
 
       // ownership check before the wallet opens
       sellDom.status.textContent = 'Checking ownership...';

@@ -142,11 +142,35 @@ describe('market page does not promise sponsored checkout ahead of the rehearsal
     );
   });
 
-  it('sponsored markets are hidden from the sell selector while the flag is off', () => {
-    expect(marketSection).toContain('const SPONSORED_CHECKOUT_ENABLED = false;');
+  it('the sell selector is gated on what a market can accept, not a flag', () => {
+    // The blanket SPONSORED_CHECKOUT_ENABLED gate is gone. It hid the only
+    // markets that accept a v3 inscription, which left sellers with nowhere to
+    // list at all. The gate is now the contract-level fact.
+    expect(marketSection).not.toContain('SPONSORED_CHECKOUT_ENABLED');
     expect(marketSection).toMatch(
-      /SPONSORED_CHECKOUT_ENABLED \|\| !isSponsoredMarket\(entry\)/
+      /const sellEntries = \(\) =>\s*getSellableMarkets\(/
     );
+  });
+
+  it('a stale market selection is re-checked before the wallet opens', () => {
+    expect(marketSection).toMatch(/if \(!marketAcceptsNftContract\(entry, activeNftContract\)\)/);
+  });
+
+  it('the sponsorship deposit is disclosed, in STX, before signing', () => {
+    expect(marketCopy).toContain('Sponsorship deposit:');
+    // Charged in STX on the sBTC and USDCx markets too, which is the detail a
+    // seller is most likely to be caught by.
+    expect(marketCopy).toMatch(/charged in STX even on an sBTC or USDCx listing/);
+    // Refundability. Asserted on a phrase that survives the source's string
+    // concatenation rather than one that spans a line join.
+    expect(marketCopy).toMatch(/when the listing sells or you cancel/i);
+  });
+
+  it('the deposit is validated against the contract bounds before signing', () => {
+    // list-token asserts fee-budget >= MIN-FEE-BUDGET, so an out-of-range
+    // deposit would abort AFTER the seller approved and paid a miner fee.
+    expect(marketSection).toContain('validateFeeBudget(budget)');
+    expect(marketSection).toContain('clampFeeBudget');
   });
 
   it('drops sponsored copy is untouched — drops really is sponsored', () => {
