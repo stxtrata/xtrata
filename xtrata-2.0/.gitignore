@@ -6,6 +6,12 @@ coverage
 .env.local
 .artifacts
 
+# Wizard test wallet keys. Real mainnet private keys, never committed.
+# scripts/wizard/.env.wizards.example holds the placeholders and IS committed.
+.env.wizards
+scripts/wizard/.env.wizards
+scripts/wizard/KILL
+
 
 # FOLDERS
 
