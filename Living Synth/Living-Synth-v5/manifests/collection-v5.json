@@ -5,8 +5,8 @@
  "engine": {
   "filename": "proof-of-free-engine-v5.js",
   "mime": "text/javascript",
-  "bytes": 113480,
-  "sha256": "959d33b13781997763c10128eedeb73408c95f8028320a7f90d81c9615e4e2bf"
+  "bytes": 113102,
+  "sha256": "cd4976b646abb06273c5ac882f6a49bc7472c76e56d755c488998235aa13f792"
  },
  "music": {
   "root": "D",

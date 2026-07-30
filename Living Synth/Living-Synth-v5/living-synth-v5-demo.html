@@ -905,16 +905,17 @@
    * tuner page can drive them live; the numbers baked here are the defaults
    * that ship. */
   const TUNING = {
-    idleDriftAmp: 0.68,       // × fadeAmp — how far a dormant tile drifts to white/black
-    idleSatDrop: 0.32,        // saturation lost at full drift
-    idlePulseLight: 3,        // lightness pulse on a dormant tile
-    idleMotifAlpha: 0.44,     // dormant motif base alpha
-    idleMotifVibrancy: 0.2,   // vibrancy added to dormant motif alpha
-    idleDrumAlpha: 0.28,      // dormant drum letter base alpha
-    idleDrumPulse: 0.15,      // pulse added to dormant drum letter alpha
-    idleDrumRing: 0.13,       // dormant drum beat-ring alpha
-    motifsOff: false          // reference view: base colours only
-  };
+      idleDriftAmp: 0.3,
+      idleSatDrop: 0.31,
+      idlePulseLight: 0.5,
+      idleMotifAlpha: 0.67,
+      idleMotifVibrancy: 0.32,
+      idleDrumAlpha: 0.61,
+      idleDrumPulse: 0.07,
+      idleDrumRing: 0.2,
+      motifsOff: false
+    };
+
 
   /* ---------- shared audio graph ---------- */
   let ctx = null, master = null, reverbBus = null, noiseBuffer = null;

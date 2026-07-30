@@ -86,48 +86,75 @@ inscribe later. **▶ song** replays it hands-off: input locks, a stop button
 floats over the mosaic, and the artwork performs itself — the same engine,
 non-interactive. **⇪ load** plays back any saved session JSON.
 
-## On-chain (Xtrata) reveal, fees & deploy
+## Mosaic legibility
 
-The editions are **Xtrata inscriptions** (natively SIP-009), so ownership, transfers
-and marketplaces are Xtrata's. The mosaic starts empty and reveals a tile once its
-edition has **left the treasury wallet** (gifted or sold) — read live from Xtrata
-ownership through a `pof-chain` config block; unrevealed tiles render as dark "not yet
-inscribed" slots and can't be played. Child recordings that evolve a synth are Xtrata
-parent-child inscriptions. The one bespoke contract, **`recording-fees`**, charges
-0.1 STX / 1 STX (owner-updatable) to inscribe a child / live-set recording.
+The base colours reproduce the Xtrata mark exactly, so how loud a **dormant** tile
+is allowed to be is a direct trade against whether the mark reads. Those numbers
+live in one `TUNING` block at the top of `engine/engine-core.js` and are read every
+frame. Live tiles ignore all of it and always draw at full strength, which is what
+makes playing a tile the reward.
+
+Open **`apps/tuner/tuner.html`** to drag them against the full 1,024-cell reveal.
+It drives the real engine rather than a copy, has a `play 8` button so you judge
+dormant tiles against live ones, a `base colours` reference view, hold-to-A/B
+against the shipped defaults, and it prints the block to paste back.
+
+## On-chain (Xtrata + one registry contract)
+
+The editions are **Xtrata inscriptions** (natively SIP-009), so ownership,
+transfers and marketplaces are Xtrata's, and child recordings are Xtrata
+parent-child inscriptions. One bespoke contract,
+**[`living-synth-registry`](contract/contracts/living-synth-registry.clar)**, holds
+the two facts the chain cannot otherwise answer:
+
+- **Sticky reveal.** A cell lights up the first time its token leaves treasury
+  custody and stays lit forever after, even if it comes back. That is history, not
+  current state, so it is latched when it happens. All 1,024 flags are bits inside
+  8 uints, so **one read-only call returns the whole collection**.
+- **Which recording a cell plays.** Parent-child only points upward on chain, so
+  children have to be indexed. `register-child` verifies the caller owns both the
+  edition and the recording, checks the parent link, and takes the fee, all in one
+  transaction. 0.1 STX for a child, 1 STX for a live set, owner-updatable.
+
+Unrevealed tiles render as dark "not yet inscribed" slots and can't be played.
 
 - **Preview the reveal now:** `living-synth-v5-demo.html?sim=1` — seed / reroll / step 32 / auto.
-- **Point at real state:** `?live&holdersUrl=…&treasury=…`, or bake a `pof-chain` block in.
-- **Deploy it:** open `apps/canary/canary.html` — a one-wallet, step-through console
-  (connect → inscribe engine → deploy `recording-fees` → inscribe mosaic → inscribe
-  editions → distribute), each step verified.
+- **Contracts:** `cd contract && clarinet check && npm test` — 3 contracts, 0 errors, 46 tests.
 
-Architecture: [`docs/onchain-reveal-plan.md`](docs/onchain-reveal-plan.md) · deploy: [`docs/deploy-runbook.md`](docs/deploy-runbook.md) · contract: [`contract/`](contract).
+> **Not yet wired.** The mosaic still reads reveal from a `holdersUrl` HTTP endpoint
+> and keeps children in `localStorage`. Nothing reads the registry yet, and
+> `apps/canary/canary.html` still walks the superseded `recording-fees` deployment.
+
+Architecture: [`docs/onchain-reveal-plan.md`](docs/onchain-reveal-plan.md) · deploy: [`docs/deploy-runbook.md`](docs/deploy-runbook.md) · contracts: [`contract/`](contract).
 
 ## Layout
 
 ```
 packages/genome/               XTRATA_MAP · roles · synth-arch trait · drums · drift
 packages/performance-codec/    xtrata-performance v1 (+ pattern + tone) · xtrata-session v1 (song)
-engine/engine-core.js          pluggable cores · per-instrument mute bus · reveal gating ·
+engine/engine-core.js          TUNING · pluggable cores · per-instrument mute bus · reveal gating ·
                                phase-locked launch · MIDI/keyboard · drum kit · mosaic
 artifacts/proof-of-free-engine-v5.js   built inscription artifact
 scripts/build-collection.mjs   builder + invariants + manifest
 manifests/collection-v5.json   hashes · roles · archs · loops · map
 apps/mosaic/mosaic.html        square shell · view-swap · live controls · MIDI · reveal (sim + live)
-apps/canary/canary.html        one-wallet deploy console (Xtrata + Stacks)
-contract/                      recording-fees.clar (fees) + Clarinet tests
-docs/onchain-reveal-plan.md    on-chain architecture (Xtrata-native)
+apps/tuner/tuner.html          mosaic legibility sliders, driving the real engine
+apps/canary/canary.html        one-wallet deploy console (predates the registry)
+contract/                      living-synth-registry.clar + mock core + Clarinet tests
+docs/onchain-reveal-plan.md    on-chain architecture (Xtrata + registry)
+docs/deploy-runbook.md         inscribe · deploy · register · distribute
 living-synth-v5-demo.html      self-contained single-file demo
 ```
 
 ## Run
 
 ```sh
-node scripts/build-collection.mjs
+node scripts/build-collection.mjs       # ALWAYS rerun after editing engine/ or packages/
 node scripts/build-collection.mjs --seeds --engine-id 12345
 open living-synth-v5-demo.html          # the instrument
 open living-synth-v5-demo.html?sim=1    # + the random batched-reveal simulation
+open apps/tuner/tuner.html              # mosaic legibility sliders
+cd contract && clarinet check && npm test
 ```
 
 Invariants: byte-identical rebuilds · 1,024 unique genome hashes · loop trait

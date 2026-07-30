@@ -3,9 +3,12 @@
 ;; One contract for the whole Living Synth mosaic, against xtrata-v3-2-3.
 ;;
 ;;   1. edition <-> Xtrata token id  (the 1,024 cells, mapped once at setup)
-;;   2. STICKY REVEAL. A cell is revealed the first time its token leaves the
-;;      treasury, and stays revealed forever after. It may return to the
-;;      treasury, be sold on, be sent anywhere: once lit, always lit.
+;;   2. STICKY REVEAL. A cell is revealed the first time its token leaves
+;;      treasury custody, and stays revealed forever after. It may return to
+;;      the treasury, be sold on, be sent anywhere: once lit, always lit.
+;;      "Custody" is the set of every address that has ever been the treasury,
+;;      not just the current one, so rotating the treasury cannot make the
+;;      tokens still sitting in the old wallet look distributed.
 ;;   3. Owner-gated child recordings, with the fee, in one transaction.
 ;;   4. The entire 1,024-cell state in two read-only calls.
 ;;
@@ -59,6 +62,7 @@
 (define-constant ERR-INVALID-PAGE (err u120))
 (define-constant ERR-INVALID-BATCH (err u121))
 (define-constant ERR-NO-PENDING-OWNER (err u122))
+(define-constant ERR-SAME-TREASURY (err u123))
 
 ;; Only the four core readers/writers this contract needs. Declaring the error
 ;; type as uint matches the proven v2 gateway trait; the core's own readers
@@ -97,6 +101,13 @@
 (define-map EditionToToken uint uint)
 (define-map TokenToEdition uint uint)
 
+;; Every address that has ever been the treasury. Reveal means "this token has
+;; left Jim's custody", so rotating the treasury must not make the tokens still
+;; sitting in the OLD one look distributed. Checking the whole history rather
+;; than just the current address is what makes rotation safe, which matters if
+;; a treasury wallet is ever compromised mid-distribution.
+(define-map PastTreasuries principal bool)
+
 ;; 8 slots x 128 bits = 1,024 flags. Slot 0 holds editions 1-128.
 (define-map RevealBits uint uint)
 (define-map ChildBits uint uint)                  ;; "this edition has a child"
@@ -131,6 +142,10 @@
 
 (define-private (valid-edition (edition uint))
   (and (> edition u0) (<= edition MAX-EDITIONS)))
+
+;; In treasury custody: the address in use now, or any address that ever was.
+(define-private (in-custody (who principal))
+  (or (is-eq who (var-get treasury)) (default-to false (map-get? PastTreasuries who))))
 
 (define-private (read-owner (core <xtrata-core-trait>) (token-id uint))
   (ok (unwrap! (try! (contract-call? core get-owner token-id)) ERR-NOT-FOUND)))
@@ -177,8 +192,17 @@
     (print { event: "core-locked", core: (contract-of core) })
     (ok true)))
 
+;; Rotating the treasury retires the old address into PastTreasuries rather than
+;; forgetting it, so tokens still held there stay unrevealed.
 (define-public (set-treasury (who principal))
-  (begin (try! (assert-owner)) (var-set treasury who) (ok true)))
+  (let ((previous (var-get treasury)))
+    (begin
+      (try! (assert-owner))
+      (asserts! (not (is-eq who previous)) ERR-SAME-TREASURY)
+      (map-set PastTreasuries previous true)
+      (var-set treasury who)
+      (print { event: "treasury-rotated", from: previous, to: who })
+      (ok true))))
 
 (define-public (set-paused (value bool))
   (begin (try! (assert-owner)) (var-set paused value) (ok true)))
@@ -248,7 +272,7 @@
     (try! (assert-core core))
     (try! (assert-not-paused))
     (asserts! (is-eq tx-sender (var-get treasury)) ERR-NOT-AUTHORIZED)
-    (asserts! (not (is-eq recipient (var-get treasury))) ERR-STILL-IN-TREASURY)
+    (asserts! (not (in-custody recipient)) ERR-STILL-IN-TREASURY)
     (let ((token-id (unwrap! (map-get? EditionToToken edition) ERR-NOT-REGISTERED)))
       (begin
         (try! (contract-call? core transfer token-id tx-sender recipient))
@@ -270,7 +294,7 @@
         (ok false)
         (let ((owner (try! (read-owner core token-id))))
           (begin
-            (asserts! (not (is-eq owner (var-get treasury))) ERR-STILL-IN-TREASURY)
+            (asserts! (not (in-custody owner)) ERR-STILL-IN-TREASURY)
             (latch-reveal edition)
             (print { event: "revealed", edition: edition, token-id: token-id,
                      owner: owner, via: "catch-up" })
@@ -424,6 +448,10 @@
     live-set-count: (var-get live-set-count),
     max-editions: MAX-EDITIONS
   })
+
+;; True while an address counts as treasury custody, current or retired.
+(define-read-only (is-in-custody (who principal)) (in-custody who))
+(define-read-only (was-treasury (who principal)) (default-to false (map-get? PastTreasuries who)))
 
 (define-read-only (get-token-for-edition (edition uint)) (map-get? EditionToToken edition))
 (define-read-only (get-edition-for-token (token-id uint)) (map-get? TokenToEdition token-id))

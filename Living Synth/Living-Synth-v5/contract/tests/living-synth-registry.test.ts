@@ -265,6 +265,64 @@ describe("child recordings", () => {
   });
 });
 
+/* Rotating the treasury must not retroactively "distribute" everything still
+ * sitting in the old wallet. Custody is the whole history of treasury
+ * addresses, not just the current one. */
+describe("treasury rotation", () => {
+  beforeEach(() => setup([1, 2, 3]));
+
+  it("keeps tokens in the OLD treasury unrevealable after a rotation", () => {
+    // editions 1-3 are all still in the deployer wallet
+    expect(reg("set-treasury", [Cl.principal(bob)]).result).toBeOk(Cl.bool(true));
+    // bob is the treasury now, but edition 1 never moved out of the deployer
+    expect(reg("reveal", [corePrincipal(), Cl.uint(1)], alice).result).toBeErr(Cl.uint(112));
+    expect(ro("is-revealed", [Cl.uint(1)])).toBeBool(false);
+  });
+
+  it("keeps tokens in the NEW treasury unrevealable too", () => {
+    reg("set-treasury", [Cl.principal(bob)]);
+    core("test-set-owner", [Cl.uint(1002), Cl.principal(bob)]);
+    expect(reg("reveal", [corePrincipal(), Cl.uint(2)], alice).result).toBeErr(Cl.uint(112));
+  });
+
+  it("still reveals once a token reaches someone outside custody", () => {
+    reg("set-treasury", [Cl.principal(bob)]);
+    core("test-set-owner", [Cl.uint(1003), Cl.principal(alice)]);
+    expect(reg("reveal", [corePrincipal(), Cl.uint(3)], alice).result).toBeOk(Cl.bool(true));
+    expect(ro("is-revealed", [Cl.uint(3)])).toBeBool(true);
+  });
+
+  it("survives rotating back to a wallet used before", () => {
+    reg("set-treasury", [Cl.principal(bob)]);
+    reg("set-treasury", [Cl.principal(deployer)], deployer);
+    expect(ro("is-in-custody", [Cl.principal(deployer)])).toBeBool(true);
+    expect(ro("is-in-custody", [Cl.principal(bob)])).toBeBool(true);
+    expect(reg("reveal", [corePrincipal(), Cl.uint(1)], alice).result).toBeErr(Cl.uint(112));
+  });
+
+  it("refuses transfer-and-reveal into a retired treasury wallet", () => {
+    reg("set-treasury", [Cl.principal(bob)]);
+    // bob (the new treasury) tries to send edition 1 back to the old wallet
+    core("test-set-owner", [Cl.uint(1001), Cl.principal(bob)]);
+    expect(reg("transfer-and-reveal", [corePrincipal(), Cl.uint(1), Cl.principal(deployer)], bob).result)
+      .toBeErr(Cl.uint(112));
+    expect(ro("is-revealed", [Cl.uint(1)])).toBeBool(false);
+  });
+
+  it("reports custody and rejects a no-op rotation", () => {
+    expect(ro("is-in-custody", [Cl.principal(deployer)])).toBeBool(true);
+    expect(ro("is-in-custody", [Cl.principal(alice)])).toBeBool(false);
+    expect(ro("was-treasury", [Cl.principal(deployer)])).toBeBool(false);   // current, not retired
+    expect(reg("set-treasury", [Cl.principal(deployer)]).result).toBeErr(Cl.uint(123));
+    reg("set-treasury", [Cl.principal(bob)]);
+    expect(ro("was-treasury", [Cl.principal(deployer)])).toBeBool(true);
+  });
+
+  it("is owner-only", () => {
+    expect(reg("set-treasury", [Cl.principal(alice)], alice).result).toBeErr(Cl.uint(100));
+  });
+});
+
 describe("live sets", () => {
   beforeEach(() => setup([1]));
 
