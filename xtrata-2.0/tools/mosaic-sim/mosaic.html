@@ -1,0 +1,132 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Mosaic (reference implementation under test)</title>
+<style>
+  :root{--bg:#07090d;--ink:#e6edf6;--mut:#8b9bb4;--line:#243044;--treas:#2b3a55;--sold:#3ddc97;--bad:#ff6b6b}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,sans-serif;padding:18px}
+  h1{font-size:16px;margin:0 0 4px} .sub{color:var(--mut);font-size:12px;margin-bottom:14px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(14px,1fr));gap:2px;max-width:1100px}
+  .cell{aspect-ratio:1;border-radius:2px;background:var(--treas)}
+  .cell.sold{background:var(--sold)}
+  .cell.missing{background:transparent;border:1px dashed var(--line)}
+  .cell.bad{background:var(--bad)}
+  .legend{margin-top:14px;font-size:12px;color:var(--mut);display:flex;gap:16px;flex-wrap:wrap}
+  .sw{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:5px}
+  .warn{margin-top:12px;padding:9px 11px;border:1px solid var(--bad);border-radius:8px;color:var(--bad);font-size:12px}
+  code{color:var(--mut)}
+</style>
+<body>
+<h1>Mosaic — reference implementation</h1>
+<div class="sub" id="sub">reading…</div>
+<div class="grid" id="grid"></div>
+<div class="legend">
+  <span><i class="sw" style="background:var(--treas)"></i>in treasury</span>
+  <span><i class="sw" style="background:var(--sold)"></i>released</span>
+  <span><i class="sw" style="border:1px dashed var(--line)"></i>not minted</span>
+  <span><i class="sw" style="background:var(--bad)"></i>anomaly</span>
+</div>
+<div id="warnings"></div>
+
+<script>
+// A REFERENCE mosaic, not the real one. It exists so the harness can be proved to work
+// before the real mosaic exists, and to document the read contract the real one should
+// follow. Three deliberate choices worth copying:
+//
+//   1. It maps token -> collection index by READING THE CONTENT, never by assuming
+//      tokenId - base == index or that mint order is collection order.
+//   2. It renders "not minted" as a distinct state from "minted but unsold", because on
+//      launch day those look the same to a careless renderer and mean different things.
+//   3. It flags anomalies loudly instead of rendering a plausible picture over them.
+const CORE = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3';
+const COLL = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-collection-mint-v1-5';
+
+const uintHex = (n) => '0x01' + BigInt(n).toString(16).padStart(32, '0');
+
+// The treasury principal, Clarity-encoded. An inscribed mosaic has to be self-contained,
+// so it compares the raw hex of get-owner against a known constant rather than shipping a
+// c32 decoder it does not otherwise need. Generated with:
+//   cvToHex(standardPrincipalCV('SP3JNSE...743X'))  ->  0x0516e55c...
+const TREASURY_CV = '0516e55cbbaafd88b6e63b036a3a2303b029e039cbbd';
+
+async function read(contractId, fn, args = []) {
+  const [addr, name] = contractId.split('.');
+  const r = await fetch(`/v2/contracts/call-read/${addr}/${name}/${fn}`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ sender: addr, arguments: args })
+  });
+  if (!r.ok) throw new Error(`${fn}: HTTP ${r.status}`);
+  return (await r.json()).result;
+}
+
+// Minimal Clarity decoding — enough for the shapes this mosaic reads.
+// (ok uN) is 07 (response-ok) + 01 (uint) + 16 bytes big-endian, so FOUR hex chars of
+// wrapper come off, not two. Stripping only the response byte left the uint type byte in
+// place and produced an astronomically large number.
+const decodeUint = (hex) => Number(BigInt('0x' + hex.replace(/^0x/, '').slice(4)));
+const isNone = (hex) => hex.replace(/^0x/, '').startsWith('0709');   // (ok none)
+
+(async () => {
+  const warn = (msg) => {
+    const d = document.createElement('div');
+    d.className = 'warn'; d.textContent = '⚠ ' + msg;
+    document.getElementById('warnings').append(d);
+  };
+  try {
+    const maxSupply = decodeUint(await read(COLL, 'get-max-supply'));
+    const mintedIndexCount = decodeUint(await read(COLL, 'get-minted-index-count'));
+
+    // Build index -> state. Start from "not minted" for every slot, so a hole is visible
+    // rather than shifting everything after it.
+    const cells = new Array(maxSupply).fill(null);
+    const strays = [];
+
+    for (let i = 0; i < mintedIndexCount; i++) {
+      const idHex = await read(COLL, 'get-minted-id', [uintHex(i)]);
+      if (isNone(idHex)) { warn(`mint index ${i} has no token id`); continue; }
+      // (ok (some uN)) — strip response + optional wrappers.
+      const tokenId = Number(BigInt('0x' + idHex.replace(/^0x/, '').slice(6)));
+
+      // Collection index comes from the CONTENT, never from arithmetic on the token id.
+      const content = await (await fetch(`/i/${tokenId}`)).text();
+      const m = /^xtrata:seed\/[^/]+\/(\d+):/.exec(content);
+      if (!m) { warn(`token #${tokenId} content is not a namespaced seed: "${content.slice(0, 40)}"`); continue; }
+      const index = Number(m[1]);
+      if (index >= maxSupply) { strays.push(index); warn(`token #${tokenId} claims index ${index}, beyond supply ${maxSupply}`); continue; }
+      if (cells[index]) { warn(`index ${index} claimed twice — tokens #${cells[index].tokenId} and #${tokenId}`); cells[index].twin = true; continue; }
+
+      const ownerHex = await read(CORE, 'get-owner', [uintHex(tokenId)]);
+      if (isNone(ownerHex)) { warn(`token #${tokenId} is minted but has no owner`); continue; }
+      cells[index] = {
+        tokenId,
+        inTreasury: ownerHex.replace(/^0x/, '').includes(TREASURY_CV),
+        content
+      };
+    }
+
+    const grid = document.getElementById('grid');
+    let treasuryCount = 0, soldCount = 0, missing = 0;
+    // The treasury address is what "unsold" means; anything else is a collector.
+    for (let i = 0; i < maxSupply; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      const c = cells[i];
+      if (!c) { cell.classList.add('missing'); missing++; }
+      else if (c.twin) cell.classList.add('bad');
+      else if (c.inTreasury) { treasuryCount++; }
+      else { soldCount++; cell.classList.add('sold'); }
+      cell.title = c
+        ? `#${i} · token ${c.tokenId} · ${c.twin ? 'TWIN' : c.inTreasury ? 'in treasury' : 'released'}`
+        : `#${i} · not minted`;
+      grid.append(cell);
+    }
+
+    document.getElementById('sub').textContent =
+      `${maxSupply} slots · ${treasuryCount} in treasury · ${soldCount} released · ${missing} not minted` +
+      (strays.length ? ` · ${strays.length} stray` : '');
+  } catch (e) {
+    document.getElementById('sub').textContent = 'failed: ' + e.message;
+    warn('the mosaic could not read the collection: ' + e.message);
+  }
+})();
+</script>
+</body>
