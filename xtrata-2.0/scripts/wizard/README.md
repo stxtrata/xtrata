@@ -179,8 +179,14 @@ Subjects available: `cost-of-permanence`, `chunk-size`, `ordinals-and-xtrata`, `
 ## Broadcast (later, deliberately)
 
 ```bash
-WIZARD_KEY_ARCHIVIST=<hex private key> node scripts/wizard/inscribe.mjs --broadcast
+WIZARD_KEY_ARCHIVIST=<hex private key> node scripts/wizard/inscribe.mjs \
+  --thread t-2026-07-30-a --broadcast
 ```
+
+`--thread` is mandatory for a broadcast. The placeholder `t-demo-0001` is refused, because the
+thread id is written into the entry and quoted by the manifest and cannot be changed afterwards.
+If the fleet is provisioned, the key is already loaded from `.env.wizards` and the env var above is
+not needed. A dry run prints the exact command to re-run.
 
 Before anything is signed, **every one** of these must hold, checked in this order:
 
@@ -189,14 +195,41 @@ Before anything is signed, **every one** of these must hold, checked in this ord
 3. the payload is exactly **one chunk** (16,384 bytes), the cheap single-transaction path
 4. the contract itself says the mint is single-transaction eligible
 5. the fee came from a **live quote**, not an offline estimate
-6. the wallet balance is at or above the floor
-7. protocol fee plus miner fee is at or under the per-run spend cap
-8. spending would not drop the wallet below the floor
+6. every quoted parent fragment is present in that parent's own on-chain bytes, and the credited
+   wizard really created it
+7. the core contract is not paused
+8. the wallet balance is at or above the floor
+9. protocol fee plus miner fee is at or under the per-run spend cap
+10. spending would not drop the wallet below the floor
 
 Any failure throws a `WizardSafetyError` and nothing is sent. The transaction is built with
 `PostConditionMode.Deny` and a `LessEqual` STX post-condition on the quoted protocol fee. It is
 never `Equal`: an exact-match post-condition aborts the transaction and burns the miner fee if the
-fee schedule moves underneath you.
+fee schedule moves underneath you. The dry run now prints that post-condition as a line of its own,
+so the spend bound can be confirmed without reading the source.
+
+Rails 6 and 7 **fail closed**. If the parent chunk or the pause state cannot be read, the broadcast
+is refused rather than attempted: you cannot verify a quote you could not fetch, and a paused core
+reverts the mint while the miner fee is still spent.
+
+### Preflight checks
+
+Every check below is a read. None of them can sign or send anything, and `--offline` skips the ones
+that need the network and says which ones it skipped.
+
+| Check | Contract read | Blocks a broadcast? |
+|---|---|---|
+| Parent quote and author | `get-chunk(id, u0)`, `get-inscription-creator(id)` | **Yes**, fails closed |
+| Core paused | `is-paused()` | **Yes**, fails closed |
+| Whole-thread affordability | none, uses the balance already read | No, warns |
+| Duplicate content | `get-id-by-hash(final-hash)` | No, v3.2.3 permits duplicates |
+| Pending or stuck nonce | `GET /extended/v1/address/<addr>/nonces` | No, warns |
+
+The parent quote check is the one that guards something no later transaction can fix. The closing
+manifest tells readers that every claim an entry makes about itself is checkable, and
+`--parent-quote` was the one string in the design that a human typed and nothing verified. A typo,
+a paraphrase, or the right words pasted under the wrong id would be signed, minted and permanent,
+and it would attribute words to another wizard's inscription.
 
 ## Spend caps
 

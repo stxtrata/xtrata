@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   CHUNK_SIZE,
@@ -10,16 +12,26 @@ import {
   DEFAULT_SPEND_CAP_USTX,
   MODE_SINGLE_TX,
   OFFLINE_FEE_ESTIMATE_USTX,
+  SKIPPED_OFFLINE,
   WizardSafetyError,
   assertBroadcastAllowed,
+  broadcastInstruction,
   buildMintCall,
+  checkCorePaused,
+  checkDuplicateContent,
+  checkPendingNonce,
+  checkThreadAffordability,
+  expectedWizardAddresses,
   fetchChainTip,
   fetchStxBalance,
+  formatChecks,
   formatPlan,
+  formatPostCondition,
   killSwitchEngaged,
   planInscription,
   quoteSingleTxFee,
-  tokenUriFor
+  tokenUriFor,
+  verifyParentQuote
 } from '../inscribe.mjs';
 
 /**
@@ -46,22 +58,116 @@ const QUOTE_RESULT =
 const CHAIN_TIP = 8_668_831;
 const BALANCE = '5000000';
 
+/**
+ * Synthetic fixture addresses, valid c32 but belonging to nobody: derived from
+ * fixed dummy keys. An earlier draft hardcoded the operator's real, funded
+ * Archivist address here. It is public rather than secret, so nothing leaked,
+ * but it coupled the suite to one provisioned fleet — regenerating the wizards
+ * (which the README explicitly contemplates) would have broken these tests, and
+ * a reader could reasonably think they assert something about the live wallets.
+ * They do not. Any valid address serves.
+ */
+const ARCHIVIST_ADDRESS = 'SP3Y74M5227FDVHREWPH773F5Y1W1ED8WXY3RAVG4';
+const SOMEONE_ELSE = 'SPXGFH9JTKPF2TQZJ2AH7NSMMMXJ72VMGH8PR654';
+
 type Call = { url: string; method: string; body?: unknown };
 
-const stubNetwork = (overrides: { balance?: string; quoteResult?: string } = {}) => {
+type Nonces = {
+  last_executed_tx_nonce: number | null;
+  possible_next_nonce: number;
+  detected_missing_nonces: number[];
+};
+
+type StubOptions = {
+  balance?: string;
+  quoteResult?: string;
+  /** true = the core is paused; 'error' = the read fails. */
+  paused?: boolean | 'error';
+  /** inscription id -> the utf8 body of its chunk u0. Absent means `none`. */
+  chunks?: Record<string, string> | 'error';
+  /** inscription id -> creator principal. Absent means `none`. */
+  creators?: Record<string, string>;
+  /** the id get-id-by-hash returns, or null for `none`. */
+  idByHash?: string | null | 'error';
+  nonces?: Nonces | 'error';
+};
+
+/** Read a uint argument back out of a stubbed call-read POST body. */
+const uintArg = async (body: unknown, index: number) => {
+  const { cvToJSON, hexToCV } = await import('@stacks/transactions');
+  const hex = (body as { arguments: string[] }).arguments[index];
+  return String((cvToJSON(hexToCV(hex)) as { value: string }).value);
+};
+
+const clarity = async (build: (t: typeof import('@stacks/transactions')) => unknown) => {
+  const transactions = await import('@stacks/transactions');
+  const { cvToHex } = transactions;
+  return Response.json({
+    okay: true,
+    result: cvToHex(build(transactions) as Parameters<typeof cvToHex>[0])
+  });
+};
+
+const stubNetwork = (overrides: StubOptions = {}) => {
   const calls: Call[] = [];
   const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     const method = init?.method ?? 'GET';
-    calls.push({ url, method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+    calls.push({ url, method, body });
+
     if (url.includes('/quote-inscription-fee')) {
       return Response.json({ okay: true, result: overrides.quoteResult ?? QUOTE_RESULT });
     }
     if (url.includes('/balances/stx')) return Response.json({ balance: overrides.balance ?? BALANCE });
     if (url.includes('/extended/v2/blocks')) return Response.json({ results: [{ height: CHAIN_TIP }] });
+
+    if (url.endsWith('/is-paused')) {
+      if (overrides.paused === 'error') return new Response('down', { status: 500 });
+      return clarity(({ boolCV, responseOkCV }) => responseOkCV(boolCV(overrides.paused === true)));
+    }
+    if (url.endsWith('/get-chunk')) {
+      if (overrides.chunks === 'error') return new Response('down', { status: 500 });
+      const text = (overrides.chunks ?? {})[await uintArg(body, 0)];
+      return clarity(({ bufferCV, noneCV, someCV }) =>
+        text === undefined ? noneCV() : someCV(bufferCV(Buffer.from(text, 'utf8')))
+      );
+    }
+    if (url.endsWith('/get-inscription-creator')) {
+      const who = (overrides.creators ?? {})[await uintArg(body, 0)];
+      return clarity(({ noneCV, someCV, standardPrincipalCV }) =>
+        who === undefined ? noneCV() : someCV(standardPrincipalCV(who))
+      );
+    }
+    if (url.endsWith('/get-id-by-hash')) {
+      if (overrides.idByHash === 'error') return new Response('down', { status: 500 });
+      return clarity(({ noneCV, someCV, uintCV }) =>
+        overrides.idByHash ? someCV(uintCV(BigInt(overrides.idByHash))) : noneCV()
+      );
+    }
+    if (url.includes('/nonces')) {
+      if (overrides.nonces === 'error') return new Response('down', { status: 500 });
+      return Response.json(
+        overrides.nonces ?? { last_executed_tx_nonce: 6, possible_next_nonce: 7, detected_missing_nonces: [] }
+      );
+    }
     throw new Error(`unexpected request ${method} ${url}`);
   });
   return { fetchImpl: fetchImpl as unknown as typeof fetch, calls };
+};
+
+/** A real composed entry, so the quote under test is a real Claim section. */
+const parentEntry = async () => {
+  const { citationFrom, composeEntry } = await import('../compose.mjs');
+  const body = composeEntry({
+    persona: 'archivist',
+    threadId: 't-inscribe-0001',
+    position: 1,
+    subject: 'cost-of-permanence',
+    blockHeight: CHAIN_TIP,
+    feeMicroStx: 11_000
+  });
+  return { body, citation: citationFrom(body, '4242') };
 };
 
 const BASE = {
@@ -365,6 +471,545 @@ describe('the env file the provisioning canary tells you to create', () => {
       loadWizardEnv({ path: '/definitely/not/here/.env.wizards', env })
     ).not.toThrow();
     expect(Object.keys(env)).toHaveLength(0);
+  });
+});
+
+describe('verifyParentQuote, the check that guards the permanent record', () => {
+  it('passes when the quoted fragment is in the parent chunk and the credited wizard created it', async () => {
+    const { body, citation } = await parentEntry();
+    const { fetchImpl, calls } = stubNetwork({
+      chunks: { '4242': body },
+      creators: { '4242': ARCHIVIST_ADDRESS }
+    });
+
+    const check = await verifyParentQuote({
+      fetchImpl,
+      parentIds: ['4242'],
+      answering: [citation],
+      expectedAddresses: { [citation.wizard.toLowerCase()]: ARCHIVIST_ADDRESS }
+    });
+
+    expect(check.ok).toBe(true);
+    expect(check.status).toBe('verified');
+    expect(check.results[0]).toMatchObject({ id: '4242', status: 'ok', authorChecked: true });
+    // index u0 is the whole body, because wizard entries are always one chunk
+    expect(await uintArg(calls.find((c) => c.url.endsWith('/get-chunk'))?.body, 1)).toBe('0');
+    expect(calls.some((c) => c.url.includes('/v2/transactions'))).toBe(false);
+  });
+
+  it('fails when the operator typed a fragment the parent does not contain, and shows both sides', async () => {
+    const { body } = await parentEntry();
+    const { fetchImpl } = stubNetwork({ chunks: { '4242': body } });
+
+    const check = await verifyParentQuote({
+      fetchImpl,
+      parentIds: ['4242'],
+      answering: [{ id: '4242', wizard: 'Wizard-1, the Archivist', quote: 'a claim it never made' }]
+    });
+
+    expect(check.ok).toBe(false);
+    expect(check.status).toBe('failed');
+    expect(check.results[0].status).toBe('quote-mismatch');
+    expect(check.results[0].quote).toBe('a claim it never made');
+    // the "found" half is the parent's real Claim section, not a raw byte dump
+    expect(check.results[0].found).toBeTruthy();
+    expect(body).toContain(check.results[0].found);
+  });
+
+  it('fails when the words are right but the inscription belongs to another wizard', async () => {
+    const { body, citation } = await parentEntry();
+    const { fetchImpl } = stubNetwork({
+      chunks: { '4242': body },
+      creators: { '4242': SOMEONE_ELSE }
+    });
+
+    const check = await verifyParentQuote({
+      fetchImpl,
+      parentIds: ['4242'],
+      answering: [citation],
+      expectedAddresses: { [citation.wizard.toLowerCase()]: ARCHIVIST_ADDRESS }
+    });
+
+    expect(check.ok).toBe(false);
+    expect(check.results[0]).toMatchObject({
+      status: 'wrong-author',
+      expectedAuthor: ARCHIVIST_ADDRESS,
+      foundAuthor: SOMEONE_ELSE
+    });
+    expect(check.results[0].message).toContain(SOMEONE_ELSE);
+  });
+
+  it('fails closed when the parent cannot be fetched: an unread quote is not a verified quote', async () => {
+    const { citation } = await parentEntry();
+    const { fetchImpl } = stubNetwork({ chunks: 'error' });
+
+    const check = await verifyParentQuote({ fetchImpl, parentIds: ['4242'], answering: [citation] });
+
+    expect(check.ok).toBe(false);
+    expect(check.status).toBe('unavailable');
+    expect(check.results[0].status).toBe('unavailable');
+  });
+
+  it('fails when the parent has no chunk u0 at all', async () => {
+    const { citation } = await parentEntry();
+    const { fetchImpl } = stubNetwork({ chunks: {} });
+    const check = await verifyParentQuote({ fetchImpl, parentIds: ['4242'], answering: [citation] });
+    expect(check.results[0].status).toBe('no-chunk');
+    expect(check.ok).toBe(false);
+  });
+
+  it('skips the author half, but not the quote half, when no address is known for the credited wizard', async () => {
+    const { body, citation } = await parentEntry();
+    const { fetchImpl, calls } = stubNetwork({ chunks: { '4242': body } });
+    const check = await verifyParentQuote({ fetchImpl, parentIds: ['4242'], answering: [citation] });
+
+    expect(check.ok).toBe(true);
+    expect(check.results[0]).toMatchObject({ status: 'ok', authorChecked: false });
+    expect(check.results[0].note).toMatch(/WIZARD_ADDRESS/);
+    expect(calls.some((c) => c.url.endsWith('/get-inscription-creator'))).toBe(false);
+  });
+
+  it('has nothing to do for an opening statement, and skips cleanly offline', async () => {
+    const { fetchImpl } = stubNetwork();
+    expect(await verifyParentQuote({ fetchImpl })).toMatchObject({ status: 'not-applicable', ok: true });
+
+    const offline = await verifyParentQuote({ fetchImpl, parentIds: ['4242'], offline: true });
+    expect(offline).toMatchObject({ status: 'skipped', ok: false, note: SKIPPED_OFFLINE });
+  });
+
+  it('resolves expected addresses from WIZARD_ADDRESS_* by id, full name and short name', () => {
+    const map = expectedWizardAddresses({ WIZARD_ADDRESS_ARCHIVIST: ARCHIVIST_ADDRESS } as NodeJS.ProcessEnv);
+    expect(map.archivist).toBe(ARCHIVIST_ADDRESS);
+    expect(map['wizard-1, the archivist']).toBe(ARCHIVIST_ADDRESS);
+    expect(map['the archivist']).toBe(ARCHIVIST_ADDRESS);
+    expect(map.skeptic).toBeUndefined();
+  });
+});
+
+describe('a mis-quoted parent: reported in a dry run, refused at broadcast', () => {
+  const badPlan = async () => {
+    const { body } = await parentEntry();
+    const { fetchImpl } = stubNetwork({ chunks: { '4242': body } });
+    return planInscription({
+      ...BASE,
+      wizard: 'skeptic',
+      position: 2,
+      parentIds: ['4242'],
+      answering: [{ id: '4242', wizard: 'Wizard-1, the Archivist', quote: 'a claim it never made' }],
+      fetchImpl
+    });
+  };
+
+  it('does not kill the dry run, it prints a FAIL line the operator can read', async () => {
+    const plan = await badPlan();
+    expect(plan.checks.parentQuote.ok).toBe(false);
+    const printed = formatPlan(plan);
+    expect(printed).toContain('parent quote: FAIL');
+    expect(printed).toContain('#4242 FAIL');
+    expect(printed).toContain('expected: "a claim it never made"');
+    expect(printed).toContain('found   : "');
+  });
+
+  it('refuses the broadcast, naming the id and both fragments', async () => {
+    const plan = await badPlan();
+    const attempt = () =>
+      assertBroadcastAllowed({
+        senderKey: 'a'.repeat(64) + '01',
+        wizardId: 'skeptic',
+        totalChunks: 1,
+        singleTxEligible: true,
+        feeSource: 'live-quote',
+        balanceUstx: 5_000_000n,
+        protocolFeeUstx: 11_000n,
+        parentQuoteCheck: plan.checks.parentQuote,
+        pausedCheck: plan.checks.corePaused
+      });
+    expect(attempt).toThrow(WizardSafetyError);
+    expect(attempt).toThrow(/#4242 does not contain the quoted fragment/);
+    expect(attempt).toThrow(/expected: "a claim it never made"/);
+    expect(attempt).toThrow(/attributes\s+words to another wizard/);
+  });
+
+  it('refuses when the check could not run at all, rather than assuming it would have passed', async () => {
+    const { citation } = await parentEntry();
+    const { fetchImpl } = stubNetwork({ chunks: 'error' });
+    const check = await verifyParentQuote({ fetchImpl, parentIds: ['4242'], answering: [citation] });
+    expect(() =>
+      assertBroadcastAllowed({
+        senderKey: 'a'.repeat(64) + '01',
+        totalChunks: 1,
+        singleTxEligible: true,
+        feeSource: 'live-quote',
+        balanceUstx: 5_000_000n,
+        protocolFeeUstx: 11_000n,
+        parentQuoteCheck: check
+      })
+    ).toThrow(/could not read #4242/);
+  });
+
+  it('lets a verified quote through', async () => {
+    const { body, citation } = await parentEntry();
+    const { fetchImpl } = stubNetwork({ chunks: { '4242': body }, creators: { '4242': ARCHIVIST_ADDRESS } });
+    const check = await verifyParentQuote({
+      fetchImpl,
+      parentIds: ['4242'],
+      answering: [citation],
+      expectedAddresses: { [citation.wizard.toLowerCase()]: ARCHIVIST_ADDRESS }
+    });
+    expect(
+      assertBroadcastAllowed({
+        senderKey: 'a'.repeat(64) + '01',
+        totalChunks: 1,
+        singleTxEligible: true,
+        feeSource: 'live-quote',
+        balanceUstx: 5_000_000n,
+        protocolFeeUstx: 11_000n,
+        parentQuoteCheck: check,
+        pausedCheck: { status: 'running', ok: true }
+      }).plannedSpendUstx
+    ).toBe(41_000n);
+  });
+});
+
+describe('the core pause state', () => {
+  it('reads as running when the contract says (ok false)', async () => {
+    const { fetchImpl } = stubNetwork();
+    expect(await checkCorePaused({ fetchImpl })).toMatchObject({ status: 'running', ok: true, paused: false });
+  });
+
+  it('reads as paused when the contract says (ok true), and refuses a broadcast', async () => {
+    const { fetchImpl } = stubNetwork({ paused: true });
+    const check = await checkCorePaused({ fetchImpl });
+    expect(check).toMatchObject({ status: 'paused', ok: false, paused: true });
+    expect(() =>
+      assertBroadcastAllowed({
+        senderKey: 'a'.repeat(64) + '01',
+        totalChunks: 1,
+        singleTxEligible: true,
+        feeSource: 'live-quote',
+        balanceUstx: 5_000_000n,
+        protocolFeeUstx: 11_000n,
+        pausedCheck: check
+      })
+    ).toThrow(/paused.*miner fee would still be spent/s);
+  });
+
+  it('fails closed when the pause state cannot be read', async () => {
+    const { fetchImpl } = stubNetwork({ paused: 'error' });
+    const check = await checkCorePaused({ fetchImpl });
+    expect(check).toMatchObject({ status: 'unavailable', ok: false });
+    expect(() =>
+      assertBroadcastAllowed({
+        senderKey: 'a'.repeat(64) + '01',
+        totalChunks: 1,
+        singleTxEligible: true,
+        feeSource: 'live-quote',
+        balanceUstx: 5_000_000n,
+        protocolFeeUstx: 11_000n,
+        pausedCheck: check
+      })
+    ).toThrow(/fails closed/);
+  });
+
+  it('is surfaced in the plan either way', async () => {
+    const { fetchImpl } = stubNetwork({ paused: true });
+    const printed = formatPlan(await planInscription({ ...BASE, fetchImpl }));
+    expect(printed).toContain('core paused: YES');
+  });
+});
+
+describe('the post-condition the broadcast would carry', () => {
+  it('is rendered as an explicit bound, so the spend can be confirmed without reading source', async () => {
+    const { fetchImpl } = stubNetwork();
+    const plan = await planInscription({ ...BASE, fetchImpl, senderAddress: CORE_ADDRESS });
+    expect(plan.postCondition).toEqual({
+      mode: 'deny',
+      asset: 'STX',
+      principal: CORE_ADDRESS,
+      condition: 'LessEqual',
+      capUstx: 11_000n
+    });
+    expect(formatPlan(plan)).toContain(
+      `post-conditions: deny mode; STX from ${CORE_ADDRESS} <= 11,000 microSTX (0.011 STX)`
+    );
+  });
+
+  it('caps at the protocol fee, not at the whole planned spend, because the miner fee is not a transfer', async () => {
+    const { fetchImpl } = stubNetwork();
+    const plan = await planInscription({ ...BASE, fetchImpl });
+    expect(plan.postCondition.capUstx).toBe(plan.protocolFeeUstx);
+    expect(plan.postCondition.capUstx).not.toBe(plan.plannedSpendUstx);
+    expect(formatPostCondition(plan.postCondition)).toContain('<the wizard wallet>');
+  });
+});
+
+describe('whole-thread affordability', () => {
+  it('multiplies the per-entry spend by the thread length and compares to balance minus floor', () => {
+    const check = checkThreadAffordability({
+      threadLength: 6,
+      plannedSpendUstx: 41_000n,
+      balanceUstx: 5_000_000n,
+      balanceFloorUstx: DEFAULT_BALANCE_FLOOR_USTX
+    });
+    expect(check).toMatchObject({ status: 'affordable', affordable: true, threadCostUstx: 246_000n });
+    expect(formatChecks({ checks: { threadAffordability: check } }).join('\n')).toContain(
+      'thread cost: 6 x 41,000 = 246,000 microSTX (0.246 STX); affordable: yes'
+    );
+  });
+
+  it('warns but never refuses when the thread would not complete', async () => {
+    const check = checkThreadAffordability({
+      threadLength: 6,
+      plannedSpendUstx: 41_000n,
+      balanceUstx: 1_100_000n,
+      balanceFloorUstx: DEFAULT_BALANCE_FLOOR_USTX
+    });
+    expect(check).toMatchObject({ status: 'short', affordable: false, ok: true, shortfallUstx: 146_000n });
+    const printed = formatChecks({ checks: { threadAffordability: check } }).join('\n');
+    expect(printed).toContain('affordable: NO, short by 146,000 microSTX');
+    expect(printed).toContain('warning:');
+
+    // one entry is still affordable, so the per-run rails let it through
+    expect(
+      assertBroadcastAllowed({
+        senderKey: 'a'.repeat(64) + '01',
+        totalChunks: 1,
+        singleTxEligible: true,
+        feeSource: 'live-quote',
+        balanceUstx: 1_100_000n,
+        protocolFeeUstx: 11_000n
+      }).plannedSpendUstx
+    ).toBe(41_000n);
+  });
+
+  it('says so rather than guessing when no balance was read', () => {
+    const check = checkThreadAffordability({ threadLength: 6, plannedSpendUstx: 41_000n });
+    expect(check).toMatchObject({ status: 'unknown', affordable: null });
+    expect(formatChecks({ checks: { threadAffordability: check } }).join('\n')).toContain(
+      'affordable: unknown (no balance read)'
+    );
+  });
+});
+
+describe('duplicate content, advisory because v3.2.3 permits duplicates', () => {
+  it('reports the existing id on a hit, and does not refuse', async () => {
+    const { fetchImpl } = stubNetwork({ idByHash: '1234' });
+    const plan = await planInscription({ ...BASE, fetchImpl });
+    expect(plan.checks.duplicateContent).toMatchObject({ status: 'duplicate', ok: true, existingId: '1234' });
+    expect(formatPlan(plan)).toContain('duplicate: already inscribed as #1234');
+  });
+
+  it('reports a miss plainly', async () => {
+    const { fetchImpl } = stubNetwork();
+    const plan = await planInscription({ ...BASE, fetchImpl });
+    expect(plan.checks.duplicateContent).toMatchObject({ status: 'new', existingId: null });
+    expect(formatPlan(plan)).toContain('duplicate: no prior inscription with these bytes');
+  });
+
+  it('looks the plan\'s own final hash up, and degrades to unavailable on an API error', async () => {
+    const { fetchImpl, calls } = stubNetwork({ idByHash: 'error' });
+    const plan = await planInscription({ ...BASE, fetchImpl });
+    const sent = (calls.find((c) => c.url.endsWith('/get-id-by-hash'))?.body as { arguments: string[] }).arguments[0];
+    expect(sent).toBe(`0x02${(32).toString(16).padStart(8, '0')}${plan.call.finalHashHex.slice(2)}`);
+    expect(plan.checks.duplicateContent).toMatchObject({ status: 'unavailable', ok: true });
+    expect(formatPlan(plan)).toContain('duplicate: unavailable');
+  });
+});
+
+describe('the pending nonce', () => {
+  it('reports the next nonce when nothing is in flight', async () => {
+    const { fetchImpl } = stubNetwork();
+    const check = await checkPendingNonce({ fetchImpl, address: CORE_ADDRESS });
+    expect(check).toMatchObject({ status: 'clear', nextNonce: 7, warning: null });
+    expect(formatChecks({ checks: { pendingNonce: check } }).join('\n')).toContain('nonce: next 7');
+  });
+
+  it('warns when a gap says a transaction is already queued', async () => {
+    const { fetchImpl } = stubNetwork({
+      nonces: { last_executed_tx_nonce: 6, possible_next_nonce: 9, detected_missing_nonces: [] }
+    });
+    const check = await checkPendingNonce({ fetchImpl, address: CORE_ADDRESS });
+    expect(check.status).toBe('pending');
+    expect(formatChecks({ checks: { pendingNonce: check } }).join('\n')).toMatch(/warning:.*queues behind it/);
+  });
+
+  it('warns on detected missing nonces, which are a stuck transaction', async () => {
+    const { fetchImpl } = stubNetwork({
+      nonces: { last_executed_tx_nonce: 6, possible_next_nonce: 7, detected_missing_nonces: [4, 5] }
+    });
+    const check = await checkPendingNonce({ fetchImpl, address: CORE_ADDRESS });
+    expect(check).toMatchObject({ status: 'pending', missingNonces: [4, 5] });
+    expect(check.warning).toContain('missing nonces 4, 5');
+  });
+
+  it('treats a wallet that has executed nothing but has a next nonce as in flight', async () => {
+    const { fetchImpl } = stubNetwork({
+      nonces: { last_executed_tx_nonce: null, possible_next_nonce: 3, detected_missing_nonces: [] }
+    });
+    expect((await checkPendingNonce({ fetchImpl, address: CORE_ADDRESS })).status).toBe('pending');
+  });
+
+  it('skips without an address and degrades on an API error, never blocking either way', async () => {
+    const { fetchImpl } = stubNetwork({ nonces: 'error' });
+    expect(await checkPendingNonce({ fetchImpl })).toMatchObject({ status: 'skipped', ok: true });
+    expect(await checkPendingNonce({ fetchImpl, address: CORE_ADDRESS })).toMatchObject({
+      status: 'unavailable',
+      ok: true
+    });
+  });
+});
+
+describe('--offline', () => {
+  it('skips every network-dependent check, says which, and touches no endpoint', async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new Error('network must not be touched in offline mode');
+    });
+    const plan = await planInscription({
+      ...BASE,
+      wizard: 'skeptic',
+      position: 2,
+      parentIds: ['4242'],
+      answering: [{ id: '4242', wizard: 'Wizard-1, the Archivist', quote: 'anything' }],
+      offline: true,
+      senderAddress: CORE_ADDRESS,
+      fetchImpl: fetchImpl as unknown as typeof fetch
+    });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(plan.skippedChecks).toEqual(['parent quote', 'core paused', 'duplicate', 'nonce']);
+    for (const name of ['parentQuote', 'corePaused', 'duplicateContent', 'pendingNonce'] as const) {
+      expect(plan.checks[name].status).toBe('skipped');
+    }
+    // the sixth check needs no network, but it needs a balance it did not read
+    expect(plan.checks.threadAffordability.status).toBe('unknown');
+
+    const printed = formatPlan(plan);
+    expect(printed).toContain('parent quote: skipped (--offline)');
+    expect(printed).toContain('core paused: skipped (--offline)');
+    expect(printed).toContain('duplicate: skipped (--offline)');
+    expect(printed).toContain('nonce: skipped (--offline)');
+    expect(printed).toContain('offline: skipped parent quote, core paused, duplicate, nonce');
+  });
+
+  it('cannot be broadcast, so a skipped check is never a passed check', () => {
+    expect(() =>
+      assertBroadcastAllowed({
+        senderKey: 'a'.repeat(64) + '01',
+        totalChunks: 1,
+        singleTxEligible: true,
+        feeSource: 'offline-estimate',
+        balanceUstx: 5_000_000n,
+        protocolFeeUstx: OFFLINE_FEE_ESTIMATE_USTX,
+        parentQuoteCheck: { status: 'skipped', ok: false },
+        pausedCheck: { status: 'skipped', ok: false }
+      })
+    ).toThrow(/not a live quote/);
+  });
+});
+
+describe('the preflight checks cannot spend anything', () => {
+  it('reaches only read endpoints across a full plan with every check exercised', async () => {
+    const { body, citation } = await parentEntry();
+    const { fetchImpl, calls } = stubNetwork({
+      chunks: { '4242': body },
+      creators: { '4242': ARCHIVIST_ADDRESS },
+      idByHash: '1234',
+      nonces: { last_executed_tx_nonce: 6, possible_next_nonce: 9, detected_missing_nonces: [3] }
+    });
+
+    await planInscription({
+      ...BASE,
+      wizard: 'skeptic',
+      position: 2,
+      parentIds: ['4242'],
+      answering: [citation],
+      senderAddress: ARCHIVIST_ADDRESS,
+      expectedAddresses: { [citation.wizard.toLowerCase()]: ARCHIVIST_ADDRESS },
+      fetchImpl
+    });
+
+    const readOnlyFunctions = new Set([
+      'quote-inscription-fee',
+      'get-chunk',
+      'get-inscription-creator',
+      'get-id-by-hash',
+      'is-paused'
+    ]);
+    for (const call of calls) {
+      expect(call.url).not.toContain('/v2/transactions');
+      expect(call.url).not.toContain('broadcast');
+      expect(['GET', 'POST']).toContain(call.method);
+      if (call.url.includes('/call-read/')) {
+        expect(readOnlyFunctions.has(call.url.split('/').pop() as string)).toBe(true);
+      }
+    }
+    // and it did exercise the new reads rather than silently skipping them
+    for (const fn of readOnlyFunctions) expect(calls.some((c) => c.url.endsWith(`/${fn}`))).toBe(true);
+  });
+
+  it('keeps signing and broadcasting confined to the cli, where --broadcast gates them', () => {
+    const source = readFileSync(join(__dirname, '..', 'inscribe.mjs'), 'utf8');
+    const cliAt = source.indexOf('/* cli ');
+    expect(cliAt).toBeGreaterThan(0);
+    for (const needle of ['broadcastTransaction(', 'makeContractCall(', 'makeStandardSTXPostCondition(']) {
+      const positions = [...source.matchAll(new RegExp(needle.replace('(', '\\('), 'g'))].map((match) => match.index);
+      expect(positions.length).toBeGreaterThan(0);
+      for (const at of positions) expect(at).toBeGreaterThan(cliAt);
+    }
+  });
+});
+
+describe('the closing instruction', () => {
+  it('says the key is already loaded, rather than asking for one that is present', () => {
+    const lines = broadcastInstruction({
+      wizardId: 'archivist',
+      hasKey: true,
+      threadId: 't-2026-07-30-a',
+      subject: 'cost-of-permanence',
+      position: 1
+    }).join('\n');
+    expect(lines).toContain('already loaded');
+    expect(lines).toContain('scripts/wizard/.env.wizards');
+    expect(lines).toContain(
+      'node scripts/wizard/inscribe.mjs --wizard archivist --subject cost-of-permanence --position 1 ' +
+        '--thread t-2026-07-30-a --broadcast'
+    );
+    expect(lines).not.toMatch(/WIZARD_KEY_ARCHIVIST=<hex/);
+  });
+
+  it('still asks for the key when there is none, and mentions the env file as well', () => {
+    const lines = broadcastInstruction({ wizardId: 'skeptic', hasKey: false, threadId: DEMO_THREAD_ID }).join('\n');
+    expect(lines).toContain('WIZARD_KEY_SKEPTIC=<hex private key>');
+    expect(lines).toContain('scripts/wizard/.env.wizards');
+  });
+
+  it('always names --thread, and refuses to pretend the demo id would work', () => {
+    const demo = broadcastInstruction({ wizardId: 'archivist', hasKey: true }).join('\n');
+    expect(demo).toContain('--thread <your-thread-id>');
+    expect(demo).toContain(`the placeholder "${DEMO_THREAD_ID}" is refused`);
+
+    const real = broadcastInstruction({ wizardId: 'archivist', hasKey: true, threadId: 't-real' }).join('\n');
+    expect(real).toContain('--thread t-real');
+    expect(real).toContain('--thread is mandatory');
+  });
+
+  it('reproduces the citation flags, shell-quoted, so the command is the one that was planned', () => {
+    const lines = broadcastInstruction({
+      wizardId: 'skeptic',
+      hasKey: true,
+      threadId: 't-real',
+      parentIds: ['4242', '4243'],
+      parentQuote: 'a "quoted" fragment',
+      parentWizard: 'Wizard-1, the Archivist'
+    }).join('\n');
+    expect(lines).toContain('--parents 4242,4243');
+    expect(lines).toContain('--parent-quote "a \\"quoted\\" fragment"');
+    expect(lines).toContain('--parent-wizard "Wizard-1, the Archivist"');
+  });
+
+  it('tells an offline run to drop --offline before adding --broadcast', () => {
+    const lines = broadcastInstruction({ wizardId: 'archivist', hasKey: true, offline: true }).join('\n');
+    expect(lines).toMatch(/Drop --offline before you add --broadcast/);
   });
 });
 
