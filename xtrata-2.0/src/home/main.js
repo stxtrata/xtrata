@@ -72,6 +72,7 @@
       isSponsoredMarket
     } from '/src/lib/market/sponsored.ts';
     import {
+      resolveSponsorBase,
       runSponsoredBuy,
       sponsoredBuyIneligibilityMessage,
       sponsoredBuyProgressLabel
@@ -10517,8 +10518,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
     const marketSponsorClients = new Map();
     const marketSponsorClientFor = (entry) => {
-      const base = (entry?.sponsorApi ?? '').replace(/\/+$/, '');
-      if (!base) return null;
+      // resolveSponsorBase returns '' for a same-origin relayer and null only
+      // when the market has none. Do not collapse the two: the mainnet registry
+      // writes "/" for every sponsored market, so a falsy check here disables
+      // sponsorship everywhere and does it silently.
+      const base = resolveSponsorBase(entry);
+      if (base === null) return null;
       if (!marketSponsorClients.has(base)) {
         marketSponsorClients.set(base, createSponsorClient(base));
       }

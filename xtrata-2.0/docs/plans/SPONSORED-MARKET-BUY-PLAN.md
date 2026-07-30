@@ -93,6 +93,10 @@ The market page never refreshes after a buy, cancel, or list — a sold listing 
 
 **Regression guards.** `market-sponsored-claims.test.ts` is the anti-drift mechanism: copy and capability must move together. Extend it at Stages 2, 3 and 4 rather than deleting it.
 
+**The dev server cannot exercise the sponsored path.** `/sponsor/*` is a Cloudflare Pages function, so under `vite dev` a quote returns HTTP 404, eligibility fails `relayer-unavailable`, and every sponsored buy falls through to self-paid. Correct degradation, but it means Playwright coverage needs a stubbed relayer rather than the real one — and that a manual dev-server pass can only ever confirm the fall-through, never the sponsorship.
+
+**There are currently no live sponsored listings on mainnet.** `get-last-listing-id` reads 0 / 2 / 0 for STX / sBTC / USDCx, and both sBTC listings return `none`. So the sponsored branch cannot be clicked through on production either until someone lists — which is itself gated on Stage 4. The testnet rehearsal is therefore the first real exercise of this code, not a formality.
+
 **Browser (Playwright).** The market page has **no behavioural UI test at all** — the fifteen guards in `market-sponsored-claims.test.ts` are structural assertions against `main.js` source, not rendering. Stage 1 closed most of the gap by moving the decisions into a module with real unit tests, but the ~100 lines of DOM glue in `marketSponsoredBuy` are still only structurally checked. This is the same gap that let the drops history ship broken, and it remains the largest risk in this plan. Minimum before Stage 3 ships the copy: sponsored buy happy path against a stubbed relayer; relayer-down fallback. Before Stage 4: list-with-deposit; cancel returns NFT and deposit.
 
 **Manual testnet rehearsal.** Before mainnet: list on each of the three sponsored markets, buy each from a **genuinely zero-STX wallet** (the actual claim being made), confirm `claim-fee` and `settle-refund` settle, and confirm seller self-refund works after 144 blocks with the relayer deliberately stopped.

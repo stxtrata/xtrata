@@ -14,8 +14,11 @@ import {
   type SponsorClient,
   type SponsorJob
 } from '../sponsor-client';
+import { MARKET_REGISTRY } from '../registry';
+import { isSponsoredMarket } from '../sponsored';
 import {
   isWalletCancellation,
+  resolveSponsorBase,
   runSponsoredBuy,
   sponsoredBuyFailureFromSignError,
   sponsoredBuyFailureFromSubmitError,
@@ -213,6 +216,49 @@ describe('runSponsoredBuy', () => {
     // RECEIVED on submit, then one entry per genuine change. The repeated
     // CLAIMED must not produce a second entry.
     expect(sponsoring.map((p) => p.jobState)).toEqual(['RECEIVED', 'CONFIRMED', 'CLAIMED']);
+  });
+});
+
+/**
+ * These caught a live defect. main.js normalised the base with
+ * `(entry.sponsorApi ?? '').replace(/\/+$/, '')` and treated the empty result
+ * as "no relayer", which silently disabled sponsorship for every mainnet
+ * market — all three write `"/"`. Nothing failed loudly: the branch just fell
+ * through to a self-paid buy forever. Hence the assertion against the real
+ * registry rather than a fixture.
+ */
+describe('resolveSponsorBase', () => {
+  it('treats a same-origin "/" as configured, not missing', () => {
+    expect(resolveSponsorBase({ sponsorApi: '/' })).toBe('');
+    expect(resolveSponsorBase({ sponsorApi: '///' })).toBe('');
+  });
+
+  it('returns null only when there is genuinely no relayer', () => {
+    expect(resolveSponsorBase({ sponsorApi: undefined })).toBeNull();
+    expect(resolveSponsorBase({ sponsorApi: '' })).toBeNull();
+    expect(resolveSponsorBase({ sponsorApi: '   ' })).toBeNull();
+    expect(resolveSponsorBase(null)).toBeNull();
+    expect(resolveSponsorBase(undefined)).toBeNull();
+  });
+
+  it('strips trailing slashes from an absolute relayer', () => {
+    expect(resolveSponsorBase({ sponsorApi: 'https://relay.example/' })).toBe(
+      'https://relay.example'
+    );
+    expect(resolveSponsorBase({ sponsorApi: ' https://relay.example//' })).toBe(
+      'https://relay.example'
+    );
+  });
+
+  it('every sponsored market in the shipped registry resolves to a client', () => {
+    const sponsored = MARKET_REGISTRY.filter((entry) => isSponsoredMarket(entry));
+    expect(sponsored.length, 'no sponsored markets in the registry').toBeGreaterThan(0);
+    for (const entry of sponsored) {
+      expect(
+        resolveSponsorBase(entry),
+        `${entry.contractName} would never attempt a sponsored buy`
+      ).not.toBeNull();
+    }
   });
 });
 

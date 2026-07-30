@@ -33,6 +33,25 @@ import {
   submitSponsorClaimWithRetry
 } from '../drops/sponsored-claim';
 import type { SponsoredBuyEligibility } from './sponsored';
+import type { MarketRegistryEntry } from './registry';
+
+/**
+ * Sponsor relayer base URL for a market, or null when it has no relayer.
+ *
+ * An empty string is a valid answer and means same-origin. The registry writes
+ * `"/"` for markets served by this site's own `/sponsor` functions, and
+ * stripping the trailing slash leaves nothing behind. Treating that emptiness
+ * as "unconfigured" disables sponsorship for every mainnet market at once and
+ * does it silently, since the caller just falls through to a self-paid buy —
+ * which is precisely what it did before this was pulled out of main.js.
+ */
+export const resolveSponsorBase = (
+  entry: Pick<MarketRegistryEntry, 'sponsorApi'> | null | undefined
+): string | null => {
+  const raw = entry?.sponsorApi;
+  if (typeof raw !== 'string' || raw.trim().length === 0) return null;
+  return raw.trim().replace(/\/+$/, '');
+};
 
 export type SponsoredBuyPhase =
   | { phase: 'idle' }
