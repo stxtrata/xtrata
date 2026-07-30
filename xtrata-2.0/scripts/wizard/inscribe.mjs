@@ -1195,10 +1195,22 @@ export function formatChecks(plan) {
   return lines;
 }
 
-/** Render a plan for a terminal. Pure string building. */
-export function formatPlan(plan) {
+/**
+ * Render a plan for a terminal. Pure string building.
+ *
+ * The header used to say "(DRY RUN)" unconditionally, including on a real
+ * broadcast — the plan prints before the broadcast branch is reached, so an
+ * operator scanning the output saw DRY RUN at the top of a run that then spent
+ * real STX and wrote a permanent record. The only contradiction was one line at
+ * the very bottom. Pass `broadcast: true` so the first line tells the truth.
+ */
+export function formatPlan(plan, { broadcast = false } = {}) {
   const lines = [];
-  lines.push('--- wizard inscription plan (DRY RUN) ---');
+  lines.push(
+    broadcast
+      ? '--- wizard inscription plan (BROADCAST — this will spend STX and cannot be undone) ---'
+      : '--- wizard inscription plan (DRY RUN) ---'
+  );
   lines.push(`wizard      : ${plan.wizard.name}`);
   lines.push(`thread      : ${plan.threadId}  position ${plan.position} of ${plan.threadLength}`);
   lines.push(`subject     : ${plan.subject.id}  (${plan.subject.title})`);
@@ -1399,7 +1411,7 @@ async function main() {
     minerFeeUstx: BigInt(arg('max-tx-fee-ustx', String(DEFAULT_MAX_TX_FEE_USTX)))
   });
 
-  console.log(formatPlan(plan));
+  console.log(formatPlan(plan, { broadcast: flag('broadcast') }));
 
   const outPath = typeof arg('out') === 'string' ? arg('out') : null;
   if (outPath) {

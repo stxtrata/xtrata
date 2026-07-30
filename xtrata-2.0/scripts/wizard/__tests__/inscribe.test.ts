@@ -1023,3 +1023,24 @@ describe('the placeholder thread id', () => {
     expect(DEMO_THREAD_ID.startsWith('t-demo')).toBe(true);
   });
 });
+
+describe('the plan header states what the run will actually do', () => {
+  const planFor = async () => {
+    const { fetchImpl } = stubNetwork();
+    return planInscription({ ...BASE, fetchImpl });
+  };
+
+  it('says DRY RUN when nothing will be sent', async () => {
+    expect(formatPlan(await planFor())).toContain('(DRY RUN)');
+  });
+
+  it('says BROADCAST, and warns it cannot be undone, when it will spend', async () => {
+    // The header was hardcoded to "(DRY RUN)" and printed before the broadcast
+    // branch, so a real spend announced itself as a dry run and the only
+    // contradiction was one line at the very bottom of the output.
+    const header = formatPlan(await planFor(), { broadcast: true }).split('\n')[0];
+    expect(header).toContain('BROADCAST');
+    expect(header).toMatch(/cannot be undone/i);
+    expect(header).not.toContain('DRY RUN');
+  });
+});

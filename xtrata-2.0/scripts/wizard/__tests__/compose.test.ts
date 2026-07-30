@@ -368,3 +368,30 @@ describe('input validation', () => {
     expect(() => parseEntry('# not an entry')).toThrow(/no front matter/);
   });
 });
+
+describe('the manifest tells the truth about how to walk the thread', () => {
+  const manifestOf = () =>
+    composeThread({ ...BASE, subject: 'cost-of-permanence', ids: [1, 2, 3, 4, 5, 6] }).manifest;
+
+  it('does not claim the edges can be followed forward', () => {
+    // get-dependencies names what an entry answers; the core keeps no reverse
+    // index, so nothing on chain leads from an earlier entry to a later one.
+    // The manifest previously said "start at the lowest id and follow the edges
+    // forward", which is not possible — a bad instruction to make permanent in
+    // a document whose whole claim is that it is checkable.
+    const manifest = manifestOf();
+    expect(manifest).not.toMatch(/lowest id/i);
+    expect(manifest).not.toMatch(/edges forward/i);
+  });
+
+  it('says the edges point backwards and names the read that proves it', () => {
+    const manifest = manifestOf();
+    expect(manifest).toMatch(/backwards only/i);
+    expect(manifest).toContain('get-dependencies');
+    expect(manifest).toMatch(/highest id and walk back/i);
+  });
+
+  it('still defers to the edges over its own list', () => {
+    expect(manifestOf()).toMatch(/the edges are right and this file is wrong/i);
+  });
+});

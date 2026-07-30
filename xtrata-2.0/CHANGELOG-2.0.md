@@ -2,6 +2,15 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Wizard corpus: first entries live, and two corrections they exposed (2026-07-31)
+
+- **Thread `t-permanence-001` is minting on mainnet.** Entry 1, inscription **#2922** (Archivist, 1,661 bytes, block 8,670,293) and entry 2, **#2923** (Skeptic, 1,807 bytes, block 8,670,309, `mint-single-tx-recursive` with dependency `[2922]`). Both verified from chain: creator, thread, position and claim all read back correctly.
+- **The parent-quote rail did its job on real data.** Entry 2's dry run verified its citation against #2922's own on-chain bytes and confirmed the credited wizard was the creator. Tested adversarially by altering one word — `remove` → `delete` — which it caught, printing both sides. A misquote can no longer become permanent.
+- **The plan header lied on a broadcast.** `formatPlan` hardcoded `(DRY RUN)` and prints before the broadcast branch is reached, so entry 2's real, irreversible spend opened with a header saying DRY RUN; the only contradiction was one line at the very bottom of the output. It now reads `(BROADCAST — this will spend STX and cannot be undone)`. Guarded by test.
+- **The manifest gave an instruction that cannot be followed.** It said "start at the lowest id and follow the edges forward". Verified on chain that this is impossible: `get-dependencies(2923)` returns `[2922]`, the edges point backwards only, and the core has **no reverse index** — no `get-dependents`, no `get-children`. Nothing on chain leads from an earlier entry to a later one. For a document whose entire claim is that its assertions are checkable, an uncheckable instruction was the worst possible thing to make permanent. Rewritten to say the edges point backwards, name the read that proves it, and direct the reader to start at the highest id or use the list. Safe to correct because the manifest is written last; entries #2922 and #2923 are untouched.
+- **On why these are dependency edges and not `parents`:** the core's `parents` means supersession and requires the sender to own every id listed, which is impossible across three separate wizard wallets. The explorer therefore shows `Dependencies (1): #2922` on #2923 and "no parents, children or siblings" — both correct. "Answers" is also the truer claim than "replaces".
+- **Verified:** `npx vitest run` — **1705 tests across 218 files**; `npx eslint scripts/wizard/**/*.mjs` clean. Entry composition untouched, so no minted bytes moved.
+
 ## Wizard inscribe preflight: parent-quote verification and five more checks (2026-07-30, follow-up)
 
 - **Why:** the dry run printed a correct plan and proved nothing about the conditions the mint actually depends on. Six checks now run before any spend, all reads, none able to broadcast.

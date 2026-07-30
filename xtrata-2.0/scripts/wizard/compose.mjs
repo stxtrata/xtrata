@@ -547,9 +547,11 @@ export function composeThreadManifest({ threadId, entries = [], subject = null, 
   lines.push('## How to read it');
   lines.push('');
   lines.push(
-    'Each entry after the first carries an on-chain dependency edge to the one it answers, so the order above ' +
-      'can be rebuilt from the chain without trusting this file. Start at the lowest id and follow the edges ' +
-      'forward. If this list and the edges ever disagree, the edges are right and this file is wrong.'
+    'Each entry after the first carries an on-chain dependency edge to the one it answers. The edges point ' +
+      'backwards only: get-dependencies on an entry names what it answers, and the core keeps no reverse ' +
+      'index, so nothing on chain leads from an earlier entry to a later one. Start at the highest id and walk ' +
+      'back, or use the list above, which is what it is for. If the list and the edges ever disagree, the ' +
+      'edges are right and this file is wrong.'
   );
   lines.push('');
   lines.push(
