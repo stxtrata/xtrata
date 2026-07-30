@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -117,5 +117,27 @@ describe('broken states are reported, never corrected', () => {
     const s = build({});
     expect(s.mintedCount).toBe(0);
     expect(s.anomalies).toEqual([]);
+  });
+});
+
+describe('the grid is laid out as the artwork is', () => {
+  // Behaviour was verified in a browser (32 columns, square cells, item 32 starting a new
+  // row). These guard the two ways it silently regresses: an auto-fill grid that reflows
+  // with the window, and a hardcoded side that breaks on a different supply.
+  const mosaic = readFileSync(new URL('../../../tools/mosaic-sim/mosaic.html', import.meta.url), 'utf8');
+
+  it('never uses auto-fill, which would put every item in the wrong place', () => {
+    // Match the USAGE, not the word — the file mentions auto-fill in a comment saying
+    // exactly why it must not be used, and an assertion on the bare word fails on that.
+    expect(mosaic).not.toMatch(/repeat\(\s*auto-fi[lt]/);
+  });
+
+  it('derives the square side from the supply rather than hardcoding 32', () => {
+    expect(mosaic).toContain('Math.sqrt(maxSupply)');
+    expect(mosaic).toContain('gridTemplateColumns = `repeat(${side}, 1fr)`');
+  });
+
+  it('says so when the supply cannot be a square', () => {
+    expect(mosaic).toContain('is not a perfect square');
   });
 });

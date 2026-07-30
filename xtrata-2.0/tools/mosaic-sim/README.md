@@ -45,6 +45,16 @@ File contents are the real namespaced seed: `xtrata:seed/<slug>/0417:9f3a2c`.
 engine and mosaic ids), `finalized`, and `holders` (index → collector address).
 `state/mint-order.json` pins the order items were minted in.
 
+## The grid is a fixed square
+
+1024 = 32×32, and the seed determines **position as well as colour** — so the grid is a
+fixed square, laid out as the artwork is. The side comes from `sqrt(maxSupply)`, and a
+supply that is not a perfect square says so rather than being rendered as a rectangle.
+
+An `auto-fill` grid was the first version and was wrong: it reflows with the window, so
+every item sits somewhere different at every width. It looked fine and meant nothing.
+There is a test guarding against that regression.
+
 ## Two traps built in on purpose
 
 A mosaic that gets either of these wrong looks perfect right up until launch day.

@@ -5,8 +5,11 @@
   :root{--bg:#07090d;--ink:#e6edf6;--mut:#8b9bb4;--line:#243044;--treas:#2b3a55;--sold:#3ddc97;--bad:#ff6b6b}
   body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,sans-serif;padding:18px}
   h1{font-size:16px;margin:0 0 4px} .sub{color:var(--mut);font-size:12px;margin-bottom:14px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(14px,1fr));gap:2px;max-width:1100px}
-  .cell{aspect-ratio:1;border-radius:2px;background:var(--treas)}
+  /* A FIXED square, not auto-fill. The seed determines colour AND position, so the grid
+     has to be laid out as the artwork is: 1024 = 32x32. An auto-fill grid reflows with the
+     window and puts every item in the wrong place, which looks fine and is meaningless. */
+  .grid{display:grid;gap:2px;width:min(88vmin,900px);aspect-ratio:1}
+  .cell{border-radius:2px;background:var(--treas);min-width:0;min-height:0}
   .cell.sold{background:var(--sold)}
   .cell.missing{background:transparent;border:1px dashed var(--line)}
   .cell.bad{background:var(--bad)}
@@ -104,6 +107,14 @@ const isNone = (hex) => hex.replace(/^0x/, '').startsWith('0709');   // (ok none
     }
 
     const grid = document.getElementById('grid');
+    // Square side from the supply. A supply that is not a perfect square cannot be laid
+    // out as the artwork is, so say so rather than guessing at a rectangle.
+    const side = Math.round(Math.sqrt(maxSupply));
+    if (side * side !== maxSupply) {
+      warn(`supply ${maxSupply} is not a perfect square — the grid cannot match the artwork layout`);
+    }
+    grid.style.gridTemplateColumns = `repeat(${side}, 1fr)`;
+
     let treasuryCount = 0, soldCount = 0, missing = 0;
     // The treasury address is what "unsold" means; anything else is a collector.
     for (let i = 0; i < maxSupply; i++) {
@@ -114,9 +125,10 @@ const isNone = (hex) => hex.replace(/^0x/, '').startsWith('0709');   // (ok none
       else if (c.twin) cell.classList.add('bad');
       else if (c.inTreasury) { treasuryCount++; }
       else { soldCount++; cell.classList.add('sold'); }
+      const rc = `r${Math.floor(i / side)} c${i % side}`;
       cell.title = c
-        ? `#${i} · token ${c.tokenId} · ${c.twin ? 'TWIN' : c.inTreasury ? 'in treasury' : 'released'}`
-        : `#${i} · not minted`;
+        ? `#${i} (${rc}) · token ${c.tokenId} · ${c.twin ? 'TWIN' : c.inTreasury ? 'in treasury' : 'released'}`
+        : `#${i} (${rc}) · not minted`;
       grid.append(cell);
     }
 
