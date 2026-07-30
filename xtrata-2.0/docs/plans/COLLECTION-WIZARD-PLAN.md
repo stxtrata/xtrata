@@ -128,11 +128,47 @@ alone: our local record of token ids, the collection contract's minted index, an
 check" and stop — never "not inscribed". That rule has cost more than any other this
 month.
 
-### Seed uniqueness is on us
+### The seed list is FIXED, and that has consequences
 
-Nothing on-chain stops two identical seeds. Two identical seeds means two indistinguishable
-artworks in a 1,024 collection. The wizard enforces 1,024 distinct seeds locally, before a
-single transaction goes out.
+The seed determines colour and positioning, so the list is curated, not generated. The
+wizard verifies it; it never invents it. Beyond artistic control that also makes the
+collection reproducible — a generated list could differ between runs with nothing on-chain
+to reveal which one was intended.
+
+Four things follow:
+
+**The list is an artefact of record.** Hash the canonical list file, show that fingerprint
+before minting, and record it in the manifest. Without it, a re-run from a subtly different
+export (re-sorted, re-encoded) mints a different collection invisibly.
+
+**Order is part of the collection's identity.** The namespaced content bakes in the index,
+so re-sorting the list changes every content hash and therefore every piece. That is
+desirable — it pins the mapping permanently — but the list's order must be frozen before
+the first mint and never casually touched after.
+
+**Retrying a successful item mints a TWIN.** Duplicates are allowed on-chain, so retrying
+an item whose broadcast we never saw confirm produces a second token with identical
+content: 1,025 tokens with an indistinguishable pair at one index. The three-source
+reconciliation (§4) is therefore not an efficiency measure — it is what stops the
+collection being quietly wrong. Treat it as load-bearing.
+
+**Render all 1,024 through the real engine BEFORE minting anything.** A malformed seed, an
+out-of-range value or a stray character produces a broken piece, and inscribing is
+permanent — discovering it at item 900 means 900 paid transactions and a hole in the
+collection. Rendering the whole list locally through the actual engine is cheap and
+catches every seed the engine cannot handle. It also catches what nothing else would: two
+DIFFERENT seeds that render near-identically, which are not hash twins but still weaken the
+collection.
+
+This is a **gate, not a suggestion**: no minting until every seed in the list has rendered
+successfully, and the operator has seen the contact sheet.
+
+### Seed uniqueness is still checked
+
+Nothing on-chain stops two identical seeds, so the wizard verifies the supplied list has
+1,024 distinct seeds and contiguous indices before a single transaction goes out. It
+rejects the list rather than fixing it — a curated list with a duplicate is a mistake to
+be corrected at source, not silently patched.
 
 ---
 
@@ -173,11 +209,25 @@ per-URL faults. It needs a chaining cap and a minted-index for the collection co
   alone it would skip — assert the difference explicitly, so nobody "simplifies" it later.
 - A failed reconciliation read stops the run and says "could not check".
 
-**Seeds**
-- Fewer or more than 1,024 seeds refuses to start.
+**The fixed list**
+- Fewer or more than 1,024 rows refuses to start.
 - Any duplicate seed refuses to start, naming both indices.
-- Every item's content matches `xtrata:seed/<slug>/<index>:<seed>` exactly, and indices
-  are contiguous 0..1023.
+- Non-contiguous or repeated indices refuse to start.
+- Every item's content matches `xtrata:seed/<slug>/<index>:<seed>` exactly.
+- The list fingerprint is recorded, and a changed list is detected on resume and refuses
+  to continue against a collection minted from a different one.
+- Re-ordering the list changes the content hashes — asserted, so the coupling is explicit
+  and nobody "tidies" the ordering later.
+
+**The pre-render gate**
+- Minting refuses until every one of the 1,024 seeds has rendered through the engine.
+- A seed the engine rejects is named, and blocks the run rather than being skipped.
+- Two seeds rendering near-identically are reported (a weakened collection, not an error).
+
+**Retry safety**
+- An item whose broadcast succeeded but was never observed is NOT re-minted; reconciliation
+  finds the token and moves on.
+- Forcing a retry of a landed item is refused rather than producing a twin at that index.
 
 **Ordering and prerequisites**
 - Minting refuses if `default-dependencies` is unset or does not match the engine and
