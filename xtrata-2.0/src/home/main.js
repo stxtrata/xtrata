@@ -446,6 +446,8 @@
       fullscreenTitle: $('fullscreenTitle'),
       fullscreenMeta: $('fullscreenMeta'),
       fullscreenId: $('fullscreenId'),
+      fullscreenMarkButton: $('fullscreenMarkButton'),
+      fullscreenRelations: $('fullscreenRelations'),
       fullscreenStage: $('fullscreenStage'),
       fullscreenRawLink: $('fullscreenRawLink'),
       fullscreenPrevButton: $('fullscreenPrevButton'),
@@ -608,6 +610,7 @@
       prepared: null,
       lastMintAttempt: null,
       handoffDependencyIds: [],
+      fullscreenRelRequestId: 0,
       parentIds: [],
       parentStatusById: new Map(),
       parentStatusMessage: null,
@@ -6015,12 +6018,125 @@
       dom.fullscreenStage.append(link);
     };
 
+    // How many chips a group shows before it stops. A piece with 200 children is
+    // real, and rendering 200 tap targets would turn the strip into a scroll
+    // marathon; the count in the label still tells the whole truth.
+    /**
+     * Reserves the height the chrome and relations strip ACTUALLY occupy.
+     *
+     * The stage is sized as `min(90vw, 90vh - chrome-space)`, and chrome-space used
+     * to be a hardcoded 82px. That number is only right while the chrome is a single
+     * row: on a phone it wraps to three, and adding the relations strip pushed the
+     * artwork off the bottom of the screen. Measuring is the only version of this
+     * that survives both wrapping and a strip that comes and goes.
+     */
+    const syncFullscreenChromeSpace = () => {
+      const viewer = dom.fullscreenViewer;
+      if (!viewer) return;
+      const chrome = viewer.querySelector('.fullscreen-viewer__chrome');
+      const strip = dom.fullscreenRelations;
+      const gap = 14;
+      const stripHeight = strip && !strip.hidden ? strip.offsetHeight + gap : 0;
+      const space = (chrome?.offsetHeight ?? 0) + stripHeight + gap * 2;
+      viewer.style.setProperty('--fullscreen-chrome-space', `${space}px`);
+    };
+
+    const FULLSCREEN_REL_CHIP_LIMIT = 12;
+
+    const buildRelStripGroup = (contractId, label, kind, ids) => {
+      if (!ids || ids.length === 0) return null;
+      const group = document.createElement('div');
+      group.className = `rel-strip__group rel-strip__group--${kind}`;
+
+      const labelEl = document.createElement('span');
+      labelEl.className = 'rel-strip__label';
+      labelEl.textContent = `${label} ${ids.length}`;
+      group.append(labelEl);
+
+      for (const id of ids.slice(0, FULLSCREEN_REL_CHIP_LIMIT)) {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'rel-strip__chip';
+        chip.textContent = `#${id.toString()}`;
+        chip.title = `Open ${label.toLowerCase()} #${id.toString()}`;
+        chip.addEventListener('click', async (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          await selectRelationshipToken(contractId, id);
+          // Stay enlarged: the whole point is navigating the family without
+          // dropping back to the grid between each hop.
+          if (state.fullscreenOpen) await renderFullscreenSelectedToken();
+        });
+        group.append(chip);
+      }
+
+      if (ids.length > FULLSCREEN_REL_CHIP_LIMIT) {
+        const more = document.createElement('span');
+        more.className = 'rel-strip__more';
+        more.textContent = `+${ids.length - FULLSCREEN_REL_CHIP_LIMIT} more below`;
+        group.append(more);
+      }
+      return group;
+    };
+
+    /**
+     * Direct relations for the enlarged view: parents, children, what this piece
+     * depends on, and what replies to it.
+     *
+     * Deliberately DIRECT relations only. The sidebar already draws the full
+     * lineage tree, and repeating deep ancestry here would cost height on exactly
+     * the screens that have least of it. What this strip is for is getting to a
+     * neighbour in one tap.
+     */
+    const renderFullscreenRelations = async (token) => {
+      const container = dom.fullscreenRelations;
+      if (!container) return;
+      const requestId = ++state.fullscreenRelRequestId;
+      container.replaceChildren();
+      container.hidden = true;
+      dom.fullscreenViewer?.classList.remove('has-relations');
+      syncFullscreenChromeSpace();
+      if (!token || !supportsParentRelationships() || state.fullscreenSource === 'prepared') {
+        return;
+      }
+
+      const contractId = getTokenCacheContractId(token);
+      const sender = getReadOnlySenderAddress();
+      const [lineage, dependents, dependencies] = await Promise.all([
+        fetchLineage({ contractId, id: token.id }).catch(() => null),
+        fetchDependents({ contractId, id: token.id }).catch(() => null),
+        state.client?.getDependencies(token.id, sender).catch(() => []) ?? []
+      ]);
+      // A slower request for a piece the user has already navigated away from
+      // must never repaint the strip.
+      if (requestId !== state.fullscreenRelRequestId) return;
+
+      const groups = [
+        buildRelStripGroup(contractId, 'Parents', 'parents', lineage?.parents ?? []),
+        buildRelStripGroup(contractId, 'Children', 'children', lineage?.children ?? []),
+        buildRelStripGroup(contractId, 'Depends on', 'deps', dependencies ?? []),
+        buildRelStripGroup(contractId, 'Replies', 'replies', dependents?.dependents ?? [])
+      ].filter(Boolean);
+
+      const viewer = dom.fullscreenViewer;
+      if (groups.length === 0) {
+        viewer?.classList.remove('has-relations');
+        syncFullscreenChromeSpace();
+        return; // a lone piece gets no empty bar
+      }
+      container.append(...groups);
+      container.hidden = false;
+      viewer?.classList.add('has-relations');
+      syncFullscreenChromeSpace();
+    };
+
     const renderFullscreenSelectedToken = async () => {
       setFullscreenNotice('Loading inscription...');
       try {
         const source = await getSelectedTokenPreviewSource();
         renderFullscreenContent(source);
         updateFullscreenControls();
+        void renderFullscreenRelations(getSelectedToken());
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         setFullscreenNotice(message);
@@ -6041,6 +6157,7 @@
         dom.fullscreenTitle.hidden = false;
         dom.fullscreenMeta.textContent = 'No payload prepared';
         setFullscreenId(null); // nothing is inscribed yet, so there is no id to show
+        void renderFullscreenRelations(null);
         setFullscreenNotice('Prepare a payload first.');
         return;
       }
@@ -6058,6 +6175,7 @@
       dom.fullscreenMeta.textContent =
         `${kind.toUpperCase()} · ${formatBytes(BigInt(prepared.bytes.length))} · ${prepared.file.name}`;
       setFullscreenId(null); // a prepared payload has no token id until it is sealed
+      void renderFullscreenRelations(null);
       dom.fullscreenRawLink.href = url;
       dom.fullscreenRawLink.textContent = 'Open payload';
       dom.fullscreenRawLink.download = prepared.file.name;
@@ -14525,6 +14643,17 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     dom.previewExpandButton.addEventListener('click', openFullscreenViewer);
     dom.fullscreenCloseButton.addEventListener('click', () => {
       void closeFullscreenViewer();
+    });
+    // The mark is the way back. Closing the enlarged view IS returning to the
+    // explorer, so it shares the close path rather than navigating anywhere.
+    dom.fullscreenMarkButton?.addEventListener('click', () => {
+      void closeFullscreenViewer();
+    });
+    // Rotating a phone rewraps the chrome, which changes how much room the stage
+    // has. Recompute on the next frame so the measurement reflects the new layout.
+    window.addEventListener('resize', () => {
+      if (!state.fullscreenOpen) return;
+      requestAnimationFrame(syncFullscreenChromeSpace);
     });
     dom.fullscreenPrevButton.addEventListener('click', () => {
       void navigateFullscreenSelection(-1);

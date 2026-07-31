@@ -987,7 +987,10 @@
 
   <div class="fullscreen-viewer" id="fullscreenViewer" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="fullscreenTitle" hidden>
     <div class="fullscreen-viewer__chrome">
-      <img class="fullscreen-viewer__mark" src="/favicon.svg" alt="" aria-hidden="true" />
+      <button class="fullscreen-viewer__mark" id="fullscreenMarkButton" type="button"
+              aria-label="Back to the explorer" title="Back to the explorer">
+        <img src="/favicon.svg" alt="" aria-hidden="true" />
+      </button>
       <div class="fullscreen-viewer__title">
         <strong id="fullscreenTitle">Selected inscription</strong>
         <span id="fullscreenMeta">Select an inscription</span>
@@ -1008,6 +1011,11 @@
         <button class="btn ghost" id="fullscreenCloseButton" type="button">Close</button>
       </div>
     </div>
+    <!-- Direct relations, so a piece can be navigated by its family without
+         leaving the enlarged view. One horizontally scrolling row, so a piece
+         with forty children costs the same vertical space as one with two —
+         which is what makes it usable on a phone. -->
+    <div class="fullscreen-viewer__rel" id="fullscreenRelations" hidden></div>
     <div class="fullscreen-viewer__stage" id="fullscreenStage">No selection</div>
   </div>
 

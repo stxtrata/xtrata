@@ -2339,8 +2339,17 @@
       inset: 0;
       z-index: 1000;
       display: grid;
-      grid-template-columns: minmax(0, var(--fullscreen-stage-size));
-      grid-template-rows: auto var(--fullscreen-stage-size);
+      /* The bar must NOT be tied to the square stage width. It was, and that made a
+         feedback loop: the relations strip made the chrome taller, a taller chrome
+         shrank the stage, a smaller stage narrowed the bar, a narrower bar wrapped
+         to more rows, which made it taller again. The column is now the wider of
+         the stage and a readable minimum, and the stage caps itself below. */
+      grid-template-columns: minmax(0, min(92vw, max(var(--fullscreen-stage-size), 640px)));
+      /* Three explicit rows: chrome, relations, stage. Rows are assigned by hand
+         below rather than left to auto-placement, because a hidden relations
+         strip must collapse to nothing WITHOUT the stage sliding up into the
+         wrong track and losing its fixed size. */
+      grid-template-rows: auto auto var(--fullscreen-stage-size);
       align-content: center;
       justify-content: center;
       gap: 14px;
@@ -2358,6 +2367,20 @@
         --fullscreen-viewport-height: 90dvh;
       }
     }
+
+    .fullscreen-viewer__chrome { grid-row: 1; }
+    .fullscreen-viewer__rel { grid-row: 2; }
+    .fullscreen-viewer__stage {
+      grid-row: 3;
+      /* Stays square and centred even though its column may now be wider. */
+      width: min(100%, var(--fullscreen-stage-size));
+      justify-self: center;
+    }
+
+    /* --fullscreen-chrome-space is set from MEASUREMENT in syncFullscreenChromeSpace,
+       because the chrome wraps to two or three rows on a narrow screen and the
+       relations strip comes and goes. The 82px default below is only the
+       first-paint estimate, before that measurement lands. */
 
     .fullscreen-viewer__chrome {
       min-width: 0;
@@ -2402,13 +2425,92 @@
     }
 
     /* The brand mark, so an enlarged inscription still reads as Xtrata rather than
-       as an anonymous box of someone else's content. */
+       as an anonymous box of someone else's content. Doubles as the way back. */
     .fullscreen-viewer__mark {
       flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: none;
+      cursor: pointer;
+    }
+    .fullscreen-viewer__mark img {
       width: 22px;
       height: 22px;
       border-radius: 6px;
+      pointer-events: none;
     }
+    .fullscreen-viewer__mark:hover,
+    .fullscreen-viewer__mark:focus-visible {
+      border-color: var(--line);
+      background: color-mix(in srgb, var(--ink) 8%, transparent);
+    }
+
+    /* --- Relations strip ------------------------------------------------- */
+    .fullscreen-viewer__rel {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      /* One row that scrolls sideways. Wrapping would let a piece with many
+         children push the artwork off a phone screen entirely. */
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: color-mix(in srgb, var(--panel) 78%, transparent);
+    }
+    .fullscreen-viewer__rel[hidden] { display: none; }
+
+    .rel-strip__group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 0 0 auto;
+    }
+    .rel-strip__label {
+      flex: 0 0 auto;
+      color: var(--muted);
+      font-size: 10.5px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .rel-strip__chip {
+      flex: 0 0 auto;
+      /* 32px min so it is a comfortable tap target, not a mouse-sized pill. */
+      min-height: 32px;
+      padding: 4px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--rel-acc, var(--ink)) 10%, transparent);
+      color: var(--ink);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .rel-strip__chip:hover,
+    .rel-strip__chip:focus-visible {
+      border-color: var(--rel-acc, var(--ink));
+    }
+    .rel-strip__more {
+      flex: 0 0 auto;
+      color: var(--muted);
+      font-size: 11.5px;
+      white-space: nowrap;
+    }
+    /* Distinct accents so a parent never reads as a child at a glance. */
+    .rel-strip__group--parents   { --rel-acc: #e0a03f; }
+    .rel-strip__group--children  { --rel-acc: #5aa9e6; }
+    .rel-strip__group--deps      { --rel-acc: #8f7cf0; }
+    .rel-strip__group--replies   { --rel-acc: #4fb286; }
 
     /* The id is the one thing you always want off this screen, so it gets its own
        slot in the gap rather than being crammed in beside the type and size. */
