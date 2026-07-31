@@ -2364,7 +2364,13 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 14px;
+      /* The chrome is only as wide as the STAGE, so a portrait piece gives it
+         ~566px to hold a mark, the type, the id and four controls. It does not
+         fit, and the first casualty was the type truncating to "HTML · 2.…".
+         Wrapping the controls onto their own row is tidier than truncating, and
+         on a wide piece everything still sits on one line. */
+      flex-wrap: wrap;
+      gap: 10px;
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: color-mix(in srgb, var(--panel) 78%, transparent);
@@ -2373,6 +2379,10 @@
     }
 
     .fullscreen-viewer__title {
+      /* flex:1 so the spare width lands HERE. Without it the title defaults to
+         0 1 auto, the free space is swallowed by the actions' auto margin, and
+         the title truncates to "Inscript…" while the row is half empty. */
+      flex: 1 1 auto;
       min-width: 0;
       display: grid;
       gap: 2px;
@@ -2391,12 +2401,54 @@
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     }
 
+    /* The brand mark, so an enlarged inscription still reads as Xtrata rather than
+       as an anonymous box of someone else's content. */
+    .fullscreen-viewer__mark {
+      flex: 0 0 auto;
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+    }
+
+    /* The id is the one thing you always want off this screen, so it gets its own
+       slot in the gap rather than being crammed in beside the type and size. */
+    .fullscreen-viewer__id {
+      /* Never shrink: an id truncated to "Xtrata #11…" is worse than useless,
+         because it looks like a complete number and is not. The title beside it
+         has min-width:0 and ellipsis, so it gives up its space instead. */
+      flex: 0 0 auto;
+      white-space: nowrap;
+      padding: 3px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--ink);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      letter-spacing: 0.02em;
+      user-select: all; /* one click selects the whole id */
+    }
+    .fullscreen-viewer__id[hidden] { display: none; }
+
     .fullscreen-viewer__actions {
       display: flex;
-      flex-wrap: wrap;
+      /* Wrapping dropped Close onto a second row and doubled the height of the
+         chrome. The controls stay on one line and the title yields instead. */
+      flex-wrap: nowrap;
       justify-content: flex-end;
       align-items: center;
       gap: 8px;
+      /* No margin-left:auto here. An auto margin consumes positive free space
+         BEFORE flex-grow gets any, so it silently starved the title's flex:1 and
+         the type/size truncated while the row still had room. The title growing
+         pushes these to the right on its own. */
+    }
+
+    /* Arrows read faster than words at this size, and leave room for the id. */
+    .fullscreen-viewer__actions .btn.icon {
+      min-width: 38px;
+      padding-inline: 10px;
+      font-size: 15px;
+      line-height: 1;
     }
 
     .fullscreen-viewer__stage {

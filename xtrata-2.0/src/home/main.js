@@ -445,6 +445,7 @@
       fullscreenViewer: $('fullscreenViewer'),
       fullscreenTitle: $('fullscreenTitle'),
       fullscreenMeta: $('fullscreenMeta'),
+      fullscreenId: $('fullscreenId'),
       fullscreenStage: $('fullscreenStage'),
       fullscreenRawLink: $('fullscreenRawLink'),
       fullscreenPrevButton: $('fullscreenPrevButton'),
@@ -5794,11 +5795,26 @@
       dom.fullscreenStage.replaceChildren(notice);
     };
 
+    const setFullscreenId = (token) => {
+      if (!dom.fullscreenId) return;
+      const id = token?.id?.toString?.() ?? '';
+      dom.fullscreenId.textContent = id ? `Xtrata #${id}` : '';
+      dom.fullscreenId.hidden = !id;
+      dom.fullscreenId.title = id ? `Xtrata inscription #${id}` : '';
+    };
+
     const setFullscreenMeta = (token, mimeType) => {
       const kind = getMediaKind(mimeType ?? null).toUpperCase();
       const size = token.meta?.totalSize ? formatBytes(token.meta.totalSize) : 'unknown size';
-      dom.fullscreenTitle.textContent = 'Inscription';
+      // The chrome is only as wide as the stage, which for a portrait piece can be
+      // ~560px. With the id pill added, a generic "Inscription" label was the first
+      // thing to truncate — and "Inscript…" above "HTML · 2.…" reads as broken. The
+      // id already says what this is, so the label goes and the type/size gets the
+      // room. "Prepared payload" keeps its label, because there it carries meaning.
+      dom.fullscreenTitle.textContent = '';
+      dom.fullscreenTitle.hidden = true;
       dom.fullscreenMeta.textContent = `${kind} · ${size}`;
+      setFullscreenId(token);
     };
 
     const getSelectedTokenPreviewSource = async () => {
@@ -6022,7 +6038,9 @@
 
       if (!prepared || !prepared.bytes || prepared.bytes.length === 0) {
         dom.fullscreenTitle.textContent = 'Prepared payload';
+        dom.fullscreenTitle.hidden = false;
         dom.fullscreenMeta.textContent = 'No payload prepared';
+        setFullscreenId(null); // nothing is inscribed yet, so there is no id to show
         setFullscreenNotice('Prepare a payload first.');
         return;
       }
@@ -6036,8 +6054,10 @@
       const url = URL.createObjectURL(blob);
       state.fullscreenUrl = url;
       dom.fullscreenTitle.textContent = 'Prepared payload';
+      dom.fullscreenTitle.hidden = false;
       dom.fullscreenMeta.textContent =
         `${kind.toUpperCase()} · ${formatBytes(BigInt(prepared.bytes.length))} · ${prepared.file.name}`;
+      setFullscreenId(null); // a prepared payload has no token id until it is sealed
       dom.fullscreenRawLink.href = url;
       dom.fullscreenRawLink.textContent = 'Open payload';
       dom.fullscreenRawLink.download = prepared.file.name;

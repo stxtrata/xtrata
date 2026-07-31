@@ -987,13 +987,23 @@
 
   <div class="fullscreen-viewer" id="fullscreenViewer" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="fullscreenTitle" hidden>
     <div class="fullscreen-viewer__chrome">
+      <img class="fullscreen-viewer__mark" src="/favicon.svg" alt="" aria-hidden="true" />
       <div class="fullscreen-viewer__title">
         <strong id="fullscreenTitle">Selected inscription</strong>
         <span id="fullscreenMeta">Select an inscription</span>
       </div>
+      <!-- The id sits on its own so it stays readable at a glance and can be
+           selected without dragging through the type and size as well. -->
+      <span class="fullscreen-viewer__id" id="fullscreenId" hidden></span>
       <div class="fullscreen-viewer__actions">
-        <button class="btn ghost" id="fullscreenPrevButton" type="button" disabled>Prev</button>
-        <button class="btn ghost" id="fullscreenNextButton" type="button" disabled>Next</button>
+        <button class="btn ghost icon" id="fullscreenPrevButton" type="button" disabled
+                aria-label="Previous inscription" title="Previous inscription — or press ← on your keyboard">
+          <span aria-hidden="true">←</span>
+        </button>
+        <button class="btn ghost icon" id="fullscreenNextButton" type="button" disabled
+                aria-label="Next inscription" title="Next inscription — or press → on your keyboard">
+          <span aria-hidden="true">→</span>
+        </button>
         <a class="btn ghost" id="fullscreenRawLink" href="#" target="_blank" rel="noreferrer" hidden>Open endpoint</a>
         <button class="btn ghost" id="fullscreenCloseButton" type="button">Close</button>
       </div>
