@@ -1015,7 +1015,11 @@
          leaving the enlarged view. One horizontally scrolling row, so a piece
          with forty children costs the same vertical space as one with two —
          which is what makes it usable on a phone. -->
-    <div class="fullscreen-viewer__rel" id="fullscreenRelations" hidden></div>
+    <!-- Never `hidden`. The row is a fixed track that must be reserved from the
+         first paint: its chips arrive after two network round trips, and a row
+         that appears later moves the artwork below it. An empty bar on a piece
+         with no relations is the cost of a page that never jumps. -->
+    <div class="fullscreen-viewer__rel" id="fullscreenRelations"></div>
     <div class="fullscreen-viewer__stage" id="fullscreenStage">No selection</div>
   </div>
 

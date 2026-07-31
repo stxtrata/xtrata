@@ -6022,29 +6022,27 @@
     // real, and rendering 200 tap targets would turn the strip into a scroll
     // marathon; the count in the label still tells the whole truth.
     /**
-     * Reserves the height the chrome and relations strip ACTUALLY occupy.
+     * Reports ONLY the chrome's measured height. Everything else that consumes
+     * vertical space — the relations row, the gaps — is a constant in the CSS.
      *
-     * The stage is sized as `min(90vw, 90vh - chrome-space)`, and chrome-space used
-     * to be a hardcoded 82px. That number is only right while the chrome is a single
-     * row: on a phone it wraps to three, and adding the relations strip pushed the
-     * artwork off the bottom of the screen. Measuring is the only version of this
-     * that survives both wrapping and a strip that comes and goes.
+     * The chrome genuinely varies: one row on a desktop, up to three wrapped rows
+     * on a phone, so it has to be measured. The relations row does not vary. It is
+     * a fixed track in `grid-template-rows`, present whether or not it has chips.
+     *
+     * An earlier version folded the strip into this number and skipped it while
+     * the strip was hidden, which reintroduced the jump it was written to prevent:
+     * the strip is populated after two network round trips, so the first paint
+     * computed a small space and a tall stage, and the moment the chips landed the
+     * space grew, the stage shrank, and `align-content: center` moved everything.
+     * The strip's existence must not be an input to any size, so it no longer is.
      */
     const syncFullscreenChromeSpace = () => {
       const viewer = dom.fullscreenViewer;
       if (!viewer) return;
       const chrome = viewer.querySelector('.fullscreen-viewer__chrome');
-      const strip = dom.fullscreenRelations;
-      const gap = 14;
-      // The strip's own height is fixed by --fullscreen-rel-height, so read that
-      // rather than measure: measuring a row that is still empty reserves nothing,
-      // and the artwork drops when it fills.
-      const relHeight = strip && !strip.hidden
-        ? parseFloat(getComputedStyle(viewer).getPropertyValue('--fullscreen-rel-height')) || 50
-        : 0;
-      const stripHeight = relHeight ? relHeight + gap : 0;
-      const space = (chrome?.offsetHeight ?? 0) + stripHeight + gap * 2;
-      viewer.style.setProperty('--fullscreen-chrome-space', `${space}px`);
+      const height = chrome?.offsetHeight ?? 0;
+      if (!height) return; // not laid out yet; the CSS default already reserves a row
+      viewer.style.setProperty('--fullscreen-chrome-height', `${height}px`);
     };
 
     const FULLSCREEN_REL_CHIP_LIMIT = 12;
@@ -6126,11 +6124,16 @@
       if (!container) return;
       const requestId = ++state.fullscreenRelRequestId;
       container.replaceChildren();
-      // Never hidden: the row is reserved in the grid so the artwork below it cannot
-      // move when these land. Hiding it is what made the page jump.
+      // The row is NEVER hidden, in any state. It is a fixed grid track reserved
+      // from the first paint, so the artwork below it cannot move when the chips
+      // land two round trips later. Collapsing it for a piece that has no
+      // relations would reintroduce exactly the jump this is here to prevent,
+      // because whether a piece has relations is itself only known after those
+      // round trips. An empty bar is the price of a page that never moves.
       container.hidden = false;
       if (!token || !supportsParentRelationships() || state.fullscreenSource === 'prepared') {
-        container.hidden = true; // no inscription in view, so no row to reserve
+        // Nothing to look up — a prepared file has no on-chain edges yet. Leave
+        // the reserved row in place and empty rather than collapsing it.
         return;
       }
 

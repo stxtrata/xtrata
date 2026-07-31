@@ -41,10 +41,11 @@ describe('enlarged viewer: relations strip', () => {
     // They share a grid column, so alignment only holds while the stage fills it.
     // Capping the stage at the square --fullscreen-stage-size left it visibly
     // narrower than the two bars above it on every screen.
-    const rule = css.slice(
-      css.indexOf('.fullscreen-viewer__stage {\n      grid-row: 3;'),
-      css.indexOf('--fullscreen-chrome-space is set from MEASUREMENT')
-    );
+    // Slice exactly this rule: end at its own closing brace, so a nearby comment or
+    // a one-line `.fullscreen-viewer__chrome { grid-row: 1; }` cannot move the anchor.
+    const start = css.indexOf('.fullscreen-viewer__stage {\n      grid-row: 3;');
+    expect(start).toBeGreaterThan(-1);
+    const rule = css.slice(start, css.indexOf('\n    }', start));
     expect(rule).toContain('width: 100%');
     expect(rule).not.toContain('min(100%, var(--fullscreen-stage-size))');
     expect(rule).not.toContain('justify-self');
@@ -56,7 +57,7 @@ describe('enlarged viewer: relations strip', () => {
     expect(css).not.toMatch(/grid-template-columns: minmax\(0, var\(--fullscreen-stage-size\)\);/);
   });
 
-  it('reserves the height the chrome really occupies', () => {
+  it('measures the chrome, which really does vary', () => {
     // A hardcoded reservation is wrong the moment the chrome wraps, which it does on
     // any phone. The stage then runs off the bottom of the screen.
     expect(mainSource).toContain('const syncFullscreenChromeSpace = ()');
@@ -65,9 +66,34 @@ describe('enlarged viewer: relations strip', () => {
       mainSource.indexOf('const FULLSCREEN_REL_CHIP_LIMIT')
     );
     expect(fn).toContain('offsetHeight');
-    expect(fn).toContain('--fullscreen-chrome-space');
-    // The strip must be part of the sum, or it is not paid for.
-    expect(fn).toContain('strip');
+    expect(fn).toContain('--fullscreen-chrome-height');
+  });
+
+  it('never makes the relations strip an input to a size', () => {
+    // This is the fix for the page jumping. The strip is filled after two network
+    // round trips, so ANY size derived from its presence changes when the chips
+    // land, and `align-content: center` turns that into the artwork moving.
+    // The reservation is a CSS constant; only the chrome's own height is measured.
+    const fn = mainSource.slice(
+      mainSource.indexOf('const syncFullscreenChromeSpace = ()'),
+      mainSource.indexOf('const FULLSCREEN_REL_CHIP_LIMIT')
+    );
+    expect(fn).not.toContain('fullscreenRelations');
+    expect(fn).not.toContain('--fullscreen-rel-height');
+    expect(fn).not.toMatch(/\bstrip\b/);
+    expect(fn).not.toContain('--fullscreen-chrome-space');
+  });
+
+  it('reserves the relations row from the first paint, in CSS and in the markup', () => {
+    // The row cannot be `hidden` on load: a row that appears later moves the
+    // artwork, which is the whole defect. An empty bar is the accepted cost.
+    expect(indexHtml).toMatch(/id="fullscreenRelations"(?![^>]*\bhidden\b)/);
+    // The reservation is one formula, so a media query cannot silently drop the
+    // relations row back out of it — which is what overriding the whole
+    // --fullscreen-chrome-space used to do on exactly the smallest screens.
+    expect(css).toMatch(/--fullscreen-chrome-space:\s*calc\(/);
+    const overrides = css.match(/--fullscreen-chrome-space:\s*\d+px/g) ?? [];
+    expect(overrides).toHaveLength(0);
   });
 
   it('scrolls sideways rather than wrapping', () => {

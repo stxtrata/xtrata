@@ -2333,8 +2333,20 @@
 
     .fullscreen-viewer {
       --fullscreen-viewport-height: 90vh;
-      --fullscreen-chrome-space: 82px;
       --fullscreen-rel-height: 50px;
+      --fullscreen-gap: 14px;
+      /* Measured by JS, because the chrome wraps to two or three rows on a phone.
+         It is the ONLY part of the reserved space that is allowed to change, and
+         it is known on the first layout pass — before any network call. */
+      --fullscreen-chrome-height: 54px;
+      /* The relations row and the gaps are constants here rather than inputs to a
+         JS calculation. That is the whole fix for the page jumping: the strip is
+         filled after two round trips, so anything that resizes when it arrives
+         moves the artwork. Now nothing does — the row is reserved from the first
+         paint and simply sits empty on a piece with no relations. */
+      --fullscreen-chrome-space: calc(
+        var(--fullscreen-chrome-height) + var(--fullscreen-rel-height) + var(--fullscreen-gap) * 3
+      );
       --fullscreen-stage-size: min(90vw, calc(var(--fullscreen-viewport-height) - var(--fullscreen-chrome-space)));
       position: fixed;
       inset: 0;
@@ -2357,7 +2369,7 @@
       grid-template-rows: auto var(--fullscreen-rel-height) var(--fullscreen-stage-size);
       align-content: center;
       justify-content: center;
-      gap: 14px;
+      gap: var(--fullscreen-gap);
       padding: 0;
       background: color-mix(in srgb, var(--bg) 88%, rgba(0, 0, 0, 0.88));
       color: var(--ink);
@@ -2385,10 +2397,10 @@
       width: 100%;
     }
 
-    /* --fullscreen-chrome-space is set from MEASUREMENT in syncFullscreenChromeSpace,
-       because the chrome wraps to two or three rows on a narrow screen and the
-       relations strip comes and goes. The 82px default below is only the
-       first-paint estimate, before that measurement lands. */
+    /* Only --fullscreen-chrome-height is measured (syncFullscreenChromeSpace), because
+       the chrome is the one part that genuinely varies: it wraps to two or three rows
+       on a narrow screen. The relations row and the gaps are constants above, so the
+       reserved space is identical before and after the chips arrive. */
 
     .fullscreen-viewer__chrome {
       min-width: 0;
@@ -2640,8 +2652,15 @@
 
     @media (max-width: 680px) {
       .fullscreen-viewer {
-        --fullscreen-chrome-space: 136px;
-        --fullscreen-stage-size: min(90vw, calc(var(--fullscreen-viewport-height) - var(--fullscreen-chrome-space)));
+        /* Only the chrome estimate changes: the rule below stacks it into a
+           column, so it is roughly twice as tall. The relations row and the gaps
+           stay in the one formula above, which is what keeps the reserved space
+           identical before and after the chips arrive. Overriding the whole
+           --fullscreen-chrome-space here, as this used to, silently dropped the
+           relations row back out of the reservation on exactly the screens with
+           the least height to spare. JS replaces this with a measurement once
+           the viewer is laid out. */
+        --fullscreen-chrome-height: 108px;
       }
 
       .fullscreen-viewer__chrome {
@@ -2656,8 +2675,9 @@
 
     @media (orientation: portrait) {
       .fullscreen-viewer {
-        --fullscreen-chrome-space: 136px;
-        --fullscreen-stage-size: min(90vw, calc(var(--fullscreen-viewport-height) - var(--fullscreen-chrome-space)));
+        /* Same reasoning as the narrow-screen rule above: adjust the chrome
+           estimate, never the whole reservation. */
+        --fullscreen-chrome-height: 108px;
       }
     }
 
