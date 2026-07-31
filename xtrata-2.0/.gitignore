@@ -16,6 +16,10 @@ scripts/wizard/KILL
 # txids, inscription ids and what has been spent. No key material, by assertion.
 scripts/wizard/.run-*.json
 
+# Market runner journals. Same shape, same assertion: txids, listing ids, which
+# scenario opened what, and what is still in escrow.
+scripts/wizard/.market-*.json
+
 
 # FOLDERS
 

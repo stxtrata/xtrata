@@ -58,6 +58,8 @@
     "wizards:preview": "node scripts/wizard/inscribe.mjs --preview-thread",
     "wizards:run": "node scripts/wizard/run-thread.mjs",
     "wizards:status": "node scripts/wizard/run-thread.mjs --status",
+    "wizards:market": "node scripts/wizard/market-run.mjs",
+    "wizards:market:dry": "node scripts/wizard/market-run.mjs --all --dry",
     "smoke:premerge:live": "node scripts/premerge-live-smoke.mjs",
     "smoke:deploy-console:pof": "node scripts/deploy-console-pof-smoke.mjs",
     "smoke:premerge:all": "npm run smoke:premerge && npm run smoke:premerge:live",

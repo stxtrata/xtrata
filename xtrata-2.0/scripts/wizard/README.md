@@ -12,8 +12,9 @@ leaks you lose a few STX and some inscriptions, and you generate three new walle
 whole security model, and it only works if the wallets stay disposable.
 
 Full design: [`docs/plans/WIZARD-TEST-WALLETS-PLAN.md`](../../docs/plans/WIZARD-TEST-WALLETS-PLAN.md).
-Stages 1 and 2 of that plan are what lives here: provisioning, and one wizard doing
-generate plus inscribe plus verify.
+Stages 1 to 7 of that plan are what lives here: provisioning, inscribing a whole thread, and
+the market half — list, buy, cancel, relist, settle, and fail legibly where a wizard holds
+none of the payment token.
 
 ## Keys never go in git
 
@@ -390,11 +391,157 @@ Useful flags:
 --resolve <pos> <decision>    settle one position by hand: abandoned, or landed:<id>
 ```
 
+## Running the market scenarios
+
+`run-thread.mjs` proves the fleet can write. `market-run.mjs` proves it can trade: scenarios 2
+to 10 of the plan, each independently pass, fail or skip, and each runnable on its own by name.
+
+```bash
+# every scenario against a fake market, with a pass/fail/skip table (the default)
+npm run wizards:market:dry
+
+# one scenario, by name
+npm run wizards:market -- --scenario cancel --market usdcx --listing-id 12 --dry
+
+# really do it
+npm run wizards:market -- --all --run m-2026-07-31 --tokens 2922,2923,2924,2925 --broadcast
+```
+
+| # | Scenario | What it proves |
+|---|---|---|
+| 2 | `list-stx` | Listing, NFT escrow, and the STX fee budget leaving the seller |
+| 3 | `list-sbtc` | A cross-currency listing needs **no sBTC** — asserted, by reading the balance first |
+| 4 | `list-usdcx` | The same on the second cross-currency market |
+| 5 | `buy-stx` | A self-paid purchase: ownership moves, STX moves seller-ward, the row is marked sold |
+| 6 | `buy-sponsored` | Quote, a fee-0 signature, submit, poll — the relayer end to end |
+| 7 | `cancel` | Escrow recovery and a **full** budget refund |
+| 8 | `buy-sbtc-expected-failure` | The failure is clean and legible, not a silent hang |
+| 9 | `relist` | Cancel-then-list, the only price change the contracts support |
+| 10 | `settlement` | Escrowed budget minus claimed equals what comes back |
+
+### Only the sponsored markets will take a v3 inscription
+
+`xtrata-market-{stx,sbtc,usdc}-v1-0` and `xtrata-market-v1-1` hardcode `ALLOWED-NFT-CONTRACT` to
+the retired `xtrata-v2-1-0` and reject anything minted on the current core at `list-token`. The
+three usable markets are:
+
+| Key | Contract |
+|---|---|
+| `stx` | `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-stx-v1-1` |
+| `sbtc` | `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-sbtc-v1-1` |
+| `usdcx` | `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-usdcx-v1-1` |
+
+That is checked live against `is-nft-allowed(core)` before anything is signed, and a market that
+answers `false` — or that cannot be read at all — refuses the broadcast rather than paying a
+miner fee to find out.
+
+**`list-token` escrows the NFT and a fee budget, and the budget is always STX**, on the sBTC and
+USDCx markets exactly as much as on the STX one. So listing for sBTC needs no sBTC; only the buy
+leg needs the token. Scenarios 3 and 4 exist to prove that, so they read the seller's token
+balance first and **fail if it is not zero** — a listing made from a wallet that holds the token
+proves nothing about the claim.
+
+### Scenario 8 costs one miner fee, on purpose
+
+The free half comes first: read the buyer's sBTC balance and the listing, and establish that the
+payment leg cannot succeed. That needs no transaction. But "aborts cleanly with a legible error,
+moves nothing, leaves the listing unsold" is a statement about a transaction, and only a
+transaction can make it — a hang and a clean abort look identical from a balance read. So the
+scenario broadcasts, and says so before it does.
+
+It passes only on a *specific* failure: the status has to start with `abort`, the result has to
+carry a readable `(err uN)`, that `N` must **not** be one of the market's own `u100`–`u109`
+codes (which would mean the buy never reached the token transfer), the escrow must still hold
+the token, and the listing must still be unsold. A silent success is reported as a market bug
+rather than a test failure, in those words.
+
+`--no-onchain-failure-proof` stops after the free half; the report records whether the proof was
+`read-only` or `broadcast`.
+
+### Settlement is usually a skip, and that is correct
+
+`claim-fee` and `settle-refund` are sponsor-only, and the wizards are not the sponsor. The half
+they can reach is the seller's self-settle, which the contract locks for `REFUND-DELAY` — 144
+blocks, roughly a day — after the sale. Before that, scenario 10 skips and names the number of
+blocks remaining. A run that went red on a block height would be red every night and would mean
+nothing.
+
+`--blocks-per-tx <n>` widens the fake chain's step so a **dry** rehearsal can reach the far side
+of the delay and exercise the settle path. It is refused under `--broadcast`, because there is no
+such thing on mainnet.
+
+### The market journal
+
+`scripts/wizard/.market-<runId>.json`, gitignored, one file per run. Same crash discipline as the
+thread runner's journal, and it imports that runner's nonce logic rather than restating it:
+
+- The **intent** — sender, intended nonce, and a hash of the exact contract call and arguments —
+  is written **before** the broadcast, not after.
+- A step with a transaction id is **polled**, never re-sent.
+- A step with an intent and no transaction id is the crash window, and is decided the same way,
+  with the same asymmetry. What differs is the positive proof. A mint can be found again by
+  content hash; a market call cannot, so every step carries a **probe** — a read-only question
+  whose answer is yes only if that step already landed. `get-listing-id-by-token` for a listing,
+  `get-owner` for a purchase, the absence of a listing row for a cancel.
+
+| Reading | What it proves | What the run does |
+|---|---|---|
+| the probe finds the state the step produces | it **landed** | Adopts it. Never re-broadcasts. |
+| a mempool nonce **at or above** the intended one | still **in flight** | Waits, re-probing; then halts and names the nonce. |
+| `last_executed_tx_nonce` **below** the intended one | it **never landed, and cannot** | Clears the intent into `previousIntents` and sends again. |
+| `last_executed_tx_nonce` **at or above** it | **nothing** | Halts. |
+
+A resumed run also relaxes the preconditions that only make sense before a first attempt. "The
+seller still owns it" and "nothing is listed yet" are both false after a crash *because the step
+worked*, and a runner that refused on them would leave the NFT in escrow and report a skip. Past
+that point the probe and the nonce decide. Balance-delta checks are skipped on a recovered step,
+since their baseline is gone; the on-chain state checks still run.
+
+### Post-conditions
+
+Every call is `PostConditionMode.Deny` with one condition per asset that moves, mirroring the
+recipe the shipped market page uses:
+
+| Call | Conditions |
+|---|---|
+| `list-token` | NFT sent by the seller; STX from the seller `<=` the fee budget |
+| `buy` | payment token from the buyer `<=` the price; NFT sent by the market contract |
+| `cancel` | NFT sent back by the market contract; STX from the contract `<=` the remaining budget |
+| `settle-refund` | STX from the contract `<=` the unclaimed budget, or none when nothing moves |
+
+The STX bounds are `LessEqual`, never `Equal`. An exact-match condition aborts and burns the
+miner fee the moment the contract moves a microSTX less than predicted, and `LessEqual` bounds
+the spend just as tightly in the only direction that can cost a wizard anything.
+
+### Cleanup
+
+Every run ends by asking the chain what it is leaving behind — open listings, NFTs in escrow, and
+sold listings whose budget has not been settled — and prints the exact command that recovers each
+one. It reads the chain rather than the journal, so a listing a previous crashed run left is
+reported too.
+
+Useful flags:
+
+```bash
+--seller <wizard>            who lists (default archivist)
+--buyer <wizard>             who buys (default skeptic)
+--tokens <a,b,c,d>           inscriptions for list-stx, list-sbtc, list-usdcx, buy-sponsored
+--listing-id <n>             act on this listing, which makes any scenario runnable alone
+--market <key>               stx, sbtc or usdcx, for a single-scenario run
+--price-ustx <n>             listing price in microSTX, scaled into each market's own unit
+--fee-budget-ustx <n>        sponsorship deposit, always STX (default 50,000, the minimum)
+--no-sponsor                 skip the relayer entirely
+--sponsor-api <url>          relayer base (default https://xtrata.xyz)
+--no-onchain-failure-proof   scenario 8 stops at the free read-only proof
+--blocks-per-tx <n>          dry only: how far the fake tip moves per transaction
+--run-spend-cap-ustx <n>     cap across the whole run (default 1,000,000)
+```
+
 ## Spend caps
 
 | Rail | Env var | Default | What it does |
 |---|---|---|---|
-| Whole-run spend cap | `--run-spend-cap-ustx` | `1000000` (1 STX) | Ceiling across **every remaining broadcast** in a thread run, checked before each one. A per-entry cap cannot see a loop. |
+| Whole-run spend cap | `--run-spend-cap-ustx` | `1000000` (1 STX) | Ceiling across **every remaining broadcast** in a thread or market run, checked before each one. A per-entry cap cannot see a loop. In a market run it counts the miner fee plus every microSTX that leaves a wizard's wallet, escrowed fee budgets and purchase prices included, even though both are recoverable: the number exists to stop a loop, not to balance the books. |
 | Per-run spend cap | `WIZARD_SPEND_CAP_USTX` | `500000` (0.5 STX) | Hard ceiling on protocol plus miner fee for one run. Plan section 4.4. |
 | Balance floor | `WIZARD_BALANCE_FLOOR_USTX` | `1000000` (1 STX) | Refuse to start, or to spend down past, this balance. Recovery transactions have to stay affordable. |
 | Max miner fee | `WIZARD_MAX_TX_FEE_USTX` | `30000` (0.03 STX) | The bid on any one transaction. Miner fees are not refundable. |
@@ -436,6 +583,8 @@ spending.
 | `inscribe.mjs` | The inscribe skill. Dry run by default. Live fee quote. All the safety rails. |
 | `run-thread.mjs` | The thread runner. Dry run by default. Terminal, the fake chain for `--dry`, and the one port that signs. |
 | `run-thread-core.mjs` | The loop as pure logic with every port injected: fetch, submit, clock, sleep, journal, kill switch. |
+| `market-run.mjs` | The market runner, scenarios 2 to 10. Dry run by default. Terminal, the fake market for `--dry`, the port that signs, and the relayer client. |
+| `market-run-core.mjs` | The scenarios as pure logic with every port injected, including the sponsor relayer. Imports the thread runner's nonce logic rather than restating it. |
 | `__tests__/` | Vitest. Picked up by the repo's normal `npx vitest run` sweep. |
 
 ```bash
@@ -444,8 +593,13 @@ npx vitest run scripts/wizard
 
 ## What this does not do yet
 
-Stages 3 and up of the plan: listing, cancelling, multi-wizard trade, sponsored buy, cross-currency
-listings, orchestration and reporting. Nothing here lists or buys anything. It generates, inscribes,
-verifies and threads, which is the plan's stage 2 end to end.
+The wizards are not the market's **sponsor**, so `claim-fee` and the sponsor's half of
+`settle-refund` are out of reach from here. Scenario 10 covers the seller's half, which is the
+half that guarantees a seller can always recover their own escrow.
 
-The manifest is the thing the plan wants listed for sale. Nothing here lists it.
+Nothing here claims from a drop: drops v1.1 gates claims by BNS attestation, and each wizard
+would need a name first. Plan section 7, open decision 3.
+
+Nothing here clicks a button, so a broken render, a mislabelled control or copy that promises
+something the code does not do is still invisible to it. That needs the Playwright suite. The two
+are complements: browser tests catch what the user sees, wizards catch what the chain does.
