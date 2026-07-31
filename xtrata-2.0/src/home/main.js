@@ -6036,7 +6036,13 @@
       const chrome = viewer.querySelector('.fullscreen-viewer__chrome');
       const strip = dom.fullscreenRelations;
       const gap = 14;
-      const stripHeight = strip && !strip.hidden ? strip.offsetHeight + gap : 0;
+      // The strip's own height is fixed by --fullscreen-rel-height, so read that
+      // rather than measure: measuring a row that is still empty reserves nothing,
+      // and the artwork drops when it fills.
+      const relHeight = strip && !strip.hidden
+        ? parseFloat(getComputedStyle(viewer).getPropertyValue('--fullscreen-rel-height')) || 50
+        : 0;
+      const stripHeight = relHeight ? relHeight + gap : 0;
       const space = (chrome?.offsetHeight ?? 0) + stripHeight + gap * 2;
       viewer.style.setProperty('--fullscreen-chrome-space', `${space}px`);
     };
@@ -6068,7 +6074,7 @@
       return new Map(ids.map((id) => [id.toString(), getCachedRelationshipSummary(id)]));
     };
 
-    const buildRelStripGroup = (contractId, label, kind, ids) => {
+    const buildRelStripGroup = (contractId, label, kind, ids, describe = null) => {
       if (!ids || ids.length === 0) return null;
       const group = document.createElement('div');
       group.className = `rel-strip__group rel-strip__group--${kind}`;
@@ -6078,12 +6084,14 @@
       labelEl.textContent = `${label} ${ids.length}`;
       group.append(labelEl);
 
-      for (const id of ids.slice(0, FULLSCREEN_REL_CHIP_LIMIT)) {
+      ids.slice(0, FULLSCREEN_REL_CHIP_LIMIT).forEach((id, index) => {
         const chip = document.createElement('button');
         chip.type = 'button';
         chip.className = 'rel-strip__chip';
         chip.textContent = `#${id.toString()}`;
-        chip.title = `Open ${label.toLowerCase()} #${id.toString()}`;
+        chip.title = describe
+          ? `Open #${id.toString()} — ${describe(id, index)}`
+          : `Open ${label.toLowerCase()} #${id.toString()}`;
         chip.addEventListener('click', async (event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -6093,7 +6101,7 @@
           if (state.fullscreenOpen) await renderFullscreenSelectedToken();
         });
         group.append(chip);
-      }
+      });
 
       if (ids.length > FULLSCREEN_REL_CHIP_LIMIT) {
         const more = document.createElement('span');
@@ -6118,10 +6126,11 @@
       if (!container) return;
       const requestId = ++state.fullscreenRelRequestId;
       container.replaceChildren();
-      container.hidden = true;
-      dom.fullscreenViewer?.classList.remove('has-relations');
-      syncFullscreenChromeSpace();
+      // Never hidden: the row is reserved in the grid so the artwork below it cannot
+      // move when these land. Hiding it is what made the page jump.
+      container.hidden = false;
       if (!token || !supportsParentRelationships() || state.fullscreenSource === 'prepared') {
+        container.hidden = true; // no inscription in view, so no row to reserve
         return;
       }
 
@@ -6152,24 +6161,38 @@
       // documents, so say that rather than the generic "Depends on".
       const outgoingLabel = isReceiptSummary(token) ? 'Receipt for' : 'Depends on';
 
+      // depth 1 IS the direct parents, already their own group — including them here
+      // would list every parent twice.
+      const ancestors = (lineage?.ancestors ?? [])
+        .filter((node) => node.depth > 1)
+        .sort((a, b) => a.depth - b.depth);
+
       const groups = [
         buildRelStripGroup(contractId, 'Parents', 'parents', lineage?.parents ?? []),
+        buildRelStripGroup(
+          contractId,
+          'Ancestors',
+          'ancestors',
+          ancestors.map((node) => node.id),
+          (id, index) => `${ancestors[index].depth} generations up`
+        ),
+        buildRelStripGroup(contractId, 'Siblings', 'siblings', lineage?.siblings ?? []),
         buildRelStripGroup(contractId, 'Children', 'children', lineage?.children ?? []),
         buildRelStripGroup(contractId, outgoingLabel, 'deps', dependencies ?? []),
         buildRelStripGroup(contractId, 'Replies', 'replies', replies),
         buildRelStripGroup(contractId, 'Receipts', 'receipts', receipts)
       ].filter(Boolean);
 
-      const viewer = dom.fullscreenViewer;
       if (groups.length === 0) {
-        viewer?.classList.remove('has-relations');
-        syncFullscreenChromeSpace();
-        return; // a lone piece gets no empty bar
+        // The row is reserved either way, so say why it is empty rather than
+        // leaving a blank bar the user has to interpret.
+        const empty = document.createElement('span');
+        empty.className = 'rel-strip__empty';
+        empty.textContent = 'No relations';
+        container.append(empty);
+        return;
       }
       container.append(...groups);
-      container.hidden = false;
-      viewer?.classList.add('has-relations');
-      syncFullscreenChromeSpace();
     };
 
     const renderFullscreenSelectedToken = async () => {

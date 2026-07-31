@@ -32,7 +32,9 @@ describe('enlarged viewer: relations strip', () => {
     expect(css).toContain('.fullscreen-viewer__chrome { grid-row: 1; }');
     expect(css).toContain('.fullscreen-viewer__rel { grid-row: 2; }');
     expect(css).toMatch(/\.fullscreen-viewer__stage \{\s*grid-row: 3;/);
-    expect(css).toContain('grid-template-rows: auto auto var(--fullscreen-stage-size)');
+    expect(css).toContain(
+      'grid-template-rows: auto var(--fullscreen-rel-height) var(--fullscreen-stage-size)'
+    );
   });
 
   it('gives the chrome, the strip and the stage ONE width', () => {
@@ -71,7 +73,7 @@ describe('enlarged viewer: relations strip', () => {
   it('scrolls sideways rather than wrapping', () => {
     // Wrapping would let a piece with forty children push the artwork off a phone.
     const block = css.slice(
-      css.indexOf('.fullscreen-viewer__rel {\n      display: flex;'),
+      css.indexOf('.fullscreen-viewer__rel {\n      height: 100%;'),
       css.indexOf('.rel-strip__group')
     );
     expect(block).toContain('overflow-x: auto');
@@ -108,13 +110,13 @@ describe('enlarged viewer: relations strip', () => {
     expect(fn).toContain('if (requestId !== state.fullscreenRelRequestId) return;');
   });
 
-  it('shows no bar at all for a piece with no relations', () => {
+  it('says the row is empty rather than leaving it blank', () => {
     const fn = mainSource.slice(
       mainSource.indexOf('const renderFullscreenRelations'),
       mainSource.indexOf('const renderFullscreenSelectedToken')
     );
     expect(fn).toContain('if (groups.length === 0)');
-    expect(fn).toContain("classList.remove('has-relations')");
+    expect(fn).toContain("rel-strip__empty");
   });
 });
 

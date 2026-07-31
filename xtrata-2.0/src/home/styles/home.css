@@ -2334,6 +2334,7 @@
     .fullscreen-viewer {
       --fullscreen-viewport-height: 90vh;
       --fullscreen-chrome-space: 82px;
+      --fullscreen-rel-height: 50px;
       --fullscreen-stage-size: min(90vw, calc(var(--fullscreen-viewport-height) - var(--fullscreen-chrome-space)));
       position: fixed;
       inset: 0;
@@ -2349,7 +2350,11 @@
          below rather than left to auto-placement, because a hidden relations
          strip must collapse to nothing WITHOUT the stage sliding up into the
          wrong track and losing its fixed size. */
-      grid-template-rows: auto auto var(--fullscreen-stage-size);
+      /* The relations row is a FIXED height, not `auto`. It is populated after two
+         network round trips, and an auto row meant the artwork jumped down the page
+         the moment they landed. Reserving the space costs one empty bar on a piece
+         with no relations and buys a page that never moves. */
+      grid-template-rows: auto var(--fullscreen-rel-height) var(--fullscreen-stage-size);
       align-content: center;
       justify-content: center;
       gap: 14px;
@@ -2455,6 +2460,7 @@
 
     /* --- Relations strip ------------------------------------------------- */
     .fullscreen-viewer__rel {
+      height: 100%;
       display: flex;
       align-items: center;
       gap: 14px;
@@ -2503,6 +2509,12 @@
     .rel-strip__chip:focus-visible {
       border-color: var(--rel-acc, var(--ink));
     }
+    .rel-strip__empty {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
     .rel-strip__more {
       flex: 0 0 auto;
       color: var(--muted);
@@ -2515,6 +2527,8 @@
     .rel-strip__group--deps      { --rel-acc: #8f7cf0; }
     .rel-strip__group--replies   { --rel-acc: #4fb286; }
     .rel-strip__group--receipts  { --rel-acc: #b6b2a8; }
+    .rel-strip__group--ancestors { --rel-acc: #c98a2e; }
+    .rel-strip__group--siblings  { --rel-acc: #7f8fa6; }
 
     /* The id is the one thing you always want off this screen, so it gets its own
        slot in the gap rather than being crammed in beside the type and size. */
