@@ -20,11 +20,38 @@
  *     forgets it broadcast will broadcast again, and the second mint is just as
  *     permanent and just as expensive as the first. So intent is written first,
  *     and a position that already carries a txid is never re-broadcast; it is
- *     polled. A position whose intent was written but whose txid never was is
- *     resolved against the chain by content hash — the bytes are deterministic,
- *     so if the mint landed, `get-id-by-hash` finds it — and if that comes back
- *     empty the run halts rather than guessing, because "not indexed yet" and
- *     "never sent" look identical from here and only one of them is safe.
+ *     polled.
+ *
+ *   - **Two independent pieces of evidence about an intent with no txid.** The
+ *     content hash says whether the mint landed: the bytes are deterministic, so
+ *     `get-id-by-hash` finds them if it did. The sender's nonce, recorded next
+ *     to the intent, says whether it could have. They are asymmetric, and the
+ *     asymmetry is the whole point:
+ *
+ *       - `last_executed_tx_nonce` **below** the intended nonce is proof of
+ *         absence. That nonce has never confirmed, so neither did the mint, and
+ *         the position can be re-composed cleanly.
+ *       - `last_executed_tx_nonce` **at or above** it proves nothing. Some
+ *         transaction spent that nonce, and it may have been an unrelated send
+ *         from the same wallet. Only a hash hit proves this mint landed.
+ *
+ *     Before the nonce was recorded the runner could only halt, and that halt
+ *     was permanent: an entry states the block it was written at, so a retry
+ *     composes different bytes under a different hash, and the orphaned intent
+ *     could never afterwards be matched or cleared.
+ *
+ *   - **A bounded wait before the halt.** When the wallet has something in the
+ *     mempool at or above the intended nonce, the mint may be seconds from
+ *     landing, so the runner waits a few minutes with a countdown before giving
+ *     up, and names the nonce when it does. It never waits when the nonce has
+ *     already proved the mint absent.
+ *
+ *   - **An operator decision of last resort.** `--resolve <n> landed:<id>` and
+ *     `--resolve <n> abandoned` write a human's verdict into the journal with a
+ *     timestamp, so a genuinely ambiguous position is closed rather than left
+ *     ambiguous forever. Both check the chain first: `landed` refuses an id
+ *     whose own front matter is not this thread, this position and this subject,
+ *     and `abandoned` refuses a position the chain shows as confirmed.
  *
  *   - **Stop on the first failure. Never retry a broadcast.** Any terminal
  *     status other than success halts the run. There is no backoff, no second
@@ -90,7 +117,15 @@ export { DEFAULT_HIRO_URL, THREAD_LENGTH, WizardSafetyError, groupDigits, microS
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-/** Bumped when the on-disk journal shape changes incompatibly. */
+/**
+ * Bumped when the on-disk journal shape changes *incompatibly*.
+ *
+ * Deliberately still 1 after the nonce fields were added. `intendedNonce` is
+ * optional: a journal written before it existed loads unchanged and resolves an
+ * orphaned intent the old way, by content hash alone. Bumping the version would
+ * have halted every one of those journals over a field whose absence the runner
+ * already knows how to handle.
+ */
 export const RUN_JOURNAL_VERSION = 1;
 
 /**
@@ -109,6 +144,18 @@ export const DEFAULT_RUN_SPEND_CAP_USTX = 1_000_000n;
 export const DEFAULT_CONFIRM_TIMEOUT_MS = 30 * 60_000;
 export const DEFAULT_CONFIRM_POLL_MS = 20_000;
 
+/**
+ * How long to wait on an intent whose nonce is sitting in the mempool.
+ *
+ * Much shorter than the confirmation window, because this is not a transaction
+ * being watched — it is a transaction whose id was lost, found again only by
+ * hash. A few minutes covers "the node had it all along and the API was a block
+ * behind"; past that, waiting adds nothing a later run would not also see, and
+ * the run should say what it is waiting for and stop.
+ */
+export const DEFAULT_MEMPOOL_WAIT_MS = 3 * 60_000;
+export const DEFAULT_MEMPOOL_POLL_MS = 15_000;
+
 /** The journal key for the closing manifest. Deliberately not a number. */
 export const MANIFEST_KEY = 'manifest';
 
@@ -121,8 +168,22 @@ export const MANIFEST_KEY = 'manifest';
  *   confirmed     success, inscription id known. Skip.
  *   failed        terminal non-success. Halt; a human decides what happens.
  *   timeout       polled past the window. The transaction may still land.
+ *   abandoned     settled as never-minted, by the nonce or by an operator.
+ *                 Composed again from scratch, which is safe precisely because
+ *                 something proved the earlier attempt never landed.
  */
-export const POSITION_STATUSES = ['external', 'broadcasting', 'broadcast', 'confirmed', 'failed', 'timeout'];
+export const POSITION_STATUSES = [
+  'external',
+  'broadcasting',
+  'broadcast',
+  'confirmed',
+  'failed',
+  'timeout',
+  'abandoned'
+];
+
+/** The two verdicts an operator can record by hand with `--resolve`. */
+export const RESOLUTIONS = ['abandoned', 'landed'];
 
 /**
  * Why a run stopped. Every one of these is a stop, never a retry.
@@ -516,6 +577,261 @@ export async function hydrateMember({
 }
 
 /* ------------------------------------------------------------------ */
+/* the crash window: what the nonce knows                              */
+/* ------------------------------------------------------------------ */
+
+/** "2m 45s", for a countdown a human is reading while they wait. */
+export function formatDuration(ms) {
+  const seconds = Math.max(0, Math.round(Number(ms) / 1000));
+  const minutes = Math.floor(seconds / 60);
+  return minutes > 0 ? `${minutes}m ${String(seconds % 60).padStart(2, '0')}s` : `${seconds}s`;
+}
+
+/**
+ * The wallet's nonce state, including what it has in the mempool.
+ *
+ *   last_executed_tx_nonce   the highest nonce that has CONFIRMED
+ *   possible_next_nonce      what the next transaction will be signed with
+ *   last_mempool_tx_nonce    the highest nonce in flight, or null for nothing
+ *   detected_mempool_nonces  every nonce in flight
+ *   detected_missing_nonces  gaps: a nonce nothing has ever used
+ *
+ * `checkPendingNonce` in inscribe.mjs reads the same endpoint as an advisory
+ * warning before a mint. This reads it as evidence after one, so it needs the
+ * mempool arrays that check does not surface, and it must not throw: an
+ * unreadable nonce is not evidence either way, and every caller treats "could
+ * not read" as "the nonce says nothing", which is the behaviour that existed
+ * before the nonce was recorded at all.
+ */
+export async function fetchSenderNonces({ fetchImpl = globalThis.fetch, hiroUrl = DEFAULT_HIRO_URL, address } = {}) {
+  const base = {
+    address: address ?? null,
+    available: false,
+    lastExecutedNonce: null,
+    nextNonce: null,
+    lastMempoolNonce: null,
+    mempoolNonces: [],
+    missingNonces: [],
+    error: null
+  };
+  if (!address) return { ...base, error: 'no wallet address was recorded with the intent' };
+  try {
+    const response = await fetchImpl(`${trimSlash(hiroUrl)}/extended/v1/address/${address}/nonces`);
+    let body;
+    try {
+      body = await response.json();
+    } catch {
+      throw new Error(`nonce lookup returned non-JSON content (HTTP ${response.status})`);
+    }
+    if (!response.ok) throw new Error(`nonce lookup returned HTTP ${response.status}`);
+    const number = (value) => (value === null || value === undefined ? null : Number(value));
+    const list = (value) =>
+      Array.isArray(value) ? value.map(Number).filter((entry) => Number.isFinite(entry)) : [];
+    return {
+      ...base,
+      available: true,
+      lastExecutedNonce: number(body?.last_executed_tx_nonce),
+      nextNonce: number(body?.possible_next_nonce),
+      lastMempoolNonce: number(body?.last_mempool_tx_nonce),
+      mempoolNonces: list(body?.detected_mempool_nonces),
+      missingNonces: list(body?.detected_missing_nonces)
+    };
+  } catch (error) {
+    return { ...base, error: errorMessage(error) };
+  }
+}
+
+/**
+ * The nonce the next transaction from this wallet will carry, or null.
+ *
+ * Null is a legitimate answer and never a refusal. A run that cannot read the
+ * nonce is exactly as safe as every run before this field existed; it just
+ * cannot be told later that its transaction never landed.
+ */
+export async function readIntendedNonce({
+  fetchImpl = globalThis.fetch,
+  hiroUrl = DEFAULT_HIRO_URL,
+  address = null,
+  fallback = null
+} = {}) {
+  if (!address) return fallback === null || fallback === undefined ? null : Number(fallback);
+  const nonces = await fetchSenderNonces({ fetchImpl, hiroUrl, address });
+  if (nonces.available && nonces.nextNonce !== null && Number.isFinite(nonces.nextNonce)) return nonces.nextNonce;
+  return fallback === null || fallback === undefined || !Number.isFinite(Number(fallback)) ? null : Number(fallback);
+}
+
+/**
+ * The parts of a stranded intent worth keeping once it has been closed.
+ *
+ * Kept as history on the position rather than deleted, so a journal can still
+ * answer "what was composed here, at what nonce, and who decided it never
+ * landed" long after the position has been minted by a later attempt.
+ */
+export function archiveIntent(stranded, { reason = null, note = null } = {}) {
+  return {
+    reason,
+    note,
+    status: stranded?.status ?? null,
+    finalHashHex: stranded?.finalHashHex ?? null,
+    intendedNonce: stranded?.intendedNonce ?? null,
+    senderAddress: stranded?.senderAddress ?? null,
+    txid: stranded?.txid ?? null,
+    txStatus: stranded?.txStatus ?? null,
+    blockHeight: stranded?.blockHeight ?? null,
+    protocolFeeUstx: stranded?.protocolFeeUstx ?? null,
+    minerFeeUstx: stranded?.minerFeeUstx ?? null,
+    actualMinerFeeUstx: stranded?.actualMinerFeeUstx ?? null,
+    broadcastAt: stranded?.broadcastAt ?? null
+  };
+}
+
+/**
+ * What the wallet's nonces say about an intent that has no transaction id.
+ *
+ * THE ASYMMETRY, which is the entire reason any of this is recorded:
+ *
+ *   A last-executed nonce BELOW the intended one proves ABSENCE. The mint was
+ *   signed at that nonce; a nonce cannot confirm out of order; so if it has
+ *   never confirmed, neither did the mint. Nothing landed and nothing can.
+ *
+ *   A last-executed nonce AT OR ABOVE the intended one proves NOTHING. It says
+ *   some transaction consumed that nonce, and that transaction could just as
+ *   easily have been an operator moving funds out of the same wallet, or a mint
+ *   done by hand. Only the content hash can say this mint landed.
+ *
+ * So this function can return `absent` as a verdict but never `landed`, and the
+ * caller must not read `consumed` as anything but "ask the chain".
+ */
+export function classifyIntentNonce({ intendedNonce = null, nonces = null } = {}) {
+  const intended =
+    intendedNonce === null || intendedNonce === undefined || !Number.isFinite(Number(intendedNonce))
+      ? null
+      : Number(intendedNonce);
+  const detail = {
+    intendedNonce: intended,
+    lastExecutedNonce: nonces?.available ? nonces.lastExecutedNonce : null,
+    pendingNonces: [],
+    address: nonces?.address ?? null
+  };
+
+  if (intended === null) {
+    return { ...detail, verdict: 'unknown', why: 'the intent was written before this runner recorded nonces' };
+  }
+  if (!nonces?.available) {
+    return {
+      ...detail,
+      verdict: 'unknown',
+      why: `the wallet's nonces could not be read${nonces?.error ? ` (${nonces.error})` : ''}`
+    };
+  }
+
+  // Anything in flight at or above our nonce could still be our transaction, so
+  // it is checked first: a mint in the mempool has not landed *yet*, which is
+  // not the same as never, and must never be mistaken for proof of absence.
+  const pendingNonces = [
+    ...nonces.mempoolNonces,
+    ...(nonces.lastMempoolNonce === null ? [] : [nonces.lastMempoolNonce])
+  ]
+    .filter((nonce) => nonce >= intended)
+    .sort((left, right) => left - right)
+    .filter((nonce, index, all) => all.indexOf(nonce) === index);
+  if (pendingNonces.length > 0) {
+    return {
+      ...detail,
+      pendingNonces,
+      verdict: 'pending',
+      why: `this wallet has nonce ${pendingNonces.join(', ')} in the mempool, at or above the ${intended} this entry was signed with`
+    };
+  }
+
+  // A wallet that has executed nothing reads as -1, so nonce 0 is still unspent.
+  const executed = nonces.lastExecutedNonce === null ? -1 : nonces.lastExecutedNonce;
+  if (executed < intended) {
+    return {
+      ...detail,
+      verdict: 'absent',
+      why: `nonce ${intended} has never confirmed on this wallet (last executed ${executed < 0 ? 'none' : executed}), so this transaction did not land and cannot`
+    };
+  }
+  return {
+    ...detail,
+    verdict: 'consumed',
+    why: `nonce ${intended} has been consumed (last executed ${executed}), but by what is not knowable from the nonce alone`
+  };
+}
+
+/**
+ * A position whose intent was written but whose txid was not, resolved against
+ * the chain: first by content hash, then by nonce, then by waiting.
+ *
+ * Returns one of
+ *   { outcome: 'landed',    id, member }  the bytes are on chain. Adopt them.
+ *   { outcome: 'absent',    nonce }       proved never minted. Compose again.
+ *   { outcome: 'pending',   nonce }       still in the mempool after the wait.
+ *   { outcome: 'ambiguous', nonce }       nothing proves anything. Halt.
+ *
+ * The hash is asked first and asked again throughout, because it is the only
+ * positive proof available. The nonce only ever decides what a *missing* hash
+ * means.
+ */
+export async function resolveIntent({
+  fetchImpl = globalThis.fetch,
+  hiroUrl = DEFAULT_HIRO_URL,
+  record,
+  position = null,
+  threadId,
+  subject = null,
+  now = () => Date.now(),
+  sleep = async () => {},
+  say = () => {},
+  guard = () => {},
+  mempoolWaitMs = DEFAULT_MEMPOOL_WAIT_MS,
+  mempoolPollMs = DEFAULT_MEMPOOL_POLL_MS
+} = {}) {
+  const landed = async () => {
+    if (!record?.finalHashHex) return null;
+    const id = await lookupIdByHash({ fetchImpl, hiroUrl, finalHashHex: record.finalHashHex });
+    if (!id) return null;
+    const member =
+      position === null ? null : await hydrateMember({ fetchImpl, hiroUrl, id, position, threadId, subject });
+    return { outcome: 'landed', id, member };
+  };
+
+  const first = await landed();
+  if (first) return { ...first, nonce: null, waitedMs: 0 };
+
+  const nonces = await fetchSenderNonces({ fetchImpl, hiroUrl, address: record?.senderAddress ?? null });
+  const nonce = classifyIntentNonce({ intendedNonce: record?.intendedNonce ?? null, nonces });
+
+  if (nonce.verdict === 'absent') return { outcome: 'absent', id: null, member: null, nonce, waitedMs: 0 };
+  if (nonce.verdict !== 'pending') return { outcome: 'ambiguous', id: null, member: null, nonce, waitedMs: 0 };
+
+  // Pending: the transaction may be a block away. Wait, out loud, for a bounded
+  // time. Nothing is broadcast in here and nothing is written; the only thing
+  // that ends the wait early is the bytes appearing on chain.
+  const started = now();
+  const waitMs = Math.max(0, Number(mempoolWaitMs));
+  const intervalMs = Math.max(0, Number(mempoolPollMs));
+  if (waitMs > 0) {
+    say(
+      `    ${nonce.why}. Waiting up to ${formatDuration(waitMs)} for it to confirm before giving up. Nothing is being re-sent.`
+    );
+  }
+  for (;;) {
+    const remaining = waitMs - (now() - started);
+    if (remaining <= 0) break;
+    say(`    still pending at nonce ${nonce.intendedNonce}: ${formatDuration(remaining)} left`);
+    await sleep(Math.min(intervalMs, remaining));
+    // Between every look, not only before the first: a run standing still is
+    // exactly when someone reaches for the kill switch.
+    guard('waiting for the mempool');
+    const seen = await landed();
+    if (seen) return { ...seen, nonce, waitedMs: waitMs - remaining };
+  }
+  return { outcome: 'pending', id: null, member: null, nonce, waitedMs: waitMs };
+}
+
+/* ------------------------------------------------------------------ */
 /* the spend cap for a whole run                                       */
 /* ------------------------------------------------------------------ */
 
@@ -527,15 +843,22 @@ export async function hydrateMember({
  * balance the books, and over-counting stops it sooner. Where the confirmed
  * miner fee is known it is used in place of the bid, which is the one direction
  * the estimate can safely move.
+ *
+ * Cleared intents are counted too, out of the `previousIntents` they leave
+ * behind. Almost none of them spent anything — that is what "cleared" means —
+ * but a position that keeps being cleared and re-composed is exactly the loop
+ * this cap exists to stop, and a total that forgot the earlier attempts would
+ * never reach it.
  */
 export function committedSpendUstx(journal) {
+  const spend = (record) =>
+    BigInt(record?.protocolFeeUstx ?? 0) + BigInt(record?.actualMinerFeeUstx ?? record?.minerFeeUstx ?? 0);
   let total = 0n;
   for (const record of Object.values(journal?.positions ?? {})) {
     if (!record || record.status === 'external') continue;
-    if (!['broadcasting', 'broadcast', 'confirmed', 'failed', 'timeout'].includes(record.status)) continue;
-    const protocolFee = BigInt(record.protocolFeeUstx ?? 0);
-    const minerFee = BigInt(record.actualMinerFeeUstx ?? record.minerFeeUstx ?? 0);
-    total += protocolFee + minerFee;
+    for (const cleared of record.previousIntents ?? []) total += spend(cleared);
+    if (!['broadcasting', 'broadcast', 'confirmed', 'failed', 'timeout', 'abandoned'].includes(record.status)) continue;
+    total += spend(record);
   }
   return total;
 }
@@ -742,7 +1065,9 @@ export async function runThread({ ports = {}, options = {} } = {}) {
     balanceFloorUstx = DEFAULT_BALANCE_FLOOR_USTX,
     minerFeeUstx = DEFAULT_MAX_TX_FEE_USTX,
     confirmTimeoutMs = DEFAULT_CONFIRM_TIMEOUT_MS,
-    confirmPollMs = DEFAULT_CONFIRM_POLL_MS
+    confirmPollMs = DEFAULT_CONFIRM_POLL_MS,
+    mempoolWaitMs = DEFAULT_MEMPOOL_WAIT_MS,
+    mempoolPollMs = DEFAULT_MEMPOOL_POLL_MS
   } = options;
 
   const mode = broadcast ? 'broadcast' : 'dry';
@@ -803,6 +1128,61 @@ export async function runThread({ ports = {}, options = {} } = {}) {
     journal.positions[key] = { ...(journal.positions[key] ?? {}), ...patch, updatedAt: iso(io.now()) };
     save();
     return journal.positions[key];
+  };
+
+  /**
+   * Clear an intent the nonce has proved was never mined, keeping what it said.
+   *
+   * The record is not deleted. The bytes it was going to mint, the nonce it was
+   * signed at and the wallet it came from are the evidence for the decision, and
+   * a journal that quietly forgot an attempt would be a worse record than one
+   * that never made it.
+   */
+  const clearIntent = (key, stranded, nonce) =>
+    record(key, {
+      status: 'abandoned',
+      txid: null,
+      inscriptionId: null,
+      finalHashHex: null,
+      intendedNonce: null,
+      // What it would have cost moves into the archive with everything else, so
+      // the run total counts this attempt once rather than twice.
+      protocolFeeUstx: null,
+      minerFeeUstx: null,
+      actualMinerFeeUstx: null,
+      resolution: 'nonce-proved-absent',
+      resolvedBy: 'runner',
+      resolvedAt: iso(io.now()),
+      note: nonce?.why ?? 'the intended nonce had never confirmed, so nothing was minted',
+      previousIntents: [
+        ...(stranded.previousIntents ?? []),
+        archiveIntent(stranded, { reason: 'nonce-proved-absent', note: nonce?.why ?? null })
+      ]
+    });
+
+  /** What a run says when it will not decide for itself. */
+  const unresolvedMessage = (key, stranded, resolved) => {
+    const label = key === MANIFEST_KEY ? 'the manifest' : `position ${key}`;
+    const where = stranded.senderAddress ?? 'the wizard wallet';
+    const settle =
+      `Once you know what happened, close it with --resolve ${key} landed:<id> or --resolve ${key} abandoned, ` +
+      'either of which is recorded in the journal as a human decision.';
+    if (resolved.outcome === 'pending') {
+      return (
+        `${label} has an intent record from an earlier run but no transaction id, and after ` +
+        `${formatDuration(resolved.waitedMs)} of waiting this wallet STILL HAS NONCE ${resolved.nonce.intendedNonce} ` +
+        'IN THE MEMPOOL. That is not a failure and it is not a loss: the transaction may confirm at any time. ' +
+        'This runner will not broadcast it again, because a second mint would be just as permanent as the first. ' +
+        `Watch ${where} in the explorer and run --status once nonce ${resolved.nonce.intendedNonce} clears. ${settle}`
+      );
+    }
+    return (
+      `${label} has an intent record from an earlier run but no transaction id, and no inscription with those ` +
+      `exact bytes is on chain yet. ${resolved.nonce?.why ?? 'The wallet nonce says nothing about it either.'} ` +
+      'That transaction may still be in the mempool. This runner will not broadcast it again: a second mint ' +
+      `would be just as permanent as the first. Check ${where} in the explorer, wait for the mempool to clear, ` +
+      `and run --status again. ${settle}`
+    );
   };
 
   let halted = null;
@@ -901,7 +1281,9 @@ export async function runThread({ ports = {}, options = {} } = {}) {
       const key = positionKey(position);
       const persona = personaForPosition(position);
       const previous = members.at(-1) ?? null;
-      const existing = journal.positions[key] ?? null;
+      // Not const: an intent the nonce proves was never mined is cleared here,
+      // and the rest of the loop has to see the position as untouched.
+      let existing = journal.positions[key] ?? null;
 
       guard(`position ${position}`);
 
@@ -923,33 +1305,53 @@ export async function runThread({ ports = {}, options = {} } = {}) {
         continue;
       }
 
-      // Intent written, txid never was. The crash window. Never re-broadcast:
-      // the bytes are deterministic, so ask the chain whether they are already
-      // there, and if the answer is no, stop — "not yet indexed" and "never
-      // sent" are the same answer from here and only one is safe to act on.
+      // Intent written, txid never was. The crash window. Never re-broadcast on
+      // a guess: ask the chain whether those exact bytes are already there, and
+      // if they are not, let the nonce recorded with the intent say what that
+      // silence means.
       if (existing && existing.status === 'broadcasting' && !existing.txid) {
-        const resolved = await resolveUnrecordedBroadcast({
+        const resolved = await resolveIntent({
           fetchImpl,
           hiroUrl,
           record: existing,
           position,
-          threadId
+          threadId,
+          subject,
+          now: io.now,
+          sleep: io.sleep,
+          say: io.say,
+          guard,
+          mempoolWaitMs,
+          mempoolPollMs
         });
-        if (!resolved) {
-          throw new RunHalt(
-            'unresolved',
-            `position ${position} has an intent record from an earlier run but no transaction id, and no ` +
-              'inscription with those exact bytes is on chain yet. That transaction may still be in the ' +
-              'mempool. This runner will not broadcast it again: a second mint would be just as permanent as ' +
-              `the first. Check ${existing.senderAddress ?? 'the wizard wallet'} in the explorer, wait for the ` +
-              'mempool to clear, and run --status again.',
-            { position, finalHashHex: existing.finalHashHex }
-          );
+
+        if (resolved.outcome === 'landed') {
+          record(key, { status: 'confirmed', inscriptionId: resolved.id, recovered: true });
+          members.push(resolved.member);
+          io.say(`  position ${position}: recovered as #${resolved.id} by content hash; no second broadcast`);
+          continue;
         }
-        record(key, { status: 'confirmed', inscriptionId: resolved.id, recovered: true });
-        members.push(resolved.member);
-        io.say(`  position ${position}: recovered as #${resolved.id} by content hash; no second broadcast`);
-        continue;
+
+        if (resolved.outcome !== 'absent') {
+          throw new RunHalt('unresolved', unresolvedMessage(key, existing, resolved), {
+            position,
+            finalHashHex: existing.finalHashHex,
+            intendedNonce: existing.intendedNonce ?? null,
+            nonce: resolved.nonce
+          });
+        }
+
+        // The one branch that may compose the entry again, and the whole reason
+        // the nonce is written down. It is safe here and nowhere else: a nonce
+        // below the intended one is proof the transaction never confirmed, so
+        // there is nothing on chain for a second mint to duplicate. The mirror
+        // case — a nonce at or above the intended one — proves only that some
+        // transaction used it, which may have been an unrelated send from the
+        // same wallet, and is handled above as a halt.
+        clearIntent(key, existing, resolved.nonce);
+        io.say(`  position ${position}: ${resolved.nonce.why}`);
+        io.say('    the orphaned intent is cleared and this entry is composed again from scratch');
+        existing = null;
       }
 
       // A txid exists. Poll it. Under no circumstances send another.
@@ -1047,22 +1449,43 @@ export async function runThread({ ports = {}, options = {} } = {}) {
 
     if (manifest && last === Number(threadLength) && members.length === Number(threadLength)) {
       const key = MANIFEST_KEY;
-      const existing = journal.positions[key] ?? null;
+      // Not const, for the same reason as a position: a cleared intent has to
+      // leave the manifest looking unwritten.
+      let existing = journal.positions[key] ?? null;
       guard('the manifest');
+
+      if (existing && existing.status === 'broadcasting' && !existing.txid) {
+        const resolved = await resolveIntent({
+          fetchImpl,
+          hiroUrl,
+          record: existing,
+          threadId,
+          now: io.now,
+          sleep: io.sleep,
+          say: io.say,
+          guard,
+          mempoolWaitMs,
+          mempoolPollMs
+        });
+        if (resolved.outcome === 'landed') {
+          record(key, { status: 'confirmed', inscriptionId: resolved.id, recovered: true });
+          existing = journal.positions[key];
+        } else if (resolved.outcome === 'absent') {
+          clearIntent(key, existing, resolved.nonce);
+          io.say(`  manifest: ${resolved.nonce.why}`);
+          io.say('    the orphaned intent is cleared and the manifest is composed again from scratch');
+          existing = null;
+        } else {
+          throw new RunHalt('unresolved', unresolvedMessage(key, existing, resolved), {
+            finalHashHex: existing.finalHashHex,
+            intendedNonce: existing.intendedNonce ?? null,
+            nonce: resolved.nonce
+          });
+        }
+      }
 
       if (existing && existing.status === 'confirmed' && existing.inscriptionId) {
         io.say(`  manifest: already #${existing.inscriptionId}, nothing to broadcast`);
-      } else if (existing && existing.status === 'broadcasting' && !existing.txid) {
-        const resolved = await resolveUnrecordedBroadcast({ fetchImpl, hiroUrl, record: existing, threadId });
-        if (!resolved) {
-          throw new RunHalt(
-            'unresolved',
-            'the manifest has an intent record from an earlier run but no transaction id, and no inscription ' +
-              'with those exact bytes is on chain yet. It may still be in the mempool. This runner will not ' +
-              'broadcast it again. Run --status once the mempool has cleared.'
-          );
-        }
-        record(key, { status: 'confirmed', inscriptionId: resolved.id, recovered: true });
       } else if (existing && existing.txid && existing.status !== 'failed') {
         await settle({
           io,
@@ -1171,12 +1594,14 @@ export async function runThread({ ports = {}, options = {} } = {}) {
 }
 
 /**
- * A position whose intent was written but whose txid was not, resolved against
- * the chain by the content hash recorded at intent time.
+ * The hash half of `resolveIntent`, on its own: did these exact bytes land?
  *
- * The hash is what makes this possible. An entry states the block it was written
- * at, so re-composing it later produces different bytes; the hash recorded
- * before the broadcast is the only stable handle on what was actually signed.
+ * The hash is what makes any of this possible. An entry states the block it was
+ * written at, so re-composing it later produces different bytes; the hash
+ * recorded before the broadcast is the only stable handle on what was signed.
+ * It is also the only positive proof in the system — a hit means the mint
+ * landed, and nothing else does — so it is asked first everywhere and asked
+ * again while waiting.
  */
 export async function resolveUnrecordedBroadcast({ fetchImpl, hiroUrl, record, position = null, threadId } = {}) {
   if (!record?.finalHashHex) return null;
@@ -1205,6 +1630,22 @@ async function broadcastAndSettle({
   confirmPollMs,
   hydrate = true
 }) {
+  // The nonce this transaction is about to be signed with, read before the
+  // intent is written so the write itself stays adjacent to the submit below.
+  //
+  // `possible_next_nonce` is what the signer will pick a moment from now, and
+  // recording it turns the crash window from a permanent halt into a decidable
+  // question: a wallet whose last executed nonce is still below this one cannot
+  // have mined this transaction. An unreadable nonce is not a reason to refuse
+  // to broadcast — it only costs a later run the cheap answer, leaving it the
+  // hash and the halt it always had.
+  const intendedNonce = await readIntendedNonce({
+    fetchImpl,
+    hiroUrl,
+    address: plan.senderAddress,
+    fallback: plan.checks?.pendingNonce?.nextNonce ?? null
+  });
+
   // Intent, before anything is signed. Everything a later run needs to work out
   // what happened to this position without re-sending it.
   //
@@ -1229,7 +1670,14 @@ async function broadcastAndSettle({
     protocolFeeUstx: String(plan.protocolFeeUstx),
     minerFeeUstx: String(plan.minerFeeUstx),
     senderAddress: plan.senderAddress,
-    broadcastAt: iso(io.now())
+    intendedNonce,
+    broadcastAt: iso(io.now()),
+    // A position composed again after an earlier attempt was cleared keeps the
+    // history in previousIntents, but must not keep the verdict that closed it.
+    resolution: null,
+    resolvedBy: null,
+    resolvedAt: null,
+    note: null
   });
 
   let txid;
@@ -1459,18 +1907,36 @@ export async function statusReport({ ports = {}, options = {} } = {}) {
           }
         }
       } else if (stored?.status === 'broadcasting') {
-        // The ambiguous state. Resolve it the same way a resumed run would.
-        const resolved = await resolveUnrecordedBroadcast({ fetchImpl: io.fetchImpl, hiroUrl, record: stored, threadId });
-        if (resolved) {
+        // The ambiguous state. Resolve it the way a resumed run would, but
+        // never wait: --status is a read that reports, not a run that blocks.
+        const resolved = await resolveIntent({
+          fetchImpl: io.fetchImpl,
+          hiroUrl,
+          record: stored,
+          threadId,
+          mempoolWaitMs: 0
+        });
+        if (resolved.outcome === 'landed') {
           row.inscriptionId = resolved.id;
           row.chain = 'confirmed';
           row.note = 'recovered by content hash: the mint landed but its txid was never recorded';
+        } else if (resolved.outcome === 'absent') {
+          row.chain = 'never-sent';
+          row.note = `${resolved.nonce.why}. The next run clears this intent and composes the entry again.`;
+        } else if (resolved.outcome === 'pending') {
+          row.chain = 'pending';
+          row.note = `${resolved.nonce.why}. Do not broadcast it again; wait for that nonce to clear.`;
         } else {
           row.chain = 'unresolved';
           row.note =
-            'intent recorded, no txid, and nothing with those bytes on chain. It may still be in the mempool. ' +
-            'Do not broadcast it again.';
+            `intent recorded, no txid, and nothing with those bytes on chain. ${resolved.nonce?.why ?? ''} ` +
+            'It may still be in the mempool. Do not broadcast it again.';
         }
+      } else if (stored?.status === 'abandoned') {
+        row.chain = 'abandoned';
+        row.note =
+          `settled as never minted by ${stored.resolvedBy === 'operator' ? 'a human' : 'the wallet nonce'}` +
+          `${stored.resolvedAt ? ` at ${stored.resolvedAt}` : ''}: ${stored.note ?? 'no reason recorded'}`;
       }
     } catch (error) {
       row.chain = 'unknown';
@@ -1487,6 +1953,293 @@ export async function statusReport({ ports = {}, options = {} } = {}) {
     journalFound: Boolean(journal),
     committedUstx: journal ? committedSpendUstx(journal) : 0n,
     rows
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* the operator's decision                                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A closing manifest, read back and checked to be the manifest of this thread.
+ *
+ * `hydrateMember` cannot do this: a manifest has no `## Claim` and no position,
+ * so every assertion that makes hydrateMember safe for an entry would reject it.
+ */
+export async function hydrateManifest({
+  fetchImpl = globalThis.fetch,
+  hiroUrl = DEFAULT_HIRO_URL,
+  senderAddress = CORE_ADDRESS,
+  id,
+  threadId,
+  subject = null
+} = {}) {
+  const read = await readEntryFromChain({ fetchImpl, hiroUrl, senderAddress, id });
+  if (!read.found) {
+    throw new WizardSafetyError(`#${id} has no chunk u0 on chain, so it cannot be the manifest of ${threadId}.`);
+  }
+  const meta = read.entry?.meta ?? {};
+  if (meta.record !== 'thread-manifest') {
+    throw new WizardSafetyError(`#${id} is on chain but its front matter does not say "record: thread-manifest".`);
+  }
+  if (read.entry.thread !== threadId) {
+    throw new WizardSafetyError(`#${id} is the manifest of thread "${read.entry.thread}", not "${threadId}".`);
+  }
+  if (subject && read.entry.subject && read.entry.subject !== '(mixed)' && read.entry.subject !== getSubject(subject).id) {
+    throw new WizardSafetyError(
+      `#${id} is a manifest for subject "${read.entry.subject}", but this thread is composing ` +
+        `"${getSubject(subject).id}".`
+    );
+  }
+  return { id: String(id), position: null, body: read.body, members: meta['member-ids'] ?? null };
+}
+
+/**
+ * Record a human's verdict on one position, into the journal, with a timestamp.
+ *
+ * The runner decides everything it can decide from the chain. This is for what
+ * is left: an intent whose nonce was consumed by something unidentifiable, or a
+ * transaction that sat in the mempool until it was garbage collected and can no
+ * longer be distinguished from one that was never sent. Without this the
+ * position stays ambiguous permanently — the entry names the block it was
+ * written at, so it can never be re-composed to the same bytes and the orphaned
+ * hash can never be matched again.
+ *
+ * It is deliberately not a way to skip a check. Both verdicts are refused
+ * unless the chain agrees they are possible:
+ *
+ *   landed:<id>  the id's own front matter has to be this thread, this position
+ *                and this subject. An operator pasting the id of a neighbouring
+ *                entry would otherwise write a permanent citation of the wrong
+ *                inscription into the manifest.
+ *   abandoned    refused outright if the chain shows the position confirmed, by
+ *                recorded id, by content hash or by a successful transaction.
+ *                You cannot abandon something that landed.
+ *
+ * Broadcasts nothing, signs nothing, needs no key.
+ */
+export async function resolvePosition({ ports = {}, options = {} } = {}) {
+  const io = { ...NULL_PORTS, ...ports };
+  const {
+    threadId,
+    threadLength = THREAD_LENGTH,
+    subject = null,
+    position,
+    resolution,
+    inscriptionId = null,
+    note = null,
+    hiroUrl = DEFAULT_HIRO_URL,
+    journalDir = HERE,
+    mode = 'broadcast'
+  } = options;
+
+  if (!RESOLUTIONS.includes(resolution)) {
+    throw new WizardSafetyError(
+      `"${resolution}" is not a resolution. Use "abandoned" or "landed:<id>", and only when you have checked ` +
+        'the explorer yourself.'
+    );
+  }
+
+  const raw = String(position ?? '').trim();
+  const key = raw.toLowerCase() === MANIFEST_KEY ? MANIFEST_KEY : raw;
+  if (key !== MANIFEST_KEY) {
+    const numeric = Number(key);
+    if (!Number.isInteger(numeric) || numeric < 1 || numeric > Number(threadLength)) {
+      throw new WizardSafetyError(
+        `"${position}" is not a position in a thread of ${threadLength}, and not "${MANIFEST_KEY}".`
+      );
+    }
+  }
+  const label = key === MANIFEST_KEY ? 'the manifest' : `position ${key}`;
+
+  const journalPath = journalPathFor({ dir: journalDir, threadId, mode });
+  const journal = io.readJournal(journalPath);
+  if (!journal) {
+    throw new WizardSafetyError(`there is no run journal at ${journalPath}, so there is nothing to resolve.`);
+  }
+  if (journal.threadId !== threadId || journal.mode !== mode) {
+    throw new WizardSafetyError(
+      `the run journal at ${journalPath} is for thread ${journal.threadId} in ${journal.mode} mode, not ` +
+        `${threadId} in ${mode} mode.`
+    );
+  }
+
+  // The journal knows what this thread argues about. Trusting it over a CLI
+  // default means an operator who forgets --subject gets the right check rather
+  // than a refusal about a subject they never chose.
+  const checkSubject = subject ?? journal.subject ?? null;
+
+  const stored = journal.positions?.[key] ?? null;
+  if (!stored) {
+    throw new WizardSafetyError(
+      `${label} of thread ${threadId} has no record in ${journalPath}. --resolve closes a record this runner ` +
+        'left behind; an entry minted outside it is supplied with --ids instead.'
+    );
+  }
+  // Already settled by the chain itself. A human verdict cannot improve on a
+  // confirmed inscription and must not be able to overwrite one.
+  if ((stored.status === 'confirmed' || stored.status === 'external') && stored.inscriptionId) {
+    throw new WizardSafetyError(
+      `${label} is already resolved as #${stored.inscriptionId} (${stored.status}). There is nothing ambiguous ` +
+        'here to settle.'
+    );
+  }
+
+  const resolvedAt = iso(io.now());
+  const checks = {};
+  let patch;
+  let message;
+
+  if (resolution === 'landed') {
+    if (!/^\d+$/.test(String(inscriptionId ?? ''))) {
+      throw new WizardSafetyError(`"landed:${inscriptionId ?? ''}" needs an inscription id: --resolve ${key} landed:2926`);
+    }
+    if (stored.inscriptionId && String(stored.inscriptionId) !== String(inscriptionId)) {
+      throw new WizardSafetyError(
+        `${label} is already recorded as #${stored.inscriptionId}, not #${inscriptionId}. One of them is wrong ` +
+          'and this will not guess which.'
+      );
+    }
+    try {
+      checks.onChain =
+        key === MANIFEST_KEY
+          ? await hydrateManifest({
+              fetchImpl: io.fetchImpl,
+              hiroUrl,
+              id: inscriptionId,
+              threadId,
+              subject: checkSubject
+            })
+          : await hydrateMember({
+              fetchImpl: io.fetchImpl,
+              hiroUrl,
+              id: inscriptionId,
+              position: Number(key),
+              threadId,
+              subject: checkSubject
+            });
+    } catch (error) {
+      throw new WizardSafetyError(
+        `refusing to record ${label} as landed at #${inscriptionId}: ${errorMessage(error)} Nothing was written.`
+      );
+    }
+
+    // Advisory only. The bytes an entry mints carry the block it was written at,
+    // so a mint that was re-composed after the crash legitimately hashes to
+    // something else; that is a fact worth recording, not a reason to refuse.
+    checks.matchesIntent = null;
+    if (stored.finalHashHex) {
+      const byHash = await lookupIdByHash({ fetchImpl: io.fetchImpl, hiroUrl, finalHashHex: stored.finalHashHex });
+      checks.matchesIntent = byHash === null ? null : String(byHash) === String(inscriptionId);
+    }
+
+    patch = {
+      status: 'confirmed',
+      inscriptionId: String(inscriptionId),
+      recovered: true,
+      resolution: 'landed',
+      resolvedBy: 'operator',
+      resolvedAt,
+      note:
+        note ??
+        `settled by hand: a human verified #${inscriptionId} is ${label} of thread ${threadId}` +
+          `${checks.matchesIntent === true ? ' and that it is the intent recorded here' : ''}` +
+          `${checks.matchesIntent === false ? ', composed differently from the intent recorded here' : ''}.`
+    };
+    message =
+      `${label} is now recorded as #${inscriptionId}, verified against its own front matter and settled by hand ` +
+      `at ${resolvedAt}.`;
+  } else {
+    // You cannot abandon something that landed. Three independent ways of asking.
+    if (stored.inscriptionId) {
+      const read = await readEntryFromChain({ fetchImpl: io.fetchImpl, hiroUrl, id: stored.inscriptionId });
+      checks.recordedId = read.found;
+      if (read.found) {
+        throw new WizardSafetyError(
+          `refusing to abandon ${label}: it is recorded as #${stored.inscriptionId} and #${stored.inscriptionId} ` +
+            'is on chain. It landed. Nothing was written.'
+        );
+      }
+    }
+    if (stored.finalHashHex) {
+      const byHash = await lookupIdByHash({ fetchImpl: io.fetchImpl, hiroUrl, finalHashHex: stored.finalHashHex });
+      checks.contentHash = byHash;
+      if (byHash) {
+        throw new WizardSafetyError(
+          `refusing to abandon ${label}: the exact bytes it was going to mint are on chain as #${byHash}. It ` +
+            `landed. Record it with --resolve ${key} landed:${byHash} instead. Nothing was written.`
+        );
+      }
+    }
+    if (stored.txid) {
+      const seen = await fetchTransaction({ fetchImpl: io.fetchImpl, hiroUrl, txid: stored.txid });
+      checks.txStatus = seen.txStatus;
+      const verdict = classifyTxStatus(seen.txStatus);
+      if (verdict === 'success') {
+        throw new WizardSafetyError(
+          `refusing to abandon ${label}: transaction ${stored.txid} succeeded. It landed. Re-run to let the ` +
+            'runner read the id out of it. Nothing was written.'
+        );
+      }
+      if (verdict === 'pending') {
+        throw new WizardSafetyError(
+          `refusing to abandon ${label}: transaction ${stored.txid} has not reached a terminal status and may ` +
+            'still confirm. Watch it, and abandon it only once the chain says it will not. Nothing was written.'
+        );
+      }
+    }
+    if (stored.status === 'abandoned') {
+      throw new WizardSafetyError(`${label} is already abandoned (${stored.note ?? 'no reason recorded'}).`);
+    }
+
+    checks.nonce = classifyIntentNonce({
+      intendedNonce: stored.intendedNonce ?? null,
+      nonces: await fetchSenderNonces({ fetchImpl: io.fetchImpl, hiroUrl, address: stored.senderAddress ?? null })
+    });
+
+    patch = {
+      status: 'abandoned',
+      txid: null,
+      inscriptionId: null,
+      finalHashHex: null,
+      intendedNonce: null,
+      protocolFeeUstx: null,
+      minerFeeUstx: null,
+      actualMinerFeeUstx: null,
+      resolution: 'abandoned',
+      resolvedBy: 'operator',
+      resolvedAt,
+      note:
+        note ??
+        `settled by hand: a human established this was never minted. At the time of the decision, ${checks.nonce.why}.`,
+      previousIntents: [
+        ...(stored.previousIntents ?? []),
+        archiveIntent(stored, { reason: 'operator-abandoned', note: checks.nonce.why })
+      ]
+    };
+    message =
+      `${label} is now recorded as abandoned, settled by hand at ${resolvedAt}. The next run composes it again ` +
+      'from scratch.';
+  }
+
+  journal.positions[key] = { ...stored, ...patch, updatedAt: resolvedAt };
+  journal.updatedAt = resolvedAt;
+  assertJournalSecretFree(journal);
+  io.writeJournal(journalPath, journal);
+
+  return {
+    ok: true,
+    threadId,
+    key,
+    label,
+    resolution,
+    inscriptionId: patch.inscriptionId ?? null,
+    resolvedAt,
+    journalPath,
+    journal,
+    record: journal.positions[key],
+    checks,
+    message
   };
 }
 
@@ -1514,6 +2267,23 @@ export function formatStatusTable(report) {
   }
   lines.push('');
   lines.push(`committed so far, by this runner: ${groupDigits(report.committedUstx)} microSTX`);
+  return lines.join('\n');
+}
+
+/** What an operator decision changed. Pure string building. */
+export function formatResolution(result) {
+  const lines = [''];
+  lines.push(`--- thread ${result.threadId}: ${result.label} resolved as ${result.resolution} ---`);
+  lines.push('');
+  lines.push(`  ${result.message}`);
+  if (result.checks?.nonce?.why) lines.push(`  nonce   : ${result.checks.nonce.why}`);
+  if (result.checks?.matchesIntent === false) {
+    lines.push('  note    : the inscription does not hash to the intent recorded here, which is expected when the');
+    lines.push('            entry was composed again at a later block.');
+  }
+  lines.push(`  journal : ${result.journalPath}`);
+  lines.push('');
+  lines.push('Nothing was signed and nothing was sent. This wrote one decision to the journal.');
   return lines.join('\n');
 }
 

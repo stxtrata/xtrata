@@ -2,6 +2,23 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Wizard thread runner: the crash window closed with a nonce (2026-07-31, follow-up)
+
+- **Why:** the halt on an unresolvable intent was safe but permanent. An entry states the block it was written at, so a retry composes different bytes under a different hash, which means the orphaned intent could never afterwards be matched or cleared and the position stayed ambiguous in the journal forever.
+- **The intent now records the wallet and the nonce it is about to be signed with** (`possible_next_nonce`, read immediately before signing), which turns "did this land?" into a question the chain can answer. The asymmetry is the whole change: `last_executed_tx_nonce` **below** the intended nonce is proof of absence, because a nonce cannot confirm out of order, so the entry is composed again cleanly. `last_executed_tx_nonce` **at or above** it proves nothing at all — some transaction consumed that nonce, and it may have been the operator moving funds out of the same wallet — so only a content-hash hit can say the mint landed, and without one the run still halts.
+- **A bounded wait before the halt.** A mempool nonce at or above the intended one means the mint may be a block away, so the runner waits `--mempool-wait-minutes` (default 3) with a visible countdown, re-checking the hash. It never waits when the nonce has already proved the mint absent.
+- **`--resolve <position> abandoned` and `--resolve <position> landed:<id>`** record a human's verdict, with a timestamp, for what is genuinely left. Neither skips a check: `landed:<id>` refuses an id whose own front matter is not this thread, this position and this subject, and `abandoned` refuses a position the chain shows as confirmed by recorded id, by content hash or by a successful transaction. Both refuse a position already cleanly resolved, and both leave the journal untouched when they refuse.
+- **Backward compatible by design.** The journal version stayed at 1: a journal written before `intendedNonce` existed loads unchanged and falls back to hash-only resolution, which is the old halt. A test asserts exactly that, using a wallet reading that *would* have proved absence had the field been there.
+- **Verified:** `npx vitest run scripts/wizard` — **255 tests** (227 before, 28 new); eslint clean. `--dry` on `t-permanence-001` from position 5 unchanged, and `--status` against live mainnet still reads positions 1–6 plus the manifest correctly. `compose.mjs`, `personas.mjs` and `inscribe.mjs` untouched, so no entry hash moved. Nothing broadcast.
+
+### Thread `t-permanence-001` is complete — the runner's first real use
+
+Seven inscriptions on mainnet: **#2922** (Archivist) · **#2923** (Skeptic) · **#2924** (Builder) · **#2925** (Archivist) · **#2926** (Skeptic) · **#2927** (Builder) · **#2928** (the closing manifest, citing all six as dependencies). 0.123 STX for the three the runner broadcast, spread across all three wallets.
+
+The runner earned its polling loop immediately: every position read `not visible yet` on the first poll, and the manifest passed through `pending` before confirming on the third. That gap is exactly where a human retries and double-mints.
+
+Two claims verified against chain after the fact rather than asserted. The manifest's own instruction works — walking `get-dependencies` back from #2927 yields `2927 → 2926 → 2925 → 2924 → 2923 → 2922`, the whole thread recovered from the chain without trusting the file. And the corrected walkability text is what actually got inscribed; the earlier "start at the lowest id and follow the edges forward", which the core cannot support, is absent from the permanent record.
+
 ## Wizard thread runner: autonomous minting with a crash-safe journal (2026-07-31, follow-up)
 
 - **Why:** driving a thread by hand means transcribing an inscription id and a claim between every entry, and the citation is only as good as the transcription. The runner broadcasts, polls to a terminal transaction status, reads the resulting inscription id from `tx_result` (`(ok (tuple (existed false) (token-id u2925)))` — the id and a duplicate flag are both there), reads the new entry's `## Claim` back **off chain**, and cites that in the next entry. The parent-quote rail therefore checks what was really inscribed rather than what we believe we inscribed.

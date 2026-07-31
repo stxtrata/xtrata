@@ -245,6 +245,9 @@ npm run wizards:run -- --thread t-permanence-001 --subject cost-of-permanence --
 # what is confirmed, pending or missing. Reads only. Runs nothing.
 npm run wizards:status -- t-permanence-001 --ids 2922,2923,2924,2925
 
+# settle one position the chain cannot settle. Writes one journal record, sends nothing.
+npm run wizards:run -- --thread t-permanence-001 --resolve 5 abandoned
+
 # really do it
 npm run wizards:run -- --thread t-permanence-001 --subject cost-of-permanence \
   --from 5 --ids 2922,2923,2924,2925 --broadcast
@@ -256,7 +259,8 @@ Per entry the loop does exactly this, in this order:
 2. compose the entry and run the **full existing preflight** from `inscribe.mjs`, including
    `verifyParentQuote` against the real parent's on-chain bytes
 3. check the run-level spend cap, then `assertBroadcastAllowed`
-4. write the **intent** to the run journal — before anything is signed
+4. read the wallet's `possible_next_nonce`, then write the **intent** — the hash of the bytes about
+   to be signed, the wallet, and that nonce — to the run journal, before anything is signed
 5. broadcast
 6. record the txid, then poll to a terminal transaction status
 7. on success, parse `token-id` out of the mint's own `(ok (tuple (existed bool) (token-id uint)))`
@@ -273,7 +277,8 @@ real ones, and the output says which it used.
 ### The run journal
 
 `scripts/wizard/.run-<threadId>.json`, gitignored, one file per thread. It records per position the
-status, txid, inscription id, block, the content hash of what was signed and what it cost.
+status, txid, inscription id, block, the content hash of what was signed, the wallet and the nonce it
+was signed with, and what it cost.
 
 It is written **before** each broadcast, not after. That ordering is the whole point: the dangerous
 crash is the one between signing and recording, because a runner that forgets it broadcast will
@@ -283,11 +288,75 @@ broadcast again, and the second mint is just as permanent and just as expensive 
 |---|---|
 | `confirmed` | Skips it. Re-reads the entry off chain for the next citation. |
 | `broadcast` or `timeout` (has a txid) | **Polls that txid.** Never re-sends. |
-| `broadcasting` (intent written, no txid) | Resolves it against the chain by content hash — the bytes are deterministic, so if the mint landed `get-id-by-hash` finds it. If it does not, **halts**: "not indexed yet" and "never sent" look identical from here and only one of them is safe to act on. |
+| `broadcasting` (intent written, no txid) | The crash window, decided by hash and nonce. See below. |
+| `abandoned` | Something proved it was never minted. Composes it again from scratch. |
 | `failed` | Halts. A human decides what happened. |
 
 A dry run keeps its journal in memory and writes nothing, so the invented ids and txids of a
 rehearsal can never be mistaken for a real run's.
+
+Recording the nonce did not change the journal version. A journal written before that field existed
+loads unchanged and falls back to the hash-only behaviour, which is the halt in the last row below.
+
+### The crash window
+
+An intent with no transaction id is the one state the journal cannot answer on its own. Two
+independent questions decide it, and **they are not symmetric**.
+
+**The content hash** is positive proof, and the only positive proof there is. The bytes are
+deterministic, so if the mint landed `get-id-by-hash` finds it. It is asked first, and asked again
+every few seconds while waiting.
+
+**The sender's nonce**, recorded with the intent as the `possible_next_nonce` read immediately before
+signing, decides what a *missing* hash means:
+
+| Reading | What it proves | What the run does |
+|---|---|---|
+| `get-id-by-hash` finds those exact bytes | The mint **landed** | Adopts that inscription. Never re-broadcasts. |
+| a mempool nonce **at or above** the intended one | It is **still in flight** | Waits up to `--mempool-wait-minutes` (default 3) with a countdown, re-checking the hash. If it lands in the window the run carries on; if it does not, it halts, says the transaction is still pending, and names the nonce. |
+| `last_executed_tx_nonce` **below** the intended one | It **never landed, and cannot** | Clears the orphaned intent, keeps it under `previousIntents`, composes the entry again and carries on. No wait: waiting on a transaction that provably does not exist buys nothing. |
+| `last_executed_tx_nonce` **at or above** the intended one | **Nothing** | Halts. |
+| no nonce recorded, or the endpoint unreadable | **Nothing** | Halts, exactly as it did before nonces were recorded. |
+
+The last two rows are the point. A nonce **below** the intended one is proof of absence: that nonce
+has never confirmed, a nonce cannot confirm out of order, so this transaction did not confirm. A
+nonce **at or above** it proves only that *some* transaction consumed it, and that transaction may
+have been the operator moving funds out of the same wallet, or a mint done by hand. Only the content
+hash can say that this mint landed.
+
+Before the nonce was recorded, an ambiguous position halted permanently. An entry states the block it
+was written at, so composing it again produces different bytes under a different hash, which means
+the orphaned intent could never afterwards be matched, cleared, or told apart from a mint that
+landed.
+
+### Settling a position by hand
+
+For what is left — a nonce consumed by something unidentifiable, or a transaction that sat in the
+mempool until it was garbage collected — `--resolve` writes a human's verdict into the journal, with
+a timestamp and a note recording that a human settled it.
+
+```bash
+# it was minted as #2926 — checked against #2926's own front matter before it is believed
+npm run wizards:run -- --thread t-permanence-001 --resolve 5 landed:2926
+
+# it was never minted — checked against the chain before it is believed
+npm run wizards:run -- --thread t-permanence-001 --resolve 5 abandoned
+```
+
+Neither is a way to skip a check:
+
+- **`landed:<id>`** reads that inscription's own front matter and refuses unless the thread, the
+  position and the subject are this run's. Pasting the id of a neighbouring entry would otherwise
+  write a permanent citation of the wrong inscription into the manifest. `manifest` is verified as a
+  `record: thread-manifest` for this thread instead, since a manifest has no position and no claim.
+- **`abandoned`** refuses if the chain shows the position confirmed — by recorded id, by content
+  hash, or by a transaction that succeeded — and refuses while a recorded transaction is still
+  pending and might yet confirm. You cannot abandon something that landed.
+- Both refuse a position that is already cleanly resolved, and both leave the journal untouched when
+  they refuse.
+
+`<position>` is a position number or `manifest`, and `--thread` is required. Both broadcast nothing,
+sign nothing and need no key: they read the chain and write one journal record.
 
 ### Failure semantics
 
@@ -297,9 +366,13 @@ rehearsal can never be mistaken for a real run's.
 - **A timeout is not a failure.** A transaction that has not confirmed inside the window may still
   confirm. The runner says so in as many words, keeps the txid in the journal, and tells you not to
   re-broadcast. Re-run with the same `--from` once it lands, or watch it with `--status`.
-- **The kill switch is checked between every step**, not only at the start. Engaged while a
-  transaction is in flight, the run stops and reports that the broadcast may still confirm — nothing
-  is undone, because nothing can be.
+- **The kill switch is checked between every step**, not only at the start — including between looks
+  while waiting on the mempool. Engaged while a transaction is in flight, the run stops and reports
+  that the broadcast may still confirm: nothing is undone, because nothing can be.
+- **A pending transaction is not a lost one.** An intent whose nonce is still in the mempool halts
+  saying so, and names the nonce to watch. Once that nonce clears, a re-run resolves the position
+  without anyone deciding anything: it either finds the bytes on chain, or the nonce proves they
+  never got there.
 - **`--from <n>` refuses to start when the predecessor is not confirmed on chain**, and refuses an id
   whose own front matter says it belongs to a different thread or a different position.
 
@@ -312,6 +385,9 @@ Useful flags:
 --run-spend-cap-ustx <n>      cap across the whole run
 --confirm-timeout-minutes <n> how long to wait for one transaction (default 30)
 --poll-seconds <n>            gap between transaction lookups (default 20)
+--mempool-wait-minutes <n>    how long to wait on a lost txid whose nonce is pending (default 3)
+--mempool-poll-seconds <n>    gap between those lookups (default 15)
+--resolve <pos> <decision>    settle one position by hand: abandoned, or landed:<id>
 ```
 
 ## Spend caps

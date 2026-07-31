@@ -21,6 +21,10 @@
  * See what is confirmed, pending or missing, without running anything:
  *   node scripts/wizard/run-thread.mjs --status t-permanence-001
  *
+ * Settle a position the chain cannot settle, by hand, into the journal:
+ *   node scripts/wizard/run-thread.mjs --thread t-permanence-001 --resolve 5 abandoned
+ *   node scripts/wizard/run-thread.mjs --thread t-permanence-001 --resolve 5 landed:2926
+ *
  * Really do it (real mainnet transactions, real STX, irreversible):
  *   node scripts/wizard/run-thread.mjs --thread t-permanence-001 \
  *     --subject cost-of-permanence --from 5 --ids 2922,2923,2924,2925 --broadcast
@@ -30,6 +34,10 @@
  *   - a run journal at scripts/wizard/.run-<threadId>.json, written before each
  *     broadcast and updated after, so a runner that dies mid-flight never
  *     re-broadcasts a position it already sent
+ *   - the sender's nonce recorded with that intent, so a lost transaction id is
+ *     a decidable question rather than a permanent halt: a nonce that has never
+ *     confirmed proves the mint never landed, and only then is the entry
+ *     composed again
  *   - a run-level spend cap across every remaining broadcast
  *   - the kill switch checked between every step
  *   - stop on the first failure, and never retry a broadcast
@@ -83,9 +91,13 @@ import { PERSONA_IDS, SUBJECT_IDS, THREAD_LENGTH } from './personas.mjs';
 import {
   DEFAULT_CONFIRM_POLL_MS,
   DEFAULT_CONFIRM_TIMEOUT_MS,
+  DEFAULT_MEMPOOL_POLL_MS,
+  DEFAULT_MEMPOOL_WAIT_MS,
   DEFAULT_RUN_SPEND_CAP_USTX,
+  formatResolution,
   formatRunReport,
   formatStatusTable,
+  resolvePosition,
   runThread,
   statusReport
 } from './run-thread-core.mjs';
@@ -104,6 +116,40 @@ const flag = (name) => arg(name) === true;
 const text = (name, fallback = null) => (typeof arg(name) === 'string' ? arg(name) : fallback);
 const csv = (value) =>
   value && typeof value === 'string' ? value.split(',').map((part) => part.trim()).filter(Boolean) : [];
+
+/**
+ * The words after a flag, for the one flag that takes two of them.
+ * `--resolve 5 abandoned` reads as ['5', 'abandoned']; a following `--flag`
+ * ends the list, so a missing word is missing rather than the next flag's name.
+ */
+const words = (name, count) => {
+  const index = process.argv.indexOf(`--${name}`);
+  if (index === -1) return [];
+  const out = [];
+  for (let offset = 1; offset <= count; offset += 1) {
+    const value = process.argv[index + offset];
+    if (!value || value.startsWith('--')) break;
+    out.push(value);
+  }
+  return out;
+};
+
+/**
+ * `abandoned` or `landed:<id>`, as the two fields the core wants.
+ *
+ * Parsed here rather than in the core so the core takes a decision and an id
+ * rather than a string an operator typed.
+ */
+function parseResolution(value) {
+  const raw = String(value ?? '').trim();
+  if (raw === 'abandoned') return { resolution: 'abandoned', inscriptionId: null };
+  const landed = /^landed:(\d+)$/.exec(raw);
+  if (landed) return { resolution: 'landed', inscriptionId: landed[1] };
+  throw new WizardSafetyError(
+    `"${raw || '(nothing)'}" is not a resolution. Use --resolve <position> abandoned, or ` +
+      '--resolve <position> landed:<inscription id>.'
+  );
+}
 
 const say = (line = '') => console.log(line);
 
@@ -189,10 +235,29 @@ function makeFakeChain({ tip, feeUstx }) {
     inscriptions,
     byHash,
     transactions,
+    /**
+     * One wallet's worth of nonce truth, shared by all three wizards. The real
+     * endpoint is per address; a dry run does not have three fake wallets and
+     * does not need them. Mutable, so a test can put a nonce in the mempool or
+     * behind the intent and watch the runner decide.
+     */
+    nonces: {
+      last_executed_tx_nonce: 6,
+      possible_next_nonce: 7,
+      last_mempool_tx_nonce: null,
+      detected_missing_nonces: [],
+      detected_mempool_nonces: []
+    },
     add,
     mint(body, creator, minerFeeUstx) {
       const id = add(String(nextId + 1), body, creator);
       const txid = toHex(finalHash(new Uint8Array(Buffer.from(body, 'utf8'))));
+      // A mint spends a nonce. Keeping the fake honest about that matters: the
+      // runner now reads this endpoint back to decide whether a transaction it
+      // lost the id of ever landed, and a fake whose nonce never moved would
+      // insist every mint it just served had never happened.
+      this.nonces.last_executed_tx_nonce += 1;
+      this.nonces.possible_next_nonce = this.nonces.last_executed_tx_nonce + 1;
       transactions.set(txid.toLowerCase(), {
         tx_status: 'success',
         tx_result: {
@@ -260,9 +325,10 @@ function fakeFetch(chain) {
     }
     if (url.includes('/extended/v2/blocks')) return json({ results: [{ height: chain.tip }] });
     if (url.includes('/balances/stx')) return json({ balance: '5000000' });
-    if (url.includes('/nonces')) {
-      return json({ last_executed_tx_nonce: 6, possible_next_nonce: 7, detected_missing_nonces: [] });
-    }
+    // The live shape, all five fields. The runner records possible_next_nonce
+    // with every intent and reads the rest back to decide what a lost txid
+    // means, so a fake that omitted them would hide that decision from --dry.
+    if (url.includes('/nonces')) return json(chain.nonces);
     const tx = /\/extended\/v1\/tx\/(0x[0-9a-f]{64})/i.exec(url);
     if (tx) {
       const found = chain.transactions.get(tx[1].toLowerCase());
@@ -352,6 +418,10 @@ function usage() {
   say('  --dry                    the default: the whole loop against a fake chain');
   say('  --broadcast              real mainnet transactions, real STX, irreversible');
   say('  --status <threadId>      journal plus chain, as a table. Runs nothing.');
+  say('  --resolve <pos> <what>   settle one ambiguous position by hand, into the journal.');
+  say('                             abandoned    it was never minted (refused if the chain says it landed)');
+  say('                             landed:<id>  it was minted as <id> (refused unless #<id> checks out)');
+  say('                           <pos> is a position number or "manifest". Needs --thread.');
   say('  --no-manifest            stop after the last entry, do not close the thread');
   say('  --manifest-wizard <id>   who signs the manifest (default the opening wizard)');
   say('  --thread-length <n>      entries in a thread (default ' + THREAD_LENGTH + ')');
@@ -361,6 +431,8 @@ function usage() {
   say('  --max-tx-fee-ustx <n>    miner fee bid per transaction');
   say('  --confirm-timeout-minutes <n>  how long to wait for one transaction');
   say('  --poll-seconds <n>       gap between transaction lookups');
+  say('  --mempool-wait-minutes <n>     how long to wait on a lost txid whose nonce is still pending');
+  say('  --mempool-poll-seconds <n>     gap between those lookups');
   say('  --hiro <url>             Hiro endpoint');
   say('');
   say(`  wizards : ${PERSONA_IDS.join(', ')}`);
@@ -397,6 +469,35 @@ async function main() {
     return 0;
   }
 
+  // An operator settling one position by hand. Reads the chain to check the
+  // decision is possible, writes one journal record, signs nothing.
+  if (process.argv.includes('--resolve')) {
+    const [positionArg, decisionArg] = words('resolve', 2);
+    const threadId = text('thread');
+    if (!threadId) throw new WizardSafetyError('--resolve needs --thread <id>: it writes into that thread\'s journal.');
+    if (!positionArg) {
+      throw new WizardSafetyError('--resolve needs a position: --resolve <position|manifest> <abandoned|landed:id>');
+    }
+    const { resolution, inscriptionId } = parseResolution(decisionArg);
+    const result = await resolvePosition({
+      ports: { ...journalPorts(), fetchImpl: globalThis.fetch, now: () => Date.now(), say },
+      options: {
+        threadId,
+        threadLength,
+        // No default: unset means "whatever the journal says this thread is
+        // about", which is a better answer than the first subject in the bank.
+        subject: text('subject'),
+        position: positionArg,
+        resolution,
+        inscriptionId,
+        note: text('note'),
+        hiroUrl
+      }
+    });
+    say(formatResolution(result));
+    return 0;
+  }
+
   const threadId = text('thread');
   if (!threadId) throw new WizardSafetyError('--thread <id> is required. It is written into every entry.');
   const subject = text('subject', SUBJECT_IDS[0]);
@@ -423,7 +524,13 @@ async function main() {
     confirmTimeoutMs: arg('confirm-timeout-minutes')
       ? Number(arg('confirm-timeout-minutes')) * 60_000
       : DEFAULT_CONFIRM_TIMEOUT_MS,
-    confirmPollMs: arg('poll-seconds') ? Number(arg('poll-seconds')) * 1_000 : DEFAULT_CONFIRM_POLL_MS
+    confirmPollMs: arg('poll-seconds') ? Number(arg('poll-seconds')) * 1_000 : DEFAULT_CONFIRM_POLL_MS,
+    mempoolWaitMs: arg('mempool-wait-minutes')
+      ? Number(arg('mempool-wait-minutes')) * 60_000
+      : DEFAULT_MEMPOOL_WAIT_MS,
+    mempoolPollMs: arg('mempool-poll-seconds')
+      ? Number(arg('mempool-poll-seconds')) * 1_000
+      : DEFAULT_MEMPOOL_POLL_MS
   };
 
   const wallets = walletsFor({ env, broadcast });
@@ -514,4 +621,4 @@ if (isDirectRun) {
     });
 }
 
-export { dryPorts, fakeFetch, journalPorts, liveSubmit, makeFakeChain, walletsFor };
+export { dryPorts, fakeFetch, journalPorts, liveSubmit, makeFakeChain, parseResolution, walletsFor };

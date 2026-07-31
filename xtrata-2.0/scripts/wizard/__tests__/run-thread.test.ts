@@ -12,22 +12,27 @@ import {
 
 import { composeThread, parseEntry } from '../compose.mjs';
 import { PERSONA_IDS } from '../personas.mjs';
-import { dryPorts, fakeFetch, liveSubmit, makeFakeChain } from '../run-thread.mjs';
+import { dryPorts, fakeFetch, liveSubmit, makeFakeChain, parseResolution } from '../run-thread.mjs';
 import {
+  DEFAULT_MEMPOOL_WAIT_MS,
   DEFAULT_RUN_SPEND_CAP_USTX,
   MANIFEST_KEY,
   RUN_JOURNAL_VERSION,
   RunHalt,
   assertJournalSecretFree,
   assertRunSpendCap,
+  classifyIntentNonce,
   classifyTxStatus,
   committedSpendUstx,
+  fetchSenderNonces,
+  formatResolution,
   formatRunReport,
   formatStatusTable,
   journalPathFor,
   normaliseTxid,
   parseMintResult,
   pollTransaction,
+  resolvePosition,
   runThread,
   statusReport
 } from '../run-thread-core.mjs';
@@ -78,6 +83,17 @@ type HarnessOptions = {
   /** Seed the journal as if an earlier run had written it. */
   journal?: unknown;
   clockStepMs?: number;
+  /** The wallet nonce state the fake `/nonces` endpoint serves. */
+  nonces?: Partial<Nonces>;
+};
+
+/** The five fields the live Hiro nonces endpoint returns. */
+type Nonces = {
+  last_executed_tx_nonce: number | null;
+  possible_next_nonce: number | null;
+  last_mempool_tx_nonce: number | null;
+  detected_missing_nonces: number[];
+  detected_mempool_nonces: number[];
 };
 
 /**
@@ -92,6 +108,7 @@ type HarnessOptions = {
 const harness = (options: HarnessOptions = {}) => {
   const priorIds = options.priorIds ?? LIVE_IDS;
   const chain = makeFakeChain({ tip: TIP, feeUstx: FEE });
+  if (options.nonces) Object.assign(chain.nonces, options.nonces);
 
   if (priorIds.length > 0) {
     const seeded = composeThread({
@@ -195,8 +212,23 @@ const harness = (options: HarnessOptions = {}) => {
     },
     setTxStatus: (value: string) => {
       txStatus = value;
-    }
+    },
+    setNonces: (value: Partial<Nonces>) => Object.assign(chain.nonces, value)
   };
+};
+
+/**
+ * The journal an interrupted run leaves behind: intent written for position 5,
+ * the mint accepted by the node, the process dead before the txid was recorded.
+ *
+ * Returned with the world that produced it, because the inscription those bytes
+ * became lives in that world's chain and the resumed world may or may not be
+ * given it.
+ */
+const crashedAtFive = async () => {
+  const world = harness({ crashAfterMint: true });
+  const crashed = await world.run();
+  return { world, crashed, journal: world.journal() as any };
 };
 
 /* ------------------------------------------------------------------ */
@@ -285,6 +317,33 @@ describe('the run-level spend cap', () => {
     // 5: 11,000 + 7,000 actual. 6: 11,000 + 30,000 bid. 1 is external: not ours.
     expect(committedSpendUstx(journal)).toBe(59_000n);
     expect(committedSpendUstx({ positions: {} })).toBe(0n);
+  });
+
+  it('keeps counting attempts that were cleared, so a re-composing loop still hits the cap', () => {
+    // A position cleared twice and then minted is three attempts against the
+    // cap, not one. Almost none of them spent anything; the number is there to
+    // stop a loop, and a total that forgot them could never reach it.
+    const cleared = {
+      positions: {
+        5: {
+          status: 'broadcasting',
+          protocolFeeUstx: '11000',
+          minerFeeUstx: '30000',
+          previousIntents: [
+            { protocolFeeUstx: '11000', minerFeeUstx: '30000' },
+            { protocolFeeUstx: '11000', minerFeeUstx: '30000' }
+          ]
+        }
+      }
+    };
+    expect(committedSpendUstx(cleared)).toBe(3n * 41_000n);
+    // And an abandoned position counts its archive once, not twice: the fee
+    // fields move into the archive when the intent is cleared.
+    expect(
+      committedSpendUstx({
+        positions: { 5: { status: 'abandoned', previousIntents: [{ protocolFeeUstx: '11000', minerFeeUstx: '30000' }] } }
+      })
+    ).toBe(41_000n);
   });
 
   it('refuses the broadcast that would cross the cap, before it happens', () => {
@@ -577,13 +636,13 @@ describe('crash safety', () => {
   });
 
   it('halts rather than guessing when the intent cannot be resolved', async () => {
-    // Same crash, but nothing with those bytes is on chain. It may still be in
-    // the mempool, so re-broadcasting would risk a second permanent mint.
-    const world = harness({ crashAfterMint: true });
-    await world.run();
-    const journal = world.journal() as any;
+    // Same crash, but nothing with those bytes is on chain. The nonce it was
+    // signed with HAS been consumed, which says a transaction was mined and
+    // says nothing about which one, so re-broadcasting would risk a second
+    // permanent mint.
+    const { journal } = await crashedAtFive();
 
-    const resumed = harness({ journal });
+    const resumed = harness({ journal, nonces: { last_executed_tx_nonce: 7, possible_next_nonce: 8 } });
     const result = await resumed.run();
 
     expect(result.ok).toBe(false);
@@ -611,6 +670,500 @@ describe('crash safety', () => {
     // recorded before submit is ever called.
     expect(seen[0]).toBe('broadcasting');
     expect(seen.indexOf('submit')).toBeGreaterThan(0);
+  });
+});
+
+describe('what the nonce knows', () => {
+  const seen = (patch: Record<string, unknown> = {}) => ({
+    address: ADDRESSES.skeptic,
+    available: true,
+    lastExecutedNonce: 6,
+    nextNonce: 7,
+    lastMempoolNonce: null,
+    mempoolNonces: [] as number[],
+    missingNonces: [] as number[],
+    error: null,
+    ...patch
+  });
+
+  it('reads the five fields the live endpoint returns', async () => {
+    const fetchImpl = vi.fn(async () =>
+      Response.json({
+        last_executed_tx_nonce: 1,
+        possible_next_nonce: 2,
+        last_mempool_tx_nonce: null,
+        detected_missing_nonces: [],
+        detected_mempool_nonces: []
+      })
+    );
+    const nonces = await fetchSenderNonces({
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      address: ADDRESSES.skeptic
+    });
+    // The shape a live wizard with two confirmed transactions really returns.
+    expect(nonces).toMatchObject({ available: true, lastExecutedNonce: 1, nextNonce: 2, lastMempoolNonce: null });
+    expect(String(fetchImpl.mock.calls[0][0])).toContain(`/extended/v1/address/${ADDRESSES.skeptic}/nonces`);
+  });
+
+  it('never throws: an unreadable nonce is not evidence either way', async () => {
+    const down = await fetchSenderNonces({
+      fetchImpl: (async () => new Response('nope', { status: 500 })) as unknown as typeof fetch,
+      address: ADDRESSES.skeptic
+    });
+    expect(down.available).toBe(false);
+    expect(down.error).toMatch(/HTTP 500/);
+
+    const offline = await fetchSenderNonces({
+      fetchImpl: (async () => {
+        throw new Error('getaddrinfo ENOTFOUND');
+      }) as unknown as typeof fetch,
+      address: ADDRESSES.skeptic
+    });
+    expect(offline.available).toBe(false);
+    expect(offline.error).toMatch(/ENOTFOUND/);
+
+    expect((await fetchSenderNonces({ address: null })).available).toBe(false);
+  });
+
+  it('calls a nonce below the intended one proof that nothing was mined', () => {
+    expect(classifyIntentNonce({ intendedNonce: 7, nonces: seen() }).verdict).toBe('absent');
+    // A wallet that has executed nothing at all reads as -1, so nonce 0 is
+    // unspent rather than spent.
+    expect(
+      classifyIntentNonce({ intendedNonce: 0, nonces: seen({ lastExecutedNonce: null, nextNonce: 0 }) }).verdict
+    ).toBe('absent');
+  });
+
+  it('calls a nonce at or above the intended one proof of nothing at all', () => {
+    // THE ASYMMETRY. Something consumed the nonce. Which something is exactly
+    // what the nonce cannot say, so this is never a landed verdict.
+    for (const lastExecutedNonce of [7, 8, 40]) {
+      const verdict = classifyIntentNonce({ intendedNonce: 7, nonces: seen({ lastExecutedNonce }) });
+      expect(verdict.verdict).toBe('consumed');
+      expect(verdict.verdict).not.toBe('landed');
+    }
+  });
+
+  it('calls anything in the mempool at or above the intended nonce pending', () => {
+    expect(classifyIntentNonce({ intendedNonce: 7, nonces: seen({ mempoolNonces: [7] }) }).verdict).toBe('pending');
+    expect(classifyIntentNonce({ intendedNonce: 7, nonces: seen({ lastMempoolNonce: 9 }) }).verdict).toBe('pending');
+    // Below the intended nonce is somebody else's transaction, and this one was
+    // never sent: the mempool would be holding it if it had been.
+    expect(
+      classifyIntentNonce({ intendedNonce: 7, nonces: seen({ lastExecutedNonce: 4, mempoolNonces: [5] }) }).verdict
+    ).toBe('absent');
+  });
+
+  it('knows nothing without an intended nonce or without a reading', () => {
+    expect(classifyIntentNonce({ intendedNonce: null, nonces: seen() })).toMatchObject({
+      verdict: 'unknown',
+      why: expect.stringMatching(/before this runner recorded nonces/)
+    });
+    expect(
+      classifyIntentNonce({ intendedNonce: 7, nonces: { available: false, error: 'HTTP 500' } }).verdict
+    ).toBe('unknown');
+    expect(classifyIntentNonce({ intendedNonce: 7, nonces: null }).verdict).toBe('unknown');
+  });
+});
+
+describe('the crash window, decided by nonce', () => {
+  it('records the wallet and the nonce it is about to sign with, before it signs', async () => {
+    const world = harness();
+    await world.run();
+    const journal = world.journal() as any;
+
+    expect(journal.positions['5'].senderAddress).toBe(ADDRESSES.skeptic);
+    expect(journal.positions['5'].intendedNonce).toBe(7);
+    // Each mint spends one, so the next entry is signed with the next nonce.
+    expect(journal.positions['6'].intendedNonce).toBe(8);
+    expect(journal.positions[MANIFEST_KEY].intendedNonce).toBe(9);
+  });
+
+  it('clears the orphan and composes again when the nonce proves nothing was mined', async () => {
+    const { journal } = await crashedAtFive();
+    expect(journal.positions['5'].intendedNonce).toBe(7);
+
+    // Nonce 7 has never confirmed and nothing is in flight: whatever happened
+    // to that transaction, it did not land and it cannot.
+    const resumed = harness({ journal, nonces: { last_executed_tx_nonce: 6, possible_next_nonce: 7 } });
+    let sleeps = 0;
+    resumed.ports.sleep = async () => {
+      sleeps += 1;
+    };
+
+    const result = await resumed.run();
+    expect(result.ok).toBe(true);
+    // It proceeds immediately. Waiting on a transaction that provably does not
+    // exist is time spent for nothing.
+    expect(sleeps).toBe(0);
+    expect(resumed.submitted.map((entry) => entry.position)).toEqual([5, 6, 7]);
+
+    // And exactly one position 5 exists on chain afterwards. No double mint.
+    const positions = [...resumed.chain.inscriptions.values()].map((entry: any) => {
+      try {
+        return parseEntry(entry.body).position;
+      } catch {
+        return null;
+      }
+    });
+    expect(positions.filter((position) => position === 5)).toHaveLength(1);
+
+    const record = (resumed.journal() as any).positions['5'];
+    expect(record.status).toBe('confirmed');
+    expect(record.inscriptionId).toBe('2926');
+    // The cleared attempt is kept as history, and the fresh one does not
+    // inherit the verdict that closed it.
+    expect(record.previousIntents).toHaveLength(1);
+    expect(record.previousIntents[0]).toMatchObject({
+      reason: 'nonce-proved-absent',
+      intendedNonce: 7,
+      finalHashHex: journal.positions['5'].finalHashHex,
+      senderAddress: ADDRESSES.skeptic
+    });
+    expect(record.resolution).toBeNull();
+  });
+
+  it('adopts the landed inscription when the nonce was consumed and the bytes are on chain', async () => {
+    const { world, journal } = await crashedAtFive();
+    const minted = world.chain.inscriptions.get('2926');
+
+    const resumed = harness({ journal, nonces: { last_executed_tx_nonce: 7, possible_next_nonce: 8 } });
+    resumed.chain.add('2926', minted.body, minted.creator);
+
+    const result = await resumed.run();
+    expect(result.ok).toBe(true);
+    expect((resumed.journal() as any).positions['5'].inscriptionId).toBe('2926');
+    expect((resumed.journal() as any).positions['5'].recovered).toBe(true);
+    expect(resumed.submitted.map((entry) => entry.position)).toEqual([6, 7]);
+  });
+
+  it('does not assume a mint landed because an unrelated transaction advanced the nonce', async () => {
+    // The operator moved funds out of the wizard wallet after the crash, so
+    // nonces 7 through 11 have all confirmed and not one of them is this mint.
+    // A runner that read "nonce consumed" as "mint landed" would now adopt
+    // whatever id it found next, or invent one.
+    const { journal } = await crashedAtFive();
+    const resumed = harness({ journal, nonces: { last_executed_tx_nonce: 11, possible_next_nonce: 12 } });
+
+    const result = await resumed.run();
+    expect(result.ok).toBe(false);
+    expect(result.halted.reason).toBe('unresolved');
+    expect(result.halted.message).toMatch(/nonce 7 has been consumed/);
+    expect(resumed.submit).not.toHaveBeenCalled();
+
+    const record = (resumed.journal() as any).positions['5'];
+    expect(record.status).toBe('broadcasting');
+    expect(record.inscriptionId).toBeNull();
+  });
+
+  it('waits on a pending nonce, and carries on when it lands inside the window', async () => {
+    const { world, journal } = await crashedAtFive();
+    const minted = world.chain.inscriptions.get('2926');
+
+    const resumed = harness({
+      journal,
+      nonces: { last_executed_tx_nonce: 6, possible_next_nonce: 7, last_mempool_tx_nonce: 7, detected_mempool_nonces: [7] }
+    });
+    let sleeps = 0;
+    resumed.ports.sleep = async () => {
+      sleeps += 1;
+      // Two looks in, the block carrying it is indexed.
+      if (sleeps === 2) resumed.chain.add('2926', minted.body, minted.creator);
+    };
+
+    const result = await resumed.run({ mempoolWaitMs: 60_000, mempoolPollMs: 1_000 });
+    expect(result.ok).toBe(true);
+    expect(sleeps).toBeGreaterThan(1);
+    expect((resumed.journal() as any).positions['5'].inscriptionId).toBe('2926');
+    expect((resumed.journal() as any).positions['5'].recovered).toBe(true);
+    expect(resumed.submitted.map((entry) => entry.position)).toEqual([6, 7]);
+  });
+
+  it('gives up after the window, naming the nonce, and calls it pending rather than failed', async () => {
+    const { journal } = await crashedAtFive();
+    const resumed = harness({
+      journal,
+      nonces: { last_executed_tx_nonce: 6, possible_next_nonce: 7, last_mempool_tx_nonce: 7, detected_mempool_nonces: [7] }
+    });
+    let sleeps = 0;
+    resumed.ports.sleep = async () => {
+      sleeps += 1;
+    };
+
+    const result = await resumed.run({ mempoolWaitMs: 10_000, mempoolPollMs: 1_000 });
+    expect(result.ok).toBe(false);
+    expect(result.halted.reason).toBe('unresolved');
+    expect(sleeps).toBeGreaterThan(0);
+    expect(result.halted.message).toMatch(/NONCE 7/);
+    expect(result.halted.message).toMatch(/STILL HAS NONCE 7 IN THE MEMPOOL/);
+    expect(result.halted.message).toMatch(/will not broadcast it again/);
+    expect(result.halted.message).not.toMatch(/\bfailed\b/);
+    expect(resumed.submit).not.toHaveBeenCalled();
+    // Nothing was decided, so nothing was written over the intent.
+    expect((resumed.journal() as any).positions['5'].status).toBe('broadcasting');
+  });
+
+  it('honours the kill switch while it is waiting on the mempool', async () => {
+    const { journal } = await crashedAtFive();
+    const resumed = harness({
+      journal,
+      nonces: { last_executed_tx_nonce: 6, possible_next_nonce: 7, detected_mempool_nonces: [7] }
+    });
+    let waits = 0;
+    resumed.ports.sleep = async () => {
+      waits += 1;
+    };
+    resumed.ports.killSwitch = () => (waits > 1 ? 'scripts/wizard/KILL exists' : null);
+
+    const result = await resumed.run({ mempoolWaitMs: 600_000, mempoolPollMs: 1_000 });
+    expect(result.halted.reason).toBe('kill-switch');
+    expect(resumed.submit).not.toHaveBeenCalled();
+  });
+
+  it('loads a journal written before nonces existed, and halts exactly as it always did', async () => {
+    const { journal } = await crashedAtFive();
+    delete journal.positions['5'].intendedNonce;
+
+    // The wallet reading that WOULD have proved absence, if the field were
+    // there. Without it the runner has only the hash, so it halts.
+    const resumed = harness({ journal, nonces: { last_executed_tx_nonce: 6, possible_next_nonce: 7 } });
+    const result = await resumed.run();
+
+    expect(result.ok).toBe(false);
+    expect(result.halted.reason).toBe('unresolved');
+    expect(result.halted.message).toMatch(/before this runner recorded nonces/);
+    expect(result.halted.message).toMatch(/will not broadcast it again/);
+    expect(resumed.submit).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the hash alone when the nonce endpoint is down', async () => {
+    const { journal } = await crashedAtFive();
+    const resumed = harness({ journal });
+    const answer = resumed.ports.fetchImpl as any;
+    resumed.ports.fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes('/nonces')) return new Response('down', { status: 503 });
+      return answer(input, init);
+    }) as unknown as typeof fetch;
+
+    const result = await resumed.run();
+    expect(result.halted.reason).toBe('unresolved');
+    expect(result.halted.message).toMatch(/could not be read/);
+    expect(resumed.submit).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * `--resolve`, driven through the same core the CLI drives. Every one of these
+ * writes at most one journal record and none of them can broadcast: the ports
+ * they are given have no submit at all.
+ */
+const resolveIn = (world: ReturnType<typeof harness>, options: Record<string, unknown>) =>
+  resolvePosition({
+    ports: {
+      fetchImpl: world.ports.fetchImpl,
+      readJournal: world.ports.readJournal,
+      writeJournal: world.ports.writeJournal,
+      now: world.ports.now
+    },
+    options: { threadId: THREAD, threadLength: 6, subject: SUBJECT, journalDir: JOURNAL_DIR, ...options }
+  });
+
+describe('settling a position by hand', () => {
+  it('records landed:<id> once the id checks out against its own front matter', async () => {
+    const { world, journal } = await crashedAtFive();
+    const minted = world.chain.inscriptions.get('2926');
+    const resumed = harness({ journal });
+    resumed.chain.add('2926', minted.body, minted.creator);
+
+    const result = await resolveIn(resumed, { position: 5, resolution: 'landed', inscriptionId: '2926' });
+    expect(result.ok).toBe(true);
+    expect(result.record).toMatchObject({
+      status: 'confirmed',
+      inscriptionId: '2926',
+      resolution: 'landed',
+      resolvedBy: 'operator'
+    });
+    expect(result.record.resolvedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(result.record.note).toMatch(/settled by hand/);
+    expect(formatResolution(result)).toContain('resolved as landed');
+
+    // And the run carries on from it, citing the adopted entry.
+    const carried = await resumed.run();
+    expect(carried.ok).toBe(true);
+    expect(resumed.submitted.map((entry) => entry.position)).toEqual([6, 7]);
+    expect(resumed.submitted[0].body).toContain('inscription #2926');
+  });
+
+  it('refuses an id whose front matter is a different position, thread or subject', async () => {
+    const { journal } = await crashedAtFive();
+    const resumed = harness({ journal });
+
+    // #2923 is real, on chain, and is position 2 of this very thread.
+    await expect(resolveIn(resumed, { position: 5, resolution: 'landed', inscriptionId: '2923' })).rejects.toThrow(
+      /is position 2 of its thread/
+    );
+
+    // A real entry from a different thread, minted at the same block.
+    const other = composeThread({
+      threadId: 't-somewhere-else',
+      subject: SUBJECT,
+      blockHeight: TIP,
+      feeMicroStx: FEE,
+      ids: ['3001'],
+      threadLength: 6
+    }) as { entries: Array<{ id: string; body: string; wizard: string }> };
+    resumed.chain.add('3001', other.entries[0].body, ADDRESSES.archivist);
+    await expect(resolveIn(resumed, { position: 5, resolution: 'landed', inscriptionId: '3001' })).rejects.toThrow(
+      /belongs to thread "t-somewhere-else"/
+    );
+
+    // The right id, under a subject this thread is not arguing about.
+    const minted = (await crashedAtFive()).world.chain.inscriptions.get('2926');
+    resumed.chain.add('2926', minted.body, minted.creator);
+    await expect(
+      resolveIn(resumed, { position: 5, resolution: 'landed', inscriptionId: '2926', subject: 'chunk-size' })
+    ).rejects.toThrow(/A thread argues about one subject/);
+
+    // An id that is not on chain at all.
+    await expect(resolveIn(resumed, { position: 5, resolution: 'landed', inscriptionId: '9999' })).rejects.toThrow(
+      /no chunk u0/
+    );
+
+    // Nothing above was written.
+    expect((resumed.journal() as any).positions['5'].status).toBe('broadcasting');
+  });
+
+  it('takes the subject from the journal when the operator does not name one', async () => {
+    const { world, journal } = await crashedAtFive();
+    const minted = world.chain.inscriptions.get('2926');
+    const resumed = harness({ journal });
+    resumed.chain.add('2926', minted.body, minted.creator);
+
+    const result = await resolveIn(resumed, {
+      position: 5,
+      resolution: 'landed',
+      inscriptionId: '2926',
+      subject: undefined
+    });
+    expect(result.record.inscriptionId).toBe('2926');
+  });
+
+  it('verifies a manifest by its own front matter, which is not an entry', async () => {
+    const world = harness();
+    await world.run();
+    const journal = world.journal() as any;
+    journal.positions[MANIFEST_KEY] = {
+      ...journal.positions[MANIFEST_KEY],
+      status: 'broadcasting',
+      txid: null,
+      inscriptionId: null
+    };
+    world.setJournal(journal);
+
+    // #2926 is an entry, not the manifest.
+    await expect(
+      resolveIn(world, { position: 'manifest', resolution: 'landed', inscriptionId: '2926' })
+    ).rejects.toThrow(/thread-manifest/);
+
+    const result = await resolveIn(world, { position: 'manifest', resolution: 'landed', inscriptionId: '2928' });
+    expect(result.record).toMatchObject({ status: 'confirmed', inscriptionId: '2928', resolvedBy: 'operator' });
+  });
+
+  it('refuses to abandon a position the chain shows as landed, by content hash', async () => {
+    const { world, journal } = await crashedAtFive();
+    const minted = world.chain.inscriptions.get('2926');
+    const resumed = harness({ journal });
+    resumed.chain.add('2926', minted.body, minted.creator);
+
+    await expect(resolveIn(resumed, { position: 5, resolution: 'abandoned' })).rejects.toThrow(/on chain as #2926/);
+    expect((resumed.journal() as any).positions['5'].status).toBe('broadcasting');
+  });
+
+  it('refuses to abandon a position whose transaction succeeded, or might still', async () => {
+    const world = harness();
+    await world.run();
+    const journal = world.journal() as any;
+
+    // A successful transaction, with the id forgotten and the hash cleared out
+    // so only the txid can answer.
+    journal.positions['5'] = {
+      ...journal.positions['5'],
+      status: 'timeout',
+      inscriptionId: null,
+      finalHashHex: null
+    };
+    world.setJournal(journal);
+    await expect(resolveIn(world, { position: 5, resolution: 'abandoned' })).rejects.toThrow(/succeeded/);
+
+    // A transaction the API has never heard of is pending, not absent.
+    journal.positions['5'] = { ...journal.positions['5'], txid: `0x${'c'.repeat(64)}` };
+    world.setJournal(journal);
+    await expect(resolveIn(world, { position: 5, resolution: 'abandoned' })).rejects.toThrow(/may\s+still confirm/);
+  });
+
+  it('refuses to touch a position that is already cleanly resolved', async () => {
+    const world = harness();
+    await world.run();
+
+    for (const resolution of ['abandoned', 'landed'] as const) {
+      await expect(
+        resolveIn(world, { position: 5, resolution, inscriptionId: '2926' })
+      ).rejects.toThrow(/already resolved as #2926/);
+    }
+    // Including the ids the operator supplied for entries minted before the run.
+    await expect(resolveIn(world, { position: 1, resolution: 'abandoned' })).rejects.toThrow(/already resolved/);
+  });
+
+  it('records abandoned when nothing on chain contradicts it, and lets the run compose again', async () => {
+    const { journal } = await crashedAtFive();
+    const resumed = harness({ journal, nonces: { last_executed_tx_nonce: 11, possible_next_nonce: 12 } });
+
+    // The state --resolve exists for: the nonce was consumed by something
+    // unidentifiable, so the runner itself halts and will keep halting.
+    const stuck = await resumed.run();
+    expect(stuck.halted.reason).toBe('unresolved');
+
+    const result = await resolveIn(resumed, { position: 5, resolution: 'abandoned' });
+    expect(result.record).toMatchObject({
+      status: 'abandoned',
+      resolution: 'abandoned',
+      resolvedBy: 'operator',
+      finalHashHex: null,
+      intendedNonce: null
+    });
+    expect(result.record.note).toMatch(/a human established this was never minted/);
+    expect(result.record.resolvedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(result.record.previousIntents).toHaveLength(1);
+    expect(result.record.previousIntents[0]).toMatchObject({
+      reason: 'operator-abandoned',
+      intendedNonce: 7,
+      finalHashHex: journal.positions['5'].finalHashHex
+    });
+
+    const carried = await resumed.run();
+    expect(carried.ok).toBe(true);
+    expect(resumed.submitted.map((entry) => entry.position)).toEqual([5, 6, 7]);
+  });
+
+  it('parses what the operator typed, and refuses anything else', () => {
+    expect(parseResolution('abandoned')).toEqual({ resolution: 'abandoned', inscriptionId: null });
+    expect(parseResolution('landed:2926')).toEqual({ resolution: 'landed', inscriptionId: '2926' });
+    for (const typed of ['landed', 'landed:', 'landed:abc', 'abandon', '', undefined]) {
+      expect(() => parseResolution(typed)).toThrow(/is not a resolution/);
+    }
+  });
+
+  it('refuses a position, a decision or a journal that does not exist', async () => {
+    const { journal } = await crashedAtFive();
+    const resumed = harness({ journal });
+
+    await expect(resolveIn(resumed, { position: 5, resolution: 'settled' })).rejects.toThrow(/not a resolution/);
+    await expect(resolveIn(resumed, { position: 9, resolution: 'abandoned' })).rejects.toThrow(/not a position/);
+    await expect(resolveIn(resumed, { position: 6, resolution: 'abandoned' })).rejects.toThrow(/has no record/);
+    await expect(resolveIn(resumed, { position: 5, resolution: 'landed' })).rejects.toThrow(/needs an inscription id/);
+
+    const empty = harness();
+    await expect(resolveIn(empty, { position: 5, resolution: 'abandoned' })).rejects.toThrow(/no run journal/);
   });
 });
 
@@ -812,6 +1365,49 @@ describe('status', () => {
     const table = formatStatusTable(report);
     expect(table).toContain(THREAD);
     expect(table).toContain('recovered by content hash');
+  });
+
+  it('says which unresolved positions the nonce has already settled', async () => {
+    const { journal } = await crashedAtFive();
+
+    const report = async (world: ReturnType<typeof harness>) =>
+      statusReport({
+        ports: { fetchImpl: world.ports.fetchImpl, readJournal: world.ports.readJournal },
+        options: { threadId: THREAD, threadLength: 6, journalDir: JOURNAL_DIR }
+      });
+    const row = (result: any) => result.rows.find((entry: any) => entry.key === '5');
+
+    const never = await report(harness({ journal, nonces: { last_executed_tx_nonce: 6, possible_next_nonce: 7 } }));
+    expect(row(never).chain).toBe('never-sent');
+    expect(row(never).note).toMatch(/has never confirmed/);
+
+    const flight = await report(
+      harness({ journal, nonces: { last_executed_tx_nonce: 6, detected_mempool_nonces: [7] } })
+    );
+    expect(row(flight).chain).toBe('pending');
+    expect(row(flight).note).toMatch(/Do not broadcast it again/);
+
+    const consumed = await report(
+      harness({ journal, nonces: { last_executed_tx_nonce: 9, possible_next_nonce: 10 } })
+    );
+    expect(row(consumed).chain).toBe('unresolved');
+    expect(row(consumed).note).toMatch(/has been consumed/);
+  });
+
+  it('shows a position a human abandoned, and who decided it', async () => {
+    const { journal } = await crashedAtFive();
+    const world = harness({ journal, nonces: { last_executed_tx_nonce: 11, possible_next_nonce: 12 } });
+    await resolveIn(world, { position: 5, resolution: 'abandoned' });
+
+    const report = await statusReport({
+      ports: { fetchImpl: world.ports.fetchImpl, readJournal: world.ports.readJournal },
+      options: { threadId: THREAD, threadLength: 6, journalDir: JOURNAL_DIR }
+    });
+    const row = report.rows.find((entry: any) => entry.key === '5') as any;
+    expect(row.journalStatus).toBe('abandoned');
+    expect(row.chain).toBe('abandoned');
+    expect(row.note).toMatch(/settled as never minted by a human/);
+    expect(formatStatusTable(report)).toContain('abandoned');
   });
 
   it('works with no journal at all, from ids alone', async () => {
