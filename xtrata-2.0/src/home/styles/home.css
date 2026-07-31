@@ -2372,9 +2372,12 @@
     .fullscreen-viewer__rel { grid-row: 2; }
     .fullscreen-viewer__stage {
       grid-row: 3;
-      /* Stays square and centred even though its column may now be wider. */
-      width: min(100%, var(--fullscreen-stage-size));
-      justify-self: center;
+      /* Fills the column, so the chrome, the relations strip and the artwork share
+         one edge-to-edge width on every screen. Capping this at the square
+         --fullscreen-stage-size left the stage visibly narrower than the two bars
+         above it. The height still comes from the row, so the frame is square when
+         that is what fits and simply wider when the column is wider. */
+      width: 100%;
     }
 
     /* --fullscreen-chrome-space is set from MEASUREMENT in syncFullscreenChromeSpace,

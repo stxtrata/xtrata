@@ -35,6 +35,19 @@ describe('enlarged viewer: relations strip', () => {
     expect(css).toContain('grid-template-rows: auto auto var(--fullscreen-stage-size)');
   });
 
+  it('gives the chrome, the strip and the stage ONE width', () => {
+    // They share a grid column, so alignment only holds while the stage fills it.
+    // Capping the stage at the square --fullscreen-stage-size left it visibly
+    // narrower than the two bars above it on every screen.
+    const rule = css.slice(
+      css.indexOf('.fullscreen-viewer__stage {\n      grid-row: 3;'),
+      css.indexOf('--fullscreen-chrome-space is set from MEASUREMENT')
+    );
+    expect(rule).toContain('width: 100%');
+    expect(rule).not.toContain('min(100%, var(--fullscreen-stage-size))');
+    expect(rule).not.toContain('justify-self');
+  });
+
   it('does not size the chrome from the stage', () => {
     // The loop above. The column takes the WIDER of the stage and a readable floor.
     expect(css).toContain('max(var(--fullscreen-stage-size), 640px)');
