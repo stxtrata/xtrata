@@ -2514,6 +2514,7 @@
     .rel-strip__group--children  { --rel-acc: #5aa9e6; }
     .rel-strip__group--deps      { --rel-acc: #8f7cf0; }
     .rel-strip__group--replies   { --rel-acc: #4fb286; }
+    .rel-strip__group--receipts  { --rel-acc: #b6b2a8; }
 
     /* The id is the one thing you always want off this screen, so it gets its own
        slot in the gap rather than being crammed in beside the type and size. */

@@ -118,6 +118,63 @@ describe('enlarged viewer: relations strip', () => {
   });
 });
 
+describe('enlarged viewer: telling receipts from replies', () => {
+  /**
+   * Receipts, replies and plain dependencies are the SAME on-chain edge — a
+   * dependency declared on another inscription. Only the token URI separates them,
+   * and the wizard always mints a receipt as `xtrata:receipt/<jobId>`.
+   *
+   * Before this, the receipt the wizard writes for a piece appeared as a "reply" to
+   * it. Verified against the real chain: #2920 now reads "Receipts 1 · #2921", and
+   * #2921 reads "Receipt for 1 · #2920".
+   */
+  it('identifies a receipt by its token URI, not by guesswork', () => {
+    expect(mainSource).toContain("const RECEIPT_URI_PREFIX = 'xtrata:receipt/'");
+    expect(mainSource).toContain('summary.tokenUri.startsWith(RECEIPT_URI_PREFIX)');
+  });
+
+  it('splits incoming edges into replies and receipts', () => {
+    const fn = mainSource.slice(
+      mainSource.indexOf('const renderFullscreenRelations'),
+      mainSource.indexOf('const renderFullscreenSelectedToken')
+    );
+    expect(fn).toContain('receipts = dependentIds.filter((id) => isReceiptSummary');
+    expect(fn).toContain('replies = dependentIds.filter((id) => !isReceiptSummary');
+    expect(fn).toContain("buildRelStripGroup(contractId, 'Receipts', 'receipts', receipts)");
+  });
+
+  it('says what a receipt is a receipt FOR', () => {
+    const fn = mainSource.slice(
+      mainSource.indexOf('const renderFullscreenRelations'),
+      mainSource.indexOf('const renderFullscreenSelectedToken')
+    );
+    expect(fn).toContain("isReceiptSummary(token) ? 'Receipt for' : 'Depends on'");
+  });
+
+  it('classifies from cache first, so it costs at most one batched call', () => {
+    const fn = mainSource.slice(
+      mainSource.indexOf('const ensureRelationshipSummaries'),
+      mainSource.indexOf('const buildRelStripGroup')
+    );
+    expect(fn).toContain('ids.filter((id) => !getCachedRelationshipSummary(id))');
+    expect(fn).toContain('if (missing.length > 0)');
+  });
+
+  it('re-checks staleness after the extra await', () => {
+    // Classifying adds a second round trip, which is a second chance to repaint a
+    // piece the user has already navigated away from.
+    const fn = mainSource.slice(
+      mainSource.indexOf('const dependentIds = dependents?.dependents'),
+      mainSource.indexOf('const outgoingLabel')
+    );
+    expect(fn).toContain('if (requestId !== state.fullscreenRelRequestId) return;');
+  });
+
+  it('gives receipts their own accent', () => {
+    expect(css).toContain('.rel-strip__group--receipts');
+  });
+});
+
 describe('enlarged viewer: the mark is the way back', () => {
   it('is a real button with an accessible name', () => {
     expect(indexHtml).toContain('id="fullscreenMarkButton"');

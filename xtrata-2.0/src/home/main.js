@@ -6043,6 +6043,31 @@
 
     const FULLSCREEN_REL_CHIP_LIMIT = 12;
 
+    /**
+     * Receipts, replies and plain dependencies are all the SAME on-chain edge: an
+     * inscription that declares a dependency on another. Only the token URI tells
+     * them apart, and the wizard always mints a receipt as `xtrata:receipt/<jobId>`.
+     *
+     * Without this split, the receipt the wizard writes for a piece showed up as a
+     * "reply" to it, which is misleading in both directions: the receipt is not a
+     * reply, and a real reply gets buried among them.
+     */
+    const RECEIPT_URI_PREFIX = 'xtrata:receipt/';
+    const isReceiptSummary = (summary) =>
+      typeof summary?.tokenUri === 'string' && summary.tokenUri.startsWith(RECEIPT_URI_PREFIX);
+
+    /** Cached-first summary lookup, so classifying costs at most one batched call. */
+    const ensureRelationshipSummaries = async (ids) => {
+      const missing = ids.filter((id) => !getCachedRelationshipSummary(id));
+      if (missing.length > 0) {
+        const summaries = await fetchWalletTokenSummaries(missing).catch(() => []);
+        for (const summary of summaries) {
+          state.walletTokenCache.set(summary.id.toString(), summary);
+        }
+      }
+      return new Map(ids.map((id) => [id.toString(), getCachedRelationshipSummary(id)]));
+    };
+
     const buildRelStripGroup = (contractId, label, kind, ids) => {
       if (!ids || ids.length === 0) return null;
       const group = document.createElement('div');
@@ -6111,11 +6136,28 @@
       // must never repaint the strip.
       if (requestId !== state.fullscreenRelRequestId) return;
 
+      // Split the incoming edges: a receipt is not a reply, and lumping them
+      // together buries a real reply among the wizard's paperwork.
+      const dependentIds = dependents?.dependents ?? [];
+      let replies = dependentIds;
+      let receipts = [];
+      if (dependentIds.length > 0) {
+        const summaries = await ensureRelationshipSummaries(dependentIds);
+        if (requestId !== state.fullscreenRelRequestId) return;
+        receipts = dependentIds.filter((id) => isReceiptSummary(summaries.get(id.toString())));
+        replies = dependentIds.filter((id) => !isReceiptSummary(summaries.get(id.toString())));
+      }
+
+      // When the piece on screen IS a receipt, its dependency is the thing it
+      // documents, so say that rather than the generic "Depends on".
+      const outgoingLabel = isReceiptSummary(token) ? 'Receipt for' : 'Depends on';
+
       const groups = [
         buildRelStripGroup(contractId, 'Parents', 'parents', lineage?.parents ?? []),
         buildRelStripGroup(contractId, 'Children', 'children', lineage?.children ?? []),
-        buildRelStripGroup(contractId, 'Depends on', 'deps', dependencies ?? []),
-        buildRelStripGroup(contractId, 'Replies', 'replies', dependents?.dependents ?? [])
+        buildRelStripGroup(contractId, outgoingLabel, 'deps', dependencies ?? []),
+        buildRelStripGroup(contractId, 'Replies', 'replies', replies),
+        buildRelStripGroup(contractId, 'Receipts', 'receipts', receipts)
       ].filter(Boolean);
 
       const viewer = dom.fullscreenViewer;
