@@ -231,10 +231,94 @@ manifest tells readers that every claim an entry makes about itself is checkable
 a paraphrase, or the right words pasted under the wrong id would be signed, minted and permanent,
 and it would attribute words to another wizard's inscription.
 
+## Running a whole thread
+
+`inscribe.mjs` mints one entry. A thread is six of them plus a manifest, and every entry after the
+first quotes the inscription id **and the claim** of the one before it — neither of which exists
+until the previous transaction confirms. Driving that by hand means an hour in front of an explorer
+copying ids and claims between commands, with a chance to paste the wrong one at every step.
+
+```bash
+# rehearse the remaining entries and the manifest against a fake chain (default)
+npm run wizards:run -- --thread t-permanence-001 --subject cost-of-permanence --from 5 --dry
+
+# what is confirmed, pending or missing. Reads only. Runs nothing.
+npm run wizards:status -- t-permanence-001 --ids 2922,2923,2924,2925
+
+# really do it
+npm run wizards:run -- --thread t-permanence-001 --subject cost-of-permanence \
+  --from 5 --ids 2922,2923,2924,2925 --broadcast
+```
+
+Per entry the loop does exactly this, in this order:
+
+1. check the kill switch
+2. compose the entry and run the **full existing preflight** from `inscribe.mjs`, including
+   `verifyParentQuote` against the real parent's on-chain bytes
+3. check the run-level spend cap, then `assertBroadcastAllowed`
+4. write the **intent** to the run journal — before anything is signed
+5. broadcast
+6. record the txid, then poll to a terminal transaction status
+7. on success, parse `token-id` out of the mint's own `(ok (tuple (existed bool) (token-id uint)))`
+8. read that inscription's bytes back off chain and take its `## Claim` as the next entry's quote
+
+After the last position it composes the manifest from every member's **on-chain** bytes — id, block,
+cost, claim, wizard — and mints it with all six as dependencies.
+
+`--dry` is the default and runs the whole loop against a fake chain inside the process: no key is
+read, nothing is signed, and any request to an endpoint the fake does not serve throws rather than
+reaching mainnet. Ids for entries minted before the run are synthetic unless `--ids` supplies the
+real ones, and the output says which it used.
+
+### The run journal
+
+`scripts/wizard/.run-<threadId>.json`, gitignored, one file per thread. It records per position the
+status, txid, inscription id, block, the content hash of what was signed and what it cost.
+
+It is written **before** each broadcast, not after. That ordering is the whole point: the dangerous
+crash is the one between signing and recording, because a runner that forgets it broadcast will
+broadcast again, and the second mint is just as permanent and just as expensive as the first.
+
+| What the journal says | What a resumed run does |
+|---|---|
+| `confirmed` | Skips it. Re-reads the entry off chain for the next citation. |
+| `broadcast` or `timeout` (has a txid) | **Polls that txid.** Never re-sends. |
+| `broadcasting` (intent written, no txid) | Resolves it against the chain by content hash — the bytes are deterministic, so if the mint landed `get-id-by-hash` finds it. If it does not, **halts**: "not indexed yet" and "never sent" look identical from here and only one of them is safe to act on. |
+| `failed` | Halts. A human decides what happened. |
+
+A dry run keeps its journal in memory and writes nothing, so the invented ids and txids of a
+rehearsal can never be mistaken for a real run's.
+
+### Failure semantics
+
+- **Stop on the first failure. Never retry a broadcast.** Any terminal status other than `success`
+  halts the run. There is no backoff and no second attempt: a retry loop with a private key and a
+  mempool is how you mint six copies of the same entry.
+- **A timeout is not a failure.** A transaction that has not confirmed inside the window may still
+  confirm. The runner says so in as many words, keeps the txid in the journal, and tells you not to
+  re-broadcast. Re-run with the same `--from` once it lands, or watch it with `--status`.
+- **The kill switch is checked between every step**, not only at the start. Engaged while a
+  transaction is in flight, the run stops and reports that the broadcast may still confirm — nothing
+  is undone, because nothing can be.
+- **`--from <n>` refuses to start when the predecessor is not confirmed on chain**, and refuses an id
+  whose own front matter says it belongs to a different thread or a different position.
+
+Useful flags:
+
+```bash
+--to <n>                      stop before the end of the thread
+--no-manifest                 mint the entries, do not close the thread
+--manifest-wizard <id>        who signs the manifest (default the opening wizard)
+--run-spend-cap-ustx <n>      cap across the whole run
+--confirm-timeout-minutes <n> how long to wait for one transaction (default 30)
+--poll-seconds <n>            gap between transaction lookups (default 20)
+```
+
 ## Spend caps
 
 | Rail | Env var | Default | What it does |
 |---|---|---|---|
+| Whole-run spend cap | `--run-spend-cap-ustx` | `1000000` (1 STX) | Ceiling across **every remaining broadcast** in a thread run, checked before each one. A per-entry cap cannot see a loop. |
 | Per-run spend cap | `WIZARD_SPEND_CAP_USTX` | `500000` (0.5 STX) | Hard ceiling on protocol plus miner fee for one run. Plan section 4.4. |
 | Balance floor | `WIZARD_BALANCE_FLOOR_USTX` | `1000000` (1 STX) | Refuse to start, or to spend down past, this balance. Recovery transactions have to stay affordable. |
 | Max miner fee | `WIZARD_MAX_TX_FEE_USTX` | `30000` (0.03 STX) | The bid on any one transaction. Miner fees are not refundable. |
@@ -255,6 +339,10 @@ export WIZARD_KILL_SWITCH=1        # env var
 touch scripts/wizard/KILL          # or a file next to the scripts
 ```
 
+A thread run checks it between every step, so engaging it mid-run stops the loop at the next
+boundary rather than at the end. If a transaction is already in flight when it is engaged, the run
+stops and says that transaction may still confirm: nothing is undone, because nothing can be.
+
 Dry runs still work while the kill switch is on, and print `KILL SWITCH : ENGAGED` in the plan.
 `provision.mjs` refuses to run at all, in every mode including `--dry`, because provisioning ends in
 funding a mainnet wallet. `--verify-only` is read-only and unaffected. Remove both to re-enable
@@ -270,6 +358,8 @@ spending.
 | `personas.mjs` | The three voices and the subject bank. Pure data plus small pure functions. |
 | `compose.mjs` | The corpus engine. Pure, deterministic, no network. Enforces the 16 KiB cap. |
 | `inscribe.mjs` | The inscribe skill. Dry run by default. Live fee quote. All the safety rails. |
+| `run-thread.mjs` | The thread runner. Dry run by default. Terminal, the fake chain for `--dry`, and the one port that signs. |
+| `run-thread-core.mjs` | The loop as pure logic with every port injected: fetch, submit, clock, sleep, journal, kill switch. |
 | `__tests__/` | Vitest. Picked up by the repo's normal `npx vitest run` sweep. |
 
 ```bash
@@ -279,5 +369,7 @@ npx vitest run scripts/wizard
 ## What this does not do yet
 
 Stages 3 and up of the plan: listing, cancelling, multi-wizard trade, sponsored buy, cross-currency
-listings, orchestration and reporting. Nothing here lists or buys anything. It generates, inscribes
-and verifies, which is the plan's stage 2.
+listings, orchestration and reporting. Nothing here lists or buys anything. It generates, inscribes,
+verifies and threads, which is the plan's stage 2 end to end.
+
+The manifest is the thing the plan wants listed for sale. Nothing here lists it.

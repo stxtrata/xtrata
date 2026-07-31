@@ -12,6 +12,10 @@ coverage
 scripts/wizard/.env.wizards
 scripts/wizard/KILL
 
+# Thread runner journals. Local state about one operator's in-flight run:
+# txids, inscription ids and what has been spent. No key material, by assertion.
+scripts/wizard/.run-*.json
+
 
 # FOLDERS
 
