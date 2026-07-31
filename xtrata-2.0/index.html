@@ -87,14 +87,22 @@
     </header>
 
     <nav class="site-nav" aria-label="Primary">
+      <!-- Labels say what the destination DOES. "Free drops" is safe to promise:
+           the drops contract has no price parameter and `claim` moves no STX from
+           the claimer, so a paid drop is not expressible. The creator funds a
+           fee-budget that sponsors the claim instead.
+           The Wizard is deliberately NOT a top-level entry. It inscribes the same
+           things the Inscribe page does, so two doors to one job made the menu
+           ask a question new users cannot answer. It is reached from inside the
+           Inscribe panel: a standing link, plus a prompt when a file is large
+           enough to need it. /create-wizard still routes, for anyone holding a link. -->
       <a href="/" data-nav="home" target="_self">Home</a>
       <a href="/xplorer" data-nav="xplorer" target="_self">Explore</a>
-      <a href="/inscribe" data-nav="inscribe" target="_self">Create</a>
-      <a href="/drops" data-nav="drops" target="_self">Claim</a>
-      <a href="/market" data-nav="market" target="_self">Collect</a>
+      <a href="/inscribe" data-nav="inscribe" target="_self">Inscribe</a>
+      <a href="/drops" data-nav="drops" target="_self">Free drops</a>
+      <a href="/market" data-nav="market" target="_self">Buy &amp; sell</a>
       <a href="/my-wallet" data-nav="my-wallet" target="_self">My Xtrata</a>
-      <a href="/create-wizard" data-nav="wizard" target="_self">Wizard</a>
-      <a href="/#build" data-nav="build" target="_self">Build</a>
+      <a href="/#build" data-nav="build" target="_self">Developers</a>
       <div class="radio-slot" id="radioSlot" aria-label="Xtrata FM radio"></div>
     </nav>
     </div>

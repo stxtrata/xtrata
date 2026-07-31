@@ -246,3 +246,61 @@ describe('inscription iframe permissions', () => {
     expect(homeMainSource).not.toContain("sandbox = 'allow-scripts allow-same-origin'");
   });
 });
+
+/**
+ * The menu names destinations by what they do, and the Wizard is reached from
+ * inside Inscribe rather than from the top level.
+ */
+describe('primary navigation', () => {
+  it('labels destinations by what they do', () => {
+    // Scoped to the nav: "Create" and "Build" are legitimate words elsewhere on
+    // the page, so asserting against the whole document would fail on headings.
+    const nav = indexHtml.slice(
+      indexHtml.indexOf('<nav class="site-nav"'),
+      indexHtml.indexOf('</nav>')
+    );
+    for (const label of ['>Inscribe<', '>Free drops<', '>Buy &amp; sell<', '>Developers<']) {
+      expect(nav).toContain(label);
+    }
+    // The old labels asked the user to guess.
+    for (const stale of ['>Create<', '>Claim<', '>Collect<', '>Build<']) {
+      expect(nav).not.toContain(stale);
+    }
+  });
+
+  it('promises "free drops" only because a paid drop is not expressible', () => {
+    // Guard the claim behind the label: the drops contract has no price parameter,
+    // and `claim` moves no STX from the claimer. If that ever changes, this label
+    // becomes a lie and this test should be the thing that objects.
+    const drops = readFileSync(
+      new URL('../../../contracts/live/xtrata-drops-v1.1.clar', import.meta.url),
+      'utf8'
+    );
+    const claim = drops.slice(
+      drops.indexOf('(define-public (claim (nft-contract'),
+      drops.indexOf('(define-public (claim-campaign')
+    );
+    expect(claim).not.toContain('stx-transfer?');
+  });
+
+  it('keeps the Wizard out of the nav but reachable from Inscribe', () => {
+    expect(indexHtml).not.toContain('data-nav="wizard"');
+    // A standing link in the panel, so it is never orphaned.
+    expect(indexHtml).toContain('class="support-note inscribe-wizard-note"');
+    expect(indexHtml).toContain('id="largeFileNotice"');
+  });
+
+  it('actually shows the large-file notice, which nothing used to do', () => {
+    // The markup existed and no JavaScript referenced it, so the automatic
+    // hand-off never fired. It is the safety net for dropping the nav entry.
+    expect(homeMainSource).toContain('const renderLargeFileNotice = ()');
+    expect(homeMainSource).toContain('dom.largeFileNotice');
+    // Same threshold as the batch guide: the point a mint stops being one tx.
+    const fn = homeMainSource.slice(
+      homeMainSource.indexOf('const renderLargeFileNotice = ()'),
+      homeMainSource.indexOf('const renderResumeNotice')
+    );
+    expect(fn).toContain('SMALL_MINT_HELPER_MAX_CHUNKS');
+    expect(fn).toContain('notice.hidden = false');
+  });
+});

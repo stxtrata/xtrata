@@ -366,6 +366,8 @@
       activityLog: $('activityLog'),
       textAdvancedDetails: $('textAdvancedDetails'),
       textAdvancedSummary: $('textAdvancedSummary'),
+      largeFileNotice: $('largeFileNotice'),
+      largeFileNoticeText: $('largeFileNoticeText'),
       textRelSummary: $('textRelSummary'),
       textAdvancedLogSlot: $('textAdvancedLogSlot'),
       parentRelationshipPanel: $('parentRelationshipPanel'),
@@ -1713,6 +1715,7 @@
     };
 
     const renderBatchGuide = () => {
+      renderLargeFileNotice();
       if (!dom.batchGuide || !dom.batchGuideStatus || !dom.batchGuideTitle) {
         return;
       }
@@ -1732,6 +1735,39 @@
           ? `All ${progress.totalBatches} upload batches are confirmed. The inscription is ready to seal.`
           : `${progress.confirmedBatches} of ${progress.totalBatches} upload batches confirmed. Next: batch ${progress.nextBatch} of ${progress.totalBatches}.`;
       dom.batchGuide.hidden = false;
+    };
+
+    /**
+     * Offers the Wizard when a file is too big to inscribe in one transaction.
+     *
+     * The markup for this notice has always been in index.html, and nothing ever
+     * unhid it — `largeFileNotice` appeared in no JavaScript at all, so the
+     * automatic hand-off everyone believed existed never fired once. That matters
+     * more now the Wizard is not in the top nav: this and the standing link in the
+     * panel are how it gets found.
+     *
+     * The threshold is the same one the batch guide uses. Above
+     * SMALL_MINT_HELPER_MAX_CHUNKS a mint stops being a single transaction and
+     * becomes a staged upload the user has to sit through and sign repeatedly,
+     * which is exactly the job the Wizard does for one payment.
+     */
+    const renderLargeFileNotice = () => {
+      const notice = dom.largeFileNotice;
+      if (!notice) return;
+      const totalChunks =
+        state.prepared?.chunks.length ??
+        Number(state.uploadState?.totalChunks ?? state.lastMintAttempt?.totalChunks ?? 0);
+      if (!Number.isSafeInteger(totalChunks) || totalChunks <= SMALL_MINT_HELPER_MAX_CHUNKS) {
+        notice.hidden = true;
+        return;
+      }
+      const batches = getUploadBatchProgress(0, totalChunks).totalBatches;
+      if (dom.largeFileNoticeText) {
+        dom.largeFileNoticeText.textContent =
+          `This one needs ${batches + 2} transactions to inscribe here, each signed and confirmed. ` +
+          `The Wizard does it for a single payment.`;
+      }
+      notice.hidden = false;
     };
 
     const renderResumeNotice = () => {
