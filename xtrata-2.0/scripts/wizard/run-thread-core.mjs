@@ -196,7 +196,22 @@ export const HALT_REASONS = [
   'timeout',
   'unresolved',
   'predecessor',
-  'journal'
+  'journal',
+  /**
+   * A stage of the pipeline was verified against the chain and did not match
+   * what the next stage is about to cite. Distinct from 'safety', which is a
+   * refusal to broadcast THIS transaction: a gate failure means something
+   * already on chain is not what the journal says it is, so the transaction
+   * that would have been next is not the problem and retrying it is not the
+   * fix.
+   */
+  'gate',
+  /**
+   * The generic mint leg failed for a reason the caller reported rather than
+   * one this file classified. Kept separate from 'tx-failed' so a delegated
+   * runner's own halt is not relabelled as a transaction outcome.
+   */
+  'failed'
 ];
 
 /**

@@ -1,6 +1,8 @@
 # Wizard Pipeline — Personas to Marketplace, End to End
 
-One harness that takes the fleet from nothing on chain to a complete, cross-referenced, listed body of work. 31 permanent inscriptions and ~24 listings, spending roughly 3 STX. Every reference is permanent and unfixable, so the design is mostly about refusing to proceed on an unverified assumption.
+One harness that takes the fleet from nothing on chain to a complete, cross-referenced, listed body of work. 35 permanent inscriptions and 24 listings. Every reference is permanent and unfixable, so the design is mostly about refusing to proceed on an unverified assumption.
+
+**Built.** `scripts/wizard/pipeline.mjs`, `pipeline-core.mjs`, `pipeline-rehearse.mjs`, 48 tests. The numbers below were corrected against what the harness actually does; where this document and the code disagree, the code is the fact.
 
 ## 0. What this first release deliberately leaves for later
 
@@ -22,31 +24,48 @@ Neither belongs in this release. Both belong in the record of why it looks like 
 Edges point backwards only (`get-dependencies` names what an inscription cites; the core keeps no reverse index). So **mint order is forced** — nothing can cite something that does not yet exist.
 
 ```
-persona:archivist ─┬─ 8 archivist plates ── archivist manifest ─┐
-persona:skeptic   ─┼─ 8 skeptic plates   ── skeptic manifest   ─┼─ the page
-persona:builder   ─┴─ 8 builder plates   ── builder manifest   ─┘
+persona:archivist ─┬─ 8 archivist plates ─┬─ archivist manifest ─┐
+                   └─ mark:archivist ─────┼──────────────┐       │
+persona:skeptic   ─┬─ 8 skeptic plates   ─┼─ skeptic manifest ───┼─ the page
+                   └─ mark:skeptic ───────┼─ the arms ───┘       │
+persona:builder   ─┬─ 8 builder plates   ─┼─ builder manifest ───┘
+                   └─ mark:builder ───────┘
 ```
 
 | Stage | Inscriptions | Cites |
 |---|---|---|
 | 1 personas | 3 | nothing (roots) |
-| 2 plates | 24 | its wizard's persona |
+| 2 plates | 24 | nothing |
 | 3 manifests | 3 | its 8 plates + its persona |
-| 4 the page | 1 | 3 manifests + 24 plates (27 deps, inside the 50 limit) |
-| 5 listings | — | 24 sponsored-market listings |
+| 4 marks | 3 | its wizard's persona |
+| 5 arms | 1 | the 3 marks |
+| 6 the page | 1 | 24 plates + 3 manifests + 3 marks + the arms (31 deps, inside the 50 limit) |
+| 7 listings | — | 24 sponsored-market listings |
 
-**31 inscriptions.** The existing corpus (#2922–#2928) is *not* re-minted and cannot cite the personas — its lineage closed when it was inscribed. The page may cite it as historical context.
+**35 inscriptions.** The existing corpus (#2922–#2928) is *not* re-minted and cannot cite the personas — its lineage closed when it was inscribed. The page may cite it as historical context.
+
+**Plates cite nothing, and the manifest carries the persona edge.** The original sketch above had each plate citing its wizard's persona. `runCollection` mints plates with an empty dependency list, and changing that would have meant re-testing the one runner that already works. The manifest cites the persona instead (`citeIds`), so every collection still reaches its wizard's account of itself in one hop from its index — which is the property that mattered. Without that edge the personas would have been cited only by the marks.
 
 ## 2. Cost
 
+The first draft of this table counted the protocol fee and forgot the miner bid, which understated the run by 1.05 STX. The real figures, from `pipeline.mjs --cost`:
+
 | Stage | Cost | Recoverable |
 |---|---|---|
-| 31 inscriptions × 41,000 µSTX | 1.271 STX | no |
+| 35 inscriptions × 71,000 µSTX (41,000 protocol + 30,000 miner) | 2.485 STX | no |
 | 24 listings × 30,000 µSTX miner | 0.720 STX | no |
 | 24 deposits × 50,000 µSTX | 1.200 STX | yes, on cancel or settle |
-| **Total committed** | **3.191 STX** | of which ~1.99 is spent |
+| **Total committed** | **4.405 STX** | of which 3.205 is spent |
 
-Against a fleet of ~14.4 STX. Per wizard the load is uneven — the page comes from one wallet — so the harness must check each wallet against its own floor, not the fleet total.
+Against a fleet of ~14.4 STX. Per wizard the load is uneven — the arms and the page both come from the Archivist's wallet — so the harness checks each wallet against its own floor, not the fleet total:
+
+| wizard | mints | listings | spent | escrowed | committed |
+|---|---|---|---|---|---|
+| archivist | 13 | 8 | 1.163 STX | 0.400 STX | 1.563 STX |
+| skeptic | 11 | 8 | 1.021 STX | 0.400 STX | 1.421 STX |
+| builder | 11 | 8 | 1.021 STX | 0.400 STX | 1.421 STX |
+
+**The default run cap does not cover this run.** `DEFAULT_RUN_SPEND_CAP_USTX` is 1 STX and the mint half alone is 2.485. The harness refuses to start rather than halting three stages in and leaving 27 inscriptions that no manifest cites — halfway through a permanent graph is the one place not to stop. Pass `--run-spend-cap-ustx 2485000` deliberately.
 
 ## 3. The rule that makes it safe
 
@@ -78,16 +97,24 @@ Each wizard lists its own plates and keeps its own proceeds. Prices follow each 
 
 **The manifests and the page are not listed.** They are the index; selling the index separately from what it indexes would make the collection incoherent.
 
-## 7. Dry run
+## 7. Rehearsal, not a dry run
 
-`--dry` must exercise all five stages against a fake chain with synthetic ids, and prove:
-- mint order respects the graph — no stage cites something unminted;
-- every gate fires, including on injected failures (missing dep, wrong persona ref, byte mismatch, wrong owner);
-- the cost model matches the sum of the planned transactions;
-- a simulated crash at each stage boundary resumes without re-minting;
-- nothing reaches a broadcast endpoint.
+This section originally asked for `--dry`. Building it showed why that is not enough, and the distinction is the most useful thing this plan learned:
 
-A dry run writes no journal to disk. Two consecutive rehearsals produce identical output.
+**A dry run mints nothing, so there are no ids, so there is nothing to read back, so every gate is skipped.** The one mechanism standing between the fleet and a permanent manifest citing the wrong plate is the one mechanism a dry run never executes.
+
+So the default is a *rehearsal*: the real loop — intent, journal, submit, poll, verify, gate — against a chain that lives in a JavaScript object (`pipeline-rehearse.mjs`). Nothing reaches a network, and the fake chain **throws on any URL it does not recognise**, which makes "nothing was broadcast" a checkable property rather than an assurance.
+
+What the rehearsal proves, all covered by tests:
+- mint order respects the graph — no inscription cites an id larger than its own;
+- every gate fires on injected failures: flipped byte, vanished inscription, dropped edge, extra edge, edge pointing at the wrong persona, wrong creator;
+- the cost model matches what the run actually spends, to the microSTX;
+- a run whose journal is wiped adopts by content hash instead of paying twice;
+- running the whole pipeline twice broadcasts 35 times, not 70;
+- two consecutive rehearsals produce byte-identical output;
+- no journal is written to disk — the rehearsal journal is in memory, so it cannot be resumed from by a real run.
+
+**The gates were verified by breaking them.** Disabling the dependency-set comparison fails 3 tests; disabling the byte comparison fails 2; disabling the creator check fails 1; reintroducing the `collectionId` resume bug fails 16. A gate whose removal breaks nothing was not being tested.
 
 ## 8. Halt conditions
 
@@ -97,13 +124,25 @@ Continue: a listing that fails for a recoverable reason, isolated and reported; 
 
 ## 9. Definition of done
 
-- 31 inscriptions live, every reference verified on chain by reading it back.
-- Every plate cites its wizard's persona; every manifest cites its 8 plates; the page cites all 27.
+- 35 inscriptions live, every reference verified on chain by reading it back.
+- Every manifest cites its 8 plates and its persona; every mark cites its persona; the arms cites the 3 marks; the page cites all 31.
 - 24 plates listed, each by its maker, at its persona's price.
 - Fleet spend within cap and reconciled per wallet.
 - `--status` shows the complete pipeline green.
 - A final report: what was minted, what it cost, what is listed, and anything left open with the command to recover it.
 
-## 10. What only a real run can prove
+## 10. Bugs this harness found before the chain did
+
+Building the rehearsal surfaced five defects, three of them in code that was already committed and passing 521 tests:
+
+1. **`collection-run-core.mjs` omitted `collectionId` on its adopt path**, so a *resumed* run of the Archivist's or Skeptic's collection compared their plates against the Builder's and halted blaming the id. Fails closed, so nothing was ever minted wrongly — but it blocked resume for two collections in three, which is exactly the path a crash leads to.
+2. **The generic mint leg shipped without `assertBroadcastAllowed`**, so personas, marks, the arms and the page would have broadcast with no key check, no balance floor and no paused check, while the plates two stages later had all three.
+3. **`runCollection` never returned the manifest id** — its own report dug it out of the journal, and a second caller would have been a second copy of that dig.
+4. **A manifest leg narrowed to `to: 1` silently mints nothing.** `runCollection` only mints the manifest once it has a member for every index, so a narrowed leg walks one plate, fails that condition, and returns `ok` having done nothing.
+5. **The fleet spend cap was blind to 27 of 35 mints**, and separately double-counted the plates when the manifest leg re-walked them — reporting 4.19 STX for a 2.49 STX run.
+
+And one in the rehearsal itself, which is the most instructive: `flip-byte` used `/.$/`, which without the `m` flag needs a non-newline final character. Every body here ends in a newline, so it matched nothing and **three negative controls passed while corrupting nothing at all**. A control that silently does nothing is worse than not having one.
+
+## 11. What only a real run can prove
 
 That `mint-single-tx` charges the quoted fee for `image/svg+xml` as it does for markdown. That a gallery renders an SVG token-uri. That the page's recursive `/i/<id>` references resolve when served from the gateway. That 27 dependencies in one call stays inside the cost budget — the largest dependency list the fleet has attempted is 8.

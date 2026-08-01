@@ -529,6 +529,20 @@ export async function planCollectionManifest({
   spendCapUstx = DEFAULT_SPEND_CAP_USTX,
   balanceFloorUstx = DEFAULT_BALANCE_FLOOR_USTX,
   minerFeeUstx = DEFAULT_MAX_TX_FEE_USTX,
+  /**
+   * Ids the manifest should cite in addition to its members -- in practice the
+   * wizard's persona inscription, when one exists.
+   *
+   * Without this the personas are very nearly orphaned: nothing in a collection
+   * points at the account its maker gave of itself, so "follow any piece of my
+   * work back to my persona" is false. Dependencies are a separate argument to
+   * the mint call and are not part of the hashed body, so adding one changes
+   * what the manifest CITES without changing what it SAYS or what it hashes to.
+   *
+   * Empty by default, so a collection minted without personas behaves exactly
+   * as it did before this existed.
+   */
+  citeIds = [],
   env = {}
 } = {}) {
   const art = artFor(collectionId);
@@ -546,7 +560,7 @@ export async function planCollectionManifest({
     index: null,
     body: art.composeManifest({ collectionId: art.id, members }),
     tokenUri: tokenUriForCollectionManifest({ collectionId: art.id }),
-    parentIds: members.map((member) => String(member.id)),
+    parentIds: [...members.map((member) => String(member.id)), ...citeIds.map(String)],
     art,
     collectionId: art.id,
     persona: getPersona(wizard ?? art.wizard),
@@ -615,6 +629,8 @@ export async function runCollection({ ports = {}, options = {} } = {}) {
     env = {},
     wallets = {},
     knownIds = {},
+    /** Extra ids for the manifest to cite, e.g. the wizard's persona. */
+    citeIds = [],
     journalDir = HERE,
     runSpendCapUstx = DEFAULT_RUN_SPEND_CAP_USTX,
     spendCapUstx = DEFAULT_SPEND_CAP_USTX,
@@ -964,12 +980,19 @@ export async function runCollection({ ports = {}, options = {} } = {}) {
       // Already done, by this run or an earlier one. Read it back rather than
       // trusting the journal.
       if (existing && (existing.status === 'confirmed' || existing.status === 'external') && existing.inscriptionId) {
+        // `collectionId` is not optional here, though it reads as though it
+        // could be. Without it hydratePiece falls back to DEFAULT_COLLECTION_ID
+        // and compares the Archivist's plate against the Builder's, which fails
+        // closed with a message blaming the id. This is the adopt path, so it
+        // only fires on a RESUMED run of a non-default collection -- exactly the
+        // path a crash leads to, and it blocked two collections out of three.
         const member = await hydratePiece({
           fetchImpl,
           hiroUrl,
           id: existing.inscriptionId,
           index,
-          txid: existing.txid ?? null
+          txid: existing.txid ?? null,
+          collectionId: art.id
         });
         members.push(member);
         io.say(`  piece ${index}: already #${member.id}, nothing to broadcast`);
@@ -1127,6 +1150,7 @@ export async function runCollection({ ports = {}, options = {} } = {}) {
           members,
           collectionId,
           wizard: persona,
+          citeIds,
           fetchImpl,
           hiroUrl,
           senderAddress: wallet.address ?? null,
@@ -1190,6 +1214,18 @@ export async function runCollection({ ports = {}, options = {} } = {}) {
     journalPath,
     journal,
     members,
+    /**
+     * The manifest's id, or null when this leg did not mint one.
+     *
+     * Surfaced here rather than left for each caller to dig out of
+     * `journal.pieces[MANIFEST_KEY]`. formatCollectionRunReport was already
+     * doing that dig, and the pipeline harness needs the same id to hand to the
+     * page -- two copies of "where does the manifest id live" is one more than
+     * the number of places that should know.
+     */
+    manifestId: journal.pieces?.[MANIFEST_KEY]?.inscriptionId
+      ? String(journal.pieces[MANIFEST_KEY].inscriptionId)
+      : null,
     committedUstx: committedCollectionSpendUstx(journal),
     runSpendCapUstx: BigInt(runSpendCapUstx)
   };
