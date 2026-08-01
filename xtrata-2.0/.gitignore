@@ -22,6 +22,10 @@ scripts/wizard/.market-*.json
 
 # Collection runner journals. Same shape again, keyed by piece index.
 scripts/wizard/.collection-*.json
+# The pipeline journal. Holds addresses, txids and the resolved id map -- no
+# keys (assertJournalSecretFree refuses to write one), but it is run state and
+# not source. Added after a real run left it showing as untracked.
+scripts/wizard/.pipeline-*.json
 
 
 # FOLDERS
