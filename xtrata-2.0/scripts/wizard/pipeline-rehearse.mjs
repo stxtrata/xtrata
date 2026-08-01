@@ -68,7 +68,9 @@ export function makeFakeChain({
   nextId = 90_001,
   balances = {},
   tip = 1_000_000,
-  feeUstx = 41_000n,
+  // The live mainnet figure, so the rehearsal rehearses the real economics
+  // rather than a plausible-looking invented one.
+  feeUstx = 11_000n,
   paused = false
 } = {}) {
   const state = {

@@ -125,7 +125,7 @@ describe('the pipeline runs end to end against a chain in memory', () => {
     // blind to twenty-seven of the thirty-five mints.
     const { run } = await rehearse();
     const result = await run();
-    expect(result.spentUstx).toBeGreaterThan(8n * 71_000n);
+    expect(result.spentUstx).toBeGreaterThan(8n * 41_000n);
   });
 
   it('writes every id into the map, including the ones runCollection minted', async () => {
@@ -680,9 +680,14 @@ describe('regressions found by building this harness', () => {
 
   it('delegated spend is counted once, not once per stage that touches it', async () => {
     // Keyed by stage, the manifest leg's cumulative total re-added the plates
-    // and reported 4.19 STX for a 2.49 STX run.
+    // and reported nearly double the real spend.
+    //
+    // 41,000 per mint: the 11,000 protocol fee measured live against v3-2-3 on
+    // 2026-08-01, plus the 30,000 miner bid. The fake chain quotes the same
+    // 11,000 so the rehearsal rehearses the real economics rather than an
+    // invented number that happens to look plausible.
     const { run } = await rehearse();
     const result = await run();
-    expect(result.spentUstx).toBe(BigInt(TOTAL_MINTS) * 71_000n);
+    expect(result.spentUstx).toBe(BigInt(TOTAL_MINTS) * 41_000n);
   });
 });

@@ -1416,7 +1416,21 @@ export async function pipelineStatusReport({ ports = {}, options = {} } = {}) {
  * the run in aggregate can still have one wizard unable to pay for its share.
  */
 export function costModel({
-  mintFeeUstx = 41_000n,
+  /**
+   * The PROTOCOL fee per mint, measured against mainnet on 2026-08-01: a flat
+   * 11,000 microSTX for every body in this pipeline.
+   *
+   * Was 41,000 here, taken from the plan, which was itself stale. Quoted live
+   * against v3-2-3 for all five body types -- persona 1,829 bytes, plate 1,814,
+   * mark 1,589, arms 2,192, page 12,866 -- and the answer is 11,000 for every
+   * one of them. One chunk each, and `image/svg+xml` is charged exactly as
+   * `text/markdown` is, which was one of the plan's open questions.
+   *
+   * This number only sizes the cap and the report. Each transaction pays what
+   * `quote-inscription-fee` says at the moment it is planned, so a fee schedule
+   * that moves under the run changes what is paid and not what is checked.
+   */
+  mintFeeUstx = 11_000n,
   minerFeeUstx = BigInt(DEFAULT_MAX_TX_FEE_USTX),
   listingBudgetUstx = 50_000n,
   listingMinerUstx = 30_000n,

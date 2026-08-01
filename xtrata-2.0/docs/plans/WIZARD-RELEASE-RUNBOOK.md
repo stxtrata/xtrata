@@ -2,14 +2,14 @@
 
 The ordered steps for taking the fleet's work on chain. `WIZARD-PIPELINE-PLAN.md` is the design; this is what you follow on the day.
 
-35 inscriptions, 24 listings, 4.405 STX committed of which 3.205 is spent. Every reference is permanent. The gates below exist because there is no correction, only a second inscription admitting the first was wrong.
+35 inscriptions, 24 listings, 3.355 STX committed of which 2.155 is spent. Every reference is permanent. The gates below exist because there is no correction, only a second inscription admitting the first was wrong.
 
 ## The one flag that matters
 
-**The default run cap does not cover this run.** `DEFAULT_RUN_SPEND_CAP_USTX` is 1 STX; the mint half alone is 2.485. The harness refuses to start rather than halting three stages in and leaving 27 inscriptions that no manifest cites. Every command below therefore carries:
+**The default run cap does not cover this run.** `DEFAULT_RUN_SPEND_CAP_USTX` is 1 STX; the mint half is 1.435. The harness refuses to start rather than halting three stages in and leaving 27 inscriptions that no manifest cites. Every command below therefore carries:
 
 ```
---run-spend-cap-ustx 2485000
+--run-spend-cap-ustx 1435000
 ```
 
 It is not raised for you, and it should not be raised further without a reason you can say out loud.
@@ -18,9 +18,9 @@ It is not raised for you, and it should not be raised further without a reason y
 
 - [ ] Triptych collections built; `npx vitest run scripts/wizard` green (569 tests).
 - [ ] The full rehearsal passes:
-      `node scripts/wizard/pipeline.mjs --run-spend-cap-ustx 2485000`
+      `node scripts/wizard/pipeline.mjs --run-spend-cap-ustx 1435000`
       35/35 mints, seven gates, all verified, nothing left the process.
-- [ ] Fleet balances checked against `--cost`. Archivist needs the most (1.563 STX committed) because the arms and the page both come out of its wallet.
+- [ ] Fleet balances checked against `--cost`. Archivist needs the most (1.173 STX committed) because the arms and the page both come out of its wallet.
 - [ ] `.env.wizards` present and **ignored by git** — confirm with
       `git check-ignore -v scripts/wizard/.env.wizards`, which must print a match.
 - [ ] Kill switch absent: `ls scripts/wizard/KILL` finds nothing.
@@ -42,66 +42,66 @@ The CLI takes `--from` and `--to`, not `--stage`. Rehearsal is the default; `--b
 
 ```bash
 node scripts/wizard/pipeline.mjs --cost                    # what it commits, per wallet
-node scripts/wizard/pipeline.mjs --run-spend-cap-ustx 2485000   # rehearse everything
+node scripts/wizard/pipeline.mjs --run-spend-cap-ustx 1435000   # rehearse everything
 node scripts/wizard/pipeline.mjs --status                  # where the real run has got to
 ```
 
 **Run one stage at a time for the first real run.** The harness will do all seven in one command, and it is correct to, but a stage boundary is a free place to stop and look.
 
-## Step 1 — Personas (3 inscriptions, 0.213 STX)
+## Step 1 — Personas (3 inscriptions, 0.123 STX)
 
 ```bash
-node scripts/wizard/pipeline.mjs --to personas --broadcast --run-spend-cap-ustx 2485000
+node scripts/wizard/pipeline.mjs --to personas --broadcast --run-spend-cap-ustx 1435000
 ```
 
 Roots of the whole graph. They cite nothing, so this is the cheapest stage to get wrong and the only one with no upstream risk.
 
 **Gate:** three inscriptions live, each byte-identical to its generated source, each citing nothing, each created by the right wallet.
 
-## Step 2 — Plates (24 inscriptions, 1.704 STX)
+## Step 2 — Plates (24 inscriptions, 0.984 STX)
 
 ```bash
-node scripts/wizard/pipeline.mjs --from plates --to plates --broadcast --run-spend-cap-ustx 2485000
+node scripts/wizard/pipeline.mjs --from plates --to plates --broadcast --run-spend-cap-ustx 1435000
 ```
 
 Plates cite nothing. The edge to the persona is carried by the manifest — see the plan's §1.
 
 **Gate:** every plate reads back byte-identical to its generated source and was created by its own wizard. Do not skip this because the transactions succeeded. **A successful transaction proves something was inscribed, not that it was the right thing.**
 
-## Step 3 — Manifests (3 inscriptions, 0.213 STX)
+## Step 3 — Manifests (3 inscriptions, 0.123 STX)
 
 ```bash
-node scripts/wizard/pipeline.mjs --from manifests --to manifests --broadcast --run-spend-cap-ustx 2485000
+node scripts/wizard/pipeline.mjs --from manifests --to manifests --broadcast --run-spend-cap-ustx 1435000
 ```
 
 Each cites its eight plates **and its persona**. This is the first irreversible aggregation: after it, those eight ids are that collection permanently.
 
 **Gate:** each manifest's dependency set is exactly its eight plates plus its persona — checked as a set, because the core stores what it was given and promises no order.
 
-## Step 4 — Marks (3 inscriptions, 0.213 STX)
+## Step 4 — Marks (3 inscriptions, 0.123 STX)
 
 ```bash
-node scripts/wizard/pipeline.mjs --from marks --to marks --broadcast --run-spend-cap-ustx 2485000
+node scripts/wizard/pipeline.mjs --from marks --to marks --broadcast --run-spend-cap-ustx 1435000
 ```
 
 Each mark cites its own wizard's persona and nothing else.
 
 **Gate:** byte-identical, right creator, exactly one dependency and it is the right persona.
 
-## Step 5 — The arms (1 inscription, 0.071 STX)
+## Step 5 — The arms (1 inscription, 0.041 STX)
 
 ```bash
-node scripts/wizard/pipeline.mjs --from arms --to arms --broadcast --run-spend-cap-ustx 2485000
+node scripts/wizard/pipeline.mjs --from arms --to arms --broadcast --run-spend-cap-ustx 1435000
 ```
 
 Cites all three marks. Minted from the Archivist's wallet: it belongs to all three, somebody has to hold it, and custody is that wizard's stated concern.
 
 **Gate:** the dependency set is exactly the three marks.
 
-## Step 6 — The page (1 inscription, 0.071 STX)
+## Step 6 — The page (1 inscription, 0.041 STX)
 
 ```bash
-node scripts/wizard/pipeline.mjs --from page --to page --broadcast --run-spend-cap-ustx 2485000
+node scripts/wizard/pipeline.mjs --from page --to page --broadcast --run-spend-cap-ustx 1435000
 ```
 
 Cites all 31: 24 plates, 3 manifests, 3 marks, the arms. Inside the core's bound of 50, but **the largest dependency list the fleet has ever attempted is 8** and the cost of a 31-entry list is unproven. If it exceeds the single-transaction budget, the fallback is citing the three manifests, the three marks and the arms only, and letting the page reach the plates through the manifests.
@@ -113,7 +113,7 @@ The page is the one inscription that is not regenerable from nothing: it embeds 
 ## Step 7 — Listings (24 listings, 0.72 STX spent, 1.2 escrowed)
 
 ```bash
-node scripts/wizard/pipeline.mjs --from listings --to listings --broadcast --run-spend-cap-ustx 2485000
+node scripts/wizard/pipeline.mjs --from listings --to listings --broadcast --run-spend-cap-ustx 1435000
 node scripts/wizard/collection-run.mjs --collection <id> --list --broadcast
 ```
 
@@ -147,7 +147,7 @@ Manifests, marks, the arms and the page are **not** listed. They are the index, 
 
 Four things only a real run can settle:
 
-1. whether `mint-single-tx` charges the same for `image/svg+xml` as for markdown;
+1. ~~whether `mint-single-tx` charges the same for `image/svg+xml` as for markdown~~ — **answered before the run**: quoted live against v3-2-3 on 2026-08-01, every body type is one chunk at a flat 11,000 microSTX. Markdown 1,829 bytes, SVG 1,814, the page 12,866. Same price.
 2. whether a gallery renders an SVG token-uri;
 3. whether the page's recursive `/i/<id>` references resolve from the gateway;
 4. whether 31 dependencies fit one transaction's budget.
