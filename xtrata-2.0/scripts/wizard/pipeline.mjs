@@ -45,7 +45,8 @@
  * See docs/plans/WIZARD-RELEASE-RUNBOOK.md.
  */
 
-import { pathToFileURL } from 'node:url';
+import { dirname, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
   DEFAULT_BALANCE_FLOOR_USTX,
@@ -53,7 +54,6 @@ import {
   DEFAULT_MAX_TX_FEE_USTX,
   DEFAULT_SPEND_CAP_USTX,
   WizardSafetyError,
-  formatPlan,
   killSwitchEngaged,
   loadWizardEnv
 } from './inscribe.mjs';
@@ -71,6 +71,9 @@ import {
   runPipeline
 } from './pipeline-core.mjs';
 import { REHEARSAL_WALLETS, makeFakeChain, makeFastClock, makeMemoryJournal } from './pipeline-rehearse.mjs';
+import { describeHiroKeys, makeHiroFetch } from './hiro-fetch.mjs';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 const USAGE = `
 pipeline.mjs — the whole fleet, from three roots to twenty-four listings.
@@ -152,7 +155,12 @@ const rehearsalPorts = ({ say }) => {
       killSwitch: killSwitchEngaged,
       now: clock.now,
       sleep: clock.sleep,
-      say
+      say,
+      // The rehearsal runs with the SAME port set as the real thing.
+      // It did not, and that is precisely why it missed a crash in the plan
+      // formatter: a port the rehearsal never supplies is a port the rehearsal
+      // never tests.
+      verbose: true
     }
   };
 };
@@ -165,7 +173,27 @@ async function main(argv) {
 
   const args = parseArgs(argv);
   const broadcast = args.flags.has('broadcast');
-  const env = loadWizardEnv();
+  // Wizard keys live in .env.wizards; the Hiro API key lives in .env.local
+  // with the rest of the app's configuration. Both are needed and neither
+  // belongs in the other file, so both are loaded. loadWizardEnv never
+  // overwrites a value that is already set, so the order is not a trap.
+  const env = loadWizardEnv({ path: join(HERE, '.env.wizards') });
+  loadWizardEnv({ path: join(HERE, '..', '..', '.env.local'), env });
+
+  /**
+   * The read port for everything.
+   *
+   * The gates read the chain back hard -- verifying 24 plates is 48 calls in a
+   * burst -- and the first real plates run was rate-limited on call ~40, which
+   * halted the pipeline with 24 good inscriptions on chain and nothing wrong
+   * with any of them. This spaces the reads out and backs off when the answer
+   * is still 429.
+   */
+  const readFetch = makeHiroFetch({
+    env,
+    onRetry: ({ status, attempt, waitMs }) =>
+      console.log(`    (HTTP ${status}; waiting ${Math.round(waitMs / 1000)}s and trying again, attempt ${attempt})`)
+  });
   const hiroUrl = args.values['hiro-url'] ?? DEFAULT_HIRO_URL;
   const runId = args.values['run-id'] ?? 'fleet';
 
@@ -177,7 +205,7 @@ async function main(argv) {
   if (args.flags.has('status')) {
     const wallets = walletsFor({ env, broadcast: true });
     const report = await pipelineStatusReport({
-      ports: { fetchImpl: globalThis.fetch, ...journalPorts() },
+      ports: { fetchImpl: readFetch, ...journalPorts() },
       options: { runId, hiroUrl, wallets }
     });
     console.log(formatPipelineStatus(report));
@@ -270,6 +298,7 @@ async function main(argv) {
 
   const model = costModel({ minerFeeUstx: options.minerFeeUstx });
   console.log('BROADCASTING. Real mainnet transactions, real STX, irreversible.');
+  console.log(describeHiroKeys(env));
   console.log('');
   console.log(formatCostModel(model));
   console.log('');
@@ -286,14 +315,20 @@ async function main(argv) {
 
   const result = await runPipeline({
     ports: {
-      fetchImpl: globalThis.fetch,
+      fetchImpl: readFetch,
       submit: liveSubmit({ hiroUrl }),
       ...journalPorts(),
       killSwitch: killSwitchEngaged,
       now: () => Date.now(),
       sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
       say,
-      presentPlan: (plan) => console.log(formatPlan(plan, { broadcast: true }))
+      // No formatter here on purpose. This line used to be
+      // `formatPlan(plan, ...)` -- the CORPUS thread's formatter, which reads
+      // `plan.subject.id`. A persona plan has no subject, so the first real
+      // broadcast attempt crashed before signing anything. pipeline-core now
+      // owns the formatting and routes each leg to the formatter that matches
+      // its own plan shape, so a caller cannot pick the wrong one.
+      verbose: true
     },
     options: { ...options, wallets }
   });

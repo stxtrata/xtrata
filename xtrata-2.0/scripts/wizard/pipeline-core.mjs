@@ -114,7 +114,7 @@ import {
   renderCollectionPage
 } from './collection-page.mjs';
 import { COLLECTION_MIME } from './collection-kit.mjs';
-import { runCollection } from './collection-run-core.mjs';
+import { formatCollectionPlan, runCollection } from './collection-run-core.mjs';
 
 export {
   DEFAULT_CONFIRM_POLL_MS,
@@ -738,6 +738,8 @@ export const NULL_PORTS = {
   sleep: async () => {},
   say: () => {},
   presentPlan: () => {},
+  /** Print the full plan for every mint. Off by default; the CLI turns it on. */
+  verbose: false,
   /**
    * How plates and manifests get minted. Defaults to the real runner and is
    * overridable so a rehearsal can drive a fake one without this file knowing
@@ -994,6 +996,10 @@ export async function runPipeline({ ports = {}, options = {} } = {}) {
       env,
       remainingMints
     });
+    // Formatted here, with the formatter that matches this plan's shape.
+    // The caller supplies `say` and not a formatter, because a caller that
+    // picks the formatter can pick the wrong one -- and did.
+    if (io.verbose) say(formatPipelinePlan(plan, { broadcast }));
     io.presentPlan(plan, { broadcast });
 
     // The duplicate-content probe is not a nuisance here, it is the resume
@@ -1211,7 +1217,12 @@ export async function runPipeline({ ports = {}, options = {} } = {}) {
               now: io.now,
               sleep: io.sleep,
               say: (line) => say(`    ${line}`),
-              presentPlan: io.presentPlan
+              // runCollection's plans are plate-shaped and need plate-shaped
+              // formatting. Passing the caller's formatter through here is how
+              // a persona formatter would end up printing a plate.
+              presentPlan: io.verbose
+                ? (plan, presentOptions) => say(formatCollectionPlan(plan, presentOptions))
+                : () => {}
             },
             options: {
               collectionId,
@@ -1515,6 +1526,40 @@ export function formatCostModel(model) {
   );
   lines.push('');
   lines.push(`Spent is unrecoverable. Escrowed returns when a listing sells or is cancelled.`);
+  return lines.join('\n');
+}
+
+/**
+ * One generic-leg plan, printed.
+ *
+ * There is a `formatPlan` in inscribe.mjs and a `formatCollectionPlan` in
+ * collection-run-core.mjs, and neither fits: the first is shaped around a
+ * corpus entry and reads `plan.subject.id`, the second around a plate and reads
+ * `plan.pieceId`. Handing the corpus one a persona plan crashes on an undefined
+ * `subject`, which is exactly what happened on the first real broadcast attempt
+ * -- caught before anything signed, but only because it crashed rather than
+ * printing something wrong.
+ *
+ * So this one prints what a generic plan actually has, and nothing it does not.
+ */
+export function formatPipelinePlan(plan, { broadcast = false } = {}) {
+  const lines = [
+    '',
+    broadcast ? '  --- BROADCAST ---' : '  --- rehearsal, nothing signed ---',
+    `  ${plan.stage}:${plan.item}   ${plan.label}`,
+    `  wizard      ${plan.wizard.name}`,
+    `  cites       ${plan.parentIds.length > 0 ? plan.parentIds.map((id) => `#${id}`).join(', ') : '(nothing; this is a root)'}`,
+    `  body        ${groupDigits(plan.call.totalSize)} bytes / ${plan.call.totalChunks} chunk(s)`,
+    `  token-uri   ${plan.call.tokenUri}`,
+    `  mime        ${plan.call.mime}`,
+    `  finalHash   ${plan.call.finalHashHex}`,
+    `  protocol    ${microStxToStx(plan.protocolFeeUstx)} STX   [${plan.feeSource}]`,
+    `  miner bid   up to ${microStxToStx(plan.minerFeeUstx)} STX   [not refundable]`,
+    `  wallet      ${plan.senderAddress ?? '(none)'}   balance ${plan.balanceUstx === null ? 'unknown' : `${microStxToStx(plan.balanceUstx)} STX`}`
+  ];
+  for (const [name, check] of Object.entries(plan.checks ?? {})) {
+    if (check && check.ok === false) lines.push(`  CHECK FAILED  ${name}: ${check.status ?? ''} ${check.note ?? check.error ?? ''}`);
+  }
   return lines.join('\n');
 }
 
