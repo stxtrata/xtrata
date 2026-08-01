@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#07090d" />
+  <meta name="description" content="Proof of Creation results. Five creators share 300 STX. Every entry is now a permanent on-chain object anchored to Bitcoin." />
+  <meta property="og:title" content="Proof of Creation — Results | Xtrata × Zero Authority DAO" />
+  <meta property="og:description" content="The first masterpieces are on-chain. Five winners, 60 STX each, and an open invitation to keep inscribing." />
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://xtrata.xyz/proofzero/results/" />
+  <link rel="canonical" href="https://xtrata.xyz/proofzero/results/" />
+  <title>Proof of Creation — Results | Xtrata × Zero Authority DAO</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #050505;
+      --panel: #111111;
+      --surface: #151515;
+      --ink: #f7f7f7;
+      --muted: #aeb5b0;
+      --line: #303030;
+      --line-strong: #5b5b5b;
+      --green: #b9ef77;
+      --green-soft: #14200f;
+      --teal: #7de6d1;
+      --violet: #6c49ff;
+      --coral: #ff664d;
+      --dark-panel: #0d0d0d;
+      --shadow: 0 22px 60px rgba(0, 0, 0, .42);
+      --max: 1240px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      min-width: 320px;
+      margin: 0;
+      background:
+        radial-gradient(circle at 14% 4%, rgba(108, 73, 255, .055), transparent 28rem),
+        radial-gradient(circle at 86% 12%, rgba(185, 239, 119, .04), transparent 30rem),
+        var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+    a { color: inherit; text-decoration: none; }
+    img, svg { display: block; max-width: 100%; }
+    .shell { width: min(var(--max), calc(100vw - 32px)); margin: 0 auto; }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .section { padding: clamp(64px, 9vw, 116px) 0 0; }
+    .eyebrow { font-size: 10px; color: var(--green); margin: 0 0 14px; }
+    h1, h2, h3 { margin: 0; font-weight: 620; letter-spacing: -.02em; }
+    h2 { font-size: clamp(28px, 4vw, 44px); line-height: 1.06; }
+    h3 { font-size: clamp(19px, 2.2vw, 24px); line-height: 1.15; }
+    p { margin: 0; color: var(--muted); }
+    .lede { font-size: clamp(15px, 1.5vw, 18px); max-width: 62ch; margin-top: 16px; }
+
+    /* announcement + header */
+    .announcement {
+      background: var(--green-soft);
+      border-bottom: 1px solid rgba(185, 239, 119, .22);
+      padding: 9px 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+      color: var(--green);
+    }
+    .announcement .shell { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 0 rgba(185, 239, 119, .55); animation: pulse 2.6s infinite; }
+    @keyframes pulse { 70% { box-shadow: 0 0 0 9px rgba(185, 239, 119, 0); } 100% { box-shadow: 0 0 0 0 rgba(185, 239, 119, 0); } }
+
+    .site-header { border-bottom: 1px solid var(--line); background: rgba(5, 5, 5, .86); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 20; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; flex-wrap: wrap; }
+    .brand { display: flex; gap: 11px; align-items: center; }
+    .brand-logo { width: 26px; height: 26px; }
+    .brand-wordmark { display: block; font-weight: 700; letter-spacing: .18em; font-size: 13px; }
+    .brand-tagline { display: block; font-size: 10px; color: var(--muted); letter-spacing: .02em; }
+    .top-actions { display: flex; gap: 9px; flex-wrap: wrap; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 20px; border-radius: 999px;
+      background: var(--green); color: #0a0f06;
+      font-weight: 640; font-size: 14px; border: 1px solid var(--green);
+      transition: transform .18s ease, background .18s ease;
+    }
+    .btn:hover { transform: translateY(-1px); background: #cbf793; }
+    .btn.secondary { background: transparent; color: var(--ink); border-color: var(--line-strong); }
+    .btn.secondary:hover { background: rgba(255, 255, 255, .05); }
+    .btn.small { padding: 9px 15px; font-size: 12.5px; }
+
+    /* hero */
+    .hero { padding: clamp(56px, 8vw, 104px) 0 0; }
+    .hero h1 { font-size: clamp(38px, 7.4vw, 82px); line-height: .98; letter-spacing: -.035em; }
+    .hero h1 em { font-style: normal; color: var(--green); }
+    .hero-lede { font-size: clamp(16px, 1.8vw, 20px); max-width: 60ch; margin-top: 22px; color: var(--muted); }
+    .hero-actions { display: flex; gap: 11px; flex-wrap: wrap; margin-top: 30px; }
+
+    .stat-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; margin-top: clamp(40px, 6vw, 64px); }
+    .stat { background: var(--dark-panel); padding: 22px 20px; }
+    .stat-value { font-size: clamp(24px, 3.4vw, 36px); font-weight: 660; letter-spacing: -.03em; color: var(--green); }
+    .stat-label { font-size: 9.5px; color: var(--muted); margin-top: 7px; }
+
+    /* winners */
+    .winner-grid { display: grid; gap: 18px; margin-top: clamp(32px, 4vw, 48px); }
+    .winner {
+      display: grid; grid-template-columns: 108px minmax(0, 1fr) auto; gap: 26px; align-items: start;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+      padding: 26px 28px; box-shadow: var(--shadow);
+      transition: border-color .2s ease, transform .2s ease;
+    }
+    .winner:hover { border-color: var(--line-strong); transform: translateY(-2px); }
+    .winner-token { font-size: 10px; color: var(--muted); }
+    .winner-token strong { display: block; font-size: 26px; letter-spacing: -.02em; margin-bottom: 4px; }
+    .token-link { color: var(--green); border-bottom: 1px solid transparent; transition: border-color .18s ease, color .18s ease; }
+    .token-link:hover, .token-link:focus-visible { border-bottom-color: var(--green); }
+    .mention-id .token-link { border-bottom: 1px solid rgba(185, 239, 119, .22); }
+    .token-second { display: block; margin-top: 5px; font-size: 11px; color: var(--muted); }
+    .winner-body h3 { margin-bottom: 8px; }
+    .winner-meta { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 14px; }
+    .chip { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; }
+    .chip.accent { color: var(--green); border-color: rgba(185, 239, 119, .35); }
+    .chip.name { text-transform: none; letter-spacing: .02em; color: var(--ink); }
+    .winner-body p { font-size: 14.5px; line-height: 1.6; }
+    .winner-award { text-align: right; }
+    .winner-award .amount { font-size: 22px; font-weight: 660; color: var(--ink); letter-spacing: -.02em; }
+    .winner-award .amount span { color: var(--muted); font-size: 12px; font-weight: 500; }
+    .winner-award .view { display: inline-block; margin-top: 12px; font-size: 11px; color: var(--green); border-bottom: 1px solid rgba(185, 239, 119, .3); padding-bottom: 2px; }
+
+    /* generic cards */
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: clamp(28px, 4vw, 44px); }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: clamp(28px, 4vw, 44px); }
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 26px 24px; }
+    .card h3 { font-size: 19px; margin-bottom: 10px; }
+    .card p { font-size: 14px; line-height: 1.62; }
+    .card .kicker { font-size: 9.5px; color: var(--green); margin-bottom: 14px; }
+
+    .open { border-color: rgba(125, 230, 209, .28); background: linear-gradient(180deg, rgba(125, 230, 209, .05), transparent 60%), var(--surface); }
+    .open .kicker { color: var(--teal); }
+
+    .mentions { border: 1px solid var(--line); border-radius: 16px; margin-top: clamp(28px, 4vw, 44px); overflow: hidden; }
+    .mention { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 20px; padding: 18px 24px; border-bottom: 1px solid var(--line); align-items: baseline; }
+    .mention:last-child { border-bottom: 0; }
+    .mention-id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--green); }
+    .mention-title { font-weight: 600; font-size: 15px; }
+    .mention p { font-size: 13.5px; margin-top: 5px; }
+
+    .cta {
+      margin-top: clamp(70px, 9vw, 116px);
+      border: 1px solid rgba(185, 239, 119, .28);
+      border-radius: 22px;
+      background: linear-gradient(160deg, rgba(185, 239, 119, .08), transparent 55%), var(--dark-panel);
+      padding: clamp(36px, 5vw, 62px);
+      text-align: center;
+    }
+    .cta h2 { max-width: 20ch; margin: 0 auto; }
+    .cta p { margin: 18px auto 0; max-width: 56ch; }
+    .cta .hero-actions { justify-content: center; }
+
+    footer { margin-top: clamp(70px, 9vw, 110px); border-top: 1px solid var(--line); padding: 34px 0 56px; }
+    .footer-grid { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; align-items: center; }
+    .footer-links { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+    .footer-links a:hover { color: var(--ink); }
+    .footer-note { font-size: 10px; color: var(--muted); }
+
+    @media (max-width: 900px) {
+      .stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid-3, .grid-2 { grid-template-columns: 1fr; }
+      .winner { grid-template-columns: 1fr; gap: 16px; padding: 24px 22px; }
+      .winner-award { text-align: left; }
+      .mention { grid-template-columns: 1fr; gap: 4px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="announcement">
+    <div class="shell">
+      <span class="pulse" aria-hidden="true"></span>
+      <strong>Proof of Creation · Results · 300 STX awarded</strong>
+      <span aria-hidden="true">·</span>
+      <span>Entries closed 31 July 2026</span>
+    </div>
+  </div>
+
+  <header class="site-header">
+    <div class="shell">
+      <div class="topbar">
+        <a class="brand" href="https://xtrata.xyz/" aria-label="Xtrata home">
+          <img class="brand-logo" src="/favicon.svg" alt="" />
+          <span class="brand-name">
+            <span class="brand-wordmark">XTRATA</span>
+            <span class="brand-tagline">Living on-chain objects, anchored to Bitcoin</span>
+          </span>
+        </a>
+        <div class="top-actions">
+          <a class="btn secondary small" href="https://xtrata.xyz/xplorer">Explore Xtrata</a>
+          <a class="btn small" href="/inscribe">Inscribe yours</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- HERO -->
+    <section class="hero">
+      <div class="shell">
+        <p class="eyebrow mono">Proof of Creation · Xtrata × Zero Authority DAO</p>
+        <h1>The first masterpieces<br />are <em>on-chain</em>.</h1>
+        <p class="hero-lede">
+          We asked for original work, preserved permanently, with the story told out loud. Two dozen creators
+          answered. Every valid entry is now a living object anchored to Bitcoin, readable without a server,
+          a platform, or anyone's permission. Five of them share the 300 STX pool.
+        </p>
+        <div class="hero-actions">
+          <a class="btn" href="#winners">See the winners</a>
+          <a class="btn secondary" href="#keep-going">Inscribe something next</a>
+        </div>
+
+        <div class="stat-strip">
+          <div class="stat">
+            <div class="stat-value">25</div>
+            <div class="stat-label mono">Works inscribed</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">18</div>
+            <div class="stat-label mono">Creators</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">3.5<span style="font-size:.55em"> MB</span></div>
+            <div class="stat-label mono">Written to the chain</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">100<span style="font-size:.55em">%</span></div>
+            <div class="stat-label mono">Still readable, no host</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- WINNERS -->
+    <section class="section" id="winners">
+      <div class="shell">
+        <p class="eyebrow mono">The distribution · five equal awards</p>
+        <h2>Five winners. 60 STX each.</h2>
+        <p class="lede">
+          No first place and no runner-up. The pool splits evenly, because ranking creative work across
+          five different mediums was never going to be honest. Each of these is permanent, and each one
+          uses the chain for something the chain is actually good at.
+        </p>
+
+        <div class="winner-grid">
+
+          <article class="winner">
+            <div class="winner-token mono">
+              <strong><a class="token-link" href="https://xtrata.xyz/inscription/2897" aria-label="View inscription 2897">2897</a></strong>
+              Token
+            </div>
+            <div class="winner-body">
+              <h3>Keeper of Vanishing Words</h3>
+              <div class="winner-meta">
+                <span class="chip accent">Interactive HTML</span>
+                <span class="chip">31.7 KB</span>
+                <span class="chip">28 July</span>
+                <span class="chip mono">SP3PF8P0B6…288TJGTD4</span>
+              </div>
+              <p>
+                Six words from languages that are endangered, critically endangered, or almost gone. Each one
+                really is spoken aloud, by the browser's own voice, imperfectly, the way any voice learning a
+                word for the first time does. No server is involved in that, which is the point. The argument
+                underneath is the best case for this medium anyone made all month. For as long as language has
+                existed a word has needed a living mouth to survive, and the moment nobody is left to say it,
+                it goes quiet. For the first time a word can be carried by something that never dies of old age.
+              </p>
+            </div>
+            <div class="winner-award">
+              <div class="amount">60 <span>STX</span></div>
+              <a class="view" href="https://xtrata.xyz/inscription/2897">View inscription</a>
+            </div>
+          </article>
+
+          <article class="winner">
+            <div class="winner-token mono">
+              <strong><a class="token-link" href="https://xtrata.xyz/inscription/2899" aria-label="View inscription 2899">2899</a></strong>
+              Token
+            </div>
+            <div class="winner-body">
+              <h3>A Letter, Sealed</h3>
+              <div class="winner-meta">
+                <span class="chip accent">Interactive HTML</span>
+                <span class="chip">11.4 KB</span>
+                <span class="chip">28 July</span>
+                <span class="chip mono">SPPC6F6C2M…67JE06J4</span>
+              </div>
+              <p>
+                A letter written to a nine month old son, presented as a document waiting to be opened. The
+                reasoning is what earns it a place here. Memories get kinder to themselves with age, so
+                rather than leave a story that will soften, the writer left a fact that can be checked,
+                unchanged. The wax seal is drawn rather than enforced, and deliberately so. How you actually
+                seal something until a date arrives is left open, because there are many ways it might be
+                done and the good ones have probably not been invented yet. The piece states the wish and
+                leaves the method to whoever solves it. What is permanent today is the letter, which can no
+                longer be quietly edited or taken down.
+              </p>
+            </div>
+            <div class="winner-award">
+              <div class="amount">60 <span>STX</span></div>
+              <a class="view" href="https://xtrata.xyz/inscription/2899">View inscription</a>
+            </div>
+          </article>
+
+          <article class="winner">
+            <div class="winner-token mono">
+              <strong><a class="token-link" href="https://xtrata.xyz/inscription/2912" aria-label="View inscription 2912">2912</a></strong>
+              Token
+            </div>
+            <div class="winner-body">
+              <h3>What the Chain Remembers</h3>
+              <div class="winner-meta">
+                <span class="chip accent">Poem · HTML</span>
+                <span class="chip">27.2 KB</span>
+                <span class="chip">30 July</span>
+                <span class="chip mono">SP54RC8Z5T…EGDF71A</span>
+              </div>
+              <p>
+                Five parts, about a father's name receding the way a shoreline loses names to water it has
+                always known. It chooses the chisel over the pen, because a pen apologises for itself and
+                leaves room to be crossed out. Stone does not keep drafts. The fourth section makes the case
+                for distributed memory better than any explainer we have written. Ten thousand strangers
+                holding the same true copy of a single afternoon in July, and no fire finds all ten thousand
+                candles.
+              </p>
+            </div>
+            <div class="winner-award">
+              <div class="amount">60 <span>STX</span></div>
+              <a class="view" href="https://xtrata.xyz/inscription/2912">View inscription</a>
+            </div>
+          </article>
+
+          <article class="winner">
+            <div class="winner-token mono">
+              <strong><a class="token-link" href="https://xtrata.xyz/inscription/2824" aria-label="View inscription 2824">2824</a></strong>
+              Tokens
+              <span class="token-second">+ <a class="token-link" href="https://xtrata.xyz/inscription/2825" aria-label="View inscription 2825">2825</a></span>
+            </div>
+            <div class="winner-body">
+              <h3>The Architecture of Permanence</h3>
+              <div class="winner-meta">
+                <span class="chip accent">Essay · text and PDF</span>
+                <span class="chip">863 B + 8.6 KB</span>
+                <span class="chip">23 July</span>
+                <span class="chip mono">SP3B21HRFF…Y69XBX8</span>
+              </div>
+              <p>
+                The only entrant who inscribed the same work twice on purpose, once as raw text and once as
+                a typeset PDF, seven minutes apart. That is a real argument about preservation rather than a
+                decoration. One copy is the words with nothing around them, readable by anything that can
+                read bytes. The other is the words as the author wanted them set. The essay itself surveys
+                the same ground. Concrete settles, steel rusts, and time erodes the greatest of structures,
+                but a foundation alone is not a city, and it demands a superstructure. It is the only PDF in
+                the campaign, and nothing in it is staged or invented.
+              </p>
+            </div>
+            <div class="winner-award">
+              <div class="amount">60 <span>STX</span></div>
+              <a class="view" href="https://xtrata.xyz/inscription/2824">View inscription</a>
+            </div>
+          </article>
+
+          <article class="winner">
+            <div class="winner-token mono">
+              <strong><a class="token-link" href="https://xtrata.xyz/inscription/2920" aria-label="View inscription 2920">2920</a></strong>
+              Token
+            </div>
+            <div class="winner-body">
+              <h3>Muneeb the Builder</h3>
+              <div class="winner-meta">
+                <span class="chip accent">Image · JPEG</span>
+                <span class="chip">1.76 MB · 113 chunks</span>
+                <span class="chip">30 July</span>
+                <span class="chip mono">SP23BQZ3RN…4KJGDKMX</span>
+              </div>
+              <p>
+                A character portrait of the builder, in armour, rendered at full resolution and put on-chain
+                without compromise. At 1.76 megabytes across 113 staged chunks this is by a wide margin the
+                heaviest thing anyone committed during the campaign, and the only entry that took the guided
+                Wizard all the way through a staged upload and seal. It is proof that the ceiling is a lot
+                higher than most people assume.
+              </p>
+            </div>
+            <div class="winner-award">
+              <div class="amount">60 <span>STX</span></div>
+              <a class="view" href="https://xtrata.xyz/inscription/2920">View inscription</a>
+            </div>
+          </article>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- WHAT HAPPENED -->
+    <section class="section" id="what-happened">
+      <div class="shell">
+        <p class="eyebrow mono">What actually happened</p>
+        <h2>Nobody submitted a pitch. They submitted proof.</h2>
+        <p class="lede">
+          That was the whole idea, and it held. There were no decks and no roadmaps. People made a thing,
+          put it somewhere it cannot be edited, and said why. Here is what the chain now holds.
+        </p>
+
+        <div class="grid-3">
+          <div class="card">
+            <p class="kicker mono">01 / The page is the artwork</p>
+            <h3>Ten self-contained web pieces</h3>
+            <p>
+              The largest single category was not images. It was HTML. Ten entries were complete interactive
+              works with their own canvas animation, their own audio, their own typography, no external
+              request of any kind. One of them declared in its own footer that it had been kept deliberately
+              light so it could genuinely live on-chain rather than just describe living on-chain. That is
+              the medium finding its own shape.
+            </p>
+          </div>
+          <div class="card">
+            <p class="kicker mono">02 / Small work counts</p>
+            <h3>From 25 bytes to 1.76 megabytes</h3>
+            <p>
+              The smallest entry was twenty five bytes long. The largest was seventy thousand times bigger.
+              Both are equally permanent and both cost less than a coffee. Six creators chose plain text and
+              nothing else, which turns out to be the purest form of the thing. Words, sealed, no wrapper.
+            </p>
+          </div>
+          <div class="card">
+            <p class="kicker mono">03 / Formats nobody expected</p>
+            <h3>PDF, SVG, and hand-written vector</h3>
+            <p>
+              Alongside the images and the essays we got a PDF of a typeset essay, and an original SVG
+              illustration written as vector source rather than exported as pixels. A blossom tree above
+              ground with a hexagonal block lattice for roots. Sixty kilobytes, infinitely scalable, and
+              it will render identically in a hundred years.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- WHAT THEY ASKED FOR -->
+    <section class="section" id="asked-for">
+      <div class="shell">
+        <p class="eyebrow mono">The most useful surprise</p>
+        <h2>Half the entries designed a product we have not built.</h2>
+        <p class="lede">
+          Something worth saying plainly. Several of the strongest entries are complete artworks that contain
+          an imagined interface. A button that says seal this letter. A field that says write one true
+          sentence. A prompt that asks which word you would not want lost. Press them and nothing leaves the
+          page, because none of these works connect to a wallet or a contract. They were never meant to.
+        </p>
+        <p class="lede">
+          We could treat that as a gap. We would rather treat it as a specification. When creators are handed
+          a permanent medium and asked what they want, and they independently draw the same three controls,
+          that is not a mistake in their work. That is a roadmap arriving unprompted, drawn by the people who
+          would use it.
+        </p>
+
+        <div class="grid-3">
+          <div class="card">
+            <p class="kicker mono">Requested / 01</p>
+            <h3>Let a reader add to a work</h3>
+            <p>
+              Three separate entries built an input box inviting the visitor to contribute a sentence, a word,
+              or a memory. Nobody could wire it up, because a page cannot mint on someone else's behalf today.
+              A child inscription written by a reader and pointing at the parent is exactly what recursion is
+              for, and it is the single most requested thing in the whole campaign.
+            </p>
+          </div>
+          <div class="card">
+            <p class="kicker mono">Requested / 02</p>
+            <h3>A letter that opens on a date</h3>
+            <p>
+              The most affecting entry is built entirely around a lock that does not exist yet. A sealed
+              message with a stated opening date, unreadable until then. The entrant did not propose a
+              mechanism, and was right not to. Encryption with a released key, a covenant, a delegated
+              opener, a social threshold. There are many routes and the good one may not be invented yet.
+              The demand is now on record, written by somebody with a reason.
+            </p>
+          </div>
+          <div class="card">
+            <p class="kicker mono">Requested / 03</p>
+            <h3>Show me my own proof</h3>
+            <p>
+              More than one entry drew its own receipt, a small panel stating what was inscribed and where it
+              lives. The Wizard already writes exactly that as a recursive child of every job it completes.
+              Creators clearly want it visible inside the artwork, not filed away beside it, and that is a
+              much smaller ask than it sounds.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- OPEN GROUND -->
+    <section class="section" id="open-ground">
+      <div class="shell">
+        <p class="eyebrow mono">Open ground</p>
+        <h2>Two whole territories are still empty.</h2>
+        <p class="lede">
+          This is the most useful thing the campaign told us, and we are saying it plainly rather than
+          quietly. Two of the most powerful things Xtrata can do went almost entirely unclaimed. If you
+          are looking for where to plant a flag, it is right here.
+        </p>
+
+        <div class="grid-2">
+          <div class="card open">
+            <p class="kicker mono">Unclaimed / 01</p>
+            <h3>Nobody inscribed music.</h3>
+            <p>
+              Not one entrant put a track on-chain. The path is built and proven. A single self-contained
+              HTML player, embedded Opus audio, cover art, transport controls, the whole thing sealed as one
+              object that plays in any browser with no streaming service behind it. We ran multi-megabyte
+              songs through it during the campaign and they work. The first person to inscribe a real
+              original track through Xtrata will be the first person to have done it. That is a
+              one-time-only position.
+            </p>
+          </div>
+          <div class="card open">
+            <p class="kicker mono">Unclaimed / 02</p>
+            <h3>Almost nobody used recursion.</h3>
+            <p>
+              Every entry stood alone. Xtrata objects can name parents, declare dependencies, and build on
+              inscriptions that already exist, including inscriptions made by other people. During the whole
+              campaign the only recursive objects created were the receipts the Wizard writes automatically,
+              each one a child that points at the work it paid for. Not a single entrant reached for it on
+              purpose. Remix, response, sequel, annotation, a cover version that cites the original as its
+              parent. All of it is sitting there unused.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HONOURABLE MENTIONS -->
+    <section class="section" id="mentions">
+      <div class="shell">
+        <p class="eyebrow mono">Also on the record</p>
+        <h2>Work we did not want to leave unmentioned.</h2>
+        <p class="lede">
+          Five awards is five awards, but the pool was the smallest part of this. Every one of these is
+          permanent, and every one of them is worth opening.
+        </p>
+
+        <div class="mentions">
+          <div class="mention">
+            <div class="mention-id"><a class="token-link" href="https://xtrata.xyz/inscription/2902" aria-label="View inscription 2902">2902</a></div>
+            <div>
+              <div class="mention-title">Inscription №000001</div>
+              <p>Cursor movement carves glowing lines into stone, and the carving is real. Four stages, sediment to pressure to stratum to bedrock, mapping geology onto consensus better than any diagram we have drawn.</p>
+            </div>
+          </div>
+          <div class="mention">
+            <div class="mention-id"><a class="token-link" href="https://xtrata.xyz/inscription/2894" aria-label="View inscription 2894">2894</a></div>
+            <div>
+              <div class="mention-title">Echoes of Humanity</div>
+              <p>A starfield of 260 particles, generated audio, and narration that arrives one line at a time. Before history, there were ideas. Every civilisation began with one creation.</p>
+            </div>
+          </div>
+          <div class="mention">
+            <div class="mention-id"><a class="token-link" href="https://xtrata.xyz/inscription/2919" aria-label="View inscription 2919">2919</a></div>
+            <div>
+              <div class="mention-title">What the Chain Remembers (illustration)</div>
+              <p>Hand-authored SVG. A blossoming tree under a crescent moon, rooted in a lattice of hexagonal blocks. Vector source, not an export.</p>
+            </div>
+          </div>
+          <div class="mention">
+            <div class="mention-id"><a class="token-link" href="https://xtrata.xyz/inscription/2916" aria-label="View inscription 2916">2916</a></div>
+            <div>
+              <div class="mention-title">Your Thought, A Wordless Echo</div>
+              <p>An original poem about the crowd you create inside your own head, typeset and inscribed whole. A thousand versions of you pacing the floor.</p>
+            </div>
+          </div>
+          <div class="mention">
+            <div class="mention-id"><a class="token-link" href="https://xtrata.xyz/inscription/2826" aria-label="View inscription 2826">2826</a></div>
+            <div>
+              <div class="mention-title">What Survives</div>
+              <p>The first serious entry of the campaign, four days after the page went up. What survives is not what is loud, it is what is written down. Signed inside the file by @aminuabkrr, so the credit is part of the record.</p>
+            </div>
+          </div>
+          <div class="mention">
+            <div class="mention-id"><a class="token-link" href="https://xtrata.xyz/inscription/2915" aria-label="View inscription 2915">2915</a></div>
+            <div>
+              <div class="mention-title">Most things online are rented</div>
+              <p>Two hundred and twenty one bytes, and the sharpest line of the campaign. No IPFS, no pinning service, no admin key. If you are reading this years from now, it worked.</p>
+            </div>
+          </div>
+          <div class="mention">
+            <div class="mention-id"><a class="token-link" href="https://xtrata.xyz/inscription/2901" aria-label="View inscription 2901">2901</a></div>
+            <div>
+              <div class="mention-title">A builder was here</div>
+              <p>Not chasing hype, not following crowds. Proof lasts longer than promises, and consistency outlives talent.</p>
+            </div>
+          </div>
+          <div class="mention">
+            <div class="mention-id"><a class="token-link" href="https://xtrata.xyz/inscription/2874" aria-label="View inscription 2874">2874</a></div>
+            <div>
+              <div class="mention-title">Character study</div>
+              <p>The campaign's only entry from a named Stacks identity, and a reminder that permanence does not have to be solemn.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="section" id="keep-going">
+      <div class="shell">
+        <div class="cta">
+          <p class="eyebrow mono">The door did not close</p>
+          <h2>The bounty ended. The archive did not.</h2>
+          <p>
+            Nothing about inscribing depended on the prize. A single file up to 512 KB still mints in one
+            transaction on the Create page, and anything larger, or a folder, or a whole collection, still
+            goes through the guided Wizard. It costs less than you think and it lasts longer than anything
+            else you will publish this year.
+          </p>
+          <p>
+            Make something. Seal it. Tell people why. If it is music or if it builds on somebody else's
+            work, you will be first.
+          </p>
+          <div class="hero-actions">
+            <a class="btn" href="/inscribe">Create an inscription</a>
+            <a class="btn secondary" href="/wizard/">Open the Wizard</a>
+            <a class="btn secondary" href="https://t.me/+CCH5BtGV78g1Mjhk">Join the Telegram</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="shell footer-grid">
+      <div>
+        <div class="brand-wordmark">XTRATA</div>
+        <p class="footer-note" style="margin-top:8px">
+          Proof of Creation ran 17 to 31 July 2026. Sponsored by Zero Authority DAO · Built on Stacks · Anchored to Bitcoin
+        </p>
+      </div>
+      <div class="footer-links">
+        <a href="https://xtrata.xyz/">Xtrata</a>
+        <a href="https://xtrata.xyz/xplorer">Explore</a>
+        <a href="/proofzero/">Campaign page</a>
+        <a href="https://t.me/+CCH5BtGV78g1Mjhk">Telegram</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
