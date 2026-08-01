@@ -11030,6 +11030,45 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       return summary;
     };
 
+    /**
+     * The Xtrata core's built-in placeholder, as it comes back from
+     * `get-svg-data-uri`.
+     *
+     * Verified against xtrata-v3.2.3.clar: the function is
+     *
+     *     (if (is-some (nft-get-owner? xtrata-inscription id))
+     *       (ok (some (concat SVG-DATAURI-PREFIX SVG-STATIC-B64)))
+     *       (ok none))
+     *
+     * — a constant for every token that exists, and identical across v1.1
+     * through v3.4. It answers "does this id exist", not "what does it look
+     * like".
+     *
+     * Matched on three marks in the DECODED svg rather than on the base64,
+     * because base64 of the same bytes can differ by padding or line breaks
+     * while the decoded text cannot. Three marks and not one, so a coincidental
+     * 50x50 viewBox somewhere else is not enough to be mistaken for it.
+     */
+    const isPlaceholderSvgDataUri = (dataUri) => {
+      if (typeof dataUri !== 'string') return false;
+      const base64 = dataUri.split(',')[1] ?? '';
+      if (!base64) return false;
+      // Compare on the decoded text: base64 of the same bytes can differ by
+      // padding or line breaks, and the decoded form is what a reader would
+      // actually recognise.
+      let decoded;
+      try {
+        decoded = atob(base64);
+      } catch {
+        return false;
+      }
+      return (
+        decoded.includes("viewBox='0 0 50 50'") &&
+        decoded.includes("cx='25' cy='25' r='20'") &&
+        decoded.includes("#6366f1")
+      );
+    };
+
     const MARKET_MEDIA_MAX_BYTES = 512n * 1024n;
     const MARKET_REMOTE_THUMBNAIL_MAX_BYTES = 5 * 1024 * 1024;
 
@@ -11145,7 +11184,21 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         const fetchable =
           meta && meta.totalSize > 0n && meta.totalSize <= MARKET_MEDIA_MAX_BYTES;
 
-        if (kind === 'image' && fetchable && mime.includes('svg')) {
+        // `getMediaKind` returns 'svg' for image/svg+xml and 'image' only for
+        // the raster types, so the two are DISJOINT. This branch used to read
+        // `kind === 'image' && mime.includes('svg')`, which cannot ever be
+        // true: any mime containing "svg" classifies as 'svg', never 'image'.
+        //
+        // The whole on-chain SVG path was therefore dead. Every SVG listing
+        // fell through to the `summary.svgDataUri` fallback below, which is the
+        // core contract's SVG-STATIC constant — the same generic three-circle
+        // device for every token. Twenty-four distinct pixel-art plates all
+        // rendered as identical concentric circles, and the page made one
+        // get-chunk call across twenty-five listings instead of twenty-five.
+        //
+        // Every other renderer in this file already writes
+        // `kind === 'image' || kind === 'svg'`. This was the only one that did not.
+        if (kind === 'svg' && fetchable) {
           // On-chain SVG: script-driven animations need a real document.
           const bytes = await marketFetchContent(listing, meta);
           const text = new TextDecoder().decode(bytes);
@@ -11182,7 +11235,19 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         }
 
         // Fallbacks: inline SVG data URI from the summary, then token-URI image.
-        if (!media && summary?.svgDataUri) {
+        //
+        // The svgDataUri one is skipped when it is the core's placeholder.
+        // `get-svg-data-uri` on an Xtrata core returns a CONSTANT — the same
+        // three-circle SVG-STATIC device for every token that exists — so it is
+        // an existence probe wearing the costume of artwork. Rendering it says
+        // "this is the inscription" about something that is the same for all of
+        // them, which is a worse answer than "no preview": one is an absence,
+        // the other is a confident wrong picture.
+        //
+        // Still tried for anything that is NOT that constant, because
+        // fetchTokenSummary is generic and another contract's svgDataUri may
+        // well be the real thing.
+        if (!media && summary?.svgDataUri && !isPlaceholderSvgDataUri(summary.svgDataUri)) {
           media = { kind: 'image', url: summary.svgDataUri };
         }
         if (!media && summary?.tokenUri) {
