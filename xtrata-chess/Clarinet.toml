@@ -1,0 +1,16 @@
+[project]
+name = "xtrata-chess"
+description = "Append-only chess move log for the open Xtrata board"
+authors = ["Xtrata"]
+telemetry = false
+cache_dir = ".cache"
+requirements = []
+
+[contracts.xtrata-chess-log-v1]
+path = "contracts/xtrata-chess-log-v1.clar"
+clarity_version = 3
+epoch = "latest"
+
+[repl.analysis]
+passes = ["check_checker"]
+check_checker = { trusted_sender = false, trusted_caller = false, callee_filter = false }
