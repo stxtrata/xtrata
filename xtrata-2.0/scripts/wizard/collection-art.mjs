@@ -10,37 +10,53 @@
  * Pure. No network, no clock, no Math.random, no chain read. `renderPiece(n)`
  * is a function of `n` and nothing else.
  *
- * Rules enforced here:
+ * The rules are no longer stated here. They are enforced in `collection-kit.mjs`
+ * for all three collections at once — 16x16, integer coordinates, four flat
+ * colours, `crispEdges`, no gradient, deterministic from the index, the honesty
+ * line in every `<desc>`, one chunk — because three copies of a rule is two
+ * chances for one collection to quietly stop obeying it. What is left in this
+ * file is the Builder's reading: eight subjects drawn as solid mechanical
+ * objects, and eight captions that are funny only where they are literal.
  *
- *   1. Under one 16,384-byte chunk. Same gate as the corpus, delegated to
- *      compose.mjs rather than restated, because two implementations of "does
- *      this fit" is one too many. Crossing the boundary silently moves the mint
- *      onto the two-chunk cost path.
- *   2. Deterministic from the index alone. Deliberately *stronger* than the
- *      corpus, which cannot manage it: a corpus entry names the block it was
- *      written at, so re-composing it later produces different bytes and a
- *      different hash. A plate names no block and no cost. That makes
- *      `get-id-by-hash` a permanently decisive probe for these files — a
- *      crashed run can always ask the chain again, forever, and get an answer.
- *      It is also why nothing here reads the chain: a plate that quoted its own
- *      fee would forfeit the property to say something the chain already says
- *      next to the transaction that carried it.
- *   3. Honest. The disclosure in every `<desc>` is `HONESTY_PREAMBLE`, imported
- *      verbatim from personas.mjs. It is the one claim in this corpus that must
- *      never drift, and a second copy of the wording is a second thing to drift.
- *   4. Genuinely pixel art. A fixed 16x16 grid, integer coordinates, four flat
- *      colours, `shape-rendering="crispEdges"`, no gradient and no blur. It
- *      reads as pixel art at any zoom because it is pixel art at every zoom.
+ * The other two readings of the same eight subjects are in
+ * `collection-keeping.mjs` (the Archivist, on what survives and at what price)
+ * and `collection-omission.mjs` (the Skeptic, on what a hash cannot hold).
  *
  * On 16x16: chosen because the chunk is 16 KiB and the rhyme was available. It
  * is not a technical constraint and pretending otherwise would be the exact
  * failure the Skeptic keeps naming, so the manifest says so in as many words.
  */
 
-import { HONESTY_PREAMBLE, getPersona } from './personas.mjs';
-import { CORE_CONTRACT, WizardComposeError, assertFitsOneChunk, byteLength, groupDigits } from './compose.mjs';
+import {
+  COLLECTION_LENGTH as KIT_LENGTH,
+  COLLECTION_MIME as KIT_MIME,
+  CORE_CONTRACT,
+  GRID,
+  HONESTY_PREAMBLE,
+  MINT_COST_USTX,
+  RENDER_PX,
+  WizardComposeError,
+  assertGrid as assertGridWith,
+  assertPieceFitsOneChunk,
+  byteLength,
+  defineCollection,
+  frontMatter,
+  groupDigits,
+  rectsFor,
+  xmlText
+} from './collection-kit.mjs';
 
-export { CORE_CONTRACT, HONESTY_PREAMBLE, WizardComposeError, byteLength };
+export {
+  CORE_CONTRACT,
+  GRID,
+  HONESTY_PREAMBLE,
+  RENDER_PX,
+  WizardComposeError,
+  assertPieceFitsOneChunk,
+  byteLength,
+  rectsFor,
+  xmlText
+};
 
 /** Stable identity for the collection. Written into every `<desc>`. */
 export const COLLECTION_ID = 'c-machinery-001';
@@ -53,23 +69,17 @@ export const COLLECTION_SLUG = 'machinery';
 export const COLLECTION_WIZARD = 'builder';
 
 /** Mime for a plate. Not text/markdown, which is the only thing the corpus mints. */
-export const COLLECTION_MIME = 'image/svg+xml';
-
-/** The drawing grid. Every coordinate in every plate is an integer in [0, 16]. */
-export const GRID = 16;
-
-/**
- * The `width`/`height` the plate declares. The viewBox is the grid, so this is
- * only a default display size; a gallery that ignores it and scales the SVG
- * gets identical pixels, because there is nothing in here that resolves
- * differently at a different scale.
- */
-export const RENDER_PX = 512;
+export const COLLECTION_MIME = KIT_MIME;
 
 /**
  * Four flat colours and no fifth. A gradient would not survive being called
  * pixel art, and a palette that needed explaining would be a palette chosen for
  * the wrong reason.
+ *
+ * The Builder draws things as objects: solid bodies, hard edges, one orange for
+ * the part that costs or commits. The other two collections read the same eight
+ * subjects and neither of them may use this palette, which is asserted by test
+ * rather than left to taste.
  */
 export const PALETTE = {
   '.': '#101418',
@@ -81,29 +91,8 @@ export const PALETTE = {
 /** Drawn in this order, so a plate's bytes do not depend on object key order. */
 export const LAYER_ORDER = ['+', '#', '*'];
 
-/**
- * Every grid is 16 rows of 16 characters drawn from the palette. Checked at
- * import rather than at render: a malformed plate should be impossible to load,
- * not merely impossible to mint.
- */
-export function assertGrid(rows, label = 'piece') {
-  if (!Array.isArray(rows) || rows.length !== GRID) {
-    throw new WizardComposeError(`${label} must be ${GRID} rows, got ${Array.isArray(rows) ? rows.length : typeof rows}`);
-  }
-  for (const [index, row] of rows.entries()) {
-    if (typeof row !== 'string' || row.length !== GRID) {
-      throw new WizardComposeError(
-        `${label} row ${index} must be ${GRID} characters, got ${typeof row === 'string' ? row.length : typeof row}`
-      );
-    }
-    for (const character of row) {
-      if (!(character in PALETTE)) {
-        throw new WizardComposeError(`${label} row ${index} uses "${character}", which is not in the palette`);
-      }
-    }
-  }
-  return rows;
-}
+/** The Builder's grid check, bound to the Builder's palette. */
+export const assertGrid = (rows, label = 'piece') => assertGridWith(rows, PALETTE, label);
 
 /* ------------------------------------------------------------------ */
 /* the plates                                                          */
@@ -115,6 +104,9 @@ export function assertGrid(rows, label = 'piece') {
  * sealed, the seal may carry a dependency, the transaction is signed at a
  * nonce, it carries a miner fee and a post-condition, and if the result is ever
  * listed it goes into escrow.
+ *
+ * These eight are the substrate all three collections share. The subjects do
+ * not move; only the reading of them does.
  *
  * `caption` becomes `<title>` and is the deadpan line. `depicts` and `note`
  * become `<desc>`, which is where a plate says which collection it belongs to,
@@ -345,166 +337,46 @@ export const PIECES = [
   }
 ];
 
-for (const piece of PIECES) assertGrid(piece.grid, `piece ${piece.index} (${piece.id})`);
-
-export const COLLECTION_LENGTH = PIECES.length;
-export const PIECE_INDEXES = PIECES.map((piece) => piece.index);
-export const PIECE_IDS = PIECES.map((piece) => piece.id);
-
-const BY_INDEX = new Map(PIECES.map((piece) => [piece.index, piece]));
-
-/** Resolve a 1-based piece index. Refuses anything that is not one of them. */
-export function getPiece(index) {
-  const key = Number(index);
-  const piece = BY_INDEX.get(key);
-  if (!piece) {
-    throw new WizardComposeError(
-      `"${index}" is not a piece in ${COLLECTION_TITLE}. Pieces are ${PIECE_INDEXES.join(', ')}.`
-    );
-  }
-  return piece;
-}
-
 /* ------------------------------------------------------------------ */
-/* rendering                                                           */
+/* the price                                                           */
 /* ------------------------------------------------------------------ */
 
 /**
- * Maximal rectangles for one colour, greedily, in a fixed scan order.
+ * The Builder prices at cost, because cost is the only number it can compute.
  *
- * One `<rect>` per pixel would be 256 of them per plate and would still be
- * pixel art, just wasteful pixel art on a medium that charges by the chunk. So
- * each run is extended right as far as it goes and then down as far as an
- * identical free run continues. Scan order is top-to-bottom, left-to-right and
- * never varies, which is what makes the output byte-stable.
- */
-export function rectsFor(rows, character) {
-  const filled = rows.map((row) => [...row].map((cell) => cell === character));
-  const used = rows.map(() => new Array(GRID).fill(false));
-  const rects = [];
-
-  for (let y = 0; y < GRID; y += 1) {
-    for (let x = 0; x < GRID; x += 1) {
-      if (!filled[y][x] || used[y][x]) continue;
-
-      let width = 1;
-      while (x + width < GRID && filled[y][x + width] && !used[y][x + width]) width += 1;
-
-      let height = 1;
-      for (;;) {
-        const next = y + height;
-        if (next >= GRID) break;
-        let matches = true;
-        for (let offset = 0; offset < width; offset += 1) {
-          if (!filled[next][x + offset] || used[next][x + offset]) {
-            matches = false;
-            break;
-          }
-        }
-        if (!matches) break;
-        height += 1;
-      }
-
-      for (let row = y; row < y + height; row += 1) {
-        for (let column = x; column < x + width; column += 1) used[row][column] = true;
-      }
-      rects.push({ x, y, width, height });
-    }
-  }
-  return rects;
-}
-
-/** Text content only. Attribute values here are generated, never user input. */
-export const xmlText = (value) =>
-  String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-/**
- * What a plate says about itself: which collection, which index, what it is a
- * picture of, how it was made, and the standing honesty note.
+ * A plate cost 11,000 microSTX of protocol fee and a miner bid capped at
+ * 30,000: call it 41,000. Listing it escrows another 50,000 of STX budget,
+ * refunded on a cancel and mostly refunded on a sale. That is 91,000 microSTX
+ * of outlay per plate, all of it measurable, none of it a judgement.
  *
- * No block height and no cost, unlike a corpus entry. That is the trade this
- * collection makes and the reason it can promise byte-reproducibility from the
- * index alone.
- */
-export function describePiece(index) {
-  const piece = getPiece(index);
-  const persona = getPersona(COLLECTION_WIZARD);
-  return (
-    `${COLLECTION_TITLE}, piece ${piece.index} of ${COLLECTION_LENGTH}: ${piece.depicts}. ${piece.note} ` +
-    `Collection ${COLLECTION_ID}, conceived and drawn by ${persona.name}. ` +
-    `${GRID} by ${GRID} pixels, integer coordinates, four flat colours, no gradient and no blur. These bytes ` +
-    'are a function of the piece index alone, so this file can be reproduced without reading the chain and ' +
-    `compared to what the chain holds. ${HONESTY_PREAMBLE}`
-  );
-}
-
-/**
- * The single hard size gate, delegated to the corpus engine so there is one
- * implementation of the 16,384-byte rule in this directory.
+ * 750,000 microSTX is that outlay times eight, rounded to something a person can
+ * read. The multiple covers the mint, the escrowed budget, the market's cut and
+ * the second miner fee a sale costs, and leaves roughly half as the only part of
+ * the number that is not arithmetic. Pricing at cost is not modesty. It is the
+ * only price I can defend from the implementation side, and a price I could not
+ * defend would be the one claim in this collection that is not checkable.
  *
- * The gate is the chunk boundary and not the much smaller size these plates
- * actually come out at, because the chunk boundary is the thing that costs
- * money. That a plate stays near 2 KB is a property worth having and is
- * asserted by test, where a number that has to be revised is cheap.
+ * The manifest is twice a plate because it is the only file that has to be
+ * verified against eight others before it can be signed, and that verification
+ * is work the buyer does not have to repeat. Two, not eight: the list is one
+ * file and pricing it at the sum of its members would be pricing the members
+ * twice.
  */
-export function assertPieceFitsOneChunk(svg, label = 'piece') {
-  return assertFitsOneChunk(svg, label);
-}
-
-/**
- * One plate, as exact bytes.
- *
- * Deterministic: seeded by the index and by nothing else. No clock, no
- * randomness, no chain read, no environment.
- */
-export function renderPiece(index) {
-  const piece = getPiece(index);
-  const titleId = `${COLLECTION_SLUG}-${piece.index}-title`;
-  const descId = `${COLLECTION_SLUG}-${piece.index}-desc`;
-
-  const lines = [
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${GRID} ${GRID}" width="${RENDER_PX}" height="${RENDER_PX}" ` +
-      `shape-rendering="crispEdges" role="img" aria-labelledby="${titleId} ${descId}">`,
-    `<title id="${titleId}">${xmlText(piece.caption)}</title>`,
-    `<desc id="${descId}">${xmlText(describePiece(piece.index))}</desc>`,
-    `<rect width="${GRID}" height="${GRID}" fill="${PALETTE['.']}"/>`
-  ];
-
-  for (const character of LAYER_ORDER) {
-    const rects = rectsFor(piece.grid, character);
-    if (rects.length === 0) continue;
-    lines.push(`<g fill="${PALETTE[character]}">`);
-    for (const rect of rects) {
-      lines.push(`<rect x="${rect.x}" y="${rect.y}" width="${rect.width}" height="${rect.height}"/>`);
-    }
-    lines.push('</g>');
-  }
-  lines.push('</svg>');
-
-  const svg = `${lines.join('\n')}\n`;
-  assertPieceFitsOneChunk(svg, `piece ${piece.index} (${piece.id}) of ${COLLECTION_ID}`);
-  return svg;
-}
-
-/** Every plate, in index order. Convenience for previews and for tests. */
-export const renderCollection = () =>
-  PIECES.map((piece) => ({
-    index: piece.index,
-    id: piece.id,
-    caption: piece.caption,
-    svg: renderPiece(piece.index),
-    bytes: byteLength(renderPiece(piece.index))
-  }));
+export const PRICING = {
+  pieceUstx: 750_000n,
+  manifestUstx: 1_500_000n,
+  reasoning:
+    'Cost, plus arithmetic. A plate cost 41,000 microSTX to mint and escrows 50,000 more to list, so 750,000 is ' +
+    'that outlay times eight with the rounding visible. The manifest is twice a plate because it is the one file ' +
+    'that had to be checked against eight others before it could be signed.'
+};
 
 /* ------------------------------------------------------------------ */
-/* the closing manifest                                                */
+/* the collection                                                      */
 /* ------------------------------------------------------------------ */
 
-const frontMatter = (rows) =>
-  ['---', ...rows.map(([key, value]) => `${key}: ${value}`), '---'].join('\n');
-
 /**
- * The manifest: markdown, minted last, with every member as a dependency.
+ * The closing manifest, in the Builder's voice.
  *
  * It follows composeThreadManifest's shape and its one hard lesson. The thread
  * manifest originally told readers to start at the lowest id and follow the
@@ -517,51 +389,8 @@ const frontMatter = (rows) =>
  * cost, so re-composing it after a crash produces the same bytes and the same
  * hash. The thread manifest cannot do that, and pays for it with a crash window
  * that only a human can close.
- *
- * @param {object} input
- * @param {string} input.collectionId
- * @param {Array<{index: number, id: string|number}>} input.members
- * @returns {string} markdown body, guaranteed under one chunk
  */
-export function composeCollectionManifest({
-  collectionId = COLLECTION_ID,
-  members = [],
-  collectionLength = COLLECTION_LENGTH
-} = {}) {
-  if (!collectionId || typeof collectionId !== 'string') {
-    throw new WizardComposeError('collectionId is required and must be a string');
-  }
-  if (!Array.isArray(members) || members.length === 0) {
-    throw new WizardComposeError('a manifest needs at least one member');
-  }
-  // A manifest closes a finished collection. Refusing a short one keeps a
-  // crashed run from publishing a permanent list of a collection that is not
-  // all there, with no way to add the rest afterwards.
-  if (collectionLength !== null && collectionLength !== undefined && members.length !== Number(collectionLength)) {
-    throw new WizardComposeError(
-      `manifest has ${members.length} members but ${collectionId} is ${collectionLength} pieces. ` +
-        'A manifest closes a complete collection.'
-    );
-  }
-
-  const persona = getPersona(COLLECTION_WIZARD);
-  const rows = members.map((member) => {
-    const id = String(member?.id ?? '').trim();
-    if (!id) throw new WizardComposeError('every manifest member needs an inscription id');
-    // The piece the id is claimed to be, resolved from the piece bank rather
-    // than from whatever the caller passed alongside it. A manifest that took
-    // the caller's word for which drawing an id holds could name the wrong one.
-    return { id, piece: getPiece(member?.index) };
-  });
-
-  const seen = new Set();
-  for (const row of rows) {
-    if (seen.has(row.piece.index)) {
-      throw new WizardComposeError(`piece ${row.piece.index} is listed twice in the manifest for ${collectionId}`);
-    }
-    seen.add(row.piece.index);
-  }
-
+const machineryManifest = ({ collectionId, rows, persona, price }) => {
   const head = frontMatter([
     ['xtrata-wizard-corpus', '1'],
     ['record', 'collection-manifest'],
@@ -573,6 +402,7 @@ export function composeCollectionManifest({
     ['wizard', persona.id],
     ['wizard-name', persona.name],
     ['grid', `${GRID}x${GRID}`],
+    ['ask-ustx', String(price.pieceUstx)],
     ['core', CORE_CONTRACT]
   ]);
 
@@ -636,6 +466,29 @@ export function composeCollectionManifest({
   );
   lines.push('');
 
+  lines.push('## The price');
+  lines.push('');
+  lines.push(
+    `Each plate is offered at ${groupDigits(price.pieceUstx)} microSTX and this list at ` +
+      `${groupDigits(price.manifestUstx)}. That is cost plus arithmetic and nothing else. A plate cost ` +
+      `${groupDigits(MINT_COST_USTX)} microSTX to mint — 11,000 of protocol fee at the current schedule plus a ` +
+      'miner bid capped at 30,000 — and listing it escrows 50,000 more in STX, refunded on a cancel. 91,000 of ' +
+      'outlay, times eight, rounded to a number a person can read.'
+  );
+  lines.push('');
+  lines.push(
+    'The list is twice a plate because it is the only file here that had to be verified against eight others ' +
+      'before it could be signed, and that verification is work a buyer does not have to repeat. Twice and not ' +
+      'eight times: pricing the list at the sum of its members would be charging for the members again.'
+  );
+  lines.push('');
+  lines.push(
+    'Pricing at cost is not modesty. Every other number I could name would be a guess about what someone else ' +
+      'values, and I have no instrument for that. The fee schedule has already moved once in this system, so even ' +
+      'the arithmetic has a shelf life, which is stated here rather than discovered later.'
+  );
+  lines.push('');
+
   lines.push('## Standing note');
   lines.push('');
   lines.push(
@@ -644,20 +497,69 @@ export function composeCollectionManifest({
       'of a mechanism that is checkable against the contract source.'
   );
 
-  const body = `${lines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd()}\n`;
-  assertFitsOneChunk(body, `manifest for collection ${collectionId}`);
-  return body;
-}
+  return `${lines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd()}\n`;
+};
+
+/**
+ * The Builder's collection, bound.
+ *
+ * Every byte this produces is identical to what the single-collection version
+ * of this file produced, which is asserted against a stored baseline rather
+ * than assumed: eight of these are already on chain and a plate whose bytes
+ * moved would stop being findable by content hash.
+ */
+export const MACHINERY = defineCollection({
+  id: COLLECTION_ID,
+  title: COLLECTION_TITLE,
+  slug: COLLECTION_SLUG,
+  wizard: COLLECTION_WIZARD,
+  palette: PALETTE,
+  layerOrder: LAYER_ORDER,
+  pieces: PIECES,
+  pricing: PRICING,
+  blurb: ({ piece, title, length, id, persona }) =>
+    `${title}, piece ${piece.index} of ${length}: ${piece.depicts}. ${piece.note} ` +
+    `Collection ${id}, conceived and drawn by ${persona.name}.`,
+  manifest: machineryManifest,
+  concept: ({ id, title, length, persona }) =>
+    `${title} (${id}): ${length} pixel drawings of the parts of the mint path, conceived, generated and paid for ` +
+    `by ${persona.name}. ${GRID} by ${GRID}, four colours, one deadpan caption each, deterministic from the piece ` +
+    'index alone.'
+});
+
+/* ------------------------------------------------------------------ */
+/* the Builder-bound surface, unchanged                                */
+/* ------------------------------------------------------------------ */
+
+export const COLLECTION_LENGTH = KIT_LENGTH;
+export const PIECE_INDEXES = MACHINERY.pieceIndexes;
+export const PIECE_IDS = MACHINERY.pieceIds;
+
+/** Resolve a 1-based piece index. Refuses anything that is not one of them. */
+export const getPiece = (index) => MACHINERY.getPiece(index);
+
+/** What a plate says about itself. */
+export const describePiece = (index) => MACHINERY.describePiece(index);
+
+/**
+ * One plate, as exact bytes.
+ *
+ * Deterministic: seeded by the index and by nothing else. No clock, no
+ * randomness, no chain read, no environment.
+ */
+export const renderPiece = (index) => MACHINERY.renderPiece(index);
+
+/** Every plate, in index order. Convenience for previews and for tests. */
+export const renderCollection = () => MACHINERY.renderAll();
+
+/** The manifest: markdown, minted last, with every member as a dependency. */
+export const composeCollectionManifest = (input) => MACHINERY.composeManifest(input);
 
 /** The concept, in one paragraph, for a terminal or a README. */
-export const COLLECTION_CONCEPT =
-  `${COLLECTION_TITLE} (${COLLECTION_ID}): ${COLLECTION_LENGTH} pixel drawings of the parts of the mint path, ` +
-  `conceived, generated and paid for by ${getPersona(COLLECTION_WIZARD).name}. ${GRID} by ${GRID}, four colours, ` +
-  'one deadpan caption each, deterministic from the piece index alone.';
+export const COLLECTION_CONCEPT = MACHINERY.concept;
 
 /** A one-line summary per piece, for previews and the run report. */
-export const describeCollection = () =>
-  PIECES.map((piece) => {
-    const svg = renderPiece(piece.index);
-    return `  ${String(piece.index).padStart(2)}. ${piece.id.padEnd(16)} ${String(groupDigits(byteLength(svg))).padStart(6)} bytes  ${piece.caption}`;
-  });
+export const describeCollection = () => MACHINERY.describeLines();
+
+/** Kept exported because the cost arithmetic above is quoted in the README. */
+export { MINT_COST_USTX };

@@ -378,7 +378,14 @@ describe('the manifest', () => {
     expect(manifest()).toBe(manifest());
     expect(manifest()).not.toBe(manifest([1, 2, 3, 4, 5, 6, 7, 8]));
     expect(manifest()).not.toMatch(/\bblock \d/i);
-    expect(manifest()).not.toMatch(/microSTX/);
+    // The manifest does now quote microSTX, in the price section: an ask, and
+    // the arithmetic behind it. Both are constants in the generator, so the
+    // determinism above still holds. What must never appear is a number the
+    // chain decided at compose time, which is what the thread manifest quotes
+    // and what makes its bytes unreproducible.
+    expect(manifest()).toContain('750,000 microSTX');
+    expect(manifest()).not.toMatch(/protocol cost/i);
+    expect(manifest()).not.toMatch(/written (?:at|between) blocks?/i);
   });
 
   it('refuses a member list that is short, duplicated, or missing an id', () => {

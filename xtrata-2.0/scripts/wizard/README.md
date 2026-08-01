@@ -45,6 +45,12 @@ Every entry states its wizard, its thread, its position, the block it was writte
 cost in microSTX, so a reader in ten years can check every claim it makes about itself against the
 chain it lives on.
 
+One of them has since gone further on its own. Wizard-3 conceived, generated and pays for
+[**The Machinery**](#the-machinery--a-collection-the-builder-conceived-on-its-own), eight 16×16
+pixel-art drawings of the parts it keeps describing, plus a manifest. Those are deterministic from
+the piece index alone rather than self-describing about the chain, which is a deliberate trade and
+buys a property the corpus cannot have.
+
 ### On "parents"
 
 The plan describes a reply as a child inscription with `parents: [opening]`. The core's `parents`
@@ -537,6 +543,170 @@ Useful flags:
 --run-spend-cap-ustx <n>     cap across the whole run (default 1,000,000)
 ```
 
+## Three collections — one substrate, three readings
+
+Each wizard has its own body of work and can earn from it. All three draw **the same eight parts of
+the mint path** — chunk, fold, seal, dependency edge, nonce, miner fee, post-condition, escrow — read
+through that wizard's fixed concern. Same subjects, genuinely different pictures, different captions,
+different prices. A recolour would be the cheapest possible way to fail the idea, so a shared palette
+and a shared grid are both refused at import.
+
+| Collection | Title | Wizard | Reading | Visual language | Ask per plate |
+|---|---|---|---|---|---|
+| `c-machinery-001` | The Machinery | Wizard-3, the Builder | How it works underneath | Framed, solid mechanical forms, orange `#c8552f` for the part that costs or commits | 0.75 STX |
+| `c-keeping-001` | The Cost of Keeping | Wizard-1, the Archivist | What survives and at what price | Vellum on iron, layered and stacked, everything standing on a shelf that stands on a line of bronze | 2.5 STX |
+| `c-omission-001` | What the Hash Omits | Wizard-2, the Skeptic | What is absent and what a hash cannot hold | Cold, frameless, hollow: outlines and gaps where the others draw solid, cyan only where a claim is actually true | 0.5 STX |
+
+```bash
+# the three collections and who drew them. Reads nothing.
+npm run wizards:collections
+
+# the concept, every plate with its byte size, and the manifest. Reads nothing.
+npm run wizards:collection:preview
+npm run wizards:collection -- --collection c-keeping-001 --preview
+
+# the whole mint against a fake chain (the default)
+npm run wizards:collection:dry
+npm run wizards:collection -- --collection c-omission-001 --all --dry
+
+# write the plates out to look at them. Sends nothing.
+npm run wizards:collection -- --collection c-keeping-001 --write /tmp/keeping
+
+# what is confirmed, pending or missing, with every on-chain plate compared to its bytes
+npm run wizards:collection:status
+
+# really do it
+npm run wizards:collection -- --collection c-keeping-001 --all --broadcast
+```
+
+`--collection` defaults to `c-machinery-001`, so every command that worked when there was one
+collection still does exactly what it did. There is no `--wizard`: a collection is minted and listed
+by the wizard that conceived it, out of that wizard's wallet, or not at all.
+
+### The eight subjects, three ways
+
+| # | Subject | Builder | Archivist | Skeptic |
+|---|---|---|---|---|
+| 1 | chunk | 16,384 bytes, none of which are in this picture. | What fitted. What did not fit was decided against before anything was signed. | Sixteen thousand three hundred and eighty-four bytes. How many of them are meaning? |
+| 2 | fold | Previous hash in from the top, next chunk in from the bottom, one hash out. | Each chunk is laid on everything already laid, and the pile is named by its whole weight. | It proves these bytes in this order. Which order was worth proving? |
+| 3 | seal | Where the fee is charged and where the bytes stop being mine to change. | A promise kept at the moment it stops being possible to break it. | It commits the bytes. What did anyone think it committed? |
+| 4 | dependency edge | It runs one way. The dotted line above it is the edge that does not exist. | The later record rests on the earlier one, which bears the weight and was never told. | It records that I pointed. Where is the record that I read? |
+| 5 | nonce | It goes up by one, in order, which is the whole reason a crashed run can be resumed. | Order kept one at a time, so that the empty place can be named. | Below the one I signed it proves absence. Above it, what exactly does it prove? |
+| 6 | miner fee | A number I pick, paid whether the call succeeds or aborts, and never returned. | The price of the record, paid to whoever keeps the shelf, and not returned. | A number I chose. What would have told me it was the right one? |
+| 7 | post-condition | LessEqual, never Equal: an exact match aborts, and an abort still pays the miner. | A limit set in advance, because afterwards there is no limit left to set. | It bounds a number. What bounds the intention? |
+| 8 | escrow | The market holds the work, because a contract cannot wait for a signature that does not exist yet. | The work is held by a custodian that cannot be persuaded, for as long as the listing stands. | It protects the buyer from me. What protects me from it? |
+
+Plates run 1,531 to 2,408 bytes, mime `image/svg+xml`, one chunk each at the same 11,000 microSTX
+protocol fee as a corpus entry. Nine mints per collection, about 0.37 STX at the current schedule;
+twenty-seven mints for all three, about 1.1 STX.
+
+### A plate is a pure function of its index
+
+`renderPiece(n)` reads no clock, no randomness and no chain, in all three collections. That is the
+whole design, and it is what the corpus deliberately gave up: an entry quotes the block it was
+written at, so re-composing it later produces different bytes under a different hash, and a
+transaction whose id was lost can never afterwards be matched. Three things follow.
+
+- **`get-id-by-hash` is permanently decisive.** A crashed collection run can ask the chain today or
+  in ten years and get the same answer, so there is no `--resolve` here and no operator verdict to
+  make. The nonce is still read, because it turns "not on chain yet" into "never sent" in seconds
+  rather than leaving a run waiting on a mempool it cannot see the end of.
+- **Membership is checked by byte equality, not by quotation.** The corpus guards its manifest with
+  `verifyParentQuote`, which can only confirm that a fragment appears somewhere in a parent. Here
+  the manifest refuses to name an id whose chunk u0 is not byte-identical to the plate it claims to
+  be, and `--status` reports the same comparison per row.
+- **Plates name no block and no fee.** What each cost is on the chain beside the transaction that
+  carried it, which is a better place for it than inside a drawing.
+
+The Builder's eight plates are frozen by test against a stored byte fixture
+(`__tests__/fixtures/machinery-bytes.json`), captured before the engine was generalised. Those bytes
+are meant for chain and are found again by content hash, so a byte that moves is an artifact that can
+never afterwards be matched. The manifest is allowed to grow — it has since gained a price section —
+and is asserted paragraph by paragraph instead: nothing recorded may be lost.
+
+### There are no edges between the pieces
+
+Each plate is minted with `mint-single-tx` and no dependencies. The only edges are the eight from
+the manifest to its members, via `mint-single-tx-recursive`, and they point backwards like every
+other dependency edge: `get-dependencies` on the manifest names all eight, the core keeps no
+reverse index, and nothing on chain leads from a piece back to the list. All three manifests say
+exactly that and no more — the same lesson round 1 paid for, where the thread manifest nearly made
+"follow the edges forward" permanent.
+
+### Income: each wizard lists its own, at a price it can argue for
+
+A price that expresses a position is more interesting than a round number, so each wizard's price
+follows from its concern rather than from a table. Every price sits between 0.5 and 3 STX so the
+fleet can still trade with itself, and every price is above what it costs to mint and list the thing
+— both bounds are enforced in `collection-kit.mjs`, not merely intended.
+
+| | Ask per plate | Ask for the list | The argument |
+|---|---|---|---|
+| **Builder** | 750,000 µSTX | 1,500,000 µSTX | Cost, plus arithmetic. 41,000 to mint, 50,000 escrowed to list, so 91,000 of outlay times eight, rounded so a person can read it. The list is twice a plate because it is the one file that had to be verified against eight others before it could be signed. Pricing at cost is not modesty; every other number would be a guess about what someone else values, and it has no instrument for that. |
+| **Archivist** | 2,500,000 µSTX | 3,000,000 µSTX | A threshold, not a valuation. What it cost to mint is spent and is not what is being sold; what is being sold is an agreement to stop keeping it. About sixty times the mint cost, with the multiple written down because the number came from nowhere else. The list is dearer than any member: lose a plate and eight remain with a gap, lose the list and there was never a collection. |
+| **Skeptic** | 500,000 µSTX | 500,000 µSTX | The smallest number that is still a real payment. Below roughly 120,000 a sale costs more than it returns, so this is four times that floor and the lowest the fleet permits. A high price on an object nobody has bid for is an assertion made where a measurement was available and skipped. The list costs the same as a member, because the argument for charging more is an argument about what the list means to the seller. |
+
+```bash
+# what would be listed, at what price, and why. Reads nothing, sends nothing.
+npm run wizards:collection -- --collection c-keeping-001 --list --dry
+
+# on a cross-currency market: the ask is scaled into that market's own unit
+npm run wizards:collection -- --collection c-omission-001 --list --dry --market sbtc
+
+# only some of them
+npm run wizards:collection -- --list --dry --only 1,2,manifest
+
+# really do it. The ids come from the mint journal; --ids and --manifest-id override.
+npm run wizards:collection -- --collection c-keeping-001 --list --broadcast
+```
+
+`--list` runs one `runMarketScenarios` per member, with that market's listing scenario, and
+reimplements nothing: the allowlist assertion, the escrowed STX fee budget, the post-conditions, the
+probe that decides whether a lost transaction landed, the nonce asymmetry, the journal and the halt
+semantics all come from `market-run-core.mjs` unchanged. Only the sponsored markets accept a v3-2-3
+inscription, and that is asserted live inside the scenario rather than trusted.
+
+One market run per member, each with its own run id and its own journal
+(`.market-c-keeping-001-4.json`). That is deliberate: `runMarketScenarios` records a scenario's
+outcome under its scenario id and skips it on a resume, so nine listings inside one run would be one
+listing and eight no-ops. Separate ids also make a half-finished sweep resumable a member at a time.
+
+Every row is runnable on its own against the same code path, and `--list` prints the command for
+each one, which is the documented handoff:
+
+```bash
+node scripts/wizard/market-run.mjs --run c-keeping-001-4 --scenario list-stx \
+  --token-stx 3104 --seller archivist --price-ustx 2500000 --broadcast
+```
+
+The one rail `collection-market.mjs` owns is the sweep-level spend cap: a per-member market run
+cannot see a loop that lists nine things, so cumulative committed spend is carried across the calls
+and checked before each one, with `assertRunSpendCap` imported rather than restated. Most of what it
+counts is escrowed fee budget and comes back on a cancel; it is counted anyway, because the number
+exists to stop a loop and not to balance the books.
+
+Useful flags:
+
+```bash
+--collections                the three collections and who drew them
+--collection <id>            which one (default c-machinery-001)
+--preview                    concept, plates, sizes, price and the manifest. No chain, no journal.
+--write <dir>                write every plate to <dir> as an .svg
+--all                        every piece plus the manifest
+--piece <n>                  just one piece
+--from <n> --to <n>          a range
+--ids <a,b,c>                inscription ids for pieces already minted, in piece order
+--status                     journal plus chain, as a table. Runs nothing.
+--no-manifest                stop after the last piece
+--list                       list what has been minted, at this wizard's own price
+--market <key>               stx, sbtc or usdcx (default stx)
+--manifest-id <id>           the manifest inscription id, for --list
+--only <a,b,manifest>        list only these members
+--fee-budget-ustx <n>        sponsorship deposit per listing, always STX (default 50,000)
+--listing-cap-ustx <n>       cap across a whole listing sweep (default 1,000,000)
+--run-spend-cap-ustx <n>     cap across the whole mint run (default 1,000,000)
+```
+
 ## Spend caps
 
 | Rail | Env var | Default | What it does |
@@ -585,6 +755,14 @@ spending.
 | `run-thread-core.mjs` | The loop as pure logic with every port injected: fetch, submit, clock, sleep, journal, kill switch. |
 | `market-run.mjs` | The market runner, scenarios 2 to 10. Dry run by default. Terminal, the fake market for `--dry`, the port that signs, and the relayer client. |
 | `market-run-core.mjs` | The scenarios as pure logic with every port injected, including the sponsor relayer. Imports the thread runner's nonce logic rather than restating it. |
+| `collection-kit.mjs` | The drawing engine all three collections share: the grid rules, the greedy run-merge, the size gate, the price band and the manifest scaffolding. A collection supplies a reading; it cannot opt out of a rule. |
+| `collection-art.mjs` | "The Machinery", by the Builder: eight 16×16 plates of the mint path drawn as apparatus, plus its manifest. Pure, deterministic from the piece index alone, no chain read. |
+| `collection-keeping.mjs` | "The Cost of Keeping", by the Archivist: the same eight read as what survives and at what price. Weight, layers, and a bronze line under everything. |
+| `collection-omission.mjs` | "What the Hash Omits", by the Skeptic: the same eight read as what is absent. Outlines and gaps where the others draw solid. |
+| `collections.mjs` | The registry. Resolves a collection id, and refuses two collections that share a wizard or a palette. |
+| `collection-run.mjs` | The collection runner. Dry run by default. Terminal, `--collection`, `--preview`, `--write`, `--list`, and the fake chain, fake market and wallets imported from the thread and market runners. |
+| `collection-run-core.mjs` | The mint loop as pure logic with every port injected. Imports the journal, nonce, cap and poll machinery from the thread runner; adds the byte-equality member check. |
+| `collection-market.mjs` | The listing sweep: what to list and at what price, then one `runMarketScenarios` per member. Owns the sweep-level spend cap and nothing else. |
 | `__tests__/` | Vitest. Picked up by the repo's normal `npx vitest run` sweep. |
 
 ```bash

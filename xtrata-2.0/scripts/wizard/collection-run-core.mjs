@@ -101,19 +101,19 @@ import {
   COLLECTION_LENGTH,
   COLLECTION_MIME,
   COLLECTION_TITLE,
-  COLLECTION_WIZARD,
-  PIECES,
-  composeCollectionManifest,
-  getPiece,
-  renderPiece
+  COLLECTION_WIZARD
 } from './collection-art.mjs';
+import { COLLECTION_IDS, DEFAULT_COLLECTION_ID, getCollection } from './collections.mjs';
 
 export {
   COLLECTION_ID,
+  COLLECTION_IDS,
   COLLECTION_LENGTH,
   COLLECTION_MIME,
   COLLECTION_TITLE,
   COLLECTION_WIZARD,
+  DEFAULT_COLLECTION_ID,
+  getCollection,
   DEFAULT_CONFIRM_POLL_MS,
   DEFAULT_CONFIRM_TIMEOUT_MS,
   DEFAULT_HIRO_URL,
@@ -129,6 +129,18 @@ export {
 };
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Which collection a call is about.
+ *
+ * Every entry point below takes a `collectionId` and resolves it here, and the
+ * default is the Builder's, so a caller that names nothing gets exactly the
+ * behaviour this file had when there was only one collection to have. Passing
+ * an id that is not one of the three throws rather than quietly rendering
+ * somebody else's plates under it, which would put the wrong drawing on chain
+ * under the right name.
+ */
+const artFor = (collectionId) => getCollection(collectionId ?? DEFAULT_COLLECTION_ID);
 
 const errorMessage = (error) => (error instanceof Error ? error.message : String(error));
 const iso = (ms) => new Date(ms).toISOString();
@@ -209,19 +221,27 @@ export const readPieceFromChain = async ({ fetchImpl, hiroUrl = DEFAULT_HIRO_URL
  * parent's bytes, because it cannot reproduce the parent. Here the comparison
  * is total: equal, or the id is wrong and nothing may cite it.
  */
-export async function hydratePiece({ fetchImpl, hiroUrl = DEFAULT_HIRO_URL, id, index, txid = null } = {}) {
-  const piece = getPiece(index);
+export async function hydratePiece({
+  fetchImpl,
+  hiroUrl = DEFAULT_HIRO_URL,
+  id,
+  index,
+  txid = null,
+  collectionId = DEFAULT_COLLECTION_ID
+} = {}) {
+  const art = artFor(collectionId);
+  const piece = art.getPiece(index);
   const read = await readPieceFromChain({ fetchImpl, hiroUrl, id });
   if (!read.found) {
     throw new WizardSafetyError(
-      `piece ${piece.index} of ${COLLECTION_ID} is recorded as inscription #${id}, but #${id} has no chunk u0 on ` +
+      `piece ${piece.index} of ${art.id} is recorded as inscription #${id}, but #${id} has no chunk u0 on ` +
         'chain. Nothing can list a piece that is not there.'
     );
   }
-  const expected = renderPiece(piece.index);
+  const expected = art.renderPiece(piece.index);
   if (read.body !== expected) {
     throw new WizardSafetyError(
-      `#${id} is on chain but its bytes are not piece ${piece.index} (${piece.id}) of ${COLLECTION_ID}. A plate is ` +
+      `#${id} is on chain but its bytes are not piece ${piece.index} (${piece.id}) of ${art.id}. A plate is ` +
         'a pure function of its index, so this comparison is exact and there is nothing to interpret: the id is ' +
         'wrong, or something other than this generator wrote it.'
     );
@@ -245,8 +265,10 @@ export async function verifyCollectionMembers({
   hiroUrl = DEFAULT_HIRO_URL,
   members = [],
   expectedAddress = null,
-  senderAddress = CORE_ADDRESS
+  senderAddress = CORE_ADDRESS,
+  collectionId = DEFAULT_COLLECTION_ID
 } = {}) {
+  const art = artFor(collectionId);
   if (members.length === 0) {
     return { name: 'members', status: 'not-applicable', ok: true, results: [], failures: [], note: 'nothing is listed' };
   }
@@ -265,7 +287,7 @@ export async function verifyCollectionMembers({
         results.push({ index, id, status: 'no-chunk', message: `#${id} has no chunk u0 on chain` });
         continue;
       }
-      if (read.body !== renderPiece(index)) {
+      if (read.body !== art.renderPiece(index)) {
         results.push({
           index,
           id,
@@ -341,6 +363,7 @@ const planFor = async ({
   body,
   tokenUri,
   parentIds,
+  art,
   collectionId,
   persona,
   blockHeight,
@@ -359,7 +382,7 @@ const planFor = async ({
       ? BigInt(blockHeight)
       : await fetchChainTip({ fetchImpl, hiroUrl });
 
-  const call = buildMintCall({ body, mime: record === 'manifest' ? 'text/markdown' : COLLECTION_MIME, tokenUri, parentIds });
+  const call = buildMintCall({ body, mime: record === 'manifest' ? 'text/markdown' : art.mime, tokenUri, parentIds });
 
   const quote = await quoteSingleTxFee({
     fetchImpl,
@@ -385,8 +408,11 @@ const planFor = async ({
   return {
     record,
     collectionId,
+    collectionTitle: art.title,
     index,
-    collectionLength: COLLECTION_LENGTH,
+    pieceId: index === null ? null : art.getPiece(index).id,
+    askUstx: record === 'manifest' ? art.price.manifestUstx : art.price.pieceUstx,
+    collectionLength: art.length,
     wizard: persona,
     parentIds: parentIds.map(String),
     block,
@@ -452,8 +478,8 @@ const planFor = async ({
 /** The plan for one plate. Same shape the thread runner's plans have. */
 export async function planPiece({
   index,
-  collectionId = COLLECTION_ID,
-  wizard = COLLECTION_WIZARD,
+  collectionId = DEFAULT_COLLECTION_ID,
+  wizard = null,
   blockHeight = null,
   fetchImpl,
   hiroUrl = DEFAULT_HIRO_URL,
@@ -464,18 +490,20 @@ export async function planPiece({
   env = {},
   remainingMints = 1
 } = {}) {
-  const piece = getPiece(index);
+  const art = artFor(collectionId);
+  const piece = art.getPiece(index);
   return planFor({
     record: 'piece',
     index: piece.index,
-    body: renderPiece(piece.index),
-    tokenUri: tokenUriForPiece({ collectionId, index: piece.index }),
+    body: art.renderPiece(piece.index),
+    tokenUri: tokenUriForPiece({ collectionId: art.id, index: piece.index }),
     // No dependency between plates. There is no relationship between them to
     // record: a collection is a set, and the only edge worth minting is the
     // one from the manifest to each member.
     parentIds: [],
-    collectionId,
-    persona: getPersona(wizard),
+    art,
+    collectionId: art.id,
+    persona: getPersona(wizard ?? art.wizard),
     blockHeight,
     fetchImpl,
     hiroUrl,
@@ -491,8 +519,8 @@ export async function planPiece({
 /** The plan for the closing manifest, with every member as a dependency. */
 export async function planCollectionManifest({
   members = [],
-  collectionId = COLLECTION_ID,
-  wizard = COLLECTION_WIZARD,
+  collectionId = DEFAULT_COLLECTION_ID,
+  wizard = null,
   blockHeight = null,
   fetchImpl,
   hiroUrl = DEFAULT_HIRO_URL,
@@ -503,22 +531,25 @@ export async function planCollectionManifest({
   minerFeeUstx = DEFAULT_MAX_TX_FEE_USTX,
   env = {}
 } = {}) {
+  const art = artFor(collectionId);
   const memberCheck = await verifyCollectionMembers({
     fetchImpl,
     hiroUrl,
     members,
     expectedAddress,
-    senderAddress: senderAddress ?? CORE_ADDRESS
+    senderAddress: senderAddress ?? CORE_ADDRESS,
+    collectionId: art.id
   });
 
   return planFor({
     record: 'manifest',
     index: null,
-    body: composeCollectionManifest({ collectionId, members }),
-    tokenUri: tokenUriForCollectionManifest({ collectionId }),
+    body: art.composeManifest({ collectionId: art.id, members }),
+    tokenUri: tokenUriForCollectionManifest({ collectionId: art.id }),
     parentIds: members.map((member) => String(member.id)),
-    collectionId,
-    persona: getPersona(wizard),
+    art,
+    collectionId: art.id,
+    persona: getPersona(wizard ?? art.wizard),
     blockHeight,
     fetchImpl,
     hiroUrl,
@@ -574,12 +605,12 @@ export const NULL_PORTS = {
 export async function runCollection({ ports = {}, options = {} } = {}) {
   const io = { ...NULL_PORTS, ...ports };
   const {
-    collectionId = COLLECTION_ID,
+    collectionId = DEFAULT_COLLECTION_ID,
     from = 1,
-    to = COLLECTION_LENGTH,
+    to = null,
     broadcast = false,
     manifest = true,
-    wizard = COLLECTION_WIZARD,
+    wizard = null,
     hiroUrl = DEFAULT_HIRO_URL,
     env = {},
     wallets = {},
@@ -597,7 +628,13 @@ export async function runCollection({ ports = {}, options = {} } = {}) {
 
   const mode = broadcast ? 'broadcast' : 'dry';
   const fetchImpl = io.fetchImpl;
-  const persona = getPersona(wizard);
+  // The collection decides the wizard, not the caller. A run that minted the
+  // Skeptic's plates out of the Archivist's wallet would put the wrong creator
+  // on chain, permanently, against the one claim these files make about who
+  // paid for them. `wizard` stays overridable only because the runner passes
+  // the resolved persona object back in on the manifest leg.
+  const art = artFor(collectionId);
+  const persona = getPersona(wizard ?? art.wizard);
   const wallet = wallets[persona.id] ?? {};
   const guard = (step) => {
     const reason = io.killSwitch(env);
@@ -607,21 +644,21 @@ export async function runCollection({ ports = {}, options = {} } = {}) {
   };
 
   const first = Number(from);
-  const last = Number(to);
-  if (!Number.isInteger(first) || first < 1 || first > COLLECTION_LENGTH) {
-    throw new WizardSafetyError(`--from ${from} is not a piece in a collection of ${COLLECTION_LENGTH}`);
+  const last = to === null || to === undefined ? art.length : Number(to);
+  if (!Number.isInteger(first) || first < 1 || first > art.length) {
+    throw new WizardSafetyError(`--from ${from} is not a piece in a collection of ${art.length}`);
   }
-  if (!Number.isInteger(last) || last < first || last > COLLECTION_LENGTH) {
+  if (!Number.isInteger(last) || last < first || last > art.length) {
     throw new WizardSafetyError(
-      `--to ${to} is not a piece at or after ${first} in a collection of ${COLLECTION_LENGTH}`
+      `--to ${to} is not a piece at or after ${first} in a collection of ${art.length}`
     );
   }
 
-  const journalPath = collectionJournalPathFor({ dir: journalDir, collectionId, mode });
+  const journalPath = collectionJournalPathFor({ dir: journalDir, collectionId: art.id, mode });
   const startedAt = iso(io.now());
   const journal =
     io.readJournal(journalPath) ??
-    emptyCollectionJournal({ collectionId, collectionLength: COLLECTION_LENGTH, mode, startedAt });
+    emptyCollectionJournal({ collectionId: art.id, collectionLength: art.length, mode, startedAt });
 
   const members = [];
   let halted = null;
@@ -775,7 +812,7 @@ export async function runCollection({ ports = {}, options = {} } = {}) {
 
     if (index === null) return { id: inscriptionId, existed };
     guard(`reading #${inscriptionId} back`);
-    return hydratePiece({ fetchImpl, hiroUrl, id: inscriptionId, index, txid });
+    return hydratePiece({ fetchImpl, hiroUrl, id: inscriptionId, index, txid, collectionId: art.id });
   };
 
   /** Broadcast one plan, record the txid, then wait for it. */
@@ -858,11 +895,11 @@ export async function runCollection({ ports = {}, options = {} } = {}) {
           `${COLLECTION_JOURNAL_VERSION}. Move it aside and check what it says before starting again.`
       );
     }
-    if (journal.collectionId !== collectionId || journal.mode !== mode) {
+    if (journal.collectionId !== art.id || journal.mode !== mode) {
       throw new RunHalt(
         'journal',
         `the run journal at ${journalPath} is for collection ${journal.collectionId} in ${journal.mode} mode, not ` +
-          `${collectionId} in ${mode} mode.`
+          `${art.id} in ${mode} mode.`
       );
     }
 
@@ -902,14 +939,14 @@ export async function runCollection({ ports = {}, options = {} } = {}) {
       if (!id) {
         throw new RunHalt(
           'predecessor',
-          `refusing to start at piece ${first}: no inscription id is known for piece ${index} of ${collectionId}. ` +
+          `refusing to start at piece ${first}: no inscription id is known for piece ${index} of ${art.id}. ` +
             'Pass every earlier id with --ids <id1,id2,...> in piece order.',
           { index }
         );
       }
       let member;
       try {
-        member = await hydratePiece({ fetchImpl, hiroUrl, id, index, txid: stored?.txid ?? null });
+        member = await hydratePiece({ fetchImpl, hiroUrl, id, index, txid: stored?.txid ?? null, collectionId: art.id });
       } catch (error) {
         throw new RunHalt('predecessor', `refusing to start at piece ${first}: ${errorMessage(error)}`, { index, id });
       }
@@ -919,7 +956,7 @@ export async function runCollection({ ports = {}, options = {} } = {}) {
 
     for (let index = first; index <= last; index += 1) {
       const key = pieceKey(index);
-      const piece = getPiece(index);
+      const piece = art.getPiece(index);
       let existing = journal.pieces[key] ?? null;
 
       guard(`piece ${index}`);
@@ -950,7 +987,7 @@ export async function runCollection({ ports = {}, options = {} } = {}) {
           hiroUrl,
           record: existing,
           position: null,
-          threadId: collectionId,
+          threadId: art.id,
           now: io.now,
           sleep: io.sleep,
           say: io.say,
@@ -960,7 +997,7 @@ export async function runCollection({ ports = {}, options = {} } = {}) {
         });
 
         if (resolved.outcome === 'landed') {
-          const member = await hydratePiece({ fetchImpl, hiroUrl, id: resolved.id, index });
+          const member = await hydratePiece({ fetchImpl, hiroUrl, id: resolved.id, index, collectionId: art.id });
           record(key, { status: 'confirmed', inscriptionId: resolved.id, recovered: true });
           members.push(member);
           io.say(`  piece ${index}: recovered as #${resolved.id} by content hash; no second broadcast`);
@@ -996,7 +1033,7 @@ export async function runCollection({ ports = {}, options = {} } = {}) {
         );
       }
 
-      io.say(`\n  piece ${index} of ${COLLECTION_LENGTH}: ${piece.id} — ${persona.name}`);
+      io.say(`\n  piece ${index} of ${art.length}: ${piece.id} — ${persona.name}`);
       const plan = await planPiece({
         index,
         collectionId,
@@ -1038,7 +1075,7 @@ export async function runCollection({ ports = {}, options = {} } = {}) {
       members.push(await broadcastAndSettle({ key, index, plan }));
     }
 
-    if (manifest && last === COLLECTION_LENGTH && members.length === COLLECTION_LENGTH) {
+    if (manifest && last === art.length && members.length === art.length) {
       const key = MANIFEST_KEY;
       let existing = journal.pieces[key] ?? null;
       guard('the manifest');
@@ -1049,7 +1086,7 @@ export async function runCollection({ ports = {}, options = {} } = {}) {
           hiroUrl,
           record: existing,
           position: null,
-          threadId: collectionId,
+          threadId: art.id,
           now: io.now,
           sleep: io.sleep,
           say: io.say,
@@ -1145,8 +1182,9 @@ export async function runCollection({ ports = {}, options = {} } = {}) {
   return {
     ok: halted === null,
     halted,
-    collectionId,
-    collectionLength: COLLECTION_LENGTH,
+    collectionId: art.id,
+    collectionTitle: art.title,
+    collectionLength: art.length,
     mode,
     broadcast,
     journalPath,
@@ -1173,25 +1211,26 @@ export async function runCollection({ ports = {}, options = {} } = {}) {
 export async function collectionStatusReport({ ports = {}, options = {} } = {}) {
   const io = { ...NULL_PORTS, ...ports };
   const {
-    collectionId = COLLECTION_ID,
+    collectionId = DEFAULT_COLLECTION_ID,
     hiroUrl = DEFAULT_HIRO_URL,
     journalDir = HERE,
     mode = 'broadcast',
     knownIds = {}
   } = options;
 
-  const journalPath = collectionJournalPathFor({ dir: journalDir, collectionId, mode });
+  const art = artFor(collectionId);
+  const journalPath = collectionJournalPathFor({ dir: journalDir, collectionId: art.id, mode });
   const journal = io.readJournal(journalPath);
   const rows = [];
 
-  for (const key of [...PIECES.map((piece) => pieceKey(piece.index)), MANIFEST_KEY]) {
+  for (const key of [...art.pieces.map((piece) => pieceKey(piece.index)), MANIFEST_KEY]) {
     const index = key === MANIFEST_KEY ? null : Number(key);
     const stored = journal?.pieces?.[key] ?? null;
     const id = stored?.inscriptionId ?? knownIds[key] ?? null;
     const row = {
       key,
       index,
-      piece: index === null ? 'manifest' : getPiece(index).id,
+      piece: index === null ? 'manifest' : art.getPiece(index).id,
       journalStatus: stored?.status ?? 'not recorded',
       txid: stored?.txid ?? null,
       inscriptionId: id,
@@ -1208,7 +1247,7 @@ export async function collectionStatusReport({ ports = {}, options = {} } = {}) 
         } else if (index === null) {
           row.chain = read.entry?.meta?.record === 'collection-manifest' ? 'confirmed' : 'mismatch';
           if (row.chain === 'mismatch') row.note = `#${id} is on chain but is not a collection manifest`;
-        } else if (read.body === renderPiece(index)) {
+        } else if (read.body === art.renderPiece(index)) {
           row.chain = 'confirmed';
           row.note = 'byte-identical to the plate';
         } else {
@@ -1235,7 +1274,7 @@ export async function collectionStatusReport({ ports = {}, options = {} } = {}) 
           hiroUrl,
           record: stored,
           position: null,
-          threadId: collectionId,
+          threadId: art.id,
           mempoolWaitMs: 0
         });
         if (resolved.outcome === 'landed') {
@@ -1263,8 +1302,9 @@ export async function collectionStatusReport({ ports = {}, options = {} } = {}) 
   }
 
   return {
-    collectionId,
-    collectionLength: COLLECTION_LENGTH,
+    collectionId: art.id,
+    collectionTitle: art.title,
+    collectionLength: art.length,
     mode,
     journalPath,
     journalFound: Boolean(journal),
@@ -1289,11 +1329,11 @@ export function formatCollectionPlan(plan, { broadcast = false } = {}) {
       ? '--- collection mint plan (BROADCAST — this will spend STX and cannot be undone) ---'
       : '--- collection mint plan (DRY RUN) ---'
   );
-  lines.push(`collection  : ${plan.collectionId}  (${COLLECTION_TITLE})`);
+  lines.push(`collection  : ${plan.collectionId}  (${plan.collectionTitle ?? COLLECTION_TITLE})`);
   lines.push(
     plan.record === 'manifest'
       ? `record      : closing manifest, listing ${plan.parentIds.length} members`
-      : `piece       : ${plan.index} of ${plan.collectionLength}  (${getPiece(plan.index).id})`
+      : `piece       : ${plan.index} of ${plan.collectionLength}  (${plan.pieceId})`
   );
   lines.push(`wizard      : ${plan.wizard.name}`);
   lines.push(
@@ -1459,4 +1499,3 @@ export function formatCollectionRunReport(result) {
   return lines.join('\n');
 }
 
-export { renderPiece };
