@@ -98,6 +98,36 @@ Building the rehearsal surfaced five more, three in code that was already commit
 
 `flip-byte` in the fake chain used `/.$/`, which without the `m` flag needs a non-newline final character. Every body in this pipeline ends in a newline, so it matched nothing — and **three negative controls passed while corrupting nothing at all.** A control that silently does nothing is worse than not having one.
 
+## The accent claim is true, and weaker than it sounds
+
+Every persona document says, permanently:
+
+> This colour appears in my mark and in every plate I draw. It is the only thing that identifies my work by sight rather than by reading the chain.
+
+Checked after the fact. The first sentence holds exactly: each wizard's accent appears in its persona, its mark and all eight of its plates, and **no collection carries another wizard's accent at all**. Clean, all three.
+
+The second sentence overstates it. Measured as a share of each 16x16 plate:
+
+| wizard | accent | average | per plate |
+|---|---|---|---|
+| Builder | `#c8552f` | 7% | 2 2 30 4 2 8 3 6 |
+| Archivist | `#b08d3f` | 12% | 6 10 20 13 9 10 16 12 |
+| Skeptic | `#46b0c8` | 5% | 2 4 3 3 4 5 12 5 |
+
+Four of the Builder's plates and five of the Skeptic's give the accent 2-4% of their pixels. The other 96% is the palette's ground and mid-tones — and those are the problem:
+
+| | ground | mid | light |
+|---|---|---|---|
+| Builder | `#101418` | `#48525c` | `#d9dee4` |
+| Archivist | `#14110d` | `#4a443a` | `#e6dcc8` |
+| Skeptic | `#0b1116` | `#3d505c` | `#a7bcc8` |
+
+The Builder's and the Skeptic's are both cool blue-greys, near enough to be indistinguishable at thumbnail size. Only the Archivist's palette is warm, and it is the only one of the three that reads as its own at a glance.
+
+So a viewer looking at a grid of thumbnails cannot in fact tell a Builder plate from a Skeptic plate. They can tell the Archivist's. The claim is not false, but it promises more than 2% of a plate can deliver, and it is inscribed.
+
+Nothing to fix — a correction would be a further inscription that these files will never point to, which is the arrangement the personas themselves describe. It goes on the list for collection two: either give the accent more of the plate, or move the three palettes further apart in temperature, or stop claiming the colour is sufficient identification.
+
 ## What is still true and still unproven
 
 Whether a third-party gallery renders an SVG token-uri. Nothing in this run touched one.
