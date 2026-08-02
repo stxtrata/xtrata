@@ -3,7 +3,7 @@ import {
   makeStandardSTXPostCondition,
   type PostCondition
 } from '@stacks/transactions';
-import { MAX_BATCH_SIZE } from '../chunking/hash';
+import { FEE_BATCH_SIZE } from '../chunking/hash';
 
 type MintBeginSpendCapParams = {
   mintPrice: bigint | null;
@@ -91,7 +91,7 @@ export const resolveSealSpendCapMicroStx = (
   if (feeUnit === null || totalChunks === null) {
     return null;
   }
-  const chunkBatchSize = BigInt(MAX_BATCH_SIZE);
+  const chunkBatchSize = BigInt(FEE_BATCH_SIZE);
   const feeBatches = (totalChunks + chunkBatchSize - 1n) / chunkBatchSize;
   return feeUnit * (1n + feeBatches);
 };

@@ -3,6 +3,21 @@ import { sha256 } from '@noble/hashes/sha256';
 export const CHUNK_SIZE = 16_384;
 export const MAX_BATCH_SIZE = 50;
 export const MAX_UPLOAD_BATCH_SIZE = 30;
+
+/**
+ * Divisor for protocol fee arithmetic. Matches the deployed contract's
+ * MAX-UPLOAD-BATCH-SIZE (u32) — the batch size the contract CHARGES for, which
+ * is neither the size the client SENDS (MAX_UPLOAD_BATCH_SIZE = 30) nor the
+ * purge index list length (MAX_BATCH_SIZE = 50, typed `(list 50 uint)`).
+ *
+ * Dividing by 50 here under-counts fee batches, so a seal post-condition caps
+ * below the fee the contract charges and aborts the seal AFTER the begin fee
+ * and every upload batch fee have been spent.
+ *
+ * Verified against mainnet 2026-08-02:
+ * SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 line 75.
+ */
+export const FEE_BATCH_SIZE = 32;
 export const EMPTY_HASH = new Uint8Array(32);
 
 export const chunkBytes = (data: Uint8Array, chunkSize = CHUNK_SIZE) => {

@@ -13,10 +13,12 @@ describe('contract fee estimates', () => {
     expect(schedule.feeUnitMicroStx).toBe(250_000);
 
     const estimate = estimateContractFees({ schedule, totalChunks: 120 });
-    expect(estimate.feeBatches).toBe(3);
+    // 120 chunks: ceil(120/32) = 4 fee batches, not ceil(120/50) = 3.
+    expect(estimate.feeBatches).toBe(4);
     expect(estimate.beginMicroStx).toBe(250_000);
-    expect(estimate.sealMicroStx).toBe(1_000_000);
-    expect(estimate.totalMicroStx).toBe(1_250_000);
+    // feeUnit 250_000 x (1 seal + 4 batches); total adds the begin fee.
+    expect(estimate.sealMicroStx).toBe(1_250_000);
+    expect(estimate.totalMicroStx).toBe(1_500_000);
   });
 
   it('defaults the fee unit when missing', () => {
