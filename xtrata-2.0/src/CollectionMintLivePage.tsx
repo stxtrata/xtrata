@@ -25,7 +25,7 @@ import {
   CHUNK_SIZE,
   chunkBytes,
   computeExpectedHash,
-  MAX_BATCH_SIZE
+  FEE_BATCH_SIZE
 } from './lib/chunking/hash';
 import {
   buildCollectionSmallSingleTxStxPostConditions,
@@ -3328,7 +3328,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   const estimatedSealFeeUnits =
     collectionMaxChunkCount === null || collectionMaxChunkCount <= 0
       ? null
-      : 1 + Math.ceil(collectionMaxChunkCount / MAX_BATCH_SIZE);
+      : 1 + Math.ceil(collectionMaxChunkCount / FEE_BATCH_SIZE);
   const minimumProtocolFeeTotal =
     contractStatus?.coreFeeUnitMicroStx && contractStatus.coreFeeUnitMicroStx > 0n
       ? contractStatus.coreFeeUnitMicroStx * 3n

@@ -1,0 +1,192 @@
+{
+  "note": "Byte freeze for all three collections as they stood before maker's marks and the coat of arms were added. Every plate is destined for chain and is found again by content hash, so a byte that moves is an artifact that can never afterwards be matched. Manifests are frozen on the same terms: a mark is a signature and not a member, so adding one must leave every manifest exactly where it was. Regenerating this file is a decision, not a fix.",
+  "manifestMembers": "synthetic ids 9001..9008, in piece order",
+  "collections": {
+    "c-machinery-001": {
+      "palette": {
+        ".": "#101418",
+        "+": "#48525c",
+        "#": "#d9dee4",
+        "*": "#c8552f"
+      },
+      "pieces": [
+        {
+          "index": 1,
+          "id": "chunk",
+          "bytes": 1814,
+          "sha256": "5ffcf096e0fab659f44b94a471312e9ef3b80b28db1d741d06b6e5fa02f05897"
+        },
+        {
+          "index": 2,
+          "id": "fold",
+          "bytes": 1820,
+          "sha256": "22203306b5abf35a58365e421075c1c613a1e7a1841dfaeb3508ad37da057c10"
+        },
+        {
+          "index": 3,
+          "id": "seal",
+          "bytes": 2408,
+          "sha256": "23ada121492a002404b1ae8202fa63fac97213fcaf4741741088f01458c44cd3"
+        },
+        {
+          "index": 4,
+          "id": "dependency-edge",
+          "bytes": 1769,
+          "sha256": "0d4d9ebe87ab3cbbffe1cea44190b9b95dd00b5a550db206def7fe077ea9ffc6"
+        },
+        {
+          "index": 5,
+          "id": "nonce",
+          "bytes": 1741,
+          "sha256": "592f6ea65ef2d1a7a6064a3615de8c62cd27253f60da78378a822007aa57b009"
+        },
+        {
+          "index": 6,
+          "id": "miner-fee",
+          "bytes": 1870,
+          "sha256": "209ccc55286d630395912cf41a8e2ea0c8589285df8397703e8bff490bc48aed"
+        },
+        {
+          "index": 7,
+          "id": "post-condition",
+          "bytes": 1590,
+          "sha256": "39c48d06463364b5fa973f5920f264b92e175544398f9a8551550dbee9363f56"
+        },
+        {
+          "index": 8,
+          "id": "escrow",
+          "bytes": 1670,
+          "sha256": "ae9a1044e06e479a4ceaff1170760c20708bf6cdd972f579fec293d6d249ea3b"
+        }
+      ],
+      "manifest": {
+        "bytes": 5256,
+        "sha256": "37dfddf2a201e796b491608fbab35b91773d9918ab337b1d9c2a8e6f7a949890"
+      }
+    },
+    "c-keeping-001": {
+      "palette": {
+        ".": "#14110d",
+        "+": "#4a443a",
+        "#": "#e6dcc8",
+        "*": "#b08d3f"
+      },
+      "pieces": [
+        {
+          "index": 1,
+          "id": "chunk",
+          "bytes": 1577,
+          "sha256": "8cde5369d31e659e6ce0323154a183df03d1c8e19ac5305a6eadcbf7c361bbff"
+        },
+        {
+          "index": 2,
+          "id": "fold",
+          "bytes": 1666,
+          "sha256": "102b2ff0407d09976e0bf8c5016a5f21f0c60f7ce04f5d335956dd41924f2a09"
+        },
+        {
+          "index": 3,
+          "id": "seal",
+          "bytes": 2067,
+          "sha256": "c10d309a0e33620e244d464fc3bb31156694f83fd174c543099a7c2559951b02"
+        },
+        {
+          "index": 4,
+          "id": "dependency-edge",
+          "bytes": 1509,
+          "sha256": "e3d5be9a2336fa1099b752b610fca514952928951aca8a6a94541cc521fc7936"
+        },
+        {
+          "index": 5,
+          "id": "nonce",
+          "bytes": 2015,
+          "sha256": "40de00239b276d5063ea10c83073745b0973bfc2504ee33289b915713eb0fbae"
+        },
+        {
+          "index": 6,
+          "id": "miner-fee",
+          "bytes": 1902,
+          "sha256": "a63be70b8dcda483ca1adedcaaa5ad582f0f7fa745317974ad5046fc4bfebdf3"
+        },
+        {
+          "index": 7,
+          "id": "post-condition",
+          "bytes": 1595,
+          "sha256": "8aa99e0e6a5b52082e0d1f0d9704355ca623a8cb9269361f72c5305ed50e63f4"
+        },
+        {
+          "index": 8,
+          "id": "escrow",
+          "bytes": 1886,
+          "sha256": "5bbab39c7de970c50a92789fa2430398a1471c3dc4a9e09ffe8a633d68f5a2dd"
+        }
+      ],
+      "manifest": {
+        "bytes": 4898,
+        "sha256": "5be1388e314880dab03dd4da8906642364022a4808d927052293b7d76ae8c123"
+      }
+    },
+    "c-omission-001": {
+      "palette": {
+        ".": "#0b1116",
+        "+": "#3d505c",
+        "#": "#a7bcc8",
+        "*": "#46b0c8"
+      },
+      "pieces": [
+        {
+          "index": 1,
+          "id": "chunk",
+          "bytes": 1629,
+          "sha256": "efef4d76f8478233607d9f3db072ab3e0ba509de6cd64c208386b25ce7432f75"
+        },
+        {
+          "index": 2,
+          "id": "fold",
+          "bytes": 2289,
+          "sha256": "6aa5fdee2ea50b26771322e801ba6e06d31c6c5a311ad97cd5eda4e0e3f9d4ee"
+        },
+        {
+          "index": 3,
+          "id": "seal",
+          "bytes": 2180,
+          "sha256": "d7d96687a2ea4b9523ed419a61664d9d7673b9588e0fbe61f46b21cdef4f8f6f"
+        },
+        {
+          "index": 4,
+          "id": "dependency-edge",
+          "bytes": 1903,
+          "sha256": "ae24db2897327fcf987c7eea919962a96cd5be419f2e7c7ae4848b494238a782"
+        },
+        {
+          "index": 5,
+          "id": "nonce",
+          "bytes": 2148,
+          "sha256": "694c74cfc41659849619faf95a8373814ca04d1821748462478dec3e2ccad557"
+        },
+        {
+          "index": 6,
+          "id": "miner-fee",
+          "bytes": 2214,
+          "sha256": "35f4ca697c2b2126a832bb9479df8beb48a8422a6bea8a4d1fed39830b1b415d"
+        },
+        {
+          "index": 7,
+          "id": "post-condition",
+          "bytes": 1553,
+          "sha256": "56b9129ff873f22d97b1bd1288a6701c8a651a6f6026fb8c314f2ec17d155add"
+        },
+        {
+          "index": 8,
+          "id": "escrow",
+          "bytes": 1867,
+          "sha256": "1c1268b674c8b81a93e3195d1b1c5a7e4dfef451a80561e9191aaded1d00c12b"
+        }
+      ],
+      "manifest": {
+        "bytes": 5157,
+        "sha256": "abecb37cf2e1eb66d82d6130b45728346c6a478d24d67ae9bf7070befe0a4db9"
+      }
+    }
+  }
+}

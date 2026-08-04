@@ -1,4 +1,4 @@
-import { MAX_BATCH_SIZE } from '../chunking/hash';
+import { FEE_BATCH_SIZE } from '../chunking/hash';
 import { SMALL_MINT_HELPER_MAX_CHUNKS } from '../mint/constants';
 
 export type DeployPricingLockSnapshot = {
@@ -55,7 +55,7 @@ export const estimateWorstCaseSealFeeMicroStx = (params: {
 }) => {
   const normalizedMaxChunks = Math.max(0, Math.floor(params.maxChunks));
   const batchCount =
-    normalizedMaxChunks > 0 ? Math.ceil(normalizedMaxChunks / MAX_BATCH_SIZE) : 0;
+    normalizedMaxChunks > 0 ? Math.ceil(normalizedMaxChunks / FEE_BATCH_SIZE) : 0;
   const sealMicroStx =
     normalizedMaxChunks > 0
       ? params.feeUnitMicroStx * BigInt(1 + batchCount)

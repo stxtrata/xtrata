@@ -59,7 +59,12 @@
       getLegacyContract
     } from '/src/lib/contract/registry.ts';
     import { getContractId } from '/src/lib/contract/config.ts';
-    import { MARKET_REGISTRY, getMarketContractId } from '/src/lib/market/registry.ts';
+    import {
+      MARKET_REGISTRY,
+      getMarketContractId,
+      getSellableMarkets,
+      marketAcceptsNftContract
+    } from '/src/lib/market/registry.ts';
     import DROPS_REGISTRY from '/src/data/drops-registry.json';
     import {
       getMarketSettlementAsset,
@@ -67,7 +72,19 @@
       buildMarketBuyPostConditions,
       formatMarketPriceWithUsd
     } from '/src/lib/market/settlement.ts';
-    import { isSponsoredMarket } from '/src/lib/market/sponsored.ts';
+    import {
+      MAX_USEFUL_BUDGET_USTX,
+      MIN_FEE_BUDGET_USTX,
+      getSponsoredBuyEligibility,
+      isSponsoredMarket,
+      validateFeeBudget
+    } from '/src/lib/market/sponsored.ts';
+    import {
+      resolveSponsorBase,
+      runSponsoredBuy,
+      sponsoredBuyIneligibilityMessage,
+      sponsoredBuyProgressLabel
+    } from '/src/lib/market/sponsored-buy.ts';
     import {
       SponsorClientError,
       createSponsorClient
@@ -111,6 +128,7 @@
     } from '/src/lib/contract/client.ts';
     import { fetchContractAdminStatus } from '/src/lib/contract/admin-status.ts';
     import {
+      estimateContractFeeCaps,
       estimateContractFees,
       getFeeSchedule
     } from '/src/lib/contract/fees.ts';
@@ -349,6 +367,8 @@
       activityLog: $('activityLog'),
       textAdvancedDetails: $('textAdvancedDetails'),
       textAdvancedSummary: $('textAdvancedSummary'),
+      largeFileNotice: $('largeFileNotice'),
+      largeFileNoticeText: $('largeFileNoticeText'),
       textRelSummary: $('textRelSummary'),
       textAdvancedLogSlot: $('textAdvancedLogSlot'),
       parentRelationshipPanel: $('parentRelationshipPanel'),
@@ -428,6 +448,9 @@
       fullscreenViewer: $('fullscreenViewer'),
       fullscreenTitle: $('fullscreenTitle'),
       fullscreenMeta: $('fullscreenMeta'),
+      fullscreenId: $('fullscreenId'),
+      fullscreenMarkButton: $('fullscreenMarkButton'),
+      fullscreenRelations: $('fullscreenRelations'),
       fullscreenStage: $('fullscreenStage'),
       fullscreenRawLink: $('fullscreenRawLink'),
       fullscreenPrevButton: $('fullscreenPrevButton'),
@@ -590,6 +613,7 @@
       prepared: null,
       lastMintAttempt: null,
       handoffDependencyIds: [],
+      fullscreenRelRequestId: 0,
       parentIds: [],
       parentStatusById: new Map(),
       parentStatusMessage: null,
@@ -1467,6 +1491,16 @@
         totalChunks
       });
 
+    // Post-condition caps, NOT the displayed estimate. The five fee units are
+    // admin-mutable and only the legacy aggregate is read here, so the caps
+    // carry headroom. Prefer an on-chain quote (state.prepared.stagedFee /
+    // singleTxFeeMicroStx) whenever one is available.
+    const getFeeCaps = (totalChunks = state.prepared?.chunks.length ?? 0) =>
+      estimateContractFeeCaps({
+        schedule: getFeeSchedule(state.contract, getFeeUnitNumber()),
+        totalChunks
+      });
+
     const loadUsdPriceBook = async () => {
       if (state.usdPriceBook || state.usdPriceBookLoading) {
         return;
@@ -1692,6 +1726,7 @@
     };
 
     const renderBatchGuide = () => {
+      renderLargeFileNotice();
       if (!dom.batchGuide || !dom.batchGuideStatus || !dom.batchGuideTitle) {
         return;
       }
@@ -1711,6 +1746,39 @@
           ? `All ${progress.totalBatches} upload batches are confirmed. The inscription is ready to seal.`
           : `${progress.confirmedBatches} of ${progress.totalBatches} upload batches confirmed. Next: batch ${progress.nextBatch} of ${progress.totalBatches}.`;
       dom.batchGuide.hidden = false;
+    };
+
+    /**
+     * Offers the Wizard when a file is too big to inscribe in one transaction.
+     *
+     * The markup for this notice has always been in index.html, and nothing ever
+     * unhid it — `largeFileNotice` appeared in no JavaScript at all, so the
+     * automatic hand-off everyone believed existed never fired once. That matters
+     * more now the Wizard is not in the top nav: this and the standing link in the
+     * panel are how it gets found.
+     *
+     * The threshold is the same one the batch guide uses. Above
+     * SMALL_MINT_HELPER_MAX_CHUNKS a mint stops being a single transaction and
+     * becomes a staged upload the user has to sit through and sign repeatedly,
+     * which is exactly the job the Wizard does for one payment.
+     */
+    const renderLargeFileNotice = () => {
+      const notice = dom.largeFileNotice;
+      if (!notice) return;
+      const totalChunks =
+        state.prepared?.chunks.length ??
+        Number(state.uploadState?.totalChunks ?? state.lastMintAttempt?.totalChunks ?? 0);
+      if (!Number.isSafeInteger(totalChunks) || totalChunks <= SMALL_MINT_HELPER_MAX_CHUNKS) {
+        notice.hidden = true;
+        return;
+      }
+      const batches = getUploadBatchProgress(0, totalChunks).totalBatches;
+      if (dom.largeFileNoticeText) {
+        dom.largeFileNoticeText.textContent =
+          `This one needs ${batches + 2} transactions to inscribe here, each signed and confirmed. ` +
+          `The Wizard does it for a single payment.`;
+      }
+      notice.hidden = false;
     };
 
     const renderResumeNotice = () => {
@@ -5076,7 +5144,7 @@
         await refreshUploadState(prepared.expectedHash);
         telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'success' });
         flowStarted = true;
-        const feeEstimate = getFeeEstimate(prepared.chunks.length);
+        const feeCaps = getFeeCaps(prepared.chunks.length);
         const hasUploadState = !!state.uploadState;
 
         if (shouldUseNativeSingleTx()) {
@@ -5098,12 +5166,13 @@
             listCV(prepared.chunks.map((chunk) => bufferCV(chunk))),
             stringAsciiCV(prepared.tokenUriValue)
           ];
-          // Cap at the quoted single-tx fee when known; fall back to the 3-stage
-          // estimate (always >= the single-tx fee) if the quote is unavailable.
+          // Cap at the quoted single-tx fee when known; otherwise fall back to
+          // single-tx-fee-for-chunks with headroom (NOT the 3-stage estimate,
+          // which is ~27x the real single-tx fee at 1 chunk).
           const singleTxCapMicroStx =
             typeof prepared.singleTxFeeMicroStx === 'number'
               ? prepared.singleTxFeeMicroStx
-              : feeEstimate.totalMicroStx;
+              : feeCaps.singleTxMicroStx;
           telemetryStep = 'submit';
           telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'start' });
           const singleTx = await requestContractCall({
@@ -5192,7 +5261,9 @@
                     listCV(prepared.chunks.map((chunk) => bufferCV(chunk))),
                     stringAsciiCV(prepared.tokenUriValue)
                   ],
-            postConditions: resolveFeePostConditions(feeEstimate.totalMicroStx),
+            // Helper route: the helper runs begin -> upload -> seal on the
+            // core, so the staged fees apply, not single-tx-fee-for-chunks.
+            postConditions: resolveFeePostConditions(feeCaps.totalMicroStx),
             feeMicroStx: walletMinerFeeMicroStx(prepared.bytes.length)
           });
           const singleTxId = normalizeTxId(singleTx);
@@ -5237,7 +5308,7 @@
               uintCV(BigInt(prepared.chunks.length))
             ],
             postConditions: resolveFeePostConditions(
-              prepared.stagedFee?.beginMicroStx ?? feeEstimate.beginMicroStx
+              prepared.stagedFee?.beginMicroStx ?? feeCaps.beginMicroStx
             )
           });
           const beginTxId = normalizeTxId(beginTx);
@@ -5350,7 +5421,7 @@
           functionName: sealFunctionName,
           functionArgs: buildSealFunctionArgs(prepared),
           postConditions: resolveFeePostConditions(
-            prepared.stagedFee?.sealMicroStx ?? feeEstimate.sealMicroStx
+            prepared.stagedFee?.sealMicroStx ?? feeCaps.sealMicroStx
           )
         });
         const sealTxId = normalizeTxId(sealTx);
@@ -5777,11 +5848,26 @@
       dom.fullscreenStage.replaceChildren(notice);
     };
 
+    const setFullscreenId = (token) => {
+      if (!dom.fullscreenId) return;
+      const id = token?.id?.toString?.() ?? '';
+      dom.fullscreenId.textContent = id ? `Xtrata #${id}` : '';
+      dom.fullscreenId.hidden = !id;
+      dom.fullscreenId.title = id ? `Xtrata inscription #${id}` : '';
+    };
+
     const setFullscreenMeta = (token, mimeType) => {
       const kind = getMediaKind(mimeType ?? null).toUpperCase();
       const size = token.meta?.totalSize ? formatBytes(token.meta.totalSize) : 'unknown size';
-      dom.fullscreenTitle.textContent = 'Inscription';
+      // The chrome is only as wide as the stage, which for a portrait piece can be
+      // ~560px. With the id pill added, a generic "Inscription" label was the first
+      // thing to truncate — and "Inscript…" above "HTML · 2.…" reads as broken. The
+      // id already says what this is, so the label goes and the type/size gets the
+      // room. "Prepared payload" keeps its label, because there it carries meaning.
+      dom.fullscreenTitle.textContent = '';
+      dom.fullscreenTitle.hidden = true;
       dom.fullscreenMeta.textContent = `${kind} · ${size}`;
+      setFullscreenId(token);
     };
 
     const getSelectedTokenPreviewSource = async () => {
@@ -5982,12 +6068,193 @@
       dom.fullscreenStage.append(link);
     };
 
+    // How many chips a group shows before it stops. A piece with 200 children is
+    // real, and rendering 200 tap targets would turn the strip into a scroll
+    // marathon; the count in the label still tells the whole truth.
+    /**
+     * Reports ONLY the chrome's measured height. Everything else that consumes
+     * vertical space — the relations row, the gaps — is a constant in the CSS.
+     *
+     * The chrome genuinely varies: one row on a desktop, up to three wrapped rows
+     * on a phone, so it has to be measured. The relations row does not vary. It is
+     * a fixed track in `grid-template-rows`, present whether or not it has chips.
+     *
+     * An earlier version folded the strip into this number and skipped it while
+     * the strip was hidden, which reintroduced the jump it was written to prevent:
+     * the strip is populated after two network round trips, so the first paint
+     * computed a small space and a tall stage, and the moment the chips landed the
+     * space grew, the stage shrank, and `align-content: center` moved everything.
+     * The strip's existence must not be an input to any size, so it no longer is.
+     */
+    const syncFullscreenChromeSpace = () => {
+      const viewer = dom.fullscreenViewer;
+      if (!viewer) return;
+      const chrome = viewer.querySelector('.fullscreen-viewer__chrome');
+      const height = chrome?.offsetHeight ?? 0;
+      if (!height) return; // not laid out yet; the CSS default already reserves a row
+      viewer.style.setProperty('--fullscreen-chrome-height', `${height}px`);
+    };
+
+    const FULLSCREEN_REL_CHIP_LIMIT = 12;
+
+    /**
+     * Receipts, replies and plain dependencies are all the SAME on-chain edge: an
+     * inscription that declares a dependency on another. Only the token URI tells
+     * them apart, and the wizard always mints a receipt as `xtrata:receipt/<jobId>`.
+     *
+     * Without this split, the receipt the wizard writes for a piece showed up as a
+     * "reply" to it, which is misleading in both directions: the receipt is not a
+     * reply, and a real reply gets buried among them.
+     */
+    const RECEIPT_URI_PREFIX = 'xtrata:receipt/';
+    const isReceiptSummary = (summary) =>
+      typeof summary?.tokenUri === 'string' && summary.tokenUri.startsWith(RECEIPT_URI_PREFIX);
+
+    /** Cached-first summary lookup, so classifying costs at most one batched call. */
+    const ensureRelationshipSummaries = async (ids) => {
+      const missing = ids.filter((id) => !getCachedRelationshipSummary(id));
+      if (missing.length > 0) {
+        const summaries = await fetchWalletTokenSummaries(missing).catch(() => []);
+        for (const summary of summaries) {
+          state.walletTokenCache.set(summary.id.toString(), summary);
+        }
+      }
+      return new Map(ids.map((id) => [id.toString(), getCachedRelationshipSummary(id)]));
+    };
+
+    const buildRelStripGroup = (contractId, label, kind, ids, describe = null) => {
+      if (!ids || ids.length === 0) return null;
+      const group = document.createElement('div');
+      group.className = `rel-strip__group rel-strip__group--${kind}`;
+
+      const labelEl = document.createElement('span');
+      labelEl.className = 'rel-strip__label';
+      labelEl.textContent = `${label} ${ids.length}`;
+      group.append(labelEl);
+
+      ids.slice(0, FULLSCREEN_REL_CHIP_LIMIT).forEach((id, index) => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'rel-strip__chip';
+        chip.textContent = `#${id.toString()}`;
+        chip.title = describe
+          ? `Open #${id.toString()} — ${describe(id, index)}`
+          : `Open ${label.toLowerCase()} #${id.toString()}`;
+        chip.addEventListener('click', async (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          await selectRelationshipToken(contractId, id);
+          // Stay enlarged: the whole point is navigating the family without
+          // dropping back to the grid between each hop.
+          if (state.fullscreenOpen) await renderFullscreenSelectedToken();
+        });
+        group.append(chip);
+      });
+
+      if (ids.length > FULLSCREEN_REL_CHIP_LIMIT) {
+        const more = document.createElement('span');
+        more.className = 'rel-strip__more';
+        more.textContent = `+${ids.length - FULLSCREEN_REL_CHIP_LIMIT} more below`;
+        group.append(more);
+      }
+      return group;
+    };
+
+    /**
+     * Direct relations for the enlarged view: parents, children, what this piece
+     * depends on, and what replies to it.
+     *
+     * Deliberately DIRECT relations only. The sidebar already draws the full
+     * lineage tree, and repeating deep ancestry here would cost height on exactly
+     * the screens that have least of it. What this strip is for is getting to a
+     * neighbour in one tap.
+     */
+    const renderFullscreenRelations = async (token) => {
+      const container = dom.fullscreenRelations;
+      if (!container) return;
+      const requestId = ++state.fullscreenRelRequestId;
+      container.replaceChildren();
+      // The row is NEVER hidden, in any state. It is a fixed grid track reserved
+      // from the first paint, so the artwork below it cannot move when the chips
+      // land two round trips later. Collapsing it for a piece that has no
+      // relations would reintroduce exactly the jump this is here to prevent,
+      // because whether a piece has relations is itself only known after those
+      // round trips. An empty bar is the price of a page that never moves.
+      container.hidden = false;
+      if (!token || !supportsParentRelationships() || state.fullscreenSource === 'prepared') {
+        // Nothing to look up — a prepared file has no on-chain edges yet. Leave
+        // the reserved row in place and empty rather than collapsing it.
+        return;
+      }
+
+      const contractId = getTokenCacheContractId(token);
+      const sender = getReadOnlySenderAddress();
+      const [lineage, dependents, dependencies] = await Promise.all([
+        fetchLineage({ contractId, id: token.id }).catch(() => null),
+        fetchDependents({ contractId, id: token.id }).catch(() => null),
+        state.client?.getDependencies(token.id, sender).catch(() => []) ?? []
+      ]);
+      // A slower request for a piece the user has already navigated away from
+      // must never repaint the strip.
+      if (requestId !== state.fullscreenRelRequestId) return;
+
+      // Split the incoming edges: a receipt is not a reply, and lumping them
+      // together buries a real reply among the wizard's paperwork.
+      const dependentIds = dependents?.dependents ?? [];
+      let replies = dependentIds;
+      let receipts = [];
+      if (dependentIds.length > 0) {
+        const summaries = await ensureRelationshipSummaries(dependentIds);
+        if (requestId !== state.fullscreenRelRequestId) return;
+        receipts = dependentIds.filter((id) => isReceiptSummary(summaries.get(id.toString())));
+        replies = dependentIds.filter((id) => !isReceiptSummary(summaries.get(id.toString())));
+      }
+
+      // When the piece on screen IS a receipt, its dependency is the thing it
+      // documents, so say that rather than the generic "Depends on".
+      const outgoingLabel = isReceiptSummary(token) ? 'Receipt for' : 'Depends on';
+
+      // depth 1 IS the direct parents, already their own group — including them here
+      // would list every parent twice.
+      const ancestors = (lineage?.ancestors ?? [])
+        .filter((node) => node.depth > 1)
+        .sort((a, b) => a.depth - b.depth);
+
+      const groups = [
+        buildRelStripGroup(contractId, 'Parents', 'parents', lineage?.parents ?? []),
+        buildRelStripGroup(
+          contractId,
+          'Ancestors',
+          'ancestors',
+          ancestors.map((node) => node.id),
+          (id, index) => `${ancestors[index].depth} generations up`
+        ),
+        buildRelStripGroup(contractId, 'Siblings', 'siblings', lineage?.siblings ?? []),
+        buildRelStripGroup(contractId, 'Children', 'children', lineage?.children ?? []),
+        buildRelStripGroup(contractId, outgoingLabel, 'deps', dependencies ?? []),
+        buildRelStripGroup(contractId, 'Replies', 'replies', replies),
+        buildRelStripGroup(contractId, 'Receipts', 'receipts', receipts)
+      ].filter(Boolean);
+
+      if (groups.length === 0) {
+        // The row is reserved either way, so say why it is empty rather than
+        // leaving a blank bar the user has to interpret.
+        const empty = document.createElement('span');
+        empty.className = 'rel-strip__empty';
+        empty.textContent = 'No relations';
+        container.append(empty);
+        return;
+      }
+      container.append(...groups);
+    };
+
     const renderFullscreenSelectedToken = async () => {
       setFullscreenNotice('Loading inscription...');
       try {
         const source = await getSelectedTokenPreviewSource();
         renderFullscreenContent(source);
         updateFullscreenControls();
+        void renderFullscreenRelations(getSelectedToken());
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         setFullscreenNotice(message);
@@ -6005,7 +6272,10 @@
 
       if (!prepared || !prepared.bytes || prepared.bytes.length === 0) {
         dom.fullscreenTitle.textContent = 'Prepared payload';
+        dom.fullscreenTitle.hidden = false;
         dom.fullscreenMeta.textContent = 'No payload prepared';
+        setFullscreenId(null); // nothing is inscribed yet, so there is no id to show
+        void renderFullscreenRelations(null);
         setFullscreenNotice('Prepare a payload first.');
         return;
       }
@@ -6019,8 +6289,11 @@
       const url = URL.createObjectURL(blob);
       state.fullscreenUrl = url;
       dom.fullscreenTitle.textContent = 'Prepared payload';
+      dom.fullscreenTitle.hidden = false;
       dom.fullscreenMeta.textContent =
         `${kind.toUpperCase()} · ${formatBytes(BigInt(prepared.bytes.length))} · ${prepared.file.name}`;
+      setFullscreenId(null); // a prepared payload has no token id until it is sealed
+      void renderFullscreenRelations(null);
       dom.fullscreenRawLink.href = url;
       dom.fullscreenRawLink.textContent = 'Open payload';
       dom.fullscreenRawLink.download = prepared.file.name;
@@ -10252,11 +10525,21 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // and content loaders, and the market activity indexer.
     // ------------------------------------------------------------------
     const MARKET_LISTINGS_PER_CONTRACT = 24;
+
     const MARKET_THUMB_HYDRATION_CONCURRENCY = 4;
     const marketState = {
       filter: 'all',
       run: 0,
       listings: [],
+      // 'loading' | 'ready' | 'failed'. An empty `listings` array means three
+      // different things depending on this, and they must not be conflated:
+      // the fetch has not landed, the market really is empty, or the fetch
+      // broke. The USD price book resolves in well under a second and
+      // re-renders on arrival, so before this existed the first paint announced
+      // "no live listings right now" while the fetch was still in flight —
+      // reporting an empty variable as an empty market. A late re-render after
+      // a failure would likewise have overwritten the error with "loading".
+      listingsPhase: 'loading',
       liveFrames: 0, // sandboxed iframes currently mounted (shares the grid's cap)
       summaries: new Map(), // `${nftContract}:${tokenId}` -> TokenSummary|null
       media: new Map(), // same key -> { url, kind } | null
@@ -10477,7 +10760,189 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
     const marketBuyJourneys = new Map();
 
-    const marketBuy = async (listing) => {
+    // --- sponsored (zero-STX) checkout ------------------------------------
+    // Stage 2 of docs/plans/SPONSORED-MARKET-BUY-PLAN.md. Every decision below
+    // comes from /src/lib/market/sponsored-buy.ts, which the React MarketScreen
+    // imports too, so the two surfaces cannot answer the same question
+    // differently. This page owns only the DOM.
+    //
+    // Deliberately quiet: nothing here advertises free checkout. Restoring that
+    // copy is Stage 3, gated on the testnet rehearsal in the plan's §5. A buyer
+    // who happens to get sponsored simply pays no fee.
+
+    // Relayer messages and txids reach the DOM through innerHTML templates, and
+    // they come from a remote service rather than this page. Escape them.
+    const escapeHtml = (value) => String(value ?? '').replace(
+      /[&<>"']/g,
+      (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+    );
+
+    const marketSponsorClients = new Map();
+    const marketSponsorClientFor = (entry) => {
+      // resolveSponsorBase returns '' for a same-origin relayer and null only
+      // when the market has none. Do not collapse the two: the mainnet registry
+      // writes "/" for every sponsored market, so a falsy check here disables
+      // sponsorship everywhere and does it silently.
+      const base = resolveSponsorBase(entry);
+      if (base === null) return null;
+      if (!marketSponsorClients.has(base)) {
+        marketSponsorClients.set(base, createSponsorClient(base));
+      }
+      return marketSponsorClients.get(base);
+    };
+
+    /**
+     * Ask the relayer what a sponsored buy would cost and whether it is up.
+     * A quote failure is not an error here: it means "not available", and the
+     * caller falls through to a normal self-paid purchase.
+     */
+    const marketSponsorReadiness = async (client) => {
+      try {
+        const quote = await client.quote();
+        return { available: true, estimatedFeeUstx: quote.estimatedFeeUstx };
+      } catch {
+        return { available: false, estimatedFeeUstx: 0n };
+      }
+    };
+
+    /**
+     * Render a terminal failure with, when it is safe, a button that retries the
+     * same purchase self-paid. `fallbackToSelfPaid` is false when a second
+     * attempt could cost the buyer a miner fee for nothing (listing already
+     * sold, or a sponsored buy that may still be confirming) — see
+     * sponsoredBuyTimeoutFailure in lib/market/sponsored-buy.ts.
+     */
+    const renderMarketSponsorFailure = (listing, phase) => {
+      marketDom.status.innerHTML =
+        `<span><strong>Market</strong> sponsored checkout failed: ${escapeHtml(phase.message)}</span>`;
+      if (!phase.fallbackToSelfPaid) return;
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'market-chip';
+      retry.textContent = 'Pay my own network fee instead';
+      retry.addEventListener('click', () => {
+        void marketBuy(listing, { forceSelfPaid: true });
+      });
+      marketDom.status.append(' ', retry);
+    };
+
+    /**
+     * Returns true when the sponsored path took ownership of this purchase
+     * (whether it succeeded or failed), false when the caller should carry on
+     * to the normal self-paid buy.
+     */
+    const marketSponsoredBuy = async (listing, ctx) => {
+      const client = marketSponsorClientFor(listing.entry);
+      if (!client) return false;
+
+      marketDom.status.innerHTML =
+        '<span><strong>Market</strong> checking sponsored checkout…</span>';
+      const readiness = await marketSponsorReadiness(client);
+      const eligibility = getSponsoredBuyEligibility({
+        market: listing.entry,
+        listing,
+        estimatedFeeUstx: readiness.estimatedFeeUstx,
+        relayerAvailable: readiness.available
+      });
+      if (!eligibility.ok) {
+        // A sold listing is the one refusal a self-paid retry cannot fix.
+        if (eligibility.reason === 'listing-sold') {
+          marketDom.status.innerHTML =
+            `<span><strong>Market</strong> ${escapeHtml(sponsoredBuyIneligibilityMessage(eligibility) ?? 'this listing is unavailable.')}</span>`;
+          return true;
+        }
+        return false;
+      }
+
+      const finalPhase = await runSponsoredBuy({
+        client,
+        contractId: listing.contractId,
+        listingId: listing.listingId,
+        signSponsoredBuy: async () => {
+          // The origin signs at fee 0 and does not broadcast; the relayer
+          // attaches the sponsor signature and pays. A public nonce read is
+          // required because the wallet never sees an unsigned sponsored tx it
+          // can nonce itself.
+          const originNonce = await fetchAddressNonce(
+            state.walletSession.address,
+            listing.entry.network
+          );
+          const payload = await new Promise((resolve, reject) => {
+            showSponsoredContractCall({
+              contractAddress: listing.entry.address,
+              contractName: listing.entry.contractName,
+              functionName: 'buy',
+              functionArgs: [
+                contractPrincipalCV(ctx.nftAddress, ctx.nftName),
+                uintCV(listing.listingId)
+              ],
+              network: listing.entry.network,
+              stxAddress: state.walletSession.address,
+              publicKey: state.walletSession.publicKey,
+              nonce: originNonce,
+              postConditionMode: PostConditionMode.Deny,
+              postConditions: ctx.postConditions,
+              sponsored: true,
+              onFinish: resolve,
+              onCancel: () => reject(Object.assign(
+                new Error('Wallet request cancelled.'),
+                { code: 'WALLET_CANCELLED' }
+              )),
+              onError: (error) => reject(Object.assign(
+                error instanceof Error ? error : new Error(String(error)),
+                { code: error?.code ?? 'WALLET_REQUEST_FAILED' }
+              ))
+            });
+          });
+          const txHex = payload?.txHex ?? payload?.transaction ?? payload?.tx ?? null;
+          if (typeof txHex !== 'string' || txHex.length === 0) {
+            throw new Error('Wallet did not return a signed transaction.');
+          }
+          return { txHex };
+        },
+        onSubmitRetry: (error, attempt, maxAttempts) => {
+          marketDom.status.innerHTML =
+            `<span><strong>Market</strong> sponsor is busy; your signature is still valid, retrying (${attempt + 1}/${maxAttempts})…</span>`;
+        },
+        onPhase: (phase) => {
+          if (phase.phase === 'idle' || phase.phase === 'failed' || phase.phase === 'settled') return;
+          marketDom.status.innerHTML =
+            `<span><strong>Market</strong> ${escapeHtml(sponsoredBuyProgressLabel(phase))}</span>`;
+        }
+      });
+
+      if (finalPhase.phase === 'settled') {
+        telemetryEvent({
+          journey: ctx.journey,
+          attempt: ctx.attempt,
+          step: 'settle',
+          outcome: 'success'
+        });
+        marketBuyJourneys.delete(ctx.target);
+        marketDom.status.innerHTML =
+          `<span><strong>Market</strong> purchase complete — you paid no network fee${finalPhase.buyTxId ? ` — tx ${escapeHtml(finalPhase.buyTxId)}` : ''}.</span><span class="badge green">settled</span>`;
+        return true;
+      }
+      if (finalPhase.phase === 'failed') {
+        telemetryEvent({
+          journey: ctx.journey,
+          attempt: ctx.attempt,
+          step: 'settle',
+          outcome: 'error',
+          errorCode: 'SPONSOR_REJECTED',
+          error: finalPhase.message
+        });
+        renderMarketSponsorFailure(listing, finalPhase);
+        return true;
+      }
+      // idle: the buyer dismissed the wallet. Say so and stop, rather than
+      // reopening it for a self-paid buy they did not ask for.
+      marketBuyJourneys.delete(ctx.target);
+      marketDom.status.innerHTML = '<span><strong>Market</strong> purchase cancelled.</span>';
+      return true;
+    };
+
+    const marketBuy = async (listing, options = {}) => {
       const publicBlockReason = getListingPublicBlockReason(listing);
       if (publicBlockReason) {
         marketDom.status.innerHTML = publicBlockReason === 'legacy-nft'
@@ -10511,6 +10976,23 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         marketBuyJourneys.get(marketTarget) ?? startJourney('market_buy', marketTarget);
       marketBuyJourneys.set(marketTarget, marketJourney);
       const marketAttempt = marketJourney.attempt();
+
+      // Sponsored branch. Anything short of "eligible and the relayer answered"
+      // returns false and drops through to the self-paid call below, so a buyer
+      // is never left without a way to purchase. `forceSelfPaid` is set by the
+      // fallback button rendered on a sponsored failure.
+      if (!options.forceSelfPaid && isSponsoredMarket(listing.entry)) {
+        const handled = await marketSponsoredBuy(listing, {
+          nftAddress,
+          nftName,
+          postConditions,
+          journey: marketJourney,
+          attempt: marketAttempt,
+          target: marketTarget
+        });
+        if (handled) return;
+      }
+
       telemetryEvent({ journey: marketJourney, attempt: marketAttempt, step: 'submit', outcome: 'start' });
       marketDom.status.innerHTML = '<span><strong>Market</strong> confirm the purchase in your wallet…</span>';
       showContractCall({
@@ -10569,6 +11051,45 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
       marketState.summaries.set(key, summary);
       return summary;
+    };
+
+    /**
+     * The Xtrata core's built-in placeholder, as it comes back from
+     * `get-svg-data-uri`.
+     *
+     * Verified against xtrata-v3.2.3.clar: the function is
+     *
+     *     (if (is-some (nft-get-owner? xtrata-inscription id))
+     *       (ok (some (concat SVG-DATAURI-PREFIX SVG-STATIC-B64)))
+     *       (ok none))
+     *
+     * — a constant for every token that exists, and identical across v1.1
+     * through v3.4. It answers "does this id exist", not "what does it look
+     * like".
+     *
+     * Matched on three marks in the DECODED svg rather than on the base64,
+     * because base64 of the same bytes can differ by padding or line breaks
+     * while the decoded text cannot. Three marks and not one, so a coincidental
+     * 50x50 viewBox somewhere else is not enough to be mistaken for it.
+     */
+    const isPlaceholderSvgDataUri = (dataUri) => {
+      if (typeof dataUri !== 'string') return false;
+      const base64 = dataUri.split(',')[1] ?? '';
+      if (!base64) return false;
+      // Compare on the decoded text: base64 of the same bytes can differ by
+      // padding or line breaks, and the decoded form is what a reader would
+      // actually recognise.
+      let decoded;
+      try {
+        decoded = atob(base64);
+      } catch {
+        return false;
+      }
+      return (
+        decoded.includes("viewBox='0 0 50 50'") &&
+        decoded.includes("cx='25' cy='25' r='20'") &&
+        decoded.includes("#6366f1")
+      );
     };
 
     const MARKET_MEDIA_MAX_BYTES = 512n * 1024n;
@@ -10686,7 +11207,21 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         const fetchable =
           meta && meta.totalSize > 0n && meta.totalSize <= MARKET_MEDIA_MAX_BYTES;
 
-        if (kind === 'image' && fetchable && mime.includes('svg')) {
+        // `getMediaKind` returns 'svg' for image/svg+xml and 'image' only for
+        // the raster types, so the two are DISJOINT. This branch used to read
+        // `kind === 'image' && mime.includes('svg')`, which cannot ever be
+        // true: any mime containing "svg" classifies as 'svg', never 'image'.
+        //
+        // The whole on-chain SVG path was therefore dead. Every SVG listing
+        // fell through to the `summary.svgDataUri` fallback below, which is the
+        // core contract's SVG-STATIC constant — the same generic three-circle
+        // device for every token. Twenty-four distinct pixel-art plates all
+        // rendered as identical concentric circles, and the page made one
+        // get-chunk call across twenty-five listings instead of twenty-five.
+        //
+        // Every other renderer in this file already writes
+        // `kind === 'image' || kind === 'svg'`. This was the only one that did not.
+        if (kind === 'svg' && fetchable) {
           // On-chain SVG: script-driven animations need a real document.
           const bytes = await marketFetchContent(listing, meta);
           const text = new TextDecoder().decode(bytes);
@@ -10723,7 +11258,19 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         }
 
         // Fallbacks: inline SVG data URI from the summary, then token-URI image.
-        if (!media && summary?.svgDataUri) {
+        //
+        // The svgDataUri one is skipped when it is the core's placeholder.
+        // `get-svg-data-uri` on an Xtrata core returns a CONSTANT — the same
+        // three-circle SVG-STATIC device for every token that exists — so it is
+        // an existence probe wearing the costume of artwork. Rendering it says
+        // "this is the inscription" about something that is the same for all of
+        // them, which is a worse answer than "no preview": one is an absence,
+        // the other is a confident wrong picture.
+        //
+        // Still tried for anything that is NOT that constant, because
+        // fetchTokenSummary is generic and another contract's svgDataUri may
+        // well be the real thing.
+        if (!media && summary?.svgDataUri && !isPlaceholderSvgDataUri(summary.svgDataUri)) {
           media = { kind: 'image', url: summary.svgDataUri };
         }
         if (!media && summary?.tokenUri) {
@@ -10920,8 +11467,13 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         priceBlock.append(detailRow('Listed at block', listing.createdAt.toString()));
       }
       if (isSponsoredMarket(listing.entry) && listing.budgetRemaining !== null) {
+        // Factual only: the budget is genuinely escrowed, but it is not yet
+        // spendable from this page, so do not describe the buy as free.
         priceBlock.append(
-          detailRow('Sponsorship', `no STX needed — fee budget ${formatAssetAmount(listing.budgetRemaining, 6, 'STX')} remaining`)
+          detailRow(
+            'Seller fee deposit',
+            `${formatAssetAmount(listing.budgetRemaining, 6, 'STX')} escrowed — refunds to the seller (sponsored checkout not yet enabled)`
+          )
         );
       }
       frag.append(priceBlock);
@@ -10971,10 +11523,38 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     };
     const sellState = { quote: null, quoteRun: 0 };
 
-    // Legacy markets stay in the registry so old listings remain readable,
-    // but new listings must not go to them — exclude from the sell selector.
+    // Fallback when the relayer cannot be reached for a live quote. Above
+    // MIN-FEE-BUDGET so a listing still succeeds, and well under the claim cap
+    // so nothing extra is tied up.
+    const DEFAULT_FEE_BUDGET_USTX = 60_000n;
+
+    // A quote is a remote number and the contract rejects anything below
+    // MIN-FEE-BUDGET outright, which would abort the listing after the seller
+    // had already approved it. Anything above the claim cap is simply escrowed
+    // and never spendable, so it is the seller's money sitting idle.
+    const clampFeeBudget = (budget) => {
+      if (budget < MIN_FEE_BUDGET_USTX) return MIN_FEE_BUDGET_USTX;
+      if (budget > MAX_USEFUL_BUDGET_USTX) return MAX_USEFUL_BUDGET_USTX;
+      return budget;
+    };
+
+    // Which markets can take a NEW listing of the inscription core the app is
+    // currently pointed at.
+    //
+    // Every pre-sponsored market welds its NFT contract in at deploy time:
+    // xtrata-market-{stx,sbtc,usdc}-v1-0 accept only xtrata-v2-1-0, and
+    // xtrata-market-v1-{0,1} only xtrata-v1-1-1. Offering those for a v3
+    // inscription produced a transaction that aborted with ERR-NOT-AUTHORIZED
+    // before the wallet ever showed a confirmation, which Xverse reports as
+    // "Internal error" — no way for a seller to work out what was wrong. Worse,
+    // the buy path tells sellers of legacy listings to migrate to v3 and relist,
+    // which moved their token OUT of the only core those markets accept.
+    //
+    // marketAcceptsNftContract reads the recorded lock, so the selector now
+    // offers only what will actually work. Existing listings on locked markets
+    // stay readable, buyable and cancellable: the lock is on list-token alone.
     const sellEntries = () =>
-      marketEntriesForNetwork().filter((entry) => !/legacy/i.test(entry.label ?? ''));
+      getSellableMarkets(getContractId(state.contract), state.contract.network);
 
     const sellSelectedEntry = () => {
       const id = sellDom.market?.value;
@@ -10984,9 +11564,26 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const populateSellMarkets = () => {
       if (!sellDom.market) return;
       const current = sellDom.market.value;
-      const orderedEntries = [...sellEntries()].sort((a, b) =>
-        Number(isSponsoredMarket(a)) - Number(isSponsoredMarket(b))
-      );
+      // getSellableMarkets already returns sponsored first. The previous sort
+      // here read `Number(isSponsoredMarket(a)) - Number(isSponsoredMarket(b))`,
+      // which put them last — the opposite of what the sBTC and USDCx flows want,
+      // since sponsored is the only kind of market that can take a v3 listing.
+      const orderedEntries = sellEntries();
+      if (orderedEntries.length === 0) {
+        // Say so rather than presenting an empty dropdown. This is reachable:
+        // point the app at a core no deployed market accepts and there is
+        // genuinely nowhere to list until one is allow-listed.
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'No market accepts this inscription contract';
+        sellDom.market.replaceChildren(option);
+        sellDom.market.disabled = true;
+        if (sellDom.button) sellDom.button.disabled = true;
+        updateSellUi();
+        return;
+      }
+      sellDom.market.disabled = false;
+      if (sellDom.button) sellDom.button.disabled = false;
       sellDom.market.replaceChildren(
         ...orderedEntries.map((entry) => {
           const settlement = getMarketSettlementAsset(entry.paymentTokenContractId ?? null);
@@ -10994,12 +11591,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           const option = document.createElement('option');
           option.value = getMarketContractId(entry);
           option.textContent = isSponsoredMarket(entry)
-            ? `${symbol} - sponsored (buyer pays no fee)`
+            ? `${symbol} - buyer can pay no network fee`
             : `${symbol} - standard`;
           return option;
         })
       );
-      if (current) sellDom.market.value = current;
+      if (current && orderedEntries.some((entry) => getMarketContractId(entry) === current)) {
+        sellDom.market.value = current;
+      }
       updateSellUi();
     };
 
@@ -11018,24 +11617,43 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const settlement = getMarketSettlementAsset(entry.paymentTokenContractId ?? null);
       const symbol = getMarketSettlementLabel(settlement);
       sellDom.priceLabel.textContent = `Price (${symbol})`;
-      if (isSponsoredMarket(entry) && entry.sponsorApi) {
+      if (isSponsoredMarket(entry) && resolveSponsorBase(entry) !== null) {
         const run = ++sellState.quoteRun;
         sellDom.deposit.textContent = 'Fetching sponsorship deposit quote...';
+        // The deposit is charged in STX on EVERY sponsored market, including the
+        // sBTC and USDCx ones, and the contract requires it: list-token asserts
+        // fee-budget >= MIN-FEE-BUDGET. Say the amount and the currency before
+        // the wallet opens, because this is money leaving the seller's balance.
+        const describe = (budget, suffix) =>
+          `Sponsorship deposit: ${formatAssetAmount(budget, 6, 'STX')}${suffix}, ` +
+          'charged in STX even on an sBTC or USDCx listing. It covers the buyer\'s ' +
+          'network fee so they can buy holding no STX, and the unused part comes ' +
+          'back to you when the listing sells or you cancel.';
         try {
-          const base = entry.sponsorApi.replace(/\/+$/, '');
+          const base = resolveSponsorBase(entry);
           const r = await fetch(`${base}/sponsor/quote`, { method: 'POST' });
           if (run !== sellState.quoteRun) return;
           if (!r.ok) throw new Error('quote unavailable');
           const q = await r.json();
-          sellState.quote = BigInt(q.budgetUstx ?? 60000);
-          sellDom.deposit.textContent =
-            `Sponsorship deposit: ${formatAssetAmount(sellState.quote, 6, 'STX')} - covers the buyer's network fee so they need no extra STX; the unused part is refunded to you when it sells or you cancel.`;
+          sellState.quote = clampFeeBudget(BigInt(q.budgetUstx ?? DEFAULT_FEE_BUDGET_USTX));
+          sellDom.deposit.textContent = describe(sellState.quote, '');
         } catch {
           if (run !== sellState.quoteRun) return;
-          sellState.quote = 60_000n;
-          sellDom.deposit.textContent =
-            'Sponsorship deposit: 0.06 STX (default - live quote unavailable). Unused portion refunds to you.';
+          sellState.quote = DEFAULT_FEE_BUDGET_USTX;
+          sellDom.deposit.textContent = describe(
+            sellState.quote,
+            ' (default rate, live quote unavailable)'
+          );
         }
+      } else if (isSponsoredMarket(entry)) {
+        // Sponsored market with no relayer configured: the deposit is still
+        // mandatory on chain, so quote the contract minimum rather than
+        // implying the listing is free.
+        sellState.quote = DEFAULT_FEE_BUDGET_USTX;
+        sellDom.deposit.textContent =
+          `Sponsorship deposit: ${formatAssetAmount(sellState.quote, 6, 'STX')}, charged in STX. ` +
+          'No sponsor relayer is configured for this market, so buyers will pay their ' +
+          'own fee for now. The deposit is refunded when the listing sells or you cancel.';
       } else {
         sellState.quote = null;
         sellDom.deposit.textContent = 'Standard listing: the buyer pays their own network fee.';
@@ -11045,6 +11663,15 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const marketList = async () => {
       const entry = sellSelectedEntry();
       if (!entry) return;
+      // Belt and braces: the selector should never offer a market that cannot
+      // take this core, but a stale selection survives a contract switch, and
+      // the failure mode is an opaque wallet error rather than a useful message.
+      const activeNftContract = getContractId(state.contract);
+      if (!marketAcceptsNftContract(entry, activeNftContract)) {
+        sellDom.status.textContent =
+          `${entry.label} only accepts ${entry.lockedNftContract?.split('.')[1] ?? 'another'} inscriptions, not ${activeNftContract.split('.')[1]}. Pick a different market.`;
+        return;
+      }
       if (!state.walletSession.isConnected || !state.walletSession.address) {
         sellDom.status.textContent = 'Connect a wallet to list.';
         return;
@@ -11063,7 +11690,22 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         return;
       }
       const sponsored = isSponsoredMarket(entry);
-      const budget = sponsored ? (sellState.quote ?? 60_000n) : null;
+      const budget = sponsored
+        ? clampFeeBudget(sellState.quote ?? DEFAULT_FEE_BUDGET_USTX)
+        : null;
+      if (sponsored) {
+        // The contract asserts fee-budget >= MIN-FEE-BUDGET and would abort
+        // after the seller had already approved the transaction, paying a miner
+        // fee for nothing. Check here, where it costs them nothing.
+        const validation = validateFeeBudget(budget);
+        if (!validation.ok) {
+          sellDom.status.textContent =
+            validation.reason === 'above-useful-maximum'
+              ? `Sponsorship deposit cannot exceed ${formatAssetAmount(MAX_USEFUL_BUDGET_USTX, 6, 'STX')}.`
+              : `Sponsorship deposit must be at least ${formatAssetAmount(MIN_FEE_BUDGET_USTX, 6, 'STX')}.`;
+          return;
+        }
+      }
 
       // ownership check before the wallet opens
       sellDom.status.textContent = 'Checking ownership...';
@@ -11167,7 +11809,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       );
       if (!visible.length) {
         marketDom.listings.replaceChildren();
-        marketDom.status.innerHTML = '<span><strong>Market</strong> no live listings right now — list one from My Wallet.</span>';
+        // "Nothing yet", "nothing at all" and "we could not find out" are three
+        // different claims. Only the middle one is about the market.
+        const emptyMessage = {
+          loading: 'loading listings…',
+          failed: 'could not load listings.',
+          ready: 'no live listings right now — list one from My Wallet.'
+        }[marketState.listingsPhase] ?? 'loading listings…';
+        marketDom.status.innerHTML = `<span><strong>Market</strong> ${emptyMessage}</span>`;
         return;
       }
       marketDom.status.innerHTML = `<span><strong>Market</strong> ${visible.length} live listing${visible.length === 1 ? '' : 's'}.</span>`;
@@ -11177,7 +11826,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           const card = document.createElement('article');
           card.className = 'market-card';
           const symbol = getMarketSettlementLabel(listing.settlement);
-          const sponsored = isSponsoredMarket(listing.entry);
+          // No `sponsored` flag here on purpose: the card must look identical on
+          // every market until Stage 3 restores the sponsorship copy. marketBuy
+          // decides sponsorship at click time from the live relayer state, which
+          // a badge rendered at list time could not honestly reflect anyway.
           const isOwnListing = !!state.walletSession.address &&
             addressesEqual(listing.seller, state.walletSession.address);
 
@@ -11196,12 +11848,22 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
           const badges = document.createElement('div');
           badges.className = 'market-card__badge-row';
+          // Sponsored checkout is NOT wired into this page: marketBuy always
+          // uses showContractCall, so the buyer pays their own network fee on
+          // every market. Until the sponsored buy flow is implemented here (see
+          // docs/plans/SPONSORED-MARKET-BUY-PLAN.md) this must not claim
+          // otherwise — the badge previously said "No STX needed", which sent
+          // zero-STX buyers into a transaction they could not pay for.
           badges.innerHTML = `<span class="badge">${symbol}</span>${
-            sponsored ? '<span class="badge green">No STX needed</span>' : ''
-          }${isOwnListing ? '<span class="badge blue">Your listing</span>' : ''}`;
+            isOwnListing ? '<span class="badge blue">Your listing</span>' : ''
+          }`;
 
           const price = document.createElement('div');
           price.className = 'market-card__price';
+          // Tagged so the USD spot rates can be dropped in later by updating this
+          // one text node, instead of re-rendering the whole grid. See
+          // refreshMarketPrices.
+          price.dataset.marketPrice = `${listing.contractId}:${listing.listingId}`;
           // Always show the USD equivalent next to the asset price (live
           // Coinbase spot rates; falls back to asset-only while loading).
           price.textContent = formatMarketPriceWithUsd(
@@ -11252,7 +11914,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             const buy = document.createElement('button');
             buy.type = 'button';
             buy.className = 'market-chip';
-            buy.textContent = sponsored ? 'Buy — no STX needed' : 'Buy';
+            // See the badge comment above: every buy on this page is self-paid.
+            buy.textContent = 'Buy';
             buy.addEventListener('click', () => { void marketBuy(listing); });
             actions.append(buy);
           }
@@ -11370,11 +12033,30 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // Fast path: the edge-cached aggregate endpoint (functions/market/listings)
     // turns ~1+N Hiro reads per market into ONE cached request. Falls back to
     // direct reads when unavailable (local dev without wrangler).
+    /**
+     * Read the aggregate listings endpoint.
+     *
+     * Returns `{ listings, meta }`. The meta exists because the old log line
+     * ("listings served from edge cache") printed identically for a 0.2s cache
+     * hit and a ~4.5s cold origin scan — it named which endpoint answered, not
+     * how, which hid the one measurement worth taking. `elapsedMs` is the real
+     * round trip and `ageMs` is how stale the answer was, so a cold scan is
+     * distinguishable from a warm read in the console without a profiler.
+     */
     const loadListingsFromCache = async ({ seller = null, allowEmpty = false } = {}) => {
       const query = seller ? `?seller=${encodeURIComponent(seller)}` : '';
+      const startedAt = Date.now();
       const response = await fetch(`/market/listings${query}`);
+      const elapsedMs = Date.now() - startedAt;
       if (!response.ok) throw new Error(`cache endpoint ${response.status}`);
       const payload = await response.json();
+      const meta = {
+        elapsedMs,
+        degraded: payload.degraded === true,
+        // The endpoint stamps updatedAt when it built the answer. A big age means
+        // the edge served a cached copy; near zero means this request paid for it.
+        ageMs: typeof payload.updatedAt === 'number' ? Math.max(0, startedAt - payload.updatedAt) : null
+      };
       // Never trust an empty or degraded cache answer: a transient upstream
       // failure server-side must not render as "no listings" when listings
       // exist on-chain. Throwing here falls back to direct reads.
@@ -11384,7 +12066,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const byId = new Map(
         marketEntriesForNetwork().map((entry) => [getMarketContractId(entry), entry])
       );
-      return (payload.listings ?? [])
+      const listings = (payload.listings ?? [])
         .map((row) => {
           const entry = byId.get(row.contractId);
           if (!entry) return null;
@@ -11405,6 +12087,36 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           };
         })
         .filter(Boolean);
+      return { listings, meta };
+    };
+
+    /**
+     * Drop live USD figures into cards that are already on screen.
+     *
+     * The price book resolves independently of the listings fetch, and the old
+     * callback re-ran renderMarketListings for it — which calls replaceChildren
+     * on the grid and rebuilds every card, thumbnail slot and button, purely to
+     * append "~$1.38" to one text node each. That doubled the render work and the
+     * thumbnail cache lookups on every market load (48 for 24 cards).
+     *
+     * Prices are the only thing a spot rate changes, so update only those.
+     */
+    const refreshMarketPrices = () => {
+      if (!marketDom.listings) return 0;
+      const byKey = new Map(
+        marketState.listings.map((listing) => [`${listing.contractId}:${listing.listingId}`, listing])
+      );
+      let updated = 0;
+      marketDom.listings.querySelectorAll('[data-market-price]').forEach((node) => {
+        const listing = byKey.get(node.dataset.marketPrice);
+        if (!listing) return;
+        const next = formatMarketPriceWithUsd(listing.price, listing.settlement, state.usdPriceBook);
+        if (node.textContent !== next) {
+          node.textContent = next;
+          updated += 1;
+        }
+      });
+      return updated;
     };
 
     const renderWalletMarketListings = () => {
@@ -11511,7 +12223,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       renderWalletMarketListings();
       let listings = [];
       try {
-        listings = await loadListingsFromCache({ seller: walletAddress, allowEmpty: true });
+        ({ listings } = await loadListingsFromCache({ seller: walletAddress, allowEmpty: true }));
       } catch {
         const perContract = await Promise.all(
           marketEntriesForNetwork().map((entry) => readMarketListings(entry).catch(() => []))
@@ -11535,14 +12247,21 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const loadMarketPage = async (params = null) => {
       const run = ++marketState.run;
       if (!marketDom.listings) return;
+      // A fresh load has not resolved yet, so any render before the fetch lands
+      // must say "loading", not "none".
+      marketState.listingsPhase = 'loading';
       if (marketDom.badge) marketDom.badge.textContent = state.contract.network;
-      // USD conversion: fetch spot rates in the background and re-render the
-      // cards once available (asset-only prices show in the meantime).
+      // USD conversion: fetch spot rates in the background and patch the figures
+      // into whatever is on screen once they land (asset-only prices show in the
+      // meantime). This used to call renderMarketListings, which rebuilt every
+      // card to change one text node each — and, because it could win the race
+      // against the listings fetch, was what painted "no live listings" over a
+      // grid that was still loading.
       void loadUsdPriceBook().then(() => {
-        if (run === marketState.run && state.usdPriceBook) {
-          renderMarketListings();
-          renderSellerDashboard();
-        }
+        if (run !== marketState.run || !state.usdPriceBook) return;
+        const updated = refreshMarketPrices();
+        renderSellerDashboard();
+        debugLog('market', 'usd prices applied', { updated });
       });
       renderMarketToolbar();
       populateSellMarkets();
@@ -11554,8 +12273,18 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       try {
         let listings;
         try {
-          listings = await loadListingsFromCache();
-          debugLog('market', 'listings served from edge cache', { count: listings.length });
+          const answer = await loadListingsFromCache();
+          listings = answer.listings;
+          // Report how the answer arrived, not merely that it did. A warm edge
+          // read and a cold origin scan differ by an order of magnitude, and the
+          // old message was identical for both.
+          debugLog('market', 'listings loaded', {
+            count: listings.length,
+            elapsedMs: answer.meta.elapsedMs,
+            source: answer.meta.ageMs !== null && answer.meta.ageMs > 1000 ? 'edge-cache' : 'origin-scan',
+            answerAgeMs: answer.meta.ageMs,
+            degraded: answer.meta.degraded
+          });
         } catch {
           const perContract = await Promise.all(
             marketEntriesForNetwork().map((entry) => readMarketListings(entry).catch(() => []))
@@ -11564,10 +12293,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         }
         if (run !== marketState.run) return;
         marketState.listings = listings.sort((a, b) => (b.listingId > a.listingId ? 1 : -1));
+        marketState.listingsPhase = 'ready';
         renderMarketListings();
         renderSellerDashboard();
       } catch (error) {
         if (run !== marketState.run) return;
+        marketState.listingsPhase = 'failed';
         marketDom.status.innerHTML = '<span><strong>Market</strong> could not load listings.</span>';
         debugLog('market', 'load failed', { error: String(error?.message ?? error) });
       }
@@ -14183,6 +14914,17 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     dom.previewExpandButton.addEventListener('click', openFullscreenViewer);
     dom.fullscreenCloseButton.addEventListener('click', () => {
       void closeFullscreenViewer();
+    });
+    // The mark is the way back. Closing the enlarged view IS returning to the
+    // explorer, so it shares the close path rather than navigating anywhere.
+    dom.fullscreenMarkButton?.addEventListener('click', () => {
+      void closeFullscreenViewer();
+    });
+    // Rotating a phone rewraps the chrome, which changes how much room the stage
+    // has. Recompute on the next frame so the measurement reflects the new layout.
+    window.addEventListener('resize', () => {
+      if (!state.fullscreenOpen) return;
+      requestAnimationFrame(syncFullscreenChromeSpace);
     });
     dom.fullscreenPrevButton.addEventListener('click', () => {
       void navigateFullscreenSelection(-1);

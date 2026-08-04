@@ -12,7 +12,7 @@
 ;; 5) SIP-009 compatible: standard NFT interfaces for wallet/indexer interoperability.
 ;; 6) Admin can: set split fees (bounded), set royalty recipient, pause/unpause, transfer admin ownership.
 ;; 7) Sealing requires ALL declared chunks uploaded (current-index == total-chunks) and hash verified.
-;; 8) Upload sessions are start-or-resume and expire after inactivity (stacks-block-height based):
+;; 8) Upload sessions are start-or-resume and expire after inactivity (burn-block-height based):
 ;;    - begin-inscription starts/resumes {uploader, file-hash} uploads
 ;;    - begin-or-get starts/resumes upload and does not canonicalize duplicates
 ;;    - expired uploads can be permissionlessly purged in batches
@@ -86,7 +86,13 @@
 (define-constant FEE-MIN u1)
 (define-constant FEE-MAX u1000000)
 
-;; Upload expiry (~30 days at 10-min block cadence)
+;; Upload expiry: 4320 Bitcoin blocks, so ~30 days.
+;;
+;; Measured in burn-block-height, not stacks-block-height. Under stacks-block-height
+;; this same constant meant 30 days pre-Nakamoto and about 15 hours after it, because
+;; Stacks blocks went from one-per-Bitcoin-block to one every ~12 seconds. Pegging to
+;; the burn chain keeps the window meaning what it says regardless of Stacks block
+;; production.
 (define-constant UPLOAD-EXPIRY-BLOCKS u4320)
 
 (define-constant MODE-STAGED u1)
@@ -120,17 +126,27 @@
 (define-data-var royalty-recipient principal tx-sender)
 
 ;; Split fee controls (microSTX), bounded for predictability.
-;; Defaults preserve prior pricing at 50+ chunks while pro-rating the first batch.
+;;
+;; These defaults mirror what v3.2.3 is actually charging on mainnet, not the
+;; values v3.2.3 shipped with. Two of them were tuned down after that deploy:
+;; upload-chunk-fee-unit from 2000 and single-tx-fee-unit from 100000. Baking the
+;; live numbers in means the contract prices correctly the moment it lands, with
+;; no admin transaction between deploy and correct pricing, and no window where
+;; someone mints at ten times the going rate.
+;;
+;; It also keeps it reachable. assert-valid-fee-update caps a single change at 10x
+;; down, so correcting single-tx-fee-unit from 100000 to 10000 after the fact would
+;; sit exactly on that limit with no room to spare.
 ;; - begin-fee-unit: charged once per new upload session
 ;; - upload-chunk-fee-unit: charged per chunk for the first upload batch only (up to 32 chunks)
 ;; - upload-batch-fee-unit: charged per full upload batch after the first
 ;; - seal-fee-unit: fixed extra fee charged at seal
 ;; - single-tx-fee-unit: one fixed fee for the core-native small-file route
 (define-data-var begin-fee-unit uint u100000)
-(define-data-var upload-chunk-fee-unit uint u2000)
+(define-data-var upload-chunk-fee-unit uint u1000)
 (define-data-var upload-batch-fee-unit uint u100000)
 (define-data-var seal-fee-unit uint u100000)
-(define-data-var single-tx-fee-unit uint u100000)
+(define-data-var single-tx-fee-unit uint u10000)
 
 ;; Pause switch (admin adjustable)
 ;; IMPORTANT: pause blocks inscription writes for non-owners; transfers and reads remain available.
@@ -176,6 +192,11 @@
 
 (define-map InscriptionDependencies uint (list 50 uint))
 (define-map InscriptionParents uint (list 50 uint))
+
+;; owner -> delegate. Set by the owner, for the owner's own inscriptions only.
+;; Lets `delegate` attach children to `owner`'s inscriptions, but only when the
+;; child mints to `owner`. Revocable at any time. See parent-allowed?.
+(define-map ParentDelegates { owner: principal, delegate: principal } bool)
 (define-map MigrationSource uint { source-contract: principal, source-id: uint })
 
 (define-map UploadState
@@ -224,7 +245,7 @@
     purge-index: uint
   })
 )
-  (>= stacks-block-height (+ (get last-touched state) UPLOAD-EXPIRY-BLOCKS))
+  (>= burn-block-height (+ (get last-touched state) UPLOAD-EXPIRY-BLOCKS))
 )
 
 (define-private (assert-not-expired
@@ -351,24 +372,50 @@
   )
 )
 
-(define-private (validate-parent (id uint) (acc { missing: bool, unowned: bool }))
-  (if (or (get missing acc) (get unowned acc))
-    acc
-    (match (nft-get-owner? xtrata-inscription id)
-      owner
-        (if (is-eq owner tx-sender)
-          { missing: false, unowned: false }
-          { missing: false, unowned: true }
-        )
-      { missing: true, unowned: false }
+;; A parent link is a claim of descent, so it is gated on ownership: by default
+;; the only children of your inscription are the ones you made. That guarantee is
+;; worth keeping, so the payer/recipient split does NOT relax it.
+;;
+;; It does need an escape hatch. A publisher paying for an author's piece cannot
+;; attach it to a parent the author owns, because the payer does not hold it. The
+;; author opens that door themselves, once, with set-parent-delegate, and can shut
+;; it again at any time. A delegate can only ever attach children that mint TO the
+;; owner, so a delegation cannot be used to build someone else's lineage.
+(define-private (parent-allowed? (owner principal) (recipient principal))
+  (or
+    (is-eq owner tx-sender)
+    (and
+      (is-eq owner recipient)
+      (is-some (map-get? ParentDelegates { owner: owner, delegate: tx-sender }))
     )
   )
 )
 
-(define-private (validate-parents (parents (list 50 uint)))
+(define-private (validate-parent
+  (id uint)
+  (acc { missing: bool, unowned: bool, recipient: principal })
+)
+  (if (or (get missing acc) (get unowned acc))
+    acc
+    (match (nft-get-owner? xtrata-inscription id)
+      owner
+        (if (parent-allowed? owner (get recipient acc))
+          (merge acc { missing: false, unowned: false })
+          (merge acc { missing: false, unowned: true })
+        )
+      (merge acc { missing: true, unowned: false })
+    )
+  )
+)
+
+(define-private (validate-parents (parents (list 50 uint)) (recipient principal))
   (begin
     (asserts! (validate-parent-uniqueness parents) ERR-DUPLICATE)
-    (let ((res (fold validate-parent parents { missing: false, unowned: false })))
+    (let ((res (fold validate-parent parents {
+      missing: false,
+      unowned: false,
+      recipient: recipient
+    })))
       (begin
         (asserts! (not (get missing res)) ERR-DEPENDENCY-MISSING)
         (asserts! (not (get unowned res)) ERR-NOT-AUTHORIZED)
@@ -806,6 +853,27 @@
   )
 )
 
+;; Not an admin function. Any principal governs their own delegations.
+;;
+;; Transfers no STX, so a publisher can sponsor the miner fee and the author
+;; never needs a funded wallet. That is the one thing Stacks sponsorship does
+;; cover, unlike the protocol fee.
+(define-public (set-parent-delegate (delegate principal) (allowed bool))
+  (begin
+    (if allowed
+      (map-set ParentDelegates { owner: tx-sender, delegate: delegate } true)
+      (map-delete ParentDelegates { owner: tx-sender, delegate: delegate })
+    )
+    (print {
+      event: "parent-delegate",
+      owner: tx-sender,
+      delegate: delegate,
+      allowed: allowed
+    })
+    (ok true)
+  )
+)
+
 (define-public (set-paused (value bool))
   (begin
     (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-NOT-AUTHORIZED)
@@ -1006,7 +1074,7 @@
           (asserts! (is-eq (get total-chunks state) total-chunks) ERR-INVALID-BATCH)
           (map-set UploadState
             { owner: tx-sender, hash: expected-hash }
-            (merge state { last-touched: stacks-block-height })
+            (merge state { last-touched: burn-block-height })
           )
           (ok true)
         )
@@ -1022,7 +1090,7 @@
             total-chunks: total-chunks,
             current-index: u0,
             running-hash: 0x0000000000000000000000000000000000000000000000000000000000000000,
-            last-touched: stacks-block-height,
+            last-touched: burn-block-height,
             purge-index: u0
           }
         )
@@ -1044,8 +1112,8 @@
 (define-public (abandon-upload (expected-hash (buff 32)))
   (let (
     (state (unwrap! (map-get? UploadState { owner: tx-sender, hash: expected-hash }) ERR-NOT-FOUND))
-    (expired-height (if (>= stacks-block-height UPLOAD-EXPIRY-BLOCKS)
-      (- stacks-block-height UPLOAD-EXPIRY-BLOCKS)
+    (expired-height (if (>= burn-block-height UPLOAD-EXPIRY-BLOCKS)
+      (- burn-block-height UPLOAD-EXPIRY-BLOCKS)
       u0))
   )
     (begin
@@ -1126,7 +1194,7 @@
             (merge state {
               current-index: (get idx result),
               running-hash: (get run-hash result),
-              last-touched: stacks-block-height
+              last-touched: burn-block-height
             })
           )
           (ok true)
@@ -1209,7 +1277,7 @@
   (begin
     (try! (assert-inscription-allowed))
     (asserts! (validate-dependencies dependencies) ERR-DEPENDENCY-MISSING)
-    (try! (validate-parents parents))
+    (try! (validate-parents parents tx-sender))
     (let (
       (validation (try! (seal-validate expected-hash token-uri-string)))
       (state (get state validation))
@@ -1344,7 +1412,7 @@
       (asserts! (> (len token-uri-string) u0) ERR-INVALID-URI)
       (asserts! (is-none (map-get? UploadState { owner: tx-sender, hash: expected-hash })) ERR-DUPLICATE)
       (asserts! (validate-dependencies dependencies) ERR-DEPENDENCY-MISSING)
-      (try! (validate-parents parents))
+      (try! (validate-parents parents recipient))
       (let (
         (result (fold process-chunk chunks {
           ok: true,
@@ -1524,11 +1592,14 @@
   (source { source-contract: principal, source-id: uint })
   (index uint)
 )
-  (if (is-eq (get source-contract source) .xtrata-v2-1-0)
-    (contract-call? .xtrata-v2-1-0 get-chunk (get source-id source) index)
-    (if (is-eq (get source-contract source) .xtrata-v1-1-1)
-      (contract-call? .xtrata-v1-1-1 get-chunk (get source-id source) index)
-      none
+  (if (is-eq (get source-contract source) .xtrata-v3-2-3)
+    (contract-call? .xtrata-v3-2-3 get-chunk (get source-id source) index)
+    (if (is-eq (get source-contract source) .xtrata-v2-1-0)
+      (contract-call? .xtrata-v2-1-0 get-chunk (get source-id source) index)
+      (if (is-eq (get source-contract source) .xtrata-v1-1-1)
+        (contract-call? .xtrata-v1-1-1 get-chunk (get source-id source) index)
+        none
+      )
     )
   )
 )
@@ -1537,11 +1608,14 @@
   (source { source-contract: principal, source-id: uint })
   (indexes (list 50 uint))
 )
-  (if (is-eq (get source-contract source) .xtrata-v2-1-0)
-    (contract-call? .xtrata-v2-1-0 get-chunk-batch (get source-id source) indexes)
-    (if (is-eq (get source-contract source) .xtrata-v1-1-1)
-      (contract-call? .xtrata-v1-1-1 get-chunk-batch (get source-id source) indexes)
-      (list)
+  (if (is-eq (get source-contract source) .xtrata-v3-2-3)
+    (contract-call? .xtrata-v3-2-3 get-chunk-batch (get source-id source) indexes)
+    (if (is-eq (get source-contract source) .xtrata-v2-1-0)
+      (contract-call? .xtrata-v2-1-0 get-chunk-batch (get source-id source) indexes)
+      (if (is-eq (get source-contract source) .xtrata-v1-1-1)
+        (contract-call? .xtrata-v1-1-1 get-chunk-batch (get source-id source) indexes)
+        (list)
+      )
     )
   )
 )
@@ -1605,7 +1679,7 @@
 
 (define-read-only (get-contract-info)
   (ok {
-    version: "xtrata-v3.2.3",
+    version: "xtrata-v3.2.4",
     chunk-size: CHUNK-SIZE,
     upload-batch-limit: MAX-UPLOAD-BATCH-SIZE,
     upload-payload-limit: MAX-UPLOAD-PAYLOAD,
@@ -1697,6 +1771,10 @@
 
 (define-read-only (is-allowed-caller (caller principal))
   (ok (is-some (map-get? AllowedCallers caller)))
+)
+
+(define-read-only (is-parent-delegate (owner principal) (delegate principal))
+  (ok (is-some (map-get? ParentDelegates { owner: owner, delegate: delegate })))
 )
 
 (define-read-only (get-royalty-recipient)

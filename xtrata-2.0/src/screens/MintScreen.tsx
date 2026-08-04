@@ -75,7 +75,9 @@ import {
   validateDependencyIds
 } from '../lib/mint/dependencies';
 import {
+  estimateContractFeeCaps,
   estimateContractFees,
+  firstBatchChunks,
   formatMicroStx,
   getFeeSchedule,
   MICROSTX_PER_STX
@@ -1202,6 +1204,18 @@ export default function MintScreen(props: MintScreenProps) {
   const feeEstimate = useMemo(
     () =>
       estimateContractFees({
+        schedule: feeSchedule,
+        totalChunks: chunks.length
+      }),
+    [feeSchedule, chunks.length]
+  );
+  // Post-condition caps, NOT the displayed estimate. The five fee units are
+  // admin-mutable and only the legacy aggregate is read here, so the caps carry
+  // headroom; capping at the exact estimate would abort a stage whose earlier
+  // stages have already been paid for.
+  const feeCaps = useMemo(
+    () =>
+      estimateContractFeeCaps({
         schedule: feeSchedule,
         totalChunks: chunks.length
       }),
@@ -2723,8 +2737,13 @@ export default function MintScreen(props: MintScreenProps) {
           return;
         }
 
+        // Native v3+ route pays single-tx-fee-for-chunks; the external helper
+        // route runs begin -> upload -> seal on the core and pays the staged
+        // fees instead.
         const helperPostConditions = resolveFeePostConditions(
-          feeEstimate.totalMicroStx
+          shouldUseNativeSingleTx
+            ? feeCaps.singleTxMicroStx
+            : feeCaps.totalMicroStx
         );
         const hasDependencies = mintInputs.dependencyIds.length > 0;
         const hasParents = mintInputs.parentIds.length > 0;
@@ -2804,7 +2823,7 @@ export default function MintScreen(props: MintScreenProps) {
 
       setBeginState('pending');
       appendLog('Step 1: begin-inscription');
-      const beginPostConditions = resolveFeePostConditions(feeEstimate.beginMicroStx);
+      const beginPostConditions = resolveFeePostConditions(feeCaps.beginMicroStx);
       const beginTx = await requestContractCall({
         functionName: 'begin-inscription',
         functionArgs: [
@@ -2907,7 +2926,7 @@ export default function MintScreen(props: MintScreenProps) {
         return;
       }
       await pauseBeforeNextTx('Sealing in');
-      const sealPostConditions = resolveFeePostConditions(feeEstimate.sealMicroStx);
+      const sealPostConditions = resolveFeePostConditions(feeCaps.sealMicroStx);
       const sealFunctionName = getSealFunctionName(
         mintInputs.dependencyIds,
         mintInputs.parentIds
@@ -3172,7 +3191,7 @@ export default function MintScreen(props: MintScreenProps) {
       if (didUploadBatches) {
         await pauseBeforeNextTx('Sealing in');
       }
-      const sealPostConditions = resolveFeePostConditions(feeEstimate.sealMicroStx);
+      const sealPostConditions = resolveFeePostConditions(feeCaps.sealMicroStx);
       const sealFunctionName = getSealFunctionName(
         mintInputs.dependencyIds,
         mintInputs.parentIds
@@ -4281,11 +4300,14 @@ export default function MintScreen(props: MintScreenProps) {
             <span className="meta-value">
               {hasChunks ? (
                 <>
-                  {feeUnitValue !== null
-                    ? formatMicroStx(feeUnitValue)
-                    : 'Fee unit'}{' '}
-                  × (1 + {feeEstimate.feeBatches} batches) ={' '}
-                  {formatStx(feeEstimate.sealMicroStx)}
+                  Seal fee + {firstBatchChunks(chunks.length)} chunk fee
+                  {firstBatchChunks(chunks.length) === 1 ? '' : 's'}
+                  {feeEstimate.feeBatches > 0
+                    ? ` + ${feeEstimate.feeBatches} batch fee${
+                        feeEstimate.feeBatches === 1 ? '' : 's'
+                      }`
+                    : ''}{' '}
+                  = {formatStx(feeEstimate.sealMicroStx)}
                 </>
               ) : (
                 'Select a file to estimate.'

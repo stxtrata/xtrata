@@ -12,19 +12,8 @@ type ImageSource = {
   cleanup?: () => void;
 };
 
-const loadImageSource = async (blob: Blob): Promise<ImageSource> => {
-  if (typeof createImageBitmap === 'function') {
-    const bitmap = await createImageBitmap(blob);
-    return {
-      source: bitmap,
-      width: bitmap.width,
-      height: bitmap.height,
-      cleanup: () => {
-        bitmap.close?.();
-      }
-    };
-  }
-
+/** Decode through an <img> element, which resolves an SVG's intrinsic size. */
+const loadViaImageElement = async (blob: Blob): Promise<ImageSource> => {
   const url = URL.createObjectURL(blob);
   return new Promise<ImageSource>((resolve, reject) => {
     const img = new Image();
@@ -45,6 +34,41 @@ const loadImageSource = async (blob: Blob): Promise<ImageSource> => {
     };
     img.src = url;
   });
+};
+
+/**
+ * Decode a blob to something canvas can draw.
+ *
+ * `createImageBitmap` is preferred — it decodes off the main thread — but it
+ * **cannot decode SVG at all**. Chrome throws "The source image could not be
+ * decoded." for every `image/svg+xml` blob, because a bitmap decode has no step
+ * that resolves an SVG's intrinsic size the way an <img> element does.
+ *
+ * This used to reach the <img> path only when `createImageBitmap` was
+ * *undefined*, never when it *threw* — so every SVG inscription failed to
+ * produce a thumbnail, and a market page full of them logged one failure and
+ * stack trace per card. The <img> fallback handles those blobs perfectly, so a
+ * throw is a reason to fall through rather than to give up.
+ */
+const loadImageSource = async (blob: Blob): Promise<ImageSource> => {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const bitmap = await createImageBitmap(blob);
+      return {
+        source: bitmap,
+        width: bitmap.width,
+        height: bitmap.height,
+        cleanup: () => {
+          bitmap.close?.();
+        }
+      };
+    } catch {
+      // Falls through: SVG always lands here, and a corrupt raster image will
+      // fail again below and reject with the decode error, as before.
+    }
+  }
+
+  return loadViaImageElement(blob);
 };
 
 export const createImageThumbnail = async (params: {

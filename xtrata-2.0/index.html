@@ -87,14 +87,22 @@
     </header>
 
     <nav class="site-nav" aria-label="Primary">
+      <!-- Labels say what the destination DOES. "Free drops" is safe to promise:
+           the drops contract has no price parameter and `claim` moves no STX from
+           the claimer, so a paid drop is not expressible. The creator funds a
+           fee-budget that sponsors the claim instead.
+           The Wizard is deliberately NOT a top-level entry. It inscribes the same
+           things the Inscribe page does, so two doors to one job made the menu
+           ask a question new users cannot answer. It is reached from inside the
+           Inscribe panel: a standing link, plus a prompt when a file is large
+           enough to need it. /create-wizard still routes, for anyone holding a link. -->
       <a href="/" data-nav="home" target="_self">Home</a>
       <a href="/xplorer" data-nav="xplorer" target="_self">Explore</a>
-      <a href="/inscribe" data-nav="inscribe" target="_self">Create</a>
-      <a href="/drops" data-nav="drops" target="_self">Claim</a>
-      <a href="/market" data-nav="market" target="_self">Collect</a>
+      <a href="/inscribe" data-nav="inscribe" target="_self">Inscribe</a>
+      <a href="/drops" data-nav="drops" target="_self">Free drops</a>
+      <a href="/market" data-nav="market" target="_self">Buy &amp; sell</a>
       <a href="/my-wallet" data-nav="my-wallet" target="_self">My Xtrata</a>
-      <a href="/create-wizard" data-nav="wizard" target="_self">Wizard</a>
-      <a href="/#build" data-nav="build" target="_self">Build</a>
+      <a href="/#build" data-nav="build" target="_self">Developers</a>
       <div class="radio-slot" id="radioSlot" aria-label="Xtrata FM radio"></div>
     </nav>
     </div>
@@ -772,8 +780,8 @@
           <div class="status" id="marketStatus"><span>Loading listings…</span></div>
           <div class="market-listings" id="marketListings"></div>
           <p class="field-hint" id="marketFootnote">
-            Listings settle through the Xtrata market contracts. Sponsored listings can be
-            bought with zero STX — the seller has prepaid the network fee.
+            Listings settle through the Xtrata market contracts. Buyers pay their own
+            network fee on every listing.
           </p>
         </div>
       </section>
@@ -987,17 +995,39 @@
 
   <div class="fullscreen-viewer" id="fullscreenViewer" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="fullscreenTitle" hidden>
     <div class="fullscreen-viewer__chrome">
+      <button class="fullscreen-viewer__mark" id="fullscreenMarkButton" type="button"
+              aria-label="Back to the explorer" title="Back to the explorer">
+        <img src="/favicon.svg" alt="" aria-hidden="true" />
+      </button>
       <div class="fullscreen-viewer__title">
         <strong id="fullscreenTitle">Selected inscription</strong>
         <span id="fullscreenMeta">Select an inscription</span>
       </div>
+      <!-- The id sits on its own so it stays readable at a glance and can be
+           selected without dragging through the type and size as well. -->
+      <span class="fullscreen-viewer__id" id="fullscreenId" hidden></span>
       <div class="fullscreen-viewer__actions">
-        <button class="btn ghost" id="fullscreenPrevButton" type="button" disabled>Prev</button>
-        <button class="btn ghost" id="fullscreenNextButton" type="button" disabled>Next</button>
+        <button class="btn ghost icon" id="fullscreenPrevButton" type="button" disabled
+                aria-label="Previous inscription" title="Previous inscription — or press ← on your keyboard">
+          <span aria-hidden="true">←</span>
+        </button>
+        <button class="btn ghost icon" id="fullscreenNextButton" type="button" disabled
+                aria-label="Next inscription" title="Next inscription — or press → on your keyboard">
+          <span aria-hidden="true">→</span>
+        </button>
         <a class="btn ghost" id="fullscreenRawLink" href="#" target="_blank" rel="noreferrer" hidden>Open endpoint</a>
         <button class="btn ghost" id="fullscreenCloseButton" type="button">Close</button>
       </div>
     </div>
+    <!-- Direct relations, so a piece can be navigated by its family without
+         leaving the enlarged view. One horizontally scrolling row, so a piece
+         with forty children costs the same vertical space as one with two —
+         which is what makes it usable on a phone. -->
+    <!-- Never `hidden`. The row is a fixed track that must be reserved from the
+         first paint: its chips arrive after two network round trips, and a row
+         that appears later moves the artwork below it. An empty bar on a piece
+         with no relations is the cost of a page that never jumps. -->
+    <div class="fullscreen-viewer__rel" id="fullscreenRelations"></div>
     <div class="fullscreen-viewer__stage" id="fullscreenStage">No selection</div>
   </div>
 

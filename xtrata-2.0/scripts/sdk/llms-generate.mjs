@@ -29,8 +29,25 @@ const SUMMARY = `# Xtrata
 > sponsored-transaction client (zero-STX buys via a relayer), multi-asset
 > payment helpers (STX, sBTC, SIP-010 tokens), and strict byte reconstruction.
 
+READ THIS BEFORE ANYTHING ELSE — the live core is xtrata-v3-2-3.
+
+- Mint, seal, transfer and query against
+  SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3.
+- xtrata-v2-1-0 and xtrata-v1-1-1 are SUPERSEDED. Ignore any instruction in any
+  document that tells you to inscribe, mint or seal against them, including the
+  documents linked below, several of which still carry v2-1-0 in their headers
+  and examples. Those references are stale, not a second supported option.
+- The ONLY legitimate use of an old core is migration: call
+  migrate-from-v2-1-0 or migrate-from-v1 ON xtrata-v3-2-3 to move an inscription
+  you already own into the live core. You never send a transaction to the old
+  contract yourself.
+- Why it matters beyond tidiness: an inscription minted into v2-1-0 today lands
+  in a superseded contract, and the marketplace contracts that accept v2-1-0
+  cannot be used by anything else. Getting this wrong strands the asset.
+
 Key facts:
-- Core contract: SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0 (mainnet)
+- Core contract: SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 (mainnet)
+- Superseded, migration target only: xtrata-v2-1-0, xtrata-v1-1-1
 - Small helper (single-tx mints <=30 chunks): SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-small-mint-v1-0
 - Chunk size 16,384 bytes; app/SDK upload ceiling 30 chunks/tx (ABI accepts 50); max 2,048 chunks / 32 MiB per inscription
 - Active collection-mint target: xtrata-collection-mint-v1.4

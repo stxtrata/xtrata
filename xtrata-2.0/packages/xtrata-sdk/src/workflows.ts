@@ -30,7 +30,7 @@ import {
   MAX_MIME_LENGTH,
   MAX_TOKEN_URI_LENGTH,
   batchChunks,
-  buildSmallMintSingleTxStxPostConditions,
+  buildHelperSmallMintStxPostConditions,
   chunkBytes
 } from './mint.js';
 import { toStacksNetwork } from './network.js';
@@ -438,7 +438,11 @@ export const buildSmallMintSingleTxWorkflowPlan = (
   }
 
   const network = toStacksNetwork(params.helperContract.network, params.apiBaseUrl);
-  const postConditions = buildSmallMintSingleTxStxPostConditions({
+  // The helper runs begin-or-get -> add-chunk-batch -> seal on the core inside
+  // one transaction, so the core charges the STAGED fees (begin + seal), not
+  // single-tx-fee-for-chunks. Capping at the single-tx fee here would abort the
+  // mint.
+  const postConditions = buildHelperSmallMintStxPostConditions({
     sender: params.senderAddress,
     protocolFeeMicroStx: params.protocolFeeMicroStx,
     totalChunks: chunks.length

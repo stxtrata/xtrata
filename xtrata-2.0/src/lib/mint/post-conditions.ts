@@ -3,7 +3,7 @@ import {
   makeStandardSTXPostCondition,
   type PostCondition
 } from '@stacks/transactions';
-import { MAX_BATCH_SIZE } from '../chunking/hash';
+import { FEE_BATCH_SIZE } from '../chunking/hash';
 
 type MintBeginSpendCapParams = {
   mintPrice: bigint | null;
@@ -58,9 +58,26 @@ export const resolveCollectionBeginSpendCapMicroStx = (
   return protocolFee + beginFee;
 };
 
+/**
+ * Real granular fee units read from the core, when the caller has them.
+ *
+ * The v3.2.x core charges from five independent admin-mutable units, not one
+ * (xtrata-v3.2.3.clar lines 129-133 and 415-442). `protocolFeeMicroStx` below is
+ * the legacy aggregate `get-fee-unit`, which cannot express upload-chunk or
+ * single-tx. Supply these to get the exact `seal-fee-for-chunks` amount.
+ */
+export type SpendCapFeeUnits = {
+  beginFeeUnit?: bigint | null;
+  uploadChunkFeeUnit?: bigint | null;
+  uploadBatchFeeUnit?: bigint | null;
+  sealFeeUnit?: bigint | null;
+  singleTxFeeUnit?: bigint | null;
+};
+
 type SealSpendCapParams = {
   protocolFeeMicroStx: bigint | null;
   totalChunks: number | bigint | null;
+  feeUnits?: SpendCapFeeUnits | null;
 };
 
 const toPositiveChunkCount = (value: number | bigint | null) => {
@@ -83,6 +100,34 @@ const toPositiveProtocolFee = (value: bigint | null) => {
   return value;
 };
 
+const hasGranularSealUnits = (units?: SpendCapFeeUnits | null) =>
+  !!units &&
+  units.sealFeeUnit !== null &&
+  units.sealFeeUnit !== undefined &&
+  units.uploadChunkFeeUnit !== null &&
+  units.uploadChunkFeeUnit !== undefined &&
+  units.uploadBatchFeeUnit !== null &&
+  units.uploadBatchFeeUnit !== undefined;
+
+/** Contract `first-batch-chunks` / `additional-batches` / `seal-fee-for-chunks`. */
+const sealFeeMicroStxFromUnits = (
+  units: SpendCapFeeUnits,
+  totalChunks: bigint
+) => {
+  const chunkBatchSize = BigInt(FEE_BATCH_SIZE);
+  const firstChunks =
+    totalChunks > chunkBatchSize ? chunkBatchSize : totalChunks;
+  const extraBatches =
+    totalChunks <= chunkBatchSize
+      ? 0n
+      : (totalChunks - chunkBatchSize + chunkBatchSize - 1n) / chunkBatchSize;
+  return (
+    (units.sealFeeUnit ?? 0n) +
+    firstChunks * (units.uploadChunkFeeUnit ?? 0n) +
+    extraBatches * (units.uploadBatchFeeUnit ?? 0n)
+  );
+};
+
 export const resolveSealSpendCapMicroStx = (
   params: SealSpendCapParams
 ) => {
@@ -91,7 +136,15 @@ export const resolveSealSpendCapMicroStx = (
   if (feeUnit === null || totalChunks === null) {
     return null;
   }
-  const chunkBatchSize = BigInt(MAX_BATCH_SIZE);
+  if (hasGranularSealUnits(params.feeUnits)) {
+    return sealFeeMicroStxFromUnits(params.feeUnits!, totalChunks);
+  }
+  // Only the legacy aggregate is known, and it cannot express
+  // upload-chunk-fee-unit. Keep the conservative `aggregate * (1 + ceil(n/32))`
+  // bound: it is >= the real granular seal fee for every unit configuration
+  // seen on chain, and a cap that is too LOW aborts the seal after the begin
+  // fee and every upload batch have already been spent.
+  const chunkBatchSize = BigInt(FEE_BATCH_SIZE);
   const feeBatches = (totalChunks + chunkBatchSize - 1n) / chunkBatchSize;
   return feeUnit * (1n + feeBatches);
 };
@@ -99,6 +152,7 @@ export const resolveSealSpendCapMicroStx = (
 type BatchSealSpendCapParams = {
   protocolFeeMicroStx: bigint | null;
   totalChunks: Array<number | bigint>;
+  feeUnits?: SpendCapFeeUnits | null;
 };
 
 export const resolveBatchSealSpendCapMicroStx = (
@@ -112,7 +166,8 @@ export const resolveBatchSealSpendCapMicroStx = (
   for (const totalChunks of params.totalChunks) {
     const itemCap = resolveSealSpendCapMicroStx({
       protocolFeeMicroStx: feeUnit,
-      totalChunks
+      totalChunks,
+      feeUnits: params.feeUnits
     });
     if (itemCap === null) {
       return null;
@@ -171,6 +226,7 @@ type SealPostConditionParams = {
   sender?: string | null;
   protocolFeeMicroStx: bigint | null;
   totalChunks: number | bigint | null;
+  feeUnits?: SpendCapFeeUnits | null;
 };
 
 export const buildSealStxPostConditions = (
@@ -182,7 +238,8 @@ export const buildSealStxPostConditions = (
   }
   const sealCap = resolveSealSpendCapMicroStx({
     protocolFeeMicroStx: params.protocolFeeMicroStx,
-    totalChunks: params.totalChunks
+    totalChunks: params.totalChunks,
+    feeUnits: params.feeUnits
   });
   if (sealCap === null) {
     return null;
@@ -200,6 +257,7 @@ type BatchSealPostConditionParams = {
   sender?: string | null;
   protocolFeeMicroStx: bigint | null;
   totalChunks: Array<number | bigint>;
+  feeUnits?: SpendCapFeeUnits | null;
 };
 
 export const buildBatchSealStxPostConditions = (
@@ -211,7 +269,8 @@ export const buildBatchSealStxPostConditions = (
   }
   const sealCap = resolveBatchSealSpendCapMicroStx({
     protocolFeeMicroStx: params.protocolFeeMicroStx,
-    totalChunks: params.totalChunks
+    totalChunks: params.totalChunks,
+    feeUnits: params.feeUnits
   });
   if (sealCap === null) {
     return null;
@@ -230,6 +289,7 @@ type CollectionSealSpendCapParams = {
   activePhaseMintPrice?: bigint | null;
   protocolFeeMicroStx: bigint | null;
   totalChunks: number | bigint | null;
+  feeUnits?: SpendCapFeeUnits | null;
 };
 
 const resolveCollectionMintPrice = (params: {
@@ -249,7 +309,8 @@ export const resolveCollectionSealSpendCapMicroStx = (
   const mintPrice = resolveCollectionMintPrice(params);
   const sealCap = resolveSealSpendCapMicroStx({
     protocolFeeMicroStx: params.protocolFeeMicroStx,
-    totalChunks: params.totalChunks
+    totalChunks: params.totalChunks,
+    feeUnits: params.feeUnits
   });
   if (mintPrice === null || sealCap === null) {
     return null;
@@ -262,6 +323,7 @@ type CollectionBatchSealSpendCapParams = {
   activePhaseMintPrice?: bigint | null;
   protocolFeeMicroStx: bigint | null;
   totalChunks: Array<number | bigint>;
+  feeUnits?: SpendCapFeeUnits | null;
 };
 
 export const resolveCollectionBatchSealSpendCapMicroStx = (
@@ -270,7 +332,8 @@ export const resolveCollectionBatchSealSpendCapMicroStx = (
   const mintPrice = resolveCollectionMintPrice(params);
   const batchSealCap = resolveBatchSealSpendCapMicroStx({
     protocolFeeMicroStx: params.protocolFeeMicroStx,
-    totalChunks: params.totalChunks
+    totalChunks: params.totalChunks,
+    feeUnits: params.feeUnits
   });
   if (mintPrice === null || batchSealCap === null) {
     return null;
@@ -286,8 +349,19 @@ type CollectionSmallSingleTxSpendCapParams = {
   chargeMintPriceAtBegin?: boolean;
   beginFeeMicroStx?: bigint | null;
   sealSpendCapMicroStx?: bigint | null;
+  feeUnits?: SpendCapFeeUnits | null;
 };
 
+/**
+ * Cap for the collection contract's `mint-small-single-tx`.
+ *
+ * This deliberately stays on the STAGED model (begin + seal). The collection
+ * contract packs begin-or-get -> add-chunk-batch -> seal-inscription into one
+ * transaction (xtrata-collection-mint-v1.4.clar lines 1470-1482), so the core
+ * charges begin_fee + seal_fee(n). `single-tx-fee-for-chunks` applies only to
+ * the core's OWN `mint-single-tx`, and using it here would cap below the real
+ * fee and abort the mint.
+ */
 export const resolveCollectionSmallSingleTxSpendCapMicroStx = (
   params: CollectionSmallSingleTxSpendCapParams
 ) => {
@@ -307,13 +381,15 @@ export const resolveCollectionSmallSingleTxSpendCapMicroStx = (
     sealCap = params.chargeMintPriceAtBegin
       ? resolveSealSpendCapMicroStx({
           protocolFeeMicroStx: params.protocolFeeMicroStx,
-          totalChunks: params.totalChunks
+          totalChunks: params.totalChunks,
+          feeUnits: params.feeUnits
         })
       : resolveCollectionSealSpendCapMicroStx({
           mintPrice: params.mintPrice,
           activePhaseMintPrice: params.activePhaseMintPrice,
           protocolFeeMicroStx: params.protocolFeeMicroStx,
-          totalChunks: params.totalChunks
+          totalChunks: params.totalChunks,
+          feeUnits: params.feeUnits
         });
   }
 
@@ -330,6 +406,7 @@ type CollectionSealPostConditionParams = {
   activePhaseMintPrice?: bigint | null;
   protocolFeeMicroStx: bigint | null;
   totalChunks: number | bigint | null;
+  feeUnits?: SpendCapFeeUnits | null;
 };
 
 export const buildCollectionSealStxPostConditions = (
@@ -358,6 +435,7 @@ type CollectionBatchSealPostConditionParams = {
   activePhaseMintPrice?: bigint | null;
   protocolFeeMicroStx: bigint | null;
   totalChunks: Array<number | bigint>;
+  feeUnits?: SpendCapFeeUnits | null;
 };
 
 export const buildCollectionBatchSealStxPostConditions = (

@@ -1,0 +1,29 @@
+[project]
+name = "proof-of-free-contract"
+description = "Living Synth registry (reveal + child recordings + fees) for Xtrata v3.2.3"
+authors = []
+telemetry = false
+cache_dir = "./.cache"
+requirements = []
+
+[contracts.mock-xtrata-core]
+path = "contracts/mock-xtrata-core.clar"
+clarity_version = 3
+epoch = "latest"
+
+[contracts.living-synth-registry]
+path = "contracts/living-synth-registry.clar"
+clarity_version = 3
+epoch = "latest"
+
+# Superseded by living-synth-registry, which folds the fee into the same
+# transaction that registers the recording. Kept only until the mainnet
+# deployment at SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7 is retired.
+[contracts.recording-fees]
+path = "contracts/recording-fees.clar"
+clarity_version = 3
+epoch = "latest"
+
+[repl.analysis]
+passes = ["check_checker"]
+check_checker = { trusted_sender = false, trusted_caller = false, callee_filter = false }
