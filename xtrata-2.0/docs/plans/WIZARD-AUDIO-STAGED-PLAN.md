@@ -86,6 +86,27 @@ Two consequences to plan around:
 
 Worth noting #2909 has its own parent (#2908), so the samples will sit three deep: #2908 → #2909 → sample. That is real provenance and worth keeping intact.
 
+## 4b. The manifest is a child of every sample
+
+Decision: the library manifest is minted **last**, after every sample, and declares **all of them as its parents**. That inversion is what creates the bond — the manifest is not a label pointing at the samples, it is an object that could not have been minted without them, and the contract enforces that rather than the prose asserting it.
+
+Verified mechanics:
+
+- `mint-single-tx-with-relationships` and `seal-with-relationships` both take `parents (list 50 uint)`, so **up to 50 samples per manifest**. A one-of-each round is nowhere near the limit; a full library would need several manifests, or a manifest of manifests.
+- `validate-parents` requires the minting wallet to own **every** id listed, so the manifest must come from the wallet holding all the samples — already the plan, since only the #2909 holder can inscribe them.
+- Parent ids must be unique (`ERR-DUPLICATE u114`) and must exist (`ERR-DEPENDENCY-MISSING u111`).
+
+The result is one lineage, deepest at the manifest:
+
+```
+#2908  ←  #2909  ←  each sample  ←  manifest
+        (library root)          (binds the set)
+```
+
+Each sample declares `parents: [2909]`, so it belongs to the library from the moment it mints, before any manifest exists. The manifest then declares `parents: [every sample]`, closing the set. Both links stand alone, which matters because samples are inscribed one at a time and a round can end early — an unclosed set is still a coherent library, just an open one.
+
+**One honest limitation, the same one round 1 hit.** These edges point child → parent and the core keeps no reverse index, so on chain you can walk *from* the manifest *to* every sample, but not from a sample back to the manifest. The app's lineage service builds that reverse view indexer-side, so the explorer will show the manifest as a child of each sample — but that is an index, not a chain guarantee. The manifest should say so plainly rather than implying a walk the core cannot perform.
+
 ## 5. Parent relationships
 
 The samples are a library, not a thread, so the edge shape differs from round 1:
