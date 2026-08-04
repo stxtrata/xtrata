@@ -12,7 +12,7 @@
 ;; 5) SIP-009 compatible: standard NFT interfaces for wallet/indexer interoperability.
 ;; 6) Admin can: set split fees (bounded), set royalty recipient, pause/unpause, transfer admin ownership.
 ;; 7) Sealing requires ALL declared chunks uploaded (current-index == total-chunks) and hash verified.
-;; 8) Upload sessions are start-or-resume and expire after inactivity (stacks-block-height based):
+;; 8) Upload sessions are start-or-resume and expire after inactivity (burn-block-height based):
 ;;    - begin-inscription starts/resumes {uploader, file-hash} uploads
 ;;    - begin-or-get starts/resumes upload and does not canonicalize duplicates
 ;;    - expired uploads can be permissionlessly purged in batches
@@ -86,7 +86,13 @@
 (define-constant FEE-MIN u1)
 (define-constant FEE-MAX u1000000)
 
-;; Upload expiry (~30 days at 10-min block cadence)
+;; Upload expiry: 4320 Bitcoin blocks, so ~30 days.
+;;
+;; Measured in burn-block-height, not stacks-block-height. Under stacks-block-height
+;; this same constant meant 30 days pre-Nakamoto and about 15 hours after it, because
+;; Stacks blocks went from one-per-Bitcoin-block to one every ~12 seconds. Pegging to
+;; the burn chain keeps the window meaning what it says regardless of Stacks block
+;; production.
 (define-constant UPLOAD-EXPIRY-BLOCKS u4320)
 
 (define-constant MODE-STAGED u1)
@@ -229,7 +235,7 @@
     purge-index: uint
   })
 )
-  (>= stacks-block-height (+ (get last-touched state) UPLOAD-EXPIRY-BLOCKS))
+  (>= burn-block-height (+ (get last-touched state) UPLOAD-EXPIRY-BLOCKS))
 )
 
 (define-private (assert-not-expired
@@ -1058,7 +1064,7 @@
           (asserts! (is-eq (get total-chunks state) total-chunks) ERR-INVALID-BATCH)
           (map-set UploadState
             { owner: tx-sender, hash: expected-hash }
-            (merge state { last-touched: stacks-block-height })
+            (merge state { last-touched: burn-block-height })
           )
           (ok true)
         )
@@ -1074,7 +1080,7 @@
             total-chunks: total-chunks,
             current-index: u0,
             running-hash: 0x0000000000000000000000000000000000000000000000000000000000000000,
-            last-touched: stacks-block-height,
+            last-touched: burn-block-height,
             purge-index: u0
           }
         )
@@ -1096,8 +1102,8 @@
 (define-public (abandon-upload (expected-hash (buff 32)))
   (let (
     (state (unwrap! (map-get? UploadState { owner: tx-sender, hash: expected-hash }) ERR-NOT-FOUND))
-    (expired-height (if (>= stacks-block-height UPLOAD-EXPIRY-BLOCKS)
-      (- stacks-block-height UPLOAD-EXPIRY-BLOCKS)
+    (expired-height (if (>= burn-block-height UPLOAD-EXPIRY-BLOCKS)
+      (- burn-block-height UPLOAD-EXPIRY-BLOCKS)
       u0))
   )
     (begin
@@ -1178,7 +1184,7 @@
             (merge state {
               current-index: (get idx result),
               running-hash: (get run-hash result),
-              last-touched: stacks-block-height
+              last-touched: burn-block-height
             })
           )
           (ok true)
