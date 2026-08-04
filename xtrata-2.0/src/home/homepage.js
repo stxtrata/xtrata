@@ -1,7 +1,6 @@
 import {
   HOMEPAGE_ACTIVITY_DOORS,
   HOMEPAGE_CAMPAIGN_BANNERS,
-  HOMEPAGE_CAMPAIGN,
   HOMEPAGE_INTENTS,
   HOMEPAGE_OBJECTS,
   validateHomepageContent
@@ -243,58 +242,6 @@ const renderCampaignBanners = () => {
   });
 };
 
-const renderCampaign = () => {
-  const mount = document.getElementById('campaignSlot');
-  if (!mount) {
-    return;
-  }
-  mount.replaceChildren();
-  mount.dataset.campaignId = HOMEPAGE_CAMPAIGN.id;
-  mount.dataset.campaignStatus = HOMEPAGE_CAMPAIGN.status;
-
-  const art = element('div', 'campaign-slot__art');
-  if (HOMEPAGE_CAMPAIGN.artwork) {
-    const image = document.createElement('img');
-    image.src = HOMEPAGE_CAMPAIGN.artwork;
-    image.alt = `${HOMEPAGE_CAMPAIGN.title} campaign artwork`;
-    image.loading = 'lazy';
-    art.append(image);
-  } else {
-    const stat = element('div', 'campaign-slot__stat');
-    stat.append(
-      element('span', 'campaign-slot__stat-number', HOMEPAGE_CAMPAIGN.stat),
-      element('span', 'campaign-slot__stat-label', HOMEPAGE_CAMPAIGN.statLabel)
-    );
-    art.append(stat);
-  }
-
-  const body = element('div', 'campaign-slot__body');
-  const sponsor = HOMEPAGE_CAMPAIGN.sponsor
-    ? ` · with ${HOMEPAGE_CAMPAIGN.sponsor}`
-    : '';
-  body.append(
-    element('span', 'section-kicker', `${HOMEPAGE_CAMPAIGN.eyebrow}${sponsor}`),
-    element('h3', 'campaign-slot__title', HOMEPAGE_CAMPAIGN.title),
-    element('p', 'campaign-slot__copy', HOMEPAGE_CAMPAIGN.description)
-  );
-  const actions = element('div', 'campaign-slot__actions');
-  actions.append(
-    actionLink(
-      HOMEPAGE_CAMPAIGN.primaryAction.href,
-      HOMEPAGE_CAMPAIGN.primaryAction.label,
-      'btn',
-      `campaign:${HOMEPAGE_CAMPAIGN.id}:primary`
-    ),
-    actionLink(
-      HOMEPAGE_CAMPAIGN.secondaryAction.href,
-      HOMEPAGE_CAMPAIGN.secondaryAction.label,
-      'btn secondary',
-      `campaign:${HOMEPAGE_CAMPAIGN.id}:secondary`
-    )
-  );
-  body.append(actions);
-  mount.append(art, body);
-};
 
 const installActionTracking = () => {
   if (actionTrackingInstalled) {
@@ -344,7 +291,6 @@ export const initHomepage = () => {
   renderIntents();
   renderActivity();
   renderCampaignBanners();
-  renderCampaign();
   installActionTracking();
 };
 

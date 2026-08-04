@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   HOMEPAGE_ACTIVITY_DOORS,
   HOMEPAGE_CAMPAIGN_BANNERS,
-  HOMEPAGE_CAMPAIGN,
   HOMEPAGE_INTENTS,
   HOMEPAGE_OBJECTS,
   validateHomepageContent
@@ -45,15 +44,12 @@ describe('homepage content configuration', () => {
     const hrefs = [
       ...HOMEPAGE_CAMPAIGN_BANNERS.map((item) => item.href),
       ...HOMEPAGE_OBJECTS.map((item) => item.href),
-      ...HOMEPAGE_INTENTS.map((item) => item.href),
-      HOMEPAGE_CAMPAIGN.primaryAction.href,
-      HOMEPAGE_CAMPAIGN.secondaryAction.href
+      ...HOMEPAGE_INTENTS.map((item) => item.href)
     ];
 
     expect(hrefs.every((href) => href.startsWith('/') || href.startsWith('https://'))).toBe(true);
     expect(HOMEPAGE_OBJECTS.some((item) => item.preview.src?.includes('/i/'))).toBe(true);
     expect(HOMEPAGE_CAMPAIGN_BANNERS.map((item) => item.id)).toEqual([
-      'proof-zero',
       'forever-twins',
       'suno-more'
     ]);
