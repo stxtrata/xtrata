@@ -147,15 +147,13 @@
         }
       }
     },
-    "allowedCallers": {
-      "SPY8JZN46DRC0ZDQV7EKWPJY8644VTE8B5B9EHM3": false
-    }
+    "allowedCallers": {}
   },
   "observed": {
-    "lastTokenId": 2972,
-    "mintedCount": 2868,
-    "stacksTipHeight": 8702017,
-    "burnBlockHeight": 961022,
-    "stacksTip": "04d7e3e3cf098931189bfaa5085ba574f7aa939343baaf744eede592000f0e40"
+    "lastTokenId": 2975,
+    "mintedCount": 2871,
+    "stacksTipHeight": 8703272,
+    "burnBlockHeight": 961065,
+    "stacksTip": "5f6abf8189b84359b8b0ea4bd1b47fa5ba38f7069b69dfa8b379a3b1c68d33b5"
   }
 }

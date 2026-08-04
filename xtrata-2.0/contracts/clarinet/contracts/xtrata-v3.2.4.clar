@@ -126,17 +126,27 @@
 (define-data-var royalty-recipient principal tx-sender)
 
 ;; Split fee controls (microSTX), bounded for predictability.
-;; Defaults preserve prior pricing at 50+ chunks while pro-rating the first batch.
+;;
+;; These defaults mirror what v3.2.3 is actually charging on mainnet, not the
+;; values v3.2.3 shipped with. Two of them were tuned down after that deploy:
+;; upload-chunk-fee-unit from 2000 and single-tx-fee-unit from 100000. Baking the
+;; live numbers in means the contract prices correctly the moment it lands, with
+;; no admin transaction between deploy and correct pricing, and no window where
+;; someone mints at ten times the going rate.
+;;
+;; It also keeps it reachable. assert-valid-fee-update caps a single change at 10x
+;; down, so correcting single-tx-fee-unit from 100000 to 10000 after the fact would
+;; sit exactly on that limit with no room to spare.
 ;; - begin-fee-unit: charged once per new upload session
 ;; - upload-chunk-fee-unit: charged per chunk for the first upload batch only (up to 32 chunks)
 ;; - upload-batch-fee-unit: charged per full upload batch after the first
 ;; - seal-fee-unit: fixed extra fee charged at seal
 ;; - single-tx-fee-unit: one fixed fee for the core-native small-file route
 (define-data-var begin-fee-unit uint u100000)
-(define-data-var upload-chunk-fee-unit uint u2000)
+(define-data-var upload-chunk-fee-unit uint u1000)
 (define-data-var upload-batch-fee-unit uint u100000)
 (define-data-var seal-fee-unit uint u100000)
-(define-data-var single-tx-fee-unit uint u100000)
+(define-data-var single-tx-fee-unit uint u10000)
 
 ;; Pause switch (admin adjustable)
 ;; IMPORTANT: pause blocks inscription writes for non-owners; transfers and reads remain available.
