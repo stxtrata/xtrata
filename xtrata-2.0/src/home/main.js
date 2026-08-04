@@ -10517,6 +10517,15 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       filter: 'all',
       run: 0,
       listings: [],
+      // 'loading' | 'ready' | 'failed'. An empty `listings` array means three
+      // different things depending on this, and they must not be conflated:
+      // the fetch has not landed, the market really is empty, or the fetch
+      // broke. The USD price book resolves in well under a second and
+      // re-renders on arrival, so before this existed the first paint announced
+      // "no live listings right now" while the fetch was still in flight —
+      // reporting an empty variable as an empty market. A late re-render after
+      // a failure would likewise have overwritten the error with "loading".
+      listingsPhase: 'loading',
       liveFrames: 0, // sandboxed iframes currently mounted (shares the grid's cap)
       summaries: new Map(), // `${nftContract}:${tokenId}` -> TokenSummary|null
       media: new Map(), // same key -> { url, kind } | null
@@ -11786,7 +11795,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       );
       if (!visible.length) {
         marketDom.listings.replaceChildren();
-        marketDom.status.innerHTML = '<span><strong>Market</strong> no live listings right now — list one from My Wallet.</span>';
+        // "Nothing yet", "nothing at all" and "we could not find out" are three
+        // different claims. Only the middle one is about the market.
+        const emptyMessage = {
+          loading: 'loading listings…',
+          failed: 'could not load listings.',
+          ready: 'no live listings right now — list one from My Wallet.'
+        }[marketState.listingsPhase] ?? 'loading listings…';
+        marketDom.status.innerHTML = `<span><strong>Market</strong> ${emptyMessage}</span>`;
         return;
       }
       marketDom.status.innerHTML = `<span><strong>Market</strong> ${visible.length} live listing${visible.length === 1 ? '' : 's'}.</span>`;
@@ -12164,6 +12180,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     const loadMarketPage = async (params = null) => {
       const run = ++marketState.run;
       if (!marketDom.listings) return;
+      // A fresh load has not resolved yet, so any render before the fetch lands
+      // must say "loading", not "none".
+      marketState.listingsPhase = 'loading';
       if (marketDom.badge) marketDom.badge.textContent = state.contract.network;
       // USD conversion: fetch spot rates in the background and re-render the
       // cards once available (asset-only prices show in the meantime).
@@ -12193,10 +12212,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         }
         if (run !== marketState.run) return;
         marketState.listings = listings.sort((a, b) => (b.listingId > a.listingId ? 1 : -1));
+        marketState.listingsPhase = 'ready';
         renderMarketListings();
         renderSellerDashboard();
       } catch (error) {
         if (run !== marketState.run) return;
+        marketState.listingsPhase = 'failed';
         marketDom.status.innerHTML = '<span><strong>Market</strong> could not load listings.</span>';
         debugLog('market', 'load failed', { error: String(error?.message ?? error) });
       }
