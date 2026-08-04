@@ -2333,17 +2333,43 @@
 
     .fullscreen-viewer {
       --fullscreen-viewport-height: 90vh;
-      --fullscreen-chrome-space: 82px;
+      --fullscreen-rel-height: 50px;
+      --fullscreen-gap: 14px;
+      /* Measured by JS, because the chrome wraps to two or three rows on a phone.
+         It is the ONLY part of the reserved space that is allowed to change, and
+         it is known on the first layout pass — before any network call. */
+      --fullscreen-chrome-height: 54px;
+      /* The relations row and the gaps are constants here rather than inputs to a
+         JS calculation. That is the whole fix for the page jumping: the strip is
+         filled after two round trips, so anything that resizes when it arrives
+         moves the artwork. Now nothing does — the row is reserved from the first
+         paint and simply sits empty on a piece with no relations. */
+      --fullscreen-chrome-space: calc(
+        var(--fullscreen-chrome-height) + var(--fullscreen-rel-height) + var(--fullscreen-gap) * 3
+      );
       --fullscreen-stage-size: min(90vw, calc(var(--fullscreen-viewport-height) - var(--fullscreen-chrome-space)));
       position: fixed;
       inset: 0;
       z-index: 1000;
       display: grid;
-      grid-template-columns: minmax(0, var(--fullscreen-stage-size));
-      grid-template-rows: auto var(--fullscreen-stage-size);
+      /* The bar must NOT be tied to the square stage width. It was, and that made a
+         feedback loop: the relations strip made the chrome taller, a taller chrome
+         shrank the stage, a smaller stage narrowed the bar, a narrower bar wrapped
+         to more rows, which made it taller again. The column is now the wider of
+         the stage and a readable minimum, and the stage caps itself below. */
+      grid-template-columns: minmax(0, min(92vw, max(var(--fullscreen-stage-size), 640px)));
+      /* Three explicit rows: chrome, relations, stage. Rows are assigned by hand
+         below rather than left to auto-placement, because a hidden relations
+         strip must collapse to nothing WITHOUT the stage sliding up into the
+         wrong track and losing its fixed size. */
+      /* The relations row is a FIXED height, not `auto`. It is populated after two
+         network round trips, and an auto row meant the artwork jumped down the page
+         the moment they landed. Reserving the space costs one empty bar on a piece
+         with no relations and buys a page that never moves. */
+      grid-template-rows: auto var(--fullscreen-rel-height) var(--fullscreen-stage-size);
       align-content: center;
       justify-content: center;
-      gap: 14px;
+      gap: var(--fullscreen-gap);
       padding: 0;
       background: color-mix(in srgb, var(--bg) 88%, rgba(0, 0, 0, 0.88));
       color: var(--ink);
@@ -2359,12 +2385,35 @@
       }
     }
 
+    .fullscreen-viewer__chrome { grid-row: 1; }
+    .fullscreen-viewer__rel { grid-row: 2; }
+    .fullscreen-viewer__stage {
+      grid-row: 3;
+      /* Fills the column, so the chrome, the relations strip and the artwork share
+         one edge-to-edge width on every screen. Capping this at the square
+         --fullscreen-stage-size left the stage visibly narrower than the two bars
+         above it. The height still comes from the row, so the frame is square when
+         that is what fits and simply wider when the column is wider. */
+      width: 100%;
+    }
+
+    /* Only --fullscreen-chrome-height is measured (syncFullscreenChromeSpace), because
+       the chrome is the one part that genuinely varies: it wraps to two or three rows
+       on a narrow screen. The relations row and the gaps are constants above, so the
+       reserved space is identical before and after the chips arrive. */
+
     .fullscreen-viewer__chrome {
       min-width: 0;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 14px;
+      /* The chrome is only as wide as the STAGE, so a portrait piece gives it
+         ~566px to hold a mark, the type, the id and four controls. It does not
+         fit, and the first casualty was the type truncating to "HTML · 2.…".
+         Wrapping the controls onto their own row is tidier than truncating, and
+         on a wide piece everything still sits on one line. */
+      flex-wrap: wrap;
+      gap: 10px;
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: color-mix(in srgb, var(--panel) 78%, transparent);
@@ -2373,6 +2422,10 @@
     }
 
     .fullscreen-viewer__title {
+      /* flex:1 so the spare width lands HERE. Without it the title defaults to
+         0 1 auto, the free space is swallowed by the actions' auto margin, and
+         the title truncates to "Inscript…" while the row is half empty. */
+      flex: 1 1 auto;
       min-width: 0;
       display: grid;
       gap: 2px;
@@ -2391,12 +2444,143 @@
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     }
 
+    /* The brand mark, so an enlarged inscription still reads as Xtrata rather than
+       as an anonymous box of someone else's content. Doubles as the way back. */
+    .fullscreen-viewer__mark {
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: none;
+      cursor: pointer;
+    }
+    .fullscreen-viewer__mark img {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      pointer-events: none;
+    }
+    .fullscreen-viewer__mark:hover,
+    .fullscreen-viewer__mark:focus-visible {
+      border-color: var(--line);
+      background: color-mix(in srgb, var(--ink) 8%, transparent);
+    }
+
+    /* --- Relations strip ------------------------------------------------- */
+    .fullscreen-viewer__rel {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      /* One row that scrolls sideways. Wrapping would let a piece with many
+         children push the artwork off a phone screen entirely. */
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: color-mix(in srgb, var(--panel) 78%, transparent);
+    }
+    .fullscreen-viewer__rel[hidden] { display: none; }
+
+    .rel-strip__group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 0 0 auto;
+    }
+    .rel-strip__label {
+      flex: 0 0 auto;
+      color: var(--muted);
+      font-size: 10.5px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .rel-strip__chip {
+      flex: 0 0 auto;
+      /* 32px min so it is a comfortable tap target, not a mouse-sized pill. */
+      min-height: 32px;
+      padding: 4px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--rel-acc, var(--ink)) 10%, transparent);
+      color: var(--ink);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .rel-strip__chip:hover,
+    .rel-strip__chip:focus-visible {
+      border-color: var(--rel-acc, var(--ink));
+    }
+    .rel-strip__empty {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .rel-strip__more {
+      flex: 0 0 auto;
+      color: var(--muted);
+      font-size: 11.5px;
+      white-space: nowrap;
+    }
+    /* Distinct accents so a parent never reads as a child at a glance. */
+    .rel-strip__group--parents   { --rel-acc: #e0a03f; }
+    .rel-strip__group--children  { --rel-acc: #5aa9e6; }
+    .rel-strip__group--deps      { --rel-acc: #8f7cf0; }
+    .rel-strip__group--replies   { --rel-acc: #4fb286; }
+    .rel-strip__group--receipts  { --rel-acc: #b6b2a8; }
+    .rel-strip__group--ancestors { --rel-acc: #c98a2e; }
+    .rel-strip__group--siblings  { --rel-acc: #7f8fa6; }
+
+    /* The id is the one thing you always want off this screen, so it gets its own
+       slot in the gap rather than being crammed in beside the type and size. */
+    .fullscreen-viewer__id {
+      /* Never shrink: an id truncated to "Xtrata #11…" is worse than useless,
+         because it looks like a complete number and is not. The title beside it
+         has min-width:0 and ellipsis, so it gives up its space instead. */
+      flex: 0 0 auto;
+      white-space: nowrap;
+      padding: 3px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--ink);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      letter-spacing: 0.02em;
+      user-select: all; /* one click selects the whole id */
+    }
+    .fullscreen-viewer__id[hidden] { display: none; }
+
     .fullscreen-viewer__actions {
       display: flex;
-      flex-wrap: wrap;
+      /* Wrapping dropped Close onto a second row and doubled the height of the
+         chrome. The controls stay on one line and the title yields instead. */
+      flex-wrap: nowrap;
       justify-content: flex-end;
       align-items: center;
       gap: 8px;
+      /* No margin-left:auto here. An auto margin consumes positive free space
+         BEFORE flex-grow gets any, so it silently starved the title's flex:1 and
+         the type/size truncated while the row still had room. The title growing
+         pushes these to the right on its own. */
+    }
+
+    /* Arrows read faster than words at this size, and leave room for the id. */
+    .fullscreen-viewer__actions .btn.icon {
+      min-width: 38px;
+      padding-inline: 10px;
+      font-size: 15px;
+      line-height: 1;
     }
 
     .fullscreen-viewer__stage {
@@ -2468,8 +2652,15 @@
 
     @media (max-width: 680px) {
       .fullscreen-viewer {
-        --fullscreen-chrome-space: 136px;
-        --fullscreen-stage-size: min(90vw, calc(var(--fullscreen-viewport-height) - var(--fullscreen-chrome-space)));
+        /* Only the chrome estimate changes: the rule below stacks it into a
+           column, so it is roughly twice as tall. The relations row and the gaps
+           stay in the one formula above, which is what keeps the reserved space
+           identical before and after the chips arrive. Overriding the whole
+           --fullscreen-chrome-space here, as this used to, silently dropped the
+           relations row back out of the reservation on exactly the screens with
+           the least height to spare. JS replaces this with a measurement once
+           the viewer is laid out. */
+        --fullscreen-chrome-height: 108px;
       }
 
       .fullscreen-viewer__chrome {
@@ -2484,8 +2675,9 @@
 
     @media (orientation: portrait) {
       .fullscreen-viewer {
-        --fullscreen-chrome-space: 136px;
-        --fullscreen-stage-size: min(90vw, calc(var(--fullscreen-viewport-height) - var(--fullscreen-chrome-space)));
+        /* Same reasoning as the narrow-screen rule above: adjust the chrome
+           estimate, never the whole reservation. */
+        --fullscreen-chrome-height: 108px;
       }
     }
 

@@ -53,8 +53,9 @@ describe('deploy pricing lock helpers', () => {
       maxChunks: 120,
       feeUnitMicroStx: 100_000n
     });
-    expect(estimate.batchCount).toBe(3);
-    expect(estimate.sealMicroStx).toBe(400_000n);
+    // 120 chunks: ceil(120/32) = 4 fee batches, not ceil(120/50) = 3.
+    expect(estimate.batchCount).toBe(4);
+    expect(estimate.sealMicroStx).toBe(500_000n);
   });
 
   it('evaluates deploy price safety margin', () => {
@@ -63,15 +64,19 @@ describe('deploy pricing lock helpers', () => {
       maxChunks: 120,
       feeUnitMicroStx: 100_000n
     });
-    expect(safe.worstCaseSealFeeMicroStx).toBe(400_000n);
+    // 120 chunks: ceil(120/32) = 4 fee batches, not ceil(120/50) = 3.
+    expect(safe.worstCaseSealFeeMicroStx).toBe(500_000n);
     expect(safe.worstCaseBeginFeeMicroStx).toBe(0n);
-    expect(safe.absorbedProtocolFeeMicroStx).toBe(400_000n);
+    expect(safe.absorbedProtocolFeeMicroStx).toBe(500_000n);
     expect(safe.absorptionModel).toBe('seal-fee-only');
-    expect(safe.marginMicroStx).toBe(600_000n);
+    // 1,000,000 price less the 500,000 absorbed floor.
+    expect(safe.marginMicroStx).toBe(500_000n);
     expect(safe.safe).toBe(true);
 
+    // The floor is now 500,000 (1 seal + 4 batches at 100,000), so these two
+    // cases move with it: exactly-at-floor and one microSTX under.
     const exactFloorMatch = evaluateDeployPriceSafety({
-      mintPriceMicroStx: 400_000n,
+      mintPriceMicroStx: 500_000n,
       maxChunks: 120,
       feeUnitMicroStx: 100_000n
     });
@@ -79,7 +84,7 @@ describe('deploy pricing lock helpers', () => {
     expect(exactFloorMatch.safe).toBe(true);
 
     const unsafe = evaluateDeployPriceSafety({
-      mintPriceMicroStx: 399_999n,
+      mintPriceMicroStx: 499_999n,
       maxChunks: 120,
       feeUnitMicroStx: 100_000n
     });

@@ -1,0 +1,159 @@
+{
+  "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+  "network": "mainnet",
+  "state": {
+    "version": "xtrata-v3.2.3",
+    "paused": false,
+    "admin": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+    "royaltyRecipient": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+    "feeUnits": {
+      "beginFeeUnit": 100000,
+      "uploadChunkFeeUnit": 1000,
+      "uploadBatchFeeUnit": 100000,
+      "sealFeeUnit": 100000,
+      "singleTxFeeUnit": 10000
+    },
+    "limits": {
+      "chunk-size": 16384,
+      "general-list-limit": 50,
+      "max-total-chunks": 2048,
+      "max-total-size": 33554432,
+      "seal-batch-limit": 50,
+      "single-tx-chunk-limit": 32,
+      "single-tx-payload-limit": 524288,
+      "upload-batch-limit": 32,
+      "upload-payload-limit": 524288,
+      "version": "xtrata-v3.2.3"
+    },
+    "quotes": {
+      "article-1-chunk": {
+        "totalSize": 16384,
+        "totalChunks": 1,
+        "single": {
+          "begin-fee": 100000,
+          "chunk-size": 16384,
+          "mode": 2,
+          "seal-fee": 101000,
+          "single-tx-eligible": true,
+          "single-tx-fee": 11000,
+          "total-fee": 11000,
+          "upload-batch-limit": 32,
+          "upload-batches": 1
+        },
+        "staged": {
+          "begin-fee": 100000,
+          "chunk-size": 16384,
+          "mode": 1,
+          "seal-fee": 101000,
+          "single-tx-eligible": true,
+          "single-tx-fee": 11000,
+          "total-fee": 201000,
+          "upload-batch-limit": 32,
+          "upload-batches": 1
+        }
+      },
+      "article-2-chunks": {
+        "totalSize": 32768,
+        "totalChunks": 2,
+        "single": {
+          "begin-fee": 100000,
+          "chunk-size": 16384,
+          "mode": 2,
+          "seal-fee": 102000,
+          "single-tx-eligible": true,
+          "single-tx-fee": 12000,
+          "total-fee": 12000,
+          "upload-batch-limit": 32,
+          "upload-batches": 1
+        },
+        "staged": {
+          "begin-fee": 100000,
+          "chunk-size": 16384,
+          "mode": 1,
+          "seal-fee": 102000,
+          "single-tx-eligible": true,
+          "single-tx-fee": 12000,
+          "total-fee": 202000,
+          "upload-batch-limit": 32,
+          "upload-batches": 1
+        }
+      },
+      "media-8-chunks": {
+        "totalSize": 131072,
+        "totalChunks": 8,
+        "single": {
+          "begin-fee": 100000,
+          "chunk-size": 16384,
+          "mode": 2,
+          "seal-fee": 108000,
+          "single-tx-eligible": true,
+          "single-tx-fee": 18000,
+          "total-fee": 18000,
+          "upload-batch-limit": 32,
+          "upload-batches": 1
+        },
+        "staged": {
+          "begin-fee": 100000,
+          "chunk-size": 16384,
+          "mode": 1,
+          "seal-fee": 108000,
+          "single-tx-eligible": true,
+          "single-tx-fee": 18000,
+          "total-fee": 208000,
+          "upload-batch-limit": 32,
+          "upload-batches": 1
+        }
+      },
+      "media-32-chunks": {
+        "totalSize": 524288,
+        "totalChunks": 32,
+        "single": {
+          "begin-fee": 100000,
+          "chunk-size": 16384,
+          "mode": 2,
+          "seal-fee": 132000,
+          "single-tx-eligible": true,
+          "single-tx-fee": 42000,
+          "total-fee": 42000,
+          "upload-batch-limit": 32,
+          "upload-batches": 1
+        },
+        "staged": {
+          "begin-fee": 100000,
+          "chunk-size": 16384,
+          "mode": 1,
+          "seal-fee": 132000,
+          "single-tx-eligible": true,
+          "single-tx-fee": 42000,
+          "total-fee": 232000,
+          "upload-batch-limit": 32,
+          "upload-batches": 1
+        }
+      },
+      "media-100-chunks": {
+        "totalSize": 1638400,
+        "totalChunks": 100,
+        "single": null,
+        "staged": {
+          "begin-fee": 100000,
+          "chunk-size": 16384,
+          "mode": 1,
+          "seal-fee": 432000,
+          "single-tx-eligible": false,
+          "single-tx-fee": 110000,
+          "total-fee": 532000,
+          "upload-batch-limit": 32,
+          "upload-batches": 4
+        }
+      }
+    },
+    "allowedCallers": {}
+  },
+  "observed": {
+    "lastTokenId": 2975,
+    "mintedCount": 2871,
+    "stacksTipHeight": 8703272,
+    "burnBlockHeight": 961065,
+    "stacksTip": "5f6abf8189b84359b8b0ea4bd1b47fa5ba38f7069b69dfa8b379a3b1c68d33b5"
+  }
+}

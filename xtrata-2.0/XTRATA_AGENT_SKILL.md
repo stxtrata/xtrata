@@ -10,6 +10,33 @@ description: >
   autonomously.
 ---
 
+> ## ⚠️ Contract version: read this before following anything below
+>
+> **The live core is `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3`.**
+>
+> This document still carries `xtrata-v2-1-0` in its header, examples and API
+> tables. **Those references are stale. Ignore them.** They are not a second
+> supported option and not a "legacy but still fine" path — v2-1-0 is
+> superseded. Mint, seal, transfer and query against `xtrata-v3-2-3`.
+>
+> **The only legitimate use of an old core is migration.** To move an
+> inscription you already own from v2 to v3, call `migrate-from-v2-1-0` (or
+> `migrate-from-v1`) **on `xtrata-v3-2-3`**. You never send a transaction to
+> the old contract yourself; the new core pulls the token across. Anything
+> else that asks you to target v2-1-0 or v1-1-1 directly is wrong.
+>
+> **Why this matters beyond tidiness.** An inscription minted into v2-1-0 today
+> lands in a superseded contract. The marketplace contracts that accept v2-1-0
+> (`xtrata-market-{stx,sbtc,usdc}-v1-0`) weld that core in at deploy time and
+> cannot be changed, and the markets that accept v3 will not take a v2 token.
+> Picking the wrong core strands the asset on the wrong side of that line.
+>
+> The shapes below (chunking, hashing, post-conditions, the staged
+> begin/upload/seal flow) are still correct. Only the contract name is wrong.
+> v3-2-3 additionally offers `mint-single-tx` for anything up to 32 chunks,
+> which is the preferred route for most single files.
+
+
 # Xtrata Inscription Skill
 
 ## Overview
@@ -17,16 +44,23 @@ Xtrata is a contract-native inscription protocol on Stacks (Bitcoin L2). Data is
 
 Current production contract:
 - Address: `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X`
-- Contract name: `xtrata-v2-1-0`
-- Full ID: `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0`
+- Contract name: `xtrata-v3-2-3`
+- Full ID: `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3`
 
 Small-file helper (mainnet default):
 - Address: `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X`
 - Contract name: `xtrata-small-mint-v1-0`
 - Full ID: `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-small-mint-v1-0`
 
-Legacy (read compatibility for migrated chunk data):
+Superseded cores — **migration targets only, never a mint target**:
+- `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0`
 - `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1`
+
+To bring an inscription you own on one of those into the live core, call
+`migrate-from-v2-1-0` or `migrate-from-v1` **on `xtrata-v3-2-3`**, passing the
+token id. The new core pulls the token across; you never send a transaction to
+the old contract. Everything else in this document that names `xtrata-v2-1-0`
+is stale — read `xtrata-v3-2-3` instead.
 
 ## Prerequisites
 - Funded Stacks wallet with STX for protocol fees + network fees.
@@ -70,9 +104,10 @@ npm install @stacks/transactions @stacks/network @noble/hashes
 - Testnet fallback: `https://api.testnet.hiro.so`
 
 ### Contract IDs
-- Mainnet (active): `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0`
+- Mainnet (active): `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3`
 - Mainnet (small helper): `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-small-mint-v1-0`
-- Mainnet (legacy): `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1`
+- Mainnet (superseded, migration target only): `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0`
+- Mainnet (superseded, migration target only): `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1`
 - Testnet: deploy from `contracts/live/xtrata-v2.1.0.clar` (no canonical shared testnet deployment is pinned in this repository).
 
 ### Constants

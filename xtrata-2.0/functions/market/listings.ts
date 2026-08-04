@@ -93,6 +93,43 @@ const unwrapTuple = (node: unknown): Record<string, { value: unknown }> | null =
     : null;
 };
 
+/**
+ * Read `ids` with bounded concurrency, preserving input order.
+ *
+ * These reads are independent, and doing them one after another made this
+ * endpoint scale linearly with listing count: at ~200ms per Hiro round trip, a
+ * market holding 21 listings cost ~4.5s, and the slowest market set the whole
+ * response time. The drops path already fans out this way for the same reason.
+ *
+ * `null` means the contract genuinely returned no listing for that id. A thrown
+ * read is reported separately, because the two must not be confused — see the
+ * `incomplete` handling in `readMarket`.
+ */
+const mapWithConcurrency = async <T, R>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<R>
+): Promise<Array<{ ok: true; value: R } | { ok: false }>> => {
+  const results = new Array<{ ok: true; value: R } | { ok: false }>(items.length);
+  let cursor = 0;
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (;;) {
+      const index = cursor++;
+      if (index >= items.length) return;
+      try {
+        results[index] = { ok: true, value: await worker(items[index]!) };
+      } catch {
+        results[index] = { ok: false };
+      }
+    }
+  });
+  await Promise.all(runners);
+  return results;
+};
+
+/** Concurrent Hiro reads per market. Enough to be fast, low enough to stay inside rate limits. */
+const READ_CONCURRENCY = 6;
+
 const readMarket = async (
   env: MarketEnv,
   entry: RegistryEntry,
@@ -109,18 +146,37 @@ const readMarket = async (
   const floor = seller === null && lastId > BigInt(LISTINGS_PER_CONTRACT)
     ? lastId - BigInt(LISTINGS_PER_CONTRACT)
     : 0n;
-  const listings: Record<string, unknown>[] = [];
+
+  const ids: bigint[] = [];
   for (let id = lastId; id >= floor; id -= 1n) {
-    try {
-      const json = await callRead(env, contractId, 'get-listing', [cvToHex(uintCV(id))]);
-      const tuple = unwrapTuple(json);
+    ids.push(id);
+    if (id === 0n) break;
+  }
+
+  const fetched = await mapWithConcurrency(ids, READ_CONCURRENCY, async (id) =>
+    unwrapTuple(await callRead(env, contractId, 'get-listing', [cvToHex(uintCV(id))]))
+  );
+
+  const listings: Record<string, unknown>[] = [];
+  // A read that THREW is not the same as a listing that does not exist. The old
+  // per-id `catch` treated both as "sparse / deleted id", so a rate-limited
+  // middle of the scan produced a shorter list that was then cached as healthy
+  // for 30s — the page showing fewer listings than exist, with no signal.
+  let incomplete = false;
+
+  ids.forEach((id, index) => {
+    const outcome = fetched[index];
+    if (!outcome || outcome.ok !== true) {
+      incomplete = true;
+      return;
+    }
+    const tuple = outcome.value;
+    {
       if (!tuple) {
-        if (id === 0n) break;
-        continue;
+        return;
       }
       if (seller !== null && String(tuple.seller.value) !== seller) {
-        if (id === 0n) break;
-        continue;
+        return;
       }
       const opt = (field: string) => {
         const raw = tuple[field]?.value as { value?: unknown } | null | undefined;
@@ -143,12 +199,10 @@ const readMarket = async (
         claimed: tuple.claimed ? String(tuple.claimed.value) : null,
         soldAt: tuple['sold-at'] ? opt('sold-at') : null
       });
-    } catch {
-      // sparse / deleted ids
     }
-    if (id === 0n) break;
-  }
-  return listings;
+  });
+
+  return { listings, incomplete };
 };
 
 export const onRequestGet: PagesFunction<MarketEnv> = async (context) => {
@@ -172,8 +226,8 @@ export const onRequestGet: PagesFunction<MarketEnv> = async (context) => {
   const perMarket = await Promise.all(
     entries.map((entry) =>
       readMarket(env, entry, seller).then(
-        (listings) => ({ ok: true as const, listings }),
-        () => ({ ok: false as const, listings: [] as Record<string, unknown>[] })
+        ({ listings, incomplete }) => ({ ok: true as const, listings, incomplete }),
+        () => ({ ok: false as const, listings: [] as Record<string, unknown>[], incomplete: true })
       )
     )
   );
@@ -182,7 +236,12 @@ export const onRequestGet: PagesFunction<MarketEnv> = async (context) => {
   // would show "no listings" while listings exist on-chain. Serve degraded
   // results without caching them, and fail loudly when everything failed so
   // the frontend falls back to its own direct reads.
-  const degraded = perMarket.some((r) => !r.ok);
+  //
+  // `incomplete` covers the subtler half: a market whose id scan lost some
+  // individual reads still resolves, and used to be reported as healthy because
+  // only a thrown `get-last-listing-id` counted. Under concurrent reads a
+  // rate-limited id is more likely, not less, so a partial scan must degrade too.
+  const degraded = perMarket.some((r) => !r.ok || r.incomplete);
   if (perMarket.length > 0 && perMarket.every((r) => !r.ok)) {
     return jsonResponse(
       { error: 'UPSTREAM_UNAVAILABLE', message: 'all market reads failed' },
