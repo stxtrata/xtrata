@@ -245,6 +245,16 @@ One correction, narrow rather than important. You wrote that the guard "can neve
 
 So your conclusion stands unchanged, and your integrator guidance is what we would tell anyone. Write the intent record before broadcasting, reconcile by txid, use `get-id-by-hash` as a free pre-flight.
 
+**We went back and proved all of this in simnet rather than reasoning about it, and turned up three things worth having.**
+
+First, the exact shape of that guard. It fires on `{tx-sender, expected-hash}` while a staged session is open. It is **not** a global content lock. Another principal can mint the same hash through the single-tx path while your staged session is still in flight, and it succeeds.
+
+Second, `get-id-by-hash` always names the **first** token minted for a hash, never the most recent. Good as a pre-flight, but do not treat it as a current-state lookup after duplicates exist.
+
+Third, and this one is useful rather than cautionary: `begin-or-get` is genuinely idempotent on the fee. Re-calling it for a session you already opened resumes it and charges **nothing**. So a crashed uploader can safely call it again on restart without paying the begin fee twice. Worth building into your retry logic.
+
+One more, since it may affect how you think about cost. Chunks are keyed `{final-hash, creator, index}` and written with `map-set`. So when the same creator re-inscribes identical bytes, the second mint rewrites the same rows rather than storing a second copy. You pay a second protocol fee, but you are not paying to store the same bytes twice.
+
 On the posture question. Yes, dedup is the integrator's responsibility, and that is deliberate rather than an oversight. Identical bytes are not always a mistake. Two people can legitimately inscribe the same content, and the same person can legitimately want a second copy. A contract-side unique constraint would make that impossible and would push everyone into hash-collision workarounds.
 
 The candidate core does not change this, so it is safe to build on the assumption that it stays. If it ever changed it would be additive, an opt-in flag rather than a new default.

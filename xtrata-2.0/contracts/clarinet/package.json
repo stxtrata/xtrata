@@ -11,7 +11,7 @@
     "test:report": "vitest run -- --coverage --costs",
     "test:watch": "chokidar \"tests/**/*.ts\" \"contracts/**/*.clar\" -c \"npm run test:report\"",
     "check:v3.2.4": "clarinet check --manifest-path v3.2.4/Clarinet.toml",
-    "test:v3.2.4": "npm run check:v3.2.4 && node tests/xtrata-v3.2.4.migration.test.mjs && node tests/xtrata-v3.2.4.composability.test.mjs && node tests/xtrata-v3.2.4.expiry.test.mjs"
+    "test:v3.2.4": "npm run check:v3.2.4 && node tests/xtrata-v3.2.4.migration.test.mjs && node tests/xtrata-v3.2.4.composability.test.mjs && node tests/xtrata-v3.2.4.expiry.test.mjs && node tests/xtrata-v3.2.4.dedup.test.mjs"
   },
   "author": "",
   "license": "ISC",
