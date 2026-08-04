@@ -2,6 +2,15 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Market page: one render per load, and a log that says how (2026-08-03, follow-up)
+
+- **The grid was rendering twice.** 48 thumbnail cache lookups for 24 cards. `loadMarketPage` renders once when listings arrive, and the USD price book callback called `renderMarketListings()` again — which `replaceChildren`s the grid and rebuilds every card, thumbnail slot and button, purely to append "~$1.38" to one text node each. New `refreshMarketPrices()` patches the figures into the nodes already on screen; price nodes carry `data-market-price="<contractId>:<listingId>"` to make that addressable. Verified in-browser: ~24 lookups for 24 cards, all 24 prices still showing USD.
+- That redundant render was also the mechanism behind the earlier "no live listings" flash — whichever of the two renders landed first painted the state it found. The phase fix made the message honest; this removes the race that caused it.
+- **`listings served from edge cache` printed identically for a 0.2s cache hit and a ~4.5s cold origin scan.** It named which endpoint answered, not how, which hid the only number worth watching and cost a diagnostic round trip. Replaced with `listings loaded`, carrying `count`, `elapsedMs`, `answerAgeMs`, `degraded`, and a `source` of `edge-cache | origin-scan` derived from the endpoint's own `updatedAt` stamp — a large age means the edge served a copy, near zero means this request paid for the scan.
+- **Incidental:** the comment-stripping behind the copy guards only handled `//` lines, so a block comment quoting a banned phrase defeated them — noticed because my own comment tripped it. It now strips block comments too, which quietly strengthens the sponsorship-copy assertions that share the same helper.
+- **Verified:** `npx vitest run` — **2172 tests across 230 files**; build clean; lint unchanged at the 4 pre-existing errors. Three new guards in `market-sponsored-claims.test.ts`: the USD callback must not call `renderMarketListings`, price nodes must stay addressable, and the log must report timing and source rather than the old fixed string.
+- **Still unproven:** the concurrency fix from the previous entry. Local dev serves no Cloudflare functions, so `/market/listings` 404s and falls back to direct reads (~11s, plus a "Price route unavailable" warning) — neither is representative. On the next preview, load after >30s of inactivity and read the new line: `source: 'origin-scan'` under a second means it works; ~4500ms means it did not take effect.
+
 ## Market page: 23s blank load, and 24 SVGs that could not thumbnail (2026-08-03)
 
 - **Symptom:** the market page announced "no live listings right now", then filled in ~23 seconds later, logging ~25 `market thumbnail cache warm failed` errors with `The source image could not be decoded.` for tokens 2932–2955. Three separate causes, all measured rather than guessed.

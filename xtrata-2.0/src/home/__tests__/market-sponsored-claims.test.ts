@@ -29,11 +29,14 @@ const marketSection = (() => {
 })();
 
 /**
- * Market section with `//` comments stripped. The copy assertions must test
- * what a user can read, not the comments explaining why the copy changed —
- * those legitimately quote the removed phrases.
+ * Market section with comments stripped — both `//` lines and `/* *\/` blocks.
+ * The copy assertions must test what a user can read, not the comments
+ * explaining why the copy changed: those legitimately quote the removed
+ * phrases, and a block comment doing so used to defeat these guards.
  */
-const marketCopy = marketSection.replace(/^\s*\/\/.*$/gm, '');
+const marketCopy = marketSection
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/^\s*\/\/.*$/gm, '');
 
 const sponsoredBuyFn = (() => {
   const start = marketSection.indexOf('const marketSponsoredBuy');
@@ -179,5 +182,43 @@ describe('market page does not promise sponsored checkout ahead of the rehearsal
     const dropsSection = mainSource.slice(mainSource.indexOf('const DROPS_DISPLAY_LIMIT'));
     expect(dropsSection).toContain('showSponsoredContractCall');
     expect(dropsSection).toMatch(/no STX needed/i);
+  });
+});
+
+describe('the market grid renders once per load', () => {
+  const loadFn = (() => {
+    const start = marketSection.indexOf('const loadMarketPage');
+    expect(start, 'loadMarketPage not found').toBeGreaterThan(-1);
+    const from = marketSection.slice(start);
+    return from.slice(0, from.indexOf('\n    };'));
+  })();
+
+  it('the USD price book patches prices instead of re-rendering the grid', () => {
+    // It used to call renderMarketListings, which replaceChildren's the grid and
+    // rebuilds every card, thumbnail slot and button to change one text node
+    // each — 48 thumbnail cache lookups for 24 cards. It was also what could
+    // paint "no live listings" over a grid that was still loading, by winning
+    // the race against the listings fetch.
+    const usdCallback = loadFn.slice(loadFn.indexOf('loadUsdPriceBook'));
+    const callbackBody = usdCallback.slice(0, usdCallback.indexOf('renderMarketToolbar'));
+    expect(callbackBody).toContain('refreshMarketPrices');
+    expect(callbackBody).not.toContain('renderMarketListings');
+  });
+
+  it('price nodes are addressable, which is what makes a targeted update possible', () => {
+    expect(marketSection).toContain('price.dataset.marketPrice');
+    expect(marketSection).toMatch(/const refreshMarketPrices = \(\) =>/);
+    expect(marketSection).toContain('[data-market-price]');
+  });
+
+  it('reports how listings arrived, not merely that they did', () => {
+    // "listings served from edge cache" printed identically for a 0.2s cache hit
+    // and a ~4.5s cold origin scan, hiding the only number worth watching.
+    // marketCopy has comments stripped: the comment explaining the rename
+    // legitimately quotes the old string.
+    expect(marketCopy).not.toContain('listings served from edge cache');
+    expect(marketSection).toContain("debugLog('market', 'listings loaded'");
+    expect(marketSection).toMatch(/elapsedMs: answer\.meta\.elapsedMs/);
+    expect(marketSection).toMatch(/source: .*edge-cache.*origin-scan/s);
   });
 });
