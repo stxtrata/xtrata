@@ -128,6 +128,7 @@
     } from '/src/lib/contract/client.ts';
     import { fetchContractAdminStatus } from '/src/lib/contract/admin-status.ts';
     import {
+      estimateContractFeeCaps,
       estimateContractFees,
       getFeeSchedule
     } from '/src/lib/contract/fees.ts';
@@ -1486,6 +1487,16 @@
 
     const getFeeEstimate = (totalChunks = state.prepared?.chunks.length ?? 0) =>
       estimateContractFees({
+        schedule: getFeeSchedule(state.contract, getFeeUnitNumber()),
+        totalChunks
+      });
+
+    // Post-condition caps, NOT the displayed estimate. The five fee units are
+    // admin-mutable and only the legacy aggregate is read here, so the caps
+    // carry headroom. Prefer an on-chain quote (state.prepared.stagedFee /
+    // singleTxFeeMicroStx) whenever one is available.
+    const getFeeCaps = (totalChunks = state.prepared?.chunks.length ?? 0) =>
+      estimateContractFeeCaps({
         schedule: getFeeSchedule(state.contract, getFeeUnitNumber()),
         totalChunks
       });
@@ -5133,7 +5144,7 @@
         await refreshUploadState(prepared.expectedHash);
         telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'success' });
         flowStarted = true;
-        const feeEstimate = getFeeEstimate(prepared.chunks.length);
+        const feeCaps = getFeeCaps(prepared.chunks.length);
         const hasUploadState = !!state.uploadState;
 
         if (shouldUseNativeSingleTx()) {
@@ -5155,12 +5166,13 @@
             listCV(prepared.chunks.map((chunk) => bufferCV(chunk))),
             stringAsciiCV(prepared.tokenUriValue)
           ];
-          // Cap at the quoted single-tx fee when known; fall back to the 3-stage
-          // estimate (always >= the single-tx fee) if the quote is unavailable.
+          // Cap at the quoted single-tx fee when known; otherwise fall back to
+          // single-tx-fee-for-chunks with headroom (NOT the 3-stage estimate,
+          // which is ~27x the real single-tx fee at 1 chunk).
           const singleTxCapMicroStx =
             typeof prepared.singleTxFeeMicroStx === 'number'
               ? prepared.singleTxFeeMicroStx
-              : feeEstimate.totalMicroStx;
+              : feeCaps.singleTxMicroStx;
           telemetryStep = 'submit';
           telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'start' });
           const singleTx = await requestContractCall({
@@ -5249,7 +5261,9 @@
                     listCV(prepared.chunks.map((chunk) => bufferCV(chunk))),
                     stringAsciiCV(prepared.tokenUriValue)
                   ],
-            postConditions: resolveFeePostConditions(feeEstimate.totalMicroStx),
+            // Helper route: the helper runs begin -> upload -> seal on the
+            // core, so the staged fees apply, not single-tx-fee-for-chunks.
+            postConditions: resolveFeePostConditions(feeCaps.totalMicroStx),
             feeMicroStx: walletMinerFeeMicroStx(prepared.bytes.length)
           });
           const singleTxId = normalizeTxId(singleTx);
@@ -5294,7 +5308,7 @@
               uintCV(BigInt(prepared.chunks.length))
             ],
             postConditions: resolveFeePostConditions(
-              prepared.stagedFee?.beginMicroStx ?? feeEstimate.beginMicroStx
+              prepared.stagedFee?.beginMicroStx ?? feeCaps.beginMicroStx
             )
           });
           const beginTxId = normalizeTxId(beginTx);
@@ -5407,7 +5421,7 @@
           functionName: sealFunctionName,
           functionArgs: buildSealFunctionArgs(prepared),
           postConditions: resolveFeePostConditions(
-            prepared.stagedFee?.sealMicroStx ?? feeEstimate.sealMicroStx
+            prepared.stagedFee?.sealMicroStx ?? feeCaps.sealMicroStx
           )
         });
         const sealTxId = normalizeTxId(sealTx);
