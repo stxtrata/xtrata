@@ -34,6 +34,7 @@ import { useContractAdminStatus } from '../lib/contract/admin-status';
 import { createXtrataClient } from '../lib/contract/client';
 import { toStacksNetwork } from '../lib/network/stacks';
 import {
+  estimateBatchContractFeeCaps,
   estimateBatchContractFees,
   formatMicroStx,
   getFeeSchedule
@@ -597,6 +598,16 @@ export default function CollectionMintScreen(props: CollectionMintScreenProps) {
   const feeEstimate = useMemo(
     () =>
       estimateBatchContractFees({
+        schedule: feeSchedule,
+        totalChunks: items.map((item) => item.totalChunks)
+      }),
+    [feeSchedule, items]
+  );
+  // Post-condition caps carry headroom over the displayed estimate; the five
+  // fee units are admin-mutable and only the legacy aggregate is read here.
+  const feeCaps = useMemo(
+    () =>
+      estimateBatchContractFeeCaps({
         schedule: feeSchedule,
         totalChunks: items.map((item) => item.totalChunks)
       }),
@@ -1609,7 +1620,7 @@ export default function CollectionMintScreen(props: CollectionMintScreenProps) {
             ? resolveCollectionBatchSealPostConditions(
                 itemsToSeal.map((item) => item.totalChunks)
               )
-            : resolveFeePostConditions(feeEstimate.sealMicroStx);
+            : resolveFeePostConditions(feeCaps.sealMicroStx);
         if (mintTarget === 'collection' && !sealPostConditions) {
           throw new Error(
             'Collection batch seal fee safety cap could not be calculated from chunk counts.'

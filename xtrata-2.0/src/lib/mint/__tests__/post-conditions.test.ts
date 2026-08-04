@@ -140,7 +140,48 @@ describe('mint post conditions', () => {
       protocolFeeMicroStx: 100_000n,
       totalChunks: 51
     });
+    // Only the legacy aggregate get-fee-unit is known here, so the cap stays on
+    // the conservative aggregate x (1 + ceil(51/32)) bound.
     expect(cap).toBe(300_000n);
+  });
+
+  it('computes the exact granular seal cap when real units are supplied', () => {
+    // Live mainnet units for xtrata-v3-2-3 read 2026-08-03 (admin-mutable):
+    // seal 100000, upload-chunk 1000, upload-batch 100000.
+    const feeUnits = {
+      sealFeeUnit: 100_000n,
+      uploadChunkFeeUnit: 1_000n,
+      uploadBatchFeeUnit: 100_000n
+    };
+    expect(
+      resolveSealSpendCapMicroStx({
+        protocolFeeMicroStx: 100_000n,
+        totalChunks: 1,
+        feeUnits
+      })
+    ).toBe(101_000n);
+    expect(
+      resolveSealSpendCapMicroStx({
+        protocolFeeMicroStx: 100_000n,
+        totalChunks: 32,
+        feeUnits
+      })
+    ).toBe(132_000n);
+    // 32/33 boundary: chunk 33 adds a whole additional batch fee.
+    expect(
+      resolveSealSpendCapMicroStx({
+        protocolFeeMicroStx: 100_000n,
+        totalChunks: 33,
+        feeUnits
+      })
+    ).toBe(232_000n);
+    expect(
+      resolveSealSpendCapMicroStx({
+        protocolFeeMicroStx: 100_000n,
+        totalChunks: 643,
+        feeUnits
+      })
+    ).toBe(2_132_000n);
   });
 
   it('computes batch seal cap as the sum of item seal caps', () => {

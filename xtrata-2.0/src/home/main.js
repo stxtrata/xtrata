@@ -128,6 +128,7 @@
     } from '/src/lib/contract/client.ts';
     import { fetchContractAdminStatus } from '/src/lib/contract/admin-status.ts';
     import {
+      estimateContractFeeCaps,
       estimateContractFees,
       getFeeSchedule
     } from '/src/lib/contract/fees.ts';
@@ -1486,6 +1487,16 @@
 
     const getFeeEstimate = (totalChunks = state.prepared?.chunks.length ?? 0) =>
       estimateContractFees({
+        schedule: getFeeSchedule(state.contract, getFeeUnitNumber()),
+        totalChunks
+      });
+
+    // Post-condition caps, NOT the displayed estimate. The five fee units are
+    // admin-mutable and only the legacy aggregate is read here, so the caps
+    // carry headroom. Prefer an on-chain quote (state.prepared.stagedFee /
+    // singleTxFeeMicroStx) whenever one is available.
+    const getFeeCaps = (totalChunks = state.prepared?.chunks.length ?? 0) =>
+      estimateContractFeeCaps({
         schedule: getFeeSchedule(state.contract, getFeeUnitNumber()),
         totalChunks
       });
@@ -5133,7 +5144,7 @@
         await refreshUploadState(prepared.expectedHash);
         telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'success' });
         flowStarted = true;
-        const feeEstimate = getFeeEstimate(prepared.chunks.length);
+        const feeCaps = getFeeCaps(prepared.chunks.length);
         const hasUploadState = !!state.uploadState;
 
         if (shouldUseNativeSingleTx()) {
@@ -5155,12 +5166,13 @@
             listCV(prepared.chunks.map((chunk) => bufferCV(chunk))),
             stringAsciiCV(prepared.tokenUriValue)
           ];
-          // Cap at the quoted single-tx fee when known; fall back to the 3-stage
-          // estimate (always >= the single-tx fee) if the quote is unavailable.
+          // Cap at the quoted single-tx fee when known; otherwise fall back to
+          // single-tx-fee-for-chunks with headroom (NOT the 3-stage estimate,
+          // which is ~27x the real single-tx fee at 1 chunk).
           const singleTxCapMicroStx =
             typeof prepared.singleTxFeeMicroStx === 'number'
               ? prepared.singleTxFeeMicroStx
-              : feeEstimate.totalMicroStx;
+              : feeCaps.singleTxMicroStx;
           telemetryStep = 'submit';
           telemetryEvent({ journey: mintJourney, attempt: mintAttempt, step: telemetryStep, outcome: 'start' });
           const singleTx = await requestContractCall({
@@ -5249,7 +5261,9 @@
                     listCV(prepared.chunks.map((chunk) => bufferCV(chunk))),
                     stringAsciiCV(prepared.tokenUriValue)
                   ],
-            postConditions: resolveFeePostConditions(feeEstimate.totalMicroStx),
+            // Helper route: the helper runs begin -> upload -> seal on the
+            // core, so the staged fees apply, not single-tx-fee-for-chunks.
+            postConditions: resolveFeePostConditions(feeCaps.totalMicroStx),
             feeMicroStx: walletMinerFeeMicroStx(prepared.bytes.length)
           });
           const singleTxId = normalizeTxId(singleTx);
@@ -5294,7 +5308,7 @@
               uintCV(BigInt(prepared.chunks.length))
             ],
             postConditions: resolveFeePostConditions(
-              prepared.stagedFee?.beginMicroStx ?? feeEstimate.beginMicroStx
+              prepared.stagedFee?.beginMicroStx ?? feeCaps.beginMicroStx
             )
           });
           const beginTxId = normalizeTxId(beginTx);
@@ -5407,7 +5421,7 @@
           functionName: sealFunctionName,
           functionArgs: buildSealFunctionArgs(prepared),
           postConditions: resolveFeePostConditions(
-            prepared.stagedFee?.sealMicroStx ?? feeEstimate.sealMicroStx
+            prepared.stagedFee?.sealMicroStx ?? feeCaps.sealMicroStx
           )
         });
         const sealTxId = normalizeTxId(sealTx);
@@ -11846,6 +11860,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
           const price = document.createElement('div');
           price.className = 'market-card__price';
+          // Tagged so the USD spot rates can be dropped in later by updating this
+          // one text node, instead of re-rendering the whole grid. See
+          // refreshMarketPrices.
+          price.dataset.marketPrice = `${listing.contractId}:${listing.listingId}`;
           // Always show the USD equivalent next to the asset price (live
           // Coinbase spot rates; falls back to asset-only while loading).
           price.textContent = formatMarketPriceWithUsd(
@@ -12015,11 +12033,30 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // Fast path: the edge-cached aggregate endpoint (functions/market/listings)
     // turns ~1+N Hiro reads per market into ONE cached request. Falls back to
     // direct reads when unavailable (local dev without wrangler).
+    /**
+     * Read the aggregate listings endpoint.
+     *
+     * Returns `{ listings, meta }`. The meta exists because the old log line
+     * ("listings served from edge cache") printed identically for a 0.2s cache
+     * hit and a ~4.5s cold origin scan — it named which endpoint answered, not
+     * how, which hid the one measurement worth taking. `elapsedMs` is the real
+     * round trip and `ageMs` is how stale the answer was, so a cold scan is
+     * distinguishable from a warm read in the console without a profiler.
+     */
     const loadListingsFromCache = async ({ seller = null, allowEmpty = false } = {}) => {
       const query = seller ? `?seller=${encodeURIComponent(seller)}` : '';
+      const startedAt = Date.now();
       const response = await fetch(`/market/listings${query}`);
+      const elapsedMs = Date.now() - startedAt;
       if (!response.ok) throw new Error(`cache endpoint ${response.status}`);
       const payload = await response.json();
+      const meta = {
+        elapsedMs,
+        degraded: payload.degraded === true,
+        // The endpoint stamps updatedAt when it built the answer. A big age means
+        // the edge served a cached copy; near zero means this request paid for it.
+        ageMs: typeof payload.updatedAt === 'number' ? Math.max(0, startedAt - payload.updatedAt) : null
+      };
       // Never trust an empty or degraded cache answer: a transient upstream
       // failure server-side must not render as "no listings" when listings
       // exist on-chain. Throwing here falls back to direct reads.
@@ -12029,7 +12066,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const byId = new Map(
         marketEntriesForNetwork().map((entry) => [getMarketContractId(entry), entry])
       );
-      return (payload.listings ?? [])
+      const listings = (payload.listings ?? [])
         .map((row) => {
           const entry = byId.get(row.contractId);
           if (!entry) return null;
@@ -12050,6 +12087,36 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           };
         })
         .filter(Boolean);
+      return { listings, meta };
+    };
+
+    /**
+     * Drop live USD figures into cards that are already on screen.
+     *
+     * The price book resolves independently of the listings fetch, and the old
+     * callback re-ran renderMarketListings for it — which calls replaceChildren
+     * on the grid and rebuilds every card, thumbnail slot and button, purely to
+     * append "~$1.38" to one text node each. That doubled the render work and the
+     * thumbnail cache lookups on every market load (48 for 24 cards).
+     *
+     * Prices are the only thing a spot rate changes, so update only those.
+     */
+    const refreshMarketPrices = () => {
+      if (!marketDom.listings) return 0;
+      const byKey = new Map(
+        marketState.listings.map((listing) => [`${listing.contractId}:${listing.listingId}`, listing])
+      );
+      let updated = 0;
+      marketDom.listings.querySelectorAll('[data-market-price]').forEach((node) => {
+        const listing = byKey.get(node.dataset.marketPrice);
+        if (!listing) return;
+        const next = formatMarketPriceWithUsd(listing.price, listing.settlement, state.usdPriceBook);
+        if (node.textContent !== next) {
+          node.textContent = next;
+          updated += 1;
+        }
+      });
+      return updated;
     };
 
     const renderWalletMarketListings = () => {
@@ -12156,7 +12223,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       renderWalletMarketListings();
       let listings = [];
       try {
-        listings = await loadListingsFromCache({ seller: walletAddress, allowEmpty: true });
+        ({ listings } = await loadListingsFromCache({ seller: walletAddress, allowEmpty: true }));
       } catch {
         const perContract = await Promise.all(
           marketEntriesForNetwork().map((entry) => readMarketListings(entry).catch(() => []))
@@ -12184,13 +12251,17 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       // must say "loading", not "none".
       marketState.listingsPhase = 'loading';
       if (marketDom.badge) marketDom.badge.textContent = state.contract.network;
-      // USD conversion: fetch spot rates in the background and re-render the
-      // cards once available (asset-only prices show in the meantime).
+      // USD conversion: fetch spot rates in the background and patch the figures
+      // into whatever is on screen once they land (asset-only prices show in the
+      // meantime). This used to call renderMarketListings, which rebuilt every
+      // card to change one text node each — and, because it could win the race
+      // against the listings fetch, was what painted "no live listings" over a
+      // grid that was still loading.
       void loadUsdPriceBook().then(() => {
-        if (run === marketState.run && state.usdPriceBook) {
-          renderMarketListings();
-          renderSellerDashboard();
-        }
+        if (run !== marketState.run || !state.usdPriceBook) return;
+        const updated = refreshMarketPrices();
+        renderSellerDashboard();
+        debugLog('market', 'usd prices applied', { updated });
       });
       renderMarketToolbar();
       populateSellMarkets();
@@ -12202,8 +12273,18 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       try {
         let listings;
         try {
-          listings = await loadListingsFromCache();
-          debugLog('market', 'listings served from edge cache', { count: listings.length });
+          const answer = await loadListingsFromCache();
+          listings = answer.listings;
+          // Report how the answer arrived, not merely that it did. A warm edge
+          // read and a cold origin scan differ by an order of magnitude, and the
+          // old message was identical for both.
+          debugLog('market', 'listings loaded', {
+            count: listings.length,
+            elapsedMs: answer.meta.elapsedMs,
+            source: answer.meta.ageMs !== null && answer.meta.ageMs > 1000 ? 'edge-cache' : 'origin-scan',
+            answerAgeMs: answer.meta.ageMs,
+            degraded: answer.meta.degraded
+          });
         } catch {
           const perContract = await Promise.all(
             marketEntriesForNetwork().map((entry) => readMarketListings(entry).catch(() => []))
