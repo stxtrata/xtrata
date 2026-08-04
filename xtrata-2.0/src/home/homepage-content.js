@@ -1,17 +1,5 @@
 export const HOMEPAGE_CAMPAIGN_BANNERS = Object.freeze([
   Object.freeze({
-    id: 'proof-zero',
-    status: 'live',
-    eyebrow: 'Live bounty · 200 STX prize pool',
-    title: 'Inscribe your first masterpiece',
-    description: 'Create original work, put it fully on-chain, and enter to become one of four winners.',
-    stat: '200',
-    statLabel: 'STX',
-    href: '/masterpiece',
-    cta: 'Enter the bounty',
-    tone: 'proof-zero'
-  }),
-  Object.freeze({
     id: 'forever-twins',
     status: 'live',
     eyebrow: 'On-chain legacy',
@@ -211,28 +199,6 @@ export const HOMEPAGE_ACTIVITY_DOORS = Object.freeze([
   }
 ]);
 
-export const HOMEPAGE_CAMPAIGN = Object.freeze({
-  id: 'proof-zero-2026',
-  status: 'live',
-  eyebrow: 'Live bounty · Xtrata × Zero Authority DAO',
-  title: 'Inscribe your first masterpiece.',
-  description:
-    'Create an original song, artwork, photograph, poem, animation or film. Put it fully on-chain through Xtrata and enter to win part of 200 STX. Four winners. No theme. Permanent by design.',
-  stat: '200',
-  statLabel: 'STX · prize pool',
-  primaryAction: {
-    label: 'Enter the bounty',
-    href: '/masterpiece'
-  },
-  secondaryAction: {
-    label: 'Start inscribing',
-    href: '/wizard/'
-  },
-  startDate: null,
-  endDate: null,
-  featuredInscriptions: [],
-  sponsor: null
-});
 
 const hasUniqueIds = (items) => {
   const ids = items.map((item) => item.id);
@@ -279,12 +245,5 @@ export const validateHomepageContent = () => {
       errors.push(`Homepage intent ${item.id} is missing required content.`);
     }
   });
-  if (
-    !HOMEPAGE_CAMPAIGN.id ||
-    !HOMEPAGE_CAMPAIGN.title ||
-    !isNavigableHref(HOMEPAGE_CAMPAIGN.primaryAction?.href)
-  ) {
-    errors.push('Homepage campaign is missing required content.');
-  }
   return errors;
 };
