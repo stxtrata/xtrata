@@ -39,3 +39,8 @@ strict = false
 trusted_sender = false
 trusted_caller = false
 callee_filter = false
+
+[contracts.mock-builder]
+path = '../contracts/mock-builder-v3.2.4.clar'
+clarity_version = 3
+epoch = 'latest'

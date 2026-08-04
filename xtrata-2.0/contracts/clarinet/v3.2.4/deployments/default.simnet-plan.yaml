@@ -88,4 +88,9 @@ plan:
             emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
             path: "../contracts/xtrata-v3.2.4.clar"
             clarity-version: 3
+        - emulated-contract-publish:
+            contract-name: mock-builder
+            emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            path: "../contracts/mock-builder-v3.2.4.clar"
+            clarity-version: 3
       epoch: "3.3"
