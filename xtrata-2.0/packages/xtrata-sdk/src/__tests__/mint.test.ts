@@ -47,7 +47,8 @@ describe('sdk mint helpers', () => {
         protocolFeeMicroStx: 100_000n,
         totalChunks: 120
       })
-    ).toBe(400_000n);
+      // 120 chunks: ceil(120/32) = 4 fee batches, not ceil(120/50) = 3.
+    ).toBe(500_000n);
   });
 
   it('builds STX post condition in deny-friendly format', () => {

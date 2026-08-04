@@ -23,9 +23,22 @@ Current packaging mode:
 - Tarball smoke validation is available via `npm run sdk:pack:smoke` from repo root.
 - Example tarball smoke validation is available via `npm run sdk:examples:tarball:smoke` from repo root.
 
-Mint workflow planners cap first-party upload calls at 30 chunks per
-`add-chunk-batch` / `mint-add-chunk-batch`, while retaining the deployed
-contract ABI constant of 50 for protocol fee math and list compatibility.
+Three different batch sizes are in play, and conflating them is a money bug:
+
+- **30** (`MAX_UPLOAD_BATCH_SIZE`) — chunks this SDK sends per
+  `add-chunk-batch` / `mint-add-chunk-batch`. A client-side cap, safely under
+  the contract's limit.
+- **32** (`FEE_BATCH_SIZE`) — the deployed contract's `MAX-UPLOAD-BATCH-SIZE`,
+  the batch size it CHARGES for. This is the divisor for protocol fee math.
+  Verified against mainnet source for `xtrata-v3-2-3` (line 75, asserted at
+  line 1067).
+- **50** (`MAX_BATCH_SIZE`) — the length of the index lists the contract types
+  as `(list 50 uint)`, e.g. `purge-expired-chunk-batch`. Correct for those
+  lists and for read batching. **Never** correct for fee math.
+
+This file previously stated the deployed ABI constant was 50 and directed its
+use for protocol fee math. It is 32. Six fee sites followed that premise and
+capped seal post-conditions below the fee the contract charges.
 
 Quick start:
 

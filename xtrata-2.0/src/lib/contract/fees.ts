@@ -1,4 +1,4 @@
-import { MAX_BATCH_SIZE } from '../chunking/hash';
+import { FEE_BATCH_SIZE } from '../chunking/hash';
 
 export const MICROSTX_PER_STX = 1_000_000;
 
@@ -59,7 +59,7 @@ export const estimateContractFees = (params: {
 
   const feeUnitMicroStx = params.schedule.feeUnitMicroStx;
   const feeBatches =
-    totalChunks > 0 ? Math.ceil(totalChunks / MAX_BATCH_SIZE) : 0;
+    totalChunks > 0 ? Math.ceil(totalChunks / FEE_BATCH_SIZE) : 0;
   const sealMicroStx =
     totalChunks > 0 ? feeUnitMicroStx * (1 + feeBatches) : 0;
   const beginMicroStx = feeUnitMicroStx;
