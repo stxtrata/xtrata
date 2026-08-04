@@ -188,10 +188,20 @@ So batches must go in order, one at a time, and you should confirm each before s
 |---|---|
 | Resume | `begin-or-get` returns the existing session rather than erroring, so it is safe to call again. Read `get-upload-state` for `current-index` to see where you got to |
 | Abandon | `abandon-upload` marks the session immediately expired so it can be purged |
-| Expiry | Sessions expire after 4320 Stacks blocks of inactivity. `last-touched` refreshes on every batch, so it is a rolling window, not a deadline from `begin` |
+| Expiry | Inactivity, measured in `stacks-block-height`. 4320 blocks, which is **about 15 hours** at current block production. `last-touched` refreshes on every batch, so it is a rolling window, not a deadline from `begin` |
 | Cleanup | `purge-expired-chunk-batch` clears the chunks of an expired session. Anyone can call it |
 
 A partially chunked inscription is resumable indefinitely as long as you keep touching it, and abandonable on demand.
+
+**Two corrections on expiry, one of them against our own source comment.**
+
+The constant is `UPLOAD-EXPIRY-BLOCKS u4320` and the comment beside it reads "~30 days at 10-min block cadence". That was true when it was written, when one Stacks block meant one Bitcoin block. Post-Nakamoto `stacks-block-height` advances roughly every 12 seconds, so 4320 blocks is now about **15 hours**, not 30 days. Measured across the last 39,000 blocks the range was 13.2 to 18.4 hours. Treat it as roughly half a day and do not rely on a precise figure, because it moves with block production.
+
+Second, and more important operationally: **an expired session cannot be resumed.** Both `add-chunk-batch` and `begin-or-get` reject it with `ERR-EXPIRED`. To retry you must first purge it, and `purge-expired-chunk-batch` walks indexes 0 to `total-chunks - 1` in batches of 50. For a 2048 chunk upload that is 41 transactions before you can even start again, and then you re-pay the begin fee and re-upload every chunk.
+
+So the number to design around is not total upload time, which can be as long as you like because the window refreshes on every batch. It is the largest gap you can tolerate between batches. If your uploader stalls overnight you lose the session.
+
+We are looking at pegging this to `burn-block-height` instead, so it means a fixed number of Bitcoin blocks and stops drifting with Stacks block production. Nothing decided yet.
 
 **(c) Seal fee at runtime.** Yes. `quote-staged-fee(total-size, total-chunks)` returns a tuple including `begin-fee`, `seal-fee`, `total-fee` and `upload-batches`. Quote it the same way you quote single-tx.
 
