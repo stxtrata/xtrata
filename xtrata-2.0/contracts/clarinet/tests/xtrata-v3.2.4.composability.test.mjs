@@ -112,25 +112,68 @@ console.log('\n=== 4. Marketplace custody round-trip ===');
   if (release.result.type === 'ok') check('buyer owns it', ownerOf(id) === bob, `owner=${ownerOf(id)}`);
 }
 
-console.log('\n=== 5. Relationships when payer and owner differ ===');
+console.log('\n=== 5. Parent links: the lineage-pollution guard ===');
 {
-  const pb = body('parent');
-  const p = simnet.callPublicFn(CORE, 'mint-single-tx', args(pb), alice);
-  const parentId = idOf(p);
+  // bob is the artist. His album parent is the thing that must stay clean.
+  const album = idOf(simnet.callPublicFn(CORE, 'mint-single-tx', args(body('album')), bob));
 
-  const cb = body('child-payer-owns');
-  const ok = simnet.callPublicFn(CORE, 'mint-single-tx-with-relationships-to',
-    [Cl.principal(bob), ...args(cb), Cl.list([]), Cl.list([Cl.uint(parentId)])], alice);
-  check('payer owns the parent -> allowed, recipient gets the child',
-    ok.result.type === 'ok', JSON.stringify(ok.result).slice(0, 160));
+  const mine = simnet.callPublicFn(CORE, 'mint-single-tx-with-relationships',
+    [...args(body('own-track')), Cl.list([]), Cl.list([Cl.uint(album)])], bob);
+  check('the album owner can add his own tracks', mine.result.type === 'ok',
+    JSON.stringify(mine.result).slice(0, 160));
 
-  const cb2 = body('child-recipient-owns');
-  const blocked = simnet.callPublicFn(CORE, 'mint-single-tx-with-relationships-to',
-    [Cl.principal(alice), ...args(cb2), Cl.list([]), Cl.list([Cl.uint(parentId)])], carol);
-  check('payer does NOT own the parent -> rejected', blocked.result.type === 'err',
-    JSON.stringify(blocked.result).slice(0, 120));
-  observe('parent ownership',
-    'checked against tx-sender (the payer), never the recipient. A platform cannot mint a child of an AUTHOR-owned parent on their behalf');
+  // The attack: a stranger tries to hang junk off bob's album, gifting it to bob
+  // so it lands inside his structure.
+  const junk = simnet.callPublicFn(CORE, 'mint-single-tx-with-relationships-to',
+    [Cl.principal(bob), ...args(body('junk')), Cl.list([]), Cl.list([Cl.uint(album)])], carol);
+  check('a stranger CANNOT hang junk off someone else\'s album', junk.result.type === 'err',
+    JSON.stringify(junk.result).slice(0, 120));
+
+  // And cannot do it for themselves either.
+  const steal = simnet.callPublicFn(CORE, 'mint-single-tx-with-relationships-to',
+    [Cl.principal(carol), ...args(body('steal')), Cl.list([]), Cl.list([Cl.uint(album)])], carol);
+  check('a stranger cannot claim descent from it for themselves', steal.result.type === 'err');
+
+  console.log('  -- now bob opts alice in, once --');
+  const grant = simnet.callPublicFn(CORE, 'set-parent-delegate',
+    [Cl.principal(alice), Cl.bool(true)], bob);
+  check('an owner can delegate, and it is not an admin call', grant.result.type === 'ok',
+    JSON.stringify(grant.result).slice(0, 160));
+  const delegated = (owner, delegate) => simnet.callReadOnlyFn(CORE, 'is-parent-delegate',
+    [Cl.principal(owner), Cl.principal(delegate)], alice).result?.value?.type === 'true';
+  check('the delegation is readable on chain', delegated(bob, alice));
+  check('and it is specific, not a blanket opt-in', !delegated(bob, carol));
+
+  const sponsored = simnet.callPublicFn(CORE, 'mint-single-tx-with-relationships-to',
+    [Cl.principal(bob), ...args(body('sponsored-track')), Cl.list([]), Cl.list([Cl.uint(album)])], alice);
+  check('the delegate can now attach a child, minting it TO bob',
+    sponsored.result.type === 'ok', JSON.stringify(sponsored.result).slice(0, 160));
+
+  const keep = simnet.callPublicFn(CORE, 'mint-single-tx-with-relationships-to',
+    [Cl.principal(alice), ...args(body('delegate-keeps')), Cl.list([]), Cl.list([Cl.uint(album)])], alice);
+  check('but the delegate CANNOT keep the child for herself', keep.result.type === 'err',
+    JSON.stringify(keep.result).slice(0, 120));
+
+  const stillBlocked = simnet.callPublicFn(CORE, 'mint-single-tx-with-relationships-to',
+    [Cl.principal(bob), ...args(body('carol-still-out')), Cl.list([]), Cl.list([Cl.uint(album)])], carol);
+  check('delegating to alice does not let carol in', stillBlocked.result.type === 'err');
+
+  console.log('  -- bob revokes --');
+  simnet.callPublicFn(CORE, 'set-parent-delegate', [Cl.principal(alice), Cl.bool(false)], bob);
+  const revoked = simnet.callPublicFn(CORE, 'mint-single-tx-with-relationships-to',
+    [Cl.principal(bob), ...args(body('after-revoke')), Cl.list([]), Cl.list([Cl.uint(album)])], alice);
+  check('revocation takes effect immediately', revoked.result.type === 'err',
+    JSON.stringify(revoked.result).slice(0, 120));
+
+  // The publisher-owned-manifest case must keep working untouched.
+  const vol = idOf(simnet.callPublicFn(CORE, 'mint-single-tx', args(body('volume')), alice));
+  const gifted = simnet.callPublicFn(CORE, 'mint-single-tx-with-relationships-to',
+    [Cl.principal(bob), ...args(body('in-volume')), Cl.list([]), Cl.list([Cl.uint(vol)])], alice);
+  check('a publisher can still gift a child of their OWN manifest', gifted.result.type === 'ok',
+    JSON.stringify(gifted.result).slice(0, 160));
+
+  observe('lineage safety',
+    'default is unchanged: only the owner can add children. A delegation is opt-in, one call, revocable, and can only produce children that mint to the owner');
 }
 
 console.log('\n=== 6. Paused core: can an allowlisted contract keep working? ===');

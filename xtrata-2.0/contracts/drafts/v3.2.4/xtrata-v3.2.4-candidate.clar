@@ -176,6 +176,11 @@
 
 (define-map InscriptionDependencies uint (list 50 uint))
 (define-map InscriptionParents uint (list 50 uint))
+
+;; owner -> delegate. Set by the owner, for the owner's own inscriptions only.
+;; Lets `delegate` attach children to `owner`'s inscriptions, but only when the
+;; child mints to `owner`. Revocable at any time. See parent-allowed?.
+(define-map ParentDelegates { owner: principal, delegate: principal } bool)
 (define-map MigrationSource uint { source-contract: principal, source-id: uint })
 
 (define-map UploadState
@@ -351,24 +356,50 @@
   )
 )
 
-(define-private (validate-parent (id uint) (acc { missing: bool, unowned: bool }))
-  (if (or (get missing acc) (get unowned acc))
-    acc
-    (match (nft-get-owner? xtrata-inscription id)
-      owner
-        (if (is-eq owner tx-sender)
-          { missing: false, unowned: false }
-          { missing: false, unowned: true }
-        )
-      { missing: true, unowned: false }
+;; A parent link is a claim of descent, so it is gated on ownership: by default
+;; the only children of your inscription are the ones you made. That guarantee is
+;; worth keeping, so the payer/recipient split does NOT relax it.
+;;
+;; It does need an escape hatch. A publisher paying for an author's piece cannot
+;; attach it to a parent the author owns, because the payer does not hold it. The
+;; author opens that door themselves, once, with set-parent-delegate, and can shut
+;; it again at any time. A delegate can only ever attach children that mint TO the
+;; owner, so a delegation cannot be used to build someone else's lineage.
+(define-private (parent-allowed? (owner principal) (recipient principal))
+  (or
+    (is-eq owner tx-sender)
+    (and
+      (is-eq owner recipient)
+      (is-some (map-get? ParentDelegates { owner: owner, delegate: tx-sender }))
     )
   )
 )
 
-(define-private (validate-parents (parents (list 50 uint)))
+(define-private (validate-parent
+  (id uint)
+  (acc { missing: bool, unowned: bool, recipient: principal })
+)
+  (if (or (get missing acc) (get unowned acc))
+    acc
+    (match (nft-get-owner? xtrata-inscription id)
+      owner
+        (if (parent-allowed? owner (get recipient acc))
+          (merge acc { missing: false, unowned: false })
+          (merge acc { missing: false, unowned: true })
+        )
+      (merge acc { missing: true, unowned: false })
+    )
+  )
+)
+
+(define-private (validate-parents (parents (list 50 uint)) (recipient principal))
   (begin
     (asserts! (validate-parent-uniqueness parents) ERR-DUPLICATE)
-    (let ((res (fold validate-parent parents { missing: false, unowned: false })))
+    (let ((res (fold validate-parent parents {
+      missing: false,
+      unowned: false,
+      recipient: recipient
+    })))
       (begin
         (asserts! (not (get missing res)) ERR-DEPENDENCY-MISSING)
         (asserts! (not (get unowned res)) ERR-NOT-AUTHORIZED)
@@ -806,6 +837,27 @@
   )
 )
 
+;; Not an admin function. Any principal governs their own delegations.
+;;
+;; Transfers no STX, so a publisher can sponsor the miner fee and the author
+;; never needs a funded wallet. That is the one thing Stacks sponsorship does
+;; cover, unlike the protocol fee.
+(define-public (set-parent-delegate (delegate principal) (allowed bool))
+  (begin
+    (if allowed
+      (map-set ParentDelegates { owner: tx-sender, delegate: delegate } true)
+      (map-delete ParentDelegates { owner: tx-sender, delegate: delegate })
+    )
+    (print {
+      event: "parent-delegate",
+      owner: tx-sender,
+      delegate: delegate,
+      allowed: allowed
+    })
+    (ok true)
+  )
+)
+
 (define-public (set-paused (value bool))
   (begin
     (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-NOT-AUTHORIZED)
@@ -1209,7 +1261,7 @@
   (begin
     (try! (assert-inscription-allowed))
     (asserts! (validate-dependencies dependencies) ERR-DEPENDENCY-MISSING)
-    (try! (validate-parents parents))
+    (try! (validate-parents parents tx-sender))
     (let (
       (validation (try! (seal-validate expected-hash token-uri-string)))
       (state (get state validation))
@@ -1344,7 +1396,7 @@
       (asserts! (> (len token-uri-string) u0) ERR-INVALID-URI)
       (asserts! (is-none (map-get? UploadState { owner: tx-sender, hash: expected-hash })) ERR-DUPLICATE)
       (asserts! (validate-dependencies dependencies) ERR-DEPENDENCY-MISSING)
-      (try! (validate-parents parents))
+      (try! (validate-parents parents recipient))
       (let (
         (result (fold process-chunk chunks {
           ok: true,
@@ -1703,6 +1755,10 @@
 
 (define-read-only (is-allowed-caller (caller principal))
   (ok (is-some (map-get? AllowedCallers caller)))
+)
+
+(define-read-only (is-parent-delegate (owner principal) (delegate principal))
+  (ok (is-some (map-get? ParentDelegates { owner: owner, delegate: delegate })))
 )
 
 (define-read-only (get-royalty-recipient)
