@@ -126,11 +126,19 @@ async function buildEngine(html) {
 }
 
 // The open board as a thin page that depends on the inscribed engine.
-async function buildBoard(engineId) {
+//
+// It carries its own contract. An inscribed board that opened with an empty
+// address box would be a tool for finding the game rather than the game, and
+// whoever inscribed it already knows the answer.
+async function buildBoard(engineId, contract, network = 'mainnet') {
+  const config = contract
+    ? `<script>window.__XTRATA_CHESS_BOARD__ = ${JSON.stringify({ contract, network })};</script>\n`
+    : '';
+
   const source = `<!doctype html>
 <meta charset="utf-8">
 <title>Xtrata Open Board</title>
-<script src="/i/${engineId}"></script>
+${config}<script src="/i/${engineId}"></script>
 `;
 
   await mkdir(OUT_DIR, { recursive: true });
@@ -209,7 +217,13 @@ async function main() {
 
   if (args.includes('--board')) {
     if (!engineId) throw new Error('--board needs --engine-id <inscription id>');
-    await buildBoard(engineId);
+    const contractIndex = args.indexOf('--contract');
+    const networkIndex = args.indexOf('--network');
+    await buildBoard(
+      engineId,
+      contractIndex >= 0 ? args[contractIndex + 1] : null,
+      networkIndex >= 0 ? args[networkIndex + 1] : 'mainnet'
+    );
     return;
   }
 

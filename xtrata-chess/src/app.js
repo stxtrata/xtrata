@@ -96,10 +96,22 @@ export class ChessBoardApp {
     // all. This is the mode an inscribed finished game runs in.
     const sealed = options.sealed || globalThis.__XTRATA_CHESS_SEALED__;
     const child = options.child || globalThis.__XTRATA_CHESS_CHILD__;
+    // An inscribed open board knows its own contract, so it opens on the game
+    // rather than on a form asking where the game is.
+    const board = options.board || globalThis.__XTRATA_CHESS_BOARD__;
 
     if (sealed) this.startSealed(sealed);
     else if (child) this.startChild(child);
+    else if (board) this.startConfiguredBoard(board);
     else this.startSimulation();
+  }
+
+  async startConfiguredBoard(board) {
+    const [address, name] = String(board.contract || '').split('.');
+    this.elements.contractAddress.value = address || '';
+    if (name) this.elements.contractName.value = name;
+    this.elements.network.value = board.network || 'mainnet';
+    this.setMode('live');
   }
 
   // A generated board: one game, one rule set, nothing else. It still reads the
