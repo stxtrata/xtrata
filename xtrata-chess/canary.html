@@ -85,6 +85,15 @@
       button:disabled { opacity: 0.4; cursor: not-allowed; }
       button.go { background: var(--accent); border-color: var(--accent); color: #1a1409; font-weight: 600; }
       button.go:disabled { background: #3a3025; border-color: #3a3025; color: var(--dim); }
+      button.connected {
+        background: transparent;
+        border-color: var(--ok);
+        color: var(--ok);
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 600;
+      }
+      button.connected:hover { border-color: var(--ok); background: rgba(127, 176, 105, 0.1); }
 
       .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
       .row + .row { margin-top: 10px; }
@@ -211,7 +220,12 @@
           </label>
           <button id="btn-detect">Re-detect</button>
           <button id="btn-connect" class="go">Connect</button>
+          <button id="btn-disconnect" hidden>Disconnect</button>
         </div>
+        <p class="hint" id="wallet-hint">
+          Pick a wallet if more than one is listed, then Connect. Your wallet should open and ask you to
+          approve; if it does not, it may be locked.
+        </p>
         <p class="meta">address <span id="address">—</span></p>
         <p class="meta" id="source-info">loading contract source…</p>
       </div>
@@ -296,6 +310,8 @@
         buildCheck: byId('build-check'),
         btnDetect: byId('btn-detect'),
         btnConnect: byId('btn-connect'),
+        btnDisconnect: byId('btn-disconnect'),
+        walletHint: byId('wallet-hint'),
         btnPreflight: byId('btn-preflight'),
         deployShape: byId('deploy-shape'),
         btnDeploy: byId('btn-deploy'),

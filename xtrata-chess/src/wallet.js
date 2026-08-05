@@ -183,6 +183,20 @@ export function waitForProvider({ timeoutMs = 4000, intervalMs = 250 } = {}) {
 // StacksProvider throws "request function is not implemented" for every method;
 // others answer -32601. Either way the right move is the next provider, not a
 // failure, which is what the Xtrata shim does with the same error string.
+// Cancelling is not failing. A wallet that says the user declined has done its
+// job, and telling someone to go try other parameter shapes because they chose
+// Cancel is both wrong and alarming.
+export function userCancelled(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return (
+    error?.code === 4001 ||
+    message.includes('cancel') ||
+    message.includes('reject') ||
+    message.includes('declin') ||
+    message.includes('denied')
+  );
+}
+
 export function providerCannot(error) {
   const message = String(error?.message || '').toLowerCase();
   return (
@@ -327,13 +341,19 @@ export function networkFromAddress(address) {
 // and wallet_connect raise a real prompt. Silent methods stay as fallbacks for
 // wallets that have no prompting equivalent.
 const ADDRESS_METHODS = [
-  'stx_getAccounts',
   'wallet_connect',
   'stx_requestAccounts',
+  'stx_getAccounts',
   'getAddresses',
   'stx_getAddresses',
   'wallet_getAccount'
 ];
+
+// Probing is not signing. A wallet that has not answered a "who are you" call in
+// this long is not going to, and waiting the full signing timeout on each of six
+// methods leaves the button looking dead for minutes. Xverse never answers
+// stx_getAccounts at all, so this is the difference between a pause and a hang.
+const PROBE_TIMEOUT_MS = 15_000;
 
 /**
  * Connect, and reuse an existing session when the host already has one.
@@ -371,9 +391,19 @@ export async function connectWallet({ preferredLabel, onLog, forcePrompt = false
     throw error;
   }
 
-  const found = collectProviders();
-  log('info', `${found.length} provider(s) available`, {
+  const all = collectProviders();
+  // An explicit choice is a choice: try only that provider, so picking one in a
+  // dropdown means something. Without a choice, try them all in ranked order.
+  const chosen = preferredLabel ? all.filter((entry) => entry.label === preferredLabel) : [];
+  const found = chosen.length ? chosen : all;
+
+  if (preferredLabel && !chosen.length) {
+    log('warn', `${preferredLabel} is no longer present, falling back to whatever is`);
+  }
+
+  log('info', `${found.length} provider(s) to try`, {
     order: found.map((entry) => entry.label),
+    chosen: preferredLabel || '(best available)',
     framed: isFramed(),
     hostBridge: usingHostBridge(),
     shim: shimInstalled()
@@ -387,7 +417,7 @@ export async function connectWallet({ preferredLabel, onLog, forcePrompt = false
     for (const entry of found) {
       try {
         // A locked wallet can take a long time to answer the first call.
-        const result = await walletRequest(entry, method, {}, { timeoutMs: 45_000 });
+        const result = await walletRequest(entry, method, {}, { timeoutMs: PROBE_TIMEOUT_MS });
         const address = extractAddress(result);
         if (address) {
           const session = {

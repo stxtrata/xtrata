@@ -32,11 +32,17 @@ import {
   usingHostBridge,
   walletRequest,
   walletCall,
+  userCancelled,
   extractAddress
 } from './wallet.js';
 
 // Re-exported so the canary's own tests pin the behaviour it actually uses.
 export const harvestAddress = extractAddress;
+
+function short(address) {
+  const value = String(address || '');
+  return value.length > 14 ? `${value.slice(0, 5)}…${value.slice(-4)}` : value;
+}
 
 const API = {
   mainnet: 'https://api.mainnet.hiro.so',
@@ -129,6 +135,7 @@ export class LaunchCanary {
     this.entries = [];
 
     this._wire();
+    this._renderWallet('idle');
     this._showBuild();
     this._loadSource();
     this.detect();
@@ -242,7 +249,11 @@ export class LaunchCanary {
       this._resetFrom(1);
     });
     el.btnDetect.addEventListener('click', () => this.detect());
-    el.btnConnect.addEventListener('click', () => this.connect());
+    el.btnConnect.addEventListener('click', () => (this.address ? this.disconnect() : this.connect()));
+    el.btnDisconnect.addEventListener('click', () => this.disconnect());
+    el.providers.addEventListener('change', () => {
+      if (!this.address) this.log('info', `will connect using ${el.providers.value}`);
+    });
     el.btnPreflight.addEventListener('click', () => this.preflight());
     el.btnDeploy.addEventListener('click', () => this.deploy());
     el.btnVerifyDeploy.addEventListener('click', () => this.verifyDeploy());
@@ -313,22 +324,79 @@ export class LaunchCanary {
     this.log('ok', `found ${found.length} provider(s), best first`, found.map((p) => p.label));
   }
 
+  // One place that decides what the wallet panel looks like, so the button can
+  // never disagree with whether we are actually connected.
+  _renderWallet(state, detail) {
+    const el = this.el;
+
+    if (state === 'connecting') {
+      el.btnConnect.disabled = true;
+      el.btnConnect.textContent = detail ? `Asking ${detail}…` : 'Connecting…';
+      el.btnConnect.className = 'go';
+      el.btnDisconnect.hidden = true;
+      el.providers.disabled = true;
+      return;
+    }
+
+    if (state === 'connected') {
+      el.btnConnect.disabled = false;
+      el.btnConnect.className = 'connected';
+      el.btnConnect.textContent = `Connected · ${short(this.address)}`;
+      el.btnConnect.title = `${this.address}\nClick to disconnect and choose another wallet`;
+      el.btnDisconnect.hidden = false;
+      el.providers.disabled = true;
+      el.walletHint.textContent = `Signing as ${this.address} via ${this.providerLabel}. Disconnect to switch wallets.`;
+      return;
+    }
+
+    el.btnConnect.disabled = false;
+    el.btnConnect.className = 'go';
+    el.btnConnect.textContent = 'Connect';
+    el.btnConnect.title = '';
+    el.btnDisconnect.hidden = true;
+    el.providers.disabled = false;
+    el.walletHint.textContent =
+      'Pick a wallet if more than one is listed, then Connect. Your wallet should open and ask you to approve; if it does not, it may be locked.';
+  }
+
+  disconnect() {
+    this.address = null;
+    this.provider = null;
+    this.providerLabel = null;
+    try {
+      delete globalThis.XtrataWalletSession;
+    } catch {
+      // Sandboxed pages can refuse window writes.
+    }
+    this.el.address.textContent = '—';
+    this.mark(0, 'waiting', 'not connected');
+    this._renderWallet('idle');
+    this._resetFrom(1);
+    this.log('info', 'disconnected — pick a provider and connect again');
+  }
+
   async connect() {
+    const chosen = this.el.providers.value || null;
+    this._renderWallet('connecting', chosen ? chosen.replace(/^window\./, '') : null);
+
     try {
       const session = await connectWallet({
-        preferredLabel: this.el.providers.value,
+        // Whatever is selected in the dropdown, and only that. Picking a wallet
+        // has to mean the page uses it.
+        preferredLabel: chosen,
         // Always go to the wallet. Reusing a cached session here would make
         // Connect look broken: nothing appears and nothing is proven.
         forcePrompt: true,
         onLog: (level, message, detail) => this.log(level, message, detail)
       });
+
       this.address = session.address;
       this.provider = session.provider || this.provider;
+      this.providerLabel = session.provider?.label || chosen || 'unknown';
       this.el.address.textContent = session.address;
 
-      // The wallet panel had no way of saying it had succeeded, so a connection
-      // that worked still read "not connected".
       this.mark(0, 'ok', session.network);
+      this._renderWallet('connected');
 
       // A testnet address with mainnet selected is the mistake that costs a
       // contract name, so say it loudly rather than letting the deploy fail.
@@ -341,11 +409,12 @@ export class LaunchCanary {
       this._gate();
     } catch (error) {
       this.mark(0, 'failed', 'not connected');
+      this._renderWallet('idle');
       this.log('err', `connect failed: ${error.message}`);
       if (error.code === 'NO_ADDRESS') {
         this.log(
           'info',
-          'every provider was asked and none answered. If your wallet is locked, unlock it and press Connect again.'
+          'every method was tried and none answered. Unlock the wallet, or pick a different provider above, then Connect again.'
         );
       }
     }
@@ -443,9 +512,19 @@ export class LaunchCanary {
       this.mark(2, 'sent', 'confirming');
       this._gate();
     } catch (error) {
+      if (userCancelled(error)) {
+        // Nothing was sent, so return the step to not-started. Marking it done
+        // would unlock the step after it for a transaction that never happened.
+        this.mark(2, 'waiting', 'not started');
+        this.log('info', 'you cancelled in the wallet — nothing was sent');
+        return;
+      }
       this.log('err', `deploy failed: ${error.message}`);
-      this.log('info', 'try another shape from the dropdown before concluding the wallet cannot do it');
-      this.mark(2, 'failed', 'rejected');
+      this.log(
+        'info',
+        'if the wallet refused the request itself, try another parameter shape from the dropdown before concluding it cannot deploy'
+      );
+      this.mark(2, 'failed', 'refused');
     }
   }
 
@@ -517,8 +596,13 @@ export class LaunchCanary {
       this.mark(3, 'sent', 'confirming');
       this._gate();
     } catch (error) {
+      if (userCancelled(error)) {
+        this.mark(3, 'waiting', 'not started');
+        this.log('info', 'you cancelled in the wallet — nothing was sent');
+        return;
+      }
       this.log('err', `open-game failed: ${error.message}`);
-      this.mark(3, 'failed', 'rejected');
+      this.mark(3, 'failed', 'refused');
     }
   }
 
@@ -583,8 +667,13 @@ export class LaunchCanary {
       this.mark(4, 'sent', 'confirming');
       this._gate();
     } catch (error) {
+      if (userCancelled(error)) {
+        this.mark(4, 'waiting', 'not started');
+        this.log('info', 'you cancelled in the wallet — nothing was sent');
+        return;
+      }
       this.log('err', `submit-move failed: ${error.message}`);
-      this.mark(4, 'failed', 'rejected');
+      this.mark(4, 'failed', 'refused');
     }
   }
 

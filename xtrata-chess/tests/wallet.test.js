@@ -13,6 +13,7 @@ import {
   networkFromAddress,
   providerCannot,
   resolveProvider,
+  userCancelled,
   walletCall,
   walletRequest
 } from '../src/wallet.js';
@@ -337,13 +338,16 @@ describe('the ordering that broke connect', () => {
 describe('forcing the wallet to appear', () => {
   // Xverse answers getAddresses silently from cache, so leading with it
   // "connects" without the wallet ever showing, which reads as broken.
+  // wallet_connect leads because it is what answered on the machine that
+  // reported this. stx_getAccounts sits behind it: Xverse never answers that one
+  // at all, and leading with it cost a full timeout before anything else ran.
   it('asks a prompting method before a silent one', async () => {
     const asked = [];
     setGlobals({
       LeatherProvider: {
         request: async (method) => {
           asked.push(method);
-          if (method === 'stx_getAccounts') {
+          if (method === 'wallet_connect') {
             return { addresses: [{ symbol: 'STX', address: ALICE }] };
           }
           throw new Error('not implemented');
@@ -353,7 +357,25 @@ describe('forcing the wallet to appear', () => {
 
     const session = await connectWallet();
     expect(session.address).toBe(ALICE);
-    expect(asked[0]).toBe('stx_getAccounts');
+    expect(asked[0]).toBe('wallet_connect');
+    // getAddresses answers silently from cache on Xverse, so it must not lead.
+    expect(asked.indexOf('getAddresses')).toBe(-1);
+  });
+
+  it('uses only the provider that was explicitly chosen', async () => {
+    const wrong = vi.fn(async () => ({ addresses: [{ symbol: 'STX', address: ALICE }] }));
+    const right = vi.fn(async () => ({ addresses: [{ symbol: 'STX', address: TESTNET }] }));
+    setGlobals({
+      XverseProviders: { BitcoinProvider: { request: wrong }, StacksProvider: { request: right } }
+    });
+
+    const session = await connectWallet({
+      preferredLabel: 'window.XverseProviders.StacksProvider'
+    });
+
+    expect(session.address).toBe(TESTNET);
+    expect(right).toHaveBeenCalled();
+    expect(wrong).not.toHaveBeenCalled();
   });
 
   it('skips a cached session when the caller insists on a prompt', async () => {
@@ -370,5 +392,43 @@ describe('forcing the wallet to appear', () => {
     const forced = await connectWallet({ forcePrompt: true });
     expect(forced.via).toContain('LeatherProvider');
     expect(request).toHaveBeenCalled();
+  });
+});
+
+describe('telling a cancel from a refusal', () => {
+  // Cancelling is a decision, not a fault. Treating it as one sends people off
+  // trying other parameter shapes for a request that was fine.
+  it('recognises the ways wallets say the user declined', () => {
+    for (const error of [
+      { code: 4001 },
+      new Error('User rejected the request'),
+      new Error('Transaction cancelled by user'),
+      new Error('User denied transaction signature'),
+      new Error('Request was declined')
+    ]) {
+      expect(userCancelled(error)).toBe(true);
+    }
+  });
+
+  it('does not mistake a genuine failure for a cancel', () => {
+    for (const error of [
+      new Error('`request` function is not implemented'),
+      new Error('network mismatch'),
+      { code: -32601 },
+      new Error('insufficient balance')
+    ]) {
+      expect(userCancelled(error)).toBe(false);
+    }
+  });
+
+  // A refusal and a cancel are both "no", but only one means try something else.
+  it('keeps the two categories apart', () => {
+    const cancel = new Error('User rejected the request');
+    expect(userCancelled(cancel)).toBe(true);
+    expect(providerCannot(cancel)).toBe(false);
+
+    const cannot = new Error('`request` function is not implemented');
+    expect(providerCannot(cannot)).toBe(true);
+    expect(userCancelled(cannot)).toBe(false);
   });
 });
