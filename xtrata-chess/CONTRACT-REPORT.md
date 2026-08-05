@@ -245,3 +245,80 @@ contract is right, and its smallness is the point.
 If you want the chain itself to enforce the rules, refuse illegal moves, know
 who won, or ever pay anybody, then this is the wrong contract, and it is much
 easier to say so now than after the name is spent.
+
+---
+
+# Version 2 · the same contract, with a fee
+
+Written and tested. **Not deployed**, and deploying it is a decision rather than
+a step.
+
+**File:** `contracts/xtrata-chess-log-v2.clar`
+**Format version:** 2
+
+## What is the same
+
+Everything about how chess works. It still does not know the rules, still stores
+short strings in a total order, still forms no opinion about them, still lets
+anyone move either side in any order. Replay in the board still decides what
+counts. The rules commitment, the log ceiling, and the paging all behave exactly
+as v1 does, and the tests assert that rather than assuming it.
+
+## What is different
+
+Opening a game and submitting a move each transfer a fee from the sender to a
+recipient. The default is **0.01 STX**, which is what a move has actually cost.
+
+That is a change in kind, not degree, and it costs the two properties this
+report singled out as v1's best:
+
+| | v1 | v2 |
+|---|---|---|
+| Nobody owns it | true | **false** — a programmable fee needs somebody able to program it |
+| Never touches money | true | **false** — every call moves STX |
+
+The second has a practical edge: a move can now fail for a reason that has
+nothing to do with chess, namely an empty wallet.
+
+## The two guards
+
+**A ceiling in the code.** `FEE-CEILING` is one STX and is a constant, so no
+owner can ever charge more, however much they want to. Without it,
+"programmable fee" would mean the owner can close the board at will. Tested: an
+owner setting anything above it is refused, and the ceiling itself is allowed.
+
+**Ownership can be renounced.** `transfer-ownership` accepts nothing, which
+gives the contract away to no one, permanently. After that the fee and the
+recipient are frozen exactly as they stand and the contract is as unowned as v1
+is. There is no way back, which is the point. That path exists so this does not
+have to stay owned forever.
+
+## What an owner still cannot do
+
+Change a game, delete a move, rewrite the log, or stop the game. There is no
+`map-delete` anywhere in the contract, and the only public functions are
+`open-game`, `submit-move`, `set-move-fee`, `set-fee-recipient` and
+`transfer-ownership`. A test asserts that list, so adding a sixth would fail
+loudly rather than quietly.
+
+## Details worth knowing
+
+- **A refusal costs nothing.** The length check and the game check run before
+  the charge, so a submission that was never going to be stored is never billed.
+- **Paying yourself is skipped**, not attempted, so the recipient can play for
+  free rather than paying themselves.
+- **Junk still costs the same as a move.** A fee buys a slot in the log, not a
+  legal move. Raising the fee raises the cost of spam and of play in exactly the
+  same proportion, which is a trade rather than a win.
+- **A fee of zero turns charging off** without needing a redeploy.
+
+## The thing that will bite first
+
+The board currently sends every call with `postConditionMode: 'deny'` and no
+post conditions, which is correct for v1 because v1 moves nothing. Against v2
+that would **abort every move**: the contract tries to transfer STX, the deny
+mode forbids it, and the transaction fails.
+
+Wiring the board to v2 therefore means reading `get-move-fee` first and sending
+a post condition that permits exactly that amount and no more. That is a client
+change, not a contract change, and it has not been made.

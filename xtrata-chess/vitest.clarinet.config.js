@@ -7,7 +7,7 @@ export default defineConfig({
     pool: 'forks',
     isolate: false,
     maxWorkers: 1,
-    include: ['tests/contract.test.js'],
+    include: ['tests/contract.test.js', 'tests/contract-v2.test.js'],
     setupFiles: [vitestSetupFilePath],
     environmentOptions: {
       clarinet: { ...getClarinetVitestsArgv() }

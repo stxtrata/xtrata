@@ -211,8 +211,13 @@ runtime units per move against a 5,000,000,000 block limit, and flat** — move 
 costs 1% more than move 1. The binding dimension is `read_count` at 8 of 15,000,
 so a block would hold roughly 1,875 moves.
 
-See [CONTRACT-REPORT.md](CONTRACT-REPORT.md) for a line-by-line walkthrough in
-plain language.
+There is also a **version 2** in `contracts/xtrata-chess-log-v2.clar` which
+charges a fee per call, defaulting to 0.01 STX, with a hard ceiling no owner can
+exceed and ownership that can be renounced permanently. Written and tested, not
+deployed.
+
+See [CONTRACT-REPORT.md](CONTRACT-REPORT.md) for a line-by-line walkthrough of
+both in plain language.
 
 ## Replay
 
