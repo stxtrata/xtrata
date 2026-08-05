@@ -16,19 +16,21 @@
 ;; here on. Those are not worth the same, and pricing them the same means either
 ;; moves cost too much or games cost too little.
 ;;
-;; So v3 splits them. The move fee keeps v2's behaviour exactly, including that
-;; it may be zero. The open fee is new and is bounded on both sides:
+;; So v3 splits them. Both fees are now the same kind of thing, governed the same
+;; way and differing only in their default and their ceiling:
 ;;
-;;   * OPEN-FEE-CEILING is ten STX. As with the move fee, no owner can ever
-;;     charge more, because the constant is in the code where no owner reaches.
-;;   * OPEN-FEE-FLOOR is 0.0001 STX. This one is the more unusual guard, and it
-;;     is deliberate: the floor means opening a game can never become free, not
-;;     even by the owner's choice. Opening is the only call that costs the chain
-;;     permanent storage no matter what follows it, and a free one is an
-;;     invitation to fill the map with empty games.
+;;   * Either may be set to zero, which turns that charge off entirely.
+;;   * Neither may exceed its ceiling, which is a constant in the code where no
+;;     owner can reach it. One STX for a move, ten for opening a game.
 ;;
-;; A floor is a real constraint on the owner, not a default. It cannot be
-;; lowered later, and a renounced contract keeps it forever.
+;; Opening defaults to a hundred times a move, because a move says something
+;; while a game id is permanent. But that is a default and not a rule: an owner
+;; who wants opening to be free can make it free, exactly as they can with moves.
+;;
+;; What that costs is worth stating rather than burying. A free open-game is an
+;; invitation to fill the map with empty games, and unlike a junk move, which
+;; replay simply skips, nothing undoes a game once it exists. The fee is the only
+;; discouragement there is. Setting it to zero is a decision to do without one.
 ;; The two guards v2 introduced still apply to both fees: a ceiling no owner can
 ;; exceed, and a renounce that freezes everything permanently.
 ;;
@@ -45,7 +47,6 @@
 (define-constant ERR-NOT-OWNER    (err u103))
 (define-constant ERR-FEE-TOO-HIGH (err u104))
 (define-constant ERR-NO-OWNER     (err u105))
-(define-constant ERR-FEE-TOO-LOW  (err u106))
 
 ;; A ceiling on submissions per game, high enough that reaching it is a
 ;; deliberate act rather than an accident.
@@ -59,13 +60,10 @@
 ;; 0.01 STX, which is what a move has actually cost in practice.
 (define-constant DEFAULT-FEE u10000)
 
-;; Opening a game, priced separately from playing one.
-;;
-;; Bounded at both ends. The ceiling stops an owner closing the board; the floor
-;; stops anyone, including the owner, making game creation free. Ten STX and
-;; 0.0001 STX respectively.
+;; Opening a game, priced separately from playing one. Ten STX, and the same
+;; shape of guard as the move fee: a ceiling no owner can exceed, and zero
+;; always allowed.
 (define-constant OPEN-FEE-CEILING u10000000)
-(define-constant OPEN-FEE-FLOOR u100)
 
 ;; One STX.
 (define-constant DEFAULT-OPEN-FEE u1000000)
@@ -225,13 +223,12 @@
   )
 )
 
-;; The floor is checked as strictly as the ceiling. An owner who wants opening
-;; to be free has to deploy a different contract, which is the intent.
+;; Deliberately the same gate as set-move-fee, differing only in which ceiling
+;; it checks against. Zero is allowed and turns the charge off.
 (define-public (set-open-fee (amount uint))
   (begin
     (asserts! (is-owner) ERR-NOT-OWNER)
     (asserts! (<= amount OPEN-FEE-CEILING) ERR-FEE-TOO-HIGH)
-    (asserts! (>= amount OPEN-FEE-FLOOR) ERR-FEE-TOO-LOW)
     (var-set open-fee amount)
     (print { event: "open-fee-changed", fee: amount, by: tx-sender })
     (ok amount)
@@ -300,10 +297,6 @@
 
 (define-read-only (get-open-fee-ceiling)
   OPEN-FEE-CEILING
-)
-
-(define-read-only (get-open-fee-floor)
-  OPEN-FEE-FLOOR
 )
 
 (define-read-only (get-fee-recipient)

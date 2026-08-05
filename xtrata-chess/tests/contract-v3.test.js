@@ -19,7 +19,6 @@ const bob = accounts.get('wallet_2');
 const MOVE_FEE = 10_000;          // 0.01 STX
 const OPEN_FEE = 1_000_000;       // 1 STX
 const OPEN_CEILING = 10_000_000;  // 10 STX
-const OPEN_FLOOR = 100;           // 0.0001 STX
 
 const read = (fn, args = []) => simnet.callReadOnlyFn(CONTRACT, fn, args, deployer).result;
 const call = (fn, args, sender) => simnet.callPublicFn(CONTRACT, fn, args, sender).result;
@@ -49,9 +48,8 @@ describe('defaults', () => {
     expect(read('get-move-fee')).toBeUint(MOVE_FEE);
   });
 
-  it('bounds the open fee at ten STX and 0.0001 STX', () => {
+  it('caps the open fee at ten STX', () => {
     expect(read('get-open-fee-ceiling')).toBeUint(OPEN_CEILING);
-    expect(read('get-open-fee-floor')).toBeUint(OPEN_FLOOR);
   });
 
   it('is a different format version from v2', () => {
@@ -123,8 +121,8 @@ describe('charging the two fees apart', () => {
 });
 
 describe('what the owner can do to the open fee', () => {
-  it('moves it anywhere between the floor and the ceiling', () => {
-    for (const amount of [OPEN_FLOOR, 500_000, OPEN_CEILING]) {
+  it('moves it anywhere up to the ceiling, zero included', () => {
+    for (const amount of [0, 1, 500_000, OPEN_CEILING]) {
       expect(call('set-open-fee', [Cl.uint(amount)], deployer)).toBeOk(Cl.uint(amount));
       expect(read('get-open-fee')).toBeUint(amount);
     }
@@ -145,15 +143,28 @@ describe('what the owner cannot do to the open fee', () => {
     expect(call('set-open-fee', [Cl.uint(1_000_000_000)], deployer)).toBeErr(Cl.uint(104));
   });
 
-  // The unusual one. Opening is the only call that costs permanent storage no
-  // matter what follows it, so it can never be free — not even by choice.
-  it('cannot make opening free, or cheaper than the floor', () => {
-    expect(call('set-open-fee', [Cl.uint(0)], deployer)).toBeErr(Cl.uint(106));
-    expect(call('set-open-fee', [Cl.uint(OPEN_FLOOR - 1)], deployer)).toBeErr(Cl.uint(106));
-    expect(read('get-open-fee')).toBeUint(OPEN_FEE);
+  // The gate is deliberately the same shape as set-move-fee's: one ceiling
+  // check, and zero always allowed. The two fees differ in their default and
+  // their ceiling, not in what an owner may do to them.
+  it('can be turned off entirely, exactly as the move fee can', () => {
+    expect(call('set-open-fee', [Cl.uint(0)], deployer)).toBeOk(Cl.uint(0));
+    expect(read('get-open-fee')).toBeUint(0);
+
+    const before = stxOf(alice);
+    const game = Number(openGame().result.value.value);
+    expect(stxOf(alice)).toBe(before);
+    expect(read('get-game', [Cl.uint(game)])).not.toBeNone();
   });
 
-  it('the move fee may still be zero, which is the difference between them', () => {
+  it('and turned back on again', () => {
+    call('set-open-fee', [Cl.uint(0)], deployer);
+    expect(call('set-open-fee', [Cl.uint(OPEN_FEE)], deployer)).toBeOk(Cl.uint(OPEN_FEE));
+    const before = stxOf(alice);
+    openGame();
+    expect(stxOf(alice)).toBe(before - BigInt(OPEN_FEE));
+  });
+
+  it('the move fee is governed the same way', () => {
     expect(call('set-move-fee', [Cl.uint(0)], deployer)).toBeOk(Cl.uint(0));
     const game = Number(openGame().result.value.value);
     const before = stxOf(alice);
@@ -164,18 +175,18 @@ describe('what the owner cannot do to the open fee', () => {
 
 describe('who is not the owner', () => {
   it('cannot change either fee', () => {
-    expect(call('set-open-fee', [Cl.uint(OPEN_FLOOR)], alice)).toBeErr(Cl.uint(103));
+    expect(call('set-open-fee', [Cl.uint(0)], alice)).toBeErr(Cl.uint(103));
     expect(call('set-move-fee', [Cl.uint(0)], alice)).toBeErr(Cl.uint(103));
   });
 });
 
 describe('renouncing', () => {
-  it('freezes both fees, and the floor outlives the owner', () => {
+  it('freezes both fees wherever they stood', () => {
     call('set-open-fee', [Cl.uint(750_000)], deployer);
     expect(call('transfer-ownership', [Cl.none()], deployer)).toBeOk(Cl.none());
 
     for (const who of [deployer, alice, bob]) {
-      expect(call('set-open-fee', [Cl.uint(OPEN_FLOOR)], who)).toBeErr(Cl.uint(103));
+      expect(call('set-open-fee', [Cl.uint(0)], who)).toBeErr(Cl.uint(103));
       expect(call('set-move-fee', [Cl.uint(0)], who)).toBeErr(Cl.uint(103));
     }
     expect(read('get-open-fee')).toBeUint(750_000);

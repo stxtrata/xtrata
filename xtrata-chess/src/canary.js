@@ -927,7 +927,6 @@ export class LaunchCanary {
       // below reports as "not on this contract" rather than as a failure.
       ['open fee', 'get-open-fee', (v) => `${v} \u00b5STX (${(Number(v) / 1e6).toFixed(6)} STX)`],
       ['open fee ceiling', 'get-open-fee-ceiling', (v) => `${v} \u00b5STX (${(Number(v) / 1e6).toFixed(6)} STX)`],
-      ['open fee floor', 'get-open-fee-floor', (v) => `${v} \u00b5STX (${(Number(v) / 1e6).toFixed(6)} STX)`],
       ['fee recipient', 'get-fee-recipient', (v) => String(v)],
       ['owner', 'get-owner', (v) => (v === null ? 'renounced — nobody can change anything' : String(v))]
     ];
@@ -977,7 +976,6 @@ export class LaunchCanary {
       el.newRecipient.value = String(this.chainState['get-fee-recipient'] ?? '');
       if (hasOpenFee && el.newOpenFee) {
         el.newOpenFee.value = String(this.chainState['get-open-fee'] ?? '');
-        el.newOpenFee.min = String(this.chainState['get-open-fee-floor'] ?? 0);
         el.newOpenFee.max = String(this.chainState['get-open-fee-ceiling'] ?? '');
       }
     }
@@ -1042,30 +1040,28 @@ export class LaunchCanary {
     );
   }
 
-  // Bounded at both ends, unlike the move fee. The floor is the unusual half:
-  // opening a game can never be made free, not even by the owner, so a zero
-  // here is refused rather than treated as "charge nothing".
+  // The same gate as the move fee, against a different ceiling. Zero is allowed
+  // and turns the charge off, which for opening a game means anyone can create
+  // one for nothing but the network fee.
   async setOpenFee() {
     const amount = Number(this.el.newOpenFee.value);
     const ceiling = Number(this.chainState?.['get-open-fee-ceiling'] ?? 0);
-    const floor = Number(this.chainState?.['get-open-fee-floor'] ?? 0);
 
-    if (!Number.isFinite(amount) || Math.floor(amount) !== amount) {
-      this.log('err', 'the open fee must be a whole number of microSTX');
+    if (!Number.isFinite(amount) || amount < 0 || Math.floor(amount) !== amount) {
+      this.log('err', 'the open fee must be a whole number of microSTX, or zero to charge nothing');
       return;
     }
-    // Both checked here as well as on chain, because the contract would refuse
-    // these and the refusal still costs a transaction fee.
+    // Checked here as well as on chain, because the contract would refuse this
+    // and the refusal still costs a transaction fee.
     if (ceiling && amount > ceiling) {
       this.log('err', `${amount} is above the contract's ceiling of ${ceiling} \u00b5STX, which it would refuse`);
       return;
     }
-    if (amount < floor) {
+    if (amount === 0) {
       this.log(
-        'err',
-        `${amount} is below the contract's floor of ${floor} \u00b5STX. Opening a game cannot be made free.`
+        'warn',
+        'zero means anyone can open a game for nothing but the network fee. A junk move is skipped by replay; a junk game is permanent.'
       );
-      return;
     }
 
     await this._ownerCall(

@@ -341,36 +341,41 @@ One new fee, and one new control for it.
 | | default | lowest | highest |
 |---|---|---|---|
 | Move fee | 0.01 STX | 0, which turns charging off | 1 STX |
-| Open fee | **1 STX** | **0.0001 STX** | **10 STX** |
+| Open fee | **1 STX** | 0, which turns charging off | **10 STX** |
 
 Everything else is version 2 unchanged: the same log, the same ignorance about
 chess, the same owner who can be renounced, the same inability to touch a game
 or a move once it is recorded.
 
-## The floor is the unusual part
+## Both fees are governed the same way
 
-A ceiling is the familiar guard, and version 2 already had one: no owner can
-price the board out of existence, because the limit is a constant in the code
-where no owner can reach it.
+`set-open-fee` is deliberately the same shape as `set-move-fee`, differing only
+in which ceiling it checks. One assertion, and zero always allowed.
 
-The open fee has a floor as well, and that is a genuine constraint on the owner
-rather than a default they can undo. **Opening a game can never be made free.**
-Not by the owner, not by anyone, not ever.
+The ceiling is the guard that matters, and it is a constant in the code where no
+owner can reach it. Whatever else an owner does, they cannot price the board out
+of existence.
 
-The reason is that opening is the only call that costs the chain permanent
-storage no matter what happens next. A move at least says something. A game
-opened and abandoned is a row that can never be reclaimed, sitting in every
-enumeration of games from then on. Free game creation is an invitation to fill
-the map, and unlike a move, there is nothing a reader can skip to undo it.
+The rest is a default rather than a rule. Opening starts at a hundred times a
+move because a move says something and a game id is permanent, but an owner who
+wants opening to be free can make it free.
 
-So `set-open-fee` refuses zero the same way it refuses eleven STX. An owner who
-wants opening to be free has to deploy a different contract, which is the point.
+## What free game creation costs, stated plainly
 
-## What this changes in practice
+It is worth being clear about this rather than burying it, because it is the one
+asymmetry the split does not remove.
 
-Someone with 0.05 STX can play a dozen moves and cannot open a game. That is the
-split working: the barrier sits at creation, where the permanent cost is, rather
-than on every move.
+A junk move is skipped by replay. It sits in the log, it cost its sender a fee,
+and every reader steps over it. Nothing is left behind that matters.
+
+A junk game is permanent. It holds an id, occupies a row that can never be
+reclaimed, and appears in every enumeration of games from then on. There is no
+replay step that undoes it, because a game is not a claim about chess that a
+referee can reject — it is just a row.
+
+The fee is the only discouragement there is. Setting it to zero is a decision to
+do without one, and a reasonable one if the board is quiet or the audience is
+known. It is not a setting to reach for absentmindedly.
 
 ## What is still true
 
@@ -379,4 +384,4 @@ than on every move.
 - A refused call still costs nothing, because both fees are charged after the
   checks and before anything is written. A sender who cannot pay to open a game
   leaves no game behind and consumes no id.
-- Renouncing still freezes everything, and the floor outlives the owner.
+- Renouncing still freezes everything, at whatever both fees happened to be.

@@ -363,12 +363,13 @@
           <div class="row" id="open-fee-row" hidden>
             <label class="field" style="flex: 0 1 180px">
               <span>Open a game (µSTX)</span>
-              <input id="new-open-fee" type="number" step="1000" />
+              <input id="new-open-fee" type="number" min="0" step="1000" />
             </label>
             <button id="btn-set-open-fee">Set open fee</button>
             <p class="hint">
-              v3 only. Bounded at both ends: it cannot go above the ceiling, and it cannot be
-              made free, because opening a game costs permanent storage whatever follows it.
+              v3 only, and governed exactly like the move fee: capped by the contract's ceiling,
+              and zero turns it off. Zero means a game costs nothing to create, and unlike a junk
+              move, which replay skips, a junk game is permanent.
             </p>
           </div>
 
