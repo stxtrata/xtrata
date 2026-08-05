@@ -27,6 +27,7 @@ import { replay } from './replay.js';
 import {
   collectProviders,
   connectWallet,
+  disconnectWallet,
   isFramed,
   shimInstalled,
   usingHostBridge,

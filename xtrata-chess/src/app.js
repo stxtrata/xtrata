@@ -41,7 +41,7 @@ import {
   rulesMatchCommitment
 } from './rules.js';
 import { childPage, engineIdFromLocation } from './child.js';
-import { connectWallet } from './wallet.js';
+import { connectWallet, disconnectWallet } from './wallet.js';
 
 const REASON_LABEL = {
   malformed: 'not a move',
@@ -758,13 +758,11 @@ export class ChessBoardApp {
     this.render();
   }
 
-  disconnectWallet() {
+  async disconnectWallet() {
     this.walletAddress = null;
-    try {
-      delete globalThis.XtrataWalletSession;
-    } catch {
-      // Sandboxed pages can refuse window writes.
-    }
+    // Ask the wallet to forget as well, or the next Connect is answered from
+    // its own session rather than by asking.
+    await disconnectWallet({ onLog: () => {} }).catch(() => {});
     this._renderWallet();
     this._notify('Disconnected. Connect again to sign as a different wallet.', 'info');
     this.render();
@@ -789,8 +787,10 @@ export class ChessBoardApp {
   async connect() {
     try {
       const session = await connectWallet({
-        // A board is not a canary: reusing a session the host already has is
-        // the right thing here, and saves a prompt on every page load.
+        // Always ask. A silent reconnect leaves someone stuck with whichever
+        // account they happened to pick first, with no way to change it from
+        // here, which is exactly the complaint this fixes.
+        forcePrompt: true,
         onLog: (level, message) => this._notify(message, level === 'ok' ? 'info' : level)
       });
       this.walletAddress = session.address;

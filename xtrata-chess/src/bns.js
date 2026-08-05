@@ -9,7 +9,28 @@
 // re-renders. A lookup that fails is cached as "no name" so a board with a
 // hundred anonymous senders does not re-ask on every poll.
 
+import { deserialize, serializePrincipal } from './clarity.js';
+
 const PRINCIPAL_RE = /^S[0-9A-HJKMNP-TV-Z]{25,50}$/;
+
+// The BNS-V2 registry, which is the only thing that knows which of a wallet's
+// names is its primary.
+const BNS_V2 = {
+  mainnet: 'SP2QEZ06AGJ3RKJPBV14SY1V5BBFNAW33D96YPGZF.BNS-V2',
+  testnet: 'ST2QEZ06AGJ3RKJPBV14SY1V5BBFNAW33D9SZJQ0M.BNS-V2'
+};
+
+// Labels are ASCII. Anything outside that range means the response was misread,
+// and a wrong name is worse than no name.
+function decodeLabel(bytes) {
+  if (!bytes || !bytes.length) return null;
+  let out = '';
+  for (const byte of bytes) {
+    if (byte < 0x20 || byte > 0x7e) return null;
+    out += String.fromCharCode(byte);
+  }
+  return out;
+}
 
 // Only real Stacks principals are worth asking about. Simulation senders like
 // "GRIEFER" and "SIM-WHITE" are already the clearest label they will ever have.
@@ -40,6 +61,7 @@ export class StaticNames {
 export class NameResolver {
   constructor(options = {}) {
     this.apiUrl = options.apiUrl;
+    this.network = options.network || (String(options.apiUrl || '').includes('testnet') ? 'testnet' : 'mainnet');
     this.fetch = options.fetch || globalThis.fetch?.bind(globalThis);
     this.concurrency = options.concurrency ?? 4;
     // principal -> name string, or null for "asked, no name"
@@ -56,15 +78,72 @@ export class NameResolver {
     return this.cache.has(principal);
   }
 
+  /**
+   * The wallet's primary name, read from the BNS-V2 contract.
+   *
+   * The name *list* endpoint does not say which name is primary. Taking the
+   * first entry, which is what this used to do, picks the wrong name for any
+   * wallet whose primary is not first in the list. The registry answers the
+   * actual question:
+   *
+   *   get-primary(owner) -> (ok (some {name: (buff 20), namespace: (buff 20)}))
+   */
+  async _lookupPrimary(principal) {
+    const contract = BNS_V2[this.network];
+    if (!contract) return null;
+
+    const [address, name] = contract.split('.');
+    const response = await this.fetch(
+      `${this.apiUrl}/v2/contracts/call-read/${address}/${name}/get-primary`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sender: principal,
+          arguments: [serializePrincipal(principal)]
+        })
+      }
+    );
+    if (!response.ok) return null;
+
+    const body = await response.json();
+    if (!body?.okay || typeof body.result !== 'string') return null;
+
+    // (ok (some {name, namespace})) unwraps to a plain record. An error, an
+    // (ok none), or anything unexpected all mean "no primary name".
+    const decoded = deserialize(body.result);
+    const record = decoded && decoded.ok === true ? decoded.value : null;
+    if (!record || typeof record !== 'object') return null;
+
+    const label = decodeLabel(record.name);
+    const namespace = decodeLabel(record.namespace);
+    if (!label || !namespace) return null;
+
+    return `${label}.${namespace}`.toLowerCase();
+  }
+
+  // The old list endpoint, kept only as a fallback for a wallet that holds names
+  // but has set no primary. It cannot say which is preferred, so it is used only
+  // when the registry has already said there is no answer.
+  async _lookupAny(principal) {
+    const response = await this.fetch(
+      `${this.apiUrl}/v1/addresses/stacks/${encodeURIComponent(principal)}`
+    );
+    if (!response.ok) return null;
+    const body = await response.json();
+    const names = Array.isArray(body?.names) ? body.names : [];
+    return names.length ? String(names[0]).toLowerCase() : null;
+  }
+
   async _lookup(principal) {
     try {
-      const response = await this.fetch(
-        `${this.apiUrl}/v1/addresses/stacks/${encodeURIComponent(principal)}`
-      );
-      if (!response.ok) return null;
-      const body = await response.json();
-      const names = Array.isArray(body?.names) ? body.names : [];
-      return names.length ? String(names[0]) : null;
+      const primary = await this._lookupPrimary(principal);
+      if (primary) return primary;
+    } catch {
+      // Fall through: a registry that is unreachable should not mean no name.
+    }
+    try {
+      return await this._lookupAny(principal);
     } catch {
       return null;
     }

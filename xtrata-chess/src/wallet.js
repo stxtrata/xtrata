@@ -355,6 +355,20 @@ const ADDRESS_METHODS = [
 // stx_getAccounts at all, so this is the difference between a pause and a hang.
 const PROBE_TIMEOUT_MS = 15_000;
 
+// What to send with each address method.
+//
+// wallet_connect remembers. Once a wallet has been chosen it answers from its
+// own session, so the second Connect is silent and the person is stuck with
+// whichever account they picked first. forceWalletSelect asks it to put the
+// chooser up regardless, and persistWalletSession false stops it caching the
+// answer for next time. Both are ignored by wallets that do not know them.
+function paramsFor(method, forcePrompt) {
+  if (method !== 'wallet_connect') return {};
+  return forcePrompt
+    ? { forceWalletSelect: true, persistWalletSession: false }
+    : {};
+}
+
 /**
  * Connect, and reuse an existing session when the host already has one.
  *
@@ -417,7 +431,9 @@ export async function connectWallet({ preferredLabel, onLog, forcePrompt = false
     for (const entry of found) {
       try {
         // A locked wallet can take a long time to answer the first call.
-        const result = await walletRequest(entry, method, {}, { timeoutMs: PROBE_TIMEOUT_MS });
+        const result = await walletRequest(entry, method, paramsFor(method, forcePrompt), {
+          timeoutMs: PROBE_TIMEOUT_MS
+        });
         const address = extractAddress(result);
         if (address) {
           const session = {
@@ -452,6 +468,36 @@ export async function connectWallet({ preferredLabel, onLog, forcePrompt = false
   );
   error.code = 'NO_ADDRESS';
   throw error;
+}
+
+/**
+ * Ask the wallet to forget too.
+ *
+ * Clearing our own session is not enough: the wallet keeps its own, and the
+ * next Connect would be answered from it without asking. Wallets that do not
+ * implement this simply say so, which is not a failure.
+ */
+export async function disconnectWallet({ onLog } = {}) {
+  const log = onLog || (() => {});
+  for (const entry of collectProviders()) {
+    for (const method of ['wallet_disconnect', 'stx_disconnect', 'disconnect']) {
+      try {
+        await walletRequest(entry, method, {}, { timeoutMs: 5_000 });
+        log('info', `${entry.label} disconnected via ${method}`);
+        break;
+      } catch {
+        // Try the next spelling, then the next provider.
+      }
+    }
+  }
+
+  for (const key of ['XtrataWalletSession', 'ArcadeWalletSession', '__xtrataWalletSession']) {
+    try {
+      delete globalThis[key];
+    } catch {
+      // Sandboxed pages can refuse window writes.
+    }
+  }
 }
 
 export const BRIDGE = { REQUEST: BRIDGE_REQUEST, RESPONSE: BRIDGE_RESPONSE };

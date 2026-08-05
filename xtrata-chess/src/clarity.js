@@ -140,6 +140,64 @@ function c32encode(bytes) {
   return '0'.repeat(leadingZeros) + out;
 }
 
+// The inverse of c32address. Needed to build a principal argument, which is
+// how the BNS-V2 contract is asked for a wallet's primary name.
+function c32decode(text) {
+  let value = 0n;
+  for (const ch of text) {
+    const index = C32.indexOf(ch.toUpperCase());
+    if (index < 0) throw new Error(`bad c32 character: ${ch}`);
+    value = value * 32n + BigInt(index);
+  }
+
+  const bytes = [];
+  while (value > 0n) {
+    bytes.unshift(Number(value & 0xffn));
+    value >>= 8n;
+  }
+  // hash160 plus a four byte checksum. Left-padding to the known length is what
+  // restores any leading zero bytes the encoding dropped.
+  while (bytes.length < 24) bytes.unshift(0);
+  return new Uint8Array(bytes);
+}
+
+/**
+ * Split an address back into its version byte and hash160, checking the
+ * checksum on the way so a mistyped address fails here rather than becoming a
+ * lookup for an account that does not exist.
+ */
+export function parseAddress(address) {
+  const text = String(address || '').trim().toUpperCase();
+  if (!text.startsWith('S') || text.length < 20) throw new Error('not a Stacks address');
+
+  const version = C32.indexOf(text[1]);
+  if (version < 0) throw new Error('bad address version');
+
+  const body = c32decode(text.slice(2));
+  const hash160 = body.slice(0, 20);
+  const checksum = body.slice(20);
+
+  const payload = new Uint8Array(21);
+  payload[0] = version;
+  payload.set(hash160, 1);
+  const expected = sha256(sha256(payload)).slice(0, 4);
+
+  for (let i = 0; i < 4; i++) {
+    if (checksum[i] !== expected[i]) throw new Error('address checksum does not match');
+  }
+
+  return { version, hash160 };
+}
+
+export function serializePrincipal(address) {
+  const { version, hash160 } = parseAddress(address);
+  const out = new Uint8Array(22);
+  out[0] = CV.PRINCIPAL_STANDARD;
+  out[1] = version;
+  out.set(hash160, 2);
+  return `0x${bytesToHex(out)}`;
+}
+
 export function c32address(version, hash160) {
   const payload = new Uint8Array(1 + hash160.length);
   payload[0] = version;
