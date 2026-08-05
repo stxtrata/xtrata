@@ -187,6 +187,79 @@ function framedHost(bridgeToken, mode) {
     }).join('\\n') || 'host bridge idle';
   }
 
+  // Everything the framed board logs, mirrored out of the frame.
+  //
+  // DevTools hides a lot by default: the level filter starts above debug, and
+  // the Issues panel tucks whole categories behind "N hidden". An inscribed
+  // page's console is the only diagnostic channel it has, so the harness
+  // reports it rather than leaving it to be found.
+  //
+  // Same origin, so the frame's console and errors are reachable from here.
+  var captured = (window.__frameConsole = { error: [], warn: [], log: [], info: [], debug: [] });
+
+  function describe(value) {
+    if (value === null || value === undefined) return String(value);
+    // Not instanceof: an Error thrown inside the frame belongs to the frame's
+    // realm and fails an instanceof check against ours, which would reduce a
+    // perfectly good stack trace to "{}".
+    if (typeof value === 'object' && (value.stack || value.message)) {
+      return String(value.stack || value.message);
+    }
+    if (typeof value === 'object') {
+      try { return JSON.stringify(value); } catch (error) { return String(value); }
+    }
+    return String(value);
+  }
+
+  function record(level, text) {
+    captured[level].push(text);
+    if (level !== 'error' && level !== 'warn') return;
+    try {
+      // Straight to the terminal, where nothing can filter it away.
+      navigator.sendBeacon('/harness/console', JSON.stringify({ level: level, text: text }));
+    } catch (error) {}
+  }
+
+  // Stable references, so re-registering cannot pile up duplicates.
+  function onFrameError(event) {
+    var where = event.filename ? ' at ' + event.filename + ':' + event.lineno : '';
+    record('error', 'uncaught: ' + event.message + where);
+  }
+
+  function onFrameRejection(event) {
+    record('error', 'unhandled rejection: ' + describe(event.reason));
+  }
+
+  function watchFrameConsole(frame) {
+    var view = frame.contentWindow;
+    if (!view) return;
+
+    // The runtime replaces the document with document.open/write/close, and
+    // that removes every listener on the window as well as on the document.
+    // It does not remove properties, so a "already watching" flag would survive
+    // the wipe and stop the listeners ever coming back. Hence: guard the
+    // console patch, which does survive, and simply re-add the listeners.
+    try {
+      if (!view.console.__harnessPatched) {
+        ['error', 'warn', 'log', 'info', 'debug'].forEach(function (level) {
+          var original = view.console[level];
+          view.console[level] = function () {
+            record(level, Array.prototype.map.call(arguments, describe).join(' '));
+            return original.apply(view.console, arguments);
+          };
+        });
+        view.console.__harnessPatched = true;
+      }
+
+      view.removeEventListener('error', onFrameError);
+      view.addEventListener('error', onFrameError);
+      view.removeEventListener('unhandledrejection', onFrameRejection);
+      view.addEventListener('unhandledrejection', onFrameRejection);
+    } catch (error) {
+      // A frame mid-navigation can throw on access. The next tick will get it.
+    }
+  }
+
   function realProvider() {
     var w = window;
     return w.LeatherProvider
@@ -220,6 +293,15 @@ function framedHost(bridgeToken, mode) {
       }
     };
   }
+
+  // The board is written into the frame after load, so watch on load and again
+  // shortly after, the same way the shim reinstalls itself.
+  // Re-attach for a while rather than once: the document write lands after
+  // load, and the shim itself reinstalls on a schedule for the same reason.
+  var frame = document.getElementById('frame');
+  frame.addEventListener('load', function () { watchFrameConsole(frame); });
+  var attaching = setInterval(function () { watchFrameConsole(frame); }, 250);
+  setTimeout(function () { clearInterval(attaching); }, 8000);
 
   window.addEventListener('message', async function (event) {
     var data = event.data;
@@ -341,6 +423,19 @@ const server = createServer(async (request, response) => {
         text,
         upstreamResponse.headers.get('content-type') || TYPES['.json']
       );
+    }
+
+    // Console traffic from the framed board, so it lands in the terminal
+    // instead of behind a DevTools filter.
+    if (path === '/harness/console' && request.method === 'POST') {
+      try {
+        const { level, text } = JSON.parse(await readBody(request));
+        const mark = level === 'error' ? 'ERROR' : 'WARN ';
+        console.log(`  [board ${mark}] ${text}`);
+      } catch {
+        // A malformed beacon is not worth failing a request over.
+      }
+      return send(response, 204, '');
     }
 
     if (path === '/viewer') {

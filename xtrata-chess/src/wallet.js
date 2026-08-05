@@ -419,7 +419,28 @@ const ADDRESS_METHODS = [
 // this long is not going to, and waiting the full signing timeout on each of six
 // methods leaves the button looking dead for minutes. Xverse never answers
 // stx_getAccounts at all, so this is the difference between a pause and a hang.
+//
+// The first call gets the long budget because it may be sitting behind an unlock
+// screen, and someone typing a password needs more than a moment.
 const PROBE_TIMEOUT_MS = 15_000;
+
+// Once any provider has answered anything, the wallet is awake and unlocked.
+// From then on a method it intends to answer answers immediately, and one it
+// does not is not going to start. Measured against Xverse under the runtime:
+// three of the six methods never settle at all, and at the full budget that is
+// forty-five seconds of a Connect button that looks broken.
+const AWAKE_PROBE_TIMEOUT_MS = 3_000;
+
+// Connect methods raise the wallet's chooser. Some answer it and still hand back
+// no address, which is not a failure, it is a wallet that has connected and
+// expects to be asked separately who it connected as.
+function isConnectish(method) {
+  return method === 'wallet_connect' || method === 'stx_requestAccounts';
+}
+
+// The method that actually produces an address once a wallet is connected.
+// Trying it straight after a connect skips the ones in between that hang.
+const READ_AFTER_CONNECT = 'stx_getAddresses';
 
 // What to send with each address method.
 //
@@ -492,38 +513,82 @@ export async function connectWallet({ preferredLabel, onLog, forcePrompt = false
   // Method-first, provider-second. A wallet that cannot do getAddresses may
   // still answer wallet_connect, and a provider that refuses everything must not
   // stop us reaching the one beside it that works.
+  //
+  // The order is deliberately not tuned for any one wallet: it is what decides
+  // whether the chooser appears, and demoting a prompting method to reach a
+  // faster one would trade a visible wallet for a silent reconnect. What is
+  // tuned is how long we wait, and jumping ahead when a connect has already told
+  // us the wallet is there.
   let lastError = null;
+  let awake = false;
+  const tried = new Set();
+
+  // Returns the session when one was found, and otherwise says whether the
+  // provider answered at all. The difference matters: a connect that answered
+  // without an address means the wallet is there and can be asked again, while
+  // one that threw means this route is closed and the normal order should
+  // continue undisturbed.
+  const attempt = async (method, entry) => {
+    const key = `${method}|${entry.label}`;
+    if (tried.has(key)) return { answered: false };
+    tried.add(key);
+
+    try {
+      const result = await walletRequest(entry, method, paramsFor(method, forcePrompt), {
+        timeoutMs: awake ? AWAKE_PROBE_TIMEOUT_MS : PROBE_TIMEOUT_MS
+      });
+      // It answered, so whatever else is true, it is not locked or asleep.
+      awake = true;
+
+      const address = extractAddress(result);
+      if (address) {
+        const session = {
+          address,
+          network: networkFromAddress(address) || 'mainnet',
+          via: `${method} on ${entry.label}`,
+          provider: entry
+        };
+        try {
+          globalThis.XtrataWalletSession = { address, network: session.network };
+        } catch {
+          // Sandboxed pages can throw on window writes. Not worth failing over.
+        }
+        log('ok', `connected via ${method} on ${entry.label}`, address);
+        return { session, answered: true };
+      }
+      log('warn', `${entry.label} answered ${method} without an address`, result);
+      return { answered: true };
+    } catch (error) {
+      lastError = error;
+      // A refusal is still an answer. Only a timeout leaves us none the wiser
+      // about whether anyone is home.
+      if (error.code !== 'TIMEOUT') awake = true;
+      if (providerCannot(error)) {
+        log('info', `${entry.label} does not implement ${method}`);
+      } else {
+        log('warn', `${entry.label} ${method}: ${error.message}`);
+      }
+      return { answered: false };
+    }
+  };
+
   for (const method of ADDRESS_METHODS) {
     for (const entry of found) {
-      try {
-        // A locked wallet can take a long time to answer the first call.
-        const result = await walletRequest(entry, method, paramsFor(method, forcePrompt), {
-          timeoutMs: PROBE_TIMEOUT_MS
-        });
-        const address = extractAddress(result);
-        if (address) {
-          const session = {
-            address,
-            network: networkFromAddress(address) || 'mainnet',
-            via: `${method} on ${entry.label}`,
-            provider: entry
-          };
-          try {
-            globalThis.XtrataWalletSession = { address, network: session.network };
-          } catch {
-            // Sandboxed pages can throw on window writes. Not worth failing over.
-          }
-          log('ok', `connected via ${method} on ${entry.label}`, address);
-          return session;
-        }
-        log('warn', `${entry.label} answered ${method} without an address`, result);
-      } catch (error) {
-        lastError = error;
-        if (providerCannot(error)) {
-          log('info', `${entry.label} does not implement ${method}`);
-        } else {
-          log('warn', `${entry.label} ${method}: ${error.message}`);
-        }
+      const outcome = await attempt(method, entry);
+      if (outcome.session) return outcome.session;
+
+      // A connect that answered without naming anybody means the wallet is now
+      // connected and simply expects to be asked who it connected as. Ask it
+      // now rather than walking the methods in between, which is where Xverse
+      // under the runtime loses most of its time: it answers wallet_connect,
+      // hands back no address, then never settles the next three at all.
+      //
+      // Only after an answer. Jumping ahead on a refusal would reach a silent
+      // read before the prompting methods have had their turn, and a Connect
+      // that never shows the wallet is the bug this ordering exists to avoid.
+      if (outcome.answered && isConnectish(method)) {
+        const followUp = await attempt(READ_AFTER_CONNECT, entry);
+        if (followUp.session) return followUp.session;
       }
     }
   }
