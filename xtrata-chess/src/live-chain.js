@@ -22,10 +22,11 @@ import {
 import { walletCall, waitForProvider, feePostConditions, callFeeParams } from './wallet.js';
 import { CONTRACT_NAME, ERR, PAGE_SIZE } from './protocol.js';
 
-export const DEFAULT_API = {
-  mainnet: 'https://api.mainnet.hiro.so',
-  testnet: 'https://api.testnet.hiro.so'
-};
+import { PUBLIC_API, makeResilientFetch, preferredApiBase } from './api-base.js';
+
+// Kept for callers that want the public host by name. What this board actually
+// uses is chosen at runtime; see src/api-base.js.
+export const DEFAULT_API = PUBLIC_API;
 
 // Any principal works as the read-only caller; nothing here reads tx-sender.
 const READ_SENDER = 'SP000000000000000000002Q6VF78';
@@ -47,7 +48,19 @@ export class LiveChain {
     this.contractAddress = options.contractAddress;
     this.contractName = options.contractName || CONTRACT_NAME;
     this.network = options.network || 'mainnet';
-    this.apiUrl = options.apiUrl || DEFAULT_API[this.network];
+    // Under the Xtrata runtime this is the site's caching proxy, and off it the
+    // public host. Overridable, and it falls back on its own if the proxy stops
+    // answering, because an inscription cannot be corrected.
+    this.apiUrl = options.apiUrl || preferredApiBase(this.network);
+    this.api = makeResilientFetch({
+      network: this.network,
+      base: options.apiUrl,
+      fetch: options.fetch,
+      onFallback: (from, to) => {
+        this.apiUrl = to;
+        if (options.onLog) options.onLog('warn', `${from} did not answer; using ${to}`);
+      }
+    });
     this.fetch = options.fetch || globalThis.fetch?.bind(globalThis);
     this.fee = Number.isFinite(Number(options.fee)) ? Number(options.fee) : DEFAULT_FEE_USTX;
     // The address that will sign, needed to write a post condition about it.
@@ -68,8 +81,8 @@ export class LiveChain {
   // ---- reads ---------------------------------------------------------
 
   async callReadOnly(functionName, args = []) {
-    const url = `${this.apiUrl}/v2/contracts/call-read/${this.contractAddress}/${this.contractName}/${functionName}`;
-    const response = await this.fetch(url, {
+    const path = `/v2/contracts/call-read/${this.contractAddress}/${this.contractName}/${functionName}`;
+    const response = await this.api.request(path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sender: READ_SENDER, arguments: args })
@@ -157,8 +170,9 @@ export class LiveChain {
    * read the same way here as it is when it lands.
    */
   async getMempool(game) {
-    const url = `${this.apiUrl}/extended/v1/address/${this.contractId}/mempool?limit=50`;
-    const response = await this.fetch(url);
+    const response = await this.api.request(
+      `/extended/v1/address/${this.contractId}/mempool?limit=50`
+    );
     if (!response.ok) return [];
 
     const body = await response.json();

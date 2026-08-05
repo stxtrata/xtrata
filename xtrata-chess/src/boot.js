@@ -42,13 +42,27 @@ function mountShell() {
   document.body.innerHTML = SHELL.html;
 }
 
+// The one board on this page, if it has already been started.
+//
+// Booting twice does not look broken. mountShell finds the markup already there
+// and leaves it alone, so the page renders perfectly — but every button now has
+// two listeners, and one click on Submit move signs two transactions. Two fees,
+// two entries in a permanent log, for one intended move.
+//
+// An inscription cannot be corrected, so this is a guard rather than a
+// convention: however many times boot is called, there is one board.
+let running = null;
+
 export function boot(options = {}) {
+  if (running) return running;
+
   mountShell();
 
   const elements = {};
   for (const id of IDS) elements[camel(id)] = document.getElementById(id);
 
   const app = new ChessBoardApp({ ...options, elements });
+  running = app;
 
   // Published so the running board can be inspected from a console: which game,
   // what is in flight, what the last read returned. Diagnosing a live board
@@ -62,12 +76,14 @@ export function boot(options = {}) {
   return app;
 }
 
-// Auto-start when loaded as a plain script, which is how an inscription runs.
-// Under a module import the caller decides when.
-if (typeof document !== 'undefined' && document.currentScript) {
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => boot());
-  } else {
-    boot();
-  }
-}
+// No auto-start here on purpose.
+//
+// There used to be one, guarded on document.currentScript so it would fire for
+// a classic script and not for a module import. Inside the built engine that
+// guard is satisfied — the bundle is a classic script, and currentScript is set
+// for the whole of its synchronous execution, including this module's body — so
+// it started a second board alongside the one the bundle's own footer starts.
+//
+// Every entry point already calls boot explicitly: index.html for development,
+// and both build modes append a call of their own. There was nothing left for
+// the auto-start to do except double everything.

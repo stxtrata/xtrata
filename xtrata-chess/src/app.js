@@ -43,6 +43,7 @@ import {
 } from './rules.js';
 import { childPage, engineIdFromLocation } from './child.js';
 import { connectWallet, disconnectWallet } from './wallet.js';
+import { preferredApiBase } from './api-base.js';
 
 const REASON_LABEL = {
   malformed: 'not a move',
@@ -144,7 +145,7 @@ export class ChessBoardApp {
   }
 
   async _firstDeployed(candidates, network) {
-    const api = network === 'testnet' ? 'https://api.testnet.hiro.so' : 'https://api.mainnet.hiro.so';
+    const api = preferredApiBase(network);
     for (const candidate of candidates) {
       const [address, name] = candidate.split('.');
       if (!address || !name) continue;
