@@ -89,8 +89,15 @@ parent or an opener. The Xtrata site supplies one — `src/App.tsx` and
 the embedded preview and for open-in-a-new-tab alike. So the normal path works.
 
 What does not work is a raw link to `/i/<id>` with no token. Reads are fine and
-the board renders, but no move can be signed. That is worth saying on the board
-rather than letting someone meet it as a failed transaction.
+the board renders, but no move can be signed.
+
+The board now says so. `canSignHere()` reports false only when the shim is
+installed, there is no bridge, and every provider it collected carries the
+shim's own `__xtrataRuntimeWalletPatched` mark — so an Xverse `BitcoinProvider`,
+which the shim never patches and `walletCall` already falls through to, does not
+trigger a false warning. It is a warning rather than a disabled Submit: the
+check is a heuristic about providers that may inject after we look, and a board
+someone cannot use is worse than a notice someone did not need.
 
 The shim also patches `window.LeatherProvider` and the Xverse Stacks providers
 in place, so a board cannot sidestep it by preferring an extension.

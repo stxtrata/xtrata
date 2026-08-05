@@ -42,7 +42,12 @@ import {
   rulesMatchCommitment
 } from './rules.js';
 import { childPage, engineIdFromLocation } from './child.js';
-import { connectWallet, disconnectWallet } from './wallet.js';
+import {
+  connectWallet,
+  disconnectWallet,
+  needsWalletBridge,
+  signingBlockedReason
+} from './wallet.js';
 import { preferredApiBase } from './api-base.js';
 
 const REASON_LABEL = {
@@ -751,6 +756,14 @@ export class ChessBoardApp {
     } catch (error) {
       if (error.code === 'NO_WALLET') {
         this._notify('No Stacks wallet found. Install Leather or Xverse to play live.', 'error');
+      } else if (needsWalletBridge(error)) {
+        // The shim's own wording is "requires host wallet bridge support",
+        // which tells a player nothing they can act on. Say what to do instead.
+        this._notify(
+          'This page cannot sign moves: it is open without a wallet bridge. ' +
+            'Open the board from the Xtrata site and try again.',
+          'error'
+        );
       } else {
         this._notify(`Wallet call failed: ${error.message}`, 'error');
       }
@@ -808,6 +821,47 @@ export class ChessBoardApp {
     this._renderWallet();
     this._notify('Disconnected. Connect again to sign as a different wallet.', 'info');
     this.render();
+  }
+
+  /**
+   * Warn when this page cannot sign, before someone stages a move to find out.
+   *
+   * An inscription opened by its bare URL has no wallet bridge, and the runtime
+   * shim refuses every contract call without one. Reading, replaying and
+   * downloading a child board all still work, so the board is not broken and
+   * should not pretend to be. What it must not do is let someone pick a move,
+   * click Submit and meet a -32601 they cannot act on.
+   *
+   * Deliberately a warning and not a disabled button. This is a heuristic about
+   * providers that may inject after we look, and the cost of being wrong is
+   * asymmetric: a warning shown to someone who could have played is a nuisance,
+   * a disabled Submit is a board they cannot use at all. walletCall still tries.
+   */
+  _renderSigningHint() {
+    const el = this.elements;
+    if (!el.walletHint) return;
+
+    const reason = signingBlockedReason();
+    el.walletHint.className = reason ? 'hint warn' : 'hint';
+
+    if (reason === 'no-bridge') {
+      el.walletHint.innerHTML =
+        '<strong>This page cannot sign moves.</strong> It is open without a wallet ' +
+        'bridge, and the Xtrata runtime only passes a transaction to your wallet ' +
+        'when the page it framed carries one. Open this board from the Xtrata site ' +
+        'and moves will sign normally. Reading and replaying work either way.';
+      return;
+    }
+
+    if (reason === 'no-wallet') {
+      el.walletHint.innerHTML =
+        'No Stacks wallet found, so moves cannot be signed from here. Install ' +
+        'Leather or Xverse. Reading and replaying need no wallet.';
+      return;
+    }
+
+    el.walletHint.textContent =
+      'Reading is free and needs no wallet. Only submitting a move does.';
   }
 
   // Keeps the button and the hint agreeing with whether a wallet is attached.
@@ -1200,6 +1254,8 @@ export class ChessBoardApp {
     }
 
     el.gameLabel.textContent = this.game ? `game #${this.game}` : 'no game';
+
+    this._renderSigningHint();
 
     // Say what a move costs before anybody signs for one.
     if (el.chargeNote) {

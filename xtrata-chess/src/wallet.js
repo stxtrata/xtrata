@@ -52,6 +52,57 @@ export function usingHostBridge() {
   return !!bridgeToken() && isFramed();
 }
 
+// The shim marks every provider it takes over. A marked provider will refuse a
+// contract call unless there is a bridge to carry it.
+function shimPatched(provider) {
+  try {
+    return provider?.__xtrataRuntimeWalletPatched === true;
+  } catch {
+    // Some injected providers throw on unknown property access. Assume the shim
+    // did not reach it, which errs towards letting someone try.
+    return false;
+  }
+}
+
+/**
+ * Can a move actually be signed from this page?
+ *
+ * Reading wallet-shim.js, `stx_callContract` is not merely routed through the
+ * shim, it is refused outright with -32601 unless a host bridge exists:
+ *
+ *     if (isContractCallMethod(lower)) {
+ *       if (!hasHostBridge()) return Promise.reject(createShimError(
+ *         'Wallet contract call requires host wallet bridge support.', -32601));
+ *
+ * A bridge exists only when the page carries a walletBridgeToken and has a
+ * parent or an opener, which is what the Xtrata site supplies. Open the same
+ * inscription by its bare URL and the board reads and replays perfectly but
+ * cannot sign anything.
+ *
+ * The shim also patches Leather's provider and the Xverse Stacks providers in
+ * place, so having an extension installed is not enough on its own. What is
+ * enough is a provider the shim did not reach, such as Xverse's BitcoinProvider.
+ * walletCall already falls through to one of those on -32601; this only reports
+ * whether such a provider is there to fall through to.
+ */
+export function canSignHere() {
+  if (usingHostBridge()) return true;
+  if (!shimInstalled()) return true;
+  return collectProviders().some((entry) => !shimPatched(entry.provider));
+}
+
+/**
+ * Why signing is unavailable, or null when it is available.
+ *
+ * Separate from canSignHere so a caller can say something useful rather than
+ * only that something is wrong. Both cases below are worth distinguishing: one
+ * is fixed by opening a different link, the other by installing a wallet.
+ */
+export function signingBlockedReason() {
+  if (canSignHere()) return null;
+  return collectProviders().length ? 'no-bridge' : 'no-wallet';
+}
+
 /**
  * Every usable provider in this page, best first.
  *
@@ -197,6 +248,19 @@ export function userCancelled(error) {
     message.includes('declin') ||
     message.includes('denied')
   );
+}
+
+/**
+ * Did this fail because the page has no wallet bridge?
+ *
+ * The shim rejects a contract call with -32601 and this wording when there is no
+ * host to carry it. -32601 alone is not enough to go on: it is also how a
+ * provider says it has never heard of a method.
+ */
+export function needsWalletBridge(error) {
+  return String(error?.message || '')
+    .toLowerCase()
+    .includes('host wallet bridge');
 }
 
 export function providerCannot(error) {

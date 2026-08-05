@@ -381,6 +381,14 @@
       .hint.good { color: var(--ok); }
       .hint.good strong { color: var(--ok); font-family: var(--mono); }
       .hint.bad { color: var(--no); }
+      /* Something will not work from this page, but the board still reads and
+         replays, so this reads as caution rather than failure. */
+      .hint.warn {
+        color: #d8a24a;
+        border-left: 2px solid #6b5320;
+        padding-left: 8px;
+      }
+      .hint.warn strong { color: #e8c07d; }
     </style>
   </head>
 
