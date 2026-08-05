@@ -262,9 +262,25 @@ export class LaunchCanary {
     const found = providers();
     this.el.providers.innerHTML = '';
 
+    // Opening the file directly is the usual reason a wallet appears to be
+    // missing. Extensions do not inject into file:// pages unless the user has
+    // gone out of their way to allow it, so say so before anyone concludes
+    // their wallet is broken.
+    if (globalThis.location?.protocol === 'file:') {
+      this.el.fileWarning.hidden = false;
+      if (!found.length) {
+        this.log(
+          'err',
+          'opened from file:// — wallets almost never inject here. Serve it over http://localhost instead.'
+        );
+        this.el.providers.textContent = 'none — see the note above';
+        return;
+      }
+    }
+
     if (!found.length) {
       this.log('err', 'no Stacks wallet found in this page');
-      this.el.providers.textContent = 'none — install Leather or Xverse, then Re-detect';
+      this.el.providers.textContent = 'none — install Leather or Xverse, unlock it, then Re-detect';
       return;
     }
 

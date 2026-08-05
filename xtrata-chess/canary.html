@@ -153,6 +153,16 @@
         On mainnet this spends real STX and cannot be undone. A contract name, once used, is gone forever.
       </div>
 
+      <div class="warning" id="file-warning" hidden>
+        <strong>This page was opened from a file, not a server.</strong>
+        Wallet extensions do not inject into <code>file://</code> pages, so Connect will find nothing.
+        Serve it over localhost instead:
+        <br /><br />
+        <code>cd xtrata-chess &amp;&amp; npm run dev</code>
+        <br />
+        then open <code>http://localhost:4321/dist/xtrata-chess-launch-canary.html</code>
+      </div>
+
       <div class="panel" id="step-0">
         <h2>0 · Wallet <span class="state">not connected</span></h2>
         <div class="row">
@@ -247,6 +257,7 @@
         providers: byId('providers'),
         address: byId('address'),
         sourceInfo: byId('source-info'),
+        fileWarning: byId('file-warning'),
         btnDetect: byId('btn-detect'),
         btnConnect: byId('btn-connect'),
         btnPreflight: byId('btn-preflight'),
