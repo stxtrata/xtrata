@@ -301,3 +301,74 @@ describe('Xverse, as actually installed', () => {
     expect(refuse).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('the ordering that broke connect', () => {
+  // Xverse's StacksProvider is a stub for request() but does expose the legacy
+  // transactionRequest. Scoring that capability highly, as the arcade does
+  // because it calls that path, put the stub ahead of the provider that works.
+  // This board only ever speaks request(), so it must rank on that.
+  it('ranks a working request() above a stub that merely has transactionRequest', () => {
+    setGlobals({
+      XverseProviders: {
+        StacksProvider: {
+          request: async () => {
+            throw new Error('`request` function is not implemented');
+          },
+          transactionRequest: async () => ({})
+        },
+        BitcoinProvider: { request: async () => ({}) }
+      }
+    });
+
+    expect(collectProviders()[0].label).toBe('window.XverseProviders.BitcoinProvider');
+  });
+
+  it('puts a transactionRequest-only provider last, since it cannot be called', () => {
+    setGlobals({
+      LeatherProvider: { request: async () => ({}) },
+      btc_providers: [{ id: 'legacyOnly', provider: { transactionRequest: async () => ({}) } }]
+    });
+
+    const order = collectProviders().map((entry) => entry.label);
+    expect(order[order.length - 1]).toBe('registry:legacyOnly');
+  });
+});
+
+describe('forcing the wallet to appear', () => {
+  // Xverse answers getAddresses silently from cache, so leading with it
+  // "connects" without the wallet ever showing, which reads as broken.
+  it('asks a prompting method before a silent one', async () => {
+    const asked = [];
+    setGlobals({
+      LeatherProvider: {
+        request: async (method) => {
+          asked.push(method);
+          if (method === 'stx_getAccounts') {
+            return { addresses: [{ symbol: 'STX', address: ALICE }] };
+          }
+          throw new Error('not implemented');
+        }
+      }
+    });
+
+    const session = await connectWallet();
+    expect(session.address).toBe(ALICE);
+    expect(asked[0]).toBe('stx_getAccounts');
+  });
+
+  it('skips a cached session when the caller insists on a prompt', async () => {
+    const request = vi.fn(async () => ({ addresses: [{ symbol: 'STX', address: ALICE }] }));
+    setGlobals({
+      LeatherProvider: { request },
+      ArcadeWalletSession: { address: ALICE }
+    });
+
+    const reused = await connectWallet();
+    expect(reused.via).toBe('host-session');
+    expect(request).not.toHaveBeenCalled();
+
+    const forced = await connectWallet({ forcePrompt: true });
+    expect(forced.via).toContain('LeatherProvider');
+    expect(request).toHaveBeenCalled();
+  });
+});

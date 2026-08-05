@@ -118,8 +118,13 @@ export function collectProviders() {
   const score = (item) => {
     const label = String(item.label || '').toLowerCase();
     let value = 0;
-    if (item.hasTransactionRequest) value += 100;
+    // Astro Blaster ranks transactionRequest +100 because it calls that path.
+    // This board never does: it only speaks request(), and a provider is useful
+    // here exactly insofar as request() works. Scoring a capability we do not
+    // use put Xverse's stub StacksProvider, which has transactionRequest, above
+    // the BitcoinProvider that actually answers.
     if (item.hasRequest) value += 10;
+    else if (item.hasTransactionRequest) value -= 50;
     if (label.includes('bitcoinprovider')) value += 40;
     if (label.includes('xverse')) value += 20;
     if (label.startsWith('registry:')) value += 15;
@@ -316,13 +321,18 @@ export function networkFromAddress(address) {
 // Methods that ask a wallet who it is, in the order least likely to annoy.
 // getAddresses answers on both wallets without a permission storm; the rest are
 // fallbacks for older builds.
+// Order matters, and not for speed. Xverse answers getAddresses silently from
+// its cache, so leading with it "connects" without the wallet ever appearing,
+// which looks broken and gives no chance to pick an account. stx_getAccounts
+// and wallet_connect raise a real prompt. Silent methods stay as fallbacks for
+// wallets that have no prompting equivalent.
 const ADDRESS_METHODS = [
+  'stx_getAccounts',
+  'wallet_connect',
+  'stx_requestAccounts',
   'getAddresses',
   'stx_getAddresses',
-  'wallet_connect',
-  'stx_getAccounts',
-  'wallet_getAccount',
-  'stx_requestAccounts'
+  'wallet_getAccount'
 ];
 
 /**
@@ -332,10 +342,14 @@ const ADDRESS_METHODS = [
  * framed app does not have to re-prompt. A locked Leather can take twenty
  * seconds to answer, so one interactive read per page lifecycle is the budget.
  */
-export async function connectWallet({ preferredLabel, onLog } = {}) {
+export async function connectWallet({ preferredLabel, onLog, forcePrompt = false } = {}) {
   const log = onLog || (() => {});
 
-  const shared =
+  // A canary wants to see the wallet appear, so it asks for the prompt even when
+  // a session is already lying around. Ordinary pages take the cached one.
+  const shared = forcePrompt
+    ? null
+    :
     globalThis.ArcadeWalletSession ||
     globalThis.XtrataWalletSession ||
     globalThis.__xtrataWalletSession;

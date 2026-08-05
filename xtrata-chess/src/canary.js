@@ -317,11 +317,18 @@ export class LaunchCanary {
     try {
       const session = await connectWallet({
         preferredLabel: this.el.providers.value,
+        // Always go to the wallet. Reusing a cached session here would make
+        // Connect look broken: nothing appears and nothing is proven.
+        forcePrompt: true,
         onLog: (level, message, detail) => this.log(level, message, detail)
       });
       this.address = session.address;
       this.provider = session.provider || this.provider;
       this.el.address.textContent = session.address;
+
+      // The wallet panel had no way of saying it had succeeded, so a connection
+      // that worked still read "not connected".
+      this.mark(0, 'ok', session.network);
 
       // A testnet address with mainnet selected is the mistake that costs a
       // contract name, so say it loudly rather than letting the deploy fail.
@@ -333,7 +340,14 @@ export class LaunchCanary {
       }
       this._gate();
     } catch (error) {
+      this.mark(0, 'failed', 'not connected');
       this.log('err', `connect failed: ${error.message}`);
+      if (error.code === 'NO_ADDRESS') {
+        this.log(
+          'info',
+          'every provider was asked and none answered. If your wallet is locked, unlock it and press Connect again.'
+        );
+      }
     }
   }
 

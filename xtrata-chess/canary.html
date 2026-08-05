@@ -195,7 +195,7 @@
         then open <code>http://localhost:4321/dist/xtrata-chess-launch-canary.html</code>
       </div>
 
-      <div class="panel" id="step-0">
+      <div class="panel" id="step-0" data-state="waiting">
         <h2>0 · Wallet <span class="state">not connected</span></h2>
         <div class="row">
           <label class="field">
@@ -310,6 +310,7 @@
         moveTx: byId('move-tx'),
         btnReport: byId('btn-report'),
         log: byId('log'),
+        step0: byId('step-0'),
         step1: byId('step-1'),
         step2: byId('step-2'),
         step3: byId('step-3'),
