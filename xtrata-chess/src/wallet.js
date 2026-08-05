@@ -500,4 +500,61 @@ export async function disconnectWallet({ onLog } = {}) {
   }
 }
 
+/**
+ * Post conditions for a call that may move STX.
+ *
+ * A contract that transfers nothing wants deny with an empty list: the wallet
+ * then refuses any transfer at all, which is the strongest thing that can be
+ * asked for and is exactly right for v1.
+ *
+ * A contract that charges a fee cannot use that. Deny with no conditions
+ * forbids the very transfer the contract is about to make, so every call aborts.
+ * The fix is not to give up and allow everything: it is to permit exactly the
+ * fee and nothing more, so a contract that tried to take more would still fail.
+ *
+ * Wallets have spelled post conditions two ways. The object form below is what
+ * current sats-connect and Leather expect; `shape` exists so a canary can fall
+ * back rather than leaving somebody stuck.
+ */
+export function feePostConditions({ sender, fee, shape = 'strict' }) {
+  const amount = Number(fee) || 0;
+
+  if (!amount) {
+    // Nothing should move. Say so as forcefully as the wallet allows.
+    return { postConditionMode: 'deny', postConditions: [] };
+  }
+
+  if (shape === 'allow') {
+    // A last resort. The transfer will go through, but so would a larger one,
+    // so this is weaker than it looks and should not be the default.
+    return { postConditionMode: 'allow', postConditions: [] };
+  }
+
+  if (shape === 'legacy') {
+    return {
+      postConditionMode: 'deny',
+      postConditions: [
+        {
+          principal: { type: 'Standard', address: sender },
+          conditionCode: 'sent_equal_to',
+          amount: String(amount),
+          type: 'STX'
+        }
+      ]
+    };
+  }
+
+  return {
+    postConditionMode: 'deny',
+    postConditions: [
+      {
+        type: 'stx-postcondition',
+        address: sender,
+        condition: 'eq',
+        amount: String(amount)
+      }
+    ]
+  };
+}
+
 export const BRIDGE = { REQUEST: BRIDGE_REQUEST, RESPONSE: BRIDGE_RESPONSE };

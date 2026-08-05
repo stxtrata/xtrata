@@ -218,6 +218,13 @@
             <span>Provider</span>
             <select id="providers"></select>
           </label>
+          <label class="field" style="flex: 0 1 210px">
+            <span>Contract</span>
+            <select id="contract-version">
+              <option value="xtrata-chess-log-v2">v2 · charges a fee per call</option>
+              <option value="xtrata-chess-log-v1">v1 · no fee, already deployed</option>
+            </select>
+          </label>
           <button id="btn-detect">Re-detect</button>
           <button id="btn-connect" class="go">Connect</button>
           <button id="btn-disconnect" hidden>Disconnect</button>
@@ -228,6 +235,11 @@
         </p>
         <p class="meta">address <span id="address">—</span></p>
         <p class="meta" id="source-info">loading contract source…</p>
+        <p class="hint" id="fee-note" hidden>
+          v2 charges a fee on every call, so its calls must permit that transfer. The page reads
+          <code>get-move-fee</code> from the deployed contract and permits exactly that amount and no
+          more — denying outright, which is right for v1, would abort every move against v2.
+        </p>
       </div>
 
       <div class="panel" id="step-1" data-state="waiting">
@@ -246,6 +258,14 @@
           call here. If the first shape is refused, try the others before concluding the wallet cannot do it.
         </p>
         <div class="row">
+          <label class="field">
+            <span>Post conditions</span>
+            <select id="pc-shape">
+              <option value="strict">Permit exactly the fee (recommended)</option>
+              <option value="legacy">Permit exactly the fee, older spelling</option>
+              <option value="allow">Allow any transfer (last resort)</option>
+            </select>
+          </label>
           <label class="field">
             <span>Parameter shape</span>
             <select id="deploy-shape">
@@ -314,6 +334,9 @@
         walletHint: byId('wallet-hint'),
         btnPreflight: byId('btn-preflight'),
         deployShape: byId('deploy-shape'),
+        contractVersion: byId('contract-version'),
+        pcShape: byId('pc-shape'),
+        feeNote: byId('fee-note'),
         btnDeploy: byId('btn-deploy'),
         btnVerifyDeploy: byId('btn-verify-deploy'),
         deployTx: byId('deploy-tx'),

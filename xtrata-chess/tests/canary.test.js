@@ -149,3 +149,66 @@ describe('logging what the chain returns', () => {
     expect(String(Number(out.seq))).not.toBe(out.seq);
   });
 });
+
+describe('post conditions for a contract that charges', () => {
+  const ALICE = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
+
+  it('denies every transfer when nothing should move', async () => {
+    const { feePostConditions } = await import('../src/wallet.js');
+    const guard = feePostConditions({ sender: ALICE, fee: 0 });
+    expect(guard.postConditionMode).toBe('deny');
+    expect(guard.postConditions).toEqual([]);
+  });
+
+  // Deny with no conditions forbids the very transfer the contract is about to
+  // make, so v1's correct setting would abort every v2 call. The fix is not to
+  // allow everything but to permit exactly the fee.
+  it('permits exactly the fee, and stays deny so anything larger still fails', async () => {
+    const { feePostConditions } = await import('../src/wallet.js');
+    const guard = feePostConditions({ sender: ALICE, fee: 10_000 });
+
+    expect(guard.postConditionMode).toBe('deny');
+    expect(guard.postConditions).toHaveLength(1);
+    expect(guard.postConditions[0]).toMatchObject({
+      type: 'stx-postcondition',
+      address: ALICE,
+      condition: 'eq',
+      amount: '10000'
+    });
+  });
+
+  it('offers an older spelling for wallets that want it', async () => {
+    const { feePostConditions } = await import('../src/wallet.js');
+    const guard = feePostConditions({ sender: ALICE, fee: 10_000, shape: 'legacy' });
+    expect(guard.postConditionMode).toBe('deny');
+    expect(guard.postConditions[0]).toMatchObject({
+      type: 'STX',
+      conditionCode: 'sent_equal_to',
+      amount: '10000'
+    });
+  });
+
+  it('has a last resort that is honestly weaker', async () => {
+    const { feePostConditions } = await import('../src/wallet.js');
+    const guard = feePostConditions({ sender: ALICE, fee: 10_000, shape: 'allow' });
+    expect(guard.postConditionMode).toBe('allow');
+    expect(guard.postConditions).toEqual([]);
+  });
+});
+
+describe('which contract the canary deploys', () => {
+  it('offers both, and the fee-charging one is the new default', async () => {
+    const { CONTRACTS } = await import('../src/canary.js');
+    expect(Object.keys(CONTRACTS)).toEqual(['xtrata-chess-log-v2', 'xtrata-chess-log-v1']);
+    expect(CONTRACTS['xtrata-chess-log-v2'].charges).toBe(true);
+    expect(CONTRACTS['xtrata-chess-log-v1'].charges).toBe(false);
+  });
+
+  it('names the contract it is deploying in every shape', async () => {
+    const { DEPLOY_SHAPES } = await import('../src/canary.js');
+    for (const build of Object.values(DEPLOY_SHAPES)) {
+      expect(build(';; src', 'mainnet', 'xtrata-chess-log-v2').name).toBe('xtrata-chess-log-v2');
+      expect(build(';; src', 'mainnet', 'xtrata-chess-log-v1').name).toBe('xtrata-chess-log-v1');
+    }
+  });
+});

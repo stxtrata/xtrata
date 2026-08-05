@@ -218,10 +218,19 @@ ${config}<script src="/i/${engineId}"></script>
 // going to deploy rather than fetching them from somewhere.
 async function buildCanary() {
   const html = await readFile(resolve(ROOT, 'canary.html'), 'utf8');
-  const contract = await readFile(
-    resolve(ROOT, 'contracts', 'xtrata-chess-log-v1.clar'),
-    'utf8'
-  );
+  // Both contracts travel with the canary, so the page can deploy either and
+  // always carries the exact bytes it is going to send.
+  const contracts = {
+    'xtrata-chess-log-v1': await readFile(
+      resolve(ROOT, 'contracts', 'xtrata-chess-log-v1.clar'),
+      'utf8'
+    ),
+    'xtrata-chess-log-v2': await readFile(
+      resolve(ROOT, 'contracts', 'xtrata-chess-log-v2.clar'),
+      'utf8'
+    )
+  };
+  const contract = contracts['xtrata-chess-log-v2'];
   const modules = await bundleFrom('./canary.js');
 
   const entryScript = /<script type="module">[\s\S]*?<\/script>/;
@@ -232,13 +241,13 @@ async function buildCanary() {
     .replace(/<\/?script[^>]*>/g, '')
     .replace(/^\s*import\s*\{[\s\S]*?\}\s*from\s*['"][^'"]+['"];?\s*$/m, '');
 
-  const stamp = buildStamp([modules, contract, html]);
+  const stamp = buildStamp([modules, JSON.stringify(contracts), html]);
 
   const script = [
     '<script>',
     '(function () {',
     `window.__XTRATA_CHESS_BUILD__ = ${JSON.stringify(stamp)};`,
-    `window.__XTRATA_CHESS_CONTRACT__ = ${JSON.stringify(contract)};`,
+    `window.__XTRATA_CHESS_CONTRACTS__ = ${JSON.stringify(contracts)};`,
     modules,
     'const { LaunchCanary } = __require("./canary.js");',
     wiring.trim(),
@@ -260,7 +269,12 @@ async function buildCanary() {
   console.log(`bytes  ${Buffer.byteLength(output, 'utf8').toLocaleString()}`);
   console.log(`sha256 ${createHash('sha256').update(output).digest('hex')}`);
   console.log(`build  ${stamp.version} · ${stamp.buildId} · ${stamp.builtAt}`);
-  console.log(`\ncontract inlined: ${contract.length.toLocaleString()} bytes, sha256 ${contractHash}`);
+  for (const [name, source] of Object.entries(contracts)) {
+    console.log(
+      `inlined ${name}: ${source.length.toLocaleString()} bytes, ` +
+        `sha256 ${createHash('sha256').update(source).digest('hex')}`
+    );
+  }
   console.log('Open it in a browser with Leather or Xverse installed. No seed phrase is needed.');
 }
 

@@ -23,6 +23,13 @@ import {
   sha256
 } from './clarity.js';
 import { CONTRACT_NAME } from './protocol.js';
+
+// Which contracts this page can deploy. v2 leads because it is the one being
+// launched; v1 stays so the canary can still verify the board already on chain.
+export const CONTRACTS = {
+  'xtrata-chess-log-v2': { charges: true },
+  'xtrata-chess-log-v1': { charges: false }
+};
 import { replay } from './replay.js';
 import {
   collectProviders,
@@ -33,6 +40,7 @@ import {
   usingHostBridge,
   walletRequest,
   walletCall,
+  feePostConditions,
   userCancelled,
   extractAddress
 } from './wallet.js';
@@ -71,6 +79,11 @@ const FIRST_MOVE = 'e2e4';
 // once, so the wallet's own estimate is the safer default there.
 const CALL_FEE_USTX = 10_000;
 
+// The contract's own fee, which is a different thing from the transaction fee.
+// One is paid to the network for including the transaction; the other is paid
+// to the contract's recipient for playing. Confusing them is how a post
+// condition ends up permitting the wrong amount.
+
 // ---------------------------------------------------------------------------
 // Providers
 // ---------------------------------------------------------------------------
@@ -105,23 +118,23 @@ async function txStatus(api, txid) {
 // ---------------------------------------------------------------------------
 
 export const DEPLOY_SHAPES = {
-  A: (source, network) => ({
-    name: CONTRACT_NAME,
+  A: (source, network, name = CONTRACT_NAME) => ({
+    name,
     clarityCode: source,
     clarityVersion: 3,
     network
   }),
-  B: (source, network) => ({
-    name: CONTRACT_NAME,
+  B: (source, network, name = CONTRACT_NAME) => ({
+    name,
     clarityCode: source,
     clarityVersion: 3,
     network,
     postConditionMode: 'deny',
     postConditions: []
   }),
-  C: (source, network) => ({
-    name: CONTRACT_NAME,
-    contractName: CONTRACT_NAME,
+  C: (source, network, name = CONTRACT_NAME) => ({
+    name,
+    contractName: name,
     clarityCode: source,
     codeBody: source,
     clarityVersion: 3,
@@ -270,6 +283,11 @@ export class LaunchCanary {
       this.log('info', `network set to ${this.network}`);
       this._resetFrom(1);
     });
+    el.contractVersion.addEventListener('change', () => {
+      this.log('info', `switched to ${this.contractName}`);
+      this._resetFrom(1);
+      this._loadSource();
+    });
     el.btnDetect.addEventListener('click', () => this.detect());
     el.btnConnect.addEventListener('click', () => (this.address ? this.disconnect() : this.connect()));
     el.btnDisconnect.addEventListener('click', () => this.disconnect());
@@ -295,15 +313,26 @@ export class LaunchCanary {
     this._gate();
   }
 
+  get contractName() {
+    return this.el.contractVersion?.value || 'xtrata-chess-log-v2';
+  }
+
+  get charges() {
+    return CONTRACTS[this.contractName]?.charges === true;
+  }
+
   async _loadSource() {
     // Inlined by the build for the standalone page; fetched during development.
-    const inlined = globalThis.__XTRATA_CHESS_CONTRACT__;
-    this.source = inlined || (await (await fetch(`./contracts/${CONTRACT_NAME}.clar`)).text());
+    const inlined = globalThis.__XTRATA_CHESS_CONTRACTS__?.[this.contractName];
+    this.source =
+      inlined || (await (await fetch(`./contracts/${this.contractName}.clar`)).text());
     this.sourceHash = bytesToHex(sha256(new TextEncoder().encode(this.source)));
 
     this.el.sourceInfo.textContent =
-      `${CONTRACT_NAME}.clar · ${this.source.length.toLocaleString()} bytes · sha256 ${this.sourceHash}`;
-    this.log('info', 'contract source loaded', `sha256 ${this.sourceHash}`);
+      `${this.contractName}.clar · ${this.source.length.toLocaleString()} bytes · sha256 ${this.sourceHash}`;
+    this.log('info', `${this.contractName} loaded`, `sha256 ${this.sourceHash}`);
+
+    this.el.feeNote.hidden = !this.charges;
   }
 
   // ---- 0 · wallet ---------------------------------------------------
@@ -464,25 +493,25 @@ export class LaunchCanary {
     // useless the moment it succeeded.
     try {
       const response = await fetch(
-        `${this.api}/v2/contracts/interface/${this.address}/${CONTRACT_NAME}`
+        `${this.api}/v2/contracts/interface/${this.address}/${this.contractName}`
       );
 
       if (!response.ok) {
-        this.log('ok', `${CONTRACT_NAME} is free on ${this.address}`);
+        this.log('ok', `${this.contractName} is free on ${this.address}`);
       } else {
         const source = await (
-          await fetch(`${this.api}/v2/contracts/source/${this.address}/${CONTRACT_NAME}`)
+          await fetch(`${this.api}/v2/contracts/source/${this.address}/${this.contractName}`)
         ).json();
         const onChain = bytesToHex(sha256(new TextEncoder().encode(source.source)));
 
         if (onChain === this.sourceHash) {
           this.log('ok', 'already deployed, and the on-chain source matches byte for byte', {
-            contract: `${this.address}.${CONTRACT_NAME}`,
+            contract: `${this.address}.${this.contractName}`,
             publishedAt: source.publish_height,
             sha256: onChain
           });
           this.alreadyDeployed = true;
-          this.el.contractId.textContent = `${this.address}.${CONTRACT_NAME}`;
+          this.el.contractId.textContent = `${this.address}.${this.contractName}`;
           this.mark(2, 'ok', 'already deployed');
         } else {
           // The dangerous case: a contract of this name exists but is not this
@@ -530,14 +559,14 @@ export class LaunchCanary {
 
   async deploy() {
     const shape = this.el.deployShape.value;
-    const params = DEPLOY_SHAPES[shape](this.source, this.network);
+    const params = DEPLOY_SHAPES[shape](this.source, this.network, this.contractName);
 
     const typed = prompt(
-      `This deploys ${CONTRACT_NAME} to ${this.network} as ${this.address}.\n` +
+      `This deploys ${this.contractName} to ${this.network} as ${this.address}.\n` +
         `It is irreversible, the name can never be reused, and the contract can never be changed.\n\n` +
         `Type the contract name to continue:`
     );
-    if (typed !== CONTRACT_NAME) {
+    if (typed !== this.contractName) {
       this.log('warn', 'deploy not confirmed, nothing sent');
       return;
     }
@@ -595,13 +624,13 @@ export class LaunchCanary {
     }
 
     try {
-      const response = await fetch(`${this.api}/v2/contracts/source/${this.address}/${CONTRACT_NAME}`);
+      const response = await fetch(`${this.api}/v2/contracts/source/${this.address}/${this.contractName}`);
       const body = await response.json();
       const onChainHash = bytesToHex(sha256(new TextEncoder().encode(body.source)));
 
       if (onChainHash === this.sourceHash) {
         this.log('ok', 'on-chain source matches byte for byte', `sha256 ${onChainHash}`);
-        this.el.contractId.textContent = `${this.address}.${CONTRACT_NAME}`;
+        this.el.contractId.textContent = `${this.address}.${this.contractName}`;
         this.mark(2, 'ok', 'deployed');
       } else {
         this.log('err', 'ON-CHAIN SOURCE DOES NOT MATCH', {
@@ -615,6 +644,42 @@ export class LaunchCanary {
     }
   }
 
+  /**
+   * What the contract will charge for this call, and the post conditions that
+   * permit exactly that.
+   *
+   * v1 charges nothing, so its calls deny every transfer. v2 charges, so its
+   * calls must permit the fee and no more; denying outright would abort the very
+   * transfer the contract is about to make.
+   */
+  async _feeGuard() {
+    if (!this.charges) {
+      return { ...feePostConditions({ sender: this.address, fee: 0 }), contractFee: 0 };
+    }
+
+    let fee = 0;
+    try {
+      fee = Number(
+        await readOnly(this.api, this.address, this.contractName, 'get-move-fee')
+      );
+    } catch (error) {
+      this.log('warn', `could not read the contract fee: ${error.message}`);
+      throw error;
+    }
+
+    const shape = this.el.pcShape?.value || 'strict';
+    this.log(
+      'info',
+      `contract fee is ${fee} \u00b5STX (${(fee / 1e6).toFixed(6)} STX), permitting exactly that`,
+      { shape }
+    );
+
+    return {
+      ...feePostConditions({ sender: this.address, fee, shape }),
+      contractFee: fee
+    };
+  }
+
   // ---- 3 · open game #1 ---------------------------------------------
 
   async openGame() {
@@ -622,13 +687,21 @@ export class LaunchCanary {
 
     // none = the open board that anyone may play. A ruled game would pass a
     // 32-byte hash here instead.
+    let guard;
+    try {
+      guard = await this._feeGuard();
+    } catch {
+      this.mark(3, 'failed', 'could not read fee');
+      return;
+    }
+
     const params = {
-      contract: `${this.address}.${CONTRACT_NAME}`,
+      contract: `${this.address}.${this.contractName}`,
       functionName: 'open-game',
       functionArgs: [serializeNone()],
       arguments: [serializeNone()],
-      postConditionMode: 'deny',
-      postConditions: [],
+      postConditionMode: guard.postConditionMode,
+      postConditions: guard.postConditions,
       network: this.network,
       fee: String(CALL_FEE_USTX),
       feeRate: String(CALL_FEE_USTX)
@@ -671,8 +744,8 @@ export class LaunchCanary {
     }
 
     try {
-      const count = await readOnly(this.api, this.address, CONTRACT_NAME, 'get-game-count');
-      const game = await readOnly(this.api, this.address, CONTRACT_NAME, 'get-game', [
+      const count = await readOnly(this.api, this.address, this.contractName, 'get-game-count');
+      const game = await readOnly(this.api, this.address, this.contractName, 'get-game', [
         serializeUint(1)
       ]);
       this.log('ok', `game-count is ${count}`, game);
@@ -694,14 +767,22 @@ export class LaunchCanary {
   async firstMove() {
     this.mark(4, 'running', 'awaiting wallet');
 
+    let guard;
+    try {
+      guard = await this._feeGuard();
+    } catch {
+      this.mark(4, 'failed', 'could not read fee');
+      return;
+    }
+
     const args = [serializeUint(1), serializeStringAscii(FIRST_MOVE)];
     const params = {
-      contract: `${this.address}.${CONTRACT_NAME}`,
+      contract: `${this.address}.${this.contractName}`,
       functionName: 'submit-move',
       functionArgs: args,
       arguments: args,
-      postConditionMode: 'deny',
-      postConditions: [],
+      postConditionMode: guard.postConditionMode,
+      postConditions: guard.postConditions,
       network: this.network,
       fee: String(CALL_FEE_USTX),
       feeRate: String(CALL_FEE_USTX)
@@ -744,7 +825,7 @@ export class LaunchCanary {
     }
 
     try {
-      const page = await readOnly(this.api, this.address, CONTRACT_NAME, 'get-page', [
+      const page = await readOnly(this.api, this.address, this.contractName, 'get-page', [
         serializeUint(1),
         serializeUint(0)
       ]);
@@ -792,7 +873,7 @@ export class LaunchCanary {
       `network       ${this.network}`,
       `deployer      ${this.address || '(not connected)'}`,
       `provider      ${this.provider?.id || '(none)'}`,
-      `contract      ${this.address}.${CONTRACT_NAME}`,
+      `contract      ${this.address}.${this.contractName}`,
       `source sha256 ${this.sourceHash}`,
       `deploy tx     ${this.deployTxid || '-'}`,
       `open-game tx  ${this.openTxid || '-'}`,
