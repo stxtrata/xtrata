@@ -19,6 +19,8 @@
 // the shim installs itself at load and again at 400ms, 1400ms, 3200ms, and on
 // focus. Anything that captured a provider early would capture nothing.
 
+import { parseAddress, bytesToHex } from './clarity.js';
+
 const BRIDGE_REQUEST = 'xtrata:wallet:request';
 const BRIDGE_RESPONSE = 'xtrata:wallet:response';
 
@@ -516,6 +518,49 @@ export async function disconnectWallet({ onLog } = {}) {
  * current sats-connect and Leather expect; `shape` exists so a canary can fall
  * back rather than leaving somebody stuck.
  */
+// Fungible condition codes, as they appear on the wire.
+const SENT_EQUAL_TO = 0x01;
+const SENT_LESS_THAN_OR_EQUAL_TO = 0x05;
+
+/**
+ * A serialised STX post condition.
+ *
+ *   00        STX condition
+ *   02        standard principal
+ *   version   one byte
+ *   hash160   twenty bytes
+ *   code      one byte
+ *   amount    eight bytes, big endian
+ *
+ * A hex string, not an object. Xverse accepts this and hangs on the object form
+ * without ever settling the promise, which reads as a wallet that never opened.
+ * This repo's wallet canary settled on this shape and it is what the arcade
+ * sends, so it is copied rather than reinvented.
+ */
+export function stxPostConditionHex(address, amountMicro, code = SENT_LESS_THAN_OR_EQUAL_TO) {
+  const { version, hash160 } = parseAddress(address);
+  const amount = BigInt(amountMicro).toString(16).padStart(16, '0');
+  const versionHex = version.toString(16).padStart(2, '0');
+  const codeHex = Number(code).toString(16).padStart(2, '0');
+  return `00${'02'}${versionHex}${bytesToHex(hash160)}${codeHex}${amount}`;
+}
+
+/**
+ * Post conditions for a call that may move STX.
+ *
+ * A contract that transfers nothing wants deny with an empty list: the wallet
+ * then refuses any transfer at all, which is the strongest thing that can be
+ * asked for and is exactly right for v1.
+ *
+ * A contract that charges cannot use that. Deny with no conditions forbids the
+ * very transfer the contract is about to make, so every call aborts. The fix is
+ * not to allow everything but to cap what may leave.
+ *
+ * The cap is "at most the fee" rather than "exactly the fee". Both bound the
+ * loss identically, but if the owner lowers the fee between the board reading it
+ * and the wallet signing, an exact condition fails a transaction that was
+ * perfectly fine. A cap does not.
+ */
 export function feePostConditions({ sender, fee, shape = 'strict' }) {
   const amount = Number(fee) || 0;
 
@@ -530,30 +575,16 @@ export function feePostConditions({ sender, fee, shape = 'strict' }) {
     return { postConditionMode: 'allow', postConditions: [] };
   }
 
-  if (shape === 'legacy') {
+  if (shape === 'exact') {
     return {
       postConditionMode: 'deny',
-      postConditions: [
-        {
-          principal: { type: 'Standard', address: sender },
-          conditionCode: 'sent_equal_to',
-          amount: String(amount),
-          type: 'STX'
-        }
-      ]
+      postConditions: [stxPostConditionHex(sender, amount, SENT_EQUAL_TO)]
     };
   }
 
   return {
     postConditionMode: 'deny',
-    postConditions: [
-      {
-        type: 'stx-postcondition',
-        address: sender,
-        condition: 'eq',
-        amount: String(amount)
-      }
-    ]
+    postConditions: [stxPostConditionHex(sender, amount, SENT_LESS_THAN_OR_EQUAL_TO)]
   };
 }
 

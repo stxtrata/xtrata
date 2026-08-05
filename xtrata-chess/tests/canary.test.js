@@ -160,32 +160,39 @@ describe('post conditions for a contract that charges', () => {
     expect(guard.postConditions).toEqual([]);
   });
 
-  // Deny with no conditions forbids the very transfer the contract is about to
-  // make, so v1's correct setting would abort every v2 call. The fix is not to
-  // allow everything but to permit exactly the fee.
-  it('permits exactly the fee, and stays deny so anything larger still fails', async () => {
+  // A hex string, not an object. Xverse hangs on the object form without ever
+  // settling, which looks like a wallet that never opened. This is the shape the
+  // repo's wallet canary settled on.
+  it('sends a serialised hex condition, not an object', async () => {
     const { feePostConditions } = await import('../src/wallet.js');
-    const guard = feePostConditions({ sender: ALICE, fee: 10_000 });
+    const [pc] = feePostConditions({ sender: ALICE, fee: 10_000 }).postConditions;
 
-    expect(guard.postConditionMode).toBe('deny');
-    expect(guard.postConditions).toHaveLength(1);
-    expect(guard.postConditions[0]).toMatchObject({
-      type: 'stx-postcondition',
-      address: ALICE,
-      condition: 'eq',
-      amount: '10000'
-    });
+    expect(typeof pc).toBe('string');
+    expect(pc).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it('offers an older spelling for wallets that want it', async () => {
+  it('lays the bytes out the way the wire expects', async () => {
+    const { stxPostConditionHex } = await import('../src/wallet.js');
+    const pc = stxPostConditionHex(ALICE, 10_000);
+
+    expect(pc.slice(0, 2)).toBe('00'); // an STX condition
+    expect(pc.slice(2, 4)).toBe('02'); // about a standard principal
+    expect(pc.slice(4, 6)).toBe('16'); // mainnet version byte
+    expect(pc.slice(46, 48)).toBe('05'); // sent at most
+    expect(parseInt(pc.slice(48), 16)).toBe(10_000);
+    expect(pc.length / 2).toBe(32);
+  });
+
+  // Both bound the loss identically, but an exact condition fails a perfectly
+  // good transaction if the owner lowers the fee between reading and signing.
+  it('caps rather than pins, and can pin when asked', async () => {
     const { feePostConditions } = await import('../src/wallet.js');
-    const guard = feePostConditions({ sender: ALICE, fee: 10_000, shape: 'legacy' });
-    expect(guard.postConditionMode).toBe('deny');
-    expect(guard.postConditions[0]).toMatchObject({
-      type: 'STX',
-      conditionCode: 'sent_equal_to',
-      amount: '10000'
-    });
+    const capped = feePostConditions({ sender: ALICE, fee: 10_000 }).postConditions[0];
+    const exact = feePostConditions({ sender: ALICE, fee: 10_000, shape: 'exact' })
+      .postConditions[0];
+
+    expect(capped.slice(46, 48)).toBe('05');
+    expect(exact.slice(46, 48)).toBe('01');
   });
 
   it('has a last resort that is honestly weaker', async () => {
@@ -193,6 +200,11 @@ describe('post conditions for a contract that charges', () => {
     const guard = feePostConditions({ sender: ALICE, fee: 10_000, shape: 'allow' });
     expect(guard.postConditionMode).toBe('allow');
     expect(guard.postConditions).toEqual([]);
+  });
+
+  it('refuses to write a condition about an address that is not one', async () => {
+    const { stxPostConditionHex } = await import('../src/wallet.js');
+    expect(() => stxPostConditionHex('not-an-address', 10_000)).toThrow();
   });
 });
 

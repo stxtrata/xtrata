@@ -502,12 +502,13 @@ describe('what a move costs', () => {
     const [, params] = request.mock.calls[0];
 
     expect(params.postConditionMode).toBe('deny');
-    expect(params.postConditions[0]).toMatchObject({
-      type: 'stx-postcondition',
-      address: ALICE,
-      condition: 'eq',
-      amount: '10000'
-    });
+    expect(params.postConditions).toHaveLength(1);
+    // Serialised hex, which is what wallets take. The amount is the last eight
+    // bytes and the condition code the byte before them.
+    const pc = params.postConditions[0];
+    expect(typeof pc).toBe('string');
+    expect(parseInt(pc.slice(48), 16)).toBe(10_000);
+    expect(pc.slice(46, 48)).toBe('05');
   });
 
   it('refuses to build a charging call without knowing who signs', async () => {
