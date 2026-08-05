@@ -188,6 +188,25 @@ export function serializeUint(value) {
   return `0x${bytesToHex(out)}`;
 }
 
+export function serializeBuffer(value) {
+  const body = typeof value === 'string' ? hexToBytes(value) : value;
+  const out = new Uint8Array(5 + body.length);
+  out[0] = CV.BUFFER;
+  new DataView(out.buffer).setUint32(1, body.length);
+  out.set(body, 5);
+  return `0x${bytesToHex(out)}`;
+}
+
+export function serializeNone() {
+  return `0x${CV.NONE.toString(16).padStart(2, '0')}`;
+}
+
+// Wraps an already-serialised value, so callers compose rather than passing
+// types around.
+export function serializeSome(innerHex) {
+  return `0x${CV.SOME.toString(16).padStart(2, '0')}${String(innerHex).replace(/^0x/, '')}`;
+}
+
 export function serializeStringAscii(value) {
   const body = new TextEncoder().encode(value);
   const out = new Uint8Array(5 + body.length);

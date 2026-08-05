@@ -10,7 +10,15 @@
 // both `functionArgs` and `arguments`. Leading with any other shape made one
 // wallet or another hang without ever settling the promise.
 
-import { deserialize, serializeStringAscii, serializeUint } from './clarity.js';
+import {
+  bytesToHex,
+  deserialize,
+  serializeBuffer,
+  serializeNone,
+  serializeSome,
+  serializeStringAscii,
+  serializeUint
+} from './clarity.js';
 import { CONTRACT_NAME, ERR, PAGE_SIZE } from './protocol.js';
 
 export const DEFAULT_API = {
@@ -69,10 +77,13 @@ export class LiveChain {
   async getGame(game) {
     const entry = await this.callReadOnly('get-game', [serializeUint(game)]);
     if (!entry) return null;
+    const committed = entry['rules-hash'];
     return {
       openedBy: entry['opened-by'],
       openedAt: Number(entry['opened-at']),
-      nextSeq: Number(entry['next-seq'])
+      nextSeq: Number(entry['next-seq']),
+      // A buffer when the game committed to a rule set, null for the open board.
+      rulesHash: committed ? bytesToHex(committed) : null
     };
   }
 
@@ -151,8 +162,12 @@ export class LiveChain {
     return { ok: true, txid, raw: result };
   }
 
-  async openGame() {
-    return this._call('open-game', []);
+  // rulesHash is hex, or null for the open board that anyone may play.
+  async openGame(rulesHash = null) {
+    const argument = rulesHash
+      ? serializeSome(serializeBuffer(rulesHash))
+      : serializeNone();
+    return this._call('open-game', [argument]);
   }
 
   async submitMove(game, mv) {

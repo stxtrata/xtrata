@@ -451,6 +451,41 @@
           <p class="hint">Reading is free and needs no wallet. Only submitting a move does.</p>
         </div>
 
+        <div class="panel" id="rules-panel">
+          <h2>Start a game with your own rules</h2>
+          <div class="row">
+            <label class="field">
+              <span>White</span>
+              <input id="rules-white" type="text" placeholder="anyone, or SP…" autocomplete="off" spellcheck="false" />
+            </label>
+          </div>
+          <div class="row">
+            <label class="field">
+              <span>Black</span>
+              <input id="rules-black" type="text" placeholder="anyone, or SP…" autocomplete="off" spellcheck="false" />
+            </label>
+          </div>
+          <div class="row">
+            <label class="field" style="flex: 0 1 170px">
+              <span>Cooldown (blocks)</span>
+              <input id="rules-cooldown" type="number" min="0" step="1" value="0" />
+            </label>
+            <label class="check"><input type="checkbox" id="rules-no-consecutive" /> No two moves in a row</label>
+          </div>
+          <p class="hint" id="rules-summary"></p>
+          <p class="fen">rules hash <code id="rules-hash"></code></p>
+          <div class="row">
+            <button id="rules-open">Open game on chain</button>
+            <button id="rules-download">Download the board</button>
+            <button id="rules-reset">Reset</button>
+          </div>
+          <p class="hint" id="rules-note">
+            The contract enforces none of this. It stores the hash above when the game is opened, and the
+            board you download is the referee: it replays the log and skips anything these rules disallow.
+            Open the game first, then download the board bound to it.
+          </p>
+        </div>
+
         <div class="panel">
           <h2>Moves played</h2>
           <div class="scroll" id="moves"></div>
@@ -468,51 +503,8 @@
     </main>
 
     <script type="module">
-      import { ChessBoardApp } from './src/app.js';
-
-      const byId = (id) => document.getElementById(id);
-
-      new ChessBoardApp({
-        elements: {
-          board: byId('board'),
-          status: byId('status'),
-          counts: byId('counts'),
-          fen: byId('fen'),
-          notice: byId('notice'),
-          moves: byId('moves'),
-          log: byId('log'),
-          gameLabel: byId('game-label'),
-          modeSim: byId('mode-sim'),
-          modeLive: byId('mode-live'),
-          simPanel: byId('sim-panel'),
-          livePanel: byId('live-panel'),
-          newGame: byId('new-game'),
-          flip: byId('flip'),
-          copyPgn: byId('copy-pgn'),
-          manualForm: byId('manual-form'),
-          manualInput: byId('manual-input'),
-          playControls: byId('play-controls'),
-          botMove: byId('bot-move'),
-          junk: byId('junk'),
-          autoplay: byId('autoplay'),
-          replayPanel: byId('replay-panel'),
-          replayCaption: byId('replay-caption'),
-          playPause: byId('play-pause'),
-          toStart: byId('to-start'),
-          toEnd: byId('to-end'),
-          stepBack: byId('step-back'),
-          stepForward: byId('step-forward'),
-          seek: byId('seek'),
-          pace: byId('pace'),
-          capWaits: byId('cap-waits'),
-          contractAddress: byId('contract-address'),
-          contractName: byId('contract-name'),
-          network: byId('network'),
-          gameSelect: byId('game-select'),
-          loadLive: byId('load-live'),
-          connect: byId('connect')
-        }
-      });
+      import { boot } from './src/boot.js';
+      boot();
     </script>
   </body>
 </html>

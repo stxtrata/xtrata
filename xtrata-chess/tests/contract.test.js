@@ -9,6 +9,7 @@ import { Cl } from '@stacks/transactions';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MockChain } from '../src/mock-chain.js';
 import { ERR, FORMAT_VERSION, MAX_SEQ, PAGE_SIZE } from '../src/protocol.js';
+import { DEFAULT_RULES, rulesHash } from '../src/rules.js';
 
 const CONTRACT = 'xtrata-chess-log-v1';
 
@@ -17,8 +18,9 @@ const deployer = accounts.get('deployer');
 const alice = accounts.get('wallet_1');
 const bob = accounts.get('wallet_2');
 
-function openGame(sender = deployer) {
-  return simnet.callPublicFn(CONTRACT, 'open-game', [], sender);
+function openGame(sender = deployer, rulesHash = null) {
+  const argument = rulesHash ? Cl.some(Cl.bufferFromHex(rulesHash)) : Cl.none();
+  return simnet.callPublicFn(CONTRACT, 'open-game', [argument], sender);
 }
 
 function submitMove(game, mv, sender = deployer) {
@@ -71,6 +73,51 @@ describe('opening games', () => {
 
   it('reports nothing for a game that does not exist', () => {
     expect(readOnly('get-game', [Cl.uint(999_999)])).toBeNone();
+  });
+});
+
+describe('the rules commitment', () => {
+  it('is absent by default, which means the open board', () => {
+    const game = Number(openGame(alice).result.value.value);
+    expect(readOnly('get-game', [Cl.uint(game)]).value.value['rules-hash']).toBeNone();
+  });
+
+  it('stores the hash of a rule set unchanged', () => {
+    const hash = rulesHash({ ...DEFAULT_RULES, white: alice, black: bob });
+    const game = Number(openGame(alice, hash).result.value.value);
+    expect(readOnly('get-game', [Cl.uint(game)]).value.value['rules-hash']).toBeSome(
+      Cl.bufferFromHex(hash)
+    );
+  });
+
+  it('takes any thirty-two bytes, because the meaning is entirely off chain', () => {
+    const nonsense = 'ff'.repeat(32);
+    const game = Number(openGame(alice, nonsense).result.value.value);
+    expect(readOnly('get-game', [Cl.uint(game)]).value.value['rules-hash']).toBeSome(
+      Cl.bufferFromHex(nonsense)
+    );
+  });
+
+  // The commitment is only worth anything if it cannot move after the fact.
+  // There is no setter, and this asserts that absence on purpose.
+  it('has no way to be changed once the game is open', () => {
+    const source = simnet.getContractSource(`${deployer}.${CONTRACT}`);
+    expect(source).not.toMatch(/set-rules|update-rules|change-rules/);
+
+    const fns = simnet.getContractsInterfaces().get(`${deployer}.${CONTRACT}`).functions;
+    const publicFns = fns.filter((f) => f.access === 'public').map((f) => f.name).sort();
+    expect(publicFns).toEqual(['open-game', 'submit-move']);
+  });
+
+  it('is per game, so one contract hosts boards with different rules', () => {
+    const open = Number(openGame(alice).result.value.value);
+    const strict = Number(openGame(bob, rulesHash({ ...DEFAULT_RULES, white: bob })).result.value.value);
+
+    expect(readOnly('get-game', [Cl.uint(open)]).value.value['rules-hash']).toBeNone();
+    expect(readOnly('get-game', [Cl.uint(strict)]).value.value['rules-hash']).not.toBeNone();
+
+    // And the contract still refuses to police either of them.
+    expect(submitMove(strict, 'e2e4', alice).result).toBeOk(Cl.uint(0));
   });
 });
 

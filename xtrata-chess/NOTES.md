@@ -73,6 +73,26 @@ a skipped submission advances the counter without moving the board.
 address. It will get botted; the log keeps the evidence. Junk costs its sender a
 fee and changes nothing, which is the whole economic argument.
 
+**`MAX-SEQ` is 65,536, not 4,096.** The original ceiling was low enough that a
+spammer could freeze a legitimate game part-played for a few tens of STX, and it
+protected nothing: there is no unbounded loop, paging is fixed at fifty, and the
+per-move fee already bounds spam. Raised before deploying, because it could not
+be raised after.
+
+**`open-game` commits to a rules hash.** Rules for a child game live in the board
+that renders it, not on chain, because they are all questions about the log and
+the contract must never form an opinion. But with no commitment, two boards could
+claim different rules for the same game and nothing would decide between them.
+Thirty-two optional bytes written once per game removes that ambiguity. It is a
+hash rather than an inscription id because the game has to be opened before the
+board that renders it can be inscribed.
+
+**The engine is its own inscription.** A child game cannot `<script src>` the
+parent, because the parent is a whole HTML page. So the engine is inscribed once
+and the open board and every child are thin pages that depend on it. This is what
+makes generating a game cost about 600 bytes rather than 136KB, which is the
+difference between a casual act and a considered one.
+
 ## Checked
 
 - **Move generation.** Perft against the six standard positions, depth 5 on
@@ -95,6 +115,16 @@ fee and changes nothing, which is the whole economic argument.
 - **The board and the sealed page.** In a real browser, including click-to-move,
   the reject path, playback transport, and the pace controls.
 
+- **Execution cost.** Measured under Clarinet with `--costs`: 9,150 runtime units
+  per move against a 5,000,000,000 block limit, and flat with game length. The
+  binding dimension is `read_count`, 8 of 15,000.
+- **The deploy preflight.** Source checks, key derivation, address, contract-name
+  availability and balance, all exercised with a throwaway key. It halts where it
+  should.
+- **The engine split.** The engine self-mounts into a page containing nothing but
+  a script tag, and a child page loads bound to its game with the right controls
+  hidden.
+
 ## Not checked
 
 - **Live wallet signing.** Everything up to `provider.request` is exercised, but
@@ -102,6 +132,14 @@ fee and changes nothing, which is the whole economic argument.
   this repo's canary proved across Xverse and Leather, desktop and mobile.
 - **Anything on chain.** The contract is not deployed. No real fee has been paid
   and no real transaction has been sent.
+- **Mnemonic derivation against the real deployer.** The path matches the
+  documented `m/44'/5757'/3'/0/0` and the xtrata-2.0 script's convention, but
+  without the seed phrase there is no way to confirm it lands on SP3J…743X. The
+  preflight prints the derived address before anything is broadcast, so this is
+  checkable at deploy time in one glance.
+- **A child game end to end.** The generator produces the page and the child mode
+  loads it, but no child has been inscribed or played, because that needs the
+  engine on chain first.
 - **Real pacing.** The rhythm you see in simulation is modelled, not measured. An
   actual open board is likely far lumpier: quiet for hours, then a burst when
   someone notices.

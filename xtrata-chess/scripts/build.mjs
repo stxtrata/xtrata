@@ -23,7 +23,7 @@ const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const SRC = resolve(ROOT, 'src');
 const OUT_DIR = resolve(ROOT, 'dist');
 
-const ENTRY = './app.js';
+const ENTRY = './boot.js';
 
 const IMPORT_RE = /^import\s*\{([\s\S]*?)\}\s*from\s*['"](\.\/[^'"]+)['"];?\s*$/gm;
 const EXPORT_DECL_RE = /^export\s+(const|let|function|class|async function)\s+([A-Za-z_$][\w$]*)/gm;
@@ -76,12 +76,92 @@ function __require(id) {
   return [runtime, ...seen.values()].join('\n\n');
 }
 
+// Pull the shell out of index.html so the engine can carry it. The dev page and
+// the inscribed engine then share one definition of the markup rather than
+// drifting apart.
+function extractShell(html) {
+  const css = (html.match(/<style>([\s\S]*?)<\/style>/) || [, ''])[1];
+  const body = (html.match(/<body>([\s\S]*?)<\/body>/) || [, ''])[1];
+  const markup = body.replace(/<script[\s\S]*?<\/script>/g, '').trim();
+  if (!markup) throw new Error('could not find the board markup in index.html');
+  return { css: css.trim(), html: markup };
+}
+
+// The engine as a standalone inscription: every module, the shell it mounts
+// when a page does not already have one, and nothing else. Children depend on
+// this rather than carrying their own copy.
+async function buildEngine(html) {
+  const shell = extractShell(html);
+  const modules = await bundle();
+
+  const source = [
+    '(function () {',
+    modules,
+    'const __boot = __require("./boot.js");',
+    `__boot.SHELL.css = ${JSON.stringify(shell.css)};`,
+    `__boot.SHELL.html = ${JSON.stringify(shell.html)};`,
+    'if (document.readyState === "loading") {',
+    '  document.addEventListener("DOMContentLoaded", function () { __boot.boot(); });',
+    '} else {',
+    '  __boot.boot();',
+    '}',
+    '})();'
+  ].join('\n');
+
+  await mkdir(OUT_DIR, { recursive: true });
+  const outPath = resolve(OUT_DIR, 'xtrata-chess-engine.js');
+  await writeFile(outPath, source, 'utf8');
+
+  const bytes = Buffer.byteLength(source, 'utf8');
+  const sha = createHash('sha256').update(source).digest('hex');
+
+  console.log(`built  ${outPath}`);
+  console.log(`bytes  ${bytes.toLocaleString()}`);
+  console.log(`sha256 ${sha}`);
+  console.log('\nInscribe this first. Every board and every child game depends on it,');
+  console.log('so its inscription id is what children carry.');
+  return { outPath, bytes, sha };
+}
+
+// The open board as a thin page that depends on the inscribed engine.
+async function buildBoard(engineId) {
+  const source = `<!doctype html>
+<meta charset="utf-8">
+<title>Xtrata Open Board</title>
+<script src="/i/${engineId}"></script>
+`;
+
+  await mkdir(OUT_DIR, { recursive: true });
+  const outPath = resolve(OUT_DIR, 'xtrata-chess-open-board.html');
+  await writeFile(outPath, source, 'utf8');
+
+  console.log(`built  ${outPath}`);
+  console.log(`bytes  ${Buffer.byteLength(source, 'utf8')}`);
+  console.log(`sha256 ${createHash('sha256').update(source).digest('hex')}`);
+  console.log(`\nSeal with dependency [${engineId}].`);
+  return outPath;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const sealIndex = args.indexOf('--seal');
   const sealPath = sealIndex >= 0 ? args[sealIndex + 1] : null;
+  const engineIdIndex = args.indexOf('--engine-id');
+  const engineId = engineIdIndex >= 0 ? args[engineIdIndex + 1] : null;
 
   const html = await readFile(resolve(ROOT, 'index.html'), 'utf8');
+
+  if (args.includes('--engine')) {
+    await buildEngine(html);
+    return;
+  }
+
+  if (args.includes('--board')) {
+    if (!engineId) throw new Error('--board needs --engine-id <inscription id>');
+    await buildBoard(engineId);
+    return;
+  }
+
   const modules = await bundle();
 
   // Replace the dev entry script with the inlined bundle.
@@ -107,8 +187,8 @@ async function main() {
     '(function () {',
     sealedBlock,
     modules,
-    'const { ChessBoardApp } = __require("./app.js");',
-    wiring.trim(),
+    'const __boot = __require("./boot.js");',
+    '__boot.boot();',
     '})();',
     '</script>'
   ].join('\n');

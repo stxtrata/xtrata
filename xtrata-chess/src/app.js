@@ -26,13 +26,27 @@ import {
 import { BOTS, mulberry32 } from './bots.js';
 import { SimIdentities } from './sim-identities.js';
 import { isWellFormedLength } from './protocol.js';
+import {
+  DEFAULT_RULES,
+  describeRules,
+  isOpenBoard,
+  normaliseRules,
+  rulesHash,
+  rulesMatchCommitment
+} from './rules.js';
+import { childPage, engineIdFromLocation } from './child.js';
 
 const REASON_LABEL = {
   malformed: 'not a move',
   'empty-square': 'no piece there',
   'wrong-turn': 'not their turn',
   illegal: 'illegal',
-  'game-over': 'game already over'
+  'game-over': 'game already over',
+  // Reasons that only a child board's rules can produce.
+  'wrong-player': 'not their side',
+  'not-allowed': 'not on the list',
+  consecutive: 'two in a row',
+  cooldown: 'too soon'
 };
 
 export class ChessBoardApp {
@@ -45,6 +59,11 @@ export class ChessBoardApp {
     this.random = mulberry32(options.seed ?? 1);
     this.simSeed = options.seed ?? 1;
     this.identities = null;
+    this.gameRules = null;
+    this.committedHash = null;
+    this.childGame = null;
+    this.engineId = null;
+    this.isChild = false;
     this.autoplayTimer = null;
     this.pollTimer = null;
     this.busy = false;
@@ -76,8 +95,73 @@ export class ChessBoardApp {
     // A sealed game carries its own log, so the page renders with no network at
     // all. This is the mode an inscribed finished game runs in.
     const sealed = options.sealed || globalThis.__XTRATA_CHESS_SEALED__;
+    const child = options.child || globalThis.__XTRATA_CHESS_CHILD__;
+
     if (sealed) this.startSealed(sealed);
+    else if (child) this.startChild(child);
     else this.startSimulation();
+  }
+
+  // A generated board: one game, one rule set, nothing else. It still reads the
+  // chain like any live board, and it checks that the rules it was built with
+  // are the ones the game actually committed to.
+  async startChild(child) {
+    this.mode = 'live';
+    this.isChild = true;
+    this.engineId = child.engine ?? null;
+    this.gameRules = normaliseRules(child.rules);
+
+    const el = this.elements;
+    el.modeSim.hidden = true;
+    el.modeLive.hidden = true;
+    el.simPanel.hidden = true;
+    el.livePanel.hidden = true;
+    el.rulesPanel.hidden = true;
+    el.newGame.hidden = true;
+
+    const [address, name] = String(child.contract || '').split('.');
+    this.chain = new LiveChain({
+      contractAddress: address,
+      contractName: name,
+      network: child.network || 'mainnet'
+    });
+    this.names = new NameResolver({ apiUrl: this.chain.apiUrl });
+    this.times = new BlockTimes({ apiUrl: this.chain.apiUrl });
+    this.game = Number(child.game);
+
+    await this.refresh();
+    await this._verifyCommitment();
+    this._startPolling();
+  }
+
+  // Does the chain agree that this is the referee for this game?
+  async _verifyCommitment() {
+    if (!this.gameRules || !this.chain.getGame) return;
+
+    try {
+      const entry = await this.chain.getGame(this.game);
+      if (!entry) {
+        this._notify(`Game #${this.game} does not exist on this contract.`, 'error');
+        this.render();
+        return;
+      }
+
+      this.committedHash = entry.rulesHash ?? null;
+
+      if (!rulesMatchCommitment(this.gameRules, this.committedHash)) {
+        // Worth stating plainly rather than quietly rendering anyway: a board
+        // whose rules do not hash to the commitment is not this game's referee,
+        // and anything it shows is its own opinion.
+        this._notify(
+          `These rules do not match what game #${this.game} committed to on chain. This board is not the referee for this game, and what it shows should not be trusted.`,
+          'error'
+        );
+      }
+      this.render();
+    } catch (error) {
+      this._notify(`Could not check the rules commitment: ${error.message}`, 'warn');
+      this.render();
+    }
   }
 
   startSealed(sealed) {
@@ -151,6 +235,21 @@ export class ChessBoardApp {
       this.seek(Number(el.seek.value));
     });
     el.pace.addEventListener('change', () => this.setPace(el.pace.value));
+
+    for (const control of [el.rulesWhite, el.rulesBlack, el.rulesCooldown, el.rulesNoConsecutive]) {
+      control.addEventListener('input', () => this.renderRules());
+      control.addEventListener('change', () => this.renderRules());
+    }
+    el.rulesOpen.addEventListener('click', () => this.openRuledGame());
+    el.rulesDownload.addEventListener('click', () => this.downloadChild());
+    el.rulesReset.addEventListener('click', () => {
+      el.rulesWhite.value = '';
+      el.rulesBlack.value = '';
+      el.rulesCooldown.value = '0';
+      el.rulesNoConsecutive.checked = false;
+      this.childGame = null;
+      this.renderRules();
+    });
     el.capWaits.addEventListener('change', () => {
       this.capLongWaits = el.capWaits.checked;
       this.setPace(this.pace);
@@ -185,6 +284,8 @@ export class ChessBoardApp {
     // The mock chain keeps its own clock, so simulated games have real gaps to
     // be replayed against.
     this.times = this.chain.blockTimes;
+    this.gameRules = null;
+    this.childGame = null;
     this.game = this.chain.openGame(this.identities.you).value;
     this.viewIndex = null;
     this.pause();
@@ -274,7 +375,7 @@ export class ChessBoardApp {
     try {
       const moves = await this.chain.getAllMoves(this.game);
       this.rawMoves = moves;
-      this.state = replay(moves);
+      this.state = replay(moves, { rules: this.gameRules });
       this.stamps = stampLog(moves, this.times);
     } catch (error) {
       this._notify(`Read failed: ${error.message}`, 'error');
@@ -303,7 +404,7 @@ export class ChessBoardApp {
   // The state being drawn: a historical prefix while scrubbing, else the latest.
   viewState() {
     if (this.viewIndex === null) return this.state;
-    return replay(this.rawMoves.slice(0, this.viewIndex));
+    return replay(this.rawMoves.slice(0, this.viewIndex), { rules: this.gameRules });
   }
 
   seek(index) {
@@ -637,6 +738,108 @@ export class ChessBoardApp {
   }
 
   // ------------------------------------------------------------------
+  // Child boards
+  // ------------------------------------------------------------------
+
+  // The rules currently described by the panel.
+  draftRules() {
+    const el = this.elements;
+    return normaliseRules({
+      white: el.rulesWhite.value,
+      black: el.rulesBlack.value,
+      cooldown: el.rulesCooldown.value,
+      noConsecutive: el.rulesNoConsecutive.checked
+    });
+  }
+
+  renderRules() {
+    const el = this.elements;
+    const rules = this.draftRules();
+    const open = isOpenBoard(rules);
+
+    el.rulesSummary.textContent = describeRules(rules);
+    el.rulesHash.textContent = open ? 'none — these are the open board rules' : rulesHash(rules);
+    el.rulesDownload.disabled = !this.childGame;
+    el.rulesDownload.textContent = this.childGame
+      ? `Download the board for game #${this.childGame}`
+      : 'Download the board';
+  }
+
+  async openRuledGame() {
+    const rules = this.draftRules();
+    const hash = isOpenBoard(rules) ? null : rulesHash(rules);
+
+    if (this.mode === 'sim') {
+      const id = this.chain.openGame(this.identities.you, hash).value;
+      this.childGame = id;
+      this.game = id;
+      this.gameRules = rules;
+      this._notify(
+        `Opened game #${id} in simulation with those rules. On chain this would write the hash and nothing else.`,
+        'info'
+      );
+      await this.refresh();
+      this.renderRules();
+      return;
+    }
+
+    try {
+      this._notify('Confirm the new game in your wallet…', 'info');
+      this.render();
+      const result = await this.chain.openGame(hash);
+      this._notify(
+        `Game submitted with its rules hash. Once it confirms, note its number and come back to download the board. tx ${shortSender(result.txid)}`,
+        'info'
+      );
+    } catch (error) {
+      this._notify(`Wallet call failed: ${error.message}`, 'error');
+    }
+    this.render();
+  }
+
+  downloadChild() {
+    const rules = this.draftRules();
+    const game = this.childGame ?? this.game;
+    if (!game) {
+      this._notify('Open the game first, so the board can be bound to its number.', 'warn');
+      this.render();
+      return;
+    }
+
+    const engine = this.engineId ?? engineIdFromLocation();
+    if (!engine) {
+      this._notify(
+        'This board is not running from an inscription, so it does not know which engine a child should depend on. Inscribe the engine first, then generate children from the inscribed board.',
+        'warn'
+      );
+      this.render();
+      return;
+    }
+
+    const html = childPage({
+      contract: this.chain.contractId || 'simulation',
+      network: this.mode === 'live' ? this.chain.network : 'simulation',
+      game,
+      rules,
+      engine
+    });
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `xtrata-chess-game-${game}.html`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    this._notify(
+      `Board for game #${game} downloaded, ${html.length} bytes. Inscribe it with dependency [${engine}].`,
+      'info'
+    );
+    this.render();
+  }
+
+  // ------------------------------------------------------------------
   // Rendering
   // ------------------------------------------------------------------
 
@@ -653,7 +856,7 @@ export class ChessBoardApp {
     const replayable = finished || this.mode === 'sealed';
 
     el.playControls.hidden = !playable;
-    el.newGame.hidden = this.mode === 'sealed';
+    el.newGame.hidden = this.mode === 'sealed' || this.isChild;
     if (this.mode === 'sim') el.simPanel.hidden = !playable;
     el.replayPanel.hidden = !replayable;
 
@@ -677,6 +880,7 @@ export class ChessBoardApp {
       `<span><strong>${this.state.rejected.length}</strong> skipped</span>`;
 
     this._renderReplayControls(view);
+    if (!el.rulesPanel.hidden) this.renderRules();
 
     el.moves.innerHTML = this._renderMoves(this.state, view);
     el.log.innerHTML = this._renderLog(this.state);

@@ -44,6 +44,42 @@ Descendants inherit these. They are fixed.
 | `seq` semantics | A sequence number, not a ply count. It counts submissions including ones replay skips, so it drifts from the real ply count. Never treat it as a chess concept. |
 | Game identity | Contract principal plus game number. A bare game number means nothing outside its contract. |
 | Version marker | `FORMAT-VERSION` on chain, `formatVersion` in a sealed game. |
+| Rules commitment | `open-game` takes an optional 32-byte hash. `none` means the open board. |
+
+## Games with their own rules
+
+The open board lets anyone move either side. A game can be opened under narrower
+rules instead: bind a colour to an address, require a wait between an address's
+own moves, start from a given position.
+
+None of that is in the contract, and none of it could be. Every rule is a
+question about the log, and the log already records the sender and the block
+height of every submission, so replay answers them at exactly the point it
+answers "is this legal". A submission that breaks a rule is skipped like any
+illegal move, and the sender still paid for it.
+
+What the contract does hold is `sha256` of the rules, written when the game is
+opened and never changed. Without it, two boards could claim different rules for
+the same game and nothing would say which was the referee. With it, a board
+checks itself: if its rules do not hash to the commitment, it says so and tells
+you not to trust what it shows.
+
+### Generating one
+
+The board has a panel for it. Set the rules, open the game on chain, then
+download the board bound to that game number. What you get is about 600 bytes:
+
+```html
+<!doctype html>
+<script>window.__XTRATA_CHESS_CHILD__ = { …contract, game, rules… };</script>
+<script src="/i/<engine>"></script>
+```
+
+The engine is inscribed once and every game after it depends on that one
+inscription. A child game is a config block, so making one is a casual act
+rather than a 100KB commitment.
+
+Inscribe with `seal-recursive(hash, uri, [<engine id>])`.
 
 Reading is lenient about case and surrounding whitespace, because people type
 these into wallets by hand and a stray space should not cost someone a fee.
@@ -198,14 +234,23 @@ Two details that are honest rather than tidy:
 A sealed game embeds its block times along with its names, for the same reason:
 it has no network, and the record should get more durable when it is inscribed.
 
-## Building the inscription
+## Building and inscribing
+
+Three artifacts, in the order they go on chain:
 
 ```bash
-npm run build
+node scripts/build.mjs --engine                  # the engine, ~136KB, inscribed once
+node scripts/build.mjs --board --engine-id <id>  # the open board, ~100 bytes
+node scripts/build.mjs                           # a self-contained board, for local use
 ```
 
-Produces `dist/xtrata-chess-board.html`: one file, every module inlined, zero
-external requests. Around 86KB.
+The engine carries every module and the markup it mounts when a page has none.
+The open board and every child game are thin pages that depend on it, sealed
+with `seal-recursive(hash, uri, [<engine id>])`.
+
+The self-contained build is one file with everything inlined. It needs no
+inscription id, which makes it the right thing for local use and the wrong thing
+to inscribe, since each copy would pay for the engine again.
 
 A finished game seals into a standalone artifact:
 
@@ -220,9 +265,24 @@ a link.
 
 ## Deploying
 
-`clarinet check` passes against Clarity 3. The contract holds no funds, moves
-no tokens, and has no admin, so there is nothing to configure. Deploy it, note
-the principal, and put that into the board's Live panel.
+`clarinet check` passes clean against Clarity 3. The contract holds no funds,
+moves no tokens, and has no admin, so there is nothing to configure.
+
+```bash
+node scripts/deploy.mjs                                  # preflight, nothing sent
+XTRATA_MAINNET_MNEMONIC="…" node scripts/deploy.mjs      # dry run, builds the tx
+XTRATA_MAINNET_MNEMONIC="…" node scripts/deploy.mjs --broadcast
+```
+
+Dry run is the default and the preflight runs either way, so the safe thing is
+also what you get if you forget a flag. It checks the source is the one that was
+tested, derives the deployer, confirms the contract name is free, confirms the
+balance covers the fee, and asks for typed confirmation before broadcasting.
+
+Measured cost per move, under Clarinet: 9,150 runtime units against a block
+limit of 5,000,000,000, and flat — move 82 costs 1% more than move 1. The
+binding dimension is `read_count` at 8 of 15,000, so a block would hold roughly
+1,875 moves. Execution is not what a move costs; the transaction fee is.
 
 Reading a board is free and needs no wallet. Only submitting costs anything.
 

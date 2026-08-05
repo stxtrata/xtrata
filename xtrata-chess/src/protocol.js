@@ -8,7 +8,10 @@ export const FORMAT_VERSION = 1;
 
 export const CONTRACT_NAME = 'xtrata-chess-log-v1';
 
-export const MAX_SEQ = 4096;
+// Deliberately far above any real game. The board is unthrottled, so a lower
+// ceiling would let a spammer freeze a legitimate game part-played, and the
+// ceiling protects nothing the per-move fee does not already bound.
+export const MAX_SEQ = 65536;
 
 export const PAGE_SIZE = 50;
 

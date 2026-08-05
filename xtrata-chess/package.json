@@ -16,6 +16,8 @@
     "dev": "node scripts/serve.mjs"
   },
   "devDependencies": {
+    "@scure/bip32": "^1.7.0",
+    "@scure/bip39": "^1.6.0",
     "@stacks/clarinet-sdk": "^3.9.0",
     "@stacks/transactions": "^7.2.0",
     "vitest": "^4.0.7",
