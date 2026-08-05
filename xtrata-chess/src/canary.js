@@ -351,7 +351,9 @@ export class LaunchCanary {
   }
 
   get contractName() {
-    return this.el.contractVersion?.value || 'xtrata-chess-log-v2';
+    // The shared constant rather than a literal, so adding a version in one
+    // place cannot leave the canary quietly offering the previous one.
+    return this.el.contractVersion?.value || CONTRACT_NAME;
   }
 
   // The network fee to suggest, matching the board's default and editable here

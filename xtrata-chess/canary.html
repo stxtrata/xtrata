@@ -249,8 +249,9 @@
           <label class="field" style="flex: 0 1 210px">
             <span>Contract</span>
             <select id="contract-version">
-              <option value="xtrata-chess-log-v2">v2 · charges a fee per call</option>
-              <option value="xtrata-chess-log-v1">v1 · no fee, already deployed</option>
+              <option value="xtrata-chess-log-v3">v3 · opening and moving priced apart</option>
+              <option value="xtrata-chess-log-v2">v2 · one fee for both, deployed</option>
+              <option value="xtrata-chess-log-v1">v1 · no fee, deployed</option>
             </select>
           </label>
           <label class="field" style="flex: 0 1 140px">
@@ -407,7 +408,11 @@
 
       const byId = (id) => document.getElementById(id);
 
-      new LaunchCanary({
+      // Published so a deploy in progress can be inspected from a console:
+      // which contract, what was sent, what came back. The board does the same
+      // for the same reason, and a contract deploy is the one action here that
+      // cannot be repeated if it goes wrong.
+      window.__xtrataCanary = new LaunchCanary({
         network: byId('network'),
         providers: byId('providers'),
         address: byId('address'),
