@@ -39,6 +39,18 @@ import {
 // Re-exported so the canary's own tests pin the behaviour it actually uses.
 export const harvestAddress = extractAddress;
 
+// The Clarity codec returns uints as BigInt so nothing is silently rounded.
+// JSON.stringify throws on those, which meant a successful chain read could be
+// reported as "read failed" purely because logging it threw, and Copy report
+// died outright. Everything that stringifies goes through here.
+function safeJson(value, indent) {
+  return JSON.stringify(
+    value,
+    (_key, v) => (typeof v === 'bigint' ? `${v}` : v),
+    indent
+  );
+}
+
 function short(address) {
   const value = String(address || '');
   return value.length > 14 ? `${value.slice(0, 5)}…${value.slice(-4)}` : value;
@@ -214,7 +226,7 @@ export class LaunchCanary {
     row.querySelector('.msg').textContent = message;
     if (detail !== undefined) {
       row.querySelector('pre').textContent =
-        typeof detail === 'string' ? detail : JSON.stringify(detail, null, 2);
+        typeof detail === 'string' ? detail : safeJson(detail, 2);
     }
     this.el.log.prepend(row);
   }
@@ -233,7 +245,9 @@ export class LaunchCanary {
   // Each button unlocks only when the step before it has been verified on chain.
   _gate() {
     this.el.btnPreflight.disabled = !this.address;
-    this.el.btnDeploy.disabled = this.steps[1] !== 'ok';
+    // Deploying again cannot work: the name is spent. Offering the button after
+    // a verified deploy invites a wallet call that will only ever hang.
+    this.el.btnDeploy.disabled = this.steps[1] !== 'ok' || this.steps[2] === 'ok';
     this.el.btnVerifyDeploy.disabled = !this.deployTxid;
     this.el.btnOpen.disabled = this.steps[2] !== 'ok';
     this.el.btnVerifyOpen.disabled = !this.openTxid;
@@ -739,10 +753,10 @@ export class LaunchCanary {
       `deploy tx     ${this.deployTxid || '-'}`,
       `open-game tx  ${this.openTxid || '-'}`,
       `first move tx ${this.moveTxid || '-'}`,
-      `steps         ${JSON.stringify(this.steps)}`,
+      `steps         ${safeJson(this.steps)}`,
       ``,
       ...this.entries.map(
-        (e) => `[${e.at}] ${e.level.toUpperCase()} ${e.message}${e.detail === undefined ? '' : `\n${typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail)}`}`
+        (e) => `[${e.at}] ${e.level.toUpperCase()} ${e.message}${e.detail === undefined ? '' : `\n${typeof e.detail === 'string' ? e.detail : safeJson(e.detail)}`}`
       )
     ].join('\n');
 

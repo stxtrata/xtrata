@@ -111,3 +111,41 @@ describe('reading a txid back', () => {
     }
   });
 });
+
+describe('logging what the chain returns', () => {
+  // The Clarity codec returns uints as BigInt so nothing is silently rounded,
+  // and JSON.stringify throws on those. On the live deploy this made a
+  // successful read of game #1 report itself as "read failed", and killed Copy
+  // report outright. Anything that stringifies chain data must survive it.
+  const chainReply = {
+    'next-seq': 0n,
+    'opened-at': 8706789n,
+    'opened-by': 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+    'rules-hash': null
+  };
+
+  it('plain JSON.stringify is exactly what broke', () => {
+    expect(() => JSON.stringify(chainReply)).toThrow(/BigInt/);
+  });
+
+  it('the replacer keeps the value rather than dropping or rounding it', () => {
+    const out = JSON.parse(
+      JSON.stringify(chainReply, (_k, v) => (typeof v === 'bigint' ? `${v}` : v))
+    );
+    expect(out['opened-at']).toBe('8706789');
+    expect(out['next-seq']).toBe('0');
+    expect(out['opened-by']).toBe(chainReply['opened-by']);
+    expect(out['rules-hash']).toBe(null);
+  });
+
+  it('survives a uint beyond what a Number holds exactly', () => {
+    const huge = { seq: 2n ** 100n };
+    const out = JSON.parse(
+      JSON.stringify(huge, (_k, v) => (typeof v === 'bigint' ? `${v}` : v))
+    );
+    expect(out.seq).toBe('1267650600228229401496703205376');
+    // Why BigInt is used at all: going through Number loses digits, and the
+    // string keeps every one of them.
+    expect(String(Number(out.seq))).not.toBe(out.seq);
+  });
+});
