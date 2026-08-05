@@ -17,9 +17,9 @@ import { ChessBoardApp } from './app.js';
 export const SHELL = { css: '', html: '' };
 
 const IDS = [
-  'board', 'status', 'counts', 'fen', 'notice', 'moves', 'log', 'game-label',
+  'board', 'status', 'counts', 'fen', 'notice', 'pending-panel', 'moves', 'log', 'game-label',
   'mode-sim', 'mode-live', 'sim-panel', 'live-panel', 'new-game', 'flip',
-  'copy-pgn', 'manual-form', 'manual-input', 'play-controls', 'bot-move',
+  'copy-pgn', 'manual-form', 'manual-input', 'submit-move', 'clear-move', 'move-hint', 'play-controls', 'bot-move',
   'junk', 'autoplay', 'replay-panel', 'replay-caption', 'play-pause',
   'to-start', 'to-end', 'step-back', 'step-forward', 'seek', 'pace',
   'cap-waits', 'contract-address', 'contract-name', 'network', 'game-select',
@@ -48,7 +48,18 @@ export function boot(options = {}) {
   const elements = {};
   for (const id of IDS) elements[camel(id)] = document.getElementById(id);
 
-  return new ChessBoardApp({ ...options, elements });
+  const app = new ChessBoardApp({ ...options, elements });
+
+  // Published so the running board can be inspected from a console: which game,
+  // what is in flight, what the last read returned. Diagnosing a live board
+  // otherwise means guessing, and it costs nothing to be legible.
+  try {
+    globalThis.__xtrataChess = app;
+  } catch {
+    // Sandboxed pages can refuse window writes; the board still works.
+  }
+
+  return app;
 }
 
 // Auto-start when loaded as a plain script, which is how an inscription runs.

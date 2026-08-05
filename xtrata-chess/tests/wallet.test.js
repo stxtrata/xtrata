@@ -472,3 +472,97 @@ describe('what a move costs', () => {
     expect(params.postConditions).toEqual([]);
   });
 });
+
+describe('the mempool', () => {
+  // A board that ignores in-flight moves makes everyone race: two people see the
+  // same position, both move, and the loser pays for a submission that is
+  // skipped. Reading the mempool is free and needs no wallet.
+  const CONTRACT = `${ALICE}.xtrata-chess-log-v1`;
+
+  function mempoolReply(entries) {
+    return {
+      ok: true,
+      json: async () => ({
+        results: entries.map((e, i) => ({
+          tx_id: `0x${i}`,
+          tx_type: e.type || 'contract_call',
+          sender_address: e.sender || ALICE,
+          fee_rate: '10000',
+          receipt_time: e.receipt ?? 1785900000,
+          contract_call: e.call || {
+            contract_id: CONTRACT,
+            function_name: 'submit-move',
+            function_args: [
+              { hex: '0x0100000000000000000000000000000001' },
+              { hex: '0x0d00000004' + Buffer.from(e.mv || 'e2e4').toString('hex') }
+            ]
+          }
+        }))
+      })
+    };
+  }
+
+  async function chainWith(entries) {
+    const { LiveChain } = await import('../src/live-chain.js');
+    return new LiveChain({
+      contractAddress: ALICE,
+      fetch: async () => mempoolReply(entries)
+    });
+  }
+
+  it('decodes a pending move with the same codec that reads a landed one', async () => {
+    const chain = await chainWith([{ mv: 'e7e5' }]);
+    const pending = await chain.getMempool(1);
+    expect(pending).toHaveLength(1);
+    expect(pending[0].mv).toBe('e7e5');
+    expect(pending[0].sender).toBe(ALICE);
+  });
+
+  it('ignores traffic that is not a move on this game', async () => {
+    const chain = await chainWith([
+      { type: 'token_transfer' },
+      { call: { contract_id: 'SP999.other', function_name: 'submit-move', function_args: [] } },
+      { call: { contract_id: CONTRACT, function_name: 'open-game', function_args: [] } },
+      { mv: 'e7e5' }
+    ]);
+    const pending = await chain.getMempool(1);
+    expect(pending).toHaveLength(1);
+    expect(pending[0].mv).toBe('e7e5');
+  });
+
+  it('filters to the game being watched', async () => {
+    const chain = await chainWith([
+      {
+        mv: 'e7e5',
+        call: {
+          contract_id: CONTRACT,
+          function_name: 'submit-move',
+          function_args: [
+            { hex: '0x0100000000000000000000000000000007' },
+            { hex: '0x0d00000004' + Buffer.from('e7e5').toString('hex') }
+          ]
+        }
+      }
+    ]);
+    expect(await chain.getMempool(1)).toHaveLength(0);
+    expect(await chain.getMempool(7)).toHaveLength(1);
+  });
+
+  it('survives a malformed entry rather than losing the rest', async () => {
+    const chain = await chainWith([
+      { call: { contract_id: CONTRACT, function_name: 'submit-move', function_args: [{ hex: '0xzz' }, { hex: '0xzz' }] } },
+      { mv: 'g8f6' }
+    ]);
+    const pending = await chain.getMempool(1);
+    expect(pending).toHaveLength(1);
+    expect(pending[0].mv).toBe('g8f6');
+  });
+
+  it('orders oldest first, which is roughly the order they will land', async () => {
+    const chain = await chainWith([
+      { mv: 'b8c6', receipt: 1785900100 },
+      { mv: 'e7e5', receipt: 1785900000 }
+    ]);
+    expect((await chain.getMempool(1)).map((e) => e.mv)).toEqual(['e7e5', 'b8c6']);
+  });
+});

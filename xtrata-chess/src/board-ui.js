@@ -1,9 +1,14 @@
 // Board rendering and click-to-move.
 //
 // This layer knows nothing about chains. It is handed a replay state and a
-// callback, it draws the position, and when someone completes a move it hands
-// back a UCI string. Whether that string goes to a mock chain or a wallet is
-// somebody else's problem.
+// callback, and when someone completes a move it hands back a UCI string.
+// Whether that string goes to a mock chain or a wallet is somebody else's
+// problem.
+//
+// Clicking a destination *stages* a move rather than sending it. On a live board
+// every submission costs a fee and opens a wallet, so a stray click should never
+// be a transaction. The staged move goes into the input where it can be read,
+// edited, or abandoned before anything is signed.
 
 import { algebraic, parseSquare, pieceColor, pieceType, PAWN, QUEEN, ROOK, BISHOP, KNIGHT } from './engine.js';
 
@@ -38,9 +43,29 @@ export class BoardView {
     this.interactive = true;
     this.pendingPromotion = null;
     this.state = null;
+    // A move chosen on the board but not yet submitted.
+    this.staged = null;
+    // A move submitted and waiting for the chain to catch up.
+    this.pending = null;
+    this.hovered = null;
 
     this.root.classList.add('board');
     this.root.addEventListener('click', (event) => this._onClick(event));
+
+    // Hovering a piece shows where it could go, before committing to selecting
+    // it. On a board where the next click matters, looking should be free.
+    this.root.addEventListener('mouseover', (event) => {
+      const cell = event.target.closest('[data-square]');
+      const square = cell ? cell.dataset.square : null;
+      if (square === this.hovered) return;
+      this.hovered = square;
+      if (!this.selected) this.render(this.state);
+    });
+    this.root.addEventListener('mouseleave', () => {
+      if (this.hovered === null) return;
+      this.hovered = null;
+      if (!this.selected) this.render(this.state);
+    });
   }
 
   setFlipped(flipped) {
@@ -50,6 +75,19 @@ export class BoardView {
 
   setInteractive(interactive) {
     this.interactive = interactive;
+    this.render(this.state);
+  }
+
+  setStaged(uci) {
+    this.staged = uci && uci.length >= 4 ? uci : null;
+    this.selected = null;
+    this.render(this.state);
+  }
+
+  // A move that has been sent but is not in the log yet. Shown ghosted so the
+  // board does not appear frozen during the half minute a block takes.
+  setPending(uci) {
+    this.pending = uci && uci.length >= 4 ? uci : null;
     this.render(this.state);
   }
 
@@ -65,9 +103,11 @@ export class BoardView {
     const promotionButton = event.target.closest('[data-promotion]');
     if (promotionButton) {
       const { from, to } = this.pendingPromotion;
+      const uci = from + to + promotionButton.dataset.promotion;
       this.pendingPromotion = null;
       this.selected = null;
-      this.onMove(from + to + promotionButton.dataset.promotion);
+      this.staged = uci;
+      this.onMove(uci);
       this.render(this.state);
       return;
     }
@@ -98,6 +138,8 @@ export class BoardView {
       if (candidates.length === 1) {
         const uci = candidates[0];
         this.selected = null;
+        this.staged = uci;
+        // Staged, not sent. The caller decides what to do with it.
         this.onMove(uci);
         this.render(this.state);
         return;
@@ -121,9 +163,18 @@ export class BoardView {
     const lastFrom = lastAccepted ? lastAccepted.uci.slice(0, 2) : null;
     const lastTo = lastAccepted ? lastAccepted.uci.slice(2, 4) : null;
 
+    // Selecting wins over hovering, so the board does not flicker while the
+    // pointer crosses other pieces mid-decision.
+    const showFrom = this.selected || (this.interactive ? this.hovered : null);
     const targets = new Set(
-      this.selected ? this._legalFrom(this.selected).map((uci) => uci.slice(2, 4)) : []
+      showFrom ? this._legalFrom(showFrom).map((uci) => uci.slice(2, 4)) : []
     );
+    const previewing = !this.selected && targets.size > 0;
+
+    const stagedFrom = this.staged ? this.staged.slice(0, 2) : null;
+    const stagedTo = this.staged ? this.staged.slice(2, 4) : null;
+    const pendingFrom = this.pending ? this.pending.slice(0, 2) : null;
+    const pendingTo = this.pending ? this.pending.slice(2, 4) : null;
 
     const ranks = this.flipped ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
     const files = this.flipped ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
@@ -142,13 +193,31 @@ export class BoardView {
 
         const classes = ['sq', (rank + file) % 2 === 0 ? 'light' : 'dark'];
         if (square === this.selected) classes.push('selected');
+        if (square === showFrom && previewing) classes.push('preview-from');
         if (square === lastFrom || square === lastTo) classes.push('last');
         if (square === checkSquare) classes.push('check');
-        if (targets.has(square)) classes.push(piece ? 'capture' : 'target');
+        if (square === stagedFrom || square === stagedTo) classes.push('staged');
+        if (square === pendingFrom || square === pendingTo) classes.push('pending');
+        if (targets.has(square)) {
+          classes.push(piece ? 'capture' : 'target');
+          if (previewing) classes.push('preview');
+        }
 
-        const glyph = piece
+        let glyph = piece
           ? `<span class="piece ${pieceColor(piece) === 0 ? 'white' : 'black'}">${GLYPH[pieceType(piece)]}</span>`
           : '';
+
+        // Show where the piece is going, so a staged or in-flight move reads as
+        // a move rather than two unrelated highlighted squares.
+        const ghostFrom = square === stagedTo ? stagedFrom : square === pendingTo ? pendingFrom : null;
+        if (!piece && ghostFrom) {
+          const source = board[parseSquare(ghostFrom)];
+          if (source) {
+            glyph =
+              `<span class="piece ghost ${pieceColor(source) === 0 ? 'white' : 'black'}">` +
+              `${GLYPH[pieceType(source)]}</span>`;
+          }
+        }
 
         const coord =
           file === files[0] ? `<span class="coord rank">${8 - rank}</span>` : '';

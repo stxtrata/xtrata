@@ -139,6 +139,53 @@ export class LiveChain {
     return out;
   }
 
+  /**
+   * Moves that have been broadcast but are not in a block yet.
+   *
+   * A chess board that ignores the mempool makes everybody race: two people see
+   * the same position, both move, and one of them pays for a submission that
+   * will be skipped. Reading it costs nothing and needs no wallet.
+   *
+   * Arguments come back as hex, which the local codec decodes, so the move is
+   * read the same way here as it is when it lands.
+   */
+  async getMempool(game) {
+    const url = `${this.apiUrl}/extended/v1/address/${this.contractId}/mempool?limit=50`;
+    const response = await this.fetch(url);
+    if (!response.ok) return [];
+
+    const body = await response.json();
+    const out = [];
+
+    for (const tx of body.results || []) {
+      const call = tx.contract_call;
+      if (tx.tx_type !== 'contract_call' || !call) continue;
+      if (call.contract_id !== this.contractId) continue;
+      if (call.function_name !== 'submit-move') continue;
+
+      const args = call.function_args || [];
+      if (args.length < 2) continue;
+
+      try {
+        const forGame = Number(deserialize(args[0].hex));
+        if (forGame !== Number(game)) continue;
+        out.push({
+          txid: tx.tx_id,
+          sender: tx.sender_address,
+          mv: String(deserialize(args[1].hex)),
+          receivedAt: tx.receipt_time ? tx.receipt_time * 1000 : null,
+          fee: Number(tx.fee_rate) || null
+        });
+      } catch {
+        // A malformed argument is somebody else's problem; skip it rather than
+        // letting one bad entry hide the rest.
+      }
+    }
+
+    // Oldest first, which is roughly the order they will land in.
+    return out.sort((a, b) => (a.receivedAt || 0) - (b.receivedAt || 0));
+  }
+
   // The board pairs this with a BlockTimes resolver rather than asking the
   // contract for timestamps, because the contract deliberately stores only the
   // height. See src/block-time.js.

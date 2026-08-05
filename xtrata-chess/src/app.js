@@ -12,7 +12,8 @@
 import { MockChain } from './mock-chain.js';
 import { SealedChain } from './sealed-chain.js';
 import { LiveChain, describeContractError } from './live-chain.js';
-import { replay, toPgn } from './replay.js';
+import { replay, toPgn, REJECTED } from './replay.js';
+import { Chess, parseUci, pieceColor } from './engine.js';
 import { BoardView, statusText, shortSender, displaySender } from './board-ui.js';
 import { NameResolver, StaticNames } from './bns.js';
 import {
@@ -65,6 +66,10 @@ export class ChessBoardApp {
     this.childGame = null;
     this.engineId = null;
     this.isChild = false;
+    this.pendingMove = null;
+    this.pendingTimer = null;
+    // Moves broadcast by anyone and not yet in a block.
+    this.mempool = [];
     this.autoplayTimer = null;
     this.pollTimer = null;
     this.busy = false;
@@ -89,7 +94,7 @@ export class ChessBoardApp {
     this.capLongWaits = true;
     this.waiting = null;
 
-    this.board = new BoardView(this.elements.board, (uci) => this.submit(uci));
+    this.board = new BoardView(this.elements.board, (uci) => this.stage(uci));
 
     this._wire();
 
@@ -219,8 +224,14 @@ export class ChessBoardApp {
       event.preventDefault();
       const value = el.manualInput.value.trim();
       if (!value) return;
-      el.manualInput.value = '';
       this.submit(value);
+    });
+    el.manualInput.addEventListener('input', () => this._describeInput());
+    el.clearMove.addEventListener('click', () => {
+      el.manualInput.value = '';
+      this.board.setStaged(null);
+      this._describeInput();
+      this.render();
     });
 
     el.connect.addEventListener('click', () => this.connect());
@@ -395,6 +406,11 @@ export class ChessBoardApp {
       this.rawMoves = moves;
       this.state = replay(moves, { rules: this.gameRules });
       this.stamps = stampLog(moves, this.times);
+
+      // What is in flight matters as much as what has landed: it is the
+      // difference between waiting your turn and paying for a move that will be
+      // skipped because somebody beat you to it.
+      this.mempool = this.chain.getMempool ? await this.chain.getMempool(this.game) : [];
     } catch (error) {
       this._notify(`Read failed: ${error.message}`, 'error');
     } finally {
@@ -522,6 +538,60 @@ export class ChessBoardApp {
     }
   }
 
+  // A broadcast that never confirms must not lock the board permanently, so
+  // anything older than this stops counting as in flight.
+  livePending() {
+    const CUTOFF = 10 * 60 * 1000;
+    const now = Date.now();
+    return this.mempool.filter(
+      (entry) => !entry.receivedAt || now - entry.receivedAt < CUTOFF
+    );
+  }
+
+  // Poll harder than the idle rate while something of ours is in flight, and
+  // stop as soon as it appears in the log.
+  _watchPending() {
+    if (this.pendingTimer) clearInterval(this.pendingTimer);
+    this.pendingTimer = setInterval(async () => {
+      if (!this.pendingMove) return this._stopWatching();
+
+      await this.refresh();
+
+      const landed = this.state.log.some(
+        (entry) => String(entry.uci).toLowerCase() === this.pendingMove.uci.toLowerCase()
+      );
+      const tooOld = Date.now() - this.pendingMove.at > 10 * 60 * 1000;
+
+      if (landed) {
+        const record = this.state.log.find(
+          (entry) => String(entry.uci).toLowerCase() === this.pendingMove.uci.toLowerCase()
+        );
+        this._notify(
+          record.status === 'accepted'
+            ? `${record.san} is on the board.`
+            : `Your submission landed and was skipped: ${record.reason}. The fee was still paid.`,
+          record.status === 'accepted' ? 'info' : 'warn'
+        );
+        this._clearPending();
+      } else if (tooOld) {
+        this._notify('That move has not appeared after ten minutes. Check the transaction in the explorer.', 'warn');
+        this._clearPending();
+      }
+      this.render();
+    }, 8_000);
+  }
+
+  _clearPending() {
+    this.pendingMove = null;
+    this.board.setPending(null);
+    this._stopWatching();
+  }
+
+  _stopWatching() {
+    if (this.pendingTimer) clearInterval(this.pendingTimer);
+    this.pendingTimer = null;
+  }
+
   // Fire and forget. The board is already drawn from replay; names land later
   // and only cause a redraw if any of them actually resolved.
   _resolveNames() {
@@ -569,6 +639,19 @@ export class ChessBoardApp {
       return;
     }
 
+    // Somebody's move is already on its way. Sending now means both land in the
+    // same block, the second is skipped, and its sender paid for nothing.
+    const inFlight = this.livePending();
+    if (this.mode === 'live' && inFlight.length) {
+      const who = inFlight[0].sender === this.walletAddress ? 'Your' : "Somebody else's";
+      this._notify(
+        `${who} move (${inFlight[0].mv}) is waiting for a block. Sending now would almost certainly be skipped, so the board is holding until it confirms.`,
+        'warn'
+      );
+      this.render();
+      return;
+    }
+
     // Mirror the contract's filter locally so the obvious case does not cost a
     // transaction to learn.
     if (!isWellFormedLength(uci)) {
@@ -593,12 +676,19 @@ export class ChessBoardApp {
       this._notify('Confirm the move in your wallet…', 'info');
       this.render();
       const result = await this.chain.submitMove(this.game, uci);
+
+      // A block takes the better part of a minute. Without this the board sits
+      // unchanged after signing and looks like it did nothing.
+      this.pendingMove = { uci, txid: result.txid, at: Date.now() };
+      this.board.setPending(uci);
+      this.elements.manualInput.value = '';
       this._notify(
         result.txid
-          ? `Submitted. It lands when the transaction confirms. tx ${shortSender(result.txid)}`
-          : 'Submitted.',
+          ? `Sent. Waiting for it to confirm — tx ${shortSender(result.txid)}`
+          : 'Sent. Waiting for it to confirm.',
         'info'
       );
+      this._watchPending();
     } catch (error) {
       if (error.code === 'NO_WALLET') {
         this._notify('No Stacks wallet found. Install Leather or Xverse to play live.', 'error');
@@ -784,6 +874,73 @@ export class ChessBoardApp {
   }
 
   // ------------------------------------------------------------------
+  // Choosing a move before sending it
+  // ------------------------------------------------------------------
+
+  // Put a move in the box rather than on the chain. Every submission costs a
+  // fee and opens a wallet, so the board proposes and the person disposes.
+  stage(uci) {
+    this.elements.manualInput.value = uci;
+    this.board.setStaged(uci);
+    this._describeInput();
+    this.render();
+    this.elements.manualInput.focus();
+  }
+
+  // Says what the text in the box would do, as it is typed. Uses the same
+  // engine the chain-side replay uses, so the verdict here and the verdict
+  // after submitting cannot disagree.
+  _describeInput() {
+    const el = this.elements;
+    const raw = el.manualInput.value.trim();
+    const state = this.state;
+
+    if (!raw) {
+      el.moveHint.textContent = 'Click a piece and then its destination, or type a move.';
+      el.moveHint.className = 'hint';
+      el.submitMove.disabled = true;
+      this.board.setStaged(null);
+      return;
+    }
+
+    if (!isWellFormedLength(raw)) {
+      el.moveHint.textContent = `${raw.length} characters. The contract only stores four or five, so this would be refused before it reached the log.`;
+      el.moveHint.className = 'hint bad';
+      el.submitMove.disabled = true;
+      this.board.setStaged(null);
+      return;
+    }
+
+    const uci = raw.toLowerCase();
+    const legal = state.legalMoves.includes(uci);
+
+    if (legal) {
+      // Show the move in the notation people read, not just the one they type.
+      const preview = new Chess(state.fen);
+      const applied = preview.moveUci(uci);
+      el.moveHint.innerHTML =
+        `<strong>${escapeHtml(applied ? applied.san : uci)}</strong> · ` +
+        `${escapeHtml(uci.slice(0, 2))} → ${escapeHtml(uci.slice(2, 4))}` +
+        (uci.length === 5 ? `, promoting to ${escapeHtml(uci[4].toUpperCase())}` : '') +
+        ' · legal, ready to send';
+      el.moveHint.className = 'hint good';
+      el.submitMove.disabled = false;
+      this.board.setStaged(uci);
+      return;
+    }
+
+    // Not legal: say which kind of not-legal, using the same categories the log
+    // will show if it is sent anyway.
+    const reason = state.isGameOver
+      ? 'this game is over'
+      : classifyDraft(state, uci);
+    el.moveHint.textContent = `${uci} · ${reason}. It would be stored and then skipped.`;
+    el.moveHint.className = 'hint bad';
+    el.submitMove.disabled = false;
+    this.board.setStaged(null);
+  }
+
+  // ------------------------------------------------------------------
   // Child boards
   // ------------------------------------------------------------------
 
@@ -906,15 +1063,47 @@ export class ChessBoardApp {
     if (this.mode === 'sim') el.simPanel.hidden = !playable;
     el.replayPanel.hidden = !replayable;
 
+    const inFlight = this.livePending();
+    // Anyone's in-flight move, not just ours. Watching an opponent's move
+    // arrive is half the point of a shared board.
+    this.board.pending = inFlight.length ? inFlight[0].mv : null;
     this.board.setInteractive(playable && !scrubbing);
     this.board.render(view);
 
-    el.status.textContent = scrubbing
-      ? `Replaying — submission ${this.viewIndex} of ${this.rawMoves.length}`
-      : statusText(this.state);
-    el.status.className = `status ${
-      scrubbing ? 'replaying' : this.state.outcome ? 'over' : this.state.inCheck ? 'check' : ''
-    }`;
+    if (scrubbing) {
+      el.status.textContent = `Replaying — submission ${this.viewIndex} of ${this.rawMoves.length}`;
+      el.status.className = 'status replaying';
+    } else if (inFlight.length) {
+      const first = inFlight[0];
+      const mine = first.sender === this.walletAddress;
+      el.status.textContent = `${mine ? 'Your' : 'A'} move ${first.mv} is in the mempool, waiting for a block`;
+      el.status.className = 'status waiting';
+    } else {
+      el.status.textContent = statusText(this.state);
+      el.status.className = `status ${
+        this.state.outcome ? 'over' : this.state.inCheck ? 'check' : ''
+      }`;
+    }
+
+    el.pendingPanel.hidden = inFlight.length === 0;
+    if (inFlight.length) {
+      el.pendingPanel.innerHTML = inFlight
+        .map((entry) => {
+          const who = displaySender(entry.sender, this.names);
+          const age = entry.receivedAt
+            ? ` · ${formatDuration((Date.now() - entry.receivedAt) / 1000)} ago`
+            : '';
+          return (
+            `<div class="inflight">` +
+            `<span class="dotpulse"></span>` +
+            `<code>${escapeHtml(entry.mv)}</code>` +
+            `<span class="who ${who.named ? 'named' : ''}" title="${escapeHtml(who.title)}">${escapeHtml(who.label)}</span>` +
+            `<span class="age">broadcast${escapeHtml(age)}</span>` +
+            `</div>`
+          );
+        })
+        .join('');
+    }
 
     el.fen.textContent = view.fen;
 
@@ -927,6 +1116,14 @@ export class ChessBoardApp {
 
     this._renderReplayControls(view);
     if (!el.rulesPanel.hidden) this.renderRules();
+
+    if (inFlight.length && this.mode === 'live') {
+      el.submitMove.disabled = true;
+      el.submitMove.textContent = 'Waiting for a block';
+    } else if (el.submitMove.textContent === 'Waiting for a block') {
+      el.submitMove.textContent = 'Submit move';
+      this._describeInput();
+    }
 
     el.moves.innerHTML = this._renderMoves(this.state, view);
     el.log.innerHTML = this._renderLog(this.state);
@@ -1062,6 +1259,23 @@ export class ChessBoardApp {
       })
       .join('');
   }
+}
+
+// Mirrors replay's rejection categories for a move that has not been sent yet,
+// so the board's warning and the log's eventual reason use the same words.
+function classifyDraft(state, uci) {
+  const parsed = parseUci(uci);
+  if (!parsed) return 'not a move';
+
+  const piece = state.chess.board[parsed.from];
+  if (!piece) return `there is no piece on ${uci.slice(0, 2)}`;
+  if (pieceColor(piece) !== state.chess.turn) {
+    return `that is ${state.turn === 'white' ? "Black's" : "White's"} piece, and it is ${state.turn} to move`;
+  }
+  if (state.legalMoves.some((m) => m.slice(0, 2) === uci.slice(0, 2))) {
+    return 'that piece cannot go there';
+  }
+  return 'that piece has no legal move';
 }
 
 function escapeHtml(value) {
