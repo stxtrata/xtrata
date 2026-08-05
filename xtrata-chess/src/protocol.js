@@ -8,6 +8,18 @@ export const FORMAT_VERSION = 1;
 
 export const CONTRACT_NAME = 'xtrata-chess-log-v1';
 
+// The deployed board. Baked in so the page opens on the game rather than on a
+// form asking where the game is; the contract address is not a thing a player
+// should have to know or paste. It stays overridable behind a disclosure for
+// testnet, for a future version, or for anyone running their own.
+export const DEFAULT_DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
+export const DEFAULT_NETWORK = 'mainnet';
+export const DEFAULT_CONTRACT = `${DEFAULT_DEPLOYER}.${CONTRACT_NAME}`;
+
+// The open board. Games are numbered from one, and the first is the one people
+// arriving without a link should land on.
+export const DEFAULT_GAME = 1;
+
 // Deliberately far above any real game. The board is unthrottled, so a lower
 // ceiling would let a spammer freeze a legitimate game part-played, and the
 // ceiling protects nothing the per-move fee does not already bound.

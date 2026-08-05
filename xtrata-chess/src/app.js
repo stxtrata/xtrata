@@ -26,7 +26,12 @@ import {
 } from './block-time.js';
 import { BOTS, mulberry32 } from './bots.js';
 import { SimIdentities } from './sim-identities.js';
-import { isWellFormedLength } from './protocol.js';
+import {
+  isWellFormedLength,
+  DEFAULT_CONTRACT,
+  DEFAULT_NETWORK,
+  DEFAULT_GAME
+} from './protocol.js';
 import {
   DEFAULT_RULES,
   describeRules,
@@ -109,7 +114,7 @@ export class ChessBoardApp {
     if (sealed) this.startSealed(sealed);
     else if (child) this.startChild(child);
     else if (board) this.startConfiguredBoard(board);
-    else this.startSimulation();
+    else this.startConfiguredBoard({ contract: DEFAULT_CONTRACT, network: DEFAULT_NETWORK });
   }
 
   async startConfiguredBoard(board) {
@@ -299,8 +304,19 @@ export class ChessBoardApp {
     this.elements.simPanel.hidden = mode !== 'sim';
     this.elements.livePanel.hidden = mode !== 'live';
 
-    if (mode === 'sim') this.startSimulation();
-    else this.startLive();
+    if (mode === 'sim') {
+      this.startSimulation();
+      return;
+    }
+    // Coming back to live: fall back to the built-in board if the fields are
+    // empty, so the toggle never lands on a blank form.
+    if (!this.elements.contractAddress.value.trim()) {
+      const [address, name] = DEFAULT_CONTRACT.split('.');
+      this.elements.contractAddress.value = address;
+      this.elements.contractName.value = name;
+      this.elements.network.value = DEFAULT_NETWORK;
+    }
+    this.startLive();
   }
 
   startSimulation() {
@@ -354,7 +370,7 @@ export class ChessBoardApp {
       }
 
       this._fillGameSelect(count);
-      this.game = Number(el.gameSelect.value) || count;
+      this.game = Number(el.gameSelect.value) || DEFAULT_GAME;
       this.notice = null;
       await this.refresh();
       this._startPolling();
@@ -374,7 +390,9 @@ export class ChessBoardApp {
       option.textContent = `game #${id}`;
       el.appendChild(option);
     }
-    el.value = String(previous >= 1 && previous <= count ? previous : count);
+    // Game 1 unless the viewer has already chosen another. The newest game is
+    // not the interesting one by default; the open board is.
+    el.value = String(previous >= 1 && previous <= count ? previous : Math.min(DEFAULT_GAME, count));
   }
 
   _startPolling() {

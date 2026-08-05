@@ -343,6 +343,41 @@
       .empty { color: var(--dim); font-size: 13px; margin: 0; }
 
       .hint { color: var(--dim); font-size: 12px; margin: 8px 0 0; }
+
+      /* Collapsible sections. Everything a player needs is open; everything
+         they need once is folded away. */
+      details.fold-panel { padding: 0; }
+      details.fold-panel > summary {
+        list-style: none;
+        cursor: pointer;
+        padding: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      details.fold-panel > summary::-webkit-details-marker { display: none; }
+      details.fold-panel > summary::before {
+        content: '▸';
+        color: var(--dim);
+        font-size: 11px;
+        transition: transform 0.15s;
+      }
+      details.fold-panel[open] > summary::before { transform: rotate(90deg); }
+      details.fold-panel > summary h2 { margin: 0; }
+      details.fold-panel > summary:hover h2 { color: var(--ink); }
+      details.fold-panel > *:not(summary) { padding: 0 14px; }
+      details.fold-panel > *:last-child { padding-bottom: 14px; }
+
+      details.fold { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+      details.fold > summary {
+        cursor: pointer;
+        color: var(--dim);
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      details.fold > summary:hover { color: var(--ink); }
+      details.fold[open] > summary { margin-bottom: 10px; }
       .hint.good { color: var(--ok); }
       .hint.good strong { color: var(--ok); font-family: var(--mono); }
       .hint.bad { color: var(--no); }
@@ -452,53 +487,70 @@
           </p>
         </div>
 
-        <div class="panel" id="live-panel" hidden>
-          <h2>Live</h2>
+        <div class="panel" id="live-panel">
+          <h2>Game</h2>
           <div class="row">
-            <label class="field">
-              <span>Contract address</span>
-              <input id="contract-address" type="text" placeholder="SP…" autocomplete="off" spellcheck="false" />
-            </label>
-          </div>
-          <div class="row">
-            <label class="field">
-              <span>Contract name</span>
-              <input id="contract-name" type="text" value="xtrata-chess-log-v1" autocomplete="off" spellcheck="false" />
-            </label>
-            <label class="field">
-              <span>Network</span>
-              <select id="network">
-                <option value="mainnet">mainnet</option>
-                <option value="testnet">testnet</option>
-              </select>
-            </label>
-          </div>
-          <div class="row">
-            <label class="field">
-              <span>Game</span>
+            <label class="field" style="flex: 1 1 140px">
+              <span>Playing</span>
               <select id="game-select"></select>
             </label>
-          </div>
-          <div class="row">
-            <label class="field" style="flex: 0 1 150px">
+            <label class="field" style="flex: 0 1 130px">
               <span>Fee per move (µSTX)</span>
               <input id="fee" type="number" min="1" step="1000" value="10000" />
             </label>
           </div>
           <div class="row">
-            <button id="load-live">Load board</button>
             <button id="connect" class="go">Connect wallet</button>
             <button id="disconnect" hidden>Disconnect</button>
+            <button id="load-live">Refresh</button>
           </div>
           <p class="hint" id="wallet-hint">
             Reading is free and needs no wallet. Only submitting a move does.
-            10,000 µSTX is 0.01 STX, which has confirmed on mainnet for this contract; wallets left to
-            themselves suggest roughly fifty times that.
           </p>
+
+          <details class="fold">
+            <summary>Contract</summary>
+            <div class="row">
+              <label class="field">
+                <span>Address</span>
+                <input id="contract-address" type="text" autocomplete="off" spellcheck="false" />
+              </label>
+            </div>
+            <div class="row">
+              <label class="field">
+                <span>Name</span>
+                <input id="contract-name" type="text" autocomplete="off" spellcheck="false" />
+              </label>
+              <label class="field" style="flex: 0 1 130px">
+                <span>Network</span>
+                <select id="network">
+                  <option value="mainnet">mainnet</option>
+                  <option value="testnet">testnet</option>
+                </select>
+              </label>
+            </div>
+            <p class="hint">
+              The board it came with. Change these only to watch a different deployment.
+            </p>
+          </details>
         </div>
 
-        <div class="panel" id="rules-panel">
-          <h2>Start a game with your own rules</h2>
+        <div class="panel">
+          <h2>Moves played</h2>
+          <div class="scroll" id="moves"></div>
+        </div>
+
+        <details class="panel fold-panel">
+          <summary><h2>Every submission</h2></summary>
+          <div class="scroll" id="log"></div>
+          <p class="hint">
+            Skipped entries stay on the record. They are what the open board attracted, and they cost their
+            senders a fee to change nothing.
+          </p>
+        </details>
+
+        <details class="panel fold-panel" id="rules-panel">
+          <summary><h2>Start a game with your own rules</h2></summary>
           <div class="row">
             <label class="field">
               <span>White</span>
@@ -530,21 +582,8 @@
             board you download is the referee: it replays the log and skips anything these rules disallow.
             Open the game first, then download the board bound to it.
           </p>
-        </div>
+        </details>
 
-        <div class="panel">
-          <h2>Moves played</h2>
-          <div class="scroll" id="moves"></div>
-        </div>
-
-        <div class="panel">
-          <h2>Every submission</h2>
-          <div class="scroll" id="log"></div>
-          <p class="hint">
-            Skipped entries stay on the record. They are what the open board attracted, and they cost their
-            senders a fee to change nothing.
-          </p>
-        </div>
       </section>
     </main>
 
