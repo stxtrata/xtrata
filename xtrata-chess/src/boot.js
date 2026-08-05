@@ -23,7 +23,7 @@ const IDS = [
   'junk', 'autoplay', 'replay-panel', 'replay-caption', 'play-pause',
   'to-start', 'to-end', 'step-back', 'step-forward', 'seek', 'pace',
   'cap-waits', 'contract-address', 'contract-name', 'network', 'game-select',
-  'load-live', 'connect', 'rules-panel', 'rules-white', 'rules-black',
+  'load-live', 'connect', 'disconnect', 'fee', 'wallet-hint', 'rules-panel', 'rules-white', 'rules-black',
   'rules-cooldown', 'rules-no-consecutive', 'rules-hash', 'rules-summary',
   'rules-open', 'rules-download', 'rules-reset', 'rules-note'
 ];

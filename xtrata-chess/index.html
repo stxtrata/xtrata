@@ -445,10 +445,21 @@
             </label>
           </div>
           <div class="row">
-            <button id="load-live">Load board</button>
-            <button id="connect">Connect wallet</button>
+            <label class="field" style="flex: 0 1 150px">
+              <span>Fee per move (µSTX)</span>
+              <input id="fee" type="number" min="1" step="1000" value="10000" />
+            </label>
           </div>
-          <p class="hint">Reading is free and needs no wallet. Only submitting a move does.</p>
+          <div class="row">
+            <button id="load-live">Load board</button>
+            <button id="connect" class="go">Connect wallet</button>
+            <button id="disconnect" hidden>Disconnect</button>
+          </div>
+          <p class="hint" id="wallet-hint">
+            Reading is free and needs no wallet. Only submitting a move does.
+            10,000 µSTX is 0.01 STX, which has confirmed on mainnet for this contract; wallets left to
+            themselves suggest roughly fifty times that.
+          </p>
         </div>
 
         <div class="panel" id="rules-panel">

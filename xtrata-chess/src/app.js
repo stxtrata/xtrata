@@ -224,6 +224,10 @@ export class ChessBoardApp {
     });
 
     el.connect.addEventListener('click', () => this.connect());
+    el.disconnect.addEventListener('click', () => this.disconnectWallet());
+    el.fee.addEventListener('change', () => {
+      if (this.chain?.fee !== undefined) this.chain.fee = Number(el.fee.value) || this.chain.fee;
+    });
     el.loadLive.addEventListener('click', () => this.startLive());
     el.gameSelect.addEventListener('change', () => {
       this.game = Number(el.gameSelect.value);
@@ -319,7 +323,8 @@ export class ChessBoardApp {
       this.chain = new LiveChain({
         contractAddress,
         contractName: el.contractName.value.trim() || undefined,
-        network: el.network.value
+        network: el.network.value,
+        fee: Number(el.fee.value) || undefined
       });
 
       // Names are only meaningful against a real chain, and the resolver is
@@ -645,12 +650,43 @@ export class ChessBoardApp {
     this.render();
   }
 
+  disconnectWallet() {
+    this.walletAddress = null;
+    try {
+      delete globalThis.XtrataWalletSession;
+    } catch {
+      // Sandboxed pages can refuse window writes.
+    }
+    this._renderWallet();
+    this._notify('Disconnected. Connect again to sign as a different wallet.', 'info');
+    this.render();
+  }
+
+  // Keeps the button and the hint agreeing with whether a wallet is attached.
+  _renderWallet() {
+    const el = this.elements;
+    if (this.walletAddress) {
+      el.connect.className = 'connected';
+      el.connect.textContent = `Connected · ${shortSender(this.walletAddress)}`;
+      el.connect.title = this.walletAddress;
+      el.disconnect.hidden = false;
+    } else {
+      el.connect.className = 'go';
+      el.connect.textContent = 'Connect wallet';
+      el.connect.title = '';
+      el.disconnect.hidden = true;
+    }
+  }
+
   async connect() {
     try {
       const session = await connectWallet({
+        // A board is not a canary: reusing a session the host already has is
+        // the right thing here, and saves a prompt on every page load.
         onLog: (level, message) => this._notify(message, level === 'ok' ? 'info' : level)
       });
       this.walletAddress = session.address;
+      this._renderWallet();
       this._notify(
         `Connected ${shortSender(session.address)}${session.via === 'host-session' ? ' (session from the host)' : ''}`,
         'info'

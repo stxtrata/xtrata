@@ -85,6 +85,33 @@ async function loadModule(id, seen) {
   seen.set(id, `__modules[${JSON.stringify(id)}] = function (__exports, __require) {\n${body}${assignment}};`);
 }
 
+// Inlining JavaScript into an HTML <script> block has one hard rule: the text
+// "</script>" must never appear in it, because the HTML parser closes the tag on
+// sight without caring that it is inside a string. src/child.js generates child
+// pages and therefore contains that text verbatim, which silently truncated
+// every self-contained build at that point and turned the remainder into markup.
+//
+// Inside a JavaScript string, <\/script> is identical to </script>, so escaping
+// costs nothing and the parser stops noticing.
+// A self-contained page has exactly one script and loads nothing. If a stray
+// </script> ever slips through again, the build stops rather than shipping a
+// page that looks fine and does nothing.
+function assertSingleScript(html, label) {
+  // Only the closing tag ends a script block, so that is what to count. An
+  // opening "<script" inside a JavaScript string is inert; a closing one is not.
+  const closers = (html.match(/<\/script/gi) || []).length;
+  if (closers !== 1) {
+    throw new Error(
+      `${label}: expected exactly one unescaped </script>, found ${closers}. ` +
+        'One inside the bundled source will have truncated the page there.'
+    );
+  }
+}
+
+function escapeForInlineScript(code) {
+  return code.replace(/<\/(script)/gi, '<\\/$1');
+}
+
 async function bundleFrom(entry) {
   const seen = new Map();
   await loadModule(entry, seen);
@@ -220,6 +247,7 @@ async function buildCanary() {
   ].join('\n');
 
   const output = html.replace(entryScript, script);
+  assertSingleScript(output, 'launch canary');
 
   await mkdir(OUT_DIR, { recursive: true });
   const outPath = resolve(OUT_DIR, 'xtrata-chess-launch-canary.html');
@@ -281,6 +309,17 @@ async function main() {
   let sealedBlock = '';
   let name = 'xtrata-chess-board';
 
+  const contractIndex = args.indexOf('--contract');
+  if (contractIndex >= 0) {
+    const networkIndex = args.indexOf('--network');
+    const boardConfig = {
+      contract: args[contractIndex + 1],
+      network: networkIndex >= 0 ? args[networkIndex + 1] : 'mainnet'
+    };
+    sealedBlock += `window.__XTRATA_CHESS_BOARD__ = ${JSON.stringify(boardConfig)};\n`;
+    name = 'xtrata-chess-play';
+  }
+
   if (sealPath) {
     const sealed = JSON.parse(await readFile(resolve(process.cwd(), sealPath), 'utf8'));
     sealedBlock = `window.__XTRATA_CHESS_SEALED__ = ${JSON.stringify(sealed)};\n`;
@@ -291,7 +330,7 @@ async function main() {
     '<script>',
     '(function () {',
     sealedBlock,
-    modules,
+    escapeForInlineScript(modules),
     'const __boot = __require("./boot.js");',
     '__boot.boot();',
     '})();',
@@ -299,6 +338,7 @@ async function main() {
   ].join('\n');
 
   const output = html.replace(entryScript, script);
+  assertSingleScript(output, name);
 
   await mkdir(OUT_DIR, { recursive: true });
   const outPath = resolve(OUT_DIR, `${name}.html`);

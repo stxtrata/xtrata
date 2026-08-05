@@ -30,6 +30,18 @@ export const DEFAULT_API = {
 // Any principal works as the read-only caller; nothing here reads tx-sender.
 const READ_SENDER = 'SP000000000000000000002Q6VF78';
 
+// Fee for a move, in microSTX.
+//
+// Wallets left to themselves suggest around 0.5 STX for a contract call, which
+// is roughly fifty times what this one is worth: submit-move uses 9,150 runtime
+// units of a 5,000,000,000 block budget and writes a few hundred bytes. Paying
+// a wallet's default here would make the fee the dominant cost of playing chess
+// and would price the open board out of being casual.
+//
+// 0.01 STX has confirmed on mainnet for this contract. It is passed explicitly
+// so the wallet shows it rather than guessing.
+export const DEFAULT_FEE_USTX = 10_000;
+
 export class LiveChain {
   constructor(options = {}) {
     this.contractAddress = options.contractAddress;
@@ -37,6 +49,7 @@ export class LiveChain {
     this.network = options.network || 'mainnet';
     this.apiUrl = options.apiUrl || DEFAULT_API[this.network];
     this.fetch = options.fetch || globalThis.fetch?.bind(globalThis);
+    this.fee = Number.isFinite(Number(options.fee)) ? Number(options.fee) : DEFAULT_FEE_USTX;
 
     if (!this.contractAddress) throw new Error('contractAddress is required');
   }
@@ -154,7 +167,10 @@ export class LiveChain {
       // correct and the strictest thing we can ask for.
       postConditionMode: 'deny',
       postConditions: [],
-      network: this.network
+      network: this.network,
+      // Both spellings: wallets have read one or the other over time.
+      fee: String(this.fee),
+      feeRate: String(this.fee)
     };
 
     const { result, entry } = await walletCall('stx_callContract', params);

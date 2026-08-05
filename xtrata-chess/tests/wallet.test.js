@@ -432,3 +432,43 @@ describe('telling a cancel from a refusal', () => {
     expect(userCancelled(cannot)).toBe(false);
   });
 });
+
+describe('what a move costs', () => {
+  // Wallets left to themselves suggested ~0.5 STX for a call that uses 9,150 of
+  // a 5,000,000,000 runtime budget. Paying that would make the fee the dominant
+  // cost of playing and price the open board out of being casual.
+  it('states a fee rather than letting the wallet guess', async () => {
+    const { LiveChain, DEFAULT_FEE_USTX } = await import('../src/live-chain.js');
+    const request = vi.fn(async () => ({ txid: '0xabc' }));
+    setGlobals({ LeatherProvider: { request } });
+
+    const chain = new LiveChain({ contractAddress: ALICE });
+    await chain.submitMove(1, 'e2e4');
+
+    const [, params] = request.mock.calls[0];
+    expect(params.fee).toBe(String(DEFAULT_FEE_USTX));
+    expect(DEFAULT_FEE_USTX).toBe(10_000);
+  });
+
+  it('takes an override, so a busy chain can be paid more', async () => {
+    const { LiveChain } = await import('../src/live-chain.js');
+    const request = vi.fn(async () => ({ txid: '0xabc' }));
+    setGlobals({ LeatherProvider: { request } });
+
+    const chain = new LiveChain({ contractAddress: ALICE, fee: 50_000 });
+    await chain.submitMove(1, 'e2e4');
+
+    expect(request.mock.calls[0][1].fee).toBe('50000');
+  });
+
+  it('still denies post conditions, since a move moves nothing', async () => {
+    const { LiveChain } = await import('../src/live-chain.js');
+    const request = vi.fn(async () => ({ txid: '0xabc' }));
+    setGlobals({ LeatherProvider: { request } });
+
+    await new LiveChain({ contractAddress: ALICE }).openGame();
+    const [, params] = request.mock.calls[0];
+    expect(params.postConditionMode).toBe('deny');
+    expect(params.postConditions).toEqual([]);
+  });
+});

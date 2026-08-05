@@ -63,6 +63,13 @@ const API = {
 
 const FIRST_MOVE = 'e2e4';
 
+// Contract calls here are tiny. Left to itself a wallet suggests around 0.5 STX,
+// which is roughly fifty times what this work is worth. 0.01 STX has confirmed
+// on mainnet for this contract, so it is stated explicitly rather than guessed.
+// The deploy is left alone: its cost scales with 8KB of source and it happens
+// once, so the wallet's own estimate is the safer default there.
+const CALL_FEE_USTX = 10_000;
+
 // ---------------------------------------------------------------------------
 // Providers
 // ---------------------------------------------------------------------------
@@ -279,6 +286,7 @@ export class LaunchCanary {
   }
 
   _resetFrom(step) {
+    if (step <= 2) this.alreadyDeployed = false;
     for (let i = step; i <= 4; i++) this.mark(i, 'waiting', 'not started');
     if (step <= 2) this.deployTxid = null;
     if (step <= 3) this.openTxid = null;
@@ -448,16 +456,43 @@ export class LaunchCanary {
       allGood = false;
     }
 
-    // The name must be free: contract names can never be reused.
+    // A spent name is not automatically a problem. If it is spent by *this*
+    // deployer with *these* bytes, the contract is simply already there, and the
+    // right move is to skip the deploy rather than refuse to continue. The
+    // launch canary was written assuming nothing existed yet, which made it
+    // useless the moment it succeeded.
     try {
       const response = await fetch(
         `${this.api}/v2/contracts/interface/${this.address}/${CONTRACT_NAME}`
       );
-      if (response.ok) {
-        this.log('err', `${this.address}.${CONTRACT_NAME} already exists — the name is spent`);
-        allGood = false;
-      } else {
+
+      if (!response.ok) {
         this.log('ok', `${CONTRACT_NAME} is free on ${this.address}`);
+      } else {
+        const source = await (
+          await fetch(`${this.api}/v2/contracts/source/${this.address}/${CONTRACT_NAME}`)
+        ).json();
+        const onChain = bytesToHex(sha256(new TextEncoder().encode(source.source)));
+
+        if (onChain === this.sourceHash) {
+          this.log('ok', 'already deployed, and the on-chain source matches byte for byte', {
+            contract: `${this.address}.${CONTRACT_NAME}`,
+            publishedAt: source.publish_height,
+            sha256: onChain
+          });
+          this.alreadyDeployed = true;
+          this.el.contractId.textContent = `${this.address}.${CONTRACT_NAME}`;
+          this.mark(2, 'ok', 'already deployed');
+        } else {
+          // The dangerous case: a contract of this name exists but is not this
+          // code. Nothing downstream can be trusted, and the name cannot be
+          // reused, so this is a full stop.
+          this.log('err', 'A DIFFERENT CONTRACT ALREADY HOLDS THIS NAME', {
+            expected: this.sourceHash,
+            onChain
+          });
+          allGood = false;
+        }
       }
     } catch (error) {
       this.log('warn', `could not check the name: ${error.message}`);
@@ -484,6 +519,10 @@ export class LaunchCanary {
     }
 
     this.mark(1, allGood ? 'ok' : 'failed', allGood ? 'ready' : 'see log');
+    if (allGood && this.alreadyDeployed) {
+      this.mark(2, 'ok', 'already deployed');
+      this.log('info', 'nothing to deploy — carry on at step 3');
+    }
   }
 
   // ---- 2 · deploy ---------------------------------------------------
@@ -589,10 +628,12 @@ export class LaunchCanary {
       arguments: [serializeNone()],
       postConditionMode: 'deny',
       postConditions: [],
-      network: this.network
+      network: this.network,
+      fee: String(CALL_FEE_USTX),
+      feeRate: String(CALL_FEE_USTX)
     };
 
-    this.log('info', 'stx_callContract open-game(none)', params);
+    this.log('info', `stx_callContract open-game(none), fee ${CALL_FEE_USTX} \u00b5STX`, params);
 
     try {
       const { result } = await walletCall('stx_callContract', params, {
@@ -660,10 +701,12 @@ export class LaunchCanary {
       arguments: args,
       postConditionMode: 'deny',
       postConditions: [],
-      network: this.network
+      network: this.network,
+      fee: String(CALL_FEE_USTX),
+      feeRate: String(CALL_FEE_USTX)
     };
 
-    this.log('info', `stx_callContract submit-move(u1, "${FIRST_MOVE}")`, params);
+    this.log('info', `stx_callContract submit-move(u1, "${FIRST_MOVE}"), fee ${CALL_FEE_USTX} \u00b5STX`, params);
 
     try {
       const { result } = await walletCall('stx_callContract', params, {
