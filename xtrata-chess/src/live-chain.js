@@ -19,6 +19,7 @@ import {
   serializeStringAscii,
   serializeUint
 } from './clarity.js';
+import { resolveProvider, waitForProvider, walletRequest } from './wallet.js';
 import { CONTRACT_NAME, ERR, PAGE_SIZE } from './protocol.js';
 
 export const DEFAULT_API = {
@@ -36,7 +37,6 @@ export class LiveChain {
     this.network = options.network || 'mainnet';
     this.apiUrl = options.apiUrl || DEFAULT_API[this.network];
     this.fetch = options.fetch || globalThis.fetch?.bind(globalThis);
-    this.getProvider = options.getProvider || defaultProvider;
 
     if (!this.contractAddress) throw new Error('contractAddress is required');
   }
@@ -136,8 +136,11 @@ export class LiveChain {
   // ---- writes --------------------------------------------------------
 
   async _call(functionName, args) {
-    const provider = await this.getProvider();
-    if (!provider) {
+    // Resolved per call, never cached. Under the Xtrata runtime the wallet shim
+    // installs itself after the page has already loaded, so a provider captured
+    // at startup would be a provider that did not exist yet.
+    const entry = (await waitForProvider()) || resolveProvider();
+    if (!entry) {
       const error = new Error('no Stacks wallet found in this browser');
       error.code = 'NO_WALLET';
       throw error;
@@ -157,12 +160,11 @@ export class LiveChain {
       network: this.network
     };
 
-    const result = await provider.request('stx_callContract', params);
-    const txid = result?.txid || result?.result?.txid || result?.txId;
-    return { ok: true, txid, raw: result };
+    const result = await walletRequest(entry, 'stx_callContract', params);
+    const txid = result?.txid || result?.result?.txid || result?.txId || result?.result?.txId;
+    return { ok: true, txid, raw: result, provider: entry.label };
   }
 
-  // rulesHash is hex, or null for the open board that anyone may play.
   async openGame(rulesHash = null) {
     const argument = rulesHash
       ? serializeSome(serializeBuffer(rulesHash))
@@ -173,20 +175,6 @@ export class LiveChain {
   async submitMove(game, mv) {
     return this._call('submit-move', [serializeUint(game), serializeStringAscii(mv)]);
   }
-}
-
-// Wallets inject themselves under a handful of globals. Prefer the explicit
-// Stacks-specific ones, since window.btc is also claimed by wallets that do not
-// speak stx_callContract.
-export function defaultProvider() {
-  if (typeof window === 'undefined') return null;
-  return (
-    window.LeatherProvider ||
-    window.XverseProviders?.StacksProvider ||
-    window.StacksProvider ||
-    window.btc ||
-    null
-  );
 }
 
 export function describeContractError(code) {

@@ -35,6 +35,7 @@ import {
   rulesMatchCommitment
 } from './rules.js';
 import { childPage, engineIdFromLocation } from './child.js';
+import { connectWallet } from './wallet.js';
 
 const REASON_LABEL = {
   malformed: 'not a move',
@@ -646,24 +647,21 @@ export class ChessBoardApp {
 
   async connect() {
     try {
-      const provider =
-        typeof window !== 'undefined'
-          ? window.LeatherProvider ||
-            window.XverseProviders?.StacksProvider ||
-            window.StacksProvider ||
-            window.btc
-          : null;
-      if (!provider) {
-        this._notify('No Stacks wallet found. Install Leather or Xverse.', 'error');
-        this.render();
-        return;
-      }
-      const result = await provider.request('getAddresses');
-      const addresses = result?.result?.addresses || result?.addresses || [];
-      const stx = addresses.find((entry) => entry.symbol === 'STX' || entry.address?.startsWith('S'));
-      this._notify(stx ? `Connected ${shortSender(stx.address)}` : 'Wallet connected.', 'info');
+      const session = await connectWallet({
+        onLog: (level, message) => this._notify(message, level === 'ok' ? 'info' : level)
+      });
+      this.walletAddress = session.address;
+      this._notify(
+        `Connected ${shortSender(session.address)}${session.via === 'host-session' ? ' (session from the host)' : ''}`,
+        'info'
+      );
     } catch (error) {
-      this._notify(`Connect failed: ${error.message}`, 'error');
+      this._notify(
+        error.code === 'NO_WALLET'
+          ? 'No Stacks wallet found. Install Leather or Xverse, or open this board inside a wallet browser.'
+          : `Connect failed: ${error.message}`,
+        'error'
+      );
     }
     this.render();
   }

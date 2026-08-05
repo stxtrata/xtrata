@@ -24,6 +24,18 @@ import {
 } from './clarity.js';
 import { CONTRACT_NAME } from './protocol.js';
 import { replay } from './replay.js';
+import {
+  collectProviders,
+  connectWallet,
+  isFramed,
+  shimInstalled,
+  usingHostBridge,
+  walletRequest,
+  extractAddress
+} from './wallet.js';
+
+// Re-exported so the canary's own tests pin the behaviour it actually uses.
+export const harvestAddress = extractAddress;
 
 const API = {
   mainnet: 'https://api.mainnet.hiro.so',
@@ -35,61 +47,6 @@ const FIRST_MOVE = 'e2e4';
 // ---------------------------------------------------------------------------
 // Providers
 // ---------------------------------------------------------------------------
-
-function providers() {
-  const w = globalThis;
-  const found = [];
-  const add = (id, obj) => {
-    if (obj && typeof obj.request === 'function') found.push({ id, obj });
-  };
-  add('LeatherProvider', w.LeatherProvider);
-  add('XverseProviders.StacksProvider', w.XverseProviders?.StacksProvider);
-  add('StacksProvider', w.StacksProvider);
-  add('XverseProviders.BitcoinProvider', w.XverseProviders?.BitcoinProvider);
-  add('btc', w.btc);
-  return found;
-}
-
-// Always the two-argument form. Arity-sniffing to pick a call style is what
-// broke Leather here before, and a wallet that rejects a request outright is far
-// easier to diagnose than one that never settles the promise.
-async function request(provider, method, params) {
-  const response = await provider.obj.request(method, params);
-  if (response && typeof response === 'object') {
-    if (response.error) {
-      const error = new Error(JSON.stringify(response.error));
-      error.code = response.error.code;
-      throw error;
-    }
-    if (response.status === 'error') throw new Error(JSON.stringify(response.result || response));
-  }
-  return response;
-}
-
-// Wallets nest the address differently and change where over time, so dig for
-// something that looks like one rather than trusting a fixed path.
-export function harvestAddress(payload, depth = 0) {
-  if (depth > 7 || payload == null) return null;
-  if (typeof payload === 'string') {
-    const t = payload.trim();
-    return /^S[PMT][0-9A-Z]{28,}$/i.test(t) ? t.toUpperCase() : null;
-  }
-  if (Array.isArray(payload)) {
-    for (const item of payload) {
-      const hit = harvestAddress(item, depth + 1);
-      if (hit) return hit;
-    }
-    return null;
-  }
-  if (typeof payload !== 'object') return null;
-  for (const key of ['address', 'stxAddress', 'selectedAddress', 'addresses', 'accounts', 'result', 'mainnet', 'stx']) {
-    if (key in payload) {
-      const hit = harvestAddress(payload[key], depth + 1);
-      if (hit) return hit;
-    }
-  }
-  return null;
-}
 
 // ---------------------------------------------------------------------------
 // Chain reads (no wallet needed)
@@ -259,65 +216,66 @@ export class LaunchCanary {
   // ---- 0 · wallet ---------------------------------------------------
 
   detect() {
-    const found = providers();
+    const found = collectProviders();
     this.el.providers.innerHTML = '';
 
     // Opening the file directly is the usual reason a wallet appears to be
     // missing. Extensions do not inject into file:// pages unless the user has
-    // gone out of their way to allow it, so say so before anyone concludes
-    // their wallet is broken.
+    // gone out of their way to allow it.
     if (globalThis.location?.protocol === 'file:') {
       this.el.fileWarning.hidden = false;
-      if (!found.length) {
-        this.log(
-          'err',
-          'opened from file:// — wallets almost never inject here. Serve it over http://localhost instead.'
-        );
-        this.el.providers.textContent = 'none — see the note above';
-        return;
-      }
     }
 
+    this.log('info', 'environment', {
+      framed: isFramed(),
+      xtrataShim: shimInstalled(),
+      hostBridge: usingHostBridge()
+    });
+
     if (!found.length) {
-      this.log('err', 'no Stacks wallet found in this page');
-      this.el.providers.textContent = 'none — install Leather or Xverse, unlock it, then Re-detect';
+      const inSandbox = isFramed();
+      this.log(
+        'err',
+        inSandbox
+          ? 'no wallet in this frame yet — under the Xtrata runtime the shim installs a moment after load, so try Re-detect'
+          : 'no Stacks wallet found in this page'
+      );
+      this.el.providers.textContent = 'none — install a wallet, unlock it, then Re-detect';
       return;
     }
 
-    for (const p of found) {
+    for (const entry of found) {
       const option = document.createElement('option');
-      option.value = p.id;
-      option.textContent = p.id;
+      option.value = entry.label;
+      option.textContent = entry.label;
       this.el.providers.appendChild(option);
     }
     this.provider = found[0];
-    this.log('ok', `found ${found.length} provider(s)`, found.map((p) => p.id));
+    this.log('ok', `found ${found.length} provider(s), best first`, found.map((p) => p.label));
   }
 
   async connect() {
-    const found = providers();
-    this.provider = found.find((p) => p.id === this.el.providers.value) || found[0];
-    if (!this.provider) return this.log('err', 'no provider to connect to');
+    try {
+      const session = await connectWallet({
+        preferredLabel: this.el.providers.value,
+        onLog: (level, message, detail) => this.log(level, message, detail)
+      });
+      this.address = session.address;
+      this.provider = session.provider || this.provider;
+      this.el.address.textContent = session.address;
 
-    // getAddresses first: it is the one both wallets answer without a prompt
-    // storm. The others are fallbacks.
-    for (const method of ['getAddresses', 'stx_getAddresses', 'wallet_connect', 'stx_getAccounts']) {
-      try {
-        const result = await request(this.provider, method, {});
-        const address = harvestAddress(result);
-        if (address) {
-          this.address = address;
-          this.el.address.textContent = address;
-          this.log('ok', `connected via ${method}`, address);
-          this._gate();
-          return;
-        }
-        this.log('warn', `${method} answered but no address in the reply`, result);
-      } catch (error) {
-        this.log('warn', `${method} failed: ${error.message}`);
+      // A testnet address with mainnet selected is the mistake that costs a
+      // contract name, so say it loudly rather than letting the deploy fail.
+      if (session.network !== this.network) {
+        this.log(
+          'warn',
+          `wallet is on ${session.network} but this page is set to ${this.network} — change one of them before deploying`
+        );
       }
+      this._gate();
+    } catch (error) {
+      this.log('err', `connect failed: ${error.message}`);
     }
-    this.log('err', 'could not get an address from the wallet');
   }
 
   // ---- 1 · preflight (no wallet, nothing sent) -----------------------
@@ -396,7 +354,7 @@ export class LaunchCanary {
     });
 
     try {
-      const result = await request(this.provider, 'stx_deployContract', params);
+      const result = await walletRequest(this.provider, 'stx_deployContract', params);
       const txid = txidFrom(result);
       if (!txid) {
         this.log('warn', 'wallet returned no txid', result);
@@ -468,7 +426,7 @@ export class LaunchCanary {
     this.log('info', 'stx_callContract open-game(none)', params);
 
     try {
-      const result = await request(this.provider, 'stx_callContract', params);
+      const result = await walletRequest(this.provider, 'stx_callContract', params);
       const txid = txidFrom(result);
       if (!txid) {
         this.log('warn', 'wallet returned no txid', result);
@@ -532,7 +490,7 @@ export class LaunchCanary {
     this.log('info', `stx_callContract submit-move(u1, "${FIRST_MOVE}")`, params);
 
     try {
-      const result = await request(this.provider, 'stx_callContract', params);
+      const result = await walletRequest(this.provider, 'stx_callContract', params);
       const txid = txidFrom(result);
       if (!txid) {
         this.log('warn', 'wallet returned no txid', result);
