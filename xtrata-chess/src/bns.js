@@ -135,6 +135,33 @@ export class NameResolver {
     return names.length ? String(names[0]).toLowerCase() : null;
   }
 
+  /**
+   * The address a name currently points at.
+   *
+   * The other direction from everything else here, and used for one thing:
+   * turning a name someone typed into the principal that gets hashed into a
+   * game's rules. It has to happen before the game is opened, because replay
+   * compares principals and a sealed board has no network to ask.
+   *
+   * Returns null rather than throwing. A name that cannot be resolved must stop
+   * a game being opened, and "we could not tell" and "it does not exist" both
+   * mean the same thing at that moment.
+   */
+  async lookupName(name) {
+    const wanted = String(name || '').trim().toLowerCase();
+    if (!wanted) return null;
+
+    try {
+      const response = await this.fetch(`${this.apiUrl}/v1/names/${encodeURIComponent(wanted)}`);
+      if (!response.ok) return null;
+      const body = await response.json();
+      const address = body?.address;
+      return looksLikePrincipal(address) ? String(address) : null;
+    } catch {
+      return null;
+    }
+  }
+
   async _lookup(principal) {
     try {
       const primary = await this._lookupPrimary(principal);

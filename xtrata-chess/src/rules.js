@@ -121,6 +121,95 @@ export function rulesMatchCommitment(rules, committedHex) {
  *
  * Returns null when the submission is allowed, or a rejection reason.
  */
+// A Stacks principal, and a BNS name, told apart.
+//
+// The distinction matters more here than anywhere else in the board: rules are
+// hashed and committed on chain, and replay compares a stored value against a
+// transaction's sender, which is always a principal. A name that reaches the
+// hash is a side nobody can ever play, permanently.
+const PRINCIPAL_PATTERN = /^S[0-9A-HJKMNP-TV-Z]{5,}$/;
+const NAME_PATTERN = /^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$/;
+
+export function looksLikePrincipal(value) {
+  return typeof value === 'string' && PRINCIPAL_PATTERN.test(value.trim().toUpperCase());
+}
+
+export function looksLikeName(value) {
+  return typeof value === 'string' && NAME_PATTERN.test(value.trim().toLowerCase());
+}
+
+/**
+ * Is this rule set complete enough to commit to a chain that cannot forget it?
+ *
+ * Opening a game writes a hash. After that the rules are fixed: there is no
+ * edit, no migration, and no way to reach the people who joined. So the bar for
+ * opening is not "will this parse" but "is every choice here one somebody made
+ * on purpose, and can it still be satisfied tomorrow".
+ *
+ * Three things are refused:
+ *
+ *   * A side left blank. Blank normalises to "anyone", which is a perfectly good
+ *     rule and a terrible default: it is the difference between a public board
+ *     and a private one, and it should be typed rather than fallen into.
+ *   * A side naming something that is neither a principal nor a name. A typo
+ *     locks that side out for good.
+ *   * A name that has not been resolved to an address yet. Replay compares
+ *     principals, and a sealed board has no network, so the name has to become
+ *     an address before it is hashed rather than after.
+ */
+export function readyToOpen(draft = {}) {
+  const problems = [];
+  const check = (field, label) => {
+    const raw = draft[field];
+    const value = typeof raw === 'string' ? raw.trim() : '';
+
+    if (!value) {
+      problems.push({ field, message: `${label} is not set. Type an address, a .btc name, or "anyone".` });
+      return;
+    }
+    if (value.toLowerCase() === ANYONE) return;
+    if (looksLikePrincipal(value)) return;
+    if (looksLikeName(value)) {
+      problems.push({
+        field,
+        message: `${label} is the name ${value}, which has to be looked up before the game is opened.`,
+        needsResolving: value
+      });
+      return;
+    }
+    problems.push({
+      field,
+      message: `${label} is "${value}", which is neither a Stacks address nor a .btc name.`
+    });
+  };
+
+  check('white', 'White');
+  check('black', 'Black');
+
+  // Not held to the same standard as the sides, and deliberately so. A blank
+  // side decides who may play and can lock somebody out permanently; a blank
+  // cooldown means no cooldown, which is the stated default and restricts
+  // nobody. Only a value that was typed and makes no sense is a problem.
+  const raw = draft.cooldown;
+  const given = raw !== undefined && raw !== null && String(raw).trim() !== '';
+  if (given) {
+    const cooldown = Number(raw);
+    if (!Number.isFinite(cooldown) || cooldown < 0 || Math.floor(cooldown) !== cooldown) {
+      problems.push({
+        field: 'cooldown',
+        message: 'Cooldown must be a whole number of blocks, or zero.'
+      });
+    }
+  }
+
+  return {
+    ready: problems.length === 0,
+    problems,
+    // The names still to look up, so a caller can resolve them all in one go.
+    unresolved: problems.filter((p) => p.needsResolving).map((p) => p.needsResolving)
+  };
+}
+
 export function checkSender(rules, { sender, height, turn, history }) {
   const r = normaliseRules(rules);
 

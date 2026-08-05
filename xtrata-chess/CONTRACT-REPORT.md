@@ -322,3 +322,61 @@ mode forbids it, and the transaction fails.
 Wiring the board to v2 therefore means reading `get-move-fee` first and sending
 a post condition that permits exactly that amount and no more. That is a client
 change, not a contract change, and it has not been made.
+
+---
+
+# Version 3 · opening a game priced apart from playing one
+
+Version 2 charged the same fee for both, which gets the incentives backwards.
+
+A move is the thing people should do freely. A game is a permanent id, a row in
+a map, and an entry in every list of games from here on. Those are not worth the
+same, and pricing them the same forces a choice between moves that cost too much
+and games that cost too little.
+
+## What is different
+
+One new fee, and one new control for it.
+
+| | default | lowest | highest |
+|---|---|---|---|
+| Move fee | 0.01 STX | 0, which turns charging off | 1 STX |
+| Open fee | **1 STX** | **0.0001 STX** | **10 STX** |
+
+Everything else is version 2 unchanged: the same log, the same ignorance about
+chess, the same owner who can be renounced, the same inability to touch a game
+or a move once it is recorded.
+
+## The floor is the unusual part
+
+A ceiling is the familiar guard, and version 2 already had one: no owner can
+price the board out of existence, because the limit is a constant in the code
+where no owner can reach it.
+
+The open fee has a floor as well, and that is a genuine constraint on the owner
+rather than a default they can undo. **Opening a game can never be made free.**
+Not by the owner, not by anyone, not ever.
+
+The reason is that opening is the only call that costs the chain permanent
+storage no matter what happens next. A move at least says something. A game
+opened and abandoned is a row that can never be reclaimed, sitting in every
+enumeration of games from then on. Free game creation is an invitation to fill
+the map, and unlike a move, there is nothing a reader can skip to undo it.
+
+So `set-open-fee` refuses zero the same way it refuses eleven STX. An owner who
+wants opening to be free has to deploy a different contract, which is the point.
+
+## What this changes in practice
+
+Someone with 0.05 STX can play a dozen moves and cannot open a game. That is the
+split working: the barrier sits at creation, where the permanent cost is, rather
+than on every move.
+
+## What is still true
+
+- The contract still does not know the rules of chess.
+- It still may filter, never adjudicate.
+- A refused call still costs nothing, because both fees are charged after the
+  checks and before anything is written. A sender who cannot pay to open a game
+  leaves no game behind and consumes no id.
+- Renouncing still freezes everything, and the floor outlives the owner.

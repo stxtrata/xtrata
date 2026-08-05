@@ -218,19 +218,19 @@ ${config}<script src="/i/${engineId}"></script>
 // going to deploy rather than fetching them from somewhere.
 async function buildCanary() {
   const html = await readFile(resolve(ROOT, 'canary.html'), 'utf8');
-  // Both contracts travel with the canary, so the page can deploy either and
-  // always carries the exact bytes it is going to send.
-  const contracts = {
-    'xtrata-chess-log-v1': await readFile(
-      resolve(ROOT, 'contracts', 'xtrata-chess-log-v1.clar'),
-      'utf8'
-    ),
-    'xtrata-chess-log-v2': await readFile(
-      resolve(ROOT, 'contracts', 'xtrata-chess-log-v2.clar'),
-      'utf8'
+  // Every contract travels with the canary, so the page can deploy any of them
+  // and always carries the exact bytes it is going to send.
+  const names = ['xtrata-chess-log-v1', 'xtrata-chess-log-v2', 'xtrata-chess-log-v3'];
+  const contracts = Object.fromEntries(
+    await Promise.all(
+      names.map(async (name) => [
+        name,
+        await readFile(resolve(ROOT, 'contracts', `${name}.clar`), 'utf8')
+      ])
     )
-  };
-  const contract = contracts['xtrata-chess-log-v2'];
+  );
+  // The newest, which is what the canary offers first.
+  const contract = contracts[names[names.length - 1]];
   const modules = await bundleFrom('./canary.js');
 
   const entryScript = /<script type="module">[\s\S]*?<\/script>/;

@@ -29,8 +29,9 @@ import { CONTRACT_NAME } from './protocol.js';
 // Which contracts this page can deploy. v2 leads because it is the one being
 // launched; v1 stays so the canary can still verify the board already on chain.
 export const CONTRACTS = {
-  'xtrata-chess-log-v2': { charges: true },
-  'xtrata-chess-log-v1': { charges: false }
+  'xtrata-chess-log-v3': { charges: true, splitFees: true },
+  'xtrata-chess-log-v2': { charges: true, splitFees: false },
+  'xtrata-chess-log-v1': { charges: false, splitFees: false }
 };
 import { replay } from './replay.js';
 import {
@@ -334,6 +335,7 @@ export class LaunchCanary {
 
     el.btnReadState.addEventListener('click', () => this.readContractState());
     el.btnSetFee.addEventListener('click', () => this.setMoveFee());
+    el.btnSetOpenFee.addEventListener('click', () => this.setOpenFee());
     el.btnSetRecipient.addEventListener('click', () => this.setFeeRecipient());
     el.btnTransfer.addEventListener('click', () => this.transferOwnership());
     el.btnRenounce.addEventListener('click', () => this.renounceOwnership());
@@ -921,6 +923,11 @@ export class LaunchCanary {
       ['log ceiling', 'get-max-seq', (v) => `${v} submissions per game`],
       ['move fee', 'get-move-fee', (v) => `${v} \u00b5STX (${(Number(v) / 1e6).toFixed(6)} STX)`],
       ['fee ceiling', 'get-fee-ceiling', (v) => `${v} \u00b5STX (${(Number(v) / 1e6).toFixed(6)} STX)`],
+      // v3 only. A contract without them answers with a miss, which the loop
+      // below reports as "not on this contract" rather than as a failure.
+      ['open fee', 'get-open-fee', (v) => `${v} \u00b5STX (${(Number(v) / 1e6).toFixed(6)} STX)`],
+      ['open fee ceiling', 'get-open-fee-ceiling', (v) => `${v} \u00b5STX (${(Number(v) / 1e6).toFixed(6)} STX)`],
+      ['open fee floor', 'get-open-fee-floor', (v) => `${v} \u00b5STX (${(Number(v) / 1e6).toFixed(6)} STX)`],
       ['fee recipient', 'get-fee-recipient', (v) => String(v)],
       ['owner', 'get-owner', (v) => (v === null ? 'renounced — nobody can change anything' : String(v))]
     ];
@@ -960,9 +967,19 @@ export class LaunchCanary {
       this.log('info', `these controls belong to ${owner}, and you are connected as ${this.address}`);
     }
 
+    // Only v3 prices opening separately, so the control appears only where it
+    // means something rather than sitting there failing on v1 and v2.
+    const hasOpenFee = this.chainState['get-open-fee'] !== undefined;
+    if (el.openFeeRow) el.openFeeRow.hidden = !hasOpenFee;
+
     if (isOwner) {
       el.newFee.value = String(this.chainState['get-move-fee'] ?? '');
       el.newRecipient.value = String(this.chainState['get-fee-recipient'] ?? '');
+      if (hasOpenFee && el.newOpenFee) {
+        el.newOpenFee.value = String(this.chainState['get-open-fee'] ?? '');
+        el.newOpenFee.min = String(this.chainState['get-open-fee-floor'] ?? 0);
+        el.newOpenFee.max = String(this.chainState['get-open-fee-ceiling'] ?? '');
+      }
     }
   }
 
@@ -1022,6 +1039,39 @@ export class LaunchCanary {
       'set-move-fee',
       [serializeUint(amount)],
       `Set the move fee to ${amount} \u00b5STX (${(amount / 1e6).toFixed(6)} STX).`
+    );
+  }
+
+  // Bounded at both ends, unlike the move fee. The floor is the unusual half:
+  // opening a game can never be made free, not even by the owner, so a zero
+  // here is refused rather than treated as "charge nothing".
+  async setOpenFee() {
+    const amount = Number(this.el.newOpenFee.value);
+    const ceiling = Number(this.chainState?.['get-open-fee-ceiling'] ?? 0);
+    const floor = Number(this.chainState?.['get-open-fee-floor'] ?? 0);
+
+    if (!Number.isFinite(amount) || Math.floor(amount) !== amount) {
+      this.log('err', 'the open fee must be a whole number of microSTX');
+      return;
+    }
+    // Both checked here as well as on chain, because the contract would refuse
+    // these and the refusal still costs a transaction fee.
+    if (ceiling && amount > ceiling) {
+      this.log('err', `${amount} is above the contract's ceiling of ${ceiling} \u00b5STX, which it would refuse`);
+      return;
+    }
+    if (amount < floor) {
+      this.log(
+        'err',
+        `${amount} is below the contract's floor of ${floor} \u00b5STX. Opening a game cannot be made free.`
+      );
+      return;
+    }
+
+    await this._ownerCall(
+      'set-open-fee',
+      [serializeUint(amount)],
+      `Set the fee for opening a game to ${amount} \u00b5STX (${(amount / 1e6).toFixed(6)} STX).`
     );
   }
 

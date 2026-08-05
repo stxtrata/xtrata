@@ -360,6 +360,18 @@
             <button id="btn-set-fee">Set fee</button>
           </div>
 
+          <div class="row" id="open-fee-row" hidden>
+            <label class="field" style="flex: 0 1 180px">
+              <span>Open a game (µSTX)</span>
+              <input id="new-open-fee" type="number" step="1000" />
+            </label>
+            <button id="btn-set-open-fee">Set open fee</button>
+            <p class="hint">
+              v3 only. Bounded at both ends: it cannot go above the ceiling, and it cannot be
+              made free, because opening a game costs permanent storage whatever follows it.
+            </p>
+          </div>
+
           <div class="row">
             <label class="field">
               <span>Fee recipient</span>
@@ -432,6 +444,9 @@
         btnReadState: byId('btn-read-state'),
         newFee: byId('new-fee'),
         btnSetFee: byId('btn-set-fee'),
+        openFeeRow: byId('open-fee-row'),
+        newOpenFee: byId('new-open-fee'),
+        btnSetOpenFee: byId('btn-set-open-fee'),
         newRecipient: byId('new-recipient'),
         btnSetRecipient: byId('btn-set-recipient'),
         newOwner: byId('new-owner'),

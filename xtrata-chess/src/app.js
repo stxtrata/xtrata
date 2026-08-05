@@ -29,7 +29,7 @@ import { SimIdentities } from './sim-identities.js';
 import {
   isWellFormedLength,
   DEFAULT_CONTRACT,
-  FALLBACK_CONTRACT,
+  CONTRACT_CANDIDATES,
   DEFAULT_NETWORK,
   DEFAULT_GAME
 } from './protocol.js';
@@ -37,7 +37,9 @@ import {
   DEFAULT_RULES,
   describeRules,
   isOpenBoard,
+  looksLikeName,
   normaliseRules,
+  readyToOpen,
   rulesHash,
   rulesMatchCommitment
 } from './rules.js';
@@ -131,9 +133,14 @@ export class ChessBoardApp {
     // Prefer the current contract; use the previous one when it is not there.
     // Pointing at a contract before it exists should degrade to a working board
     // rather than an error page, and should say which one it settled on.
+    // Whatever was asked for first, then the rest of the chain newest first, so
+    // a board naming a contract that is not deployed yet still opens.
     const chosen = board.exact
       ? wanted
-      : await this._firstDeployed([wanted, FALLBACK_CONTRACT], network);
+      : await this._firstDeployed(
+          [wanted, ...CONTRACT_CANDIDATES.filter((candidate) => candidate !== wanted)],
+          network
+        );
 
     const [address, name] = (chosen || wanted).split('.');
     this.elements.contractAddress.value = address || '';
@@ -1062,20 +1069,32 @@ export class ChessBoardApp {
   // ------------------------------------------------------------------
 
   // The rules currently described by the panel.
-  draftRules() {
+  // What is typed in the panel, before normalising.
+  //
+  // normaliseRules is deliberately forgiving: it turns anything it does not
+  // recognise into "anyone" so that two descriptions of the same rules hash
+  // identically. That is right for hashing and wrong for validating, because it
+  // silently converts a typo into the most permissive rule there is. So the
+  // check runs on what was actually typed.
+  draftInput() {
     const el = this.elements;
-    return normaliseRules({
+    return {
       white: el.rulesWhite.value,
       black: el.rulesBlack.value,
       cooldown: el.rulesCooldown.value,
       noConsecutive: el.rulesNoConsecutive.checked
-    });
+    };
+  }
+
+  draftRules() {
+    return normaliseRules(this.draftInput());
   }
 
   renderRules() {
     const el = this.elements;
     const rules = this.draftRules();
     const open = isOpenBoard(rules);
+    const check = readyToOpen(this.draftInput());
 
     el.rulesSummary.textContent = describeRules(rules);
     el.rulesHash.textContent = open ? 'none — these are the open board rules' : rulesHash(rules);
@@ -1083,9 +1102,38 @@ export class ChessBoardApp {
     el.rulesDownload.textContent = this.childGame
       ? `Download the board for game #${this.childGame}`
       : 'Download the board';
+
+    // Nothing reaches a wallet until every choice has been made. A game's rules
+    // are hashed on chain and cannot be edited afterwards, so an incomplete set
+    // is not a draft to be fixed later, it is a permanent mistake.
+    el.rulesOpen.disabled = !check.ready;
+    el.rulesOpen.textContent = check.ready ? 'Open this game' : 'Set the rules first';
+
+    if (el.rulesNote) {
+      el.rulesNote.className = check.ready ? 'hint' : 'hint warn';
+      el.rulesNote.innerHTML = check.ready
+        ? 'The contract enforces none of this. It stores the hash above when the game is opened, and the ' +
+          'board you download is the referee: it replays the log and skips anything these rules disallow. ' +
+          'Open the game first, then download the board bound to it.'
+        : '<strong>Not ready to open.</strong><br>' +
+          check.problems.map((problem) => escapeHtml(problem.message)).join('<br>');
+    }
   }
 
   async openRuledGame() {
+    // Names first, and only then a hash. Replay compares principals, and a
+    // sealed board has no network to ask, so a name that reached the hash would
+    // be a side nobody could ever play. This is the last moment it can be fixed.
+    const resolved = await this._resolveRuleNames();
+    if (!resolved) return;
+
+    const check = readyToOpen(this.draftInput());
+    if (!check.ready) {
+      this._notify(check.problems[0].message, 'warn');
+      this.renderRules();
+      return;
+    }
+
     const rules = this.draftRules();
     const hash = isOpenBoard(rules) ? null : rulesHash(rules);
 
@@ -1115,6 +1163,48 @@ export class ChessBoardApp {
       this._notify(`Wallet call failed: ${error.message}`, 'error');
     }
     this.render();
+  }
+
+  /**
+   * Turn any .btc names in the panel into the addresses they point at.
+   *
+   * Writes the addresses back into the inputs rather than resolving invisibly,
+   * so what gets hashed is what the person opening the game can see. A name that
+   * does not resolve stops the whole thing: on an immutable commitment, a side
+   * assigned to nobody is worse than no game at all.
+   */
+  async _resolveRuleNames() {
+    const el = this.elements;
+    const fields = [
+      ['white', el.rulesWhite],
+      ['black', el.rulesBlack]
+    ];
+
+    for (const [side, input] of fields) {
+      const typed = String(input.value || '').trim();
+      if (!typed || !looksLikeName(typed)) continue;
+
+      this._notify(`Looking up ${typed}…`, 'info');
+      this.render();
+
+      const address = await this.names?.lookupName?.(typed);
+      if (!address) {
+        this._notify(
+          `${typed} does not resolve to an address, so ${side} would be a side nobody could play. ` +
+            'Nothing has been sent.',
+          'error'
+        );
+        this.renderRules();
+        this.render();
+        return false;
+      }
+
+      input.value = address;
+      this._notify(`${typed} is ${shortSender(address)}. Check it, then open the game.`, 'info');
+    }
+
+    this.renderRules();
+    return true;
   }
 
   downloadChild() {

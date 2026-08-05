@@ -209,16 +209,23 @@ describe('post conditions for a contract that charges', () => {
 });
 
 describe('which contract the canary deploys', () => {
-  it('offers both, and the fee-charging one is the new default', async () => {
+  it('offers all three, newest first, and only v3 prices the two calls apart', async () => {
     const { CONTRACTS } = await import('../src/canary.js');
-    expect(Object.keys(CONTRACTS)).toEqual(['xtrata-chess-log-v2', 'xtrata-chess-log-v1']);
+    expect(Object.keys(CONTRACTS)).toEqual([
+      'xtrata-chess-log-v3',
+      'xtrata-chess-log-v2',
+      'xtrata-chess-log-v1'
+    ]);
+    expect(CONTRACTS['xtrata-chess-log-v3'].splitFees).toBe(true);
     expect(CONTRACTS['xtrata-chess-log-v2'].charges).toBe(true);
+    expect(CONTRACTS['xtrata-chess-log-v2'].splitFees).toBe(false);
     expect(CONTRACTS['xtrata-chess-log-v1'].charges).toBe(false);
   });
 
   it('names the contract it is deploying in every shape', async () => {
     const { DEPLOY_SHAPES } = await import('../src/canary.js');
     for (const build of Object.values(DEPLOY_SHAPES)) {
+      expect(build(';; src', 'mainnet', 'xtrata-chess-log-v3').name).toBe('xtrata-chess-log-v3');
       expect(build(';; src', 'mainnet', 'xtrata-chess-log-v2').name).toBe('xtrata-chess-log-v2');
       expect(build(';; src', 'mainnet', 'xtrata-chess-log-v1').name).toBe('xtrata-chess-log-v1');
     }
