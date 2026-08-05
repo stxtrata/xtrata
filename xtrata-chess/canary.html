@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Xtrata Chess · Launch Canary</title>
+    <style>
+      :root {
+        --bg: #12100e;
+        --panel: #1b1815;
+        --line: #2e2924;
+        --ink: #e8e2d9;
+        --dim: #96897a;
+        --accent: #d8a24a;
+        --ok: #7fb069;
+        --warn: #c9922e;
+        --err: #b4574c;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      [hidden] { display: none !important; }
+
+      body {
+        margin: 0;
+        padding: 24px;
+        background: var(--bg);
+        color: var(--ink);
+        font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, sans-serif;
+      }
+
+      main { max-width: 860px; margin: 0 auto; }
+
+      h1 { margin: 0; font-size: 20px; font-weight: 600; }
+      .sub { margin: 4px 0 0; color: var(--dim); font-size: 13px; }
+
+      h2 {
+        margin: 0 0 10px;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--dim);
+        font-weight: 600;
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+      }
+
+      .state {
+        font-family: var(--mono);
+        text-transform: none;
+        letter-spacing: 0;
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 20px;
+        border: 1px solid var(--line);
+        color: var(--dim);
+      }
+      [data-state='ok'] .state { color: var(--ok); border-color: var(--ok); }
+      [data-state='failed'] .state { color: var(--err); border-color: var(--err); }
+      [data-state='sent'] .state,
+      [data-state='running'] .state { color: var(--warn); border-color: var(--warn); }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px;
+        margin-top: 14px;
+      }
+      [data-state='ok'] { border-color: rgba(127, 176, 105, 0.4); }
+      [data-state='failed'] { border-color: rgba(180, 87, 76, 0.5); }
+
+      button, select, input {
+        font: inherit;
+        color: var(--ink);
+        background: #221e1a;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 7px 12px;
+      }
+      button { cursor: pointer; }
+      button:hover:not(:disabled) { border-color: var(--dim); }
+      button:disabled { opacity: 0.4; cursor: not-allowed; }
+      button.go { background: var(--accent); border-color: var(--accent); color: #1a1409; font-weight: 600; }
+      button.go:disabled { background: #3a3025; border-color: #3a3025; color: var(--dim); }
+
+      .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+      .row + .row { margin-top: 10px; }
+
+      .field { display: flex; flex-direction: column; gap: 4px; }
+      .field span { font-size: 11px; color: var(--dim); }
+
+      .warning {
+        border: 1px solid var(--err);
+        background: #2a1614;
+        border-radius: 10px;
+        padding: 12px 14px;
+        margin-top: 16px;
+      }
+      .warning strong { color: #e8907f; }
+
+      .mono, code, pre { font-family: var(--mono); }
+      .meta { font-family: var(--mono); font-size: 11px; color: var(--dim); word-break: break-all; margin: 8px 0 0; }
+      .meta a { color: var(--accent); }
+
+      .hint { color: var(--dim); font-size: 12px; margin: 10px 0 0; }
+
+      #log { max-height: 420px; overflow-y: auto; margin-top: 10px; }
+      .entry {
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        padding: 5px 0;
+        font-size: 12px;
+        display: grid;
+        grid-template-columns: 46px 1fr;
+        gap: 8px;
+      }
+      .entry .lvl { font-family: var(--mono); font-size: 10px; text-transform: uppercase; }
+      .entry.ok .lvl { color: var(--ok); }
+      .entry.warn .lvl { color: var(--warn); }
+      .entry.err .lvl { color: var(--err); }
+      .entry.info .lvl { color: var(--dim); }
+      .entry pre {
+        grid-column: 2;
+        margin: 4px 0 0;
+        padding: 7px 9px;
+        background: #14110f;
+        border-radius: 6px;
+        font-size: 11px;
+        white-space: pre-wrap;
+        word-break: break-all;
+        max-height: 190px;
+        overflow-y: auto;
+        color: var(--dim);
+      }
+    </style>
+  </head>
+
+  <body>
+    <main>
+      <h1>Xtrata Chess · Launch Canary</h1>
+      <p class="sub">
+        From nothing to a played first move, every transaction signed by your wallet.
+      </p>
+
+      <div class="warning">
+        <strong>No seed phrase is ever asked for, entered, or stored.</strong>
+        This page builds each request, shows it to you in full, and hands it to your wallet to sign.
+        It holds no keys and can sign nothing by itself. Nothing is sent without a click, and the
+        deploy step asks you to type the contract name first.
+        <br /><br />
+        On mainnet this spends real STX and cannot be undone. A contract name, once used, is gone forever.
+      </div>
+
+      <div class="panel" id="step-0">
+        <h2>0 · Wallet <span class="state">not connected</span></h2>
+        <div class="row">
+          <label class="field">
+            <span>Network</span>
+            <select id="network">
+              <option value="mainnet">mainnet</option>
+              <option value="testnet">testnet</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Provider</span>
+            <select id="providers"></select>
+          </label>
+          <button id="btn-detect">Re-detect</button>
+          <button id="btn-connect" class="go">Connect</button>
+        </div>
+        <p class="meta">address <span id="address">—</span></p>
+        <p class="meta" id="source-info">loading contract source…</p>
+      </div>
+
+      <div class="panel" id="step-1" data-state="waiting">
+        <h2>1 · Preflight <span class="state">not started</span></h2>
+        <p class="hint">
+          Reads only. Checks the node answers, the contract name is still free, and the balance covers
+          a deploy plus two calls. Nothing is signed and nothing is sent.
+        </p>
+        <div class="row"><button id="btn-preflight" class="go" disabled>Run preflight</button></div>
+      </div>
+
+      <div class="panel" id="step-2" data-state="waiting">
+        <h2>2 · Deploy the contract <span class="state">not started</span></h2>
+        <p class="hint">
+          Contract deployment through a wallet has never been exercised in this repo, unlike every other
+          call here. If the first shape is refused, try the others before concluding the wallet cannot do it.
+        </p>
+        <div class="row">
+          <label class="field">
+            <span>Parameter shape</span>
+            <select id="deploy-shape">
+              <option value="A">A · spec (name, clarityCode, clarityVersion)</option>
+              <option value="B">B · spec + deny post conditions</option>
+              <option value="C">C · spec + codeBody and contractName aliases</option>
+            </select>
+          </label>
+          <button id="btn-deploy" class="go" disabled>Deploy</button>
+          <button id="btn-verify-deploy" disabled>Check and verify source</button>
+        </div>
+        <p class="meta">tx <span id="deploy-tx">—</span></p>
+        <p class="meta">contract <span id="contract-id">—</span></p>
+      </div>
+
+      <div class="panel" id="step-3" data-state="waiting">
+        <h2>3 · Open game #1 <span class="state">not started</span></h2>
+        <p class="hint">
+          <code>open-game(none)</code> — the open board that anyone may play. A game with its own rules
+          would pass a 32-byte hash here instead.
+        </p>
+        <div class="row">
+          <button id="btn-open" class="go" disabled>Open game #1</button>
+          <button id="btn-verify-open" disabled>Check and read back</button>
+        </div>
+        <p class="meta">tx <span id="open-tx">—</span></p>
+      </div>
+
+      <div class="panel" id="step-4" data-state="waiting">
+        <h2>4 · The first move <span class="state">not started</span></h2>
+        <p class="hint">
+          <code>submit-move(u1, "e2e4")</code>, then read the log back and replay it. The chain holds a
+          five character string; replaying it has to produce <code>1. e4</code>.
+        </p>
+        <div class="row">
+          <button id="btn-move" class="go" disabled>Play 1. e4</button>
+          <button id="btn-verify-move" disabled>Check and replay</button>
+        </div>
+        <p class="meta">tx <span id="move-tx">—</span></p>
+      </div>
+
+      <div class="panel">
+        <h2>Log <span class="state"><button id="btn-report">Copy report</button></span></h2>
+        <div id="log"></div>
+      </div>
+    </main>
+
+    <script type="module">
+      import { LaunchCanary } from './src/canary.js';
+
+      const byId = (id) => document.getElementById(id);
+
+      new LaunchCanary({
+        network: byId('network'),
+        providers: byId('providers'),
+        address: byId('address'),
+        sourceInfo: byId('source-info'),
+        btnDetect: byId('btn-detect'),
+        btnConnect: byId('btn-connect'),
+        btnPreflight: byId('btn-preflight'),
+        deployShape: byId('deploy-shape'),
+        btnDeploy: byId('btn-deploy'),
+        btnVerifyDeploy: byId('btn-verify-deploy'),
+        deployTx: byId('deploy-tx'),
+        contractId: byId('contract-id'),
+        btnOpen: byId('btn-open'),
+        btnVerifyOpen: byId('btn-verify-open'),
+        openTx: byId('open-tx'),
+        btnMove: byId('btn-move'),
+        btnVerifyMove: byId('btn-verify-move'),
+        moveTx: byId('move-tx'),
+        btnReport: byId('btn-report'),
+        log: byId('log'),
+        step1: byId('step-1'),
+        step2: byId('step-2'),
+        step3: byId('step-3'),
+        step4: byId('step-4')
+      });
+    </script>
+  </body>
+</html>

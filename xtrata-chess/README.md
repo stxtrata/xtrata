@@ -263,7 +263,44 @@ dependency on the contract that hosted it still being the one people read. Same
 renderer, two modes — that is what makes an inscribed game durable rather than
 a link.
 
-## Deploying
+## Launching
+
+Two routes. Both deploy the same bytes.
+
+### The canary, signed by your wallet
+
+```bash
+node scripts/build.mjs --canary
+```
+
+Produces `dist/xtrata-chess-launch-canary.html`: one file, the contract source
+inlined, no external requests. Open it in a browser with Leather or Xverse
+installed and it walks the whole launch — deploy, open game #1, play `1. e4` —
+with every transaction signed by the wallet.
+
+**No seed phrase is asked for, entered, or stored.** The page holds no keys and
+can sign nothing itself. It builds each request, shows it in full, and hands it
+over. Nothing is sent without a click, and the deploy step asks you to type the
+contract name first.
+
+Each step is gated on the one before it having confirmed *and been read back*.
+Deploy is not done when the transaction succeeds; it is done when the on-chain
+source hashes to the same bytes the page carried. Opening game #1 is not done
+until `get-game` answers. The first move is not done until the log replays to
+`1. e4`. The failure worth catching is a transaction that succeeds and does not
+mean what you intended.
+
+`stx_deployContract` has never been exercised in this repo, unlike every other
+call here, so that step offers three parameter shapes to fall back through.
+
+### The script, with a seed phrase
+
+```bash
+XTRATA_MAINNET_MNEMONIC="…" node scripts/deploy.mjs --broadcast
+```
+
+Same preflight, same pinned Clarity version, but the key material is yours to
+handle. Prefer the canary unless you are automating.
 
 `clarinet check` passes clean against Clarity 3. The contract holds no funds,
 moves no tokens, and has no admin, so there is nothing to configure.

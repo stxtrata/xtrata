@@ -57,9 +57,9 @@ async function loadModule(id, seen) {
   seen.set(id, `__modules[${JSON.stringify(id)}] = function (__exports, __require) {\n${body}${assignment}};`);
 }
 
-async function bundle() {
+async function bundleFrom(entry) {
   const seen = new Map();
-  await loadModule(ENTRY, seen);
+  await loadModule(entry, seen);
 
   const runtime = `
 const __modules = {};
@@ -75,6 +75,8 @@ function __require(id) {
 
   return [runtime, ...seen.values()].join('\n\n');
 }
+
+const bundle = () => bundleFrom(ENTRY);
 
 // Pull the shell out of index.html so the engine can carry it. The dev page and
 // the inscribed engine then share one definition of the markup rather than
@@ -142,6 +144,50 @@ async function buildBoard(engineId) {
   return outPath;
 }
 
+// The launch canary as one file: every module inlined, plus the contract source
+// itself, so the page that deploys the contract carries the exact bytes it is
+// going to deploy rather than fetching them from somewhere.
+async function buildCanary() {
+  const html = await readFile(resolve(ROOT, 'canary.html'), 'utf8');
+  const contract = await readFile(
+    resolve(ROOT, 'contracts', 'xtrata-chess-log-v1.clar'),
+    'utf8'
+  );
+  const modules = await bundleFrom('./canary.js');
+
+  const entryScript = /<script type="module">[\s\S]*?<\/script>/;
+  if (!entryScript.test(html)) throw new Error('could not find the entry script in canary.html');
+
+  const wiring = html
+    .match(entryScript)[0]
+    .replace(/<\/?script[^>]*>/g, '')
+    .replace(/^\s*import\s*\{[\s\S]*?\}\s*from\s*['"][^'"]+['"];?\s*$/m, '');
+
+  const script = [
+    '<script>',
+    '(function () {',
+    `window.__XTRATA_CHESS_CONTRACT__ = ${JSON.stringify(contract)};`,
+    modules,
+    'const { LaunchCanary } = __require("./canary.js");',
+    wiring.trim(),
+    '})();',
+    '</script>'
+  ].join('\n');
+
+  const output = html.replace(entryScript, script);
+
+  await mkdir(OUT_DIR, { recursive: true });
+  const outPath = resolve(OUT_DIR, 'xtrata-chess-launch-canary.html');
+  await writeFile(outPath, output, 'utf8');
+
+  const contractHash = createHash('sha256').update(contract).digest('hex');
+  console.log(`built  ${outPath}`);
+  console.log(`bytes  ${Buffer.byteLength(output, 'utf8').toLocaleString()}`);
+  console.log(`sha256 ${createHash('sha256').update(output).digest('hex')}`);
+  console.log(`\ncontract inlined: ${contract.length.toLocaleString()} bytes, sha256 ${contractHash}`);
+  console.log('Open it in a browser with Leather or Xverse installed. No seed phrase is needed.');
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const sealIndex = args.indexOf('--seal');
@@ -150,6 +196,11 @@ async function main() {
   const engineId = engineIdIndex >= 0 ? args[engineIdIndex + 1] : null;
 
   const html = await readFile(resolve(ROOT, 'index.html'), 'utf8');
+
+  if (args.includes('--canary')) {
+    await buildCanary();
+    return;
+  }
 
   if (args.includes('--engine')) {
     await buildEngine(html);

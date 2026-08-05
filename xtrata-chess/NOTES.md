@@ -124,12 +124,20 @@ difference between a casual act and a considered one.
 - **The engine split.** The engine self-mounts into a page containing nothing but
   a script tag, and a child page loads bound to its game with the right controls
   hidden.
+- **The launch canary, against live mainnet with a mock wallet.** Preflight reads
+  the real deployer: name free, 83.27 STX available. The deploy payload the
+  wallet would receive carries the right name, the full 8,311 byte source and
+  Clarity 3. Step gating holds — nothing unlocks until the step before it has
+  been read back off chain.
 
 ## Not checked
 
-- **Live wallet signing.** Everything up to `provider.request` is exercised, but
-  the request itself has not run against a real wallet. The call shape is the one
-  this repo's canary proved across Xverse and Leather, desktop and mobile.
+- **Live wallet signing.** Everything up to `provider.request` is exercised, and
+  the payloads have been checked against a mock, but no request has reached a
+  real wallet. `stx_callContract` uses the shape this repo's canary proved across
+  Xverse and Leather on desktop and mobile. `stx_deployContract` has no such
+  provenance: nothing here has ever deployed through a wallet, which is why the
+  canary offers three shapes rather than assuming one.
 - **Anything on chain.** The contract is not deployed. No real fee has been paid
   and no real transaction has been sent.
 - **Mnemonic derivation against the real deployer.** The path matches the
