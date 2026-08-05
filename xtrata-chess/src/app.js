@@ -29,6 +29,7 @@ import { SimIdentities } from './sim-identities.js';
 import {
   isWellFormedLength,
   DEFAULT_CONTRACT,
+  FALLBACK_CONTRACT,
   DEFAULT_NETWORK,
   DEFAULT_GAME
 } from './protocol.js';
@@ -118,11 +119,44 @@ export class ChessBoardApp {
   }
 
   async startConfiguredBoard(board) {
-    const [address, name] = String(board.contract || '').split('.');
+    const network = board.network || 'mainnet';
+    const wanted = String(board.contract || '');
+
+    // Prefer the current contract; use the previous one when it is not there.
+    // Pointing at a contract before it exists should degrade to a working board
+    // rather than an error page, and should say which one it settled on.
+    const chosen = board.exact
+      ? wanted
+      : await this._firstDeployed([wanted, FALLBACK_CONTRACT], network);
+
+    const [address, name] = (chosen || wanted).split('.');
     this.elements.contractAddress.value = address || '';
     if (name) this.elements.contractName.value = name;
-    this.elements.network.value = board.network || 'mainnet';
+    this.elements.network.value = network;
+
+    if (chosen && chosen !== wanted) {
+      this._notify(
+        `${wanted.split('.')[1]} is not deployed yet, so this is showing ${name}.`,
+        'warn'
+      );
+    }
     this.setMode('live');
+  }
+
+  async _firstDeployed(candidates, network) {
+    const api = network === 'testnet' ? 'https://api.testnet.hiro.so' : 'https://api.mainnet.hiro.so';
+    for (const candidate of candidates) {
+      const [address, name] = candidate.split('.');
+      if (!address || !name) continue;
+      try {
+        const response = await fetch(`${api}/v2/contracts/interface/${address}/${name}`);
+        if (response.ok) return candidate;
+      } catch {
+        // Unreachable is not the same as absent; try the next and let the
+        // ordinary read path report the problem properly.
+      }
+    }
+    return candidates[0];
   }
 
   // A generated board: one game, one rule set, nothing else. It still reads the
@@ -351,13 +385,19 @@ export class ChessBoardApp {
         contractAddress,
         contractName: el.contractName.value.trim() || undefined,
         network: el.network.value,
-        fee: Number(el.fee.value) || undefined
+        fee: Number(el.fee.value) || undefined,
+        senderAddress: this.walletAddress || undefined
       });
 
       // Names are only meaningful against a real chain, and the resolver is
       // per-network because the same principal can hold different names on each.
       this.names = new NameResolver({ apiUrl: this.chain.apiUrl });
       this.times = new BlockTimes({ apiUrl: this.chain.apiUrl });
+
+      // Read before anything can return early. A contract with no games yet
+      // still charges for opening one, and the previous ordering meant an empty
+      // board reported that it charged nothing.
+      this.contractFee = this.chain.getContractFee ? await this.chain.getContractFee() : 0;
 
       const count = await this.chain.getGameCount();
       if (count === 0) {
@@ -429,6 +469,10 @@ export class ChessBoardApp {
       // difference between waiting your turn and paying for a move that will be
       // skipped because somebody beat you to it.
       this.mempool = this.chain.getMempool ? await this.chain.getMempool(this.game) : [];
+
+      // What the contract itself charges, which is not the transaction fee and
+      // should not be discovered for the first time in a wallet prompt.
+      if (this.chain.getContractFee) this.contractFee = await this.chain.getContractFee();
     } catch (error) {
       this._notify(`Read failed: ${error.message}`, 'error');
     } finally {
@@ -760,6 +804,7 @@ export class ChessBoardApp {
 
   async disconnectWallet() {
     this.walletAddress = null;
+    if (this.chain) this.chain.senderAddress = null;
     // Ask the wallet to forget as well, or the next Connect is answered from
     // its own session rather than by asking.
     await disconnectWallet({ onLog: () => {} }).catch(() => {});
@@ -794,6 +839,9 @@ export class ChessBoardApp {
         onLog: (level, message) => this._notify(message, level === 'ok' ? 'info' : level)
       });
       this.walletAddress = session.address;
+      // The contract's post condition is written about this address, so the
+      // chain has to be told who is signing before a charging call is built.
+      if (this.chain) this.chain.senderAddress = session.address;
       this._renderWallet();
       this._notify(
         `Connected ${shortSender(session.address)}${session.via === 'host-session' ? ' (session from the host)' : ''}`,
@@ -1155,6 +1203,17 @@ export class ChessBoardApp {
     }
 
     el.gameLabel.textContent = this.game ? `game #${this.game}` : 'no game';
+
+    // Say what a move costs before anybody signs for one.
+    if (el.chargeNote) {
+      const charge = Number(this.contractFee) || 0;
+      const name = el.contractName.value;
+      el.chargeNote.hidden = this.mode !== 'live';
+      el.chargeNote.innerHTML = charge
+        ? `<strong>${(charge / 1e6).toFixed(6)} STX</strong> per move to the contract, plus the network fee above. ` +
+          `Your wallet will be asked to permit exactly that and no more.`
+        : `${escapeHtml(name)} charges nothing. Only the network fee above applies.`;
+    }
   }
 
   _renderReplayControls(view) {

@@ -19,7 +19,7 @@ import {
   serializeStringAscii,
   serializeUint
 } from './clarity.js';
-import { walletCall, waitForProvider } from './wallet.js';
+import { walletCall, waitForProvider, feePostConditions } from './wallet.js';
 import { CONTRACT_NAME, ERR, PAGE_SIZE } from './protocol.js';
 
 export const DEFAULT_API = {
@@ -50,6 +50,13 @@ export class LiveChain {
     this.apiUrl = options.apiUrl || DEFAULT_API[this.network];
     this.fetch = options.fetch || globalThis.fetch?.bind(globalThis);
     this.fee = Number.isFinite(Number(options.fee)) ? Number(options.fee) : DEFAULT_FEE_USTX;
+    // The address that will sign, needed to write a post condition about it.
+    this.senderAddress = options.senderAddress || null;
+    // Which post condition spelling to send; 'strict' permits exactly the fee.
+    this.pcShape = options.pcShape || 'strict';
+    // The contract's own charge, read once and remembered. undefined means not
+    // asked yet; 0 means asked and it charges nothing, which is v1.
+    this.contractFee = undefined;
 
     if (!this.contractAddress) throw new Error('contractAddress is required');
   }
@@ -186,6 +193,23 @@ export class LiveChain {
     return out.sort((a, b) => (a.receivedAt || 0) - (b.receivedAt || 0));
   }
 
+  /**
+   * What this contract charges per call, in microSTX.
+   *
+   * v1 has no such function, and a contract that does not answer is a contract
+   * that does not charge, so the failure is cached as zero rather than retried
+   * before every move.
+   */
+  async getContractFee() {
+    if (this.contractFee !== undefined) return this.contractFee;
+    try {
+      this.contractFee = Number(await this.callReadOnly('get-move-fee')) || 0;
+    } catch {
+      this.contractFee = 0;
+    }
+    return this.contractFee;
+  }
+
   // The board pairs this with a BlockTimes resolver rather than asking the
   // contract for timestamps, because the contract deliberately stores only the
   // height. See src/block-time.js.
@@ -203,6 +227,22 @@ export class LiveChain {
     // provider looked up at startup would not exist yet.
     await waitForProvider();
 
+    // A contract that charges must be allowed to charge. Denying every transfer
+    // is right for a contract that moves nothing and fatal for one that does, so
+    // ask the contract what it takes and permit exactly that.
+    const contractFee = await this.getContractFee();
+    if (contractFee > 0 && !this.senderAddress) {
+      const error = new Error('connect a wallet before moving: this contract charges a fee');
+      error.code = 'NO_SENDER';
+      throw error;
+    }
+
+    const guard = feePostConditions({
+      sender: this.senderAddress,
+      fee: contractFee,
+      shape: this.pcShape
+    });
+
     const params = {
       contract: this.contractId,
       functionName,
@@ -210,12 +250,12 @@ export class LiveChain {
       // Some wallet builds read `arguments` rather than `functionArgs`. Sending
       // both is what the canary found to work everywhere.
       arguments: args,
-      // This contract moves no tokens, so deny with an empty list is both
-      // correct and the strictest thing we can ask for.
-      postConditionMode: 'deny',
-      postConditions: [],
+      postConditionMode: guard.postConditionMode,
+      postConditions: guard.postConditions,
       network: this.network,
-      // Both spellings: wallets have read one or the other over time.
+      // Both spellings: wallets have read one or the other over time. This is
+      // the network's fee for including the transaction, which is a different
+      // thing from the contract's charge for playing.
       fee: String(this.fee),
       feeRate: String(this.fee)
     };

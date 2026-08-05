@@ -6,7 +6,18 @@
 
 export const FORMAT_VERSION = 1;
 
-export const CONTRACT_NAME = 'xtrata-chess-log-v1';
+// Both deployed shapes of this board. v2 is the current one and charges a fee;
+// v1 charges nothing and is what is on chain today.
+export const CONTRACT_NAMES = {
+  v1: 'xtrata-chess-log-v1',
+  v2: 'xtrata-chess-log-v2'
+};
+
+// The current contract. The board prefers this and falls back to the previous
+// one when it is not deployed, so pointing at v2 before it exists degrades to a
+// working board rather than an error page.
+export const CONTRACT_NAME = CONTRACT_NAMES.v2;
+export const FALLBACK_CONTRACT_NAME = CONTRACT_NAMES.v1;
 
 // The deployed board. Baked in so the page opens on the game rather than on a
 // form asking where the game is; the contract address is not a thing a player
@@ -15,6 +26,7 @@ export const CONTRACT_NAME = 'xtrata-chess-log-v1';
 export const DEFAULT_DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 export const DEFAULT_NETWORK = 'mainnet';
 export const DEFAULT_CONTRACT = `${DEFAULT_DEPLOYER}.${CONTRACT_NAME}`;
+export const FALLBACK_CONTRACT = `${DEFAULT_DEPLOYER}.${FALLBACK_CONTRACT_NAME}`;
 
 // The open board. Games are numbered from one, and the first is the one people
 // arriving without a link should land on.

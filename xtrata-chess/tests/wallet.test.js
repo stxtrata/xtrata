@@ -6,6 +6,7 @@
 // screen with a disabled Confirm button.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { CONTRACT_NAME } from '../src/protocol.js';
 import {
   collectProviders,
   connectWallet,
@@ -437,12 +438,15 @@ describe('what a move costs', () => {
   // Wallets left to themselves suggested ~0.5 STX for a call that uses 9,150 of
   // a 5,000,000,000 runtime budget. Paying that would make the fee the dominant
   // cost of playing and price the open board out of being casual.
+  // A contract that charges nothing, stated rather than fetched.
+  const freeContract = { ok: true, json: async () => ({ okay: false, cause: 'no such function' }) };
+
   it('states a fee rather than letting the wallet guess', async () => {
     const { LiveChain, DEFAULT_FEE_USTX } = await import('../src/live-chain.js');
     const request = vi.fn(async () => ({ txid: '0xabc' }));
     setGlobals({ LeatherProvider: { request } });
 
-    const chain = new LiveChain({ contractAddress: ALICE });
+    const chain = new LiveChain({ contractAddress: ALICE, fetch: async () => freeContract });
     await chain.submitMove(1, 'e2e4');
 
     const [, params] = request.mock.calls[0];
@@ -455,7 +459,11 @@ describe('what a move costs', () => {
     const request = vi.fn(async () => ({ txid: '0xabc' }));
     setGlobals({ LeatherProvider: { request } });
 
-    const chain = new LiveChain({ contractAddress: ALICE, fee: 50_000 });
+    const chain = new LiveChain({
+      contractAddress: ALICE,
+      fee: 50_000,
+      fetch: async () => freeContract
+    });
     await chain.submitMove(1, 'e2e4');
 
     expect(request.mock.calls[0][1].fee).toBe('50000');
@@ -466,10 +474,55 @@ describe('what a move costs', () => {
     const request = vi.fn(async () => ({ txid: '0xabc' }));
     setGlobals({ LeatherProvider: { request } });
 
-    await new LiveChain({ contractAddress: ALICE }).openGame();
+    await new LiveChain({ contractAddress: ALICE, fetch: async () => freeContract }).openGame();
     const [, params] = request.mock.calls[0];
     expect(params.postConditionMode).toBe('deny');
     expect(params.postConditions).toEqual([]);
+  });
+
+  // v2 charges, so the call must permit exactly that and no more. Denying
+  // outright, which is right for v1, would abort the transfer the contract is
+  // about to make.
+  it('permits exactly what a charging contract takes', async () => {
+    const { LiveChain } = await import('../src/live-chain.js');
+    const request = vi.fn(async () => ({ txid: '0xabc' }));
+    setGlobals({ LeatherProvider: { request } });
+
+    const chain = new LiveChain({
+      contractAddress: ALICE,
+      senderAddress: ALICE,
+      // get-move-fee answering u10000
+      fetch: async () => ({
+        ok: true,
+        json: async () => ({ okay: true, result: '0x0100000000000000000000000000002710' })
+      })
+    });
+
+    await chain.submitMove(1, 'e2e4');
+    const [, params] = request.mock.calls[0];
+
+    expect(params.postConditionMode).toBe('deny');
+    expect(params.postConditions[0]).toMatchObject({
+      type: 'stx-postcondition',
+      address: ALICE,
+      condition: 'eq',
+      amount: '10000'
+    });
+  });
+
+  it('refuses to build a charging call without knowing who signs', async () => {
+    const { LiveChain } = await import('../src/live-chain.js');
+    setGlobals({ LeatherProvider: { request: vi.fn() } });
+
+    const chain = new LiveChain({
+      contractAddress: ALICE,
+      fetch: async () => ({
+        ok: true,
+        json: async () => ({ okay: true, result: '0x0100000000000000000000000000002710' })
+      })
+    });
+
+    await expect(chain.submitMove(1, 'e2e4')).rejects.toMatchObject({ code: 'NO_SENDER' });
   });
 });
 
@@ -477,7 +530,8 @@ describe('the mempool', () => {
   // A board that ignores in-flight moves makes everyone race: two people see the
   // same position, both move, and the loser pays for a submission that is
   // skipped. Reading the mempool is free and needs no wallet.
-  const CONTRACT = `${ALICE}.xtrata-chess-log-v1`;
+  // Whatever LiveChain defaults to, since that is what it filters on.
+  const CONTRACT = `${ALICE}.${CONTRACT_NAME}`;
 
   function mempoolReply(entries) {
     return {
