@@ -18,6 +18,8 @@ import {
   bytesToHex,
   deserialize,
   serializeNone,
+  serializePrincipal,
+  serializeSome,
   serializeStringAscii,
   serializeUint,
   sha256
@@ -41,6 +43,7 @@ import {
   walletRequest,
   walletCall,
   feePostConditions,
+  callFeeParams,
   userCancelled,
   extractAddress
 } from './wallet.js';
@@ -58,6 +61,16 @@ function safeJson(value, indent) {
     (_key, v) => (typeof v === 'bigint' ? `${v}` : v),
     indent
   );
+}
+
+// Contract state is written into innerHTML, and a principal or a name is not
+// something to trust unescaped just because it came from a chain read.
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function short(address) {
@@ -166,6 +179,22 @@ export class LaunchCanary {
     this.sourceHash = '';
     this.steps = {};
     this.entries = [];
+
+    // Adding a control to the markup and forgetting to add it to this map has
+    // now cost three debugging sessions. The symptom is always the same: _wire
+    // throws on an undefined element, every later step never runs, and the page
+    // renders perfectly while doing nothing. Say which one is missing instead.
+    const missing = Object.entries(this.el)
+      .filter(([, node]) => !node)
+      .map(([name]) => name);
+    if (missing.length) {
+      const message = `canary is missing elements: ${missing.join(', ')}`;
+      if (this.el.log) {
+        this.el.log.innerHTML =
+          `<div class="entry err"><span class="lvl">err</span><span class="msg">${message}</span></div>`;
+      }
+      throw new Error(message);
+    }
 
     this._wire();
     this._renderWallet('idle');
@@ -302,6 +331,12 @@ export class LaunchCanary {
     el.btnMove.addEventListener('click', () => this.firstMove());
     el.btnVerifyMove.addEventListener('click', () => this.verifyMove());
     el.btnReport.addEventListener('click', () => this.copyReport());
+
+    el.btnReadState.addEventListener('click', () => this.readContractState());
+    el.btnSetFee.addEventListener('click', () => this.setMoveFee());
+    el.btnSetRecipient.addEventListener('click', () => this.setFeeRecipient());
+    el.btnTransfer.addEventListener('click', () => this.transferOwnership());
+    el.btnRenounce.addEventListener('click', () => this.renounceOwnership());
   }
 
   _resetFrom(step) {
@@ -315,6 +350,12 @@ export class LaunchCanary {
 
   get contractName() {
     return this.el.contractVersion?.value || 'xtrata-chess-log-v2';
+  }
+
+  // The network fee to suggest, matching the board's default and editable here
+  // for the same reason it is editable there.
+  get callFee() {
+    return Number(this.el.callFee?.value) || CALL_FEE_USTX;
   }
 
   get charges() {
@@ -703,11 +744,10 @@ export class LaunchCanary {
       postConditionMode: guard.postConditionMode,
       postConditions: guard.postConditions,
       network: this.network,
-      fee: String(CALL_FEE_USTX),
-      feeRate: String(CALL_FEE_USTX)
+      ...callFeeParams(this.callFee)
     };
 
-    this.log('info', `stx_callContract open-game(none), fee ${CALL_FEE_USTX} \u00b5STX`, params);
+    this.log('info', `stx_callContract open-game(none), network fee ${this.callFee} \u00b5STX`, params);
 
     try {
       const { result } = await walletCall('stx_callContract', params, {
@@ -784,11 +824,14 @@ export class LaunchCanary {
       postConditionMode: guard.postConditionMode,
       postConditions: guard.postConditions,
       network: this.network,
-      fee: String(CALL_FEE_USTX),
-      feeRate: String(CALL_FEE_USTX)
+      ...callFeeParams(this.callFee)
     };
 
-    this.log('info', `stx_callContract submit-move(u1, "${FIRST_MOVE}"), fee ${CALL_FEE_USTX} \u00b5STX`, params);
+    this.log(
+      'info',
+      `stx_callContract submit-move(u1, "${FIRST_MOVE}"), network fee ${this.callFee} \u00b5STX`,
+      params
+    );
 
     try {
       const { result } = await walletCall('stx_callContract', params, {
@@ -858,6 +901,173 @@ export class LaunchCanary {
     } catch (error) {
       this.log('warn', `read failed: ${error.message}`);
     }
+  }
+
+  // ------------------------------------------------------------------
+  // Contract controls
+  //
+  // Everything the deployed contract exposes, in one place, gated on actually
+  // being its owner. The board deliberately has none of this: what a move costs
+  // is the owner's to set, not a knob for whoever happens to be playing.
+  // ------------------------------------------------------------------
+
+  async readContractState() {
+    const el = this.el;
+    el.contractState.innerHTML = '<dt>reading…</dt><dd></dd>';
+
+    const readers = [
+      ['format version', 'get-format-version', (v) => String(v)],
+      ['games opened', 'get-game-count', (v) => String(v)],
+      ['log ceiling', 'get-max-seq', (v) => `${v} submissions per game`],
+      ['move fee', 'get-move-fee', (v) => `${v} \u00b5STX (${(Number(v) / 1e6).toFixed(6)} STX)`],
+      ['fee ceiling', 'get-fee-ceiling', (v) => `${v} \u00b5STX (${(Number(v) / 1e6).toFixed(6)} STX)`],
+      ['fee recipient', 'get-fee-recipient', (v) => String(v)],
+      ['owner', 'get-owner', (v) => (v === null ? 'renounced — nobody can change anything' : String(v))]
+    ];
+
+    const rows = [];
+    this.chainState = {};
+
+    for (const [label, fn, format] of readers) {
+      try {
+        const value = await readOnly(this.api, this.address, this.contractName, fn);
+        this.chainState[fn] = value;
+        rows.push([label, format(value)]);
+      } catch {
+        // v1 has no fee functions at all, which is an answer rather than a fault.
+        rows.push([label, '—  not on this contract']);
+      }
+    }
+
+    el.contractState.innerHTML = rows
+      .map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd>`)
+      .join('');
+
+    const owner = this.chainState['get-owner'];
+    const isOwner = owner && this.address && String(owner) === this.address;
+    const hasOwnerFns = this.chainState['get-move-fee'] !== undefined;
+
+    el.ownerControls.hidden = !hasOwnerFns || !isOwner;
+    el.controlsState.textContent = !hasOwnerFns
+      ? 'read only'
+      : owner === null
+        ? 'renounced'
+        : isOwner
+          ? 'you own this'
+          : 'owned by someone else';
+
+    if (hasOwnerFns && !isOwner && owner !== null) {
+      this.log('info', `these controls belong to ${owner}, and you are connected as ${this.address}`);
+    }
+
+    if (isOwner) {
+      el.newFee.value = String(this.chainState['get-move-fee'] ?? '');
+      el.newRecipient.value = String(this.chainState['get-fee-recipient'] ?? '');
+    }
+  }
+
+  // Every owner action is the same shape: confirm, send, report.
+  async _ownerCall(functionName, args, description) {
+    if (!confirm(`${description}\n\nThis changes the deployed contract on ${this.network}. Continue?`)) {
+      this.log('info', 'not confirmed, nothing sent');
+      return;
+    }
+
+    this.log('info', `${functionName}`, { args: description });
+
+    try {
+      const { result } = await walletCall(
+        'stx_callContract',
+        {
+          contract: `${this.address}.${this.contractName}`,
+          functionName,
+          functionArgs: args,
+          arguments: args,
+          // These move no STX, so nothing should leave the wallet.
+          postConditionMode: 'deny',
+          postConditions: [],
+          network: this.network,
+          ...callFeeParams(this.callFee)
+        },
+        { onLog: (level, message, detail) => this.log(level, message, detail) }
+      );
+
+      const txid = txidFrom(result);
+      this.log('ok', `${functionName} sent${txid ? `, txid ${txid}` : ''}`);
+      if (txid) this.log('info', this._explorer(txid).replace(/<[^>]+>/g, ''));
+    } catch (error) {
+      if (userCancelled(error)) {
+        this.log('info', 'you cancelled in the wallet — nothing was sent');
+        return;
+      }
+      this.log('err', `${functionName} failed: ${error.message}`);
+    }
+  }
+
+  async setMoveFee() {
+    const amount = Number(this.el.newFee.value);
+    const ceiling = Number(this.chainState?.['get-fee-ceiling'] ?? 0);
+
+    if (!Number.isFinite(amount) || amount < 0) {
+      this.log('err', 'the fee must be a whole number of microSTX, or zero to charge nothing');
+      return;
+    }
+    if (ceiling && amount > ceiling) {
+      // The contract would refuse this anyway. Saying so here saves a fee.
+      this.log('err', `${amount} is above the contract's ceiling of ${ceiling} \u00b5STX, which it would refuse`);
+      return;
+    }
+
+    await this._ownerCall(
+      'set-move-fee',
+      [serializeUint(amount)],
+      `Set the move fee to ${amount} \u00b5STX (${(amount / 1e6).toFixed(6)} STX).`
+    );
+  }
+
+  async setFeeRecipient() {
+    const who = this.el.newRecipient.value.trim();
+    try {
+      await this._ownerCall(
+        'set-fee-recipient',
+        [serializePrincipal(who)],
+        `Send every future fee to ${who}.`
+      );
+    } catch (error) {
+      this.log('err', `that is not a valid address: ${error.message}`);
+    }
+  }
+
+  async transferOwnership() {
+    const who = this.el.newOwner.value.trim();
+    try {
+      await this._ownerCall(
+        'transfer-ownership',
+        [serializeSome(serializePrincipal(who))],
+        `Hand this contract to ${who}. They will control the fee, and you will not.`
+      );
+    } catch (error) {
+      this.log('err', `that is not a valid address: ${error.message}`);
+    }
+  }
+
+  async renounceOwnership() {
+    const typed = prompt(
+      'Renouncing gives this contract to nobody, permanently.\n\n' +
+        `The fee stays at ${this.chainState?.['get-move-fee'] ?? '?'} \u00b5STX and the recipient stays as it is, ` +
+        'forever. Nobody can ever change them again, including you. There is no way back.\n\n' +
+        'Type RENOUNCE to continue:'
+    );
+    if (typed !== 'RENOUNCE') {
+      this.log('info', 'not confirmed, nothing sent');
+      return;
+    }
+
+    await this._ownerCall(
+      'transfer-ownership',
+      [serializeNone()],
+      'Renounce ownership permanently.'
+    );
   }
 
   // ---- report -------------------------------------------------------

@@ -275,9 +275,6 @@ export class ChessBoardApp {
 
     el.connect.addEventListener('click', () => this.connect());
     el.disconnect.addEventListener('click', () => this.disconnectWallet());
-    el.fee.addEventListener('change', () => {
-      if (this.chain?.fee !== undefined) this.chain.fee = Number(el.fee.value) || this.chain.fee;
-    });
     el.loadLive.addEventListener('click', () => this.startLive());
     el.gameSelect.addEventListener('change', () => {
       this.game = Number(el.gameSelect.value);
@@ -385,7 +382,6 @@ export class ChessBoardApp {
         contractAddress,
         contractName: el.contractName.value.trim() || undefined,
         network: el.network.value,
-        fee: Number(el.fee.value) || undefined,
         senderAddress: this.walletAddress || undefined
       });
 
@@ -1210,9 +1206,10 @@ export class ChessBoardApp {
       const name = el.contractName.value;
       el.chargeNote.hidden = this.mode !== 'live';
       el.chargeNote.innerHTML = charge
-        ? `<strong>${(charge / 1e6).toFixed(6)} STX</strong> per move to the contract, plus the network fee above. ` +
-          `Your wallet will be asked to permit exactly that and no more.`
-        : `${escapeHtml(name)} charges nothing. Only the network fee above applies.`;
+        ? `<strong>${(charge / 1e6).toFixed(6)} STX</strong> per move, set by whoever owns ` +
+          `${escapeHtml(name)}, plus the usual network fee. Your wallet will be asked to permit ` +
+          `that amount and no more.`
+        : `${escapeHtml(name)} charges nothing to play. Only the usual network fee applies.`;
     }
   }
 

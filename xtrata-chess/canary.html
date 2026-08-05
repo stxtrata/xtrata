@@ -134,6 +134,34 @@
          build, including the contract it would deploy. */
       .version.stale { border-color: var(--err); background: #2a1614; }
 
+      button.danger { border-color: var(--err); color: #e8907f; }
+      button.danger:hover { background: rgba(180, 87, 76, 0.12); }
+
+      .stategrid {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 4px 12px;
+        font-family: var(--mono);
+        font-size: 11px;
+        margin: 10px 0;
+      }
+      .stategrid dt { color: var(--dim); }
+      .stategrid dd { margin: 0; word-break: break-all; }
+
+      details.fold-panel { padding: 0; }
+      details.fold-panel > summary {
+        list-style: none; cursor: pointer; padding: 14px;
+        display: flex; align-items: center; gap: 8px;
+      }
+      details.fold-panel > summary::-webkit-details-marker { display: none; }
+      details.fold-panel > summary::before {
+        content: '▸'; color: var(--dim); font-size: 11px; transition: transform .15s;
+      }
+      details.fold-panel[open] > summary::before { transform: rotate(90deg); }
+      details.fold-panel > summary h2 { margin: 0; flex: 1; }
+      details.fold-panel > *:not(summary) { padding: 0 14px; }
+      details.fold-panel > *:last-child { padding-bottom: 14px; }
+
       .mono, code, pre { font-family: var(--mono); }
       .meta { font-family: var(--mono); font-size: 11px; color: var(--dim); word-break: break-all; margin: 8px 0 0; }
       .meta a { color: var(--accent); }
@@ -225,6 +253,10 @@
               <option value="xtrata-chess-log-v1">v1 · no fee, already deployed</option>
             </select>
           </label>
+          <label class="field" style="flex: 0 1 140px">
+            <span>Network fee (µSTX)</span>
+            <input id="call-fee" type="number" min="1" step="1000" value="10000" />
+          </label>
           <button id="btn-detect">Re-detect</button>
           <button id="btn-connect" class="go">Connect</button>
           <button id="btn-disconnect" hidden>Disconnect</button>
@@ -307,6 +339,50 @@
         <p class="meta">tx <span id="move-tx">—</span></p>
       </div>
 
+      <details class="panel fold-panel" id="controls-panel">
+        <summary><h2>Contract controls <span class="state" id="controls-state">read only</span></h2></summary>
+
+        <div class="row">
+          <button id="btn-read-state">Read contract state</button>
+        </div>
+        <div id="contract-state" class="stategrid"></div>
+
+        <div id="owner-controls" hidden>
+          <p class="hint">
+            These change the deployed contract and are refused for anyone who is not its owner.
+          </p>
+
+          <div class="row">
+            <label class="field" style="flex: 0 1 180px">
+              <span>Move fee (µSTX)</span>
+              <input id="new-fee" type="number" min="0" step="1000" />
+            </label>
+            <button id="btn-set-fee">Set fee</button>
+          </div>
+
+          <div class="row">
+            <label class="field">
+              <span>Fee recipient</span>
+              <input id="new-recipient" type="text" placeholder="SP…" autocomplete="off" spellcheck="false" />
+            </label>
+            <button id="btn-set-recipient">Set recipient</button>
+          </div>
+
+          <div class="row">
+            <label class="field">
+              <span>Transfer ownership to</span>
+              <input id="new-owner" type="text" placeholder="SP…" autocomplete="off" spellcheck="false" />
+            </label>
+            <button id="btn-transfer">Transfer</button>
+            <button id="btn-renounce" class="danger">Renounce forever</button>
+          </div>
+          <p class="hint">
+            Renouncing gives the contract to nobody, permanently. The fee and the recipient freeze
+            exactly as they stand and no one can ever change them again, including you.
+          </p>
+        </div>
+      </details>
+
       <div class="panel">
         <h2>Log <span class="state"><button id="btn-report">Copy report</button></span></h2>
         <div id="log"></div>
@@ -348,6 +424,19 @@
         btnVerifyMove: byId('btn-verify-move'),
         moveTx: byId('move-tx'),
         btnReport: byId('btn-report'),
+        callFee: byId('call-fee'),
+        controlsPanel: byId('controls-panel'),
+        controlsState: byId('controls-state'),
+        contractState: byId('contract-state'),
+        ownerControls: byId('owner-controls'),
+        btnReadState: byId('btn-read-state'),
+        newFee: byId('new-fee'),
+        btnSetFee: byId('btn-set-fee'),
+        newRecipient: byId('new-recipient'),
+        btnSetRecipient: byId('btn-set-recipient'),
+        newOwner: byId('new-owner'),
+        btnTransfer: byId('btn-transfer'),
+        btnRenounce: byId('btn-renounce'),
         log: byId('log'),
         step0: byId('step-0'),
         step1: byId('step-1'),

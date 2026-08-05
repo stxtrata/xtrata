@@ -518,6 +518,29 @@ export async function disconnectWallet({ onLog } = {}) {
  * current sats-connect and Leather expect; `shape` exists so a canary can fall
  * back rather than leaving somebody stuck.
  */
+/**
+ * The transaction fee to suggest for a call, in microSTX.
+ *
+ * This is the network's fee for including the transaction, and is a different
+ * thing from whatever the contract charges for playing. Left alone, wallets
+ * suggest around 0.5 STX for a call that uses 9,150 units of a 5,000,000,000
+ * runtime budget, which would make the fee the dominant cost of a move.
+ *
+ * Sent as a number rather than a string. Nothing in this repo had ever set a
+ * fee through a wallet, so the string form was a guess, and Xverse ignored it
+ * and went on estimating. A number is what a wallet building the transaction
+ * would parse.
+ *
+ * A wallet is still free to overrule this and show its own estimate; the figure
+ * is editable in the wallet either way. Both spellings go out because wallets
+ * have read one or the other over time, and an unknown key is ignored.
+ */
+export function callFeeParams(microStx) {
+  const fee = Number(microStx);
+  if (!Number.isFinite(fee) || fee <= 0) return {};
+  return { fee, feeRate: fee };
+}
+
 // Fungible condition codes, as they appear on the wire.
 const SENT_EQUAL_TO = 0x01;
 const SENT_LESS_THAN_OR_EQUAL_TO = 0x05;

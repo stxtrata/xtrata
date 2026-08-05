@@ -19,7 +19,7 @@ import {
   serializeStringAscii,
   serializeUint
 } from './clarity.js';
-import { walletCall, waitForProvider, feePostConditions } from './wallet.js';
+import { walletCall, waitForProvider, feePostConditions, callFeeParams } from './wallet.js';
 import { CONTRACT_NAME, ERR, PAGE_SIZE } from './protocol.js';
 
 export const DEFAULT_API = {
@@ -253,11 +253,7 @@ export class LiveChain {
       postConditionMode: guard.postConditionMode,
       postConditions: guard.postConditions,
       network: this.network,
-      // Both spellings: wallets have read one or the other over time. This is
-      // the network's fee for including the transaction, which is a different
-      // thing from the contract's charge for playing.
-      fee: String(this.fee),
-      feeRate: String(this.fee)
+      ...callFeeParams(this.fee)
     };
 
     const { result, entry } = await walletCall('stx_callContract', params);

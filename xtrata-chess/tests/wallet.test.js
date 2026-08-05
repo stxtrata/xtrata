@@ -450,7 +450,11 @@ describe('what a move costs', () => {
     await chain.submitMove(1, 'e2e4');
 
     const [, params] = request.mock.calls[0];
-    expect(params.fee).toBe(String(DEFAULT_FEE_USTX));
+    // A number, not a string. Nothing here had ever set a fee through a wallet,
+    // and the string form was a guess that Xverse ignored while going on to
+    // estimate around 0.5 STX for a call worth a fraction of that.
+    expect(params.fee).toBe(DEFAULT_FEE_USTX);
+    expect(typeof params.fee).toBe('number');
     expect(DEFAULT_FEE_USTX).toBe(10_000);
   });
 
@@ -466,7 +470,16 @@ describe('what a move costs', () => {
     });
     await chain.submitMove(1, 'e2e4');
 
-    expect(request.mock.calls[0][1].fee).toBe('50000');
+    expect(request.mock.calls[0][1].fee).toBe(50_000);
+  });
+
+  it('sends nothing rather than a nonsense fee', async () => {
+    const { callFeeParams } = await import('../src/wallet.js');
+    // A wallet estimating for itself is better than one handed rubbish.
+    expect(callFeeParams(0)).toEqual({});
+    expect(callFeeParams(-1)).toEqual({});
+    expect(callFeeParams('lots')).toEqual({});
+    expect(callFeeParams(10_000)).toEqual({ fee: 10_000, feeRate: 10_000 });
   });
 
   it('still denies post conditions, since a move moves nothing', async () => {
