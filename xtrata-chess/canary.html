@@ -101,6 +101,30 @@
       }
       .warning strong { color: #e8907f; }
 
+      .version {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: baseline;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--dim);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 7px 11px;
+        margin-bottom: 16px;
+      }
+      .version .vlabel { text-transform: uppercase; letter-spacing: 0.06em; }
+      .version code { color: var(--ink); }
+      .version .vsep { opacity: 0.5; }
+      .vcheck { margin-left: auto; }
+      .vcheck.ok { color: var(--ok); }
+      .vcheck.stale { color: var(--err); font-weight: 600; }
+      .vcheck.unknown { color: var(--dim); }
+      /* A stale page is worth shouting about: everything below it is the wrong
+         build, including the contract it would deploy. */
+      .version.stale { border-color: var(--err); background: #2a1614; }
+
       .mono, code, pre { font-family: var(--mono); }
       .meta { font-family: var(--mono); font-size: 11px; color: var(--dim); word-break: break-all; margin: 8px 0 0; }
       .meta a { color: var(--accent); }
@@ -139,6 +163,14 @@
 
   <body>
     <main>
+      <div id="version-bar" class="version">
+        <span class="vlabel">build</span>
+        <code id="build-id">unknown</code>
+        <span class="vsep">·</span>
+        <span id="build-at">—</span>
+        <span id="build-check" class="vcheck">checking…</span>
+      </div>
+
       <h1>Xtrata Chess · Launch Canary</h1>
       <p class="sub">
         From nothing to a played first move, every transaction signed by your wallet.
@@ -258,6 +290,10 @@
         address: byId('address'),
         sourceInfo: byId('source-info'),
         fileWarning: byId('file-warning'),
+        versionBar: byId('version-bar'),
+        buildId: byId('build-id'),
+        buildAt: byId('build-at'),
+        buildCheck: byId('build-check'),
         btnDetect: byId('btn-detect'),
         btnConnect: byId('btn-connect'),
         btnPreflight: byId('btn-preflight'),

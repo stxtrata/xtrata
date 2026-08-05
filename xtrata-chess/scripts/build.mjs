@@ -25,6 +25,34 @@ const OUT_DIR = resolve(ROOT, 'dist');
 
 const ENTRY = './boot.js';
 
+// A build stamp both the artifact and the manifest carry, so a page can tell
+// you whether it is the build you just made. The id is content-derived, so an
+// unchanged rebuild keeps the same id and only the timestamp moves. That is
+// deliberate: what matters is whether the bytes are current, not when they were
+// produced.
+function buildStamp(parts) {
+  const digest = createHash('sha256');
+  for (const part of parts) digest.update(part);
+  return {
+    version: '1.0.0',
+    buildId: digest.digest('hex').slice(0, 12),
+    builtAt: new Date().toISOString()
+  };
+}
+
+async function writeManifest(name, stamp, extra = {}) {
+  const manifestPath = resolve(OUT_DIR, 'build-manifest.json');
+  let manifest = {};
+  try {
+    manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+  } catch {
+    manifest = {};
+  }
+  manifest[name] = { ...stamp, ...extra };
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
+  return manifestPath;
+}
+
 const IMPORT_RE = /^import\s*\{([\s\S]*?)\}\s*from\s*['"](\.\/[^'"]+)['"];?\s*$/gm;
 const EXPORT_DECL_RE = /^export\s+(const|let|function|class|async function)\s+([A-Za-z_$][\w$]*)/gm;
 
@@ -96,8 +124,11 @@ async function buildEngine(html) {
   const shell = extractShell(html);
   const modules = await bundle();
 
+  const stamp = buildStamp([modules, shell.css, shell.html]);
+
   const source = [
     '(function () {',
+    `window.__XTRATA_CHESS_BUILD__ = ${JSON.stringify(stamp)};`,
     modules,
     'const __boot = __require("./boot.js");',
     `__boot.SHELL.css = ${JSON.stringify(shell.css)};`,
@@ -117,9 +148,12 @@ async function buildEngine(html) {
   const bytes = Buffer.byteLength(source, 'utf8');
   const sha = createHash('sha256').update(source).digest('hex');
 
+  await writeManifest('engine', stamp);
+
   console.log(`built  ${outPath}`);
   console.log(`bytes  ${bytes.toLocaleString()}`);
   console.log(`sha256 ${sha}`);
+  console.log(`build  ${stamp.version} · ${stamp.buildId} · ${stamp.builtAt}`);
   console.log('\nInscribe this first. Every board and every child game depends on it,');
   console.log('so its inscription id is what children carry.');
   return { outPath, bytes, sha };
@@ -171,9 +205,12 @@ async function buildCanary() {
     .replace(/<\/?script[^>]*>/g, '')
     .replace(/^\s*import\s*\{[\s\S]*?\}\s*from\s*['"][^'"]+['"];?\s*$/m, '');
 
+  const stamp = buildStamp([modules, contract, html]);
+
   const script = [
     '<script>',
     '(function () {',
+    `window.__XTRATA_CHESS_BUILD__ = ${JSON.stringify(stamp)};`,
     `window.__XTRATA_CHESS_CONTRACT__ = ${JSON.stringify(contract)};`,
     modules,
     'const { LaunchCanary } = __require("./canary.js");',
@@ -189,9 +226,12 @@ async function buildCanary() {
   await writeFile(outPath, output, 'utf8');
 
   const contractHash = createHash('sha256').update(contract).digest('hex');
+  await writeManifest('canary', stamp, { contractHash });
+
   console.log(`built  ${outPath}`);
   console.log(`bytes  ${Buffer.byteLength(output, 'utf8').toLocaleString()}`);
   console.log(`sha256 ${createHash('sha256').update(output).digest('hex')}`);
+  console.log(`build  ${stamp.version} · ${stamp.buildId} · ${stamp.builtAt}`);
   console.log(`\ncontract inlined: ${contract.length.toLocaleString()} bytes, sha256 ${contractHash}`);
   console.log('Open it in a browser with Leather or Xverse installed. No seed phrase is needed.');
 }

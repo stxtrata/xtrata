@@ -128,8 +128,66 @@ export class LaunchCanary {
     this.entries = [];
 
     this._wire();
+    this._showBuild();
     this._loadSource();
     this.detect();
+  }
+
+  // ---- which build am I? --------------------------------------------
+  //
+  // A browser holding a stale copy of this page is the quiet failure mode: the
+  // steps still work, they just deploy yesterday's contract. So the page states
+  // its build, and checks that against the manifest each build writes.
+
+  _showBuild() {
+    const build = globalThis.__XTRATA_CHESS_BUILD__;
+    if (!build) {
+      this.el.buildId.textContent = 'dev';
+      this.el.buildAt.textContent = 'running from source, not a build';
+      this.el.buildCheck.textContent = '';
+      return;
+    }
+
+    this.build = build;
+    this.el.buildId.textContent = `${build.version} · ${build.buildId}`;
+    this.el.buildAt.textContent = new Date(build.builtAt).toLocaleString();
+    this.log('info', `build ${build.version} · ${build.buildId}`, build.builtAt);
+
+    this._checkBuild();
+  }
+
+  async _checkBuild() {
+    const el = this.el;
+    try {
+      // Cache-busted on purpose: whether its own cached copy is current is the
+      // one question a browser cache cannot answer.
+      const response = await fetch(`./build-manifest.json?t=${Date.now()}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const manifest = await response.json();
+      const latest = manifest?.canary;
+      if (!latest?.buildId) throw new Error('no canary entry in the manifest');
+
+      if (latest.buildId === this.build.buildId) {
+        el.buildCheck.textContent = 'current';
+        el.buildCheck.className = 'vcheck ok';
+        return;
+      }
+
+      el.buildCheck.textContent = `STALE — latest is ${latest.buildId}`;
+      el.buildCheck.className = 'vcheck stale';
+      el.versionBar.classList.add('stale');
+      this.log(
+        'err',
+        `this page is build ${this.build.buildId} but ${latest.buildId} exists — hard reload before doing anything`,
+        { thisPage: this.build, latest }
+      );
+    } catch {
+      // Offline, inscribed, or opened from a file. Not a failure: there is
+      // nothing to compare against, and saying so beats a false all-clear.
+      el.buildCheck.textContent = 'no manifest to compare';
+      el.buildCheck.className = 'vcheck unknown';
+    }
   }
 
   get api() {
