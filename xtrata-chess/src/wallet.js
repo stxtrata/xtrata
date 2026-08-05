@@ -109,17 +109,24 @@ export function collectProviders() {
     }
   }
 
+  // Astro Blaster's weights, kept verbatim. The one that matters most is
+  // bitcoinprovider: Xverse injects both a StacksProvider whose request() is a
+  // stub that throws "request function is not implemented", and a
+  // BitcoinProvider that is the real sats-connect surface and answers stx_*
+  // methods properly. Ranking StacksProvider first, as an alphabetical or
+  // name-based ordering would, picks the broken one every time.
   const score = (item) => {
     const label = String(item.label || '').toLowerCase();
     let value = 0;
+    if (item.hasTransactionRequest) value += 100;
     if (item.hasRequest) value += 10;
-    // The shim is the only route to a wallet inside the sandbox, so it wins
-    // there and is otherwise a thin pass-through to the real provider anyway.
-    if (shim && label === 'window.stacksprovider') value += 60;
-    if (label.includes('leather')) value += 25;
+    if (label.includes('bitcoinprovider')) value += 40;
     if (label.includes('xverse')) value += 20;
     if (label.startsWith('registry:')) value += 15;
-    if (!shim && label === 'window.stacksprovider') value -= 10;
+    // Inside the Xtrata runtime the shim is window.StacksProvider and may be
+    // the only route to a wallet, so it outranks everything there.
+    if (shim && label === 'window.stacksprovider') value += 120;
+    else if (label === 'window.stacksprovider') value -= 10;
     return value;
   };
 
@@ -167,6 +174,20 @@ export function waitForProvider({ timeoutMs = 4000, intervalMs = 250 } = {}) {
  * form: rest and default parameters report an arity of 0 or 1, so the sniff was
  * wrong precisely for the wallets that mattered.
  */
+// Some providers exist, expose request(), and then refuse everything. Xverse's
+// StacksProvider throws "request function is not implemented" for every method;
+// others answer -32601. Either way the right move is the next provider, not a
+// failure, which is what the Xtrata shim does with the same error string.
+export function providerCannot(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return (
+    error?.code === -32601 ||
+    message.includes('not implemented') ||
+    message.includes('method not found') ||
+    message.includes('unsupported method')
+  );
+}
+
 export async function walletRequest(entry, method, params, { timeoutMs = 180_000 } = {}) {
   const provider = entry?.provider || entry;
   if (!provider || typeof provider.request !== 'function') {
@@ -211,6 +232,44 @@ export async function walletRequest(entry, method, params, { timeoutMs = 180_000
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Call a method against the best provider that can actually perform it.
+ *
+ * Tries each discovered provider in order, moving on when one says it cannot do
+ * the method rather than giving up. A page with Xverse installed sees two
+ * providers where only the second works, so stopping at the first is the
+ * difference between connecting and not.
+ */
+export async function walletCall(method, params, { timeoutMs, onLog } = {}) {
+  const log = onLog || (() => {});
+  const found = collectProviders();
+
+  if (!found.length) {
+    const error = new Error('no Stacks wallet found');
+    error.code = 'NO_WALLET';
+    throw error;
+  }
+
+  let lastError = null;
+  for (const entry of found) {
+    try {
+      const result = await walletRequest(entry, method, params, { timeoutMs });
+      return { result, entry };
+    } catch (error) {
+      lastError = error;
+      if (providerCannot(error)) {
+        log('info', `${entry.label} cannot do ${method}, trying the next provider`);
+        continue;
+      }
+      // A real rejection (user cancelled, bad params) is an answer, not a
+      // reason to go asking a different wallet the same question.
+      throw error;
+    }
+  }
+
+  throw lastError || new Error(`no provider could perform ${method}`);
 }
 
 // Wallets nest the address differently, and move it between versions.
@@ -291,48 +350,61 @@ export async function connectWallet({ preferredLabel, onLog } = {}) {
     };
   }
 
-  const entry = await waitForProvider();
-  if (!entry) {
+  const first = await waitForProvider();
+  if (!first) {
     const error = new Error('no Stacks wallet found');
     error.code = 'NO_WALLET';
     throw error;
   }
-  log('info', `using ${entry.label}`, {
+
+  const found = collectProviders();
+  log('info', `${found.length} provider(s) available`, {
+    order: found.map((entry) => entry.label),
     framed: isFramed(),
     hostBridge: usingHostBridge(),
     shim: shimInstalled()
   });
 
+  // Method-first, provider-second. A wallet that cannot do getAddresses may
+  // still answer wallet_connect, and a provider that refuses everything must not
+  // stop us reaching the one beside it that works.
   let lastError = null;
   for (const method of ADDRESS_METHODS) {
-    try {
-      // A locked wallet can take a long time to answer the first call.
-      const result = await walletRequest(entry, method, {}, { timeoutMs: 45_000 });
-      const address = extractAddress(result);
-      if (address) {
-        const session = {
-          address,
-          network: networkFromAddress(address) || 'mainnet',
-          via: method,
-          provider: entry
-        };
-        try {
-          globalThis.XtrataWalletSession = { address, network: session.network };
-        } catch {
-          // Sandboxed pages can throw on window writes. Not worth failing over.
+    for (const entry of found) {
+      try {
+        // A locked wallet can take a long time to answer the first call.
+        const result = await walletRequest(entry, method, {}, { timeoutMs: 45_000 });
+        const address = extractAddress(result);
+        if (address) {
+          const session = {
+            address,
+            network: networkFromAddress(address) || 'mainnet',
+            via: `${method} on ${entry.label}`,
+            provider: entry
+          };
+          try {
+            globalThis.XtrataWalletSession = { address, network: session.network };
+          } catch {
+            // Sandboxed pages can throw on window writes. Not worth failing over.
+          }
+          log('ok', `connected via ${method} on ${entry.label}`, address);
+          return session;
         }
-        log('ok', `connected via ${method}`, address);
-        return session;
+        log('warn', `${entry.label} answered ${method} without an address`, result);
+      } catch (error) {
+        lastError = error;
+        if (providerCannot(error)) {
+          log('info', `${entry.label} does not implement ${method}`);
+        } else {
+          log('warn', `${entry.label} ${method}: ${error.message}`);
+        }
       }
-      log('warn', `${method} answered without an address`, result);
-    } catch (error) {
-      lastError = error;
-      log('warn', `${method}: ${error.message}`);
     }
   }
 
   const error = new Error(
-    `wallet found (${entry.label}) but no method returned an address${lastError ? `: ${lastError.message}` : ''}`
+    `found ${found.length} provider(s) but none returned an address` +
+      (lastError ? `. Last error: ${lastError.message}` : '')
   );
   error.code = 'NO_ADDRESS';
   throw error;

@@ -8,9 +8,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   collectProviders,
+  connectWallet,
   extractAddress,
   networkFromAddress,
+  providerCannot,
   resolveProvider,
+  walletCall,
   walletRequest
 } from '../src/wallet.js';
 
@@ -27,7 +30,10 @@ afterEach(() => {
   for (const key of [
     'LeatherProvider', 'XverseProviders', 'xverseProviders', 'StacksProvider',
     'stacks', 'btc', 'BitcoinProvider', 'btc_providers', 'webbtc_providers',
-    'wbip_providers', '__xtrataRuntimeWalletShimInstalled'
+    'wbip_providers', '__xtrataRuntimeWalletShimInstalled',
+    // connectWallet publishes a session on success, and a later connect reuses
+    // it rather than re-prompting. Left behind it leaks between tests.
+    'XtrataWalletSession', 'ArcadeWalletSession', '__xtrataWalletSession'
   ]) {
     delete globalThis[key];
   }
@@ -89,9 +95,39 @@ describe('the Xtrata sandbox', () => {
     expect(resolveProvider().label).toBe('window.StacksProvider');
   });
 
-  it('prefers a named wallet over the bare generic when there is no shim', () => {
-    setGlobals({ LeatherProvider: fake('leather'), XverseProviders: { StacksProvider: fake('x') } });
-    expect(resolveProvider().label).toBe('window.LeatherProvider');
+  // Astro Blaster's weights give Xverse a bonus and Leather none, so with both
+  // installed an Xverse surface leads. Kept as it is rather than "improved":
+  // the ordering was tuned against a real wallet matrix, and the fallback below
+  // handles a leader that turns out to be a stub.
+  it('leads with an Xverse surface when Leather and Xverse are both installed', () => {
+    setGlobals({
+      LeatherProvider: fake('leather'),
+      XverseProviders: { StacksProvider: fake('x'), BitcoinProvider: fake('sats') }
+    });
+
+    const order = collectProviders().map((entry) => entry.label);
+    expect(order[0]).toBe('window.XverseProviders.BitcoinProvider');
+    expect(order).toContain('window.LeatherProvider');
+  });
+
+  it('still offers Leather, so a failing Xverse falls through to it', async () => {
+    const leather = {
+      request: vi.fn(async () => ({ addresses: [{ symbol: 'STX', address: ALICE }] }))
+    };
+    setGlobals({
+      LeatherProvider: leather,
+      XverseProviders: {
+        StacksProvider: {
+          request: async () => {
+            throw new Error('`request` function is not implemented');
+          }
+        }
+      }
+    });
+
+    const session = await connectWallet();
+    expect(session.address).toBe(ALICE);
+    expect(session.via).toContain('LeatherProvider');
   });
 });
 
@@ -186,5 +222,82 @@ describe('network from address', () => {
     expect(networkFromAddress('SM123')).toBe('mainnet');
     expect(networkFromAddress('SN123')).toBe('testnet');
     expect(networkFromAddress('nonsense')).toBe(null);
+  });
+});
+
+describe('session reuse', () => {
+  // A connected page publishes its session so a second ask does not re-prompt.
+  // That is the budget Astro Blaster settled on: one interactive wallet read per
+  // page lifecycle, because a locked Leather can take twenty seconds to answer.
+  it('reuses a session the host already published, without touching a provider', async () => {
+    const request = vi.fn();
+    setGlobals({
+      LeatherProvider: { request },
+      ArcadeWalletSession: { address: ALICE }
+    });
+
+    const session = await connectWallet();
+    expect(session.address).toBe(ALICE);
+    expect(session.via).toBe('host-session');
+    expect(request).not.toHaveBeenCalled();
+  });
+});
+
+describe('Xverse, as actually installed', () => {
+  // Reproduces a real failure. Xverse injects a StacksProvider whose request()
+  // is a stub that throws "request function is not implemented" for every
+  // method, alongside a BitcoinProvider that is the working sats-connect
+  // surface. Ranking by name puts the broken one first and nothing connects.
+  const ALICE_REPLY = {
+    result: { addresses: [{ symbol: 'STX', address: ALICE }] }
+  };
+
+  function installXverse() {
+    const stub = {
+      request: async () => {
+        throw new Error('`request` function is not implemented');
+      }
+    };
+    const working = { request: vi.fn(async () => ALICE_REPLY) };
+    setGlobals({
+      XverseProviders: { StacksProvider: stub, BitcoinProvider: working }
+    });
+    return { stub, working };
+  }
+
+  it('ranks the working BitcoinProvider above the stub StacksProvider', () => {
+    installXverse();
+    expect(resolveProvider().label).toBe('window.XverseProviders.BitcoinProvider');
+  });
+
+  it('recognises the stub error as "ask someone else"', () => {
+    expect(providerCannot(new Error('`request` function is not implemented'))).toBe(true);
+    expect(providerCannot({ code: -32601 })).toBe(true);
+    // A refusal by the user is an answer, not a reason to try another wallet.
+    expect(providerCannot(new Error('user rejected the request'))).toBe(false);
+  });
+
+  it('falls through the stub and connects via the provider that works', async () => {
+    const { working } = installXverse();
+    const session = await connectWallet();
+    expect(session.address).toBe(ALICE);
+    expect(session.via).toContain('BitcoinProvider');
+    expect(working.request).toHaveBeenCalled();
+  });
+
+  it('sends a contract call through the working provider', async () => {
+    const { working } = installXverse();
+    const { entry } = await walletCall('stx_callContract', { contract: 'x.y' });
+    expect(entry.label).toBe('window.XverseProviders.BitcoinProvider');
+    expect(working.request).toHaveBeenCalledWith('stx_callContract', { contract: 'x.y' });
+  });
+
+  it('does not keep shopping around once a wallet genuinely refuses', async () => {
+    const refuse = vi.fn(async () => {
+      throw new Error('User rejected the request');
+    });
+    setGlobals({ XverseProviders: { BitcoinProvider: { request: refuse } } });
+    await expect(walletCall('stx_callContract', {})).rejects.toThrow(/rejected/i);
+    expect(refuse).toHaveBeenCalledTimes(1);
   });
 });

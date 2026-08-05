@@ -31,6 +31,7 @@ import {
   shimInstalled,
   usingHostBridge,
   walletRequest,
+  walletCall,
   extractAddress
 } from './wallet.js';
 
@@ -412,7 +413,10 @@ export class LaunchCanary {
     });
 
     try {
-      const result = await walletRequest(this.provider, 'stx_deployContract', params);
+      const { result, entry } = await walletCall('stx_deployContract', params, {
+        onLog: (level, message, detail) => this.log(level, message, detail)
+      });
+      this.log('info', `signed via ${entry.label}`);
       const txid = txidFrom(result);
       if (!txid) {
         this.log('warn', 'wallet returned no txid', result);
@@ -484,7 +488,9 @@ export class LaunchCanary {
     this.log('info', 'stx_callContract open-game(none)', params);
 
     try {
-      const result = await walletRequest(this.provider, 'stx_callContract', params);
+      const { result } = await walletCall('stx_callContract', params, {
+        onLog: (level, message, detail) => this.log(level, message, detail)
+      });
       const txid = txidFrom(result);
       if (!txid) {
         this.log('warn', 'wallet returned no txid', result);
@@ -548,7 +554,9 @@ export class LaunchCanary {
     this.log('info', `stx_callContract submit-move(u1, "${FIRST_MOVE}")`, params);
 
     try {
-      const result = await walletRequest(this.provider, 'stx_callContract', params);
+      const { result } = await walletCall('stx_callContract', params, {
+        onLog: (level, message, detail) => this.log(level, message, detail)
+      });
       const txid = txidFrom(result);
       if (!txid) {
         this.log('warn', 'wallet returned no txid', result);

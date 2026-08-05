@@ -19,7 +19,7 @@ import {
   serializeStringAscii,
   serializeUint
 } from './clarity.js';
-import { resolveProvider, waitForProvider, walletRequest } from './wallet.js';
+import { walletCall, waitForProvider } from './wallet.js';
 import { CONTRACT_NAME, ERR, PAGE_SIZE } from './protocol.js';
 
 export const DEFAULT_API = {
@@ -139,12 +139,9 @@ export class LiveChain {
     // Resolved per call, never cached. Under the Xtrata runtime the wallet shim
     // installs itself after the page has already loaded, so a provider captured
     // at startup would be a provider that did not exist yet.
-    const entry = (await waitForProvider()) || resolveProvider();
-    if (!entry) {
-      const error = new Error('no Stacks wallet found in this browser');
-      error.code = 'NO_WALLET';
-      throw error;
-    }
+    // Waiting first: under the Xtrata runtime the shim installs after load, so a
+    // provider looked up at startup would not exist yet.
+    await waitForProvider();
 
     const params = {
       contract: this.contractId,
@@ -160,7 +157,7 @@ export class LiveChain {
       network: this.network
     };
 
-    const result = await walletRequest(entry, 'stx_callContract', params);
+    const { result, entry } = await walletCall('stx_callContract', params);
     const txid = result?.txid || result?.result?.txid || result?.txId || result?.result?.txId;
     return { ok: true, txid, raw: result, provider: entry.label };
   }
