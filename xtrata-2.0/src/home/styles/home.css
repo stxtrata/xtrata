@@ -4714,6 +4714,46 @@
       gap: 14px;
     }
 
+    /* Market grid only — #dropsListings shares .market-listings and keeps the
+       auto-fill behaviour. Fixed at five across so a page of 25 reads as 5x5,
+       stepping down on narrower viewports rather than squeezing five columns
+       into a phone. minmax(0, 1fr) not 1fr: a grid track's default min-width is
+       auto, so a wide inscription would otherwise push the column past its
+       share and break the row. */
+    #marketListings {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    @media (max-width: 1200px) {
+      #marketListings { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 980px) {
+      #marketListings { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 720px) {
+      #marketListings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 460px) {
+      #marketListings { grid-template-columns: minmax(0, 1fr); }
+    }
+
+    .market-pager {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .market-pager__label {
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
     /* Recessed by default: this is a debugging aid, not something a collector
        needs to read. Blocked claims surface on the card itself instead. */
     .claim-diagnostics {

@@ -10531,8 +10531,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // Was 4, when nothing over 512 KiB was ever read. With the cap now at 10 MiB
     // each job can pull megabytes, so this follows Xplorer's pacing instead.
     const MARKET_THUMB_HYDRATION_CONCURRENCY = GRID_THUMBNAIL_HYDRATION_CONCURRENCY;
+    // 25 per page, drawn 5x5. Every card now renders the real inscription from
+    // the runtime endpoint rather than a rasterised still, so the page has to be
+    // bounded: 22 live listings is fine unbounded, 500 animated APNGs is not.
+    const MARKET_PAGE_SIZE = 25;
+
     const marketState = {
       filter: 'all',
+      page: 0,
       run: 0,
       listings: [],
       // 'loading' | 'ready' | 'failed'. An empty `listings` array means three
@@ -11233,17 +11239,53 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     //   html-live  → sandboxed <iframe srcdoc> (HTML inscriptions and
     //                script-driven SVG animations, per the wallet-grid pattern)
     //   video      → muted looping <video>
-    const marketMediaFor = async (listing) => {
+    const marketMediaFor = async (listing, options = {}) => {
       const key = marketTokenKey(listing);
       if (marketState.media.has(key)) return marketState.media.get(key);
       let media = null;
       try {
+        const earlySummary = await marketSummaryFor(listing);
+        const earlyMeta = earlySummary?.meta ?? null;
+        const earlyKind = getMediaKind((earlyMeta?.mimeType ?? '').toLowerCase());
+
+        // Raster images render straight from the runtime content endpoint, which
+        // is exactly what the Xplorer grid does (getTokenRuntimeImageUrl). The
+        // browser decodes the original file.
+        //
+        // This has to come BEFORE the cached-thumbnail lookup, because that
+        // cache holds canvas-rasterised stills. createImageThumbnail draws one
+        // frame to a <canvas>, so every animated image is flattened: #295 is a
+        // 3.64 MB APNG (verified acTL + fcTL chunks on chain) and showed as a
+        // motionless first frame here while animating in Xplorer.
+        //
+        // It also removes the size question for images entirely — nothing is
+        // reconstructed into JS memory, so a 3.64 MB APNG costs the grid no more
+        // than a 10 KB PNG.
+        if (
+          earlyKind === 'image' &&
+          (earlyMeta?.totalSize ?? 0n) > 0n &&
+          !options.skipRuntimeEndpoint
+        ) {
+          const runtimeUrl = buildRuntimeInscriptionContentUrl({
+            coreContractId: listing.nftContract,
+            tokenId: listing.tokenId
+          });
+          if (runtimeUrl) {
+            // viaRuntimeEndpoint tells the renderer this URL depends on a Pages
+            // Function, so a load failure is recoverable by rebuilding from
+            // chunks rather than a dead card.
+            media = { kind: 'image', url: runtimeUrl, viaRuntimeEndpoint: true };
+            marketState.media.set(key, media);
+            return media;
+          }
+        }
+
         media = await marketCachedThumbnailFor(listing);
         if (media) {
           marketState.media.set(key, media);
           return media;
         }
-        const summary = await marketSummaryFor(listing);
+        const summary = earlySummary;
         const meta = summary?.meta ?? null;
         const mime = (meta?.mimeType ?? '').toLowerCase();
         const kind = getMediaKind(mime);
@@ -11635,6 +11677,29 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           img.src = media.url;
           img.alt = `Inscription #${listing.tokenId}`;
           img.loading = 'lazy';
+          // `/runtime/content` is a Pages Function, so it only exists on a
+          // deployed site. Under `vite dev` the dev server answers unknown paths
+          // with index.html, which arrives as a 200 of text/html and fails to
+          // decode — every raster card would be blank locally.
+          //
+          // Rebuild from chunks when that happens. It costs a reconstruction on
+          // the failing card only, keeps the grid working in local development,
+          // and covers a genuine production case too: if the endpoint ever
+          // fails, cards degrade to the slower path instead of going empty.
+          if (media.viaRuntimeEndpoint) {
+            img.addEventListener(
+              'error',
+              () => {
+                void (async () => {
+                  const key = marketTokenKey(listing);
+                  marketState.media.delete(key);
+                  const rebuilt = await marketMediaFor(listing, { skipRuntimeEndpoint: true });
+                  if (rebuilt?.url && img.isConnected) img.src = rebuilt.url;
+                })();
+              },
+              { once: true }
+            );
+          }
           slot.replaceChildren(img);
           slot.classList.add('market-thumb--media');
         } else {
@@ -12104,6 +12169,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           chip.textContent = symbol === 'all' ? 'All assets' : symbol;
           chip.addEventListener('click', () => {
             marketState.filter = symbol;
+            // Back to page 1: staying on page 3 of a filter that now has one
+            // page shows an empty grid over a full count.
+            marketState.page = 0;
             renderMarketToolbar();
             renderMarketListings();
           });
@@ -12139,10 +12207,22 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         marketDom.status.innerHTML = `<span><strong>Market</strong> ${emptyMessage}</span>`;
         return;
       }
-      marketDom.status.innerHTML = `<span><strong>Market</strong> ${visible.length} live listing${visible.length === 1 ? '' : 's'}.</span>`;
+      const pageCount = Math.max(1, Math.ceil(visible.length / MARKET_PAGE_SIZE));
+      // Clamp rather than trust: the listing set changes under us as sales land
+      // and filters change, so a stored page can outlive the pages it indexed.
+      marketState.page = Math.min(Math.max(0, marketState.page), pageCount - 1);
+      const pageStart = marketState.page * MARKET_PAGE_SIZE;
+      const pageItems = visible.slice(pageStart, pageStart + MARKET_PAGE_SIZE);
+
+      const countText = `${visible.length} live listing${visible.length === 1 ? '' : 's'}`;
+      const rangeText =
+        pageCount > 1
+          ? ` — showing ${pageStart + 1}–${pageStart + pageItems.length}`
+          : '';
+      marketDom.status.innerHTML = `<span><strong>Market</strong> ${countText}${rangeText}.</span>`;
       marketState.liveFrames = 0; // cards re-render from scratch; recount frames
       marketDom.listings.replaceChildren(
-        ...visible.map((listing) => {
+        ...pageItems.map((listing) => {
           const card = document.createElement('article');
           card.className = 'market-card';
           const symbol = getMarketSettlementLabel(listing.settlement);
@@ -12266,7 +12346,55 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           return card;
         })
       );
-      void hydrateMarketThumbnails(run, visible);
+      renderMarketPager(pageCount);
+      // Only the visible page hydrates. Hydration reads content, so paging is
+      // what keeps that bounded regardless of how many listings exist.
+      void hydrateMarketThumbnails(run, pageItems);
+    };
+
+    /**
+     * Page controls under the grid, mirroring the Xplorer pager.
+     *
+     * Rendered into a sibling of the grid rather than inside it, because
+     * `.market-listings` is a CSS grid and a pager placed inside it would be
+     * laid out as a 26th card.
+     */
+    const renderMarketPager = (pageCount) => {
+      const grid = marketDom.listings;
+      if (!grid) return;
+      let pager = document.getElementById('marketPager');
+      if (pageCount <= 1) {
+        pager?.remove();
+        return;
+      }
+      if (!pager) {
+        pager = document.createElement('div');
+        pager.id = 'marketPager';
+        pager.className = 'market-pager';
+        grid.insertAdjacentElement('afterend', pager);
+      }
+      const step = (delta) => {
+        marketState.page += delta;
+        renderMarketListings();
+        grid.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      };
+      const button = (label, delta, disabled) => {
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.className = 'market-chip';
+        el.textContent = label;
+        el.disabled = disabled;
+        if (!disabled) el.addEventListener('click', () => step(delta));
+        return el;
+      };
+      pager.replaceChildren(
+        button('‹ Previous', -1, marketState.page === 0),
+        Object.assign(document.createElement('span'), {
+          className: 'market-pager__label',
+          textContent: `Page ${marketState.page + 1} / ${pageCount}`
+        }),
+        button('Next ›', 1, marketState.page >= pageCount - 1)
+      );
     };
 
     // --- Seller dashboard: my listings across all markets -----------------
