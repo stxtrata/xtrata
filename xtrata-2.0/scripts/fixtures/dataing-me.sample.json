@@ -1,0 +1,40 @@
+{
+  "_comment": [
+    "SAMPLE ONLY — invented data, not a real Dataing user, not real listening history.",
+    "Shape follows UserApiMeResponse from api.dataing.io/openapi.json so the pipeline",
+    "can be exercised without a dtok_ token. Never put a real profile response in this",
+    "repo: it is somebody's dating profile."
+  ],
+  "success": true,
+  "data": {
+    "user": {
+      "id": "sample-user",
+      "createdAt": "2026-01-04T09:12:00.000Z",
+      "updatedAt": "2026-08-01T18:40:00.000Z"
+    },
+    "age": 31,
+    "profileComplete": true,
+    "latestBio": {
+      "text": "Happiest in a dark room with a good soundsystem. I will always say yes to a late night mix."
+    },
+    "topTraits": [
+      { "trait": { "key": "night_owl", "name": "Night owl", "category": "Rhythm" }, "value": 0.82, "confidence": 0.9 },
+      { "trait": { "key": "live_music_lover", "name": "Live music lover", "category": "Interests" }, "value": 0.91, "confidence": 0.95 },
+      { "trait": { "key": "weekend_getaway_ready", "name": "Weekend getaway ready", "category": "Personality" }, "value": 0.44, "confidence": 0.6 }
+    ],
+    "linkedSignals": [
+      {
+        "provider": "APPLE_MUSIC",
+        "label": "Recent listening",
+        "summary": "Heavy on disco edits and late night house",
+        "items": [
+          { "name": "Midnight Drive", "artistName": "Sunset Radio", "genreName": "Nu Disco" },
+          { "name": "Offline", "artistName": "Local Drive", "genreName": "House" },
+          { "name": "Decentralized", "artistName": "BVST", "genreName": "Electronic" },
+          { "name": "Dark Rooms", "artistName": "Nocturne", "genreName": "Deep House" }
+        ]
+      }
+    ],
+    "generatedAt": "2026-08-06T19:00:00.000Z"
+  }
+}
