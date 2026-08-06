@@ -86,7 +86,7 @@ function boardHtml() {
   return `<!doctype html>
 <meta charset="utf-8">
 <title>Xtrata Open Board</title>
-<script>window.__XTRATA_CHESS_BOARD__ = ${JSON.stringify({ contract: CONTRACT, network: NETWORK })};</script>
+<script>window.__XTRATA_CHESS_BOARD__ = ${JSON.stringify({ contract: CONTRACT, network: NETWORK, exact: true })};</script>
 <script src="/i/${ENGINE_ID}"></script>
 `;
 }

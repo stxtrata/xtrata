@@ -385,3 +385,40 @@ known. It is not a setting to reach for absentmindedly.
   checks and before anything is written. A sender who cannot pay to open a game
   leaves no game behind and consumes no id.
 - Renouncing still freezes everything, at whatever both fees happened to be.
+
+---
+
+# Game 1 on v3 · one player against the world
+
+The board opens on this game by default, so it is worth saying what it is.
+
+**White is `jim.btc`. Black is anyone except `jim.btc`.**
+
+That second half is not the same as leaving Black open. An open Black would let
+the named player answer their own moves, which is a different game. The rule set
+says `anyone-else`, which means exactly what it reads as: everyone but whoever
+holds the other side.
+
+## Where those rules live
+
+Not on the chain. The contract stores a hash and nothing else, and it still
+forms no opinion about chess or about who may play.
+
+So the board carries the rules, and checks them against the chain before
+trusting them:
+
+- rules hash `67e4031bb5728b61bea6283878a366696a4196de5c167578a6257cd0f8c4c294`
+- White `SP162D87CY84QVVCMJKNKGHC7GGXFGA0TAR9D0XJW`, which is `jim.btc` resolved
+  to an address, because replay compares principals and a sealed board has no
+  network to ask a name resolver
+
+If the game on chain committed to anything other than that hash, the board says
+so and referees nothing. It never enforces rules a game did not agree to,
+because a board doing that would skip moves every other reader accepts, and the
+log would stop being a shared record.
+
+## What that means for a move that breaks the rules
+
+The same as it has always meant. The contract accepts it, charges for it, and
+stores it. Replay skips it, and every board replaying the same log skips it
+identically. Nobody's move is deleted; some moves simply do not count.

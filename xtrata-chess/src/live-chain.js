@@ -70,6 +70,7 @@ export class LiveChain {
     // The contract's own charge, read once and remembered. undefined means not
     // asked yet; 0 means asked and it charges nothing, which is v1.
     this.contractFee = undefined;
+    this.openFee = undefined;
 
     if (!this.contractAddress) throw new Error('contractAddress is required');
   }
@@ -208,7 +209,7 @@ export class LiveChain {
   }
 
   /**
-   * What this contract charges per call, in microSTX.
+   * What this contract charges to make a move, in microSTX.
    *
    * v1 has no such function, and a contract that does not answer is a contract
    * that does not charge, so the failure is cached as zero rather than retried
@@ -222,6 +223,38 @@ export class LiveChain {
       this.contractFee = 0;
     }
     return this.contractFee;
+  }
+
+  /**
+   * What this contract charges to open a game, in microSTX.
+   *
+   * v3 prices this separately, and by a lot: a hundred times a move, by
+   * default. v1 and v2 have no such function, and for v2 the move fee is the
+   * right answer for both calls, so a contract that cannot answer falls back to
+   * whatever it charges for a move.
+   */
+  async getOpenFee() {
+    if (this.openFee !== undefined) return this.openFee;
+    try {
+      const value = await this.callReadOnly('get-open-fee');
+      this.openFee = Number(value) || 0;
+    } catch {
+      this.openFee = await this.getContractFee();
+    }
+    return this.openFee;
+  }
+
+  /**
+   * The fee a given call will actually move.
+   *
+   * This is the whole reason the two are read separately. A post condition is a
+   * cap, and one written for the wrong call is not a smaller cap, it is a
+   * transaction that aborts — and an aborted transaction still costs its sender
+   * the network fee. Opening a game on v3 under a move-fee cap would fail every
+   * single time, for a thousandth of what it needed.
+   */
+  async feeFor(functionName) {
+    return functionName === 'open-game' ? this.getOpenFee() : this.getContractFee();
   }
 
   // The board pairs this with a BlockTimes resolver rather than asking the
@@ -244,7 +277,7 @@ export class LiveChain {
     // A contract that charges must be allowed to charge. Denying every transfer
     // is right for a contract that moves nothing and fatal for one that does, so
     // ask the contract what it takes and permit exactly that.
-    const contractFee = await this.getContractFee();
+    const contractFee = await this.feeFor(functionName);
     if (contractFee > 0 && !this.senderAddress) {
       const error = new Error('connect a wallet before moving: this contract charges a fee');
       error.code = 'NO_SENDER';

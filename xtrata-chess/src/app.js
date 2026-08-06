@@ -34,6 +34,7 @@ import {
   DEFAULT_GAME
 } from './protocol.js';
 import {
+  ANYONE,
   DEFAULT_RULES,
   describeRules,
   isOpenBoard,
@@ -43,6 +44,7 @@ import {
   rulesHash,
   rulesMatchCommitment
 } from './rules.js';
+import { knownGame } from './known-games.js';
 import { childPage, engineIdFromLocation } from './child.js';
 import {
   connectWallet,
@@ -123,7 +125,18 @@ export class ChessBoardApp {
     if (sealed) this.startSealed(sealed);
     else if (child) this.startChild(child);
     else if (board) this.startConfiguredBoard(board);
-    else this.startConfiguredBoard({ contract: DEFAULT_CONTRACT, network: DEFAULT_NETWORK });
+    // exact: the deployed contract is named and not searched for. The probing
+    // path below exists for a board built before its contract was deployed;
+    // once it exists, probing is a network round trip that can only do harm. A
+    // single 500 on that one request would silently drop the board to an older
+    // version and show a different log under the same game number.
+    else {
+      this.startConfiguredBoard({
+        contract: DEFAULT_CONTRACT,
+        network: DEFAULT_NETWORK,
+        exact: true
+      });
+    }
   }
 
   async startConfiguredBoard(board) {
@@ -202,6 +215,108 @@ export class ChessBoardApp {
     await this.refresh();
     await this._verifyCommitment();
     this._startPolling();
+  }
+
+  /**
+   * Take on a known game's rules, but only if the chain agrees they are its.
+   *
+   * The contract stores a hash, never the rules, so a board that simply trusted
+   * a local table could enforce rules a game never committed to. Every branch
+   * here that is not an exact match ends with the board refereeing nothing,
+   * which is the open-board behaviour and the safe direction to fail in.
+   */
+  async _adoptKnownRules() {
+    const known = knownGame(this.chain?.contractId, this.game);
+
+    if (!known) {
+      // Not a game this board claims to referee. Any commitment it carries
+      // belongs to a generated board somewhere, not to this one.
+      this.gameRules = null;
+      return;
+    }
+
+    let entry = null;
+    try {
+      entry = this.chain.getGame ? await this.chain.getGame(this.game) : null;
+    } catch {
+      // A read that failed is not a game without rules. Referee nothing rather
+      // than guess, and let the ordinary read path report the problem.
+      this.gameRules = null;
+      return;
+    }
+
+    this.committedHash = entry?.rulesHash ?? null;
+    const rules = normaliseRules(known.rules);
+
+    if (!this.committedHash) {
+      this._notify(
+        `Game #${this.game} was opened without a rules commitment, so ${known.label} cannot be enforced. ` +
+          'Playing it as an open board.',
+        'warn'
+      );
+      this.gameRules = null;
+      return;
+    }
+
+    if (!rulesMatchCommitment(rules, this.committedHash)) {
+      this._notify(
+        `Game #${this.game} committed to rules this board does not have, so it is not the referee for it. ` +
+          'Playing it as an open board.',
+        'warn'
+      );
+      this.gameRules = null;
+      return;
+    }
+
+    this.gameRules = rules;
+  }
+
+  /**
+   * Fill the rules panel with a known game's rules, when that game is missing.
+   *
+   * The board carries the rules for the game it opens on, but the chain only
+   * stores their hash — so the game has to be opened with those exact rules or
+   * the commitment will not match and the board will referee nothing. Typing
+   * them by hand is a way to get one character wrong, permanently.
+   *
+   * Only ever fills an untouched panel, and only when the game is genuinely
+   * absent. Overwriting somebody's half-typed rules would be worse than the
+   * problem being solved.
+   */
+  _offerKnownRules() {
+    if (this._offeredRules || this.mode !== 'live' || this.isChild) return;
+
+    // With no games on the contract at all, this.game is null rather than 1:
+    // there is no game to be on. The game the board is built to referee is
+    // still the one worth offering, so ask about that rather than about
+    // nothing.
+    // Only ever called where the game is known not to exist. Games are numbered
+    // from one without gaps, so a contract with any games at all has game 1,
+    // and offering to open it there would be a plain lie. Guarding on "has no
+    // moves" instead would tell that lie to every freshly opened game.
+    const game = this.game ?? DEFAULT_GAME;
+    const known = knownGame(this.chain?.contractId, game);
+    if (!known) return;
+
+    const el = this.elements;
+    const untouched =
+      !el.rulesWhite.value.trim() && !el.rulesBlack.value.trim() && !Number(el.rulesCooldown.value);
+    if (!untouched) return;
+
+    const rules = normaliseRules(known.rules);
+    el.rulesWhite.value = rules.white;
+    el.rulesBlack.value = rules.black;
+    el.rulesCooldown.value = String(rules.cooldown);
+    el.rulesNoConsecutive.checked = rules.noConsecutive;
+    this._offeredRules = true;
+
+    this._notify(
+      `Game #${game} has not been opened yet. The rules panel below is filled with ` +
+        `"${known.label}", which is what this board is built to referee. Opening it with anything ` +
+        'else means this board will not enforce it.',
+      'info'
+    );
+    this.renderRules();
   }
 
   // Does the chain agree that this is the referee for this game?
@@ -320,10 +435,16 @@ export class ChessBoardApp {
     el.rulesOpen.addEventListener('click', () => this.openRuledGame());
     el.rulesDownload.addEventListener('click', () => this.downloadChild());
     el.rulesReset.addEventListener('click', () => {
-      el.rulesWhite.value = '';
-      el.rulesBlack.value = '';
-      el.rulesCooldown.value = '0';
-      el.rulesNoConsecutive.checked = false;
+      // Back to the rules this board is built to referee, where there are any.
+      // Blanking the panel on the default board would leave someone retyping an
+      // address that has to match a hash exactly, with no way to check it.
+      const known = knownGame(this.chain?.contractId, this.game ?? DEFAULT_GAME);
+      const rules = known ? normaliseRules(known.rules) : DEFAULT_RULES;
+
+      el.rulesWhite.value = rules.white === ANYONE ? '' : rules.white;
+      el.rulesBlack.value = rules.black === ANYONE ? '' : rules.black;
+      el.rulesCooldown.value = String(rules.cooldown);
+      el.rulesNoConsecutive.checked = rules.noConsecutive;
       this.childGame = null;
       this.renderRules();
     });
@@ -407,13 +528,20 @@ export class ChessBoardApp {
       // still charges for opening one, and the previous ordering meant an empty
       // board reported that it charged nothing.
       this.contractFee = this.chain.getContractFee ? await this.chain.getContractFee() : 0;
+      this.openFee = this.chain.getOpenFee ? await this.chain.getOpenFee() : this.contractFee;
 
       const count = await this.chain.getGameCount();
       if (count === 0) {
-        this._notify('No games opened on this contract yet.', 'warn');
         this.game = null;
         this.rawMoves = [];
         this.state = replay([]);
+        // An empty contract is the one moment the rules panel matters most: the
+        // game this board is built to referee does not exist yet, and it has to
+        // be opened with exactly the rules the board carries or the commitment
+        // will not match. Offer them first, and only say "no games" if there is
+        // nothing this board knows to suggest.
+        this._offerKnownRules();
+        if (!this._offeredRules) this._notify('No games opened on this contract yet.', 'warn');
         this.render();
         return;
       }
@@ -469,6 +597,11 @@ export class ChessBoardApp {
 
     this.busy = true;
     try {
+      // Before replaying, work out whether this board is the referee for this
+      // game. A child board already knows; the open board has to look it up and
+      // then check the chain agrees.
+      if (!this.isChild) await this._adoptKnownRules();
+
       const moves = await this.chain.getAllMoves(this.game);
       this.rawMoves = moves;
       this.state = replay(moves, { rules: this.gameRules });
@@ -482,6 +615,7 @@ export class ChessBoardApp {
       // What the contract itself charges, which is not the transaction fee and
       // should not be discovered for the first time in a wallet prompt.
       if (this.chain.getContractFee) this.contractFee = await this.chain.getContractFee();
+      if (this.chain.getOpenFee) this.openFee = await this.chain.getOpenFee();
     } catch (error) {
       this._notify(`Read failed: ${error.message}`, 'error');
     } finally {
@@ -1107,7 +1241,15 @@ export class ChessBoardApp {
     // are hashed on chain and cannot be edited afterwards, so an incomplete set
     // is not a draft to be fixed later, it is a permanent mistake.
     el.rulesOpen.disabled = !check.ready;
-    el.rulesOpen.textContent = check.ready ? 'Open this game' : 'Set the rules first';
+
+    // Price it on the button. Opening is a hundred times a move on v3 by
+    // default, and a button that says only "Open this game" invites someone to
+    // approve a wallet prompt an order of magnitude larger than they expect.
+    const openCost = Number(this.openFee) || 0;
+    const priced = openCost && this.mode === 'live'
+      ? `Open this game · ${(openCost / 1e6).toFixed(6)} STX`
+      : 'Open this game';
+    el.rulesOpen.textContent = check.ready ? priced : 'Set the rules first';
 
     if (el.rulesNote) {
       el.rulesNote.className = check.ready ? 'hint' : 'hint warn';

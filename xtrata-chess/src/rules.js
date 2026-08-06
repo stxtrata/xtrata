@@ -21,6 +21,18 @@ import { START_FEN } from './engine.js';
 
 export const ANYONE = 'anyone';
 
+// "Anyone except whoever holds the other side."
+//
+// A distinguished value rather than a new field, so the hashed shape is
+// unchanged and RULES_VERSION stays where it is. A game already committed must
+// keep hashing to the same bytes forever, and adding a key to canonicalRules
+// would break every one of them.
+//
+// The case it exists for: one named player against the world. Without it,
+// naming White and leaving Black open lets the named player answer themselves,
+// which is a different game.
+export const ANYONE_ELSE = 'anyone-else';
+
 export const RULES_VERSION = 1;
 
 export const DEFAULT_RULES = {
@@ -49,7 +61,9 @@ export function normaliseRules(input = {}) {
   const principal = (value) => {
     if (typeof value !== 'string') return ANYONE;
     const trimmed = value.trim().toUpperCase();
-    return trimmed === '' || trimmed === ANYONE.toUpperCase() ? ANYONE : trimmed;
+    if (trimmed === '' || trimmed === ANYONE.toUpperCase()) return ANYONE;
+    if (trimmed === ANYONE_ELSE.toUpperCase()) return ANYONE_ELSE;
+    return trimmed;
   };
 
   const allow = Array.isArray(source.allow)
@@ -164,10 +178,14 @@ export function readyToOpen(draft = {}) {
     const value = typeof raw === 'string' ? raw.trim() : '';
 
     if (!value) {
-      problems.push({ field, message: `${label} is not set. Type an address, a .btc name, or "anyone".` });
+      problems.push({
+        field,
+        message: `${label} is not set. Type an address, a .btc name, "anyone", or "anyone-else".`
+      });
       return;
     }
-    if (value.toLowerCase() === ANYONE) return;
+    const lowered = value.toLowerCase();
+    if (lowered === ANYONE || lowered === ANYONE_ELSE) return;
     if (looksLikePrincipal(value)) return;
     if (looksLikeName(value)) {
       problems.push({
@@ -217,8 +235,17 @@ export function checkSender(rules, { sender, height, turn, history }) {
     return REJECTED_BY_RULE.NOT_ALLOWED;
   }
 
+  const from = String(sender ?? '').toUpperCase();
   const bound = turn === 'white' ? r.white : r.black;
-  if (bound !== ANYONE && String(sender ?? '').toUpperCase() !== bound) {
+  const opposite = turn === 'white' ? r.black : r.white;
+
+  if (bound === ANYONE_ELSE) {
+    // Everyone but the other side. When the other side is not a specific
+    // person there is nobody to exclude, so this is simply "anyone" — which is
+    // the honest reading, not a special case being swallowed.
+    const named = opposite !== ANYONE && opposite !== ANYONE_ELSE;
+    if (named && from === opposite) return REJECTED_BY_RULE.WRONG_PLAYER;
+  } else if (bound !== ANYONE && from !== bound) {
     return REJECTED_BY_RULE.WRONG_PLAYER;
   }
 
@@ -245,8 +272,17 @@ export function describeRules(rules) {
   const r = normaliseRules(rules);
   const parts = [];
 
-  const side = (colour, who) =>
-    who === ANYONE ? `${colour} open to anyone` : `${colour} is ${who}`;
+  const other = (colour) => (colour === 'White' ? r.black : r.white);
+  const side = (colour, who) => {
+    if (who === ANYONE) return `${colour} open to anyone`;
+    if (who === ANYONE_ELSE) {
+      const excluded = other(colour);
+      return excluded === ANYONE || excluded === ANYONE_ELSE
+        ? `${colour} open to anyone`
+        : `${colour} open to anyone except ${excluded}`;
+    }
+    return `${colour} is ${who}`;
+  };
 
   if (r.white === ANYONE && r.black === ANYONE) parts.push('Anyone may move either side');
   else {

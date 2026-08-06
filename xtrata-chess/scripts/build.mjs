@@ -192,8 +192,11 @@ async function buildEngine(html) {
 // address box would be a tool for finding the game rather than the game, and
 // whoever inscribed it already knows the answer.
 async function buildBoard(engineId, contract, network = 'mainnet') {
+  // exact, because an inscribed board cannot be corrected and must not be able
+  // to talk to a contract other than the one it was built against. Falling back
+  // would show a different log under the same game number.
   const config = contract
-    ? `<script>window.__XTRATA_CHESS_BOARD__ = ${JSON.stringify({ contract, network })};</script>\n`
+    ? `<script>window.__XTRATA_CHESS_BOARD__ = ${JSON.stringify({ contract, network, exact: true })};</script>\n`
     : '';
 
   const source = `<!doctype html>
@@ -328,7 +331,8 @@ async function main() {
     const networkIndex = args.indexOf('--network');
     const boardConfig = {
       contract: args[contractIndex + 1],
-      network: networkIndex >= 0 ? args[networkIndex + 1] : 'mainnet'
+      network: networkIndex >= 0 ? args[networkIndex + 1] : 'mainnet',
+      exact: true
     };
     sealedBlock += `window.__XTRATA_CHESS_BOARD__ = ${JSON.stringify(boardConfig)};\n`;
     name = 'xtrata-chess-play';

@@ -559,13 +559,17 @@
           <div class="row">
             <label class="field">
               <span>White</span>
-              <input id="rules-white" type="text" placeholder="anyone, or SP…" autocomplete="off" spellcheck="false" />
+              <input id="rules-white" type="text" placeholder="anyone · anyone-else · SP… · name.btc" autocomplete="off" spellcheck="false" list="side-values" />
             </label>
           </div>
           <div class="row">
             <label class="field">
               <span>Black</span>
-              <input id="rules-black" type="text" placeholder="anyone, or SP…" autocomplete="off" spellcheck="false" />
+              <input id="rules-black" type="text" placeholder="anyone · anyone-else · SP… · name.btc" autocomplete="off" spellcheck="false" list="side-values" />
+              <datalist id="side-values">
+                <option value="anyone">anyone at all</option>
+                <option value="anyone-else">anyone except the other side</option>
+              </datalist>
             </label>
           </div>
           <div class="row">
