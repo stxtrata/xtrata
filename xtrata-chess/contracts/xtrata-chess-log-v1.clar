@@ -42,10 +42,12 @@
 (define-constant ERR-BAD-LENGTH (err u101))
 (define-constant ERR-LOG-FULL   (err u102))
 
-;; A generous ceiling on submissions per game. Real games run to roughly eighty
-;; plies and the fifty move rule bounds them well below this, but the log also
-;; holds submissions that replay rejects, so there is room for noise.
-(define-constant MAX-SEQ u4096)
+;; A ceiling on submissions per game, high enough that reaching it is a
+;; deliberate act rather than an accident. It is set this far above any real
+;; game because the board is unthrottled: a lower ceiling would let a spammer
+;; freeze a legitimate game part-played, and the ceiling protects nothing that
+;; the per-move fee does not already bound.
+(define-constant MAX-SEQ u65536)
 
 (define-data-var game-count uint u0)
 
@@ -54,7 +56,20 @@
   {
     opened-by: principal,
     opened-at: uint,
-    next-seq: uint
+    next-seq: uint,
+    ;; A commitment to the rules this game is played under, made before its
+    ;; first move and never changed. none means the default open rules: anyone
+    ;; may move either side.
+    ;;
+    ;; The rules themselves live in the board that renders the game, not here,
+    ;; because the contract must never form an opinion about chess. But without
+    ;; a commitment there is nothing to stop two boards claiming different rules
+    ;; for the same game, and no way to tell which is the referee. Thirty-two
+    ;; bytes written once per game removes that ambiguity for good.
+    ;;
+    ;; It is a hash rather than an inscription id because the game has to be
+    ;; opened before the board that renders it can be inscribed.
+    rules-hash: (optional (buff 32))
   }
 )
 
@@ -73,16 +88,28 @@
 
 ;; Open a new game and return its id. Games are numbered from u1 so that the
 ;; renderer can walk 1..game-count without a registry.
-(define-public (open-game)
+;;
+;; Pass none for the open board that anyone may play. Pass the hash of a rule
+;; set to open a game somebody else's board will referee under those rules: who
+;; may move which colour, whether an address must wait between its own moves,
+;; and so on. The contract enforces none of it, and could not: every one of
+;; those rules is a question about the log, which the board answers at replay
+;; time using the sender and height already recorded on every move.
+(define-public (open-game (rules-hash (optional (buff 32))))
   (let
     (
       (id (+ (var-get game-count) u1))
     )
+    ;; The hash is opaque here on purpose. There is nothing to validate: its
+    ;; meaning is entirely off chain, exactly like the move strings. Storing it
+    ;; unexamined is the same discipline, not a gap in one.
+    ;; #[allow(unchecked_data)]
     (map-set Games id
       {
         opened-by: tx-sender,
         opened-at: stacks-block-height,
-        next-seq: u0
+        next-seq: u0,
+        rules-hash: rules-hash
       }
     )
     (var-set game-count id)
@@ -91,7 +118,8 @@
         event: "game-opened",
         game: id,
         opened-by: tx-sender,
-        height: stacks-block-height
+        height: stacks-block-height,
+        rules-hash: rules-hash
       }
     )
     (ok id)
@@ -114,6 +142,11 @@
     )
     (asserts! (or (is-eq size u4) (is-eq size u5)) ERR-BAD-LENGTH)
     (asserts! (< seq MAX-SEQ) ERR-LOG-FULL)
+    ;; `game` reaches the map writes below unexamined, which the checker flags.
+    ;; It is safe: the unwrap! above returns early unless the game already
+    ;; exists, so by here it is a known id and not an arbitrary number. `mv` is
+    ;; unexamined by design, beyond its length.
+    ;; #[allow(unchecked_data)]
     (map-set Moves
       { game: game, seq: seq }
       {
@@ -122,6 +155,7 @@
         height: stacks-block-height
       }
     )
+    ;; #[allow(unchecked_data)]
     (map-set Games game (merge entry { next-seq: (+ seq u1) }))
     (print
       {

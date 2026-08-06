@@ -2,3 +2,4 @@ node_modules/
 dist/
 .cache/
 deployments/default.simnet-plan.yaml
+costs-reports.json

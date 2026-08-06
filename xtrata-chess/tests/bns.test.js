@@ -9,9 +9,42 @@ import { displaySender } from '../src/board-ui.js';
 const ALICE = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const BOB = 'SP15T1W26JTNS26VG17HM468KW7TQD3124KTYA9EJ';
 
-function stubFetch(map) {
-  return vi.fn(async (url) => {
-    const principal = decodeURIComponent(String(url).split('/').pop());
+// A Clarity (ok (some {name, namespace})) for a primary-name reply, built the
+// same way the chain builds it.
+function primaryReply(name) {
+  const [label, namespace] = name.split('.');
+  const buff = (text) => {
+    const hex = [...text].map((c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+    return '02' + (text.length).toString(16).padStart(8, '0') + hex;
+  };
+  // ok -> some -> tuple{ name, namespace }, fields in alphabetical order.
+  return (
+    '0x07' +
+    '0a' +
+    '0c00000002' +
+    '046e616d65' + buff(label) +
+    '096e616d657370616365' + buff(namespace)
+  );
+}
+
+/**
+ * @param {object} map        principal -> names[] for the legacy list endpoint
+ * @param {object} primaries  principal -> primary name for the BNS-V2 registry
+ */
+function stubFetch(map, primaries = {}) {
+  return vi.fn(async (url, options) => {
+    const target = String(url);
+
+    if (target.includes('/get-primary')) {
+      const sender = JSON.parse(options.body).sender;
+      const name = primaries[sender];
+      return {
+        ok: true,
+        json: async () => ({ okay: true, result: name ? primaryReply(name) : '0x070a09' })
+      };
+    }
+
+    const principal = decodeURIComponent(target.split('/').pop());
     if (!(principal in map)) return { ok: false, status: 404 };
     return { ok: true, json: async () => ({ names: map[principal] }) };
   });
@@ -38,9 +71,10 @@ describe('NameResolver', () => {
     expect(await resolver.resolve([ALICE])).toBe(true);
     expect(resolver.get(ALICE)).toBe('alice.btc');
 
-    // Asking again does not hit the API.
+    // Asking again does not hit the API at all.
+    const calls = fetch.mock.calls.length;
     expect(await resolver.resolve([ALICE])).toBe(false);
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(calls);
   });
 
   it('caches an absent name so it does not re-ask on every poll', async () => {
@@ -48,10 +82,11 @@ describe('NameResolver', () => {
     const resolver = new NameResolver({ apiUrl: 'https://api', fetch });
 
     await resolver.resolve([ALICE]);
+    const calls = fetch.mock.calls.length;
     await resolver.resolve([ALICE]);
     await resolver.resolve([ALICE]);
 
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(calls);
     expect(resolver.known(ALICE)).toBe(true);
     expect(resolver.get(ALICE)).toBe(null);
   });
@@ -91,7 +126,9 @@ describe('NameResolver', () => {
     const resolver = new NameResolver({ apiUrl: 'https://api', fetch });
 
     await resolver.resolve(Array.from({ length: 40 }, () => ALICE));
-    expect(fetch).toHaveBeenCalledTimes(1);
+    // One address, asked about once, however many times it appears in the log.
+    const asked = fetch.mock.calls.filter((c) => String(c[0]).includes(ALICE) || String(c[1]?.body || '').includes(ALICE));
+    expect(asked.length).toBeLessThanOrEqual(2);
   });
 
   it('resolves a mixed batch', async () => {
@@ -158,5 +195,54 @@ describe('displaySender', () => {
 
   it('handles a missing sender', () => {
     expect(displaySender(null, null)).toEqual({ label: '', title: '', named: false });
+  });
+});
+
+describe('primary names', () => {
+  // The name-list endpoint cannot say which of a wallet's names is primary, so
+  // taking the first was wrong for anyone whose primary is not first. The
+  // BNS-V2 registry answers the actual question, and is asked first.
+  it('prefers the registry over the first name in the list', async () => {
+    const fetch = stubFetch({ [ALICE]: ['aaa.btc', 'zzz.btc'] }, { [ALICE]: 'zzz.btc' });
+    const resolver = new NameResolver({ apiUrl: 'https://api', fetch });
+
+    await resolver.resolve([ALICE]);
+    expect(resolver.get(ALICE)).toBe('zzz.btc');
+  });
+
+  it('asks the registry before the list', async () => {
+    const fetch = stubFetch({ [ALICE]: ['aaa.btc'] }, { [ALICE]: 'primary.btc' });
+    const resolver = new NameResolver({ apiUrl: 'https://api', fetch });
+
+    await resolver.resolve([ALICE]);
+    expect(String(fetch.mock.calls[0][0])).toContain('/get-primary');
+  });
+
+  it('falls back to the list when no primary is set', async () => {
+    const fetch = stubFetch({ [ALICE]: ['only.btc'] }, {});
+    const resolver = new NameResolver({ apiUrl: 'https://api', fetch });
+
+    await resolver.resolve([ALICE]);
+    expect(resolver.get(ALICE)).toBe('only.btc');
+  });
+
+  it('reports no name when neither has one', async () => {
+    const fetch = stubFetch({ [ALICE]: [] }, {});
+    const resolver = new NameResolver({ apiUrl: 'https://api', fetch });
+
+    await resolver.resolve([ALICE]);
+    expect(resolver.get(ALICE)).toBe(null);
+  });
+
+  it('survives a registry that is unreachable', async () => {
+    const fetch = vi.fn(async (url) =>
+      String(url).includes('/get-primary')
+        ? Promise.reject(new Error('registry down'))
+        : { ok: true, json: async () => ({ names: ['fallback.btc'] }) }
+    );
+    const resolver = new NameResolver({ apiUrl: 'https://api', fetch });
+
+    await resolver.resolve([ALICE]);
+    expect(resolver.get(ALICE)).toBe('fallback.btc');
   });
 });

@@ -75,6 +75,7 @@
     import {
       MAX_USEFUL_BUDGET_USTX,
       MIN_FEE_BUDGET_USTX,
+      SPONSOR_FEE_FLOOR_USTX,
       getSponsoredBuyEligibility,
       isSponsoredMarket,
       validateFeeBudget
@@ -10851,7 +10852,27 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             `<span><strong>Market</strong> ${escapeHtml(sponsoredBuyIneligibilityMessage(eligibility) ?? 'this listing is unavailable.')}</span>`;
           return true;
         }
-        return false;
+        // Every other refusal used to `return false`, which fell straight through
+        // to the self-paid wallet prompt with NO message. On 2026-08-06 a buyer
+        // was charged 0.193 STX that way, 39 minutes after an identical purchase
+        // was sponsored for free, and had no way to know why. Never spend a
+        // buyer's money on a path they did not choose: stop here, say what
+        // happened and what it will cost, and let them decide.
+        marketDom.status.innerHTML =
+          `<span><strong>Market</strong> sponsored checkout unavailable: ${escapeHtml(
+            sponsoredBuyIneligibilityMessage(eligibility) ?? 'the relayer could not cover this purchase.'
+          )} You would pay about ${escapeHtml(
+            formatAssetAmount(readiness.estimatedFeeUstx, 6, 'STX')
+          )} in network fees.</span>`;
+        const payOwn = document.createElement('button');
+        payOwn.type = 'button';
+        payOwn.className = 'market-chip';
+        payOwn.textContent = 'Pay my own network fee instead';
+        payOwn.addEventListener('click', () => {
+          void marketBuy(listing, { forceSelfPaid: true });
+        });
+        marketDom.status.append(' ', payOwn);
+        return true;
       }
 
       const finalPhase = await runSponsoredBuy({
@@ -11826,12 +11847,24 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           const card = document.createElement('article');
           card.className = 'market-card';
           const symbol = getMarketSettlementLabel(listing.settlement);
-          // No `sponsored` flag here on purpose: the card must look identical on
-          // every market until Stage 3 restores the sponsorship copy. marketBuy
-          // decides sponsorship at click time from the live relayer state, which
-          // a badge rendered at list time could not honestly reflect anyway.
+          // The badge was previously removed because a list-time render cannot
+          // know the click-time relayer state. That objection is now covered:
+          // marketSponsoredBuy stops and asks before spending anything if the
+          // prediction turns out wrong, so the worst case is a badge that
+          // promised free and then offered a priced choice — not a silent charge.
+          //
+          // Showing nothing was its own failure. On 2026-08-06 a buyer read the
+          // registry label's blanket "no STX needed" and paid 0.193 STX.
           const isOwnListing = !!state.walletSession.address &&
             addressesEqual(listing.seller, state.walletSession.address);
+          // Everything here is knowable without a network call: is this a
+          // sponsored market, is a relayer configured, and did the seller escrow
+          // enough to cover the floor. Under the fee cap that is what decides it.
+          const sponsoredLikely =
+            isSponsoredMarket(listing.entry) &&
+            resolveSponsorBase(listing.entry) !== null &&
+            listing.budgetRemaining !== null &&
+            listing.budgetRemaining >= SPONSOR_FEE_FLOOR_USTX;
 
           const thumb = document.createElement('a');
           thumb.className = 'market-thumb';
@@ -11856,6 +11889,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           // zero-STX buyers into a transaction they could not pay for.
           badges.innerHTML = `<span class="badge">${symbol}</span>${
             isOwnListing ? '<span class="badge blue">Your listing</span>' : ''
+          }${
+            sponsoredLikely
+              ? '<span class="badge green" title="The seller prepaid the network fee for this listing.">No STX fee</span>'
+              : '<span class="badge" title="You pay the Stacks network fee for this purchase.">You pay network fee</span>'
           }`;
 
           const price = document.createElement('div');
