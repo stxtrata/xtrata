@@ -40,7 +40,7 @@
     "lockedNftContract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0"
   },
   {
-    "label": "Xtrata Market STX v1.1 (Sponsored - no fee needed)",
+    "label": "Xtrata Market STX v1.1",
     "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
     "contractName": "xtrata-market-sponsored-stx-v1-1",
     "network": "mainnet",
@@ -49,7 +49,7 @@
     "sponsorApi": "/"
   },
   {
-    "label": "Xtrata Market sBTC v1.1 (Sponsored - no STX needed)",
+    "label": "Xtrata Market sBTC v1.1",
     "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
     "contractName": "xtrata-market-sponsored-sbtc-v1-1",
     "network": "mainnet",
@@ -58,7 +58,7 @@
     "sponsorApi": "/"
   },
   {
-    "label": "Xtrata Market USDCx v1.1 (Sponsored - no STX needed)",
+    "label": "Xtrata Market USDCx v1.1",
     "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
     "contractName": "xtrata-market-sponsored-usdcx-v1-1",
     "network": "mainnet",

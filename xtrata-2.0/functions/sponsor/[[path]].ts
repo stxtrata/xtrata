@@ -112,6 +112,24 @@ const MIN_BUDGET_USTX = 50_000n;
 const MAX_FEE_USTX = 2_000_000n;
 const LOW_BALANCE_USTX = 5_000_000n; // refuse below 5 STX float
 const MAX_UNSETTLED = 20;
+/**
+ * Lowest fee the relayer will put on a sponsored buy. Mirrors the
+ * `Math.max(3000, …)` floor in estimateBuyFee, and SPONSOR_FEE_FLOOR_USTX in
+ * src/lib/market/sponsored.ts — the client gates on the same number.
+ */
+const SPONSOR_FEE_FLOOR_USTX = 3_000n;
+/**
+ * Ceiling on a market sponsored buy (0.01 STX). Twin of SPONSOR_FEE_CAP_USTX in
+ * src/lib/market/sponsored.ts; if you change one, change both.
+ *
+ * estimateBuyFee is a deliberate over-estimate over a noisy source. On
+ * 2026-08-06 /v2/fees/transfer briefly read ~322 instead of its usual 1,
+ * producing a ~193,000 uSTX estimate. Markets took the `else` branch below and
+ * returned BUDGET_TOO_SMALL against the 50,000 uSTX escrow, so sponsorship
+ * failed marketplace-wide for a few minutes on a bad reading, and buyers were
+ * quietly charged their own fee instead.
+ */
+const SPONSOR_FEE_CAP_USTX = 10_000n;
 const SETTLE_BATCH = 4; // jobs advanced per incoming request
 const SETTLE_TIMEOUT_MS = 2 * 3_600_000;
 // Mempool drop statuses can race block ingestion: Hiro may briefly report a
@@ -1444,12 +1462,37 @@ const handleRequest = async (
         });
       }
     } else {
-      if (fee > MAX_FEE_USTX) return fail('FEE_TOO_LARGE', 'network fee above relayer cap', 503);
-      if (listing.budgetRemaining < fee) {
+      // Markets used to refuse outright when the estimate exceeded the escrow.
+      // That treated a noisy over-estimate as a hard fact and, because the page
+      // then fell through silently, charged the buyer instead. Cap the same way
+      // drops do: pay the floor at minimum, never more than 0.01 STX, and never
+      // more than the seller escrowed (the relayer reclaims from that escrow, so
+      // anything above it is an unrecoverable loss).
+      //
+      // The node still decides whether the fee is enough to accept the
+      // broadcast. A capped fee can therefore mean a slower confirmation — which
+      // is a far better failure than silently billing the buyer 60x the fee.
+      const wanted = estimatedFee < SPONSOR_FEE_FLOOR_USTX ? SPONSOR_FEE_FLOOR_USTX : estimatedFee;
+      fee = [wanted, SPONSOR_FEE_CAP_USTX, listing.budgetRemaining, MAX_FEE_USTX].reduce(
+        (smallest, candidate) => (candidate < smallest ? candidate : smallest)
+      );
+      // The one genuine refusal left: an escrow too small to pay even the floor.
+      if (listing.budgetRemaining < SPONSOR_FEE_FLOOR_USTX) {
         return fail(
           'BUDGET_TOO_SMALL',
-          `listing budget ${listing.budgetRemaining} µSTX cannot cover estimated fee ${fee} µSTX`
+          `listing budget ${listing.budgetRemaining} µSTX cannot cover the minimum fee ${SPONSOR_FEE_FLOOR_USTX} µSTX`
         );
+      }
+      if (fee < estimatedFee) {
+        console.warn('[sponsor:fee-cap]', {
+          requestId: diagnostics.requestId,
+          traceId: diagnostics.traceId,
+          contractId,
+          listingId: listingId.toString(),
+          estimatedFeeUstx: estimatedFee.toString(),
+          budgetRemainingUstx: listing.budgetRemaining.toString(),
+          sponsoredFeeUstx: fee.toString()
+        });
       }
     }
 

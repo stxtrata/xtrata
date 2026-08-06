@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { resolve } from 'node:path';
 
 /**
  * Keeps the market page's sponsorship copy tied to what it can actually do.
@@ -73,11 +74,23 @@ describe('sponsored buy is wired into the public market page', () => {
     expect(sponsoredBuyFn).toContain('runSponsoredBuy');
   });
 
-  it('an ineligible listing falls through to self-paid rather than blocking', () => {
-    // Everything except an already-sold listing returns false, and false means
-    // marketBuy carries on to showContractCall.
-    expect(sponsoredBuyFn).toMatch(/if \(!eligibility\.ok\) \{[\s\S]*?return false;\s*\}/);
+  it('an ineligible listing stops and asks, instead of silently charging the buyer', () => {
+    // This used to `return false`, which fell through to showContractCall and
+    // opened a self-paid wallet prompt with no message. On 2026-08-06 that
+    // charged a buyer 0.193 STX, 39 minutes after the same purchase was
+    // sponsored for free, with nothing on screen to explain it.
+    //
+    // The buyer must still be ABLE to proceed self-paid — but by choosing to,
+    // never by default. If this test fails because the code returns false here
+    // again, fix the code: a silent fallback spends the buyer's money on a path
+    // they did not pick.
     expect(sponsoredBuyFn).toContain("eligibility.reason === 'listing-sold'");
+    expect(sponsoredBuyFn).not.toMatch(/if \(!eligibility\.ok\) \{[\s\S]*?return false;\s*\}/);
+    // Says what happened, quotes the cost, and offers the choice.
+    expect(sponsoredBuyFn).toMatch(/sponsored checkout unavailable/i);
+    expect(sponsoredBuyFn).toMatch(/estimatedFeeUstx/);
+    expect(sponsoredBuyFn).toMatch(/Pay my own network fee instead/);
+    expect(sponsoredBuyFn).toMatch(/forceSelfPaid: true/);
   });
 
   it('a missing relayer configuration falls through instead of failing', () => {
@@ -220,5 +233,25 @@ describe('the market grid renders once per load', () => {
     expect(marketSection).toContain("debugLog('market', 'listings loaded'");
     expect(marketSection).toMatch(/elapsedMs: answer\.meta\.elapsedMs/);
     expect(marketSection).toMatch(/source: .*edge-cache.*origin-scan/s);
+  });
+});
+
+describe('market registry labels make no fee promises', () => {
+  // The original guard checked generated copy only, so it never saw the claim
+  // baked into the registry's own `label` strings. Those printed straight into
+  // the listing detail as "#6 on Xtrata Market sBTC v1.1 (Sponsored - no STX
+  // needed)" while the same card said "sponsored checkout not yet enabled", and
+  // a buyer went on to pay 0.193 STX. A label names a market; whether THIS buyer
+  // pays a fee is decided per listing at render and re-checked at click time.
+  const registry = JSON.parse(
+    readFileSync(resolve(__dirname, '../../data/market-registry.json'), 'utf8')
+  ) as Array<{ label: string }>;
+
+  it('no label claims the buyer pays nothing', () => {
+    for (const entry of registry) {
+      expect(entry.label).not.toMatch(/no\s+(STX|fee)s?\s+needed/i);
+      expect(entry.label).not.toMatch(/free/i);
+      expect(entry.label).not.toMatch(/sponsored/i);
+    }
   });
 });
