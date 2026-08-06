@@ -9,7 +9,7 @@
 // re-renders. A lookup that fails is cached as "no name" so a board with a
 // hundred anonymous senders does not re-ask on every poll.
 
-import { deserialize, serializePrincipal } from './clarity.js';
+import { deserialize, serializeBuffer, serializePrincipal, serializeUint } from './clarity.js';
 
 const PRINCIPAL_RE = /^S[0-9A-HJKMNP-TV-Z]{25,50}$/;
 
@@ -135,13 +135,40 @@ export class NameResolver {
     return names.length ? String(names[0]).toLowerCase() : null;
   }
 
+  // One read-only call against the BNS-V2 registry.
+  async _bnsRead(fn, args, sender) {
+    const contract = BNS_V2[this.network];
+    if (!contract) return null;
+
+    const [address, name] = contract.split('.');
+    const response = await this.fetch(
+      `${this.apiUrl}/v2/contracts/call-read/${address}/${name}/${fn}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender, arguments: args })
+      }
+    );
+    if (!response.ok) return null;
+
+    const body = await response.json();
+    if (!body?.okay || typeof body.result !== 'string') return null;
+    return deserialize(body.result);
+  }
+
   /**
-   * The address a name currently points at.
+   * The address a name currently points at, according to BNS-V2.
    *
    * The other direction from everything else here, and used for one thing:
    * turning a name someone typed into the principal that gets hashed into a
    * game's rules. It has to happen before the game is opened, because replay
    * compares principals and a sealed board has no network to ask.
+   *
+   * The registry, not the `/v1/names/<name>` endpoint. That endpoint answers
+   * from the legacy BNS v1 index and can be years out of date: asked for
+   * jim.btc it returns an address that has not held the name since it moved to
+   * BNS-V2. Writing that into a rules commitment would lock the real holder out
+   * of their own game, permanently, with the board enforcing it.
    *
    * Returns null rather than throwing. A name that cannot be resolved must stop
    * a game being opened, and "we could not tell" and "it does not exist" both
@@ -149,13 +176,34 @@ export class NameResolver {
    */
   async lookupName(name) {
     const wanted = String(name || '').trim().toLowerCase();
-    if (!wanted) return null;
+    const at = wanted.indexOf('.');
+    if (at <= 0 || at === wanted.length - 1) return null;
+
+    const label = wanted.slice(0, at);
+    const namespace = wanted.slice(at + 1);
+    // Any principal will do as the caller; a read-only call does not spend.
+    const sender = 'SP000000000000000000002Q6VF78';
 
     try {
-      const response = await this.fetch(`${this.apiUrl}/v1/names/${encodeURIComponent(wanted)}`);
-      if (!response.ok) return null;
-      const body = await response.json();
-      const address = body?.address;
+      const id = await this._bnsRead(
+        'get-id-from-bns',
+        [serializeBuffer(new TextEncoder().encode(label)),
+         serializeBuffer(new TextEncoder().encode(namespace))],
+        sender
+      );
+      // (some uint) when the name exists, none when it does not.
+      const nameId = id && typeof id === 'object' && 'value' in id ? id.value : id;
+      if (nameId === null || nameId === undefined) return null;
+
+      const owner = await this._bnsRead(
+        'get-owner',
+        [serializeUint(BigInt(nameId))],
+        sender
+      );
+      // (ok (some principal)), (ok none), or an error.
+      const inner = owner && owner.ok === true ? owner.value : null;
+      const address = inner && typeof inner === 'object' && 'value' in inner ? inner.value : inner;
+
       return looksLikePrincipal(address) ? String(address) : null;
     } catch {
       return null;

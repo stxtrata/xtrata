@@ -697,16 +697,29 @@ export class LaunchCanary {
    * calls must permit the fee and no more; denying outright would abort the very
    * transfer the contract is about to make.
    */
-  async _feeGuard() {
+  async _feeGuard(functionName = 'submit-move') {
     if (!this.charges) {
       return { ...feePostConditions({ sender: this.address, fee: 0 }), contractFee: 0 };
     }
 
+    // Which fee this call actually moves. v3 prices opening a game separately,
+    // and by a hundred times, so guarding open-game with the move fee is not a
+    // tighter cap — it is a transaction that aborts while still costing its
+    // sender the network fee.
+    const opening = functionName === 'open-game';
     let fee = 0;
     try {
-      fee = Number(
-        await readOnly(this.api, this.address, this.contractName, 'get-move-fee')
-      );
+      if (opening) {
+        try {
+          fee = Number(await readOnly(this.api, this.address, this.contractName, 'get-open-fee'));
+        } catch {
+          // v1 and v2 have no such function, and for v2 the move fee is the
+          // right answer for both calls.
+          fee = Number(await readOnly(this.api, this.address, this.contractName, 'get-move-fee'));
+        }
+      } else {
+        fee = Number(await readOnly(this.api, this.address, this.contractName, 'get-move-fee'));
+      }
     } catch (error) {
       this.log('warn', `could not read the contract fee: ${error.message}`);
       throw error;
@@ -715,8 +728,8 @@ export class LaunchCanary {
     const shape = this.el.pcShape?.value || 'strict';
     this.log(
       'info',
-      `contract fee is ${fee} \u00b5STX (${(fee / 1e6).toFixed(6)} STX), permitting exactly that`,
-      { shape }
+      `${functionName} moves ${fee} \u00b5STX (${(fee / 1e6).toFixed(6)} STX), permitting exactly that`,
+      { shape, read: opening ? 'get-open-fee' : 'get-move-fee' }
     );
 
     return {
@@ -734,7 +747,7 @@ export class LaunchCanary {
     // 32-byte hash here instead.
     let guard;
     try {
-      guard = await this._feeGuard();
+      guard = await this._feeGuard('open-game');
     } catch {
       this.mark(3, 'failed', 'could not read fee');
       return;
@@ -813,7 +826,7 @@ export class LaunchCanary {
 
     let guard;
     try {
-      guard = await this._feeGuard();
+      guard = await this._feeGuard('submit-move');
     } catch {
       this.mark(4, 'failed', 'could not read fee');
       return;

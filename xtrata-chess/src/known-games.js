@@ -22,8 +22,14 @@
 import { ANYONE_ELSE } from './rules.js';
 
 // jim.btc, resolved once and stored as the address, because replay compares
-// principals and a sealed board has no network to ask. Resolved 2026-08-06.
-export const JIM = 'SP162D87CY84QVVCMJKNKGHC7GGXFGA0TAR9D0XJW';
+// principals and a sealed board has no network to ask.
+//
+// Resolved against the BNS-V2 registry on 2026-08-06, not against the
+// `/v1/names/` endpoint. That endpoint answers from the legacy BNS v1 index and
+// returns SP162D87CY84QVVCMJKNKGHC7GGXFGA0TAR9D0XJW for this name, which has
+// not held it since it moved to BNS-V2. Writing that into the rules would have
+// locked the actual holder out of their own game, with this board enforcing it.
+export const JIM = 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7';
 
 /**
  * Keyed by `<contract>#<game>`, because a game number means nothing on its own.

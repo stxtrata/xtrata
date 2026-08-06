@@ -660,14 +660,27 @@ export async function disconnectWallet({ onLog } = {}) {
  * and went on estimating. A number is what a wallet building the transaction
  * would parse.
  *
+ * Only `fee`, and deliberately not `feeRate` as well.
+ *
+ * `feeRate` was sent alongside on the reasoning that an unknown key is ignored,
+ * so spelling it both ways could only help. That reasoning is wrong for this
+ * particular key: a rate is a fee *per byte*, and a wallet reading 10,000 there
+ * would compute a fee two orders of magnitude too large rather than ignore it.
+ * Xverse has quoted both 0.003 STX and 0.5 STX for the same 10,000 we sent, and
+ * 0.5 STX is what 10,000 per byte comes to on a transaction this size.
+ *
+ * Whether that is the cause is not proven — wallets estimate from the mempool
+ * and their own numbers move. But a key that can only ever be misread as a
+ * hundredfold overcharge is not worth sending on the chance a wallet reads it
+ * the way we meant.
+ *
  * A wallet is still free to overrule this and show its own estimate; the figure
- * is editable in the wallet either way. Both spellings go out because wallets
- * have read one or the other over time, and an unknown key is ignored.
+ * is editable in the wallet either way.
  */
 export function callFeeParams(microStx) {
   const fee = Number(microStx);
   if (!Number.isFinite(fee) || fee <= 0) return {};
-  return { fee, feeRate: fee };
+  return { fee };
 }
 
 // Fungible condition codes, as they appear on the wire.

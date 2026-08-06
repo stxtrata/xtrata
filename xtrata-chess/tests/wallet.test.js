@@ -479,7 +479,7 @@ describe('what a move costs', () => {
     expect(callFeeParams(0)).toEqual({});
     expect(callFeeParams(-1)).toEqual({});
     expect(callFeeParams('lots')).toEqual({});
-    expect(callFeeParams(10_000)).toEqual({ fee: 10_000, feeRate: 10_000 });
+    expect(callFeeParams(10_000)).toEqual({ fee: 10_000 });
   });
 
   it('still denies post conditions, since a move moves nothing', async () => {

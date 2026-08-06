@@ -21,6 +21,7 @@ import {
 import { JIM, KNOWN_GAMES, knownGame } from '../src/known-games.js';
 
 const WORLD = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
+const STALE_JIM = 'SP162D87CY84QVVCMJKNKGHC7GGXFGA0TAR9D0XJW';
 const OTHER = 'SP2QEZ06AGJ3RKJPBV14SY1V5BBFNAW33D96YPGZF';
 
 const GAME = { white: JIM, black: ANYONE_ELSE };
@@ -157,6 +158,14 @@ describe('the game the board carries', () => {
         expect(side === ANYONE || side === ANYONE_ELSE || /^SP/.test(side)).toBe(true);
       }
     }
+  });
+
+  // The legacy /v1/names/ endpoint still answers this name with an address that
+  // has not held it since it moved to BNS-V2. It got as far as a committed rule
+  // set once; it must not again.
+  it('is not the address the legacy BNS index reports', () => {
+    expect(JIM).toBe('SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7');
+    expect(JIM).not.toBe(STALE_JIM);
   });
 
   it('is the one-against-the-world setup', () => {
