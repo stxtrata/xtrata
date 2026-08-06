@@ -10606,11 +10606,30 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     };
     // Renders "name.btc" into the span once resolved; keeps the short
     // principal until then (and permanently when the address has no name).
-    const applyBnsName = (span, address) => {
-      span.textContent = shortPrincipal(address);
+    /**
+     * A BNS name is user-chosen and unbounded. Most are short (`dyle.btc`) but
+     * a wallet-derived one runs to 42 characters, and on a market card that
+     * wrapped onto two lines and became the largest thing on the card.
+     *
+     * `shorten: true` keeps the head and, importantly, the TAIL — the tail
+     * carries the `.btc`, so a shortened name still reads as a name rather than
+     * as a truncated hash. The full value is always on the title attribute.
+     */
+    const BNS_DISPLAY_HEAD = 6;
+    const BNS_DISPLAY_TAIL = 12;
+
+    const applyBnsName = (span, address, options = {}) => {
+      const display = (value) =>
+        options.shorten ? truncateMiddle(value, BNS_DISPLAY_HEAD, BNS_DISPLAY_TAIL) : value;
+      span.textContent = display(shortPrincipal(address));
       span.title = address;
       void marketBnsNameFor(address).then((name) => {
-        if (name && span.isConnected) span.textContent = name;
+        if (name && span.isConnected) {
+          span.textContent = display(name);
+          // Both, so hovering a shortened name reveals it AND still identifies
+          // the wallet behind it.
+          span.title = `${name} · ${address}`;
+        }
       });
     };
     const bnsNameSpan = (address) => {
@@ -12294,12 +12313,29 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             state.usdPriceBook
           );
 
+          // Seller moves out of the run-on meta line and onto its own row.
+          //
+          // It used to be the tail of "Inscription #N · listing #N · seller X",
+          // set in 12px muted text with `overflow-wrap: anywhere` — so a long
+          // BNS name wrapped across two lines and became the biggest thing on
+          // the card, while a short one was the least readable text on it. Who
+          // is selling is a decision input; the listing id is a reference.
           const meta = document.createElement('div');
           meta.className = 'market-card__meta';
-          meta.textContent = `Inscription #${listing.tokenId} · listing #${listing.listingId} · seller `;
+          meta.textContent = `Inscription #${listing.tokenId} · listing #${listing.listingId}`;
+
+          const sellerLine = document.createElement('div');
+          sellerLine.className = 'market-card__seller';
+          sellerLine.append(
+            Object.assign(document.createElement('span'), {
+              className: 'market-card__seller-label',
+              textContent: 'Seller'
+            })
+          );
           const sellerSpan = document.createElement('span');
-          applyBnsName(sellerSpan, listing.seller);
-          meta.append(sellerSpan);
+          sellerSpan.className = 'market-card__seller-name';
+          applyBnsName(sellerSpan, listing.seller, { shorten: true });
+          sellerLine.append(sellerSpan);
 
           const details = document.createElement('details');
           details.className = 'market-card__details';
@@ -12342,7 +12378,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             actions.append(buy);
           }
 
-          card.append(thumb, badges, price, meta, details, actions);
+          card.append(thumb, badges, price, meta, sellerLine, details, actions);
           return card;
         })
       );
