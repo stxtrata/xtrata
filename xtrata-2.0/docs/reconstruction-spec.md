@@ -7,17 +7,24 @@ without using `xtrata.xyz` as a trust anchor.
 
 Current public mainnet target:
 
-`SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-1`
+`SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3`
 
 Fallback source chain for historical and migrated content:
 
-1. `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0`
-2. `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1`
+1. `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-1`
+2. `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0`
+3. `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1`
 
-`xtrata-v3.0.0` exists in contract sources and SDK capability detection, but it
-is not the public default until the contract registry and public docs explicitly
-promote it. `xtrata-v3.1.1` exists as a comparison contract source and still
-requires SDK/app capability updates before promotion.
+Verified against mainnet on 2026-07-27: `xtrata-v3-2-3` is live, and every
+read-only call listed below answers on it. Earlier v3 sources (`xtrata-v3.0.0`,
+`xtrata-v3.1.0`, `xtrata-v3.1.1`, `xtrata-v3.2.0` through `xtrata-v3.2.2`) exist
+in this repository as contract history and comparison sources. They are not
+reconstruction targets.
+
+Reconstruction never depends on this list being current: a reconstructor is
+given a contract ID and reads it directly. The list records which contracts hold
+public content, not which contracts the library is capable of reading — the
+library is version-agnostic and works against anything exposing the calls below.
 
 ## Required Public Inputs
 
