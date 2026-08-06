@@ -146,12 +146,25 @@ describe('market page does not promise sponsored checkout ahead of the rehearsal
     expect(marketSection).not.toMatch(/buy\.textContent\s*=\s*sponsored\s*\?/);
   });
 
-  it('the market footnote does not advertise zero-STX buying', () => {
+  it('the market footnote makes no blanket fee claim in either direction', () => {
+    // It used to assert "buyers pay their own network fee on every listing".
+    // That was true when sponsored checkout was unwired, and became a second
+    // false blanket claim once it worked — sitting on the same screen as the
+    // per-listing NO STX FEE badges and flatly contradicting them.
+    //
+    // The footnote is page-level copy, so it cannot know which listing a reader
+    // is looking at. It must therefore point AT the per-listing signal rather
+    // than answer for it, which is the same rule that removed the promise from
+    // the market registry labels.
     const raw = /id="marketFootnote"[^>]*>([\s\S]*?)<\/p>/.exec(indexHtml)?.[1] ?? '';
     const footnote = raw.replace(/\s+/g, ' ').trim(); // the markup hard-wraps
     expect(footnote.length, 'marketFootnote not found').toBeGreaterThan(0);
+    // Neither "it is always free" nor "you always pay".
     expect(footnote).not.toMatch(/zero STX|no STX/i);
-    expect(footnote).toMatch(/buyers pay their own network fee/i);
+    expect(footnote).not.toMatch(/pay their own network fee on every/i);
+    expect(footnote).not.toMatch(/every listing/i);
+    // Defers to the badge instead of answering for it.
+    expect(footnote).toMatch(/each listing shows/i);
   });
 
   it('the only zero-fee statement is made after settlement, never before', () => {

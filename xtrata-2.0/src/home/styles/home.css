@@ -5157,6 +5157,39 @@
       overflow-wrap: anywhere;
     }
 
+    /* Seller row. `overflow-wrap: anywhere` above is right for ids and wrong for
+       a name: it let a 42-character BNS name wrap to two lines and dominate the
+       card. Here the name gets one line, sized and coloured to be read, and is
+       shortened in JS with the full value on the title attribute. */
+    .market-card__seller {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin-top: 4px;
+      min-width: 0;
+    }
+
+    .market-card__seller-label {
+      flex: none;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .market-card__seller-name {
+      min-width: 0;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--ink);
+      /* Belt and braces: JS shortens the name, and this guarantees one line
+         even for a value that slips past the length threshold. */
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     .market-card__badge-row {
       display: flex;
       gap: 6px;
