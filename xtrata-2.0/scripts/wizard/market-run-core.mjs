@@ -1351,7 +1351,21 @@ async function loadListing({ io, ctx, market, listingId }) {
  * happened" is the same work every time and a second copy of it would be a
  * second place for the verification to be weaker.
  */
-async function listAndVerify({ io, ctx, scenarioId, market, tokenId, priceAmount, feeBudgetUstx, sellerId, stepName = 'list' }) {
+/**
+ * `proveZeroTokenBalance` asserts a SCENARIO's claim, not a contract rule.
+ *
+ * `list-token` does not care whether the seller holds any of the payment
+ * token -- that is the whole point, and proving it is what the list-sbtc and
+ * list-usdcx scenarios exist for. But a proof is only a proof from a wallet
+ * that holds zero, so those scenarios pass `true`.
+ *
+ * Ordinary listing passes `false`. It has to: the Archivist earned 700 sats
+ * when its sBTC plate sold, and with the assertion hardwired the runner then
+ * refused to list anything else on sBTC from that wallet. Success at the thing
+ * being tested made the tool refuse to do the thing. A guard that belongs to a
+ * claim about the world does not belong in the code path that changes it.
+ */
+async function listAndVerify({ io, ctx, scenarioId, market, tokenId, priceAmount, feeBudgetUstx, sellerId, stepName = 'list', proveZeroTokenBalance = false }) {
   const wallet = ctx.walletFor(sellerId);
   const stepKey = `${scenarioId}:${stepName}`;
   // An earlier attempt at this exact step changes what the preconditions mean.
@@ -1372,21 +1386,26 @@ async function listAndVerify({ io, ctx, scenarioId, market, tokenId, priceAmount
       )
     };
   }
+  // Read either way: the balance is worth reporting even when it is not
+  // being asserted on, because "listed on sBTC while holding 700 sats" is a
+  // fact a reader of the run report wants.
   const zeroToken = await checkZeroTokenBalance({ io, ctx, market, address: wallet.address });
-  if (market.payment.kind === 'ft' && zeroToken.status === 'unavailable') {
-    return { error: fail(`could not read the ${market.payment.symbol} balance of ${wallet.address}: ${zeroToken.error}`) };
-  }
-  if (market.payment.kind === 'ft' && !zeroToken.ok) {
-    // Not a contract failure: the scenario's claim is "no token needed", and a
-    // wallet that holds some proves nothing about that claim.
-    return {
-      error: fail(
-        `${wallet.address} holds ${formatAmount(zeroToken.balance, market.payment.decimals, market.payment.symbol)}. ` +
-          'This scenario proves a listing needs none of the payment token, so it is only meaningful from a wallet ' +
-          'that holds zero. Use a wizard with no balance, or move the token out first.',
-        { checks: { zeroToken } }
-      )
-    };
+  if (proveZeroTokenBalance && market.payment.kind === 'ft') {
+    if (zeroToken.status === 'unavailable') {
+      return { error: fail(`could not read the ${market.payment.symbol} balance of ${wallet.address}: ${zeroToken.error}`) };
+    }
+    if (!zeroToken.ok) {
+      // Not a contract failure: the scenario's claim is "no token needed", and
+      // a wallet that holds some proves nothing about that claim.
+      return {
+        error: fail(
+          `${wallet.address} holds ${formatAmount(zeroToken.balance, market.payment.decimals, market.payment.symbol)}. ` +
+            'This scenario proves a listing needs none of the payment token, so it is only meaningful from a wallet ' +
+            'that holds zero. Use a wizard with no balance, or move the token out first.',
+          { checks: { zeroToken } }
+        )
+      };
+    }
   }
 
   if (!resuming) {
@@ -1581,14 +1600,29 @@ const listScenario = (marketKey) => async ({ io, ctx }) => {
     tokenId,
     priceAmount: ctx.priceFor(market),
     feeBudgetUstx: ctx.feeBudgetUstx,
-    sellerId: ctx.sellerId
+    sellerId: ctx.sellerId,
+    // list-sbtc and list-usdcx exist to prove a listing needs none of the
+    // payment token, so from these scenarios the zero balance IS the evidence
+    // -- unless the caller is listing for real and said so.
+    proveZeroTokenBalance: ctx.proveZeroTokenBalance !== false && market.payment.kind === 'ft'
   });
   if (listed.error) return listed.error;
   if (listed.problems.length > 0) return fail(listed.problems.join('; '), { txid: listed.txid, listingId: listed.listingId });
 
+  // Report the balance that was MEASURED, not the one the scenario hoped for.
+  //
+  // This sentence used to be hardwired to "held 0 ... throughout" for every FT
+  // market. The zero-balance guard made that accidentally true; once a real
+  // listing could proceed from a wallet holding some of the payment token, the
+  // same sentence would have stated a falsehood in a permanent run report --
+  // the Archivist holds 700 sats and the report would have said zero.
+  const heldBalance = listed.checks?.zeroToken?.balance ?? null;
   const currency =
     market.payment.kind === 'ft'
-      ? ` The seller held 0 ${market.payment.symbol} throughout, and the budget was charged in STX.`
+      ? heldBalance === null
+        ? ` The seller's ${market.payment.symbol} balance could not be read; the budget was charged in STX.`
+        : ` The seller held ${formatAmount(heldBalance, market.payment.decimals, market.payment.symbol)} throughout, ` +
+          'and the budget was charged in STX.'
       : '';
   return pass(
     `#${tokenId} is listing ${listed.listingId} at ${formatAmount(listed.listing.price, market.payment.decimals, market.payment.symbol)}, ` +
@@ -2199,6 +2233,15 @@ export async function runMarketScenarios({ ports = {}, options = {} } = {}) {
     priceUstx = DEFAULT_PRICE_USTX,
     relistPriceUstx = DEFAULT_RELIST_PRICE_USTX,
     feeBudgetUstx = MIN_FEE_BUDGET_USTX,
+    /**
+     * Whether a cross-currency listing must come from a wallet holding none of
+     * the payment token.
+     *
+     * True by default, so `--scenario list-sbtc` still proves what it claims.
+     * The collection sweep passes false: it is listing for real, and the
+     * contract has never required a zero balance. See listAndVerify.
+     */
+    proveZeroTokenBalance = true,
     journalDir = HERE,
     runSpendCapUstx = DEFAULT_MARKET_RUN_SPEND_CAP_USTX,
     balanceFloorUstx = DEFAULT_BALANCE_FLOOR_USTX,
@@ -2283,6 +2326,7 @@ export async function runMarketScenarios({ ports = {}, options = {} } = {}) {
     wizardForAddress: (address) => addressToWizard[address] ?? null,
     tokenFor: (scenarioId) => tokens[scenarioId] ?? null,
     marketFor: (scenarioId, fallback) => marketOverrides[scenarioId] ?? marketOverrides.default ?? fallback,
+    proveZeroTokenBalance,
     priceFor: (market) => priceForMarket(priceUstx, market),
     relistPriceFor: (market) => priceForMarket(relistPriceUstx, market),
     explicitListingId: listingId === null ? null : String(listingId),
