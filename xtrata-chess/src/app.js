@@ -1517,7 +1517,12 @@ export class ChessBoardApp {
     const replayable = finished || this.mode === 'sealed';
 
     el.playControls.hidden = !playable;
-    el.newGame.hidden = this.mode === 'sealed' || this.isChild;
+    // Simulation only. On chain this opens a game with no rules for the full
+    // open fee, which is a trap next to a rules panel that does the same thing
+    // deliberately: one click, one STX, and an unrefereed game nobody asked
+    // for. Opening a live game goes through the rules panel, where the cost is
+    // on the button and the rules have to be settled first.
+    el.newGame.hidden = this.mode !== 'sim';
     if (this.mode === 'sim') el.simPanel.hidden = !playable;
     el.replayPanel.hidden = !replayable;
 
