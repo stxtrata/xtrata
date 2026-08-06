@@ -827,6 +827,18 @@ async function main() {
     buyerId,
     listingId: text('listing-id'),
     priceUstx: BigInt(arg('price-ustx', String(DEFAULT_PRICE_USTX))),
+    /**
+     * `--real-listing` turns list-sbtc / list-usdcx from a proof into a plain
+     * listing.
+     *
+     * Those scenarios normally refuse from a wallet holding any of the payment
+     * token, because their whole claim is "a listing needs none of it" and a
+     * wallet that holds some proves nothing. The contract has never required
+     * it. Once the Archivist actually earned 700 sats from an sBTC sale, that
+     * assertion made the only tool with a price override refuse to list any
+     * more of its work.
+     */
+    proveZeroTokenBalance: !flag('real-listing'),
     relistPriceUstx: BigInt(arg('relist-price-ustx', String(DEFAULT_RELIST_PRICE_USTX))),
     feeBudgetUstx: BigInt(arg('fee-budget-ustx', String(MIN_FEE_BUDGET_USTX))),
     runSpendCapUstx: BigInt(arg('run-spend-cap-ustx', String(DEFAULT_MARKET_RUN_SPEND_CAP_USTX))),

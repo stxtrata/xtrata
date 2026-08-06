@@ -505,6 +505,50 @@ describe('the zero-token assertion', () => {
     expect(world.submitted).toHaveLength(0);
   });
 
+  /**
+   * The assertion belongs to the CLAIM, not to listing.
+   *
+   * `list-token` does not care whether the seller holds the payment token.
+   * When the assertion was hardwired into the shared listing path, the
+   * Archivist earning 700 sats from a real sBTC sale made the runner refuse to
+   * list anything else on sBTC from that wallet -- success at the very thing
+   * being tested disabled the tool. These two pin the split.
+   */
+  it('still fires for the proof scenario, because that is what it proves', async () => {
+    const { world, report } = await runAll(
+      { fundToken: [{ market: SBTC_MARKET, address: SELLER, amount: 700n }] },
+      { scenarios: ['list-sbtc'] }
+    );
+    expect(world.row(report, 'list-sbtc').status).toBe('failed');
+    expect(world.submitted).toHaveLength(0);
+  });
+
+  it('reports the balance it measured, not the one it hoped for', async () => {
+    // The summary sentence was hardwired to "held 0 ... throughout" for every
+    // FT market. With real listings now permitted from a wallet holding some,
+    // that would have written a falsehood into a run report.
+    const { world, report } = await runAll(
+      { fundToken: [{ market: SBTC_MARKET, address: SELLER, amount: 700n }] },
+      { scenarios: ['list-sbtc'], proveZeroTokenBalance: false }
+    );
+    const row = world.row(report, 'list-sbtc');
+    expect(row.status, row.reason ?? '').toBe('passed');
+    expect(row.summary).not.toMatch(/held 0 sBTC/);
+    expect(row.summary).toMatch(/held 0\.000007 sBTC throughout/);
+  });
+
+  it('does NOT fire for an ordinary listing from a wallet holding the token', async () => {
+    // The seller holds 700 sats and lists on sBTC anyway. The contract permits
+    // it, so the runner must too.
+    const { world, report } = await runAll(
+      { fundToken: [{ market: SBTC_MARKET, address: SELLER, amount: 700n }] },
+      { scenarios: ['list-sbtc'], proveZeroTokenBalance: false }
+    );
+    const row = world.row(report, 'list-sbtc');
+    expect(row.status, row.reason ?? '').toBe('passed');
+    expect(world.submitted.length).toBeGreaterThan(0);
+  });
+
   it('fires for USDCx as well as sBTC', async () => {
     const { world, report } = await runAll(
       { fundToken: [{ market: USDCX_MARKET, address: SELLER, amount: 1n }] },

@@ -270,6 +270,10 @@ export async function listCollection({ ports = {}, options = {} } = {}) {
           wallets,
           tokens: { [plan.scenarioId]: row.inscriptionId },
           sellerId: art.wizard,
+          // This sweep lists for real. The zero-balance assertion belongs to
+          // the list-sbtc/list-usdcx PROOF, and a wizard that has earned some
+          // of the payment token must still be able to sell more of its work.
+          proveZeroTokenBalance: false,
           priceUstx: row.askUstx,
           feeBudgetUstx,
           runSpendCapUstx
