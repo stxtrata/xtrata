@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Xtrata Chess · Launch Canary</title>
+    <style>
+      :root {
+        --bg: #12100e;
+        --panel: #1b1815;
+        --line: #2e2924;
+        --ink: #e8e2d9;
+        --dim: #96897a;
+        --accent: #d8a24a;
+        --ok: #7fb069;
+        --warn: #c9922e;
+        --err: #b4574c;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      [hidden] { display: none !important; }
+
+      body {
+        margin: 0;
+        padding: 24px;
+        background: var(--bg);
+        color: var(--ink);
+        font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, sans-serif;
+      }
+
+      main { max-width: 860px; margin: 0 auto; }
+
+      h1 { margin: 0; font-size: 20px; font-weight: 600; }
+      .sub { margin: 4px 0 0; color: var(--dim); font-size: 13px; }
+
+      h2 {
+        margin: 0 0 10px;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--dim);
+        font-weight: 600;
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+      }
+
+      .state {
+        font-family: var(--mono);
+        text-transform: none;
+        letter-spacing: 0;
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 20px;
+        border: 1px solid var(--line);
+        color: var(--dim);
+      }
+      [data-state='ok'] .state { color: var(--ok); border-color: var(--ok); }
+      [data-state='failed'] .state { color: var(--err); border-color: var(--err); }
+      [data-state='sent'] .state,
+      [data-state='running'] .state { color: var(--warn); border-color: var(--warn); }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px;
+        margin-top: 14px;
+      }
+      [data-state='ok'] { border-color: rgba(127, 176, 105, 0.4); }
+      [data-state='failed'] { border-color: rgba(180, 87, 76, 0.5); }
+
+      button, select, input {
+        font: inherit;
+        color: var(--ink);
+        background: #221e1a;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 7px 12px;
+      }
+      button { cursor: pointer; }
+      button:hover:not(:disabled) { border-color: var(--dim); }
+      button:disabled { opacity: 0.4; cursor: not-allowed; }
+      button.go { background: var(--accent); border-color: var(--accent); color: #1a1409; font-weight: 600; }
+      button.go:disabled { background: #3a3025; border-color: #3a3025; color: var(--dim); }
+      button.connected {
+        background: transparent;
+        border-color: var(--ok);
+        color: var(--ok);
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 600;
+      }
+      button.connected:hover { border-color: var(--ok); background: rgba(127, 176, 105, 0.1); }
+
+      .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+      .row + .row { margin-top: 10px; }
+
+      .field { display: flex; flex-direction: column; gap: 4px; }
+      .field span { font-size: 11px; color: var(--dim); }
+
+      .warning {
+        border: 1px solid var(--err);
+        background: #2a1614;
+        border-radius: 10px;
+        padding: 12px 14px;
+        margin-top: 16px;
+      }
+      .warning strong { color: #e8907f; }
+
+      .version {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: baseline;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--dim);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 7px 11px;
+        margin-bottom: 16px;
+      }
+      .version .vlabel { text-transform: uppercase; letter-spacing: 0.06em; }
+      .version code { color: var(--ink); }
+      .version .vsep { opacity: 0.5; }
+      .vcheck { margin-left: auto; }
+      .vcheck.ok { color: var(--ok); }
+      .vcheck.stale { color: var(--err); font-weight: 600; }
+      .vcheck.unknown { color: var(--dim); }
+      /* A stale page is worth shouting about: everything below it is the wrong
+         build, including the contract it would deploy. */
+      .version.stale { border-color: var(--err); background: #2a1614; }
+
+      button.danger { border-color: var(--err); color: #e8907f; }
+      button.danger:hover { background: rgba(180, 87, 76, 0.12); }
+
+      .stategrid {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 4px 12px;
+        font-family: var(--mono);
+        font-size: 11px;
+        margin: 10px 0;
+      }
+      .stategrid dt { color: var(--dim); }
+      .stategrid dd { margin: 0; word-break: break-all; }
+
+      details.fold-panel { padding: 0; }
+      details.fold-panel > summary {
+        list-style: none; cursor: pointer; padding: 14px;
+        display: flex; align-items: center; gap: 8px;
+      }
+      details.fold-panel > summary::-webkit-details-marker { display: none; }
+      details.fold-panel > summary::before {
+        content: '▸'; color: var(--dim); font-size: 11px; transition: transform .15s;
+      }
+      details.fold-panel[open] > summary::before { transform: rotate(90deg); }
+      details.fold-panel > summary h2 { margin: 0; flex: 1; }
+      details.fold-panel > *:not(summary) { padding: 0 14px; }
+      details.fold-panel > *:last-child { padding-bottom: 14px; }
+
+      .mono, code, pre { font-family: var(--mono); }
+      .meta { font-family: var(--mono); font-size: 11px; color: var(--dim); word-break: break-all; margin: 8px 0 0; }
+      .meta a { color: var(--accent); }
+
+      .hint { color: var(--dim); font-size: 12px; margin: 10px 0 0; }
+
+      #log { max-height: 420px; overflow-y: auto; margin-top: 10px; }
+      .entry {
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        padding: 5px 0;
+        font-size: 12px;
+        display: grid;
+        grid-template-columns: 46px 1fr;
+        gap: 8px;
+      }
+      .entry .lvl { font-family: var(--mono); font-size: 10px; text-transform: uppercase; }
+      .entry.ok .lvl { color: var(--ok); }
+      .entry.warn .lvl { color: var(--warn); }
+      .entry.err .lvl { color: var(--err); }
+      .entry.info .lvl { color: var(--dim); }
+      .entry pre {
+        grid-column: 2;
+        margin: 4px 0 0;
+        padding: 7px 9px;
+        background: #14110f;
+        border-radius: 6px;
+        font-size: 11px;
+        white-space: pre-wrap;
+        word-break: break-all;
+        max-height: 190px;
+        overflow-y: auto;
+        color: var(--dim);
+      }
+    </style>
+  </head>
+
+  <body>
+    <main>
+      <div id="version-bar" class="version">
+        <span class="vlabel">build</span>
+        <code id="build-id">unknown</code>
+        <span class="vsep">·</span>
+        <span id="build-at">—</span>
+        <span id="build-check" class="vcheck">checking…</span>
+      </div>
+
+      <h1>Xtrata Chess · Launch Canary</h1>
+      <p class="sub">
+        From nothing to a played first move, every transaction signed by your wallet.
+      </p>
+
+      <div class="warning">
+        <strong>No seed phrase is ever asked for, entered, or stored.</strong>
+        This page builds each request, shows it to you in full, and hands it to your wallet to sign.
+        It holds no keys and can sign nothing by itself. Nothing is sent without a click, and the
+        deploy step asks you to type the contract name first.
+        <br /><br />
+        On mainnet this spends real STX and cannot be undone. A contract name, once used, is gone forever.
+      </div>
+
+      <div class="warning" id="file-warning" hidden>
+        <strong>This page was opened from a file, not a server.</strong>
+        Wallet extensions do not inject into <code>file://</code> pages, so Connect will find nothing.
+        Serve it over localhost instead:
+        <br /><br />
+        <code>cd xtrata-chess &amp;&amp; npm run dev</code>
+        <br />
+        then open <code>http://localhost:4321/dist/xtrata-chess-launch-canary.html</code>
+      </div>
+
+      <div class="panel" id="step-0" data-state="waiting">
+        <h2>0 · Wallet <span class="state">not connected</span></h2>
+        <div class="row">
+          <label class="field">
+            <span>Network</span>
+            <select id="network">
+              <option value="mainnet">mainnet</option>
+              <option value="testnet">testnet</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Provider</span>
+            <select id="providers"></select>
+          </label>
+          <label class="field" style="flex: 0 1 210px">
+            <span>Contract</span>
+            <select id="contract-version">
+              <option value="xtrata-chess-log-v3">v3 · opening and moving priced apart</option>
+              <option value="xtrata-chess-log-v2">v2 · one fee for both, deployed</option>
+              <option value="xtrata-chess-log-v1">v1 · no fee, deployed</option>
+            </select>
+          </label>
+          <label class="field" style="flex: 0 1 140px">
+            <span>Network fee (µSTX)</span>
+            <input id="call-fee" type="number" min="1" step="1000" value="10000" />
+          </label>
+          <button id="btn-detect">Re-detect</button>
+          <button id="btn-connect" class="go">Connect</button>
+          <button id="btn-disconnect" hidden>Disconnect</button>
+        </div>
+        <p class="hint" id="wallet-hint">
+          Pick a wallet if more than one is listed, then Connect. Your wallet should open and ask you to
+          approve; if it does not, it may be locked.
+        </p>
+        <p class="meta">address <span id="address">—</span></p>
+        <p class="meta" id="source-info">loading contract source…</p>
+        <p class="hint" id="fee-note" hidden>
+          v2 charges a fee on every call, so its calls must permit that transfer. The page reads
+          <code>get-move-fee</code> from the deployed contract and permits exactly that amount and no
+          more — denying outright, which is right for v1, would abort every move against v2.
+        </p>
+      </div>
+
+      <div class="panel" id="step-1" data-state="waiting">
+        <h2>1 · Preflight <span class="state">not started</span></h2>
+        <p class="hint">
+          Reads only. Checks the node answers, the contract name is still free, and the balance covers
+          a deploy plus two calls. Nothing is signed and nothing is sent.
+        </p>
+        <div class="row"><button id="btn-preflight" class="go" disabled>Run preflight</button></div>
+      </div>
+
+      <div class="panel" id="step-2" data-state="waiting">
+        <h2>2 · Deploy the contract <span class="state">not started</span></h2>
+        <p class="hint">
+          Contract deployment through a wallet has never been exercised in this repo, unlike every other
+          call here. If the first shape is refused, try the others before concluding the wallet cannot do it.
+        </p>
+        <div class="row">
+          <label class="field">
+            <span>Post conditions</span>
+            <select id="pc-shape">
+              <option value="strict">Permit at most the fee (recommended)</option>
+              <option value="exact">Permit exactly the fee</option>
+              <option value="allow">Allow any transfer (last resort)</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Parameter shape</span>
+            <select id="deploy-shape">
+              <option value="A">A · spec (name, clarityCode, clarityVersion)</option>
+              <option value="B">B · spec + deny post conditions</option>
+              <option value="C">C · spec + codeBody and contractName aliases</option>
+            </select>
+          </label>
+          <button id="btn-deploy" class="go" disabled>Deploy</button>
+          <button id="btn-verify-deploy" disabled>Check and verify source</button>
+        </div>
+        <p class="meta">tx <span id="deploy-tx">—</span></p>
+        <p class="meta">contract <span id="contract-id">—</span></p>
+      </div>
+
+      <div class="panel" id="step-3" data-state="waiting">
+        <h2>3 · Open game #1 <span class="state">not started</span></h2>
+        <p class="hint">
+          <code>open-game(none)</code> — the open board that anyone may play. A game with its own rules
+          would pass a 32-byte hash here instead.
+        </p>
+        <div class="row">
+          <button id="btn-open" class="go" disabled>Open game #1</button>
+          <button id="btn-verify-open" disabled>Check and read back</button>
+        </div>
+        <p class="meta">tx <span id="open-tx">—</span></p>
+      </div>
+
+      <div class="panel" id="step-4" data-state="waiting">
+        <h2>4 · The first move <span class="state">not started</span></h2>
+        <p class="hint">
+          <code>submit-move(u1, "e2e4")</code>, then read the log back and replay it. The chain holds a
+          five character string; replaying it has to produce <code>1. e4</code>.
+        </p>
+        <div class="row">
+          <button id="btn-move" class="go" disabled>Play 1. e4</button>
+          <button id="btn-verify-move" disabled>Check and replay</button>
+        </div>
+        <p class="meta">tx <span id="move-tx">—</span></p>
+      </div>
+
+      <details class="panel fold-panel" id="controls-panel">
+        <summary><h2>Contract controls <span class="state" id="controls-state">read only</span></h2></summary>
+
+        <div class="row">
+          <button id="btn-read-state">Read contract state</button>
+        </div>
+        <div id="contract-state" class="stategrid"></div>
+
+        <div id="owner-controls" hidden>
+          <p class="hint">
+            These change the deployed contract and are refused for anyone who is not its owner.
+          </p>
+
+          <div class="row">
+            <label class="field" style="flex: 0 1 180px">
+              <span>Move fee (µSTX)</span>
+              <input id="new-fee" type="number" min="0" step="1000" />
+            </label>
+            <button id="btn-set-fee">Set fee</button>
+          </div>
+
+          <div class="row" id="open-fee-row" hidden>
+            <label class="field" style="flex: 0 1 180px">
+              <span>Open a game (µSTX)</span>
+              <input id="new-open-fee" type="number" min="0" step="1000" />
+            </label>
+            <button id="btn-set-open-fee">Set open fee</button>
+            <p class="hint">
+              v3 only, and governed exactly like the move fee: capped by the contract's ceiling,
+              and zero turns it off. Zero means a game costs nothing to create, and unlike a junk
+              move, which replay skips, a junk game is permanent.
+            </p>
+          </div>
+
+          <div class="row">
+            <label class="field">
+              <span>Fee recipient</span>
+              <input id="new-recipient" type="text" placeholder="SP…" autocomplete="off" spellcheck="false" />
+            </label>
+            <button id="btn-set-recipient">Set recipient</button>
+          </div>
+
+          <div class="row">
+            <label class="field">
+              <span>Transfer ownership to</span>
+              <input id="new-owner" type="text" placeholder="SP…" autocomplete="off" spellcheck="false" />
+            </label>
+            <button id="btn-transfer">Transfer</button>
+            <button id="btn-renounce" class="danger">Renounce forever</button>
+          </div>
+          <p class="hint">
+            Renouncing gives the contract to nobody, permanently. The fee and the recipient freeze
+            exactly as they stand and no one can ever change them again, including you.
+          </p>
+        </div>
+      </details>
+
+      <div class="panel">
+        <h2>Log <span class="state"><button id="btn-report">Copy report</button></span></h2>
+        <div id="log"></div>
+      </div>
+    </main>
+
+    <script type="module">
+      import { LaunchCanary } from './src/canary.js';
+
+      const byId = (id) => document.getElementById(id);
+
+      // Published so a deploy in progress can be inspected from a console:
+      // which contract, what was sent, what came back. The board does the same
+      // for the same reason, and a contract deploy is the one action here that
+      // cannot be repeated if it goes wrong.
+      window.__xtrataCanary = new LaunchCanary({
+        network: byId('network'),
+        providers: byId('providers'),
+        address: byId('address'),
+        sourceInfo: byId('source-info'),
+        fileWarning: byId('file-warning'),
+        versionBar: byId('version-bar'),
+        buildId: byId('build-id'),
+        buildAt: byId('build-at'),
+        buildCheck: byId('build-check'),
+        btnDetect: byId('btn-detect'),
+        btnConnect: byId('btn-connect'),
+        btnDisconnect: byId('btn-disconnect'),
+        walletHint: byId('wallet-hint'),
+        btnPreflight: byId('btn-preflight'),
+        deployShape: byId('deploy-shape'),
+        contractVersion: byId('contract-version'),
+        pcShape: byId('pc-shape'),
+        feeNote: byId('fee-note'),
+        btnDeploy: byId('btn-deploy'),
+        btnVerifyDeploy: byId('btn-verify-deploy'),
+        deployTx: byId('deploy-tx'),
+        contractId: byId('contract-id'),
+        btnOpen: byId('btn-open'),
+        btnVerifyOpen: byId('btn-verify-open'),
+        openTx: byId('open-tx'),
+        btnMove: byId('btn-move'),
+        btnVerifyMove: byId('btn-verify-move'),
+        moveTx: byId('move-tx'),
+        btnReport: byId('btn-report'),
+        callFee: byId('call-fee'),
+        controlsPanel: byId('controls-panel'),
+        controlsState: byId('controls-state'),
+        contractState: byId('contract-state'),
+        ownerControls: byId('owner-controls'),
+        btnReadState: byId('btn-read-state'),
+        newFee: byId('new-fee'),
+        btnSetFee: byId('btn-set-fee'),
+        openFeeRow: byId('open-fee-row'),
+        newOpenFee: byId('new-open-fee'),
+        btnSetOpenFee: byId('btn-set-open-fee'),
+        newRecipient: byId('new-recipient'),
+        btnSetRecipient: byId('btn-set-recipient'),
+        newOwner: byId('new-owner'),
+        btnTransfer: byId('btn-transfer'),
+        btnRenounce: byId('btn-renounce'),
+        log: byId('log'),
+        step0: byId('step-0'),
+        step1: byId('step-1'),
+        step2: byId('step-2'),
+        step3: byId('step-3'),
+        step4: byId('step-4')
+      });
+    </script>
+  </body>
+</html>

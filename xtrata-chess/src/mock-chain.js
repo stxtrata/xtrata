@@ -55,12 +55,14 @@ export class MockChain {
 
   // ---- writes --------------------------------------------------------
 
-  openGame(sender = 'SIM') {
+  openGame(sender = 'SIM', rulesHash = null) {
     const id = this.gameCount + 1;
     this.games.set(id, {
       openedBy: sender,
       openedAt: this.height,
       nextSeq: 0,
+      // Hex without the 0x prefix, or null for the open board.
+      rulesHash: rulesHash ? String(rulesHash).replace(/^0x/, '').toLowerCase() : null,
       moves: []
     });
     this.gameCount = id;
@@ -97,7 +99,8 @@ export class MockChain {
     return {
       openedBy: entry.openedBy,
       openedAt: entry.openedAt,
-      nextSeq: entry.nextSeq
+      nextSeq: entry.nextSeq,
+      rulesHash: entry.rulesHash
     };
   }
 

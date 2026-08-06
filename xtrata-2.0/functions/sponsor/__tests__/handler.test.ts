@@ -889,20 +889,35 @@ describe('sponsor relayer Pages handler', () => {
     expect(db.jobs[1].state).toBe('SPONSORED');
   });
 
-  it('keeps the strict insufficient-budget block for sponsored market buys', async () => {
-    feeRate = 250;
+  // Was 'keeps the strict insufficient-budget block for sponsored market buys'.
+  // That block treated a noisy over-estimate as fact: on 2026-08-06
+  // /v2/fees/transfer read ~322 instead of its usual 1, the relayer refused, the
+  // market page fell through silently, and the buyer paid 0.193 STX for a
+  // purchase that had been sponsored for free 39 minutes earlier. Refusing to
+  // sponsor is not the safe option when the fallback spends the buyer's money.
+  it('caps a fee-estimate spike instead of refusing to sponsor', async () => {
+    feeRate = 250; // estimate = 250 * 600 = 150,000 uSTX, well over the escrow
     const res = await submit(env, {
       txHex: await fixture({ listingId: 7n }),
       contractId: MARKET,
       listingId: '7'
     });
-    expect(res.status).toBe(400);
-    expect(await res.json()).toMatchObject({
-      code: 'BUDGET_TOO_SMALL',
-      stage: 'FEE_ESTIMATE',
-      message: 'listing budget 100000 µSTX cannot cover estimated fee 150000 µSTX'
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ state: 'SPONSORED' });
+    expect(broadcasts).toHaveLength(1);
+    // Capped to 0.01 STX: not the 150,000 estimate, and not the 100,000 escrow.
+    expect(db.jobs[0].fee_ustx).toBe('10000');
+  });
+
+  it('still pays the plain estimate when it is under the cap', async () => {
+    feeRate = 10; // estimate = 6,000 uSTX
+    const res = await submit(env, {
+      txHex: await fixture({ listingId: 7n }),
+      contractId: MARKET,
+      listingId: '7'
     });
-    expect(broadcasts).toHaveLength(0);
+    expect(res.status).toBe(200);
+    expect(db.jobs[0].fee_ustx).toBe('6000');
   });
 
   it('normalizes a 0x-prefixed sponsor secret before deriving and signing', async () => {

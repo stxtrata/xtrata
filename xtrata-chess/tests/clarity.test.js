@@ -18,6 +18,9 @@ import {
   hexToBytes,
   serializeStringAscii,
   serializeUint,
+  serializeBuffer,
+  serializeNone,
+  serializeSome,
   sha256
 } from '../src/clarity.js';
 
@@ -152,3 +155,24 @@ describe('c32address', () => {
     expect(notFortyOne).toBeGreaterThan(0);
   });
 });
+
+describe('serialising the rules commitment', () => {
+  const HASH = 'a'.repeat(64);
+
+  it('encodes buffers, none and some the same way as @stacks/transactions', () => {
+    expect(serializeBuffer(HASH)).toBe(hex(Cl.buffer(Buffer.from(HASH, 'hex'))));
+    expect(serializeNone()).toBe(hex(Cl.none()));
+    expect(serializeSome(serializeBuffer(HASH))).toBe(
+      hex(Cl.some(Cl.buffer(Buffer.from(HASH, 'hex'))))
+    );
+  });
+
+  it('round-trips an optional buffer', () => {
+    expect(deserialize(serializeNone())).toBe(null);
+    expect(bytesToHexHelper(deserialize(serializeSome(serializeBuffer(HASH))))).toBe(HASH);
+  });
+});
+
+function bytesToHexHelper(bytes) {
+  return Buffer.from(bytes).toString('hex');
+}

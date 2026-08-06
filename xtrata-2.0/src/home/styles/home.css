@@ -705,6 +705,21 @@
       border-color: rgba(132, 96, 27, 0.22);
     }
 
+    /*
+     * "You pay network fee" on a market card. Colour alone cannot carry this:
+     * several themes here are deliberately monochrome (--green-soft #1d1d1d vs
+     * --amber-soft #202020, three values apart), so a badge relying on the
+     * accent palette renders the warning in the same grey as the reassurance.
+     * The border is drawn from --line-strong, which every theme keeps legible
+     * against its own background, so the distinction survives the palette.
+     */
+    .badge.fee-due {
+      background: transparent;
+      color: var(--ink);
+      border: 1px dashed var(--line-strong);
+      font-weight: 700;
+    }
+
     .panel-body {
       padding: 18px;
     }

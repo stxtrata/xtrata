@@ -9,13 +9,15 @@
 // a malformed submission is an ordinary outcome rather than an error.
 
 import { Chess, START_FEN, parseUci, pieceColor } from './engine.js';
+import { DEFAULT_RULES, REJECTED_BY_RULE, checkSender, normaliseRules } from './rules.js';
 
 export const REJECTED = {
   MALFORMED: 'malformed',
   EMPTY_SQUARE: 'empty-square',
   WRONG_TURN: 'wrong-turn',
   ILLEGAL: 'illegal',
-  GAME_OVER: 'game-over'
+  GAME_OVER: 'game-over',
+  ...REJECTED_BY_RULE
 };
 
 // Why a submission failed. The categories below are refinements of "illegal"
@@ -34,10 +36,14 @@ function classify(chess, uci) {
 
 /**
  * @param {Array<{mv: string, sender?: string, seq?: number, height?: number}>|string[]} submissions
- * @param {{startFen?: string}} [options]
+ * @param {{startFen?: string, rules?: object}} [options]
  */
 export function replay(submissions, options = {}) {
-  const startFen = options.startFen || START_FEN;
+  // Rules and the starting position are the same decision: both come from the
+  // rule set the game was opened under. An explicit startFen still wins, so
+  // callers that only want a position do not have to build a rule set.
+  const rules = normaliseRules(options.rules || DEFAULT_RULES);
+  const startFen = options.startFen || rules.startFen || START_FEN;
   const chess = new Chess(startFen);
 
   const log = [];
@@ -56,6 +62,23 @@ export function replay(submissions, options = {}) {
 
     if (chess.isGameOver()) {
       const record = { ...base, status: 'rejected', reason: REJECTED.GAME_OVER };
+      log.push(record);
+      rejected.push(record);
+      return;
+    }
+
+    // Who may move is settled before whether the move is legal. The order is
+    // fixed rather than incidental: it decides which reason a submission that
+    // breaks both gets labelled with, and that label is part of the record.
+    const broken = checkSender(rules, {
+      sender,
+      height,
+      turn: chess.turn === 0 ? 'white' : 'black',
+      history: accepted
+    });
+
+    if (broken) {
+      const record = { ...base, status: 'rejected', reason: broken };
       log.push(record);
       rejected.push(record);
       return;
@@ -87,6 +110,7 @@ export function replay(submissions, options = {}) {
 
   return {
     chess,
+    rules,
     fen: chess.fen(),
     startFen,
     turn: chess.turn === 0 ? 'white' : 'black',

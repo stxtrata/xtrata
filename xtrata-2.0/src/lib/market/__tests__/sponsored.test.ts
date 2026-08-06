@@ -6,6 +6,9 @@ import {
   isSponsoredMarket,
   validateFeeBudget,
   getSponsoredBuyEligibility,
+  sponsorFeeToCharge,
+  SPONSOR_FEE_CAP_USTX,
+  SPONSOR_FEE_FLOOR_USTX,
   getSellerBudgetSummary
 } from '../sponsored';
 
@@ -54,6 +57,30 @@ describe('getSponsoredBuyEligibility', () => {
 
   it('eligible on a live sponsored listing with budget and relayer', () => {
     expect(getSponsoredBuyEligibility(base)).toEqual({ ok: true });
+  });
+
+  // The 2026-08-06 incident. /v2/fees/transfer briefly returned ~322 instead of
+  // its usual 1, so estimateBuyFee produced ~193,000 uSTX against a 50,000 uSTX
+  // escrow. Eligibility failed, main.js fell through silently, and the buyer paid
+  // 0.193 STX for a purchase that had been free 39 minutes earlier.
+  it('survives a transient fee-estimate spike on a normally-funded listing', () => {
+    expect(
+      getSponsoredBuyEligibility({
+        ...base,
+        listing: { soldAt: null, budgetRemaining: MIN_FEE_BUDGET_USTX },
+        estimatedFeeUstx: 193_339n
+      })
+    ).toEqual({ ok: true });
+  });
+
+  it('still refuses when the escrow cannot cover even the floor', () => {
+    expect(
+      getSponsoredBuyEligibility({
+        ...base,
+        listing: { soldAt: null, budgetRemaining: 1_000n },
+        estimatedFeeUstx: 3_000n
+      })
+    ).toEqual({ ok: false, reason: 'budget-exhausted' });
   });
 
   it('reports each failure reason', () => {
@@ -112,5 +139,37 @@ describe('getSellerBudgetSummary', () => {
       getSellerBudgetSummary({ ...listing, soldAt: null }, 10_000_000n)
         .selfRefundable
     ).toBe(false);
+  });
+});
+
+describe('sponsorFeeToCharge', () => {
+  it('pays the floor when the network is cheap', () => {
+    expect(sponsorFeeToCharge(1_000n, MIN_FEE_BUDGET_USTX)).toBe(SPONSOR_FEE_FLOOR_USTX);
+    expect(sponsorFeeToCharge(3_000n, MIN_FEE_BUDGET_USTX)).toBe(3_000n);
+  });
+
+  it('pays the estimate between the floor and the cap', () => {
+    expect(sponsorFeeToCharge(7_500n, MIN_FEE_BUDGET_USTX)).toBe(7_500n);
+  });
+
+  // The whole point: a bad reading must not become a bill.
+  it('never pays more than the cap, however wild the estimate', () => {
+    expect(sponsorFeeToCharge(193_339n, MIN_FEE_BUDGET_USTX)).toBe(SPONSOR_FEE_CAP_USTX);
+    expect(sponsorFeeToCharge(50_000_000n, MIN_FEE_BUDGET_USTX)).toBe(SPONSOR_FEE_CAP_USTX);
+  });
+
+  // The relayer reclaims its fee from the escrow, so paying above it is an
+  // unrecoverable loss for us.
+  it('never pays more than the seller escrowed', () => {
+    expect(sponsorFeeToCharge(9_000n, 4_000n)).toBe(4_000n);
+    expect(sponsorFeeToCharge(193_339n, 4_000n)).toBe(4_000n);
+  });
+
+  it('is bounded by the cap for every plausible estimate', () => {
+    for (const est of [0n, 1n, 2_999n, 3_000n, 9_999n, 10_001n, 193_339n, 2_000_000n]) {
+      const fee = sponsorFeeToCharge(est, MIN_FEE_BUDGET_USTX);
+      expect(fee).toBeLessThanOrEqual(SPONSOR_FEE_CAP_USTX);
+      expect(fee).toBeGreaterThanOrEqual(SPONSOR_FEE_FLOOR_USTX);
+    }
   });
 });

@@ -1,12 +1,41 @@
 # Sponsored Market Buy — Safe Implementation Plan
 
-Status: **Stages 0–2 and 4 done (2026-07-30). Buying is wired, selling is unblocked, nothing advertises free checkout yet.**
+Status: **Stages 0–2 and 4 done (2026-07-30). Stage 3 copy restored 2026-08-06 after the incident below. Stage 5 remains.**
 
-- A buyer clicking Buy on a sponsored listing now goes through the relayer and pays no network fee. Every refusal falls through to the normal self-paid purchase, so no buyer is ever left without a way to buy.
-- No buyer-facing copy claims free checkout. That is Stage 3, and it is gated on the testnet rehearsal in §5 — restoring the promise before the flow has been run against a real relayer would repeat the original defect.
+- A buyer clicking Buy on a sponsored listing goes through the relayer and pays no network fee.
+- ~~Every refusal falls through to the normal self-paid purchase, so no buyer is ever left without a way to buy.~~
+  **This was recorded as a safety property and was the defect.** "Falls through" meant
+  `return false` into `showContractCall` with nothing on screen. On 2026-08-06 a buyer was
+  charged 0.193 STX that way, 39 minutes after the identical purchase was sponsored for
+  0.003 STX, with no way to tell why. A fallback that spends the buyer's money is not a
+  safety net unless they chose it. The path now stops, explains, quotes the cost and offers
+  the choice.
 - `SPONSORED_CHECKOUT_ENABLED` is **gone**. It had to go: see §3.1. Sellers now choose from whatever markets can actually accept the active core, with the deposit disclosed before signing.
 
-Stages 3 and 5 remain. This document is the route through them.
+## 0.1 The testnet rehearsal gate — superseded 2026-08-06
+
+Stage 3 was gated on a testnet rehearsal (§5). **There is no testnet and there is not
+expected to be one**, so as written the gate could never be met and Stage 3 would have
+stayed blocked indefinitely while the market page kept advertising free checkout through
+the registry labels — the worst of both.
+
+The gate's stated purpose was "knowing it works against a real relayer". That is now
+established on mainnet, more strongly than a testnet rehearsal could have shown:
+
+| Evidence | Tx |
+|---|---|
+| Sponsored buy confirmed, relayer paid 0.003 STX | `0x2cc3aefd5ad55749d91b9e5861dd1ee6c09acf40c95106e6f73be94aaa63eeaa` |
+| Self-paid buy on the same market confirmed | `0x7d211623a853d50fb9da29244ff34493a308b261eb755b7154b1ff2440d8812e` |
+
+Both routes are proven in production with real value. The rehearsal requirement is
+therefore **closed as superseded**, not waived.
+
+**Still genuinely open, and now the only Stage 3 blocker:** the local signed-transaction
+inspector noted at the end of Stage 2. The market path still has no equivalent of
+`inspectSponsoredClaimTransaction`, so it trusts the relayer's own validation. That is a
+real gap and it is not covered by the mainnet evidence above.
+
+Stage 5 remains. This document is the route through it.
 
 ## 3.1 Why the seller gate had to go — the v2-1-0 weld
 
@@ -86,8 +115,20 @@ A recoverable failure renders "Pay my own network fee instead", which re-enters 
 
 **Not done in Stage 2, and deliberately:** there is no market-specific equivalent of `inspectSponsoredClaimTransaction`. The drops flow validates the wallet-signed transaction locally before handing it to the relayer; the market path relies on the relayer's own signed-tx-is-truth validation, which checks the contract allowlist, the function name, the arguments and the post-condition mode. That is adequate for a flow gated behind a testnet rehearsal, but it should be added before Stage 3 turns the copy back on.
 
-### Stage 3 — Restore honest sponsored copy
-**Blocked on the testnet rehearsal in §5, and on the local signed-tx inspector noted in Stage 2.** Wiring the branch is not the same as knowing it works against a real relayer, and the copy is the part that costs a buyer money when it is wrong.
+### Stage 3 — Restore honest sponsored copy (done 2026-08-06, one blocker outstanding)
+~~**Blocked on the testnet rehearsal in §5**~~ — superseded by mainnet evidence, see §0.1.
+**The local signed-tx inspector from Stage 2 is still outstanding.**
+
+Done: per-listing badge (`NO STX FEE` / `YOU PAY NETWORK FEE`) computed from market kind,
+relayer configuration and whether the escrow covers the fee floor. The registry labels no
+longer carry `(Sponsored - no STX needed)`, which was printing the promise into the listing
+detail four lines above "sponsored checkout not yet enabled" on the same card.
+
+The warning below — that a list-time badge cannot honestly reflect click-time eligibility —
+was correct and is answered in two halves, neither sufficient alone. The badge predicts from
+what is knowable at render; `marketSponsoredBuy` stops and asks whenever the prediction turns
+out wrong, so the worst case is a badge that promised free and then offered a priced choice,
+never a silent charge.
 
 Only then reintroduce buyer-facing sponsorship copy, worded to the truth: "Buyer pays no network fee — seller prepaid it." Show remaining budget and degrade to self-paid wording when the budget is exhausted or the relayer is down. Note that eligibility is resolved at click time from a live quote, so a badge rendered at list time cannot honestly reflect it — the copy needs to be either conditional on a fresh probe or phrased as a possibility.
 

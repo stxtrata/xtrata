@@ -14,6 +14,14 @@ balance = 100_000_000_000_000
 mnemonic = "hold excess usual excess ring elephant install account glad dry fragile donkey gaze humble truck breeze nation gasp vacuum limb head keep delay hospital"
 balance = 100_000_000_000_000
 
+# Deliberately poor. Enough to make a few moves at the default 0.01 STX, nowhere
+# near enough to open a game at the default 1 STX. It exists so the v3 tests can
+# check that a sender who cannot pay leaves no game behind, without draining a
+# wallet the other tests are still using.
+[accounts.wallet_3]
+mnemonic = "water mobile bicycle rural eagle talent glare involve noble task october august forget live recycle hurry test echo camera oblige simple advice tilt ring"
+balance = 50_000
+
 [devnet]
 disable_stacks_explorer = false
 disable_stacks_api = false

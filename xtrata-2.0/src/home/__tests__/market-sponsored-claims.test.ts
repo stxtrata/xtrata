@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { resolve } from 'node:path';
 
 /**
  * Keeps the market page's sponsorship copy tied to what it can actually do.
@@ -9,12 +10,18 @@ import { describe, expect, it } from 'vitest';
  * buyer always paid their own fee. That sent zero-STX buyers into a transaction
  * they could not pay for.
  *
- * Stage 2 of docs/plans/SPONSORED-MARKET-BUY-PLAN.md wired the sponsored branch,
- * so the capability is now real. The copy stays quiet anyway: restoring
- * buyer-facing sponsorship claims is Stage 3, gated on the testnet rehearsal in
- * the plan's §5. These guards therefore assert both halves — the branch exists,
- * and nothing promises free checkout ahead of that rehearsal — so the two can
- * only move together.
+ * Stage 2 of docs/plans/SPONSORED-MARKET-BUY-PLAN.md wired the sponsored branch.
+ * Stage 3 restored the copy on 2026-08-06: the testnet rehearsal it was gated on
+ * is superseded by mainnet evidence (plan §0.1), there being no testnet.
+ *
+ * The guards therefore changed shape rather than relaxing. They no longer assert
+ * "nothing promises free checkout"; they assert the promise is made **only where
+ * it is true** — per listing, from real state, degrading to "you pay network fee"
+ * when the escrow or the relayer cannot back it, and never in a market label that
+ * cannot know which buyer is reading it.
+ *
+ * The blanket-claim guards stay, because the blanket claim is what caused the
+ * 2026-08-06 overcharge.
  */
 const mainSource = readFileSync(new URL('../main.js', import.meta.url), 'utf8');
 const indexHtml = readFileSync(new URL('../../../index.html', import.meta.url), 'utf8');
@@ -73,11 +80,23 @@ describe('sponsored buy is wired into the public market page', () => {
     expect(sponsoredBuyFn).toContain('runSponsoredBuy');
   });
 
-  it('an ineligible listing falls through to self-paid rather than blocking', () => {
-    // Everything except an already-sold listing returns false, and false means
-    // marketBuy carries on to showContractCall.
-    expect(sponsoredBuyFn).toMatch(/if \(!eligibility\.ok\) \{[\s\S]*?return false;\s*\}/);
+  it('an ineligible listing stops and asks, instead of silently charging the buyer', () => {
+    // This used to `return false`, which fell through to showContractCall and
+    // opened a self-paid wallet prompt with no message. On 2026-08-06 that
+    // charged a buyer 0.193 STX, 39 minutes after the same purchase was
+    // sponsored for free, with nothing on screen to explain it.
+    //
+    // The buyer must still be ABLE to proceed self-paid — but by choosing to,
+    // never by default. If this test fails because the code returns false here
+    // again, fix the code: a silent fallback spends the buyer's money on a path
+    // they did not pick.
     expect(sponsoredBuyFn).toContain("eligibility.reason === 'listing-sold'");
+    expect(sponsoredBuyFn).not.toMatch(/if \(!eligibility\.ok\) \{[\s\S]*?return false;\s*\}/);
+    // Says what happened, quotes the cost, and offers the choice.
+    expect(sponsoredBuyFn).toMatch(/sponsored checkout unavailable/i);
+    expect(sponsoredBuyFn).toMatch(/estimatedFeeUstx/);
+    expect(sponsoredBuyFn).toMatch(/Pay my own network fee instead/);
+    expect(sponsoredBuyFn).toMatch(/forceSelfPaid: true/);
   });
 
   it('a missing relayer configuration falls through instead of failing', () => {
@@ -220,5 +239,92 @@ describe('the market grid renders once per load', () => {
     expect(marketSection).toContain("debugLog('market', 'listings loaded'");
     expect(marketSection).toMatch(/elapsedMs: answer\.meta\.elapsedMs/);
     expect(marketSection).toMatch(/source: .*edge-cache.*origin-scan/s);
+  });
+});
+
+describe('market registry labels make no fee promises', () => {
+  // The original guard checked generated copy only, so it never saw the claim
+  // baked into the registry's own `label` strings. Those printed straight into
+  // the listing detail as "#6 on Xtrata Market sBTC v1.1 (Sponsored - no STX
+  // needed)" while the same card said "sponsored checkout not yet enabled", and
+  // a buyer went on to pay 0.193 STX. A label names a market; whether THIS buyer
+  // pays a fee is decided per listing at render and re-checked at click time.
+  const registry = JSON.parse(
+    readFileSync(resolve(__dirname, '../../data/market-registry.json'), 'utf8')
+  ) as Array<{ label: string }>;
+
+  it('no label claims the buyer pays nothing', () => {
+    for (const entry of registry) {
+      expect(entry.label).not.toMatch(/no\s+(STX|fee)s?\s+needed/i);
+      expect(entry.label).not.toMatch(/free/i);
+      expect(entry.label).not.toMatch(/sponsored/i);
+    }
+  });
+});
+
+describe('the sponsored badge degrades honestly (plan Stage 3 tests)', () => {
+  // SPONSORED-MARKET-BUY-PLAN.md §Stage 3: "assert exhausted-budget and
+  // relayer-down listings do not advertise free checkout".
+  //
+  // The plan also warned that a badge rendered at list time cannot honestly
+  // reflect click-time eligibility. That is why the badge is computed only from
+  // state knowable at render (market kind, relayer configured, escrow covers the
+  // floor) AND why marketSponsoredBuy stops and asks when the prediction is
+  // wrong. Neither half is sufficient alone: without the badge the buyer reads
+  // the market label, without the stop-and-ask the badge can silently overpromise.
+  it('the badge is conditional on a relayer and a funded escrow', () => {
+    expect(marketSection).toMatch(/sponsoredLikely[\s\S]{0,400}?isSponsoredMarket\(listing\.entry\)/);
+    expect(marketSection).toMatch(/sponsoredLikely[\s\S]{0,400}?resolveSponsorBase\(listing\.entry\) !== null/);
+    expect(marketSection).toMatch(/sponsoredLikely[\s\S]{0,400}?budgetRemaining >= SPONSOR_FEE_FLOOR_USTX/);
+  });
+
+  it('an exhausted or unsponsored listing says the buyer pays', () => {
+    // Assert both arms exist rather than their proximity: a proximity window
+    // breaks the moment someone adds a comment between them, which says nothing
+    // about whether the behaviour is right.
+    expect(marketSection).toMatch(/sponsoredLikely\s*\n?\s*\?/);
+    expect(marketSection).toMatch(/>No STX fee</);
+    expect(marketSection).toMatch(/>You pay network fee</);
+  });
+
+  it('the badge never uses the phrasing the old false promise used', () => {
+    // "no STX needed" was the label that cost a buyer 0.193 STX.
+    expect(marketCopy).not.toMatch(/no STX needed/i);
+  });
+});
+
+describe('the stop-and-ask never invents a fee it does not know', () => {
+  // First version printed formatAssetAmount(readiness.estimatedFeeUstx) unconditionally.
+  // marketSponsorReadiness returns estimatedFeeUstx 0n when the quote FAILS, so a
+  // relayer-down buyer read "you would pay about 0.000000 STX" directly above a
+  // button that charges a real fee. Relayer-down is the most common failure, so
+  // the reassuring-but-false number would have been the usual case.
+  it('only quotes a figure when the relayer answered', () => {
+    expect(sponsoredBuyFn).toMatch(/readiness\.available[\s\S]{0,200}?formatAssetAmount/);
+  });
+
+  it('says something true instead of a zero when the quote failed', () => {
+    expect(sponsoredBuyFn).toMatch(/at whatever the network charges when you sign/);
+  });
+});
+
+describe('the two fee badges are visually distinguishable', () => {
+  // The base .badge is ALREADY green (--green-soft/--green in home.css), so a bare
+  // <span class="badge"> rendered the "you pay" warning in the same reassuring
+  // green as "No STX fee". The badge existed and told the buyer nothing.
+  const css = readFileSync(
+    resolve(__dirname, '../styles/home.css'),
+    'utf8'
+  );
+
+  it('the warning badge uses a modifier class that exists in the stylesheet', () => {
+    expect(marketSection).toMatch(/badge fee-due[^<]*You pay network fee/);
+    expect(css).toMatch(/\.badge\.fee-due\s*\{/);
+  });
+
+  it('the two badges do not share a class list', () => {
+    const noFee = /class="badge"[^>]*>No STX fee/.test(marketSection);
+    const youPay = /class="badge fee-due"[^>]*>You pay network fee/.test(marketSection);
+    expect(noFee && youPay).toBe(true);
   });
 });

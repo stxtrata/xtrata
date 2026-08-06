@@ -12,7 +12,8 @@
 import { MockChain } from './mock-chain.js';
 import { SealedChain } from './sealed-chain.js';
 import { LiveChain, describeContractError } from './live-chain.js';
-import { replay, toPgn } from './replay.js';
+import { replay, toPgn, REJECTED } from './replay.js';
+import { Chess, parseUci, pieceColor } from './engine.js';
 import { BoardView, statusText, shortSender, displaySender } from './board-ui.js';
 import { NameResolver, StaticNames } from './bns.js';
 import {
@@ -25,14 +26,45 @@ import {
 } from './block-time.js';
 import { BOTS, mulberry32 } from './bots.js';
 import { SimIdentities } from './sim-identities.js';
-import { isWellFormedLength } from './protocol.js';
+import {
+  isWellFormedLength,
+  DEFAULT_CONTRACT,
+  CONTRACT_CANDIDATES,
+  DEFAULT_NETWORK,
+  DEFAULT_GAME
+} from './protocol.js';
+import {
+  ANYONE,
+  DEFAULT_RULES,
+  describeRules,
+  isOpenBoard,
+  looksLikeName,
+  normaliseRules,
+  readyToOpen,
+  rulesHash,
+  rulesMatchCommitment
+} from './rules.js';
+import { knownGame } from './known-games.js';
+import { childPage, engineIdFromLocation } from './child.js';
+import {
+  connectWallet,
+  disconnectWallet,
+  needsWalletBridge,
+  signingBlockedReason
+} from './wallet.js';
+import { preferredApiBase } from './api-base.js';
 
 const REASON_LABEL = {
   malformed: 'not a move',
   'empty-square': 'no piece there',
   'wrong-turn': 'not their turn',
   illegal: 'illegal',
-  'game-over': 'game already over'
+  'game-over': 'game already over',
+  // Reasons that only a child board's rules can produce.
+  'wrong-player': 'not their side',
+  'not-allowed': 'not on the list',
+  consecutive: 'two in a row',
+  cooldown: 'too soon'
 };
 
 export class ChessBoardApp {
@@ -45,6 +77,15 @@ export class ChessBoardApp {
     this.random = mulberry32(options.seed ?? 1);
     this.simSeed = options.seed ?? 1;
     this.identities = null;
+    this.gameRules = null;
+    this.committedHash = null;
+    this.childGame = null;
+    this.engineId = null;
+    this.isChild = false;
+    this.pendingMove = null;
+    this.pendingTimer = null;
+    // Moves broadcast by anyone and not yet in a block.
+    this.mempool = [];
     this.autoplayTimer = null;
     this.pollTimer = null;
     this.busy = false;
@@ -69,15 +110,243 @@ export class ChessBoardApp {
     this.capLongWaits = true;
     this.waiting = null;
 
-    this.board = new BoardView(this.elements.board, (uci) => this.submit(uci));
+    this.board = new BoardView(this.elements.board, (uci) => this.stage(uci));
 
     this._wire();
 
     // A sealed game carries its own log, so the page renders with no network at
     // all. This is the mode an inscribed finished game runs in.
     const sealed = options.sealed || globalThis.__XTRATA_CHESS_SEALED__;
+    const child = options.child || globalThis.__XTRATA_CHESS_CHILD__;
+    // An inscribed open board knows its own contract, so it opens on the game
+    // rather than on a form asking where the game is.
+    const board = options.board || globalThis.__XTRATA_CHESS_BOARD__;
+
     if (sealed) this.startSealed(sealed);
-    else this.startSimulation();
+    else if (child) this.startChild(child);
+    else if (board) this.startConfiguredBoard(board);
+    // exact: the deployed contract is named and not searched for. The probing
+    // path below exists for a board built before its contract was deployed;
+    // once it exists, probing is a network round trip that can only do harm. A
+    // single 500 on that one request would silently drop the board to an older
+    // version and show a different log under the same game number.
+    else {
+      this.startConfiguredBoard({
+        contract: DEFAULT_CONTRACT,
+        network: DEFAULT_NETWORK,
+        exact: true
+      });
+    }
+  }
+
+  async startConfiguredBoard(board) {
+    const network = board.network || 'mainnet';
+    const wanted = String(board.contract || '');
+
+    // Prefer the current contract; use the previous one when it is not there.
+    // Pointing at a contract before it exists should degrade to a working board
+    // rather than an error page, and should say which one it settled on.
+    // Whatever was asked for first, then the rest of the chain newest first, so
+    // a board naming a contract that is not deployed yet still opens.
+    const chosen = board.exact
+      ? wanted
+      : await this._firstDeployed(
+          [wanted, ...CONTRACT_CANDIDATES.filter((candidate) => candidate !== wanted)],
+          network
+        );
+
+    const [address, name] = (chosen || wanted).split('.');
+    this.elements.contractAddress.value = address || '';
+    if (name) this.elements.contractName.value = name;
+    this.elements.network.value = network;
+
+    if (chosen && chosen !== wanted) {
+      this._notify(
+        `${wanted.split('.')[1]} is not deployed yet, so this is showing ${name}.`,
+        'warn'
+      );
+    }
+    this.setMode('live');
+  }
+
+  async _firstDeployed(candidates, network) {
+    const api = preferredApiBase(network);
+    for (const candidate of candidates) {
+      const [address, name] = candidate.split('.');
+      if (!address || !name) continue;
+      try {
+        const response = await fetch(`${api}/v2/contracts/interface/${address}/${name}`);
+        if (response.ok) return candidate;
+      } catch {
+        // Unreachable is not the same as absent; try the next and let the
+        // ordinary read path report the problem properly.
+      }
+    }
+    return candidates[0];
+  }
+
+  // A generated board: one game, one rule set, nothing else. It still reads the
+  // chain like any live board, and it checks that the rules it was built with
+  // are the ones the game actually committed to.
+  async startChild(child) {
+    this.mode = 'live';
+    this.isChild = true;
+    this.engineId = child.engine ?? null;
+    this.gameRules = normaliseRules(child.rules);
+
+    const el = this.elements;
+    el.modeSim.hidden = true;
+    el.modeLive.hidden = true;
+    el.simPanel.hidden = true;
+    el.livePanel.hidden = true;
+    el.rulesPanel.hidden = true;
+    el.newGame.hidden = true;
+
+    const [address, name] = String(child.contract || '').split('.');
+    this.chain = new LiveChain({
+      contractAddress: address,
+      contractName: name,
+      network: child.network || 'mainnet'
+    });
+    this.names = new NameResolver({ apiUrl: this.chain.apiUrl });
+    this.times = new BlockTimes({ apiUrl: this.chain.apiUrl });
+    this.game = Number(child.game);
+
+    await this.refresh();
+    await this._verifyCommitment();
+    this._startPolling();
+  }
+
+  /**
+   * Take on a known game's rules, but only if the chain agrees they are its.
+   *
+   * The contract stores a hash, never the rules, so a board that simply trusted
+   * a local table could enforce rules a game never committed to. Every branch
+   * here that is not an exact match ends with the board refereeing nothing,
+   * which is the open-board behaviour and the safe direction to fail in.
+   */
+  async _adoptKnownRules() {
+    const known = knownGame(this.chain?.contractId, this.game);
+
+    if (!known) {
+      // Not a game this board claims to referee. Any commitment it carries
+      // belongs to a generated board somewhere, not to this one.
+      this.gameRules = null;
+      return;
+    }
+
+    let entry = null;
+    try {
+      entry = this.chain.getGame ? await this.chain.getGame(this.game) : null;
+    } catch {
+      // A read that failed is not a game without rules. Referee nothing rather
+      // than guess, and let the ordinary read path report the problem.
+      this.gameRules = null;
+      return;
+    }
+
+    this.committedHash = entry?.rulesHash ?? null;
+    const rules = normaliseRules(known.rules);
+
+    if (!this.committedHash) {
+      this._notify(
+        `Game #${this.game} was opened without a rules commitment, so ${known.label} cannot be enforced. ` +
+          'Playing it as an open board.',
+        'warn'
+      );
+      this.gameRules = null;
+      return;
+    }
+
+    if (!rulesMatchCommitment(rules, this.committedHash)) {
+      this._notify(
+        `Game #${this.game} committed to rules this board does not have, so it is not the referee for it. ` +
+          'Playing it as an open board.',
+        'warn'
+      );
+      this.gameRules = null;
+      return;
+    }
+
+    this.gameRules = rules;
+  }
+
+  /**
+   * Fill the rules panel with a known game's rules, when that game is missing.
+   *
+   * The board carries the rules for the game it opens on, but the chain only
+   * stores their hash — so the game has to be opened with those exact rules or
+   * the commitment will not match and the board will referee nothing. Typing
+   * them by hand is a way to get one character wrong, permanently.
+   *
+   * Only ever fills an untouched panel, and only when the game is genuinely
+   * absent. Overwriting somebody's half-typed rules would be worse than the
+   * problem being solved.
+   */
+  _offerKnownRules() {
+    if (this._offeredRules || this.mode !== 'live' || this.isChild) return;
+
+    // With no games on the contract at all, this.game is null rather than 1:
+    // there is no game to be on. The game the board is built to referee is
+    // still the one worth offering, so ask about that rather than about
+    // nothing.
+    // Only ever called where the game is known not to exist. Games are numbered
+    // from one without gaps, so a contract with any games at all has game 1,
+    // and offering to open it there would be a plain lie. Guarding on "has no
+    // moves" instead would tell that lie to every freshly opened game.
+    const game = this.game ?? DEFAULT_GAME;
+    const known = knownGame(this.chain?.contractId, game);
+    if (!known) return;
+
+    const el = this.elements;
+    const untouched =
+      !el.rulesWhite.value.trim() && !el.rulesBlack.value.trim() && !Number(el.rulesCooldown.value);
+    if (!untouched) return;
+
+    const rules = normaliseRules(known.rules);
+    el.rulesWhite.value = rules.white;
+    el.rulesBlack.value = rules.black;
+    el.rulesCooldown.value = String(rules.cooldown);
+    el.rulesNoConsecutive.checked = rules.noConsecutive;
+    this._offeredRules = true;
+
+    this._notify(
+      `Game #${game} has not been opened yet. The rules panel below is filled with ` +
+        `"${known.label}", which is what this board is built to referee. Opening it with anything ` +
+        'else means this board will not enforce it.',
+      'info'
+    );
+    this.renderRules();
+  }
+
+  // Does the chain agree that this is the referee for this game?
+  async _verifyCommitment() {
+    if (!this.gameRules || !this.chain.getGame) return;
+
+    try {
+      const entry = await this.chain.getGame(this.game);
+      if (!entry) {
+        this._notify(`Game #${this.game} does not exist on this contract.`, 'error');
+        this.render();
+        return;
+      }
+
+      this.committedHash = entry.rulesHash ?? null;
+
+      if (!rulesMatchCommitment(this.gameRules, this.committedHash)) {
+        // Worth stating plainly rather than quietly rendering anyway: a board
+        // whose rules do not hash to the commitment is not this game's referee,
+        // and anything it shows is its own opinion.
+        this._notify(
+          `These rules do not match what game #${this.game} committed to on chain. This board is not the referee for this game, and what it shows should not be trusted.`,
+          'error'
+        );
+      }
+      this.render();
+    } catch (error) {
+      this._notify(`Could not check the rules commitment: ${error.message}`, 'warn');
+      this.render();
+    }
   }
 
   startSealed(sealed) {
@@ -122,11 +391,18 @@ export class ChessBoardApp {
       event.preventDefault();
       const value = el.manualInput.value.trim();
       if (!value) return;
-      el.manualInput.value = '';
       this.submit(value);
+    });
+    el.manualInput.addEventListener('input', () => this._describeInput());
+    el.clearMove.addEventListener('click', () => {
+      el.manualInput.value = '';
+      this.board.setStaged(null);
+      this._describeInput();
+      this.render();
     });
 
     el.connect.addEventListener('click', () => this.connect());
+    el.disconnect.addEventListener('click', () => this.disconnectWallet());
     el.loadLive.addEventListener('click', () => this.startLive());
     el.gameSelect.addEventListener('change', () => {
       this.game = Number(el.gameSelect.value);
@@ -151,6 +427,27 @@ export class ChessBoardApp {
       this.seek(Number(el.seek.value));
     });
     el.pace.addEventListener('change', () => this.setPace(el.pace.value));
+
+    for (const control of [el.rulesWhite, el.rulesBlack, el.rulesCooldown, el.rulesNoConsecutive]) {
+      control.addEventListener('input', () => this.renderRules());
+      control.addEventListener('change', () => this.renderRules());
+    }
+    el.rulesOpen.addEventListener('click', () => this.openRuledGame());
+    el.rulesDownload.addEventListener('click', () => this.downloadChild());
+    el.rulesReset.addEventListener('click', () => {
+      // Back to the rules this board is built to referee, where there are any.
+      // Blanking the panel on the default board would leave someone retyping an
+      // address that has to match a hash exactly, with no way to check it.
+      const known = knownGame(this.chain?.contractId, this.game ?? DEFAULT_GAME);
+      const rules = known ? normaliseRules(known.rules) : DEFAULT_RULES;
+
+      el.rulesWhite.value = rules.white === ANYONE ? '' : rules.white;
+      el.rulesBlack.value = rules.black === ANYONE ? '' : rules.black;
+      el.rulesCooldown.value = String(rules.cooldown);
+      el.rulesNoConsecutive.checked = rules.noConsecutive;
+      this.childGame = null;
+      this.renderRules();
+    });
     el.capWaits.addEventListener('change', () => {
       this.capLongWaits = el.capWaits.checked;
       this.setPace(this.pace);
@@ -172,8 +469,19 @@ export class ChessBoardApp {
     this.elements.simPanel.hidden = mode !== 'sim';
     this.elements.livePanel.hidden = mode !== 'live';
 
-    if (mode === 'sim') this.startSimulation();
-    else this.startLive();
+    if (mode === 'sim') {
+      this.startSimulation();
+      return;
+    }
+    // Coming back to live: fall back to the built-in board if the fields are
+    // empty, so the toggle never lands on a blank form.
+    if (!this.elements.contractAddress.value.trim()) {
+      const [address, name] = DEFAULT_CONTRACT.split('.');
+      this.elements.contractAddress.value = address;
+      this.elements.contractName.value = name;
+      this.elements.network.value = DEFAULT_NETWORK;
+    }
+    this.startLive();
   }
 
   startSimulation() {
@@ -185,6 +493,8 @@ export class ChessBoardApp {
     // The mock chain keeps its own clock, so simulated games have real gaps to
     // be replayed against.
     this.times = this.chain.blockTimes;
+    this.gameRules = null;
+    this.childGame = null;
     this.game = this.chain.openGame(this.identities.you).value;
     this.viewIndex = null;
     this.pause();
@@ -205,7 +515,8 @@ export class ChessBoardApp {
       this.chain = new LiveChain({
         contractAddress,
         contractName: el.contractName.value.trim() || undefined,
-        network: el.network.value
+        network: el.network.value,
+        senderAddress: this.walletAddress || undefined
       });
 
       // Names are only meaningful against a real chain, and the resolver is
@@ -213,18 +524,30 @@ export class ChessBoardApp {
       this.names = new NameResolver({ apiUrl: this.chain.apiUrl });
       this.times = new BlockTimes({ apiUrl: this.chain.apiUrl });
 
+      // Read before anything can return early. A contract with no games yet
+      // still charges for opening one, and the previous ordering meant an empty
+      // board reported that it charged nothing.
+      this.contractFee = this.chain.getContractFee ? await this.chain.getContractFee() : 0;
+      this.openFee = this.chain.getOpenFee ? await this.chain.getOpenFee() : this.contractFee;
+
       const count = await this.chain.getGameCount();
       if (count === 0) {
-        this._notify('No games opened on this contract yet.', 'warn');
         this.game = null;
         this.rawMoves = [];
         this.state = replay([]);
+        // An empty contract is the one moment the rules panel matters most: the
+        // game this board is built to referee does not exist yet, and it has to
+        // be opened with exactly the rules the board carries or the commitment
+        // will not match. Offer them first, and only say "no games" if there is
+        // nothing this board knows to suggest.
+        this._offerKnownRules();
+        if (!this._offeredRules) this._notify('No games opened on this contract yet.', 'warn');
         this.render();
         return;
       }
 
       this._fillGameSelect(count);
-      this.game = Number(el.gameSelect.value) || count;
+      this.game = Number(el.gameSelect.value) || DEFAULT_GAME;
       this.notice = null;
       await this.refresh();
       this._startPolling();
@@ -244,7 +567,9 @@ export class ChessBoardApp {
       option.textContent = `game #${id}`;
       el.appendChild(option);
     }
-    el.value = String(previous >= 1 && previous <= count ? previous : count);
+    // Game 1 unless the viewer has already chosen another. The newest game is
+    // not the interesting one by default; the open board is.
+    el.value = String(previous >= 1 && previous <= count ? previous : Math.min(DEFAULT_GAME, count));
   }
 
   _startPolling() {
@@ -272,10 +597,25 @@ export class ChessBoardApp {
 
     this.busy = true;
     try {
+      // Before replaying, work out whether this board is the referee for this
+      // game. A child board already knows; the open board has to look it up and
+      // then check the chain agrees.
+      if (!this.isChild) await this._adoptKnownRules();
+
       const moves = await this.chain.getAllMoves(this.game);
       this.rawMoves = moves;
-      this.state = replay(moves);
+      this.state = replay(moves, { rules: this.gameRules });
       this.stamps = stampLog(moves, this.times);
+
+      // What is in flight matters as much as what has landed: it is the
+      // difference between waiting your turn and paying for a move that will be
+      // skipped because somebody beat you to it.
+      this.mempool = this.chain.getMempool ? await this.chain.getMempool(this.game) : [];
+
+      // What the contract itself charges, which is not the transaction fee and
+      // should not be discovered for the first time in a wallet prompt.
+      if (this.chain.getContractFee) this.contractFee = await this.chain.getContractFee();
+      if (this.chain.getOpenFee) this.openFee = await this.chain.getOpenFee();
     } catch (error) {
       this._notify(`Read failed: ${error.message}`, 'error');
     } finally {
@@ -303,7 +643,7 @@ export class ChessBoardApp {
   // The state being drawn: a historical prefix while scrubbing, else the latest.
   viewState() {
     if (this.viewIndex === null) return this.state;
-    return replay(this.rawMoves.slice(0, this.viewIndex));
+    return replay(this.rawMoves.slice(0, this.viewIndex), { rules: this.gameRules });
   }
 
   seek(index) {
@@ -403,6 +743,60 @@ export class ChessBoardApp {
     }
   }
 
+  // A broadcast that never confirms must not lock the board permanently, so
+  // anything older than this stops counting as in flight.
+  livePending() {
+    const CUTOFF = 10 * 60 * 1000;
+    const now = Date.now();
+    return this.mempool.filter(
+      (entry) => !entry.receivedAt || now - entry.receivedAt < CUTOFF
+    );
+  }
+
+  // Poll harder than the idle rate while something of ours is in flight, and
+  // stop as soon as it appears in the log.
+  _watchPending() {
+    if (this.pendingTimer) clearInterval(this.pendingTimer);
+    this.pendingTimer = setInterval(async () => {
+      if (!this.pendingMove) return this._stopWatching();
+
+      await this.refresh();
+
+      const landed = this.state.log.some(
+        (entry) => String(entry.uci).toLowerCase() === this.pendingMove.uci.toLowerCase()
+      );
+      const tooOld = Date.now() - this.pendingMove.at > 10 * 60 * 1000;
+
+      if (landed) {
+        const record = this.state.log.find(
+          (entry) => String(entry.uci).toLowerCase() === this.pendingMove.uci.toLowerCase()
+        );
+        this._notify(
+          record.status === 'accepted'
+            ? `${record.san} is on the board.`
+            : `Your submission landed and was skipped: ${record.reason}. The fee was still paid.`,
+          record.status === 'accepted' ? 'info' : 'warn'
+        );
+        this._clearPending();
+      } else if (tooOld) {
+        this._notify('That move has not appeared after ten minutes. Check the transaction in the explorer.', 'warn');
+        this._clearPending();
+      }
+      this.render();
+    }, 8_000);
+  }
+
+  _clearPending() {
+    this.pendingMove = null;
+    this.board.setPending(null);
+    this._stopWatching();
+  }
+
+  _stopWatching() {
+    if (this.pendingTimer) clearInterval(this.pendingTimer);
+    this.pendingTimer = null;
+  }
+
   // Fire and forget. The board is already drawn from replay; names land later
   // and only cause a redraw if any of them actually resolved.
   _resolveNames() {
@@ -450,6 +844,19 @@ export class ChessBoardApp {
       return;
     }
 
+    // Somebody's move is already on its way. Sending now means both land in the
+    // same block, the second is skipped, and its sender paid for nothing.
+    const inFlight = this.livePending();
+    if (this.mode === 'live' && inFlight.length) {
+      const who = inFlight[0].sender === this.walletAddress ? 'Your' : "Somebody else's";
+      this._notify(
+        `${who} move (${inFlight[0].mv}) is waiting for a block. Sending now would almost certainly be skipped, so the board is holding until it confirms.`,
+        'warn'
+      );
+      this.render();
+      return;
+    }
+
     // Mirror the contract's filter locally so the obvious case does not cost a
     // transaction to learn.
     if (!isWellFormedLength(uci)) {
@@ -474,15 +881,30 @@ export class ChessBoardApp {
       this._notify('Confirm the move in your wallet…', 'info');
       this.render();
       const result = await this.chain.submitMove(this.game, uci);
+
+      // A block takes the better part of a minute. Without this the board sits
+      // unchanged after signing and looks like it did nothing.
+      this.pendingMove = { uci, txid: result.txid, at: Date.now() };
+      this.board.setPending(uci);
+      this.elements.manualInput.value = '';
       this._notify(
         result.txid
-          ? `Submitted. It lands when the transaction confirms. tx ${shortSender(result.txid)}`
-          : 'Submitted.',
+          ? `Sent. Waiting for it to confirm — tx ${shortSender(result.txid)}`
+          : 'Sent. Waiting for it to confirm.',
         'info'
       );
+      this._watchPending();
     } catch (error) {
       if (error.code === 'NO_WALLET') {
         this._notify('No Stacks wallet found. Install Leather or Xverse to play live.', 'error');
+      } else if (needsWalletBridge(error)) {
+        // The shim's own wording is "requires host wallet bridge support",
+        // which tells a player nothing they can act on. Say what to do instead.
+        this._notify(
+          'This page cannot sign moves: it is open without a wallet bridge. ' +
+            'Open the board from the Xtrata site and try again.',
+          'error'
+        );
       } else {
         this._notify(`Wallet call failed: ${error.message}`, 'error');
       }
@@ -531,26 +953,99 @@ export class ChessBoardApp {
     this.render();
   }
 
+  async disconnectWallet() {
+    this.walletAddress = null;
+    if (this.chain) this.chain.senderAddress = null;
+    // Ask the wallet to forget as well, or the next Connect is answered from
+    // its own session rather than by asking.
+    await disconnectWallet({ onLog: () => {} }).catch(() => {});
+    this._renderWallet();
+    this._notify('Disconnected. Connect again to sign as a different wallet.', 'info');
+    this.render();
+  }
+
+  /**
+   * Warn when this page cannot sign, before someone stages a move to find out.
+   *
+   * An inscription opened by its bare URL has no wallet bridge, and the runtime
+   * shim refuses every contract call without one. Reading, replaying and
+   * downloading a child board all still work, so the board is not broken and
+   * should not pretend to be. What it must not do is let someone pick a move,
+   * click Submit and meet a -32601 they cannot act on.
+   *
+   * Deliberately a warning and not a disabled button. This is a heuristic about
+   * providers that may inject after we look, and the cost of being wrong is
+   * asymmetric: a warning shown to someone who could have played is a nuisance,
+   * a disabled Submit is a board they cannot use at all. walletCall still tries.
+   */
+  _renderSigningHint() {
+    const el = this.elements;
+    if (!el.walletHint) return;
+
+    const reason = signingBlockedReason();
+    el.walletHint.className = reason ? 'hint warn' : 'hint';
+
+    if (reason === 'no-bridge') {
+      el.walletHint.innerHTML =
+        '<strong>This page cannot sign moves.</strong> It is open without a wallet ' +
+        'bridge, and the Xtrata runtime only passes a transaction to your wallet ' +
+        'when the page it framed carries one. Open this board from the Xtrata site ' +
+        'and moves will sign normally. Reading and replaying work either way.';
+      return;
+    }
+
+    if (reason === 'no-wallet') {
+      el.walletHint.innerHTML =
+        'No Stacks wallet found, so moves cannot be signed from here. Install ' +
+        'Leather or Xverse. Reading and replaying need no wallet.';
+      return;
+    }
+
+    el.walletHint.textContent =
+      'Reading is free and needs no wallet. Only submitting a move does.';
+  }
+
+  // Keeps the button and the hint agreeing with whether a wallet is attached.
+  _renderWallet() {
+    const el = this.elements;
+    if (this.walletAddress) {
+      el.connect.className = 'connected';
+      el.connect.textContent = `Connected · ${shortSender(this.walletAddress)}`;
+      el.connect.title = this.walletAddress;
+      el.disconnect.hidden = false;
+    } else {
+      el.connect.className = 'go';
+      el.connect.textContent = 'Connect wallet';
+      el.connect.title = '';
+      el.disconnect.hidden = true;
+    }
+  }
+
   async connect() {
     try {
-      const provider =
-        typeof window !== 'undefined'
-          ? window.LeatherProvider ||
-            window.XverseProviders?.StacksProvider ||
-            window.StacksProvider ||
-            window.btc
-          : null;
-      if (!provider) {
-        this._notify('No Stacks wallet found. Install Leather or Xverse.', 'error');
-        this.render();
-        return;
-      }
-      const result = await provider.request('getAddresses');
-      const addresses = result?.result?.addresses || result?.addresses || [];
-      const stx = addresses.find((entry) => entry.symbol === 'STX' || entry.address?.startsWith('S'));
-      this._notify(stx ? `Connected ${shortSender(stx.address)}` : 'Wallet connected.', 'info');
+      const session = await connectWallet({
+        // Always ask. A silent reconnect leaves someone stuck with whichever
+        // account they happened to pick first, with no way to change it from
+        // here, which is exactly the complaint this fixes.
+        forcePrompt: true,
+        onLog: (level, message) => this._notify(message, level === 'ok' ? 'info' : level)
+      });
+      this.walletAddress = session.address;
+      // The contract's post condition is written about this address, so the
+      // chain has to be told who is signing before a charging call is built.
+      if (this.chain) this.chain.senderAddress = session.address;
+      this._renderWallet();
+      this._notify(
+        `Connected ${shortSender(session.address)}${session.via === 'host-session' ? ' (session from the host)' : ''}`,
+        'info'
+      );
     } catch (error) {
-      this._notify(`Connect failed: ${error.message}`, 'error');
+      this._notify(
+        error.code === 'NO_WALLET'
+          ? 'No Stacks wallet found. Install Leather or Xverse, or open this board inside a wallet browser.'
+          : `Connect failed: ${error.message}`,
+        'error'
+      );
     }
     this.render();
   }
@@ -637,6 +1132,266 @@ export class ChessBoardApp {
   }
 
   // ------------------------------------------------------------------
+  // Choosing a move before sending it
+  // ------------------------------------------------------------------
+
+  // Put a move in the box rather than on the chain. Every submission costs a
+  // fee and opens a wallet, so the board proposes and the person disposes.
+  stage(uci) {
+    this.elements.manualInput.value = uci;
+    this.board.setStaged(uci);
+    this._describeInput();
+    this.render();
+    this.elements.manualInput.focus();
+  }
+
+  // Says what the text in the box would do, as it is typed. Uses the same
+  // engine the chain-side replay uses, so the verdict here and the verdict
+  // after submitting cannot disagree.
+  _describeInput() {
+    const el = this.elements;
+    const raw = el.manualInput.value.trim();
+    const state = this.state;
+
+    if (!raw) {
+      el.moveHint.textContent = 'Click a piece and then its destination, or type a move.';
+      el.moveHint.className = 'hint';
+      el.submitMove.disabled = true;
+      this.board.setStaged(null);
+      return;
+    }
+
+    if (!isWellFormedLength(raw)) {
+      el.moveHint.textContent = `${raw.length} characters. The contract only stores four or five, so this would be refused before it reached the log.`;
+      el.moveHint.className = 'hint bad';
+      el.submitMove.disabled = true;
+      this.board.setStaged(null);
+      return;
+    }
+
+    const uci = raw.toLowerCase();
+    const legal = state.legalMoves.includes(uci);
+
+    if (legal) {
+      // Show the move in the notation people read, not just the one they type.
+      const preview = new Chess(state.fen);
+      const applied = preview.moveUci(uci);
+      el.moveHint.innerHTML =
+        `<strong>${escapeHtml(applied ? applied.san : uci)}</strong> · ` +
+        `${escapeHtml(uci.slice(0, 2))} → ${escapeHtml(uci.slice(2, 4))}` +
+        (uci.length === 5 ? `, promoting to ${escapeHtml(uci[4].toUpperCase())}` : '') +
+        ' · legal, ready to send';
+      el.moveHint.className = 'hint good';
+      el.submitMove.disabled = false;
+      this.board.setStaged(uci);
+      return;
+    }
+
+    // Not legal: say which kind of not-legal, using the same categories the log
+    // will show if it is sent anyway.
+    const reason = state.isGameOver
+      ? 'this game is over'
+      : classifyDraft(state, uci);
+    el.moveHint.textContent = `${uci} · ${reason}. It would be stored and then skipped.`;
+    el.moveHint.className = 'hint bad';
+    el.submitMove.disabled = false;
+    this.board.setStaged(null);
+  }
+
+  // ------------------------------------------------------------------
+  // Child boards
+  // ------------------------------------------------------------------
+
+  // The rules currently described by the panel.
+  // What is typed in the panel, before normalising.
+  //
+  // normaliseRules is deliberately forgiving: it turns anything it does not
+  // recognise into "anyone" so that two descriptions of the same rules hash
+  // identically. That is right for hashing and wrong for validating, because it
+  // silently converts a typo into the most permissive rule there is. So the
+  // check runs on what was actually typed.
+  draftInput() {
+    const el = this.elements;
+    return {
+      white: el.rulesWhite.value,
+      black: el.rulesBlack.value,
+      cooldown: el.rulesCooldown.value,
+      noConsecutive: el.rulesNoConsecutive.checked
+    };
+  }
+
+  draftRules() {
+    return normaliseRules(this.draftInput());
+  }
+
+  renderRules() {
+    const el = this.elements;
+    const rules = this.draftRules();
+    const open = isOpenBoard(rules);
+    const check = readyToOpen(this.draftInput());
+
+    el.rulesSummary.textContent = describeRules(rules);
+    el.rulesHash.textContent = open ? 'none — these are the open board rules' : rulesHash(rules);
+    el.rulesDownload.disabled = !this.childGame;
+    el.rulesDownload.textContent = this.childGame
+      ? `Download the board for game #${this.childGame}`
+      : 'Download the board';
+
+    // Nothing reaches a wallet until every choice has been made. A game's rules
+    // are hashed on chain and cannot be edited afterwards, so an incomplete set
+    // is not a draft to be fixed later, it is a permanent mistake.
+    el.rulesOpen.disabled = !check.ready;
+
+    // Price it on the button. Opening is a hundred times a move on v3 by
+    // default, and a button that says only "Open this game" invites someone to
+    // approve a wallet prompt an order of magnitude larger than they expect.
+    const openCost = Number(this.openFee) || 0;
+    const priced = openCost && this.mode === 'live'
+      ? `Open this game · ${(openCost / 1e6).toFixed(6)} STX`
+      : 'Open this game';
+    el.rulesOpen.textContent = check.ready ? priced : 'Set the rules first';
+
+    if (el.rulesNote) {
+      el.rulesNote.className = check.ready ? 'hint' : 'hint warn';
+      el.rulesNote.innerHTML = check.ready
+        ? 'The contract enforces none of this. It stores the hash above when the game is opened, and the ' +
+          'board you download is the referee: it replays the log and skips anything these rules disallow. ' +
+          'Open the game first, then download the board bound to it.'
+        : '<strong>Not ready to open.</strong><br>' +
+          check.problems.map((problem) => escapeHtml(problem.message)).join('<br>');
+    }
+  }
+
+  async openRuledGame() {
+    // Names first, and only then a hash. Replay compares principals, and a
+    // sealed board has no network to ask, so a name that reached the hash would
+    // be a side nobody could ever play. This is the last moment it can be fixed.
+    const resolved = await this._resolveRuleNames();
+    if (!resolved) return;
+
+    const check = readyToOpen(this.draftInput());
+    if (!check.ready) {
+      this._notify(check.problems[0].message, 'warn');
+      this.renderRules();
+      return;
+    }
+
+    const rules = this.draftRules();
+    const hash = isOpenBoard(rules) ? null : rulesHash(rules);
+
+    if (this.mode === 'sim') {
+      const id = this.chain.openGame(this.identities.you, hash).value;
+      this.childGame = id;
+      this.game = id;
+      this.gameRules = rules;
+      this._notify(
+        `Opened game #${id} in simulation with those rules. On chain this would write the hash and nothing else.`,
+        'info'
+      );
+      await this.refresh();
+      this.renderRules();
+      return;
+    }
+
+    try {
+      this._notify('Confirm the new game in your wallet…', 'info');
+      this.render();
+      const result = await this.chain.openGame(hash);
+      this._notify(
+        `Game submitted with its rules hash. Once it confirms, note its number and come back to download the board. tx ${shortSender(result.txid)}`,
+        'info'
+      );
+    } catch (error) {
+      this._notify(`Wallet call failed: ${error.message}`, 'error');
+    }
+    this.render();
+  }
+
+  /**
+   * Turn any .btc names in the panel into the addresses they point at.
+   *
+   * Writes the addresses back into the inputs rather than resolving invisibly,
+   * so what gets hashed is what the person opening the game can see. A name that
+   * does not resolve stops the whole thing: on an immutable commitment, a side
+   * assigned to nobody is worse than no game at all.
+   */
+  async _resolveRuleNames() {
+    const el = this.elements;
+    const fields = [
+      ['white', el.rulesWhite],
+      ['black', el.rulesBlack]
+    ];
+
+    for (const [side, input] of fields) {
+      const typed = String(input.value || '').trim();
+      if (!typed || !looksLikeName(typed)) continue;
+
+      this._notify(`Looking up ${typed}…`, 'info');
+      this.render();
+
+      const address = await this.names?.lookupName?.(typed);
+      if (!address) {
+        this._notify(
+          `${typed} does not resolve to an address, so ${side} would be a side nobody could play. ` +
+            'Nothing has been sent.',
+          'error'
+        );
+        this.renderRules();
+        this.render();
+        return false;
+      }
+
+      input.value = address;
+      this._notify(`${typed} is ${shortSender(address)}. Check it, then open the game.`, 'info');
+    }
+
+    this.renderRules();
+    return true;
+  }
+
+  downloadChild() {
+    const rules = this.draftRules();
+    const game = this.childGame ?? this.game;
+    if (!game) {
+      this._notify('Open the game first, so the board can be bound to its number.', 'warn');
+      this.render();
+      return;
+    }
+
+    const engine = this.engineId ?? engineIdFromLocation();
+    if (!engine) {
+      this._notify(
+        'This board is not running from an inscription, so it does not know which engine a child should depend on. Inscribe the engine first, then generate children from the inscribed board.',
+        'warn'
+      );
+      this.render();
+      return;
+    }
+
+    const html = childPage({
+      contract: this.chain.contractId || 'simulation',
+      network: this.mode === 'live' ? this.chain.network : 'simulation',
+      game,
+      rules,
+      engine
+    });
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `xtrata-chess-game-${game}.html`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    this._notify(
+      `Board for game #${game} downloaded, ${html.length} bytes. Inscribe it with dependency [${engine}].`,
+      'info'
+    );
+    this.render();
+  }
+
+  // ------------------------------------------------------------------
   // Rendering
   // ------------------------------------------------------------------
 
@@ -653,19 +1408,51 @@ export class ChessBoardApp {
     const replayable = finished || this.mode === 'sealed';
 
     el.playControls.hidden = !playable;
-    el.newGame.hidden = this.mode === 'sealed';
+    el.newGame.hidden = this.mode === 'sealed' || this.isChild;
     if (this.mode === 'sim') el.simPanel.hidden = !playable;
     el.replayPanel.hidden = !replayable;
 
+    const inFlight = this.livePending();
+    // Anyone's in-flight move, not just ours. Watching an opponent's move
+    // arrive is half the point of a shared board.
+    this.board.pending = inFlight.length ? inFlight[0].mv : null;
     this.board.setInteractive(playable && !scrubbing);
     this.board.render(view);
 
-    el.status.textContent = scrubbing
-      ? `Replaying — submission ${this.viewIndex} of ${this.rawMoves.length}`
-      : statusText(this.state);
-    el.status.className = `status ${
-      scrubbing ? 'replaying' : this.state.outcome ? 'over' : this.state.inCheck ? 'check' : ''
-    }`;
+    if (scrubbing) {
+      el.status.textContent = `Replaying — submission ${this.viewIndex} of ${this.rawMoves.length}`;
+      el.status.className = 'status replaying';
+    } else if (inFlight.length) {
+      const first = inFlight[0];
+      const mine = first.sender === this.walletAddress;
+      el.status.textContent = `${mine ? 'Your' : 'A'} move ${first.mv} is in the mempool, waiting for a block`;
+      el.status.className = 'status waiting';
+    } else {
+      el.status.textContent = statusText(this.state);
+      el.status.className = `status ${
+        this.state.outcome ? 'over' : this.state.inCheck ? 'check' : ''
+      }`;
+    }
+
+    el.pendingPanel.hidden = inFlight.length === 0;
+    if (inFlight.length) {
+      el.pendingPanel.innerHTML = inFlight
+        .map((entry) => {
+          const who = displaySender(entry.sender, this.names);
+          const age = entry.receivedAt
+            ? ` · ${formatDuration((Date.now() - entry.receivedAt) / 1000)} ago`
+            : '';
+          return (
+            `<div class="inflight">` +
+            `<span class="dotpulse"></span>` +
+            `<code>${escapeHtml(entry.mv)}</code>` +
+            `<span class="who ${who.named ? 'named' : ''}" title="${escapeHtml(who.title)}">${escapeHtml(who.label)}</span>` +
+            `<span class="age">broadcast${escapeHtml(age)}</span>` +
+            `</div>`
+          );
+        })
+        .join('');
+    }
 
     el.fen.textContent = view.fen;
 
@@ -677,6 +1464,15 @@ export class ChessBoardApp {
       `<span><strong>${this.state.rejected.length}</strong> skipped</span>`;
 
     this._renderReplayControls(view);
+    if (!el.rulesPanel.hidden) this.renderRules();
+
+    if (inFlight.length && this.mode === 'live') {
+      el.submitMove.disabled = true;
+      el.submitMove.textContent = 'Waiting for a block';
+    } else if (el.submitMove.textContent === 'Waiting for a block') {
+      el.submitMove.textContent = 'Submit move';
+      this._describeInput();
+    }
 
     el.moves.innerHTML = this._renderMoves(this.state, view);
     el.log.innerHTML = this._renderLog(this.state);
@@ -690,6 +1486,20 @@ export class ChessBoardApp {
     }
 
     el.gameLabel.textContent = this.game ? `game #${this.game}` : 'no game';
+
+    this._renderSigningHint();
+
+    // Say what a move costs before anybody signs for one.
+    if (el.chargeNote) {
+      const charge = Number(this.contractFee) || 0;
+      const name = el.contractName.value;
+      el.chargeNote.hidden = this.mode !== 'live';
+      el.chargeNote.innerHTML = charge
+        ? `<strong>${(charge / 1e6).toFixed(6)} STX</strong> per move, set by whoever owns ` +
+          `${escapeHtml(name)}, plus the usual network fee. Your wallet will be asked to permit ` +
+          `that amount and no more.`
+        : `${escapeHtml(name)} charges nothing to play. Only the usual network fee applies.`;
+    }
   }
 
   _renderReplayControls(view) {
@@ -812,6 +1622,23 @@ export class ChessBoardApp {
       })
       .join('');
   }
+}
+
+// Mirrors replay's rejection categories for a move that has not been sent yet,
+// so the board's warning and the log's eventual reason use the same words.
+function classifyDraft(state, uci) {
+  const parsed = parseUci(uci);
+  if (!parsed) return 'not a move';
+
+  const piece = state.chess.board[parsed.from];
+  if (!piece) return `there is no piece on ${uci.slice(0, 2)}`;
+  if (pieceColor(piece) !== state.chess.turn) {
+    return `that is ${state.turn === 'white' ? "Black's" : "White's"} piece, and it is ${state.turn} to move`;
+  }
+  if (state.legalMoves.some((m) => m.slice(0, 2) === uci.slice(0, 2))) {
+    return 'that piece cannot go there';
+  }
+  return 'that piece has no legal move';
 }
 
 function escapeHtml(value) {
