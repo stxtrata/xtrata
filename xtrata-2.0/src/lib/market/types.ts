@@ -1,3 +1,4 @@
+import type { MarketSettlementAsset } from './settlement';
 export type MarketListing = {
   seller: string;
   nftContract: string;
@@ -50,6 +51,15 @@ export type MarketActivityEvent = {
 export type MarketIndexSnapshot = {
   contractId: string;
   events: MarketActivityEvent[];
+  /**
+   * Did the fetch reach the end of this contract's history?
+   *
+   * False when the page walk hit its bound or the merge hit MAX_EVENTS, i.e.
+   * older events exist that are not in `events`. A view that shows this
+   * snapshot as a complete history when this is false is lying, so it is not
+   * optional and defaults to absent-meaning-unknown rather than to true.
+   */
+  complete?: boolean;
   updatedAt: number;
 };
 
@@ -94,4 +104,44 @@ export type UnifiedActivityEvent = {
   blockHeight?: number;
   eventIndex?: number;
   timestamp?: string;
+};
+
+/**
+ * One row of the marketplace-wide activity list.
+ *
+ * A `MarketActivityEvent` knows its listing but not which market it happened
+ * on, because it was only ever read back per contract. Merging three markets
+ * into one list makes that ambiguous -- listing 6 exists on all three -- so the
+ * market is attached here rather than inferred later.
+ */
+export type MarketplaceActivityRow = MarketActivityEvent & {
+  marketContractId: string;
+  marketKey: string;
+  marketLabel: string;
+  /**
+   * The asset this market settles in, carried whole so the row formats through
+   * the same `formatMarketPrice` the listing cards use. A second opinion about
+   * what a price means is how two parts of one page disagree about a number.
+   */
+  settlement: MarketSettlementAsset;
+  /**
+   * True when the sponsor reimbursed itself from the seller's escrowed budget,
+   * which only happens on a sponsored buy. Derived from a `claim-fee` event
+   * against the same listing, NOT from the market being sponsor-capable --
+   * every listing here is on a sponsored market, but most sales are self-paid.
+   */
+  sponsored?: boolean;
+};
+
+export type MarketplaceActivitySnapshot = {
+  rows: MarketplaceActivityRow[];
+  /** False when ANY market's history was truncated. See MarketIndexSnapshot. */
+  complete: boolean;
+  markets: {
+    contractId: string;
+    label: string;
+    count: number;
+    complete: boolean;
+  }[];
+  updatedAt: number;
 };

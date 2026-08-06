@@ -70,6 +70,7 @@
       getMarketSettlementAsset,
       getMarketSettlementLabel,
       buildMarketBuyPostConditions,
+      formatMarketPrice,
       formatMarketPriceWithUsd
     } from '/src/lib/market/settlement.ts';
     import {
@@ -122,7 +123,7 @@
       getMarketListingPublicBlockReason,
       isMarketListingPubliclyBuyable
     } from '/src/lib/market/actions.ts';
-    import { loadMarketActivity } from '/src/lib/market/indexer.ts';
+    import { loadMarketActivity, loadMarketplaceActivity } from '/src/lib/market/indexer.ts';
     import {
       buildTransferCall,
       createXtrataClient
@@ -10551,7 +10552,13 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       toolbar: $('marketToolbar'),
       status: $('marketStatus'),
       listings: $('marketListings'),
-      badge: $('marketNetworkBadge')
+      badge: $('marketNetworkBadge'),
+      activity: $('marketActivity'),
+      activityCount: $('marketActivityCount'),
+      activityFilters: $('marketActivityFilters'),
+      activityNote: $('marketActivityNote'),
+      activityStatus: $('marketActivityStatus'),
+      activityRows: $('marketActivityRows')
     };
 
     const marketEntriesForNetwork = () =>
@@ -11122,7 +11129,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       );
     };
 
-    const MARKET_MEDIA_MAX_BYTES = 512n * 1024n;
+    // Size cap and pacing both come from config.js now, shared with the Xplorer
+    // grid. The market previously kept its own 512 KiB literal here — 20x
+    // stricter than Xplorer for no recorded reason — which is why oversized
+    // inscriptions rendered a token-URI placeholder instead of their artwork.
+    const MARKET_MEDIA_MAX_BYTES = MAX_GRID_EAGER_FULL_LOAD_BYTES;
     const MARKET_REMOTE_THUMBNAIL_MAX_BYTES = 5 * 1024 * 1024;
 
     const marketFetchContent = async (listing, meta) => {
@@ -11315,6 +11326,232 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
       marketState.media.set(key, media);
       return media;
+    };
+
+    /* --- marketplace-wide activity ------------------------------------- */
+
+    /**
+     * How each event reads to somebody who did not write the contract.
+     *
+     * `claim-fee` and `settle-refund` are the sponsorship plumbing: the sponsor
+     * taking back what it fronted, and the seller reclaiming what was left.
+     * They are shown because they are what makes a sponsored sale visible at
+     * all, but they are labelled in plain words rather than by function name.
+     */
+    const ACTIVITY_LABELS = {
+      list: 'Listed',
+      buy: 'Sold',
+      cancel: 'Cancelled',
+      'claim-fee': 'Sponsor reimbursed',
+      'settle-refund': 'Deposit returned'
+    };
+
+    const ACTIVITY_FILTERS = [
+      { key: 'all', label: 'All' },
+      { key: 'buy', label: 'Sales' },
+      { key: 'list', label: 'Listings' },
+      { key: 'cancel', label: 'Cancellations' },
+      { key: 'fees', label: 'Fees' }
+    ];
+
+    const marketActivityState = { snapshot: null, filter: 'all', loading: false, loaded: false };
+
+    const activityMatchesFilter = (row, filter) => {
+      if (filter === 'all') return true;
+      if (filter === 'fees') return row.type === 'claim-fee' || row.type === 'settle-refund';
+      return row.type === filter;
+    };
+
+    const renderMarketActivityRows = () => {
+      const root = marketDom.activityRows;
+      if (!root) return;
+      const snapshot = marketActivityState.snapshot;
+      if (!snapshot) return;
+
+      const rows = snapshot.rows.filter((row) => activityMatchesFilter(row, marketActivityState.filter));
+      root.replaceChildren();
+
+      if (rows.length === 0) {
+        root.append(
+          Object.assign(document.createElement('p'), {
+            className: 'field-hint',
+            textContent:
+              snapshot.rows.length === 0
+                ? 'No activity found on any market yet.'
+                : 'Nothing of that kind in the activity read so far.'
+          })
+        );
+        return;
+      }
+
+      for (const row of rows) {
+        const line = document.createElement('div');
+        line.className = 'market-activity__row';
+        line.setAttribute('role', 'listitem');
+
+        const kind = document.createElement('span');
+        kind.className = `market-activity__kind market-activity__kind--${row.type}`;
+        kind.textContent = ACTIVITY_LABELS[row.type] ?? row.type;
+        line.append(kind);
+
+        const what = document.createElement('span');
+        what.className = 'market-activity__what';
+        if (row.tokenId !== undefined && row.tokenId !== null) {
+          const link = document.createElement('a');
+          link.href = `/xplorer?token=${row.tokenId}`;
+          link.textContent = `#${row.tokenId}`;
+          what.append(link);
+        } else {
+          what.append(document.createTextNode(`listing ${row.listingId}`));
+        }
+        line.append(what);
+
+        const price = document.createElement('span');
+        price.className = 'market-activity__price';
+        // Formatted through the same helper the listing cards use, so the two
+        // halves of this page cannot disagree about what a number means.
+        price.textContent =
+          row.price === undefined || row.price === null
+            ? ''
+            : formatMarketPrice(row.price, row.settlement);
+        line.append(price);
+
+        const who = document.createElement('span');
+        who.className = 'market-activity__who';
+        if (row.type === 'buy' && row.buyer) {
+          who.append(document.createTextNode('to '));
+          const span = document.createElement('span');
+          applyBnsName(span, row.buyer);
+          who.append(span);
+        } else if (row.seller) {
+          who.append(document.createTextNode('by '));
+          const span = document.createElement('span');
+          applyBnsName(span, row.seller);
+          who.append(span);
+        }
+        line.append(who);
+
+        const tail = document.createElement('span');
+        tail.className = 'market-activity__tail';
+        // Only a SALE can be sponsored or self-paid, so the badge is not shown
+        // on a listing or a cancel -- where it would be meaningless rather than
+        // merely absent.
+        if (row.type === 'buy') {
+          const badge = document.createElement('span');
+          badge.className = `badge ${row.sponsored ? 'green' : ''}`.trim();
+          badge.textContent = row.sponsored ? 'Sponsored' : 'Self-paid';
+          tail.append(badge);
+        }
+        const market = document.createElement('span');
+        market.className = 'market-activity__market';
+        market.textContent = row.settlement?.symbol ?? '';
+        tail.append(market);
+        if (row.txId) {
+          const explorer = document.createElement('a');
+          explorer.className = 'market-activity__tx';
+          explorer.href = `https://explorer.hiro.so/txid/${row.txId}?chain=mainnet`;
+          explorer.target = '_blank';
+          explorer.rel = 'noreferrer noopener';
+          explorer.textContent = row.blockHeight ? `#${row.blockHeight}` : 'tx';
+          tail.append(explorer);
+        }
+        line.append(tail);
+
+        root.append(line);
+      }
+    };
+
+    const renderMarketActivityFilters = () => {
+      const root = marketDom.activityFilters;
+      if (!root) return;
+      root.replaceChildren();
+      for (const entry of ACTIVITY_FILTERS) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `market-chip${marketActivityState.filter === entry.key ? ' is-active' : ''}`;
+        button.textContent = entry.label;
+        button.setAttribute('aria-pressed', String(marketActivityState.filter === entry.key));
+        button.addEventListener('click', () => {
+          marketActivityState.filter = entry.key;
+          renderMarketActivityFilters();
+          renderMarketActivityRows();
+        });
+        root.append(button);
+      }
+    };
+
+    /**
+     * Say what was NOT read.
+     *
+     * The snapshot knows whether each market's history was walked to the end.
+     * When it was not, this says so in the open rather than presenting a
+     * partial history as a whole one -- the same reason the market thumbnails
+     * stopped rendering the core's placeholder as though it were artwork.
+     */
+    const renderMarketActivityNote = () => {
+      const note = marketDom.activityNote;
+      const snapshot = marketActivityState.snapshot;
+      if (!note || !snapshot) return;
+      if (snapshot.complete) {
+        note.hidden = true;
+        note.textContent = '';
+        return;
+      }
+      const partial = snapshot.markets.filter((market) => !market.complete);
+      note.hidden = false;
+      note.textContent =
+        `Showing the most recent activity only. ${partial.length} of ${snapshot.markets.length} ` +
+        `market${snapshot.markets.length === 1 ? '' : 's'} could not be read all the way back, so older ` +
+        'events are missing from this list.';
+    };
+
+    const loadMarketActivityPanel = async ({ force = false } = {}) => {
+      if (marketActivityState.loading) return;
+      if (marketActivityState.loaded && !force) return;
+      marketActivityState.loading = true;
+      const status = marketDom.activityStatus;
+      if (status) {
+        status.hidden = false;
+        status.replaceChildren(
+          Object.assign(document.createElement('span'), { textContent: 'Loading activity…' })
+        );
+      }
+      try {
+        const contracts = getSellableMarkets(getContractId(state.contract))
+          .filter((entry) => entry.sponsored)
+          .map((entry) => ({ entry }));
+        // Always a fresh read on the first open.
+        //
+        // Snapshots cached before `complete` existed have it undefined, which
+        // reads as "unknown" and correctly shows the truncation note -- but the
+        // note then says older events are missing when the real answer is "not
+        // refreshed yet". Opening the panel is a deliberate act, so pay for the
+        // read once and be sure, rather than explain a stale cache.
+        const snapshot = await loadMarketplaceActivity({
+          contracts,
+          force: force || !marketActivityState.loaded
+        });
+        marketActivityState.snapshot = snapshot;
+        marketActivityState.loaded = true;
+        if (marketDom.activityCount) {
+          marketDom.activityCount.textContent = `${snapshot.rows.length}${snapshot.complete ? '' : '+'}`;
+        }
+        if (status) status.hidden = true;
+        renderMarketActivityFilters();
+        renderMarketActivityNote();
+        renderMarketActivityRows();
+      } catch (error) {
+        if (status) {
+          status.hidden = false;
+          status.replaceChildren(
+            Object.assign(document.createElement('span'), {
+              textContent: `Could not load activity: ${error instanceof Error ? error.message : String(error)}`
+            })
+          );
+        }
+      } finally {
+        marketActivityState.loading = false;
+      }
     };
 
     const hydrateMarketThumbnails = async (run, listings, root = marketDom.listings) => {
@@ -11827,6 +12064,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         })
       );
     };
+
+    // First open loads it; later opens reuse what was read. The `once` is on
+    // the load, not the listener, because reopening must not refetch.
+    marketDom.activity?.addEventListener('toggle', () => {
+      if (marketDom.activity.open) void loadMarketActivityPanel();
+    });
 
     const renderMarketListings = () => {
       if (!marketDom.listings) return;
@@ -12345,6 +12588,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         marketState.listingsPhase = 'ready';
         renderMarketListings();
         renderSellerDashboard();
+        // Lazily: the panel is collapsed by default, and walking three markets'
+        // event history is several requests against a rate-limited API. A
+        // reader who never opens it should never pay for it.
+        if (marketDom.activity?.open) void loadMarketActivityPanel();
       } catch (error) {
         if (run !== marketState.run) return;
         marketState.listingsPhase = 'failed';

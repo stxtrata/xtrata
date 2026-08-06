@@ -4595,6 +4595,119 @@
       color: var(--ink);
     }
 
+    /* --- marketplace-wide activity ------------------------------------ */
+
+    .market-activity {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface-soft);
+      margin-top: 18px;
+    }
+
+    .market-activity > summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 14px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13.5px;
+    }
+
+    .market-activity__count {
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      font-weight: 500;
+    }
+
+    .market-activity__body {
+      padding: 0 14px 14px;
+    }
+
+    .market-activity__filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding-bottom: 10px;
+    }
+
+    .market-chip.is-active {
+      background: var(--panel);
+      color: var(--ink);
+    }
+
+    .market-activity__note {
+      margin: 0 0 10px;
+    }
+
+    /* One row per event. Scrolls inside itself rather than growing the page:
+       a market with a thousand events must not push the footnote off screen. */
+    .market-activity__rows {
+      display: flex;
+      flex-direction: column;
+      max-height: 22rem;
+      overflow-y: auto;
+      border-top: 1px solid var(--line);
+    }
+
+    .market-activity__row {
+      display: grid;
+      grid-template-columns: 8.5rem 5rem 1fr auto auto;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 2px;
+      border-bottom: 1px solid var(--line);
+      font-size: 12.5px;
+    }
+
+    .market-activity__row:last-child {
+      border-bottom: 0;
+    }
+
+    .market-activity__kind {
+      font-weight: 600;
+    }
+
+    .market-activity__kind--buy { color: var(--good, #4ba36b); }
+    .market-activity__kind--cancel { color: var(--muted); }
+    .market-activity__kind--claim-fee,
+    .market-activity__kind--settle-refund { color: var(--muted); font-weight: 500; }
+
+    .market-activity__price {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .market-activity__who,
+    .market-activity__market {
+      color: var(--muted);
+    }
+
+    .market-activity__tail {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .market-activity__tx {
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* The grid collapses on a phone: five columns at 12.5px is unreadable
+       long before it is narrow. */
+    @media (max-width: 640px) {
+      .market-activity__row {
+        grid-template-columns: 1fr auto;
+        row-gap: 2px;
+      }
+      .market-activity__who,
+      .market-activity__price {
+        grid-column: 1 / -1;
+      }
+    }
+
     .market-listings {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
