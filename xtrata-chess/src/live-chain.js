@@ -19,7 +19,12 @@ import {
   serializeStringAscii,
   serializeUint
 } from './clarity.js';
-import { walletCall, waitForProvider, feePostConditions, callFeeParams } from './wallet.js';
+import {
+  walletCall,
+  waitForProvider,
+  feePostConditions,
+  contractCallParams
+} from './wallet.js';
 import { CONTRACT_NAME, ERR, PAGE_SIZE } from './protocol.js';
 
 import { PUBLIC_API, makeResilientFetch, preferredApiBase } from './api-base.js';
@@ -290,18 +295,19 @@ export class LiveChain {
       shape: this.pcShape
     });
 
-    const params = {
+    const request = {
       contract: this.contractId,
       functionName,
       functionArgs: args,
-      // Some wallet builds read `arguments` rather than `functionArgs`. Sending
-      // both is what the canary found to work everywhere.
-      arguments: args,
       postConditionMode: guard.postConditionMode,
       postConditions: guard.postConditions,
       network: this.network,
-      ...callFeeParams(this.fee)
+      fee: this.fee
     };
+
+    // Shaped per provider: a wallet that validates against the sats-connect
+    // schema gets only the fields that schema names. See contractCallParams.
+    const params = (entry) => contractCallParams(entry, request);
 
     const { result, entry } = await walletCall('stx_callContract', params);
     const txid = result?.txid || result?.result?.txid || result?.txId || result?.result?.txId;

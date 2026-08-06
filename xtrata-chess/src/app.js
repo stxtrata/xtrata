@@ -226,18 +226,16 @@ export class ChessBoardApp {
    * which is the open-board behaviour and the safe direction to fail in.
    */
   async _adoptKnownRules() {
-    const known = knownGame(this.chain?.contractId, this.game);
-
-    if (!known) {
-      // Not a game this board claims to referee. Any commitment it carries
-      // belongs to a generated board somewhere, not to this one.
-      this.gameRules = null;
-      return;
-    }
-
+    // Read the commitment first and for every game, not only for ones this
+    // board knows. A viewer is entitled to see that a game has rules even when
+    // this board cannot say what they are — that is the difference between an
+    // unrefereed game and a refereed one, and hiding it would have them take
+    // this board's word for which moves counted.
+    this.committedHash = null;
     let entry = null;
     try {
       entry = this.chain.getGame ? await this.chain.getGame(this.game) : null;
+      this.committedHash = entry?.rulesHash ?? null;
     } catch {
       // A read that failed is not a game without rules. Referee nothing rather
       // than guess, and let the ordinary read path report the problem.
@@ -245,7 +243,14 @@ export class ChessBoardApp {
       return;
     }
 
-    this.committedHash = entry?.rulesHash ?? null;
+    const known = knownGame(this.chain?.contractId, this.game);
+    if (!known) {
+      // Not a game this board claims to referee. Any commitment it carries
+      // belongs to a generated board somewhere, not to this one.
+      this.gameRules = null;
+      return;
+    }
+
     const rules = normaliseRules(known.rules);
 
     if (!this.committedHash) {
@@ -965,6 +970,100 @@ export class ChessBoardApp {
   }
 
   /**
+   * The selected game's rules, resolved from what the chain actually says.
+   *
+   * The contract stores a hash and nothing else, so there are exactly three
+   * answers and they should not be blurred together:
+   *
+   *   * No commitment. The game is the open board: anyone, either side. That is
+   *     a real answer, not a missing one.
+   *   * A commitment this board can reproduce. The rules are named, and this
+   *     board enforces them when it replays.
+   *   * A commitment it cannot reproduce. Somebody opened the game with rules
+   *     that live in a board somewhere else. The hash is shown, because that is
+   *     the whole of what is knowable from here, and replay enforces nothing.
+   *
+   * The third case is the one worth showing rather than hiding: a viewer who
+   * cannot see it would have no way to tell an unrefereed game from a refereed
+   * one, and would take this board's word for which moves counted.
+   */
+  _renderGameRules() {
+    const el = this.elements;
+    if (!el.gameRules) return;
+
+    if (this.mode !== 'live' || !this.game) {
+      el.gameRules.hidden = true;
+      return;
+    }
+    el.gameRules.hidden = false;
+
+    const committed = this.committedHash
+      ? String(this.committedHash).replace(/^0x/, '').toLowerCase()
+      : null;
+
+    el.gameRulesTitle.textContent = `Rules for game #${this.game}`;
+    el.gameRulesHash.textContent = committed || 'none — nothing was committed';
+
+    if (!committed) {
+      el.gameRulesState.textContent = 'open board';
+      el.gameRulesState.className = 'tag open';
+      el.gameRulesSummary.textContent = 'Anyone may move either side.';
+      el.gameRulesNote.textContent =
+        'This game was opened without a rules commitment, so there is nothing for a board to enforce. ' +
+        'Every submission of the right shape counts, in the order the chain recorded it.';
+      return;
+    }
+
+    if (this.gameRules) {
+      const known = knownGame(this.chain?.contractId, this.game);
+      el.gameRulesState.textContent = 'enforced';
+      el.gameRulesState.className = 'tag enforced';
+      el.gameRulesSummary.textContent = describeRules(this.gameRules, (who) =>
+        this.names?.get(who) || null
+      );
+
+      // Names arrive after a lookup, so ask for the ones this game names and
+      // redraw when they land. Without this the rules read as raw addresses
+      // until something else happens to trigger a render.
+      this._nameRuleSides();
+      el.gameRulesNote.textContent =
+        `${known?.label ? `${known.label}. ` : ''}` +
+        'These rules hash to the commitment above, which is how this board knows it is the referee. ' +
+        'The contract enforces none of it: a move that breaks these rules is still accepted and still ' +
+        'charged, and replay skips it.';
+      return;
+    }
+
+    el.gameRulesState.textContent = 'not this board';
+    el.gameRulesState.className = 'tag unknown';
+    el.gameRulesSummary.textContent = 'This game has rules, and they are not ones this board holds.';
+    el.gameRulesNote.textContent =
+      'The chain records the hash above and nothing more, so the rules themselves cannot be read from ' +
+      'here. Whoever opened the game generated a board that carries them. This board replays the log ' +
+      'without enforcing anything, so what it shows may differ from what that board shows.';
+  }
+
+  // Resolve the addresses a rule set names, then redraw once.
+  _nameRuleSides() {
+    if (!this.names || !this.gameRules || this._namingSides) return;
+    const wanted = [this.gameRules.white, this.gameRules.black].filter(
+      (who) => who && who.startsWith('SP') && !this.names.known(who)
+    );
+    if (!wanted.length) return;
+
+    this._namingSides = true;
+    this.names
+      .resolve(wanted)
+      .then((learned) => {
+        if (learned) this.render();
+      })
+      .catch(() => {})
+      .finally(() => {
+        this._namingSides = false;
+      });
+  }
+
+  /**
    * Warn when this page cannot sign, before someone stages a move to find out.
    *
    * An inscription opened by its bare URL has no wallet bridge, and the runtime
@@ -1487,6 +1586,7 @@ export class ChessBoardApp {
 
     el.gameLabel.textContent = this.game ? `game #${this.game}` : 'no game';
 
+    this._renderGameRules();
     this._renderSigningHint();
 
     // Say what a move costs before anybody signs for one.

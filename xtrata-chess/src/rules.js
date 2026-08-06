@@ -267,11 +267,19 @@ export function checkSender(rules, { sender, height, turn, history }) {
   return null;
 }
 
-/** A short human description, for the board to show above a game. */
-export function describeRules(rules) {
+/**
+ * A short human description, for the board to show above a game.
+ *
+ * `name` turns a principal into whatever it should be called. Rules store
+ * addresses, because that is what replay compares and what a sealed board can
+ * check with no network, but an address is not what anybody calls themselves.
+ * Left out, it falls back to the address, which is always correct if unfriendly.
+ */
+export function describeRules(rules, name = null) {
   const r = normaliseRules(rules);
   const parts = [];
 
+  const called = (who) => (name && name(who)) || who;
   const other = (colour) => (colour === 'White' ? r.black : r.white);
   const side = (colour, who) => {
     if (who === ANYONE) return `${colour} open to anyone`;
@@ -279,9 +287,9 @@ export function describeRules(rules) {
       const excluded = other(colour);
       return excluded === ANYONE || excluded === ANYONE_ELSE
         ? `${colour} open to anyone`
-        : `${colour} open to anyone except ${excluded}`;
+        : `${colour} open to anyone except ${called(excluded)}`;
     }
-    return `${colour} is ${who}`;
+    return `${colour} is ${called(who)}`;
   };
 
   if (r.white === ANYONE && r.black === ANYONE) parts.push('Anyone may move either side');

@@ -381,6 +381,26 @@
       .hint.good { color: var(--ok); }
       .hint.good strong { color: var(--ok); font-family: var(--mono); }
       .hint.bad { color: var(--no); }
+
+      /* The selected game's rules, as the chain has them. */
+      .rulesbox {
+        margin: 10px 0 0;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 10px 12px;
+        background: #191612;
+      }
+      .rulesbox-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+      .rulesbox p { margin: 4px 0 0; font-size: 13px; }
+      .rulesbox .meta { color: var(--dim); font-size: 11px; font-family: var(--mono); }
+      .rulesbox code { font-family: var(--mono); font-size: 10px; word-break: break-all; color: var(--dim); }
+      .tag {
+        font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+        padding: 2px 7px; border-radius: 20px; border: 1px solid var(--line); color: var(--dim);
+      }
+      .tag.enforced { color: var(--ok); border-color: #3c5a30; }
+      .tag.open { color: var(--dim); }
+      .tag.unknown { color: var(--accent); border-color: #6b5320; }
       /* Something will not work from this page, but the board still reads and
          replays, so this reads as caution rather than failure. */
       .hint.warn {
@@ -508,6 +528,20 @@
             <button id="disconnect" hidden>Disconnect</button>
             <button id="load-live">Refresh</button>
           </div>
+          <!-- What the chain says this game's rules are, and whether this
+               board can act on that. -->
+          <div id="game-rules" class="rulesbox" hidden>
+            <div class="rulesbox-head">
+              <strong id="game-rules-title">Rules</strong>
+              <span id="game-rules-state" class="tag"></span>
+            </div>
+            <p id="game-rules-summary"></p>
+            <p class="meta">
+              committed on chain <code id="game-rules-hash">—</code>
+            </p>
+            <p class="hint" id="game-rules-note"></p>
+          </div>
+
           <p class="hint" id="charge-note" hidden></p>
           <p class="hint" id="wallet-hint">
             Reading is free and needs no wallet. Only submitting a move does.
