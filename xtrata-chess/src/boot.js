@@ -18,9 +18,9 @@ export const SHELL = { css: '', html: '' };
 
 const IDS = [
   'board', 'status', 'counts', 'fen', 'notice', 'pending-panel', 'moves', 'log', 'game-label',
-  'mode-sim', 'mode-live', 'sim-panel', 'live-panel', 'new-game', 'flip',
-  'copy-pgn', 'manual-form', 'manual-input', 'submit-move', 'clear-move', 'move-hint', 'play-controls', 'bot-move',
-  'junk', 'autoplay', 'replay-panel', 'replay-caption', 'play-pause',
+  'live-panel', 'new-game', 'flip',
+  'copy-pgn', 'manual-form', 'manual-input', 'submit-move', 'clear-move', 'move-hint', 'play-controls', 
+  'replay-panel', 'replay-caption', 'play-pause',
   'to-start', 'to-end', 'step-back', 'step-forward', 'seek', 'pace',
   'cap-waits', 'contract-address', 'contract-name', 'network', 'game-select',
   'load-live', 'connect', 'disconnect', 'charge-note', 'wallet-hint',

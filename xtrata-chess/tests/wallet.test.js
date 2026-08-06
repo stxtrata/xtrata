@@ -634,3 +634,56 @@ describe('the mempool', () => {
     expect((await chain.getMempool(1)).map((e) => e.mv)).toEqual(['e7e5', 'b8c6']);
   });
 });
+
+describe('the shape a contract call is sent in', () => {
+  // Xverse validates stx_callContract against the sats-connect schema. The
+  // observation that matters: a call sent through the Xtrata host bridge, which
+  // strips to exactly the fields that schema names, was quoted at 0.003 STX,
+  // while the same call sent directly with fee/feeRate/network alongside was
+  // quoted at 0.5 STX. Out-of-spec fields are not merely ignored.
+  //
+  // So this pins our field set to xtrata-2.0's buildXverseContractCallParams.
+  // If the two drift apart, the fee estimate is what suffers, and it suffers
+  // silently in a dialog somebody is about to approve.
+  const request = {
+    contract: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-chess-log-v3',
+    functionName: 'submit-move',
+    functionArgs: ['0x01'],
+    postConditionMode: 'deny',
+    postConditions: ['00021600'],
+    network: 'mainnet',
+    fee: 10_000
+  };
+
+  it('sends a schema-validating wallet exactly what the schema names', async () => {
+    const { contractCallParams } = await import('../src/wallet.js');
+    for (const label of [
+      'window.XverseProviders.BitcoinProvider',
+      'window.XverseProviders.StacksProvider',
+      'window.StacksProvider'
+    ]) {
+      const params = contractCallParams({ label }, request);
+      expect(Object.keys(params).sort(), label).toEqual([
+        'arguments',
+        'contract',
+        'functionArgs',
+        'functionName',
+        'postConditionMode',
+        'postConditions'
+      ]);
+    }
+  });
+
+  it('sends everything else the fee as well, which is where it has ever worked', async () => {
+    const { contractCallParams } = await import('../src/wallet.js');
+    const params = contractCallParams({ label: 'window.LeatherProvider' }, request);
+    expect(params.fee).toBe(10_000);
+    expect(params.network).toBe('mainnet');
+  });
+
+  it('spells the arguments both ways, for builds that read only one', async () => {
+    const { contractCallParams } = await import('../src/wallet.js');
+    const params = contractCallParams({ label: 'window.LeatherProvider' }, request);
+    expect(params.arguments).toBe(params.functionArgs);
+  });
+});

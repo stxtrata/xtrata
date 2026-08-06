@@ -420,10 +420,6 @@
           Anyone moves. The contract stores strings; the rules live here, and replay decides what counts.
         </p>
       </div>
-      <div class="modes">
-        <button id="mode-sim" class="active">Simulation</button>
-        <button id="mode-live">Live</button>
-      </div>
     </header>
 
     <main>
@@ -499,19 +495,6 @@
           <p class="hint">
             No further moves will ever be accepted. What is left is the record: every submission that
             was made, in order, replayed through the same rules the live board used.
-          </p>
-        </div>
-
-        <div class="panel" id="sim-panel">
-          <h2>Simulation</h2>
-          <div class="row">
-            <button id="bot-move">Play a bot move</button>
-            <button id="junk">Send junk</button>
-            <label class="check"><input type="checkbox" id="autoplay" /> Autoplay</label>
-          </div>
-          <p class="hint">
-            No wallet, no fees, nothing on chain. The junk button submits what a griefer would, so you can
-            watch the board absorb it.
           </p>
         </div>
 

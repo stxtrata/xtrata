@@ -1,15 +1,19 @@
 // The board application.
 //
-// Two modes behind one interface. Simulation runs against MockChain in memory,
-// with bots and a griefer available so a whole open board can be exercised
-// without a wallet. Live runs against the deployed contract, reading over HTTP
-// and writing through an injected wallet.
+// The board. It reads the deployed contract over HTTP and writes through an
+// injected wallet.
 //
-// Both modes do the same thing on every update: read the entire log, replay it
-// from the first entry, and draw whatever comes out. There is no incremental
-// state to drift.
+// On every update it does the same thing: read the entire log, replay it from
+// the first entry, and draw whatever comes out. There is no incremental state
+// to drift.
+//
+// Simulation used to live here too, running against MockChain in memory so a
+// whole open board could be exercised without a wallet. It was worth having
+// while the rules were being worked out and it is dead weight in an inscription
+// nobody can edit: a second set of code paths, shipped forever, that no player
+// on a live board can reach. The modules it used are still in the repo, where
+// the tests drive them directly.
 
-import { MockChain } from './mock-chain.js';
 import { SealedChain } from './sealed-chain.js';
 import { LiveChain, describeContractError } from './live-chain.js';
 import { replay, toPgn, REJECTED } from './replay.js';
@@ -24,8 +28,6 @@ import {
   gapAt,
   stampLog
 } from './block-time.js';
-import { BOTS, mulberry32 } from './bots.js';
-import { SimIdentities } from './sim-identities.js';
 import {
   isWellFormedLength,
   DEFAULT_CONTRACT,
@@ -80,13 +82,12 @@ const REASON_LABEL = {
 export class ChessBoardApp {
   constructor(options = {}) {
     this.elements = options.elements;
-    this.mode = 'sim';
-    this.chain = new MockChain();
+    // One mode. The board reads a contract and replays what is there; there is
+    // nothing else for it to be.
+    this.mode = 'live';
+    this.chain = null;
     this.game = null;
     this.state = replay([]);
-    this.random = mulberry32(options.seed ?? 1);
-    this.simSeed = options.seed ?? 1;
-    this.identities = null;
     this.gameRules = null;
     this.committedHash = null;
     this.childGame = null;
@@ -96,7 +97,6 @@ export class ChessBoardApp {
     this.pendingTimer = null;
     // Moves broadcast by anyone and not yet in a block.
     this.mempool = [];
-    this.autoplayTimer = null;
     this.pollTimer = null;
     this.busy = false;
     this.notice = null;
@@ -176,7 +176,7 @@ export class ChessBoardApp {
         'warn'
       );
     }
-    this.setMode('live');
+    this.startLive();
   }
 
   async _firstDeployed(candidates, network) {
@@ -205,9 +205,6 @@ export class ChessBoardApp {
     this.gameRules = normaliseRules(child.rules);
 
     const el = this.elements;
-    el.modeSim.hidden = true;
-    el.modeLive.hidden = true;
-    el.simPanel.hidden = true;
     el.livePanel.hidden = true;
     el.rulesPanel.hidden = true;
     el.newGame.hidden = true;
@@ -374,9 +371,6 @@ export class ChessBoardApp {
     this.times = new StaticBlockTimes(sealed.blockTimes);
 
     const el = this.elements;
-    el.modeSim.hidden = true;
-    el.modeLive.hidden = true;
-    el.simPanel.hidden = true;
     el.livePanel.hidden = true;
     el.newGame.hidden = true;
     el.playControls.hidden = true;
@@ -392,15 +386,10 @@ export class ChessBoardApp {
   _wire() {
     const el = this.elements;
 
-    el.modeSim.addEventListener('click', () => this.setMode('sim'));
-    el.modeLive.addEventListener('click', () => this.setMode('live'));
 
     el.newGame.addEventListener('click', () => this.newGame());
     el.flip.addEventListener('click', () => this.board.setFlipped(!this.board.flipped));
 
-    el.botMove.addEventListener('click', () => this.playBotMove());
-    el.junk.addEventListener('click', () => this.playGrief());
-    el.autoplay.addEventListener('change', () => this.setAutoplay(el.autoplay.checked));
 
     el.manualForm.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -472,50 +461,6 @@ export class ChessBoardApp {
   // ------------------------------------------------------------------
   // Modes
   // ------------------------------------------------------------------
-
-  setMode(mode) {
-    if (this.mode === mode) return;
-    this.mode = mode;
-    this.setAutoplay(false);
-    this._stopPolling();
-
-    this.elements.modeSim.classList.toggle('active', mode === 'sim');
-    this.elements.modeLive.classList.toggle('active', mode === 'live');
-    this.elements.simPanel.hidden = mode !== 'sim';
-    this.elements.livePanel.hidden = mode !== 'live';
-
-    if (mode === 'sim') {
-      this.startSimulation();
-      return;
-    }
-    // Coming back to live: fall back to the built-in board if the fields are
-    // empty, so the toggle never lands on a blank form.
-    if (!this.elements.contractAddress.value.trim()) {
-      const [address, name] = DEFAULT_CONTRACT.split('.');
-      this.elements.contractAddress.value = address;
-      this.elements.contractName.value = name;
-      this.elements.network.value = DEFAULT_NETWORK;
-    }
-    this.startLive();
-  }
-
-  startSimulation() {
-    this.chain = new MockChain();
-    // Real-shaped principals with real-shaped names, so simulation previews
-    // exactly what a live board looks like rather than a tidied version of it.
-    this.identities = new SimIdentities(this.simSeed++);
-    this.names = this.identities;
-    // The mock chain keeps its own clock, so simulated games have real gaps to
-    // be replayed against.
-    this.times = this.chain.blockTimes;
-    this.gameRules = null;
-    this.childGame = null;
-    this.game = this.chain.openGame(this.identities.you).value;
-    this.viewIndex = null;
-    this.pause();
-    this.notice = null;
-    this.refresh();
-  }
 
   async startLive() {
     const el = this.elements;
@@ -883,15 +828,6 @@ export class ChessBoardApp {
       return;
     }
 
-    if (this.mode === 'sim') {
-      const result = this.chain.submitMove(this.game, uci, this.identities.you);
-      this.chain.advance();
-      if (!result.ok) this._notify(describeContractError(result.error), 'warn');
-      else this._noteOutcome(uci);
-      await this.refresh();
-      return;
-    }
-
     try {
       this._notify('Confirm the move in your wallet…', 'info');
       this.render();
@@ -940,18 +876,6 @@ export class ChessBoardApp {
   }
 
   async newGame() {
-    if (this.mode === 'sim') {
-      this.pause();
-      this.viewIndex = null;
-      this.identities = new SimIdentities(this.simSeed++);
-      this.names = this.identities;
-      this.times = this.chain.blockTimes;
-      this.game = this.chain.openGame(this.identities.you).value;
-      this.notice = null;
-      await this.refresh();
-      return;
-    }
-
     try {
       this._notify('Confirm the new game in your wallet…', 'info');
       this.render();
@@ -1176,55 +1100,10 @@ export class ChessBoardApp {
     }
   }
 
-  async playBotMove() {
-    if (this.mode !== 'sim' || this.state.isGameOver) return;
-    await this._act(async () => {
-      const uci = BOTS.greedy(this.state.chess, this.random);
-      if (!uci) return;
-      this.chain.submitMove(this.game, uci, this.identities.forSide(this.state.turn));
-      this.chain.advance();
-      await this.refresh();
-    });
-  }
-
-  async playGrief() {
-    if (this.mode !== 'sim') return;
-    await this._act(async () => {
-      const uci = BOTS.griefer(this.state.chess, this.random);
-      const result = this.chain.submitMove(this.game, uci, this.identities.griefer(this.random()));
-      this.chain.advance();
-      if (!result.ok) {
-        this._notify(
-          `"${uci}" — ${describeContractError(result.error)}. Turned away by the contract, so it never reached the log.`,
-          'warn'
-        );
-      }
-      await this.refresh();
-    });
-  }
-
-  setAutoplay(on) {
-    this.elements.autoplay.checked = on;
-    if (this.autoplayTimer) clearInterval(this.autoplayTimer);
-    this.autoplayTimer = null;
-    if (!on || this.mode !== 'sim') return;
-
-    this.autoplayTimer = setInterval(async () => {
-      if (this.state.isGameOver) {
-        this.setAutoplay(false);
-        return;
-      }
-      // Roughly one junk submission in four, which is about what the wide open
-      // board should expect.
-      if (this.random() < 0.25) await this.playGrief();
-      else await this.playBotMove();
-    }, 700);
-  }
-
   async copyPgn() {
     const pgn = toPgn(this.state, {
-      Event: this.mode === 'sim' ? 'Xtrata Open Board (simulation)' : 'Xtrata Open Board',
-      Site: this.mode === 'sim' ? 'simulation' : this.chain.contractId || 'chain',
+      Event: 'Xtrata Open Board',
+      Site: this.chain?.contractId || 'chain',
       Round: String(this.game ?? '-')
     });
     try {
@@ -1388,20 +1267,6 @@ export class ChessBoardApp {
     const rules = this.draftRules();
     const hash = isOpenBoard(rules) ? null : rulesHash(rules);
 
-    if (this.mode === 'sim') {
-      const id = this.chain.openGame(this.identities.you, hash).value;
-      this.childGame = id;
-      this.game = id;
-      this.gameRules = rules;
-      this._notify(
-        `Opened game #${id} in simulation with those rules. On chain this would write the hash and nothing else.`,
-        'info'
-      );
-      await this.refresh();
-      this.renderRules();
-      return;
-    }
-
     try {
       this._notify('Confirm the new game in your wallet…', 'info');
       this.render();
@@ -1479,7 +1344,7 @@ export class ChessBoardApp {
 
     const html = childPage({
       contract: this.chain.contractId || 'simulation',
-      network: this.mode === 'live' ? this.chain.network : 'simulation',
+      network: this.chain?.network ?? DEFAULT_NETWORK,
       game,
       rules,
       engine
@@ -1522,8 +1387,7 @@ export class ChessBoardApp {
     // deliberately: one click, one STX, and an unrefereed game nobody asked
     // for. Opening a live game goes through the rules panel, where the cost is
     // on the button and the rules have to be settled first.
-    el.newGame.hidden = this.mode !== 'sim';
-    if (this.mode === 'sim') el.simPanel.hidden = !playable;
+    el.newGame.hidden = true;
     el.replayPanel.hidden = !replayable;
 
     const inFlight = this.livePending();
