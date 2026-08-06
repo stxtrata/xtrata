@@ -547,31 +547,19 @@
             Reading is free and needs no wallet. Only submitting a move does.
           </p>
 
-          <details class="fold">
-            <summary>Contract</summary>
-            <div class="row">
-              <label class="field">
-                <span>Address</span>
-                <input id="contract-address" type="text" autocomplete="off" spellcheck="false" />
-              </label>
-            </div>
-            <div class="row">
-              <label class="field">
-                <span>Name</span>
-                <input id="contract-name" type="text" autocomplete="off" spellcheck="false" />
-              </label>
-              <label class="field" style="flex: 0 1 130px">
-                <span>Network</span>
-                <select id="network">
-                  <option value="mainnet">mainnet</option>
-                  <option value="testnet">testnet</option>
-                </select>
-              </label>
-            </div>
-            <p class="hint">
-              The board it came with. Change these only to watch a different deployment.
-            </p>
-          </details>
+          <!-- The contract this board is bound to. Not shown, because it is
+               not a choice: the board is built for one contract and exact:true
+               stops it talking to any other. The fields stay so the rest of the
+               board can read them, which is cheaper and less error-prone than
+               threading the values through every call site. -->
+          <div hidden>
+            <input id="contract-address" type="text" autocomplete="off" spellcheck="false" />
+            <input id="contract-name" type="text" autocomplete="off" spellcheck="false" />
+            <select id="network">
+              <option value="mainnet">mainnet</option>
+              <option value="testnet">testnet</option>
+            </select>
+          </div>
         </div>
 
         <div class="panel">

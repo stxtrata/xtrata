@@ -45,6 +45,7 @@ import {
   isRuntimeWalletBridgeTokenValid,
   registerRuntimeWalletBridgeToken
 } from './lib/viewer/runtime-open';
+import { parseRuntimeFee } from './lib/viewer/runtime-fee';
 import { createStacksWalletAdapter } from './lib/wallet/adapter';
 import { createWalletSessionStore } from './lib/wallet/session';
 import { getWalletLookupState } from './lib/wallet/lookup';
@@ -337,6 +338,9 @@ type RuntimeWalletContractCallRequest = {
   network: NetworkType;
   postConditionMode: PostConditionMode;
   postConditions?: PostCondition[];
+  // Absent means "let the wallet estimate", which is what happened to every
+  // request before this field existed. See lib/viewer/runtime-fee.
+  fee?: string;
 };
 
 type RuntimeWalletStxTransferRequest = {
@@ -620,7 +624,11 @@ const parseRuntimeContractCallRequest = (
     functionArgs: parseRuntimeFunctionArgs(record.functionArgs),
     network: normalizeRuntimeNetwork(record.network, fallbackNetwork),
     postConditionMode: parseRuntimePostConditionMode(record.postConditionMode),
-    postConditions: parseRuntimePostConditions(record.postConditions)
+    postConditions: parseRuntimePostConditions(record.postConditions),
+    // Bounded, and ignored rather than rejected when out of range: a hostile
+    // inscription must not be able to drain a wallet through an ordinary
+    // looking dialog, nor to block a call by asking for something absurd.
+    fee: parseRuntimeFee(record.fee)
   };
 };
 
@@ -1251,6 +1259,7 @@ export default function App() {
               stxAddress: session.address,
               postConditionMode: request.postConditionMode,
               postConditions: request.postConditions,
+              fee: request.fee,
               onFinish: (result) => resolve(result),
               onCancel: () =>
                 reject(

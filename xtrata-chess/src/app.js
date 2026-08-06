@@ -54,6 +54,16 @@ import {
 } from './wallet.js';
 import { preferredApiBase } from './api-base.js';
 
+// microSTX as people write it: 1000000 is "1 STX", not "1.000000 STX", and
+// 1000 is "0.001 STX". Trailing zeros are noise on a figure someone is reading
+// to decide whether to sign.
+function stx(microStx) {
+  const amount = Number(microStx) || 0;
+  if (!amount) return '0 STX';
+  const text = (amount / 1e6).toFixed(6).replace(/\.?0+$/, '');
+  return `${text} STX`;
+}
+
 const REASON_LABEL = {
   malformed: 'not a move',
   'empty-square': 'no piece there',
@@ -1346,7 +1356,7 @@ export class ChessBoardApp {
     // approve a wallet prompt an order of magnitude larger than they expect.
     const openCost = Number(this.openFee) || 0;
     const priced = openCost && this.mode === 'live'
-      ? `Open this game · ${(openCost / 1e6).toFixed(6)} STX`
+      ? `Open this game · ${stx(openCost)}`
       : 'Open this game';
     el.rulesOpen.textContent = check.ready ? priced : 'Set the rules first';
 
@@ -1589,16 +1599,16 @@ export class ChessBoardApp {
     this._renderGameRules();
     this._renderSigningHint();
 
-    // Say what a move costs before anybody signs for one.
+    // What the contract takes, in the fewest words that are still true. Two
+    // numbers, because there are two of them and they differ by a hundredfold.
     if (el.chargeNote) {
-      const charge = Number(this.contractFee) || 0;
-      const name = el.contractName.value;
+      const move = Number(this.contractFee) || 0;
+      const open = Number(this.openFee) || 0;
       el.chargeNote.hidden = this.mode !== 'live';
-      el.chargeNote.innerHTML = charge
-        ? `<strong>${(charge / 1e6).toFixed(6)} STX</strong> per move, set by whoever owns ` +
-          `${escapeHtml(name)}, plus the usual network fee. Your wallet will be asked to permit ` +
-          `that amount and no more.`
-        : `${escapeHtml(name)} charges nothing to play. Only the usual network fee applies.`;
+      el.chargeNote.innerHTML = move || open
+        ? `per move <strong>${stx(move)}</strong> &nbsp;·&nbsp; new game <strong>${stx(open)}</strong>` +
+          '<br><span class="meta">plus the network fee your wallet asks for</span>'
+        : 'free to play, apart from the network fee your wallet asks for';
     }
   }
 
