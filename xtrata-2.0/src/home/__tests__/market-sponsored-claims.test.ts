@@ -10,12 +10,18 @@ import { resolve } from 'node:path';
  * buyer always paid their own fee. That sent zero-STX buyers into a transaction
  * they could not pay for.
  *
- * Stage 2 of docs/plans/SPONSORED-MARKET-BUY-PLAN.md wired the sponsored branch,
- * so the capability is now real. The copy stays quiet anyway: restoring
- * buyer-facing sponsorship claims is Stage 3, gated on the testnet rehearsal in
- * the plan's §5. These guards therefore assert both halves — the branch exists,
- * and nothing promises free checkout ahead of that rehearsal — so the two can
- * only move together.
+ * Stage 2 of docs/plans/SPONSORED-MARKET-BUY-PLAN.md wired the sponsored branch.
+ * Stage 3 restored the copy on 2026-08-06: the testnet rehearsal it was gated on
+ * is superseded by mainnet evidence (plan §0.1), there being no testnet.
+ *
+ * The guards therefore changed shape rather than relaxing. They no longer assert
+ * "nothing promises free checkout"; they assert the promise is made **only where
+ * it is true** — per listing, from real state, degrading to "you pay network fee"
+ * when the escrow or the relayer cannot back it, and never in a market label that
+ * cannot know which buyer is reading it.
+ *
+ * The blanket-claim guards stay, because the blanket claim is what caused the
+ * 2026-08-06 overcharge.
  */
 const mainSource = readFileSync(new URL('../main.js', import.meta.url), 'utf8');
 const indexHtml = readFileSync(new URL('../../../index.html', import.meta.url), 'utf8');
@@ -253,5 +259,31 @@ describe('market registry labels make no fee promises', () => {
       expect(entry.label).not.toMatch(/free/i);
       expect(entry.label).not.toMatch(/sponsored/i);
     }
+  });
+});
+
+describe('the sponsored badge degrades honestly (plan Stage 3 tests)', () => {
+  // SPONSORED-MARKET-BUY-PLAN.md §Stage 3: "assert exhausted-budget and
+  // relayer-down listings do not advertise free checkout".
+  //
+  // The plan also warned that a badge rendered at list time cannot honestly
+  // reflect click-time eligibility. That is why the badge is computed only from
+  // state knowable at render (market kind, relayer configured, escrow covers the
+  // floor) AND why marketSponsoredBuy stops and asks when the prediction is
+  // wrong. Neither half is sufficient alone: without the badge the buyer reads
+  // the market label, without the stop-and-ask the badge can silently overpromise.
+  it('the badge is conditional on a relayer and a funded escrow', () => {
+    expect(marketSection).toMatch(/sponsoredLikely[\s\S]{0,400}?isSponsoredMarket\(listing\.entry\)/);
+    expect(marketSection).toMatch(/sponsoredLikely[\s\S]{0,400}?resolveSponsorBase\(listing\.entry\) !== null/);
+    expect(marketSection).toMatch(/sponsoredLikely[\s\S]{0,400}?budgetRemaining >= SPONSOR_FEE_FLOOR_USTX/);
+  });
+
+  it('an exhausted or unsponsored listing says the buyer pays', () => {
+    expect(marketSection).toMatch(/sponsoredLikely\s*\?[\s\S]{0,300}?You pay network fee/);
+  });
+
+  it('the badge never uses the phrasing the old false promise used', () => {
+    // "no STX needed" was the label that cost a buyer 0.193 STX.
+    expect(marketCopy).not.toMatch(/no STX needed/i);
   });
 });
