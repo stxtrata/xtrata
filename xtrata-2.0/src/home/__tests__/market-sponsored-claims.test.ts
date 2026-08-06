@@ -279,11 +279,52 @@ describe('the sponsored badge degrades honestly (plan Stage 3 tests)', () => {
   });
 
   it('an exhausted or unsponsored listing says the buyer pays', () => {
-    expect(marketSection).toMatch(/sponsoredLikely\s*\?[\s\S]{0,300}?You pay network fee/);
+    // Assert both arms exist rather than their proximity: a proximity window
+    // breaks the moment someone adds a comment between them, which says nothing
+    // about whether the behaviour is right.
+    expect(marketSection).toMatch(/sponsoredLikely\s*\n?\s*\?/);
+    expect(marketSection).toMatch(/>No STX fee</);
+    expect(marketSection).toMatch(/>You pay network fee</);
   });
 
   it('the badge never uses the phrasing the old false promise used', () => {
     // "no STX needed" was the label that cost a buyer 0.193 STX.
     expect(marketCopy).not.toMatch(/no STX needed/i);
+  });
+});
+
+describe('the stop-and-ask never invents a fee it does not know', () => {
+  // First version printed formatAssetAmount(readiness.estimatedFeeUstx) unconditionally.
+  // marketSponsorReadiness returns estimatedFeeUstx 0n when the quote FAILS, so a
+  // relayer-down buyer read "you would pay about 0.000000 STX" directly above a
+  // button that charges a real fee. Relayer-down is the most common failure, so
+  // the reassuring-but-false number would have been the usual case.
+  it('only quotes a figure when the relayer answered', () => {
+    expect(sponsoredBuyFn).toMatch(/readiness\.available[\s\S]{0,200}?formatAssetAmount/);
+  });
+
+  it('says something true instead of a zero when the quote failed', () => {
+    expect(sponsoredBuyFn).toMatch(/at whatever the network charges when you sign/);
+  });
+});
+
+describe('the two fee badges are visually distinguishable', () => {
+  // The base .badge is ALREADY green (--green-soft/--green in home.css), so a bare
+  // <span class="badge"> rendered the "you pay" warning in the same reassuring
+  // green as "No STX fee". The badge existed and told the buyer nothing.
+  const css = readFileSync(
+    resolve(__dirname, '../styles/home.css'),
+    'utf8'
+  );
+
+  it('the warning badge uses a modifier class that exists in the stylesheet', () => {
+    expect(marketSection).toMatch(/badge fee-due[^<]*You pay network fee/);
+    expect(css).toMatch(/\.badge\.fee-due\s*\{/);
+  });
+
+  it('the two badges do not share a class list', () => {
+    const noFee = /class="badge"[^>]*>No STX fee/.test(marketSection);
+    const youPay = /class="badge fee-due"[^>]*>You pay network fee/.test(marketSection);
+    expect(noFee && youPay).toBe(true);
   });
 });

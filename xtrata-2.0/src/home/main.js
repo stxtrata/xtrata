@@ -10858,12 +10858,21 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         // was sponsored for free, and had no way to know why. Never spend a
         // buyer's money on a path they did not choose: stop here, say what
         // happened and what it will cost, and let them decide.
+        // Quote the fee ONLY when the relayer actually answered. A failed quote
+        // returns estimatedFeeUstx 0n (see marketSponsorReadiness), and the first
+        // version of this message printed that verbatim: "you would pay about
+        // 0.000000 STX", immediately above a button that charges a real fee. That
+        // is the same false reassurance this whole change exists to remove, and
+        // relayer-down is the case that fires most often.
+        const feeSentence = readiness.available
+          ? ` You would pay about ${escapeHtml(
+              formatAssetAmount(readiness.estimatedFeeUstx, 6, 'STX')
+            )} in network fees.`
+          : ' You would pay the network fee yourself, at whatever the network charges when you sign.';
         marketDom.status.innerHTML =
           `<span><strong>Market</strong> sponsored checkout unavailable: ${escapeHtml(
             sponsoredBuyIneligibilityMessage(eligibility) ?? 'the relayer could not cover this purchase.'
-          )} You would pay about ${escapeHtml(
-            formatAssetAmount(readiness.estimatedFeeUstx, 6, 'STX')
-          )} in network fees.</span>`;
+          )}${feeSentence}</span>`;
         const payOwn = document.createElement('button');
         payOwn.type = 'button';
         payOwn.className = 'market-chip';
@@ -11891,8 +11900,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             isOwnListing ? '<span class="badge blue">Your listing</span>' : ''
           }${
             sponsoredLikely
-              ? '<span class="badge green" title="The seller prepaid the network fee for this listing.">No STX fee</span>'
-              : '<span class="badge" title="You pay the Stacks network fee for this purchase.">You pay network fee</span>'
+              ? '<span class="badge" title="The seller prepaid the network fee for this listing.">No STX fee</span>'
+              : // amber, NOT the default: the base .badge is green, so a bare
+                // <span class="badge"> rendered this warning in exactly the same
+                // reassuring green as "No STX fee" and told the buyer nothing.
+                '<span class="badge fee-due" title="You pay the Stacks network fee for this purchase.">You pay network fee</span>'
           }`;
 
           const price = document.createElement('div');
