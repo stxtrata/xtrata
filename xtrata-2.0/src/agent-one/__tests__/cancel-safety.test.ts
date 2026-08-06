@@ -41,6 +41,33 @@ describe('Agent One cancel safety', () => {
     expect(agentSource).toContain('return !!readJob(id).cancelRequested');
   });
 
+  it('a stale in-flight copy cannot erase a cancel that arrived after it was read', () => {
+    // The half the test above misses, and the reason this shipped.
+    //
+    // That test pins the READ side — the flag is re-read from storage rather
+    // than held in memory — and that was true the whole time the bug existed.
+    // Its own comment names the hazard exactly ("the loop doing the work may be
+    // mid-tick in another call stack") and then only checks the reader. The
+    // writer in that other call stack was the problem.
+    //
+    // Every long-running path holds its own `job` object for the duration and
+    // writes it back wholesale; `prog()` does so after every batch. cancelJob
+    // writes the flag from the UI thread. With a blind overwrite the sequence is
+    // set-flag → stale write → flag gone, all before assertNotCancelled reads it
+    // at the top of the next batch. The user sees the panel say "cancelling"
+    // while the upload carries on inscribing, which is what happened on
+    // 2026-08-06 and cost a real job its cancel.
+    //
+    // writeJob must therefore carry a stored cancel forward. Safe because the
+    // flag is only ever set, never cleared — the job ends CANCELLED instead.
+    expect(agentSource).toMatch(
+      /function writeJob[\s\S]{0,600}?stored\.cancelRequested[\s\S]{0,120}?j\.cancelRequested = true/
+    );
+    // And nothing may start clearing it, which would make the merge unsafe.
+    expect(agentSource).not.toMatch(/cancelRequested\s*=\s*false/);
+    expect(agentSource).not.toMatch(/delete\s+\w+\.cancelRequested/);
+  });
+
   it('stops only at points where nothing is in flight', () => {
     // Between chunk batches (previous send settled, next not started)...
     expect(agentSource).toContain('assertNotCancelled(job.jobId);\n    const batch = chunks.slice(idx, idx + BATCH);');

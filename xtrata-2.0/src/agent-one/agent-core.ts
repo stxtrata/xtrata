@@ -557,7 +557,38 @@ function xaoLog(id: string | null, msg: string) {
   if (!id) return;
   try { const j = readJob(id); j.log = ((j.log || []).slice(-199)).concat(new Date().toISOString() + ' ' + msg); writeJob(j); } catch {}
 }
-function writeJob(j: any) { try { localStorage.setItem(jobKey(j.jobId), JSON.stringify(j)); } catch {} return j; }
+/**
+ * Persist a job, preserving a cancel that arrived while this copy was in flight.
+ *
+ * Every long-running path holds its own `job` object for the duration and writes
+ * it back wholesale — `prog()` does this after each batch. `cancelJob` runs on
+ * the UI thread and does read → set `cancelRequested` → write. So the sequence
+ * is: user clicks Stop, the flag is written, the upload's next progress write
+ * puts its stale copy back, and the flag is gone before `assertNotCancelled`
+ * reads it at the top of the next batch.
+ *
+ * That is what a user sees as "it said cancelling and carried on inscribing":
+ * the panel showed the cancelling text because cancelJob wrote it, and the flag
+ * it depended on was erased milliseconds later.
+ *
+ * `cancelRequested` is only ever set, never cleared (the job ends CANCELLED
+ * instead), so carrying it forward from storage can never resurrect a stale
+ * cancel. Fixing it here rather than in each `prog()` closure covers every
+ * writer, including ones added later; rewriting those closures to re-read would
+ * also discard in-memory state they have not written yet.
+ */
+function writeJob(j: any) {
+  try {
+    if (j && !j.cancelRequested) {
+      try {
+        const stored = JSON.parse(localStorage.getItem(jobKey(j.jobId)) || 'null');
+        if (stored && stored.cancelRequested) j.cancelRequested = true;
+      } catch {}
+    }
+    localStorage.setItem(jobKey(j.jobId), JSON.stringify(j));
+  } catch {}
+  return j;
+}
 function readJob(id: string): any { const s = localStorage.getItem(jobKey(id)); if (!s) throw new Error('job not found: ' + id); return JSON.parse(s); }
 const publicJob = (j: any) => { const { ephemeralMnemonic, ...pub } = j; return { ...pub, hasKey: !!ephemeralMnemonic }; };
 
