@@ -70,6 +70,7 @@
       getMarketSettlementAsset,
       getMarketSettlementLabel,
       buildMarketBuyPostConditions,
+      formatMarketPrice,
       formatMarketPriceWithUsd
     } from '/src/lib/market/settlement.ts';
     import {
@@ -122,7 +123,7 @@
       getMarketListingPublicBlockReason,
       isMarketListingPubliclyBuyable
     } from '/src/lib/market/actions.ts';
-    import { loadMarketActivity } from '/src/lib/market/indexer.ts';
+    import { loadMarketActivity, loadMarketplaceActivity } from '/src/lib/market/indexer.ts';
     import {
       buildTransferCall,
       createXtrataClient
@@ -10527,9 +10528,17 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // ------------------------------------------------------------------
     const MARKET_LISTINGS_PER_CONTRACT = 24;
 
-    const MARKET_THUMB_HYDRATION_CONCURRENCY = 4;
+    // Was 4, when nothing over 512 KiB was ever read. With the cap now at 10 MiB
+    // each job can pull megabytes, so this follows Xplorer's pacing instead.
+    const MARKET_THUMB_HYDRATION_CONCURRENCY = GRID_THUMBNAIL_HYDRATION_CONCURRENCY;
+    // 25 per page, drawn 5x5. Every card now renders the real inscription from
+    // the runtime endpoint rather than a rasterised still, so the page has to be
+    // bounded: 22 live listings is fine unbounded, 500 animated APNGs is not.
+    const MARKET_PAGE_SIZE = 25;
+
     const marketState = {
       filter: 'all',
+      page: 0,
       run: 0,
       listings: [],
       // 'loading' | 'ready' | 'failed'. An empty `listings` array means three
@@ -10551,7 +10560,13 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       toolbar: $('marketToolbar'),
       status: $('marketStatus'),
       listings: $('marketListings'),
-      badge: $('marketNetworkBadge')
+      badge: $('marketNetworkBadge'),
+      activity: $('marketActivity'),
+      activityCount: $('marketActivityCount'),
+      activityFilters: $('marketActivityFilters'),
+      activityNote: $('marketActivityNote'),
+      activityStatus: $('marketActivityStatus'),
+      activityRows: $('marketActivityRows')
     };
 
     const marketEntriesForNetwork = () =>
@@ -11122,7 +11137,11 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       );
     };
 
-    const MARKET_MEDIA_MAX_BYTES = 512n * 1024n;
+    // Size cap and pacing both come from config.js now, shared with the Xplorer
+    // grid. The market previously kept its own 512 KiB literal here — 20x
+    // stricter than Xplorer for no recorded reason — which is why oversized
+    // inscriptions rendered a token-URI placeholder instead of their artwork.
+    const MARKET_MEDIA_MAX_BYTES = MAX_GRID_EAGER_FULL_LOAD_BYTES;
     const MARKET_REMOTE_THUMBNAIL_MAX_BYTES = 5 * 1024 * 1024;
 
     const marketFetchContent = async (listing, meta) => {
@@ -11220,17 +11239,53 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     //   html-live  → sandboxed <iframe srcdoc> (HTML inscriptions and
     //                script-driven SVG animations, per the wallet-grid pattern)
     //   video      → muted looping <video>
-    const marketMediaFor = async (listing) => {
+    const marketMediaFor = async (listing, options = {}) => {
       const key = marketTokenKey(listing);
       if (marketState.media.has(key)) return marketState.media.get(key);
       let media = null;
       try {
+        const earlySummary = await marketSummaryFor(listing);
+        const earlyMeta = earlySummary?.meta ?? null;
+        const earlyKind = getMediaKind((earlyMeta?.mimeType ?? '').toLowerCase());
+
+        // Raster images render straight from the runtime content endpoint, which
+        // is exactly what the Xplorer grid does (getTokenRuntimeImageUrl). The
+        // browser decodes the original file.
+        //
+        // This has to come BEFORE the cached-thumbnail lookup, because that
+        // cache holds canvas-rasterised stills. createImageThumbnail draws one
+        // frame to a <canvas>, so every animated image is flattened: #295 is a
+        // 3.64 MB APNG (verified acTL + fcTL chunks on chain) and showed as a
+        // motionless first frame here while animating in Xplorer.
+        //
+        // It also removes the size question for images entirely — nothing is
+        // reconstructed into JS memory, so a 3.64 MB APNG costs the grid no more
+        // than a 10 KB PNG.
+        if (
+          earlyKind === 'image' &&
+          (earlyMeta?.totalSize ?? 0n) > 0n &&
+          !options.skipRuntimeEndpoint
+        ) {
+          const runtimeUrl = buildRuntimeInscriptionContentUrl({
+            coreContractId: listing.nftContract,
+            tokenId: listing.tokenId
+          });
+          if (runtimeUrl) {
+            // viaRuntimeEndpoint tells the renderer this URL depends on a Pages
+            // Function, so a load failure is recoverable by rebuilding from
+            // chunks rather than a dead card.
+            media = { kind: 'image', url: runtimeUrl, viaRuntimeEndpoint: true };
+            marketState.media.set(key, media);
+            return media;
+          }
+        }
+
         media = await marketCachedThumbnailFor(listing);
         if (media) {
           marketState.media.set(key, media);
           return media;
         }
-        const summary = await marketSummaryFor(listing);
+        const summary = earlySummary;
         const meta = summary?.meta ?? null;
         const mime = (meta?.mimeType ?? '').toLowerCase();
         const kind = getMediaKind(mime);
@@ -11303,7 +11358,21 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         if (!media && summary?.svgDataUri && !isPlaceholderSvgDataUri(summary.svgDataUri)) {
           media = { kind: 'image', url: summary.svgDataUri };
         }
-        if (!media && summary?.tokenUri) {
+        // Token-URI image ONLY when the token has no on-chain bytes at all.
+        //
+        // The reasoning three paragraphs up — that a confident wrong picture is
+        // worse than an absence — applies here and did not used to. If an
+        // inscription HAS content on chain and we merely declined to read it,
+        // a remote image is not "the closest we have", it is a different
+        // artwork. #295 is a 3.64 MB PNG whose token URI is a SHARED Arweave
+        // metadata document, so this branch drew the same generic disc for
+        // every oversized listing pointing at it, captioned with the real
+        // inscription number.
+        //
+        // With no on-chain bytes the token URI is the only thing that exists,
+        // so it is the honest answer rather than a substitute for one.
+        const hasOnChainContent = (meta?.totalSize ?? 0n) > 0n;
+        if (!media && summary?.tokenUri && !hasOnChainContent) {
           const uriImage = await fetchTokenImageFromUri(summary.tokenUri);
           if (uriImage) {
             void cacheMarketRemoteImage(listing, uriImage);
@@ -11317,8 +11386,258 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       return media;
     };
 
+    /* --- marketplace-wide activity ------------------------------------- */
+
+    /**
+     * How each event reads to somebody who did not write the contract.
+     *
+     * `claim-fee` and `settle-refund` are the sponsorship plumbing: the sponsor
+     * taking back what it fronted, and the seller reclaiming what was left.
+     * They are shown because they are what makes a sponsored sale visible at
+     * all, but they are labelled in plain words rather than by function name.
+     */
+    const ACTIVITY_LABELS = {
+      list: 'Listed',
+      buy: 'Sold',
+      cancel: 'Cancelled',
+      'claim-fee': 'Sponsor reimbursed',
+      'settle-refund': 'Deposit returned'
+    };
+
+    const ACTIVITY_FILTERS = [
+      { key: 'all', label: 'All' },
+      { key: 'buy', label: 'Sales' },
+      { key: 'list', label: 'Listings' },
+      { key: 'cancel', label: 'Cancellations' },
+      { key: 'fees', label: 'Fees' }
+    ];
+
+    const marketActivityState = { snapshot: null, filter: 'all', loading: false, loaded: false };
+
+    const activityMatchesFilter = (row, filter) => {
+      if (filter === 'all') return true;
+      if (filter === 'fees') return row.type === 'claim-fee' || row.type === 'settle-refund';
+      return row.type === filter;
+    };
+
+    const renderMarketActivityRows = () => {
+      const root = marketDom.activityRows;
+      if (!root) return;
+      const snapshot = marketActivityState.snapshot;
+      if (!snapshot) return;
+
+      const rows = snapshot.rows.filter((row) => activityMatchesFilter(row, marketActivityState.filter));
+      root.replaceChildren();
+
+      if (rows.length === 0) {
+        root.append(
+          Object.assign(document.createElement('p'), {
+            className: 'field-hint',
+            textContent:
+              snapshot.rows.length === 0
+                ? 'No activity found on any market yet.'
+                : 'Nothing of that kind in the activity read so far.'
+          })
+        );
+        return;
+      }
+
+      for (const row of rows) {
+        const line = document.createElement('div');
+        line.className = 'market-activity__row';
+        line.setAttribute('role', 'listitem');
+
+        const kind = document.createElement('span');
+        kind.className = `market-activity__kind market-activity__kind--${row.type}`;
+        kind.textContent = ACTIVITY_LABELS[row.type] ?? row.type;
+        line.append(kind);
+
+        const what = document.createElement('span');
+        what.className = 'market-activity__what';
+        if (row.tokenId !== undefined && row.tokenId !== null) {
+          const link = document.createElement('a');
+          link.href = `/xplorer?token=${row.tokenId}`;
+          link.textContent = `#${row.tokenId}`;
+          what.append(link);
+        } else {
+          what.append(document.createTextNode(`listing ${row.listingId}`));
+        }
+        line.append(what);
+
+        const price = document.createElement('span');
+        price.className = 'market-activity__price';
+        // Formatted through the same helper the listing cards use, so the two
+        // halves of this page cannot disagree about what a number means.
+        price.textContent =
+          row.price === undefined || row.price === null
+            ? ''
+            : formatMarketPrice(row.price, row.settlement);
+        line.append(price);
+
+        const who = document.createElement('span');
+        who.className = 'market-activity__who';
+        if (row.type === 'buy' && row.buyer) {
+          who.append(document.createTextNode('to '));
+          const span = document.createElement('span');
+          applyBnsName(span, row.buyer);
+          who.append(span);
+        } else if (row.seller) {
+          who.append(document.createTextNode('by '));
+          const span = document.createElement('span');
+          applyBnsName(span, row.seller);
+          who.append(span);
+        }
+        line.append(who);
+
+        const tail = document.createElement('span');
+        tail.className = 'market-activity__tail';
+        // Only a SALE can be sponsored or self-paid, so the badge is not shown
+        // on a listing or a cancel -- where it would be meaningless rather than
+        // merely absent.
+        if (row.type === 'buy') {
+          const badge = document.createElement('span');
+          badge.className = `badge ${row.sponsored ? 'green' : ''}`.trim();
+          badge.textContent = row.sponsored ? 'Sponsored' : 'Self-paid';
+          tail.append(badge);
+        }
+        const market = document.createElement('span');
+        market.className = 'market-activity__market';
+        market.textContent = row.settlement?.symbol ?? '';
+        tail.append(market);
+        if (row.txId) {
+          const explorer = document.createElement('a');
+          explorer.className = 'market-activity__tx';
+          explorer.href = `https://explorer.hiro.so/txid/${row.txId}?chain=mainnet`;
+          explorer.target = '_blank';
+          explorer.rel = 'noreferrer noopener';
+          explorer.textContent = row.blockHeight ? `#${row.blockHeight}` : 'tx';
+          tail.append(explorer);
+        }
+        line.append(tail);
+
+        root.append(line);
+      }
+    };
+
+    const renderMarketActivityFilters = () => {
+      const root = marketDom.activityFilters;
+      if (!root) return;
+      root.replaceChildren();
+      for (const entry of ACTIVITY_FILTERS) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `market-chip${marketActivityState.filter === entry.key ? ' is-active' : ''}`;
+        button.textContent = entry.label;
+        button.setAttribute('aria-pressed', String(marketActivityState.filter === entry.key));
+        button.addEventListener('click', () => {
+          marketActivityState.filter = entry.key;
+          renderMarketActivityFilters();
+          renderMarketActivityRows();
+        });
+        root.append(button);
+      }
+    };
+
+    /**
+     * Say what was NOT read.
+     *
+     * The snapshot knows whether each market's history was walked to the end.
+     * When it was not, this says so in the open rather than presenting a
+     * partial history as a whole one -- the same reason the market thumbnails
+     * stopped rendering the core's placeholder as though it were artwork.
+     */
+    const renderMarketActivityNote = () => {
+      const note = marketDom.activityNote;
+      const snapshot = marketActivityState.snapshot;
+      if (!note || !snapshot) return;
+      if (snapshot.complete) {
+        note.hidden = true;
+        note.textContent = '';
+        return;
+      }
+      const partial = snapshot.markets.filter((market) => !market.complete);
+      note.hidden = false;
+      note.textContent =
+        `Showing the most recent activity only. ${partial.length} of ${snapshot.markets.length} ` +
+        `market${snapshot.markets.length === 1 ? '' : 's'} could not be read all the way back, so older ` +
+        'events are missing from this list.';
+    };
+
+    const loadMarketActivityPanel = async ({ force = false } = {}) => {
+      if (marketActivityState.loading) return;
+      if (marketActivityState.loaded && !force) return;
+      marketActivityState.loading = true;
+      const status = marketDom.activityStatus;
+      if (status) {
+        status.hidden = false;
+        status.replaceChildren(
+          Object.assign(document.createElement('span'), { textContent: 'Loading activity…' })
+        );
+      }
+      try {
+        const contracts = getSellableMarkets(getContractId(state.contract))
+          .filter((entry) => entry.sponsored)
+          .map((entry) => ({ entry }));
+        // Always a fresh read on the first open.
+        //
+        // Snapshots cached before `complete` existed have it undefined, which
+        // reads as "unknown" and correctly shows the truncation note -- but the
+        // note then says older events are missing when the real answer is "not
+        // refreshed yet". Opening the panel is a deliberate act, so pay for the
+        // read once and be sure, rather than explain a stale cache.
+        const snapshot = await loadMarketplaceActivity({
+          contracts,
+          force: force || !marketActivityState.loaded
+        });
+        marketActivityState.snapshot = snapshot;
+        marketActivityState.loaded = true;
+        if (marketDom.activityCount) {
+          marketDom.activityCount.textContent = `${snapshot.rows.length}${snapshot.complete ? '' : '+'}`;
+        }
+        if (status) status.hidden = true;
+        renderMarketActivityFilters();
+        renderMarketActivityNote();
+        renderMarketActivityRows();
+      } catch (error) {
+        if (status) {
+          status.hidden = false;
+          status.replaceChildren(
+            Object.assign(document.createElement('span'), {
+              textContent: `Could not load activity: ${error instanceof Error ? error.message : String(error)}`
+            })
+          );
+        }
+      } finally {
+        marketActivityState.loading = false;
+      }
+    };
+
     const hydrateMarketThumbnails = async (run, listings, root = marketDom.listings) => {
-      await runLimited(listings, MARKET_THUMB_HYDRATION_CONCURRENCY, async (listing) => {
+      // Smallest first, matching the Xplorer grid's
+      // compareBackgroundThumbnailHydrationJobs. With the cap at 10 MiB, listing
+      // order would otherwise let one multi-megabyte inscription occupy a worker
+      // while a dozen small ones that could have painted immediately wait behind
+      // it. Summaries are memoised by marketSummaryFor, so this pass is cheap and
+      // the sizes are needed by marketMediaFor moments later anyway.
+      const sized = await runLimited(
+        listings,
+        MARKET_THUMB_HYDRATION_CONCURRENCY,
+        async (listing) => {
+          let size = 0n;
+          try {
+            size = (await marketSummaryFor(listing))?.meta?.totalSize ?? 0n;
+          } catch {
+            size = 0n; // unknown size sorts first; it is cheap to find out
+          }
+          return { listing, size };
+        }
+      );
+      if (run !== marketState.run) return;
+      const ordered = sized
+        .sort((left, right) => (left.size < right.size ? -1 : left.size > right.size ? 1 : 0))
+        .map((entry) => entry.listing);
+
+      await runLimited(ordered, MARKET_THUMB_HYDRATION_CONCURRENCY, async (listing) => {
         if (run !== marketState.run) return;
         const media = await marketMediaFor(listing);
         if (run !== marketState.run) return;
@@ -11358,6 +11677,29 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           img.src = media.url;
           img.alt = `Inscription #${listing.tokenId}`;
           img.loading = 'lazy';
+          // `/runtime/content` is a Pages Function, so it only exists on a
+          // deployed site. Under `vite dev` the dev server answers unknown paths
+          // with index.html, which arrives as a 200 of text/html and fails to
+          // decode — every raster card would be blank locally.
+          //
+          // Rebuild from chunks when that happens. It costs a reconstruction on
+          // the failing card only, keeps the grid working in local development,
+          // and covers a genuine production case too: if the endpoint ever
+          // fails, cards degrade to the slower path instead of going empty.
+          if (media.viaRuntimeEndpoint) {
+            img.addEventListener(
+              'error',
+              () => {
+                void (async () => {
+                  const key = marketTokenKey(listing);
+                  marketState.media.delete(key);
+                  const rebuilt = await marketMediaFor(listing, { skipRuntimeEndpoint: true });
+                  if (rebuilt?.url && img.isConnected) img.src = rebuilt.url;
+                })();
+              },
+              { once: true }
+            );
+          }
           slot.replaceChildren(img);
           slot.classList.add('market-thumb--media');
         } else {
@@ -11370,7 +11712,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             }),
             Object.assign(document.createElement('span'), {
               className: 'market-thumb__label',
-              textContent: summary?.meta?.mimeType ?? 'no preview'
+              // Say WHY there is no preview when the reason is size. "no
+              // preview" on a 3.64 MB artwork reads as "this is broken"; the
+              // size plus a route to see it reads as a deliberate limit, which
+              // is what it is.
+              textContent:
+                (summary?.meta?.totalSize ?? 0n) > MARKET_MEDIA_MAX_BYTES
+                  ? `${formatBytes(summary.meta.totalSize)} · open to view`
+                  : summary?.meta?.mimeType ?? 'no preview'
             })
           );
         }
@@ -11820,6 +12169,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           chip.textContent = symbol === 'all' ? 'All assets' : symbol;
           chip.addEventListener('click', () => {
             marketState.filter = symbol;
+            // Back to page 1: staying on page 3 of a filter that now has one
+            // page shows an empty grid over a full count.
+            marketState.page = 0;
             renderMarketToolbar();
             renderMarketListings();
           });
@@ -11827,6 +12179,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         })
       );
     };
+
+    // First open loads it; later opens reuse what was read. The `once` is on
+    // the load, not the listener, because reopening must not refetch.
+    marketDom.activity?.addEventListener('toggle', () => {
+      if (marketDom.activity.open) void loadMarketActivityPanel();
+    });
 
     const renderMarketListings = () => {
       if (!marketDom.listings) return;
@@ -11849,10 +12207,22 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         marketDom.status.innerHTML = `<span><strong>Market</strong> ${emptyMessage}</span>`;
         return;
       }
-      marketDom.status.innerHTML = `<span><strong>Market</strong> ${visible.length} live listing${visible.length === 1 ? '' : 's'}.</span>`;
+      const pageCount = Math.max(1, Math.ceil(visible.length / MARKET_PAGE_SIZE));
+      // Clamp rather than trust: the listing set changes under us as sales land
+      // and filters change, so a stored page can outlive the pages it indexed.
+      marketState.page = Math.min(Math.max(0, marketState.page), pageCount - 1);
+      const pageStart = marketState.page * MARKET_PAGE_SIZE;
+      const pageItems = visible.slice(pageStart, pageStart + MARKET_PAGE_SIZE);
+
+      const countText = `${visible.length} live listing${visible.length === 1 ? '' : 's'}`;
+      const rangeText =
+        pageCount > 1
+          ? ` — showing ${pageStart + 1}–${pageStart + pageItems.length}`
+          : '';
+      marketDom.status.innerHTML = `<span><strong>Market</strong> ${countText}${rangeText}.</span>`;
       marketState.liveFrames = 0; // cards re-render from scratch; recount frames
       marketDom.listings.replaceChildren(
-        ...visible.map((listing) => {
+        ...pageItems.map((listing) => {
           const card = document.createElement('article');
           card.className = 'market-card';
           const symbol = getMarketSettlementLabel(listing.settlement);
@@ -11890,12 +12260,15 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
           const badges = document.createElement('div');
           badges.className = 'market-card__badge-row';
-          // Sponsored checkout is NOT wired into this page: marketBuy always
-          // uses showContractCall, so the buyer pays their own network fee on
-          // every market. Until the sponsored buy flow is implemented here (see
-          // docs/plans/SPONSORED-MARKET-BUY-PLAN.md) this must not claim
-          // otherwise — the badge previously said "No STX needed", which sent
-          // zero-STX buyers into a transaction they could not pay for.
+          // Sponsored checkout IS wired into this page now (plan Stage 2), and
+          // a mainnet buy confirmed sponsored on 2026-08-06. This comment used
+          // to say the opposite and sat directly above the badge that decides
+          // what a buyer is told about fees.
+          //
+          // The rule it was protecting still stands, restated: never claim free
+          // checkout as a property of the MARKET. It is a property of this
+          // listing at this moment — escrow funded, relayer reachable — and
+          // marketSponsoredBuy re-checks it before anything is signed.
           badges.innerHTML = `<span class="badge">${symbol}</span>${
             isOwnListing ? '<span class="badge blue">Your listing</span>' : ''
           }${
@@ -11973,7 +12346,55 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           return card;
         })
       );
-      void hydrateMarketThumbnails(run, visible);
+      renderMarketPager(pageCount);
+      // Only the visible page hydrates. Hydration reads content, so paging is
+      // what keeps that bounded regardless of how many listings exist.
+      void hydrateMarketThumbnails(run, pageItems);
+    };
+
+    /**
+     * Page controls under the grid, mirroring the Xplorer pager.
+     *
+     * Rendered into a sibling of the grid rather than inside it, because
+     * `.market-listings` is a CSS grid and a pager placed inside it would be
+     * laid out as a 26th card.
+     */
+    const renderMarketPager = (pageCount) => {
+      const grid = marketDom.listings;
+      if (!grid) return;
+      let pager = document.getElementById('marketPager');
+      if (pageCount <= 1) {
+        pager?.remove();
+        return;
+      }
+      if (!pager) {
+        pager = document.createElement('div');
+        pager.id = 'marketPager';
+        pager.className = 'market-pager';
+        grid.insertAdjacentElement('afterend', pager);
+      }
+      const step = (delta) => {
+        marketState.page += delta;
+        renderMarketListings();
+        grid.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      };
+      const button = (label, delta, disabled) => {
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.className = 'market-chip';
+        el.textContent = label;
+        el.disabled = disabled;
+        if (!disabled) el.addEventListener('click', () => step(delta));
+        return el;
+      };
+      pager.replaceChildren(
+        button('‹ Previous', -1, marketState.page === 0),
+        Object.assign(document.createElement('span'), {
+          className: 'market-pager__label',
+          textContent: `Page ${marketState.page + 1} / ${pageCount}`
+        }),
+        button('Next ›', 1, marketState.page >= pageCount - 1)
+      );
     };
 
     // --- Seller dashboard: my listings across all markets -----------------
@@ -12345,6 +12766,10 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         marketState.listingsPhase = 'ready';
         renderMarketListings();
         renderSellerDashboard();
+        // Lazily: the panel is collapsed by default, and walking three markets'
+        // event history is several requests against a rate-limited API. A
+        // reader who never opens it should never pay for it.
+        if (marketDom.activity?.open) void loadMarketActivityPanel();
       } catch (error) {
         if (run !== marketState.run) return;
         marketState.listingsPhase = 'failed';

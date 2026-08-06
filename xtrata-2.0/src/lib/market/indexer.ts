@@ -1,4 +1,4 @@
-import { Cl } from '@stacks/transactions';
+import { Cl, hexToCV } from '@stacks/transactions';
 import { getApiBaseUrls } from '../network/config';
 import { getContractId, type ContractConfig } from '../contract/config';
 import {
@@ -9,6 +9,8 @@ import {
   getTupleValue
 } from '../protocol/clarity';
 import { logWarn } from '../utils/logger';
+import { getMarketSettlementAsset } from './settlement';
+import type { MarketRegistryEntry } from './registry';
 import {
   loadMarketIndexSnapshot,
   loadNftIndexSnapshot,
@@ -18,6 +20,8 @@ import {
 import type {
   MarketActivityEvent,
   MarketIndexSnapshot,
+  MarketplaceActivityRow,
+  MarketplaceActivitySnapshot,
   NftActivityEvent,
   NftIndexSnapshot,
   UnifiedActivityEvent
@@ -25,6 +29,20 @@ import type {
 
 const EVENT_LIMIT = 50;
 const MAX_EVENTS = 200;
+/**
+ * How many pages of 50 a single refresh will walk.
+ *
+ * The loader used to fetch ONE page at offset 0 and stop, so any market with
+ * more than 50 events silently lost the older ones -- and said nothing about
+ * it. The STX market was at 40 when this was written, so the truncation was
+ * weeks away rather than hypothetical.
+ *
+ * Bounded rather than unbounded because this runs in a browser against a
+ * rate-limited API. When the walk stops early the snapshot says so via
+ * `complete: false`, and the UI is required to show that rather than present a
+ * partial history as a whole one.
+ */
+const MAX_EVENT_PAGES = 8;
 const MIN_REFRESH_MS = 60_000;
 const MARKET_RATE_LIMIT_BACKOFF_MS = 300_000;
 const NFT_EVENT_LIMIT = 50;
@@ -132,7 +150,16 @@ const parseMarketEventFromValue = (
     getTupleValue(tuple, 'event', 'market.event'),
     'market.event.event'
   );
-  if (type !== 'list' && type !== 'buy' && type !== 'cancel') {
+  // claim-fee and settle-refund were declared in MarketActivityType from the
+  // start but dropped here, so the only evidence that a sale was SPONSORED --
+  // the sponsor reimbursing itself -- never reached the UI at all.
+  if (
+    type !== 'list' &&
+    type !== 'buy' &&
+    type !== 'cancel' &&
+    type !== 'claim-fee' &&
+    type !== 'settle-refund'
+  ) {
     return null;
   }
   const listingId = expectUInt(
@@ -142,6 +169,16 @@ const parseMarketEventFromValue = (
   const tokenIdValue = tuple['token-id'];
   const priceValue = tuple['price'];
   const feeValue = tuple['fee'];
+  // Verified against the live contracts on 2026-08-06:
+  //   list          event fee-budget listing-id nft-contract price seller token-id
+  //   buy           buyer event fee listing-id nft-contract price seller token-id
+  //   cancel        budget-refunded event listing-id nft-contract seller token-id
+  //   claim-fee     amount budget-remaining event listing-id sponsor
+  //   settle-refund claimed event listing-id refunded seller
+  const feeBudgetValue = tuple['fee-budget'];
+  const budgetRemainingValue = tuple['budget-remaining'];
+  const claimAmountValue = tuple['amount'];
+  const refundedValue = tuple['refunded'] ?? tuple['budget-refunded'];
   const sellerValue = tuple['seller'];
   const buyerValue = tuple['buyer'];
   const nftContractValue = tuple['nft-contract'];
@@ -165,6 +202,12 @@ const parseMarketEventFromValue = (
     seller,
     buyer,
     nftContract,
+    feeBudget: feeBudgetValue ? expectUInt(feeBudgetValue, 'market.event.fee-budget') : undefined,
+    budgetRemaining: budgetRemainingValue
+      ? expectUInt(budgetRemainingValue, 'market.event.budget-remaining')
+      : undefined,
+    claimAmount: claimAmountValue ? expectUInt(claimAmountValue, 'market.event.amount') : undefined,
+    refunded: refundedValue ? expectUInt(refundedValue, 'market.event.refunded') : undefined,
     txId: meta.txId,
     blockHeight: meta.blockHeight,
     eventIndex: meta.eventIndex,
@@ -179,12 +222,24 @@ const parseMarketEvent = (event: HiroContractEvent): MarketActivityEvent | null 
   if (event.contract_log?.topic !== 'print') {
     return null;
   }
+  // Deserialize the HEX, not the repr.
+  //
+  // This read `Cl.parse(repr)` and swallowed the throw as `null`. Cl.parse
+  // rejects every repr these contracts emit -- checked against all five event
+  // shapes on mainnet -- so parseMarketEvent returned null for literally every
+  // market event, and the per-listing activity panel had been silently empty
+  // since it shipped. The hex round-trips exactly.
+  //
+  // The repr stays as a fallback rather than being deleted: it costs nothing,
+  // and an event with a hex this version cannot decode is better read badly
+  // than not at all.
+  const hex = event.contract_log?.value?.hex;
   const repr = event.contract_log?.value?.repr;
-  if (!repr) {
+  if (!hex && !repr) {
     return null;
   }
   try {
-    const parsed = Cl.parse(repr);
+    const parsed = hex ? hexToCV(hex) : Cl.parse(repr as string);
     return parseMarketEventFromValue(parsed, {
       txId: event.tx_id,
       blockHeight: event.block_height,
@@ -280,7 +335,7 @@ const fetchMarketEventsPage = async (params: {
   contractId: string;
   limit: number;
   offset: number;
-}): Promise<MarketActivityEvent[]> => {
+}): Promise<{ events: MarketActivityEvent[]; rawCount: number }> => {
   const url = `${params.baseUrl}/extended/v1/contract/${encodeURIComponent(
     params.contractId
   )}/events?limit=${params.limit}&offset=${params.offset}`;
@@ -290,7 +345,15 @@ const fetchMarketEventsPage = async (params: {
   }
   const json = (await response.json()) as HiroContractEventResponse;
   const results = Array.isArray(json.results) ? json.results : [];
-  return results.map(parseMarketEvent).filter(Boolean) as MarketActivityEvent[];
+  return {
+    events: results.map(parseMarketEvent).filter(Boolean) as MarketActivityEvent[],
+    // The RAW count decides whether to ask for another page. Paging on the
+    // parsed count would stop the walk the moment a page contained anything
+    // this parser ignores -- and a market's event feed is full of nft_transfer
+    // and stx_transfer events alongside the prints, so on the real chain that
+    // meant stopping after page one and silently losing all older history.
+    rawCount: results.length
+  };
 };
 
 const parseUintFromRepr = (repr?: string) => {
@@ -397,6 +460,7 @@ export const loadMarketActivity = async (params: {
     );
     let events: MarketActivityEvent[] = cached?.events ?? [];
     let lastError: unknown = null;
+    let complete = false;
 
     if (apiBaseUrls.length === 0) {
       logWarn('market', 'Market activity fetch skipped: no Hiro API base configured');
@@ -410,13 +474,28 @@ export const loadMarketActivity = async (params: {
     for (let index = 0; index < apiBaseUrls.length; index += 1) {
       const baseUrl = apiBaseUrls[index];
       try {
-        const fetched = await fetchMarketEventsPage({
-          baseUrl,
-          contractId,
-          limit: EVENT_LIMIT,
-          offset: 0
-        });
-        events = mergeEvents(events, fetched);
+        // Walk pages until one comes back short, which is the only signal
+        // this API gives that there is nothing older.
+        let offset = 0;
+        let page = 0;
+        let reachedEnd = false;
+        for (; page < MAX_EVENT_PAGES; page += 1) {
+          const fetched = await fetchMarketEventsPage({
+            baseUrl,
+            contractId,
+            limit: EVENT_LIMIT,
+            offset
+          });
+          events = mergeEvents(events, fetched.events);
+          if (fetched.rawCount < EVENT_LIMIT) {
+            reachedEnd = true;
+            break;
+          }
+          offset += EVENT_LIMIT;
+        }
+        // Complete only if the walk ran out of events rather than out of pages,
+        // AND the merge did not hit its own ceiling.
+        complete = reachedEnd && events.length < MAX_EVENTS;
         lastError = null;
         break;
       } catch (error) {
@@ -441,6 +520,7 @@ export const loadMarketActivity = async (params: {
     const snapshot: MarketIndexSnapshot = {
       contractId,
       events,
+      complete,
       updatedAt: Date.now()
     };
     await saveMarketIndexSnapshot(snapshot);
@@ -620,4 +700,92 @@ export const __testing = {
     marketActivityInFlight.clear();
     nftActivityInFlight.clear();
   }
+};
+
+/**
+ * Every market's activity, merged into one list.
+ *
+ * The per-listing "Details" panel has always had this data -- `loadMarketActivity`
+ * indexes a whole contract -- but the page then filtered it to a single token,
+ * so the only way to read the marketplace was one listing at a time. This is
+ * the same data with the filter removed and the three markets merged.
+ *
+ * Two things it refuses to fake:
+ *
+ *   1. **Sponsorship is derived, not assumed.** Every listing here is on a
+ *      sponsor-capable market, so "sponsored market" says nothing about a given
+ *      sale. What settles it is a `claim-fee` against the same listing: the
+ *      sponsor reimbursing itself from the seller's escrowed budget, which only
+ *      happens when the buyer paid no fee. Most sales so far are self-paid.
+ *
+ *   2. **Truncation is reported.** If any market's history was cut short, the
+ *      snapshot says `complete: false` and the caller must show it. A partial
+ *      history presented as a whole one is the same class of error as rendering
+ *      a placeholder as artwork.
+ *
+ * Failures are per-market and non-fatal: one market being unreadable returns
+ * the others plus `complete: false`, rather than an empty list that looks like
+ * a quiet marketplace.
+ */
+export const loadMarketplaceActivity = async (params: {
+  contracts: { entry: MarketRegistryEntry; label?: string }[];
+  force?: boolean;
+}): Promise<MarketplaceActivitySnapshot> => {
+  const markets: MarketplaceActivitySnapshot['markets'] = [];
+  const rows: MarketplaceActivityRow[] = [];
+
+  const snapshots = await Promise.all(
+    params.contracts.map(async ({ entry, label }) => {
+      const contractId = getContractId(entry);
+      try {
+        const snapshot = await loadMarketActivity({ contract: entry, force: params.force });
+        return { entry, label, contractId, snapshot, failed: false };
+      } catch {
+        return { entry, label, contractId, snapshot: null, failed: true };
+      }
+    })
+  );
+
+  for (const { entry, label, contractId, snapshot, failed } of snapshots) {
+    const events = snapshot?.events ?? [];
+    // A market that could not be read is not a complete market.
+    const complete = failed ? false : snapshot?.complete === true;
+    markets.push({
+      contractId,
+      label: label ?? entry.label,
+      count: events.length,
+      complete
+    });
+
+    // Which listings on THIS market had the sponsor reimburse itself. Scoped
+    // per market because listing ids restart at zero on each contract, so a
+    // set keyed on listing id alone would mark listing 6 on all three markets
+    // sponsored the moment any one of them was.
+    const sponsoredListings = new Set(
+      events
+        .filter((event) => event.type === 'claim-fee')
+        .map((event) => event.listingId.toString())
+    );
+
+    const settlement = getMarketSettlementAsset(entry.paymentTokenContractId);
+    for (const event of events) {
+      rows.push({
+        ...event,
+        marketContractId: contractId,
+        marketKey: entry.contractName,
+        marketLabel: label ?? entry.label,
+        settlement,
+        sponsored: sponsoredListings.has(event.listingId.toString())
+      });
+    }
+  }
+
+  rows.sort(sortEventsDesc);
+
+  return {
+    rows,
+    complete: markets.length > 0 && markets.every((market) => market.complete),
+    markets,
+    updatedAt: Date.now()
+  };
 };

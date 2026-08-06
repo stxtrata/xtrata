@@ -44,6 +44,13 @@ const NETWORK = process.env.XTRATA_CHESS_NETWORK || 'mainnet';
 
 const framed = process.argv.includes('--framed');
 
+// Serve one self-contained file as the inscription, instead of the thin board
+// plus a separate engine.
+const STANDALONE = (() => {
+  const at = process.argv.indexOf('--standalone');
+  return at >= 0 ? process.argv[at + 1] : null;
+})();
+
 // What plays the wallet on the host side. See framedHost().
 const WALLET_MODE = (() => {
   const flag = process.argv.find((a) => a.startsWith('--wallet='));
@@ -79,6 +86,14 @@ function rewriteHiroBases(html) {
 
 async function engineSource() {
   return readFile(resolve(ROOT, 'dist', 'xtrata-chess-engine.js'), 'utf8');
+}
+
+// A self-contained board, served the way an inscription of it would be: HTML,
+// so the Hiro rewrite applies to its own bytes. Nothing is fetched, so this is
+// the one artifact that does not depend on the engine already being inscribed.
+//   node scripts/harness.mjs --framed --standalone dist/xtrata-chess-board-v3.html
+async function standaloneSource(file) {
+  return readFile(resolve(ROOT, file), 'utf8');
 }
 
 // The thin board, exactly as `--board` produces it.
@@ -380,7 +395,8 @@ const server = createServer(async (request, response) => {
 
     if (path === `/i/${BOARD_ID}`) {
       // HTML, so it is rewritten on the way out, exactly as the worker does.
-      return send(response, 200, rewriteHiroBases(boardHtml()), TYPES['.html']);
+      const html = STANDALONE ? await standaloneSource(STANDALONE) : boardHtml();
+      return send(response, 200, rewriteHiroBases(html), TYPES['.html']);
     }
 
     // The real runtime support scripts, read from xtrata-2.0 so they cannot
@@ -468,7 +484,10 @@ server.listen(PORT, () => {
   console.log(`  mode      ${framed ? `framed, wallet over the host bridge (${WALLET_MODE})` : 'top frame, no bridge'}`);
   console.log(`  contract  ${CONTRACT} (${NETWORK})`);
   console.log(`  engine    /i/${ENGINE_ID}   served as JavaScript, not rewritten`);
-  console.log(`  board     /i/${BOARD_ID}   served as HTML, Hiro bases rewritten`);
+  console.log(
+    `  board     /i/${BOARD_ID}   served as HTML, Hiro bases rewritten` +
+      (STANDALONE ? ` (${STANDALONE})` : '')
+  );
   console.log(`  runtime   real scripts from ${RUNTIME_DIR}`);
   console.log(`  proxy     /hiro/<network> -> the public API\n`);
   console.log('Every API request the board makes is logged below. If any of them');

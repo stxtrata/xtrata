@@ -17,7 +17,20 @@ export const TEMP_CACHE_MAX_BYTES = 25 * 1024 * 1024;
 // changing the more conservative reconstruction cache threshold above.
 export const STREAM_TEMP_CACHE_MAX_BYTES = 100 * 1024 * 1024;
 export const THUMBNAIL_CACHE_LIMIT = 4000;
-export const THUMBNAIL_CACHE_KEY_VERSION = 'v2';
+/**
+ * Bumped v2 -> v3 on 2026-08-06 to discard poisoned market thumbnails.
+ *
+ * While the market grid capped reads at 512 KiB, every oversized listing fell
+ * through to its token-URI image and cached THAT as the token's thumbnail —
+ * inscription #295, a 3.64 MB PNG, was cached as a generic Arweave disc. The
+ * cache is consulted before the on-chain path (marketCachedThumbnailFor runs
+ * first in marketMediaFor), so raising the cap alone would not have healed
+ * those entries: the wrong picture would have won on every future load.
+ *
+ * Cost is one re-hydration pass per browser, on both grids, which is why this
+ * is a version bump and not something to do casually.
+ */
+export const THUMBNAIL_CACHE_KEY_VERSION = 'v3';
 export const SUMMARY_CACHE_TTL_MS = 60 * 60 * 1000;
 
 type CacheValue = {

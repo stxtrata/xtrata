@@ -335,7 +335,13 @@ async function main() {
       exact: true
     };
     sealedBlock += `window.__XTRATA_CHESS_BOARD__ = ${JSON.stringify(boardConfig)};\n`;
-    name = 'xtrata-chess-play';
+    // Named after the contract it is bound to. An inscription is permanent and
+    // there will be more than one of these over time; a file called "play" says
+    // nothing about which contract it talks to, and the whole point of exact is
+    // that this file talks to one and only one.
+    const contractName = String(boardConfig.contract).split('.')[1] || '';
+    const version = contractName.match(/v\d+$/)?.[0];
+    name = version ? `xtrata-chess-board-${version}` : 'xtrata-chess-play';
   }
 
   if (sealPath) {

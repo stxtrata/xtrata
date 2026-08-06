@@ -765,6 +765,23 @@
           <div class="market-toolbar" id="marketToolbar" role="tablist" aria-label="Payment asset"></div>
           <div class="status" id="marketStatus"><span>Loading listings…</span></div>
           <div class="market-listings" id="marketListings"></div>
+          <!-- Marketplace-wide activity. The per-listing "Details" panel has
+               always had this data -- the indexer reads a whole contract -- but
+               the page filtered it to one token, so the marketplace could only
+               be read one listing at a time. Collapsed by default: it is a
+               reference, not the point of the page. -->
+          <details class="market-activity" id="marketActivity">
+            <summary>
+              <span>Marketplace activity</span>
+              <span class="market-activity__count" id="marketActivityCount"></span>
+            </summary>
+            <div class="market-activity__body">
+              <div class="market-activity__filters" id="marketActivityFilters" role="group" aria-label="Filter activity"></div>
+              <p class="field-hint market-activity__note" id="marketActivityNote" hidden></p>
+              <div class="status" id="marketActivityStatus"><span>Loading activity…</span></div>
+              <div class="market-activity__rows" id="marketActivityRows" role="list"></div>
+            </div>
+          </details>
           <p class="field-hint" id="marketFootnote">
             Listings settle through the Xtrata market contracts. Buyers pay their own
             network fee on every listing.
