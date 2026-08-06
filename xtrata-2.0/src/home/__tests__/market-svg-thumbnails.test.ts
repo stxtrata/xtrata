@@ -116,10 +116,15 @@ describe('the core placeholder is not passed off as artwork', () => {
   it('the detector matches the real SVG-STATIC and nothing else', async () => {
     // Rebuild the function from source rather than exporting it, so the test
     // pins the shipped implementation and not a copy that could drift.
-    const fn = marketSection.slice(
+    const sliced = marketSection.slice(
       marketSection.indexOf('const isPlaceholderSvgDataUri ='),
       marketSection.indexOf('const MARKET_MEDIA_MAX_BYTES')
     );
+    // The slice runs to the NEXT declaration, so any comment written above that
+    // declaration lands in here and breaks the eval. Strip comments first: this
+    // test exists to pin the detector's behaviour, and it should not fail
+    // because somebody documented the constant underneath it.
+    const fn = sliced.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
     const arrow = fn.slice(fn.indexOf('=') + 1).trim().replace(/;\s*$/, '');
     // eslint-disable-next-line no-new-func
     const isPlaceholder = new Function(`return (${arrow})`)();

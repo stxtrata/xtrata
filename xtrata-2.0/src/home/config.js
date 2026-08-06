@@ -109,8 +109,29 @@ export const WALLET_PAGE_SIZE = 16;
 
 export const WALLET_FALLBACK_SCAN_LIMIT = 2000;
 
+/**
+ * Largest inscription any grid will read in full to draw a thumbnail.
+ *
+ * Shared by the Xplorer grid AND the marketplace grid deliberately. The market
+ * used to carry its own literal of 512 KiB while this said 10 MiB, so the same
+ * inscription rendered correctly in one grid and fell back to a token-URI image
+ * in the other — inscription #295 (3.64 MB) showed its real artwork in Xplorer
+ * and a generic Arweave placeholder in the market. Nobody chose 512 KiB over
+ * 10 MiB; the two numbers were just written at different times.
+ *
+ * If a grid ever genuinely needs a different limit, give it a named constant
+ * here with a reason, rather than a literal at the call site.
+ */
 export const MAX_GRID_EAGER_FULL_LOAD_BYTES = 10n * 1024n * 1024n;
 
+/**
+ * Concurrent full-content reads while hydrating a grid of thumbnails.
+ *
+ * Deliberately low. Raising the size cap above means each job can now pull
+ * megabytes, so the pacing and the cap have to move together: reading four
+ * multi-megabyte inscriptions at once hits the API far harder than reading four
+ * small ones. Both grids use this.
+ */
 export const GRID_THUMBNAIL_HYDRATION_CONCURRENCY = 2;
 
 // Max number of HTML inscription iframes allowed to execute simultaneously

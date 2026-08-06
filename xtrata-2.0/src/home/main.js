@@ -10528,7 +10528,9 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // ------------------------------------------------------------------
     const MARKET_LISTINGS_PER_CONTRACT = 24;
 
-    const MARKET_THUMB_HYDRATION_CONCURRENCY = 4;
+    // Was 4, when nothing over 512 KiB was ever read. With the cap now at 10 MiB
+    // each job can pull megabytes, so this follows Xplorer's pacing instead.
+    const MARKET_THUMB_HYDRATION_CONCURRENCY = GRID_THUMBNAIL_HYDRATION_CONCURRENCY;
     const marketState = {
       filter: 'all',
       run: 0,
@@ -11314,7 +11316,21 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         if (!media && summary?.svgDataUri && !isPlaceholderSvgDataUri(summary.svgDataUri)) {
           media = { kind: 'image', url: summary.svgDataUri };
         }
-        if (!media && summary?.tokenUri) {
+        // Token-URI image ONLY when the token has no on-chain bytes at all.
+        //
+        // The reasoning three paragraphs up — that a confident wrong picture is
+        // worse than an absence — applies here and did not used to. If an
+        // inscription HAS content on chain and we merely declined to read it,
+        // a remote image is not "the closest we have", it is a different
+        // artwork. #295 is a 3.64 MB PNG whose token URI is a SHARED Arweave
+        // metadata document, so this branch drew the same generic disc for
+        // every oversized listing pointing at it, captioned with the real
+        // inscription number.
+        //
+        // With no on-chain bytes the token URI is the only thing that exists,
+        // so it is the honest answer rather than a substitute for one.
+        const hasOnChainContent = (meta?.totalSize ?? 0n) > 0n;
+        if (!media && summary?.tokenUri && !hasOnChainContent) {
           const uriImage = await fetchTokenImageFromUri(summary.tokenUri);
           if (uriImage) {
             void cacheMarketRemoteImage(listing, uriImage);
@@ -11555,7 +11571,31 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     };
 
     const hydrateMarketThumbnails = async (run, listings, root = marketDom.listings) => {
-      await runLimited(listings, MARKET_THUMB_HYDRATION_CONCURRENCY, async (listing) => {
+      // Smallest first, matching the Xplorer grid's
+      // compareBackgroundThumbnailHydrationJobs. With the cap at 10 MiB, listing
+      // order would otherwise let one multi-megabyte inscription occupy a worker
+      // while a dozen small ones that could have painted immediately wait behind
+      // it. Summaries are memoised by marketSummaryFor, so this pass is cheap and
+      // the sizes are needed by marketMediaFor moments later anyway.
+      const sized = await runLimited(
+        listings,
+        MARKET_THUMB_HYDRATION_CONCURRENCY,
+        async (listing) => {
+          let size = 0n;
+          try {
+            size = (await marketSummaryFor(listing))?.meta?.totalSize ?? 0n;
+          } catch {
+            size = 0n; // unknown size sorts first; it is cheap to find out
+          }
+          return { listing, size };
+        }
+      );
+      if (run !== marketState.run) return;
+      const ordered = sized
+        .sort((left, right) => (left.size < right.size ? -1 : left.size > right.size ? 1 : 0))
+        .map((entry) => entry.listing);
+
+      await runLimited(ordered, MARKET_THUMB_HYDRATION_CONCURRENCY, async (listing) => {
         if (run !== marketState.run) return;
         const media = await marketMediaFor(listing);
         if (run !== marketState.run) return;
@@ -11607,7 +11647,14 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             }),
             Object.assign(document.createElement('span'), {
               className: 'market-thumb__label',
-              textContent: summary?.meta?.mimeType ?? 'no preview'
+              // Say WHY there is no preview when the reason is size. "no
+              // preview" on a 3.64 MB artwork reads as "this is broken"; the
+              // size plus a route to see it reads as a deliberate limit, which
+              // is what it is.
+              textContent:
+                (summary?.meta?.totalSize ?? 0n) > MARKET_MEDIA_MAX_BYTES
+                  ? `${formatBytes(summary.meta.totalSize)} · open to view`
+                  : summary?.meta?.mimeType ?? 'no preview'
             })
           );
         }
@@ -12133,12 +12180,15 @@ const openCuratedGallery = async (galleryId, options = {}) => {
 
           const badges = document.createElement('div');
           badges.className = 'market-card__badge-row';
-          // Sponsored checkout is NOT wired into this page: marketBuy always
-          // uses showContractCall, so the buyer pays their own network fee on
-          // every market. Until the sponsored buy flow is implemented here (see
-          // docs/plans/SPONSORED-MARKET-BUY-PLAN.md) this must not claim
-          // otherwise — the badge previously said "No STX needed", which sent
-          // zero-STX buyers into a transaction they could not pay for.
+          // Sponsored checkout IS wired into this page now (plan Stage 2), and
+          // a mainnet buy confirmed sponsored on 2026-08-06. This comment used
+          // to say the opposite and sat directly above the badge that decides
+          // what a buyer is told about fees.
+          //
+          // The rule it was protecting still stands, restated: never claim free
+          // checkout as a property of the MARKET. It is a property of this
+          // listing at this moment — escrow funded, relayer reachable — and
+          // marketSponsoredBuy re-checks it before anything is signed.
           badges.innerHTML = `<span class="badge">${symbol}</span>${
             isOwnListing ? '<span class="badge blue">Your listing</span>' : ''
           }${
