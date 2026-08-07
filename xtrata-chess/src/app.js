@@ -424,6 +424,16 @@ export class ChessBoardApp {
 
     el.copyPgn.addEventListener('click', () => this.copyPgn());
 
+    // The rules panel is at the foot of the page, where somebody who has just
+    // watched a game will find it. Somebody who arrived meaning to start one
+    // should not have to scroll looking, so the button is up here and does the
+    // opening and the scrolling itself.
+    el.startOwn.addEventListener('click', () => {
+      el.rulesPanel.open = true;
+      el.rulesPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      el.rulesWhite.focus({ preventScroll: true });
+    });
+
     el.playPause.addEventListener('click', () => this.togglePlay());
     el.toStart.addEventListener('click', () => {
       this.pause();
