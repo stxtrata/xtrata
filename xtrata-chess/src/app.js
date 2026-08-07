@@ -1,20 +1,32 @@
 // The board application.
 //
-// Two modes behind one interface. Simulation runs against MockChain in memory,
-// with bots and a griefer available so a whole open board can be exercised
-// without a wallet. Live runs against the deployed contract, reading over HTTP
-// and writing through an injected wallet.
+// The board. It reads the deployed contract over HTTP and writes through an
+// injected wallet.
 //
-// Both modes do the same thing on every update: read the entire log, replay it
-// from the first entry, and draw whatever comes out. There is no incremental
-// state to drift.
+// On every update it does the same thing: read the entire log, replay it from
+// the first entry, and draw whatever comes out. There is no incremental state
+// to drift.
+//
+// Simulation used to live here too, running against MockChain in memory so a
+// whole open board could be exercised without a wallet. It was worth having
+// while the rules were being worked out and it is dead weight in an inscription
+// nobody can edit: a second set of code paths, shipped forever, that no player
+// on a live board can reach. The modules it used are still in the repo, where
+// the tests drive them directly.
 
-import { MockChain } from './mock-chain.js';
 import { SealedChain } from './sealed-chain.js';
 import { LiveChain, describeContractError } from './live-chain.js';
 import { replay, toPgn, REJECTED } from './replay.js';
-import { Chess, parseUci, pieceColor } from './engine.js';
-import { BoardView, statusText, shortSender, displaySender } from './board-ui.js';
+import { Chess, parseUci, pieceColor, pieceType } from './engine.js';
+import {
+  BoardView,
+  statusText,
+  shortSender,
+  displaySender,
+  describeMove,
+  pieceGlyph,
+  pieceName
+} from './board-ui.js';
 import { NameResolver, StaticNames } from './bns.js';
 import {
   BlockTimes,
@@ -24,8 +36,6 @@ import {
   gapAt,
   stampLog
 } from './block-time.js';
-import { BOTS, mulberry32 } from './bots.js';
-import { SimIdentities } from './sim-identities.js';
 import {
   isWellFormedLength,
   DEFAULT_CONTRACT,
@@ -35,6 +45,7 @@ import {
 } from './protocol.js';
 import {
   ANYONE,
+  ANYONE_ELSE,
   DEFAULT_RULES,
   describeRules,
   isOpenBoard,
@@ -54,6 +65,16 @@ import {
 } from './wallet.js';
 import { preferredApiBase } from './api-base.js';
 
+// microSTX as people write it: 1000000 is "1 STX", not "1.000000 STX", and
+// 1000 is "0.001 STX". Trailing zeros are noise on a figure someone is reading
+// to decide whether to sign.
+function stx(microStx) {
+  const amount = Number(microStx) || 0;
+  if (!amount) return '0 STX';
+  const text = (amount / 1e6).toFixed(6).replace(/\.?0+$/, '');
+  return `${text} STX`;
+}
+
 const REASON_LABEL = {
   malformed: 'not a move',
   'empty-square': 'no piece there',
@@ -70,13 +91,12 @@ const REASON_LABEL = {
 export class ChessBoardApp {
   constructor(options = {}) {
     this.elements = options.elements;
-    this.mode = 'sim';
-    this.chain = new MockChain();
+    // One mode. The board reads a contract and replays what is there; there is
+    // nothing else for it to be.
+    this.mode = 'live';
+    this.chain = null;
     this.game = null;
     this.state = replay([]);
-    this.random = mulberry32(options.seed ?? 1);
-    this.simSeed = options.seed ?? 1;
-    this.identities = null;
     this.gameRules = null;
     this.committedHash = null;
     this.childGame = null;
@@ -86,7 +106,6 @@ export class ChessBoardApp {
     this.pendingTimer = null;
     // Moves broadcast by anyone and not yet in a block.
     this.mempool = [];
-    this.autoplayTimer = null;
     this.pollTimer = null;
     this.busy = false;
     this.notice = null;
@@ -166,7 +185,7 @@ export class ChessBoardApp {
         'warn'
       );
     }
-    this.setMode('live');
+    this.startLive();
   }
 
   async _firstDeployed(candidates, network) {
@@ -195,9 +214,6 @@ export class ChessBoardApp {
     this.gameRules = normaliseRules(child.rules);
 
     const el = this.elements;
-    el.modeSim.hidden = true;
-    el.modeLive.hidden = true;
-    el.simPanel.hidden = true;
     el.livePanel.hidden = true;
     el.rulesPanel.hidden = true;
     el.newGame.hidden = true;
@@ -226,18 +242,16 @@ export class ChessBoardApp {
    * which is the open-board behaviour and the safe direction to fail in.
    */
   async _adoptKnownRules() {
-    const known = knownGame(this.chain?.contractId, this.game);
-
-    if (!known) {
-      // Not a game this board claims to referee. Any commitment it carries
-      // belongs to a generated board somewhere, not to this one.
-      this.gameRules = null;
-      return;
-    }
-
+    // Read the commitment first and for every game, not only for ones this
+    // board knows. A viewer is entitled to see that a game has rules even when
+    // this board cannot say what they are — that is the difference between an
+    // unrefereed game and a refereed one, and hiding it would have them take
+    // this board's word for which moves counted.
+    this.committedHash = null;
     let entry = null;
     try {
       entry = this.chain.getGame ? await this.chain.getGame(this.game) : null;
+      this.committedHash = entry?.rulesHash ?? null;
     } catch {
       // A read that failed is not a game without rules. Referee nothing rather
       // than guess, and let the ordinary read path report the problem.
@@ -245,7 +259,16 @@ export class ChessBoardApp {
       return;
     }
 
-    this.committedHash = entry?.rulesHash ?? null;
+    const known = knownGame(this.chain?.contractId, this.game);
+    if (!known) {
+      // Not a game this board carries rules for. It may still be able to
+      // referee it: see below.
+      this.gameRules = null;
+      this.rulesSource = null;
+      this._adoptMatchingDraft();
+      return;
+    }
+
     const rules = normaliseRules(known.rules);
 
     if (!this.committedHash) {
@@ -269,6 +292,34 @@ export class ChessBoardApp {
     }
 
     this.gameRules = rules;
+    this.rulesSource = 'built-in';
+  }
+
+  /**
+   * Referee a game using the rules currently set in the panel, if they match.
+   *
+   * The chain stores a hash and never the rules, so a hash cannot be turned
+   * back into them — but it can confirm them. If what somebody has typed into
+   * "Start your own game" hashes to what this game committed, that is not a
+   * guess: no other rule set could produce the same hash.
+   *
+   * It matters because without this the board says "rules unknown" for a game
+   * whose rules are sitting on the same screen, and referees nothing.
+   */
+  _adoptMatchingDraft() {
+    if (!this.committedHash || this.isChild) return;
+
+    let draft;
+    try {
+      draft = this.draftRules();
+    } catch {
+      return;
+    }
+
+    if (isOpenBoard(draft) || !rulesMatchCommitment(draft, this.committedHash)) return;
+
+    this.gameRules = draft;
+    this.rulesSource = 'panel';
   }
 
   /**
@@ -359,9 +410,6 @@ export class ChessBoardApp {
     this.times = new StaticBlockTimes(sealed.blockTimes);
 
     const el = this.elements;
-    el.modeSim.hidden = true;
-    el.modeLive.hidden = true;
-    el.simPanel.hidden = true;
     el.livePanel.hidden = true;
     el.newGame.hidden = true;
     el.playControls.hidden = true;
@@ -377,15 +425,10 @@ export class ChessBoardApp {
   _wire() {
     const el = this.elements;
 
-    el.modeSim.addEventListener('click', () => this.setMode('sim'));
-    el.modeLive.addEventListener('click', () => this.setMode('live'));
 
     el.newGame.addEventListener('click', () => this.newGame());
     el.flip.addEventListener('click', () => this.board.setFlipped(!this.board.flipped));
 
-    el.botMove.addEventListener('click', () => this.playBotMove());
-    el.junk.addEventListener('click', () => this.playGrief());
-    el.autoplay.addEventListener('change', () => this.setAutoplay(el.autoplay.checked));
 
     el.manualForm.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -411,6 +454,36 @@ export class ChessBoardApp {
 
     el.copyPgn.addEventListener('click', () => this.copyPgn());
 
+    // The rules panel is at the foot of the page, where somebody who has just
+    // watched a game will find it. Somebody who arrived meaning to start one
+    // should not have to scroll looking, so the button is up here and does the
+    // opening and the scrolling itself.
+    // The info icons, opened by a tap as well as a hover. A title attribute is
+    // invisible on a phone, which is where somebody is most likely to need the
+    // explanation and least able to guess it. Delegated, so the markup can grow
+    // another setting without another listener.
+    el.rulesPanel.addEventListener('click', (event) => {
+      const button = event.target.closest?.('.help');
+      if (!button) return;
+      event.preventDefault();
+      // Paired by name rather than by position: the explainer sits at the end
+      // of its row so it can use the full width, which puts it out of reach of
+      // nextElementSibling, and one row carries two of them.
+      const text = el.rulesPanel.querySelector(
+        `.help-text[data-info="${button.dataset.info}"]`
+      );
+      if (!text) return;
+      const open = !text.hidden;
+      text.hidden = open;
+      button.setAttribute('aria-expanded', String(!open));
+    });
+
+    el.startOwn.addEventListener('click', () => {
+      el.rulesPanel.open = true;
+      el.rulesPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      el.rulesWhite.focus({ preventScroll: true });
+    });
+
     el.playPause.addEventListener('click', () => this.togglePlay());
     el.toStart.addEventListener('click', () => {
       this.pause();
@@ -429,8 +502,8 @@ export class ChessBoardApp {
     el.pace.addEventListener('change', () => this.setPace(el.pace.value));
 
     for (const control of [el.rulesWhite, el.rulesBlack, el.rulesCooldown, el.rulesNoConsecutive]) {
-      control.addEventListener('input', () => this.renderRules());
-      control.addEventListener('change', () => this.renderRules());
+      control.addEventListener('input', () => this._rulesChanged());
+      control.addEventListener('change', () => this._rulesChanged());
     }
     el.rulesOpen.addEventListener('click', () => this.openRuledGame());
     el.rulesDownload.addEventListener('click', () => this.downloadChild());
@@ -457,50 +530,6 @@ export class ChessBoardApp {
   // ------------------------------------------------------------------
   // Modes
   // ------------------------------------------------------------------
-
-  setMode(mode) {
-    if (this.mode === mode) return;
-    this.mode = mode;
-    this.setAutoplay(false);
-    this._stopPolling();
-
-    this.elements.modeSim.classList.toggle('active', mode === 'sim');
-    this.elements.modeLive.classList.toggle('active', mode === 'live');
-    this.elements.simPanel.hidden = mode !== 'sim';
-    this.elements.livePanel.hidden = mode !== 'live';
-
-    if (mode === 'sim') {
-      this.startSimulation();
-      return;
-    }
-    // Coming back to live: fall back to the built-in board if the fields are
-    // empty, so the toggle never lands on a blank form.
-    if (!this.elements.contractAddress.value.trim()) {
-      const [address, name] = DEFAULT_CONTRACT.split('.');
-      this.elements.contractAddress.value = address;
-      this.elements.contractName.value = name;
-      this.elements.network.value = DEFAULT_NETWORK;
-    }
-    this.startLive();
-  }
-
-  startSimulation() {
-    this.chain = new MockChain();
-    // Real-shaped principals with real-shaped names, so simulation previews
-    // exactly what a live board looks like rather than a tidied version of it.
-    this.identities = new SimIdentities(this.simSeed++);
-    this.names = this.identities;
-    // The mock chain keeps its own clock, so simulated games have real gaps to
-    // be replayed against.
-    this.times = this.chain.blockTimes;
-    this.gameRules = null;
-    this.childGame = null;
-    this.game = this.chain.openGame(this.identities.you).value;
-    this.viewIndex = null;
-    this.pause();
-    this.notice = null;
-    this.refresh();
-  }
 
   async startLive() {
     const el = this.elements;
@@ -541,7 +570,7 @@ export class ChessBoardApp {
         // will not match. Offer them first, and only say "no games" if there is
         // nothing this board knows to suggest.
         this._offerKnownRules();
-        if (!this._offeredRules) this._notify('No games opened on this contract yet.', 'warn');
+        if (!this._offeredRules) this._notify('No games have been started yet.', 'warn');
         this.render();
         return;
       }
@@ -617,7 +646,7 @@ export class ChessBoardApp {
       if (this.chain.getContractFee) this.contractFee = await this.chain.getContractFee();
       if (this.chain.getOpenFee) this.openFee = await this.chain.getOpenFee();
     } catch (error) {
-      this._notify(`Read failed: ${error.message}`, 'error');
+      this._notify(`Could not read the game: ${error.message}`, 'error');
     } finally {
       this.busy = false;
     }
@@ -779,7 +808,7 @@ export class ChessBoardApp {
         );
         this._clearPending();
       } else if (tooOld) {
-        this._notify('That move has not appeared after ten minutes. Check the transaction in the explorer.', 'warn');
+        this._notify('That move still has not appeared after ten minutes. It may have failed — check it in a block explorer.', 'warn');
         this._clearPending();
       }
       this.render();
@@ -868,17 +897,8 @@ export class ChessBoardApp {
       return;
     }
 
-    if (this.mode === 'sim') {
-      const result = this.chain.submitMove(this.game, uci, this.identities.you);
-      this.chain.advance();
-      if (!result.ok) this._notify(describeContractError(result.error), 'warn');
-      else this._noteOutcome(uci);
-      await this.refresh();
-      return;
-    }
-
     try {
-      this._notify('Confirm the move in your wallet…', 'info');
+      this._notify('Check your wallet, and approve the move there.', 'info');
       this.render();
       const result = await this.chain.submitMove(this.game, uci);
 
@@ -896,17 +916,17 @@ export class ChessBoardApp {
       this._watchPending();
     } catch (error) {
       if (error.code === 'NO_WALLET') {
-        this._notify('No Stacks wallet found. Install Leather or Xverse to play live.', 'error');
+        this._notify('No wallet found. Install Leather or Xverse, both free, to make a move.', 'error');
       } else if (needsWalletBridge(error)) {
         // The shim's own wording is "requires host wallet bridge support",
         // which tells a player nothing they can act on. Say what to do instead.
         this._notify(
-          'This page cannot sign moves: it is open without a wallet bridge. ' +
+          'This page cannot reach your wallet, because it was opened by a direct link. ' +
             'Open the board from the Xtrata site and try again.',
           'error'
         );
       } else {
-        this._notify(`Wallet call failed: ${error.message}`, 'error');
+        this._notify(`Your wallet could not send that: ${error.message}`, 'error');
       }
     }
     this.render();
@@ -916,29 +936,17 @@ export class ChessBoardApp {
   _noteOutcome(uci) {
     const legal = this.state.legalMoves.includes(uci.trim().toLowerCase());
     if (this.state.isGameOver) {
-      this._notify('The game is already over, so this will be skipped.', 'warn');
+      this._notify('This game is already over, so this move will be ignored.', 'warn');
     } else if (!legal) {
-      this._notify(`"${uci}" is not legal here, so replay will skip it.`, 'warn');
+      this._notify(`"${uci}" is not a legal move here, so it will be ignored.`, 'warn');
     } else {
       this.notice = null;
     }
   }
 
   async newGame() {
-    if (this.mode === 'sim') {
-      this.pause();
-      this.viewIndex = null;
-      this.identities = new SimIdentities(this.simSeed++);
-      this.names = this.identities;
-      this.times = this.chain.blockTimes;
-      this.game = this.chain.openGame(this.identities.you).value;
-      this.notice = null;
-      await this.refresh();
-      return;
-    }
-
     try {
-      this._notify('Confirm the new game in your wallet…', 'info');
+      this._notify('Check your wallet, and approve the new game there.', 'info');
       this.render();
       const result = await this.chain.openGame();
       this._notify(
@@ -960,8 +968,110 @@ export class ChessBoardApp {
     // its own session rather than by asking.
     await disconnectWallet({ onLog: () => {} }).catch(() => {});
     this._renderWallet();
-    this._notify('Disconnected. Connect again to sign as a different wallet.', 'info');
+    this._notify('Wallet disconnected. Connect again to play as someone else.', 'info');
     this.render();
+  }
+
+  /**
+   * The selected game's rules, resolved from what the chain actually says.
+   *
+   * The contract stores a hash and nothing else, so there are exactly three
+   * answers and they should not be blurred together:
+   *
+   *   * No commitment. The game is the open board: anyone, either side. That is
+   *     a real answer, not a missing one.
+   *   * A commitment this board can reproduce. The rules are named, and this
+   *     board enforces them when it replays.
+   *   * A commitment it cannot reproduce. Somebody opened the game with rules
+   *     that live in a board somewhere else. The hash is shown, because that is
+   *     the whole of what is knowable from here, and replay enforces nothing.
+   *
+   * The third case is the one worth showing rather than hiding: a viewer who
+   * cannot see it would have no way to tell an unrefereed game from a refereed
+   * one, and would take this board's word for which moves counted.
+   */
+  _renderGameRules() {
+    const el = this.elements;
+    if (!el.gameRules) return;
+
+    if (this.mode !== 'live' || !this.game) {
+      el.gameRules.hidden = true;
+      return;
+    }
+    el.gameRules.hidden = false;
+
+    const committed = this.committedHash
+      ? String(this.committedHash).replace(/^0x/, '').toLowerCase()
+      : null;
+
+    el.gameRulesTitle.textContent = `Rules for game #${this.game}`;
+    el.gameRulesHash.textContent = committed || 'none — nothing was committed';
+
+    if (!committed) {
+      el.gameRulesState.textContent = 'no rules';
+      el.gameRulesState.className = 'tag open';
+      el.gameRulesSummary.textContent = 'Anyone can play either colour.';
+      el.gameRulesNote.textContent =
+        'This game was started without any rules, so there is nothing extra to enforce. Every legal ' +
+        'chess move counts, in the order the blockchain recorded it.';
+      return;
+    }
+
+    if (this.gameRules) {
+      const known = knownGame(this.chain?.contractId, this.game);
+      el.gameRulesState.textContent = 'rules apply';
+      el.gameRulesState.className = 'tag enforced';
+      el.gameRulesSummary.textContent = describeRules(this.gameRules, (who) =>
+        this.names?.get(who) || null
+      );
+
+      // Names arrive after a lookup, so ask for the ones this game names and
+      // redraw when they land. Without this the rules read as raw addresses
+      // until something else happens to trigger a render.
+      this._nameRuleSides();
+      const source = this.rulesSource === 'panel'
+        ? 'These are the rules set in “Start your own game” below, and they match the hash this ' +
+          'game committed to, so they are its rules and nothing else could be. '
+        : '';
+      el.gameRulesNote.textContent =
+        source +
+        `${known?.label ? `${known.label}. ` : ''}` +
+        'A hash is a short fingerprint of something longer, and it could not have come from any other ' +
+        'set of rules. These rules match the one saved on the blockchain, which is how this page knows ' +
+        'it is the right referee for this game. The blockchain itself does not check the rules: a move ' +
+        'that breaks them is still saved and still costs its sender, and this page ignores it.';
+      return;
+    }
+
+    el.gameRulesState.textContent = 'rules unknown';
+    el.gameRulesState.className = 'tag unknown';
+    el.gameRulesSummary.textContent = 'This game has rules, but they are not ones this page knows.';
+    el.gameRulesNote.textContent =
+      'The blockchain saves only the hash above, never the rules themselves, so they cannot be read ' +
+      'from here. Whoever started this game made their own page that has them, and this page shows ' +
+      'every move without judging any of them. If you know what the rules were, set them in ' +
+      '“Start your own game” below: when they hash to the same value, this page will use them, ' +
+      'because no other rules could produce that hash.';
+  }
+
+  // Resolve the addresses a rule set names, then redraw once.
+  _nameRuleSides() {
+    if (!this.names || !this.gameRules || this._namingSides) return;
+    const wanted = [this.gameRules.white, this.gameRules.black].filter(
+      (who) => who && who.startsWith('SP') && !this.names.known(who)
+    );
+    if (!wanted.length) return;
+
+    this._namingSides = true;
+    this.names
+      .resolve(wanted)
+      .then((learned) => {
+        if (learned) this.render();
+      })
+      .catch(() => {})
+      .finally(() => {
+        this._namingSides = false;
+      });
   }
 
   /**
@@ -987,22 +1097,21 @@ export class ChessBoardApp {
 
     if (reason === 'no-bridge') {
       el.walletHint.innerHTML =
-        '<strong>This page cannot sign moves.</strong> It is open without a wallet ' +
-        'bridge, and the Xtrata runtime only passes a transaction to your wallet ' +
-        'when the page it framed carries one. Open this board from the Xtrata site ' +
-        'and moves will sign normally. Reading and replaying work either way.';
+        '<strong>You cannot make moves from this page.</strong> It was opened by a direct ' +
+        'link, and that route cannot reach your wallet. Open the board from the Xtrata ' +
+        'site instead and moves will work normally. Watching the game works either way.';
       return;
     }
 
     if (reason === 'no-wallet') {
       el.walletHint.innerHTML =
-        'No Stacks wallet found, so moves cannot be signed from here. Install ' +
-        'Leather or Xverse. Reading and replaying need no wallet.';
+        'No wallet found, so you cannot make a move yet. Install Leather or Xverse, ' +
+        'both free. Watching the game needs no wallet.';
       return;
     }
 
     el.walletHint.textContent =
-      'Reading is free and needs no wallet. Only submitting a move does.';
+      'Watching the game is free and needs no wallet. You only need one to make a move.';
   }
 
   // Keeps the button and the hint agreeing with whether a wallet is attached.
@@ -1067,64 +1176,84 @@ export class ChessBoardApp {
     }
   }
 
-  async playBotMove() {
-    if (this.mode !== 'sim' || this.state.isGameOver) return;
-    await this._act(async () => {
-      const uci = BOTS.greedy(this.state.chess, this.random);
-      if (!uci) return;
-      this.chain.submitMove(this.game, uci, this.identities.forSide(this.state.turn));
-      this.chain.advance();
-      await this.refresh();
-    });
-  }
-
-  async playGrief() {
-    if (this.mode !== 'sim') return;
-    await this._act(async () => {
-      const uci = BOTS.griefer(this.state.chess, this.random);
-      const result = this.chain.submitMove(this.game, uci, this.identities.griefer(this.random()));
-      this.chain.advance();
-      if (!result.ok) {
-        this._notify(
-          `"${uci}" — ${describeContractError(result.error)}. Turned away by the contract, so it never reached the log.`,
-          'warn'
-        );
-      }
-      await this.refresh();
-    });
-  }
-
-  setAutoplay(on) {
-    this.elements.autoplay.checked = on;
-    if (this.autoplayTimer) clearInterval(this.autoplayTimer);
-    this.autoplayTimer = null;
-    if (!on || this.mode !== 'sim') return;
-
-    this.autoplayTimer = setInterval(async () => {
-      if (this.state.isGameOver) {
-        this.setAutoplay(false);
-        return;
-      }
-      // Roughly one junk submission in four, which is about what the wide open
-      // board should expect.
-      if (this.random() < 0.25) await this.playGrief();
-      else await this.playBotMove();
-    }, 700);
-  }
-
+  /**
+   * The game as PGN, with headers that agree with the board.
+   *
+   * White and Black are not decoration here. A PGN saying "anyone" for a game
+   * whose rules name a player contradicts the panel directly above it, and it
+   * is the copy that leaves the page and gets opened somewhere else, where
+   * there is no panel to contradict.
+   */
   async copyPgn() {
     const pgn = toPgn(this.state, {
-      Event: this.mode === 'sim' ? 'Xtrata Open Board (simulation)' : 'Xtrata Open Board',
-      Site: this.mode === 'sim' ? 'simulation' : this.chain.contractId || 'chain',
-      Round: String(this.game ?? '-')
+      Event: 'X Chess',
+      Site: this.chain?.contractId || 'chain',
+      Round: String(this.game ?? '-'),
+      ...this._pgnPlayers(),
+      ...this._pgnWhen()
     });
     try {
       await navigator.clipboard.writeText(pgn);
       this._notify('PGN copied.', 'info');
     } catch {
-      this._notify('Could not reach the clipboard.', 'warn');
+      this._notify('Could not copy to the clipboard.', 'warn');
     }
     this.render();
+  }
+
+  /**
+   * When the first move landed, as PGN writes time.
+   *
+   * Three tags, because PGN separates them and the distinction is real. Date is
+   * one of the seven required tags and every reader shows it. UTCDate and
+   * UTCTime are the supplemental pair, and they are what this actually is: a
+   * block timestamp, which has no timezone of its own. Writing the time into a
+   * bare Time tag would claim a local clock nobody here has.
+   *
+   * Unknown stays as PGN writes unknown. A game with no block time yet would
+   * otherwise be dated to whenever somebody pressed Copy.
+   */
+  _pgnWhen() {
+    const first = this.stamps?.find?.((at) => Number.isFinite(at));
+    if (!Number.isFinite(first)) {
+      return { Date: '????.??.??', UTCDate: '????.??.??', UTCTime: '??:??:??' };
+    }
+
+    const when = new Date(first * 1000);
+    const pad = (n) => String(n).padStart(2, '0');
+    const date = `${when.getUTCFullYear()}.${pad(when.getUTCMonth() + 1)}.${pad(when.getUTCDate())}`;
+    const time =
+      `${pad(when.getUTCHours())}:${pad(when.getUTCMinutes())}:${pad(when.getUTCSeconds())}`;
+
+    return { Date: date, UTCDate: date, UTCTime: time };
+  }
+
+  /**
+   * Who the rules say may move each side.
+   *
+   * Only from rules this board is actually refereeing. A game whose commitment
+   * this board cannot reproduce gets "anyone", because that is the truth of
+   * what this board enforced when it produced the move list being copied.
+   */
+  _pgnPlayers() {
+    const rules = this.gameRules;
+    if (!rules) return { White: 'anyone', Black: 'anyone' };
+
+    const named = (who, other) => {
+      if (who === ANYONE) return 'anyone';
+      if (who === ANYONE_ELSE) {
+        const excluded = other === ANYONE || other === ANYONE_ELSE ? null : other;
+        return excluded
+          ? `anyone except ${this.names?.get?.(excluded) || excluded}`
+          : 'anyone';
+      }
+      return this.names?.get?.(who) || who;
+    };
+
+    return {
+      White: named(rules.white, rules.black),
+      Black: named(rules.black, rules.white)
+    };
   }
 
   _notify(message, level = 'info') {
@@ -1154,7 +1283,7 @@ export class ChessBoardApp {
     const state = this.state;
 
     if (!raw) {
-      el.moveHint.textContent = 'Click a piece and then its destination, or type a move.';
+      el.moveHint.textContent = 'Pick a piece, then pick where you want it to go.';
       el.moveHint.className = 'hint';
       el.submitMove.disabled = true;
       this.board.setStaged(null);
@@ -1162,7 +1291,7 @@ export class ChessBoardApp {
     }
 
     if (!isWellFormedLength(raw)) {
-      el.moveHint.textContent = `${raw.length} characters. The contract only stores four or five, so this would be refused before it reached the log.`;
+      el.moveHint.textContent = `That is ${raw.length} characters. A move is four, like e2e4, or five when a pawn becomes a new piece, like e7e8q.`;
       el.moveHint.className = 'hint bad';
       el.submitMove.disabled = true;
       this.board.setStaged(null);
@@ -1176,7 +1305,16 @@ export class ChessBoardApp {
       // Show the move in the notation people read, not just the one they type.
       const preview = new Chess(state.fen);
       const applied = preview.moveUci(uci);
+      const side = state.turn === 'white' ? 'white' : 'black';
+      // pieceType, not the raw board value: a piece carries its colour in the
+      // same number, so the encoded form matches no entry in the glyph table.
+      const type = applied ? pieceType(applied.piece) : 0;
+      const moving = type
+        ? `<span class="mini ${side}">${pieceGlyph(type)}</span> ` +
+          `<span class="what">${escapeHtml(pieceName(type))}</span> · `
+        : '';
       el.moveHint.innerHTML =
+        moving +
         `<strong>${escapeHtml(applied ? applied.san : uci)}</strong> · ` +
         `${escapeHtml(uci.slice(0, 2))} → ${escapeHtml(uci.slice(2, 4))}` +
         (uci.length === 5 ? `, promoting to ${escapeHtml(uci[4].toUpperCase())}` : '') +
@@ -1224,6 +1362,23 @@ export class ChessBoardApp {
     return normaliseRules(this.draftInput());
   }
 
+  /**
+   * The panel changed, so re-check whether it now proves the viewed game's
+   * rules. Without this somebody could type the right rules in and nothing
+   * would happen until the next poll.
+   */
+  _rulesChanged() {
+    const was = this.rulesSource;
+    if (!this.gameRules || this.rulesSource === 'panel') {
+      this.gameRules = null;
+      this.rulesSource = null;
+      this._adoptMatchingDraft();
+    }
+    this.renderRules();
+    if (this.rulesSource !== was) this.refresh();
+    else this.render();
+  }
+
   renderRules() {
     const el = this.elements;
     const rules = this.draftRules();
@@ -1233,9 +1388,11 @@ export class ChessBoardApp {
     el.rulesSummary.textContent = describeRules(rules);
     el.rulesHash.textContent = open ? 'none — these are the open board rules' : rulesHash(rules);
     el.rulesDownload.disabled = !this.childGame;
+    // Kept in step with the label in index.html, which this replaces the moment
+    // the panel renders.
     el.rulesDownload.textContent = this.childGame
-      ? `Download the board for game #${this.childGame}`
-      : 'Download the board';
+      ? `Download the page for game #${this.childGame}`
+      : 'Download the page for this game';
 
     // Nothing reaches a wallet until every choice has been made. A game's rules
     // are hashed on chain and cannot be edited afterwards, so an incomplete set
@@ -1247,16 +1404,23 @@ export class ChessBoardApp {
     // approve a wallet prompt an order of magnitude larger than they expect.
     const openCost = Number(this.openFee) || 0;
     const priced = openCost && this.mode === 'live'
-      ? `Open this game · ${(openCost / 1e6).toFixed(6)} STX`
+      ? `Open this game · ${stx(openCost)}`
       : 'Open this game';
     el.rulesOpen.textContent = check.ready ? priced : 'Set the rules first';
 
     if (el.rulesNote) {
       el.rulesNote.className = check.ready ? 'hint' : 'hint warn';
+      // Kept in step with the same paragraph in index.html, which this replaces
+      // the moment the panel renders. They said different things for a while,
+      // and the markup version was the one nobody ever saw.
       el.rulesNote.innerHTML = check.ready
-        ? 'The contract enforces none of this. It stores the hash above when the game is opened, and the ' +
-          'board you download is the referee: it replays the log and skips anything these rules disallow. ' +
-          'Open the game first, then download the board bound to it.'
+        ? 'The blockchain does not check any of these rules. When the game starts it saves only a ' +
+          '<strong>hash</strong> of them: a short fingerprint that could not have come from any other ' +
+          'set of rules. The page you download is the referee. It reads every move, ignores the ones ' +
+          'that break your rules, and checks its own rules against that hash, so it can prove it is ' +
+          'refereeing the game it claims to be. Inscribe that page and your game gets what this one ' +
+          'has: a permanent front end, permanently tied to a live contract. Start the game first, ' +
+          'then download its page.'
         : '<strong>Not ready to open.</strong><br>' +
           check.problems.map((problem) => escapeHtml(problem.message)).join('<br>');
     }
@@ -1279,22 +1443,8 @@ export class ChessBoardApp {
     const rules = this.draftRules();
     const hash = isOpenBoard(rules) ? null : rulesHash(rules);
 
-    if (this.mode === 'sim') {
-      const id = this.chain.openGame(this.identities.you, hash).value;
-      this.childGame = id;
-      this.game = id;
-      this.gameRules = rules;
-      this._notify(
-        `Opened game #${id} in simulation with those rules. On chain this would write the hash and nothing else.`,
-        'info'
-      );
-      await this.refresh();
-      this.renderRules();
-      return;
-    }
-
     try {
-      this._notify('Confirm the new game in your wallet…', 'info');
+      this._notify('Check your wallet, and approve the new game there.', 'info');
       this.render();
       const result = await this.chain.openGame(hash);
       this._notify(
@@ -1370,7 +1520,7 @@ export class ChessBoardApp {
 
     const html = childPage({
       contract: this.chain.contractId || 'simulation',
-      network: this.mode === 'live' ? this.chain.network : 'simulation',
+      network: this.chain?.network ?? DEFAULT_NETWORK,
       game,
       rules,
       engine
@@ -1408,8 +1558,12 @@ export class ChessBoardApp {
     const replayable = finished || this.mode === 'sealed';
 
     el.playControls.hidden = !playable;
-    el.newGame.hidden = this.mode === 'sealed' || this.isChild;
-    if (this.mode === 'sim') el.simPanel.hidden = !playable;
+    // Simulation only. On chain this opens a game with no rules for the full
+    // open fee, which is a trap next to a rules panel that does the same thing
+    // deliberately: one click, one STX, and an unrefereed game nobody asked
+    // for. Opening a live game goes through the rules panel, where the cost is
+    // on the button and the rules have to be settled first.
+    el.newGame.hidden = true;
     el.replayPanel.hidden = !replayable;
 
     const inFlight = this.livePending();
@@ -1459,9 +1613,9 @@ export class ChessBoardApp {
     // Counts always describe the whole game, not the scrubbed prefix, so the
     // header does not appear to rewind along with the board.
     el.counts.innerHTML =
-      `<span><strong>${this.state.log.length}</strong> submitted</span>` +
-      `<span><strong>${this.state.accepted.length}</strong> played</span>` +
-      `<span><strong>${this.state.rejected.length}</strong> skipped</span>`;
+      `<span><strong>${this.state.log.length}</strong> sent</span>` +
+      `<span><strong>${this.state.accepted.length}</strong> counted</span>` +
+      `<span><strong>${this.state.rejected.length}</strong> ignored</span>`;
 
     this._renderReplayControls(view);
     if (!el.rulesPanel.hidden) this.renderRules();
@@ -1487,18 +1641,19 @@ export class ChessBoardApp {
 
     el.gameLabel.textContent = this.game ? `game #${this.game}` : 'no game';
 
+    this._renderGameRules();
     this._renderSigningHint();
 
-    // Say what a move costs before anybody signs for one.
+    // What the contract takes, in the fewest words that are still true. Two
+    // numbers, because there are two of them and they differ by a hundredfold.
     if (el.chargeNote) {
-      const charge = Number(this.contractFee) || 0;
-      const name = el.contractName.value;
+      const move = Number(this.contractFee) || 0;
+      const open = Number(this.openFee) || 0;
       el.chargeNote.hidden = this.mode !== 'live';
-      el.chargeNote.innerHTML = charge
-        ? `<strong>${(charge / 1e6).toFixed(6)} STX</strong> per move, set by whoever owns ` +
-          `${escapeHtml(name)}, plus the usual network fee. Your wallet will be asked to permit ` +
-          `that amount and no more.`
-        : `${escapeHtml(name)} charges nothing to play. Only the usual network fee applies.`;
+      el.chargeNote.innerHTML = move || open
+        ? `per move <strong>${stx(move)}</strong> &nbsp;·&nbsp; new game <strong>${stx(open)}</strong>` +
+          '<br><span class="meta">your wallet also charges a small fee to send it</span>'
+        : 'free to play, apart from the small fee your wallet charges to send a move';
     }
   }
 
@@ -1582,10 +1737,14 @@ export class ChessBoardApp {
       const at = elapsed === null ? '' : formatClock(elapsed);
 
       return (
-        `<tr class="${reached ? '' : 'ahead'} ${current ? 'current' : ''}">` +
+        `<tr class="${reached ? '' : 'ahead'} ${current ? 'current' : ''}"` +
+        ` title="${escapeHtml(describeMove(entry))}">` +
         `<td class="num">${label}</td>` +
-        `<td class="dot"><span class="side ${entry.color}"></span></td>` +
+        // The piece itself rather than a coloured dot: it says which side moved
+        // and what moved, in the space the dot used.
+        `<td class="dot"><span class="mini ${entry.color}">${pieceGlyph(entry.piece)}</span></td>` +
         `<td class="san">${escapeHtml(entry.san)}</td>` +
+        `<td class="what">${escapeHtml(pieceName(entry.piece))}</td>` +
         `<td class="at">${at}</td>` +
         `<td class="who ${who.named ? 'named' : ''}" title="${escapeHtml(who.title)}">` +
         `${escapeHtml(who.label)}</td>` +

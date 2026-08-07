@@ -126,7 +126,9 @@ describe('opening a game with it', () => {
 
 describe('what it reads as', () => {
   it('says who is excluded rather than just "anyone"', () => {
-    expect(describeRules(GAME)).toBe(`White is ${JIM} · Black open to anyone except ${JIM}`);
+    expect(describeRules(GAME)).toBe(
+      `White can only be played by ${JIM} · Black can be played by anyone except ${JIM}`
+    );
   });
 });
 

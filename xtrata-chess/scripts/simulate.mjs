@@ -93,7 +93,7 @@ for (let i = 0; i < args.games; i++) {
   );
 
   if (args.pgn) {
-    console.log('\n' + toPgn(result.state, { Event: `Xtrata Open Board (sim seed ${seed})` }) + '\n');
+    console.log('\n' + toPgn(result.state, { Event: `Xtrata Chess (sim seed ${seed})` }) + '\n');
   }
 }
 

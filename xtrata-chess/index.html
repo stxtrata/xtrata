@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Xtrata Open Board</title>
+    <title>X Chess</title>
     <style>
       :root {
         --bg: #12100e;
@@ -35,9 +35,40 @@
 
       h1 {
         margin: 0;
-        font-size: 20px;
+        font-size: 26px;
         font-weight: 600;
         letter-spacing: -0.01em;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+
+      /* The logo carries its own near-black backing (#181818), a shade off this
+         page. Rounding it and giving it the panel's border makes that a badge
+         rather than a mismatched patch. */
+      .logo-x {
+        width: 1.75em;
+        height: 1.75em;
+        border-radius: 6px;
+        border: 1px solid var(--line);
+        object-fit: cover;
+        /* Before it loads, and if it never does, this is the box the alt sits
+           in; keeping it small stops the heading jumping when it arrives. */
+        font-size: 0.7em;
+        color: var(--accent);
+        text-align: center;
+        line-height: 1.6em;
+      }
+
+      /* What stands in when the inscription cannot be reached. */
+      .logo-x--text {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #181818;
+        color: var(--accent);
+        font-size: 1em;
+        font-weight: 700;
       }
 
       .sub {
@@ -45,6 +76,21 @@
         color: var(--dim);
         font-size: 13px;
       }
+      footer.about {
+        max-width: 1120px;
+        margin: 20px auto 0;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--panel);
+      }
+      footer.about p {
+        margin: 0;
+        max-width: 78ch;
+        color: var(--dim);
+        font-size: 13px;
+      }
+      footer.about strong { color: var(--accent); }
 
       header {
         display: flex;
@@ -91,8 +137,14 @@
         align-items: start;
       }
 
+      /* One column, and the panels read in the order somebody uses them:
+         board, the controls that act on it, the game, then the record and the
+         generator. Which column a panel sits in on a wide screen is a layout
+         decision and should not decide that order. */
       @media (max-width: 900px) {
         main { grid-template-columns: 1fr; }
+        main > section { display: contents; }
+        main > section > * { order: var(--order, 1); }
         body { padding: 16px; }
       }
 
@@ -285,8 +337,24 @@
       .movelist { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 13px; }
       .movelist td { padding: 3px 6px; }
       .movelist .num { color: var(--dim); width: 38px; text-align: right; }
-      .movelist .dot { width: 14px; }
-      .movelist .san { width: 74px; }
+      .movelist .dot { width: 18px; }
+      .movelist .san { width: 66px; }
+      .movelist .what { color: var(--dim); width: 58px; font-family: ui-sans-serif, system-ui; }
+
+      /* The piece that moved, at list size. Same glyphs as the board, so the
+         thing in the list is recognisably the thing you just picked up. */
+      .mini {
+        font-size: 15px;
+        line-height: 1;
+        display: inline-block;
+        vertical-align: -1px;
+      }
+      .mini.white { color: #fbf7f0; text-shadow: 0 0 1px #2b2118; }
+      .mini.black { color: #23180f; text-shadow: 0 0 1px #6a5b4a; }
+
+      /* And in the move you are about to send. */
+      .hint .mini { font-size: 17px; vertical-align: -2px; }
+      .hint .what { color: var(--ink); }
       .movelist .at {
         width: 58px;
         color: var(--dim);
@@ -381,6 +449,79 @@
       .hint.good { color: var(--ok); }
       .hint.good strong { color: var(--ok); font-family: var(--mono); }
       .hint.bad { color: var(--no); }
+
+      /* A settings explainer, on hover, focus or tap.
+         Not called .info: this page already uses that for an info-level notice,
+         and a <p class="notice info"> picking up an icon's inline-flex, 15px
+         width and absolutely positioned hit area turns a sentence into a
+         squashed column sitting on top of the panel below it. */
+      .help {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 15px;
+        height: 15px;
+        margin-left: 4px;
+        border-radius: 50%;
+        border: 1px solid var(--dim);
+        color: var(--dim);
+        font-size: 10px;
+        font-style: italic;
+        font-weight: 700;
+        font-family: var(--mono);
+        cursor: help;
+        vertical-align: 1px;
+        position: relative;
+        padding: 0;
+        flex: 0 0 auto;
+      }
+
+      /* A finger needs about 44px. The circle stays 15px and the target grows
+         around it, so the layout is unchanged and the thing is still hittable. */
+      .help::after {
+        content: '';
+        position: absolute;
+        inset: -14px;
+      }
+      .help:hover, .help:focus { color: var(--accent); border-color: var(--accent); outline: none; }
+      .help[aria-expanded='true'] { color: var(--accent); border-color: var(--accent); }
+
+      /* Tapped open rather than hovered. A title attribute is invisible on a
+         phone, which is where somebody is most likely to need the explanation
+         and least able to guess it. */
+      .help-text {
+        display: block;
+        flex: 1 0 100%;
+        margin: 6px 0 2px;
+        padding: 8px 10px;
+        border-left: 2px solid var(--accent);
+        background: rgba(216, 162, 74, 0.07);
+        border-radius: 0 7px 7px 0;
+        color: var(--dim);
+        font-size: 12.5px;
+        font-weight: 400;
+        line-height: 1.45;
+      }
+
+      /* The selected game's rules, as the chain has them. */
+      .rulesbox {
+        margin: 10px 0 0;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 10px 12px;
+        background: #191612;
+      }
+      .rulesbox-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+      .rulesbox p { margin: 4px 0 0; font-size: 13px; }
+      .rulesbox .meta { color: var(--dim); font-size: 11px; font-family: var(--mono); }
+      .rulesbox code { font-family: var(--mono); font-size: 10px; word-break: break-all; color: var(--dim); }
+      .tag {
+        font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+        padding: 2px 7px; border-radius: 20px; border: 1px solid var(--line); color: var(--dim);
+      }
+      .tag.enforced { color: var(--ok); border-color: #3c5a30; }
+      .tag.open { color: var(--dim); }
+      .tag.unknown { color: var(--accent); border-color: #6b5320; }
       /* Something will not work from this page, but the board still reads and
          replays, so this reads as caution rather than failure. */
       .hint.warn {
@@ -395,14 +536,19 @@
   <body>
     <header>
       <div>
-        <h1>Xtrata Open Board</h1>
+        <h1>
+          <!-- The X is inscription #2986, the Xtrata logo, referenced rather
+               than copied. This page carries none of those 92KB: it points at
+               bytes already on chain, and the two are now permanently joined.
+               alt="X" is not decoration — if the reference ever fails to load,
+               the heading still reads "X Chess". -->
+          <img class="logo-x" src="/i/2986" alt="X" width="850" height="850"
+               title="The Xtrata X, inscription #2986. This page does not contain it; it points at it." />
+          Chess
+        </h1>
         <p class="sub">
-          Anyone moves. The contract stores strings; the rules live here, and replay decides what counts.
+          One shared chess game that anyone can join. Every move is saved on the Stacks blockchain, so nobody can change it or take it back — including whoever made this page.
         </p>
-      </div>
-      <div class="modes">
-        <button id="mode-sim" class="active">Simulation</button>
-        <button id="mode-live">Live</button>
       </div>
     </header>
 
@@ -416,15 +562,28 @@
           <div id="pending-panel" class="pending-panel" hidden></div>
           <p id="notice" class="notice" hidden></p>
         </div>
+        <div class="panel" style="--order: 6">
+          <h2>Moves that counted</h2>
+          <div class="scroll" id="moves"></div>
+        </div>
+
+        <details class="panel fold-panel" style="--order: 7">
+          <summary><h2>Everything anyone sent</h2></summary>
+          <div class="scroll" id="log"></div>
+          <p class="hint">
+            Some moves get skipped, usually because they were not a legal chess move, or it was not that colour’s turn. They stay on this list forever, because nothing on the blockchain can be deleted. Whoever sent them still paid, and the board did not change.
+          </p>
+        </details>
       </section>
 
       <section>
-        <div class="panel">
+        <div class="panel" style="--order: 3">
           <h2>Board · <span id="game-label">no game</span></h2>
           <div class="row">
             <button id="new-game">New game</button>
-            <button id="flip">Flip</button>
-            <button id="copy-pgn">Copy PGN</button>
+            <button id="flip" title="Turn the board round, so you look at it from the other side.">Flip</button>
+            <button id="copy-pgn" title="Copy this game in PGN format — the standard way chess games are written down. You can paste it into any chess app or website to look at the game there.">Copy PGN</button>
+            <button id="start-own" title="Set up your own game with your own rules: who plays which colour, and how often anyone may move.">Start your own game</button>
           </div>
 
           <div id="play-controls">
@@ -433,25 +592,24 @@
                 <input
                   id="manual-input"
                   type="text"
-                  placeholder="click a piece, or type e2e4"
+                  placeholder="pick a piece, or type e2e4"
                   maxlength="12"
                   autocomplete="off"
                   spellcheck="false"
                   style="flex: 1 1 120px"
                 />
-                <button type="submit" id="submit-move" class="go" disabled>Submit move</button>
-                <button type="button" id="clear-move">Clear</button>
+                <button type="submit" id="submit-move" title="Send your move to the blockchain. Your wallet will ask you to approve it first." class="go" disabled>Submit move</button>
+                <button type="button" id="clear-move" title="Forget the move you picked. Nothing has been sent.">Clear</button>
               </form>
             </div>
-            <p class="hint" id="move-hint">Click a piece and then its destination, or type a move.</p>
+            <p class="hint" id="move-hint">Pick a piece, then pick where you want it to go.</p>
             <p class="hint">
-              Moves are UCI: the square you leave, then the square you land on, plus a piece letter when
-              promoting. Nothing is sent until you press Submit.
+              You can also type a move in <strong>UCI</strong>, the notation chess programs use between themselves. It is just the square a piece starts on followed by the square it ends on, so <code>e2e4</code> means "the piece on e2 goes to e4". When a pawn reaches the far end and becomes a new piece, add a letter for it: <code>e7e8q</code> promotes to a queen. Nothing is sent anywhere until you press Submit move.
             </p>
           </div>
         </div>
 
-        <div class="panel" id="replay-panel" hidden>
+        <div class="panel" id="replay-panel" style="--order: 4" hidden>
           <h2>This game is over</h2>
           <div class="transport">
             <button id="to-start" title="Start">⏮</button>
@@ -473,128 +631,111 @@
                 <option value="3600">3600× faster</option>
               </select>
             </label>
-            <label class="check" hidden><input type="checkbox" id="cap-waits" checked /> Cap long waits at 8s</label>
+            <label class="check" hidden><input type="checkbox" id="cap-waits" checked /> Skip the long waits</label>
           </div>
           <p class="hint" id="replay-caption"></p>
           <p class="hint">
-            No further moves will ever be accepted. What is left is the record: every submission that
-            was made, in order, replayed through the same rules the live board used.
+            This game is finished, and no more moves can be added. What stays is the full record: everything anyone sent, in order, replayed through the same rules the live board used. The game is permanent, and so is this page. Neither needs anyone to keep paying for a server.
           </p>
         </div>
 
-        <div class="panel" id="sim-panel">
-          <h2>Simulation</h2>
-          <div class="row">
-            <button id="bot-move">Play a bot move</button>
-            <button id="junk">Send junk</button>
-            <label class="check"><input type="checkbox" id="autoplay" /> Autoplay</label>
-          </div>
-          <p class="hint">
-            No wallet, no fees, nothing on chain. The junk button submits what a griefer would, so you can
-            watch the board absorb it.
-          </p>
-        </div>
-
-        <div class="panel" id="live-panel">
+        <div class="panel" id="live-panel" style="--order: 5">
           <h2>Game</h2>
           <div class="row">
             <label class="field" style="flex: 1 1 140px">
               <span>Playing</span>
-              <select id="game-select"></select>
+              <select id="game-select" title="Choose which game to watch."></select>
             </label>
           </div>
           <div class="row">
-            <button id="connect" class="go">Connect wallet</button>
-            <button id="disconnect" hidden>Disconnect</button>
-            <button id="load-live">Refresh</button>
+            <button id="connect" title="Connect your Stacks wallet, so you can make a move. Watching needs no wallet." class="go">Connect wallet</button>
+            <button id="disconnect" title="Disconnect your wallet. You can connect a different one afterwards." hidden>Disconnect</button>
+            <button id="load-live" title="Check the blockchain again for any new moves.">Refresh</button>
           </div>
+          <!-- What the chain says this game's rules are, and whether this
+               board can act on that. -->
+          <div id="game-rules" class="rulesbox" hidden>
+            <div class="rulesbox-head">
+              <strong id="game-rules-title">Rules</strong>
+              <span id="game-rules-state" class="tag"></span>
+            </div>
+            <p id="game-rules-summary"></p>
+            <p class="meta">
+              hash saved on the blockchain <code id="game-rules-hash">—</code>
+            </p>
+            <p class="hint" id="game-rules-note"></p>
+          </div>
+
           <p class="hint" id="charge-note" hidden></p>
           <p class="hint" id="wallet-hint">
-            Reading is free and needs no wallet. Only submitting a move does.
+            Watching the game is free and needs no wallet. You only need one when you want to make a move.
           </p>
 
-          <details class="fold">
-            <summary>Contract</summary>
-            <div class="row">
-              <label class="field">
-                <span>Address</span>
-                <input id="contract-address" type="text" autocomplete="off" spellcheck="false" />
-              </label>
-            </div>
-            <div class="row">
-              <label class="field">
-                <span>Name</span>
-                <input id="contract-name" type="text" autocomplete="off" spellcheck="false" />
-              </label>
-              <label class="field" style="flex: 0 1 130px">
-                <span>Network</span>
-                <select id="network">
-                  <option value="mainnet">mainnet</option>
-                  <option value="testnet">testnet</option>
-                </select>
-              </label>
-            </div>
-            <p class="hint">
-              The board it came with. Change these only to watch a different deployment.
-            </p>
-          </details>
+          <!-- The contract this board is bound to. Not shown, because it is
+               not a choice: the board is built for one contract and exact:true
+               stops it talking to any other. The fields stay so the rest of the
+               board can read them, which is cheaper and less error-prone than
+               threading the values through every call site. -->
+          <div hidden>
+            <input id="contract-address" type="text" autocomplete="off" spellcheck="false" />
+            <input id="contract-name" type="text" autocomplete="off" spellcheck="false" />
+            <select id="network">
+              <option value="mainnet">mainnet</option>
+              <option value="testnet">testnet</option>
+            </select>
+          </div>
         </div>
 
-        <div class="panel">
-          <h2>Moves played</h2>
-          <div class="scroll" id="moves"></div>
-        </div>
 
-        <details class="panel fold-panel">
-          <summary><h2>Every submission</h2></summary>
-          <div class="scroll" id="log"></div>
-          <p class="hint">
-            Skipped entries stay on the record. They are what the open board attracted, and they cost their
-            senders a fee to change nothing.
-          </p>
-        </details>
-
-        <details class="panel fold-panel" id="rules-panel">
-          <summary><h2>Start a game with your own rules</h2></summary>
+        <details class="panel fold-panel" id="rules-panel" style="--order: 8">
+          <summary><h2>Start your own game, with your own rules</h2></summary>
           <div class="row">
             <label class="field">
-              <span>White</span>
+              <span>White <button type="button" class="help" data-info="white" aria-expanded="false" title="Who may move the white pieces. Type “anyone” to leave it open to everybody, “anyone-else” for everybody except whoever plays black, or a wallet address or .btc name to keep it to one person." aria-label="What this setting does">i</button></span>
               <input id="rules-white" type="text" placeholder="anyone · anyone-else · SP… · name.btc" autocomplete="off" spellcheck="false" list="side-values" />
             </label>
-          </div>
+          <span class="help-text" data-info="white" hidden>Who may move the white pieces. Type “anyone” to leave it open to everybody, “anyone-else” for everybody except whoever plays black, or a wallet address or .btc name to keep it to one person.</span></div>
           <div class="row">
             <label class="field">
-              <span>Black</span>
+              <span>Black <button type="button" class="help" data-info="black" aria-expanded="false" title="Who may move the black pieces. The same choices as white. One name on one side and “anyone-else” on the other makes a game of one player against everybody." aria-label="What this setting does">i</button></span>
               <input id="rules-black" type="text" placeholder="anyone · anyone-else · SP… · name.btc" autocomplete="off" spellcheck="false" list="side-values" />
               <datalist id="side-values">
                 <option value="anyone">anyone at all</option>
-                <option value="anyone-else">anyone except the other side</option>
+                <option value="anyone-else">anyone, except whoever plays the other colour</option>
               </datalist>
             </label>
-          </div>
+          <span class="help-text" data-info="black" hidden>Who may move the black pieces. The same choices as white. One name on one side and “anyone-else” on the other makes a game of one player against everybody.</span></div>
           <div class="row">
             <label class="field" style="flex: 0 1 170px">
-              <span>Cooldown (blocks)</span>
+              <span>Wait, in moves <button type="button" class="help" data-info="cooldown" aria-expanded="false" title="After somebody moves, how many other moves must be played before that same person may move again. 0 lets anyone move whenever they like. 1 is the same as ticking “nobody can move twice in a row”. 3 means you move, then wait for three other moves. Counted in moves, not in time, so it works the same whether the game takes an hour or a year. A wait of N needs N+1 different people able to move, or the game locks up." aria-label="What this setting does">i</button></span>
               <input id="rules-cooldown" type="number" min="0" step="1" value="0" />
             </label>
-            <label class="check"><input type="checkbox" id="rules-no-consecutive" /> No two moves in a row</label>
-          </div>
+            <label class="check"><input type="checkbox" id="rules-no-consecutive" /> Nobody can move twice in a row</label><button type="button" class="help" data-info="noconsec" aria-expanded="false" title="Stops the same person playing two moves in a row, so nobody can answer their own move. Separate from the wait above: both are applied, and ticking this is the same as setting the wait to 1." aria-label="What this setting does">i</button><span class="help-text" data-info="cooldown" hidden>Stops the same person playing two moves in a row, so nobody can answer their own move. Separate from the wait above: both are applied, and ticking this is the same as setting the wait to 1.</span>
+          <span class="help-text" data-info="noconsec" hidden>After somebody moves, how many other moves must be played before that same person may move again. 0 lets anyone move whenever they like. 1 is the same as ticking “nobody can move twice in a row”. 3 means you move, then wait for three other moves. Counted in moves, not in time, so it works the same whether the game takes an hour or a year. A wait of N needs N+1 different people able to move, or the game locks up.</span></div>
           <p class="hint" id="rules-summary"></p>
-          <p class="fen">rules hash <code id="rules-hash"></code></p>
+          <p class="fen">hash of these rules <code id="rules-hash"></code></p>
           <div class="row">
-            <button id="rules-open">Open game on chain</button>
-            <button id="rules-download">Download the board</button>
-            <button id="rules-reset">Reset</button>
+            <button id="rules-open" title="Start your game on the blockchain with the rules above. Your wallet will ask you to approve it.">Open this game</button>
+            <button id="rules-download" title="Download this game as its own web page, which acts as the referee for your rules.">Download the page for this game</button>
+            <button id="rules-reset" title="Put the rules back to how they started.">Reset</button>
           </div>
           <p class="hint" id="rules-note">
-            The contract enforces none of this. It stores the hash above when the game is opened, and the
-            board you download is the referee: it replays the log and skips anything these rules disallow.
-            Open the game first, then download the board bound to it.
+            The blockchain does not check any of these rules. When the game starts it saves only a <strong>hash</strong> of them: a short fingerprint that could not have come from any other set of rules. The page you download is the referee. It reads every move, ignores the ones that break your rules, and checks its own rules against that hash, so it can prove it is refereeing the game it claims to be. Inscribe that page and your game gets what this one has: a permanent front end, permanently tied to a live contract. Start the game first, then download its page.
           </p>
         </details>
 
       </section>
     </main>
+
+    <footer class="about">
+      <p>
+        <strong>This page is an inscription.</strong> It is not hosted anywhere and nobody can
+        update it: these exact bytes are written into the Stacks blockchain, and they will still
+        be there long after any website has gone. What you have been watching is that permanent
+        page reading a live smart contract — the board changes as people play, while the thing
+        drawing it never changes at all.
+      </p>
+    </footer>
 
     <script type="module">
       import { boot } from './src/boot.js';

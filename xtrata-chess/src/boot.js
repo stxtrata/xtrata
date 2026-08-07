@@ -18,12 +18,14 @@ export const SHELL = { css: '', html: '' };
 
 const IDS = [
   'board', 'status', 'counts', 'fen', 'notice', 'pending-panel', 'moves', 'log', 'game-label',
-  'mode-sim', 'mode-live', 'sim-panel', 'live-panel', 'new-game', 'flip',
-  'copy-pgn', 'manual-form', 'manual-input', 'submit-move', 'clear-move', 'move-hint', 'play-controls', 'bot-move',
-  'junk', 'autoplay', 'replay-panel', 'replay-caption', 'play-pause',
+  'live-panel', 'new-game', 'flip',
+  'copy-pgn', 'start-own', 'manual-form', 'manual-input', 'submit-move', 'clear-move', 'move-hint', 'play-controls', 
+  'replay-panel', 'replay-caption', 'play-pause',
   'to-start', 'to-end', 'step-back', 'step-forward', 'seek', 'pace',
   'cap-waits', 'contract-address', 'contract-name', 'network', 'game-select',
-  'load-live', 'connect', 'disconnect', 'charge-note', 'wallet-hint', 'rules-panel', 'rules-white', 'rules-black',
+  'load-live', 'connect', 'disconnect', 'charge-note', 'wallet-hint',
+  'game-rules', 'game-rules-title', 'game-rules-state', 'game-rules-summary',
+  'game-rules-hash', 'game-rules-note', 'rules-panel', 'rules-white', 'rules-black',
   'rules-cooldown', 'rules-no-consecutive', 'rules-hash', 'rules-summary',
   'rules-open', 'rules-download', 'rules-reset', 'rules-note'
 ];
@@ -60,6 +62,20 @@ export function boot(options = {}) {
 
   const elements = {};
   for (const id of IDS) elements[camel(id)] = document.getElementById(id);
+
+  // The heading's X is inscription #2986, fetched at view time. If that ever
+  // fails — no network, a viewer that does not serve /i/, the inscription
+  // unreachable — a broken image icon beside the word "Chess" is worse than no
+  // image at all. Swap in the letter, which is what the alt text says anyway.
+  const logo = document.querySelector('.logo-x');
+  if (logo) {
+    logo.addEventListener('error', () => {
+      const letter = document.createElement('span');
+      letter.className = 'logo-x logo-x--text';
+      letter.textContent = 'X';
+      logo.replaceWith(letter);
+    }, { once: true });
+  }
 
   const app = new ChessBoardApp({ ...options, elements });
   running = app;

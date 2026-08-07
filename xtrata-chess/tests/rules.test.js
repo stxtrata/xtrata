@@ -163,19 +163,24 @@ describe('pacing rules', () => {
     expect(state.rejected[0].reason).toBe(REJECTED_BY_RULE.CONSECUTIVE);
   });
 
-  it('makes an address wait between its own moves', () => {
-    const rules = { ...DEFAULT_RULES, cooldown: 10 };
+  // Counted in moves rather than blocks: a Stacks block is seconds, so a wait
+  // measured in blocks stopped nobody. The heights below are far apart on
+  // purpose, to show they no longer decide the answer.
+  it('makes an address wait a number of moves between its own', () => {
+    const CAROL = 'SP2CAROL0000000000000000000000000000000';
+    const rules = { ...DEFAULT_RULES, cooldown: 2 };
     const state = replay(
       [
         { mv: 'e2e4', sender: ALICE, height: 100 },
-        { mv: 'e7e5', sender: BOB, height: 101 },
-        { mv: 'g1f3', sender: ALICE, height: 104 }, // too soon for Alice
-        { mv: 'g1f3', sender: ALICE, height: 115 } // far enough
+        { mv: 'e7e5', sender: BOB, height: 900 },
+        { mv: 'g1f3', sender: ALICE, height: 9000 }, // only one move since Alice's
+        { mv: 'g1f3', sender: CAROL, height: 9001 }, // Carol has not moved, so she may
+        { mv: 'b8c6', sender: ALICE, height: 9002 } // two have gone by, Alice is free
       ],
       { rules }
     );
 
-    expect(state.accepted.map((e) => e.san)).toEqual(['e4', 'e5', 'Nf3']);
+    expect(state.accepted.map((e) => e.san)).toEqual(['e4', 'e5', 'Nf3', 'Nc6']);
     expect(state.rejected).toHaveLength(1);
     expect(state.rejected[0].reason).toBe(REJECTED_BY_RULE.COOLDOWN);
   });
@@ -259,16 +264,16 @@ describe('determinism under rules', () => {
 
 describe('descriptions', () => {
   it('says what the open board is', () => {
-    expect(describeRules(DEFAULT_RULES)).toBe('Anyone may move either side');
+    expect(describeRules(DEFAULT_RULES)).toBe('Anyone can play either colour');
     expect(isOpenBoard(DEFAULT_RULES)).toBe(true);
     expect(isOpenBoard(duel)).toBe(false);
   });
 
   it('names the players and the pacing', () => {
     const text = describeRules({ ...duel, cooldown: 6, noConsecutive: true });
-    expect(text).toContain(`White is ${ALICE}`);
-    expect(text).toContain(`Black is ${BOB}`);
-    expect(text).toContain('6 blocks');
+    expect(text).toContain(`White can only be played by ${ALICE}`);
+    expect(text).toContain(`Black can only be played by ${BOB}`);
+    expect(text).toContain('waits for 6 other moves');
   });
 });
 

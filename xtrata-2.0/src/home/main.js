@@ -10617,10 +10617,42 @@ const openCuratedGallery = async (galleryId, options = {}) => {
      */
     const BNS_DISPLAY_HEAD = 6;
     const BNS_DISPLAY_TAIL = 12;
+    const BNS_LABEL_HEAD = 2;
+    const BNS_LABEL_TAIL = 5;
+
+    /**
+     * Shorten a BNS name without ever losing its suffix.
+     *
+     * The first attempt middle-truncated the whole string, which produced
+     * `p3km44...dc2sb26f.btc` — correct, but 21 characters do not fit a card at
+     * 15px bold, so `text-overflow: ellipsis` cut it again to
+     * `p3km44...dc2sb26...`. The safety net removed the `.btc`, which is the one
+     * part that tells a reader this is a name at all rather than a truncated
+     * hash. Two elisions in one string is also just confusing.
+     *
+     * So the suffix is held back and only the LABEL is shortened. The result is
+     * short enough that the CSS ellipsis never fires, which is what actually
+     * guarantees the `.btc` survives.
+     */
+    const shortenBnsName = (value) => {
+      const dot = value.lastIndexOf('.');
+      // No suffix to protect — a raw principal, already elided by shortPrincipal.
+      if (dot <= 0 || dot === value.length - 1) {
+        return truncateMiddle(value, BNS_DISPLAY_HEAD, BNS_DISPLAY_TAIL);
+      }
+      const label = value.slice(0, dot);
+      const suffix = value.slice(dot); // keeps the dot: ".btc"
+      if (label.length <= BNS_LABEL_HEAD + BNS_LABEL_TAIL + 3) return value;
+      // A single "…" rather than "...", matching shortPrincipal so an elided
+      // name and an elided address read the same way. It also avoids the run of
+      // four dots that "..." produces on a multi-label name such as
+      // some.long.sub.name.btc, where the tail slice starts with its own dot.
+      const tail = label.slice(-BNS_LABEL_TAIL).replace(/^[.-]+/, '');
+      return `${label.slice(0, BNS_LABEL_HEAD)}…${tail}${suffix}`;
+    };
 
     const applyBnsName = (span, address, options = {}) => {
-      const display = (value) =>
-        options.shorten ? truncateMiddle(value, BNS_DISPLAY_HEAD, BNS_DISPLAY_TAIL) : value;
+      const display = (value) => (options.shorten ? shortenBnsName(value) : value);
       span.textContent = display(shortPrincipal(address));
       span.title = address;
       void marketBnsNameFor(address).then((name) => {

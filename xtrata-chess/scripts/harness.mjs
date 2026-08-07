@@ -100,7 +100,7 @@ async function standaloneSource(file) {
 function boardHtml() {
   return `<!doctype html>
 <meta charset="utf-8">
-<title>Xtrata Open Board</title>
+<title>X Chess</title>
 <script>window.__XTRATA_CHESS_BOARD__ = ${JSON.stringify({ contract: CONTRACT, network: NETWORK, exact: true })};</script>
 <script src="/i/${ENGINE_ID}"></script>
 `;
@@ -397,6 +397,24 @@ const server = createServer(async (request, response) => {
       // HTML, so it is rewritten on the way out, exactly as the worker does.
       const html = STANDALONE ? await standaloneSource(STANDALONE) : boardHtml();
       return send(response, 200, rewriteHiroBases(html), TYPES['.html']);
+    }
+
+    // Any other inscription: fetched from the live site.
+    //
+    // Recursion is a real runtime feature, not a detail — the board's own
+    // heading points at #2986 for the Xtrata X — so a harness that 404s every
+    // /i/<id> it does not itself serve would hide exactly the kind of breakage
+    // it exists to catch.
+    if (/^\/i\/\d+$/.test(path)) {
+      const id = path.slice('/i/'.length);
+      const upstream = await fetch(`https://xtrata.xyz/i/${id}`);
+      const body = Buffer.from(await upstream.arrayBuffer());
+      console.log(`  recursion /i/${id} -> ${upstream.status} (${body.length} bytes)`);
+      response.writeHead(upstream.status, {
+        'Content-Type': upstream.headers.get('content-type') || 'application/octet-stream',
+        'Cache-Control': 'no-store'
+      });
+      return response.end(body);
     }
 
     // The real runtime support scripts, read from xtrata-2.0 so they cannot

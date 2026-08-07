@@ -86,3 +86,76 @@ describe('injectInteractivePreviewHtml', () => {
     expect(result).toContain('display: flex !important');
   });
 });
+
+describe('player chrome in a grid thumbnail', () => {
+  /**
+   * The inscribed audio player starts its transport visible, deliberately: hiding
+   * it until a pointer event left a phone with nothing visible to tap. Correct for
+   * a player, wrong for a 180px tile, where the waveform and timestamps cover the
+   * artwork and none of them can be used.
+   *
+   * It has to be fixed here. Changing the template would bring back the phone bug
+   * it was written to fix, and would do nothing for the players already inscribed,
+   * which are permanent and are exactly the ones in the grid.
+   */
+  const PLAYER = `<html><head></head><body>
+    <div class="player" data-transport="visible">
+      <section class="stage">
+        <div class="cover-media"><img src="art.png"></div>
+        <div class="stage-scrim"></div>
+        <header class="top-bar">
+          <div class="track-copy"><h1>LIQUIDEZ</h1></div>
+          <div class="top-actions" data-player-control><button>eye</button></div>
+        </header>
+        <div id="hoverTransport" class="hover-transport" data-player-control>
+          <span>0:00</span>
+          <div class="hover-wave"><canvas></canvas></div>
+          <span>1:45</span>
+        </div>
+        <section id="playerDrawer" class="drawer" data-player-control></section>
+      </section>
+    </div>
+  </body></html>`;
+
+  it('hides everything the template marked as a control', () => {
+    const result = injectGridThumbnailHtml(PLAYER);
+    expect(result).toContain('[data-player-control]');
+    expect(result).toMatch(/\[data-player-control\]\s*\{\s*display:\s*none\s*!important;/);
+  });
+
+  // !important, and not inside :where(), because it has to beat the template's
+  // own .player[data-transport="visible"] .hover-transport { opacity: 1 }. The
+  // surrounding rules use :where() so an inscription's own styling always wins;
+  // this one is the deliberate exception and the comment says why.
+  it('overrides the rule that makes the transport visible', () => {
+    const result = injectGridThumbnailHtml(PLAYER);
+    const rule = result.slice(result.indexOf('[data-player-control]'));
+    expect(rule.slice(0, 80)).not.toContain(':where');
+    expect(rule).toContain('!important');
+  });
+
+  it('leaves the artwork, the title and the scrim alone', () => {
+    const result = injectGridThumbnailHtml(PLAYER);
+    // Still in the document...
+    expect(result).toContain('class="cover-media"');
+    expect(result).toContain('LIQUIDEZ');
+    expect(result).toContain('class="stage-scrim"');
+    // ...and nothing injected hides them.
+    const injected = result.slice(
+      result.indexOf('data-xtrata-grid-preview'),
+      result.indexOf('</style>')
+    );
+    for (const kept of ['cover-media', 'stage-scrim', 'top-bar', 'track-copy']) {
+      expect(injected, kept).not.toContain(kept);
+    }
+  });
+
+  // The marker is the template author's own word for "this is a control". An
+  // inscription that does not use it is untouched, which is the whole reason for
+  // hooking on it rather than on class names that anybody might pick.
+  it('does not touch an inscription that marks nothing as a control', () => {
+    const art = '<html><head></head><body><canvas id="art"></canvas></body></html>';
+    const result = injectGridThumbnailHtml(art);
+    expect(result).toContain('<canvas id="art">');
+  });
+});

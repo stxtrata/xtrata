@@ -340,7 +340,10 @@ export async function walletCall(method, params, { timeoutMs, onLog } = {}) {
   let lastError = null;
   for (const entry of found) {
     try {
-      const result = await walletRequest(entry, method, params, { timeoutMs });
+      // params may be a function, so a caller can shape the payload to the
+      // provider that is actually going to receive it.
+      const payload = typeof params === 'function' ? params(entry) : params;
+      const result = await walletRequest(entry, method, payload, { timeoutMs });
       return { result, entry };
     } catch (error) {
       lastError = error;
@@ -677,6 +680,57 @@ export async function disconnectWallet({ onLog } = {}) {
  * A wallet is still free to overrule this and show its own estimate; the figure
  * is editable in the wallet either way.
  */
+/**
+ * Is this provider one that validates against the sats-connect schema?
+ *
+ * Xverse does, and the schema for stx_callContract knows only contract,
+ * functionName, functionArgs/arguments, postConditions and postConditionMode.
+ * Out-of-spec fields are not uniformly ignored: xtrata-2.0's wallet layer
+ * records that Xverse mobile reads an unknown `sender` field as "sign as this
+ * address" and rejects the request before showing any confirmation UI.
+ */
+function validatesAgainstSchema(entry) {
+  const label = String(entry?.label || '').toLowerCase();
+  // The runtime shim stands in for whatever the host has, which may well be
+  // Xverse, and the host rebuilds the params anyway. Sending it the narrow
+  // shape costs nothing and cannot trip a schema check.
+  return label.includes('xverse') || label.includes('stacksprovider') || label.includes('bitcoinprovider');
+}
+
+/**
+ * The parameters to send this particular provider.
+ *
+ * Two shapes, because one does not fit. A wallet that validates gets exactly
+ * the fields its schema names; anything else gets those plus the fee, which is
+ * the only place a fee has ever had an effect.
+ *
+ * Worth being plain about the limit: under the Xtrata runtime none of this
+ * reaches the wallet unchanged. The host parses the request and keeps only the
+ * contract, the function, its arguments, the network and the post conditions —
+ * `fee` is dropped before a wallet sees it. An inscribed board cannot set the
+ * network fee. What it can do is not send fields that might get it rejected,
+ * and say clearly what the fee ought to be.
+ */
+export function contractCallParams(entry, params) {
+  const {
+    contract, functionName, functionArgs, postConditionMode, postConditions
+  } = params;
+
+  const core = {
+    contract,
+    functionName,
+    functionArgs,
+    // Older builds validate with a schema that reads `arguments` and silently
+    // drop `functionArgs`. Both spellings, as xtrata-2.0 settled on.
+    arguments: functionArgs,
+    postConditionMode,
+    postConditions
+  };
+
+  if (validatesAgainstSchema(entry)) return core;
+  return { ...core, network: params.network, ...callFeeParams(params.fee) };
+}
+
 export function callFeeParams(microStx) {
   const fee = Number(microStx);
   if (!Number.isFinite(fee) || fee <= 0) return {};
