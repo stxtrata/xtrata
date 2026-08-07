@@ -282,26 +282,30 @@ export function describeRules(rules, name = null) {
   const called = (who) => (name && name(who)) || who;
   const other = (colour) => (colour === 'White' ? r.black : r.white);
   const side = (colour, who) => {
-    if (who === ANYONE) return `${colour} open to anyone`;
+    if (who === ANYONE) return `${colour} can be played by anyone`;
     if (who === ANYONE_ELSE) {
       const excluded = other(colour);
       return excluded === ANYONE || excluded === ANYONE_ELSE
-        ? `${colour} open to anyone`
-        : `${colour} open to anyone except ${called(excluded)}`;
+        ? `${colour} can be played by anyone`
+        : `${colour} can be played by anyone except ${called(excluded)}`;
     }
-    return `${colour} is ${called(who)}`;
+    return `${colour} can only be played by ${called(who)}`;
   };
 
-  if (r.white === ANYONE && r.black === ANYONE) parts.push('Anyone may move either side');
+  if (r.white === ANYONE && r.black === ANYONE) parts.push('Anyone can play either colour');
   else {
     parts.push(side('White', r.white));
     parts.push(side('Black', r.black));
   }
 
-  if (r.allow.length) parts.push(`only ${r.allow.length} address${r.allow.length === 1 ? '' : 'es'} may move`);
-  if (r.noConsecutive) parts.push('no two moves in a row from one address');
-  if (r.cooldown > 0) parts.push(`${r.cooldown} block${r.cooldown === 1 ? '' : 's'} between an address's own moves`);
-  if (r.startFen !== START_FEN) parts.push('custom starting position');
+  if (r.allow.length) {
+    parts.push(`only ${r.allow.length} wallet${r.allow.length === 1 ? '' : 's'} can play at all`);
+  }
+  if (r.noConsecutive) parts.push('nobody can move twice in a row');
+  if (r.cooldown > 0) {
+    parts.push(`each player waits ${r.cooldown} block${r.cooldown === 1 ? '' : 's'} before moving again`);
+  }
+  if (r.startFen !== START_FEN) parts.push('the game starts from a set-up position');
 
   return parts.join(' · ');
 }

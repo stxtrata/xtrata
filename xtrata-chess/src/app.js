@@ -502,7 +502,7 @@ export class ChessBoardApp {
         // will not match. Offer them first, and only say "no games" if there is
         // nothing this board knows to suggest.
         this._offerKnownRules();
-        if (!this._offeredRules) this._notify('No games opened on this contract yet.', 'warn');
+        if (!this._offeredRules) this._notify('No games have been started yet.', 'warn');
         this.render();
         return;
       }
@@ -578,7 +578,7 @@ export class ChessBoardApp {
       if (this.chain.getContractFee) this.contractFee = await this.chain.getContractFee();
       if (this.chain.getOpenFee) this.openFee = await this.chain.getOpenFee();
     } catch (error) {
-      this._notify(`Read failed: ${error.message}`, 'error');
+      this._notify(`Could not read the game: ${error.message}`, 'error');
     } finally {
       this.busy = false;
     }
@@ -740,7 +740,7 @@ export class ChessBoardApp {
         );
         this._clearPending();
       } else if (tooOld) {
-        this._notify('That move has not appeared after ten minutes. Check the transaction in the explorer.', 'warn');
+        this._notify('That move still has not appeared after ten minutes. It may have failed — check it in a block explorer.', 'warn');
         this._clearPending();
       }
       this.render();
@@ -830,7 +830,7 @@ export class ChessBoardApp {
     }
 
     try {
-      this._notify('Confirm the move in your wallet…', 'info');
+      this._notify('Check your wallet, and approve the move there.', 'info');
       this.render();
       const result = await this.chain.submitMove(this.game, uci);
 
@@ -848,17 +848,17 @@ export class ChessBoardApp {
       this._watchPending();
     } catch (error) {
       if (error.code === 'NO_WALLET') {
-        this._notify('No Stacks wallet found. Install Leather or Xverse to play live.', 'error');
+        this._notify('No wallet found. Install Leather or Xverse, both free, to make a move.', 'error');
       } else if (needsWalletBridge(error)) {
         // The shim's own wording is "requires host wallet bridge support",
         // which tells a player nothing they can act on. Say what to do instead.
         this._notify(
-          'This page cannot sign moves: it is open without a wallet bridge. ' +
+          'This page cannot reach your wallet, because it was opened by a direct link. ' +
             'Open the board from the Xtrata site and try again.',
           'error'
         );
       } else {
-        this._notify(`Wallet call failed: ${error.message}`, 'error');
+        this._notify(`Your wallet could not send that: ${error.message}`, 'error');
       }
     }
     this.render();
@@ -868,9 +868,9 @@ export class ChessBoardApp {
   _noteOutcome(uci) {
     const legal = this.state.legalMoves.includes(uci.trim().toLowerCase());
     if (this.state.isGameOver) {
-      this._notify('The game is already over, so this will be skipped.', 'warn');
+      this._notify('This game is already over, so this move will be ignored.', 'warn');
     } else if (!legal) {
-      this._notify(`"${uci}" is not legal here, so replay will skip it.`, 'warn');
+      this._notify(`"${uci}" is not a legal move here, so it will be ignored.`, 'warn');
     } else {
       this.notice = null;
     }
@@ -878,7 +878,7 @@ export class ChessBoardApp {
 
   async newGame() {
     try {
-      this._notify('Confirm the new game in your wallet…', 'info');
+      this._notify('Check your wallet, and approve the new game there.', 'info');
       this.render();
       const result = await this.chain.openGame();
       this._notify(
@@ -900,7 +900,7 @@ export class ChessBoardApp {
     // its own session rather than by asking.
     await disconnectWallet({ onLog: () => {} }).catch(() => {});
     this._renderWallet();
-    this._notify('Disconnected. Connect again to sign as a different wallet.', 'info');
+    this._notify('Wallet disconnected. Connect again to play as someone else.', 'info');
     this.render();
   }
 
@@ -940,18 +940,18 @@ export class ChessBoardApp {
     el.gameRulesHash.textContent = committed || 'none — nothing was committed';
 
     if (!committed) {
-      el.gameRulesState.textContent = 'open board';
+      el.gameRulesState.textContent = 'no rules';
       el.gameRulesState.className = 'tag open';
-      el.gameRulesSummary.textContent = 'Anyone may move either side.';
+      el.gameRulesSummary.textContent = 'Anyone can play either colour.';
       el.gameRulesNote.textContent =
-        'This game was opened without a rules commitment, so there is nothing for a board to enforce. ' +
-        'Every submission of the right shape counts, in the order the chain recorded it.';
+        'This game was started without any rules, so there is nothing extra to enforce. Every legal ' +
+        'chess move counts, in the order the blockchain recorded it.';
       return;
     }
 
     if (this.gameRules) {
       const known = knownGame(this.chain?.contractId, this.game);
-      el.gameRulesState.textContent = 'enforced';
+      el.gameRulesState.textContent = 'rules apply';
       el.gameRulesState.className = 'tag enforced';
       el.gameRulesSummary.textContent = describeRules(this.gameRules, (who) =>
         this.names?.get(who) || null
@@ -963,19 +963,19 @@ export class ChessBoardApp {
       this._nameRuleSides();
       el.gameRulesNote.textContent =
         `${known?.label ? `${known.label}. ` : ''}` +
-        'These rules hash to the commitment above, which is how this board knows it is the referee. ' +
-        'The contract enforces none of it: a move that breaks these rules is still accepted and still ' +
-        'charged, and replay skips it.';
+        'These rules match the fingerprint saved on the blockchain, which is how this page knows it is ' +
+        'the right referee for this game. The blockchain itself does not check them: a move that breaks ' +
+        'the rules is still saved and still costs its sender, and this page ignores it.';
       return;
     }
 
-    el.gameRulesState.textContent = 'not this board';
+    el.gameRulesState.textContent = 'rules unknown';
     el.gameRulesState.className = 'tag unknown';
-    el.gameRulesSummary.textContent = 'This game has rules, and they are not ones this board holds.';
+    el.gameRulesSummary.textContent = 'This game has rules, but they are not ones this page knows.';
     el.gameRulesNote.textContent =
-      'The chain records the hash above and nothing more, so the rules themselves cannot be read from ' +
-      'here. Whoever opened the game generated a board that carries them. This board replays the log ' +
-      'without enforcing anything, so what it shows may differ from what that board shows.';
+      'The blockchain saves only the fingerprint above, never the rules themselves, so they cannot be ' +
+      'read from here. Whoever started this game made their own page that has them. This page shows ' +
+      'every move without judging any of them, so it may not match what that page shows.';
   }
 
   // Resolve the addresses a rule set names, then redraw once.
@@ -1021,22 +1021,21 @@ export class ChessBoardApp {
 
     if (reason === 'no-bridge') {
       el.walletHint.innerHTML =
-        '<strong>This page cannot sign moves.</strong> It is open without a wallet ' +
-        'bridge, and the Xtrata runtime only passes a transaction to your wallet ' +
-        'when the page it framed carries one. Open this board from the Xtrata site ' +
-        'and moves will sign normally. Reading and replaying work either way.';
+        '<strong>You cannot make moves from this page.</strong> It was opened by a direct ' +
+        'link, and that route cannot reach your wallet. Open the board from the Xtrata ' +
+        'site instead and moves will work normally. Watching the game works either way.';
       return;
     }
 
     if (reason === 'no-wallet') {
       el.walletHint.innerHTML =
-        'No Stacks wallet found, so moves cannot be signed from here. Install ' +
-        'Leather or Xverse. Reading and replaying need no wallet.';
+        'No wallet found, so you cannot make a move yet. Install Leather or Xverse, ' +
+        'both free. Watching the game needs no wallet.';
       return;
     }
 
     el.walletHint.textContent =
-      'Reading is free and needs no wallet. Only submitting a move does.';
+      'Watching the game is free and needs no wallet. You only need one to make a move.';
   }
 
   // Keeps the button and the hint agreeing with whether a wallet is attached.
@@ -1121,7 +1120,7 @@ export class ChessBoardApp {
       await navigator.clipboard.writeText(pgn);
       this._notify('PGN copied.', 'info');
     } catch {
-      this._notify('Could not reach the clipboard.', 'warn');
+      this._notify('Could not copy to the clipboard.', 'warn');
     }
     this.render();
   }
@@ -1334,7 +1333,7 @@ export class ChessBoardApp {
     const hash = isOpenBoard(rules) ? null : rulesHash(rules);
 
     try {
-      this._notify('Confirm the new game in your wallet…', 'info');
+      this._notify('Check your wallet, and approve the new game there.', 'info');
       this.render();
       const result = await this.chain.openGame(hash);
       this._notify(
@@ -1503,9 +1502,9 @@ export class ChessBoardApp {
     // Counts always describe the whole game, not the scrubbed prefix, so the
     // header does not appear to rewind along with the board.
     el.counts.innerHTML =
-      `<span><strong>${this.state.log.length}</strong> submitted</span>` +
-      `<span><strong>${this.state.accepted.length}</strong> played</span>` +
-      `<span><strong>${this.state.rejected.length}</strong> skipped</span>`;
+      `<span><strong>${this.state.log.length}</strong> sent</span>` +
+      `<span><strong>${this.state.accepted.length}</strong> counted</span>` +
+      `<span><strong>${this.state.rejected.length}</strong> ignored</span>`;
 
     this._renderReplayControls(view);
     if (!el.rulesPanel.hidden) this.renderRules();
@@ -1542,8 +1541,8 @@ export class ChessBoardApp {
       el.chargeNote.hidden = this.mode !== 'live';
       el.chargeNote.innerHTML = move || open
         ? `per move <strong>${stx(move)}</strong> &nbsp;·&nbsp; new game <strong>${stx(open)}</strong>` +
-          '<br><span class="meta">plus the network fee your wallet asks for</span>'
-        : 'free to play, apart from the network fee your wallet asks for';
+          '<br><span class="meta">your wallet also charges a small fee to send it</span>'
+        : 'free to play, apart from the small fee your wallet charges to send a move';
     }
   }
 

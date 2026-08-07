@@ -417,7 +417,7 @@
       <div>
         <h1>Xtrata Open Board</h1>
         <p class="sub">
-          Anyone moves. The contract stores strings; the rules live here, and replay decides what counts.
+          One shared chess game that anyone can join. Every move is saved on the Bitcoin blockchain, so nobody can change it later.
         </p>
       </div>
     </header>
@@ -439,8 +439,8 @@
           <h2>Board · <span id="game-label">no game</span></h2>
           <div class="row">
             <button id="new-game">New game</button>
-            <button id="flip">Flip</button>
-            <button id="copy-pgn">Copy PGN</button>
+            <button id="flip" title="Turn the board round, so you look at it from the other side.">Flip</button>
+            <button id="copy-pgn" title="Copy this game in PGN format — the standard way chess games are written down. You can paste it into any chess app or website to look at the game there.">Copy PGN</button>
           </div>
 
           <div id="play-controls">
@@ -449,20 +449,19 @@
                 <input
                   id="manual-input"
                   type="text"
-                  placeholder="click a piece, or type e2e4"
+                  placeholder="pick a piece, or type e2e4"
                   maxlength="12"
                   autocomplete="off"
                   spellcheck="false"
                   style="flex: 1 1 120px"
                 />
-                <button type="submit" id="submit-move" class="go" disabled>Submit move</button>
-                <button type="button" id="clear-move">Clear</button>
+                <button type="submit" id="submit-move" title="Send your move to the blockchain. Your wallet will ask you to approve it first." class="go" disabled>Submit move</button>
+                <button type="button" id="clear-move" title="Forget the move you picked. Nothing has been sent.">Clear</button>
               </form>
             </div>
-            <p class="hint" id="move-hint">Click a piece and then its destination, or type a move.</p>
+            <p class="hint" id="move-hint">Pick a piece, then pick where you want it to go.</p>
             <p class="hint">
-              Moves are UCI: the square you leave, then the square you land on, plus a piece letter when
-              promoting. Nothing is sent until you press Submit.
+              You can also type a move: the square the piece starts on, then the square it finishes on. So e2e4 means "move the piece on e2 to e4". Nothing is sent anywhere until you press Submit move.
             </p>
           </div>
         </div>
@@ -489,12 +488,11 @@
                 <option value="3600">3600× faster</option>
               </select>
             </label>
-            <label class="check" hidden><input type="checkbox" id="cap-waits" checked /> Cap long waits at 8s</label>
+            <label class="check" hidden><input type="checkbox" id="cap-waits" checked /> Skip the long waits</label>
           </div>
           <p class="hint" id="replay-caption"></p>
           <p class="hint">
-            No further moves will ever be accepted. What is left is the record: every submission that
-            was made, in order, replayed through the same rules the live board used.
+            This game is finished, and no more moves can be added. What stays is the full record: everything anyone sent, in order, replayed through the same rules the live board used.
           </p>
         </div>
 
@@ -503,13 +501,13 @@
           <div class="row">
             <label class="field" style="flex: 1 1 140px">
               <span>Playing</span>
-              <select id="game-select"></select>
+              <select id="game-select" title="Choose which game to watch."></select>
             </label>
           </div>
           <div class="row">
-            <button id="connect" class="go">Connect wallet</button>
-            <button id="disconnect" hidden>Disconnect</button>
-            <button id="load-live">Refresh</button>
+            <button id="connect" title="Connect your Stacks wallet, so you can make a move. Watching needs no wallet." class="go">Connect wallet</button>
+            <button id="disconnect" title="Disconnect your wallet. You can connect a different one afterwards." hidden>Disconnect</button>
+            <button id="load-live" title="Check the blockchain again for any new moves.">Refresh</button>
           </div>
           <!-- What the chain says this game's rules are, and whether this
                board can act on that. -->
@@ -520,14 +518,14 @@
             </div>
             <p id="game-rules-summary"></p>
             <p class="meta">
-              committed on chain <code id="game-rules-hash">—</code>
+              fingerprint saved on the blockchain <code id="game-rules-hash">—</code>
             </p>
             <p class="hint" id="game-rules-note"></p>
           </div>
 
           <p class="hint" id="charge-note" hidden></p>
           <p class="hint" id="wallet-hint">
-            Reading is free and needs no wallet. Only submitting a move does.
+            Watching the game is free and needs no wallet. You only need one when you want to make a move.
           </p>
 
           <!-- The contract this board is bound to. Not shown, because it is
@@ -546,21 +544,20 @@
         </div>
 
         <div class="panel">
-          <h2>Moves played</h2>
+          <h2>Moves that counted</h2>
           <div class="scroll" id="moves"></div>
         </div>
 
         <details class="panel fold-panel">
-          <summary><h2>Every submission</h2></summary>
+          <summary><h2>Everything anyone sent</h2></summary>
           <div class="scroll" id="log"></div>
           <p class="hint">
-            Skipped entries stay on the record. They are what the open board attracted, and they cost their
-            senders a fee to change nothing.
+            Some moves get skipped, usually because they were not a legal chess move, or it was not that colour’s turn. They stay on this list forever, because nothing on the blockchain can be deleted. Whoever sent them still paid, and the board did not change.
           </p>
         </details>
 
         <details class="panel fold-panel" id="rules-panel">
-          <summary><h2>Start a game with your own rules</h2></summary>
+          <summary><h2>Start your own game, with your own rules</h2></summary>
           <div class="row">
             <label class="field">
               <span>White</span>
@@ -573,28 +570,26 @@
               <input id="rules-black" type="text" placeholder="anyone · anyone-else · SP… · name.btc" autocomplete="off" spellcheck="false" list="side-values" />
               <datalist id="side-values">
                 <option value="anyone">anyone at all</option>
-                <option value="anyone-else">anyone except the other side</option>
+                <option value="anyone-else">anyone, except whoever plays the other colour</option>
               </datalist>
             </label>
           </div>
           <div class="row">
             <label class="field" style="flex: 0 1 170px">
-              <span>Cooldown (blocks)</span>
+              <span>Wait between turns</span>
               <input id="rules-cooldown" type="number" min="0" step="1" value="0" />
             </label>
-            <label class="check"><input type="checkbox" id="rules-no-consecutive" /> No two moves in a row</label>
+            <label class="check"><input type="checkbox" id="rules-no-consecutive" /> Nobody can move twice in a row</label>
           </div>
           <p class="hint" id="rules-summary"></p>
-          <p class="fen">rules hash <code id="rules-hash"></code></p>
+          <p class="fen">fingerprint of these rules <code id="rules-hash"></code></p>
           <div class="row">
-            <button id="rules-open">Open game on chain</button>
-            <button id="rules-download">Download the board</button>
-            <button id="rules-reset">Reset</button>
+            <button id="rules-open" title="Start your game on the blockchain with the rules above. Your wallet will ask you to approve it.">Open this game</button>
+            <button id="rules-download" title="Download this game as its own web page, which acts as the referee for your rules.">Download the page for this game</button>
+            <button id="rules-reset" title="Put the rules back to how they started.">Reset</button>
           </div>
           <p class="hint" id="rules-note">
-            The contract enforces none of this. It stores the hash above when the game is opened, and the
-            board you download is the referee: it replays the log and skips anything these rules disallow.
-            Open the game first, then download the board bound to it.
+            The blockchain does not check any of these rules. It only saves a fingerprint of them when the game starts. The page you download is the referee: it reads every move and ignores any that break your rules. Start the game first, then download its page.
           </p>
         </details>
 

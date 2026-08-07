@@ -259,15 +259,15 @@ describe('determinism under rules', () => {
 
 describe('descriptions', () => {
   it('says what the open board is', () => {
-    expect(describeRules(DEFAULT_RULES)).toBe('Anyone may move either side');
+    expect(describeRules(DEFAULT_RULES)).toBe('Anyone can play either colour');
     expect(isOpenBoard(DEFAULT_RULES)).toBe(true);
     expect(isOpenBoard(duel)).toBe(false);
   });
 
   it('names the players and the pacing', () => {
     const text = describeRules({ ...duel, cooldown: 6, noConsecutive: true });
-    expect(text).toContain(`White is ${ALICE}`);
-    expect(text).toContain(`Black is ${BOB}`);
+    expect(text).toContain(`White can only be played by ${ALICE}`);
+    expect(text).toContain(`Black can only be played by ${BOB}`);
     expect(text).toContain('6 blocks');
   });
 });
