@@ -30,6 +30,26 @@ body {
   transform-origin: top left !important;
 }
 
+/* Player chrome, in a thumbnail nobody can click.
+
+   The inscribed audio player starts its transport visible on purpose: hiding it
+   until a pointer event meant that on a phone the artwork was the only thing you
+   could tap, with no visible control to aim at. That is right for a player and
+   wrong for a 180px tile, where the waveform, the seek bar and the timestamps
+   cover the artwork they are supposed to sit under and none of them can be used.
+
+   Fixed here rather than in the template for two reasons. Changing the template
+   would reintroduce the phone bug it was written to fix, and it would do nothing
+   for the players already inscribed — they are permanent, and every one of them
+   is in this grid.
+
+   [data-player-control] is the template's own marker for its controls, so this
+   hides what that author called chrome and cannot touch an inscription that does
+   not use it. The artwork, the title and the scrim behind it all stay. */
+[data-player-control] {
+  display: none !important;
+}
+
 body > main:only-child,
 body > div:only-child,
 body > canvas:first-of-type,
