@@ -60,6 +60,17 @@
         line-height: 1.6em;
       }
 
+      /* What stands in when the inscription cannot be reached. */
+      .logo-x--text {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #181818;
+        color: var(--accent);
+        font-size: 1em;
+        font-weight: 700;
+      }
+
       .sub {
         margin: 2px 0 0;
         color: var(--dim);
@@ -439,9 +450,12 @@
       .hint.good strong { color: var(--ok); font-family: var(--mono); }
       .hint.bad { color: var(--no); }
 
-      /* A settings explainer, on hover or focus. Small enough to ignore, and
-         reachable from a keyboard rather than mouse-only. */
-      .info {
+      /* A settings explainer, on hover, focus or tap.
+         Not called .info: this page already uses that for an info-level notice,
+         and a <p class="notice info"> picking up an icon's inline-flex, 15px
+         width and absolutely positioned hit area turns a sentence into a
+         squashed column sitting on top of the panel below it. */
+      .help {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -464,18 +478,18 @@
 
       /* A finger needs about 44px. The circle stays 15px and the target grows
          around it, so the layout is unchanged and the thing is still hittable. */
-      .info::after {
+      .help::after {
         content: '';
         position: absolute;
         inset: -14px;
       }
-      .info:hover, .info:focus { color: var(--accent); border-color: var(--accent); outline: none; }
-      .info[aria-expanded='true'] { color: var(--accent); border-color: var(--accent); }
+      .help:hover, .help:focus { color: var(--accent); border-color: var(--accent); outline: none; }
+      .help[aria-expanded='true'] { color: var(--accent); border-color: var(--accent); }
 
       /* Tapped open rather than hovered. A title attribute is invisible on a
          phone, which is where somebody is most likely to need the explanation
          and least able to guess it. */
-      .info-text {
+      .help-text {
         display: block;
         flex: 1 0 100%;
         margin: 6px 0 2px;
@@ -677,27 +691,27 @@
           <summary><h2>Start your own game, with your own rules</h2></summary>
           <div class="row">
             <label class="field">
-              <span>White <button type="button" class="info" data-info="white" aria-expanded="false" title="Who may move the white pieces. Type “anyone” to leave it open to everybody, “anyone-else” for everybody except whoever plays black, or a wallet address or .btc name to keep it to one person." aria-label="What this setting does">i</button></span>
+              <span>White <button type="button" class="help" data-info="white" aria-expanded="false" title="Who may move the white pieces. Type “anyone” to leave it open to everybody, “anyone-else” for everybody except whoever plays black, or a wallet address or .btc name to keep it to one person." aria-label="What this setting does">i</button></span>
               <input id="rules-white" type="text" placeholder="anyone · anyone-else · SP… · name.btc" autocomplete="off" spellcheck="false" list="side-values" />
             </label>
-          <span class="info-text" data-info="white" hidden>Who may move the white pieces. Type “anyone” to leave it open to everybody, “anyone-else” for everybody except whoever plays black, or a wallet address or .btc name to keep it to one person.</span></div>
+          <span class="help-text" data-info="white" hidden>Who may move the white pieces. Type “anyone” to leave it open to everybody, “anyone-else” for everybody except whoever plays black, or a wallet address or .btc name to keep it to one person.</span></div>
           <div class="row">
             <label class="field">
-              <span>Black <button type="button" class="info" data-info="black" aria-expanded="false" title="Who may move the black pieces. The same choices as white. One name on one side and “anyone-else” on the other makes a game of one player against everybody." aria-label="What this setting does">i</button></span>
+              <span>Black <button type="button" class="help" data-info="black" aria-expanded="false" title="Who may move the black pieces. The same choices as white. One name on one side and “anyone-else” on the other makes a game of one player against everybody." aria-label="What this setting does">i</button></span>
               <input id="rules-black" type="text" placeholder="anyone · anyone-else · SP… · name.btc" autocomplete="off" spellcheck="false" list="side-values" />
               <datalist id="side-values">
                 <option value="anyone">anyone at all</option>
                 <option value="anyone-else">anyone, except whoever plays the other colour</option>
               </datalist>
             </label>
-          <span class="info-text" data-info="black" hidden>Who may move the black pieces. The same choices as white. One name on one side and “anyone-else” on the other makes a game of one player against everybody.</span></div>
+          <span class="help-text" data-info="black" hidden>Who may move the black pieces. The same choices as white. One name on one side and “anyone-else” on the other makes a game of one player against everybody.</span></div>
           <div class="row">
             <label class="field" style="flex: 0 1 170px">
-              <span>Wait, in moves <button type="button" class="info" data-info="cooldown" aria-expanded="false" title="After somebody moves, how many other moves must be played before that same person may move again. 0 lets anyone move whenever they like. 1 is the same as ticking “nobody can move twice in a row”. 3 means you move, then wait for three other moves. Counted in moves, not in time, so it works the same whether the game takes an hour or a year. A wait of N needs N+1 different people able to move, or the game locks up." aria-label="What this setting does">i</button></span>
+              <span>Wait, in moves <button type="button" class="help" data-info="cooldown" aria-expanded="false" title="After somebody moves, how many other moves must be played before that same person may move again. 0 lets anyone move whenever they like. 1 is the same as ticking “nobody can move twice in a row”. 3 means you move, then wait for three other moves. Counted in moves, not in time, so it works the same whether the game takes an hour or a year. A wait of N needs N+1 different people able to move, or the game locks up." aria-label="What this setting does">i</button></span>
               <input id="rules-cooldown" type="number" min="0" step="1" value="0" />
             </label>
-            <label class="check"><input type="checkbox" id="rules-no-consecutive" /> Nobody can move twice in a row</label><button type="button" class="info" data-info="noconsec" aria-expanded="false" title="Stops the same person playing two moves in a row, so nobody can answer their own move. Separate from the wait above: both are applied, and ticking this is the same as setting the wait to 1." aria-label="What this setting does">i</button><span class="info-text" data-info="cooldown" hidden>Stops the same person playing two moves in a row, so nobody can answer their own move. Separate from the wait above: both are applied, and ticking this is the same as setting the wait to 1.</span>
-          <span class="info-text" data-info="noconsec" hidden>After somebody moves, how many other moves must be played before that same person may move again. 0 lets anyone move whenever they like. 1 is the same as ticking “nobody can move twice in a row”. 3 means you move, then wait for three other moves. Counted in moves, not in time, so it works the same whether the game takes an hour or a year. A wait of N needs N+1 different people able to move, or the game locks up.</span></div>
+            <label class="check"><input type="checkbox" id="rules-no-consecutive" /> Nobody can move twice in a row</label><button type="button" class="help" data-info="noconsec" aria-expanded="false" title="Stops the same person playing two moves in a row, so nobody can answer their own move. Separate from the wait above: both are applied, and ticking this is the same as setting the wait to 1." aria-label="What this setting does">i</button><span class="help-text" data-info="cooldown" hidden>Stops the same person playing two moves in a row, so nobody can answer their own move. Separate from the wait above: both are applied, and ticking this is the same as setting the wait to 1.</span>
+          <span class="help-text" data-info="noconsec" hidden>After somebody moves, how many other moves must be played before that same person may move again. 0 lets anyone move whenever they like. 1 is the same as ticking “nobody can move twice in a row”. 3 means you move, then wait for three other moves. Counted in moves, not in time, so it works the same whether the game takes an hour or a year. A wait of N needs N+1 different people able to move, or the game locks up.</span></div>
           <p class="hint" id="rules-summary"></p>
           <p class="fen">hash of these rules <code id="rules-hash"></code></p>
           <div class="row">

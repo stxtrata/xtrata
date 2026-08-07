@@ -63,6 +63,20 @@ export function boot(options = {}) {
   const elements = {};
   for (const id of IDS) elements[camel(id)] = document.getElementById(id);
 
+  // The heading's X is inscription #2986, fetched at view time. If that ever
+  // fails — no network, a viewer that does not serve /i/, the inscription
+  // unreachable — a broken image icon beside the word "Chess" is worse than no
+  // image at all. Swap in the letter, which is what the alt text says anyway.
+  const logo = document.querySelector('.logo-x');
+  if (logo) {
+    logo.addEventListener('error', () => {
+      const letter = document.createElement('span');
+      letter.className = 'logo-x logo-x--text';
+      letter.textContent = 'X';
+      logo.replaceWith(letter);
+    }, { once: true });
+  }
+
   const app = new ChessBoardApp({ ...options, elements });
   running = app;
 

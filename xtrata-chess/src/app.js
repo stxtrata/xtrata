@@ -261,9 +261,11 @@ export class ChessBoardApp {
 
     const known = knownGame(this.chain?.contractId, this.game);
     if (!known) {
-      // Not a game this board claims to referee. Any commitment it carries
-      // belongs to a generated board somewhere, not to this one.
+      // Not a game this board carries rules for. It may still be able to
+      // referee it: see below.
       this.gameRules = null;
+      this.rulesSource = null;
+      this._adoptMatchingDraft();
       return;
     }
 
@@ -290,6 +292,34 @@ export class ChessBoardApp {
     }
 
     this.gameRules = rules;
+    this.rulesSource = 'built-in';
+  }
+
+  /**
+   * Referee a game using the rules currently set in the panel, if they match.
+   *
+   * The chain stores a hash and never the rules, so a hash cannot be turned
+   * back into them — but it can confirm them. If what somebody has typed into
+   * "Start your own game" hashes to what this game committed, that is not a
+   * guess: no other rule set could produce the same hash.
+   *
+   * It matters because without this the board says "rules unknown" for a game
+   * whose rules are sitting on the same screen, and referees nothing.
+   */
+  _adoptMatchingDraft() {
+    if (!this.committedHash || this.isChild) return;
+
+    let draft;
+    try {
+      draft = this.draftRules();
+    } catch {
+      return;
+    }
+
+    if (isOpenBoard(draft) || !rulesMatchCommitment(draft, this.committedHash)) return;
+
+    this.gameRules = draft;
+    this.rulesSource = 'panel';
   }
 
   /**
@@ -433,14 +463,14 @@ export class ChessBoardApp {
     // explanation and least able to guess it. Delegated, so the markup can grow
     // another setting without another listener.
     el.rulesPanel.addEventListener('click', (event) => {
-      const button = event.target.closest?.('.info');
+      const button = event.target.closest?.('.help');
       if (!button) return;
       event.preventDefault();
       // Paired by name rather than by position: the explainer sits at the end
       // of its row so it can use the full width, which puts it out of reach of
       // nextElementSibling, and one row carries two of them.
       const text = el.rulesPanel.querySelector(
-        `.info-text[data-info="${button.dataset.info}"]`
+        `.help-text[data-info="${button.dataset.info}"]`
       );
       if (!text) return;
       const open = !text.hidden;
@@ -472,8 +502,8 @@ export class ChessBoardApp {
     el.pace.addEventListener('change', () => this.setPace(el.pace.value));
 
     for (const control of [el.rulesWhite, el.rulesBlack, el.rulesCooldown, el.rulesNoConsecutive]) {
-      control.addEventListener('input', () => this.renderRules());
-      control.addEventListener('change', () => this.renderRules());
+      control.addEventListener('input', () => this._rulesChanged());
+      control.addEventListener('change', () => this._rulesChanged());
     }
     el.rulesOpen.addEventListener('click', () => this.openRuledGame());
     el.rulesDownload.addEventListener('click', () => this.downloadChild());
@@ -999,7 +1029,12 @@ export class ChessBoardApp {
       // redraw when they land. Without this the rules read as raw addresses
       // until something else happens to trigger a render.
       this._nameRuleSides();
+      const source = this.rulesSource === 'panel'
+        ? 'These are the rules set in “Start your own game” below, and they match the hash this ' +
+          'game committed to, so they are its rules and nothing else could be. '
+        : '';
       el.gameRulesNote.textContent =
+        source +
         `${known?.label ? `${known.label}. ` : ''}` +
         'A hash is a short fingerprint of something longer, and it could not have come from any other ' +
         'set of rules. These rules match the one saved on the blockchain, which is how this page knows ' +
@@ -1013,8 +1048,10 @@ export class ChessBoardApp {
     el.gameRulesSummary.textContent = 'This game has rules, but they are not ones this page knows.';
     el.gameRulesNote.textContent =
       'The blockchain saves only the hash above, never the rules themselves, so they cannot be read ' +
-      'from here. Whoever started this game made their own page that has them. This page shows every ' +
-      'move without judging any of them, so it may not match what that page shows.';
+      'from here. Whoever started this game made their own page that has them, and this page shows ' +
+      'every move without judging any of them. If you know what the rules were, set them in ' +
+      '“Start your own game” below: when they hash to the same value, this page will use them, ' +
+      'because no other rules could produce that hash.';
   }
 
   // Resolve the addresses a rule set names, then redraw once.
@@ -1323,6 +1360,23 @@ export class ChessBoardApp {
 
   draftRules() {
     return normaliseRules(this.draftInput());
+  }
+
+  /**
+   * The panel changed, so re-check whether it now proves the viewed game's
+   * rules. Without this somebody could type the right rules in and nothing
+   * would happen until the next poll.
+   */
+  _rulesChanged() {
+    const was = this.rulesSource;
+    if (!this.gameRules || this.rulesSource === 'panel') {
+      this.gameRules = null;
+      this.rulesSource = null;
+      this._adoptMatchingDraft();
+    }
+    this.renderRules();
+    if (this.rulesSource !== was) this.refresh();
+    else this.render();
   }
 
   renderRules() {
