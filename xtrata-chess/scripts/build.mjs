@@ -201,7 +201,7 @@ async function buildBoard(engineId, contract, network = 'mainnet') {
 
   const source = `<!doctype html>
 <meta charset="utf-8">
-<title>Xtrata Chess</title>
+<title>X Chess</title>
 ${config}<script src="/i/${engineId}"></script>
 `;
 

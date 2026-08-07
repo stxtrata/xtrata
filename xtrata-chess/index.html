@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Xtrata Chess</title>
+    <title>X Chess</title>
     <style>
       :root {
         --bg: #12100e;
@@ -35,9 +35,29 @@
 
       h1 {
         margin: 0;
-        font-size: 20px;
+        font-size: 26px;
         font-weight: 600;
         letter-spacing: -0.01em;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+
+      /* The logo carries its own near-black backing (#181818), a shade off this
+         page. Rounding it and giving it the panel's border makes that a badge
+         rather than a mismatched patch. */
+      .logo-x {
+        width: 1.75em;
+        height: 1.75em;
+        border-radius: 6px;
+        border: 1px solid var(--line);
+        object-fit: cover;
+        /* Before it loads, and if it never does, this is the box the alt sits
+           in; keeping it small stops the heading jumping when it arrives. */
+        font-size: 0.7em;
+        color: var(--accent);
+        text-align: center;
+        line-height: 1.6em;
       }
 
       .sub {
@@ -437,8 +457,37 @@
         font-family: var(--mono);
         cursor: help;
         vertical-align: 1px;
+        position: relative;
+        padding: 0;
+        flex: 0 0 auto;
+      }
+
+      /* A finger needs about 44px. The circle stays 15px and the target grows
+         around it, so the layout is unchanged and the thing is still hittable. */
+      .info::after {
+        content: '';
+        position: absolute;
+        inset: -14px;
       }
       .info:hover, .info:focus { color: var(--accent); border-color: var(--accent); outline: none; }
+      .info[aria-expanded='true'] { color: var(--accent); border-color: var(--accent); }
+
+      /* Tapped open rather than hovered. A title attribute is invisible on a
+         phone, which is where somebody is most likely to need the explanation
+         and least able to guess it. */
+      .info-text {
+        display: block;
+        flex: 1 0 100%;
+        margin: 6px 0 2px;
+        padding: 8px 10px;
+        border-left: 2px solid var(--accent);
+        background: rgba(216, 162, 74, 0.07);
+        border-radius: 0 7px 7px 0;
+        color: var(--dim);
+        font-size: 12.5px;
+        font-weight: 400;
+        line-height: 1.45;
+      }
 
       /* The selected game's rules, as the chain has them. */
       .rulesbox {
@@ -473,7 +522,16 @@
   <body>
     <header>
       <div>
-        <h1>Xtrata Chess</h1>
+        <h1>
+          <!-- The X is inscription #2986, the Xtrata logo, referenced rather
+               than copied. This page carries none of those 92KB: it points at
+               bytes already on chain, and the two are now permanently joined.
+               alt="X" is not decoration — if the reference ever fails to load,
+               the heading still reads "X Chess". -->
+          <img class="logo-x" src="/i/2986" alt="X" width="850" height="850"
+               title="The Xtrata X, inscription #2986. This page does not contain it; it points at it." />
+          Chess
+        </h1>
         <p class="sub">
           One shared chess game that anyone can join. Every move is saved on the Stacks blockchain, so nobody can change it or take it back — including whoever made this page.
         </p>
@@ -619,27 +677,27 @@
           <summary><h2>Start your own game, with your own rules</h2></summary>
           <div class="row">
             <label class="field">
-              <span>White <span class="info" tabindex="0" role="note" title="Who is allowed to move the white pieces. Type "anyone" to leave it open to everybody, "anyone-else" for everybody except whoever plays black, or a wallet address or .btc name to keep it to one person." aria-label="Who is allowed to move the white pieces. Type "anyone" to leave it open to everybody, "anyone-else" for everybody except whoever plays black, or a wallet address or .btc name to keep it to one person.">i</span></span>
+              <span>White <button type="button" class="info" data-info="white" aria-expanded="false" title="Who may move the white pieces. Type “anyone” to leave it open to everybody, “anyone-else” for everybody except whoever plays black, or a wallet address or .btc name to keep it to one person." aria-label="What this setting does">i</button></span>
               <input id="rules-white" type="text" placeholder="anyone · anyone-else · SP… · name.btc" autocomplete="off" spellcheck="false" list="side-values" />
             </label>
-          </div>
+          <span class="info-text" data-info="white" hidden>Who may move the white pieces. Type “anyone” to leave it open to everybody, “anyone-else” for everybody except whoever plays black, or a wallet address or .btc name to keep it to one person.</span></div>
           <div class="row">
             <label class="field">
-              <span>Black <span class="info" tabindex="0" role="note" title="Who is allowed to move the black pieces. Same choices as white. One name on one side and "anyone-else" on the other makes a game of one player against everybody." aria-label="Who is allowed to move the black pieces. Same choices as white. One name on one side and "anyone-else" on the other makes a game of one player against everybody.">i</span></span>
+              <span>Black <button type="button" class="info" data-info="black" aria-expanded="false" title="Who may move the black pieces. The same choices as white. One name on one side and “anyone-else” on the other makes a game of one player against everybody." aria-label="What this setting does">i</button></span>
               <input id="rules-black" type="text" placeholder="anyone · anyone-else · SP… · name.btc" autocomplete="off" spellcheck="false" list="side-values" />
               <datalist id="side-values">
                 <option value="anyone">anyone at all</option>
                 <option value="anyone-else">anyone, except whoever plays the other colour</option>
               </datalist>
             </label>
-          </div>
+          <span class="info-text" data-info="black" hidden>Who may move the black pieces. The same choices as white. One name on one side and “anyone-else” on the other makes a game of one player against everybody.</span></div>
           <div class="row">
             <label class="field" style="flex: 0 1 170px">
-              <span>Wait, in moves <span class="info" tabindex="0" role="note" title="After somebody moves, how many other moves must be played before that same person can move again. 0 lets anyone move whenever they like. 1 is the same as ticking "nobody can move twice in a row". 3 means you move, then wait for three other moves. Counted in moves, not in time, so it works the same whether the game takes an hour or a year." aria-label="After somebody moves, how many other moves must be played before that same person can move again. 0 lets anyone move whenever they like. 1 is the same as ticking "nobody can move twice in a row". 3 means you move, then wait for three other moves. Counted in moves, not in time, so it works the same whether the game takes an hour or a year.">i</span></span>
+              <span>Wait, in moves <button type="button" class="info" data-info="cooldown" aria-expanded="false" title="After somebody moves, how many other moves must be played before that same person may move again. 0 lets anyone move whenever they like. 1 is the same as ticking “nobody can move twice in a row”. 3 means you move, then wait for three other moves. Counted in moves, not in time, so it works the same whether the game takes an hour or a year. A wait of N needs N+1 different people able to move, or the game locks up." aria-label="What this setting does">i</button></span>
               <input id="rules-cooldown" type="number" min="0" step="1" value="0" />
             </label>
-            <label class="check"><input type="checkbox" id="rules-no-consecutive" /> Nobody can move twice in a row</label><span class="info" tabindex="0" role="note" title="Stops the same person playing two moves in a row, so one player cannot answer their own move. This is a separate setting from the wait: both are applied, and ticking this is the same as setting the wait to 1." aria-label="Stops the same person playing two moves in a row, so one player cannot answer their own move. This is a separate setting from the wait: both are applied, and ticking this is the same as setting the wait to 1.">i</span>
-          </div>
+            <label class="check"><input type="checkbox" id="rules-no-consecutive" /> Nobody can move twice in a row</label><button type="button" class="info" data-info="noconsec" aria-expanded="false" title="Stops the same person playing two moves in a row, so nobody can answer their own move. Separate from the wait above: both are applied, and ticking this is the same as setting the wait to 1." aria-label="What this setting does">i</button><span class="info-text" data-info="cooldown" hidden>Stops the same person playing two moves in a row, so nobody can answer their own move. Separate from the wait above: both are applied, and ticking this is the same as setting the wait to 1.</span>
+          <span class="info-text" data-info="noconsec" hidden>After somebody moves, how many other moves must be played before that same person may move again. 0 lets anyone move whenever they like. 1 is the same as ticking “nobody can move twice in a row”. 3 means you move, then wait for three other moves. Counted in moves, not in time, so it works the same whether the game takes an hour or a year. A wait of N needs N+1 different people able to move, or the game locks up.</span></div>
           <p class="hint" id="rules-summary"></p>
           <p class="fen">hash of these rules <code id="rules-hash"></code></p>
           <div class="row">

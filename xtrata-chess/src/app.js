@@ -428,6 +428,26 @@ export class ChessBoardApp {
     // watched a game will find it. Somebody who arrived meaning to start one
     // should not have to scroll looking, so the button is up here and does the
     // opening and the scrolling itself.
+    // The info icons, opened by a tap as well as a hover. A title attribute is
+    // invisible on a phone, which is where somebody is most likely to need the
+    // explanation and least able to guess it. Delegated, so the markup can grow
+    // another setting without another listener.
+    el.rulesPanel.addEventListener('click', (event) => {
+      const button = event.target.closest?.('.info');
+      if (!button) return;
+      event.preventDefault();
+      // Paired by name rather than by position: the explainer sits at the end
+      // of its row so it can use the full width, which puts it out of reach of
+      // nextElementSibling, and one row carries two of them.
+      const text = el.rulesPanel.querySelector(
+        `.info-text[data-info="${button.dataset.info}"]`
+      );
+      if (!text) return;
+      const open = !text.hidden;
+      text.hidden = open;
+      button.setAttribute('aria-expanded', String(!open));
+    });
+
     el.startOwn.addEventListener('click', () => {
       el.rulesPanel.open = true;
       el.rulesPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1129,7 +1149,7 @@ export class ChessBoardApp {
    */
   async copyPgn() {
     const pgn = toPgn(this.state, {
-      Event: 'Xtrata Chess',
+      Event: 'X Chess',
       Site: this.chain?.contractId || 'chain',
       Round: String(this.game ?? '-'),
       ...this._pgnPlayers(),
@@ -1314,9 +1334,11 @@ export class ChessBoardApp {
     el.rulesSummary.textContent = describeRules(rules);
     el.rulesHash.textContent = open ? 'none — these are the open board rules' : rulesHash(rules);
     el.rulesDownload.disabled = !this.childGame;
+    // Kept in step with the label in index.html, which this replaces the moment
+    // the panel renders.
     el.rulesDownload.textContent = this.childGame
-      ? `Download the board for game #${this.childGame}`
-      : 'Download the board';
+      ? `Download the page for game #${this.childGame}`
+      : 'Download the page for this game';
 
     // Nothing reaches a wallet until every choice has been made. A game's rules
     // are hashed on chain and cannot be edited afterwards, so an incomplete set

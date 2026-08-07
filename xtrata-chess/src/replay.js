@@ -135,7 +135,7 @@ export function replay(submissions, options = {}) {
 // carries, alongside the raw log it was derived from.
 export function toPgn(state, headers = {}) {
   const tags = {
-    Event: 'Xtrata Chess',
+    Event: 'X Chess',
     Site: 'chain',
     Date: '????.??.??',
     Round: '-',
