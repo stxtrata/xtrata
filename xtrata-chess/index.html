@@ -106,8 +106,14 @@
         align-items: start;
       }
 
+      /* One column, and the panels read in the order somebody uses them:
+         board, the controls that act on it, the game, then the record and the
+         generator. Which column a panel sits in on a wide screen is a layout
+         decision and should not decide that order. */
       @media (max-width: 900px) {
         main { grid-template-columns: 1fr; }
+        main > section { display: contents; }
+        main > section > * { order: var(--order, 1); }
         body { padding: 16px; }
       }
 
@@ -463,10 +469,22 @@
           <div id="pending-panel" class="pending-panel" hidden></div>
           <p id="notice" class="notice" hidden></p>
         </div>
+        <div class="panel" style="--order: 6">
+          <h2>Moves that counted</h2>
+          <div class="scroll" id="moves"></div>
+        </div>
+
+        <details class="panel fold-panel" style="--order: 7">
+          <summary><h2>Everything anyone sent</h2></summary>
+          <div class="scroll" id="log"></div>
+          <p class="hint">
+            Some moves get skipped, usually because they were not a legal chess move, or it was not that colour’s turn. They stay on this list forever, because nothing on the blockchain can be deleted. Whoever sent them still paid, and the board did not change.
+          </p>
+        </details>
       </section>
 
       <section>
-        <div class="panel">
+        <div class="panel" style="--order: 3">
           <h2>Board · <span id="game-label">no game</span></h2>
           <div class="row">
             <button id="new-game">New game</button>
@@ -498,7 +516,7 @@
           </div>
         </div>
 
-        <div class="panel" id="replay-panel" hidden>
+        <div class="panel" id="replay-panel" style="--order: 4" hidden>
           <h2>This game is over</h2>
           <div class="transport">
             <button id="to-start" title="Start">⏮</button>
@@ -528,7 +546,7 @@
           </p>
         </div>
 
-        <div class="panel" id="live-panel">
+        <div class="panel" id="live-panel" style="--order: 5">
           <h2>Game</h2>
           <div class="row">
             <label class="field" style="flex: 1 1 140px">
@@ -575,20 +593,8 @@
           </div>
         </div>
 
-        <div class="panel">
-          <h2>Moves that counted</h2>
-          <div class="scroll" id="moves"></div>
-        </div>
 
-        <details class="panel fold-panel">
-          <summary><h2>Everything anyone sent</h2></summary>
-          <div class="scroll" id="log"></div>
-          <p class="hint">
-            Some moves get skipped, usually because they were not a legal chess move, or it was not that colour’s turn. They stay on this list forever, because nothing on the blockchain can be deleted. Whoever sent them still paid, and the board did not change.
-          </p>
-        </details>
-
-        <details class="panel fold-panel" id="rules-panel">
+        <details class="panel fold-panel" id="rules-panel" style="--order: 8">
           <summary><h2>Start your own game, with your own rules</h2></summary>
           <div class="row">
             <label class="field">
