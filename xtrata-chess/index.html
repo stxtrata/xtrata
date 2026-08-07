@@ -419,6 +419,27 @@
       .hint.good strong { color: var(--ok); font-family: var(--mono); }
       .hint.bad { color: var(--no); }
 
+      /* A settings explainer, on hover or focus. Small enough to ignore, and
+         reachable from a keyboard rather than mouse-only. */
+      .info {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 15px;
+        height: 15px;
+        margin-left: 4px;
+        border-radius: 50%;
+        border: 1px solid var(--dim);
+        color: var(--dim);
+        font-size: 10px;
+        font-style: italic;
+        font-weight: 700;
+        font-family: var(--mono);
+        cursor: help;
+        vertical-align: 1px;
+      }
+      .info:hover, .info:focus { color: var(--accent); border-color: var(--accent); outline: none; }
+
       /* The selected game's rules, as the chain has them. */
       .rulesbox {
         margin: 10px 0 0;
@@ -598,13 +619,13 @@
           <summary><h2>Start your own game, with your own rules</h2></summary>
           <div class="row">
             <label class="field">
-              <span>White</span>
+              <span>White <span class="info" tabindex="0" role="note" title="Who is allowed to move the white pieces. Type "anyone" to leave it open to everybody, "anyone-else" for everybody except whoever plays black, or a wallet address or .btc name to keep it to one person." aria-label="Who is allowed to move the white pieces. Type "anyone" to leave it open to everybody, "anyone-else" for everybody except whoever plays black, or a wallet address or .btc name to keep it to one person.">i</span></span>
               <input id="rules-white" type="text" placeholder="anyone · anyone-else · SP… · name.btc" autocomplete="off" spellcheck="false" list="side-values" />
             </label>
           </div>
           <div class="row">
             <label class="field">
-              <span>Black</span>
+              <span>Black <span class="info" tabindex="0" role="note" title="Who is allowed to move the black pieces. Same choices as white. One name on one side and "anyone-else" on the other makes a game of one player against everybody." aria-label="Who is allowed to move the black pieces. Same choices as white. One name on one side and "anyone-else" on the other makes a game of one player against everybody.">i</span></span>
               <input id="rules-black" type="text" placeholder="anyone · anyone-else · SP… · name.btc" autocomplete="off" spellcheck="false" list="side-values" />
               <datalist id="side-values">
                 <option value="anyone">anyone at all</option>
@@ -614,10 +635,10 @@
           </div>
           <div class="row">
             <label class="field" style="flex: 0 1 170px">
-              <span>Wait between turns</span>
+              <span>Wait, in moves <span class="info" tabindex="0" role="note" title="After somebody moves, how many other moves must be played before that same person can move again. 0 lets anyone move whenever they like. 1 is the same as ticking "nobody can move twice in a row". 3 means you move, then wait for three other moves. Counted in moves, not in time, so it works the same whether the game takes an hour or a year." aria-label="After somebody moves, how many other moves must be played before that same person can move again. 0 lets anyone move whenever they like. 1 is the same as ticking "nobody can move twice in a row". 3 means you move, then wait for three other moves. Counted in moves, not in time, so it works the same whether the game takes an hour or a year.">i</span></span>
               <input id="rules-cooldown" type="number" min="0" step="1" value="0" />
             </label>
-            <label class="check"><input type="checkbox" id="rules-no-consecutive" /> Nobody can move twice in a row</label>
+            <label class="check"><input type="checkbox" id="rules-no-consecutive" /> Nobody can move twice in a row</label><span class="info" tabindex="0" role="note" title="Stops the same person playing two moves in a row, so one player cannot answer their own move. This is a separate setting from the wait: both are applied, and ticking this is the same as setting the wait to 1." aria-label="Stops the same person playing two moves in a row, so one player cannot answer their own move. This is a separate setting from the wait: both are applied, and ticking this is the same as setting the wait to 1.">i</span>
           </div>
           <p class="hint" id="rules-summary"></p>
           <p class="fen">hash of these rules <code id="rules-hash"></code></p>

@@ -171,6 +171,28 @@ export function looksLikeName(value) {
  *     principals, and a sealed board has no network, so the name has to become
  *     an address before it is hashed rather than after.
  */
+/**
+ * How many different people these rules allow to move, or null for "no limit".
+ *
+ * Only used to catch a wait nobody could ever satisfy. "anyone" and
+ * "anyone-else" are unbounded, an allow list is exactly its own length, and two
+ * named sides are two people — or one, if somebody names themselves twice.
+ */
+function countMovers(draft = {}) {
+  const allow = Array.isArray(draft.allow)
+    ? [...new Set(draft.allow.map((v) => String(v).trim().toUpperCase()).filter(Boolean))]
+    : [];
+  if (allow.length) return allow.length;
+
+  const named = new Set();
+  for (const side of [draft.white, draft.black]) {
+    const value = typeof side === 'string' ? side.trim().toLowerCase() : '';
+    if (!value || value === ANYONE || value === ANYONE_ELSE) return null;
+    named.add(value);
+  }
+  return named.size;
+}
+
 export function readyToOpen(draft = {}) {
   const problems = [];
   const check = (field, label) => {
@@ -215,9 +237,27 @@ export function readyToOpen(draft = {}) {
     if (!Number.isFinite(cooldown) || cooldown < 0 || Math.floor(cooldown) !== cooldown) {
       problems.push({
         field: 'cooldown',
-        message: 'Cooldown must be a whole number of blocks, or zero.'
+        message: 'The wait must be a whole number of moves, or zero for no wait.'
       });
     }
+  }
+
+  // A wait of N needs N+1 different people able to move, or the game locks.
+  //
+  // Two named players and a wait of two is the case that bites: A moves, B
+  // moves, and now A is one move short and so is B. Nobody can ever move again,
+  // and the rules are already hashed on chain, so the game is a brick. Refused
+  // rather than warned about, because there is no fixing it afterwards.
+  const movers = countMovers(draft);
+  const wait = Number(draft.cooldown);
+  if (movers !== null && Number.isFinite(wait) && wait >= movers) {
+    problems.push({
+      field: 'cooldown',
+      message:
+        `A wait of ${wait} needs ${wait + 1} different people able to move, and these rules allow ` +
+        `${movers}. The game would lock up after ${movers} moves with nobody able to play. ` +
+        `Lower the wait to ${movers - 1}, or open a side to more people.`
+    });
   }
 
   return {
@@ -254,12 +294,23 @@ export function checkSender(rules, { sender, height, turn, history }) {
     if (last.sender && last.sender === sender) return REJECTED_BY_RULE.CONSECUTIVE;
   }
 
-  if (r.cooldown > 0 && Number.isFinite(height)) {
-    // The most recent accepted move by this same sender.
+  // Counted in moves, not blocks.
+  //
+  // It used to be blocks, which sounds like a waiting time and is not one: a
+  // Stacks block is seconds, so a cooldown of six was about a minute and stopped
+  // nobody. Moves are the unit that means something in a game — "wait for three
+  // other people to play" holds however fast or slow the chain runs.
+  //
+  // Not a version bump, deliberately. The only rule set committed on chain has a
+  // cooldown of zero, where both readings do exactly the same nothing, and
+  // bumping RULES_VERSION would change its hash and break a commitment that is
+  // already there.
+  if (r.cooldown > 0) {
     for (let i = history.length - 1; i >= 0; i--) {
       if (history[i].sender !== sender) continue;
-      const since = height - history[i].height;
-      if (Number.isFinite(since) && since < r.cooldown) return REJECTED_BY_RULE.COOLDOWN;
+      // How many moves have been played since this sender's last one.
+      const movesSince = history.length - 1 - i;
+      if (movesSince < r.cooldown) return REJECTED_BY_RULE.COOLDOWN;
       break;
     }
   }
@@ -303,7 +354,11 @@ export function describeRules(rules, name = null) {
   }
   if (r.noConsecutive) parts.push('nobody can move twice in a row');
   if (r.cooldown > 0) {
-    parts.push(`each player waits ${r.cooldown} block${r.cooldown === 1 ? '' : 's'} before moving again`);
+    parts.push(
+      r.cooldown === 1
+        ? 'nobody can move twice in a row'
+        : `after moving, a player waits for ${r.cooldown} other moves`
+    );
   }
   if (r.startFen !== START_FEN) parts.push('the game starts from a set-up position');
 

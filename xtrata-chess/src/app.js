@@ -1334,10 +1334,17 @@ export class ChessBoardApp {
 
     if (el.rulesNote) {
       el.rulesNote.className = check.ready ? 'hint' : 'hint warn';
+      // Kept in step with the same paragraph in index.html, which this replaces
+      // the moment the panel renders. They said different things for a while,
+      // and the markup version was the one nobody ever saw.
       el.rulesNote.innerHTML = check.ready
-        ? 'The contract enforces none of this. It stores the hash above when the game is opened, and the ' +
-          'board you download is the referee: it replays the log and skips anything these rules disallow. ' +
-          'Open the game first, then download the board bound to it.'
+        ? 'The blockchain does not check any of these rules. When the game starts it saves only a ' +
+          '<strong>hash</strong> of them: a short fingerprint that could not have come from any other ' +
+          'set of rules. The page you download is the referee. It reads every move, ignores the ones ' +
+          'that break your rules, and checks its own rules against that hash, so it can prove it is ' +
+          'refereeing the game it claims to be. Inscribe that page and your game gets what this one ' +
+          'has: a permanent front end, permanently tied to a live contract. Start the game first, ' +
+          'then download its page.'
         : '<strong>Not ready to open.</strong><br>' +
           check.problems.map((problem) => escapeHtml(problem.message)).join('<br>');
     }
