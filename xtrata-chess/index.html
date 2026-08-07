@@ -45,6 +45,21 @@
         color: var(--dim);
         font-size: 13px;
       }
+      footer.about {
+        max-width: 1120px;
+        margin: 20px auto 0;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--panel);
+      }
+      footer.about p {
+        margin: 0;
+        max-width: 78ch;
+        color: var(--dim);
+        font-size: 13px;
+      }
+      footer.about strong { color: var(--accent); }
 
       header {
         display: flex;
@@ -285,8 +300,24 @@
       .movelist { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 13px; }
       .movelist td { padding: 3px 6px; }
       .movelist .num { color: var(--dim); width: 38px; text-align: right; }
-      .movelist .dot { width: 14px; }
-      .movelist .san { width: 74px; }
+      .movelist .dot { width: 18px; }
+      .movelist .san { width: 66px; }
+      .movelist .what { color: var(--dim); width: 58px; font-family: ui-sans-serif, system-ui; }
+
+      /* The piece that moved, at list size. Same glyphs as the board, so the
+         thing in the list is recognisably the thing you just picked up. */
+      .mini {
+        font-size: 15px;
+        line-height: 1;
+        display: inline-block;
+        vertical-align: -1px;
+      }
+      .mini.white { color: #fbf7f0; text-shadow: 0 0 1px #2b2118; }
+      .mini.black { color: #23180f; text-shadow: 0 0 1px #6a5b4a; }
+
+      /* And in the move you are about to send. */
+      .hint .mini { font-size: 17px; vertical-align: -2px; }
+      .hint .what { color: var(--ink); }
       .movelist .at {
         width: 58px;
         color: var(--dim);
@@ -417,7 +448,7 @@
       <div>
         <h1>Xtrata Chess</h1>
         <p class="sub">
-          One shared chess game that anyone can join. Every move is saved on the Stacks blockchain, so nobody can change it or take it back.
+          One shared chess game that anyone can join. Every move is saved on the Stacks blockchain, so nobody can change it or take it back — including whoever made this page.
         </p>
       </div>
     </header>
@@ -492,7 +523,7 @@
           </div>
           <p class="hint" id="replay-caption"></p>
           <p class="hint">
-            This game is finished, and no more moves can be added. What stays is the full record: everything anyone sent, in order, replayed through the same rules the live board used.
+            This game is finished, and no more moves can be added. What stays is the full record: everything anyone sent, in order, replayed through the same rules the live board used. The game is permanent, and so is this page. Neither needs anyone to keep paying for a server.
           </p>
         </div>
 
@@ -589,12 +620,22 @@
             <button id="rules-reset" title="Put the rules back to how they started.">Reset</button>
           </div>
           <p class="hint" id="rules-note">
-            The blockchain does not check any of these rules. When the game starts it saves only a <strong>hash</strong> of them: a short fingerprint that could not have come from any other set of rules. The page you download is the referee. It reads every move, ignores the ones that break your rules, and checks its own rules against that fingerprint so it can prove it is refereeing the game it claims to be. Start the game first, then download its page.
+            The blockchain does not check any of these rules. When the game starts it saves only a <strong>hash</strong> of them: a short fingerprint that could not have come from any other set of rules. The page you download is the referee. It reads every move, ignores the ones that break your rules, and checks its own rules against that hash, so it can prove it is refereeing the game it claims to be. Inscribe that page and your game gets what this one has: a permanent front end, permanently tied to a live contract. Start the game first, then download its page.
           </p>
         </details>
 
       </section>
     </main>
+
+    <footer class="about">
+      <p>
+        <strong>This page is an inscription.</strong> It is not hosted anywhere and nobody can
+        update it: these exact bytes are written into the Stacks blockchain, and they will still
+        be there long after any website has gone. What you have been watching is that permanent
+        page reading a live smart contract — the board changes as people play, while the thing
+        drawing it never changes at all.
+      </p>
+    </footer>
 
     <script type="module">
       import { boot } from './src/boot.js';

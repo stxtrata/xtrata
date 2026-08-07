@@ -17,8 +17,16 @@
 import { SealedChain } from './sealed-chain.js';
 import { LiveChain, describeContractError } from './live-chain.js';
 import { replay, toPgn, REJECTED } from './replay.js';
-import { Chess, parseUci, pieceColor } from './engine.js';
-import { BoardView, statusText, shortSender, displaySender } from './board-ui.js';
+import { Chess, parseUci, pieceColor, pieceType } from './engine.js';
+import {
+  BoardView,
+  statusText,
+  shortSender,
+  displaySender,
+  describeMove,
+  pieceGlyph,
+  pieceName
+} from './board-ui.js';
 import { NameResolver, StaticNames } from './bns.js';
 import {
   BlockTimes,
@@ -1208,7 +1216,7 @@ export class ChessBoardApp {
     const state = this.state;
 
     if (!raw) {
-      el.moveHint.textContent = 'Click a piece and then its destination, or type a move.';
+      el.moveHint.textContent = 'Pick a piece, then pick where you want it to go.';
       el.moveHint.className = 'hint';
       el.submitMove.disabled = true;
       this.board.setStaged(null);
@@ -1216,7 +1224,7 @@ export class ChessBoardApp {
     }
 
     if (!isWellFormedLength(raw)) {
-      el.moveHint.textContent = `${raw.length} characters. The contract only stores four or five, so this would be refused before it reached the log.`;
+      el.moveHint.textContent = `That is ${raw.length} characters. A move is four, like e2e4, or five when a pawn becomes a new piece, like e7e8q.`;
       el.moveHint.className = 'hint bad';
       el.submitMove.disabled = true;
       this.board.setStaged(null);
@@ -1230,7 +1238,16 @@ export class ChessBoardApp {
       // Show the move in the notation people read, not just the one they type.
       const preview = new Chess(state.fen);
       const applied = preview.moveUci(uci);
+      const side = state.turn === 'white' ? 'white' : 'black';
+      // pieceType, not the raw board value: a piece carries its colour in the
+      // same number, so the encoded form matches no entry in the glyph table.
+      const type = applied ? pieceType(applied.piece) : 0;
+      const moving = type
+        ? `<span class="mini ${side}">${pieceGlyph(type)}</span> ` +
+          `<span class="what">${escapeHtml(pieceName(type))}</span> · `
+        : '';
       el.moveHint.innerHTML =
+        moving +
         `<strong>${escapeHtml(applied ? applied.san : uci)}</strong> · ` +
         `${escapeHtml(uci.slice(0, 2))} → ${escapeHtml(uci.slice(2, 4))}` +
         (uci.length === 5 ? `, promoting to ${escapeHtml(uci[4].toUpperCase())}` : '') +
@@ -1627,10 +1644,14 @@ export class ChessBoardApp {
       const at = elapsed === null ? '' : formatClock(elapsed);
 
       return (
-        `<tr class="${reached ? '' : 'ahead'} ${current ? 'current' : ''}">` +
+        `<tr class="${reached ? '' : 'ahead'} ${current ? 'current' : ''}"` +
+        ` title="${escapeHtml(describeMove(entry))}">` +
         `<td class="num">${label}</td>` +
-        `<td class="dot"><span class="side ${entry.color}"></span></td>` +
+        // The piece itself rather than a coloured dot: it says which side moved
+        // and what moved, in the space the dot used.
+        `<td class="dot"><span class="mini ${entry.color}">${pieceGlyph(entry.piece)}</span></td>` +
         `<td class="san">${escapeHtml(entry.san)}</td>` +
+        `<td class="what">${escapeHtml(pieceName(entry.piece))}</td>` +
         `<td class="at">${at}</td>` +
         `<td class="who ${who.named ? 'named' : ''}" title="${escapeHtml(who.title)}">` +
         `${escapeHtml(who.label)}</td>` +

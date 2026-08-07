@@ -23,6 +23,47 @@ const GLYPH = {
   6: '♚'
 };
 
+// What each piece is called, so a move can be read aloud. The board already
+// draws these; the moves list and the input hint say them.
+export const PIECE_NAME = {
+  [PAWN]: 'Pawn',
+  [KNIGHT]: 'Knight',
+  [BISHOP]: 'Bishop',
+  [ROOK]: 'Rook',
+  [QUEEN]: 'Queen',
+  6: 'King'
+};
+
+export function pieceGlyph(type) {
+  return GLYPH[type] || '';
+}
+
+export function pieceName(type) {
+  return PIECE_NAME[type] || '';
+}
+
+/**
+ * A move in words: "White pawn to e4", "Black knight takes on f3".
+ *
+ * For somebody who cannot yet read "Nxf3" this is the whole move. For somebody
+ * who can, it costs nothing, because it lives in a tooltip.
+ */
+export function describeMove(entry) {
+  const colour = entry.color === 'white' ? 'White' : 'Black';
+  const name = pieceName(entry.piece).toLowerCase() || 'piece';
+  const to = String(entry.uci || '').slice(2, 4);
+
+  if (/^O-O(-O)?/.test(entry.san || '')) {
+    return `${colour} castles ${entry.san.startsWith('O-O-O') ? 'queenside' : 'kingside'}`;
+  }
+
+  const verb = entry.captured ? `takes ${pieceName(entry.captured).toLowerCase()} on` : 'to';
+  const promoted = entry.promotion
+    ? `, and becomes a ${pieceName(entry.promotion).toLowerCase()}`
+    : '';
+  return `${colour} ${name} ${verb} ${to}${promoted}`;
+}
+
 const PROMOTION_CHOICES = [
   { piece: QUEEN, letter: 'q' },
   { piece: ROOK, letter: 'r' },

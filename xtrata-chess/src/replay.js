@@ -8,7 +8,7 @@
 // Nothing here throws. The input is arbitrary strings written by anyone, and
 // a malformed submission is an ordinary outcome rather than an error.
 
-import { Chess, START_FEN, parseUci, pieceColor } from './engine.js';
+import { Chess, START_FEN, parseUci, pieceColor, pieceType } from './engine.js';
 import { DEFAULT_RULES, REJECTED_BY_RULE, checkSender, normaliseRules } from './rules.js';
 
 export const REJECTED = {
@@ -99,6 +99,12 @@ export function replay(submissions, options = {}) {
       reason: null,
       san: move.san,
       uci: move.uci,
+      // Carried so a reader can say "knight" rather than decode "Nf3". The
+      // engine knows this for free at the moment it makes the move; working it
+      // out again later would mean replaying the position a second time.
+      piece: pieceType(move.piece),
+      captured: move.captured ? pieceType(move.captured) : 0,
+      promotion: move.promotion || 0,
       ply: accepted.length + 1,
       color: accepted.length % 2 === 0 ? 'white' : 'black'
     };
