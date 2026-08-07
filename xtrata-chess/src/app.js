@@ -37,6 +37,7 @@ import {
 } from './protocol.js';
 import {
   ANYONE,
+  ANYONE_ELSE,
   DEFAULT_RULES,
   describeRules,
   isOpenBoard,
@@ -1100,11 +1101,21 @@ export class ChessBoardApp {
     }
   }
 
+  /**
+   * The game as PGN, with headers that agree with the board.
+   *
+   * White and Black are not decoration here. A PGN saying "anyone" for a game
+   * whose rules name a player contradicts the panel directly above it, and it
+   * is the copy that leaves the page and gets opened somewhere else, where
+   * there is no panel to contradict.
+   */
   async copyPgn() {
     const pgn = toPgn(this.state, {
       Event: 'Xtrata Open Board',
       Site: this.chain?.contractId || 'chain',
-      Round: String(this.game ?? '-')
+      Date: this._pgnDate(),
+      Round: String(this.game ?? '-'),
+      ...this._pgnPlayers()
     });
     try {
       await navigator.clipboard.writeText(pgn);
@@ -1113,6 +1124,44 @@ export class ChessBoardApp {
       this._notify('Could not reach the clipboard.', 'warn');
     }
     this.render();
+  }
+
+  // The day the first move landed, in PGN's own format. Unknown stays as PGN
+  // writes unknown, rather than becoming today by accident.
+  _pgnDate() {
+    const first = this.stamps?.find?.((at) => Number.isFinite(at));
+    if (!Number.isFinite(first)) return '????.??.??';
+    const when = new Date(first * 1000);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${when.getUTCFullYear()}.${pad(when.getUTCMonth() + 1)}.${pad(when.getUTCDate())}`;
+  }
+
+  /**
+   * Who the rules say may move each side.
+   *
+   * Only from rules this board is actually refereeing. A game whose commitment
+   * this board cannot reproduce gets "anyone", because that is the truth of
+   * what this board enforced when it produced the move list being copied.
+   */
+  _pgnPlayers() {
+    const rules = this.gameRules;
+    if (!rules) return { White: 'anyone', Black: 'anyone' };
+
+    const named = (who, other) => {
+      if (who === ANYONE) return 'anyone';
+      if (who === ANYONE_ELSE) {
+        const excluded = other === ANYONE || other === ANYONE_ELSE ? null : other;
+        return excluded
+          ? `anyone except ${this.names?.get?.(excluded) || excluded}`
+          : 'anyone';
+      }
+      return this.names?.get?.(who) || who;
+    };
+
+    return {
+      White: named(rules.white, rules.black),
+      Black: named(rules.black, rules.white)
+    };
   }
 
   _notify(message, level = 'info') {
