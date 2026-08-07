@@ -75,14 +75,20 @@ describe('a game this board is not refereeing', () => {
   });
 });
 
-describe('the date', () => {
-  const pgnDate = (stamps) => {
+describe('when the game started', () => {
+  // Matching src/app.js _pgnWhen.
+  const pgnWhen = (stamps) => {
     const first = stamps?.find?.((at) => Number.isFinite(at));
-    if (!Number.isFinite(first)) return '????.??.??';
+    if (!Number.isFinite(first)) {
+      return { Date: '????.??.??', UTCDate: '????.??.??', UTCTime: '??:??:??' };
+    }
     const when = new Date(first * 1000);
     const pad = (n) => String(n).padStart(2, '0');
-    return `${when.getUTCFullYear()}.${pad(when.getUTCMonth() + 1)}.${pad(when.getUTCDate())}`;
+    const date = `${when.getUTCFullYear()}.${pad(when.getUTCMonth() + 1)}.${pad(when.getUTCDate())}`;
+    const time = `${pad(when.getUTCHours())}:${pad(when.getUTCMinutes())}:${pad(when.getUTCSeconds())}`;
+    return { Date: date, UTCDate: date, UTCTime: time };
   };
+  const pgnDate = (stamps) => pgnWhen(stamps).Date;
 
   // Computed rather than typed, because a hand-written epoch is a fixture that
   // can be wrong in the same direction as nothing else.
@@ -107,7 +113,25 @@ describe('the date', () => {
   // whenever somebody happened to copy it.
   it('stays unknown when no block time is known', () => {
     for (const stamps of [[], [null], null, undefined]) {
-      expect(pgnDate(stamps)).toBe('????.??.??');
+      expect(pgnWhen(stamps)).toEqual({
+        Date: '????.??.??',
+        UTCDate: '????.??.??',
+        UTCTime: '??:??:??'
+      });
     }
+  });
+
+  it('carries the time of day, to the second', () => {
+    expect(pgnWhen([NOON_6_AUG]).UTCTime).toBe('09:14:00');
+    expect(pgnWhen([Date.UTC(2026, 7, 6, 0, 0, 0) / 1000]).UTCTime).toBe('00:00:00');
+    expect(pgnWhen([Date.UTC(2026, 7, 6, 23, 59, 59) / 1000]).UTCTime).toBe('23:59:59');
+  });
+
+  // The supplemental pair is what this actually is: a block timestamp has no
+  // timezone of its own. A bare Time tag would claim a local clock nobody has.
+  it('reports the UTC pair alongside the required Date', () => {
+    const tags = pgnWhen([NOON_6_AUG]);
+    expect(tags.UTCDate).toBe(tags.Date);
+    expect(tags.UTCTime).toMatch(/^\d{2}:\d{2}:\d{2}$/);
   });
 });

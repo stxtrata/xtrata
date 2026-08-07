@@ -1113,9 +1113,9 @@ export class ChessBoardApp {
     const pgn = toPgn(this.state, {
       Event: 'Xtrata Open Board',
       Site: this.chain?.contractId || 'chain',
-      Date: this._pgnDate(),
       Round: String(this.game ?? '-'),
-      ...this._pgnPlayers()
+      ...this._pgnPlayers(),
+      ...this._pgnWhen()
     });
     try {
       await navigator.clipboard.writeText(pgn);
@@ -1126,14 +1126,31 @@ export class ChessBoardApp {
     this.render();
   }
 
-  // The day the first move landed, in PGN's own format. Unknown stays as PGN
-  // writes unknown, rather than becoming today by accident.
-  _pgnDate() {
+  /**
+   * When the first move landed, as PGN writes time.
+   *
+   * Three tags, because PGN separates them and the distinction is real. Date is
+   * one of the seven required tags and every reader shows it. UTCDate and
+   * UTCTime are the supplemental pair, and they are what this actually is: a
+   * block timestamp, which has no timezone of its own. Writing the time into a
+   * bare Time tag would claim a local clock nobody here has.
+   *
+   * Unknown stays as PGN writes unknown. A game with no block time yet would
+   * otherwise be dated to whenever somebody pressed Copy.
+   */
+  _pgnWhen() {
     const first = this.stamps?.find?.((at) => Number.isFinite(at));
-    if (!Number.isFinite(first)) return '????.??.??';
+    if (!Number.isFinite(first)) {
+      return { Date: '????.??.??', UTCDate: '????.??.??', UTCTime: '??:??:??' };
+    }
+
     const when = new Date(first * 1000);
     const pad = (n) => String(n).padStart(2, '0');
-    return `${when.getUTCFullYear()}.${pad(when.getUTCMonth() + 1)}.${pad(when.getUTCDate())}`;
+    const date = `${when.getUTCFullYear()}.${pad(when.getUTCMonth() + 1)}.${pad(when.getUTCDate())}`;
+    const time =
+      `${pad(when.getUTCHours())}:${pad(when.getUTCMinutes())}:${pad(when.getUTCSeconds())}`;
+
+    return { Date: date, UTCDate: date, UTCTime: time };
   }
 
   /**
