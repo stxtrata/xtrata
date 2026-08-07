@@ -963,9 +963,10 @@ export class ChessBoardApp {
       this._nameRuleSides();
       el.gameRulesNote.textContent =
         `${known?.label ? `${known.label}. ` : ''}` +
-        'These rules match the fingerprint saved on the blockchain, which is how this page knows it is ' +
-        'the right referee for this game. The blockchain itself does not check them: a move that breaks ' +
-        'the rules is still saved and still costs its sender, and this page ignores it.';
+        'A hash is a short fingerprint of something longer, and it could not have come from any other ' +
+        'set of rules. These rules match the one saved on the blockchain, which is how this page knows ' +
+        'it is the right referee for this game. The blockchain itself does not check the rules: a move ' +
+        'that breaks them is still saved and still costs its sender, and this page ignores it.';
       return;
     }
 
@@ -973,9 +974,9 @@ export class ChessBoardApp {
     el.gameRulesState.className = 'tag unknown';
     el.gameRulesSummary.textContent = 'This game has rules, but they are not ones this page knows.';
     el.gameRulesNote.textContent =
-      'The blockchain saves only the fingerprint above, never the rules themselves, so they cannot be ' +
-      'read from here. Whoever started this game made their own page that has them. This page shows ' +
-      'every move without judging any of them, so it may not match what that page shows.';
+      'The blockchain saves only the hash above, never the rules themselves, so they cannot be read ' +
+      'from here. Whoever started this game made their own page that has them. This page shows every ' +
+      'move without judging any of them, so it may not match what that page shows.';
   }
 
   // Resolve the addresses a rule set names, then redraw once.
@@ -1110,7 +1111,7 @@ export class ChessBoardApp {
    */
   async copyPgn() {
     const pgn = toPgn(this.state, {
-      Event: 'Xtrata Open Board',
+      Event: 'Xtrata Chess',
       Site: this.chain?.contractId || 'chain',
       Round: String(this.game ?? '-'),
       ...this._pgnPlayers(),

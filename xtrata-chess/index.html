@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Xtrata Open Board</title>
+    <title>Xtrata Chess</title>
     <style>
       :root {
         --bg: #12100e;
@@ -415,9 +415,9 @@
   <body>
     <header>
       <div>
-        <h1>Xtrata Open Board</h1>
+        <h1>Xtrata Chess</h1>
         <p class="sub">
-          One shared chess game that anyone can join. Every move is saved on the Bitcoin blockchain, so nobody can change it later.
+          One shared chess game that anyone can join. Every move is saved on the Stacks blockchain, so nobody can change it or take it back.
         </p>
       </div>
     </header>
@@ -461,7 +461,7 @@
             </div>
             <p class="hint" id="move-hint">Pick a piece, then pick where you want it to go.</p>
             <p class="hint">
-              You can also type a move: the square the piece starts on, then the square it finishes on. So e2e4 means "move the piece on e2 to e4". Nothing is sent anywhere until you press Submit move.
+              You can also type a move in <strong>UCI</strong>, the notation chess programs use between themselves. It is just the square a piece starts on followed by the square it ends on, so <code>e2e4</code> means "the piece on e2 goes to e4". When a pawn reaches the far end and becomes a new piece, add a letter for it: <code>e7e8q</code> promotes to a queen. Nothing is sent anywhere until you press Submit move.
             </p>
           </div>
         </div>
@@ -518,7 +518,7 @@
             </div>
             <p id="game-rules-summary"></p>
             <p class="meta">
-              fingerprint saved on the blockchain <code id="game-rules-hash">—</code>
+              hash saved on the blockchain <code id="game-rules-hash">—</code>
             </p>
             <p class="hint" id="game-rules-note"></p>
           </div>
@@ -582,14 +582,14 @@
             <label class="check"><input type="checkbox" id="rules-no-consecutive" /> Nobody can move twice in a row</label>
           </div>
           <p class="hint" id="rules-summary"></p>
-          <p class="fen">fingerprint of these rules <code id="rules-hash"></code></p>
+          <p class="fen">hash of these rules <code id="rules-hash"></code></p>
           <div class="row">
             <button id="rules-open" title="Start your game on the blockchain with the rules above. Your wallet will ask you to approve it.">Open this game</button>
             <button id="rules-download" title="Download this game as its own web page, which acts as the referee for your rules.">Download the page for this game</button>
             <button id="rules-reset" title="Put the rules back to how they started.">Reset</button>
           </div>
           <p class="hint" id="rules-note">
-            The blockchain does not check any of these rules. It only saves a fingerprint of them when the game starts. The page you download is the referee: it reads every move and ignores any that break your rules. Start the game first, then download its page.
+            The blockchain does not check any of these rules. When the game starts it saves only a <strong>hash</strong> of them: a short fingerprint that could not have come from any other set of rules. The page you download is the referee. It reads every move, ignores the ones that break your rules, and checks its own rules against that fingerprint so it can prove it is refereeing the game it claims to be. Start the game first, then download its page.
           </p>
         </details>
 
