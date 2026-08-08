@@ -69,12 +69,21 @@ export function boot(options = {}) {
   // image at all. Swap in the letter, which is what the alt text says anyway.
   const logo = document.querySelector('.logo-x');
   if (logo) {
-    logo.addEventListener('error', () => {
+    const useTheLetter = () => {
       const letter = document.createElement('span');
       letter.className = 'logo-x logo-x--text';
       letter.textContent = 'X';
       logo.replaceWith(letter);
-    }, { once: true });
+    };
+
+    // Both, and the first one matters more than it looks. boot() runs from the
+    // bundle's footer, after the document has been parsed, so an image that was
+    // going to fail has usually failed already — a 404 resolves at once — and
+    // its error event fired before there was anything listening. complete is
+    // true for a failed image as well as a loaded one; naturalWidth tells them
+    // apart.
+    if (logo.complete && logo.naturalWidth === 0) useTheLetter();
+    else logo.addEventListener('error', useTheLetter, { once: true });
   }
 
   const app = new ChessBoardApp({ ...options, elements });

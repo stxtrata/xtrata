@@ -1,0 +1,34 @@
+{
+  "name": "xchess",
+  "version": "2.0.0-dev",
+  "private": true,
+  "type": "module",
+  "description": "X Chess 2 — a permanent, serverless, on-chain chess application",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "check:contract": "clarinet check",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/perft tests/replay tests/rules tests/protocol tests/fuzz tests/rankings tests/wallet tests/chain",
+    "test:perft": "vitest run tests/perft",
+    "test:perft:deep": "PERFT_DEEP=1 vitest run tests/perft",
+    "test:clarity": "vitest run -c vitest.clarinet.config.ts",
+    "audit:serverless": "node harness/serverless-audit.mjs",
+    "verify": "node harness/verify.mjs",
+    "release": "node harness/release.mjs",
+    "build": "node packages/build/build.mjs",
+    "serve:runtime": "node harness/runtime/serve.mjs",
+    "test:artifact": "vitest run tests/artifact tests/runtime",
+    "test:live": "LIVE=1 vitest run tests/legacy/fetch-live.test.ts",
+    "serve": "node harness/serve.mjs"
+  },
+  "devDependencies": {
+    "@stacks/clarinet-sdk": "^3.9.0",
+    "@stacks/transactions": "^7.2.0",
+    "@types/jsdom": "^30.0.0",
+    "esbuild": "^0.25.0",
+    "jsdom": "^29.1.1",
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.7",
+    "vitest-environment-clarinet": "^3.0.0"
+  }
+}

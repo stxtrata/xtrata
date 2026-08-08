@@ -1,0 +1,25 @@
+{
+  "note": "Fees ACTUALLY PAID on Stacks mainnet, by the canary run. Wallet-suggested, not protocol minimums - which is what matters, because a sponsored player pays whatever their wallet suggests.",
+  "network": "mainnet",
+  "date": "2026-08-08",
+  "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+  "wallet": "Xverse",
+  "observed": [
+    { "call": "smart_contract (deploy)", "feeMicroStx": 500000, "status": "success" },
+    { "call": "open-sponsored-game", "feeMicroStx": 83983, "status": "success" },
+    { "call": "open-sponsored-game", "feeMicroStx": 100000, "status": "abort_by_post_condition" },
+    { "call": "submit", "feeMicroStx": 30000, "status": "success" },
+    { "call": "open-game", "feeMicroStx": 10000, "status": "success" },
+    { "call": "open-game", "feeMicroStx": 3000, "status": "success" },
+    { "call": "set-sponsorship", "feeMicroStx": 10000, "status": "success" }
+  ],
+  "theCallThatMatters": {
+    "call": "submit",
+    "feeMicroStx": 30000,
+    "configuredRebateMicroStx": 10000,
+    "shortfallPerMoveMicroStx": 20000,
+    "bootstrapMicroStx": 60000,
+    "movesBeforeStranded": 2,
+    "formula": "floor((bootstrap - fee) / (fee - rebate)) + 1 = floor((60000-30000)/20000)+1 = 2"
+  }
+}

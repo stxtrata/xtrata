@@ -1,0 +1,39 @@
+[network]
+name = "devnet"
+
+# The accounts the suite is written against. Two of them are deliberately not
+# ordinary, and the tests depend on that:
+#
+#   wallet_5  a few thousand microSTX. Enough to exist, not enough to open a
+#             game, which is what "refuses to open when the sender cannot pay"
+#             needs and what an ordinary funded wallet cannot demonstrate.
+#
+#   wallet_6  ZERO. Not "nearly zero" and not "a bit left over" - actually
+#             nothing. This is the wallet the final acceptance test in section
+#             78 of the brief is written about: a brand-new principal holding
+#             exactly 0 STX that has to be able to play chess. A test that used
+#             a nearly-empty wallet would prove something weaker and would pass
+#             for the wrong reason.
+
+[accounts.deployer]
+balance = 100_000_000_000_000
+
+[accounts.wallet_1]
+balance = 100_000_000_000_000
+
+[accounts.wallet_2]
+balance = 100_000_000_000_000
+
+[accounts.wallet_3]
+balance = 100_000_000_000_000
+
+[accounts.wallet_4]
+balance = 100_000_000_000_000
+
+[accounts.wallet_5]
+balance = 5_000
+
+[accounts.wallet_6]
+balance = 0
+
+[devnet]

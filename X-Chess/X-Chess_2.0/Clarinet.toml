@@ -1,0 +1,19 @@
+[project]
+name = "xchess"
+description = "X Chess 2 — append-only game log with creator-funded on-chain gas sponsorship"
+authors = ["Xtrata"]
+telemetry = false
+cache_dir = ".cache"
+requirements = []
+
+# Clarity 4. Not a preference: `as-contract` does not exist in Clarity 4, and the
+# sponsorship reserve requires the contract to spend from its own balance, which
+# means `as-contract?`. See ops/DECISIONS.md ADR-0001.
+[contracts.xchess-core-v1]
+path = "contracts/xchess-core-v1.clar"
+clarity_version = 4
+epoch = "latest"
+
+[repl.analysis]
+passes = ["check_checker"]
+check_checker = { trusted_sender = false, trusted_caller = false, callee_filter = false }

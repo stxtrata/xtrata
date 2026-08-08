@@ -1,0 +1,174 @@
+[
+  {
+    "name": "open board — the defaults, committing to nothing",
+    "rules": {
+      "replayProtocol": "replay-v1",
+      "eventsProtocol": "events-v1",
+      "white": "anyone",
+      "black": "anyone",
+      "allow": [],
+      "cooldown": 0,
+      "noConsecutive": false,
+      "ranked": false,
+      "startFen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    },
+    "canonical": "rules-v1\nreplay-v1\nevents-v1\nanyone\nanyone\n\n0\n0\n0\nrnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "sha256": "4a346f8d55d7ba322adeb2a778f6032df6ed28784245ebec92e922856231b368"
+  },
+  {
+    "name": "two named players, ranked",
+    "rules": {
+      "replayProtocol": "replay-v1",
+      "eventsProtocol": "events-v1",
+      "white": "SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7",
+      "black": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+      "allow": [],
+      "cooldown": 0,
+      "noConsecutive": false,
+      "ranked": true,
+      "startFen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    },
+    "canonical": "rules-v1\nreplay-v1\nevents-v1\nSP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7\nSP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X\n\n0\n0\n1\nrnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "sha256": "c5798f469b3b8d72c673fd3c75a74e673225229cca3dfcb37bfc5cd8e2568f50"
+  },
+  {
+    "name": "two named players, unranked",
+    "rules": {
+      "replayProtocol": "replay-v1",
+      "eventsProtocol": "events-v1",
+      "white": "SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7",
+      "black": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+      "allow": [],
+      "cooldown": 0,
+      "noConsecutive": false,
+      "ranked": false,
+      "startFen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    },
+    "canonical": "rules-v1\nreplay-v1\nevents-v1\nSP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7\nSP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X\n\n0\n0\n0\nrnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "sha256": "7c149311a6f5134feb20b99ce52c258a029377d916610ecbd38db9935f15abb4"
+  },
+  {
+    "name": "one against the world — anyone-else",
+    "rules": {
+      "replayProtocol": "replay-v1",
+      "eventsProtocol": "events-v1",
+      "white": "SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7",
+      "black": "anyone-else",
+      "allow": [],
+      "cooldown": 0,
+      "noConsecutive": false,
+      "ranked": false,
+      "startFen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    },
+    "canonical": "rules-v1\nreplay-v1\nevents-v1\nSP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7\nanyone-else\n\n0\n0\n0\nrnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "sha256": "89641755853ba28f33e5401b481322baae98027d5ddfdd6ea3eef435ab2c9ee9"
+  },
+  {
+    "name": "allow list of three, given out of order",
+    "rules": {
+      "replayProtocol": "replay-v1",
+      "eventsProtocol": "events-v1",
+      "white": "anyone",
+      "black": "anyone",
+      "allow": [
+        "SP15T1W26JTNS26VG17HM468KW7TQD3124KTYA9EJ",
+        "SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7",
+        "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+      ],
+      "cooldown": 0,
+      "noConsecutive": false,
+      "ranked": false,
+      "startFen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    },
+    "canonical": "rules-v1\nreplay-v1\nevents-v1\nanyone\nanyone\nSP15T1W26JTNS26VG17HM468KW7TQD3124KTYA9EJ,SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7,SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X\n0\n0\n0\nrnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "sha256": "29bcd310ab3459ee7481d0571c8b3d9928da6df135fa1be74cc26631b97cd4f6"
+  },
+  {
+    "name": "allow list of three, given in order",
+    "rules": {
+      "replayProtocol": "replay-v1",
+      "eventsProtocol": "events-v1",
+      "white": "anyone",
+      "black": "anyone",
+      "allow": [
+        "SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7",
+        "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+        "SP15T1W26JTNS26VG17HM468KW7TQD3124KTYA9EJ"
+      ],
+      "cooldown": 0,
+      "noConsecutive": false,
+      "ranked": false,
+      "startFen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    },
+    "canonical": "rules-v1\nreplay-v1\nevents-v1\nanyone\nanyone\nSP15T1W26JTNS26VG17HM468KW7TQD3124KTYA9EJ,SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7,SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X\n0\n0\n0\nrnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "sha256": "29bcd310ab3459ee7481d0571c8b3d9928da6df135fa1be74cc26631b97cd4f6"
+  },
+  {
+    "name": "cooldown of three moves",
+    "rules": {
+      "replayProtocol": "replay-v1",
+      "eventsProtocol": "events-v1",
+      "white": "anyone",
+      "black": "anyone",
+      "allow": [],
+      "cooldown": 3,
+      "noConsecutive": false,
+      "ranked": false,
+      "startFen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    },
+    "canonical": "rules-v1\nreplay-v1\nevents-v1\nanyone\nanyone\n\n3\n0\n0\nrnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "sha256": "e1680dda3e903e245087d6abed3db33f7734dd5e96837b7159a880c72ff1343f"
+  },
+  {
+    "name": "no consecutive moves",
+    "rules": {
+      "replayProtocol": "replay-v1",
+      "eventsProtocol": "events-v1",
+      "white": "anyone",
+      "black": "anyone",
+      "allow": [],
+      "cooldown": 0,
+      "noConsecutive": true,
+      "ranked": false,
+      "startFen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    },
+    "canonical": "rules-v1\nreplay-v1\nevents-v1\nanyone\nanyone\n\n0\n1\n0\nrnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "sha256": "c29b39d3e6ad22287fc1d8a2b20f2bfb50b65ce52decea91117ed09401bd41d3"
+  },
+  {
+    "name": "a set-up starting position",
+    "rules": {
+      "replayProtocol": "replay-v1",
+      "eventsProtocol": "events-v1",
+      "white": "SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7",
+      "black": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+      "allow": [],
+      "cooldown": 0,
+      "noConsecutive": false,
+      "ranked": false,
+      "startFen": "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1"
+    },
+    "canonical": "rules-v1\nreplay-v1\nevents-v1\nSP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7\nSP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X\n\n0\n0\n0\n4k3/8/8/8/8/8/4P3/4K3 w - - 0 1",
+    "sha256": "3ba6ad699a1c4c451b994145b66505039b1b6f05cfee61b447fd9db21d994cc7"
+  },
+  {
+    "name": "everything at once",
+    "rules": {
+      "replayProtocol": "replay-v1",
+      "eventsProtocol": "events-v1",
+      "white": "SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7",
+      "black": "anyone-else",
+      "allow": [
+        "SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7",
+        "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+        "SP15T1W26JTNS26VG17HM468KW7TQD3124KTYA9EJ"
+      ],
+      "cooldown": 2,
+      "noConsecutive": true,
+      "ranked": false,
+      "startFen": "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1"
+    },
+    "canonical": "rules-v1\nreplay-v1\nevents-v1\nSP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7\nanyone-else\nSP15T1W26JTNS26VG17HM468KW7TQD3124KTYA9EJ,SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7,SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X\n2\n1\n0\n8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1",
+    "sha256": "50c50ae2bcfb7df57a566ccacef28bdbc32cc10ea66039c184e38aa32078f61a"
+  }
+]

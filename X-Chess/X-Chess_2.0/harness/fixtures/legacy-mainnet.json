@@ -1,0 +1,139 @@
+{
+  "note": "Read from Stacks mainnet. These are real games played by real people.",
+  "deployer": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+  "contracts": {
+    "xtrata-chess-log-v3": {
+      "label": "Legacy X Chess v3",
+      "count": 2,
+      "games": [
+        {
+          "game": {
+            "id": 1,
+            "openedBy": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+            "openedAt": 8712902,
+            "nextSeq": 1,
+            "rulesHash": "c8ae2d82310650ad2b8bd3ea00d1727d33889dbcf7e44d686d44a3e44c2be25a",
+            "ranked": false,
+            "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-chess-log-v3",
+            "label": "Legacy X Chess v3"
+          },
+          "entries": [
+            {
+              "seq": 0,
+              "value": "e2e4",
+              "sender": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+              "height": 8712905
+            }
+          ]
+        },
+        {
+          "game": {
+            "id": 2,
+            "openedBy": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+            "openedAt": 8716661,
+            "nextSeq": 0,
+            "rulesHash": "46c9f06dfdc945033a112c4fb31be236d05cdb24fa1f8b13cd290e104f96c6ac",
+            "ranked": false,
+            "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-chess-log-v3",
+            "label": "Legacy X Chess v3"
+          },
+          "entries": []
+        }
+      ]
+    },
+    "xtrata-chess-log-v2": {
+      "label": "Legacy X Chess v2",
+      "count": 1,
+      "games": [
+        {
+          "game": {
+            "id": 1,
+            "openedBy": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+            "openedAt": 8707599,
+            "nextSeq": 7,
+            "rulesHash": null,
+            "ranked": false,
+            "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-chess-log-v2",
+            "label": "Legacy X Chess v2"
+          },
+          "entries": [
+            {
+              "seq": 0,
+              "value": "e2e4",
+              "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+              "height": 8707603
+            },
+            {
+              "seq": 1,
+              "value": "e7e5",
+              "sender": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+              "height": 8707612
+            },
+            {
+              "seq": 2,
+              "value": "d1g4",
+              "sender": "SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX",
+              "height": 8707763
+            },
+            {
+              "seq": 3,
+              "value": "d7d6",
+              "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+              "height": 8707771
+            },
+            {
+              "seq": 4,
+              "value": "f1c4",
+              "sender": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+              "height": 8708880
+            },
+            {
+              "seq": 5,
+              "value": "c8g4",
+              "sender": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+              "height": 8708888
+            },
+            {
+              "seq": 6,
+              "value": "f2f3",
+              "sender": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+              "height": 8708893
+            }
+          ]
+        }
+      ]
+    },
+    "xtrata-chess-log-v1": {
+      "label": "Legacy X Chess v1",
+      "count": 1,
+      "games": [
+        {
+          "game": {
+            "id": 1,
+            "openedBy": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+            "openedAt": 8706789,
+            "nextSeq": 2,
+            "rulesHash": null,
+            "ranked": false,
+            "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-chess-log-v1",
+            "label": "Legacy X Chess v1"
+          },
+          "entries": [
+            {
+              "seq": 0,
+              "value": "e2e4",
+              "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+              "height": 8706817
+            },
+            {
+              "seq": 1,
+              "value": "e7e5",
+              "sender": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+              "height": 8707233
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

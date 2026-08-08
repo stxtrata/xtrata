@@ -1,0 +1,384 @@
+// The markup and the styling, as strings.
+//
+// Strings rather than a template library, because the inscription carries every
+// byte of whatever produces this and a library would cost more than the markup.
+//
+// Two rules learned the hard way, and both are enforced by tests:
+//
+//   NEVER STYLE A BARE STATUS WORD. `.notice info` already meant an info-level
+//   message; adding a `.info` rule for icons gave every notice the icon's
+//   inline-flex, 15px width and absolutely positioned hit area. Both halves
+//   worked perfectly alone. Every modifier here is prefixed with its block.
+//
+//   NEVER PUT A RAW DOUBLE QUOTE IN AN ATTRIBUTE. It terminates the attribute
+//   early, truncating text mid-sentence and leaving stray attributes behind.
+
+export const CSS = `
+:root {
+  --bg: #12100e;
+  --panel: #1b1815;
+  --line: #2e2924;
+  --ink: #e8e2d9;
+  --dim: #9a9187;
+  --gold: #d8a24a;
+  --warn: #e0733f;
+  --good: #6fae5f;
+  --light: #b9a98f;
+  --dark: #6d5b46;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+main { max-width: 1100px; margin: 0 auto; padding: 12px; }
+h1 { font-size: 20px; margin: 0; display: flex; align-items: center; gap: 8px; }
+h2 { font-size: 15px; margin: 0 0 8px; color: var(--gold); font-weight: 600; }
+code, .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
+
+.topbar {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  justify-content: space-between; padding: 8px 0 12px;
+  border-bottom: 1px solid var(--line); margin-bottom: 12px;
+}
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.tab {
+  background: none; border: 1px solid transparent; color: var(--dim);
+  padding: 8px 12px; border-radius: 6px; cursor: pointer; font: inherit;
+  min-height: 44px;
+}
+.tab:hover { color: var(--ink); }
+.tab[aria-selected='true'] { color: var(--gold); border-color: var(--line); background: var(--panel); }
+
+.layout { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(260px, 380px); gap: 12px; }
+@media (max-width: 780px) { .layout { grid-template-columns: 1fr; } }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+
+.board {
+  /* Eight columns AND eight rows. With rows left implicit they size to their
+     content, so a row holding a piece grew taller than an empty one and the
+     board stopped being square. The aspect-ratio on the container is not
+     enough on its own: it fixes the outside and says nothing about the inside. */
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  border: 1px solid var(--line); border-radius: 6px; overflow: hidden;
+  /* So a square can size its glyph against the BOARD rather than the viewport.
+     A vw-based size is wrong here by construction: the board is one column of a
+     two-column layout, and its width has almost nothing to do with the
+     window's. */
+  container-type: inline-size;
+}
+.sq {
+  border: 0; padding: 0; margin: 0; cursor: default; position: relative;
+  display: flex; align-items: center; justify-content: center;
+  /* min-* 0 stops a glyph from forcing a track wider than its share. Without
+     them a grid item's automatic minimum size is its content, and one big
+     character can push a column out. */
+  min-width: 0; min-height: 0; overflow: hidden;
+  font-size: clamp(14px, 5vw, 34px); line-height: 1;
+}
+/* A square is an eighth of the board, so this is about 56% of one. */
+@supports (font-size: 1cqw) { .sq { font-size: 7cqw; } }
+.sq--light { background: var(--light); }
+.sq--dark { background: var(--dark); }
+.sq--playable { cursor: pointer; }
+.sq--selected { outline: 3px solid var(--gold); outline-offset: -3px; }
+.sq--last { box-shadow: inset 0 0 0 3px rgba(216, 162, 74, 0.45); }
+.sq--target::after {
+  content: ''; position: absolute; width: 26%; height: 26%; border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+}
+.sq--capture { outline: 3px solid var(--warn); outline-offset: -3px; }
+/* The king that is in check. Loud on purpose: it is the one fact on the board
+   that changes which moves are legal, and a player who misses it will try
+   moves that get skipped and cost a fee for nothing. */
+.sq--check {
+  background-image: radial-gradient(circle at 50% 50%,
+    rgba(196, 58, 47, .92) 14%, rgba(196, 58, 47, .42) 48%, rgba(196, 58, 47, 0) 74%);
+  animation: alarm 1.4s ease-in-out infinite;
+}
+@keyframes alarm { 0%,100% { filter: none; } 50% { filter: brightness(1.35); } }
+.pc--white { color: #fbf7f0; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+.pc--black { color: #14110e; text-shadow: 0 1px 1px rgba(255,255,255,.25); }
+
+/* A move that is broadcast but not in a block. */
+.pc--ghost { position: absolute; opacity: .42; animation: breathe 1.8s ease-in-out infinite; }
+/* The square the piece left. It is empty, and a faint ring says why. */
+.sq--vacated::before {
+  content: ''; position: absolute; inset: 22%; border-radius: 50%;
+  border: 2px dashed rgba(216, 162, 74, 0.4);
+}
+.sq--pending { outline: 2px dashed var(--gold); outline-offset: -2px; }
+/* A wallet is open for this move. Not the same as broadcast, and it should not
+   look the same: one has been sent and one has not. */
+.sq--signing { outline: 3px solid var(--gold); outline-offset: -3px;
+               background-image: linear-gradient(rgba(216,162,74,.16), rgba(216,162,74,.16)); }
+.pc--signing { animation-duration: .9s; }
+@keyframes breathe { 0%,100% { opacity: .30; } 50% { opacity: .58; } }
+@media (prefers-reduced-motion: reduce) {
+  .pc--ghost, .sq--check { animation: none; }
+}
+
+/* The submissions list. */
+/* Scoped to beat .list li, which is (0,1,1) and would otherwise win.
+   A bare .mv at (0,1,0) lost silently: the grid columns never applied and
+   every row ran together. Same shape as the legacy .notice info collision,
+   two rules that are each correct alone.
+   NOTE: no backticks anywhere in this string. It is a template literal, and
+   one backtick in a comment ends it. */
+.list li.mv { display: grid; grid-template-columns: 2.6ch 1.6em 1fr auto; gap: 8px;
+      align-items: baseline; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.list li.mv:last-child { border-bottom: 0; }
+.list li.mv--pending { opacity: .75; border-left: 2px solid var(--gold); }
+.mv-num { color: var(--dim); font-size: 11px; font-variant-numeric: tabular-nums; }
+.mv-glyph { font-size: 17px; line-height: 1; }
+.mv-glyph--white { color: #fbf7f0; }
+.mv-glyph--black { color: #cfc6b8; }
+.mv-san { font-weight: 600; }
+.mv-piece { color: var(--dim); font-size: 12px; margin-left: 6px; }
+.mv-clock { color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; margin-left: 6px; }
+.mv-who { color: var(--gold); font-size: 12px; text-align: right; white-space: nowrap; }
+.mv-rejected .mv-san { color: var(--dim); text-decoration: line-through; }
+.mv-reason { color: var(--warn); font-size: 11px; margin-left: 6px; }
+.live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+            background: var(--good); margin-right: 6px; animation: breathe 2.4s ease-in-out infinite; }
+
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row + .row { margin-top: 8px; }
+.spacer { flex: 1; }
+
+button.action {
+  background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 6px; padding: 10px 14px; font: inherit; cursor: pointer; min-height: 44px;
+}
+button.action:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+button.action:disabled { opacity: .45; cursor: not-allowed; }
+button.action--primary { background: var(--gold); color: #17130c; border-color: var(--gold); font-weight: 600; }
+
+label { display: block; color: var(--dim); font-size: 12px; margin-bottom: 4px; }
+input[type='text'], select {
+  width: 100%; background: #14120f; color: var(--ink); border: 1px solid var(--line);
+  border-radius: 6px; padding: 10px; font: inherit; min-height: 44px;
+}
+.field { margin-bottom: 10px; }
+
+.notice { border-radius: 6px; padding: 10px 12px; margin: 8px 0; border: 1px solid var(--line); }
+.notice--info { color: var(--dim); }
+.notice--warn { color: var(--warn); border-color: var(--warn); }
+.notice--good { color: var(--good); border-color: var(--good); }
+.notice--loud { color: var(--gold); border-color: var(--gold); }
+
+.list { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow: auto; }
+.list li { padding: 6px 8px; border-bottom: 1px solid var(--line); display: flex; gap: 8px; align-items: baseline; }
+.list li:last-child { border-bottom: 0; }
+.entry--rejected { color: var(--dim); text-decoration: line-through; }
+.entry--reason { color: var(--warn); font-size: 12px; text-decoration: none; }
+.entry--seq { color: var(--dim); font-size: 11px; min-width: 3ch; }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+th { color: var(--dim); font-weight: 600; font-size: 12px; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.muted { color: var(--dim); }
+.small { font-size: 12px; }
+.addr { font-family: ui-monospace, monospace; font-size: 12px; color: var(--dim); }
+/* Abbreviated, so a row is one line. The full value is on the element, so a
+   copy or a screen reader still gets all of it. */
+.addr--short { white-space: nowrap; }
+.hide { display: none !important; }
+`;
+
+/**
+ * The shell.
+ *
+ * Every id here has a matching entry in the element map and a matching handler.
+ * Add all three in one change: a missing map entry throws inside wiring, so
+ * nothing after it runs, and the page renders perfectly and does nothing.
+ */
+export const HTML = `
+<main>
+  <div class="topbar">
+    <h1><span class="logo">X</span> Chess</h1>
+    <span class="muted small mono" id="build-tag"></span>
+    <nav class="tabs" role="tablist" aria-label="sections">
+      <button class="tab" id="tab-play" role="tab" aria-selected="true">Play</button>
+      <button class="tab" id="tab-game" role="tab" aria-selected="false">Game</button>
+      <button class="tab" id="tab-explore" role="tab" aria-selected="false">Explore</button>
+      <button class="tab" id="tab-leaderboard" role="tab" aria-selected="false">Leaderboard</button>
+      <button class="tab" id="tab-profile" role="tab" aria-selected="false">Profile</button>
+    </nav>
+    <div class="row">
+      <button class="action" id="connect">Connect</button>
+      <button class="action hide" id="disconnect">Disconnect</button>
+    </div>
+  </div>
+
+  <div id="chain-notice" class="notice notice--info">Reading the chain.</div>
+  <div id="sign-notice" class="notice notice--warn hide"></div>
+
+  <section id="view-play" class="panel">
+    <h2>Start a game</h2>
+    <div class="field">
+      <label for="game-kind">Kind of game</label>
+      <select id="game-kind">
+        <option value="standard">Standard, both players pay their own gas</option>
+        <option value="sponsor-opponent">Sponsored challenge, your opponent may hold nothing</option>
+        <option value="sponsor-both">Fully sponsored, neither player needs gas</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="rules-white">White</label>
+      <input type="text" id="rules-white" placeholder="a Stacks address, a .btc name, anyone, or anyone-else">
+    </div>
+    <div class="field">
+      <label for="rules-black">Black</label>
+      <input type="text" id="rules-black" placeholder="a Stacks address, a .btc name, anyone, or anyone-else">
+    </div>
+    <div class="field">
+      <label for="rules-ranked">
+        <input type="checkbox" id="rules-ranked"> Ranked, this game counts towards ratings
+      </label>
+    </div>
+    <div id="rules-summary" class="notice notice--info"></div>
+    <div id="price-summary" class="notice notice--loud"></div>
+    <div id="rules-problems" class="notice notice--warn hide"></div>
+    <div class="row">
+      <button class="action action--primary" id="open-game">Open game</button>
+      <span class="spacer"></span>
+      <label for="join-game" class="hide">Game number</label>
+      <input type="text" id="join-game" placeholder="game number" style="max-width:160px">
+      <button class="action" id="load-game">Open that game</button>
+    </div>
+  </section>
+
+  <section id="view-game" class="layout hide">
+    <div>
+      <div class="panel">
+        <div class="row">
+          <strong id="game-label">no game loaded</strong>
+          <span class="spacer"></span>
+          <button class="action" id="copy-link" title="A link carrying this game\u2019s rules, so your opponent\u2019s board can referee it">Copy link</button>
+          <button class="action" id="flip">Flip</button>
+          <button class="action" id="refresh">Refresh</button>
+        </div>
+        <div id="board" class="board"></div>
+        <div id="status" class="notice notice--info"></div>
+        <div id="move-hint" class="small muted"></div>
+        <div id="promotion" class="notice notice--loud hide"></div>
+        <!-- A submission the board thinks is doomed, and the way past it.
+             The override is not a courtesy: the board cannot know which account
+             the wallet will sign with, and it cannot always confirm a game's
+             rules, so it will sometimes be wrong. Being warned is worth a click.
+             Being locked out of a game is not. -->
+        <div id="override" class="notice notice--warn hide">
+          <div id="override-why"></div>
+          <div class="row">
+            <button id="override-yes" type="button">Let me try anyway</button>
+          </div>
+        </div>
+        <div id="send-anyway" class="notice notice--warn hide">
+          <div id="send-anyway-why"></div>
+          <div class="row">
+            <button id="send-anyway-yes" type="button">Send anyway</button>
+            <button id="send-anyway-no" type="button">Cancel</button>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Rules for this game</h2>
+        <div id="game-rules-state" class="notice notice--info"></div>
+        <div id="game-rules-summary" class="small muted"></div>
+        <div id="game-rules-hash" class="addr"></div>
+        <!-- When the chain cannot tell the board who is playing, ask.
+             The answer is checked against the commitment, so a wrong guess is
+             refused rather than believed. -->
+        <div id="claim-rules" class="hide">
+          <div class="small muted">
+            The players are not on chain until somebody moves. If you know them, name them and
+            this board will check them against what the game committed.
+          </div>
+          <div class="row">
+            <input id="claim-white" type="text" placeholder="White: address or .btc name" />
+            <input id="claim-black" type="text" placeholder="Black: address or .btc name" />
+            <button id="claim-check" class="action" type="button">Check</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="panel">
+        <h2>Players</h2>
+        <div id="players"></div>
+      </div>
+      <div class="panel">
+        <h2>Your sponsorship</h2>
+        <div id="sponsorship" class="small muted">none on this game</div>
+        <div class="row"><button class="action" id="top-up">Add more sponsorship</button></div>
+      </div>
+      <div class="panel">
+        <div class="row">
+          <h2 id="moves-title" style="margin:0">Moves</h2>
+          <span class="spacer"></span>
+          <button class="action" id="toggle-skipped">Show skipped</button>
+        </div>
+        <div id="skipped-note" class="small muted"></div>
+        <div class="row">
+          <button class="action" id="resign">Resign</button>
+          <button class="action" id="offer-draw">Offer draw</button>
+          <button class="action" id="accept-draw">Accept draw</button>
+        </div>
+        <ul id="moves" class="list"></ul>
+      </div>
+      <div class="panel">
+        <h2>Verify</h2>
+        <div id="verify" class="small muted">Every position here is derived from the log.</div>
+        <div class="row"><button class="action" id="verify-game">Re-derive from chain</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-explore" class="panel hide">
+    <h2>Games</h2>
+    <div class="row">
+      <button class="action" id="explore-refresh">Refresh</button>
+      <span id="explore-count" class="muted small"></span>
+    </div>
+    <table><thead><tr>
+      <th>#</th><th>Opened by</th><th>Entries</th><th>Kind</th><th></th>
+    </tr></thead><tbody id="explore-rows"></tbody></table>
+  </section>
+
+  <section id="view-leaderboard" class="panel hide">
+    <h2>Leaderboard</h2>
+    <div id="leaderboard-note" class="notice notice--info"></div>
+    <table><thead><tr>
+      <th>#</th><th>Player</th><th class="num">Rating</th><th class="num">Games</th>
+      <th class="num">W</th><th class="num">D</th><th class="num">L</th>
+    </tr></thead><tbody id="leaderboard-rows"></tbody></table>
+  </section>
+
+  <section id="view-profile" class="panel hide">
+    <h2>Profile</h2>
+    <div class="field">
+      <label for="profile-who">Address</label>
+      <input type="text" id="profile-who" placeholder="a Stacks address">
+    </div>
+    <div class="row"><button class="action" id="profile-load">Show</button></div>
+    <div id="profile-body"></div>
+  </section>
+
+  <footer class="small muted" style="padding:12px 0">
+    <span id="contract-label"></span>
+    <span id="endpoint-label"></span>
+  </footer>
+</main>
+`;
+
+export const SHELL = { css: CSS, html: HTML };
