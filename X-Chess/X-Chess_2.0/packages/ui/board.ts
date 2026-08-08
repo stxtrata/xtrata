@@ -4,38 +4,43 @@
 // a set of legal moves; it does not decide legality, does not know what a
 // contract is, and does not know that some submissions get skipped.
 //
-// Glyphs rather than images. An inscription cannot fetch anything, and a base64
-// sprite sheet would cost more permanent bytes than the whole application.
+// Glyphs rather than images. An inscription cannot fetch anything, and a sprite
+// sheet would cost more permanent bytes than the whole application. WHICH
+// glyphs, and how they are sized, is the interesting part - see pieces.ts, and
+// the two problems it exists to solve.
 
 import { KING, WHITE, algebraic, parseSquare } from '../chess/board.js';
+import { GLYPH, KEY_BY_TYPE, pieceKeyName } from './pieces.js';
 import type { Color, PieceType } from '../chess/board.js';
 import type { Position } from '../chess/engine.js';
 
-const GLYPH: Record<number, [string, string]> = {
-  // [white, black]
-  1: ['♙', '♟'],
-  2: ['♘', '♞'],
-  3: ['♗', '♝'],
-  4: ['♖', '♜'],
-  5: ['♕', '♛'],
-  6: ['♔', '♚']
-};
-
-const NAME: Record<number, string> = {
-  1: 'pawn',
-  2: 'knight',
-  3: 'bishop',
-  4: 'rook',
-  5: 'queen',
-  6: 'king'
-};
-
-export function pieceGlyph(type: PieceType, color: Color): string {
-  return GLYPH[type]?.[color === WHITE ? 0 : 1] ?? '';
+export function pieceName(type: PieceType, color: Color): string {
+  const key = KEY_BY_TYPE[type];
+  return `${color === WHITE ? 'white' : 'black'} ${key ? pieceKeyName(key) : 'piece'}`;
 }
 
-export function pieceName(type: PieceType, color: Color): string {
-  return `${color === WHITE ? 'white' : 'black'} ${NAME[type] ?? 'piece'}`;
+export function pieceGlyph(type: PieceType): string {
+  const key = KEY_BY_TYPE[type];
+  return key ? GLYPH[key] : '';
+}
+
+/**
+ * One piece, as an element.
+ *
+ * The SAME glyph for both colours - colour is what tells them apart, not the
+ * codepoint - plus a class carrying that piece's share of the square. Both
+ * halves matter: the shared glyph is what stops the two sides disagreeing about
+ * size, and the class is what stops a pawn out-measuring a bishop.
+ */
+export function pieceNode(type: PieceType, color: Color, extra = ''): HTMLElement | null {
+  const key = KEY_BY_TYPE[type];
+  if (!key) return null;
+  const node = document.createElement('span');
+  node.className =
+    `pc pc--${color === WHITE ? 'white' : 'black'} pc--${key}` + (extra ? ` ${extra}` : '');
+  node.textContent = GLYPH[key];
+  node.setAttribute('aria-hidden', 'true');
+  return node;
 }
 
 export interface BoardView {
@@ -132,12 +137,12 @@ export function renderBoard(root: HTMLElement, view: BoardView, handlers: BoardH
   // The origin is drawn EMPTY rather than faded. A pending move is a claim
   // about where a piece is going, and showing the piece in both places at once
   // reads as two pieces - the eye counts material before it reads opacity.
-  const ghostTo = new Map<string, string>();
+  const ghostTo = new Map<string, { type: PieceType; color: Color }>();
   const ghostFrom = new Set<string>();
   for (const move of view.pending ?? []) {
     ghostFrom.add(move.from);
     const piece = squares.find((cell) => cell.square === move.from)?.piece;
-    if (piece) ghostTo.set(move.to, pieceGlyph(piece.type, piece.color));
+    if (piece) ghostTo.set(move.to, { type: piece.type, color: piece.color });
   }
 
   // The king that is currently in check, if any.
@@ -197,24 +202,24 @@ export function renderBoard(root: HTMLElement, view: BoardView, handlers: BoardH
     }
 
     if (cell.piece && !leaving) {
-      const glyph = document.createElement('span');
-      glyph.className = `pc pc--${cell.piece.color === WHITE ? 'white' : 'black'}`;
-      glyph.textContent = pieceGlyph(cell.piece.type, cell.piece.color);
-      glyph.setAttribute('aria-hidden', 'true');
-      button.appendChild(glyph);
+      const node = pieceNode(cell.piece.type, cell.piece.color);
+      if (node) button.appendChild(node);
     }
 
     const ghost = ghostTo.get(cell.square);
     if (ghost) {
-      const node = document.createElement('span');
-      node.className = 'pc pc--ghost';
-      node.textContent = ghost;
-      node.setAttribute('aria-hidden', 'true');
-      button.appendChild(node);
+      // Hollow, not faded. A translucent piece reads as a dim piece; an outline
+      // reads as a piece that is not there yet, which is what it is.
+      const signing = Boolean(view.signing && view.signing.slice(2, 4) === cell.square);
+      const node = pieceNode(
+        ghost.type,
+        ghost.color,
+        `pc--ghost ${signing ? 'pc--signing' : 'pc--sent'}`
+      );
+      if (node) button.appendChild(node);
       button.classList.add('sq--pending');
-      if (view.signing && view.signing.slice(2, 4) === cell.square) {
+      if (signing) {
         button.classList.add('sq--signing');
-        node.classList.add('pc--signing');
       }
       // Said in the accessible name too. A ghost is invisible to a screen
       // reader, and "a move is on its way here" is exactly the kind of thing a

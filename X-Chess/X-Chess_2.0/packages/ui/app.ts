@@ -11,6 +11,10 @@ import { BlockTimes, formatClock } from '../chain/block-time.js';
 import { parseUci } from '../chess/uci.js';
 import { KING, WHITE } from '../chess/board.js';
 import { SHELL } from './shell.js';
+import { Sound } from './audio.js';
+import { soundFor } from './sounds.js';
+import { renderSoundPanel, soundNote, soundToggleLabel } from './sound-panel.js';
+import type { SoundPanel } from './sound-panel.js';
 import { replay } from '../replay/replay.js';
 import type { ReplayState } from '../replay/replay.js';
 import { EVENT_STRINGS } from '../replay/events.js';
@@ -36,6 +40,19 @@ import type {
 
 export type Tab = 'play' | 'game' | 'explore' | 'leaderboard' | 'profile';
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/** A row of the game list, after it has been read and replayed. */
+interface ExploreRow {
+  id: number;
+  ranked: boolean;
+  entries: number;
+  white: string | null;
+  black: string | null;
+  confirmed: boolean;
+  state: string;
+}
+
 /**
  * How often the board re-reads.
  *
@@ -57,6 +74,22 @@ const POLL_MS = 5_000;
 const FAST_POLL_MS = 2_500;
 const SLOW_POLL_MS = 15_000;
 const STARVED_POLL_MS = 30_000;
+
+/**
+ * The rate for a tab nobody is looking at.
+ *
+ * Reading a hidden tab is normally the wrong thing to do, and this application
+ * refused to for exactly that reason. It is done here for one purpose: a game
+ * with a quarter of an hour between moves is a game nobody sits and watches, so
+ * a sound that only plays while the board is in front is a sound that never
+ * plays at the moment it is needed.
+ *
+ * Slower than anything in the foreground, because nothing here is being
+ * watched - the sound is the whole output, and being twenty seconds late to it
+ * is imperceptible when the thing it announces took ten minutes to confirm.
+ * Only ever used while a live game is loaded AND the person asked for it.
+ */
+const BACKGROUND_POLL_MS = 20_000;
 
 /**
  * A principal, short enough to read.
@@ -97,6 +130,8 @@ export interface AppOptions {
   /** Why signing is unavailable here, if it is. */
   signingBlocked?: () => 'no-bridge' | 'no-wallet' | null;
   document?: Document;
+  /** Injected so tests can hear what the board announced without a speaker. */
+  sound?: Sound;
 }
 
 /** Ids the shell defines. Every one must exist, or wiring throws. */
@@ -108,7 +143,7 @@ const IDS = [
   'game-kind', 'rules-white', 'rules-black', 'rules-ranked',
   'rules-summary', 'price-summary', 'rules-problems', 'open-game',
   'join-game', 'load-game',
-  'game-label', 'copy-link', 'flip', 'refresh', 'board', 'status', 'move-hint', 'promotion',
+  'game-label', 'copy-link', 'flip', 'refresh', 'board', 'arrows', 'status', 'move-hint', 'promotion',
   'send-anyway', 'send-anyway-why', 'send-anyway-yes', 'send-anyway-no',
   'override', 'override-why', 'override-yes',
   'game-rules-state', 'game-rules-summary', 'game-rules-hash',
@@ -117,6 +152,8 @@ const IDS = [
   'resign', 'offer-draw', 'accept-draw', 'moves',
   'moves-title', 'toggle-skipped', 'skipped-note',
   'verify', 'verify-game',
+  'sound-toggle', 'sound-master', 'sound-volume', 'sound-background',
+  'sound-reset', 'sound-note', 'sound-list',
   'explore-refresh', 'explore-count', 'explore-rows',
   'leaderboard-note', 'leaderboard-rows',
   'profile-who', 'profile-load', 'profile-body',
@@ -195,6 +232,7 @@ export class ChessApp {
    * accompanied by a way out, and taking it is remembered for the session.
    */
   private overridden = false;
+  private exploreRows: ExploreRow[] = [];
   private sponsorshipText: { key: string; message: string } | null = null;
   /**
    * The sponsorship row itself, against the game and wallet it belongs to.
@@ -214,10 +252,20 @@ export class ChessApp {
   private times: BlockTimes | null = null;
   private poll: ReturnType<typeof setTimeout> | null = null;
 
+  private readonly sound: Sound;
+  private soundPanel: SoundPanel | null = null;
+  /** The document title before a turn was announced into it. */
+  private baseTitle = '';
+  /** True while the title is carrying a turn nobody has come back and seen. */
+  private flashing = false;
+
   constructor(options: AppOptions) {
     this.options = options;
     this.chain = options.chain;
     this.doc = options.document ?? document;
+    // Built before wiring, because the wiring reads its settings to draw the
+    // panel and to label the switch in the top bar.
+    this.sound = options.sound ?? new Sound({ document: this.doc });
     const endpoint = (options.chain as { reader?: unknown }).reader;
     if (endpoint) {
       this.names = new Names({ endpoint: endpoint as never, network: options.build?.network as never });
@@ -257,7 +305,7 @@ export class ChessApp {
     on('openGame', () => void this.openGame());
     on('loadGame', () => void this.loadFromInput());
     on('refresh', () => void this.reload());
-    on('verifyGame', () => void this.reload());
+    on('verifyGame', () => void this.reverify());
     on('flip', () => {
       this.flipped = !this.flipped;
       this.drawGame();
@@ -293,6 +341,69 @@ export class ChessApp {
       this.el[key].addEventListener('input', () => this.drawDraft());
       this.el[key].addEventListener('change', () => this.drawDraft());
     }
+
+    this.wireSound();
+  }
+
+  /**
+   * The sound controls, and the two things that make them work at all.
+   *
+   * The panel rows are generated from the voice table rather than written into
+   * the shell, so a sound added to the library arrives with its switch, its
+   * slider and its preview already attached.
+   *
+   * `listen()` is the important call. A browser will not make a sound until the
+   * page has been touched, and the sound this whole module exists for - your
+   * opponent moved - arrives with nobody touching anything. So the first tap
+   * anywhere is taken as permission, and until one happens the panel says out
+   * loud that it is waiting for one.
+   */
+  private wireSound(): void {
+    this.soundPanel = renderSoundPanel(this.el.soundList, this.sound);
+    this.sound.onChange(() => this.drawSound());
+    this.sound.listen();
+
+    // NOT routed through `on`, which swallows a click while the board is busy.
+    // Reaching for the mute button during a slow submission is precisely when
+    // somebody wants it to work.
+    this.el.soundToggle.addEventListener('click', () => this.sound.setMaster(!this.sound.enabled));
+    this.el.soundReset.addEventListener('click', () => {
+      this.sound.reset();
+      this.soundPanel?.refresh();
+    });
+
+    const master = this.el.soundMaster as HTMLInputElement;
+    master.addEventListener('change', () => this.sound.setMaster(master.checked));
+    const volume = this.el.soundVolume as HTMLInputElement;
+    volume.addEventListener('input', () => this.sound.setVolume(Number(volume.value) / 100));
+    const background = this.el.soundBackground as HTMLInputElement;
+    background.addEventListener('change', () => {
+      this.sound.setBackground(background.checked);
+      // Reading a hidden tab starts or stops from this click, not from the next
+      // time the tab happens to change state.
+      this.scheduleTick(this.nextPollMs());
+    });
+
+    this.drawSound();
+  }
+
+  /** The controls, brought back in line with the settings. */
+  private drawSound(): void {
+    const on = this.sound.enabled;
+    this.text('soundToggle', soundToggleLabel(this.sound));
+    this.el.soundToggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+    (this.el.soundMaster as HTMLInputElement).checked = on;
+    (this.el.soundBackground as HTMLInputElement).checked = this.sound.state.background;
+    (this.el.soundBackground as HTMLInputElement).disabled = !on;
+    const volume = this.el.soundVolume as HTMLInputElement;
+    volume.disabled = !on;
+    // Not written back while it is the element being dragged: replacing the
+    // value under a finger ends the drag.
+    if (this.doc.activeElement !== volume) {
+      volume.value = String(Math.round(this.sound.state.volume * 100));
+    }
+    this.text('soundNote', soundNote(this.sound));
+    this.soundPanel?.refresh();
   }
 
   private start(): void {
@@ -335,13 +446,30 @@ export class ChessApp {
    * moment it is broadcast rather than when it confirms.
    *
    * Paused when the tab is hidden. Nobody is looking, and a background tab
-   * quietly hammering a public endpoint is how a rate limit gets hit.
+   * quietly hammering a public endpoint is how a rate limit gets hit. The one
+   * exception is background listening, which is asked for explicitly and reads
+   * at a third of the rate - see `listeningInBackground`.
    */
   private startPolling(): void {
     this.scheduleTick(this.nextPollMs());
     this.doc.addEventListener('visibilitychange', () => {
-      if (this.doc.visibilityState === 'visible') this.scheduleTick(0);
+      if (this.doc.visibilityState !== 'visible') return;
+      // Coming back IS seeing it, so the title stops shouting.
+      this.flashTitle(false);
+      this.scheduleTick(0);
     });
+  }
+
+  /**
+   * Should a hidden tab keep reading?
+   *
+   * Only when somebody asked for it, sound is on, and there is a live game to
+   * announce something about. All three, because this is the one thing in the
+   * application that spends a stranger's rate limit on a page nobody is
+   * looking at, and each condition is a reason that spending is justified.
+   */
+  private listeningInBackground(): boolean {
+    return this.sound.background && this.gameId !== null && this.state?.status === 'live';
   }
 
   /**
@@ -370,6 +498,11 @@ export class ChessApp {
       ms = mine ? SLOW_POLL_MS : POLL_MS;
     }
 
+    // A tab nobody is looking at reads slowly, whatever the position says. The
+    // only output is a sound, and a sound cannot be early or late in a way
+    // anybody can perceive when the thing it announces took minutes to confirm.
+    if (this.doc.visibilityState === 'hidden') ms = Math.max(ms, BACKGROUND_POLL_MS);
+
     // Then stretched by whatever allowance is left. The wallet spends from the
     // same per-IP budget, and a broadcast it cannot afford is a move that
     // cannot be made - but the board must never stop reading altogether, or a
@@ -390,7 +523,7 @@ export class ChessApp {
 
   private async tick(): Promise<void> {
     const skip =
-      this.doc.visibilityState === 'hidden' ||
+      (this.doc.visibilityState === 'hidden' && !this.listeningInBackground()) ||
       this.busy ||
       this.gameId === null ||
       // Yield to the wallet. The allowance is per IP and the wallet spends from
@@ -417,6 +550,16 @@ export class ChessApp {
    */
   private pollSoon(): void {
     this.scheduleTick(FAST_POLL_MS);
+  }
+
+  /**
+   * One read, now.
+   *
+   * The same read the poller does, so a test can put a move on chain and see
+   * what the board makes of it without waiting out a real interval.
+   */
+  async readNow(): Promise<void> {
+    await this.refreshQuietly();
   }
 
   stopPolling(): void {
@@ -948,7 +1091,10 @@ export class ChessApp {
 
     if (!loaded) return;
     this.adoptRules();
-    this.derive();
+    // Silently. A game is loaded whole, and every move in it is news only to
+    // somebody who has not seen the game before - which is everybody opening
+    // it. See `derive`.
+    this.derive(true);
     this.show('game');
     void this.resolveLabels();
   }
@@ -1002,7 +1148,17 @@ export class ChessApp {
     this.rulesTried = found.tried;
   }
 
-  private derive(): void {
+  /**
+   * Replay the log into a position.
+   *
+   * `fresh` means this is the first derivation of a game rather than a change
+   * to one already on screen, and it exists for the sound. Opening a forty move
+   * game replays forty moves; announcing them would be forty noises for the act
+   * of opening a page. So a fresh derivation is silent and becomes the baseline
+   * that everything after it is compared against.
+   */
+  private derive(fresh = false): void {
+    const before = fresh ? null : this.state;
     this.state = replay(
       this.entries.map((entry) => ({
         mv: entry.value,
@@ -1014,7 +1170,43 @@ export class ChessApp {
     );
     this.selected = null;
     this.pendingPromotion = null;
+    this.announce(before);
     this.drawGame();
+  }
+
+  /**
+   * Say out loud what just changed, if anything.
+   *
+   * The decision of WHICH sound belongs to soundFor, which is pure and compares
+   * two replayed states. Everything here is the part that needs a browser: one
+   * sound, and the title, which is the half of this that survives a tab being
+   * in the background on a browser that has throttled the audio.
+   */
+  private announce(before: ReplayState | null): void {
+    const after = this.state;
+    if (!after) return;
+    const event = soundFor(before, after, this.address);
+    if (!event) return;
+    this.sound.play(event);
+    if (event === 'your-turn' || event === 'check') this.flashTitle(true);
+  }
+
+  /**
+   * Put the turn in the tab's title, and take it out again when it is seen.
+   *
+   * Costs nothing and works everywhere, including the browsers that throttle a
+   * background tab hard enough to delay the sound. It is also the only part of
+   * this that survives the tab being muted.
+   */
+  private flashTitle(on: boolean): void {
+    if (!this.baseTitle) this.baseTitle = this.doc.title || 'X Chess';
+    if (on && this.doc.visibilityState === 'hidden') {
+      this.flashing = true;
+      this.doc.title = `(your turn) ${this.baseTitle}`;
+    } else if (!on && this.flashing) {
+      this.flashing = false;
+      this.doc.title = this.baseTitle;
+    }
   }
 
   get replayState(): ReplayState | null {
@@ -1080,6 +1272,7 @@ export class ChessApp {
       onSquare: (square) => this.onSquare(square)
     });
 
+    this.drawArrows(state);
     this.drawStatus(state);
     this.drawRules();
     this.drawMoves(state);
@@ -1305,6 +1498,64 @@ export class ChessApp {
     }
   }
 
+  /**
+   * A line from where each pending move started to where it is going.
+   *
+   * Drawn over the grid rather than inside it, because a mark that lived in a
+   * square would be clipped by that square. The board is eight units wide in
+   * the overlay's own coordinates, so a square is one unit and its centre is
+   * half a unit in - no pixel measuring, and it survives any board size.
+   *
+   * This is the cue that makes a pending move readable at a glance. The ghost
+   * says a piece is arriving; the line says where from.
+   */
+  private drawArrows(state: ReplayState): void {
+    const svg = this.el.arrows;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    void state;
+
+    const files = 'abcdefgh';
+    const centre = (square: string): { x: number; y: number } | null => {
+      const file = files.indexOf(square[0]);
+      const rank = Number(square[1]);
+      if (file < 0 || !rank) return null;
+      // The board is drawn from Black's side when flipped, and the overlay has
+      // to agree with it or every arrow points at the wrong square.
+      const x = this.flipped ? 7 - file : file;
+      const y = this.flipped ? rank - 1 : 8 - rank;
+      return { x: x + 0.5, y: y + 0.5 };
+    };
+
+    const signing = this.intent?.state === 'signing' ? `${this.intent.from}${this.intent.to}` : null;
+
+    for (const move of this.pendingMoves()) {
+      // One line per move, and for a castle that means the king only: two
+      // crossing arrows say less than one.
+      const from = centre(move.from);
+      const to = centre(move.to);
+      if (!from || !to) continue;
+      const isSigning = signing === `${move.from}${move.to}`;
+
+      const line = this.doc.createElementNS(SVG_NS, 'line');
+      line.setAttribute('x1', String(from.x));
+      line.setAttribute('y1', String(from.y));
+      line.setAttribute('x2', String(to.x));
+      line.setAttribute('y2', String(to.y));
+      line.setAttribute('class', isSigning ? 'ar--signing' : 'ar--sent');
+      // Scaled by the viewBox, so the stroke has to be given in those units.
+      line.setAttribute('vector-effect', 'non-scaling-stroke');
+      svg.appendChild(line);
+
+      const dot = this.doc.createElementNS(SVG_NS, 'circle');
+      dot.setAttribute('cx', String(from.x));
+      dot.setAttribute('cy', String(from.y));
+      dot.setAttribute('r', '0.09');
+      dot.setAttribute('fill', 'currentColor');
+      dot.setAttribute('class', isSigning ? 'ar--signing' : 'ar--sent');
+      svg.appendChild(dot);
+    }
+  }
+
   private drawStatus(state: ReplayState): void {
     if (state.status === 'over') {
       const who =
@@ -1436,9 +1687,10 @@ export class ChessApp {
       li.appendChild(span('mv-num', number ? `${number}.` : ''));
 
       if (isMove) {
-        const colour = record.color === 'white' ? WHITE : 1;
+        // The same glyph the board uses, so a move in the list and the piece
+        // that made it cannot look like different pieces.
         li.appendChild(
-          span(`mv-glyph mv-glyph--${record.color}`, pieceGlyph(record.piece, colour as never))
+          span(`mv-glyph pc pc--${record.color}`, pieceGlyph(record.piece as never))
         );
       } else {
         li.appendChild(span('mv-glyph', accepted ? '\u2691' : '\u00b7'));
@@ -1603,6 +1855,7 @@ export class ChessApp {
 
     if (this.selected === null) {
       this.selected = square;
+      this.sound.play('select');
       this.drawGame();
       return;
     }
@@ -1614,7 +1867,10 @@ export class ChessApp {
 
     const reachable = destinationsFrom(state.legalMoves, this.selected);
     if (!reachable.has(square)) {
+      // Not an illegal move - the board disables squares that cannot be played,
+      // so this is somebody changing their mind about which piece to pick up.
       this.selected = square;
+      this.sound.play('select');
       this.drawGame();
       return;
     }
@@ -1733,6 +1989,7 @@ export class ChessApp {
       const verdict = await this.judgeFresh(game, value);
       if (verdict.tier === 'no') {
         this.notice('chainNotice', 'warn', verdict.say);
+        this.sound.play('refused');
         return;
       }
       if (verdict.tier === 'warn') {
@@ -1774,6 +2031,10 @@ export class ChessApp {
       // only moment the cached sponsorship can have gone stale.
       this.forgetSponsorship();
       this.pollSoon();
+      // Broadcast, not confirmed. A separate sound from the one that plays when
+      // it lands, because they are separate facts and the gap between them is
+      // the thing this board spends most of its effort explaining.
+      this.sound.play('sent');
       this.notice(
         'chainNotice',
         'good',
@@ -1839,54 +2100,193 @@ export class ChessApp {
   // Explore, leaderboard, profile
   // ------------------------------------------------------------------
 
+  /**
+   * Read the whole game again and say what it derived.
+   *
+   * It used to call reload() and nothing else. The board redrew to exactly what
+   * it already showed, which is the correct outcome and looks identical to a
+   * button that does not work - and this is the one control whose entire job is
+   * to be convincing. A verification that reports nothing has, from the other
+   * side of the screen, verified nothing.
+   */
+  private async reverify(): Promise<void> {
+    if (this.gameId === null) return;
+    const game = this.gameId;
+    const before = this.state;
+
+    await this.guard(`re-deriving game ${game}`, async () => {
+      const entries = await this.chain.getAllEntries(game);
+      const row = await this.chain.getGame(game);
+      if (!row) return false;
+      this.game = row;
+      this.entries = entries;
+      this.lastReadAt = Date.now();
+      this.adoptRules();
+      this.derive();
+      this.drawGame();
+
+      const now = this.state;
+      if (!now) return false;
+
+      const agreed =
+        before === null ||
+        (before.fen === now.fen &&
+          before.result === now.result &&
+          before.accepted.length === now.accepted.length);
+
+      this.notice(
+        'chainNotice',
+        agreed ? 'good' : 'warn',
+        agreed
+          ? `Re-derived game ${game} from ${entries.length} submission` +
+            `${entries.length === 1 ? '' : 's'} read fresh from the chain, and got the same ` +
+            `answer.\n\n${now.accepted.length} counted, ${now.rejected.length} skipped. ` +
+            `${now.status === 'over' ? `Result ${now.result} by ${now.termination}.` : `${now.turn} to move.`}` +
+            `\n\nPosition ${now.fen}\n\nNothing here was stored. Every board that reads this ` +
+            'log reaches the same position by doing the same work.'
+          : `Re-deriving game ${game} produced a DIFFERENT answer from what was on screen. ` +
+            'That should be impossible from the same log, so either the log grew while you were ' +
+            'looking or this board has a bug worth reporting.'
+      );
+      return true;
+    });
+  }
+
+  /**
+   * The game list, and what somebody scanning it wants to know.
+   *
+   * It used to say who OPENED each game, how many entries it had, and whether
+   * it was ranked. None of those is the question. The questions are who is
+   * playing, under what rules, and whether it is still a game - and the opener
+   * is often neither player, so the one name shown was frequently nobody's.
+   *
+   * Every row is replayed, which costs one read each. That is why it happens
+   * when somebody asks for the list and never on a poll: the same spend on a
+   * timer is what starved the wallet and stopped a move being broadcast.
+   */
   private async loadExplore(): Promise<void> {
     await this.guard('reading the game list', async () => {
       const count = await this.chain.getGameCount();
       this.text('exploreCount', `${count} game${count === 1 ? '' : 's'} on this contract`);
       this.notice('chainNotice', 'info', `Reading ${this.chain.contractId}.`);
 
-      const rows = this.el.exploreRows;
-      rows.replaceChildren();
       // Newest first, and bounded: an unbounded walk on a busy contract would
       // make the first paint arbitrarily slow.
       const first = Math.max(1, count - 24);
+      const found: ExploreRow[] = [];
+
       for (let id = count; id >= first; id--) {
         const game = await this.chain.getGame(id);
         if (!game) continue;
-        const tr = this.doc.createElement('tr');
-        const cells = [
-          String(game.id),
-          game.openedBy,
-          String(game.nextSeq),
-          game.ranked ? 'ranked' : 'casual'
-        ];
-        for (const value of cells) {
-          const td = this.doc.createElement('td');
-          if (value === game.openedBy) td.appendChild(this.addressNode(game.openedBy));
-          else td.textContent = value;
-          tr.appendChild(td);
+
+        const row: ExploreRow = {
+          id: game.id,
+          ranked: game.ranked,
+          entries: game.nextSeq,
+          white: null,
+          black: null,
+          confirmed: false,
+          state: game.nextSeq === 0 ? 'not started' : 'live'
+        };
+
+        if (game.nextSeq > 0) {
+          try {
+            const entries = await this.chain.getAllEntries(id);
+            const rules = recoverRules({
+              rulesHash: game.rulesHash,
+              openedBy: game.openedBy,
+              ranked: game.ranked,
+              senders: entries.map((e) => e.sender),
+              viewer: this.address,
+              candidates: [knownRules(game.rulesHash)].filter((r): r is Rules => r !== null)
+            });
+            const state = replay(
+              entries.map((e) => ({ mv: e.value, sender: e.sender, seq: e.seq, height: e.height })),
+              { rules: rules.rules }
+            );
+            row.white = rules.rules.white;
+            row.black = rules.rules.black;
+            row.confirmed = rules.confirmed;
+            row.state =
+              state.status === 'over'
+                ? `${state.result} ${state.termination}`
+                : `${state.turn} to move`;
+          } catch {
+            // A row that will not replay is still a row. Saying less about it
+            // beats dropping the game out of the list.
+          }
         }
-        const actions = this.doc.createElement('td');
-        const open = this.doc.createElement('button');
-        open.type = 'button';
-        open.className = 'action';
-        open.textContent = 'Open';
-        open.addEventListener('click', () => void this.load(game.id));
-        actions.appendChild(open);
-        tr.appendChild(actions);
-        rows.appendChild(tr);
+        found.push(row);
       }
+
+      this.exploreRows = found;
+      this.drawExplore();
+
+      // Names for everyone on the list, in one go, then draw again if it
+      // learned anything. No further chain reads.
+      const players = found.flatMap((r) => [r.white, r.black]).filter((p): p is string => !!p);
+      if (await (this.names?.resolveAll(players) ?? Promise.resolve(false))) this.drawExplore();
       return true;
     });
   }
 
-  /**
-   * The leaderboard, derived from the chain and nothing else.
-   *
-   * Every ranked game is fetched, replayed, checked for eligibility, and fed to
-   * elo-v1 in canonical order. There is no leaderboard service and no index that
-   * has to be believed.
-   */
+  private drawExplore(): void {
+    const rows = this.el.exploreRows;
+    rows.replaceChildren();
+
+    for (const row of this.exploreRows) {
+      const tr = this.doc.createElement('tr');
+      const cell = (node: Node): void => {
+        const td = this.doc.createElement('td');
+        td.appendChild(node);
+        tr.appendChild(td);
+      };
+      const text = (value: string, className = ''): HTMLElement => {
+        const span = this.doc.createElement('span');
+        if (className) span.className = className;
+        span.textContent = value;
+        return span;
+      };
+
+      cell(text(String(row.id)));
+
+      // Who is PLAYING, which is not who opened it: on a sponsored or
+      // third-party game the opener is often neither player.
+      const players = this.doc.createElement('span');
+      if (row.white && row.black) {
+        players.appendChild(this.addressNode(row.white));
+        players.appendChild(text(' v ', 'muted'));
+        players.appendChild(this.addressNode(row.black));
+      } else {
+        players.appendChild(text(row.entries === 0 ? 'not yet known' : 'anyone', 'muted'));
+      }
+      cell(players);
+
+      // Ranked is the rule that changes what a game is FOR. Unconfirmed is
+      // worth saying too: it means no board can referee it yet.
+      const rules = this.doc.createElement('span');
+      rules.appendChild(text(row.ranked ? 'ranked' : 'casual'));
+      if (row.entries > 0 && !row.confirmed) {
+        rules.appendChild(text(' \u00b7 rules unconfirmed', 'muted'));
+      }
+      cell(rules);
+
+      cell(text(String(row.entries)));
+      cell(text(row.state));
+
+      const open = this.doc.createElement('button');
+      open.className = 'action';
+      open.textContent = 'Open';
+      open.addEventListener('click', () => {
+        this.show('game');
+        void this.load(row.id);
+      });
+      cell(open);
+
+      rows.appendChild(tr);
+    }
+  }
+
   async loadLeaderboard(): Promise<void> {
     await this.guard('computing ratings', async () => {
       const count = await this.chain.getRankedCount();
@@ -1902,7 +2302,7 @@ export class ChessApp {
         const entries = await this.chain.getAllEntries(id);
         const state = replay(
           entries.map((e) => ({ mv: e.value, sender: e.sender, seq: e.seq, height: e.height })),
-          { rules: this.rulesForRanked(row) }
+          { rules: this.rulesForRanked(row, entries) }
         );
         const check = checkEligibility(row, state.rules, state);
         if (!check.eligible || state.result === null) {
@@ -1964,9 +2364,30 @@ export class ChessApp {
    * two principals, which the game row does not carry - so this reads them from
    * whatever the log's participants are and lets the hash confirm or refuse.
    */
-  private rulesForRanked(row: GameRow): Rules {
-    void row;
-    return { ...DEFAULT_RULES, ranked: true };
+  /**
+   * The rules a ranked game actually committed to.
+   *
+   * It used to ignore the game and return an open board with `ranked: true`.
+   * That can never hash to the commitment of a game naming two players, so
+   * `checkEligibility` refused every real ranked game and the leaderboard read
+   * "0 verified ranked games, with 2 candidates failing verification" - about
+   * two finished games that were perfectly eligible.
+   *
+   * It is the same recovery the board does, so a game that is refereed on
+   * screen is a game that can be rated. Anything still unrecoverable falls back
+   * to the open board and is refused by eligibility, which is correct: a rating
+   * must never rest on rules nobody can check.
+   */
+  private rulesForRanked(row: GameRow, entries: readonly EntryRow[]): Rules {
+    const found = recoverRules({
+      rulesHash: row.rulesHash,
+      openedBy: row.openedBy,
+      ranked: row.ranked,
+      senders: entries.map((e) => e.sender),
+      viewer: this.address,
+      candidates: [knownRules(row.rulesHash)].filter((r): r is Rules => r !== null)
+    });
+    return found.confirmed ? found.rules : { ...DEFAULT_RULES, ranked: true };
   }
 
   private async loadProfile(): Promise<void> {

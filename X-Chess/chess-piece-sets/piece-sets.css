@@ -1,0 +1,71 @@
+/* chess-piece-sets — the colour half of the library.
+ *
+ * The geometry never names a colour. It names a class, the class reads a
+ * variable, and the variable is set by `.xcp--white` / `.xcp--black`. That is
+ * what lets one set of paths be both armies, and it is what lets you retheme a
+ * board (wooden, high-contrast, dark mode) without touching the artwork.
+ *
+ * --xcp-detail is the one worth understanding: it is the colour of anything
+ * knocked OUT of a piece - a bishop's slit, a knight's eye, the flutes on the
+ * deco column. It is dark on a white piece and light on a black piece, so the
+ * detail survives the flip instead of vanishing into the fill. Get this wrong
+ * and every black piece silently loses its face.
+ */
+
+.xcp {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Without this a stroked edge is clipped at the viewBox and every piece
+     comes out with one shaved side. */
+  overflow: visible;
+}
+
+/* EVERYTHING BELOW IS SET ON THE HOST <svg>, NEVER ON THE SHAPES.
+ *
+ * `fill` and `stroke` are inherited SVG properties and `--xcp-*` are custom
+ * properties, so all of them flow down into the content of a `<use>`. A rule
+ * targeting the shapes themselves (`.xcp .xb { fill: … }`) would look right
+ * and do nothing, because selectors do not cross a shadow boundary. */
+
+.xcp--white {
+  fill: #f6f4ef;
+  stroke: #241c12;
+  --xcp-detail: #241c12;
+  --xcp-spec: #ffffff;
+}
+
+.xcp--black {
+  fill: #191512;
+  stroke: #0d0b09;
+  --xcp-detail: #f2ede3;
+  --xcp-spec: #8e8478;
+}
+
+/* On a dark board a black piece needs a light rim or it dissolves into the
+   dark squares. Opt in with `.xcp-board--dark` on any ancestor. */
+.xcp-board--dark .xcp--black {
+  stroke: rgba(255, 255, 255, .34);
+}
+
+/* The sprite sheet is markup, not picture: keep it out of the layout. */
+.xcp-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+/* A piece that has been moved but not yet committed. Hollow rather than
+   faded, because a translucent piece reads as a dim piece while an outline
+   reads as a piece that is not there yet.
+
+   Note how the details are dropped: not `display: none` on `.xd`, which could
+   not reach them, but by handing the shapes a transparent colour to paint
+   themselves with. Everything here is inherited, so it works through `<use>`. */
+.xcp--ghost {
+  fill: none;
+  stroke-dasharray: 3 2.2;
+  --xcp-detail: transparent;
+  --xcp-spec: transparent;
+}

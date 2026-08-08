@@ -1,3 +1,5 @@
+import { SCALE_CSS } from './pieces.js';
+
 // The markup and the styling, as strings.
 //
 // Strings rather than a template library, because the inscription carries every
@@ -104,25 +106,86 @@ code, .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
   animation: alarm 1.4s ease-in-out infinite;
 }
 @keyframes alarm { 0%,100% { filter: none; } 50% { filter: brightness(1.35); } }
-.pc--white { color: #fbf7f0; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
-.pc--black { color: #14110e; text-shadow: 0 1px 1px rgba(255,255,255,.25); }
+/* The pieces.
+   BOTH colours use the FILLED glyphs (U+265A-265F) and colour tells them apart.
+   The outline block was nominally "white" and has a transparent interior, so
+   white could never be solid however it was coloured - and the two blocks have
+   different metrics, served from different fonts on some systems, so the two
+   sides disagreed about size. One set of six glyphs removes both problems. */
+.pc {
+  line-height: 1;
+  /* Solid, with an edge drawn BEHIND the fill so it defines the shape without
+     eating into it. paint-order is what makes a stroke usable on text at all. */
+  paint-order: stroke fill;
+}
+.pc--white {
+  color: #ffffff;
+  -webkit-text-stroke: 0.055em #241c12;
+  /* For anything without text-stroke: a ring of shadows is cruder but keeps a
+     white piece legible on a light square, which is the case that fails. */
+  text-shadow: 0 0 2px rgba(20, 17, 14, .55);
+}
+.pc--black {
+  color: #17130f;
+  -webkit-text-stroke: 0.05em rgba(255, 255, 255, .30);
+  text-shadow: 0 0 2px rgba(255, 255, 255, .18);
+}
+@supports (-webkit-text-stroke: 1px black) {
+  .pc--white, .pc--black { text-shadow: none; }
+}
 
-/* A move that is broadcast but not in a block. */
-.pc--ghost { position: absolute; opacity: .42; animation: breathe 1.8s ease-in-out infinite; }
-/* The square the piece left. It is empty, and a faint ring says why. */
+/* Optical scale.
+   Within one glyph set the proportions are the font designer's, not chess's: a
+   pawn fills its em box while a bishop has headroom, so at one size the pawn
+   reads LARGER than the bishop. These are ratios of the square's own size, so
+   they hold at any board size and in any font. Generated from SCALE in
+   pieces.ts, which is the only place the numbers live. */
+${SCALE_CSS}
+
+/* A move that has been chosen but has not landed.
+   HOLLOW rather than faded: a translucent piece reads as a dim piece, an
+   outline reads as a piece that is not there yet. The two states are told apart
+   by COLOUR rather than animation speed, which nobody perceives - amber is
+   waiting on your wallet, green has been broadcast and is out of your hands.
+   The status line says the same thing in words. */
+.pc--ghost {
+  position: absolute;
+  color: transparent;
+  text-shadow: none;
+  animation: trace 1.9s ease-in-out infinite;
+}
+.pc--signing { -webkit-text-stroke: 0.055em var(--gold); }
+.pc--sent { -webkit-text-stroke: 0.055em var(--good); }
+/* Without text-stroke a hollow glyph is invisible, so those browsers get a
+   translucent solid instead - worse, and still legible. */
+@supports not (-webkit-text-stroke: 1px black) {
+  .pc--ghost { opacity: .45; }
+  .pc--signing { color: var(--gold); }
+  .pc--sent { color: var(--good); }
+}
+@keyframes trace { 0%,100% { opacity: .6; } 50% { opacity: 1; } }
+
+/* The square the piece left. Empty, with a faint ring saying why. */
 .sq--vacated::before {
   content: ''; position: absolute; inset: 22%; border-radius: 50%;
   border: 2px dashed rgba(216, 162, 74, 0.4);
 }
 .sq--pending { outline: 2px dashed var(--gold); outline-offset: -2px; }
-/* A wallet is open for this move. Not the same as broadcast, and it should not
-   look the same: one has been sent and one has not. */
 .sq--signing { outline: 3px solid var(--gold); outline-offset: -3px;
                background-image: linear-gradient(rgba(216,162,74,.16), rgba(216,162,74,.16)); }
-.pc--signing { animation-duration: .9s; }
-@keyframes breathe { 0%,100% { opacity: .30; } 50% { opacity: .58; } }
+
+/* Origin to destination, drawn over the grid.
+   The one cue that makes a pending move readable without hunting for the ring
+   it came from. */
+.board-wrap { position: relative; }
+.arrows { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+.arrows line { stroke-width: 1.6; stroke-linecap: round; opacity: .85; }
+.arrows .ar--signing { stroke: var(--gold); stroke-dasharray: 4 3; }
+.arrows .ar--sent { stroke: var(--good); }
+.arrows circle { opacity: .85; }
+
 @media (prefers-reduced-motion: reduce) {
-  .pc--ghost, .sq--check { animation: none; }
+  .pc--ghost path, .sq--check { animation: none; }
 }
 
 /* The submissions list. */
@@ -138,8 +201,7 @@ code, .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
 .list li.mv--pending { opacity: .75; border-left: 2px solid var(--gold); }
 .mv-num { color: var(--dim); font-size: 11px; font-variant-numeric: tabular-nums; }
 .mv-glyph { font-size: 17px; line-height: 1; }
-.mv-glyph--white { color: #fbf7f0; }
-.mv-glyph--black { color: #cfc6b8; }
+
 .mv-san { font-weight: 600; }
 .mv-piece { color: var(--dim); font-size: 12px; margin-left: 6px; }
 .mv-clock { color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; margin-left: 6px; }
@@ -186,6 +248,26 @@ th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line
 th { color: var(--dim); font-weight: 600; font-size: 12px; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 
+/* The sound panel. One row per entry in the voice table, generated, so the
+   controls cannot fall behind the library. Every modifier is prefixed with its
+   block - see the rule at the top of this file, which a bare .name or .gain
+   here would break for the whole application. */
+.snd {
+  display: grid; grid-template-columns: minmax(0, 1fr) 90px auto; gap: 8px;
+  align-items: center; padding: 7px 0; border-bottom: 1px solid var(--line);
+}
+.snd:last-child { border-bottom: 0; }
+.snd-name { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ink); font-size: 13px; }
+/* Under the row rather than beside it. What a sound MEANS is the thing a person
+   needs when deciding whether to keep it, and a tooltip does not exist on
+   touch, which is where most of these will be heard. */
+.snd-say { grid-column: 1 / -1; margin: -3px 0 0; }
+.snd-gain { width: 100%; accent-color: var(--gold); }
+.snd-test { padding: 4px 12px; min-height: 34px; font-size: 12px; }
+/* Dimmed, never hidden. A panel that empties itself when the master switch is
+   off says the feature went away rather than that it is switched off. */
+.snd-list--off { opacity: .45; }
+
 .muted { color: var(--dim); }
 .small { font-size: 12px; }
 .addr { font-family: ui-monospace, monospace; font-size: 12px; color: var(--dim); }
@@ -215,6 +297,11 @@ export const HTML = `
       <button class="tab" id="tab-profile" role="tab" aria-selected="false">Profile</button>
     </nav>
     <div class="row">
+      <!-- The master switch lives up here, not only in the panel, because the
+           one thing somebody wants at speed is silence - and the panel is on a
+           tab they may not be looking at. -->
+      <button class="action" id="sound-toggle" aria-pressed="true"
+              title="Every sound on this board, on or off">Sound on</button>
       <button class="action" id="connect">Connect</button>
       <button class="action hide" id="disconnect">Disconnect</button>
     </div>
@@ -268,7 +355,13 @@ export const HTML = `
           <button class="action" id="flip">Flip</button>
           <button class="action" id="refresh">Refresh</button>
         </div>
-        <div id="board" class="board"></div>
+        <div class="board-wrap">
+          <div id="board" class="board"></div>
+          <!-- Drawn over the grid, not in it: an arrow that lived inside a
+               square would be clipped by it. -->
+          <svg id="arrows" class="arrows" viewBox="0 0 8 8" preserveAspectRatio="none"
+               aria-hidden="true" focusable="false"></svg>
+        </div>
         <div id="status" class="notice notice--info"></div>
         <div id="move-hint" class="small muted"></div>
         <div id="promotion" class="notice notice--loud hide"></div>
@@ -341,6 +434,30 @@ export const HTML = `
         <div id="verify" class="small muted">Every position here is derived from the log.</div>
         <div class="row"><button class="action" id="verify-game">Re-derive from chain</button></div>
       </div>
+      <!-- Sound. The rows are generated from the voice table; only the master
+           controls are written out here. -->
+      <div class="panel">
+        <div class="row">
+          <h2 style="margin:0">Sound</h2>
+          <span class="spacer"></span>
+          <button class="action" id="sound-reset">Reset</button>
+        </div>
+        <div class="row">
+          <label for="sound-master" style="margin:0">
+            <input type="checkbox" id="sound-master"> All sounds
+          </label>
+          <span class="spacer"></span>
+          <input type="range" id="sound-volume" class="snd-gain" min="0" max="100" step="5"
+                 style="max-width:130px" aria-label="Overall volume">
+        </div>
+        <div class="row">
+          <label for="sound-background" style="margin:0">
+            <input type="checkbox" id="sound-background"> Keep listening while this tab is in the background
+          </label>
+        </div>
+        <div id="sound-note" class="small muted"></div>
+        <div id="sound-list"></div>
+      </div>
     </div>
   </section>
 
@@ -351,7 +468,7 @@ export const HTML = `
       <span id="explore-count" class="muted small"></span>
     </div>
     <table><thead><tr>
-      <th>#</th><th>Opened by</th><th>Entries</th><th>Kind</th><th></th>
+      <th>#</th><th>Players</th><th>Rules</th><th>Moves</th><th>State</th><th></th>
     </tr></thead><tbody id="explore-rows"></tbody></table>
   </section>
 

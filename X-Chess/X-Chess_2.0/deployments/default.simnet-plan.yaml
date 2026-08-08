@@ -4,31 +4,31 @@ network: simnet
 genesis:
   wallets:
   - name: deployer
-    address: ST24TAPDRCC262PD48WCN8YM48WDA72M4X05PJS7R
+    address: ST3K213BCGM6WC413ZFZX6WTPF0FRMMRS5640ZNQ1
     balance: '100000000000000'
     sbtc-balance: '1000000000'
   - name: wallet_1
-    address: ST1XQPKRWE0N1G9X9QD8WVH2ZKGNCCRM77NP9NDMQ
+    address: ST2W983QK1QKP75N0GGA1YKMQFRB83SHWBRF2GDXG
     balance: '100000000000000'
     sbtc-balance: '1000000000'
   - name: wallet_2
-    address: ST1YF45W0X28YFSDG2NM3VY3E5HMERV1YSVW6WZ3Q
+    address: STB02ZMGG9ERSDRBXWP2CQ6ZCSZHHXANMQ8ERQMS
     balance: '100000000000000'
     sbtc-balance: '1000000000'
   - name: wallet_3
-    address: ST1MPQD49XW7VPGDVXH0V037S4KSW1KAX8YJXAA6Q
+    address: ST2J1KC9TK2KPVX6RQ0CR8ZFFDF9K5HX7NC7H0858
     balance: '100000000000000'
     sbtc-balance: '1000000000'
   - name: wallet_4
-    address: ST1S1WTRD0BNA2QH31PQZECCBN74V6SC2TNR28C0E
+    address: STWQ0BD604B6QV5YVPYYWXMP6D11M8QYYCNXM89C
     balance: '100000000000000'
     sbtc-balance: '1000000000'
   - name: wallet_5
-    address: ST2CBSTCD4HZYK310GB0J57DNXAKTQKED0T4DF1G1
+    address: ST3KGEXW44VB44NKSG307VSBM8WYSVVJ963BQHRMB
     balance: '5000'
     sbtc-balance: '1000000000'
   - name: wallet_6
-    address: ST1X12A8PYG0H7SBYNZDF2PK8JXJYPGRSFQTEAJ0W
+    address: STSQA6NNXN3YX6BTV2MGYAQMMQZRBJW4XPSNK5KH
     balance: '0'
     sbtc-balance: '1000000000'
   contracts:
@@ -53,7 +53,7 @@ plan:
     transactions:
     - transaction-type: emulated-contract-publish
       contract-name: xchess-core-v1
-      emulated-sender: ST24TAPDRCC262PD48WCN8YM48WDA72M4X05PJS7R
+      emulated-sender: ST3K213BCGM6WC413ZFZX6WTPF0FRMMRS5640ZNQ1
       path: contracts/xchess-core-v1.clar
       clarity-version: 4
     epoch: '4.0'

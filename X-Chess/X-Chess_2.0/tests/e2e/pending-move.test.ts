@@ -256,11 +256,11 @@ describe('what a pending move does to the square it left', () => {
     expect(square('e2').classList.contains('sq--vacated')).toBe(true);
     expect(square('e4').querySelectorAll('.pc--ghost').length).toBe(1);
 
-    // One pawn glyph on the board, not two.
-    const pawns = [...dom.window.document.querySelectorAll('.pc--white')].filter(
-      (n) => n.textContent === '♙'
-    );
-    expect(pawns.length).toBe(7);
+    // Seven SOLID white pawns and one hollow one. The piece that is leaving is
+    // drawn once, at its destination, as a shape that is not there yet.
+    const pawns = [...dom.window.document.querySelectorAll('.pc--white.pc--p')];
+    expect(pawns.filter((n) => !n.classList.contains('pc--ghost')).length).toBe(7);
+    expect(pawns.filter((n) => n.classList.contains('pc--ghost')).length).toBe(1);
 
     release(true);
     await tick(30);

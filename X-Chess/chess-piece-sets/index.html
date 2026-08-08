@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chess piece sets</title>
+<link rel="stylesheet" href="piece-sets.css">
+<style>
+  :root {
+    --bg: #14110e; --panel: #1d1915; --edge: #302921;
+    --ink: #e8e0d2; --dim: #97897a; --gold: #c9a227;
+    --light-sq: #e8d7b5; --dark-sq: #9c7a4e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 28px 20px 60px;
+    background: var(--bg); color: var(--ink);
+    font: 14px/1.55 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header { max-width: 1180px; margin: 0 auto 26px; }
+  h1 { font-size: 21px; margin: 0 0 6px; letter-spacing: .01em; }
+  header p { margin: 0; color: var(--dim); max-width: 62ch; }
+  code { background: #0000004d; padding: 1px 5px; border-radius: 3px; font-size: 12.5px; }
+
+  .wrap { max-width: 1180px; margin: 0 auto; }
+
+  .board-row { display: flex; gap: 26px; flex-wrap: wrap; align-items: flex-start; margin: 0 0 34px; }
+  .board { width: 384px; max-width: 100%; aspect-ratio: 1; display: grid;
+           grid-template-columns: repeat(8, 1fr); border: 3px solid var(--edge); border-radius: 4px; overflow: hidden; }
+  .sq { position: relative; }
+  .sq.l { background: var(--light-sq); }
+  .sq.d { background: var(--dark-sq); }
+  .sq svg { position: absolute; inset: 6%; width: 88%; height: 88%; }
+
+  .picker { display: flex; flex-direction: column; gap: 6px; min-width: 250px; }
+  .picker button {
+    text-align: left; padding: 8px 11px; border-radius: 5px; cursor: pointer;
+    background: var(--panel); color: var(--ink); border: 1px solid var(--edge);
+    font: inherit; font-size: 13px;
+  }
+  .picker button:hover { border-color: #4a3f31; }
+  .picker button[aria-pressed="true"] { border-color: var(--gold); background: #2a2318; }
+  .picker b { font-weight: 600; }
+  .picker span { display: block; color: var(--dim); font-size: 11.5px; margin-top: 1px; }
+
+  .set { border: 1px solid var(--edge); border-radius: 7px; background: var(--panel); margin: 0 0 16px; overflow: hidden; }
+  .set > h2 { margin: 0; padding: 11px 15px; font-size: 14px; font-weight: 600;
+              border-bottom: 1px solid var(--edge); display: flex; gap: 10px; align-items: baseline; }
+  .set > h2 em { font-style: normal; color: var(--dim); font-weight: 400; font-size: 12px; }
+  .set > h2 .id { color: var(--gold); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  .rows { display: grid; grid-template-columns: repeat(6, 1fr); }
+  .cell { aspect-ratio: 1; display: grid; place-items: center; padding: 7%; }
+  .cell svg { width: 100%; height: 100%; }
+  .rows .cell:nth-child(-n+6) { background: var(--light-sq); }
+  .rows .cell:nth-child(n+7) { background: var(--dark-sq); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Chess piece sets</h1>
+  <p>Ten sets, six pieces each, all drawn to the same <code>0 0 45 45</code> box so they are
+     interchangeable. White on light squares, black on dark. Click a set to load it onto the board.</p>
+</header>
+
+<div class="wrap">
+  <div class="board-row">
+    <div class="board" id="board"></div>
+    <div class="picker" id="picker"></div>
+  </div>
+  <div id="gallery"></div>
+</div>
+
+<script src="piece-sets.iife.js"></script>
+<script>
+  const { SET_IDS, SETS, PIECE_KEYS, pieceSVG, spriteDefs, pieceUse } = window.ChessPieceSets;
+
+  /* ---- gallery: every piece of every set ---- */
+  document.getElementById('gallery').innerHTML = SET_IDS.map((id, i) => {
+    const s = SETS[id];
+    const row = (color) => PIECE_KEYS.map((k) =>
+      `<div class="cell">${pieceSVG(id, k, color)}</div>`).join('');
+    return `<section class="set">
+      <h2>${i + 1}. ${s.name} <span class="id">${id}</span> <em>${s.note}</em></h2>
+      <div class="rows">${row('white')}${row('black')}</div>
+    </section>`;
+  }).join('');
+
+  /* ---- board: one set at a time, via the sprite form ---- */
+  const START = [
+    'rnbqkbnr', 'pppppppp', '........', '........',
+    '........', '........', 'PPPPPPPP', 'RNBQKBNR'
+  ];
+  const boardEl = document.getElementById('board');
+  let defsEl = null;
+
+  function draw(id) {
+    if (defsEl) defsEl.remove();
+    defsEl = document.createElement('div');
+    defsEl.innerHTML = spriteDefs(id);
+    document.body.appendChild(defsEl);
+
+    boardEl.innerHTML = START.map((rank, r) =>
+      [...rank].map((ch, f) => {
+        const shade = (r + f) % 2 ? 'd' : 'l';
+        if (ch === '.') return `<div class="sq ${shade}"></div>`;
+        const color = ch === ch.toUpperCase() ? 'white' : 'black';
+        return `<div class="sq ${shade}">${pieceUse(id, ch.toLowerCase(), color)}</div>`;
+      }).join('')
+    ).join('');
+
+    for (const b of document.querySelectorAll('.picker button'))
+      b.setAttribute('aria-pressed', String(b.dataset.id === id));
+  }
+
+  document.getElementById('picker').innerHTML = SET_IDS.map((id, i) =>
+    `<button data-id="${id}"><b>${i + 1}. ${SETS[id].name}</b><span>${id}</span></button>`).join('');
+  document.getElementById('picker').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (b) draw(b.dataset.id);
+  });
+
+  draw(SET_IDS[1]);
+</script>
+</body>
+</html>

@@ -3,6 +3,7 @@
 // Each handler does two things and they are kept apart on purpose: it ACTS, and
 // then it READS BACK. A step is only ever marked done by the read.
 
+import { INSCRIBE_STEPS } from '../../packages/ui/gates.js';
 import { Canary } from '../../packages/ui/canary.js';
 import type { CanaryContext, StepHandler, StepResult } from '../../packages/ui/canary.js';
 import { LiveChain } from '../../packages/chain/client.js';
@@ -839,6 +840,31 @@ const handlers: Record<string, StepHandler> = {
     );
   },
 
+  /**
+   * The three things that only go wrong once the bytes are permanent.
+   *
+   * All of them are invisible in ordinary local development, and all of them
+   * have happened: a bundle that boots TWICE so every click signs two
+   * transactions and every move costs double; a page that reads and replays
+   * perfectly and cannot sign at all because there is no host bridge; and an
+   * API that is unreachable because the runtime rewrites HTML only, so a script
+   * that did not choose the proxy for itself burns the public rate limit from
+   * every viewer's address.
+   *
+   * Reported rather than measured, because the thing being tested is a page
+   * OTHER than this one. Run `npm run serve:runtime`, open the board on 4331,
+   * and say what happened - the wording asked for is specific so that a run
+   * that did not really happen is hard to describe.
+   */
+  rehearsal: manual(
+    'rehearsal-note',
+    /boot|once|sign|bridge|read|game/i,
+    'Serve the artefact with `npm run serve:runtime` and open it on :4331. Then say: whether ' +
+      'the version line appears ONCE or twice, whether a wallet could be connected, and which ' +
+      'game number you loaded from the chain. If the version line appears twice, STOP - every ' +
+      'move from that build would cost two transactions.'
+  ),
+
   topup: async (ctx) => {
     const c = requireChain();
     const game = Number(state.sponsoredGame);
@@ -1124,6 +1150,7 @@ const inputs = {
     { name: 'opponent', label: 'A wallet holding exactly zero STX', placeholder: 'SP...' }
   ],
   build: [{ name: 'manifest', label: 'dist/manifest.json' }],
+  rehearsal: [{ name: 'rehearsal-note', label: 'What the runtime harness did' }],
   matrix: [{ name: 'matrix-sign', label: 'The build hash written into MATRIX.md' }],
   'inscribe-canary': [{ name: 'canary-inscription', label: 'Canary inscription id' }],
   'canary-live': [{ name: 'canary-live-note', label: 'What the inscription did' }],
@@ -1140,9 +1167,15 @@ if (document.readyState === 'loading' && !document.body) {
 }
 
 function start(): void {
+  // Two tracks on one page. `?track=inscribe` runs the short sequence that
+  // gets one board on chain against a contract already proven; anything else
+  // runs the full launch gate. Same handlers either way - the difference is
+  // which questions get asked, not how they are answered.
+  const track = new URLSearchParams(location.search).get('track');
   new Canary({
     handlers,
     inputs,
+    steps: track === 'inscribe' ? INSCRIBE_STEPS : undefined,
     build: {
       version: CONFIG.version,
       built: CONFIG.built,

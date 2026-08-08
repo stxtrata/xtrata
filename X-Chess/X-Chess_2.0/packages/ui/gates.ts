@@ -17,7 +17,18 @@
 // This file is pure: no DOM, no wallet, no network. It is the part that can be
 // tested, and tests/gates proves the gating cannot be walked around.
 
-export type Phase = 'preflight' | 'contract' | 'configure' | 'exercise' | 'artefact' | 'production';
+export type Phase =
+  | 'preflight'
+  | 'contract'
+  | 'configure'
+  | 'exercise'
+  | 'artefact'
+  | 'production'
+  // The short track's own three, so its headings say what it is doing rather
+  // than borrowing names from a sequence it is not running.
+  | 'before'
+  | 'inscribe'
+  | 'after';
 
 export type StepState = 'waiting' | 'running' | 'ok' | 'failed' | 'skipped';
 
@@ -410,5 +421,116 @@ export const PHASE_TITLES: Record<Phase, string> = {
   configure: 'Configuration',
   exercise: 'Exercising it on chain',
   artefact: 'The artefact',
-  production: 'Production'
+  production: 'Production',
+  before: 'Rehearsal, before anything is permanent',
+  inscribe: 'The inscription',
+  after: 'The real thing'
 };
+
+/**
+ * The short track: get one board on chain, tonight.
+ *
+ * Not a reduced version of the launch sequence - a different question. STEPS
+ * above asks "is this safe to launch forever", which is the right question when
+ * the contract and the board are both being fixed in place at once. This asks
+ * "will these bytes work once inscribed", against a contract that is already
+ * deployed and proven.
+ *
+ * The difference matters because it decides what may be skipped. A board is
+ * REPLACEABLE: a bad inscription costs its fee and the next one supersedes it.
+ * A contract is not. So everything here is about the bytes, and nothing about
+ * the economics - those were settled on chain already.
+ *
+ * Three things make an inscription dead on arrival, all of them invisible in
+ * local development, and all three are what the rehearsal step exists to catch:
+ * the bundle booting TWICE so every click signs two transactions, the wallet
+ * bridge being absent so the page can read but never play, and the API being
+ * unreachable because the runtime's rewrite only touches HTML and the script
+ * has to choose the proxy itself.
+ */
+export const INSCRIBE_STEPS: StepDef[] = [
+  {
+    id: 'wallet',
+    phase: 'before',
+    title: 'Find a wallet, and say what kind of page this is',
+    why:
+      'Which providers are here, whether the Xtrata shim is installed, and whether there is a ' +
+      'host bridge. Without a bridge nothing can be signed, and it is better to know that now ' +
+      'than from the inscription.',
+    needs: [],
+    irreversible: false
+  },
+  {
+    id: 'account',
+    phase: 'before',
+    title: 'Connect, and check the account',
+    why: 'The address, its network, and that it can pay for the inscription that follows.',
+    needs: ['wallet'],
+    irreversible: false
+  },
+  {
+    id: 'deployed',
+    phase: 'before',
+    title: 'Read the contract these bytes are bound to',
+    why:
+      'The board names one contract forever. It must exist, on this network, and answer - a ' +
+      'board bound to a contract that is not there reads every game as missing, and no amount ' +
+      'of re-reading fixes an inscription.',
+    needs: ['account'],
+    irreversible: false
+  },
+  {
+    id: 'build',
+    phase: 'before',
+    title: 'Confirm the bytes about to be inscribed',
+    why:
+      'Paste dist/manifest.json. Its hash must match the file being inscribed and the contract ' +
+      'it names must be the one just read back. This is the last moment either can be changed.',
+    needs: ['deployed'],
+    irreversible: false
+  },
+  {
+    id: 'rehearsal',
+    phase: 'before',
+    title: 'Rehearse the artefact under the Xtrata runtime',
+    why:
+      'THE step that earns the money. Serve the exact bytes through the runtime emulator and ' +
+      'check the three things that are invisible until they are permanent: that it boots ONCE ' +
+      'and not twice, that a wallet bridge is reachable, and that it can read a real game. Run ' +
+      'npm run serve:runtime, open the board there, and report what happened.',
+    needs: ['build'],
+    irreversible: false
+  },
+  {
+    id: 'inscribe-canary',
+    phase: 'inscribe',
+    title: 'Inscribe the board',
+    why:
+      'Permanent, and done outside this page with your own Xtrata tooling. Paste the ' +
+      'inscription id back here. Everything before this was rehearsal; everything after is ' +
+      'checking the real thing.',
+    needs: ['rehearsal'],
+    irreversible: true
+  },
+  {
+    id: 'canary-live',
+    phase: 'after',
+    title: 'Open the inscription and check it is the build you inscribed',
+    why:
+      'Not the local build. It must boot once, self-report the version and hash from the ' +
+      'manifest above, and load a game from the chain. A board that reads is most of a board.',
+    needs: ['inscribe-canary'],
+    irreversible: false
+  },
+  {
+    id: 'launch-verified',
+    phase: 'after',
+    title: 'Play one real move FROM the inscription',
+    why:
+      'The acceptance test, and the only one that cannot be rehearsed. Sign a submission from ' +
+      'the inscribed page itself and watch it land in the log. Reading proves the bytes; this ' +
+      'proves the bridge.',
+    needs: ['canary-live'],
+    irreversible: true
+  }
+];

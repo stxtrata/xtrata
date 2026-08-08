@@ -70,6 +70,17 @@ export interface CanaryOptions {
   handlers: Record<string, StepHandler>;
   /** Extra text inputs a step needs, by step id. */
   inputs?: Record<string, { name: string; label: string; placeholder?: string }[]>;
+  /**
+   * Which steps to run. The full launch sequence unless told otherwise.
+   *
+   * A shorter track exists because the twenty-six step page answers a question
+   * nobody is asking any more. It was built for a one-shot production launch,
+   * where the board and the contract both had to be right forever. If boards
+   * ship as successive inscriptions, a bad one costs its fee and is replaced -
+   * so the gate before one only has to catch what would make it dead on
+   * arrival, against a contract that is already proven.
+   */
+  steps?: readonly StepDef[];
   document?: Document;
   /** Everything the build knows about itself. */
   build?: Record<string, unknown>;
@@ -133,13 +144,17 @@ export class Canary {
   private logNode!: HTMLElement;
 
   private readonly slot: string;
+  private readonly steps: readonly StepDef[];
 
   constructor(options: CanaryOptions) {
     this.options = options;
     this.doc = options.document ?? document;
     // Keyed by what this page is FOR. A run against a different contract or a
     // different network is a different run, and must not resume into this one.
-    this.slot = `xchess-gates:${String(options.build?.network)}:${String(options.build?.contract)}`;
+    this.steps = options.steps ?? STEPS;
+    // Keyed by the TRACK as well, so a short run and a full one do not resume
+    // into each other's state.
+    this.slot = `xchess-gates:${this.steps.length}:${String(options.build?.network)}:${String(options.build?.contract)}`;
     this.restore();
     this.context = {
       log: (level, message, detail) => this.log(level, message, detail),
@@ -400,7 +415,7 @@ export class Canary {
     this.root.replaceChildren();
     let phase: Phase | null = null;
 
-    for (const [index, step] of STEPS.entries()) {
+    for (const [index, step] of this.steps.entries()) {
       if (step.phase !== phase) {
         phase = step.phase;
         const heading = this.doc.createElement('div');
@@ -540,7 +555,7 @@ export class Canary {
       `build      ${JSON.stringify(this.options.build ?? {})}`,
       ''
     ];
-    for (const step of STEPS) {
+    for (const step of this.steps) {
       lines.push(`[${this.states[step.id].padEnd(7)}] ${step.title}`);
       if (this.details[step.id]) {
         for (const line of this.details[step.id].split('\n')) lines.push(`            ${line}`);
